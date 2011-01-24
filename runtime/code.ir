@@ -1,0 +1,3471 @@
+;;
+;; Copyright (c) 2011, Andrew Sorensen
+;; 
+;; All rights reserved
+;;
+;; Redistribution and use in source and binary forms, with or without 
+;; modification, are permitted provided that the following conditions are met:
+;; 
+;; 1. Redistributions of source code must retain the above copyright notice, 
+;;    this list of conditions and the following disclaimer.
+;; 
+;; 2. Redistributions in binary form must reproduce the above copyright notice,
+;;    this list of conditions and the following disclaimer in the documentation 
+;;    and/or other materials provided with the distribution.
+;; 
+;; Neither the name of the authors nor other contributors may be used to endorse
+;; or promote products derived from this software without specific prior written 
+;; permission.
+;; 
+;; 
+;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+;; ARE DISCLEXTD. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
+;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
+;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
+;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
+;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
+;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+;; POSSIBILITY OF SUCH DAMAGE.
+;; 
+;; 
+
+
+
+;; malloc zone structures
+%mzone = type <{i8*, i64, i64}>
+
+declare %mzone* @llvm_zone_create(i64) nounwind
+declare void @llvm_zone_destroy(%mzone*) nounwind
+declare i8* @llvm_zone_malloc(%mzone*, i64) nounwind
+
+declare i64 @next_prime(i64)
+
+;; alias for environment data
+%envt = type i8*
+
+@PI = global double 3.1415926535897932384626433832795028841971693993751058209749
+@TWOPI = global double 6.2831853071795864769252867665590057683943387987502116419498
+@E = global double 2.7182818284590452353602874713526624977572470936999595749669
+
+declare i8* @malloc(i64) nounwind
+declare void @free(i8*) nounwind
+
+;; math.h stuff
+declare i32 @rand()
+declare double @cos(double)
+declare double @tan(double)
+declare double @sin(double)
+declare double @cosh(double)
+declare double @tanh(double)
+declare double @sinh(double)
+declare double @acos(double)
+declare double @asin(double)
+declare double @atan(double)
+declare double @atan2(double, double)
+declare double @ceil(double)
+declare double @floor(double)
+declare double @exp(double)
+declare double @fmod(double,double)
+declare double @pow(double,double)
+declare double @log(double)
+declare double @log10(double)
+declare double @sqrt(double)
+declare double @fabs(double)
+
+declare float @cosf(float)
+declare float @tanf(float)
+declare float @sinf(float)
+declare float @coshf(float)
+declare float @tanhf(float)
+declare float @sinhf(float)
+declare float @acosf(float)
+declare float @asinf(float)
+declare float @atanf(float)
+declare float @atan2f(float, float)
+declare float @ceilf(float)
+declare float @floorf(float)
+declare float @expf(float)
+declare float @fmodf(float,float)
+declare float @powf(float,float)
+declare float @logf(float)
+declare float @log10f(float)
+declare float @sqrtf(float)
+declare float @fabsf(float)
+
+
+;; c99 math.h stuff
+declare double @acosh(double)
+declare double @asinh(double)
+declare double @atanh(double)
+declare double @cbrt(double)
+declare double @copysign(double,double)
+declare double @erf(double)
+declare double @erfc(double)
+declare double @exp2(double)
+declare double @expm1(double)
+declare double @fdim(double,double)
+declare double @fma(double,double,double)
+declare double @fmax(double,double)
+declare double @fmin(double,double)
+declare double @hypot(double,double)
+declare double @ilogb(double)
+declare double @lgamma(double)
+declare i64 @llrint(double)
+declare i64 @lrint(double)
+declare i32 @rint(double)
+declare i64 @llround(double)
+declare i32 @lround(double)
+declare double @log1p(double)
+declare double @log2(double)
+declare i32 @logb(double)
+declare double @nan(i8*)
+declare double @nearbyint(double)
+declare double @nextafter(double,double)
+declare double @nexttoward(double,double)
+declare double @remainder(double, double)
+declare double @remquo(double, double, i8*)
+declare double @round(double)
+declare double @scalbn(double,i32)
+declare double @tgamma(double)
+declare double @trunc(double)
+
+declare float @acoshf(float)
+declare float @asinhf(float)
+declare float @atanhf(float)
+declare float @cbrtf(float)
+declare float @copysignf(float,float)
+declare float @erff(float)
+declare float @erfcf(float)
+declare float @exp2f(float)
+declare float @expm1f(float)
+declare float @fdimf(float,float)
+declare float @fmaf(float,float,float)
+declare float @fmaxf(float,float)
+declare float @fminf(float,float)
+declare float @hypotf(float,float)
+declare float @ilogbf(float)
+declare float @lgammaf(float)
+declare i64 @llrintf(float)
+declare i64 @lrintf(float)
+declare i32 @rintf(float)
+declare i64 @llroundf(float)
+declare i32 @lroundf(float)
+declare float @log1pf(float)
+declare float @log2f(float)
+declare i32 @logbf(float)
+declare float @nanf(i8*)
+declare float @nearbyintf(float)
+declare float @nextafterf(float,float)
+declare float @nexttowardf(float,float)
+declare float @remainderf(float, float)
+declare float @remquof(float, float, i8*)
+declare float @roundf(float)
+declare float @scalbnf(float,i32)
+declare float @tgammaf(float)
+declare float @truncf(float)
+
+;; stdio.h stuff
+declare void @clearerr(i8*)
+declare i8* @ctermid(i8*)
+declare i32 @fclose(i8*)
+declare i8* @fdopen(i32,  i8*)
+declare i32 @feof(i8*)
+declare i32 @ferror(i8*)
+declare i32 @fflush(i8*)
+declare i32 @fgetc(i8*)
+declare i8* @fgets(i8*, i32, i8*)
+declare i32 @fileno(i8*)
+declare void @flockfile(i8*)
+declare i8* @fopen( i8*,  i8*)
+declare i32 @fputc(i32, i8*)
+declare i32 @fputs( i8*, i8*)
+declare i64 @fread(i8*, i64, i64, i8*)
+declare i8* @freopen( i8*,  i8*, i8*)
+declare i32 @fseek(i8*, i64, i32)
+declare i64 @ftell(i8*)
+declare i32 @ftrylockfile(i8*)
+declare void @funlockfile(i8*)
+declare i64 @fwrite( i8*, i64, i64, i8*)
+declare i32 @getc(i8*)
+declare i32 @getchar()
+declare i32 @getc_unlocked(i8*)
+declare i32 @getchar_unlocked()
+declare i8* @gets(i8*)
+declare i32 @getw(i8*)
+declare i32 @pclose(i8*)
+declare void @perror( i8*)
+declare i8* @popen( i8*,  i8*)
+declare i32 @putc(i32, i8*)
+declare i32 @putchar(i32)
+declare i32 @putc_unlocked(i32, i8*)
+declare i32 @putchar_unlocked(i32)
+declare i32 @puts( i8*)
+declare i32 @putw(i32, i8*)
+declare i32 @remove( i8*)
+declare i32 @rename( i8*,  i8*)
+declare void @rewind(i8*)
+declare void @setbuf(i8*, i8*)
+declare i32 @setvbuf(i8*, i8*, i32, i64)
+declare i8* @tempnam( i8*,  i8*)
+declare i8* @tmpfile()
+declare i8* @tmpnam(i8*)
+declare i32 @ungetc(i32, i8*)
+declare i32 @llvm_printf(i8*, ...) ; can't be standard printf because of variable args
+
+;; string stuff
+declare double @atof(i8*)
+declare i32 @atoi(i8*)
+declare i64 @atol(i8*)
+
+declare i8* @memccpy(i8*, i8*, i32, i64)
+declare i8* @memchr(i8*, i32, i64)
+declare i32 @memcmp(i8*, i8*, i64)
+declare i8* @memcpy(i8*, i8*, i64)
+declare i8* @memmove(i8*, i8*, i64)
+declare i8* @memset(i8*, i32, i64)
+declare i8* @strcat(i8*, i8*)
+declare i8* @strchr(i8*, i32)
+declare i32 @strcmp(i8*, i8*)
+declare i32 @strcoll(i8*, i8*)
+declare i8* @strcpy(i8*, i8*)
+declare i64 @strcspn(i8*, i8*)
+declare i8* @strdup(i8*)
+declare i8* @strerror(i32)
+declare i64 @strlen(i8*)
+declare i8* @strncat(i8*, i8*, i64)
+declare i32 @strncmp(i8*, i8*, i64)
+declare i8* @strncpy(i8*, i8*, i64)
+declare i8* @strpbrk(i8*, i8*)
+declare i8* @strrchr(i8*, i32)
+declare i64 @strspn(i8*, i8*)
+declare i8* @strstr(i8*, i8*)
+declare i8* @strtok(i8*, i8*)
+declare i8* @strtok_r(i8*, i8*, i8**)
+declare i64 @strxfrm(i8*, i8*, i64)
+
+;; glfw guff
+@GLFW_WINDOW = global i32 65537
+@GLFW_FULLSCREEN            = global i32 65538
+@GLFW_OPENED                = global i32 131073
+@GLFW_ACTIVE                = global i32 131074
+@GLFW_ICONIFIED             = global i32 131075
+@GLFW_ACCELERATED           = global i32 131076
+@GLFW_RED_BITS              = global i32 131077
+@GLFW_GREEN_BITS            = global i32 131078
+@GLFW_BLUE_BITS             = global i32 131079
+@GLFW_ALPHA_BITS            = global i32 131080
+@GLFW_DEPTH_BITS            = global i32 131081
+@GLFW_STENCIL_BITS          = global i32 131082
+@GLFW_REFRESH_RATE          = global i32 131083
+@GLFW_ACCUM_RED_BITS        = global i32 131084
+@GLFW_ACCUM_GREEN_BITS      = global i32 131085
+@GLFW_ACCUM_BLUE_BITS       = global i32 131086
+@GLFW_ACCUM_ALPHA_BITS      = global i32 131087
+@GLFW_AUX_BUFFERS           = global i32 131088
+@GLFW_STEREO                = global i32 131089
+@GLFW_WINDOW_NO_RESIZE      = global i32 131090
+@GLFW_FSAA_SAMPLES          = global i32 131091
+@GLFW_OPENGL_VERSION_MAJOR  = global i32 131092
+@GLFW_OPENGL_VERSION_MINOR  = global i32 131093
+@GLFW_OPENGL_FORWARD_COMPAT  = global i32 131094
+@GLFW_OPENGL_DEBUG_CONTEXT  = global i32 131095
+@GLFW_OPENGL_PROFILE        = global i32 131096
+@GLFW_OPENGL_CORE_PROFILE   = global i32 327681
+@GLFW_OPENGL_COMPAT_PROFILE  = global i32 327682
+@GLFW_MOUSE_CURSOR          = global i32 196609
+@GLFW_STICKY_KEYS           = global i32 196610
+@GLFW_STICKY_MOUSE_BUTTONS  = global i32 196611
+@GLFW_SYSTEM_KEYS           = global i32 196612
+@GLFW_KEY_REPEAT            = global i32 196613
+@GLFW_AUTO_POLL_EVENTS      = global i32 196614
+@GLFW_WAIT                  = global i32 262145
+@GLFW_NOWAIT                = global i32 262146
+@GLFW_PRESENT               = global i32 327681
+@GLFW_AXES                  = global i32 327682
+@GLFW_BUTTONS               = global i32 327683
+@GLFW_NO_RESCALE_BIT        = global i32 1
+@GLFW_ORIGIN_UL_BIT         = global i32 2
+@GLFW_BUILD_MIPMAPS_BIT     = global i32 4
+@GLFW_ALPHA_MAP_BIT         = global i32 8
+
+%struct.GLFWvidmode = type <{ i32, i32, i32, i32, i32 }>
+%struct.GLFWimage = type <{ i32, i32, i32, i32, i8* }>
+
+declare i32  @glfwInit()
+declare void @glfwTerminate()
+declare void @glfwGetVersion( i32*, i32*, i32* )
+declare i32  @glfwOpenWindow( i32 , i32 , i32 , i32 , i32 , i32 , i32 , i32 , i32  )
+declare void @glfwOpenWindowHint( i32 , i32  )
+declare void @glfwCloseWindow()
+declare void @glfwSetWindowTitle( i8* )
+declare void @glfwGetWindowSize( i32*, i32* )
+declare void @glfwSetWindowSize( i32 , i32  )
+declare void @glfwSetWindowPos( i32 , i32  )
+declare void @glfwIconifyWindow()
+declare void @glfwRestoreWindow()
+declare void @glfwSwapBuffers()
+declare void @glfwSwapInterval( i32  )
+declare i32  @glfwGetWindowParam( i32  )
+declare i32  @glfwGetVideoModes( %struct.GLFWvidmode*, i32  )
+declare void @glfwGetDesktopMode( %struct.GLFWvidmode* )
+declare void @glfwPollEvents()
+declare void @glfwWaitEvents()
+declare i32  @glfwGetKey( i32  )
+declare i32  @glfwGetMouseButton( i32  )
+declare void @glfwGetMousePos( i32*, i32* )
+declare void @glfwSetMousePos( i32 , i32  )
+declare i32  @glfwGetMouseWheel()
+declare void @glfwSetMouseWheel( i32  )
+declare i32 @glfwGetJoystickParam( i32 , i32  )
+declare i32 @glfwGetJoystickPos( i32 , float *, i32  )
+declare i32 @glfwGetJoystickButtons( i32 , i8*, i32  )
+;declare double @glfwGetTime()
+;declare void   @glfwSetTime( double  )
+;declare void   @glfwSleep( double  )
+declare i32   @glfwExtensionSupported( i8* )
+declare i8* @glfwGetProcAddress( i8* )
+declare void  @glfwGetGLVersion( i32*, i32*, i32* )
+declare i32  @glfwGetNumberOfProcessors()
+declare void @glfwEnable( i32  )
+declare void @glfwDisable( i32  )
+declare i32  @glfwReadImage( i8*, %struct.GLFWimage*, i32  )
+declare i32  @glfwReadMemoryImage( i8*, i64 , %struct.GLFWimage*, i32  )
+declare void @glfwFreeImage( %struct.GLFWimage* )
+declare i32  @glfwLoadTexture2D( i8*, i32  )
+declare i32  @glfwLoadMemoryTexture2D( i8*, i64 , i32  )
+declare i32  @glfwLoadTextureImage2D( %struct.GLFWimage*, i32  )
+
+
+;; vdsp guff
+%struct.DSPComplex = type <{ float, float }>
+%struct.DSPDoubleComplex = type <{ double, double }>
+%struct.DSPDoubleSplitComplex = type <{ double*, double* }>
+%struct.DSPSplitComplex = type <{ float*, float* }>
+
+declare void @vDSP_blkman_window(float*, i32, i32)
+declare void @vDSP_blkman_windowD(double*, i32, i32)
+declare void @vDSP_conv(float*, i32, float*, i32, float*, i32, i32, i32)
+declare void @vDSP_convD(double*, i32, double*, i32, double*, i32, i32, i32)
+declare i8* @vDSP_create_fftsetup(i32, i32)
+declare i8* @vDSP_create_fftsetupD(i32, i32)
+declare void @vDSP_ctoz(%struct.DSPComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_ctozD(%struct.DSPDoubleComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_deq22(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_deq22D(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_desamp(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_desampD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_destroy_fftsetup(i8*)
+declare void @vDSP_destroy_fftsetupD(i8*)
+declare void @vDSP_dotpr(float*, i32, float*, i32, float*, i32)
+declare void @vDSP_dotprD(double*, i32, double*, i32, double*, i32)
+declare void @vDSP_f3x3(float*, i32, i32, float*, float*)
+declare void @vDSP_f3x3D(double*, i32, i32, double*, double*)
+declare void @vDSP_f5x5(float*, i32, i32, float*, float*)
+declare void @vDSP_f5x5D(double*, i32, i32, double*, double*)
+declare void @vDSP_fft2d_zip(i8*, %struct.DSPSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fft2d_zipD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fft2d_zipt(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft2d_ziptD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft2d_zop(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fft2d_zopD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fft2d_zopt(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft2d_zoptD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft2d_zrip(i8*, %struct.DSPSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fft2d_zripD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fft2d_zript(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft2d_zriptD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft2d_zrop(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fft2d_zropD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fft2d_zropt(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft2d_zroptD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft3_zop(i8*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft3_zopD(i8*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft5_zop(i8*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft5_zopD(i8*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fftm_zip(i8*, %struct.DSPSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fftm_zipD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fftm_zipt(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fftm_ziptD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fftm_zop(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fftm_zopD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fftm_zopt(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fftm_zoptD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fftm_zrip(i8*, %struct.DSPSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fftm_zripD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fftm_zript(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fftm_zriptD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fftm_zrop(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fftm_zropD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32, i32)
+declare void @vDSP_fftm_zropt(i8*, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fftm_zroptD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zip(i8*, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zipD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zipt(i8*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_fft_ziptD(i8*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_fft_zop(i8*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zopD(i8*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zopt(i8*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_fft_zoptD(i8*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_fft_zrip(i8*, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zripD(i8*, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zript(i8*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_fft_zriptD(i8*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_fft_zrop(i8*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zropD(i8*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_fft_zropt(i8*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_fft_zroptD(i8*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_hamm_window(float*, i32, i32)
+declare void @vDSP_hamm_windowD(double*, i32, i32)
+declare void @vDSP_hann_window(float*, i32, i32)
+declare void @vDSP_hann_windowD(double*, i32, i32)
+declare void @vDSP_imgfir(float*, i32, i32, float*, float*, i32, i32)
+declare void @vDSP_imgfirD(double*, i32, i32, double*, double*, i32, i32)
+declare void @vDSP_maxmgv(float*, i32, float*, i32)
+declare void @vDSP_maxmgvD(double*, i32, double*, i32)
+declare void @vDSP_maxmgvi(float*, i32, float*, i32*, i32)
+declare void @vDSP_maxmgviD(double*, i32, double*, i32*, i32)
+declare void @vDSP_maxv(float*, i32, float*, i32)
+declare void @vDSP_maxvD(double*, i32, double*, i32)
+declare void @vDSP_maxvi(float*, i32, float*, i32*, i32)
+declare void @vDSP_maxviD(double*, i32, double*, i32*, i32)
+declare void @vDSP_meamgv(float*, i32, float*, i32)
+declare void @vDSP_meamgvD(double*, i32, double*, i32)
+declare void @vDSP_meanv(float*, i32, float*, i32)
+declare void @vDSP_meanvD(double*, i32, double*, i32)
+declare void @vDSP_measqv(float*, i32, float*, i32)
+declare void @vDSP_measqvD(double*, i32, double*, i32)
+declare void @vDSP_minmgv(float*, i32, float*, i32)
+declare void @vDSP_minmgvD(double*, i32, double*, i32)
+declare void @vDSP_minmgvi(float*, i32, float*, i32*, i32)
+declare void @vDSP_minmgviD(double*, i32, double*, i32*, i32)
+declare void @vDSP_minv(float*, i32, float*, i32)
+declare void @vDSP_minvD(double*, i32, double*, i32)
+declare void @vDSP_minvi(float*, i32, float*, i32*, i32)
+declare void @vDSP_minviD(double*, i32, double*, i32*, i32)
+declare void @vDSP_mmov(float*, float*, i32, i32, i32, i32)
+declare void @vDSP_mmovD(double*, double*, i32, i32, i32, i32)
+declare void @vDSP_mmul(float*, i32, float*, i32, float*, i32, i32, i32, i32)
+declare void @vDSP_mmulD(double*, i32, double*, i32, double*, i32, i32, i32, i32)
+declare void @vDSP_mtrans(float*, i32, float*, i32, i32, i32)
+declare void @vDSP_mtransD(double*, i32, double*, i32, i32, i32)
+declare void @vDSP_mvessq(float*, i32, float*, i32)
+declare void @vDSP_mvessqD(double*, i32, double*, i32)
+declare void @vDSP_nzcros(float*, i32, i32, i32*, i32*, i32)
+declare void @vDSP_nzcrosD(double*, i32, i32, i32*, i32*, i32)
+declare void @vDSP_polar(float*, i32, float*, i32, i32)
+declare void @vDSP_polarD(double*, i32, double*, i32, i32)
+declare void @vDSP_rect(float*, i32, float*, i32, i32)
+declare void @vDSP_rectD(double*, i32, double*, i32, i32)
+declare void @vDSP_rmsqv(float*, i32, float*, i32)
+declare void @vDSP_rmsqvD(double*, i32, double*, i32)
+declare void @vDSP_svdiv(float*, float*, i32, float*, i32, i32)
+declare void @vDSP_svdivD(double*, double*, i32, double*, i32, i32)
+declare void @vDSP_sve(float*, i32, float*, i32)
+declare void @vDSP_sveD(double*, i32, double*, i32)
+declare void @vDSP_svemg(float*, i32, float*, i32)
+declare void @vDSP_svemgD(double*, i32, double*, i32)
+declare void @vDSP_svesq(float*, i32, float*, i32)
+declare void @vDSP_svesqD(double*, i32, double*, i32)
+declare void @vDSP_svs(float*, i32, float*, i32)
+declare void @vDSP_svsD(double*, i32, double*, i32)
+declare void @vDSP_vaam(float*, i32, float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vaamD(double*, i32, double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vabs(float*, i32, float*, i32, i32)
+declare void @vDSP_vabsD(double*, i32, double*, i32, i32)
+declare void @vDSP_vabsi(i32*, i32, i32*, i32, i32)
+declare void @vDSP_vadd(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vaddD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vam(float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vamD(double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vasbm(float*, i32, float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vasbmD(double*, i32, double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vasm(float*, i32, float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vasmD(double*, i32, double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vavlin(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vavlinD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vclip(float*, i32, float*, float*, float*, i32, i32)
+declare void @vDSP_vclipc(float*, i32, float*, float*, float*, i32, i32, i32*, i32*)
+declare void @vDSP_vclipcD(double*, i32, double*, double*, double*, i32, i32, i32*, i32*)
+declare void @vDSP_vclipD(double*, i32, double*, double*, double*, i32, i32)
+declare void @vDSP_vclr(float*, i32, i32)
+declare void @vDSP_vclrD(double*, i32, i32)
+declare void @vDSP_vcmprs(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vcmprsD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vdbcon(float*, i32, float*, float*, i32, i32, i32)
+declare void @vDSP_vdbconD(double*, i32, double*, double*, i32, i32, i32)
+declare void @vDSP_vdist(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vdistD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vdiv(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vdivD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vdivi(i32*, i32, i32*, i32, i32*, i32, i32)
+declare void @vDSP_vdpsp(double*, i32, float*, i32, i32)
+declare void @vDSP_venvlp(float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_venvlpD(double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_veqvi(i32*, i32, i32*, i32, i32*, i32, i32)
+declare void @vDSP_vfill(float*, float*, i32, i32)
+declare void @vDSP_vfillD(double*, double*, i32, i32)
+declare void @vDSP_vfilli(i32*, i32*, i32, i32)
+declare void @vDSP_vfrac(float*, i32, float*, i32, i32)
+declare void @vDSP_vfracD(double*, i32, double*, i32, i32)
+declare void @vDSP_vgathr(float*, i32*, i32, float*, i32, i32)
+declare void @vDSP_vgathra(float**, i32, float*, i32, i32)
+declare void @vDSP_vgathraD(double**, i32, double*, i32, i32)
+declare void @vDSP_vgathrD(double*, i32*, i32, double*, i32, i32)
+declare void @vDSP_vgen(float*, float*, float*, i32, i32)
+declare void @vDSP_vgenD(double*, double*, double*, i32, i32)
+declare void @vDSP_vgenp(float*, i32, float*, i32, float*, i32, i32, i32)
+declare void @vDSP_vgenpD(double*, i32, double*, i32, double*, i32, i32, i32)
+declare void @vDSP_viclip(float*, i32, float*, float*, float*, i32, i32)
+declare void @vDSP_viclipD(double*, i32, double*, double*, double*, i32, i32)
+declare void @vDSP_vindex(float*, float*, i32, float*, i32, i32)
+declare void @vDSP_vindexD(double*, double*, i32, double*, i32, i32)
+declare void @vDSP_vintb(float*, i32, float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vintbD(double*, i32, double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vlim(float*, i32, float*, float*, float*, i32, i32)
+declare void @vDSP_vlimD(double*, i32, double*, double*, double*, i32, i32)
+declare void @vDSP_vlint(float*, float*, i32, float*, i32, i32, i32)
+declare void @vDSP_vlintD(double*, double*, i32, double*, i32, i32, i32)
+declare void @vDSP_vma(float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vmaD(double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vmax(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vmaxD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vmaxmg(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vmaxmgD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vmin(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vminD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vminmg(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vminmgD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vmma(float*, i32, float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vmmaD(double*, i32, double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vmmsb(float*, i32, float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vmmsbD(double*, i32, double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vmsa(float*, i32, float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vmsaD(double*, i32, double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vmsb(float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vmsbD(double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vmul(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vmulD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vnabs(float*, i32, float*, i32, i32)
+declare void @vDSP_vnabsD(double*, i32, double*, i32, i32)
+declare void @vDSP_vneg(float*, i32, float*, i32, i32)
+declare void @vDSP_vnegD(double*, i32, double*, i32, i32)
+declare void @vDSP_vpoly(float*, i32, float*, i32, float*, i32, i32, i32)
+declare void @vDSP_vpolyD(double*, i32, double*, i32, double*, i32, i32, i32)
+declare void @vDSP_vpythg(float*, i32, float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vpythgD(double*, i32, double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vqint(float*, float*, i32, float*, i32, i32, i32)
+declare void @vDSP_vqintD(double*, double*, i32, double*, i32, i32, i32)
+declare void @vDSP_vramp(float*, float*, float*, i32, i32)
+declare void @vDSP_vrampD(double*, double*, double*, i32, i32)
+declare void @vDSP_vrsum(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vrsumD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vrvrs(float*, i32, i32)
+declare void @vDSP_vrvrsD(double*, i32, i32)
+declare void @vDSP_vsadd(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vsaddD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vsaddi(i32*, i32, i32*, i32*, i32, i32)
+declare void @vDSP_vsbm(float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vsbmD(double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vsbsbm(float*, i32, float*, i32, float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vsbsbmD(double*, i32, double*, i32, double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vsbsm(float*, i32, float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vsbsmD(double*, i32, double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vsdiv(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vsdivD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vsdivi(i32*, i32, i32*, i32*, i32, i32)
+declare void @vDSP_vsimps(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vsimpsD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vsma(float*, i32, float*, float*, i32, float*, i32, i32)
+declare void @vDSP_vsmaD(double*, i32, double*, double*, i32, double*, i32, i32)
+declare void @vDSP_vsmsa(float*, i32, float*, float*, float*, i32, i32)
+declare void @vDSP_vsmsaD(double*, i32, double*, double*, double*, i32, i32)
+declare void @vDSP_vsmsb(float*, i32, float*, float*, i32, float*, i32, i32)
+declare void @vDSP_vsmsbD(double*, i32, double*, double*, i32, double*, i32, i32)
+declare void @vDSP_vsmul(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vsmulD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vsort(float*, i32, i32)
+declare void @vDSP_vsortD(double*, i32, i32)
+declare void @vDSP_vsorti(float*, i32*, i32*, i32, i32)
+declare void @vDSP_vsortiD(double*, i32*, i32*, i32, i32)
+declare void @vDSP_vspdp(float*, i32, double*, i32, i32)
+declare void @vDSP_vsq(float*, i32, float*, i32, i32)
+declare void @vDSP_vsqD(double*, i32, double*, i32, i32)
+declare void @vDSP_vssq(float*, i32, float*, i32, i32)
+declare void @vDSP_vssqD(double*, i32, double*, i32, i32)
+declare void @vDSP_vsub(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vsubD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vswap(float*, i32, float*, i32, i32)
+declare void @vDSP_vswapD(double*, i32, double*, i32, i32)
+declare void @vDSP_vswsum(float*, i32, float*, i32, i32, i32)
+declare void @vDSP_vswsumD(double*, i32, double*, i32, i32, i32)
+declare void @vDSP_vtabi(float*, i32, float*, float*, float*, i32, float*, i32, i32)
+declare void @vDSP_vtabiD(double*, i32, double*, double*, double*, i32, double*, i32, i32)
+declare void @vDSP_vthr(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vthrD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vthres(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vthresD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_vthrsc(float*, i32, float*, float*, float*, i32, i32)
+declare void @vDSP_vthrscD(double*, i32, double*, double*, double*, i32, i32)
+declare void @vDSP_vtmerg(float*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_vtmergD(double*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_vtrapz(float*, i32, float*, float*, i32, i32)
+declare void @vDSP_vtrapzD(double*, i32, double*, double*, i32, i32)
+declare void @vDSP_wiener(i32, float*, float*, float*, float*, i32, i32*)
+declare void @vDSP_wienerD(i32, double*, double*, double*, double*, i32, i32*)
+declare void @vDSP_zaspec(%struct.DSPSplitComplex*, float*, i32)
+declare void @vDSP_zaspecD(%struct.DSPDoubleSplitComplex*, double*, i32)
+declare void @vDSP_zcoher(float*, float*, %struct.DSPSplitComplex*, float*, i32)
+declare void @vDSP_zcoherD(double*, double*, %struct.DSPDoubleSplitComplex*, double*, i32)
+declare void @vDSP_zconv(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_zconvD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_zcspec(%struct.DSPSplitComplex*, %struct.DSPSplitComplex*, %struct.DSPSplitComplex*, i32)
+declare void @vDSP_zcspecD(%struct.DSPDoubleSplitComplex*, %struct.DSPDoubleSplitComplex*, %struct.DSPDoubleSplitComplex*, i32)
+declare void @vDSP_zdotpr(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32)
+declare void @vDSP_zdotprD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32)
+declare void @vDSP_zidotpr(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32)
+declare void @vDSP_zidotprD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32)
+declare void @vDSP_zmma(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32, i32)
+declare void @vDSP_zmmaD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32)
+declare void @vDSP_zmms(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32, i32)
+declare void @vDSP_zmmsD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32)
+declare void @vDSP_zmmul(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32, i32)
+declare void @vDSP_zmmulD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32)
+declare void @vDSP_zmsm(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32, i32)
+declare void @vDSP_zmsmD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32, i32)
+declare void @vDSP_zrdesamp(%struct.DSPSplitComplex*, i32, float*, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zrdesampD(%struct.DSPDoubleSplitComplex*, i32, double*, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zrdotpr(%struct.DSPSplitComplex*, i32, float*, i32, %struct.DSPSplitComplex*, i32)
+declare void @vDSP_zrdotprD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, %struct.DSPDoubleSplitComplex*, i32)
+declare void @vDSP_zrvadd(%struct.DSPSplitComplex*, i32, float*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zrvaddD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zrvdiv(%struct.DSPSplitComplex*, i32, float*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zrvdivD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zrvmul(%struct.DSPSplitComplex*, i32, float*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zrvmulD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zrvsub(%struct.DSPSplitComplex*, i32, float*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zrvsubD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_ztoc(%struct.DSPSplitComplex*, i32, %struct.DSPComplex*, i32, i32)
+declare void @vDSP_ztocD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleComplex*, i32, i32)
+declare void @vDSP_ztrans(float*, %struct.DSPSplitComplex*, %struct.DSPSplitComplex*, i32)
+declare void @vDSP_ztransD(double*, %struct.DSPDoubleSplitComplex*, %struct.DSPDoubleSplitComplex*, i32)
+declare void @vDSP_zvabs(%struct.DSPSplitComplex*, i32, float*, i32, i32)
+declare void @vDSP_zvabsD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, i32)
+declare void @vDSP_zvadd(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvaddD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvcma(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvcmaD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvcmul(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvcmulD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvconj(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvconjD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvdiv(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvdivD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvfill(%struct.DSPSplitComplex*, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvfillD(%struct.DSPDoubleSplitComplex*, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvmags(%struct.DSPSplitComplex*, i32, float*, i32, i32)
+declare void @vDSP_zvmagsD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, i32)
+declare void @vDSP_zvmgsa(%struct.DSPSplitComplex*, i32, float*, i32, float*, i32, i32)
+declare void @vDSP_zvmgsaD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, double*, i32, i32)
+declare void @vDSP_zvmov(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvmovD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvmul(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32, i32)
+declare void @vDSP_zvmulD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32, i32)
+declare void @vDSP_zvneg(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvnegD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvphas(%struct.DSPSplitComplex*, i32, float*, i32, i32)
+declare void @vDSP_zvphasD(%struct.DSPDoubleSplitComplex*, i32, double*, i32, i32)
+declare void @vDSP_zvsma(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvsmaD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvsub(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvsubD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, i32, i32)
+declare void @vDSP_zvzsml(%struct.DSPSplitComplex*, i32, %struct.DSPSplitComplex*, %struct.DSPSplitComplex*, i32, i32)
+declare void @vDSP_zvzsmlD(%struct.DSPDoubleSplitComplex*, i32, %struct.DSPDoubleSplitComplex*, %struct.DSPDoubleSplitComplex*, i32, i32)
+
+
+;; Core Foundation Stuff
+
+%struct.__va_list_tag = type <{ i32, i32, i8*, i8* }>
+%struct.anon = type <{ i32, i32, i32, i32, i32, i8, i8, i8, i8, double }>
+
+declare double @CFAbsoluteTimeAddGregorianUnits(double, i8*, %struct.anon* byval)
+declare double @CFAbsoluteTimeGetCurrent()
+declare i32 @CFAbsoluteTimeGetDayOfWeek(double, i8*)
+declare i32 @CFAbsoluteTimeGetDayOfYear(double, i8*)
+declare void @CFAbsoluteTimeGetDifferenceAsGregorianUnits(%struct.anon* noalias sret, double, double, i8*, i64)
+declare { i64, double } @CFAbsoluteTimeGetGregorianDate(double, i8*)
+declare i32 @CFAbsoluteTimeGetWeekOfYear(double, i8*)
+declare i8* @CFAllocatorAllocate(i8**, i64, i64)
+declare i8** @CFAllocatorCreate(i8**, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)*, i8* (i64, i64, i8*)*, i8* (i8*, i64, i64, i8*)*, void (i8*, i8*)*, i64 (i64, i64, i8*)* }>*)
+declare void @CFAllocatorDeallocate(i8**, i8*)
+declare void @CFAllocatorGetContext(i8**, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)*, i8* (i64, i64, i8*)*, i8* (i8*, i64, i64, i8*)*, void (i8*, i8*)*, i64 (i64, i64, i8*)* }>*)
+declare i8** @CFAllocatorGetDefault()
+declare i64 @CFAllocatorGetPreferredSizeForSize(i8**, i64, i64)
+declare i64 @CFAllocatorGetTypeID()
+declare i8* @CFAllocatorReallocate(i8**, i8*, i64, i64)
+declare void @CFAllocatorSetDefault(i8**)
+declare void @CFArrayAppendArray(i8**, i8**, { i64, i64 })
+declare void @CFArrayAppendValue(i8**, i8*)
+declare void @CFArrayApplyFunction(i8**, { i64, i64 }, void (i8*, i8*)*, i8*)
+declare i64 @CFArrayBSearchValues(i8**, { i64, i64 }, i8*, i64 (i8*, i8*, i8*)*, i8*)
+declare zeroext i8 @CFArrayContainsValue(i8**, { i64, i64 }, i8*)
+declare i8** @CFArrayCreate(i8**, i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)* }>*)
+declare i8** @CFArrayCreateCopy(i8**, i8**)
+declare i8** @CFArrayCreateMutable(i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)* }>*)
+declare i8** @CFArrayCreateMutableCopy(i8**, i64, i8**)
+declare void @CFArrayExchangeValuesAtIndices(i8**, i64, i64)
+declare i64 @CFArrayGetCount(i8**)
+declare i64 @CFArrayGetCountOfValue(i8**, { i64, i64 }, i8*)
+declare i64 @CFArrayGetFirstIndexOfValue(i8**, { i64, i64 }, i8*)
+declare i64 @CFArrayGetLastIndexOfValue(i8**, { i64, i64 }, i8*)
+declare i64 @CFArrayGetTypeID()
+declare i8* @CFArrayGetValueAtIndex(i8**, i64)
+declare void @CFArrayGetValues(i8**, { i64, i64 }, i8**)
+declare void @CFArrayInsertValueAtIndex(i8**, i64, i8*)
+declare void @CFArrayRemoveAllValues(i8**)
+declare void @CFArrayRemoveValueAtIndex(i8**, i64)
+declare void @CFArrayReplaceValues(i8**, { i64, i64 }, i8**, i64)
+declare void @CFArraySetValueAtIndex(i8**, i64, i8*)
+declare void @CFArraySortValues(i8**, { i64, i64 }, i64 (i8*, i8*, i8*)*, i8*)
+declare void @CFAttributedStringBeginEditing(i8*)
+declare i8* @CFAttributedStringCreate(i8**, i8*, i8*)
+declare i8* @CFAttributedStringCreateCopy(i8**, i8*)
+declare i8* @CFAttributedStringCreateMutable(i8**, i64)
+declare i8* @CFAttributedStringCreateMutableCopy(i8**, i64, i8*)
+declare i8* @CFAttributedStringCreateWithSubstring(i8**, i8*, { i64, i64 })
+declare void @CFAttributedStringEndEditing(i8*)
+declare i8* @CFAttributedStringGetAttribute(i8*, i64, i8*, <{ i64, i64 }>*)
+declare i8* @CFAttributedStringGetAttributeAndLongestEffectiveRange(i8*, i64, i8*, { i64, i64 }, <{ i64, i64 }>*)
+declare i8* @CFAttributedStringGetAttributes(i8*, i64, <{ i64, i64 }>*)
+declare i8* @CFAttributedStringGetAttributesAndLongestEffectiveRange(i8*, i64, { i64, i64 }, <{ i64, i64 }>*)
+declare i64 @CFAttributedStringGetLength(i8*)
+declare i8* @CFAttributedStringGetMutableString(i8*)
+declare i8* @CFAttributedStringGetString(i8*)
+declare i64 @CFAttributedStringGetTypeID()
+declare void @CFAttributedStringRemoveAttribute(i8*, { i64, i64 }, i8*)
+declare void @CFAttributedStringReplaceAttributedString(i8*, { i64, i64 }, i8*)
+declare void @CFAttributedStringReplaceString(i8*, { i64, i64 }, i8*)
+declare void @CFAttributedStringSetAttribute(i8*, { i64, i64 }, i8*, i8*)
+declare void @CFAttributedStringSetAttributes(i8*, { i64, i64 }, i8*, i8 zeroext)
+declare void @CFBagAddValue(i8*, i8*)
+declare void @CFBagApplyFunction(i8*, void (i8*, i8*)*, i8*)
+declare zeroext i8 @CFBagContainsValue(i8*, i8*)
+declare i8* @CFBagCreate(i8**, i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)*, i64 (i8*)* }>*)
+declare i8* @CFBagCreateCopy(i8**, i8*)
+declare i8* @CFBagCreateMutable(i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)*, i64 (i8*)* }>*)
+declare i8* @CFBagCreateMutableCopy(i8**, i64, i8*)
+declare i64 @CFBagGetCount(i8*)
+declare i64 @CFBagGetCountOfValue(i8*, i8*)
+declare i64 @CFBagGetTypeID()
+declare i8* @CFBagGetValue(i8*, i8*)
+declare zeroext i8 @CFBagGetValueIfPresent(i8*, i8*, i8**)
+declare void @CFBagGetValues(i8*, i8**)
+declare void @CFBagRemoveAllValues(i8*)
+declare void @CFBagRemoveValue(i8*, i8*)
+declare void @CFBagReplaceValue(i8*, i8*)
+declare void @CFBagSetValue(i8*, i8*)
+declare void @CFBinaryHeapAddValue(i8*, i8*)
+declare void @CFBinaryHeapApplyFunction(i8*, void (i8*, i8*)*, i8*)
+declare zeroext i8 @CFBinaryHeapContainsValue(i8*, i8*)
+declare i8* @CFBinaryHeapCreate(i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i64 (i8*, i8*, i8*)* }>*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i8* @CFBinaryHeapCreateCopy(i8**, i64, i8*)
+declare i64 @CFBinaryHeapGetCount(i8*)
+declare i64 @CFBinaryHeapGetCountOfValue(i8*, i8*)
+declare i8* @CFBinaryHeapGetMinimum(i8*)
+declare zeroext i8 @CFBinaryHeapGetMinimumIfPresent(i8*, i8**)
+declare i64 @CFBinaryHeapGetTypeID()
+declare void @CFBinaryHeapGetValues(i8*, i8**)
+declare void @CFBinaryHeapRemoveAllValues(i8*)
+declare void @CFBinaryHeapRemoveMinimumValue(i8*)
+declare zeroext i8 @CFBitVectorContainsBit(i8*, { i64, i64 }, i32)
+declare i8* @CFBitVectorCreate(i8**, i8*, i64)
+declare i8* @CFBitVectorCreateCopy(i8**, i8*)
+declare i8* @CFBitVectorCreateMutable(i8**, i64)
+declare i8* @CFBitVectorCreateMutableCopy(i8**, i64, i8*)
+declare void @CFBitVectorFlipBitAtIndex(i8*, i64)
+declare void @CFBitVectorFlipBits(i8*, { i64, i64 })
+declare i32 @CFBitVectorGetBitAtIndex(i8*, i64)
+declare void @CFBitVectorGetBits(i8*, { i64, i64 }, i8*)
+declare i64 @CFBitVectorGetCount(i8*)
+declare i64 @CFBitVectorGetCountOfBit(i8*, { i64, i64 }, i32)
+declare i64 @CFBitVectorGetFirstIndexOfBit(i8*, { i64, i64 }, i32)
+declare i64 @CFBitVectorGetLastIndexOfBit(i8*, { i64, i64 }, i32)
+declare i64 @CFBitVectorGetTypeID()
+declare void @CFBitVectorSetAllBits(i8*, i32)
+declare void @CFBitVectorSetBitAtIndex(i8*, i64, i32)
+declare void @CFBitVectorSetBits(i8*, { i64, i64 }, i32)
+declare void @CFBitVectorSetCount(i8*, i64)
+declare i64 @CFBooleanGetTypeID()
+declare zeroext i8 @CFBooleanGetValue(i8*)
+declare void @CFBundleCloseBundleResourceMap(i8*, i32)
+declare i8* @CFBundleCopyAuxiliaryExecutableURL(i8*, i8*)
+declare i8* @CFBundleCopyBuiltInPlugInsURL(i8*)
+declare i8** @CFBundleCopyBundleLocalizations(i8*)
+declare i8* @CFBundleCopyBundleURL(i8*)
+declare i8** @CFBundleCopyExecutableArchitectures(i8*)
+declare i8** @CFBundleCopyExecutableArchitecturesForURL(i8*)
+declare i8* @CFBundleCopyExecutableURL(i8*)
+declare i8* @CFBundleCopyInfoDictionaryForURL(i8*)
+declare i8* @CFBundleCopyInfoDictionaryInDirectory(i8*)
+declare i8** @CFBundleCopyLocalizationsForPreferences(i8**, i8**)
+declare i8** @CFBundleCopyLocalizationsForURL(i8*)
+declare i8* @CFBundleCopyLocalizedString(i8*, i8*, i8*, i8*)
+declare i8** @CFBundleCopyPreferredLocalizationsFromArray(i8**)
+declare i8* @CFBundleCopyPrivateFrameworksURL(i8*)
+declare i8* @CFBundleCopyResourceURL(i8*, i8*, i8*, i8*)
+declare i8* @CFBundleCopyResourceURLForLocalization(i8*, i8*, i8*, i8*, i8*)
+declare i8* @CFBundleCopyResourceURLInDirectory(i8*, i8*, i8*, i8*)
+declare i8** @CFBundleCopyResourceURLsOfType(i8*, i8*, i8*)
+declare i8** @CFBundleCopyResourceURLsOfTypeForLocalization(i8*, i8*, i8*, i8*)
+declare i8** @CFBundleCopyResourceURLsOfTypeInDirectory(i8*, i8*, i8*)
+declare i8* @CFBundleCopyResourcesDirectoryURL(i8*)
+declare i8* @CFBundleCopySharedFrameworksURL(i8*)
+declare i8* @CFBundleCopySharedSupportURL(i8*)
+declare i8* @CFBundleCopySupportFilesDirectoryURL(i8*)
+declare i8* @CFBundleCreate(i8**, i8*)
+declare i8** @CFBundleCreateBundlesFromDirectory(i8**, i8*, i8*)
+declare i8** @CFBundleGetAllBundles()
+declare i8* @CFBundleGetBundleWithIdentifier(i8*)
+declare i8* @CFBundleGetDataPointerForName(i8*, i8*)
+declare void @CFBundleGetDataPointersForNames(i8*, i8**, i8**)
+declare i8* @CFBundleGetDevelopmentRegion(i8*)
+declare i8* @CFBundleGetFunctionPointerForName(i8*, i8*)
+declare void @CFBundleGetFunctionPointersForNames(i8*, i8**, i8**)
+declare i8* @CFBundleGetIdentifier(i8*)
+declare i8* @CFBundleGetInfoDictionary(i8*)
+declare i8* @CFBundleGetLocalInfoDictionary(i8*)
+declare i8* @CFBundleGetMainBundle()
+declare void @CFBundleGetPackageInfo(i8*, i32*, i32*)
+declare zeroext i8 @CFBundleGetPackageInfoInDirectory(i8*, i32*, i32*)
+declare i8* @CFBundleGetPlugIn(i8*)
+declare i64 @CFBundleGetTypeID()
+declare i8* @CFBundleGetValueForInfoDictionaryKey(i8*, i8*)
+declare i32 @CFBundleGetVersionNumber(i8*)
+declare zeroext i8 @CFBundleIsExecutableLoaded(i8*)
+declare zeroext i8 @CFBundleLoadExecutable(i8*)
+declare zeroext i8 @CFBundleLoadExecutableAndReturnError(i8*, i8**)
+declare i32 @CFBundleOpenBundleResourceFiles(i8*, i32*, i32*)
+declare i32 @CFBundleOpenBundleResourceMap(i8*)
+declare zeroext i8 @CFBundlePreflightExecutable(i8*, i8**)
+declare void @CFBundleUnloadExecutable(i8*)
+declare zeroext i8 @CFCalendarAddComponents(i8*, double*, i64, i8*, ...)
+declare zeroext i8 @CFCalendarComposeAbsoluteTime(i8*, double*, i8*, ...)
+declare i8* @CFCalendarCopyCurrent()
+declare i8* @CFCalendarCopyLocale(i8*)
+declare i8* @CFCalendarCopyTimeZone(i8*)
+declare i8* @CFCalendarCreateWithIdentifier(i8**, i8*)
+declare zeroext i8 @CFCalendarDecomposeAbsoluteTime(i8*, double, i8*, ...)
+declare zeroext i8 @CFCalendarGetComponentDifference(i8*, double, double, i64, i8*, ...)
+declare i64 @CFCalendarGetFirstWeekday(i8*)
+declare i8* @CFCalendarGetIdentifier(i8*)
+declare { i64, i64 } @CFCalendarGetMaximumRangeOfUnit(i8*, i64)
+declare i64 @CFCalendarGetMinimumDaysInFirstWeek(i8*)
+declare { i64, i64 } @CFCalendarGetMinimumRangeOfUnit(i8*, i64)
+declare i64 @CFCalendarGetOrdinalityOfUnit(i8*, i64, i64, double)
+declare { i64, i64 } @CFCalendarGetRangeOfUnit(i8*, i64, i64, double)
+declare zeroext i8 @CFCalendarGetTimeRangeOfUnit(i8*, i64, double, double*, double*)
+declare i64 @CFCalendarGetTypeID()
+declare void @CFCalendarSetFirstWeekday(i8*, i64)
+declare void @CFCalendarSetLocale(i8*, i8*)
+declare void @CFCalendarSetMinimumDaysInFirstWeek(i8*, i64)
+declare void @CFCalendarSetTimeZone(i8*, i8*)
+declare void @CFCharacterSetAddCharactersInRange(i8*, { i64, i64 })
+declare void @CFCharacterSetAddCharactersInString(i8*, i8*)
+declare i8* @CFCharacterSetCreateBitmapRepresentation(i8**, i8*)
+declare i8* @CFCharacterSetCreateCopy(i8**, i8*)
+declare i8* @CFCharacterSetCreateInvertedSet(i8**, i8*)
+declare i8* @CFCharacterSetCreateMutable(i8**)
+declare i8* @CFCharacterSetCreateMutableCopy(i8**, i8*)
+declare i8* @CFCharacterSetCreateWithBitmapRepresentation(i8**, i8*)
+declare i8* @CFCharacterSetCreateWithCharactersInRange(i8**, { i64, i64 })
+declare i8* @CFCharacterSetCreateWithCharactersInString(i8**, i8*)
+declare i8* @CFCharacterSetGetPredefined(i64)
+declare i64 @CFCharacterSetGetTypeID()
+declare zeroext i8 @CFCharacterSetHasMemberInPlane(i8*, i64)
+declare void @CFCharacterSetIntersect(i8*, i8*)
+declare void @CFCharacterSetInvert(i8*)
+declare zeroext i8 @CFCharacterSetIsCharacterMember(i8*, i16 zeroext)
+declare zeroext i8 @CFCharacterSetIsLongCharacterMember(i8*, i32)
+declare zeroext i8 @CFCharacterSetIsSupersetOfSet(i8*, i8*)
+declare void @CFCharacterSetRemoveCharactersInRange(i8*, { i64, i64 })
+declare void @CFCharacterSetRemoveCharactersInString(i8*, i8*)
+declare void @CFCharacterSetUnion(i8*, i8*)
+declare i8* @CFCopyDescription(i8*)
+declare i8* @CFCopyTypeIDDescription(i64)
+declare void @CFDataAppendBytes(i8*, i8*, i64)
+declare i8* @CFDataCreate(i8**, i8*, i64)
+declare i8* @CFDataCreateCopy(i8**, i8*)
+declare i8* @CFDataCreateMutable(i8**, i64)
+declare i8* @CFDataCreateMutableCopy(i8**, i64, i8*)
+declare i8* @CFDataCreateWithBytesNoCopy(i8**, i8*, i64, i8**)
+declare void @CFDataDeleteBytes(i8*, { i64, i64 })
+declare { i64, i64 } @CFDataFind(i8*, i8*, { i64, i64 }, i64)
+declare i8* @CFDataGetBytePtr(i8*)
+declare void @CFDataGetBytes(i8*, { i64, i64 }, i8*)
+declare i64 @CFDataGetLength(i8*)
+declare i8* @CFDataGetMutableBytePtr(i8*)
+declare i64 @CFDataGetTypeID()
+declare void @CFDataIncreaseLength(i8*, i64)
+declare void @CFDataReplaceBytes(i8*, { i64, i64 }, i8*, i64)
+declare void @CFDataSetLength(i8*, i64)
+declare i64 @CFDateCompare(i8*, i8*, i8*)
+declare i8* @CFDateCreate(i8**, double)
+declare i8* @CFDateFormatterCopyProperty(i8*, i8*)
+declare i8* @CFDateFormatterCreate(i8**, i8*, i64, i64)
+declare i8* @CFDateFormatterCreateDateFormatFromTemplate(i8**, i8*, i64, i8*)
+declare i8* @CFDateFormatterCreateDateFromString(i8**, i8*, i8*, <{ i64, i64 }>*)
+declare i8* @CFDateFormatterCreateStringWithAbsoluteTime(i8**, i8*, double)
+declare i8* @CFDateFormatterCreateStringWithDate(i8**, i8*, i8*)
+declare zeroext i8 @CFDateFormatterGetAbsoluteTimeFromString(i8*, i8*, <{ i64, i64 }>*, double*)
+declare i64 @CFDateFormatterGetDateStyle(i8*)
+declare i8* @CFDateFormatterGetFormat(i8*)
+declare i8* @CFDateFormatterGetLocale(i8*)
+declare i64 @CFDateFormatterGetTimeStyle(i8*)
+declare i64 @CFDateFormatterGetTypeID()
+declare void @CFDateFormatterSetFormat(i8*, i8*)
+declare void @CFDateFormatterSetProperty(i8*, i8*, i8*)
+declare double @CFDateGetAbsoluteTime(i8*)
+declare double @CFDateGetTimeIntervalSinceDate(i8*, i8*)
+declare i64 @CFDateGetTypeID()
+declare void @CFDictionaryAddValue(i8*, i8*, i8*)
+declare void @CFDictionaryApplyFunction(i8*, void (i8*, i8*, i8*)*, i8*)
+declare zeroext i8 @CFDictionaryContainsKey(i8*, i8*)
+declare zeroext i8 @CFDictionaryContainsValue(i8*, i8*)
+declare i8* @CFDictionaryCreate(i8**, i8**, i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)*, i64 (i8*)* }>*, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)* }>*)
+declare i8* @CFDictionaryCreateCopy(i8**, i8*)
+declare i8* @CFDictionaryCreateMutable(i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)*, i64 (i8*)* }>*, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)* }>*)
+declare i8* @CFDictionaryCreateMutableCopy(i8**, i64, i8*)
+declare i64 @CFDictionaryGetCount(i8*)
+declare i64 @CFDictionaryGetCountOfKey(i8*, i8*)
+declare i64 @CFDictionaryGetCountOfValue(i8*, i8*)
+declare void @CFDictionaryGetKeysAndValues(i8*, i8**, i8**)
+declare i64 @CFDictionaryGetTypeID()
+declare i8* @CFDictionaryGetValue(i8*, i8*)
+declare zeroext i8 @CFDictionaryGetValueIfPresent(i8*, i8*, i8**)
+declare void @CFDictionaryRemoveAllValues(i8*)
+declare void @CFDictionaryRemoveValue(i8*, i8*)
+declare void @CFDictionaryReplaceValue(i8*, i8*, i8*)
+declare void @CFDictionarySetValue(i8*, i8*, i8*)
+declare zeroext i8 @CFEqual(i8*, i8*)
+declare i8* @CFErrorCopyDescription(i8*)
+declare i8* @CFErrorCopyFailureReason(i8*)
+declare i8* @CFErrorCopyRecoverySuggestion(i8*)
+declare i8* @CFErrorCopyUserInfo(i8*)
+declare i8* @CFErrorCreate(i8**, i8*, i64, i8*)
+declare i8* @CFErrorCreateWithUserInfoKeysAndValues(i8**, i8*, i64, i8**, i8**, i64)
+declare i64 @CFErrorGetCode(i8*)
+declare i8* @CFErrorGetDomain(i8*)
+declare i64 @CFErrorGetTypeID()
+declare i8* @CFFileDescriptorCreate(i8**, i32, i8 zeroext, void (i8*, i64, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i8* @CFFileDescriptorCreateRunLoopSource(i8**, i8*, i64)
+declare void @CFFileDescriptorDisableCallBacks(i8*, i64)
+declare void @CFFileDescriptorEnableCallBacks(i8*, i64)
+declare void @CFFileDescriptorGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i32 @CFFileDescriptorGetNativeDescriptor(i8*)
+declare i64 @CFFileDescriptorGetTypeID()
+declare void @CFFileDescriptorInvalidate(i8*)
+declare zeroext i8 @CFFileDescriptorIsValid(i8*)
+declare i8** @CFGetAllocator(i8*)
+declare i64 @CFGetRetainCount(i8*)
+declare i64 @CFGetTypeID(i8*)
+declare double @CFGregorianDateGetAbsoluteTime({ i64, double }, i8*)
+declare zeroext i8 @CFGregorianDateIsValid({ i64, double }, i64)
+declare i64 @CFHash(i8*)
+declare i8** @CFLocaleCopyAvailableLocaleIdentifiers()
+declare i8** @CFLocaleCopyCommonISOCurrencyCodes()
+declare i8* @CFLocaleCopyCurrent()
+declare i8* @CFLocaleCopyDisplayNameForPropertyValue(i8*, i8*, i8*)
+declare i8** @CFLocaleCopyISOCountryCodes()
+declare i8** @CFLocaleCopyISOCurrencyCodes()
+declare i8** @CFLocaleCopyISOLanguageCodes()
+declare i8** @CFLocaleCopyPreferredLanguages()
+declare i8* @CFLocaleCreate(i8**, i8*)
+declare i8* @CFLocaleCreateCanonicalLanguageIdentifierFromString(i8**, i8*)
+declare i8* @CFLocaleCreateCanonicalLocaleIdentifierFromScriptManagerCodes(i8**, i16 signext, i16 signext)
+declare i8* @CFLocaleCreateCanonicalLocaleIdentifierFromString(i8**, i8*)
+declare i8* @CFLocaleCreateComponentsFromLocaleIdentifier(i8**, i8*)
+declare i8* @CFLocaleCreateCopy(i8**, i8*)
+declare i8* @CFLocaleCreateLocaleIdentifierFromComponents(i8**, i8*)
+declare i8* @CFLocaleCreateLocaleIdentifierFromWindowsLocaleCode(i8**, i32)
+declare i8* @CFLocaleGetIdentifier(i8*)
+declare i64 @CFLocaleGetLanguageCharacterDirection(i8*)
+declare i64 @CFLocaleGetLanguageLineDirection(i8*)
+declare i8* @CFLocaleGetSystem()
+declare i64 @CFLocaleGetTypeID()
+declare i8* @CFLocaleGetValue(i8*, i8*)
+declare i32 @CFLocaleGetWindowsLocaleCodeFromLocaleIdentifier(i8*)
+declare i8* @CFMachPortCreate(i8**, void (i8*, i8*, i64, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*, i8*)
+declare i8* @CFMachPortCreateRunLoopSource(i8**, i8*, i64)
+declare i8* @CFMachPortCreateWithPort(i8**, i32, void (i8*, i8*, i64, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*, i8*)
+declare void @CFMachPortGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare void (i8*, i8*)* @CFMachPortGetInvalidationCallBack(i8*)
+declare i32 @CFMachPortGetPort(i8*)
+declare i64 @CFMachPortGetTypeID()
+declare void @CFMachPortInvalidate(i8*)
+declare zeroext i8 @CFMachPortIsValid(i8*)
+declare void @CFMachPortSetInvalidationCallBack(i8*, void (i8*, i8*)*)
+declare i8* @CFMakeCollectable(i8*)
+declare i8* @CFMessagePortCreateLocal(i8**, i8*, i8* (i8*, i32, i8*, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*, i8*)
+declare i8* @CFMessagePortCreateRemote(i8**, i8*)
+declare i8* @CFMessagePortCreateRunLoopSource(i8**, i8*, i64)
+declare void @CFMessagePortGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare void (i8*, i8*)* @CFMessagePortGetInvalidationCallBack(i8*)
+declare i8* @CFMessagePortGetName(i8*)
+declare i64 @CFMessagePortGetTypeID()
+declare void @CFMessagePortInvalidate(i8*)
+declare zeroext i8 @CFMessagePortIsRemote(i8*)
+declare zeroext i8 @CFMessagePortIsValid(i8*)
+declare i32 @CFMessagePortSendRequest(i8*, i32, i8*, double, double, i8*, i8**)
+declare void @CFMessagePortSetDispatchQueue(i8*, i8*)
+declare void @CFMessagePortSetInvalidationCallBack(i8*, void (i8*, i8*)*)
+declare zeroext i8 @CFMessagePortSetName(i8*, i8*)
+declare void @CFNotificationCenterAddObserver(i8*, i8*, void (i8*, i8*, i8*, i8*, i8*)*, i8*, i8*, i64)
+declare i8* @CFNotificationCenterGetDarwinNotifyCenter()
+declare i8* @CFNotificationCenterGetDistributedCenter()
+declare i8* @CFNotificationCenterGetLocalCenter()
+declare i64 @CFNotificationCenterGetTypeID()
+declare void @CFNotificationCenterPostNotification(i8*, i8*, i8*, i8*, i8 zeroext)
+declare void @CFNotificationCenterPostNotificationWithOptions(i8*, i8*, i8*, i8*, i64)
+declare void @CFNotificationCenterRemoveEveryObserver(i8*, i8*)
+declare void @CFNotificationCenterRemoveObserver(i8*, i8*, i8*, i8*)
+declare i64 @CFNullGetTypeID()
+declare i64 @CFNumberCompare(i8*, i8*, i8*)
+declare i8* @CFNumberCreate(i8**, i64, i8*)
+declare i8* @CFNumberFormatterCopyProperty(i8*, i8*)
+declare i8* @CFNumberFormatterCreate(i8**, i8*, i64)
+declare i8* @CFNumberFormatterCreateNumberFromString(i8**, i8*, i8*, <{ i64, i64 }>*, i64)
+declare i8* @CFNumberFormatterCreateStringWithNumber(i8**, i8*, i8*)
+declare i8* @CFNumberFormatterCreateStringWithValue(i8**, i8*, i64, i8*)
+declare zeroext i8 @CFNumberFormatterGetDecimalInfoForCurrencyCode(i8*, i32*, double*)
+declare i8* @CFNumberFormatterGetFormat(i8*)
+declare i8* @CFNumberFormatterGetLocale(i8*)
+declare i64 @CFNumberFormatterGetStyle(i8*)
+declare i64 @CFNumberFormatterGetTypeID()
+declare zeroext i8 @CFNumberFormatterGetValueFromString(i8*, i8*, <{ i64, i64 }>*, i64, i8*)
+declare void @CFNumberFormatterSetFormat(i8*, i8*)
+declare void @CFNumberFormatterSetProperty(i8*, i8*, i8*)
+declare i64 @CFNumberGetByteSize(i8*)
+declare i64 @CFNumberGetType(i8*)
+declare i64 @CFNumberGetTypeID()
+declare zeroext i8 @CFNumberGetValue(i8*, i64, i8*)
+declare zeroext i8 @CFNumberIsFloatType(i8*)
+declare void @CFPlugInAddInstanceForFactory(i8*)
+declare i8* @CFPlugInCreate(i8**, i8*)
+declare i8** @CFPlugInFindFactoriesForPlugInType(i8*)
+declare i8** @CFPlugInFindFactoriesForPlugInTypeInPlugIn(i8*, i8*)
+declare i8* @CFPlugInGetBundle(i8*)
+declare i64 @CFPlugInGetTypeID()
+declare i8* @CFPlugInInstanceCreate(i8**, i8*, i8*)
+declare i8* @CFPlugInInstanceCreateWithInstanceDataSize(i8**, i64, void (i8*)*, i8*, i8 (i8*, i8*, i8**)*)
+declare i8* @CFPlugInInstanceGetFactoryName(i8*)
+declare i8* @CFPlugInInstanceGetInstanceData(i8*)
+declare zeroext i8 @CFPlugInInstanceGetInterfaceFunctionTable(i8*, i8*, i8**)
+declare i64 @CFPlugInInstanceGetTypeID()
+declare zeroext i8 @CFPlugInIsLoadOnDemand(i8*)
+declare zeroext i8 @CFPlugInRegisterFactoryFunction(i8*, i8* (i8**, i8*)*)
+declare zeroext i8 @CFPlugInRegisterFactoryFunctionByName(i8*, i8*, i8*)
+declare zeroext i8 @CFPlugInRegisterPlugInType(i8*, i8*)
+declare void @CFPlugInRemoveInstanceForFactory(i8*)
+declare void @CFPlugInSetLoadOnDemand(i8*, i8 zeroext)
+declare zeroext i8 @CFPlugInUnregisterFactory(i8*)
+declare zeroext i8 @CFPlugInUnregisterPlugInType(i8*, i8*)
+declare void @CFPreferencesAddSuitePreferencesToApp(i8*, i8*)
+declare zeroext i8 @CFPreferencesAppSynchronize(i8*)
+declare zeroext i8 @CFPreferencesAppValueIsForced(i8*, i8*)
+declare i8* @CFPreferencesCopyAppValue(i8*, i8*)
+declare i8** @CFPreferencesCopyApplicationList(i8*, i8*)
+declare i8** @CFPreferencesCopyKeyList(i8*, i8*, i8*)
+declare i8* @CFPreferencesCopyMultiple(i8**, i8*, i8*, i8*)
+declare i8* @CFPreferencesCopyValue(i8*, i8*, i8*, i8*)
+declare zeroext i8 @CFPreferencesGetAppBooleanValue(i8*, i8*, i8*)
+declare i64 @CFPreferencesGetAppIntegerValue(i8*, i8*, i8*)
+declare void @CFPreferencesRemoveSuitePreferencesFromApp(i8*, i8*)
+declare void @CFPreferencesSetAppValue(i8*, i8*, i8*)
+declare void @CFPreferencesSetMultiple(i8*, i8**, i8*, i8*, i8*)
+declare void @CFPreferencesSetValue(i8*, i8*, i8*, i8*, i8*)
+declare zeroext i8 @CFPreferencesSynchronize(i8*, i8*, i8*)
+declare i8* @CFPropertyListCreateData(i8**, i8*, i64, i64, i8**)
+declare i8* @CFPropertyListCreateDeepCopy(i8**, i8*, i64)
+declare i8* @CFPropertyListCreateFromStream(i8**, i8*, i64, i64, i64*, i8**)
+declare i8* @CFPropertyListCreateFromXMLData(i8**, i8*, i64, i8**)
+declare i8* @CFPropertyListCreateWithData(i8**, i8*, i64, i64*, i8**)
+declare i8* @CFPropertyListCreateWithStream(i8**, i8*, i64, i64, i64*, i8**)
+declare i8* @CFPropertyListCreateXMLData(i8**, i8*)
+declare zeroext i8 @CFPropertyListIsValid(i8*, i64)
+declare i64 @CFPropertyListWrite(i8*, i8*, i64, i64, i8**)
+declare i64 @CFPropertyListWriteToStream(i8*, i8*, i64, i8**)
+declare void @CFReadStreamClose(i8*)
+declare i8* @CFReadStreamCopyError(i8*)
+declare i8* @CFReadStreamCopyProperty(i8*, i8*)
+declare i8* @CFReadStreamCreateWithBytesNoCopy(i8**, i8*, i64, i8**)
+declare i8* @CFReadStreamCreateWithFile(i8**, i8*)
+declare i8* @CFReadStreamGetBuffer(i8*, i64, i64*)
+declare { i64, i64 } @CFReadStreamGetError(i8*)
+declare i64 @CFReadStreamGetStatus(i8*)
+declare i64 @CFReadStreamGetTypeID()
+declare zeroext i8 @CFReadStreamHasBytesAvailable(i8*)
+declare zeroext i8 @CFReadStreamOpen(i8*)
+declare i64 @CFReadStreamRead(i8*, i8*, i64)
+declare void @CFReadStreamScheduleWithRunLoop(i8*, i8*, i8*)
+declare zeroext i8 @CFReadStreamSetClient(i8*, i64, void (i8*, i64, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare zeroext i8 @CFReadStreamSetProperty(i8*, i8*, i8*)
+declare void @CFReadStreamUnscheduleFromRunLoop(i8*, i8*, i8*)
+declare void @CFRelease(i8*)
+declare i8* @CFRetain(i8*)
+declare void @CFRunLoopAddCommonMode(i8*, i8*)
+declare void @CFRunLoopAddObserver(i8*, i8*, i8*)
+declare void @CFRunLoopAddSource(i8*, i8*, i8*)
+declare void @CFRunLoopAddTimer(i8*, i8*, i8*)
+declare zeroext i8 @CFRunLoopContainsObserver(i8*, i8*, i8*)
+declare zeroext i8 @CFRunLoopContainsSource(i8*, i8*, i8*)
+declare zeroext i8 @CFRunLoopContainsTimer(i8*, i8*, i8*)
+declare i8** @CFRunLoopCopyAllModes(i8*)
+declare i8* @CFRunLoopCopyCurrentMode(i8*)
+declare i8* @CFRunLoopGetCurrent()
+declare i8* @CFRunLoopGetMain()
+declare double @CFRunLoopGetNextTimerFireDate(i8*, i8*)
+declare i64 @CFRunLoopGetTypeID()
+declare zeroext i8 @CFRunLoopIsWaiting(i8*)
+declare i8* @CFRunLoopObserverCreate(i8**, i64, i8 zeroext, i64, void (i8*, i64, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare zeroext i8 @CFRunLoopObserverDoesRepeat(i8*)
+declare i64 @CFRunLoopObserverGetActivities(i8*)
+declare void @CFRunLoopObserverGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i64 @CFRunLoopObserverGetOrder(i8*)
+declare i64 @CFRunLoopObserverGetTypeID()
+declare void @CFRunLoopObserverInvalidate(i8*)
+declare zeroext i8 @CFRunLoopObserverIsValid(i8*)
+declare void @CFRunLoopPerformBlock(i8*, i8*, i64)
+declare void @CFRunLoopRemoveObserver(i8*, i8*, i8*)
+declare void @CFRunLoopRemoveSource(i8*, i8*, i8*)
+declare void @CFRunLoopRemoveTimer(i8*, i8*, i8*)
+declare void @CFRunLoopRun()
+declare i32 @CFRunLoopRunInMode(i8*, double, i8 zeroext)
+declare i8* @CFRunLoopSourceCreate(i8**, i64, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)*, i8 (i8*, i8*)*, i64 (i8*)*, void (i8*, i8*, i8*)*, void (i8*, i8*, i8*)*, void (i8*)* }>*)
+declare void @CFRunLoopSourceGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)*, i8 (i8*, i8*)*, i64 (i8*)*, void (i8*, i8*, i8*)*, void (i8*, i8*, i8*)*, void (i8*)* }>*)
+declare i64 @CFRunLoopSourceGetOrder(i8*)
+declare i64 @CFRunLoopSourceGetTypeID()
+declare void @CFRunLoopSourceInvalidate(i8*)
+declare zeroext i8 @CFRunLoopSourceIsValid(i8*)
+declare void @CFRunLoopSourceSignal(i8*)
+declare void @CFRunLoopStop(i8*)
+declare i8* @CFRunLoopTimerCreate(i8**, double, double, i64, i64, void (i8*, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare zeroext i8 @CFRunLoopTimerDoesRepeat(i8*)
+declare void @CFRunLoopTimerGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare double @CFRunLoopTimerGetInterval(i8*)
+declare double @CFRunLoopTimerGetNextFireDate(i8*)
+declare i64 @CFRunLoopTimerGetOrder(i8*)
+declare i64 @CFRunLoopTimerGetTypeID()
+declare void @CFRunLoopTimerInvalidate(i8*)
+declare zeroext i8 @CFRunLoopTimerIsValid(i8*)
+declare void @CFRunLoopTimerSetNextFireDate(i8*, double)
+declare void @CFRunLoopWakeUp(i8*)
+declare void @CFSetAddValue(i8*, i8*)
+declare void @CFSetApplyFunction(i8*, void (i8*, i8*)*, i8*)
+declare zeroext i8 @CFSetContainsValue(i8*, i8*)
+declare i8* @CFSetCreate(i8**, i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)*, i64 (i8*)* }>*)
+declare i8* @CFSetCreateCopy(i8**, i8*)
+declare i8* @CFSetCreateMutable(i8**, i64, <{ i64, i8* (i8*, i8*)*, void (i8*, i8*)*, i8* (i8*)*, i8 (i8*, i8*)*, i64 (i8*)* }>*)
+declare i8* @CFSetCreateMutableCopy(i8**, i64, i8*)
+declare i64 @CFSetGetCount(i8*)
+declare i64 @CFSetGetCountOfValue(i8*, i8*)
+declare i64 @CFSetGetTypeID()
+declare i8* @CFSetGetValue(i8*, i8*)
+declare zeroext i8 @CFSetGetValueIfPresent(i8*, i8*, i8**)
+declare void @CFSetGetValues(i8*, i8**)
+declare void @CFSetRemoveAllValues(i8*)
+declare void @CFSetRemoveValue(i8*, i8*)
+declare void @CFSetReplaceValue(i8*, i8*)
+declare void @CFSetSetValue(i8*, i8*)
+declare void @CFShow(i8*)
+declare void @CFShowStr(i8*)
+declare i64 @CFSocketConnectToAddress(i8*, i8*, double)
+declare i8* @CFSocketCopyAddress(i8*)
+declare i8* @CFSocketCopyPeerAddress(i8*)
+declare i64 @CFSocketCopyRegisteredSocketSignature(<{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, double, i8*, <{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, i8**)
+declare i64 @CFSocketCopyRegisteredValue(<{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, double, i8*, i8**, i8**)
+declare i8* @CFSocketCreate(i8**, i32, i32, i32, i64, void (i8*, i64, i8*, i8*, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i8* @CFSocketCreateConnectedToSocketSignature(i8**, <{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, i64, void (i8*, i64, i8*, i8*, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*, double)
+declare i8* @CFSocketCreateRunLoopSource(i8**, i8*, i64)
+declare i8* @CFSocketCreateWithNative(i8**, i32, i64, void (i8*, i64, i8*, i8*, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i8* @CFSocketCreateWithSocketSignature(i8**, <{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, i64, void (i8*, i64, i8*, i8*, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare void @CFSocketDisableCallBacks(i8*, i64)
+declare void @CFSocketEnableCallBacks(i8*, i64)
+declare void @CFSocketGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare zeroext i16 @CFSocketGetDefaultNameRegistryPortNumber()
+declare i32 @CFSocketGetNative(i8*)
+declare i64 @CFSocketGetSocketFlags(i8*)
+declare i64 @CFSocketGetTypeID()
+declare void @CFSocketInvalidate(i8*)
+declare zeroext i8 @CFSocketIsValid(i8*)
+declare i64 @CFSocketRegisterSocketSignature(<{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, double, i8*, <{ i32, i32, i32, i8, i8, i8, i8, i8* }>*)
+declare i64 @CFSocketRegisterValue(<{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, double, i8*, i8*)
+declare i64 @CFSocketSendData(i8*, i8*, i8*, double)
+declare i64 @CFSocketSetAddress(i8*, i8*)
+declare void @CFSocketSetDefaultNameRegistryPortNumber(i16 zeroext)
+declare void @CFSocketSetSocketFlags(i8*, i64)
+declare i64 @CFSocketUnregister(<{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, double, i8*)
+declare void @CFStreamCreateBoundPair(i8**, i8**, i8**, i64)
+declare void @CFStreamCreatePairWithPeerSocketSignature(i8**, <{ i32, i32, i32, i8, i8, i8, i8, i8* }>*, i8**, i8**)
+declare void @CFStreamCreatePairWithSocket(i8**, i32, i8**, i8**)
+declare void @CFStreamCreatePairWithSocketToHost(i8**, i8*, i32, i8**, i8**)
+declare void @CFStringAppend(i8*, i8*)
+declare void @CFStringAppendCString(i8*, i8*, i32)
+declare void @CFStringAppendCharacters(i8*, i16*, i64)
+declare void @CFStringAppendFormat(i8*, i8*, i8*, ...)
+declare void @CFStringAppendFormatAndArguments(i8*, i8*, i8*, %struct.__va_list_tag*)
+declare void @CFStringAppendPascalString(i8*, i8*, i32)
+declare void @CFStringCapitalize(i8*, i8*)
+declare i64 @CFStringCompare(i8*, i8*, i64)
+declare i64 @CFStringCompareWithOptions(i8*, i8*, { i64, i64 }, i64)
+declare i64 @CFStringCompareWithOptionsAndLocale(i8*, i8*, { i64, i64 }, i64, i8*)
+declare i8* @CFStringConvertEncodingToIANACharSetName(i32)
+declare i64 @CFStringConvertEncodingToNSStringEncoding(i32)
+declare i32 @CFStringConvertEncodingToWindowsCodepage(i32)
+declare i32 @CFStringConvertIANACharSetNameToEncoding(i8*)
+declare i32 @CFStringConvertNSStringEncodingToEncoding(i64)
+declare i32 @CFStringConvertWindowsCodepageToEncoding(i32)
+declare i8** @CFStringCreateArrayBySeparatingStrings(i8**, i8*, i8*)
+declare i8** @CFStringCreateArrayWithFindResults(i8**, i8*, i8*, { i64, i64 }, i64)
+declare i8* @CFStringCreateByCombiningStrings(i8**, i8**, i8*)
+declare i8* @CFStringCreateCopy(i8**, i8*)
+declare i8* @CFStringCreateExternalRepresentation(i8**, i8*, i32, i8 zeroext)
+declare i8* @CFStringCreateFromExternalRepresentation(i8**, i8*, i32)
+declare i8* @CFStringCreateMutable(i8**, i64)
+declare i8* @CFStringCreateMutableCopy(i8**, i64, i8*)
+declare i8* @CFStringCreateMutableWithExternalCharactersNoCopy(i8**, i16*, i64, i64, i8**)
+declare i8* @CFStringCreateWithBytes(i8**, i8*, i64, i32, i8 zeroext)
+declare i8* @CFStringCreateWithBytesNoCopy(i8**, i8*, i64, i32, i8 zeroext, i8**)
+declare i8* @CFStringCreateWithCString(i8**, i8*, i32)
+declare i8* @CFStringCreateWithCStringNoCopy(i8**, i8*, i32, i8**)
+declare i8* @CFStringCreateWithCharacters(i8**, i16*, i64)
+declare i8* @CFStringCreateWithCharactersNoCopy(i8**, i16*, i64, i8**)
+declare i8* @CFStringCreateWithFileSystemRepresentation(i8**, i8*)
+declare i8* @CFStringCreateWithFormat(i8**, i8*, i8*, ...)
+declare i8* @CFStringCreateWithFormatAndArguments(i8**, i8*, i8*, %struct.__va_list_tag*)
+declare i8* @CFStringCreateWithPascalString(i8**, i8*, i32)
+declare i8* @CFStringCreateWithPascalStringNoCopy(i8**, i8*, i32, i8**)
+declare i8* @CFStringCreateWithSubstring(i8**, i8*, { i64, i64 })
+declare void @CFStringDelete(i8*, { i64, i64 })
+declare { i64, i64 } @CFStringFind(i8*, i8*, i64)
+declare i64 @CFStringFindAndReplace(i8*, i8*, i8*, { i64, i64 }, i64)
+declare zeroext i8 @CFStringFindCharacterFromSet(i8*, i8*, { i64, i64 }, i64, <{ i64, i64 }>*)
+declare zeroext i8 @CFStringFindWithOptions(i8*, i8*, { i64, i64 }, i64, <{ i64, i64 }>*)
+declare zeroext i8 @CFStringFindWithOptionsAndLocale(i8*, i8*, { i64, i64 }, i64, i8*, <{ i64, i64 }>*)
+declare void @CFStringFold(i8*, i64, i8*)
+declare i64 @CFStringGetBytes(i8*, { i64, i64 }, i32, i8 zeroext, i8 zeroext, i8*, i64, i64*)
+declare zeroext i8 @CFStringGetCString(i8*, i8*, i64, i32)
+declare i8* @CFStringGetCStringPtr(i8*, i32)
+declare zeroext i16 @CFStringGetCharacterAtIndex(i8*, i64)
+declare void @CFStringGetCharacters(i8*, { i64, i64 }, i16*)
+declare i16* @CFStringGetCharactersPtr(i8*)
+declare double @CFStringGetDoubleValue(i8*)
+declare i32 @CFStringGetFastestEncoding(i8*)
+declare zeroext i8 @CFStringGetFileSystemRepresentation(i8*, i8*, i64)
+declare i32 @CFStringGetIntValue(i8*)
+declare i64 @CFStringGetLength(i8*)
+declare void @CFStringGetLineBounds(i8*, { i64, i64 }, i64*, i64*, i64*)
+declare i32* @CFStringGetListOfAvailableEncodings()
+declare i64 @CFStringGetMaximumSizeForEncoding(i64, i32)
+declare i64 @CFStringGetMaximumSizeOfFileSystemRepresentation(i8*)
+declare i32 @CFStringGetMostCompatibleMacStringEncoding(i32)
+declare i8* @CFStringGetNameOfEncoding(i32)
+declare void @CFStringGetParagraphBounds(i8*, { i64, i64 }, i64*, i64*, i64*)
+declare zeroext i8 @CFStringGetPascalString(i8*, i8*, i64, i32)
+declare i8* @CFStringGetPascalStringPtr(i8*, i32)
+declare { i64, i64 } @CFStringGetRangeOfComposedCharactersAtIndex(i8*, i64)
+declare i32 @CFStringGetSmallestEncoding(i8*)
+declare i32 @CFStringGetSystemEncoding()
+declare i64 @CFStringGetTypeID()
+declare zeroext i8 @CFStringHasPrefix(i8*, i8*)
+declare zeroext i8 @CFStringHasSuffix(i8*, i8*)
+declare void @CFStringInsert(i8*, i64, i8*)
+declare zeroext i8 @CFStringIsEncodingAvailable(i32)
+declare void @CFStringLowercase(i8*, i8*)
+declare void @CFStringNormalize(i8*, i64)
+declare void @CFStringPad(i8*, i8*, i64, i64)
+declare void @CFStringReplace(i8*, { i64, i64 }, i8*)
+declare void @CFStringReplaceAll(i8*, i8*)
+declare void @CFStringSetExternalCharactersNoCopy(i8*, i16*, i64, i64)
+declare i64 @CFStringTokenizerAdvanceToNextToken(i8*)
+declare i8* @CFStringTokenizerCopyBestStringLanguage(i8*, { i64, i64 })
+declare i8* @CFStringTokenizerCopyCurrentTokenAttribute(i8*, i64)
+declare i8* @CFStringTokenizerCreate(i8**, i8*, { i64, i64 }, i64, i8*)
+declare i64 @CFStringTokenizerGetCurrentSubTokens(i8*, <{ i64, i64 }>*, i64, i8**)
+declare { i64, i64 } @CFStringTokenizerGetCurrentTokenRange(i8*)
+declare i64 @CFStringTokenizerGetTypeID()
+declare i64 @CFStringTokenizerGoToTokenAtIndex(i8*, i64)
+declare void @CFStringTokenizerSetString(i8*, i8*, { i64, i64 })
+declare zeroext i8 @CFStringTransform(i8*, <{ i64, i64 }>*, i8*, i8 zeroext)
+declare void @CFStringTrim(i8*, i8*)
+declare void @CFStringTrimWhitespace(i8*)
+declare void @CFStringUppercase(i8*, i8*)
+declare i8* @CFTimeZoneCopyAbbreviation(i8*, double)
+declare i8* @CFTimeZoneCopyAbbreviationDictionary()
+declare i8* @CFTimeZoneCopyDefault()
+declare i8** @CFTimeZoneCopyKnownNames()
+declare i8* @CFTimeZoneCopyLocalizedName(i8*, i64, i8*)
+declare i8* @CFTimeZoneCopySystem()
+declare i8* @CFTimeZoneCreate(i8**, i8*, i8*)
+declare i8* @CFTimeZoneCreateWithName(i8**, i8*, i8 zeroext)
+declare i8* @CFTimeZoneCreateWithTimeIntervalFromGMT(i8**, double)
+declare i8* @CFTimeZoneGetData(i8*)
+declare double @CFTimeZoneGetDaylightSavingTimeOffset(i8*, double)
+declare i8* @CFTimeZoneGetName(i8*)
+declare double @CFTimeZoneGetNextDaylightSavingTimeTransition(i8*, double)
+declare double @CFTimeZoneGetSecondsFromGMT(i8*, double)
+declare i64 @CFTimeZoneGetTypeID()
+declare zeroext i8 @CFTimeZoneIsDaylightSavingTime(i8*, double)
+declare void @CFTimeZoneResetSystem()
+declare void @CFTimeZoneSetAbbreviationDictionary(i8*)
+declare void @CFTimeZoneSetDefault(i8*)
+declare void @CFTreeAppendChild(i8*, i8*)
+declare void @CFTreeApplyFunctionToChildren(i8*, void (i8*, i8*)*, i8*)
+declare i8* @CFTreeCreate(i8**, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i8* @CFTreeFindRoot(i8*)
+declare i8* @CFTreeGetChildAtIndex(i8*, i64)
+declare i64 @CFTreeGetChildCount(i8*)
+declare void @CFTreeGetChildren(i8*, i8**)
+declare void @CFTreeGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i8* @CFTreeGetFirstChild(i8*)
+declare i8* @CFTreeGetNextSibling(i8*)
+declare i8* @CFTreeGetParent(i8*)
+declare i64 @CFTreeGetTypeID()
+declare void @CFTreeInsertSibling(i8*, i8*)
+declare void @CFTreePrependChild(i8*, i8*)
+declare void @CFTreeRemove(i8*)
+declare void @CFTreeRemoveAllChildren(i8*)
+declare void @CFTreeSetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare void @CFTreeSortChildren(i8*, i64 (i8*, i8*, i8*)*, i8*)
+declare zeroext i8 @CFURLCanBeDecomposed(i8*)
+declare void @CFURLClearResourcePropertyCache(i8*)
+declare void @CFURLClearResourcePropertyCacheForKey(i8*, i8*)
+declare i8* @CFURLCopyAbsoluteURL(i8*)
+declare i8* @CFURLCopyFileSystemPath(i8*, i64)
+declare i8* @CFURLCopyFragment(i8*, i8*)
+declare i8* @CFURLCopyHostName(i8*)
+declare i8* @CFURLCopyLastPathComponent(i8*)
+declare i8* @CFURLCopyNetLocation(i8*)
+declare i8* @CFURLCopyParameterString(i8*, i8*)
+declare i8* @CFURLCopyPassword(i8*)
+declare i8* @CFURLCopyPath(i8*)
+declare i8* @CFURLCopyPathExtension(i8*)
+declare i8* @CFURLCopyQueryString(i8*, i8*)
+declare i8* @CFURLCopyResourcePropertiesForKeys(i8*, i8**, i8**)
+declare zeroext i8 @CFURLCopyResourcePropertyForKey(i8*, i8*, i8*, i8**)
+declare i8* @CFURLCopyResourceSpecifier(i8*)
+declare i8* @CFURLCopyScheme(i8*)
+declare i8* @CFURLCopyStrictPath(i8*, i8*)
+declare i8* @CFURLCopyUserName(i8*)
+declare i8* @CFURLCreateAbsoluteURLWithBytes(i8**, i8*, i64, i32, i8*, i8 zeroext)
+declare i8* @CFURLCreateBookmarkData(i8**, i8*, i64, i8**, i8*, i8**)
+declare i8* @CFURLCreateBookmarkDataFromAliasRecord(i8**, i8*)
+declare i8* @CFURLCreateBookmarkDataFromFile(i8**, i8*, i8**)
+declare i8* @CFURLCreateByResolvingBookmarkData(i8**, i8*, i64, i8*, i8**, i8*, i8**)
+declare i8* @CFURLCreateCopyAppendingPathComponent(i8**, i8*, i8*, i8 zeroext)
+declare i8* @CFURLCreateCopyAppendingPathExtension(i8**, i8*, i8*)
+declare i8* @CFURLCreateCopyDeletingLastPathComponent(i8**, i8*)
+declare i8* @CFURLCreateCopyDeletingPathExtension(i8**, i8*)
+declare i8* @CFURLCreateData(i8**, i8*, i32, i8 zeroext)
+declare zeroext i8 @CFURLCreateDataAndPropertiesFromResource(i8**, i8*, i8**, i8**, i8**, i32*)
+declare i8* @CFURLCreateFilePathURL(i8**, i8*, i8**)
+declare i8* @CFURLCreateFileReferenceURL(i8**, i8*, i8**)
+declare i8* @CFURLCreateFromFSRef(i8**, i8*)
+declare i8* @CFURLCreateFromFileSystemRepresentation(i8**, i8*, i64, i8 zeroext)
+declare i8* @CFURLCreateFromFileSystemRepresentationRelativeToBase(i8**, i8*, i64, i8 zeroext, i8*)
+declare i8* @CFURLCreatePropertyFromResource(i8**, i8*, i8*, i32*)
+declare i8* @CFURLCreateResourcePropertiesForKeysFromBookmarkData(i8**, i8**, i8*)
+declare i8* @CFURLCreateResourcePropertyForKeyFromBookmarkData(i8**, i8*, i8*)
+declare i8* @CFURLCreateStringByAddingPercentEscapes(i8**, i8*, i8*, i8*, i32)
+declare i8* @CFURLCreateStringByReplacingPercentEscapes(i8**, i8*, i8*)
+declare i8* @CFURLCreateStringByReplacingPercentEscapesUsingEncoding(i8**, i8*, i8*, i32)
+declare i8* @CFURLCreateWithBytes(i8**, i8*, i64, i32, i8*)
+declare i8* @CFURLCreateWithFileSystemPath(i8**, i8*, i64, i8 zeroext)
+declare i8* @CFURLCreateWithFileSystemPathRelativeToBase(i8**, i8*, i64, i8 zeroext, i8*)
+declare i8* @CFURLCreateWithString(i8**, i8*, i8*)
+declare zeroext i8 @CFURLDestroyResource(i8*, i32*)
+declare i8* @CFURLEnumeratorCreateForDirectoryURL(i8**, i8*, i64, i8**)
+declare i8* @CFURLEnumeratorCreateForMountedVolumes(i8**, i64, i8**)
+declare i64 @CFURLEnumeratorGetDescendentLevel(i8*)
+declare i64 @CFURLEnumeratorGetNextURL(i8*, i8**, i8**)
+declare zeroext i8 @CFURLEnumeratorGetSourceDidChange(i8*)
+declare i64 @CFURLEnumeratorGetTypeID()
+declare void @CFURLEnumeratorSkipDescendents(i8*)
+declare i8* @CFURLGetBaseURL(i8*)
+declare { i64, i64 } @CFURLGetByteRangeForComponent(i8*, i64, <{ i64, i64 }>*)
+declare i64 @CFURLGetBytes(i8*, i8*, i64)
+declare zeroext i8 @CFURLGetFSRef(i8*, i8*)
+declare zeroext i8 @CFURLGetFileSystemRepresentation(i8*, i8 zeroext, i8*, i64)
+declare i32 @CFURLGetPortNumber(i8*)
+declare i8* @CFURLGetString(i8*)
+declare i64 @CFURLGetTypeID()
+declare zeroext i8 @CFURLHasDirectoryPath(i8*)
+declare zeroext i8 @CFURLResourceIsReachable(i8*, i8**)
+declare zeroext i8 @CFURLSetResourcePropertiesForKeys(i8*, i8*, i8**)
+declare zeroext i8 @CFURLSetResourcePropertyForKey(i8*, i8*, i8*, i8**)
+declare void @CFURLSetTemporaryResourcePropertyForKey(i8*, i8*, i8*)
+declare zeroext i8 @CFURLWriteBookmarkDataToFile(i8*, i8*, i64, i8**)
+declare zeroext i8 @CFURLWriteDataAndPropertiesToResource(i8*, i8*, i8*, i32*)
+declare i8* @CFUUIDCreate(i8**)
+declare i8* @CFUUIDCreateFromString(i8**, i8*)
+declare i8* @CFUUIDCreateFromUUIDBytes(i8**, { i64, i64 })
+declare i8* @CFUUIDCreateString(i8**, i8*)
+declare i8* @CFUUIDCreateWithBytes(i8**, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext)
+declare i8* @CFUUIDGetConstantUUIDWithBytes(i8**, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext)
+declare i64 @CFUUIDGetTypeID()
+declare { i64, i64 } @CFUUIDGetUUIDBytes(i8*)
+declare i32 @CFUserNotificationCancel(i8*)
+declare i8* @CFUserNotificationCreate(i8**, double, i64, i32*, i8*)
+declare i8* @CFUserNotificationCreateRunLoopSource(i8**, i8*, void (i8*, i64)*, i64)
+declare i32 @CFUserNotificationDisplayAlert(double, i64, i8*, i8*, i8*, i8*, i8*, i8*, i8*, i8*, i64*)
+declare i32 @CFUserNotificationDisplayNotice(double, i64, i8*, i8*, i8*, i8*, i8*, i8*)
+declare i8* @CFUserNotificationGetResponseDictionary(i8*)
+declare i8* @CFUserNotificationGetResponseValue(i8*, i8*, i64)
+declare i64 @CFUserNotificationGetTypeID()
+declare i32 @CFUserNotificationReceiveResponse(i8*, double, i64*)
+declare i32 @CFUserNotificationUpdate(i8*, double, i64, i8*)
+declare zeroext i8 @CFWriteStreamCanAcceptBytes(i8*)
+declare void @CFWriteStreamClose(i8*)
+declare i8* @CFWriteStreamCopyError(i8*)
+declare i8* @CFWriteStreamCopyProperty(i8*, i8*)
+declare i8* @CFWriteStreamCreateWithAllocatedBuffers(i8**, i8**)
+declare i8* @CFWriteStreamCreateWithBuffer(i8**, i8*, i64)
+declare i8* @CFWriteStreamCreateWithFile(i8**, i8*)
+declare { i64, i64 } @CFWriteStreamGetError(i8*)
+declare i64 @CFWriteStreamGetStatus(i8*)
+declare i64 @CFWriteStreamGetTypeID()
+declare zeroext i8 @CFWriteStreamOpen(i8*)
+declare void @CFWriteStreamScheduleWithRunLoop(i8*, i8*, i8*)
+declare zeroext i8 @CFWriteStreamSetClient(i8*, i64, void (i8*, i64, i8*)*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare zeroext i8 @CFWriteStreamSetProperty(i8*, i8*, i8*)
+declare void @CFWriteStreamUnscheduleFromRunLoop(i8*, i8*, i8*)
+declare i64 @CFWriteStreamWrite(i8*, i8*, i64)
+declare i8* @CFXMLCreateStringByEscapingEntities(i8**, i8*, i8*)
+declare i8* @CFXMLCreateStringByUnescapingEntities(i8**, i8*, i8*)
+declare i8* @CFXMLNodeCreate(i8**, i64, i8*, i8*, i64)
+declare i8* @CFXMLNodeCreateCopy(i8**, i8*)
+declare i8* @CFXMLNodeGetInfoPtr(i8*)
+declare i8* @CFXMLNodeGetString(i8*)
+declare i64 @CFXMLNodeGetTypeCode(i8*)
+declare i64 @CFXMLNodeGetTypeID()
+declare i64 @CFXMLNodeGetVersion(i8*)
+declare void @CFXMLParserAbort(i8*, i64, i8*)
+declare i8* @CFXMLParserCopyErrorDescription(i8*)
+declare i8* @CFXMLParserCreate(i8**, i8*, i8*, i64, i64, <{ i64, i8* (i8*, i8*, i8*)*, void (i8*, i8*, i8*, i8*)*, void (i8*, i8*, i8*)*, i8* (i8*, <{i8*, i8*}>*, i8*)*, i8 (i8*, i64, i8*)* }>*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i8* @CFXMLParserCreateWithDataFromURL(i8**, i8*, i64, i64, <{ i64, i8* (i8*, i8*, i8*)*, void (i8*, i8*, i8*, i8*)*, void (i8*, i8*, i8*)*, i8* (i8*, <{i8*, i8*}>*, i8*)*, i8 (i8*, i64, i8*)* }>*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare void @CFXMLParserGetCallBacks(i8*, <{ i64, i8* (i8*, i8*, i8*)*, void (i8*, i8*, i8*, i8*)*, void (i8*, i8*, i8*)*, i8* (i8*, <{i8*, i8*}>*, i8*)*, i8 (i8*, i64, i8*)* }>*)
+declare void @CFXMLParserGetContext(i8*, <{ i64, i8*, i8* (i8*)*, void (i8*)*, i8* (i8*)* }>*)
+declare i8* @CFXMLParserGetDocument(i8*)
+declare i64 @CFXMLParserGetLineNumber(i8*)
+declare i64 @CFXMLParserGetLocation(i8*)
+declare i8* @CFXMLParserGetSourceURL(i8*)
+declare i64 @CFXMLParserGetStatusCode(i8*)
+declare i64 @CFXMLParserGetTypeID()
+declare zeroext i8 @CFXMLParserParse(i8*)
+declare i8* @CFXMLTreeCreateFromData(i8**, i8*, i8*, i64, i64)
+declare i8* @CFXMLTreeCreateFromDataWithError(i8**, i8*, i8*, i64, i64, i8**)
+declare i8* @CFXMLTreeCreateWithDataFromURL(i8**, i8*, i64, i64)
+declare i8* @CFXMLTreeCreateWithNode(i8**, i8*)
+declare i8* @CFXMLTreeCreateXMLData(i8**, i8*)
+declare i8* @CFXMLTreeGetNode(i8*)
+
+;; opengl
+declare void @glAccum(i32, float)
+declare void @glAlphaFunc(i32, float)
+declare zeroext i8 @glAreTexturesResident(i32, i32*, i8*)
+declare void @glArrayElement(i32)
+declare void @glBegin(i32)
+declare void @glBindTexture(i32, i32)
+declare void @glBitmap(i32, i32, float, float, float, float, i8*)
+declare void @glBlendColor(float, float, float, float)
+declare void @glBlendEquation(i32)
+declare void @glBlendEquationSeparate(i32, i32)
+declare void @glBlendFunc(i32, i32)
+declare void @glCallList(i32)
+declare void @glCallLists(i32, i32, i8*)
+declare void @glClear(i32)
+declare void @glClearAccum(float, float, float, float)
+declare void @glClearColor(float, float, float, float)
+declare void @glClearDepth(double)
+declare void @glClearIndex(float)
+declare void @glClearStencil(i32)
+declare void @glClipPlane(i32, double*)
+declare void @glColor3b(i8 signext, i8 signext, i8 signext)
+declare void @glColor3bv(i8*)
+declare void @glColor3d(double, double, double)
+declare void @glColor3dv(double*)
+declare void @glColor3f(float, float, float)
+declare void @glColor3fv(float*)
+declare void @glColor3i(i32, i32, i32)
+declare void @glColor3iv(i32*)
+declare void @glColor3s(i16 signext, i16 signext, i16 signext)
+declare void @glColor3sv(i16*)
+declare void @glColor3ub(i8 zeroext, i8 zeroext, i8 zeroext)
+declare void @glColor3ubv(i8*)
+declare void @glColor3ui(i32, i32, i32)
+declare void @glColor3uiv(i32*)
+declare void @glColor3us(i16 zeroext, i16 zeroext, i16 zeroext)
+declare void @glColor3usv(i16*)
+declare void @glColor4b(i8 signext, i8 signext, i8 signext, i8 signext)
+declare void @glColor4bv(i8*)
+declare void @glColor4d(double, double, double, double)
+declare void @glColor4dv(double*)
+declare void @glColor4f(float, float, float, float)
+declare void @glColor4fv(float*)
+declare void @glColor4i(i32, i32, i32, i32)
+declare void @glColor4iv(i32*)
+declare void @glColor4s(i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glColor4sv(i16*)
+declare void @glColor4ub(i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext)
+declare void @glColor4ubv(i8*)
+declare void @glColor4ui(i32, i32, i32, i32)
+declare void @glColor4uiv(i32*)
+declare void @glColor4us(i16 zeroext, i16 zeroext, i16 zeroext, i16 zeroext)
+declare void @glColor4usv(i16*)
+declare void @glColorMask(i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext)
+declare void @glColorMaterial(i32, i32)
+declare void @glColorPointer(i32, i32, i32, i8*)
+declare void @glColorSubTable(i32, i32, i32, i32, i32, i8*)
+declare void @glColorTable(i32, i32, i32, i32, i32, i8*)
+declare void @glColorTableParameterfv(i32, i32, float*)
+declare void @glColorTableParameteriv(i32, i32, i32*)
+declare void @glConvolutionFilter1D(i32, i32, i32, i32, i32, i8*)
+declare void @glConvolutionFilter2D(i32, i32, i32, i32, i32, i32, i8*)
+declare void @glConvolutionParameterf(i32, i32, float)
+declare void @glConvolutionParameterfv(i32, i32, float*)
+declare void @glConvolutionParameteri(i32, i32, i32)
+declare void @glConvolutionParameteriv(i32, i32, i32*)
+declare void @glCopyColorSubTable(i32, i32, i32, i32, i32)
+declare void @glCopyColorTable(i32, i32, i32, i32, i32)
+declare void @glCopyConvolutionFilter1D(i32, i32, i32, i32, i32)
+declare void @glCopyConvolutionFilter2D(i32, i32, i32, i32, i32, i32)
+declare void @glCopyPixels(i32, i32, i32, i32, i32)
+declare void @glCopyTexImage1D(i32, i32, i32, i32, i32, i32, i32)
+declare void @glCopyTexImage2D(i32, i32, i32, i32, i32, i32, i32, i32)
+declare void @glCopyTexSubImage1D(i32, i32, i32, i32, i32, i32)
+declare void @glCopyTexSubImage2D(i32, i32, i32, i32, i32, i32, i32, i32)
+declare void @glCopyTexSubImage3D(i32, i32, i32, i32, i32, i32, i32, i32, i32)
+declare void @glCullFace(i32)
+declare void @glDeleteLists(i32, i32)
+declare void @glDeleteTextures(i32, i32*)
+declare void @glDepthFunc(i32)
+declare void @glDepthMask(i8 zeroext)
+declare void @glDepthRange(double, double)
+declare void @glDisable(i32)
+declare void @glDisableClientState(i32)
+declare void @glDrawArrays(i32, i32, i32)
+declare void @glDrawBuffer(i32)
+declare void @glDrawElements(i32, i32, i32, i8*)
+declare void @glDrawPixels(i32, i32, i32, i32, i8*)
+declare void @glDrawRangeElements(i32, i32, i32, i32, i32, i8*)
+declare void @glEdgeFlag(i8 zeroext)
+declare void @glEdgeFlagPointer(i32, i8*)
+declare void @glEdgeFlagv(i8*)
+declare void @glEnable(i32)
+declare void @glEnableClientState(i32)
+declare void @glEnd()
+declare void @glEndList()
+declare void @glEvalCoord1d(double)
+declare void @glEvalCoord1dv(double*)
+declare void @glEvalCoord1f(float)
+declare void @glEvalCoord1fv(float*)
+declare void @glEvalCoord2d(double, double)
+declare void @glEvalCoord2dv(double*)
+declare void @glEvalCoord2f(float, float)
+declare void @glEvalCoord2fv(float*)
+declare void @glEvalMesh1(i32, i32, i32)
+declare void @glEvalMesh2(i32, i32, i32, i32, i32)
+declare void @glEvalPoint1(i32)
+declare void @glEvalPoint2(i32, i32)
+declare void @glFeedbackBuffer(i32, i32, float*)
+declare void @glFinish()
+declare void @glFlush()
+declare void @glFogf(i32, float)
+declare void @glFogfv(i32, float*)
+declare void @glFogi(i32, i32)
+declare void @glFogiv(i32, i32*)
+declare void @glFrontFace(i32)
+declare void @glFrustum(double, double, double, double, double, double)
+declare i32 @glGenLists(i32)
+declare void @glGenTextures(i32, i32*)
+declare void @glGetBooleanv(i32, i8*)
+declare void @glGetClipPlane(i32, double*)
+declare void @glGetColorTable(i32, i32, i32, i8*)
+declare void @glGetColorTableParameterfv(i32, i32, float*)
+declare void @glGetColorTableParameteriv(i32, i32, i32*)
+declare void @glGetConvolutionFilter(i32, i32, i32, i8*)
+declare void @glGetConvolutionParameterfv(i32, i32, float*)
+declare void @glGetConvolutionParameteriv(i32, i32, i32*)
+declare void @glGetDoublev(i32, double*)
+declare i32 @glGetError()
+declare void @glGetFloatv(i32, float*)
+declare void @glGetHistogram(i32, i8 zeroext, i32, i32, i8*)
+declare void @glGetHistogramParameterfv(i32, i32, float*)
+declare void @glGetHistogramParameteriv(i32, i32, i32*)
+declare void @glGetIntegerv(i32, i32*)
+declare void @glGetLightfv(i32, i32, float*)
+declare void @glGetLightiv(i32, i32, i32*)
+declare void @glGetMapdv(i32, i32, double*)
+declare void @glGetMapfv(i32, i32, float*)
+declare void @glGetMapiv(i32, i32, i32*)
+declare void @glGetMaterialfv(i32, i32, float*)
+declare void @glGetMaterialiv(i32, i32, i32*)
+declare void @glGetMinmax(i32, i8 zeroext, i32, i32, i8*)
+declare void @glGetMinmaxParameterfv(i32, i32, float*)
+declare void @glGetMinmaxParameteriv(i32, i32, i32*)
+declare void @glGetPixelMapfv(i32, float*)
+declare void @glGetPixelMapuiv(i32, i32*)
+declare void @glGetPixelMapusv(i32, i16*)
+declare void @glGetPointerv(i32, i8**)
+declare void @glGetPolygonStipple(i8*)
+declare void @glGetSeparableFilter(i32, i32, i32, i8*, i8*, i8*)
+declare i8* @glGetString(i32)
+declare void @glGetTexEnvfv(i32, i32, float*)
+declare void @glGetTexEnviv(i32, i32, i32*)
+declare void @glGetTexGendv(i32, i32, double*)
+declare void @glGetTexGenfv(i32, i32, float*)
+declare void @glGetTexGeniv(i32, i32, i32*)
+declare void @glGetTexImage(i32, i32, i32, i32, i8*)
+declare void @glGetTexLevelParameterfv(i32, i32, i32, float*)
+declare void @glGetTexLevelParameteriv(i32, i32, i32, i32*)
+declare void @glGetTexParameterfv(i32, i32, float*)
+declare void @glGetTexParameteriv(i32, i32, i32*)
+declare void @glHint(i32, i32)
+declare void @glHistogram(i32, i32, i32, i8 zeroext)
+declare void @glIndexMask(i32)
+declare void @glIndexPointer(i32, i32, i8*)
+declare void @glIndexd(double)
+declare void @glIndexdv(double*)
+declare void @glIndexf(float)
+declare void @glIndexfv(float*)
+declare void @glIndexi(i32)
+declare void @glIndexiv(i32*)
+declare void @glIndexs(i16 signext)
+declare void @glIndexsv(i16*)
+declare void @glIndexub(i8 zeroext)
+declare void @glIndexubv(i8*)
+declare void @glInitNames()
+declare void @glInterleavedArrays(i32, i32, i8*)
+declare zeroext i8 @glIsEnabled(i32)
+declare zeroext i8 @glIsList(i32)
+declare zeroext i8 @glIsTexture(i32)
+declare void @glLightModelf(i32, float)
+declare void @glLightModelfv(i32, float*)
+declare void @glLightModeli(i32, i32)
+declare void @glLightModeliv(i32, i32*)
+declare void @glLightf(i32, i32, float)
+declare void @glLightfv(i32, i32, float*)
+declare void @glLighti(i32, i32, i32)
+declare void @glLightiv(i32, i32, i32*)
+declare void @glLineStipple(i32, i16 zeroext)
+declare void @glLineWidth(float)
+declare void @glListBase(i32)
+declare void @glLoadIdentity()
+declare void @glLoadMatrixd(double*)
+declare void @glLoadMatrixf(float*)
+declare void @glLoadName(i32)
+declare void @glLogicOp(i32)
+declare void @glMap1d(i32, double, double, i32, i32, double*)
+declare void @glMap1f(i32, float, float, i32, i32, float*)
+declare void @glMap2d(i32, double, double, i32, i32, double, double, i32, i32, double*)
+declare void @glMap2f(i32, float, float, i32, i32, float, float, i32, i32, float*)
+declare void @glMapGrid1d(i32, double, double)
+declare void @glMapGrid1f(i32, float, float)
+declare void @glMapGrid2d(i32, double, double, i32, double, double)
+declare void @glMapGrid2f(i32, float, float, i32, float, float)
+declare void @glMaterialf(i32, i32, float)
+declare void @glMaterialfv(i32, i32, float*)
+declare void @glMateriali(i32, i32, i32)
+declare void @glMaterialiv(i32, i32, i32*)
+declare void @glMatrixMode(i32)
+declare void @glMinmax(i32, i32, i8 zeroext)
+declare void @glMultMatrixd(double*)
+declare void @glMultMatrixf(float*)
+declare void @glNewList(i32, i32)
+declare void @glNormal3b(i8 signext, i8 signext, i8 signext)
+declare void @glNormal3bv(i8*)
+declare void @glNormal3d(double, double, double)
+declare void @glNormal3dv(double*)
+declare void @glNormal3f(float, float, float)
+declare void @glNormal3fv(float*)
+declare void @glNormal3i(i32, i32, i32)
+declare void @glNormal3iv(i32*)
+declare void @glNormal3s(i16 signext, i16 signext, i16 signext)
+declare void @glNormal3sv(i16*)
+declare void @glNormalPointer(i32, i32, i8*)
+declare void @glOrtho(double, double, double, double, double, double)
+declare void @glPassThrough(float)
+declare void @glPixelMapfv(i32, i32, float*)
+declare void @glPixelMapuiv(i32, i32, i32*)
+declare void @glPixelMapusv(i32, i32, i16*)
+declare void @glPixelStoref(i32, float)
+declare void @glPixelStorei(i32, i32)
+declare void @glPixelTransferf(i32, float)
+declare void @glPixelTransferi(i32, i32)
+declare void @glPixelZoom(float, float)
+declare void @glPointSize(float)
+declare void @glPolygonMode(i32, i32)
+declare void @glPolygonOffset(float, float)
+declare void @glPolygonStipple(i8*)
+declare void @glPopAttrib()
+declare void @glPopClientAttrib()
+declare void @glPopMatrix()
+declare void @glPopName()
+declare void @glPrioritizeTextures(i32, i32*, float*)
+declare void @glPushAttrib(i32)
+declare void @glPushClientAttrib(i32)
+declare void @glPushMatrix()
+declare void @glPushName(i32)
+declare void @glRasterPos2d(double, double)
+declare void @glRasterPos2dv(double*)
+declare void @glRasterPos2f(float, float)
+declare void @glRasterPos2fv(float*)
+declare void @glRasterPos2i(i32, i32)
+declare void @glRasterPos2iv(i32*)
+declare void @glRasterPos2s(i16 signext, i16 signext)
+declare void @glRasterPos2sv(i16*)
+declare void @glRasterPos3d(double, double, double)
+declare void @glRasterPos3dv(double*)
+declare void @glRasterPos3f(float, float, float)
+declare void @glRasterPos3fv(float*)
+declare void @glRasterPos3i(i32, i32, i32)
+declare void @glRasterPos3iv(i32*)
+declare void @glRasterPos3s(i16 signext, i16 signext, i16 signext)
+declare void @glRasterPos3sv(i16*)
+declare void @glRasterPos4d(double, double, double, double)
+declare void @glRasterPos4dv(double*)
+declare void @glRasterPos4f(float, float, float, float)
+declare void @glRasterPos4fv(float*)
+declare void @glRasterPos4i(i32, i32, i32, i32)
+declare void @glRasterPos4iv(i32*)
+declare void @glRasterPos4s(i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glRasterPos4sv(i16*)
+declare void @glReadBuffer(i32)
+declare void @glReadPixels(i32, i32, i32, i32, i32, i32, i8*)
+declare void @glRectd(double, double, double, double)
+declare void @glRectdv(double*, double*)
+declare void @glRectf(float, float, float, float)
+declare void @glRectfv(float*, float*)
+declare void @glRecti(i32, i32, i32, i32)
+declare void @glRectiv(i32*, i32*)
+declare void @glRects(i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glRectsv(i16*, i16*)
+declare i32 @glRenderMode(i32)
+declare void @glResetHistogram(i32)
+declare void @glResetMinmax(i32)
+declare void @glRotated(double, double, double, double)
+declare void @glRotatef(float, float, float, float)
+declare void @glScaled(double, double, double)
+declare void @glScalef(float, float, float)
+declare void @glScissor(i32, i32, i32, i32)
+declare void @glSelectBuffer(i32, i32*)
+declare void @glSeparableFilter2D(i32, i32, i32, i32, i32, i32, i8*, i8*)
+declare void @glShadeModel(i32)
+declare void @glStencilFunc(i32, i32, i32)
+declare void @glStencilMask(i32)
+declare void @glStencilOp(i32, i32, i32)
+declare void @glTexCoord1d(double)
+declare void @glTexCoord1dv(double*)
+declare void @glTexCoord1f(float)
+declare void @glTexCoord1fv(float*)
+declare void @glTexCoord1i(i32)
+declare void @glTexCoord1iv(i32*)
+declare void @glTexCoord1s(i16 signext)
+declare void @glTexCoord1sv(i16*)
+declare void @glTexCoord2d(double, double)
+declare void @glTexCoord2dv(double*)
+declare void @glTexCoord2f(float, float)
+declare void @glTexCoord2fv(float*)
+declare void @glTexCoord2i(i32, i32)
+declare void @glTexCoord2iv(i32*)
+declare void @glTexCoord2s(i16 signext, i16 signext)
+declare void @glTexCoord2sv(i16*)
+declare void @glTexCoord3d(double, double, double)
+declare void @glTexCoord3dv(double*)
+declare void @glTexCoord3f(float, float, float)
+declare void @glTexCoord3fv(float*)
+declare void @glTexCoord3i(i32, i32, i32)
+declare void @glTexCoord3iv(i32*)
+declare void @glTexCoord3s(i16 signext, i16 signext, i16 signext)
+declare void @glTexCoord3sv(i16*)
+declare void @glTexCoord4d(double, double, double, double)
+declare void @glTexCoord4dv(double*)
+declare void @glTexCoord4f(float, float, float, float)
+declare void @glTexCoord4fv(float*)
+declare void @glTexCoord4i(i32, i32, i32, i32)
+declare void @glTexCoord4iv(i32*)
+declare void @glTexCoord4s(i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glTexCoord4sv(i16*)
+declare void @glTexCoordPointer(i32, i32, i32, i8*)
+declare void @glTexEnvf(i32, i32, float)
+declare void @glTexEnvfv(i32, i32, float*)
+declare void @glTexEnvi(i32, i32, i32)
+declare void @glTexEnviv(i32, i32, i32*)
+declare void @glTexGend(i32, i32, double)
+declare void @glTexGendv(i32, i32, double*)
+declare void @glTexGenf(i32, i32, float)
+declare void @glTexGenfv(i32, i32, float*)
+declare void @glTexGeni(i32, i32, i32)
+declare void @glTexGeniv(i32, i32, i32*)
+declare void @glTexImage1D(i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glTexImage2D(i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glTexImage3D(i32, i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glTexParameterf(i32, i32, float)
+declare void @glTexParameterfv(i32, i32, float*)
+declare void @glTexParameteri(i32, i32, i32)
+declare void @glTexParameteriv(i32, i32, i32*)
+declare void @glTexSubImage1D(i32, i32, i32, i32, i32, i32, i8*)
+declare void @glTexSubImage2D(i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glTexSubImage3D(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glTranslated(double, double, double)
+declare void @glTranslatef(float, float, float)
+declare void @glVertex2d(double, double)
+declare void @glVertex2dv(double*)
+declare void @glVertex2f(float, float)
+declare void @glVertex2fv(float*)
+declare void @glVertex2i(i32, i32)
+declare void @glVertex2iv(i32*)
+declare void @glVertex2s(i16 signext, i16 signext)
+declare void @glVertex2sv(i16*)
+declare void @glVertex3d(double, double, double)
+declare void @glVertex3dv(double*)
+declare void @glVertex3f(float, float, float)
+declare void @glVertex3fv(float*)
+declare void @glVertex3i(i32, i32, i32)
+declare void @glVertex3iv(i32*)
+declare void @glVertex3s(i16 signext, i16 signext, i16 signext)
+declare void @glVertex3sv(i16*)
+declare void @glVertex4d(double, double, double, double)
+declare void @glVertex4dv(double*)
+declare void @glVertex4f(float, float, float, float)
+declare void @glVertex4fv(float*)
+declare void @glVertex4i(i32, i32, i32, i32)
+declare void @glVertex4iv(i32*)
+declare void @glVertex4s(i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glVertex4sv(i16*)
+declare void @glVertexPointer(i32, i32, i32, i8*)
+declare void @glViewport(i32, i32, i32, i32)
+declare void @glSampleCoverage(float, i8 zeroext)
+declare void @glSamplePass(i32)
+declare void @glLoadTransposeMatrixf(float*)
+declare void @glLoadTransposeMatrixd(double*)
+declare void @glMultTransposeMatrixf(float*)
+declare void @glMultTransposeMatrixd(double*)
+declare void @glCompressedTexImage3D(i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexImage2D(i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexImage1D(i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexSubImage3D(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexSubImage2D(i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexSubImage1D(i32, i32, i32, i32, i32, i32, i8*)
+declare void @glGetCompressedTexImage(i32, i32, i8*)
+declare void @glActiveTexture(i32)
+declare void @glClientActiveTexture(i32)
+declare void @glMultiTexCoord1d(i32, double)
+declare void @glMultiTexCoord1dv(i32, double*)
+declare void @glMultiTexCoord1f(i32, float)
+declare void @glMultiTexCoord1fv(i32, float*)
+declare void @glMultiTexCoord1i(i32, i32)
+declare void @glMultiTexCoord1iv(i32, i32*)
+declare void @glMultiTexCoord1s(i32, i16 signext)
+declare void @glMultiTexCoord1sv(i32, i16*)
+declare void @glMultiTexCoord2d(i32, double, double)
+declare void @glMultiTexCoord2dv(i32, double*)
+declare void @glMultiTexCoord2f(i32, float, float)
+declare void @glMultiTexCoord2fv(i32, float*)
+declare void @glMultiTexCoord2i(i32, i32, i32)
+declare void @glMultiTexCoord2iv(i32, i32*)
+declare void @glMultiTexCoord2s(i32, i16 signext, i16 signext)
+declare void @glMultiTexCoord2sv(i32, i16*)
+declare void @glMultiTexCoord3d(i32, double, double, double)
+declare void @glMultiTexCoord3dv(i32, double*)
+declare void @glMultiTexCoord3f(i32, float, float, float)
+declare void @glMultiTexCoord3fv(i32, float*)
+declare void @glMultiTexCoord3i(i32, i32, i32, i32)
+declare void @glMultiTexCoord3iv(i32, i32*)
+declare void @glMultiTexCoord3s(i32, i16 signext, i16 signext, i16 signext)
+declare void @glMultiTexCoord3sv(i32, i16*)
+declare void @glMultiTexCoord4d(i32, double, double, double, double)
+declare void @glMultiTexCoord4dv(i32, double*)
+declare void @glMultiTexCoord4f(i32, float, float, float, float)
+declare void @glMultiTexCoord4fv(i32, float*)
+declare void @glMultiTexCoord4i(i32, i32, i32, i32, i32)
+declare void @glMultiTexCoord4iv(i32, i32*)
+declare void @glMultiTexCoord4s(i32, i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glMultiTexCoord4sv(i32, i16*)
+declare void @glFogCoordf(float)
+declare void @glFogCoordfv(float*)
+declare void @glFogCoordd(double)
+declare void @glFogCoorddv(double*)
+declare void @glFogCoordPointer(i32, i32, i8*)
+declare void @glSecondaryColor3b(i8 signext, i8 signext, i8 signext)
+declare void @glSecondaryColor3bv(i8*)
+declare void @glSecondaryColor3d(double, double, double)
+declare void @glSecondaryColor3dv(double*)
+declare void @glSecondaryColor3f(float, float, float)
+declare void @glSecondaryColor3fv(float*)
+declare void @glSecondaryColor3i(i32, i32, i32)
+declare void @glSecondaryColor3iv(i32*)
+declare void @glSecondaryColor3s(i16 signext, i16 signext, i16 signext)
+declare void @glSecondaryColor3sv(i16*)
+declare void @glSecondaryColor3ub(i8 zeroext, i8 zeroext, i8 zeroext)
+declare void @glSecondaryColor3ubv(i8*)
+declare void @glSecondaryColor3ui(i32, i32, i32)
+declare void @glSecondaryColor3uiv(i32*)
+declare void @glSecondaryColor3us(i16 zeroext, i16 zeroext, i16 zeroext)
+declare void @glSecondaryColor3usv(i16*)
+declare void @glSecondaryColorPointer(i32, i32, i32, i8*)
+declare void @glPointParameterf(i32, float)
+declare void @glPointParameterfv(i32, float*)
+declare void @glPointParameteri(i32, i32)
+declare void @glPointParameteriv(i32, i32*)
+declare void @glBlendFuncSeparate(i32, i32, i32, i32)
+declare void @glMultiDrawArrays(i32, i32*, i32*, i32)
+declare void @glMultiDrawElements(i32, i32*, i32, i8**, i32)
+declare void @glWindowPos2d(double, double)
+declare void @glWindowPos2dv(double*)
+declare void @glWindowPos2f(float, float)
+declare void @glWindowPos2fv(float*)
+declare void @glWindowPos2i(i32, i32)
+declare void @glWindowPos2iv(i32*)
+declare void @glWindowPos2s(i16 signext, i16 signext)
+declare void @glWindowPos2sv(i16*)
+declare void @glWindowPos3d(double, double, double)
+declare void @glWindowPos3dv(double*)
+declare void @glWindowPos3f(float, float, float)
+declare void @glWindowPos3fv(float*)
+declare void @glWindowPos3i(i32, i32, i32)
+declare void @glWindowPos3iv(i32*)
+declare void @glWindowPos3s(i16 signext, i16 signext, i16 signext)
+declare void @glWindowPos3sv(i16*)
+declare void @glGenQueries(i32, i32*)
+declare void @glDeleteQueries(i32, i32*)
+declare zeroext i8 @glIsQuery(i32)
+declare void @glBeginQuery(i32, i32)
+declare void @glEndQuery(i32)
+declare void @glGetQueryiv(i32, i32, i32*)
+declare void @glGetQueryObjectiv(i32, i32, i32*)
+declare void @glGetQueryObjectuiv(i32, i32, i32*)
+declare void @glBindBuffer(i32, i32)
+declare void @glDeleteBuffers(i32, i32*)
+declare void @glGenBuffers(i32, i32*)
+declare zeroext i8 @glIsBuffer(i32)
+declare void @glBufferData(i32, i32, i8*, i32)
+declare void @glBufferSubData(i32, i32, i32, i8*)
+declare void @glGetBufferSubData(i32, i32, i32, i8*)
+declare i8* @glMapBuffer(i32, i32)
+declare zeroext i8 @glUnmapBuffer(i32)
+declare void @glGetBufferParameteriv(i32, i32, i32*)
+declare void @glGetBufferPointerv(i32, i32, i8**)
+declare void @glDrawBuffers(i32, i32*)
+declare void @glVertexAttrib1d(i32, double)
+declare void @glVertexAttrib1dv(i32, double*)
+declare void @glVertexAttrib1f(i32, float)
+declare void @glVertexAttrib1fv(i32, float*)
+declare void @glVertexAttrib1s(i32, i16 signext)
+declare void @glVertexAttrib1sv(i32, i16*)
+declare void @glVertexAttrib2d(i32, double, double)
+declare void @glVertexAttrib2dv(i32, double*)
+declare void @glVertexAttrib2f(i32, float, float)
+declare void @glVertexAttrib2fv(i32, float*)
+declare void @glVertexAttrib2s(i32, i16 signext, i16 signext)
+declare void @glVertexAttrib2sv(i32, i16*)
+declare void @glVertexAttrib3d(i32, double, double, double)
+declare void @glVertexAttrib3dv(i32, double*)
+declare void @glVertexAttrib3f(i32, float, float, float)
+declare void @glVertexAttrib3fv(i32, float*)
+declare void @glVertexAttrib3s(i32, i16 signext, i16 signext, i16 signext)
+declare void @glVertexAttrib3sv(i32, i16*)
+declare void @glVertexAttrib4Nbv(i32, i8*)
+declare void @glVertexAttrib4Niv(i32, i32*)
+declare void @glVertexAttrib4Nsv(i32, i16*)
+declare void @glVertexAttrib4Nub(i32, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext)
+declare void @glVertexAttrib4Nubv(i32, i8*)
+declare void @glVertexAttrib4Nuiv(i32, i32*)
+declare void @glVertexAttrib4Nusv(i32, i16*)
+declare void @glVertexAttrib4bv(i32, i8*)
+declare void @glVertexAttrib4d(i32, double, double, double, double)
+declare void @glVertexAttrib4dv(i32, double*)
+declare void @glVertexAttrib4f(i32, float, float, float, float)
+declare void @glVertexAttrib4fv(i32, float*)
+declare void @glVertexAttrib4iv(i32, i32*)
+declare void @glVertexAttrib4s(i32, i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glVertexAttrib4sv(i32, i16*)
+declare void @glVertexAttrib4ubv(i32, i8*)
+declare void @glVertexAttrib4uiv(i32, i32*)
+declare void @glVertexAttrib4usv(i32, i16*)
+declare void @glVertexAttribPointer(i32, i32, i32, i8 zeroext, i32, i8*)
+declare void @glEnableVertexAttribArray(i32)
+declare void @glDisableVertexAttribArray(i32)
+declare void @glGetVertexAttribdv(i32, i32, double*)
+declare void @glGetVertexAttribfv(i32, i32, float*)
+declare void @glGetVertexAttribiv(i32, i32, i32*)
+declare void @glGetVertexAttribPointerv(i32, i32, i8**)
+declare void @glDeleteShader(i32)
+declare void @glDetachShader(i32, i32)
+declare i32 @glCreateShader(i32)
+declare void @glShaderSource(i32, i32, i8**, i32*)
+declare void @glCompileShader(i32)
+declare i32 @glCreateProgram()
+declare void @glAttachShader(i32, i32)
+declare void @glLinkProgram(i32)
+declare void @glUseProgram(i32)
+declare void @glDeleteProgram(i32)
+declare void @glValidateProgram(i32)
+declare void @glUniform1f(i32, float)
+declare void @glUniform2f(i32, float, float)
+declare void @glUniform3f(i32, float, float, float)
+declare void @glUniform4f(i32, float, float, float, float)
+declare void @glUniform1i(i32, i32)
+declare void @glUniform2i(i32, i32, i32)
+declare void @glUniform3i(i32, i32, i32, i32)
+declare void @glUniform4i(i32, i32, i32, i32, i32)
+declare void @glUniform1fv(i32, i32, float*)
+declare void @glUniform2fv(i32, i32, float*)
+declare void @glUniform3fv(i32, i32, float*)
+declare void @glUniform4fv(i32, i32, float*)
+declare void @glUniform1iv(i32, i32, i32*)
+declare void @glUniform2iv(i32, i32, i32*)
+declare void @glUniform3iv(i32, i32, i32*)
+declare void @glUniform4iv(i32, i32, i32*)
+declare void @glUniformMatrix2fv(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix3fv(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix4fv(i32, i32, i8 zeroext, float*)
+declare zeroext i8 @glIsShader(i32)
+declare zeroext i8 @glIsProgram(i32)
+declare void @glGetShaderiv(i32, i32, i32*)
+declare void @glGetProgramiv(i32, i32, i32*)
+declare void @glGetAttachedShaders(i32, i32, i32*, i32*)
+declare void @glGetShaderInfoLog(i32, i32, i32*, i8*)
+declare void @glGetProgramInfoLog(i32, i32, i32*, i8*)
+declare i32 @glGetUniformLocation(i32, i8*)
+declare void @glGetActiveUniform(i32, i32, i32, i32*, i32*, i32*, i8*)
+declare void @glGetUniformfv(i32, i32, float*)
+declare void @glGetUniformiv(i32, i32, i32*)
+declare void @glGetShaderSource(i32, i32, i32*, i8*)
+declare void @glBindAttribLocation(i32, i32, i8*)
+declare void @glGetActiveAttrib(i32, i32, i32, i32*, i32*, i32*, i8*)
+declare i32 @glGetAttribLocation(i32, i8*)
+declare void @glStencilFuncSeparate(i32, i32, i32, i32)
+declare void @glStencilOpSeparate(i32, i32, i32, i32)
+declare void @glStencilMaskSeparate(i32, i32)
+declare void @glUniformMatrix2x3fv(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix3x2fv(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix2x4fv(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix4x2fv(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix3x4fv(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix4x3fv(i32, i32, i8 zeroext, float*)
+
+@GL_VERSION_1_1 = global i32 1
+@GL_VERSION_1_3 = global i32 1
+@GL_VERSION_1_5 = global i32 1
+@GL_VERSION_2_1 = global i32 1
+@GL_ACCUM = global i32 256
+@GL_RETURN = global i32 258
+@GL_ADD = global i32 260
+@GL_NEVER = global i32 512
+@GL_EQUAL = global i32 514
+@GL_GREATER = global i32 516
+@GL_GEQUAL = global i32 518
+@GL_CURRENT_BIT = global i32 1
+@GL_LINE_BIT = global i32 4
+@GL_POLYGON_STIPPLE_BIT = global i32 16
+@GL_LIGHTING_BIT = global i32 64
+@GL_DEPTH_BUFFER_BIT = global i32 256
+@GL_STENCIL_BUFFER_BIT = global i32 1024
+@GL_TRANSFORM_BIT = global i32 4096
+@GL_COLOR_BUFFER_BIT = global i32 16384
+@GL_EVAL_BIT = global i32 65536
+@GL_TEXTURE_BIT = global i32 262144
+@GL_ALL_ATTRIB_BITS = global i32 1048575
+@GL_POINTS = global i32 0
+@GL_LINES = global i32 1
+@GL_LINE_LOOP = global i32 2
+@GL_LINE_STRIP = global i32 3
+@GL_TRIANGLES = global i32 4
+@GL_TRIANGLES_STRIP = global i32 5
+@GL_TRIANGLE_FAN = global i32 6
+@GL_QUADS = global i32 7
+@GL_QUAD_STRIP = global i32 8
+@GL_POLYGON = global i32 9
+@GL_ZERO = global i32 0
+@GL_ONE = global i32 1
+@GL_SRC_COLOR = global i32 768
+@GL_SRC_ALPHA = global i32 770
+@GL_DST_ALPHA = global i32 772
+@GL_DST_COLOR = global i32 774
+@GL_SRC_ALPHA_SATURATE = global i32 776
+@GL_FALSE = global i32 0
+@GL_TRUE = global i32 1
+@GL_CLIP_PLANE0 = global i32 12288
+@GL_CLIP_PLANE2 = global i32 12290
+@GL_CLIP_PLANE4 = global i32 12292
+@GL_BYTE = global i32 5120
+@GL_SHORT = global i32 5122
+@GL_INT = global i32 5124
+@GL_FLOAT = global i32 5126
+@GL_3_BYTES = global i32 5128
+@GL_DOUBLE = global i32 5130
+@GL_NONE = global i32 0
+@GL_FRONT_RIGHT = global i32 1025
+@GL_BACK_RIGHT = global i32 1027
+@GL_BACK = global i32 1029
+@GL_RIGHT = global i32 1031
+@GL_AUX0 = global i32 1033
+@GL_AUX2 = global i32 1035
+@GL_NO_ERROR = global i32 0
+@GL_INVALID_VALUE = global i32 1281
+@GL_STACK_OVERFLOW = global i32 1283
+@GL_OUT_OF_MEMORY = global i32 1285
+@GL_2D = global i32 1536
+@GL_3D_COLOR = global i32 1538
+@GL_4D_COLOR_TEXTURE = global i32 1540
+@GL_PASS_THROUGH_TOKEN = global i32 1792
+@GL_LINE_TOKEN = global i32 1794
+@GL_BITMAP_TOKEN = global i32 1796
+@GL_COPY_PIXEL_TOKEN = global i32 1798
+@GL_EXP = global i32 2048
+@GL_CW = global i32 2304
+@GL_COEFF = global i32 2560
+@GL_DOMAIN = global i32 2562
+@GL_CURRENT_COLOR = global i32 2816
+@GL_CURRENT_NORMAL = global i32 2818
+@GL_CURRENT_RASTER_COLOR = global i32 2820
+@GL_CURRENT_RASTER_TEXTURE_COORDS = global i32 2822
+@GL_CURRENT_RASTER_POSITION_VALID = global i32 2824
+@GL_POINT_SMOOTH = global i32 2832
+@GL_POINT_SIZE_RANGE = global i32 2834
+@GL_LINE_SMOOTH = global i32 2848
+@GL_LINE_WIDTH_RANGE = global i32 2850
+@GL_LINE_STIPPLE = global i32 2852
+@GL_LINE_STIPPLE_REPEAT = global i32 2854
+@GL_LIST_MODE = global i32 2864
+@GL_LIST_BASE = global i32 2866
+@GL_POLYGON_MODE = global i32 2880
+@GL_POLYGON_STIPPLE = global i32 2882
+@GL_CULL_FACE = global i32 2884
+@GL_FRONT_FACE = global i32 2886
+@GL_LIGHT_MODEL_LOCAL_VIEWER = global i32 2897
+@GL_LIGHT_MODEL_AMBIENT = global i32 2899
+@GL_COLOR_MATERIAL_FACE = global i32 2901
+@GL_COLOR_MATERIAL = global i32 2903
+@GL_FOG_INDEX = global i32 2913
+@GL_FOG_START = global i32 2915
+@GL_FOG_MODE = global i32 2917
+@GL_DEPTH_RANGE = global i32 2928
+@GL_DEPTH_WRITEMASK = global i32 2930
+@GL_DEPTH_FUNC = global i32 2932
+@GL_STENCIL_TEST = global i32 2960
+@GL_STENCIL_FUNC = global i32 2962
+@GL_STENCIL_FAIL = global i32 2964
+@GL_STENCIL_PASS_DEPTH_PASS = global i32 2966
+@GL_STENCIL_WRITEMASK = global i32 2968
+@GL_NORMALIZE = global i32 2977
+@GL_MODELVIEW_STACK_DEPTH = global i32 2979
+@GL_TEXTURE_STACK_DEPTH = global i32 2981
+@GL_PROJECTION_MATRIX = global i32 2983
+@GL_ATTRIB_STACK_DEPTH = global i32 2992
+@GL_ALPHA_TEST = global i32 3008
+@GL_ALPHA_TEST_REF = global i32 3010
+@GL_BLEND_DST = global i32 3040
+@GL_BLEND = global i32 3042
+@GL_INDEX_LOGIC_OP = global i32 3057
+@GL_AUX_BUFFERS = global i32 3072
+@GL_READ_BUFFER = global i32 3074
+@GL_SCISSOR_TEST = global i32 3089
+@GL_INDEX_WRITEMASK = global i32 3105
+@GL_COLOR_WRITEMASK = global i32 3107
+@GL_RGBA_MODE = global i32 3121
+@GL_STEREO = global i32 3123
+@GL_PERSPECTIVE_CORRECTION_HINT = global i32 3152
+@GL_LINE_SMOOTH_HINT = global i32 3154
+@GL_FOG_HINT = global i32 3156
+@GL_TEXTURE_GEN_T = global i32 3169
+@GL_TEXTURE_GEN_Q = global i32 3171
+@GL_PIXEL_MAP_S_TO_S = global i32 3185
+@GL_PIXEL_MAP_I_TO_G = global i32 3187
+@GL_PIXEL_MAP_I_TO_A = global i32 3189
+@GL_PIXEL_MAP_G_TO_G = global i32 3191
+@GL_PIXEL_MAP_A_TO_A = global i32 3193
+@GL_PIXEL_MAP_S_TO_S_SIZE = global i32 3249
+@GL_PIXEL_MAP_I_TO_G_SIZE = global i32 3251
+@GL_PIXEL_MAP_I_TO_A_SIZE = global i32 3253
+@GL_PIXEL_MAP_G_TO_G_SIZE = global i32 3255
+@GL_PIXEL_MAP_A_TO_A_SIZE = global i32 3257
+@GL_UNPACK_LSB_FIRST = global i32 3313
+@GL_UNPACK_SKIP_ROWS = global i32 3315
+@GL_UNPACK_ALIGNMENT = global i32 3317
+@GL_PACK_LSB_FIRST = global i32 3329
+@GL_PACK_SKIP_ROWS = global i32 3331
+@GL_PACK_ALIGNMENT = global i32 3333
+@GL_MAP_STENCIL = global i32 3345
+@GL_INDEX_OFFSET = global i32 3347
+@GL_RED_BIAS = global i32 3349
+@GL_ZOOM_Y = global i32 3351
+@GL_GREEN_BIAS = global i32 3353
+@GL_BLUE_BIAS = global i32 3355
+@GL_ALPHA_BIAS = global i32 3357
+@GL_DEPTH_BIAS = global i32 3359
+@GL_MAX_LIGHTS = global i32 3377
+@GL_MAX_TEXTURE_SIZE = global i32 3379
+@GL_MAX_ATTRIB_STACK_DEPTH = global i32 3381
+@GL_MAX_NAME_STACK_DEPTH = global i32 3383
+@GL_MAX_TEXTURE_STACK_DEPTH = global i32 3385
+@GL_MAX_CLIENT_ATTRIB_STACK_DEPTH = global i32 3387
+@GL_INDEX_BITS = global i32 3409
+@GL_GREEN_BITS = global i32 3411
+@GL_ALPHA_BITS = global i32 3413
+@GL_STENCIL_BITS = global i32 3415
+@GL_ACCUM_GREEN_BITS = global i32 3417
+@GL_ACCUM_ALPHA_BITS = global i32 3419
+@GL_AUTO_NORMAL = global i32 3456
+@GL_MAP1_INDEX = global i32 3473
+@GL_MAP1_TEXTURE_COORD_1 = global i32 3475
+@GL_MAP1_TEXTURE_COORD_3 = global i32 3477
+@GL_MAP1_VERTEX_3 = global i32 3479
+@GL_MAP2_COLOR_4 = global i32 3504
+@GL_MAP2_NORMAL = global i32 3506
+@GL_MAP2_TEXTURE_COORD_2 = global i32 3508
+@GL_MAP2_TEXTURE_COORD_4 = global i32 3510
+@GL_MAP2_VERTEX_4 = global i32 3512
+@GL_MAP1_GRID_SEGMENTS = global i32 3537
+@GL_MAP2_GRID_SEGMENTS = global i32 3539
+@GL_TEXTURE_2D = global i32 3553
+@GL_FEEDBACK_BUFFER_SIZE = global i32 3569
+@GL_SELECTION_BUFFER_POINTER = global i32 3571
+@GL_TEXTURE_WIDTH = global i32 4096
+@GL_TEXTURE_INTERNAL_FORMAT = global i32 4099
+@GL_TEXTURE_BORDER = global i32 4101
+@GL_DONT_CARE = global i32 4352
+@GL_NICEST = global i32 4354
+@GL_LIGHT0 = global i32 16384
+@GL_LIGHT2 = global i32 16386
+@GL_LIGHT4 = global i32 16388
+@GL_LIGHT6 = global i32 16390
+@GL_AMBIENT = global i32 4608
+@GL_SPECULAR = global i32 4610
+@GL_SPOT_DIRECTION = global i32 4612
+@GL_SPOT_CUTOFF = global i32 4614
+@GL_LINEAR_ATTENUATION = global i32 4616
+@GL_COMPILE = global i32 4864
+@GL_CLEAR = global i32 5376
+@GL_AND_REVERSE = global i32 5378
+@GL_AND_INVERTED = global i32 5380
+@GL_XOR = global i32 5382
+@GL_NOR = global i32 5384
+@GL_INVERT = global i32 5386
+@GL_COPY_INVERTED = global i32 5388
+@GL_NAND = global i32 5390
+@GL_EMISSION = global i32 5632
+@GL_AMBIENT_AND_DIFFUSE = global i32 5634
+@GL_MODELVIEW = global i32 5888
+@GL_TEXTURE = global i32 5890
+@GL_COLOR = global i32 6144
+@GL_STENCIL = global i32 6146
+@GL_COLOR_INDEX = global i32 6400
+@GL_DEPTH_COMPONENT = global i32 6402
+@GL_GREEN = global i32 6404
+@GL_ALPHA = global i32 6406
+@GL_RGBA = global i32 6408
+@GL_LUMINANCE_ALPHA = global i32 6410
+@GL_BITMAP = global i32 6656
+@GL_POINT = global i32 6912
+@GL_FILL = global i32 6914
+@GL_RENDER = global i32 7168
+@GL_SELECT = global i32 7170
+@GL_FLAT = global i32 7424
+@GL_KEEP = global i32 7680
+@GL_INCR = global i32 7682
+@GL_VENDOR = global i32 7936
+@GL_VERSION = global i32 7938
+@GL_S = global i32 8192
+@GL_R = global i32 8194
+@GL_MODULATE = global i32 8448
+@GL_TEXTURE_ENV_MODE = global i32 8704
+@GL_TEXTURE_ENV = global i32 8960
+@GL_EYE_LINEAR = global i32 9216
+@GL_SPHERE_MAP = global i32 9218
+@GL_TEXTURE_GEN_MODE = global i32 9472
+@GL_EYE_PLANE = global i32 9474
+@GL_NEAREST = global i32 9728
+@GL_NEAREST_MIPMAP_NEAREST = global i32 9984
+@GL_NEAREST_MIPMAP_LINEAR = global i32 9986
+@GL_TEXTURE_MAG_FILTER = global i32 10240
+@GL_TEXTURE_WRAP_S = global i32 10242
+@GL_CLAMP = global i32 10496
+@GL_CLIENT_PIXEL_STORE_BIT = global i32 1
+@GL_CLIENT_ALL_ATTRIB_BITS = global i32 4294967295
+@GL_POLYGON_OFFSET_FACTOR = global i32 32824
+@GL_POLYGON_OFFSET_POINT = global i32 10753
+@GL_POLYGON_OFFSET_FILL = global i32 32823
+@GL_ALPHA4 = global i32 32827
+@GL_ALPHA12 = global i32 32829
+@GL_LUMINANCE4 = global i32 32831
+@GL_LUMINANCE12 = global i32 32833
+@GL_LUMINANCE4_ALPHA4 = global i32 32835
+@GL_LUMINANCE8_ALPHA8 = global i32 32837
+@GL_LUMINANCE12_ALPHA12 = global i32 32839
+@GL_INTENSITY = global i32 32841
+@GL_INTENSITY8 = global i32 32843
+@GL_INTENSITY16 = global i32 32845
+@GL_RGB4 = global i32 32847
+@GL_RGB8 = global i32 32849
+@GL_RGB12 = global i32 32851
+@GL_RGBA2 = global i32 32853
+@GL_RGB5_A1 = global i32 32855
+@GL_RGB10_A2 = global i32 32857
+@GL_RGBA16 = global i32 32859
+@GL_TEXTURE_GREEN_SIZE = global i32 32861
+@GL_TEXTURE_ALPHA_SIZE = global i32 32863
+@GL_TEXTURE_INTENSITY_SIZE = global i32 32865
+@GL_PROXY_TEXTURE_2D = global i32 32868
+@GL_TEXTURE_PRIORITY = global i32 32870
+@GL_TEXTURE_BINDING_1D = global i32 32872
+@GL_TEXTURE_BINDING_3D = global i32 32874
+@GL_VERTEX_ARRAY = global i32 32884
+@GL_COLOR_ARRAY = global i32 32886
+@GL_TEXTURE_COORD_ARRAY = global i32 32888
+@GL_VERTEX_ARRAY_SIZE = global i32 32890
+@GL_VERTEX_ARRAY_STRIDE = global i32 32892
+@GL_NORMAL_ARRAY_STRIDE = global i32 32895
+@GL_COLOR_ARRAY_TYPE = global i32 32898
+@GL_INDEX_ARRAY_TYPE = global i32 32901
+@GL_TEXTURE_COORD_ARRAY_SIZE = global i32 32904
+@GL_TEXTURE_COORD_ARRAY_STRIDE = global i32 32906
+@GL_VERTEX_ARRAY_POINTER = global i32 32910
+@GL_COLOR_ARRAY_POINTER = global i32 32912
+@GL_TEXTURE_COORD_ARRAY_POINTER = global i32 32914
+@GL_V2F = global i32 10784
+@GL_C4UB_V2F = global i32 10786
+@GL_C3F_V3F = global i32 10788
+@GL_C4F_N3F_V3F = global i32 10790
+@GL_T4F_V4F = global i32 10792
+@GL_T2F_C3F_V3F = global i32 10794
+@GL_T2F_C4F_N3F_V3F = global i32 10796
+@GL_BGR = global i32 32992
+@GL_CONSTANT_COLOR = global i32 32769
+@GL_CONSTANT_ALPHA = global i32 32771
+@GL_BLEND_COLOR = global i32 32773
+@GL_FUNC_ADD = global i32 32774
+@GL_MAX = global i32 32776
+@GL_BLEND_EQUATION_RGB = global i32 32777
+@GL_FUNC_SUBTRACT = global i32 32778
+@GL_COLOR_MATRIX = global i32 32945
+@GL_MAX_COLOR_MATRIX_STACK_DEPTH = global i32 32947
+@GL_POST_COLOR_MATRIX_GREEN_SCALE = global i32 32949
+@GL_POST_COLOR_MATRIX_ALPHA_SCALE = global i32 32951
+@GL_POST_COLOR_MATRIX_GREEN_BIAS = global i32 32953
+@GL_POST_COLOR_MATRIX_ALPHA_BIAS = global i32 32955
+@GL_COLOR_TABLE = global i32 32976
+@GL_POST_COLOR_MATRIX_COLOR_TABLE = global i32 32978
+@GL_PROXY_POST_CONVOLUTION_COLOR_TABLE = global i32 32980
+@GL_COLOR_TABLE_SCALE = global i32 32982
+@GL_COLOR_TABLE_FORMAT = global i32 32984
+@GL_COLOR_TABLE_RED_SIZE = global i32 32986
+@GL_COLOR_TABLE_BLUE_SIZE = global i32 32988
+@GL_COLOR_TABLE_LUMINANCE_SIZE = global i32 32990
+@GL_CONVOLUTION_1D = global i32 32784
+@GL_SEPARABLE_2D = global i32 32786
+@GL_CONVOLUTION_FILTER_SCALE = global i32 32788
+@GL_REDUCE = global i32 32790
+@GL_CONVOLUTION_WIDTH = global i32 32792
+@GL_MAX_CONVOLUTION_WIDTH = global i32 32794
+@GL_POST_CONVOLUTION_RED_SCALE = global i32 32796
+@GL_POST_CONVOLUTION_BLUE_SCALE = global i32 32798
+@GL_POST_CONVOLUTION_RED_BIAS = global i32 32800
+@GL_POST_CONVOLUTION_BLUE_BIAS = global i32 32802
+@GL_CONSTANT_BORDER = global i32 33105
+@GL_CONVOLUTION_BORDER_COLOR = global i32 33108
+@GL_MAX_ELEMENTS_VERTICES = global i32 33000
+@GL_HISTOGRAM = global i32 32804
+@GL_HISTOGRAM_WIDTH = global i32 32806
+@GL_HISTOGRAM_RED_SIZE = global i32 32808
+@GL_HISTOGRAM_BLUE_SIZE = global i32 32810
+@GL_HISTOGRAM_LUMINANCE_SIZE = global i32 32812
+@GL_MINMAX = global i32 32814
+@GL_MINMAX_SINK = global i32 32816
+@GL_UNSIGNED_BYTE_3_3_2 = global i32 32818
+@GL_UNSIGNED_SHORT_5_5_5_1 = global i32 32820
+@GL_UNSIGNED_INT_10_10_10_2 = global i32 32822
+@GL_UNSIGNED_SHORT_5_6_5 = global i32 33635
+@GL_UNSIGNED_SHORT_4_4_4_4_REV = global i32 33637
+@GL_UNSIGNED_INT_8_8_8_8_REV = global i32 33639
+@GL_RESCALE_NORMAL = global i32 32826
+@GL_LIGHT_MODEL_COLOR_CONTROL = global i32 33272
+@GL_SEPARATE_SPECULAR_COLOR = global i32 33274
+@GL_PACK_SKIP_IMAGES = global i32 32875
+@GL_UNPACK_SKIP_IMAGES = global i32 32877
+@GL_TEXTURE_3D = global i32 32879
+@GL_TEXTURE_DEPTH = global i32 32881
+@GL_MAX_3D_TEXTURE_SIZE = global i32 32883
+@GL_CLAMP_TO_EDGE = global i32 33071
+@GL_TEXTURE_MIN_LOD = global i32 33082
+@GL_TEXTURE_BASE_LEVEL = global i32 33084
+@GL_SMOOTH_POINT_SIZE_RANGE = global i32 2834
+@GL_SMOOTH_LINE_WIDTH_RANGE = global i32 2850
+@GL_ALIASED_POINT_SIZE_RANGE = global i32 33901
+@GL_TEXTURE0 = global i32 33984
+@GL_TEXTURE2 = global i32 33986
+@GL_TEXTURE4 = global i32 33988
+@GL_TEXTURE6 = global i32 33990
+@GL_TEXTURE8 = global i32 33992
+@GL_TEXTURE10 = global i32 33994
+@GL_TEXTURE12 = global i32 33996
+@GL_TEXTURE14 = global i32 33998
+@GL_TEXTURE16 = global i32 34000
+@GL_TEXTURE18 = global i32 34002
+@GL_TEXTURE20 = global i32 34004
+@GL_TEXTURE22 = global i32 34006
+@GL_TEXTURE24 = global i32 34008
+@GL_TEXTURE26 = global i32 34010
+@GL_TEXTURE28 = global i32 34012
+@GL_TEXTURE30 = global i32 34014
+@GL_ACTIVE_TEXTURE = global i32 34016
+@GL_MAX_TEXTURE_UNITS = global i32 34018
+@GL_COMBINE = global i32 34160
+@GL_COMBINE_ALPHA = global i32 34162
+@GL_ADD_SIGNED = global i32 34164
+@GL_CONSTANT = global i32 34166
+@GL_PREVIOUS = global i32 34168
+@GL_SRC0_RGB = global i32 34176
+@GL_SRC2_RGB = global i32 34178
+@GL_SRC4_RGB = global i32 34180
+@GL_SRC6_RGB = global i32 34182
+@GL_SRC0_ALPHA = global i32 34184
+@GL_SRC2_ALPHA = global i32 34186
+@GL_SRC4_ALPHA = global i32 34188
+@GL_SRC6_ALPHA = global i32 34190
+@GL_SOURCE0_RGB = global i32 34176
+@GL_SOURCE2_RGB = global i32 34178
+@GL_SOURCE4_RGB = global i32 34180
+@GL_SOURCE6_RGB = global i32 34182
+@GL_SOURCE0_ALPHA = global i32 34184
+@GL_SOURCE2_ALPHA = global i32 34186
+@GL_SOURCE4_ALPHA = global i32 34188
+@GL_SOURCE6_ALPHA = global i32 34190
+@GL_OPERAND0_RGB = global i32 34192
+@GL_OPERAND2_RGB = global i32 34194
+@GL_OPERAND4_RGB = global i32 34196
+@GL_OPERAND6_RGB = global i32 34198
+@GL_OPERAND0_ALPHA = global i32 34200
+@GL_OPERAND2_ALPHA = global i32 34202
+@GL_OPERAND4_ALPHA = global i32 34204
+@GL_OPERAND6_ALPHA = global i32 34206
+@GL_DOT3_RGB = global i32 34478
+@GL_TRANSPOSE_MODELVIEW_MATRIX = global i32 34019
+@GL_TRANSPOSE_TEXTURE_MATRIX = global i32 34021
+@GL_NORMAL_MAP = global i32 34065
+@GL_TEXTURE_CUBE_MAP = global i32 34067
+@GL_TEXTURE_CUBE_MAP_POSITIVE_X = global i32 34069
+@GL_TEXTURE_CUBE_MAP_POSITIVE_Y = global i32 34071
+@GL_TEXTURE_CUBE_MAP_POSITIVE_Z = global i32 34073
+@GL_PROXY_TEXTURE_CUBE_MAP = global i32 34075
+@GL_COMPRESSED_ALPHA = global i32 34025
+@GL_COMPRESSED_LUMINANCE_ALPHA = global i32 34027
+@GL_COMPRESSED_RGB = global i32 34029
+@GL_TEXTURE_COMPRESSION_HINT = global i32 34031
+@GL_TEXTURE_COMPRESSED = global i32 34465
+@GL_COMPRESSED_TEXTURE_FORMATS = global i32 34467
+@GL_MULTISAMPLE = global i32 32925
+@GL_SAMPLE_ALPHA_TO_ONE = global i32 32927
+@GL_SAMPLE_BUFFERS = global i32 32936
+@GL_SAMPLE_COVERAGE_VALUE = global i32 32938
+@GL_MULTISAMPLE_BIT = global i32 536870912
+@GL_DEPTH_COMPONENT16 = global i32 33189
+@GL_DEPTH_COMPONENT32 = global i32 33191
+@GL_DEPTH_TEXTURE_MODE = global i32 34891
+@GL_TEXTURE_COMPARE_MODE = global i32 34892
+@GL_COMPARE_R_TO_TEXTURE = global i32 34894
+@GL_QUERY_COUNTER_BITS = global i32 34916
+@GL_QUERY_RESULT = global i32 34918
+@GL_SAMPLES_PASSED = global i32 35092
+@GL_FOG_COORD_SRC = global i32 33872
+@GL_FRAGMENT_DEPTH = global i32 33874
+@GL_FOG_COORD_ARRAY_TYPE = global i32 33876
+@GL_FOG_COORD_ARRAY_POINTER = global i32 33878
+@GL_FOG_COORDINATE_SOURCE = global i32 33872
+@GL_CURRENT_FOG_COORDINATE = global i32 33875
+@GL_FOG_COORDINATE_ARRAY_TYPE = global i32 33876
+@GL_FOG_COORDINATE_ARRAY_STRIDE = global i32 33877
+@GL_FOG_COORDINATE_ARRAY = global i32 33879
+@GL_COLOR_SUM = global i32 33880
+@GL_SECONDARY_COLOR_ARRAY_SIZE = global i32 33882
+@GL_SECONDARY_COLOR_ARRAY_STRIDE = global i32 33884
+@GL_SECONDARY_COLOR_ARRAY = global i32 33886
+@GL_POINT_SIZE_MIN = global i32 33062
+@GL_POINT_FADE_THRESHOLD_SIZE = global i32 33064
+@GL_BLEND_DST_RGB = global i32 32968
+@GL_BLEND_DST_ALPHA = global i32 32970
+@GL_GENERATE_MIPMAP = global i32 33169
+@GL_INCR_WRAP = global i32 34055
+@GL_MIRRORED_REPEAT = global i32 33648
+@GL_MAX_TEXTURE_LOD_BIAS = global i32 34045
+@GL_TEXTURE_LOD_BIAS = global i32 34049
+@GL_ARRAY_BUFFER = global i32 34962
+@GL_ARRAY_BUFFER_BINDING = global i32 34964
+@GL_VERTEX_ARRAY_BUFFER_BINDING = global i32 34966
+@GL_COLOR_ARRAY_BUFFER_BINDING = global i32 34968
+@GL_TEXTURE_COORD_ARRAY_BUFFER_BINDING = global i32 34970
+@GL_SECONDARY_COLOR_ARRAY_BUFFER_BINDING = global i32 34972
+@GL_WEIGHT_ARRAY_BUFFER_BINDING = global i32 34974
+@GL_STREAM_DRAW = global i32 35040
+@GL_STREAM_COPY = global i32 35042
+@GL_STATIC_READ = global i32 35045
+@GL_DYNAMIC_DRAW = global i32 35048
+@GL_DYNAMIC_COPY = global i32 35050
+@GL_WRITE_ONLY = global i32 35001
+@GL_BUFFER_SIZE = global i32 34660
+@GL_BUFFER_ACCESS = global i32 35003
+@GL_BUFFER_MAP_POINTER = global i32 35005
+@GL_FOG_COORDINATE_ARRAY_BUFFER_BINDING = global i32 34973
+@GL_CURRENT_PROGRAM = global i32 35725
+@GL_DELETE_STATUS = global i32 35712
+@GL_LINK_STATUS = global i32 35714
+@GL_INFO_LOG_LENGTH = global i32 35716
+@GL_ACTIVE_UNIFORMS = global i32 35718
+@GL_SHADER_SOURCE_LENGTH = global i32 35720
+@GL_FLOAT_VEC3 = global i32 35665
+@GL_INT_VEC2 = global i32 35667
+@GL_INT_VEC4 = global i32 35669
+@GL_BOOL_VEC2 = global i32 35671
+@GL_BOOL_VEC4 = global i32 35673
+@GL_FLOAT_MAT3 = global i32 35675
+@GL_SAMPLER_1D = global i32 35677
+@GL_SAMPLER_3D = global i32 35679
+@GL_SAMPLER_1D_SHADOW = global i32 35681
+@GL_SHADING_LANGUAGE_VERSION = global i32 35724
+@GL_MAX_VERTEX_UNIFORM_COMPONENTS = global i32 35658
+@GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS = global i32 35660
+@GL_ACTIVE_ATTRIBUTES = global i32 35721
+@GL_FRAGMENT_SHADER = global i32 35632
+@GL_FRAGMENT_SHADER_DERIVATIVE_HINT = global i32 35723
+@GL_VERTEX_ATTRIB_ARRAY_ENABLED = global i32 34338
+@GL_VERTEX_ATTRIB_ARRAY_STRIDE = global i32 34340
+@GL_VERTEX_ATTRIB_ARRAY_NORMALIZED = global i32 34922
+@GL_VERTEX_ATTRIB_ARRAY_POINTER = global i32 34373
+@GL_VERTEX_PROGRAM_TWO_SIDE = global i32 34371
+@GL_MAX_TEXTURE_IMAGE_UNITS = global i32 34930
+@GL_DRAW_BUFFER0 = global i32 34853
+@GL_DRAW_BUFFER2 = global i32 34855
+@GL_DRAW_BUFFER4 = global i32 34857
+@GL_DRAW_BUFFER6 = global i32 34859
+@GL_DRAW_BUFFER8 = global i32 34861
+@GL_DRAW_BUFFER10 = global i32 34863
+@GL_DRAW_BUFFER12 = global i32 34865
+@GL_DRAW_BUFFER14 = global i32 34867
+@GL_POINT_SPRITE = global i32 34913
+@GL_POINT_SPRITE_COORD_ORIGIN = global i32 36000
+@GL_UPPER_LEFT = global i32 36002
+@GL_STENCIL_BACK_VALUE_MASK = global i32 36004
+@GL_STENCIL_BACK_FAIL = global i32 34817
+@GL_STENCIL_BACK_PASS_DEPTH_PASS = global i32 34819
+@GL_CURRENT_RASTER_SECONDARY_COLOR = global i32 33887
+@GL_PIXEL_UNPACK_BUFFER = global i32 35052
+@GL_PIXEL_UNPACK_BUFFER_BINDING = global i32 35055
+@GL_FLOAT_MAT2x4 = global i32 35686
+@GL_FLOAT_MAT3x4 = global i32 35688
+@GL_FLOAT_MAT4x3 = global i32 35690
+@GL_SRGB8 = global i32 35905
+@GL_SRGB8_ALPHA8 = global i32 35907
+@GL_SLUMINANCE8_ALPHA8 = global i32 35909
+@GL_SLUMINANCE8 = global i32 35911
+@GL_COMPRESSED_SRGB_ALPHA = global i32 35913
+@GL_COMPRESSED_SLUMINANCE_ALPHA = global i32 35915
+
+
+;; glu
+declare void @gluBeginCurve(i8*)
+declare void @gluBeginPolygon(i8*)
+declare void @gluBeginSurface(i8*)
+declare void @gluBeginTrim(i8*)
+declare i32 @gluBuild1DMipmapLevels(i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare i32 @gluBuild1DMipmaps(i32, i32, i32, i32, i32, i8*)
+declare i32 @gluBuild2DMipmapLevels(i32, i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare i32 @gluBuild2DMipmaps(i32, i32, i32, i32, i32, i32, i8*)
+declare i32 @gluBuild3DMipmapLevels(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare i32 @gluBuild3DMipmaps(i32, i32, i32, i32, i32, i32, i32, i8*)
+declare zeroext i8 @gluCheckExtension(i8*, i8*)
+declare void @gluCylinder(i8*, double, double, double, i32, i32)
+declare void @gluDeleteNurbsRenderer(i8*)
+declare void @gluDeleteQuadric(i8*)
+declare void @gluDeleteTess(i8*)
+declare void @gluDisk(i8*, double, double, i32, i32)
+declare void @gluEndCurve(i8*)
+declare void @gluEndPolygon(i8*)
+declare void @gluEndSurface(i8*)
+declare void @gluEndTrim(i8*)
+declare i8* @gluErrorString(i32)
+declare void @gluGetNurbsProperty(i8*, i32, float*)
+declare i8* @gluGetString(i32)
+declare void @gluGetTessProperty(i8*, i32, double*)
+declare void @gluLoadSamplingMatrices(i8*, float*, float*, i32*)
+declare void @gluLookAt(double, double, double, double, double, double, double, double, double)
+declare i8* @gluNewNurbsRenderer()
+declare i8* @gluNewQuadric()
+declare i8* @gluNewTess()
+declare void @gluNextContour(i8*, i32)
+declare void @gluNurbsCallback(i8*, i32, void (...)*)
+declare void @gluNurbsCallbackData(i8*, i8*)
+declare void @gluNurbsCallbackDataEXT(i8*, i8*)
+declare void @gluNurbsCurve(i8*, i32, float*, i32, float*, i32, i32)
+declare void @gluNurbsProperty(i8*, i32, float)
+declare void @gluNurbsSurface(i8*, i32, float*, i32, float*, i32, i32, float*, i32, i32, i32)
+declare void @gluOrtho2D(double, double, double, double)
+declare void @gluPartialDisk(i8*, double, double, i32, i32, double, double)
+declare void @gluPerspective(double, double, double, double)
+declare void @gluPickMatrix(double, double, double, double, i32*)
+declare i32 @gluProject(double, double, double, double*, double*, i32*, double*, double*, double*)
+declare void @gluPwlCurve(i8*, i32, float*, i32, i32)
+declare void @gluQuadricCallback(i8*, i32, void (...)*)
+declare void @gluQuadricDrawStyle(i8*, i32)
+declare void @gluQuadricNormals(i8*, i32)
+declare void @gluQuadricOrientation(i8*, i32)
+declare void @gluQuadricTexture(i8*, i8 zeroext)
+declare i32 @gluScaleImage(i32, i32, i32, i32, i8*, i32, i32, i32, i8*)
+declare void @gluSphere(i8*, double, i32, i32)
+declare void @gluTessBeginContour(i8*)
+declare void @gluTessBeginPolygon(i8*, i8*)
+declare void @gluTessCallback(i8*, i32, void (...)*)
+declare void @gluTessEndContour(i8*)
+declare void @gluTessEndPolygon(i8*)
+declare void @gluTessNormal(i8*, double, double, double)
+declare void @gluTessProperty(i8*, i32, double)
+declare void @gluTessVertex(i8*, double*, i8*)
+declare i32 @gluUnProject(double, double, double, double*, double*, i32*, double*, double*, double*)
+declare i32 @gluUnProject4(double, double, double, double, double*, double*, i32*, double, double, double*, double*, double*, double*)
+
+;; glut
+declare void @glutInit(i32*, i8**)
+declare void @glutInitDisplayMode(i32)
+declare void @glutInitDisplayString(i8*)
+declare void @glutInitWindowPosition(i32, i32)
+declare void @glutInitWindowSize(i32, i32)
+declare void @glutMainLoop()
+declare i32 @glutCreateWindow(i8*)
+declare i32 @glutCreateSubWindow(i32, i32, i32, i32, i32)
+declare void @glutDestroyWindow(i32)
+declare void @glutPostRedisplay()
+declare void @glutPostWindowRedisplay(i32)
+declare void @glutSwapBuffers()
+declare i32 @glutGetWindow()
+declare void @glutSetWindow(i32)
+declare void @glutSetWindowTitle(i8*)
+declare void @glutSetIconTitle(i8*)
+declare void @glutPositionWindow(i32, i32)
+declare void @glutReshapeWindow(i32, i32)
+declare void @glutPopWindow()
+declare void @glutPushWindow()
+declare void @glutIconifyWindow()
+declare void @glutShowWindow()
+declare void @glutHideWindow()
+declare void @glutFullScreen()
+declare void @glutSetCursor(i32)
+declare void @glutWarpPointer(i32, i32)
+declare void @glutSurfaceTexture(i32, i32, i32)
+declare void @glutWMCloseFunc(void ()*)
+declare void @glutCheckLoop()
+declare void @glutEstablishOverlay()
+declare void @glutRemoveOverlay()
+declare void @glutUseLayer(i32)
+declare void @glutPostOverlayRedisplay()
+declare void @glutPostWindowOverlayRedisplay(i32)
+declare void @glutShowOverlay()
+declare void @glutHideOverlay()
+declare i32 @glutCreateMenu(void (i32)*)
+declare void @glutDestroyMenu(i32)
+declare i32 @glutGetMenu()
+declare void @glutSetMenu(i32)
+declare void @glutAddMenuEntry(i8*, i32)
+declare void @glutAddSubMenu(i8*, i32)
+declare void @glutChangeToMenuEntry(i32, i8*, i32)
+declare void @glutChangeToSubMenu(i32, i8*, i32)
+declare void @glutRemoveMenuItem(i32)
+declare void @glutAttachMenu(i32)
+declare void @glutDetachMenu(i32)
+declare void @glutDisplayFunc(void ()*)
+declare void @glutReshapeFunc(void (i32, i32)*)
+declare void @glutKeyboardFunc(void (i8, i32, i32)*)
+declare void @glutMouseFunc(void (i32, i32, i32, i32)*)
+declare void @glutMotionFunc(void (i32, i32)*)
+declare void @glutPassiveMotionFunc(void (i32, i32)*)
+declare void @glutEntryFunc(void (i32)*)
+declare void @glutVisibilityFunc(void (i32)*)
+declare void @glutIdleFunc(void ()*)
+declare void @glutTimerFunc(i32, void (i32)*, i32)
+declare void @glutMenuStateFunc(void (i32)*)
+declare void @glutSpecialFunc(void (i32, i32, i32)*)
+declare void @glutSpaceballMotionFunc(void (i32, i32, i32)*)
+declare void @glutSpaceballRotateFunc(void (i32, i32, i32)*)
+declare void @glutSpaceballButtonFunc(void (i32, i32)*)
+declare void @glutButtonBoxFunc(void (i32, i32)*)
+declare void @glutDialsFunc(void (i32, i32)*)
+declare void @glutTabletMotionFunc(void (i32, i32)*)
+declare void @glutTabletButtonFunc(void (i32, i32, i32, i32)*)
+declare void @glutMenuStatusFunc(void (i32, i32, i32)*)
+declare void @glutOverlayDisplayFunc(void ()*)
+declare void @glutWindowStatusFunc(void (i32)*)
+declare void @glutKeyboardUpFunc(void (i8, i32, i32)*)
+declare void @glutSpecialUpFunc(void (i32, i32, i32)*)
+declare void @glutJoystickFunc(void (i32, i32, i32, i32)*, i32)
+declare void @glutSetColor(i32, float, float, float)
+declare float @glutGetColor(i32, i32)
+declare void @glutCopyColormap(i32)
+declare i32 @glutGet(i32)
+declare i32 @glutDeviceGet(i32)
+declare i32 @glutExtensionSupported(i8*)
+declare i32 @glutGetModifiers()
+declare i32 @glutLayerGet(i32)
+declare i8* @glutGetProcAddress(i8*)
+declare void @glutBitmapCharacter(i8*, i32)
+declare i32 @glutBitmapWidth(i8*, i32)
+declare void @glutStrokeCharacter(i8*, i32)
+declare i32 @glutStrokeWidth(i8*, i32)
+declare i32 @glutBitmapLength(i8*, i8*)
+declare i32 @glutStrokeLength(i8*, i8*)
+declare void @glutWireSphere(double, i32, i32)
+declare void @glutSolidSphere(double, i32, i32)
+declare void @glutWireCone(double, double, i32, i32)
+declare void @glutSolidCone(double, double, i32, i32)
+declare void @glutWireCube(double)
+declare void @glutSolidCube(double)
+declare void @glutWireTorus(double, double, i32, i32)
+declare void @glutSolidTorus(double, double, i32, i32)
+declare void @glutWireDodecahedron()
+declare void @glutSolidDodecahedron()
+declare void @glutWireTeapot(double)
+declare void @glutSolidTeapot(double)
+declare void @glutWireOctahedron()
+declare void @glutSolidOctahedron()
+declare void @glutWireTetrahedron()
+declare void @glutSolidTetrahedron()
+declare void @glutWireIcosahedron()
+declare void @glutSolidIcosahedron()
+declare i32 @glutVideoResizeGet(i32)
+declare void @glutSetupVideoResizing()
+declare void @glutStopVideoResizing()
+declare void @glutVideoResize(i32, i32, i32, i32)
+declare void @glutVideoPan(i32, i32, i32, i32)
+declare void @glutReportErrors()
+declare void @glutIgnoreKeyRepeat(i32)
+declare void @glutSetKeyRepeat(i32)
+declare void @glutForceJoystickFunc()
+declare void @glutGameModeString(i8*)
+declare i32 @glutEnterGameMode()
+declare void @glutLeaveGameMode()
+declare i32 @glutGameModeGet(i32)
+
+
+;; gl extended
+declare void @glActiveTextureARB(i32)
+declare void @glClientActiveTextureARB(i32)
+declare void @glMultiTexCoord1dARB(i32, double)
+declare void @glMultiTexCoord1dvARB(i32, double*)
+declare void @glMultiTexCoord1fARB(i32, float)
+declare void @glMultiTexCoord1fvARB(i32, float*)
+declare void @glMultiTexCoord1iARB(i32, i32)
+declare void @glMultiTexCoord1ivARB(i32, i32*)
+declare void @glMultiTexCoord1sARB(i32, i16 signext)
+declare void @glMultiTexCoord1svARB(i32, i16*)
+declare void @glMultiTexCoord2dARB(i32, double, double)
+declare void @glMultiTexCoord2dvARB(i32, double*)
+declare void @glMultiTexCoord2fARB(i32, float, float)
+declare void @glMultiTexCoord2fvARB(i32, float*)
+declare void @glMultiTexCoord2iARB(i32, i32, i32)
+declare void @glMultiTexCoord2ivARB(i32, i32*)
+declare void @glMultiTexCoord2sARB(i32, i16 signext, i16 signext)
+declare void @glMultiTexCoord2svARB(i32, i16*)
+declare void @glMultiTexCoord3dARB(i32, double, double, double)
+declare void @glMultiTexCoord3dvARB(i32, double*)
+declare void @glMultiTexCoord3fARB(i32, float, float, float)
+declare void @glMultiTexCoord3fvARB(i32, float*)
+declare void @glMultiTexCoord3iARB(i32, i32, i32, i32)
+declare void @glMultiTexCoord3ivARB(i32, i32*)
+declare void @glMultiTexCoord3sARB(i32, i16 signext, i16 signext, i16 signext)
+declare void @glMultiTexCoord3svARB(i32, i16*)
+declare void @glMultiTexCoord4dARB(i32, double, double, double, double)
+declare void @glMultiTexCoord4dvARB(i32, double*)
+declare void @glMultiTexCoord4fARB(i32, float, float, float, float)
+declare void @glMultiTexCoord4fvARB(i32, float*)
+declare void @glMultiTexCoord4iARB(i32, i32, i32, i32, i32)
+declare void @glMultiTexCoord4ivARB(i32, i32*)
+declare void @glMultiTexCoord4sARB(i32, i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glMultiTexCoord4svARB(i32, i16*)
+declare void @glLoadTransposeMatrixfARB(float*)
+declare void @glLoadTransposeMatrixdARB(double*)
+declare void @glMultTransposeMatrixfARB(float*)
+declare void @glMultTransposeMatrixdARB(double*)
+declare void @glSampleCoverageARB(float, i8 zeroext)
+declare void @glSamplePassARB(i32)
+declare void @glCompressedTexImage3DARB(i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexImage2DARB(i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexImage1DARB(i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexSubImage3DARB(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexSubImage2DARB(i32, i32, i32, i32, i32, i32, i32, i32, i8*)
+declare void @glCompressedTexSubImage1DARB(i32, i32, i32, i32, i32, i32, i8*)
+declare void @glGetCompressedTexImageARB(i32, i32, i8*)
+declare void @glWeightbvARB(i32, i8*)
+declare void @glWeightsvARB(i32, i16*)
+declare void @glWeightivARB(i32, i32*)
+declare void @glWeightfvARB(i32, float*)
+declare void @glWeightdvARB(i32, double*)
+declare void @glWeightubvARB(i32, i8*)
+declare void @glWeightusvARB(i32, i16*)
+declare void @glWeightuivARB(i32, i32*)
+declare void @glWeightPointerARB(i32, i32, i32, i8*)
+declare void @glVertexBlendARB(i32)
+declare void @glWindowPos2dARB(double, double)
+declare void @glWindowPos2dvARB(double*)
+declare void @glWindowPos2fARB(float, float)
+declare void @glWindowPos2fvARB(float*)
+declare void @glWindowPos2iARB(i32, i32)
+declare void @glWindowPos2ivARB(i32*)
+declare void @glWindowPos2sARB(i16 signext, i16 signext)
+declare void @glWindowPos2svARB(i16*)
+declare void @glWindowPos3dARB(double, double, double)
+declare void @glWindowPos3dvARB(double*)
+declare void @glWindowPos3fARB(float, float, float)
+declare void @glWindowPos3fvARB(float*)
+declare void @glWindowPos3iARB(i32, i32, i32)
+declare void @glWindowPos3ivARB(i32*)
+declare void @glWindowPos3sARB(i16 signext, i16 signext, i16 signext)
+declare void @glWindowPos3svARB(i16*)
+declare void @glGenQueriesARB(i32, i32*)
+declare void @glDeleteQueriesARB(i32, i32*)
+declare void @glBeginQueryARB(i32, i32)
+declare void @glEndQueryARB(i32)
+declare void @glGetQueryivARB(i32, i32, i32*)
+declare void @glGetQueryObjectivARB(i32, i32, i32*)
+declare void @glGetQueryObjectuivARB(i32, i32, i32*)
+declare void @glPointParameterfARB(i32, float)
+declare void @glPointParameterfvARB(i32, float*)
+declare void @glBindProgramARB(i32, i32)
+declare void @glDeleteProgramsARB(i32, i32*)
+declare void @glGenProgramsARB(i32, i32*)
+declare void @glProgramEnvParameter4dARB(i32, i32, double, double, double, double)
+declare void @glProgramEnvParameter4dvARB(i32, i32, double*)
+declare void @glProgramEnvParameter4fARB(i32, i32, float, float, float, float)
+declare void @glProgramEnvParameter4fvARB(i32, i32, float*)
+declare void @glProgramLocalParameter4dARB(i32, i32, double, double, double, double)
+declare void @glProgramLocalParameter4dvARB(i32, i32, double*)
+declare void @glProgramLocalParameter4fARB(i32, i32, float, float, float, float)
+declare void @glProgramLocalParameter4fvARB(i32, i32, float*)
+declare void @glGetProgramEnvParameterdvARB(i32, i32, double*)
+declare void @glGetProgramEnvParameterfvARB(i32, i32, float*)
+declare void @glProgramEnvParameters4fvEXT(i32, i32, i32, float*)
+declare void @glProgramLocalParameters4fvEXT(i32, i32, i32, float*)
+declare void @glGetProgramLocalParameterdvARB(i32, i32, double*)
+declare void @glGetProgramLocalParameterfvARB(i32, i32, float*)
+declare void @glProgramStringARB(i32, i32, i32, i8*)
+declare void @glGetProgramStringARB(i32, i32, i8*)
+declare void @glGetProgramivARB(i32, i32, i32*)
+declare void @glVertexAttrib1dARB(i32, double)
+declare void @glVertexAttrib1dvARB(i32, double*)
+declare void @glVertexAttrib1fARB(i32, float)
+declare void @glVertexAttrib1fvARB(i32, float*)
+declare void @glVertexAttrib1sARB(i32, i16 signext)
+declare void @glVertexAttrib1svARB(i32, i16*)
+declare void @glVertexAttrib2dARB(i32, double, double)
+declare void @glVertexAttrib2dvARB(i32, double*)
+declare void @glVertexAttrib2fARB(i32, float, float)
+declare void @glVertexAttrib2fvARB(i32, float*)
+declare void @glVertexAttrib2sARB(i32, i16 signext, i16 signext)
+declare void @glVertexAttrib2svARB(i32, i16*)
+declare void @glVertexAttrib3dARB(i32, double, double, double)
+declare void @glVertexAttrib3dvARB(i32, double*)
+declare void @glVertexAttrib3fARB(i32, float, float, float)
+declare void @glVertexAttrib3fvARB(i32, float*)
+declare void @glVertexAttrib3sARB(i32, i16 signext, i16 signext, i16 signext)
+declare void @glVertexAttrib3svARB(i32, i16*)
+declare void @glVertexAttrib4NbvARB(i32, i8*)
+declare void @glVertexAttrib4NivARB(i32, i32*)
+declare void @glVertexAttrib4NsvARB(i32, i16*)
+declare void @glVertexAttrib4NubARB(i32, i8 zeroext, i8 zeroext, i8 zeroext, i8 zeroext)
+declare void @glVertexAttrib4NubvARB(i32, i8*)
+declare void @glVertexAttrib4NuivARB(i32, i32*)
+declare void @glVertexAttrib4NusvARB(i32, i16*)
+declare void @glVertexAttrib4bvARB(i32, i8*)
+declare void @glVertexAttrib4dARB(i32, double, double, double, double)
+declare void @glVertexAttrib4dvARB(i32, double*)
+declare void @glVertexAttrib4fARB(i32, float, float, float, float)
+declare void @glVertexAttrib4fvARB(i32, float*)
+declare void @glVertexAttrib4ivARB(i32, i32*)
+declare void @glVertexAttrib4sARB(i32, i16 signext, i16 signext, i16 signext, i16 signext)
+declare void @glVertexAttrib4svARB(i32, i16*)
+declare void @glVertexAttrib4ubvARB(i32, i8*)
+declare void @glVertexAttrib4uivARB(i32, i32*)
+declare void @glVertexAttrib4usvARB(i32, i16*)
+declare void @glVertexAttribPointerARB(i32, i32, i32, i8 zeroext, i32, i8*)
+declare void @glDisableVertexAttribArrayARB(i32)
+declare void @glEnableVertexAttribArrayARB(i32)
+declare void @glGetVertexAttribPointervARB(i32, i32, i8**)
+declare void @glGetVertexAttribdvARB(i32, i32, double*)
+declare void @glGetVertexAttribfvARB(i32, i32, float*)
+declare void @glGetVertexAttribivARB(i32, i32, i32*)
+declare void @glDeleteObjectARB(i8*)
+declare void @glDetachObjectARB(i8*, i8*)
+declare void @glShaderSourceARB(i8*, i32, i8**, i32*)
+declare void @glCompileShaderARB(i8*)
+declare void @glAttachObjectARB(i8*, i8*)
+declare void @glLinkProgramARB(i8*)
+declare void @glUseProgramObjectARB(i8*)
+declare void @glValidateProgramARB(i8*)
+declare void @glUniform1fARB(i32, float)
+declare void @glUniform2fARB(i32, float, float)
+declare void @glUniform3fARB(i32, float, float, float)
+declare void @glUniform4fARB(i32, float, float, float, float)
+declare void @glUniform1iARB(i32, i32)
+declare void @glUniform2iARB(i32, i32, i32)
+declare void @glUniform3iARB(i32, i32, i32, i32)
+declare void @glUniform4iARB(i32, i32, i32, i32, i32)
+declare void @glUniform1fvARB(i32, i32, float*)
+declare void @glUniform2fvARB(i32, i32, float*)
+declare void @glUniform3fvARB(i32, i32, float*)
+declare void @glUniform4fvARB(i32, i32, float*)
+declare void @glUniform1ivARB(i32, i32, i32*)
+declare void @glUniform2ivARB(i32, i32, i32*)
+declare void @glUniform3ivARB(i32, i32, i32*)
+declare void @glUniform4ivARB(i32, i32, i32*)
+declare void @glUniformMatrix2fvARB(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix3fvARB(i32, i32, i8 zeroext, float*)
+declare void @glUniformMatrix4fvARB(i32, i32, i8 zeroext, float*)
+declare void @glGetObjectParameterfvARB(i8*, i32, float*)
+declare void @glGetObjectParameterivARB(i8*, i32, i32*)
+declare void @glGetInfoLogARB(i8*, i32, i32*, i8*)
+declare void @glGetAttachedObjectsARB(i8*, i32, i32*, i8**)
+declare void @glGetActiveUniformARB(i8*, i32, i32, i32*, i32*, i32*, i8*)
+declare void @glGetUniformfvARB(i8*, i32, float*)
+declare void @glGetUniformivARB(i8*, i32, i32*)
+declare void @glGetShaderSourceARB(i8*, i32, i32*, i8*)
+declare void @glBindAttribLocationARB(i8*, i32, i8*)
+declare void @glGetActiveAttribARB(i8*, i32, i32, i32*, i32*, i32*, i8*)
+declare void @glBindBufferARB(i32, i32)
+declare void @glDeleteBuffersARB(i32, i32*)
+declare void @glGenBuffersARB(i32, i32*)
+declare void @glBufferDataARB(i32, i32, i8*, i32)
+declare void @glBufferSubDataARB(i32, i32, i32, i8*)
+declare void @glGetBufferSubDataARB(i32, i32, i32, i8*)
+declare void @glGetBufferParameterivARB(i32, i32, i32*)
+declare void @glGetBufferPointervARB(i32, i32, i8**)
+declare void @glDrawBuffersARB(i32, i32*)
+
+;; opengl cgl
+declare i32 @CGLDescribePixelFormat(i8*, i32, i32, i32*)
+declare i8* @CGLGetPixelFormat(i8*)
+declare i8* @CGLRetainPixelFormat(i8*)
+declare void @CGLReleasePixelFormat(i8*)
+declare i32 @CGLGetPixelFormatRetainCount(i8*)
+declare i32 @CGLDestroyPixelFormat(i8*)
+declare i32 @CGLCreateContext(i8*, i8*, i8**)
+declare i32 @CGLCopyContext(i8*, i8*, i32)
+declare i8* @CGLRetainContext(i8*)
+declare void @CGLReleaseContext(i8*)
+declare i32 @CGLGetContextRetainCount(i8*)
+declare i32 @CGLDestroyContext(i8*)
+declare i8* @CGLGetCurrentContext()
+declare i32 @CGLSetCurrentContext(i8*)
+declare i32 @CGLEnable(i8*, i32)
+declare i32 @CGLDisable(i8*, i32)
+declare i32 @CGLIsEnabled(i8*, i32, i32*)
+declare i32 @CGLSetParameter(i8*, i32, i32*)
+declare i32 @CGLGetParameter(i8*, i32, i32*)
+declare i32 @CGLLockContext(i8*)
+declare i32 @CGLUnlockContext(i8*)
+declare i32 @CGLSetOffScreen(i8*, i32, i32, i32, i8*)
+declare i32 @CGLGetOffScreen(i8*, i32*, i32*, i32*, i8**)
+declare i32 @CGLSetFullScreenOnDisplay(i8*, i32)
+declare i32 @CGLClearDrawable(i8*)
+declare i32 @CGLFlushDrawable(i8*)
+declare i32 @CGLCreatePBuffer(i32, i32, i32, i32, i32, i8**)
+declare i32 @CGLDescribePBuffer(i8*, i32*, i32*, i32*, i32*, i32*)
+declare i8* @CGLRetainPBuffer(i8*)
+declare void @CGLReleasePBuffer(i8*)
+declare i32 @CGLGetPBufferRetainCount(i8*)
+declare i32 @CGLDestroyPBuffer(i8*)
+declare i32 @CGLGetPBuffer(i8*, i8**, i32*, i32*, i32*)
+declare i32 @CGLSetPBuffer(i8*, i8*, i32, i32, i32)
+declare i32 @CGLTexImagePBuffer(i8*, i8*, i32)
+declare i8* @CGLErrorString(i32)
+declare i32 @CGLSetOption(i32, i32)
+declare i32 @CGLGetOption(i32, i32*)
+declare i32 @CGLGetGlobalOption(i32, i32*)
+declare i32 @CGLSetGlobalOption(i32, i32*)
+declare void @CGLGetVersion(i32*, i32*)
+declare i32 @CGLDescribeRenderer(i8*, i32, i32, i32*)
+declare i32 @CGLDestroyRendererInfo(i8*)
+declare i32 @CGLQueryRendererInfo(i32, i8**, i32*)
+declare i32 @CGLSetVirtualScreen(i8*, i32)
+declare i32 @CGLGetVirtualScreen(i8*, i32*)
+
+
+;; R5RS equivs
+declare i8* @llvm_substring(i8*,i32,i32)
+declare i8* @llvm_string_cat(i8*,i8*)
+declare i8* @llvm_string_copy(i8*)
+declare i32 @llvm_string_eq(i8*,i8*)
+declare void @llvm_string_set(i8*, i32, i8)
+declare i8 @llvm_string_ref(i8*, i32)
+
+
+declare void @llvm_destroy_zone_after_delay(i8*, double)
+
+
+define double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, double %time, double %channel, double* %data) 
+{
+entry:
+%closureVal = bitcast i8* %closure to <{ i8*, i8*, double (i8*,i8*,double,double,double,double*)*}>*
+; apply closure 
+%fPtr = getelementptr <{i8*, i8*, double (i8*, i8*, double, double, double, double*)*}>* %closureVal, i32 0, i32 2
+%ePtr = getelementptr <{i8*, i8*, double (i8*, i8*, double, double, double, double*)*}>* %closureVal, i32 0, i32 1
+%f = load double (i8*, i8*, double,double,double,double*)** %fPtr
+%e = load i8** %ePtr
+%result = tail call fastcc double %f(i8* %_impz, i8* %e, double %sample, double %time, double %channel, double* %data)
+ret double %result
+}
+
+define i64 @imp_dsp_wrapper_fxarray(i8* %_impz, i8* %closure, float** %samples, i64 %num_of_samples, double %time, double %channels, double* %data) 
+{
+entry:
+%closureVal = bitcast i8* %closure to <{ i8*, i8*, i64 (i8*,i8*,float**,i64,double,double,double*)*}>*
+; apply closure 
+%fPtr = getelementptr <{i8*, i8*, i64 (i8*, i8*, float**, i64, double, double, double*)*}>* %closureVal, i32 0, i32 2
+%ePtr = getelementptr <{i8*, i8*, i64 (i8*, i8*, float**, i64, double, double, double*)*}>* %closureVal, i32 0, i32 1
+%f = load i64 (i8*, i8*, float**,i64,double,double,double*)** %fPtr
+%e = load i8** %ePtr
+%result = tail call fastcc i64 %f(i8* %_impz, i8* %e, float** %samples, i64 %num_of_samples, double %time, double %channels, double* %data)
+ret i64 %result
+}
+
+define i64 @imp_dsp_wrapper_muarray(i8* %_impz, i8* %closure, float** %samples, i64 %num_of_samples, i64 %status, double %freq, double %amp, double %time, double %channels, double* %data) 
+{
+entry:
+%closureVal = bitcast i8* %closure to <{ i8*, i8*, i64 (i8*,i8*,float**,i64,i64,double,double,double,double,double*)*}>*
+; apply closure 
+%fPtr = getelementptr <{i8*, i8*, i64 (i8*, i8*, float**, i64, i64, double, double, double, double, double*)*}>* %closureVal, i32 0, i32 2
+%ePtr = getelementptr <{i8*, i8*, i64 (i8*, i8*, float**, i64, i64, double, double, double, double, double*)*}>* %closureVal, i32 0, i32 1
+%f = load i64 (i8*, i8*, float**,i64,i64,double,double,double,double,double*)** %fPtr
+%e = load i8** %ePtr
+%result = tail call fastcc i64 %f(i8* %_impz, i8* %e, float** %samples, i64 %num_of_samples, i64 %status, double %freq, double %amp, double %time, double %channels, double* %data)
+ret i64 %result
+}
+
+define i8* @impc_get_env(i8* %impz, i8* %closure)
+{
+entry:
+%closureVal = bitcast i8* %closure to <{ i8*, i8*, i8* }>*
+%ePtr = getelementptr <{ i8*, i8*, i8* }>* %closureVal, i32 0, i32 1
+%e = load i8** %ePtr
+ret i8* %e
+}
+
+declare i64 @llvm_now()
+declare double @llvm_samplerate()
+
+define double @imp_rand()
+{
+entry:
+%tmp = call i32 @rand()
+%tmp1 = sitofp i32 %tmp to double
+%tmp2 = fdiv double %tmp1, 2147483647.0
+ret double %tmp2
+}
+
+define i64 @imp_rand1(double %a)
+{
+entry:
+%tmp = call i32 @rand()
+%tmp1 = sitofp i32 %tmp to double
+%tmp2 = fdiv double %tmp1, 2147483647.0
+%tmp3 = fmul double %a, %tmp2
+%tmp4 = fptosi double %tmp3 to i64
+ret i64 %tmp4
+}
+
+define i64 @imp_rand2(double %a, double %b)
+{
+entry:
+%tmp = call i32 @rand()
+%tmp1 = sitofp i32 %tmp to double
+%tmp2 = fdiv double %tmp1, 2147483647.0
+%tmp3 = fsub double %b, %a
+%tmp4 = fmul double %tmp3, %tmp2
+%tmp5 = fadd double %a, %tmp4
+%tmp6 = fptosi double %tmp5 to i64
+ret i64 %tmp6
+}
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SCHEME STUFF
+
+define i8* @impc_null()
+{
+entry:
+ret i8* null
+}
+
+define i1 @impc_true()
+{
+entry:
+ret i1 1
+}
+
+define i1 @impc_false()
+{
+entry:
+ret i1 0
+}
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CASTING STUFF
+
+define i64 @i1toi64(i1 %a)
+{
+entry:
+%return = zext i1 %a to i64
+ret i64 %return 
+}
+
+define i32 @i1toi32(i1 %a)
+{
+entry:
+%return = zext i1 %a to i32
+ret i32 %return 
+}
+
+define i8 @i1toi8(i1 %a)
+{
+entry:
+%return = zext i1 %a to i8
+ret i8 %return 
+}
+
+define i1 @i64toi1(i64 %a)
+{
+entry:
+%return = trunc i64 %a to i1
+ret i1 %return
+}
+
+define i1 @i32toi1(i32 %a)
+{
+entry:
+%return = trunc i32 %a to i1
+ret i1 %return
+}
+
+define i1 @i8toi1(i8 %a)
+{
+entry:
+%return = trunc i8 %a to i1
+ret i1 %return
+}
+
+
+;; i8 casts
+define i64 @i8toi64(i8 %a)
+{
+entry:
+%return = sext i8 %a to i64
+ret i64 %return 
+}
+
+define i64 @i8toui64(i8 %a)
+{
+entry:
+%return = zext i8 %a to i64
+ret i64 %return 
+}
+
+define i32 @i8toi32(i8 %a)
+{
+entry:
+%return = sext i8 %a to i32
+ret i32 %return 
+}
+
+define i32 @i8toui32(i8 %a)
+{
+entry:
+%return = zext i8 %a to i32
+ret i32 %return 
+}
+
+define i8 @i64toi8(i64 %a)
+{
+entry:
+%return = trunc i64 %a to i8
+ret i8 %return
+}
+
+define i8 @i32toi8(i32 %a)
+{
+entry:
+%return = trunc i32 %a to i8
+ret i8 %return
+}
+
+
+;; i32 casts
+define i64 @i32toi64(i32 %a)
+{
+entry:
+%return = sext i32 %a to i64
+ret i64 %return 
+}
+
+define i64 @i32toui64(i32 %a)
+{
+entry:
+%return = zext i32 %a to i64
+ret i64 %return 
+}
+
+define i32 @i64toi32(i64 %a)
+{
+entry:
+%return = trunc i64 %a to i32
+ret i32 %return
+}
+
+
+;; float casts
+define double @ftod(float %a)
+{
+entry:
+%return = fpext float %a to double
+ret double %return
+}
+
+define float @dtof(double %a)
+{
+entry:
+%return = fptrunc double %a to float
+ret float %return
+}
+
+define i64 @ftoi64(float %a)
+{
+entry:
+%return = fptosi float %a to i64
+ret i64 %return
+}
+
+define i32 @ftoi32(float %a)
+{
+entry:
+%return = fptosi float %a to i32
+ret i32 %return
+}
+
+define i8 @ftoi8(float %a)
+{
+entry:
+%return = fptosi float %a to i8
+ret i8 %return
+}
+
+define i1 @ftoi1(float %a)
+{
+entry:
+%return = fptosi float %a to i1
+ret i1 %return
+}
+
+define i64 @ftoui64(float %a)
+{
+entry:
+%return = fptoui float %a to i64
+ret i64 %return
+}
+
+define i32 @ftoui32(float %a)
+{
+entry:
+%return = fptoui float %a to i32
+ret i32 %return
+}
+
+define i8 @ftoui8(float %a)
+{
+entry:
+%return = fptoui float %a to i8
+ret i8 %return
+}
+
+define i1 @ftoui1(float %a)
+{
+entry:
+%return = fptoui float %a to i1
+ret i1 %return
+}
+
+define float @i64tof(i64 %a)
+{
+entry:
+%return = sitofp i64 %a to float
+ret float %return
+}
+
+define float @i32tof(i32 %a)
+{
+entry:
+%return = sitofp i32 %a to float
+ret float %return
+}
+
+define float @i8tof(i8 %a)
+{
+entry:
+%return = sitofp i8 %a to float
+ret float %return
+}
+
+define float @i1tof(i1 %a)
+{
+entry:
+%return = sitofp i1 %a to float
+ret float %return
+}
+
+define float @ui64tof(i64 %a)
+{
+entry:
+%return = uitofp i64 %a to float
+ret float %return
+}
+
+define float @ui32tof(i32 %a)
+{
+entry:
+%return = uitofp i32 %a to float
+ret float %return
+}
+
+define float @ui8tof(i8 %a)
+{
+entry:
+%return = uitofp i8 %a to float
+ret float %return
+}
+
+define float @ui1tof(i1 %a)
+{
+entry:
+%return = uitofp i1 %a to float
+ret float %return
+}
+
+;; double casts
+
+define i64 @dtoi64(double %a)
+{
+entry:
+%return = fptosi double %a to i64
+ret i64 %return
+}
+
+define i32 @dtoi32(double %a)
+{
+entry:
+%return = fptosi double %a to i32
+ret i32 %return
+}
+
+define i8 @dtoi8(double %a)
+{
+entry:
+%return = fptosi double %a to i8
+ret i8 %return
+}
+
+define i1 @dtoi1(double %a)
+{
+entry:
+%return = fptosi double %a to i1
+ret i1 %return
+}
+
+define i64 @dtoui64(double %a)
+{
+entry:
+%return = fptoui double %a to i64
+ret i64 %return
+}
+
+define i32 @dtoui32(double %a)
+{
+entry:
+%return = fptoui double %a to i32
+ret i32 %return
+}
+
+define i8 @dtoui8(double %a)
+{
+entry:
+%return = fptoui double %a to i8
+ret i8 %return
+}
+
+define i1 @dtoui1(double %a)
+{
+entry:
+%return = fptoui double %a to i1
+ret i1 %return
+}
+
+define double @i64tod(i64 %a)
+{
+entry:
+%return = sitofp i64 %a to double
+ret double %return
+}
+
+define double @i32tod(i32 %a)
+{
+entry:
+%return = sitofp i32 %a to double
+ret double %return
+}
+
+define double @i8tod(i8 %a)
+{
+entry:
+%return = sitofp i8 %a to double
+ret double %return
+}
+
+define double @i1tod(i1 %a)
+{
+entry:
+%return = sitofp i1 %a to double
+ret double %return
+}
+
+define double @ui64tod(i64 %a)
+{
+entry:
+%return = uitofp i64 %a to double
+ret double %return
+}
+
+define double @ui32tod(i32 %a)
+{
+entry:
+%return = uitofp i32 %a to double
+ret double %return
+}
+
+define double @ui8tod(i8 %a)
+{
+entry:
+%return = uitofp i8 %a to double
+ret double %return
+}
+
+define double @ui1tod(i1 %a)
+{
+entry:
+%return = uitofp i1 %a to double
+ret double %return
+}
