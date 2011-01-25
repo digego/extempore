@@ -597,7 +597,8 @@ namespace extemp {
                 client_sockets.push_back(res);
                 in_streams[res] = new std::stringstream;
                 std::stringstream* ss = new std::stringstream;
-				SchemeProcess::banner(ss);
+				if(with_banner) SchemeProcess::banner(ss);
+				else *ss << "Welcome to extempore!";
 				uint64_t time = UNIV::TIME;
 				int hours = time / UNIV::HOUR;
 				time -= hours * UNIV::HOUR;

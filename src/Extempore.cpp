@@ -61,7 +61,6 @@ int main(int argv, char** args)
 	glutInit(&argv,args);
 #endif
 	extemp::UNIV::PWD = args[1];
-	printf("PWD:%s",extemp::UNIV::PWD);
 	extemp::EXTLLVM::I()->initLLVM();
 	extemp::SchemeProcess* sp = new extemp::SchemeProcess(std::string(args[1]), std::string("primary process"), 7099, with_banner);
 	extemp::AudioDevice* dev = extemp::AudioDevice::I();
