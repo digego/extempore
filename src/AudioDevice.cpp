@@ -89,49 +89,39 @@ namespace extemp {
 		memset(outputBuffer,0,numOfSamples);
 		
 		void* dsp_closure = AudioDevice::I()->getDSPClosure();
-		dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
-		
 		void* cache_closure = 0;
-		if(dsp_closure != 0) {
-			cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
-		}
+		if(dsp_closure == 0) return 0;
+		cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
 		
-		dsp_f_ptr cache_wrapper = dsp_wrapper;
 		
-		if(cache_wrapper==0 || cache_closure==0) { return 0; }
-				
-		double* data = 0; 
-		llvm_zone_t* zone = llvm_zone_create(1024*50);
-		
-		for(uint32_t i=0;i<UNIV::FRAMES;i++)
-		{
-			uint32_t ii = i*UNIV::CHANNELS;
-			SAMPLE* dat = (SAMPLE*) outputBuffer;
-			for(uint32_t k=0; k<UNIV::CHANNELS; k++)
-			{   
-				dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+UNIV::TIME),(double)k,data));
+		if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
+			dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
+			dsp_f_ptr cache_wrapper = dsp_wrapper;
+			double* data = 0; 
+			llvm_zone_t* zone = llvm_zone_create(1024*50);				
+			for(uint32_t i=0;i<UNIV::FRAMES;i++)
+			{
+				uint32_t ii = i*UNIV::CHANNELS;
+				SAMPLE* dat = (SAMPLE*) outputBuffer;
+				for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+				{   
+					dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+UNIV::TIME),(double)k,data));
+				}
 			}
+			llvm_zone_destroy(zone);
+		}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
+			dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
+			dsp_f_ptr_array cache_wrapper = dsp_wrapper;
+			llvm_zone_t* zone = llvm_zone_create(1024*50);				
+			cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::TIME,UNIV::CHANNELS);			
+			llvm_zone_destroy(zone);
+		}else{ 
+			//nothin to do
 		}
-
-		llvm_zone_destroy(zone);
-		
-        // if(UNIV::TIME != device_time) {
-        //     std::cout << std::endl << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl;
-        //     std::cout << "Timeing Sychronization problem!!!:" << std::endl;
-        //     std::cout << "UNIV::TIME [" << UNIV::TIME << "]" << std::endl;
-        //     std::cout << "ADJUSTED_TIME [" << device_time << "]" << std::endl;
-        //     std::cout << "NON_ADJUSTED_TIME [" << t << "]" << std::endl;
-        //     std::cout << "NumOfSamples [" << numOfSamples << "]" << std::endl;
-        //     std::cout << std::endl << "Adjusting by " << (device_time - UNIV::TIME) << " samples to re-sync" << std::endl << std::endl;
-        //     std::cout << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl << std::endl;
-        // 
-        //     start_time += (device_time) - UNIV::TIME;
-        //     UNIV::TIME = device_time; //Sync to match device_time  --  maybe should not do this??
-        // }
         return 0;
     }
 
-    AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0)
+	AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
     {
         Pa_Initialize();
         //std::cout << "Initializing AudioDevice: " << std::endl;
@@ -229,37 +219,42 @@ namespace extemp {
  		sched->getGuard()->signal();
 
 		void* dsp_closure = AudioDevice::I()->getDSPClosure();
-		dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
-		
 		void* cache_closure = 0;
-		if(dsp_closure != 0) {
-			cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
-		}
+		if(dsp_closure == 0) return 0;
+		cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
 		
-		dsp_f_ptr cache_wrapper = dsp_wrapper;
 		
-		if(cache_wrapper==0 || cache_closure==0) { return 0; }
-		
-		double* data = 0; //(SAMPLE*) alloca((10*8)+data_size);
-		
-		llvm_zone_t* zone = llvm_zone_create(1024*10);
-		
-		for(uint32_t i=0;i<UNIV::FRAMES;i++)
-		{
-			uint32_t ii = i*UNIV::CHANNELS;
-			SAMPLE* dat = (SAMPLE*) outOutputData->mBuffers[0].mData;
-			for(uint32_t k=0; k<UNIV::CHANNELS; k++)
-			{   
-				dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+inNow->mSampleTime),(double)k,data)); 
+		if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
+			dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
+			dsp_f_ptr cache_wrapper = dsp_wrapper;
+			double* data = 0; 
+			llvm_zone_t* zone = llvm_zone_create(1024*50);				
+			for(uint32_t i=0;i<UNIV::FRAMES;i++)
+			{
+				uint32_t ii = i*UNIV::CHANNELS;
+				SAMPLE* dat = (SAMPLE*) outOutputData->mBuffers[0].mData;
+				for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+				{   
+					dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+inNow->mSampleTime),(double)k,data)); 
+				}
 			}
+			llvm_zone_destroy(zone);
+		}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
+			dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
+			dsp_f_ptr_array cache_wrapper = dsp_wrapper;
+			llvm_zone_t* zone = llvm_zone_create(1024*50);				
+			SAMPLE* outputBuffer = (SAMPLE*) outOutputData->mBuffers[0].mData;
+			SAMPLE* inputBuffer = (SAMPLE*) inInputData->mBuffers[0].mData;		
+			cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::TIME,UNIV::CHANNELS);
+			llvm_zone_destroy(zone);
+		}else{ 
+			//nothin to do
 		}
-
-		llvm_zone_destroy(zone);
 		
         return 0;
     }
 
-    AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0)
+    AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
     {
         // get the default output device
         UInt32 count = (UInt32) sizeof(device);

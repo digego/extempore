@@ -108,6 +108,7 @@ namespace extemp {
 		// dsp bits
 		static pointer setDSPClosure(scheme* _sc, pointer args);
 		static pointer setDSPWrapper(scheme* _sc, pointer args);
+		static pointer setDSPWrapperArray(scheme* _sc, pointer args);
 		
 	private:
 		static SchemeFFI SINGLETON;		

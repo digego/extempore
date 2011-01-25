@@ -3022,30 +3022,17 @@ entry:
 ret double %result
 }
 
-define i64 @imp_dsp_wrapper_fxarray(i8* %_impz, i8* %closure, float** %samples, i64 %num_of_samples, double %time, double %channels, double* %data) 
+define float* @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i32 %frames, i32 %time, i32 %channels) 
 {
 entry:
-%closureVal = bitcast i8* %closure to <{ i8*, i8*, i64 (i8*,i8*,float**,i64,double,double,double*)*}>*
+%closureVal = bitcast i8* %closure to <{ i8*, i8*, float* (i8*,i8*,float*,float*,i32,i32,i32)*}>*
 ; apply closure 
-%fPtr = getelementptr <{i8*, i8*, i64 (i8*, i8*, float**, i64, double, double, double*)*}>* %closureVal, i32 0, i32 2
-%ePtr = getelementptr <{i8*, i8*, i64 (i8*, i8*, float**, i64, double, double, double*)*}>* %closureVal, i32 0, i32 1
-%f = load i64 (i8*, i8*, float**,i64,double,double,double*)** %fPtr
+%fPtr = getelementptr <{i8*, i8*, float* (i8*, i8*, float*, float*, i32, i32, i32)*}>* %closureVal, i32 0, i32 2
+%ePtr = getelementptr <{i8*, i8*, float* (i8*, i8*, float*, float*, i32, i32, i32)*}>* %closureVal, i32 0, i32 1
+%f = load float* (i8*, i8*, float*,float*,i32,i32,i32)** %fPtr
 %e = load i8** %ePtr
-%result = tail call fastcc i64 %f(i8* %_impz, i8* %e, float** %samples, i64 %num_of_samples, double %time, double %channels, double* %data)
-ret i64 %result
-}
-
-define i64 @imp_dsp_wrapper_muarray(i8* %_impz, i8* %closure, float** %samples, i64 %num_of_samples, i64 %status, double %freq, double %amp, double %time, double %channels, double* %data) 
-{
-entry:
-%closureVal = bitcast i8* %closure to <{ i8*, i8*, i64 (i8*,i8*,float**,i64,i64,double,double,double,double,double*)*}>*
-; apply closure 
-%fPtr = getelementptr <{i8*, i8*, i64 (i8*, i8*, float**, i64, i64, double, double, double, double, double*)*}>* %closureVal, i32 0, i32 2
-%ePtr = getelementptr <{i8*, i8*, i64 (i8*, i8*, float**, i64, i64, double, double, double, double, double*)*}>* %closureVal, i32 0, i32 1
-%f = load i64 (i8*, i8*, float**,i64,i64,double,double,double,double,double*)** %fPtr
-%e = load i8** %ePtr
-%result = tail call fastcc i64 %f(i8* %_impz, i8* %e, float** %samples, i64 %num_of_samples, i64 %status, double %freq, double %amp, double %time, double %channels, double* %data)
-ret i64 %result
+%result = tail call fastcc float* %f(i8* %_impz, i8* %e, float* %datain, float* %dataout, i32 %frames, i32 %time, i32 %channels)
+ret float* %result
 }
 
 define i8* @impc_get_env(i8* %impz, i8* %closure)

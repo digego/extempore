@@ -163,6 +163,7 @@ namespace extemp {
 		// DSP stuff
 	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-closure"), mk_foreign_func(sc, &SchemeFFI::setDSPClosure));
 	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapper));		
+	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper-array"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapperArray));			
 	}
 	
 	//////////////////// helper functions ////////////////////////
@@ -1364,6 +1365,12 @@ namespace extemp {
 		AudioDevice::I()->setDSPWrapper((dsp_f_ptr)cptr_value(pair_car(args)));
 		return _sc->T;
 	}
+	
+	pointer SchemeFFI::setDSPWrapperArray(scheme* _sc, pointer args)
+	{
+		AudioDevice::I()->setDSPWrapperArray((dsp_f_ptr_array)cptr_value(pair_car(args)));
+		return _sc->T;
+	}	
 		
 } // end namespace
 

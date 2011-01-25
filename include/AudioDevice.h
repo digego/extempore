@@ -47,8 +47,11 @@
 #include <vector>
 #include "UNIV.h"
 
+#define BUFFERED_AUDIO
+
 #define SAMPLE float
 
+typedef float*(*dsp_f_ptr_array)(void*,void*,SAMPLE*,SAMPLE*,int,int,int);
 typedef double(*dsp_f_ptr)(void*,void*,double,double,double,double*);
 
 namespace extemp {
@@ -64,10 +67,25 @@ public:
 	void start();
 	void stop();
 	
-	void* setDSPClosure(void* _dsp_func) { dsp_closure = _dsp_func; }
+	void setDSPClosure(void* _dsp_func) 
+	{
+		if(dsp_closure != 0) { printf("You can only set me once!\nBut you are allowed to re-definec me as often as you like!\n"); return; }
+		dsp_closure = _dsp_func; 
+	}
 	void* getDSPClosure() { return dsp_closure; }
-	void setDSPWrapper( double(*_wrapper)(void*,void*,double,double,double,double*) ) { dsp_wrapper = _wrapper; }
+	
+	void setDSPWrapperArray( float*(*_wrapper)(void*,void*,SAMPLE*,SAMPLE*,int,int,int) ) 
+	{ 
+	    if(dsp_wrapper != 0 || dsp_wrapper_array != 0) return;
+      	dsp_wrapper_array = _wrapper; 
+    }
+	void setDSPWrapper( double(*_wrapper)(void*,void*,double,double,double,double*) ) 
+	{ 
+		if(dsp_wrapper_array != 0 || dsp_wrapper != 0) return;
+		dsp_wrapper = _wrapper;
+	}
 	dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
+	dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
 
 private:
 	bool started;
@@ -79,6 +97,7 @@ private:
     float* buffer;
 	void* dsp_closure;
 	dsp_f_ptr dsp_wrapper;
+	dsp_f_ptr_array dsp_wrapper_array;
 	
 	static AudioDevice SINGLETON;
 };

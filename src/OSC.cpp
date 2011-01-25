@@ -41,6 +41,7 @@
 #include <sstream>
 #include <math.h>
 
+#include <stdlib.h>
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>

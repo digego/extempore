@@ -1020,6 +1020,7 @@
           (set! *error-hook* throw))))
 
 
+;; this for buffered version
 (define dsp:set!
    (lambda (name)
       (let* ((nn (if (symbol? name) (symbol->string name) name))
@@ -1027,11 +1028,21 @@
              (ct (if ft 
                      (map (lambda (x) (impc:ir:get-type-from-str x)) ft)
                      (print-error 'Function name 'does 'not 'exist 'or 'is 'not 'compiled))))
-         (cond ((equal? ct (list *impc:ir:double*
+         (cond ((equal? ct (list (+ *impc:ir:float* *impc:ir:pointer*)
+                                 (+ *impc:ir:float* *impc:ir:pointer*)
+                                 (+ *impc:ir:float* *impc:ir:pointer*)
+                                 *impc:ir:si32*
+                                 *impc:ir:si32*
+                                 *impc:ir:si32*))
+                (sys:set-dsp-wrapper-array (llvm:get-function-pointer "imp_dsp_wrapper_array"))
+                (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))) ;; whole buffer 
+               ((equal? ct (list *impc:ir:double*
                                  *impc:ir:double*
                                  *impc:ir:double*
                                  *impc:ir:double*
                                  (+ *impc:ir:double* *impc:ir:pointer*))) ;; sample by sample form FX
                 (sys:set-dsp-wrapper (llvm:get-function-pointer "imp_dsp_wrapper"))
-                (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter"))))
-               (else (print-error 'Bad 'closure 'signature 'for 'au:code:set! ct))))))
+                (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))) ;; whole buffer 
+               (else (print-error 'Bad 'closure 'signature 'for 'dsp:set! ct))))))
+
+
