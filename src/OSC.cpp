@@ -48,14 +48,150 @@
 #include <netinet/in.h>
 #include <netdb.h>         /* host to IP resolution       */
 
-////////////////////////////////////////////////////////
-//
-//  WARNING ENDIAN CONVERSION HAS BEEN STRIPPED
-//  NEED TO ADD THIS BACK IN AT SOME POINT!!
-//
-/////////////////////////////////////////////////////////
+///////////////////////////////////////////////
+//  THIS IS UGLY AND INEFFICIENT CHANGE ME!
+// 
+// swap using char pointers
+uint64_t swap64f(double d)
+{
+    uint64_t a;
+    unsigned char *dst = (unsigned char *)&a;
+    unsigned char *src = (unsigned char *)&d;
 
-//#include <CoreFoundation/CFByteOrder.h>
+    dst[0] = src[7];
+    dst[1] = src[6];
+    dst[2] = src[5];
+    dst[3] = src[4];
+    dst[4] = src[3];
+    dst[5] = src[2];
+    dst[6] = src[1];
+    dst[7] = src[0];
+
+    return a;
+}
+
+// unswap using char pointers
+double unswap64f(uint64_t a) 
+{
+
+    double d;
+    unsigned char *src = (unsigned char *)&a;
+    unsigned char *dst = (unsigned char *)&d;
+
+    dst[0] = src[7];
+    dst[1] = src[6];
+    dst[2] = src[5];
+    dst[3] = src[4];
+    dst[4] = src[3];
+    dst[5] = src[2];
+    dst[6] = src[1];
+    dst[7] = src[0];
+
+    return d;
+}
+
+// swap using char pointers
+uint32_t swap32f(float f)
+{
+    uint32_t a;
+    unsigned char *dst = (unsigned char *)&a;
+    unsigned char *src = (unsigned char *)&f;
+
+    dst[0] = src[3];
+    dst[1] = src[2];
+    dst[2] = src[1];
+    dst[3] = src[0];
+
+    return a;
+}
+
+// unswap using char pointers
+float unswap32f(uint32_t a) 
+{
+
+    float f;
+    unsigned char *src = (unsigned char *)&a;
+    unsigned char *dst = (unsigned char *)&f;
+
+    dst[0] = src[3];
+    dst[1] = src[2];
+    dst[2] = src[1];
+    dst[3] = src[0];
+
+    return f;
+}
+
+// swap using char pointers
+uint64_t  swap64i(uint64_t d)
+{
+    uint64_t a;
+    unsigned char *dst = (unsigned char *)&a;
+    unsigned char *src = (unsigned char *)&d;
+
+    dst[0] = src[7];
+    dst[1] = src[6];
+    dst[2] = src[5];
+    dst[3] = src[4];
+    dst[4] = src[3];
+    dst[5] = src[2];
+    dst[6] = src[1];
+    dst[7] = src[0];
+
+    return a;
+}
+
+// unswap using char pointers
+uint64_t unswap64i(uint64_t a) 
+{
+
+    uint64_t d;
+    unsigned char *src = (unsigned char *)&a;
+    unsigned char *dst = (unsigned char *)&d;
+
+    dst[0] = src[7];
+    dst[1] = src[6];
+    dst[2] = src[5];
+    dst[3] = src[4];
+    dst[4] = src[3];
+    dst[5] = src[2];
+    dst[6] = src[1];
+    dst[7] = src[0];
+
+    return d;
+}
+
+// swap using char pointers
+uint32_t swap32i(uint32_t f)
+{
+    uint32_t a;
+    unsigned char *dst = (unsigned char *)&a;
+    unsigned char *src = (unsigned char *)&f;
+
+    dst[0] = src[3];
+    dst[1] = src[2];
+    dst[2] = src[1];
+    dst[3] = src[0];
+
+    return a;
+}
+
+// unswap using char pointers
+uint32_t unswap32i(uint32_t a) 
+{
+
+    uint32_t f;
+    unsigned char *src = (unsigned char *)&a;
+    unsigned char *dst = (unsigned char *)&f;
+
+    dst[0] = src[3];
+    dst[1] = src[2];
+    dst[2] = src[1];
+    dst[3] = src[0];
+
+    return f;
+}
+
+////////////////////////////////////////////////////////
 
 //#define _OSC_DEBUG_
 
@@ -246,9 +382,8 @@ namespace extemp {
 #ifdef _OSC_DEBUG_        
         std::cout << "SET OSC FLOAT 32 = " << *f << std::endl;
 #endif        	
-		// CFSwappedfloat sf = CFConvertfloatHostToSwapped(*f);
-		//         char* byte_array = (char*) &sf;
-		char* byte_array = (char*) f;
+		uint32_t sf = swap32f(*f);
+		char* byte_array = (char*) &sf;
         for(int i=0;i<4;++i) {
             data[i] = byte_array[i];
         }
@@ -256,8 +391,7 @@ namespace extemp {
     }
 
     int OSC::getOSCfloat(const char* data, float* f) {
-		//*f = CFConvertfloatSwappedToHost(*((CFSwappedfloat *) data));
-		*f = *((float*) data);
+		*f = unswap32f(*((uint32_t*)data));
 #ifdef _OSC_DEBUG_        
         std::cout << "OSC FLOAT 32 = " << *f << std::endl;
 #endif        
@@ -269,9 +403,8 @@ namespace extemp {
 #ifdef _OSC_DEBUG_        
         std::cout << "SET OSC FLOAT 64 = " << *f << std::endl;
 #endif        	
-		// CFSwappeddouble sf = CFConvertdoubleHostToSwapped(*f);
-		//         char* byte_array = (char*) &sf;
-		char* byte_array = (char*) f;
+		uint64_t sf = swap64f(*f);
+		char* byte_array = (char*) &sf;
         for(int i=0;i<8;++i) {
             data[i] = byte_array[i];
         }
@@ -279,8 +412,7 @@ namespace extemp {
     }
 	
     int OSC::getOSCdouble(const char* data, double* f) {
-		//*f = CFConvertdoubleSwappedToHost(*((CFSwappeddouble *) data));
-		*f = *((double*) data);
+		*f = unswap64f(*((uint64_t*)data));
 #ifdef _OSC_DEBUG_        
         std::cout << "OSC FLOAT 64 = " << *f << std::endl;
 #endif        
@@ -289,8 +421,8 @@ namespace extemp {
 	
 	int OSC::getOSCTimestamp(const char* data, double* d) {
 		uint32_t* dat = (uint32_t*) data;
-		int64_t seconds = dat[0]; //CFSwapInt32BigToHost(dat[0]);
-		uint32_t fractional = dat[1]; //CFSwapInt32BigToHost(dat[1]);
+		int64_t seconds = unswap32i(dat[0]);
+		uint32_t fractional = unswap32i(dat[1]);
 		
 		if((seconds == 0) && (fractional == 1)) {
 			*d = 0.0; 
@@ -315,8 +447,8 @@ namespace extemp {
 		uint32_t* si = (uint32_t*)data;
 		uint32_t* sf = (uint32_t*)(data+4);
 		
-		*si = seconds; //CFSwapInt32HostToBig(seconds);
-		*sf = fractional; //CFSwapInt32HostToBig(fractionali);
+		*si = swap32i(seconds);
+		*sf = swap32i(fractionali);
 		
 		// great! now we have both bits of the NTP puzzle, we just need to jam them into a datastream
 		return 8;		
@@ -327,8 +459,7 @@ namespace extemp {
 #ifdef _OSC_DEBUG_        
         std::cout << "SET OSC INT = " << *i << std::endl;
 #endif        		
-		// *i = CFSwapInt32HostToBig(*i);
-		//         char* byte_array = (char*) i;
+		*i = swap32i(*i);
 		char* byte_array = (char*) i;
         for(int i=0;i<4;++i) {
             data[i] = byte_array[i];
@@ -336,11 +467,9 @@ namespace extemp {
         return 4;
     }
 	
-	
 
     int OSC::getOSCInt(const char* data, int* i) {
-		//*i = CFSwapInt32BigToHost(*((int *) data));
-		*i = *((int*) data);
+		*i = unswap32i(*((int*) data));
 #ifdef _OSC_DEBUG_        
         std::cout << "OSC INT = " << *i << std::endl;
 #endif        
@@ -348,8 +477,7 @@ namespace extemp {
     }
 
     int OSC::setOSCLong(char* data, int64_t* l) {
-		// *l = CFSwapInt64HostToBig(*l);
-		//         char* byte_array = (char*) l;
+		*l = swap64i(*l);
 		char* byte_array = (char*) l;
         for(int i=0;i<8;++i) {
             data[i] = byte_array[i];
@@ -358,8 +486,7 @@ namespace extemp {
     }
 
     int OSC::getOSCLong(const char* data, int64_t* l) {
-		//*l = CFSwapInt64BigToHost(*((int64_t *) data));
-		l = (int64_t*) data;
+		*l = unswap64i(*((int64_t*)data));
 #ifdef _OSC_DEBUG_        
         std::cout << "OSC LONG = " << *l << std::endl;
 #endif        
@@ -463,33 +590,6 @@ namespace extemp {
 				processArgs(pair_car(arg),tmp,ptr,lgth,typetags,_sc);
 				typetags += "]";
 				ret = 0;
-			// }else if(is_objc(pair_car(arg))) {
-			// 	id obj = (id) objc_value(pair_car(arg));
-			// 	if([obj isKindOfClass:[NSData class]])
-			// 	{	
-			// 		NSData* data = (NSData*) obj;
-			// 		void* newmem = malloc([data length]+tmpsize);
-			// 		memcpy(newmem, *tmp, tmpsize);				
-			// 		free(*tmp);
-			// 		
-			// 		*tmp = (char*) newmem;
-			// 		tmpsize+=[data length];								
-			// 		*ptr = *tmp;
-			// 		*ptr+=*lgth;
-			// 		ret = OSC::setOSCData(*ptr, data);
-			// 		typetags += "b";
-			// 	}
-			// 	else if([obj isKindOfClass:[NSDate class]])
-			// 	{
-			// 		NSDate* date = (NSDate*) obj;
-			// 		ret = OSC::setOSCTimestamp(*ptr, date);
-			// 		typetags += "t";
-			// 	}
-			// 	else
-			// 	{
-			// 		printf("Bad object type\n");
-			// 		//error
-			// 	}
 			}else if(is_vector(pair_car(arg))) {
 				arg = pair_cdr(arg);
 				continue;
