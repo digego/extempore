@@ -36,6 +36,7 @@
 #include "TaskScheduler.h"
 #include "SchemeProcess.h"
 #include "SchemeFFI.h"
+#include "OSC.h"
 
 #include <iosfwd>
 #include <iomanip>
@@ -351,8 +352,9 @@ namespace extemp {
 		std::queue<SchemeTask>& q = scm->getQueue();
 		bool with_banner = scm->withBanner();
 		
-		std::stringstream ss;    
+		OSC::schemeInit(scm);
 		
+		std::stringstream ss;
 		std::string load_path = scm->getLoadPath();
 		
 		scm->loadFile("extempore.scm", load_path.c_str());
