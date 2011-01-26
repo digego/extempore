@@ -54,6 +54,13 @@ namespace extemp {
 		void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func);
 		void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);		
 		
+		static pointer randomReal(scheme* _sc, pointer args);
+		static pointer randomInt(scheme* _sc, pointer args);
+		static pointer integerToReal(scheme* _sc, pointer args);
+		static pointer rationalToReal(scheme* _sc, pointer args);
+		static pointer realToRational(scheme* _sc, pointer args);
+		static pointer realToInteger(scheme* _sc, pointer args);
+		
 		// misc stuff
 		static pointer pointerSize(scheme* _sc, pointer args);
 		static pointer stringStrip(scheme* _sc, pointer args);

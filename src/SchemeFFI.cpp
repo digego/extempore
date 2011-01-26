@@ -109,6 +109,13 @@ namespace extemp {
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:samplerate*"), mk_integer(sc,UNIV::SAMPLERATE));
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:channels*"), mk_integer(sc,UNIV::CHANNELS));
 		
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "random-real"), mk_foreign_func(sc, &SchemeFFI::randomReal));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "random-int"), mk_foreign_func(sc, &SchemeFFI::randomInt));		
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "real->integer"), mk_foreign_func(sc, &SchemeFFI::realToInteger));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "real->rational"), mk_foreign_func(sc, &SchemeFFI::realToRational));		
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "rational->real"), mk_foreign_func(sc, &SchemeFFI::rationalToReal));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "integer->real"), mk_foreign_func(sc, &SchemeFFI::integerToReal));		
+		
 		// misc stuff
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:pointer-size"), mk_foreign_func(sc, &SchemeFFI::pointerSize));
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "string-strip"), mk_foreign_func(sc, &SchemeFFI::stringStrip));
@@ -187,6 +194,41 @@ namespace extemp {
 	// MISC STUFF
 	//
 	//////////////////////////////////////////////////////
+	
+	pointer SchemeFFI::randomReal(scheme* _sc, pointer args)
+	{
+		return mk_real(_sc,UNIV::random());
+	}
+	
+	pointer SchemeFFI::randomInt(scheme* _sc, pointer args)
+	{
+		return mk_integer(_sc,UNIV::random(ivalue(pair_car(args))));
+	}
+	
+	pointer SchemeFFI::integerToReal(scheme* _sc, pointer args)
+	{
+		double val = (double) ivalue(pair_car(args));
+		return mk_real(_sc,val);
+	}
+	
+	pointer SchemeFFI::rationalToReal(scheme* _sc, pointer args)
+	{
+		return mk_real(_sc, rvalue(pair_car(args)));
+	}
+
+	pointer SchemeFFI::realToRational(scheme* _sc, pointer args)
+	{
+		double val = rvalue(pair_car(args));
+		long long vali = (long long) val;
+		double remain = val - (double)vali;
+		return mk_rational(_sc, ((long long)(remain*10000000.0))+(vali*10000000ll), 10000000ll);
+	}
+	
+	pointer SchemeFFI::realToInteger(scheme* _sc, pointer args)
+	{
+		long long int val = (long long int) rvalue(pair_car(args));
+		return mk_integer(_sc,val);
+	}	
 	
 	pointer SchemeFFI::pointerSize(scheme* _sc, pointer args)
 	{
@@ -1370,7 +1412,7 @@ namespace extemp {
 	{
 		AudioDevice::I()->setDSPWrapperArray((dsp_f_ptr_array)cptr_value(pair_car(args)));
 		return _sc->T;
-	}	
+	}
 		
 } // end namespace
 
