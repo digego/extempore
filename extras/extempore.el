@@ -1,3 +1,5 @@
+;; This code kindly supplied originally by Hector Levesque
+;;
 ;; Put (autoload 'extempore-mode "/path/to/thisfile" "" t) in .emacs.
 ;;
 ;; This mode uses the normal Scheme key bindings except that the sequence
