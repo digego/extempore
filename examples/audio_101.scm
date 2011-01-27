@@ -1,6 +1,7 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Simplest possible audio example
+; Just eval each expression in turn
 ;
 
 ;; compile sample by sample dsp code
@@ -20,7 +21,8 @@
            (* 0.3 (sin (* 3.14152 2.0 time (/ 660.0 44100.0)))))
           (else	0.0))))
 
-;; abstract out an oscillator function                                          
+
+;; abstract out an oscillator function                                                                        
 (definec make-oscil
    (lambda (phase)
       (lambda (amp freq)
@@ -28,23 +30,17 @@
             (set! phase (+ phase inc))
             (* amp (sin phase))))))
 
-;; slightly more complex example
+;; slightly more complex example uses make-oscil
 (definec dsp
-  (let ((osc1 (make-oscil 0.))
-        (osc1b (make-oscil 0.))
-        (osc2 (make-oscil 0.))
-        (osc2b (make-oscil 0.))
-        (osc3 (make-oscil 0.))
-        (osc3b (make-oscil 0.))
-        (osc4 (make-oscil 0.))
-        (osc4b (make-oscil 0.))
-	(osc5 (make-oscil 0.)))
+  (let ((oscs (make-array 9 [double,double,double]*)))
+    (dotimes (i 9)
+       (aset! oscs i (make-oscil 0.0)))
     (lambda (a:double b:double c:double d:double*)
-      (cond ((= 0.0 c) ;; left channel                                          
-             (+ (osc1 0.2 60.0)
-                (osc2 0.2 220.0)
-                (osc3 0.2 (+ 400. (osc5 200. .1)))
-                (osc4 0.1 900.0)))
-            ((=	1.0 c) ;; right channel                                         
-             (* .1 (random)))
-            (else 0.0))))) ;; any other channel                                 
+      (cond ((= c 0.0) ;; left channel
+             (+ ((aref oscs 0) (+ 0.3 ((aref oscs 2) 0.2 1.0)) 60.0)
+                ((aref oscs 3) 0.2 220.0)
+                ((aref oscs 4) 0.2 (+ 400. ((aref oscs 5) 200. .1)))
+                ((aref oscs 6) 0.1 900.0)))
+            ((= c 1.0) ;; right channel                                                                       
+             ((aref oscs 7) 0.3 (+ 220.0 ((aref oscs 8) 110.0 20.0))))
+            (else 0.0))))) ;; any remaining channels                                                          
