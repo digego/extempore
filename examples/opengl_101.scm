@@ -18,7 +18,7 @@
     (glLoadIdentity)
     (glTranslated 0.0 -1.0 0.0)
     (dotimes (i 50)
-       (glTranslated (/ (/ (i64tod i) 50.0) 10.0) 0.0 0.0) 
+       (glTranslated (/ (i64tod i) 100.0) 0.0 0.0) 
        (glRotated degree (/ (i64tod i) 50.0) 0.5 0.0)
        (glutWireCube 0.1))
     (glfwSwapBuffers)))
