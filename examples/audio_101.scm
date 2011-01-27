@@ -15,14 +15,14 @@
 ;; recompile dsp to produce two sine wave in left and right
 (definec dsp
   (lambda (in:double time:double channel:double	data:double*)
-    (cond	((= channel 1.0)
-           (* 0.3 (sin (* 3.14152 2.0 time (/ 440.0 44100.0)))))
-          ((= channel 0.0)
-           (* 0.3 (sin (* 3.14152 2.0 time (/ 660.0 44100.0)))))
+    (cond ((= channel 0.0)
+           (* 0.5 (sin (* 3.141592 2.0 200.0 (/ time 44100.0)))))
+          ((= channel 1.0)
+           (* 0.5 (sin (* 3.141592 2.0 210.0 (/ time 44100.0)))))
           (else	0.0))))
 
 
-;; abstract out an oscillator function                                                                        
+;; abstract out an oscillator function
 (definec make-oscil
    (lambda (phase)
       (lambda (amp freq)
@@ -30,7 +30,18 @@
             (set! phase (+ phase inc))
             (* amp (sin phase))))))
 
-;; slightly more complex example uses make-oscil
+
+;; same example as above but using oscillator abstraction
+(definec dsp
+  (let ((osc1 (make-oscil 0.0))
+	(osc2 (make-oscil 0.0)))
+    (lambda (in:double time:double channel:double data:double*)
+      (cond ((= channel 1.0) (osc1 0.3 200.0))
+	    ((= channel 0.0) (osc2 0.3 210.0))
+	    (else 0.0)))))
+
+
+;; slightly more complex example
 (definec dsp
   (let ((oscs (make-array 9 [double,double,double]*)))
     (dotimes (i 9)
