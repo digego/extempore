@@ -1688,7 +1688,7 @@
                                              (error "")))))
                        lstr))
                    ((member (car ast) '(clrun->)) ;; apply function                    
-                    (impc:ir:compile:apply-closure (cdr ast) types))
+                    (impc:ir:compile:apply-closure (cdr ast) types #f))
                    ((equal? (car ast) 'set!)
                     (impc:ir:compiler:set! ast types))
                    ((equal? (car ast) 'bitcast)
