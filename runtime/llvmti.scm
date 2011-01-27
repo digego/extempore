@@ -1033,6 +1033,20 @@
       (impc:ti:type-check (cadr ast) vars kts #f)
       (list (caddr ast))))
 
+(define impc:ti:closure-in-first-position
+   (lambda (ast vars kts request?)
+      ;; first check return type of car ast (which will be a closure)
+      ;; then check against it's arg types
+      (let ((type (impc:ti:type-check (car ast) vars kts request?)))
+         ;(print 'closure-in-first-pos: ast 'type: type)
+         (if (<> (+ *impc:ir:closure* *impc:ir:pointer*) (car type))
+             (begin (print-error 'Invalid 'Expression ast) (error ""))
+             (begin (map (lambda (a b) 
+                            (impc:ti:type-check b vars kts a))
+                         (cddr type)
+                         (cdr ast))
+                    (cadr type))))))	  
+
 ;; vars is statefull and will be modified in place
 (define impc:ti:type-check
    (lambda (ast vars kts request?)
@@ -1064,7 +1078,8 @@
             ((and (list? ast) (member (car ast) '(if ifret))) (impc:ti:if-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(set!))) (impc:ti:set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(ret->))) (impc:ti:ret-check ast vars kts request?))
-            ((and (list? ast) (assoc (car ast) vars)) (impc:ti:closure-call-check ast vars kts request?))            
+            ((and (list? ast) (assoc (car ast) vars)) (impc:ti:closure-call-check ast vars kts request?))    
+            ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))
             (else (impc:ti:join (impc:ti:type-check (car ast) vars kts request?)
                                 (impc:ti:type-check (cdr ast) vars kts request?))))))
 

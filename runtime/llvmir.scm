@@ -935,6 +935,57 @@
          (impc:ir:strip-space s))))
 
 
+(define impc:ir:compile:apply-closure
+   (lambda (ast types ftype-provided?)
+      ;(print 'apply-closure ast types ftype-provided?)
+      (let* ((s (make-string 10000))
+             (functiontype (if ftype-provided? 
+                               (cdr (impc:ir:get-type-from-str (cadar ast)))
+                               (if (and (assoc (car ast) types)
+                                        (impc:ir:closure? (cdr (assoc (car ast) types)))
+                                        (= 1 (impc:ir:get-ptr-depth (cdr (assoc (car ast) types)))))
+                                   (cddr (assoc (car ast) types))
+                                   (print-error "Compiler error: Bad type for closure!" (car ast)))))
+             (os (open-output-string s))
+             (ftype (impc:ir:make-function-str functiontype #t))
+             (clstype (string-append "<{i8*, i8*, " ftype "*}>*"))
+             (vars (map (lambda (arg hint)
+                           (display (impc:ir:compiler arg types hint) os)
+                           (impc:ir:gname))
+                        (cdr ast)
+                        (cdr functiontype))))
+         (display "\n; apply closure \n" os)
+         (define v '())
+         (if ftype-provided?
+             (set! v (caar ast))
+             (begin (display (string-append (impc:ir:gname "val" clstype) " = load " clstype "* %"
+                                            (symbol->string (car ast)) "Ptr\n") os)
+                    (set! v (car (impc:ir:gname (impc:ir:gname "val"))))))
+         (display (string-append (impc:ir:gname "fPtr" clstype)
+                                 " = getelementptr " clstype " " v ", i32 0, i32 2\n") os)
+         (display (string-append (impc:ir:gname "ePtr" clstype) " = getelementptr "
+                                 clstype " " v ", i32 0, i32 1\n") os)
+         (display (string-append (impc:ir:gname "f" (string-append ftype "*"))
+                                 " = load " ftype "** " (car (impc:ir:gname (impc:ir:gname "fPtr"))) "\n") os)
+         (display (string-append (impc:ir:gname "e" "i8*")
+                                 " = load i8** " (car (impc:ir:gname (impc:ir:gname "ePtr"))) "\n") os)
+         (display (string-append (impc:ir:gname "z" "i8*") " = bitcast %mzone* %_zone to i8*\n") os)
+         (define zone (car (impc:ir:gname)))
+         (display (string-append (if (impc:ir:void? (car functiontype))
+                                     (begin (impc:ir:gname "result" "void") "")
+                                     (string-append (impc:ir:gname "result" (impc:ir:get-type-str (car functiontype))) " = "))
+                                 "tail call fastcc "
+                                 (impc:ir:get-type-str (car functiontype)) " "
+                                 (car (impc:ir:gname (impc:ir:gname "f"))) "(i8* " zone ", i8* "
+                                 (car (impc:ir:gname (impc:ir:gname "e"))) 
+                                 (apply string-append (map (lambda (var)
+                                                              (string-append ", " (cadr var) " " (car var)))
+                                                           vars))
+                                 ")\n") os)
+         (close-output-port os)
+         (impc:ir:strip-space s))))
+
+
 (define impc:ir:compiler:loop
    (lambda (ast types)
       (let* ((s (make-string 100000))
@@ -1717,7 +1768,9 @@
                          (equal? (caar ast) 'begin))
                     (string-append (impc:ir:compiler (car ast) types)
                                    (impc:ir:compiler (cdr ast) types)))
-                   ;(else (print-error 'Compiler 'Error: 'Parse 'error 'in 'code ast))))
+                   ((list? (car ast))
+                    (string-append (impc:ir:compiler (car ast) types)                    
+                                   (impc:ir:compile:apply-closure (cons (impc:ir:gname) (cdr ast)) types #t)))
                    (else (string-append (impc:ir:compiler (car ast) types)
                                         (impc:ir:compiler (cdr ast) types)))))
             ((pair? ast)
