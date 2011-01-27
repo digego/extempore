@@ -3,12 +3,28 @@
 ; Good old temporal recursion at it's simplest
 ;
 
+
+;
+; temporal recursion
+;
 (define	tr
   (lambda (t x rate)
     (print t x)
-    (callback (+ t (/ rate .99)) 'tr (+ t rate) x rate)))
+    (callback (+ t rate) 'tr (+ t rate) x rate)))
 
 (let ((t (now)))
   tr t "a" (* 4 44100))
   (tr t " b" (* 2 44100))
   (tr t "  c" 44100))
+
+;
+; metro also works
+;
+(define metro-test
+  (lambda (beat x dur)
+    (print x beat)
+    (callback (*metro* (+ beat dur)) 'metro-test (+ beat dur)
+              x dur)))
+
+(metro-test (*metro* 'get-beat 4.0) "A" 2)
+(metro-test (*metro* 'get-beat 4.0) "--B" 1/2)
