@@ -104,7 +104,7 @@ namespace extemp {
 				uint32_t ii = i*UNIV::CHANNELS;
 				SAMPLE* dat = (SAMPLE*) outputBuffer;
 				for(uint32_t k=0; k<UNIV::CHANNELS; k++)
-				{   
+				{
 					dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+UNIV::TIME),(double)k,data));
 				}
 			}
@@ -235,7 +235,7 @@ namespace extemp {
 				SAMPLE* dat = (SAMPLE*) outOutputData->mBuffers[0].mData;
 				for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 				{   
-					dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+inNow->mSampleTime),(double)k,data)); 
+					dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+UNIV::TIME),(double)k,data)); 
 				}
 			}
 			llvm_zone_destroy(zone);
