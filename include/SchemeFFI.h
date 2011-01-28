@@ -61,8 +61,16 @@ namespace extemp {
 		static pointer realToRational(scheme* _sc, pointer args);
 		static pointer realToInteger(scheme* _sc, pointer args);
 		
-		// misc stuff
+		// sys stuff
+		static pointer openDynamicLib(scheme* _sc, pointer args);
+		static pointer closeDynamicLib(scheme* _sc, pointer args);		
 		static pointer pointerSize(scheme* _sc, pointer args);
+		// dsp bits
+		static pointer setDSPClosure(scheme* _sc, pointer args);
+		static pointer setDSPWrapper(scheme* _sc, pointer args);
+		static pointer setDSPWrapperArray(scheme* _sc, pointer args);
+		
+		// misc stuff
 		static pointer stringStrip(scheme* _sc, pointer args);
 		static pointer stringJoin(scheme* _sc, pointer args);
 		static pointer getClosureEnv(scheme* _sc, pointer args);
@@ -111,12 +119,8 @@ namespace extemp {
 		static pointer callClosure(scheme* _sc, pointer args);
 		static pointer printLLVMModule(scheme* _sc, pointer args);
 		static pointer printLLVMFunction(scheme* _sc, pointer args);
-		
-		// dsp bits
-		static pointer setDSPClosure(scheme* _sc, pointer args);
-		static pointer setDSPWrapper(scheme* _sc, pointer args);
-		static pointer setDSPWrapperArray(scheme* _sc, pointer args);
-		
+		static pointer bind_symbol(scheme* _sc, pointer args);
+
 	private:
 		static SchemeFFI SINGLETON;		
 	};

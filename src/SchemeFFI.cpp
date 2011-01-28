@@ -42,6 +42,7 @@
 
 #include <sstream>
 #include <string.h>
+#include <dlfcn.h>
 
 #define PCRE_REGEX
 
@@ -116,8 +117,22 @@ namespace extemp {
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "rational->real"), mk_foreign_func(sc, &SchemeFFI::rationalToReal));
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "integer->real"), mk_foreign_func(sc, &SchemeFFI::integerToReal));		
 		
-		// misc stuff
+		// sys stuff
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:pointer-size"), mk_foreign_func(sc, &SchemeFFI::pointerSize));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:open-dylib"), mk_foreign_func(sc, &SchemeFFI::openDynamicLib));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:close-dylib"), mk_foreign_func(sc, &SchemeFFI::closeDynamicLib));		
+		// DSP sys stuff
+	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-closure"), mk_foreign_func(sc, &SchemeFFI::setDSPClosure));
+	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapper));		
+	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper-array"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapperArray));			
+		// memory zone stuff
+		//this->addGlobalCptr(sc,(char*)"*sys:destroy-zone-with-delay*",mk_cb(this,SchemeFFI,destroyMallocZoneWithDelay));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:create-mzone"), mk_foreign_func(sc, &SchemeFFI::createMallocZone));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:default-mzone"), mk_foreign_func(sc, &SchemeFFI::defaultMallocZone));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:destroy-mzone"), mk_foreign_func(sc, &SchemeFFI::destroyMallocZone));
+		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:copy-to-dmzone"), mk_foreign_func(sc, &SchemeFFI::copyToDefaultZone));			
+		
+		// misc stuff
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "string-strip"), mk_foreign_func(sc, &SchemeFFI::stringStrip));
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "string-join"), mk_foreign_func(sc, &SchemeFFI::stringJoin));
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "call-cpp-at-time"), mk_foreign_func(sc, &SchemeFFI::callCPPAtTime));
@@ -136,14 +151,7 @@ namespace extemp {
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:match-all"), mk_foreign_func(sc, &SchemeFFI::regex_match_all));		
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:split"), mk_foreign_func(sc, &SchemeFFI::regex_split));				
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:replace"), mk_foreign_func(sc, &SchemeFFI::regex_replace));
-		
-		// memory zone stuff
-		//this->addGlobalCptr(sc,(char*)"*sys:destroy-zone-with-delay*",mk_cb(this,SchemeFFI,destroyMallocZoneWithDelay));
-		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:create-mzone"), mk_foreign_func(sc, &SchemeFFI::createMallocZone));
-		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:default-mzone"), mk_foreign_func(sc, &SchemeFFI::defaultMallocZone));
-		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:destroy-mzone"), mk_foreign_func(sc, &SchemeFFI::destroyMallocZone));
-		scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:copy-to-dmzone"), mk_foreign_func(sc, &SchemeFFI::copyToDefaultZone));		
-	
+			
 		// llvm stuff
 	    scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:compile"), mk_foreign_func(sc, &SchemeFFI::compile));
 	    scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:bind-global-var"), mk_foreign_func(sc, &SchemeFFI::bind_global_var));		
@@ -166,11 +174,7 @@ namespace extemp {
 	    scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:call-closure"), mk_foreign_func(sc, &SchemeFFI::callClosure));
 	    scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:print"), mk_foreign_func(sc, &SchemeFFI::printLLVMModule));
 	    scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:print-function"), mk_foreign_func(sc, &SchemeFFI::printLLVMFunction));
-	
-		// DSP stuff
-	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-closure"), mk_foreign_func(sc, &SchemeFFI::setDSPClosure));
-	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapper));		
-	    scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper-array"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapperArray));			
+	    scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:bind-symbol"), mk_foreign_func(sc, &SchemeFFI::bind_symbol));
 	}
 	
 	//////////////////// helper functions ////////////////////////
@@ -187,7 +191,7 @@ namespace extemp {
 	void SchemeFFI::addGlobalCptr(scheme* sc, char* symbol_name, void* ptr)
 	{
 		scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_cptr(sc, ptr));		
-	}	
+	}
 	
 	///////////////////////////////////////////////////////
 	//
@@ -228,7 +232,26 @@ namespace extemp {
 	{
 		long long int val = (long long int) rvalue(pair_car(args));
 		return mk_integer(_sc,val);
-	}	
+	}
+	
+	pointer SchemeFFI::openDynamicLib(scheme* _sc, pointer args)
+	{
+		//void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
+		void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY);
+		if (!lib_handle)
+		{
+			fprintf(stderr, "%s\n", dlerror());
+			return _sc->F;
+		}
+		return mk_cptr(_sc,lib_handle);
+	}
+
+	pointer SchemeFFI::closeDynamicLib(scheme* _sc, pointer args)
+	{
+		dlclose(cptr_value(pair_car(args)));
+		return _sc->T;
+	}
+	
 	
 	pointer SchemeFFI::pointerSize(scheme* _sc, pointer args)
 	{
@@ -1389,6 +1412,25 @@ namespace extemp {
 		printf("%s",str.c_str());
 		return _sc->T;		
 	}
+	
+	pointer SchemeFFI::bind_symbol(scheme* _sc, pointer args)
+	{
+		void* library = cptr_value(pair_car(args));
+		char* symname = string_value(pair_cadr(args));
+
+		llvm::Module* M = EXTLLVM::I()->M;
+		llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;	
+		
+		void* ptr = dlsym(library, symname);
+		if(!ptr) {
+			printf("Could not find symbol named %s!\n",symname);
+			return _sc->F;
+		}
+		llvm::GlobalValue* gv = M->getNamedValue(std::string(symname));
+		EE->updateGlobalMapping(gv,ptr);
+		
+		return _sc->T;
+	}	
 	
 	////////////////////////////////////////////////////////////
 	//

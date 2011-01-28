@@ -1046,3 +1046,27 @@
                (else (print-error 'Bad 'closure 'signature 'for 'dsp:set! ct))))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; this here for wrapping llvm dynamic binds
+(define-macro (dynamic-bind library symname type)
+  `(__dynamic-bind ,library ',symname ',type))
+
+(define __dynamic-bind
+  (lambda (library symname type)
+    (let* ((ctype (cdr (impc:ir:convert-from-pretty-types type)))
+           (ircode (string-append "declare "
+                                   (impc:ir:get-type-str (car ctype))
+                                   " @"
+                                   (symbol->string symname)
+                                   "("
+                                   (if (null? (cdr ctype))
+                                       ""
+                                       (apply string-append
+                                              (impc:ir:get-type-str (cadr ctype))
+                                              (map (lambda (v)
+                                                     (string-append "," (impc:ir:get-type-str v)))
+                                                   (cddr ctype))))
+                                   ")")))
+      (llvm:compile ircode)
+      (llvm:bind-symbol library (symbol->string symname)))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
