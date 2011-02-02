@@ -327,6 +327,17 @@
                         (impc:ti:first-transform (impc:ti:cons ast) inbody?))                       
                        ((eq? (car ast) 'cond)
                         (impc:ti:first-transform (impc:ti:cond (cdr ast)) inbody?))
+                       ((eq? (car ast) 'cset!)
+                        (list 'closure-set! 
+                              (impc:ti:first-transform (cadr ast) inbody?)
+                              (symbol->string (caddr ast))
+                              (symbol->string (cadddr ast))
+                              (impc:ti:first-transform (car (cddddr ast)) inbody?)))
+                       ((eq? (car ast) 'cref)
+                        (list 'closure-ref 
+                              (impc:ti:first-transform (cadr ast) inbody?)
+                              (symbol->string (caddr ast))
+                              (symbol->string (cadddr ast))))
                        ((eq? (car ast) 'dotimes)
                         (list 'dotimes 
                               (impc:ti:first-transform (cadr ast) inbody?)
@@ -335,6 +346,18 @@
                         (cons (impc:ti:first-transform (car ast) inbody?)
                               (cons (impc:ti:first-transform (cadr ast) #f)
                                     (list (cons 'begin (impc:ti:first-transform (cddr ast) #t))))))
+                       ((and (symbol? (car ast))
+                             (regex:match? (symbol->string (car ast)) ".*\\..*"))
+                        (if (regex:match? (symbol->string (car ast)) ".*\\..*:.*")                            
+                            (let* ((subs (regex:split (symbol->string (car ast)) "\\."))
+                                   (a (string->symbol (car subs)))
+                                   (subs2 (regex:split (cadr subs) ":"))
+                                   (b (string->symbol (car subs2)))
+                                   (c (string->symbol (cadr subs2))))
+                               (if (= (length ast) 1)
+                                   (impc:ti:first-transform (list 'cref a b c) inbody?)
+                                   (impc:ti:first-transform (list 'cset! a b c (cadr ast)) inbody?)))
+                            (print-error 'Compiler 'Error: 'You 'must 'provide (sexpr->string (car ast)) 'with 'a 'the 'correct 'type '(e.g. func.slot:i32))))
                        ((and (atom? (car ast))
                              (symbol? (car ast))
                              (not (eq? 'dotimes (car ast)))
@@ -709,7 +732,7 @@
 
 
 (define impc:ti:nativef-check
-   (lambda (ast vars kts request?)   
+   (lambda (ast vars kts request?) 
       (let ((ftype (map impc:ir:get-type-from-str
                         (llvm:get-function-args-withoutzone (symbol->string (car ast))))))
          (if *impc:ti:print-sub-checks* (print 'ftype:> 'ast: ast 'type: ftype))
@@ -908,6 +931,44 @@
              (list-ref (car a) (+ 1 (caddr ast)))
              '()))))
 
+;;(closure-set! closure a i32 5)
+(define impc:ti:closure-set-check
+   (lambda (ast vars kts request?)   
+      (if (< (length ast) 5)
+          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
+      (let* (;; a should be a closure of some kind
+             (a (if (and (symbol? (cadr ast))
+                         (llvm:get-function (symbol->string (cadr ast))))
+                    #t ; // yes (cadr ast) is a globally defined closure
+                    (impc:ti:type-check (cadr ast) vars kts request?)))
+             ;; b should be a string (the var's name)
+             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*)))
+             ;; c should be a string (the type of b)
+             (c (impc:ti:type-check (cadddr ast) vars kts (list *impc:ir:si8*)))
+             ;; d should be a value of type c
+             (d (impc:ti:type-check (car (cddddr ast)) vars kts (impc:ir:get-type-from-str (cadddr ast)))))
+         ;; should return the type requested (i.e. c)
+         (impc:ir:get-type-from-str (cadddr ast)))))
+
+
+;;(closure-ref closure a i32)
+(define impc:ti:closure-ref-check
+   (lambda (ast vars kts request?)
+      (if (< (length ast) 4)
+          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
+      (let* (;; a should be a closure of some kind
+             (a (if (and (symbol? (cadr ast))
+                         (llvm:get-function (symbol->string (cadr ast))))
+                    #t ; // yes (cadr ast) is a globally defined closure
+                    (impc:ti:type-check (cadr ast) vars kts request?)))
+             ;; b should be a string (the var's name)
+             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*)))
+             ;; c should be a string (the type of b)
+             (c (impc:ti:type-check (cadddr ast) vars kts (list *impc:ir:si8*))))
+         ;; should return the type requested (i.e. c)
+         (impc:ir:get-type-from-str (cadddr ast)))))
+
+
 
 (define impc:ti:set-check
    (lambda (ast vars kts request?)      
@@ -937,7 +998,7 @@
             ;(print 'return 'ret: ret 'from 'ast ast) 
             ret))))
 			
-			
+
 ;; whenever a closure is called we calculate a type for it
 ;; at the end these possibly multiple views should unify!
 (define impc:ti:closure-call-check
@@ -946,7 +1007,9 @@
       ;; otherwise we need to try to find a type definition for the closure      
       (let* ((ctype (if (assoc (car ast) vars)
                         (cdr (assoc (car ast) vars))
-                        (print-error 'Compiler 'Error: 'no 'closure 'named: (car ast))))
+                        (if (llvm:get-globalvar (symbol->string (car ast)))
+                            (list (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (car ast)))))
+                            (print-error 'Compiler 'Error: 'no 'closure 'named: (car ast)))))
              ;; get argument expression types
              (res (map (lambda (e t)
                           (let ((res (impc:ti:type-check e vars kts
@@ -976,9 +1039,10 @@
                           '()
                           (cadr (car ctype))))))         
          (if *impc:ti:print-sub-checks* (print 'closure:> 'ast: ast 'res: res 'ret: ret)) 
-         ; set the closure type for the symbol
-         (impc:ti:update-var (car ast) vars kts
-                             (list (impc:ir:pointer++ (list* *impc:ir:closure* ret res))))
+         ; set the closure type for the symbol (if not a global var)
+         (if (assoc (car ast) vars)
+             (impc:ti:update-var (car ast) vars kts
+                                 (list (impc:ir:pointer++ (list* *impc:ir:closure* ret res)))))
          ; and return the new closure's return type
          (if (list? ret) ret
              (list ret)))))
@@ -1069,17 +1133,23 @@
             ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?))            
             ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))                        
-            ((and (list? ast) (member (car ast) '(null?))) (impc:ti:null-check ast vars kts request?))                        			
-            ((and (list? ast) (member (car ast) '(bitcast))) (impc:ti:bitcast-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(closure-set!))) (impc:ti:closure-set-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(closure-ref))) (impc:ti:closure-ref-check ast vars kts request?))                                    
+            ((and (list? ast) (member (car ast) '(null?))) (impc:ti:null-check ast vars kts request?))                        			((and (list? ast) (member (car ast) '(bitcast))) (impc:ti:bitcast-check ast vars kts request?))
             ((and (list? ast) 
                   (symbol? (car ast))
-                  (llvm:get-function (symbol->string (car ast)))) (impc:ti:nativef-check ast vars kts request?))
+                  (llvm:get-function (symbol->string (car ast)))) 
+             (impc:ti:nativef-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(begin))) (impc:ti:begin-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(if ifret))) (impc:ti:if-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(set!))) (impc:ti:set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(ret->))) (impc:ti:ret-check ast vars kts request?))
             ((and (list? ast) (assoc (car ast) vars)) (impc:ti:closure-call-check ast vars kts request?))    
-            ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))
+            ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))                                    
+            ((and (list? ast)  ;; this is here to check against closures as global vars (i.e. not in local environment)
+                  (llvm:get-globalvar (symbol->string (car ast)))
+                  (impc:ir:closure? (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (car ast))))))
+             (impc:ti:closure-call-check ast vars kts request?))
             (else (impc:ti:join (impc:ti:type-check (car ast) vars kts request?)
                                 (impc:ti:type-check (cdr ast) vars kts request?))))))
 
@@ -1168,60 +1238,6 @@
 ;; add types to source
 ;; also add clrun for closure application
 (define impc:ti:add-types-to-source
-   (let ((cnt 0)) ;names start from 1000
-      (lambda (symname ast types . prev)
-         ;(print 'symname: symname 'ast: ast 'prev: prev)
-         (if (atom? ast) ast
-             (cond ((equal? (car ast) 'make-closure)
-                    (set! cnt (+ cnt 1))
-                    (list (car ast)
-                          ;; global name
-                          (string-append (symbol->string symname) "__" (number->string cnt))
-                          (if (null? prev) ;; this adds return type
-                              *impc:ir:other*
-                              (caddr (assoc (car prev) types))) 
-                          (map (lambda (v) ;; environment types
-                                  (assoc v types))
-                               (cadr ast))
-                          (map (lambda (v) ;; argument types
-                                  (assoc v types))
-                               (caddr ast))
-                          (impc:ti:add-types-to-source symname (cadddr ast) types)))
-                   ((equal? (car ast) 'clrun->)
-                    (list* (car ast)
-                           (cadr ast)
-                           (map (lambda (arg type)
-                                   ;(print 'clrunargs-> arg type)
-                                   (let ((a (impc:ti:add-types-to-source symname arg types ast)))
-                                      (if (null? type) 
-                                          (print-error 'Compiler 'Error: 'cannot 'infer 'closure 'type 'for 
-                                                       (symbol->string (cadr ast)))
-                                          a)))
-                                (cddr ast)
-                                (cdddr (assoc (cadr ast) types)))))
-                   ((member (car ast) '(make-env make-env-zone))
-                    (list (car ast)
-                          (map (lambda (p)
-                                  (list (assoc (car p) types)
-                                        (impc:ti:add-types-to-source symname (cadr p) types (car p))))
-                               (cadr ast))
-                          (impc:ti:add-types-to-source symname (caddr ast) types)))
-                   ((and (assoc (car ast) types)
-                         ;(not (null? (cdr ast)))
-                         (impc:ir:closure? (cdr (assoc (car ast) types))))
-                    (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types))                   
-                   ((list? ast)
-                    (map (lambda (x)
-                            (impc:ti:add-types-to-source symname x types ast))
-                         ast))
-                   (else (cons (apply impc:ti:add-types-to-source symname (car ast) types)
-                               (apply impc:ti:add-types-to-source symname (cdr ast) types))))))))
-
-
-
-;; add types to source
-;; also add clrun for closure application
-(define impc:ti:add-types-to-source
    (lambda (symname ast types envvars . prev)
       ;(print 'symname: symname 'envvars: envvars 'ast: ast 'prev: prev)
       (if (atom? ast) ast
@@ -1255,7 +1271,9 @@
                                                     (symbol->string (cadr ast)))
                                        a)))
                              (cddr ast)
-                             (cdddr (assoc (cadr ast) types)))))
+                             (cdddr (if (not (assoc (cadr ast) types)) ;; if not in local env then get types from global var
+                                        (cons (cadr ast) (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (cadr ast)))))
+                                        (assoc (cadr ast) types))))))
                 ((member (car ast) '(make-env make-env-zone))
                  (list (car ast)
                        (map (lambda (p)
@@ -1263,10 +1281,12 @@
                                      (impc:ti:add-types-to-source symname (cadr p) types envvars (car p))))
                             (cadr ast))
                        (impc:ti:add-types-to-source symname (caddr ast) types envvars)))
-                ((and (assoc (car ast) types)
-                      ;(not (null? (cdr ast)))
-                      (impc:ir:closure? (cdr (assoc (car ast) types))))
-                 (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))                   
+                ((or (and (assoc (car ast) types)
+                          (impc:ir:closure? (cdr (assoc (car ast) types))))
+                     (and (not (list? (car ast)))
+                          (llvm:get-globalvar (symbol->string (car ast)))
+                          (impc:ir:closure? (llvm:get-global-variable-type (symbol->string (car ast))))))                          
+                 (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))   
                 ((list? ast)
                  (map (lambda (x)
                          (impc:ti:add-types-to-source symname x types envvars ast))
@@ -1482,6 +1502,7 @@
       (let* ((c code)       
              (c1 (impc:ti:get-var-types c)) ;; this is a cons pair of (ast . types)
              (t1 (impc:ti:first-transform (car c1) #t)) ;; car is ast
+             (tttt (print 'first-transform: t1))
              (t2 (impc:ti:mark-returns t1 symname #f #f #f))
              (t3 (impc:ti:closure:convert t2 (list symname))) 
              (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
@@ -1895,4 +1916,4 @@
                                                 " = external global "
                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
                (llvm:bind-global-var ,(symbol->string symbol) ,value))
-       (print-error "bindc only accepts cptr values")))
+       (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!)))

@@ -116,7 +116,8 @@ int llvm_printf(char* format, ...)
 	va_start(ap,format);
 	char* ret = (char*) alloca(2048);
 	int returnval = vasprintf(&ret, format, ap);
-	printf("%s\n",ret);
+	printf("%s",ret);
+	fflush(stdout);	
 	va_end(ap);
 	return returnval;
 }
@@ -153,6 +154,91 @@ long long llvm_get_next_prime(long long start)
 	return -1;
 }
 
+// these are helpers for runtime debugging in llvm
+void llvm_print_pointer(void* ptr)
+{
+	printf("llvm:ptr:>%p -- %lld\n",ptr,*((int64_t*)ptr));
+	return;
+}
+
+void llvm_print_i32(int32_t num)
+{
+	printf("llvm:i32:>%d\n",num);
+	return;
+}
+
+void llvm_print_i64(int64_t num)
+{
+	printf("llvm:i64:>%lld\n",num);
+	return;
+}
+
+void llvm_print_f32(float num)
+{
+	printf("llvm:f32:>%f\n",num);
+	return;
+}
+
+void llvm_print_f64(double num)
+{
+	printf("llvm:f64:>%f\n",num);
+	return;
+}
+
+///////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////
+// This here for Extempore Compiler Runtime.
+// This is temporary and needs to replaced with something sensible!
+struct closure_address_table
+{
+	char* name;
+	uint32_t offset;
+	char* type;
+	struct closure_address_table* next;
+};
+
+struct closure_address_table* get_address_table(const char* name, closure_address_table* table)
+{
+	while(table)
+	{
+		if(strcmp(table->name,name)) return table;
+		table = table->next;
+	}
+	printf("Unable to locate %s in closure environment\n",name);
+	return 0;
+}
+
+uint32_t get_address_offset(const char* name, closure_address_table* table)
+{
+	while(table)
+	{
+		if(strcmp(table->name,name) == 0) {
+			//printf("in %s returning offset %d from %s\n",table->name,table->offset,name);
+			return table->offset;	
+		}
+		table = table->next;
+	}
+	printf("Unable to locate %s in closure environment\n",name);
+	return 0;
+}
+
+struct closure_address_table* new_address_table()
+{
+	return 0; // NULL for empty table
+}
+
+struct closure_address_table* add_address_table(char* name, uint32_t offset, char* type, struct closure_address_table* table)
+{	
+	struct closure_address_table* t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
+	t->name = name;
+	t->offset = offset;
+	t->type = type;
+	t->next = table;
+	//printf("adding %s of type %s at %d\n",t->name,t->type,t->offset);
+	return t;
+}
+/////////////////////////////////////////////////////////////////////////
 
 namespace extemp {
 	
@@ -246,6 +332,24 @@ namespace extemp {
 			EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);						
 			gv = M->getNamedValue(std::string("llvm_zone_malloc"));
 			EE->updateGlobalMapping(gv,(void*)&llvm_zone_malloc);						
+			gv = M->getNamedValue(std::string("get_address_table"));
+			EE->updateGlobalMapping(gv,(void*)&get_address_table);						
+			gv = M->getNamedValue(std::string("get_address_offset"));
+			EE->updateGlobalMapping(gv,(void*)&get_address_offset);									
+			gv = M->getNamedValue(std::string("add_address_table"));
+			EE->updateGlobalMapping(gv,(void*)&add_address_table);						
+			gv = M->getNamedValue(std::string("new_address_table"));
+			EE->updateGlobalMapping(gv,(void*)&new_address_table);						
+			gv = M->getNamedValue(std::string("llvm_print_pointer"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_print_pointer);						
+			gv = M->getNamedValue(std::string("llvm_print_i32"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_print_i32);						
+			gv = M->getNamedValue(std::string("llvm_print_i64"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_print_i64);						
+			gv = M->getNamedValue(std::string("llvm_print_f32"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_print_f32);						
+			gv = M->getNamedValue(std::string("llvm_print_f64"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_print_f64);						
 			
 		}	
 	 	return;

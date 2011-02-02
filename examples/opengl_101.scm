@@ -1,7 +1,9 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Simplest possible OpenGL example
 ;
+; Are you running VirtualBox!! (if yes read install notes)
+; 
 
 ;; code to open a window                                                        
 (definec open-window
@@ -32,4 +34,4 @@
 ;; open window
 (open-window 640 480)
 ;; start animating
-(opengl-test 0)
+(opengl-test 0.0)
