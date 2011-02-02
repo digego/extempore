@@ -1059,7 +1059,7 @@
                     (set! a (list *impc:ir:si64*)))
                    ((equal? (cl:sort a <) 
                             (cl:sort (list *impc:ir:double* *impc:ir:float*) <))
-                    (set! b (list *impc:ir:double*)))
+                    (set! a (list *impc:ir:double*)))
                    (else 'leave-a-alone)))                                   
          ;; (car (cadr ast)) should be a symbol that we want to update with a
          (if (not (symbol? (car (cadr ast)))) (print-error 'Compiler 'Error: 'bad 'form 'for 'dotimes. 'Needs 'a 'symbol ast))

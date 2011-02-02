@@ -965,14 +965,24 @@
          ;(print num 'numstr numstr)
          (display numstr os)         
          (display (string-append iterator "Ptr = alloca " iterator-type "\n") os)
-         (display (string-append "store " iterator-type " 0, " iterator-type "* " iterator "Ptr\n") os)
+         (display (string-append "store " iterator-type (if (impc:ir:fixed-point? (cadr num))
+							    " 0, "
+							    " 0.0, ")
+				 iterator-type "* " iterator "Ptr\n") os)
          (display (string-append "br label " loop "\n") os)
          (display (string-append "\n" loop-label "\n") os)
          (display bodystr os)
          (display (string-append "%loop_cnt" (number->string loop-num) 
                                  " = load " iterator-type "* " iterator "Ptr\n") os)
          (display (string-append "%next" (number->string loop-num)
-                                 " = add " iterator-type " %loop_cnt" (number->string loop-num) ", 1\n") os) 
+                                 (if (impc:ir:fixed-point? (cadr num))
+				     " = add " 
+				     " = fadd ")
+				 iterator-type " %loop_cnt" (number->string loop-num) 
+				 (if (impc:ir:fixed-point? (cadr num))
+				     ", 1\n"
+				     ", 1.0\n"))
+		  os)
          (display (string-append "store " iterator-type " %next" (number->string loop-num) 
                                      ", " iterator-type "* " iterator "Ptr\n") os) 
          (display (string-append cmp " = "
