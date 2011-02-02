@@ -41,6 +41,22 @@
 
 #include <string>
 
+#if _WIN32 || _WIN64
+#if _WIN64
+#define TARGET_64BIT
+#else
+#define TARGET_32BIT
+#endif
+#endif
+
+#if __GNUC__
+#if __x86_64__ || __ppc64__
+#define TARGET_64BIT
+#else
+#define TARGET_32BIT
+#endif
+#endif
+
 namespace extemp {
 
 //#define mk_cb(instance,class,func) (dynamic_cast<CM*>(new CMI<class>(instance,&class::func)))

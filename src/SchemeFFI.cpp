@@ -56,7 +56,6 @@
 #include <malloc/malloc.h>
 #endif
 
-
 /////////////////////// llvm includes
 #include "llvm/Assembly/Parser.h"
 #include "llvm/LLVMContext.h"
@@ -810,7 +809,6 @@ namespace extemp {
 	{
 		// Create some module to put our function into it.
 		using namespace llvm;
-
 		Module* M = EXTLLVM::I()->M;
 		PassManager* PM = extemp::EXTLLVM::I()->PM;
 
@@ -830,7 +828,7 @@ namespace extemp {
 			std::string errstr;
 			llvm::raw_string_ostream ss(errstr);
 			pa.Print("Impromptu",ss);
-			printf(ss.str().c_str());
+			printf("%s\n",ss.str().c_str());
 			// if the number of functions in module has changed when calling runFunction 
 			// then we assume a stub was made and appended to the end of the modules function list.
 			// we remove this function now that we no longer need it!
@@ -854,7 +852,7 @@ namespace extemp {
 					func->removeFromParent();
 				}							
 				return _sc->F;
-			} 			
+			} 
 			return _sc->T;
 		}
 	}
