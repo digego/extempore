@@ -331,13 +331,13 @@
                         (list 'closure-set! 
                               (impc:ti:first-transform (cadr ast) inbody?)
                               (symbol->string (caddr ast))
-                              (symbol->string (cadddr ast))
+                              (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast)))
                               (impc:ti:first-transform (car (cddddr ast)) inbody?)))
                        ((eq? (car ast) 'cref)
                         (list 'closure-ref 
                               (impc:ti:first-transform (cadr ast) inbody?)
                               (symbol->string (caddr ast))
-                              (symbol->string (cadddr ast))))
+                              (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast)))))
                        ((eq? (car ast) 'dotimes)
                         (list 'dotimes 
                               (impc:ti:first-transform (cadr ast) inbody?)
