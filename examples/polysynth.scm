@@ -192,7 +192,6 @@
 ;; set synth as primary dsp code
 (dsp:set! "poly-synth")
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; now normal scheme code
 ;; to "play" the synth
