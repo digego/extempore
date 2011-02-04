@@ -1323,11 +1323,25 @@ namespace extemp {
 			if(a->getType()->getTypeID() != Type::PointerTyID)
 			    {
 				printf("Bad argument type %i\n",i);
-				return _sc->F;					
+				return _sc->F;
 			    }
 			fargs[i].PointerVal = cptr_value(p);
 			//fargs[i].PointerVal = (void*)p;
 		    }
+		else if(is_closure(p))
+		    {			
+			//ascii_print_color(1,1,10); // error color
+			printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
+			//ascii_print_color(0,9,10);
+			return _sc->F;
+		    }
+		else {
+		    //ascii_print_color(1,1,10); // error color
+		    printf("Bad argument at index %i\n",i);
+		    //ascii_print_color(0,9,10); // default
+		    return _sc->F;
+		}
+		    
 	    }
 
 	//		double(*fp)(double	,double) = (double(*)(double,double)) EE->getPointerToFunction(func);
