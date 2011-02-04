@@ -164,7 +164,9 @@
 ;; make something looking like a traditional impromptu play-note
 (define play-note
   (lambda (time pitch vol dur)
-    (synth-note time (midi2frq pitch) (* dur 22050.0) (/ vol 127.))))
+    (synth-note time (midi2frq pitch) 
+		(* dur (* 44100.0 (/ 60 (*metro* 'get-tempo)))) 
+		(/ vol 127.))))
 
 ;;
 ;; play some notes
