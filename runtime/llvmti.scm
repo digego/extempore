@@ -1668,9 +1668,12 @@
                        (if *impc:compiler:print* (print-notification "compiled stub"))))
             (if *impc:compile*
                 (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname)))) 
-                   (print-notification 'Successfully 'compiled symname '>>> 
-                                       (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
-                                                                                       ftype))))))
+		  (ascii-print-color 1 2 10)		  
+                   (println 'Successfully 'compiled symname '>>> 
+			    (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
+									    ftype))))
+		   (ascii-print-color 0 9 10)))
+						      
             (cadr (impc:ir:gname))))))
 
 
@@ -1858,9 +1861,20 @@
             (if *impc:compile*
                 (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname)))) 
                    (if (not *impc:compiler:print-raw-llvm*)
-                       (print-notification 'Successfully 'compiled symname '>>> 
-                                           (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
-                                                                                           ftype)))))))
+		       (begin ;(println 'Successfully 'compiled symname '>>> 
+				   ;    (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
+					;					       ftype))))
+			      (ascii-print-color 0 9 10)
+			      (print "Successfully compiled ")
+			      (ascii-print-color 1 2 10)
+			      (print symname)
+			      (ascii-print-color 0 9 10)
+			      (print " >>> ")
+			      (ascii-print-color 1 3 10)
+			      (print (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
+										     ftype))))
+			      (ascii-print-color 0 9 10)
+			      (print)))))
             (cadr (impc:ir:gname))))))
 
 					 

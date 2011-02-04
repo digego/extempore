@@ -54,6 +54,7 @@ namespace extemp {
 		void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func);
 		void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);		
 		
+		static pointer asciiColor(scheme* _sc, pointer args);
 		static pointer randomReal(scheme* _sc, pointer args);
 		static pointer randomInt(scheme* _sc, pointer args);
 		static pointer integerToReal(scheme* _sc, pointer args);
@@ -77,6 +78,7 @@ namespace extemp {
 		static pointer getTime(scheme* _sc, pointer args);
 		static pointer sexprToString(scheme* _sc, pointer args);
 		static pointer print(scheme* _sc, pointer args);
+		static pointer print_no_new_line(scheme* _sc, pointer args);
 		static pointer printFull(scheme* _sc, pointer args);
 		static pointer printFullNoQuotes(scheme* _sc, pointer args);
 		static pointer printError(scheme* _sc, pointer args);
