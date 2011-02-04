@@ -83,7 +83,7 @@ namespace extemp {
     {
 			if(load_path[load_path.length()-1] != '/') load_path.append("/");
 			sc = scheme_init_new();
-			default_zone = llvm_zone_create(1024*1024);
+			default_zone = llvm_zone_create(50*1024*1024); // allocate default zone of 50M
 			memcpy(sc->name,_name.c_str(),_name.length()+1);
 			max_duration = sc->call_default_time;
 			//scheme_set_output_port_file(sc, stdout);

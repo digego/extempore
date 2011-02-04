@@ -439,7 +439,7 @@
 
 (define impc:ir:make-string
    (lambda (ast)
-      (let* ((str (make-string 10000))
+      (let* ((str (make-string 100000))
              (os (open-output-string str))
              (cnt 0))
          (display (string-append (impc:ir:gname "string" "i8*") " = call i8* @llvm_zone_malloc(%mzone* %_zone, i64 "

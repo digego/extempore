@@ -331,13 +331,13 @@
                         (list 'closure-set! 
                               (impc:ti:first-transform (cadr ast) inbody?)
                               (symbol->string (caddr ast))
-                              (symbol->string (cadddr ast))
+                              (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast)))
                               (impc:ti:first-transform (car (cddddr ast)) inbody?)))
                        ((eq? (car ast) 'cref)
                         (list 'closure-ref 
                               (impc:ti:first-transform (cadr ast) inbody?)
                               (symbol->string (caddr ast))
-                              (symbol->string (cadddr ast))))
+                              (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast)))))
                        ((eq? (car ast) 'dotimes)
                         (list 'dotimes 
                               (impc:ti:first-transform (cadr ast) inbody?)
@@ -1668,9 +1668,12 @@
                        (if *impc:compiler:print* (print-notification "compiled stub"))))
             (if *impc:compile*
                 (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname)))) 
-                   (print-notification 'Successfully 'compiled symname '>>> 
-                                       (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
-                                                                                       ftype))))))
+		  (ascii-print-color 1 2 10)		  
+                   (println 'Successfully 'compiled symname '>>> 
+			    (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
+									    ftype))))
+		   (ascii-print-color 0 9 10)))
+						      
             (cadr (impc:ir:gname))))))
 
 
@@ -1858,9 +1861,20 @@
             (if *impc:compile*
                 (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname)))) 
                    (if (not *impc:compiler:print-raw-llvm*)
-                       (print-notification 'Successfully 'compiled symname '>>> 
-                                           (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
-                                                                                           ftype)))))))
+		       (begin ;(println 'Successfully 'compiled symname '>>> 
+				   ;    (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
+					;					       ftype))))
+			      (ascii-print-color 0 9 10)
+			      (print "Successfully compiled ")
+			      (ascii-print-color 1 2 10)
+			      (print symname)
+			      (ascii-print-color 0 9 10)
+			      (print " >>> ")
+			      (ascii-print-color 1 3 10)
+			      (print (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer*)
+										     ftype))))
+			      (ascii-print-color 0 9 10)
+			      (print)))))
             (cadr (impc:ir:gname))))))
 
 					 
@@ -1915,5 +1929,23 @@
                    (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                 " = external global "
                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
-               (llvm:bind-global-var ,(symbol->string symbol) ,value))
+               (llvm:bind-global-var ,(symbol->string symbol) ,value)
+	       (ascii-print-color 0 9 10)
+	       (print "Successfully bound ")
+	       (ascii-print-color 1 2 10)
+	       (print ',symbol)
+	       (ascii-print-color 0 9 10)
+	       (print " >>> ")
+	       (ascii-print-color 1 3 10)
+	       (print ',type)
+	       (ascii-print-color 0 9 10)
+	       (print))	       
        (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!)))
+
+
+;; a helper for returning a scheme closure native closure (if one exists!)
+(define llvm:get-native-closure
+  (lambda (name)
+    (let ((f (llvm:get-function (string-append name "_getter"))))
+      (if f (llvm:run f)
+	  '()))))
