@@ -48,11 +48,11 @@ CXXFLAGS := \
 	-w -O3 -MMD \
 	$(DEFINES) \
 	-Iinclude \
-	-I$(LLVM_DIR)/include \
+	-I$(EXT_LLVM_DIR)/include \
 	$(PLATFORM_CXXFLAGS) \
 
 LDFLAGS := \
-	-L$(LLVM_DIR)/Release/lib \
+	-L$(EXT_LLVM_DIR)/Release/lib \
 	$(PLATFORM_LDFLAGS) \
 
 extempore: $(OBJFILES)
