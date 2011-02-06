@@ -11,30 +11,30 @@ DEFINES := $(PLATFORM_DEFINES) \
 	-D__STDC_LIMIT_MACROS \
 
 LLVM_LIBS := \
-	-lLLVMAnalysis \
-	-lLLVMAsmParser \
-	-lLLVMAsmPrinter \
-	-lLLVMCodeGen \
-	-lLLVMCore \
-	-lLLVMExecutionEngine \
-	-lLLVMInstCombine \
-	-lLLVMInstrumentation \
-	-lLLVMInterpreter \
-	-lLLVMJIT \
-	-lLLVMMC \
-	-lLLVMScalarOpts \
-	-lLLVMSelectionDAG \
-	-lLLVMSupport \
-	-lLLVMSystem \
-	-lLLVMTarget \
-	-lLLVMTransformUtils \
 	-lLLVMX86AsmParser \
 	-lLLVMX86AsmPrinter \
 	-lLLVMX86CodeGen \
-	-lLLVMX86Info \
+	-lLLVMSelectionDAG \
+	-lLLVMAsmParser \
+	-lLLVMAsmPrinter \
 	-lLLVMXCoreInfo \
-	-lLLVMipa \
+	-lLLVMX86Info \
+	-lLLVMInterpreter \
+	-lLLVMJIT \
+	-lLLVMExecutionEngine \
+	-lLLVMCodeGen \
+	-lLLVMScalarOpts \
+	-lLLVMInstCombine \
 	-lLLVMipo \
+	-lLLVMTransformUtils \
+ 	-lLLVMInstrumentation \
+	-lLLVMipa \
+	-lLLVMAnalysis \
+	-lLLVMTarget \
+	-lLLVMMC \
+	-lLLVMCore \
+	-lLLVMSupport \
+	-lLLVMSystem \
 
 LIBS := \
 	-lpthread -lm -lpcre -lglfw \
