@@ -7,11 +7,12 @@ case $(uname) in
 esac
 export EXTEMPORE_OS
 
-if [ ! -f config/llvm.bash ]; then
-	echo Missing config/llvm.bash file.  See INSTALL. >&2
-	exit 1
+if [ -z "$EXT_LLVM_DIR" ]; then 
+	if [ ! -f config/llvm.bash ]; then
+		echo Missing config/llvm.bash file.  See INSTALL. >&2
+		exit 1	
+	fi
+	. config/llvm.bash
 fi
-
-. config/llvm.bash
 
 make -f top.make extempore
