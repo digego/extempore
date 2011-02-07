@@ -38,7 +38,9 @@
 #include "UNIV.h"
 #include "TaskScheduler.h"
 #include "SchemeProcess.h"
+#include "SchemeREPL.h"
 #include "sys/mman.h"
+
 
 #include <sstream>
 #include <string.h>
@@ -80,6 +82,12 @@
 #include "llvm/ADT/StringExtras.h"
 ///////////////////////////////////////
 
+#define PRINT_ERROR(format, args...) \
+    ascii_text_color(1,1,10); \
+    printf(format , ## args); \
+    ascii_text_color(0,9,10)
+
+
 char* cstrstrip (char* inputStr)
 {
     char *start, *end;
@@ -107,7 +115,6 @@ void ascii_text_color(int attr, int fg, int bg)
     printf("%s", command);
 }
 
-
 namespace extemp {
 	
     SchemeFFI SchemeFFI::SINGLETON;
@@ -119,7 +126,18 @@ namespace extemp {
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:channels*"), mk_integer(sc,UNIV::CHANNELS));
 		
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "ascii-print-color"), mk_foreign_func(sc, &SchemeFFI::asciiColor));
+	
+	//IPC stuff
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:new"), mk_foreign_func(sc, &SchemeFFI::newSchemeProcess));
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:connect"), mk_foreign_func(sc, &SchemeFFI::connectToProcess));
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:call-async"), mk_foreign_func(sc, &SchemeFFI::ipcCall));
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:define"), mk_foreign_func(sc, &SchemeFFI::ipcDefine));
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:eval-string"), mk_foreign_func(sc, &SchemeFFI::ipcEval));
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:load"), mk_foreign_func(sc, &SchemeFFI::ipcLoad));
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:get-process-name"), mk_foreign_func(sc, &SchemeFFI::getNameOfCurrentProcess));
+	
 
+	// number stuff
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "random-real"), mk_foreign_func(sc, &SchemeFFI::randomReal));
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "random-int"), mk_foreign_func(sc, &SchemeFFI::randomInt));		
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "real->integer"), mk_foreign_func(sc, &SchemeFFI::realToInteger));
@@ -215,7 +233,156 @@ namespace extemp {
 	ascii_text_color(ivalue(pair_car(args)),ivalue(pair_cadr(args)),ivalue(pair_caddr(args)));
 	return _sc->T;
     }
-	
+
+    // ipc stuff
+    pointer SchemeFFI::newSchemeProcess(scheme* _sc, pointer args)
+    {
+	std::string host_name("localhost");
+	std::string proc_name(string_value(pair_car(args)));
+	int port = ivalue(pair_cadr(args));
+	SchemeProcess* sp = new SchemeProcess(std::string(UNIV::PWD),proc_name, port, 0);
+	sp->start();
+	SchemeREPL* repl = new SchemeREPL(proc_name);
+
+	if(repl->connectToProcessAtHostname(host_name, port)) {
+	    return _sc->T;
+	} else {
+	    sp->stop();
+	    delete sp;
+	    delete repl;
+	    return _sc->F;
+	}
+    }
+
+    pointer SchemeFFI::connectToProcess(scheme* _sc, pointer args)
+    {
+	std::string host_name(string_value(pair_car(args)));
+	std::string proc_name(string_value(pair_cadr(args)));
+	int port = ivalue(pair_caddr(args));
+	SchemeREPL* repl = new SchemeREPL(proc_name);
+	if(repl->connectToProcessAtHostname(host_name, port)) {
+	    return _sc->T;
+	} else {
+	    delete repl;
+	    return _sc->F;
+	}
+    }
+
+    pointer SchemeFFI::ipcCall(scheme* _sc, pointer args)
+    {
+	std::string process(string_value(pair_car(args)));
+	std::stringstream ss;
+	pointer sym = pair_cadr(args);
+	args = pair_cddr(args);
+	for(; is_pair(args); args = pair_cdr(args)) {
+	    ss << " ";
+	    if(is_pair(pair_car(args)) || is_vector(pair_car(args)) || is_symbol(pair_car(args))) {
+		ss << "'";
+		UNIV::printSchemeCell(_sc, ss, pair_car(args),true);
+	    }
+	    else if(_sc->NIL == pair_car(args)) {
+		ss << "'()";
+	    }
+	    else if(pair_car(args) == _sc->F) {
+		ss << "#f";
+	    }
+	    else if(pair_car(args) == _sc->T) {
+		ss << "#t";
+	    }
+	    else if(is_closure(pair_car(args))) {
+		std::stringstream tmp;
+		UNIV::printSchemeCell(_sc, tmp, closure_code(pair_car(args)), true);
+		std::string sss = "(lambda "+tmp.str().substr(1);
+		ss << sss;
+	    }
+	    else if(is_string(pair_car(args)) || is_number(pair_car(args)) || is_symbol(pair_car(args))){
+		UNIV::printSchemeCell(_sc, ss, pair_car(args), true);
+	    }
+	    else if(pair_car(args) == _sc->F) {
+		ss << "#f";
+	    }
+	    else if(pair_car(args) == _sc->T) {
+		ss << "#t";
+	    }
+	    else {
+	        PRINT_ERROR("IPC does not support type.\nThis maybe related to the return type as well as the arguments if calling from ipc:call.\nIn particular remember that objc objects cannot be passed natively (you can turn them into strings though by calling objc:string-encode and then on the other end use objc:string-decode to reconstitute an object\n");
+		return _sc->F;
+	    }
+	}
+	std::string str = "("+std::string(symname(sym))+ss.str()+")";
+	SchemeREPL::I(process)->writeString(str);
+	return _sc->T;
+    }
+    
+    pointer SchemeFFI::ipcDefine(scheme* _sc, pointer args)
+    {
+	std::string process(string_value(pair_car(args)));
+	std::stringstream ss;
+	pointer sym = pair_cadr(args);
+	pointer value = pair_caddr(args);
+	ss << " ";
+	if(is_pair(value) || is_vector(value) || is_symbol(value)) {
+	    ss << "'";
+	    UNIV::printSchemeCell(_sc, ss, value,true);
+	}
+	else if(_sc->NIL == value) {
+	    ss << "'()";
+	}
+	else if(value == _sc->F) {
+	    ss << "#f";
+	}
+	else if(value == _sc->T) {
+	    ss << "#t";
+	}
+	else if(is_closure(value)) {
+	    std::stringstream tmp;
+	    UNIV::printSchemeCell(_sc, tmp, closure_code(value), true);
+	    std::string sss = "(lambda "+tmp.str().substr(1);
+	    ss << sss;
+	}
+	else if(is_string(value) || is_number(value)) {
+	    UNIV::printSchemeCell(_sc, ss,value, true);
+	}
+	else {
+	    PRINT_ERROR("IPC does not support type.\nThis maybe related to the return type as well as the arguments if calling from ipc:call.\nIn particular remember that objc objects cannot be passed natively (you can turn them into strings though by calling objc:string-encode and then on the other end use objc:string-decode to reconstitute an object\n");
+	    return _sc->F;
+	}
+	std::string str = "(define "+std::string(symname(sym))+ss.str()+")";
+	SchemeREPL::I(process)->writeString(str);
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::ipcEval(scheme* _sc, pointer args)
+    {
+	std::string process(string_value(pair_car(args)));
+	std::string expr(string_value(pair_cadr(args)));
+	SchemeREPL::I(process)->writeString(expr);
+	return _sc->T;
+    }
+    
+    pointer SchemeFFI::ipcLoad(scheme* _sc, pointer args)
+    {
+	std::string process(string_value(pair_car(args)));
+	std::string path(string_value(pair_cadr(args)));
+	std::string str = "(load \""+std::string(path)+"\")";
+	SchemeREPL::I(process)->writeString(str);
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::getNameOfCurrentProcess(scheme* _sc, pointer args)
+    {
+	const char* name = SchemeProcess::I(_sc)->getName().c_str();
+	if(args == _sc->NIL) return mk_string(_sc, name);
+	else { printf("Error getting name of current process\n"); return _sc->F; }
+	/*
+	NSDictionary* dict = (NSDictionary*) objc_value(pair_car(args));
+	NSString* alias_name = [dict objectForKey:[NSString stringWithCString:name]];
+	if(alias_name == NULL) return mk_string(_sc, name);
+	return mk_string(_sc, [alias_name UTF8String]);
+	*/
+    }
+
+    // number stuff	
     pointer SchemeFFI::randomReal(scheme* _sc, pointer args)
     {
 	return mk_real(_sc,UNIV::random());

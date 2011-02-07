@@ -42,90 +42,101 @@
 
 namespace extemp {
 
-	class SchemeFFI {
-	public:
-		SchemeFFI() {};
-		~SchemeFFI() {};
-		static SchemeFFI* I() { return &SINGLETON; }
+    class SchemeFFI {
+    public:
+	SchemeFFI() {};
+	~SchemeFFI() {};
+	static SchemeFFI* I() { return &SINGLETON; }
 		
-		// helper functions
-		void initSchemeFFI(scheme* _sc);		
-		void addGlobal(scheme* sc, char* symbol_name, pointer arg);
-		void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func);
-		void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);		
+	// helper functions
+	void initSchemeFFI(scheme* _sc);		
+	void addGlobal(scheme* sc, char* symbol_name, pointer arg);
+	void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func);
+	void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);		
 		
-		static pointer asciiColor(scheme* _sc, pointer args);
-		static pointer randomReal(scheme* _sc, pointer args);
-		static pointer randomInt(scheme* _sc, pointer args);
-		static pointer integerToReal(scheme* _sc, pointer args);
-		static pointer rationalToReal(scheme* _sc, pointer args);
-		static pointer realToRational(scheme* _sc, pointer args);
-		static pointer realToInteger(scheme* _sc, pointer args);
-		
-		// sys stuff
-		static pointer openDynamicLib(scheme* _sc, pointer args);
-		static pointer closeDynamicLib(scheme* _sc, pointer args);		
-		static pointer pointerSize(scheme* _sc, pointer args);
-		// dsp bits
-		static pointer setDSPClosure(scheme* _sc, pointer args);
-		static pointer setDSPWrapper(scheme* _sc, pointer args);
-		static pointer setDSPWrapperArray(scheme* _sc, pointer args);
-		
-		// misc stuff
-		static pointer stringStrip(scheme* _sc, pointer args);
-		static pointer stringJoin(scheme* _sc, pointer args);
-		static pointer getClosureEnv(scheme* _sc, pointer args);
-		static pointer getTime(scheme* _sc, pointer args);
-		static pointer sexprToString(scheme* _sc, pointer args);
-		static pointer print(scheme* _sc, pointer args);
-		static pointer print_no_new_line(scheme* _sc, pointer args);
-		static pointer printFull(scheme* _sc, pointer args);
-		static pointer printFullNoQuotes(scheme* _sc, pointer args);
-		static pointer printError(scheme* _sc, pointer args);
-		static pointer printNotification(scheme* _sc, pointer args);
-		static pointer callCPPAtTime(scheme* _sc, pointer args);
-		
-		// regex stuff
-		static pointer regex_match(scheme* _sc, pointer args);
-		static pointer regex_matched(scheme* _sc, pointer args);
-		static pointer regex_match_all(scheme* _sc, pointer args);
-		static pointer regex_split(scheme* _sc, pointer args);
-		static pointer regex_replace(scheme* _sc, pointer args);
-		
-		// memory zone stuff
-		void destroyMallocZoneWithDelay(TaskI* task);
-		static pointer createMallocZone(scheme* _sc, pointer args);
-		static pointer defaultMallocZone(scheme* _sc, pointer args);
-		static pointer destroyMallocZone(scheme* _sc, pointer args);
-		static pointer copyToDefaultZone(scheme* _sc, pointer args);
-			
-		// llvm stuff
-		static pointer compile(scheme* _sc, pointer args);
-		static pointer bind_global_var(scheme* _sc, pointer args);		
-		static pointer get_function(scheme* _sc, pointer args);
-		static pointer get_globalvar(scheme* _sc, pointer args);		
-		static pointer get_function_args(scheme* _sc, pointer args);		
-		static pointer get_function_type(scheme* _sc, pointer args);		
-		static pointer get_function_calling_conv(scheme* _sc, pointer args);		
-		static pointer get_global_variable_type(scheme* _sc, pointer args);		
-		static pointer get_function_pointer(scheme* _sc, pointer args);		
-		static pointer recompile_and_link_function(scheme* _sc, pointer args);		
-		static pointer remove_function(scheme* _sc, pointer args);		
-		static pointer remove_global_var(scheme* _sc, pointer args);		
-		static pointer erase_function(scheme* _sc, pointer args);
-		static pointer call_compiled(scheme* _sc, pointer args);
-		static pointer call_compiled_closure(scheme* _sc, pointer args);
-		static pointer llvm_convert_float_constant(scheme* _sc, pointer args);
-		static pointer llvm_count(scheme* _sc, pointer args);
-		static pointer llvm_count_inc(scheme* _sc, pointer args);
-		static pointer callClosure(scheme* _sc, pointer args);
-		static pointer printLLVMModule(scheme* _sc, pointer args);
-		static pointer printLLVMFunction(scheme* _sc, pointer args);
-		static pointer bind_symbol(scheme* _sc, pointer args);
+	static pointer asciiColor(scheme* _sc, pointer args);
 
-	private:
-		static SchemeFFI SINGLETON;		
-	};
+	// ipc stuff
+	static pointer newSchemeProcess(scheme* _sc, pointer args);
+	static pointer connectToProcess(scheme* _sc, pointer args);
+	static pointer ipcCall(scheme* _sc, pointer args);
+	static pointer ipcDefine(scheme* _sc, pointer args);
+	static pointer ipcEval(scheme* _sc, pointer args);
+	static pointer ipcLoad(scheme* _sc, pointer args);
+	static pointer getNameOfCurrentProcess(scheme* _sc, pointer args);
+
+	// num stuff
+	static pointer randomReal(scheme* _sc, pointer args);
+	static pointer randomInt(scheme* _sc, pointer args);
+	static pointer integerToReal(scheme* _sc, pointer args);
+	static pointer rationalToReal(scheme* _sc, pointer args);
+	static pointer realToRational(scheme* _sc, pointer args);
+	static pointer realToInteger(scheme* _sc, pointer args);
+		
+	// sys stuff
+	static pointer openDynamicLib(scheme* _sc, pointer args);
+	static pointer closeDynamicLib(scheme* _sc, pointer args);		
+	static pointer pointerSize(scheme* _sc, pointer args);
+	// dsp bits
+	static pointer setDSPClosure(scheme* _sc, pointer args);
+	static pointer setDSPWrapper(scheme* _sc, pointer args);
+	static pointer setDSPWrapperArray(scheme* _sc, pointer args);
+		
+	// misc stuff
+	static pointer stringStrip(scheme* _sc, pointer args);
+	static pointer stringJoin(scheme* _sc, pointer args);
+	static pointer getClosureEnv(scheme* _sc, pointer args);
+	static pointer getTime(scheme* _sc, pointer args);
+	static pointer sexprToString(scheme* _sc, pointer args);
+	static pointer print(scheme* _sc, pointer args);
+	static pointer print_no_new_line(scheme* _sc, pointer args);
+	static pointer printFull(scheme* _sc, pointer args);
+	static pointer printFullNoQuotes(scheme* _sc, pointer args);
+	static pointer printError(scheme* _sc, pointer args);
+	static pointer printNotification(scheme* _sc, pointer args);
+	static pointer callCPPAtTime(scheme* _sc, pointer args);
+		
+	// regex stuff
+	static pointer regex_match(scheme* _sc, pointer args);
+	static pointer regex_matched(scheme* _sc, pointer args);
+	static pointer regex_match_all(scheme* _sc, pointer args);
+	static pointer regex_split(scheme* _sc, pointer args);
+	static pointer regex_replace(scheme* _sc, pointer args);
+		
+	// memory zone stuff
+	void destroyMallocZoneWithDelay(TaskI* task);
+	static pointer createMallocZone(scheme* _sc, pointer args);
+	static pointer defaultMallocZone(scheme* _sc, pointer args);
+	static pointer destroyMallocZone(scheme* _sc, pointer args);
+	static pointer copyToDefaultZone(scheme* _sc, pointer args);
+			
+	// llvm stuff
+	static pointer compile(scheme* _sc, pointer args);
+	static pointer bind_global_var(scheme* _sc, pointer args);		
+	static pointer get_function(scheme* _sc, pointer args);
+	static pointer get_globalvar(scheme* _sc, pointer args);		
+	static pointer get_function_args(scheme* _sc, pointer args);		
+	static pointer get_function_type(scheme* _sc, pointer args);		
+	static pointer get_function_calling_conv(scheme* _sc, pointer args);		
+	static pointer get_global_variable_type(scheme* _sc, pointer args);		
+	static pointer get_function_pointer(scheme* _sc, pointer args);		
+	static pointer recompile_and_link_function(scheme* _sc, pointer args);		
+	static pointer remove_function(scheme* _sc, pointer args);		
+	static pointer remove_global_var(scheme* _sc, pointer args);		
+	static pointer erase_function(scheme* _sc, pointer args);
+	static pointer call_compiled(scheme* _sc, pointer args);
+	static pointer call_compiled_closure(scheme* _sc, pointer args);
+	static pointer llvm_convert_float_constant(scheme* _sc, pointer args);
+	static pointer llvm_count(scheme* _sc, pointer args);
+	static pointer llvm_count_inc(scheme* _sc, pointer args);
+	static pointer callClosure(scheme* _sc, pointer args);
+	static pointer printLLVMModule(scheme* _sc, pointer args);
+	static pointer printLLVMFunction(scheme* _sc, pointer args);
+	static pointer bind_symbol(scheme* _sc, pointer args);
+
+    private:
+	static SchemeFFI SINGLETON;		
+    };
 	
 } // end namespace
 

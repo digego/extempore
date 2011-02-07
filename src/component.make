@@ -10,6 +10,7 @@ SRCFILES := \
 	src/Scheme.cpp \
 	src/SchemeFFI.cpp \
 	src/SchemeProcess.cpp \
+	src/SchemeREPL.cpp \
 	src/TaskScheduler.cpp \
 	src/UNIV.cpp \
 

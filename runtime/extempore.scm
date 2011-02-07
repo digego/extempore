@@ -672,19 +672,23 @@
 ;; synchronous IPC
 
 
-;(define *ipc:remote-process-name-map* (objc:make-dictionary))
+(define *ipc:remote-process-name-map* '()) ;(objc:make-dictionary))
 
 (define ipc:set-local-remote-mapping
    (lambda (local-name remote-name)
-      (objc:set-value-for-key *ipc:remote-process-name-map* local-name remote-name)))
+     (let ((res (assoc *impc:remote-process-name-map* local-name)))
+       (if res	   
+	   (set-cdr! res remote-name)
+	   (set! *impc:remote-process-name-map* 
+		 (cons (cons local-name remote-name)
+		       *impc:remote-process-name-map*))))))
 
 (define ipc:proc-name-with-mapping
    (lambda ()
-      (let ((name (objc:get-value-for-key *ipc:remote-process-name-map* (ipc:get-process-name))))
-         (if (objc:null? name) 
-             (ipc:get-process-name)
-             name))))
-
+     (let ((pair (assoc *impc:remote-process-name-map* (ipc:get-process-name))))
+       (if pair
+	   (car pair)
+	   (ipc:get-process-name)))))
 
 (define *ipc:active-label-buffer-size* 1000)
 (define *ipc:active-labels* (make-vector *ipc:active-label-buffer-size* '()))
@@ -692,15 +696,16 @@
 
 (define ipc:run-active-label
    (lambda (id . args)
-      (let ((k (vector-ref *ipc:active-labels* id)))
-         (vector-set! *ipc:active-labels* id '())
-         (apply k args))))
+     (let ((k (vector-ref *ipc:active-labels* id)))
+       (vector-set! *ipc:active-labels* id '())
+       (apply k args))))
 		 
 		 
 (define ipc:sync-receive
-   (lambda (process id func . args)
-      (let ((result (apply (eval func) args)))
-         (ipc:call-async process 'ipc:run-active-label id result))))
+  (lambda (process id func . args)
+    (let ((result (apply (eval func) args)))
+      (ipc:call-async process 'ipc:run-active-label id result))))
+
 
 (define ipc:call
   (lambda (process func . args)
@@ -718,22 +723,22 @@
 		
 (define ipc:call
   (lambda (process . args)
-     (let* ((callback-proc (ipc:get-process-name))
-            (func (if (string? (car args))
-                      (begin (set! callback-proc (car args))
-                             (set! args (cdr args))
-                             (car args))
-                      (car args))))
-        (let loop ((i *ipc:active-label-cnt*))
-           (if (not (null? (vector-ref *ipc:active-labels* i)))
-               (loop (modulo (+ i 1) *ipc:active-label-buffer-size*))
-               (set! *ipc:active-label-cnt* i)))
-        (apply ipc:call-async process 'ipc:sync-receive callback-proc
-               *ipc:active-label-cnt* func (cdr args))
-        (let ((return-val (call/cc (lambda (k)
-                                      (vector-set! *ipc:active-labels* *ipc:active-label-cnt* k)
-                                      (*sys:toplevel-continuation* 0)))))
-           return-val))))
+    (let* ((callback-proc (ipc:get-process-name))
+	   (func (if (string? (car args))
+		     (begin (set! callback-proc (car args))
+			    (set! args (cdr args))
+			    (car args))
+		     (car args))))
+      (let loop ((i *ipc:active-label-cnt*))
+	(if (not (null? (vector-ref *ipc:active-labels* i)))
+	    (loop (modulo (+ i 1) *ipc:active-label-buffer-size*))
+	    (set! *ipc:active-label-cnt* i)))
+      (apply ipc:call-async process 'ipc:sync-receive callback-proc
+	     *ipc:active-label-cnt* func (cdr args))
+      (let ((return-val (call/cc (lambda (k)
+				   (vector-set! *ipc:active-labels* *ipc:active-label-cnt* k)
+				   (*sys:toplevel-continuation* 0)))))
+	return-val))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
