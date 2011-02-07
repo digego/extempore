@@ -1,0 +1,8 @@
+PLATFORM_LIBS := -lportaudio -lglut /usr/lib/mesa/libGL.so.1
+
+PLATFORM_CXXFLAGS :=
+PLATFORM_LDFLAGS :=
+
+PLATFORM_DEFINES := -DTARGET_OS_LINUX
+PLATFORM_CXX := g++
+PLATFORM_LD := g++

@@ -33,55 +33,34 @@
  *
  */
 
-#include "UNIV.h"
-#include "SchemeProcess.h"
-#include "AudioDevice.h"
-#include "TaskScheduler.h"
-#include "SchemeREPL.h"
-#include "EXTLLVM.h"
+#include "EXTThread.h"
 #include <string>
+#include <map>
 
-// need to init glut on linux
-#ifdef TARGET_OS_LINUX
-#include "GL/glut.h"
-#endif
 
-int main(int argv, char** args)
-{
-	if(argv<2) {
-		printf("Must include inital path to read libs from\n");
-		return -1;
-	}
-	
-	bool with_banner = 0;
-	
-	if(argv>2) {
-		with_banner = 1;
-	}
-	
-#ifdef TARGET_OS_LINUX
-	glutInit(&argv,args);
-#endif
+namespace extemp {
+    class EXTMutex;
+   
+    class SchemeREPL {
+    public:
+	SchemeREPL(std::string&);
+	~SchemeREPL();
+	static SchemeREPL* I(std::string&);	
+	std::string& getTitle();
+	static void* readThread(void*);
+	void writeString(std::string&);
+	bool connectToProcessAtHostname(std::string&, int);
+	void closeREPL();
 
-	std::string host("localhost");
-	std::string process("primary process");
-	int port = 7099;
-
-	extemp::UNIV::PWD = args[1];
-	extemp::EXTLLVM::I()->initLLVM();
-	extemp::SchemeProcess* sp = new extemp::SchemeProcess(std::string(args[1]), process, port, with_banner);
-	extemp::AudioDevice* dev = extemp::AudioDevice::I();
-
-	sp->start();
-	dev->start();
-
-	extemp::SchemeREPL* repl = new extemp::SchemeREPL(process);
-	repl->connectToProcessAtHostname(host,port);
-	
-	// sleep indefiniately let server process do the work
-	while(1) {
-		printf("TIME: %lld\n",extemp::UNIV::TIME);
-		sleep(5000);
-	}
-	return 0;
+    private:
+	static std::map<std::string,SchemeREPL*> REPL_MAP;
+	static int BUFLENGTH;
+	int server_socket;
+	char* buf;
+	bool connected;
+	bool active;
+	std::string title;
+	EXTMutex* write_lock;
+	EXTThread read_thread;
+    };
 }
