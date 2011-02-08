@@ -308,6 +308,7 @@ namespace extemp {
 			fseek(fp,0,SEEK_SET);
 			char* assm = (char*) alloca(size+1);
 			int res = fread(assm, 1, size, fp);
+			assm[size]=0;
 			fclose(fp);
 			llvm::SMDiagnostic pa;
 			llvm::Module* newM = ParseAssemblyString(assm, M, pa, llvm::getGlobalContext());
