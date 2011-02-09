@@ -126,6 +126,7 @@ namespace extemp {
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:channels*"), mk_integer(sc,UNIV::CHANNELS));
 		
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "ascii-print-color"), mk_foreign_func(sc, &SchemeFFI::asciiColor));
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "clear-string"), mk_foreign_func(sc, &SchemeFFI::clearString));
 	
 	//IPC stuff
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:new"), mk_foreign_func(sc, &SchemeFFI::newSchemeProcess));
@@ -232,6 +233,13 @@ namespace extemp {
     {
 	ascii_text_color(ivalue(pair_car(args)),ivalue(pair_cadr(args)),ivalue(pair_caddr(args)));
 	return _sc->T;
+    }
+
+    pointer SchemeFFI::clearString(scheme* _sc, pointer args)
+    {
+	char* cstrptr = string_value(pair_car(args));
+	memset(cstrptr,0,strlen(cstrptr)+1);
+	return pair_car(args);
     }
 
     // ipc stuff

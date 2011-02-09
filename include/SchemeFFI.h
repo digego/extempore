@@ -55,6 +55,7 @@ namespace extemp {
 	void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);		
 		
 	static pointer asciiColor(scheme* _sc, pointer args);
+	static pointer clearString(scheme* _sc, pointer args);
 
 	// ipc stuff
 	static pointer newSchemeProcess(scheme* _sc, pointer args);

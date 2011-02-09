@@ -1381,6 +1381,43 @@
                                   ((atom? ast) syms)))))
 
 
+;; find all free vars
+;; currently we don't allow shadow vars
+(define impc:ti:find-all-vars
+   (lambda (full-ast syms)
+     ;(println 'ast: ast)
+     (letrec ((f (lambda (ast)
+		   (cond ((pair? ast)
+			  (cond ((equal? (car ast) 'make-closure)
+				 (if (not (null? (cl:intersection (caddr ast) syms)))
+				     (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car (cl:intersection (caddr ast) syms))) 'as 'a 'shadow 'variable))			      
+				 (set! syms (cl:remove-duplicates (append (cadr ast) (caddr ast) syms)))
+				 (f (cadddr ast)))
+				((equal? (car ast) 'dotimes)       
+				 (if (not (null? (cl:intersection (list (caadr ast)) syms)))
+				     (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car (cl:intersection (list (caadr ast)) syms))) 'as 'a 'shadow 'variable))  
+				 (set! syms (cons (caadr ast) syms))
+				 (f (cddr ast)))
+				((member (car ast) '(make-env make-env-zone))
+				 (set! syms
+				       (append (map (lambda (p)
+						       (if (member (car p) syms)
+							   (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car p)) p 'as 'a 'shadow 'variable))
+						       (car p))
+						     (cadr ast))
+					       syms))
+				 (for-each (lambda (p)
+					     (f (cadr p)))
+					   (cadr ast))					     
+				 (f (caddr ast)))
+				(else (f (car ast))
+				      (f (cdr ast)))))
+			 ((atom? ast) '())))))
+       (f full-ast)
+       syms)))
+
+
+
 (define impc:ti:block:check-for-free-syms
    (lambda (ast esyms)
       ;(print 'check: 'ast: ast 'esyms: esyms) 
