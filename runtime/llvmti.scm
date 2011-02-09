@@ -1896,6 +1896,24 @@
                  (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
                         (error "")))))))
 
+;; definec takes optional type arguments after symname
+(define-macro (definec symname . args)
+   (let ((types (cdr (reverse args)))
+         (expr (car (reverse args))))
+      ;(print-full 'types: types 'e: expr 'args: args)
+      `(define ,symname
+          (let* ((res1 (ipc:call "utility" 'impc:ti:run ',symname '(let ((,symname ,expr)) ,symname) ,@types))
+                 (setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
+                 (func (llvm:get-function (symbol->string ',symname))))
+             (if setter
+                 (llvm:run setter (sys:create-mzone))
+                 (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
+                        (error "")))
+             (if func
+                 (lambda args (apply llvm:run func *impc:zone* args))
+                 (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
+                        (error "")))))))
+
 ;; definec-precomp is for setting up precompiled ir functions only
 (define-macro (definec-precomp symname)
    `(define ,symname

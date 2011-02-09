@@ -225,7 +225,11 @@ namespace extemp {
 	}else if(is_foreign(val)){
 	    ss << "#<FOREIGN FUNC>";
 	}else if(val == _sc->NIL){
-	    ss << "NIL";
+	    if(full) {
+		ss << "()";
+	    }else{
+		ss << "NIL";
+	    }
 	}else if(_sc->T == val){
 	    ss << "#t";
 	}else if(_sc->F == val){

@@ -298,12 +298,6 @@ namespace extemp {
 	    else if(is_string(pair_car(args)) || is_number(pair_car(args)) || is_symbol(pair_car(args))){
 		UNIV::printSchemeCell(_sc, ss, pair_car(args), true);
 	    }
-	    else if(pair_car(args) == _sc->F) {
-		ss << "#f";
-	    }
-	    else if(pair_car(args) == _sc->T) {
-		ss << "#t";
-	    }
 	    else {
 	        PRINT_ERROR("IPC does not support type.\nThis maybe related to the return type as well as the arguments if calling from ipc:call.\nIn particular remember that objc objects cannot be passed natively (you can turn them into strings though by calling objc:string-encode and then on the other end use objc:string-decode to reconstitute an object\n");
 		return _sc->F;
