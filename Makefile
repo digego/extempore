@@ -30,6 +30,15 @@ SRC = AudioDevice.cpp \
 	UNIV.cpp
 
 VPATH = src
+
+ifneq (,$(findstring Linux, $(UNAME)))
+	CXXFLAGS += -DTARGET_OS_LINUX
+endif
+
+ifneq (,$(findstring Darwin, $(UNAME)))
+	CXXFLAGS += -DTARGET_OS_MAC
+endif
+
 OBJ = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRC)))
 
 .PHONY: all clean
@@ -37,7 +46,7 @@ OBJ = $(patsubst %.cpp, %.o, $(filter %.cpp, $(SRC)))
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(CXX) $(LDFLAGS) $(LDLIBS) -o $@ $^
+	$(CXX) $(CXX_FLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
 	@rm -f $(OBJ)
