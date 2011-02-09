@@ -1619,7 +1619,7 @@
                                          "%test = icmp ne %mzone* %oldzone3, null\n"
                                          "br i1 %test, label %then, label %cont\n"
                                          ;"then:\ncall ccc void @llvm_zone_destroy(%mzone* %oldzone3)\nbr label %cont\n"
-										 "then:\ncall ccc void @llvm_destroy_zone_after_delay(i8* %oldzone2,double 10.0)\nbr label %cont\n"
+					 "then:\ncall ccc void @llvm_destroy_zone_after_delay(i8* %oldzone2,double 441000.0)\nbr label %cont\n"
                                          "cont:\n"
                                          "ret void\n}\n"))
                 ;(stub-type (string->sexpr (impc:ti:string-to-type closure-type)))
@@ -1807,7 +1807,7 @@
                                          "%test = icmp ne %mzone* %oldzone3, null\n"
                                          "br i1 %test, label %then, label %cont\n"
                                          ;"then:\ncall ccc void @llvm_zone_destroy(%mzone* %oldzone3)\nbr label %cont\n"
-										 "then:\ncall ccc void @llvm_destroy_zone_after_delay(i8* %oldzone2,double 10.0)\nbr label %cont\n"
+					 "then:\ncall ccc void @llvm_destroy_zone_after_delay(i8* %oldzone2,double 441000.0)\nbr label %cont\n"
                                          "cont:\n"
                                          "ret void\n}\n"))
                 ;(stub-type (string->sexpr (impc:ti:string-to-type closure-type)))

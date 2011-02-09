@@ -106,7 +106,7 @@ void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay)
 {
 	//printf("destroyWithDelay %p\n",zone);
 	extemp::CM* cb = DestroyMallocZoneWithDelayCM; //mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
-	extemp::Task<llvm_zone_t*>* task = new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME,44100,cb,zone);
+	extemp::Task<llvm_zone_t*>* task = new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME+delay,44100,cb,zone);
 	extemp::TaskScheduler::I()->add(task);
 }
 
