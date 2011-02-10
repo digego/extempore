@@ -125,7 +125,7 @@ namespace extemp {
     {
 	int i;
 
-	struct {
+	static struct {
 		const char *name;
 		uint32_t    value;
 	} integerTable[] = {
@@ -134,7 +134,7 @@ namespace extemp {
 		{ "*au:channels*",	UNIV::CHANNELS },
 	};
 
-	struct {
+	static struct {
 		const char * name;
 		foreign_func func;
 	} funcTable[] = {
