@@ -126,7 +126,7 @@ namespace extemp {
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:channels*"), mk_integer(sc,UNIV::CHANNELS));
 		
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "ascii-print-color"), mk_foreign_func(sc, &SchemeFFI::asciiColor));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "clear-string"), mk_foreign_func(sc, &SchemeFFI::clearString));
+	scheme_define(sc, sc->global_env, mk_symbol(sc, "emit"), mk_foreign_func(sc, &SchemeFFI::emit));
 	
 	//IPC stuff
 	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:new"), mk_foreign_func(sc, &SchemeFFI::newSchemeProcess));
@@ -235,11 +235,29 @@ namespace extemp {
 	return _sc->T;
     }
 
-    pointer SchemeFFI::clearString(scheme* _sc, pointer args)
+    pointer SchemeFFI::emit(scheme* _sc, pointer args)
     {
-	char* cstrptr = string_value(pair_car(args));
-	memset(cstrptr,0,strlen(cstrptr)+1);
-	return pair_car(args);
+	std::stringstream ss;
+	int lgth = list_length(_sc,args);
+	pointer arg = 0;
+	for(int i=0;i<lgth;i++,args=pair_cdr(args)) {
+	    arg = pair_car(args);
+	    if(!is_string(arg)) {
+		PRINT_ERROR("Emit accepts only string arguments!\n");
+		return _sc->F;
+	    }
+	    ss << string_value(arg);	    
+	}
+
+	std::string tmp = ss.str();
+	// replace final string in place	
+	int l = tmp.length();
+	char* s = (char*) malloc(l+1);
+	free(arg->_object._string._svalue); // free existing char*
+	arg->_object._string._svalue = s;
+	arg->_object._string._length = l;
+	// return final string
+	return arg;
     }
 
     // ipc stuff
