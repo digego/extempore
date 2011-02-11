@@ -115,98 +115,128 @@ void ascii_text_color(int attr, int fg, int bg)
     printf("%s", command);
 }
 
+#define nelem(table) sizeof(table) / sizeof(table[0])
+
 namespace extemp {
 	
     SchemeFFI SchemeFFI::SINGLETON;
 
     void SchemeFFI::initSchemeFFI(scheme* sc)
     {
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:block-size*"), mk_integer(sc,UNIV::FRAMES));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:samplerate*"), mk_integer(sc,UNIV::SAMPLERATE));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:channels*"), mk_integer(sc,UNIV::CHANNELS));
-		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ascii-print-color"), mk_foreign_func(sc, &SchemeFFI::asciiColor));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "emit"), mk_foreign_func(sc, &SchemeFFI::emit));
-	
-	//IPC stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:new"), mk_foreign_func(sc, &SchemeFFI::newSchemeProcess));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:connect"), mk_foreign_func(sc, &SchemeFFI::connectToProcess));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:call-async"), mk_foreign_func(sc, &SchemeFFI::ipcCall));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:define"), mk_foreign_func(sc, &SchemeFFI::ipcDefine));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:eval-string"), mk_foreign_func(sc, &SchemeFFI::ipcEval));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:load"), mk_foreign_func(sc, &SchemeFFI::ipcLoad));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:get-process-name"), mk_foreign_func(sc, &SchemeFFI::getNameOfCurrentProcess));
-	
+	int i;
 
-	// number stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "random-real"), mk_foreign_func(sc, &SchemeFFI::randomReal));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "random-int"), mk_foreign_func(sc, &SchemeFFI::randomInt));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "real->integer"), mk_foreign_func(sc, &SchemeFFI::realToInteger));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "real->rational"), mk_foreign_func(sc, &SchemeFFI::realToRational));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "rational->real"), mk_foreign_func(sc, &SchemeFFI::rationalToReal));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "integer->real"), mk_foreign_func(sc, &SchemeFFI::integerToReal));		
-		
-	// sys stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:pointer-size"), mk_foreign_func(sc, &SchemeFFI::pointerSize));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:open-dylib"), mk_foreign_func(sc, &SchemeFFI::openDynamicLib));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:close-dylib"), mk_foreign_func(sc, &SchemeFFI::closeDynamicLib));		
-	// DSP sys stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-closure"), mk_foreign_func(sc, &SchemeFFI::setDSPClosure));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapper));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper-array"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapperArray));			
-	// memory zone stuff
-	//this->addGlobalCptr(sc,(char*)"*sys:destroy-zone-with-delay*",mk_cb(this,SchemeFFI,destroyMallocZoneWithDelay));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:create-mzone"), mk_foreign_func(sc, &SchemeFFI::createMallocZone));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:default-mzone"), mk_foreign_func(sc, &SchemeFFI::defaultMallocZone));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:destroy-mzone"), mk_foreign_func(sc, &SchemeFFI::destroyMallocZone));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:copy-to-dmzone"), mk_foreign_func(sc, &SchemeFFI::copyToDefaultZone));			
-		
-	// misc stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "string-strip"), mk_foreign_func(sc, &SchemeFFI::stringStrip));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "string-join"), mk_foreign_func(sc, &SchemeFFI::stringJoin));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "call-cpp-at-time"), mk_foreign_func(sc, &SchemeFFI::callCPPAtTime));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "now"), mk_foreign_func(sc, &SchemeFFI::getTime));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sexpr->string"), mk_foreign_func(sc, &SchemeFFI::sexprToString));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "println"), mk_foreign_func(sc, &SchemeFFI::print));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "print"), mk_foreign_func(sc, &SchemeFFI::print_no_new_line));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "print-full"), mk_foreign_func(sc, &SchemeFFI::printFull));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "print-full-nq"), mk_foreign_func(sc, &SchemeFFI::printFullNoQuotes));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "pprint-error"), mk_foreign_func(sc, &SchemeFFI::printError)); // pprint-error is pprint for a reason!
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "print-notification"), mk_foreign_func(sc, &SchemeFFI::printNotification));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "get-closure-env"), mk_foreign_func(sc, &SchemeFFI::getClosureEnv));
-		
-	// regex stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:match?"), mk_foreign_func(sc, &SchemeFFI::regex_match));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:matched"), mk_foreign_func(sc, &SchemeFFI::regex_matched));				
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:match-all"), mk_foreign_func(sc, &SchemeFFI::regex_match_all));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:split"), mk_foreign_func(sc, &SchemeFFI::regex_split));				
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:replace"), mk_foreign_func(sc, &SchemeFFI::regex_replace));
-			
-	// llvm stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:compile"), mk_foreign_func(sc, &SchemeFFI::compile));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:bind-global-var"), mk_foreign_func(sc, &SchemeFFI::bind_global_var));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function"), mk_foreign_func(sc, &SchemeFFI::get_function));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-globalvar"), mk_foreign_func(sc, &SchemeFFI::get_globalvar));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function-args"), mk_foreign_func(sc, &SchemeFFI::get_function_args));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function-type"), mk_foreign_func(sc, &SchemeFFI::get_function_type));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function-calling-conv"), mk_foreign_func(sc, &SchemeFFI::get_function_calling_conv));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-global-variable-type"), mk_foreign_func(sc, &SchemeFFI::get_global_variable_type));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function-pointer"), mk_foreign_func(sc, &SchemeFFI::get_function_pointer));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:jit-compile-function"), mk_foreign_func(sc, &SchemeFFI::recompile_and_link_function));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:remove-function"), mk_foreign_func(sc, &SchemeFFI::remove_function));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:remove-globalvar"), mk_foreign_func(sc, &SchemeFFI::remove_global_var));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:erase-function"), mk_foreign_func(sc, &SchemeFFI::erase_function));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:run"), mk_foreign_func(sc, &SchemeFFI::call_compiled));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:run-closure"), mk_foreign_func(sc, &SchemeFFI::call_compiled_closure));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:convert-float"), mk_foreign_func(sc, &SchemeFFI::llvm_convert_float_constant));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:count"), mk_foreign_func(sc, &SchemeFFI::llvm_count));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:count++"), mk_foreign_func(sc, &SchemeFFI::llvm_count_inc));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:call-closure"), mk_foreign_func(sc, &SchemeFFI::callClosure));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:print"), mk_foreign_func(sc, &SchemeFFI::printLLVMModule));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:print-function"), mk_foreign_func(sc, &SchemeFFI::printLLVMFunction));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:bind-symbol"), mk_foreign_func(sc, &SchemeFFI::bind_symbol));
+	static struct {
+		const char *name;
+		uint32_t    value;
+	} integerTable[] = {
+		{ "*au:block-size*",	UNIV::FRAMES },
+		{ "*au:samplerate*",	UNIV::SAMPLERATE },
+		{ "*au:channels*",	UNIV::CHANNELS },
+	};
+
+	static struct {
+		const char * name;
+		foreign_func func;
+	} funcTable[] = {
+		{ "ascii-print-color",		&SchemeFFI::asciiColor },
+		{ "emit",                       &SchemeFFI::emit },
+
+		//IPC stuff
+		{ "ipc:new",			&SchemeFFI::newSchemeProcess },
+		{ "ipc:connect",		&SchemeFFI::connectToProcess },
+		{ "ipc:call-async",		&SchemeFFI::ipcCall },
+		{ "ipc:define",			&SchemeFFI::ipcDefine },
+		{ "ipc:eval-string",		&SchemeFFI::ipcEval },
+		{ "ipc:load",			&SchemeFFI::ipcLoad },
+		{ "ipc:get-process-name",	&SchemeFFI::getNameOfCurrentProcess },
+
+		// number stuff
+		{ "random-real",		&SchemeFFI::randomReal },
+		{ "random-int",			&SchemeFFI::randomInt },
+		{ "real->integer",		&SchemeFFI::realToInteger },
+		{ "real->rational",		&SchemeFFI::realToRational },
+		{ "rational->real",		&SchemeFFI::rationalToReal },
+		{ "integer->real",		&SchemeFFI::integerToReal },
+
+		// sys stuff
+		{ "sys:pointer-size",		&SchemeFFI::pointerSize },
+		{ "sys:open-dylib",		&SchemeFFI::openDynamicLib },
+		{ "sys:close-dylib",		&SchemeFFI::closeDynamicLib },
+
+		// DSP sys stuff
+		{ "sys:set-dsp-closure",	&SchemeFFI::setDSPClosure },
+		{ "sys:set-dsp-wrapper",	&SchemeFFI::setDSPWrapper },
+		{ "sys:set-dsp-wrapper-array",	&SchemeFFI::setDSPWrapperArray },
+
+		// memory zone stuff
+		{ "sys:create-mzone",		&SchemeFFI::createMallocZone },
+		{ "sys:default-mzone",		&SchemeFFI::defaultMallocZone },
+		{ "sys:destroy-mzone",		&SchemeFFI::destroyMallocZone },
+		{ "sys:copy-to-dmzone",		&SchemeFFI::copyToDefaultZone },
+
+		// misc stuff
+		{ "string-strip",		&SchemeFFI::stringStrip },
+		{ "string-join",		&SchemeFFI::stringJoin },
+		{ "call-cpp-at-time",		&SchemeFFI::callCPPAtTime },
+		{ "now",			&SchemeFFI::getTime },
+		{ "sexpr->string",		&SchemeFFI::sexprToString },
+		{ "println",			&SchemeFFI::print },
+		{ "print",			&SchemeFFI::print_no_new_line },
+		{ "print-full",			&SchemeFFI::printFull },
+		{ "print-full-nq",		&SchemeFFI::printFullNoQuotes },
+		{ "pprint-error",		&SchemeFFI::printError }, // pprint-error is pprint for a reason!
+		{ "print-notification",		&SchemeFFI::printNotification },
+		{ "get-closure-env",		&SchemeFFI::getClosureEnv },
+
+		// regex stuff
+		{ "regex:match?",		&SchemeFFI::regex_match },
+		{ "regex:matched",		&SchemeFFI::regex_matched },
+		{ "regex:match-all",		&SchemeFFI::regex_match_all },
+		{ "regex:split",		&SchemeFFI::regex_split },
+		{ "regex:replace",		&SchemeFFI::regex_replace },
+
+		// llvm stuff
+		{ "llvm:compile",			&SchemeFFI::compile },
+		{ "llvm:bind-global-var",		&SchemeFFI::bind_global_var },
+		{ "llvm:get-function",			&SchemeFFI::get_function },
+		{ "llvm:get-globalvar",			&SchemeFFI::get_globalvar },
+		{ "llvm:get-function-args",		&SchemeFFI::get_function_args },
+		{ "llvm:get-function-type",		&SchemeFFI::get_function_type },
+		{ "llvm:get-function-calling-conv",	&SchemeFFI::get_function_calling_conv },
+		{ "llvm:get-global-variable-type",	&SchemeFFI::get_global_variable_type },
+		{ "llvm:get-function-pointer",		&SchemeFFI::get_function_pointer },
+		{ "llvm:jit-compile-function",		&SchemeFFI::recompile_and_link_function },
+		{ "llvm:remove-function",		&SchemeFFI::remove_function },
+		{ "llvm:remove-globalvar",		&SchemeFFI::remove_global_var },
+		{ "llvm:erase-function",		&SchemeFFI::erase_function },
+		{ "llvm:run",				&SchemeFFI::call_compiled },
+		{ "llvm:run-closure",			&SchemeFFI::call_compiled_closure },
+		{ "llvm:convert-float",			&SchemeFFI::llvm_convert_float_constant },
+		{ "llvm:count",				&SchemeFFI::llvm_count },
+		{ "llvm:count++",			&SchemeFFI::llvm_count_inc },
+		{ "llvm:call-closure",			&SchemeFFI::callClosure },
+		{ "llvm:print",				&SchemeFFI::printLLVMModule },
+		{ "llvm:print-function",		&SchemeFFI::printLLVMFunction },
+		{ "llvm:bind-symbol",			&SchemeFFI::bind_symbol },
+	};
+
+	for (i = 0; i < nelem(integerTable); i++) {
+		scheme_define(
+			sc, sc->global_env,
+			mk_symbol(sc, integerTable[i].name),
+			mk_integer(sc, integerTable[i].value)
+		);
+	}
+
+	for (i = 0; i < nelem(funcTable); i++) {
+		scheme_define(
+			sc, sc->global_env,
+			mk_symbol(sc, funcTable[i].name),
+			mk_foreign_func(sc, funcTable[i].func)
+		);
+	}
     }
-	
+
     //////////////////// helper functions ////////////////////////
     void SchemeFFI::addGlobal(scheme* sc, char* symbol_name, pointer arg)
     {
