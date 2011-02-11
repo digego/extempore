@@ -239,25 +239,33 @@ namespace extemp {
     {
 	std::stringstream ss;
 	int lgth = list_length(_sc,args);
+	pointer io = list_ref(_sc,lgth-1,args);
+	if(!is_string(io)) {
+	    PRINT_ERROR("Emit accepts only string arguments!\n");
+	    return _sc->F;
+	}
+	ss << string_value(io);
 	pointer arg = 0;
-	for(int i=0;i<lgth;i++,args=pair_cdr(args)) {
+	for(int i=0;i<lgth-1;i++) {
 	    arg = pair_car(args);
 	    if(!is_string(arg)) {
 		PRINT_ERROR("Emit accepts only string arguments!\n");
 		return _sc->F;
 	    }
-	    ss << string_value(arg);	    
+	    ss << string_value(arg);
+	    args = pair_cdr(args);
 	}
 
 	std::string tmp = ss.str();
-	// replace final string in place	
+	// replace io string in place	
 	int l = tmp.length();
 	char* s = (char*) malloc(l+1);
-	free(arg->_object._string._svalue); // free existing char*
-	arg->_object._string._svalue = s;
-	arg->_object._string._length = l;
-	// return final string
-	return arg;
+	strcpy(s,tmp.c_str());
+	free(io->_object._string._svalue);
+	io->_object._string._svalue = s;
+	io->_object._string._length = l;
+	// return io string
+	return io;
     }
 
     // ipc stuff
