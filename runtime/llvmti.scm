@@ -1984,7 +1984,7 @@
                    (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                 " = external global "
                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
-               (llvm:bind-global-var ,(symbol->string symbol) ,value)
+               (ipc:call "utility" 'llvm:bind-global-var ,(symbol->string symbol) ,value)
 	       (ascii-print-color 0 9 10)
 	       (print "Successfully bound ")
 	       (ascii-print-color 1 2 10)
