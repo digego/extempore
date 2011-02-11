@@ -40,8 +40,8 @@
 
 
 ;; we can call these new closures like so
-(print (my-test-1 6)) ;; 30
-(print (my-test-1f 6.0)) ;; 30.0
+(println (my-test-1 6)) ;; 30
+(println (my-test-1f 6.0)) ;; 30.0
 
 
 ;; you are free to recompile an existing compile
@@ -51,7 +51,7 @@
    (lambda (a)
       (/ a 5)))
 
-(print (my-test-1 30)) ; 30 / 5 = 6
+(println (my-test-1 30)) ; 30 / 5 = 6
 
 ;; note that the closures signature is still the same
 ;; as it was before.  This is important because we are
@@ -83,9 +83,9 @@
          (* x power))))
 
 ;; each modifies state
-(print (my-test-2 2)) ;; should = 2
-(print (my-test-2 2)) ;; should = 4
-(print (my-test-2 2)) ;; etc
+(println (my-test-2 2)) ;; should = 2
+(println (my-test-2 2)) ;; should = 4
+(println (my-test-2 2)) ;; etc
 
                
 ;; Closures can of course return closures.
@@ -93,9 +93,9 @@
 ;; as printed in the logview "[[i64,i64]*]*"
 ;; being a closure that returns a closure
 (definec my-test-3
-   (lambda ()
-      (lambda (x)
-         (* x 3))))
+  (lambda ()
+    (lambda (x)
+      (* x 3))))
 
 
 ;; let's try to make a generic incrementor
@@ -107,10 +107,10 @@
 ;;
 ;; THIS WILL CAUSE AN ERROR!
 (definec my-inc-maker
-   (lambda (i)
-      (lambda (inc)
-         (set! i (+ i inc))
-         i)))
+  (lambda (i)
+    (lambda (inc)
+      (set! i (+ i inc))
+      i)))
 
 ;; This makes sense should "+" operate
 ;; on doubles or integers - who knows?
@@ -188,9 +188,9 @@
 
 ;; and we can call my-in-maker-wrapper
 ;; to appy myf
-(print (my-inc-maker-wrapper myf 1)) ; 1
-(print (my-inc-maker-wrapper myf 1)) ; 2
-(print (my-inc-maker-wrapper myf 1)) ; 3 etc..
+(println (my-inc-maker-wrapper myf 1)) ; 1
+(println (my-inc-maker-wrapper myf 1)) ; 2
+(println (my-inc-maker-wrapper myf 1)) ; 3 etc..
 
 ;; of course the wrapper is only required if you 
 ;; need interaction with the scheme world.
@@ -202,9 +202,9 @@
       (lambda ()
          (f 1))))
 
-(print (my-inc-test)) ; 1
-(print (my-inc-test)) ; 2
-(print (my-inc-test)) ; 3
+(println (my-inc-test)) ; 1
+(println (my-inc-test)) ; 2
+(println (my-inc-test)) ; 3
 
 ;; hopefully you're getting the idea.
 ;; note that once we've compiled something
@@ -220,8 +220,8 @@
 
 ;; make and return a simple tuple
 (definec my-test-6
-   (lambda ()
-      (make-tuple i64 double i32)))
+  (lambda ()
+    (make-tuple i64 double i32)))
 
 ;; logview shows [<i64,double,i32>*]*
 ;; i.e. a closure that takes no arguments
@@ -233,17 +233,17 @@
 ;; by the tuple-reference index 
 ;; (i.e. i64 being tuple index 0)
 (definec my-test-7 
-   (lambda ()
-      (let ((a (make-tuple i64 float)) ; type <i64,float>
-            (b 37)
-            (c 6.4))
-         (tuple-set! a 0 b) ;; set i64 to 64
-         (tuple-set! a 1 c) ;; set float to 6.4
-         (tuple-ref a 0)))) ;; return first element which is i64
+  (lambda ()
+    (let ((a (make-tuple i64 float)) ; type <i64,float>
+	  (b 37)
+	  (c 6.4))
+      (tuple-set! a 0 b) ;; set i64 to 64
+      (tuple-set! a 1 c) ;; set float to 6.4
+      (tuple-ref a 0)))) ;; return first element which is i64
 
 ;; should be 64 as we return the 
 ;; first element of the tuple 
-(print (my-test-7)) ; 37
+(println (my-test-7)) ; 37
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -287,7 +287,7 @@
          (my-test-10 v))))
 
 ;; try to guess the answer before you call this!!
-(print (my-test-11))
+(println (my-test-11))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some conditionals
@@ -298,8 +298,8 @@
           x
           y)))
 
-(print (my-test-12 12 13))
-(print (my-test-12 13 12))
+(println (my-test-12 12 13))
+(println (my-test-12 13 12))
 
 ;; returns boolean true
 (definec my-test-13
@@ -363,11 +363,11 @@
          (lambda (time:double)
             (f time)))))
 
-(print (env-wrap 0.0)) ;; time 0.0 should give us 0.0
-(print (env-wrap 1.0)) ;; time 1.0 should give us 0.5
-(print (env-wrap 2.0)) ;; time 2.0 should be 1.0
-(print (env-wrap 2.5)) ;; going back down 0.75
-(print (env-wrap 4.0)) ;; to zero
+(println (env-wrap 0.0)) ;; time 0.0 should give us 0.0
+(println (env-wrap 1.0)) ;; time 1.0 should give us 0.5
+(println (env-wrap 2.0)) ;; time 2.0 should be 1.0
+(println (env-wrap 2.5)) ;; going back down 0.75
+(println (env-wrap 4.0)) ;; to zero
 
 
 
