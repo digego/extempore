@@ -46,6 +46,9 @@
 
 (define *impc:compiler:print-raw-llvm* #f)
 
+(define *impc:compiler:process* (ipc:get-process-name))
+;(define *impc:compiler:process* "utility")
+
 (define *impc:zone* (sys:default-mzone))
 
 (define icr:new-zone
@@ -1939,7 +1942,7 @@
          (expr (car (reverse args))))
       ;(print-full 'types: types 'e: expr 'args: args)
       `(define ,symname
-          (let* ((res1 (ipc:call "utility" 'impc:ti:run ',symname '(let ((,symname ,expr)) ,symname) ,@types))
+          (let* ((res1 (ipc:call ,*impc:compiler:process* 'impc:ti:run ',symname '(let ((,symname ,expr)) ,symname) ,@types))
                  (setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
                  (func (llvm:get-function (symbol->string ',symname))))
              (if setter
@@ -1984,7 +1987,7 @@
                    (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                 " = external global "
                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
-               (ipc:call "utility" 'llvm:bind-global-var ,(symbol->string symbol) ,value)
+               (ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
 	       (ascii-print-color 0 9 10)
 	       (print "Successfully bound ")
 	       (ascii-print-color 1 2 10)
