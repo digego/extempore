@@ -40,6 +40,8 @@
 #include "EXTLLVM.h"
 #include "Task.h";
 
+#include <map>
+
 namespace extemp {
 
     class SchemeFFI {
@@ -134,9 +136,13 @@ namespace extemp {
 	static pointer printLLVMModule(scheme* _sc, pointer args);
 	static pointer printLLVMFunction(scheme* _sc, pointer args);
 	static pointer bind_symbol(scheme* _sc, pointer args);
+	static pointer impcirGetName(scheme* _sc, pointer args);	
+	static pointer impcirGetType(scheme* _sc, pointer args);	
+	static pointer impcirAdd(scheme* _sc, pointer args);
 
     private:
 	static SchemeFFI SINGLETON;		
+	static std::map<std::string,std::pair<std::string,std::string> > IMPCIR_DICT;
     };
 	
 } // end namespace

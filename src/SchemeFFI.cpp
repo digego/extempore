@@ -120,6 +120,7 @@ void ascii_text_color(int attr, int fg, int bg)
 namespace extemp {
 	
     SchemeFFI SchemeFFI::SINGLETON;
+    std::map<std::string,std::pair<std::string,std::string> > SchemeFFI::IMPCIR_DICT;
 
     void SchemeFFI::initSchemeFFI(scheme* sc)
     {
@@ -218,6 +219,10 @@ namespace extemp {
 		{ "llvm:print",				&SchemeFFI::printLLVMModule },
 		{ "llvm:print-function",		&SchemeFFI::printLLVMFunction },
 		{ "llvm:bind-symbol",			&SchemeFFI::bind_symbol },
+		{ "impc:ir:getname",			&SchemeFFI::impcirGetName },
+		{ "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
+		{ "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
+		
 	};
 
 	for (i = 0; i < nelem(integerTable); i++) {
@@ -296,6 +301,32 @@ namespace extemp {
 	io->_object._string._length = l;
 	// return io string
 	return io;
+    }
+
+    pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
+    {
+	std::string key(string_value(pair_car(args)));
+	return mk_string(_sc, IMPCIR_DICT[key].second.c_str());	
+    }
+
+    pointer SchemeFFI::impcirGetName(scheme* _sc, pointer args)
+    {
+	std::string key(string_value(pair_car(args)));
+	return mk_string(_sc, IMPCIR_DICT[key].first.c_str());	
+    }
+
+    pointer SchemeFFI::impcirAdd(scheme* _sc, pointer args)
+    {
+	std::string current("current");
+	std::string previous("previous");
+	std::string key(string_value(pair_car(args)));
+	std::string name(string_value(pair_cadr(args)));
+	std::string type(string_value(pair_caddr(args)));	    
+	std::pair<std::string,std::string> p(name,type);
+	IMPCIR_DICT[previous] = IMPCIR_DICT[current];
+	IMPCIR_DICT[current] = p;
+	IMPCIR_DICT[key] = p;
+	return _sc->T;
     }
 
     // ipc stuff
