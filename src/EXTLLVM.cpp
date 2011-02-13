@@ -185,6 +185,16 @@ void llvm_print_f64(double num)
 	return;
 }
 
+int64_t llvm_now()
+{
+    return extemp::UNIV::TIME;
+}
+
+double llvm_samplerate()
+{
+    return (double) extemp::UNIV::SAMPLERATE;
+}
+
 ///////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////
@@ -351,6 +361,10 @@ namespace extemp {
 			EE->updateGlobalMapping(gv,(void*)&llvm_print_f32);						
 			gv = M->getNamedValue(std::string("llvm_print_f64"));
 			EE->updateGlobalMapping(gv,(void*)&llvm_print_f64);						
+			gv = M->getNamedValue(std::string("llvm_samplerate"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
+			gv = M->getNamedValue(std::string("llvm_now"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_now);
 			
 		}	
 	 	return;
