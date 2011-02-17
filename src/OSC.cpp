@@ -197,75 +197,75 @@ uint32_t unswap32i(uint32_t a)
 
 namespace extemp {
    
-	std::map<scheme*, OSC*> OSC::SCHEME_MAP;	
-	//OSC* OSC::singleton = NULL;
-	//scheme* OSC::sc = NULL;
+    std::map<scheme*, OSC*> OSC::SCHEME_MAP;	
+    //OSC* OSC::singleton = NULL;
+    //scheme* OSC::sc = NULL;
 	
-	int send_scheme_call(scheme* _sc, double t, std::string& address, std::string& typetags, char* args)
-	{
+    int send_scheme_call(scheme* _sc, double t, std::string& address, std::string& typetags, char* args)
+    {
 #ifdef _OSC_DEBUG_
-		std::cout << "[OSC]  ADDRESS: " << address << "  TAGS: " << typetags << std::endl;
+	std::cout << "[OSC]  ADDRESS: " << address << "  TAGS: " << typetags << std::endl;
 #endif
 		
-		int pos = 0;
-		std::stringstream ss;
-		ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
-		for(int i=1; i<typetags.size(); ++i) {
-			if(typetags[i] == 'i') {
-				int osc_int = 0;
-				pos += OSC::getOSCInt(args+pos,&osc_int);
-				ss << " " << osc_int;
-			}else if(typetags[i] == 'f'){
-				float osc_float = 0.0f;
-				pos += OSC::getOSCfloat(args+pos,&osc_float);
-				ss << " " << osc_float;
-			}else if(typetags[i] == 'd'){
-				double osc_double = 0.0;
-				pos += OSC::getOSCdouble(args+pos,&osc_double);
-				ss << " " << osc_double;
-			}else if(typetags[i] == 's'){
-				std::string osc_str;
-				pos += OSC::getOSCString(args+pos, &osc_str);
-				ss << " \"" << osc_str << "\"";
-			}else if(typetags[i] == 'h'){
-				int64_t osc_long = 0;
-				pos += OSC::getOSCLong(args+pos,&osc_long);
-				ss << " " << osc_long;
-			}else if(typetags[i] == 't'){
-				double timestamp = 0.0;
-				pos += OSC::getOSCTimestamp(args+pos, &timestamp);
-				ss << " " << timestamp;				
-			// }else if(typetags[i] == 'b'){
-			// 	NSData* osc_data;
-			// 	pos += OSC::getOSCData(args+pos, &osc_data);
-			// 	char str[64];
-			// 	sprintf(str,"%p",osc_data);
-			// 	ss << " \"" << str << "\"";
+	int pos = 0;
+	std::stringstream ss;
+	ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
+	for(int i=1; i<typetags.size(); ++i) {
+	    if(typetags[i] == 'i') {
+		int osc_int = 0;
+		pos += OSC::getOSCInt(args+pos,&osc_int);
+		ss << " " << osc_int;
+	    }else if(typetags[i] == 'f'){
+		float osc_float = 0.0f;
+		pos += OSC::getOSCfloat(args+pos,&osc_float);
+		ss << " " << osc_float;
+	    }else if(typetags[i] == 'd'){
+		double osc_double = 0.0;
+		pos += OSC::getOSCdouble(args+pos,&osc_double);
+		ss << " " << osc_double;
+	    }else if(typetags[i] == 's'){
+		std::string osc_str;
+		pos += OSC::getOSCString(args+pos, &osc_str);
+		ss << " \"" << osc_str << "\"";
+	    }else if(typetags[i] == 'h'){
+		int64_t osc_long = 0;
+		pos += OSC::getOSCLong(args+pos,&osc_long);
+		ss << " " << osc_long;
+	    }else if(typetags[i] == 't'){
+		double timestamp = 0.0;
+		pos += OSC::getOSCTimestamp(args+pos, &timestamp);
+		ss << " " << timestamp;				
+		// }else if(typetags[i] == 'b'){
+		// 	NSData* osc_data;
+		// 	pos += OSC::getOSCData(args+pos, &osc_data);
+		// 	char str[64];
+		// 	sprintf(str,"%p",osc_data);
+		// 	ss << " \"" << str << "\"";
 				
-			//}else if(typetags[i] == ',') {
-				//if it's a comma just skip over it
-			//}else if (typetags[i] == ' ') {
-				// if it's a space just skip over it
-			}else if(typetags[i] == '[') {
-				ss << " (list ";
-			}else if(typetags[i] == ']') {
-				ss << ")";
-			}else{
-				printf("Bad or unsuppored argument type (%c) - dropping message\n",typetags[i]);
-				return -1;
-			}
-		}
+		//}else if(typetags[i] == ',') {
+		//if it's a comma just skip over it
+		//}else if (typetags[i] == ' ') {
+		// if it's a space just skip over it
+	    }else if(typetags[i] == '[') {
+		ss << " (list ";
+	    }else if(typetags[i] == ']') {
 		ss << ")";
-		if(_sc != NULL) {
-#ifdef _OSC_DEBUG_
-			std::cout << "SEND SCHEME: " << ss.str() << std::endl;
-#endif
-			SchemeProcess::I(_sc)->createSchemeTask(new std::string(ss.str()),"OSC TASK",5);
-		} else {
-			printf("No OSC Registered\n");
-		}
-		return pos;
+	    }else{
+		printf("Bad or unsuppored argument type (%c) - dropping message\n",typetags[i]);
+		return -1;
+	    }
 	}
+	ss << ")";
+	if(_sc != NULL) {
+#ifdef _OSC_DEBUG_
+	    std::cout << "SEND SCHEME: " << ss.str() << std::endl;
+#endif
+	    SchemeProcess::I(_sc)->createSchemeTask(new std::string(ss.str()),"OSC TASK",5);
+	} else {
+	    printf("No OSC Registered\n");
+	}
+	return pos;
+    }
 	
     void* osc_mesg_callback(void* obj_p)
     {
@@ -274,36 +274,36 @@ namespace extemp {
             int bytes_read = recvfrom(*osc->getSocketFD(), osc->getMessageData(), 256, 0, (struct sockaddr*)osc->getClientAddress(), (socklen_t *) osc->getClientAddressSize());
 			
             if(bytes_read > -1) {
-				std::cout << "OSC from client port: " << osc->getClientAddress()->sin_port << " " << osc->getAddress()->sin_port <<  std::endl;				
+		std::cout << "OSC from client port: " << osc->getClientAddress()->sin_port << " " << osc->getAddress()->sin_port <<  std::endl;				
                 char* args = osc->getMessageData();
-				int length = bytes_read; //osc->getMessageLength();
-				double timestamp;
-				int pos = 0;
+		int length = bytes_read; //osc->getMessageLength();
+		double timestamp;
+		int pos = 0;
                 std::string address;// = new std::string;
                 std::string typetags;// = new std::string;
-				pos += OSC::getOSCString(args+pos,&address);
-				if(address.find("#bundle") != std::string::npos) {
+		pos += OSC::getOSCString(args+pos,&address);
+		if(address.find("#bundle") != std::string::npos) {
 #ifdef _OSC_DEBUG_					
-					std::cout << "OSC BUNDLE: " << length <<  "  args: " << args << std::endl;
+		    std::cout << "OSC BUNDLE: " << length <<  "  args: " << args << std::endl;
 #endif									
-					pos += OSC::getOSCTimestamp(args+pos, &timestamp); // skip time tag
-					while(pos < length) {
+		    pos += OSC::getOSCTimestamp(args+pos, &timestamp); // skip time tag
+		    while(pos < length) {
 #ifdef _OSC_DEBUG_					
-						std::cout << "-->   NEW BUNDLE" << std::endl;
+			std::cout << "-->   NEW BUNDLE" << std::endl;
 #endif											
-						pos += 4; // skip element size
-						address.clear();
-						typetags.clear();
-						pos += OSC::getOSCString(args+pos,&address);
-						pos += OSC::getOSCString(args+pos,&typetags);
-						int ret_from_call = send_scheme_call(osc->sc,timestamp,address,typetags,args+pos);
-						if(ret_from_call < 0) break;
-						else pos += ret_from_call;
-					}
-				}else{
-					pos += OSC::getOSCString(args+pos,&typetags);
-					pos += send_scheme_call(osc->sc,0.0,address,typetags,args+pos);
-				}
+			pos += 4; // skip element size
+			address.clear();
+			typetags.clear();
+			pos += OSC::getOSCString(args+pos,&address);
+			pos += OSC::getOSCString(args+pos,&typetags);
+			int ret_from_call = send_scheme_call(osc->sc,timestamp,address,typetags,args+pos);
+			if(ret_from_call < 0) break;
+			else pos += ret_from_call;
+		    }
+		}else{
+		    pos += OSC::getOSCString(args+pos,&typetags);
+		    pos += send_scheme_call(osc->sc,0.0,address,typetags,args+pos);
+		}
 				
                 char reply[256];
                 memset(reply,0,256);
@@ -314,27 +314,27 @@ namespace extemp {
                 usleep(1000);
             }
         }
-		return NULL;
+	return NULL;
     }
     
     OSC::OSC() : threadOSC(), message_length(0), started(false) 
-	{
-		send_from_serverfd = 0;
-		scheme_real_type = 'f';
-		scheme_integer_type = 'i';
+    {
+	send_from_serverfd = 0;
+	scheme_real_type = 'f';
+	scheme_integer_type = 'i';
     }
 		
-	void OSC::schemeInit(SchemeProcess* scm)
-	{
-			//scm->addForeignFunc("osc-send-msg", &OSC::sendOSC);
-		    //scm->addGlobalCptr((char*)"*io:osc-send-msg*",mk_cb(this,OSC,sendOSC));
-			scm->addForeignFunc((char*)"io:osc:start-server", &OSC::registerScheme);
-			scm->addForeignFunc((char*)"io:osc:set-real-64bit?", &OSC::set_real_type);
-			scm->addForeignFunc((char*)"io:osc:set-integer-64bit?", &OSC::set_integer_type);			
-			scm->addForeignFunc((char*)"io:osc:send-from-server-socket?", &OSC::send_from_server_socket);
+    void OSC::schemeInit(SchemeProcess* scm)
+    {
+	//scm->addForeignFunc("osc-send-msg", &OSC::sendOSC);
+	//scm->addGlobalCptr((char*)"*io:osc-send-msg*",mk_cb(this,OSC,sendOSC));
+	scm->addForeignFunc((char*)"io:osc:start-server", &OSC::registerScheme);
+	scm->addForeignFunc((char*)"io:osc:set-real-64bit?", &OSC::set_real_type);
+	scm->addForeignFunc((char*)"io:osc:set-integer-64bit?", &OSC::set_integer_type);			
+	scm->addForeignFunc((char*)"io:osc:send-from-server-socket?", &OSC::send_from_server_socket);
 			
-			//scm->addGlobal("*samplerate*",mk_integer(scm->getSchemeEnv(),AUHost::SAMPLERATE));
-	}
+	//scm->addGlobal("*samplerate*",mk_integer(scm->getSchemeEnv(),AUHost::SAMPLERATE));
+    }
 
     int OSC::setOSCString(char* data, std::string* str) {
 #ifdef _OSC_DEBUG_        
@@ -359,18 +359,18 @@ namespace extemp {
         }
         str_cnt += (4 - (int)fmod((double)str_cnt,4.0));		
 		
-		//added because we need to quote quotes to add to scheme expressions
-		for(int i=0;i<str->length();i++)
+	//added because we need to quote quotes to add to scheme expressions
+	for(int i=0;i<str->length();i++)
+	{
+	    if(str->at(i)=='"')
+	    {
+		if(str->at(i-1) != '\\')
 		{
-			if(str->at(i)=='"')
-			{
-				if(str->at(i-1) != '\\')
-				{
-					str->insert(i,"\\");
-					i++;
-				}
-			}
+		    str->insert(i,"\\");
+		    i++;
 		}
+	    }
+	}
 		
 #ifdef _OSC_DEBUG_        
         std::cout << "GET OSC STRING = " << *str << std::endl;
@@ -382,8 +382,8 @@ namespace extemp {
 #ifdef _OSC_DEBUG_        
         std::cout << "SET OSC FLOAT 32 = " << *f << std::endl;
 #endif        	
-		uint32_t sf = swap32f(*f);
-		char* byte_array = (char*) &sf;
+	uint32_t sf = swap32f(*f);
+	char* byte_array = (char*) &sf;
         for(int i=0;i<4;++i) {
             data[i] = byte_array[i];
         }
@@ -391,7 +391,7 @@ namespace extemp {
     }
 
     int OSC::getOSCfloat(const char* data, float* f) {
-		*f = unswap32f(*((uint32_t*)data));
+	*f = unswap32f(*((uint32_t*)data));
 #ifdef _OSC_DEBUG_        
         std::cout << "OSC FLOAT 32 = " << *f << std::endl;
 #endif        
@@ -403,8 +403,8 @@ namespace extemp {
 #ifdef _OSC_DEBUG_        
         std::cout << "SET OSC FLOAT 64 = " << *f << std::endl;
 #endif        	
-		uint64_t sf = swap64f(*f);
-		char* byte_array = (char*) &sf;
+	uint64_t sf = swap64f(*f);
+	char* byte_array = (char*) &sf;
         for(int i=0;i<8;++i) {
             data[i] = byte_array[i];
         }
@@ -412,55 +412,55 @@ namespace extemp {
     }
 	
     int OSC::getOSCdouble(const char* data, double* f) {
-		*f = unswap64f(*((uint64_t*)data));
+	*f = unswap64f(*((uint64_t*)data));
 #ifdef _OSC_DEBUG_        
         std::cout << "OSC FLOAT 64 = " << *f << std::endl;
 #endif        
         return 8;
     }
 	
-	int OSC::getOSCTimestamp(const char* data, double* d) {
-		uint32_t* dat = (uint32_t*) data;
-		int64_t seconds = unswap32i(dat[0]);
-		uint32_t fractional = unswap32i(dat[1]);
+    int OSC::getOSCTimestamp(const char* data, double* d) {
+	uint32_t* dat = (uint32_t*) data;
+	int64_t seconds = unswap32i(dat[0]);
+	uint32_t fractional = unswap32i(dat[1]);
 		
-		if((seconds == 0) && (fractional == 1)) {
-			*d = 0.0; 
-			return 8;
-		}
-		//std::cout << "seconds:" << seconds << " fraction:" << fractional << std::endl;
-		seconds -= 3187296000ul;
-		double dfraction = fractional/4294967296.0; //32 bit unsigned
-		*d = ((double)seconds)+dfraction;
-		return 8;
+	if((seconds == 0) && (fractional == 1)) {
+	    *d = 0.0; 
+	    return 8;
 	}
+	//std::cout << "seconds:" << seconds << " fraction:" << fractional << std::endl;
+	seconds -= 3187296000ul;
+	double dfraction = fractional/4294967296.0; //32 bit unsigned
+	*d = ((double)seconds)+dfraction;
+	return 8;
+    }
 	
-	int OSC::setOSCTimestamp(char* data, double d)
-	{
-		uint32_t seconds = trunc(d); 
+    int OSC::setOSCTimestamp(char* data, double d)
+    {
+	uint32_t seconds = trunc(d); 
 		
-		double fractional = d - (double) seconds;
-		seconds += 3187296000ul; //1543503872;
+	double fractional = d - (double) seconds;
+	seconds += 3187296000ul; //1543503872;
 		
-		uint32_t fractionali = (uint32_t)(fractional * 4294967296.0);
+	uint32_t fractionali = (uint32_t)(fractional * 4294967296.0);
 		
-		uint32_t* si = (uint32_t*)data;
-		uint32_t* sf = (uint32_t*)(data+4);
+	uint32_t* si = (uint32_t*)data;
+	uint32_t* sf = (uint32_t*)(data+4);
 		
-		*si = swap32i(seconds);
-		*sf = swap32i(fractionali);
+	*si = swap32i(seconds);
+	*sf = swap32i(fractionali);
 		
-		// great! now we have both bits of the NTP puzzle, we just need to jam them into a datastream
-		return 8;		
-	}
+	// great! now we have both bits of the NTP puzzle, we just need to jam them into a datastream
+	return 8;		
+    }
 					
 
     int OSC::setOSCInt(char* data, int* i) {
 #ifdef _OSC_DEBUG_        
         std::cout << "SET OSC INT = " << *i << std::endl;
 #endif        		
-		*i = swap32i(*i);
-		char* byte_array = (char*) i;
+	*i = swap32i(*i);
+	char* byte_array = (char*) i;
         for(int i=0;i<4;++i) {
             data[i] = byte_array[i];
         }
@@ -469,7 +469,7 @@ namespace extemp {
 	
 
     int OSC::getOSCInt(const char* data, int* i) {
-		*i = unswap32i(*((int*) data));
+	*i = unswap32i(*((int*) data));
 #ifdef _OSC_DEBUG_        
         std::cout << "OSC INT = " << *i << std::endl;
 #endif        
@@ -477,8 +477,8 @@ namespace extemp {
     }
 
     int OSC::setOSCLong(char* data, int64_t* l) {
-		*l = swap64i(*l);
-		char* byte_array = (char*) l;
+	*l = swap64i(*l);
+	char* byte_array = (char*) l;
         for(int i=0;i<8;++i) {
             data[i] = byte_array[i];
         }
@@ -486,7 +486,7 @@ namespace extemp {
     }
 
     int OSC::getOSCLong(const char* data, int64_t* l) {
-		*l = unswap64i(*((int64_t*)data));
+	*l = unswap64i(*((int64_t*)data));
 #ifdef _OSC_DEBUG_        
         std::cout << "OSC LONG = " << *l << std::endl;
 #endif        
@@ -533,9 +533,9 @@ namespace extemp {
     int OSC::clearMessageBuffer()
     {
 #ifdef _OSC_DEBUG_
-		printf("CLEAR MESSAGE BUFFER\n");
+	printf("CLEAR MESSAGE BUFFER\n");
 #endif				
-		message_length = 0;
+	message_length = 0;
         int cnt = -1;
         do {
             cnt++;
@@ -571,119 +571,119 @@ namespace extemp {
 //        }
 //    }
 	
-	void OSC::processArgs(pointer arg, char** tmp, char** ptr, int* lgth, std::string& typetags, scheme* _sc)
-	{
+    void OSC::processArgs(pointer arg, char** tmp, char** ptr, int* lgth, std::string& typetags, scheme* _sc)
+    {
 #ifdef _OSC_DEBUG_
-		printf("PROCESS ARGS\n");
+	printf("PROCESS ARGS\n");
 #endif					
-		OSC* osc = OSC::I(_sc);
-		int ret = 0;
-		int tmpsize = 1024;
-		int items = list_length(_sc,arg);
-		for(int i=0;i<items;++i) {
-			if(is_string(pair_car(arg))) {
-				std::string str(string_value(pair_car(arg)));
-				ret = OSC::setOSCString(*ptr,&str);
-				typetags += "s";
-			}else if(is_pair(pair_car(arg))) {
-				typetags += "[";  
-				processArgs(pair_car(arg),tmp,ptr,lgth,typetags,_sc);
-				typetags += "]";
-				ret = 0;
-			}else if(is_vector(pair_car(arg))) {
-				arg = pair_cdr(arg);
-				continue;
-			}else if(is_symbol(pair_car(arg))) {
-				arg = pair_cdr(arg);
-				continue;
-			}else if(is_integer(pair_car(arg))) {
-				if(osc->scheme_integer_type == 'i')
-				{
-					int val = ivalue(pair_car(arg));
-					ret = OSC::setOSCInt(*ptr, &val);
-					typetags += "i";									
-				}
-				else
-				{
-					int64_t val = ivalue(pair_car(arg));
-					ret = OSC::setOSCLong(*ptr, &val);
-					typetags += "h";				
-				}
-			}else if(is_real(pair_car(arg))){
-				if(osc->scheme_real_type == 'f') {
-					float val = (float) rvalue(pair_car(arg));
-					ret = OSC::setOSCfloat(*ptr, &val);					
-					typetags += "f";
-				}else{
-					double val = (double) rvalue(pair_car(arg));
-					ret = OSC::setOSCdouble(*ptr, &val);
-					typetags += "d";					
-				}
-			}
-			*lgth += ret; *ptr += ret;			
-			arg = pair_cdr(arg);
-		}	
-	}
-	
-	//pointer OSC::sendOSC(scheme* _sc, pointer args)
-	void OSC::sendOSC(TaskI* task)
-	{
-		Task<SchemeObj*>* t = static_cast<Task<SchemeObj*>*>(task);
-		pointer args = t->getArg()->getValue();
-		scheme* _sc = t->getArg()->getScheme();
-		
-		char* host = string_value(pair_car(args));
-		int port = ivalue(pair_cadr(args));
-#ifdef _OSC_DEBUG_
-		std::cout << "SENDTO: " << host << "  ON PORT: " << port << std::endl;
-#endif
-		int length = 0;
-		int ret = 0;
-		char* ptr;
-		
-		struct sockaddr_in sa;
-		struct hostent* hen; /* host-to-IP translation */
-		
-		/* Address resolution stage */
-		hen = gethostbyname(host);
-		if (!hen) {
-			printf("OSC Error: Could no resolve host name\n");
-			delete t->getArg();
-			return;			
+	OSC* osc = OSC::I(_sc);
+	int ret = 0;
+	int tmpsize = 1024;
+	int items = list_length(_sc,arg);
+	for(int i=0;i<items;++i) {
+	    if(is_string(pair_car(arg))) {
+		std::string str(string_value(pair_car(arg)));
+		ret = OSC::setOSCString(*ptr,&str);
+		typetags += "s";
+	    }else if(is_pair(pair_car(arg))) {
+		typetags += "[";  
+		processArgs(pair_car(arg),tmp,ptr,lgth,typetags,_sc);
+		typetags += "]";
+		ret = 0;
+	    }else if(is_vector(pair_car(arg))) {
+		arg = pair_cdr(arg);
+		continue;
+	    }else if(is_symbol(pair_car(arg))) {
+		arg = pair_cdr(arg);
+		continue;
+	    }else if(is_integer(pair_car(arg))) {
+		if(osc->scheme_integer_type == 'i')
+		{
+		    int val = ivalue(pair_car(arg));
+		    ret = OSC::setOSCInt(*ptr, &val);
+		    typetags += "i";									
 		}
+		else
+		{
+		    int64_t val = ivalue(pair_car(arg));
+		    ret = OSC::setOSCLong(*ptr, &val);
+		    typetags += "h";				
+		}
+	    }else if(is_real(pair_car(arg))){
+		if(osc->scheme_real_type == 'f') {
+		    float val = (float) rvalue(pair_car(arg));
+		    ret = OSC::setOSCfloat(*ptr, &val);					
+		    typetags += "f";
+		}else{
+		    double val = (double) rvalue(pair_car(arg));
+		    ret = OSC::setOSCdouble(*ptr, &val);
+		    typetags += "d";					
+		}
+	    }
+	    *lgth += ret; *ptr += ret;			
+	    arg = pair_cdr(arg);
+	}	
+    }
+	
+    //pointer OSC::sendOSC(scheme* _sc, pointer args)
+    void OSC::sendOSC(TaskI* task)
+    {
+	Task<SchemeObj*>* t = static_cast<Task<SchemeObj*>*>(task);
+	pointer args = t->getArg()->getValue();
+	scheme* _sc = t->getArg()->getScheme();
 		
-		memset(&sa, 0, sizeof(sa));
+	char* host = string_value(pair_car(args));
+	int port = ivalue(pair_cadr(args));
+#ifdef _OSC_DEBUG_
+	std::cout << "SENDTO: " << host << "  ON PORT: " << port << std::endl;
+#endif
+	int length = 0;
+	int ret = 0;
+	char* ptr;
 		
-		sa.sin_family = AF_INET;
-		sa.sin_port = htons(port);
-		memcpy(&sa.sin_addr.s_addr, hen->h_addr_list[0], hen->h_length);
+	struct sockaddr_in sa;
+	struct hostent* hen; /* host-to-IP translation */
+		
+	/* Address resolution stage */
+	hen = gethostbyname(host);
+	if (!hen) {
+	    printf("OSC Error: Could no resolve host name\n");
+	    delete t->getArg();
+	    return;			
+	}
+		
+	memset(&sa, 0, sizeof(sa));
+		
+	sa.sin_family = AF_INET;
+	sa.sin_port = htons(port);
+	memcpy(&sa.sin_addr.s_addr, hen->h_addr_list[0], hen->h_length);
 		
 //		if (fd == -1) {
 //			delete t->getArg();
 //			return;			
 //		}
 		
-		int fd = 0;
-		if(OSC::I(_sc)->send_from_serverfd) {
-			fd = *(OSC::I(_sc)->getSocketFD()); //  getSendFD();
-		}else{
-			fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);			
-		}
+	int fd = 0;
+	if(OSC::I(_sc)->send_from_serverfd) {
+	    fd = *(OSC::I(_sc)->getSocketFD()); //  getSendFD();
+	}else{
+	    fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);			
+	}
 		
-		//rc = connect(fd, (struct sockaddr *)&sa, sizeof(sa));
-		//if(rc) return mk_string(_sc,"Error connecting to server");
+	//rc = connect(fd, (struct sockaddr *)&sa, sizeof(sa));
+	//if(rc) return mk_string(_sc,"Error connecting to server");
 
-		std::string address(string_value(pair_caddr(args)));
-		std::string typetags(",");
-		std::string body;
+	std::string address(string_value(pair_caddr(args)));
+	std::string typetags(",");
+	std::string body;
 		
-		pointer arg = pair_cadddr(args);
-		int tmpsize = 1024;
-		char* tmp = (char*) malloc(tmpsize);
-		//char tmp[1024];
-		ptr = tmp;
-		int lgth = 0;
-		processArgs(arg,&tmp,&ptr,&lgth,typetags,_sc);
+	pointer arg = pair_cadddr(args);
+	int tmpsize = 1024;
+	char* tmp = (char*) malloc(tmpsize);
+	//char tmp[1024];
+	ptr = tmp;
+	int lgth = 0;
+	processArgs(arg,&tmp,&ptr,&lgth,typetags,_sc);
 		
 //		int items = list_length(_sc,arg);
 //		for(int i=0;i<items;++i) {
@@ -718,90 +718,90 @@ namespace extemp {
 //			arg = pair_cdr(arg);
 //		}
 
-		char* message = (char*) malloc(1024+tmpsize);		
-		ptr = message;
-		ret = OSC::setOSCString(ptr, &address);
-		length += ret; ptr += ret;
-		ret = OSC::setOSCString(ptr, &typetags);
-		length += ret; ptr += ret;
-		memcpy(ptr, tmp, lgth);
-		length += lgth;
+	char* message = (char*) malloc(1024+tmpsize);		
+	ptr = message;
+	ret = OSC::setOSCString(ptr, &address);
+	length += ret; ptr += ret;
+	ret = OSC::setOSCString(ptr, &typetags);
+	length += ret; ptr += ret;
+	memcpy(ptr, tmp, lgth);
+	length += lgth;
 #ifdef _OSC_DEBUG_
-		std::cout << "SENDING MSG: " << message << "  of size: " << length << std::endl;
+	std::cout << "SENDING MSG: " << message << "  of size: " << length << std::endl;
 #endif
-		int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
-		if(!OSC::I(_sc)->send_from_serverfd) close(fd);
-		if(err < 0)
-		{
+	int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
+	if(!OSC::I(_sc)->send_from_serverfd) close(fd);
+	if(err < 0)
+	{
 #ifdef _OSC_DEBUG_
-		std::cout << "OSC Send Error: " << err << std::endl;
+	    std::cout << "OSC Send Error: " << err << std::endl;
 #endif		
-			if(errno == EMSGSIZE) {
-				printf("Error: OSC message too large: UDP 8k message MAX\n");
-			}else{
-				printf("Error: Problem sending OSC message\n");
-			}			
+	    if(errno == EMSGSIZE) {
+		printf("Error: OSC message too large: UDP 8k message MAX\n");
+	    }else{
+		printf("Error: Problem sending OSC message\n");
+	    }			
 
-		}
-		
-		free(tmp);
-		free(message);
-		
-		delete t->getArg();		
-		return;
-		//return _sc->NIL;
 	}
+		
+	free(tmp);
+	free(message);
+		
+	delete t->getArg();		
+	return;
+	//return _sc->NIL;
+    }
 
-	pointer OSC::set_real_type(scheme* _sc, pointer args) {
-		OSC* osc = OSC::I(_sc);
+    pointer OSC::set_real_type(scheme* _sc, pointer args) {
+	OSC* osc = OSC::I(_sc);
 		
-		if(pair_car(args)==_sc->T)
-		{
-			osc->scheme_real_type = 'd';
-		}else{
-			osc->scheme_real_type = 'f';
-		}
-		return _sc->T;
+	if(pair_car(args)==_sc->T)
+	{
+	    osc->scheme_real_type = 'd';
+	}else{
+	    osc->scheme_real_type = 'f';
 	}
+	return _sc->T;
+    }
 
-	pointer OSC::set_integer_type(scheme* _sc, pointer args) {
-		OSC* osc = OSC::I(_sc);
+    pointer OSC::set_integer_type(scheme* _sc, pointer args) {
+	OSC* osc = OSC::I(_sc);
 		
-		if(pair_car(args)==_sc->T)
-		{
-			osc->scheme_integer_type = 'h';
-		}else{
-			osc->scheme_integer_type = 'i';
-		}
-		return _sc->T;
+	if(pair_car(args)==_sc->T)
+	{
+	    osc->scheme_integer_type = 'h';
+	}else{
+	    osc->scheme_integer_type = 'i';
 	}
+	return _sc->T;
+    }
 
-	pointer OSC::send_from_server_socket(scheme* _sc, pointer args) {
-		OSC* osc = OSC::I(_sc);
+    pointer OSC::send_from_server_socket(scheme* _sc, pointer args) {
+	OSC* osc = OSC::I(_sc);
 		
-		if(pair_car(args)==_sc->T)
-		{
-			osc->send_from_serverfd = 1;
-		}else{
-			osc->send_from_serverfd = 0;
-		}
-		return _sc->T;
+	if(pair_car(args)==_sc->T)
+	{
+	    osc->send_from_serverfd = 1;
+	}else{
+	    osc->send_from_serverfd = 0;
 	}
+	return _sc->T;
+    }
 	
 	
-	pointer OSC::registerScheme(scheme* _sc, pointer args) {
-		OSC* osc = new OSC(); //OSC::I();
-		SCHEME_MAP[_sc] = osc;
+    pointer OSC::registerScheme(scheme* _sc, pointer args) {
+	OSC* osc = new OSC(); //OSC::I();
+	SCHEME_MAP[_sc] = osc;
 		
-		SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
-		scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
+	SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
+	scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 				
-		// setup server port
-		struct sockaddr_in* osc_address = osc->getAddress();
+	// setup server port
+	struct sockaddr_in* osc_address = osc->getAddress();
 		
         memset((char*) osc_address, 0, sizeof(*osc_address));
-		int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
-		printf("Starting OSC server on port: %d\n",port);
+	int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
+	printf("Starting OSC server on port: %d\n",port);
 
         osc_address->sin_family = AF_INET;
         osc_address->sin_port = htons(port);
@@ -809,36 +809,36 @@ namespace extemp {
         
         int socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if(socket_fd == -1) {
-			printf("Error opening OSC socket\n");
-			std::cout << "Error opening OSC socket"<< std::endl;
-		}
+	    printf("Error opening OSC socket\n");
+	    std::cout << "Error opening OSC socket"<< std::endl;
+	}
         fcntl(socket_fd, F_SETFL, O_NONBLOCK); //set to non-blocking socket
         
         if(bind(socket_fd, (struct sockaddr*) osc_address, sizeof(*osc_address)) == -1) {
-			printf("Error opening OSC socket\n");
+	    printf("Error opening OSC socket\n");
             std::cout << "Error binding OSC address to socket" << std::endl;
         }		
 		
-		*(osc->getSocketFD())=socket_fd;
+	*(osc->getSocketFD())=socket_fd;
 		
-		// setup client struct.
-		struct sockaddr_in* osc_client_address = osc->getClientAddress();
-		*(osc->getClientAddressSize())=sizeof(*osc_client_address);
+	// setup client struct.
+	struct sockaddr_in* osc_client_address = osc->getClientAddress();
+	*(osc->getClientAddressSize())=sizeof(*osc_client_address);
 		
-		// setup sending socket
+	// setup sending socket
 //		int client_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 //		if (client_fd == -1) {
 //			return _sc->F;			
 //		}
 //		osc->setSendFD(client_fd);
 						
-		if(!osc->getStarted()) {
-			std::cout << "STARTING THREAD" << std::endl;
-			osc->getThread().create(&osc_mesg_callback, osc);
-			osc->setStarted(true);
-		}
-		osc->sc = _sc;
-		return _sc->NIL;
+	if(!osc->getStarted()) {
+	    std::cout << "STARTING THREAD" << std::endl;
+	    osc->getThread().create(&osc_mesg_callback, osc);
+	    osc->setStarted(true);
 	}
+	osc->sc = _sc;
+	return _sc->NIL;
+    }
 } //End Namespace
 

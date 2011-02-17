@@ -109,8 +109,8 @@ namespace extemp
         return result;
     }
 
-	bool EXTMonitor::isOwnedByCurrentThread()
-	{
-		mutex.isOwnedByCurrentThread();	
-	}
+    bool EXTMonitor::isOwnedByCurrentThread()
+    {
+	mutex.isOwnedByCurrentThread();	
+    }
 }

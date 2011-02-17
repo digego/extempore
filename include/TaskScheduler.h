@@ -45,10 +45,10 @@
 
 namespace extemp {
 
-class EXTMonitor;
+    class EXTMonitor;
 
-class TaskScheduler {
-public:
+    class TaskScheduler {
+    public:
 	TaskScheduler();
 	~TaskScheduler() {};
 	
@@ -61,9 +61,9 @@ public:
 	template<typename T>
 	static void addTask(uint64_t _startTime, uint64_t _duration, CM* _classMember, T _arg, int _tag, bool callback)
 	{
-		Task<T>* task = new Task<T>(_startTime,_duration,_classMember,_arg,_tag);
-		task->isCallback(callback);
-		I()->add(task);
+	    Task<T>* task = new Task<T>(_startTime,_duration,_classMember,_arg,_tag);
+	    task->isCallback(callback);
+	    I()->add(task);
 	};	
 	
 	// for pulling ready tasks from the task queue
@@ -72,14 +72,14 @@ public:
 	EXTMonitor* getGuard() { return guard; }
 	static void* queue_thread_callback(void* p_obj);
 
-private:
+    private:
 	PriorityQueue<uint64_t, TaskI*> queue;
 	//CAPThread* queueThread;
 	//CAGuard* guard;
 	EXTThread* queueThread;
 	EXTMonitor* guard;
 	static TaskScheduler SINGLETON;
-};
+    };
 
 } //End Namespace
 #endif

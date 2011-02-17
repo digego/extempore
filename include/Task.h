@@ -43,51 +43,51 @@
 
 namespace extemp {
 	
-	class TaskI {
-	public:
-		virtual ~TaskI() {} //responsibility for cleanup of classMember is outside of task
-		long long int getStartTime() const { return this->startTime; }
-		long long int getDuration() const { return this->duration; }		
-        void setStartTime(long long int _startTime) { this->startTime = _startTime; }
-        bool isActive() { return this->active; }
-		bool isCallback() { return this->is_callback; }
-		void isCallback(bool _callback) { this->is_callback = _callback; } 
-		virtual void execute() { classMember->execute(this); }
-		virtual void deleteArg() = 0;
-		bool equal(TaskI* t)
-        {
-            if(t->getStartTime() != startTime) { std::cout << "Failed Time Equality Test" << std::endl; return false; }
-			if(t->getTag() != tag) { std::cout << "Failed Tag Equality Test" << std::endl; return false; }
-            return true;
-        }
-		virtual int getTag() { return this->tag; }
-				
-	protected:
-		TaskI(long long int _startTime, long long int _duration, CM* _classMember, int _tag/*std::string _label*/) : startTime(_startTime), duration(_duration), active(true), is_callback(false), is_aumidi(false), classMember(_classMember), tag(_tag) {} //label(_label) {}				
-		
-	private:
-        long long int startTime;
-		long long int duration;
-        bool active;
-		bool is_callback;
-		bool is_aumidi;
-		int tag;
-        CM* classMember; 
-	};
-
-	template<typename T = int>
-	class Task : public TaskI {
+    class TaskI {
     public:
-        Task(long long int _startTime, long long int _duration, CM* _classMember, T _arg, int _tag=0/*std::string _label = "default"*/) : 
-			TaskI(_startTime, _duration, _classMember, _tag), //_label),
-            arg(_arg)            		
-        {}
+	virtual ~TaskI() {} //responsibility for cleanup of classMember is outside of task
+	long long int getStartTime() const { return this->startTime; }
+	long long int getDuration() const { return this->duration; }		
+	void setStartTime(long long int _startTime) { this->startTime = _startTime; }
+	bool isActive() { return this->active; }
+	bool isCallback() { return this->is_callback; }
+	void isCallback(bool _callback) { this->is_callback = _callback; } 
+	virtual void execute() { classMember->execute(this); }
+	virtual void deleteArg() = 0;
+	bool equal(TaskI* t)
+	{
+	    if(t->getStartTime() != startTime) { std::cout << "Failed Time Equality Test" << std::endl; return false; }
+	    if(t->getTag() != tag) { std::cout << "Failed Tag Equality Test" << std::endl; return false; }
+	    return true;
+	}
+	virtual int getTag() { return this->tag; }
+				
+    protected:
+	TaskI(long long int _startTime, long long int _duration, CM* _classMember, int _tag/*std::string _label*/) : startTime(_startTime), duration(_duration), active(true), is_callback(false), is_aumidi(false), classMember(_classMember), tag(_tag) {} //label(_label) {}				
+		
+    private:
+	long long int startTime;
+	long long int duration;
+	bool active;
+	bool is_callback;
+	bool is_aumidi;
+	int tag;
+	CM* classMember; 
+    };
 
-		void deleteArg() { delete arg; }
-        T getArg() { return this->arg; }
+    template<typename T = int>
+    class Task : public TaskI {
+    public:
+	Task(long long int _startTime, long long int _duration, CM* _classMember, T _arg, int _tag=0/*std::string _label = "default"*/) : 
+	    TaskI(_startTime, _duration, _classMember, _tag), //_label),
+	    arg(_arg)            		
+	{}
+
+	void deleteArg() { delete arg; }
+	T getArg() { return this->arg; }
 
     private:
-        T arg; //responsibility for cleanup of arg is outside task
+	T arg; //responsibility for cleanup of arg is outside task
     };
 
 } //End Namespace

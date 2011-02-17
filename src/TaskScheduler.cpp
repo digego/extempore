@@ -37,56 +37,56 @@
 
 namespace extemp {
 	
-	TaskScheduler TaskScheduler::SINGLETON;
+    TaskScheduler TaskScheduler::SINGLETON;
 	
-	TaskScheduler::TaskScheduler()
-	{
-		queueThread = new EXTThread();
-		guard = new EXTMonitor("task_scheduler_guard");		
-		queueThread->create(TaskScheduler::queue_thread_callback, this);
-		guard->init();
-		//std::cout << "QUEUE THREAD " << queueThread->getPthread() << std::endl;
-	}
+    TaskScheduler::TaskScheduler()
+    {
+	queueThread = new EXTThread();
+	guard = new EXTMonitor("task_scheduler_guard");		
+	queueThread->create(TaskScheduler::queue_thread_callback, this);
+	guard->init();
+	//std::cout << "QUEUE THREAD " << queueThread->getPthread() << std::endl;
+    }
 		
-	void TaskScheduler::timeSlice() //(const long timestamp, const int frames)
-	{
-		//lock the queue for this thread only
-		queue.lock();
+    void TaskScheduler::timeSlice() //(const long timestamp, const int frames)
+    {
+	//lock the queue for this thread only
+	queue.lock();
 
-		// if(clearFlag) {
-		// 	queue.clear();
-		// 	clearFlag = false;
-		// }
-		TaskI* t = queue.peek();
+	// if(clearFlag) {
+	// 	queue.clear();
+	// 	clearFlag = false;
+	// }
+	TaskI* t = queue.peek();
 
-		// this is a task we need to do something with
-		while(t != NULL && (t->getStartTime() < (UNIV::TIME + UNIV::FRAMES))) {
-			t = queue.get();
-			try{
-				if(t->getTag() == 0) t->execute();
-			}catch(...){
-				std::cout << "Error executing scheduled task!" << std::endl;
-			}
-			delete t;
-			t = queue.peek();
-		}
-
-		//unlock queue for this thread
-		queue.unlock();
-	}	
-
-	//realtime thread for handling all scheduled tasks
-	void* TaskScheduler::queue_thread_callback(void* obj_p)
-	{
-		TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);					
-		EXTMonitor* guard = sched->getGuard();
-		while(true) {
-			guard->lock();			
-			sched->timeSlice();		
-			guard->wait();
-			guard->unlock();
-		}
-		return obj_p;
+	// this is a task we need to do something with
+	while(t != NULL && (t->getStartTime() < (UNIV::TIME + UNIV::FRAMES))) {
+	    t = queue.get();
+	    try{
+		if(t->getTag() == 0) t->execute();
+	    }catch(...){
+		std::cout << "Error executing scheduled task!" << std::endl;
+	    }
+	    delete t;
+	    t = queue.peek();
 	}
+
+	//unlock queue for this thread
+	queue.unlock();
+    }	
+
+    //realtime thread for handling all scheduled tasks
+    void* TaskScheduler::queue_thread_callback(void* obj_p)
+    {
+	TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);					
+	EXTMonitor* guard = sched->getGuard();
+	while(true) {
+	    guard->lock();			
+	    sched->timeSlice();		
+	    guard->wait();
+	    guard->unlock();
+	}
+	return obj_p;
+    }
 
 } // End Namespace

@@ -39,10 +39,10 @@
 #include "Scheme.h"
 
 typedef struct _llvm_zone_t {
-	void* memory;
-	uint64_t offset;
-        uint64_t mark;
-	uint64_t size;
+    void* memory;
+    uint64_t offset;
+    uint64_t mark;
+    uint64_t size;
 } llvm_zone_t;
 
 llvm_zone_t* llvm_zone_create(uint64_t size);
@@ -58,33 +58,33 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
 
 
 namespace llvm {
-	class Module;
-	class ModuleProvider;
-	class ExecutionEngine;
-	class PassManager;
+    class Module;
+    class ModuleProvider;
+    class ExecutionEngine;
+    class PassManager;
 } // end llvm namespace
 
 namespace extemp {
 
-	class EXTLLVM {
-	public:
-		EXTLLVM();
-		~EXTLLVM();
-		static EXTLLVM* I() { return &SINGLETON; }	
+    class EXTLLVM {
+    public:
+	EXTLLVM();
+	~EXTLLVM();
+	static EXTLLVM* I() { return &SINGLETON; }	
 	
-		void initLLVM();
+	void initLLVM();
 	
-		static int64_t LLVM_COUNT;
-		static bool OPTIMIZE_COMPILES;	
+	static int64_t LLVM_COUNT;
+	static bool OPTIMIZE_COMPILES;	
 		
-		llvm::Module* M;
-		llvm::ModuleProvider* MP;
-		llvm::ExecutionEngine* EE;
-		llvm::PassManager* PM;		
+	llvm::Module* M;
+	llvm::ModuleProvider* MP;
+	llvm::ExecutionEngine* EE;
+	llvm::PassManager* PM;		
 
-	private:
-		static EXTLLVM SINGLETON;
-	};
+    private:
+	static EXTLLVM SINGLETON;
+    };
 
 } // end extemp namespace
 

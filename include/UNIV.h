@@ -61,34 +61,34 @@ namespace extemp {
 
 //#define mk_cb(instance,class,func) (dynamic_cast<CM*>(new CMI<class>(instance,&class::func)))
     
-typedef float AUDIOSAMPLE;
+    typedef float AUDIOSAMPLE;
     
-class UNIV {
+    class UNIV {
 
 #define EIGHT_BIT 127
 #define SIXTEEN_BIT 32767
 #define TWENTY_FOUR_BIT 8388608
 #define THIRTY_TWO_BIT 214748647
     
-public:
-    static uint32_t CHANNELS;
-    static uint32_t SAMPLERATE;
-    static uint64_t TIME;
-    static uint32_t HOUR;
-    static uint32_t MINUTE;
-    static uint32_t SECOND;
-    static uint32_t FRAMES;
+    public:
+	static uint32_t CHANNELS;
+	static uint32_t SAMPLERATE;
+	static uint64_t TIME;
+	static uint32_t HOUR;
+	static uint32_t MINUTE;
+	static uint32_t SECOND;
+	static uint32_t FRAMES;
 	static const char* PWD;
 
-    static double midi2frq(double pitch);
+	static double midi2frq(double pitch);
 	static double frqRatio(double semitones);
-    static void initRand();
-    static int random(int range);
-    static double random();
+	static void initRand();
+	static int random(int range);
+	static double random();
 	static bool file_check(const std::string& filename);	
-    static void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
+	static void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
 	
-};
+    };
 
 } //End Namespace
 #endif

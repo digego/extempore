@@ -41,28 +41,28 @@
 
 namespace extemp
 {
-	class EXTThread
-	{
-		public:
-			EXTThread();
-			~EXTThread();
+    class EXTThread
+    {
+    public:
+	EXTThread();
+	~EXTThread();
 
-			int create(void *(*start_routine)(void *), void *arg);
-			int detach();
-			int join();
-			int cancel();
-			bool isRunning();
-			bool isCurrentThread();
-			pthread_t getPthread();
+	int create(void *(*start_routine)(void *), void *arg);
+	int detach();
+	int join();
+	int cancel();
+	bool isRunning();
+	bool isCurrentThread();
+	pthread_t getPthread();
 
-		protected:
-			bool initialised;
-			bool detached;
-			bool joined;
-			bool cancelled;			
+    protected:
+	bool initialised;
+	bool detached;
+	bool joined;
+	bool cancelled;			
 
-			pthread_t pthread;
-	};
+	pthread_t pthread;
+    };
 } //End Namespace
 
 #endif

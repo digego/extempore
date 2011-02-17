@@ -173,12 +173,12 @@ typedef void (*func_dealloc)(void *);
 typedef struct num {
     int num_type;
     union {
-        long long ivalue;
-        double rvalue;
-		struct {
-			long long n;
-			long long d;
-		} ratvalue;		
+	long long ivalue;
+	double rvalue;
+	struct {
+	    long long n;
+	    long long d;
+	} ratvalue;		
     } value;
 } num;
 

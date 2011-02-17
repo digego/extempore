@@ -58,7 +58,7 @@ namespace extemp
     }
     
 
-   int EXTCondition::init()
+    int EXTCondition::init()
     {
         int result = pthread_cond_init(&pthread_cond, NULL);
         initialised = ! result;

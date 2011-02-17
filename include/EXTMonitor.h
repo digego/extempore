@@ -47,25 +47,25 @@ namespace extemp
     class EXTMonitor
     {
     public:
-        EXTMonitor(std::string name);
-        ~EXTMonitor();
+	EXTMonitor(std::string name);
+	~EXTMonitor();
 
-        void init();
-        void destroy();
+	void init();
+	void destroy();
 
-		bool isOwnedByCurrentThread();
+	bool isOwnedByCurrentThread();
         
-        int lock();
-        int unlock();
+	int lock();
+	int unlock();
 
-        int wait();
-        int signal();
+	int wait();
+	int signal();
         
     protected:
-        bool initialised;
-		std::string name;
-        EXTMutex mutex;
-        EXTCondition condition;
+	bool initialised;
+	std::string name;
+	EXTMutex mutex;
+	EXTCondition condition;
     };
 } //End Namespace
 

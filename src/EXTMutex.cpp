@@ -56,10 +56,10 @@ namespace extemp
     }
     
 
-   int EXTMutex::init()
+    int EXTMutex::init()
     {
         pthread_mutexattr_t pthread_mutex_attr;
-	    pthread_mutexattr_init(&pthread_mutex_attr);
+	pthread_mutexattr_init(&pthread_mutex_attr);
      
 #ifdef _EXTMUTEX_DEBUG_
         pthread_mutexattr_settype(&pthread_mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
@@ -68,9 +68,9 @@ namespace extemp
 #endif
 
 #if EXT_MUTEX_RECURSIVE
-		pthread_mutexattr_settype(&pthread_mutex_attr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutexattr_settype(&pthread_mutex_attr, PTHREAD_MUTEX_RECURSIVE);
 #endif
-		int result = pthread_mutex_init(&pthread_mutex, &pthread_mutex_attr);
+	int result = pthread_mutex_init(&pthread_mutex, &pthread_mutex_attr);
         initialised = ! result;
 
 #ifdef _EXTMUTEX_DEBUG_
@@ -103,74 +103,74 @@ namespace extemp
     }
 
 
-bool EXTMutex::isOwnedByCurrentThread()
-{
+    bool EXTMutex::isOwnedByCurrentThread()
+    {
 	return pthread_equal(pthread_self(), owner);
-}
+    }
 
 
 #if EXT_MUTEX_RECURSIVE
     int EXTMutex::unlock()
     {
-		int result = pthread_mutex_unlock(&pthread_mutex);
+	int result = pthread_mutex_unlock(&pthread_mutex);
 #ifdef _EXTMUTEX_DEBUG_
         if (result)
         {
             std::cerr << "Error unlocking mutex: " << name << " err: " << result << std::endl;
         }
 #endif
-		return result;
-	}
+	return result;
+    }
 	
-	int EXTMutex::lock()
-	{
-		int result = pthread_mutex_lock(&pthread_mutex);
+    int EXTMutex::lock()
+    {
+	int result = pthread_mutex_lock(&pthread_mutex);
 #ifdef _EXTMUTEX_DEBUG_
         if (result)
         {
             std::cerr << "Error locking mutex: " << name << " err: " << result << std::endl;
         }
 #endif
-		return true;		
-	}
+	return true;		
+    }
 #else
     int EXTMutex::lock()
     {
-		pthread_t current = pthread_self();
-		if(!pthread_equal(current,owner)) {
-	        int result = pthread_mutex_lock(&pthread_mutex);
-			if(result==0) owner = current; 
+	pthread_t current = pthread_self();
+	if(!pthread_equal(current,owner)) {
+	    int result = pthread_mutex_lock(&pthread_mutex);
+	    if(result==0) owner = current; 
 #ifdef _EXTMUTEX_DEBUG_
-	        if (result)
-	        {
-	            std::cerr << "Error locking mutex: " << name << " err: " << result << std::endl;
-	        }
+	    if (result)
+	    {
+		std::cerr << "Error locking mutex: " << name << " err: " << result << std::endl;
+	    }
 #endif
-	        return true;
-		}else{
-			return false;
-		}
+	    return true;
+	}else{
+	    return false;
+	}
     }
 	
-	int EXTMutex::unlock()
+    int EXTMutex::unlock()
+    {
+	if(pthread_equal(pthread_self(),owner)) 
 	{
-		if(pthread_equal(pthread_self(),owner)) 
-		{
-			owner = 0;
-	        int result = pthread_mutex_unlock(&pthread_mutex);
+	    owner = 0;
+	    int result = pthread_mutex_unlock(&pthread_mutex);
 #ifdef _EXTMUTEX_DEBUG_
-	        if (result)
-	        {
-	            std::cerr << "Error unlocking mutex: " << name << " err: " << result << std::endl;
-	        }
+	    if (result)
+	    {
+		std::cerr << "Error unlocking mutex: " << name << " err: " << result << std::endl;
+	    }
 #endif
-	        return result;
-		}else{
-			std::cerr << "Error attempting to unlock a mutex from a thread which does not own it!: " << name << std::endl << std::flush;
-			std::cerr << "Caller(" << pthread_self() << ")  Owner(" << owner << ")" << " " << this << std::endl << std::flush;
-			std::cerr << "Either track this down or change EXTMutex to be reursive! (i.e. set EXT_MUTEX_RECURSIVE=1)" << std::endl << std::flush;
-			exit(1);
-		}
+	    return result;
+	}else{
+	    std::cerr << "Error attempting to unlock a mutex from a thread which does not own it!: " << name << std::endl << std::flush;
+	    std::cerr << "Caller(" << pthread_self() << ")  Owner(" << owner << ")" << " " << this << std::endl << std::flush;
+	    std::cerr << "Either track this down or change EXTMutex to be reursive! (i.e. set EXT_MUTEX_RECURSIVE=1)" << std::endl << std::flush;
+	    exit(1);
+	}
     }
 
 #endif	

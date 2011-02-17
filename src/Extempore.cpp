@@ -48,48 +48,48 @@
 
 int main(int argv, char** args)
 {
-	if(argv<2) {
-		printf("Must include inital path to read libs from\n");
-		return -1;
-	}
+    if(argv<2) {
+	printf("Must include inital path to read libs from\n");
+	return -1;
+    }
 	
-	bool with_banner = 0;
+    bool with_banner = 0;
 	
-	if(argv>2) {
-	    with_banner = 1;
-	}
+    if(argv>2) {
+	with_banner = 1;
+    }
 	
 #ifdef TARGET_OS_LINUX
-	glutInit(&argv,args);
+    glutInit(&argv,args);
 #endif
 
-	std::string host("localhost");
-	std::string primary_name("primary");
-	std::string utility_name("utility");
-	int primary_port = 7099;
-	int utility_port = 7098;
+    std::string host("localhost");
+    std::string primary_name("primary");
+    std::string utility_name("utility");
+    int primary_port = 7099;
+    int utility_port = 7098;
 	
 
-	extemp::UNIV::PWD = args[1];
-	extemp::EXTLLVM::I()->initLLVM();
-	extemp::SchemeProcess* primary = new extemp::SchemeProcess(std::string(args[1]), primary_name, primary_port, with_banner);
-	extemp::SchemeProcess* utility = new extemp::SchemeProcess(std::string(args[1]), utility_name, utility_port, 0);
-	extemp::AudioDevice* dev = extemp::AudioDevice::I();
+    extemp::UNIV::PWD = args[1];
+    extemp::EXTLLVM::I()->initLLVM();
+    extemp::SchemeProcess* primary = new extemp::SchemeProcess(std::string(args[1]), primary_name, primary_port, with_banner);
+    extemp::SchemeProcess* utility = new extemp::SchemeProcess(std::string(args[1]), utility_name, utility_port, 0);
+    extemp::AudioDevice* dev = extemp::AudioDevice::I();
 
-	primary->start();
-	utility->start();
-	dev->start();
+    primary->start();
+    utility->start();
+    dev->start();
 
-	extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name);
-	primary_repl->connectToProcessAtHostname(host,primary_port);
-	extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
-        utility_repl->connectToProcessAtHostname(host,utility_port);
+    extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name);
+    primary_repl->connectToProcessAtHostname(host,primary_port);
+    extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
+    utility_repl->connectToProcessAtHostname(host,utility_port);
 	
-	// sleep indefiniately let server process do the work
-	while(1) {
-	    // put printf here as a reminder that something is happending
-	    printf("PING: %lld\n",extemp::UNIV::TIME);
-	    sleep(5000);
-	}
-	return 0;
+    // sleep indefiniately let server process do the work
+    while(1) {
+	// put printf here as a reminder that something is happending
+	printf("PING: %lld\n",extemp::UNIV::TIME);
+	sleep(5000);
+    }
+    return 0;
 }
