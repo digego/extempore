@@ -59,9 +59,10 @@
 ;; type signature.
 ;; 
 ;; So we CANNOT do this
-(definec my-test-1
-   (lambda (a)
-      (/ a 5.0)))
+
+;(definec my-test-1
+;   (lambda (a)
+;      (/ a 5.0)))
 
 ;; Just remember that you are not currently allowed to redefine an 
 ;; existing function to a new definition that requres a different type signature.  
@@ -106,11 +107,12 @@
 ;; a type for my-inc-maker!
 ;;
 ;; THIS WILL CAUSE AN ERROR!
-(definec my-inc-maker
-  (lambda (i)
-    (lambda (inc)
-      (set! i (+ i inc))
-      i)))
+
+;(definec my-inc-maker
+;  (lambda (i)
+;    (lambda (inc)
+;      (set! i (+ i inc))
+;      i)))
 
 ;; This makes sense should "+" operate
 ;; on doubles or integers - who knows?
@@ -162,9 +164,10 @@
 ;; f is our incoming closure
 ;; and x is our operand
 ;; THIS WILL CAUSE AN ERROR
-(definec my-inc-maker-wrappert
-   (lambda (f x) ; f and x are args
-      (f x)))
+
+;(definec my-inc-maker-wrappert
+;   (lambda (f x) ; f and x are args
+;      (f x)))
 
 ;; oops can't resolve the type of "f"
 ;; fair enough really.
@@ -172,9 +175,10 @@
 ;; we still can't tell what "f"'s
 ;; return type should be?
 ;; This also causes an error!
-(definec my-inc-maker-wrappert
-   (lambda (f x:i64) ; f and x are args
-      (f x)))
+
+;(definec my-inc-maker-wrappert
+;   (lambda (f x:i64) ; f and x are args
+;      (f x)))
 
 ;; so we need to type f properly
 (definec my-inc-maker-wrapper
@@ -442,4 +446,4 @@
       (f.a:i32 7)
       (f))))
 
-(my-test17) ;; 21
+(println (my-test17)) ;; 21
