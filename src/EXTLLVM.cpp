@@ -69,16 +69,28 @@
 
 #include "SchemeProcess.h"
 
+// this must be global. we should therefore
+// make it thread safe but I'm not going to bother
+// while still testing.
+std::map<void*,uint64_t> LLVM_ZONE_ALLOC_MAP;
+
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
 	llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
 	zone->memory = malloc((size_t) size);
+	zone->mark = 0;
 	zone->offset = 0;
 	zone->size = size;
 	//printf("CreateZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
 	return zone;
 }
 
+llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone)
+{
+	zone->offset = 0;
+    return zone;
+}
+ 
 void llvm_zone_destroy(llvm_zone_t* zone)
 {
 	//printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);	
@@ -89,17 +101,59 @@ void llvm_zone_destroy(llvm_zone_t* zone)
 
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
-	//printf("MallocZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
+		//printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
 	if(zone->offset+size >= zone->size)
 	{
 		// for the moment print a warning and just leak the memory
-		printf("Zone full ... leaking %lld bytes\n",size);
+		printf("Zone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
+		//exit(1);
 		return malloc((size_t)size);
 	}
 	void* newptr = (void*)(((char*)zone->memory)+zone->offset);
 	zone->offset += size; 
+	// add ptr size to alloc map
+	LLVM_ZONE_ALLOC_MAP[newptr] = size;
+    //extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_set_size(newptr, size);
 	return newptr;
 }
+
+void llvm_zone_mark(llvm_zone_t* zone)
+{
+		zone->mark = zone->offset;
+}
+
+uint64_t llvm_zone_mark_size(llvm_zone_t* zone)
+{
+		return zone->offset - zone->mark;
+}
+
+void llvm_zone_ptr_set_size(void* ptr, uint64_t size)
+{
+		LLVM_ZONE_ALLOC_MAP[ptr] = size;
+		//printf("set ptr: %p  to size: %lld\n",ptr,size);
+		return;
+}
+
+uint64_t llvm_zone_ptr_size(void* ptr)
+{
+		// return ptr size from alloc map
+		return LLVM_ZONE_ALLOC_MAP[ptr];
+		//return extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_get_size(ptr);
+}
+
+void llvm_zone_copy_ptr(void* ptr1, void* ptr2)
+{
+		uint64_t size1 = llvm_zone_ptr_size(ptr1);
+		uint64_t size2 = llvm_zone_ptr_size(ptr2);
+		if(size1 != size2) { 
+				printf("Bad LLVM ptr copy - size mismatch %p:%p %lld:%lld\n",ptr1,ptr2,size1,size2); 
+				exit(1);
+		}
+		//printf("%p,%p,%lld\n",ptr2,ptr1,size1);
+		memcpy(ptr2, ptr1, size1);
+		return;		
+}
+
 
 extemp::CM* DestroyMallocZoneWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay)
@@ -187,12 +241,12 @@ void llvm_print_f64(double num)
 
 int64_t llvm_now()
 {
-    return extemp::UNIV::TIME;
+	return extemp::UNIV::TIME;
 }
 
 double llvm_samplerate()
 {
-    return (double) extemp::UNIV::SAMPLERATE;
+	return (double) extemp::UNIV::SAMPLERATE;
 }
 
 ///////////////////////////////////
@@ -204,7 +258,7 @@ struct closure_address_table
 {
 	char* name;
 	uint32_t offset;
-	char* type;
+	char* type;		
 	struct closure_address_table* next;
 };
 
@@ -237,10 +291,10 @@ struct closure_address_table* new_address_table()
 {
 	return 0; // NULL for empty table
 }
-
-struct closure_address_table* add_address_table(char* name, uint32_t offset, char* type, struct closure_address_table* table)
+ 
+struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, struct closure_address_table* table)
 {	
-	struct closure_address_table* t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
+	struct closure_address_table* t = (struct closure_address_table*) llvm_zone_malloc(zone,sizeof(struct closure_address_table));
 	t->name = name;
 	t->offset = offset;
 	t->type = type;
@@ -274,11 +328,11 @@ namespace extemp {
 			M = new llvm::Module("JIT",llvm::getGlobalContext());
 			// Create the JIT.
 			std::string ErrStr;
-		  	EE = llvm::EngineBuilder(M).setErrorStr(&ErrStr).create();
-		  	if (!EE) {
-		    	fprintf(stderr, "Could not create ExecutionEngine: %s\n", ErrStr.c_str());
-		    	exit(1);
-		  	}
+			EE = llvm::EngineBuilder(M).setErrorStr(&ErrStr).create();
+			if (!EE) {
+				fprintf(stderr, "Could not create ExecutionEngine: %s\n", ErrStr.c_str());
+				exit(1);
+			}
 			
 			//EE = llvm::EngineBuilder(M).create();
 			PM = new llvm::PassManager();
@@ -365,8 +419,20 @@ namespace extemp {
 			EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
 			gv = M->getNamedValue(std::string("llvm_now"));
 			EE->updateGlobalMapping(gv,(void*)&llvm_now);
+			gv = M->getNamedValue(std::string("llvm_zone_reset"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_zone_reset);
+			gv = M->getNamedValue(std::string("llvm_zone_copy_ptr"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_zone_copy_ptr);
+			gv = M->getNamedValue(std::string("llvm_zone_mark"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_zone_mark);
+			gv = M->getNamedValue(std::string("llvm_zone_mark_size"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_zone_mark_size);
+			gv = M->getNamedValue(std::string("llvm_zone_ptr_set_size"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_set_size);
+			gv = M->getNamedValue(std::string("llvm_zone_ptr_size"));
+			EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_size);
 			
 		}	
-	 	return;
+		return;
 	}
 }

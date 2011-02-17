@@ -41,11 +41,18 @@
 typedef struct _llvm_zone_t {
 	void* memory;
 	uint64_t offset;
+        uint64_t mark;
 	uint64_t size;
 } llvm_zone_t;
 
 llvm_zone_t* llvm_zone_create(uint64_t size);
+llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone);
+void llvm_zone_copy_ptr(void* ptr1, void* ptr2);
 llvm_zone_t* llvm_zone_default();
+void llvm_zone_mark(llvm_zone_t* zone);
+uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
+void llvm_zone_ptr_set_size(void* ptr, uint64_t size);
+uint64_t llvm_zone_ptr_size(void* ptr);
 void llvm_zone_destroy(llvm_zone_t* zone);
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
 

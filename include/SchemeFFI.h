@@ -110,6 +110,7 @@ namespace extemp {
 	void destroyMallocZoneWithDelay(TaskI* task);
 	static pointer createMallocZone(scheme* _sc, pointer args);
 	static pointer defaultMallocZone(scheme* _sc, pointer args);
+	static pointer resetMallocZone(scheme* _sc, pointer args);
 	static pointer destroyMallocZone(scheme* _sc, pointer args);
 	static pointer copyToDefaultZone(scheme* _sc, pointer args);
 			

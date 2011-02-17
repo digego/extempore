@@ -174,6 +174,7 @@ namespace extemp {
 		{ "sys:default-mzone",		&SchemeFFI::defaultMallocZone },
 		{ "sys:destroy-mzone",		&SchemeFFI::destroyMallocZone },
 		{ "sys:copy-to-dmzone",		&SchemeFFI::copyToDefaultZone },
+		{ "sys:reset-mzone",		&SchemeFFI::resetMallocZone },
 
 		// misc stuff
 		{ "string-strip",		&SchemeFFI::stringStrip },
@@ -1095,6 +1096,13 @@ namespace extemp {
     {		
 	llvm_zone_t* ptr = (llvm_zone_t*) cptr_value(pair_car(args));
 	llvm_zone_destroy(ptr);
+	return _sc->T;
+    }
+
+  pointer SchemeFFI::resetMallocZone(scheme* _sc, pointer args)
+    {		
+	llvm_zone_t* zone = (llvm_zone_t*) cptr_value(pair_car(args));
+	llvm_zone_reset(zone);
 	return _sc->T;
     }
 

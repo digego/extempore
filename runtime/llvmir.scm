@@ -457,7 +457,7 @@
 ;; for a particular closure
 (define impc:ir:compile:make-closureenv
    (lambda (ast types)
-      ;(print 'make-closure-env 'ast: ast 'types: types)
+      ;(println 'make-closure-env 'ast: ast 'types: types)
       (let* ((os2 (make-string 0))
              (os1 (make-string 0))
              (name (list-ref ast 1)) 
@@ -471,11 +471,12 @@
          (define closure-struct-str
             (string-append "<{ i8*, i8*, " func-type-str "*}>"))
          
+	 (emit "call void @llvm_zone_mark(%mzone* %_zone)\n" os2)
          ;; malloc closure structure
          (emit "; malloc closure structure\n" os2)
          (define cstruct closure-struct-str)
          (emit (impc:ir:gname "val" "i8*") " = getelementptr " cstruct "* null, i32 1\n" os2)
-         (emit (impc:ir:gname "size" "i64") " = ptrtoint " cstruct "* " (car (impc:ir:gname 1)) " to i64\n" os2)         
+         (emit (impc:ir:gname "size" "i64") " = ptrtoint " cstruct "* " (car (impc:ir:gname 1)) " to i64\n" os2)
          (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
 	       "%mzone* %_zone, i64 " (car (impc:ir:gname "size")) ")\n" os2)         
          (emit (impc:ir:gname "closure" (string-append cstruct "*")) 
@@ -508,6 +509,7 @@
                (emit type-str os2)
                (emit (impc:ir:gname "addytable" "%clsvar*") 
 		     " = call %clsvar* @add_address_table("
+		     "%mzone* %_zone, "
 		     (cadr name) " " (car name) ", "
 		     "i32 " (number->string ptridx) ", "
 		     (cadr type) " " (car type) ", "
@@ -580,6 +582,13 @@
 	       ", i32 0, i32 2\n" os2)
          (emit "store " func-type-str "* @" name ", " func-type-str "** " (car (impc:ir:gname)) "\n" os2)
          (impc:ir:gname "closure" (car (impc:ir:gname "closure")) (cadr (impc:ir:gname "closure")))
+	 
+	 ;; force set size of clsptr to the complete size of the closure!
+	 ;; this allows us to easily copy the entire closure
+	 (emit (impc:ir:gname "closure_size" "i64") " = call i64 @llvm_zone_mark_size(%mzone* %_zone)\n" os2)
+	 (emit "call void @llvm_zone_ptr_set_size(i8* " (car (impc:ir:gname "clsptr")) ", i64 " (car (impc:ir:gname)) ")\n" os2)
+
+	 (impc:ir:gname "closure" (car (impc:ir:gname "closure")) (cadr (impc:ir:gname "closure")))
          (cons (impc:ir:strip-space os2)
                (impc:ir:strip-space os1)))))
 			   
@@ -815,6 +824,7 @@
 ;; usage:
 ;; (gname [previous name]) ;; find distance to this
 ;; (gname "fred" type) ;; set current name
+;; (gname "fred" "%fredxxx" type) ;; set current
 ;; (gname) ;; get current name
 ;; (gname 2) ;; get name 2 previous
 ;; (gname -2) ;; revert to name 2 previous
@@ -980,10 +990,44 @@
       (let* ((os (make-string 0))
              (s2 (impc:ir:compiler (caddr ast) types))
              (vv (impc:ir:gname)))
-         (emit s2 os)
+         (emit s2 os)	 	 
          (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" 
-                                 (symbol->string (cadr ast)) "Ptr\n") os)
+			      (symbol->string (cadr ast)) "Ptr\n") os)
          (impc:ir:strip-space os))))          
+
+
+;; new compiler set copies pointers
+;; this currently DOESN'T work for closures
+(define impc:ir:compiler:set!
+   (lambda (ast types)
+      (let* ((os (make-string 0))
+             (s2 (impc:ir:compiler (caddr ast) types))
+             (vv (impc:ir:gname))
+	     (type (impc:ir:get-type-from-str (cadr vv))))
+         (emit s2 os)	 	 
+	 (if (not (impc:ir:pointer? type)) ;; if this is a fixed pointer value
+	     (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" 
+				  (symbol->string (cadr ast)) "Ptr\n") os)
+	     (if (impc:ir:closure? type) 
+		 ;; unforunately closures just leak at the moment :(
+		 ;; this is due to the fact that it's nearly impossible for closures to be the
+		 ;; same size. therefore we can't just swap memory in place.
+		 ;; until I come up with a solution I'm just going to malloc outside of any zone
+		 ;; in other words we're just leaking here!
+		 ;; Remember that this leak only happens if someone tries to set! a closure
+		 (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr vv) " " (car vv) " to i8*\n"
+		       (impc:ir:gname "ptr_size" "i64") " = call i64 @llvm_zone_ptr_size(i8* " (car (impc:ir:gname 1)) ")\n"
+		       (impc:ir:gname "new_mem" "i8*") " = call i8* @malloc(i64 " (car (impc:ir:gname 1)) ")\n" 
+		       "call i8* @memcpy(i8* " (car (impc:ir:gname "new_mem")) ", i8* " (car (impc:ir:gname "ptr_one")) ", i64 " (car (impc:ir:gname "ptr_size")) ")\n"
+		       (impc:ir:gname "new_cls" (cadr vv)) " = bitcast i8* " (car (impc:ir:gname 1)) " to " (cadr vv) "\n"
+		       "store " (cadr vv) " " (car (impc:ir:gname "new_cls")) ", " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n" os)
+		 ;; all other pointers (i.e. tuples and arrays) get copied into the existing closure environment
+		 (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr vv) " " (car vv) " to i8*\n"
+		       (impc:ir:gname "pload" (cadr vv)) " = load " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n"		   
+		       (impc:ir:gname "ptr_two" "i8*") " = bitcast " (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1)) " to i8*\n"
+		       "call void @llvm_zone_copy_ptr(i8* " (car (impc:ir:gname "ptr_one")) ", i8* "
+		       (car (impc:ir:gname "ptr_two")) ")\n" os)))
+	 (impc:ir:strip-space os))))
 
 
 (define impc:ir:compiler:make-array
@@ -1021,12 +1065,17 @@
              (index-str (impc:ir:compiler (caddr ast) types))
              (idx (impc:ir:gname))
              (var-str (impc:ir:compiler (cadr ast) types))
-             (var (impc:ir:gname)))
+             (var (impc:ir:gname))
+	     (ttype (impc:ir:get-type-from-str (cadr var))))
          ;; type tests
-         (if (not (impc:ir:pointer? (impc:ir:get-type-from-str (cadr var))))
+         (if (not (impc:ir:pointer? ttype))
+             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
+	 (if (and (= 1.0 (impc:ir:get-ptr-depth ttype))
+		  (or (impc:ir:closure? ttype)
+		      (impc:ir:tuple? ttype)))
              (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))         
+             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))	 
          (emit index-str os)
          (emit var-str os)
          (emit "; array ref\n" os)
@@ -1046,12 +1095,17 @@
              (var-str (impc:ir:compiler (cadr ast) types))
              (var (impc:ir:gname))
              (val-str (impc:ir:compiler (cadddr ast) types (impc:ir:pointer-- (cadr var))))
-             (val (impc:ir:gname)))
+             (val (impc:ir:gname))
+	     (ttype (impc:ir:get-type-from-str (cadr var))))
          ;; type tests
-         (if (not (impc:ir:pointer? (impc:ir:get-type-from-str (cadr var))))
+         (if (not (impc:ir:pointer? ttype))
              (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
              (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	 (if (and (= 1.0 (impc:ir:get-ptr-depth ttype))
+		  (or (impc:ir:closure? ttype)
+		      (impc:ir:tuple? ttype)))
+             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
          (if (not (equal? (impc:ir:get-type-from-str (cadr var))
                           (impc:ir:pointer++ (impc:ir:get-type-from-str (cadr val)))))
              (print-error 'Compiler 'Error: 'Type 'Mismatch: ast '- 'setting (cadr val) 'into (cadr var)))         

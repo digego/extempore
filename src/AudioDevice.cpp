@@ -98,7 +98,7 @@ namespace extemp {
 			dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
 			dsp_f_ptr cache_wrapper = dsp_wrapper;
 			double* data = 0; 
-			llvm_zone_t* zone = llvm_zone_create(1024*50);				
+			llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
 			for(uint32_t i=0;i<UNIV::FRAMES;i++)
 			{
 				uint32_t ii = i*UNIV::CHANNELS;
@@ -106,6 +106,7 @@ namespace extemp {
 				for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 				{
 					dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+UNIV::TIME),(double)k,data));
+					llvm_zone_reset(zone);
 				}
 			}
 			llvm_zone_destroy(zone);
@@ -228,7 +229,7 @@ namespace extemp {
 			dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
 			dsp_f_ptr cache_wrapper = dsp_wrapper;
 			double* data = 0; 
-			llvm_zone_t* zone = llvm_zone_create(1024*50);				
+			llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M				
 			for(uint32_t i=0;i<UNIV::FRAMES;i++)
 			{
 				uint32_t ii = i*UNIV::CHANNELS;
@@ -236,6 +237,7 @@ namespace extemp {
 				for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 				{   
 					dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+UNIV::TIME),(double)k,data)); 
+					llvm_zone_reset(zone);
 				}
 			}
 			llvm_zone_destroy(zone);
