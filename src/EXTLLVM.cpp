@@ -110,6 +110,7 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 	return malloc((size_t)size);
     }
     void* newptr = (void*)(((char*)zone->memory)+zone->offset);
+    memset(newptr,0,size); // clear memory
     zone->offset += size; 
     // add ptr size to alloc map
     LLVM_ZONE_ALLOC_MAP[newptr] = size;
