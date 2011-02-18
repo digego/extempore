@@ -759,7 +759,6 @@
          (emit  (impc:ir:gname "val" (cadddr ast)) " = load " (cadddr ast) "* " (car (impc:ir:gname 1)) "\n" os)
          (impc:ir:strip-space os))))
 
-
 (define impc:ir:compiler:closure-set
    (lambda (ast types)
       ;; arg 1 must be a closure
@@ -807,6 +806,171 @@
                                  (string-append (cadddr ast) "*\n")) os)
          (emit  "store " (cadr val) " " (car val) ", " (cadr (impc:ir:gname)) " " (car (impc:ir:gname)) "\n" os)
          (emit  (impc:ir:gname "result" (cadr val)) " = load " (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1)) "\n" os)  
+         (impc:ir:strip-space os))))
+
+
+(define impc:ir:compiler:closure-ref
+   (lambda (ast types . hint?)
+      ;(println 'closure-ref-ast: ast hint?)
+      ;; arg 1 must be a closure
+      ;; arg 2 must be a string
+      ;; arg 3 MAY be a type string or NULL
+      (let* ((os (make-string 0))
+	     (num (number->string (llvm:count++)))
+             (closure-str (if (and (symbol? (cadr ast))
+                                   (llvm:get-function (symbol->string (cadr ast))))
+                              (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
+                              (impc:ir:compiler (cadr ast) types)))
+             (closure (impc:ir:gname))	 
+	     (type-str (impc:ir:compiler (if (null? (cadddr ast))
+					     (if (null? hint?)
+						 (print-error 'Compiler 'Error: 'could 'not 'discern 'ref 'type 'for
+							      (string-append (symbol->string (cadr ast)) "." (caddr ast))
+							      'please 'provide 'explicit 'type 'i.e. '(f.name:<type>))
+						 (impc:ir:get-type-str (car hint?)))
+					     (cadddr ast))
+					 types))
+	     (type (impc:ir:gname))
+	     (valtype (if (null? (cadddr ast)) (impc:ir:get-type-str (car hint?)) (cadddr ast)))
+             (name-str (impc:ir:compiler (caddr ast) types))
+             (name (impc:ir:gname)))
+         (emit "\n; closure set! \n" os)
+         (emit closure-str os)
+         (emit name-str os)
+         (emit type-str os)     
+
+	 ;; get address table    
+         (emit (string-append (impc:ir:gname "tablePtr" (cadr closure)) " = getelementptr "
+                                 (cadr closure) " " (car closure) ", i32 0, i32 0\n") os)         
+         (emit (string-append (impc:ir:gname "tmp" "%clsvar**") " = bitcast i8** " 
+                                 (car (impc:ir:gname 1)) " to %clsvar**\n") os)
+         (emit (string-append (impc:ir:gname "table" "%clsvar*")
+                                 " = load %clsvar** " (car (impc:ir:gname 1)) "\n") os)
+         (emit (string-append (impc:ir:gname "ePtr" "i8**") " = getelementptr "
+                                 (cadr closure) " " (car closure) ", i32 0, i32 1\n") os)
+
+	 ;; get closure environment
+         (define ePtr (impc:ir:gname))         
+         (emit (impc:ir:gname "e" "i8*") " = load i8** " (car (impc:ir:gname "ePtr")) "\n" os)
+         (define e (impc:ir:gname))
+         (emit (impc:ir:gname "offset" "i32") " = call i32 @get_address_offset(i8* "
+	       (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
+         (define offset (impc:ir:gname))
+
+
+         (emit (impc:ir:gname "valPtr" "i8*") " = getelementptr " 
+	       (cadr e) " " (car e) ", i32 " (car offset) "\n" os)
+         (emit  (impc:ir:gname "val" "i8**") " = bitcast i8* " (car (impc:ir:gname 1)) " to i8**\n" os)
+         (emit  (impc:ir:gname "val" "i8*") " = load i8** " (car (impc:ir:gname 1)) "\n" os)
+         (emit (impc:ir:gname "val" (string-append valtype "*")) " = bitcast i8* " (car (impc:ir:gname 1)) " to "
+	       (string-append valtype "*\n") os)
+
+	 ;; type check
+	 (emit (impc:ir:gname "check" "i1") " = call i1 @check_address_type(i8* " (car name) ", %clsvar* " (car (impc:ir:gname "table")) ", i8* " (car type) ")\n" os)
+         (emit  "br i1 " (car (impc:ir:gname "check")) ", label %then" num ", label %else" num "\n" os)        
+
+	 ;; do then
+	 (emit "\nthen" num ":\n" os)
+         (emit  (impc:ir:gname "then_result" valtype) " = load " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)  
+         (emit  "br label %cont" num "\n" os)
+	 
+	 ;; do else
+	 (emit "\nelse" num ":\n" os)
+         (emit  (impc:ir:gname "else_result" valtype) " = load " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)
+	 (emit "br label %cont" num "\n" os)
+
+	 ;; continue
+	 (emit "\ncont" num ":\n" os)
+	 ;(impc:ir:gname "val" (car val) (cadr val))
+
+	 (emit (impc:ir:gname "result" valtype) " = phi " valtype
+	       " [ " (car (impc:ir:gname "then_result")) ", %then" num " ], "
+	       " [ " (car (impc:ir:gname "else_result")) ", %else" num " ]\n" os)	       
+
+         (impc:ir:strip-space os))))
+
+
+(define impc:ir:compiler:closure-set
+   (lambda (ast types)
+      ;; arg 1 must be a closure
+      ;; arg 2 must be a string
+      ;; arg 3 must be a value
+      ;; arg 4 MAY be a type string or NULL
+      (let* ((os (make-string 0))
+	     (num (number->string (llvm:count++)))
+             (closure-str (if (and (symbol? (cadr ast))
+                                   (llvm:get-function (symbol->string (cadr ast))))
+                              (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
+                              (impc:ir:compiler (cadr ast) types)))
+             (closure (impc:ir:gname))
+             (name-str (impc:ir:compiler (caddr ast) types))
+             (name (impc:ir:gname))
+             (val-str (if (null? (car (cddddr ast)))
+			  (impc:ir:compiler (cadddr ast) types)
+			  (impc:ir:compiler (cadddr ast) types
+					    (impc:ir:get-type-from-str (car (cddddr ast))))))
+             (val (impc:ir:gname))
+	     (type-str (impc:ir:compiler (if (null? (car (cddddr ast)))
+					     (cadr val)
+					     (car (cddddr ast)))
+					 types))
+	     (type (impc:ir:gname)))
+         (emit "\n; closure set! \n" os)
+         (emit closure-str os)
+         (emit name-str os)
+         (emit type-str os)     
+	 (emit val-str os)
+
+	 ;; get address table    
+         (emit (string-append (impc:ir:gname "tablePtr" (cadr closure)) " = getelementptr "
+                                 (cadr closure) " " (car closure) ", i32 0, i32 0\n") os)         
+         (emit (string-append (impc:ir:gname "tmp" "%clsvar**") " = bitcast i8** " 
+                                 (car (impc:ir:gname 1)) " to %clsvar**\n") os)
+         (emit (string-append (impc:ir:gname "table" "%clsvar*")
+                                 " = load %clsvar** " (car (impc:ir:gname 1)) "\n") os)
+         (emit (string-append (impc:ir:gname "ePtr" "i8**") " = getelementptr "
+                                 (cadr closure) " " (car closure) ", i32 0, i32 1\n") os)
+
+	 ;; get closure environment
+         (define ePtr (impc:ir:gname))         
+         (emit (impc:ir:gname "e" "i8*") " = load i8** " (car (impc:ir:gname "ePtr")) "\n" os)
+         (define e (impc:ir:gname))
+         (emit (impc:ir:gname "offset" "i32") " = call i32 @get_address_offset(i8* "
+	       (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
+         (define offset (impc:ir:gname))
+
+
+         (emit (impc:ir:gname "valPtr" "i8*") " = getelementptr " 
+	       (cadr e) " " (car e) ", i32 " (car offset) "\n" os)
+         (emit  (impc:ir:gname "val" "i8**") " = bitcast i8* " (car (impc:ir:gname 1)) " to i8**\n" os)
+         (emit  (impc:ir:gname "val" "i8*") " = load i8** " (car (impc:ir:gname 1)) "\n" os)
+         (emit (impc:ir:gname "val" (string-append (cadr val) "*")) " = bitcast i8* " (car (impc:ir:gname 1)) " to "
+	       (string-append (cadr val) "*\n") os)
+	 
+	 ;; type check
+	 (emit (impc:ir:gname "check" "i1") " = call i1 @check_address_type(i8* " (car name) ", %clsvar* " (car (impc:ir:gname "table")) ", i8* " (car type) ")\n" os)
+         (emit  "br i1 " (car (impc:ir:gname "check")) ", label %then" num ", label %else" num "\n" os)        
+
+	 ;; do then
+	 (emit "\nthen" num ":\n" os)
+         (emit  "store " (cadr val) " " (car val) ", " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)
+         ;(emit  (impc:ir:gname "then_result" (cadr val)) " = load " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)  
+         (emit  "br label %cont" num "\n" os)
+	 
+	 ;; do else
+	 (emit "\nelse" num ":\n" os)
+         ;(emit  (impc:ir:gname "else_result" (cadr val)) " = load " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)
+	 (emit "br label %cont" num "\n" os)
+
+	 ;; continue
+	 (emit "\ncont" num ":\n" os)
+	 (impc:ir:gname "val" (car val) (cadr val))
+
+	 ;(emit (impc:ir:gname "result" (cadr (impc:ir:gname "then_result"))) " = phi "
+	 ;      (cadr (impc:ir:gname "then_result"))
+	 ;      " [ " (car (impc:ir:gname "then_result")) ", %then" num " ], "
+	 ;      " [ " (car (impc:ir:gname "else_result")) ", %else" num " ]\n" os)
+
          (impc:ir:strip-space os))))
 
 
@@ -1295,7 +1459,7 @@
    (let ((fcmps '("fadd" "fsub" "fmul" "fdiv" "frem"))
          (icmps '("add" "sub" "mul" "sdiv" "srem")))
       (lambda (v ast types . hint?)
-         ;(print 'math: 'ast: ast 'hint: hint?)
+         ;(println 'math: 'ast: ast 'hint: hint?)
          (let* ((type-hint (let ((value (assoc (cl:find-if symbol? (cdr ast)) types))) 
                               (if value 
                                   (cdr value) 
@@ -1306,18 +1470,29 @@
                        (impc:ir:compiler (cadr ast) types)
                        (impc:ir:compiler (cadr ast) types type-hint)))
                 (aval (impc:ir:gname))                
-                (b (if (null? type-hint)
-                       (impc:ir:compiler (caddr ast) types)
-                       (impc:ir:compiler (caddr ast) types type-hint)))                       
+                (b (if (null? type-hint) ;; use a to provide hint for b
+                       (impc:ir:compiler (caddr ast) types 
+					 (impc:ir:get-type-from-str (cadr (impc:ir:gname))))
+                       (impc:ir:compiler (caddr ast) types type-hint)))  
                 (bval (impc:ir:gname))
-                                (os (make-string 0))
+		(os (make-string 0))
                 (type (if (null? type-hint) 
                           (cadr aval)
                           (impc:ir:get-type-str type-hint))))
-            ;; sanity check
+
+            ;; sanity checks
             (if (not (and (impc:ir:number? (cadr aval))
                           (impc:ir:number? (cadr bval))))
                 (print-error 'Compiler 'Error: 'Bad 'type 'in 'math 'expression: ast  '>>> (cadr aval) 'or (cadr bval)))
+            (if (<> (impc:ir:get-type-from-str (cadr aval))
+		    (impc:ir:get-type-from-str (cadr bval)))
+		(if (number? (cadr ast))
+		    (set-car! (cdr aval) (cadr bval))
+		    (if (number? (caddr ast))
+			(set-car! (cdr bval) (cadr aval))
+			(print-error 'Compiler 'Error: 'Type 'mismatch 'in 'math 'expression: ast 'between 'arg1: (string->symbol (cadr aval)) 'and 'arg2: (string->symbol (cadr bval))))))
+
+	    (set! type (if (null? type-hint) (cadr aval) (impc:ir:get-type-str type-hint)))
             (emit a os)
             (emit b os)            
             ;(print (car aval) '>> (car bval) '>> type)
@@ -1442,7 +1617,6 @@
 
 (define impc:ir:compiler:native-call
    (lambda (ast types) 
-      ;(print 'native: 'ast ast)     
       (let* ((os (make-string 0)) 
              (fname (symbol->string (car ast)))
              (calling-conv (llvm:get-function-calling-conv fname))
@@ -1482,6 +1656,7 @@
 
 (define impc:ir:compiler
    (lambda (ast types . hint?)
+      ;(println 'compiler: ast 'hint?: hint?)
       (cond ((null? ast) "")
             ((atom? ast)
              (cond ((symbol? ast) 
@@ -1548,8 +1723,10 @@
                     (impc:ir:compiler:tuple-ref ast types))
                    ((equal? (car ast) 'tuple-set!)
                     (impc:ir:compiler:tuple-set ast types))                   
-                   ((equal? (car ast) 'closure-ref)
-                    (impc:ir:compiler:closure-ref ast types))
+                   ((equal? (car ast) 'closure-ref)		
+		    (if (null? hint?)
+			(impc:ir:compiler:closure-ref ast types)
+			(impc:ir:compiler:closure-ref ast types (car hint?))))
                    ((equal? (car ast) 'closure-set!)
                     (impc:ir:compiler:closure-set ast types))                                      
                    ((equal? (car ast) 'coerce->)

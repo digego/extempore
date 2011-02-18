@@ -287,6 +287,37 @@ uint32_t get_address_offset(const char* name, closure_address_table* table)
     return 0;
 }
 
+char* get_adddress_type(const char* name, closure_address_table* table)
+{
+    while(table)
+    {
+      if(strcmp(table->name,name) == 0) {
+	return table->type;
+      }
+      table = table->next;
+    }
+    printf("Unable to locate %s in closure environment\n",name);
+    return 0;  
+}
+
+bool check_address_type(const char* name, closure_address_table* table, const char* type)
+{
+    while(table)
+    {
+      if(strcmp(table->name,name) == 0) {
+	if(strcmp(table->type,type)!=0) {
+	  printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,name,table->type);
+	  return 0;
+	}else{
+	  return 1;
+	}	  
+      }
+      table = table->next;
+    }
+    printf("Unable to locate %s in closure environment\n",name);
+    return 0;
+}
+
 struct closure_address_table* new_address_table()
 {
     return 0; // NULL for empty table
@@ -399,6 +430,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_malloc);						
 	    gv = M->getNamedValue(std::string("get_address_table"));
 	    EE->updateGlobalMapping(gv,(void*)&get_address_table);						
+	    gv = M->getNamedValue(std::string("check_address_type"));
+	    EE->updateGlobalMapping(gv,(void*)&check_address_type);						
 	    gv = M->getNamedValue(std::string("get_address_offset"));
 	    EE->updateGlobalMapping(gv,(void*)&get_address_offset);									
 	    gv = M->getNamedValue(std::string("add_address_table"));

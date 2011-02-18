@@ -334,13 +334,15 @@
                         (list 'closure-set! 
                               (impc:ti:first-transform (cadr ast) inbody?)
                               (symbol->string (caddr ast))
-                              (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast)))
-                              (impc:ti:first-transform (car (cddddr ast)) inbody?)))
+                              (impc:ti:first-transform (cadddr ast) inbody?)
+			      (if (not (null? (cddddr ast)))
+				  (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (car (cddddr ast)))))))
                        ((eq? (car ast) 'cref)
                         (list 'closure-ref 
                               (impc:ti:first-transform (cadr ast) inbody?)
                               (symbol->string (caddr ast))
-                              (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast)))))
+                              (if (not (null? (cdddr ast)))
+				  (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast))))))
                        ((eq? (car ast) 'dotimes)
                         (list 'dotimes 
                               (impc:ti:first-transform (cadr ast) inbody?)
@@ -357,10 +359,16 @@
                                    (subs2 (regex:split (cadr subs) ":"))
                                    (b (string->symbol (car subs2)))
                                    (c (string->symbol (cadr subs2))))
-                               (if (= (length ast) 1)
-                                   (impc:ti:first-transform (list 'cref a b c) inbody?)
-                                   (impc:ti:first-transform (list 'cset! a b c (cadr ast)) inbody?)))
-                            (print-error 'Compiler 'Error: 'You 'must 'provide (sexpr->string (car ast)) 'with 'a 'the 'correct 'type '(e.g. func.slot:i32))))
+			      (if (= (length ast) 1)
+				  (impc:ti:first-transform (list 'cref a b c) inbody?)
+				  (impc:ti:first-transform (list 'cset! a b (cadr ast) c) inbody?)))
+                            (let* ((subs (regex:split (symbol->string (car ast)) "\\."))
+                                   (a (string->symbol (car subs)))
+				   (b (string->symbol (cadr subs))))
+			      (if (= (length ast) 1)
+				  (impc:ti:first-transform (list 'cref a b) inbody?)
+				  (impc:ti:first-transform (list 'cset! a b (cadr ast)) inbody?)))))
+			   ; (print-error 'Compiler 'Error: 'You 'must 'provide (sexpr->string (car ast)) 'with 'a 'the 'correct 'type '(e.g. func.slot:i32))))
                        ((and (atom? (car ast))
                              (symbol? (car ast))
                              (not (eq? 'dotimes (car ast)))
@@ -648,13 +656,20 @@
                     type))
              type))))
 
-
 (define impc:ti:math-check
    (lambda (ast vars kts request?)
       (let* ((a (impc:ti:type-check (cadr ast) vars kts request?))
              (b (impc:ti:type-check (caddr ast) vars kts request?))
-             (t (cl:intersection (if (atom? a) (list a) a) 
-                                 (if (atom? b) (list b) b))))
+	     (a1 (impc:ti:type-check (cadr ast) vars kts b))
+	     (b1 (impc:ti:type-check (cadr ast) vars kts a))
+             (t (cl:intersection (if (atom? a) (list a) a) 						  
+				 (if (atom? b) (list b) b))))
+	(if (null? t)
+	    (set! t (cl:intersection (if (atom? a1) (list a1) a1)
+				     (if (atom? b) (list b) b))))
+	(if (null? t)
+	    (set! t (cl:intersection (if (atom? a1) (list a) a)
+				     (if (atom? b1) (list b1) b1))))
          ;(print 'math: a b)
          (if *impc:ti:print-sub-checks* (print 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
          (if (not (null? t)) 
@@ -759,8 +774,11 @@
    (lambda (ast vars kts request?)
       ;; for the symbols we want to set each return type
       (for-each (lambda (e)
-                   (let ((a (impc:ti:type-check (cadr e) vars kts request?)))
-                      (impc:ti:update-var (car e) vars kts a)))
+		  (let ((a (impc:ti:type-check (cadr e) vars kts
+					       (if (member (car e) kts)
+						   (cadr (assoc (car e) vars))
+						   request?))))
+		    (impc:ti:update-var (car e) vars kts a)))
                 (cadr ast))
       ;; then return the return type for the whole let
       ;; which should have a begin body! so caddr should work
@@ -934,9 +952,11 @@
              (list-ref (car a) (+ 1 (caddr ast)))
              '()))))
 
+
 ;;(closure-set! closure a i32 5)
 (define impc:ti:closure-set-check
    (lambda (ast vars kts request?)   
+     (print 'ast: ast)
       (if (< (length ast) 5)
           (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
       (let* (;; a should be a closure of some kind
@@ -953,10 +973,9 @@
          ;; should return the type requested (i.e. c)
          (impc:ir:get-type-from-str (cadddr ast)))))
 
-
 ;;(closure-ref closure a i32)
 (define impc:ti:closure-ref-check
-   (lambda (ast vars kts request?)
+   (lambda (ast vars kts request?)     
       (if (< (length ast) 4)
           (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
       (let* (;; a should be a closure of some kind
@@ -972,6 +991,45 @@
          (impc:ir:get-type-from-str (cadddr ast)))))
 
 
+;;(closure-set! closure a i32 5)
+(define impc:ti:closure-set-check
+   (lambda (ast vars kts request?)   
+      ;(println 'cset 'ast: ast 'request? request?)
+      (if (< (length ast) 4)
+          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
+      (let* (;; a should be a closure of some kind
+             (a (if (and (symbol? (cadr ast))
+                         (llvm:get-function (symbol->string (cadr ast))))
+                    #t ; // yes (cadr ast) is a globally defined closure
+                    (impc:ti:type-check (cadr ast) vars kts request?)))
+             ;; b should be a string (the var's name)
+             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*)))
+	     ;; c should be a value for var's name
+	     (c (impc:ti:type-check (cadddr ast) vars kts 
+				    (if (null? (car (cddddr ast)))
+					request?
+					(impc:ir:get-type-from-str (car (cddddr ast)))))))
+	c)))
+
+;;(closure-ref closure a i32)
+(define impc:ti:closure-ref-check
+   (lambda (ast vars kts request?)
+     ;(println 'cls 'ref 'check: ast 'request? request?)
+      (if (< (length ast) 3)
+          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
+      (let* (;; a should be a closure of some kind
+             (a (if (and (symbol? (cadr ast))
+                         (llvm:get-function (symbol->string (cadr ast))))
+                    #t ; // yes (cadr ast) is a globally defined closure
+                    (impc:ti:type-check (cadr ast) vars kts request?)))
+             ;; b should be a string (the var's name)
+             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*))))
+	(if (null? (cadddr ast))
+	    (if request?
+		request?
+		'())
+	    (impc:ir:get-type-from-str (cadddr ast))))))
+
 
 (define impc:ti:set-check
    (lambda (ast vars kts request?)      
@@ -985,6 +1043,19 @@
 
 (define impc:ti:lambda-check
    (lambda (ast vars kts request?)
+     ;(print 'lcheck: 'ast: ast 'request? request?)
+     ;; first we check if a type request has been made
+     (if (and (impc:ir:type? request?)
+	      (impc:ir:closure? request?))
+	        ;; if there is a request then cycle through 
+	        ;; and set lambda arg symbols
+	 (begin (map (lambda (sym req)
+		       (if (symbol? sym)
+			   (impc:ti:update-var sym vars kts req)))
+		     (cadr ast)
+		     (cddr request?))
+		;; finally set request? to the return type
+		(set! request? (cadr request?))))
       ;; run body for type coverage     
       ;; grab the last result as return type
       (let ((res (impc:ti:type-check (caddr ast) vars kts request?)))
@@ -1006,7 +1077,7 @@
 ;; at the end these possibly multiple views should unify!
 (define impc:ti:closure-call-check
    (lambda (ast vars kts request?)
-      ;(print 'cchint 'ast: ast 'vars: vars 'request: request?)      
+      ;(println 'cchint 'ast: ast 'vars: vars 'request: request?)      
       ;; otherwise we need to try to find a type definition for the closure      
       (let* ((ctype (if (assoc (car ast) vars)
                         (cdr (assoc (car ast) vars))
@@ -1176,9 +1247,9 @@
 ;; try some possible substitutions!
 (define impc:ti:run-type-check
    (lambda (vars forced-types ast . cnt)
-      ;(print '------------------------------------)
-      ;(print 'forced-types forced-types)
-      ;(print 'vars: vars 'ast: ast)
+      ;(println '------------------------------------)
+      ;(println 'forced-types forced-types)
+      ;(println 'vars: vars 'ast: ast)
       ;(if (null? cnt) (sys:clear-log-view))
       (let* ((fvars (map (lambda (t) ;; add any forced-type values to vars
                             (if (assoc (car t) forced-types)
@@ -1542,7 +1613,6 @@
       (let* ((c code)       
              (c1 (impc:ti:get-var-types c)) ;; this is a cons pair of (ast . types)
              (t1 (impc:ti:first-transform (car c1) #t)) ;; car is ast
-             (tttt (print 'first-transform: t1))
              (t2 (impc:ti:mark-returns t1 symname #f #f #f))
              (t3 (impc:ti:closure:convert t2 (list symname))) 
              (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
@@ -1722,6 +1792,9 @@
 ;; define closure types properly
 (define impc:ti:run
    (lambda (symname code . args)
+     ;(println 'impc:ti:run: symname)
+     ;(println 'code: code)
+     ;(println 'args: args)
       ;; don't want type checking to find existing native versions!
       (if *impc:compile*
           (begin ;(llvm:remove-globalvar (string-append (symbol->string symname) "_var"))
@@ -1942,11 +2015,15 @@
          (expr (car (reverse args))))
       ;(print-full 'types: types 'e: expr 'args: args)
       `(define ,symname
-          (let* ((res1 (ipc:call ,*impc:compiler:process* 'impc:ti:run ',symname '(let ((,symname ,expr)) ,symname) ,@types))
+          (let* ((res1 (ipc:call ,*impc:compiler:process* 'impc:ti:run ',symname 
+				 '(let ((,symname ,expr)) ,symname)
+				 ,@(if (null? types) 
+				       '()
+				       (map (lambda (k) (list 'quote k)) types))))
                  (setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
                  (func (llvm:get-function (symbol->string ',symname))))
              (if setter
-                 (llvm:run setter (sys:create-mzone))
+                 (llvm:run setter (sys:create-mzone (* 1024 1024 5))) ;; 5M zone
                  (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
                         (error "")))
              (if func
@@ -1970,16 +2047,11 @@
 						
 					
 ;; macro helper for fx code au's							
-(define-macro (definec-fx . args)
+(define-macro (definec:dsp . args)
    `(definec ,(car args)
        (,(car args) . [double,double,double,double,double*]*)
        ,(cadr args)))
 
-;; macro helper for mu code au's
-(define-macro (definec-mu . args)
-   `(definec ,(car args)
-       (,(car args) . [[double,double,double,double,double*]*]*)
-       ,(cadr args)))						
 
 (define-macro (bindc symbol type value)
    (if (cptr? (eval value))
