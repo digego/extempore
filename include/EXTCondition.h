@@ -46,19 +46,19 @@ namespace extemp
     {
         
     public:
-        EXTCondition();
-        ~EXTCondition();
+	EXTCondition();
+	~EXTCondition();
         
-        int init();
-        void destroy();
+	int init();
+	void destroy();
         
-        int wait(EXTMutex *mutex);
-        int signal();
+	int wait(EXTMutex *mutex);
+	int signal();
         
     protected:
-        bool initialised;
+	bool initialised;
 
-        pthread_cond_t pthread_cond;
+	pthread_cond_t pthread_cond;
     };
 } //End Namespace
 

@@ -111,11 +111,11 @@ namespace extemp {
 	}
 		
 	if(is_string(val)) {
-	  if(stringquotes) {
-	    ss << "\"" << string_value(val) << "\"";
-	  }else{
-	    ss << string_value(val);			
-	  }
+	    if(stringquotes) {
+		ss << "\"" << string_value(val) << "\"";
+	    }else{
+		ss << string_value(val);			
+	    }
 	}else if(is_symbol(val)){
 	    ss << symname(val);
 	}else if(is_character(val)){
@@ -154,28 +154,28 @@ namespace extemp {
 		int nframes = stack[0];
 		dump_stack_frame* frames = (dump_stack_frame*)&stack[1];
 		for(int j=0;j<nframes;j++)
-		    {
-			ss << std::endl << std::endl << "FRAME(" << j << ")--------------------------";
-			ss << std::endl << "OPCODE: " << frames[j].op; // << std::endl << "----------" << std::endl;
+		{
+		    ss << std::endl << std::endl << "FRAME(" << j << ")--------------------------";
+		    ss << std::endl << "OPCODE: " << frames[j].op; // << std::endl << "----------" << std::endl;
 					
-			// print args
-			ss << std::endl << "ARGS: ";
-			pointer args = frames[j].args;
-			extemp::UNIV::printSchemeCell(_sc, ss, args, true, stringquotes);
+		    // print args
+		    ss << std::endl << "ARGS: ";
+		    pointer args = frames[j].args;
+		    extemp::UNIV::printSchemeCell(_sc, ss, args, true, stringquotes);
 					
-			// copy code
-			ss << std::endl << "CODE: "; 
-			pointer code = frames[j].code;
-			//		ss.str("");
-			extemp::UNIV::printSchemeCell(_sc, ss, code, true, stringquotes);
-			//		std::cout << "CODE" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
+		    // copy code
+		    ss << std::endl << "CODE: "; 
+		    pointer code = frames[j].code;
+		    //		ss.str("");
+		    extemp::UNIV::printSchemeCell(_sc, ss, code, true, stringquotes);
+		    //		std::cout << "CODE" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
 					
-			ss << std::endl << "ENVIR: ";
-			pointer envir = frames[j].envir;
-			//		ss.str("");
-			extemp::UNIV::printSchemeCell(_sc, ss, envir, true, stringquotes);
-			//		std::cout << "ENVIR" << std::endl << ss.str() << std::endl << "-----------" << std::endl;					
-		    }
+		    ss << std::endl << "ENVIR: ";
+		    pointer envir = frames[j].envir;
+		    //		ss.str("");
+		    extemp::UNIV::printSchemeCell(_sc, ss, envir, true, stringquotes);
+		    //		std::cout << "ENVIR" << std::endl << ss.str() << std::endl << "-----------" << std::endl;					
+		}
 	    }
 	    ss << std::endl << ">>";
 	}else if(is_cptr(val)){
@@ -204,28 +204,32 @@ namespace extemp {
 	}else if(is_pair(val)){
 	    int lgth = list_length(_sc, val);	
 	    if(lgth<0) // is pair
-		{
-		    ss << "(";
-		    printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
-		    ss << " . ";
-		    printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
-		    ss << ")";
-		}else if(lgth>1000 && !full) {
+	    {
+		ss << "(";
+		printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
+		ss << " . ";
+		printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
+		ss << ")";
+	    }else if(lgth>1000 && !full) {
 		ss << "( -- " << lgth << " elements -- )";
 		return;
 	    }else{ // is list
 		ss << "(";				
 		for(int i=0;i<lgth;i++)
-		    {
-			printSchemeCell(_sc, ss, list_ref(_sc, i, val), full, stringquotes);
-			if(i<(lgth-1)) ss << " ";
-		    }
+		{
+		    printSchemeCell(_sc, ss, list_ref(_sc, i, val), full, stringquotes);
+		    if(i<(lgth-1)) ss << " ";
+		}
 		ss << ")";
 	    }
 	}else if(is_foreign(val)){
 	    ss << "#<FOREIGN FUNC>";
 	}else if(val == _sc->NIL){
-	    ss << "NIL";
+	    if(full) {
+		ss << "()";
+	    }else{
+		ss << "NIL";
+	    }
 	}else if(_sc->T == val){
 	    ss << "#t";
 	}else if(_sc->F == val){

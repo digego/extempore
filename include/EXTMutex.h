@@ -44,23 +44,23 @@ namespace extemp
     class EXTMutex
     {
     public:
-        EXTMutex(std::string name);
-        ~EXTMutex();
+	EXTMutex(std::string name);
+	~EXTMutex();
         
-        int init();
-        void destroy();
+	int init();
+	void destroy();
 
-		bool isOwnedByCurrentThread();
+	bool isOwnedByCurrentThread();
 
-        int lock();
-        int unlock();
+	int lock();
+	int unlock();
         
     protected:
-        bool initialised;
-		std::string name;
-        pthread_mutex_t pthread_mutex;
-		pthread_t owner;
-        friend class EXTCondition;
+	bool initialised;
+	std::string name;
+	pthread_mutex_t pthread_mutex;
+	pthread_t owner;
+	friend class EXTCondition;
     };
 } //End Namespace
 

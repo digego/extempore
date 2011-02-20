@@ -73,26 +73,26 @@ class EXTMonitor;
 class EXTThread;
 
 enum scheme_port_kind { 
-	port_free=0, 
-	port_file=1, 
-	port_string=2, 
-	port_input=16, 
-	port_output=32 
+    port_free=0, 
+    port_file=1, 
+    port_string=2, 
+    port_input=16, 
+    port_output=32 
 };
 
 typedef struct port {
-	unsigned char kind;
-	union {
-		struct {
-			FILE *file;
-			int closeit;
-		} stdio;
-		struct {
-			char *start;
-			char *past_the_end;
-			char *curr;
-		} string;
-	} rep;
+    unsigned char kind;
+    union {
+	struct {
+	    FILE *file;
+	    int closeit;
+	} stdio;
+	struct {
+	    char *start;
+	    char *past_the_end;
+	    char *curr;
+	} string;
+    } rep;
 } port;
 
 /* cell structure */
@@ -100,170 +100,170 @@ struct cell {
     unsigned int _flag;
 //	unsigned int _colour;
 //	unsigned int _list_colour;
-	unsigned char _colour;
-	unsigned char _list_colour;	
-	unsigned int _size;
-	cell* _debugger;
-	cell* _cw;
-	cell* _ccw;
+    unsigned char _colour;
+    unsigned char _list_colour;	
+    unsigned int _size;
+    cell* _debugger;
+    cell* _cw;
+    cell* _ccw;
     union {
-        struct {
-            char   *_svalue;
-            int   _length;
-        } _string;
-        num _number;
-        port *_port;
-        foreign_func _ff;
-        struct {
-            struct cell *_car;
-            struct cell *_cdr;
-        } _cons;
-        void* _cptr;
+	struct {
+	    char   *_svalue;
+	    int   _length;
+	} _string;
+	num _number;
+	port *_port;
+	foreign_func _ff;
+	struct {
+	    struct cell *_car;
+	    struct cell *_cdr;
+	} _cons;
+	void* _cptr;
     } _object;
 };
 
 class CharPtrLess {
 public:
-	bool operator() ( const char* elem1, const char* elem2) const {
-		return (strcmp(elem1,elem2) < 0) ? true : false;
-	} 
+    bool operator() ( const char* elem1, const char* elem2) const {
+	return (strcmp(elem1,elem2) < 0) ? true : false;
+    } 
 };
 
 struct scheme {
-	/* arrays for segments */
-	func_alloc malloc;
-	func_dealloc free;
+    /* arrays for segments */
+    func_alloc malloc;
+    func_dealloc free;
 	
-	/* return code */
-	int retcode;
-	int tracing;
+    /* return code */
+    int retcode;
+    int tracing;
 	
-	/* added for concurrent treadmill GC */
-	extemp::EXTMutex* mutex;
-	extemp::EXTMonitor* Treadmill_Guard;
-	bool treadmill_flip_active;
-	bool treadmill_scanner_finished;
+    /* added for concurrent treadmill GC */
+    extemp::EXTMutex* mutex;
+    extemp::EXTMonitor* Treadmill_Guard;
+    bool treadmill_flip_active;
+    bool treadmill_scanner_finished;
 	
 	
 #define CELL_SEGSIZE   500000  /* # of cells in one segment */
 #define CELL_NSEGMENT   1    /* # of segments for cells */
-	char *alloc_seg[CELL_NSEGMENT];
-	pointer cell_seg[CELL_NSEGMENT];
-	int     last_cell_seg;
-	unsigned int dark;
+    char *alloc_seg[CELL_NSEGMENT];
+    pointer cell_seg[CELL_NSEGMENT];
+    int     last_cell_seg;
+    unsigned int dark;
 	
-	//baker treadmill
-	pointer treadmill_bottom;
-	pointer treadmill_top;
-	pointer treadmill_free;
-	pointer treadmill_scan;
-	bool treadmill_stop;
-	extemp::EXTThread* treadmill_scan_thread;
+    //baker treadmill
+    pointer treadmill_bottom;
+    pointer treadmill_top;
+    pointer treadmill_free;
+    pointer treadmill_scan;
+    bool treadmill_stop;
+    extemp::EXTThread* treadmill_scan_thread;
 	
-	pointer starting_cell;
+    pointer starting_cell;
 	
-	std::set<const char*, CharPtrLess>* defined_keywords;
-	std::map<const char*, const std::string, CharPtrLess>* function_defs;
-	std::map<pointer, pointer>* reverse_symbol_lookup;
-	//pointer imp_env;
-	std::multiset<pointer>* imp_env;
+    std::set<const char*, CharPtrLess>* defined_keywords;
+    std::map<const char*, const std::string, CharPtrLess>* function_defs;
+    std::map<pointer, pointer>* reverse_symbol_lookup;
+    //pointer imp_env;
+    std::multiset<pointer>* imp_env;
 //#define MARK_STACK_SIZE 200000 /* size of mark stack for knuth algorithm B */
 //	pointer mark_stack[MARK_STACK_SIZE];
 	
-	/* We use 4 registers. */
-	pointer args;            /* register for arguments of function */
-	pointer envir;           /* stack register for current environment */
-	pointer code;            /* register for current code */
-	pointer dump;            /* stack register for next evaluation */
+    /* We use 4 registers. */
+    pointer args;            /* register for arguments of function */
+    pointer envir;           /* stack register for current environment */
+    pointer code;            /* register for current code */
+    pointer dump;            /* stack register for next evaluation */
 	
-	pointer func_called_by_extempore; //for use in stack tracing
-	pointer last_symbol_apply;
-	std::stack<pointer>* applied_symbol_names;
+    pointer func_called_by_extempore; //for use in stack tracing
+    pointer last_symbol_apply;
+    std::stack<pointer>* applied_symbol_names;
 	
-	// USED BY DUMP_STACK_COPY
-	pointer tmp_dump;
-	pointer tmp_args;
+    // USED BY DUMP_STACK_COPY
+    pointer tmp_dump;
+    pointer tmp_args;
 	
-	int interactive_repl;    /* are we in an interactive REPL? */
+    int interactive_repl;    /* are we in an interactive REPL? */
 	
-	struct cell _sink;
-	pointer sink;            /* when mem. alloc. fails */
-	struct cell _NIL;
-	pointer NIL;             /* special cell representing empty cell */
-	struct cell _HASHT;
-	pointer T;               /* special cell representing #t */
-	struct cell _HASHF;
-	pointer F;               /* special cell representing #f */
-	struct cell _EOF_OBJ;
-	pointer EOF_OBJ;         /* special cell representing end-of-file object */
-	pointer oblist;          /* pointer to symbol table */
-	pointer global_env;      /* pointer to global environment */
+    struct cell _sink;
+    pointer sink;            /* when mem. alloc. fails */
+    struct cell _NIL;
+    pointer NIL;             /* special cell representing empty cell */
+    struct cell _HASHT;
+    pointer T;               /* special cell representing #t */
+    struct cell _HASHF;
+    pointer F;               /* special cell representing #f */
+    struct cell _EOF_OBJ;
+    pointer EOF_OBJ;         /* special cell representing end-of-file object */
+    pointer oblist;          /* pointer to symbol table */
+    pointer global_env;      /* pointer to global environment */
 	
-	/* global pointers to special symbols */
-	pointer LAMBDA;               /* pointer to syntax lambda */
-	pointer QUOTE;           /* pointer to syntax quote */
+    /* global pointers to special symbols */
+    pointer LAMBDA;               /* pointer to syntax lambda */
+    pointer QUOTE;           /* pointer to syntax quote */
 	
-	pointer QQUOTE;               /* pointer to symbol quasiquote */
-	pointer UNQUOTE;         /* pointer to symbol unquote */
-	pointer UNQUOTESP;       /* pointer to symbol unquote-splicing */
-	pointer FEED_TO;         /* => */
-	pointer COLON_HOOK;      /* *colon-hook* */
-	pointer ERROR_HOOK;      /* *error-hook* */
-	pointer LIVECODING_ERROR_HOOK;      /* *error-hook* */	
-	pointer SHARP_HOOK;  /* *sharp-hook* */
+    pointer QQUOTE;               /* pointer to symbol quasiquote */
+    pointer UNQUOTE;         /* pointer to symbol unquote */
+    pointer UNQUOTESP;       /* pointer to symbol unquote-splicing */
+    pointer FEED_TO;         /* => */
+    pointer COLON_HOOK;      /* *colon-hook* */
+    pointer ERROR_HOOK;      /* *error-hook* */
+    pointer LIVECODING_ERROR_HOOK;      /* *error-hook* */	
+    pointer SHARP_HOOK;  /* *sharp-hook* */
 	
-	pointer free_cell;       /* pointer to top of free cells */
-	uint64_t    fcells;          /* # of free cells */
-	uint64_t    total_memory_allocated;          /* total number of allocated cells */
-	uint64_t  allocation_request;
+    pointer free_cell;       /* pointer to top of free cells */
+    uint64_t    fcells;          /* # of free cells */
+    uint64_t    total_memory_allocated;          /* total number of allocated cells */
+    uint64_t  allocation_request;
 	
-	pointer inport;
-	pointer outport;
-	pointer save_inport;
-	pointer loadport;
+    pointer inport;
+    pointer outport;
+    pointer save_inport;
+    pointer loadport;
 	
 #define MAXFIL 64
-	port load_stack[MAXFIL];     /* Stack of open files for port -1 (LOADing) */
-	int nesting_stack[MAXFIL];
-	int file_i;
-	int nesting;
+    port load_stack[MAXFIL];     /* Stack of open files for port -1 (LOADing) */
+    int nesting_stack[MAXFIL];
+    int file_i;
+    int nesting;
 	
 //	char    gc_verbose;      /* if gc_verbose is not zero, print gc status */
 //    int     gc_on;
-	char    no_memory;       /* Whether mem. alloc. has failed */
+    char    no_memory;       /* Whether mem. alloc. has failed */
 	
 #define LINESIZE 1024
-	char    linebuff[LINESIZE];
-	//char    strbuff[256];
-	char    strbuff[256000];
+    char    linebuff[LINESIZE];
+    //char    strbuff[256];
+    char    strbuff[256000];
 	
-	FILE *tmpfp;
-	int tok;
-	int print_flag;
-	pointer value;
-	int op;
+    FILE *tmpfp;
+    int tok;
+    int print_flag;
+    pointer value;
+    int op;
 	
-	char error_fname[256]; 
-	int error_position;
-	char name[256];
+    char error_fname[256]; 
+    int error_position;
+    char name[256];
 	
-	uint64_t call_start_time;
-	uint64_t call_end_time;
-	uint64_t call_default_time;
+    uint64_t call_start_time;
+    uint64_t call_end_time;
+    uint64_t call_default_time;
 	
-	void *ext_data;     /* For the benefit of foreign functions */
-	long gensym_cnt;
+    void *ext_data;     /* For the benefit of foreign functions */
+    long gensym_cnt;
 	
-	struct scheme_interface *vptr;
-	void *dump_base;	 /* pointer to base of allocated dump stack */
-	int dump_size;		 /* number of frames allocated for dump stack */
+    struct scheme_interface *vptr;
+    void *dump_base;	 /* pointer to base of allocated dump stack */
+    int dump_size;		 /* number of frames allocated for dump stack */
 };
 
 /* operator code */
 enum scheme_opcodes { 
 #define _OP_DEF(A,B,C,D,E,OP) OP, 
 #include "OPDefines.h" 
-	OP_MAXDEFINED 
+    OP_MAXDEFINED 
 }; 
 
 #define cons(sc,a,b) _cons(sc,a,b,0)

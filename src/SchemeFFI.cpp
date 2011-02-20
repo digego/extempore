@@ -82,9 +82,9 @@
 #include "llvm/ADT/StringExtras.h"
 ///////////////////////////////////////
 
-#define PRINT_ERROR(format, args...) \
-    ascii_text_color(1,1,10); \
-    printf(format , ## args); \
+#define PRINT_ERROR(format, args...)		\
+    ascii_text_color(1,1,10);			\
+    printf(format , ## args);			\
     ascii_text_color(0,9,10)
 
 
@@ -115,97 +115,134 @@ void ascii_text_color(int attr, int fg, int bg)
     printf("%s", command);
 }
 
+#define nelem(table) sizeof(table) / sizeof(table[0])
+
 namespace extemp {
 	
     SchemeFFI SchemeFFI::SINGLETON;
+    std::map<std::string,std::pair<std::string,std::string> > SchemeFFI::IMPCIR_DICT;
 
     void SchemeFFI::initSchemeFFI(scheme* sc)
     {
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:block-size*"), mk_integer(sc,UNIV::FRAMES));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:samplerate*"), mk_integer(sc,UNIV::SAMPLERATE));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "*au:channels*"), mk_integer(sc,UNIV::CHANNELS));
-		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ascii-print-color"), mk_foreign_func(sc, &SchemeFFI::asciiColor));
-	
-	//IPC stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:new"), mk_foreign_func(sc, &SchemeFFI::newSchemeProcess));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:connect"), mk_foreign_func(sc, &SchemeFFI::connectToProcess));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:call-async"), mk_foreign_func(sc, &SchemeFFI::ipcCall));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:define"), mk_foreign_func(sc, &SchemeFFI::ipcDefine));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:eval-string"), mk_foreign_func(sc, &SchemeFFI::ipcEval));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:load"), mk_foreign_func(sc, &SchemeFFI::ipcLoad));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "ipc:get-process-name"), mk_foreign_func(sc, &SchemeFFI::getNameOfCurrentProcess));
-	
+	int i;
 
-	// number stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "random-real"), mk_foreign_func(sc, &SchemeFFI::randomReal));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "random-int"), mk_foreign_func(sc, &SchemeFFI::randomInt));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "real->integer"), mk_foreign_func(sc, &SchemeFFI::realToInteger));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "real->rational"), mk_foreign_func(sc, &SchemeFFI::realToRational));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "rational->real"), mk_foreign_func(sc, &SchemeFFI::rationalToReal));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "integer->real"), mk_foreign_func(sc, &SchemeFFI::integerToReal));		
+	static struct {
+	    const char *name;
+	    uint32_t    value;
+	} integerTable[] = {
+	    { "*au:block-size*",	UNIV::FRAMES },
+	    { "*au:samplerate*",	UNIV::SAMPLERATE },
+	    { "*au:channels*",	UNIV::CHANNELS },
+	};
+
+	static struct {
+	    const char * name;
+	    foreign_func func;
+	} funcTable[] = {
+	    { "ascii-print-color",		&SchemeFFI::asciiColor },
+	    { "emit",                       &SchemeFFI::emit },
+
+	    //IPC stuff
+	    { "ipc:new",			&SchemeFFI::newSchemeProcess },
+	    { "ipc:connect",		&SchemeFFI::connectToProcess },
+	    { "ipc:call-async",		&SchemeFFI::ipcCall },
+	    { "ipc:define",			&SchemeFFI::ipcDefine },
+	    { "ipc:eval-string",		&SchemeFFI::ipcEval },
+	    { "ipc:load",			&SchemeFFI::ipcLoad },
+	    { "ipc:get-process-name",	&SchemeFFI::getNameOfCurrentProcess },
+
+	    // number stuff
+	    { "random-real",		&SchemeFFI::randomReal },
+	    { "random-int",			&SchemeFFI::randomInt },
+	    { "real->integer",		&SchemeFFI::realToInteger },
+	    { "real->rational",		&SchemeFFI::realToRational },
+	    { "rational->real",		&SchemeFFI::rationalToReal },
+	    { "integer->real",		&SchemeFFI::integerToReal },
+
+	    // sys stuff
+	    { "sys:pointer-size",		&SchemeFFI::pointerSize },
+	    { "sys:open-dylib",		&SchemeFFI::openDynamicLib },
+	    { "sys:close-dylib",		&SchemeFFI::closeDynamicLib },
+
+	    // DSP sys stuff
+	    { "sys:set-dsp-closure",	&SchemeFFI::setDSPClosure },
+	    { "sys:set-dsp-wrapper",	&SchemeFFI::setDSPWrapper },
+	    { "sys:set-dsp-wrapper-array",	&SchemeFFI::setDSPWrapperArray },
+
+	    // memory zone stuff
+	    { "sys:create-mzone",		&SchemeFFI::createMallocZone },
+	    { "sys:default-mzone",		&SchemeFFI::defaultMallocZone },
+	    { "sys:destroy-mzone",		&SchemeFFI::destroyMallocZone },
+	    { "sys:copy-to-dmzone",		&SchemeFFI::copyToDefaultZone },
+	    { "sys:reset-mzone",		&SchemeFFI::resetMallocZone },
+
+	    // misc stuff
+	    { "string-strip",		&SchemeFFI::stringStrip },
+	    { "string-join",		&SchemeFFI::stringJoin },
+	    { "call-cpp-at-time",		&SchemeFFI::callCPPAtTime },
+	    { "now",			&SchemeFFI::getTime },
+	    { "sexpr->string",		&SchemeFFI::sexprToString },
+	    { "println",			&SchemeFFI::print },
+	    { "print",			&SchemeFFI::print_no_new_line },
+	    { "print-full",			&SchemeFFI::printFull },
+	    { "print-full-nq",		&SchemeFFI::printFullNoQuotes },
+	    { "pprint-error",		&SchemeFFI::printError }, // pprint-error is pprint for a reason!
+	    { "print-notification",		&SchemeFFI::printNotification },
+	    { "get-closure-env",		&SchemeFFI::getClosureEnv },
+
+	    // regex stuff
+	    { "regex:match?",		&SchemeFFI::regex_match },
+	    { "regex:matched",		&SchemeFFI::regex_matched },
+	    { "regex:match-all",		&SchemeFFI::regex_match_all },
+	    { "regex:split",		&SchemeFFI::regex_split },
+	    { "regex:replace",		&SchemeFFI::regex_replace },
+
+	    // llvm stuff
+	    { "llvm:compile",			&SchemeFFI::compile },
+	    { "llvm:bind-global-var",		&SchemeFFI::bind_global_var },
+	    { "llvm:get-function",			&SchemeFFI::get_function },
+	    { "llvm:get-globalvar",			&SchemeFFI::get_globalvar },
+	    { "llvm:get-function-args",		&SchemeFFI::get_function_args },
+	    { "llvm:get-function-type",		&SchemeFFI::get_function_type },
+	    { "llvm:get-function-calling-conv",	&SchemeFFI::get_function_calling_conv },
+	    { "llvm:get-global-variable-type",	&SchemeFFI::get_global_variable_type },
+	    { "llvm:get-function-pointer",		&SchemeFFI::get_function_pointer },
+	    { "llvm:jit-compile-function",		&SchemeFFI::recompile_and_link_function },
+	    { "llvm:remove-function",		&SchemeFFI::remove_function },
+	    { "llvm:remove-globalvar",		&SchemeFFI::remove_global_var },
+	    { "llvm:erase-function",		&SchemeFFI::erase_function },
+	    { "llvm:run",				&SchemeFFI::call_compiled },
+	    { "llvm:run-closure",			&SchemeFFI::call_compiled_closure },
+	    { "llvm:convert-float",			&SchemeFFI::llvm_convert_float_constant },
+	    { "llvm:count",				&SchemeFFI::llvm_count },
+	    { "llvm:count++",			&SchemeFFI::llvm_count_inc },
+	    { "llvm:call-closure",			&SchemeFFI::callClosure },
+	    { "llvm:print",				&SchemeFFI::printLLVMModule },
+	    { "llvm:print-function",		&SchemeFFI::printLLVMFunction },
+	    { "llvm:bind-symbol",			&SchemeFFI::bind_symbol },
+	    { "impc:ir:getname",			&SchemeFFI::impcirGetName },
+	    { "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
+	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
 		
-	// sys stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:pointer-size"), mk_foreign_func(sc, &SchemeFFI::pointerSize));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:open-dylib"), mk_foreign_func(sc, &SchemeFFI::openDynamicLib));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:close-dylib"), mk_foreign_func(sc, &SchemeFFI::closeDynamicLib));		
-	// DSP sys stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-closure"), mk_foreign_func(sc, &SchemeFFI::setDSPClosure));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapper));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:set-dsp-wrapper-array"), mk_foreign_func(sc, &SchemeFFI::setDSPWrapperArray));			
-	// memory zone stuff
-	//this->addGlobalCptr(sc,(char*)"*sys:destroy-zone-with-delay*",mk_cb(this,SchemeFFI,destroyMallocZoneWithDelay));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:create-mzone"), mk_foreign_func(sc, &SchemeFFI::createMallocZone));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:default-mzone"), mk_foreign_func(sc, &SchemeFFI::defaultMallocZone));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:destroy-mzone"), mk_foreign_func(sc, &SchemeFFI::destroyMallocZone));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sys:copy-to-dmzone"), mk_foreign_func(sc, &SchemeFFI::copyToDefaultZone));			
-		
-	// misc stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "string-strip"), mk_foreign_func(sc, &SchemeFFI::stringStrip));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "string-join"), mk_foreign_func(sc, &SchemeFFI::stringJoin));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "call-cpp-at-time"), mk_foreign_func(sc, &SchemeFFI::callCPPAtTime));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "now"), mk_foreign_func(sc, &SchemeFFI::getTime));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "sexpr->string"), mk_foreign_func(sc, &SchemeFFI::sexprToString));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "println"), mk_foreign_func(sc, &SchemeFFI::print));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "print"), mk_foreign_func(sc, &SchemeFFI::print_no_new_line));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "print-full"), mk_foreign_func(sc, &SchemeFFI::printFull));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "print-full-nq"), mk_foreign_func(sc, &SchemeFFI::printFullNoQuotes));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "pprint-error"), mk_foreign_func(sc, &SchemeFFI::printError)); // pprint-error is pprint for a reason!
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "print-notification"), mk_foreign_func(sc, &SchemeFFI::printNotification));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "get-closure-env"), mk_foreign_func(sc, &SchemeFFI::getClosureEnv));
-		
-	// regex stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:match?"), mk_foreign_func(sc, &SchemeFFI::regex_match));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:matched"), mk_foreign_func(sc, &SchemeFFI::regex_matched));				
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:match-all"), mk_foreign_func(sc, &SchemeFFI::regex_match_all));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:split"), mk_foreign_func(sc, &SchemeFFI::regex_split));				
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "regex:replace"), mk_foreign_func(sc, &SchemeFFI::regex_replace));
-			
-	// llvm stuff
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:compile"), mk_foreign_func(sc, &SchemeFFI::compile));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:bind-global-var"), mk_foreign_func(sc, &SchemeFFI::bind_global_var));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function"), mk_foreign_func(sc, &SchemeFFI::get_function));		
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-globalvar"), mk_foreign_func(sc, &SchemeFFI::get_globalvar));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function-args"), mk_foreign_func(sc, &SchemeFFI::get_function_args));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function-type"), mk_foreign_func(sc, &SchemeFFI::get_function_type));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function-calling-conv"), mk_foreign_func(sc, &SchemeFFI::get_function_calling_conv));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-global-variable-type"), mk_foreign_func(sc, &SchemeFFI::get_global_variable_type));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:get-function-pointer"), mk_foreign_func(sc, &SchemeFFI::get_function_pointer));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:jit-compile-function"), mk_foreign_func(sc, &SchemeFFI::recompile_and_link_function));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:remove-function"), mk_foreign_func(sc, &SchemeFFI::remove_function));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:remove-globalvar"), mk_foreign_func(sc, &SchemeFFI::remove_global_var));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:erase-function"), mk_foreign_func(sc, &SchemeFFI::erase_function));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:run"), mk_foreign_func(sc, &SchemeFFI::call_compiled));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:run-closure"), mk_foreign_func(sc, &SchemeFFI::call_compiled_closure));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:convert-float"), mk_foreign_func(sc, &SchemeFFI::llvm_convert_float_constant));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:count"), mk_foreign_func(sc, &SchemeFFI::llvm_count));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:count++"), mk_foreign_func(sc, &SchemeFFI::llvm_count_inc));	
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:call-closure"), mk_foreign_func(sc, &SchemeFFI::callClosure));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:print"), mk_foreign_func(sc, &SchemeFFI::printLLVMModule));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:print-function"), mk_foreign_func(sc, &SchemeFFI::printLLVMFunction));
-	scheme_define(sc, sc->global_env, mk_symbol(sc, "llvm:bind-symbol"), mk_foreign_func(sc, &SchemeFFI::bind_symbol));
+	};
+
+	for (i = 0; i < nelem(integerTable); i++) {
+	    scheme_define(
+		sc, sc->global_env,
+		mk_symbol(sc, integerTable[i].name),
+		mk_integer(sc, integerTable[i].value)
+		);
+	}
+
+	for (i = 0; i < nelem(funcTable); i++) {
+	    scheme_define(
+		sc, sc->global_env,
+		mk_symbol(sc, funcTable[i].name),
+		mk_foreign_func(sc, funcTable[i].func)
+		);
+	}
     }
-	
+
     //////////////////// helper functions ////////////////////////
     void SchemeFFI::addGlobal(scheme* sc, char* symbol_name, pointer arg)
     {
@@ -231,6 +268,65 @@ namespace extemp {
     pointer SchemeFFI::asciiColor(scheme* _sc, pointer args)
     {
 	ascii_text_color(ivalue(pair_car(args)),ivalue(pair_cadr(args)),ivalue(pair_caddr(args)));
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::emit(scheme* _sc, pointer args)
+    {
+	std::stringstream ss;
+	int lgth = list_length(_sc,args);
+	pointer io = list_ref(_sc,lgth-1,args);
+	if(!is_string(io)) {
+	    PRINT_ERROR("Emit accepts only string arguments!\n");
+	    return _sc->F;
+	}
+	ss << string_value(io);
+	pointer arg = 0;
+	for(int i=0;i<lgth-1;i++) {
+	    arg = pair_car(args);
+	    if(!is_string(arg)) {
+		PRINT_ERROR("Emit accepts only string arguments!\n");
+		return _sc->F;
+	    }
+	    ss << string_value(arg);
+	    args = pair_cdr(args);
+	}
+
+	std::string tmp = ss.str();
+	// replace io string in place	
+	int l = tmp.length();
+	char* s = (char*) malloc(l+1);
+	strcpy(s,tmp.c_str());
+	free(io->_object._string._svalue);
+	io->_object._string._svalue = s;
+	io->_object._string._length = l;
+	// return io string
+	return io;
+    }
+
+    pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
+    {
+	std::string key(string_value(pair_car(args)));
+	return mk_string(_sc, IMPCIR_DICT[key].second.c_str());	
+    }
+
+    pointer SchemeFFI::impcirGetName(scheme* _sc, pointer args)
+    {
+	std::string key(string_value(pair_car(args)));
+	return mk_string(_sc, IMPCIR_DICT[key].first.c_str());	
+    }
+
+    pointer SchemeFFI::impcirAdd(scheme* _sc, pointer args)
+    {
+	std::string current("current");
+	std::string previous("previous");
+	std::string key(string_value(pair_car(args)));
+	std::string name(string_value(pair_cadr(args)));
+	std::string type(string_value(pair_caddr(args)));	    
+	std::pair<std::string,std::string> p(name,type);
+	IMPCIR_DICT[previous] = IMPCIR_DICT[current];
+	IMPCIR_DICT[current] = p;
+	IMPCIR_DICT[key] = p;
 	return _sc->T;
     }
 
@@ -297,12 +393,6 @@ namespace extemp {
 	    }
 	    else if(is_string(pair_car(args)) || is_number(pair_car(args)) || is_symbol(pair_car(args))){
 		UNIV::printSchemeCell(_sc, ss, pair_car(args), true);
-	    }
-	    else if(pair_car(args) == _sc->F) {
-		ss << "#f";
-	    }
-	    else if(pair_car(args) == _sc->T) {
-		ss << "#t";
 	    }
 	    else {
 	        PRINT_ERROR("IPC does not support type.\nThis maybe related to the return type as well as the arguments if calling from ipc:call.\nIn particular remember that objc objects cannot be passed natively (you can turn them into strings though by calling objc:string-encode and then on the other end use objc:string-decode to reconstitute an object\n");
@@ -375,10 +465,10 @@ namespace extemp {
 	if(args == _sc->NIL) return mk_string(_sc, name);
 	else { printf("Error getting name of current process\n"); return _sc->F; }
 	/*
-	NSDictionary* dict = (NSDictionary*) objc_value(pair_car(args));
-	NSString* alias_name = [dict objectForKey:[NSString stringWithCString:name]];
-	if(alias_name == NULL) return mk_string(_sc, name);
-	return mk_string(_sc, [alias_name UTF8String]);
+	  NSDictionary* dict = (NSDictionary*) objc_value(pair_car(args));
+	  NSString* alias_name = [dict objectForKey:[NSString stringWithCString:name]];
+	  if(alias_name == NULL) return mk_string(_sc, name);
+	  return mk_string(_sc, [alias_name UTF8String]);
 	*/
     }
 
@@ -423,10 +513,10 @@ namespace extemp {
 	//void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
 	void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY);
 	if (!lib_handle)
-	    {
-		fprintf(stderr, "%s\n", dlerror());
-		return _sc->F;
-	    }
+	{
+	    fprintf(stderr, "%s\n", dlerror());
+	    return _sc->F;
+	}
 	return mk_cptr(_sc,lib_handle);
     }
 
@@ -458,21 +548,21 @@ namespace extemp {
 	char* joinstr = string_value(pair_cadr(args));
 	int len = 0;
 	for(pointer x=pair_car(array);array != _sc->NIL;array=pair_cdr(array))
-	    {
-		x = pair_car(array);
-		len += strlen(string_value(x));
-	    }
+	{
+	    x = pair_car(array);
+	    len += strlen(string_value(x));
+	}
 	len += (list_length(_sc,array)-1)*(strlen(joinstr));
 	char* result = (char*) alloca(len+1);
 	memset(result,0,len+1);
 	array = pair_car(args); // reset array
 	for(pointer x=pair_car(array);array != _sc->NIL;array=pair_cdr(array))
-	    {
-		x=pair_car(array);
-		char* str = string_value(x);
-		strcat(result,str);
-		if(pair_cdr(array) != _sc->NIL) strcat(result,joinstr);
-	    }		
+	{
+	    x=pair_car(array);
+	    char* str = string_value(x);
+	    strcat(result,str);
+	    if(pair_cdr(array) != _sc->NIL) strcat(result,joinstr);
+	}		
 	return mk_string(_sc,result);
     }	
 		
@@ -677,24 +767,24 @@ namespace extemp {
 	if(rc<0) return list;
 		
 	for(int i=0, p=0;i<rc;i++)
-	    {
-		//std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
-		p=i*2;
-		if(ovector[p]==-1) {
-		    _sc->imp_env->insert(list);
-		    list = cons(_sc,mk_string(_sc,""),list);
-		    _sc->imp_env->erase(list);
-		}else{
-		    int range = ovector[p+1] - ovector[p];				
-		    char* b = (char*) alloca(range+1);
-		    memset(b,0,range+1);
-		    char* a = data+ovector[p];
-		    char* substring = strncpy(b, a, range);
-		    _sc->imp_env->insert(list);
-		    list = cons(_sc,mk_string(_sc,substring),list);
-		    _sc->imp_env->erase(list);
-		}
+	{
+	    //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
+	    p=i*2;
+	    if(ovector[p]==-1) {
+		_sc->imp_env->insert(list);
+		list = cons(_sc,mk_string(_sc,""),list);
+		_sc->imp_env->erase(list);
+	    }else{
+		int range = ovector[p+1] - ovector[p];				
+		char* b = (char*) alloca(range+1);
+		memset(b,0,range+1);
+		char* a = data+ovector[p];
+		char* substring = strncpy(b, a, range);
+		_sc->imp_env->insert(list);
+		list = cons(_sc,mk_string(_sc,substring),list);
+		_sc->imp_env->erase(list);
 	    }
+	}
 		
 	return reverse(_sc,list);
     }	
@@ -779,9 +869,9 @@ namespace extemp {
 	    //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << std::endl;
 	    if(rc<1) {
 		if(strlen(data)>0) // append remaining chars if any left
-		    {
-			list = cons(_sc,mk_string(_sc,data),list);
-		    }
+		{
+		    list = cons(_sc,mk_string(_sc,data),list);
+		}
 		return reverse(_sc,list);
 	    }
 	    int range = ovector[0];
@@ -991,7 +1081,10 @@ namespace extemp {
 
     pointer SchemeFFI::createMallocZone(scheme* _sc, pointer args)
     {
-	return mk_cptr(_sc,llvm_zone_create(1024*10));
+	if(args == _sc->NIL)
+	    return mk_cptr(_sc,llvm_zone_create(1024*50));
+	else
+	    return mk_cptr(_sc,llvm_zone_create(ivalue(pair_car(args))));
     }
 
     pointer SchemeFFI::defaultMallocZone(scheme* _sc, pointer args)
@@ -1003,6 +1096,13 @@ namespace extemp {
     {		
 	llvm_zone_t* ptr = (llvm_zone_t*) cptr_value(pair_car(args));
 	llvm_zone_destroy(ptr);
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::resetMallocZone(scheme* _sc, pointer args)
+    {		
+	llvm_zone_t* zone = (llvm_zone_t*) cptr_value(pair_car(args));
+	llvm_zone_reset(zone);
 	return _sc->T;
     }
 
@@ -1030,29 +1130,29 @@ namespace extemp {
 	long long num_of_funcs = M->getFunctionList().size();		
 	const Module* newM = ParseAssemblyString(assm, M, pa, getGlobalContext());
 	if(EXTLLVM::OPTIMIZE_COMPILES)
-	    {
-		PM->run(*M);
-	    }
+	{
+	    PM->run(*M);
+	}
 
 	//std::stringstream ss;
 	if(newM == 0)
-	    {
-		std::string errstr;
-		llvm::raw_string_ostream ss(errstr);
-		pa.Print("Impromptu",ss);
-		printf("%s\n",ss.str().c_str());
-		// if the number of functions in module has changed when calling runFunction 
-		// then we assume a stub was made and appended to the end of the modules function list.
-		// we remove this function now that we no longer need it!
-		if(num_of_funcs != M->getFunctionList().size()) {
-		    iplist<Function>::iterator iter = M->getFunctionList().end();
-		    Function* func = dyn_cast<Function>(--iter);
-		    //std::cout << "REMOVING ON FAIL: " << *func << std::endl;
-		    func->dropAllReferences();
-		    func->removeFromParent();
-		}			
-		return _sc->F;
-	    }else{
+	{
+	    std::string errstr;
+	    llvm::raw_string_ostream ss(errstr);
+	    pa.Print("Impromptu",ss);
+	    printf("%s\n",ss.str().c_str());
+	    // if the number of functions in module has changed when calling runFunction 
+	    // then we assume a stub was made and appended to the end of the modules function list.
+	    // we remove this function now that we no longer need it!
+	    if(num_of_funcs != M->getFunctionList().size()) {
+		iplist<Function>::iterator iter = M->getFunctionList().end();
+		Function* func = dyn_cast<Function>(--iter);
+		//std::cout << "REMOVING ON FAIL: " << *func << std::endl;
+		func->dropAllReferences();
+		func->removeFromParent();
+	    }			
+	    return _sc->F;
+	}else{
 	    std::string Err;
 	    if (verifyModule(*M, ReturnStatusAction, &Err)) {
 		printf("%s\n%s","Parsed, but not valid!\n",Err.c_str());
@@ -1092,9 +1192,9 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
 	if(func == 0)
-	    {
-		return _sc->F;
-	    }
+	{
+	    return _sc->F;
+	}
 	return mk_cptr(_sc, func); 				
     }
 
@@ -1105,9 +1205,9 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;
 	llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args)))); 
 	if(var == 0)
-	    {
-		return _sc->F;
-	    }				
+	{
+	    return _sc->F;
+	}				
 	return mk_cptr(_sc, var); 				
     }
 
@@ -1119,9 +1219,9 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));		
 	if(func == 0)
-	    {
-		return _sc->F;
-	    }			
+	{
+	    return _sc->F;
+	}			
 
 	int cc = func->getCallingConv();
 	return mk_integer(_sc, cc);
@@ -1134,9 +1234,9 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
 	if(func == 0)
-	    {
-		return _sc->F;
-	    }			
+	{
+	    return _sc->F;
+	}			
 
 	pointer str = mk_string(_sc, func->getFunctionType()->getDescription().c_str());
 	return str;
@@ -1150,23 +1250,23 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
 	if(func == 0)
-	    {
-		return _sc->F;
-	    }			
+	{
+	    return _sc->F;
+	}			
 
 	pointer str = mk_string(_sc, func->getReturnType()->getDescription().c_str());
 	pointer p = cons(_sc, str, _sc->NIL); 
 
 	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
 	while(funcargs != func->getArgumentList().end())
-	    {			
-		Argument* a = funcargs;
-		_sc->imp_env->insert(p);						
-		pointer str = mk_string(_sc, a->getType()->getDescription().c_str());
-		_sc->imp_env->erase(p);
-		p = cons(_sc, str, p);			
-		funcargs++;
-	    }			
+	{			
+	    Argument* a = funcargs;
+	    _sc->imp_env->insert(p);						
+	    pointer str = mk_string(_sc, a->getType()->getDescription().c_str());
+	    _sc->imp_env->erase(p);
+	    p = cons(_sc, str, p);			
+	    funcargs++;
+	}			
 	return reverse(_sc, p);				
     }
 
@@ -1178,9 +1278,9 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;		
 	llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args)))); 
 	if(var == 0)
-	    {
-		return _sc->F;
-	    }		
+	{
+	    return _sc->F;
+	}		
 	var->dropAllReferences();		
 	var->removeFromParent();
 	return _sc->T;
@@ -1194,9 +1294,9 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;		
 	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
 	if(func == 0)
-	    {
-		return _sc->F;
-	    }		
+	{
+	    return _sc->F;
+	}		
 	if(func->mayBeOverridden()) {
 	    func->dropAllReferences();		
 	    func->removeFromParent();
@@ -1214,9 +1314,9 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
 	if(func == 0)
-	    {
-		return _sc->F;
-	    }		
+	{
+	    return _sc->F;
+	}		
 	extemp::EXTLLVM::I()->EE->freeMachineCodeForFunction(func);
 	func->deleteBody();
 	func->eraseFromParent();
@@ -1241,9 +1341,9 @@ namespace extemp {
 	Module::global_iterator i = M->global_begin();
 	GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(args))));
 	if(var == 0)
-	    {
-		return _sc->F;
-	    }				
+	{
+	    return _sc->F;
+	}				
 	return mk_string(_sc, var->getType()->getDescription().c_str());
     }	
 
@@ -1255,9 +1355,9 @@ namespace extemp {
 	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
 	//func->setCallingConv(CallingConv::C); //kCStackBased);
 	if(func == 0)
-	    {
-		return _sc->F;
-	    }
+	{
+	    return _sc->F;
+	}
 
 	void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
 
@@ -1277,9 +1377,9 @@ namespace extemp {
 	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
 	//func->setCallingConv(CallingConv::C); //kCStackBased);
 	if(func == 0)
-	    {
-		return _sc->F;
-	    }
+	{
+	    return _sc->F;
+	}
 		
 	void* p = EXTLLVM::I()->EE->recompileAndRelinkFunction(func);
 		
@@ -1306,10 +1406,10 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = M->getFunction(std::string(fname));
 	if(func == 0)
-	    {
-		printf("No such function\n");
-		return _sc->F;
-	    }				
+	{
+	    printf("No such function\n");
+	    return _sc->F;
+	}				
 	//std::cout << "FUNC: " << *func << std::endl;
 
 	int lgth = list_length(_sc, args);
@@ -1322,73 +1422,73 @@ namespace extemp {
 	// first add the environment
 	// which must always go first for a closure
 	if(((Argument*)funcargs)->getType()->getTypeID() != Type::PointerTyID)
-	    {
-		printf("Error: closure must have an environment!\n");
-		return _sc->F;			
-	    }
+	{
+	    printf("Error: closure must have an environment!\n");
+	    return _sc->F;			
+	}
 	fargs[0].PointerVal = eptr;	
 	++funcargs; // and increment funcargs past eptr
 
 	//std::cout << "ARGS: " << lgth << std::endl;
 	for(int i=1;i<lgth;i++,++funcargs)
+	{
+	    Argument* a = funcargs;
+	    pointer p = list_ref(_sc, i, args);
+	    if(is_integer(p)) {			
+		if(a->getType()->getTypeID() != Type::IntegerTyID)
+		{
+		    printf("Bad argument type %i\n",i);
+		    return _sc->F;
+		}
+		int width = a->getType()->getPrimitiveSizeInBits();				
+		//std::cout << "IVALUE: " << ivalue(p) << std::endl; 				
+		fargs[i].IntVal = APInt(width,ivalue(p));				
+	    }			
+	    else if(is_real(p))
 	    {
-		Argument* a = funcargs;
-		pointer p = list_ref(_sc, i, args);
-		if(is_integer(p)) {			
-		    if(a->getType()->getTypeID() != Type::IntegerTyID)
-			{
-			    printf("Bad argument type %i\n",i);
-			    return _sc->F;
-			}
-		    int width = a->getType()->getPrimitiveSizeInBits();				
-		    //std::cout << "IVALUE: " << ivalue(p) << std::endl; 				
-		    fargs[i].IntVal = APInt(width,ivalue(p));				
-		}			
-		else if(is_real(p))
-		    {
 
-			if(a->getType()->getTypeID() == Type::FloatTyID)
-			    {
-				//std::cout << "RVALUE: " << rvalue(p) << std::endl; 					
-				fargs[i].FloatVal = (float) rvalue(p);
-			    }
-			else if(a->getType()->getTypeID() == Type::DoubleTyID)
-			    {
-				//std::cout << "RVALUE: " << rvalue(p) << std::endl; 
-				fargs[i].DoubleVal = rvalue(p);
-			    }
-			else
-			    {
-				printf("Bad argument type %i\n",i);
-				return _sc->F;
-			    }
-		    }
-		else if(is_string(p))
-		    {
-			if(a->getType()->getTypeID() != Type::PointerTyID)
-			    {
-				printf("Bad argument type %i\n",i);
-				return _sc->F;					
-			    }
-			//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
-			fargs[i].PointerVal = string_value(p);
-		    }			
-		else if(is_cptr(p))
-		    {
-			if(a->getType()->getTypeID() != Type::PointerTyID)
-			    {
-				printf("Bad argument type %i\n",i);
-				return _sc->F;					
-			    }
-			//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
-			fargs[i].PointerVal = cptr_value(p);
-		    }
-		else 
-		    {
-			printf("Bad scheme argument\n");
-			return _sc->F;
-		    }
+		if(a->getType()->getTypeID() == Type::FloatTyID)
+		{
+		    //std::cout << "RVALUE: " << rvalue(p) << std::endl; 					
+		    fargs[i].FloatVal = (float) rvalue(p);
+		}
+		else if(a->getType()->getTypeID() == Type::DoubleTyID)
+		{
+		    //std::cout << "RVALUE: " << rvalue(p) << std::endl; 
+		    fargs[i].DoubleVal = rvalue(p);
+		}
+		else
+		{
+		    printf("Bad argument type %i\n",i);
+		    return _sc->F;
+		}
 	    }
+	    else if(is_string(p))
+	    {
+		if(a->getType()->getTypeID() != Type::PointerTyID)
+		{
+		    printf("Bad argument type %i\n",i);
+		    return _sc->F;					
+		}
+		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
+		fargs[i].PointerVal = string_value(p);
+	    }			
+	    else if(is_cptr(p))
+	    {
+		if(a->getType()->getTypeID() != Type::PointerTyID)
+		{
+		    printf("Bad argument type %i\n",i);
+		    return _sc->F;					
+		}
+		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
+		fargs[i].PointerVal = cptr_value(p);
+	    }
+	    else 
+	    {
+		printf("Bad scheme argument\n");
+		return _sc->F;
+	    }
+	}
 
 	long long num_of_funcs = M->getFunctionList().size();
 	GenericValue gv = EE->runFunction(func,fargs);
@@ -1403,18 +1503,18 @@ namespace extemp {
 	}
 
 	switch(func->getReturnType()->getTypeID())
-	    {
-	    case Type::FloatTyID:
-		return mk_real(_sc, gv.FloatVal);
-	    case Type::DoubleTyID:
-		return mk_real(_sc, gv.DoubleVal);
-	    case Type::IntegerTyID:
-		return mk_integer(_sc, gv.IntVal.getZExtValue()); //  getRawData());
-	    case Type::PointerTyID:
-		return mk_cptr(_sc, gv.PointerVal);
-	    default:
-		return _sc->F;
-	    }		
+	{
+	case Type::FloatTyID:
+	    return mk_real(_sc, gv.FloatVal);
+	case Type::DoubleTyID:
+	    return mk_real(_sc, gv.DoubleVal);
+	case Type::IntegerTyID:
+	    return mk_integer(_sc, gv.IntVal.getZExtValue()); //  getRawData());
+	case Type::PointerTyID:
+	    return mk_cptr(_sc, gv.PointerVal);
+	default:
+	    return _sc->F;
+	}		
     }
 
     pointer SchemeFFI::call_compiled(scheme* _sc, pointer args)
@@ -1425,11 +1525,11 @@ namespace extemp {
 	Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = (Function*) cptr_value(pair_car(args));
 	if(func == 0)
-	    {
-		//std::cout << "no such function\n" << std::endl;
-		printf("No such function\n");
-		return _sc->F;
-	    }				
+	{
+	    //std::cout << "no such function\n" << std::endl;
+	    printf("No such function\n");
+	    return _sc->F;
+	}				
 	func->getArgumentList();
 	args = pair_cdr(args);
 
@@ -1438,78 +1538,78 @@ namespace extemp {
 	int lgth = list_length(_sc, args);
 	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
 	if(lgth != func->getArgumentList().size())
-	    {
-		printf("Wrong number of arguments for function!\n");
-		return _sc->F;			
-	    }
+	{
+	    printf("Wrong number of arguments for function!\n");
+	    return _sc->F;			
+	}
 	std::vector<llvm::GenericValue> fargs(lgth);
 	//std::cout << "ARGS: " << lgth << std::endl;
 	for(int i=0;i<lgth;i++,++funcargs)
-	    {
-		Argument* a = funcargs;
-		pointer p = list_ref(_sc, i, args);
-		if(is_integer(p)) {
-		    if(a->getType()->getTypeID() != Type::IntegerTyID)
-			{
-			    printf("Bad argument type %i\n",i);
-			    return _sc->F;
-			}
-		    int width = a->getType()->getPrimitiveSizeInBits();
-		    //std::cout << "TYPE: " << a->getType()->getTypeID() << std::endl;				
-		    fargs[i].IntVal = APInt(width,ivalue(p));
-		}			
-		else if(is_real(p))
-		    {
-
-			if(a->getType()->getTypeID() == Type::FloatTyID)
-			    {
-				fargs[i].FloatVal = (float) rvalue(p);
-			    }
-			else if(a->getType()->getTypeID() == Type::DoubleTyID)
-			    {
-				fargs[i].DoubleVal = rvalue(p);
-			    }
-			else
-			    {
-				printf("Bad argument type %i\n",i);
-				return _sc->F;
-			    }
-		    }
-		else if(is_string(p))
-		    {
-			if(a->getType()->getTypeID() != Type::PointerTyID)
-			    {
-				printf("Bad argument type %i\n",i);
-				return _sc->F;					
-			    }
-			//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
-			fargs[i].PointerVal = string_value(p);
-		    }						
-		else if(is_cptr(p))
-		    {
-			if(a->getType()->getTypeID() != Type::PointerTyID)
-			    {
-				printf("Bad argument type %i\n",i);
-				return _sc->F;
-			    }
-			fargs[i].PointerVal = cptr_value(p);
-			//fargs[i].PointerVal = (void*)p;
-		    }
-		else if(is_closure(p))
-		    {			
-			//ascii_print_color(1,1,10); // error color
-			printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
-			//ascii_print_color(0,9,10);
-			return _sc->F;
-		    }
-		else {
-		    //ascii_print_color(1,1,10); // error color
-		    printf("Bad argument at index %i\n",i);
-		    //ascii_print_color(0,9,10); // default
+	{
+	    Argument* a = funcargs;
+	    pointer p = list_ref(_sc, i, args);
+	    if(is_integer(p)) {
+		if(a->getType()->getTypeID() != Type::IntegerTyID)
+		{
+		    printf("Bad argument type %i\n",i);
 		    return _sc->F;
 		}
-		    
+		int width = a->getType()->getPrimitiveSizeInBits();
+		//std::cout << "TYPE: " << a->getType()->getTypeID() << std::endl;				
+		fargs[i].IntVal = APInt(width,ivalue(p));
+	    }			
+	    else if(is_real(p))
+	    {
+
+		if(a->getType()->getTypeID() == Type::FloatTyID)
+		{
+		    fargs[i].FloatVal = (float) rvalue(p);
+		}
+		else if(a->getType()->getTypeID() == Type::DoubleTyID)
+		{
+		    fargs[i].DoubleVal = rvalue(p);
+		}
+		else
+		{
+		    printf("Bad argument type %i\n",i);
+		    return _sc->F;
+		}
 	    }
+	    else if(is_string(p))
+	    {
+		if(a->getType()->getTypeID() != Type::PointerTyID)
+		{
+		    printf("Bad argument type %i\n",i);
+		    return _sc->F;					
+		}
+		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
+		fargs[i].PointerVal = string_value(p);
+	    }						
+	    else if(is_cptr(p))
+	    {
+		if(a->getType()->getTypeID() != Type::PointerTyID)
+		{
+		    printf("Bad argument type %i\n",i);
+		    return _sc->F;
+		}
+		fargs[i].PointerVal = cptr_value(p);
+		//fargs[i].PointerVal = (void*)p;
+	    }
+	    else if(is_closure(p))
+	    {			
+		//ascii_print_color(1,1,10); // error color
+		printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
+		//ascii_print_color(0,9,10);
+		return _sc->F;
+	    }
+	    else {
+		//ascii_print_color(1,1,10); // error color
+		printf("Bad argument at index %i\n",i);
+		//ascii_print_color(0,9,10); // default
+		return _sc->F;
+	    }
+		    
+	}
 
 	//		double(*fp)(double	,double) = (double(*)(double,double)) EE->getPointerToFunction(func);
 	//		double v = fp(rvalue(pair_car(args)),rvalue(pair_cadr(args)));
@@ -1529,20 +1629,20 @@ namespace extemp {
 
 	//std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
 	switch(func->getReturnType()->getTypeID())
-	    {
-	    case Type::FloatTyID:
-		return mk_real(_sc, gv.FloatVal);
-	    case Type::DoubleTyID:
-		return mk_real(_sc, gv.DoubleVal);
-	    case Type::IntegerTyID:
-		return mk_integer(_sc, gv.IntVal.getZExtValue()); //  getRawData());
-	    case Type::PointerTyID:
-		return mk_cptr(_sc, gv.PointerVal);
-	    case Type::VoidTyID:
-		return _sc->T;
-	    default:
-		return _sc->F;
-	    }
+	{
+	case Type::FloatTyID:
+	    return mk_real(_sc, gv.FloatVal);
+	case Type::DoubleTyID:
+	    return mk_real(_sc, gv.DoubleVal);
+	case Type::IntegerTyID:
+	    return mk_integer(_sc, gv.IntVal.getZExtValue()); //  getRawData());
+	case Type::PointerTyID:
+	    return mk_cptr(_sc, gv.PointerVal);
+	case Type::VoidTyID:
+	    return _sc->T;
+	default:
+	    return _sc->F;
+	}
     }
 	
     // this all here to conver 32bit floats (as a string) into llvms hex float 32 notation :(

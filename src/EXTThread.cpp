@@ -45,118 +45,118 @@
 
 namespace extemp
 {
-	EXTThread::EXTThread() : initialised(false), detached(false), joined(false)
-	{
+    EXTThread::EXTThread() : initialised(false), detached(false), joined(false)
+    {
 //		initialised = false;
 //		detached = false;
 //		joined = false;
-	}
+    }
 
-	EXTThread::~EXTThread()
-	{		
+    EXTThread::~EXTThread()
+    {		
 #ifdef _EXTTHREAD_DEBUG_
-		if (initialised && (! (detached || joined)))
-		{
-			std::cerr << "Resource leak destroying EXTThread: creator has not joined nor detached thread." << std::endl;
-		}
-#endif
-	}
-
-	int EXTThread::create(void *(*start_routine)(void *), void *arg)
+	if (initialised && (! (detached || joined)))
 	{
-		int result = 22; //EINVAL;
-
-		if (! initialised)
-		{
-			result = pthread_create(&pthread, NULL, start_routine, arg);
-			initialised = ! result;
-		}
-
-#ifdef _EXTTHREAD_DEBUG_
-		if (result)
-		{
-			std::cerr << "Error creating thread: " << result << std::endl;
-		}
+	    std::cerr << "Resource leak destroying EXTThread: creator has not joined nor detached thread." << std::endl;
+	}
 #endif
+    }
 
-		return result;
-	}    
+    int EXTThread::create(void *(*start_routine)(void *), void *arg)
+    {
+	int result = 22; //EINVAL;
 
-
-	int EXTThread::detach()
+	if (! initialised)
 	{
-		int result = 22; //EINVAL;
-
-		if (initialised)
-		{
-			result = pthread_detach(pthread);
-			detached = ! result;
-		}
-
-#ifdef _EXTTHREAD_DEBUG_
-		if (result)
-		{
-			std::cerr << "Error detaching thread: " << result << std::endl;
-		}
-#endif
-
-		return result;
+	    result = pthread_create(&pthread, NULL, start_routine, arg);
+	    initialised = ! result;
 	}
 
-	int EXTThread::join()
-	{
-		int result = 22; //EINVAL;
-
-		if (initialised)
-		{
-			result = pthread_join(pthread, NULL);
-			joined = ! result;
-		}
-
 #ifdef _EXTTHREAD_DEBUG_
-		if (result)
-		{
-			std::cerr << "Error joining thread: " << result << std::endl;
-		}
+	if (result)
+	{
+	    std::cerr << "Error creating thread: " << result << std::endl;
+	}
 #endif
 
-		return result;
+	return result;
+    }    
+
+
+    int EXTThread::detach()
+    {
+	int result = 22; //EINVAL;
+
+	if (initialised)
+	{
+	    result = pthread_detach(pthread);
+	    detached = ! result;
 	}
+
+#ifdef _EXTTHREAD_DEBUG_
+	if (result)
+	{
+	    std::cerr << "Error detaching thread: " << result << std::endl;
+	}
+#endif
+
+	return result;
+    }
+
+    int EXTThread::join()
+    {
+	int result = 22; //EINVAL;
+
+	if (initialised)
+	{
+	    result = pthread_join(pthread, NULL);
+	    joined = ! result;
+	}
+
+#ifdef _EXTTHREAD_DEBUG_
+	if (result)
+	{
+	    std::cerr << "Error joining thread: " << result << std::endl;
+	}
+#endif
+
+	return result;
+    }
 	
-	//BE AWARE THAT THIS WILL ONLY TERMINATE THE THREAD AT CERTAIN PREDETEMINED POINTS (LIKE WAIT POINTS)
-	//READ pthread_cancel BEFORE MAKING ASSUMPTIONS.  (usually need a pthread_testcancel or pthread_cond_(timed)wait
-	int EXTThread::cancel()
-	{
-		int result = 22; //EINVAL
+    //BE AWARE THAT THIS WILL ONLY TERMINATE THE THREAD AT CERTAIN PREDETEMINED POINTS (LIKE WAIT POINTS)
+    //READ pthread_cancel BEFORE MAKING ASSUMPTIONS.  (usually need a pthread_testcancel or pthread_cond_(timed)wait
+    int EXTThread::cancel()
+    {
+	int result = 22; //EINVAL
 		
-		if(initialised)
-		{
-			result = pthread_cancel(pthread);
-			cancelled = ! result;
-		}
+	if(initialised)
+	{
+	    result = pthread_cancel(pthread);
+	    cancelled = ! result;
+	}
 		
 #ifdef _EXTTHREAD_DEBUG_
-		if (result)
-		{
-			std::cerr << "Error joining thread: " << result << std::endl;
-		}
+	if (result)
+	{
+	    std::cerr << "Error joining thread: " << result << std::endl;
+	}
 #endif
-		return result;
+	return result;
 		
-	}
+    }
 	
-	bool EXTThread::isRunning() 
-	{ 
-		return 0 != pthread; 
-	}	
+    bool EXTThread::isRunning() 
+    { 
+	return 0 != pthread; 
+    }	
 	
-	bool EXTThread::isCurrentThread()
-	{
-		return pthread_equal(pthread_self(), pthread);
-	}
+    bool EXTThread::isCurrentThread()
+    {
+	return pthread_equal(pthread_self(), pthread);
+    }
 	
-	pthread_t EXTThread::getPthread()
-	{
-		return pthread;
-	}
+    pthread_t EXTThread::getPthread()
+    {
+	return pthread;
+    }
 }

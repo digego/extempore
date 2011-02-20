@@ -51,236 +51,236 @@ namespace extemp {
 			
     template<typename KEY>
     class SortCriteria {
-	public:
-        bool operator() ( const KEY& elem1, const KEY& elem2) const {
-            return elem1 < elem2;
-        } 
+    public:
+	bool operator() ( const KEY& elem1, const KEY& elem2) const {
+	    return elem1 < elem2;
+	} 
     };
 	
     template<typename KEY, typename T>
-		class PriorityQueue {
-			typedef std::multimap< KEY, T, SortCriteria<KEY> > CONTAINER;
-			typedef typename std::multimap< KEY, T, SortCriteria<KEY> >::iterator CIter;    
+    class PriorityQueue {
+	typedef std::multimap< KEY, T, SortCriteria<KEY> > CONTAINER;
+	typedef typename std::multimap< KEY, T, SortCriteria<KEY> >::iterator CIter;    
 			
-	public:
+    public:
 				
-			PriorityQueue() : mutex("priority_queue")
-			{
-				mutex.init();
-			}
+	PriorityQueue() : mutex("priority_queue")
+	{
+	    mutex.init();
+	}
 			
-			~PriorityQueue()
-			{
-				mutex.destroy();
-			}
+	~PriorityQueue()
+	{
+	    mutex.destroy();
+	}
 			
-			CONTAINER& getQueue() { return this->queue; }
-			CIter begin() { return queue.begin(); }
-			CIter end() { return queue.end(); }
-			CIter lower_bound(const KEY time) { return queue.lower_bound(time); }
-			CIter upper_bound(const KEY time) { return queue.upper_bound(time); }
+	CONTAINER& getQueue() { return this->queue; }
+	CIter begin() { return queue.begin(); }
+	CIter end() { return queue.end(); }
+	CIter lower_bound(const KEY time) { return queue.lower_bound(time); }
+	CIter upper_bound(const KEY time) { return queue.upper_bound(time); }
 			
-			void lock()
-			{
-				mutex.lock();
-			}
+	void lock()
+	{
+	    mutex.lock();
+	}
 			
-			void unlock()
-			{
-				mutex.unlock();
-			}
+	void unlock()
+	{
+	    mutex.unlock();
+	}
 			
-			bool add(T val)
-			{
-				mutex.lock();
+	bool add(T val)
+	{
+	    mutex.lock();
 				
-				CIter pos  = queue.insert(std::make_pair(val->getStartTime(),val));
+	    CIter pos  = queue.insert(std::make_pair(val->getStartTime(),val));
 				
 #ifdef _DEBUG_QUEUE_
-				std::cout << "QUEUE[" << this << "] " << "Successfully Added Task. Size: " << queue.size() << " at startime " << val->getStartTime() << std::endl;
-				std::cout << "QUEUE[" << this << "] " << "Inserted as element " << (std::distance(queue.begin(),pos) + 1) << " in queue of size " << queue.size() << std::endl;
+	    std::cout << "QUEUE[" << this << "] " << "Successfully Added Task. Size: " << queue.size() << " at startime " << val->getStartTime() << std::endl;
+	    std::cout << "QUEUE[" << this << "] " << "Inserted as element " << (std::distance(queue.begin(),pos) + 1) << " in queue of size " << queue.size() << std::endl;
 				
-				/*
-				 std::cout << "-----------START----------" << std::endl;
-				 pos = queue.begin(); 
-				 CIter end = queue.end();
-				 for( ;pos != end; ++pos) {
-					 std::cout << pos->second->getStartTime() << std::endl;
-				 }
-				 std::cout << "------------END-----------" << std::endl;
-				 */
+	    /*
+	      std::cout << "-----------START----------" << std::endl;
+	      pos = queue.begin(); 
+	      CIter end = queue.end();
+	      for( ;pos != end; ++pos) {
+	      std::cout << pos->second->getStartTime() << std::endl;
+	      }
+	      std::cout << "------------END-----------" << std::endl;
+	    */
 #endif
-				mutex.unlock();
+	    mutex.unlock();
 				
-				return true;
-			}
+	    return true;
+	}
 			
-			int erase(std::string label)
-			{
-				int res = 0;
+	int erase(std::string label)
+	{
+	    int res = 0;
 				
-				mutex.lock();
+	    mutex.lock();
 				
-				CIter pos = queue.begin();
-				CIter end = queue.end();
-				for( ;pos != end; ++pos) {
-					if(label == pos->second->getLabel()) {
+	    CIter pos = queue.begin();
+	    CIter end = queue.end();
+	    for( ;pos != end; ++pos) {
+		if(label == pos->second->getLabel()) {
 #ifdef _DEBUG_QUEUE_
-						std::cout << "Removing " << pos->second << " from the queue.  LABEL(" << label << ")" << std::endl;
+		    std::cout << "Removing " << pos->second << " from the queue.  LABEL(" << label << ")" << std::endl;
 #endif
-						queue.erase(pos);
-						res = 1;
-						break;
-					}
-				}
+		    queue.erase(pos);
+		    res = 1;
+		    break;
+		}
+	    }
 				
-				mutex.unlock();
+	    mutex.unlock();
 				
-				return res;
-			}
+	    return res;
+	}
 			
-			int erase(T val)
-			{
-				int res = 0;
+	int erase(T val)
+	{
+	    int res = 0;
 				
-				mutex.lock();
+	    mutex.lock();
 				
-				CIter pos = queue.begin(); 
-				CIter end = queue.end();
-				for( ;pos != end; ++pos) {
-					if(val == (pos->second)) {
+	    CIter pos = queue.begin(); 
+	    CIter end = queue.end();
+	    for( ;pos != end; ++pos) {
+		if(val == (pos->second)) {
 #ifdef _DEBUG_QUEUE_
-						//std::cout << "A:  time(" << val->getStartTime() << ")   label(" << val->getLabel() << ")" << std::endl;
-						//std::cout << "B:  time(" << pos->second->getStartTime() << ")   label(" << pos->second->getLabel() << ")" << std::endl;
+		    //std::cout << "A:  time(" << val->getStartTime() << ")   label(" << val->getLabel() << ")" << std::endl;
+		    //std::cout << "B:  time(" << pos->second->getStartTime() << ")   label(" << pos->second->getLabel() << ")" << std::endl;
 #endif
-						//A second equality test is required here to double check that the val==*pos test above
-						//is still accurate.  "Still accurate" in this context means that there is a possibility
-						//that the original Task has been removed and a new task has been placed at the same
-						//memory location.
-						if(val->equal(pos->second)) {
+		    //A second equality test is required here to double check that the val==*pos test above
+		    //is still accurate.  "Still accurate" in this context means that there is a possibility
+		    //that the original Task has been removed and a new task has been placed at the same
+		    //memory location.
+		    if(val->equal(pos->second)) {
 #ifdef _DEBUG_QUEUE_
-							std::cout << "Removing " << val << " from the queue.  LABEL(" << val->getLabel() << ")" << std::endl;
+			std::cout << "Removing " << val << " from the queue.  LABEL(" << val->getLabel() << ")" << std::endl;
 #endif
-							queue.erase(pos);
-							res = 1;
-							break;
-						}
-					}
-				}
+			queue.erase(pos);
+			res = 1;
+			break;
+		    }
+		}
+	    }
 				
-				mutex.unlock();
+	    mutex.unlock();
 				
-				return res;
-			}
+	    return res;
+	}
 			
 #ifdef _AIME_WIN32_
-			CIter erase(CIter iter)
-			{
-				return queue.erase(iter);
-			}
+	CIter erase(CIter iter)
+	{
+	    return queue.erase(iter);
+	}
 #else
-			void erase(CIter iter)
-			{
-				queue.erase(iter);
-			}	
+	void erase(CIter iter)
+	{
+	    queue.erase(iter);
+	}	
 #endif
  
-			int reaper(const KEY time, bool callbacks)
-			{
-				int res = 0;
+	int reaper(const KEY time, bool callbacks)
+	{
+	    int res = 0;
 				
-				mutex.lock();
+	    mutex.lock();
 				
-				CIter pos;
-				for(pos = queue.begin(); pos != queue.end(); ) {
-					if(pos->first < time) {
-						if(!pos->second->isCallback() || callbacks) {
+	    CIter pos;
+	    for(pos = queue.begin(); pos != queue.end(); ) {
+		if(pos->first < time) {
+		    if(!pos->second->isCallback() || callbacks) {
 #ifdef _DEBUG_QUEUE_
-							std::cout << "Removing " << pos->second << " from the queue. REAPED" << std::endl;
+			std::cout << "Removing " << pos->second << " from the queue. REAPED" << std::endl;
 #endif						
-							pos->second->deleteArg();
-							delete pos->second;
-							//////////////////////////////////////
-							queue.erase(pos++);
-							res = 1;							
-						}else{
-							++pos;
-						}							
-					} else {
-						break;
-					}
-				}
+			pos->second->deleteArg();
+			delete pos->second;
+			//////////////////////////////////////
+			queue.erase(pos++);
+			res = 1;							
+		    }else{
+			++pos;
+		    }							
+		} else {
+		    break;
+		}
+	    }
 				
-				mutex.unlock();
+	    mutex.unlock();
 				
-				return res;
-			}
+	    return res;
+	}
 			
-			void clear()
-			{
-				CIter i = queue.begin();
-				while(i != queue.end()) {
-					delete i->second;
-					++i;
-				}
-				queue.clear();
-			}
+	void clear()
+	{
+	    CIter i = queue.begin();
+	    while(i != queue.end()) {
+		delete i->second;
+		++i;
+	    }
+	    queue.clear();
+	}
 			
-			bool empty()
-			{
-				return queue.empty();
-			}
+	bool empty()
+	{
+	    return queue.empty();
+	}
 			
-			int size()
-			{
-				return queue.size();
-			}
+	int size()
+	{
+	    return queue.size();
+	}
 			
-			// if you want the locks you'll need mutex recursion!
-			// you can set this in EXTMutex if you want it!
-			T get()
-			{
-				//mutex.lock();
+	// if you want the locks you'll need mutex recursion!
+	// you can set this in EXTMutex if you want it!
+	T get()
+	{
+	    //mutex.lock();
 				
-				if(queue.size() == 0) {
-					//mutex.unlock();
-					return NULL;
-				}
+	    if(queue.size() == 0) {
+		//mutex.unlock();
+		return NULL;
+	    }
 #ifdef _DEBUG_QUEUE_
-				std::cout << "Getting Task From Queue.   Queue Size: " << queue.size() << std::endl;
+	    std::cout << "Getting Task From Queue.   Queue Size: " << queue.size() << std::endl;
 #endif
-				CIter i = queue.begin();
-				T element = i->second;
-				queue.erase(i);
+	    CIter i = queue.begin();
+	    T element = i->second;
+	    queue.erase(i);
 				
-				//mutex.unlock();
+	    //mutex.unlock();
 				
-				return element;
-			}
+	    return element;
+	}
 			
-			// if you want the locks you'll need mutex recursion!
-			// you can set this in EXTMutex if you want it!
-			T peek()
-			{
-				//mutex.lock();
+	// if you want the locks you'll need mutex recursion!
+	// you can set this in EXTMutex if you want it!
+	T peek()
+	{
+	    //mutex.lock();
 				
-				if(queue.size() == 0) {
-					//mutex.unlock();
-					return NULL; //check for empty container
-				}
+	    if(queue.size() == 0) {
+		//mutex.unlock();
+		return NULL; //check for empty container
+	    }
 				
-				CIter i = queue.begin();
-				T element = i->second;
+	    CIter i = queue.begin();
+	    T element = i->second;
 				
-				//mutex.unlock();
+	    //mutex.unlock();
 				
-				return element;
-			}
+	    return element;
+	}
 			
-private:
-			CONTAINER queue;
-			EXTMutex mutex;
-		};
+    private:
+	CONTAINER queue;
+	EXTMutex mutex;
+    };
 	
 } //End Namespace
 #endif

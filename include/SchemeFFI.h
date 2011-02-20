@@ -40,6 +40,8 @@
 #include "EXTLLVM.h"
 #include "Task.h";
 
+#include <map>
+
 namespace extemp {
 
     class SchemeFFI {
@@ -55,6 +57,7 @@ namespace extemp {
 	void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);		
 		
 	static pointer asciiColor(scheme* _sc, pointer args);
+	static pointer emit(scheme* _sc, pointer args);
 
 	// ipc stuff
 	static pointer newSchemeProcess(scheme* _sc, pointer args);
@@ -107,6 +110,7 @@ namespace extemp {
 	void destroyMallocZoneWithDelay(TaskI* task);
 	static pointer createMallocZone(scheme* _sc, pointer args);
 	static pointer defaultMallocZone(scheme* _sc, pointer args);
+	static pointer resetMallocZone(scheme* _sc, pointer args);
 	static pointer destroyMallocZone(scheme* _sc, pointer args);
 	static pointer copyToDefaultZone(scheme* _sc, pointer args);
 			
@@ -133,9 +137,13 @@ namespace extemp {
 	static pointer printLLVMModule(scheme* _sc, pointer args);
 	static pointer printLLVMFunction(scheme* _sc, pointer args);
 	static pointer bind_symbol(scheme* _sc, pointer args);
+	static pointer impcirGetName(scheme* _sc, pointer args);	
+	static pointer impcirGetType(scheme* _sc, pointer args);	
+	static pointer impcirAdd(scheme* _sc, pointer args);
 
     private:
 	static SchemeFFI SINGLETON;		
+	static std::map<std::string,std::pair<std::string,std::string> > IMPCIR_DICT;
     };
 	
 } // end namespace

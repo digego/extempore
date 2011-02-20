@@ -69,120 +69,185 @@
 
 #include "SchemeProcess.h"
 
+// this must be global. we should therefore
+// make it thread safe but I'm not going to bother
+// while still testing.
+std::map<void*,uint64_t> LLVM_ZONE_ALLOC_MAP;
+
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
-	llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
-	zone->memory = malloc((size_t) size);
-	zone->offset = 0;
-	zone->size = size;
-	//printf("CreateZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
-	return zone;
+    llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
+    zone->memory = malloc((size_t) size);
+    zone->mark = 0;
+    zone->offset = 0;
+    zone->size = size;
+    //printf("CreateZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
+    return zone;
 }
 
+llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone)
+{
+    zone->offset = 0;
+    return zone;
+}
+ 
 void llvm_zone_destroy(llvm_zone_t* zone)
 {
-	//printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);	
-	free(zone->memory);
-	free(zone);
-	return;
+    //printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);	
+    free(zone->memory);
+    free(zone);
+    return;
 }
 
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
-	//printf("MallocZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
-	if(zone->offset+size >= zone->size)
-	{
-		// for the moment print a warning and just leak the memory
-		printf("Zone full ... leaking %lld bytes\n",size);
-		return malloc((size_t)size);
-	}
-	void* newptr = (void*)(((char*)zone->memory)+zone->offset);
-	zone->offset += size; 
-	return newptr;
+    //printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
+    if(zone->offset+size >= zone->size)
+    {
+	// for the moment print a warning and just leak the memory
+	printf("Zone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
+	//exit(1);
+	return malloc((size_t)size);
+    }
+    void* newptr = (void*)(((char*)zone->memory)+zone->offset);
+    memset(newptr,0,size); // clear memory
+    zone->offset += size; 
+    // add ptr size to alloc map
+    LLVM_ZONE_ALLOC_MAP[newptr] = size;
+    //extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_set_size(newptr, size);
+    return newptr;
 }
+
+void llvm_zone_mark(llvm_zone_t* zone)
+{
+    zone->mark = zone->offset;
+}
+
+uint64_t llvm_zone_mark_size(llvm_zone_t* zone)
+{
+    return zone->offset - zone->mark;
+}
+
+void llvm_zone_ptr_set_size(void* ptr, uint64_t size)
+{
+    LLVM_ZONE_ALLOC_MAP[ptr] = size;
+    //printf("set ptr: %p  to size: %lld\n",ptr,size);
+    return;
+}
+
+uint64_t llvm_zone_ptr_size(void* ptr)
+{
+    // return ptr size from alloc map
+    return LLVM_ZONE_ALLOC_MAP[ptr];
+    //return extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_get_size(ptr);
+}
+
+void llvm_zone_copy_ptr(void* ptr1, void* ptr2)
+{
+    uint64_t size1 = llvm_zone_ptr_size(ptr1);
+    uint64_t size2 = llvm_zone_ptr_size(ptr2);
+    if(size1 != size2) { 
+	printf("Bad LLVM ptr copy - size mismatch %p:%p %lld:%lld\n",ptr1,ptr2,size1,size2); 
+	exit(1);
+    }
+    //printf("%p,%p,%lld\n",ptr2,ptr1,size1);
+    memcpy(ptr2, ptr1, size1);
+    return;		
+}
+
 
 extemp::CM* DestroyMallocZoneWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay)
 {
-	//printf("destroyWithDelay %p\n",zone);
-	extemp::CM* cb = DestroyMallocZoneWithDelayCM; //mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
-	extemp::Task<llvm_zone_t*>* task = new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME,44100,cb,zone);
-	extemp::TaskScheduler::I()->add(task);
+    //printf("destroyWithDelay %p\n",zone);
+    extemp::CM* cb = DestroyMallocZoneWithDelayCM; //mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
+    extemp::Task<llvm_zone_t*>* task = new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME+delay,44100,cb,zone);
+    extemp::TaskScheduler::I()->add(task);
 }
 
 int llvm_printf(char* format, ...)
 {
-	va_list ap;
-	va_start(ap,format);
-	char* ret = (char*) alloca(2048);
-	int returnval = vasprintf(&ret, format, ap);
-	printf("%s",ret);
-	fflush(stdout);	
-	va_end(ap);
-	return returnval;
+    va_list ap;
+    va_start(ap,format);
+    char* ret = (char*) alloca(2048);
+    int returnval = vasprintf(&ret, format, ap);
+    printf("%s",ret);
+    fflush(stdout);	
+    va_end(ap);
+    return returnval;
 }
 
 long long llvm_get_next_prime(long long start)
 {
-	long long  how_many = start+100000;
-	long long  *array = (long long*) calloc(how_many, sizeof(long long));
-	long long  i, prime, multiple;
-	/*  mark each int as potentially prime */
-	for (i=0; i<how_many; i++)
-		array[i] = 1;
-	/* special cases: 0, 1 not considered prime */
-	array[0] = array[1] = 0;
-	/* foreach starting prime, mark every multiple as non-prime */
-	prime = 0;
-	while (1) {
-		/* skip non-primes to find first prime */
-		for (; (prime < how_many) && (!array[prime]); ++prime)
-			continue;
-		if (prime >= how_many)
-			break;
-		for (multiple=2*prime; multiple<how_many; multiple+=prime) {
-			array[multiple] = 0;
-		}
-		++prime;
+    long long  how_many = start+100000;
+    long long  *array = (long long*) calloc(how_many, sizeof(long long));
+    long long  i, prime, multiple;
+    /*  mark each int as potentially prime */
+    for (i=0; i<how_many; i++)
+	array[i] = 1;
+    /* special cases: 0, 1 not considered prime */
+    array[0] = array[1] = 0;
+    /* foreach starting prime, mark every multiple as non-prime */
+    prime = 0;
+    while (1) {
+	/* skip non-primes to find first prime */
+	for (; (prime < how_many) && (!array[prime]); ++prime)
+	    continue;
+	if (prime >= how_many)
+	    break;
+	for (multiple=2*prime; multiple<how_many; multiple+=prime) {
+	    array[multiple] = 0;
 	}
-	/* Now that we have marked all multiple of primes as non-prime, */
-	/* print the remaining numbers that fell through the sieve, and */
-	/* are thus prime */
-	for (i=start+1; i<how_many; i++) {
-		if(array[i]) return i;
-	}
-	return -1;
+	++prime;
+    }
+    /* Now that we have marked all multiple of primes as non-prime, */
+    /* print the remaining numbers that fell through the sieve, and */
+    /* are thus prime */
+    for (i=start+1; i<how_many; i++) {
+	if(array[i]) return i;
+    }
+    return -1;
 }
 
 // these are helpers for runtime debugging in llvm
 void llvm_print_pointer(void* ptr)
 {
-	printf("llvm:ptr:>%p -- %lld\n",ptr,*((int64_t*)ptr));
-	return;
+    printf("llvm:ptr:>%p -- %lld\n",ptr,*((int64_t*)ptr));
+    return;
 }
 
 void llvm_print_i32(int32_t num)
 {
-	printf("llvm:i32:>%d\n",num);
-	return;
+    printf("llvm:i32:>%d\n",num);
+    return;
 }
 
 void llvm_print_i64(int64_t num)
 {
-	printf("llvm:i64:>%lld\n",num);
-	return;
+    printf("llvm:i64:>%lld\n",num);
+    return;
 }
 
 void llvm_print_f32(float num)
 {
-	printf("llvm:f32:>%f\n",num);
-	return;
+    printf("llvm:f32:>%f\n",num);
+    return;
 }
 
 void llvm_print_f64(double num)
 {
-	printf("llvm:f64:>%f\n",num);
-	return;
+    printf("llvm:f64:>%f\n",num);
+    return;
+}
+
+int64_t llvm_now()
+{
+    return extemp::UNIV::TIME;
+}
+
+double llvm_samplerate()
+{
+    return (double) extemp::UNIV::SAMPLERATE;
 }
 
 ///////////////////////////////////
@@ -192,166 +257,216 @@ void llvm_print_f64(double num)
 // This is temporary and needs to replaced with something sensible!
 struct closure_address_table
 {
-	char* name;
-	uint32_t offset;
-	char* type;
-	struct closure_address_table* next;
+    char* name;
+    uint32_t offset;
+    char* type;		
+    struct closure_address_table* next;
 };
 
 struct closure_address_table* get_address_table(const char* name, closure_address_table* table)
 {
-	while(table)
-	{
-		if(strcmp(table->name,name)) return table;
-		table = table->next;
-	}
-	printf("Unable to locate %s in closure environment\n",name);
-	return 0;
+    while(table)
+    {
+	if(strcmp(table->name,name)) return table;
+	table = table->next;
+    }
+    printf("Unable to locate %s in closure environment\n",name);
+    return 0;
 }
 
 uint32_t get_address_offset(const char* name, closure_address_table* table)
 {
-	while(table)
-	{
-		if(strcmp(table->name,name) == 0) {
-			//printf("in %s returning offset %d from %s\n",table->name,table->offset,name);
-			return table->offset;	
-		}
-		table = table->next;
+    while(table)
+    {
+	if(strcmp(table->name,name) == 0) {
+	    //printf("in %s returning offset %d from %s\n",table->name,table->offset,name);
+	    return table->offset;	
 	}
-	printf("Unable to locate %s in closure environment\n",name);
-	return 0;
+	table = table->next;
+    }
+    printf("Unable to locate %s in closure environment\n",name);
+    return 0;
+}
+
+char* get_adddress_type(const char* name, closure_address_table* table)
+{
+    while(table)
+    {
+      if(strcmp(table->name,name) == 0) {
+	return table->type;
+      }
+      table = table->next;
+    }
+    printf("Unable to locate %s in closure environment\n",name);
+    return 0;  
+}
+
+bool check_address_type(const char* name, closure_address_table* table, const char* type)
+{
+    while(table)
+    {
+      if(strcmp(table->name,name) == 0) {
+	if(strcmp(table->type,type)!=0) {
+	  printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,name,table->type);
+	  return 0;
+	}else{
+	  return 1;
+	}	  
+      }
+      table = table->next;
+    }
+    printf("Unable to locate %s in closure environment\n",name);
+    return 0;
 }
 
 struct closure_address_table* new_address_table()
 {
-	return 0; // NULL for empty table
+    return 0; // NULL for empty table
 }
-
-struct closure_address_table* add_address_table(char* name, uint32_t offset, char* type, struct closure_address_table* table)
+ 
+struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, struct closure_address_table* table)
 {	
-	struct closure_address_table* t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
-	t->name = name;
-	t->offset = offset;
-	t->type = type;
-	t->next = table;
-	//printf("adding %s of type %s at %d\n",t->name,t->type,t->offset);
-	return t;
+    struct closure_address_table* t = (struct closure_address_table*) llvm_zone_malloc(zone,sizeof(struct closure_address_table));
+    t->name = name;
+    t->offset = offset;
+    t->type = type;
+    t->next = table;
+    //printf("adding %s of type %s at %d\n",t->name,t->type,t->offset);
+    return t;
 }
 /////////////////////////////////////////////////////////////////////////
 
 namespace extemp {
 	
-	EXTLLVM EXTLLVM::SINGLETON;
-	int64_t EXTLLVM::LLVM_COUNT = 0l;
-	bool EXTLLVM::OPTIMIZE_COMPILES = 0;
+    EXTLLVM EXTLLVM::SINGLETON;
+    int64_t EXTLLVM::LLVM_COUNT = 0l;
+    bool EXTLLVM::OPTIMIZE_COMPILES = 0;
 	
-	EXTLLVM::EXTLLVM()
-	{
-		//printf("making llvm !!!!!!!!!!!!!!!!!!\n");
-		M = 0;
-		MP = 0;
-		EE = 0;
-		//initLLVM();
-	}
+    EXTLLVM::EXTLLVM()
+    {
+	//printf("making llvm !!!!!!!!!!!!!!!!!!\n");
+	M = 0;
+	MP = 0;
+	EE = 0;
+	//initLLVM();
+    }
 	
-	EXTLLVM::~EXTLLVM() {}
+    EXTLLVM::~EXTLLVM() {}
 	
-	void EXTLLVM::initLLVM()
-	{
-		if(M == 0) { // Initalize Once Only (not per scheme process)			
-			bool result = llvm::InitializeNativeTarget();			
-			M = new llvm::Module("JIT",llvm::getGlobalContext());
-			// Create the JIT.
-			std::string ErrStr;
-		  	EE = llvm::EngineBuilder(M).setErrorStr(&ErrStr).create();
-		  	if (!EE) {
-		    	fprintf(stderr, "Could not create ExecutionEngine: %s\n", ErrStr.c_str());
-		    	exit(1);
-		  	}
+    void EXTLLVM::initLLVM()
+    {
+	if(M == 0) { // Initalize Once Only (not per scheme process)			
+	    bool result = llvm::InitializeNativeTarget();			
+	    M = new llvm::Module("JIT",llvm::getGlobalContext());
+	    // Create the JIT.
+	    std::string ErrStr;
+	    EE = llvm::EngineBuilder(M).setErrorStr(&ErrStr).create();
+	    if (!EE) {
+		fprintf(stderr, "Could not create ExecutionEngine: %s\n", ErrStr.c_str());
+		exit(1);
+	    }
 			
-			//EE = llvm::EngineBuilder(M).create();
-			PM = new llvm::PassManager();
-			PM->add(new llvm::TargetData(*EE->getTargetData()));
-			// Do simple "peephole" optimizations and bit-twiddling optzns.
-			PM->add(llvm::createInstructionCombiningPass());
-			// Reassociate expressions.
-			PM->add(llvm::createReassociatePass());
-			// Eliminate Common SubExpressions.
-			PM->add(llvm::createGVNPass());
-			// Simplify the control flow graph (deleting unreachable blocks, etc).
-			PM->add(llvm::createCFGSimplificationPass());
-			// Function inlining
-			PM->add(llvm::createFunctionInliningPass());
-			// loop invariants
-			PM->add(llvm::createLICMPass());
-			// vars
-			PM->add(llvm::createIndVarSimplifyPass());
+	    //EE = llvm::EngineBuilder(M).create();
+	    PM = new llvm::PassManager();
+	    PM->add(new llvm::TargetData(*EE->getTargetData()));
+	    // Do simple "peephole" optimizations and bit-twiddling optzns.
+	    PM->add(llvm::createInstructionCombiningPass());
+	    // Reassociate expressions.
+	    PM->add(llvm::createReassociatePass());
+	    // Eliminate Common SubExpressions.
+	    PM->add(llvm::createGVNPass());
+	    // Simplify the control flow graph (deleting unreachable blocks, etc).
+	    PM->add(llvm::createCFGSimplificationPass());
+	    // Function inlining
+	    PM->add(llvm::createFunctionInliningPass());
+	    // loop invariants
+	    PM->add(llvm::createLICMPass());
+	    // vars
+	    PM->add(llvm::createIndVarSimplifyPass());
 			
-			//llvm::PerformTailCallOpt = true;
-			llvm::GuaranteedTailCallOpt = true;
-			llvm::llvm_start_multithreaded();
+	    //llvm::PerformTailCallOpt = true;
+	    llvm::GuaranteedTailCallOpt = true;
+	    llvm::llvm_start_multithreaded();
 			
-			char fname[] = "/code.ir";
-			char load_path[256];
-			strcpy(load_path,extemp::UNIV::PWD);
-			strcat(load_path,fname);
-			FILE* fp;
-			if((fp = fopen(load_path,"r")) == NULL)
-			{
-				printf("Could not open %s",load_path);
-				exit(1);
-			}
+	    char fname[] = "/code.ir";
+	    char load_path[256];
+	    strcpy(load_path,extemp::UNIV::PWD);
+	    strcat(load_path,fname);
+	    FILE* fp;
+	    if((fp = fopen(load_path,"r")) == NULL)
+	    {
+		printf("Could not open %s",load_path);
+		exit(1);
+	    }
 			
-			fseek(fp,0,SEEK_END);
-			int size = ftell(fp);
-			fseek(fp,0,SEEK_SET);
-			char* assm = (char*) alloca(size+1);
-			int res = fread(assm, 1, size, fp);
-			fclose(fp);
-			llvm::SMDiagnostic pa;
-			llvm::Module* newM = ParseAssemblyString(assm, M, pa, llvm::getGlobalContext());
+	    fseek(fp,0,SEEK_END);
+	    int size = ftell(fp);
+	    fseek(fp,0,SEEK_SET);
+	    char* assm = (char*) alloca(size+1);
+	    int res = fread(assm, 1, size, fp);
+	    assm[size]=0;
+	    fclose(fp);
+	    llvm::SMDiagnostic pa;
+	    llvm::Module* newM = ParseAssemblyString(assm, M, pa, llvm::getGlobalContext());
 			
-			if(newM == 0)
-			{
-				std::string errstr;
-				llvm::raw_string_ostream ss(errstr);
-				pa.Print("Extempore",ss);
-				printf(ss.str().c_str());
-			}
+	    if(newM == 0)
+	    {
+		std::string errstr;
+		llvm::raw_string_ostream ss(errstr);
+		pa.Print("Extempore",ss);
+		printf(ss.str().c_str());
+	    }
 
-			llvm::GlobalValue* gv = M->getNamedValue(std::string("llvm_destroy_zone_after_delay"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_destroy_zone_after_delay);			
-			gv = M->getNamedValue(std::string("next_prime"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_get_next_prime);			
-			gv = M->getNamedValue(std::string("llvm_printf"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_printf);									
-			gv = M->getNamedValue(std::string("llvm_zone_create"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);						
-			gv = M->getNamedValue(std::string("llvm_zone_destroy"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);						
-			gv = M->getNamedValue(std::string("llvm_zone_malloc"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_zone_malloc);						
-			gv = M->getNamedValue(std::string("get_address_table"));
-			EE->updateGlobalMapping(gv,(void*)&get_address_table);						
-			gv = M->getNamedValue(std::string("get_address_offset"));
-			EE->updateGlobalMapping(gv,(void*)&get_address_offset);									
-			gv = M->getNamedValue(std::string("add_address_table"));
-			EE->updateGlobalMapping(gv,(void*)&add_address_table);						
-			gv = M->getNamedValue(std::string("new_address_table"));
-			EE->updateGlobalMapping(gv,(void*)&new_address_table);						
-			gv = M->getNamedValue(std::string("llvm_print_pointer"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_print_pointer);						
-			gv = M->getNamedValue(std::string("llvm_print_i32"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_print_i32);						
-			gv = M->getNamedValue(std::string("llvm_print_i64"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_print_i64);						
-			gv = M->getNamedValue(std::string("llvm_print_f32"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_print_f32);						
-			gv = M->getNamedValue(std::string("llvm_print_f64"));
-			EE->updateGlobalMapping(gv,(void*)&llvm_print_f64);						
+	    llvm::GlobalValue* gv = M->getNamedValue(std::string("llvm_destroy_zone_after_delay"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_destroy_zone_after_delay);			
+	    gv = M->getNamedValue(std::string("next_prime"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_get_next_prime);			
+	    gv = M->getNamedValue(std::string("llvm_printf"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_printf);									
+	    gv = M->getNamedValue(std::string("llvm_zone_create"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);						
+	    gv = M->getNamedValue(std::string("llvm_zone_destroy"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);						
+	    gv = M->getNamedValue(std::string("llvm_zone_malloc"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_malloc);						
+	    gv = M->getNamedValue(std::string("get_address_table"));
+	    EE->updateGlobalMapping(gv,(void*)&get_address_table);						
+	    gv = M->getNamedValue(std::string("check_address_type"));
+	    EE->updateGlobalMapping(gv,(void*)&check_address_type);						
+	    gv = M->getNamedValue(std::string("get_address_offset"));
+	    EE->updateGlobalMapping(gv,(void*)&get_address_offset);									
+	    gv = M->getNamedValue(std::string("add_address_table"));
+	    EE->updateGlobalMapping(gv,(void*)&add_address_table);						
+	    gv = M->getNamedValue(std::string("new_address_table"));
+	    EE->updateGlobalMapping(gv,(void*)&new_address_table);						
+	    gv = M->getNamedValue(std::string("llvm_print_pointer"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_print_pointer);						
+	    gv = M->getNamedValue(std::string("llvm_print_i32"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_print_i32);						
+	    gv = M->getNamedValue(std::string("llvm_print_i64"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_print_i64);						
+	    gv = M->getNamedValue(std::string("llvm_print_f32"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_print_f32);						
+	    gv = M->getNamedValue(std::string("llvm_print_f64"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_print_f64);						
+	    gv = M->getNamedValue(std::string("llvm_samplerate"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
+	    gv = M->getNamedValue(std::string("llvm_now"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_now);
+	    gv = M->getNamedValue(std::string("llvm_zone_reset"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_reset);
+	    gv = M->getNamedValue(std::string("llvm_zone_copy_ptr"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_copy_ptr);
+	    gv = M->getNamedValue(std::string("llvm_zone_mark"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_mark);
+	    gv = M->getNamedValue(std::string("llvm_zone_mark_size"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_mark_size);
+	    gv = M->getNamedValue(std::string("llvm_zone_ptr_set_size"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_set_size);
+	    gv = M->getNamedValue(std::string("llvm_zone_ptr_size"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_size);
 			
-		}	
-	 	return;
-	}
+	}	
+	return;
+    }
 }

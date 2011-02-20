@@ -43,32 +43,32 @@ namespace extemp {
 #define mk_cb(instance,class,func) (dynamic_cast<extemp::CM*>(new extemp::CMI<class>(instance,&class::func)))
 
 	
-	class TaskI;
+    class TaskI;
 	
     class CM {
     public:
-        //virtual void execute(TaskI* task) = 0;
-		virtual void execute(TaskI* task) = 0;
-		virtual ~CM() {}
-		virtual void print() {};
+	//virtual void execute(TaskI* task) = 0;
+	virtual void execute(TaskI* task) = 0;
+	virtual ~CM() {}
+	virtual void print() {};
     };
 
-	template<typename T>
+    template<typename T>
     class CMI : public CM {
     public:
-        CMI(T* _object, void(T::* _member) (TaskI* task)) : CM(), object(_object), member(_member) {}
-        void execute(TaskI* task) { //TaskI* task) { 
-			//std::cout << "TIME: " << current_time << "  TAG: " << tag << "  ARG: " << arg << "   OBJ: " << object << "   MEMBER: " << member << std::endl;
-			if(object == NULL) std::cerr << "AIME::Object has been removed before task could execute!" << std::endl; 
-			(*object.*member) (task); 
-		}
-		void print() {
-			std::cout << "OBJ: " << object << "  MEMBER: " << member << std::endl;
-		}
+	CMI(T* _object, void(T::* _member) (TaskI* task)) : CM(), object(_object), member(_member) {}
+	void execute(TaskI* task) { //TaskI* task) { 
+	    //std::cout << "TIME: " << current_time << "  TAG: " << tag << "  ARG: " << arg << "   OBJ: " << object << "   MEMBER: " << member << std::endl;
+	    if(object == NULL) std::cerr << "AIME::Object has been removed before task could execute!" << std::endl; 
+	    (*object.*member) (task); 
+	}
+	void print() {
+	    std::cout << "OBJ: " << object << "  MEMBER: " << member << std::endl;
+	}
                                                                             
     private:
-        void (T::* member) (TaskI* task);
-        T* object;
+	void (T::* member) (TaskI* task);
+	T* object;
     };
 }
 
