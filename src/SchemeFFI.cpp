@@ -163,6 +163,7 @@ namespace extemp {
 	    { "sys:pointer-size",		&SchemeFFI::pointerSize },
 	    { "sys:open-dylib",		&SchemeFFI::openDynamicLib },
 	    { "sys:close-dylib",		&SchemeFFI::closeDynamicLib },
+	    { "sys:make-cptr",		&SchemeFFI::makeCptr },
 
 	    // DSP sys stuff
 	    { "sys:set-dsp-closure",	&SchemeFFI::setDSPClosure },
@@ -302,6 +303,12 @@ namespace extemp {
 	io->_object._string._length = l;
 	// return io string
 	return io;
+    }
+
+    pointer SchemeFFI::makeCptr(scheme* _sc, pointer args)
+    {
+        void* ptr = malloc(ivalue(pair_car(args)));
+	mk_cptr(_sc, ptr);
     }
 
     pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
