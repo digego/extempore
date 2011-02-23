@@ -103,9 +103,10 @@ namespace extemp {
 	    {
 		uint32_t ii = i*UNIV::CHANNELS;
 		SAMPLE* dat = (SAMPLE*) outputBuffer;
+		SAMPLE* in = (SAMPLE*) inputBuffer;
 		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 		{
-		    dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+UNIV::TIME),(double)k,data));
+		    dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, (double)in[ii+k],(double)(i+UNIV::TIME),(double)k,data));
 		    llvm_zone_reset(zone);
 		}
 	    }
@@ -131,7 +132,7 @@ namespace extemp {
         int outputDevice = Pa_GetDefaultOutputDevice();
         std::cout << "Input Device: " << inputDevice << std::endl;
         std::cout << "Output Device: " << outputDevice << std::endl;
-        err = Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100.0, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
+        err = Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, 44100.0, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
 	if(err != paNoError) {
 	    std::cerr << "PA Error: " << Pa_GetErrorText(err) << std::endl;
 	}
