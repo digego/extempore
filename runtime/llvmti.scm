@@ -51,9 +51,13 @@
 
 (define *impc:zone* (sys:default-mzone))
 
+(define *impc:default-zone-size* (* 1024 50))
+
 (define icr:new-zone
-   (lambda ()
-      (sys:create-mzone)))
+   (lambda args
+     (if (null? args)
+	 (sys:create-mzone *impc:default-zone-size*)
+	 (sys:create-mzone (car args)))))
 
 (define icr:destroy-zone
    (lambda (zone)
@@ -909,8 +913,8 @@
       ;; make-tuple should return the tuple type a
       (let ((a (cons *impc:ir:tuple* (impc:ir:convert-from-pretty-types (cdr ast)))))
          ;; returns a pointer of tuple type 'a'
-		 (if (null? a) a
-             (impc:ir:pointer++ a)))))
+	(if (null? a) a
+	    (impc:ir:pointer++ a)))))
 
 
 (define impc:ti:tuple-set-check
@@ -942,7 +946,10 @@
       (if (not (integer? (caddr ast))) 
           (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'static 'integer 'index! ast))            
       (let* (; a should be a tuple of some kind!
-            (a (impc:ti:type-check (cadr ast) vars kts request?))
+            (a (impc:ti:type-check (cadr ast) vars kts (if (impc:ir:type? request?)
+							   (impc:ir:tuple? request?)
+							   request? 
+							   #f))) ;request?))
             ;; b should be fixed point -- llvm structs only support 32bit indexes
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
 	(if (impc:ir:type? a)
@@ -2053,7 +2060,7 @@
                  (setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
                  (func (llvm:get-function (symbol->string ',symname))))
              (if setter
-                 (llvm:run setter (sys:create-mzone (* 1024 1024 5))) ;; 5M zone
+                 (llvm:run setter (sys:create-mzone *impc:default-zone-size*))
                  (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
                         (error "")))
              (if func
@@ -2089,7 +2096,8 @@
                    (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                 " = external global "
                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
-               (ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
+               ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
+	       (llvm:bind-global-var ,(symbol->string symbol) ,value)
 	       (ascii-print-color 0 9 10)
 	       (print "Successfully bound ")
 	       (ascii-print-color 1 2 10)
@@ -2099,6 +2107,27 @@
 	       (ascii-print-color 1 3 10)
 	       (print ',type)
 	       (ascii-print-color 0 9 10)
+	       (print))	       
+       (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!)))
+
+(define-macro (scm-bind symbol type value)
+   (if (cptr? (eval value))
+       `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
+                   (llvm:compile (string-append "@" ,(symbol->string symbol)
+                                                " = external global "
+                                                ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
+               ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
+	       (llvm:bind-global-var ,(symbol->string symbol) ,value)
+	       (ascii-print-color 0 9 10)
+	       (print "Successfully bound ")
+	       (ascii-print-color 1 2 10)
+	       (print ',symbol)
+	       (ascii-print-color 0 9 10)
+	       (print " >>> ")
+	       (ascii-print-color 1 3 10)
+	       (print ',type)
+	       (ascii-print-color 0 9 10)
+	       ;(print " from scheme:" ,value)
 	       (print))	       
        (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!)))
 

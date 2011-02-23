@@ -1053,7 +1053,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; this here for wrapping llvm dynamic binds
-(define-macro (dynamic-bind library symname type)
+(define-macro (lib-bind library symname type)
   `(__dynamic-bind ,library ',symname ',type))
 
 (define __dynamic-bind
@@ -1073,5 +1073,18 @@
                                                    (cddr ctype))))
                                    ")")))
       (llvm:compile ircode)
-      (llvm:bind-symbol library (symbol->string symname)))))
+      (if (llvm:bind-symbol library (symbol->string symname))
+	  (begin (ascii-print-color 0 9 10)
+		 (print "Successfully bound ")
+		 (ascii-print-color 1 2 10)
+		 (print (symbol->string symname))
+		 (ascii-print-color 0 9 10)
+		 (print " >>> ")
+		 (ascii-print-color 1 3 10)
+		 (print type)
+		 (ascii-print-color 0 9 10)
+		 ;(print " from lib: " library)
+		 (print))
+	  (print-error 'Compiler 'Error: 'could 'not 'bind! symname)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

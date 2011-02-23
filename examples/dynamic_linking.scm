@@ -34,14 +34,14 @@
 
 
 ;; load highgui dynamic library
-(define highguilib (sys:open-dylib "libhighgui.so.4"))
+(define highguilib (sys:open-dylib "libhighgui.so.2.1"))
                                
 ;; bind the symbols we need so that the
 ;; extempore compiler can find (and understand) them
-(dynamic-bind highguilib cvLoadImage [i8*,i8*,i32]*)
-(dynamic-bind highguilib cvCloneImage [i8*,i8*]*)
-(dynamic-bind highguilib cvCanny [void,i8*,i8*,double,double,i32]*)
-(dynamic-bind highguilib cvSaveImage [i32,i8*,i8*]*)
+(lib-bind highguilib cvLoadImage [i8*,i8*,i32]*)
+(lib-bind highguilib cvCloneImage [i8*,i8*]*)
+(lib-bind highguilib cvCanny [void,i8*,i8*,double,double,i32]*)
+(lib-bind highguilib cvSaveImage [i32,i8*,i8*]*)
 
 ;; load image and apply canny edge detection
 (definec test-opencv
