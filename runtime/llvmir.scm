@@ -974,6 +974,32 @@
          (impc:ir:strip-space os))))
 
 
+;; returns a ptr's value
+(define impc:ir:compiler:pdref
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+	   (val-str (impc:ir:compiler (cadr ast) types))
+	   (val (impc:ir:gname))
+	   (type (- (impc:ir:get-type-from-str (cadr val)) *impc:ir:pointer*)))
+      (if (not (impc:ir:pointer? val))
+	  (print-error 'Compiler 'Error: 'ptrdref 'must 'take 'a 'pointer 'argument 'not: val))
+      (emit val-str os)
+      (emit (impc:ir:gname "val" (impc:ir:get-type-str type)) " = load " (cadr val) " " (car val) "\n" os)
+      (impc:ir:strip-space os))))
+
+
+;; returns a ptr to ptr
+(define impc:ir:compiler:pref
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+	   (val-str (impc:ir:compiler (cadr ast) types))
+	   (val (impc:ir:gname)))
+      (emit val-str os)
+      (emit (impc:ir:gname "val" (string-append (cadr val) "*")) 
+	    " = alloca " (cadr val) "\n" os)
+      (emit "store " (cadr val) " " (car val) ", " (cadr val) "* " (car (impc:ir:gname)))
+      (impc:ir:strip-space os))))
+
 ;; (impc:ir:gcnt [increment])
 ;; (impc:ir:gcnt) ;; get current cnt
 ;; (impc:ir:gcnt 2) ;; increment current cnt by 2
@@ -1705,6 +1731,10 @@
                         (impc:ir:compile:apply-closure (cdr ast) types #f))) ;; else closure is in local env
                    ((equal? (car ast) 'set!)
                     (impc:ir:compiler:set! ast types))
+                   ((equal? (car ast) 'pref)
+                    (impc:ir:compiler:pref ast types))
+		   ((equal? (car ast) 'pdref)
+                    (impc:ir:compiler:pdref ast types))
                    ((equal? (car ast) 'bitcast)
                     (impc:ir:compiler:bitcast ast types))
                    ((equal? (car ast) 'null?)

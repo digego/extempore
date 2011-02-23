@@ -941,16 +941,18 @@
       ;; (caddr ast) must be an integer 
       (if (not (integer? (caddr ast))) 
           (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'static 'integer 'index! ast))            
-      (let (; a should be a tuple of some kind!
+      (let* (; a should be a tuple of some kind!
             (a (impc:ti:type-check (cadr ast) vars kts request?))
             ;; b should be fixed point -- llvm structs only support 32bit indexes
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
-         ;(print 'tupref-check 'a: a 'ast: ast (list-ref (car a) (+ 1 (caddr ast))))
-         (if (and (not (null? a))
-                  (list? a)
-                  (impc:ir:tuple? (car a)))
-             (list-ref (car a) (+ 1 (caddr ast)))
-             '()))))
+	(if (impc:ir:type? a)
+	    (set! a (list a)))
+	;(println 'tupref-check 'a: a 'ast: ast (list-ref (car a) (+ 1 (caddr ast))))
+	(if (and (not (null? a))
+		 (list? a)
+		 (impc:ir:tuple? (car a)))
+	    (list-ref (car a) (+ 1 (caddr ast)))
+	    '()))))
 
 
 ;;(closure-set! closure a i32 5)
@@ -1039,6 +1041,31 @@
          ;; add return type to sym
          (impc:ti:update-var (car sym) vars kts a)
          a)))
+
+(define impc:ti:pdref-check
+   (lambda (ast vars kts request?)      
+      (let* ((a (impc:ti:type-check (cadr ast) vars kts request?)))
+         (if *impc:ti:print-sub-checks* (print 'ptrref:> 'ast: ast 'a: a))
+	 ;; return type of ptrref is 'a' dereferenced
+	 (if (list? a)
+	     (set! a (car a)))
+	 (if (and (impc:ir:type? a)
+		  (impc:ir:pointer? a))
+	     (impc:ir:pointer-- a)
+	     (print-error 'Compiler 'Error: 'ptrref 'takes 'a 'pointer 'argument 'not a)))))
+      
+
+(define impc:ti:pref-check
+  (lambda (ast vars kts request?)      
+    (let* ((a (impc:ti:type-check (cadr ast) vars kts request?)))
+      (if *impc:ti:print-sub-checks* (print 'ptrref:> 'ast: ast 'a: a))
+      ;; return type of ptrref is 'a' referenced
+      (if (list? a)
+	  (set! a (car a)))
+      (if (and (impc:ir:type? a)
+	       (impc:ir:pointer? a))
+	  (impc:ir:pointer++ a)
+	  (print-error 'Compiler 'Error: 'ptrref 'takes 'a 'pointer 'argument 'not a)))))
 
 
 (define impc:ti:lambda-check
@@ -1148,7 +1175,7 @@
    (lambda (ast vars kts request?)
       (let ((a (impc:ti:type-check (cadr ast) vars kts (list (+ *impc:ir:si8* *impc:ir:pointer*)))))
          ;; run through everything else for completeness but don't care about the results
-         (map (lambda (x) (impc:ti:type-check x vars kts #f)) (cddr ast))
+         (for-each (lambda (x) (impc:ti:type-check x vars kts #f)) (cddr ast))
          ;; printf returns i32
          (list *impc:ir:si32*))))
 
@@ -1208,8 +1235,11 @@
             ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))                        
             ((and (list? ast) (member (car ast) '(closure-set!))) (impc:ti:closure-set-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(closure-ref))) (impc:ti:closure-ref-check ast vars kts request?))                                    
-            ((and (list? ast) (member (car ast) '(null?))) (impc:ti:null-check ast vars kts request?))                        			((and (list? ast) (member (car ast) '(bitcast))) (impc:ti:bitcast-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(closure-ref))) (impc:ti:closure-ref-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(pref))) (impc:ti:pref-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(pdref))) (impc:ti:pdref-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(null?))) (impc:ti:null-check ast vars kts request?))
+	    ((and (list? ast) (member (car ast) '(bitcast))) (impc:ti:bitcast-check ast vars kts request?))
             ((and (list? ast) 
                   (symbol? (car ast))
                   (llvm:get-function (symbol->string (car ast)))) 
@@ -1219,7 +1249,7 @@
             ((and (list? ast) (member (car ast) '(set!))) (impc:ti:set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(ret->))) (impc:ti:ret-check ast vars kts request?))
             ((and (list? ast) (assoc (car ast) vars)) (impc:ti:closure-call-check ast vars kts request?))    
-            ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))                                    
+            ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))                            
             ((and (list? ast)  ;; this is here to check against closures as global vars (i.e. not in local environment)
                   (llvm:get-globalvar (symbol->string (car ast)))
                   (impc:ir:closure? (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (car ast))))))
