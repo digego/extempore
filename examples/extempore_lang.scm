@@ -428,7 +428,7 @@
 
 ;; now what happens if we pass 101
 ;; should print a:9 and a:101
-(my-test15 101) : 101
+(my-test15 101) ; 101
 
 
 
@@ -447,3 +447,31 @@
       (f))))
 
 (println (my-test17)) ;; 21
+
+
+
+;; and you can get and set closures also!
+(definec my-test18
+  (let ((f (lambda (x:i64) x)))
+    (lambda ()
+      (lambda (z)
+	(f z)))))
+
+
+(definec my-test19
+  (lambda ()
+    (let ((t1 (my-test18))
+	  (t2 (my-test18)))
+      ;; identity of 5
+      (printf "%lld:%lld\n" (t1 5) (t2 5))
+      (t1.f:[i64,i64]* (lambda (x:i64) (* x x)))
+      ;; square of 5
+      (printf "%lld:%lld\n" (t1 5) (t2 5))      
+      ;; cube of 5 
+      (my-test18.f:[i64,i64]* (lambda (y:i64) (* y y y)))
+      (printf "%lld:%lld\n" (t1 5) (t2 5)))))
+
+
+(my-test19) ;; 5:5 > 25:25 > 125:125
+
+(print-notification 'done)
