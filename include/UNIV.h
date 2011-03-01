@@ -57,6 +57,8 @@
 #endif
 #endif
 
+void ascii_text_color(int attr, int fg, int bg);
+
 namespace extemp {
 
 //#define mk_cb(instance,class,func) (dynamic_cast<CM*>(new CMI<class>(instance,&class::func)))

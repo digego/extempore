@@ -35,6 +35,7 @@
 
 #include "SchemeREPL.h"
 #include "EXTMutex.h"
+#include "UNIV.h"
 
 #include <stdio.h>         /* Basic I/O routines          */
 #include <sys/types.h>     /* standard system types       */
@@ -57,7 +58,13 @@ namespace extemp {
     {
 	active = true;
 	title = _title;
-	printf("Init REPL for %s\n",title.c_str());
+	ascii_text_color(0,9,10);
+	printf("\nStarting ");
+	ascii_text_color(1,6,10);
+	printf("%s",title.c_str());	
+	ascii_text_color(0,9,10);
+	printf(" process\n");
+	ascii_text_color(0,9,10);
 	server_socket = 0;
 
 	buf = new char[BUFLENGTH+1];
@@ -78,7 +85,9 @@ namespace extemp {
 	SchemeREPL* repl = REPL_MAP[name];
 	if(repl) return REPL_MAP[name];
 	else {
+	  ascii_text_color(1,1,10);
 	    printf("Could not find REPL named '%s'\n",name.c_str());
+	    ascii_text_color(0,9,10);
 	    return 0;
 	}
     }
@@ -102,21 +111,25 @@ namespace extemp {
 		int lgth = 0;
 		while((lgth = read(repl->server_socket, repl->buf, BUFLENGTH)) == BUFLENGTH) {		    
 		    if(lgth < 0) {
+		      ascii_text_color(1,1,10);
 			printf("PROBLEM WITH REPL SOCKET: %s\n",repl->buf);
+		      ascii_text_color(0,9,10);
 			break;
 		    }
 		    ss << repl->buf;
 		    memset(repl->buf,0,BUFLENGTH+1);
 		}
 		if(lgth == 0) { // end of stream
+		  ascii_text_color(1,3,10);
 		    printf("CLOSE REPL READ STREAM %d",lgth);
+		  ascii_text_color(0,9,10);
 		    return 0;
 		}
 	    }
 	    //printf("repl-result: %s",ss.str().c_str());
 	    if(repl->server_socket == 0) break;
 	}
-	printf("Exit REPL Thread\n");
+	//printf("Exit REPL Thread\n");
     }
 
     void SchemeREPL::writeString(std::string& string)
@@ -152,11 +165,21 @@ namespace extemp {
 	int rc;
 	struct sockaddr_in sa;
 	struct hostent* hen; /* host-to-IP translation */
-	printf("Trying to connect to hostname: '%s' on port %d\n",hostname.c_str(),port); 
+	//ascii_text_color(1,9,10);
+	printf("Trying to connect to ");
+	//ascii_text_color(1,6,10);
+	printf("'%s'",hostname.c_str()); 
+	//ascii_text_color(1,9,10);
+	printf(" on port ");
+	//ascii_text_color(1,6,10);
+	printf("%d\n",port);
+	//ascii_text_color(0,9,10);
 	/* Address resolution stage */
 	hen = gethostbyname(hostname.c_str());
 	if (!hen) {
+	ascii_text_color(1,1,10);
 	    printf("Could not resolve host name\n");
+	ascii_text_color(0,9,10);
 	    return false;
 	}
     
@@ -168,7 +191,9 @@ namespace extemp {
 	server_socket = socket(AF_INET, SOCK_STREAM, 0);
     
 	if (server_socket < 0) {
+	  ascii_text_color(1,1,10);
 	    printf("Socket Connection Failed\n");
+	ascii_text_color(0,9,10);
 	    return false;
 	}else{
 	    int flag = 1;
@@ -180,14 +205,16 @@ namespace extemp {
 	    if (result < 0) {
 		printf("error turning off TCP Nagle ALGO\n");
 	    }
-	    printf("Create socket successful\n");
+	    //printf("Create socket successful\n");
 	}
 	rc = connect(server_socket, (struct sockaddr *)&sa, sizeof(sa));
 	if(rc) {
-	    printf("Error connecting to socket:%d\n",errno);
+	ascii_text_color(1,1,10);
+	    printf("Connection error:%d\n",errno);
+	ascii_text_color(0,9,10);
 	    return false;
 	}else{
-	    printf("Connect socket successful\n");
+	  //printf("Connect socket successful\n");
 	}
     
 	//should now be connected
@@ -197,7 +224,10 @@ namespace extemp {
 	    printf("Could not connect to port %d. Make sure don't have any other instances of impromptu running and that no other app is using this port!",port);
 	    return false;
 	}
-	printf("successfully connected to %d\n",server_socket);
+	ascii_text_color(1,2,10);
+	printf("Successfully"); 	
+	ascii_text_color(0,9,10);
+	printf(" connected to remote process\n");
 	connected = true;
 	read_thread.create(&readThread,this);
 	return true;

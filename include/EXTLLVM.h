@@ -54,8 +54,8 @@ uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size);
 uint64_t llvm_zone_ptr_size(void* ptr);
 void llvm_zone_destroy(llvm_zone_t* zone);
+void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay);
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
-
 
 namespace llvm {
     class Module;

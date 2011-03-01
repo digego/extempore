@@ -92,11 +92,11 @@ namespace extemp {
 	void* cache_closure = 0;
 	if(dsp_closure == 0) return 0;
 	cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
-		
-		
+				
 	if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
 	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
 	    dsp_f_ptr cache_wrapper = dsp_wrapper;
+	    double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
 	    double* data = 0; 
 	    llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
 	    for(uint32_t i=0;i<UNIV::FRAMES;i++)
@@ -106,7 +106,7 @@ namespace extemp {
 		SAMPLE* in = (SAMPLE*) inputBuffer;
 		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 		{
-		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::TIME),(double)k,data));
+		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::TIME),(double)k,data));
 		    llvm_zone_reset(zone);
 		}
 	    }
@@ -130,6 +130,7 @@ namespace extemp {
         PaError err;
         int inputDevice = Pa_GetDefaultInputDevice();
         int outputDevice = Pa_GetDefaultOutputDevice();
+
         std::cout << "Input Device: " << inputDevice << std::endl;
         std::cout << "Output Device: " << outputDevice << std::endl;
         err = Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100.0, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
@@ -138,9 +139,18 @@ namespace extemp {
 	}
         UNIV::CHANNELS = 2;
         UNIV::SAMPLERATE = 44100;
-        std::cout << "Loaded Audio Device: " << std::endl;
-        std::cout << "SampleRate\t: " << UNIV::SAMPLERATE << std::endl;
-        std::cout << "Channels\t: " << UNIV::CHANNELS << std::endl;
+	ascii_text_color(1,9,10);
+        std::cout << "Loaded Default Audio Device: " << std::endl;	
+	ascii_text_color(0,9,10);	
+        std::cout << "SampleRate\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
+	ascii_text_color(0,9,10);	
+        std::cout << "Channels\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::CHANNELS << std::endl << std::flush;
+	ascii_text_color(0,9,10);	
+
     }
 	
     AudioDevice::~AudioDevice()
@@ -160,7 +170,9 @@ namespace extemp {
         UNIV::initRand();        
 	PaError err;
         err = Pa_StartStream(stream);
+	ascii_text_color(1,1,10);
 	if(err != paNoError) { std::cout << "PortAudio ERROR: " << Pa_GetErrorText(err) << std::endl; }
+	ascii_text_color(0,9,10);
 	RUNNING = true;
 	//queueThread->Start();
 	started = true;
@@ -262,6 +274,7 @@ namespace extemp {
         // get the default output device
         UInt32 count = (UInt32) sizeof(device);
         OSStatus err = AudioHardwareGetProperty(kAudioHardwarePropertyDefaultOutputDevice,&count,(void*)&device);
+	ascii_text_color(1,1,10);
         if(err != kAudioHardwareNoError) {
             std::cout << "Error while trying to retrieve default audio device" << std::endl;
         }
@@ -283,8 +296,9 @@ namespace extemp {
         if(err != 0) {
             std::cout << "Error setting Processor Overload Property Listener" << std::endl;
         }
-        
-        UNIV::CHANNELS = static_cast<int>(stream.mChannelsPerFrame);
+
+        ascii_text_color(0,9,10);        
+	UNIV::CHANNELS = static_cast<int>(stream.mChannelsPerFrame);
         UNIV::SAMPLERATE = static_cast<int>(stream.mSampleRate);
         std::cout << "Loaded Audio Device With Stream: " << std::endl;
         std::cout << "Format\t: " << stream.mFormatID << std::endl;
@@ -300,12 +314,14 @@ namespace extemp {
 	std::cout << "Frames:\t\t" << UNIV::FRAMES << std::endl;
 
 	err = AudioDeviceAddIOProc(device, &audioCallback, TaskScheduler::I());
+	
+	ascii_text_color(1,1,10);
         if (err != kAudioHardwareNoError) { std::cout << "Audio harware setup error of some kind!!!!: " << err << std::endl; exit(1);} 
+	ascii_text_color(0,9.10);
     }
 	
     AudioDevice::~AudioDevice() 
     {
-	std::cout << "DELETE AUDIOROUTER" << std::endl;
 	RUNNING = false;
     }
 	

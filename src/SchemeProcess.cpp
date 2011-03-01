@@ -94,9 +94,9 @@ namespace extemp {
 	    std::cout << "ERROR: Could not locate file: init.scm" << std::endl << "Exiting system!!" << std::endl;
 	    exit(1);
 	}else{
-	    std::cout << "START LOADING INIT.SCM" << std::endl;
+	  //std::cout << "START LOADING INIT.SCM" << std::endl;
 	    scheme_load_file(sc, initscm);
-	    std::cout << "FINISHED LOADING INIT.SCM" << std::endl;
+	    //std::cout << "FINISHED LOADING INIT.SCM" << std::endl;
 	}			
 	server_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if(server_socket == -1) {
@@ -189,7 +189,7 @@ namespace extemp {
 	    std::cout << "Problem listening to extempore socket" << std::endl;
 	    return false;
 	}
-	std::cout << "STARTED EXTEMPORE SERVER" << std::endl;
+	//std::cout << "STARTED EXTEMPORE SERVER" << std::endl;
 	threadScheme.create(&impromptu_task_executer, this);
 	//threadScheme.Start();
 	threadServer.create(&impromptu_server_thread, this);		
@@ -358,15 +358,18 @@ namespace extemp {
 	std::string load_path = scm->getLoadPath();
 		
 	scm->loadFile("extempore.scm", load_path.c_str());
-	printf("Loaded... extempore.scm\n");
+	//printf("Loaded... extempore.scm\n");
 	scm->loadFile("llvmir.scm", load_path.c_str()); 
-	printf("Loaded... llvmir.scm\n");
+	//printf("Loaded... llvmir.scm\n");
 	scm->loadFile("llvmti.scm", load_path.c_str());		
-	printf("Loaded... llvmti.scm\n");
+	//printf("Loaded... llvmti.scm\n");
 	scm->loadFile("comlist.scm", load_path.c_str());
-	printf("Loaded... comlist.scm\n");
+	//printf("Loaded... comlist.scm\n");
 	scm->loadFile("sort.scm", load_path.c_str());
-	printf("Loading... sort.scm\n");
+	//printf("Loading... sort.scm\n");
+
+
+
 	// scm->loadFile("mbe.scm", [resources UTF8String]);
 	// printf("Loading... mbe.scm\n");
 	// scm->loadFile("au.scm", [resources UTF8String]);
@@ -458,14 +461,14 @@ namespace extemp {
 			    int minutes = time / UNIV::MINUTE;
 			    time -= minutes * UNIV::MINUTE;
 			    int seconds = time / UNIV::SECOND;		
-			    sprintf(prompt, "\n[extempore %.2d:%.2d:%.2d]: ",hours,minutes,seconds);
+			    sprintf(prompt, "\n[extempore %.2d:%.2d:%.2d]: ",hours,minutes,seconds);			    
 			    ss << prompt;
 			}
 			//////////////////////////
 			std::string s = ss.str();
 			const char* res_str = s.c_str();
 			//std::cout << "WRITE: " << s << " '" << res_str << "' length: " << strlen(res_str)+1 << std::endl;
-			if(write_reply) write(return_socket, res_str, strlen(res_str)+1);				
+			if(write_reply) write(return_socket, res_str, strlen(res_str)+1);
 		    }
 		    delete evalString;
 		}else if(schemeTask.getType() == 1){ //callback
@@ -555,10 +558,10 @@ namespace extemp {
         std::vector<int> client_sockets;
         std::map<int,std::stringstream*> in_streams;
         FD_ZERO(&rfd); //zero out open sockets
-	printf("SERVER SOCKET FD_SET: %d\n",server_socket);
+	//printf("SERVER SOCKET FD_SET: %d\n",server_socket);
         FD_SET(server_socket, &rfd); //add server socket to open sockets list
 	int highest_fd = server_socket+1;		
-	printf("FD SIZE=%d  and %d\n",highest_fd,FD_SETSIZE);
+	//printf("FD SIZE=%d  and %d\n",highest_fd,FD_SETSIZE);
         int BUFLEN = 1024;
         char buf[BUFLEN+1];
         while(scm->getRunning()) {
@@ -582,7 +585,9 @@ namespace extemp {
 		    }
 		    pos++;
 		}
-		printf("%s SERVER ERROR: %s\n",scm->name.c_str(),strerror(errno));				
+		ascii_text_color(1,1,10);
+		printf("%s SERVER ERROR: %s\n",scm->name.c_str(),strerror(errno));
+		ascii_text_color(0,7,10);
 		continue;
 	    }
             if(FD_ISSET(server_socket, &c_rfd)) { //check if we have any new accpets on our server socket
@@ -593,7 +598,9 @@ namespace extemp {
 		}
 		if(res >= highest_fd) highest_fd = res+1;
                 FD_SET(res, &rfd); //add new socket to the FD_SET
+		ascii_text_color(1,3,10);
 		printf("New Client Connection \n");
+		ascii_text_color(0,7,10);
                 client_sockets.push_back(res);
                 in_streams[res] = new std::stringstream;
                 std::stringstream* ss = new std::stringstream;
@@ -624,12 +631,16 @@ namespace extemp {
 			    FD_CLR(sock, &rfd);	
 			    delete(in_streams[sock]);
 			    in_streams[sock] = 0;
-			    std::cout << "Close Client Socket" << std::endl;
+			    ascii_text_color(1,3,10);			    
+		            std::cout << "Close Client Socket" << std::endl;
+			    ascii_text_color(0,7,10);
 			    pos = client_sockets.erase(pos);							
 			    close(sock);							
 			    break;
 			}else if(res < 0){
+			    ascii_text_color(1,1,10);
 			    printf("Error with socket read from extempore process %s",strerror(errno));
+			    ascii_text_color(0,7,10);
 			    pos++;
 			    break;
 			}
@@ -645,7 +656,9 @@ namespace extemp {
 			}
 			// if we get to 1024 assume we aren't going to get a TERMINATION_CHAR and bomb out
 			if(j>(1024*10)) {
+			    ascii_text_color(1,1,10);
 			    printf("Error reading eval string from server socket. No terminator received before 10M limit.\n");
+			    ascii_text_color(0,7,10);
 			    in_streams[sock]->str("");														
 			    evalstr = "";
 			    break;
