@@ -24,7 +24,7 @@
 ;; once this is set any recompilation of the function
 ;; named "dsp" will hot-swap automatically.
 ;; in other words you should only need to call dsp:set! once.
-(dsp:set! "dsp")
+(dsp:set! dsp)
 
 
 ;; recompile dsp to produce two sine wave in left and right
@@ -64,9 +64,9 @@
     (lambda (a:double b:double c:double d:double*)
       (cond ((= c 0.0) ;; left channel
              (+ ((aref oscs 0) (+ 0.3 ((aref oscs 2) 0.2 1.0)) 60.0)
-                ((aref oscs 3) 0.2 220.0)
-                ((aref oscs 4) 0.2 (+ 400. ((aref oscs 5) 200. .1)))
-                ((aref oscs 6) 0.1 900.0)))
+		((aref oscs 3) 0.2 220.0)
+		((aref oscs 4) 0.2 (+ 400. ((aref oscs 5) 200. .1)))
+		((aref oscs 6) 0.1 900.0)))
             ((= c 1.0) ;; right channel                                                                       
              ((aref oscs 7) 0.3 (+ 220.0 ((aref oscs 8) 110.0 20.0))))
             (else 0.0))))) ;; any remaining channels                                                          
