@@ -436,7 +436,7 @@
 (define-macro (play-note time inst pitch vol dur)
   `(let ((zone (sys:create-mzone (* 1024 1024)))
 	 (default-zone *impc:zone*)	 
-	 (duration (* ,dur (* *samplerate* (/ 60 (*metro* 'get-tempo))))))
+	 (duration (* 1.0 ,dur))) ; (* ,dur (* *samplerate* (/ 60 (*metro* 'get-tempo))))))
      (sys:destroy-mzone zone (+ duration (* 30.0 *samplerate*)))
      (set! *impc:zone* zone)
      (synth-note (integer->real ,time) 
@@ -484,5 +484,8 @@
 	    (else 0.0)))))
 
 
-;; set dsp
-(dsp:set! dsp)
+;; you should set dsp manually
+;(dsp:set! dsp)
+
+(print)
+(print-notification "You will probably want to now call (dsp:set! dsp) if this is the start of a new session")
