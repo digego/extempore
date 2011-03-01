@@ -15,6 +15,13 @@
 (defvar extempore-port 7099)             ; TCP port to Extempore
 (defvar extempore-process nil)           ; process during TCP connection
 
+(font-lock-add-keywords 'scheme-mode
+  '(("definec" . font-lock-keyword-face)
+    ("definec:dsp" . font-lock-keyword-face)
+    ("define-instrument" . font-lock-keyword-face)
+    ("bind-scm" . font-lock-keyword-face)
+    ("bind-lib" . font-lock-keyword-face)))  
+
 (define-minor-mode extempore-mode 
    "Toggle the mode for interacting with Scheme in Extempore over TCP"
    :init-value nil :lighter " Extempore" :keymap scheme-mode-map
