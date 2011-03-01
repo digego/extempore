@@ -38,10 +38,10 @@
                                
 ;; bind the symbols we need so that the
 ;; extempore compiler can find (and understand) them
-(lib-bind highguilib cvLoadImage [i8*,i8*,i32]*)
-(lib-bind highguilib cvCloneImage [i8*,i8*]*)
-(lib-bind highguilib cvCanny [void,i8*,i8*,double,double,i32]*)
-(lib-bind highguilib cvSaveImage [i32,i8*,i8*]*)
+(bind-lib highguilib cvLoadImage [i8*,i8*,i32]*)
+(bind-lib highguilib cvCloneImage [i8*,i8*]*)
+(bind-lib highguilib cvCanny [void,i8*,i8*,double,double,i32]*)
+(bind-lib highguilib cvSaveImage [i32,i8*,i8*]*)
 
 ;; load image and apply canny edge detection
 (definec test-opencv
