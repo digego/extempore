@@ -139,17 +139,17 @@ namespace extemp {
 	}
         UNIV::CHANNELS = 2;
         UNIV::SAMPLERATE = 44100;
-	ascii_text_color(1,9,10);
+	ascii_text_color(1,7,10);
         std::cout << "Loaded Default Audio Device: " << std::endl;	
-	ascii_text_color(0,9,10);	
+	ascii_text_color(0,7,10);	
         std::cout << "SampleRate\t: " << std::flush;
 	ascii_text_color(1,6,10);	
 	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
-	ascii_text_color(0,9,10);	
+	ascii_text_color(0,7,10);	
         std::cout << "Channels\t: " << std::flush;
 	ascii_text_color(1,6,10);	
 	std::cout << UNIV::CHANNELS << std::endl << std::flush;
-	ascii_text_color(0,9,10);	
+	ascii_text_color(0,7,10);	
 
     }
 	
@@ -197,7 +197,7 @@ namespace extemp {
 			   AudioDevicePropertyID	inPropertyID,
 			   void*		inClientData)
     {
-        std::cout << "This has been called because you've run out of processing time!!!" << std::endl;        
+       if(UNIV::TIME>4096) std::cout << "This has been called because you've run out of processing time!!!" << std::endl;        
     }
 
     OSStatus audioCallback (AudioDeviceID		inDevice,
@@ -217,7 +217,7 @@ namespace extemp {
         device_time = t - start_time;
 	UNIV::TIME = UNIV::TIME + UNIV::FRAMES;
         
-        if(UNIV::TIME != device_time) {
+        if(false) { //UNIV::TIME != device_time) {
 	    std::cout << std::endl << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl;
 	    std::cout << "UNIV Timeing Sychronization problem!!!:" << std::endl;
 	    std::cout << "UNIV::TIME [" << UNIV::TIME << "]" << std::endl;
@@ -241,6 +241,7 @@ namespace extemp {
 	if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
 	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
 	    dsp_f_ptr cache_wrapper = dsp_wrapper;
+	    double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
 	    double* data = 0; 
 	    llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M				
 	    for(uint32_t i=0;i<UNIV::FRAMES;i++)
@@ -249,7 +250,7 @@ namespace extemp {
 		SAMPLE* dat = (SAMPLE*) outOutputData->mBuffers[0].mData;
 		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 		{   
-		    dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, cache_closure, 0.0,(double)(i+UNIV::TIME),(double)k,data)); 
+		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, 0.0,(double)(i+UNIV::TIME),(double)k,data)); 
 		    llvm_zone_reset(zone);
 		}
 	    }
@@ -297,27 +298,41 @@ namespace extemp {
             std::cout << "Error setting Processor Overload Property Listener" << std::endl;
         }
 
-        ascii_text_color(0,9,10);        
+
 	UNIV::CHANNELS = static_cast<int>(stream.mChannelsPerFrame);
         UNIV::SAMPLERATE = static_cast<int>(stream.mSampleRate);
-        std::cout << "Loaded Audio Device With Stream: " << std::endl;
-        std::cout << "Format\t: " << stream.mFormatID << std::endl;
-        std::cout << "Format Flags\t: " << stream.mFormatFlags << std::endl;
-        std::cout << "Bytes Per Packet\t: " << stream.mBytesPerPacket << std::endl;
-        std::cout << "Frames Per Packet\t: " << stream.mFramesPerPacket << std::endl;
-        std::cout << "Bytes Per Frame\t: " << stream.mBytesPerFrame << std::endl;
-        std::cout << "Channels Per Frame\t: " << stream.mChannelsPerFrame << std::endl;
-        std::cout << "Bits Per Channel\t: " << stream.mBitsPerChannel << std::endl;
+        //ascii_text_color(0,7,10);        
+        //std::cout << "Loaded Audio Device With Stream: " << std::endl;
+        //std::cout << "Format\t: " << stream.mFormatID << std::endl;
+        //std::cout << "Format Flags\t: " << stream.mFormatFlags << std::endl;
+        //std::cout << "Bytes Per Packet\t: " << stream.mBytesPerPacket << std::endl;
+        //std::cout << "Frames Per Packet\t: " << stream.mFramesPerPacket << std::endl;
+        //std::cout << "Bytes Per Frame\t: " << stream.mBytesPerFrame << std::endl;
+        //std::cout << "Channels Per Frame\t: " << stream.mChannelsPerFrame << std::endl;
+        //std::cout << "Bits Per Channel\t: " << stream.mBitsPerChannel << std::endl;
 
-        std::cout << "SampleRate\t: " << UNIV::SAMPLERATE << std::endl;
-        std::cout << "Channels\t: " << UNIV::CHANNELS << std::endl;
-	std::cout << "Frames:\t\t" << UNIV::FRAMES << std::endl;
+        //std::cout << "SampleRate\t: " << UNIV::SAMPLERATE << std::endl;
+        //std::cout << "Channels\t: " << UNIV::CHANNELS << std::endl;
+	//std::cout << "Frames:\t\t" << UNIV::FRAMES << std::endl;
+
+        ascii_text_color(1,7,10);
+	std::cout << "Loaded Default Audio Device: " << std::endl;
+        ascii_text_color(0,7,10);
+	std::cout << "SampleRate\t: " << std::flush;
+        ascii_text_color(1,6,10);
+	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
+        ascii_text_color(0,7,10);
+	std::cout << "Channels\t: " << std::flush;
+        ascii_text_color(1,6,10);
+	std::cout << UNIV::CHANNELS << std::endl << std::flush;
+        ascii_text_color(0,7,10);
+
 
 	err = AudioDeviceAddIOProc(device, &audioCallback, TaskScheduler::I());
 	
 	ascii_text_color(1,1,10);
         if (err != kAudioHardwareNoError) { std::cout << "Audio harware setup error of some kind!!!!: " << err << std::endl; exit(1);} 
-	ascii_text_color(0,9.10);
+	ascii_text_color(0,7,10);
     }
 	
     AudioDevice::~AudioDevice() 
