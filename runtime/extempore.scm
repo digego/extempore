@@ -1026,7 +1026,7 @@
 
 
 ;; this for buffered version
-(define dsp:set!
+(define _dsp:set!
    (lambda (name)
       (let* ((nn (if (symbol? name) (symbol->string name) name))
              (ft (llvm:get-function-args-withoutzone nn))
@@ -1050,10 +1050,13 @@
                 (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))) ;; whole buffer 
                (else (print-error 'Bad 'closure 'signature 'for 'dsp:set! ct))))))
 
+(define-macro (dsp:set! name)
+  `(_dsp:set! ,(symbol->string name)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; this here for wrapping llvm dynamic binds
-(define-macro (dynamic-bind library symname type)
+(define-macro (bind-lib library symname type)
   `(__dynamic-bind ,library ',symname ',type))
 
 (define __dynamic-bind
@@ -1073,5 +1076,18 @@
                                                    (cddr ctype))))
                                    ")")))
       (llvm:compile ircode)
-      (llvm:bind-symbol library (symbol->string symname)))))
+      (if (llvm:bind-symbol library (symbol->string symname))
+	  (begin (ascii-print-color 0 9 10)
+		 (print "Successfully bound ")
+		 (ascii-print-color 1 2 10)
+		 (print (symbol->string symname))
+		 (ascii-print-color 0 9 10)
+		 (print " >>> ")
+		 (ascii-print-color 1 3 10)
+		 (print type)
+		 (ascii-print-color 0 9 10)
+		 ;(print " from lib: " library)
+		 (print))
+	  (print-error 'Compiler 'Error: 'could 'not 'bind! symname)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

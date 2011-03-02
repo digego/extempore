@@ -85,7 +85,7 @@
 #define PRINT_ERROR(format, args...)		\
     ascii_text_color(1,1,10);			\
     printf(format , ## args);			\
-    ascii_text_color(0,9,10)
+    ascii_text_color(0,7,10)
 
 
 char* cstrstrip (char* inputStr)
@@ -107,13 +107,6 @@ char* cstrstrip (char* inputStr)
     return inputStr;
 }
 
-void ascii_text_color(int attr, int fg, int bg)
-{
-    char command[13];
-    /* Command is the control command to the terminal */
-    sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
-    printf("%s", command);
-}
 
 #define nelem(table) sizeof(table) / sizeof(table[0])
 
@@ -163,6 +156,7 @@ namespace extemp {
 	    { "sys:pointer-size",		&SchemeFFI::pointerSize },
 	    { "sys:open-dylib",		&SchemeFFI::openDynamicLib },
 	    { "sys:close-dylib",		&SchemeFFI::closeDynamicLib },
+	    { "sys:make-cptr",		&SchemeFFI::makeCptr },
 
 	    // DSP sys stuff
 	    { "sys:set-dsp-closure",	&SchemeFFI::setDSPClosure },
@@ -170,7 +164,7 @@ namespace extemp {
 	    { "sys:set-dsp-wrapper-array",	&SchemeFFI::setDSPWrapperArray },
 
 	    // memory zone stuff
-	    { "sys:create-mzone",		&SchemeFFI::createMallocZone },
+    	    { "sys:create-mzone",		&SchemeFFI::createMallocZone },
 	    { "sys:default-mzone",		&SchemeFFI::defaultMallocZone },
 	    { "sys:destroy-mzone",		&SchemeFFI::destroyMallocZone },
 	    { "sys:copy-to-dmzone",		&SchemeFFI::copyToDefaultZone },
@@ -302,6 +296,12 @@ namespace extemp {
 	io->_object._string._length = l;
 	// return io string
 	return io;
+    }
+
+    pointer SchemeFFI::makeCptr(scheme* _sc, pointer args)
+    {
+        void* ptr = malloc(ivalue(pair_car(args)));
+	mk_cptr(_sc, ptr);
     }
 
     pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
@@ -651,7 +651,7 @@ namespace extemp {
 	s.erase(s.size()-1,1);
 	ascii_text_color(1,1,10);
 	printf("%s\n",s.c_str());	
-	ascii_text_color(0,9,10);	
+	ascii_text_color(0,7,10);	
 	return _sc->T; //mk_string(_sc, s.c_str()); 
     }
 
@@ -664,7 +664,7 @@ namespace extemp {
 	s.erase(s.size()-1,1);
 	ascii_text_color(1,3,10);
 	printf("%s\n",s.c_str());
-	ascii_text_color(0,9,10);		
+	ascii_text_color(0,7,10);		
 	return _sc->T; //mk_string(_sc, s.c_str()); 
     }
 	
@@ -1095,7 +1095,14 @@ namespace extemp {
     pointer SchemeFFI::destroyMallocZone(scheme* _sc, pointer args)
     {		
 	llvm_zone_t* ptr = (llvm_zone_t*) cptr_value(pair_car(args));
-	llvm_zone_destroy(ptr);
+	if(pair_cdr(args) != _sc->NIL)
+	{
+	  llvm_destroy_zone_after_delay(ptr, rvalue(pair_cadr(args)));
+	}
+        else
+	{
+	  llvm_zone_destroy(ptr);
+	}
 	return _sc->T;
     }
 

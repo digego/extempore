@@ -80,6 +80,7 @@ namespace extemp {
 	static pointer openDynamicLib(scheme* _sc, pointer args);
 	static pointer closeDynamicLib(scheme* _sc, pointer args);		
 	static pointer pointerSize(scheme* _sc, pointer args);
+	static pointer makeCptr(scheme* _sc, pointer args);
 	// dsp bits
 	static pointer setDSPClosure(scheme* _sc, pointer args);
 	static pointer setDSPWrapper(scheme* _sc, pointer args);

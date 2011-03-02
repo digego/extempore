@@ -209,6 +209,12 @@ long long llvm_get_next_prime(long long start)
     return -1;
 }
 
+void* llvm_memset(void* ptr, int32_t c, int64_t n)
+{
+    return memset(ptr, c, n);
+}
+
+
 // these are helpers for runtime debugging in llvm
 void llvm_print_pointer(void* ptr)
 {
@@ -465,6 +471,9 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_set_size);
 	    gv = M->getNamedValue(std::string("llvm_zone_ptr_size"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_size);
+
+	    gv = M->getNamedValue(std::string("llvm_memset"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_memset);
 			
 	}	
 	return;

@@ -61,6 +61,8 @@
 //#include "EXTMonitor"
 //#include "EXTThread"
 
+#include "UNIV.h"
+
 //#include <iosfwd>
 #include <iomanip>
 
@@ -1066,9 +1068,9 @@ static int alloc_cellseg(scheme *sc, int n) {
 	adj=sizeof(struct cell);
     }
 	
-    std::cout << "ALLOCATE MEMORY" << std::endl;
+    //std::cout << "ALLOCATE MEMORY" << std::endl;
 	
-    std::cout << "FCELLS: " << sc->fcells << std::endl;
+    //std::cout << "FCELLS: " << sc->fcells << std::endl;
 	
     for (k = 0; k < n; k++) {
 	if (sc->last_cell_seg >= CELL_NSEGMENT - 1)
@@ -1131,7 +1133,7 @@ static int alloc_cellseg(scheme *sc, int n) {
 	ttt = ttt->_cw;
     }
     sc->treadmill_bottom = ttt; //sc->treadmill_free + (CELL_SEGSIZE/2);//100000;
-    std::cout << sc->fcells << " number of free cells" << std::endl;	
+    //std::cout << sc->fcells << " number of free cells" << std::endl;	
 	
 #ifdef TREADMILL_CHECKS
     printf("////////////// SANITY CHECK TREADMILL AFTER ALLOCATION /////////////\n");
@@ -1187,7 +1189,7 @@ static int alloc_cellseg(scheme *sc, int n) {
     char str[256];
     sprintf(str,"Allocated: %d cell segements for a total of %d.  Free cells = %lld",n,sc->last_cell_seg,sc->fcells);
 //	CPPBridge::notification(str);
-    std::cout << "Allocated: " << n << " Cell Segements For A Total Of " << sc->last_cell_seg << ",  Free Cells = " << sc->fcells << std::endl;
+//    std::cout << "Allocated: " << n << " Cell Segements For A Total Of " << sc->last_cell_seg << ",  Free Cells = " << sc->fcells << std::endl;
     return n;
 }
 
@@ -5948,8 +5950,6 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     ///////////////////////////////////////////////////////////////////////
 	
 
-    printf("First Round Ready to Rock\n");
-	
     sc->treadmill_stop = false;
     sc->treadmill_scan_thread = new extemp::EXTThread();
     sc->treadmill_scan_thread->create(&treadmill_scanner, sc); //, CAPThread::kDefaultThreadPriority);
