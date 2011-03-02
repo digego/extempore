@@ -11,9 +11,9 @@
 (define libsndfile (sys:open-dylib "libsndfile.so.1"))
 
 ;; bind 3 sndfile lib functions
-(lib-bind libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
-(lib-bind libsndfile sf_read_double [i64,i8*,double*,i64]*)
-(lib-bind libsndfile sf_seek [i64,i8*,i64,i32]*)
+(bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
+(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
 
 ;; an audio buffer reader
 (definec read-audio-file
@@ -34,17 +34,20 @@
 ;; setup some space to hold audio data
 (define audio-data (sys:make-cptr (* 44100 8 2 20)))
 ;; bind space for the compiler to access
-(scm-bind adat double* audio-data)
+(bind-scm adat double* audio-data)
 
 ;; dsp function
 (definec:dsp dsp  
-  (let ((sample 0.0)
-	(audio (read-audio-file "/tmp/your_sound_file.ogg" adat (* 2 44100) (* 44100 10))))
+  (let ((sample 0.0)	
+	(lgth 0.5)
+	(offset 9.0)
+	(audio (read-audio-file "/tmp/allegro.ogg" adat 
+				(dtoi64 (* 44100.0 offset))
+				(dtoi64 (* 44100.0 lgth)))))
     (lambda (in time chan dat)
-      (let ((pos1 (modulo time (* 2.2 44100.0)))
-	    (pos2 (modulo time (* 2.15 44100.0))))
-	(+ (aref audio (dtoi64 (+ chan (* pos1 2.0))))
-	   (* .4 (aref audio (dtoi64 (+ chan (* pos2 2.0))))))))))
+      (let ((pos (modulo time (* lgth 44100.0))))
+	(aref audio (dtoi64 (+ chan (* 2.0 pos))))))))
+	   
 
 ;; set dsp
 (dsp:set! dsp)
