@@ -57,6 +57,10 @@ void llvm_zone_destroy(llvm_zone_t* zone);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay);
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
 
+pointer llvm_scheme_env_set(scheme* _sc, char* sym);
+bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
+bool regex_split(char* str, char** a, char** b);
+
 namespace llvm {
     class Module;
     class ModuleProvider;

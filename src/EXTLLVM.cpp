@@ -38,6 +38,8 @@
 #include "UNIV.h"
 #include "SchemeFFI.h"
 #include "TaskScheduler.h"
+#include "Scheme.h"
+#include "pcre.h"
 
 #include "llvm/Assembly/Parser.h"
 #include "llvm/LLVMContext.h"
@@ -256,6 +258,7 @@ double llvm_samplerate()
     return (double) extemp::UNIV::SAMPLERATE;
 }
 
+
 ///////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////
@@ -284,6 +287,7 @@ uint32_t get_address_offset(const char* name, closure_address_table* table)
 {
     while(table)
     {
+      //printf("tablename: %s\n",table->name);
 	if(strcmp(table->name,name) == 0) {
 	    //printf("in %s returning offset %d from %s\n",table->name,table->offset,name);
 	    return table->offset;	
@@ -294,7 +298,7 @@ uint32_t get_address_offset(const char* name, closure_address_table* table)
     return 0;
 }
 
-char* get_adddress_type(const char* name, closure_address_table* table)
+char* get_address_type(const char* name, closure_address_table* table)
 {
     while(table)
     {
@@ -305,6 +309,18 @@ char* get_adddress_type(const char* name, closure_address_table* table)
     }
     printf("Unable to locate %s in closure environment\n",name);
     return 0;  
+}
+
+bool check_address_exists(const char* name, closure_address_table* table)
+{
+    while(table)
+    {
+      if(strcmp(table->name,name) == 0) {
+	return true;
+      }
+      table = table->next;
+    }
+    return false;  
 }
 
 bool check_address_type(const char* name, closure_address_table* table, const char* type)
@@ -340,6 +356,177 @@ struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, u
     //printf("adding %s of type %s at %d\n",t->name,t->type,t->offset);
     return t;
 }
+
+bool regex_split(char* regex, char* str, char* a, char* b)
+{
+  char* data = str;
+  int length = strlen(data);
+  char* pattern = regex;		
+  pcre *re; 
+  const char *error; 
+  int erroffset; 
+  //printf("dat: data\n");
+  // should probably move this regex compile to global
+  re = pcre_compile(	pattern, /* the pattern */ 
+			0, /* default options */ 
+			&error, /* for error message */ 
+			&erroffset, /* for error offset */ 
+			NULL); /* use default character tables */		
+  int rc; 
+  int ovector[60];					
+  rc = pcre_exec(	re, /* result of pcre_compile() */ 
+			NULL, /* we didn’t study the pattern */ 
+			data, /* the subject string */ 
+			strlen(data), /* the length of the subject string */ 
+			0, /* start at offset 0 in the subject */ 
+			0, /* default options */ 
+			ovector, /* vector of integers for substring information */ 
+			60); /* number of elements (NOT size in bytes) */
+  
+  if(rc<1 || rc>1) return false; // then we failed
+  int range = ovector[0];
+  memset(a,0,range+1);
+  memcpy(a,data,range);
+  memset(b,0,(length-(range+1))+1);
+  memcpy(b,data+range+1,(length-(range+1)));
+  return true;
+}
+
+bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
+  char a[256];
+  char b[256];
+  if(!regex_split((char*)"\\.", symbol, (char*) a, (char*) b)) {
+    printf("Eval error: not valid dot syntax\n");
+    return false;
+  }
+  pointer x=find_slot_in_env(sc,sc->envir,mk_symbol(sc,a),1);
+  if(x==sc->NIL) { // || !is_closure(x)) { // then we failed
+    printf("Eval error: not valid dot syntax: bad value\n");
+    return false;
+  }else{
+    llvm::Module* M = extemp::EXTLLVM::I()->M;
+    std::string funcname(a);
+    std::string getter("_getter");
+    llvm::Function* func = M->getFunction(funcname+getter);
+    if(func) {
+      return true;
+    }else{
+      printf("Eval error: No compiler match for %s\n",symbol);
+      return false; 
+    }
+  }
+}
+
+pointer llvm_scheme_env_set(scheme* _sc, char* sym)
+{
+  using namespace llvm; 
+  char fname[256];
+  char tmp[256];
+  char vname[256];
+  char tname[256];
+  if(!(regex_split((char*)"\\.",sym, (char*) fname, (char*) tmp))) {
+    printf("Error attempting to set environment variable in closure bad split %s\n",sym);
+    return _sc->F;  
+  }
+  if(!regex_split((char*)":",tmp, (char*) vname,(char*) tname)) {
+    memset(tname, 0, 256);
+    memset(vname, 0, 256);
+    memcpy(vname, tmp, 256);
+  }   
+  //printf("in llvm scheme env set %s.%s:%s\n",fname,vname,tname);
+  
+  Module* M = extemp::EXTLLVM::I()->M;
+  std::string funcname(fname);
+  std::string getter("_getter");
+  llvm::Function* func = M->getFunction(funcname+getter); //std::string(string_value(pair_car(args))));
+  if(func == 0) {
+    printf("Error: no matching function for %s.%s\n",fname,vname);
+    return _sc->F; 
+  }
+  
+  void*(*p)() = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
+  
+  if(p==NULL) {
+    printf("Error attempting to set environment variable in closure %s.%s\n",fname,vname);
+    return _sc->F;
+  }
+  
+  size_t*** closur = (size_t***) p();
+  size_t** closure = *closur;
+  //uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
+  closure_address_table* addy_table = (closure_address_table*) *(closure+0);
+  // check address exists
+  if(!check_address_exists(vname, addy_table)) {
+    ascii_text_color(0,2,10);
+    printf("Eval Error:");
+    ascii_text_color(1,7,10);
+    printf(" Environment variable does not existing in comipled closure");
+    ascii_text_color(1,7,10);
+    printf("%s.%s\n",fname,vname);
+    ascii_text_color(0,7,10);
+    return _sc->F;
+  }
+  char* eptr = (char*) *(closure+1);
+  char* type = get_address_type(vname,addy_table);
+  uint32_t offset = get_address_offset(vname,addy_table);
+
+  //printf("type: %s  offset: %d\n",type, offset);
+
+  pointer value = 0;
+  if(_sc->args == _sc->NIL) {
+    value = 0;
+  } else {   
+    value = pair_car(_sc->args);
+  }
+
+  if(strcmp(type,"i32")==0) {
+    int32_t** ptr = (int32_t**) (eptr+offset);
+    if(value == _sc->NIL) {
+      return mk_integer(_sc, **ptr);
+    } else {
+      **ptr = (int32_t) ivalue(value);
+      return _sc->T;
+    }
+  }else if(strcmp(type,"i64")==0){
+    uint64_t** ptr = (uint64_t**) (eptr+offset);
+    if(value == _sc->NIL) {
+      return mk_integer(_sc, **ptr);
+    } else {
+      **ptr = ivalue(value);
+      return _sc->T;
+    }        
+  }else if(strcmp(type,"float") == 0){
+    float** ptr = (float**) (eptr+offset);
+    if(value == _sc->NIL) {
+      return mk_real(_sc, **ptr);
+    } else {
+      **ptr = rvalue(value);
+      return _sc->T;
+    }            
+  }else if(strcmp(type,"double")==0){
+    double** ptr = (double**) (eptr+offset);
+    if(value == _sc->NIL) {
+      return mk_real(_sc, **ptr);
+    } else {
+      **ptr = rvalue(value);
+      return _sc->T;
+    }            
+  }else{ // else pointer type
+    char*** ptr = (char***) (eptr+offset);
+    if(value == _sc->NIL) {      
+      return mk_cptr(_sc, (void*) **ptr);
+    } else {
+      **ptr = (char*) cptr_value(value);
+      //printf("Unsuported type for closure environment set\n");
+      return _sc->T;
+    }
+  }
+  // shouldn't get to here 
+  return _sc->F;
+}
+
+
+
 /////////////////////////////////////////////////////////////////////////
 
 namespace extemp {

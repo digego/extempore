@@ -58,6 +58,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <pcre.h>
+#include "EXTLLVM.h"
 //#include "EXTMonitor"
 //#include "EXTThread"
 
@@ -3595,7 +3597,11 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
 		s_return(sc,xx);
 		//s_return(sc,slot_value_in_env(x));
 	    } else {
+	      if(llvm_check_valid_dot_symbol(sc,symname(sc->code))) {
+		s_return(sc,sc->code);
+	      }else{
 		Error_1(sc,"eval: unbound variable:", sc->code, sc->code->_debugger->_size);
+	      }
 	    }
 	} else if (is_pair(sc->code)) {
 	    if (is_syntax(x = car(sc->code))) {     /* SYNTAX */
@@ -3707,7 +3713,13 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
 	    dump_stack_continuation_set(sc, cont_dump(sc->code));
 	    s_return(sc,sc->args != sc->NIL ? car(sc->args) : sc->NIL);
 	} else {
+	  if(llvm_check_valid_dot_symbol(sc, symname(sc->code))) {
+	    // all good so far so now we check llvm
+	    pointer ppp = llvm_scheme_env_set(sc, symname(sc->code));
+	    s_return(sc,ppp);
+	  }else{
 	    Error_0(sc,"illegal function",sc->code->_debugger->_size);
+	  }
 	}
 
     case OP_DOMACRO:    /* do macro */
