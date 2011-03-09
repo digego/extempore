@@ -1355,8 +1355,9 @@
    (lambda (symname ast types envvars . prev)
       ;(println 'symname: symname 'envvars: envvars 'ast: ast 'prev: prev)
       (if (atom? ast) ast
-          (cond ((equal? (car ast) 'make-closure)
+          (cond ((equal? (car ast) 'make-closure)		 
                  (list (car ast)
+		       (cadr ast)
                        ;; global name
                        (string-append (symbol->string symname) "__" (number->string (llvm:count++)))
                        (if (null? prev) ;; this adds return type
@@ -1369,11 +1370,11 @@
                                       (cons (string->symbol (string-append (symbol->string (car p)) "__sub"))
                                             (cdr p)))
                                    (assoc v types)))
-                            (cadr ast))
+                            (caddr ast))
                        (map (lambda (v) ;; argument types
                                (assoc v types))
-                            (caddr ast))
-                       (impc:ti:add-types-to-source symname (cadddr ast) types (append envvars (cadr ast)))))
+                            (cadddr ast))
+                       (impc:ti:add-types-to-source symname (car (cddddr ast)) types (append envvars (caddr ast)))))
                 ((equal? (car ast) 'clrun->)
                  (list* (car ast)
                         (cadr ast)
@@ -1390,11 +1391,12 @@
                                         (assoc (cadr ast) types))))))
                 ((member (car ast) '(make-env make-env-zone))
                  (list (car ast)
+		       (cadr ast)
                        (map (lambda (p)
                                (list (assoc (car p) types)
                                      (impc:ti:add-types-to-source symname (cadr p) types envvars (car p))))
-                            (cadr ast))
-                       (impc:ti:add-types-to-source symname (caddr ast) types envvars)))
+                            (caddr ast))
+                       (impc:ti:add-types-to-source symname (cadddr ast) types envvars)))
                 ((or (and (assoc (car ast) types)
                           (impc:ir:closure? (cdr (assoc (car ast) types))))
                      (and (not (list? (car ast)))
@@ -1472,41 +1474,15 @@
 ;; find all free vars
 ;; currently we don't allow shadow vars
 (define impc:ti:find-all-vars
-   (lambda (ast syms)
-      ;(print 'syms syms)
-      (cl:remove-duplicates (cond ((pair? ast)
-                                   (cond ((equal? (car ast) 'make-closure)
-                                          (if (not (null? (cl:intersection (caddr ast) syms)))
-                                              (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car (cl:intersection (caddr ast) syms))) 'as 'a 'shadow 'variable))
-                                          (impc:ti:find-all-vars (cadddr ast) (append (cadr ast) (caddr ast) syms)))
-                                         ((equal? (car ast) 'dotimes)                                          
-                                          (impc:ti:find-all-vars (cddr ast) (cons (caadr ast) syms)))
-                                         ((member (car ast) '(make-env make-env-zone))
-                                          (impc:ti:find-all-vars (caddr ast) 
-                                                            (append (impc:ti:flatten-1 (map (lambda (p)
-                                                                                       (if (member (car p) syms)
-                                                                                           (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car p)) p 'as 'a 'shadow 'variable))
-                                                                                       (cons (car p)
-                                                                                             (impc:ti:find-all-vars (cadr p) syms)))
-                                                                                    (cadr ast)))
-                                                                                syms)))
-                                         (else (append (impc:ti:find-all-vars (car ast) syms)
-                                                       (impc:ti:find-all-vars (cdr ast) syms)))))
-                                  ((atom? ast) syms)))))
-
-
-;; find all free vars
-;; currently we don't allow shadow vars
-(define impc:ti:find-all-vars
    (lambda (full-ast syms)
      ;(println 'ast: ast)
      (letrec ((f (lambda (ast)
 		   (cond ((pair? ast)
 			  (cond ((equal? (car ast) 'make-closure)
-				 (if (not (null? (cl:intersection (caddr ast) syms)))
+				 (if (not (null? (cl:intersection (cadddr ast) syms)))
 				     (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car (cl:intersection (caddr ast) syms))) 'as 'a 'shadow 'variable))			      
-				 (set! syms (cl:remove-duplicates (append (cadr ast) (caddr ast) syms)))
-				 (f (cadddr ast)))
+				 (set! syms (cl:remove-duplicates (append (caddr ast) (cadddr ast) syms)))
+				 (f (car (cddddr ast))))
 				((equal? (car ast) 'dotimes)       
 				 (if (not (null? (cl:intersection (list (caadr ast)) syms)))
 				     (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car (cl:intersection (list (caadr ast)) syms))) 'as 'a 'shadow 'variable))  
@@ -1515,15 +1491,15 @@
 				((member (car ast) '(make-env make-env-zone))
 				 (set! syms
 				       (append (map (lambda (p)
-						       (if (member (car p) syms)
-							   (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car p)) p 'as 'a 'shadow 'variable))
-						       (car p))
-						     (cadr ast))
+						      (if (member (car p) syms)
+							  (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car p)) p 'as 'a 'shadow 'variable))
+						      (car p))
+						    (caddr ast))
 					       syms))
 				 (for-each (lambda (p)
 					     (f (cadr p)))
-					   (cadr ast))					     
-				 (f (caddr ast)))
+					   (caddr ast))					     
+				 (f (cadddr ast)))
 				(else (f (car ast))
 				      (f (cdr ast)))))
 			 ((atom? ast) '())))))
@@ -1548,22 +1524,38 @@
 ;; adds make-closure and make-env tags
 ;;
 
+(define impc:ti:allocate-var?
+  (lambda (ast)
+    (cond ((null? ast) #f)
+	  ((eq? ast 'lambda) #t)
+	  ((pair? ast)
+	   (or (impc:ti:allocate-var? (car ast))
+	       (impc:ti:allocate-var? (cdr ast))))
+	  (else #f))))
 
 ;; adds make-closure and make-env tags
 (define impc:ti:closure:convert
    (lambda (ast esyms)
-      ;(print 'ast: ast 'syms: esyms)
       (cond ((pair? ast)
              (if (equal? (car ast) 'lambda)
-                 (let ((env (impc:ti:block:check-for-free-syms ast esyms)))
-                    (list 'make-closure env (cadr ast) 
-                          (impc:ti:closure:convert (caddr ast) (append (cadr ast) esyms))))
+                 (let (;(env (impc:ti:block:check-for-free-syms ast esyms))
+		       (allocate-mem-for-vars? (impc:ti:allocate-var? (cdr ast))))
+		   (list 'make-closure allocate-mem-for-vars? 
+			 ;; name of compiled function is always last 
+			 ;; so we can remove it by dropping it off the end
+			 (cdr (reverse (cl:remove-duplicates esyms))) ;env 
+			 (cadr ast)
+			 (impc:ti:closure:convert (caddr ast) (append (cadr ast) esyms))))
                  (if (member (car ast) '(let let* letrec))
-                     (let* ((bindings (map (lambda (binding) (car binding)) (cadr ast))))
-                            ;(free-syms (impc:ti:block:check-for-free-syms (cddr ast) (append bindings esyms))))
-                        (cons 'make-env
-                              (list (impc:ti:closure:convert (cadr ast) (append bindings esyms))
-                                    (impc:ti:closure:convert (caddr ast) (append bindings esyms)))))
+                     (let* ((allocate-mem-for-vars? (impc:ti:allocate-var? ast))
+                            (bindings (map (lambda (binding) 
+					     (car binding))
+					   (cadr ast))))
+		       ;(free-syms (impc:ti:block:check-for-free-syms (cddr ast) (append bindings esyms))))
+		       (cons 'make-env
+			     (cons allocate-mem-for-vars?
+				   (list (impc:ti:closure:convert (cadr ast) (append bindings esyms))
+					 (impc:ti:closure:convert (caddr ast) (append bindings esyms))))))
                      (cons (impc:ti:closure:convert (car ast) esyms)
                            (impc:ti:closure:convert (cdr ast) esyms)))))
             ((atom? ast) ast))))
@@ -1631,9 +1623,9 @@
          (let loop ((alst ast))
             (cond ((null? alst) '())
                   ((atom? alst) '())
-                  ((pair? alst)
+                  ((pair? alst)		   
                    (if (equal? (car alst) 'make-closure)
-                       (set! blst (cons (cadr alst) blst)))
+		       (set! blst (cons (caddr alst) blst)))
                    (loop (car alst))
                    (loop (cdr alst)))))
          blst)))
@@ -1692,10 +1684,10 @@
                                                    *impc:ir:pointer*)
                                                  (map (lambda (x) (impc:ir:get-type-from-str x))
                                                       (llvm:get-function-args-withoutzone (symbol->string symname)))))))
-         ;(print-error "stop")
+	 ;(print-error "stop")
          (if *impc:compiler:print-types* (print '---------------------------------))
          (if *impc:compiler:print-types* (print 'types: types))
-         ;(print 'ctypes: converted-types)
+         ;(println 'ctypes: converted-types)
          (if *impc:compiler:print-types* (print 'newast: newast))
 
          ;; check for unfound types
@@ -1752,15 +1744,15 @@
                                          "entry:\n"
                                          "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
                                          "%func = load i8** %ptr\n"
-                                         "ret i8* %func\n}\n"))                                                                           
+                                         "ret i8* %func\n}\n"))
                 (fstub (string-append "define ccc " (impc:ir:get-type-str (car stub-type))
                                       " @" (string-append (symbol->string symname) "(i8* %_impz")
                                       (apply string-append (map (lambda (t n c)
                                                                    (string-append c (impc:ir:get-type-str t) " "
                                                                                   n))
                                                                 (cdr stub-type)                                           
-                                                                '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j")
-                                                                '("," "," "," "," "," "," "," "," "," ",")))
+                                                                '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
+                                                                '("," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
                                       ")\n"
                                       "{\nentry:\n"
                                       ;"%_zone = call ccc %mzone* @malloc_create_zone(0,0)\n"
@@ -1783,12 +1775,49 @@
                                                                                   (impc:ir:get-type-str t) 
                                                                                   " " n))
                                                                 (cdr stub-type)
-                                                                '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j")))                                                        
+								'("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
                                       ")\nret " (impc:ir:get-type-str (car stub-type)) 
                                       (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-                                      "}")))
+                                      "}"))
+                (fstub_native (string-append "define ccc " (impc:ir:get-type-str (car stub-type))
+					     " @" (string-append (symbol->string symname) "_native("
+								 (apply string-append (map (lambda (t n c)
+											     (string-append c (impc:ir:get-type-str t) " "
+													    n))
+											   (cdr stub-type)                                
+											   '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
+											   '("" "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
+					     ")\n"
+					     "{\nentry:\n"
+					     "%_zone = call ccc %mzone* @llvm_zone_create(i64 0)\n"
+					     ;"%_zone = call ccc %mzone* @malloc_default_zone()\n"
+					     "%_impz = bitcast %mzone* %_zone to i8*\n"
+					     "call ccc void @llvm_destroy_zone_after_delay(i8* %_impz, double 44100.0)\n"
+					     "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
+					     "%ptrvar = load i8** %ptr\n"
+					     "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"				      
+					     "%closure = load " closure-type " %closure_tmp \n"
+					     "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
+					     "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+					     "%ff = load "
+					     (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
+					     "* %fPtr\n"
+					     "%ee = load i8** %ePtr\n"
+					     (if (impc:ir:void? (car stub-type)) "" "%result = ")
+					     "tail call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+					     (apply string-append (map (lambda (t n)
+									 (string-append ", " 
+											(impc:ir:get-type-str t) 
+											" " n))
+								       (cdr stub-type)
+								       '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
+					     ")\nret " (impc:ir:get-type-str (car stub-type)) 
+					     (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
+					     "}"))))
+
 	   ;(println fsgetter)
             ;(println fstub)
+
             (if *impc:compiler:print* (print '--------------------------------compiling----------------------------------->))
             (if *impc:compiler:print* (print fs))
             (if *impc:compiler:print-raw-llvm* (print-full-nq fs)) 
@@ -1829,7 +1858,8 @@
             (if *impc:compiler:print-raw-llvm* (print-full-nq fstub))
             (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_stub"))
-                       (if (not (llvm:compile fstub))
+                       (if (or (not (llvm:compile fstub))
+			       (not (llvm:compile fstub_native)))
                            (begin (print-error "Compiler Failed")
                                   (error ""))) 
                        (if *impc:compiler:print* (print-notification "compiled stub"))))
@@ -1964,3 +1994,8 @@
     (let ((f (llvm:get-function (string-append name "_getter"))))
       (if f (llvm:run f)
 	  '()))))
+
+;; a helper for returning a scheme closure native closure (if one exists!)
+(define llvm:get-native-function
+  (lambda (name)
+    (llvm:get-function-pointer (string-append name "_native"))))
