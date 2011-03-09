@@ -457,13 +457,14 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   closure_address_table* addy_table = (closure_address_table*) *(closure+0);
   // check address exists
   if(!check_address_exists(vname, addy_table)) {
-    ascii_text_color(0,2,10);
-    printf("Eval Error:");
-    ascii_text_color(1,7,10);
-    printf(" Environment variable does not existing in comipled closure");
-    ascii_text_color(1,7,10);
-    printf("%s.%s\n",fname,vname);
+    ascii_text_color(0,1,10);
+    printf("RunTime Error:");
     ascii_text_color(0,7,10);
+    printf(" slot");
+    ascii_text_color(1,7,10);
+    printf(" %s.%s ",fname,vname);
+    ascii_text_color(0,7,10);
+    printf("does not exist!\n"); 
     return _sc->F;
   }
   char* eptr = (char*) *(closure+1);
