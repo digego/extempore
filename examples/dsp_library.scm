@@ -378,14 +378,14 @@
 
 (definec make-note
   (lambda (start-time freq:double amp:double dur 
-		      attack-time decay-time
+		      attack decay release sus-amp
 		      nstarts:double*
 		      idx:i64 kernel:[double,double,double,double,double]*)
-    (let ((env (make-adsr start-time (* 0.5 attack-time) (* 1.0 attack-time)
-			  dur ; subtract atk and dky                             
-			  decay-time 1.0 0.6)))
+    (let ((env (if (< (+ attack decay) dur)
+		   (make-adsr start-time attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
+		   (make-adsr start-time 0.0 0.0 dur release 1.0 sus-amp))))
       (lambda (sample:double time:double channel:double)
-	(if (> time (+ start-time (* 1.5 attack-time) dur decay-time)) ;; add adsr release amt                      
+	(if (> time (+ start-time dur release))
 	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
 	(kernel time channel freq (* (env time) amp))))))
 
@@ -394,8 +394,10 @@
   `(definec ,name
      (let* ((poly 48)
 	    (notes (make-array poly [double,double,double,double]*))
-	    (attack-time 1000.0)
-	    (decay-time 1500.0)
+	    (attack 200.0)
+	    (decay 200.0)
+	    (release 1000.0)
+	    (sustain 0.6) ;; amplitude of the sustain
 	    (note-starts (make-array poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1))
@@ -405,17 +407,16 @@
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
 			      (begin (aset! notes free-note
 					    (make-note start freq amp dur
-						       attack-time decay-time
+						       attack decay release sustain
 						       note-starts free-note
 						       (,kernel)))
 				     (aset! note-starts free-note start)
 				     1)
 			      0)))))
-       (dotimes (ii poly) ;; sets all notes to inactive     $
+       (dotimes (ii poly) ;; sets all notes to inactive
 		(aset! note-starts ii 9999999999999.0))
        (lambda (in:double time:double chan:double dat:double*)
-	 (let ((out 0.0)
-	       (f new-note)) ;; f here is a temporary hack - don't ask!  
+	 (let ((out 0.0))
 	   (dotimes (k poly) ;; sum all active notes          
 		    (if (< (aref note-starts k) time)
 			(set! out (+ out (* 0.3 ((aref notes k) in time chan))))))
@@ -437,7 +438,7 @@
   `(let ((zone (sys:create-mzone (* 1024 1024)))
 	 (default-zone *impc:zone*)	 
 	 (duration (* 1.0 ,dur))) ; (* ,dur (* *samplerate* (/ 60 (*metro* 'get-tempo))))))
-     (sys:destroy-mzone zone (+ duration (* 30.0 *samplerate*)))
+     (sys:destroy-mzone zone (+ duration (* 3.0 *samplerate*)))
      (set! *impc:zone* zone)
      (synth-note (integer->real ,time) 
 		 (llvm:get-native-closure ,(symbol->string inst))
@@ -458,7 +459,7 @@
 	  (oscr2 (make-oscil 0.25)))
       (lambda (time:double chan:double freq:double amp:double)
 	(if (< chan 1.0)
-	    (* amp (+ (oscl2 0.8 (+ freq (* 10.0 (random))))
+	    (* amp (+ (oscl2 0.8 (+ freq (* 25.0 (random))))
 		      (oscl 0.8 (+ freq (oscl3 100.0 (* freq 1.001))))))
 	    (* amp (+ (oscr2 0.5 (+ freq (* 10.0 (random))))
 		      (oscr 0.8 (+ freq (oscr3 1000.0 (* freq 0.99)))))))))))
