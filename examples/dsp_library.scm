@@ -15,6 +15,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
 ;; sine oscillator function
 (definec make-oscil
    (lambda (phase)  
@@ -31,6 +32,7 @@
             (n 50.0))         
 	(lambda (amp freq)
             (* amp (tanh (* n (osc 1.0 freq))))))))
+
 
 ;; saw oscillator
 (definec make-saw
@@ -68,22 +70,48 @@
 		amp
 		0.0))))))
 
-;; iir comb
+
+;; delay with interpolation
 (definec make-comb
    (lambda (max-delay)
       (let ((line (make-array max-delay double))
-            (time 0)	    
-	    (delay max-delay)
-	    (in 0.5)
+	    (in-head 0)
+	    (out-head 0)
+	    (delay_ (i64tod max-delay))
+	    (delay (i64tod max-delay))
+	    (alpha 0.0)
+	    (om_alpha 1.0)
+	    (in 1.0)
 	    (out 0.5))
 	(dotimes (i max-delay) (aset! line i 0.0))
 	(lambda (x:double)
-	  (let* ((n (modulo time delay))
-		 (delayed (aref line n))                   
+	  (if (<> delay delay_)
+	      (begin (set! delay_ delay)		 
+		     (set! alpha (- delay (floor delay)))
+		     (set! om_alpha (- 1.0 alpha))
+		     (set! out-head (- (+ max-delay in-head)
+				       (dtoi64 delay)))))
+	  (let* ((ih:i64 (modulo in-head max-delay))
+		 (oh:i64 (modulo out-head max-delay))
+		 (delayed1 (aref line oh))
+		 (delayed2 (aref line (modulo (+ oh 1) max-delay)))
+		 (delayed (+ (* alpha delayed1) (* om_alpha delayed2))) 
 		 (y (+ (* in x) (* out delayed))))
-	    (aset! line n y)
-	    (set! time (+ time 1))
+	    (aset! line ih y)
+	    (set! in-head (+ ih 1))
+	    (set! out-head (+ oh 1))
 	    y)))))
+
+
+;; chorus fx
+(definec make-chorus
+  (lambda (delay mod-phase mod-range mod-rate)
+    (let ((comb (make-comb (dtoi64 (+ delay mod-range))))
+	  (mod (make-oscil mod-phase)))
+      (lambda (x:double)
+	(comb.delay (+ delay (mod mod-range mod-rate)))
+	(comb x)))))
+    
 
 ;; tap delay
 (definec tap-delay
@@ -91,7 +119,7 @@
       (let ((line (make-array max-delay double))
 	    (taps (make-array num-of-taps i64))
 	    (delay max-delay)
-            (time 0))
+	    (time 0))
          (lambda (x:double)
             (let ((y 0.0)
                   (n (modulo time delay))
@@ -120,7 +148,16 @@
                (aset! outline n y)
                (set! time (+ time 1))
                y)))))
-            
+
+
+;; a very dodgy bitcrusher
+(definec make-crusher
+  (lambda (bits)
+    (let ((amp 1.0))
+      (lambda (in)
+	(* amp (/ (floor (* in (pow 2. bits))) 
+		  (pow 2. bits)))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -316,9 +353,15 @@
                y)))))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; envelope stuff
 ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
 (definec make-line
   (lambda (x1:double y1:double x2 y2)
     (let* ((m (if (= 0.0 (- x2 x1)) 
@@ -376,6 +419,13 @@
 	  (f time))))))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; INSTRUMENT STUFF
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (definec make-note
   (lambda (start-time freq:double amp:double dur 
 		      attack decay release sus-amp
@@ -390,7 +440,7 @@
 	(kernel time channel freq (* (env time) amp))))))
 
 
-(define-macro (define-instrument name kernel)
+(define-macro (define-instrument name note-kernel effect-kernel)
   `(definec ,name
      (let* ((poly 48)
 	    (notes (make-array poly [double,double,double,double]*))
@@ -409,7 +459,7 @@
 					    (make-note start freq amp dur
 						       attack decay release sustain
 						       note-starts free-note
-						       (,kernel)))
+						       (,note-kernel)))
 				     (aset! note-starts free-note start)
 				     1)
 			      0)))))
@@ -420,10 +470,10 @@
 	   (dotimes (k poly) ;; sum all active notes          
 		    (if (< (aref note-starts k) time)
 			(set! out (+ out (* 0.3 ((aref notes k) in time chan))))))
-	   out)))))
+	   (,effect-kernel out time chan dat))))))
 
 
-(definec synth-note
+(definec _synth-note
   (lambda (time inst:[double,double,double,double,double*]* freq amp dur)
     ((inst.new-note:[i64,double,double,double,double]*) time freq dur amp)))
 
@@ -440,16 +490,29 @@
 	 (duration (* 1.0 ,dur))) ; (* ,dur (* *samplerate* (/ 60 (*metro* 'get-tempo))))))
      (sys:destroy-mzone zone (+ duration (* 3.0 *samplerate*)))
      (set! *impc:zone* zone)
-     (synth-note (integer->real ,time) 
+     (_synth-note (integer->real ,time) 
 		 (llvm:get-native-closure ,(symbol->string inst))
 		 (midi2frq ,pitch)
 		 (/ ,vol 127.0)
 		 duration)
      (set! *impc:zone* default-zone)))
 
+;; make synth defaults
+(definec default-note
+  (lambda ()
+    (let ((sawl (make-saw))
+	  (sawr (make-saw)))
+      (lambda (tim:double chan:double freq:double amp:double)
+	(if (< chan 1.0)
+	    (* amp (sawl amp freq))
+	    (* amp (sawr amp freq)))))))
 
-;; make default instrument
-(definec default-inst-kernel
+(definec default-effect
+  (lambda (in:double time:double chan:double dat:double*)
+    in))
+
+;; make default "synth" instrument
+(definec default-synth-note
   (lambda ()
     (let ((oscl (make-oscil 0.0))
 	  (oscl3 (make-oscil 0.0))
@@ -459,31 +522,35 @@
 	  (oscr2 (make-oscil 0.25)))
       (lambda (time:double chan:double freq:double amp:double)
 	(if (< chan 1.0)
-	    (* amp (+ (oscl2 0.8 (+ freq (* 25.0 (random))))
-		      (oscl 0.8 (+ freq (oscl3 100.0 (* freq 1.001))))))
-	    (* amp (+ (oscr2 0.5 (+ freq (* 10.0 (random))))
-		      (oscr 0.8 (+ freq (oscr3 1000.0 (* freq 0.99)))))))))))
+	    (* amp (+ (oscl2 0.8 (+ freq (* 10.0 (random))))
+		      (oscl 0.8 (+ freq (oscl3 200.0 (* freq 1.001))))))
+	    (* amp (+ (oscr2 0.8 (+ freq (* 5.0 (random))))
+		      (oscr 0.8 (+ freq (oscr3 400.0 (* freq 0.99)))))))))))
 
-
-;; define default instrument called synth
-(define-instrument synth default-inst-kernel)
-
-
-;; define default dsp using synth and stereo delay
-(definec:dsp dsp
-  (let ((combl (make-comb (dtoi64 (* 0.25 *samplerate*))))
-	(combr (make-comb (dtoi64 (* 0.33333333 *samplerate*)))))
-    (combl.out .2)
-    (combr.out .2)
-    (combl.in 0.7)
-    (combr.in 0.7)    
-    (lambda (in time chan dat)   
-      (cond ((< chan 1.0)
-	     (combl (synth in time chan dat)))
-	    ((< chan 2.0)	     
-	     (combr (synth in time chan dat)))
+(definec default-synth-effect
+  (let ((dleft (dtoi64 (* 0.125 *samplerate*)))
+	(combl (make-comb dleft))
+	(dright (dtoi64 (* 0.33333333 *samplerate*)))
+	(combr (make-comb dright))
+	(chorusl (make-chorus 700.0 0.0 200.0 0.1))
+	(chorusr (make-chorus 700.0 0.5 200.0 0.1)))
+    (combl.out .3)
+    (combr.out .3)
+    (lambda (in:double time:double chan:double dat:double*)      
+      (cond ((< chan 1.0) 
+	     (combl (chorusl in)))
+	    ((< chan 2.0) 
+	     (combr (chorusr in)))
 	    (else 0.0)))))
 
+;; define default instrument called synth
+(define-instrument synth default-synth-note default-synth-effect)
+
+;; setup default synth to play
+(definec:dsp dsp
+  (lambda (in time chan dat)
+    (cond ((< chan 2.0) (synth in time chan dat))
+	  (else 0.0))))
 
 ;; you should set dsp manually
 ;(dsp:set! dsp)

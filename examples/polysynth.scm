@@ -47,35 +47,39 @@
 	       (sawr amp freq))
 	      (else 0.0))))))
 
-;; now define an instrument to use my-additive-synth kernel
-(define-instrument my-synth my-additive-synth)
+;; now define an instrument to use my-additive-synth note kernel
+;; with a default (i.e. pass through) default-effect
+(define-instrument my-synth my-additive-synth default-effect)
+
 
 ;; finally we need to add the new synth to the dsp routine
 ;; this is only slightly modified from the on in dsp_library
-;; we just sum my-synth with synth.
+;; we just sum my-synth with synth and add some delay
 (definec:dsp dsp
   (let ((combl (make-comb (dtoi64 (* 0.25 *samplerate*))))
 	(combr (make-comb (dtoi64 (* 0.33333333 *samplerate*)))))
-    (lambda (in time chan dat)   
+    (lambda (in time chan dat)
       (cond ((< chan 1.0)
-	     (combl (+ (synth in time chan dat)
+	     (combl (+ (* .7 (synth in time chan dat))
 		       (my-synth in time chan dat))))
-		    
 	    ((< chan 2.0)	     
-	     (combr (+ (synth in time chan dat)
-		       (my-synth in time chan dat))))
+	     (combr (+ (* .7 (synth in time chan dat))
+				  (my-synth in time chan dat))))
 	    (else 0.0)))))
 
 
 ;; now start a temporal recursion to play the new synth
 (define loop2
   (lambda (beat dur)
-    (play-note (*metro* beat) my-synth (random '(55 36 63 70 72)) 80 3000)
-    (callback (*metro* (+ beat (* dur .5))) 'loop2
-	      (+ beat dur)
-	      dur)))
+    (let ((pitch (random '(55 36 63 70 72))))
+      (play-note (*metro* beat) my-synth pitch 
+		 (if (= pitch 36) 120 80) 3000)
+      (callback (*metro* (+ beat (* dur .5))) 'loop2
+		(+ beat dur)
+		dur))))
 
 (loop2 (*metro* 'get-beat 4) 1/3) ;; play our new synth
+
 
 ;; we can recompile my-additive-synth into something 
 ;; else whenever we like
