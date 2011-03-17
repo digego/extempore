@@ -18,7 +18,7 @@
 
 ;; sine oscillator function
 (definec make-oscil
-   (lambda (phase)  
+  (lambda (phase)
      (lambda (amp freq)
        (let ((inc (* TWOPI (/ freq *samplerate*))))
 	 (set! phase (+ phase inc))
@@ -103,15 +103,45 @@
 	    y)))))
 
 
-;; chorus fx
-(definec make-chorus
+;; flanger
+(definec make-flanger
   (lambda (delay mod-phase mod-range mod-rate)
     (let ((comb (make-comb (dtoi64 (+ delay mod-range))))
 	  (mod (make-oscil mod-phase)))
       (lambda (x:double)
 	(comb.delay (+ delay (mod mod-range mod-rate)))
-	(comb x)))))
-    
+	(comb x)))))   
+
+
+;; chorus fx
+(definec make-chorus
+  (lambda (delay mod-phase mod-range mod-rate)
+    (let ((comb1 (make-comb (dtoi64 (+ delay mod-range))))
+	  (comb2 (make-comb (dtoi64 (+ delay mod-range))))
+	  (comb3 (make-comb (dtoi64 (+ delay mod-range))))
+	  (mrng1 mod-range)
+	  (mrng2 (* (random) mod-range))
+	  (mrng3 (* (random) mod-range))
+	  (mrte1 mod-rate)
+	  (mrte2 (* mod-rate 1.372))
+	  (mrte3 (* mod-rate 0.792))
+	  (dly1 delay)
+	  (dly2 (* (random) delay))
+	  (dly3 (* (random) delay))
+	  (mod1 (make-oscil mod-phase))
+	  (mod2 (make-oscil mod-phase))
+	  (mod3 (make-oscil mod-phase)))
+      (comb1.in .5)
+      (comb2.in .5)
+      (comb3.in .5)
+      (lambda (x:double)
+	(comb1.delay (+ dly1 (mod1 mrng1 mrte1)))
+	(comb2.delay (+ dly2 (mod2 mrng2 mrte2)))
+	(comb3.delay (+ dly3 (mod3 mrng3 mrte3)))
+	(+ (comb1 x)
+	   (comb2 x)
+	   (comb3 x))))))
+ 
 
 ;; tap delay
 (definec tap-delay
@@ -437,7 +467,7 @@
       (lambda (sample:double time:double channel:double)
 	(if (> time (+ start-time dur release))
 	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
-	(kernel time channel freq (* (env time) amp))))))
+	(kernel (- time start-time) channel freq (* (env time) amp))))))
 
 
 (define-macro (define-instrument name note-kernel effect-kernel)
@@ -526,6 +556,7 @@
 		      (oscl 0.8 (+ freq (oscl3 200.0 (* freq 1.001))))))
 	    (* amp (+ (oscr2 0.8 (+ freq (* 5.0 (random))))
 		      (oscr 0.8 (+ freq (oscr3 400.0 (* freq 0.99)))))))))))
+
 
 (definec default-synth-effect
   (let ((dleft (dtoi64 (* 0.125 *samplerate*)))
