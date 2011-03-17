@@ -15,12 +15,42 @@
 (defvar extempore-port 7099)             ; TCP port to Extempore
 (defvar extempore-process nil)           ; process during TCP connection
 
+(defun smart-tab ()
+  "This smart tab is minibuffer compliant: it acts as usual in
+    the minibuffer. Else, if mark is active, indents region. Else if
+    point is at the end of a symbol, expands it. Else indents the
+    current line."
+  (interactive)
+  (if (minibufferp)
+      (unless (minibuffer-complete)
+	(dabbrev-expand nil))
+    (if mark-active
+	(indent-region (region-beginning)
+		       (region-end))
+	(if (looking-at "\\_>")
+	    (dabbrev-expand nil)
+	  (indent-for-tab-command)))))
+
+;(global-set-key (kbd "TAB") 'smart-tab)
+(define-key scheme-mode-map (kbd "TAB") 'smart-tab); # only in scheme-mode
+
+(define-key scheme-mode-map (kbd "RET") 'newline-and-indent)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; add some stuff to scheme mode
+
 (font-lock-add-keywords 'scheme-mode
   '(("definec" . font-lock-keyword-face)
     ("definec:dsp" . font-lock-keyword-face)
     ("define-instrument" . font-lock-keyword-face)
     ("bind-scm" . font-lock-keyword-face)
-    ("bind-lib" . font-lock-keyword-face)))  
+    ("dotimes" . font-lock-keyword-face)
+    ("bind-lib" . font-lock-keyword-face)))
+
+(put 'dotimes 'scheme-indent-function 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; handle extempore minor mode stuff
 
 (define-minor-mode extempore-mode 
    "Toggle the mode for interacting with Scheme in Extempore over TCP"
