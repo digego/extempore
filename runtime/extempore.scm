@@ -427,6 +427,18 @@
 (macro (tanr args)
    `(+ ,(cadr args) (* ,(caddr args) (tan (* 2pi beat ,(cadddr args))))))
 
+(macro (play args)
+  (if (symbol? (cadr args))
+      (if (> (length args) 5)
+	  `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+		      ,(car (cdr (cddddr args))))
+	  `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
+      (if (> (length args) 6)
+	  `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+		      (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))))
+	  `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+		      (*metro* 'dur ,(car (cdr (cddddr args))))))))
+
 
 ; creates a rhythm of a given length
 ; a tactus is provided and a percentage of synconization (from 0 - 1)
