@@ -519,18 +519,6 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(definec make-note
-  (lambda (start-time freq:double amp:double dur 
-		      attack decay release sus-amp
-		      nstarts:double*
-		      idx:i64 kernel:[double,double,double,double,double]*)
-    (let ((env (if (< (+ attack decay) dur)
-		   (make-adsr start-time attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
-		   (make-adsr start-time 0.0 0.0 dur release 1.0 sus-amp))))
-      (lambda (sample:double time:double channel:double)
-	(if (> time (+ start-time dur release))
-	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
-	(kernel (- time start-time) channel freq (* (env time) amp))))))
 
 
 ;; make-note should probably use relative not absolute time?
@@ -549,6 +537,20 @@
 	(if (> t (+ dur release))
 	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
 	(kernel t channel freq (* (env t) amp))))))
+
+(definec make-note
+  (lambda (start-time freq:double amp:double dur 
+		      attack decay release sus-amp
+		      nstarts:double*
+		      idx:i64 kernel:[double,double,double,double,double]*)
+    (let ((env (if (< (+ attack decay) dur)
+		   (make-adsr start-time attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
+		   (make-adsr start-time 0.0 0.0 dur release 1.0 sus-amp))))
+      (lambda (sample:double time:double channel:double)
+	(if (> time (+ start-time dur release))
+	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
+	(kernel (- time start-time) channel freq (* (env time) amp))))))
+
 
 
 (define-macro (define-instrument name note-kernel effect-kernel)
