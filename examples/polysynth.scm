@@ -3,7 +3,6 @@
 ;; This example shows how to define your own polyphonic synths
 ;;
 ;; You will first need to load and compile dsp_library.scm
-;; Then call (dsp:set! dsp)
 ;;
 ;; Then you're OK to go
 ;;
@@ -12,15 +11,12 @@
 ;;      [just have to put up with the audio delays while compiling
 ;;
 
-;; call this after compiling dsp_library
-(dsp:set! dsp)
-
 
 ;; first let's play with the default synth defined in dsp_library
 ;; the default synth is called .... synth
 (define loop
   (lambda (beat offset dur)
-    (play-note (*metro* beat) synth (+ offset (random '(60 62 63 65 67))) 80 5000)
+    (play-note (*metro* beat) synth (+ offset (random '(60 62 63 65 67))) 80 2000)
     (callback (*metro* (+ beat (* dur .5))) 'loop
 	      (+ beat dur)
 	      offset
