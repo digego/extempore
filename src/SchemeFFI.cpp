@@ -154,6 +154,7 @@ namespace extemp {
 
 	    // sys stuff
 	    { "sys:pointer-size",		&SchemeFFI::pointerSize },
+	    { "sys:platform",		&SchemeFFI::platform },
 	    { "sys:open-dylib",		&SchemeFFI::openDynamicLib },
 	    { "sys:close-dylib",		&SchemeFFI::closeDynamicLib },
 	    { "sys:make-cptr",		&SchemeFFI::makeCptr },
@@ -533,6 +534,15 @@ namespace extemp {
 	return mk_integer(_sc, 64);
 #else
 	return mk_integer(_sc, 32);
+#endif
+    }
+
+    pointer SchemeFFI::platform(scheme* _sc, pointer args)
+    {
+#ifdef TARGET_OS_MAC
+      return mk_string(_sc, "OSX");
+#else
+      return mk_string(_sc, "Linux");
 #endif
     }
 	

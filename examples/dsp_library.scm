@@ -519,25 +519,10 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-
 ;; make-note should probably use relative not absolute time?
 ;; if we decide to keep this we can remove start-time
-(definec make-note
-  (lambda (start-time:double freq:double amp:double dur 
-		      attack decay release sus-amp
-		      nstarts:double*
-		      idx:i64 kernel:[double,double,double,double,double]*)
-    (let ((env (if (< (+ attack decay) dur)
-		   (make-adsr 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
-		   (make-adsr 0.0 0.0 0.0 dur release 1.0 sus-amp)))
-	  (t 0.0))
-      (lambda (sample:double time:double channel:double)
-	(if (< channel 1.0) (set! t (+ t 1.0)))
-	(if (> t (+ dur release))
-	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
-	(kernel t channel freq (* (env t) amp))))))
 
+;; absolute time
 (definec make-note
   (lambda (start-time freq:double amp:double dur 
 		      attack decay release sus-amp
@@ -551,6 +536,23 @@
 	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
 	(kernel (- time start-time) channel freq (* (env time) amp))))))
 
+
+;; relative time
+(definec make-note
+  (lambda (start-time:double freq:double amp:double dur 
+		      attack decay release sus-amp
+		      nstarts:double*
+		      idx:i64 kernel:[double,double,double,double,double]*)
+    (let ((env (if (< (+ attack decay) dur)
+		   (make-adsr 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
+		   (make-adsr 0.0 0.0 0.0 dur release 1.0 sus-amp)))
+	  (t 0.0))
+      (lambda (sample:double time:double channel:double)
+	(if (< channel 1.0) (set! t (+ t 1.0)))
+	(if (> t (+ dur release))
+	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
+	; don't remove the * 1.0
+	(* 1.0 (kernel t channel freq (* (env t) amp)))))))
 
 
 (define-macro (define-instrument name note-kernel effect-kernel)
@@ -698,7 +700,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; load highgui dynamic library
-(define libsndfile (sys:open-dylib "libsndfile.so.1"))
+(define libsndfile (if (string=? "Linux" (sys:platform))
+		       (sys:open-dylib "libsndfile.so.1")
+		       (sys:open-dylib "libsndfile.1.dylib")))
+
 
 ;; bind 3 sndfile lib functions
 (bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
