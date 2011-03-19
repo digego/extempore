@@ -622,8 +622,8 @@
 	  (sawr (make-saw)))
       (lambda (time:double chan:double freq:double amp:double)
 	(if (< chan 1.0)
-	    (* amp (/ 20000.0 freq) (sawl amp freq))
-	    (* amp (/ 20000.0 freq) (sawr amp freq)))))))
+	    (* amp (/ 200.0 freq) (sawl amp freq))
+	    (* amp (/ 200.0 freq) (sawr amp freq)))))))
 
 (definec default-effect
   (lambda (in:double time:double chan:double dat:double*)
@@ -668,24 +668,22 @@
 
 (definec synth-fx
   (let ((dleft (dtoi64 (* 0.125 *samplerate*)))
-	(combl (make-comb dleft))
+	(dlyl (make-delay dleft))
 	(dright (dtoi64 (* 0.33333333 *samplerate*)))
-	(combr (make-comb dright))
-	(chorusl (make-chorus 0.0))
-	(chorusr (make-chorus 0.5))
+	(dlyr (make-delay dright))
 	(pan .5)
 	(pan_old pan)
-	(wet .3))    
+	(wet .3))
     (lambda (in:double time:double chan:double dat:double*)
       (if (< pan_old pan) ;; interpolate pan
 	  (set! pan_old (+ pan_old .001))
 	  (set! pan_old (- pan_old .001)))
-      (combl.out wet)
-      (combr.out wet)      
+      (dlyl.out wet)
+      (dlyr.out wet)      
       (cond ((< chan 1.0) 
-	     (combl (chorusl (* 1.5 pan_old in))))
-	    ((< chan 2.0) 
-	     (combr (chorusr (* 1.5 (- 1.0 pan_old) in))))
+	     (dlyl (* 2.0 pan_old in)))
+	    ((< chan 2.0)
+	     (dlyr (* 2.0 (- 1.0 pan_old) in)))
 	    (else 0.0)))))
 
 ;; define default instrument called synth
