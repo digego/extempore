@@ -37,7 +37,6 @@
 ;; floating point is OK
 (play-note (now) sampler 67.25 80 100000)
 
-
 ;; a loop
 (define loop
   (lambda (beat dur)
@@ -50,21 +49,55 @@
 (loop (*metro* 'get-beat 4) 1)
 
 
-;; now load in another subsample into a different index
-;; make sure your audio file is long enough for the params below!!
-(set-sampler-index sampler "/tmp/audio.ogg" 24 2100000 1000000)
+;; read a directory full of samples
+;; samples define a midi root i.e. 60.wav (for middle c)
+;; must be stereo samples of type wav aif or ogg
+(define-macro (load-sampler sampler path)
+  `(let ((files (sys:directory-list ,path)))
+     (for-each (lambda (f)
+		 (if (regex:match? f "^([0-9]*)\.(wav|aif|aiff|ogg)$")		     
+		     (let ((result (regex:matched f "^([0-9]*)\.(wav|aif|aiff|ogg)$")))
+		       (set-sampler-index ,sampler (string-append ,path "/" f)
+		       			  (string->number (cadr result)) 0 0))))
+	       files)))
+
+;; load audio samples
+;; I'm using piano samples
+(load-sampler sampler "/home/andrew/Documents/samples/piano")
 
 
-;; then redefine loop using new sample load
-;; old stuff keeps playing
-;; notice that the sampler chooses the closest
-;; available index to pitch shift to.
-(define loop
-  (lambda (beat dur)
-    (play sampler 24 80 dur)    
-    (play sampler (random 48 72) 80 dur)
-    (callback (*metro* (+ beat (* .5 dur))) 'loop
-	      (+ beat dur)
-	      dur)))
+(define loop2
+  (lambda (beat dur root)
+    (play 3 sampler 36 100 dur)
+    (for-each (lambda (p offset)
+		(play (+ offset) sampler p 100 (* 2. dur)))
+	      (pc:make-chord 40 84 7
+			     (pc:chord root (if (member root '(10 8))
+						'^7
+						'-7)))
+	      '(1/3 1 3/2 1 2 3 13/3))
+    (callback (*metro* (+ beat (* .5 dur))) 'loop2 (+ beat dur)
+	      dur
+	      (if (member root '(0 8))
+		  (random '(2 7 10))
+		  (random '(0 8))))))
 
-;; etc..
+
+(loop2 (*metro* 'get-beat 4) 4 0)
+
+
+
+;; make some more samplers
+(define-sampler sampler2 sampler-note sampler-fx)
+(define-sampler sampler3 sampler-note sampler-fx)
+
+;; add new samplers to dsp
+(definec:dsp dsp
+  (lambda (in time chan dat)
+    (cond ((< chan 2.0) (+ (synth in time chan dat)
+			   (sampler in time chan dat)
+			   (sampler2 in time chan dat)
+			   (sampler3 in time chan dat)))
+	  (else 0.0))))
+
+;; load new samplers
