@@ -563,7 +563,7 @@
 	    (decay 200.0)
 	    (release 1000.0)
 	    (sustain 0.6) ;; amplitude of the sustain
-	    (gain 1.0)
+	    (gain 2.0)
 	    (note-starts (make-array poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1))
@@ -611,7 +611,7 @@
      (_synth-note (integer->real ,time) 
 		  (llvm:get-native-closure ,(symbol->string inst))
 		  (midi2frq (* 1.0 ,pitch))
-		  (/ ,vol 127.0)
+		  (/ (exp (/ ,vol 26.222)) 127.0)
 		  duration)
      (set! *impc:zone* default-zone)))
 
@@ -850,7 +850,7 @@
 	    (decay 200.0)
 	    (release 1000.0)
 	    (sustain 1.0) ;; amplitude of the sustain
-	    (gain 1.0)
+	    (gain 2.0)
 	    (note-starts (make-array poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1)
