@@ -274,7 +274,7 @@ namespace extemp {
             int bytes_read = recvfrom(*osc->getSocketFD(), osc->getMessageData(), 256, 0, (struct sockaddr*)osc->getClientAddress(), (socklen_t *) osc->getClientAddressSize());
 			
             if(bytes_read > -1) {
-		std::cout << "OSC from client port: " << osc->getClientAddress()->sin_port << " " << osc->getAddress()->sin_port <<  std::endl;				
+	      //std::cout << "OSC from client port: " << osc->getClientAddress()->sin_port << " " << osc->getAddress()->sin_port <<  std::endl;				
                 char* args = osc->getMessageData();
 		int length = bytes_read; //osc->getMessageLength();
 		double timestamp;
