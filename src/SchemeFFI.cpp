@@ -46,6 +46,8 @@
 #include <string.h>
 #include <dlfcn.h>
 
+#include <dirent.h>
+
 #define PCRE_REGEX
 
 #ifdef PCRE_REGEX
@@ -81,6 +83,9 @@
 #include "llvm/PassManager.h"
 #include "llvm/ADT/StringExtras.h"
 ///////////////////////////////////////
+
+#include <GL/glx.h>
+#include <GL/gl.h>
 
 #define PRINT_ERROR(format, args...)		\
     ascii_text_color(1,1,10);			\
@@ -158,6 +163,7 @@ namespace extemp {
 	    { "sys:open-dylib",		&SchemeFFI::openDynamicLib },
 	    { "sys:close-dylib",		&SchemeFFI::closeDynamicLib },
 	    { "sys:make-cptr",		&SchemeFFI::makeCptr },
+	    { "sys:directory-list",     &SchemeFFI::dirlist },
 
 	    // DSP sys stuff
 	    { "sys:set-dsp-closure",	&SchemeFFI::setDSPClosure },
@@ -218,7 +224,12 @@ namespace extemp {
 	    { "impc:ir:getname",			&SchemeFFI::impcirGetName },
 	    { "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
-		
+
+	    { "glx:make-ctx",			&SchemeFFI::makeGLXContext },	    
+	    { "glx:set-context",                 &SchemeFFI::glxMakeContextCurrent },
+	    { "glx:swap-buffers",			&SchemeFFI::glxSwapBuffers },
+
+	    		
 	};
 
 	for (i = 0; i < nelem(integerTable); i++) {
@@ -303,6 +314,31 @@ namespace extemp {
     {
         void* ptr = malloc(ivalue(pair_car(args)));
 	mk_cptr(_sc, ptr);
+    }
+
+    pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
+    {    
+      DIR *dp;
+      struct dirent *ep;     
+      dp = opendir (string_value(pair_car(args)));
+
+      pointer list = _sc->NIL;
+      if (dp != NULL)
+	{
+	  while (ep = readdir (dp)) {
+	    _sc->imp_env->insert(list);
+	    pointer tlist = cons(_sc,mk_string(_sc,ep->d_name),list);
+	    _sc->imp_env->erase(list);
+	    list = tlist;
+	  }
+
+	  (void) closedir (dp);
+	}
+      else {
+	perror ("Couldn't open the directory");
+      }
+
+      return reverse(_sc,list);
     }
 
     pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
@@ -782,8 +818,9 @@ namespace extemp {
 	    p=i*2;
 	    if(ovector[p]==-1) {
 		_sc->imp_env->insert(list);
-		list = cons(_sc,mk_string(_sc,""),list);
+		pointer tlist = cons(_sc,mk_string(_sc,""),list);
 		_sc->imp_env->erase(list);
+		list = tlist;
 	    }else{
 		int range = ovector[p+1] - ovector[p];				
 		char* b = (char*) alloca(range+1);
@@ -791,8 +828,9 @@ namespace extemp {
 		char* a = data+ovector[p];
 		char* substring = strncpy(b, a, range);
 		_sc->imp_env->insert(list);
-		list = cons(_sc,mk_string(_sc,substring),list);
+		pointer tlist = cons(_sc,mk_string(_sc,substring),list);
 		_sc->imp_env->erase(list);
+		list = tlist;
 	    }
 	}
 		
@@ -838,8 +876,9 @@ namespace extemp {
 	    char* a = data+ovector[0];
 	    char* substring = strncpy(b, a, range);
 	    _sc->imp_env->insert(list);
-	    list = cons(_sc,mk_string(_sc,substring),list);
+	    pointer tlist = cons(_sc,mk_string(_sc,substring),list);
 	    _sc->imp_env->erase(list);
+	    list = tlist;
 	    data = data+range+ovector[0];
 	}
 		
@@ -889,8 +928,9 @@ namespace extemp {
 	    memset(b,0,range+1);
 	    char* substring = strncpy(b, data, range);
 	    _sc->imp_env->insert(list);
-	    list = cons(_sc,mk_string(_sc,substring),list);
+	    pointer tlist = cons(_sc,mk_string(_sc,substring),list);
 	    _sc->imp_env->erase(list);
+	    list = tlist;
 	    data = data+ovector[1];
 	}
 		
@@ -1052,8 +1092,9 @@ namespace extemp {
 		    memset(substr,0,range+1);
 		    strncpy(substr, ((char*)str)+region->beg[i], range);
 		    _sc->imp_env->insert(list); 			
-		    list = cons(_sc,mk_string(_sc,substr),list);
+		    pointer tlist = cons(_sc,mk_string(_sc,substr),list);
 		    _sc->imp_env->erase(list);
+		    list = tlist;
 		    //set_vector_elem(_sc,v,vpos++,mk_string(_sc,substr));
 		    fprintf(stderr, "%d: (%d-%d)\n", i, region->beg[i], region->end[i]);
 		    str = str+region->end[i];		
@@ -1796,6 +1837,169 @@ namespace extemp {
 	AudioDevice::I()->setDSPWrapperArray((dsp_f_ptr_array)cptr_value(pair_car(args)));
 	return _sc->T;
     }
+
+  int singleBufferAttributess[] = {
+    GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+    GLX_RENDER_TYPE,   GLX_RGBA_BIT,
+    GLX_RED_SIZE,      1,   /* Request a single buffered color buffer */
+    GLX_GREEN_SIZE,    1,   /* with the maximum number of color bits  */
+    GLX_BLUE_SIZE,     1,   /* for each component                     */
+    None
+  };
+
+  int doubleBufferAttributes[] = {
+    GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+    GLX_RENDER_TYPE,   GLX_RGBA_BIT,
+    GLX_DOUBLEBUFFER,  True,  /* Request a double-buffered color buffer with */
+    GLX_RED_SIZE,      1,     /* the maximum number of bits per component    */
+    GLX_GREEN_SIZE,    1, 
+    GLX_BLUE_SIZE,     1,
+    None
+  };
+
+  static Bool EXTGLWaitForNotify( Display *dpy, XEvent *event, XPointer arg ) {
+    return (event->type == MapNotify) && (event->xmap.window == (Window) arg);
+  }
+
+  pointer SchemeFFI::glxSwapBuffers(scheme* _sc, pointer args)
+  {
+    args = pair_car(args);
+    glXSwapBuffers((Display*) cptr_value(pair_car(args)), (GLXDrawable) cptr_value(pair_cadr(args)));
+    return _sc->T;
+  }
+
+  pointer SchemeFFI::glxMakeContextCurrent(scheme* _sc, pointer args)
+  {
+    args = pair_car(args);
+    Display* dpy = (Display*) cptr_value(pair_car(args));
+    GLXDrawable glxWin = (GLXDrawable) cptr_value(pair_cadr(args));
+    GLXContext context = (GLXContext) cptr_value(pair_caddr(args));
+    /* Bind the GLX context to the Window */
+    glXMakeContextCurrent( (Display*) dpy, (GLXDrawable) glxWin, (GLXDrawable) glxWin, (GLXContext) context);    
+    return _sc->T;
+  }
+
+  pointer SchemeFFI::makeGLXContext(scheme* _sc, pointer args)
+  {
+    Display              *dpy;
+    Window                xWin;
+    XEvent                event;
+    XVisualInfo          *vInfo;
+    XSetWindowAttributes  swa;
+    GLXFBConfig          *fbConfigs;
+    GLXContext            context;
+    GLXContext            sharedContext;
+    GLXWindow             glxWin;
+    int                   swaMask;
+    int                   numReturned;
+    int                   swapFlag = True;
+
+    sharedContext = NULL;
+    if(pair_cdr(args) != _sc->NIL) sharedContext = (GLXContext) cptr_value(pair_cadr(args));
+
+    //GLXContext util_glctx;     
+    dpy = XOpenDisplay (string_value(pair_car(args)));
+    if (dpy == NULL) {
+      printf("No such X display\n");
+      return _sc->F;     
+    }
+
+    /* Request a suitable framebuffer configuration - try for a double 
+    ** buffered configuration first */
+    fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy),
+                                   doubleBufferAttributes, &numReturned );
+
+    if ( fbConfigs == NULL ) {  /* no double buffered configs available */
+      fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy),
+                                     singleBufferAttributess, &numReturned );
+      swapFlag = False;
+    }
+
+    /* Create an X colormap and window with a visual matching the first
+    ** returned framebuffer config */
+    vInfo = glXGetVisualFromFBConfig( dpy, fbConfigs[0] );
+
+    // attrList[indx] = GLX_USE_GL; indx++; 
+    // attrList[indx] = GLX_DEPTH_SIZE; indx++; 
+    // attrList[indx] = 1; indx++; 
+    // attrList[indx] = GLX_RGBA; indx++; 
+    // attrList[indx] = GLX_RED_SIZE; indx++; 
+    // attrList[indx] = 1; indx++; 
+    // attrList[indx] = GLX_GREEN_SIZE; indx++; 
+    // attrList[indx] = 1; indx++; 
+    // attrList[indx] = GLX_BLUE_SIZE; indx++; 
+    // attrList[indx] = 1; indx++;     
+    // attrList[indx] = None;     
+    //vinfo = glXChooseVisual(display, DefaultScreen(display), attrList);     
+    if (vInfo == NULL) {
+      printf ("ERROR: Can't open window\n"); 
+      return _sc->F;
+    }    
+ 
+
+    swa.border_pixel = 0;
+    swa.override_redirect = True;
+    swa.event_mask = StructureNotifyMask | KeyPressMask;
+    swa.colormap = XCreateColormap( dpy, RootWindow(dpy, vInfo->screen),
+                                    vInfo->visual, AllocNone );
+
+    //swaMask = CWBorderPixel | CWColormap | CWEventMask;
+    swaMask = CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect;
+
+
+    //xWin = XCreateWindow( dpy, RootWindow(dpy, vInfo->screen), 0, 0, 1024, 768,
+    //                      0, vInfo->depth, InputOutput, vInfo->visual,
+    //                      swaMask, &swa );
+
+    xWin = XCreateWindow( dpy, RootWindow(dpy, vInfo->screen), 0, 0, 1920, 1200,
+                          0, vInfo->depth, InputOutput, vInfo->visual,
+                          swaMask, &swa );
+
+    // if we are sharing a context
+    if(sharedContext) {
+      /* Create a GLX context for OpenGL rendering */
+      context = glXCreateNewContext( dpy, fbConfigs[0], GLX_RGBA_TYPE,
+				     sharedContext, True );    
+    }else{ // if we aren't sharing a context
+      /* Create a GLX context for OpenGL rendering */
+      context = glXCreateNewContext( dpy, fbConfigs[0], GLX_RGBA_TYPE,
+				     NULL, True );
+    }
+
+    /* Create a GLX window to associate the frame buffer configuration
+    ** with the created X window */
+    glxWin = glXCreateWindow( dpy, fbConfigs[0], xWin, NULL );
+    
+    /* Map the window to the screen, and wait for it to appear */
+    XMapWindow( dpy, xWin );
+    XIfEvent( dpy, &event, EXTGLWaitForNotify, (XPointer) xWin );
+
+    /* Bind the GLX context to the Window */
+    glXMakeContextCurrent( dpy, glxWin, glxWin, context );
+
+    /* OpenGL rendering ... */
+    glClearColor( 0.0, 0.0, 0.0, 1.0 );
+    glClear( GL_COLOR_BUFFER_BIT );
+
+    glFlush();
+    
+    if ( swapFlag )
+      glXSwapBuffers(dpy, glxWin);
+
+    pointer list = _sc->NIL;
+    _sc->imp_env->insert(list);
+    pointer tlist = cons(_sc,mk_cptr(_sc,(void*)context),list);
+    _sc->imp_env->erase(list);
+    list = tlist;
+    _sc->imp_env->insert(list);
+    tlist = cons(_sc,mk_cptr(_sc,(void*)glxWin),list);
+    _sc->imp_env->erase(list);
+    list = tlist;
+    tlist = cons(_sc,mk_cptr(_sc,(void*)dpy),list);
+    _sc->imp_env->erase(list);
+    list = tlist;
 		
+    return list; //_cons(_sc, mk_cptr(_sc, (void*)dpy),mk_cptr(_sc,(void*)glxWin),1);
+  }
 } // end namespace
 

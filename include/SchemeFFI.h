@@ -82,6 +82,7 @@ namespace extemp {
 	static pointer pointerSize(scheme* _sc, pointer args);
 	static pointer platform(scheme* _sc, pointer args);
 	static pointer makeCptr(scheme* _sc, pointer args);
+	static pointer dirlist(scheme* _sc, pointer args);
 	// dsp bits
 	static pointer setDSPClosure(scheme* _sc, pointer args);
 	static pointer setDSPWrapper(scheme* _sc, pointer args);
@@ -142,6 +143,12 @@ namespace extemp {
 	static pointer impcirGetName(scheme* _sc, pointer args);	
 	static pointer impcirGetType(scheme* _sc, pointer args);	
 	static pointer impcirAdd(scheme* _sc, pointer args);
+
+	// guff
+	static pointer makeGLXContext(scheme* _sc, pointer args);
+	static pointer glxSwapBuffers(scheme* _sc, pointer args);
+	static pointer glxMakeContextCurrent(scheme* _sc, pointer args);
+
 
     private:
 	static SchemeFFI SINGLETON;		
