@@ -224,10 +224,11 @@ namespace extemp {
 	    { "impc:ir:getname",			&SchemeFFI::impcirGetName },
 	    { "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
-
+#if defined (TARGET_OS_LINUX)
 	    { "glx:make-ctx",			&SchemeFFI::makeGLXContext },	    
 	    { "glx:set-context",                 &SchemeFFI::glxMakeContextCurrent },
 	    { "glx:swap-buffers",			&SchemeFFI::glxSwapBuffers },
+#endif
 
 	    		
 	};
@@ -1838,6 +1839,12 @@ namespace extemp {
 	return _sc->T;
     }
 
+
+  ////////////////////////////////////////////////////////////////
+  //  SOME XWindows guff
+  ////////////////////////////////////////////////////////////////
+#if defined (TARGET_OS_LINUX)
+
   int singleBufferAttributess[] = {
     GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
     GLX_RENDER_TYPE,   GLX_RGBA_BIT,
@@ -2001,5 +2008,8 @@ namespace extemp {
 		
     return list; //_cons(_sc, mk_cptr(_sc, (void*)dpy),mk_cptr(_sc,(void*)glxWin),1);
   }
+
+#endif
+
 } // end namespace
 

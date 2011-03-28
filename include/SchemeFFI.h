@@ -144,11 +144,12 @@ namespace extemp {
 	static pointer impcirGetType(scheme* _sc, pointer args);	
 	static pointer impcirAdd(scheme* _sc, pointer args);
 
-	// guff
+#if defined (TARGET_OS_LINUX)
+	// some XWindows guff
 	static pointer makeGLXContext(scheme* _sc, pointer args);
 	static pointer glxSwapBuffers(scheme* _sc, pointer args);
 	static pointer glxMakeContextCurrent(scheme* _sc, pointer args);
-
+#endif
 
     private:
 	static SchemeFFI SINGLETON;		
