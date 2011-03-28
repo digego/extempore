@@ -63,13 +63,15 @@
 				  (my-synth in time chan dat))))
 	    (else 0.0)))))
 
+;;make my-synth active
+(my-synth.active 1)
 
 ;; now start a temporal recursion to play the new synth
 (define loop2
   (lambda (beat dur)
     (let ((pitch (random '(55 36 63 70 72))))
       (play-note (*metro* beat) my-synth pitch 
-		 (if (= pitch 36) 120 80) 3000)
+		 (if (= pitch 36) 110 100) 3000)
       (callback (*metro* (+ beat (* dur .5))) 'loop2
 		(+ beat dur)
 		dur))))
