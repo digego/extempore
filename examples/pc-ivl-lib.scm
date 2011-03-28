@@ -207,8 +207,6 @@
      (-7b5 . 'locrian)))
 
 
-(define *pc:chord-syms-dict* (objc:list->nsdictionary *pc:chord-syms*))
-
 ;; returns a scale based on a chord (standard jazz translations)
 (define *pc:chord->scale*
    '((i . (0 . ionian))
@@ -461,15 +459,6 @@
          (pc:chord (modulo (+ root (cadr val)) 12) (cddr val)))))
 
 
-;; returns a chord following basic diatonic harmony rules
-;; based on root (0 for C etc.) maj/min ('- or '^) and degree (i-vii) 
-(define pc:diatonic-dict
-   (lambda (root maj-min degree)   
-      (let ((val (objc->list (objc:call (if (equal? '^ maj-min)
-                                            *pc:diatonic-major-dict*
-                                            *pc:diatonic-minor-dict*)
-                                        "objectForKey:" (symbol->string degree)))))
-         (pc:chord (modulo (+ root (cadr val)) 12) (cddr val)))))
 
 
 ;; returns a chord given a root and type
@@ -677,4 +666,3 @@
                                  (cons (+ starting-pitch (car ivls)) (car args)))))))
 
                  
-
