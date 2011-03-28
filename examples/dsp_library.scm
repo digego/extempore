@@ -533,8 +533,8 @@
 		   (make-adsr start-time 0.0 0.0 dur release 1.0 sus-amp))))
       (lambda (sample:double time:double channel:double)
 	(if (> time (+ start-time dur release))
-	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
-	(kernel (- time start-time) channel freq (* (env time) amp))))))
+	    (begin (aset! nstarts idx 9999999999999.0) 0.0)
+	    (kernel (- time start-time) channel freq (* (env time) amp)))))))
 
 
 ;; relative time
@@ -549,10 +549,9 @@
 	  (t 0.0))
       (lambda (sample:double time:double channel:double)
 	(if (< channel 1.0) (set! t (+ t 1.0)))
-	(if (> t (+ dur release))
-	    (begin (aset! nstarts idx 9999999999999.0) 0.0))
-	; don't remove the * 1.0
-	(* 1.0 (kernel t channel freq (* (env t) amp)))))))
+	(if (< t (+ dur release))
+	    (kernel t channel freq (* (env t) amp))
+	    (begin (aset! nstarts idx 9999999999999.0) 0.0))))))
 
 
 (define-macro (define-instrument name note-kernel effect-kernel)
@@ -564,12 +563,16 @@
 	    (release 1000.0)
 	    (sustain 0.6) ;; amplitude of the sustain
 	    (gain 2.0)
+	    (active 0)
 	    (note-starts (make-array poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1))
 			  (dotimes (i poly) ;; check for free poly spot           
 			    (if (> (aref note-starts i) 9999999999998.0)
 				(set! free-note i)))
+			  (if (= 0 active)
+			      (begin (dotimes (iii poly) (aset! note-starts iii 9999999999999.0))
+				     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
 			      (begin (aset! notes free-note
 					    (make-note start freq amp dur
@@ -592,6 +595,7 @@
 (definec _synth-note
   (lambda (time inst:[double,double,double,double,double*]* freq amp dur)
     ((inst.new-note:[i64,double,double,double,double]*) time freq dur amp)))
+  
 
 (definec midi2frq    
   (lambda (pitch)            
@@ -606,7 +610,7 @@
   `(let ((zone (sys:create-mzone (* 1024 1024)))
 	 (default-zone *impc:zone*)	 
 	 (duration (* 1.0 ,dur))) ; (* ,dur (* *samplerate* (/ 60 (*metro* 'get-tempo))))))
-     (sys:destroy-mzone zone (+ duration (* 3.0 *samplerate*)))
+     (sys:destroy-mzone zone (+ duration (* 5 60.0 *samplerate*))) ; 3 minutes later?
      (set! *impc:zone* zone)
      (_synth-note (integer->real ,time) 
 		  (llvm:get-native-closure ,(symbol->string inst))
@@ -762,7 +766,7 @@
 	    (if (<> 0 (aref samples-length index))
 		(begin (free (aref samples index)) 1))
 	    (aset! samples index adat)
-	    (aset! samples-length index num)
+	    (aset! samples-length index (/ read channels)) ;num)
 	    (printf "read %lld(frames):%f(k) into sampler index: %lld\n" (/ read channels) (/ (i64tod (* num 8)) 1024.) index)
 	    1)
 	  (begin (printf "%s\n" (sf_strerror audiofile))
@@ -793,7 +797,6 @@
 	  (b (+ w a)))
       (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
 
-
 ;; make synth defaults
 (definec sampler-note
   (lambda (samples:double** samples-length:i64* index)
@@ -811,7 +814,7 @@
 	      (dat (aref samples index))
 	      (y1 (if (< posi 1) 0.0 (aref dat (- posx 2)))) ; assume stereo
 	      (x0 (if (> posi length) 0.0 (aref dat posx)))
-	      (x1 (if (> (+ posi 1) length) 0.000001 (aref dat (+ posx 2)))) ; assume stereo
+	      (x1 (if (> (+ posi 1) length) 0.0 (aref dat (+ posx 2)))) ; assume stereo
 	      (x2 (if (> (+ posi 2) length) 0.0 (aref dat (+ posx 4))))) ; assume stereo
 	  (* amp (hermite-interp posr y1 x0 x1 x2)))))))
 
@@ -851,22 +854,27 @@
 	    (release 1000.0)
 	    (sustain 1.0) ;; amplitude of the sustain
 	    (gain 2.0)
+	    (active 0)
 	    (note-starts (make-array poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1)
 			      (idx (dtoi64 (floor (frq2midi freq))))
 			      (closest 1000000)
 			      (new-idx idx))
-			  (dotimes (idxi 1281)
-			    (let ((v (llabs (- idx idxi))))
-			      (if (and (<> (aref samples-length idxi) 0)
-				       (< v closest))
-				  (begin (set! new-idx idxi) (set! closest v) 0))))
 			  (dotimes (i poly) ;; check for free poly spot           
 			    (if (> (aref note-starts i) 9999999999998.0)
 				(set! free-note i)))
+			  (if (= 0 active)
+			      (begin (dotimes (iii poly) (aset! note-starts iii 9999999999999.0))
+				     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
-			      (begin (aset! notes free-note
+			      (begin (dotimes (idxi 128)
+				       (let ((v (llabs (- idx idxi))))
+					 (if (and (<> (aref samples-length idxi) 0)
+						  (< v closest))
+				      (begin (set! new-idx idxi)
+					     (set! closest v) 0))))
+				     (aset! notes free-note
 					    (make-note start freq amp dur
 						       attack decay release sustain
 						       note-starts free-note
@@ -879,7 +887,7 @@
 	 (aset! note-starts ii 9999999999999.0))
        (lambda (in:double time:double chan:double dat:double*)
 	 (let ((out 0.0))
-	   (dotimes (k poly) ;; sum all active notes          
+	   (dotimes (k poly) ;; sum all active notesx   
 	     (if (< (aref note-starts k) time)
 		 (set! out (+ out (* 0.3 ((aref notes k) in time chan))))))
 	   (* gain (,effect-kernel out time chan dat)))))))
@@ -887,6 +895,17 @@
 
 ;; create a default sampler
 (define-sampler sampler sampler-note sampler-fx)
+
+;; must be stereo samples of type wav aif or ogg
+(define-macro (load-sampler sampler path)
+    `(let ((files (sys:directory-list ,path)))
+            (for-each (lambda (f)
+			(if (regex:match? f "^([0-9]*)\.(wav|aif|aiff|ogg)$")
+			    (let ((result (regex:matched f "^([0-9]*)\.(wav|aif|aiff|ogg)$")))
+			      (set-sampler-index ,sampler (string-append ,path "/" f)
+						 (string->number (cadr result)) 0 0))))
+		      files)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -901,10 +920,16 @@
 			   (sampler in time chan dat)))
 	  (else 0.0))))
 
+
 (ipc:call (ipc:get-process-name) 'print)
 (ipc:call (ipc:get-process-name) 'ascii-print-color 1 7 10) 
 (ipc:call (ipc:get-process-name) 'print "All set to go!\n")
-(ipc:call (ipc:get-process-name) 'ascii-print-color 0 7 10) 
+(ipc:call (ipc:get-process-name) 'synth.active 1)
+(ipc:call (ipc:get-process-name) 'ascii-print-color 0 7 10)
+(ipc:call (ipc:get-process-name) 'print "'Synth' active = true\n")
+(ipc:call (ipc:get-process-name) 'sampler.active 1)
+(ipc:call (ipc:get-process-name) 'print "'Sampler' active = true\n")
+(ipc:call (ipc:get-process-name) 'print)
 (ipc:call (ipc:get-process-name) 'print "You have two default instruments loaded 'synth' and 'sampler'\n")
 (ipc:call (ipc:get-process-name) 'print)
 (ipc:call (ipc:get-process-name) 'callback 0 '_dsp:set! 'dsp)
