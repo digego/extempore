@@ -86,7 +86,7 @@ namespace extemp {
         uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
 	sched->getGuard()->signal();
 		
-	memset(outputBuffer,0,numOfSamples);
+	memset(outputBuffer,0,numOfSamples*sizeof(SAMPLE));
 		
 	void* dsp_closure = AudioDevice::I()->getDSPClosure();
 	void* cache_closure = 0;
