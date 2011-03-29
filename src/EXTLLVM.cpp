@@ -75,6 +75,7 @@
 // make it thread safe but I'm not going to bother
 // while still testing.
 std::map<void*,uint64_t> LLVM_ZONE_ALLOC_MAP;
+extemp::EXTMutex alloc_mutex("alloc mutex");
 
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
@@ -103,6 +104,7 @@ void llvm_zone_destroy(llvm_zone_t* zone)
 
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
+    alloc_mutex.lock();
     //printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
     if(zone->offset+size >= zone->size)
     {
@@ -116,6 +118,7 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
     zone->offset += size; 
     // add ptr size to alloc map
     LLVM_ZONE_ALLOC_MAP[newptr] = size;
+    alloc_mutex.unlock();
     //extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_set_size(newptr, size);
     return newptr;
 }
@@ -132,7 +135,10 @@ uint64_t llvm_zone_mark_size(llvm_zone_t* zone)
 
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size)
 {
+    // going to try getting away without a lock here?? 
+    // alloc_mutex.lock();
     LLVM_ZONE_ALLOC_MAP[ptr] = size;
+    // alloc_mutex.unlock();
     //printf("set ptr: %p  to size: %lld\n",ptr,size);
     return;
 }
@@ -539,6 +545,7 @@ namespace extemp {
     EXTLLVM::EXTLLVM()
     {
 	//printf("making llvm !!!!!!!!!!!!!!!!!!\n");
+      alloc_mutex.init();
 	M = 0;
 	MP = 0;
 	EE = 0;
