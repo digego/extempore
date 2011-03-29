@@ -105,6 +105,7 @@ namespace extemp {
 		
 		
 	scheme* sc;
+	char fname[256];
 	static std::map<scheme*, OSC*> SCHEME_MAP;		
 	char scheme_real_type;
 	char scheme_integer_type;

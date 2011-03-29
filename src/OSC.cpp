@@ -201,7 +201,7 @@ namespace extemp {
     //OSC* OSC::singleton = NULL;
     //scheme* OSC::sc = NULL;
 	
-    int send_scheme_call(scheme* _sc, double t, std::string& address, std::string& typetags, char* args)
+  int send_scheme_call(scheme* _sc, char* fname, double t, std::string& address, std::string& typetags, char* args)
     {
 #ifdef _OSC_DEBUG_
 	std::cout << "[OSC]  ADDRESS: " << address << "  TAGS: " << typetags << std::endl;
@@ -209,7 +209,8 @@ namespace extemp {
 		
 	int pos = 0;
 	std::stringstream ss;
-	ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
+	ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
+	//ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
 	for(int i=1; i<typetags.size(); ++i) {
 	    if(typetags[i] == 'i') {
 		int osc_int = 0;
@@ -269,7 +270,7 @@ namespace extemp {
 	
     void* osc_mesg_callback(void* obj_p)
     {
-        OSC* osc = (OSC*) obj_p;        
+        OSC* osc = (OSC*) obj_p;
         while(true) {
             int bytes_read = recvfrom(*osc->getSocketFD(), osc->getMessageData(), 256, 0, (struct sockaddr*)osc->getClientAddress(), (socklen_t *) osc->getClientAddressSize());
 			
@@ -296,13 +297,13 @@ namespace extemp {
 			typetags.clear();
 			pos += OSC::getOSCString(args+pos,&address);
 			pos += OSC::getOSCString(args+pos,&typetags);
-			int ret_from_call = send_scheme_call(osc->sc,timestamp,address,typetags,args+pos);
+			int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,args+pos);
 			if(ret_from_call < 0) break;
 			else pos += ret_from_call;
 		    }
 		}else{
 		    pos += OSC::getOSCString(args+pos,&typetags);
-		    pos += send_scheme_call(osc->sc,0.0,address,typetags,args+pos);
+		    pos += send_scheme_call(osc->sc,osc->fname,0.0,address,typetags,args+pos);
 		}
 				
                 char reply[256];
@@ -792,6 +793,9 @@ namespace extemp {
     pointer OSC::registerScheme(scheme* _sc, pointer args) {
 	OSC* osc = new OSC(); //OSC::I();
 	SCHEME_MAP[_sc] = osc;
+	memset(osc->fname,0,256);
+	char* name = string_value(pair_cadr(args));
+	strcpy(osc->fname,name);
 		
 	SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
 	scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
@@ -801,7 +805,7 @@ namespace extemp {
 		
         memset((char*) osc_address, 0, sizeof(*osc_address));
 	int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
-	printf("Starting OSC server on port: %d\n",port);
+	printf("Starting OSC server on port: %d calling back to %s\n",port,name);
 
         osc_address->sin_family = AF_INET;
         osc_address->sin_port = htons(port);
