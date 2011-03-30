@@ -135,10 +135,11 @@ uint64_t llvm_zone_mark_size(llvm_zone_t* zone)
 
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size)
 {
-    // going to try getting away without a lock here?? 
-    // alloc_mutex.lock();
+    // not sure if I definitely need this here
+    // probably do though so better safe than sorry
+    alloc_mutex.lock();
     LLVM_ZONE_ALLOC_MAP[ptr] = size;
-    // alloc_mutex.unlock();
+    alloc_mutex.unlock();
     //printf("set ptr: %p  to size: %lld\n",ptr,size);
     return;
 }
