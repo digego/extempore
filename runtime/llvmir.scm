@@ -219,7 +219,7 @@
                         (apply string-append "<{i8*, i8*, " (impc:ir:make-function-str (cdr type) #t) "*}>"
                                (make-list (impc:ir:get-ptr-depth (car type)) "*")))
                        ((impc:ir:tuple? (car type))
-                        (apply string-append "<{" (string-join (map (lambda (x) (impc:ir:get-type-str x)) (cdr type)) ",") "}>"
+                        (apply string-append "{" (string-join (map (lambda (x) (impc:ir:get-type-str x)) (cdr type)) ",") "}"
                                (make-list (impc:ir:get-ptr-depth (car type)) "*")))
                        (else (print-error 'Compiler 'Error: 'bad 'complex 'type! type))))
                 ((= type -1) "void")
