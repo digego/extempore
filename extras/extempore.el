@@ -55,17 +55,23 @@
 (define-minor-mode extempore-mode 
    "Toggle the mode for interacting with Scheme in Extempore over TCP"
    :init-value nil :lighter " Extempore" :keymap scheme-mode-map
-   (if extempore-mode (extempore-go) (extempore-stop)))
+   (if extempore-mode (extempore-connect "localhost" 7099) (extempore-stop)))
 
-(defun extempore-go ()                   ; start connection to Extempore
+(defun extempore-connect (host port)     ; start connection to Extempore
+  (interactive "sHostname: \nnPort: ")
   (define-key scheme-mode-map extempore-keydef 'extempore-send-definition)
   (define-key scheme-mode-map extempore-keyreg 'extempore-send-region)
+  (if (not (null extempore-process))
+      (delete-process extempore-process))
   (setq extempore-process
-	(open-network-stream "extempore" nil "localhost" extempore-port))
+	(open-network-stream "extempore" nil
+			     (if (null host) "localhost" host)
+			     (if (null port) 7099 port)))
   (set-process-filter extempore-process 
 	'(lambda (proc str) (message (substring str 0 -1)))))
 
 (defun extempore-stop ()                 ; terminate connection to Extempore
+  (interactive)
   (delete-process extempore-process)
   (setq extempore-process nil))
 
