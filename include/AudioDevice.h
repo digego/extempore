@@ -36,7 +36,7 @@
 #ifndef _AUDIO_DEVICE_H
 #define _AUDIO_DEVICE_H
 
-#if defined (TARGET_OS_OSX)
+#if defined (TARGET_OS_MAC)
 #include <CoreAudio/AudioHardware.h>
 #elif defined (JACK_AUDIO)
 #include <jack/jack.h>
