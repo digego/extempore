@@ -76,6 +76,7 @@ namespace extemp {
 	static uint32_t CHANNELS;
 	static uint32_t SAMPLERATE;
 	static uint64_t TIME;
+	static uint64_t DEVICE_TIME;
 	static uint32_t HOUR;
 	static uint32_t MINUTE;
 	static uint32_t SECOND;

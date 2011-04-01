@@ -15,4 +15,7 @@ if [ -z "$EXT_LLVM_DIR" ]; then
 	. config/llvm.bash
 fi
 
+EXT_USER_ARGS=$@
+export EXT_USER_ARGS
+
 make -f top.make extempore

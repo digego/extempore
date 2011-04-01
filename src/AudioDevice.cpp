@@ -52,6 +52,27 @@
 #include <sys/sysctl.h>
 #endif
 
+#include <stdlib.h>
+
+
+///////////////////////////////////////////////////////////////////////
+//
+//
+// NOTE  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+//
+// The contents of this file are a complete HACK!
+// I have written some placeholder code to get the project
+// started, but all of this code needs to be replaced.
+//
+// Nothing here is implemented properly AT ANY LEVEL!
+// There is A LOT to do to make this stuff work properly.
+// So please don't complain about how dodgy this code is
+// Jump in and start to replace it !!!
+//
+///////////////////////////////////////////////////////////////////////
+
+
+
 SAMPLE audio_sanity(SAMPLE x)
 {
     if(isinf(x)) return 0.0f;
@@ -72,20 +93,392 @@ namespace extemp {
 	
     bool RUNNING = true;	
 
-#ifdef TARGET_OS_LINUX
+
+  /////////////////////////////////////////////////////////////////
+  //
+  // This ALSA code doesn't work!!!
+  // I've just put this here as I might come back to it later
+  //
+  ///////////////////////////////////////////////////////////////
+#if defined (___ALSA_AUDIO___) // ALSA not currently supported
+
+    static int xrun_recovery(snd_pcm_t *handle, int err)
+    {
+      if (err == -EPIPE) {    /* under-run */
+	err = snd_pcm_prepare(handle);
+	if (err < 0)
+	  printf("Can't recovery from underrun, prepare failed: %s\n", snd_strerror(err));
+	return 0;
+      } else if (err == -ESTRPIPE) {
+	while ((err = snd_pcm_resume(handle)) == -EAGAIN)
+	  sleep(1);       /* wait until the suspend flag is released */
+	if (err < 0) {
+	  err = snd_pcm_prepare(handle);
+	  if (err < 0)
+	    printf("Can't recovery from suspend, prepare failed: %s\n", snd_strerror(err));
+	}
+	return 0;
+      }
+      return err;
+    }
+
+    void audioCallback(snd_async_handler_t *pcm_callback)
+    {
+      printf("HI\n");
+      snd_pcm_t* handle = snd_async_handler_get_pcm(pcm_callback);
+      AudioDevice* private_data = (AudioDevice*) snd_async_handler_get_callback_private(pcm_callback);
+      SAMPLE* outputBuffer = private_data->getBuffer();
+
+      snd_pcm_sframes_t avail;
+      int err;
+      int period_size = UNIV::FRAMES/16;
+
+      TaskScheduler* sched = TaskScheduler::I(); //static_cast<TaskScheduler*>(userData);
+      UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + period_size; //UNIV::FRAMES;
+      UNIV::TIME = DEVICE_TIME;
+      int channels = 2;
+      sched->getGuard()->signal();
+      
+      void* dsp_closure = AudioDevice::I()->getDSPClosure();
+      void* cache_closure = 0;
+      if(dsp_closure == 0) return;
+      cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
+      
+      avail = snd_pcm_avail_update(handle);
+      while (avail >= period_size) {
+	if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
+	  dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
+	  dsp_f_ptr cache_wrapper = dsp_wrapper;
+	  double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
+	  double* data = 0; 
+	  llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	  for(uint32_t i=0;i<period_size;i++)
+	    {
+	      uint32_t ii = i*UNIV::CHANNELS;
+	      SAMPLE* dat = (SAMPLE*) outputBuffer;
+	      //SAMPLE* in = (SAMPLE*) inputBuffer;
+	      for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+		{
+		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		  llvm_zone_reset(zone);
+		}
+	    }
+	  llvm_zone_destroy(zone);
+	}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
+	  dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
+	  dsp_f_ptr_array cache_wrapper = dsp_wrapper;
+	  llvm_zone_t* zone = llvm_zone_create(1024*50);				
+	  cache_wrapper(zone, cache_closure, 0 /*(SAMPLE*)inputBuffer*/,(SAMPLE*)outputBuffer,period_size,UNIV::DEVICE_TIME,UNIV::CHANNELS);
+	  llvm_zone_destroy(zone);
+	}else{ 
+	  //nothin to do
+	}
+	
+	// now write outputBuffer to the device
+	err = snd_pcm_writei(handle, outputBuffer, period_size);
+	if (err < 0) {
+	  printf("Write error: %s\n", snd_strerror(err));
+	  exit(EXIT_FAILURE);
+	}
+	if (err != period_size) {
+	  printf("Write error: written %i expected %li\n", err, period_size);
+	  exit(EXIT_FAILURE);
+	}
+	avail = snd_pcm_avail_update(handle);
+      }
+    }
+
+    AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
+    {
+      UNIV::CHANNELS = 2;
+      UNIV::SAMPLERATE = 44100;
+      UNIV::FRAMES = 1024;
+
+      /* This holds the error code returned */
+      int err;
+      /* Our device handle */
+      pcm_handle = NULL;
+      /* The device name */
+      const char *device_name = "default";
+      /* Open the device */
+      err = snd_pcm_open (&pcm_handle, device_name, SND_PCM_STREAM_PLAYBACK, 0);
+      /* Error check */
+      if (err < 0) {
+	fprintf (stderr, "cannot open audio device %s (%s)\n", 
+		 device_name, snd_strerror (err));
+	pcm_handle = NULL;
+	return;
+      }
+
+      // first handle hardware params
+      snd_pcm_hw_params_t *hw_params;
+      snd_pcm_hw_params_malloc (&hw_params);
+      snd_pcm_hw_params_any (pcm_handle, hw_params);
+      unsigned int rrate = UNIV::SAMPLERATE;
+      snd_pcm_hw_params_set_access (pcm_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED);
+      //snd_pcm_hw_params_set_format (pcm_handle, hw_params, SND_PCM_FORMAT_FLOAT_LE); //SND_PCM_FORMAT_S16_LE);
+      snd_pcm_hw_params_set_format (pcm_handle, hw_params, SND_PCM_FORMAT_S16_LE);
+      snd_pcm_hw_params_set_rate_near (pcm_handle, hw_params, &rrate, NULL);
+      snd_pcm_hw_params_set_channels (pcm_handle, hw_params, UNIV::CHANNELS);
+
+      /* These values are pretty small, might be useful in
+	 situations where latency is a dirty word. */
+      snd_pcm_uframes_t buffer_size = UNIV::FRAMES;
+      snd_pcm_uframes_t period_size = UNIV::FRAMES/16;
+      snd_pcm_hw_params_set_buffer_size_near (pcm_handle, hw_params, &buffer_size);
+      snd_pcm_hw_params_set_period_size_near (pcm_handle, hw_params, &period_size, NULL);
+      // make it so!
+      snd_pcm_hw_params (pcm_handle, hw_params);
+
+      // now handle software params
+      snd_pcm_sw_params_t *sw_params;
+      snd_pcm_sw_params_malloc (&sw_params);
+      snd_pcm_sw_params_current (pcm_handle, sw_params);
+      snd_pcm_sw_params_set_start_threshold(pcm_handle, sw_params, buffer_size - period_size);
+      snd_pcm_sw_params_set_avail_min(pcm_handle, sw_params, period_size);
+      // make is so!
+      snd_pcm_sw_params(pcm_handle, sw_params);
+      snd_pcm_sw_params_free (sw_params);
+
+      // allocate memory for audio buffer
+      buffer = (float*) malloc(period_size * sizeof(SAMPLE) * UNIV::CHANNELS);
+      
+      //std::cout << "Input Device: " << inputDevice << std::endl;
+      //std::cout << "Output Device: " << outputDevice << std::endl;
+      ascii_text_color(1,7,10);
+      std::cout << "---Alsa Audio---" << std::endl;
+      std::cout << "Loaded Default Audio Device: " << std::endl;	
+      ascii_text_color(0,7,10);	
+      std::cout << "SampleRate\t: " << std::flush;
+      ascii_text_color(1,6,10);	
+      std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
+      ascii_text_color(0,7,10);	
+      std::cout << "Channels\t: " << std::flush;
+      ascii_text_color(1,6,10);	
+      std::cout << UNIV::CHANNELS << std::endl << std::flush;
+      ascii_text_color(0,7,10);	
+    }
+	
+    AudioDevice::~AudioDevice()
+    {
+      free(buffer);
+    }
+
+    void AudioDevice::start()
+    {
+	if(started) return;
+        UNIV::initRand();        
+	// pepare device
+	if(snd_pcm_prepare (pcm_handle) != 0) {
+	  printf("Error preparing PCM for Alsa\n");
+	}
+	//do we really need to do this?
+	//void* buf = malloc(2*64*4);
+	//snd_pcm_writei (pcm_handle, buf, 2 * 64); //period_size);
+	snd_async_handler_t *pcm_callback;
+	int err;
+	err = snd_async_add_pcm_handler(&pcm_callback, pcm_handle, &audioCallback, this);
+	if(err != 0)
+	  printf("Error setting PCM callback for ALSA: %s\n",snd_strerror(err));
+	RUNNING = true;
+	//queueThread->Start();
+	if(snd_pcm_start(pcm_handle) != 0) {
+	  printf("ERROR starting Alsa!!!");
+	}else{
+	  started = true;
+	  printf("started!!!\n");
+	}
+    }
+
+    void AudioDevice::stop()
+    {
+	if(!started) return;
+	started = false;
+    }
+
+
+
+#elif defined (JACK_AUDIO)
+    //-----------------------------------
+    //  JACK
+    //-----------------------------------
+ 
+    void jack_shutdown (void *arg)
+    {
+      printf("Jack Server Died!!\n"); 
+      exit (1);
+    }
+
+    int audioCallback(jack_nframes_t framesPerBuffer, void *userData)
+    {
+      AudioDevice* ad = AudioDevice::I();
+      //jack_port_t* output_port_left = ad->out_port_left();
+      jack_port_t** output_ports = ad->out_ports();
+      jack_port_t** input_ports = ad->in_ports();
+
+      jack_default_audio_sample_t* outputBuffers[UNIV::CHANNELS];
+      //jack_default_audio_sample_t *inputBuffer = 0;
+      for(int i=0;i<UNIV::CHANNELS;i++) {
+	outputBuffers[i] = (jack_default_audio_sample_t *) jack_port_get_buffer (output_ports[i], framesPerBuffer);
+      }
+
+      TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
+      //sched->getGuard()->signal();	
+      UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
+      UNIV::TIME = UNIV::DEVICE_TIME;
+      //printf("DEVICE CALLBACK %lld\n",UNIV::DEVICE_TIME); 
+      int channels = 2;
+      uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
+      sched->getGuard()->signal();
+      
+      void* dsp_closure = AudioDevice::I()->getDSPClosure();
+      void* cache_closure = 0;
+      if(dsp_closure == 0) return 0;
+      cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
+      
+      if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
+	dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
+	dsp_f_ptr cache_wrapper = dsp_wrapper;
+	double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
+	double* data = 0; 
+	llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	for(uint32_t i=0;i<UNIV::FRAMES;i++)
+	  {
+	    for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+	      {
+		outputBuffers[k][i] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		//datr[i] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)1.,data));
+		llvm_zone_reset(zone);
+	      }
+	  }
+	llvm_zone_destroy(zone);
+      }else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
+	dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
+	dsp_f_ptr_array cache_wrapper = dsp_wrapper;
+	llvm_zone_t* zone = llvm_zone_create(1024*50);				
+	//cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
+	llvm_zone_destroy(zone);
+      }else{ 
+	//nothin to do
+      }
+      return 0;
+    }
+
+    AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
+    {
+        UNIV::CHANNELS = 2;
+        UNIV::SAMPLERATE = 44100;
+
+	const char **ports;
+
+	/* try to become a client of the JACK server */
+	jack_status_t status;
+
+	if ((client = jack_client_open ("Extempore",JackNullOption,&status)) == 0) {	  
+	  fprintf (stderr, "jack server not running?  %d\n",client);
+	  exit(1);
+	}
+	
+        /* tell the JACK server to call `process()' whenever
+	   there is work to be done.
+	*/
+	jack_set_process_callback (client, audioCallback, (void*)TaskScheduler::I());
+
+	/* tell the JACK server to call `jack_shutdown()' if
+	   it ever shuts down, either entirely, or if it
+	   just decides to stop calling us.
+	*/
+	jack_on_shutdown (client, jack_shutdown, 0);
+
+	/* get the current sample rate. */ 
+	UNIV::SAMPLERATE = jack_get_sample_rate (client);
+	UNIV::FRAMES = jack_get_buffer_size (client);
+	
+	/* create ports */
+	//input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+	output_ports = (jack_port_t**) malloc(sizeof(jack_port_t*)*UNIV::CHANNELS);
+	for(int i=0;i<UNIV::CHANNELS;i++) {	  
+	  char name[256];
+	  sprintf(name,"output_%d",i);
+	  output_ports[i] = jack_port_register (client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+	}
+ 	
+	ascii_text_color(1,7,10);
+	std::cout << "---         JACK         ----" << std::endl;
+        std::cout << "Loaded Default Audio Device: " << std::endl;	
+	ascii_text_color(0,7,10);	
+        std::cout << "SampleRate\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
+	ascii_text_color(0,7,10);	
+        std::cout << "Channels\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::CHANNELS << std::endl << std::flush;
+	ascii_text_color(0,7,10);	
+        std::cout << "Frames\t\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::FRAMES << std::endl << std::flush;
+	ascii_text_color(0,7,10);	
+
+    }
+	
+    AudioDevice::~AudioDevice()
+    {
+        jack_client_close(client);
+    }
+
+    void AudioDevice::start()
+    {
+	if(started) return;
+       /* tell the JACK server that we are ready to roll */
+	if (jack_activate (client)) {
+	  ascii_text_color(1,1,10);	
+	  fprintf (stderr, "Jack did not activate us :(\n");
+	  ascii_text_color(0,9,10);	  
+	  return;
+	}
+	const char** ports;
+	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput)) == NULL) {
+	   fprintf(stderr, "Cannot find any physical playback ports\n");
+	   exit(1);
+	}
+
+	for(int i=0;i<UNIV::CHANNELS;i++) {
+	  if(jack_connect (client, jack_port_name (output_ports[i]), ports[i])) {
+	    fprintf (stderr, "cannot connect output port %d\n", i);
+	  }
+	}
+
+	free(ports);
+
+        UNIV::initRand();        
+	RUNNING = true;
+	//queueThread->Start();
+	started = true;
+    }
+
+    void AudioDevice::stop()
+    {
+	if(!started) return;
+	started = false;
+    }
+
+#elif defined(TARGET_OS_LINUX)
     //-----------------------------------
     //  PORT AUDIO
     //-----------------------------------
     int audioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
     {
         TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
-	UNIV::TIME = UNIV::TIME + UNIV::FRAMES;
-	device_time = UNIV::TIME;
-        if(UNIV::TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
+	//sched->getGuard()->signal();
+	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
+	UNIV::TIME = UNIV::DEVICE_TIME;
+	//device_time = UNIV::DEVICE_TIME;
+        //if(UNIV::DEVIDE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
         int channels = 2;
         uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
-	sched->getGuard()->signal();
-				
+	sched->getGuard()->signal();	
+	
 	void* dsp_closure = AudioDevice::I()->getDSPClosure();
 	void* cache_closure = 0;
 	if(dsp_closure == 0) return 0;
@@ -104,8 +497,8 @@ namespace extemp {
 		SAMPLE* in = (SAMPLE*) inputBuffer;
 		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 		{
-		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::TIME),(double)k,data));
-		    llvm_zone_reset(zone);
+		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		  llvm_zone_reset(zone);
 		}
 	    }
 	    llvm_zone_destroy(zone);
@@ -113,7 +506,7 @@ namespace extemp {
 	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
 	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
 	    llvm_zone_t* zone = llvm_zone_create(1024*50);				
-	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::TIME,UNIV::CHANNELS);			
+	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
 	    llvm_zone_destroy(zone);
 	}else{ 
 	    //nothin to do
@@ -138,6 +531,7 @@ namespace extemp {
         UNIV::CHANNELS = 2;
         UNIV::SAMPLERATE = 44100;
 	ascii_text_color(1,7,10);
+	std::cout << "---PortAudio---" << std::endl;
         std::cout << "Loaded Default Audio Device: " << std::endl;	
 	ascii_text_color(0,7,10);	
         std::cout << "SampleRate\t: " << std::flush;
@@ -148,7 +542,10 @@ namespace extemp {
 	ascii_text_color(1,6,10);	
 	std::cout << UNIV::CHANNELS << std::endl << std::flush;
 	ascii_text_color(0,7,10);	
-
+        std::cout << "Frames\t\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::FRAMES << std::endl << std::flush;
+	ascii_text_color(0,7,10); 
     }
 	
     AudioDevice::~AudioDevice()
@@ -195,7 +592,7 @@ namespace extemp {
 			   AudioDevicePropertyID	inPropertyID,
 			   void*		inClientData)
     {
-       if(UNIV::TIME>4096) std::cout << "This has been called because you've run out of processing time!!!" << std::endl;        
+       if(UNIV::DEVICE_TIME>4096) std::cout << "This has been called because you've run out of processing time!!!" << std::endl;        
     }
 
     OSStatus audioCallback (AudioDeviceID		inDevice,
@@ -213,20 +610,21 @@ namespace extemp {
         long t = static_cast<long>(inOutputTime->mSampleTime);
         if(first_callback) { first_callback = false; start_time = t; }
         device_time = t - start_time;
-	UNIV::TIME = UNIV::TIME + UNIV::FRAMES;
+	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
+	UNIV::TIME = DEVICE_TIME;
         
         if(false) { //UNIV::TIME != device_time) {
 	    std::cout << std::endl << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl;
 	    std::cout << "UNIV Timeing Sychronization problem!!!:" << std::endl;
-	    std::cout << "UNIV::TIME [" << UNIV::TIME << "]" << std::endl;
+	    std::cout << "UNIV::DEVICE_TIME [" << UNIV::DEVICE_TIME << "]" << std::endl;
 	    std::cout << "ADJUSTED_DEVICE_TIME [" << device_time << "]" << std::endl;
 	    std::cout << "NON_ADJUSTED_DEVICE_TIME [" << t << "]" << std::endl;
 	    std::cout << "ADJUSTMENT_VALUE [" << start_time << "]" << std::endl;
 	    std::cout << "NumOfSamples [" << numOfSamples << "]" << std::endl;
-	    std::cout << std::endl << "Adjusting by " << (device_time - UNIV::TIME) << " samples to re-sync" << std::endl << std::endl;
+	    std::cout << std::endl << "Adjusting by " << (device_time - UNIV::DEVICE_TIME) << " samples to re-sync" << std::endl << std::endl;
 	    std::cout << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl << std::endl;
 
-	    start_time += (device_time) - UNIV::TIME;
+	    start_time += (device_time) - UNIV::DEVICE_TIME;
         } 
 	sched->getGuard()->signal();
 
@@ -248,7 +646,7 @@ namespace extemp {
 		SAMPLE* dat = (SAMPLE*) outOutputData->mBuffers[0].mData;
 		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 		{   
-		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, 0.0,(double)(i+UNIV::TIME),(double)k,data)); 
+		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, 0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data)); 
 		    llvm_zone_reset(zone);
 		}
 	    }
@@ -259,7 +657,7 @@ namespace extemp {
 	    llvm_zone_t* zone = llvm_zone_create(1024*50);				
 	    SAMPLE* outputBuffer = (SAMPLE*) outOutputData->mBuffers[0].mData;
 	    SAMPLE* inputBuffer = (SAMPLE*) inInputData->mBuffers[0].mData;		
-	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::TIME,UNIV::CHANNELS);
+	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
 	    llvm_zone_destroy(zone);
 	}else{ 
 	    //nothin to do
@@ -314,17 +712,21 @@ namespace extemp {
 	//std::cout << "Frames:\t\t" << UNIV::FRAMES << std::endl;
 
         ascii_text_color(1,7,10);
-	std::cout << "Loaded Default Audio Device: " << std::endl;
-        ascii_text_color(0,7,10);
-	std::cout << "SampleRate\t: " << std::flush;
-        ascii_text_color(1,6,10);
+	std::cout << "---      CoreAudio     ----" << std::endl;
+        std::cout << "Loaded Default Audio Device: " << std::endl;	
+	ascii_text_color(0,7,10);	
+        std::cout << "SampleRate\t: " << std::flush;
+	ascii_text_color(1,6,10);	
 	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
-        ascii_text_color(0,7,10);
-	std::cout << "Channels\t: " << std::flush;
-        ascii_text_color(1,6,10);
+	ascii_text_color(0,7,10);	
+        std::cout << "Channels\t: " << std::flush;
+	ascii_text_color(1,6,10);	
 	std::cout << UNIV::CHANNELS << std::endl << std::flush;
-        ascii_text_color(0,7,10);
-
+	ascii_text_color(0,7,10);	
+        std::cout << "Frames\t\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::FRAMES << std::endl << std::flush;
+	ascii_text_color(0,7,10); 
 
 	err = AudioDeviceAddIOProc(device, &audioCallback, TaskScheduler::I());
 	

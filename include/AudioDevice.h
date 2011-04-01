@@ -36,8 +36,12 @@
 #ifndef _AUDIO_DEVICE_H
 #define _AUDIO_DEVICE_H
 
-#ifndef TARGET_OS_LINUX
+#if defined (TARGET_OS_OSX)
 #include <CoreAudio/AudioHardware.h>
+#elif defined (JACK_AUDIO)
+#include <jack/jack.h>
+#elif defined (ALSA_AUDIO)
+#include <alsa/asoundlib.h>
 #else
 #include <portaudio.h>
 #endif
@@ -87,9 +91,23 @@ namespace extemp {
 	dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
 	dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
 
+#if defined (JACK_AUDIO)
+	jack_port_t** out_ports() { return output_ports; }
+	jack_port_t** in_ports() { return input_ports; }
+#elif defined (___ALSA_AUDIO___)
+	snd_pcm_t* get_pcm_handle() { return pcm_handle; }	
+	float* getBuffer() { return buffer; }
+#endif
+
     private:
 	bool started;
-#ifdef TARGET_OS_LINUX
+#if defined (JACK_AUDIO)
+	jack_client_t *client;
+	jack_port_t** input_ports;
+	jack_port_t** output_ports;
+#elif defined (___ALSA_AUDIO___) // ALSA NOT CURRENTLY SUPPORTED
+	snd_pcm_t *pcm_handle;
+#elif defined (TARGET_OS_LINUX) // default on linux is portaudio
 	PaStream* stream;
 #else 
 	AudioDeviceID device;

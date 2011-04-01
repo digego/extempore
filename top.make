@@ -47,6 +47,7 @@ LD := $(PLATFORM_LD)
 CXXFLAGS := \
 	-w -O3 -MMD \
 	$(DEFINES) \
+	$(EXT_USER_ARGS) \
 	-Iinclude \
 	-I$(EXT_LLVM_DIR)/include \
 	$(PLATFORM_CXXFLAGS) \

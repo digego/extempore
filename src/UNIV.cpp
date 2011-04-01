@@ -53,13 +53,14 @@ void ascii_text_color(int attr, int fg, int bg)
 
 namespace extemp {
 
-    uint32_t UNIV::FRAMES = 256;
+    uint32_t UNIV::FRAMES = 512;
     uint32_t UNIV::CHANNELS = 2;
     uint32_t UNIV::SAMPLERATE = 44100;
     uint32_t UNIV::SECOND = SAMPLERATE;
     uint32_t UNIV::MINUTE = SECOND * 60;
     uint32_t UNIV::HOUR = MINUTE * 60;
     uint64_t UNIV::TIME = 0l;
+    uint64_t UNIV::DEVICE_TIME = 0l;
     const char* UNIV::PWD = "";
 
     void UNIV::initRand() {
