@@ -290,6 +290,10 @@
             (if (null? rest) lst
                 (loop (cdr rest) (list op lst (impc:ti:first-transform (car rest) inbody?))))))))				
 
+(define impc:ti:bitwise-not-to-eor
+  (lambda (ast inbody?)
+    (list 'bitwise-eor (cadr ast) -1)))
+
 
 (define impc:ti:first-transform
    (lambda (ast inbody?)
@@ -321,9 +325,11 @@
                         (impc:ti:first-transform (impc:ti:not (cadr ast)) inbody?))
                        ((eq? (car ast) 'list)
                         (impc:ti:first-transform (impc:ti:binary-arity (cons 'cons (append (cdr ast) '(nilnil))) inbody?) inbody?))
-                       ((and (member (car ast) '(* - / +))
+		       ((and (member (car ast) '(* - / + bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
                              (<> (length ast) 3))
-                        (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
+                        (impc::ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
+		       ((eq? (car ast) 'bitwise-not)
+			(impc:ti:bitwise-not-to-eor ast inbody?))
                        ((eq? (car ast) 'lambda)
                         (if inbody?
                             (impc:ti:lambda ast)
@@ -1234,7 +1240,7 @@
             ((atom? ast) (print-error 'Compiler 'Error: 'internal 'error 'unhandled 'atom: ast))
             ((and (list? ast) (member (car ast) '(let let* letrec))) (impc:ti:let-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(lambda))) (impc:ti:lambda-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(* / + - modulo))) (impc:ti:math-check ast vars kts request?))
+	    ((and (list? ast) (member (car ast) '(* / + - modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right bitwise-not))) (impc:ti:math-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))            
             ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))
@@ -1994,7 +2000,6 @@
     (let ((f (llvm:get-function (string-append name "_getter"))))
       (if f (llvm:run f)
 	  '()))))
-
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-function
   (lambda (name)

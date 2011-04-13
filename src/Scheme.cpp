@@ -853,6 +853,114 @@ static num num_div(num a, num b) {
     return ret;
 }
 
+static num num_bitnot(num a) {
+  num ret;
+  ret.num_type = MY_ARR[a.num_type];
+	
+  switch(ret.num_type) {
+  case 0:
+    ret.value.ivalue= ~ (a.value.ivalue);	
+    break;
+  case 1:
+  case 3:
+    ret.num_type = 0;		
+    ret.value.ivalue= ~((int)a.value.ivalue);	
+  }
+	
+  return ret;
+}
+
+static num num_bitand(num a, num b) {
+  num ret;
+  int tot = a.num_type + b.num_type;
+  ret.num_type = MY_ARR[tot];
+	
+  switch(ret.num_type) {
+  case 0:
+    ret.value.ivalue= a.value.ivalue & b.value.ivalue;	
+    break;
+  case 1:
+  case 3:
+    ret.num_type = 0;		
+    ret.value.ivalue= (int)a.value.ivalue & (int)b.value.ivalue;	
+  }
+	
+  return ret;
+}
+
+static num num_bitor(num a, num b) {
+  num ret;
+  int tot = a.num_type + b.num_type;
+  ret.num_type = MY_ARR[tot];
+	
+  switch(ret.num_type) {
+  case 0:
+    ret.value.ivalue= a.value.ivalue | b.value.ivalue;	
+    break;
+  case 1:
+  case 3:
+    ret.num_type = 0;		
+    ret.value.ivalue= (int)a.value.ivalue | (int)b.value.ivalue;	
+  }
+	
+  return ret;
+}
+
+static num num_biteor(num a, num b) {
+  num ret;
+  int tot = a.num_type + b.num_type;
+  ret.num_type = MY_ARR[tot];
+	
+  switch(ret.num_type) {
+  case 0:
+    ret.value.ivalue= a.value.ivalue ^ b.value.ivalue;	
+    break;
+  case 1:
+  case 3:
+    ret.num_type = 0;		
+    ret.value.ivalue= (int)a.value.ivalue ^ (int)b.value.ivalue;	
+  }
+	
+  return ret;
+}
+
+static num num_bitlsl(num a, num b) {
+  num ret;
+  int tot = a.num_type + b.num_type;
+  ret.num_type = MY_ARR[tot];
+	
+  switch(ret.num_type) {
+  case 0:
+    ret.value.ivalue= a.value.ivalue << b.value.ivalue;	
+    break;
+  case 1:
+  case 3:
+    ret.num_type = 0;		
+    ret.value.ivalue= (int)a.value.ivalue << (int)b.value.ivalue;	
+  }
+	
+  return ret;
+}
+
+static num num_bitlsr(num a, num b) {
+  num ret;
+  int tot = a.num_type + b.num_type;
+  ret.num_type = MY_ARR[tot];
+	
+  switch(ret.num_type) {
+  case 0:
+    ret.value.ivalue= a.value.ivalue >> b.value.ivalue;	
+    break;
+  case 1:
+  case 3:
+    ret.num_type = 0;		
+    ret.value.ivalue= (int)a.value.ivalue >> (int)b.value.ivalue;	
+  }
+	
+  return ret;
+}
+
+
 static num num_intdiv(num a, num b) {
     num ret;
     int tot = a.num_type + b.num_type;
@@ -4301,6 +4409,56 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
 	    }
 	}
 	s_return(sc,mk_number(sc, v));
+  case OP_BITNOT:        /* ~ */
+    v=num_bitnot(nvalue(car(x)));
+    s_return(sc,mk_number(sc, v));
+
+  case OP_BITAND:        /* & */
+    v=num_zero;
+    x = sc->args;
+    if (x != sc->NIL) {
+      v = nvalue(car(x));
+      for (x = cdr(x); x != sc->NIL; x = cdr(x)) {
+	v=num_bitand(v,nvalue(car(x)));
+      }
+    }
+    s_return(sc,mk_number(sc, v));
+				
+  case OP_BITOR:        /* | */
+    v=num_zero;
+    for (x = sc->args; x != sc->NIL; x = cdr(x)) {
+      v=num_bitor(v,nvalue(car(x)));
+    }
+    s_return(sc,mk_number(sc, v));
+				
+  case OP_BITEOR:        /* ^ */
+    v=num_zero;
+    for (x = sc->args; x != sc->NIL; x = cdr(x)) {
+      v=num_biteor(v,nvalue(car(x)));
+    }
+    s_return(sc,mk_number(sc, v));
+				
+  case OP_BITLSL:        /* << */
+    v=num_zero;
+    x = sc->args;
+    if (x != sc->NIL) {
+      v = nvalue(car(x));
+      for (x = cdr(x); x != sc->NIL; x = cdr(x)) {
+	v=num_bitlsl(v,nvalue(car(x)));
+      }
+    }
+    s_return(sc,mk_number(sc, v));
+				
+  case OP_BITLSR:        /* >> */
+    v=num_zero;
+    x = sc->args;
+    if (x != sc->NIL) {
+      v = nvalue(car(x));
+      for (x = cdr(x); x != sc->NIL; x = cdr(x)) {
+	v=num_bitlsr(v,nvalue(car(x)));
+      }
+    }
+    s_return(sc,mk_number(sc, v));
 				
     case OP_INTDIV:        /* quotient */
 	if(cdr(sc->args)==sc->NIL) {
