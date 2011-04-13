@@ -611,7 +611,7 @@ namespace extemp {
         if(first_callback) { first_callback = false; start_time = t; }
         device_time = t - start_time;
 	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
-	UNIV::TIME = DEVICE_TIME;
+	UNIV::TIME = UNIV::DEVICE_TIME;
         
         if(false) { //UNIV::TIME != device_time) {
 	    std::cout << std::endl << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl;
