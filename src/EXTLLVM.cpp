@@ -174,6 +174,15 @@ void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay)
     extemp::TaskScheduler::I()->add(task);
 }
 
+char* itoa(int64_t val) {
+  int base = 10;
+  static char buf[32] = {0};        
+  int i = 30;        
+  for(; val && i ; --i, val /= base)        
+    buf[i] = "0123456789abcdef"[val % base];        
+  return &buf[i+1];        
+}
+
 int llvm_printf(char* format, ...)
 {
     va_list ap;
@@ -546,7 +555,7 @@ namespace extemp {
     EXTLLVM::EXTLLVM()
     {
 	//printf("making llvm !!!!!!!!!!!!!!!!!!\n");
-      alloc_mutex.init();
+        alloc_mutex.init();
 	M = 0;
 	MP = 0;
 	EE = 0;
@@ -588,7 +597,7 @@ namespace extemp {
 			
 	    //llvm::PerformTailCallOpt = true;
 	    llvm::GuaranteedTailCallOpt = true;
-	    llvm::llvm_start_multithreaded();
+	    //llvm::llvm_start_multithreaded();
 			
 	    char fname[] = "/code.ir";
 	    char load_path[256];
@@ -667,9 +676,11 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_set_size);
 	    gv = M->getNamedValue(std::string("llvm_zone_ptr_size"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_size);
-
 	    gv = M->getNamedValue(std::string("llvm_memset"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_memset);
+	    gv = M->getNamedValue(std::string("itoa"));
+	    EE->updateGlobalMapping(gv,(void*)&itoa);
+
 			
 	}	
 	return;
