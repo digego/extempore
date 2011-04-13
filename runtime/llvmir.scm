@@ -1584,7 +1584,23 @@
                                         ", " (car bval) "\n") os))
             (impc:ir:strip-space os)))))
 
-
+(define impc:ir:compiler:bitwise
+  (lambda (v ast types . hint?)
+    (let* ((bitops '("and" "or" "xor" "shl" "lshr"))
+	   (os (make-string 0))
+	   (a (impc:ir:compiler (cadr ast) types))
+	   (aval (impc:ir:gname))     
+	   (b (impc:ir:compiler (caddr ast) types))
+	   (bval (impc:ir:gname))
+	   (type (cadr aval)))
+      (emit a os)
+      (emit b os)
+      (emit (string-append (impc:ir:gname "val" type)
+ 			   " = " (list-ref bitops v)
+			   " " type " " (car aval) ", " (car bval) "\n") os)
+      (println 'bitwise 'ast: ast)
+      (println 'bitwise 'ir: os)
+      (impc:ir:strip-space os))))
 			
 
 (define impc:ir:compiler:bitcast
@@ -1821,6 +1837,12 @@
                     (if (not (null? hint?))                    
                         (impc:ir:compiler:math (cl:position (car ast) '(+ - * /)) ast types (car hint?))
                         (impc:ir:compiler:math (cl:position (car ast) '(+ - * /)) ast types)))
+		   ((member (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
+		    (if (<> (length ast) 3)
+			(print-error 'Compiler 'Error: ast 'bad 'arity))
+		    (if (not (null? hint?))                    
+			(impc:ir:compiler:bitwise (cl:position (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right)) ast types (car hint?))
+			(impc:ir:compiler:bitwise (cl:position (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right)) ast types)))
                    ((equal? (car ast) 'if)
                     (impc:ir:compiler:if ast types))
                    ((equal? (car ast) 'ifret)
