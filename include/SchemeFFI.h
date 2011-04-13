@@ -89,6 +89,11 @@ namespace extemp {
 	static pointer setDSPWrapperArray(scheme* _sc, pointer args);
 		
 	// misc stuff
+	static pointer dataGETi64(scheme* _sc, pointer args);
+	static pointer dataGETdouble(scheme* _sc, pointer args);	
+	static pointer dataSETi64(scheme* _sc, pointer args);
+	static pointer dataSETdouble(scheme* _sc, pointer args);
+	static pointer cptrToString(scheme* _sc, pointer args);
 	static pointer stringStrip(scheme* _sc, pointer args);
 	static pointer stringJoin(scheme* _sc, pointer args);
 	static pointer getClosureEnv(scheme* _sc, pointer args);
@@ -146,6 +151,7 @@ namespace extemp {
 
 #if defined (TARGET_OS_LINUX)
 	// some XWindows guff
+	static pointer getX11Event(scheme* _sc, pointer args);
 	static pointer makeGLXContext(scheme* _sc, pointer args);
 	static pointer glxSwapBuffers(scheme* _sc, pointer args);
 	static pointer glxMakeContextCurrent(scheme* _sc, pointer args);

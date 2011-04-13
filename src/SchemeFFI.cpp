@@ -178,6 +178,12 @@ namespace extemp {
 	    { "sys:reset-mzone",		&SchemeFFI::resetMallocZone },
 
 	    // misc stuff
+	    { "cptr:get-i64",            &SchemeFFI::dataGETi64 },
+	    { "cptr:get-double",            &SchemeFFI::dataGETdouble },
+	    { "cptr:set-i64",            &SchemeFFI::dataSETi64 },
+	    { "cptr:set-double",            &SchemeFFI::dataSETdouble },
+	    { "cptr->string",            &SchemeFFI::cptrToString },
+	    { "cptr:get-string",            &SchemeFFI::cptrToString },
 	    { "string-strip",		&SchemeFFI::stringStrip },
 	    { "string-join",		&SchemeFFI::stringJoin },
 	    { "call-cpp-at-time",		&SchemeFFI::callCPPAtTime },
@@ -225,6 +231,7 @@ namespace extemp {
 	    { "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
 #if defined (TARGET_OS_LINUX)
+	    { "glx:get-event",			&SchemeFFI::getX11Event },
 	    { "glx:make-ctx",			&SchemeFFI::makeGLXContext },	    
 	    { "glx:set-context",                 &SchemeFFI::glxMakeContextCurrent },
 	    { "glx:swap-buffers",			&SchemeFFI::glxSwapBuffers },
@@ -271,6 +278,47 @@ namespace extemp {
     // MISC STUFF
     //
     //////////////////////////////////////////////////////
+
+    pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)
+    {       
+        void* cptr = cptr_value(pair_car(args));
+	int64_t offset = ivalue(pair_cadr(args));
+	int64_t* ptr = (int64_t*) (cptr+offset); 
+	return mk_integer(_sc,ptr[0]);
+    }
+
+    pointer SchemeFFI::dataGETdouble(scheme* _sc, pointer args)
+    {       
+        void* cptr = cptr_value(pair_car(args));
+	int64_t offset = ivalue(pair_cadr(args));
+	double* ptr = (double*) (cptr+offset); 
+	return mk_real(_sc,ptr[0]);
+    }
+
+    pointer SchemeFFI::dataSETi64(scheme* _sc, pointer args)
+    {       
+        void* cptr = cptr_value(pair_car(args));
+	int64_t offset = ivalue(pair_cadr(args));
+	int64_t* ptr = (int64_t*) (cptr+offset);
+	ptr[0] = (int64_t) ivalue(pair_caddr(args));
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::dataSETdouble(scheme* _sc, pointer args)
+    {       
+        void* cptr = cptr_value(pair_car(args));
+	int64_t offset = ivalue(pair_cadr(args));
+	double* ptr = (double*) (cptr+offset);
+	ptr[0] = (double) rvalue(pair_caddr(args));
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::cptrToString(scheme* _sc, pointer args)
+    {       
+        void* cptr = cptr_value(pair_car(args));
+	char* cstr = (char*) cptr;
+	return mk_string(_sc, cstr);
+    }
 
     pointer SchemeFFI::asciiColor(scheme* _sc, pointer args)
     {
@@ -1886,6 +1934,106 @@ namespace extemp {
     return _sc->T;
   }
 
+  pointer SchemeFFI::getX11Event(scheme* _sc, pointer args)
+  {
+    args = pair_car(args);
+    Display* dpy = (Display*) cptr_value(pair_car(args));
+    XEvent event;
+    if(XPending(dpy) == 0) return _sc->NIL;
+    //only return the LATEST event. DROP eveything earlier
+    while(XPending(dpy)) XNextEvent(dpy, &event);
+    switch(event.type){
+    case ButtonPress: {
+      XButtonEvent be = event.xbutton;
+      pointer list = _sc->NIL;
+      _sc->imp_env->insert(list);
+      pointer tlist = cons(_sc,mk_integer(_sc,be.y),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      _sc->imp_env->insert(list);
+      tlist = cons(_sc,mk_integer(_sc,be.x),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,be.button),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,be.state),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,0),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      return list;
+    }
+    case MotionNotify: {
+      XMotionEvent me = event.xmotion;
+      pointer list = _sc->NIL;
+      _sc->imp_env->insert(list);
+      pointer tlist = cons(_sc,mk_integer(_sc,me.y),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      _sc->imp_env->insert(list);
+      tlist = cons(_sc,mk_integer(_sc,me.x),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,me.state),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,1),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      return list;
+    }
+    case KeyPress: {
+      XKeyEvent ke = event.xkey;
+      pointer list = _sc->NIL;
+      _sc->imp_env->insert(list);
+      pointer tlist = cons(_sc,mk_integer(_sc,ke.y),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      _sc->imp_env->insert(list);
+      tlist = cons(_sc,mk_integer(_sc,ke.x),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,ke.keycode),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,ke.state),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,2),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      return list;
+    }
+    default:
+      return _sc->NIL;
+    }
+  }
+
+  bool checkGLXExtension(Display* dpy,const char* extName)
+   {
+     /*
+          Search for extName in the extensions string.  Use of strstr()
+          is not sufficient because extension names can be prefixes of
+          other extension names.  Could use strtok() but the constant
+          string returned by glGetString can be in read-only memory.
+     */
+     char* list = (char*) glXQueryExtensionsString(dpy, DefaultScreen(dpy));
+     char* end;
+     int extNameLen;
+     extNameLen = strlen(extName);
+     end = list + strlen(list);
+     while (list < end)
+       {
+	 int n = strcspn(list, " ");
+	 if ((extNameLen == n) && (strncmp(extName, list, n) == 0))
+	   return true;
+	 list += (n + 1);
+       };
+     return false;
+   }; // bool checkGLXExtension(const char* extName)
+
   pointer SchemeFFI::makeGLXContext(scheme* _sc, pointer args)
   {
     Display              *dpy;
@@ -1902,7 +2050,7 @@ namespace extemp {
     int                   swapFlag = True;
 
     sharedContext = NULL;
-    if(pair_cdr(args) != _sc->NIL) sharedContext = (GLXContext) cptr_value(pair_cadr(args));
+    //if(pair_cdr(args) != _sc->NIL) sharedContext = (GLXContext) cptr_value(pair_cadr(args));
 
     //GLXContext util_glctx;     
     dpy = XOpenDisplay (string_value(pair_car(args)));
@@ -1911,14 +2059,11 @@ namespace extemp {
       return _sc->F;     
     }
 
-    /* Request a suitable framebuffer configuration - try for a double 
-    ** buffered configuration first */
-    fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy),
-                                   doubleBufferAttributes, &numReturned );
+    /* Request a suitable framebuffer configuration - try for a double buffered configuration first */
+    fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy), doubleBufferAttributes, &numReturned );
 
     if ( fbConfigs == NULL ) {  /* no double buffered configs available */
-      fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy),
-                                     singleBufferAttributess, &numReturned );
+      fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy), singleBufferAttributess, &numReturned );
       swapFlag = False;
     }
 
@@ -1945,8 +2090,8 @@ namespace extemp {
  
 
     swa.border_pixel = 0;
-    swa.override_redirect = True;
-    swa.event_mask = StructureNotifyMask | KeyPressMask;
+    swa.override_redirect = (pair_cadr(args) == _sc->T) ? True : False; 
+    swa.event_mask = StructureNotifyMask | KeyPressMask | ButtonPressMask | ButtonMotionMask;
     swa.colormap = XCreateColormap( dpy, RootWindow(dpy, vInfo->screen),
                                     vInfo->visual, AllocNone );
 
@@ -1958,23 +2103,20 @@ namespace extemp {
     //                      0, vInfo->depth, InputOutput, vInfo->visual,
     //                      swaMask, &swa );
 
-    xWin = XCreateWindow( dpy, RootWindow(dpy, vInfo->screen), 0, 0, 1920, 1200,
+    xWin = XCreateWindow( dpy, RootWindow(dpy, vInfo->screen), ivalue(pair_caddr(args)), ivalue(pair_cadddr(args)), ivalue(pair_car(pair_cddddr(args))), ivalue(pair_cadr(pair_cddddr(args))),
                           0, vInfo->depth, InputOutput, vInfo->visual,
                           swaMask, &swa );
 
     // if we are sharing a context
     if(sharedContext) {
       /* Create a GLX context for OpenGL rendering */
-      context = glXCreateNewContext( dpy, fbConfigs[0], GLX_RGBA_TYPE,
-				     sharedContext, True );    
+      context = glXCreateNewContext( dpy, fbConfigs[0], GLX_RGBA_TYPE, sharedContext, True );    
     }else{ // if we aren't sharing a context
       /* Create a GLX context for OpenGL rendering */
-      context = glXCreateNewContext( dpy, fbConfigs[0], GLX_RGBA_TYPE,
-				     NULL, True );
+      context = glXCreateNewContext( dpy, fbConfigs[0], GLX_RGBA_TYPE, NULL, True );
     }
 
-    /* Create a GLX window to associate the frame buffer configuration
-    ** with the created X window */
+    /* Create a GLX window to associate the frame buffer configuration with the created X window */
     glxWin = glXCreateWindow( dpy, fbConfigs[0], xWin, NULL );
     
     /* Map the window to the screen, and wait for it to appear */
@@ -1984,12 +2126,29 @@ namespace extemp {
     /* Bind the GLX context to the Window */
     glXMakeContextCurrent( dpy, glxWin, glxWin, context );
 
+    void (*swapInterval)(int) = 0;
+
+    if (checkGLXExtension(dpy,"GLX_MESA_swap_control")) {
+      swapInterval = (void (*)(int)) glXGetProcAddress((const GLubyte*) "glXSwapIntervalMESA");
+    } else if (checkGLXExtension(dpy,"GLX_SGI_swap_control")) {
+      swapInterval = (void (*)(int)) glXGetProcAddress((const GLubyte*) "glXSwapIntervalSGI");
+    } else {
+      printf("no vsync?!\n");
+    }
+
+    printf("Is Direct:%d\n",glXIsDirect(dpy,context));
+
+    swapInterval(0);
+
+    //glxSwapIntervalSGI(1);
+    //glXSwapIntervalMESA(1);
+
     /* OpenGL rendering ... */
     glClearColor( 0.0, 0.0, 0.0, 1.0 );
     glClear( GL_COLOR_BUFFER_BIT );
 
     glFlush();
-    
+
     if ( swapFlag )
       glXSwapBuffers(dpy, glxWin);
 
