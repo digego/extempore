@@ -4410,7 +4410,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
 	}
 	s_return(sc,mk_number(sc, v));
   case OP_BITNOT:        /* ~ */
-    v=num_bitnot(nvalue(car(x)));
+    v=num_bitnot(nvalue(car(sc->args)));
     s_return(sc,mk_number(sc, v));
 
   case OP_BITAND:        /* & */

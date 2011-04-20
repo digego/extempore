@@ -327,7 +327,7 @@
                         (impc:ti:first-transform (impc:ti:binary-arity (cons 'cons (append (cdr ast) '(nilnil))) inbody?) inbody?))
 		       ((and (member (car ast) '(* - / + bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
                              (<> (length ast) 3))
-                        (impc::ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
+                        (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
 		       ((eq? (car ast) 'bitwise-not)
 			(impc:ti:bitwise-not-to-eor ast inbody?))
                        ((eq? (car ast) 'lambda)
