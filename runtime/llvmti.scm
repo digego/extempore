@@ -1946,6 +1946,11 @@
        ,(cadr args)))
 
 
+(define-macro (bind-type symbol type)  
+  `(llvm:compile (string-append "%" ,(symbol->string symbol) " = type "
+				,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type) (symbol->string symbol))))))
+
+
 (define-macro (bindc symbol type value)
    (if (cptr? (eval value))
        `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))

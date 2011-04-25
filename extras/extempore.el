@@ -44,6 +44,7 @@
     ("definec:dsp" . font-lock-keyword-face)
     ("define-instrument" . font-lock-keyword-face)
     ("bind-scm" . font-lock-keyword-face)
+    ("bind-type" . font-lock-keyword-face)
     ("dotimes" . font-lock-keyword-face)
     ("bind-lib" . font-lock-keyword-face)))
 

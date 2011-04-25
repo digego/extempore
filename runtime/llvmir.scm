@@ -77,19 +77,19 @@
 
 
 (define impc:ir:get-type-from-pretty-tuple
-   (lambda (string-type)
+   (lambda (string-type . args)
       (let* ((s1 (regex:replace string-type "\\<(.*)\\>?.*" "$1"))
              (t1 (cl:remove-if (lambda (x) (string=? x "")) 
                                (regex:match-all s1 impc:ir:regex-tc-or-a)))
-             (t2 (map (lambda (x) (impc:ir:get-type-from-pretty-str x)) t1)))
+             (t2 (map (lambda (x) (apply impc:ir:get-type-from-pretty-str x args)) t1)))
          t2)))
 
 (define impc:ir:get-type-from-pretty-closure
-   (lambda (string-type)
+   (lambda (string-type . args)
      (let* ((s1 (regex:replace string-type "\\[(.*)\\]?.*" "$1"))
 	    (t1 (cl:remove-if (lambda (x) (string=? x "")) 
 			      (regex:match-all s1 impc:ir:regex-tc-or-a)))
-	    (t2 (map (lambda (x) (impc:ir:get-type-from-pretty-str x)) t1)))
+	    (t2 (map (lambda (x) (apply impc:ir:get-type-from-pretty-str x args)) t1)))
        t2)))
 		 
 		 
@@ -113,25 +113,36 @@
 ;; now with pretty print support
 (define impc:ir:get-type-from-pretty-str
    (lambda (string-type . args)
+     ;(println 'stype: string-type args)
       (if (or (not (string? string-type))
               (string=? "" string-type))
           (print-error 'Compiler 'Error: 'Internal 'error 'impc:ir:get-type-from-str 'must 'take 'a 'string 'not string-type))
       (let* ((ptr-depth (impc:ir:get-ptr-depth string-type))
              (offset (* ptr-depth 100))
-             (expand-closures? (if (null? args) #f (car args)))
+             ;(expand-closures? (if (null? args) #f (car args)))
              (base (impc:ir:get-base-type string-type)))
-         ;(print 'base: base 'ptr-depth: ptr-depth)
+         ;(println 'base: base 'ptr-depth: ptr-depth (string? base))
          (cond ((string=? base "void") *impc:ir:void*)
                ((string=? base "closure") (+ *impc:ir:closure* offset))
                ((string=? base "tuple") (+ *impc:ir:tuple* offset))
                ((regex:match? base "^\\[.*\\]$") 
-                (cons (+ offset *impc:ir:pointer* *impc:ir:closure*) (impc:ir:get-type-from-pretty-closure string-type)))               
+                (cons (+ offset *impc:ir:pointer* *impc:ir:closure*) (apply impc:ir:get-type-from-pretty-closure string-type args)))
                ((regex:match? base "\\<\\{\\s?i8\\*,\\s?i8\\*.*") 
                 (cons (+ offset *impc:ir:closure*) (impc:ir:get-closure-type-from-str string-type)))
                ((regex:match? base "^\\<[^{].*[^}]\\>$") 
-                (cons (+ offset *impc:ir:tuple*) (impc:ir:get-type-from-pretty-tuple string-type)))               
+                (cons (+ offset *impc:ir:tuple*) (apply impc:ir:get-type-from-pretty-tuple string-type args)))               
                ((regex:match? base "\\<?\\{.*\\}\\>?\\**")
-                (cons (+ offset *impc:ir:tuple*) (impc:ir:get-tuple-type-from-str string-type)))               
+                (cons (+ offset *impc:ir:tuple*) (impc:ir:get-tuple-type-from-str string-type)))
+	       ((or (not (null? (llvm:get-named-type base)))
+		    (and (not (null? args))
+			 (string=? (car args) base)))
+		(if (and (not (null? args))
+			 (string=? (car args) base))
+		    (string-append "%" string-type)
+		    (let ((type (impc:ir:get-type-from-str (llvm:get-named-type base))))
+		      (dotimes (i ptr-depth)
+			(set! type (impc:ir:pointer++ type)))
+		      type)))
                (else (let loop ((i -1))
                         (if (string=? base (impc:ir:get-type-str i))
                             (+ i offset)
@@ -193,7 +204,7 @@
       ;(print 'string-type: string-type)
       (let* ((ptr-depth (impc:ir:get-ptr-depth string-type))
              (offset (* ptr-depth 100))
-             (expand-closures? (if (null? args) #f (car args)))
+             ;(expand-closures? (if (null? args) #f (car args)))
              (base (impc:ir:get-base-type string-type)))
          (cond ((string=? base "void") *impc:ir:void*)
                ((string=? base "closure") (+ *impc:ir:closure* offset))
@@ -213,26 +224,26 @@
 
 (define impc:ir:get-type-str
    (lambda (type)
-      (if (string? type) type
-          (cond ((list? type) ;; must be a complex type
-                 (cond ((impc:ir:closure? (car type))
-                        (apply string-append "<{i8*, i8*, " (impc:ir:make-function-str (cdr type) #t) "*}>"
-                               (make-list (impc:ir:get-ptr-depth (car type)) "*")))
-                       ((impc:ir:tuple? (car type))
-                        (apply string-append "{" (string-join (map (lambda (x) (impc:ir:get-type-str x)) (cdr type)) ",") "}"
-                               (make-list (impc:ir:get-ptr-depth (car type)) "*")))
-                       (else (print-error 'Compiler 'Error: 'bad 'complex 'type! type))))
-                ((= type -1) "void")
-                (else (let ((base (modulo type 100))
-                            (ptr-depth (floor (/ type 100))))
-                         (string-append (cond ((= base *impc:ir:double*) "double")
-                                              ((= base *impc:ir:float*) "float")
-                                              ((member base (list *impc:ir:si64* *impc:ir:ui64*)) "i64")
-                                              ((member base (list *impc:ir:si32* *impc:ir:ui32*)) "i32")
-                                              ((member base (list *impc:ir:si8* *impc:ir:ui8* *impc:ir:char*)) "i8")
-                                              ((= base *impc:ir:i1*) "i1")
-                                              (else (print-error 'Compiler 'Error: 'bad 'type 'getting 'type 'str type)))
-                                        (apply string-append (make-list ptr-depth "*")))))))))
+     (if (string? type) type
+	 (cond ((list? type) ;; must be a complex type
+		(cond ((impc:ir:closure? (car type))
+		       (apply string-append "<{i8*, i8*, " (impc:ir:make-function-str (cdr type) #t) "*}>"
+			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
+		      ((impc:ir:tuple? (car type))
+		       (apply string-append "{" (string-join (map (lambda (x) (impc:ir:get-type-str x)) (cdr type)) ",") "}"
+			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
+		      (else (print-error 'Compiler 'Error: 'bad 'complex 'type! type))))	       
+	       ((= type -1) "void")
+	       (else (let ((base (modulo type 100))
+			   (ptr-depth (floor (/ type 100))))
+		       (string-append (cond ((= base *impc:ir:double*) "double")
+					    ((= base *impc:ir:float*) "float")
+					    ((member base (list *impc:ir:si64* *impc:ir:ui64*)) "i64")
+					    ((member base (list *impc:ir:si32* *impc:ir:ui32*)) "i32")
+					    ((member base (list *impc:ir:si8* *impc:ir:ui8* *impc:ir:char*)) "i8")
+					    ((= base *impc:ir:i1*) "i1")
+					    (else (print-error 'Compiler 'Error: 'bad 'type 'getting 'type 'str type)))
+				      (apply string-append (make-list ptr-depth "*")))))))))
 
 (define impc:ir:convert-types
    (lambda (t)

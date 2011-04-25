@@ -145,6 +145,7 @@ namespace extemp {
 	static pointer printLLVMModule(scheme* _sc, pointer args);
 	static pointer printLLVMFunction(scheme* _sc, pointer args);
 	static pointer bind_symbol(scheme* _sc, pointer args);
+	static pointer get_named_type(scheme* _sc, pointer args);
 	static pointer impcirGetName(scheme* _sc, pointer args);	
 	static pointer impcirGetType(scheme* _sc, pointer args);	
 	static pointer impcirAdd(scheme* _sc, pointer args);

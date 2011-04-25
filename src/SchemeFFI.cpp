@@ -227,6 +227,7 @@ namespace extemp {
 	    { "llvm:print",				&SchemeFFI::printLLVMModule },
 	    { "llvm:print-function",		&SchemeFFI::printLLVMFunction },
 	    { "llvm:bind-symbol",			&SchemeFFI::bind_symbol },
+	    { "llvm:get-named-type",                          &SchemeFFI::get_named_type },
 	    { "impc:ir:getname",			&SchemeFFI::impcirGetName },
 	    { "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
@@ -1862,6 +1863,20 @@ namespace extemp {
 		
 	return _sc->T;
     }	
+
+
+    pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
+    {
+	char* name = string_value(pair_car(args));
+
+	llvm::Module* M = EXTLLVM::I()->M;
+
+	const llvm::Type* tt = M->getTypeByName(name);
+	if(tt)
+	  return mk_string(_sc,tt->getDescription().c_str());
+	else
+	  return _sc->NIL;
+    }
 	
     ////////////////////////////////////////////////////////////
     //
