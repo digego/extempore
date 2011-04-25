@@ -282,7 +282,7 @@ namespace extemp {
 
     pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)
     {       
-        void* cptr = cptr_value(pair_car(args));
+        char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
 	int64_t* ptr = (int64_t*) (cptr+offset); 
 	return mk_integer(_sc,ptr[0]);
@@ -290,7 +290,7 @@ namespace extemp {
 
     pointer SchemeFFI::dataGETdouble(scheme* _sc, pointer args)
     {       
-        void* cptr = cptr_value(pair_car(args));
+        char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
 	double* ptr = (double*) (cptr+offset); 
 	return mk_real(_sc,ptr[0]);
@@ -298,7 +298,7 @@ namespace extemp {
 
     pointer SchemeFFI::dataSETi64(scheme* _sc, pointer args)
     {       
-        void* cptr = cptr_value(pair_car(args));
+        char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
 	int64_t* ptr = (int64_t*) (cptr+offset);
 	ptr[0] = (int64_t) ivalue(pair_caddr(args));
@@ -307,7 +307,7 @@ namespace extemp {
 
     pointer SchemeFFI::dataSETdouble(scheme* _sc, pointer args)
     {       
-        void* cptr = cptr_value(pair_car(args));
+        char* cptr = (char*) cptr_value(pair_car(args));
 	int64_t offset = ivalue(pair_cadr(args));
 	double* ptr = (double*) (cptr+offset);
 	ptr[0] = (double) rvalue(pair_caddr(args));
@@ -316,7 +316,7 @@ namespace extemp {
 
     pointer SchemeFFI::cptrToString(scheme* _sc, pointer args)
     {       
-        void* cptr = cptr_value(pair_car(args));
+        char* cptr = (char*) cptr_value(pair_car(args));
 	char* cstr = (char*) cptr;
 	return mk_string(_sc, cstr);
     }
