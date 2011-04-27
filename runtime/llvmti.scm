@@ -959,7 +959,7 @@
 
 (define impc:ti:tuple-ref-check
    (lambda (ast vars kts request?)
-      ;; (caddr ast) must be an integer 
+      ;; (caddr ast) must be an integer    
       (if (not (integer? (caddr ast))) 
           (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'static 'integer 'index! ast))            
       (let* (; a should be a tuple of some kind!
@@ -975,8 +975,16 @@
 	(if (and (not (null? a))
 		 (list? a)
 		 (impc:ir:tuple? (car a)))
-	    (if (= (list-ref (car a) (+ 1 (caddr ast))) -2)
-		a
+	    ;; this check here for named type recursion
+	    (if (and (atom? (list-ref (car a) (+ 1 (caddr ast))))
+		     (< (list-ref (car a) (+ 1 (caddr ast))) -1))
+		(let* ((element-type (list-ref (car a) (+ 1 (caddr ast))))
+		       (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0))
+		       (tuple-type (car a)))
+		  (dotimes (i ptr-depth)
+		    (set! tuple-type (impc:ir:pointer++ tuple-type)))
+		  tuple-type)
+		;; normal (i.e. non recursive tuple element type
 		(list-ref (car a) (+ 1 (caddr ast))))
 	    '()))))
 

@@ -99,8 +99,12 @@
           (impc:ir:pretty-print-type (impc:ir:get-type-from-pretty-str t))      
           (if (null? t) '()
               (cond ((atom? t)
-		     (if (= t -2) "REC"
-			 (impc:ir:get-type-str t)))
+		     (if (< t -1) ;; must be a recursive type
+			 (let* ((element-type t)
+				(ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0)))
+			   (apply string-append "@" (make-list ptr-depth "*")))
+			 ;;otherwise normal type
+		    	 (impc:ir:get-type-str t)))
                     ((impc:ir:tuple? t) 
                      (string-append "<" (string-join (map (lambda (k) (impc:ir:pretty-print-type k)) (cdr t)) ",")
                                     ">" (apply string-append (make-list-with-proc (impc:ir:get-ptr-depth t) (lambda (k) "*")))))
@@ -125,7 +129,7 @@
              (base (impc:ir:get-base-type string-type)))
          ;(println 'base: base 'ptr-depth: ptr-depth (string? base))
          (cond ((string=? base "void") *impc:ir:void*)
-               ((string=? base "REC") -2)
+               ((string=? base "@") (+ -2 (* *impc:ir:pointer* ptr-depth)))
                ((string=? base "closure") (+ *impc:ir:closure* offset))
                ((string=? base "tuple") (+ *impc:ir:tuple* offset))
                ((regex:match? base "^\\[.*\\]$") 
@@ -1427,10 +1431,13 @@
          (define ttstr (impc:ir:get-type-str element-type))
          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	 ;; do a check for recursive type!
-	 (if (< element-type -1)
-	     (if (< element-type -2)
-		 (print-error "Compiler Error: only one level of recursive typing allowed! (i.e. nothing greater than LLVM IR \2 is supported yet ... sorry :(")
-		 (set! ttstr (impc:ir:get-type-str tuple-type))))
+	 (if (and (atom? element-type)
+		  (< element-type -1))
+	     (let ((ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0))
+		   (tt tuple-type))
+	       (dotimes (i ptr-depth)
+		 (set! tt (impc:ir:pointer++ tt)))
+	       (set! ttstr (impc:ir:get-type-str tt))))
 	 ;; this code here to support basic type recursion (only depth \2)
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
          (emit (string-append (impc:ir:gname "val" (string-append ttstr "*")) " = getelementptr " 

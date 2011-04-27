@@ -507,6 +507,10 @@
 ;; named types support a single level of recursion
 ;; this is very useful for building data structures
 ;; linked lists for example!
+;; The '@' symbol in the type signature represents
+;; the recursive type
+;; In the example below the '@' stands in place of
+;; @ = <i64,@>* (i.e. it's recursive)
 (bind-type i64list <i64,i64list>*)
 
 (definec cons-i64
