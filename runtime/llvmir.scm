@@ -1640,8 +1640,8 @@
       (emit (string-append (impc:ir:gname "val" type)
  			   " = " (list-ref bitops v)
 			   " " type " " (car aval) ", " (car bval) "\n") os)
-      (println 'bitwise 'ast: ast)
-      (println 'bitwise 'ir: os)
+      ;;(println 'bitwise 'ast: ast)
+      ;;(println 'bitwise 'ir: os)
       (impc:ir:strip-space os))))
 			
 
