@@ -1870,12 +1870,15 @@ namespace extemp {
 	char* name = string_value(pair_car(args));
 
 	llvm::Module* M = EXTLLVM::I()->M;
-
+	
 	const llvm::Type* tt = M->getTypeByName(name);
-	if(tt)
+	
+	if(tt) {
+	  //return mk_string(_sc,M->getTypeName(tt).c_str());
 	  return mk_string(_sc,tt->getDescription().c_str());
-	else
+	} else {
 	  return _sc->NIL;
+	}
     }
 	
     ////////////////////////////////////////////////////////////

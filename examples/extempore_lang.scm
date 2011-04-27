@@ -216,6 +216,21 @@
 ;; function definitions.
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Closures can be recursive
+;;
+
+(definec my-test-4
+  (lambda (a)
+    (if (< a 1)
+	(printf "done\n")
+	(begin (printf "a: %lld\n" a)
+	       (my-test-4 (- a 1))))))
+
+(my-test-4 7)
+    
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; a simple tuple example
 ;; 
@@ -474,4 +489,57 @@
 
 (my-test19) ;; 5:5 > 25:25 > 125:125
 
-(print-notification 'done)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; named types
+
+;; we can name our own types using bind-type
+(bind-type mytype <i64,i64>*)
+
+;; which we can then use in place
+(definec my-test20
+  (lambda (a:mytype)
+    (tref a 0)))
+
+
+;; named types support a single level of recursion
+;; this is very useful for building data structures
+;; linked lists for example!
+(bind-type i64list <i64,i64list>*)
+
+(definec cons-i64
+  (lambda (a:i64 b:i64list)
+    (let ((pair (make-tuple i64 i64list)))
+      (tset! pair 0 a)
+      (tset! pair 1 b)
+      pair)))
+          
+(definec car-i64
+  (lambda (a:i64list)
+    (tref a 0)))
+
+(definec cdr-i64
+  (lambda (a:i64list)
+    (tref a 1)))
+
+;; print all i64's in list
+(definec my-test25
+  (lambda (a:i64list)
+    (if (null? a)
+	(begin (printf "done\n") 1)
+	(begin (printf "%lld\n" (car-i64 a))
+	       (my-test25 (cdr-i64 a))))))
+
+;; build a list (using cons) and then call my-test25
+(definec my-test26
+  (lambda ()
+    (let ((my-list (cons-i64 1 (cons-i64 2 (cons-i64 3 null)))))
+      (my-test25 my-list))))
+
+(my-test26) ;; 1 > 2 > 3 > done
+
+
+(print)
+(println 'finished)
