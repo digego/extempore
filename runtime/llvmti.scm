@@ -1999,12 +1999,14 @@
 	       (print))	       
        (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!)))
 
+
 (define-macro (bind-scm symbol type value)
    (if (cptr? (eval value))
        `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
                    (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                 " = external global "
                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
+						;,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str type)))))
                ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
 	       (llvm:bind-global-var ,(symbol->string symbol) ,value)
 	       (ascii-print-color 0 7 10)
@@ -2020,6 +2022,44 @@
 	       (print))	       
        (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; this here for wrapping llvm dynamic binds
+(define-macro (bind-lib library symname type)
+  `(__dynamic-bind ,library ',symname ',type))
+
+(define __dynamic-bind
+  (lambda (library symname type)
+    (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
+           (ircode (string-append "declare "
+                                   (impc:ir:get-type-str (car ctype))
+                                   " @"
+                                   (symbol->string symname)
+                                   "("
+                                   (if (null? (cdr ctype))
+                                       ""
+                                       (apply string-append
+                                              (impc:ir:get-type-str (cadr ctype))
+                                              (map (lambda (v)
+                                                     (string-append "," (impc:ir:get-type-str v)))
+                                                   (cddr ctype))))
+                                   ")")))
+      (llvm:compile ircode)
+      (if (llvm:bind-symbol library (symbol->string symname))
+	  (begin (ascii-print-color 0 9 10)
+		 (print "Successfully bound ")
+		 (ascii-print-color 1 2 10)
+		 (print (symbol->string symname))
+		 (ascii-print-color 0 9 10)
+		 (print " >>> ")
+		 (ascii-print-color 1 3 10)
+		 (print type)
+		 (ascii-print-color 0 9 10)
+		 ;(print " from lib: " library)
+		 (print))
+	  (print-error 'Compiler 'Error: 'could 'not 'bind! symname)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-closure
@@ -2027,6 +2067,7 @@
     (let ((f (llvm:get-function (string-append name "_getter"))))
       (if f (llvm:run f)
 	  '()))))
+
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-function
   (lambda (name)
