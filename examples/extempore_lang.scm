@@ -503,7 +503,6 @@
   (lambda (a:mytype)
     (tref a 0)))
 
-
 ;; named types support a single level of recursion
 ;; this is very useful for building data structures
 ;; linked lists for example!
@@ -543,6 +542,30 @@
       (my-test25 my-list))))
 
 (my-test26) ;; 1 > 2 > 3 > done
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; aref-ptr and tref-ptr
+;;
+
+;; aref-ptr and tref-ptr return a pointer to an element
+;; just as aref and tref return elements aref-ptr and
+;; tref-ptr return a pointer to those elements.
+
+;; This allows you to do things like create an array
+;; with an offset
+(definec my-test27
+  (lambda ()
+    (let ((arr (make-array 32 i64))
+	  (arroff (aref-ptr arr 16)))
+      ;; load arr
+      (dotimes (i 32) (aset! arr i i))
+      (dotimes (k 16)
+	(printf "index: %lld\tarr: %lld\tarroff: %lld\n"
+		k (aref arr k) (aref arroff k))))))
+      
+(my-test27) ;; print outs
 
 
 (print)

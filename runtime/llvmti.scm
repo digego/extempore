@@ -392,11 +392,13 @@
                             ((eq? ast 'else) '(impc_true))
                             ((eq? ast '*samplerate*) '(llvm_samplerate))
                             ((eq? ast 'printf) 'llvm_printf)
-							((eq? ast 'null) '(impc_null))
-							((eq? ast 'aset!) 'array-set!)
-							((eq? ast 'aref) 'array-ref)
-							((eq? ast 'tset!) 'tuple-set!)
-							((eq? ast 'tref) 'tuple-ref)
+			    ((eq? ast 'null) '(impc_null))
+			    ((eq? ast 'aset!) 'array-set!)
+			    ((eq? ast 'aref) 'array-ref)
+			    ((eq? ast 'aref-ptr) 'array-ref-ptr)
+			    ((eq? ast 'tset!) 'tuple-set!)
+			    ((eq? ast 'tref) 'tuple-ref)
+			    ((eq? ast 'tref-ptr) 'tuple-ref-ptr)
                             (else ast)))))))
 
 
@@ -911,6 +913,16 @@
          c)))
 
 
+(define impc:ti:array-ref-ptr-check
+   (lambda (ast vars kts request?)
+      (let ((a (impc:ti:type-check (cadr ast) vars kts request?))
+            ;; b should be fixed point
+            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
+	(if (null? a) 
+	    a
+	    (list (car a))))))
+
+
 (define impc:ti:array-ref-check
    (lambda (ast vars kts request?)      
       (let ((a (impc:ti:type-check (cadr ast) vars kts request?))
@@ -918,7 +930,7 @@
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
          (if (null? a) 
              a
-             (impc:ir:pointer-- (car a))))))
+             (list (impc:ir:pointer-- (car a)))))))
 
 
 ;; make-tuple should be of the form
@@ -955,6 +967,38 @@
                                         #f)))) 
          ;; tuple set check will return the type of the value set
          c)))
+
+
+(define impc:ti:tuple-ref-ptr-check
+   (lambda (ast vars kts request?)
+      ;; (caddr ast) must be an integer    
+      (if (not (integer? (caddr ast))) 
+          (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'static 'integer 'index! ast))            
+      (let* (; a should be a tuple of some kind!
+            (a (impc:ti:type-check (cadr ast) vars kts (if (impc:ir:type? request?)
+							   (impc:ir:tuple? request?)
+							   request? 
+							   #f))) ;request?))
+            ;; b should be fixed point -- llvm structs only support 32bit indexes
+            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
+	(if (impc:ir:type? a)
+	    (set! a (list a)))
+	;(println 'tupref-check 'a: a 'ast: ast (list-ref (car a) (+ 1 (caddr ast))))
+	(if (and (not (null? a))
+		 (list? a)
+		 (impc:ir:tuple? (car a)))
+	    ;; this check here for named type recursion
+	    (if (and (atom? (list-ref (car a) (+ 1 (caddr ast))))
+		     (< (list-ref (car a) (+ 1 (caddr ast))) -1))
+		(let* ((element-type (list-ref (car a) (+ 1 (caddr ast))))
+		       (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0))
+		       (tuple-type (car a)))
+		  (dotimes (i ptr-depth)
+		    (set! tuple-type (impc:ir:pointer++ tuple-type)))
+		  (list (impc:ir:pointer++ tuple-type)))
+		;; normal (i.e. non recursive tuple element type
+		(list (impc:ir:pointer++ (list-ref (car a) (+ 1 (caddr ast))))))
+	    '()))))
 
 
 (define impc:ti:tuple-ref-check
@@ -1238,6 +1282,8 @@
       ;; then check against it's arg types
       (let ((type (impc:ti:type-check (car ast) vars kts request?)))
          ;(print 'closure-in-first-pos: ast 'type: type)
+	(if (not (impc:ir:type? type))
+	    (set! type (car type)))
          (if (<> (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (car type))
              (begin (print-error 'Invalid 'Expression ast) (error ""))
              (begin (map (lambda (a b) 
@@ -1262,12 +1308,14 @@
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))            
             ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))            
+            ((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))  
             ((and (list? ast) (member (car ast) '(array-set!))) (impc:ti:array-set-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(array-ref))) (impc:ti:array-ref-check ast vars kts request?))            
-            ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?))            
+            ((and (list? ast) (member (car ast) '(array-ref))) (impc:ti:array-ref-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(array-ref-ptr))) (impc:ti:array-ref-ptr-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?)) 
             ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))                        
+            ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(tuple-ref-ptr))) (impc:ti:tuple-ref-ptr-check ast vars kts request?))	    
             ((and (list? ast) (member (car ast) '(closure-set!))) (impc:ti:closure-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(closure-ref))) (impc:ti:closure-ref-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(pref))) (impc:ti:pref-check ast vars kts request?))
