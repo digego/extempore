@@ -935,20 +935,32 @@
 
 
 
+;; make should be of the form
+;; (make type)
+;; where type is a valid type
+;; (make i64)
+;; memory is allocated on the head 
+(define impc:ti:heap-alloc-check
+   (lambda (ast vars kts request?)      
+      ;; make should return a ptr to type a
+      (let ((a (impc:ir:convert-from-pretty-types (cadr ast))))
+         ;; returns a pointer of tuple type 'a'
+	(if (null? a) a
+	    (impc:ir:pointer++ a)))))
+
 
 ;; make should be of the form
 ;; (make type)
 ;; where type is a valid type
 ;; (make i64)
 ;; memory is allocated on the stack 
-(define impc:ti:alloca-check
+(define impc:ti:stack-alloc-check
    (lambda (ast vars kts request?)      
       ;; alloc should return a ptr to type a
       (let ((a (impc:ir:convert-from-pretty-types (cadr ast))))
          ;; returns a pointer of tuple type 'a'
 	(if (null? a) a
 	    (impc:ir:pointer++ a)))))
-
 
 
 ;; make-tuple should be of the form
@@ -1332,7 +1344,8 @@
             ((and (list? ast) (member (car ast) '(array-set!))) (impc:ti:array-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref))) (impc:ti:array-ref-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref-ptr))) (impc:ti:array-ref-ptr-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(allocate))) (impc:ti:alloca-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(stack-alloc))) (impc:ti:stack-alloc-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(heap-alloc))) (impc:ti:heap-alloc-check ast vars kts request?))	    
             ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?)) 
             ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))

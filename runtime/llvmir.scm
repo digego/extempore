@@ -1420,7 +1420,20 @@
          (impc:ir:strip-space os))))
 
 
-(define impc:ir:compiler:alloca
+(define impc:ir:compiler:heap-alloc
+  (lambda (ast types)
+      (let* ((os (make-string 0)))
+         (let* ((t (impc:ir:convert-from-pretty-types (cadr ast))))
+            (emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* %_zone, i64 "
+                                    (number->string (impc:ir:get-type-size t))
+                                    ")\n") os)            
+            (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
+                                    " = bitcast i8* " (car (impc:ir:gname "dat")) 
+                                    " to " (impc:ir:get-type-str t) "*\n") os)
+            (impc:ir:strip-space os)))))
+  
+
+(define impc:ir:compiler:stack-alloc
   (lambda (ast types)
     (let* ((os (make-string 0)))
       (let* ((t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadr ast)))))
@@ -1963,8 +1976,10 @@
                     (impc:ir:compiler:array-ref-ptr ast types))
                    ((equal? (car ast) 'array-set!)
                     (impc:ir:compiler:array-set ast types))
-                   ((equal? (car ast) 'allocate)
-                    (impc:ir:compiler:alloca ast types))
+                   ((equal? (car ast) 'heap-alloc)
+                    (impc:ir:compiler:heap-alloc ast types))		   
+                   ((equal? (car ast) 'stack-alloc)
+                    (impc:ir:compiler:stack-alloc ast types))		   
                    ((equal? (car ast) 'make-tuple)
                     (impc:ir:compiler:make-tuple ast types))
                    ((equal? (car ast) 'tuple-ref)

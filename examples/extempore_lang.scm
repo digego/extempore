@@ -550,11 +550,13 @@
 (bind-type vec3 <double,double,double>)
 
 ;; note that point is deallocated at the
-;; end of the function call.  You can allocate
+;; end of the function call.  You can
+;; stack allocate (stack-alloc) or
+;; heap allocate (heap-alloc)
 ;; any valid type  (i64 for example)
 (definec my-test27
   (lambda ()
-    (let ((point (allocate vec3)))
+    (let ((point (stack-alloc vec3)))
       (tset! point 0 0.0)
       (tset! point 1 -1.0)
       (tset! point 2 1.0)
