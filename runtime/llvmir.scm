@@ -105,7 +105,7 @@
 				(ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0)))
 			   (apply string-append "@" (make-list ptr-depth "*")))
 			 ;;otherwise normal type
-		    	 (impc:ir:get-type-str t)))
+		    	 (impc:ir:get-type-str t t)))
                     ((impc:ir:tuple? t) 
                      (string-append "<" (string-join (map (lambda (k) (impc:ir:pretty-print-type k)) (cdr t)) ",")
                                     ">" (apply string-append (make-list-with-proc (impc:ir:get-ptr-depth t) (lambda (k) "*")))))
@@ -226,7 +226,7 @@
 	    ((regex:match? base "\\<?\\{.*\\}\\>?\\**")
 	     (cons (+ offset *impc:ir:tuple*) (impc:ir:get-tuple-type-from-str string-type)))
 	    (else (let loop ((i -1))
-		    (if (string=? base (impc:ir:get-type-str i))
+		    (if (string=? base (impc:ir:get-type-str i string-type))
 			(+ i offset)
 			(if (< i *impc:ir:lowest-base-type*)
 			    (loop (+ i 1))
@@ -235,14 +235,15 @@
 
 (define impc:ir:get-type-str
    (lambda (type . args)
-     ;(println 'type: type)
+     ;;(println 'type: type)
+     (if (null? args) (set! args (list type)))
      (if (string? type) type
 	 (cond ((list? type) ;; must be a complex type
 		(cond ((impc:ir:closure? (car type))
 		       (apply string-append "<{i8*, i8*, " (impc:ir:make-function-str (cdr type) #t) "*}>"
 			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
 		      ((impc:ir:tuple? (car type))
-		       (apply string-append "{" (string-join (map (lambda (x) (impc:ir:get-type-str x)) (cdr type)) ",") "}"
+		       (apply string-append "{" (string-join (map (lambda (x) (apply impc:ir:get-type-str x args)) (cdr type)) ",") "}"
 			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
 		      (else (print-error 'Compiler 'Error: 'bad 'complex 'type! type))))	       
 	       ((= type -1) "void")
@@ -1419,6 +1420,14 @@
          (impc:ir:strip-space os))))
 
 
+(define impc:ir:compiler:alloca
+  (lambda (ast types)
+    (let* ((os (make-string 0)))
+      (let* ((t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadr ast)))))
+	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t "\n") os)
+	(impc:ir:strip-space os)))))
+
+
 (define impc:ir:compiler:make-tuple
    (lambda (ast types)
       (let* ((os (make-string 0)))
@@ -1460,8 +1469,9 @@
 	 ;; do a check for recursive type!
 	 (if (and (atom? element-type)
 		  (< element-type -1))
-	     (let ((ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0))
-		   (tt tuple-type))
+	     (let* ((tuples-ptr-depth (floor (/ (car tuple-type) (* 1 *impc:ir:pointer*))))
+		    (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) tuples-ptr-depth))
+		    (tt tuple-type))
 	       (dotimes (i ptr-depth)
 		 (set! tt (impc:ir:pointer++ tt)))
 	       (set! ttstr (impc:ir:get-type-str tt))))
@@ -1507,7 +1517,8 @@
 	 ;; do a check for recursive type!
 	 (if (and (atom? element-type)
 		  (< element-type -1))
-	     (let ((ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0))
+	     (let ((tuples-ptr-depth (floor (/ (car tuple-type) (* 1 *impc:ir:pointer*))))
+		   (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) tuples-ptr-depth))
 		   (tt tuple-type))
 	       (dotimes (i ptr-depth)
 		 (set! tt (impc:ir:pointer++ tt)))
@@ -1952,6 +1963,8 @@
                     (impc:ir:compiler:array-ref-ptr ast types))
                    ((equal? (car ast) 'array-set!)
                     (impc:ir:compiler:array-set ast types))
+                   ((equal? (car ast) 'allocate)
+                    (impc:ir:compiler:alloca ast types))
                    ((equal? (car ast) 'make-tuple)
                     (impc:ir:compiler:make-tuple ast types))
                    ((equal? (car ast) 'tuple-ref)

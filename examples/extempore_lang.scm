@@ -509,27 +509,27 @@
 ;; The '@' symbol in the type signature represents
 ;; the recursive type
 ;; In the example below the '@' stands in place of
-;; @ = <i64,@>* (i.e. it's recursive)
-(bind-type i64list <i64,i64list>*)
+;; @ = <i64,@*> (i.e. it's recursive)
+(bind-type i64list <i64,i64list*>)
 
 (definec cons-i64
-  (lambda (a:i64 b:i64list)
-    (let ((pair (make-tuple i64 i64list)))
+  (lambda (a:i64 b:i64list*)
+    (let ((pair (make-tuple i64 i64list*)))
       (tset! pair 0 a)
       (tset! pair 1 b)
       pair)))
           
 (definec car-i64
-  (lambda (a:i64list)
+  (lambda (a:i64list*)
     (tref a 0)))
 
 (definec cdr-i64
-  (lambda (a:i64list)
+  (lambda (a:i64list*)
     (tref a 1)))
 
 ;; print all i64's in list
 (definec my-test25
-  (lambda (a:i64list)
+  (lambda (a:i64list*)
     (if (null? a)
 	(begin (printf "done\n") 1)
 	(begin (printf "%lld\n" (car-i64 a))
@@ -544,6 +544,25 @@
 (my-test26) ;; 1 > 2 > 3 > done
 
 
+;; it can sometimes be helpful to allocate
+;; a predefined tuple type on the stack
+;; you can do this using allocate
+(bind-type vec3 <double,double,double>)
+
+;; note that point is deallocated at the
+;; end of the function call.  You can allocate
+;; any valid type  (i64 for example)
+(definec my-test27
+  (lambda ()
+    (let ((point (allocate vec3)))
+      (tset! point 0 0.0)
+      (tset! point 1 -1.0)
+      (tset! point 2 1.0)
+      1)))
+
+(my-test27) ;; 1
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; aref-ptr and tref-ptr
@@ -555,7 +574,7 @@
 
 ;; This allows you to do things like create an array
 ;; with an offset
-(definec my-test27
+(definec my-test28
   (lambda ()
     (let ((arr (make-array 32 i64))
 	  (arroff (aref-ptr arr 16)))
@@ -565,7 +584,7 @@
 	(printf "index: %lld\tarr: %lld\tarroff: %lld\n"
 		k (aref arr k) (aref arroff k))))))
       
-(my-test27) ;; print outs
+(my-test28) ;; print outs
 
 
 (print)

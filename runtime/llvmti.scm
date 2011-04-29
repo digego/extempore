@@ -928,9 +928,27 @@
       (let ((a (impc:ti:type-check (cadr ast) vars kts request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
+	(if (impc:ir:type? a) (set! a (list a)))
          (if (null? a) 
              a
              (list (impc:ir:pointer-- (car a)))))))
+
+
+
+
+;; make should be of the form
+;; (make type)
+;; where type is a valid type
+;; (make i64)
+;; memory is allocated on the stack 
+(define impc:ti:alloca-check
+   (lambda (ast vars kts request?)      
+      ;; alloc should return a ptr to type a
+      (let ((a (impc:ir:convert-from-pretty-types (cadr ast))))
+         ;; returns a pointer of tuple type 'a'
+	(if (null? a) a
+	    (impc:ir:pointer++ a)))))
+
 
 
 ;; make-tuple should be of the form
@@ -938,7 +956,7 @@
 ;; where types are valid types
 ;; (make-array i64 i8* i32)
 (define impc:ti:make-tuple-check
-   (lambda (ast vars kts request?)      
+   (lambda (ast vars kts request?)
       ;; make-tuple should return the tuple type a
       (let ((a (cons *impc:ir:tuple* (impc:ir:convert-from-pretty-types (cdr ast)))))
          ;; returns a pointer of tuple type 'a'
@@ -952,7 +970,7 @@
           (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
       ;; (caddr ast) must be an integer 
       (if (not (integer? (caddr ast))) 
-          (print-error 'Compiler 'Error: 'tuple-set! 'must 'use 'a 'static 'integer 'index! ast))
+          (print-error 'Compiler 'Error: 'tuple-set! 'must 'use 'a 'literal 'integer 'index! ast))
       (let* (;; a should be a tuple of some kind
              (a (impc:ti:type-check (cadr ast) vars kts request?))
              ;; b should be 32bit fixed point type -- llvm structs only support 32bit indexes
@@ -973,7 +991,7 @@
    (lambda (ast vars kts request?)
       ;; (caddr ast) must be an integer    
       (if (not (integer? (caddr ast))) 
-          (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'static 'integer 'index! ast))            
+          (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'literal 'integer 'index! ast))
       (let* (; a should be a tuple of some kind!
             (a (impc:ti:type-check (cadr ast) vars kts (if (impc:ir:type? request?)
 							   (impc:ir:tuple? request?)
@@ -991,7 +1009,8 @@
 	    (if (and (atom? (list-ref (car a) (+ 1 (caddr ast))))
 		     (< (list-ref (car a) (+ 1 (caddr ast))) -1))
 		(let* ((element-type (list-ref (car a) (+ 1 (caddr ast))))
-		       (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0))
+		       (tuples-ptr-depth (floor (/ (caar a) (* 1 *impc:ir:pointer*))))		       
+		       (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) tuples-ptr-depth))
 		       (tuple-type (car a)))
 		  (dotimes (i ptr-depth)
 		    (set! tuple-type (impc:ir:pointer++ tuple-type)))
@@ -1005,7 +1024,7 @@
    (lambda (ast vars kts request?)
       ;; (caddr ast) must be an integer    
       (if (not (integer? (caddr ast))) 
-          (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'static 'integer 'index! ast))            
+          (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'literal 'integer 'index! ast))
       (let* (; a should be a tuple of some kind!
             (a (impc:ti:type-check (cadr ast) vars kts (if (impc:ir:type? request?)
 							   (impc:ir:tuple? request?)
@@ -1023,7 +1042,8 @@
 	    (if (and (atom? (list-ref (car a) (+ 1 (caddr ast))))
 		     (< (list-ref (car a) (+ 1 (caddr ast))) -1))
 		(let* ((element-type (list-ref (car a) (+ 1 (caddr ast))))
-		       (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) 0))
+		       (tuples-ptr-depth (floor (/ (caar a) (* 1 *impc:ir:pointer*))))
+		       (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) tuples-ptr-depth))
 		       (tuple-type (car a)))
 		  (dotimes (i ptr-depth)
 		    (set! tuple-type (impc:ir:pointer++ tuple-type)))
@@ -1312,6 +1332,7 @@
             ((and (list? ast) (member (car ast) '(array-set!))) (impc:ti:array-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref))) (impc:ti:array-ref-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref-ptr))) (impc:ti:array-ref-ptr-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(allocate))) (impc:ti:alloca-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?)) 
             ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))
