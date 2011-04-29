@@ -151,7 +151,7 @@
 			(set! type (impc:ir:pointer++ type)))
 		      type)))
                (else (let loop ((i -1))
-                        (if (string=? base (impc:ir:get-type-str i))
+                        (if (string=? base (impc:ir:get-type-str i string-type))
                             (+ i offset)
                             (if (< i *impc:ir:lowest-base-type*)
                                 (loop (+ i 1))
@@ -231,9 +231,10 @@
 			(if (< i *impc:ir:lowest-base-type*)
 			    (loop (+ i 1))
 			    (print-error 'Compiler 'Error: 'cannot 'find 'type 'for 'string string-type)))))))))
-																
+
+
 (define impc:ir:get-type-str
-   (lambda (type)
+   (lambda (type . args)
      ;(println 'type: type)
      (if (string? type) type
 	 (cond ((list? type) ;; must be a complex type
@@ -258,7 +259,8 @@
 					    ((member base (list *impc:ir:si32* *impc:ir:ui32*)) "i32")
 					    ((member base (list *impc:ir:si8* *impc:ir:ui8* *impc:ir:char*)) "i8")
 					    ((= base *impc:ir:i1*) "i1")
-					    (else (print-error 'Compiler 'Error: 'bad 'type 'getting 'type 'str type)))
+					    (else (print-error 'Compiler 'Error: 'bad 'type
+							       (if (null? args) type (car args)))))
 				      (apply string-append (make-list ptr-depth "*")))))))))
 
 (define impc:ir:convert-types
