@@ -216,6 +216,21 @@
 ;; function definitions.
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Closures can be recursive
+;;
+
+(definec my-test-4
+  (lambda (a)
+    (if (< a 1)
+	(printf "done\n")
+	(begin (printf "a: %lld\n" a)
+	       (my-test-4 (- a 1))))))
+
+(my-test-4 7)
+    
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; a simple tuple example
 ;; 
@@ -474,4 +489,105 @@
 
 (my-test19) ;; 5:5 > 25:25 > 125:125
 
-(print-notification 'done)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; named types
+
+;; we can name our own types using bind-type
+(bind-type mytype <i64,i64>*)
+
+;; which we can then use in place
+(definec my-test20
+  (lambda (a:mytype)
+    (tref a 0)))
+
+;; named types support a single level of recursion
+;; this is very useful for building data structures
+;; linked lists for example!
+;; The '@' symbol in the type signature represents
+;; the recursive type
+;; In the example below the '@' stands in place of
+;; @ = <i64,@*> (i.e. it's recursive)
+(bind-type i64list <i64,i64list*>)
+
+(definec cons-i64
+  (lambda (a:i64 b:i64list*)
+    (let ((pair (make-tuple i64 i64list*)))
+      (tset! pair 0 a)
+      (tset! pair 1 b)
+      pair)))
+          
+(definec car-i64
+  (lambda (a:i64list*)
+    (tref a 0)))
+
+(definec cdr-i64
+  (lambda (a:i64list*)
+    (tref a 1)))
+
+;; print all i64's in list
+(definec my-test25
+  (lambda (a:i64list*)
+    (if (null? a)
+	(begin (printf "done\n") 1)
+	(begin (printf "%lld\n" (car-i64 a))
+	       (my-test25 (cdr-i64 a))))))
+
+;; build a list (using cons) and then call my-test25
+(definec my-test26
+  (lambda ()
+    (let ((my-list (cons-i64 1 (cons-i64 2 (cons-i64 3 null)))))
+      (my-test25 my-list))))
+
+(my-test26) ;; 1 > 2 > 3 > done
+
+
+;; it can sometimes be helpful to allocate
+;; a predefined tuple type on the stack
+;; you can do this using allocate
+(bind-type vec3 <double,double,double>)
+
+;; note that point is deallocated at the
+;; end of the function call.  You can
+;; stack allocate (stack-alloc) or
+;; heap allocate (heap-alloc)
+;; any valid type  (i64 for example)
+(definec my-test27
+  (lambda ()
+    (let ((point (stack-alloc vec3)))
+      (tset! point 0 0.0)
+      (tset! point 1 -1.0)
+      (tset! point 2 1.0)
+      1)))
+
+(my-test27) ;; 1
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; aref-ptr and tref-ptr
+;;
+
+;; aref-ptr and tref-ptr return a pointer to an element
+;; just as aref and tref return elements aref-ptr and
+;; tref-ptr return a pointer to those elements.
+
+;; This allows you to do things like create an array
+;; with an offset
+(definec my-test28
+  (lambda ()
+    (let ((arr (make-array 32 i64))
+	  (arroff (aref-ptr arr 16)))
+      ;; load arr
+      (dotimes (i 32) (aset! arr i i))
+      (dotimes (k 16)
+	(printf "index: %lld\tarr: %lld\tarroff: %lld\n"
+		k (aref arr k) (aref arroff k))))))
+      
+(my-test28) ;; print outs
+
+
+(print)
+(println 'finished)
