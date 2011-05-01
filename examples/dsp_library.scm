@@ -95,7 +95,7 @@
 ;; don't need variable length
 (definec make-delay
   (lambda (max-delay)
-    (let ((line (make-array max-delay double))
+    (let ((line (heap-alloc max-delay double))
 	  (time 0)
 	  (delay max-delay)
 	  (in 0.5)
@@ -112,7 +112,7 @@
 ;; iir comb with interpolation
 (definec make-comb
   (lambda (max-delay)
-    (let ((line (make-array max-delay double))
+    (let ((line (heap-alloc max-delay double))
 	  (in-head 0)
 	  (out-head 0)
 	  (delay_ (i64tod max-delay))
@@ -187,8 +187,8 @@
 ;; tap delay
 (definec tap-delay
   (lambda (max-delay num-of-taps)
-    (let ((line (make-array max-delay double))
-	  (taps (make-array num-of-taps i64))
+    (let ((line (heap-alloc max-delay double))
+	  (taps (heap-alloc num-of-taps i64))
 	  (delay max-delay)
 	  (time 0))
       (lambda (x:double)
@@ -205,8 +205,8 @@
 ;; allpass
 (definec make-allpass
   (lambda (delay)
-    (let ((inline (make-array delay double))
-	  (outline (make-array delay double))
+    (let ((inline (heap-alloc delay double))
+	  (outline (heap-alloc delay double))
 	  (time 0)
 	  (g 0.9))
       (lambda (x)
@@ -466,7 +466,7 @@
 
 (definec envelope-segments
   (lambda (points:double* num-of-points:i64)
-    (let ((lines (make-array num-of-points [double,double]*)))
+    (let ((lines (heap-alloc num-of-points [double,double]*)))
       (dotimes (k num-of-points)
 	(let* ((idx (* k 2))
 	       (x1 (aref points (+ idx 0)))
@@ -494,7 +494,7 @@
 (definec make-adsr
   (lambda (start-time atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
     (let* ((points 6)
-	   (data (make-array (* points 2) double)))
+	   (data (heap-alloc (* points 2) double)))
       (aset! data 0 start-time)
       (aset! data 1 0.0)
       (aset! data 2 (+ start-time atk-dur)) ;; point data
@@ -557,14 +557,14 @@
 (define-macro (define-instrument name note-kernel effect-kernel)
   `(definec ,name
      (let* ((poly 48)
-	    (notes (make-array poly [double,double,double,double]*))
+	    (notes (heap-alloc poly [double,double,double,double]*))
 	    (attack 200.0)
 	    (decay 200.0)
 	    (release 1000.0)
 	    (sustain 0.6) ;; amplitude of the sustain
 	    (gain 2.0)
 	    (active 0)
-	    (note-starts (make-array poly double))
+	    (note-starts (heap-alloc poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1))
 			  (dotimes (i poly) ;; check for free poly spot           
@@ -796,6 +796,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
 (definec hermite-interp
   (lambda (fractional y1:double x0 x1 x2)
     (let ((c (* 0.5 (- x1 y1)))
@@ -805,9 +806,10 @@
 	  (b (+ w a)))
       (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
 
+
 ;; make synth defaults
 (definec sampler-note
-  (lambda (samples:double** samples-length:i64* index)
+  (lambda (samples:|128,double*|* samples-length:|128,i64|* index)
     (let ((idx-freq (midi2frq (i64tod index)))
 	  (phase 0.0)) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
@@ -856,14 +858,14 @@
      (let* ((poly 48)
 	    (samples (make-array 128 double*)) ;; 128 samples
 	    (samples-length (make-array 128 i64)) ;; 128 samples
-	    (notes (make-array poly [double,double,double,double]*))
+	    (notes (heap-alloc poly [double,double,double,double]*))
 	    (attack 200.0)
 	    (decay 200.0)
 	    (release 1000.0)
 	    (sustain 1.0) ;; amplitude of the sustain
 	    (gain 2.0)
 	    (active 0)
-	    (note-starts (make-array poly double))
+	    (note-starts (heap-alloc poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1)
 			      (idx (dtoi64 (floor (frq2midi freq))))
