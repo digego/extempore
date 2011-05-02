@@ -102,6 +102,11 @@ void llvm_zone_destroy(llvm_zone_t* zone)
     return;
 }
 
+void* llvm_stack_alloc(int64_t size)
+{
+  alloca(size);
+}
+
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
     alloc_mutex.lock();
@@ -638,6 +643,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);						
 	    gv = M->getNamedValue(std::string("llvm_zone_destroy"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);						
+	    gv = M->getNamedValue(std::string("llvm_stack_alloc"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_stack_alloc);						
 	    gv = M->getNamedValue(std::string("llvm_zone_malloc"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_malloc);						
 	    gv = M->getNamedValue(std::string("get_address_table"));

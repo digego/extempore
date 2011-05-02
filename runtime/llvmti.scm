@@ -645,7 +645,7 @@
 
 (define impc:ti:symbol-check
    (lambda (ast vars kts request?)   
-      ;(print 'ast: ast 'r: request? 'vars: vars 'kts: kts)      
+      ;(println 'symcheck 'ast: ast 'r: request? 'vars: vars 'kts: kts)      
       (if *impc:ti:print-sub-checks* (print 'sym:> 'ast: ast 'request? request?))
       ;; if a request is made - assume it's forced
       ;; find the intersection between the request
@@ -794,6 +794,7 @@
 					       (if (member (car e) kts)
 						   (cadr (assoc (car e) vars))
 						   request?))))
+		    ;(println 'update: (car e) 'with: a)  
 		    (impc:ti:update-var (car e) vars kts a)))
                 (cadr ast))
       ;; then return the return type for the whole let
@@ -893,12 +894,14 @@
 (define impc:ti:make-array-check
    (lambda (ast vars kts request?)      
       ;; make-array should have a type
-      (let ((a (impc:ir:convert-from-pretty-types (caddr ast)))
+      (let ((a (list *impc:ir:array*
+		     (cadr ast)
+		     (impc:ir:convert-from-pretty-types (caddr ast))))
             ;; this should be fixed point
             (b (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
-         ;; returns a pointer of type 'a'
-		 (if (null? a) a
-             (impc:ir:pointer++ a)))))
+	;; returns a pointer of type 'a'
+	(if (null? a) a
+	    (list (impc:ir:pointer++ a))))))
 
 
 (define impc:ti:array-set-check
@@ -906,11 +909,14 @@
       (let* ((a (impc:ti:type-check (cadr ast) vars kts request?))
              ;; b should be fixed point types
              (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*)))
-             ;; c should be of type *a
+             ;; c should be of type a*
              (c (impc:ti:type-check (cadddr ast) vars kts (if (null? a) #f
-                                                              (list (impc:ir:pointer-- (car a)))))))
-         ;; array set check will return the type of the value set
-         c)))
+							      (if (and (not (impc:ir:type? a))
+								       (impc:ir:array? (car a)))
+								  (list (caddr (car a)))
+								  (list (impc:ir:pointer-- (car a))))))))
+	;; array set check will return the type of the value set
+	c)))
 
 
 (define impc:ti:array-ref-ptr-check
@@ -918,20 +924,26 @@
       (let ((a (impc:ti:type-check (cadr ast) vars kts request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
+	(if (impc:ir:type? a) (set! a (list a)))	
 	(if (null? a) 
 	    a
-	    (list (car a))))))
+	    (if (impc:ir:array? (car a))
+		(list (impc:ir:pointer++ (caddr (car a))))
+		(list (car a)))))))
 
 
 (define impc:ti:array-ref-check
-   (lambda (ast vars kts request?)      
+   (lambda (ast vars kts request?)
+      ;(println 'array-ref-check: 'ast: ast 'vars: vars 'kts: kts)
       (let ((a (impc:ti:type-check (cadr ast) vars kts request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
 	(if (impc:ir:type? a) (set! a (list a)))
-         (if (null? a) 
+	(if (null? a) 
              a
-             (list (impc:ir:pointer-- (car a)))))))
+             (if (impc:ir:array? (car a))
+		 (list (caddr (car a)))
+		 (list (impc:ir:pointer-- (car a))))))))
 
 
 
@@ -941,9 +953,9 @@
 ;; (make i64)
 ;; memory is allocated on the head 
 (define impc:ti:heap-alloc-check
-   (lambda (ast vars kts request?)      
+   (lambda (ast vars kts request?)
       ;; make should return a ptr to type a
-      (let ((a (impc:ir:convert-from-pretty-types (cadr ast))))
+      (let ((a (impc:ir:convert-from-pretty-types (if (< (length ast) 3) (cadr ast) (caddr ast)))))
          ;; returns a pointer of tuple type 'a'
 	(if (null? a) a
 	    (impc:ir:pointer++ a)))))
@@ -955,18 +967,18 @@
 ;; (make i64)
 ;; memory is allocated on the stack 
 (define impc:ti:stack-alloc-check
-   (lambda (ast vars kts request?)      
+   (lambda (ast vars kts request?)
       ;; alloc should return a ptr to type a
-      (let ((a (impc:ir:convert-from-pretty-types (cadr ast))))
+      (let ((a (impc:ir:convert-from-pretty-types (if (< (length ast) 3) (cadr ast) (caddr ast)))))
          ;; returns a pointer of tuple type 'a'
 	(if (null? a) a
 	    (impc:ir:pointer++ a)))))
 
 
 ;; make-tuple should be of the form
-;; (make-array type type type ...)
+;; (make-tuple type type type ...)
 ;; where types are valid types
-;; (make-array i64 i8* i32)
+;; (make-tuple i64 i8* i32)
 (define impc:ti:make-tuple-check
    (lambda (ast vars kts request?)
       ;; make-tuple should return the tuple type a
@@ -1327,6 +1339,7 @@
 ;; vars is statefull and will be modified in place
 (define impc:ti:type-check
    (lambda (ast vars kts request?)
+      ;(println 'type-check: ast)
       (if *impc:ti:print-main-check* (print 'type-check: ast 'kts: kts 'request? request?))
       (if *impc:ti:print-main-check* (print 'vars------: vars))
       (cond ((null? ast) '())
@@ -1380,7 +1393,7 @@
                                               (if (null? (cdr x)) #f
                                                   (if (and (list? (cdr x)) ;; check there are multiple choices
                                                            (not (member (modulo (cadr x) *impc:ir:pointer*) 
-                                                                        (list *impc:ir:tuple* *impc:ir:closure*))) ;; make sure it's a base type (not closure or tuple)
+                                                                        (list *impc:ir:tuple* *impc:ir:closure* *impc:ir:array*))) ;; make sure it's a base type (not closure or tuple)
                                                            (cl:every impc:ir:type? (cdr x))) ;; check that it's choices are valid (not null)
                                                       x #f)))
                                            union))))
@@ -1395,11 +1408,12 @@
    (lambda (vars forced-types ast . cnt)
       ;(println '------------------------------------)
       ;(println 'forced-types forced-types)
-      ;(println 'vars: vars 'ast: ast)
+      ;(println 'vars: vars)
+      ;(println 'ast: ast)
       ;(if (null? cnt) (sys:clear-log-view))
       (let* ((fvars (map (lambda (t) ;; add any forced-type values to vars
                             (if (assoc (car t) forced-types)
-                                (let ((tt (cdr (assoc (car t) forced-types))))                                   
+                                (let ((tt (cdr (assoc (car t) forced-types))))
                                    (cons (car t) (list tt)))
                                 t))
                          vars))
@@ -1983,8 +1997,8 @@
 			      (ascii-print-color 0 7 10)
 			      (print " >>> ")
 			      (ascii-print-color 1 3 10)
-			      (print (string->sexpr (impc:ir:pretty-print-type (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*)
-										     ftype))))
+			      (print (string->sexpr (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*)
+													   ftype)))))
 			      (ascii-print-color 0 7 10)
 			      (print)))))
             (cadr (impc:ir:gname))))))
