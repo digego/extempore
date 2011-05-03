@@ -768,8 +768,8 @@
       (if (<> null audiofile)
 	  (let ((adat_ (malloc (* num 8)))
 		(adat (bitcast adat_ double*))
-		(samples (inst.samples:double**))
-		(samples-length (inst.samples-length:i64*))
+		(samples (inst.samples:|128,double*|*))
+		(samples-length (inst.samples-length:|128,i64|*))
 		(read (read-audio-data fname adat (* offset channels) num)))
 	    (if (<> 0 (aref samples-length index))
 		(begin (free (aref samples index)) 1))
@@ -822,7 +822,7 @@
 	      (posx (+ (* posi 2) (dtoi64 chan)))
 	      (length (- (aref samples-length index) 10))
 	      (dat (aref samples index))
-	      (y1 (if (< posi 1) 0.0 (aref dat (- posx 2)))) ; assume stereo
+	      (y1 (if (or (> posi length) (< posi 1)) 0.0 (aref dat (- posx 2)))) ; assume stereo
 	      (x0 (if (> posi length) 0.0 (aref dat posx)))
 	      (x1 (if (> (+ posi 1) length) 0.0 (aref dat (+ posx 2)))) ; assume stereo
 	      (x2 (if (> (+ posi 2) length) 0.0 (aref dat (+ posx 4))))) ; assume stereo
@@ -906,15 +906,31 @@
 ;; create a default sampler
 (define-sampler sampler sampler-note sampler-fx)
 
+(define audio-file-regex-match
+  (lambda (fname)
+    (if (regex:match? fname "^.*[ABCDEFGabcdefg][#]?[0-9].*(wav|aif|aiff|ogg)$")
+	(let ((result (regex:matched fname "([ABCDEFGabcdefg])(.*)([0-9])")))
+	  (if (null? result) #f
+	      (let ((sharp (if (regex:match? (caddr result) "#") #t #f))
+		    (offset (+ 12 (* (string->number (cadddr result)) 12)))
+		    (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+			  ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+		(if sharp (+ pc offset 1) (+ offset pc))))))))
+	      
+
 ;; must be stereo samples of type wav aif or ogg
 (define-macro (load-sampler sampler path)
-    `(let ((files (sys:directory-list ,path)))
-            (for-each (lambda (f)
-			(if (regex:match? f "^([0-9]*)\.(wav|aif|aiff|ogg)$")
-			    (let ((result (regex:matched f "^([0-9]*)\.(wav|aif|aiff|ogg)$")))
-			      (set-sampler-index ,sampler (string-append ,path "/" f)
-						 (string->number (cadr result)) 0 0))))
-		      files)))
+  `(let ((files (sys:directory-list ,path)))
+     (for-each (lambda (f)
+		 (if (regex:match? f "^([0-9]*)\.(wav|aif|aiff|ogg)$")
+		     (let ((result (regex:matched f "^([0-9]*)\.(wav|aif|aiff|ogg)$")))
+		       (set-sampler-index ,sampler (string-append ,path "/" f)
+					  (string->number (cadr result)) 0 0))
+		     (let ((result (audio-file-regex-match f)))
+		       (if (number? result)
+			   (set-sampler-index ,sampler (string-append ,path "/" f)
+					      result 0 0)))))
+	       files)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
