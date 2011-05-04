@@ -1262,6 +1262,7 @@
          (impc:ir:strip-space os))))
 
 
+
 (define impc:ir:compiler:loop
    (lambda (ast types)
       (let* ((os (make-string 0))
@@ -1283,14 +1284,14 @@
          (emit numstr os)         
          (emit  iterator "Ptr = alloca " iterator-type "\n" os)
          (emit (string-append "store " iterator-type (if (impc:ir:fixed-point? (cadr num))
-							    " 0, "
-							    " 0.0, ")
-				 iterator-type "* " iterator "Ptr\n") os)
+							 " 0, "
+							 " 0.0, ")
+			      iterator-type "* " iterator "Ptr\n") os)
          (emit  "br label " loop "\n" os)
          (emit  "\n" loop-label "\n" os)
          (emit bodystr os)
          (emit (string-append "%loop_cnt" (number->string loop-num) 
-                                 " = load " iterator-type "* " iterator "Ptr\n") os)
+			      " = load " iterator-type "* " iterator "Ptr\n") os)
          (emit (string-append "%next" (number->string loop-num)
                                  (if (impc:ir:fixed-point? (cadr num))
 				     " = add " 
@@ -1301,17 +1302,85 @@
 				     ", 1.0\n"))
 		  os)
          (emit (string-append "store " iterator-type " %next" (number->string loop-num) 
-                                     ", " iterator-type "* " iterator "Ptr\n") os) 
+			      ", " iterator-type "* " iterator "Ptr\n") os) 
          (emit (string-append cmp " = "
-                                 (if (impc:ir:fixed-point? (cadr num))
-                                     "icmp ult "
-                                     "fcmp ult ")
-                                 (cadr num) " "
-                                 "%next" (number->string loop-num) ", " (car num) "\n") os)
+			      (if (impc:ir:fixed-point? (cadr num))
+				  "icmp ult "
+				  "fcmp ult ")
+			      (cadr num) " "
+			      "%next" (number->string loop-num) ", " (car num) "\n") os)
          (emit  "br i1 " cmp ", label " loop ", label " after "\n" os)         
          (emit  "\n" after-label "\n" os)
          (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))		 
          (impc:ir:strip-space os))))
+
+
+
+(define impc:ir:compiler:loop
+   (lambda (ast types)
+      (let* ((os (make-string 0))
+             (loop-num (llvm:count++))
+             (loop-label (string-append "loop" (number->string loop-num) ":"))
+             (closeloop-label (string-append "closeloop" (number->string loop-num) ":"))
+             (after-label (string-append "after" (number->string loop-num) ":"))
+             (loop (string-append "%loop" (number->string loop-num)))
+             (closeloop (string-append "%closeloop" (number->string loop-num)))
+             (cmp (string-append "%cmp" (number->string loop-num)))
+             (after (string-append "%after" (number->string  loop-num)))
+             (iterator (string-append "%" (symbol->string (caar ast)))) ; "Loop" (number->string loop-num)))
+             (iterator-type (impc:ir:get-type-str (cdr (assoc (caar ast) types))))
+             (numstr (impc:ir:compiler (cadar ast) types (cdr (assoc (caar ast) types))))
+             (num (impc:ir:gname)) ;(ir:eval (cadar ast) os stack sym-table))
+             (bodystr (impc:ir:compiler (cdr ast) types)))
+         (emit "; setup loop\n" os)
+         ;(print num 'numstr numstr)
+         (emit numstr os)         
+         (emit iterator "Ptr = alloca " iterator-type "\n" os)
+         (emit (string-append "store " iterator-type (if (impc:ir:fixed-point? (cadr num))
+							 " 0, "
+							 " 0.0, ")
+			      iterator-type "* " iterator "Ptr\n") os)
+
+         (emit (string-append (impc:ir:gname "comp" "i1") " = " 
+			      (if (impc:ir:fixed-point? (cadr num))
+				  "icmp ult "
+				  "fcmp ult ")
+			      (cadr num) " " (car num) ", "
+			      (if (impc:ir:fixed-point? (cadr num))
+				  "1"
+				  "1.0\n")) os)
+	 
+         (emit  "br i1 " (car (impc:ir:gname)) ", label " after ", label " loop "\n" os)
+	 
+         ;(emit  "br label " loop "\n" os)
+
+	 (emit  "\n" loop-label "\n" os)
+         (emit bodystr os)
+         (emit (string-append "%loop_cnt" (number->string loop-num) 
+			      " = load " iterator-type "* " iterator "Ptr\n") os)
+         (emit (string-append "%next" (number->string loop-num)
+			      (if (impc:ir:fixed-point? (cadr num))
+				  " = add " 
+				  " = fadd ")
+			      iterator-type " %loop_cnt" (number->string loop-num) 
+			      (if (impc:ir:fixed-point? (cadr num))
+				  ", 1\n"
+				  ", 1.0\n"))
+	       os)
+         (emit (string-append "store " iterator-type " %next" (number->string loop-num) 
+			      ", " iterator-type "* " iterator "Ptr\n") os) 
+         (emit (string-append cmp " = "
+			      (if (impc:ir:fixed-point? (cadr num))
+				  "icmp ult "
+				  "fcmp ult ")
+			      (cadr num) " "
+			      "%next" (number->string loop-num) ", " (car num) "\n") os)
+         (emit  "br i1 " cmp ", label " loop ", label " after "\n" os)
+         (emit  "\n" after-label "\n" os)
+         (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))		 
+         (impc:ir:strip-space os))))
+
+
 
 
 (define impc:ir:compiler:set!
