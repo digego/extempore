@@ -1829,13 +1829,15 @@
                                   (if (null? hint?)
                                       '()
                                       (car hint?)))))
+		(n1 (if (number? (cadr ast)) (caddr ast) (cadr ast)))
+		(n2 (if (number? (cadr ast)) (cadr ast) (caddr ast)))
                 (a (if (null? type-hint)
-                       (impc:ir:compiler (cadr ast) types)
-                       (impc:ir:compiler (cadr ast) types type-hint)))
+                       (impc:ir:compiler n1 types)
+                       (impc:ir:compiler n1 types type-hint)))
                 (aval (impc:ir:gname))                
                 (b (if (null? type-hint)
-                       (impc:ir:compiler (caddr ast) types)
-                       (impc:ir:compiler (caddr ast) types type-hint)))                       
+                       (impc:ir:compiler n2 types)
+                       (impc:ir:compiler n2 types type-hint)))                       
                 (bval (impc:ir:gname))
                                 (os (make-string 0))
                 (type (if (null? type-hint) 
@@ -1845,8 +1847,8 @@
             (emit b os)
             ;; do llvm float constant check
             (if (= *impc:ir:float* (impc:ir:get-type-from-str type))
-                (begin (if (number? (cadr ast)) (set-car! aval (llvm:convert-float (car aval))))
-                       (if (number? (caddr ast)) (set-car! bval (llvm:convert-float (car bval))))))
+                (begin (if (number? n1) (set-car! aval (llvm:convert-float (car aval))))
+                       (if (number? n2) (set-car! bval (llvm:convert-float (car bval))))))
             (if (impc:ir:fixed-point? type)
                 (emit (string-append (impc:ir:gname "cmp" "i1") " = icmp " (list-ref icmps v) 
                                         " " type " " (car aval) 
@@ -2052,8 +2054,9 @@
          ;; do then
          (emit  "\nthen" num ":\n" os)
          (emit (impc:ir:compiler (caddr ast) types) os)
-         (emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
-                                 ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os)
+	 (if (not (impc:ir:void? (cadr (impc:ir:gname))))
+	     (emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
+				  ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os))
          (emit  "br label %ifcont" num "\n" os)
          
          (define a (impc:ir:gname))
@@ -2061,8 +2064,9 @@
          (if elset
              (begin (emit  "\nelse" num ":\n" os)
                     (emit (impc:ir:compiler (cadddr ast) types) os)
-                    (emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
-                                 ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os)         
+		    (if (not (impc:ir:void? (cadr (impc:ir:gname))))
+			(emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
+					     ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os))
                     (emit  "br label %ifcont" num "\n" os))
              (begin (emit  "\nelse" num ":\n" os)
                     (emit  "br label %ifcont" num "\n" os)))
@@ -2075,11 +2079,13 @@
              (print-error 'Compiler 'error: ast 'type 'conflict 'in 'between 'then (cadr a) 'and 'else (cadr b)))
          
          (emit  "\nifcont" num ":\n" os)
-         (emit  (impc:ir:gname "ifres" (cadr a)) " = load " (cadr a) "* %ifptr" num "\n\n" os) 
-         ;; finally append %ifptr alloca to front of string
-         (string-append "\n; alloca if pointer\n"
-                        "%ifptr" num " = alloca " (cadr a) "\n"
-                        (impc:ir:strip-space os)))))		 
+	 (if (not (impc:ir:void? (cadr a)))
+	     (begin (emit  (impc:ir:gname "ifres" (cadr a)) " = load " (cadr a) "* %ifptr" num "\n\n" os) 
+		    ;; finally append %ifptr alloca to front of string
+		    (string-append "\n; alloca if pointer\n"
+				   "%ifptr" num " = alloca " (cadr a) "\n"
+				   (impc:ir:strip-space os)))
+	     (impc:ir:strip-space os)))))
 
 (define impc:ir:compiler:native-call
    (lambda (ast types) 
