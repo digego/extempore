@@ -78,6 +78,11 @@
 (define impc:ir:regex-tc-or-a "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)|(?:([%0-9a-zA-Z_]\\**)+)")
 (define impc:ir:regex-tc-or-a "((\\[|\\<|\\|)(?<struct>[^<>\\[\\]\\|]|(\\[|\\<|\\|)\\g<struct>*(\\]|\\>|\\|)\\**)*(\\]|\\>|\\|)\\**)|(?:([%0-9a-zA-Z_]\\**)+)")
 
+(define impc:ir:regex-tc-or-a (string-append "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)"
+					     "|(\\|[0-9](?<array>[^\\|]|\\|[0-9]\\g<array>*\\|\\**)*\\|\\**)"
+					     "|(?:([%0-9a-zA-Z_]\\**)+)"))
+
+
 (define impc:ir:get-type-from-pretty-array
   (lambda (string-type . args)
      (let* ((s1 (regex:replace string-type "\\|(.+)\\|?.*" "$1"))
@@ -1262,6 +1267,7 @@
          (impc:ir:strip-space os))))
 
 
+
 (define impc:ir:compiler:loop
    (lambda (ast types)
       (let* ((os (make-string 0))
@@ -1283,14 +1289,14 @@
          (emit numstr os)         
          (emit  iterator "Ptr = alloca " iterator-type "\n" os)
          (emit (string-append "store " iterator-type (if (impc:ir:fixed-point? (cadr num))
-							    " 0, "
-							    " 0.0, ")
-				 iterator-type "* " iterator "Ptr\n") os)
+							 " 0, "
+							 " 0.0, ")
+			      iterator-type "* " iterator "Ptr\n") os)
          (emit  "br label " loop "\n" os)
          (emit  "\n" loop-label "\n" os)
          (emit bodystr os)
          (emit (string-append "%loop_cnt" (number->string loop-num) 
-                                 " = load " iterator-type "* " iterator "Ptr\n") os)
+			      " = load " iterator-type "* " iterator "Ptr\n") os)
          (emit (string-append "%next" (number->string loop-num)
                                  (if (impc:ir:fixed-point? (cadr num))
 				     " = add " 
@@ -1301,17 +1307,85 @@
 				     ", 1.0\n"))
 		  os)
          (emit (string-append "store " iterator-type " %next" (number->string loop-num) 
-                                     ", " iterator-type "* " iterator "Ptr\n") os) 
+			      ", " iterator-type "* " iterator "Ptr\n") os) 
          (emit (string-append cmp " = "
-                                 (if (impc:ir:fixed-point? (cadr num))
-                                     "icmp ult "
-                                     "fcmp ult ")
-                                 (cadr num) " "
-                                 "%next" (number->string loop-num) ", " (car num) "\n") os)
+			      (if (impc:ir:fixed-point? (cadr num))
+				  "icmp ult "
+				  "fcmp ult ")
+			      (cadr num) " "
+			      "%next" (number->string loop-num) ", " (car num) "\n") os)
          (emit  "br i1 " cmp ", label " loop ", label " after "\n" os)         
          (emit  "\n" after-label "\n" os)
          (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))		 
          (impc:ir:strip-space os))))
+
+
+
+(define impc:ir:compiler:loop
+   (lambda (ast types)
+      (let* ((os (make-string 0))
+             (loop-num (llvm:count++))
+             (loop-label (string-append "loop" (number->string loop-num) ":"))
+             (closeloop-label (string-append "closeloop" (number->string loop-num) ":"))
+             (after-label (string-append "after" (number->string loop-num) ":"))
+             (loop (string-append "%loop" (number->string loop-num)))
+             (closeloop (string-append "%closeloop" (number->string loop-num)))
+             (cmp (string-append "%cmp" (number->string loop-num)))
+             (after (string-append "%after" (number->string  loop-num)))
+             (iterator (string-append "%" (symbol->string (caar ast)))) ; "Loop" (number->string loop-num)))
+             (iterator-type (impc:ir:get-type-str (cdr (assoc (caar ast) types))))
+             (numstr (impc:ir:compiler (cadar ast) types (cdr (assoc (caar ast) types))))
+             (num (impc:ir:gname)) ;(ir:eval (cadar ast) os stack sym-table))
+             (bodystr (impc:ir:compiler (cdr ast) types)))
+         (emit "; setup loop\n" os)
+         ;(print num 'numstr numstr)
+         (emit numstr os)         
+         (emit iterator "Ptr = alloca " iterator-type "\n" os)
+         (emit (string-append "store " iterator-type (if (impc:ir:fixed-point? (cadr num))
+							 " 0, "
+							 " 0.0, ")
+			      iterator-type "* " iterator "Ptr\n") os)
+
+         (emit (string-append (impc:ir:gname "comp" "i1") " = " 
+			      (if (impc:ir:fixed-point? (cadr num))
+				  "icmp ult "
+				  "fcmp ult ")
+			      (cadr num) " " (car num) ", "
+			      (if (impc:ir:fixed-point? (cadr num))
+				  "1"
+				  "1.0\n")) os)
+	 
+         (emit  "br i1 " (car (impc:ir:gname)) ", label " after ", label " loop "\n" os)
+	 
+         ;(emit  "br label " loop "\n" os)
+
+	 (emit  "\n" loop-label "\n" os)
+         (emit bodystr os)
+         (emit (string-append "%loop_cnt" (number->string loop-num) 
+			      " = load " iterator-type "* " iterator "Ptr\n") os)
+         (emit (string-append "%next" (number->string loop-num)
+			      (if (impc:ir:fixed-point? (cadr num))
+				  " = add " 
+				  " = fadd ")
+			      iterator-type " %loop_cnt" (number->string loop-num) 
+			      (if (impc:ir:fixed-point? (cadr num))
+				  ", 1\n"
+				  ", 1.0\n"))
+	       os)
+         (emit (string-append "store " iterator-type " %next" (number->string loop-num) 
+			      ", " iterator-type "* " iterator "Ptr\n") os) 
+         (emit (string-append cmp " = "
+			      (if (impc:ir:fixed-point? (cadr num))
+				  "icmp ult "
+				  "fcmp ult ")
+			      (cadr num) " "
+			      "%next" (number->string loop-num) ", " (car num) "\n") os)
+         (emit  "br i1 " cmp ", label " loop ", label " after "\n" os)
+         (emit  "\n" after-label "\n" os)
+         (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))		 
+         (impc:ir:strip-space os))))
+
+
 
 
 (define impc:ir:compiler:set!
@@ -1642,7 +1716,7 @@
 	 ;; this code here to support basic type recursion (only depth \2)
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	 (if (> (impc:ir:get-ptr-depth tuple-type) 1)
-	     (print-error "Compiler Error: trying to ref from a tuple pointer")
+	     (print-error "Compiler Error: trying to ref from a tuple pointer " ast)
 	     (if (< (impc:ir:get-ptr-depth tuple-type) 1)
 		    (emit (string-append (impc:ir:gname "val" ttstr) " = extractvalue " 
 					 (cadr var) " " (car var) ", " (car idx) "\n") os)		 
@@ -1760,13 +1834,15 @@
                                   (if (null? hint?)
                                       '()
                                       (car hint?)))))
+		(n1 (if (number? (cadr ast)) (caddr ast) (cadr ast)))
+		(n2 (if (number? (cadr ast)) (cadr ast) (caddr ast)))
                 (a (if (null? type-hint)
-                       (impc:ir:compiler (cadr ast) types)
-                       (impc:ir:compiler (cadr ast) types type-hint)))
+                       (impc:ir:compiler n1 types)
+                       (impc:ir:compiler n1 types type-hint)))
                 (aval (impc:ir:gname))                
                 (b (if (null? type-hint)
-                       (impc:ir:compiler (caddr ast) types)
-                       (impc:ir:compiler (caddr ast) types type-hint)))                       
+                       (impc:ir:compiler n2 types)
+                       (impc:ir:compiler n2 types type-hint)))                       
                 (bval (impc:ir:gname))
                                 (os (make-string 0))
                 (type (if (null? type-hint) 
@@ -1776,8 +1852,8 @@
             (emit b os)
             ;; do llvm float constant check
             (if (= *impc:ir:float* (impc:ir:get-type-from-str type))
-                (begin (if (number? (cadr ast)) (set-car! aval (llvm:convert-float (car aval))))
-                       (if (number? (caddr ast)) (set-car! bval (llvm:convert-float (car bval))))))
+                (begin (if (number? n1) (set-car! aval (llvm:convert-float (car aval))))
+                       (if (number? n2) (set-car! bval (llvm:convert-float (car bval))))))
             (if (impc:ir:fixed-point? type)
                 (emit (string-append (impc:ir:gname "cmp" "i1") " = icmp " (list-ref icmps v) 
                                         " " type " " (car aval) 
@@ -1983,8 +2059,9 @@
          ;; do then
          (emit  "\nthen" num ":\n" os)
          (emit (impc:ir:compiler (caddr ast) types) os)
-         (emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
-                                 ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os)
+	 (if (not (impc:ir:void? (cadr (impc:ir:gname))))
+	     (emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
+				  ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os))
          (emit  "br label %ifcont" num "\n" os)
          
          (define a (impc:ir:gname))
@@ -1992,8 +2069,9 @@
          (if elset
              (begin (emit  "\nelse" num ":\n" os)
                     (emit (impc:ir:compiler (cadddr ast) types) os)
-                    (emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
-                                 ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os)         
+		    (if (not (impc:ir:void? (cadr (impc:ir:gname))))
+			(emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
+					     ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os))
                     (emit  "br label %ifcont" num "\n" os))
              (begin (emit  "\nelse" num ":\n" os)
                     (emit  "br label %ifcont" num "\n" os)))
@@ -2006,11 +2084,13 @@
              (print-error 'Compiler 'error: ast 'type 'conflict 'in 'between 'then (cadr a) 'and 'else (cadr b)))
          
          (emit  "\nifcont" num ":\n" os)
-         (emit  (impc:ir:gname "ifres" (cadr a)) " = load " (cadr a) "* %ifptr" num "\n\n" os) 
-         ;; finally append %ifptr alloca to front of string
-         (string-append "\n; alloca if pointer\n"
-                        "%ifptr" num " = alloca " (cadr a) "\n"
-                        (impc:ir:strip-space os)))))		 
+	 (if (not (impc:ir:void? (cadr a)))
+	     (begin (emit  (impc:ir:gname "ifres" (cadr a)) " = load " (cadr a) "* %ifptr" num "\n\n" os) 
+		    ;; finally append %ifptr alloca to front of string
+		    (string-append "\n; alloca if pointer\n"
+				   "%ifptr" num " = alloca " (cadr a) "\n"
+				   (impc:ir:strip-space os)))
+	     (impc:ir:strip-space os)))))
 
 (define impc:ir:compiler:native-call
    (lambda (ast types) 
