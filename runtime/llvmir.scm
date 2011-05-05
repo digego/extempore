@@ -78,6 +78,11 @@
 (define impc:ir:regex-tc-or-a "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)|(?:([%0-9a-zA-Z_]\\**)+)")
 (define impc:ir:regex-tc-or-a "((\\[|\\<|\\|)(?<struct>[^<>\\[\\]\\|]|(\\[|\\<|\\|)\\g<struct>*(\\]|\\>|\\|)\\**)*(\\]|\\>|\\|)\\**)|(?:([%0-9a-zA-Z_]\\**)+)")
 
+(define impc:ir:regex-tc-or-a (string-append "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)"
+					     "|(\\|[0-9](?<array>[^\\|]|\\|[0-9]\\g<array>*\\|\\**)*\\|\\**)"
+					     "|(?:([%0-9a-zA-Z_]\\**)+)"))
+
+
 (define impc:ir:get-type-from-pretty-array
   (lambda (string-type . args)
      (let* ((s1 (regex:replace string-type "\\|(.+)\\|?.*" "$1"))
@@ -1711,7 +1716,7 @@
 	 ;; this code here to support basic type recursion (only depth \2)
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	 (if (> (impc:ir:get-ptr-depth tuple-type) 1)
-	     (print-error "Compiler Error: trying to ref from a tuple pointer")
+	     (print-error "Compiler Error: trying to ref from a tuple pointer " ast)
 	     (if (< (impc:ir:get-ptr-depth tuple-type) 1)
 		    (emit (string-append (impc:ir:gname "val" ttstr) " = extractvalue " 
 					 (cadr var) " " (car var) ", " (car idx) "\n") os)		 
