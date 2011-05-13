@@ -51,7 +51,7 @@
 
 (define *impc:zone* (sys:default-mzone))
 
-(define *impc:default-zone-size* (* 1024 1024))
+(define *impc:default-zone-size* (* 1 1024 1024))
 
 (define icr:new-zone
    (lambda args
@@ -1062,6 +1062,8 @@
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
 	(if (impc:ir:type? a)
 	    (set! a (list a)))
+	(if (>= (caddr ast) (- (length (car a)) 1))
+	    (print-error 'Compiler 'Error: 'tuple 'index 'beyond 'type 'boundary ast))
 	;(println 'tupref-check 'a: a 'ast: ast (list-ref (car a) (+ 1 (caddr ast))))
 	(if (and (not (null? a))
 		 (list? a)
