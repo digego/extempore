@@ -49,9 +49,11 @@
 #include <netdb.h>         /* host to IP resolution       */
 
 ///////////////////////////////////////////////
-//  THIS IS UGLY AND INEFFICIENT CHANGE ME!
+//
+// THIS IS UGLY AND INEFFICIENT CHANGE ME!
 // 
 // swap using char pointers
+//
 uint64_t swap64f(double d)
 {
     uint64_t a;
@@ -191,7 +193,8 @@ uint32_t unswap32i(uint32_t a)
     return f;
 }
 
-////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+
 
 //#define _OSC_DEBUG_
 
@@ -200,6 +203,34 @@ namespace extemp {
     std::map<scheme*, OSC*> OSC::SCHEME_MAP;	
     //OSC* OSC::singleton = NULL;
     //scheme* OSC::sc = NULL;
+
+  int get_message_length(std::string& typetags, char* args)
+  {
+    int pos = 0;
+    for(int i=1; i<typetags.size(); ++i) {
+      if(typetags[i] == 'i') {
+	pos += 4;
+      }else if(typetags[i] == 'f'){
+	pos += 4; 
+      }else if(typetags[i] == 'd'){
+	pos += 8;
+      }else if(typetags[i] == 's'){
+	std::string osc_str;
+	pos += OSC::getOSCString(args+pos, &osc_str);
+      }else if(typetags[i] == 'h'){
+	pos += 8;
+      }else if(typetags[i] == 't'){
+	pos += 8;
+      }else if(typetags[i] == '[') {
+	pos += 0;
+      }else if(typetags[i] == ']') {
+	pos += 0;
+      }else{
+	return -1;
+      }
+    }
+    return pos;
+  }
 	
   int send_scheme_call(scheme* _sc, char* fname, double t, std::string& address, std::string& typetags, char* args)
     {
@@ -275,7 +306,7 @@ namespace extemp {
             int bytes_read = recvfrom(*osc->getSocketFD(), osc->getMessageData(), 256, 0, (struct sockaddr*)osc->getClientAddress(), (socklen_t *) osc->getClientAddressSize());
 			
             if(bytes_read > -1) {
-	      //std::cout << "OSC from client port: " << osc->getClientAddress()->sin_port << " " << osc->getAddress()->sin_port <<  std::endl;				
+	      //std::cout << "OSC from client port: " << osc->getClientAddress()->sin_port << " " << osc->getAddress()->sin_port <<  std::endl;
                 char* args = osc->getMessageData();
 		int length = bytes_read; //osc->getMessageLength();
 		double timestamp;
@@ -297,15 +328,26 @@ namespace extemp {
 			typetags.clear();
 			pos += OSC::getOSCString(args+pos,&address);
 			pos += OSC::getOSCString(args+pos,&typetags);
-			int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,args+pos);
-			if(ret_from_call < 0) break;
-			else pos += ret_from_call;
+			if(osc->getNative() == NULL) {
+			  int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,args+pos);
+			  if(ret_from_call < 0) break;
+			  else pos += ret_from_call;
+			}else{
+			  int (*native) (char*,char*,char*) = osc->getNative();
+			  native((char*)address.c_str(),(char*)typetags.c_str(),args+pos);
+			  pos += get_message_length(typetags, args);
+			}
 		    }
 		}else{
+		  if(osc->getNative() == NULL) {
 		    pos += OSC::getOSCString(args+pos,&typetags);
 		    pos += send_scheme_call(osc->sc,osc->fname,0.0,address,typetags,args+pos);
-		}
-				
+		  }else{
+		    pos += OSC::getOSCString(args+pos,&typetags);
+		    int (*native) (char*,char*,char*) = osc->getNative();
+		    native((char*)address.c_str(),(char*)typetags.c_str(),args+pos);
+		  }
+		}				
                 char reply[256];
                 memset(reply,0,256);
                 std::string caller(inet_ntoa((*osc->getClientAddress()).sin_addr));
@@ -796,6 +838,13 @@ namespace extemp {
 	memset(osc->fname,0,256);
 	char* name = string_value(pair_cadr(args));
 	strcpy(osc->fname,name);
+
+	// should we use native callback?
+	if(pair_cddr(args) != _sc->NIL && is_cptr(pair_caddr(args))) {
+	  osc->setNative( (int(*)(char*,char*,char*)) cptr_value(pair_caddr(args)));
+	}else{
+	  osc->setNative(NULL);
+	}
 		
 	SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
 	scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));

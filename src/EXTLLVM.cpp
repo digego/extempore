@@ -40,6 +40,7 @@
 #include "TaskScheduler.h"
 #include "Scheme.h"
 #include "pcre.h"
+#include "OSC.h"
 
 #include "llvm/Assembly/Parser.h"
 #include "llvm/LLVMContext.h"
@@ -549,8 +550,6 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
 
 
 
-/////////////////////////////////////////////////////////////////////////
-
 namespace extemp {
 	
     EXTLLVM EXTLLVM::SINGLETON;
@@ -688,7 +687,22 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("itoa"));
 	    EE->updateGlobalMapping(gv,(void*)&itoa);
 
-			
+	    gv = M->getNamedValue(std::string("swap64i"));
+	    EE->updateGlobalMapping(gv,(void*)&swap64i);
+	    gv = M->getNamedValue(std::string("swap64f"));
+	    EE->updateGlobalMapping(gv,(void*)&swap64f);
+	    gv = M->getNamedValue(std::string("swap32i"));
+	    EE->updateGlobalMapping(gv,(void*)&swap32i);
+	    gv = M->getNamedValue(std::string("swap32f"));
+	    EE->updateGlobalMapping(gv,(void*)&swap32f);			
+	    gv = M->getNamedValue(std::string("unswap64i"));
+	    EE->updateGlobalMapping(gv,(void*)&unswap64i);
+	    gv = M->getNamedValue(std::string("unswap64f"));
+	    EE->updateGlobalMapping(gv,(void*)&unswap64f);
+	    gv = M->getNamedValue(std::string("unswap32i"));
+	    EE->updateGlobalMapping(gv,(void*)&unswap32i);
+	    gv = M->getNamedValue(std::string("unswap32f"));
+	    EE->updateGlobalMapping(gv,(void*)&unswap32f);			
 	}	
 	return;
     }
