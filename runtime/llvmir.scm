@@ -728,6 +728,13 @@
          (emit "entry:\n" os)
          (emit "; setup zone\n" os)
          (emit "%_zone = bitcast i8* %_impz to %mzone*\n" os)
+
+	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	 ;; new for impz stuff
+         (emit "%_impzPtr = alloca i8*\n" os)
+	 (emit "store i8* %_impz, i8** %_impzPtr\n" os)
+         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
          ;; first we need to pull evironment values
          (if (not (null? env))
              (begin (emit "; setup environment\n" os)
@@ -2102,9 +2109,13 @@
              (args (map (lambda (a hint)
                            (cons (impc:ir:compiler a types (impc:ir:get-type-from-str hint)) (impc:ir:gname)))
                         (cdr ast)
-                        (cdr ftypes))))
+                        (cdr ftypes))))	
          (if (<> (length args) (length (cdr ftypes)))
              (print-error 'Compiler 'Error: ast 'Wrong 'number 'of 'arguments))
+	 ;;;;;;;;;;;;;;;;;;;;;;;;;
+	 ;; new for impz stuff	 
+	 (if closurecall (emit (impc:ir:gname "tmp_zone" "i8*") " = load i8** %_impzPtr\n" os))
+	 ;;;;;;;;;;;;;;;;;;;;;;;;;
          (emit (apply string-append (map (lambda (p) (car p)) args)) os)
          (emit (string-append (if (impc:ir:void? (car ftypes))
                                      (begin (impc:ir:gname "res" "void") "")
@@ -2112,8 +2123,13 @@
                                  "tail call cc " (number->string calling-conv)
                                  " " (car ftypes)
                                  " @" fname "("
-                                 (if closurecall 
-                                     (string-append "i8* %_impz" (if (null? (cdr ftypes)) "" ","))
+                                 (if closurecall
+				     ;;;;;;;;;;;;;;;;;;;;;;;;;
+				     ;; new for impz stuff
+				     (string-append "i8* " (car (impc:ir:gname "tmp_zone")) (if (null? (cdr ftypes)) "" ","))
+				     ;; this line replaced by above
+                                     ;(string-append "i8* %_impz" (if (null? (cdr ftypes)) "" ","))
+				     ;;;;;;;;;;;;;;;;;;;;;;;;;
                                      "")
                                  (apply string-append 
                                         (map (lambda (p ft i)

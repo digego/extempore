@@ -1838,7 +1838,12 @@
                 (compile-stub? (if (llvm:get-globalvar (string-append (symbol->string symname) "_var")) #f #t))				
                 (fs (string-append "define ccc " closure-type " @" (string-append (symbol->string symname) "_maker")
                                    "(i8* %_impz){\nentry:\n"
-                                   "%_zone = bitcast i8* %_impz to %mzone*\n"                                   
+                                   "%_zone = bitcast i8* %_impz to %mzone*\n"
+				   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				   ;; new lines for impz
+				   "%_impzPtr = alloca i8*\n"
+				   "store i8* %_impz, i8** %_impzPtr\n"
+				   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                    fstr "}\n"))
                 (fssetter (string-append (if (llvm:get-globalvar (string-append (symbol->string symname) "_var"))
                                              "" ;; if global var alread exists do nothing
@@ -1915,13 +1920,13 @@
 											   '("" "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
 					     ")\n"
 					     "{\nentry:\n"
-					     "%_zone = call ccc %mzone* @llvm_zone_create(i64 0)\n"
+					     "%_zone = call ccc %mzone* @llvm_zone_create(i64 2048)\n"
 					     ;"%_zone = call ccc %mzone* @malloc_default_zone()\n"
 					     "%_impz = bitcast %mzone* %_zone to i8*\n"
-					     "call ccc void @llvm_destroy_zone_after_delay(i8* %_impz, double 44100.0)\n"
+					     "call ccc void @llvm_destroy_zone_after_delay(i8* %_impz, double 88200.0)\n"
 					     "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
 					     "%ptrvar = load i8** %ptr\n"
-					     "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"				      
+					     "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
 					     "%closure = load " closure-type " %closure_tmp \n"
 					     "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
 					     "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
