@@ -46,6 +46,19 @@
 #include "SchemeProcess.h"
 #include "EXTThread.h"
 
+ 
+uint64_t swap64f(double d);
+double unswap64f(uint64_t a);
+uint32_t swap32f(float f);
+float unswap32f(uint32_t a);
+uint64_t  swap64i(uint64_t d);
+uint64_t unswap64i(uint64_t a);
+uint32_t swap32i(uint32_t f);
+uint32_t unswap32i(uint32_t a);
+
+
+//#define _OSC_DEBUG_
+
 
 namespace extemp {
     
@@ -101,6 +114,8 @@ namespace extemp {
 	EXTThread& getThread() { return threadOSC; }
 	bool getStarted() { return started; }
 	void setStarted(bool val) { started = val; }
+        int (*getNative()) (char*,char*,char*) { return native; }
+	void setNative(int(*val)(char*,char*,char*)) { native = val; }
 	void sendOSC(TaskI* task);
 		
 		
@@ -121,7 +136,8 @@ namespace extemp {
 	int osc_client_address_size;
 	char message_data[256];
 	int message_length;
-	bool started;		
+	bool started;
+	int(*native)(char*,char*,char*); /* if not null then use this compiled function for callbacks */
 	//char scheme_real_type;
 	//char scheme_integer_type;
 	//OSC_CALLBACK callback;

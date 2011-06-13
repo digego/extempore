@@ -2052,6 +2052,143 @@ namespace extemp {
      return false;
    }; // bool checkGLXExtension(const char* extName)
 
+  
+  void* opengl_render_callback(void* a)
+  {
+    Display              *dpy;
+    Window                xWin;
+    XEvent                event;
+    XVisualInfo          *vInfo;
+    XSetWindowAttributes  swa;
+    GLXFBConfig          *fbConfigs;
+    GLXContext            context;
+    GLXContext            sharedContext;
+    GLXWindow             glxWin;
+    int                   swaMask;
+    int                   numReturned;
+    int                   swapFlag = True;
+
+
+    pointer args = (pointer) ((void**)a)[0];
+    scheme* _sc = (scheme*) ((void**)a)[1];
+
+    long(*callback)(void) = (long(*)(void)) cptr_value(pair_caddr(pair_cddddr(args)));
+
+    //GLXContext util_glctx;     
+    dpy = XOpenDisplay (string_value(pair_car(args)));
+    if (dpy == NULL) {
+      printf("No such X display\n");
+      return _sc->F;     
+    }
+
+    /* Request a suitable framebuffer configuration - try for a double buffered configuration first */
+    fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy), doubleBufferAttributes, &numReturned );
+
+    if ( fbConfigs == NULL ) {  /* no double buffered configs available */
+      fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy), singleBufferAttributess, &numReturned );
+      swapFlag = False;
+    }
+
+    /* Create an X colormap and window with a visual matching the first
+    ** returned framebuffer config */
+    vInfo = glXGetVisualFromFBConfig( dpy, fbConfigs[0] );
+
+    // attrList[indx] = GLX_USE_GL; indx++; 
+    // attrList[indx] = GLX_DEPTH_SIZE; indx++; 
+    // attrList[indx] = 1; indx++; 
+    // attrList[indx] = GLX_RGBA; indx++; 
+    // attrList[indx] = GLX_RED_SIZE; indx++; 
+    // attrList[indx] = 1; indx++; 
+    // attrList[indx] = GLX_GREEN_SIZE; indx++; 
+    // attrList[indx] = 1; indx++; 
+    // attrList[indx] = GLX_BLUE_SIZE; indx++; 
+    // attrList[indx] = 1; indx++;     
+    // attrList[indx] = None;     
+    //vinfo = glXChooseVisual(display, DefaultScreen(display), attrList);     
+    if (vInfo == NULL) {
+      printf ("ERROR: Can't open window\n"); 
+      return _sc->F;
+    }    
+ 
+
+    swa.border_pixel = 0;
+    swa.override_redirect = (pair_cadr(args) == _sc->T) ? True : False; 
+    swa.event_mask = StructureNotifyMask | KeyPressMask | ButtonPressMask | ButtonMotionMask;
+    swa.colormap = XCreateColormap( dpy, RootWindow(dpy, vInfo->screen),
+                                    vInfo->visual, AllocNone );
+
+    //swaMask = CWBorderPixel | CWColormap | CWEventMask;
+    swaMask = CWBorderPixel | CWColormap | CWEventMask | CWOverrideRedirect;
+
+
+    //xWin = XCreateWindow( dpy, RootWindow(dpy, vInfo->screen), 0, 0, 1024, 768,
+    //                      0, vInfo->depth, InputOutput, vInfo->visual,
+    //                      swaMask, &swa );
+
+    xWin = XCreateWindow( dpy, RootWindow(dpy, vInfo->screen), ivalue(pair_caddr(args)), ivalue(pair_cadddr(args)), ivalue(pair_car(pair_cddddr(args))), ivalue(pair_cadr(pair_cddddr(args))),
+                          0, vInfo->depth, InputOutput, vInfo->visual,
+                          swaMask, &swa );
+
+    // if we are sharing a context
+    if(sharedContext) {
+      /* Create a GLX context for OpenGL rendering */
+      context = glXCreateNewContext( dpy, fbConfigs[0], GLX_RGBA_TYPE, sharedContext, True );    
+    }else{ // if we aren't sharing a context
+      /* Create a GLX context for OpenGL rendering */
+      context = glXCreateNewContext( dpy, fbConfigs[0], GLX_RGBA_TYPE, NULL, True );
+    }
+
+    /* Create a GLX window to associate the frame buffer configuration with the created X window */
+    glxWin = glXCreateWindow( dpy, fbConfigs[0], xWin, NULL );
+    
+    /* Map the window to the screen, and wait for it to appear */
+    XMapWindow( dpy, xWin );
+    XIfEvent( dpy, &event, EXTGLWaitForNotify, (XPointer) xWin );
+
+    /* Bind the GLX context to the Window */
+    glXMakeContextCurrent( dpy, glxWin, glxWin, context );
+
+    void (*swapInterval)(int) = 0;
+
+    if (checkGLXExtension(dpy,"GLX_MESA_swap_control")) {
+      swapInterval = (void (*)(int)) glXGetProcAddress((const GLubyte*) "glXSwapIntervalMESA");
+    } else if (checkGLXExtension(dpy,"GLX_SGI_swap_control")) {
+      swapInterval = (void (*)(int)) glXGetProcAddress((const GLubyte*) "glXSwapIntervalSGI");
+    } else {
+      printf("no vsync?!\n");
+    }
+
+    printf("Is Direct:%d\n",glXIsDirect(dpy,context));
+
+    //glxSwapIntervalSGI(1);
+    //glXSwapIntervalMESA(1);
+
+    /* OpenGL rendering ... */
+    glClearColor( 0.0, 0.0, 0.0, 1.0 );
+    glClear( GL_COLOR_BUFFER_BIT );
+
+    glFlush();
+
+    if ( swapFlag )
+      glXSwapBuffers(dpy, glxWin);
+
+    printf("Using OPENGL callback render loop at refresh rate!\n");
+    if(pair_cdddr(pair_cddddr(args)) != _sc->NIL) {
+      long(*glinit)(void) = (long(*)(void)) cptr_value(pair_cadddr(pair_cddddr(args)));
+      glinit();
+    }
+    
+    glXSwapBuffers(dpy, glxWin);
+    glFlush();
+    swapInterval(1);
+    
+    while(true) {
+      callback();
+      glXSwapBuffers(dpy, glxWin);
+    }
+  }
+
+  
   pointer SchemeFFI::makeGLXContext(scheme* _sc, pointer args)
   {
     Display              *dpy;
@@ -2066,6 +2203,15 @@ namespace extemp {
     int                   swaMask;
     int                   numReturned;
     int                   swapFlag = True;
+
+    if(pair_cddr(pair_cddddr(args)) != _sc->NIL) {
+      EXTThread* render_thread = new EXTThread();
+      void* v[2];
+      v[0] = args;
+      v[1] = _sc;
+      render_thread->create(&opengl_render_callback,v);
+      return _sc->T;
+    }
 
     sharedContext = NULL;
     //if(pair_cdr(args) != _sc->NIL) sharedContext = (GLXContext) cptr_value(pair_cadr(args));
@@ -2156,8 +2302,6 @@ namespace extemp {
 
     printf("Is Direct:%d\n",glXIsDirect(dpy,context));
 
-    swapInterval(0);
-
     //glxSwapIntervalSGI(1);
     //glXSwapIntervalMESA(1);
 
@@ -2169,6 +2313,8 @@ namespace extemp {
 
     if ( swapFlag )
       glXSwapBuffers(dpy, glxWin);
+
+    swapInterval(0);    
 
     pointer list = _sc->NIL;
     _sc->imp_env->insert(list);
