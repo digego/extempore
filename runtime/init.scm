@@ -579,6 +579,15 @@
 	     (if (apply pred (list x)) (cons x acc) acc))
 	   (list)
 	   lst)))
+
+(define flatten
+  (lambda (lst)
+    (foldr (lambda (x acc)
+	     (if (list? x)
+		 (append (flatten x) acc)
+		 (cons x acc)))
+	   (list)
+	   lst)))
 	    
 (define remove
   (lambda (val lst prc)
