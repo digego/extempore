@@ -571,3 +571,26 @@
 			   (not (cond-eval (cadr condition)))))
 		(else (error "cond-expand : unknown operator" (car condition)))))))
 
+
+;; Some list manipulation bits and pieces.
+(define filter
+  (lambda (pred lst)
+    (foldr (lambda (x acc)
+	     (if (apply pred (list x)) (cons x acc) acc))
+	   (list)
+	   lst)))
+	    
+(define remove
+  (lambda (val lst prc)
+    (foldr (lambda (x acc)
+	     (if (apply prc (list val x)) acc (cons x acc)))
+	   (list)
+	   lst)))
+
+(define remq
+  (lambda (val lst)
+    (remove val lst eq?)))
+
+(define remv
+  (lambda (val lst)
+    (remove val lst eqv?)))
