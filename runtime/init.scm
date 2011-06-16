@@ -590,11 +590,12 @@
 	   lst)))
 	    
 (define remove
-  (lambda (val lst prc)
-    (foldr (lambda (x acc)
-	     (if (apply prc (list val x)) acc (cons x acc)))
-	   (list)
-	   lst)))
+  (lambda (val lst . prc)
+    (let ((proc (if (procedure? prc) prc equal?))) 
+      (foldr (lambda (x acc)
+	       (if (apply proc (list val x)) acc (cons x acc)))
+	     (list)
+	     lst))))
 
 (define remq
   (lambda (val lst)
