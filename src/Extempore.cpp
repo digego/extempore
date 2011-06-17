@@ -42,8 +42,13 @@
 #include <string>
 
 // need to init glut on linux
+#ifdef USE_GLUT
 #ifdef TARGET_OS_LINUX
 #include "GL/glut.h"
+#endif
+#ifdef TARGET_OS_MAC
+#include <GLUT/glut.h>
+#endif
 #endif
 
 int main(int argv, char** args)
@@ -59,7 +64,7 @@ int main(int argv, char** args)
 	with_banner = 1;
     }
 	
-#ifdef TARGET_OS_LINUX
+#ifdef USE_GLUT
     glutInit(&argv,args);
 #endif
 
