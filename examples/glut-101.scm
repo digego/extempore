@@ -1,15 +1,17 @@
 ;; Binding functions
 (define (setup-bindings)
-  (define libglut (sys:open-dylib "/System/Library/Frameworks/GLUT.framework/GLUT"))
-  (bind-lib libglut glutInitWindowPosition [void,i32,i32]*)
-  (bind-lib libglut glutInitWindowSize [void,i32,i32]*)
-  (bind-lib libglut glutInitDisplayMode [void,i32]*)
-  (bind-lib libglut glutCreateWindow [i32,i8*]*)
-  (bind-lib libglut glutDisplayFunc [void,i8*]*)
-  (bind-lib libglut glutMainLoop [void]*)
-  (bind-lib libglut glutPostRedisplay [void]*)
-  (bind-lib libglut glutIdleFunc [void,i8*]*)
-  )
+  (let* ((platform (sys:platform))
+	 (libglut (sys:open-dylib (cond ((equal? platform "OSX") "/System/Library/Frameworks/GLUT.framework/GLUT")
+					(else "/usr/local/lib/libglut.so")))))	   
+    (bind-lib libglut glutInitWindowPosition [void,i32,i32]*)
+    (bind-lib libglut glutInitWindowSize [void,i32,i32]*)
+    (bind-lib libglut glutInitDisplayMode [void,i32]*)
+    (bind-lib libglut glutCreateWindow [i32,i8*]*)
+    (bind-lib libglut glutDisplayFunc [void,i8*]*)
+    (bind-lib libglut glutMainLoop [void]*)
+    (bind-lib libglut glutPostRedisplay [void]*)
+    (bind-lib libglut glutIdleFunc [void,i8*]*)
+    ))
 
 ;; Wrappers
 (definec open-window
