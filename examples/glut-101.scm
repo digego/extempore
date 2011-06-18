@@ -1,19 +1,8 @@
-;; Binding functions
-(define (setup-bindings)
-  (let* ((platform (sys:platform))
-	 (libglut (sys:open-dylib (cond ((equal? platform "OSX") "/System/Library/Frameworks/GLUT.framework/GLUT")
-					(else "/usr/local/lib/libglut.so")))))	   
-    (bind-lib libglut glutInitWindowPosition [void,i32,i32]*)
-    (bind-lib libglut glutInitWindowSize [void,i32,i32]*)
-    (bind-lib libglut glutInitDisplayMode [void,i32]*)
-    (bind-lib libglut glutCreateWindow [i32,i8*]*)
-    (bind-lib libglut glutDisplayFunc [void,i8*]*)
-    (bind-lib libglut glutMainLoop [void]*)
-    (bind-lib libglut glutPostRedisplay [void]*)
-    (bind-lib libglut glutIdleFunc [void,i8*]*)
-    ))
+;; Wrappers for C functions we want to call from Scheme
+(define-wrapper glut-display-func glutDisplayFunc)
+(define-wrapper glut-idle-func glutIdleFunc)
+(define-wrapper glut-main-loop glutMainLoop)
 
-;; Wrappers
 (definec open-window
   (lambda (x y w h mode title)
     (glutInitWindowPosition x y)
@@ -21,17 +10,6 @@
     (glutInitDisplayMode mode)
     (glutCreateWindow title)))
 
-(definec glut-display-func
-  (lambda (f:[void,i8*]*)
-    (glutDisplayFunc f)))
-
-(definec glut-idle-func
-  (lambda (f:[void,i8*]*)
-    (glutIdleFunc f)))
-
-(definec glut-main-loop
-  (lambda ()
-    (glutMainLoop)))
 
 ;; Callbacks
 (definec render-callback
@@ -50,9 +28,6 @@
     (glutPostRedisplay)
     '()))
 
-(llvm:get-globalvar "angle")
-
-(setup-bindings)
 (open-window 0 0 800 600 18 "foo")
 (glut-display-func (llvm:get-native-function "render-callback"))
 (glut-idle-func (llvm:get-native-function "idle-callback"))

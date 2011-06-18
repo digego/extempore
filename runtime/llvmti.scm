@@ -2186,3 +2186,11 @@
 (define llvm:get-native-function
   (lambda (name)
     (llvm:get-function-pointer (string-append name "_native"))))
+
+;; Wrap a native, bound C function, allowing it to be called from scheme
+(define-macro (define-wrapper local-sym native-sym)
+  (let* ((types (cdr (llvm:get-function-args (symbol->string native-sym))))
+	 (args (map (lambda (t) (gensym)) types)))
+    `(definec ,local-sym
+       (lambda ,args
+	 ,(cons native-sym args)))))
