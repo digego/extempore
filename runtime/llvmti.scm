@@ -2158,8 +2158,8 @@
                                                      (string-append "," (impc:ir:get-type-str v)))
                                                    (cddr ctype))))
                                    ")")))
-      (llvm:compile ircode)
-      (if (llvm:bind-symbol library (symbol->string symname))
+      (if (and (llvm:compile ircode)
+	       (llvm:bind-symbol library (symbol->string symname)))
 	  (begin (ascii-print-color 0 9 10)
 		 (print "Successfully bound ")
 		 (ascii-print-color 1 2 10)
@@ -2169,7 +2169,7 @@
 		 (ascii-print-color 1 3 10)
 		 (print type)
 		 (ascii-print-color 0 9 10)
-		 ;(print " from lib: " library)
+					;(print " from lib: " library)
 		 (print))
 	  (print-error 'Compiler 'Error: 'could 'not 'bind! symname)))))
 
@@ -2182,8 +2182,15 @@
     (let ((f (llvm:get-function (string-append name "_getter"))))
       (if f (llvm:run f)
 	  '()))))
-
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-function
   (lambda (name)
     (llvm:get-function-pointer (string-append name "_native"))))
+
+;; Wrap a native, bound C function, allowing it to be called from scheme
+(define-macro (define-wrapper local-sym native-sym)
+  (let* ((types (cdr (llvm:get-function-args (symbol->string native-sym))))
+	 (args (map (lambda (t) (gensym)) types)))
+    `(definec ,local-sym
+       (lambda ,args
+	 ,(cons native-sym args)))))
