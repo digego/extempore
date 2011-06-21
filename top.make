@@ -53,7 +53,7 @@ CXXFLAGS := \
 	$(PLATFORM_CXXFLAGS) \
 
 LDFLAGS := \
-	-L$(EXT_LLVM_DIR)/lib \
+	-L$(EXT_LLVM_DIR)/Release/lib \
 	$(PLATFORM_LDFLAGS) \
 
 extempore: $(OBJFILES)
