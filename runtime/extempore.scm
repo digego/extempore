@@ -280,7 +280,7 @@
 ;; convert from audio samples to clock
 (define samples->clock
    (lambda (time)
-      (let* ((c (clock:au:clock))
+      (let* ((c (clock:ad:clock))
              (t1 (car c))
              (t2 (cdr c)))
          (+ t2 (/ (- time t1) *samplerate*)))))
@@ -290,7 +290,7 @@
 (define clock->samples
    (lambda (time)
       (let* ((t1 (clock:clock))
-             (t2 (clock:au:clock))
+             (t2 (clock:ad:clock))
              (t3 (round (+ (+ (car t2) (* (- time t1) *samplerate*))
                            (* (- t1 (cdr t2)) *samplerate*)))))                        
          (real->integer t3))))

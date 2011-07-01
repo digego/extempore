@@ -149,6 +149,16 @@ namespace extemp {
 	static pointer impcirGetName(scheme* _sc, pointer args);	
 	static pointer impcirGetType(scheme* _sc, pointer args);	
 	static pointer impcirAdd(scheme* _sc, pointer args);
+	static pointer adjustClockOffset(scheme* _sc, pointer args);
+	static pointer setClockOffset(scheme* _sc, pointer args);
+	static pointer getClockOffset(scheme* _sc, pointer args);
+	static pointer getClockTime(scheme* _sc, pointer args);
+	static pointer lastSampleBlockClock(scheme* _sc, pointer args);
+	static pointer ad_adjustClockOffset(scheme* _sc, pointer args);
+	static pointer ad_setClockOffset(scheme* _sc, pointer args);
+	static pointer ad_getClockOffset(scheme* _sc, pointer args);
+	static pointer ad_getClockTime(scheme* _sc, pointer args);
+	static pointer ad_setTime(scheme* _sc, pointer args);
 
 #if defined (TARGET_OS_LINUX)
 	// some XWindows guff
@@ -157,7 +167,7 @@ namespace extemp {
 	static pointer glxSwapBuffers(scheme* _sc, pointer args);
 	static pointer glxMakeContextCurrent(scheme* _sc, pointer args);
 #endif
-
+	static double CLOCK_OFFSET;
     private:
 	static SchemeFFI SINGLETON;		
 	static std::map<std::string,std::pair<std::string,std::string> > IMPCIR_DICT;

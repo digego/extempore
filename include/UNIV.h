@@ -57,6 +57,11 @@
 #endif
 #endif
 
+#define BILLION  1000000000L
+#define D_BILLION 1000000000.0
+#define D_MILLION 1000000.0
+
+
 void ascii_text_color(int attr, int fg, int bg);
 
 namespace extemp {

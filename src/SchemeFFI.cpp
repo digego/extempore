@@ -58,6 +58,8 @@
 
 #ifdef TARGET_OS_MAC
 #include <malloc/malloc.h>
+#else
+#include <time.h>
 #endif
 
 /////////////////////// llvm includes
@@ -93,6 +95,7 @@
     ascii_text_color(0,7,10)
 
 
+
 char* cstrstrip (char* inputStr)
 {
     char *start, *end;
@@ -118,6 +121,7 @@ char* cstrstrip (char* inputStr)
 namespace extemp {
 	
     SchemeFFI SchemeFFI::SINGLETON;
+    double SchemeFFI::CLOCK_OFFSET = 0.0;
     std::map<std::string,std::pair<std::string,std::string> > SchemeFFI::IMPCIR_DICT;
 
     void SchemeFFI::initSchemeFFI(scheme* sc)
@@ -237,6 +241,19 @@ namespace extemp {
 	    { "glx:set-context",                 &SchemeFFI::glxMakeContextCurrent },
 	    { "glx:swap-buffers",			&SchemeFFI::glxSwapBuffers },
 #endif
+
+	    //CLOCK STUFF
+	    { "clock:set-offset",                           &SchemeFFI::setClockOffset},
+	    { "clock:get-offset",                           &SchemeFFI::getClockOffset},
+            { "clock:adjust-offset",                        &SchemeFFI::adjustClockOffset},
+	    { "clock:clock",                                &SchemeFFI::getClockTime},
+            { "clock:ad:clock",                             &SchemeFFI::lastSampleBlockClock},    
+	    { "ad:clock:set-offset",                        &SchemeFFI::ad_setClockOffset},
+            { "ad:clock:get-offset",                       &SchemeFFI::ad_getClockOffset},
+	    { "ad:clock:adjust-offset",                    &SchemeFFI::ad_adjustClockOffset},
+	    { "ad:clock:clock",                            &SchemeFFI::ad_getClockTime},
+            { "ad:clock",                                  &SchemeFFI::ad_getClockTime},
+           
 
 	    		
 	};
@@ -2333,6 +2350,109 @@ namespace extemp {
   }
 
 #endif
+
+
+  //////////////////////////////////////////////////////////////////
+  //  CLOCK STUFF
+
+double time_to_double(struct timespec t) {
+    return t.tv_sec + t.tv_nsec/D_BILLION;
+}
+ 
+struct timespec double_to_time(double tm) {
+  struct timespec t;
+ 
+  t.tv_sec = (long)tm;
+  t.tv_nsec = (tm - t.tv_sec)*BILLION;
+  if (t.tv_nsec == BILLION) {
+    t.tv_sec++;
+    t.tv_nsec = 0;
+  }
+  return t;
+}
+
+  pointer SchemeFFI::adjustClockOffset(scheme* _sc, pointer args)
+  {
+    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args)) + SchemeFFI::CLOCK_OFFSET;
+    return mk_real(_sc,SchemeFFI::CLOCK_OFFSET);
+  }
+
+  pointer SchemeFFI::setClockOffset(scheme* _sc, pointer args)
+  {
+    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args));
+    return pair_car(args);
+  }
+
+  pointer SchemeFFI::getClockOffset(scheme* _sc, pointer args)
+  {
+    return mk_real(_sc, SchemeFFI::CLOCK_OFFSET);
+  }
+
+  pointer SchemeFFI::lastSampleBlockClock(scheme* _sc, pointer args)
+  {
+    pointer p1 = mk_integer(_sc,UNIV::TIME);
+    _sc->imp_env->insert(p1);
+    pointer p2 = mk_real(_sc,AudioDevice::REALTIME + SchemeFFI::CLOCK_OFFSET);
+    _sc->imp_env->insert(p2);
+    pointer p3 = cons(_sc, p1, p2);
+    _sc->imp_env->erase(p1);
+    _sc->imp_env->erase(p2);
+    return p3;
+  }
+
+#ifdef TARGET_OS_MAC
+  pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
+  {
+    return mk_real(_sc, CFAbsoluteTimeGetCurrent() + SchemeFFI::CLOCK_OFFSET);
+  } 
+#else
+  pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
+  {
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    return mk_real(_sc, time_to_double(t));
+  }
+#endif
+
+  //audiodevice clock stuff
+  pointer SchemeFFI::ad_adjustClockOffset(scheme* _sc, pointer args)
+  {
+    AudioDevice::CLOCKOFFSET = rvalue(pair_car(args)) + AudioDevice::CLOCKOFFSET;
+    return mk_real(_sc,AudioDevice::CLOCKOFFSET);
+  }
+
+  pointer SchemeFFI::ad_setClockOffset(scheme* _sc, pointer args)
+  {
+    AudioDevice::CLOCKOFFSET = rvalue(pair_car(args));
+    return pair_car(args);
+  }
+
+  pointer SchemeFFI::ad_getClockOffset(scheme* _sc, pointer args)
+  {
+    return mk_real(_sc, AudioDevice::CLOCKOFFSET);
+  }
+
+  pointer SchemeFFI::ad_getClockTime(scheme* _sc, pointer args)
+  {
+    return mk_real(_sc,AudioDevice::CLOCKBASE + AudioDevice::CLOCKOFFSET + ((double)UNIV::TIME/(double)UNIV::SAMPLERATE));
+  }
+
+  pointer SchemeFFI::ad_setTime(scheme* _sc, pointer args)
+  {
+    if(pair_cdr(args) == _sc->NIL) {
+#ifdef TARGET_OS_MAC
+      AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent();
+#else
+      struct timespec t;
+      clock_gettime(CLOCK_REALTIME, &t);
+      AudioDevice::CLOCKBASE = time_to_double(t);
+#endif
+    }else{
+      AudioDevice::CLOCKBASE = rvalue(pair_cadr(args));
+    }
+    UNIV::TIME = ivalue(pair_car(args));
+    return _sc->T;
+  } 
 
 } // end namespace
 

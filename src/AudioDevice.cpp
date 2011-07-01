@@ -50,9 +50,12 @@
 #include <mach/thread_act.h>
 #include <mach/thread_policy.h>
 #include <sys/sysctl.h>
+#include <time.h>
 #endif
 
 #include <stdlib.h>
+
+
 
 
 ///////////////////////////////////////////////////////////////////////
@@ -72,6 +75,31 @@
 ///////////////////////////////////////////////////////////////////////
 
 
+#ifdef TARGET_OS_LINUX
+double time_to_double(struct timespec t) {
+    return t.tv_sec + t.tv_nsec/D_BILLION;
+}
+ 
+struct timespec double_to_time(double tm) {
+  struct timespec t;
+ 
+  t.tv_sec = (long)tm;
+  t.tv_nsec = (tm - t.tv_sec)*BILLION;
+  if (t.tv_nsec == BILLION) {
+    t.tv_sec++;
+    t.tv_nsec = 0;
+  }
+  return t;
+}
+
+double getRealTime()
+{
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME,&t);
+  return time_to_double(t);
+}
+#endif
+
 
 SAMPLE audio_sanity(SAMPLE x)
 {
@@ -85,6 +113,9 @@ SAMPLE audio_sanity(SAMPLE x)
 namespace extemp {
 	
     AudioDevice AudioDevice::SINGLETON;
+    double AudioDevice::REALTIME = 0.0;
+    double AudioDevice::CLOCKBASE = 0.0;
+    double AudioDevice::CLOCKOFFSET = 0.0;
 
     bool first_callback = true;
 
@@ -326,6 +357,10 @@ namespace extemp {
       //sched->getGuard()->signal();	
       UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
       UNIV::TIME = UNIV::DEVICE_TIME;
+
+      if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime();
+      AudioDevice::REALTIME = getRealTime();
+
       //printf("DEVICE CALLBACK %lld\n",UNIV::DEVICE_TIME); 
       int channels = 2;
       uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
@@ -468,11 +503,15 @@ namespace extemp {
     //  PORT AUDIO
     //-----------------------------------
     int audioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
-    {
+    {        
         TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
 	//sched->getGuard()->signal();
 	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
 	UNIV::TIME = UNIV::DEVICE_TIME;
+
+	if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
+	AudioDevice::REALTIME = getRealTime();
+
 	//device_time = UNIV::DEVICE_TIME;
         //if(UNIV::DEVIDE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
         int channels = 2;
@@ -612,6 +651,9 @@ namespace extemp {
         device_time = t - start_time;
 	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
 	UNIV::TIME = UNIV::DEVICE_TIME;
+
+	if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent(); 
+	AudioDevice::REALTIME = CFAbsoluteTimeGetCurrent();
         
         if(false) { //UNIV::TIME != device_time) {
 	    std::cout << std::endl << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl;

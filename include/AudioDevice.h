@@ -99,6 +99,10 @@ namespace extemp {
 	float* getBuffer() { return buffer; }
 #endif
 
+	static double CLOCKBASE;
+	static double REALTIME;
+	static double CLOCKOFFSET;
+
     private:
 	bool started;
 #if defined (JACK_AUDIO)
