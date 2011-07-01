@@ -36,6 +36,14 @@
     0.0))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; high limit
+;; low limit
+;; then value
+(definec range-limit
+  (lambda (h:double l:double v:double)
+    (if (< v l) l
+	(if (> v h) h
+	    v))))
 
 (definec make-oscil
   (lambda (phase)
@@ -250,6 +258,14 @@
       (lambda (in)
 	(* amp (/ (floor (* in (pow 2. bits))) 
 		  (pow 2. bits)))))))
+
+
+;; a dodgy amp distortion
+(definec make-distort
+  (lambda (gain)
+    (let ((lim 0.5))
+      (lambda (in)
+	(range-limit lim (* -1.0 lim) (* gain in))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
