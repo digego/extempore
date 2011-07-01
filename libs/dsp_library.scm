@@ -788,7 +788,25 @@
 		     (real->integer ,index)
 		     (real->integer ,offset)
 		     (real->integer ,length)))
-					      
+
+
+;; helper functions for setting an individual samples offset
+;; i.e. set sample index 60 to start at 40000 samples into the audio buffer
+(definec set-sample-offset_
+  (lambda (sampler:[double,double,double,double*]* index:i64 offset:i64)
+    (let ((offsets (sampler.samples-offsets:|128,i64|*)))
+      (aset! offsets index offset)
+      1)))
+
+
+;; (set-sample-offset sampler 60 50000)
+;; this would offset the sample at index 60 by 50000 samples
+(define-macro (set-sample-offset inst index offset)
+  `(set-sample-offset_ (llvm:get-native-closure "sampler")
+		       (real->integer ,index)
+		       (real->integer ,offset)))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -809,9 +827,9 @@
 
 ;; make synth defaults
 (definec sampler-note
-  (lambda (samples:|128,double*|* samples-length:|128,i64|* index)
+  (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* index)
     (let ((idx-freq (midi2frq (i64tod index)))
-	  (phase 0.0)) ;; phase unit is audio frames
+	  (phase (i64tod (aref samples-offsets index)))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
 	(let ((rate (/ freq idx-freq))
 	      (pos (if (< chan 1.0) ;; only increment once per frame
@@ -858,6 +876,7 @@
      (let* ((poly 48)
 	    (samples (make-array 128 double*)) ;; 128 samples
 	    (samples-length (make-array 128 i64)) ;; 128 samples
+	    (samples-offsets (make-array 128 i64)) ;; 128 samples
 	    (notes (heap-alloc poly [double,double,double,double]*))
 	    (attack 200.0)
 	    (decay 200.0)
@@ -888,11 +907,13 @@
 					    (make-note start freq amp dur
 						       attack decay release sustain
 						       note-starts free-note
-						       (,note-kernel samples samples-length new-idx)))
+						       (,note-kernel samples samples-length samples-offsets new-idx)))
 				     (aset! note-starts free-note start)
 				     1)
 			      0)))))
-       (dotimes (kk 128) (aset! samples-length kk 0))
+       (dotimes (kk 128)
+	 (aset! samples-offsets kk 0)
+	 (aset! samples-length kk 0))
        (dotimes (ii poly) ;; sets all notes to inactive
 	 (aset! note-starts ii 9999999999999.0))
        (lambda (in:double time:double chan:double dat:double*)
@@ -942,8 +963,9 @@
 ;; setup default synth to play
 (definec:dsp dsp
   (lambda (in time chan dat)
-    (cond ((< chan 2.0) (+ (synth in time chan dat)
-			   (sampler in time chan dat)))
+    (cond ((< chan 2.0)
+	   (+ (synth in time chan dat)
+	      (sampler in time chan dat)))
 	  (else 0.0))))
 
 
