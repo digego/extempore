@@ -652,8 +652,8 @@ namespace extemp {
 	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
 	UNIV::TIME = UNIV::DEVICE_TIME;
 
-	if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent(); 
-	AudioDevice::REALTIME = CFAbsoluteTimeGetCurrent();
+	if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970; 
+	AudioDevice::REALTIME = CFAbsoluteTimeGetCurrent()+kCFAbsoluteTimeIntervalSince1970;
         
         if(false) { //UNIV::TIME != device_time) {
 	    std::cout << std::endl << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl;
