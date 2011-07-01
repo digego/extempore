@@ -392,6 +392,7 @@
                             ((eq? ast 'else) '(impc_true))
                             ((eq? ast '*samplerate*) '(llvm_samplerate))
                             ((eq? ast 'printf) 'llvm_printf)
+                            ((eq? ast 'sprintf) 'llvm_sprintf)			    
 			    ((eq? ast 'null) '(impc_null))
 			    ((eq? ast 'aset!) 'array-set!)
 			    ((eq? ast 'aref) 'array-ref)
@@ -1307,6 +1308,15 @@
          ;; printf returns i32
          (list *impc:ir:si32*))))
 
+(define impc:ti:sprintf-check
+   (lambda (ast vars kts request?)
+      (let ((a (impc:ti:type-check (cadr ast) vars kts (list (+ *impc:ir:si8* *impc:ir:pointer*))))
+	    (b (impc:ti:type-check (caddr ast) vars kts (list (+ *impc:ir:si8* *impc:ir:pointer*)))))
+         ;; run through everything else for completeness but don't care about the results
+         (for-each (lambda (x) (impc:ti:type-check x vars kts #f)) (cdddr ast))
+         ;; printf returns i32
+         (list *impc:ir:si32*))))
+
 (define impc:ti:string-check
    (lambda (ast vars kts request?)
       (if (string? ast)
@@ -1359,6 +1369,7 @@
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))            
             ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(llvm_sprintf))) (impc:ti:sprintf-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))  
             ((and (list? ast) (member (car ast) '(array-set!))) (impc:ti:array-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref))) (impc:ti:array-ref-check ast vars kts request?))

@@ -2285,8 +2285,28 @@
                                                                                       (caddr a) 
                                                                                       " " (cadr a)))
                                                                     (cdr args)))
-                                          ")\n"))                                                                  
-                        (impc:ir:compiler:native-call ast types)))
+                                          ")\n"))
+			(if (equal? (car ast) 'llvm_sprintf) ;; this guff all here for llvm_sprintf
+			    (let ((args (map (lambda (a)
+					       (cons (impc:ir:compiler a types)
+						     (impc:ir:gname)))
+					     (cdr ast)))				  
+				  (va (impc:ir:gname "val" "i32")))
+			      (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) (impc:ir:pointer++ *impc:ir:si8*))
+			      	  (print-error 'Compiler 'Error: 'Type 'Mismatch ast 'First 'argument 'must 'be 'allocated 'memory))
+			      (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (cadr args))))) (impc:ir:pointer++ *impc:ir:si8*))
+			      	  (print-error 'Compiler 'Error: 'Type 'Mismatch ast 'Second 'argument 'must 'be 'format 'string))
+			      (string-append (apply string-append (map (lambda (a) (car a)) args))
+					     "\n" va " = call i32 (i8*,i8*, ...)* @llvm_sprintf("
+					     (caddr (car args)) " " (cadr (car args)) ", "
+					     (caddr (cadr args)) " " (cadr (cadr args))					     
+					     (apply string-append (map (lambda (a)
+									 (string-append ", " 
+											(caddr a) 
+											" " (cadr a)))
+								       (cddr args)))
+					     ")\n"))						    
+			    (impc:ir:compiler:native-call ast types))))
                    ((equal? (car ast) 'ret->) ;; return from function
                     (let ((str (impc:ir:compiler (caddr ast) types)))
                        (if (impc:ir:void? (cadr (impc:ir:gname)))

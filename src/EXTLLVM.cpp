@@ -194,9 +194,19 @@ int llvm_printf(char* format, ...)
     va_list ap;
     va_start(ap,format);
     char* ret = (char*) alloca(2048);
-    int returnval = vasprintf(&ret, format, ap);
+    int returnval = vsprintf(ret, format, ap);
     printf("%s",ret);
     fflush(stdout);	
+    va_end(ap);
+    return returnval;
+}
+
+int llvm_sprintf(char* str, char* format, ...)
+{
+    va_list ap;
+    va_start(ap,format);
+    int returnval = vsprintf(str, format, ap);
+    printf("in the wing: %s\n",str);
     va_end(ap);
     return returnval;
 }
@@ -638,6 +648,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_get_next_prime);			
 	    gv = M->getNamedValue(std::string("llvm_printf"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_printf);									
+	    gv = M->getNamedValue(std::string("llvm_sprintf"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_sprintf);									
 	    gv = M->getNamedValue(std::string("llvm_zone_create"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);						
 	    gv = M->getNamedValue(std::string("llvm_zone_destroy"));
