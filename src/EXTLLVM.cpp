@@ -206,7 +206,7 @@ int llvm_sprintf(char* str, char* format, ...)
     va_list ap;
     va_start(ap,format);
     int returnval = vsprintf(str, format, ap);
-    printf("in the wing: %s\n",str);
+    //printf("in the wing: %s\n",str);
     va_end(ap);
     return returnval;
 }
