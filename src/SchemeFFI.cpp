@@ -2403,7 +2403,7 @@ struct timespec double_to_time(double tm) {
 #ifdef TARGET_OS_MAC
   pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
   {
-    return mk_real(_sc, CFAbsoluteTimeGetCurrent() + SchemeFFI::CLOCK_OFFSET);
+    return mk_real(_sc, CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + SchemeFFI::CLOCK_OFFSET);
   } 
 #else
   pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
@@ -2441,7 +2441,7 @@ struct timespec double_to_time(double tm) {
   {
     if(pair_cdr(args) == _sc->NIL) {
 #ifdef TARGET_OS_MAC
-      AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent();
+      AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
 #else
       struct timespec t;
       clock_gettime(CLOCK_REALTIME, &t);
