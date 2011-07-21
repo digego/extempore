@@ -26,7 +26,7 @@
   (lambda (path idx:i32)
     (let ((res (SOIL_load_OGL_texture path 4 idx (+ 4 8 16)))) ; (+ 512 16))))
       (if (= 0 res)
-	  (printf "failed to load %s\n" path)
+	  (printf "failed (%lld) to load %s\n" res path)
 	  (printf "successfully loaded %s as index: %d\n" path res)))))
 
 
@@ -46,8 +46,8 @@
 ;; lib GLU
 (define libglu (sys:open-dylib "libGLU.so"))
 
-(bind-lib libglu gluLookAt [double,double,double,double,double,double,double,double,double]*)
-(bind-lib libglu gluPerspective [double,double,double,double]*)
+(bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
+(bind-lib libglu gluPerspective [void,double,double,double,double]*)
 (bind-lib libglu gluErrorString [i8*,i32]*)
 
 (bind-type size_t i64)
@@ -101,7 +101,6 @@
 (bind-type aiCamera <aiString,aiVector3D,aiVector3D,aiVector3D,float,float,float,float>)
 ;; mFlags(0),mRootNode(1),mNumMeshes(2),mMeshes(3),mNumMaterials(4),mMaterials(5),mNumAnimations(6),mAnimations(7),mNumTextures(8),mTextures(9),mNumLights(10),mLights(11),mNumCameras(12),mCameras(13)
 (bind-type aiScene <i32,aiNode*,i32,aiMesh**,i32,aiMaterial**,i32,aiAnimation**,i32,aiTexture**,i32,aiLight**,i32,aiCamera**>)
-
 
 (bind-lib libassimp aiImportFile [aiScene*,i8*,i32]*)
 (bind-lib libassimp aiReleaseImport [void,aiScene*]*)
@@ -411,6 +410,23 @@
 		     (load-ogl-texture (bitcast (tref-ptr texfile 1) i8*) (+ 1 i)))))))))
 
 
+(definec build-display-list-from-node
+  (lambda (container:<aiScene*,aiVector3D*,aiVector3D*,aiVector3D*>* idx:i64)
+    (let ((scene (tref container 0))
+	  (scene_list 0)
+	  (root-node (tref scene 1))
+	  (children (tref root-node 4))
+	  (child (aref children idx)))
+      (printf "Try to build!\n")
+      (set! scene_list (glGenLists 1))
+      ;; load material textures?
+      (load-textures scene)
+      (glNewList scene_list GL_COMPILE)
+      (printf "Load model into GL Display List %d\n" scene_list);
+      (recursive_render scene child)
+      (glEndList)
+      scene_list)))
+
 (definec build-display-list
   (lambda (container:<aiScene*,aiVector3D*,aiVector3D*,aiVector3D*>*)
     (let ((scene (tref container 0))
@@ -420,7 +436,7 @@
       ;; load material textures?
       (load-textures scene)
       (glNewList scene_list GL_COMPILE)
-      (printf "Load model into GL Display List\n");
+      (printf "Load model into GL Display List %d\n" scene_list);
       (recursive_render scene (tref scene 1))
       (glEndList)
       scene_list)))

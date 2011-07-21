@@ -1400,10 +1400,13 @@
       (let* ((os (make-string 0))
              (s2 (impc:ir:compiler (caddr ast) types))
              (vv (impc:ir:gname)))
-         (emit s2 os)	 	 
-         (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" 
-			      (symbol->string (cadr ast)) "Ptr\n") os)
-         (impc:ir:strip-space os))))          
+         (emit s2 os)
+	 (if (llvm:get-globalvar (symbol->string (cadr ast)))
+	     (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+				  (symbol->string (cadr ast)) "\n") os)	     
+	     (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"				  
+				  (symbol->string (cadr ast)) "Ptr\n") os))
+         (impc:ir:strip-space os))))
 
 
 ;; new compiler set copies pointers
@@ -1416,8 +1419,13 @@
 	     (type (impc:ir:get-type-from-str (cadr vv))))
          (emit s2 os)	 	 
 	 (if (not (impc:ir:pointer? type)) ;; if this is a fixed pointer value
-	     (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" 
-				  (symbol->string (cadr ast)) "Ptr\n") os)
+	     (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; are we are setting a global variable?
+		 (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+				      (symbol->string (cadr ast)) "\n") os)	     
+		 (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
+				      (symbol->string (cadr ast)) "Ptr\n") os))	     
+	     ;(emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" 
+	     ;			  (symbol->string (cadr ast)) "Ptr\n") os)
 	     (if (impc:ir:closure? type) 
 		 ;; unforunately closures just leak at the moment :(
 		 ;; this is due to the fact that it's nearly impossible for closures to be the

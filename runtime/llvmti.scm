@@ -1167,8 +1167,9 @@
       (let* ((sym (impc:ti:get-var (cadr ast) vars))
              (a (impc:ti:type-check (caddr ast) vars kts (cdr sym))))
          (if *impc:ti:print-sub-checks* (print 'set!:> 'ast: ast 'a: a))
-         ;; add return type to sym
-         (impc:ti:update-var (car sym) vars kts a)
+	 ;; if sym is not a global var then add return type to sym
+	 (if (assoc (car sym) vars) 
+	     (impc:ti:update-var (car sym) vars kts a))
          a)))
 
 (define impc:ti:pdref-check
@@ -2103,8 +2104,15 @@
 	  (ascii-print-color 0 7 10)
 	  (print)))
   
-
-
+;;
+;; bindc should not really be called directly and
+;; is really now only here for legacy reasons
+;;
+;; although bind-val does currently call into bindc
+;; so don't go deleteing it!!
+;;
+;; end users should use bind-val instead
+;;
 (define-macro (bindc symbol type value)
    (if (cptr? (eval value))
        `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
@@ -2123,7 +2131,32 @@
 	       (print ',type)
 	       (ascii-print-color 0 7 10)
 	       (print))	       
-       (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!)))
+       (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!  'Try 'bind-val 'for 'numeric 'binds)))
+
+
+(define-macro (bind-val symbol type value)
+   (if (number? (eval value))
+       `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
+                   (llvm:compile (string-append "@" ,(symbol->string symbol)
+                                                " = global "
+                                                ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type))
+						" "
+						(atom->string ,value))))
+               ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
+	       ;(llvm:bind-global-var ,(symbol->string symbol) ,value)
+	       (ascii-print-color 0 7 10)
+	       (print "Successfully bound ")
+	       (ascii-print-color 1 2 10)
+	       (print ',symbol)
+	       (ascii-print-color 0 7 10)
+	       (print " >>> ")
+	       (ascii-print-color 1 3 10)
+	       (print ',type)
+	       (ascii-print-color 0 7 10)
+	       (print))
+       (if (cptr? (eval value))
+	   `(bindc ,symbol ,type ,value)
+	   (print-error 'Compiler 'Error: 'bind-val 'only 'accepts 'numeric 'and 'cptr 'values!))))
 
 
 (define-macro (bind-scm symbol type value)
@@ -2145,8 +2178,10 @@
 	       (print ',type)
 	       (ascii-print-color 0 7 10)
 	       ;(print " from scheme:" ,value)
-	       (print))	       
-       (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!)))
+	       (print))
+       (if (number? (eval value))
+	   `(bind-val ,symbol ,type ,value)
+	   (print-error 'Compiler 'Error: 'bind-scm 'only 'accepts 'cptr 'or 'numeric 'values!))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; this here for wrapping llvm dynamic binds

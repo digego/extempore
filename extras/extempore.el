@@ -36,6 +36,14 @@
 
 (define-key scheme-mode-map (kbd "RET") 'newline-and-indent)
 
+(defun ext:marco1 (name duration)
+  (interactive "sName: \nsDuration: ")
+  (insert (concat "(define " name
+		  "\n  (lambda (beat dur)\n    "
+		  "(callback (*metro* (+ beat (* .5 " duration "))) '" 
+		  name " (+ beat " duration ") " duration ")))\n\n"
+		  "(" name " (*metro* 'get-beat 4) " duration ")")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; add some stuff to scheme mode
 
@@ -43,7 +51,8 @@
   '(("definec" . font-lock-keyword-face)
     ("definec:dsp" . font-lock-keyword-face)
     ("define-instrument" . font-lock-keyword-face)
-    ("bind-scm" . font-lock-keyword-face)
+    ;("bind-scm" . font-lock-keyword-face)
+    ("bind-val" . font-lock-keyword-face)
     ("bind-type" . font-lock-keyword-face)
     ("dotimes" . font-lock-keyword-face)
     ("bind-lib" . font-lock-keyword-face)))
