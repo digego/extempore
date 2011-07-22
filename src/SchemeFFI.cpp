@@ -1363,7 +1363,11 @@ namespace extemp {
 	    return _sc->F;
 	}			
 
-	pointer str = mk_string(_sc, func->getFunctionType()->getDescription().c_str());
+        std::string typestr;
+	llvm::raw_string_ostream ss(typestr);
+        func->getFunctionType()->print(ss);
+	//printf("%s\n",ss.str().c_str());
+	pointer str = mk_string(_sc, ss.str().c_str()); //func->getFunctionType()->getDescription().c_str());
 	return str;
     }
 
@@ -1379,15 +1383,22 @@ namespace extemp {
 	    return _sc->F;
 	}			
 
-	pointer str = mk_string(_sc, func->getReturnType()->getDescription().c_str());
+        std::string typestr;
+	llvm::raw_string_ostream ss(typestr);
+        func->getReturnType()->print(ss);
+	pointer str = mk_string(_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
 	pointer p = cons(_sc, str, _sc->NIL); 
 
 	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
 	while(funcargs != func->getArgumentList().end())
 	{			
 	    Argument* a = funcargs;
-	    _sc->imp_env->insert(p);						
-	    pointer str = mk_string(_sc, a->getType()->getDescription().c_str());
+	    _sc->imp_env->insert(p);					
+	    std::string typestr2;
+	    llvm::raw_string_ostream ss2(typestr2);
+	    a->getType()->print(ss2);
+	
+	    pointer str = mk_string(_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
 	    _sc->imp_env->erase(p);
 	    p = cons(_sc, str, p);			
 	    funcargs++;
@@ -1469,7 +1480,10 @@ namespace extemp {
 	{
 	    return _sc->F;
 	}				
-	return mk_string(_sc, var->getType()->getDescription().c_str());
+        std::string typestr;
+	llvm::raw_string_ostream ss(typestr);
+        var->getType()->print(ss);
+	return mk_string(_sc, ss.str().c_str()); //var->getType()->getDescription().c_str());
     }	
 
     pointer SchemeFFI::get_function_pointer(scheme* _sc, pointer args)
@@ -1892,7 +1906,11 @@ namespace extemp {
 	
 	if(tt) {
 	  //return mk_string(_sc,M->getTypeName(tt).c_str());
-	  return mk_string(_sc,tt->getDescription().c_str());
+	  std::string typestr;
+	  llvm::raw_string_ostream ss(typestr);
+	  tt->print(ss);
+
+	  return mk_string(_sc,ss.str().c_str()); //tt->getDescription().c_str());
 	} else {
 	  return _sc->NIL;
 	}

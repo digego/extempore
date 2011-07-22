@@ -16,6 +16,7 @@ On linux you will also need:
    - portaudio
    - mesa GL (opengl)
    - glut
+   - (optionally jack)
 
 On OSX you also need the following frameworks:
    - opengl
@@ -37,18 +38,22 @@ are PCRE, GLFW and LLVM (version 2.8).  You can find them here:
    LLVM you can get from:
    http://www.llvm.org/
 
-In all cases building from  the most recent source should "just work".
-Also all three should build  fine with standard defaults.  So a simple
-configure/make should be sufficient in all cases.
+PCRE and GLFW should build from the most recent source and should
+"just work".  LLVM must be version 2.8.  All three should build fine
+with standard defaults - although you do need to provide an install
+location for LLVM.  So a simple './configure', then 'make' and then
+'make install' should be sufficient for PCRE and GLFW.  LLVM will just
+require an additional build location, so something like './configure
+--prefix=~/Documents/ext_llvm' then 'make -j2' and then 'make install'
 
-PCRE   and  GLFW   should  be   installed  in   the   usual  locations
-(i.e. somewhere that gcc can find).
-
-LLVM is a special case.  You'll need to to ONE of either (a) copy
-config/llvm.bash.sample to config/llvm.bash and edit it according to
-the location of LLVM.  OR (b) set the EXT_LLVM_DIR shell variable to
-point to the LLVM top level source directory.  Make sure you download
-version 2.8 of LLVM!
+PCRE and GLFW should be installed in the usual locations
+(i.e. somewhere that gcc can find).  LLVM is a special case.  You'll
+need to do ONE of either (a) copy config/llvm.bash.sample to
+config/llvm.bash and edit it according to the prefix install location
+you set for LLVM.  OR (b) set the EXT_LLVM_DIR shell variable to point
+to the prefix install location for LLVM.  Make sure you download
+version 2.8 of LLVM!  
+(i.e. $ export EXT_LLVM_DIR=~/Documents/ext_llvm)
 
 Once all of the library dependencies for your platform are installed,
 you can build extempore using:
@@ -70,23 +75,29 @@ For now you need to build LLVM from source (it will take some time):
    $ wget http://llvm.org/releases/2.8/llvm-2.8.tgz
    $ tar -xvzf llvm-2.8.tgz
    $ cd llvm-2.8/
-   $ ./configure
+   $ ./configure --prefix=~/Documents/ext_llvm
    $ make
+   $ make install
 
 Now you can build Extempore:
 
    $ git clone https://github.com/digego/extempore.git
    $ cd extempore/
+   $ export EXT_LLVM_DIR=~/Documents/ext_llvm
    $ ./all.bash
 
-NOTE: If you are running Ubuntu in VirtualBox (on OSX but also possibly
-      on other hosts as well) then you will need to make a small
-      source modification and then compile and install glfw manually.
-      I haven't spent the time to investigate this properly but the
-      following hack will fix it in the short term:
+NOTE1: If you want to compile against Jack instead of portaudio
+       provide all.bash with a -DJACK_AUDIO argument (and make sure
+       that the jack libs and headers are installed correctly!)
 
-      The required source change is a one liner:
-      	  uninstall any glfw packages that you have installed
+NOTE2: If you are running Ubuntu in VirtualBox (on OSX but also
+       possibly on other hosts as well) then you will need to make a
+       small source modification and then compile and install glfw
+       manually.  I haven't spent the time to investigate this properly
+       but the following hack will fix it in the short term:
+
+       The required source change is a one liner:
+       	  uninstall any glfw packages that you have installed
 	  download the glfw 2.7 source
           open the file glfw-2.7/lib/x11/x11_window.c
 	  then search in the file for GLX_DRAWABLE_TYPE

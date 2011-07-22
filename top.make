@@ -10,31 +10,7 @@ DEFINES := $(PLATFORM_DEFINES) \
 	-D__STDC_CONSTANT_MACROS \
 	-D__STDC_LIMIT_MACROS \
 
-LLVM_LIBS := \
-	-lLLVMX86AsmParser \
-	-lLLVMX86AsmPrinter \
-	-lLLVMX86CodeGen \
-	-lLLVMSelectionDAG \
-	-lLLVMAsmParser \
-	-lLLVMAsmPrinter \
-	-lLLVMXCoreInfo \
-	-lLLVMX86Info \
-	-lLLVMInterpreter \
-	-lLLVMJIT \
-	-lLLVMExecutionEngine \
-	-lLLVMCodeGen \
-	-lLLVMScalarOpts \
-	-lLLVMInstCombine \
-	-lLLVMipo \
-	-lLLVMTransformUtils \
- 	-lLLVMInstrumentation \
-	-lLLVMipa \
-	-lLLVMAnalysis \
-	-lLLVMTarget \
-	-lLLVMMC \
-	-lLLVMCore \
-	-lLLVMSupport \
-	-lLLVMSystem \
+LLVM_LIBS := $(EXT_LLVM_LIBS)
 
 LIBS := \
 	-lpthread -lm -lpcre -lglfw \
@@ -53,10 +29,10 @@ CXXFLAGS := \
 	$(PLATFORM_CXXFLAGS) \
 
 LDFLAGS := \
-	-L$(EXT_LLVM_DIR)/Release/lib \
+	-L$(EXT_LLVM_DIR)/lib \
 	$(PLATFORM_LDFLAGS) \
 
-extempore: $(OBJFILES)
+extempore: $(OBJFILES)        
 	@echo + ld $@
 	@$(LD) $(LDFLAGS) -o $@ $(OBJFILES) $(LIBS)
 
