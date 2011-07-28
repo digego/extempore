@@ -102,6 +102,15 @@
 (bind-val H3DNodeFlags_NoRayQuery i32 4)
 (bind-val H3DNodeFlags_Inactive i32 7)
 
+;; Model Node Params
+(bind-val H3DModel_GeoResI i32 200)
+(bind-val H3DModel_SWSkinningI i32 201)
+(bind-val H3DModel_LodDist1F i32 202)
+(bind-val H3DModel_LodDist2F i32 203)
+(bind-val H3DModel_LodDist3F i32 204)
+(bind-val H3DModel_LodDist4F i32 205)
+
+
 ;; LightNodeParams
 (bind-val H3DLight_MatResI i32 500)
 (bind-val H3DLight_RadiusF i32 501)

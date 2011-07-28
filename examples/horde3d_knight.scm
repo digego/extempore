@@ -98,6 +98,9 @@
 	  (printf "succesfully loaded resouces\n")
 	  (printf "failed to load resources\n"))
 
+      ;; log any errors to Horde3D_Log.html
+      (h3dutDumpMessages)                  
+
       ;; add camera
       (set! _cam (h3dAddCameraNode H3DRootNode "Camera" _hdrPipeRes))
       ;; add environment
@@ -169,6 +172,7 @@
       (h3dRender _cam)
       (h3dFinalizeFrame)
       (h3dClearOverlays)
+      (h3dutDumpMessages)            
       1)))
 
 
