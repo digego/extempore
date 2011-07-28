@@ -115,6 +115,7 @@ namespace extemp {
 	static pointer regex_replace(scheme* _sc, pointer args);
 		
 	// memory zone stuff
+	void freeWithDelay(TaskI* task);
 	void destroyMallocZoneWithDelay(TaskI* task);
 	static pointer createMallocZone(scheme* _sc, pointer args);
 	static pointer defaultMallocZone(scheme* _sc, pointer args);

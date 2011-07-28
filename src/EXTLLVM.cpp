@@ -171,11 +171,20 @@ void llvm_zone_copy_ptr(void* ptr1, void* ptr2)
 }
 
 
+extemp::CM* FreeWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,freeWithDelay);
+void free_after_delay(char* dat, double delay)
+{
+    //printf("freeWithDelay %p\n",zone);
+    extemp::CM* cb = FreeWithDelayCM; 
+    extemp::Task<char*>* task = new extemp::Task<char*>(extemp::UNIV::TIME+delay,44100,cb,dat);
+    extemp::TaskScheduler::I()->add(task);
+}
+
 extemp::CM* DestroyMallocZoneWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay)
 {
     //printf("destroyWithDelay %p\n",zone);
-    extemp::CM* cb = DestroyMallocZoneWithDelayCM; //mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
+    extemp::CM* cb = DestroyMallocZoneWithDelayCM;
     extemp::Task<llvm_zone_t*>* task = new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME+delay,44100,cb,zone);
     extemp::TaskScheduler::I()->add(task);
 }
@@ -644,6 +653,8 @@ namespace extemp {
 
 	    llvm::GlobalValue* gv = M->getNamedValue(std::string("llvm_destroy_zone_after_delay"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_destroy_zone_after_delay);			
+	    gv = M->getNamedValue(std::string("free_after_delay"));
+	    EE->updateGlobalMapping(gv,(void*)&free_after_delay);			
 	    gv = M->getNamedValue(std::string("next_prime"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_get_next_prime);			
 	    gv = M->getNamedValue(std::string("llvm_printf"));

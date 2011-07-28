@@ -1190,6 +1190,13 @@ namespace extemp {
     // MEMORY ZONE STUFF
     //
     //////////////////////////////////////////////////////
+    void SchemeFFI::freeWithDelay(TaskI* task)
+    {
+	Task<char*>* t = static_cast<Task<char*>*>(task);
+        char* dat = t->getArg();
+	free(dat);
+    }
+
     void SchemeFFI::destroyMallocZoneWithDelay(TaskI* task)
     {
 	Task<llvm_zone_t*>* t = static_cast<Task<llvm_zone_t*>*>(task);

@@ -733,6 +733,7 @@
 
 ;; bind 3 sndfile lib functions
 (bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
+(bind-lib libsndfile sf_close [i32,i8*]*)
 (bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
 (bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
@@ -751,7 +752,8 @@
       (printf "frames:\t\t %lld\n" (tref info 0))
       (printf "seconds:\t %f\n"
 	      (/ (i64tod (/ (tref info 0) (i32toi64 (tref info 2))))
-		 (i32tod (tref info 1)))))))
+		 (i32tod (tref info 1))))
+      (sf_close audiofile))))
 
 ;; an audio buffer reader
 (definec read-audio-data
@@ -761,6 +763,7 @@
 	  (audiofile (sf_open fname 16 info))
 	  (cnt (sf_seek audiofile offset 0))
 	  (samples-read (sf_read_double audiofile dat num)))
+      (sf_close audiofile)
       samples-read)))
 
 
@@ -786,12 +789,15 @@
 		(adat (bitcast adat_ double*))
 		(samples (inst.samples:|128,double*|*))
 		(samples-length (inst.samples-length:|128,i64|*))
-		(read (read-audio-data fname adat (* offset channels) num)))
-	    (if (<> 0 (aref samples-length index))
-		(begin (free (aref samples index)) 1))
+		(read (read-audio-data fname adat (* offset channels) num))
+		(olddat (if (<> 0 (aref samples-length index))
+			    (bitcast (aref samples index) i8*)
+			    null)))
+	    (aset! samples-length index (/ read channels)) ;num)	    
 	    (aset! samples index adat)
-	    (aset! samples-length index (/ read channels)) ;num)
-	    (printf "read %lld(frames):%f(k) into sampler index: %lld\n" (/ read channels) (/ (i64tod (* num 8)) 1024.) index)
+	    (free_after_delay olddat (* 10.0 44100.0))
+	    (printf "read %lld(frames):%f(k) into index:%lld\n" (/ read channels) (/ (i64tod (* num 8)) 1024.) index)
+	    (sf_close audiofile)
 	    1)
 	  (begin (printf "%s\n" (sf_strerror audiofile))
 		 0)))))
