@@ -1,4 +1,4 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; A DSP Library.
 ;;
@@ -734,7 +734,9 @@
 ;; bind 3 sndfile lib functions
 (bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
 (bind-lib libsndfile sf_close [i32,i8*]*)
+(bind-lib libsndfile sf_write_sync [void,i8*]*)
 (bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
 (bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
 
@@ -766,6 +768,21 @@
       (sf_close audiofile)
       samples-read)))
 
+;; write out an audio buffer
+(definec write-audio-data
+  (lambda (fname frames channels:i32 dat)
+    (let ((info (make-tuple i64 i32 i32 i32 i32 i32)))
+      (tset! info 0 frames)
+      (tset! info 1 (dtoi32 *samplerate*))
+      (tset! info 2 channels)
+      (tset! info 3 (+ 131072 2)) ;; + 6 for 32 bit float (+ 2 for 16 bit signed)
+      (let ((audiofile (sf_open fname 32 info))
+	    (samples-written (sf_write_double audiofile dat (* (i32toi64 channels) frames))))
+	(if (null? audiofile)
+	    (printf "error writing file: %s\n" (sf_strerror audiofile)))
+	(sf_write_sync audiofile)
+	(sf_close audiofile)
+	samples-written))))
 
 ;; helper function for adding sample data to sampler
 ;; this assumes stereo files at the moment!!
