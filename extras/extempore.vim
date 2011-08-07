@@ -157,7 +157,7 @@ def join_lines(lines):
     result = ""
     for line in lines:
         # remove comment; TODO: do less hacky
-        result += line.split(";;")[0]
+        result += line.split(";")[0]
 
     result += "\r\n"
     return result
