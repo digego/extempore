@@ -20,5 +20,5 @@
 (define addy2 (cons "localhost" 7019))
 
 ;; Some a test message delayed by 4 seconds
-(io:osc:send (+ (now) (* *second* 4)) addy "/test/msg" "Hello" 500 6.6 "World")
+(io:osc:send (+ (now) (* *second* 4)) addy1 "/test/msg" "Hello" 500 6.6 "World")
 (io:osc:send (+ (now) (* *second* 4)) addy2 "/test/msg" "Hello" 500 6.6 "World")
