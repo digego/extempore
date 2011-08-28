@@ -89,6 +89,69 @@ bool rsplit(char* regex, char* str, char* a, char* b)
   return true;
 }
 
+// returns char* result
+char* rreplace(char* regex, char* str, char* replacement, char* result) {
+
+        char* data = str; //string_value(pair_car(args));
+	char* pattern = regex; //string_value(pair_cadr(args));
+	strcpy(result,replacement);
+		
+	pcre *re;
+	const char *error; 
+	int erroffset; 
+	re = pcre_compile(	pattern, /* the pattern */ 
+				0, /* default options */ 
+				&error, /* for error message */ 
+				&erroffset, /* for error offset */ 
+				NULL); /* use default character tables */
+		
+	int rc; 
+	int ovector[60];
+
+	rc = pcre_exec(	re, /* result of pcre_compile() */ 
+			NULL, /* we didn’t study the pattern */ 
+			data, /* the subject string */ 
+			strlen(data), /* the length of the subject string */ 
+			0, /* start at offset 0 in the subject */ 
+			0, /* default options */ 
+			ovector, /* vector of integers for substring information */ 
+			60); /* number of elements (NOT size in bytes) */
+
+	// no match found return original string
+	if(rc<1) {strcpy(result,str); return result;} // Return mk_string(_sc,data);
+
+	// ok we have a match
+	// first replace any groups in replace string (i.e. $1 $2 ...)
+	char* res = (char*) "";
+	char* sep = (char*) "$";
+	char* tmp = 0;
+	int pos,range,size = 0;
+	char* p = strtok(result,sep);
+	do{
+	    char* cc;
+	    pos = strtol(p,&cc,10);
+	    range = (pos>0) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
+	    size = strlen(res);
+	    tmp = (char*) alloca(size+range+strlen(cc)+1);
+	    memset(tmp,0,size+range+strlen(cc)+1);
+	    memcpy(tmp,res,size);
+	    memcpy(tmp+size,data+ovector[pos*2],range);
+	    memcpy(tmp+size+range,cc,strlen(cc));
+	    res = tmp;
+	    p = strtok(NULL, sep);
+	}while(p);
+	// now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
+	int lgth = (strlen(data)-range)+strlen(res)+1;
+	range = ovector[1] - ovector[0];
+	//char* result = (char*) alloca(lgth);
+	memset(result,0,lgth);
+	memcpy(result,data,ovector[0]);
+	memcpy(result+ovector[0],res,strlen(res));
+	memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);		
+	return result;
+}
+
+
 
 namespace extemp {
 

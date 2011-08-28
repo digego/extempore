@@ -63,6 +63,7 @@
 
 
 bool rsplit(char* regex, char* str, char* a, char* b);
+char* rreplace(char* regex, char* str, char* replacement, char* result);
 void ascii_text_color(int attr, int fg, int bg);
 
 namespace extemp {
