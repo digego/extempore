@@ -520,7 +520,7 @@ namespace extemp {
 	
 	void* dsp_closure = AudioDevice::I()->getDSPClosure();
 	void* cache_closure = 0;
-	if(dsp_closure == 0) return 0;
+	if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE))); return 0; }
 	cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
 				
 	if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
@@ -548,6 +548,8 @@ namespace extemp {
 	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
 	    llvm_zone_destroy(zone);
 	}else{ 
+	    //zero out audiobuffer
+	    memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)));
 	    //nothin to do
 	}
         return 0;
