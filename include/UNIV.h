@@ -62,6 +62,7 @@
 #define D_MILLION 1000000.0
 
 
+bool rsplit(char* regex, char* str, char* a, char* b);
 void ascii_text_color(int attr, int fg, int bg);
 
 namespace extemp {

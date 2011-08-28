@@ -41,6 +41,7 @@
 #include <sstream>
 #include <iosfwd>
 #include <iomanip>
+#include "pcre.h"
 
 
 void ascii_text_color(int attr, int fg, int bg)
@@ -50,6 +51,44 @@ void ascii_text_color(int attr, int fg, int bg)
     sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
     printf("%s", command);
 }
+
+bool rsplit(char* regex, char* str, char* a, char* b)
+{
+  char* data = str;
+  int length = strlen(data);
+  char* pattern = regex;		
+  pcre *re; 
+  const char *error; 
+  int erroffset; 
+  //printf("dat: data\n");
+  // should probably move this regex compile to global
+  re = pcre_compile(	pattern, /* the pattern */ 
+			0, /* default options */ 
+			&error, /* for error message */ 
+			&erroffset, /* for error offset */ 
+			NULL); /* use default character tables */		
+  int rc; 
+  int ovector[60];					
+  rc = pcre_exec(	re, /* result of pcre_compile() */ 
+			NULL, /* we didn’t study the pattern */ 
+			data, /* the subject string */ 
+			strlen(data), /* the length of the subject string */ 
+			0, /* start at offset 0 in the subject */ 
+			0, /* default options */ 
+			ovector, /* vector of integers for substring information */ 
+			60); /* number of elements (NOT size in bytes) */
+  
+  if(rc<1 || rc>1) return false; // then we failed
+  int range = ovector[0];
+  int range2 = ovector[1];
+  //printf("reg ranges %d:%d\n",range,range2);
+  memset(a,0,range+1);
+  memcpy(a,data,range);
+  memset(b,0,(length-(range2+0))+1);
+  memcpy(b,data+range2+0,(length-(range2+0)));
+  return true;
+}
+
 
 namespace extemp {
 
