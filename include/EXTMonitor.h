@@ -36,7 +36,6 @@
 #ifndef EXT_MONTIOR_H
 #define EXT_MONITOR_H
 
-#include "pthread.h"
 #include <string>
 
 #include "EXTMutex.h"

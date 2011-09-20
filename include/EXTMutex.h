@@ -36,7 +36,12 @@
 #ifndef EXT_MUTEX
 #define EXT_MUTEX
 
+#ifdef EXT_BOOST
+#include <boost/thread/recursive_mutex.hpp>
+#else
 #include "pthread.h"
+#endif
+
 #include <string>
 
 namespace extemp
@@ -58,8 +63,12 @@ namespace extemp
     protected:
 	bool initialised;
 	std::string name;
+#ifdef EXT_BOOST
+	boost::recursive_mutex bmutex;
+#else
 	pthread_mutex_t pthread_mutex;
 	pthread_t owner;
+#endif
 	friend class EXTCondition;
     };
 } //End Namespace

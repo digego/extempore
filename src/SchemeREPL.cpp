@@ -38,11 +38,16 @@
 #include "UNIV.h"
 
 #include <stdio.h>         /* Basic I/O routines          */
+
+#ifdef EXT_BOOST
+// nothing 
+#else
 #include <sys/types.h>     /* standard system types       */
 #include <netinet/in.h>    /* Internet address structures */
 #include <netinet/tcp.h>   /* for define of TCP_NODELAY  Nagles Algorithm*/
 #include <sys/socket.h>    /* socket interface functions  */
 #include <netdb.h>         /* host to IP resolution       */
+#endif
 
 #include <iostream>
 #include <sstream>    
@@ -109,7 +114,12 @@ namespace extemp {
 	    }else{
 		memset(repl->buf,0,BUFLENGTH+1);
 		int lgth = 0;
+#ifdef EXT_BOOST
+               	while((lgth = repl->server_socket->read_some(boost::asio::buffer(repl->buf, BUFLENGTH))) == BUFLENGTH) {
+#else
 		while((lgth = read(repl->server_socket, repl->buf, BUFLENGTH)) == BUFLENGTH) {		    
+#endif
+
 		    if(lgth < 0) {
 		      ascii_text_color(1,1,10);
 			printf("PROBLEM WITH REPL SOCKET: %s\n",repl->buf);
@@ -147,7 +157,11 @@ namespace extemp {
     
 	for(;;) {
 	    int lth = (length > 1024) ? 1024 : length;
+#ifdef EXT_BOOST
+	    int chars_written = server_socket->write_some(boost::asio::buffer(b, lth));
+#else
 	    int chars_written = write(server_socket, b, lth);
+#endif
 	    if(chars_written != lth) {
 		printf("There was an error sending this expression to the interpreter. Check for non-ascii characters in your code.\n");
 	    }
@@ -163,8 +177,12 @@ namespace extemp {
     {
 	if(connected) return false;
 	int rc;
+#ifdef EXT_BOOST
+	// do nothing for boost
+#else
 	struct sockaddr_in sa;
 	struct hostent* hen; /* host-to-IP translation */
+#endif
 	//ascii_text_color(1,9,10);
 	printf("Trying to connect to ");
 	//ascii_text_color(1,6,10);
@@ -174,15 +192,51 @@ namespace extemp {
 	//ascii_text_color(1,6,10);
 	printf("%d\n",port);
 	//ascii_text_color(0,9,10);
-	/* Address resolution stage */
+	/* Address resolution stage */	
+
+#ifdef EXT_BOOST
+	boost::asio::ip::tcp::resolver::iterator end;
+	boost::asio::io_service service;
+	boost::asio::ip::tcp::resolver resolver(service);
+	std::stringstream ss;
+	ss << port;
+	boost::asio::ip::tcp::resolver::query newQuery(boost::asio::ip::tcp::v4(),hostname, ss.str());
+	boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(newQuery);
+
+	boost::asio::ip::tcp::endpoint ep = *iter;
+	std::cout << "resolved: " << ep << std::endl << std::flush;
+        if(iter == end) {
+#else
 	hen = gethostbyname(hostname.c_str());
 	if (!hen) {
-	ascii_text_color(1,1,10);
+#endif
+  	ascii_text_color(1,1,10);
 	    printf("Could not resolve host name\n");
 	ascii_text_color(0,9,10);
 	    return false;
 	}
-    
+        // wait for main server to start up first time out of the gates.
+#ifdef TARGET_OS_WINDOWS
+        Sleep(1);
+#else
+        sleep(1);
+#endif
+
+#ifdef EXT_BOOST        
+        server_io_service = new boost::asio::io_service;
+    try{
+        server_socket = new boost::asio::ip::tcp::socket(*server_io_service);
+        server_socket->open(boost::asio::ip::tcp::v4());
+        server_socket->connect(ep);
+	}catch(std::exception& e){
+	    ascii_text_color(1,1,10);
+		std::cout << "Connection Error:" << e.what() << std::endl;
+	    //printf("Connection error:%d\n",errno);
+	    ascii_text_color(0,9,10);
+	    return false;
+	}    
+	rc = server_socket->read_some(boost::asio::buffer(buf,BUFLENGTH));
+#else    
 	memset(&sa, 0, sizeof(sa));
 
 	sa.sin_family = AF_INET;
@@ -207,7 +261,9 @@ namespace extemp {
 	    }
 	    //printf("Create socket successful\n");
 	}
+
 	rc = connect(server_socket, (struct sockaddr *)&sa, sizeof(sa));
+
 	if(rc) {
 	ascii_text_color(1,1,10);
 	    printf("Connection error:%d\n",errno);
@@ -219,11 +275,13 @@ namespace extemp {
     
 	//should now be connected
 	rc = read(server_socket,buf,BUFLENGTH);
+#endif
 	if(rc == 0) {
 	    this->closeREPL();
 	    printf("Could not connect to port %d. Make sure don't have any other instances of impromptu running and that no other app is using this port!",port);
 	    return false;
 	}
+
 	ascii_text_color(1,2,10);
 	printf("Successfully"); 	
 	ascii_text_color(0,9,10);
@@ -235,9 +293,17 @@ namespace extemp {
 
     void SchemeREPL::closeREPL()
     {
+
 	active = false;
+#ifdef EXT_BOOST
+        server_socket->close();
+        delete(server_socket);
+        delete(server_io_service);
+        server_io_service = 0;
+#else
 	shutdown(server_socket, SHUT_RDWR);
 	close(server_socket);
+#endif
 	server_socket = 0;
 	connected = false;
 	// removeREPL will release us

@@ -36,6 +36,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include "EXTMutex.h"
+#include <cstring>
 
 
 #define _EXTMUTEX_DEBUG_
@@ -45,8 +46,7 @@ namespace extemp
 {
     EXTMutex::EXTMutex(std::string _name) :
 	initialised(false),
-	name(_name),
-	owner(0)
+	name(_name)
     {
     }
     
@@ -58,6 +58,10 @@ namespace extemp
 
     int EXTMutex::init()
     {
+
+#ifdef EXT_BOOST  // START BOOST
+        int result = 0;
+#else // START POSIX
         pthread_mutexattr_t pthread_mutex_attr;
 	pthread_mutexattr_init(&pthread_mutex_attr);
      
@@ -71,6 +75,8 @@ namespace extemp
 	pthread_mutexattr_settype(&pthread_mutex_attr, PTHREAD_MUTEX_RECURSIVE);
 #endif
 	int result = pthread_mutex_init(&pthread_mutex, &pthread_mutex_attr);
+#endif // END POSIX
+
         initialised = ! result;
 
 #ifdef _EXTMUTEX_DEBUG_
@@ -78,8 +84,7 @@ namespace extemp
         {
             std::cerr << "Error initialising mutex: " << name << " err: " << result << std::endl;
         }
-#endif
-        
+#endif   
         return result;
     }
 
@@ -91,7 +96,11 @@ namespace extemp
         if (initialised)
         {
             initialised = false;
+#ifdef EXT_BOOST
+            result = 0;
+#else
             result = pthread_mutex_destroy(&pthread_mutex);
+#endif
         }
 		
 #ifdef _EXTMUTEX_DEBUG_
@@ -105,11 +114,38 @@ namespace extemp
 
     bool EXTMutex::isOwnedByCurrentThread()
     {
+#ifdef EXT_BOOST
+	return false;
+#else
 	return pthread_equal(pthread_self(), owner);
+#endif 
+
     }
 
-
-#if EXT_MUTEX_RECURSIVE
+#ifdef EXT_BOOST
+	int EXTMutex::lock()
+	{  
+	  try{
+	    bmutex.lock();
+	    return true;
+	  }catch(std::exception& e){
+	    std::cout << "Problem locking mutex: " << name << " " << e.what() << std::endl;
+	    return false;
+	  }
+	}
+	
+    int EXTMutex::unlock()
+    {
+		
+      try{
+	bmutex.unlock();
+	return 0;
+      }catch(std::exception& e){
+	std::cout << "Problem unlocking mutex: " << name << " " << e.what() << std::endl;
+	return 0;
+      }
+    }
+#elif EXT_MUTEX_RECURSIVE
     int EXTMutex::unlock()
     {
 	int result = pthread_mutex_unlock(&pthread_mutex);

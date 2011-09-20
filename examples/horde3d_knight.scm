@@ -8,12 +8,18 @@
 ;; 
 ;; NOTE!:
 ;; a) You will need to load the horde3d_lib.scm to bind to Horde3D
-;; b) YOu will need to change the resource path to match your system!
+;; b) You will need to change the resource path to match your system!
+;;    (resource path set on line 102)
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define libglu (sys:open-dylib "libGLU.so"))
-(bind-lib libglu gluLookAt [double,double,double,double,double,double,double,double,double]*)
+(define libglu (if (string=? "Linux" (sys:platform))
+		   (sys:open-dylib "libGLU.so")
+		   (if (string=? "Windows" (sys:platform))
+		       (sys:open-dylib "Glu32.dll")
+		       #f)))
+
+(bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
 (bind-lib libglu gluPerspective [void,double,double,double,double]*)
 (bind-lib libglu gluErrorString [i8*,i32]*)
 
@@ -22,12 +28,12 @@
     (* f (/ 3.141592 180.0))))
 
 ;; globals
-(bind-val _knight H3DNode 0)
-(bind-val light H3DNode 0)
-(bind-val _particleSys H3DNode 0)
-(bind-val _particleSys2 H3DNode 0)
-(bind-val _cam H3DNode 0)
-(bind-val _hdrPipeRes H3DNode 0)
+(bind-val _knight i32 0)
+(bind-val light i32 0)
+(bind-val _particleSys i32 0)
+(bind-val _particleSys2 i32 0)
+(bind-val _cam i32 0)
+(bind-val _hdrPipeRes i32 0)
 (bind-val _x float 5.0)
 (bind-val _y float 3.0)
 (bind-val _z float 19.0)
@@ -38,12 +44,12 @@
 (bind-val _curFPS float 30.0)
 (bind-val _weight float 1.0)
 (bind-val _animTime float 0.0)
-(bind-val _forwardPipeRes H3DNode 0)
-(bind-val _deferredPipeRes H3DNode 0)
-(bind-val _fontMatRes H3DNode 0)
-(bind-val _panelMatRes H3DNode 0)
-(bind-val _logoMatRes H3DNode 0)
-(bind-val env H3DNode 0)
+(bind-val _forwardPipeRes i32 0)
+(bind-val _deferredPipeRes i32 0)
+(bind-val _fontMatRes i32 0)
+(bind-val _panelMatRes i32 0)
+(bind-val _logoMatRes i32 0)
+(bind-val env i32 0)
 
 
 (definec resize
@@ -180,11 +186,12 @@
 (define opengl-test
   (lambda (time degree)
     (mainLoop)
-    (glx:swap-buffers pr2)
+    (gl:swap-buffers pr2)
     (callback (+ time 500) 'opengl-test (+ time 1000) (+ degree 0.01))))
 
 
-(define pr2 (glx:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
+(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
 (h3d_init)
 (resize 1024.0 768.0)
 (opengl-test (now) 0.0)
+

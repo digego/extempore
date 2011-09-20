@@ -43,13 +43,36 @@
 #include <iomanip>
 #include "pcre.h"
 
+#ifdef TARGET_OS_WINDOWS
+#include <malloc.h>
+//#include <unistd.h>
+#include <Windows.h>
+/*
+void uSleep(int waitTime){
+ __int64 time1 = 0, time2 = 0, sysFreq = 0;
+
+ QueryPerformanceCounter((LARGE_INTEGER *)&time1);
+ QueryPerformanceFrequency((LARGE_INTEGER *)&sysFreq);
+ do{
+ QueryPerformanceCounter((LARGE_INTEGER *)&time2);
+
+ //  }while((((time2-time1)*1.0)/sysFreq)<waitTime);
+   }while( (time2-time1) <waitTime);
+}
+*/
+#endif
+
 
 void ascii_text_color(int attr, int fg, int bg)
 {
+#ifdef TARGET_OS_WINDOWS
+	//no ansi terminal colors for windows :(
+#else
     char command[13];
     /* Command is the control command to the terminal */
     sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
     printf("%s", command);
+#endif
 }
 
 bool rsplit(char* regex, char* str, char* a, char* b)
@@ -166,7 +189,7 @@ namespace extemp {
     const char* UNIV::PWD = "";
 
     void UNIV::initRand() {
-#ifdef TARGET_OS_WIN
+#ifdef TARGET_OS_WINDOWS
 	srand(0);
 #elif TARGET_OS_LINUX
 	srand(0);

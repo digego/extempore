@@ -39,14 +39,27 @@
 #include "TaskScheduler.h"
 #include "SchemeProcess.h"
 #include "SchemeREPL.h"
-#include "sys/mman.h"
+//#include "sys/mman.h"
 
+#ifdef TARGET_OS_WINDOWS
+#include <Windows.h>
+#else
+#include <dlfcn.h>
+#endif
+
+#ifdef EXT_BOOST
+#include <boost/filesystem.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#endif
 
 #include <sstream>
 #include <string.h>
-#include <dlfcn.h>
 
+
+#ifdef TARGET_OS_WINDOWS
+#else
 #include <dirent.h>
+#endif
 
 #define PCRE_REGEX
 
@@ -74,7 +87,10 @@
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
+#ifdef EXT_LLVM_3
+#else
 #include "llvm/Target/TargetSelect.h"
+#endif
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -86,14 +102,26 @@
 #include "llvm/ADT/StringExtras.h"
 ///////////////////////////////////////
 
+#ifdef TARGET_OS_WINDOWS
+//#include <unistd.h>
+#include <malloc.h>
+#include <gl/GL.h>
+#elif TARGET_OS_LINUX
 #include <GL/glx.h>
 #include <GL/gl.h>
+#endif
 
+#ifdef TARGET_OS_WINDOWS
+#define PRINT_ERROR(format, ...)		\
+    ascii_text_color(1,1,10);			\
+    printf(format , __VA_ARGS__);			\
+    ascii_text_color(0,7,10)
+#else
 #define PRINT_ERROR(format, args...)		\
     ascii_text_color(1,1,10);			\
     printf(format , ## args);			\
     ascii_text_color(0,7,10)
-
+#endif
 
 
 char* cstrstrip (char* inputStr)
@@ -122,7 +150,10 @@ namespace extemp {
 	
     SchemeFFI SchemeFFI::SINGLETON;
     double SchemeFFI::CLOCK_OFFSET = 0.0;
-    std::map<std::string,std::pair<std::string,std::string> > SchemeFFI::IMPCIR_DICT;
+    std::map<std::string,std::pair<std::string,std::string> > SchemeFFI::IMPCIR_DICT;  
+    char* SchemeFFI::tmp_str_a = (char*) malloc(1024);
+    char* SchemeFFI::tmp_str_b = (char*) malloc(4096);
+  std::map<std::string,std::string> SchemeFFI::LLVM_ALIAS_TABLE;
 
     void SchemeFFI::initSchemeFFI(scheme* sc)
     {
@@ -231,17 +262,21 @@ namespace extemp {
 	    { "llvm:print",				&SchemeFFI::printLLVMModule },
 	    { "llvm:print-function",		&SchemeFFI::printLLVMFunction },
 	    { "llvm:bind-symbol",			&SchemeFFI::bind_symbol },
+	    { "llvm:add-llvm-alias",                          &SchemeFFI::add_llvm_alias },
+	    { "llvm:get-llvm-alias",                          &SchemeFFI::get_llvm_alias },
 	    { "llvm:get-named-type",                          &SchemeFFI::get_named_type },
 	    { "impc:ir:getname",			&SchemeFFI::impcirGetName },
 	    { "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
 #if defined (TARGET_OS_LINUX)
 	    { "glx:get-event",			&SchemeFFI::getX11Event },
-	    { "glx:make-ctx",			&SchemeFFI::makeGLXContext },	    
-	    { "glx:set-context",                 &SchemeFFI::glxMakeContextCurrent },
-	    { "glx:swap-buffers",			&SchemeFFI::glxSwapBuffers },
 #endif
+	    { "gl:make-ctx",			    &SchemeFFI::makeGLContext },	    
+	    { "gl:set-context",             &SchemeFFI::glMakeContextCurrent },
+	    { "gl:swap-buffers",			&SchemeFFI::glSwapBuffers },
 
+#ifdef EXT_BOOST
+#else
 	    //CLOCK STUFF
 	    { "clock:set-offset",                           &SchemeFFI::setClockOffset},
 	    { "clock:get-offset",                           &SchemeFFI::getClockOffset},
@@ -253,6 +288,7 @@ namespace extemp {
 	    { "ad:clock:adjust-offset",                    &SchemeFFI::ad_adjustClockOffset},
 	    { "ad:clock:clock",                            &SchemeFFI::ad_getClockTime},
             { "ad:clock",                                  &SchemeFFI::ad_getClockTime},
+#endif
            
 
 	    		
@@ -380,58 +416,87 @@ namespace extemp {
     pointer SchemeFFI::makeCptr(scheme* _sc, pointer args)
     {
         void* ptr = malloc(ivalue(pair_car(args)));
-	mk_cptr(_sc, ptr);
+	    return mk_cptr(_sc, ptr);
     }
 
-    pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
-    {    
-      DIR *dp;
-      struct dirent *ep;     
-      dp = opendir (string_value(pair_car(args)));
-
-      pointer list = _sc->NIL;
-      if (dp != NULL)
+#ifdef EXT_BOOST
+	pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
 	{
-	  while (ep = readdir (dp)) {
-	    _sc->imp_env->insert(list);
-	    pointer tlist = cons(_sc,mk_string(_sc,ep->d_name),list);
-	    _sc->imp_env->erase(list);
-	    list = tlist;
+	  char* path = string_value(pair_car(args));
+	  boost::filesystem::path bpath(path);
+	  if(!boost::filesystem::exists(bpath)) {
+		  return _sc->NIL;
+	  }
+	  if(!boost::filesystem::is_directory(bpath)) {
+		  return _sc->NIL;
 	  }
 
-	  (void) closedir (dp);
-	}
-      else {
-	perror ("Couldn't open the directory");
-      }
+	  boost::filesystem::directory_iterator end_it;
 
-      return reverse(_sc,list);
-    }
+	  pointer list = _sc->NIL;
+	  for(boost::filesystem::directory_iterator it(bpath); it != end_it; ++it) {
+	    _sc->imp_env->insert(list);
+		pointer tlist = 0;
+		//tlist = cons(_sc,mk_string(_sc,it->path().leaf().string().c_str()),list);
+		tlist = cons(_sc,mk_string(_sc,it->path().string().c_str()),list);
+	    _sc->imp_env->erase(list);
+	    list = tlist;	    
+	  }
+	  return reverse(_sc,list);
+	}
+#else
+	pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
+	{    
+
+		DIR *dp;
+		struct dirent *ep;     
+		dp = opendir (string_value(pair_car(args)));
+
+		pointer list = _sc->NIL;
+		if (dp != NULL)
+		{
+			while (ep = readdir (dp)) {
+				_sc->imp_env->insert(list);
+				pointer tlist = cons(_sc,mk_string(_sc,ep->d_name),list);
+				_sc->imp_env->erase(list);
+				list = tlist;
+			}
+
+			(void) closedir (dp);
+		}
+		else {
+			perror ("Couldn't open the directory");
+		}
+
+		return reverse(_sc,list);
+	}
+#endif
 
     pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
     {
-	std::string key(string_value(pair_car(args)));
-	return mk_string(_sc, IMPCIR_DICT[key].second.c_str());	
+		std::string key(string_value(pair_car(args)));
+		return mk_string(_sc, IMPCIR_DICT[key].second.c_str());	
     }
 
     pointer SchemeFFI::impcirGetName(scheme* _sc, pointer args)
     {
-	std::string key(string_value(pair_car(args)));
-	return mk_string(_sc, IMPCIR_DICT[key].first.c_str());	
+		std::string key(string_value(pair_car(args)));
+		return mk_string(_sc, IMPCIR_DICT[key].first.c_str());	
     }
 
     pointer SchemeFFI::impcirAdd(scheme* _sc, pointer args)
     {
-	std::string current("current");
-	std::string previous("previous");
-	std::string key(string_value(pair_car(args)));
-	std::string name(string_value(pair_cadr(args)));
-	std::string type(string_value(pair_caddr(args)));	    
-	std::pair<std::string,std::string> p(name,type);
-	IMPCIR_DICT[previous] = IMPCIR_DICT[current];
-	IMPCIR_DICT[current] = p;
-	IMPCIR_DICT[key] = p;
-	return _sc->T;
+		std::string current("current");
+		std::string previous("previous");
+		std::string key(string_value(pair_car(args)));
+		std::string name(string_value(pair_cadr(args)));
+		std::string type(string_value(pair_caddr(args)));
+		//std::cout << "ADDING IN C++ "  << key << " " << name << " " << type << std::endl; 
+		std::pair<std::string,std::string> p(name,type);
+		IMPCIR_DICT[previous] = IMPCIR_DICT[current];
+		IMPCIR_DICT[current] = p;
+		IMPCIR_DICT[key] = p;
+		return _sc->T;
     }
 
     // ipc stuff
@@ -471,7 +536,7 @@ namespace extemp {
     pointer SchemeFFI::ipcCall(scheme* _sc, pointer args)
     {
 	std::string process(string_value(pair_car(args)));
-	std::stringstream ss;
+ 	std::stringstream ss;
 	pointer sym = pair_cadr(args);
 	args = pair_cddr(args);
 	for(; is_pair(args); args = pair_cdr(args)) {
@@ -565,9 +630,10 @@ namespace extemp {
 
     pointer SchemeFFI::getNameOfCurrentProcess(scheme* _sc, pointer args)
     {
-	const char* name = SchemeProcess::I(_sc)->getName().c_str();
-	if(args == _sc->NIL) return mk_string(_sc, name);
-	else { printf("Error getting name of current process\n"); return _sc->F; }
+	    const char* name = SchemeProcess::I(_sc)->getName().c_str();
+		return mk_string(_sc,name);
+	//if(args == _sc->NIL) return mk_string(_sc, name);
+	//else { printf("Error getting name of current process\n"); return _sc->F; }
 	/*
 	  NSDictionary* dict = (NSDictionary*) objc_value(pair_car(args));
 	  NSString* alias_name = [dict objectForKey:[NSString stringWithCString:name]];
@@ -615,10 +681,25 @@ namespace extemp {
     pointer SchemeFFI::openDynamicLib(scheme* _sc, pointer args)
     {
 	//void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
+#ifdef TARGET_OS_WINDOWS
+	  char* ccc = string_value(pair_car(args));
+	  size_t ccc_size = (strlen(ccc)+1) * 2; //2 for 16 bytes (wide_char)
+	  size_t converted_chars = 0;
+	  wchar_t* wstr = (wchar_t*) _alloca(ccc_size);
+	  mbstowcs_s(&converted_chars,wstr,ccc_size, ccc, _TRUNCATE);
+      void* lib_handle = LoadLibrary(wstr);
+#else
 	void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY);
+#endif
 	if (!lib_handle)
 	{
-	    fprintf(stderr, "%s\n", dlerror());
+#ifdef TARGET_OS_WINDOWS
+	  std::cout << "Error loading library" << GetLastError() << std::endl;
+	  printf("For Library Path: %ls\n",wstr);
+	  return _sc->F;
+#else                       
+	  fprintf(stderr, "%s\n", dlerror());
+#endif
 	    return _sc->F;
 	}
 	return mk_cptr(_sc,lib_handle);
@@ -626,7 +707,11 @@ namespace extemp {
 
     pointer SchemeFFI::closeDynamicLib(scheme* _sc, pointer args)
     {
+#ifdef TARGET_OS_WINDOWS
+      FreeLibrary((HMODULE)cptr_value(pair_car(args))) ;
+#else
 	dlclose(cptr_value(pair_car(args)));
+#endif
 	return _sc->T;
     }
 	
@@ -644,8 +729,12 @@ namespace extemp {
     {
 #ifdef TARGET_OS_MAC
       return mk_string(_sc, "OSX");
-#else
+#elif TARGET_OS_LINUX
       return mk_string(_sc, "Linux");
+#elif TARGET_OS_WINDOWS
+	  return mk_string(_sc, "Windows");
+#else
+	  return mk_string(_sc, "");
 #endif
     }
 	
@@ -665,17 +754,20 @@ namespace extemp {
 	    x = pair_car(array);
 	    len += strlen(string_value(x));
 	}
-	len += (list_length(_sc,array)-1)*(strlen(joinstr));
-	char* result = (char*) alloca(len+1);
-	memset(result,0,len+1);
 	array = pair_car(args); // reset array
+	len += (list_length(_sc,array)-1)*(strlen(joinstr));
+
+	char* result = (char*) alloca(len+1);
+
+	memset(result,0,len+1);
+
 	for(pointer x=pair_car(array);array != _sc->NIL;array=pair_cdr(array))
 	{
 	    x=pair_car(array);
 	    char* str = string_value(x);
 	    strcat(result,str);
 	    if(pair_cdr(array) != _sc->NIL) strcat(result,joinstr);
-	}		
+	}
 	return mk_string(_sc,result);
     }	
 		
@@ -828,11 +920,12 @@ namespace extemp {
 	pcre *re; 
 	const char *error; 
 	int erroffset;
+
 	re = pcre_compile(	pattern, /* the pattern */ 
-				0, /* default options */ 
-				&error, /* for error message */ 
-				&erroffset, /* for error offset */ 
-				NULL); /* use default character tables */
+			0, /* default options */ 
+			&error, /* for error message */ 
+			&erroffset, /* for error offset */ 
+			NULL); /* use default character tables */
 	
 	int rc;
 	int ovector[30]; 
@@ -1041,7 +1134,7 @@ namespace extemp {
 	char* sep = (char*) "$";
 	char* tmp = 0;
 	int pos,range,size = 0;
-	char* p = strtok(replace,sep);
+ 	char* p = strtok(replace,sep);
 	do{
 	    char* cc;
 	    pos = strtol(p,&cc,10);
@@ -1393,7 +1486,16 @@ namespace extemp {
         std::string typestr;
 	llvm::raw_string_ostream ss(typestr);
         func->getReturnType()->print(ss);
-	pointer str = mk_string(_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
+
+	const char* tmp_name = ss.str().c_str();
+#ifdef EXT_LLVM_3
+	if(func->getReturnType()->isStructTy()) {	      
+	  rsplit("= type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	  tmp_name = tmp_str_b;
+	}
+#endif
+	
+	pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
 	pointer p = cons(_sc, str, _sc->NIL); 
 
 	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
@@ -1404,8 +1506,17 @@ namespace extemp {
 	    std::string typestr2;
 	    llvm::raw_string_ostream ss2(typestr2);
 	    a->getType()->print(ss2);
-	
-	    pointer str = mk_string(_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
+
+	    tmp_name = ss2.str().c_str();
+#ifdef EXT_LLVM_3
+	    if(a->getType()->isStructTy()) {	      
+	      rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	      //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	      //tmp_name = tmp_str_b;
+	      tmp_name = tmp_str_a;
+	    }
+#endif
+	    pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
 	    _sc->imp_env->erase(p);
 	    p = cons(_sc, str, p);			
 	    funcargs++;
@@ -1519,15 +1630,26 @@ namespace extemp {
     {
 	using namespace llvm;
 		
+	std::string fname(string_value(pair_car(args)));
 	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+	llvm::Function* func = M->getFunction(fname); //std::string(string_value(pair_car(args))));
 	//func->setCallingConv(CallingConv::C); //kCStackBased);
 	if(func == 0)
 	{
 	    return _sc->F;
 	}
-		
-	void* p = EXTLLVM::I()->EE->recompileAndRelinkFunction(func);
+	//std::cout << "fname: " << fname << std::endl;
+	//std::cout << "M: " << M << std::endl;
+	//std::cout << "FUNC: " << func << std::endl;
+	//std::cout << "EE: " << EXTLLVM::I()->EE << std::endl;
+	void* p = 0;
+	try{
+	  EXTLLVM* xll = EXTLLVM::I();
+	  ExecutionEngine* EE = xll->EE;
+	  void* p = EE->recompileAndRelinkFunction(func);
+	}catch(std::exception& e) {
+	  std::cout << "EXCEPT: " << e.what() << std::endl;
+	}
 		
 	if(p==NULL) {
 	    return _sc->F;
@@ -1796,7 +1918,11 @@ namespace extemp {
     {		
 	char* floatin = string_value(pair_car(args));
 	char floatout[256];
+#ifdef TARGET_OS_WINDOWS
+	float f = (float) strtod(floatin, (char**) &floatout);
+#else
 	float f = strtof(floatin, (char**) &floatout);
+#endif
 	llvm::APFloat apf(f);
 		
 	bool ignored;
@@ -1891,7 +2017,11 @@ namespace extemp {
 	llvm::Module* M = EXTLLVM::I()->M;
 	llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;	
 		
+#ifdef TARGET_OS_WINDOWS
+        void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
+#else
 	void* ptr = dlsym(library, symname);
+#endif
 	if(!ptr) {
 	    printf("Could not find symbol named %s!\n",symname);
 	    return _sc->F;
@@ -1903,6 +2033,25 @@ namespace extemp {
     }	
 
 
+    // For simple preprocessor alias's
+    pointer SchemeFFI::add_llvm_alias(scheme* _sc, pointer args)
+    {
+	char* name = string_value(pair_car(args));
+	char* type = string_value(pair_cadr(args));
+        LLVM_ALIAS_TABLE[std::string(name)] = std::string(type);
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::get_llvm_alias(scheme* _sc, pointer args)
+    {
+	char* name = string_value(pair_car(args));
+	if (LLVM_ALIAS_TABLE.find(std::string(name)) != LLVM_ALIAS_TABLE.end())
+	  return mk_string(_sc,LLVM_ALIAS_TABLE[std::string(name)].c_str());
+	else
+	  return _sc->NIL;		    
+    }
+
+
     pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
     {
 	char* name = string_value(pair_car(args));
@@ -1910,14 +2059,23 @@ namespace extemp {
 	llvm::Module* M = EXTLLVM::I()->M;
 	
 	const llvm::Type* tt = M->getTypeByName(name);
-	
+
 	if(tt) {
 	  //return mk_string(_sc,M->getTypeName(tt).c_str());
 	  std::string typestr;
 	  llvm::raw_string_ostream ss(typestr);
 	  tt->print(ss);
-
-	  return mk_string(_sc,ss.str().c_str()); //tt->getDescription().c_str());
+	  
+#ifdef EXT_LLVM_3
+	  const char* tmp_name = ss.str().c_str();
+	  if(tt->isStructTy()) {
+	    rsplit("= type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	    tmp_name = tmp_str_b;
+	  }
+	  return mk_string(_sc,tmp_name);
+#else
+ 	  return mk_string(_sc,ss.str().c_str()); //tt->getDescription().c_str());
+#endif
 	} else {
 	  return _sc->NIL;
 	}
@@ -1976,14 +2134,14 @@ namespace extemp {
     return (event->type == MapNotify) && (event->xmap.window == (Window) arg);
   }
 
-  pointer SchemeFFI::glxSwapBuffers(scheme* _sc, pointer args)
+  pointer SchemeFFI::glSwapBuffers(scheme* _sc, pointer args)
   {
     args = pair_car(args);
     glXSwapBuffers((Display*) cptr_value(pair_car(args)), (GLXDrawable) cptr_value(pair_cadr(args)));
     return _sc->T;
   }
 
-  pointer SchemeFFI::glxMakeContextCurrent(scheme* _sc, pointer args)
+  pointer SchemeFFI::glMakeContextCurrent(scheme* _sc, pointer args)
   {
     args = pair_car(args);
     Display* dpy = (Display*) cptr_value(pair_car(args));
@@ -2231,7 +2389,7 @@ namespace extemp {
   }
 
   
-  pointer SchemeFFI::makeGLXContext(scheme* _sc, pointer args)
+  pointer SchemeFFI::makeGLContext(scheme* _sc, pointer args)
   {
     Display              *dpy;
     Window                xWin;
@@ -2374,12 +2532,334 @@ namespace extemp {
     return list; //_cons(_sc, mk_cptr(_sc, (void*)dpy),mk_cptr(_sc,(void*)glxWin),1);
   }
 
+#elif TARGET_OS_WINDOWS
+
+  //int singleBufferAttributess[] = {
+  //  GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+  //  GLX_RENDER_TYPE,   GLX_RGBA_BIT,
+  //  GLX_RED_SIZE,      1,   /* Request a single buffered color buffer */
+  //  GLX_GREEN_SIZE,    1,   /* with the maximum number of color bits  */
+  //  GLX_BLUE_SIZE,     1,   /* for each component                     */
+  //  None
+  //};
+
+  //int doubleBufferAttributes[] = {
+  //  GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+  //  GLX_RENDER_TYPE,   GLX_RGBA_BIT,
+  //  GLX_DOUBLEBUFFER,  True,  /* Request a double-buffered color buffer with */
+  //  GLX_RED_SIZE,      1,     /* the maximum number of bits per component    */
+  //  GLX_GREEN_SIZE,    1, 
+  //  GLX_BLUE_SIZE,     1,
+  //  None
+  //};
+
+  //static Bool EXTGLWaitForNotify( Display *dpy, XEvent *event, XPointer arg ) {
+  //  return (event->type == MapNotify) && (event->xmap.window == (Window) arg);
+  //}
+  
+  pointer SchemeFFI::glSwapBuffers(scheme* _sc, pointer args)
+  {
+    args = pair_car(args);
+	SwapBuffers((HDC)cptr_value(pair_car(args)));
+
+	MSG msg;
+
+	//std::cout << "GOING INTO GET MESSAGES" << std::endl;
+	while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+		//std::cout << "GOT MESSAGE" << std::endl;
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		//std::cout << "msg: " << &msg << std::endl;
+	}
+	//std::cout << "DONE PROCESSING WIN MESSAGES" << std::endl;
+
+    //glXSwapBuffers((Display*) cptr_value(pair_car(args)), (GLXDrawable) cptr_value(pair_cadr(args)));
+    return _sc->T;
+  }
+
+  pointer SchemeFFI::glMakeContextCurrent(scheme* _sc, pointer args)
+  {
+	  wglMakeCurrent ( (HDC)cptr_value(pair_car(args)), (HGLRC)cptr_value(pair_cadr(args)) );
+      return _sc->T;
+  }
+
+ // window handler
+ 
+// Step 4: the Window Procedure
+LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch(msg)
+    {
+        case WM_CLOSE:
+            DestroyWindow(hwnd);
+        break;
+        case WM_DESTROY:
+            PostQuitMessage(0);
+        break;
+        default:
+            return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+
+  pointer SchemeFFI::makeGLContext(scheme* _sc, pointer args)
+  {
+	PIXELFORMATDESCRIPTOR pfd = { 
+		sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
+		1,                     // version number  
+		PFD_DRAW_TO_WINDOW |   // support window  
+		PFD_SUPPORT_OPENGL |   // support OpenGL  
+		PFD_DOUBLEBUFFER,      // double buffered  
+		PFD_TYPE_RGBA,         // RGBA type  
+		24,                    // 24-bit color depth  
+		0, 0, 0, 0, 0, 0,      // color bits ignored  
+		0,                     // no alpha buffer  
+		0,                     // shift bit ignored  
+		0,                     // no accumulation buffer  
+		0, 0, 0, 0,            // accum bits ignored  
+		32,                    // 32-bit z-buffer      
+		0,                     // no stencil buffer  
+		0,                     // no auxiliary buffer  
+		PFD_MAIN_PLANE,        // main layer  
+		0,                     // reserved  
+		0, 0, 0                // layer masks ignored  
+		}; 
+		
+	HDC  hdc;
+    HGLRC hglrc;
+    int  iPixelFormat; 
+	int  posx = ivalue(pair_caddr(args));
+	int  posy = ivalue(pair_cadddr(args));
+	int  width = ivalue(pair_car(pair_cddddr(args)));
+	int  height = ivalue(pair_cadr(pair_cddddr(args)));
+
+	// call OpenGL APIs as desired ... 
+ 
+	// when the rendering context is no longer needed ...   
+ 
+	// make the rendering context not current  
+	//wglMakeCurrent (NULL, NULL) ; 
+ 
+	// delete the rendering context  
+	//wglDeleteContext (hglrc);
+
+	  //render callback
+	/*
+      if(false) //pair_cddr(pair_cddddr(args)) != _sc->NIL) {
+        EXTThread* render_thread = new EXTThread();
+        void* v[2];
+        v[0] = args;
+        v[1] = _sc;
+        render_thread->create(&opengl_render_callback,v);
+        return _sc->T;
+      }
+	  */
+
+      //sharedContext = NULL;
+	
+	MSG msg;
+    WNDCLASSEX ex;
+    HINSTANCE hinstance;
+
+	LPCWSTR WNDCLASSNAME = L"GLClass";
+	LPCWSTR WNDNAME = L"OpenGL base code";
+
+    ex.cbSize = sizeof(WNDCLASSEX);
+    ex.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
+    ex.lpfnWndProc = WinProc;
+    ex.cbClsExtra = 0;
+    ex.cbWndExtra = 0;
+    ex.hInstance = hinstance;
+    ex.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    ex.hCursor = LoadCursor(NULL, IDC_ARROW);
+    ex.hbrBackground = NULL;
+    ex.lpszMenuName = NULL;
+    ex.lpszClassName = (LPCWSTR)WNDCLASSNAME;
+    ex.hIconSm = NULL;
+
+    RegisterClassEx(&ex);
+	
+	      // center position of the window
+    //int posx = (GetSystemMetrics(SM_CXSCREEN) / 2) - (width / 2);
+    //int posy = (GetSystemMetrics(SM_CYSCREEN) / 2) - (height / 2);
+
+    // set up the window for a windowed application by default
+    long wndStyle = WS_OVERLAPPEDWINDOW;
+    int screenmode = 0; // NOT FULLSCREEN
+
+    if (pair_cadr(args) == _sc->T) // if fullscreen
+    {
+        wndStyle = WS_POPUP;
+        screenmode = 1; //FULLSCREEN
+        posx = 0;
+        posy = 0;
+
+        // change resolution before the window is created
+        //SysSetDisplayMode(screenw, screenh, SCRDEPTH);
+    }
+	
+    // create the window
+    HWND hwnd = CreateWindowEx(NULL,
+                  WNDCLASSNAME, //"GLClass",
+                  WNDNAME, //"Extempore OpenGL",
+                  wndStyle|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,
+                  posx, posy,
+                  width, height,
+                  NULL,
+                  NULL,
+                  hinstance,
+                  NULL);
+
+    hdc = GetDC(hwnd);
+    if(hdc == NULL) {
+      std::cout << "Failed to Get the Window Device Context" << std::endl;
+      return _sc->F;
+    }
+    
+	// set pixel format
+    iPixelFormat = ChoosePixelFormat(hdc, &pfd);
+    SetPixelFormat(hdc, iPixelFormat, &pfd);
+
+    // create a rendering context  
+    hglrc = wglCreateContext (hdc); 
+    if(hglrc == NULL) {
+      std::cout << "Failed to create an OpenGL rendering Context" << std::endl;
+      return _sc->F;
+    }
+    
+    // make it the calling thread's current rendering context 
+    wglMakeCurrent (hdc, hglrc);
+    
+    ShowWindow(hwnd, SW_SHOW);		// everything went OK, show the window
+    UpdateWindow(hwnd);
+    
+    /* Bind the GLX context to the Window */
+    wglMakeCurrent( hdc,hglrc );
+
+    std::cout << "hwnd:" << hwnd << " hdc:" << hdc << " hglrc:" << hglrc << std::endl;
+
+    /* OpenGL rendering ... */
+    glClearColor( 0.0, 0.0, 0.0, 1.0 );
+    glClear( GL_COLOR_BUFFER_BIT );
+
+    glFlush();
+
+    //if ( swapFlag )
+	  SwapBuffers(hdc);
+
+    //swapInterval(0);    
+
+    pointer list = _sc->NIL;
+    _sc->imp_env->insert(list);
+    pointer tlist = cons(_sc,mk_cptr(_sc,(void*)hglrc),list);
+    _sc->imp_env->erase(list);
+    list = tlist;
+    _sc->imp_env->insert(list);
+    tlist = cons(_sc,mk_cptr(_sc,(void*)hdc),list);
+    _sc->imp_env->erase(list);
+    list = tlist;
+		
+    return list; //_cons(_sc, mk_cptr(_sc, (void*)dpy),mk_cptr(_sc,(void*)glxWin),1);
+  }
+
+
+#elif TARGET_OS_MAC
 #endif
 
 
   //////////////////////////////////////////////////////////////////
   //  CLOCK STUFF
 
+#ifdef EXT_BOOST
+ boost::posix_time::ptime EXT_BOOST_JAN1970(boost::gregorian::date(1970,boost::gregorian::Jan,1));
+
+  double time_to_double(boost::posix_time::ptime& time) {
+	 boost::posix_time::time_period period(EXT_BOOST_JAN1970,time);
+	 return period.length().total_microseconds()/D_MILLION;
+  }
+ 
+  struct boost::posix_time::ptime& double_to_time(double tm) {
+     using namespace boost::posix_time;
+     ptime p;
+     int64_t seconds = (int64_t)tm;
+     int64_t fractional = (tm-seconds)*time_duration::ticks_per_second();
+     p = EXT_BOOST_JAN1970+time_duration(0,0,seconds,fractional);
+
+     return p;
+  }
+  pointer SchemeFFI::adjustClockOffset(scheme* _sc, pointer args)
+  {
+    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args)) + SchemeFFI::CLOCK_OFFSET;
+    return mk_real(_sc,SchemeFFI::CLOCK_OFFSET);
+  }
+
+  pointer SchemeFFI::setClockOffset(scheme* _sc, pointer args)
+  {
+    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args));
+    return pair_car(args);
+  }
+
+  pointer SchemeFFI::getClockOffset(scheme* _sc, pointer args)
+  {
+    return mk_real(_sc, SchemeFFI::CLOCK_OFFSET);
+  }
+
+  pointer SchemeFFI::lastSampleBlockClock(scheme* _sc, pointer args)
+  {
+    pointer p1 = mk_integer(_sc,UNIV::TIME);
+    _sc->imp_env->insert(p1);
+    pointer p2 = mk_real(_sc,AudioDevice::REALTIME + SchemeFFI::CLOCK_OFFSET);
+    _sc->imp_env->insert(p2);
+    pointer p3 = cons(_sc, p1, p2);
+    _sc->imp_env->erase(p1);
+    _sc->imp_env->erase(p2);
+    return p3;
+  }
+
+  pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
+  {
+	boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
+	return mk_real(_sc, time_to_double(pt) + SchemeFFI::CLOCK_OFFSET);
+    //return mk_real(_sc, CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + SchemeFFI::CLOCK_OFFSET);
+  }
+
+  //audiodevice clock stuff
+  pointer SchemeFFI::ad_adjustClockOffset(scheme* _sc, pointer args)
+  {
+    AudioDevice::CLOCKOFFSET = rvalue(pair_car(args)) + AudioDevice::CLOCKOFFSET;
+    return mk_real(_sc,AudioDevice::CLOCKOFFSET);
+  }
+
+  pointer SchemeFFI::ad_setClockOffset(scheme* _sc, pointer args)
+  {
+    AudioDevice::CLOCKOFFSET = rvalue(pair_car(args));
+    return pair_car(args);
+  }
+
+  pointer SchemeFFI::ad_getClockOffset(scheme* _sc, pointer args)
+  {
+    return mk_real(_sc, AudioDevice::CLOCKOFFSET);
+  }
+
+  pointer SchemeFFI::ad_getClockTime(scheme* _sc, pointer args)
+  {
+    return mk_real(_sc,AudioDevice::CLOCKBASE + AudioDevice::CLOCKOFFSET + ((double)UNIV::TIME/(double)UNIV::SAMPLERATE));
+  }
+
+  pointer SchemeFFI::ad_setTime(scheme* _sc, pointer args)
+  {
+    if(pair_cdr(args) == _sc->NIL) {
+		//AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
+		boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
+		AudioDevice::CLOCKBASE = time_to_double(pt); /* + SchemeFFI::CLOCK_OFFSET) */
+    }else{
+      AudioDevice::CLOCKBASE = rvalue(pair_cadr(args));
+    }
+    UNIV::TIME = ivalue(pair_car(args));
+    return _sc->T;
+  } 
+#else
 double time_to_double(struct timespec t) {
     return t.tv_sec + t.tv_nsec/D_BILLION;
 }
@@ -2435,7 +2915,7 @@ struct timespec double_to_time(double tm) {
   {
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
-    return mk_real(_sc, time_to_double(t));
+    return mk_real(_sc, time_to_double(t)+SchemeFFI::CLOCK_OFFSET);
   }
 #endif
 
@@ -2478,6 +2958,7 @@ struct timespec double_to_time(double tm) {
     UNIV::TIME = ivalue(pair_car(args));
     return _sc->T;
   } 
+#endif
 
 } // end namespace
 

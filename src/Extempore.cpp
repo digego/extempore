@@ -92,9 +92,11 @@ int main(int argv, char** args)
 	
     // sleep indefiniately let server process do the work
     while(1) {
-	// put printf here as a reminder that something is happending
-	//printf("PING: %lld\n",extemp::UNIV::TIME);
-	sleep(5000);
+#ifdef TARGET_OS_WINDOWS
+      Sleep(5000);
+#else
+      sleep(5000);
+#endif
     }
     return 0;
 }

@@ -13,9 +13,9 @@ DEFINES := $(PLATFORM_DEFINES) \
 LLVM_LIBS := $(EXT_LLVM_LIBS)
 
 LIBS := \
-	-lpthread -lm -lpcre -lglfw \
-	$(LLVM_LIBS) \
 	$(PLATFORM_LIBS) \
+	$(LLVM_LIBS) \
+
 
 CXX := $(PLATFORM_CXX)
 LD := $(PLATFORM_LD)
@@ -24,6 +24,7 @@ CXXFLAGS := \
 	-w -O3 -MMD \
 	$(DEFINES) \
 	$(EXT_USER_ARGS) \
+        -I/usr/local/include \
 	-Iinclude \
 	-I$(EXT_LLVM_DIR)/include \
 	$(PLATFORM_CXXFLAGS) \

@@ -41,6 +41,11 @@
 
 #include <string>
 
+#ifdef TARGET_OS_WINDOWS
+#include <SDKDDKVer.h>
+//void uSleep(int waitTime);
+#endif
+
 #if _WIN32 || _WIN64
 #if _WIN64
 #define TARGET_64BIT

@@ -38,7 +38,7 @@
 
 #include "Scheme.h"
 #include "EXTLLVM.h"
-#include "Task.h";
+#include "Task.h"
 
 #include <map>
 
@@ -147,6 +147,8 @@ namespace extemp {
 	static pointer printLLVMFunction(scheme* _sc, pointer args);
 	static pointer bind_symbol(scheme* _sc, pointer args);
 	static pointer get_named_type(scheme* _sc, pointer args);
+        static pointer add_llvm_alias(scheme* _sc, pointer args);
+        static pointer get_llvm_alias(scheme* _sc, pointer args);
 	static pointer impcirGetName(scheme* _sc, pointer args);	
 	static pointer impcirGetType(scheme* _sc, pointer args);	
 	static pointer impcirAdd(scheme* _sc, pointer args);
@@ -164,14 +166,21 @@ namespace extemp {
 #if defined (TARGET_OS_LINUX)
 	// some XWindows guff
 	static pointer getX11Event(scheme* _sc, pointer args);
-	static pointer makeGLXContext(scheme* _sc, pointer args);
-	static pointer glxSwapBuffers(scheme* _sc, pointer args);
-	static pointer glxMakeContextCurrent(scheme* _sc, pointer args);
 #endif
+
+	static pointer makeGLContext(scheme* _sc, pointer args);
+	static pointer glSwapBuffers(scheme* _sc, pointer args);
+	static pointer glMakeContextCurrent(scheme* _sc, pointer args);
+
 	static double CLOCK_OFFSET;
     private:
 	static SchemeFFI SINGLETON;		
 	static std::map<std::string,std::pair<std::string,std::string> > IMPCIR_DICT;
+	// these tmp buffers used for regex splits
+	static char* tmp_str_a;
+	static char* tmp_str_b;
+	// this used for trivial preoprocesor aliasing (for LLVM IR)
+	static std::map<std::string,std::string> LLVM_ALIAS_TABLE;    
     };
 	
 } // end namespace

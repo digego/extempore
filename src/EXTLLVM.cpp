@@ -42,6 +42,11 @@
 #include "pcre.h"
 #include "OSC.h"
 
+#ifdef TARGET_OS_WINDOWS
+#include <malloc.h>
+#endif
+
+
 #include "llvm/Assembly/Parser.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/CallingConv.h"
@@ -49,8 +54,11 @@
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Instructions.h"
-
+#ifdef EXT_LLVM_3
+#include "llvm/Support/TargetSelect.h"
+#else
 #include "llvm/Target/TargetSelect.h"
+#endif
 
 //#include "llvm/ModuleProvider.h"
 
@@ -76,7 +84,15 @@
 // make it thread safe but I'm not going to bother
 // while still testing.
 std::map<void*,uint64_t> LLVM_ZONE_ALLOC_MAP;
+// same as above.
+std::map<std::string,std::string> LLVM_STR_CONST_MAP;
 extemp::EXTMutex alloc_mutex("alloc mutex");
+
+#ifdef TARGET_OS_WINDOWS
+double log2(double num) {
+	return log(num)/log(2.0);
+}
+#endif
 
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
@@ -105,7 +121,11 @@ void llvm_zone_destroy(llvm_zone_t* zone)
 
 void* llvm_stack_alloc(int64_t size)
 {
-  alloca(size);
+#ifdef TARGET_OS_WINDOWS
+  return _alloca(size);
+#else
+  return alloca(size);
+#endif
 }
 
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
@@ -189,20 +209,28 @@ void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay)
     extemp::TaskScheduler::I()->add(task);
 }
 
-char* itoa(int64_t val) {
+char* extitoa(int64_t val) {
+	/*
   int base = 10;
   static char buf[32] = {0};        
   int i = 30;        
   for(; val && i ; --i, val /= base)        
-    buf[i] = "0123456789abcdef"[val % base];        
-  return &buf[i+1];        
+    buf[i] = "0123456789abcdef"[val % base]; 
+	*/
+  static char buf[32] = {0};
+  sprintf(buf,"%lld",val);
+  return buf;//&buf[i+1];        
 }
 
 int llvm_printf(char* format, ...)
 {
     va_list ap;
     va_start(ap,format);
+#ifdef TARGET_OS_WINDOWS
+    char* ret = (char*) _alloca(2048);
+#else
     char* ret = (char*) alloca(2048);
+#endif
     int returnval = vsprintf(ret, format, ap);
     printf("%s",ret);
     fflush(stdout);	
@@ -636,7 +664,11 @@ namespace extemp {
 	    fseek(fp,0,SEEK_END);
 	    int size = ftell(fp);
 	    fseek(fp,0,SEEK_SET);
+#ifdef TARGET_OS_WINDOWS
+	    char* assm = (char*) _alloca(size+1);
+#else
 	    char* assm = (char*) alloca(size+1);
+#endif
 	    int res = fread(assm, 1, size, fp);
 	    assm[size]=0;
 	    fclose(fp);
@@ -707,8 +739,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_size);
 	    gv = M->getNamedValue(std::string("llvm_memset"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_memset);
-	    gv = M->getNamedValue(std::string("itoa"));
-	    EE->updateGlobalMapping(gv,(void*)&itoa);
+	    gv = M->getNamedValue(std::string("extitoa"));
+	    EE->updateGlobalMapping(gv,(void*)&extitoa);
 
 	    gv = M->getNamedValue(std::string("swap64i"));
 	    EE->updateGlobalMapping(gv,(void*)&swap64i);
@@ -725,7 +757,11 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("unswap32i"));
 	    EE->updateGlobalMapping(gv,(void*)&unswap32i);
 	    gv = M->getNamedValue(std::string("unswap32f"));
-	    EE->updateGlobalMapping(gv,(void*)&unswap32f);			
+	    EE->updateGlobalMapping(gv,(void*)&unswap32f);	
+#ifdef TARGET_OS_WINDOWS
+	    gv = M->getNamedValue(std::string("log2"));
+	    EE->updateGlobalMapping(gv,(void*)&log2);		
+#endif
 	}	
 	return;
     }

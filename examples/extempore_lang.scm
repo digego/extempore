@@ -2,6 +2,11 @@
 ;;
 ;;  A basic introduction to the Extempore Language and Compiler
 ;;
+;;  These examples are for Extempore lang for LLVM 
+;;  versions 2.8 and 2.9.
+;;
+;;  For recent changes to extempore lang check out
+;;  the extempore_lang_3.scm file which supports LLVM 3.0+
 
 ;; multiple a * 5
 ;; note that type infercing works out the type 

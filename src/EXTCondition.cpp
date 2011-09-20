@@ -35,7 +35,10 @@
 
 #include <iostream>
 
+#ifdef EXT_BOOST
+#else
 #include "pthread.h"
+#endif
 
 #include "EXTCondition.h"
 #include "EXTMutex.h"
@@ -59,9 +62,15 @@ namespace extemp
     
 
     int EXTCondition::init()
-    {
+    {  
+#ifdef EXT_BOOST
+      //boost_cond = boost::condition_variable;
+	int result = 0;
+#else
         int result = pthread_cond_init(&pthread_cond, NULL);
+#endif
         initialised = ! result;
+
         
 #ifdef _EXTCONDITION_DEBUG_
         if (result)
@@ -81,7 +90,11 @@ namespace extemp
         if (initialised)
         {
             initialised = false;
+#ifdef EXT_BOOST        
+            result = 0;
+#else
             result = pthread_cond_destroy(&pthread_cond);
+#endif
         }
 
 #ifdef _EXTCONDITION_DEBUG_
@@ -95,7 +108,15 @@ namespace extemp
     
     int EXTCondition::wait(EXTMutex *aimeMutex)
     {
+
+#ifdef EXT_BOOST
+        boost::recursive_mutex::scoped_lock lock(aimeMutex->bmutex);
+        boost_cond.wait(lock); //aimeMutex->block); // bmutex.scoped_lock); //lock);
+        int result = 0;
+#else
         int result = pthread_cond_wait(&pthread_cond, &aimeMutex->pthread_mutex);
+#endif
+
 
 #ifdef _EXTCONDITION_DEBUG_
         if (result)
@@ -108,9 +129,14 @@ namespace extemp
     }
 
     
-    int EXTCondition::signal()
+    int EXTCondition::signal(EXTMutex* aimeMutex)
     {
+#ifdef EXT_BOOST
+        boost_cond.notify_one();
+        int result = 0;
+#else
         int result = pthread_cond_signal(&pthread_cond);
+#endif
 
 #ifdef _EXTCONDITION_DEBUG_
         if (result)

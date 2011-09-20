@@ -63,8 +63,6 @@
 //#include "EXTMonitor"
 //#include "EXTThread"
 
-#include "UNIV.h"
-
 //#include <iosfwd>
 #include <iomanip>
 
@@ -87,7 +85,12 @@
 
 //#if USE_STRCASECMP
 //#include <strings.h>
-#define stricmp strcasecmp
+#ifdef TARGET_OS_WINDOWS
+#define stricmp strcmp //stricmp _stricmp
+#define ULONG_LONG_MAX UINT64_MAX
+#else
+#define stricmp strcmp //strcasecmp
+#endif
 //#endif
 
 /* Used for documentation purposes, to signal functions in 'interface' */
@@ -137,6 +140,10 @@
 /* } */
 #endif 
 
+#ifdef TARGET_OS_WINDOWS
+#define atoll _atoi64
+#endif
+/*
 #if USE_STRLWR
 static const char *strlwr(char *s) {
     const char *p=s;
@@ -147,6 +154,9 @@ static const char *strlwr(char *s) {
     return p;
 }
 #endif
+*/
+
+#define strlwr(a) a
 
 #ifndef prompt
 # define prompt "> "
@@ -530,7 +540,7 @@ char* symname_sc(scheme* sc,pointer p)
 }
 
 #if USE_PLIST
-SCHEME_EXPORT inline int hasprop(pointer p)     { return (typeflag(p)&T_SYMBOL); }
+inline int hasprop(pointer p)     { return (typeflag(p)&T_SYMBOL); }
 #define symprop(p)       cdr(p)
 #endif
 
@@ -678,7 +688,7 @@ static port *port_rep_from_filename(scheme *sc, const char *fn, int prop);
 static port *port_rep_from_file(scheme *sc, FILE *, int prop);
 static port *port_rep_from_string(scheme *sc, char *start, char *past_the_end, int prop);
 static void port_close(scheme *sc, pointer p, int flag);
-static void mark(pointer a);
+//static void mark(pointer a);
 static void treadmill_mark_roots(scheme* sc, pointer a, pointer b);
 static void* treadmill_scanner(void* obj);
 
@@ -695,7 +705,10 @@ static void printatom(scheme *sc, pointer l, int f);
 static pointer mk_proc(scheme *sc, enum scheme_opcodes op);
 //static pointer mk_closure(scheme *sc, pointer c, pointer e);
 //pointer mk_continuation(scheme *sc);
+
+/*
 static void dump_stack_mark(scheme *);
+*/
 static pointer dump_stack_copy(scheme *sc);
 static pointer opexe_0(scheme *sc, enum scheme_opcodes op);
 static pointer opexe_1(scheme *sc, enum scheme_opcodes op);
@@ -1573,7 +1586,7 @@ static char *store_string(scheme *sc, int len_str, const char *str, char fill) {
 
 /* get new string */
 pointer mk_string(scheme *sc, const char *str) {
-    if(str == 0) str = "";    
+    if(str == 0) str = "";
     return mk_counted_string(sc,str,strlen(str));
 }
 
@@ -1900,7 +1913,12 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 #ifdef TREADMILL_DEBUG		
 	std::cout << "TREADMILL: FLIP SPINNING" << std::endl << std::flush;
 #endif
+
+#ifdef EXT_BOOST
+	boost::this_thread::sleep(boost::posix_time::microseconds(50));
+#else
 	usleep(50);
+#endif
     }
 #ifdef TREADMILL_DEBUG
     std::cout << "TREADMILL: FINISHSED SPINNING - ON WITH THE WORK" << std::endl << std::flush;	
@@ -2188,7 +2206,11 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 	}catch( ... ) {
 	    std::cout << "ERROR: SENDING NOTIFICATION TO SCANNER THREAD" << std::endl << std::flush;					
 	}
+#ifdef EXT_BOOST
+	boost::this_thread::sleep(boost::posix_time::microseconds(50));
+#else
 	usleep(50);
+#endif
 #ifdef TREADMILL_DEBUG 
 	std::cout << "SPINNING FLIP WAITING FOR NOTIFICATION" << std::endl << std::flush;
 #endif
@@ -2301,10 +2323,17 @@ static void* treadmill_scanner(void* obj)
 				
 	    }
 	    sc->mutex->unlock(); // yeild here to let interpreter add greys to the treadmill!!
+#ifdef EXT_BOOST
+		boost::this_thread::sleep(boost::posix_time::microseconds(500));
+#else
 	    usleep(500);
+#endif
 	    sc->mutex->lock(); // But lock again after sleep!
 	}
+#ifdef EXT_BOOST
+#else
 	sc->Treadmill_Guard->lock();
+#endif
 #ifdef TREADMILL_DEBUG		
 	std::cout << "TREADMILL: FINISHED SCAN: " << sc->treadmill_flip_active << std::endl << std::flush;
 #endif
@@ -2321,7 +2350,10 @@ static void* treadmill_scanner(void* obj)
 	std::cout << "WAKING UP SCANNER" << std::endl << std::flush;		
 #endif
 	sc->mutex->lock();				
+#ifdef EXT_BOOST
+#else
 	sc->Treadmill_Guard->unlock();
+#endif
 	if(sc->treadmill_stop) break; // exit treadmill thread 
     }
 		
@@ -3221,7 +3253,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     pointer hdl=sc->ERROR_HOOK;
 	
     x=find_slot_in_env(sc,sc->envir,hdl,1);
-    if (x != sc->NIL and slot_value_in_env(x) != sc->NIL) {
+    if (x != sc->NIL && slot_value_in_env(x) != sc->NIL) {
 	if(a!=0) {
 	    sc->code = cons(sc, cons(sc, sc->QUOTE, cons(sc,(a), sc->NIL)), sc->NIL);
 	} else {
@@ -3244,7 +3276,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
 	
     hdl = sc->LIVECODING_ERROR_HOOK;
     x=find_slot_in_env(sc,sc->envir,hdl,1);
-    if (x != sc->NIL and slot_value_in_env(x) != sc->NIL ) {
+    if (x != sc->NIL && slot_value_in_env(x) != sc->NIL ) {
 	if(a!=0) {
 	    pointer p1 = mk_integer(sc, errnum);
 	    pointer p2 = cons(sc,p1,sc->NIL);
@@ -3392,7 +3424,7 @@ static void dump_stack_free(scheme *sc)
     sc->dump = (pointer)0; 
     sc->dump_size = 0; 
 }
-
+/*
 static inline void dump_stack_mark(scheme *sc) 
 { 
     intptr_t nframes = (intptr_t)sc->dump;
@@ -3405,6 +3437,7 @@ static inline void dump_stack_mark(scheme *sc)
 	mark(frame->code);
     } 
 } 
+*/
 
 static void dump_stack_continuation_set(scheme* sc, pointer p)
 {
@@ -3596,11 +3629,12 @@ static pointer dump_stack_copy(scheme* sc, pointer dump) {
 	
     return sc->tmp_args;	
 }
-
+/*
 static inline void dump_stack_mark(scheme *sc) 
 { 
     mark(sc->dump); 
 } 
+*/
 #endif 
 
 #define s_retbool(tf)    s_return(sc,(tf) ? sc->T : sc->F)
@@ -4767,11 +4801,13 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     int v=0;
     pointer x;
     for (x = a, v = 0; is_pair(x); x = cdr(x)) {
-	++v;
+	   ++v;
     }
+
     if(x==sc->NIL) {
-	return v;
+	   return v;
     }
+
     return -1;
 }
 
@@ -6246,10 +6282,14 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
     sc->call_end_time = end_time;
 	
     try{
-	Eval_Cycle(sc, OP_T0LVL); 
+		Eval_Cycle(sc, OP_T0LVL); 
     }catch(ScmRuntimeError err){
-	_Error_1(sc,err.msg,sc->NIL,0,0);
-    }
+		_Error_1(sc,err.msg,sc->NIL,0,0);
+    }catch(std::exception& e) {
+		_Error_1(sc,e.what(),sc->NIL,0,0);
+	}catch(std::string& e) {
+		_Error_1(sc,e.c_str(),sc->NIL,0,0);
+	}
 	
     typeflag(sc->loadport)=T_ATOM;
     if(sc->retcode==0) {

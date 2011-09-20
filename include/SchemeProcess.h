@@ -45,6 +45,10 @@
 #include <sstream>
 #include "EXTLLVM.h"
 
+#ifdef EXT_BOOST
+#include <boost/asio.hpp>
+#endif
+
 #define pair_caar(p) pair_car(pair_car(p))
 #define pair_cadr(p) pair_car(pair_cdr(p))
 #define pair_cdar(p) pair_cdr(pair_car(p))
@@ -69,10 +73,11 @@ namespace extemp {
 	
     class SchemeTask {	
     public:
-	SchemeTask(uint64_t _time, uint64_t _max_duration, void* _ptr, std::string _label, int _type) : time(_time), max_duration(_max_duration), ptr(_ptr), label(_label), type(_type) {}
+    SchemeTask(uint64_t _time, uint64_t _max_duration, void* _ptr, std::string _label, int _type, void* _ptr2 = 0) : time(_time), max_duration(_max_duration), ptr(_ptr), label(_label), type(_type), ptr2(_ptr2) /*, cnt_access_ptr(0) */ {}
 	uint64_t getTime() { return time; }
 	uint64_t getMaxDuration() { return max_duration; }
 	void* getPtr() { return ptr; }
+	void* getPtr2() { return ptr2; }
 	std::string getLabel() { return label; }
 	int getType() { return type; }
 				
@@ -82,6 +87,7 @@ namespace extemp {
 	void* ptr;
 	std::string label;
 	int type; // 0 = repl task,  1 = callback task,  2 = destroy env task
+	void* ptr2;
     };
 
     class SchemeProcess {
@@ -91,8 +97,11 @@ namespace extemp {
 	static SchemeProcess* I(int index=0);
 	static SchemeProcess* I(std::string name);
 	static SchemeProcess* I(scheme* sc);
+#ifdef EXT_BOOST
+	//	static SchemeProcess* I(int);
+#else
 	static SchemeProcess* I(pthread_t);
-
+#endif
 	//Thread functions
 	static void* impromptu_server_thread(void* obj_p);
 	static void* impromptu_task_executer(void* obj_p);		
@@ -128,12 +137,19 @@ namespace extemp {
 	bool getRunning() { return running; }
 	//static void printSchemeCons(scheme* sc, std::stringstream& ss, pointer cons, bool full = false, bool stringquotes = true);
 	static void banner(std::ostream* ss);
-	int getServerSocket() { return server_socket; }		
+#ifdef EXT_BOOST
+	boost::asio::ip::tcp::acceptor* getServerSocket() { return server_socket; }
+	boost::asio::io_service* getIOService() { return io_service; }
+        std::vector<boost::asio::ip::tcp::socket*>& getClientSockets() { return client_sockets;}
+        std::map<boost::asio::ip::tcp::socket*,std::stringstream*>& getInStreams() { return in_streams; }        
+#else
+	int getServerSocket() { return server_socket; }
+#endif
 	int getServerPort() { return server_port; }
 	std::queue<SchemeTask>& getQueue() { return taskq; }
 	llvm_zone_t* getDefaultZone() { return default_zone; }
 		
-	std::string getName() { return name; }
+	std::string& getName() { return name; }
 	void setLoadedLibs(bool v) { libs_loaded = v; }
 	bool loadedLibs() {return libs_loaded; }
 	//std::vector<int>* getClientSockets() { return &client_sockets; }
@@ -149,9 +165,6 @@ namespace extemp {
 	static std::map<scheme*, SchemeProcess*> SCHEME_MAP;
 	static std::map<std::string, SchemeProcess*> SCHEME_NAME_MAP;
 
-//		llvm::Module* M;
-//		llvm::ExistingModuleProvider* MP;
-//		llvm::ExecutionEngine* EE;				
 		
     private:
 	bool libs_loaded;
@@ -160,21 +173,24 @@ namespace extemp {
 	scheme* sc;		
 	EXTThread threadScheme;
 	EXTThread threadServer;
+#ifdef EXT_BOOST
+	EXTThread threadBoost;
+#endif
 	EXTMonitor guard;
-	//CAPThread threadScheme;				
-	//CAPThread threadServer;
-	//CAGuard guard;				
 	bool running;
 	int server_port;
 	bool with_banner;
 	uint64_t max_duration;				
+#ifdef EXT_BOOST
+	boost::asio::ip::tcp::acceptor* server_socket;
+	boost::asio::io_service* io_service;
+        std::vector<boost::asio::ip::tcp::socket*> client_sockets;
+        std::map<boost::asio::ip::tcp::socket*,std::stringstream*> in_streams;
+#else
 	int server_socket;				
+#endif
 	std::queue<SchemeTask> taskq;
-	llvm_zone_t* default_zone;
-		
-	//std::map<int, std::string> result_string;
-	//std::vector<int> client_sockets;
-	//static vars
+	llvm_zone_t* default_zone;		
     };
 	
     class SchemeObj{
@@ -184,8 +200,6 @@ namespace extemp {
 	pointer getEnvironment();
 	pointer getValue();
 	scheme* getScheme();
-	//pointer copyList(scheme* _sc, pointer newlist, pointer val, int* i);
-	//int totalItems(pointer list, int res =0);		
 		
     private:
 	scheme* sc;

@@ -63,9 +63,9 @@ namespace extemp {
 	while(t != NULL && (t->getStartTime() < (UNIV::TIME + UNIV::FRAMES))) {
 	    t = queue.get();
 	    try{
-		if(t->getTag() == 0) t->execute();
-	    }catch(...){
-		std::cout << "Error executing scheduled task!" << std::endl;
+		   if(t->getTag() == 0) t->execute();
+	    }catch(std::exception& e){ //...){
+		   std::cout << "Error executing scheduled task! " << e.what() << std::endl;
 	    }
 	    delete t;
 	    t = queue.peek();
@@ -81,10 +81,15 @@ namespace extemp {
 	TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);					
 	EXTMonitor* guard = sched->getGuard();
 	while(true) {
-	    guard->lock();			
-	    sched->timeSlice();		
-	    guard->wait();
-	    guard->unlock();
+#ifdef EXT_BOOST
+	     sched->timeSlice();		
+	     guard->wait();
+#else
+	     guard->lock();			
+	     sched->timeSlice();		
+	     guard->wait();
+	     guard->unlock();
+#endif
 	}
 	return obj_p;
     }

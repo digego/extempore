@@ -33,10 +33,14 @@
  *
  */
 
+#include "UNIV.h"
 #include "EXTThread.h"
 #include <string>
 #include <map>
 
+#ifdef EXT_BOOST
+#include <boost/asio.hpp>
+#endif
 
 namespace extemp {
     class EXTMutex;
@@ -55,7 +59,12 @@ namespace extemp {
     private:
 	static std::map<std::string,SchemeREPL*> REPL_MAP;
 	static int BUFLENGTH;
+#ifdef EXT_BOOST
+	boost::asio::ip::tcp::socket* server_socket;
+	boost::asio::io_service* server_io_service;
+#else
 	int server_socket;
+#endif
 	char* buf;
 	bool connected;
 	bool active;

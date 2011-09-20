@@ -35,8 +35,6 @@
 
 #include <iostream>
 
-#include "pthread.h"
-
 #include "EXTMonitor.h"
 
 
@@ -105,7 +103,7 @@ namespace extemp
 
     int EXTMonitor::signal()
     {
-        int result = condition.signal();
+        int result = condition.signal(&mutex);
         return result;
     }
 

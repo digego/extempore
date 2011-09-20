@@ -38,12 +38,11 @@
 #include <string.h>
 
 #include "AudioDevice.h"
-#include "math.h"
 #include "TaskScheduler.h"
 //#include "EXTMonitor.h"
 #include "EXTLLVM.h"
 
-#ifndef TARGET_OS_LINUX
+#ifdef TARGET_OS_OSX
 #include <CoreAudio/HostTime.h>
 #include <mach/mach_init.h>
 #include <mach/task_policy.h>
@@ -54,9 +53,7 @@
 #endif
 
 #include <stdlib.h>
-
-
-
+#include <math.h>
 
 ///////////////////////////////////////////////////////////////////////
 //
@@ -74,7 +71,8 @@
 //
 ///////////////////////////////////////////////////////////////////////
 
-
+#ifdef EXT_BOOST
+#else
 #ifdef TARGET_OS_LINUX
 double time_to_double(struct timespec t) {
     return t.tv_sec + t.tv_nsec/D_BILLION;
@@ -98,16 +96,21 @@ double getRealTime()
   clock_gettime(CLOCK_REALTIME,&t);
   return time_to_double(t);
 }
-#endif
+#endif //TARGET_OS_LINUX
+#endif //EXT_BOOST
 
+#ifdef TARGET_OS_WINDOWS
+#define isnan(x) ((x) != (x))
+#define isinf(x) (isnan(x-x))
+#endif
 
 SAMPLE audio_sanity(SAMPLE x)
 {
-    if(isinf(x)) return 0.0f;
-    else if(isnan(x)) return 0.0f;
-    else if(x < -0.99f) return -0.99f; 
-    else if(x > 0.99f) return 0.99f;
-    else return x;
+  if(isinf(x)) return 0.0f;
+  else if(isnan(x)) return 0.0f;
+  else if(x < -0.99f) return -0.99f; 
+  else if(x > 0.99f) return 0.99f;  
+  else return x;
 }
 
 namespace extemp {
@@ -155,7 +158,6 @@ namespace extemp {
 
     void audioCallback(snd_async_handler_t *pcm_callback)
     {
-      printf("HI\n");
       snd_pcm_t* handle = snd_async_handler_get_pcm(pcm_callback);
       AudioDevice* private_data = (AudioDevice*) snd_async_handler_get_callback_private(pcm_callback);
       SAMPLE* outputBuffer = private_data->getBuffer();
@@ -498,130 +500,7 @@ namespace extemp {
 	started = false;
     }
 
-#elif defined(TARGET_OS_LINUX)
-    //-----------------------------------
-    //  PORT AUDIO
-    //-----------------------------------
-    int audioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
-    {        
-        TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
-	//sched->getGuard()->signal();
-	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
-	UNIV::TIME = UNIV::DEVICE_TIME;
-
-	if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
-	AudioDevice::REALTIME = getRealTime();
-
-	//device_time = UNIV::DEVICE_TIME;
-        //if(UNIV::DEVIDE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
-        int channels = 2;
-        uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
-	sched->getGuard()->signal();	
-	
-	void* dsp_closure = AudioDevice::I()->getDSPClosure();
-	void* cache_closure = 0;
-	if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE))); return 0; }
-	cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
-				
-	if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
-	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
-	    dsp_f_ptr cache_wrapper = dsp_wrapper;
-	    double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
-	    double* data = 0; 
-	    llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
-	    for(uint32_t i=0;i<UNIV::FRAMES;i++)
-	    {
-		uint32_t ii = i*UNIV::CHANNELS;
-		SAMPLE* dat = (SAMPLE*) outputBuffer;
-		SAMPLE* in = (SAMPLE*) inputBuffer;
-		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
-		{
-		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data));
-		  llvm_zone_reset(zone);
-		}
-	    }
-	    llvm_zone_destroy(zone);
-	}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
-	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
-	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	    llvm_zone_t* zone = llvm_zone_create(1024*50);				
-	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
-	    llvm_zone_destroy(zone);
-	}else{ 
-	    //zero out audiobuffer
-	    memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)));
-	    //nothin to do
-	}
-        return 0;
-    }
-
-    AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
-    {
-        Pa_Initialize();
-        //std::cout << "Initializing AudioDevice: " << std::endl;
-        PaError err;
-        int inputDevice = Pa_GetDefaultInputDevice();
-        int outputDevice = Pa_GetDefaultOutputDevice();
-
-        std::cout << "Input Device: " << inputDevice << std::endl;
-        std::cout << "Output Device: " << outputDevice << std::endl;
-        err = Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100.0, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
-	if(err != paNoError) {
-	    std::cerr << "PA Error: " << Pa_GetErrorText(err) << std::endl;
-	}
-        UNIV::CHANNELS = 2;
-        UNIV::SAMPLERATE = 44100;
-	ascii_text_color(1,7,10);
-	std::cout << "---PortAudio---" << std::endl;
-        std::cout << "Loaded Default Audio Device: " << std::endl;	
-	ascii_text_color(0,7,10);	
-        std::cout << "SampleRate\t: " << std::flush;
-	ascii_text_color(1,6,10);	
-	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
-	ascii_text_color(0,7,10);	
-        std::cout << "Channels\t: " << std::flush;
-	ascii_text_color(1,6,10);	
-	std::cout << UNIV::CHANNELS << std::endl << std::flush;
-	ascii_text_color(0,7,10);	
-        std::cout << "Frames\t\t: " << std::flush;
-	ascii_text_color(1,6,10);	
-	std::cout << UNIV::FRAMES << std::endl << std::flush;
-	ascii_text_color(0,7,10); 
-    }
-	
-    AudioDevice::~AudioDevice()
-    {
-	PaError err;
-	err = Pa_StopStream(stream);
-	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-	err = Pa_CloseStream(stream);
-	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-	err = Pa_Terminate();
-	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-    }
-
-    void AudioDevice::start()
-    {
-	if(started) return;
-        UNIV::initRand();        
-	PaError err;
-        err = Pa_StartStream(stream);
-	ascii_text_color(1,1,10);
-	if(err != paNoError) { std::cout << "PortAudio ERROR: " << Pa_GetErrorText(err) << std::endl; }
-	ascii_text_color(0,9,10);
-	RUNNING = true;
-	//queueThread->Start();
-	started = true;
-    }
-
-    void AudioDevice::stop()
-    {
-	if(!started) return;
-	PaError err = Pa_StopStream(stream);
-	if(err != paNoError) std::cout << "PA Error: " << Pa_GetErrorText(err) << std::endl;    
-	started = false;
-    }
-#else
+#elif defined (TARGET_OS_MAC)
 
 
     //-----------------------------------
@@ -809,7 +688,131 @@ namespace extemp {
 	if (err != kAudioHardwareNoError) { std::cerr << "CoreAudio ERROR: removing IOProc" << std::endl; }
 	started = false;
     }
+#else
+    //-----------------------------------
+    //  PORT AUDIO
+    //-----------------------------------
+    int audioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData)
+    {        
+        TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
+	//sched->getGuard()->signal();
+	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
+	UNIV::TIME = UNIV::DEVICE_TIME;
+/*
+	if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
+	AudioDevice::REALTIME = getRealTime();
+*/
+	//device_time = UNIV::DEVICE_TIME;
+        //if(UNIV::DEVIDE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
+        int channels = 2;
+        uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
+	sched->getGuard()->signal();	
+	
+	void* dsp_closure = AudioDevice::I()->getDSPClosure();
+	void* cache_closure = 0;
+	if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE))); return 0; }
+	cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
+				
+	if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
+	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
+	    dsp_f_ptr cache_wrapper = dsp_wrapper;
+	    double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
+	    double* data = 0; 
+	    llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	    for(uint32_t i=0;i<UNIV::FRAMES;i++)
+	    {
+		uint32_t ii = i*UNIV::CHANNELS;
+		SAMPLE* dat = (SAMPLE*) outputBuffer;
+		SAMPLE* in = (SAMPLE*) inputBuffer;
+		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+		{
+		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		  llvm_zone_reset(zone);
+		}
+	    }
+	    llvm_zone_destroy(zone);
+	}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
+	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
+	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
+	    llvm_zone_t* zone = llvm_zone_create(1024*50);				
+	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
+	    llvm_zone_destroy(zone);
+	}else{ 
+	    //zero out audiobuffer
+	    memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)));
+	    //nothin to do
+	}
+        return 0;
+    }
 
+    AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
+    {
+        Pa_Initialize();
+        //std::cout << "Initializing AudioDevice: " << std::endl;
+        PaError err;
+        int inputDevice = Pa_GetDefaultInputDevice();
+        int outputDevice = Pa_GetDefaultOutputDevice();
+
+        std::cout << "Input Device: " << inputDevice << std::endl;
+        std::cout << "Output Device: " << outputDevice << std::endl;
+        err = Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100.0, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
+	if(err != paNoError) {
+	    std::cerr << "PA Error: " << Pa_GetErrorText(err) << std::endl;
+	}
+        UNIV::CHANNELS = 2;
+        UNIV::SAMPLERATE = 44100;
+	ascii_text_color(1,7,10);
+	std::cout << "---PortAudio---" << std::endl;
+        std::cout << "Loaded Default Audio Device: " << std::endl;	
+	ascii_text_color(0,7,10);	
+        std::cout << "SampleRate\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
+	ascii_text_color(0,7,10);	
+        std::cout << "Channels\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::CHANNELS << std::endl << std::flush;
+	ascii_text_color(0,7,10);	
+        std::cout << "Frames\t\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::FRAMES << std::endl << std::flush;
+	ascii_text_color(0,7,10); 
+	std::cout << std::endl << std::flush;
+	//ascii_text_color(0,7,10);
+    }
+	
+    AudioDevice::~AudioDevice()
+    {
+	PaError err;
+	err = Pa_StopStream(stream);
+	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+	err = Pa_CloseStream(stream);
+	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+	err = Pa_Terminate();
+	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+    }
+
+    void AudioDevice::start()
+    {
+	if(started) return;
+        UNIV::initRand();        
+	PaError err;
+        err = Pa_StartStream(stream);
+	ascii_text_color(1,1,10);
+	if(err != paNoError) { std::cout << "PortAudio ERROR: " << Pa_GetErrorText(err) << std::endl; }
+	ascii_text_color(0,9,10);
+	RUNNING = true;
+	//queueThread->Start();
+	started = true;
+    }
+
+    void AudioDevice::stop()
+    {
+	if(!started) return;
+	PaError err = Pa_StopStream(stream);
+	if(err != paNoError) std::cout << "PA Error: " << Pa_GetErrorText(err) << std::endl;    
+	started = false;
+    }
 #endif
 
 

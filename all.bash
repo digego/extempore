@@ -1,6 +1,7 @@
 #!/bin/bash
 
 case $(uname) in
+        *NT*) EXTEMPORE_OS=windows ;;
 	Linux) EXTEMPORE_OS=linux ;;
 	Darwin) EXTEMPORE_OS=darwin ;;
 	*) echo Unsupported OS:  $(uname) >&2 ; exit 1 ;;

@@ -36,15 +36,22 @@
 #ifndef OSC_H
 #define OSC_H
 
+#include "UNIV.h"
 #include <stdio.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
 #include <iostream>
 #include <stdexcept>
 #include <map>
 #include "SchemeProcess.h"
 #include "EXTThread.h"
+
+
+#ifdef EXT_BOOST
+#include <boost/asio.hpp>
+#else
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#endif
 
  
 uint64_t swap64f(double d);
@@ -99,18 +106,27 @@ namespace extemp {
 	static pointer set_real_type(scheme* _sc, pointer args);		
 	static pointer set_integer_type(scheme* _sc, pointer args);
 	static pointer send_from_server_socket(scheme* _sc, pointer args);		
-	//static void osc_callback(std::string* address, std::string* typetags, char* args, int length, char* reply, int* reply_length, std::string* caller);		
-        
+#ifdef EXT_BOOST
+	boost::asio::ip::udp::endpoint* getAddress() { return osc_address; }
+	boost::asio::ip::udp::endpoint* getClientAddress() { return osc_client_address; }
+	int* getClientAddressSize() { return &osc_client_address_size; }
+	char* getMessageData() { return message_data; }
+	int getMessageLength() { return message_length; }
+	boost::asio::ip::udp::socket* getSendFD() { return send_socket; }
+	void setSendFD(boost::asio::ip::udp::socket* fd) { send_socket = fd; }
+	void setSocket(boost::asio::ip::udp::socket* soc) { socket = soc; }
+	boost::asio::ip::udp::socket* getSocketFD() { return socket; }
+	boost::asio::io_service* getIOService() { return io_service; }
+#else       
 	struct sockaddr_in* getAddress() { return &osc_address; }
 	struct sockaddr_in* getClientAddress() { return &osc_client_address; }
-//        int sizeOfClientAddress() { return sizeof(osc_client_address); }
-	int* getClientAddressSize() { return &osc_client_address_size; }        
+	int* getClientAddressSize() { return &osc_client_address_size; }
 	char* getMessageData() { return message_data; }
 	int getMessageLength() { return message_length; }
 	int getSendFD() { return send_socket_fd; }
 	void setSendFD(int fd) { send_socket_fd = fd; }		
-	//OSC_CALLBACK getCallback() { return callback; }
 	int* getSocketFD() { return &socket_fd; }
+#endif
 	EXTThread& getThread() { return threadOSC; }
 	bool getStarted() { return started; }
 	void setStarted(bool val) { started = val; }
@@ -129,18 +145,23 @@ namespace extemp {
     private:
 	static OSC* singleton;
 	EXTThread threadOSC;
+#ifdef EXT_BOOST
+	boost::asio::ip::udp::socket* socket;
+	boost::asio::ip::udp::socket* send_socket;
+	boost::asio::ip::udp::endpoint* osc_address;
+	boost::asio::ip::udp::endpoint* osc_client_address;
+	boost::asio::io_service* io_service;
+#else
 	int socket_fd;
 	int send_socket_fd;
 	struct sockaddr_in osc_address;
 	struct sockaddr_in osc_client_address;
+#endif
 	int osc_client_address_size;
-	char message_data[256];
+	char message_data[20000];
 	int message_length;
 	bool started;
 	int(*native)(char*,char*,char*); /* if not null then use this compiled function for callbacks */
-	//char scheme_real_type;
-	//char scheme_integer_type;
-	//OSC_CALLBACK callback;
     };
 
 } //End Namespace

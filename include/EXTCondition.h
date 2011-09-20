@@ -36,9 +36,14 @@
 #ifndef EXT_CONDITION
 #define EXT_CONDITION
 
+#ifdef EXT_BOOST
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/locks.hpp>
+#else
 #include "pthread.h"
-#include "EXTMutex.h"
+#endif
 
+#include "EXTMutex.h"
 
 namespace extemp
 {
@@ -53,12 +58,16 @@ namespace extemp
 	void destroy();
         
 	int wait(EXTMutex *mutex);
-	int signal();
+	int signal(EXTMutex *mutex);
         
     protected:
 	bool initialised;
-
+#ifdef EXT_BOOST
+	boost::condition_variable_any boost_cond;
+#else
 	pthread_cond_t pthread_cond;
+#endif
+
     };
 } //End Namespace
 

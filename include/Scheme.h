@@ -182,26 +182,26 @@ typedef struct num {
     } value;
 } num;
 
-SCHEME_EXPORT scheme *scheme_init_new();
-SCHEME_EXPORT scheme *scheme_init_new_custom_alloc(func_alloc malloc, func_dealloc free);
-SCHEME_EXPORT int scheme_init(scheme *sc);
-SCHEME_EXPORT int scheme_init_custom_alloc(scheme *sc, func_alloc, func_dealloc);
-SCHEME_EXPORT void scheme_deinit(scheme *sc);
+scheme *scheme_init_new();
+scheme *scheme_init_new_custom_alloc(func_alloc malloc, func_dealloc free);
+int scheme_init(scheme *sc);
+int scheme_init_custom_alloc(scheme *sc, func_alloc, func_dealloc);
+void scheme_deinit(scheme *sc);
 void scheme_set_input_port_file(scheme *sc, FILE *fin);
 void scheme_set_input_port_string(scheme *sc, char *start, char *past_the_end);
-SCHEME_EXPORT void scheme_set_output_port_file(scheme *sc, FILE *fin);
+void scheme_set_output_port_file(scheme *sc, FILE *fin);
 void scheme_set_output_port_string(scheme *sc, char *start, char *past_the_end);
-SCHEME_EXPORT void scheme_load_file(scheme *sc, FILE *fin);
-SCHEME_EXPORT void scheme_load_string(scheme *sc, const char *cmd, unsigned long long int start_time, unsigned long long int end_time);
+void scheme_load_file(scheme *sc, FILE *fin);
+void scheme_load_string(scheme *sc, const char *cmd, unsigned long long int start_time, unsigned long long int end_time);
 void scheme_apply0(scheme *sc, const char *procname);
-SCHEME_EXPORT pointer scheme_apply1(scheme *sc, const char *procname, pointer);
+pointer scheme_apply1(scheme *sc, const char *procname, pointer);
 const char *procname(pointer x);
 pointer mk_continuation(scheme* sc);
 pointer mk_closure(scheme* sc, pointer c, pointer e);
 void scheme_call(scheme *sc, pointer func, pointer args, uint64_t start_time, uint64_t call_duration);
 void scheme_call_without_stack_reset(scheme *sc, pointer func, pointer args);
 void scheme_set_external_data(scheme *sc, void *p);
-SCHEME_EXPORT void scheme_define(scheme *sc, pointer env, pointer symbol, pointer value);
+void scheme_define(scheme *sc, pointer env, pointer symbol, pointer value);
 
 pointer find_slot_in_env(scheme *sc, pointer env, pointer sym, int all);
 void set_slot_in_env(scheme *sc, pointer slot, pointer value);

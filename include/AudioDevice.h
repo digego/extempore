@@ -111,10 +111,10 @@ namespace extemp {
 	jack_port_t** output_ports;
 #elif defined (___ALSA_AUDIO___) // ALSA NOT CURRENTLY SUPPORTED
 	snd_pcm_t *pcm_handle;
-#elif defined (TARGET_OS_LINUX) // default on linux is portaudio
-	PaStream* stream;
-#else 
+#elif defined (TARGET_OS_MAC)
 	AudioDeviceID device;
+#else 
+	PaStream* stream;
 #endif
 	float* buffer;
 	void* dsp_closure;

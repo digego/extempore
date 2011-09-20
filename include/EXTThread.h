@@ -36,7 +36,11 @@
 #ifndef EXT_THREAD
 #define EXT_THREAD
 
+#ifdef EXT_BOOST
+#include <boost/thread/thread.hpp>
+#else
 #include "pthread.h"
+#endif
 
 
 namespace extemp
@@ -53,15 +57,22 @@ namespace extemp
 	int cancel();
 	bool isRunning();
 	bool isCurrentThread();
+#ifdef EXT_BOOST
+	boost::thread& getBthread();
+#else
 	pthread_t getPthread();
+#endif
 
     protected:
 	bool initialised;
 	bool detached;
 	bool joined;
 	bool cancelled;			
-
+#ifdef EXT_BOOST
+	boost::thread bthread;
+#else
 	pthread_t pthread;
+#endif
     };
 } //End Namespace
 

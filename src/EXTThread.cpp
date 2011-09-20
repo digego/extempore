@@ -35,10 +35,7 @@
 
 #include <iostream>
 
-#include "pthread.h"
-
 #include "EXTThread.h"
-
 
 #define _EXTTHREAD_DEBUG_
 
@@ -46,10 +43,7 @@
 namespace extemp
 {
     EXTThread::EXTThread() : initialised(false), detached(false), joined(false)
-    {
-//		initialised = false;
-//		detached = false;
-//		joined = false;
+    {       
     }
 
     EXTThread::~EXTThread()
@@ -68,7 +62,12 @@ namespace extemp
 
 	if (! initialised)
 	{
+#ifdef EXT_BOOST
+            bthread = boost::thread(start_routine, arg);
+            result = 0;
+#else
 	    result = pthread_create(&pthread, NULL, start_routine, arg);
+#endif
 	    initialised = ! result;
 	}
 
@@ -89,7 +88,12 @@ namespace extemp
 
 	if (initialised)
 	{
+#ifdef EXT_BOOST
+	    bthread.detach();
+	    result = 0;
+#else
 	    result = pthread_detach(pthread);
+#endif
 	    detached = ! result;
 	}
 
@@ -109,7 +113,12 @@ namespace extemp
 
 	if (initialised)
 	{
+#ifdef EXT_BOOST
+	    bthread.join();
+            result = 0;
+#else
 	    result = pthread_join(pthread, NULL);
+#endif
 	    joined = ! result;
 	}
 
@@ -131,7 +140,12 @@ namespace extemp
 		
 	if(initialised)
 	{
+#ifdef EXT_BOOST
+	    bthread.interrupt();
+            result = 0;
+#else
 	    result = pthread_cancel(pthread);
+#endif
 	    cancelled = ! result;
 	}
 		
@@ -147,16 +161,31 @@ namespace extemp
 	
     bool EXTThread::isRunning() 
     { 
+#ifdef EXT_BOOST
+      return initialised;
+#else
 	return 0 != pthread; 
+#endif
     }	
 	
     bool EXTThread::isCurrentThread()
     {
+#ifdef EXT_BOOST
+        return (bthread.get_id() == boost::this_thread::get_id());
+#else
 	return pthread_equal(pthread_self(), pthread);
+#endif
     }
 	
+#ifdef EXT_BOOST
+  boost::thread& EXTThread::getBthread()
+    {
+	return bthread;
+    }
+#else
     pthread_t EXTThread::getPthread()
     {
 	return pthread;
     }
+#endif
 }
