@@ -275,8 +275,8 @@ namespace extemp {
 	    { "gl:set-context",             &SchemeFFI::glMakeContextCurrent },
 	    { "gl:swap-buffers",			&SchemeFFI::glSwapBuffers },
 
-#ifdef EXT_BOOST
-#else
+	    //#ifdef EXT_BOOST
+	    //#else
 	    //CLOCK STUFF
 	    { "clock:set-offset",                           &SchemeFFI::setClockOffset},
 	    { "clock:get-offset",                           &SchemeFFI::getClockOffset},
@@ -288,7 +288,7 @@ namespace extemp {
 	    { "ad:clock:adjust-offset",                    &SchemeFFI::ad_adjustClockOffset},
 	    { "ad:clock:clock",                            &SchemeFFI::ad_getClockTime},
             { "ad:clock",                                  &SchemeFFI::ad_getClockTime},
-#endif
+	    //#endif
            
 
 	    		
@@ -445,31 +445,31 @@ namespace extemp {
 	  return reverse(_sc,list);
 	}
 #else
-	pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
-	{    
+  pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
+  {    
 
-		DIR *dp;
-		struct dirent *ep;     
-		dp = opendir (string_value(pair_car(args)));
-
-		pointer list = _sc->NIL;
-		if (dp != NULL)
-		{
-			while (ep = readdir (dp)) {
-				_sc->imp_env->insert(list);
-				pointer tlist = cons(_sc,mk_string(_sc,ep->d_name),list);
-				_sc->imp_env->erase(list);
-				list = tlist;
-			}
-
-			(void) closedir (dp);
-		}
-		else {
-			perror ("Couldn't open the directory");
-		}
-
-		return reverse(_sc,list);
+    DIR *dp;
+    struct dirent *ep;     
+    dp = opendir (string_value(pair_car(args)));
+    
+    pointer list = _sc->NIL;
+    if (dp != NULL)
+      {
+	while (ep = readdir (dp)) {
+	  _sc->imp_env->insert(list);
+	  pointer tlist = cons(_sc,mk_string(_sc,ep->d_name),list);
+	  _sc->imp_env->erase(list);
+	  list = tlist;
 	}
+	
+	(void) closedir (dp);
+      }
+    else {
+      perror ("Couldn't open the directory");
+    }
+    
+    return reverse(_sc,list);
+  }
 #endif
 
     pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)

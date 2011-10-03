@@ -72,6 +72,32 @@
 ///////////////////////////////////////////////////////////////////////
 
 #ifdef EXT_BOOST
+#include <boost/filesystem.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+
+ boost::posix_time::ptime EXT_BOOST_JAN1970(boost::gregorian::date(1970,boost::gregorian::Jan,1));
+
+  double time_to_double(boost::posix_time::ptime& time) {
+	 boost::posix_time::time_period period(EXT_BOOST_JAN1970,time);
+	 return period.length().total_microseconds()/D_MILLION;
+  }
+ 
+  struct boost::posix_time::ptime& double_to_time(double tm) {
+     using namespace boost::posix_time;
+     ptime p;
+     int64_t seconds = (int64_t)tm;
+     int64_t fractional = (tm-seconds)*time_duration::ticks_per_second();
+     p = EXT_BOOST_JAN1970+time_duration(0,0,seconds,fractional);
+
+     return p;
+  }
+
+  double getRealTime()
+  {
+	boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
+	return time_to_double(pt); // + SchemeFFI::CLOCK_OFFSET);
+  }
+
 #else
 #ifdef TARGET_OS_LINUX
 double time_to_double(struct timespec t) {
@@ -698,12 +724,13 @@ namespace extemp {
 	//sched->getGuard()->signal();
 	UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
 	UNIV::TIME = UNIV::DEVICE_TIME;
-/*
+
 	if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
 	AudioDevice::REALTIME = getRealTime();
-*/
-	//device_time = UNIV::DEVICE_TIME;
-        //if(UNIV::DEVIDE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
+
+	device_time = UNIV::DEVICE_TIME;
+        if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
+
         int channels = 2;
         uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
 	sched->getGuard()->signal();	

@@ -236,7 +236,7 @@
              ;; check tolerance of return
              (if (> (math:std-deviation lst) 
                     (if (null? args) 0.0005 (car args)))                    
-                 (print-notification "clock sync outside tolerance - making no time adjustment")
+                 (print-notification "clock sync outside tolerance - making no time adjustment: " (math:std-deviation lst))
                  (begin (print-notification 'clock 'successfully 'adjusted)
                         (clock:adjust-offset (/ (apply + lst) (length lst)))))))))
 
@@ -709,6 +709,8 @@
 (define ipc:run-active-label
    (lambda (id . args)
      (let ((k (vector-ref *ipc:active-labels* id)))
+       (if (null? k)
+	   (println "Error: bad process? Have you given your local process a name on the remote host?"))
        (vector-set! *ipc:active-labels* id '())
        (apply k args))))
 		 
