@@ -67,6 +67,7 @@
 #define D_MILLION 1000000.0
 
 
+bool rmatch(char* regex, char* str);
 bool rsplit(char* regex, char* str, char* a, char* b);
 char* rreplace(char* regex, char* str, char* replacement, char* result);
 void ascii_text_color(int attr, int fg, int bg);
@@ -75,9 +76,9 @@ namespace extemp {
 
 //#define mk_cb(instance,class,func) (dynamic_cast<CM*>(new CMI<class>(instance,&class::func)))
     
-    typedef float AUDIOSAMPLE;
+typedef float AUDIOSAMPLE;
     
-    class UNIV {
+class UNIV {
 
 #define EIGHT_BIT 127
 #define SIXTEEN_BIT 32767

@@ -762,6 +762,12 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("log2"));
 	    EE->updateGlobalMapping(gv,(void*)&log2);		
 #endif
+	    gv = M->getNamedValue(std::string("rsplit"));
+	    EE->updateGlobalMapping(gv,(void*)&rsplit);		
+	    gv = M->getNamedValue(std::string("rmatch"));
+	    EE->updateGlobalMapping(gv,(void*)&rmatch);		
+	    gv = M->getNamedValue(std::string("rreplace"));
+	    EE->updateGlobalMapping(gv,(void*)&rreplace);			    
 	}	
 	return;
     }

@@ -75,6 +75,37 @@ void ascii_text_color(int attr, int fg, int bg)
 #endif
 }
 
+bool rmatch(char* regex, char* str)
+{
+  //  char* data = char* strstring_value(pair_car(args));
+  // char* pattern = string_value(pair_cadr(args));
+  char* data = str;
+  char* pattern = regex;		
+  
+  pcre *re; 
+  const char *error; 
+  int erroffset;
+  
+  re = pcre_compile(	pattern, /* the pattern */ 
+			0, /* default options */ 
+			&error, /* for error message */ 
+			&erroffset, /* for error offset */ 
+			NULL); /* use default character tables */
+  
+  int rc;
+  int ovector[30]; 
+  rc = pcre_exec(	re, /* result of pcre_compile() */ 
+			NULL, /* we didn’t study the pattern */ 
+			data, /* the subject string */ 
+			strlen(data), /* the length of the subject string */ 
+			0, /* start at offset 0 in the subject */ 
+			0, /* default options */ 
+			ovector, /* vector of integers for substring information */ 
+			30); /* number of elements (NOT size in bytes) */
+  
+  return (rc>=0) ? true : false;
+}
+
 bool rsplit(char* regex, char* str, char* a, char* b)
 {
   char* data = str;
