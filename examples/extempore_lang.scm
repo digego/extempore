@@ -250,7 +250,7 @@
 ;; logview shows [<i64,double,i32>*]*
 ;; i.e. a closure that takes no arguments
 ;; and returns the tuple <i64,double,i32>*
-      
+
 
 ;; here's another tuple example
 ;; note that my-test-7's return type is inferred
@@ -258,16 +258,20 @@
 ;; (i.e. i64 being tuple index 0)
 (definec my-test-7 
   (lambda ()
-    (let ((a (make-tuple i64 float)) ; returns pointer to type <i64,float>
+    (let ((a (make-tuple i64 double)) ; returns pointer to type <i64,double>
 	  (b 37)
 	  (c 6.4))
       (tuple-set! a 0 b) ;; set i64 to 64
-      (tuple-set! a 1 c) ;; set float to 6.4
+      (tset! a 1 c) ;; set double to 6.4 - tset! is an alias for tuple-set!
+      (printf "tuple:1 %lld::%f\n" (tuple-ref a 0) (tref a 1))
+      ;; we can fill a tuple in a single call by using tfill!
+      (tfill! a 77 77.7)
+      (printf "tuple:2 %lld::%f\n" (tuple-ref a 0) (tuple-ref a 1))
       (tuple-ref a 0)))) ;; return first element which is i64
 
 ;; should be 64 as we return the 
 ;; first element of the tuple 
-(println (my-test-7)) ; 37
+(println (my-test-7)) ; 77
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -275,15 +279,20 @@
 ;; this function returns void
 (definec my-test-8
    (lambda ()
-      (let ((v (make-array 5 float))) ; returns pointer to type |5,float|
+      (let ((v1 (make-array 5 float))
+	    (v2 (make-array 5 float)))				
          (dotimes (i 5)
             ;; random returns double so "truncate" to float
             ;; which is what v expects
-            (array-set! v i (dtof (random))))
+            (array-set! v1 i (dtof (random))))
+	 ;; we can use the afill! function to fill an array
+	 (afill! v2 1.1 2.2 3.3 4.4 5.5)
          (dotimes (k 5)
             ;; unfortunately printf doesn't like floats
             ;; so back to double for us :(
-            (printf "val: %lld::%2f\n" k (ftod (array-ref v k)))))))
+            (printf "val: %lld::%2f::%2f\n" k
+		    (ftod (array-ref v1 k))
+		    (ftod (aref v2 k)))))))
 
 (my-test-8)
 
