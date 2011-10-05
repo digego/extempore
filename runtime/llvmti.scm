@@ -288,16 +288,34 @@
                                (impc:ti:first-transform (car inlst) inbody?) 
                                (impc:ti:first-transform (cadr inlst) inbody?))))
             (if (null? rest) lst
-                (loop (cdr rest) (list op lst (impc:ti:first-transform (car rest) inbody?))))))))				
+                (loop (cdr rest) (list op lst (impc:ti:first-transform (car rest) inbody?))))))))
 
 (define impc:ti:bitwise-not-to-eor
   (lambda (ast inbody?)
     (list 'bitwise-eor (cadr ast) -1)))
 
 
+(define impc:ti:afill!
+  (lambda (ast)
+    (append '(begin)
+	    (map (lambda (arg idx)
+		   (list 'aset! (car ast) idx arg))
+		 (cdr ast)
+		 (make-list-with-proc (length ast) (lambda (i) i))))))
+
+
+(define impc:ti:tfill!
+  (lambda (ast)
+    (append '(begin)
+	    (map (lambda (arg idx)
+		   (list 'tset! (car ast) idx arg))
+		 (cdr ast)
+		 (make-list-with-proc (length ast) (lambda (i) i))))))
+
+
 (define impc:ti:first-transform
    (lambda (ast inbody?)
-      ;(print inbody? 'transforming-ast: ast)
+      ;(println inbody? 'transforming-ast: ast)
       (if (null? ast) '()
           (cond ((list? ast)
                  (cond ((eq? (car ast) 'and) 
@@ -310,6 +328,10 @@
                         (impc:ti:first-transform (impc:ti:map (cdr ast)) inbody?))
                        ((eq? (car ast) 'case) 
                         (impc:ti:first-transform (impc:ti:case (cadr ast) (cddr ast)) inbody?))
+		       ((eq? (car ast) 'afill!)
+			(impc:ti:first-transform (impc:ti:afill! (cdr ast)) inbody?))
+		       ((eq? (car ast) 'tfill!)
+			(impc:ti:first-transform (impc:ti:tfill! (cdr ast)) inbody?))
                        ((eq? (car ast) 'or) 
                         (impc:ti:first-transform (impc:ti:or (cdr ast)) inbody?))
                        ((eq? (car ast) 'free) 
