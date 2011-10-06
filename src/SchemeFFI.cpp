@@ -271,9 +271,11 @@ namespace extemp {
 #if defined (TARGET_OS_LINUX)
 	    { "glx:get-event",			&SchemeFFI::getX11Event },
 #endif
+#ifndef TARGET_OS_MAC
 	    { "gl:make-ctx",			    &SchemeFFI::makeGLContext },	    
 	    { "gl:set-context",             &SchemeFFI::glMakeContextCurrent },
 	    { "gl:swap-buffers",			&SchemeFFI::glSwapBuffers },
+#endif 
 
 	    //#ifdef EXT_BOOST
 	    //#else
