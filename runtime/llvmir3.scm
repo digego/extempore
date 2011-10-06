@@ -161,6 +161,9 @@
              (base (impc:ir:get-base-type string-type)))
          ;(println 'base: base 'ptr-depth: ptr-depth (string? base))
          (cond ((string=? base "void") *impc:ir:void*)
+	       ((string=? base "size_t") (+ offset (if (= 64 (sys:pointer-size))
+						       *impc:ir:ui64*
+						       *impc:ir:ui32*)))
                ((string=? base "@") (+ -2 (* *impc:ir:pointer* ptr-depth)))
                ((string=? base "closure") (+ *impc:ir:closure* offset))
                ((string=? base "tuple") (+ *impc:ir:tuple* offset))
