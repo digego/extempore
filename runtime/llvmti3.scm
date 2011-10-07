@@ -2099,6 +2099,21 @@
        ,(cadr args)))
 
 
+(define-macro (bind-alias symbol type)
+  `(begin (impc:ir:add-type-alias ,(symbol->string symbol) ,(symbol->string type))
+          (ascii-print-color 0 7 10)
+	  (print "Successfull aliased ")
+	  (ascii-print-color 1 2 10)
+	  (print ',symbol)
+	  (ascii-print-color 0 7 10)
+	  (print " >>> ")
+	  (ascii-print-color 1 3 10)
+	  ;(print ',type)
+	  (print (impc:ir:pretty-print-type ,(symbol->string symbol))) ; (llvm:get-named-type ,(symbol->string symbol))))
+	  (ascii-print-color 0 7 10)
+	  (print)))
+  
+
 (define-macro (bind-type symbol type)
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<) ; (impc:ir:tuple? (impc:ir:get-type-from-pretty-str ,(symbol->string type)))
 	      (llvm:compile (string-append "%" ,(symbol->string symbol) " = type "

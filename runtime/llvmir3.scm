@@ -82,6 +82,30 @@
     (impc:ir:get-base-type str)))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; type aliases
+;;
+
+(define *impc:ir:type-aliases* (list (cons "size_t" (if (= 64 (sys:pointer-size)) "i64" "i32"))))
+
+(define impc:ir:add-type-alias
+  (lambda (name type)
+    (let ((v (assoc name *impc:ir:type-aliases*)))
+      (if v
+	  (begin (set-cdr! v type)
+		 #t)
+	  (begin (set! *impc:ir:type-aliases* (cons (cons name type) *impc:ir:type-aliases*))
+		 #t)))))
+	  
+(define impc:ir:check-type-aliases
+  (lambda (base ptr-depth)
+    (let ((res (assoc base *impc:ir:type-aliases*)))
+      (if res
+	  (let ((t (impc:ir:get-type-from-pretty-str (cdr res))))
+	    (dotimes (i ptr-depth) (set! t (impc:ir:pointer++ t)))
+	    t)
+	  #f))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  This stuff is all here just for pretty printing
@@ -161,9 +185,9 @@
              (base (impc:ir:get-base-type string-type)))
          ;(println 'base: base 'ptr-depth: ptr-depth (string? base))
          (cond ((string=? base "void") *impc:ir:void*)
-	       ((string=? base "size_t") (+ offset (if (= 64 (sys:pointer-size))
-						       *impc:ir:ui64*
-						       *impc:ir:ui32*)))
+	       ;((string=? base "size_t") (+ offset (if (= 64 (sys:pointer-size))
+	       ;					       *impc:ir:ui64*
+	       ;					       *impc:ir:ui32*)))
                ((string=? base "@") (+ -2 (* *impc:ir:pointer* ptr-depth)))
                ((string=? base "closure") (+ *impc:ir:closure* offset))
                ((string=? base "tuple") (+ *impc:ir:tuple* offset))
@@ -189,30 +213,15 @@
 		(if (char=? (string-ref base 0) #\%)
 		    string-type
 		    (string-append "%" string-type)))
-		;(substring string-type 1 (string-length string-type)))
-               ;((regex:match? base "\\[.*\\]\\**")
-               ; (cons (+ offset *impc:ir:array*) (impc:ir:get-array-type-from-str string-type)))
-	       
-	       ;((or (not (null? (llvm:get-named-type base)))
-	       ;	    (and (not (null? args))
-	       ;		 (string=? (car args) base)))
-	       ;	string-type)
-	       
-		;(string-append "%" string-type))
-		;(string-append string-type))
-		;(if (and (not (null? args))
-		;	 (string=? (car args) base))
-		;    (string-append "%" string-type)
-		;    (let ((type (impc:ir:get-type-from-str (llvm:get-named-type base))))
-		;      (dotimes (i ptr-depth)
-		;	(set! type (impc:ir:pointer++ type)))
-		;      type)))
                (else (let loop ((i -1))
                         (if (string=? base (impc:ir:get-type-str i string-type))
                             (+ i offset)
                             (if (< i *impc:ir:lowest-base-type*)
-                                (loop (+ i 1))
-                                (print-error 'Compiler 'Error: 'cannot 'find 'type 'for 'string string-type)))))))))
+                                (loop (+ i 1))				
+				;; if everything else fails try type aliases
+				(let ((res (impc:ir:check-type-aliases base ptr-depth)))
+				  (if res res
+				      (print-error 'Compiler 'Error: 'cannot 'find 'type 'for 'string string-type)))))))))))
 								
 								
 (define impc:ir:convert-from-pretty-types
