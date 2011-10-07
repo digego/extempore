@@ -1597,29 +1597,34 @@
 	     (ttype (impc:ir:get-type-from-str (cadr var)))
 	     (tt '()))
          ;; type tests
-	(if (and (not (impc:ir:pointer? ttype)))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
-	 (if (and (= 1.0 (impc:ir:get-ptr-depth ttype))
-		  (or (impc:ir:closure? ttype)))
-		      ;(impc:ir:tuple? ttype)))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
-         (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))	 
-         (emit index-str os)
-         (emit var-str os)
-         (emit "; array ref\n" os)
-	 (if (impc:ir:array? ttype)
-	     (begin (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
-					 " = getelementptr " (cadr var) " " (car var)
-					 ", i32 0, " (cadr idx) " " (car idx) "\n") os)
-		    (set! tt (impc:ir:get-type-str (caddr ttype))))
-	     (begin (emit (string-append (impc:ir:gname "val" (cadr var)) " = getelementptr " 
-					 (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n") os)
-		    (set! tt (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var)))))))
-	 ;(set! tt (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var)))))
-	 (emit (string-append (impc:ir:gname "val" tt) " = load " tt "* "
-			      (car (impc:ir:gname 1)) "\n") os)
-         (impc:ir:strip-space os))))
+	(if (and (not (impc:ir:pointer? ttype))
+		 (not (impc:ir:array? ttype)))
+	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'or 'array 'not (cadr var)))
+	;; (if (and (= 1.0 (impc:ir:get-ptr-depth ttype))
+	;; 	 (or (impc:ir:closure? ttype)))
+	;;     ;;(impc:ir:tuple? ttype)))
+	;;     (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
+	(if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
+	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))	 
+	(emit index-str os)
+	(emit var-str os)
+	(emit "; array ref\n" os)
+	(if (not (impc:ir:pointer? ttype)) ;; must be an array if we're not a pointer
+	    (emit (string-append (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractvalue " 
+				 (cadr var) " " (car var) ", " (car idx) "\n") os)
+	    (if (impc:ir:array? ttype)
+		(begin (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
+					    " = getelementptr " (cadr var) " " (car var)
+					    ", i32 0, " (cadr idx) " " (car idx) "\n") os)
+		       (set! tt (impc:ir:get-type-str (caddr ttype))))
+		(begin (emit (string-append (impc:ir:gname "val" (cadr var)) " = getelementptr " 
+					    (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n") os)
+		       (set! tt (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var))))))))
+	    ;;(set! tt (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var)))))
+	(if (impc:ir:pointer? ttype)
+	    (emit (string-append (impc:ir:gname "val" tt) " = load " tt "* "
+				 (car (impc:ir:gname 1)) "\n") os))
+	(impc:ir:strip-space os))))
 
 
 (define impc:ir:compiler:array-ref-ptr
