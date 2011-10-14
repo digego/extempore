@@ -1492,8 +1492,8 @@ namespace extemp {
 	const char* tmp_name = ss.str().c_str();
 #ifdef EXT_LLVM_3
 	if(func->getReturnType()->isStructTy()) {	      
-	  rsplit("= type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
-	  tmp_name = tmp_str_b;
+	  rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	  tmp_name = tmp_str_a;
 	}
 #endif
 	
@@ -1886,6 +1886,7 @@ namespace extemp {
 
 	long long num_of_funcs = M->getFunctionList().size();
 	GenericValue gv = EE->runFunction(func,fargs);
+
 	// if the number of functions in module has changed when calling runFunction 
 	// then we assume a stub was made and appended to the end of the modules function list.
 	// we remove this function now that we no longer need it!

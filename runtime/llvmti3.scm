@@ -579,6 +579,7 @@
       (if (member sym kts) ;; if in known types don't do anything
           '()
           (if (and (not (assoc sym vars))
+		   (not (llvm:get-function (symbol->string sym)))
 		   (not (llvm:get-globalvar (symbol->string sym))))
               (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist)
               (let ((pair (assoc sym vars)))
@@ -2256,6 +2257,7 @@
     (let ((f (llvm:get-function (string-append name "_getter"))))
       (if f (llvm:run f)
 	  '()))))
+
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-function
   (lambda (name)

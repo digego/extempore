@@ -223,7 +223,7 @@
 				  (if res res
 				      (print-error 'Compiler 'Error: 'cannot 'find 'type 'for 'string string-type)))))))))))
 								
-								
+
 (define impc:ir:convert-from-pretty-types
    (lambda (t)
       ;(print 't: t)
@@ -919,12 +919,23 @@
 		    
                     ;; this bitcast should be the same type on both sides                    
                     (emit "\n; let value assignment\n" os)
-                    (emit (string-append "%" symstr " = bitcast " typestr " " 
+                    ;; (emit (string-append "%" symstr " = bitcast " typestr " " 
+                    ;;                         (if (and (number? (cadr p))
+                    ;;                                  (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+                    ;;                             (llvm:convert-float (car (impc:ir:gname)))
+                    ;;                             (car (impc:ir:gname)))
+                    ;;                         " to " typestr "\n") os)                    		    
+                    (emit (string-append "%" symstr " = select i1 true, " typestr " " 
                                             (if (and (number? (cadr p))
                                                      (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
                                                 (llvm:convert-float (car (impc:ir:gname)))
                                                 (car (impc:ir:gname)))
-                                            " to " typestr "\n") os)
+                                            ", " typestr " "
+                                            (if (and (number? (cadr p))
+                                                     (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+                                                (llvm:convert-float (car (impc:ir:gname)))
+                                                (car (impc:ir:gname)))
+					    "\n") os)
                     
 		    ;; (if (cadr ast)
 		    ;; 	(begin (emit "%dat_" symstr " = call i8* @llvm_zone_malloc(" 
@@ -2292,7 +2303,6 @@
                                  ")\n") os)
          (impc:ir:strip-space os))))
 
-  
 
 (define impc:ir:compiler
    (lambda (ast types . hint?)
@@ -2307,7 +2317,14 @@
                             (impc:ir:compile:eval-var ast (cdr (assoc ast types)))
                             (impc:ir:compile:eval-gvar ast))
 			(if (llvm:get-function (symbol->string ast))
-			    (impc:ir:compiler:closure-from-getter (symbol->string ast))
+			    (if (llvm:get-function (string-append (symbol->string ast) "_getter"))
+				(impc:ir:compiler:closure-from-getter (symbol->string ast))
+				(let ((name (symbol->string ast))
+				      (ftypes (llvm:get-function-args (symbol->string ast))))
+				  (string-append (impc:ir:gname "__fptr" "i8*")
+						 " = bitcast " (car ftypes)
+						 " (" (string-join (cdr ftypes) ",")
+						 ")* @" name " to i8*\n")))
 			    (print-error 'Compiler 'Error: 'Unbound 'symbol ast))))
                    ((number? ast)
                     ;(print 'number: ast hint?)
