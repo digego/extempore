@@ -814,10 +814,8 @@
 			    null)))
 	    (aset! samples-length index (/ read channels)) ;num)	    
 	    (aset! samples index adat)
-	    ;; this is a problem on windows!
-	    ;; and needs to be fixed!
-	    (if (string=? "Linux" (sys:platform))
-		(free_after_delay olddat (* 10.0 44100.0)))
+	    ;; the following line is a problem on windows and needs to be fixed!
+	    ; (free_after_delay olddat (* 10.0 44100.0)))
 	    (printf "read %lld(frames):%f(k) into index:%lld\n" (/ read channels) (/ (i64tod (* num 8)) 1024.) index)
 	    (sf_close audiofile)
 	    1)
