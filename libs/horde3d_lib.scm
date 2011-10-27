@@ -27,6 +27,8 @@
 (bind-lib hordelib h3dRemoveNode [void,i32]*)
 (bind-lib hordelib h3dSetNodeTransform [void,i32,float,float,float,float,float,float,float,float,float]*)
 (bind-lib hordelib h3dSetupModelAnimStage [void,i32,i32,i32,i32,i8*,i1]*)
+(bind-lib hordelib h3dAddModelNode [i32,i32,i8*,i32]*)
+(bind-lib hordelib h3dAddMeshNode [i32,i32,i8*,i32,i32,i32,i32,i32]*)
 (bind-lib hordelib h3dFindNodes [i32,i32,i8*,i32]*)
 (bind-lib hordelib h3dFindResource [i32,i32,i8*]*)
 (bind-lib hordelib h3dGetNodeFindResult [i32,i32]*)
@@ -47,10 +49,12 @@
 (bind-lib hordelib h3dLoadResource [i1,i32,i8*,i32]*)
 (bind-lib hordelib h3dIsResLoaded [i1,i32]*)
 (bind-lib hordelib h3dUnloadResource [void,i32]*)
-
+(bind-lib hordelib h3dSetNodeTransMat [void,i32,float*]*)
+(bind-lib hordelib h3dGetNodeTransMats [void,i32,float**,float**]*)
 (bind-lib hordeutlib h3dutDumpMessages [i1]*)
 (bind-lib hordeutlib h3dutLoadResourcesFromDisk [i1,i8*]*)
-
+(bind-lib hordeutlib h3dutCreateGeometryRes [i32,i8*,i32,i32,float*,i32*,i32*,i32*,i32*,float*,float*]*)
+					     
 ;; global contants
 
 ;; EngineOptions
