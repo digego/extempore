@@ -80,7 +80,7 @@
 
 (define impc:ir:regex-tc-or-a (string-append "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)"
 					     "|(\\|[0-9](?<array>[^\\|]|\\|[0-9]\\g<array>*\\|\\**)*\\|\\**)"
-					     "|(?:([%0-9a-zA-Z_]\\**)+)"))
+					     "|(?:([%0-9a-zA-Z_-]\\**)+)"))
 
 
 (define impc:ir:get-type-from-pretty-array
