@@ -116,7 +116,7 @@
 
 (define impc:ir:regex-tc-or-a (string-append "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)"
 					     "|(\\|[0-9](?<array>[^\\|]|\\|[0-9]\\g<array>*\\|\\**)*\\|\\**)"
-					     "|(?:([%0-9a-zA-Z_]\\**)+)"))
+					     "|(?:([%0-9a-zA-Z_-]\\**)+)"))
 
 
 (define impc:ir:get-type-from-pretty-array
@@ -243,7 +243,7 @@
 ;(define impc:ir:regex-structs-or-atoms "(\\<?\\{(?<struct>[^<{}>]|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)|(?:([%0-9a-zA-Z_]\\**)+)")
 (define impc:ir:regex-structs-or-atoms (string-append "(\\<?\\{(?<struct>[^<{}>]|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
 						      "|(\\[(?<array>[^\\[\\]]|\\[\\g<array>*\\]\\**)*\\]\\**)"
-						      "|(?:([%0-9a-zA-Z_]\\**)+)"))
+						      "|(?:([%0-9a-zA-Z_-]\\**)+)"))
 
 
 
@@ -1761,30 +1761,40 @@
 	(impc:ir:compiler:heap-alloc-with-size ast types))))
 
 
+;; (define impc:ir:compiler:stack-alloc-with-size
+;;   (lambda (ast types)
+;;     (let* ((os (make-string 0)))
+;;       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
+;; 	     (idx (impc:ir:gname))
+;; 	     (t (impc:ir:get-type-from-str (cadr idx)))
+;; 	     (tt (impc:ir:convert-from-pretty-types (caddr ast))))
+;; 	(if (not (impc:ir:fixed-point? t))
+;; 	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'size 'must 'be 'fixed-point 'not (impc:ir:get-type-str t)))                         
+;; 	(emit idx-str os)
+;; 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 	(if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
+;; 	    (begin (emit (string-append (impc:ir:gname "tmp" "i64") " = zext " (impc:ir:get-type-str t) " "
+;; 					(car idx) " to i64\n") os)
+;; 		   (set! idx (impc:ir:gname))))
+;;         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 	(emit (string-append (impc:ir:gname "size" "i64") " = mul i64 "
+;; 			     (number->string (impc:ir:get-type-size tt)) ", " 
+;; 			     (car idx) "\n") os)
+;; 	(emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @llvm_stack_alloc(i64 " (car (impc:ir:gname "size")) ")\n") os)
+;; 	(emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "size")) ")\n" os)
+;; 	(emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str tt) "*"))
+;; 			     " = bitcast i8* " (car (impc:ir:gname "dat"))
+;; 			     " to " (impc:ir:get-type-str tt) "*\n") os)
+;; 	(impc:ir:strip-space os)))))
+
+
 (define impc:ir:compiler:stack-alloc-with-size
   (lambda (ast types)
     (let* ((os (make-string 0)))
       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
 	     (idx (impc:ir:gname))
-	     (t (impc:ir:get-type-from-str (cadr idx)))
-	     (tt (impc:ir:convert-from-pretty-types (caddr ast))))
-	(if (not (impc:ir:fixed-point? t))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'size 'must 'be 'fixed-point 'not (impc:ir:get-type-str t)))                         
-	(emit idx-str os)
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	(if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
-	    (begin (emit (string-append (impc:ir:gname "tmp" "i64") " = zext " (impc:ir:get-type-str t) " "
-					(car idx) " to i64\n") os)
-		   (set! idx (impc:ir:gname))))
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	(emit (string-append (impc:ir:gname "size" "i64") " = mul i64 "
-			     (number->string (impc:ir:get-type-size tt)) ", " 
-			     (car idx) "\n") os)
-	(emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @llvm_stack_alloc(i64 " (car (impc:ir:gname "size")) ")\n") os)
-	(emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "size")) ")\n" os)
-	(emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str tt) "*"))
-			     " = bitcast i8* " (car (impc:ir:gname "dat"))
-			     " to " (impc:ir:get-type-str tt) "*\n") os)
+	     (t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (caddr ast)))))
+	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t ", " (cadr idx) " " (car idx) "\n") os)
 	(impc:ir:strip-space os)))))
 
 
@@ -1801,8 +1811,6 @@
     (if (= (length ast) 2)
 	(impc:ir:compiler:stack-alloc-without-size ast types)
 	(impc:ir:compiler:stack-alloc-with-size ast types))))
-
-
 
 
 (define impc:ir:compiler:make-tuple

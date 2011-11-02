@@ -630,10 +630,6 @@
 (my-test28) ;; print outs
 
 
-(print)
-(println 'finished)
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; arrays
@@ -698,3 +694,7 @@
     1))
 
 (test31) ;; 11.000 :: 55
+
+
+(print)
+(println 'finished)
