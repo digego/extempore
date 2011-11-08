@@ -209,7 +209,7 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 
 namespace extemp {
 
-    uint32_t UNIV::FRAMES = 512;
+    uint32_t UNIV::FRAMES = 128;
     uint32_t UNIV::CHANNELS = 2;
     uint32_t UNIV::SAMPLERATE = 44100;
     uint32_t UNIV::SECOND = SAMPLERATE;

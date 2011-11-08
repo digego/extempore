@@ -1302,7 +1302,7 @@ namespace extemp {
     pointer SchemeFFI::createMallocZone(scheme* _sc, pointer args)
     {
 	if(args == _sc->NIL)
-	    return mk_cptr(_sc,llvm_zone_create(1024*50));
+	    return mk_cptr(_sc,llvm_zone_create(1024*100));
 	else
 	    return mk_cptr(_sc,llvm_zone_create(ivalue(pair_car(args))));
     }
