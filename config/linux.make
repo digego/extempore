@@ -1,5 +1,5 @@
-PLATFORM_LIBS := -pthread -lboost_thread -lboost_system -lboost_filesystem -lm -lpcre -lportaudio /usr/lib/libGL.so
-
+PLATFORM_LIBS := -pthread -ldl -lboost_thread -lboost_system -lboost_filesystem -lm -lpcre -ljack /usr/lib/nvidia-current/libGL.so 
+ 
 PLATFORM_CXXFLAGS :=
 PLATFORM_LDFLAGS :=
 
