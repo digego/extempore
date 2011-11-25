@@ -58,6 +58,7 @@ namespace extemp {
 		
 	static pointer asciiColor(scheme* _sc, pointer args);
 	static pointer emit(scheme* _sc, pointer args);
+	static pointer exit_extempore(scheme* _sc, pointer args);
 
 	// ipc stuff
 	static pointer newSchemeProcess(scheme* _sc, pointer args);
@@ -122,6 +123,9 @@ namespace extemp {
 	static pointer resetMallocZone(scheme* _sc, pointer args);
 	static pointer destroyMallocZone(scheme* _sc, pointer args);
 	static pointer copyToDefaultZone(scheme* _sc, pointer args);
+	static pointer peekMemoryZone(scheme* _sc, pointer args);
+	static pointer popMemoryZone(scheme* _sc, pointer args);
+	static pointer pushMemoryZone(scheme* _sc, pointer args);
 			
 	// llvm stuff
 	static pointer compile(scheme* _sc, pointer args);

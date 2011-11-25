@@ -174,6 +174,7 @@ namespace extemp {
 	} funcTable[] = {
 	    { "ascii-print-color",		&SchemeFFI::asciiColor },
 	    { "emit",                       &SchemeFFI::emit },
+            { "quit",                       &SchemeFFI::exit_extempore },
 
 	    //IPC stuff
 	    { "ipc:new",			&SchemeFFI::newSchemeProcess },
@@ -211,6 +212,10 @@ namespace extemp {
 	    { "sys:destroy-mzone",		&SchemeFFI::destroyMallocZone },
 	    { "sys:copy-to-dmzone",		&SchemeFFI::copyToDefaultZone },
 	    { "sys:reset-mzone",		&SchemeFFI::resetMallocZone },
+	    { "sys:peek-memzone",               &SchemeFFI::peekMemoryZone },
+	    { "sys:pop-memzone",               &SchemeFFI::popMemoryZone },
+	    { "sys:push-memzone",               &SchemeFFI::pushMemoryZone },
+
 
 	    // misc stuff
 	    { "cptr:get-i64",            &SchemeFFI::dataGETi64 },
@@ -334,6 +339,13 @@ namespace extemp {
     // MISC STUFF
     //
     //////////////////////////////////////////////////////
+
+    pointer SchemeFFI::exit_extempore(scheme* _sc, pointer args)
+    {
+        // This is a seriously nasty HACK!!
+        // PLEASE FIX ME!
+        exit(1);
+    }
 
     pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)
     {       
@@ -1317,7 +1329,7 @@ namespace extemp {
 	llvm_zone_t* ptr = (llvm_zone_t*) cptr_value(pair_car(args));
 	if(pair_cdr(args) != _sc->NIL)
 	{
-	  llvm_destroy_zone_after_delay(ptr, rvalue(pair_cadr(args)));
+	  llvm_destroy_zone_after_delay(ptr, ivalue(pair_cadr(args)));
 	}
         else
 	{
@@ -1337,6 +1349,23 @@ namespace extemp {
     {		
 	return _sc->NIL;
     }
+
+    pointer SchemeFFI::peekMemoryZone(scheme* _sc, pointer args)
+    {
+        return mk_cptr(_sc,llvm_peek_zone_stack());
+    }
+
+    pointer SchemeFFI::popMemoryZone(scheme* _sc, pointer args)
+    {
+        return mk_cptr(_sc,llvm_pop_zone_stack());
+    }
+
+    pointer SchemeFFI::pushMemoryZone(scheme* _sc, pointer args)
+    {
+        llvm_push_zone_stack((llvm_zone_t*)cptr_value(pair_car(args)));
+        return _sc->T;
+    }
+
 	
     ////////////////////////////////////////////
     //
@@ -1986,7 +2015,7 @@ namespace extemp {
 	llvm::raw_string_ostream ss(str);
 		
 	if(list_length(_sc, args) > 0) {
-	    llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(args))));			
+	    llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(args))));
 	    if(val == NULL) {
 		std::cerr << "No such value found in LLVM Module" << std::endl;
 		return _sc->F;

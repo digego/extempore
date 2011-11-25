@@ -13,19 +13,6 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define libglu (if (string=? "Linux" (sys:platform))
-		   (sys:open-dylib "libGLU.so")
-		   (if (string=? "Windows" (sys:platform))
-		       (sys:open-dylib "Glu32.dll")
-		       #f)))
-
-(bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
-(bind-lib libglu gluPerspective [void,double,double,double,double]*)
-(bind-lib libglu gluErrorString [i8*,i32]*)
-
-(definec degToRad
-  (lambda (f:float)
-    (* f (/ 3.141592 180.0))))
 
 ;; globals
 (bind-val _knight i32 0)
@@ -158,7 +145,7 @@
       (set! _curFPS fps)
       (h3dSetOption H3DOptions_DebugViewMode 0.0)
       (h3dSetOption H3DOptions_WireframeMode 0.0)
-      (set! _at (+ _at .03))
+      (set! _at (+ _at 0.025))
       
       (h3dSetModelAnimParams _knight 0 (* (dtof _at) 24.0) 24.0) ;_weight)
       
@@ -173,13 +160,22 @@
       (h3dSetNodeTransform light 7.0 15.0 20.0
 			         -60.0 0.0  0.0
 				 1.0  1.0  1.0)
-            
-      (h3dSetNodeTransform _cam (+ 0 _x) (+ 2 _y) (+ (* (dtof (sin _at)) 10) _z) (- 12 _rx) _ry 0.0 1.0 1.0 1.0)
+
+      (h3dSetNodeTransform _cam
+			   (+ (* 30.0 (dtof (cos (* 1.0 _at)))) 0.0)
+			   5.0
+			   (+ (* 30.0 (dtof (sin (* 1.0 _at)))) 0.0)
+			   0.0
+			   (dtof (* 57.295791 (atan2 (cos (* 1.0 _at))
+						     (sin (* 1.0 _at)))))
+			   0.0
+			   1.0 1.0 1.0)
       (h3dRender _cam)
       (h3dFinalizeFrame)
       (h3dClearOverlays)
-      (h3dutDumpMessages)            
+      (h3dutDumpMessages)      
       1)))
+
 
 
 ;; standard impromptu callback
@@ -187,8 +183,9 @@
   (lambda (time degree)
     (mainLoop)
     (gl:swap-buffers pr2)
-    (callback (+ time 500) 'opengl-test (+ time 1000) (+ degree 0.01))))
+    (callback (+ time 100) 'opengl-test (+ time 1000) (+ degree 0.01))))
 
+(* 57.295791 2.0)
 
 (define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
 (h3d_init)

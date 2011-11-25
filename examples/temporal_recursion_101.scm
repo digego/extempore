@@ -9,7 +9,7 @@
 ;
 (define	tr
   (lambda (t x rate)
-    (print t x)
+    (println t x)
     (callback (+ t rate) 'tr (+ t rate) x rate)))
 
 (let ((t (now)))
@@ -22,7 +22,7 @@
 ;
 (define metro-test
   (lambda (beat x dur)
-    (print x beat)
+    (println x beat)
     (callback (*metro* (+ beat dur)) 'metro-test (+ beat dur)
               x dur)))
 

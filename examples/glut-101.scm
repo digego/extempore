@@ -1,3 +1,12 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; GLUT IS DEPRECATED!!!!
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+
 ;; Wrappers for C functions we want to call from Scheme
 (define-wrapper glut-display-func glutDisplayFunc)
 (define-wrapper glut-idle-func glutIdleFunc)

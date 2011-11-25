@@ -32,7 +32,7 @@
 ;; it must be a closure that returns a closure
 ;; 
 ;; lets try a simple sawwave synth
-(definec my-additive-synth
+(definec my-saw-synth
   (lambda ()
     (let ((sawl (make-saw))
 	  (sawr (make-saw)))
@@ -41,26 +41,29 @@
 	       (sawl amp freq))
 	      ((< chan 2.0)
 	       (sawr amp freq))
-	      (else 0.0))))))
+	      (else 0.0)))))))
 
 ;; now define an instrument to use my-additive-synth note kernel
 ;; with a default (i.e. pass through) default-effect
-(define-instrument my-synth my-additive-synth default-effect)
-
+(define-instrument my-synth my-saw-synth default-effect)
+    
 
 ;; finally we need to add the new synth to the dsp routine
 ;; this is only slightly modified from the on in dsp_library
 ;; we just sum my-synth with synth and add some delay
-(definec:dsp dsp
+;;
+;; NOTE: then 100000 is extra memory for our
+;; comb filters
+(definec dsp 1000000
   (let ((combl (make-comb (dtoi64 (* 0.25 *samplerate*))))
 	(combr (make-comb (dtoi64 (* 0.33333333 *samplerate*)))))
-    (lambda (in time chan dat)
+    (lambda (in:double time:double chan:double dat:double*)
       (cond ((< chan 1.0)
-	     (combl (+ (* .7 (synth in time chan dat))
+	     (combl (+ (* 1.0 (synth in time chan dat))
 		       (my-synth in time chan dat))))
 	    ((< chan 2.0)	     
-	     (combr (+ (* .7 (synth in time chan dat))
-				  (my-synth in time chan dat))))
+	     (combr (+ (* 1.0 (synth in time chan dat))
+		       (my-synth in time chan dat))))
 	    (else 0.0)))))
 
 ;;make my-synth active
@@ -71,7 +74,7 @@
   (lambda (beat dur)
     (let ((pitch (random '(55 36 63 70 72))))
       (play-note (*metro* beat) my-synth pitch 
-		 (if (= pitch 36) 110 100) 3000)
+      		 (if (= pitch 36) 105 95) 3000)
       (callback (*metro* (+ beat (* dur .5))) 'loop2
 		(+ beat dur)
 		dur))))
@@ -79,10 +82,10 @@
 (loop2 (*metro* 'get-beat 4) 1/3) ;; play our new synth
 
 
-;; we can recompile my-additive-synth into something 
+;; we can recompile my-saw-synth into something 
 ;; else whenever we like
 ;; here's something more complex
-(definec my-additive-synth
+(definec my-saw-synth
   (let ((res 15.0)
 	(cof 8000.0))
     (lambda ()
@@ -116,8 +119,8 @@
 (define res-sweep
   (lambda (beat dur)
     (my-synth.release (cosr 12000.0 11000.0 1/29)) 
-    (my-additive-synth.res (cosr 40.0 30.0 1/37))
-    (my-additive-synth.cof (cosr 5000.0 3500.0 1/19))
+    (my-saw-synth.res (cosr 40.0 30.0 1/37))
+    (my-saw-synth.cof (cosr 5000.0 3500.0 1/19))
     (callback (*metro* (+ beat (* dur .5))) 'res-sweep
 	      (+ beat dur) dur)))
 

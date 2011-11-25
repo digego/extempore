@@ -44,6 +44,12 @@
 
 #ifdef TARGET_OS_WINDOWS
 #include <malloc.h>
+#else
+#include <sys/types.h>
+#endif
+
+#ifdef TARGET_OS_LINUX
+#include <sys/syscall.h>
 #endif
 
 
@@ -94,6 +100,169 @@ double log2(double num) {
 }
 #endif
 
+//////////////////////////////////////////////////////////////////
+// this whole zone section should 
+// all be thread safe of course
+// but currently isn't!
+// FIX ME!!
+typedef struct llvm_zone_stack
+{
+    llvm_zone_t* head;
+    llvm_zone_stack* tail;
+} llvm_zone_stack;
+
+
+#ifdef EXT_BOOST
+std::map<boost::thread::id,llvm_zone_stack*> LLVM_ZONE_STACKS;
+std::map<boost::thread::id,uint64_t> LLVM_ZONE_STACKSIZES;
+#else
+std::map<long,llvm_zone_stack*> LLVM_ZONE_STACKS;
+std::map<long,uint64_t> LLVM_ZONE_STACKSIZES;
+#endif
+
+
+
+llvm_zone_stack* llvm_threads_get_zone_stack()
+{
+  llvm_zone_stack* stack = 0;
+#ifdef EXT_BOOST
+  stack = LLVM_ZONE_STACKS[boost::this_thread::get_id()];
+#elif TARGET_OS_MAC
+  mach_port_t tid = pthread_mach_thread_np(pthread_self());
+  stack = LLVM_ZONE_STACKS[(long)tid];
+#else
+  pid_t tid = (pid_t) syscall (SYS_gettid);
+  stack = LLVM_ZONE_STACKS[(long)tid];
+#endif
+  return stack;
+}
+
+void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
+{
+#ifdef EXT_BOOST
+  LLVM_ZONE_STACKS[boost::this_thread::get_id()] = llvm_zone_stack;
+#elif TARGET_OS_MAC
+  mach_port_t tid = pthread_mach_thread_np(pthread_self());
+  LLVM_ZONE_STACKS[(long)tid] = llvm_zone_stack;
+#else
+  pid_t tid = (pid_t) syscall (SYS_gettid);
+  LLVM_ZONE_STACKS[(long)tid] = llvm_zone_stack;
+#endif
+  return;
+}
+
+void llvm_threads_inc_zone_stacksize()
+{
+#ifdef EXT_BOOST
+  LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()] += 1;
+#elif TARGET_OS_MAC
+  mach_port_t tid = pthread_mach_thread_np(pthread_self());
+  LLVM_ZONE_STACKSIZES[(long)tid] += 1;
+#else
+  pid_t tid = (pid_t) syscall (SYS_gettid);
+  LLVM_ZONE_STACKS[(long)tid] += 1;
+#endif
+  return;
+}
+
+void llvm_threads_dec_zone_stacksize()
+{
+#ifdef EXT_BOOST
+  LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()] -= 1;
+#elif TARGET_OS_MAC
+  mach_port_t tid = pthread_mach_thread_np(pthread_self());
+  LLVM_ZONE_STACKSIZES[(long)tid] -= 1;
+#else
+  pid_t tid = (pid_t) syscall (SYS_gettid);
+  LLVM_ZONE_STACKS[(long)tid] -= 1;
+#endif
+  return;
+}
+
+uint64_t llvm_threads_get_zone_stacksize()
+{
+  uint64_t size = 0;
+#ifdef EXT_BOOST
+  size = LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()];
+#elif TARGET_OS_MAC
+  mach_port_t tid = pthread_mach_thread_np(pthread_self());
+  size = LLVM_ZONE_STACKSIZES[(long)tid];
+#else
+  pid_t tid = (pid_t) syscall (SYS_gettid);
+  size = LLVM_ZONE_STACKSIZES[(long)tid];
+#endif
+  return size;
+}
+
+#define DEBUG_ZONE_STACK 0
+#define DEBUG_ZONE_ALLOC 0
+
+
+void llvm_push_zone_stack(llvm_zone_t* z)
+{
+    llvm_zone_stack* stack = (llvm_zone_stack*) malloc(sizeof(llvm_zone_stack));
+    stack->head = z;
+    stack->tail = llvm_threads_get_zone_stack();
+    llvm_threads_set_zone_stack(stack);
+
+#if DEBUG_ZONE_STACK          
+    llvm_threads_inc_zone_stacksize();
+    if(stack->tail) 
+      printf("%p: push new zone %p:%lld onto old zone %p:%lld stacksize:%lld\n",stack,z,z->size,stack->tail->head,stack->tail->head->size,llvm_threads_get_zone_stacksize());
+    else
+      printf("%p: push new zone %p:%lld onto empty stack\n",stack,z,z->size);
+#endif
+    //printf("zones: %lld\n",llvm_threads_get_zone_stacksize());
+    return;
+}
+
+llvm_zone_t* llvm_peek_zone_stack()
+{
+    llvm_zone_t* z = 0;
+    llvm_zone_stack* stack = llvm_threads_get_zone_stack();
+    if(!stack) {  // for the moment create a "DEFAULT" zone if stack is NULL      
+#if DEBUG_ZONE_STACK      
+      printf("TRYING TO PEEK AT A NULL ZONE STACK\n"); 
+#endif
+      llvm_zone_t* z = llvm_zone_create(1024*1024*1); // default root zone is 1M
+      llvm_push_zone_stack(z);
+      stack = llvm_threads_get_zone_stack();
+      //#if DEBUG_ZONE_STACK      
+      ascii_text_color(0,3,10);
+      printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
+      ascii_text_color(0,7,10);
+      printf(""); 
+      //#endif      
+      return z;
+    }else{
+      z = stack->head;
+#if DEBUG_ZONE_STACK      
+      //printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
+#endif
+      return z;
+    }
+}
+
+llvm_zone_t* llvm_pop_zone_stack()
+{
+    llvm_zone_stack* stack = llvm_threads_get_zone_stack();
+    if(!stack) {
+#if DEBUG_ZONE_STACK      
+      printf("TRYING TO POP A ZONE FROM AN EMPTY ZONE STACK\n");
+#endif
+      return 0;
+    }
+    llvm_zone_t* head = stack->head;
+    llvm_zone_stack* tail = stack->tail;
+#if DEBUG_ZONE_STACK    
+    llvm_threads_dec_zone_stacksize();
+    printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n",stack,head,head->size,tail->head,tail->head->size);
+#endif
+    free(stack);
+    llvm_threads_set_zone_stack(tail);
+    return head;
+}
+
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
     llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
@@ -101,7 +270,9 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     zone->mark = 0;
     zone->offset = 0;
     zone->size = size;
-    //printf("CreateZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
+#if DEBUG_ZONE_ALLOC    
+    printf("CreateZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
+#endif
     return zone;
 }
 
@@ -113,25 +284,20 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone)
  
 void llvm_zone_destroy(llvm_zone_t* zone)
 {
-    //printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);	
+#if DEBUG_ZONE_ALLOC  
+    printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
+#endif
     free(zone->memory);
     free(zone);
     return;
 }
 
-void* llvm_stack_alloc(int64_t size)
-{
-#ifdef TARGET_OS_WINDOWS
-  return _alloca(size);
-#else
-  return alloca(size);
-#endif
-}
-
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
     alloc_mutex.lock();
-    //printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
+#if DEBUG_ZONE_ALLOC
+    printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
+#endif
     if(zone->offset+size >= zone->size)
     {
 	// for the moment print a warning and just leak the memory
@@ -181,11 +347,12 @@ void llvm_zone_copy_ptr(void* ptr1, void* ptr2)
 {
     uint64_t size1 = llvm_zone_ptr_size(ptr1);
     uint64_t size2 = llvm_zone_ptr_size(ptr2);
+
     if(size1 != size2) { 
 	printf("Bad LLVM ptr copy - size mismatch %p:%p %lld:%lld\n",ptr1,ptr2,size1,size2); 
 	exit(1);
     }
-    //printf("%p,%p,%lld\n",ptr2,ptr1,size1);
+    //printf("zone_copy_ptr: %p,%p,%lld,%lld\n",ptr2,ptr1,size1,size2);
     memcpy(ptr2, ptr1, size1);
     return;		
 }
@@ -201,12 +368,40 @@ void free_after_delay(char* dat, double delay)
 }
 
 extemp::CM* DestroyMallocZoneWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
-void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay)
+void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay)
 {
     //printf("destroyWithDelay %p\n",zone);
     extemp::CM* cb = DestroyMallocZoneWithDelayCM;
     extemp::Task<llvm_zone_t*>* task = new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME+delay,44100,cb,zone);
     extemp::TaskScheduler::I()->add(task);
+}
+
+void llvm_schedule_callback(long long time, void* dat)
+{
+  //printf("scheduled callback %lld\n",time);
+  extemp::SchemeProcess* proc = extemp::SchemeProcess::I(); //extemp::SchemeProcess::I()->extemporeCallback(time,dat);
+
+  uint64_t current_time = time; //task->getStartTime();
+  uint64_t duration = 1000000000; //task->getDuration();
+  extemp::TaskScheduler::I()->addTask(current_time, duration, proc->extempore_lang_cb, dat, 0, true);
+  return;
+}
+
+void* llvm_get_function_ptr(char* fname)
+{
+  //using namespace llvm;
+  llvm::Module* M = extemp::EXTLLVM::I()->M;
+  llvm::Function* func = M->getFunction(std::string(fname));
+  if(func == 0) {
+      throw std::runtime_error("Extempore runtime error: error retrieving function in llvm_get_function_ptr");
+  }
+
+  void* p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
+
+  if(p==NULL) {
+      throw std::runtime_error("Extempore runtime error: null ptr retrieving function ptr in llvm_get_function_ptr");
+  }
+  return p;
 }
 
 char* extitoa(int64_t val) {
@@ -279,6 +474,25 @@ long long llvm_get_next_prime(long long start)
     }
     return -1;
 }
+
+
+/////////////////////////////////////////////////
+// This added for dodgy continuations support
+// ucontext_t* llvm_make_ucontext()
+// {
+//   ucontext_t* ctx = (ucontext_t*) malloc(sizeof(ucontext_t));
+//   ctx->uc_stack.ss_sp   = (void*) malloc(1024*1024); //iterator_stack;
+//   ctx->uc_stack.ss_size = 1024*1024;
+//   return ctx;
+// }
+
+// ucontext_t* llvm_scheme_process_ucontext()
+// {
+//   extemp::SchemeProcess* proc = extemp::SchemeProcess::I(); //extemp::SchemeProcess::I()->extemporeCallback(time,dat);
+//   ucontext_t* ctx = proc->getContext();
+//   return ctx;
+// }
+///////////////////////////////////////////////////
 
 void* llvm_memset(void* ptr, int32_t c, int64_t n)
 {
@@ -356,7 +570,7 @@ uint32_t get_address_offset(const char* name, closure_address_table* table)
 {
     while(table)
     {
-      //printf("tablename: %s\n",table->name);
+        //printf("tablename: %s\n",table->name);
 	if(strcmp(table->name,name) == 0) {
 	    //printf("in %s returning offset %d from %s\n",table->name,table->offset,name);
 	    return table->offset;	
@@ -690,15 +904,34 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("next_prime"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_get_next_prime);			
 	    gv = M->getNamedValue(std::string("llvm_printf"));
-	    EE->updateGlobalMapping(gv,(void*)&llvm_printf);									
+	    EE->updateGlobalMapping(gv,(void*)&llvm_printf);  
 	    gv = M->getNamedValue(std::string("llvm_sprintf"));
-	    EE->updateGlobalMapping(gv,(void*)&llvm_sprintf);									
+	    EE->updateGlobalMapping(gv,(void*)&llvm_sprintf);	  
 	    gv = M->getNamedValue(std::string("llvm_zone_create"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);						
 	    gv = M->getNamedValue(std::string("llvm_zone_destroy"));
-	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);						
-	    gv = M->getNamedValue(std::string("llvm_stack_alloc"));
-	    EE->updateGlobalMapping(gv,(void*)&llvm_stack_alloc);						
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);
+
+	    gv = M->getNamedValue(std::string("llvm_schedule_callback"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_schedule_callback); 	
+	    gv = M->getNamedValue(std::string("llvm_get_function_ptr"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_get_function_ptr); 	
+	    // // this added for dodgy continuations
+	    // gv = M->getNamedValue(std::string("llvm_make_ucontext"));
+	    // EE->updateGlobalMapping(gv,(void*)&llvm_make_ucontext); 	
+	    // gv = M->getNamedValue(std::string("llvm_scheme_process_ucontext"));
+	    // EE->updateGlobalMapping(gv,(void*)&llvm_scheme_process_ucontext); 	
+
+
+	    gv = M->getNamedValue(std::string("llvm_peek_zone_stack"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_peek_zone_stack);						
+	    gv = M->getNamedValue(std::string("llvm_pop_zone_stack"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_pop_zone_stack);						
+	    gv = M->getNamedValue(std::string("llvm_push_zone_stack"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_push_zone_stack);						
+						
+	    // gv = M->getNamedValue(std::string("llvm_stack_alloc"));
+	    // EE->updateGlobalMapping(gv,(void*)&llvm_stack_alloc);						
 	    gv = M->getNamedValue(std::string("llvm_zone_malloc"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_malloc);						
 	    gv = M->getNamedValue(std::string("get_address_table"));
@@ -706,7 +939,7 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("check_address_type"));
 	    EE->updateGlobalMapping(gv,(void*)&check_address_type);						
 	    gv = M->getNamedValue(std::string("get_address_offset"));
-	    EE->updateGlobalMapping(gv,(void*)&get_address_offset);									
+	    EE->updateGlobalMapping(gv,(void*)&get_address_offset);  
 	    gv = M->getNamedValue(std::string("add_address_table"));
 	    EE->updateGlobalMapping(gv,(void*)&add_address_table);						
 	    gv = M->getNamedValue(std::string("new_address_table"));

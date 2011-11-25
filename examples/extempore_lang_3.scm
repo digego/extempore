@@ -30,7 +30,7 @@
 ;; All closures are pointers.  Pointer types are
 ;; represented (as in "C") with a "*" which trails
 ;; the base type.
-;; So an i64 pointer type would be "i64*"
+;; So a pointer to a 64 bit integer would be "i64*"
 ;; A double pointer type would be "double*"
 ;; So a closure pointer type is "[...]*"
 
@@ -41,15 +41,18 @@
 
 ;; Again note the closures type in the logview
 ;; [double,double]*
+;; a closure that returns a double and
+;; taks a double as it's only argument
 
 
 ;; we can call these new closures like so
+;; making sure we pass an integer for my-test-1
 (println (my-test-1 6)) ;; 30
+;; and a real number for my-test-1f
 (println (my-test-1f 6.0)) ;; 30.0
 
 
-;; you are free to recompile an existing compile
-;; closures body to do something different whenever you like
+;; you are free to recompile an existing closure
 ;; so we can change my-test-1 to
 (definec my-test-1
    (lambda (a)
@@ -76,7 +79,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Because we are working with closures
-;; we can close over free variables
+;; we can "close" over free variables
 ;; in this example we close over power
 ;; to maintain state between calls
 ;;
@@ -94,9 +97,11 @@
 
                
 ;; Closures can of course return closures.
-;; notice the type signature of this function
+;; notice the type signature of this closure
 ;; as printed in the logview "[[i64,i64]*]*"
 ;; being a closure that returns a closure
+;; the outer closure takes no arguments
+;; and the return closure takes an i64 argument
 (definec my-test-3
   (lambda ()
     (lambda (x)
@@ -107,24 +112,23 @@
 ;;
 ;; here we run into trouble
 ;; because the type inferencer cannot infer a valid type 
-;; for i or inc and therefore also cannot infer
-;; a type for my-inc-maker!
-;;
-;; THIS WILL CAUSE AN ERROR!
+;; for i or inc because there are no numberic literals
+;; to help in the validation process
 
+;; THIS WOULD CAUSE AN ERROR!
 ;(definec my-inc-maker
 ;  (lambda (i)
 ;    (lambda (inc)
 ;      (set! i (+ i inc))
 ;      i)))
 
-;; This makes sense should "+" operate
+;; This makes sense - should "+" operate
 ;; on doubles or integers - who knows?
-;; So the type inferencer complains justifiably complains
+;; So the type inferencer justifiably complains
 ;;
 ;; What can we do about this ... 
-;; we need to help the compiler out by proving some
-;; explicit type goal posts
+;; we need to help the compiler out by providing
+;; some explicit type information
 ;;
 ;; We can do that by "typing" a variable.
 ;; Explicitly typing a variable means tagging
@@ -135,10 +139,12 @@
 ;; y:double     = y is a double
 ;; z:i32*       = z is a pointer to a 32 bit integer
 ;; w:[i64,i64]* = w is a closure which takes an i64 and returns an i64
+;;                (remember that closures are ALWAYS pointers it is not
+;;                 valid to have a closure type which is NOT a pointer)
+
 ;;
-;; Make sure there are no spaces in the expression
-;;
-;; Now we can explicitly type i
+;; With this information in mind we can
+;; fix the incrementor by explicitly typing 'i'
 (definec my-inc-maker
    (lambda (i:i64)
       (lambda (inc)
@@ -149,18 +155,30 @@
 ;; can now use i's type to infer inc and
 ;; therefore my-inc-maker.
 
-
 ;; now we have a different problem.
 ;; if we call my-inc-maker we expect to be 
-;; returned a closure.  But Scheme does not
-;; know anything about ICR closure types and therefore
-;; has no way of using the returned data.  Instead
-;; it places the returned pointer (remember a closure is a pointer)
+;; returned a closure.  However Scheme does not
+;; know anything about Extempore Lang closure types and therefore
+;; has no way of using the returned data.
+
+;; Instead it places the returned pointer
+;; (remember a closure is a pointer)
 ;; into a generic Scheme cptr type.
+;; All pointer types moving from Extempore Lang -> Scheme
+;; are converted into generic Scheme cptr types.  Scheme
+;; knows that the type is a cptr but has no further information.
+;;
 ;;
 ;; We are free to then pass that cptr back into another
-;; compiled function as an argument.  
-;; 
+;; compiled Extempore Lang function as an argument. When moving
+;; from Scheme -> Extempore Lang the generic Scheme cptr is
+;; automatically converted back into the explicit pointer type
+;; required by Extempore Lang.
+;; IMPORTANT!: This conversion is automatic and UNCHECKED so
+;; it is your responsibility to ensure that Scheme cptr's point
+;; to appropriate data (i.e. appropriate for the function be
+;; called in Extempore Lang).
+
 ;; So let's build a function that excepts a closure returned from 
 ;; my-inc-maker as an argument, as well as a suitable operand, and 
 ;; apply the closure.
@@ -244,7 +262,8 @@
 ;; make and return a simple tuple
 (definec my-test-6
   (lambda ()
-    (make-tuple i64 double i32)))
+    (alloc <i64,double,i32>)))
+
 
 ;; logview shows [<i64,double,i32>*]*
 ;; i.e. a closure that takes no arguments
@@ -257,7 +276,7 @@
 ;; (i.e. i64 being tuple index 0)
 (definec my-test-7 
   (lambda ()
-    (let ((a (make-tuple i64 double)) ; returns pointer to type <i64,double>
+    (let ((a (alloc <i64,double>)) ; returns pointer to type <i64,double>
 	  (b 37)
 	  (c 6.4))
       (tuple-set! a 0 b) ;; set i64 to 64
@@ -278,8 +297,8 @@
 ;; this function returns void
 (definec my-test-8
    (lambda ()
-      (let ((v1 (make-array 5 float))
-	    (v2 (make-array 5 float)))				
+      (let ((v1 (alloc |5,float|))
+	    (v2 (alloc |5,float|)))				
          (dotimes (i 5)
             ;; random returns double so "truncate" to float
             ;; which is what v expects
@@ -336,8 +355,8 @@
 
 (definec my-test-11
    (lambda ()
-      (let ((v (make-array 5 [i64,i64]*)) ;; make an array of closures!
-            (vv (make-array 5 i64)))
+      (let ((v (alloc |5,[i64,i64]*|)) ;; make an array of closures!
+            (vv (alloc |5,i64|)))
          (array-set! vv 2 3)
          (aset! v 0 (my-test-9 vv)) ;; aset! alias for array-set!
          (my-test-10 v))))
@@ -378,17 +397,17 @@
 
 (definec envelope-segments
   (lambda (points:double* num-of-points:i64)
-    (let ((lines (heap-alloc num-of-points [double,double]*)))
+    (let ((lines (zone-alloc num-of-points [double,double]*)))
       (dotimes (k num-of-points)
 	(let* ((idx (* k 2))
-	       (x1 (aref points (+ idx 0)))
-	       (y1 (aref points (+ idx 1)))
-	       (x2 (aref points (+ idx 2)))
-	       (y2 (aref points (+ idx 3)))
+	       (x1 (pointer-ref points (+ idx 0)))
+	       (y1 (pointer-ref points (+ idx 1)))
+	       (x2 (pointer-ref points (+ idx 2)))
+	       (y2 (pointer-ref points (+ idx 3)))
 	       (m (if (= 0.0 (- x2 x1)) 0.0 (/ (- y2 y1) (- x2 x1))))
 	       (c (- y2 (* m x2)))
 	       (l (lambda (time) (+ (* m time) c))))
-	  (aset! lines k l)))
+	  (pointer-set! lines k l)))
       lines)))
 
 
@@ -399,8 +418,8 @@
          (lambda (time)
             (let ((res -1.0))
                (dotimes (k num-of-points)
-                  (let ((line (aref klines k))
-                        (time-point (aref points (* k 2))))
+                  (let ((line (pointer-ref klines k))
+                        (time-point (pointer-ref points (* k 2))))
                      (if (or (= time time-point)
                              (< time-point time))
                          (set! res (line time)))))
@@ -410,13 +429,13 @@
 ;; make a convenience wrapper 
 (definec env-wrap
    (let* ((points 3)
-          (data (heap-alloc (* points 2) double)))
-      (aset! data 0 0.0) ;; point data
-      (aset! data 1 0.0)      
-      (aset! data 2 2.0)
-      (aset! data 3 1.0)      
-      (aset! data 4 4.0)
-      (aset! data 5 0.0)
+          (data (zone-alloc (* points 2) double)))
+      (pointer-set! data 0 0.0) ;; point data
+      (pset! data 1 0.0)      
+      (pset! data 2 2.0)
+      (pset! data 3 1.0)      
+      (pset! data 4 4.0)
+      (pset! data 5 0.0)
       (let ((f (make-envelope data points)))
          (lambda (time:double)
             (f time)))))
@@ -544,9 +563,9 @@
 ;; named types support recursion
 (bind-type i64list <i64,i64list*>)
 
-;; Note the use of heap-alloc to allocate
-;; enough heap memory to hold an i64list
-;; heap-alloc returns a pointer to the
+;; Note the use of zone-alloc to allocate
+;; enough zone memory to hold an i64list
+;; zone-alloc returns a pointer to the
 ;; type that you ask it to allocate
 ;; pair is type i64list* in this case.
 ;;
@@ -556,7 +575,7 @@
 ;; heap allocation was made into)
 (definec cons-i64
   (lambda (a:i64 b:i64list*)
-    (let ((pair (heap-alloc i64list)))
+    (let ((pair (zone-alloc i64list)))
       (tset! pair 0 a)
       (tset! pair 1 b)
       pair)))
@@ -603,7 +622,7 @@
       (tset! point 2 1.0)
       1)))
 
-(my-test27) ;; 1
+(println (my-test27)) ;; 1
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -619,13 +638,13 @@
 ;; with an offset
 (definec my-test28
   (lambda ()
-    (let ((arr (make-array 32 i64))
+    (let ((arr (alloc |32,i64|))
 	  (arroff (aref-ptr arr 16)))
       ;; load arr
       (dotimes (i 32) (aset! arr i i))
       (dotimes (k 16)
 	(printf "index: %lld\tarr: %lld\tarroff: %lld\n"
-		k (aref arr k) (aref arroff k))))))
+		k (aref arr k) (pref arroff k))))))
       
 (my-test28) ;; print outs
 
@@ -678,23 +697,243 @@
 
 (println (my-test30 3)) ;; 8
 
-;; you can use any primitive type
+;; you can bind any primitive type
 (bind-val g-var-b double 5.5)
 (bind-val g-var-c i1 0)
-;; you can use sys:make-cptr to assign
-;; the required memory for aggregate types
+
+;; you can bind array types
+;; and choose to either
+;; a) assign a value to each element
+(bind-val g-var-a1 |5,i64| (list 1 2 3 4 5))
+;; or b) assign a default value to all elements
+;; for example initialize all 1024 double elements to 5.125
+(bind-val g-var-a2 |1024,double| 5.125)
+
+(definec test31
+  (lambda ()
+    (printf "a1[3]:%lld  a2[55]:%f\n" (aref g-var-a1 3) (aref g-var-a2 55))
+    1))
+
+(test31)
+
+;; finally you can use sys:make-cptr to allocate
+;; memory to any ptr type you like. It is up to
+;; you to however to ensure that you allocate an
+;; appropriate amount of space.
 (bind-val g-var-d |4,i32|* (sys:make-cptr (* 4 4)))
 (bind-val g-var-e tuple-with-array* (sys:make-cptr (+ 8 (* 32 (* 4 4)) 4)))
 
-(definec test31
+(definec test32
   (lambda ()
     (tset! g-var-e 0 11.0)
     (aset! g-var-d 0 55)
     (printf "%f :: %d\n" (tref g-var-e 0) (aref g-var-d 0))
     1))
 
-(test31) ;; 11.000 :: 55
+(test32) ;; 11.000 :: 55
 
 
+(bind-val gvar-array |5,double| 0.0)
+
+(definec test33
+  (lambda ()
+    (aset! gvar-array 3 19.19)
+    (aref gvar-array 3)))
+
+(println (test33)) ;; -> 19.19
+
+
+;; End Of Tutorial
 (print)
 (println 'finished)
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Callbacks
+
+(definec test34
+  (lambda (time:i64 count:i64)
+    (printf "time: %lld:%lld\n" time count)
+    (callback (+ time 1000) test34 (+ time 22050) (+ count 1))))
+
+(test34 (now) 0)
+
+
+;; compiling this will stop the callbacks
+;;
+;; of course we need to keep the type
+;; signature the same [void,i64,i64]*
+;;
+(definec test34
+  (lambda (time:i64 count:i64)
+    void))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; memzone tests
+
+(definec test35
+  (lambda ()
+    (let ((b (zalloc |5,double|)))
+      (aset! b 0
+	(memzone 1024
+	   (let ((a (zalloc |10,double|)))
+	     (aset! a 0 3.5)
+	     (aref a 0))))
+      (let ((c (zalloc |9,i32|)))
+	(aset! c 0 99)
+	(aref b 0)))))
+
+
+(println (test35)) ;; 3.5
+
+
+(definec test36
+  (lambda ()
+    (memzone 1024
+      (let ((k (zalloc |15,double|))
+	    (f (lambda (fa:|15,double|*)
+	         (memzone 1024
+		   (let ((a (zalloc |10,double|)))
+		     (dotimes (i 10)
+		       (aset! a i (* (aref fa i) (random))))
+		   a)))))
+	(f k)))))
+
+(definec test37
+  (lambda ()
+    (let ((v (test36)))
+      (dotimes (i 10) (printf "%lld:%f\n" i (aref v i))))))
+
+;; should print all 0.0's  
+(test37)
+
+
+
+
+(definec test38
+  (lambda ()
+    (memzone 1024 (* 44100 10)
+      (let ((a (alloc |5,double|)))
+	(aset! a 0 5.5)
+	(aref a 0)))))
+
+(println (test38)) ;; 5.50000
+	     
+
+;;
+;; Large allocation of memory on BUILD (i.e. when the closure is created)
+;; requires an optional argument (i.e. an amount of memory to allocate
+;; specifically for closure creation)
+;;
+;; This memory is automatically free'd whenever you recompile the closure
+;; (it will be destroyed and replaced by a new allocation of the
+;;  same amount or whatever new amount you have allocated for closure
+;;  compilation)
+;;
+(definec test39 1000000
+  (let ((k (zalloc |100000,double|)))
+    (lambda ()
+      (aset! k 0 1.0)
+      (aref k 0))))
+
+
+(definec makecls
+  (lambda ()
+    (let ((arr (zalloc |1000,double|)))
+      (lambda (a:double)
+	(* a 5.0)))))
+
+(definec k 10000000
+  (let ((cls (zalloc |1000,[double,double]*|))
+	(mmm 5.0))
+    (dotimes (i:i64 1000)
+      (aset! cls i (makecls)))
+    (lambda (cl:[double,double]* idx:i64)
+      (set! mmm (random))
+      (aset! cls idx cl)
+      1)))
+	     
+(definec kk2
+  (let ((zz:i64 5)
+	(sum 0.0))
+    (lambda (idx:i64)
+      (let ((vs (k.cls:|1000,[double,double]*|*)))
+	(set! sum 0.0)
+	(dotimes (i:i64 1000)
+	  (set! sum (+ sum ((aref vs i) 5.0))))
+        (printf "sum %lld:%f\n" idx sum)
+	(set! zz 6)
+	(aset! vs idx (makecls))
+	1))))
+
+(definec runner
+  (lambda (idx)
+    (memzone 10024 (* 44100 10)
+      (begin (kk2 idx)))))
+
+(define round
+  (lambda (idx)
+    ;(println 'runner idx)
+    (runner (modulo idx 1000))
+    (callback (+ (now) 500) 'round (+ idx 1))))
+
+(round 0)
+
+
+
+
+
+;; Memory Usage In Extempore Lang
+;; -------------------------------
+
+;; Extempore supports three types of memory allocation: stack allocation,
+;; heap alloation and zone allocation.  The first two of these memory
+;; allocation techniques should be familiar to anyone who has programmed
+;; in C/C++.  The third allocation type represents a type of middle ground
+;; between these two extremes.  Zone allocation in Extempore is in essence
+;; a form of stack allocation whose scope is defined by the user.
+
+;; Stack allocation in extempore is identical to stack allocation in C.
+;; Stack allocation is made using the stack-alloc call (or salloc for
+;; short).  Stack allocations, as in C, are available only for the
+;; duration of the function call.  They are deallocated when the function
+;; returns.
+
+;; (definec ex1
+;;   (lambda ()
+;;     (let ((a (stack-alloc double)))
+;;       (aset! a 0 5.5)
+;;       (aref a 0))))
+
+;; This example demonstrates a stack allocation of a single double (8
+;; bytes) bound to the symbol a. The type returned by stack-alloc is
+;; always a pointer to the memory allocated.  In ex1 the instance 'a'
+;; will be of type double* (a:double*).  An optional integer argument
+;; before the requested type results in a multiple allocation.
+
+;; (bind-type vec3 <float,float,float>)
+
+;; (definec ex2
+;;   (lambda ()
+     
+
+
+
+;; ;; calls that draw memory from the current zone
+
+;; make-string (literal strings are constant heap allocations)
+;; closures (i.e. lambda)
+;; make-array
+;; make-tuple
+;; zone-alloc
+
+;; ;; call that draw memory from the stack
+;; stack-alloc
+;; just about everything else
+
+;; ;; calls that draw memory from the heap
+;; heap-alloc

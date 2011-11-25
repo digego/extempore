@@ -34,6 +34,7 @@
  */
 
 #include "UNIV.h"
+#include "SimpleOpt.h"
 #include "SchemeProcess.h"
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
@@ -41,44 +42,108 @@
 #include "EXTLLVM.h"
 #include <string>
 
-// need to init glut on linux
-#ifdef USE_GLUT
-#ifdef TARGET_OS_LINUX
-#include "GL/glut.h"
-#endif
-#ifdef TARGET_OS_MAC
-#include <GLUT/glut.h>
-#endif
-#endif
+enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, OPT_CHANNELS, OPT_INITFILE, OPT_PORT};
+CSimpleOptA::SOption g_rgOptions[] = {
+    // ID              TEXT                   TYPE
+  { OPT_RUNTIME,       "--runtime",       SO_REQ_SEP    },
+    { OPT_SAMPLERATE,  "--samplerate",    SO_REQ_SEP    },
+    { OPT_FRAMES,      "--frames",        SO_REQ_SEP    },
+    { OPT_CHANNELS,    "--channels",      SO_REQ_SEP    },
+    { OPT_INITFILE,    "--run",           SO_REQ_SEP    },
+    { OPT_PORT,        "--port",          SO_REQ_SEP    },
+    SO_END_OF_OPTIONS                       // END
+};
 
-int main(int argv, char** args)
+
+int main(int argc, char** argv)
 {
-    if(argv<2) {
-	printf("Must include inital path to read libs from\n");
-	return -1;
-    }
-	
-    bool with_banner = 0;
-	
-    if(argv>2) {
-	with_banner = 1;
-    }
-	
-#ifdef USE_GLUT
-    glutInit(&argv,args);
-#endif
-
+    std::string runtimedir("runtime");
+    std::string initfile;    
+    bool initfile_on = false;
+    
     std::string host("localhost");
     std::string primary_name("primary");
     std::string utility_name("utility");
     int primary_port = 7099;
     int utility_port = 7098;
-	
 
-    extemp::UNIV::PWD = args[1];
+    CSimpleOptA args(argc, argv, g_rgOptions);
+    while (args.Next()) {
+      if (args.LastError() == SO_SUCCESS) {
+	switch(args.OptionId()) {
+	case OPT_RUNTIME:
+	  runtimedir = std::string(args.OptionArg());
+	  break;
+        case OPT_SAMPLERATE:
+	  extemp::UNIV::SAMPLERATE = atoi(args.OptionArg());
+	  break;
+        case OPT_FRAMES:
+	  extemp::UNIV::FRAMES = atoi(args.OptionArg());
+	  break;
+        case OPT_CHANNELS:
+	  extemp::UNIV::CHANNELS = atoi(args.OptionArg());
+	  break;
+	case OPT_PORT:
+	  primary_port = atoi(args.OptionArg());
+	  utility_port = primary_port-1;
+        case OPT_INITFILE:
+	  initfile = std::string(args.OptionArg());
+	  initfile_on = true;	  
+	  break;
+        default:
+	  std::cout << "Extempore's command line options: " << std::endl;
+	  std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
+	  std::cout << "      --samplerate: attempt to force samplerate [default device setting]" << std::endl; 
+	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
+	  std::cout << "        --channels: attempts to force num of audio channels [default device setting]" << std::endl;
+	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
+	  std::cout << "            --port: port for primary process [7099]" << std::endl;	
+	  //delete(extemp::AudioDevice::I());
+	  return -1;	  
+	}
+      } else {
+	std::cout << "Extempore's command line options: " << std::endl;
+	std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
+	std::cout << "      --samplerate: attempt to force samplerate [default device setting]" << std::endl; 
+	std::cout << "          --frames: attempts to force frames [128]" << std::endl;
+	std::cout << "        --channels: attempts to force num of audio channels [default device setting]" << std::endl;
+	std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
+	std::cout << "            --port: port for primary process [7099]" << std::endl;	
+	//delete(extemp::AudioDevice::I());
+	return -1;
+        // handle error (see the error codes - enum ESOError)
+      }
+    }
+
+    ascii_text_color(1,9,10);	    
+    std::cout << "##########################################" << std::endl;
+    std::cout << "##                                      ##" << std::endl;        
+    std::cout << "##               EXTEMPORE              ##" << std::endl;        
+    std::cout << "##                                      ##" << std::endl;        		    		
+    std::cout << "##           andrew@moso.com.au         ##" << std::endl;            
+    std::cout << "##                                      ##" << std::endl;
+    std::cout << "##            (c) 2005-2012             ##" << std::endl;    
+    std::cout << "##                                      ##" << std::endl;        
+    std::cout << "##########################################" << std::endl;
+    std::cout << "     ################################" << std::endl;
+    std::cout << "          ######################" << std::endl;
+    std::cout << "               ############" << std::endl;
+    std::cout << "                    ##" << std::endl;
+    std::cout << std::endl;
+    ascii_text_color(0,9,10);	    
+
+		
+    extemp::UNIV::PWD = runtimedir.c_str();
     extemp::EXTLLVM::I()->initLLVM();
-    extemp::SchemeProcess* primary = new extemp::SchemeProcess(std::string(args[1]), primary_name, primary_port, with_banner);
-    extemp::SchemeProcess* utility = new extemp::SchemeProcess(std::string(args[1]), utility_name, utility_port, 0);
+    extemp::SchemeProcess* primary = 0;
+
+    if(initfile_on) { // if a file needs to be loaded from the command line
+       primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0, initfile);
+    }else{
+       primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0);
+    }
+
+    extemp::SchemeProcess* utility = new extemp::SchemeProcess(runtimedir, utility_name, utility_port, 0);
     extemp::AudioDevice* dev = extemp::AudioDevice::I();
 
     primary->start();
@@ -90,7 +155,7 @@ int main(int argv, char** args)
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
     utility_repl->connectToProcessAtHostname(host,utility_port);
 	
-    // sleep indefiniately let server process do the work
+    // sleep indefiniately let scheme processes do the work
     while(1) {
 #ifdef TARGET_OS_WINDOWS
       Sleep(5000);

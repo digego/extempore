@@ -82,7 +82,7 @@ namespace extemp {
 	bool SchemeProcess::SCHEME_EVAL_TIMING = 0;	
 
 
-	SchemeProcess::SchemeProcess(std::string _load_path, std::string _name, int _server_port, bool _banner) :
+  SchemeProcess::SchemeProcess(std::string _load_path, std::string _name, int _server_port, bool _banner, std::string _init_file) :
 	libs_loaded(false),
 		load_path(_load_path),
 		name(_name),
@@ -94,7 +94,8 @@ namespace extemp {
 		guard("scheme_server_guard"), //"Scheme Guard"),
 		running(true),
 		server_port(_server_port),
-		with_banner(_banner)
+          	with_banner(_banner),
+         	init_file(_init_file)
 	{
 		if(load_path[load_path.length()-1] != '/') load_path.append("/");
 		sc = scheme_init_new();
@@ -108,7 +109,7 @@ namespace extemp {
 		if(!initscm) {
 			std::cout << "ERROR: Could not locate file: init.scm" << std::endl << "Exiting system!!" << std::endl;
 			exit(1);
-		}else{
+                }else{
 			//std::cout << "START LOADING INIT.SCM" << std::endl;
 			scheme_load_file(sc, initscm);
 			//std::cout << "FINISHED LOADING INIT.SCM" << std::endl;
@@ -133,7 +134,7 @@ namespace extemp {
 #endif						
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "*imp-envs*"), sc->NIL);
 		scheme_define(sc, sc->global_env, mk_symbol(sc, "*callback*"), mk_cptr(sc, mk_cb(this,SchemeProcess,schemeCallback)));
-
+		extempore_lang_cb = mk_cb(this,SchemeProcess,extemporeCallback);
 		SchemeFFI::I()->initSchemeFFI(sc);
 		//threadScheme.SetPriority(CAPThread::kMaxThreadPriority); //kMaxThreadPriority || kDefaultThreadPriority
 		//threadServer.SetPriority(CAPThread::kMaxThreadPriority); //kMaxThreadPriority || kDefaultThreadPriority
@@ -143,9 +144,20 @@ namespace extemp {
 	{
 	}
 
-#ifdef EXT_BOOST
-#else
-	SchemeProcess* SchemeProcess::I(pthread_t pthread)
+// #ifdef EXT_BOOST
+//         SchemeProcess* SchemeProcess::I()
+// 	{
+// 		for(int i=0;i<INSTANCES.size();i++) {
+// 			if(INSTANCES[i]->threadScheme.isCurrentThread())
+// 			{
+// 				return INSTANCES[i];
+// 			}
+// 		}
+// 		throw std::runtime_error("Error: SchemeProcess does not exist");		
+// 		return INSTANCES[0];
+// 	}
+// #else
+        SchemeProcess* SchemeProcess::I() 
 	{
 		for(int i=0;i<INSTANCES.size();i++) {
 			if(INSTANCES[i]->threadScheme.isCurrentThread())
@@ -156,7 +168,7 @@ namespace extemp {
 		throw std::runtime_error("Error: SchemeProcess does not exist");		
 		return INSTANCES[0];
 	}
-#endif
+  // #endif
 
 	SchemeProcess* SchemeProcess::I(std::string name)
 	{
@@ -383,6 +395,26 @@ namespace extemp {
 	}
 
 
+	// called from scheduling queue thread
+        void SchemeProcess::extemporeCallback(TaskI* task)
+	{
+		if(guard.isOwnedByCurrentThread())
+		{
+			printf("Thread trying to relock during scheme callback. Potential deadlock. Dropping Task!\n");
+			return;
+		}	
+
+		guard.lock();
+		uint64_t current_time = task->getStartTime();
+		//printf("ADD NEW CALLBACK: at(%lld) now(%lld)\n",task->getStartTime(),extemp::UNIV::TIME);
+		uint64_t duration = task->getDuration();
+		Task<void*>* t = (Task<void*>*) task;
+		taskq.push(SchemeTask(current_time, duration, t->getArg(), /*label*/"tmp_label", 6));
+		guard.signal(); //Notify();
+		guard.unlock();
+	}
+
+
 	void SchemeProcess::createSchemeTask(void* arg, std::string label, int type)
 	{
 		if(guard.isOwnedByCurrentThread())
@@ -402,6 +434,22 @@ namespace extemp {
 		FILE* impscm = fopen(std::string(path).append("/").append(file).c_str(),"r");
 		if(!impscm) {
 			std::cout << "ERROR: Unable to locate file: " << path << "/" << file << std::endl;
+			return false;
+			//exit(1);
+		}else{		
+			//std::cout << "LOAD THREAD:" << pthread_self() << std::endl;
+			//std::cout << "LOADING FILE: " << path << "/" << file << std::endl << std::flush;		
+			scheme_load_file(sc, impscm);
+			return true;
+		}
+	}
+
+	bool SchemeProcess::loadFile(const std::string file)
+	{
+
+		FILE* impscm = fopen(std::string(file).c_str(),"r");
+		if(!impscm) {
+			std::cout << "ERROR: Unable to locate file: " << file << std::endl;
 			return false;
 			//exit(1);
 		}else{		
@@ -457,7 +505,6 @@ namespace extemp {
 		scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_cptr(sc, c_ptr));            
 	}
 
-
 	void* SchemeProcess::impromptu_task_executer(void* obj_p)
 	{
 		SchemeProcess* scm = (SchemeProcess*) obj_p;
@@ -489,8 +536,9 @@ namespace extemp {
 		//printf("Loaded... comlist.scm\n");
 		scm->loadFile("sort.scm", load_path.c_str());
 		//printf("Loading... sort.scm\n");
-
-
+                if(scm->getInitFile().compare("") != 0) {
+		  scm->loadFile(scm->getInitFile().c_str());
+                }
 
 		// scm->loadFile("mbe.scm", [resources UTF8String]);
 		// printf("Loading... mbe.scm\n");
@@ -509,9 +557,17 @@ namespace extemp {
 		// scm->loadFile("match.scm", [resources UTF8String]);
 		// 
 
+		// //////////////////////////////////////////////////
+		// // this added for dodgy continuations support
+                // ucontext_t* ctx = scm->getContext();
+		// ///////////////////////////////////////////////
 		scm->setLoadedLibs(true);
-
+                
 		while(scm->getRunning()) {
+               		// /////////////////////////////////////////////
+		        // // This added for dodgy contuations support
+		        // getcontext(ctx);
+			// /////////////////////////////////////////////
 			while(!q.empty() && scm->getRunning()) {
 				//For the moment I've assumed we can get away without locking
 				//the thread for q access. We'll see :)  (mutex lock)	
@@ -657,8 +713,14 @@ namespace extemp {
 						std::cerr << "Bad Closure From Symbol ... " << ss.str() << " Ignoring callback request " << std::endl;
 					}					
 					delete obj;
+				}else if(schemeTask.getType() == 6){ // callback from extempore lang
+				  _llvm_callback_struct_* s = (_llvm_callback_struct_*) schemeTask.getPtr(); //obj->getValue(); 
+				  void(*func)(void*) = s->fptr;
+				  void* dat = s->dat;
+				  func(dat);
+				  free(dat);
 				}else{
-					std::cerr << "ERROR: BAD SchemeTask type!!" << std::endl;					
+				        std::cerr << "ERROR: BAD SchemeTask type!!" << std::endl;
 				}
 			}
 

@@ -4,7 +4,13 @@ OSX_FRAMEWORKS := \
 	-framework glut \
 	-framework opengl \
 
-PLATFORM_LIBS := -lpcre -lboost_thread -lboost_system -lboost_filesystem $(OSX_FRAMEWORKS)
+PLATFORM_LIBS := -lpcre
+
+ifdef EXT_BOOST
+PLATFORM_LIBS += -lboost_thread -lboost_system -lboost_filesystem 
+endif
+
+PLATFORM_LIBS += $(OSX_FRAMEWORKS)
 
 PLATFORM_CXXFLAGS := -g -O0
 PLATFORM_LDFLAGS :=

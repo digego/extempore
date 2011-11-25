@@ -92,16 +92,18 @@ namespace extemp {
 
     class SchemeProcess {
     public:
-	SchemeProcess(std::string _load_path, std::string _name, int server_port=7010, bool banner=false);
+        SchemeProcess(std::string _load_path, std::string _name, int server_port=7010, bool banner=false, std::string load_file="");
 	~SchemeProcess();
-	static SchemeProcess* I(int index=0);
+        static SchemeProcess* I();
+	static SchemeProcess* I(int index);
 	static SchemeProcess* I(std::string name);
 	static SchemeProcess* I(scheme* sc);
-#ifdef EXT_BOOST
-	//	static SchemeProcess* I(int);
-#else
-	static SchemeProcess* I(pthread_t);
-#endif
+
+/* #ifdef EXT_BOOST */
+/* 	//	static SchemeProcess* I(int); */
+/* #else */
+/* 	static SchemeProcess* I(pthread_t); */
+/* #endif */
 	//Thread functions
 	static void* impromptu_server_thread(void* obj_p);
 	static void* impromptu_task_executer(void* obj_p);		
@@ -109,10 +111,13 @@ namespace extemp {
 	long long int getMaxDuration();
 	void setMaxDuration(long long int);		
 	bool loadFile(const std::string file, const std::string path);
+	bool loadFile(const std::string file);
+	std::string getInitFile() { return init_file; }
 	void addGlobal(char* symbol_name, pointer arg);		
 	void addForeignFunc(char* symbol_name, foreign_func func);
 	void addGlobalCptr(char* symbol_name, void* ptr);
 	void schemeCallback(TaskI* task);
+	void extemporeCallback(TaskI* task);
 	void createSchemeTask(void* arg, std::string label, int taskType);
 	bool isServerThreadRunning() { return threadServer.isRunning(); }
 	bool isSchemeThreadRunning() { return threadScheme.isRunning(); }
@@ -148,6 +153,8 @@ namespace extemp {
 	int getServerPort() { return server_port; }
 	std::queue<SchemeTask>& getQueue() { return taskq; }
 	llvm_zone_t* getDefaultZone() { return default_zone; }
+	/* // this added for dodgy contuations support */
+        /* ucontext_t* getContext() { return _context; }         */
 		
 	std::string& getName() { return name; }
 	void setLoadedLibs(bool v) { libs_loaded = v; }
@@ -165,6 +172,7 @@ namespace extemp {
 	static std::map<scheme*, SchemeProcess*> SCHEME_MAP;
 	static std::map<std::string, SchemeProcess*> SCHEME_NAME_MAP;
 
+	extemp::CM* extempore_lang_cb;
 		
     private:
 	bool libs_loaded;
@@ -190,7 +198,10 @@ namespace extemp {
 	int server_socket;				
 #endif
 	std::queue<SchemeTask> taskq;
-	llvm_zone_t* default_zone;		
+	llvm_zone_t* default_zone;
+	/* // this added for dodgy continuations support */
+        /* ucontext_t _context;		 */
+	std::string init_file;
     };
 	
     class SchemeObj{
@@ -199,7 +210,7 @@ namespace extemp {
 	~SchemeObj();
 	pointer getEnvironment();
 	pointer getValue();
-	scheme* getScheme();
+	scheme* getScheme();	
 		
     private:
 	scheme* sc;

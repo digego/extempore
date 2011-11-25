@@ -42,7 +42,7 @@
 //#include "EXTMonitor.h"
 #include "EXTLLVM.h"
 
-#ifdef TARGET_OS_OSX
+#ifdef TARGET_OS_MAC
 #include <CoreAudio/HostTime.h>
 #include <mach/mach_init.h>
 #include <mach/task_policy.h>
@@ -213,7 +213,9 @@ namespace extemp {
 	  dsp_f_ptr cache_wrapper = dsp_wrapper;
 	  double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
 	  double* data = 0; 
-	  llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	  //llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	  llvm_zone_t* zone = llvm_peek_zone_stack();
+	  //llvm_push_zone_stack(zone);
 	  for(uint32_t i=0;i<period_size;i++)
 	    {
 	      uint32_t ii = i*UNIV::CHANNELS;
@@ -225,13 +227,18 @@ namespace extemp {
 		  llvm_zone_reset(zone);
 		}
 	    }
-	  llvm_zone_destroy(zone);
+	  //llvm_pop_zone_stack();
+	  //llvm_zone_destroy(zone);
 	}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
 	  dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
 	  dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	  llvm_zone_t* zone = llvm_zone_create(1024*50);				
+	  //llvm_zone_t* zone = llvm_zone_create(1024*50);
+          llvm_zone_t* zone = llvm_peek_zone_stack();
+	  //llvm_push_zone_stack(zone);
 	  cache_wrapper(zone, cache_closure, 0 /*(SAMPLE*)inputBuffer*/,(SAMPLE*)outputBuffer,period_size,UNIV::DEVICE_TIME,UNIV::CHANNELS);
-	  llvm_zone_destroy(zone);
+	  //llvm_pop_zone_stack();
+	  //llvm_zone_destroy(zone);
+          llvm_zone_reset(zone);
 	}else{ 
 	  //nothin to do
 	}
@@ -393,7 +400,8 @@ namespace extemp {
       AudioDevice::REALTIME = getRealTime();
 
       //printf("DEVICE CALLBACK %lld\n",UNIV::DEVICE_TIME); 
-      int channels = 2;
+      //int channels = 2;
+      int channels = UNIV::CHANNELS;
       uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
       sched->getGuard()->signal();
       
@@ -407,7 +415,10 @@ namespace extemp {
 	dsp_f_ptr cache_wrapper = dsp_wrapper;
 	double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
 	double* data = 0; 
-	llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	//llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	llvm_zone_t* zone = llvm_peek_zone_stack(); //(1024*1024); // 1M
+        //printf("zone:%p  size:%lld  offset:%lld\n",zone,zone->size,zone->offset);
+	//llvm_push_zone_stack(zone);
 	for(uint32_t i=0;i<UNIV::FRAMES;i++)
 	  {
 	    for(uint32_t k=0; k<UNIV::CHANNELS; k++)
@@ -417,13 +428,18 @@ namespace extemp {
 		llvm_zone_reset(zone);
 	      }
 	  }
-	llvm_zone_destroy(zone);
+	//llvm_pop_zone_stack();
+	//llvm_zone_destroy(zone);
       }else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
 	dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
 	dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	llvm_zone_t* zone = llvm_zone_create(1024*50);				
+	//llvm_zone_t* zone = llvm_zone_create(1024*50);
+	llvm_zone_t* zone = llvm_peek_zone_stack(); //(1024*1024); // 1M
+	//llvm_push_zone_stack(zone);
 	//cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
-	llvm_zone_destroy(zone);
+	llvm_zone_reset(zone);
+	//llvm_pop_zone_stack();
+	//llvm_zone_destroy(zone);
       }else{ 
 	//nothin to do
       }
@@ -432,8 +448,17 @@ namespace extemp {
 
     AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
     {
-        UNIV::CHANNELS = 2;
-        UNIV::SAMPLERATE = 44100;
+    }
+	
+    AudioDevice::~AudioDevice()
+    {
+      if(client) jack_client_close(client);
+    }
+
+    void AudioDevice::start()
+    {
+        //UNIV::CHANNELS = 2;
+        //UNIV::SAMPLERATE = 44100;
 
 	const char **ports;
 
@@ -457,9 +482,11 @@ namespace extemp {
 	jack_on_shutdown (client, jack_shutdown, 0);
 
 	/* get the current sample rate. */ 
-	UNIV::SAMPLERATE = jack_get_sample_rate (client);
-	UNIV::FRAMES = jack_get_buffer_size (client);
-	
+	UNIV::SAMPLERATE = jack_get_sample_rate (client);	
+
+	//UNIV::FRAMES = jack_get_buffer_size (client);
+	jack_set_buffer_size(client,UNIV::FRAMES);
+
 	/* create ports */
 	//input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
 	output_ports = (jack_port_t**) malloc(sizeof(jack_port_t*)*UNIV::CHANNELS);
@@ -469,6 +496,38 @@ namespace extemp {
 	  output_ports[i] = jack_port_register (client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 	}
  	
+
+	if(started) return;
+       /* tell the JACK server that we are ready to roll */
+	if (jack_activate (client)) {
+	  ascii_text_color(1,1,10);	
+	  fprintf (stderr, "Jack did not activate us :(\n");
+	  ascii_text_color(0,9,10);	  
+	  return;
+	}
+	
+	//const char** ports;
+	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput)) == NULL) {
+	   fprintf(stderr, "Cannot find any physical playback ports\n");
+	   exit(1);
+	}
+
+	for(int i=0;i<UNIV::CHANNELS;i++) {
+	  if(jack_connect (client, jack_port_name (output_ports[i]), ports[i])) {
+	    ascii_text_color(1,1,10);
+	    fprintf (stderr, "JACK initialization error: cannot connect to output port number %d\n", (i+1));
+	    ascii_text_color(0,9,10);
+	    exit(1);
+	  }
+	}
+
+	free(ports);
+
+        UNIV::initRand();
+	RUNNING = true;
+	//queueThread->Start();
+	started = true;
+
 	ascii_text_color(1,7,10);
 	std::cout << "---         JACK         ----" << std::endl;
         std::cout << "Loaded Default Audio Device: " << std::endl;	
@@ -486,41 +545,6 @@ namespace extemp {
 	std::cout << UNIV::FRAMES << std::endl << std::flush;
 	ascii_text_color(0,7,10);	
 
-    }
-	
-    AudioDevice::~AudioDevice()
-    {
-        jack_client_close(client);
-    }
-
-    void AudioDevice::start()
-    {
-	if(started) return;
-       /* tell the JACK server that we are ready to roll */
-	if (jack_activate (client)) {
-	  ascii_text_color(1,1,10);	
-	  fprintf (stderr, "Jack did not activate us :(\n");
-	  ascii_text_color(0,9,10);	  
-	  return;
-	}
-	const char** ports;
-	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput)) == NULL) {
-	   fprintf(stderr, "Cannot find any physical playback ports\n");
-	   exit(1);
-	}
-
-	for(int i=0;i<UNIV::CHANNELS;i++) {
-	  if(jack_connect (client, jack_port_name (output_ports[i]), ports[i])) {
-	    fprintf (stderr, "cannot connect output port %d\n", i);
-	  }
-	}
-
-	free(ports);
-
-        UNIV::initRand();        
-	RUNNING = true;
-	//queueThread->Start();
-	started = true;
     }
 
     void AudioDevice::stop()
@@ -566,6 +590,7 @@ namespace extemp {
 	AudioDevice::REALTIME = CFAbsoluteTimeGetCurrent()+kCFAbsoluteTimeIntervalSince1970;
         
         if(false) { //UNIV::TIME != device_time) {
+
 	    std::cout << std::endl << "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=" << std::endl;
 	    std::cout << "UNIV Timeing Sychronization problem!!!:" << std::endl;
 	    std::cout << "UNIV::DEVICE_TIME [" << UNIV::DEVICE_TIME << "]" << std::endl;
@@ -591,26 +616,31 @@ namespace extemp {
 	    dsp_f_ptr cache_wrapper = dsp_wrapper;
 	    double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
 	    double* data = 0; 
-	    llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M				
-	    for(uint32_t i=0;i<UNIV::FRAMES;i++)
-	    {
-		uint32_t ii = i*UNIV::CHANNELS;
-		SAMPLE* dat = (SAMPLE*) outOutputData->mBuffers[0].mData;
-		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
-		{   
-		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, 0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data)); 
-		    llvm_zone_reset(zone);
-		}
+	    //llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M 
+	    llvm_zone_t* zone = llvm_peek_zone_stack();
+	    //llvm_push_zone_stack(zone);
+	    for(uint32_t i=0;i<UNIV::FRAMES;i++) {
+	      uint32_t ii = i*UNIV::CHANNELS;
+	      SAMPLE* dat = (SAMPLE*) outOutputData->mBuffers[0].mData;
+	      for(uint32_t k=0; k<UNIV::CHANNELS; k++) {   
+		dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, 0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data)); 
+		llvm_zone_reset(zone);
+	      }
 	    }
-	    llvm_zone_destroy(zone);
+	    //llvm_pop_zone_stack();
+	    //llvm_zone_destroy(zone);
 	}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
 	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
 	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	    llvm_zone_t* zone = llvm_zone_create(1024*50);				
+	    //llvm_zone_t* zone = llvm_zone_create(1024*50);
+	    llvm_zone_t* zone = llvm_peek_zone_stack();
+	    //llvm_push_zone_stack(zone);
 	    SAMPLE* outputBuffer = (SAMPLE*) outOutputData->mBuffers[0].mData;
-	    SAMPLE* inputBuffer = (SAMPLE*) inInputData->mBuffers[0].mData;		
+	    SAMPLE* inputBuffer = (SAMPLE*) inInputData->mBuffers[0].mData;
 	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
-	    llvm_zone_destroy(zone);
+	    llvm_zone_reset(zone);
+	    //llvm_pop_zone_stack();
+	    //llvm_zone_destroy(zone);
 	}else{ 
 	    //nothin to do
 	}
@@ -620,12 +650,88 @@ namespace extemp {
 
     AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
     {
+        // // get the default output device
+        // UInt32 count = (UInt32) sizeof(device);
+        // OSStatus err = AudioHardwareGetProperty(kAudioHardwarePropertyDefaultOutputDevice,&count,(void*)&device);
+	// ascii_text_color(1,1,10);
+        // if(err != kAudioHardwareNoError) {
+        //     std::cout << "Error while trying to retrieve default audio device" << std::endl;
+        // }
+        // // get the default audio stream
+        // AudioStreamBasicDescription stream;
+        // count = sizeof(stream);
+        // err = AudioDeviceGetProperty(device,0,false,kAudioDevicePropertyStreamFormat,&count,(void*)&stream);
+        // if(err != kAudioHardwareNoError) {
+        //     std::cout << "Error when reading audio device stream format" << std::endl;
+        // }
+        // err = AudioDeviceSetProperty(device,NULL,0,false,kAudioDevicePropertyBufferFrameSize,4,&UNIV::FRAMES);
+        // while(err != 0) {
+        //     std::cout << "Error setting Frames To: " << UNIV::FRAMES << std::endl;
+        //     UNIV::FRAMES = 1024;
+        //     std::cout << "Adjusting Frames To: " << UNIV::FRAMES << std::endl;
+        //     err = AudioDeviceSetProperty(device,NULL,0,false,kAudioDevicePropertyBufferFrameSize,4,&UNIV::FRAMES);            
+        // }
+        // err = AudioDeviceAddPropertyListener(device, 0, false, kAudioDeviceProcessorOverload, &errorCallback, NULL);
+        // if(err != 0) {
+        //     std::cout << "Error setting Processor Overload Property Listener" << std::endl;
+        // }
+
+
+	// UNIV::CHANNELS = static_cast<int>(stream.mChannelsPerFrame);
+        // UNIV::SAMPLERATE = static_cast<int>(stream.mSampleRate);
+        // //ascii_text_color(0,7,10);        
+        // //std::cout << "Loaded Audio Device With Stream: " << std::endl;
+        // //std::cout << "Format\t: " << stream.mFormatID << std::endl;
+        // //std::cout << "Format Flags\t: " << stream.mFormatFlags << std::endl;
+        // //std::cout << "Bytes Per Packet\t: " << stream.mBytesPerPacket << std::endl;
+        // //std::cout << "Frames Per Packet\t: " << stream.mFramesPerPacket << std::endl;
+        // //std::cout << "Bytes Per Frame\t: " << stream.mBytesPerFrame << std::endl;
+        // //std::cout << "Channels Per Frame\t: " << stream.mChannelsPerFrame << std::endl;
+        // //std::cout << "Bits Per Channel\t: " << stream.mBitsPerChannel << std::endl;
+
+        // //std::cout << "SampleRate\t: " << UNIV::SAMPLERATE << std::endl;
+        // //std::cout << "Channels\t: " << UNIV::CHANNELS << std::endl;
+	// //std::cout << "Frames:\t\t" << UNIV::FRAMES << std::endl;
+
+        // ascii_text_color(1,7,10);
+	// std::cout << "---      CoreAudio     ----" << std::endl;
+        // std::cout << "Loaded Default Audio Device: " << std::endl;	
+	// ascii_text_color(0,7,10);	
+        // std::cout << "SampleRate\t: " << std::flush;
+	// ascii_text_color(1,6,10);	
+	// std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
+	// ascii_text_color(0,7,10);	
+        // std::cout << "Channels\t: " << std::flush;
+	// ascii_text_color(1,6,10);	
+	// std::cout << UNIV::CHANNELS << std::endl << std::flush;
+	// ascii_text_color(0,7,10);	
+        // std::cout << "Frames\t\t: " << std::flush;
+	// ascii_text_color(1,6,10);	
+	// std::cout << UNIV::FRAMES << std::endl << std::flush;
+	// ascii_text_color(0,7,10); 
+
+	// err = AudioDeviceAddIOProc(device, &audioCallback, TaskScheduler::I());
+	
+	// ascii_text_color(1,1,10);
+        // if (err != kAudioHardwareNoError) { std::cout << "Audio harware setup error of some kind!!!!: " << err << std::endl; exit(1);} 
+	// ascii_text_color(0,7,10);
+    }
+	
+    AudioDevice::~AudioDevice() 
+    {
+	RUNNING = false;
+    }
+	
+    void AudioDevice::start() 
+    {
         // get the default output device
         UInt32 count = (UInt32) sizeof(device);
         OSStatus err = AudioHardwareGetProperty(kAudioHardwarePropertyDefaultOutputDevice,&count,(void*)&device);
 	ascii_text_color(1,1,10);
         if(err != kAudioHardwareNoError) {
+
             std::cout << "Error while trying to retrieve default audio device" << std::endl;
+	    exit(1);
         }
         // get the default audio stream
         AudioStreamBasicDescription stream;
@@ -633,6 +739,7 @@ namespace extemp {
         err = AudioDeviceGetProperty(device,0,false,kAudioDevicePropertyStreamFormat,&count,(void*)&stream);
         if(err != kAudioHardwareNoError) {
             std::cout << "Error when reading audio device stream format" << std::endl;
+	    exit(1);
         }
         err = AudioDeviceSetProperty(device,NULL,0,false,kAudioDevicePropertyBufferFrameSize,4,&UNIV::FRAMES);
         while(err != 0) {
@@ -646,9 +753,9 @@ namespace extemp {
             std::cout << "Error setting Processor Overload Property Listener" << std::endl;
         }
 
-
 	UNIV::CHANNELS = static_cast<int>(stream.mChannelsPerFrame);
         UNIV::SAMPLERATE = static_cast<int>(stream.mSampleRate);
+
         //ascii_text_color(0,7,10);        
         //std::cout << "Loaded Audio Device With Stream: " << std::endl;
         //std::cout << "Format\t: " << stream.mFormatID << std::endl;
@@ -685,19 +792,12 @@ namespace extemp {
 	ascii_text_color(1,1,10);
         if (err != kAudioHardwareNoError) { std::cout << "Audio harware setup error of some kind!!!!: " << err << std::endl; exit(1);} 
 	ascii_text_color(0,7,10);
-    }
-	
-    AudioDevice::~AudioDevice() 
-    {
-	RUNNING = false;
-    }
-	
-    void AudioDevice::start() 
-    {
+
+
 	if(started) return;
 	UNIV::initRand();
 						
-	OSStatus err = AudioDeviceStart(device, &audioCallback);
+	err = AudioDeviceStart(device, &audioCallback);
 	if(err != kAudioHardwareNoError) {
 	    std::cerr << "Error loading audio hardware!!" << std::endl;
 	    exit(1);
@@ -748,7 +848,9 @@ namespace extemp {
 	    dsp_f_ptr cache_wrapper = dsp_wrapper;
 	    double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
 	    double* data = 0; 
-	    llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	    //llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
+	    llvm_zone_t* zone = llvm_peek_zone_stack();
+	    //llvm_push_zone_stack(zone);
 	    for(uint32_t i=0;i<UNIV::FRAMES;i++)
 	    {
 		uint32_t ii = i*UNIV::CHANNELS;
@@ -760,13 +862,18 @@ namespace extemp {
 		  llvm_zone_reset(zone);
 		}
 	    }
-	    llvm_zone_destroy(zone);
+	    //llvm_pop_zone_stack();
+	    //llvm_zone_destroy(zone);
 	}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
 	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
 	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	    llvm_zone_t* zone = llvm_zone_create(1024*50);				
+	    //llvm_zone_t* zone = llvm_zone_create(1024*50);
+	    llvm_zone_t* zone = llvm_peek_zone_stack();
+	    //llvm_push_zone_stack(zone);
 	    cache_wrapper(zone, cache_closure, (SAMPLE*)inputBuffer,(SAMPLE*)outputBuffer,UNIV::FRAMES,UNIV::DEVICE_TIME,UNIV::CHANNELS);
-	    llvm_zone_destroy(zone);
+	    llvm_zone_reset(zone);
+	    //llvm_pop_zone_stack();
+	    //llvm_zone_destroy(zone);
 	}else{ 
 	    //zero out audiobuffer
 	    memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)));
@@ -777,6 +884,21 @@ namespace extemp {
 
     AudioDevice::AudioDevice() : started(false), buffer(0), dsp_closure(0), dsp_wrapper(0), dsp_wrapper_array(0)
     {
+    }
+	
+    AudioDevice::~AudioDevice()
+    {
+	PaError err;
+	err = Pa_StopStream(stream);
+	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+	err = Pa_CloseStream(stream);
+	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+	err = Pa_Terminate();
+	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+    }
+
+    void AudioDevice::start()
+    {
         Pa_Initialize();
         //std::cout << "Initializing AudioDevice: " << std::endl;
         PaError err;
@@ -785,12 +907,28 @@ namespace extemp {
 
         std::cout << "Input Device: " << inputDevice << std::endl;
         std::cout << "Output Device: " << outputDevice << std::endl;
-        err = Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100.0, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
+        err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
 	if(err != paNoError) {
-	    std::cerr << "PA Error: " << Pa_GetErrorText(err) << std::endl;
+   	    ascii_text_color(1,1,10);
+	    std::cerr << "PortAudio Initialization Error: " << Pa_GetErrorText(err) << std::endl;
+	ascii_text_color(0,7,10); 
+	    exit(1);
 	}
-        UNIV::CHANNELS = 2;
-        UNIV::SAMPLERATE = 44100;
+        //UNIV::CHANNELS = 2;
+        //UNIV::SAMPLERATE = 44100;
+
+
+	if(started) return;
+        UNIV::initRand();        
+
+        err = Pa_StartStream(stream);
+	ascii_text_color(1,1,10);
+	if(err != paNoError) { std::cout << "PortAudio ERROR: " << Pa_GetErrorText(err) << std::endl; }
+	ascii_text_color(0,9,10);
+	RUNNING = true;
+	//queueThread->Start();
+	started = true;
+
 	ascii_text_color(1,7,10);
 	std::cout << "---PortAudio---" << std::endl;
         std::cout << "Loaded Default Audio Device: " << std::endl;	
@@ -809,31 +947,7 @@ namespace extemp {
 	ascii_text_color(0,7,10); 
 	std::cout << std::endl << std::flush;
 	//ascii_text_color(0,7,10);
-    }
-	
-    AudioDevice::~AudioDevice()
-    {
-	PaError err;
-	err = Pa_StopStream(stream);
-	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-	err = Pa_CloseStream(stream);
-	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-	err = Pa_Terminate();
-	if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-    }
 
-    void AudioDevice::start()
-    {
-	if(started) return;
-        UNIV::initRand();        
-	PaError err;
-        err = Pa_StartStream(stream);
-	ascii_text_color(1,1,10);
-	if(err != paNoError) { std::cout << "PortAudio ERROR: " << Pa_GetErrorText(err) << std::endl; }
-	ascii_text_color(0,9,10);
-	RUNNING = true;
-	//queueThread->Start();
-	started = true;
     }
 
     void AudioDevice::stop()

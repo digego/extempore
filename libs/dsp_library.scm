@@ -103,16 +103,16 @@
 ;; don't need variable length
 (definec make-delay
   (lambda (max-delay)
-    (let ((line (heap-alloc max-delay double))
+    (let ((line (zalloc max-delay double))
 	  (time 0)
 	  (delay max-delay)
 	  (in 0.5)
 	  (out 0.5))
       (lambda (x:double)
 	(let* ((n (modulo time delay))
-	       (delayed (aref line n))
+	       (delayed (pref line n))
 	       (y (+ (* in x) (* out delayed))))
-	  (aset! line n y)
+	  (pset! line n y)
 	  (set! time (+ time 1))
 	  y)))))
 
@@ -120,7 +120,7 @@
 ;; iir comb with interpolation
 (definec make-comb
   (lambda (max-delay)
-    (let ((line (heap-alloc max-delay double))
+    (let ((line (zalloc max-delay double))
 	  (in-head 0)
 	  (out-head 0)
 	  (delay_ (i64tod max-delay))
@@ -129,7 +129,7 @@
 	  (om_alpha 1.0)
 	  (in 1.0)
 	  (out 0.5))
-      (dotimes (i max-delay) (aset! line i 0.0))
+      (dotimes (i max-delay) (pset! line i 0.0))
       (lambda (x:double)
 	(if (<> delay delay_)
 	    (begin (set! delay_ delay)		 
@@ -139,11 +139,11 @@
 				     (dtoi64 delay)))))
 	(let* ((ih:i64 (modulo in-head max-delay))
 	       (oh:i64 (modulo out-head max-delay))
-	       (delayed1 (aref line oh))
-	       (delayed2 (aref line (modulo (+ oh 1) max-delay)))
+	       (delayed1 (pref line oh))
+	       (delayed2 (pref line (modulo (+ oh 1) max-delay)))
 	       (delayed (+ (* alpha delayed1) (* om_alpha delayed2))) 
 	       (y (+ (* in x) (* out delayed))))
-	  (aset! line ih y)
+	  (pset! line ih y)
 	  (set! in-head (+ ih 1))
 	  (set! out-head (+ oh 1))
 	  y)))))
@@ -195,17 +195,17 @@
 ;; tap delay
 (definec tap-delay
   (lambda (max-delay num-of-taps)
-    (let ((line (heap-alloc max-delay double))
-	  (taps (heap-alloc num-of-taps i64))
+    (let ((line (zalloc max-delay double))
+	  (taps (zalloc num-of-taps i64))
 	  (delay max-delay)
 	  (time 0))
       (lambda (x:double)
 	(let ((y 0.0)
 	      (n (modulo time delay))
 	      (gain (/ 1.0 (i64tod num-of-taps))))
-	  (aset! line n x)
+	  (pset! line n x)
 	  (dotimes (i num-of-taps)
-	    (set! y (+ y (* gain (aref line (modulo (+ (aref taps i) n) delay))))))
+	    (set! y (+ y (* gain (pref line (modulo (+ (pref taps i) n) delay))))))
 	  (set! time (+ time 1))
 	  y)))))
 
@@ -213,19 +213,19 @@
 ;; allpass
 (definec make-allpass
   (lambda (delay)
-    (let ((inline (heap-alloc delay double))
-	  (outline (heap-alloc delay double))
+    (let ((inline (zalloc delay double))
+	  (outline (zalloc delay double))
 	  (time 0)
 	  (g 0.9))
       (lambda (x)
 	(let* ((n (modulo time delay))
-	       (dy (aref outline n))
-	       (dx (aref inline n))
+	       (dy (pref outline n))
+	       (dx (pref inline n))
 	       (y (+ (* -1.0 g x)
 		     dx
 		     (* g dy))))
-	  (aset! inline n x)
-	  (aset! outline n y)
+	  (pset! inline n x)
+	  (pset! outline n y)
 	  (set! time (+ time 1))
 	  y)))))
 
@@ -482,14 +482,14 @@
 
 (definec envelope-segments
   (lambda (points:double* num-of-points:i64)
-    (let ((lines (heap-alloc num-of-points [double,double]*)))
+    (let ((lines (zalloc num-of-points [double,double]*)))
       (dotimes (k num-of-points)
 	(let* ((idx (* k 2))
-	       (x1 (aref points (+ idx 0)))
-	       (y1 (aref points (+ idx 1)))
-	       (x2 (aref points (+ idx 2)))
-	       (y2 (aref points (+ idx 3))))
-	  (aset! lines k (make-line x1 y1 x2 y2))))
+	       (x1 (pref points (+ idx 0)))
+	       (y1 (pref points (+ idx 1)))
+	       (x2 (pref points (+ idx 2)))
+	       (y2 (pref points (+ idx 3))))
+	  (pset! lines k (make-line x1 y1 x2 y2))))
       lines)))
 
 (definec make-envelope
@@ -499,8 +499,8 @@
       (lambda (time)
 	(let ((res -1.0))
 	  (dotimes (k num-of-points)
-	    (let ((line (aref klines k))
-		  (time-point (aref points (* k 2))))
+	    (let ((line (pref klines k))
+		  (time-point (pref points (* k 2))))
 	      (if (or (= time time-point)
 		      (< time-point time))
 		  (set! res (line time)))))
@@ -510,19 +510,19 @@
 (definec make-adsr
   (lambda (start-time atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
     (let* ((points 6)
-	   (data (heap-alloc (* points 2) double)))
-      (aset! data 0 start-time)
-      (aset! data 1 0.0)
-      (aset! data 2 (+ start-time atk-dur)) ;; point data
-      (aset! data 3 peek-amp)
-      (aset! data 4 (+ start-time atk-dur dky-dur))
-      (aset! data 5 sus-amp)
-      (aset! data 6 (+ start-time atk-dur dky-dur sus-dur))
-      (aset! data 7 sus-amp)
-      (aset! data 8 (+ start-time atk-dur dky-dur sus-dur rel-dur))
-      (aset! data 9 0.0)
-      (aset! data 10 (+ start-time atk-dur dky-dur sus-dur rel-dur 1)) ;; this to flatten out at 0.0
-      (aset! data 11 0.0)
+	   (data (zalloc (* points 2) double)))
+      (pset! data 0 start-time)
+      (pset! data 1 0.0)
+      (pset! data 2 (+ start-time atk-dur)) ;; point data
+      (pset! data 3 peek-amp)
+      (pset! data 4 (+ start-time atk-dur dky-dur))
+      (pset! data 5 sus-amp)
+      (pset! data 6 (+ start-time atk-dur dky-dur sus-dur))
+      (pset! data 7 sus-amp)
+      (pset! data 8 (+ start-time atk-dur dky-dur sus-dur rel-dur))
+      (pset! data 9 0.0)
+      (pset! data 10 (+ start-time atk-dur dky-dur sus-dur rel-dur 1)) ;; this to flatten out at 0.0
+      (pset! data 11 0.0)
       (let ((f (make-envelope data points)))
 	(lambda (time:double)
 	  (f time))))))
@@ -549,69 +549,81 @@
 		   (make-adsr start-time 0.0 0.0 dur release 1.0 sus-amp))))
       (lambda (sample:double time:double channel:double)
 	(if (> time (+ start-time dur release))
-	    (begin (aset! nstarts idx 9999999999999.0) 0.0)
+	    (begin (pset! nstarts idx 9999999999999.0) 0.0)
 	    (kernel (- time start-time) channel freq (* (env time) amp)))))))
 
 
 ;; relative time
 (definec make-note
   (lambda (start-time:double freq:double amp:double dur 
-		      attack decay release sus-amp
+		      attack:double decay:double release:double sus-amp:double
 		      nstarts:double*
 		      idx:i64 kernel:[double,double,double,double,double]*)
     (let ((env (if (< (+ attack decay) dur)
-		   (make-adsr 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
-		   (make-adsr 0.0 0.0 0.0 dur release 1.0 sus-amp)))
+	  	   (make-adsr 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
+	  	   (make-adsr 0.0 0.0 0.0 dur release 1.0 sus-amp)))
 	  (t 0.0))
       (lambda (sample:double time:double channel:double)
 	(if (< channel 1.0) (set! t (+ t 1.0)))
 	(if (< t (+ dur release))
 	    (kernel t channel freq (* (env t) amp))
-	    (begin (aset! nstarts idx 9999999999999.0) 0.0))))))
+	    (begin (pset! nstarts idx 9999999999999.0) 0.0))))))
 
 
 (define-macro (define-instrument name note-kernel effect-kernel)
   `(definec ,name
      (let* ((poly 48)
-	    (notes (heap-alloc poly [double,double,double,double]*))
+	    (notes (zalloc poly [double,double,double,double]*))
 	    (attack 200.0)
 	    (decay 200.0)
 	    (release 1000.0)
 	    (sustain 0.6) ;; amplitude of the sustain
 	    (gain 2.0)
 	    (active 0)
-	    (note-starts (heap-alloc poly double))
+	    (note-starts (zalloc poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1))
 			  (dotimes (i poly) ;; check for free poly spot           
-			    (if (> (aref note-starts i) 9999999999998.0)
+			    (if (> (pref note-starts i) 9999999999998.0)
 				(set! free-note i)))
 			  (if (= 0 active)
-			      (begin (dotimes (iii poly) (aset! note-starts iii 9999999999999.0))
+			      (begin (dotimes (iii poly) (pset! note-starts iii 9999999999999.0))
 				     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
-			      (begin (aset! notes free-note
+			      (begin (pset! notes free-note
 					    (make-note start freq amp dur
 						       attack decay release sustain
 						       note-starts free-note
 						       (,note-kernel)))
-				     (aset! note-starts free-note start)
+				     (pset! note-starts free-note start)
 				     1)
 			      0)))))
        (dotimes (ii poly) ;; sets all notes to inactive
-	 (aset! note-starts ii 9999999999999.0))
+	 (pset! note-starts ii 9999999999999.0))
        (lambda (in:double time:double chan:double dat:double*)
-	 (let ((out 0.0))
+	 (let ((out:double 0.0))
 	   (dotimes (k poly) ;; sum all active notes          
-	     (if (< (aref note-starts k) time)
-		 (set! out (+ out (* 0.3 ((aref notes k) in time chan))))))
+	     (if (< (pref note-starts k) time)
+		 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
 	   (* gain (,effect-kernel out time chan dat)))))))
 
 
+;; NOTE!
+;; (* 5.0 *samplerate*) is time padding
+;; it is used because the decay length of the note may go
+;; beyond the duration.
+;; however making it longer means using more memory
+;; it's a trade off!
 (definec _synth-note
   (lambda (time inst:[double,double,double,double,double*]* freq amp dur)
-    ((inst.new-note:[i64,double,double,double,double]*) time freq dur amp)))
-  
+    (memzone (* 1024 10)
+	     (dtoi64 (+ (- time (i64tod (now)))
+			dur
+			(* 5.0 *samplerate*))) ;; time padding
+      (let ((f (inst.new-note:[i64,double,double,double,double]*)))
+	(f time freq dur amp)
+	;; so that we only copy an integer from memzone
+	1))))
 
 (definec midi2frq    
   (lambda (pitch)            
@@ -621,19 +633,28 @@
   (lambda (freq)            
     (+ (* 12.0 (log2 (/ freq 440.0))) 69.0)))
 
+;; ;; playnote wrapper
+;; (define-macro (play-note time inst pitch vol dur)
+;;   `(let ((zone (sys:create-mzone (* 1024 1024)))
+;; 	 (default-zone *impc:zone*)	 
+;; 	 (duration (* 1.0 ,dur))) ; (* ,dur (* *samplerate* (/ 60 (*metro* 'get-tempo))))))
+;;      (sys:destroy-mzone zone (+ duration (* 5 60.0 *samplerate*))) ; 3 minutes later?
+;;      (set! *impc:zone* zone)
+;;      (_synth-note (integer->real ,time) 
+;; 		  (llvm:get-native-closure ,(symbol->string inst))
+;; 		  (midi2frq (* 1.0 ,pitch))
+;; 		  (/ (exp (/ ,vol 26.222)) 127.0)
+;; 		  duration)
+;;      (set! *impc:zone* default-zone)))
+
 ;; playnote wrapper
 (define-macro (play-note time inst pitch vol dur)
-  `(let ((zone (sys:create-mzone (* 1024 1024)))
-	 (default-zone *impc:zone*)	 
-	 (duration (* 1.0 ,dur))) ; (* ,dur (* *samplerate* (/ 60 (*metro* 'get-tempo))))))
-     (sys:destroy-mzone zone (+ duration (* 5 60.0 *samplerate*))) ; 3 minutes later?
-     (set! *impc:zone* zone)
+  `(let ((duration (* 1.0 ,dur)))
      (_synth-note (integer->real ,time) 
 		  (llvm:get-native-closure ,(symbol->string inst))
 		  (midi2frq (* 1.0 ,pitch))
 		  (/ (exp (/ ,vol 26.222)) 127.0)
-		  duration)
-     (set! *impc:zone* default-zone)))
+		  duration)))
 
 ;; make synth defaults
 (definec default-note
@@ -688,10 +709,10 @@
 		 (+ (oscr2 1.0 (+ freq (* 5.0 (random))))
 		    (lpf2 (saw2 fxamp freq) (* 3.0 freq))
 		    (oscr 0.8 (+ freq (oscr3 (* 0.99 freq)
-					     (* freq 0.99))))))))))))
+		       		     (* freq 0.99))))))))))))
 
 
-(definec synth-fx
+(definec synth-fx 262144
   (let ((dleft (dtoi64 (* 0.125 *samplerate*)))
 	(dlyl (make-delay dleft))
 	(dright (dtoi64 (* 0.33333333 *samplerate*)))
@@ -745,7 +766,7 @@
 ;; size of audio data in file (in bytes)
 (definec print-audio-file-info
   (lambda (fname)
-    (let ((info (make-tuple i64 i32 i32 i32 i32 i32))
+    (let ((info (zalloc <i64,i32,i32,i32,i32,i32>))
 	  (audiofile (sf_open fname 16 info))
 	  (channels (i32toi64 (tref info 2))))
       (printf "---------------\n")
@@ -755,15 +776,15 @@
       (printf "channels:\t %d\n" (tref info 2))
       (printf "frames:\t\t %lld\n" (tref info 0))
       (printf "seconds:\t %f\n"
-	      (/ (i64tod (/ (tref info 0) (i32toi64 (tref info 2))))
-		 (i32tod (tref info 1))))
+      	      (/ (i64tod (/ (tref info 0) (i32toi64 (tref info 2))))
+      		 (i32tod (tref info 1))))
       (sf_close audiofile))))
 
 ;; an audio buffer reader
 (definec read-audio-data
   (lambda (fname dat offset num)
     ;(printf "in: %s %p %lld %lld\n" fname dat offset num)
-    (let ((info (make-tuple i64 i32 i32 i32 i32 i32))
+    (let ((info (zalloc <i64,i32,i32,i32,i32,i32>))
 	  (audiofile (sf_open fname 16 info))
 	  (cnt (sf_seek audiofile offset 0))
 	  (samples-read (sf_read_double audiofile dat num)))
@@ -773,7 +794,7 @@
 ;; write out an audio buffer
 (definec write-audio-data
   (lambda (fname frames channels:i32 dat)
-    (let ((info (make-tuple i64 i32 i32 i32 i32 i32)))
+    (let ((info (zalloc <i64,i32,i32,i32,i32,i32>)))
       (tset! info 0 frames)
       (tset! info 1 (dtoi32 *samplerate*))
       (tset! info 2 channels)
@@ -797,7 +818,7 @@
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000) 
 (definec set-sample-data_
   (lambda (inst:[double,double,double,double*]* fname index offset length)    
-    (let ((info (make-tuple i64 i32 i32 i32 i32 i32))
+    (let ((info (zalloc <i64,i32,i32,i32,i32,i32>))
 	  (audiofile (sf_open fname 16 info))
 	  (channels (i32toi64 (tref info 2)))		     
 	  (num (if (= 0 length)
@@ -809,11 +830,11 @@
 		(samples (inst.samples:|128,double*|*))
 		(samples-length (inst.samples-length:|128,i64|*))
 		(read (read-audio-data fname adat (* offset channels) num))
-		(olddat (if (<> 0 (aref samples-length index))
-			    (bitcast (aref samples index) i8*)
+		(olddat (if (<> 0 (pref samples-length index))
+			    (bitcast (pref samples index) i8*)
 			    null)))
-	    (aset! samples-length index (/ read channels)) ;num)	    
-	    (aset! samples index adat)
+	    (pset! samples-length index (/ read channels)) ;num)	    
+	    (pset! samples index adat)
 	    ;; the following line is a problem on windows and needs to be fixed!
 	    ; (free_after_delay olddat (* 10.0 44100.0)))
 	    (printf "read %lld(frames):%f(k) into index:%lld\n" (/ read channels) (/ (i64tod (* num 8)) 1024.) index)
@@ -837,7 +858,7 @@
 (definec set-sample-offset_
   (lambda (sampler:[double,double,double,double*]* index:i64 offset:i64)
     (let ((offsets (sampler.samples-offsets:|128,i64|*)))
-      (aset! offsets index offset)
+      (pset! offsets index offset)
       1)))
 
 
@@ -871,7 +892,7 @@
 (definec sampler-note
   (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* index)
     (let ((idx-freq (midi2frq (i64tod index)))
-	  (phase (i64tod (aref samples-offsets index)))) ;; phase unit is audio frames
+	  (phase (i64tod (pref samples-offsets index)))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
 	(let ((rate (/ freq idx-freq))
 	      (pos (if (< chan 1.0) ;; only increment once per frame
@@ -880,16 +901,16 @@
 	      (posi (dtoi64 (floor pos)))
 	      (posr (modulo pos 1.0))
 	      (posx (+ (* posi 2) (dtoi64 chan)))
-	      (length (- (aref samples-length index) 10))
-	      (dat (aref samples index))
-	      (y1 (if (or (> posi length) (< posi 1)) 0.0 (aref dat (- posx 2)))) ; assume stereo
-	      (x0 (if (> posi length) 0.0 (aref dat posx)))
-	      (x1 (if (> (+ posi 1) length) 0.0 (aref dat (+ posx 2)))) ; assume stereo
-	      (x2 (if (> (+ posi 2) length) 0.0 (aref dat (+ posx 4))))) ; assume stereo
+	      (length (- (pref samples-length index) 10))
+	      (dat (pref samples index))
+	      (y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx 2)))) ; assume stereo
+	      (x0 (if (> posi length) 0.0 (pref dat posx)))
+	      (x1 (if (> (+ posi 1) length) 0.0 (pref dat (+ posx 2)))) ; assume stereo
+	      (x2 (if (> (+ posi 2) length) 0.0 (pref dat (+ posx 4))))) ; assume stereo
 	  (* amp (hermite-interp posr y1 x0 x1 x2)))))))
 
 
-(definec sampler-fx
+(definec sampler-fx 294912
   (let ((reverbl (make-reverb 80.0))
 	(reverbr (make-reverb 79.0))	
 	(pan .5)
@@ -915,28 +936,28 @@
 ;; make sampler instrument
 (define-macro (define-sampler name note-kernel effect-kernel)
   `(definec ,name
-     (let* ((poly 48)
-	    (samples (make-array 128 double*)) ;; 128 samples
-	    (samples-length (make-array 128 i64)) ;; 128 samples
-	    (samples-offsets (make-array 128 i64)) ;; 128 samples
-	    (notes (heap-alloc poly [double,double,double,double]*))
-	    (attack 200.0)
-	    (decay 200.0)
-	    (release 1000.0)
-	    (sustain 1.0) ;; amplitude of the sustain
-	    (gain 2.0)
-	    (active 0)
-	    (note-starts (heap-alloc poly double))
+     (let* ((poly:i64 48)
+	    (samples (zalloc |128,double*|)) ;; 128 samples
+	    (samples-length (zalloc |128,i64|)) ;; 128 samples
+	    (samples-offsets (zalloc |128,i64|)) ;; 128 samples
+	    (notes (zalloc poly [double,double,double,double]*))
+	    (attack:double 200.0)
+	    (decay:double 200.0)
+	    (release:double 1000.0)
+	    (sustain:double 1.0) ;; amplitude of the sustain
+	    (gain:double 2.0)
+	    (active:i64 0)
+	    (note-starts:double* (zalloc poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1)
 			      (idx (dtoi64 (floor (frq2midi freq))))
 			      (closest 1000000)
 			      (new-idx idx))
-			  (dotimes (i poly) ;; check for free poly spot           
-			    (if (> (aref note-starts i) 9999999999998.0)
+			  (dotimes (i:i64 poly) ;; check for free poly spot           
+			    (if (> (pref note-starts i) 9999999999998.0)
 				(set! free-note i)))
 			  (if (= 0 active)
-			      (begin (dotimes (iii poly) (aset! note-starts iii 9999999999999.0))
+			      (begin (dotimes (iii:i64 poly) (pset! note-starts iii 9999999999999.0))
 				     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
 			      (begin (dotimes (idxi 128)
@@ -945,24 +966,24 @@
 						  (< v closest))
 				      (begin (set! new-idx idxi)
 					     (set! closest v) 0))))
-				     (aset! notes free-note
+				     (pset! notes free-note
 					    (make-note start freq amp dur
 						       attack decay release sustain
 						       note-starts free-note
 						       (,note-kernel samples samples-length samples-offsets new-idx)))
-				     (aset! note-starts free-note start)
+				     (pset! note-starts free-note start)
 				     1)
 			      0)))))
-       (dotimes (kk 128)
+       (dotimes (kk:i64 128)
 	 (aset! samples-offsets kk 0)
 	 (aset! samples-length kk 0))
-       (dotimes (ii poly) ;; sets all notes to inactive
-	 (aset! note-starts ii 9999999999999.0))
+       (dotimes (ii:i64 poly) ;; sets all notes to inactive
+	 (pset! note-starts ii 9999999999999.0))
        (lambda (in:double time:double chan:double dat:double*)
-	 (let ((out 0.0))
-	   (dotimes (k poly) ;; sum all active notesx   
-	     (if (< (aref note-starts k) time)
-		 (set! out (+ out (* 0.3 ((aref notes k) in time chan))))))
+	 (let ((out:double 0.0))
+	   (dotimes (k:i64 poly) ;; sum all active notesx   
+	     (if (< (pref note-starts k) time)
+		 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
 	   (* gain (,effect-kernel out time chan dat)))))))
 
 
@@ -1011,15 +1032,28 @@
 	  (else 0.0))))
 
 
-(ipc:call (ipc:get-process-name) 'print)
-(ipc:call (ipc:get-process-name) 'ascii-print-color 1 7 10) 
-(ipc:call (ipc:get-process-name) 'print "All set to go!\n")
-(ipc:call (ipc:get-process-name) 'synth.active 1)
-(ipc:call (ipc:get-process-name) 'ascii-print-color 0 7 10)
-(ipc:call (ipc:get-process-name) 'print "'Synth' active = true\n")
-(ipc:call (ipc:get-process-name) 'sampler.active 1)
-(ipc:call (ipc:get-process-name) 'print "'Sampler' active = true\n")
-(ipc:call (ipc:get-process-name) 'print)
-(ipc:call (ipc:get-process-name) 'print "You have two default instruments loaded 'synth' and 'sampler'\n")
-(ipc:call (ipc:get-process-name) 'print)
-(ipc:call (ipc:get-process-name) 'callback 0 '_dsp:set! 'dsp)
+;; (ipc:call (ipc:get-process-name) 'print)
+;; (ipc:call (ipc:get-process-name) 'ascii-print-color 1 7 10) 
+;; (ipc:call (ipc:get-process-name) 'print "All set to go!\n")
+;; (ipc:call (ipc:get-process-name) 'synth.active 1)
+;; (ipc:call (ipc:get-process-name) 'ascii-print-color 0 7 10)
+;; (ipc:call (ipc:get-process-name) 'print "'Synth' active = true\n")
+;; (ipc:call (ipc:get-process-name) 'sampler.active 1)
+;; (ipc:call (ipc:get-process-name) 'print "'Sampler' active = true\n")
+;; (ipc:call (ipc:get-process-name) 'print)
+;; (ipc:call (ipc:get-process-name) 'print "You have two default instruments loaded 'synth' and 'sampler'\n")
+;; (ipc:call (ipc:get-process-name) 'print)
+;; (ipc:call (ipc:get-process-name) 'callback 0 '_dsp:set! 'dsp)
+
+(print)
+(ascii-print-color 1 7 10) 
+(print "All set to go!\n")
+(synth.active 1)
+(ascii-print-color 0 7 10)
+(print "'Synth' active = true\n")
+(sampler.active 1)
+(print "'Sampler' active = true\n")
+(print)
+(print "You have two default instruments loaded 'synth' and 'sampler'\n")
+(print)
+(dsp:set! dsp)

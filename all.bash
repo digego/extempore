@@ -20,6 +20,25 @@ EXT_LLVM_CONFIG_SCRIPT="$EXT_LLVM_DIR/bin/llvm-config --libs"
 EXT_LLVM_LIBS=`$EXT_LLVM_CONFIG_SCRIPT`
 export EXT_LLVM_LIBS
 
+# check for jack audio
+if [[ "$@" =~ "-DJACK_AUDIO" ]]
+then
+    JACK_AUDIO=1
+    export JACK_AUDIO
+else
+    unset JACK_AUDIO
+fi
+
+# check for boost
+if [[ "$@" =~ "-DEXT_BOOST" ]]
+then
+    EXT_BOOST=1
+    export EXT_BOOST
+else
+    unset EXT_BOOST
+fi
+
+
 EXT_USER_ARGS=$@
 export EXT_USER_ARGS
 

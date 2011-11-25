@@ -33,8 +33,8 @@ LDFLAGS := \
 	-L$(EXT_LLVM_DIR)/lib \
 	$(PLATFORM_LDFLAGS) \
 
-extempore: $(OBJFILES)        
-	@echo + ld $@
+extempore: $(OBJFILES)	
+	@echo + ld $@ $(LIBS)
 	@$(LD) $(LDFLAGS) -o $@ $(OBJFILES) $(LIBS)
 
 # C++ include-dependencies are tracked for us by the compiler.  In the
@@ -44,5 +44,6 @@ extempore: $(OBJFILES)
 $(OBJDIR)/.deps: $(wildcard $(OBJDIR)/*.d)
 	@mkdir -p $(@D)
 	@$(PERL) build/mergedep.pl $@ $^
+
 
 -include $(OBJDIR)/.deps

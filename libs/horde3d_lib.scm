@@ -54,6 +54,7 @@
 (bind-lib hordeutlib h3dutDumpMessages [i1]*)
 (bind-lib hordeutlib h3dutLoadResourcesFromDisk [i1,i8*]*)
 (bind-lib hordeutlib h3dutCreateGeometryRes [i32,i8*,i32,i32,float*,i32*,i32*,i32*,i32*,float*,float*]*)
+(bind-lib hordeutlib h3dutScreenshot [i1,i8*]*)
 					     
 ;; global contants
 

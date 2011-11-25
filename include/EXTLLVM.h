@@ -37,6 +37,7 @@
 #define _EXTLLVM_H
 
 #include "Scheme.h"
+//#include <ucontext.h>
 
 typedef struct _llvm_zone_t {
     void* memory;
@@ -44,6 +45,12 @@ typedef struct _llvm_zone_t {
     uint64_t mark;
     uint64_t size;
 } llvm_zone_t;
+
+typedef struct _llvm_callback_struct_ {
+    void(*fptr)(void*);
+    void* dat;
+  } _llvm_callback_struct_;
+
 
 llvm_zone_t* llvm_zone_create(uint64_t size);
 llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone);
@@ -54,12 +61,22 @@ uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size);
 uint64_t llvm_zone_ptr_size(void* ptr);
 void llvm_zone_destroy(llvm_zone_t* zone);
-void llvm_destroy_zone_after_delay(llvm_zone_t* zone, double delay);
+void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
+llvm_zone_t* llvm_pop_zone_stack();
+llvm_zone_t* llvm_peek_zone_stack();
+void llvm_push_zone_stack(llvm_zone_t*);
 
+void* llvm_get_function_ptr(char* n);
 pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
+
+///////////////////////////////////////////////////
+// this added for dogdy continuations support
+/* ucontext_t* llvm_make_ucontext(); */
+/* ucontext_t* llvm_scheme_process_ucontext(); */
+///////////////////////////////////////////////////
 
 namespace llvm {
     class Module;
