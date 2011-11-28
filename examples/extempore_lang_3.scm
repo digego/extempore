@@ -773,7 +773,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; memzone tests
+;; some memzone tests
 
 (definec test35
   (lambda ()
@@ -812,8 +812,6 @@
 (test37)
 
 
-
-
 (definec test38
   (lambda ()
     (memzone 1024 (* 44100 10)
@@ -839,49 +837,6 @@
     (lambda ()
       (aset! k 0 1.0)
       (aref k 0))))
-
-
-(definec makecls
-  (lambda ()
-    (let ((arr (zalloc |1000,double|)))
-      (lambda (a:double)
-	(* a 5.0)))))
-
-(definec k 10000000
-  (let ((cls (zalloc |1000,[double,double]*|))
-	(mmm 5.0))
-    (dotimes (i:i64 1000)
-      (aset! cls i (makecls)))
-    (lambda (cl:[double,double]* idx:i64)
-      (set! mmm (random))
-      (aset! cls idx cl)
-      1)))
-	     
-(definec kk2
-  (let ((zz:i64 5)
-	(sum 0.0))
-    (lambda (idx:i64)
-      (let ((vs (k.cls:|1000,[double,double]*|*)))
-	(set! sum 0.0)
-	(dotimes (i:i64 1000)
-	  (set! sum (+ sum ((aref vs i) 5.0))))
-        (printf "sum %lld:%f\n" idx sum)
-	(set! zz 6)
-	(aset! vs idx (makecls))
-	1))))
-
-(definec runner
-  (lambda (idx)
-    (memzone 10024 (* 44100 10)
-      (begin (kk2 idx)))))
-
-(define round
-  (lambda (idx)
-    ;(println 'runner idx)
-    (runner (modulo idx 1000))
-    (callback (+ (now) 500) 'round (+ idx 1))))
-
-(round 0)
 
 
 
