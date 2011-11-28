@@ -6,37 +6,43 @@ Prerequisites
 
 Extempore has some library dependencies. 
 
-On linux and OSX:
+On OSX:
    - LLVM 3.0
    - pthread (if not using boost)
      OR boost (if not using pthread)
    - pcre (Perl Compatible Regular Expressions)
 
-On linux you will also need:
+On linux:
+   - LLVM 3.0 (must be built from source)
+   - pthread (if not using boost)
+     OR boost (if not using pthread)
+   - pcre
    - jack OR portaudio
    - mesa GL (opengl)
 
-On Windows 7
+On Windows 7:
    - LLVM 3.0
    - pcre
    - boost
    - portaudio
 
-Most of these  are pretty standard and you  will probably already have
-them on your system (or they will be easy to install).  The three that
-you are most likely to  need to download, compile and install yourself
-are PCRE, PORTAUDIO and LLVM.  You can find them here:
 
-   PCRE you can get from:
-   http://www.pcre.org/
 
-   PORTAUDIO you can get from:
-   http://www.portaudio.com
+LLVM Install Instructions
+=====================
 
-   LLVM you can get from:
+Most of the libraries are pretty standard and will either (a) already
+be installed on your system or (b) can usually be easily installed
+as from binary packages.
+
+However, LLVM *must* currently be installed from source. The reason
+being that a small patch to LLParser.cpp (an LLVM source file) is 
+required.
+
+   You can get LLVM src from:
    http://www.llvm.org/
 
-LLVM requires a small patch to the file LLParser.cpp and so must be
+LLVM requires this small patch to the file LLParser.cpp and so must be
 built from source. The patch file is availble in the extempore/extras
 directory (llparser.patch).  To apply the patch just move into the
 llvm/lib/AsmParser directory and then apply the llparser.patch file 
@@ -44,84 +50,48 @@ which in can be found in extempore/extras.
 
 [~/llvm/lib/AsmParser]$ patch < ~/extempore/extras/llparser.patch 
 
-PCRE and PortAudio should build from the most recent source and should
-"just work".  LLVM must be version 3.0 and must be patched as above.
-All three libraries should build fine with standard defaults -
-although you do need to provide an install location for LLVM.  So a
-simple './configure', then 'make' and then 'make install' should be
-sufficient for PCRE and PORTAUDIO. LLVM requires a small patch (see
-diff file in extras directory) and will require an additional build
-location, so something like './configure --prefix=~/Documents/ext_llvm
---enable-optimized' then 'make -j4' and then 'make install'.  You
-should also --enable-optimized when configuring LLVM to be safe.
+LLVM must be version 3.0 and must be patched as above.  LLVM also
+requires you to set a --prefix location (i.e. where everything will be
+installed into). 
 
-PCRE and PortAudio should be installed in the usual locations
-(i.e. somewhere that gcc can find).  LLVM is a special case.  You'll
-need to do ONE of either (a) copy config/llvm.bash.sample to
-config/llvm.bash and edit it according to the prefix install location
-you set for LLVM.  OR (b) set the EXT_LLVM_DIR shell variable to point
-to the prefix install location for LLVM. 
+# a common build process for LLVM
+
+$ cd ~/llvm/lib/AsmParser
+$ patch < ~/extempore/extras/llparser.patch
+$ cd ~/llvm
+$ mkdir Build
+$ ./configure --prefix=~/llvm/Build --enable-optimized
+$ make -j4
+$ make install
+
+
+Once all of the libraries required for your platform are installed
+you can compile extempore:
+
+# firstly you must point extempore to your llvm Build directory
+# by defining the shell variable EXT_LLVM_DIR
 
 # for example
-$ export EXT_LLVM_DIR=~/llvm-3.0/llvm/Build
+$ export EXT_LLVM_DIR=~/llvm/Build
 
-Once all of the library dependencies for your platform are installed,
-you can build extempore using:
+Then you can build extempore using the all.bash shell script 
 
-   ./all.bash -DEXT_LLVM_3
+$ ./all.bash -DEXT_LLVM_3
 
 Voila ... you should be done.
 
 There are a couple of extra build arguments that you may need to use
 
-1) If you are building against LLVM version 3.0+ you to define
-EXT_LLVM_3. ( This is now mandatory as Extempore now only support
-LLVM version 3.0+ )
-
-2) If you wish to build against the boost library you
+1) If you wish to build against the boost library you
 need to define EXT_BOOST.
 
-So to build against LLVM 3.0+ with boost support you would use the
+2) If you want to build against the Jack audio library on Linux
+you will need to define JACK_AUDIO
+
+So to build against LLVM 3.0+ with boost and jack support you would use the
 build command:
 
-   ./all.bash -DEXT_LLVM_3 -DEXT_BOOST
-
-
-
-Ubuntu GNU/Linux Installation
-=============================
-
-You'll need some dependencies:
-
-   $ sudo apt-get install libpthread-stubs0 libpcre3 libpcre3-dev libglfw2 
-     libglfw-dev glutg3 libglut3 libglut3-dev portaudio19-dev
-
-If you want to build against the boost libraries you'll also need:
-   $ sudo apt-get install libboost-dev 
-
-For now you need to build LLVM from source (it will take some time):
-
-   $ wget http://llvm.org/releases/3.0/llvm-3.0.tgz
-   $ tar -xvzf llvm-3.0.tgz
-   $ cd llvm-3.0/
-   $ ./configure --prefix=~/Documents/ext_llvm --enable-optimized
-   $ make -j4
-   $ make install
-
-Now you can build Extempore:
-
-   $ git clone https://github.com/digego/extempore.git
-   $ cd extempore/
-   $ export EXT_LLVM_DIR=~/Documents/ext_llvm
-   $ ./all.bash -DEXT_LLVM_3
-
-OR with LLVM 3.0 and Boost and JACK
-
-   $ ./all.bash -DEXT_LLVM_3 -DEXT_BOOST -DJACK_AUDIO
-
-NOTE1: If you want to compile against Jack instead of portaudio
-       provide all.bash with a -DJACK_AUDIO argument (and make sure
-       that the jack libs and headers are installed correctly!)
+   ./all.bash -DEXT_LLVM_3 -DEXT_BOOST -DJACK_AUDIO
 
 
 
@@ -152,25 +122,30 @@ Some Early Windows Build Notes (for me so I don't forget)
       
 
 
-Running
-=======
+Running Extempore
+==================
 
 You don't need to do anyting special to run extempore:
 
    $ ./extempore
 
 There are some optional command line options that you may want to use
-you can get a list by runnint ./extempore --help
+you can get a list by running ./extempore --help
 
 Once you've started extempore you can connect using either Telnet,
 Emacs (using the included extras/extempore.el file), or vim (using
 the included extras/extempore.vim).
 
-If  using  Telnet  the  default   extempore  port  to  connect  to  is
-7099.
+If using Telnet the default extempore port to connect to is 7099.
 
-If you want to use Emacs you'll probably want to add the following to
-your ~/.emacs file:
+If you want ot use Emacs (recommended) then you'll need to call
+"M-x load-file" and then load extempore/extras/extempore.el after you've
+started emacs. Then swith to a blank buffer (C-x b - new - return) 
+and then (M-x scheme-mode) (M-x extempore-mode) and you're away.
+(C-x C-x) to eval an expression.
+  
+To avoid loading extempore.el everytime you start emacs you'll
+probably want to add the following to your ~/.emacs file:
 
    (autoload 'extempore-mode "/path/to/extempore.el" "" t)
 
@@ -178,5 +153,3 @@ extempore.el can be found in the extras directory.
 
 If you want to use (g)Vim, see the instructions found in
 "extras/extempore.vim".
-
-
