@@ -376,7 +376,7 @@
 		   (sys:open-dylib "/usr/lib/x86_64-linux-gnu/libGLU.so.1")
 		   (if (string=? "Windows" (sys:platform))
 		       (sys:open-dylib "Glu32.dll")
-		       #f)))
+		       (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))))
 
 (bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
 (bind-lib libglu gluPerspective [void,double,double,double,double]*)
