@@ -41,6 +41,10 @@
 #include "SchemeREPL.h"
 #include "EXTLLVM.h"
 #include <string>
+#ifdef TARGET_OS_MAC
+#include <Cocoa/Cocoa.h>
+#include <AppKit/AppKit.h>
+#endif
 
 enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, OPT_CHANNELS, OPT_INITFILE, OPT_PORT};
 CSimpleOptA::SOption g_rgOptions[] = {
@@ -154,8 +158,11 @@ int main(int argc, char** argv)
     primary_repl->connectToProcessAtHostname(host,primary_port);
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
     utility_repl->connectToProcessAtHostname(host,utility_port);
-	
-    // sleep indefiniately let scheme processes do the work
+
+
+#ifdef TARGET_OS_MAC
+    [[NSApplication sharedApplication] run];
+#else
     while(1) {
 #ifdef TARGET_OS_WINDOWS
       Sleep(5000);
@@ -163,5 +170,7 @@ int main(int argc, char** argv)
       sleep(5000);
 #endif
     }
+#endif
+
     return 0;
 }
