@@ -149,11 +149,13 @@
       
       (h3dSetModelAnimParams _knight 0 (* (dtof _at) 24.0) 24.0) ;_weight)
       
-      (let ((cnt (h3dFindNodes _particleSys "" H3DNodeTypes_Emitter)))
+      (let ((cnt (h3dFindNodes _particleSys "" H3DNodeTypes_Emitter))
+	    (i 0))
       	(dotimes (i cnt)
       	  (h3dAdvanceEmitterTime (h3dGetNodeFindResult i) (/ 1.0 _curFPS))))
       (h3dSetNodeTransform _particleSys2 (* 12.0 (dtof (sin _at))) 2.0 (* 12.0 (dtof (cos _at))) 0.0 0.0 0.0 1.0 1.0 1.0)
-      (let ((cnt3 (h3dFindNodes _particleSys2 "" H3DNodeTypes_Emitter)))	
+      (let ((cnt3 (h3dFindNodes _particleSys2 "" H3DNodeTypes_Emitter))
+	    (i3 0))
       	(dotimes (i3 cnt3)
       	  (h3dAdvanceEmitterTime (h3dGetNodeFindResult i3) (/ 1.0 _curFPS))))
 
@@ -191,4 +193,3 @@
 (h3d_init)
 (resize 1024.0 768.0)
 (opengl-test (now) 0.0)
-

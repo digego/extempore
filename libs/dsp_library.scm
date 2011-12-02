@@ -128,6 +128,7 @@
 	  (alpha 0.0)
 	  (om_alpha 1.0)
 	  (in 1.0)
+	  (i 0)
 	  (out 0.5))
       (dotimes (i max-delay) (pset! line i 0.0))
       (lambda (x:double)
@@ -201,6 +202,7 @@
 	  (time 0))
       (lambda (x:double)
 	(let ((y 0.0)
+	      (i 0)
 	      (n (modulo time delay))
 	      (gain (/ 1.0 (i64tod num-of-taps))))
 	  (pset! line n x)
@@ -482,7 +484,8 @@
 
 (definec envelope-segments
   (lambda (points:double* num-of-points:i64)
-    (let ((lines (zalloc num-of-points [double,double]*)))
+    (let ((lines (zalloc num-of-points [double,double]*))
+	  (k 0))
       (dotimes (k num-of-points)
 	(let* ((idx (* k 2))
 	       (x1 (pref points (+ idx 0)))
@@ -497,7 +500,8 @@
     (let ((klines:[double,double]** (envelope-segments points num-of-points))
 	  (line-length num-of-points))
       (lambda (time)
-	(let ((res -1.0))
+	(let ((res -1.0)
+	      (k:i64 0))
 	  (dotimes (k num-of-points)
 	    (let ((line (pref klines k))
 		  (time-point (pref points (* k 2))))
@@ -580,9 +584,12 @@
 	    (sustain 0.6) ;; amplitude of the sustain
 	    (gain 2.0)
 	    (active 0)
+	    (ii 0)
 	    (note-starts (zalloc poly double))
 	    (new-note (lambda (start freq dur amp)
-			(let ((free-note -1))
+			(let ((free-note -1)
+			      (iii 0)
+			      (i 0))
 			  (dotimes (i poly) ;; check for free poly spot           
 			    (if (> (pref note-starts i) 9999999999998.0)
 				(set! free-note i)))
@@ -601,7 +608,8 @@
        (dotimes (ii poly) ;; sets all notes to inactive
 	 (pset! note-starts ii 9999999999999.0))
        (lambda (in:double time:double chan:double dat:double*)
-	 (let ((out:double 0.0))
+	 (let ((out:double 0.0)
+	       (k 0))
 	   (dotimes (k poly) ;; sum all active notes          
 	     (if (< (pref note-starts k) time)
 		 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
@@ -946,18 +954,20 @@
 	    (release:double 1000.0)
 	    (sustain:double 1.0) ;; amplitude of the sustain
 	    (gain:double 2.0)
+	    (kk:i64 0) (ii:i64 0)
 	    (active:i64 0)
 	    (note-starts:double* (zalloc poly double))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note -1)
 			      (idx (dtoi64 (floor (frq2midi freq))))
 			      (closest 1000000)
+			      (i:i64 0) (iii:i64 0) (idxi:i64 0)
 			      (new-idx idx))
-			  (dotimes (i:i64 poly) ;; check for free poly spot           
+			  (dotimes (i poly) ;; check for free poly spot           
 			    (if (> (pref note-starts i) 9999999999998.0)
 				(set! free-note i)))
 			  (if (= 0 active)
-			      (begin (dotimes (iii:i64 poly) (pset! note-starts iii 9999999999999.0))
+			      (begin (dotimes (iii poly) (pset! note-starts iii 9999999999999.0))
 				     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
 			      (begin (dotimes (idxi 128)
@@ -974,14 +984,15 @@
 				     (pset! note-starts free-note start)
 				     1)
 			      0)))))
-       (dotimes (kk:i64 128)
+       (dotimes (kk 128)
 	 (aset! samples-offsets kk 0)
 	 (aset! samples-length kk 0))
-       (dotimes (ii:i64 poly) ;; sets all notes to inactive
+       (dotimes (ii poly) ;; sets all notes to inactive
 	 (pset! note-starts ii 9999999999999.0))
        (lambda (in:double time:double chan:double dat:double*)
-	 (let ((out:double 0.0))
-	   (dotimes (k:i64 poly) ;; sum all active notesx   
+	 (let ((out:double 0.0)
+	       (k:i64 0))
+	   (dotimes (k poly) ;; sum all active notesx   
 	     (if (< (pref note-starts k) time)
 		 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
 	   (* gain (,effect-kernel out time chan dat)))))))

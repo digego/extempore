@@ -521,17 +521,10 @@ namespace extemp {
 
 		scm->loadFile("extempore.scm", load_path.c_str());
 		//printf("Loaded... extempore.scm\n");
-#ifdef EXT_LLVM_3
-		scm->loadFile("llvmir3.scm", load_path.c_str()); 
-		//printf("Loaded... llvmir.scm\n");
-		scm->loadFile("llvmti3.scm", load_path.c_str());		
-		//printf("Loaded... llvmti.scm\n");
-#else
 		scm->loadFile("llvmir.scm", load_path.c_str()); 
 		//printf("Loaded... llvmir.scm\n");
 		scm->loadFile("llvmti.scm", load_path.c_str());		
 		//printf("Loaded... llvmti.scm\n");
-#endif
 		scm->loadFile("comlist.scm", load_path.c_str());
 		//printf("Loaded... comlist.scm\n");
 		scm->loadFile("sort.scm", load_path.c_str());

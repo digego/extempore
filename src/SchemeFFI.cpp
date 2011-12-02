@@ -88,10 +88,6 @@
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
-#ifdef EXT_LLVM_3
-#else
-#include "llvm/Target/TargetSelect.h"
-#endif
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1524,12 +1520,11 @@ namespace extemp {
         func->getReturnType()->print(ss);
 
 	const char* tmp_name = ss.str().c_str();
-#ifdef EXT_LLVM_3
+
 	if(func->getReturnType()->isStructTy()) {	      
 	  rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
 	  tmp_name = tmp_str_a;
 	}
-#endif
 	
 	pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
 	pointer p = cons(_sc, str, _sc->NIL); 
@@ -1544,14 +1539,14 @@ namespace extemp {
 	    a->getType()->print(ss2);
 
 	    tmp_name = ss2.str().c_str();
-#ifdef EXT_LLVM_3
+
 	    if(a->getType()->isStructTy()) {	      
 	      rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
 	      //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
 	      //tmp_name = tmp_str_b;
 	      tmp_name = tmp_str_a;
 	    }
-#endif
+
 	    pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
 	    _sc->imp_env->erase(p);
 	    p = cons(_sc, str, p);			
@@ -2103,16 +2098,13 @@ namespace extemp {
 	  llvm::raw_string_ostream ss(typestr);
 	  tt->print(ss);
 	  
-#ifdef EXT_LLVM_3
+
 	  const char* tmp_name = ss.str().c_str();
 	  if(tt->isStructTy()) {
 	    rsplit("= type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
 	    tmp_name = tmp_str_b;
 	  }
 	  return mk_string(_sc,tmp_name);
-#else
- 	  return mk_string(_sc,ss.str().c_str()); //tt->getDescription().c_str());
-#endif
 	} else {
 	  return _sc->NIL;
 	}

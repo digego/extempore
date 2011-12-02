@@ -58,7 +58,8 @@
 
 ;; slightly more complex example
 (definec dsp
-  (let ((oscs (zalloc |9,[double,double,double]*|)))
+  (let ((oscs (zalloc |9,[double,double,double]*|))
+	(i 0))
     (dotimes (i 9)
        (aset! oscs i (make-oscil 0.0)))
     (lambda (a:double b:double c:double d:double*)
