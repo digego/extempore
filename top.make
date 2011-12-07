@@ -33,8 +33,8 @@ LDFLAGS := \
 	-L$(EXT_LLVM_DIR)/lib \
 	$(PLATFORM_LDFLAGS) \
 
-extempore: $(OBJFILES)	
-	@echo + ld $@ $(LIBS)
+extempore: $(OBJFILES)
+	@echo + ld $(LDFLAGS) -o $@ $(OBJFILES) $(LIBS)
 	@$(LD) $(LDFLAGS) -o $@ $(OBJFILES) $(LIBS)
 
 # C++ include-dependencies are tracked for us by the compiler.  In the
