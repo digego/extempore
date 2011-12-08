@@ -2374,10 +2374,13 @@
             (emit a os)
             (emit b os)
             ;; do llvm float constant check
-            (if (= *impc:ir:float* (impc:ir:get-type-from-str type))
+            (if (and (impc:ir:number? (impc:ir:get-type-from-str type))
+		     (= *impc:ir:float* (impc:ir:get-type-from-str type)))
                 (begin (if (number? n1) (set-car! aval (llvm:convert-float (car aval))))
                        (if (number? n2) (set-car! bval (llvm:convert-float (car bval))))))
-            (if (impc:ir:fixed-point? type)
+
+            (if (or (impc:ir:fixed-point? type)
+		    (impc:ir:pointer? type))
                 (emit (string-append (impc:ir:gname "cmp" "i1") " = icmp " (list-ref icmps v) 
                                         " " type " " (car aval) 
                                         ", " (car bval) "\n") os)
