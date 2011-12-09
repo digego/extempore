@@ -7,7 +7,9 @@ OSX_FRAMEWORKS := \
 PLATFORM_LIBS := -lpcre
 
 ifdef EXT_BOOST
-PLATFORM_LIBS += -lboost_thread -lboost_system -lboost_filesystem 
+PLATFORM_LIBS += -lboost_thread -lboost_system -lboost_filesystem -lpthread
+else
+PLATFORM_LIBS += -lpthread
 endif
 
 PLATFORM_LIBS += $(OSX_FRAMEWORKS)

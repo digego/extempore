@@ -28,6 +28,7 @@ CXXFLAGS := \
 	$(DEFINES) \
 	$(EXT_USER_ARGS) \
 	-Iinclude \
+        -fexceptions \
 
 LDFLAGS := \
 	$(EXT_LLVM_LDFLAGS) \

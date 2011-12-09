@@ -16,6 +16,13 @@ if [ -z "$EXT_LLVM_DIR" ]; then
 	. config/llvm.bash
 fi
 
+# LLVM DEFS
+EXT_LLVM_CONFIG_SCRIPT="$EXT_LLVM_DIR/bin/llvm-config"
+EXT_LLVM_CXXFLAGS=`$EXT_LLVM_CONFIG_SCRIPT --cxxflags`
+EXT_LLVM_LDFLAGS=`$EXT_LLVM_CONFIG_SCRIPT --ldflags`
+EXT_LLVM_LIBS=`$EXT_LLVM_CONFIG_SCRIPT --libs`
+export EXT_LLVM_CXXFLAGS EXT_LLVM_LDFLAGS EXT_LLVM_LIBS
+
 # check for jack audio
 if [[ "$@" =~ "-DJACK_AUDIO" ]]
 then

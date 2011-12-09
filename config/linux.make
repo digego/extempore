@@ -1,7 +1,7 @@
 PLATFORM_LIBS = -ldl -lm
 
 ifdef EXT_BOOST
-PLATFORM_LIBS += -lboost_thread -lboost_system -lboost_filesystem 
+PLATFORM_LIBS += -lboost_thread -lboost_system -lboost_filesystem -pthread
 else
 PLATFORM_LIBS += -pthread
 endif
