@@ -65,8 +65,8 @@
 #endif
 
 
-#include "llvm/Analysis/DebugInfo.h"
-#include "llvm/Analysis/Verifier.h"
+//#include "llvm/Analysis/DebugInfo.h"
+//#include "llvm/Analysis/Verifier.h"
 #include "llvm/Assembly/Parser.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/CallingConv.h"
@@ -921,7 +921,7 @@ namespace extemp {
 	    PM = new llvm::PassManager();
 	    PM->add(new llvm::TargetData(*EE->getTargetData()));
 
-            PM->add(llvm::createVerifierPass());
+            // PM->add(llvm::createProfileVerifierPass());
             // promote allocs to register 
             PM->add(llvm::createPromoteMemoryToRegisterPass());
 	    // Do simple "peephole" optimizations and bit-twiddling optzns.
