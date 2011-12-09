@@ -29,6 +29,7 @@ CXXFLAGS := \
 	$(EXT_USER_ARGS) \
 	-Iinclude \
         -fexceptions \
+        -frtti \
 
 LDFLAGS := \
 	$(EXT_LLVM_LDFLAGS) \
