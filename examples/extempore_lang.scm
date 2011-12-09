@@ -849,6 +849,82 @@
 
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Some data structures examples
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; FIFO Queue for positive 64bit integers
+;;
+;; i8* is value  --- list_t* is next
+(bind-type list_t <i64,list_t*>)
+
+;; remove value from front of list
+(definec dequeue
+  (lambda (queue:|2,list_t*|*)
+    (let ((front (aref queue 0)))
+      (if (null? front) -1
+	  (let ((val (tref front 0))
+		(back (aref queue 1)))
+	    (aset! queue 0 (tref front 1))
+	    (if (= back front) (aset! queue 1 null))
+	    (free front)
+	    val)))))
+
+;; add to the back of the list
+(definec enqueue
+  (lambda (queue:|2,list_t*|* value:i64)
+    (let ((tmp (halloc list_t))
+	  (front (aref queue 0))
+	  (back (aref queue 1)))
+      (tset! tmp 0 value)
+      (tset! tmp 1 null)
+      (if (null? back) 1 (begin (tset! back 1 tmp) 1))
+      (if (null? front) (aset! queue 0 tmp))
+      (aset! queue 1 tmp) ;; set back to tmp
+      1)))
+
+(definec queue_test
+  (lambda ()
+    (let ((myqueue (salloc |2,list_t*|))
+	  (stuff (salloc |8,i64|))
+	  (i 0))
+      ;; first we must set queue front and back to null
+      (afill! myqueue null null)
+      ;; initialize stuff array
+      (dotimes (i 8) (aset! stuff i i))
+      ;; what happens if we dequeue an empty queue (-1)
+      (printf "dequeue 1: %lld\n" (dequeue myqueue))
+      ;; add something to the queue
+      (enqueue myqueue (aref stuff 1))
+      ;; dequeue something
+      (printf "dequeue 2: %lld\n" (dequeue myqueue))
+      ;; back to nothing?
+      (printf "dequeue 4: %lld\n" (dequeue myqueue))
+      ;; etc..
+      (enqueue myqueue (aref stuff 2))
+      (printf "dequeue 5: %lld\n" (dequeue myqueue))
+      (enqueue myqueue (aref stuff 3))
+      (enqueue myqueue (aref stuff 4))
+      (printf "dequeue 6: %lld\n" (dequeue myqueue))
+      (printf "dequeue 7: %lld\n" (dequeue myqueue))
+      (printf "dequeue 8: %lld\n" (dequeue myqueue))      
+      1)))
+
+(queue_test)
+
+
+
+
+
+
+
+
+
+
+
 
 ;; Memory Usage In Extempore Lang
 ;; -------------------------------

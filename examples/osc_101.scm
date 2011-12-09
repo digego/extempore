@@ -14,7 +14,6 @@
 (define (osc-receive-7019 timestamp address . args)
    (println 'port 7019 address '-> args))
 
-
 ;; define a sending address
 (define addy1 (cons "localhost" 7009))
 (define addy2 (cons "localhost" 7019))
@@ -22,3 +21,57 @@
 ;; Some a test message delayed by 4 seconds
 (io:osc:send (+ (now) (* *second* 4)) addy1 "/test/msg" "Hello" 500 6.6 "World")
 (io:osc:send (+ (now) (* *second* 4)) addy2 "/test/msg" "Hello" 500 6.6 "World")
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; OSC messages can also be sent and received
+;; using extempore lang compiled code
+;;
+
+
+;; a couple of things to keep in mind
+;; args is the complete list of arguments
+;;
+;; by default all extempore osc ints and floats
+;; are 32bit (i.e. not 64bit)
+;; finally, osc messages are bit endian
+;; so you'll likely need to swap your arguments
+(definec osc-receive-7020
+  (lambda (address:i8* types:i8* args:i8*)
+    (let ((data (bitcast args i32*)))
+      (printf "address:%s  type:%s arg1:%f arg2:%lld\n"
+	      address types
+	      (ftod (unswap32f (pref data 0)))
+	      (unswap32i (pref data 1))))))
+
+;; define a sending address
+(define addy3 (cons "localhost" 7020))
+
+;; start server pointing to native wrapper around osc-receive-7020 closure
+(io:osc:start-server 7020 "osc-receive-7020" (llvm:get-native-function "osc-receive-7020"))
+
+;; Send a test message
+(io:osc:send (now) addy3 "/native/test" 5.5 1234)
+
+;; my native message sender
+;; NOTE osc-strings must be padded to 32bit multiples
+(definec my-osc-send
+  (lambda (address a:float b:i32)
+    (let ((types ",fi")
+	  (mod (modulo (+ (strlen address) 1) 4))
+	  (addressl (+ (+ (strlen address) 1)
+		       (if (= 0 mod) 0 (- 4 mod))))
+	  (typesl 4)		     
+	  (length (+ addressl typesl 4 4))
+	  (data (malloc length))
+	  (args (bitcast (pref-ptr data (+ addressl typesl)) i32*)))
+      (printf "addy length %d:%d:%d\n" (strlen address) addressl (- 4 (modulo (+ (strlen address) 1) 4)))
+      (strcpy (pref-ptr data 0) address)
+      (strcpy (pref-ptr data addressl) types)
+      (pset! args 0 (swap32f a))
+      (pset! args 1 (swap32i b))
+      (llvm_send_udp "localhost" 7020 data (i64toi32 length)))))
+
+;; Send another test message
+(my-osc-send "/native/mytest" 6.6 4321)

@@ -238,7 +238,7 @@
                     (if (null? args) 0.0005 (car args)))                    
                  (begin (print-notification "clock sync outside tolerance - making no time adjustment: " (math:std-deviation lst))
 			(print-notification "clock times: " lst))
-                 (begin (print-notification 'clock 'successfully 'adjusted)
+                 (begin (print-notification 'clock 'successfully 'adjusted 'by (/ (apply + lst) (length lst)) 'seconds)
                         (clock:adjust-offset (/ (apply + lst) (length lst)))))))))
 
 
