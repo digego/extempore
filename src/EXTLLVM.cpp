@@ -980,7 +980,7 @@ namespace extemp {
 	    {
 		std::string errstr;
 		llvm::raw_string_ostream ss(errstr);
-		pa.print("Extempore",ss);
+		pa.Print("Extempore",ss);
 		printf(ss.str().c_str());
 	    }
 
