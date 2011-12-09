@@ -52,6 +52,18 @@
 #include <sys/syscall.h>
 #endif
 
+#ifdef EXT_BOOST
+#include <boost/asio.hpp>
+#else
+#include <sys/errno.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>         /* host to IP resolution       */
+#include <sys/fcntl.h>
+#include <arpa/inet.h>
+#endif
+
 
 #include "llvm/Analysis/DebugInfo.h"
 #include "llvm/Analysis/Verifier.h"
@@ -440,6 +452,71 @@ int llvm_sprintf(char* str, char* format, ...)
     va_end(ap);
     return returnval;
 }
+
+void llvm_send_udp(char* host, int port, void* message, int message_length)
+{
+  int length = message_length;
+  int ret = 0;
+  char* ptr;
+
+#ifdef EXT_BOOST
+  boost::asio::io_service io_service;
+  boost::asio::ip::udp::resolver::iterator end;
+  boost::asio::ip::udp::resolver resolver(io_service);
+  std::stringstream ss;
+  ss << port;
+  boost::asio::ip::udp::resolver::query newQuery(boost::asio::ip::udp::v4(),host, ss.str());
+  boost::asio::ip::udp::resolver::iterator iter = resolver.resolve(newQuery);
+
+  boost::asio::ip::udp::endpoint sa = *iter;
+#else
+  struct sockaddr_in sa;
+  struct hostent* hen; /* host-to-IP translation */
+
+  /* Address resolution stage */
+  hen = gethostbyname(host);
+  if (!hen) {
+    printf("OSC Error: Could no resolve host name\n");
+    return;			
+  }
+
+  memset(&sa, 0, sizeof(sa));
+
+  sa.sin_family = AF_INET;
+  sa.sin_port = htons(port);
+  memcpy(&sa.sin_addr.s_addr, hen->h_addr_list[0], hen->h_length);
+#endif		
+
+
+#ifdef EXT_BOOST
+  boost::asio::ip::udp::socket* fd = 0;
+#else
+  int fd = 0;
+#endif
+
+#ifdef EXT_BOOST
+  int err = 0;
+  boost::asio::io_service service;
+  boost::asio::ip::udp::socket socket(service);
+  socket.open(boost::asio::ip::udp::v4());
+  socket.send_to(boost::asio::buffer(message, length), sa);
+#else
+  int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
+  close(fd);
+#endif
+  if(err < 0)
+    {
+      if(errno == EMSGSIZE) {
+	printf("Error: OSC message too large: UDP 8k message MAX\n");
+      }else{
+	printf("Error: Problem sending OSC message\n");
+      }			
+
+    }
+
+  return;
+}
+
 
 long long llvm_get_next_prime(long long start)
 {
@@ -921,6 +998,9 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);						
 	    gv = M->getNamedValue(std::string("llvm_zone_destroy"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);
+
+	    gv = M->getNamedValue(std::string("llvm_send_udp"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_send_udp);	  
 
 	    gv = M->getNamedValue(std::string("llvm_schedule_callback"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_schedule_callback); 	
