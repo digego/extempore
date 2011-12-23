@@ -758,10 +758,10 @@ namespace extemp {
 #ifdef _OSC_DEBUG_
 			std::cout << "OSC Send Error: " << err << std::endl;
 #endif		
-			if(errno == EMSGSIZE) {
+			if(err == EMSGSIZE) {
 				printf("Error: OSC message too large: UDP 8k message MAX\n");
 			}else{
-				printf("Error: Problem sending OSC message\n");
+    			        printf("Error: Problem sending OSC message: %d\n",err);
 			}			
 
 		}
