@@ -233,13 +233,15 @@
          (if (> i 0)
              (loop (- i 1)
                    (cons (clock:offset-from-server server-proc local-proc) lst))
-             ;; check tolerance of return
-             (if (> (math:std-deviation lst) 
-                    (if (null? args) 0.0005 (car args)))                    
-                 (begin (print-notification "clock sync outside tolerance - making no time adjustment: " (math:std-deviation lst))
-			(print-notification "clock times: " lst))
-                 (begin (print-notification 'clock 'successfully 'adjusted 'by (/ (apply + lst) (length lst)) 'seconds)
-                        (clock:adjust-offset (/ (apply + lst) (length lst)))))))))
+	     (let* ((l1 (cddr (cl:sort lst <))) ;; remove bottom 2
+		    (l2 (cddr (reverse l1)))) ;; remote top 2
+	       ;; check tolerance of return
+	       (if (> (math:std-deviation l2) 
+		      (if (null? args) 0.0005 (car args)))                    
+		   (begin (print-notification "clock sync outside tolerance - making no time adjustment: " (math:std-deviation l2))
+			  (print-notification "clock times: " lst))
+		   (begin (print-notification 'clock 'successfully 'adjusted 'by (/ (apply + l2) (length l2)) 'seconds)
+			  (clock:adjust-offset (/ (apply + l2) (length l2))))))))))
 
 
 (define -clock:metro-from-host-
