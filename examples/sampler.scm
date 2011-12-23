@@ -55,22 +55,22 @@
 (define-macro (load-sampler sampler path)
   `(let ((files (sys:directory-list ,path)))
      (for-each (lambda (f)
-		 (if (regex:match? f "^([0-9]*)\.(wav|aif|aiff|ogg)$")		     
-		     (let ((result (regex:matched f "^([0-9]*)\.(wav|aif|aiff|ogg)$")))
-		       (set-sampler-index ,sampler (string-append ,path "/" f)
+		 (if (regex:match? f "([0-9]*)\.(wav|aif|aiff|ogg)$")		     
+		     (let ((result (regex:matched f "([0-9]*)\.(wav|aif|aiff|ogg)$")))
+		       (set-sampler-index ,sampler f
 		       			  (string->number (cadr result)) 0 0))))
 	       files)))
 
 ;; load audio samples
 ;; I'm using piano samples
-(load-sampler sampler "/home/andrew/Documents/samples/piano")
+(load-sampler sampler "/home/andrew/Desktop/piano")
 
 
 (define loop2
   (lambda (beat dur root)
     (play 3 sampler 36 100 dur)
     (for-each (lambda (p offset)
-		(play (+ offset) sampler p 100 (* 2. dur)))
+		(play (+ offset) sampler p 100 dur))
 	      (pc:make-chord 40 84 7
 			     (pc:chord root (if (member root '(10 8))
 						'^7
