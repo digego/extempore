@@ -2277,22 +2277,43 @@
 	       (lambda args (apply llvm:run func (sys:peek-memzone) args))
 	       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		      (error ""))))))))
+    
 
-
-;; definec-precomp is for setting up precompiled ir functions only
+;; Definec-precomp is for setting up precompiled ir functions only
 (define-macro (definec-precomp symname)
-   `(define ,symname
+  (let ((zone-size *impc:default-zone-size*))
+    `(define ,symname
        (let* ((setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
               (func (llvm:get-function (symbol->string ',symname))))
-          (if setter
-              (llvm:run setter (sys:create-mzone))
-              (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
-                     (error "")))
-          (if func
-              (lambda args (apply llvm:run func (sys:peek-memzone) args))
-              (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
-                     (error ""))))))
-						
+	 (println 'setter: setter 'func: func)
+	 (if setter
+	     (llvm:run setter (sys:create-mzone ,zone-size))
+	     (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
+		    (error "")))
+	 (if func
+	     (lambda args (apply llvm:run func (sys:peek-memzone) args))
+	     (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
+		    (error "")))))))
+
+;; Definec-precomp is for setting up precompiled ir functions only
+(define (definec-precomp symname)
+  (let ((zone-size *impc:default-zone-size*))
+    (eval
+     `(define ,symname
+	(let* ((setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
+	       (func (llvm:get-function (symbol->string ',symname))))
+	  (println 'setter: setter 'func: func)
+	  (if setter
+	      (llvm:run setter (sys:create-mzone ,zone-size))
+	      (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
+		     (error "")))
+	  (if func
+	      (lambda args (apply llvm:run func (sys:peek-memzone) args))
+	      (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
+		     (error "")))))
+     (interaction-environment))))
+    
+
 					
 ;; macro helper for fx code au's							
 (define-macro (definec:dsp . args)
