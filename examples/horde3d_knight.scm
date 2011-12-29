@@ -187,7 +187,6 @@
     (gl:swap-buffers pr2)
     (callback (+ time 100) 'opengl-test (+ time 1000) (+ degree 0.01))))
 
-(* 57.295791 2.0)
 
 (define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
 (h3d_init)
