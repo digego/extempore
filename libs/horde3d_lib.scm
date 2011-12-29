@@ -115,12 +115,12 @@
 (bind-val H3DModel_LodDist4F i32 205)
 
 ;; Mesh Node Params
-(bind-val H3DMesh_MatResI 300)
-(bind-val H3DMesh_BatchStartI 301)
-(bind-val H3DMesh_BatchCountI 302)
-(bind-val H3DMesh_VertRStartI 303)
-(bind-val H3DMesh_VertREndI 304)
-(bind-val H3DMesh_LodLevelI 305)
+(bind-val H3DMesh_MatResI i32 300)
+(bind-val H3DMesh_BatchStartI i32 301)
+(bind-val H3DMesh_BatchCountI i32 302)
+(bind-val H3DMesh_VertRStartI i32 303)
+(bind-val H3DMesh_VertREndI i32 304)
+(bind-val H3DMesh_LodLevelI i32 305)
 
 ;; LightNodeParams
 (bind-val H3DLight_MatResI i32 500)
