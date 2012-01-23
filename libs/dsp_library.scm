@@ -1017,16 +1017,16 @@
 (define-macro (load-sampler sampler path)
   `(let ((files (sys:directory-list ,path)))
      (for-each (lambda (f)
-		 (if (regex:match? f "^([0-9]*)\.(wav|aif|aiff|ogg)$")
-		     (let ((result (regex:matched f "^([0-9]*)\.(wav|aif|aiff|ogg)$")))
-		       (set-sampler-index ,sampler (string-append ,path "/" f)
+		 (if (regex:match? f "\/([0-9]*)\.(wav|aif|aiff|ogg)$")
+		     (let ((result (regex:matched f "\/([0-9]*)\.(wav|aif|aiff|ogg)$")))
+		       (println 'result: result)
+		       (set-sampler-index ,sampler f
 					  (string->number (cadr result)) 0 0))
 		     (let ((result (audio-file-regex-match f)))
 		       (if (number? result)
-			   (set-sampler-index ,sampler (string-append ,path "/" f)
+			   (set-sampler-index ,sampler f
 					      result 0 0)))))
 	       files)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

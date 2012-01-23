@@ -921,30 +921,30 @@ namespace extemp {
 	    PM = new llvm::PassManager();
 	    PM->add(new llvm::TargetData(*EE->getTargetData()));
 
-            // PM->add(llvm::createProfileVerifierPass());
-            // promote allocs to register 
+            // // PM->add(llvm::createProfileVerifierPass());
+            // // promote allocs to register 
+            // PM->add(llvm::createPromoteMemoryToRegisterPass());
+	    // // Do simple "peephole" optimizations and bit-twiddling optzns.
+	    // PM->add(llvm::createInstructionCombiningPass());
+	    // // Simplify the control flow graph (deleting unreachable blocks, etc).
+	    // PM->add(llvm::createCFGSimplificationPass());
+
+            // promote allocs to register
             PM->add(llvm::createPromoteMemoryToRegisterPass());
 	    // Do simple "peephole" optimizations and bit-twiddling optzns.
 	    PM->add(llvm::createInstructionCombiningPass());
+	    // Reassociate expressions.
+	    PM->add(llvm::createReassociatePass());
+	    // Eliminate Common SubExpressions.
+	    PM->add(llvm::createGVNPass());
+	    // Function inlining
+	    PM->add(llvm::createFunctionInliningPass());
+	    // loop invariants
+	    PM->add(llvm::createLICMPass());
+	    // vars
+	    PM->add(llvm::createIndVarSimplifyPass());
 	    // Simplify the control flow graph (deleting unreachable blocks, etc).
 	    PM->add(llvm::createCFGSimplificationPass());
-
-	    // // Do simple "peephole" optimizations and bit-twiddling optzns.
-	    // PM->add(llvm::createInstructionCombiningPass());
-	    // // Reassociate expressions.
-	    // PM->add(llvm::createReassociatePass());
-	    // // Eliminate Common SubExpressions.
-	    // PM->add(llvm::createGVNPass());
-	    // // Simplify the control flow graph (deleting unreachable blocks, etc).
-	    // PM->add(llvm::createCFGSimplificationPass());
-	    // // Function inlining
-	    // PM->add(llvm::createFunctionInliningPass());
-	    // // loop invariants
-	    // PM->add(llvm::createLICMPass());
-	    // // vars
-	    // PM->add(llvm::createIndVarSimplifyPass());
-            // // promote allocs to register 
-            // PM->add(llvm::createPromoteMemoryToRegisterPass());
 
 			
 	    //llvm::PerformTailCallOpt = true;

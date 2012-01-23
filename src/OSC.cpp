@@ -329,31 +329,47 @@ namespace extemp {
 				int length = bytes_read; //osc->getMessageLength();
 				double timestamp;
 				int pos = 0;
+                                int used = 0;
 				std::string address;// = new std::string;
 				std::string typetags;// = new std::string;
 				pos += OSC::getOSCString(args+pos,&address);
+                                used += pos;
 				if(address.find("#bundle") != std::string::npos) {
-#ifdef _OSC_DEBUG_					
-					std::cout << "OSC BUNDLE: " << length <<  "  args: " << args << std::endl;
+#ifdef _OSC_DEBUG_
+					std::cout << "OSC BUNDLE:: " << length <<  "  args: " << args << std::endl;
 #endif									
 					pos += OSC::getOSCTimestamp(args+pos, &timestamp); // skip time tag
 					while(pos < length) {
+                                                int size = 0;
+                                                used = 0;
+                                                int res = OSC::getOSCInt(args+pos,&size);
+                                                //Used += res;
+                                                //don't add res from getting size to used
+                                                pos += res;
 #ifdef _OSC_DEBUG_					
-						std::cout << "-->   NEW BUNDLE" << std::endl;
-#endif											
-						pos += 4; // skip element size
+					        std::cout << "\t--> bundle msg   size(" << size << ") pos(" << pos-4 << ")" << std::endl;
+#endif										
+						//pos += 4; // skip element size
 						address.clear();
 						typetags.clear();
-						pos += OSC::getOSCString(args+pos,&address);
-						pos += OSC::getOSCString(args+pos,&typetags);
+						res = OSC::getOSCString(args+pos,&address);
+                                                if(address.find("#bundle") != std::string::npos) {
+						  std::cout << "WARNING!!!!! Extempore OSC doesn't support recursive bundles!" << std::endl;
+                                                  return 0;
+						}
+                                                used += res;
+                                                pos += res; 
+						res = OSC::getOSCString(args+pos,&typetags);
+                                                used += res;
+                                                pos += res; 
 						if(osc->getNative() == NULL) {
 							int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,args+pos);
 							if(ret_from_call < 0) break;
-							else pos += ret_from_call;
+							else pos += size-used; //ret_from_call;
 						}else{
-							int (*native) (char*,char*,char*) = osc->getNative();
-							native((char*)address.c_str(),(char*)typetags.c_str(),args+pos);
-							pos += get_message_length(typetags, args);
+          						int (*native) (char*,char*,char*,int) = osc->getNative();
+							native((char*)address.c_str(),(char*)typetags.c_str(),args+pos,size-used);
+							pos += size-used; //get_message_length(typetags, args);
 						}
 					}
 				}else{
@@ -361,9 +377,11 @@ namespace extemp {
 						pos += OSC::getOSCString(args+pos,&typetags);
 						pos += send_scheme_call(osc->sc,osc->fname,0.0,address,typetags,args+pos);
 					}else{
-						pos += OSC::getOSCString(args+pos,&typetags);
-						int (*native) (char*,char*,char*) = osc->getNative();
-						native((char*)address.c_str(),(char*)typetags.c_str(),args+pos);
+						int res = OSC::getOSCString(args+pos,&typetags);
+                                                pos+=res;
+                                                used+=res;
+						int (*native) (char*,char*,char*,int) = osc->getNative();
+						native((char*)address.c_str(),(char*)typetags.c_str(),args+pos,length-used);
 					}
 				}				
 				char reply[256];
@@ -820,7 +838,7 @@ namespace extemp {
 
 		// should we use native callback?
 		if(pair_cddr(args) != _sc->NIL && is_cptr(pair_caddr(args))) {
-			osc->setNative( (int(*)(char*,char*,char*)) cptr_value(pair_caddr(args)));
+  		        osc->setNative( (int(*)(char*,char*,char*,int)) cptr_value(pair_caddr(args)));
 		}else{
 			osc->setNative(NULL);
 		}

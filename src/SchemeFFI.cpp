@@ -248,6 +248,7 @@ namespace extemp {
 	    { "regex:replace",		&SchemeFFI::regex_replace },
 
 	    // llvm stuff
+	    { "llvm:optimize",			&SchemeFFI::optimizeCompiles },
 	    { "llvm:compile",			&SchemeFFI::compile },
 	    { "llvm:bind-global-var",		&SchemeFFI::bind_global_var },
 	    { "llvm:get-function",			&SchemeFFI::get_function },
@@ -278,6 +279,9 @@ namespace extemp {
 	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
 #if defined (TARGET_OS_LINUX)
 	    { "glx:get-event",			&SchemeFFI::getX11Event },
+#endif
+#if defined (TARGET_OS_WINDOWS)
+	    { "gl:add-extension",           &SchemeFFI::addGLExtension },
 #endif
 	    { "gl:make-ctx",			    &SchemeFFI::makeGLContext },	    
 	    { "gl:set-context",             &SchemeFFI::glMakeContextCurrent },
@@ -1373,6 +1377,12 @@ namespace extemp {
     // LLVM STUFF
     //
     /////////////////////////////////////////////
+
+    pointer SchemeFFI::optimizeCompiles(scheme* _sc, pointer args)
+    {
+        EXTLLVM::OPTIMIZE_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0; 
+        return _sc->T;
+    }
 	
     pointer SchemeFFI::compile(scheme* _sc, pointer args)
     {
@@ -2585,22 +2595,43 @@ namespace extemp {
   //static Bool EXTGLWaitForNotify( Display *dpy, XEvent *event, XPointer arg ) {
   //  return (event->type == MapNotify) && (event->xmap.window == (Window) arg);
   //}
+
+  pointer SchemeFFI::addGLExtension(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
+    char* ext_name = string_value(pair_car(args));
+    Module* M = EXTLLVM::I()->M;		
+    llvm::GlobalValue* gv = M->getNamedValue(std::string(ext_name));
+    if( gv == 0 ) {
+      printf("Attempting to bind to a non-existant global LLVM variable\n");
+      return _sc->F;
+    }
+    void* ptr = (void*) wglGetProcAddress(ext_name); //cptr_value(pair_cadr(args));
+    if( ptr ) {
+      EXTLLVM::I()->EE->updateGlobalMapping(gv,ptr); 
+      printf("successfully bound extension:%s\n",ext_name);
+      return _sc->T;
+    } else {
+      printf("Cannot find opengl extension %s\n",ext_name);
+      return _sc->F;
+    }
+  }
   
   pointer SchemeFFI::glSwapBuffers(scheme* _sc, pointer args)
   {
     args = pair_car(args);
-	SwapBuffers((HDC)cptr_value(pair_car(args)));
+    SwapBuffers((HDC)cptr_value(pair_car(args)));
 
-	MSG msg;
+    MSG msg;
 
-	//std::cout << "GOING INTO GET MESSAGES" << std::endl;
-	while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-		//std::cout << "GOT MESSAGE" << std::endl;
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
-		//std::cout << "msg: " << &msg << std::endl;
-	}
-	//std::cout << "DONE PROCESSING WIN MESSAGES" << std::endl;
+    //std::cout << "GOING INTO GET MESSAGES" << std::endl;
+    while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+      //std::cout << "GOT MESSAGE" << std::endl;
+      TranslateMessage(&msg);
+      DispatchMessage(&msg);
+      //std::cout << "msg: " << &msg << std::endl;
+    }
+    //std::cout << "DONE PROCESSING WIN MESSAGES" << std::endl;
 
     //glXSwapBuffers((Display*) cptr_value(pair_car(args)), (GLXDrawable) cptr_value(pair_cadr(args)));
     return _sc->T;
@@ -2608,8 +2639,8 @@ namespace extemp {
 
   pointer SchemeFFI::glMakeContextCurrent(scheme* _sc, pointer args)
   {
-	  wglMakeCurrent ( (HDC)cptr_value(pair_car(args)), (HGLRC)cptr_value(pair_cadr(args)) );
-      return _sc->T;
+    wglMakeCurrent ( (HDC)cptr_value(pair_car(args)), (HGLRC)cptr_value(pair_cadr(args)) );
+    return _sc->T;
   }
 
  // window handler

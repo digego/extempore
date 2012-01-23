@@ -128,6 +128,7 @@ namespace extemp {
 	static pointer pushMemoryZone(scheme* _sc, pointer args);
 			
 	// llvm stuff
+        static pointer optimizeCompiles(scheme* _sc, pointer args);
 	static pointer compile(scheme* _sc, pointer args);
 	static pointer bind_global_var(scheme* _sc, pointer args);		
 	static pointer get_function(scheme* _sc, pointer args);
@@ -171,7 +172,9 @@ namespace extemp {
 	// some XWindows guff
 	static pointer getX11Event(scheme* _sc, pointer args);
 #endif
-
+#if defined (TARGET_OS_WINDOWS)
+	static pointer addGLExtension(scheme* _sc, pointer args);
+#endif
 	static pointer makeGLContext(scheme* _sc, pointer args);
 	static pointer glSwapBuffers(scheme* _sc, pointer args);
 	static pointer glMakeContextCurrent(scheme* _sc, pointer args);
