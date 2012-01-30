@@ -46,6 +46,25 @@
 #include <AppKit/AppKit.h>
 #endif
 
+
+// WARNING EVIL WINDOWS TERMINATION CODE!
+#ifdef TARGET_OS_WINDOWS
+BOOL CtrlHandler( DWORD fdwCtrlType ) 
+{ 
+  switch( fdwCtrlType ) 
+  { 
+    case CTRL_C_EVENT: 
+      //printf( "Ctrl-C event\n\n" );
+      TerminateProcess(GetCurrentProcess(),1);
+      return( TRUE );
+ 
+    default: 
+      return FALSE; 
+  } 
+} 
+#endif
+
+
 enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, OPT_CHANNELS, OPT_INITFILE, OPT_PORT};
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
@@ -70,6 +89,12 @@ int main(int argc, char** argv)
     std::string utility_name("utility");
     int primary_port = 7099;
     int utility_port = 7098;
+
+    // more evil windows termination code
+    #ifdef TARGET_OS_WINDOWS
+       SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
+    #endif
+
 
     CSimpleOptA args(argc, argv, g_rgOptions);
     while (args.Next()) {
