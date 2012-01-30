@@ -1,0 +1,379 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Rendering with Distance fields on the GPU
+;;
+;; Most of these ideas are stolen from Inigo Quilez
+;; http://www.iquilezles.org/
+;; 
+
+(define libglu (if (string=? "Linux" (sys:platform))
+		   (sys:open-dylib "libGLU.so")
+		   (if (string=? "Windows" (sys:platform))
+		       (sys:open-dylib "Glu32.dll")
+		       (sys:open-dylib "OpenGL.framework/OpenGL"))))
+(bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
+(bind-lib libglu gluPerspective [void,double,double,double,double]*)
+(bind-lib libglu gluErrorString [i8*,i32]*)
+
+
+;; a couple of shader helper functions
+(definec print-shader-info-log
+  (lambda (obj:i32)
+    (let ((infologLength (salloc 1 i32))
+	  (charsWritten (salloc 1 i32)))
+      (glGetShaderiv obj GL_INFO_LOG_LENGTH infologLength)
+      (if (> (pref infologLength 0) 0)
+	  (let ((log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
+	    (glGetShaderInfoLog obj (pref infologLength 0) charsWritten log)
+	    (printf "printShaderInfoLog: %s\n" log)
+	    (free log)
+	    1)
+	  (begin (printf "Shader Info log: OK\n") 1)))))
+
+(definec print-program-info-log
+  (lambda (obj:i32)
+    (let ((infologLength (salloc 1 i32))
+	  (charsWritten (salloc 1 i32)))
+      (glGetProgramiv obj GL_INFO_LOG_LENGTH infologLength)
+      (if (> (pref infologLength 0) 0)
+	  (let ((log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
+	    (glGetProgramInfoLog obj (pref infologLength 0) charsWritten log)
+	    (printf "printProgramInfoLog: %s\n" log)
+	    (free log)
+	    1)
+	  (begin (printf "Program Info log: OK\n") 1)))))
+
+
+;; Setup some opengl stuff
+(definec setup
+  (lambda ()
+    (glEnable GL_DEPTH_TEST)))
+
+
+(definec set-view
+  (lambda (w h)
+    (glViewport 0 0 w h)
+    (glMatrixMode 5889) ;GL_PROJECTION_MATRIX)
+    (glLoadIdentity)
+    (gluPerspective 27.0 (/ (i32tod w) (i32tod h)) 0.01 1000.0)
+    (glMatrixMode 5888)
+    (glEnable 2929)))
+	      
+
+(definec look-at
+  (lambda (eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)
+    (glLoadIdentity)
+    (gluLookAt eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)))
+
+
+(bind-val _vshader i32 0)
+(bind-val _fshader i32 0)
+(bind-val _program i32 0)
+
+;; load the frag + vert shaders
+(definec load-shaders
+  (lambda (fsource:i8* vsource:i8*)
+    (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
+	  (vshader (glCreateShader GL_VERTEX_SHADER))
+	  (fcode (salloc 1 i8*))
+	  (vcode (salloc 1 i8*))
+	  (program (glCreateProgram))
+	  (temp (salloc 1 i32)))
+
+      (set! _program program)
+      
+      (pset! fcode 0 fsource)
+      (pset! vcode 0 vsource)
+      (printf "program %d\n" program)
+      
+      (glShaderSource fshader 1 fcode (bitcast null i32*))
+      (glShaderSource vshader 1 vcode (bitcast null i32*))
+
+      (set! _fshader fshader)
+      (glCompileShader fshader)
+      (set! _vshader vshader)
+      (glCompileShader vshader))
+    
+      (glAttachShader program fshader)
+      (glAttachShader program vshader)
+      
+      (glLinkProgram program)
+      ;(glValidateProgram program)
+      (glUseProgram program)
+      ;;
+      (print-shader-info-log fshader)
+      (print-shader-info-log vshader)
+      (print-program-info-log program)
+      (glUseProgram program))))
+
+
+;; draw a simple quad which fills the whole screen space
+(definec opengl-draw
+  (let ((ratio (/ 4.0 3.0)))
+    (lambda (degree:double)
+      ;;(printf "%d:%d\n" (glGetUniformLocation _program "time") (glGetUniformLocation _program "unResolution"))
+      (glUniform1f (glGetUniformLocation _program "time") (dtof (* .02 degree)))
+      (glUniform3f (glGetUniformLocation _program "unResolution") 1024.0 768.0 0.0)
+      (glLoadIdentity)
+      (glTranslated 0.0 0.0 -4.0)
+      (glClearColor 0.0 0.0 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      (glBegin GL_QUADS)
+      (glVertex3d (* -1.0 ratio) -1.0 0.0)
+      (glVertex3d (* -1.0 ratio)  1.0 0.0)
+      (glVertex3d (* 1.0 ratio)  1.0 0.0)
+      (glVertex3d (* 1.0 ratio) -1.0 0.0)
+      (glEnd))))
+
+
+;; standard impromptu callback to call openg-draw
+(define opengl-test
+  (lambda (time degree) ; distance)
+    (define tt (now))
+    (define distance 80.0)
+    ;(gl:set-context pr2)
+    (opengl-draw degree)
+    (gl:swap-buffers pr2)
+    (callback (+ time 200) 'opengl-test (+ time 1000) (+ degree 1.0)))) ; distance)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; The shaders
+;;
+;; This is actually where all the work
+;; in this example happens.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; vert shader does nothing
+;; just passes through the QUAD without change
+(define vertshader
+"// VERTEX SHADER
+
+void main() {
+   //Transform the vertex (ModelViewProj matrix)
+   gl_Position = ftransform();
+}")
+
+
+;; Frag shader does EVERYTHING
+(define fragshader
+"//  FRAGMENT SHADER
+ // #version 120
+ // #extension GL_ARB_geometry_shader4 : enable
+
+uniform vec3 unResolution;
+uniform float time;
+uniform sampler2D tex0;
+uniform sampler2D tex1;
+uniform sampler2D fft;
+uniform vec4 unPar;
+uniform vec4 unPos;
+uniform vec3 unBeatBassFFT;
+
+
+/**
+ useful with domain repetition.
+ shapes are only rendered between min and max limits
+ using abs makes this symmetric (left/right and front/ back)
+ */
+vec3 clamp_abs_xz( vec3 p, vec3 min, vec3 max ) {
+    vec3 q = p;
+    q.x = clamp( abs(q.x), min.x, max.x);
+    q.z = clamp( abs(q.z), min.z, max.z);
+    return q;
+}
+
+float hash(float n) {
+   return fract( sin(n) * 43758.5453 );
+}
+
+float noise(in vec3 x) {
+   vec3 p = floor(x);
+   vec3 k = fract(x);
+
+   k = k*k*(3.0-2.0*k);
+   float n = p.x + p.y*57.0 + p.z*113.0;
+
+   float a = hash(n);
+   float b = hash(n+1.0);
+   float c = hash(n+57.0);
+   float d = hash(n+58.0);
+   float e = hash(n+113.0);
+   float f = hash(n+114.0);
+   float g = hash(n+170.0);
+   float h = hash(n+171.0);
+
+   float res = mix ( mix( mix(a,b,k.x), mix(c,d,k.x), k.y),
+                     mix( mix(e,f,k.x), mix(g,h,k.x), k.y),
+                     k.z);
+
+   return res;
+}
+
+float fbm(in vec3 p) {
+   float f = 0.0;
+   f += 0.5000*noise(p);
+   p *= 2.02; 
+   f += 0.2500*noise(p);
+   p *= 2.03; 
+   f += 0.1250*noise(p);
+   p *= 2.01; 
+   f += 0.0625*noise(p);
+   return f/0.9375;
+}
+
+float torusShape( in vec3 p, in vec2 t, in mat4 trans) {   
+   vec3 p2 = vec3(trans*vec4(p,1.0));
+   vec2 q = vec2( length(p2.xz)-t.x, p2.y);
+   return length(q) - t.y;
+}
+
+float torusShape2( in vec3 p, in vec2 t, in vec3 pos) {
+   vec2 q = vec2( length(p.xz+pos.xz)-t.x, p.y+pos.y);
+   return length(q) - t.y;
+}
+
+vec3 torusMaterial(in vec3 pos, in vec3 nor) {
+   return vec3(0.0,1.0,0.0);
+}
+
+float circleShape( in vec3 p, in vec3 pos, float size) {
+   return length(p+pos) - size;
+}
+
+vec3 circleMaterial(in vec3 pos, in vec3 nor) {
+   float f = smoothstep(0.0,1.0,fbm(pos));
+   return mix(vec3(0.0,0.0,1.0),vec3(1.0,0.0,0.0),f);
+}
+
+float floorShape( in vec3 p) {
+   return (p.y + 1.0*noise(p*vec3(1.0,cos(time),1.0))); // * noise(p);;
+}
+
+vec3 floorMaterial(in vec3 pos, in vec3 nor) {
+   return vec3(1.0);
+}
+
+vec2 map( in vec3 p) {
+   vec3 circlePos = vec3(0.0,(cos(time*0.5)*0.5)-0.2,1.0);
+   vec2 d1 = vec2( circleShape(p,circlePos,0.5), 1.0);
+   mat4 trans_a = mat4(1.0,0.0,0.0,0.0,
+                     0.0,1.0,0.0,0.0,
+                     0.0,0.0,1.0,0.0,
+                     0.0,0.0,0.0,1.0);
+   vec2 d3 = vec2( floorShape(p), 2.0);
+   float scale = 0.5;
+   mat4 trans = mat4(cos(time*2.),0.0,-sin(time*2.),0.0,
+                    0.0,1.0,0.0,0.0,
+                    sin(time*2.),3.0,cos(time*2.0),0.0,
+                    1.0,1.0,1.0,1.0);
+   vec3 tpos = vec3(0.0, 5.0, 0.0);
+   vec2 d4 = vec2( torusShape2(p, vec2(0.3,0.1), vec3(cos(time),-1.0,sin(time)+1.0)), 3.0);
+   if( d3.x < d1.x ) d1=d3;
+   if( d4.x < d1.x ) d1=d4;
+   return d1;
+}
+
+vec2 intersect (in vec3 ro, in vec3 rd) {
+   for(float t=0.0; t<4.0; ) {
+      vec2 h = map( ro + t*rd );
+      if( h.x < 0.0001) return vec2(t,h.y);
+      t += h.x;
+   }
+   return vec2(0.0);
+}
+
+float softShadow( in vec3 ro, in vec3 rd ) {
+   float res = 1.0;
+   for( float t=0.1; t<6.0; ) {
+       float h = map( ro + t*rd ).x;
+       if( h<0.001 ) return 0.0;
+       res = min( res, 8.0*h/t );
+       t += h;
+   }
+   return res;
+}
+
+vec3 calcNormal( in vec3 p) {
+   vec3 e = vec3(0.0001,0.0,0.0);
+   vec3 n;
+   n.x = map(p+e.xyy).x - map(p-e.xyy).x;
+   n.y = map(p+e.yxy).x - map(p-e.yxy).x;
+   n.z = map(p+e.yyx).x - map(p-e.yyx).x;
+   return normalize( n );
+}
+
+void main() {
+   // uv are the pixel coordinates from 0 to 1
+   vec2 uv = (gl_FragCoord.xy/unResolution.xy);
+
+   // we generate a ray with origin ro and direction rd
+   vec3 ro = vec3(0.0,0.0,-4.0);
+   vec3 rd = normalize( vec3( (-1.0+2.0*uv)*vec2(1.5,1.0), 1.0));
+
+   // we interect the ray with the 3d scene
+   vec2 t = intersect(ro, rd);
+
+   // we draw a white to black gradient by default   
+   vec3 col = vec3(0.0,0.0,1.0-uv.y);
+
+   // otherwise overide black with colour!!
+   if(t.y > 0.5) {
+     vec3 pos = ro + t.x*rd;
+     vec3 nor = calcNormal( pos );
+     vec3 ref = reflect(rd,nor);
+
+     vec3 lig1 = normalize( vec3(cos(time),0.8,sin(time)) );
+     vec3 blig1 = vec3(-lig1.x, lig1.y, -lig1.z);
+     vec3 spe1 = vec3(pow(clamp(dot(lig1,ref),0.0,1.0),16.0));
+     vec3 color1 = normalize(vec3(0.4,0.3,0.2));
+
+     vec3 lig2 = normalize( vec3(.3,0.8,-0.3) );
+     vec3 blig2 = vec3(-lig2.x, lig2.y, -lig2.z);
+     vec3 spe2 = vec3(pow(clamp(dot(lig2,ref),0.0,1.0),16.0));
+     vec3 color2 = normalize(vec3(0.5,0.3,1.0)); //0.0,0.4,1.0));
+
+     float con = 1.0;
+     float amb = 0.5 + 0.5*nor.y;
+
+     float dif1 = max( 0.0, dot(nor,lig1) );
+     float dif2 = max( 0.0, dot(nor,lig2) );
+
+     float sha1 = softShadow( pos, lig1 );
+     float sha2 = softShadow( pos, lig2 );
+
+     col = con*vec3(0.0); //0.2,0.3,0.4);
+     col += amb*vec3(0.0); //0.2,0.3,0.4);
+     col += dif1*color1*sha1;
+     col += dif2*color2*sha2;
+
+     if(t.y < 1.5) { // must be circle
+        col *= circleMaterial(pos,nor);
+     }else if(t.y < 2.5) { // must be floor
+        col *= floorMaterial(pos,nor);
+     }else if(t.y < 3.5) { // must be torus
+        col *= torusMaterial(pos,nor);
+     }
+
+     // add specular from light1
+     col += 0.5*spe1;
+     // add specular from light2 
+     col += 0.5*spe2;
+   }
+   gl_FragColor = vec4(col,1.0);
+}")
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Now setup and run
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0)) ;1080.0 1920.0))
+(setup)
+(set-view 1024 768) ;1920 1200) 
+
+(opengl-test (now) 0.0)
+(load-shaders fragshader vertshader)
