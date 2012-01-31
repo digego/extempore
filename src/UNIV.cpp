@@ -60,18 +60,54 @@ void uSleep(int waitTime){
    }while( (time2-time1) <waitTime);
 }
 */
-#endif
 
+
+enum Windows_Color_Convert
+{
+        Black       = 0,
+        Red         = FOREGROUND_RED,
+        Green       = FOREGROUND_GREEN,
+        Yellow      = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+        Blue        = FOREGROUND_BLUE,
+        Purple      = FOREGROUND_RED   | FOREGROUND_BLUE,
+        Cyan        = FOREGROUND_GREEN | FOREGROUND_BLUE,
+        White       = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY,
+        LightGrey   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE,
+        Grey        = FOREGROUND_INTENSITY,
+        Orange      = FOREGROUND_RED   | FOREGROUND_GREEN,
+        LightRed    = FOREGROUND_RED   | FOREGROUND_INTENSITY,
+        LightGreen  = FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+        LightBlue   = FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
+        LightPurple = FOREGROUND_RED   | FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
+        LightCyan   = FOREGROUND_GREEN | FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
+        //LightGrey   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE,
+};
+
+int WINDOWS_COLORS[16] = {Black,LightRed,LightGreen,Yellow,Blue,Purple,LightCyan,White,LightGrey,Orange,Grey,LightRed,LightGreen,LightBlue,Cyan};
+
+#endif
 
 void ascii_text_color(int attr, int fg, int bg)
 {
 #ifdef TARGET_OS_WINDOWS
-	//no ansi terminal colors for windows :(
-#else
+  if (extemp::UNIV::EXT_TERM == 1) {
+    char command[13];
+    if(fg>8) fg = 8;
+    if(bg>9) bg = 0;
+    sprintf(command, "COLOR %d%d", bg, fg);
+    HANDLE console=GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(console, WINDOWS_COLORS[fg]);
+  }else{
     char command[13];
     /* Command is the control command to the terminal */
     sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
     printf("%s", command);
+  }
+#else
+  char command[13];
+  /* Command is the control command to the terminal */
+  sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
+  printf("%s", command);
 #endif
 }
 
@@ -218,6 +254,13 @@ namespace extemp {
     uint64_t UNIV::TIME = 0l;
     uint64_t UNIV::DEVICE_TIME = 0l;
     const char* UNIV::PWD = "";
+
+    // 0 is for ansi, 1 is for MSDos CMD shell
+#ifdef TARGET_OS_WINDOWS
+    uint32_t UNIV::EXT_TERM = 1;
+#else
+    uint32_t UNIV::EXT_TERM = 0; 
+#endif
 
     void UNIV::initRand() {
 #ifdef TARGET_OS_WINDOWS

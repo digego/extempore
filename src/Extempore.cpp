@@ -65,7 +65,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 #endif
 
 
-enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, OPT_CHANNELS, OPT_INITFILE, OPT_PORT};
+enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, OPT_CHANNELS, OPT_INITFILE, OPT_PORT, OPT_TERM};
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
   { OPT_RUNTIME,       "--runtime",       SO_REQ_SEP    },
@@ -74,6 +74,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_CHANNELS,    "--channels",      SO_REQ_SEP    },
     { OPT_INITFILE,    "--run",           SO_REQ_SEP    },
     { OPT_PORT,        "--port",          SO_REQ_SEP    },
+    { OPT_TERM,        "--term",          SO_REQ_SEP    },
     SO_END_OF_OPTIONS                       // END
 };
 
@@ -119,6 +120,13 @@ int main(int argc, char** argv)
 	  initfile = std::string(args.OptionArg());
 	  initfile_on = true;	  
 	  break;
+        case OPT_TERM:
+          if(strcmp(args.OptionArg(),"cmd")==0) {
+	    extemp::UNIV::EXT_TERM = 1;
+	  }else{
+	    extemp::UNIV::EXT_TERM = 0;
+	  }
+          break;
         default:
 	  std::cout << "Extempore's command line options: " << std::endl;
 	  std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
@@ -127,6 +135,7 @@ int main(int argc, char** argv)
 	  std::cout << "        --channels: attempts to force num of audio channels [default device setting]" << std::endl;
 	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	  std::cout << "            --port: port for primary process [7099]" << std::endl;	
+	  std::cout << "            --term: either ansi or cmd" << std::endl;	
 	  //delete(extemp::AudioDevice::I());
 	  return -1;	  
 	}
@@ -138,6 +147,7 @@ int main(int argc, char** argv)
 	std::cout << "        --channels: attempts to force num of audio channels [default device setting]" << std::endl;
 	std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	std::cout << "            --port: port for primary process [7099]" << std::endl;	
+        std::cout << "            --term: either ansi or cmd" << std::endl;	
 	//delete(extemp::AudioDevice::I());
 	return -1;
         // handle error (see the error codes - enum ESOError)
