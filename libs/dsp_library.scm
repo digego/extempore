@@ -885,7 +885,6 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 (definec hermite-interp
   (lambda (fractional y1:double x0 x1 x2)
     (let ((c (* 0.5 (- x1 y1)))
@@ -896,8 +895,11 @@
       (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
 
 
-;; make synth defaults
-(definec sampler-note
+
+;; linear sampler
+;;
+;; faster but noisy
+(definec sampler-note-linear
   (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* index)
     (let ((idx-freq (midi2frq (i64tod index)))
 	  (phase (i64tod (pref samples-offsets index)))) ;; phase unit is audio frames
@@ -907,15 +909,39 @@
 		       (set! phase (+ phase rate))
 		       phase))
 	      (posi (dtoi64 (floor pos)))
-	      (posr (modulo pos 1.0))
 	      (posx (+ (* posi 2) (dtoi64 chan)))
-	      (length (- (pref samples-length index) 10))
-	      (dat (pref samples index))
-	      (y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx 2)))) ; assume stereo
-	      (x0 (if (> posi length) 0.0 (pref dat posx)))
-	      (x1 (if (> (+ posi 1) length) 0.0 (pref dat (+ posx 2)))) ; assume stereo
-	      (x2 (if (> (+ posi 2) length) 0.0 (pref dat (+ posx 4))))) ; assume stereo
-	  (* amp (hermite-interp posr y1 x0 x1 x2)))))))
+	      (length (- (pref samples-length index) 10))	      
+	      (dat (pref samples index)))	  
+	  (* amp (if (> posi length) 0.0 (pref dat posx))))))))
+
+
+
+;; hermite sampler
+;;
+;; slower but less noisy (default)
+(definec sampler-note-hermite
+  (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* index)
+    (let ((idx-freq (midi2frq (i64tod index)))
+	  (phase (i64tod (pref samples-offsets index)))) ;; phase unit is audio frames
+      (lambda (time:double chan:double freq:double amp:double)
+	(let ((rate (/ freq idx-freq))
+	      (pos (if (< chan 1.0) ;; only increment once per frame
+		       (set! phase (+ phase rate))
+		       phase))
+	      (posi (dtoi64 (floor pos)))
+	      (posx (+ (* posi 2) (dtoi64 chan)))
+	      (length (- (pref samples-length index) 10))	      
+	      (dat (pref samples index)))
+	  (if (< (fabs (- rate 1.0)) 0.01)
+	      (if (> posi length) 0.0 (* amp (pref dat posx)))
+	      (let ((posr (modulo pos 1.0))
+		    (y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx 2)))) ; assume stereo
+		    (x0 (if (> posi length) 0.0 (pref dat posx)))
+		    (x1 (if (> (+ posi 1) length) 0.0 (pref dat (+ posx 2)))) ; assume stereo
+		    (x2 (if (> (+ posi 2) length) 0.0 (pref dat (+ posx 4))))) ; assume stereo
+		(* amp (hermite-interp posr y1 x0 x1 x2)))))))))
+
+
 
 
 (definec sampler-fx 294912
@@ -999,7 +1025,7 @@
 
 
 ;; create a default sampler
-(define-sampler sampler sampler-note sampler-fx)
+(define-sampler sampler sampler-note-hermite sampler-fx)
 
 (define audio-file-regex-match
   (lambda (fname)
