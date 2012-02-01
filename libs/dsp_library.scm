@@ -934,12 +934,11 @@
 	      (dat (pref samples index)))
 	  (if (< (fabs (- rate 1.0)) 0.01)
 	      (if (> posi length) 0.0 (* amp (pref dat posx)))
-	      (let ((posr (modulo pos 1.0))
-		    (y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx 2)))) ; assume stereo
+	      (let ((y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx 2)))) ; assume stereo
 		    (x0 (if (> posi length) 0.0 (pref dat posx)))
 		    (x1 (if (> (+ posi 1) length) 0.0 (pref dat (+ posx 2)))) ; assume stereo
 		    (x2 (if (> (+ posi 2) length) 0.0 (pref dat (+ posx 4))))) ; assume stereo
-		(* amp (hermite-interp posr y1 x0 x1 x2)))))))))
+		(* amp (hermite-interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
 
 
