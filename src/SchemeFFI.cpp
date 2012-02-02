@@ -44,6 +44,7 @@
 
 #ifdef TARGET_OS_WINDOWS
 #include <Windows.h>
+#include <Windowsx.h>
 #else
 #include <dlfcn.h>
 #endif
@@ -265,6 +266,7 @@ namespace extemp {
 	    { "llvm:run",				&SchemeFFI::call_compiled },
 	    { "llvm:run-closure",			&SchemeFFI::call_compiled_closure },
 	    { "llvm:convert-float",			&SchemeFFI::llvm_convert_float_constant },
+ 	    { "llvm:convert-double",			&SchemeFFI::llvm_convert_double_constant },
 	    { "llvm:count",				&SchemeFFI::llvm_count },
 	    { "llvm:count++",			&SchemeFFI::llvm_count_inc },
 	    { "llvm:call-closure",			&SchemeFFI::callClosure },
@@ -278,9 +280,10 @@ namespace extemp {
 	    { "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
 #if defined (TARGET_OS_LINUX)
-	    { "glx:get-event",			&SchemeFFI::getX11Event },
+	    { "gl:get-event",			&SchemeFFI::getEvent },
 #endif
 #if defined (TARGET_OS_WINDOWS)
+	    { "gl:get-event",			&SchemeFFI::getEvent },
 	    { "gl:add-extension",           &SchemeFFI::addGLExtension },
 #endif
 	    { "gl:make-ctx",			    &SchemeFFI::makeGLContext },	    
@@ -2007,6 +2010,61 @@ namespace extemp {
 	return mk_string(_sc, tmpstr);
     }	
 
+
+     // this all here to conver 64bit floats (as a string) into llvms hex floating point notation :(
+     pointer SchemeFFI::llvm_convert_double_constant(scheme* _sc, pointer args)
+     {		
+ 	char* floatin = string_value(pair_car(args));
+ 	char floatout[256];
+ #ifdef TARGET_OS_WINDOWS
+ 	double f = strtod(floatin, (char**) &floatout);
+ #else
+ 	double f = strtod(floatin, (char**) &floatout);
+ #endif
+ 	llvm::APFloat apf(f); 
+ 		
+ 	bool ignored;
+ 	bool isDouble = true; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
+ 	double Val = isDouble ? apf.convertToDouble() : apf.convertToFloat();
+ 	std::string StrVal = llvm::ftostr(apf);
+ 		
+ 	// Check to make sure that the stringized number is not some string like
+ 	// "Inf" or NaN, that atof will accept, but the lexer will not.  Check
+ 	// that the string matches the "[-+]?[0-9]" regex.
+ 	//
+ 	if ((StrVal[0] >= '0' && StrVal[0] <= '9') ||
+ 	    ((StrVal[0] == '-' || StrVal[0] == '+') &&
+ 	     (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
+ 	    // Reparse stringized version!
+ 	    if (atof(StrVal.c_str()) == Val) {
+ 		return mk_string(_sc, StrVal.c_str());
+ 	    }
+ 	}
+ 		
+ 	// Otherwise we could not reparse it to exactly the same value, so we must
+ 	// output the string in hexadecimal format!  Note that loading and storing
+ 	// floating point types changes the bits of NaNs on some hosts, notably
+ 	// x86, so we must not use these types.
+ 	assert(sizeof(double) == sizeof(uint64_t) && "assuming that double is 64 bits!");
+ 	char Buffer[40];
+ 	//APFloat apf = CFP->getValueAPF();
+ 	// Floats are represented in ASCII IR as double, convert.
+ 	//if (!isDouble) apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
+ 	//apf.convert(llvm::APFloat::IEEEdouble, llvm::APFloat::rmNearestTiesToEven, &ignored);
+ 		
+ 	char tmpstr[256];
+ 	tmpstr[0] = '0';
+ 	tmpstr[1] = 'x';
+ 	tmpstr[2] = 0;
+ 	char* v = llvm::utohex_buffer(uint64_t(apf.bitcastToAPInt().getZExtValue()), Buffer+40);
+ 	strcat(tmpstr, v);
+ 	//std::cout << "STR: " << tmpstr << "  v: " << v <<  std::endl;
+ 	return mk_string(_sc, tmpstr);
+     }	
+ 
+
+
+
     pointer SchemeFFI::llvm_count_inc(scheme* _sc, pointer args)
     {
 	EXTLLVM::LLVM_COUNT++;
@@ -2616,26 +2674,96 @@ namespace extemp {
       return _sc->F;
     }
   }
-  
+
+  int EXT_WIN_MSG_MASK = PM_REMOVE;
+ 
+  pointer SchemeFFI::getEvent(scheme* _sc, pointer args)
+  {
+    // this here to stop opengl swap buffer code from pinching out input events before we get to them    
+    if(EXT_WIN_MSG_MASK==PM_REMOVE) // this is a temporary hack!
+      int EXT_WIN_MSG_MASK = PM_REMOVE | PM_QS_PAINT | PM_QS_POSTMESSAGE | PM_QS_SENDMESSAGE;
+ 
+     
+    MSG msg;
+ 
+    // std::cout << "GOING INTO GET MESSAGES" << std::endl;
+    // int res = PeekMessage(&msg,NULL,0,0,PM_REMOVE);
+    // std::cout << "MSG RES: " << res <<  std::endl;
+    while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE | PM_QS_INPUT)) {
+      //if(res){      
+      //std::cout << "GRABBED MSG" << std::endl;
+      WPARAM wParam = msg.wParam;
+      LPARAM lParam = msg.lParam;
+      //std::cout << "GOT MESSAGE: " << &msg << std::endl;
+      switch(msg.message) {
+      case WM_CHAR: {
+   	pointer list = _sc->NIL;
+   	_sc->imp_env->insert(list);
+   	pointer tlist = cons(_sc,mk_integer(_sc,wParam),list);
+   	_sc->imp_env->erase(list);
+   	list = tlist;
+   	return list;
+      }       
+      case WM_MOUSEMOVE: {
+   	pointer list = _sc->NIL;
+   	_sc->imp_env->insert(list);
+   	pointer tlist = cons(_sc,mk_integer(_sc,GET_X_LPARAM(lParam)),list);
+   	_sc->imp_env->erase(list);
+   	list = tlist;
+   	_sc->imp_env->insert(list);
+   	tlist = cons(_sc,mk_integer(_sc,GET_Y_LPARAM(lParam)),list);
+   	_sc->imp_env->erase(list);
+   	list = tlist;
+   	return list;       
+      } 
+      default:
+   	TranslateMessage(&msg);
+   	DispatchMessage(&msg);
+   	return _sc->NIL;
+      }
+    }
+    return _sc->NIL;
+  }
+ 
+    
   pointer SchemeFFI::glSwapBuffers(scheme* _sc, pointer args)
   {
     args = pair_car(args);
     SwapBuffers((HDC)cptr_value(pair_car(args)));
-
+  
     MSG msg;
-
+  
     //std::cout << "GOING INTO GET MESSAGES" << std::endl;
-    while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+    while(PeekMessage(&msg, NULL, 0, 0, EXT_WIN_MSG_MASK)) {
       //std::cout << "GOT MESSAGE" << std::endl;
       TranslateMessage(&msg);
       DispatchMessage(&msg);
       //std::cout << "msg: " << &msg << std::endl;
     }
     //std::cout << "DONE PROCESSING WIN MESSAGES" << std::endl;
-
-    //glXSwapBuffers((Display*) cptr_value(pair_car(args)), (GLXDrawable) cptr_value(pair_cadr(args)));
     return _sc->T;
   }
+
+  
+  // pointer SchemeFFI::glSwapBuffers(scheme* _sc, pointer args)
+  // {
+  //   args = pair_car(args);
+  //   SwapBuffers((HDC)cptr_value(pair_car(args)));
+
+  //   MSG msg;
+
+  //   //std::cout << "GOING INTO GET MESSAGES" << std::endl;
+  //   while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+  //     //std::cout << "GOT MESSAGE" << std::endl;
+  //     TranslateMessage(&msg);
+  //     DispatchMessage(&msg);
+  //     //std::cout << "msg: " << &msg << std::endl;
+  //   }
+  //   //std::cout << "DONE PROCESSING WIN MESSAGES" << std::endl;
+
+  //   //glXSwapBuffers((Display*) cptr_value(pair_car(args)), (GLXDrawable) cptr_value(pair_cadr(args)));
+  //   return _sc->T;
+  // }
 
   pointer SchemeFFI::glMakeContextCurrent(scheme* _sc, pointer args)
   {

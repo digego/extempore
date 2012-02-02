@@ -145,6 +145,7 @@ namespace extemp {
 	static pointer call_compiled(scheme* _sc, pointer args);
 	static pointer call_compiled_closure(scheme* _sc, pointer args);
 	static pointer llvm_convert_float_constant(scheme* _sc, pointer args);
+	static pointer llvm_convert_double_constant(scheme* _sc, pointer args);
 	static pointer llvm_count(scheme* _sc, pointer args);
 	static pointer llvm_count_inc(scheme* _sc, pointer args);
 	static pointer callClosure(scheme* _sc, pointer args);
@@ -170,9 +171,10 @@ namespace extemp {
 
 #if defined (TARGET_OS_LINUX)
 	// some XWindows guff
-	static pointer getX11Event(scheme* _sc, pointer args);
+	static pointer getEvent(scheme* _sc, pointer args);
 #endif
 #if defined (TARGET_OS_WINDOWS)
+	static pointer getEvent(scheme* _sc, pointer args);
 	static pointer addGLExtension(scheme* _sc, pointer args);
 #endif
 	static pointer makeGLContext(scheme* _sc, pointer args);
