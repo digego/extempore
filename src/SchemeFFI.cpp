@@ -2249,7 +2249,7 @@ namespace extemp {
     return _sc->T;
   }
 
-  pointer SchemeFFI::getX11Event(scheme* _sc, pointer args)
+  pointer SchemeFFI::getEvent(scheme* _sc, pointer args)
   {
     args = pair_car(args);
     Display* dpy = (Display*) cptr_value(pair_car(args));
