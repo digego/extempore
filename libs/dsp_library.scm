@@ -472,6 +472,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;; time in samples (starting from 0)
+;; apex (in samples) is after how many samples we hit 1.0 before decaying
+(definec impulse
+  (lambda (time:double apex:double)
+    (let ((h (* time apex)))
+      (* h (exp (- 1.0 h))))))
+	  
 
 (definec make-line
   (lambda (x1:double y1:double x2 y2)
