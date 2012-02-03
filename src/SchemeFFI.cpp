@@ -2680,9 +2680,9 @@ namespace extemp {
   pointer SchemeFFI::getEvent(scheme* _sc, pointer args)
   {
     // this here to stop opengl swap buffer code from pinching out input events before we get to them    
-    if(EXT_WIN_MSG_MASK==PM_REMOVE) // this is a temporary hack!
-      int EXT_WIN_MSG_MASK = PM_REMOVE | PM_QS_PAINT | PM_QS_POSTMESSAGE | PM_QS_SENDMESSAGE;
- 
+    if(EXT_WIN_MSG_MASK==PM_REMOVE) { // this is a temporary hack!
+      EXT_WIN_MSG_MASK = PM_REMOVE | PM_QS_PAINT | PM_QS_POSTMESSAGE | PM_QS_SENDMESSAGE;
+    }
      
     MSG msg;
  
@@ -2730,7 +2730,7 @@ namespace extemp {
   {
     args = pair_car(args);
     SwapBuffers((HDC)cptr_value(pair_car(args)));
-  
+    //EXT_WIN_MSG_MASK = PM_REMOVE | PM_QS_PAINT | PM_QS_POSTMESSAGE | PM_QS_SENDMESSAGE;  
     MSG msg;
   
     //std::cout << "GOING INTO GET MESSAGES" << std::endl;
@@ -2793,66 +2793,43 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
   pointer SchemeFFI::makeGLContext(scheme* _sc, pointer args)
   {
-	PIXELFORMATDESCRIPTOR pfd = { 
-		sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
-		1,                     // version number  
-		PFD_DRAW_TO_WINDOW |   // support window  
-		PFD_SUPPORT_OPENGL |   // support OpenGL  
-		PFD_DOUBLEBUFFER,      // double buffered  
-		PFD_TYPE_RGBA,         // RGBA type  
-		24,                    // 24-bit color depth  
-		0, 0, 0, 0, 0, 0,      // color bits ignored  
-		0,                     // no alpha buffer  
-		0,                     // shift bit ignored  
-		0,                     // no accumulation buffer  
-		0, 0, 0, 0,            // accum bits ignored  
-		32,                    // 32-bit z-buffer      
-		0,                     // no stencil buffer  
-		0,                     // no auxiliary buffer  
-		PFD_MAIN_PLANE,        // main layer  
-		0,                     // reserved  
-		0, 0, 0                // layer masks ignored  
-		}; 
-		
-	HDC  hdc;
+    PIXELFORMATDESCRIPTOR pfd = { 
+      sizeof(PIXELFORMATDESCRIPTOR),  //  size of this pfd  
+      1,                     // version number  
+      PFD_DRAW_TO_WINDOW |   // support window  
+      PFD_SUPPORT_OPENGL |   // support OpenGL  
+      PFD_DOUBLEBUFFER,      // double buffered  
+      PFD_TYPE_RGBA,         // RGBA type  
+      32,                    // 24-bit color depth  
+      0, 0, 0, 0, 0, 0,      // color bits ignored  
+      0,                     // no alpha buffer  
+      0,                     // shift bit ignored  
+      0,                     // no accumulation buffer  
+      0, 0, 0, 0,            // accum bits ignored  
+      32,                    // 32-bit z-buffer      
+      0,                     // no stencil buffer  
+      0,                     // no auxiliary buffer  
+      PFD_MAIN_PLANE,        // main layer  
+      0,                     // reserved  
+      0, 0, 0                // layer masks ignored  
+    }; 
+    
+    HDC  hdc;
     HGLRC hglrc;
     int  iPixelFormat; 
-	int  posx = ivalue(pair_caddr(args));
-	int  posy = ivalue(pair_cadddr(args));
-	int  width = ivalue(pair_car(pair_cddddr(args)));
-	int  height = ivalue(pair_cadr(pair_cddddr(args)));
-
-	// call OpenGL APIs as desired ... 
- 
-	// when the rendering context is no longer needed ...   
- 
-	// make the rendering context not current  
-	//wglMakeCurrent (NULL, NULL) ; 
- 
-	// delete the rendering context  
-	//wglDeleteContext (hglrc);
-
-	  //render callback
-	/*
-      if(false) //pair_cddr(pair_cddddr(args)) != _sc->NIL) {
-        EXTThread* render_thread = new EXTThread();
-        void* v[2];
-        v[0] = args;
-        v[1] = _sc;
-        render_thread->create(&opengl_render_callback,v);
-        return _sc->T;
-      }
-	  */
-
-      //sharedContext = NULL;
-	
-	MSG msg;
+    int  posx = ivalue(pair_caddr(args));
+    int  posy = ivalue(pair_cadddr(args));
+    int  width = ivalue(pair_car(pair_cddddr(args)));
+    int  height = ivalue(pair_cadr(pair_cddddr(args)));
+    
+    
+    MSG msg;
     WNDCLASSEX ex;
     HINSTANCE hinstance;
-
-	LPCWSTR WNDCLASSNAME = L"GLClass";
-	LPCWSTR WNDNAME = L"OpenGL base code";
-
+    
+    LPCWSTR WNDCLASSNAME = L"GLClass";
+    LPCWSTR WNDNAME = L"OpenGL base code";
+    
     ex.cbSize = sizeof(WNDCLASSEX);
     ex.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
     ex.lpfnWndProc = WinProc;
@@ -2867,26 +2844,66 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     ex.hIconSm = NULL;
 
     RegisterClassEx(&ex);
-	
+    
 	      // center position of the window
     //int posx = (GetSystemMetrics(SM_CXSCREEN) / 2) - (width / 2);
     //int posy = (GetSystemMetrics(SM_CYSCREEN) / 2) - (height / 2);
 
     // set up the window for a windowed application by default
-    long wndStyle = WS_OVERLAPPEDWINDOW;
+    long wndStyle; // = WS_OVERLAPPEDWINDOW;
+    long dwExStyle; // = WS_OVERLAPPEDWINDOW;
     int screenmode = 0; // NOT FULLSCREEN
+    bool fullScreen = false;
 
-    if (pair_cadr(args) == _sc->T) // if fullscreen
-    {
+    if (pair_cadr(args) == _sc->T){ // if fullscreen
+        screenmode = 1;
+        fullScreen = true;
+    }
+
+    /*      Check if fullscreen is on*/
+    if (fullScreen) {
+	DEVMODE dmScreenSettings;
+	memset(&dmScreenSettings, 0, sizeof(dmScreenSettings));
+	dmScreenSettings.dmSize = sizeof(dmScreenSettings);
+	dmScreenSettings.dmPelsWidth = width;   //screen width
+	dmScreenSettings.dmPelsHeight = height; //screen height
+	dmScreenSettings.dmBitsPerPel = 32; //bits;   //bits per pixel
+	dmScreenSettings.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
+	
+	if (ChangeDisplaySettings(&dmScreenSettings, CDS_FULLSCREEN != DISP_CHANGE_SUCCESSFUL)) {
+	  /*      Setting display mode failed, switch to windowed*/
+	  MessageBox(NULL, (LPCWSTR)L"Display mode failed", NULL, MB_OK);
+	  fullScreen = true; //false; 
+	  screenmode = 1;
+	}
+    }
+
+
+    if (fullScreen){ // if fullscreen
+        dwExStyle = WS_EX_APPWINDOW;
         wndStyle = WS_POPUP;
         screenmode = 1; //FULLSCREEN
         posx = 0;
         posy = 0;
-
+       
+        ShowCursor(FALSE);
         // change resolution before the window is created
         //SysSetDisplayMode(screenw, screenh, SCRDEPTH);
+    }else{
+        dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE; //window extended style
+        wndStyle = WS_OVERLAPPEDWINDOW; //windows style         
+        screenmode = 0; //not fullscreen
     }
-	
+
+    RECT    windowRect;
+
+    windowRect.left =(long)0;               //set left value to 0
+    windowRect.right =(long)posx;  //set right value to requested width
+    windowRect.top =(long)0;                //set top value to 0
+    windowRect.bottom =(long)posy;//set bottom value to requested height
+
+    AdjustWindowRectEx(&windowRect, wndStyle, FALSE, dwExStyle);	
+
     // create the window
     HWND hwnd = CreateWindowEx(NULL,
                   WNDCLASSNAME, //"GLClass",
