@@ -711,7 +711,11 @@ namespace extemp {
 				  void(*func)(void*) = s->fptr;
 				  void* dat = s->dat;
 				  func(dat);
-				  free(dat);
+                                  // Hmmm we should be able to free this but it's causing a crash!
+                                  // and I don't know why!  I'll come back to it when I have some more time.
+                                  // in the mean time THIS IS LEAKING!
+
+				  //free(dat);
 				}else{
 				        std::cerr << "ERROR: BAD SchemeTask type!!" << std::endl;
 				}

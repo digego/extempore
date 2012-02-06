@@ -142,6 +142,7 @@ namespace extemp {
 	static pointer remove_function(scheme* _sc, pointer args);		
 	static pointer remove_global_var(scheme* _sc, pointer args);		
 	static pointer erase_function(scheme* _sc, pointer args);
+        static pointer llvm_call_void_native(scheme* _sc, pointer args);
 	static pointer call_compiled(scheme* _sc, pointer args);
 	static pointer call_compiled_closure(scheme* _sc, pointer args);
 	static pointer llvm_convert_float_constant(scheme* _sc, pointer args);

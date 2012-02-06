@@ -63,6 +63,16 @@
 #include <dirent.h>
 #endif
 
+
+// setting this define should make call_compiled_closure
+// and call_compiled thread safe 
+// BUT ... also extremely SLOW !
+
+#define LLVM_EE_LOCK
+
+////////////////////////////////
+
+
 #define PCRE_REGEX
 
 #ifdef PCRE_REGEX
@@ -263,6 +273,7 @@ namespace extemp {
 	    { "llvm:remove-function",		&SchemeFFI::remove_function },
 	    { "llvm:remove-globalvar",		&SchemeFFI::remove_global_var },
 	    { "llvm:erase-function",		&SchemeFFI::erase_function },
+	    { "llvm:call-void-func",          &SchemeFFI::llvm_call_void_native },
 	    { "llvm:run",				&SchemeFFI::call_compiled },
 	    { "llvm:run-closure",			&SchemeFFI::call_compiled_closure },
 	    { "llvm:convert-float",			&SchemeFFI::llvm_convert_float_constant },
@@ -879,7 +890,8 @@ namespace extemp {
 	s.erase(s.size()-1,1);
 	ascii_text_color(1,1,10);
 	printf("%s\n",s.c_str());	
-	ascii_text_color(0,7,10);	
+	ascii_text_color(0,7,10);
+        fflush(stdout);	
 	return _sc->T; //mk_string(_sc, s.c_str()); 
     }
 
@@ -893,6 +905,7 @@ namespace extemp {
 	ascii_text_color(1,3,10);
 	printf("%s\n",s.c_str());
 	ascii_text_color(0,7,10);		
+        fflush(stdout);	
 	return _sc->T; //mk_string(_sc, s.c_str()); 
     }
 	
@@ -1452,7 +1465,9 @@ namespace extemp {
 	void* ptr = cptr_value(pair_cadr(args));
 	void** ptrptr = (void**) malloc(sizeof(void*));
 	ptrptr[0] = ptr;
+        EXTLLVM::I()->EE->lock.acquire();
 	EXTLLVM::I()->EE->updateGlobalMapping(gv,ptrptr);
+	EXTLLVM::I()->EE->lock.release();
 	return _sc->T;
     }
 	
@@ -1615,7 +1630,9 @@ namespace extemp {
 	{
 	    return _sc->F;
 	}		
+	extemp::EXTLLVM::I()->EE->lock.acquire();
 	extemp::EXTLLVM::I()->EE->freeMachineCodeForFunction(func);
+	extemp::EXTLLVM::I()->EE->lock.release();
 	func->deleteBody();
 	func->eraseFromParent();
 
@@ -1659,7 +1676,7 @@ namespace extemp {
 	{
 	    return _sc->F;
 	}
-
+        // this should be safe without a lock
 	void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
 
 	if(p==NULL) {
@@ -1668,6 +1685,34 @@ namespace extemp {
 	}
 
 	return mk_cptr(_sc, p);
+    }		
+
+    pointer SchemeFFI::llvm_call_void_native(scheme* _sc, pointer args)
+    {
+	using namespace llvm;
+
+	Module* M = EXTLLVM::I()->M;
+        char name[1024];
+        sprintf(name,"%s_native",string_value(pair_car(args)));
+	llvm::Function* func = M->getFunction(std::string(name));
+	//llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+	//func->setCallingConv(CallingConv::C); //kCStackBased);
+	if(func == 0)
+	{
+	    return _sc->F;
+	}
+        // this should be safe without a lock
+	void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
+
+	if(p==NULL) {
+	    //[[LogView sharedInstance] error:@"LLVM: Bad Function Ptr\n"];
+	    return _sc->F;
+	}
+
+        void(*f)(void) = (void(*)(void)) p;
+        f();
+        
+        return _sc->T;
     }		
 	
     pointer SchemeFFI::recompile_and_link_function(scheme* _sc, pointer args)
@@ -1690,7 +1735,9 @@ namespace extemp {
 	try{
 	  EXTLLVM* xll = EXTLLVM::I();
 	  ExecutionEngine* EE = xll->EE;
+	  EE->lock.acquire();
 	  void* p = EE->recompileAndRelinkFunction(func);
+	  EE->lock.release();
 	}catch(std::exception& e) {
 	  std::cout << "EXCEPT: " << e.what() << std::endl;
 	}
@@ -1705,6 +1752,10 @@ namespace extemp {
 	return mk_cptr(_sc, p);
     }
 
+
+    //
+    // This will not be threadsafe whenever a definec is done!
+    // 
     pointer SchemeFFI::call_compiled_closure(scheme* _sc, pointer args)
     {
 	using namespace llvm;
@@ -1714,12 +1765,20 @@ namespace extemp {
 
 	//std::cout << "CALL COMPILED CLOSURE: " << fname << std::endl;
 
-	ExecutionEngine* EE = EXTLLVM::I()->EE;		
+	ExecutionEngine* EE = EXTLLVM::I()->EE;	
+
+#ifdef LLVM_EE_LOCK
+        EE->lock.acquire();	
+#endif
+
 	Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = M->getFunction(std::string(fname));
 	if(func == 0)
 	{
 	    printf("No such function\n");
+#ifdef LLVM_EE_LOCK
+	    EE->lock.release();	
+#endif
 	    return _sc->F;
 	}				
 	//std::cout << "FUNC: " << *func << std::endl;
@@ -1727,6 +1786,9 @@ namespace extemp {
 	int lgth = list_length(_sc, args);
 	if(lgth != func->arg_size()) {
 	    printf("Wrong number of arguments supplied to native closure - should take: %d\n",(func->arg_size()-1));
+#ifdef LLVM_EE_LOCK
+	    EE->lock.release();	
+#endif
 	    return _sc->F;			
 	}
 	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();		
@@ -1736,6 +1798,9 @@ namespace extemp {
 	if(((Argument*)funcargs)->getType()->getTypeID() != Type::PointerTyID)
 	{
 	    printf("Error: closure must have an environment!\n");
+#ifdef LLVM_EE_LOCK
+	    EE->lock.release();	
+#endif
 	    return _sc->F;			
 	}
 	fargs[0].PointerVal = eptr;	
@@ -1750,6 +1815,9 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::IntegerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
+#ifdef LLVM_EE_LOCK
+		    EE->lock.release();	
+#endif
 		    return _sc->F;
 		}
 		int width = a->getType()->getPrimitiveSizeInBits();				
@@ -1772,6 +1840,9 @@ namespace extemp {
 		else
 		{
 		    printf("Bad argument type %i\n",i);
+#ifdef LLVM_EE_LOCK
+		    EE->lock.release();	
+#endif
 		    return _sc->F;
 		}
 	    }
@@ -1780,6 +1851,9 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::PointerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
+#ifdef LLVM_EE_LOCK
+		    EE->lock.release();	
+#endif
 		    return _sc->F;					
 		}
 		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
@@ -1790,6 +1864,9 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::PointerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
+#ifdef LLVM_EE_LOCK
+		    EE->lock.release();	
+#endif
 		    return _sc->F;					
 		}
 		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
@@ -1798,13 +1875,31 @@ namespace extemp {
 	    else 
 	    {
 		printf("Bad scheme argument\n");
+#ifdef LLVM_EE_LOCK
+		EE->lock.release();	
+#endif
 		return _sc->F;
 	    }
 	}
 
-	long long num_of_funcs = M->getFunctionList().size();
+
+	//long long num_of_funcs = M->getFunctionList().size();
+	//EE->lock.release();	
+
+	/*
+#ifdef LLVM_EE_LOCK	
+	EE->lock.release();	
+#endif
+	*/
 	GenericValue gv = EE->runFunction(func,fargs);
+
+#ifdef LLVM_EE_LOCK	
+	EE->lock.release();	
+#endif
+
+	/*
 	if(num_of_funcs != M->getFunctionList().size()) {
+	  std::cout << "KICK(ccc): " << num_of_funcs << "  id:" << boost::this_thread::get_id() << std::endl;
 	    iplist<Function>::iterator iter = M->getFunctionList().end();
 	    Function* stub = dyn_cast<Function>(--iter);
 	    //			std::stringstream ss;
@@ -1813,6 +1908,9 @@ namespace extemp {
 	    stub->deleteBody();
 	    stub->eraseFromParent();
 	}
+	*/
+
+	//EE->lock.release();	
 
 	switch(func->getReturnType()->getTypeID())
 	{
@@ -1829,17 +1927,28 @@ namespace extemp {
 	}		
     }
 
+    //
+    // This will not be threadsafe whenever a definec is done!
+    // 
     pointer SchemeFFI::call_compiled(scheme* _sc, pointer args)
     {
 	using namespace llvm;
 
-	ExecutionEngine* EE = EXTLLVM::I()->EE;	
-	Module* M = EXTLLVM::I()->M;
+	ExecutionEngine* EE = EXTLLVM::I()->EE;
+
+#ifdef LLVM_EE_LOCK	
+	EE->lock.acquire();
+#endif
+	
+        Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = (Function*) cptr_value(pair_car(args));
 	if(func == 0)
 	{
 	    //std::cout << "no such function\n" << std::endl;
 	    printf("No such function\n");
+#ifdef LLVM_EE_LOCK
+	    EE->lock.release();	
+#endif
 	    return _sc->F;
 	}				
 	func->getArgumentList();
@@ -1852,6 +1961,9 @@ namespace extemp {
 	if(lgth != func->getArgumentList().size())
 	{
 	    printf("Wrong number of arguments for function!\n");
+#ifdef LLVM_EE_LOCK
+	    EE->lock.release();	
+#endif
 	    return _sc->F;			
 	}
 	std::vector<llvm::GenericValue> fargs(lgth);
@@ -1864,6 +1976,9 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::IntegerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
+#ifdef LLVM_EE_LOCK
+		    EE->lock.release();	
+#endif
 		    return _sc->F;
 		}
 		int width = a->getType()->getPrimitiveSizeInBits();
@@ -1884,6 +1999,9 @@ namespace extemp {
 		else
 		{
 		    printf("Bad argument type %i\n",i);
+#ifdef LLVM_EE_LOCK
+		    EE->lock.release();	
+#endif
 		    return _sc->F;
 		}
 	    }
@@ -1892,6 +2010,9 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::PointerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
+#ifdef LLVM_EE_LOCK
+		    EE->lock.release();	
+#endif
 		    return _sc->F;					
 		}
 		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
@@ -1902,6 +2023,9 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::PointerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
+#ifdef LLVM_EE_LOCK
+		    EE->lock.release();	
+#endif
 		    return _sc->F;
 		}
 		fargs[i].PointerVal = cptr_value(p);
@@ -1912,12 +2036,18 @@ namespace extemp {
 		//ascii_print_color(1,1,10); // error color
 		printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
 		//ascii_print_color(0,9,10);
+#ifdef LLVM_EE_LOCK
+		EE->lock.release();	
+#endif
 		return _sc->F;
 	    }
 	    else {
 		//ascii_print_color(1,1,10); // error color
 		printf("Bad argument at index %i\n",i);
 		//ascii_print_color(0,9,10); // default
+#ifdef LLVM_EE_LOCK
+		EE->lock.release();	
+#endif
 		return _sc->F;
 	    }
 		    
@@ -1926,19 +2056,43 @@ namespace extemp {
 	//		double(*fp)(double	,double) = (double(*)(double,double)) EE->getPointerToFunction(func);
 	//		double v = fp(rvalue(pair_car(args)),rvalue(pair_cadr(args)));
 
-	long long num_of_funcs = M->getFunctionList().size();
-	GenericValue gv = EE->runFunction(func,fargs);
+
+	//long long num_of_funcs = M->getFunctionList().size();
+	//std::cout << "llvm funcs: " << num_of_funcs << "  id:" << boost::this_thread::get_id() << std::endl;
+	
+	//        EE->lock.release();	
+
+
+/*
+	#ifdef LLVM_EE_LOCK
+	EE->lock.release();
+	#endif
+*/
+	
+        GenericValue gv = EE->runFunction(func,fargs);
+#ifdef LLVM_EE_LOCK		
+	EE->lock.release();
+#endif
+
+        //EE->lock.acquire();	
+	//long long num_of_funcs = M->getFunctionList().size();
 
 	// if the number of functions in module has changed when calling runFunction 
 	// then we assume a stub was made and appended to the end of the modules function list.
 	// we remove this function now that we no longer need it!
+
+	/*
 	if(num_of_funcs != M->getFunctionList().size()) {
+	    std::cout << "KICK(cc): " << num_of_funcs << "  id:" << boost::this_thread::get_id() << std::endl;
 	    iplist<Function>::iterator iter = M->getFunctionList().end();
 	    Function* stub = dyn_cast<Function>(--iter);
 	    EE->freeMachineCodeForFunction(stub);
 	    stub->deleteBody();
 	    stub->eraseFromParent();
 	}
+*/
+	//	EE->lock.release();	
+
 
 	//std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
 	switch(func->getReturnType()->getTypeID())
@@ -2116,6 +2270,8 @@ namespace extemp {
 
 	llvm::Module* M = EXTLLVM::I()->M;
 	llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;	
+
+	EE->lock.acquire();
 		
 #ifdef TARGET_OS_WINDOWS
         void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
@@ -2128,7 +2284,9 @@ namespace extemp {
 	}
 	llvm::GlobalValue* gv = M->getNamedValue(std::string(symname));
 	EE->updateGlobalMapping(gv,ptr);
-		
+
+	EE->lock.release();		
+
 	return _sc->T;
     }	
 
@@ -2666,7 +2824,9 @@ namespace extemp {
     }
     void* ptr = (void*) wglGetProcAddress(ext_name); //cptr_value(pair_cadr(args));
     if( ptr ) {
+      EXTLLVM::I()->EE->lock.acquire();	
       EXTLLVM::I()->EE->updateGlobalMapping(gv,ptr); 
+      EXTLLVM::I()->EE->lock.release();	
       printf("successfully bound extension:%s\n",ext_name);
       return _sc->T;
     } else {

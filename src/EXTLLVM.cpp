@@ -96,6 +96,7 @@
 
 #include "SchemeProcess.h"
 
+
 // this must be global. we should therefore
 // make it thread safe but I'm not going to bother
 // while still testing.
@@ -131,7 +132,8 @@ std::map<long,uint64_t> LLVM_ZONE_STACKSIZES;
 #endif
 
 
-
+// this is going to cause concurrency problems at some stage.
+// you really need to FIX IT!
 llvm_zone_stack* llvm_threads_get_zone_stack()
 {
   llvm_zone_stack* stack = 0;
@@ -147,6 +149,9 @@ llvm_zone_stack* llvm_threads_get_zone_stack()
   return stack;
 }
 
+
+// this is going to cause concurrency problems at some stage.
+// you really need to FIX IT!
 void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
 {
 #ifdef EXT_BOOST
@@ -907,6 +912,7 @@ namespace extemp {
     void EXTLLVM::initLLVM()
     {
 	if(M == 0) { // Initalize Once Only (not per scheme process)			
+	    //llvm::llvm_start_multithreaded();
 	    bool result = llvm::InitializeNativeTarget();			
 	    M = new llvm::Module("JIT",llvm::getGlobalContext());
 	    // Create the JIT.
@@ -916,6 +922,9 @@ namespace extemp {
 		fprintf(stderr, "Could not create ExecutionEngine: %s\n", ErrStr.c_str());
 		exit(1);
 	    }
+	    EE->DisableLazyCompilation(true);
+	    std::cout << "Lazy Compilation: OFF" << std::endl;
+
 			
 	    //EE = llvm::EngineBuilder(M).create();
 	    PM = new llvm::PassManager();

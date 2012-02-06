@@ -639,10 +639,8 @@
                      (real->rational (+ val (- quantize (modulo val quantize))))))
                  (else 'bad-method-name))))))
 
-				 
-				 
-				 
-(define *metro* (make-metro 120))
+				 				 				 
+(define *metro* (make-metro 120 '(0 . 0)))
 
 (define-macro (set-signal! variable value dur . rate)
    (let ((r (if (null? rate) 1/16 (car rate)))) 
