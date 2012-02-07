@@ -2131,7 +2131,85 @@
 					   ")\nret void\n" ; (impc:ir:get-type-str (car stub-type)) 
 					   ;(if (impc:ir:void? (car stub-type)) "\n" " %result\n")
 					   "}")))
-				
+                (fstub_scheme (string-append "define ccc i8* " ;(impc:ir:get-type-str (car stub-type))
+					     " @" (string-append (symbol->string symname) "_scheme(i8* %_sc, i8* %args)\n"
+					     "{\nentry:\n"
+					     ;"%_zone = call ccc %mzone* @llvm_zone_create(i64 2048)\n"
+					     ;"%_zone = call ccc %mzone* @malloc_default_zone()\n"
+					     "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+					     "%_impz = bitcast %mzone* %_zone to i8*\n"
+
+					     ;(begin (println 'aaaaa) "")
+
+					     (apply string-append
+						    (map (lambda (t n idx)
+							   ;(println 't: t 'n: n 'idx: idx)
+							   (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                                                            (cond ((or (not (number? t))
+										       (> t 9))
+										   (string-append "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
+												  n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n"))
+										  ((= t 0) (string-append n " = call ccc double @r64value(i8* " n "_val)\n"))
+										  ((= t 1) (string-append n " = call ccc float  @r32value(i8* " n "_val)\n"))
+										  ((= t 2) (string-append n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+										  ((= t 3) (string-append n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+										  ((= t 4) (string-append n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+										  ((= t 5) (string-append n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+										  ((= t 6) (string-append n " = call ccc i32  @i8value(i8* " n "_val)\n"))
+										  ((= t 7) (string-append n " = call ccc i32  @i8value(i8* " n "_val)\n"))
+										  ((= t 8) (string-append n " = call ccc i32  @i1value(i8* %_sc, i8* " n "_val)\n"))
+										  ((= t 9) (string-append n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+										  (else (error "Compiler Error: 'bad 'type 'in 'scheme 'stub")))))
+							 (cdr stub-type)
+							 '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
+							 (make-list-with-proc 20 (lambda (i) i))))
+
+					     ;(begin (println 'bbbbb) "")					     
+					     
+					     ;"call ccc void @llvm_destroy_zone_after_delay(i8* %_impz, double 88200.0)\n"
+					     "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
+					     "%ptrvar = load i8** %ptr\n"
+					     "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+					     "%closure = load " closure-type " %closure_tmp \n"
+					     "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
+					     "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+					     "%ff = load "
+					     (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
+					     "* %fPtr\n"
+					     "%ee = load i8** %ePtr\n"
+					     (if (impc:ir:void? (car stub-type)) "" "%result = ")
+					     "tail call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+
+					     (apply string-append
+						    (map (lambda (t n)
+							   (string-append ", " (impc:ir:get-type-str t) " " n))
+							 (cdr stub-type)
+							 '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
+					     ")\n"
+
+					     ;(begin (println 'ccccc) "")
+
+					     (let* ((t (car stub-type)))
+					       (cond ((or (not (number? t))
+							  (> t 9))
+						      (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
+								     "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
+						     ((= t -1) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
+						     ((= t 0) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
+						     ((= t 1) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
+						     ((= t 2) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+						     ((= t 3) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n") 
+						     ((= t 4) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+						     ((= t 5) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")  
+						     ((= t 6) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+						     ((= t 7) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")	 
+						     ((= t 8) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
+						     ((= t 9) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+						     (else (error 'Compiler 'Error: 'return 'type 'error 'in 'scheme 'stub))))
+					     
+					     "ret i8* %res\n"
+					     "}")))
+		;;(fffffffff (println fstub_scheme))
                 (fstub_native (string-append "define ccc " (impc:ir:get-type-str (car stub-type))
 					     " @" (string-append (symbol->string symname) "_native("
 								 (apply string-append (map (lambda (t n c)
@@ -2205,16 +2283,20 @@
                            (begin (print-error "Compiler Failed")
                                   (error ""))) 
                        (if *impc:compiler:print* (print-notification "compiled stub"))))
-            (if *impc:compiler:print* (println '--------------------------------compiling 'stub----------------------------------->))            
+            (if *impc:compiler:print* (println '--------------------------------compiling 'stubs----------------------------------->))            
             (if *impc:compiler:print* (println fstub))            
             (if *impc:compiler:print-raw-llvm* (print-full-nq fstub))
             (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_stub"))
                        (if (or (not (llvm:compile fstub))
-			       (not (llvm:compile fstub_native)))
-                           (begin (print-error "Compiler Failed")
-                                  (error ""))) 
-                       (if *impc:compiler:print* (print-notification "compiled stub"))))
+			       (not (llvm:compile fstub_native))
+			       (not (llvm:compile fstub_scheme)))
+                           (begin (print-error "Compiler Failed building stubs!")
+                                  (error "")))
+		       ;; bind fstub_scheme
+		       ;(add-foreign-func (symbol->string symname) (llvm:get-scheme-function (symbol->string name)))
+                       (if *impc:compiler:print*
+			   (print-notification "compiled stubs"))))
 	   (if *impc:compiler:print* (println '----------------------------compiling 'callback----------------------------------->))
 	   (if *impc:compiler:print* (println fscallback))
 	   (if *impc:compiler:print-raw-llvm* (print-full-nq fscallback))
@@ -2274,26 +2356,11 @@
 	       (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
 		      (error "")))
 	   (if func
-	       (lambda args (apply llvm:run func (sys:peek-memzone) args))
+	       ;(lambda args (apply llvm:run func (sys:peek-memzone) args))
+	       (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
 	       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		      (error ""))))))))
     
-
-;; Definec-precomp is for setting up precompiled ir functions only
-(define-macro (definec-precomp symname)
-  (let ((zone-size *impc:default-zone-size*))
-    `(define ,symname
-       (let* ((setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
-              (func (llvm:get-function (symbol->string ',symname))))
-	 (println 'setter: setter 'func: func)
-	 (if setter
-	     (llvm:run setter (sys:create-mzone ,zone-size))
-	     (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
-		    (error "")))
-	 (if func
-	     (lambda args (apply llvm:run func (sys:peek-memzone) args))
-	     (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
-		    (error "")))))))
 
 ;; Definec-precomp is for setting up precompiled ir functions only
 (define definec-precomp
@@ -2309,7 +2376,8 @@
 		(begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
 		       (error "")))
 	    (if func
-		(lambda args (apply llvm:run func (sys:peek-memzone) args))
+		(mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
+		;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 		(begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		       (error "")))))
        (interaction-environment)))))
@@ -2548,6 +2616,11 @@
 (define llvm:get-native-function
   (lambda (name)
     (llvm:get-function-pointer (string-append name "_native"))))
+
+;; a helper for returning a scheme closure native closure (if one exists!)
+(define llvm:get-scheme-function
+  (lambda (name)
+    (llvm:get-function-pointer (string-append name "_scheme"))))
 
 ;; Wrap a native, bound C function, allowing it to be called from scheme
 (define-macro (define-wrapper local-sym native-sym)

@@ -250,6 +250,7 @@ namespace extemp {
 	    { "pprint-error",		&SchemeFFI::printError }, // pprint-error is pprint for a reason!
 	    { "print-notification",		&SchemeFFI::printNotification },
 	    { "get-closure-env",		&SchemeFFI::getClosureEnv },
+            { "mk-ff",               &SchemeFFI::scmAddForeignFunc },
 
 	    // regex stuff
 	    { "regex:match?",		&SchemeFFI::regex_match },
@@ -348,6 +349,13 @@ namespace extemp {
     {
 	scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
     }
+
+    pointer SchemeFFI::scmAddForeignFunc(scheme* sc, pointer args) {
+      //char* sym_name = string_value(pair_car(args));
+        foreign_func func = (foreign_func) cptr_value(pair_car(args));       
+        //scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), mk_foreign_func(sc, func));
+        return mk_foreign_func(sc,func); //sc->T;
+    }
 	
     void SchemeFFI::addGlobalCptr(scheme* sc, char* symbol_name, void* ptr)
     {
@@ -359,6 +367,8 @@ namespace extemp {
     // MISC STUFF
     //
     //////////////////////////////////////////////////////
+
+
 
     pointer SchemeFFI::exit_extempore(scheme* _sc, pointer args)
     {

@@ -226,7 +226,14 @@ typedef pointer (*foreign_func)(scheme *, pointer);
 
 pointer _cons(scheme *sc, pointer a, pointer b, int immutable);
 pointer mk_integer(scheme *sc, long long num);
+pointer mk_i64(scheme *sc, long long num);
+pointer mk_i32(scheme *sc, int num);
+pointer mk_i8(scheme *sc, char num);
+pointer mk_i1(scheme *sc, bool num);
 pointer mk_real(scheme *sc, double num);
+pointer mk_double(scheme *sc, double num);
+pointer mk_float(scheme *sc, float num);
+
 pointer mk_rational(scheme *sc, long long n, long long d);
 pointer mk_symbol(scheme *sc, const char *name);
 pointer gensym(scheme *sc);
@@ -263,7 +270,13 @@ char* string_value(pointer p);
 int is_number(pointer p);
 num nvalue(pointer p);
 long long ivalue(pointer p);
+long long i64value(pointer p);
+int i32value(pointer p);
+char i8value(pointer p);
+bool i1value(scheme* _sc, pointer p);
 double rvalue(pointer p);
+double r64value(pointer p);
+float r32value(pointer p);
 int is_integer(pointer p);
 int is_real(pointer p);
 int is_rational(pointer p);

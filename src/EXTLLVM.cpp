@@ -1100,6 +1100,48 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&rmatch);		
 	    gv = M->getNamedValue(std::string("rreplace"));
 	    EE->updateGlobalMapping(gv,(void*)&rreplace);			    
+
+	    // add scheme bits
+	    gv = M->getNamedValue(std::string("r64value"));
+	    EE->updateGlobalMapping(gv,(void*)&r64value);
+	    gv = M->getNamedValue(std::string("mk_double"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_double);
+	    gv = M->getNamedValue(std::string("r32value"));
+	    EE->updateGlobalMapping(gv,(void*)&r32value);
+	    gv = M->getNamedValue(std::string("mk_float"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_float);
+
+	    gv = M->getNamedValue(std::string("i64value"));
+	    EE->updateGlobalMapping(gv,(void*)&i64value);
+	    gv = M->getNamedValue(std::string("mk_i64"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_i64);			    
+	    gv = M->getNamedValue(std::string("i32value"));
+	    EE->updateGlobalMapping(gv,(void*)&i32value);			    
+	    gv = M->getNamedValue(std::string("mk_i32"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_i32);
+	    gv = M->getNamedValue(std::string("i8value"));
+	    EE->updateGlobalMapping(gv,(void*)&i8value);			    
+	    gv = M->getNamedValue(std::string("mk_i8"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_i8);
+	    gv = M->getNamedValue(std::string("i1value"));
+	    EE->updateGlobalMapping(gv,(void*)&i1value);			    
+	    gv = M->getNamedValue(std::string("mk_i1"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_i1);
+
+	    gv = M->getNamedValue(std::string("string_value"));
+	    EE->updateGlobalMapping(gv,(void*)&string_value);			    
+	    gv = M->getNamedValue(std::string("mk_string"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_string);
+
+	    gv = M->getNamedValue(std::string("cptr_value"));
+	    EE->updateGlobalMapping(gv,(void*)&cptr_value);			    
+	    gv = M->getNamedValue(std::string("mk_cptr"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_cptr);
+
+	    gv = M->getNamedValue(std::string("list_ref"));
+	    EE->updateGlobalMapping(gv,(void*)&list_ref);
+
+
 	}	
 	return;
     }

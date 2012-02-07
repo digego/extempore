@@ -456,6 +456,26 @@ long long ivalue(pointer p)
     return 0;
 }
 
+long long i64value(pointer p)      
+{ 	
+    return ivalue(p);
+}
+
+int i32value(pointer p)      
+{ 	
+    return (int) ivalue(p);
+}
+
+char i8value(pointer p)      
+{ 	
+  return (char) ivalue(p);
+}
+
+bool i1value(scheme* _sc, pointer p)      
+{   
+    return (p == _sc->T) ? true : false;
+}
+
 double rvalue(pointer p)    
 { 
     switch(p->_object._number.num_type){
@@ -467,6 +487,16 @@ double rvalue(pointer p)
 	return ((double)(p)->_object._number.value.ratvalue.n)/((double)(p)->_object._number.value.ratvalue.d);
     }
     return 0.0;
+}
+
+double r64value(pointer p)    
+{ 
+  return (double) rvalue(p);
+}
+
+float r32value(pointer p)    
+{ 
+  return (float) rvalue(p);
 }
 
 #define ivalue_unchecked(p)       ((p)->_object._number.value.ivalue)
@@ -552,8 +582,9 @@ int is_cptr(pointer p) { return (type(p) == T_CPTR); }
 
 void* cptr_value(pointer p) 
 { 
-    if(!is_cptr(p)) {
-	throw ScmRuntimeError("Attempting to return a cptr from a non-cptr obj");
+  if(!is_cptr(p)) {
+     if(is_string(p)) return (void*) strvalue(p);
+     else throw ScmRuntimeError("Attempting to return a cptr from a non-cptr obj");
 	//[NSException raise:@"IncorrectSchemeOBJ" format:@"Attempting to return a cptr from a non-cptr obj"];
     }
     return p->_object._cptr; 
@@ -561,8 +592,14 @@ void* cptr_value(pointer p)
 
 void* cptr_value_sc(scheme* sc, pointer p) 
 { 
-    if(!is_cptr(p)) _Error_1(sc, "Attempting to return a cptr from a non-cptr obj", p, sc->code->_debugger->_size);
-    return p->_object._cptr; 
+  if(!is_cptr(p)) {
+    if(!is_string(p)) {
+      _Error_1(sc, "Attempting to return a cptr from a non-cptr obj", p, sc->code->_debugger->_size);
+    }else{
+      return strvalue(p);
+    }
+  }
+   return p->_object._cptr; 
 }
 
 inline char *syntaxname(pointer p) { return strvalue(car(p)); }
@@ -1500,6 +1537,22 @@ pointer mk_integer(scheme *sc, long long num) {
     return (x);
 }
 
+pointer mk_i64(scheme *sc, long long num) {
+    return mk_integer(sc, num);
+}
+
+pointer mk_i32(scheme *sc, int num) {
+    return mk_integer(sc, num);
+}
+
+pointer mk_i8(scheme *sc, char num) {
+    return mk_integer(sc, num);
+}
+
+pointer mk_i1(scheme *sc, bool num) {
+    return mk_integer(sc, num);
+}
+
 pointer mk_real(scheme *sc, double n) {
     pointer x = get_cell(sc,sc->NIL, sc->NIL);
 	
@@ -1508,6 +1561,15 @@ pointer mk_real(scheme *sc, double n) {
     set_real(x);
     return (x);
 }
+
+pointer mk_double(scheme* sc, double n) {
+    return mk_real(sc, n);
+}
+
+pointer mk_float(scheme* sc, float n) {
+    return mk_real(sc, (double) n);
+}
+
 
 long long gcd(long long a,long long b)
 {

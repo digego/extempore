@@ -55,6 +55,8 @@ namespace extemp {
 	void addGlobal(scheme* sc, char* symbol_name, pointer arg);
 	void addForeignFunc(scheme* sc, char* symbol_name, foreign_func func);
 	void addGlobalCptr(scheme* sc, char* symbol_name, void* ptr);		
+
+	static pointer scmAddForeignFunc(scheme* sc, pointer args);
 		
 	static pointer asciiColor(scheme* _sc, pointer args);
 	static pointer emit(scheme* _sc, pointer args);
