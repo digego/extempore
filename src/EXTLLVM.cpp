@@ -96,6 +96,10 @@
 
 #include "SchemeProcess.h"
 
+#define DEBUG_ZONE_STACK 0
+#define DEBUG_ZONE_ALLOC 0
+#define LEAKY_ZONES 1
+
 
 // this must be global. we should therefore
 // make it thread safe but I'm not going to bother
@@ -209,10 +213,6 @@ uint64_t llvm_threads_get_zone_stacksize()
   return size;
 }
 
-#define DEBUG_ZONE_STACK 0
-#define DEBUG_ZONE_ALLOC 0
-
-
 void llvm_push_zone_stack(llvm_zone_t* z)
 {
     llvm_zone_stack* stack = (llvm_zone_stack*) malloc(sizeof(llvm_zone_stack));
@@ -315,10 +315,17 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 #endif
     if(zone->offset+size >= zone->size)
     {
-	// for the moment print a warning and just leak the memory
-	printf("Zone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
-	//exit(1);
+	// if LEAKY ZONE is TRUE then just print a warning and just leak the memory
+#if LEAKY_ZONES
+	printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
+        printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
+        fflush(NULL);
 	return malloc((size_t)size);
+#else
+	printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
+        fflush(NULL);
+	exit(1);
+#endif
     }
     void* newptr = (void*)(((char*)zone->memory)+zone->offset);
     memset(newptr,0,size); // clear memory
@@ -965,32 +972,49 @@ namespace extemp {
 	    strcpy(load_path,extemp::UNIV::PWD);
 	    strcat(load_path,fname);
 	    FILE* fp;
-	    if((fp = fopen(load_path,"r")) == NULL)
+	    if((fp = fopen(load_path,"rb")) == NULL)
 	    {
 		printf("Could not open %s",load_path);
 		exit(1);
 	    }
 			
 	    fseek(fp,0,SEEK_END);
-	    int size = ftell(fp);
+	    long long size = ftell(fp);
 	    fseek(fp,0,SEEK_SET);
 #ifdef TARGET_OS_WINDOWS
 	    char* assm = (char*) _alloca(size+1);
 #else
 	    char* assm = (char*) alloca(size+1);
 #endif
-	    int res = fread(assm, 1, size, fp);
-	    assm[size]=0;
+	    size_t res = fread(assm, 1, size, fp);
+            if(res != size) {
+   	      printf("code.ir length(%lld) read(%lld) \n",size,res);
+              if(ferror(fp)) {
+    	        printf("Error reading code.ir %d\n",ferror(fp));
+                exit(1);
+              }else if(feof(fp)){
+    	        printf("Error reading code.ir end-of-file error %d\n",feof(fp));
+                exit(1);
+              }else{
+                printf("Length mismatch reading code.ir lgth(%lld) read(%lld)\n",size,res);
+                exit(1);
+	      }
+	    }
+	    //std::cout << "assm: " << size << " :: " << res << " ... " << std::endl << assm << std::endl;
+
+            assm[size]=0;
 	    fclose(fp);
 	    llvm::SMDiagnostic pa;
 	    llvm::Module* newM = ParseAssemblyString(assm, M, pa, llvm::getGlobalContext());
 			
 	    if(newM == 0)
 	    {
+     	        printf("Compiler Error: Error building code.ir\n");
 		std::string errstr;
 		llvm::raw_string_ostream ss(errstr);
 		pa.Print("Extempore",ss);
 		printf(ss.str().c_str());
+                exit(1);
 	    }
 
 	    llvm::GlobalValue* gv = M->getNamedValue(std::string("llvm_destroy_zone_after_delay"));
