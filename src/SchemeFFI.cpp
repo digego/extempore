@@ -3042,7 +3042,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	
 	if (ChangeDisplaySettings(&dmScreenSettings, CDS_FULLSCREEN != DISP_CHANGE_SUCCESSFUL)) {
 	  /*      Setting display mode failed, switch to windowed*/
-	  MessageBox(NULL, (LPCWSTR)L"Display mode failed", NULL, MB_OK);
+	  //MessageBox(NULL, (LPCWSTR)L"Display mode failed", NULL, MB_OK);
 	  fullScreen = true; //false; 
 	  screenmode = 1;
 	}
