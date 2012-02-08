@@ -2375,6 +2375,25 @@
 		(llvm:run setter (sys:create-mzone ,zone-size))
 		(begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
 		       (error "")))
+	    ;(println 'scheme_func: (llvm:get-scheme-function ,(symbol->string symname)))
+	    (if func
+		(mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
+		;(lambda args (apply llvm:run func (sys:peek-memzone) args))
+		(begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
+		       (error "")))))
+       (interaction-environment)))))
+
+
+;; definec-ipc is for passing an already compiled (and setter'd) native function
+;; acroos to a non-primary process
+(define definec-ipc
+  (lambda (symname)
+    (let ((zone-size *impc:default-zone-size*))
+      (eval
+       `(define ,symname
+	  (let* ((setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
+		 (func (llvm:get-function (symbol->string ',symname))))
+	    ;(println 'scmfunc: (llvm:get-scheme-function ,(symbol->string symname)))
 	    (if func
 		(mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
 		;(lambda args (apply llvm:run func (sys:peek-memzone) args))
@@ -2384,7 +2403,8 @@
 
 (define ipc:definec
   (lambda (procname symname)
-    (ipc:call procname 'definec-precomp symname)))
+    (ipc:call procname 'definec-ipc symname)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 					
 ;; macro helper for fx code au's							
