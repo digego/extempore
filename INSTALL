@@ -4,7 +4,8 @@ Installation Instructions
 Prerequisites
 =============
 
-Extempore has some library dependencies. 
+Extempore has some library dependencies that
+may not be installed on your system.
 
 On OSX:
    - LLVM 3.0
@@ -27,10 +28,6 @@ On Windows 7:
    - portaudio
 
 
-
-LLVM Install Instructions
-=====================
-
 Most of the libraries are pretty standard and will either (a) already
 be installed on your system or (b) can usually be easily installed
 as from binary packages.
@@ -42,11 +39,18 @@ required.
    You can get LLVM src from:
    http://www.llvm.org/
 
-LLVM requires this small patch to the file LLParser.cpp and so must be
+LLVM requires a small patch to the file LLParser.cpp and so must be
 built from source. The patch file is availble in the extempore/extras
 directory (llparser.patch).  To apply the patch just move into the
 llvm/lib/AsmParser directory and then apply the llparser.patch file 
 which in can be found in extempore/extras.
+
+
+
+Unix Install Instructions
+=========================
+
+Patch LLVM (see above)
 
 [~/llvm/lib/AsmParser]$ patch < ~/extempore/extras/llparser.patch 
 
@@ -100,31 +104,64 @@ WINDOWS
 ======= 
 
 Windows support is new but functional. Boost is mandatory for
-Extempore on Windows.  You will need to build BOOST, PORTAUDIO and
-LLVM 3.0 for yourself.  These can all be built as static libs.
+Extempore on Windows.  You will need to build PCRE, BOOST, PORTAUDIO 
+and LLVM 3.0 for yourself.
 
-Alternatively I have put a winx64libs.zip up on github which 
-has prebuilds of LLVM 3.0, BOOST and PORTAUDIO.  You should
-unzip them into a new folder called extempore/msvc/libs.
+The build process is straight forward once you have build the
+aforementioned libraries.  The Extempore build script expects
+the following to be true:
 
-If you have CL.exe and MSBuild (.NET 4.0 runtime or C++ Express) 
-installed you should now be able to build extempore using
-the all.bat batch file in the extempore directory. If you've
-build LLVM, BOOST and PORTAUDIO you may need to edit some of 
-the paths in extempore/msvc/extempore.vcxproj 
+These are required for includes
+
+a) a directory llvm-3.0 (a straight decompression of the llvm download)
+b) a directory boost_1_47_0 (a straight decompression of the boost download)
+c) a directory pcre-8.12 (a straight decomp ...)
+d) a directory portaudio (a straight decomp ...)
+
+You will need to patch LLVM (see above).
+
+These are required for libs
+
+a) a directory my_llvm_build - use cmake to create then build using msvc
+b) a directory my_boost_build - use bjam (see below --build-dir=my_boost_build)
+c) a directory my_pcre_build - use cmake to create then build using msvc
+d) build portaudio using provided msvc project (portaudio/build/msvc/portaudio.sln)
+
+The extempore directory expects to find itself in the same directory as
+all of the directories mentioned above.  Of course you can change all
+of this by manually editing extempore/msvc/extempore.vcxproj.
+
+If you have now built everything successfully you should be able to 
+build extempore from the command line by:
+
+First set the shells vc/build environment vars:
+
+> cd extempore\msvc
+> ms_build_vars.bat
+
+Then you can build extempore ...
+
+> cd extempore
+> all.bat
+
+Voila ...
+
+
+Unfortunately you will need a full version of Visual Studio to get the 64bit 
+compiler (cl.exe).
+
 
 EMACS NOTE: if you choose to use emacs on windows (recommended)
 and run extempore in a *shell* or *eshell* then you should
 set term=ansi as an option when starting extempore.
 
 
-Below are a few extra windows build notes.
 
-Some Early Windows Build Notes (for me so I don't forget)
+Some Windows Build Notes (for me so I don't forget)
 =========================================================
 
-(a) Make sure you install CMake
-(b) Use CMake to Build LLVM (choose 64bit option)
+(a) Use CMake to build PCRE (my_pcre_build)
+(b) Use CMake to Build LLVM (choose 64bit option - my_llvm_build)
 (c) Make sure that Debug build mode has _ITERATOR_DEBUG_LEVEL=2 set for both 
     CMAKE_CXX_FLAGS_DEBUG and CMAKE_C_FLAGS_DEBUG (click advanced checkbox in cmake gui) 
 (d) Make sure portaudio msvc general project settings are set to static lib
