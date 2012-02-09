@@ -255,6 +255,10 @@ namespace extemp {
     uint64_t UNIV::DEVICE_TIME = 0l;
     const char* UNIV::PWD = "";
 
+#ifdef TARGET_OS_WINDOWS
+    uint32_t UNIV::AUDIO_DEVICE = -1;
+#endif
+
     // 0 is for ansi, 1 is for MSDos CMD shell
 #ifdef TARGET_OS_WINDOWS
     uint32_t UNIV::EXT_TERM = 1;

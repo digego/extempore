@@ -96,6 +96,8 @@ class UNIV {
 	static uint32_t FRAMES;
 	static const char* PWD;
         static uint32_t EXT_TERM;
+        static uint32_t AUDIO_DEVICE;
+
 
 	static double midi2frq(double pitch);
 	static double frqRatio(double semitones);

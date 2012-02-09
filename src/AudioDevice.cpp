@@ -902,9 +902,30 @@ namespace extemp {
         Pa_Initialize();
         //std::cout << "Initializing AudioDevice: " << std::endl;
         PaError err;
-        int inputDevice = Pa_GetDefaultInputDevice();
-        int outputDevice = Pa_GetDefaultOutputDevice();
 
+	int numDevices = Pa_GetDeviceCount();
+	if( numDevices < 0 ) {
+	  printf("No audio devices found!\n");
+	    printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
+            exit(1);
+	}
+        char* hostapi_strs[15] = {"InDevelopment","DirectSound","MME","ASIO","SoundManager","CoreAudio","OSS","ALSA","AL","BeOS","WDMKS","JACK","WASAPI","AudioScienceHPI"};
+        const   PaDeviceInfo *deviceInfo;
+        const   PaHostApiInfo* apiInfo;
+	for( int i=0; i<numDevices; i++ ) {
+	  deviceInfo = Pa_GetDeviceInfo( i );
+          apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+	  printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
+	}    
+
+	int inputDevice = Pa_GetDefaultInputDevice();
+	int outputDevice = Pa_GetDefaultOutputDevice();     
+
+	if(UNIV::AUDIO_DEVICE > 0) {
+	  inputDevice = UNIV::AUDIO_DEVICE; //Pa_HostApiDeviceIndexToDeviceIndex(UNIV::AUDIO_API,UNIV::AUDIO_DEVICE);
+	  outputDevice = UNIV::AUDIO_DEVICE; //Pa_HostApiDeviceIndexToDeviceIndex(UNIV::AUDIO_API,UNIV::AUDIO_DEVICE);
+	}
+	
         std::cout << "Input Device: " << inputDevice << std::endl;
         std::cout << "Output Device: " << outputDevice << std::endl;
         err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());

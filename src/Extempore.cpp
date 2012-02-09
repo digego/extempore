@@ -65,7 +65,13 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 #endif
 
 
-enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, OPT_CHANNELS, OPT_INITFILE, OPT_PORT, OPT_TERM};
+enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, OPT_CHANNELS, 
+       OPT_INITFILE, OPT_PORT, OPT_TERM
+#ifdef TARGET_OS_WINDOWS
+       , OPT_DEVICE
+#endif
+     };
+
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
   { OPT_RUNTIME,       "--runtime",       SO_REQ_SEP    },
@@ -75,6 +81,9 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_INITFILE,    "--run",           SO_REQ_SEP    },
     { OPT_PORT,        "--port",          SO_REQ_SEP    },
     { OPT_TERM,        "--term",          SO_REQ_SEP    },
+#ifdef TARGET_OS_WINDOWS
+    { OPT_DEVICE,      "--device",        SO_REQ_SEP    },
+#endif
     SO_END_OF_OPTIONS                       // END
 };
 
@@ -127,6 +136,11 @@ int main(int argc, char** argv)
 	    extemp::UNIV::EXT_TERM = 0;
 	  }
           break;
+#ifdef TARGET_OS_WINDOWS
+	case OPT_DEVICE:
+	  extemp::UNIV::AUDIO_DEVICE = atoi(args.OptionArg());
+          break;
+#endif
         default:
 	  std::cout << "Extempore's command line options: " << std::endl;
 	  std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
@@ -136,6 +150,9 @@ int main(int argc, char** argv)
 	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	  std::cout << "            --port: port for primary process [7099]" << std::endl;	
 	  std::cout << "            --term: either ansi or cmd" << std::endl;	
+#ifdef TARGET_OS_WINDOWS
+	  std::cout << "          --device: the index of the audiodevice to use" << std::endl;	
+#endif
 	  //delete(extemp::AudioDevice::I());
 	  return -1;	  
 	}
@@ -148,6 +165,10 @@ int main(int argc, char** argv)
 	std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	std::cout << "            --port: port for primary process [7099]" << std::endl;	
         std::cout << "            --term: either ansi or cmd" << std::endl;	
+#ifdef TARGET_OS_WINDOWS
+	std::cout << "          --device: the index of the audiodevice to use" << std::endl;	
+#endif
+
 	//delete(extemp::AudioDevice::I());
 	return -1;
         // handle error (see the error codes - enum ESOError)
