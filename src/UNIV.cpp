@@ -247,6 +247,7 @@ namespace extemp {
 
     uint32_t UNIV::FRAMES = 128;
     uint32_t UNIV::CHANNELS = 2;
+    uint32_t UNIV::IN_CHANNELS = 0;
     uint32_t UNIV::SAMPLERATE = 44100;
     uint32_t UNIV::SECOND = SAMPLERATE;
     uint32_t UNIV::MINUTE = SECOND * 60;
@@ -254,10 +255,7 @@ namespace extemp {
     uint64_t UNIV::TIME = 0l;
     uint64_t UNIV::DEVICE_TIME = 0l;
     const char* UNIV::PWD = "";
-
-#ifdef TARGET_OS_WINDOWS
     uint32_t UNIV::AUDIO_DEVICE = -1;
-#endif
 
     // 0 is for ansi, 1 is for MSDos CMD shell
 #ifdef TARGET_OS_WINDOWS

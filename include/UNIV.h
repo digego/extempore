@@ -87,6 +87,7 @@ class UNIV {
     
     public:
 	static uint32_t CHANNELS;
+	static uint32_t IN_CHANNELS;
 	static uint32_t SAMPLERATE;
 	static uint64_t TIME;
 	static uint64_t DEVICE_TIME;

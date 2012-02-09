@@ -65,11 +65,9 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 #endif
 
 
-enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, OPT_CHANNELS, 
-       OPT_INITFILE, OPT_PORT, OPT_TERM
-#ifdef TARGET_OS_WINDOWS
-       , OPT_DEVICE
-#endif
+enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, 
+       OPT_CHANNELS, OPT_IN_CHANNELS,
+       OPT_INITFILE, OPT_PORT, OPT_TERM, OPT_DEVICE
      };
 
 CSimpleOptA::SOption g_rgOptions[] = {
@@ -78,12 +76,11 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_SAMPLERATE,  "--samplerate",    SO_REQ_SEP    },
     { OPT_FRAMES,      "--frames",        SO_REQ_SEP    },
     { OPT_CHANNELS,    "--channels",      SO_REQ_SEP    },
+    { OPT_IN_CHANNELS, "--inchannels",    SO_REQ_SEP    },
     { OPT_INITFILE,    "--run",           SO_REQ_SEP    },
     { OPT_PORT,        "--port",          SO_REQ_SEP    },
     { OPT_TERM,        "--term",          SO_REQ_SEP    },
-#ifdef TARGET_OS_WINDOWS
     { OPT_DEVICE,      "--device",        SO_REQ_SEP    },
-#endif
     SO_END_OF_OPTIONS                       // END
 };
 
@@ -122,6 +119,9 @@ int main(int argc, char** argv)
         case OPT_CHANNELS:
 	  extemp::UNIV::CHANNELS = atoi(args.OptionArg());
 	  break;
+        case OPT_IN_CHANNELS:
+	  extemp::UNIV::IN_CHANNELS = atoi(args.OptionArg());
+	  break;
 	case OPT_PORT:
 	  primary_port = atoi(args.OptionArg());
 	  utility_port = primary_port-1;
@@ -136,23 +136,20 @@ int main(int argc, char** argv)
 	    extemp::UNIV::EXT_TERM = 0;
 	  }
           break;
-#ifdef TARGET_OS_WINDOWS
 	case OPT_DEVICE:
 	  extemp::UNIV::AUDIO_DEVICE = atoi(args.OptionArg());
           break;
-#endif
         default:
 	  std::cout << "Extempore's command line options: " << std::endl;
 	  std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
 	  std::cout << "      --samplerate: attempt to force samplerate [default device setting]" << std::endl; 
 	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
-	  std::cout << "        --channels: attempts to force num of audio channels [default device setting]" << std::endl;
+	  std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
+	  std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
 	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	  std::cout << "            --port: port for primary process [7099]" << std::endl;	
 	  std::cout << "            --term: either ansi or cmd" << std::endl;	
-#ifdef TARGET_OS_WINDOWS
 	  std::cout << "          --device: the index of the audiodevice to use" << std::endl;	
-#endif
 	  //delete(extemp::AudioDevice::I());
 	  return -1;	  
 	}
@@ -161,14 +158,12 @@ int main(int argc, char** argv)
 	std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
 	std::cout << "      --samplerate: attempt to force samplerate [default device setting]" << std::endl; 
 	std::cout << "          --frames: attempts to force frames [128]" << std::endl;
-	std::cout << "        --channels: attempts to force num of audio channels [default device setting]" << std::endl;
+	std::cout << "        --channels: attempts to force num of audio channels" << std::endl;
+	std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
 	std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	std::cout << "            --port: port for primary process [7099]" << std::endl;	
         std::cout << "            --term: either ansi or cmd" << std::endl;	
-#ifdef TARGET_OS_WINDOWS
 	std::cout << "          --device: the index of the audiodevice to use" << std::endl;	
-#endif
-
 	//delete(extemp::AudioDevice::I());
 	return -1;
         // handle error (see the error codes - enum ESOError)

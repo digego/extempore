@@ -899,8 +899,10 @@ namespace extemp {
 
     void AudioDevice::start()
     {
-        Pa_Initialize();
-        //std::cout << "Initializing AudioDevice: " << std::endl;
+
+	Pa_Initialize();
+        std::cout << "Initializing AudioDevice: " << std::endl;
+        printf("\n-----Available Audio Drivers-------\n");
         PaError err;
 
 	int numDevices = Pa_GetDeviceCount();
@@ -909,7 +911,7 @@ namespace extemp {
 	    printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
             exit(1);
 	}
-        char* hostapi_strs[15] = {"InDevelopment","DirectSound","MME","ASIO","SoundManager","CoreAudio","OSS","ALSA","AL","BeOS","WDMKS","JACK","WASAPI","AudioScienceHPI"};
+        
         const   PaDeviceInfo *deviceInfo;
         const   PaHostApiInfo* apiInfo;
 	for( int i=0; i<numDevices; i++ ) {
@@ -917,22 +919,49 @@ namespace extemp {
           apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
 	  printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
 	}    
+        printf("-----------------------------------\n\n");
 
 	int inputDevice = Pa_GetDefaultInputDevice();
 	int outputDevice = Pa_GetDefaultOutputDevice();     
 
-	if(UNIV::AUDIO_DEVICE > 0) {
+	if(UNIV::AUDIO_DEVICE != -1) {
+          PaStreamParameters pain;
+          PaStreamParameters paout;
+	  deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_DEVICE );
+	  //std::cout << "INC: " << UNIV::IN_CHANNELS << "  OUTC: " << UNIV::CHANNELS << "  name: " << deviceInfo->name <<  std::endl;
+
+          pain.channelCount=UNIV::IN_CHANNELS;
+          pain.device=UNIV::AUDIO_DEVICE;
+          pain.hostApiSpecificStreamInfo=NULL;
+          pain.sampleFormat=paFloat32;
+          pain.suggestedLatency = deviceInfo->defaultLowInputLatency;
+          pain.hostApiSpecificStreamInfo = NULL;
+          PaStreamParameters* painptr = &pain;
+          if(UNIV::IN_CHANNELS<1) painptr=NULL;
+
+          paout.channelCount=UNIV::CHANNELS;
+          paout.device=UNIV::AUDIO_DEVICE;
+          paout.hostApiSpecificStreamInfo=NULL;
+          paout.sampleFormat=paFloat32;
+          paout.suggestedLatency = deviceInfo->defaultLowOutputLatency;
+          paout.hostApiSpecificStreamInfo = NULL;
+          PaStreamParameters* paoutptr = &paout;
+          if(UNIV::CHANNELS<1) paoutptr=NULL;
+
 	  inputDevice = UNIV::AUDIO_DEVICE; //Pa_HostApiDeviceIndexToDeviceIndex(UNIV::AUDIO_API,UNIV::AUDIO_DEVICE);
 	  outputDevice = UNIV::AUDIO_DEVICE; //Pa_HostApiDeviceIndexToDeviceIndex(UNIV::AUDIO_API,UNIV::AUDIO_DEVICE);
+          err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback, (void*)TaskScheduler::I());
+	}else{
+          err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
 	}
-	
-        std::cout << "Input Device: " << inputDevice << std::endl;
-        std::cout << "Output Device: " << outputDevice << std::endl;
-        err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
+        //std::cout << "Input Device: " << inputDevice << std::endl;
+        //std::cout << "Output Device: " << outputDevice << std::endl;
+
 	if(err != paNoError) {
-   	    ascii_text_color(1,1,10);
+   	    ascii_text_color(1,1,10);            
 	    std::cerr << "PortAudio Initialization Error: " << Pa_GetErrorText(err) << std::endl;
-	ascii_text_color(0,7,10); 
+	    std::cerr << "PortAudio Device: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
+	    ascii_text_color(0,7,10); 
 	    exit(1);
 	}
         //UNIV::CHANNELS = 2;
@@ -943,8 +972,15 @@ namespace extemp {
         UNIV::initRand();        
 
         err = Pa_StartStream(stream);
-	ascii_text_color(1,1,10);
-	if(err != paNoError) { std::cout << "PortAudio ERROR: " << Pa_GetErrorText(err) << std::endl; }
+	
+	if(err != paNoError) {        
+           ascii_text_color(1,1,10);    
+           std::cout << "PortAudio ERROR: " << Pa_GetErrorText(err) << std::endl; 
+           std::cerr << "PortAudio Device: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
+	   ascii_text_color(0,7,10); 
+	   exit(1);
+        }
+	    
 	ascii_text_color(0,9,10);
 	RUNNING = true;
 	//queueThread->Start();
@@ -952,7 +988,7 @@ namespace extemp {
 
 	ascii_text_color(1,7,10);
 	std::cout << "---PortAudio---" << std::endl;
-        std::cout << "Loaded Default Audio Device: " << std::endl;	
+        std::cout << "Audio Device: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;	
 	ascii_text_color(0,7,10);	
         std::cout << "SampleRate\t: " << std::flush;
 	ascii_text_color(1,6,10);	
