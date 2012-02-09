@@ -628,6 +628,58 @@ double llvm_samplerate()
     return (double) extemp::UNIV::SAMPLERATE;
 }
 
+double imp_rand()
+{
+    return (double)rand()/(double)RAND_MAX;
+}
+/*
+define double @imp_rand()
+{
+entry:
+%tmp = call i32 @rand()
+%tmp1 = sitofp i32 %tmp to double
+%tmp2 = fdiv double %tmp1, 32767.0 ; 2147483647.0
+ret double %tmp2
+}
+*/
+
+int64_t imp_rand1(double a)
+{
+  return (int64_t)((double)rand()/(double)RAND_MAX)*a;
+}
+
+/*
+define i64 @imp_rand1(double %a)
+{
+entry:
+%tmp = call i32 @rand()
+%tmp1 = sitofp i32 %tmp to double
+%tmp2 = fdiv double %tmp1, 32767.0 ; 2147483647.0
+%tmp3 = fmul double %a, %tmp2
+%tmp4 = fptosi double %tmp3 to i64
+ret i64 %tmp4
+}
+*/
+
+int64_t imp_rand2(double a, double b)
+{
+  return (int64_t) a+(((double)rand()/(double)RAND_MAX)*(b-a));
+}
+/*
+define i64 @imp_rand2(double %a, double %b)
+{
+entry:
+%tmp = call i32 @rand()
+%tmp1 = sitofp i32 %tmp to double
+%tmp2 = fdiv double %tmp1, 32767.0 ; 2147483647.0
+%tmp3 = fsub double %b, %a
+%tmp4 = fmul double %tmp3, %tmp2
+%tmp5 = fadd double %a, %tmp4
+%tmp6 = fptosi double %tmp5 to i64
+ret i64 %tmp6
+}
+*/
+
 
 ///////////////////////////////////
 
@@ -1114,6 +1166,15 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&unswap32i);
 	    gv = M->getNamedValue(std::string("unswap32f"));
 	    EE->updateGlobalMapping(gv,(void*)&unswap32f);	
+
+	    gv = M->getNamedValue(std::string("imp_rand"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand);	
+	    gv = M->getNamedValue(std::string("imp_rand1"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand1);	
+	    gv = M->getNamedValue(std::string("imp_rand2"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand2);	
+
+
 #ifdef TARGET_OS_WINDOWS
 	    gv = M->getNamedValue(std::string("log2"));
 	    EE->updateGlobalMapping(gv,(void*)&log2);		

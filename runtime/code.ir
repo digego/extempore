@@ -3117,6 +3117,10 @@ declare void @llvm_string_set(i8*, i32, i8)
 declare i8 @llvm_string_ref(i8*, i32)
 
 
+declare double @imp_rand()
+declare i64 @imp_rand1(double)
+declare i64 @imp_rand2(double,double)
+
 declare void @llvm_destroy_zone_after_delay(%mzone*, i64)
 declare void @free_after_delay(i8*, double)
 
@@ -3158,39 +3162,6 @@ ret i8* %e
 
 declare i64 @llvm_now()
 declare double @llvm_samplerate()
-
-define double @imp_rand()
-{
-entry:
-%tmp = call i32 @rand()
-%tmp1 = sitofp i32 %tmp to double
-%tmp2 = fdiv double %tmp1, 2147483647.0
-ret double %tmp2
-}
-
-define i64 @imp_rand1(double %a)
-{
-entry:
-%tmp = call i32 @rand()
-%tmp1 = sitofp i32 %tmp to double
-%tmp2 = fdiv double %tmp1, 2147483647.0
-%tmp3 = fmul double %a, %tmp2
-%tmp4 = fptosi double %tmp3 to i64
-ret i64 %tmp4
-}
-
-define i64 @imp_rand2(double %a, double %b)
-{
-entry:
-%tmp = call i32 @rand()
-%tmp1 = sitofp i32 %tmp to double
-%tmp2 = fdiv double %tmp1, 2147483647.0
-%tmp3 = fsub double %b, %a
-%tmp4 = fmul double %tmp3, %tmp2
-%tmp5 = fadd double %a, %tmp4
-%tmp6 = fptosi double %tmp5 to i64
-ret i64 %tmp6
-}
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
