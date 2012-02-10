@@ -39,6 +39,11 @@
 #include <stdint.h>
 #include "SchemePrivate.h"
 
+#ifdef EXT_BOOST
+#include <boost/random.hpp>
+#include <boost/random/mersenne_twister.hpp>
+#endif
+
 #include <string>
 
 #ifdef TARGET_OS_WINDOWS
@@ -98,7 +103,12 @@ class UNIV {
 	static const char* PWD;
         static uint32_t EXT_TERM;
         static uint32_t AUDIO_DEVICE;
-
+        static uint32_t AUDIO_IN_DEVICE;
+#ifdef EXT_BOOST
+        static boost::mt19937 RNGGEN;
+        static boost::uniform_01<boost::mt19937> RNG;
+        //static boost::random::uniform_01<boost::random::mt19937> RNG(RNGGEN);
+#endif
 
 	static double midi2frq(double pitch);
 	static double frqRatio(double semitones);
@@ -107,6 +117,8 @@ class UNIV {
 	static double random();
 	static bool file_check(const std::string& filename);	
 	static void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
+     
+ private:
 	
     };
 

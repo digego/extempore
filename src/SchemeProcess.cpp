@@ -221,7 +221,10 @@ namespace extemp {
 	{     
 		//std::cout << "ACCEPT_HANDLER" << std::endl;
 		if (!error) {
-			std::cout << "New Connection" << std::endl;
+                        ascii_text_color(1,7,10);
+		        std::cout << "New client connection" << std::endl;
+                        ascii_text_color(0,9,10); 
+                        fflush(NULL);
 			boost::asio::ip::tcp::acceptor* server_socket = scm->getServerSocket();        
 			boost::asio::io_service* io_service = scm->getIOService();
 			bool with_banner = scm->withBanner();
@@ -745,6 +748,9 @@ namespace extemp {
 #ifdef EXT_BOOST    
 	void* SchemeProcess::impromptu_server_thread(void* obj_p)
 	{
+	        // seed rng for process
+    	        UNIV::initRand();
+
 		SchemeProcess* scm = (SchemeProcess*) obj_p;
 		boost::asio::io_service* io_service = scm->getIOService();
 		boost::asio::io_service::work work(*io_service);
@@ -755,6 +761,9 @@ namespace extemp {
 #else
 	void* SchemeProcess::impromptu_server_thread(void* obj_p)
 	{
+	        // seed rng for process
+    	        UNIV::initRand();
+
 		SchemeProcess* scm = (SchemeProcess*) obj_p;
 		bool with_banner = scm->withBanner();
 
@@ -763,7 +772,7 @@ namespace extemp {
 		{
 			usleep(1000);
 		}
-
+                
 		//CAGuard& guard = scm->getGuard();
 		EXTMonitor& guard = scm->getGuard();
 		std::queue<SchemeTask>& taskq = scm->getQueue();

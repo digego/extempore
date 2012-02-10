@@ -630,7 +630,11 @@ double llvm_samplerate()
 
 double imp_rand()
 {
+#ifdef EXT_BOOST
+  return extemp::UNIV::random();
+#else
     return (double)rand()/(double)RAND_MAX;
+#endif
 }
 /*
 define double @imp_rand()
@@ -645,7 +649,11 @@ ret double %tmp2
 
 int64_t imp_rand1(double a)
 {
+#ifdef EXT_BOOST
+  return (int64_t) extemp::UNIV::random()*a;
+#else
   return (int64_t)((double)rand()/(double)RAND_MAX)*a;
+#endif
 }
 
 /*
@@ -663,7 +671,11 @@ ret i64 %tmp4
 
 int64_t imp_rand2(double a, double b)
 {
+#ifdef EXT_BOOST
+  return (int64_t) a+(extemp::UNIV::random()*(b-a));
+#else
   return (int64_t) a+(((double)rand()/(double)RAND_MAX)*(b-a));
+#endif
 }
 /*
 define i64 @imp_rand2(double %a, double %b)
@@ -982,7 +994,7 @@ namespace extemp {
 		exit(1);
 	    }
 	    EE->DisableLazyCompilation(true);
-	    std::cout << "Lazy Compilation: OFF" << std::endl;
+	    //std::cout << "Lazy Compilation: OFF" << std::endl;
 
 			
 	    //EE = llvm::EngineBuilder(M).create();

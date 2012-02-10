@@ -755,6 +755,31 @@
 				   (*sys:toplevel-continuation* 0)))))
 	return-val))))
 
+(define ipc:mapcall
+  (lambda (func process-lst . args-lists)
+    (let* ((callback-proc (ipc:get-process-name))
+	   (results '())
+	   (loopK '()))
+      (let ((pos (call/cc (lambda (kk) (set! loopK kk) 0))))
+	(if (< pos (length process-lst))
+	    (let ((z (list-ref process-lst pos))
+		  (ags (if (null? args-lists) #f (list-ref args-lists pos))))
+	      (let loop ((i *ipc:active-label-cnt*))
+		(if (not (null? (vector-ref *ipc:active-labels* i)))
+		    (loop (modulo (+ i 1) *ipc:active-label-buffer-size*))
+		    (set! *ipc:active-label-cnt* i)))
+	      (apply ipc:call-async z 'ipc:sync-receive callback-proc
+		     *ipc:active-label-cnt* func (if (null? args-lists) '() ags))
+	      (let ((return-val (call/cc (lambda (k)
+					   (vector-set! *ipc:active-labels* *ipc:active-label-cnt* k)
+					   (loopK (+ pos 1))))))
+		(set! results (cons return-val results))
+		(if (< (length results) (length process-lst))
+		    (*sys:toplevel-continuation* 0)
+		    results)))
+	    (*sys:toplevel-continuation*))))))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

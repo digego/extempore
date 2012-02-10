@@ -97,6 +97,11 @@ namespace extemp {
 #elif defined (___ALSA_AUDIO___)
 	snd_pcm_t* get_pcm_handle() { return pcm_handle; }	
 	float* getBuffer() { return buffer; }
+#elif defined (TARGET_OS_MAC)
+
+#else  //  must be portaudio
+        static void printDevices();
+         
 #endif
 
 	static double CLOCKBASE;

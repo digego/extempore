@@ -901,37 +901,43 @@ namespace extemp {
     {
 
 	Pa_Initialize();
-        std::cout << "Initializing AudioDevice: " << std::endl;
-        printf("\n-----Available Audio Drivers-------\n");
+        //printf("\n-----Available Audio Drivers-------\n");
         PaError err;
 
 	int numDevices = Pa_GetDeviceCount();
 	if( numDevices < 0 ) {
-	  printf("No audio devices found!\n");
-	    printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
-            exit(1);
+   	  printf("No audio devices found!\n");
+	  printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
+          exit(1);
 	}
+
         
         const   PaDeviceInfo *deviceInfo;
         const   PaHostApiInfo* apiInfo;
+        /*
 	for( int i=0; i<numDevices; i++ ) {
 	  deviceInfo = Pa_GetDeviceInfo( i );
           apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
 	  printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
-	}    
-        printf("-----------------------------------\n\n");
-
+	} 
+        */   
+        //printf("-----------------------------------\n\n");
 	int inputDevice = Pa_GetDefaultInputDevice();
 	int outputDevice = Pa_GetDefaultOutputDevice();     
 
 	if(UNIV::AUDIO_DEVICE != -1) {
           PaStreamParameters pain;
           PaStreamParameters paout;
-	  deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_DEVICE );
-	  //std::cout << "INC: " << UNIV::IN_CHANNELS << "  OUTC: " << UNIV::CHANNELS << "  name: " << deviceInfo->name <<  std::endl;
 
-          pain.channelCount=UNIV::IN_CHANNELS;
+	  //std::cout << "INC: " << UNIV::IN_CHANNELS << "  OUTC: " << UNIV::CHANNELS << "  name: " << deviceInfo->name <<  std::endl;
+	  deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_DEVICE );
           pain.device=UNIV::AUDIO_DEVICE;
+          if(UNIV::AUDIO_IN_DEVICE != -1) {
+             deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_IN_DEVICE );
+   	     inputDevice = UNIV::AUDIO_IN_DEVICE;
+             pain.device=UNIV::AUDIO_IN_DEVICE;
+	  }
+          pain.channelCount=UNIV::IN_CHANNELS;
           pain.hostApiSpecificStreamInfo=NULL;
           pain.sampleFormat=paFloat32;
           pain.suggestedLatency = deviceInfo->defaultLowInputLatency;
@@ -939,6 +945,8 @@ namespace extemp {
           PaStreamParameters* painptr = &pain;
           if(UNIV::IN_CHANNELS<1) painptr=NULL;
 
+	  deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_DEVICE );
+	  outputDevice = UNIV::AUDIO_DEVICE;
           paout.channelCount=UNIV::CHANNELS;
           paout.device=UNIV::AUDIO_DEVICE;
           paout.hostApiSpecificStreamInfo=NULL;
@@ -948,8 +956,6 @@ namespace extemp {
           PaStreamParameters* paoutptr = &paout;
           if(UNIV::CHANNELS<1) paoutptr=NULL;
 
-	  inputDevice = UNIV::AUDIO_DEVICE; //Pa_HostApiDeviceIndexToDeviceIndex(UNIV::AUDIO_API,UNIV::AUDIO_DEVICE);
-	  outputDevice = UNIV::AUDIO_DEVICE; //Pa_HostApiDeviceIndexToDeviceIndex(UNIV::AUDIO_API,UNIV::AUDIO_DEVICE);
           err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback, (void*)TaskScheduler::I());
 	}else{
           err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
@@ -966,7 +972,6 @@ namespace extemp {
 	}
         //UNIV::CHANNELS = 2;
         //UNIV::SAMPLERATE = 44100;
-
 
 	if(started) return;
         UNIV::initRand();        
@@ -1014,6 +1019,31 @@ namespace extemp {
 	if(err != paNoError) std::cout << "PA Error: " << Pa_GetErrorText(err) << std::endl;    
 	started = false;
     }
+
+  void AudioDevice::printDevices() {
+	Pa_Initialize();
+        printf("\n-----Available Audio Drivers-------\n");
+        PaError err;
+
+	int numDevices = Pa_GetDeviceCount();
+	if( numDevices < 0 ) {
+   	  printf("No audio devices found!\n");
+	  printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
+          exit(1);
+	}
+        
+        const   PaDeviceInfo *deviceInfo;
+        const   PaHostApiInfo* apiInfo;
+	for( int i=0; i<numDevices; i++ ) {
+	  deviceInfo = Pa_GetDeviceInfo( i );
+          apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+	  printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
+	}    
+        printf("-----------------------------------\n\n");
+        Pa_Terminate();
+        return;
+  }
+
 #endif
 
 

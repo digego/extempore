@@ -256,6 +256,11 @@ namespace extemp {
     uint64_t UNIV::DEVICE_TIME = 0l;
     const char* UNIV::PWD = "";
     uint32_t UNIV::AUDIO_DEVICE = -1;
+    uint32_t UNIV::AUDIO_IN_DEVICE = -1;
+#ifdef EXT_BOOST
+    boost::mt19937 UNIV::RNGGEN;
+    boost::uniform_01<boost::mt19937> UNIV::RNG(UNIV::RNGGEN);
+#endif
 
     // 0 is for ansi, 1 is for MSDos CMD shell
 #ifdef TARGET_OS_WINDOWS
@@ -266,20 +271,29 @@ namespace extemp {
 
     void UNIV::initRand() {
 #ifdef TARGET_OS_WINDOWS
-	srand(0);
+      printf("SEED RNG: %d\n",(int)UNIV::DEVICE_TIME);
+      srand((int)UNIV::DEVICE_TIME); ///UNIV::SECOND));
 #elif TARGET_OS_LINUX
-	srand(0);
+      srand((int)(UNIT::DEVICE_TIME/UNIV::SECOND));
 #else
-	sranddev();
+      sranddev();
 #endif
     }
     
     int UNIV::random(int range) {
-	return (int)((double)rand() / (double)RAND_MAX * (double) range);
+#ifdef EXT_BOOST
+        return (int) (RNG()*(double)range);
+#else
+        return (int)((double)rand() / (double)RAND_MAX * (double) range);
+#endif
     }
 
     double UNIV::random() {
+#ifdef EXT_BOOST
+        return RNG();
+#else      
 	return (double)rand() / (double)RAND_MAX;
+#endif
     }
 
     double UNIV::midi2frq(double pitch)
@@ -309,6 +323,7 @@ namespace extemp {
 	pointer envir; 
 	pointer code; 
     }; 	
+
 	
     void UNIV::printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full, bool stringquotes)
     {

@@ -186,7 +186,7 @@ namespace extemp {
 	//ascii_text_color(1,9,10);
 	printf("Trying to connect to ");
 	//ascii_text_color(1,6,10);
-	printf("'%s'",hostname.c_str()); 
+	printf("'%s'",hostname.c_str());
 	//ascii_text_color(1,9,10);
 	printf(" on port ");
 	//ascii_text_color(1,6,10);
@@ -204,7 +204,7 @@ namespace extemp {
 	boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(newQuery);
 
 	boost::asio::ip::tcp::endpoint ep = *iter;
-	std::cout << "resolved: " << ep << std::endl << std::flush;
+	//std::cout << "resolved: " << ep << std::endl << std::flush;
         if(iter == end) {
 #else
 	hen = gethostbyname(hostname.c_str());
@@ -286,6 +286,7 @@ namespace extemp {
 	printf("Successfully"); 	
 	ascii_text_color(0,9,10);
 	printf(" connected to remote process\n");
+        fflush(NULL);
 	connected = true;
 	read_thread.create(&readThread,this);
 	return true;
