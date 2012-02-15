@@ -126,13 +126,13 @@ int main(int argc, char** argv)
         case OPT_IN_CHANNELS:
 	  extemp::UNIV::IN_CHANNELS = atoi(args.OptionArg());
 	  break;
-	case OPT_PORT:
-	  primary_port = atoi(args.OptionArg());
-	  utility_port = primary_port-1;
         case OPT_INITFILE:
 	  initfile = std::string(args.OptionArg());
 	  initfile_on = true;	  
 	  break;
+	case OPT_PORT:
+	  primary_port = atoi(args.OptionArg());
+	  utility_port = primary_port-1;
         case OPT_TERM:
           if(strcmp(args.OptionArg(),"cmd")==0) {
 	    extemp::UNIV::EXT_TERM = 1;
@@ -208,7 +208,6 @@ int main(int argc, char** argv)
     std::cout << std::endl;
     ascii_text_color(0,9,10);
     fflush(NULL);    
-
 		
     extemp::UNIV::PWD = runtimedir.c_str();
     extemp::EXTLLVM::I()->initLLVM();

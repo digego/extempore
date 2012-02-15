@@ -271,7 +271,6 @@ namespace extemp {
 
     void UNIV::initRand() {
 #ifdef TARGET_OS_WINDOWS
-      printf("SEED RNG: %d\n",(int)UNIV::DEVICE_TIME);
       srand((int)UNIV::DEVICE_TIME); ///UNIV::SECOND));
 #elif TARGET_OS_LINUX
       srand((int)(UNIT::DEVICE_TIME/UNIV::SECOND));
