@@ -670,7 +670,8 @@
                  (let* ((t1 (impc:ti:numeric-check ast vars kts #f))
                         (t2 (cl:intersection (list request?) t1)))
                     t2))
-                (else (print-error 'Compiler 'Error: 'shouldn't 'reach 'here 'in 'numeric 'check 'request? request?)))
+                (else (print-error 'Compiler 'Error: 'shouldn't 'reach 'here 'in 'numeric 'check 'request? request?)
+		      (print-error '-> 'You 'might 'be 'using 'a 'pref 'where 'you 'should 'be 'using 'a 'tref?)))
           (if (integer? ast)  ;; preference goes to start of list
               (if (< ast 256)
                   (list *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8* *impc:ir:double* *impc:ir:float*)
