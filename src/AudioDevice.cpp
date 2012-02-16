@@ -943,13 +943,12 @@ namespace extemp {
           pain.suggestedLatency = deviceInfo->defaultLowInputLatency;
           pain.hostApiSpecificStreamInfo = NULL;
           PaStreamParameters* painptr = &pain;
-          if(UNIV::IN_CHANNELS<1) painptr=NULL;
+          if(UNIV::IN_CHANNELS<1) painptr=NULL;	  
 
 	  deviceInfo = Pa_GetDeviceInfo( UNIV::AUDIO_DEVICE );
 	  outputDevice = UNIV::AUDIO_DEVICE;
           paout.channelCount=UNIV::CHANNELS;
           paout.device=UNIV::AUDIO_DEVICE;
-          paout.hostApiSpecificStreamInfo=NULL;
           paout.sampleFormat=paFloat32;
           paout.suggestedLatency = deviceInfo->defaultLowOutputLatency;
           paout.hostApiSpecificStreamInfo = NULL;
@@ -985,7 +984,10 @@ namespace extemp {
 	   ascii_text_color(0,7,10); 
 	   exit(1);
         }
-	    
+	
+        const PaStreamInfo* info = Pa_GetStreamInfo(stream);
+	//std::cout << "Stream latency: " << info->outputLatency << std::endl;       
+
 	ascii_text_color(0,9,10);
 	RUNNING = true;
 	//queueThread->Start();
@@ -993,8 +995,11 @@ namespace extemp {
 
 	ascii_text_color(1,7,10);
 	std::cout << "---PortAudio---" << std::endl;
-        std::cout << "Audio Device: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;	
-	ascii_text_color(0,7,10);	
+	ascii_text_color(0,7,10);
+        std::cout << "Audio Device\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;	
+	ascii_text_color(0,7,10);
         std::cout << "SampleRate\t: " << std::flush;
 	ascii_text_color(1,6,10);	
 	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
@@ -1007,6 +1012,10 @@ namespace extemp {
 	ascii_text_color(1,6,10);	
 	std::cout << UNIV::FRAMES << std::endl << std::flush;
 	ascii_text_color(0,7,10); 
+        std::cout << "Latency\t\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << info->outputLatency << std::endl << std::flush;
+	ascii_text_color(0,7,10);	
 	std::cout << std::endl << std::flush;
 	//ascii_text_color(0,7,10);
 
