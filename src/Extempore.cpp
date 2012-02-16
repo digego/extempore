@@ -146,9 +146,11 @@ int main(int argc, char** argv)
 	case OPT_IN_DEVICE:
 	  extemp::UNIV::AUDIO_IN_DEVICE = atoi(args.OptionArg());
           break;
+#if !(defined (JACK_AUDIO) || defined (___ALSA_AUDIO___) || defined (TARGET_OS_MAC))
 	case OPT_PRT_DEVICES:
           extemp::AudioDevice::printDevices();
 	  return -1;
+#endif
         case OPT_REALTIME:
 #ifdef TARGET_OS_WINDOWS          
           SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
