@@ -239,18 +239,18 @@
       (fluid-diffuse 1 Vx0 Vx visc dt iter Ny N)
       (fluid-diffuse 2 Vy0 Vy visc dt iter Ny N)
       
-      ;; (dotimes (k (* Ny N))
-      ;; 	(pset! Vx k 0.0)
-      ;; 	(pset! Vy k 0.0))
+      (dotimes (k (* Ny N))
+      	(pset! Vx k 0.0)
+      	(pset! Vy k 0.0))
 
       (fluid-project Vx0 Vy0 Vx Vy iter Ny N)
 
       (fluid-advect 1 Vx Vx0 Vx0 Vy0 dt Ny N)
       (fluid-advect 2 Vy Vy0 Vx0 Vy0 dt Ny N)
 
-      ;; (dotimes (kk (* Ny N))
-      ;; 	(pset! Vx0 kk 0.0)
-      ;; 	(pset! Vy0 kk 0.0))      
+      (dotimes (kk (* Ny N))
+      	(pset! Vx0 kk 0.0)
+      	(pset! Vy0 kk 0.0))      
             
       (fluid-project Vx Vy Vx0 Vy0 iter Ny N)
 
@@ -388,9 +388,8 @@
 		(xv (pref Vx idx))
 		(yv (pref Vy idx))		
 		(norm (* 1.0 (sqrt (+ (* xv xv) (* yv yv)))))
-		(n1 1.0)) ;(fabs (/ norm 0.5))))
+		(n1 0.2)) ;(fabs (/ norm 0.5))))
 	    ;(set! norm (* 0.125 norm))
-	    ;(set! norm (* 0.0 norm))	    
 	    (if (> norm mn) (set! mn norm))
 	    (pset! point_data (+ 0 (* 4 cnt)) (i64tof ii))
 	    (pset! point_data (+ 1 (* 4 cnt)) (+ offset (i64tof jj)))
@@ -476,10 +475,10 @@
       (glColorPointer 4 GL_FLOAT 0 (bitcast color_data1 i8*))	
       (glDrawArrays GL_POINTS 0 (i64toi32 (/ (* 320 180) 1))) ; size-y)))      
       
-      ;; (set-data-arrays-lines (get-fluid-cube) point_data2 color_data2 0.0 1)
-      ;; (glVertexPointer 2 GL_FLOAT 0 (bitcast point_data2 i8*))
-      ;; (glColorPointer 4 GL_FLOAT 0 (bitcast color_data2 i8*))	
-      ;; (glDrawArrays GL_LINES 0 (i64toi32 (/ (* 320 180 2) 1))) ; size-y)))
+      (set-data-arrays-lines (get-fluid-cube) point_data2 color_data2 0.0 1)
+      (glVertexPointer 2 GL_FLOAT 0 (bitcast point_data2 i8*))
+      (glColorPointer 4 GL_FLOAT 0 (bitcast color_data2 i8*))	
+      (glDrawArrays GL_LINES 0 (i64toi32 (/ (* 320 180 2) 1))) ; size-y)))
 
       
       (glDisableClientState GL_VERTEX_ARRAY)
