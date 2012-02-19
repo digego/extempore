@@ -26,6 +26,7 @@
 (bind-lib hordelib h3dAddNodes [i32,i32,i32]*)
 (bind-lib hordelib h3dRemoveNode [void,i32]*)
 (bind-lib hordelib h3dSetNodeTransform [void,i32,float,float,float,float,float,float,float,float,float]*)
+(bind-lib hordelib h3dGetNodeTransform [void,i32,float*,float*,float*,float*,float*,float*,float*,float*,float*]*)
 (bind-lib hordelib h3dSetupModelAnimStage [void,i32,i32,i32,i32,i8*,i1]*)
 (bind-lib hordelib h3dAddModelNode [i32,i32,i8*,i32]*)
 (bind-lib hordelib h3dAddMeshNode [i32,i32,i8*,i32,i32,i32,i32,i32]*)
@@ -153,3 +154,23 @@
 
 ;; ROOT NODE
 (bind-val H3DRootNode i32 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Some helper functions
+
+(definec rotate-joint
+  (lambda (obj name x y z)
+    ;; rotate chest joint
+    (h3dFindNodes obj name H3DNodeTypes_Joint)
+    (let ((joint (h3dGetNodeFindResult 0))
+	  (dat (salloc 9 float)))
+      (h3dGetNodeTransform joint
+			   (pref-ptr dat 0) (pref-ptr dat 1) (pref-ptr dat 2)
+			   (pref-ptr dat 3) (pref-ptr dat 4) (pref-ptr dat 5)
+			   (pref-ptr dat 6) (pref-ptr dat 7) (pref-ptr dat 8))
+      (h3dSetNodeTransform joint
+			   (pref dat 0) (pref dat 1) (pref dat 2)
+			   (+ (pref dat 3) x)
+			   (+ (pref dat 4) y)
+			   (+ (pref dat 5) z)
+			   (pref dat 6) (pref dat 7) (pref dat 8)))))    

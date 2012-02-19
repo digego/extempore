@@ -2849,6 +2849,7 @@ namespace extemp {
  
   pointer SchemeFFI::getEvent(scheme* _sc, pointer args)
   {
+    //std::cout << "GET EVENTS!" << std::endl;
     // this here to stop opengl swap buffer code from pinching out input events before we get to them    
     if(EXT_WIN_MSG_MASK==PM_REMOVE) { // this is a temporary hack!
       EXT_WIN_MSG_MASK = PM_REMOVE | PM_QS_PAINT | PM_QS_POSTMESSAGE | PM_QS_SENDMESSAGE;
@@ -3050,7 +3051,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 
     if (fullScreen){ // if fullscreen
-        dwExStyle = WS_EX_APPWINDOW;
+        dwExStyle = WS_EX_APPWINDOW | WS_EX_TOPMOST ;
         wndStyle = WS_POPUP;
         screenmode = 1; //FULLSCREEN
         posx = 0;
@@ -3060,7 +3061,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         // change resolution before the window is created
         //SysSetDisplayMode(screenw, screenh, SCRDEPTH);
     }else{
-        dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE; //window extended style
+      dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_TOPMOST ; //window extended style
         wndStyle = WS_OVERLAPPEDWINDOW; //windows style         
         screenmode = 0; //not fullscreen
     }
@@ -3108,6 +3109,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     
     ShowWindow(hwnd, SW_SHOW);		// everything went OK, show the window
     UpdateWindow(hwnd);
+    SetWindowPos(hwnd,HWND_TOPMOST,posx,posy,width,height,SWP_NOOWNERZORDER);
     
     /* Bind the GLX context to the Window */
     wglMakeCurrent( hdc,hglrc );

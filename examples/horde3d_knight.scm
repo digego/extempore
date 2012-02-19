@@ -141,6 +141,7 @@
       1)))
 
 
+
 (definec mainLoop
   (let ((fps:float 30.0))
     (lambda (_at:double)
@@ -149,7 +150,7 @@
       (h3dSetOption H3DOptions_WireframeMode 0.0)
       (set! _at (+ _at 0.025))
       
-      (h3dSetModelAnimParams _knight 0 (* (dtof _at) 24.0) 24.0) ;_weight)
+      (h3dSetModelAnimParams _knight 0 (* (dtof (* 0.5 _at)) 24.0) 24.0) ;_weight)     
       
       (let ((cnt (h3dFindNodes _particleSys "" H3DNodeTypes_Emitter))
 	    (i 0))
@@ -161,17 +162,17 @@
       	(dotimes (i3 cnt3)
       	  (h3dAdvanceEmitterTime (h3dGetNodeFindResult i3) (/ 1.0 _curFPS))))
 
-      (h3dSetNodeTransform light 5.0 15.0 20.0
+      (h3dSetNodeTransform light 4.0 9.0 3.0
 			         -60.0 0.0  0.0
 				 1.0  1.0  1.0)
 
       (h3dSetNodeTransform _cam
-			   (+ (* 30.0 (dtof (cos (* 1.0 _at)))) 0.0)
+			   (+ (* 25.0 (dtof (cos (* 0.25 _at)))) 0.0)
 			   5.0
-			   (+ (* 30.0 (dtof (sin (* 1.0 _at)))) 0.0)
+			   (+ (* 25.0 (dtof (sin (* 0.25 _at)))) 0.0)
 			   0.0
-			   (dtof (* 57.295791 (atan2 (cos (* 1.0 _at))
-						     (sin (* 1.0 _at)))))
+			   (dtof (* 57.295791 (atan2 (cos (* 0.25 _at))
+						     (sin (* 0.25 _at)))))
 			   0.0
 			   1.0 1.0 1.0)
       (h3dRender _cam)
@@ -183,12 +184,12 @@
 
 ;; standard impromptu callback
 (define opengl-test
-  (lambda (time degree)
-    (if (< time (now))
-	(println 'opengl-test-behind (- time (now))))
-    (mainLoop degree)
+  (lambda (beat dur)
+    (if (< (*metro* beat) (now))
+    	(println 'opengl-test-behind (- (*metro* beat) (now))))
+    (mainLoop beat)
     (gl:swap-buffers pr2)
-    (callback (+ time 100) 'opengl-test (+ time 1800) (+ degree 0.025))))
+    (callback (*metro* (+ beat (* dur .125))) 'opengl-test (+ beat dur) dur)))
 
 
 (define start
@@ -198,7 +199,7 @@
 	  (interaction-environment))
     (h3d_init)
     (resize 900.0 600.0)
-    (opengl-test (now) 0.0)))
+    (opengl-test (*metro* 'get-beat 4) 1/12)))
 
 
 ;; setup new process

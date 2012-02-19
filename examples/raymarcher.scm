@@ -6,14 +6,12 @@
 ;; http://www.iquilezles.org/
 ;; 
 
-(define libglu (if (string=? "Linux" (sys:platform))
-		   (sys:open-dylib "libGLU.so")
-		   (if (string=? "Windows" (sys:platform))
-		       (sys:open-dylib "Glu32.dll")
-		       (sys:open-dylib "OpenGL.framework/OpenGL"))))
-(bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
-(bind-lib libglu gluPerspective [void,double,double,double,double]*)
-(bind-lib libglu gluErrorString [i8*,i32]*)
+(load "libs/opengl_lib.scm")
+
+;; must create openglview before calling gl-load-extensions
+(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+(gl-set-view 900.0 600.0)
+(gl-load-extensions)
 
 
 ;; a couple of shader helper functions
@@ -42,28 +40,6 @@
 	    (free log)
 	    1)
 	  (begin (printf "Program Info log: OK\n") 1)))))
-
-
-;; Setup some opengl stuff
-(definec setup
-  (lambda ()
-    (glEnable GL_DEPTH_TEST)))
-
-
-(definec set-view
-  (lambda (w h)
-    (glViewport 0 0 w h)
-    (glMatrixMode 5889) ;GL_PROJECTION_MATRIX)
-    (glLoadIdentity)
-    (gluPerspective 27.0 (/ (i32tod w) (i32tod h)) 0.01 1000.0)
-    (glMatrixMode 5888)
-    (glEnable 2929)))
-	      
-
-(definec look-at
-  (lambda (eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)
-    (glLoadIdentity)
-    (gluLookAt eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)))
 
 
 (bind-val _vshader i32 0)
@@ -104,16 +80,14 @@
       (print-shader-info-log fshader)
       (print-shader-info-log vshader)
       (print-program-info-log program)
-      (glUseProgram program))))
-
+      (glUseProgram program)))
 
 ;; draw a simple quad which fills the whole screen space
 (definec opengl-draw
-  (let ((ratio (/ 4.0 3.0)))
+  (let ((ratio (/ 4.0 2.75)))
     (lambda (degree:double)
-      ;;(printf "%d:%d\n" (glGetUniformLocation _program "time") (glGetUniformLocation _program "unResolution"))
-      (glUniform1f (glGetUniformLocation _program "time") (dtof (* .02 degree)))
-      (glUniform3f (glGetUniformLocation _program "unResolution") 1024.0 768.0 0.0)
+      (glUniform1f (glGetUniformLocation _program "time") (dtof (* .025 degree)))
+      (glUniform3f (glGetUniformLocation _program "unResolution") 900.0 600.0 0.0)
       (glLoadIdentity)
       (glTranslated 0.0 0.0 -4.0)
       (glClearColor 0.0 0.0 0.0 1.0)
@@ -310,7 +284,7 @@ void main() {
    vec2 uv = (gl_FragCoord.xy/unResolution.xy);
 
    // we generate a ray with origin ro and direction rd
-   vec3 ro = vec3(0.0,0.0,-4.0);
+   vec3 ro = vec3(0.0,0.0,-3.5);
    vec3 rd = normalize( vec3( (-1.0+2.0*uv)*vec2(1.5,1.0), 1.0));
 
    // we interect the ray with the 3d scene
@@ -333,7 +307,7 @@ void main() {
      vec3 lig2 = normalize( vec3(.3,0.8,-0.3) );
      vec3 blig2 = vec3(-lig2.x, lig2.y, -lig2.z);
      vec3 spe2 = vec3(pow(clamp(dot(lig2,ref),0.0,1.0),16.0));
-     vec3 color2 = normalize(vec3(0.5,0.3,1.0)); //0.0,0.4,1.0));
+     vec3 color2 = normalize(vec3(0.5,0.3,1.0));
 
      float con = 1.0;
      float amb = 0.5 + 0.5*nor.y;
@@ -371,9 +345,7 @@ void main() {
 ;;  Now setup and run
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0)) ;1080.0 1920.0))
-(setup)
-(set-view 1024 768) ;1920 1200) 
 
 (opengl-test (now) 0.0)
 (load-shaders fragshader vertshader)
+

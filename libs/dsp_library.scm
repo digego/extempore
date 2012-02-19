@@ -1049,8 +1049,9 @@
 (define-macro (load-sampler sampler path)
   `(let ((files (sys:directory-list ,path)))
      (for-each (lambda (f)
-		 (if (regex:match? f "\/([0-9]*)\.(wav|aif|aiff|ogg)$")
-		     (let ((result (regex:matched f "\/([0-9]*)\.(wav|aif|aiff|ogg)$")))
+		 (println 'f: f)
+		 (if (regex:match? f "([0-9]*)\.(wav|aif|aiff|ogg)$")
+		     (let ((result (regex:matched f "([0-9]*)\.(wav|aif|aiff|ogg)$")))
 		       (println 'result: result)
 		       (set-sampler-index ,sampler f
 					  (string->number (cadr result)) 0 0))
@@ -1059,6 +1060,7 @@
 			   (set-sampler-index ,sampler f
 					      result 0 0)))))
 	       files)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
