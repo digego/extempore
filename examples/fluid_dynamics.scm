@@ -334,7 +334,7 @@
 
       (dotimes (k (* N N N))
       	(pset! Vx k 0.0)
-      	(pset! Vy k 0.0))
+      	(pset! Vy k 0.0)
       	(pset! Vz k 0.0))
       
       (fluid-project Vx0 Vy0 Vz0 Vx Vy 4 N)
@@ -346,15 +346,15 @@
       (dotimes (kk (* N N N))
       	(pset! Vx0 kk 0.0)
       	(pset! Vy0 kk 0.0)
-      	(pset! Vz0 kk 0.0))                               
+      	(pset! Vz0 kk 0.0))
       
       (fluid-project Vx Vy Vz Vx0 Vy0 4 N)
       (fluid-diffuse 0 s density diff dt 4 N)
       (fluid-advect 0 density s Vx Vy Vz dt N)
-      cube))
+      cube)))
 
 (definec get-fluid-cube
-  (let ((cube (fluid-cube-create 22 0.001 0.1 0.002)))
+  (let ((cube (fluid-cube-create 22 0.001 0.001 0.002)))
     (lambda ()
       cube)))
 
