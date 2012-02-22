@@ -1089,6 +1089,27 @@
 	       files)))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; An ipc helper for audio
+;;
+
+(define ipc:audio-setup
+  (lambda (proc)
+    (ipc:eval-string proc
+		     "(define-macro (play-note time inst pitch vol dur)
+                         `(let ((duration (* 1.0 ,dur)))
+                            (_synth-note (integer->real ,time) 
+		            (llvm:get-native-closure ,(symbol->string inst))
+     		            (midi2frq (* 1.0 ,pitch))
+		            (/ (exp (/ ,vol 26.222)) 127.0)
+		            duration)))")
+
+    (ipc:definec proc '_synth-note)
+    (ipc:definec proc 'midi2frq)))
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Default DSP
