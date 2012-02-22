@@ -843,16 +843,18 @@
 	  (let ((adat_ (malloc (* num 8)))
 		(adat (bitcast adat_ double*))
 		(samples (inst.samples:|128,double*|*))
+		(samples-channels (inst.samples-channels:|128,i64|*))
 		(samples-length (inst.samples-length:|128,i64|*))
 		(read (read-audio-data fname adat (* offset channels) num))
 		(olddat (if (<> 0 (pref samples-length index))
 			    (bitcast (pref samples index) i8*)
 			    null)))
-	    (pset! samples-length index (/ read channels)) ;num)	    
+	    (pset! samples-length index (/ read channels)) ;num)
+	    (pset! samples-channels index channels)    
 	    (pset! samples index adat)
 	    ;; the following line is a problem on windows and needs to be fixed!
 	    ; (free_after_delay olddat (* 10.0 44100.0)))
-	    (printf "read %lld(frames):%f(k) into index:%lld\n" (/ read channels) (/ (i64tod (* num 8)) 1024.) index)
+	    (printf "%s:\t%lld(channels) %lld(frames):%f(k)\t\tinto index:%lld\n" fname channels (/ read channels) (/ (i64tod (* num 8)) 1024.) index)
 	    (sf_close audiofile)
 	    1)
 	  (begin (printf "%s\n" (sf_strerror audiofile))
@@ -923,12 +925,38 @@
 
 
 
-;; hermite sampler
+;; ;; hermite sampler (stereo version)
+;; ;;
+;; ;; slower but less noisy (default)
+;; (definec sampler-note-hermite
+;;   (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* index)
+;;     (let ((idx-freq (midi2frq (i64tod index)))
+;; 	  (phase (i64tod (pref samples-offsets index)))) ;; phase unit is audio frames
+;;       (lambda (time:double chan:double freq:double amp:double)
+;; 	(let ((rate (/ freq idx-freq))
+;; 	      (pos (if (< chan 1.0) ;; only increment once per frame
+;; 		       (set! phase (+ phase rate))
+;; 		       phase))
+;; 	      (posi (dtoi64 (floor pos)))
+;; 	      (posx (+ (* posi 2) (dtoi64 chan)))
+;; 	      (length (- (pref samples-length index) 10))	      
+;; 	      (dat (pref samples index)))
+;; 	  (if (< (fabs (- rate 1.0)) 0.01)
+;; 	      (if (> posi length) 0.0 (* amp (pref dat posx)))
+;; 	      (let ((y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx 2)))) ; assume stereo
+;; 		    (x0 (if (> posi length) 0.0 (pref dat posx)))
+;; 		    (x1 (if (> (+ posi 1) length) 0.0 (pref dat (+ posx 2)))) ; assume stereo
+;; 		    (x2 (if (> (+ posi 2) length) 0.0 (pref dat (+ posx 4))))) ; assume stereo
+;; 		(* amp (hermite-interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
+
+
+;; hermite sampler  (multi-channels version)
 ;;
 ;; slower but less noisy (default)
 (definec sampler-note-hermite
-  (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* index)
+  (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* samples-channels:|128,i64|* index)
     (let ((idx-freq (midi2frq (i64tod index)))
+	  (channels (pref samples-channels index))
 	  (phase (i64tod (pref samples-offsets index)))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
 	(let ((rate (/ freq idx-freq))
@@ -936,15 +964,15 @@
 		       (set! phase (+ phase rate))
 		       phase))
 	      (posi (dtoi64 (floor pos)))
-	      (posx (+ (* posi 2) (dtoi64 chan)))
+	      (posx (+ (* posi channels) (if (< (dtoi64 chan) channels) (dtoi64 chan) 0)))
 	      (length (- (pref samples-length index) 10))	      
 	      (dat (pref samples index)))
 	  (if (< (fabs (- rate 1.0)) 0.01)
 	      (if (> posi length) 0.0 (* amp (pref dat posx)))
-	      (let ((y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx 2)))) ; assume stereo
+	      (let ((y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx channels))))
 		    (x0 (if (> posi length) 0.0 (pref dat posx)))
-		    (x1 (if (> (+ posi 1) length) 0.0 (pref dat (+ posx 2)))) ; assume stereo
-		    (x2 (if (> (+ posi 2) length) 0.0 (pref dat (+ posx 4))))) ; assume stereo
+		    (x1 (if (> (+ posi 1) length) 0.0 (pref dat (+ posx channels))))
+		    (x2 (if (> (+ posi 2) length) 0.0 (pref dat (+ posx (* 2 channels))))))
 		(* amp (hermite-interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
 
@@ -979,6 +1007,7 @@
      (let* ((poly:i64 48)
 	    (samples (zalloc |128,double*|)) ;; 128 samples
 	    (samples-length (zalloc |128,i64|)) ;; 128 samples
+	    (samples-channels (zalloc |128,i64|)) ;; 128 samples	    
 	    (samples-offsets (zalloc |128,i64|)) ;; 128 samples
 	    (notes (zalloc poly [double,double,double,double]*))
 	    (attack:double 200.0)
@@ -1012,7 +1041,7 @@
 					    (make-note start freq amp dur
 						       attack decay release sustain
 						       note-starts free-note
-						       (,note-kernel samples samples-length samples-offsets new-idx)))
+						       (,note-kernel samples samples-length samples-offsets samples-channels new-idx)))
 				     (pset! note-starts free-note start)
 				     1)
 			      0)))))
@@ -1049,10 +1078,8 @@
 (define-macro (load-sampler sampler path)
   `(let ((files (sys:directory-list ,path)))
      (for-each (lambda (f)
-		 (println 'f: f)
 		 (if (regex:match? f "([0-9]*)\.(wav|aif|aiff|ogg)$")
 		     (let ((result (regex:matched f "([0-9]*)\.(wav|aif|aiff|ogg)$")))
-		       (println 'result: result)
 		       (set-sampler-index ,sampler f
 					  (string->number (cadr result)) 0 0))
 		     (let ((result (audio-file-regex-match f)))
