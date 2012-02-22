@@ -36,12 +36,12 @@
 	  (alphas (psystem_alphas psys))
 	  (states (psystem_states psys))
 	  (i 0))
-      (dotimes (i 10000)
+      (dotimes (i 5000)
 	(pset! xs i 0.0) ;(dtof (* 10.0 (random))))
 	(pset! ys i 0.0) ;(dtof (* 10.0 (random))))
-	(pset! xvs i (* 30.0 (- (dtof (random)) .5)))
-	(pset! yvs i (* 30.0 (- (dtof (random)) .5)))
-	(pset! sizes i (dtof (* (random) 150.0)))
+	(pset! xvs i (* 20.0 (- (dtof (random)) .5)))
+	(pset! yvs i (* 20.0 (- (dtof (random)) .5)))
+	(pset! sizes i (dtof (* (random) 200.0)))
 	(pset! reds i (dtof (random)))
 	(pset! greens i (dtof (random)))
 	(pset! blues i (dtof (random)))
@@ -51,7 +51,7 @@
 
 ;; gl-code 	  
 (definec gl-loop
-  (let ((psys (psystem_create 10000 texture1)))
+  (let ((psys (psystem_create 5000 texture1)))
     (init-psys psys)
     (lambda (time:double)
       (glClearColor 0.0 0.0 0.0 1.0)
