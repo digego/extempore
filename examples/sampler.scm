@@ -2,15 +2,12 @@
 ;;
 ;; This example shows how to use the builtin sampler
 ;;
-;; You will first need to load and compile dsp_library.scm
-;;
-;; Then you're OK to go
-;;
 ;; NOTE [at the moment compiling in a secondary thread is a little
 ;;      [flakey.  I'm working on this so in the mean time you'll
 ;;      [just have to put up with the audio delays while compiling
 ;;
 
+(load "libs/dsp_library.scm")
 
 ;; first find a stereo audio file of some kind (not mp3 or aac)
 ;; ogg wav or aif should all be fine
@@ -61,10 +58,13 @@
 		       			  (string->number (cadr result)) 0 0))))
 	       files)))
 
+
 ;; load audio samples
 ;; I'm using piano samples
-(load-sampler sampler "/home/andrew/Desktop/piano")
+(load-sampler sampler "samples/piano")
 
+;; loop2 requires pc-ivl-lib
+(load "libs/pc-ivl-lib.scm")
 
 (define loop2
   (lambda (beat dur root)
