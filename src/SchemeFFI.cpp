@@ -2127,9 +2127,11 @@ namespace extemp {
     {		
 	char* floatin = string_value(pair_car(args));
 	char floatout[256];
+        // if already converted to hex value just return Hex String Unchanged
+        if(floatin[1]=='x') return pair_car(args); 
 #ifdef TARGET_OS_WINDOWS
 	float f = (float) strtod(floatin, (char**) &floatout);
-#else
+#else        
 	float f = strtof(floatin, (char**) &floatout);
 #endif
 	llvm::APFloat apf(f);
@@ -2137,7 +2139,7 @@ namespace extemp {
 	bool ignored;
 	bool isDouble = false; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
 	double Val = isDouble ? apf.convertToDouble() :
-	    apf.convertToFloat();
+	apf.convertToFloat();
 	std::string StrVal = llvm::ftostr(apf);
 		
 	// Check to make sure that the stringized number is not some string like
@@ -2149,7 +2151,7 @@ namespace extemp {
 	     (StrVal[1] >= '0' && StrVal[1] <= '9'))) {
 	    // Reparse stringized version!
 	    if (atof(StrVal.c_str()) == Val) {
-		return mk_string(_sc, StrVal.c_str());
+	      return mk_string(_sc, StrVal.c_str());
 	    }
 	}
 		
@@ -2180,6 +2182,8 @@ namespace extemp {
      {		
  	char* floatin = string_value(pair_car(args));
  	char floatout[256];
+        // if already converted to hex value just return Hex String Unchanged
+        if(floatin[1]=='x') return pair_car(args); 
  #ifdef TARGET_OS_WINDOWS
  	double f = strtod(floatin, (char**) &floatout);
  #else
