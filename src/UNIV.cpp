@@ -273,7 +273,7 @@ namespace extemp {
 #ifdef TARGET_OS_WINDOWS
       srand((int)UNIV::DEVICE_TIME); ///UNIV::SECOND));
 #elif TARGET_OS_LINUX
-      srand((int)(UNIT::DEVICE_TIME/UNIV::SECOND));
+      srand((int)(UNIV::DEVICE_TIME/UNIV::SECOND));
 #else
       sranddev();
 #endif

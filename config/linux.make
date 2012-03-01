@@ -13,7 +13,7 @@ PLATFORM_LIBS += -lportaudio
 endif
 
 #PLATFORM_LIBS := -ldl -lm -ljack -lboost_thread -lboost_system -lboost_filesystem  -lm -lpcre /usr/lib/nvidia-current/libGL.so
-PLATFORM_LIBS += -lpcre /usr/lib/nvidia-current/libGL.so
+PLATFORM_LIBS += -lpcre -lGL #/usr/lib/nvidia-current/libGL.so
 
 PLATFORM_CXXFLAGS :=
 PLATFORM_LDFLAGS :=
