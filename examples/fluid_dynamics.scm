@@ -378,58 +378,10 @@
 	      (pset! densities idx 0.0))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Next Some OpenGL Stuff    
+;; Next Some OpenGL Stuff
 
-(define libglu (if (string=? "Linux" (sys:platform))
-		   (sys:open-dylib "/usr/lib/x86_64-linux-gnu/libGLU.so.1")
-		   (if (string=? "Windows" (sys:platform))
-		       (sys:open-dylib "Glu32.dll")
-		       (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))))
+(load "libs/opengl_lib.scm")
 
-(bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
-(bind-lib libglu gluPerspective [void,double,double,double,double]*)
-(bind-lib libglu gluErrorString [i8*,i32]*)
-
-(definec setup
-  (lambda ()
-    (glEnable GL_LIGHTING)
-    (glEnable GL_LIGHT0)
-    (let ((diffuse (heap-alloc 4 float))
-	  (specular (heap-alloc 4 float))
-	  (position (heap-alloc 4 float)))      
-      (pset! diffuse 0 1.0)
-      (pset! diffuse 1 0.3)
-      (pset! diffuse 2 0.0)
-      (pset! diffuse 3 1.0)
-      (pset! specular 0 1.0)
-      (pset! specular 2 1.0)
-      (pset! specular 3 1.0)
-      (pset! specular 4 1.0)
-      (pset! position 0 100.0)
-      (pset! position 1 100.0)
-      (pset! position 2 100.0)
-      (pset! position 3 0.0)
-
-      (glLightfv GL_LIGHT0 GL_DIFFUSE diffuse)
-      (glLightfv GL_LIGHT0 GL_SPECULAR specular)
-      (glLightfv GL_LIGHT0 GL_POSITION position))
-    
-    (glEnable GL_DEPTH_TEST)
-    (glShadeModel GL_FLAT)
-    (glEnable GL_BLEND)
-    (glBlendFunc GL_ONE GL_SRC_ALPHA)))
-
-
-(definec set-view
-  (lambda ()
-    (glViewport 0 0 1024 768)
-    (glMatrixMode 5889)
-    (glLoadIdentity)
-    (gluPerspective 27.0 (/ 1024.0 768.0) 1.0 1000.0)
-    (glMatrixMode 5888)
-    (glEnable 2929)
-    (setup)
-    1))
  
 (definec add-density
   (lambda (x:i64 y:i64 z:i64 amount:double)
@@ -598,7 +550,7 @@
 
 
 (define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
-(set-view)
+(gl-set-view 1024.0 768.0)
 (opengl-test (now) 0.0)
 (smoke-signal (now))
 

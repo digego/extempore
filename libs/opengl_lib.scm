@@ -49,7 +49,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GLU
 (define libglu (if (string=? "Linux" (sys:platform))
-		   (sys:open-dylib "/usr/lib/x86_64-linux-gnu/libGLU.so.1")
+		   (sys:open-dylib "/usr/lib/libGLU.so")
 		   (if (string=? "Windows" (sys:platform))
 		       (sys:open-dylib "Glu32.dll")
 		       (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))))
