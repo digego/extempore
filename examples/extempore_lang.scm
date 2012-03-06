@@ -956,8 +956,124 @@
 
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Ad-Hoc Polymorphism
+;; 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; extempore supports ad-hoc polymorphism
+;; at some stage in the future this will
+;; be implicit - but for the moment
+;; it is explicitly defined using bind-poly
+
+;; ad-hoc polymorphism allows you to provide
+;; different specialisations depending on
+;; type.  In other words, a single 'name'
+;; can be bound to multiple function
+;; implementations each with a uniqute
+;; type.
+
+;; for example to create the type variable
+;; named 'cos' that ranges over the two
+;; closure types [double,double]* and [float,float]*
+;; you would call the two lines below
+
+(bind-poly cos* cos)
+(bind-poly cos* cosf)
+
+;; the first argument is the polymorphic type name ('cos*')
+;; the second argument is an implementation name ('cos' or 'cosf')
+;; the third argument is the type ([double,double]* or [float,float]*) 
+
+;; now you can let the compiler
+;; decide whether to use cosf or cos
+
+;; here cos defaults to float
+;; this is because in this instance
+;; both [double,double]* and [float,float]*
+;; are acceptable.
+;; In this instance the compiler chooses
+;; the last poly bound -> [float,float]*
+(definec test40
+  (lambda (a)
+    (cos* a)))
+
+;; you could of course force the issue
+;; to [double,double]* by adding a type to a
+(definec test41
+  (lambda (a:double)
+    (cos* a)))
+
+;; in a slightly more complex senario
+;; floorf requires a float
+(definec test42
+  (lambda (a)
+    (floorf (cos* a)))) 
+
+;; note that forcing a to double in this case
+;; fails because there is no 
+;; "cos" poly with signature [float,double]*
+(definec test43
+  (lambda (a)
+    (floorf (cos* a))))  ;; this fails although floor would work
 
 
+;; poly variables can be for functions of
+;; mixed argument lengths
+;; 
+;; so for example:
+(definec my-func-1
+  (lambda (a:i8*)
+    (printf "%s\n" a)))
+
+(definec my-func-2
+  (lambda (a:i8* b:i8*)
+    (printf "%s %s\n" a b)))
+
+(definec my-func-3
+  (lambda (a:i8* b:i8* c:i8*)
+    (printf "%s %s %s\n" a b c)))
+
+;; bind these three functions to poly 'print'
+(bind-poly print my-func-1)
+(bind-poly print my-func-2)
+(bind-poly print my-func-3)
+
+(definec test44
+  (lambda (a b c)
+    (print a)
+    (print a b)
+    (print a b c)))
+
+(test44 "extempore's" "polymorphism" "rocks")
+
+
+;; polys can also specialize
+;; on the return type
+(definec my-func-4
+  (lambda (a:double)
+    (* a a)))
+
+(definec my-func-5
+  (lambda (a:double)
+    (dtoi64 (* a a))))
+
+(bind-poly sqrd my-func-4)
+(bind-poly sqrd my-func-5)
+
+;; specialize on [i64,double]*
+(definec test45
+  (lambda (a:double)
+    (+ 1.0 (sqrd a))))
+
+;; specialize on [double,doube]*
+(definec test46
+  (lambda (a:double)
+    (+ 1 (sqrd a))))
+
+(println '-> (test45 5.0))
+(println '-> (test46 5.0))
 
 
 ;; Memory Usage In Extempore Lang
@@ -966,7 +1082,7 @@
 ;; Extempore supports three types of memory allocation: stack allocation,
 ;; heap alloation and zone allocation.  The first two of these memory
 ;; allocation techniques should be familiar to anyone who has programmed
-;; in C/C++.  The third allocation type represents a type of middle ground
+;; in C/C++.  The third allocation type presents a type of middle ground
 ;; between these two extremes.  Zone allocation in Extempore is in essence
 ;; a form of stack allocation whose scope is defined by the user.
 

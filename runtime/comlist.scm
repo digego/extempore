@@ -51,6 +51,15 @@
   (do ((k (+ -1 k) (+ -1 k))
        (result '() (cons init result)))
       ((negative? k) result)))
+
+ 	
+
+(define (cl:tree-copy tree)
+  (let loop ((tree tree))
+    (if (pair? tree)
+        (cons (loop (car tree)) (loop (cdr tree)))
+        tree)))
+
 ;@
 (define (cl:copy-list lst) (append lst '()))
 ;@

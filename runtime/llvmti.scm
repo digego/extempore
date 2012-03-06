@@ -597,7 +597,7 @@
 ;; don't allow update to add to kts values
 (define impc:ti:update-var
    (lambda (sym vars kts t)
-      ;(print 'update-var:> sym 'in: vars 'with: t 'kts: kts)      
+      ;(println 'update-var:> sym 'in: vars 'with: t 'kts: kts)
       (if (member sym kts) ;; if in known types don't do anything
           '()
           (if (and (not (assoc sym vars))
@@ -654,7 +654,7 @@
 
 (define impc:ti:numeric-check
    (lambda (ast vars kts request?)      
-      (if *impc:ti:print-sub-checks* (print 'num:> 'ast: ast 'request? request?))
+      (if *impc:ti:print-sub-checks* (println 'num:> 'ast: ast 'request? request?))
       (if (and request?
                (not (null? request?)))
           (cond ((symbol? request?) 
@@ -673,16 +673,17 @@
                 (else (print-error 'Compiler 'Error: 'shouldn't 'reach 'here 'in 'numeric 'check 'request? request?)
 		      (print-error '-> 'You 'might 'be 'using 'a 'pref 'where 'you 'should 'be 'using 'a 'tref?)))
           (if (integer? ast)  ;; preference goes to start of list
-              (if (< ast 256)
-                  (list *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8* *impc:ir:double* *impc:ir:float*)
-                  (list *impc:ir:si64* *impc:ir:si32* *impc:ir:double* *impc:ir:float*))
+	      (if (or (= 1 ast) (= 0 ast))
+	      	  (list *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8* *impc:ir:i1*)
+		  (if (< ast 256)
+		      (list *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8*)
+		      (list *impc:ir:si64* *impc:ir:si32*)))  ;*impc:ir:double* *impc:ir:float*))
               (list *impc:ir:double* *impc:ir:float*)))))
 
 
 (define impc:ti:symbol-check
-   (lambda (ast vars kts request?)   
-      ;(println 'symcheck 'ast: ast 'r: request? 'vars: vars 'kts: kts)      
-      (if *impc:ti:print-sub-checks* (print 'sym:> 'ast: ast 'request? request?))
+   (lambda (ast vars kts request?)
+      (if *impc:ti:print-sub-checks* (println 'sym:> 'ast: ast 'request? request?))
       ;; if a request is made - assume it's forced
       ;; find the intersection between the request
       ;; and the current values and force that intersection
@@ -699,7 +700,7 @@
                   (not (null? request?)))             
              (let ((intersection (cl:intersection (if (null? type) ;; if type is null then force request
                                                       (if (atom? request?) (list request?) request?)
-                                                      type)
+                                                      (if (atom? type) (list type) type))
                                                   ;; if request is not a set make it one
                                                   (if (atom? request?) (list request?) request?))))
                 (if (not (null? intersection))
@@ -716,7 +717,7 @@
              (t (cl:intersection (if (atom? a) (list a) a) 
                                  (if (atom? b) (list b) b))))
          ;(println 'math: a b)
-         (if *impc:ti:print-sub-checks* (print 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
+         (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
          (if (not (null? t))
              (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
                     (if (symbol? (caddr ast)) (impc:ti:force-var (caddr ast) vars kts t))
@@ -747,7 +748,7 @@
              (b (impc:ti:type-check n2 vars kts request?))
              (t (cl:intersection (if (atom? a) (list a) a) 
                                  (if (atom? b) (list b) b))))
-         (if *impc:ti:print-sub-checks* (print 'compare:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
+         (if *impc:ti:print-sub-checks* (println 'compare:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
          (if (not (null? t)) 
              (list *impc:ir:i1*)
              (cond ((not (cl:find-if symbol? (cdr ast))) (list *impc:ir:i1*)) ;; return t
@@ -774,10 +775,13 @@
       ;(println 'native-check 'ast: ast 'vars: vars 'request: request?)
       (let ((ftype (map impc:ir:get-type-from-str
                         (llvm:get-function-args-withoutzone (symbol->string (car ast))))))
-         (if *impc:ti:print-sub-checks* (print 'ftype:> 'ast: ast 'type: ftype))
+	 ;(println 'ftype:> 'ast: ast 'type: ftype)
+         (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
+
          (if (<> (length ftype) 
                  (length ast))
              (print-error 'Compiler 'Error: 'bad 'arity 'in 'call ast))
+
          ;; we don't care what we get back because we already know the return type
          (for-each (lambda (a t)
                       ;; if a is a symbol then add type t to a
@@ -792,6 +796,63 @@
          (list (car ftype)))))
 
 
+;; polymorphic version
+(define impc:ti:nativef-poly-check
+   (lambda (ast vars kts request?)
+      ;(println 'poly-check 'ast: ast 'vars: vars 'request: request?)
+      (let* ((ftypes (assoc (car ast) *impc:ir:polys*))
+	     (valid-lgth (map (lambda (type)
+				(if (<> (length (cdadr type))
+					(length ast)) #f #t))
+			      (cdr ftypes)))
+	     (valid-args (map (lambda (type valid)
+				(if valid
+				    (let* ((checked-types
+					    (map (lambda (a t)
+						   (impc:ti:type-check a vars kts t))
+						 (cdr ast)
+						 (cdr (cdadr type))))
+					   (ct2 (map (lambda (ct ft) ;; checked type against poly type
+						       ;(println 'ct: ct 'ft: ft)
+						       (if (number? ct)
+							   (if (= ct ft) #t #f)
+							   (if (list? ct)
+							       (if (member ft ct) #t #f)
+							       #f)))
+						     checked-types
+						     (cdr (cdadr type)))))
+				      ;(println 'checked-types checked-types (cdr (cdadr type)) ct2)
+				      (if (member #f ct2) #f #t))				      
+				    #f))
+			      (cdr ftypes)
+			      valid-lgth))
+	     (valid-polys (remove '()
+				  (map (lambda (type valid)
+					 (if valid type '()))
+				       (cdr ftypes)
+				       valid-args))))
+	;(println 'kts: kts 'requst? request? 'valid-args: valid-args 'valid-polys: valid-polys)
+	(if (null? valid-polys)
+	    (print-error 'Compiler 'Error: 'no 'valid 'polymorphic 'options 'for: ast))
+	;; if there is only ONE valid poly then we should FORCE that poly's vars
+	;; (if (= 1 (length valid-polys))	    
+	;;     (for-each (lambda (a t)
+	;; 		(impc:ti:type-check a vars kts t))
+	;; 	      (cdr ast)
+	;; 	      (cddr (cadr (car valid-polys)))))
+	(let ((returns (map (lambda (t)
+			      (car (cdr (cadr t))))
+			    valid-polys)))
+	  ;(println 'returns: returns 'request? request?)	  
+	  (if request?
+	      (begin (if (atom? request?)
+			 (set! request? (list request?)))
+		     (set! returns (impc:ti:intersection* returns request?))))
+	  ;(println 'returns: returns)
+	  returns))))
+      
+
+
 (define impc:ti:callback-check
    (lambda (ast vars kts request?)
       ;(println 'callback-check 'ast: ast 'vars: vars 'request: request?)
@@ -799,7 +860,7 @@
                         (let ((ags (llvm:get-function-args-withoutzone (symbol->string (caddr ast)))))
 			  (if ags ags '())))))
 	;(println 'ftype: ftype)
-	(if *impc:ti:print-sub-checks* (print 'ftype:> 'ast: ast 'type: ftype))
+	(if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
 	(if (null? ftype)
 	    (begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
 		   (impc:ti:type-check (cddr ast) vars kts '())
@@ -887,7 +948,7 @@
                       (not (impc:ir:closure? t))))
              (print-error 'Compiler 'Error: 'type 'error 'calculating 'return 'type: ast 
                           'have 'you 'specified 'an 'incorrect 'closure 'type?))
-         (if *impc:ti:print-sub-checks* (print 'ret:> 'ast: ast 'a: a 'sym: sym))
+         (if *impc:ti:print-sub-checks* (println 'ret:> 'ast: ast 'a: a 'sym: sym))
          (if t
              ;; if the return value is a symbol then it should be
              ;; give then return type of 't             
@@ -905,7 +966,7 @@
       (let ((a (car (reverse (map (lambda (e)
                                      (impc:ti:type-check e vars kts request?))
                                   (cdr ast))))))
-         (if *impc:ti:print-sub-checks* (print 'begin:> 'ast: ast 'a: a))
+         (if *impc:ti:print-sub-checks* (println 'begin:> 'ast: ast 'a: a))
          a)))
 		 
 
@@ -924,7 +985,7 @@
 		    '()
 		    (impc:ti:type-check (cadddr ast) vars kts request?)))
              (t (cl:intersection (if (atom? b) (list b) b) (if (atom? c) (list c) c))))
-         (if *impc:ti:print-sub-checks* (print 'if:> 'a: a 'b: b 'c: c 't: t))
+         (if *impc:ti:print-sub-checks* (println 'if:> 'a: a 'b: b 'c: c 't: t))
          (if (null? b)
              (set! t c))
          (if (null? c)
@@ -1216,7 +1277,7 @@
 ;;(closure-set! closure a i32 5)
 (define impc:ti:closure-set-check
    (lambda (ast vars kts request?)   
-     (print 'ast: ast)
+     (println 'ast: ast)
       (if (< (length ast) 5)
           (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
       (let* (;; a should be a closure of some kind
@@ -1295,7 +1356,7 @@
    (lambda (ast vars kts request?)      
       (let* ((sym (impc:ti:get-var (cadr ast) vars))
              (a (impc:ti:type-check (caddr ast) vars kts (cdr sym))))
-         (if *impc:ti:print-sub-checks* (print 'set!:> 'ast: ast 'a: a))
+         (if *impc:ti:print-sub-checks* (println 'set!:> 'ast: ast 'a: a))
 	 ;; if sym is not a global var then add return type to sym
 	 (if (assoc (car sym) vars) 
 	     (impc:ti:update-var (car sym) vars kts a))
@@ -1304,7 +1365,7 @@
 (define impc:ti:pdref-check
    (lambda (ast vars kts request?)      
       (let* ((a (impc:ti:type-check (cadr ast) vars kts request?)))
-         (if *impc:ti:print-sub-checks* (print 'ptrref:> 'ast: ast 'a: a))
+         (if *impc:ti:print-sub-checks* (println 'ptrref:> 'ast: ast 'a: a))
 	 ;; return type of ptrref is 'a' dereferenced
 	 (if (list? a)
 	     (set! a (car a)))
@@ -1317,7 +1378,7 @@
 (define impc:ti:pref-check
   (lambda (ast vars kts request?)      
     (let* ((a (impc:ti:type-check (cadr ast) vars kts request?)))
-      (if *impc:ti:print-sub-checks* (print 'ptrref:> 'ast: ast 'a: a))
+      (if *impc:ti:print-sub-checks* (println 'ptrref:> 'ast: ast 'a: a))
       ;; return type of ptrref is 'a' referenced
       (if (list? a)
 	  (set! a (car a)))
@@ -1346,13 +1407,13 @@
       ;; grab the last result as return type
       (let ((res (impc:ti:type-check (caddr ast) vars kts request?)))
          ;; if we have a choice between numeric options we force one!
-         (if (and (not (string? res))
-		  (equal? (cl:sort res <) 
-                          (cl:sort (list *impc:ir:double* *impc:ir:float*) <)))
+         (if (and (list? res)
+		  (> (length res) 1)
+		  (not (member #f (map (lambda (t) (impc:ir:floating-point? t)) res))))
              (set! res (list *impc:ir:double*))) ;; force doubles
-         (if (and (not (string? res))
-		  (equal? (cl:sort res <)
-			  (cl:sort (list *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8* *impc:ir:float* *impc:ir:double*) <)))
+         (if (and (list? res)
+		  (> (length res) 1)
+		  (not (member #f (map (lambda (t) (impc:ir:fixed-point? t)) res))))
              (set! res (list *impc:ir:si64*))) ;; force i64
          ;; return lambda type which is made up of
          ;; argument symbols plus return type from last body expression         
@@ -1400,7 +1461,7 @@
                               (not (impc:ir:closure? (car ctype))))
                           '()
                           (cadr (car ctype))))))         
-         (if *impc:ti:print-sub-checks* (print 'closure:> 'ast: ast 'res: res 'ret: ret))
+         (if *impc:ti:print-sub-checks* (println 'closure:> 'ast: ast 'res: res 'ret: ret))
          ; set the closure type for the symbol (if not a global var)
          (if (assoc (car ast) vars)
              (impc:ti:update-var (car ast) vars kts
@@ -1488,8 +1549,8 @@
 (define impc:ti:type-check
    (lambda (ast vars kts request?)
       ;(println 'type-check: ast  'vars: vars  'kts: kts)
-      (if *impc:ti:print-main-check* (print 'type-check: ast 'kts: kts 'request? request?))
-      (if *impc:ti:print-main-check* (print 'vars------: vars))
+      (if *impc:ti:print-main-check* (println 'type-check: ast 'kts: kts 'request? request?))
+      (if *impc:ti:print-main-check* (println 'vars------: vars))
       (cond ((null? ast) '())
             ((and (atom? ast) (number? ast)) (impc:ti:numeric-check ast vars kts request?))
             ((and (atom? ast) (symbol? ast)) (impc:ti:symbol-check ast vars kts request?)) ;#f)) ;request?))
@@ -1525,9 +1586,15 @@
             ((and (list? ast) (member (car ast) '(null?))) (impc:ti:null-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(bitcast))) (impc:ti:bitcast-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(void))) (impc:ti:void-check ast vars kts request?))
-            ((and (list? ast) 
+            ((and (list? ast) ;; polymorphic function
                   (symbol? (car ast))
-                  (llvm:get-function (symbol->string (car ast)))) 
+                  (assoc (car ast) *impc:ir:polys*))
+             (let ((reses (impc:ti:nativef-poly-check ast vars kts request?)))
+	       ;(println 'ast: ast reses)
+	       reses))
+            ((and (list? ast) ;; native function
+                  (symbol? (car ast))
+                  (llvm:get-function (symbol->string (car ast))))
              (impc:ti:nativef-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(begin))) (impc:ti:begin-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(if ifret))) (impc:ti:if-check ast vars kts request?))
@@ -1580,7 +1647,7 @@
              (tt (cl:every (lambda (x) x) t))
              (a (if tt #t
                     (impc:ti:find-unresolved-simple-types u))))
-         (if *impc:ti:print-unifications* (print 'tirun:> a '-> u))
+         (if *impc:ti:print-unifications* (println 'tirun:> a '-> u))
          ;; if we have unified types then return them otherwise run through options!
          (if tt 
              u
@@ -1641,6 +1708,7 @@
 
 ;; add types to source
 ;; also add clrun for closure application
+;; and inject polymorphic functions
 (define impc:ti:add-types-to-source
    (lambda (symname ast types envvars . prev)
       ;(println 'symname: symname 'envvars: envvars 'ast: ast 'prev: prev)
@@ -1656,7 +1724,6 @@
                        (map (lambda (v) ;; environment types
                                (if (member v envvars)
                                    (let ((p (assoc v types)))
-                                      ;(print 'p: p)
                                       (cons (string->symbol (string-append (symbol->string (car p)) "__sub"))
                                             (cdr p)))
                                    (assoc v types)))
@@ -1679,6 +1746,45 @@
                              (cdddr (if (not (assoc (cadr ast) types)) ;; if not in local env then get types from global var
                                         (cons (cadr ast) (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (cadr ast)))))
                                         (assoc (cadr ast) types))))))
+		;; inject polymorphic functions
+		((assoc (car ast) *impc:ir:polys*)
+		 (let* ((vars (cl:tree-copy types))		       
+			(kts (map (lambda (t) (car t)) types))
+			(polyargs (map (lambda (arg)
+					 ;(println 'arg: arg)
+					 (let ((res (impc:ti:type-check arg vars kts #f)))
+					   (if (and (list? res)
+						    (> (length res) 1))
+					       res
+					       ;(print-error 'Compiler 'Error: 'unable 'to 'resolve 'polymorphic 'function: ast)
+					       (if (atom? res) res (car res)))))
+				       (cdr ast)))	
+			(retargs (impc:ti:type-check ast vars kts #f))
+			(rets (if (null? prev) retargs (impc:ti:type-check (car prev) vars kts retargs))))
+		   ;(println 'polyargs: polyargs 'retargs: retargs 'rets: rets)
+		   (let* ((polys (map (lambda (pret)
+					(let* ((polyf (cons (+ *impc:ir:closure*
+							       *impc:ir:pointer*
+							       *impc:ir:pointer*)
+							    (cons pret polyargs)))
+					       (polyfunc (impc:ir:check-poly (car ast) polyf)))
+					  polyfunc))
+				      rets))
+			  (validpolys (remove #f polys)))
+		     ;(println 'polys: validpolys)
+		     ;; take the first valid polymorphic dispatch
+		     (cons (car validpolys) (impc:ti:add-types-to-source symname (cdr ast) types envvars)))))		   
+		   ;; (println 'polyargs: polyargs 'retargs: retargs)
+		   ;; (println '2-res: retargs)
+		   ;; (if (> (length retargs) 1)
+		   ;;     (print-error 'Compiler 'Error 'unable 'to 'resolve 'poly 'function ast))		       
+		   ;; ;(println (car ast) 'polyargs: polyargs 'retargs: retargs)
+		   ;; (let* ((polyf (cons (+ *impc:ir:closure*
+		   ;; 			  *impc:ir:pointer*
+		   ;; 			  *impc:ir:pointer*)
+		   ;; 		       (cons (car retargs) polyargs)))
+		   ;; 	  (polyfunc (impc:ir:check-poly (car ast) polyf)))
+		   ;;   (cons polyfunc (impc:ti:add-types-to-source symname (cdr ast) types envvars)))))		   
                 ((member (car ast) '(make-env make-env-zone))
                  (list (car ast)
 		       (cadr ast)
@@ -1735,7 +1841,7 @@
                            (rest (reverse (cdr rev)))
                            (newast (append '(begin) 
                                            (append (map (lambda (a)
-                                                           ;; block everything except ...                                     
+                                                           ;; block everything except ...
                                                            (impc:ti:mark-returns a name in-body? #f #t))
                                                        rest)
                                                    ;; the last one which we let through
@@ -1921,7 +2027,6 @@
                    (loop (cdr alst)))))
          blst)))
 			 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define impc:ti:run
    (lambda (symname code . args)
@@ -1942,11 +2047,12 @@
              (t3 (impc:ti:closure:convert t2 (list symname)))
              (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
              (forced-types (apply impc:ti:handle-forced-types t1 (append (cdr c1) args)))
-             (types (impc:ti:run-type-check vars forced-types t2))             
-             (newast (impc:ti:add-types-to-source symname t3 types (list))))
-	 ;(println 'types: types) 
-	 ;(println 'newast: newast)
-	 ;(println 'forced: forced-types)
+             (types (impc:ti:run-type-check vars forced-types t2))
+             (newast (impc:ti:add-types-to-source symname t3 (cl:tree-copy types) (list))))
+	 ;; (println 'types: types)
+	 ;; (println 'run: (impc:ti:unity? types))
+	 ;; (println 'newast: newast)
+	 ;; (println 'forced: forced-types)
          ;; if we didn't unify print error and bomb out!
          (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
              (print-error 'Compiler 'Error: 'could 'not 'resolve
@@ -2562,6 +2668,31 @@
 	       `(bindc ,symbol ,type ,value)
 	       (print-error 'Compiler 'Error: 'bind-val 'only 'accepts 'numeric 'array 'and 'cptr 'values!)))))
 
+
+(define impc:ir:get-function-type
+  (lambda (name)
+    (if (symbol? name)
+	(set! name (symbol->string name)))
+    (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*)
+	  (map (lambda (x) (impc:ir:get-type-from-str x))
+	       (llvm:get-function-args-withoutzone name)))))
+
+
+(define-macro (bind-poly poly_sym implementation_sym)
+  (let ((type (impc:ir:get-function-type implementation_sym)))
+    ;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
+    `(begin (impc:ir:add-poly ',poly_sym ',implementation_sym ',type)
+	    (ascii-print-color 0 7 10)
+	    (print "Successfully poly'd ")
+	    (ascii-print-color 1 2 10)
+	    (print ',poly_sym)
+	    (ascii-print-color 0 7 10)
+	    (print " >>> ")
+	    (ascii-print-color 1 3 10)
+	    (print ,(impc:ir:pretty-print-type type))
+	    (ascii-print-color 0 7 10)
+	    (print))))
+	  
 
 (define-macro (bind-scm symbol type value)
    (if (cptr? (eval value))

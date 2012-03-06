@@ -122,6 +122,77 @@
 	    t)
 	  #f))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; poly types
+;;
+
+(define *impc:ir:polys* (list))
+
+(define impc:ir:add-poly
+  (lambda (name fname ftype)
+    (if (string? ftype)
+	(set! ftype (impc:ir:get-type-from-pretty-str ftype)))
+    (let ((v (assoc name *impc:ir:polys*)))
+      (if v
+	  (let ((p (assoc fname (cdr v))))
+	    (if p		
+		(begin (set-car! (cdr p) ftype) #t)
+		(begin (set-cdr! v (cons (list fname ftype) (cdr v))) #t)))
+	  (begin (set! *impc:ir:polys* (cons (list name (list fname ftype)) *impc:ir:polys*))
+		 #t)))))
+
+(define impc:ir:poly-types
+  (lambda (name)
+    (let ((res (assoc name *impc:ir:polys*)))
+      (if res
+	  (map (lambda (p)
+		 (cadr p))
+	       (cdr res))
+	  #f))))
+
+(define impc:ir:poly-types-pretty
+  (lambda (name)
+    (let ((res (impc:ir:poly-types name)))
+      (if res
+	  (map (lambda (p)
+		 (impc:ir:pretty-print-type p))
+	       res)
+	  res))))
+
+(define impc:ir:type-match?
+  (lambda (t1 t2)
+    (if (<> (length t1)
+	    (length t2))
+	#f
+	(if (member #f (map (lambda (t1 t2)
+			      (if (atom? t1)
+				  (set! t1 (list t1)))
+			      (if (atom? t2)
+				  (set! t2 (list t2)))
+			      (if (null? (impc:ti:intersection* t1 t2))
+				  #f
+				  #t))
+			    t1
+			    t2))
+	    #f
+	    #t))))
+
+
+(define impc:ir:check-poly
+  (lambda (name ftype)
+    (if (string? ftype)
+	(set! ftype (impc:ir:get-type-from-pretty-str ftype)))
+    (let ((res (assoc name *impc:ir:polys*)))
+      (if res
+	  (let* ((r2 (map (lambda (p)
+			    (if (impc:ir:type-match? (cadr p) ftype)
+				(car p)
+				'()))
+			  (cdr res)))
+		 (r3 (remove '() r2)))
+	    (if (null? r3) #f (car r3)))
+	  #f))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  This stuff is all here just for pretty printing
@@ -545,7 +616,8 @@
        (if (string? t) #f
 	   (if (member (modulo t *impc:ir:pointer*)
 		       (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si8*
-			     *impc:ir:ui64* *impc:ir:ui32* *impc:ir:ui8*))
+			     *impc:ir:ui64* *impc:ir:ui32* *impc:ir:ui8*
+			     *impc:ir:i1*))
 	       #t #f)))))
 
 (define impc:ir:boolean?

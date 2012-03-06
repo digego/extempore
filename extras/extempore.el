@@ -55,6 +55,7 @@
     ("bind-val" . font-lock-keyword-face)
     ("bind-alias" . font-lock-keyword-face)
     ("bind-type" . font-lock-keyword-face)
+    ("bind-poly" . font-lock-keyword-face)
     ("dotimes" . font-lock-keyword-face)
     ("memzone" . font-lock-keyword-face)
     ("bind-lib" . font-lock-keyword-face)))
