@@ -95,4 +95,4 @@
     (callback (+ time 100) 'loop (+ time 1800))))
 
 (begin (sys:sleep (* 44100 2))
-       (loop))
+       (loop (now)))
