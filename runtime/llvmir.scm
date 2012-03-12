@@ -271,6 +271,8 @@
              ;(expand-closures? (if (null? args) #f (car args)))
              (base (impc:ir:get-base-type string-type)))
          ;(println 'base: base 'ptr-depth: ptr-depth (string? base))
+	 (if (< (string-length base) 1)
+	     (print-error 'Compiler 'Error: 'illegal 'type: string-type))
          (cond ((string=? base "void") *impc:ir:void*)
 	       ;((string=? base "size_t") (+ offset (if (= 64 (sys:pointer-size))
 	       ;					       *impc:ir:ui64*

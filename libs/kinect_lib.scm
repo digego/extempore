@@ -68,3 +68,60 @@
     (tfill! smooth_params (dtof 0.5) (dtof 0.5) (dtof 0.5) (dtof 0.05) (dtof 0.04))
     (lambda (skeleton)
       (kinect_smooth skeleton smooth_params))))
+
+
+(definec send-skeleton-osc  
+  (let ((skel-frame (zalloc 1 NUI_SKELETON_FRAME))
+	(pos (zalloc 100 double))
+	(buf (halloc 8000 i8))
+	(data (halloc (* 20 4) float))) ;; 20 Vector4's
+    (lambda (addy port)
+      (kinect_get_skeleton 100 skel-frame)
+      (kinect-smooth-params skel-frame 0.5 0.5 0.5 0.05 0.04)
+      (let ((skels:|6,NUI_SKELETON_DATA|* (tref-ptr skel-frame 5))
+	    (i 0))
+	(dotimes (i 6)
+	  (let ((skel-data:NUI_SKELETON_DATA* (aref-ptr skels i))
+		(state (tref skel-data 0))
+		(position:Vector4* (tref-ptr skel-data  4))
+		(positions:|20,Vector4|* (tref-ptr skel-data 5)))
+	    (if (= state 2)
+		(let ((address (salloc 15 i8))
+		      (types ",b")
+		      (addressl 16)
+		      (typesl 4)
+		      (datal 320)
+		      (length (+ addressl typesl 4 datal)))
+		  ;; setup address
+		  (memset address 0 15)
+		  (strcat address "/kinect/skel/")
+		  (strcat address (extitoa i))
+		  ;; clear message
+		  (memset buf 0 (+ length 1))
+		  ;; copy address into message
+		  (strcpy (pref-ptr buf 0) address)
+		  ;; copy types into message
+		  (strcpy (pref-ptr buf addressl) types)
+		  ;; copy blob size into message
+		  (pset! (bitcast (pref-ptr buf (+ addressl typesl)) i32*)
+			 0 (i64toi32 datal))
+		  ;; copy blob data into message
+		  (memcpy (pref-ptr buf (+ addressl typesl 4))
+			  (bitcast positions i8*) datal)
+		  ;; send message
+		  (llvm_send_udp addy port buf (i64toi32 length)))))))))) 
+
+
+(bind-val _skeletons_ |6,|20,Vector4|*|* (sys:make-cptr (* 6 (* 20 4 4))))
+(bind-val _skeletons-alive_ |6,i1|* (sys:make-cptr 6))
+
+(definec receive-skel-osc
+  (lambda (address:i8* types:i8* args:i8* size:i32)
+    (if (= (strncmp address "/kinect/skel" 12) 0)
+	(let ((skel-num (pref address 13))
+	      (positions (pref-ptr args 4))
+	      (skel (bitcast (aref-ptr _skeletons_ skel-num) i8*)))
+	  (memcpy skel positions (* 20 4 4))
+	  (pset! _skeletons-alive_ skel-num 1)
+	  1)
+	1)))
