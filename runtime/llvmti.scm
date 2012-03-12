@@ -520,7 +520,7 @@
       ;; otherwise we have a problem
       (if (and (> (length types) 1)
                (not (apply = (map length types))))
-          (print-error 'Compiler 'Error: 'bad 'complex 'type 'in types)
+          (print-error 'Compiler 'Error: 'un-even 'type 'error 'for 'sym: sym 'types: types)
           (map (lambda (ts)
                   ;(print 'ts: ts)
                   (let ((ttt (if (list? ts)
