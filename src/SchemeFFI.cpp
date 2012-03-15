@@ -2996,7 +2996,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     int  posy = ivalue(pair_cadddr(args));
     int  width = ivalue(pair_car(pair_cddddr(args)));
     int  height = ivalue(pair_cadr(pair_cddddr(args)));
-    
+    bool  forcetop = (pair_cddr(pair_cddddr(args))==_sc->NIL) ? 0 : 1;    
     
     MSG msg;
     WNDCLASSEX ex;
@@ -3055,7 +3055,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 
     if (fullScreen){ // if fullscreen
-        dwExStyle = WS_EX_APPWINDOW | WS_EX_TOPMOST ;
+        dwExStyle = WS_EX_APPWINDOW | WS_EX_TOPMOST;
         wndStyle = WS_POPUP;
         screenmode = 1; //FULLSCREEN
         posx = 0;
@@ -3065,7 +3065,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         // change resolution before the window is created
         //SysSetDisplayMode(screenw, screenh, SCRDEPTH);
     }else{
-      dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_TOPMOST ; //window extended style
+        dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE | WS_EX_TOPMOST;
         wndStyle = WS_OVERLAPPEDWINDOW; //windows style         
         screenmode = 0; //not fullscreen
     }
@@ -3113,7 +3113,8 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     
     ShowWindow(hwnd, SW_SHOW);		// everything went OK, show the window
     UpdateWindow(hwnd);
-    SetWindowPos(hwnd,HWND_TOPMOST,posx,posy,width,height,SWP_NOOWNERZORDER);
+    if (forcetop) SetWindowPos(hwnd,HWND_TOPMOST,posx,posy,width,height,SWP_NOOWNERZORDER);
+
     
     /* Bind the GLX context to the Window */
     wglMakeCurrent( hdc,hglrc );
