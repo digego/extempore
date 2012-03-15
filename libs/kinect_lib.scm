@@ -92,6 +92,7 @@
 		      (typesl 4)
 		      (datal 320)
 		      (length (+ addressl typesl 4 datal)))
+		  ;(printf "sending %d:%f\n" i (ftod (tref (aref-ptr positions 0) 0)))
 		  ;; setup address
 		  (memset address 0 15)
 		  (strcat address "/kinect/skel/")
@@ -112,16 +113,22 @@
 		  (llvm_send_udp addy port buf (i64toi32 length)))))))))) 
 
 
-(bind-val _skeletons_ |6,|20,Vector4|*|* (sys:make-cptr (* 6 (* 20 4 4))))
-(bind-val _skeletons-alive_ |6,i1|* (sys:make-cptr 6))
+(bind-val _skeletons_ |6,|20,Vector4||* (sys:make-cptr (* 6 (* 20 4 4))))
+(bind-val _skeletons-alive_ |6,i1| 0)
 
 (definec receive-skel-osc
   (lambda (address:i8* types:i8* args:i8* size:i32)
     (if (= (strncmp address "/kinect/skel" 12) 0)
-	(let ((skel-num (pref address 13))
+	(let ((skel-num (- (i8toi64 (pref address 13)) 48))
 	      (positions (pref-ptr args 4))
-	      (skel (bitcast (aref-ptr _skeletons_ skel-num) i8*)))
-	  (memcpy skel positions (* 20 4 4))
-	  (pset! _skeletons-alive_ skel-num 1)
+	      (posarg (bitcast positions |20,Vector4|*))
+	      (i 0) (k 0)
+	      (skel (aref-ptr _skeletons_ skel-num)))
+	  ;(printf "receiving %d:%f\n" skel-num (ftod (tref (aref-ptr posarg 0) 0)))
+	  (dotimes (i 20)
+	    (let ((v4p (aref-ptr posarg i)))
+	      (tfill! (aref-ptr skel i) (tref v4p 0) (tref v4p 1) (tref v4p 2) (tref v4p 3))))
+	  ;(memcpy skel positions (* 20 4 4))
+	  (aset! _skeletons-alive_ skel-num 1)
 	  1)
 	1)))

@@ -6,9 +6,23 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define gliblib (sys:open-dylib (if (string=? "Linux" (sys:platform))
-				    "libglib-2.0.so"
-				    (println "Where can I find glib on your platform?"))))
+(define gliblib
+  (sys:open-dylib (if (string=? "Linux" (sys:platform))
+		      "libglib-2.0.so"
+		      (if (string=? "Windows" (sys:platform))
+			  "libglib-2.0-0.dll"
+			  (print-error "Where can I find glib on your platform?")))))
+
+(if (not gliblib) (print-error "Could not load 'glib' dynamic library"))
+
+(define giolib
+  (sys:open-dylib (if (string=? "Linux" (sys:platform))
+		      "libglib-2.0.so"
+		      (if (string=? "Windows" (sys:platform))
+			  "libgio-2.0-0.dll"
+			  (print-error "Where can I find glib on your platform?")))))
+
+(if (not gliblib) (print-error "Could not load 'gio' dynamic library"))
 
 ;; some GLib type aliases
 ;; note that some of these differ from GLib's actual implementation!
@@ -48,6 +62,7 @@
 (bind-lib gliblib g_setenv [gboolean,gchar*]*)
 (bind-lib gliblib g_unsetenv [void,gchar*]*)
 (bind-lib gliblib g_spaced_primes_closest [guint,guint]*)
+
 
 ;; regex stuff
 (bind-lib gliblib g_match_info_matches [gboolean,GMatchInfo]*)
