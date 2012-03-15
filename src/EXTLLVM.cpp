@@ -513,15 +513,16 @@ void llvm_send_udp(char* host, int port, void* message, int message_length)
   socket.open(boost::asio::ip::udp::v4());
   socket.send_to(boost::asio::buffer(message, length), sa);
 #else
+  fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);			
   int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
   close(fd);
 #endif
   if(err < 0)
     {
-      if(errno == EMSGSIZE) {
+      if(err == EMSGSIZE) {
 	printf("Error: OSC message too large: UDP 8k message MAX\n");
       }else{
-	printf("Error: Problem sending OSC message\n");
+	printf("Error: Problem sending OSC message %d\n",err);
       }			
 
     }
