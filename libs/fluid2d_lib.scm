@@ -48,67 +48,44 @@
       cube)))
 
 
+;; I don't want to reflect at boundary points
+;; so just average everything.
 (definec fluid-set-boundary
   (lambda (b:i64 x:double* Ny:i64 N:i64)
     (let ((j 0)
 	  (i 0)
-	  (kk 0)
-	  (ii 0)
-	  (kkk 0)
-	  (jjj 0))
-      (dotimes (ii N) ;(- N 1))
-      	(pset! x ii
-      	       ;; (if (= b -2)		   
-      	       ;; 	   (* -1.0 (pref x (+ ii (* 1 N))))
-      		   (pref x (+ ii (* 1 N))))
-      	(pset! x (+ ii (* (- N 1) N))
-      	       ;; (if (= b -2)		   
-      	       ;; 	   (* -1.0 (pref x (+ ii (* (- N 1) N))))
-      		   (pref x (+ ii (* (- N 1) N)))))
-      (dotimes (jjj Ny)
-      	(pset! x (* jjj N)
-      		   (pref x (* jjj N)))
-      	(pset! x (+ (- N 1) (* jjj N))
-      	       ;; (if (= b -1)	       
-      	       ;; 	   (* -1.0 (pref x (+ (- N 1) (* jjj N))))
-      		   (pref x (+ (- N 1) (* jjj N)))))
-
-      
-      (dotimes (ii (- N 2))
-      	(pset! x (+ ii 1)
-      	       (if (= b -2)		   
-      		   (* -1.0 (pref x (+ (+ ii 1) (* 1 N))))
-      		   (pref x (+ (+ ii 1) (* 1 N)))))
-      	(pset! x (+ (+ ii 1) (* (- N 1) N))
-      	       (if (= b -2)		   
-      		   (* -1.0 (pref x (+ (+ ii 1) (* (- N 2) N))))
-      		   (pref x (+ (+ ii 1) (* (- N 2) N))))))
-      (dotimes (jjj (- Ny 2))
-      	(pset! x (* (+ jjj 1) N)
-      	       (if (= b -1)
-      		   (* -1.0 (pref x (+ 1 (* (+ jjj 1) N))))
-      		   (pref x (+ 1 (* (+ jjj 1) N)))))
-      	(pset! x (+ (- N 1) (* (+ jjj 1) N))
-      	       (if (= b -1)	       
-      		   (* -1.0 (pref x (+ (- N 2) (* (+ jjj 1) N))))
-      		   (pref x (+ (- N 2) (* (+ jjj 1) N))))))
-
-      (pset! x 0
-      	     (* 0.5 (+ (pref x 1)
-      		       (pref x (* 1 N)))))
-      
-      (pset! x (* (- Ny 1) N)
-      	     (* 0.5 (+ (pref x (+ 1 (* (- N 1) N)))
-      		       (pref x (* (- N 2) N)))))
-      
-      (pset! x (- N 1)
-      	     (* 0.5 (+ (pref x (- N 2))
-      		       (pref x (+ (- N 1) (* 1 N))))))
-
-      (pset! x (+ (- N 1) (* (- Ny 1) N))
-      	     (* 0.5 (+ (pref x (+ (- N 2) (* (- N 1) N)))
-      		       (pref x (+ (- N 1) (* (- N 2) N))))))
+	  (lastrow (* (- Ny 1) N)))
+      (dotimes (i 1 (- N 2))
+      	(pset! x i
+	       (* 0.5 (+ (pref x i)
+			 (pref x (+ i N)))))
+      	(pset! x (+ i lastrow)
+	       (* .5 (+ (pref x (+ i lastrow))
+			(pref x (+ i (- lastrow N)))))))
+      (dotimes (j 1 (- Ny 2))
+	(pset! x (* j N)
+	       (* .5  (+ (pref x (* j N))
+			 (pref x (+ 1 (* j N))))))
+	(pset! x (+ (* j N) (- N 1))
+	       (* .5 (+ (pref x (+ (* j N) (- N 1)))
+			(pref x (+ (* j N) (- N 2)))))))
+	
+      (pset! x 0 (* 0.33333 (+ (pref x 0)
+			     (pref x 1)
+			     (pref x N))))
+      (pset! x (- N 1) (* 0.33333 (+ (pref x (- N 1))
+				     (pref x (- N 2))
+				     (pref x (- (* 2 N) 1)))))
+      (pset! x (* (- Ny 1) N) (* 0.33333 (+ (pref x (* (- Ny 1) N))
+					    (pref x (+ (* (- Ny 1) N) 1))
+					    (pref x (* (- Ny 2) N)))))
+      (pset! x (+ (* (- Ny 1) N) (- N 1))
+      	     (* .33333 (+ (pref x (+ (* (- Ny 1) N) (- N 1)))
+			  (pref x (- (+ (* (- Ny 1) N) (- N 1)) 1))
+			  (pref x (+ (* (- Ny 2) N) (- N 1))))))
       1)))
+
+
 
 
 
@@ -120,8 +97,8 @@
 	  (j 0)
 	  (i 0))
       (dotimes (k iter)
-	(dotimes (j (- Ny 1))
-	  (dotimes (i (- N 1))
+	(dotimes (j (- Ny 2))
+	  (dotimes (i (- N 2))
 	    (pset! x (+ (+ i 1) (* (+ j 1) N))
 		   (* cRecip
 		      (+ (pref x0 (+ (+ i 1) (* (+ j 1) N)))
@@ -145,8 +122,8 @@
 	  (i 0)
 	  (jj 0)
 	  (ii 0))
-      (dotimes (j (- Ny 1))
-	(dotimes (i (- N 1))
+      (dotimes (j (- Ny 2))
+	(dotimes (i (- N 2))
 	  (pset! div (+ (+ i 1) (* (+ j 1) N))
 		 (* -0.5 (/ (+ (- (pref velocx (+ (+ i 2) (* (+ j 1) N)))
 				  (pref velocx (+ i (* (+ j 1) N))))
@@ -185,8 +162,9 @@
 (definec fluid-advect
   (lambda (b:i64 d:double* d0:double* velocx:double* velocy:double* dt:double Ny:i64 N:i64)
     (let ((n-1 (i64tod (- N 1)))
+	  (ny-1 (i64tod (- Ny 1)))
 	  (dtx (* dt n-1))
-	  (dty (* dt n-1))
+	  (dty (* dt ny-1))
 	  (jfloat 0.0) (ifloat 0.0)
 	  (s0 0.0) (s1 0.0) (t0 0.0) (t1 0.0)
 	  (i0 0.0) (i0i 0) (i1 0.0) (i1i 0)
@@ -194,11 +172,12 @@
 	  (j:i64 0) (i:i64 0)
 	  (tmp1 0.0) (tmp2 0.0) (tmp3 0.0)
 	  (x 0.0) (y 0.0) (z 0.0)
-	  (Nfloat (i64tod N)))
-      (dotimes (j (- Ny 1))
+	  (Nfloat (i64tod N))
+	  (NYfloat (i64tod N)))
+      (dotimes (j (- Ny 2))
 	(set! jfloat (+ jfloat 1.0))
 	(set! ifloat 0.0)
-	(dotimes (i (- N 1))
+	(dotimes (i (- N 2))
 	  (set! ifloat (+ ifloat 1.0))
 	  (set! tmp1 (* dtx (pref velocx (+ (+ i 1) (* (+ j 1) N)))))
 	  (set! tmp2 (* dty (pref velocy (+ (+ i 1) (* (+ j 1) N)))))
@@ -210,7 +189,7 @@
 	  (set! i0 (floor x))
 	  (set! i1 (+ i0 1.0))
 	  (if (< y 0.5) (set! y 0.5))
-	  (if (> y (+ Nfloat 0.5)) (set! y (+ Nfloat 0.5)))
+	  (if (> y (+ NYfloat 0.5)) (set! y (+ NYfloat 0.5)))
 	  (set! j0 (floor y))
 	  (set! j1 (+ j0 1.0))
 
@@ -493,7 +472,7 @@
 	  (pset! args1 1 (i64toi32 xN))
 	  (dotimes (i xN)
 	    (pset! args2 i (dtof (pref dat i)))))
-	(llvm_send_udp addy 3333 buf (i64toi32 length))))))
+	(llvm_send_udp addy 4444 buf (i64toi32 length))))))
 
 (definec send-fluid-first-row-osc
   (lambda (addy cube:fluidcube* type:i32)
@@ -538,7 +517,7 @@
 	  (pset! args1 1 (i64toi32 yN))
 	  (dotimes (i yN)
 	    (pset! args2 i (dtof (pref dat i)))))
-	(llvm_send_udp addy 3333 buf (i64toi32 length))))))
+	(llvm_send_udp addy 4444 buf (i64toi32 length))))))
 
 (definec send-fluid-first-column-osc
   (lambda (addy cube:fluidcube* type:i32)
