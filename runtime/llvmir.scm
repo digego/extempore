@@ -2549,6 +2549,7 @@
 			(set-car! (cdr bval) (cadr aval))
 			(print-error 'Compiler 'Error: 'Type 'mismatch 'in 'math 'expression: ast 'between 'arg1: (string->symbol (cadr aval)) 'and 'arg2: (string->symbol (cadr bval))))))
 
+
 	    (set! type (if (null? type-hint) (cadr aval) (impc:ir:get-type-str type-hint)))
             (emit a os)
             (emit b os)            
@@ -2928,7 +2929,11 @@
 						 ")* @" name " to i8*\n")))
 			    (print-error 'Compiler 'Error: 'Unbound 'symbol ast))))
                    ((number? ast)
-                    ;(print 'number: ast hint?)
+		    (if (not (null? hint?))
+			(begin (if (and (integer? ast) (impc:ir:floating-point? (car hint?)))
+				   (print-error 'Compiler 'Error: 'bad 'floating 'point 'type ast 'required: (car hint?)))
+			       (if (and (not (integer? ast)) (impc:ir:fixed-point? (car hint?)))
+				   (print-error 'Compiler 'Error: 'bad 'fixed 'point 'type ast 'required: (car hint?)))))
                     (if (and (not (null? hint?))
                              (impc:ir:number? (car hint?)))
                         (if (= *impc:ir:float* (car hint?))
