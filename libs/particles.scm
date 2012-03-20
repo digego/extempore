@@ -67,6 +67,57 @@
     void))
 
 
+
+(definec psystem-particle-check
+  (lambda (psys:psystem* idx)
+    (let ((states (psystem_states psys))
+	  (size (psystem_size psys)))
+      (if (> idx (- size 1)) -1	  
+	  (if (< (pref states idx) 1)
+	      idx
+	      (psystem-particle-check psys (+ idx 1)))))))
+
+
+(definec psystem-set-particle
+  (lambda (psys:psystem* idx x y s xx yy r g b a dur)
+    (let ((size (psystem_size psys))
+	  (free-particle idx))
+      (if (or (= free-particle -1)
+	      (> free-particle size))
+	  void ;; don't do anything if no free particles
+          (let ((states (tref psys 1))
+		(xs (tref psys 2))
+		(ys (tref psys 3))
+		(xvs (tref psys 4))
+		(yvs (tref psys 5))
+		(sizes (tref psys 6))
+		(reds (tref psys 7))
+		(greens (tref psys 8))
+		(blues (tref psys 9))
+		(alphas (tref psys 10)))
+	    (pset! states free-particle dur)
+	    (pset! xs free-particle x)
+	    (pset! ys free-particle y)
+	    (pset! xvs free-particle xx)
+	    (pset! yvs free-particle yy)
+	    (pset! sizes free-particle s)
+	    (pset! reds free-particle r)
+	    (pset! greens free-particle g)
+	    (pset! blues free-particle b)
+	    (pset! alphas free-particle a)
+	    void)))))
+
+
+(definec psystem-add-particle
+  (lambda (psys:psystem* x y s xx yy r g b a dur)
+    (let ((size (psystem_size psys))
+	  (free-particle (psystem-particle-check psys 0)))
+      (if (= free-particle -1)
+	  void ;; don't do anything if no free particles
+	  (begin (psystem-set-particle psys free-particle x y s xx yy r g b a dur)
+		 void)))))		  
+
+
 ;; draw system
 (definec psystem_draw 250000000
   (let ((vertex_dat (zalloc 8000000 float))
