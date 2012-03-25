@@ -1049,7 +1049,7 @@
 	    a
 	    (if (or (not (impc:ir:array? (car a)))
 		    (> (impc:ir:get-ptr-depth (car a)) 1))
-		(print-error 'Compiler 'Error: 'invalid 'array-ref-ptr 'type (impc:ir:get-type-str (car a)))
+		(print-error 'Compiler 'Error: 'invalid 'array-ref-ptr 'type (impc:ir:get-type-str (car a)) 'in ast)
 		(list (impc:ir:pointer++ (caddr (car a)))))))))
 
 
@@ -1064,7 +1064,7 @@
              a
 	     (if (or (not (impc:ir:array? (car a)))
 		     (> (impc:ir:get-ptr-depth (car a)) 1))
-		 (print-error 'Compiler 'Error: 'invalid 'array-ref 'type (impc:ir:get-type-str (car a)))
+		 (print-error 'Compiler 'Error: 'invalid 'array-ref 'type (impc:ir:get-type-str (car a)) 'in ast)
 		 (list (caddr (car a))))))))
 
 
@@ -2238,6 +2238,7 @@
 					   ")\nret void\n" ; (impc:ir:get-type-str (car stub-type)) 
 					   ;(if (impc:ir:void? (car stub-type)) "\n" " %result\n")
 					   "}")))
+		(fstub_scheme_valid #t) ;; this will be set to false if no valid conversion type to scheme is available (structs and arrays are not supported yet for example)
                 (fstub_scheme (string-append "define ccc i8* " ;(impc:ir:get-type-str (car stub-type))
 					     " @" (string-append (symbol->string symname) "_scheme(i8* %_sc, i8* %args)\n"
 					     "{\nentry:\n"
@@ -2252,7 +2253,11 @@
 						    (map (lambda (t n idx)
 							   ;(println 't: t 'n: n 'idx: idx)
 							   (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
-                                                                            (cond ((or (not (number? t))
+                                                                            (cond ((and (not (number? t))
+											(not (impc:ir:pointer? t)))
+										   (set! fstub_scheme_valid #f)
+										   "")
+										  ((or (not (number? t))
 										       (> t 9))
 										   (string-append "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
 												  n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n"))
@@ -2297,7 +2302,11 @@
 					     ;(begin (println 'ccccc) "")
 
 					     (let* ((t (car stub-type)))
-					       (cond ((or (not (number? t))
+					       (cond ((and (not (number? t))
+							   (not (impc:ir:pointer? t)))
+						      (set! fstub_scheme_valid #f)
+						      "")
+						     ((or (not (number? t))
 							  (> t 9))
 						      (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
 								     "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
@@ -2397,7 +2406,7 @@
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_stub"))
                        (if (or (not (llvm:compile fstub))
 			       (not (llvm:compile fstub_native))
-			       (not (llvm:compile fstub_scheme)))
+			       (not (if fstub_scheme_valid (llvm:compile fstub_scheme) #t)))
                            (begin (print-error "Compiler Failed building stubs!")
                                   (error "")))
 		       ;; bind fstub_scheme
@@ -2445,16 +2454,11 @@
 	  (expr (car (reverse args))))
       ;;(print-full 'types: types 'e: expr 'args: args)
       `(define ,symname
-	 (let* (;(res1 (ipc:call ,*impc:compiler:process* 'impc:ti:run ',symname 
-		;		'(let ((,symname ,expr)) ,symname)
-		;		,@(if (null? types) 
-		;		      '()
-		;		      (map (lambda (k) (list 'quote k)) types))))
-		(res1 (impc:ti:run ',symname
+	 (let* ((res1 (impc:ti:run ',symname
 				   '(let ((,symname ,expr)) ,symname)
 				   ,@(if (null? types) 
 					 '()
-					 (map (lambda (k) (list 'quote k)) types))))				   
+					 (map (lambda (k) (list 'quote k)) types))))
 		(setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
 		(func (llvm:get-function (symbol->string ',symname))))
 	   (if setter
@@ -2463,10 +2467,16 @@
 		      (error "")))
 	   (if func
 	       ;(lambda args (apply llvm:run func (sys:peek-memzone) args))
-	       (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
+	       (if (llvm:get-scheme-function ,(symbol->string symname))
+		   (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
+		   (begin (ascii-print-color 0 7 10)
+			  (print "There is no scheme stub available for ")
+			  (ascii-print-color 0 6 10)
+			  (println ,(symbol->string symname))
+			  (ascii-print-color 0 7 10)))
 	       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		      (error ""))))))))
-    
+
 
 ;; Definec-precomp is for setting up precompiled ir functions only
 (define definec-precomp

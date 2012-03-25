@@ -1902,9 +1902,9 @@
 	(emit var-str os)
 	(emit "; array ref\n" os)
 	(if (not (impc:ir:pointer? ttype)) ;; must be an array if we're not a pointer
-	     (print-error 'Compiler 'Error: 'array-ref-ptr 'must 'take 'a 'pointer 'to 'an 'array 'not (cadr var))
-	    ;; (emit (string-append (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractvalue " 
-	    ;; 			 (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n") os)
+	    ;; (print-error 'Compiler 'Error: 'array-ref 'must 'take 'a 'pointer 'to 'an 'array 'not (cadr var))
+	    (emit (string-append (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractvalue "
+	     			 (cadr var) " " (car var) ", " (car idx) "\n") os)
 	    (begin (emit (string-append (impc:ir:gname "_val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
 					" = getelementptr " (cadr var) " " (car var)
 					", i32 0, " (cadr idx) " " (car idx) "\n") os)
