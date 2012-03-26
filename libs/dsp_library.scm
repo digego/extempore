@@ -532,7 +532,7 @@
       (pset! data 7 sus-amp)
       (pset! data 8 (+ start-time atk-dur dky-dur sus-dur rel-dur))
       (pset! data 9 0.0)
-      (pset! data 10 (+ start-time atk-dur dky-dur sus-dur rel-dur 1)) ;; this to flatten out at 0.0
+      (pset! data 10 (+ start-time atk-dur dky-dur sus-dur rel-dur 1.0)) ;; this to flatten out at 0.0
       (pset! data 11 0.0)
       (let ((f (make-envelope data points)))
 	(lambda (time:double)
