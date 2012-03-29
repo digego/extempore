@@ -14,7 +14,7 @@
 ;; (i.e. argument type and return type)
 ;; 
 ;; integer literals default to 64 bit integers
-(definec my-test-1
+(bind-func my-test-1
    (lambda (a)
       (* a 5)))
 
@@ -35,7 +35,7 @@
 ;; So a closure pointer type is "[...]*"
 
 ;; float literals default to doubles
-(definec my-test-1f
+(bind-func my-test-1f
    (lambda (a)
       (* a 5.0)))
 
@@ -54,7 +54,7 @@
 
 ;; you are free to recompile an existing closure
 ;; so we can change my-test-1 to
-(definec my-test-1
+(bind-func my-test-1
    (lambda (a)
       (/ a 5)))
 
@@ -67,7 +67,7 @@
 ;; 
 ;; So we CANNOT do this
 
-;(definec my-test-1
+;(bind-func my-test-1
 ;   (lambda (a)
 ;      (/ a 5.0)))
 
@@ -84,7 +84,7 @@
 ;; to maintain state between calls
 ;;
 ;; increment power each call
-(definec my-test-2
+(bind-func my-test-2
    (let ((power 0))
       (lambda (x)
          (set! power (+ power 1)) ;; set! for closure mutation as per scheme
@@ -102,7 +102,7 @@
 ;; being a closure that returns a closure
 ;; the outer closure takes no arguments
 ;; and the return closure takes an i64 argument
-(definec my-test-3
+(bind-func my-test-3
   (lambda ()
     (lambda (x)
       (* x 3))))
@@ -116,7 +116,7 @@
 ;; to help in the validation process
 
 ;; THIS WOULD CAUSE AN ERROR!
-;(definec my-inc-maker
+;(bind-func my-inc-maker
 ;  (lambda (i)
 ;    (lambda (inc)
 ;      (set! i (+ i inc))
@@ -145,7 +145,7 @@
 ;;
 ;; With this information in mind we can
 ;; fix the incrementor by explicitly typing 'i'
-(definec my-inc-maker
+(bind-func my-inc-maker
    (lambda (i:i64)
       (lambda (inc)
          (set! i (+ i inc))
@@ -187,7 +187,7 @@
 ;; and x is our operand
 ;; THIS WILL CAUSE AN ERROR
 
-;(definec my-inc-maker-wrappert
+;(bind-func my-inc-maker-wrappert
 ;   (lambda (f x) ; f and x are args
 ;      (f x)))
 
@@ -198,12 +198,12 @@
 ;; return type should be?
 ;; This also causes an error!
 
-;(definec my-inc-maker-wrappert
+;(bind-func my-inc-maker-wrappert
 ;   (lambda (f x:i64) ; f and x are args
 ;      (f x)))
 
 ;; so we need to type f properly
-(definec my-inc-maker-wrapper
+(bind-func my-inc-maker-wrapper
    (lambda (f:[i64,i64]* x)      
       (f x)))
 
@@ -223,7 +223,7 @@
 ;; otherwise you just call my-inc-maker directly
 
 ;; this avoids the wrapper completely
-(definec my-inc-test
+(bind-func my-inc-test
    (let ((f (my-inc-maker 0)))
       (lambda ()
          (f 1))))
@@ -243,7 +243,7 @@
 ;; Closures can be recursive
 ;;
 
-(definec my-test-4
+(bind-func my-test-4
   (lambda (a)
     (if (< a 1)
 	(printf "done\n")
@@ -260,7 +260,7 @@
 ;;
 
 ;; make and return a simple tuple
-(definec my-test-6
+(bind-func my-test-6
   (lambda ()
     (alloc <i64,double,i32>)))
 
@@ -274,7 +274,7 @@
 ;; note that my-test-7's return type is inferred
 ;; by the tuple-reference index 
 ;; (i.e. i64 being tuple index 0)
-(definec my-test-7 
+(bind-func my-test-7 
   (lambda ()
     (let ((a (alloc <i64,double>)) ; returns pointer to type <i64,double>
 	  (b 37)
@@ -295,7 +295,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some array code with *casting*
 ;; this function returns void
-(definec my-test-8
+(bind-func my-test-8
    (lambda ()
       (let ((v1 (alloc |5,float|))
 	    (v2 (alloc |5,float|))
@@ -343,19 +343,19 @@
 ;; in other words aref and aset! are happy
 ;; to work with either i64* or |5,i64|*
 
-(definec my-test-9
+(bind-func my-test-9
    (lambda (v:|5,i64|*)
       (let ((f (lambda (x)
                   (* (array-ref v 2) x))))
          f)))
 
-(definec my-test-10
+(bind-func my-test-10
   (lambda (v:|5,[i64,i64]*|*)
     (let ((ff (aref v 0))) ; aref alias for array-ref
       (ff 5))))
 
 
-(definec my-test-11
+(bind-func my-test-11
    (lambda ()
       (let ((v (alloc |5,[i64,i64]*|)) ;; make an array of closures!
             (vv (alloc |5,i64|)))
@@ -369,7 +369,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some conditionals
 
-(definec my-test-12
+(bind-func my-test-12
    (lambda (x:i64 y)
       (if (> x y)
           x
@@ -379,7 +379,7 @@
 (println (my-test-12 13 12))
 
 ;; returns boolean true
-(definec my-test-13
+(bind-func my-test-13
    (lambda (x:i64)
       (cond ((= x 1) (printf "A\n"))
             ((= x 2) (printf "B\n"))
@@ -397,7 +397,7 @@
 ;; making a linear envelop generator
 ;; for signal processing and alike
 
-(definec envelope-segments
+(bind-func envelope-segments
   (lambda (points:double* num-of-points:i64)
     (let ((lines (zone-alloc num-of-points [double,double]*))
 	  (k 0))
@@ -414,7 +414,7 @@
       lines)))
 
 
-(definec make-envelope
+(bind-func make-envelope
    (lambda (points:double* num-of-points)
       (let ((klines:[double,double]** (envelope-segments points num-of-points))
             (line-length num-of-points))
@@ -431,7 +431,7 @@
 
 
 ;; make a convenience wrapper 
-(definec env-wrap
+(bind-func env-wrap
    (let* ((points 3)
           (data (zone-alloc (* points 2) double)))
       (pointer-set! data 0 0.0) ;; point data
@@ -476,7 +476,7 @@
 ;; let's create a closure that capture's 'a'
 
 
-(definec my-test14
+(bind-func my-test14
   (let ((a:i32 6))
     (lambda ()
       (printf "a:%d\n" a)
@@ -493,7 +493,7 @@
 ;; then we directly set the closures 'a' binding
 ;; then call again
 ;; 
-(definec my-test15
+(bind-func my-test15
   (lambda (x:i32)
     (my-test14)
     (my-test14.a:i32 x)
@@ -510,13 +510,13 @@
 
 ;; of course this works just as well for
 ;; non-global closures
-(definec my-test16
+(bind-func my-test16
   (lambda (a:i32)
     (let ((f (lambda ()
 	       (* 3 a))))
       f)))
 
-(definec my-test17
+(bind-func my-test17
   (lambda ()
     (let ((f (my-test16 5)))
       (f.a:i32 7)
@@ -527,14 +527,14 @@
 
 
 ;; and you can get and set closures also!
-(definec my-test18
+(bind-func my-test18
   (let ((f (lambda (x:i64) x)))
     (lambda ()
       (lambda (z)
 	(f z)))))
 
 
-(definec my-test19
+(bind-func my-test19
   (lambda ()
     (let ((t1 (my-test18))
 	  (t2 (my-test18)))
@@ -560,7 +560,7 @@
 (bind-type mytype <i64,i64>)
 
 ;; which we can then use in place
-(definec my-test20
+(bind-func my-test20
   (lambda (a:mytype*)
     (tref a 0)))
 
@@ -577,23 +577,23 @@
 ;; this memory at some point in the future!
 ;; (i.e. cleaning up the memory zone that this
 ;; heap allocation was made into)
-(definec cons-i64
+(bind-func cons-i64
   (lambda (a:i64 b:i64list*)
     (let ((pair (zone-alloc i64list)))
       (tset! pair 0 a)
       (tset! pair 1 b)
       pair)))
           
-(definec car-i64
+(bind-func car-i64
   (lambda (a:i64list*)
     (tref a 0)))
 
-(definec cdr-i64
+(bind-func cdr-i64
   (lambda (a:i64list*)
     (tref a 1)))
 
 ;; print all i64's in list
-(definec my-test25
+(bind-func my-test25
   (lambda (a:i64list*)
     (if (null? a)
 	(begin (printf "done\n") 1)
@@ -601,7 +601,7 @@
 	       (my-test25 (cdr-i64 a))))))
 
 ;; build a list (using cons) and then call my-test25
-(definec my-test26
+(bind-func my-test26
   (lambda ()
     (let ((my-list (cons-i64 1 (cons-i64 2 (cons-i64 3 null)))))
       (my-test25 my-list))))
@@ -618,7 +618,7 @@
 ;; end of the function call.  You can
 ;; stack allocate (stack-alloc)
 ;; any valid type  (i64 for example)
-(definec my-test27
+(bind-func my-test27
   (lambda ()
     (let ((point (stack-alloc vec3)))
       (tset! point 0 0.0)
@@ -640,7 +640,7 @@
 
 ;; This allows you to do things like create an array
 ;; with an offset
-(definec my-test28
+(bind-func my-test28
   (lambda ()
     (let ((arr (alloc |32,i64|))
 	  (arroff (aref-ptr arr 16))
@@ -668,7 +668,7 @@
 
 (bind-type tuple-with-array <double,|32,|4,i32||,float>)
 
-(definec my-test29
+(bind-func my-test29
   (lambda ()
     (let ((tup (stack-alloc tuple-with-array))
 	  (t2 (stack-alloc |32,i64|)))
@@ -696,7 +696,7 @@
 
 ;; increment g-var-a by inc
 ;; and return new value of g-var-a
-(definec my-test30
+(bind-func my-test30
   (lambda (inc)
     (set! g-var-a (+ g-var-a inc))
     g-var-a))
@@ -715,7 +715,7 @@
 ;; for example initialize all 1024 double elements to 5.125
 (bind-val g-var-a2 |1024,double| 5.125)
 
-(definec test31
+(bind-func test31
   (lambda ()
     (printf "a1[3]:%lld  a2[55]:%f\n" (aref g-var-a1 3) (aref g-var-a2 55))
     1))
@@ -729,7 +729,7 @@
 (bind-val g-var-d |4,i32|* (sys:make-cptr (* 4 4)))
 (bind-val g-var-e tuple-with-array* (sys:make-cptr (+ 8 (* 32 (* 4 4)) 4)))
 
-(definec test32
+(bind-func test32
   (lambda ()
     (tset! g-var-e 0 11.0)
     (aset! g-var-d 0 55)
@@ -741,7 +741,7 @@
 
 (bind-val gvar-array |5,double| 0.0)
 
-(definec test33
+(bind-func test33
   (lambda ()
     (aset! gvar-array 3 19.19)
     (aref gvar-array 3)))
@@ -759,7 +759,7 @@
 ;;
 ;; Callbacks
 
-(definec test34
+(bind-func test34
   (lambda (time:i64 count:i64)
     (printf "time: %lld:%lld\n" time count)
     (callback (+ time 1000) test34 (+ time 22050) (+ count 1))))
@@ -772,7 +772,7 @@
 ;; of course we need to keep the type
 ;; signature the same [void,i64,i64]*
 ;;
-(definec test34
+(bind-func test34
   (lambda (time:i64 count:i64)
     void))
 
@@ -781,7 +781,7 @@
 ;;
 ;; some memzone tests
 
-(definec test35
+(bind-func test35
   (lambda ()
     (let ((b (zalloc |5,double|)))
       (aset! b 0
@@ -797,7 +797,7 @@
 (println (test35)) ;; 3.5
 
 
-(definec test36
+(bind-func test36
   (lambda ()
     (memzone 1024
       (let ((k (zalloc |15,double|))
@@ -810,7 +810,7 @@
 		   a)))))
 	(f k)))))
 
-(definec test37
+(bind-func test37
   (lambda ()
     (let ((v (test36))
 	  (i 0))
@@ -820,7 +820,7 @@
 (test37)
 
 
-(definec test38
+(bind-func test38
   (lambda ()
     (memzone 1024 (* 44100 10)
       (let ((a (alloc |5,double|)))
@@ -840,7 +840,7 @@
 ;;  same amount or whatever new amount you have allocated for closure
 ;;  compilation)
 ;;
-(definec test39 1000000
+(bind-func test39 1000000
   (let ((k (zalloc |100000,double|)))
     (lambda ()
       (aset! k 0 1.0)
@@ -862,7 +862,7 @@
 (bind-type list_t <i64,list_t*>)
 
 ;; remove value from front of list
-(definec dequeue
+(bind-func dequeue
   (lambda (queue:|2,list_t*|*)
     (let ((front (aref queue 0)))
       (if (null? front) -1
@@ -874,7 +874,7 @@
 	    val)))))
 
 ;; add to the back of the list
-(definec enqueue
+(bind-func enqueue
   (lambda (queue:|2,list_t*|* value:i64)
     (let ((tmp (halloc list_t))
 	  (front (aref queue 0))
@@ -886,7 +886,7 @@
       (aset! queue 1 tmp) ;; set back to tmp
       1)))
 
-(definec queue_test
+(bind-func queue_test
   (lambda ()
     (let ((myqueue (salloc |2,list_t*|))
 	  (stuff (salloc |8,i64|))
@@ -925,7 +925,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; do some work
-(definec work
+(bind-func work
   (lambda (a:i64)
     (let ((i:i64 0))
       ;; 1 billion iterations
@@ -936,11 +936,11 @@
     (* a a)))
 
 ;; start 5 new processes
-;; ipc:definec work in each
+;; ipc:bind-func work in each
 (define procs
   (map (lambda (n p)
 	 (ipc:new n p)
-	 (ipc:definec n 'work)
+	 (ipc:bind-func n 'work)
 	 n)
        (list "proc-a" "proc-b" "proc-c" "proc-d" "proc-e")
        (list 7097 7096 7095 7094 7093)))
@@ -995,26 +995,26 @@
 ;; are acceptable.
 ;; In this instance the compiler chooses
 ;; the last poly bound -> [float,float]*
-(definec test40
+(bind-func test40
   (lambda (a)
     (cos* a)))
 
 ;; you could of course force the issue
 ;; to [double,double]* by adding a type to a
-(definec test41
+(bind-func test41
   (lambda (a:double)
     (cos* a)))
 
 ;; in a slightly more complex senario
 ;; floorf requires a float
-(definec test42
+(bind-func test42
   (lambda (a)
     (floorf (cos* a)))) 
 
 ;; note that forcing a to double in this case
 ;; fails because there is no 
 ;; "cos" poly with signature [float,double]*
-(definec test43
+(bind-func test43
   (lambda (a)
     (floorf (cos* a))))  ;; this fails although floor would work
 
@@ -1023,15 +1023,15 @@
 ;; mixed argument lengths
 ;; 
 ;; so for example:
-(definec my-func-1
+(bind-func my-func-1
   (lambda (a:i8*)
     (printf "%s\n" a)))
 
-(definec my-func-2
+(bind-func my-func-2
   (lambda (a:i8* b:i8*)
     (printf "%s %s\n" a b)))
 
-(definec my-func-3
+(bind-func my-func-3
   (lambda (a:i8* b:i8* c:i8*)
     (printf "%s %s %s\n" a b c)))
 
@@ -1040,7 +1040,7 @@
 (bind-poly print my-func-2)
 (bind-poly print my-func-3)
 
-(definec test44
+(bind-func test44
   (lambda (a b c)
     (print a)
     (print a b)
@@ -1051,11 +1051,11 @@
 
 ;; polys can also specialize
 ;; on the return type
-(definec my-func-4
+(bind-func my-func-4
   (lambda (a:double)
     (* a a)))
 
-(definec my-func-5
+(bind-func my-func-5
   (lambda (a:double)
     (dtoi64 (* a a))))
 
@@ -1063,12 +1063,12 @@
 (bind-poly sqrd my-func-5)
 
 ;; specialize on [i64,double]*
-(definec test45
+(bind-func test45
   (lambda (a:double)
     (+ 1.0 (sqrd a))))
 
 ;; specialize on [double,doube]*
-(definec test46
+(bind-func test46
   (lambda (a:double)
     (+ 1 (sqrd a))))
 
@@ -1081,10 +1081,56 @@
 ;; Generics
 ;;
 
-(bind-typevar numz i64 i32)
+(bind-typevar num i64 i32 i8 i1 float double)
+
+(bind-func mul
+  (lambda (a:num b:num)
+    (* a b)))
+
+(bind-func sum
+  (lambda (a:num b:num)
+    (+ a b)))
+
+(bind-type i64list <i64,i64list*>)
+(bind-type i32list <i32,i32list*>)
+(bind-type i8list <i8,i8list*>)
+(bind-type i1list <i1,i1list*>)
+(bind-type f32list <float,f32list*>)
+(bind-type f64list <double,f64list*>)
+
+(bind-typevar numlists i64list* i32list* i8list* i1list* f32list* f64list*)
+
+(bind-func mcons
+  (lambda (a:num b:numlists)
+    (let ((pair (alloc :numlists)))
+      (tset! pair 0 a)
+      (tset! pair 1 b)
+      pair)))
+
+(bind-func mcar
+  (lambda (b:numlists)
+    (tref b 0)))
+
+(bind-func mcdr
+  (lambda (b:numlists)
+    (tref b 1)))
+
+(bind-func ttt4
+  (lambda ()
+    (let ((n1 (bitcast null f64list*)))
+      (set! n1 (mcons 3.0 n1))
+      (mcar n1))))
+
+(bind-func test48
+  (lambda ()
+    (let ((n1 (bitcast null f64list*)))
+      (set! n1 (mcons 3.0 n1))
+      ;(printf "%f\n" (mcar n1))
+      (mcar n1))))
+
 
 (bind-func test47
-  (lambda (x:numz y)
+  (lambda (x:numz y)    
     (* x y)))
 
 (bind-func test48
@@ -1114,7 +1160,7 @@
 ;; duration of the function call.  They are deallocated when the function
 ;; returns.
 
-;; (definec ex1
+;; (bind-func ex1
 ;;   (lambda ()
 ;;     (let ((a (stack-alloc double)))
 ;;       (aset! a 0 5.5)
@@ -1128,7 +1174,7 @@
 
 ;; (bind-type vec3 <float,float,float>)
 
-;; (definec ex2
+;; (bind-func ex2
 ;;   (lambda ()
      
 

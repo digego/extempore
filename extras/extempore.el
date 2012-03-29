@@ -52,9 +52,8 @@
     ("bind-func" . font-lock-keyword-face)
     ("definec:dsp" . font-lock-keyword-face)
     ("define-instrument" . font-lock-keyword-face)
-    ;("bind-scm" . font-lock-keyword-face)
     ("bind-val" . font-lock-keyword-face)
-    ("bind-tvar" . font-lock-keyword-face)
+    ("bind-typevar" . font-lock-keyword-face)
     ("bind-alias" . font-lock-keyword-face)
     ("bind-type" . font-lock-keyword-face)    
     ("bind-poly" . font-lock-keyword-face)
@@ -63,6 +62,7 @@
     ("bind-lib" . font-lock-keyword-face)))
 
 (put 'dotimes 'scheme-indent-function 1)
+(put 'bind-func 'scheme-indent-function 1)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; handle extempore minor mode stuff

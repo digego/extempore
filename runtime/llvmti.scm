@@ -222,6 +222,15 @@
 					atypes
 					comb))
 				 combinations))
+	   (fixedtype-lists2 (map (lambda (comb)
+				    (map (lambda (at c)
+					   (let ((findstr (string-append ":" (symbol->string (cdr at))))
+						 (replacestr (impc:ir:get-base-type (symbol->string c))))
+					     (cons (string->symbol findstr)
+						   (string->symbol replacestr))))
+					 atypes
+					 comb))
+				 combinations))
 	   (newnames (map (lambda (r)
 			    (let* ((hash (string-hash (apply string-append
 							    (map (lambda (t)
@@ -231,42 +240,103 @@
 			      (cons (string->symbol name) (string->symbol nameandhash))))
 			  combinations)))
       (list (map (lambda (n) (cdr n)) newnames)
-	    (map (lambda (n r)
-		   (replace-all (cl:copy-list ast) (cons n r)))
+	    (map (lambda (n r r2)
+		   ;(println '-> (cons n (append r r2)))
+		   (replace-all (cl:copy-list ast) (cons n (append r r2))))
 		 newnames
-		 fixedtype-lists)))))
+		 fixedtype-lists
+		 fixedtype-lists2)))))
 
 
 (define impc:ti:parametric-poly-pass
   (lambda (ast)
     (if (not (impc:ti:check-for-vtypes ast))
 	(eval ast (interaction-environment)) ;; if not generic func compile normally
-	(let* ((name (cadr ast)) ;; otherwise compile all required templates
-	      (dat (impc:ti:vtype-transforms name ast))
-	      (res (map (lambda (fname nast)
-			  (eval nast (interaction-environment))
-			  (let* ((type (impc:ir:get-function-type (symbol->string fname)))
-				 (strtype (impc:ir:pretty-print-type type)))
-			    (if (null? type)
-				#f
-				(begin					
-				  (eval `(bind-poly ,name ,fname ,(string->symbol strtype))
-					(interaction-environment))
-				  #t))))
-			(car dat)
-			(cadr dat))))
-	  (if (= (length (cl:remove #t res)) 0)
+	(let* ((storeprint print) ;; set print to nothing but store original as storeprint
+	       (name (cadr ast)) ;; otherwise compile all required templates
+	       (dat (impc:ti:vtype-transforms name ast))
+	       (_ (set! print (lambda args (storeprint "")))) ;;setting print to suppress compiler output
+	       (res (map (lambda (fname nast)
+			   ;(println 'fname: fname)
+			   (let ((val (call/cc (lambda (k)
+						 (set! print-error (lambda args
+								     ;(println "andrew world")
+								     ;(apply pprint-error args)
+								     (k #f)))
+						 #t))))
+			     ;(println 'bingo: val 'fname: fname)
+			     (if (equal? val #t)
+				 (let* ((rr (eval nast (interaction-environment)))
+					(type (impc:ir:get-function-type (symbol->string fname)))
+					(strtype (impc:ir:pretty-print-type type)))
+				   (if (null? type)
+				       #f
+				       (begin					
+					 (eval `(bind-poly ,name ,fname ,(string->symbol strtype))
+					       (interaction-environment))
+					 type))))))
+			 (car dat)
+			 (cadr dat))))
+	  ;; restore print-error and print
+	  (set! print-error (lambda args (apply pprint-error args) (error "")))
+	  (set! print storeprint)
+	  (print)
+	  (if (> (length (cl:remove '() (cl:remove #f res))) 0)
 	      (begin
 		(ascii-print-color 0 7 10)
 		(print 'Successfully 'compiled 'generic 'function )
 		(ascii-print-color 1 2 10)
 		(print "" name)
-		(ascii-print-color 0 7 10)		
+		(ascii-print-color 0 7 10)
 		(print)
+		(ascii-print-color 1 3 10)
+		(for-each (lambda (k)
+			    (print)
+			    (print "\t" (impc:ir:pretty-print-type k)))
+			  (cl:remove '() (cl:remove #f res)))
+		(ascii-print-color 0 7 10)
+		(print)
+		(print)
+		(print ".... ")
+		(ascii-print-color 1 2 10)
+		(print name)
+		(ascii-print-color 0 7 10)
+		(print) (print)
 		#t)
-	      (begin (print-error 'Compile 'Error: 'failed 'to 'build 'generic 'function name)
+	      (begin (print-error 'Compile 'Error: 'failed 'to 'find 'any 'valid 'forms 'for 'generic 'function: name)
 		     #f))))))
-	
+
+;; (define impc:ti:parametric-poly-pass
+;;   (lambda (ast)
+;;     (if (not (impc:ti:check-for-vtypes ast))
+;; 	(eval ast (interaction-environment)) ;; if not generic func compile normally
+;; 	(let* ((name (cadr ast)) ;; otherwise compile all required templates
+;; 	      (dat (impc:ti:vtype-transforms name ast))
+;; 	      (res (map (lambda (fname nast)
+;; 			  (eval nast (interaction-environment))
+;; 			  (let* ((type (impc:ir:get-function-type (symbol->string fname)))
+;; 				 (strtype (impc:ir:pretty-print-type type)))
+;; 			    (if (null? type)
+;; 				#f
+;; 				(begin					
+;; 				  (eval `(bind-poly ,name ,fname ,(string->symbol strtype))
+;; 					(interaction-environment))
+;; 				  #t))))
+;; 			(car dat)
+;; 			(cadr dat))))
+;; 	  (if (= (length (cl:remove #t res)) 0)
+;; 	      (begin
+;; 		(ascii-print-color 1 6 10)
+;; 		(print)
+;; 		(print 'Successfully 'compiled 'generic 'function '-> )
+;; 		(ascii-print-color 1 2 10)
+;; 		(print "" name)
+;; 		(ascii-print-color 0 7 10)		
+;; 		(print) (print)
+;; 		#t)
+;; 	      (begin (print-error 'Compile 'Error: 'failed 'to 'build 'generic 'function name)
+;; 		     #f))))))
+
 	
 
 ;;
@@ -497,7 +567,8 @@
                             (cons (impc:ti:first-transform (car ast) inbody?)
                                   (cons (impc:ti:first-transform (cadr ast) #t)
                                         (list (cons 'begin (impc:ti:first-transform (cddr ast) #t)))))))
-                       ((eq? (car ast) 'cons) 
+                       ((eq? (car ast) 'cons)
+			(println 'ast: ast)
                         (impc:ti:first-transform (impc:ti:cons ast) inbody?))                       
                        ((eq? (car ast) 'cond)
                         (impc:ti:first-transform (impc:ti:cond (cdr ast)) inbody?))
@@ -836,6 +907,7 @@
                            intersection)
                     type))
              type))))
+
 
 
 (define impc:ti:math-check
@@ -1800,7 +1872,7 @@
                     (let ((r (cl:find-if (lambda (x) 
                                             (cl:every (lambda (x) x) (impc:ti:unity? x)))
                                          res)))
-;; old version below as backup
+		      ;; old version below as backup
                       (if (not r) 
                           (apply print-error 'Compiler 'Error: 'could 'not 'resolve 'types:
 				 (map (lambda (x) (symbol->string (car x)))
@@ -1809,16 +1881,6 @@
 						    (car res))))
                           (car res))
                       r)))))))
-
-; OLD VERSION FROM (if (not r) down
-;
-;                       (if (not r) 
-;                           (apply print-error 'Compiler 'Error: 'could 'not 'resolve 'types:
-;                                  (map (lambda (x) (sexpr->string x)) (car res)))
-;                           (car res))
-;                       r)))))))
-
-
 
             
 ;;
@@ -2139,6 +2201,56 @@
                    (loop (car alst))
                    (loop (cdr alst)))))
          blst)))
+
+
+(define impc:ti:numeric-cast-operator
+  (lambda (a b)
+    (let* ((lowest (if (< a b) a b))
+	   (highest (if (= a lowest) b a))
+	   (caststr (string-append (if (impc:ir:floating-point? highest)
+				       (if (= highest 0) "d" "f")
+				       (impc:ir:pretty-print-type highest))
+				   "to"
+				   (if (impc:ir:floating-point? lowest)
+				       (if (= lowest 0) "d" "f")
+				       (impc:ir:pretty-print-type lowest)))))
+      caststr)))
+
+
+;; an optional compiler stage to support some basic type coercions
+;; particular math coercions of forced types
+(define impc:ti:coercion-run
+  (lambda (ast forced-types)
+    (if (pair? ast)
+	(cond ((member (car ast) '(< > * / = + - <>))
+	       (let ((a (assoc (cadr ast) forced-types))
+		     (b (assoc (caddr ast) forced-types)))
+		 (if (and (and a b)
+			  (<> (cdr a) (cdr b)))
+		     (let ((ret (string->symbol (impc:ti:numeric-cast-operator (cdr a) (cdr b)))))
+		       (if (> (cdr a) (cdr b))
+			   `(,(car ast) (,ret ,(cadr ast)) ,(caddr ast))
+			   `(,(car ast) ,(cadr ast) (,ret ,(caddr ast)))))
+		     (if (and a (number? (caddr ast)))
+			 (if (and (impc:ir:floating-point? (cdr a))
+				  (integer? (caddr ast)))
+			     `(,(car ast) ,(cadr ast) ,(integer->real (caddr ast)))
+			     (if (and (impc:ir:fixed-point? (cdr a))
+				      (real? (caddr ast)))
+				 `(,(car ast) ,(cadr ast) ,(real->integer (caddr ast)))
+				 ast))
+			 (if (and b (number? (cadr ast)))
+			     (if (and (impc:ir:floating-point? (cdr b))
+				      (integer? (cadr ast)))
+				 `(,(car ast) ,(integer->real (cadr ast)) ,(caddr ast))
+				 (if (and (impc:ir:fixed-point? (cdr b))
+					  (real? (cadr ast)))
+				     `(,(car ast) ,(real->integer (cadr ast)) ,(caddr ast))
+				     ast))
+			     ast)))))
+	      (else (cons (impc:ti:coercion-run (car ast) forced-types)
+			  (impc:ti:coercion-run (cdr ast) forced-types))))
+	ast)))
 			 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define impc:ti:run
@@ -2153,19 +2265,34 @@
                  ;(llvm:erase-function (symbol->string symname))
                  (llvm:erase-function (string-append (symbol->string symname) "_setter"))
                  (llvm:erase-function (string-append (symbol->string symname) "_maker"))))  
-      (let* ((c code)       
+      (let* ((c code)
+	     ;(ct1 (now))
              (c1 (impc:ti:get-var-types c)) ;; this is a cons pair of (ast . types)
+	     ;(ct2 (now))	     
              (t1 (impc:ti:first-transform (car c1) #t)) ;; car is ast
+	     ;(ct3 (now))	     
              (t2 (impc:ti:mark-returns t1 symname #f #f #f))
+	     ;(ct4 (now))	     
              (t3 (impc:ti:closure:convert t2 (list symname)))
+	     ;(ct5 (now))	     
              (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
+	     ;(ct6 (now))	     
              (forced-types (apply impc:ti:handle-forced-types t1 (append (cdr c1) args)))
-             (types (impc:ti:run-type-check vars forced-types t2))
-             (newast (impc:ti:add-types-to-source symname t3 (cl:tree-copy types) (list))))
+	     ;(ct7 (now))
+	     (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
+	     ;(ct8 (now))	     
+	     (t5 (impc:ti:coercion-run t3 forced-types)) ;; also there is doubling dipping here :(
+	     ;(ct9 (now))
+             (types (impc:ti:run-type-check vars forced-types t4))
+	     ;(ct10 (now))	     
+             (newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list)))
+	     ;(ct11 (now))
+	     )
 	 ;; (println 'types: types)
 	 ;; (println 'run: (impc:ti:unity? types))
 	 ;; (println 'newast: newast)
 	 ;; (println 'forced: forced-types)
+	 ;(println 'times: (- ct2 ct1) (- ct3 ct2) (- ct4 ct3) (- ct5 ct4) (- ct6 ct5) (- ct7 ct6) (- ct8 ct7) (- ct9 ct8) (- ct10 ct9) (- ct11 ct10))	 
          ;; if we didn't unify print error and bomb out!
          (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
              (print-error 'Compiler 'Error: 'could 'not 'resolve
@@ -2380,9 +2507,9 @@
 										  ((= t 3) (string-append n " = call ccc i64  @i64value(i8* " n "_val)\n"))
 										  ((= t 4) (string-append n " = call ccc i32  @i32value(i8* " n "_val)\n"))
 										  ((= t 5) (string-append n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-										  ((= t 6) (string-append n " = call ccc i32  @i8value(i8* " n "_val)\n"))
-										  ((= t 7) (string-append n " = call ccc i32  @i8value(i8* " n "_val)\n"))
-										  ((= t 8) (string-append n " = call ccc i32  @i1value(i8* %_sc, i8* " n "_val)\n"))
+										  ((= t 6) (string-append n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+										  ((= t 7) (string-append n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+										  ((= t 8) (string-append n " = call ccc i1  @i1value(i8* " n "_val)\n"))
 										  ((= t 9) (string-append n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
 										  (else (error "Compiler Error: 'bad 'type 'in 'scheme 'stub")))))
 							 (cdr stub-type)

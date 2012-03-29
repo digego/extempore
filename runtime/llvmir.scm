@@ -2400,7 +2400,7 @@
          (define ttstr (impc:ir:get-type-str element-type))
 	 ;; (println '(cadr var) (cadr var) '(car var) (car var) '(cadr val) (cadr val) '(car val) (car val) '(car idx) (car idx))
 	 (if (<> (impc:ir:get-ptr-depth tuple-type) 1)
-	     (print-error "Compiler Error: cannot set element in tuple type " tuple-type))
+	     (print-error 'Compiler 'Error: 'cannot 'set 'element 'into 'tuple 'type tuple-type '-> ast))
 	 (emit (string-append (impc:ir:gname "val" (string-append ttstr "*")) " = getelementptr " 
 			      (cadr var) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
 	 (emit (string-append "store " (cadr val) " " (car val) ", " 
