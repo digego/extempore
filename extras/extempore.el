@@ -36,7 +36,7 @@
 
 (define-key scheme-mode-map (kbd "RET") 'newline-and-indent)
 
-(defun ext:marco1 (name duration)
+(defun ext:m1 (name duration)
   (interactive "sName: \nsDuration: ")
   (insert (concat "(define " name
 		  "\n  (lambda (beat dur)\n    "
@@ -49,12 +49,14 @@
 
 (font-lock-add-keywords 'scheme-mode
   '(("definec" . font-lock-keyword-face)
+    ("bind-func" . font-lock-keyword-face)
     ("definec:dsp" . font-lock-keyword-face)
     ("define-instrument" . font-lock-keyword-face)
     ;("bind-scm" . font-lock-keyword-face)
     ("bind-val" . font-lock-keyword-face)
+    ("bind-tvar" . font-lock-keyword-face)
     ("bind-alias" . font-lock-keyword-face)
-    ("bind-type" . font-lock-keyword-face)
+    ("bind-type" . font-lock-keyword-face)    
     ("bind-poly" . font-lock-keyword-face)
     ("dotimes" . font-lock-keyword-face)
     ("memzone" . font-lock-keyword-face)

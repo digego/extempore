@@ -98,6 +98,7 @@ namespace extemp {
 	static pointer dataSETdouble(scheme* _sc, pointer args);
 	static pointer cptrToString(scheme* _sc, pointer args);
 	static pointer stringStrip(scheme* _sc, pointer args);
+	static pointer stringHash(scheme* _sc, pointer args);
 	static pointer stringJoin(scheme* _sc, pointer args);
 	static pointer getClosureEnv(scheme* _sc, pointer args);
 	static pointer getTime(scheme* _sc, pointer args);

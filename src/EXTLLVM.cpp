@@ -439,6 +439,17 @@ char* extitoa(int64_t val) {
   return buf;//&buf[i+1];        
 }
 
+static unsigned long string_hash(unsigned char* str) 
+{
+  unsigned long hash = 0;
+  int c;
+  
+  while (c = *str++)
+    hash = c + (hash << 6) + (hash << 16) - hash;
+  
+  return hash;
+}
+
 int llvm_printf(char* format, ...)
 {
     va_list ap;
@@ -1162,6 +1173,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_memset);
 	    gv = M->getNamedValue(std::string("extitoa"));
 	    EE->updateGlobalMapping(gv,(void*)&extitoa);
+	    gv = M->getNamedValue(std::string("string_hash"));
+	    EE->updateGlobalMapping(gv,(void*)&string_hash);
 
 	    gv = M->getNamedValue(std::string("swap64i"));
 	    EE->updateGlobalMapping(gv,(void*)&swap64i);

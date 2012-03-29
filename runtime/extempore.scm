@@ -952,12 +952,38 @@
   (lambda (s size)
      (if (= 0 size) '()   
         (flatten-1 (map (lambda (x)
-                           (let ((res (combination (list-tail s (+ 1 (cl:position x s))) (- size 1))))
+                           (let ((res (combinations (list-tail s (+ 1 (cl:position x s))) (- size 1))))
                               (if (null? res) (list x)
                                   (map (lambda (y)
                                           (if (list? y) (list* x y) (list x y)))
                                        (flatten-1 res)))))
                         (list-head s (- (length s) ( - size 1))))))))
+
+
+;; USE multi-set-combination (below) to access this function
+(define multi-list-combination-2
+  (lambda args
+    (if (null? args)
+	args
+	(flatten-1 (map (lambda (k)
+			  (let ((r (apply multi-list-combination-2 (cdr args))))
+			    (if (null? r)
+				k
+				(map (lambda (j)
+				       (list k j))
+				     r))))
+			(car args))))))
+
+
+;; combine multiple ordered lists into combinations
+;;
+;; for example (multi-list-combination '(a b) '(c d)) -> ((a c) (a d) (b c) (b d))
+;; or (multi-list-combination '(a b) '(c) '(d e)) -> ((a c d) (a c e) (b c d) (b c e))
+;; 
+(define multi-list-combination
+  (lambda args
+    (map (lambda (k) (flatten k)) (apply multi-list-combination-2 args))))
+
 			 
 (define factorial
    (lambda (x)

@@ -141,6 +141,134 @@
          (cons (f ast) types))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Simple Compile Time Generics using type classes
+;;
+
+(define *impc:ti:vtypes* (list))
+
+(define impc:ti:add-vtype
+  (lambda (name type)
+    (if (string? type)
+	(set! type (impc:ir:get-type-from-pretty-str type)))
+    (if (string? name)
+	(set! name (string->symbol name)))
+    (let ((v (assoc name *impc:ti:vtypes*)))
+      (if v
+	  (if (member type v) #t
+	      (set-cdr! v (cons type (cdr v))))
+	  (set! *impc:ti:vtypes* (cons (list name type) *impc:ti:vtypes*)))
+      (ascii-print-color 0 7 10)
+      (print "Successfull appended type variable ")
+      (ascii-print-color 1 2 10)
+      (print name)
+      (ascii-print-color 0 7 10)
+      (print " >>> ")
+      (ascii-print-color 1 3 10)
+      (print type)
+      (ascii-print-color 0 7 10)
+      (print)
+      #t)))
+
+
+(define impc:ti:vtypes
+  (lambda (name)
+    (let ((res (assoc name *impc:ti:vtypes*)))
+      (if res (cdr res)
+	  #f))))
+
+(define impc:ti:vtype-match?
+  (lambda (name type)
+    (let ((res (assoc name *impc:ti:vtypes*)))
+      (if (list? res) (if (member type res) #t #f)
+	  #f))))
+
+
+(define impc:ti:check-for-vtypes
+  (lambda (ast)
+    (let* ((atypes (cdr (impc:ti:get-var-types ast)))
+	   (types (map (lambda (v) (impc:ti:vtypes (cdr v))) atypes))
+	   (rest (cl:remove #f types)))
+      (if (> (length rest) 0) #t #f))))
+
+(define impc:ti:force-vtypes
+  (lambda (ast)
+    (replace-all ast '((y:num . y:double)))))
+
+
+
+(define impc:ti:vtype-transforms
+  (lambda (name ast)
+    (if (symbol? name) (set! name (symbol->string name)))
+    (let* ((stripped (impc:ti:get-var-types ast))
+	   (args (cadr (caddr (car stripped))))
+	   (atypes (reverse (cdr stripped))) ;; statically bound types
+	   (tvar-lists (map (lambda (v) (impc:ti:vtypes (cdr v))) atypes))
+	   (tlists (cl:remove #f tvar-lists))
+	   (combinations (if (= (length tlists) 1)
+			     (map (lambda (x) (list x)) (car tlists))
+			     (apply multi-list-combination tlists)))
+	   (fixedtype-lists (map (lambda (comb)
+				   (map (lambda (at c)
+					  (let ((findstr (string-append (symbol->string (car at))
+									":"
+									(symbol->string (cdr at))))
+						(replacestr (string-append (symbol->string (car at))
+									   ":"
+									   (symbol->string c))))
+					    (cons (string->symbol findstr)
+						  (string->symbol replacestr))))
+					atypes
+					comb))
+				 combinations))
+	   (newnames (map (lambda (r)
+			    (let* ((hash (string-hash (apply string-append
+							    (map (lambda (t)
+								   (symbol->string t))
+								 r))))
+				   (nameandhash (string-append name (number->string hash))))
+			      (cons (string->symbol name) (string->symbol nameandhash))))
+			  combinations)))
+      (list (map (lambda (n) (cdr n)) newnames)
+	    (map (lambda (n r)
+		   (replace-all (cl:copy-list ast) (cons n r)))
+		 newnames
+		 fixedtype-lists)))))
+
+
+(define impc:ti:parametric-poly-pass
+  (lambda (ast)
+    (if (not (impc:ti:check-for-vtypes ast))
+	(eval ast (interaction-environment)) ;; if not generic func compile normally
+	(let* ((name (cadr ast)) ;; otherwise compile all required templates
+	      (dat (impc:ti:vtype-transforms name ast))
+	      (res (map (lambda (fname nast)
+			  (eval nast (interaction-environment))
+			  (let* ((type (impc:ir:get-function-type (symbol->string fname)))
+				 (strtype (impc:ir:pretty-print-type type)))
+			    (if (null? type)
+				#f
+				(begin					
+				  (eval `(bind-poly ,name ,fname ,(string->symbol strtype))
+					(interaction-environment))
+				  #t))))
+			(car dat)
+			(cadr dat))))
+	  (if (= (length (cl:remove #t res)) 0)
+	      (begin
+		(ascii-print-color 0 7 10)
+		(print 'Successfully 'compiled 'generic 'function )
+		(ascii-print-color 1 2 10)
+		(print "" name)
+		(ascii-print-color 0 7 10)		
+		(print)
+		#t)
+	      (begin (print-error 'Compile 'Error: 'failed 'to 'build 'generic 'function name)
+		     #f))))))
+	
+	
+
 ;;
 ;; TRANSFORM CODE
 ;;
@@ -933,11 +1061,11 @@
                                     (if (and t
                                              (impc:ir:type? t)
                                              (impc:ir:closure? t))
-                                        (cadr t)
+					(if (list? t) (cadr t) #f)
                                         #f)))) ;; or else pass #f
          ;; if t is not a closure type we have a problem!
          (if (and t
-                  (or ;(not (impc:ir:type? t))
+                  (or (not (list? t));(not (impc:ir:type? t))
                       (not (impc:ir:closure? t))))
              (print-error 'Compiler 'Error: 'type 'error 'calculating 'return 'type: ast 
                           'have 'you 'specified 'an 'incorrect 'closure 'type?))
@@ -1740,13 +1868,13 @@
                                         (cons (cadr ast) (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (cadr ast)))))
                                         (assoc (cadr ast) types))))))
 		;; inject polymorphic functions
-		(;(assoc (car ast) *impc:ir:polys*)
-		 (impc:ir:poly-types (car ast))
+		((impc:ir:poly-types (car ast))
 		 (let* ((vars (cl:tree-copy types))		       
 			(kts (map (lambda (t) (car t)) types))
 			(polyargs (map (lambda (arg)
 					 ;(println 'arg: arg)
 					 (let ((res (impc:ti:type-check arg vars kts #f)))
+					   ;(println 'res: res)
 					   (if (and (list? res)
 						    (> (length res) 1))
 					       res
@@ -1765,20 +1893,10 @@
 					  polyfunc))
 				      rets))
 			  (validpolys (remove #f polys)))
-		     ;(println 'polys: validpolys)
-		     ;; take the first valid polymorphic dispatch
-		     (cons (car validpolys) (impc:ti:add-types-to-source symname (cdr ast) types envvars)))))		   
-		   ;; (println 'polyargs: polyargs 'retargs: retargs)
-		   ;; (println '2-res: retargs)
-		   ;; (if (> (length retargs) 1)
-		   ;;     (print-error 'Compiler 'Error 'unable 'to 'resolve 'poly 'function ast))		       
-		   ;; ;(println (car ast) 'polyargs: polyargs 'retargs: retargs)
-		   ;; (let* ((polyf (cons (+ *impc:ir:closure*
-		   ;; 			  *impc:ir:pointer*
-		   ;; 			  *impc:ir:pointer*)
-		   ;; 		       (cons (car retargs) polyargs)))
-		   ;; 	  (polyfunc (impc:ir:check-poly (car ast) polyf)))
-		   ;;   (cons polyfunc (impc:ti:add-types-to-source symname (cdr ast) types envvars)))))		   
+		     ;(println 'polys: validpolys symname (cdr ast))
+		     (let ((rr (impc:ti:add-types-to-source symname (cdr ast) types envvars)))
+		       ;; take the first valid polymorphic dispatch
+		       (cons (car validpolys) rr)))))
                 ((member (car ast) '(make-env make-env-zone))
                  (list (car ast)
 		       (cadr ast)
@@ -1790,8 +1908,9 @@
                 ((or (and (assoc (car ast) types)
                           (impc:ir:closure? (cdr (assoc (car ast) types))))
                      (and (not (list? (car ast)))
+			  (symbol? (car ast))
                           (llvm:get-globalvar (symbol->string (car ast)))
-                          (impc:ir:closure? (llvm:get-global-variable-type (symbol->string (car ast))))))                          
+                          (impc:ir:closure? (llvm:get-global-variable-type (symbol->string (car ast))))))
                  (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))   
                 ((list? ast)
                  (map (lambda (x)
@@ -2436,7 +2555,7 @@
 			      (ascii-print-color 0 7 10)
 			      (print)))))
             (cadr (impc:ir:gname))))))
-					
+
 
 ;; definec takes optional type arguments after symname
 (define-macro (definec symname . args)
@@ -2471,6 +2590,15 @@
 	       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		      (error ""))))))))
 
+;; alias for definec (should replace definec)
+(define-macro (bind-func . args)
+  `(impc:ti:parametric-poly-pass '(definec ,@args)))
+
+(define-macro (bind-typevar name . args)
+  (if (string? name) (set! name (string->symbol name)))
+  `(map (lambda (a)
+	  (impc:ti:add-vtype ',name a))
+	',args))
 
 ;; Definec-precomp is for setting up precompiled ir functions only
 (define definec-precomp
@@ -2555,6 +2683,25 @@
 	  (print (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))
 	  (ascii-print-color 0 7 10)
 	  (print)))
+
+
+(define-macro (bind-tvar symbol . types)
+  `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<) ; (impc:ir:tuple? (impc:ir:get-type-from-pretty-str ,(symbol->string type)))
+	      (llvm:compile (string-append "%" ,(symbol->string symbol) " = type "
+					   ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type) (symbol->string symbol)))))
+	      (print-error 'Compiler 'Error: 'only 'named 'tuple 'types 'are 'supported))
+	  (ascii-print-color 0 7 10)
+	  (print "Successfull bound ")
+	  (ascii-print-color 1 2 10)
+	  (print ',symbol)
+	  (ascii-print-color 0 7 10)
+	  (print " >>> ")
+	  (ascii-print-color 1 3 10)
+	  ;(print ',type)
+	  (print (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))
+	  (ascii-print-color 0 7 10)
+	  (print)))
+  
 
 
 ;;

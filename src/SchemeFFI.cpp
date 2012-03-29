@@ -239,6 +239,7 @@ namespace extemp {
 	    { "cptr->string",            &SchemeFFI::cptrToString },
 	    { "cptr:get-string",            &SchemeFFI::cptrToString },
 	    { "string-strip",		&SchemeFFI::stringStrip },
+	    { "string-hash",		&SchemeFFI::stringHash },
 	    { "string-join",		&SchemeFFI::stringJoin },
 	    { "call-cpp-at-time",		&SchemeFFI::callCPPAtTime },
 	    { "now",			&SchemeFFI::getTime },
@@ -780,6 +781,18 @@ namespace extemp {
 #else
 	  return mk_string(_sc, "");
 #endif
+    }
+
+    pointer SchemeFFI::stringHash(scheme* _sc, pointer args)
+    {
+      char* str = string_value(pair_car(args));
+      unsigned long hash = 0;
+      int c;
+  
+      while (c = *str++)
+	hash = c + (hash << 6) + (hash << 16) - hash;
+  
+      return mk_integer(_sc,hash);
     }
 	
     pointer SchemeFFI::stringStrip(scheme* _sc, pointer args)

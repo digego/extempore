@@ -1076,6 +1076,28 @@
 (println '-> (test46 5.0))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Generics
+;;
+
+(bind-typevar numz i64 i32)
+
+(bind-func test47
+  (lambda (x:numz y)
+    (* x y)))
+
+(bind-func test48
+  (lambda (a:numz)
+    (test47 a a)))
+
+(bind-func test49
+  (lambda (a)
+    (test47 a 5)))	   
+
+
+
+
 ;; Memory Usage In Extempore Lang
 ;; -------------------------------
 
