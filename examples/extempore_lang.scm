@@ -940,7 +940,7 @@
 (define procs
   (map (lambda (n p)
 	 (ipc:new n p)
-	 (ipc:bind-func n 'work)
+	 (ipc:definec n 'work)
 	 n)
        (list "proc-a" "proc-b" "proc-c" "proc-d" "proc-e")
        (list 7097 7096 7095 7094 7093)))
@@ -1049,7 +1049,7 @@
 (test44 "extempore's" "polymorphism" "rocks")
 
 
-;; polys can also specialize
+;; polys can Also specialize
 ;; on the return type
 (bind-func my-func-4
   (lambda (a:double)
@@ -1063,6 +1063,8 @@
 (bind-poly sqrd my-func-5)
 
 ;; specialize on [i64,double]*
+;;
+;; THIS BROKEN AT THE MOMENT!
 (bind-func test45
   (lambda (a:double)
     (+ 1.0 (sqrd a))))
@@ -1083,12 +1085,14 @@
 
 (bind-typevar num i64 i32 i8 i1 float double)
 
+;; compare this 
 (bind-func mul
   (lambda (a:num b:num)
     (* a b)))
 
+;; to this
 (bind-func sum
-  (lambda (a:num b:num)
+  (lambda (a:num b)
     (+ a b)))
 
 (bind-type i64list <i64,i64list*>)
@@ -1115,31 +1119,22 @@
   (lambda (b:numlists)
     (tref b 1)))
 
-(bind-func ttt4
-  (lambda ()
-    (let ((n1 (bitcast null f64list*)))
-      (set! n1 (mcons 3.0 n1))
-      (mcar n1))))
-
 (bind-func test48
-  (lambda ()
-    (let ((n1 (bitcast null f64list*)))
-      (set! n1 (mcons 3.0 n1))
-      ;(printf "%f\n" (mcar n1))
-      (mcar n1))))
-
-
-(bind-func test47
-  (lambda (x:numz y)    
-    (* x y)))
-
-(bind-func test48
-  (lambda (a:numz)
-    (test47 a a)))
+  (lambda (a:i64list*)
+    (if (null? a)
+	(begin (printf "done\n") 1)
+	(begin (printf "%lld\n" (mcar a))
+	       (test48 (mcdr a))))))
 
 (bind-func test49
-  (lambda (a)
-    (test47 a 5)))	   
+  (lambda ()
+    (let ((n1 (alloc i64list))
+	  (lst (mcons 1 (mcons 2 (mcons 3 n1)))))
+      (test48 lst))))
+
+(test49) ;; 1 > 2 > 3 > done
+
+
 
 
 
