@@ -185,6 +185,7 @@
     (let ((res (assoc name *impc:ir:polys*)))
       (if res
 	  (let* ((r2 (map (lambda (p)
+			    ;(println 'ftype: ftype 'p: p)
 			    (if (impc:ir:type-match? (cadr p) ftype)
 				(car p)
 				'()))
@@ -2104,14 +2105,14 @@
   (lambda (ast types)
     (let* ((os (make-string 0)))
       (let* ((t (impc:ir:convert-from-pretty-types (cadr ast))))
-
 	 (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
 	       (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-	       os)      	 	
+	       os)
 	;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)	
 	(emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
 			     (number->string (impc:ir:get-type-size t))
-			     ")\n") os)            
+			     ")\n") os)
+	(emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (number->string (impc:ir:get-type-size t)) ")\n" os)
 	(emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
 			     " = bitcast i8* " (car (impc:ir:gname "dat")) 
 			     " to " (impc:ir:get-type-str t) "*\n") os)
@@ -2159,14 +2160,14 @@
 	(impc:ir:compiler:zone-alloc-with-size ast types))))
 
 
-
 (define impc:ir:compiler:heap-alloc-without-size
   (lambda (ast types)
     (let* ((os (make-string 0)))
       (let* ((t (impc:ir:convert-from-pretty-types (cadr ast))))
 	(emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @malloc(i64 "
 			     (number->string (impc:ir:get-type-size t))
-			     ")\n") os)            
+			     ")\n") os)
+	(emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (number->string (impc:ir:get-type-size t)) ")\n" os)
 	(emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
 			     " = bitcast i8* " (car (impc:ir:gname "dat")) 
 			     " to " (impc:ir:get-type-str t) "*\n") os)
@@ -2950,8 +2951,8 @@
 		   ((equal? (car ast) 'memzone) (impc:ir:compile:zone ast types))
 		   ((member (car ast) '(impc_null))
 		    (string-append (impc:ir:gname "null" (if (null? hint?) "i8*" (impc:ir:get-type-str (car hint?))))
-				   " = bitcast i8* null to " (if (null? hint?) "i8*" (impc:ir:get-type-str (car hint?)))
-				   "\n"))
+		    		   " = bitcast i8* null to " (if (null? hint?) "i8*" (impc:ir:get-type-str (car hint?)))
+		    		   "\n"))
                    ((equal? (car ast) 'make-closure) 
                     (let* (;(str-pair (impc:ir:compile:make-closure ast types))
                            ;(fstr (car str-pair))
