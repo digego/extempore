@@ -1054,7 +1054,7 @@
 (bind-func my-func-4
   (lambda (a:double)
     (* a a)))
-
+    
 (bind-func my-func-5
   (lambda (a:double)
     (dtoi64 (* a a))))
@@ -1064,15 +1064,14 @@
 
 ;; specialize on [i64,double]*
 ;;
-;; THIS BROKEN AT THE MOMENT!
-(bind-func test45
-  (lambda (a:double)
-    (+ 1.0 (sqrd a))))
+(bind-func test45:[i64,double]*
+  (lambda (a)
+    (+ 1 (sqrd a))))
 
 ;; specialize on [double,doube]*
-(bind-func test46
-  (lambda (a:double)
-    (+ 1 (sqrd a))))
+(bind-func test46:[double,double]*
+  (lambda (a)
+    (+ 1.0 (sqrd a))))
 
 (println '-> (test45 5.0))
 (println '-> (test46 5.0))
@@ -1085,15 +1084,15 @@
 
 (bind-typevar num i64 i32 i8 i1 float double)
 
-;; compare this 
-(bind-func mul
-  (lambda (a:num b:num)
-    (* a b)))
+;; ;; compare this
+;; (bind-func sum
+;;   (lambda (a:num b)
+;;     (+ a b)))
 
-;; to this
-(bind-func sum
-  (lambda (a:num b)
-    (+ a b)))
+;; ;; compare this 
+;; (bind-func mul
+;;   (lambda (a:num b:num)
+;;     (* a b)))
 
 (bind-type i64list <i64,i64list*>)
 (bind-type i32list <i32,i32list*>)
@@ -1119,24 +1118,20 @@
   (lambda (b:numlists)
     (tref b 1)))
 
-(bind-func test48
+(bind-func test47
   (lambda (a:i64list*)
     (if (null? a)
 	(begin (printf "done\n") 1)
 	(begin (printf "%lld\n" (mcar a))
-	       (test48 (mcdr a))))))
+	       (test47 (mcdr a))))))
 
-(bind-func test49
+(bind-func test48
   (lambda ()
-    (let ((n1 (alloc i64list))
-	  (lst (mcons 1 (mcons 2 (mcons 3 n1)))))
-      (test48 lst))))
+    (let ((a:i64 3)
+	  (lst (mcons 1 (mcons 2 (mcons a null))))) ;(cast null i64list*))))))
+      (test47 lst))))
 
-(test49) ;; 1 > 2 > 3 > done
-
-
-
-
+(test48) ;; 1 > 2 > 3 > done
 
 
 ;; Memory Usage In Extempore Lang
