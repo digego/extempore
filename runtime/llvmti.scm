@@ -1150,7 +1150,7 @@
      (if (and request?
 	      (impc:ir:pointer? request?))
 	 request?
-	 (list *impc:ir:i8*))))
+	 (list (+ *impc:ir:pointer* *impc:ir:si8*)))))
 
 
 (define impc:ti:ret-check
