@@ -2727,9 +2727,7 @@
 	   	 (if (not (llvm:compile fscallback))
 	   	     (begin (print-error 'Compiler 'Failed:)
 	   		    (error "")))
-	   	 (if *impc:compiler:print* (print-notification "compiled callback"))))
-	   
-	    
+	   	 (if *impc:compiler:print* (print-notification "compiled callback"))))	   	    
 
             (if *impc:compile*
                 (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname)))) 		  
@@ -2810,17 +2808,18 @@
 		(llvm:run setter (sys:create-mzone ,zone-size))
 		(begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
 		       (error "")))
-	    ;(println 'scheme_func: (llvm:get-scheme-function ,(symbol->string symname)))
+	    ;;(println 'scheme_func: (llvm:get-scheme-function ,(symbol->string symname)))
 	    (if func
-		(mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
-		;(lambda args (apply llvm:run func (sys:peek-memzone) args))
+		;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
+		(if (llvm:get-scheme-function ,(symbol->string symname))
+		    (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
 		(begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		       (error "")))))
        (interaction-environment)))))
 
 
 ;; definec-ipc is for passing an already compiled (and setter'd) native function
-;; acroos to a non-primary process
+;; across to a non-primary process
 (define definec-ipc
   (lambda (symname)
     (let ((zone-size *impc:default-zone-size*))
@@ -2830,7 +2829,13 @@
 		 (func (llvm:get-function (symbol->string ',symname))))
 	    ;(println 'scmfunc: (llvm:get-scheme-function ,(symbol->string symname)))
 	    (if func
-		(mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
+		(if (llvm:get-scheme-function ,(symbol->string symname))		    
+		    (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
+		    (begin (ascii-print-color 0 7 10)
+			   (print "There is no scheme stub available for ")
+			   (ascii-print-color 0 6 10)
+			   (println ,(symbol->string symname))
+			   (ascii-print-color 0 7 10)))		    
 		;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 		(begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		       (error "")))))
