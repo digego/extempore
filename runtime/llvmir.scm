@@ -122,11 +122,120 @@
 	    t)
 	  #f))))
 
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; poly types
 ;;
 
+(define *impc:ir:gpolytypes* (list))
+(define *impc:ir:polytypes* (list))
+
+(define impc:ir:add-gpolytype
+  (lambda (name type)
+    (if (string? type) (set! type (string->symbol type)))
+    (let ((v (assoc name *impc:ir:gpolytypes*)))
+      (if v
+	  (set-cdr! v type)
+	  (set! *impc:ir:gpolytypes* (cons (cons name type) *impc:ir:gpolytypes*)))
+      #t)))
+
+(define impc:ir:add-polytype
+  (lambda (name tname ttype)
+    (if (string? ttype) (set! ttype (string->symbol ttype)))
+    (let ((v (assoc name *impc:ir:polytypes*)))
+      (if v
+	  (let ((p (assoc tname (cdr v))))
+	    (if p		
+		(begin (set-car! (cdr p) ttype) #t)
+		(begin (set-cdr! v (cons (list tname ttype) (cdr v))) #t)))
+	  (begin (set! *impc:ir:polytypes* (cons (list name (list tname ttype)) *impc:ir:polytypes*))
+		 #t)))))
+
+(define impc:ir:gpolytype-types
+  (lambda (name)
+    (if (string? name) (set! name (string->symbol name)))
+    (let ((res (assoc name *impc:ir:gpolytypes*)))      
+      (if res
+	  (cdr res)
+	  #f))))
+
+
+(define impc:ir:polytype-types
+  (lambda (name)
+    (let ((res (assoc name *impc:ir:polytypes*)))
+      (if res
+	  (map (lambda (p)
+		 (cadr p))
+	       (cdr res))
+	  #f))))
+
+(define impc:ir:polytype-match?
+  (lambda (t1 t2)
+    (if (<> (length t1)
+	    (length t2))
+	#f
+	(if (member #f (map (lambda (t1 t2)
+			      (if (atom? t1)
+				  (set! t1 (list t1)))
+			      (if (atom? t2)
+				  (set! t2 (list t2)))
+			      (if (null? (impc:ti:intersection* t1 t2))
+				  #f
+				  #t))
+			    t1
+			    t2))
+	    #f
+	    #t))))
+
+(define impc:ir:check-polytype
+  (lambda (name ttype)
+    (if (string? ttype)
+	(set! ftype (impc:ir:get-type-from-pretty-str ttype)))
+    (let ((res (assoc name *impc:ir:polytypes*)))
+      (if res
+	  (let* ((r2 (map (lambda (p)
+			    ;(println 'ftype: ftype 'p: p)
+			    (if (impc:ir:polytype-match? (cadr p) ttype)
+				(car p)
+				'()))
+			  (cdr res)))
+		 (r3 (remove '() r2)))
+	    (if (null? r3) #f (car r3)))
+	  #f))))
+
+
+;; checks both named types and poly types
+(define impc:ir:get-named-type
+  (lambda (name)
+    (if (impc:ir:gpolytype-types name)
+	(impc:ir:gpolytype-types name)
+	(if (impc:ir:polytype-types name)
+	    (impc:ir:polytype-types name)
+	    (llvm:get-named-type name)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; poly funcs
+;;
+
+;; gpolys are generic polys (i.e. non-specializations)
+(define *impc:ir:gpolys* (list))
+;; non 'g' polys are ad-hoc polys (i.e. specializations)
 (define *impc:ir:polys* (list))
+
+(define impc:ir:add-gpoly
+  (lambda (code)
+    (if (not (regex:match? (symbol->string (cadr code)) ":"))
+	(print-error 'Compile 'Error: 'generic 'functions 'must 'supply 'type))
+    (let* ((res (regex:split (symbol->string (cadr code)) ":"))
+	   (name (string->symbol (car res)))
+	   (ftype (string->symbol (cadr res))))
+      (let ((v (assoc name *impc:ir:gpolys*)))
+	(if v
+	    (set-cdr! v (list ftype code))
+	    (set! *impc:ir:gpolys* (cons (list name ftype code) *impc:ir:gpolys*)))
+	#t))))
 
 (define impc:ir:add-poly
   (lambda (name fname ftype)
@@ -140,6 +249,14 @@
 		(begin (set-cdr! v (cons (list fname ftype) (cdr v))) #t)))
 	  (begin (set! *impc:ir:polys* (cons (list name (list fname ftype)) *impc:ir:polys*))
 		 #t)))))
+
+(define impc:ir:gpoly-types
+  (lambda (name)
+    (let ((res (assoc name *impc:ir:gpolys*)))
+      (if res
+	  (cdr res)
+	  #f))))
+
 
 (define impc:ir:poly-types
   (lambda (name)
@@ -177,7 +294,6 @@
 	    #f
 	    #t))))
 
-
 (define impc:ir:check-poly
   (lambda (name ftype)
     (if (string? ftype)
@@ -195,6 +311,7 @@
 	  #f))))
 
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  This stuff is all here just for pretty printing
 
@@ -204,7 +321,7 @@
 
 (define impc:ir:regex-tc-or-a (string-append "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)"
 					     "|(\\|[0-9](?<array>[^\\|]|\\|[0-9]\\g<array>*\\|\\**)*\\|\\**)"
-					     "|(?:([%0-9a-zA-Z_-]\\**)+)"))
+					     "|(?:([%!0-9a-zA-Z_-]\\**)+)"))
 
 
 (define impc:ir:get-type-from-pretty-array
@@ -295,6 +412,15 @@
 	       ((and (char=? (string-ref base 0) #\%)
 	       	     (not (null? (llvm:get-named-type (substring base 1 (string-length base))))))
 		string-type)
+	       ((regex:match? base "!") (string->symbol base))	       
+	       ((impc:ir:gpolytype-types base)
+		(if (and (not (null? args))
+			 (string=? (car args) base))
+		    (string->symbol string-type)
+		    (impc:ir:get-type-from-pretty-str
+		     (apply string-append (symbol->string (impc:ir:gpolytype-types base))
+			    (make-list-with-proc ptr-depth (lambda (i) "*")))
+		     base)))
 	       ((not (null? (llvm:get-named-type base)))
 		(string-append "%" string-type))
 	       ;; recursive types
@@ -311,7 +437,7 @@
 				;; if everything else fails try type aliases
 				(let ((res (impc:ir:check-type-aliases base ptr-depth)))
 				  (if res res
-				      (print-error 'Compiler 'Error: 'cannot 'find 'type 'for 'string string-type)))))))))))
+				      (print-error 'Compiler 'Error: 'cannot 'find 'type 'for string-type)))))))))))
 								
 
 (define impc:ir:convert-from-pretty-types
@@ -414,7 +540,9 @@
    (lambda (type . args)
      ;(println 'ir:get-type-str 'type: type 'args: args)
      (if (null? args) (set! args (list type)))
-     (if (string? type) type
+     (if (or (string? type)
+	     (symbol? type))
+	 type
 	 (cond ((list? type) ;; must be a complex type
 		(cond ((impc:ir:closure? (car type))
 		       (apply string-append "<{i8*, i8*, " (impc:ir:make-function-str (cdr type) #t) "*}>"
@@ -571,9 +699,10 @@
 	 (if (< (length type) 2) #f
 	     (if (impc:ir:tuple? (car type)) #t #f))
 	 (let ((t (impc:ir:str-list-check type)))
-	   (if (string? t) #t
-	       (if (= (modulo t *impc:ir:pointer*) *impc:ir:tuple*)
-		   #t #f))))))
+	   (if (symbol? t) #f ;; symbol will be poly type
+	       (if (string? t) #t
+		   (if (= (modulo t *impc:ir:pointer*) *impc:ir:tuple*)
+		       #t #f)))))))
 
 (define impc:ir:array?
    (lambda (type)
