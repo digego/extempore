@@ -1082,57 +1082,64 @@
 ;; Generics
 ;;
 
-(bind-typevar num i64 i32 i8 i1 float double)
+;; generic type
+(bind-type list <!head,list*>)
 
-;; ;; compare this
-;; (bind-func sum
-;;   (lambda (a:num b)
-;;     (+ a b)))
-
-;; ;; compare this 
-;; (bind-func mul
-;;   (lambda (a:num b:num)
-;;     (* a b)))
-
-(bind-type i64list <i64,i64list*>)
-(bind-type i32list <i32,i32list*>)
-(bind-type i8list <i8,i8list*>)
-(bind-type i1list <i1,i1list*>)
-(bind-type f32list <float,f32list*>)
-(bind-type f64list <double,f64list*>)
-
-(bind-typevar numlists i64list* i32list* i8list* i1list* f32list* f64list*)
-
-(bind-func mcons
-  (lambda (a:num b:numlists)
-    (let ((pair (alloc :numlists)))
+(bind-func cons:[list*,!head,list*]*
+  (lambda (a b)
+    (let ((pair (halloc)))
       (tset! pair 0 a)
       (tset! pair 1 b)
       pair)))
 
-(bind-func mcar
-  (lambda (b:numlists)
-    (tref b 0)))
+(bind-func car:[!head,list*]*
+  (lambda (a)
+    (tref a 0)))
 
-(bind-func mcdr
-  (lambda (b:numlists)
-    (tref b 1)))
+(bind-func cdr:[list*,list*]*
+  (lambda (a)
+    (tref a 1)))
 
-(bind-func test47
-  (lambda (a:i64list*)
+(bind-func testlist1
+  (lambda (a:i32 b:i32 c:i32)
+    (cons a (cons b (cons c null)))))
+
+(bind-func testlist2
+  (lambda (a:double b:double c:double)
+    (cons a (cons b (cons c null)))))
+
+(bind-func length:[i64,list*]*
+  (lambda (a)    
     (if (null? a)
-	(begin (printf "done\n") 1)
-	(begin (printf "%lld\n" (mcar a))
-	       (test47 (mcdr a))))))
+	0
+	(+ 1 (length (cdr a))))))
 
-(bind-func test48
+(definec testcar
   (lambda ()
-    (let ((a:i64 3)
-	  (lst (mcons 1 (mcons 2 (mcons a null))))) ;(cast null i64list*))))))
-      (test47 lst))))
+    (let ((l1 (testlist1 1 2 3))
+	  (l2 (testlist2 1.0 2.0 3.0)))
+      (printf "int:%d double:%f\n" (car l1) 1.0) ;; adding second polymorphic function of 'different base type' breaks this: e.g. (car l2) which is for double)
+      (printf "%lld\n" (length l1))
+      void)))
 
-(test48) ;; 1 > 2 > 3 > done
+(testcar)
 
+(definec testme
+  (lambda ()
+    (let ((lst (cons 1 (cons 2 (cons (i64toi32 3) null))))) ;(testlist1 5 4 3)))
+      (printf "length: %lld\n" (length lst))
+      (cdr lst))))
+
+(testme)
+
+;; (bind-func map:[list*,[!result,!head]*,list*]
+;;   (lambda (func lst)
+;;     (let ((i 0)
+;; 	  (f (lambda (l)
+;; 	       (if (null? l)
+;; 		   null
+;; 		   (cons (func (car l)) (f (cdr l)))))))
+;;       (f lst))))
 
 ;; Memory Usage In Extempore Lang
 ;; -------------------------------

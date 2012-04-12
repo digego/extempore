@@ -2339,7 +2339,17 @@ namespace extemp {
 
     pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
     {
-	char* name = string_value(pair_car(args));
+	char* n = string_value(pair_car(args));
+	char nk[256];
+	char* name = nk;
+	strcpy(name,n);
+	if (name[0] == '%') name = name++;	
+
+	int ptrdepth = 0;
+	while(name[strlen(name)-1] == '*') {
+	  name[strlen(name)-1]=NULL;
+          ptrdepth++;
+	}
 
 	llvm::Module* M = EXTLLVM::I()->M;
 	
@@ -2357,9 +2367,20 @@ namespace extemp {
 	    rsplit("= type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
 	    tmp_name = tmp_str_b;
 	  }
+	  
+	  //add back any requried '*'s
+	  if(ptrdepth>0) {
+	    char tmpstr[256];
+	    memset(tmpstr,0,256);
+            strcpy(tmpstr,tmp_name);
+	    for( ;ptrdepth>0;ptrdepth--) {
+	      tmpstr[strlen(tmpstr)]='*';
+	    }
+	    tmp_name = tmpstr;
+	  }
 	  return mk_string(_sc,tmp_name);
 	} else {
-	  return _sc->NIL;
+	  return _sc->NIL; 
 	}
     }
 	
