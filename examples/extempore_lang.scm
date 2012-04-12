@@ -1092,11 +1092,11 @@
       (tset! pair 1 b)
       pair)))
 
-(bind-func car:[!head,list*]*
+(bind-func head:[!head,list*]*
   (lambda (a)
     (tref a 0)))
 
-(bind-func cdr:[list*,list*]*
+(bind-func tail:[list*,list*]*
   (lambda (a)
     (tref a 1)))
 
@@ -1105,32 +1105,27 @@
     (cons a (cons b (cons c null)))))
 
 (bind-func testlist2
-  (lambda (a:double b:double c:double)
-    (cons a (cons b (cons c null)))))
+  (lambda (a:double b:double c:double d:double)
+    (cons a (cons b (cons c (cons d null))))))
 
 (bind-func length:[i64,list*]*
   (lambda (a)    
     (if (null? a)
 	0
-	(+ 1 (length (cdr a))))))
+	(+ 1 (length (tail a))))))
 
-(definec testcar
+(bind-func gen_test
   (lambda ()
     (let ((l1 (testlist1 1 2 3))
-	  (l2 (testlist2 1.0 2.0 3.0)))
-      (printf "int:%d double:%f\n" (car l1) 1.0) ;; adding second polymorphic function of 'different base type' breaks this: e.g. (car l2) which is for double)
-      (printf "%lld\n" (length l1))
+	  (l2 (testlist2 1.0 2.0 3.0 4.0)))
+      (printf "int:%d double:%f\n" (head (tail l1)) (head (tail (tail l2))))
+      (printf "lengths: %lld:%lld\n" (length l1) (length l2))
       void)))
 
-(testcar)
+(gen_test)
+		 
+  
 
-(definec testme
-  (lambda ()
-    (let ((lst (cons 1 (cons 2 (cons (i64toi32 3) null))))) ;(testlist1 5 4 3)))
-      (printf "length: %lld\n" (length lst))
-      (cdr lst))))
-
-(testme)
 
 ;; (bind-func map:[list*,[!result,!head]*,list*]
 ;;   (lambda (func lst)
