@@ -1119,22 +1119,70 @@
     (let ((l1 (testlist1 1 2 3))
 	  (l2 (testlist2 1.0 2.0 3.0 4.0)))
       (printf "int:%d double:%f\n" (head (tail l1)) (head (tail (tail l2))))
+      (head (tail l1))
+      (head (tail l2))
       (printf "lengths: %lld:%lld\n" (length l1) (length l2))
       void)))
 
 (gen_test)
-		 
-  
+
+;; I need these two !heads to be independant
+(bind-func map:[list*,[!head,!head]*,list*]
+  (lambda (func lst)
+    (let ((i 0)
+	  (f (lambda (l)
+	       (if (null? l)
+		   null
+		   (cons (func (head l)) (f (tail l)))))))
+      (f lst))))
+
+;; this works  ... yay!!
+(bind-func map_test
+  (lambda ()
+    (let ((l1 (testlist1 1 2 3))
+	  (ff (lambda (a) (+ 10 a))))
+      (let ((l2 (map ff l1)))
+	(head (tail l2))))))
+
+(println (map_test)) ; -> 12
+
+;; this doesn't work :(  need to separate !head's in map
+(bind-func map_testz
+  (lambda ()
+    (let ((l1 (testlist1 1 2 3))
+	  (ff (lambda (a:i32) (+ 10.0 (i32tod a)))))
+      (let ((l2 (map ff l1)))
+	(head (tail l2))))))
+
+(map_testz)
 
 
-;; (bind-func map:[list*,[!result,!head]*,list*]
-;;   (lambda (func lst)
-;;     (let ((i 0)
-;; 	  (f (lambda (l)
-;; 	       (if (null? l)
-;; 		   null
-;; 		   (cons (func (car l)) (f (cdr l)))))))
-;;       (f lst))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;  this doesn't
+(bind-func map_testb
+  (lambda ()
+    (let ((l1 (testlist1 1 2 3))
+	  (l2 (map (lambda (a) (+ 10 a)) l1)))
+      (head l2))))
+
+;;;;;;; nor does this
+(bind-func map_testc
+  (lambda ()
+    (let ((l1 (testlist1 1 2 3))
+	  (ff (lambda (a) (+ 10 a)))
+	  (kk 5))
+      ;; adding anything to let AFTER a lambda creates an error
+      ;; my suspician is that the lambda opens something up that
+      ;; doesn't get propertly closed again ...
+      (let ((l2 (map ff l1)))
+	(head l2)))))
+
+
+
+;; ALTHOUGH THESE ARE GENERAL PROBLEMS WITH
+;; LAMBDA ... NOT POLYMORPHISM OR GENERICS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ;; Memory Usage In Extempore Lang
 ;; -------------------------------
