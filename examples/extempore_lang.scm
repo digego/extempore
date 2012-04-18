@@ -249,8 +249,6 @@
 	(printf "done\n")
 	(begin (printf "a: %lld\n" a)
 	       (my-test-4 (- a 1))))))
-
-(my-test-4 7)
     
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -263,7 +261,6 @@
 (bind-func my-test-6
   (lambda ()
     (alloc <i64,double,i32>)))
-
 
 ;; logview shows [<i64,double,i32>*]*
 ;; i.e. a closure that takes no arguments
@@ -1127,24 +1124,72 @@
 (gen_test)
 
 ;; I need these two !heads to be independant
-(bind-func map:[list*,[!head,!head]*,list*]
+(bind-func map:[list%a*,[!head%a,!head%b]*,list%b*]
   (lambda (func lst)
-    (let ((i 0)
-	  (f (lambda (l)
+    (let ((f (lambda (l)
 	       (if (null? l)
 		   null
 		   (cons (func (head l)) (f (tail l)))))))
       (f lst))))
 
-;; this works  ... yay!!
 (bind-func map_test
   (lambda ()
     (let ((l1 (testlist1 1 2 3))
-	  (ff (lambda (a) (+ 10 a))))
+	  (ff:[i64,i32]* (lambda (a) (i32toi64 (+ 10 a)))))
+      (let ((l2 (map ff l1)))
+	l2))))
+
+;;;;;;;;;;;;;;;;;; ANDREW READ THIS ;;;;;;;;;;;;;;;;;;;
+;;
+;;     GNUMS should be based on polytypes!
+;;     NOT on poly functions
+;;
+;;     IN OTHER WORDS, there should only be
+;;     one !head per polytype variable
+;;     ... not sure exactly how to calculate
+;;     which polyvars to follow though and
+;;     how to number them :
+;;
+;;     actually -> check that you are using
+;;     the gnum in relation to !head's
+;;     without specialization: i.e.
+;;
+;;     we are checking for this:
+;;     !head%b$$$5 with list*%b$$$5
+;;
+;;     but are we check for this:
+;;     !head$$$5 with list*$$$5
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func ttt3
+  (lambda (a:i32 b:i64)
+    (let ((l1 (head (tail (cons a null))))
+	  (l2 (cons (i32toi64 5) (cons b null)))
+	  (l3 (head l2)))
+      void)))
+
+(bind-func ttt2
+  (lambda (a:i32 b:i64)
+    (let ((l1 (cons a null))
+	  (l2 (cons b null))
+	  (l3 (head l2)))      
+      void)))
+
+(bind-func ttt1
+  (lambda (a)
+    (* 1 a)))
+
+;; this works  ... yay!!
+(bind-func map_test_b
+  (lambda ()
+    (let ((l1 (testlist1 1 2 3))
+	  (ff:[i64,i32]* (lambda (a) (i32toi64 (+ 10 a)))))
       (let ((l2 (map ff l1)))
 	(head (tail l2))))))
 
-(println (map_test)) ; -> 12
+(println (map_test_b)) ; -> 12
+
 
 ;; this doesn't work :(  need to separate !head's in map
 (bind-func map_testz
@@ -1154,28 +1199,31 @@
       (let ((l2 (map ff l1)))
 	(head (tail l2))))))
 
-(map_testz)
+(println (map_testz)) ; -> 12.0
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;  this doesn't
-(bind-func map_testb
-  (lambda ()
-    (let ((l1 (testlist1 1 2 3))
-	  (l2 (map (lambda (a) (+ 10 a)) l1)))
-      (head l2))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; the next two don't work because
+;; they use anoymous lambdas
 
-;;;;;;; nor does this
-(bind-func map_testc
-  (lambda ()
-    (let ((l1 (testlist1 1 2 3))
-	  (ff (lambda (a) (+ 10 a)))
-	  (kk 5))
-      ;; adding anything to let AFTER a lambda creates an error
-      ;; my suspician is that the lambda opens something up that
-      ;; doesn't get propertly closed again ...
-      (let ((l2 (map ff l1)))
-	(head l2)))))
+;; (bind-func map_testb
+;;   (lambda ()
+;;     (let ((l1 (testlist1 1 2 3))
+;; 	  (l2 (map (lambda (a) (+ 10 a)) l1)))
+;;       (head l2))))
+
+;; ;;;;;;; nor does this
+;; (bind-func map_testc
+;;   (lambda ()
+;;     (let ((l1 (testlist1 1 2 3))
+;; 	  (ff (lambda (a) (+ 10 a)))
+;; 	  (kk 5))
+;;       ;; adding anything to let AFTER a lambda creates an error
+;;       ;; my suspician is that the lambda opens something up that
+;;       ;; doesn't get propertly closed again ...
+;;       (let ((l2 (map ff l1)))
+;; 	(head l2)))))
 
 
 
