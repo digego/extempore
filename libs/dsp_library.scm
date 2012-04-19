@@ -103,7 +103,7 @@
 ;; don't need variable length
 (definec make-delay
   (lambda (max-delay)
-    (let ((line (zalloc max-delay double))
+    (let ((line:double* (zalloc max-delay))
 	  (time 0)
 	  (delay max-delay)
 	  (in 0.5)
@@ -120,7 +120,7 @@
 ;; iir comb with interpolation
 (definec make-comb
   (lambda (max-delay)
-    (let ((line (zalloc max-delay double))
+    (let ((line:double* (zalloc max-delay))
 	  (in-head 0)
 	  (out-head 0)
 	  (delay_ (i64tod max-delay))
@@ -196,8 +196,8 @@
 ;; tap delay
 (definec tap-delay
   (lambda (max-delay num-of-taps)
-    (let ((line (zalloc max-delay double))
-	  (taps (zalloc num-of-taps i64))
+    (let ((line:double* (zalloc max-delay))
+	  (taps:i64* (zalloc num-of-taps))
 	  (delay max-delay)
 	  (time 0))
       (lambda (x:double)
@@ -215,8 +215,8 @@
 ;; allpass
 (definec make-allpass
   (lambda (delay)
-    (let ((inline (zalloc delay double))
-	  (outline (zalloc delay double))
+    (let ((inline:double* (zalloc delay))
+	  (outline:double* (zalloc delay))
 	  (time 0)
 	  (g 0.9))
       (lambda (x)
@@ -491,7 +491,7 @@
 
 (definec envelope-segments
   (lambda (points:double* num-of-points:i64)
-    (let ((lines (zalloc num-of-points [double,double]*))
+    (let ((lines:[double,double]** (zalloc num-of-points))
 	  (k 0))
       (dotimes (k num-of-points)
 	(let* ((idx (* k 2))
@@ -521,7 +521,7 @@
 (definec make-adsr
   (lambda (start-time atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
     (let* ((points 6)
-	   (data (zalloc (* points 2) double)))
+	   (data:double* (zalloc (* points 2))))
       (pset! data 0 start-time)
       (pset! data 1 0.0)
       (pset! data 2 (+ start-time atk-dur)) ;; point data
@@ -583,26 +583,34 @@
 
 (define-macro (define-instrument name note-kernel effect-kernel)
   `(definec ,name
-     (let* ((poly 48)
-	    (notes (zalloc poly [double,double,double,double]*))
-	    (attack 200.0)
-	    (decay 200.0)
-	    (release 1000.0)
-	    (sustain 0.6) ;; amplitude of the sustain
+     (let* ((poly:i64 48)
+	    (notes:[double,double,double,double]** (zalloc poly))
+	    (attack:double 200.0)
+	    (decay:double 200.0)
+	    (release:double 1000.0)
+	    (sustain:double 0.6) ;; amplitude of the sustain
 	    (gain 2.0)
 	    (active 0)
 	    (ii 0)
-	    (note-starts (zalloc poly double))
+	    (note-starts:double* (zalloc poly))
 	    (new-note (lambda (start freq dur amp)
-			(let ((free-note -1)
+			(let ((free-note:i64 -1)
 			      (iii 0)
 			      (i 0))
 			  (dotimes (i poly) ;; check for free poly spot           
 			    (if (> (pref note-starts i) 9999999999998.0)
 				(set! free-note i)))
 			  (if (= 0 active)
-			      (begin (dotimes (iii poly) (pset! note-starts iii 9999999999999.0))
-				     (set! free-note -1)))
+			      (begin (dotimes (iii poly)
+				       (pset! note-starts iii 9999999999999.0))
+				     (set! free-note -1)))			  
+			  ;; (dotimes (i poly) ;; check for free poly spot           
+			  ;;   (if (> (pref note-starts i) 9999999999998.0)
+			  ;; 	(set! free-note i)))
+			  ;; (if (= 0 active)
+			  ;;     (begin (dotimes (iii poly)
+			  ;; 	       (pset! note-starts iii 9999999999999.0))
+			  ;; 	     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
 			      (begin (pset! notes free-note
 					    (make-note start freq amp dur
@@ -781,7 +789,7 @@
 ;; size of audio data in file (in bytes)
 (definec print-audio-file-info
   (lambda (fname)
-    (let ((info (zalloc <i64,i32,i32,i32,i32,i32>))
+    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
 	  (audiofile (sf_open fname 16 info))
 	  (channels (i32toi64 (tref info 2))))
       (printf "---------------\n")
@@ -799,7 +807,7 @@
 (definec read-audio-data
   (lambda (fname dat offset num)
     ;(printf "in: %s %p %lld %lld\n" fname dat offset num)
-    (let ((info (zalloc <i64,i32,i32,i32,i32,i32>))
+    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
 	  (audiofile (sf_open fname 16 info))
 	  (cnt (sf_seek audiofile offset 0))
 	  (samples-read (sf_read_double audiofile dat num)))
@@ -809,7 +817,7 @@
 ;; write out an audio buffer
 (definec write-audio-data
   (lambda (fname frames channels:i32 dat)
-    (let ((info (zalloc <i64,i32,i32,i32,i32,i32>)))
+    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc)))
       (tset! info 0 frames)
       (tset! info 1 (dtoi32 *samplerate*))
       (tset! info 2 channels)
@@ -833,7 +841,7 @@
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000) 
 (definec set-sample-data_
   (lambda (inst:[double,double,double,double*]* fname index offset length)    
-    (let ((info (zalloc <i64,i32,i32,i32,i32,i32>))
+    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
 	  (audiofile (sf_open fname 16 info))
 	  (channels (i32toi64 (tref info 2)))		     
 	  (num (if (= 0 length)
@@ -1005,11 +1013,11 @@
 (define-macro (define-sampler name note-kernel effect-kernel)
   `(definec ,name
      (let* ((poly:i64 48)
-	    (samples (zalloc |128,double*|)) ;; 128 samples
-	    (samples-length (zalloc |128,i64|)) ;; 128 samples
-	    (samples-channels (zalloc |128,i64|)) ;; 128 samples	    
-	    (samples-offsets (zalloc |128,i64|)) ;; 128 samples
-	    (notes (zalloc poly [double,double,double,double]*))
+	    (samples:|128,double*|* (zalloc)) ;; 128 samples
+	    (samples-length:|128,i64|* (zalloc)) ;; 128 samples
+	    (samples-channels:|128,i64|* (zalloc)) ;; 128 samples	    
+	    (samples-offsets:|128,i64|* (zalloc)) ;; 128 samples
+	    (notes:[double,double,double,double]** (zalloc poly))
 	    (attack:double 200.0)
 	    (decay:double 200.0)
 	    (release:double 1000.0)
@@ -1017,9 +1025,9 @@
 	    (gain:double 2.0)
 	    (kk:i64 0) (ii:i64 0)
 	    (active:i64 0)
-	    (note-starts:double* (zalloc poly double))
+	    (note-starts:double* (zalloc poly))
 	    (new-note (lambda (start freq dur amp)
-			(let ((free-note -1)
+			(let ((free-note:i64 -1)
 			      (idx (dtoi64 (floor (frq2midi freq))))
 			      (closest 1000000)
 			      (i:i64 0) (iii:i64 0) (idxi:i64 0)
@@ -1028,7 +1036,8 @@
 			    (if (> (pref note-starts i) 9999999999998.0)
 				(set! free-note i)))
 			  (if (= 0 active)
-			      (begin (dotimes (iii poly) (pset! note-starts iii 9999999999999.0))
+			      (begin (dotimes (iii poly)
+				       (pset! note-starts iii 9999999999999.0))
 				     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
 			      (begin (dotimes (idxi 128)

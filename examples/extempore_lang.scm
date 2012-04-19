@@ -260,7 +260,9 @@
 ;; make and return a simple tuple
 (bind-func my-test-6
   (lambda ()
-    (alloc <i64,double,i32>)))
+    (let ((t:<i64,double,i32>* (alloc)))
+      t)))
+
 
 ;; logview shows [<i64,double,i32>*]*
 ;; i.e. a closure that takes no arguments
@@ -273,7 +275,7 @@
 ;; (i.e. i64 being tuple index 0)
 (bind-func my-test-7 
   (lambda ()
-    (let ((a (alloc <i64,double>)) ; returns pointer to type <i64,double>
+    (let ((a:<i64,double>* (alloc)) ; returns pointer to type <i64,double>
 	  (b 37)
 	  (c 6.4))
       (tuple-set! a 0 b) ;; set i64 to 64
@@ -294,8 +296,8 @@
 ;; this function returns void
 (bind-func my-test-8
    (lambda ()
-      (let ((v1 (alloc |5,float|))
-	    (v2 (alloc |5,float|))
+      (let ((v1:|5,float|* (alloc))
+	    (v2:|5,float|* (alloc))
 	    (i 0)
 	    (k 0))
          (dotimes (i 5)
@@ -354,8 +356,8 @@
 
 (bind-func my-test-11
    (lambda ()
-      (let ((v (alloc |5,[i64,i64]*|)) ;; make an array of closures!
-            (vv (alloc |5,i64|)))
+      (let ((v:|5,[i64,i64]*|* (alloc)) ;; make an array of closures!
+            (vv:|5,i64|* (alloc)))
          (array-set! vv 2 3)
          (aset! v 0 (my-test-9 vv)) ;; aset! alias for array-set!
          (my-test-10 v))))
@@ -396,7 +398,7 @@
 
 (bind-func envelope-segments
   (lambda (points:double* num-of-points:i64)
-    (let ((lines (zone-alloc num-of-points [double,double]*))
+    (let ((lines:[double,double]** (zone-alloc num-of-points))
 	  (k 0))
       (dotimes (k num-of-points)
 	(let* ((idx (* k 2))
@@ -430,7 +432,7 @@
 ;; make a convenience wrapper 
 (bind-func env-wrap
    (let* ((points 3)
-          (data (zone-alloc (* points 2) double)))
+          (data (zone-alloc (* points 2))))
       (pointer-set! data 0 0.0) ;; point data
       (pset! data 1 0.0)      
       (pset! data 2 2.0)
@@ -576,7 +578,7 @@
 ;; heap allocation was made into)
 (bind-func cons-i64
   (lambda (a:i64 b:i64list*)
-    (let ((pair (zone-alloc i64list)))
+    (let ((pair:i64list* (zone-alloc)))
       (tset! pair 0 a)
       (tset! pair 1 b)
       pair)))
@@ -617,7 +619,7 @@
 ;; any valid type  (i64 for example)
 (bind-func my-test27
   (lambda ()
-    (let ((point (stack-alloc vec3)))
+    (let ((point:vec3* (stack-alloc)))
       (tset! point 0 0.0)
       (tset! point 1 -1.0)
       (tset! point 2 1.0)
@@ -639,7 +641,7 @@
 ;; with an offset
 (bind-func my-test28
   (lambda ()
-    (let ((arr (alloc |32,i64|))
+    (let ((arr:|32,i64|* (alloc))
 	  (arroff (aref-ptr arr 16))
 	  (i 0)
 	  (k 0))
@@ -667,8 +669,8 @@
 
 (bind-func my-test29
   (lambda ()
-    (let ((tup (stack-alloc tuple-with-array))
-	  (t2 (stack-alloc |32,i64|)))
+    (let ((tup:tuple-with-array* (stack-alloc))
+	  (t2:|32,i64|* (stack-alloc)))
       (aset! t2 0 9)      
       (tset! tup 2 5.5)
       (aset! (aref-ptr (tref-ptr tup 1) 0) 0 0)
@@ -780,13 +782,13 @@
 
 (bind-func test35
   (lambda ()
-    (let ((b (zalloc |5,double|)))
+    (let ((b:|5,double|* (zalloc)))
       (aset! b 0
 	(memzone 1024
-	   (let ((a (zalloc |10,double|)))
+	   (let ((a:|10,double|* (zalloc)))
 	     (aset! a 0 3.5)
 	     (aref a 0))))
-      (let ((c (zalloc |9,i32|)))
+      (let ((c:|9,i32|* (zalloc)))
 	(aset! c 0 99)
 	(aref b 0)))))
 
@@ -797,10 +799,10 @@
 (bind-func test36
   (lambda ()
     (memzone 1024
-      (let ((k (zalloc |15,double|))
+      (let ((k:|15,double|* (zalloc))
 	    (f (lambda (fa:|15,double|*)
 	         (memzone 1024
-		   (let ((a (zalloc |10,double|))
+		   (let ((a:|10,double|* (zalloc))
 			 (i 0))
 		     (dotimes (i 10)
 		       (aset! a i (* (aref fa i) (random))))
@@ -820,7 +822,7 @@
 (bind-func test38
   (lambda ()
     (memzone 1024 (* 44100 10)
-      (let ((a (alloc |5,double|)))
+      (let ((a:|5,double|* (alloc)))
 	(aset! a 0 5.5)
 	(aref a 0)))))
 
@@ -838,7 +840,7 @@
 ;;  compilation)
 ;;
 (bind-func test39 1000000
-  (let ((k (zalloc |100000,double|)))
+  (let ((k:|100000,double|* (zalloc)))
     (lambda ()
       (aset! k 0 1.0)
       (aref k 0))))
@@ -873,7 +875,7 @@
 ;; add to the back of the list
 (bind-func enqueue
   (lambda (queue:|2,list_t*|* value:i64)
-    (let ((tmp (halloc list_t))
+    (let ((tmp:list_t* (halloc))
 	  (front (aref queue 0))
 	  (back (aref queue 1)))
       (tset! tmp 0 value)
@@ -885,8 +887,8 @@
 
 (bind-func queue_test
   (lambda ()
-    (let ((myqueue (salloc |2,list_t*|))
-	  (stuff (salloc |8,i64|))
+    (let ((myqueue:|2,list_t*|* (salloc))
+	  (stuff:|8,i64|* (salloc))
 	  (i 0))
       ;; first we must set queue front and back to null
       (afill! myqueue null null)
@@ -934,22 +936,22 @@
 
 ;; start 5 new processes
 ;; ipc:bind-func work in each
-(define procs
-  (map (lambda (n p)
-	 (ipc:new n p)
-	 (ipc:definec n 'work)
-	 n)
-       (list "proc-a" "proc-b" "proc-c" "proc-d" "proc-e")
-       (list 7097 7096 7095 7094 7093)))
+;; (define procs
+;;   (map (lambda (n p)
+;; 	 (ipc:new n p)
+;; 	 (ipc:definec n 'work)
+;; 	 n)
+;;        (list "proc-a" "proc-b" "proc-c" "proc-d" "proc-e")
+;;        (list 7097 7096 7095 7094 7093)))
 
-;; call work using ipc:mapcall
-;;
-;; ipc:mapcall calls a given function on 'n'
-;; number of processes and then blocks waiting
-;; until it receives 'n' results.
-(println 'result:
-	 (ipc:mapcall 'work procs
-		      '(1) '(2) '(3) '(4) '(5)))
+;; ;; call work using ipc:mapcall
+;; ;;
+;; ;; ipc:mapcall calls a given function on 'n'
+;; ;; number of processes and then blocks waiting
+;; ;; until it receives 'n' results.
+;; (println 'result:
+;; 	 (ipc:mapcall 'work procs
+;; 		      '(1) '(2) '(3) '(4) '(5)))
 
 
 
@@ -1097,6 +1099,9 @@
   (lambda (a)
     (tref a 1)))
 
+
+;; CHECK TUPLE-SET-CHECK
+;; AND SYMBOL-CHECK
 (bind-func testlist1
   (lambda (a:i32 b:i32 c:i32)
     (cons a (cons b (cons c null)))))
@@ -1104,6 +1109,10 @@
 (bind-func testlist2
   (lambda (a:double b:double c:double d:double)
     (cons a (cons b (cons c (cons d null))))))
+
+(bind-func testlist3
+  (lambda (a:<i32,i64>*)
+    (head (cons a null))))
 
 (bind-func length:[i64,list*]*
   (lambda (a)    
@@ -1123,6 +1132,7 @@
 
 (gen_test)
 
+
 ;; I need these two !heads to be independant
 (bind-func map:[list%a*,[!head%a,!head%b]*,list%b*]
   (lambda (func lst)
@@ -1139,28 +1149,6 @@
       (let ((l2 (map ff l1)))
 	l2))))
 
-;;;;;;;;;;;;;;;;;; ANDREW READ THIS ;;;;;;;;;;;;;;;;;;;
-;;
-;;     GNUMS should be based on polytypes!
-;;     NOT on poly functions
-;;
-;;     IN OTHER WORDS, there should only be
-;;     one !head per polytype variable
-;;     ... not sure exactly how to calculate
-;;     which polyvars to follow though and
-;;     how to number them :
-;;
-;;     actually -> check that you are using
-;;     the gnum in relation to !head's
-;;     without specialization: i.e.
-;;
-;;     we are checking for this:
-;;     !head%b$$$5 with list*%b$$$5
-;;
-;;     but are we check for this:
-;;     !head$$$5 with list*$$$5
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func ttt3
   (lambda (a:i32 b:i64)

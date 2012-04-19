@@ -331,6 +331,8 @@
      (let* ((s1 (regex:replace string-type "\\|(.+)\\|?.*" "$1"))
 	    (t1 (cl:remove-if (lambda (x) (string=? x "")) 
 			      (regex:match-all s1 impc:ir:regex-tc-or-a)))
+	    (num? (if (regex:match? (car t1) "[a-zA-Z]") ;; (car t1) should be numbers only!
+		      (print-error 'Compiler 'Error: 'syntax 'error 'first 'element 'should 'be 'a 'number: string-type)))
 	    (t2 (list (string->number (car t1))
 		      (apply impc:ir:get-type-from-pretty-str (cadr t1) args))))
        t2)))
@@ -689,7 +691,7 @@
              (cond ((impc:ir:closure? (car type)) (car type))
                    ((impc:ir:tuple? (car type)) (car type))
                    ((impc:ir:array? (car type)) (car type))
-                   (else (print-error 'Compiler 'Error: 'Unknown 'complex 'type type))))
+                   (else (error) (print-error 'Compiler 'Error: 'Unknown 'complex 'type type))))
             (else type))))
 
 
@@ -1258,8 +1260,8 @@
                         (value (impc:ir:compiler (cadr p) types symtype) os)
                         (typestr (cadr (impc:ir:gname)))
 			(e (impc:ir:gname)))
-		   (println 'symstr: symstr 'symtype: symtype)
-		   (println 'typestr: typestr)
+		   ;(println 'symstr: symstr 'symtype: symtype)
+		   ;(println 'typestr: typestr)
 		   (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
 			    (impc:ir:number? (cdr (assoc (caar p) types)))
 			    (impc:ir:number? (impc:ir:get-type-from-str typestr)))
@@ -2461,24 +2463,23 @@
     (let* ((os (make-string 0)))
       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
 	     (idx (impc:ir:gname))
-	     (t (impc:ir:pointer-- (car hint?)))) ;(impc:ir:convert-from-pretty-types (car hint?)))))	     	     
+	     (t (impc:ir:get-type-str (impc:ir:pointer-- (car hint?))))) ;(impc:ir:convert-from-pretty-types (car hint?)))))	     	     
 	     ;(t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (caddr ast)))))
 	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t ", " (cadr idx) " " (car idx) "\n") os)
 	(impc:ir:strip-space os)))))
-
 
 (define impc:ir:compiler:stack-alloc-without-size
   (lambda (ast types hint?)
     (let* ((os (make-string 0)))
       (let* ;((t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadr ast)))))
-	    ((t (impc:ir:pointer-- (car hint?))))
+	    ((t (impc:ir:get-type-str (impc:ir:pointer-- (car hint?)))))
 	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t "\n") os)
 	(impc:ir:strip-space os)))))
 
 
 (define impc:ir:compiler:stack-alloc
   (lambda (ast types hint?)
-    (if (= (length ast) 2)
+    (if (= (length ast) 1)
 	(impc:ir:compiler:stack-alloc-without-size ast types hint?)
 	(impc:ir:compiler:stack-alloc-with-size ast types hint?))))
 
@@ -2638,14 +2639,14 @@
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
              (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
 
-	 ;; check to see if we have type equivelency but not type equality
-	 ;; i.e. check to see if a given 'named type' is equivelent to the
-	 ;; requied tuple type (of vica-versa) if it is we will need to bitcast.
-	 (if (and (impc:ir:tuple? (cadr val))
-		  (not (null? (llvm:get-named-type element-type))))
-	     (begin 
-	       (set! val-str (string-append val-str (impc:ir:gname "val" element-type) " = bitcast " (cadr val) " " (car val) " to " element-type "\n") os)
-	       (set! val (impc:ir:gname))))
+	 ;; ;; check to see if we have type equivelency but not type equality
+	 ;; ;; i.e. check to see if a given 'named type' is equivelent to the
+	 ;; ;; requied tuple type (of vica-versa) if it is we will need to bitcast.
+	 ;; (if (and (impc:ir:tuple? (cadr val))
+	 ;; 	  (not (null? (llvm:get-named-type element-type))))
+	 ;;     (begin 
+	 ;;       (set! val-str (string-append val-str (impc:ir:gname "val" element-type) " = bitcast " (cadr val) " " (car val) " to " element-type "\n") os)
+	 ;;       (set! val (impc:ir:gname))))
 	 
 	 ;(if (not (impc:ir:types-equal? element-type (impc:ir:get-type-from-str (cadr val))))
          (if (not (equal? element-type
