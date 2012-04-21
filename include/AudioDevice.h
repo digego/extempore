@@ -38,6 +38,10 @@
 
 #if defined (TARGET_OS_MAC)
 #include <CoreAudio/AudioHardware.h>
+#endif
+
+#if defined (COREAUDIO) //TARGET_OS_MAC)
+#include <CoreAudio/AudioHardware.h>
 #elif defined (JACK_AUDIO)
 #include <jack/jack.h>
 #elif defined (ALSA_AUDIO)
@@ -97,7 +101,7 @@ namespace extemp {
 #elif defined (___ALSA_AUDIO___)
 	snd_pcm_t* get_pcm_handle() { return pcm_handle; }	
 	float* getBuffer() { return buffer; }
-#elif defined (TARGET_OS_MAC)
+#elif defined (COREAUDIO)
 
 #else  //  must be portaudio
         static void printDevices();
@@ -116,7 +120,7 @@ namespace extemp {
 	jack_port_t** output_ports;
 #elif defined (___ALSA_AUDIO___) // ALSA NOT CURRENTLY SUPPORTED
 	snd_pcm_t *pcm_handle;
-#elif defined (TARGET_OS_MAC)
+#elif defined (COREAUDIO) //TARGET_OS_MAC)
 	AudioDeviceID device;
 #else 
 	PaStream* stream;

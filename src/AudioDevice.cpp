@@ -125,6 +125,13 @@ double getRealTime()
 #endif //TARGET_OS_LINUX
 #endif //EXT_BOOST
 
+#ifdef TARGET_OS_MAC
+double getRealTime()
+{
+   return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970; 
+}
+#endif
+
 #ifdef TARGET_OS_WINDOWS
 #define isnan(x) ((x) != (x))
 #define isinf(x) (isnan(x-x))
@@ -553,7 +560,7 @@ namespace extemp {
 	started = false;
     }
 
-#elif defined (TARGET_OS_MAC)
+#elif defined (COREAUDIO) //(TARGET_OS_MAC)
 
 
     //-----------------------------------
