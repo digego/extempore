@@ -1099,9 +1099,6 @@
   (lambda (a)
     (tref a 1)))
 
-
-;; CHECK TUPLE-SET-CHECK
-;; AND SYMBOL-CHECK
 (bind-func testlist1
   (lambda (a:i32 b:i32 c:i32)
     (cons a (cons b (cons c null)))))
@@ -1164,9 +1161,6 @@
 	  (l3 (head l2)))      
       void)))
 
-(bind-func ttt1
-  (lambda (a)
-    (* 1 a)))
 
 ;; this works  ... yay!!
 (bind-func map_test_b
@@ -1189,6 +1183,47 @@
 
 (println (map_testz)) ; -> 12.0
 
+(bind-func map-test10
+  (lambda (a:i64)
+    (let ((l1 (cons a null))
+	  (l2 (cons l1 null)))
+      (head l2))))
+
+
+(bind-type colour <!red,!green,!blue>)
+(bind-type colour2 <!type,!type,!type>)
+
+(bind-func make-colour:[colour*,!red,!green,!blue]
+  (lambda (a b c)
+    (let ((col (alloc)))
+      (tfill! col a b c)
+      col)))
+
+(bind-func make-colour2:[colour2*,!type,!type,!type]
+  (lambda (a b c)
+    (let ((col (alloc)))
+      (tfill! col a b c)
+      col)))
+
+(bind-func drawsomething5
+  (lambda (a:float b:float c:double)
+    (let ((colour (make-colour a b c)))
+      colour)))
+
+(bind-func drawsomething7
+  (lambda (a:float b:float c:float)
+    (let ((colour (make-colour2 a b c)))
+      colour)))
+
+(bind-func drawsomething8
+  (lambda (a:double b:double c:double)
+    (let ((colour (make-colour2 a b c)))
+      colour)))
+
+
+(bind-func draw-something
+  (lambda (a:colour*)
+    
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

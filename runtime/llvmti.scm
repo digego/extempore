@@ -714,21 +714,39 @@
 		vars)
       ;(println '------ vs 't2: t1)
       ;(println '---------- 't22: (impc:ti:type-unify (impc:ir:get-type-from-pretty-str t1) vars))
-      (if (string? t1) (set! t1 (string->symbol t1)))
-      ;(println 'aaaa: (regex:replace (symbol->string t1) gpolyname " "))
-      ;(println 'bbbb: (impc:ir:type? (impc:ir:get-type-from-pretty-str (regex:replace (symbol->string t1) gpolyname " "))))
-      (if (impc:ir:type? (impc:ir:get-type-from-pretty-str (regex:replace (symbol->string t1) gpolyname " ")))
+      (if (string? t1) (set! t1 (string->symbol t1)))     
+      ;(println 'aaaa: (regex:replace (symbol->string t1) (string-append gpolyname "([^-][^-])") "$1")) ;  "[^-][^-]") " "))
+      (if (impc:ir:type? (impc:ir:get-type-from-pretty-str (regex:replace (symbol->string t1) (string-append gpolyname "([^-][^-])") "$1")))
 	  (let* ((t2 (symbol->string t1))
 		 (base (impc:ir:get-base-type gpolyname)) ;(symbol->string vs)))
 		 (newname (string-append base "--" (number->string (string-hash t2))))
-		 (newtype (regex:replace t2 base newname)))
-	    ;(println vs 't2: t2 'base: base 'newname: newname 'newtype: newtype)
-	    (llvm:compile (string-append "%" newname " = type "
-					 (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str newtype newname))))
-	    (impc:ir:add-polytype (string->symbol base) (string->symbol newname) (string->symbol newtype))
-	    (set! newtype (apply string-append newtype (make-list-with-proc ptrdepth (lambda (i) "*"))))
-	    ;(println 'expanded vs 'into (string->symbol newtype) 'return: (apply string-append "%" newname (make-list-with-proc ptrdepth (lambda (i) "*"))))
-	    (apply string-append "%" newname (make-list-with-proc ptrdepth (lambda (i) "*"))))
+		 ;(l (println 'newname: newname))
+		 (newtype1 (regex:replace t2 (string-append base "([^-][^-])") (string-append newname "$1")))
+		 ;(ll (println 'newtype1: newtype1))
+		 (newtype2 (impc:ti:type-unify (impc:ir:get-type-from-pretty-str newtype1 (apply string-append newname (make-list-with-proc ptrdepth (lambda (kk) "*")))) vars))
+		 ;(lll (println 'newtype2: newtype2))
+		 ;(newtype3 (impc:ir:get-type-str newtype2 (apply string-append newname (make-list-with-proc ptrdepth (lambda (kk) "*"))))))
+		 ;;
+		 ;; we should do a type normalize but we CAN'T include newname
+		 ;; because we haven't added it to LLVM
+		 (newtype3 (impc:ir:get-type-str
+			    (map (lambda (ttt)
+					;(println 'ttt: ttt)
+				   (if (and (string? ttt)
+					    (regex:match? ttt newname))
+				       ttt
+				       (impc:ti:type-normalize ttt)))
+				 newtype2))))	    
+	    ;(println 'newtype2: newtype2 'newtype3: newtype3 'newname: newname)
+	    
+	    ;; ok now we have a type we need to add it to llvm and polytype
+	    (llvm:compile (string-append "%" newname " = type " newtype3))
+	    ;; next we should try to normalize the newtype
+	    (let* ((newtype4 (impc:ti:type-normalize (impc:ir:get-type-from-str (apply string-append newtype3 (make-list-with-proc ptrdepth (lambda (kk) "*"))))))
+		   (newtype5 (impc:ir:get-type-str newtype4)))
+	      ;(println 'newtype3: newtype3 'newtype4: newtype4 'newtype5: newtype5)
+	      (impc:ir:add-polytype (string->symbol base) (string->symbol newname) (string->symbol newtype5))
+	      newtype4))
 	  vs))))
 
 
@@ -1105,13 +1123,18 @@
 	  ((and (list? t)
 		(number? (car t))
 		(= *impc:ir:tuple* (modulo (car t) *impc:ir:pointer*)))
+	   ;; first check all sub tuples for possible normalization!	   
+	   (set! t (map (lambda (a) (impc:ti:type-normalize a)) t))
 	   (let ((named-types (cl:remove-if-not string? t)))
 	     (if (null? named-types)
 		 t
 		 ;(impc:ti:type-normalize t) ;(cdr t))
 		 (let ((res (map (lambda (k)
+				   ;(println 'k: k ': (llvm:get-named-type k) '-> (impc:ir:get-type-from-str (llvm:get-named-type k)))
+				   ;(println t '= (impc:ir:get-type-from-str (llvm:get-named-type k)))
 				   (if (equal? t (impc:ir:get-type-from-str (llvm:get-named-type k))) k #f))
 				 named-types)))
+		   (set! res (cl:remove-if-not string? res))
 		   ;(println 'res: res)
 		   (if (null? res)
 		       (impc:ti:type-normalize (cdr t))
@@ -1123,8 +1146,10 @@
 		 (impc:ti:type-normalize (cdr t)))))))
 
 
+
 (define impc:ti:type-unify
   (lambda (t vars)
+    ;(println 't: t)
     (cond ((atom? t)
 	   ;; (if (symbol? t)
 	   ;;     (impc:ti:type-unify (impc:ti:symbol-expand t vars '()) vars)
@@ -1434,7 +1459,7 @@
 		      (if (llvm:get-function (symbol->string ast))
 			  (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (llvm:get-function-args-withoutzone (symbol->string ast)))))
                           (list (impc:ir:pointer-- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string ast)))))))))
-	 ;(println 'sym: ast 'type: type)
+	 ;(println 'sym: ast 'type: type 'request? request?)
          (if (and request?
                   (not (null? request?)))             
              ;; (let ((intersection (cl:intersection (if (null? type) ;; if type is null then force request
@@ -1579,11 +1604,10 @@
 
 	 ;; type inferencing for generic functions arguments
          (let ((res (map (lambda (a gt)
-	 		   ;;(println 'a: a 'gt: gt)
+	 		   ;(println 'a: a 'gt: gt)
 			   ;;(println 'avars: (assoc a vars))
 	 		   ;; gt for generics type
 	 		   (let ((tt (impc:ti:type-check a vars kts gt)))
-			     ;;(println 'tttt: tt)
 			     ;;(println 'avars2: (assoc a vars))
 			     ;(if (and (list? tt) (> (length tt) 1)) (set! tt (list tt)))
 	 		     ;;(println 'a: a 'tt: tt 'gt: gt)
@@ -1616,7 +1640,7 @@
 			     ;; we might be able to update-vars based by matching our request 'gt vs our result 'tt
 			     (for-each
 			      (lambda (aa bb)
-				;;(println 'sub: aa bb)
+				;(println 'sub: aa bb)
 				(if (and (atom? aa)
 					 (symbol? aa)
 					 (regex:match? (symbol->string aa) "!"))
@@ -1660,6 +1684,7 @@
 	   (if request?	       
 	       (for-each
 	   	(lambda (aa bb)
+		  ;; (println 'aa: aa 'bb: bb)
 	   	  (if (and (atom? aa)
 	   		   (symbol? aa)
 	   		   (regex:match? (symbol->string aa) "!"))

@@ -443,7 +443,6 @@
 ;; 				  (if res res
 ;; 				      (print-error 'Compiler 'Error: 'cannot 'find 'type 'for string-type)))))))))))
 
-
 ;; now with pretty print support
 (define impc:ir:get-type-from-pretty-str
    (lambda (string-type . args)
@@ -508,7 +507,9 @@
 					   k)))
 				 type)
 			    type)))))
-	       ((not (null? (llvm:get-named-type base)))
+	       ((or (not (null? (llvm:get-named-type base)))
+		    (and (not (null? args))
+			 (equal? string-type (car args))))
 		(string-append "%" string-type))
 	       ;; recursive types
 	       ((and (not (null? args))
