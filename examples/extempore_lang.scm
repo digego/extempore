@@ -1099,6 +1099,14 @@
   (lambda (a)
     (tref a 1)))
 
+(bind-func car:[!head,list*]*
+  (lambda (a)
+    (tref a 0)))
+
+(bind-func cdr:[list*,list*]*
+  (lambda (a)
+    (tref a 1)))
+
 (bind-func testlist1
   (lambda (a:i32 b:i32 c:i32)
     (cons a (cons b (cons c null)))))
@@ -1115,15 +1123,15 @@
   (lambda (a)    
     (if (null? a)
 	0
-	(+ 1 (length (tail a))))))
+	(+ 1 (length (cdr a))))))
 
 (bind-func gen_test
   (lambda ()
     (let ((l1 (testlist1 1 2 3))
 	  (l2 (testlist2 1.0 2.0 3.0 4.0)))
-      (printf "int:%d double:%f\n" (head (tail l1)) (head (tail (tail l2))))
-      (head (tail l1))
-      (head (tail l2))
+      (printf "int:%d double:%f\n" (car (cdr l1)) (car (cdr (cdr l2))))
+      (car (cdr l1))
+      (car (cdr l2))
       (printf "lengths: %lld:%lld\n" (length l1) (length l2))
       void)))
 
@@ -1136,7 +1144,7 @@
     (let ((f (lambda (l)
 	       (if (null? l)
 		   null
-		   (cons (func (head l)) (f (tail l)))))))
+		   (cons (func (car l)) (f (cdr l)))))))
       (f lst))))
 
 (bind-func map_test
@@ -1146,43 +1154,41 @@
       (let ((l2 (map ff l1)))
 	l2))))
 
+A simple specialisation might then be:
 
-(bind-func ttt3
-  (lambda (a:i32 b:i64)
-    (let ((l1 (head (tail (cons a null))))
-	  (l2 (cons (i32toi64 5) (cons b null)))
-	  (l3 (head l2)))
-      void)))
+(bind-func mymap
+  (lambda (a:i32)
+    (i32tod (+ 10 a))))
 
-(bind-func ttt2
-  (lambda (a:i32 b:i64)
-    (let ((l1 (cons a null))
-	  (l2 (cons b null))
-	  (l3 (head l2)))      
-      void)))
+(bind-func map_test2
+  (lambda (a:i32 b:i32 c:i32)
+    (let ((l1 (cons a (cons b (cons c null))))
+	  (l2 (map mymap l1)))
+      l2)))
+
 
 
 ;; this works  ... yay!!
-(bind-func map_test_b
+(bind-func map_test_a
   (lambda ()
     (let ((l1 (testlist1 1 2 3))
 	  (ff:[i64,i32]* (lambda (a) (i32toi64 (+ 10 a)))))
       (let ((l2 (map ff l1)))
 	(head (tail l2))))))
 
-(println (map_test_b)) ; -> 12
+(println (map_test_a)) ; -> 12
 
 
-;; this doesn't work :(  need to separate !head's in map
-(bind-func map_testz
-  (lambda ()
-    (let ((l1 (testlist1 1 2 3))
-	  (ff (lambda (a:i32) (+ 10.0 (i32tod a)))))
+(bind-func map_test_b
+  (lambda (a:i32 b:i32 c:i32)
+    (let ((l1 (cons a (cons b (cons c null))))
+	  (ff (lambda (d:i32) (+ 10.0 (i32tod d)))))
       (let ((l2 (map ff l1)))
 	(head (tail l2))))))
 
-(println (map_testz)) ; -> 12.0
+(println (map_test_b 1.0 2.0 3.0)) ; -> 12.0
 
+;; use l1 in l2 (i.e. poly as car of poly
 (bind-func map-test10
   (lambda (a:i64)
     (let ((l1 (cons a null))
@@ -1219,10 +1225,6 @@
   (lambda (a:double b:double c:double)
     (let ((colour (make-colour2 a b c)))
       colour)))
-
-
-(bind-func draw-something
-  (lambda (a:colour*)
     
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
