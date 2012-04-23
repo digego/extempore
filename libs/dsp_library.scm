@@ -642,7 +642,7 @@
     (memzone (* 1024 10)
 	     (dtoi64 (+ (- time (i64tod (now)))
 			dur
-			(* 5.0 *samplerate*))) ;; time padding
+			(* 20.0 *samplerate*))) ;; time padding
       (let ((f (inst.new-note:[i64,double,double,double,double]*)))
 	(f time freq dur amp)
 	;; so that we only copy an integer from memzone
