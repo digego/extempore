@@ -595,6 +595,7 @@
   (lambda (start-tempo . args)	
      (let* ((offset (if (null? args) (now) (caar args)))
             (mark offset)
+	    (loffset 0.0)
             (total-beats (if (null? args) 0 (cdar args)))
             (g-tempo (/ 60 start-tempo))
             (beat-pos (lambda (x1 y1 x2 y2)
@@ -605,11 +606,13 @@
             (samp-env (beat-pos total-beats mark (+ total-beats 1.0) (+ mark (* g-tempo *au:samplerate*)))))
         (lambda (sym . args)
            (cond ((number? sym)
-                  (+ (samp-env sym) 0))
+                  (+ (samp-env sym) loffset)) ;mark))
+                  ;(+ (samp-env sym) 0))		 
                  ((equal? sym 'get-mark)
                   (cons mark total-beats))
                  ((equal? sym 'get-time)
-                  (+ (samp-env (car args)) 0))
+                  (+ (samp-env (car args)) loffset)) ;mark))
+                 ;; (+ (samp-env (car args)) 0))		 
                  ((equal? sym 'set-tempo)
                   (let ((time (if (null? (cdr args)) (now) (cadr args)))
                         (val (* *au:samplerate* g-tempo 0.125)))
@@ -628,9 +631,9 @@
                      (car args)))
                  ((equal? sym 'get-tempo) (* (/ 1 g-tempo) 60))
                  ((equal? sym 'dur) (* *au:samplerate* g-tempo (car args)))
-                 ((equal? sym 'push) (set! mark (+ mark 256)))
-                 ((equal? sym 'pull) (set! mark (- mark 256)))
-                 ((equal? sym 'get-beat) 
+                 ((equal? sym 'push) (set! loffset (+ loffset 256)))
+                 ((equal? sym 'pull) (set! loffset (- loffset 256)))
+                 ((equal? sym 'get-beat)
                   (let ((val (+ total-beats
                                 (/ (- (now) mark)
                                    (* *au:samplerate* g-tempo))))
@@ -639,7 +642,7 @@
                      (real->rational (+ val (- quantize (modulo val quantize))))))
                  (else 'bad-method-name))))))
 
-				 				 				 
+
 (define *metro* (make-metro 120 '(0 . 0)))
 
 (define-macro (set-signal! variable value dur . rate)
