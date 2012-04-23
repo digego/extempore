@@ -863,10 +863,24 @@ namespace extemp {
 		uint32_t ii = i*UNIV::CHANNELS;
 		SAMPLE* dat = (SAMPLE*) outputBuffer;
 		SAMPLE* in = (SAMPLE*) inputBuffer;
-		for(uint32_t k=0; k<UNIV::CHANNELS; k++)
-		{
-		  dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data));
-		  llvm_zone_reset(zone);
+		if(UNIV::IN_CHANNELS==UNIV::CHANNELS) {
+		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+		    {		  
+		      dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, (double)in[ii+k], (double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		      llvm_zone_reset(zone);
+		    }
+		}else if(UNIV::IN_CHANNELS==1){
+		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+		    {		  
+		      dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, (double)in[ii],(double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		      llvm_zone_reset(zone);
+		    }		  
+		}else{
+		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+		    {		  
+		      dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		      llvm_zone_reset(zone);
+		    }
 		}
 	    }
 	    //llvm_pop_zone_stack();
@@ -1003,17 +1017,25 @@ namespace extemp {
 	ascii_text_color(1,7,10);
 	std::cout << "---PortAudio---" << std::endl;
 	ascii_text_color(0,7,10);
-        std::cout << "Audio Device\t: " << std::flush;
+        std::cout << "Output Device\t: " << std::flush;
 	ascii_text_color(1,6,10);	
 	std::cout << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;	
+	ascii_text_color(0,7,10);
+        std::cout << "Input Device\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << (Pa_GetDeviceInfo( inputDevice ))->name << std::endl;	
 	ascii_text_color(0,7,10);
         std::cout << "SampleRate\t: " << std::flush;
 	ascii_text_color(1,6,10);	
 	std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
 	ascii_text_color(0,7,10);	
-        std::cout << "Channels\t: " << std::flush;
+        std::cout << "Channels Out\t: " << std::flush;
 	ascii_text_color(1,6,10);	
 	std::cout << UNIV::CHANNELS << std::endl << std::flush;
+	ascii_text_color(0,7,10);	
+        std::cout << "Channels In\t: " << std::flush;
+	ascii_text_color(1,6,10);	
+	std::cout << UNIV::IN_CHANNELS << std::endl << std::flush;
 	ascii_text_color(0,7,10);	
         std::cout << "Frames\t\t: " << std::flush;
 	ascii_text_color(1,6,10);	
