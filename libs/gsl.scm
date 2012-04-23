@@ -8,7 +8,9 @@
 
 (define gsllib (if (string=? "Linux" (sys:platform))
 		   (sys:open-dylib "libgsl.so.0")
-		   (print-error "tell me where to find the gsl dynamic library on your platform here!")))
+		   (if (string=? "OSX" (sys:platform))
+		       (sys:open-dylib "libgsl.0.dylib")
+		       (print-error "tell me where to find the gsl dynamic library on your platform here!"))))
 
 
 ;; SOME TYPES FOR GSL
@@ -164,7 +166,7 @@
 ;;
 (definec Crect
   (lambda (real imag)
-    (let ((num (alloc gsl_complex))
+    (let ((num:gsl_complex* (alloc))
 	  (n (tref-ptr num 0))) ;
       (aset! n 0 real)
       (aset! n 1 imag)
@@ -172,7 +174,7 @@
 
 (definec Cpolar
   (lambda (mag arg)
-    (let ((num (alloc gsl_complex))
+    (let ((num:gsl_complex* (alloc))
 	  (n (tref-ptr num 0))
 	  (real (* mag (cos arg)))
 	  (imag (* mag (sin arg))))
@@ -204,7 +206,7 @@
   (lambda (num1:gsl_complex* num2:gsl_complex*)
     (let ((n1 (bitcast num1 |2,double|*))
 	  (n2 (bitcast num2 |2,double|*))
-	  (num3 (alloc gsl_complex))
+	  (num3:gsl_complex* (alloc))
 	  (n3 (bitcast num3 |2,double|*)))
       (aset! n3 0 (+ (aref n1 0) (aref n2 0)))
       (aset! n3 1 (+ (aref n1 1) (aref n2 1)))
@@ -213,7 +215,7 @@
 (definec CaddR
   (lambda (num1:gsl_complex* num2:double)
     (let ((n1 (bitcast num1 |2,double|*))
-	  (num3 (alloc gsl_complex))
+	  (num3:gsl_complex* (alloc))
 	  (n3 (bitcast num3 |2,double|*)))
       (aset! n3 0 (+ (aref n1 0) num2))
       (aset! n3 1 (+ (aref n1 1) num2))
@@ -223,7 +225,7 @@
   (lambda (num1:gsl_complex* num2:gsl_complex*)
     (let ((n1 (bitcast num1 |2,double|*))
 	  (n2 (bitcast num2 |2,double|*))
-	  (num3 (alloc gsl_complex))
+	  (num3:gsl_complex* (alloc))
 	  (n3 (bitcast num3 |2,double|*)))
       (aset! n3 0 (- (aref n1 0) (aref n2 0)))
       (aset! n3 1 (- (aref n1 1) (aref n2 1)))
@@ -232,7 +234,7 @@
 (definec CsubR
   (lambda (num1:gsl_complex* num2:double)
     (let ((n1 (bitcast num1 |2,double|*))
-	  (num3 (alloc gsl_complex))
+	  (num3:gsl_complex* (alloc))
 	  (n3 (bitcast num3 |2,double|*)))
       (aset! n3 0 (- (aref n1 0) num2))
       (aset! n3 1 (- (aref n1 1) num2))
@@ -242,7 +244,7 @@
   (lambda (num1:gsl_complex* num2:gsl_complex*)
     (let ((n1 (bitcast num1 |2,double|*))
 	  (n2 (bitcast num2 |2,double|*))
-	  (num3 (alloc gsl_complex))
+	  (num3:gsl_complex* (alloc))
 	  (n3 (bitcast num3 |2,double|*))
 	  (ac (* (aref n1 0) (aref n2 0)))
 	  (ad (* (aref n1 0) (aref n2 1)))
@@ -255,7 +257,7 @@
 (definec CmulR
   (lambda (num1:gsl_complex* num2:double)
     (let ((n1 (bitcast num1 |2,double|*))
-	  (num3 (alloc gsl_complex))
+	  (num3:gsl_complex* (alloc))
 	  (n3 (bitcast num3 |2,double|*)))
       (aset! n3 0 (* (aref n3 0) num2))
       (aset! n3 1 (* (aref n3 1) num2))
@@ -263,7 +265,7 @@
 
 (definec Cdiv
   (lambda (num1:gsl_complex* num2:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
           (res (tref (gsl_complex_div (pref num1 0) (pref num2 0)) 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
       (aset! (tref-ptr num3 0) 1 (aref res 1))
@@ -271,7 +273,7 @@
 
 (definec Cconj
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_conjugate (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -280,7 +282,7 @@
 
 (definec Cinverse
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_inverse (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -289,7 +291,7 @@
 
 (definec Cnegative
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_negative (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -298,7 +300,7 @@
 
 (definec Csqrt
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_sqrt (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -307,7 +309,7 @@
 
 (definec Cpow
   (lambda (num1:gsl_complex* num2:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_pow (pref num1 0) (pref num2 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -316,7 +318,7 @@
 
 (definec CpowR
   (lambda (num1:gsl_complex* num2:double)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_pow_real (pref num1 0) num2))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -325,7 +327,7 @@
 
 (definec Cexp
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_exp (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -334,7 +336,7 @@
 
 (definec Clog
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_log (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -343,7 +345,7 @@
 
 (definec Csin
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_sin (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -352,7 +354,7 @@
 
 (definec Ccos
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_cos (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -361,7 +363,7 @@
 
 (definec Ctan
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_tan (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -370,7 +372,7 @@
 
 (definec Csec
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_sec (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -379,7 +381,7 @@
 
 (definec Ccsc
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_csc (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -388,7 +390,7 @@
 
 (definec Ccot
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_cot (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -397,7 +399,7 @@
 
 (definec Casin
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arcsin (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -406,7 +408,7 @@
 
 (definec Cacos
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arccos (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -415,7 +417,7 @@
 
 (definec Catan
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arctan (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -424,7 +426,7 @@
 
 (definec Casec
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arcsec (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -433,7 +435,7 @@
 
 (definec Cacsc
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arccsc (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -442,7 +444,7 @@
 
 (definec Cacot
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arccot (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -451,7 +453,7 @@
 
 (definec Csinh
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_sinh (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -460,7 +462,7 @@
 
 (definec Ccosh
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_cosh (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -469,7 +471,7 @@
 
 (definec Ctanh
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_tanh (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -478,7 +480,7 @@
 
 (definec Csech
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_sech (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -487,7 +489,7 @@
 
 (definec Ccsch
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_csch (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -496,7 +498,7 @@
 
 (definec Ccoth
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_coth (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -505,7 +507,7 @@
 
 (definec Casinh
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arcsinh (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -514,7 +516,7 @@
 
 (definec Cacosh
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arccosh (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -523,7 +525,7 @@
 
 (definec Catanh
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arctanh (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -532,7 +534,7 @@
 
 (definec Casech
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arcsech (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -541,7 +543,7 @@
 
 (definec Cacsch
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arccsch (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -550,7 +552,7 @@
 
 (definec Cacoth
   (lambda (num1:gsl_complex*)
-    (let ((num3 (alloc gsl_complex))
+    (let ((num3:gsl_complex* (alloc))
 	  (cres (gsl_complex_arccoth (pref num1 0)))
           (res (tref cres 0)))
       (aset! (tref-ptr num3 0) 0 (aref res 0))
@@ -841,7 +843,7 @@
 (definec VtoPtr
   (lambda (v1)
     (let ((size:size_t (tref v1 0))
-	  (ptr (zalloc (* 8 size)))
+	  (ptr:double* (zalloc (* 8 size)))
 	  (i 0))
       (dotimes (i size)
 	(pset! ptr i (gsl_vector_get v1 i)))
