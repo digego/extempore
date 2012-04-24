@@ -253,6 +253,31 @@
 					     (dly4 wetin))))))))))
 
 
+
+;; a dodgy reverb mk2
+(definec make-reverb
+  (lambda (size) ; size in ms
+    (let ((ms (/ *samplerate* 1000.0))
+	  (wet .25)
+	  (dly1 (make-delay (dtoi64 (* ms (* .192 size)))))
+	  (dly2 (make-delay (dtoi64 (* ms (* .373 size)))))
+	  (dly3 (make-delay (dtoi64 (* ms (* .671 size)))))
+	  (dly4 (make-delay (dtoi64 (* ms (* .712 size)))))
+	  (ap1 (make-allpass (dtoi64 (* ms size))))
+	  (ap3 (make-allpass (dtoi64 (* ms (* .929 size)))))
+	  (ap2 (make-allpass (dtoi64 (* ms (* .329 size))))))
+      (ap1.g .8)
+      (ap2.g .7)
+      (ap3.g .6)
+      (lambda (in)
+	(let ((wetin (* in wet)))
+	  (+ (* in (- 1.0 wet))
+	     (ap1 (ap2 (ap3 (+ (dly1 wetin)
+			       (dly2 wetin)
+			       (dly3 wetin)
+			       (dly4 wetin)))))))))))
+
+
 ;; a dodgy bitcrusher
 (definec make-crusher
   (lambda (bits)
@@ -462,6 +487,65 @@
 	  (set! x2 x1)
 	  (set! x1 x)
 	  y)))))
+
+
+;;
+;; moog VCF
+;;
+;; from Stilson/Smith CCRMA
+;;
+(bind-func make-vcf
+  (lambda ()
+    (let ((res 0.5) ;; 0.0 - 1.0
+	  (x 0.0) (y1 0.0) (y2 0.0) (y3 0.0) (y4 0.0)
+	  (oldx 0.0) (oldy1 0.0) (oldy2 0.0) (oldy3 0.0))
+      (lambda (in cutoff)
+	(let (;(f (* 2.0 (/ cutoff *samplerate*)))
+	      ;(f (* 1.8 (/ cutoff *samplerate*)))
+	      (f (* 1.75 (/ cutoff *samplerate*)))
+              ;(k (- (* 2.0 (sin (* f (/ PI 2.0)))) 1.0))
+	      (k (- (- (* 3.6 f) (* 1.6 (* f f))) 1.0))
+	      (p (* 0.5 (+ k 1.0)))
+	      (scale (exp (* (- 1.0 p) 1.386249)))
+	      (r (* res scale)))
+	  (set! x (- in (* r y4)))
+	  (set! y1 (+ (* x  p) (* oldx  p) (* -1.0 k y1)))
+	  (set! y2 (+ (* y1 p) (* oldy1 p) (* -1.0 k y2)))
+	  (set! y3 (+ (* y2 p) (* oldy2 p) (* -1.0 k y3)))
+	  (set! y4 (+ (* y3 p) (* oldy3 p) (* -1.0 k y4)))
+
+	  (set! oldx x) (set! oldy1 y1) (set! oldy2 y2) (set! oldy3 y3)
+	  ;; y4 is output
+	  (set! y4 (- y4 (/ (pow y4 3.0) 6.0)))
+	  y4)))))
+
+
+;;
+;; moog VCF v2.0
+;;
+;; from Stilson/Smith CCRMA
+;;
+(bind-func make-vcf2
+  (lambda ()
+    (let ((res 0.5) ;; 0.0 - 1.0
+	  (in1 0.0) (in2 0.0) (in3 0.0) (in4 0.0)
+	  (out1 0.0) (out2 0.0) (out3 0.0) (out4 0.0))
+      (lambda (in cutoff)
+	(let ((f (/ (* 7.0 cutoff) (* 1.16 *samplerate*))) ;1.16))
+	      (f1 (- 1.0 f))
+	      (fb (* res 4.0 (- 1.0 (* 0.15 f f)))))
+	  (set! in (- in (* out4 fb)))
+	  (set! in (* in 0.35013 f f f f))
+	  (set! out1 (+ in   (* 0.3 in1) (* f1 out1))) ;; Pole 1
+	  (set! in1 in)
+	  (set! out2 (+ out1 (* 0.3 in2) (* f1 out2)))  ;; Pole 2	  
+	  (set! in2 out1)
+	  (set! out3 (+ out2 (* 0.3 in3) (* f1 out3)))  ;; Pole 3
+	  (set! in3 out2)
+	  (set! out4 (+ out3 (* 0.3 in4) (* f1 out4)))  ;; Pole 4	  
+	  (set! in4 out3)
+	  out4)))))
+
 
 
 
