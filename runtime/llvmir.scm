@@ -49,8 +49,9 @@
 (define *impc:ir:closure* 11)
 (define *impc:ir:tuple* 12)
 (define *impc:ir:array* 13)
+(define *impc:ir:vector* 14)
 ;; this should be incremented to represent the lowest native type
-(define *impc:ir:lowest-base-type* 14)
+(define *impc:ir:lowest-base-type* 15)
 
 ;; and a non-type
 (define *impc:ir:other* 1000)
@@ -373,6 +374,9 @@
 			((impc:ir:array? t) 
 			 (string-append "|" (number->string (cadr t)) "," (impc:ir:pretty-print-type (caddr t))
 					"|" (apply string-append (make-list-with-proc (impc:ir:get-ptr-depth t) (lambda (k) "*")))))
+			((impc:ir:vector? t) 
+			 (string-append "|" (number->string (cadr t)) "^" (impc:ir:pretty-print-type (caddr t))
+					"|" (apply string-append (make-list-with-proc (impc:ir:get-ptr-depth t) (lambda (k) "*")))))
 			((impc:ir:closure? t)
 			 (string-append "[" (string-join (map (lambda (k) (impc:ir:pretty-print-type k)) (cdr t)) ",")
 					"]" (apply string-append (make-list-with-proc (- (impc:ir:get-ptr-depth t) 1) (lambda (k) "*")))))))))))
@@ -466,6 +470,7 @@
                ((string=? base "closure") (+ *impc:ir:closure* offset))
                ((string=? base "tuple") (+ *impc:ir:tuple* offset))
                ((string=? base "array") (+ *impc:ir:array* offset))
+               ((string=? base "vector") (+ *impc:ir:vector* offset))	       
                ((regex:match? base "^\\[.*\\]$") 
                 (cons (+ offset *impc:ir:pointer* *impc:ir:closure*) (apply impc:ir:get-type-from-pretty-closure string-type args)))
                ((regex:match? base "\\<\\{\\s?i8\\*,\\s?i8\\*.*") 
@@ -474,7 +479,10 @@
                 (cons (+ offset *impc:ir:tuple*) (apply impc:ir:get-type-from-pretty-tuple string-type args)))
                ((regex:match? base "\\<?\\{.*\\}\\>?\\**")
                 (cons (+ offset *impc:ir:tuple*) (impc:ir:get-tuple-type-from-str string-type)))
-               ((regex:match? base "\\|.*\\|\\**")
+               ((and (regex:match? base "\\^") ;; the ^ changes an array to a vector |3^double| is a vector
+		     (regex:match? base "\\|.*\\|\\**"))
+                (cons (+ offset *impc:ir:vector*) (apply impc:ir:get-type-from-pretty-array string-type args)))
+               ((regex:match? base "\\|.*\\|\\**") ;; |3,double| is an array
                 (cons (+ offset *impc:ir:array*) (apply impc:ir:get-type-from-pretty-array string-type args)))
 	       ((and (char=? (string-ref base 0) #\%)
 	       	     (not (null? (llvm:get-named-type (substring base 1 (string-length base))))))
@@ -547,8 +555,8 @@
 ;(define impc:ir:regex-structs-or-atoms "(\\<?\\{(?<struct>[^<{}>]|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)|(?:([%0-9a-zA-Z_]\\**)+)")
 (define impc:ir:regex-structs-or-atoms (string-append "(\\<?\\{(?<struct>[^<{}>]|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
 						      "|(\\[(?<array>[^\\[\\]]|\\[\\g<array>*\\]\\**)*\\]\\**)"
+						      "|(\\<(?<vector>[^<>]|\\<\\g<vector>*\\>\\**)*\\>\\**)"
 						      "|(?:([%#0-9a-zA-Z_-]\\**)+)"))
-
 
 
 (define impc:ir:get-tuple-type-from-str
@@ -562,6 +570,14 @@
 (define impc:ir:get-array-type-from-str
    (lambda (string-type)
       (let* ((s1 (regex:replace string-type "\\[(.*)\\].*" "$1"))
+             (t1 (cl:remove-if (lambda (x) (string=? x "")) 
+                               (regex:match-all s1 impc:ir:regex-structs-or-atoms)))
+             (t2 (list (string->number (car t1)) (impc:ir:get-type-from-str (caddr t1)))))
+	t2)))
+
+(define impc:ir:get-vector-type-from-str
+   (lambda (string-type)
+      (let* ((s1 (regex:replace string-type "\\<(.*)\\>.*" "$1"))
              (t1 (cl:remove-if (lambda (x) (string=? x "")) 
                                (regex:match-all s1 impc:ir:regex-structs-or-atoms)))
              (t2 (list (string->number (car t1)) (impc:ir:get-type-from-str (caddr t1)))))
@@ -583,7 +599,6 @@
                       s2)))
          s3)))
 
-
 (define impc:ir:get-type-from-str
   (lambda (string-type . args)
     ;(println 'ir:get-type-from-str 'string-type: string-type 'args: args)
@@ -604,7 +619,11 @@
 	    ((string=? base "closure") (+ *impc:ir:closure* offset))
 	    ((string=? base "tuple") (+ *impc:ir:tuple* offset))
 	    ((string=? base "array") (+ *impc:ir:array* offset))
+	    ((string=? base "vector") (+ *impc:ir:vector* offset))
 	    ;((regex:match? base "\\<\\{\\s?i8\\*,\\s?i8\\*.*")
+	    ((and (regex:match? base "^\\<.* x .*\\>\\**$")
+		  (not (regex:match? base ",")))
+	     (cons (+ offset *impc:ir:vector*) (impc:ir:get-vector-type-from-str string-type)))
 	    ((regex:match? base "^\\<\\{\\s?i8\\*,\\s?i8\\*.*$")
 	     (cons (+ offset *impc:ir:closure*) (impc:ir:get-closure-type-from-str string-type)))
 	    ;((regex:match? base "\\<?\\{.*\\}\\>?\\**")
@@ -640,6 +659,9 @@
 			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
 		      ((impc:ir:array? (car type))
 		       (apply string-append "[" (number->string (cadr type)) " x " (apply impc:ir:get-type-str (caddr type) args) "]"
+			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
+		      ((impc:ir:vector? (car type))
+		       (apply string-append "<" (number->string (cadr type)) " x " (apply impc:ir:get-type-str (caddr type) args) ">"
 			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
 		      (else (print-error 'Compiler 'Error: 'bad 'complex 'type! type))))
 	       ((= type -1) "void")
@@ -692,6 +714,7 @@
              (cond ((impc:ir:closure? (car type)) (car type))
                    ((impc:ir:tuple? (car type)) (car type))
                    ((impc:ir:array? (car type)) (car type))
+                   ((impc:ir:vector? (car type)) (car type))		   
                    (else (error) (print-error 'Compiler 'Error: 'Unknown 'complex 'type type))))
             (else type))))
 
@@ -714,6 +737,7 @@
 		     ((member t (list *impc:ir:char* *impc:ir:si8* *impc:ir:ui8* *impc:ir:i1*)) 1) ; 1 bytes stuff
 		     ((= t *impc:ir:closure*) (* (impc:ir:get-type-size "i8*") 3))
 		     ((= t *impc:ir:array*) (* (impc:ir:get-type-size (caddr type)) (cadr type)))
+		     ((= t *impc:ir:vector*) (* (impc:ir:get-type-size (caddr type)) (cadr type)))
 		     ((= t *impc:ir:tuple*)
 		      (apply + (map (lambda (x) (impc:ir:get-type-size x)) (cdr type))))
 		     (else (print-error 'Compiler 'Error: 'bad 'type 'in 'get-size))))))))
@@ -726,6 +750,7 @@
 	 (substring type 0 (- (string-length type) 1))
 	 (if (or (impc:ir:closure? type)
 		 (impc:ir:array? type)
+		 (impc:ir:vector? type)		 
 		 (impc:ir:tuple? type))
 	     (let ((nl (cl:copy-list (if (string? type) (impc:ir:get-type-from-str type) type))))
 	       (set-car! nl (- (impc:ir:str-list-check type) *impc:ir:pointer*))
@@ -739,6 +764,7 @@
 	 (string-append type "*")	       
 	 (if (or (impc:ir:closure? type)
 		 (impc:ir:array? type)
+		 (impc:ir:vector? type)		 
 		 (impc:ir:tuple? type))
 	     (let ((nl (cl:copy-list (if (string? type) (impc:ir:get-type-from-str type) type))))
 	       (set-car! nl (+ (impc:ir:str-list-check type) *impc:ir:pointer*))
@@ -765,7 +791,8 @@
                  #t)
 		((and (list? type)
 		      (number? (car type))
-		      (impc:ir:array? type)
+		      (or (impc:ir:array? type)
+			  (impc:ir:vector? type))		      
 		      (impc:ir:type? (caddr type)))
 		 #t)		
                 (else #f)))))
@@ -824,6 +851,16 @@
 	 (let ((t (impc:ir:str-list-check type)))
 	   (if (string? t) #f
 	       (if (= (modulo t *impc:ir:pointer*) *impc:ir:array*)
+		   #t #f))))))
+
+(define impc:ir:vector?
+   (lambda (type)
+     (if (list? type)
+	 (if (< (length type) 2) #f
+	     (if (impc:ir:vector? (car type)) #t #f))
+	 (let ((t (impc:ir:str-list-check type)))
+	   (if (string? t) #f
+	       (if (= (modulo t *impc:ir:pointer*) *impc:ir:vector*)
 		   #t #f))))))
 
 (define impc:ir:closure?
@@ -1268,7 +1305,6 @@
 			    (impc:ir:number? (impc:ir:get-type-from-str typestr)))
 		       (set! typestr (impc:ir:get-type-str (cdr (assoc (caar p) types)))))
                     ;; type check
-		   
 		    ;;(if (not (impc:ir:types-equal? typestr (cdr (assoc (caar p) types))))
                     (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
                                      (cdr (assoc (caar p) types))))
@@ -1710,6 +1746,7 @@
              (type2 (impc:ir:pointer-- type))
              (typestr (impc:ir:get-type-str type2)))
 	(if (and (or (impc:ir:array? type2)
+		     (impc:ir:vector? type2)
 		     (impc:ir:tuple? type2))
 		 (= (impc:ir:get-ptr-depth type2) 0))
 	    (emit (impc:ir:gname "val" (impc:ir:get-type-str type))
@@ -2344,6 +2381,67 @@
          (impc:ir:strip-space os))))
 
 
+(define impc:ir:compiler:vector-ref
+   (lambda (ast types)
+      (let* ((os (make-string 0))
+             (index-str (impc:ir:compiler (caddr ast) types *impc:ir:si32*))
+             (idx (impc:ir:gname))
+             (var-str (impc:ir:compiler (cadr ast) types))
+             (var (impc:ir:gname))
+	     (ttype (impc:ir:get-type-from-str (cadr var)))
+	     (tt '()))
+         ;; type tests
+	(if (not (impc:ir:vector? ttype))
+	    (print-error 'Compiler 'Error: 'Type 'Mismatch: 'invalid 'vector 'type (sexpr->string (cadr var)) ': ast))
+	(if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
+	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	(emit index-str os)
+	(emit var-str os)
+	(emit "; vector ref\n" os)
+	;; (println 'ttype: ttype)
+	;; (println 'var: var)
+	;; (println 'idx: idx)
+	;; (println 'ret: (caddr ttype))
+	;; (println 'pointer: (impc:ir:pointer? ttype))
+	(if (impc:ir:pointer? ttype) ;; a pointer?
+	    (emit (string-append (impc:ir:gname "vect" (impc:ir:get-type-str (impc:ir:pointer-- (cadr var)))) " = load " (cadr var) " " (car var) "\n"
+		                 (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractelement "
+	     			 (cadr (impc:ir:gname "vect")) " " (car (impc:ir:gname "vect")) ", i32 " (car idx) "\n") os)
+	    (emit (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractelement "
+		  (cadr var) " " (car var) ", i32 " (car idx) "\n" os))
+	(impc:ir:strip-space os))))
+
+
+(define impc:ir:compiler:vector-set
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+	   (index-str (impc:ir:compiler (caddr ast) types *impc:ir:si32*)) ;; i32
+	   (idx (impc:ir:gname))
+	   (var-str (impc:ir:compiler (cadr ast) types))
+	   (var (impc:ir:gname))
+	   (ttype (impc:ir:get-type-from-str (cadr var)))
+	   (val-str (impc:ir:compiler (cadddr ast) types (caddr ttype)))
+	   (val (impc:ir:gname)))
+      ;; type tests
+      (if (not (impc:ir:vector? ttype))
+	  (print-error 'Compiler 'Error: 'Type 'Mismatch: 'invalid 'vector 'type (cadr var)))
+      (if (> (impc:ir:get-ptr-depth ttype) 1.0)
+	  (print-error 'Compiler 'Error: 'Type 'Mismatch: 'ptr 'depth 'to 'great 'for 'vector-set! (cadr var)))
+      ;; type tests done
+      (emit index-str os)
+      (emit var-str os)
+      (emit val-str os)
+      (emit "; set vector\n" os)
+      (if (impc:ir:pointer? ttype) ;; must be an array if we're not a pointer
+	  (emit (impc:ir:gname "vect" (impc:ir:get-type-str (impc:ir:pointer-- ttype))) " = load " (cadr var) " " (car var) "\n"
+	        (impc:ir:gname "vect2" (cadr (impc:ir:gname "vect"))) " = insertelement " (cadr (impc:ir:gname "vect")) " " (car (impc:ir:gname "vect"))
+		", " (cadr val) " " (car val) ", i32 " (car idx) "\n"
+		"store " (cadr (impc:ir:gname "vect2")) " " (car (impc:ir:gname "vect2")) ", " (cadr var) " " (car var) os)
+	  (print-error 'Compiler 'Error: 'vset! 'needs 'to 'be 'a 'pointer 'to 'a 'vector))
+      (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
+      (impc:ir:strip-space os))))
+
+
 (define impc:ir:compiler:zone-alloc-without-size
   (lambda (ast types hint?)
     (let* ((os (make-string 0)))
@@ -2466,7 +2564,7 @@
 	     (idx (impc:ir:gname))
 	     (t (impc:ir:get-type-str (impc:ir:pointer-- (car hint?))))) ;(impc:ir:convert-from-pretty-types (car hint?)))))	     	     
 	     ;(t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (caddr ast)))))
-	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t ", " (cadr idx) " " (car idx) "\n") os)
+	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t ", " (cadr idx) " " (car idx) ", align 16\n") os)
 	(impc:ir:strip-space os)))))
 
 (define impc:ir:compiler:stack-alloc-without-size
@@ -2474,7 +2572,7 @@
     (let* ((os (make-string 0)))
       (let* ;((t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadr ast)))))
 	    ((t (impc:ir:get-type-str (impc:ir:pointer-- (car hint?)))))
-	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t "\n") os)
+	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t ", align 16\n") os)
 	(impc:ir:strip-space os)))))
 
 
@@ -2705,47 +2803,132 @@
        (impc:ir:strip-space os))))
 
 
+;; (define impc:ir:compiler:cmp
+;;    (let ((fcmps '("ugt" "ult" "une" "ueq"))
+;;          (icmps '("sgt" "slt" "ne" "eq")))
+;;       (lambda (v ast types . hint?)
+;;          (let* ((type-hint (let ((value (assoc (cl:find-if symbol? (cdr ast)) types))) 
+;;                               (if value 
+;;                                   (cdr value) 
+;;                                   (if (null? hint?)
+;;                                       '()
+;;                                       (car hint?)))))
+;; 		(n1 (if (number? (cadr ast)) (caddr ast) (cadr ast)))
+;; 		(n2 (if (number? (cadr ast)) (cadr ast) (caddr ast)))
+;;                 (a (if (null? type-hint)
+;;                        (impc:ir:compiler n1 types)
+;;                        (impc:ir:compiler n1 types type-hint)))
+;;                 (aval (impc:ir:gname))                
+;;                 (b (if (null? type-hint)
+;;                        (impc:ir:compiler n2 types)
+;;                        (impc:ir:compiler n2 types type-hint)))                       
+;;                 (bval (impc:ir:gname))
+;;                                 (os (make-string 0))
+;;                 (type (if (null? type-hint) 
+;;                           (cadr aval)
+;;                           (impc:ir:get-type-str type-hint))))
+;;             (emit a os)
+;;             (emit b os)
+;;             ;; do llvm float constant check
+;;             (if (and (impc:ir:number? (impc:ir:get-type-from-str type))
+;; 		     (= *impc:ir:float* (impc:ir:get-type-from-str type)))
+;;                 (begin (if (number? n1) (set-car! aval (llvm:convert-float (car aval))))
+;;                        (if (number? n2) (set-car! bval (llvm:convert-float (car bval))))))
+
+;;             (if (or (impc:ir:fixed-point? type)
+;; 		    (impc:ir:pointer? type))
+;;                 (emit (string-append (impc:ir:gname "cmp" "i1") " = icmp " (list-ref icmps v) 
+;;                                         " " type " " (car aval) 
+;;                                         ", " (car bval) "\n") os)
+;;                 (emit (string-append (impc:ir:gname "cmp" "i1") " = fcmp " (list-ref fcmps v)
+;;                                         " " type " " (car aval) 
+;;                                         ", " (car bval) "\n") os))
+;;             (impc:ir:strip-space os)))))
+
 
 (define impc:ir:compiler:cmp
    (let ((fcmps '("ugt" "ult" "une" "ueq"))
+	 ;(fcmps '("ogt" "olt" "one" "oeq"))
          (icmps '("sgt" "slt" "ne" "eq")))
       (lambda (v ast types . hint?)
+	 ;(println 'types: types)
          (let* ((type-hint (let ((value (assoc (cl:find-if symbol? (cdr ast)) types))) 
                               (if value 
                                   (cdr value) 
                                   (if (null? hint?)
                                       '()
                                       (car hint?)))))
-		(n1 (if (number? (cadr ast)) (caddr ast) (cadr ast)))
-		(n2 (if (number? (cadr ast)) (cadr ast) (caddr ast)))
-                (a (if (null? type-hint)
-                       (impc:ir:compiler n1 types)
-                       (impc:ir:compiler n1 types type-hint)))
+                (a (impc:ir:compiler (cadr ast) types))
                 (aval (impc:ir:gname))                
-                (b (if (null? type-hint)
-                       (impc:ir:compiler n2 types)
-                       (impc:ir:compiler n2 types type-hint)))                       
+                (b (impc:ir:compiler (caddr ast) types))
                 (bval (impc:ir:gname))
-                                (os (make-string 0))
-                (type (if (null? type-hint) 
-                          (cadr aval)
-                          (impc:ir:get-type-str type-hint))))
+		(os (make-string 0))
+                (type (cadr aval)))
+            ;; sanity checks
+            (if (not (or (and (impc:ir:number? (cadr aval))
+			      (impc:ir:number? (cadr bval)))
+			 (and (impc:ir:pointer? (cadr aval))
+			      (impc:ir:pointer? (cadr bval)))
+			 (and (impc:ir:vector? (cadr aval))
+			      (impc:ir:vector? (cadr bval)))))
+                (print-error 'Compiler 'Error: 'Bad 'type 'in 'math 'expression: ast  '>>> (cadr aval) 'or (cadr bval)))
+	    
+            (if (and (impc:ir:number? (cadr aval))
+		     (<> (impc:ir:get-type-from-str (cadr aval))
+			 (impc:ir:get-type-from-str (cadr bval))))
+		(if (number? (cadr ast))
+		    (set-car! (cdr aval) (cadr bval))
+		    (if (number? (caddr ast))
+			(set-car! (cdr bval) (cadr aval))
+			(print-error 'Compiler 'Error: 'Type 'mismatch 'in 'math 'expression: ast 'between 'arg1: (string->symbol (cadr aval)) 'and 'arg2: (string->symbol (cadr bval))))))
+	    
             (emit a os)
-            (emit b os)
+            (emit b os)            
+            ;(println (cadr aval) '>> (cadr bval) '>> type '>> hint?)
             ;; do llvm float constant check
-            (if (and (impc:ir:number? (impc:ir:get-type-from-str type))
+            (if (and (number? type)
 		     (= *impc:ir:float* (impc:ir:get-type-from-str type)))
-                (begin (if (number? n1) (set-car! aval (llvm:convert-float (car aval))))
-                       (if (number? n2) (set-car! bval (llvm:convert-float (car bval))))))
+                (begin (if (number? (cadr ast)) (set-car! aval (llvm:convert-float (car aval))))
+                       (if (number? (caddr ast)) (set-car! bval (llvm:convert-float (car bval))))))
 
-            (if (or (impc:ir:fixed-point? type)
-		    (impc:ir:pointer? type))
-                (emit (string-append (impc:ir:gname "cmp" "i1") " = icmp " (list-ref icmps v) 
-                                        " " type " " (car aval) 
-                                        ", " (car bval) "\n") os)
-                (emit (string-append (impc:ir:gname "cmp" "i1") " = fcmp " (list-ref fcmps v)
-                                        " " type " " (car aval) 
-                                        ", " (car bval) "\n") os))
+            ;; do llvm double constant check       
+            (if (and (number? type)
+		     (= *impc:ir:double* (impc:ir:get-type-from-str type)))
+                (begin (if (number? (cadr ast)) (set-car! aval (number->string (* 1.0 (cadr ast)))))
+                       (if (number? (caddr ast)) (set-car! bval (number->string (* 1.0 (caddr ast)))))))
+
+	    ;; dereference any vector pointers
+	    (if (and (impc:ir:pointer? (cadr aval))
+		     (impc:ir:vector? (cadr aval)))
+		(begin (emit (impc:ir:gname "val" (impc:ir:get-type-str (impc:ir:pointer-- (cadr aval)))) " = load " (cadr aval) " " (car aval) "\n" os)
+		       (set! aval (impc:ir:gname))))
+	    (if (and (impc:ir:pointer? (cadr bval))
+		     (impc:ir:vector? (cadr bval)))
+		(begin (emit (impc:ir:gname "val" (impc:ir:get-type-str (impc:ir:pointer-- (cadr bval)))) " = load " (cadr bval) " " (car bval) "\n" os)
+		       (set! bval (impc:ir:gname))))
+	    (if (and (impc:ir:vector? (cadr bval))
+		     (impc:ir:pointer? type))
+		(set! type (impc:ir:get-type-str (impc:ir:pointer-- type))))
+
+	    (let* ((typet (impc:ir:get-type-from-str (cadr aval)))
+		   (typetest (if (impc:ir:vector? typet) ;(impc:ir:number? typet)
+				 (caddr typet)
+				 typet)))
+	      (if (impc:ir:vector? typet)
+		  (set! typet (list (car typet) (cadr typet) *impc:ir:i1*))
+		  (set! typet *impc:ir:i1*))
+	      ;(println 'typet: typet 'v: v (list-ref icmps v) (list-ref fcmps v))
+	      ;(println 'a: aval 'b: bval)
+	      ;; need this to transpose float values            
+	      (if (or (impc:ir:fixed-point? typetest)
+		      (impc:ir:pointer? typetest))
+		  (emit (string-append (impc:ir:gname "cmp" (impc:ir:get-type-str typet)) " = icmp " (list-ref icmps v) 
+				       " " type " " (car aval) 
+				       ", " (car bval) "\n") os)
+		  (emit (string-append (impc:ir:gname "cmp" (impc:ir:get-type-str typet)) " = fcmp " (list-ref fcmps v)
+				       " " type " " (car aval) 
+				       ", " (car bval) "\n") os)))
+	    ;(println 'os: os)
             (impc:ir:strip-space os)))))
 
 
@@ -2801,6 +2984,7 @@
    (let ((fcmps '("fadd" "fsub" "fmul" "fdiv" "frem"))
          (icmps '("add" "sub" "mul" "sdiv" "srem")))
       (lambda (v ast types . hint?)
+         ;(println 'types: types)	
          ;(println 'math: 'ast: ast 'hint: hint?)
          (let* ((type-hint (let ((value (assoc (cl:find-if symbol? (cdr ast)) types))) 
                               (if value 
@@ -2823,40 +3007,62 @@
                           (impc:ir:get-type-str type-hint))))
 
             ;; sanity checks
-            (if (not (and (impc:ir:number? (cadr aval))
-                          (impc:ir:number? (cadr bval))))
+            (if (not (or (and (impc:ir:number? (cadr aval))
+			      (impc:ir:number? (cadr bval)))
+			 (and (impc:ir:vector? (cadr aval))
+			      (impc:ir:vector? (cadr bval)))))
                 (print-error 'Compiler 'Error: 'Bad 'type 'in 'math 'expression: ast  '>>> (cadr aval) 'or (cadr bval)))
-            (if (<> (impc:ir:get-type-from-str (cadr aval))
-		    (impc:ir:get-type-from-str (cadr bval)))
+	    
+            (if (and (impc:ir:number? (cadr aval))
+		     (<> (impc:ir:get-type-from-str (cadr aval))
+			 (impc:ir:get-type-from-str (cadr bval))))
 		(if (number? (cadr ast))
 		    (set-car! (cdr aval) (cadr bval))
 		    (if (number? (caddr ast))
 			(set-car! (cdr bval) (cadr aval))
 			(print-error 'Compiler 'Error: 'Type 'mismatch 'in 'math 'expression: ast 'between 'arg1: (string->symbol (cadr aval)) 'and 'arg2: (string->symbol (cadr bval))))))
-
-
+	    
 	    (set! type (if (null? type-hint) (cadr aval) (impc:ir:get-type-str type-hint)))
             (emit a os)
             (emit b os)            
             ;(print (car aval) '>> (car bval) '>> type)
             ;; do llvm float constant check
-            (if (= *impc:ir:float* (impc:ir:get-type-from-str type))
+            (if (and (number? type)
+		     (= *impc:ir:float* (impc:ir:get-type-from-str type)))
                 (begin (if (number? (cadr ast)) (set-car! aval (llvm:convert-float (car aval))))
                        (if (number? (caddr ast)) (set-car! bval (llvm:convert-float (car bval))))))     
             ;; do llvm double constant check       
-            (if (= *impc:ir:double* (impc:ir:get-type-from-str type))
+            (if (and (number? type)
+		     (= *impc:ir:double* (impc:ir:get-type-from-str type)))
                 (begin (if (number? (cadr ast)) (set-car! aval (number->string (* 1.0 (cadr ast)))))
                        (if (number? (caddr ast)) (set-car! bval (number->string (* 1.0 (caddr ast)))))))
-            
-            ;; need this to transpose float values            
-            (if (impc:ir:fixed-point? (impc:ir:get-type-from-str type))
-                (emit (string-append (impc:ir:gname "val" type) " = " (list-ref icmps v) 
-                                        " " type " " (car aval) 
-                                        ", " (car bval) "\n") os)
-                (emit (string-append (impc:ir:gname "val" type) " = " (list-ref fcmps v)
-                                        " " type " " (car aval) 
-                                        ", " (car bval) "\n") os))
+	    ;; dereference any vector pointers
+	    (if (and (impc:ir:pointer? (cadr aval))
+		     (impc:ir:vector? (cadr aval)))
+		(begin (emit (impc:ir:gname "val" (impc:ir:get-type-str (impc:ir:pointer-- (cadr aval)))) " = load " (cadr aval) " " (car aval) "\n" os)
+		       (set! aval (impc:ir:gname))))
+	    (if (and (impc:ir:pointer? (cadr bval))
+		     (impc:ir:vector? (cadr bval)))
+		(begin (emit (impc:ir:gname "val" (impc:ir:get-type-str (impc:ir:pointer-- (cadr bval)))) " = load " (cadr bval) " " (car bval) "\n" os)
+		       (set! bval (impc:ir:gname))))
+	    (if (and (impc:ir:vector? (cadr bval))
+		     (impc:ir:pointer? type))
+		(set! type (impc:ir:get-type-str (impc:ir:pointer-- type))))
+	    
+	    (let* ((typet (impc:ir:get-type-from-str type))
+		   (typetest (if (impc:ir:number? typet) typet
+				 (caddr typet))))
+	      ;; (println 'mathcheck: typetest)
+	      ;; need this to transpose float values            
+	      (if (impc:ir:fixed-point? typetest)
+		  (emit (string-append (impc:ir:gname "val" type) " = " (list-ref icmps v) 
+				       " " type " " (car aval) 
+				       ", " (car bval) "\n") os)
+		  (emit (string-append (impc:ir:gname "val" type) " = " (list-ref fcmps v)
+				       " " type " " (car aval) 
+				       ", " (car bval) "\n") os)))
             (impc:ir:strip-space os)))))
+
 
 (define impc:ir:compiler:bitwise
   (lambda (v ast types . hint?)
@@ -3280,6 +3486,10 @@
                     (impc:ir:compiler:array-ref-ptr ast types))
                    ((equal? (car ast) 'array-set!)
                     (impc:ir:compiler:array-set ast types))
+                   ((equal? (car ast) 'vector-set!)
+                    (impc:ir:compiler:vector-set ast types))
+                   ((equal? (car ast) 'vector-ref)
+                    (impc:ir:compiler:vector-ref ast types))
                    ((equal? (car ast) 'pointer-ref)
                     (impc:ir:compiler:pointer-ref ast types))
                    ((equal? (car ast) 'pointer-ref-ptr)
@@ -3320,12 +3530,12 @@
                     (if (not (null? hint?))                        
                         (impc:ir:compiler:cmp (cl:position (car ast) '(> < <> =)) ast types (car hint?))
                         (impc:ir:compiler:cmp (cl:position (car ast) '(> < <> =)) ast types)))
-                   ((member (car ast) '(+ - * /))
+                   ((member (car ast) '(+ - * / %))
                     (if (<> (length ast) 3)
                         (print-error 'Compiler 'Error: ast 'bad 'arity))
                     (if (not (null? hint?))                    
-                        (impc:ir:compiler:math (cl:position (car ast) '(+ - * /)) ast types (car hint?))
-                        (impc:ir:compiler:math (cl:position (car ast) '(+ - * /)) ast types)))
+                        (impc:ir:compiler:math (cl:position (car ast) '(+ - * / %)) ast types (car hint?))
+                        (impc:ir:compiler:math (cl:position (car ast) '(+ - * / %)) ast types)))
 		   ((member (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
 		    (if (<> (length ast) 3)
 			(print-error 'Compiler 'Error: ast 'bad 'arity))

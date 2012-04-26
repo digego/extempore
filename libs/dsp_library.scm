@@ -985,13 +985,13 @@
 ;; ;; this reads 5000 frames starting 1000 frames into the file
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000) 
 (definec set-sample-data_
-  (lambda (inst:[double,double,double,double*]* fname index offset length)    
+  (lambda (inst:[double,double,double,double*]* fname index offset lgth)    
     (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
 	  (audiofile (sf_open fname 16 info))
 	  (channels (i32toi64 (tref info 2)))		     
-	  (num (if (= 0 length)
+	  (num (if (= 0 lgth)
 		   (* (- (tref info 0) offset) channels)
-		   (* length channels))))
+		   (* lgth channels))))
       (if (<> null audiofile)
 	  (let ((adat_ (malloc (* num 8)))
 		(adat (bitcast adat_ double*))
@@ -1015,12 +1015,12 @@
 
 
 ;; passing a length of 0 will read the whole file
-(define-macro (set-sampler-index inst fname index offset length)
+(define-macro (set-sampler-index inst fname index offset lgth)
   `(set-sample-data_ (llvm:get-native-closure ,(symbol->string inst))
 		     ,fname
 		     (real->integer ,index)
 		     (real->integer ,offset)
-		     (real->integer ,length)))
+		     (real->integer ,lgth)))
 
 
 ;; helper functions for setting an individual samples offset
@@ -1072,9 +1072,9 @@
 		       phase))
 	      (posi (dtoi64 (floor pos)))
 	      (posx (+ (* posi 2) (dtoi64 chan)))
-	      (length (- (pref samples-length index) 10))	      
+	      (lgth (- (pref samples-length index) 10))	      
 	      (dat (pref samples index)))	  
-	  (* amp (if (> posi length) 0.0 (pref dat posx))))))))
+	  (* amp (if (> posi lgth) 0.0 (pref dat posx))))))))
 
 
 
@@ -1118,14 +1118,14 @@
 		       phase))
 	      (posi (dtoi64 (floor pos)))
 	      (posx (+ (* posi channels) (if (< (dtoi64 chan) channels) (dtoi64 chan) 0)))
-	      (length (- (pref samples-length index) 10))	      
+	      (lgth (- (pref samples-length index) 10))	      
 	      (dat (pref samples index)))
 	  (if (< (fabs (- rate 1.0)) 0.01)
-	      (if (> posi length) 0.0 (* amp (pref dat posx)))
-	      (let ((y1 (if (or (> posi length) (< posi 1)) 0.0 (pref dat (- posx channels))))
-		    (x0 (if (> posi length) 0.0 (pref dat posx)))
-		    (x1 (if (> (+ posi 1) length) 0.0 (pref dat (+ posx channels))))
-		    (x2 (if (> (+ posi 2) length) 0.0 (pref dat (+ posx (* 2 channels))))))
+	      (if (> posi lgth) 0.0 (* amp (pref dat posx)))
+	      (let ((y1 (if (or (> posi lgth) (< posi 1)) 0.0 (pref dat (- posx channels))))
+		    (x0 (if (> posi lgth) 0.0 (pref dat posx)))
+		    (x1 (if (> (+ posi 1) lgth) 0.0 (pref dat (+ posx channels))))
+		    (x2 (if (> (+ posi 2) lgth) 0.0 (pref dat (+ posx (* 2 channels))))))
 		(* amp (hermite-interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
 

@@ -521,6 +521,14 @@
 		 (cdr ast)
 		 (make-list-with-proc (length ast) (lambda (i) i))))))
 
+(define impc:ti:vfill!
+  (lambda (ast)
+    (append '(begin)
+	    (map (lambda (arg idx)
+		   (list 'vset! (car ast) idx arg))
+		 (cdr ast)
+		 (make-list-with-proc (length ast) (lambda (i) i))))))
+
 (define *unique-polynum* 0)
 
 (define impc:ti:first-transform
@@ -553,6 +561,8 @@
 			(impc:ti:first-transform (impc:ti:pfill! (cdr ast)) inbody?))
 		       ((eq? (car ast) 'tfill!)
 			(impc:ti:first-transform (impc:ti:tfill! (cdr ast)) inbody?))
+		       ((eq? (car ast) 'vfill!)
+			(impc:ti:first-transform (impc:ti:vfill! (cdr ast)) inbody?))
                        ((eq? (car ast) 'or) 
                         (impc:ti:first-transform (impc:ti:or (cdr ast)) inbody?))
                        ((eq? (car ast) 'free) 
@@ -568,7 +578,7 @@
                         (impc:ti:first-transform (impc:ti:not (cadr ast)) inbody?))
                        ;; ((eq? (car ast) 'list)
                        ;;  (impc:ti:first-transform (impc:ti:binary-arity (cons 'mcons (append (cdr ast) '(nilnil))) inbody?) inbody?))
-		       ((and (member (car ast) '(* - / + bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
+		       ((and (member (car ast) '(* - / + % bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
                              (<> (length ast) 3))
                         (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
 		       ((eq? (car ast) 'bitwise-not)
@@ -641,7 +651,9 @@
 			    ((eq? ast 'now) 'llvm_now)
 			    ((eq? ast 'pset!) 'pointer-set!)
 			    ((eq? ast 'pref) 'pointer-ref)
-			    ((eq? ast 'pref-ptr) 'pointer-ref-ptr)			    
+			    ((eq? ast 'pref-ptr) 'pointer-ref-ptr)
+			    ((eq? ast 'vset!) 'vector-set!)
+			    ((eq? ast 'vref) 'vector-ref)			    
 			    ((eq? ast 'aset!) 'array-set!)
 			    ((eq? ast 'aref) 'array-ref)
 			    ((eq? ast 'aref-ptr) 'array-ref-ptr)
@@ -1086,12 +1098,13 @@
 ;; 	  (else (print-error 'Compiler 'Error: 'bad 'type t 'in 'unification)))))
 
 
+
 ;; this goes through IN ORDER and returns either:
 ;; NULL if the lists don't match
 ;; or 
 (define impc:ti:unify-lists
   (lambda args
-    ;(println 'unify: args)
+    ;(println 'unify: args 'norm: (impc:ti:type-normalize args))
     (if (null? args)
 	args
 	(let ((lgths (map (lambda (k) (length k)) args)))
@@ -1100,12 +1113,14 @@
 	      (let ((result
 		     (apply map (lambda args
 				  (let ((l1 (cl:remove '() args)))
-				    ;(println 'l1: l1 'car: (car l1))
 				    (if (null? l1) l1
 					(let ((l2 (cl:remove-duplicates l1)))
-					  ;(println 'l2: l2)
-					  (if (null? l2) l2
-					      (car l2))))))
+					  (if (null? l2)
+					      l2	     
+					      ;;(car l2))))))
+					      (if (= 1 (length l2))
+					      	  (car l2)
+					      	  '()))))))
 			    args)))
 		;(println 'result: result)
 		(if (member '() result)
@@ -1146,7 +1161,6 @@
 		 (impc:ti:type-normalize (cdr t)))))))
 
 
-
 (define impc:ti:type-unify
   (lambda (t vars)
     ;(println 't: t)
@@ -1168,9 +1182,10 @@
 	   ;; 	       (<> (car t) *impc:ir:void*) ;; if not void
 	   ;; 	       (> (modulo (car t) *impc:ir:pointer*) 10)) ;; if proper complex type (tuple,array,closure)
 	   ;; 	  (map (lambda (v) (impc:ti:type-unify v vars)) t))
-		 (else (let* ((trick (map (lambda (v)
-					    (impc:ti:type-unify v vars))
-					  t))
+		 (else (let* ((trick (impc:ti:type-normalize 
+				      (map (lambda (v)
+					     (impc:ti:type-unify v vars))
+					   t)))
 			      (typelgth (if (list? (car trick)) (length (car trick)) 1))
 			      (atoms (cl:remove-duplicates (cl:remove #f (map (lambda (v) (if (and (atom? v) (not (null? v))) v #f)) trick))))
 			      (lists (cl:remove #f (map (lambda (v) (if (list? v) v #f)) trick))))
@@ -1179,7 +1194,7 @@
 			 ;; (println 'trick: trick)
 			 ;; (println 'atoms: atoms)
 			 ;; (println 'lists: lists)
-			 ;; (set! lists (apply impc:ti:intersection* lists))
+			 ;; (set! lists (apply impc:ti:intersection* lists))			 
 			 (set! lists (apply impc:ti:unify-lists lists))
 			 ;; (println 'uniflists: lists)
 			 ;; typelgth helps us to decide if the returned type has
@@ -1349,7 +1364,7 @@
 (define impc:ti:update-var
    (lambda (sym vars kts t)
      ;(println 'updatevar: sym 't: t)
-     ;(if (equal? sym 'length) (begin (println '-> 'updating 'length t))) ; (error)))
+     ;(if (equal? sym 'f) (begin (println '-> 'updating sym t))) ; (error)))
      ;; don't ever add oursevles (i.e. sym) as a type arg or NULL
      (if (or (null? t)
 	     (and (list? t)
@@ -1484,16 +1499,28 @@
 
 (define impc:ti:math-check
    (lambda (ast vars kts request?)
-      (let* ((a (impc:ti:type-check (cadr ast) vars kts request?))
-             (b (impc:ti:type-check (caddr ast) vars kts request?))
+      (let* ((a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
+             (b (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars))
 	     (t (impc:ti:type-unify (list a b) vars)))
-         ;(println 'math: a b 't: t 'vars: vars)
+         ;(println 'math: a b 't: t 'request? request?) ;'vars: vars)
          (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
          (if (not (null? t))
              (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
                     (if (symbol? (caddr ast)) (impc:ti:force-var (caddr ast) vars kts t))
-                    t)
-             (cond ((not (cl:find-if symbol? (cdr ast))) t) ;; return t
+		    (if (and (not (null? t)) ;; this here because math functions always return non-pointer vectors
+			     (impc:ir:vector? t) ;; we want to do this because these vectors are always stack allocated
+			     (impc:ir:pointer? t)) ;; also these vectors are immutable (i.e. cannot use vector-set!)
+			(impc:ir:pointer-- t)
+			t))
+             (cond ((impc:ir:vector? a)
+		    ;(println 'veca: a)
+		    (if (symbol? (cadr ast)) (impc:ti:update-var (cadr ast) vars kts a))
+		    (if (impc:ir:pointer? a) (impc:ir:pointer-- a) a))
+		   ((impc:ir:vector? b)
+		    ;(println 'vecb: b)
+		    (if (symbol? (caddr ast)) (impc:ti:update-var (cadr ast) vars kts b))
+		    (if (impc:ir:pointer? b) (impc:ir:pointer-- b) b))
+	           ((not (cl:find-if symbol? (cdr ast))) t) ;; return t
                    ((and (symbol? (cadr ast)) 
                          (symbol? (caddr ast))                         
                          (not (null? (cdr (impc:ti:get-var (cadr ast) vars))))
@@ -1510,20 +1537,33 @@
                    (else t))))))
 				   
 
-
 (define impc:ti:compare-check
    (lambda (ast vars kts request?)
       (let* ((n1 (if (number? (cadr ast)) (caddr ast) (cadr ast)))
 	     (n2 (if (number? (cadr ast)) (cadr ast) (caddr ast)))
-	     (a (impc:ti:type-check n1 vars kts request?))
-             (b (impc:ti:type-check n2 vars kts request?))
+	     (a (impc:ti:type-unify (impc:ti:type-check n1 vars kts request?) vars))
+             (b (impc:ti:type-unify (impc:ti:type-check n2 vars kts request?) vars))
 	     (t (impc:ti:type-unify (list a b) vars)))
+	 ;(println 'a a 'b b 't t)
          (if *impc:ti:print-sub-checks* (println 'compare:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
          (if (not (null? t))
              (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
                     (if (symbol? (caddr ast)) (impc:ti:force-var (caddr ast) vars kts t))
-                    (list *impc:ir:i1*))
-             (cond ((not (cl:find-if symbol? (cdr ast))) (list *impc:ir:i1*)) ;; return t
+		    (if (and (not (null? t))
+			     (impc:ir:vector? t))
+			(if (impc:ir:pointer? t)
+			    (list (- (car t) *impc:ir:pointer*) (cadr t) *impc:ir:i1*)
+			    (list (car t) (cadr t) *impc:ir:i1*))
+			(list *impc:ir:i1*)))
+             (cond ((impc:ir:vector? a)
+		    (if (symbol? (cadr ast)) (impc:ti:update-var (cadr ast) vars kts a))
+		    (let ((retvec (if (impc:ir:pointer? a) (impc:ir:pointer-- a) a)))
+		      (list (car retvec) (cadr retvec) *impc:ir:i1*)))
+		   ((impc:ir:vector? b)
+		    (if (symbol? (caddr ast)) (impc:ti:update-var (cadr ast) vars kts b))
+		    (let ((retvec (if (impc:ir:pointer? b) (impc:ir:pointer-- b) b)))
+		      (list (car retvec) (cadr retvec) *impc:ir:i1*)))
+		   ((not (cl:find-if symbol? (cdr ast))) (list *impc:ir:i1*)) ;; return t
                    ((and (symbol? n1) 
                          (symbol? n2)                         
                          (not (null? (cdr (impc:ti:get-var n1 vars))))
@@ -2041,6 +2081,40 @@
 		 (print-error 'Compiler 'Error: 'invalid 'array-ref 'type (impc:ir:get-type-str (car a)) 'in ast)
 		 (list (caddr (car a))))))))
 
+(define impc:ti:vector-set-check
+   (lambda (ast vars kts request?)
+     ;(println 'ast: ast 'vars: vars)
+     (if (<> (length ast) 4)
+	 (print-error 'Compiler 'Error: 'error 'parsing (atom->string (car ast)) 'incorrect 'number 'of 'arguments))
+     (let* ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
+	    ;; b should be i32
+	    (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*)))
+	    ;; c should be of type a*
+	    (c (impc:ti:type-check (cadddr ast) vars kts (if (null? a) #f (list (caddr (car a)))))))
+       (if (or (and (not (null? a))
+		    (not (impc:ir:vector? (car a))))
+	       (and (not (null? a))
+		    (> (impc:ir:get-ptr-depth (car a)) 1)))
+	   (print-error 'Compiler 'Error: 'invalid 'vset! 'type (impc:ir:get-type-str (car a))))
+       ;; vector set returns a whole new vector!  check llvm ir doc
+       a)))
+
+(define impc:ti:vector-ref-check
+   (lambda (ast vars kts request?)
+      ;(println 'request? request?)
+      ;(println 'vector-ref-check: 'ast: ast 'vars: vars 'kts: kts)
+      (let ((a (impc:ti:type-check (cadr ast) vars kts '()))
+            ;; b should be i32
+            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
+	(if (impc:ir:type? a) (set! a (list a)))
+	(if (null? a) 
+             a
+	     (if (or (not (impc:ir:vector? (car a)))
+		     (> (impc:ir:get-ptr-depth (car a)) 1))
+		 (print-error 'Compiler 'Error: 'invalid 'vector-ref 'type (impc:ir:get-type-str (car a)) 'in ast)
+		 (list (caddr (car a))))))))
+
+
 
 (define impc:ti:pointer-set-check
    (lambda (ast vars kts request?)
@@ -2078,6 +2152,7 @@
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
 	(if (impc:ir:type? a) (set! a (list a)))
+	;(println 'a: a 'b: b)
 	(if (null? a) 
              a
              (if (impc:ir:array? (car a))
@@ -2621,14 +2696,16 @@
             ((atom? ast) (print-error 'Compiler 'Error: 'internal 'error 'unhandled 'atom: ast))
             ((and (list? ast) (member (car ast) '(let let* letrec))) (impc:ti:let-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(lambda))) (impc:ti:lambda-check ast vars kts request?))
-	    ((and (list? ast) (member (car ast) '(* / + - modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right bitwise-not))) (impc:ti:math-check ast vars kts request?))
+	    ((and (list? ast) (member (car ast) '(* / + - % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right bitwise-not))) (impc:ti:math-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))            
             ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(memzone))) (impc:ti:memzone-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(callback))) (impc:ti:callback-check ast vars kts request?))	    
             ((and (list? ast) (member (car ast) '(llvm_sprintf))) (impc:ti:sprintf-check ast vars kts request?))
-            ;((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))  
+            ;((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(vector-set!))) (impc:ti:vector-set-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(vector-ref))) (impc:ti:vector-ref-check ast vars kts request?))	    
             ((and (list? ast) (member (car ast) '(array-set!))) (impc:ti:array-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref))) (impc:ti:array-ref-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref-ptr))) (impc:ti:array-ref-ptr-check ast vars kts request?))
@@ -3335,11 +3412,13 @@
 ;; particular math coercions of forced types
 (define impc:ti:coercion-run
   (lambda (ast forced-types)
+    ;(println 'ast: ast)
     (if (pair? ast)
 	(cond ((member (car ast) '(< > * / = + - <>))
 	       (let ((a (assoc (cadr ast) forced-types))
 		     (b (assoc (caddr ast) forced-types)))
 		 (if (and (and a b)
+			  (not (impc:ir:vector? (cdr a)))
 			  (<> (cdr a) (cdr b)))
 		     (let ((ret (string->symbol (impc:ti:numeric-cast-operator (cdr a) (cdr b)))))
 		       (if (> (cdr a) (cdr b))

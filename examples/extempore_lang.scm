@@ -1132,6 +1132,7 @@
       (printf "int:%d double:%f\n" (car (cdr l1)) (car (cdr (cdr l2))))
       (car (cdr l1))
       (car (cdr l2))
+      (% 2.0 3.0)
       (printf "lengths: %lld:%lld\n" (length l1) (length l2))
       void)))
 
@@ -1154,7 +1155,7 @@
       (let ((l2 (map ff l1)))
 	l2))))
 
-A simple specialisation might then be:
+;; A simple specialisation might then be:
 
 (bind-func mymap
   (lambda (a:i32)
@@ -1251,10 +1252,33 @@ A simple specialisation might then be:
 ;; 	(head l2)))))
 
 
-
 ;; ALTHOUGH THESE ARE GENERAL PROBLEMS WITH
 ;; LAMBDA ... NOT POLYMORPHISM OR GENERICS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+;;;;;;;;;;;;;;;;;;
+;; vector types
+
+
+(bind-func vtest
+  (lambda ()
+    (let ((v1:|4^float|* (salloc)) ;; zalloc is crashing this!
+	  (v2:|4^float|* (salloc))
+	  (v3:|4^float|* (salloc)))
+      (vfill! v1 4.0 3.0 2.0 1.0)
+      (vfill! v2 1.0 2.0 3.0 4.0)
+      (vfill! v3 5.0 5.0 5.0 5.0)       
+      (let ((v4 (* v1 v2))
+	    (v5 (> v3 v4))) ;; unforunately vector conditionals don't work!
+	(printf "mul:%f:%f:%f:%f\n" (ftod (vref v4 0)) (ftod (vref v4 1)) (ftod (vref v4 2)) (ftod (vref v4 3)))	
+	(printf "cmp:%d:%d:%d:%d\n" (i1toi32 (vref v5 0)) (i1toi32 (vref v5 1)) (i1toi32 (vref v5 2)) (i1toi32 (vref v5 3)))
+	void))))
+
+(vtest)
+
+
 
 
 ;; Memory Usage In Extempore Lang
