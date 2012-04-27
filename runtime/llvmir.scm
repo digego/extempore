@@ -1996,13 +1996,14 @@
              (numstr (impc:ir:compiler (if start-value?
 					   (caddar ast)
 					   (cadar ast))
-				       types)) ; (cdr (assoc (caar ast) types))))
+				       types
+				       (cdr (assoc (caar ast) types))))
              (num (impc:ir:gname)) ;(ir:eval (cadar ast) os stack sym-table))
              (bodystr (impc:ir:compiler (cdr ast) types)))
          (emit "; setup loop\n" os)
          ;(print num 'numstr numstr)
          (emit numstr os)
-	 (if start-value? (emit startstr os))
+	 (if start-value? (emit startstr os))	 
 		  
 	 (if (not (equal? (cdr (assoc (caar ast) types))
 			  (impc:ir:get-type-from-str (cadr num))))
