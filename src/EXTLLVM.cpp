@@ -135,6 +135,9 @@ std::map<long,llvm_zone_stack*> LLVM_ZONE_STACKS;
 std::map<long,uint64_t> LLVM_ZONE_STACKSIZES;
 #endif
 
+int LLVM_ZONE_ALIGN = 16;
+int LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN-1;
+
 
 // this is going to cause concurrency problems at some stage.
 // you really need to FIX IT!
@@ -307,6 +310,37 @@ void llvm_zone_destroy(llvm_zone_t* zone)
     return;
 }
 
+// void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
+// {
+//     alloc_mutex.lock();
+// #if DEBUG_ZONE_ALLOC
+//     printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
+// #endif
+//     if(zone->offset+size >= zone->size)
+//     {
+// 	// if LEAKY ZONE is TRUE then just print a warning and just leak the memory
+// #if LEAKY_ZONES
+// 	printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
+//         printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
+//         fflush(NULL);
+// 	return malloc((size_t)size);
+// #else
+// 	printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
+//         fflush(NULL);
+// 	exit(1);
+// #endif
+//     }
+//     void* newptr = (void*)(((char*)zone->memory)+zone->offset);
+//     memset(newptr,0,size); // clear memory
+//     zone->offset += size; 
+//     // add ptr size to alloc map
+//     LLVM_ZONE_ALLOC_MAP[newptr] = size;
+//     alloc_mutex.unlock();
+//     //extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_set_size(newptr, size);
+//     return newptr;
+// }
+
+
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
     alloc_mutex.lock();
@@ -327,6 +361,8 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 	exit(1);
 #endif
     }
+    uint64_t sa = size+LLVM_ZONE_ALIGNPAD;
+    size = sa - sa%LLVM_ZONE_ALIGN; // adjust size to an alignment boundary
     void* newptr = (void*)(((char*)zone->memory)+zone->offset);
     memset(newptr,0,size); // clear memory
     zone->offset += size; 

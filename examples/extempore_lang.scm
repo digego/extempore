@@ -1264,9 +1264,9 @@
 
 (bind-func vtest
   (lambda ()
-    (let ((v1:|4^float|* (salloc)) ;; zalloc is crashing this!
-	  (v2:|4^float|* (salloc))
-	  (v3:|4^float|* (salloc)))
+    (let ((v1:|4^float|* (alloc)) 
+	  (v2:|4^float|* (alloc))
+	  (v3:|4^float|* (alloc)))
       (vfill! v1 4.0 3.0 2.0 1.0)
       (vfill! v2 1.0 2.0 3.0 4.0)
       (vfill! v3 5.0 5.0 5.0 5.0)       
@@ -1278,6 +1278,26 @@
 
 (vtest)
 
+(bind-func vector_test_a
+  (lambda ()
+    (let ((v1:|4^float|* (alloc))
+	  (v2:|4^float|* (alloc)))
+      (vfill! v1 1.0 2.0 4.0 8.0)
+      (vfill! v2 2.0 2.5 2.25 2.125)
+      (* v1 v2))))
+
+(bind-func vector_test
+  (lambda ()
+    (let ((a (vector_test_a)))
+      (printf "%f:%f:%f:%f\n"
+	      (ftod (vref a 0))
+	      (ftod (vref a 1))
+	      (ftod (vref a 2))
+	      (ftod (vref a 3)))
+      void)))
+	   
+
+(vector_test)
 
 
 
