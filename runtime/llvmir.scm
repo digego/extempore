@@ -326,10 +326,26 @@
 					     "|(\\|[0-9](?<array>[^\\|]|\\|[0-9]\\g<array>*\\|\\**)*\\|\\**)"
 					     "|(?:([%#!0-9a-zA-Z_-]\\**)+)"))
 
+(define impc:ir:regex-tc-or-a (string-append "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)"
+					     "|(\\|[0-9](?<array>[^\\|]|\\|[0-9]\\g<array>*\\|\\**)*\\|\\**)"
+					     "|(/[0-9](?<vector>[^/]|/[0-9]\\g<vector>*/\\**)*/\\**)"
+					     "|(?:([%#!0-9a-zA-Z_-]\\**)+)"))
+
 
 (define impc:ir:get-type-from-pretty-array
   (lambda (string-type . args)
      (let* ((s1 (regex:replace string-type "\\|(.+)\\|?.*" "$1"))
+	    (t1 (cl:remove-if (lambda (x) (string=? x "")) 
+			      (regex:match-all s1 impc:ir:regex-tc-or-a)))
+	    (num? (if (regex:match? (car t1) "[a-zA-Z]") ;; (car t1) should be numbers only!
+		      (print-error 'Compiler 'Error: 'syntax 'error 'first 'element 'should 'be 'a 'number: string-type)))
+	    (t2 (list (string->number (car t1))
+		      (apply impc:ir:get-type-from-pretty-str (cadr t1) args))))
+       t2)))
+
+(define impc:ir:get-type-from-pretty-vector
+  (lambda (string-type . args)
+     (let* ((s1 (regex:replace string-type "/(.+)/?.*" "$1"))
 	    (t1 (cl:remove-if (lambda (x) (string=? x "")) 
 			      (regex:match-all s1 impc:ir:regex-tc-or-a)))
 	    (num? (if (regex:match? (car t1) "[a-zA-Z]") ;; (car t1) should be numbers only!
@@ -375,8 +391,8 @@
 			 (string-append "|" (number->string (cadr t)) "," (impc:ir:pretty-print-type (caddr t))
 					"|" (apply string-append (make-list-with-proc (impc:ir:get-ptr-depth t) (lambda (k) "*")))))
 			((impc:ir:vector? t) 
-			 (string-append "|" (number->string (cadr t)) "^" (impc:ir:pretty-print-type (caddr t))
-					"|" (apply string-append (make-list-with-proc (impc:ir:get-ptr-depth t) (lambda (k) "*")))))
+			 (string-append "/" (number->string (cadr t)) "," (impc:ir:pretty-print-type (caddr t))
+					"/" (apply string-append (make-list-with-proc (impc:ir:get-ptr-depth t) (lambda (k) "*")))))
 			((impc:ir:closure? t)
 			 (string-append "[" (string-join (map (lambda (k) (impc:ir:pretty-print-type k)) (cdr t)) ",")
 					"]" (apply string-append (make-list-with-proc (- (impc:ir:get-ptr-depth t) 1) (lambda (k) "*")))))))))))
@@ -479,9 +495,8 @@
                 (cons (+ offset *impc:ir:tuple*) (apply impc:ir:get-type-from-pretty-tuple string-type args)))
                ((regex:match? base "\\<?\\{.*\\}\\>?\\**")
                 (cons (+ offset *impc:ir:tuple*) (impc:ir:get-tuple-type-from-str string-type)))
-               ((and (regex:match? base "\\^") ;; the ^ changes an array to a vector |3^double| is a vector
-		     (regex:match? base "\\|.*\\|\\**"))
-                (cons (+ offset *impc:ir:vector*) (apply impc:ir:get-type-from-pretty-array string-type args)))
+               ((regex:match? base "/.*/\\**")
+                (cons (+ offset *impc:ir:vector*) (apply impc:ir:get-type-from-pretty-vector string-type args)))
                ((regex:match? base "\\|.*\\|\\**") ;; |3,double| is an array
                 (cons (+ offset *impc:ir:array*) (apply impc:ir:get-type-from-pretty-array string-type args)))
 	       ((and (char=? (string-ref base 0) #\%)
