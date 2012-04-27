@@ -1264,9 +1264,9 @@
 
 (bind-func vtest
   (lambda ()
-    (let ((v1:|4^float|* (alloc)) 
-	  (v2:|4^float|* (alloc))
-	  (v3:|4^float|* (alloc)))
+    (let ((v1:/4,float/* (alloc)) 
+	  (v2:/4,float/* (alloc))
+	  (v3:/4,float/* (alloc)))
       (vfill! v1 4.0 3.0 2.0 1.0)
       (vfill! v2 1.0 2.0 3.0 4.0)
       (vfill! v3 5.0 5.0 5.0 5.0)       
@@ -1280,8 +1280,8 @@
 
 (bind-func vector_test_a
   (lambda ()
-    (let ((v1:|4^float|* (alloc))
-	  (v2:|4^float|* (alloc)))
+    (let ((v1:/4,float/* (alloc))
+	  (v2:/4,float/* (alloc)))
       (vfill! v1 1.0 2.0 4.0 8.0)
       (vfill! v2 2.0 2.5 2.25 2.125)
       (* v1 v2))))
@@ -1298,6 +1298,52 @@
 	   
 
 (vector_test)
+
+;; vectorised sine func
+(bind-func vsinf
+  (let ((p:/4,float/* (alloc))
+	(b:/4,float/* (alloc))
+	(c:/4,float/* (alloc))
+	(f1:/4,float/* (alloc))
+	(f2:/4,float/* (alloc))
+	(i:i32 0)
+	(p_ 0.225)
+	(b_ (dtof (/ 4.0 PI)))
+	(c_ (dtof (/ -4.0 (* PI PI)))))
+    (dotimes (i 4)
+      (vset! p i p_)
+      (vset! b i b_)
+      (vset! c i c_))
+    (lambda (x:/4,float/)
+      ;; no SIMD for fabs
+      (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
+      (let ((y (+ (* b x) (* c x f1))))
+	;; no SIMD for fabs
+	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+	(+ (* p (- (* y f2) y)) y)))))
+
+(bind-func testsine
+  (lambda ()
+    (let ((a:/4,float/* (alloc)))
+      (vfill! a 0.1 0.2 0.3 0.4)
+      (let ((b (vsinf (pref a 0))))
+	(printf "precision inaccuracy is expected:\n")
+	(printf "%f,%f,%f,%f\n"
+		(ftod (sinf 0.1))
+		(ftod (sinf 0.2))
+		(ftod (sinf 0.3))
+		(ftod (sinf 0.4)))
+	(printf "%f,%f,%f,%f\n"
+		(ftod (vref b 0))
+		(ftod (vref b 1))
+		(ftod (vref b 2))
+		(ftod (vref b 3)))
+	void))))
+
+(testsine)
+
+
+
 
 
 
