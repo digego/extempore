@@ -2767,7 +2767,7 @@
                                               (if (null? (cdr x)) #f
                                                   (if (and (list? (cdr x)) ;; check there are multiple choices
                                                            (not (member (modulo (cadr x) *impc:ir:pointer*) 
-                                                                        (list *impc:ir:tuple* *impc:ir:closure* *impc:ir:array*))) ;; make sure it's a base type (not closure or tuple)
+                                                                        (list *impc:ir:tuple* *impc:ir:closure* *impc:ir:array* *impc:ir:vector*))) ;; make sure it's a base type (not closure or tuple)
                                                            (cl:every impc:ir:type? (cdr x))) ;; check that it's choices are valid (not null)
                                                       x #f)))
                                            union))))
