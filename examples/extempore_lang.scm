@@ -1310,37 +1310,70 @@
 	(p_ 0.225)
 	(b_ (dtof (/ 4.0 PI)))
 	(c_ (dtof (/ -4.0 (* PI PI)))))
-    (dotimes (i 4)
-      (vset! p i p_)
-      (vset! b i b_)
-      (vset! c i c_))
+    (dotimes (i 4) (vset! p i p_) (vset! b i b_) (vset! c i c_))
     (lambda (x:/4,float/)
-      ;; no SIMD for fabs
+      ;; no SIMD for abs yet!
       (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
       (let ((y (+ (* b x) (* c x f1))))
-	;; no SIMD for fabs
+	;; no SIMD for abs yet!
 	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
 	(+ (* p (- (* y f2) y)) y)))))
 
-(bind-func testsine
+(bind-func vcosf
+  (let ((p:/4,float/* (alloc))
+	(b:/4,float/* (alloc))
+	(c:/4,float/* (alloc))
+	(d:/4,float/* (alloc))
+	(f1:/4,float/* (alloc))
+	(f2:/4,float/* (alloc))
+	(i:i32 0)
+	(p_ 0.225)
+	(d_ (dtof (/ PI 2.0)))
+	(b_ (dtof (/ 4.0 PI)))
+	(c_ (dtof (/ -4.0 (* PI PI)))))
+    (dotimes (i 4)
+      (vset! p i p_) (vset! b i b_) (vset! c i c_) (vset! d i d_))
+    (lambda (x:/4,float/)
+      ;; offset x for cos
+      (set! x (+ x d))
+      ;; no SIMD for abs yet!
+      (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
+      (let ((y (+ (* b x) (* c x f1))))
+	;; no SIMD for abs yet!
+	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+	(+ (* p (- (* y f2) y)) y)))))
+
+
+(bind-func testvsinecos
   (lambda ()
     (let ((a:/4,float/* (alloc)))
       (vfill! a 0.1 0.2 0.3 0.4)
-      (let ((b (vsinf (pref a 0))))
+      (let ((b (vsinf (pref a 0)))
+	    (c (vcosf (pref a 0))))	       
 	(printf "precision inaccuracy is expected:\n")
-	(printf "%f,%f,%f,%f\n"
+	(printf " sinf:\t%f,%f,%f,%f\n"
 		(ftod (sinf 0.1))
 		(ftod (sinf 0.2))
 		(ftod (sinf 0.3))
 		(ftod (sinf 0.4)))
-	(printf "%f,%f,%f,%f\n"
+	(printf "vsinf:\t%f,%f,%f,%f\n"
 		(ftod (vref b 0))
 		(ftod (vref b 1))
 		(ftod (vref b 2))
 		(ftod (vref b 3)))
+	(printf " cosf:\t%f,%f,%f,%f\n"
+		(ftod (cosf 0.1))
+		(ftod (cosf 0.2))
+		(ftod (cosf 0.3))
+		(ftod (cosf 0.4)))
+	(printf "vcosf:\t%f,%f,%f,%f\n"
+		(ftod (vref c 0))
+		(ftod (vref c 1))
+		(ftod (vref c 2))
+		(ftod (vref c 3)))
 	void))))
 
-(testsine)
+(testvsinecos)
 
 
 
