@@ -68,7 +68,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, 
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITFILE, 
        OPT_PORT, OPT_TERM, OPT_DEVICE, OPT_IN_DEVICE,
-       OPT_PRT_DEVICES, OPT_REALTIME
+       OPT_PRT_DEVICES, OPT_REALTIME, OPT_HELP
      };
 
 CSimpleOptA::SOption g_rgOptions[] = {
@@ -85,6 +85,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_IN_DEVICE,   "--indevice",      SO_REQ_SEP    },
     { OPT_PRT_DEVICES, "--print-devices", SO_NONE       },
     { OPT_REALTIME,    "--realtime",      SO_NONE       },
+    { OPT_HELP,        "--help",          SO_NONE       },
     SO_END_OF_OPTIONS                       // END
 };
 
@@ -158,8 +159,10 @@ int main(int argc, char** argv)
 	  std::cout << "Realtime priority setting not available on your platform" << std::endl;
 #endif
           break;
-        default:
+        case OPT_HELP:
+	default:
 	  std::cout << "Extempore's command line options: " << std::endl;
+	  std::cout << "            --help: prints this menu" << std::endl;	
 	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	  std::cout << "            --port: port for primary process [7099]" << std::endl;	
 	  std::cout << "            --term: either ansi or cmd" << std::endl;	
@@ -171,25 +174,16 @@ int main(int argc, char** argv)
 	  std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
 	  std::cout << "        --indevice: the index of the audio input device to use" << std::endl;	
 	  std::cout << "   --print-devices: print the available audio devices to console" << std::endl;	
-	  //delete(extemp::AudioDevice::I());
-	  return -1;	  
+	  return -1;
 	}
       } else {
-	std::cout << "Extempore's command line options: " << std::endl;
-	std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
-	std::cout << "            --port: port for primary process [7099]" << std::endl;	
-        std::cout << "            --term: either ansi or cmd" << std::endl;	
-	std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
-	std::cout << "      --samplerate: audio samplerate" << std::endl; 
-	std::cout << "          --frames: attempts to force frames [128]" << std::endl;
-	std::cout << "        --channels: attempts to force num of audio channels" << std::endl;
-	std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
-	std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
-	std::cout << "        --indevice: the index of the audio input device to use" << std::endl;	
-    	std::cout << "   --print-devices: print the available audio devices to console" << std::endl;	
-    	//delete(extemp::AudioDevice::I());
-    	return -1;
-        // handle error (see the error codes - enum ESOError)
+	  char* key = (char*) args.OptionText();
+	  char* val = args.OptionArg();
+	  char a[256];
+	  char b[256];
+	  rsplit("--",key,a,b);
+	  //std::cout << "ADD-ARG: " << b << " " << val << std::endl;
+	  extemp::UNIV::CMDPARAMS[std::string(b)] = std::string(val);
       }
     }
 

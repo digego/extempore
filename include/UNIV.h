@@ -104,6 +104,7 @@ class UNIV {
         static uint32_t EXT_TERM;
         static uint32_t AUDIO_DEVICE;
         static uint32_t AUDIO_IN_DEVICE;
+        static std::map<std::string,std::string> CMDPARAMS;
 #ifdef EXT_BOOST
         static boost::mt19937 RNGGEN;
         static boost::uniform_01<boost::mt19937> RNG;

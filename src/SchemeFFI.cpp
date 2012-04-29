@@ -210,6 +210,7 @@ namespace extemp {
 	    // sys stuff
 	    { "sys:pointer-size",		&SchemeFFI::pointerSize },
 	    { "sys:platform",		&SchemeFFI::platform },
+	    { "sys:cmdarg",		&SchemeFFI::cmdarg },
 	    { "sys:open-dylib",		&SchemeFFI::openDynamicLib },
 	    { "sys:close-dylib",		&SchemeFFI::closeDynamicLib },
 	    { "sys:make-cptr",		&SchemeFFI::makeCptr },
@@ -768,6 +769,13 @@ namespace extemp {
 #else
 	return mk_integer(_sc, 32);
 #endif
+    }
+
+    pointer SchemeFFI::cmdarg(scheme* _sc, pointer args)
+    {
+      char* key = string_value(pair_car(args));
+      std::string val = UNIV::CMDPARAMS[std::string(key)];
+      return mk_string(_sc,val.c_str());
     }
 
     pointer SchemeFFI::platform(scheme* _sc, pointer args)

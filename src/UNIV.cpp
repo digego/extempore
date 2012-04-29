@@ -257,6 +257,7 @@ namespace extemp {
     const char* UNIV::PWD = "";
     uint32_t UNIV::AUDIO_DEVICE = -1;
     uint32_t UNIV::AUDIO_IN_DEVICE = -1;
+    std::map<std::string,std::string> UNIV::CMDPARAMS;
 #ifdef EXT_BOOST
     boost::mt19937 UNIV::RNGGEN;
     boost::uniform_01<boost::mt19937> UNIV::RNG(UNIV::RNGGEN);
