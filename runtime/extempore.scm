@@ -1102,12 +1102,12 @@
              (ct (if ft 
                      (map (lambda (x) (impc:ir:get-type-from-str x)) ft)
                      (print-error 'Function name 'does 'not 'exist 'or 'is 'not 'compiled))))
-         (cond ((equal? ct (list (+ *impc:ir:float* *impc:ir:pointer*)
+	(cond ((equal? ct (list *impc:ir:void*
                                  (+ *impc:ir:float* *impc:ir:pointer*)
                                  (+ *impc:ir:float* *impc:ir:pointer*)
-                                 *impc:ir:si32*
-                                 *impc:ir:si32*
-                                 *impc:ir:si32*))
+                                 *impc:ir:float*
+                                 *impc:ir:float*
+                                 (+ *impc:ir:si8* *impc:ir:pointer*)))
                 (sys:set-dsp-wrapper-array (llvm:get-function-pointer "imp_dsp_wrapper_array"))
                 (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))) ;; whole buffer 
                ((equal? ct (list *impc:ir:double*
