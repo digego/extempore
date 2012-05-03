@@ -2452,7 +2452,7 @@
 	  (emit (impc:ir:gname "vect" (impc:ir:get-type-str (impc:ir:pointer-- ttype))) " = load " (cadr var) " " (car var) "\n"
 	        (impc:ir:gname "vect2" (cadr (impc:ir:gname "vect"))) " = insertelement " (cadr (impc:ir:gname "vect")) " " (car (impc:ir:gname "vect"))
 		", " (cadr val) " " (car val) ", i32 " (car idx) "\n"
-		"store " (cadr (impc:ir:gname "vect2")) " " (car (impc:ir:gname "vect2")) ", " (cadr var) " " (car var) os)
+		"store " (cadr (impc:ir:gname "vect2")) " " (car (impc:ir:gname "vect2")) ", " (cadr var) " " (car var) "\n" os)
 	  (print-error 'Compiler 'Error: 'vset! 'needs 'to 'be 'a 'pointer 'to 'a 'vector))
       (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
       (impc:ir:strip-space os))))
