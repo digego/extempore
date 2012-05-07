@@ -3077,6 +3077,25 @@
 		  (emit (string-append (impc:ir:gname "val" type) " = " (list-ref fcmps v)
 				       " " type " " (car aval) 
 				       ", " (car bval) "\n") os)))
+
+	    ;; JUST ADD THIS TO HAVE VECTOR MATH RETURN VECTOR PTRS
+	    ;; ;; if vector math operations then copy the result into a new
+	    ;; ;; vector pointer (zone allocated)
+	    ;; (if (impc:ir:vector? (cadr aval))
+	    ;; 	(let* ((mathval (impc:ir:gname "val"))
+	    ;; 	       (mathtype (impc:ir:get-type-from-str (cadr mathval)))
+	    ;; 	       (zallocsize (impc:ir:get-type-size mathtype)))
+	    ;; 	  (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+	    ;; 		(impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+	    ;; 		os)      		  
+	    ;; 	  (emit (impc:ir:gname "newdat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* "
+	    ;; 		(car (impc:ir:gname "zone")) ", i64 " (number->string zallocsize) ")\n" os)
+	    ;; 	  (emit (impc:ir:gname "oldvect" (string-append (cadr mathval) "*")) " = alloca " (cadr mathval) "\n" os)
+	    ;; 	  (emit "store " (cadr mathval) " " (car mathval) ", " (cadr (impc:ir:gname "oldvect")) " " (car (impc:ir:gname "oldvect")) "\n" os)
+	    ;; 	  (emit (impc:ir:gname "olddat" "i8*") " = bitcast " (cadr (impc:ir:gname "oldvect")) " " (car (impc:ir:gname "oldvect")) " to i8*\n" os)
+	    ;; 	  (emit "call i8* @memcpy(i8* " (car (impc:ir:gname "newdat")) ", i8* " (car (impc:ir:gname "olddat")) ", i64 " (number->string zallocsize) ")\n" os)
+	    ;; 	  (emit (impc:ir:gname "newvect" (string-append (cadr mathval) "*")) " = bitcast i8* " (car (impc:ir:gname "newdat")) " to " (string-append (cadr mathval) "*") "\n" os)))
+
             (impc:ir:strip-space os)))))
 
 
