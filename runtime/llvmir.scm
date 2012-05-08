@@ -2580,6 +2580,7 @@
 	     (idx (impc:ir:gname))
 	     (t (impc:ir:get-type-str (impc:ir:pointer-- (car hint?))))) ;(impc:ir:convert-from-pretty-types (car hint?)))))	     	     
 	     ;(t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (caddr ast)))))
+	(emit idx-str os)
 	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t ", " (cadr idx) " " (car idx) ", align 16\n") os)
 	(impc:ir:strip-space os)))))
 
