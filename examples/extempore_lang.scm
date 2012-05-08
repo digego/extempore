@@ -1300,7 +1300,7 @@
 (vector_test)
 
 ;; vectorised sine func
-(bind-func vsinf
+(bind-func vsinf4
   (let ((p:/4,float/* (alloc))
 	(b:/4,float/* (alloc))
 	(c:/4,float/* (alloc))
@@ -1319,7 +1319,7 @@
 	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
 	(+ (* p (- (* y f2) y)) y)))))
 
-(bind-func vcosf
+(bind-func vcosf4
   (let ((p:/4,float/* (alloc))
 	(b:/4,float/* (alloc))
 	(c:/4,float/* (alloc))
@@ -1348,8 +1348,8 @@
   (lambda ()
     (let ((a:/4,float/* (alloc)))
       (vfill! a 0.1 0.2 0.3 0.4)
-      (let ((b (vsinf (pref a 0)))
-	    (c (vcosf (pref a 0))))	       
+      (let ((b (vsinf4 (pref a 0)))
+	    (c (vcosf4 (pref a 0))))	       
 	(printf "precision inaccuracy is expected:\n")
 	(printf " sinf:\t%f,%f,%f,%f\n"
 		(ftod (sinf 0.1))
