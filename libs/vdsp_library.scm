@@ -1,0 +1,788 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A DSP Library. (VECTOR BASED)
+;;
+;; Please keep in mind that these functions
+;; are provided as EXAMPLES ONLY.  They are
+;; things that I've thown together and are
+;; not to be considered "production" in any way.
+;; In particular they are very very inefficient!!
+;;
+;; You will need to have libsndfile installed
+;; before evaluating this file.
+;;
+;; Please feel free to fix things and contribute
+;; extras juicy bits and pieces
+;;
+;; C-x h     ; selects whole buffer
+;; C-x C-r   ; eval selection
+;;
+;; Contains:
+;; Sine, Square, Saw, Pulse waves
+;; Delay, TapDelay, Comb (variable length delay)
+;; AllPass, Reverb, Flanger and Chorus
+;; LowPass, HighPass, BandPass and Notch filters
+;; BitCrusher
+;;
+;; Instrument abstraction
+;; + A default 'synth' and a default 'sampler'
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; vector type
+
+;(define *impc:compiler:print* #t)
+
+;; (llvm:optimize #t)
+
+;; audio data type
+(bind-alias _stype float) ;; sample type
+(bind-alias _abuf /32,_stype/)
+;; size of abuf
+(bind-val ABUFS i32 32) ;; num samples in audio buffer
+
+;; some scalar constants
+(define *srflt* (llvm:convert-float (number->string (integer->real *samplerate*))))
+(define *pi* (llvm:convert-float (number->string pi)))
+(define *2pi* (llvm:convert-float (number->string (* 2.0 pi))))
+(bind-val PIf float *pi*)
+(bind-val TWOPIf float *2pi*)
+(bind-val T float *srflt*) ;; sample rate as float
+
+
+;; make and return a zone allocated vector initalized with x
+;; vec_value returns _abuf* (by ref) zone allocated
+(bind-func vec_value
+  (lambda (x:float) ;; x is an init value
+    (let ((v:_abuf* (zalloc))
+	  (i:i32 0))
+      (dotimes (i ABUFS)
+	(vset! v i x))
+      v)))
+
+;; copy b into a
+(bind-func vec_copy
+  (let ((i:i32 0))
+    (lambda (a:_abuf* b:_abuf)
+      (dotimes (i ABUFS)
+	(vset! a i (vref b i)))
+      a)))
+
+;; copy a into new vector
+(bind-func vec_new
+  (let ((i:i32 0))
+    (lambda (a:_abuf)
+      (let ((new:_abuf* (alloc)))
+	(dotimes (i ABUFS)
+	  (vset! new i (vref a i)))
+	new))))
+
+;; vectorised sine function
+;; x values must be within the range -PI ... PI
+(bind-func vsinf
+  (let ((p (vec_value 0.225)) ; :_abuf* (alloc))
+	(b (vec_value (dtof (/ 4.0 PI))))
+	(c (vec_value (dtof (/ -4.0 (* PI PI)))))
+	(f1:_abuf* (alloc))
+	(f2:_abuf* (alloc))
+	(i:i32 0))
+    (lambda (x:_abuf*)
+      ;; no SIMD for abs yet!
+      (dotimes (i ABUFS) (vset! f1 i (fabsf (vref x i))))
+      (let ((y (+ (* b x) (* c x f1))))
+	;; no SIMD for abs yet!
+	(dotimes (i ABUFS) (vset! f2 i (fabsf (vref y i))))
+	(+ (* p (- (* y f2) y)) y)))))
+
+;; vectorised make-oscil
+(bind-func make-oscil-v
+  (lambda (phase)
+    (let ((vphase (vec_value phase))
+	  (vsr (vec_value T))
+	  (v2pi (vec_value TWOPIf))
+	  (i:i32 0))
+      (lambda (amp:_abuf* freq:_abuf*)
+	(let ((inc (* v2pi (/ freq vsr))))
+	  (dotimes (i ABUFS)
+	    (set! phase (+ phase (vref inc i)))
+	    (if (> phase PIf) (set! phase (- phase TWOPIf)))
+	    (vset! vphase i phase))
+	  (vec_new (* amp (vsinf vphase))))))))
+
+;; vectorised square oscillator
+(bind-func make-square-v
+  (lambda (phase)   
+    (let ((osc (make-oscil-v phase))	  
+	  (tv:_abuf* (alloc))   ; tmp vector
+	  (i:i32 0)
+	  (vone (vec_value 1.0))
+	  (n (vec_value 50.0)))
+      (lambda (amp:_abuf* freq:_abuf*)
+	(let ((v1 (* n (osc vone freq))))
+	  (dotimes (i ABUFS)
+	    (vset! tv i (tanhf (vref v1 i))))
+	  (vec_new (* amp tv)))))))
+
+
+;; SAW NOT WORKING - don't know why!
+;; saw oscillator
+(bind-func make-saw-v
+  (lambda ()
+    (let ((vsr (vec_value T))
+	  (vhalf (vec_value 0.5))
+	  (a (vec_value -0.498))
+	  (p (vec_value 0.0))
+	  (dp (vec_value 1.0))
+	  (x (vec_value 0.0))
+	  (i:i32 0)
+	  (c (dtof 0.000001))
+	  (leak 0.995)
+	  (saw (vec_value 0.0)))
+      (lambda (amp:_abuf* freq:_abuf*)
+	(let ((qmax (* vhalf (/ vsr freq)))
+	      (dc (/ a qmax)))
+	  (vec_copy p (+ p dp))
+	  (dotimes (i ABUFS)
+	    (if (< (vref p i) 0.0)
+	    	(begin (vset! p i (- 0.0 (vref p i)))
+	    	       (vset! dp i (- 0.0 (vref dp i))))
+	    	(if (> (vref p i) (vref qmax i))
+	    	    (begin (vset! p i (+ (vref qmax i) (- (vref qmax i) (vref p i))))
+	    	    	   (vset! dp i (- 0.0 (vref dp i))))))
+	    (vset! x i (* PIf (vref p i)))
+	    (if (< (vref x i) c) (vset! x i c))
+	    (vset! saw i (* leak (+ (vref saw i)
+				    (vref dc i)
+				    (/ (sinf (vref x i)) (vref x i))))))
+	  (vec_new (* amp saw)))))))
+
+
+
+;; pulse train
+(definec make-pulse-v
+  (lambda ()
+    (let ((vsr (vec_value T))
+	  (tc (vec_value 32.0))
+	  (time:_abuf* (alloc))
+	  (width 100.0)
+	  (i:i32 0)
+	  (out (vec_value 0.0)))
+      (dotimes (i ABUFS) (vset! time i (i32tof i)))
+      (lambda (amp:_abuf* freq:_abuf*)	
+	(let ((period (/ vsr freq))
+	      (modperiod (% (vec_copy time (+ tc time)) period)))
+	  (dotimes (i ABUFS)
+	    (if (< (vref modperiod i) width)
+		(vset! out i (vref amp i))
+		(vset! out i 0.0)))
+	  out)))))
+
+
+
+;; (definec make-delay
+;;   (lambda (max-delay)
+;;     (let ((line:double* (zalloc max-delay))
+;; 	  (time 0)
+;; 	  (delay max-delay)
+;; 	  (in 0.5)
+;; 	  (out 0.5))
+;;       (lambda (x:double)
+;; 	(let* ((n (modulo time delay))
+;; 	       (delayed (pref line n))
+;; 	       (y (+ (* in x) (* out delayed))))
+;; 	  (pset! line n y)
+;; 	  (set! time (+ time 1))
+;; 	  y)))))
+
+
+
+;; iir comb without interpolation
+;; more efficient than comb if you
+;; don't need variable length
+;;
+;; hard to vectorize delay because of non-aligned
+;; boundaries (i.e. not 16byte aligned for example)
+(definec make-delay-v
+  (lambda (delay:i32)
+    (let ((line:float* (zalloc delay))
+	  (time:i32 0)
+	  (i:i32 0)
+	  (vout:_abuf* (alloc))
+	  (in 0.5)
+	  (out 0.5))
+      (lambda (x:_abuf*)
+	(dotimes (i ABUFS)
+	  (let ((val (+ (* in (vref x i))
+			(* out (pref line time)))))
+	    (vset! vout i val)
+	    (pset! line time val)
+	    (set! time (modulo (+ time 1) delay))))
+	vout))))
+	    
+
+
+;; iir comb with interpolation
+;;
+;; hard to vectorize comb because of non-aligned
+;; boundaries (i.e. not 16byte aligned for example)
+(definec make-comb-v
+  (lambda (max-delay)
+    (let ((line:float* (zalloc max-delay))
+	  (vout:_abuf* (alloc))
+	  (in-head 0)
+	  (out-head 0)
+	  (delay_ (i64tof max-delay))
+	  (delay (i64tof max-delay))
+	  (alpha 0.0)
+	  (om_alpha 1.0)
+	  (in 0.5)
+	  (i 0)
+	  (out 0.5))
+      (dotimes (i (i64toi32 max-delay)) (pset! line i 0.0))
+      (lambda (x:_abuf*)
+	(if (<> delay delay_)
+	    (begin (set! delay_ delay)		 
+		   (set! alpha (- delay (floorf delay)))
+		   (set! om_alpha (- 1.0 alpha))
+		   (set! out-head (- (+ max-delay in-head)
+				     (ftoi64 delay)))))
+	(dotimes (i ABUFS)
+	  (let* ((ih:i64 (modulo in-head max-delay))
+		 (oh:i64 (modulo out-head max-delay))
+		 (delayed1 (pref line oh))
+		 (delayed2 (pref line (modulo (+ oh 1) max-delay)))
+		 (delayed (+ (* alpha delayed1) (* om_alpha delayed2))) 
+		 (y (+ (* in (vref x i)) (* out delayed))))
+	    (pset! line ih y)
+	    (set! in-head (+ ih 1))
+	    (set! out-head (+ oh 1))
+	    (vset! vout i y)))
+	vout))))
+
+
+;; ;; chorus
+(definec make-chorus-v
+  (lambda (phase)
+    (let ((delay 700.0)
+	  (range 200.0)
+	  (rate 0.1)
+	  (comb1 (make-comb-v (dtoi64 (+ delay range))))
+	  (comb2 (make-comb-v (dtoi64 (+ delay range))))
+	  (comb3 (make-comb-v (dtoi64 (+ delay range))))
+	  (mrng1 (vec_value (dtof range)))
+	  (mrng2 (vec_value (dtof (* (random) range))))
+	  (mrng3 (vec_value (dtof (* (random) range))))
+	  (mrte1 (vec_value (dtof rate)))
+	  (mrte2 (vec_value (dtof (* rate 1.372))))
+	  (mrte3 (vec_value (dtof (* rate 0.792))))
+	  (dly1 (vec_value (dtof delay)))
+	  (dly2 (vec_value (dtof (* (random) delay))))
+	  (dly3 (vec_value (dtof (* (random) delay))))
+	  (mod1 (make-oscil-v phase))
+	  (mod2 (make-oscil-v phase))
+	  (mod3 (make-oscil-v phase)))
+      (comb1.in (dtof 0.5))
+      (comb2.in (dtof 0.5))
+      (comb3.in (dtof 0.5))
+      (lambda (x:_abuf*)
+	;; this is a bit silly we're doing vec multi just to
+	(comb1.delay (vref (+ dly1 (mod1 mrng1 mrte1)) 0))
+	(comb2.delay (vref (+ dly2 (mod2 mrng2 mrte2)) 0))
+	(comb3.delay (vref (+ dly3 (mod3 mrng3 mrte3)) 0))
+	(vec_new (+ (comb1 x)
+		    (comb2 x)
+		    (comb3 x)))))))
+
+;; allpass
+;;
+;; hard to vectorize delay types
+;; because of vector boundaries (i.e. 16byte)
+(definec make-allpass-v
+  (lambda (delay)
+    (let ((inline:float* (zalloc delay))
+	  (outline:float* (zalloc delay))
+	  (time 0)
+	  (i:i32 0)
+	  (vout:_abuf* (alloc))
+	  (g (dtof 0.9)))
+      (lambda (x:_abuf*)
+	(dotimes (i ABUFS)
+	  (let* ((n (modulo time delay))
+		 (dy (pref outline n))
+		 (dx (pref inline n))
+		 (y (+ (* -1.0 g (vref x i))
+		       dx
+		       (* g dy))))
+	    (pset! inline n (vref x i))
+	    (pset! outline n y)
+	    (set! time (+ time 1))
+	    (vset! vout i y)))
+       vout))))
+
+
+;; a dodgy reverb mk2
+(definec make-reverb-v
+  (lambda (size:float) ; size in ms
+    (let ((ms (dtof (/ *samplerate* 1000.0)))
+	  (wet (vec_value .25))
+	  (neg1 (vec_value -1.0))
+	  (dly1 (make-delay-v (ftoi32 (* ms (* .192 size)))))
+	  (dly2 (make-delay-v (ftoi32 (* ms (* .373 size)))))
+	  (dly3 (make-delay-v (ftoi32 (* ms (* .671 size)))))
+	  (dly4 (make-delay-v (ftoi32 (* ms (* .712 size)))))
+	  (ap1 (make-allpass-v (ftoi64 (* ms size))))
+	  (ap3 (make-allpass-v (ftoi64 (* ms (* .929 size)))))
+	  (ap2 (make-allpass-v (ftoi64 (* ms (* .329 size))))))
+      (ap1.g (dtof .8))
+      (ap2.g (dtof .7))
+      (ap3.g (dtof .6))
+      (lambda (in:_abuf*)
+	(let ((wetin (vec_new (* in wet))))
+	  (vec_new (+ (* in (- neg1 wet))
+		      (ap1 (ap2 (ap3 (vec_new (+ (dly1 wetin)
+						 (dly2 wetin)
+						 (dly3 wetin)
+						 (dly4 wetin)))))))))))))
+
+
+
+;; a dodgy bitcrusher
+(definec make-crusher-v
+  (lambda (bits)
+    (let ((amp 1.0)
+	  (vout:_abuf* (alloc))
+	  (i:i32 0))
+      (lambda (in:_abuf*)
+	(dotimes (i ABUFS)
+	  (vset! vout i
+		 (* amp (/ (floorf (* (vref in i)
+				      (powf 2. bits))) 
+			   (powf 2. bits)))))
+	vout))))
+
+
+
+;;
+;; moog VCF
+;;
+;; from Stilson/Smith CCRMA
+;;
+(bind-func make-vcf-v
+  (lambda ()
+    (let ((vc175 (vec_value 1.75))
+	  (vc36 (vec_value 3.6))
+	  (vc16 (vec_value 1.6))
+	  (vc1 (vec_value 1.0))
+	  (vhalf (vec_value 0.5))
+	  (va (vec_value 1.386249))
+	  (vsr (vec_value T))
+	  (vout:_abuf* (alloc))
+	  (res (dtof 0.5)) ;; 0.0 - 1.0
+	  (scale 0.0)
+	  (i:i32 0)
+	  (x:float 0.0) (y1:float 0.0) (y2:float 0.0) (y3:float 0.0) (y4:float 0.0)
+	  (oldx 0.0) (oldy1 0.0) (oldy2 0.0) (oldy3 0.0))
+      (lambda (in:_abuf* cutoff:_abuf*)
+	(let ((f (* vc175 (/ cutoff vsr)))
+              (k (- (- (* vc36 f) (* vc16 (* f f))) vc1))
+	      (p (* vhalf (+ k vc1)))
+	      (vtmp (* (- vc1 p) va)))
+	  ;; should do better with vectors here!
+	  (dotimes (i ABUFS)
+	    (let ((R:float (* res (expf (vref vtmp i))))
+		  (p_ (vref p i))
+		  (k_ (vref k i)))
+	      (set! x (- (vref in i) (* R y4)))
+	      (set! y1 (+ (* x  p_) (* oldx  p_) (* -1.0 k_ y1)))
+	      (set! y2 (+ (* y1 p_) (* oldy1 p_) (* -1.0 k_ y2)))
+	      (set! y3 (+ (* y2 p_) (* oldy2 p_) (* -1.0 k_ y3)))
+	      (set! y4 (+ (* y3 p_) (* oldy3 p_) (* -1.0 k_ y4)))
+	      (set! oldx x) (set! oldy1 y1) (set! oldy2 y2) (set! oldy3 y3)
+	      (set! y4 (- y4 (/ (powf y4 3.0) 6.0)))
+	      (vset! vout i y4)))
+	  vout)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; ENVELOPE FOR FLOATS
+;; 
+;; time in samples (starting from 0)
+;; apex (in samples) is after how many samples we hit 1.0 before decaying
+
+(definec impulsef
+  (lambda (time:float apex:float)
+    (let ((h (* time apex)))
+      (* h (expf (- 1.0 h))))))
+	  
+
+(definec make-linef
+  (lambda (x1:float y1:float x2 y2)
+    (let* ((m (if (= (dtof 0.0) (- x2 x1)) 
+		  (dtof 0.0)
+		  (/ (- y2 y1) (- x2 x1))))
+	   (c (- y2 (* m x2))))
+      (lambda (time) (+ (* m time) c)))))
+
+
+(definec envelope-segmentsf
+  (lambda (points:float* num-of-points:i64)
+    (let ((lines:[float,float]** (zalloc num-of-points))
+	  (k 0))
+      (dotimes (k num-of-points)
+	(let* ((idx (* k 2))
+	       (x1 (pref points (+ idx 0)))
+	       (y1 (pref points (+ idx 1)))
+	       (x2 (pref points (+ idx 2)))
+	       (y2 (pref points (+ idx 3))))
+	  (pset! lines k (make-linef x1 y1 x2 y2))))
+      lines)))
+
+
+(definec make-envelopef
+  (lambda (points:float* num-of-points)
+    (let ((klines:[float,float]** (envelope-segmentsf points num-of-points))
+	  (line-length num-of-points))
+      (lambda (time)
+	(let ((res (dtof -1.0))
+	      (k:i64 0)) 
+	  (dotimes (k num-of-points)
+	    (let ((line (pref klines k))
+		  (time-point (pref points (* k 2))))
+	      (if (or (= time time-point)
+		      (< time-point time))
+		  (set! res (line time)))))
+	  res)))))
+
+
+;; make a convenience wrapper for asr
+(definec make-adsrf
+  (lambda (start-time atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
+    (let* ((points 6)
+	   (data:float* (zalloc (* points 2))))
+      (pset! data 0 start-time)
+      (pset! data 1 0.0)
+      (pset! data 2 (+ start-time atk-dur)) ;; point data
+      (pset! data 3 peek-amp)
+      (pset! data 4 (+ start-time atk-dur dky-dur))
+      (pset! data 5 sus-amp)
+      (pset! data 6 (+ start-time atk-dur dky-dur sus-dur))
+      (pset! data 7 sus-amp)
+      (pset! data 8 (+ start-time atk-dur dky-dur sus-dur rel-dur))
+      (pset! data 9 0.0)
+      (pset! data 10 (+ start-time atk-dur dky-dur sus-dur rel-dur 1.0)) ;; this to flatten out at 0.0
+      (pset! data 11 0.0)
+      (let ((f (make-envelopef data points)))
+	(lambda (time:float)
+	  (f time))))))
+
+
+
+;; relative time
+(definec make-note-v
+  (lambda (start-time:float freq:float amp:float dur 
+		      attack:float decay:float release:float sus-amp:float
+		      nstarts:float*
+		      idx:i64 kernel:[_abuf*,float,float,_abuf*,_abuf*]*)
+    ;(printf "make-note\n")
+    (let ((env (if (< (+ attack decay) dur)
+	   	   (make-adsrf 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
+	   	   (make-adsrf 0.0 0.0 0.0 dur release 1.0 sus-amp)))
+	  (vamp:_abuf* (alloc))
+	  (vfreq (vec_value freq))
+	  (i:i32 0)
+	  (vc1 (vec_value 1.0))
+	  (vc0 (vec_value 0.0))
+	  (t:float 0.0))
+      ;(printf "all good to here\n")
+      (lambda (samples:_abuf* time:float channel:float)
+	;(printf "calling notev\n")
+	(if (< channel 1.0) (set! t (+ t (i32tof ABUFS))))
+	(if (< t (+ dur release))
+	    (begin
+	      (dotimes (i ABUFS)
+		(vset! vamp i (* (env (+ t (i32tof i))) amp)))
+	      (kernel t channel vfreq vamp))
+	      ;; (let ((data (kernel t channel vfreq (pref vamp 0))))
+	      ;; 	data))
+	    (begin (pset! nstarts idx (dtof 9999999999999.0))
+		   vc0))))))
+
+
+;; (bind-alias _stype float) ;; sample type
+;; (bind-alias _abuf /32,_stype/)
+;; (bind-val ABUFS i32 32) ;; num samples in audio buffer
+
+;; ;; make and return a vector "constant"
+;; ;; vec_value return _abuf (by copy)
+;; (bind-func vec_value
+;;   (lambda (x:float) ;; x is constant value
+;;     (let ((v:_abuf* (salloc))
+;; 	  (i:i32 0))
+;;       (dotimes (i ABUFS)
+;; 	(vset! v i x))
+;;       (pref v 0))))
+
+;; (definec test
+;;   (lambda ()
+;;     (lambda ()
+;;       (let ((v (vec_value 0.0)))
+;; 	(* v v)))))
+
+;; (definec t2
+;;   (lambda ()
+;;     (let ((f (test)))
+;;       (f))))
+
+;; (definec t3
+;;   (lambda ()
+;;     (t2)
+;;     void))
+
+;; (t3)
+
+
+(define-macro (define-instrument-v name note-kernel effect-kernel)
+  `(definec ,name
+     (let* ((poly:i64 48)
+	    (notes:[_abuf*,_abuf*,float,float]** (zalloc poly))
+	    (attack:float 200.0)
+	    (decay:float 200.0)
+	    (release:float 1000.0)
+	    (sustain:float 0.6) ;; amplitude of the sustain
+	    (gain (vec_value 2.0))
+	    (active 0)
+	    (ii 0)
+	    (note-starts:float* (zalloc poly))
+	    (new-note (lambda (start freq dur amp)
+			(let ((free-note:i64 -1)
+			      (iii 0)
+			      (i 0))
+			  (dotimes (i poly) ;; check for free poly spot           
+			    (if (> (pref note-starts i) (dtof 999999999999.0))
+				(set! free-note i)))
+			  (if (= 0 active)
+			      (begin (dotimes (iii poly)
+				       (pset! note-starts iii (dtof 9999999999999.0)))
+				     (set! free-note -1)))
+			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
+			      (begin ;(printf "free note!\n")
+				     (pset! notes free-note
+					    (make-note-v start freq amp dur
+							 attack decay release sustain
+							 note-starts free-note
+							 (,note-kernel)))
+				     (pset! note-starts free-note start)
+				     1)
+			      0)))))
+       (dotimes (ii poly) ;; sets all notes to inactive
+	 (pset! note-starts ii (dtof 9999999999999.0)))
+       (lambda (in:_abuf* time:float chan:float dat:i8*)
+	 (let ((out (vec_value 0.0))
+	       (vc3 (vec_value 0.3))	    
+	       (k 0))
+	   (dotimes (k poly) ;; sum all active notes
+	     (if (< (pref note-starts k) time)
+		 (begin ;(printf "note %d in\n" k)
+			(let ;((aa ((pref notes k) in time chan)))
+			    ((notefunc (pref notes k))
+			     ;(lllll (printf "notefunc %p\n" notefunc))
+			     (aa (notefunc in time chan)))
+			  ;(printf "note %d out\n" k)
+			  (vec_copy out (+ out (* vc3 aa)))))))
+;			(vec_copy out (+ out (* vc3 ((pref notes k) in time chan))))
+			;(printf "note %d out\n" k))))
+;		 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
+	   (vec_new (* gain (,effect-kernel out time chan dat))))))))
+
+
+
+
+
+;; NOTE!
+;; (* 5.0 *samplerate*) is time padding
+;; it is used because the decay length of the note may go
+;; beyond the duration.
+;; however making it longer means using more memory
+;; it's a trade off!
+(definec _synth-note
+  (lambda (time inst:[_abuf*,_abuf*,float,float,i8*]* freq amp dur)
+    (memzone (* 1024 100)
+	     (ftoi64 (+ (- time (i64tof (now)))
+			dur
+			(* 20.0 T))) ;; time paddingx
+      (let ((f (inst.new-note:[i64,float,float,float,float]*)))
+	(f time freq dur amp)
+	;; so that we only copy an integer from memzone
+	1))))
+
+
+(definec midi2frq    
+  (lambda (pitch)            
+    (* 440.0 (pow 2.0 (/ (- pitch 69.0) 12.0)))))
+
+(definec frq2midi
+  (lambda (freq)            
+    (+ (* 12.0 (log2 (/ freq 440.0))) 69.0)))
+
+;; playnote wrapper
+(define-macro (play-note time inst pitch vol dur)
+  `(let ((duration (* 1.0 ,dur)))
+     (_synth-note (integer->real ,time) 
+		  (llvm:get-native-closure ,(symbol->string inst))
+		  (midi2frq (* 1.0 ,pitch))
+		  (/ (exp (/ ,vol 26.222)) 127.0)
+		  duration)))
+
+
+
+;; make synth defaults
+(definec default-note-v
+  (lambda ()
+    (let ((oscl (make-oscil-v 0.0))
+	  (oscr (make-oscil-v 0.0)))
+      (lambda (time:float chan:float freq:_abuf* amp:_abuf*)
+	(let ((vc200 (vec_value 200.0)))
+	  (if (< chan 1.0)
+	      (vec_new (* amp (/ vc200 freq) (oscl amp freq)))
+	      (vec_new (* amp (/ vc200 freq) (oscr amp freq)))))))))
+
+(definec default-effect-v
+  (lambda (in:_abuf* time:float chan:float dat:i8*)
+    in))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Define EPAD
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(bind-func epad1-note-v
+  (let ((res (dtof 0.1)))
+    (lambda ()
+      ;(printf "new epad1 note\n")
+      (let ((oscl (make-square-v 0.0)) 
+	    (oscr (make-square-v 0.1))
+	    (o1 (make-oscil-v 0.0))
+	    (oscl2 (make-square-v (dtof (random))))
+	    (vcfl (make-vcf-v))
+	    (vcfr (make-vcf-v))	  
+	    (oscr2 (make-square-v (dtof (random))))
+	    (val (vec_value 0.3))
+	    (var (vec_value 0.2))
+	    (f1 (vec_value 550.0))
+	    (f2 (vec_value 500.0))
+	    (vcfl_range (vec_value 8000.0))
+	    (vcfr_range (vec_value 10000.0))
+	    (a (vec_value (dtof (+ 1.0 (* 0.02 (random))))))
+	    (b (vec_value (dtof (+ 1.0 (* 0.02 (random)))))))
+	(vcfl.res (+ res 0.2))
+	(vcfr.res res)      
+	(lambda (time:float chan:float freq:_abuf* amp:_abuf*)
+	  (if (< chan 1.0)
+	      (vec_new (* amp (vcfl (vec_new (+ (oscl val freq)
+						(oscl2 val (vec_new (+ freq a)))))
+				    (vec_new (+ f1 (vec_new (* amp vcfl_range)))))))
+	      (vec_new (* amp (vcfr (vec_new (+ (oscr var freq)
+						(oscr2 var (vec_new (* freq b)))))
+				    (vec_new (+ f2 (vec_new (* amp vcfr_range)))))))))))))
+
+
+(definec epad1-fx-v 2000000
+  (let ((d1 (make-comb-v 44100))
+	(d22 (make-comb-v 44100))
+	(c1 (make-chorus-v 0.0))
+	(c2 (make-chorus-v 0.1))
+	(rev1 (make-reverb-v 200.0))
+	(rev2 (make-reverb-v 120.0))	
+	(vcf1 (make-vcf-v))
+	(del1 1000.0)
+	(del2 2000.0)
+	(vc2 (vec_value 2.0))
+	(vc1 (vec_value 1.0))
+	(vc0 (vec_value 0.0))
+	(vchalf (vec_value 0.5))
+	(panwidth (vec_value 0.4))
+	(panspeed (vec_value 0.1))
+	(opan (make-square-v 0.0))
+	;(vcr (vec_value 0.0))
+	(vf (vec_value 440.0))
+	(osc (make-oscil-v 0.0))
+	(wet_ (dtof .0))
+	(wet (dtof .15))
+	(vwet (vec_value wet)))
+    ;(dotimes (i ABUFS) (vset! vcr i (dtof (random))))
+    (lambda (in:_abuf* time:float chan:float dat:i8*)
+      (rev1.wet vwet)
+      (rev2.wet vwet)
+      (let ((pan (+ vchalf (opan panwidth panspeed))))
+	(if (< chan 1.0)
+	    (rev1 (c1 (vec_new (* vc2 pan in))))
+	    (rev2 (c2 (vec_new (* vc2 (- vc1 pan) in)))))))))
+
+
+(define-instrument-v epad-v epad1-note-v epad1-fx-v)
+;(define-instrument-v epad-v default-note-v default-effect-v)
+(epad1-fx-v.wet .15)
+(epad-v.attack 1000.0)
+(epad-v.decay 1000.0)
+(epad-v.sustain 0.9)
+(epad-v.release 7000.0)
+(epad-v.active 1)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Test code for vector dsp
+;;
+
+
+
+
+;; setup default synth to play
+(definec dsp-v
+  (let ((epad_amp (vec_value 1.0))
+	(epad_zero (vec_value 0.0))
+	(i:i32 0))
+    (lambda (in:float* out:float* time:float chan:float dat:i8*)
+      ;(dotimes (i 32) (pset! out i (dtof (random)))))))
+      (let ((vin (bitcast in _abuf*)))
+      	(cond ((< chan 2.0)
+      	       (let ((data (* epad_amp (epad-v vin time chan dat))))
+      		 (dotimes (i 32)
+      		   (pset! out i (vref data i)))))
+      	      (else (dotimes (i 32)
+      		      (pset! out i 0.0))))
+      	void))))
+
+;; set vdsp
+;(dsp:set! dsp-v)
+
+
+(load "libs/pc-ivl-lib.scm")
+
+(define loop2
+  (let ((s 'aeolian)
+	(b 0))
+    (lambda (beat dur)
+      (if (> (random) .9)
+	  (set! s (random '(aeolian lydian))))
+      (if (> (random) .9)
+	  (set! b (random '(0 5))))
+      (play epad-v
+      	    (pc:quantize (cosr 84 12 0.9) (pc:scale b s))
+      	    (cosr 60 25 1/3) (* 1/2 dur))
+      (play epad-v
+      	    (pc:quantize (cosr 72 7 1/2) (pc:scale b s))
+      	    (cosr 60 25 1/4) (* 1/2 dur))
+      (play epad-v
+      	    (pc:quantize (cosr 60 12 1/3) (pc:scale b s))
+      	    (cosr 65 25 1/2) (* 1/2 dur))
+      (play epad-v
+      	    (pc:quantize (cosr 48 12 1) (pc:scale b s))
+      	    (cosr 50 40 1/3) (* 1/2 dur))
+      (callback (*metro* (+ beat (* .5 dur))) 'loop2 (+ beat dur) dur)))) ;dur))))
+
+;;(loop2 (*metro* 'get-beat 4) 1/4)
