@@ -1502,7 +1502,7 @@
       (let* ((a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
              (b (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars))
 	     (t (impc:ti:type-unify (list a b) vars)))
-         ;(println 'math: a b 't: t 'request? request?) ;'vars: vars)
+         ;(println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)
          (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
          (if (not (null? t))
              (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
@@ -2583,16 +2583,31 @@
                                (print-error 'Compiler 'Error: 'bad 'arity 'for ast)
                                (cddr (car ctype))))))
 	     ;; (lllll (println 'res: res 'from (car ast) 'request? request?))
+	     
              ;; if there was a request that will be the return type
              ;; otherwise if we already have a type defined we can use it's return type
-             ;; otherwise we cannot know it	     
-             (ret (if (and request?
-                           (not (null? request?)))
-                      request?
-                      (if (or (null? ctype) 
-                              (not (impc:ir:closure? (car ctype))))
-                          '()
-                          (cadr (car ctype))))))
+             ;; otherwise we cannot know it
+	     
+             ;; (ret (if (and request?
+             ;;               (not (null? request?)))
+             ;;          request?
+             ;;          (if (or (null? ctype) 
+             ;;                  (not (impc:ir:closure? (car ctype))))
+             ;;              '()
+             ;;              (cadr (car ctype))))))
+
+	     ;; if we already have a type defined we can use it's return type
+	     ;; otherwise
+             ;; if there was a request that will be the return type
+             ;; otherwise we cannot know it
+             (ret (if (and (not (null? ctype))
+			   (impc:ir:closure? (car ctype)))
+		      (cadr (car ctype))
+		      (if (and request?
+			       (not (null? request?)))
+			  request?
+			  '()))))
+
          (if *impc:ti:print-sub-checks* (println 'closure:> 'ast: ast 'res: res 'ret: ret))
          ; set the closure type for the symbol (if not a global var)
 	 ;(if (not (null? ret))
