@@ -46,19 +46,6 @@
 (loop (*metro* 'get-beat 4) 1)
 
 
-;; read a directory full of samples
-;; samples define a midi root i.e. 60.wav (for middle c)
-;; must be stereo samples of type wav aif or ogg
-(define-macro (load-sampler sampler path)
-  `(let ((files (sys:directory-list ,path)))
-     (for-each (lambda (f)
-		 (if (regex:match? f "([0-9]*)\.(wav|aif|aiff|ogg)$")		     
-		     (let ((result (regex:matched f "([0-9]*)\.(wav|aif|aiff|ogg)$")))
-		       (set-sampler-index ,sampler f
-		       			  (string->number (cadr result)) 0 0))))
-	       files)))
-
-
 ;; load audio samples
 ;; I'm using piano samples
 (load-sampler sampler "samples/piano")
@@ -100,4 +87,4 @@
 			   (sampler3 in time chan dat)))
 	  (else 0.0))))
 
-;; load new samplers
+;; load new samplers etc..
