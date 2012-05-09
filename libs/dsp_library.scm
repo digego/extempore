@@ -45,6 +45,15 @@
 	(if (> v h) h
 	    v))))
 
+;; x values must fall within the range -PI ... PI
+(bind-func _sin
+  (let ((p 0.225) ; :_abuf* (alloc))
+	(b (/ 4.0 PI))
+	(c (/ -4.0 (* PI PI))))
+    (lambda (x)
+      (let ((y (+ (* b x) (* c x (fabs x)))))
+	(+ (* p (- (* y (fabs y)) y)) y)))))
+
 (definec make-oscil
   (lambda (phase)
     (lambda (amp freq)
@@ -52,14 +61,39 @@
 	(set! phase (+ phase inc))
 	(* amp (sin phase))))))
 
+(definec make-oscil
+  (lambda (phase)
+    (lambda (amp freq)
+      (let ((inc (* TWOPI (/ freq *samplerate*))))
+	(set! phase (+ phase inc))
+	(if (> phase PI) (set! phase (- phase TWOPI)))
+	(* amp (_sin phase))))))
+
+(definec make-oscil-c
+  (lambda (phase)
+    (let ((mem 0.0)
+	  (osc (make-oscil phase)))
+      (lambda (chan amp freq)
+	(if (< chan 1.0) (set! mem (osc amp freq)))
+	mem))))
+
+
 ;; square oscillator
 (definec make-square
   (lambda (phase)   
-    (let ((osc (make-oscil phase))
+    (let ((osc (make-oscil phase))	  
 	  (n 50.0))         
       (lambda (amp freq)
 	(* amp (tanh (* n (osc 1.0 freq))))))))
 
+;; square oscillator multichannel
+(definec make-square-c
+  (lambda (phase)   
+    (let ((sqr (make-square phase))
+	  (mem 0.0))
+      (lambda (chan amp freq)	
+	(if (< chan 1.0) (set! mem (sqr amp freq)))
+	mem))))
 
 ;; saw oscillator
 (definec make-saw
@@ -84,6 +118,15 @@
 	  (set! saw (* leak (+ saw (+ dc (/ (sin x) x)))))
 	  (* amp saw))))))
 
+;; saw oscillator
+(definec make-saw-c
+  (lambda ()
+    (let ((mem 0.0)
+	  (saw (make-saw)))
+      (lambda (chan amp freq)
+	(if (< chan 1.0) (set! mem (saw amp freq)))
+	mem))))
+
 
 ;; pulse train
 (definec make-pulse
@@ -96,6 +139,14 @@
 	  (if (< (modulo time period) width)
 	      amp
 	      0.0))))))
+
+(definec make-pulse-c
+  (lambda ()
+    (let ((pulse (make-pulse))
+	  (mem 0.0))
+      (lambda (chan amp freq)
+	(if (< chan 1.0) (set! mem (pulse amp freq)))
+	mem))))      
 
 
 ;; iir comb without interpolation
@@ -115,6 +166,14 @@
 	  (pset! line n y)
 	  (set! time (+ time 1))
 	  y)))))
+
+(definec make-delay-c
+  (lambda (channels:i64 max-delay)
+    (let ((dlines:[double,double]** (alloc channels))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! dlines i (make-delay max-delay)))
+      (lambda (chan x)
+	((pref dlines (dtoi32 chan)) x)))))
 
 
 ;; iir comb with interpolation
@@ -150,6 +209,18 @@
 	  y)))))
 
 
+(definec make-comb-c
+  (lambda (channels:i64 max-delay)
+    (let ((dlines:[double,double]** (alloc channels))
+	  (delay (i64tod max-delay))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! dlines i (make-comb max-delay)))
+      (lambda (chan x)
+	(let ((f (pref dlines (dtoi32 chan))))
+	  (f.delay delay)
+	  (f x))))))
+
+
 ;; flanger
 (definec make-flanger
   (lambda (delay mod-phase mod-range mod-rate)
@@ -157,7 +228,17 @@
 	  (mod (make-oscil mod-phase)))
       (lambda (x:double)
 	(comb.delay (+ delay (mod mod-range mod-rate)))
-	(comb x)))))   
+	(comb x)))))
+
+
+(definec make-flanger-c
+  (lambda (channels:i64 delay mod-phase mod-range mod-rate)
+    (let ((comb (make-comb-c channels (dtoi64 (+ delay mod-range))))
+	  (mod (make-oscil-c mod-phase))
+	  (i:i64 0))
+      (lambda (chan x)
+	(comb.delay (+ delay (mod chan mod-range mod-rate)))
+	(comb chan x)))))
 
 
 ;; chorus
@@ -192,6 +273,15 @@
 	   (comb2 x)
 	   (comb3 x))))))
 
+(definec make-chorus-c
+  (lambda (channels:i64 phase)
+    (let ((dlines:[double,double]** (alloc channels))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! dlines i (make-chorus phase)))
+      (lambda (chan x)
+	(let ((f (pref dlines (dtoi32 chan))))
+	  (f x))))))
+
 
 ;; tap delay
 (definec tap-delay
@@ -211,7 +301,6 @@
 	  (set! time (+ time 1))
 	  y)))))
 
-
 ;; allpass
 (definec make-allpass
   (lambda (delay)
@@ -230,6 +319,15 @@
 	  (pset! outline n y)
 	  (set! time (+ time 1))
 	  y)))))
+
+(definec make-allpass-c
+  (lambda (channels:i64 delay)
+    (let ((lines:[double,double]** (alloc channels))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! lines i (make-allpass delay)))
+      (lambda (chan x)
+	(let ((f (pref lines (dtoi32 chan))))
+	  (f x))))))
 
 
 ;; a dodgy reverb
@@ -277,6 +375,15 @@
 			       (dly3 wetin)
 			       (dly4 wetin)))))))))))
 
+(definec make-reverb-c
+  (lambda (channels:i64 size)
+    (let ((lines:[double,double]** (alloc channels))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! lines i (make-reverb size)))
+      (lambda (chan x)
+	(let ((f (pref lines (dtoi32 chan))))
+	  (f x))))))
+
 
 ;; a dodgy bitcrusher
 (definec make-crusher
@@ -293,6 +400,27 @@
     (let ((lim 0.5))
       (lambda (in)
 	(range-limit lim (* -1.0 lim) (* gain in))))))
+
+;; a four channel mixer
+(definec mixquad
+  (lambda (c1 c2 c3 c4 chan in:double)
+    (cond ((< chan 1.0) (* in c1))
+	  ((< chan 2.0) (* in c2))
+	  ((< chan 3.0) (* in c3))
+	  ((< chan 4.0) (* in c4))
+	  (else 0.0))))
+
+;; a four channel mixer
+;; cdat is an array of doubles values
+;; each array element is a channels mix (between 0.0 and 1.0)
+(definec make-mixer
+  (lambda (channels:i64)
+    (let ((ch (i64tod channels)))
+      (lambda (cdat:double* chan:double in:double)
+	(if (< chan channels)
+	    (* in (pref cdat (dtoi32 chan)))
+	    0.0)))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -347,6 +475,15 @@
 	  (set! x1 x)
 	  y)))))
 
+(definec make-lpf-c
+  (lambda (channels:i64)
+    (let ((lines:[double,double,double]** (alloc channels))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! lines i (make-lpf)))
+      (lambda (chan x freq)
+	(let ((f (pref lines (dtoi32 chan))))
+	  (f x freq))))))
+
 
 ;; biquad high-pass filter
 (definec make-hpf
@@ -391,6 +528,15 @@
 	  (set! x2 x1)
 	  (set! x1 x)
 	  y)))))
+
+(definec make-hpf-c
+  (lambda (channels:i64)
+    (let ((lines:[double,double,double]** (alloc channels))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! lines i (make-hpf)))
+      (lambda (chan x freq)
+	(let ((f (pref lines (dtoi32 chan))))
+	  (f x freq))))))
 
 
 ;; biquad band-pass filter
@@ -441,6 +587,16 @@
 	  y)))))
 
 
+(definec make-bpf-c
+  (lambda (channels:i64)
+    (let ((lines:[double,double,double]** (alloc channels))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! lines i (make-bpf)))
+      (lambda (chan x freq)
+	(let ((f (pref lines (dtoi32 chan))))
+	  (f x freq))))))
+
+
 ;; biquad notch filter
 (definec make-notch
   (lambda () 
@@ -488,6 +644,16 @@
 	  (set! x1 x)
 	  y)))))
 
+(definec make-notch-c
+  (lambda (channels:i64)
+    (let ((lines:[double,double,double]** (alloc channels))
+	  (i:i64 0))
+      (dotimes (i channels) (pset! lines i (make-notch)))
+      (lambda (chan x freq)
+	(let ((f (pref lines (dtoi32 chan))))
+	  (f x freq))))))
+
+
 
 ;;
 ;; moog VCF
@@ -519,6 +685,16 @@
 	  (set! y4 (- y4 (/ (pow y4 3.0) 6.0)))
 	  y4)))))
 
+(definec make-vcf-c
+  (lambda (channels:i64)
+    (let ((lines:[double,double,double]** (alloc channels))
+	  (res 0.5)
+	  (i:i64 0))
+      (dotimes (i channels) (pset! lines i (make-vcf)))
+      (lambda (chan x freq)
+	(let ((f (pref lines (dtoi32 chan))))
+	  (f.res res)
+	  (f x freq))))))
 
 ;;
 ;; moog VCF v2.0
@@ -547,6 +723,16 @@
 	  out4)))))
 
 
+(definec make-vcf2-c
+  (lambda (channels:i64)
+    (let ((lines:[double,double,double]** (alloc channels))
+	  (res 0.5)
+	  (i:i64 0))
+      (dotimes (i channels) (pset! lines i (make-vcf2)))
+      (lambda (chan x freq)
+	(let ((f (pref lines (dtoi32 chan))))
+	  (f.res res)
+	  (f x freq))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -623,6 +809,28 @@
 	  (f time))))))
 
 
+;; an accumulative adsr (random access not allowed! time must be linear).
+(definec make-adsr-accum
+  (lambda (start-time:double atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
+    (let ((val (if (> (+ atk-dur dky-dur) 1.0) 0.0 peek-amp))
+	  (t1 atk-dur)
+	  (t2 (+ atk-dur dky-dur))
+	  (t3 (+ atk-dur dky-dur sus-dur))
+	  (t4 (+ atk-dur dky-dur sus-dur rel-dur))	  
+	  (inc1 (/ peek-amp atk-dur))
+	  (inc2 (* -1.0 (/ (- peek-amp sus-amp) dky-dur)))
+	  (inc3 (* -1.0 (/ sus-amp rel-dur))))
+      (lambda (time:double chan)
+	(if (< chan 1.0)
+	    (cond ((> time t4) (set! val 0.0))
+		  ((> time t3) (set! val (+ val inc3)))
+		  ((> time t2) val) ;; sustain (don't do anything with val)
+		  ((> time t1) (set! val (+ val inc2)))
+		  ((> time 0) (set! val (+ val inc1)))
+		  (else (set! val 0.0))))
+	val))))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -648,20 +856,20 @@
 	    (kernel (- time start-time) channel freq (* (env time) amp)))))))
 
 
-;; relative time
+;; relative time USING adsr-accum
 (definec make-note
   (lambda (start-time:double freq:double amp:double dur 
 		      attack:double decay:double release:double sus-amp:double
 		      nstarts:double*
 		      idx:i64 kernel:[double,double,double,double,double]*)
     (let ((env (if (< (+ attack decay) dur)
-	  	   (make-adsr 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
-	  	   (make-adsr 0.0 0.0 0.0 dur release 1.0 sus-amp)))
+	  	   (make-adsr-accum 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
+	  	   (make-adsr-accum 0.0 0.0 0.0 dur release 1.0 sus-amp)))
 	  (t 0.0))
       (lambda (sample:double time:double channel:double)
 	(if (< channel 1.0) (set! t (+ t 1.0)))
 	(if (< t (+ dur release))
-	    (kernel t channel freq (* (env t) amp))
+	    (kernel t channel freq (* (env t channel) amp))
 	    (begin (pset! nstarts idx 9999999999999.0) 0.0))))))
 
 
@@ -688,13 +896,6 @@
 			      (begin (dotimes (iii poly)
 				       (pset! note-starts iii 9999999999999.0))
 				     (set! free-note -1)))			  
-			  ;; (dotimes (i poly) ;; check for free poly spot           
-			  ;;   (if (> (pref note-starts i) 9999999999998.0)
-			  ;; 	(set! free-note i)))
-			  ;; (if (= 0 active)
-			  ;;     (begin (dotimes (iii poly)
-			  ;; 	       (pset! note-starts iii 9999999999999.0))
-			  ;; 	     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
 			      (begin (pset! notes free-note
 					    (make-note start freq amp dur
@@ -740,19 +941,6 @@
   (lambda (freq)            
     (+ (* 12.0 (log2 (/ freq 440.0))) 69.0)))
 
-;; ;; playnote wrapper
-;; (define-macro (play-note time inst pitch vol dur)
-;;   `(let ((zone (sys:create-mzone (* 1024 1024)))
-;; 	 (default-zone *impc:zone*)	 
-;; 	 (duration (* 1.0 ,dur))) ; (* ,dur (* *samplerate* (/ 60 (*metro* 'get-tempo))))))
-;;      (sys:destroy-mzone zone (+ duration (* 5 60.0 *samplerate*))) ; 3 minutes later?
-;;      (set! *impc:zone* zone)
-;;      (_synth-note (integer->real ,time) 
-;; 		  (llvm:get-native-closure ,(symbol->string inst))
-;; 		  (midi2frq (* 1.0 ,pitch))
-;; 		  (/ (exp (/ ,vol 26.222)) 127.0)
-;; 		  duration)
-;;      (set! *impc:zone* default-zone)))
 
 ;; playnote wrapper
 (define-macro (play-note time inst pitch vol dur)
@@ -844,68 +1032,6 @@
 
 ;; define default instrument called synth
 (define-instrument synth synth-note synth-fx)
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; extempore-pad 1
-;;
-(bind-func epad1-note
-  (let ((res 0.1))
-    (lambda ()
-      (let ((oscl (make-square 0.0)) 
-	    (oscr (make-square 0.1))
-	    (o1 (make-oscil 0.0))
-	    (oscl2 (make-square (random)))
-	    (vcfl (make-vcf))
-	    (vcfr (make-vcf))	  
-	    (oscr2 (make-square (random)))
-	    (ramp 0.0)
-	    (a (+ 1.0 (* 0.02 (random))))
-	    (b (+ 1.0 (* 0.02 (random)))))
-	(vcfl.res (+ res 0.2))
-	(vcfr.res res)      
-	(lambda (time:double chan:double freq:double amp:double)
-	  (if (< chan 1.0)
-	      (* amp (vcfl (+ (oscl 0.3 freq)
-			      (oscl2 0.3 (+ freq a)))
-			   (+ 550.0 (* amp 8000.0))))
-	      (* amp (vcfr (+ (oscr 0.2 freq)
-			      (oscr2 0.2 (* freq b)))
-			   (+ 500.0 (* amp 10000.0))))))))))
-
-
-(definec epad1-fx 2000000
-  (let ((pan .5)
-	(d1 (make-comb 44100))
-	(d22 (make-comb 44100))
-	(c1 (make-chorus 0.0))
-	(c2 (make-chorus 0.1))
-	(rev1 (make-reverb 200.0))
-	(rev2 (make-reverb 120.0))	
-	(vcf1 (make-vcf))
-	(del1 1000.0)
-	(del2 2000.0)
-	(ipan pan)
-	(opan (make-oscil 0.0))
-	(wet_ .0)
-	(wet .15))
-    (lambda (in:double time:double chan:double dat:double*)
-      (set! pan (+ 0.5 (opan 0.2 3.0)))
-      (rev1.wet wet)
-      (rev2.wet wet)
-      (cond ((< chan 1.0)
-	     (rev1 (c1 (* 2.0 pan in))))
-	    ((< chan 2.0)
-	     (rev2 (c2 (* 2.0 (- 1.0 pan) in))))
-	    (else 0.0)))))
-
-(define-instrument epad epad1-note epad1-fx)
-(epad.attack 1000.0)
-(epad.decay 1000.0)
-(epad.sustain 0.9)
-(epad.release 7000.0)
-;; epad is NOT active by default
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
