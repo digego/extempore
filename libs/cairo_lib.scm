@@ -543,6 +543,11 @@
 (bind-lib cairolib cairo_region_union_rectangle [cairo_status_t,cairo_region_t*,cairo_rectangle_int_t*]*)
 (bind-lib cairolib cairo_region_xor_rectangle [cairo_status_t,cairo_region_t*,cairo_rectangle_int_t*]*)
 
+;; svg
+(bind-lib cairolib cairo_svg_surface_create [cairo_surface_t*,i8*,double,double]*)
+;; pdf
+(bind-lib cairolib cairo_pdf_surface_create [cairo_surface_t*,i8*,double,double]*)
+(bind-lib cairolib cairo_pdf_surface_set_size [void,cairo_surface_t*,double,double]*)
 
 
 
