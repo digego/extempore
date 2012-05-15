@@ -16,35 +16,6 @@
 ;; Load SOIL
 (load "libs/image_lib.scm")
 
-;; id of 0 means Create new texture
-;; id > 0 means load image into existing texture
-;; returns texture 
-(definec gl-load-tex
-  (lambda (path id)
-    (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y)))) ; SOIL_FLAG_MULTIPLY_ALPHA
-      (if (= texid 0)
-	  (printf "Error loading: %s\n" path))
-      texid)))
-
-
-;; get texture-width
-(definec gl-tex-width
-  (lambda (tex)
-    (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
-    (let ((v (stack-alloc i32)))
-      (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_WIDTH v)
-      (pref v 0))))
-
-
-;; get texture height
-(definec gl-tex-height
-  (lambda (tex)
-    (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
-    (let ((v (stack-alloc i32)))
-      (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_HEIGHT v)
-      (pref v 0))))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GLU
@@ -141,6 +112,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+
 (definec circle-line
   (lambda (radius:double x:double y:double)
     (let ((k 0.0))
@@ -150,7 +123,6 @@
 	(let ((angle:double (/ (* k 2.0 PI) 90.0)))
 	  (glVertex2d (+ x (* (cos angle) radius)) (+ y (* (sin angle) radius)))))
       (glEnd))))
-
 
 (definec circle-whole
   (lambda (radius:double x:double y:double)
