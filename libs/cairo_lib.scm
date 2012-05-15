@@ -11,7 +11,6 @@
       (print-error "tell me where to find the opencv core dynamic library on your platform here!")))
 
 
-
 ;; complex structs with i8 name cheat (i.e. must be pointers)
 (bind-alias cairo_t i8)
 (bind-alias cairo_device_t i8)
@@ -466,6 +465,7 @@
 ;; image surface stuff
 (bind-lib cairolib cairo_image_surface_create [cairo_surface_t*,cairo_format_t,i32,i32]*)
 (bind-lib cairolib cairo_format_stride_for_width [i32,cairo_format_t,i32]*)
+(bind-lib cairolib cairo_image_surface_create_for_data [cairo_surface_t*,i8*,cairo_format_t,i32,i32,i32]*)
 (bind-lib cairolib cairo_image_surface_get_data [i8*,cairo_surface_t*]*)
 (bind-lib cairolib cairo_image_surface_get_format [cairo_format_t,cairo_surface_t*]*)
 (bind-lib cairolib cairo_image_surface_get_width [i32,cairo_surface_t*]*)
