@@ -55,12 +55,11 @@
     (gl-draw-img -1.0 -1.0 2.0 2.0 0.0 5)
     void))
 
-;; standard impromptu callback
+;; standard callback
 (define cairo-animation
   (lambda (beat dur)
     (gl-draw)
     (gl:swap-buffers ctx)    
     (callback (*metro* (+ beat (* .5 dur))) 'cairo-animation (+ beat dur) dur)))
 
-(cairo-animation (*metro* 'get-beat 4) 1/12)	      
-    
+(cairo-animation (*metro* 'get-beat 4) 1/12)

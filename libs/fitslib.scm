@@ -425,7 +425,7 @@
 	data))))
 
 
-(definec fits-image-data-ARGB32
+(definec fits-image-data-RGBA32
   (lambda (f:fitsfile* transparency:i8)
     (let ((status:i32* (salloc))
 	  (err:i8* (salloc 40))
@@ -491,14 +491,14 @@
       (pset! status 0 0)
       (printf "-------------------\n")
       (ffgky f TINT "NAXIS" (bitcast dims i8*) comment status)
-      (printf "%s:\t\t%d\n" comment (pref dims 0) (pref status 0))      
+      (printf "%s:\t\t%d\n" comment (pref dims 0))
       (ffgky f TLONG "NAXIS1" (bitcast x i8*) comment status)
-      (printf "%s:\t\t%lld\n" comment (pref x 0) (pref status 0))
+      (printf "%s:\t\t%lld\n" comment (pref x 0))
       (ffgky f TLONG "NAXIS2" (bitcast y i8*) comment status)
-      (printf "%s:\t\t%lld\n" comment (pref y 0) (pref status 0))      
+      (printf "%s:\t\t%lld\n" comment (pref y 0))      
       (if (> (pref dims 0) 2)
 	  (begin (ffgky f TLONG "NAXIS3" (bitcast z i8*) comment status)
-		 (printf "%s:\t\t%lld\n" comment (pref z 0) (pref status 0))))
+		 (printf "%s:\t\t%lld\n" comment (pref z 0))))
       (ffgky f TDOUBLE "DATAMAX" (bitcast datamax i8*) comment status)
       (printf "%s:\t%f\n" comment (pref datamax 0) (pref status 0))            
       (ffgky f TDOUBLE "DATAMIN" (bitcast datamin i8*) comment status)

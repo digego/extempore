@@ -25,6 +25,11 @@
       (sys:open-dylib "libopencv_imgproc.so")
       (print-error "tell me where to find the opencv core dynamic library on your platform here!")))
 
+(define ocv_wrapper_lib
+  (if (string=? "Linux" (sys:platform))
+      (sys:open-dylib "/home/andrew/Documents/code/opencvwrap/libwrapcv.so.1.0")
+      (print-error "tell me where to find the opencv core dynamic library on your platform here!")))
+
 
 ;; image depth constants
 (bind-val IPL_DEPTH_1U  i32 1)
@@ -36,13 +41,197 @@
 (bind-val IPL_DEPTH_16S i32 (+ 2147483648 16))
 (bind-val IPL_DEPTH_32S i32 (+ 2147483648 32))
 
+;; color conversions
+(bind-val     CV_BGR2BGRA     i32 0)
+(bind-val     CV_RGB2RGBA     i32 0) ;CV_BGR2BGRA)
+(bind-val     CV_BGRA2BGR     i32 1)
+(bind-val     CV_RGBA2RGB     i32 1) ;CV_BGRA2BGR)
+(bind-val     CV_BGR2RGBA     i32 2)
+(bind-val     CV_RGB2BGRA     i32 2) ;CV_BGR2RGBA)
+(bind-val     CV_RGBA2BGR     i32 3)
+(bind-val     CV_BGRA2RGB     i32 3) ;CV_RGBA2BGR)
+(bind-val     CV_BGR2RGB      i32 4)
+(bind-val     CV_RGB2BGR      i32 4) ;CV_BGR2RGB)
+(bind-val     CV_BGRA2RGBA    i32 5)
+(bind-val     CV_RGBA2BGRA    i32 5) ;CV_BGRA2RGBA)
+(bind-val     CV_BGR2GRAY     i32 6)
+(bind-val     CV_RGB2GRAY     i32 7)
+(bind-val     CV_GRAY2BGR     i32 8)
+(bind-val     CV_GRAY2RGB     i32 8) ;CV_GRAY2BGR)
+(bind-val     CV_GRAY2BGRA    i32 9)
+(bind-val     CV_GRAY2RGBA    i32 9) ;CV_GRAY2BGRA)
+(bind-val     CV_BGRA2GRAY    i32 10)
+(bind-val     CV_RGBA2GRAY    i32 11)
+(bind-val     CV_BGR2BGR565   i32 12)
+(bind-val     CV_RGB2BGR565   i32 13)
+(bind-val     CV_BGR5652BGR   i32 14)
+(bind-val     CV_BGR5652RGB   i32 15)
+(bind-val     CV_BGRA2BGR565  i32 16)
+(bind-val     CV_RGBA2BGR565  i32 17)
+(bind-val     CV_BGR5652BGRA  i32 18)
+(bind-val     CV_BGR5652RGBA  i32 19)
+(bind-val     CV_GRAY2BGR565  i32 20)
+(bind-val     CV_BGR5652GRAY  i32 21)
+(bind-val     CV_BGR2BGR555   i32 22)
+(bind-val     CV_RGB2BGR555   i32 23)
+(bind-val     CV_BGR5552BGR   i32 24)
+(bind-val     CV_BGR5552RGB   i32 25)
+(bind-val     CV_BGRA2BGR555  i32 26)
+(bind-val     CV_RGBA2BGR555  i32 27)
+(bind-val     CV_BGR5552BGRA  i32 28)
+(bind-val     CV_BGR5552RGBA  i32 29)
+(bind-val     CV_GRAY2BGR555  i32 30)
+(bind-val     CV_BGR5552GRAY  i32 31)
+(bind-val     CV_BGR2XYZ      i32 32)
+(bind-val     CV_RGB2XYZ      i32 33)
+(bind-val     CV_XYZ2BGR      i32 34)
+(bind-val     CV_XYZ2RGB      i32 35)
+(bind-val     CV_BGR2YCrCb    i32 36)
+(bind-val     CV_RGB2YCrCb    i32 37)
+(bind-val     CV_YCrCb2BGR    i32 38)
+(bind-val     CV_YCrCb2RGB    i32 39)
+(bind-val     CV_BGR2HSV      i32 40)
+(bind-val     CV_RGB2HSV      i32 41)
+(bind-val     CV_BGR2Lab      i32 44)
+(bind-val     CV_RGB2Lab      i32 45)
+(bind-val     CV_BayerBG2BGR  i32 46)
+(bind-val     CV_BayerGB2BGR  i32 47)
+(bind-val     CV_BayerRG2BGR  i32 48)
+(bind-val     CV_BayerGR2BGR  i32 49)
+(bind-val     CV_BayerBG2RGB  i32 48) ;CV_BayerRG2BGR)
+(bind-val     CV_BayerGB2RGB  i32 49) ;CV_BayerGR2BGR)
+(bind-val     CV_BayerRG2RGB  i32 46) ;CV_BayerBG2BGR)
+(bind-val     CV_BayerGR2RGB  i32 47) ;CV_BayerGB2BGR)
+(bind-val     CV_BGR2Luv      i32 50)
+(bind-val     CV_RGB2Luv      i32 51)
+(bind-val     CV_BGR2HLS      i32 52)
+(bind-val     CV_RGB2HLS      i32 53)
+(bind-val     CV_HSV2BGR      i32 54)
+(bind-val     CV_HSV2RGB      i32 55)
+(bind-val     CV_Lab2BGR      i32 56)
+(bind-val     CV_Lab2RGB      i32 57)
+(bind-val     CV_Luv2BGR      i32 58)
+(bind-val     CV_Luv2RGB      i32 59)
+(bind-val     CV_HLS2BGR      i32 60)
+(bind-val     CV_HLS2RGB      i32 61)
+(bind-val     CV_BayerBG2BGR_VNG  i32 62)
+(bind-val     CV_BayerGB2BGR_VNG  i32 63)
+(bind-val     CV_BayerRG2BGR_VNG  i32 64)
+(bind-val     CV_BayerGR2BGR_VNG  i32 65)
+;; (bind-val     CV_BayerBG2RGB_VNG  i32 CV_BayerRG2BGR_VNG)
+;; (bind-val     CV_BayerGB2RGB_VNG  i32 CV_BayerGR2BGR_VNG)
+;; (bind-val     CV_BayerRG2RGB_VNG  i32 CV_BayerBG2BGR_VNG)
+;; (bind-val     CV_BayerGR2RGB_VNG  i32 CV_BayerGB2BGR_VNG)
+(bind-val     CV_BGR2HSV_FULL  i32  66)
+(bind-val     CV_RGB2HSV_FULL  i32  67)
+(bind-val     CV_BGR2HLS_FULL  i32  68)
+(bind-val     CV_RGB2HLS_FULL  i32  69)
+(bind-val     CV_HSV2BGR_FULL  i32  70)
+(bind-val     CV_HSV2RGB_FULL  i32  71)
+(bind-val     CV_HLS2BGR_FULL  i32  72)
+(bind-val     CV_HLS2RGB_FULL  i32  73)
+(bind-val     CV_LBGR2Lab      i32  74)
+(bind-val     CV_LRGB2Lab      i32  75)
+(bind-val     CV_LBGR2Luv      i32  76)
+(bind-val     CV_LRGB2Luv      i32  77)
+(bind-val     CV_Lab2LBGR      i32  78)
+(bind-val     CV_Lab2LRGB      i32  79)
+(bind-val     CV_Luv2LBGR      i32  80)
+(bind-val     CV_Luv2LRGB      i32  81)
+(bind-val     CV_BGR2YUV       i32  82)
+(bind-val     CV_RGB2YUV       i32  83)
+(bind-val     CV_YUV2BGR       i32  84)
+(bind-val     CV_YUV2RGB       i32  85)
+(bind-val     CV_BayerBG2GRAY  i32  86)
+(bind-val     CV_BayerGB2GRAY  i32  87)
+(bind-val     CV_BayerRG2GRAY  i32  88)
+(bind-val     CV_BayerGR2GRAY  i32  89)
+(bind-val     CV_YUV2RGB_NV12  i32  90)
+(bind-val     CV_YUV2BGR_NV12  i32  91    )
+(bind-val     CV_YUV2RGB_NV21  i32  92)
+(bind-val     CV_YUV2BGR_NV21  i32  93)
+;; (bind-val     CV_YUV420sp2RGB  i32  CV_YUV2RGB_NV21)
+;; (bind-val     CV_YUV420sp2BGR  i32  CV_YUV2BGR_NV21)
+(bind-val     CV_YUV2RGBA_NV12  i32  94)
+(bind-val     CV_YUV2BGRA_NV12  i32  95)
+(bind-val     CV_YUV2RGBA_NV21  i32  96)
+(bind-val     CV_YUV2BGRA_NV21  i32  97)
+;; (bind-val     CV_YUV420sp2RGBA  i32  CV_YUV2RGBA_NV21)
+;; (bind-val     CV_YUV420sp2BGRA  i32  CV_YUV2BGRA_NV21)
+(bind-val     CV_YUV2RGB_YV12  i32  98)
+(bind-val     CV_YUV2BGR_YV12  i32  99)
+(bind-val     CV_YUV2RGB_IYUV  i32  100)
+(bind-val     CV_YUV2BGR_IYUV  i32  101)
+;; (bind-val     CV_YUV2RGB_I420  i32  CV_YUV2RGB_IYUV)
+;; (bind-val     CV_YUV2BGR_I420  i32  CV_YUV2BGR_IYUV)
+;; (bind-val     CV_YUV420p2RGB  i32  CV_YUV2RGB_YV12)
+;; (bind-val     CV_YUV420p2BGR  i32  CV_YUV2BGR_YV12)
+(bind-val     CV_YUV2RGBA_YV12  i32  102)
+(bind-val     CV_YUV2BGRA_YV12  i32  103)
+(bind-val     CV_YUV2RGBA_IYUV  i32  104)
+(bind-val     CV_YUV2BGRA_IYUV  i32  105)
+;; (bind-val     CV_YUV2RGBA_I420  i32  CV_YUV2RGBA_IYUV)
+;; (bind-val     CV_YUV2BGRA_I420  i32  CV_YUV2BGRA_IYUV)
+;; (bind-val     CV_YUV420p2RGBA  i32  CV_YUV2RGBA_YV12)
+;; (bind-val     CV_YUV420p2BGRA  i32  CV_YUV2BGRA_YV12)
+(bind-val     CV_YUV2GRAY_420  i32  106)
+;; (bind-val     CV_YUV2GRAY_NV21  i32  CV_YUV2GRAY_420)
+;; (bind-val     CV_YUV2GRAY_NV12  i32  CV_YUV2GRAY_420)
+;; (bind-val     CV_YUV2GRAY_YV12  i32  CV_YUV2GRAY_420)
+;; (bind-val     CV_YUV2GRAY_IYUV  i32  CV_YUV2GRAY_420)
+;; (bind-val     CV_YUV2GRAY_I420  i32  CV_YUV2GRAY_420)
+;; (bind-val     CV_YUV420sp2GRAY  i32  CV_YUV2GRAY_420)
+;; (bind-val     CV_YUV420p2GRAY  i32  CV_YUV2GRAY_420)
+(bind-val     CV_YUV2RGB_UYVY  i32  107)
+(bind-val     CV_YUV2BGR_UYVY  i32  108)
+;; (bind-val     CV_YUV2RGB_Y422  i32  CV_YUV2RGB_UYVY)
+;; (bind-val     CV_YUV2BGR_Y422  i32  CV_YUV2BGR_UYVY)
+;; (bind-val     CV_YUV2RGB_UYNV  i32  CV_YUV2RGB_UYVY)
+;; (bind-val     CV_YUV2BGR_UYNV  i32  CV_YUV2BGR_UYVY)
+(bind-val     CV_YUV2RGBA_UYVY  i32  111)
+(bind-val     CV_YUV2BGRA_UYVY  i32  112)
+;; (bind-val     CV_YUV2RGBA_Y422  i32  CV_YUV2RGBA_UYVY)
+;; (bind-val     CV_YUV2BGRA_Y422  i32  CV_YUV2BGRA_UYVY)
+;; (bind-val     CV_YUV2RGBA_UYNV  i32  CV_YUV2RGBA_UYVY)
+;; (bind-val     CV_YUV2BGRA_UYNV  i32  CV_YUV2BGRA_UYVY)
+(bind-val     CV_YUV2RGB_YUY2  i32  115)
+(bind-val     CV_YUV2BGR_YUY2  i32  116)
+(bind-val     CV_YUV2RGB_YVYU  i32  117)
+(bind-val     CV_YUV2BGR_YVYU  i32  118)
+;; (bind-val     CV_YUV2RGB_YUYV  i32  CV_YUV2RGB_YUY2)
+;; (bind-val     CV_YUV2BGR_YUYV  i32  CV_YUV2BGR_YUY2)
+;; (bind-val     CV_YUV2RGB_YUNV  i32  CV_YUV2RGB_YUY2)
+;; (bind-val     CV_YUV2BGR_YUNV  i32  CV_YUV2BGR_YUY2)
+(bind-val     CV_YUV2RGBA_YUY2  i32  119)
+(bind-val     CV_YUV2BGRA_YUY2  i32  120)
+(bind-val     CV_YUV2RGBA_YVYU  i32  121)
+(bind-val     CV_YUV2BGRA_YVYU  i32  122)
+;; (bind-val     CV_YUV2RGBA_YUYV  i32  CV_YUV2RGBA_YUY2)
+;; (bind-val     CV_YUV2BGRA_YUYV  i32  CV_YUV2BGRA_YUY2)
+;; (bind-val     CV_YUV2RGBA_YUNV  i32  CV_YUV2RGBA_YUY2)
+;; (bind-val     CV_YUV2BGRA_YUNV  i32  CV_YUV2BGRA_YUY2)
+(bind-val     CV_YUV2GRAY_UYVY  i32  123)
+(bind-val     CV_YUV2GRAY_YUY2  i32  124)
+;; (bind-val     CV_YUV2GRAY_Y422  i32  CV_YUV2GRAY_UYVY)
+;; (bind-val     CV_YUV2GRAY_UYNV  i32  CV_YUV2GRAY_UYVY)
+;; (bind-val     CV_YUV2GRAY_YVYU  i32  CV_YUV2GRAY_YUY2)
+;; (bind-val     CV_YUV2GRAY_YUYV  i32  CV_YUV2GRAY_YUY2)
+;; (bind-val     CV_YUV2GRAY_YUNV  i32  CV_YUV2GRAY_YUY2)
+(bind-val     CV_COLORCVT_MAX   i32  125)
+
+
+(bind-val CV_LOAD_IMAGE_COLOR i32 1)
+(bind-val CV_LOAD_IMAGE_GRAYSCALE i32 0)
+(bind-val CV_LOAD_IMAGE_UNCHANGED i32 -1)
+
+
 ;; (define ocv_video_lib
 ;;   (if (string=? "Linux" (sys:platform))
 ;;       (sys:open-dylib "libopencv_video.so")
 ;;       (print-error "tell me where to find the opencv core dynamic library on your platform here!")))
 
 (bind-alias CvArr i8)
-(bind-alias CvSeq i8) ;; cvseq is really complex struct
+;(bind-alias CvSeq i8) ;; cvseq is really complex struct
 (bind-alias CvFont i8) ;; cvfont is really complex struct
 (bind-alias CvGraph i8) ;; cvgraph is really complex struct
 (bind-alias CvGraphScanner i8) ;; CvGraphScanner is really complex struct
@@ -52,10 +241,12 @@
 (bind-val CV_LOAD_IMAGE_GRAYSCALE i32  0)
 (bind-val CV_LOAD_IMAGE_UNCHANGED i32 -1)
 
-(bind-type CvPoint <i32,i32>)
-(bind-type CvSize <i32,i32>)
+(bind-type CvPoint <i32,i32>) ;; bitcast to ExtCvPoint
+(bind-alias ExtCvPoint i64)
+(bind-type CvSize <i32,i32>) ;; bitcast to ExtCvSize
+(bind-alias ExtCvSize i64) 
 (bind-type CvScalar <|4,double|>)
-(bind-type CvRect <i32,i32,i32,i32>)
+(bind-type CvRect <i32,i32,i32,i32>) ;;bitcast CvRect into two i64 arguments!
 (bind-type CvSize2D32f <float,float>)
 (bind-type CvPoint2D32f <float,float>)
 (bind-type CvPoint3D32f <float,float,float>)
@@ -66,7 +257,8 @@
 (bind-type CvMemStorage <CvMemBlock*,CvMemBlock*,CvMemStorage*,i32,i32>)
 (bind-type CvMemStoragePos <CvMemBlock*,i32>)
 (bind-type CvSeqBlock <CvSeqBlock*,CvSeqBlock*,i32,i32,i32>)
-(bind-type CvSlice <i32,i32>)
+(bind-type CvSlice <i32,i32>) ;; bitcast to ExtCvSlice
+(bind-alias ExtCvSlice i64) 
 (bind-type CvSetElem <i32,CvSetElem*>)
 (bind-type CvSet <i32,CvSetElem*>)
 (bind-type CvGraphVtx <i32,i8*>)
@@ -110,6 +302,25 @@
 ;;     char *imageDataOrigin;
 ;; }
 (bind-type IplImage <i32,i32,i32,i32,i32,|4,i8|,|4,i8|,i32,i32,i32,i32,i32,i8*,i8*,i8*,i8*,i32,i8*,i32,|4,i32|,|4,i32|,i8*>)
+;(bind-alias IplImage i8)
+
+    ;; int flags; /* micsellaneous flags */ \                                  0
+    ;; int header_size; /* size of sequence header */ \                        1
+    ;; struct CvSeq* h_prev; /* previous sequence */ \                         
+    ;; struct CvSeq* h_next; /* next sequence */ \
+    ;; struct CvSeq* v_prev; /* 2nd previous sequence */ \
+    ;; struct CvSeq* v_next; /* 2nd next sequence */ \
+    ;; int total; /* total number of elements */ \                             6
+    ;; int elem_size;/* size of sequence element in bytes */ \                 7
+    ;; char* block_max;/* maximal bound of the last block */ \   
+    ;; char* ptr; /* current write pointer */ \
+    ;; int delta_elems; /* how many elements allocated when the sequence grows
+    ;;                     (sequence granularity) */ \
+    ;; CvMemStorage* storage; /* where the seq is stored */ \
+    ;; CvSeqBlock* free_blocks; /* free blocks list */ \
+    ;; CvSeqBlock* first; /* pointer to the first sequence block */
+
+(bind-type CvSeq <i32,i32,i8*,i8*,i8*,i8*,i32,i32,i8*,i8*,i32,i8*,i8*,i8*>)
 
 ;; data related stuff
 (bind-lib ocv_core_lib cvCreateMemStorage [CvMemStorage*,i32]*)
@@ -120,7 +331,7 @@
 (bind-lib ocv_core_lib cvCloneGraph [CvGraph*,CvGraph*,CvMemStorage*]*)
 (bind-lib ocv_core_lib cvCreateGraph [CvGraph*,i32,i32,i32,i32,CvMemStorage*]*)
 (bind-lib ocv_core_lib cvCreateGraphScanner [CvGraphScanner*,CvGraph*,i8*,i32]*)
-(bind-lib ocv_core_lib cvCvtSeqToArray [i8*,CvSeq*,i8*,CvSlice]*)
+(bind-lib ocv_core_lib cvCvtSeqToArray [i8*,CvSeq*,i8*,ExtCvSlice]*)
 (bind-lib ocv_core_lib cvEndWriteSeq [CvSeq*,i8*]*)
 (bind-lib ocv_core_lib cvFindGraphEdge [i8*,CvGraph*,i32,i32]*)
 (bind-lib ocv_core_lib cvFindGraphEdgeByPtr [CvGraphEdge*,CvGraph*,CvGraphVtx*,CvGraphVtx*]*)
@@ -154,7 +365,7 @@
 (bind-lib ocv_core_lib cvSeqRemove [void,CvSeq*,i32]*)
 (bind-lib ocv_core_lib cvSeqRemoveSlice [void,CvSeq*,CvSlice*]*)
 (bind-lib ocv_core_lib cvSeqSearch [i8*,CvSeq*,i8*,i8*,i32,i32*,i8*]*)
-(bind-lib ocv_core_lib cvSeqSlice [CvSeq*,CvSeq*,CvSlice,CvMemStorage*,i32]*)
+(bind-lib ocv_core_lib cvSeqSlice [CvSeq*,CvSeq*,ExtCvSlice,CvMemStorage*,i32]*)
 (bind-lib ocv_core_lib cvSeqSort [void,CvSeq*,i8*,i8*]*)
 (bind-lib ocv_core_lib cvSetAdd [i32,CvSet*,CvSetElem*,CvSetElem**]*)
 ;(bind-lib ocv_core_lib cvSetNew [CvSetElem*,CvSet*]*)
@@ -166,17 +377,19 @@
 (bind-lib ocv_core_lib cvTreeToNodeSeq [CvSeq*,i8*,i32,CvMemStorage*]*)
 (bind-lib ocv_core_lib cvCreateData [void,CvArr*]*)
 (bind-lib ocv_core_lib cvReleaseData [void,CvArr*]*)
-(bind-lib ocv_core_lib cvCreateImage [IplImage*,CvSize,i32,i32]*)
+;(bind-lib ocv_core_lib cvCreateImage [IplImage*,ExtCvSize,i32,i32]*)
+(bind-lib ocv_core_lib cvCreateImageHeader [IplImage*,ExtCvSize,i32,i32]*)
 (bind-lib ocv_core_lib cvCloneImage [IplImage*,IplImage*]*)
-(bind-lib ocv_core_lib cvReleaseImage [void,IplImage**]*)
+;(bind-lib ocv_core_lib cvReleaseImage [void,IplImage**]*)
 (bind-lib ocv_core_lib cvCreateMat [i8*,i32,i32,i32]*)
 (bind-lib ocv_core_lib cvSetImageCOI [void,IplImage*,i32]*)
-(bind-lib ocv_core_lib cvSetImageROI [void,IplImage*,CvRect]*)
+(bind-lib ocv_core_lib cvSetImageROI [void,IplImage*,i64,i64]*)
 
 (bind-lib ocv_core_lib cvGetReal1D [double,CvArr*,i32]*)
 (bind-lib ocv_core_lib cvGetReal2D [double,CvArr*,i32,i32]*)
 (bind-lib ocv_core_lib cvGetReal3D [double,CvArr*,i32,i32,i32]*)
 (bind-lib ocv_core_lib cvGetRealND [double,CvArr*,i32*]*)
+
 
 ;(bind-lib ocv_core_lib cvCloneSeq [CvSeq*,CvSeq*,CvMemStorage*]*)
 
@@ -185,23 +398,26 @@
 ;; 1 = flip around y
 ;; -1 =  flip both x and y
 (bind-lib ocv_core_lib cvFlip [void,CvArr*,CvArr*,i32]*)
-(bind-lib ocv_core_lib cvGetSize [CvSize,CvArr*]*)
+(bind-lib ocv_core_lib cvGetSize [ExtCvSize,CvArr*]*)
+;(bind-lib ocv_core_lib ExtCvSize [CvSize,i32,i32]*)
+;(bind-lib ocv_core_lib ExtCvSizeTwo [CvSize*,i32,i32]*)
+;(bind-lib ocv_core_lib cvGetSize [<i32,i32>,CvArr*]*)
 
 ;; drawing functions
-(bind-lib ocv_core_lib cvCircle [void,CvArr*,CvPoint,i32,CvScalar,i32,i32,i32]*)
-(bind-lib ocv_core_lib cvClipLine [i32,CvSize,CvPoint*,CvPoint*]*)
+(bind-lib ocv_core_lib cvCircle [void,CvArr*,ExtCvPoint,i32,CvScalar,i32,i32,i32]*)
+(bind-lib ocv_core_lib cvClipLine [i32,ExtCvSize,CvPoint*,CvPoint*]*)
 (bind-lib ocv_core_lib cvDrawContours [void,CvArr*,CvSeq*,CvScalar,CvScalar,i32,i32,i32]*)
-(bind-lib ocv_core_lib cvEllipse [void,CvArr*,CvPoint,CvSize,double,double,double,CvScalar,i32,i32,i32]*)
+(bind-lib ocv_core_lib cvEllipse [void,CvArr*,ExtCvPoint,ExtCvSize,double,double,double,CvScalar,i32,i32,i32]*)
 ;(bind-lib ocv_core_lib cvEllipseBox [void,CvArr*,CvBox2D,CvScalar,i32,i32,i32]*)
 (bind-lib ocv_core_lib cvFillConvexPoly [void,CvArr*,CvPoint*,i32,CvScalar,i32,i32]*)
 (bind-lib ocv_core_lib cvFillPoly [void,CvArr*,CvPoint**,i32*,i32,CvScalar,i32,i32]*)
 (bind-lib ocv_core_lib cvGetTextSize [void,i8*,CvFont*,CvSize*,i32*]*)
 (bind-lib ocv_core_lib cvInitFont [void,CvFont*,i32,double,double,double,i32,i32]*)
-(bind-lib ocv_core_lib cvInitLineIterator [i32,CvArr*,CvPoint,CvPoint,i8*,i32,i32,i32]*)
-(bind-lib ocv_core_lib cvLine [void,CvArr*,CvPoint,CvPoint,CvScalar,i32,i32,i32]*)
+(bind-lib ocv_core_lib cvInitLineIterator [i32,CvArr*,ExtCvPoint,CvPoint,i8*,i32,i32,i32]*)
+(bind-lib ocv_core_lib cvLine [void,CvArr*,ExtCvPoint,ExtCvPoint,CvScalar,i32,i32,i32]*)
 (bind-lib ocv_core_lib cvPolyLine [void,CvArr*,CvPoint**,i32*,i32,i32,CvScalar,i32,i32,i32]*)
-(bind-lib ocv_core_lib cvPutText [void,CvArr*,i8*,CvPoint,CvFont*,CvScalar]*)
-(bind-lib ocv_core_lib cvRectangle [void,CvArr*,CvPoint,CvPoint,CvScalar,i32,i32,i32]*)
+(bind-lib ocv_core_lib cvPutText [void,CvArr*,i8*,ExtCvPoint,CvFont*,CvScalar]*)
+(bind-lib ocv_core_lib cvRectangle [void,CvArr*,ExtCvPoint,ExtCvPoint,CvScalar,i32,i32,i32]*)
 (bind-func cvMakeColour (lambda (r g b) ;; returns CvScalar
 			  (let ((s:CvScalar* (salloc)) (a (tref-ptr s 0)))
 			    (aset! a 0 b) (aset! a 1 g) (aset! a 0 r) (pref s 0))))
@@ -245,8 +461,39 @@
 
 
 ;; image processing
+(bind-val CV_BLUR_NO_SCALE i32 0)
+(bind-val CV_BLUR i32 1)
+(bind-val CV_GAUSSIAN i32 2)
+(bind-val CV_MEDIAN i32 3)
+(bind-val CV_BILATERAL i32 4)
+
+(bind-lib ocv_iproc_lib cvSmooth [void,CvArr*,CvArr*,i32,,i32,i32,double,double]*)
 ;; void cvIntegral(const CvArr* image, CvArr* sum, CvArr* sqsum=NULL, CvArr* tiltedSum=NULL)¶
 (bind-lib ocv_iproc_lib cvIntegral [void,CvArr*,CvArr*,CvArr*,CvArr*]*)
 ;;void cvFilter2D(const CvArr* src, CvArr* dst, const CvMat* kernel, CvPoint anchor=cvPoint(-1, -1))¶
-(bind-lib ocv_iproc_lib cvFilter2D [void,CvArr*,CvArr*,i8*,CvPoint]*)
+(bind-lib ocv_iproc_lib cvFilter2D [void,CvArr*,CvArr*,i8*,ExtCvPoint]*)
+;;CvSeq* cvGetStarKeypoints(const CvArr* image, CvMemStorage* storage, CvStarDetectorParams params=cvStarDetectorParams())
 
+
+;; typedef struct CvStarDetectorParams
+;; {
+;;    int maxSize; // maximal size of the features detected. The following
+;;                 // values of the parameter are supported:
+;;                 // 4, 6, 8, 11, 12, 16, 22, 23, 32, 45, 46, 64, 90, 128
+;;    int responseThreshold; // threshold for the approximatd laplacian,
+;;                           // used to eliminate weak features
+;;    int lineThresholdProjected; // another threshold for laplacian to
+;;                // eliminate edges
+;;    int lineThresholdBinarized; // another threshold for the feature
+;;                // scale to eliminate edges
+;;    int suppressNonmaxSize; // linear size of a pixel neighborhood
+;;                // for non-maxima suppression
+;; }
+(bind-type CvStarDetectorParams <i32,i32,i32,i32,i32>)
+;(bind-lib ocv_features_lib cvGetStarKeypoints [CvSeq*,CvArr*,CvMemStorage*,CvStarDetectorParams*]*)
+;(bind-lib ocv_features_lib extCvGetStarKeypoints [CvSeq*,CvArr*,CvMemStorage*,CvStarDetectorParams*]*)
+(bind-lib ocv_wrapper_lib _cvGetStarKeypoints [CvSeq*,CvArr*,CvMemStorage*,CvStarDetectorParams*]*)
+
+(bind-lib ocv_wrapper_lib _cvGetImageData [i8*,IplImage*]*)
+(bind-lib ocv_wrapper_lib _cvCreateImage [IplImage*,CvSize*,i32,i32]*)
+(bind-lib ocv_wrapper_lib _cvReleaseImage [void,IplImage*]*)
