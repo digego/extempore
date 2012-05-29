@@ -267,6 +267,8 @@
 
 (bind-lib cairolib cairo_create [cairo_t*,cairo_surface_t*]*)
 (bind-lib cairolib cairo_destroy [void,cairo_t*]*)
+(bind-lib cairolib cairo_save [void,cairo_t*]*)
+(bind-lib cairolib cairo_restore [void,cairo_t*]*)
 
 (bind-lib cairolib cairo_set_operator [void,cairo_t*,cairo_operator_t]*)
 (bind-lib cairolib cairo_set_source [void,cairo_t*,cairo_pattern_t*]*)
@@ -400,6 +402,7 @@
 (bind-lib cairolib cairo_get_source [cairo_pattern_t*,cairo_t*]*)
 (bind-lib cairolib cairo_get_tolerance [double,cairo_t*]*)
 (bind-lib cairolib cairo_get_antialias [cairo_antialias_t,cairo_t*]*)
+(bind-lib cairolib cairo_set_antialias [void,cairo_t*,cairo_antialias_t]*)
 (bind-lib cairolib cairo_has_current_point [cairo_bool_t,cairo_t*]*)
 (bind-lib cairolib cairo_get_current_point [cairo_bool_t,cairo_t*,double,double]*)
 (bind-lib cairolib cairo_get_fill_rule [cairo_fill_rule_t,cairo_t*]*)
@@ -548,28 +551,4 @@
 ;; pdf
 (bind-lib cairolib cairo_pdf_surface_create [cairo_surface_t*,i8*,double,double]*)
 (bind-lib cairolib cairo_pdf_surface_set_size [void,cairo_surface_t*,double,double]*)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

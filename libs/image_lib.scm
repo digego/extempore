@@ -63,7 +63,8 @@
 (bind-val GL_2_BYTES i32 5127)
 (bind-val GL_3_BYTES i32 5128)
 (bind-val GL_4_BYTES i32 5129)
-
+(bind-val GL_BGRA i32 32993)
+	  
 
 ;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
 ;; if texid is zero then assign a new tex id otherwise use the texid provided
@@ -85,8 +86,36 @@
 		    0
 		    (cond ((= channels 1) GL_RED)
 			  ((= channels 3) GL_RGB)
-			  ((= channels 4) GL_RGBA)
+			  ((= channels 4) GL_RGBA) ;GL_RGBA)
 			  (else GL_RGBA))
+		    type
+		    ; GL_FLOAT; GL_UNSIGNED_BYTE
+		    data)
+      (pref tex 0))))
+
+
+;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
+;; if texid is zero then assign a new tex id otherwise use the texid provided
+(definec gl-load-tex-bgr
+  (lambda (width height channels type data texid)
+    (let* ((tex:i32* (salloc)))
+      (pset! tex 0 texid)
+      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
+      (if (< texid 1) (glGenTextures 1 tex))
+      ;(printf "tex: %d\n" (pref tex 0))
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
+      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 channels ;GL_RGBA
+		    width height
+		    0
+		    (cond ((= channels 1) GL_RED)
+			  ((= channels 3) GL_BGR)
+			  ((= channels 4) GL_BGRA) ;GL_RGBA)
+			  (else GL_BGRA))
 		    type
 		    ; GL_FLOAT; GL_UNSIGNED_BYTE
 		    data)
@@ -118,20 +147,85 @@
 	  (tw (i32tod (gl-tex-width texid)))
 	  (th (i32tod (gl-tex-height texid))))
       (glEnable GL_TEXTURE_RECTANGLE_ARB)
-      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE); GL_BLEND) ;REPLACE)
+      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE) ;GL_REPLACE)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
+      ;(glDisable GL_DEPTH_TEST)
       (glPushMatrix)
-      (glLoadIdentity)
+      ;(glLoadIdentity)
       (glTranslated xx yy 0.0)
       (glRotated r 0.0 0.0 1.0)
       (glBegin GL_QUADS)
       (glTexCoord2d 0.0 0.0)
-      (glVertex3d hx hy 0.0)
-      (glTexCoord2d 0.0 th)	
-      (glVertex3d hx (+ hy h) 0.0)	  
+      (glVertex2d hx hy)
+      (glTexCoord2d 0.0 th)
+      (glVertex2d hx (+ hy h))
       (glTexCoord2d tw th)
+      (glVertex2d (+ hx w) (+ hy h))
+      (glTexCoord2d tw 0.0)
+      (glVertex2d (+ hx w) hy)
+      (glTexCoord2d 0.0 0.0)
+      (glEnd)
+      (glPopMatrix)
+      ;(glEnable GL_DEPTH_TEST)
+      (glDisable GL_TEXTURE_RECTANGLE_ARB)
+      void)))
+
+
+(definec gl-draw-img-from-img
+  (lambda (ix iy tw th x y w h r texid)
+    (let ((hx (* -0.5 w))
+	  (hy (* -0.5 h))
+	  (xx (+ x (* .5 w)))
+	  (yy (+ y (* .5 h))))
+      (glEnable GL_TEXTURE_RECTANGLE_ARB)
+      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE) ;GL_REPLACE)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
+      ;(glDisable GL_DEPTH_TEST)
+      (glPushMatrix)
+      ;(glLoadIdentity)
+      (glTranslated xx yy 0.0)
+      (glRotated r 0.0 0.0 1.0)
+      (glBegin GL_QUADS)
+      (glTexCoord2d ix iy)
+      (glVertex2d hx hy)
+      (glTexCoord2d ix (+ iy th))
+      (glVertex2d hx (+ hy h))
+      (glTexCoord2d (+ ix tw) (+ iy th))
+      (glVertex2d (+ hx w) (+ hy h))
+      (glTexCoord2d (+ ix tw) iy)
+      (glVertex2d (+ hx w) hy)
+      (glTexCoord2d ix iy)
+      (glEnd)
+      (glPopMatrix)
+      (glDisable GL_TEXTURE_RECTANGLE_ARB)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
+      void)))
+
+
+
+(definec gl-draw-img-reverse
+  (lambda (x y w h r texid)
+    (let ((hx (* -0.5 w))
+	  (hy (* -0.5 h))
+	  (xx (+ x (* .5 w)))
+	  (yy (+ y (* .5 h)))
+	  (tw (i32tod (gl-tex-width texid)))
+	  (th (i32tod (gl-tex-height texid))))
+      (glEnable GL_TEXTURE_RECTANGLE_ARB)
+      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE); GL_BLEND) ;REPLACE)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
+      (glPushMatrix)      
+      ;(glLoadIdentity)
+      (glTranslated xx yy 0.0)
+      (glRotated r 0.0 0.0 1.0)
+      (glBegin GL_QUADS)
+      (glTexCoord2d tw 0.0)
+      (glVertex3d hx hy 0.0)
+      (glTexCoord2d tw th)
+      (glVertex3d hx (+ hy h) 0.0)
+      (glTexCoord2d 0.0 th)
       (glVertex3d (+ hx w) (+ hy h) 0.0)
-      (glTexCoord2d tw 0.0)	
+      (glTexCoord2d 0.0 0.0)
       (glVertex3d (+ hx w) hy 0.0)
       (glTexCoord2d 0.0 0.0)
       (glEnd)

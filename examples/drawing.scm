@@ -26,24 +26,43 @@
 
 (test1)
 
+
+(definec cairo-draw-image
+  (lambda (cr:cairo_surface_t* image:cairo_surface_t* sx sy sw:double sh:double dx dy dw dh)
+    (let ((scalex (/ dw sw)) 
+	  (scaley (/ dh sh)))
+      (cairo_save cr)
+      (cairo_scale cr scalex scaley)
+      (cairo_set_source_surface cr image (- (* dx scalex) (* 1.0 sx)) (- (* dy scaley) (* 1.0 sy)))
+      (cairo_rectangle cr (/ dx scalex) (/ dy scaley) (/ dw scalex) (/ dh scaley))
+      (cairo_fill cr)
+      (cairo_restore cr)
+      void)))
+
 ;; draw animated circles to an opengl context
 (definec test2
-  (let ((surface (cairo_image_surface_create CAIRO_FORMAT_ARGB32 900 600))
-	(cr (cairo_create surface))
-	(i 0.0))	    
+  (let ((surface (cairo_image_surface_create CAIRO_FORMAT_RGB24 900 600))
+	(image (cairo_image_surface_create_from_png "/home/andrew/Pictures/aacell1.png"))
+	(cr (cairo_create surface))	
+	(i 0.0)
+	(width 0.0)
+	(height 0.0))
     (lambda (t:double)
-      (cairo_set_source_rgba cr 0.0 0.0 0.0 1.0)
-      (cairo_paint cr)
-      (cairo_set_line_width cr 2.0)      
+      ;; scale image to fullscreen background
+      (set! width (i32tod (cairo_image_surface_get_width image)))
+      (set! height (i32tod (cairo_image_surface_get_height image)))
+      (cairo-draw-image cr image 0.0 0.0 width height 0.0 0.0 900.0 600.0)
+            
       (dotimes (i 200.0)
-	(cairo_set_source_rgba cr (* .005 i) (* 0.005 i) 0.7 0.7)
-	(cairo_arc cr
-		   (+ 450.0 (* 350.0 (cos (* i t .00000003))))
-		   (+ 300.0 (* 200.0 (sin (* i t .0000002))))
-		   10.0 0.0 TWOPI)
-	(cairo_stroke cr))
-      (cairo_surface_flush surface)
+      	(cairo_set_source_rgba cr (* .005 i) (* 0.005 i) 0.7 0.7)
+      	(cairo_arc cr
+      		   (+ 450.0 (* 350.0 (cos (* i t .00000003))))
+      		   (+ 300.0 (* 200.0 (sin (* i t .0000002))))
+      		   10.0 0.0 TWOPI)
+      	(cairo_stroke cr))
+      ;(cairo_surface_flush surface)
       (cairo_image_surface_get_data surface))))
+        
 
 ;; draw surface data returned from test2
 (definec gl-draw
@@ -51,8 +70,8 @@
     (glLoadIdentity)
     (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))    
     ;; use tex num 5 repeatedly
-    (gl-load-tex 900 600 4 GL_UNSIGNED_BYTE (test2 (i64tod (now))) 5)
-    (gl-draw-img -1.0 -1.0 2.0 2.0 0.0 5)
+    (gl-load-tex-bgr 900 600 4 GL_UNSIGNED_BYTE (test2 (i64tod (now))) 5)
+    (gl-draw-img-reverse -1.0 -1.0 2.0 2.0 180.0 5)
     void))
 
 ;; standard callback

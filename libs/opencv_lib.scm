@@ -220,6 +220,7 @@
 (bind-val     CV_COLORCVT_MAX   i32  125)
 
 
+;; image load constants
 (bind-val CV_LOAD_IMAGE_COLOR i32 1)
 (bind-val CV_LOAD_IMAGE_GRAYSCALE i32 0)
 (bind-val CV_LOAD_IMAGE_UNCHANGED i32 -1)
@@ -323,6 +324,7 @@
 (bind-type CvSeq <i32,i32,i8*,i8*,i8*,i8*,i32,i32,i8*,i8*,i32,i8*,i8*,i8*>)
 
 ;; data related stuff
+(bind-lib ocv_core_lib cvConvertScale [void,CvArr*,CvArr*,double,double]*)
 (bind-lib ocv_core_lib cvCreateMemStorage [CvMemStorage*,i32]*)
 (bind-lib ocv_core_lib cvMemStorageAlloc [i8*,CvMemStorage*,i32]*)
 (bind-lib ocv_core_lib cvClearMemStorage [void,CvMemStorage*]*)
