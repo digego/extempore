@@ -1197,6 +1197,25 @@
       (head l2))))
 
 
+
+(bind-func add-key-value-b
+  (lambda (key:i8* val:double dict:list*)
+    (let ((p:<i8*,double>* (zalloc)))
+      (tfill! p key val)
+      (cons p dict))))
+
+(bind-func value-for-key
+  (lambda (key:i8* dict:list* val:double*)
+    (let ((e:<i8*,double>* (car dict)))
+      (if (null? e)
+	  0
+	  (if (= (strcmp (tref e 0) key) 0)
+	      (begin (pset! val 0 (tref e 1)) 1)
+	      (value-for-key key (cdr dict) val))))))
+
+
+
+
 (bind-type colour <!red,!green,!blue>)
 (bind-type colour2 <!type,!type,!type>)
 
