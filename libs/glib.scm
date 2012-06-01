@@ -137,6 +137,7 @@
 (bind-lib gliblib g_main_loop_quit [void,GMainLoop*]*)
 (bind-lib gliblib g_main_loop_is_running [gboolean,GMainLoop*]*)
 (bind-lib gliblib g_main_loop_unref [void,GMainLoop*]*)
+(bind-lib gliblib g_main_context_iteration [gboolean,i8*,gboolean]*)
 
 
 ;; value and TYPE STUFF

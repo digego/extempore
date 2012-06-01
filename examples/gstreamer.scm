@@ -97,30 +97,67 @@
       (gst_object_unref (cast pipeline gpointer))
 
       0)))
-      
+
+
+(bind-func playbin_bus_call:GstBusFunc
+  (lambda (bus msg data)
+    (let ((playz (cast data GstElement*))
+	  (msgtype (tref msg 3))
+	  (time (tref msg 4)))
+      (cond ((= msgtype GST_MESSAGE_EOS)
+	     (printf "End of stream\n")
+	     (gst_element_set_state playz GST_STATE_NULL)
+	     (gst_object_unref (cast playz gpointer))
+	     1)
+	    ((= msgtype GST_MESSAGE_ERROR)
+	     (let ((debug:|1,i8*|* (alloc))
+		   (error:|1,GError*|* (alloc)))
+	       (gst_message_parse_error msg (cast error GError**) (cast debug i8**))
+	       (g_free (pref debug 0))
+	       (printf "GstError: %s\n" (tref (pref error 0) 2))
+	       (g_error_free (pref error 0))
+	       1))
+	    (else 1))
+      (i64toi1 1))))
+
 
 ;; URI to any media
 (bind-func playbin
   (lambda (path)
     (gst_init null null)
-    (let ((loop (g_main_loop_new null 0))
-	  (playz (gst_element_factory_make "playbin2" "play"))
+    (let ((playz (gst_element_factory_make "playbin2" "play"))
 	  (bus (gst_pipeline_get_bus (cast playz GstPipeline*)))
 	  (G_TYPE_STRING (* 4 (g_type_fundamental 16)))
 	  (gval:GValue* (alloc)))
       (g_value_init gval G_TYPE_STRING)
       (g_value_set_string gval path)      
-      (g_object_set_property (cast playz GObject*) "uri" gval)      
-      (gst_bus_add_watch bus (cast (llvm_get_function_ptr "bus_call_native") GstBusFunc) loop)
-      ;; (gst_object_unref bus)
+      (g_object_set_property (cast playz GObject*) "uri" gval)
+      (gst_bus_add_watch bus (cast (llvm_get_function_ptr "playbin_bus_call_native") GstBusFunc) (cast playz gpointer))
+      (gst_object_unref bus)
       (gst_element_set_state playz GST_STATE_PLAYING)
-      ;; (g_main_loop_run loop)
-      ;; (gst_element_set_state playz GST_STATE_NULL)
-      ;; (gst_object_unref (cast playz gpointer))
       1)))
 
+;; message loop
+(bind-func g_loop
+  (lambda ()
+    (g_main_context_iteration null 0)))
 
+(define msg-loop
+  (lambda ()
+    (g_loop)
+    (callback (+ (now) 2000) 'msg-loop)))
+
+;; start GST msg loop
+(msg-loop)
+
+
+;; start audio playback
 (playbin "file:///home/andrew/Music/Enigma/Enigma/02\ Track\ 02.mp3")
+;; 1
+(playbin "file:///home/andrew/Videos/stp_model.mov")
+;; 2
+(playbin "file:///home/andrew/Videos/stp_model.mov")
+;; 3
 (playbin "file:///home/andrew/Videos/stp_model.mov")
 
 ;; (ogg_audio "/tmp/audio.ogg")
