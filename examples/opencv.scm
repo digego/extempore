@@ -1,0 +1,99 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A simple opencv example
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; load libs
+(load "libs/opengl_lib.scm")
+(load "libs/opencv_lib.scm")
+
+;; create opengl context
+(define ctx (gl:make-ctx ":0.0" #t 0.0 0.0 900.0 600.0))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; helper functions
+
+;; flag: (0) flips x - (1) flips y - (-1) flips both
+(bind-func cv-flip
+  (lambda (img flag)
+    (cvFlip img null flag)
+    img))
+
+(bind-func cv-bgr2rgb
+  (lambda (img:IplImage*)
+    (let ((size:CvSize* (salloc)))
+      (tfill! size (tref img 10) (tref img 11))
+      (let ((img2 (_cvCreateImage size IPL_DEPTH_8U (tref img 2))))
+	(cvCvtColor (cast img i8*) (cast img2 i8*) CV_BGR2RGB)
+	img2))))
+
+;; this creates a copy of the parameters of the image but not its image data
+;; i.e. same size, channels depth etc..
+(bind-func cv-clone-image
+  (lambda (img:IplImage*)
+    (let ((size:CvSize* (salloc)))
+      (tfill! size (tref img 10) (tref img 11))
+      (let ((img2 (_cvCreateImage size IPL_DEPTH_8U (tref img 2))))
+	img2))))
+
+(bind-func cv-load-image
+  (lambda (path flag)
+    (let ((img (cvLoadImage path flag)))
+      (printf "img:%p\n" img)
+      (if (null? img)
+	  (begin (printf "failed to load %s\n" path)
+		 (cast null IplImage*))
+	  (begin (printf "successfully loaded %s\n" path)
+		 img)))))
+      
+(bind-func cv-img-to-gltex
+  (lambda (img:IplImage* id:i32)
+    (let ((width (tref img 10))
+	  (height (tref img 11))
+	  (channels (tref img 2))
+	  (bitdepth (tref img 4))
+	  (size (tref img 16))
+	  (data (tref img 17))
+	  (aa:i32 7)
+	  (step (tref img 18)))
+      ;(printf "img data: %p:%p\n" data (_cvGetImageData img))
+      ;(printf "w:%d h:%d channels:%d depth:%d\n" width height channels bitdepth)
+      (let ((dd (gl-load-tex width height channels GL_UNSIGNED_BYTE data id)))
+	dd))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; load image
+(define cvimg (cv-load-image "/home/andrew/Pictures/aacell1.JPG" -1))
+(define cvimg2 (cv-bgr2rgb cvimg))
+;; make a clone of cvimg2 (no data just format)
+(define cvimg3 (cv-clone-image cvimg2))
+;; create opengl texture id for image
+(define texid1 (cv-img-to-gltex (cv-flip cvimg2 0) 1))
+
+;; draw loop
+(bind-func gl-loop
+  (lambda (id)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    (gl-draw-img -1.0 -1.0 2.0 2.0 0.0 id)
+    void))
+
+;; image smoothing example
+(bind-func gl-with-processing
+  (lambda (in:i8* out:i8* amt:i32)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    (cvSmooth in out CV_BLUR amt 0 0.0 0.0)
+    (let ((id (cv-img-to-gltex (cast out IplImage*) 2)))
+      (gl-draw-img -1.0 -1.0 2.0 2.0 0.0 id)
+      void)))
+
+(define loop
+  (lambda (beat dur)
+    (let* ((v (+ 1 (* 2 (real->integer (cosr 20 19 1/1))))))
+      ;; switch gl-loop with gl-with-processing for image processing
+      ;(gl-loop texid1)
+      (gl-with-processing cvimg2 cvimg3 v)
+      (gl:swap-buffers ctx)    
+      (callback (*metro* (+ beat (* .5 dur))) 'loop (+ beat dur) 1/12))))
+
+(loop (*metro* 'get-beat 4) 1/6)

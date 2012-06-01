@@ -17,12 +17,12 @@
 
 (define giolib
   (sys:open-dylib (if (string=? "Linux" (sys:platform))
-		      "libglib-2.0.so"
+		      "libgio-2.0.so"
 		      (if (string=? "Windows" (sys:platform))
 			  "libgio-2.0-0.dll"
 			  (print-error "Where can I find glib on your platform?")))))
 
-(if (not gliblib) (print-error "Could not load 'gio' dynamic library"))
+(if (not giolib) (print-error "Could not load 'gio' dynamic library"))
 
 ;; some GLib type aliases
 ;; note that some of these differ from GLib's actual implementation!
@@ -35,14 +35,40 @@
 (bind-alias gpointer i8*)
 (bind-alias gchar i8)
 (bind-alias guint i32)
+(bind-alias gdouble double)
+(bind-alias gulong i64)
+(bind-alias gfloat float)
 (bind-alias gssize i64)
-(bind-alias GQuark i32)
-(bind-alias GRegexMatchFlags i32)
+(bind-alias gsize i64)
+(bind-alias gint64 i64)
+(bind-alias guint64 i64)
+(bind-alias guint16 |2,i8|)
+(bind-alias guint32 i32)
 (bind-alias gint i32)
 (bind-alias gboolean i1) ;; GLib defines this as i32
+(bind-alias GQuark i32)
+(bind-alias GRegexMatchFlags i32)
+(bind-alias GObject i8) ;; opaque struct
+(bind-alias GObjectClass i8) ;; opaque struct
+(bind-alias GObjectConstructParam i8) ;; opaque struct
+(bind-alias GType i64)
+(bind-type GTypeClass <GType>)
+(bind-type GTypeInstance <GTypeClass*>)
+(bind-type GTypeInterface <GType,GType>)
+(bind-alias GMutex i8) ;; opaque struct
+(if (= 64 (sys:pointer-size))
+    (bind-alias gsize i64)
+    (bind-alias gsize i32))
+;(bind-alias GValue i8) ;; opaque struct
+(bind-alias GMainLoop i8) ;; opaque struct
+(bind-alias GCallback [void]*) ;; callback
 
 ;; some types
+
+(bind-type GList <gpointer,GList*,GList*>)
+(bind-type GString <gchar*,gsize,gsize>)
 (bind-type GError <GQuark,gint,gchar*>)
+(bind-type GValue <GType,|2,i64|>)
 
 ;; hash table stuff
 (bind-lib gliblib g_hash_table_new [GHashTable,GHashFunc,GEqualFunc]*)
@@ -62,7 +88,6 @@
 (bind-lib gliblib g_setenv [gboolean,gchar*]*)
 (bind-lib gliblib g_unsetenv [void,gchar*]*)
 (bind-lib gliblib g_spaced_primes_closest [guint,guint]*)
-
 
 ;; regex stuff
 (bind-lib gliblib g_match_info_matches [gboolean,GMatchInfo]*)
@@ -86,3 +111,48 @@
 (bind-lib gliblib g_regex_split_full [gchar**,GRegex,gchar*,gssize,gint,GRegexMatchFlags,gint,GError**]*)
 (bind-lib gliblib g_regex_replace [gchar*,GRegex,gchar*,gssize,gint,gchar*,GRegexMatchFlags,GError**]*)
 (bind-lib gliblib g_regex_replace_literal [gchar*,GRegex,gchar*,gssize,gint,gchar*,GRegexMatchFlags,GError**]*)
+
+;; error stuff
+(bind-lib gliblib g_error_free [void,GError*]*)
+
+;; memory stuff
+(bind-lib gliblib g_free [void,gpointer]*)
+(bind-lib gliblib g_malloc [gpointer,gsize]*)
+
+;; GObject stuff
+(bind-lib giolib g_object_ref [gpointer,gpointer]*)
+(bind-lib giolib g_object_unref [void,gpointer]*)
+(bind-lib giolib g_object_set_property [void,GObject*,gchar*,GValue*]*)
+(bind-lib giolib g_object_get_property [void,GObject*,gchar*,GValue*]*)
+
+;; signal stuff
+(bind-alias GClosure i8)
+(bind-alias GClosureNotify [void,gpointer,GClosure*]*)
+(bind-lib giolib g_signal_connect_data [gulong,gpointer,gchar*,GCallback,gpointer,GClosureNotify,i32]*)
+(bind-func g_signal_connect (lambda (a:gpointer b:gchar* c:GCallback d:gpointer) (g_signal_connect_data a b c d null 0)))
+
+;; Main loop
+(bind-lib gliblib g_main_loop_new [GMainLoop*,i8*,gboolean]*)
+(bind-lib gliblib g_main_loop_run [void,GMainLoop*]*)
+(bind-lib gliblib g_main_loop_quit [void,GMainLoop*]*)
+(bind-lib gliblib g_main_loop_is_running [gboolean,GMainLoop*]*)
+(bind-lib gliblib g_main_loop_unref [void,GMainLoop*]*)
+
+
+;; value and TYPE STUFF
+(bind-lib giolib g_value_init [GValue*,GValue*,GType]*)
+(bind-lib giolib g_value_set_string [void,GValue*,gchar*]*)
+(bind-lib giolib g_value_set_static_string [void,GValue*,gchar*]*)
+(bind-lib giolib g_strdup_value_contents [gchar*,GValue*]*)
+(bind-lib giolib g_type_check_value [gboolean,GValue*]*)
+(bind-lib giolib g_type_check_value_holds [gboolean,GValue*,GType]*)
+(bind-lib giolib g_type_name_from_instance [gchar*,GTypeInstance*]*)
+(bind-lib giolib g_type_name_from_class [gchar*,GTypeClass*]*)
+(bind-lib giolib g_type_fundamental [GType,GType]*)
+(bind-lib giolib g_type_from_name [GType,gchar*]*)
+(bind-lib giolib g_type_init [void]*)
+
+
+
+;; type string stuff
+(bind-lib gliblib g_string_new [GString*,gchar*]*)
