@@ -10,8 +10,8 @@
   (sys:open-dylib (if (string=? "Linux" (sys:platform))
 		      "libglib-2.0.so"
 		      (if (string=? "Windows" (sys:platform))
-			  "libglib-2.0-0.dll"
-			  (print-error "Where can I find glib on your platform?")))))
+			  (print-error "Where can I find glib on your platform?")
+			  "libglib-2.0.dylib"))))
 
 (if (not gliblib) (print-error "Could not load 'glib' dynamic library"))
 
@@ -19,8 +19,8 @@
   (sys:open-dylib (if (string=? "Linux" (sys:platform))
 		      "libgio-2.0.so"
 		      (if (string=? "Windows" (sys:platform))
-			  "libgio-2.0-0.dll"
-			  (print-error "Where can I find glib on your platform?")))))
+			  (print-error "Where can I find glib on your platform?")
+			  "libgio-2.0.dylib"))))
 
 (if (not giolib) (print-error "Could not load 'gio' dynamic library"))
 
@@ -48,13 +48,10 @@
 (bind-alias gboolean i1) ;; GLib defines this as i32
 (bind-alias GQuark i32)
 (bind-alias GRegexMatchFlags i32)
-(bind-alias GObject i8) ;; opaque struct
+;(bind-alias GObject i8) ;; opaque struct
 (bind-alias GObjectClass i8) ;; opaque struct
 (bind-alias GObjectConstructParam i8) ;; opaque struct
 (bind-alias GType i64)
-(bind-type GTypeClass <GType>)
-(bind-type GTypeInstance <GTypeClass*>)
-(bind-type GTypeInterface <GType,GType>)
 (bind-alias GMutex i8) ;; opaque struct
 (if (= 64 (sys:pointer-size))
     (bind-alias gsize i64)
@@ -62,9 +59,13 @@
 ;(bind-alias GValue i8) ;; opaque struct
 (bind-alias GMainLoop i8) ;; opaque struct
 (bind-alias GCallback [void]*) ;; callback
+(bind-alias GData i8) ;; opaque
 
 ;; some types
-
+(bind-type GTypeClass <GType>)
+(bind-type GTypeInstance <GTypeClass*>)
+(bind-type GTypeInterface <GType,GType>)
+(bind-type GObject <GTypeInstance,guint,GData*>)
 (bind-type GList <gpointer,GList*,GList*>)
 (bind-type GString <gchar*,gsize,gsize>)
 (bind-type GError <GQuark,gint,gchar*>)

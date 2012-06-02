@@ -42,7 +42,8 @@
 ;; draw animated circles to an opengl context
 (definec test2
   (let ((surface (cairo_image_surface_create CAIRO_FORMAT_RGB24 900 600))
-	(image (cairo_image_surface_create_from_png "/home/andrew/Pictures/aacell1.png"))
+	;(image (cairo_image_surface_create_from_png "/home/andrew/Pictures/aacell1.png"))
+	(image (cairo_image_surface_create_from_png "/Users/jam2jamresearch/Documents/andrew/doc/dancing_man.png"))
 	(cr (cairo_create surface))	
 	(i 0.0)
 	(width 0.0)
