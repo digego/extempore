@@ -112,7 +112,6 @@
 
     (glColorMaterial GL_FRONT_AND_BACK GL_AMBIENT_AND_DIFFUSE)
     (glEnable GL_COLOR_MATERIAL)
-    (glEnable GL_DEPTH_TEST)
     (glShadeModel GL_SMOOTH)
     (glDisable GL_BLEND)
     (glBlendFunc GL_ONE GL_SRC_ALPHA)))
