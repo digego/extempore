@@ -11,6 +11,7 @@
 ;;      [just have to put up with the audio delays while compiling
 ;;
 
+(load "libs/dsp_library.scm")
 
 ;; first let's play with the default synth defined in dsp_library
 ;; the default synth is called .... synth
