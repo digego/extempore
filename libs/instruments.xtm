@@ -1,0 +1,67 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; INSTRUMENT LIBRARY FOR EXTEMPORE
+;;
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; extempore-pad 
+;;
+(bind-func epad-note
+  (let ((res 0.1))
+    (lambda ()
+      (let ((oscl (make-square 0.0)) 
+	    (oscr (make-square 0.1))
+	    (o1 (make-oscil 0.0))
+	    (oscl2 (make-square (random)))
+	    (vcfl (make-vcf))
+	    (vcfr (make-vcf))	  
+	    (oscr2 (make-square (random)))
+	    (ramp 0.0)
+	    (a (+ 1.0 (* 0.02 (random))))
+	    (b (+ 1.0 (* 0.02 (random)))))
+	(vcfl.res (+ res 0.2))
+	(vcfr.res res)      
+	(lambda (time:double chan:double freq:double amp:double)
+	  (if (< chan 1.0)
+	      (* amp (vcfl (+ (oscl 0.3 freq)
+			      (oscl2 0.3 (+ freq a)))
+			   (+ 550.0 (* amp 8000.0))))
+	      (* amp (vcfr (+ (oscr 0.2 freq)
+			      (oscr2 0.2 (* freq b)))
+			   (+ 500.0 (* amp 10000.0))))))))))
+
+
+(definec epad-fx 2000000
+  (let ((pan .5)
+	(d1 (make-comb 44100))
+	(d22 (make-comb 44100))
+	(c1 (make-chorus 0.0))
+	(c2 (make-chorus 0.1))
+	(rev1 (make-reverb 200.0))
+	(rev2 (make-reverb 120.0))	
+	(vcf1 (make-vcf))
+	(del1 1000.0)
+	(del2 2000.0)
+	(ipan pan)
+	(opan (make-oscil 0.0))
+	(wet_ .0)
+	(wet .15))
+    (lambda (in:double time:double chan:double dat:double*)
+      (set! pan (+ 0.5 (opan 0.2 3.0)))
+      (rev1.wet wet)
+      (rev2.wet wet)
+      (cond ((< chan 1.0)
+	     (rev1 (c1 (* 2.0 pan in))))
+	    ((< chan 2.0)
+	     (rev2 (c2 (* 2.0 (- 1.0 pan) in))))
+	    (else 0.0)))))
+
+(define-instrument epad epad-note epad-fx)
+(epad.attack 1000.0)
+(epad.decay 1000.0)
+(epad.sustain 0.9)
+(epad.release 7000.0)
+;; epad is NOT active by default

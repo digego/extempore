@@ -1,0 +1,53 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Basic audiofile reading example
+;;
+;; This simple example uses libsndfile for
+;; reading in an ogg file for sample playback
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; load highgui dynamic library
+(define libsndfile (sys:open-dylib "libsndfile.so.1"))
+
+;; bind 3 sndfile lib functions
+(bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
+(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
+
+;; an audio buffer reader
+(definec read-audio-file
+  (lambda (fname dat offset num)
+    (printf "file name: %s\n" fname)
+    (let ((info (make-tuple i64 i32 i32 i32 i32 i32))
+	  (audiofile (sf_open fname 16 info))
+	  (channels (i32toi64 (tref info 2)))
+	  (num-to-read (* num channels))
+	  (num-to-offset (* offset channels))
+	  (cnt (sf_seek audiofile num-to-offset 0))       
+	  (samples-read (sf_read_double audiofile dat num-to-read)))
+      (printf "samplerate: %d\n" (tref info 1))
+      (printf "channels: %d\n" (tref info 2))
+      (printf "samples read: %lld\n" samples-read)
+      dat)))
+
+;; setup some space to hold audio data
+(define audio-data (sys:make-cptr (* 44100 8 2 20)))
+;; bind space for the compiler to access
+(bind-scm adat double* audio-data)
+
+;; dsp function
+(definec:dsp dsp  
+  (let ((sample 0.0)	
+	(lgth 0.5)
+	(offset 9.0)
+	(audio (read-audio-file "/tmp/allegro.ogg" adat 
+				(dtoi64 (* 44100.0 offset))
+				(dtoi64 (* 44100.0 lgth)))))
+    (lambda (in time chan dat)
+      (let ((pos (modulo time (* lgth 44100.0))))
+	(aref audio (dtoi64 (+ chan (* 2.0 pos))))))))
+	   
+
+;; set dsp
+(dsp:set! dsp)
