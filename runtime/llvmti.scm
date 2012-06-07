@@ -2417,20 +2417,20 @@
 
 (define impc:ti:tuple-ref-check
    (lambda (ast vars kts request?)
-      ;; (println 'ref-check ast request?) ;kts vars)
+      ;(println 'ref-check ast request?) ;kts vars)
       ;; (caddr ast) must be an integer    
       (if (not (integer? (caddr ast))) 
           (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'literal 'integer 'index! ast))
       (let* (; a should be a tuple of some kind!
-            (a (impc:ti:type-check (cadr ast) vars kts (if (and (impc:ir:type? request?)
-								(impc:ir:tuple? request?))
-							   request? 
-							   #f))) ;request?))
+            (a (impc:ti:type-check (cadr ast) vars kts #f)) ;(if (and (impc:ir:type? request?)
+							;	(impc:ir:tuple? request?))
+							 ;  request? 
+							  ; #f))) ;request?))
             ;; b should be fixed point -- llvm structs only support 32bit indexes
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
 	(if (impc:ir:type? a)
 	    (set! a (list a)))
-	;(println 'a: a)
+	;(println 'a: a 'b: b (cadr ast))
 	;; check for named types
 	(if (and (not (null? a))
 		 (string? (car a)))

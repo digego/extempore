@@ -489,7 +489,7 @@
                ((string=? base "vector") (+ *impc:ir:vector* offset))	       
                ((regex:match? base "^\\[.*\\]$") 
                 (cons (+ offset *impc:ir:pointer* *impc:ir:closure*) (apply impc:ir:get-type-from-pretty-closure string-type args)))
-               ((regex:match? base "\\<\\{\\s?i8\\*,\\s?i8\\*.*") 
+               ((regex:match? base "^\\<\\{\\s?i8\\*,\\s?i8\\*.*") 
                 (cons (+ offset *impc:ir:closure*) (impc:ir:get-closure-type-from-str string-type)))
                ((regex:match? base "^\\<[^{].*[^}]\\>$")
                 (cons (+ offset *impc:ir:tuple*) (apply impc:ir:get-type-from-pretty-tuple string-type args)))
