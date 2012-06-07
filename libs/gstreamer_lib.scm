@@ -93,14 +93,19 @@
 (bind-alias GstPipeline i8) ;; opaque struct
 (bind-alias GstBin i8) ;; opaque struct
 (bind-alias GstPad i8) ;; opaque struct
-(bind-alias GstObject i8) ;; opaque struct
+;(bind-alias GstObject i8) ;; opaque struct
 (bind-alias GstEvent i8) ;; opaque struct
+(bind-alias GstBufferPrivate i8) ;; opaque
+(bind-alias GstClockTime i64)
+(bind-alias GstCapsFlags i32)
 
 (bind-type GstElement <GStaticRecMutex*,GCond*,guint32,GstState,GstState,GstState,GstStateChangeReturn,GstBus*,GstClock*,GstClockTimeDiff,guint16,GList,guint16,GList,guint16,GList,guint32>)
 (bind-type GstElementDetails <gchar*,gchar*,gchar*,gchar*>)
-(bind-type GstStructure <GType>)
+(bind-type GstStructure <GType,GQuark,gint,GArray*,gpointer>)
 (bind-type GstObject <gint,GMutex*,gchar*,gchar*,GstObject*,guint32>)
 (bind-type GstMiniObject <GTypeInstance,i32,i32,i8*>)
+(bind-type GstCaps <GType,gint,GstCapsFlags,i8*,|4,gpointer|>)
+(bind-type GstBuffer <GstMiniObject,i8*,guint,GstClockTime,GstClockTime,GstCaps*,i64,i64,i8*,GFreeFunc,GstBuffer*,GstBufferPrivate*,gpointer>)
 ;; 3 message type
 ;; 4 time
 ;; 5 gst_object
@@ -162,3 +167,22 @@
 ;; messages
 (bind-lib gstlib gst_message_parse_error [void,GstMessage*,GError**,gchar**]*)
 (bind-lib gstlib gst_message_new_eos [GstMessage*,GstObject*]*)
+
+;; gst caps and structure stuff
+(bind-lib gstlib gst_caps_get_structure [GstStructure*,GstCaps*,guint]*)
+(bind-lib gstlib gst_caps_to_string [gchar*,GstCaps*]*)
+(bind-lib gstlib gst_caps_from_string [GstCaps*,gchar*]*)
+(bind-lib gstlib gst_structure_get_int [gboolean,GstStructure*,gchar*,gint*]*)
+(bind-lib gstlib gst_structure_get_double [gboolean,GstStructure*,gchar*,gdouble*]*)
+(bind-lib gstlib gst_structure_get_string [gchar*,GstStructure*,gchar*]*)
+(bind-lib gstlib gst_structure_get_clock_time [gboolean,GstStructure*,gchar*,GstClockTime*]*)
+
+;; gst mini object stuff
+(bind-lib gstlib gst_value_set_mini_object [void,GValue*,GstMiniObject*]*)
+(bind-lib gstlib gst_value_take_mini_object [void,GValue*,GstMiniObject*]*)
+(bind-lib gstlib gst_value_get_mini_object [GstMiniObject*,GValue*]*)
+(bind-lib gstlib gst_value_dup_mini_object [GstMiniObject*,GValue*]*)
+
+
+
+;(bind-lib gstlib gst_video_convert_frame [GstBuffer*,GstBuffer*,GstCaps*,GstClockTime,GError**]*)

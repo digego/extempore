@@ -45,13 +45,16 @@
 (bind-alias guint16 |2,i8|)
 (bind-alias guint32 i32)
 (bind-alias gint i32)
-(bind-alias gboolean i1) ;; GLib defines this as i32
+(bind-alias gboolean i1) ;; WARNING GLib defines this as i32
 (bind-alias GQuark i32)
 (bind-alias GRegexMatchFlags i32)
 (bind-alias GObject i8) ;; opaque struct
 (bind-alias GObjectClass i8) ;; opaque struct
 (bind-alias GObjectConstructParam i8) ;; opaque struct
 (bind-alias GType i64)
+(bind-type GArray <gchar*,guint>)
+(bind-type GByteArray <i8*,guint>)
+(bind-type GPtrArray <gpointer*,guint>)
 (bind-type GTypeClass <GType>)
 (bind-type GTypeInstance <GTypeClass*>)
 (bind-type GTypeInterface <GType,GType>)
@@ -62,6 +65,7 @@
 ;(bind-alias GValue i8) ;; opaque struct
 (bind-alias GMainLoop i8) ;; opaque struct
 (bind-alias GCallback [void]*) ;; callback
+(bind-alias GFreeFunc [void,gpointer]*)
 
 ;; some types
 
@@ -125,11 +129,16 @@
 (bind-lib giolib g_object_set_property [void,GObject*,gchar*,GValue*]*)
 (bind-lib giolib g_object_get_property [void,GObject*,gchar*,GValue*]*)
 
+
 ;; signal stuff
 (bind-alias GClosure i8)
 (bind-alias GClosureNotify [void,gpointer,GClosure*]*)
 (bind-lib giolib g_signal_connect_data [gulong,gpointer,gchar*,GCallback,gpointer,GClosureNotify,i32]*)
 (bind-func g_signal_connect (lambda (a:gpointer b:gchar* c:GCallback d:gpointer) (g_signal_connect_data a b c d null 0)))
+(bind-lib giolib g_signal_connect_object [gulong,gpointer,gchar*,GCallback,gpointer,i32]*)
+(bind-lib giolib g_signal_emitv [void,GValue*,guint,GQuark,GValue*]*)
+(bind-lib giolib g_signal_lookup [guint,gchar*,GType]*)
+
 
 ;; Main loop
 (bind-lib gliblib g_main_loop_new [GMainLoop*,i8*,gboolean]*)
@@ -142,7 +151,14 @@
 
 ;; value and TYPE STUFF
 (bind-lib giolib g_value_init [GValue*,GValue*,GType]*)
+(bind-lib giolib g_value_get_object [gpointer,GValue*]*)
+(bind-lib giolib g_value_get_string [gchar*,GValue*]*)
+(bind-lib giolib g_value_get_int [gint,GValue*]*)
 (bind-lib giolib g_value_set_string [void,GValue*,gchar*]*)
+(bind-lib giolib g_value_set_object [void,GValue*,gpointer]*)
+(bind-lib giolib g_value_set_boxed [void,GValue*,gpointer]*)
+(bind-lib giolib g_value_set_pointer [void,GValue*,gpointer]*)
+(bind-lib giolib g_value_set_boolean [void,GValue*,i32]*);gboolean]*)
 (bind-lib giolib g_value_set_static_string [void,GValue*,gchar*]*)
 (bind-lib giolib g_strdup_value_contents [gchar*,GValue*]*)
 (bind-lib giolib g_type_check_value [gboolean,GValue*]*)
@@ -152,8 +168,7 @@
 (bind-lib giolib g_type_fundamental [GType,GType]*)
 (bind-lib giolib g_type_from_name [GType,gchar*]*)
 (bind-lib giolib g_type_init [void]*)
-
-
+(bind-lib giolib g_type_name [gchar*,GType]*)
 
 ;; type string stuff
 (bind-lib gliblib g_string_new [GString*,gchar*]*)
