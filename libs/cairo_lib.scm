@@ -8,7 +8,11 @@
 (define cairolib
   (if (string=? "Linux" (sys:platform))
       (sys:open-dylib "libcairo.so")
-      (print-error "tell me where to find the opencv core dynamic library on your platform here!")))
+      (if (string=? "Windows" (sys:platform))
+	  (print-error "tell me where to find the opencv core dynamic library on your platform here!")
+	  (sys:open-dylib "libcairo.dylib"))))
+
+(if (null? cairolib) (print-error "Error loading cairo library"))
 
 
 ;; complex structs with i8 name cheat (i.e. must be pointers)

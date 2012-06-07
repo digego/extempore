@@ -9,7 +9,11 @@
 ;; load soil library
 (define soillib (if (string=? "Linux" (sys:platform))
 		    (sys:open-dylib "libSOIL.so.1")
-		    (sys:open-dylib "soil.dll")))
+		    (if (string=? "Windows" (sys:platform))
+			(sys:open-dylib "soil.dll")
+			(sys:open-dylib "libSOIL.dylib"))))
+
+(if (null? soillib) (print-error "Error loading SOIL image library\n"))
 
 
 (bind-lib soillib SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)

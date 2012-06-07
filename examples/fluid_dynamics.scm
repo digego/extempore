@@ -460,12 +460,14 @@
   (let ((degree 0.0))
     (lambda ()    
       (look-at -30.5 30.0 50.0 20.5 3.5 -1.0 0.0 1.0 0.0)
+      (glEnable GL_BLEND)
+      (glBlendFunc GL_SRC_ALPHA (+ GL_SRC_ALPHA 1))      
       (glClearColor 1.0 0.5 .0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (glColorMaterial GL_FRONT_AND_BACK GL_AMBIENT_AND_DIFFUSE)
       (glDisable GL_DEPTH_TEST)
-      (glEnable GL_COLOR_MATERIAL)      
-      (glBlendFunc GL_SRC_ALPHA (+ GL_SRC_ALPHA 1))
+      (glEnable GL_COLOR_MATERIAL)
+
       (glColor4d 0.0 0.0 0.0 1.0)
       (glLineWidth 1.0)
       (fluid-step-cube (get-fluid-cube))
@@ -550,7 +552,7 @@
 
 
 (define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
-(gl-set-view 1024.0 768.0)
+(gl-set-view 1024.0 768.0 100.0)
 (opengl-test (now) 0.0)
 (smoke-signal (now))
 
