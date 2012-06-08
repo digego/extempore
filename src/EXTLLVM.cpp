@@ -957,7 +957,8 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
 
   pointer value = 0;
   if(_sc->args == _sc->NIL) {
-    value = 0;
+    //value = 0;
+    value = _sc->NIL;
   } else {   
     value = pair_car(_sc->args);
   }
