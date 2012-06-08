@@ -1377,7 +1377,21 @@
                     (if (pair? value)
                         (emit (cdr value) os))))                 
               (caddr ast))
-         (emit (impc:ir:compiler (cdddr ast) types) os)
+
+
+         ;; compile body
+	 (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
+	 (define envbody-str (impc:ir:compiler (cdddr ast) types))
+	 ;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
+	 (if (not (null? (car *impc:ir:ls_var*)))
+	     (begin (emit "; promote local stack var allocations\n" os)
+		    (map (lambda (v)
+			   (emit (car v) " = alloca " (cdr v) "\n" os))
+			 (car *impc:ir:ls_var*))))
+	 (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
+	 (emit envbody-str os)	 	 
+	 
+         ;(emit (impc:ir:compiler (cdddr ast) types) os)
          (impc:ir:strip-space os))))
 
 
