@@ -105,14 +105,14 @@ namespace extemp {
 		//scheme_set_output_port_file(sc, stdout);
 		memset(scheme_outport_string,0,256);
 		scheme_set_output_port_string(sc,scheme_outport_string,&scheme_outport_string[255]);
-		FILE *initscm = fopen(std::string(load_path).append("init.scm").c_str(),"r");
+		FILE *initscm = fopen(std::string(load_path).append("init.xtm").c_str(),"r");
 		if(!initscm) {
-			std::cout << "ERROR: Could not locate file: init.scm" << std::endl << "Exiting system!!" << std::endl;
+			std::cout << "ERROR: Could not locate file: init.xtm" << std::endl << "Exiting system!!" << std::endl;
 			exit(1);
                 }else{
-			//std::cout << "START LOADING INIT.SCM" << std::endl;
+			//std::cout << "START LOADING INIT.XTM" << std::endl;
 			scheme_load_file(sc, initscm);
-			//std::cout << "FINISHED LOADING INIT.SCM" << std::endl;
+			//std::cout << "FINISHED LOADING INIT.XTM" << std::endl;
 		}	
 #ifdef EXT_BOOST
 		io_service = new boost::asio::io_service();
@@ -522,35 +522,35 @@ namespace extemp {
 		std::stringstream ss;
 		std::string load_path = scm->getLoadPath();
 
-		scm->loadFile("extempore.scm", load_path.c_str());
-		//printf("Loaded... extempore.scm\n");
-		scm->loadFile("llvmir.scm", load_path.c_str()); 
-		//printf("Loaded... llvmir.scm\n");
-		scm->loadFile("llvmti.scm", load_path.c_str());		
-		//printf("Loaded... llvmti.scm\n");
-		scm->loadFile("comlist.scm", load_path.c_str());
-		//printf("Loaded... comlist.scm\n");
-		scm->loadFile("sort.scm", load_path.c_str());
-		//printf("Loading... sort.scm\n");
+		scm->loadFile("extempore.xtm", load_path.c_str());
+		//printf("Loaded... extempore.xtm\n");
+		scm->loadFile("llvmir.xtm", load_path.c_str()); 
+		//printf("Loaded... llvmir.xtm\n");
+		scm->loadFile("llvmti.xtm", load_path.c_str());		
+		//printf("Loaded... llvmti.xtm\n");
+		scm->loadFile("comlist.xtm", load_path.c_str());
+		//printf("Loaded... comlist.xtm\n");
+		scm->loadFile("sort.xtm", load_path.c_str());
+		//printf("Loading... sort.xtm\n");
                 if(scm->getInitFile().compare("") != 0) {
 		  scm->loadFile(scm->getInitFile().c_str());
                 }
 
-		// scm->loadFile("mbe.scm", [resources UTF8String]);
-		// printf("Loading... mbe.scm\n");
-		// scm->loadFile("au.scm", [resources UTF8String]);
-		// printf("Loading... au.scm\n");
-		// scm->loadFile("graphics.scm", [resources UTF8String]);
-		// printf("Loading... graphics.scm\n");
-		// scm->loadFile("openglconst.scm", [resources UTF8String]);
-		// printf("Loading... openglconst.scm\n");
-		// scm->loadFile("auvisualui.scm", [resources UTF8String]);
-		// printf("Loading... auvisualui.scm\n");
-		// scm->loadFile("vdspveclib.scm", [resources UTF8String]);
-		// printf("Loading... spaces.scm\n");
-		// scm->loadFile("spaces.scm", [resources UTF8String]);
-		// printf("Loading... match.scm\n");
-		// scm->loadFile("match.scm", [resources UTF8String]);
+		// scm->loadFile("mbe.xtm", [resources UTF8String]);
+		// printf("Loading... mbe.xtm\n");
+		// scm->loadFile("au.xtm", [resources UTF8String]);
+		// printf("Loading... au.xtm\n");
+		// scm->loadFile("graphics.xtm", [resources UTF8String]);
+		// printf("Loading... graphics.xtm\n");
+		// scm->loadFile("openglconst.xtm", [resources UTF8String]);
+		// printf("Loading... openglconst.xtm\n");
+		// scm->loadFile("auvisualui.xtm", [resources UTF8String]);
+		// printf("Loading... auvisualui.xtm\n");
+		// scm->loadFile("vdspveclib.xtm", [resources UTF8String]);
+		// printf("Loading... spaces.xtm\n");
+		// scm->loadFile("spaces.xtm", [resources UTF8String]);
+		// printf("Loading... match.xtm\n");
+		// scm->loadFile("match.xtm", [resources UTF8String]);
 		// 
 
 		// //////////////////////////////////////////////////
