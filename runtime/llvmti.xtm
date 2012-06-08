@@ -2648,8 +2648,10 @@
                              ;(if (symbol? t) (impc:ti:update-var t vars kts res))
 
                              res))
-                       (cdr ast)
-                       (if (or (null? ctype) 
+                       (cdr ast)	       
+                       (if (or (null? ctype)
+			       (and (number? (car ctype))
+				    (= (car ctype) 211))
                                (not (impc:ir:closure? (car ctype))))
                            (make-list (length (cdr ast)) #f)
                            ;; if we are using an existing definition then check arity
@@ -2676,6 +2678,7 @@
              ;; if there was a request that will be the return type
              ;; otherwise we cannot know it
              (ret (if (and (not (null? ctype))
+			   (not (atom? (car ctype)))
 			   (impc:ir:closure? (car ctype)))
 		      (cadr (car ctype))
 		      (if (and request?

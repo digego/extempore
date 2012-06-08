@@ -1395,6 +1395,92 @@
          (impc:ir:strip-space os))))
 
 
+(define impc:ir:compile:make-env
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+	   (lambda-envs '())
+	   (env-zone-tmp '()))
+      (map (lambda (p)   
+	     ;;(println 'p: p (cadr p)) ;'ast: ast)
+	     (let* ((symstr (symbol->string (caar p)))
+		    (symtype (cdr (assoc (caar p) types)))
+		    (value (impc:ir:compiler (cadr p) types symtype)) ; os)
+		    (typestr (cadr (impc:ir:gname)))
+		    (e (impc:ir:gname)))	       
+	       ;; (println 'symstr: symstr 'symtype: symtype)
+	       ;;(println 'typestr: typestr)
+	       (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
+			(impc:ir:number? (cdr (assoc (caar p) types)))
+			(impc:ir:number? (impc:ir:get-type-from-str typestr)))
+		   (set! typestr (impc:ir:get-type-str (cdr (assoc (caar p) types)))))
+	       ;; type check
+	       ;;(if (not (impc:ir:types-equal? typestr (cdr (assoc (caar p) types))))
+	       (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
+				(cdr (assoc (caar p) types))))
+		   (print-error 'Compiler 'Error:  'Type 'Mismatch 'for ; 'symbol 'in (cadr p)
+				'symbol: (symbol->string (caar p))
+				(string->symbol (impc:ir:get-type-str (cdr (assoc (caar p) types)))) 
+				'does 'not 'match 'use 'of 
+				(string->symbol typestr)))
+					;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
+					;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+
+	       (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+	       	     (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+	       	     os)      	 		    
+	       (emit  "\n; let assign value to symbol " symstr "\n" os)
+	       (if (cadr ast)
+	       	   (begin (emit "%dat_" symstr " = call i8* @llvm_zone_malloc(" 
+	       			"%mzone* " (car (impc:ir:gname "zone")) ", i64 "
+	       			(number->string (impc:ir:get-type-size (impc:ir:get-type-from-str (cadr e)))) ")\n" os)
+	       		  (emit "%" symstr "Ptr = bitcast i8* %dat_" symstr " to " typestr "*\n" os))
+	       	   (emit "%" symstr "Ptr = alloca " typestr "\n" os))		    
+
+	       (if (pair? value)
+		   (emit (car value) os)
+		   (emit value os))
+	       
+	       ;; this bitcast should be the same type on both sides                    
+	       (emit "\n; let value assignment\n" os)
+	       (emit (string-append "%" symstr " = select i1 true, " typestr " " 
+				    (if (and (number? (cadr p))
+					     (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+					(llvm:convert-float (car e)) ;(impc:ir:gname)))
+					(car e)) ;(impc:ir:gname)))
+				    ", " typestr " "
+				    (if (and (number? (cadr p))
+					     (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+					(llvm:convert-float (car e)) ; (impc:ir:gname)))
+					(car e)) ;(impc:ir:gname)))
+				    "\n") os)
+	       (emit (string-append "store " typestr " %" symstr ", " 
+				    typestr "* %" symstr "Ptr\n\n") os)
+	       (if (pair? value)
+		   (set! lambda-envs (cons (cdr value) lambda-envs)))))
+;		   (emit (cdr value) os))))                 
+	   (caddr ast))
+
+      ;; fill in and lambda environments now
+      (map (lambda (a)
+	     (emit a os))
+	   lambda-envs)
+       
+      ;; compile body
+      (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
+      (define envbody-str (impc:ir:compiler (cdddr ast) types))
+					;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
+      (if (not (null? (car *impc:ir:ls_var*)))
+	  (begin (emit "; promote local stack var allocations\n" os)
+		 (map (lambda (v)
+			(emit (car v) " = alloca " (cdr v) "\n" os))
+		      (car *impc:ir:ls_var*))))
+      (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
+      (emit envbody-str os)	 	 
+      
+					;(emit (impc:ir:compiler (cdddr ast) types) os)
+      (impc:ir:strip-space os))))
+
+
 (define impc:ir:compiler:closure-from-getter
    (lambda (name)
       (if (not (llvm:get-function (string-append name "_getter")))
