@@ -4213,12 +4213,14 @@
   (if (and (not (impc:ir:pointer? (impc:ir:convert-from-pretty-types type)))
 	   (or (impc:ir:number? (impc:ir:convert-from-pretty-types type)) ;(eval value))
 	       (impc:ir:boolean? (impc:ir:convert-from-pretty-types type)))) ;(eval value))
-       `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
-                   (llvm:compile (string-append "@" ,(symbol->string symbol)
-                                                " = global "
-                                                ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type))
-						" "
-						(atom->string ,value))))
+       `(begin (if (llvm:get-globalvar ,(symbol->string symbol))
+		   (print-error 'Compiler 'Error: 'cannot 'rebind ,(symbol->string symbol))
+                   (if (not (llvm:compile (string-append "@" ,(symbol->string symbol)
+							 " = global "
+							 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type))
+							 " "
+							 (atom->string ,value))))
+		       (print-error 'Compiler 'Error: 'cannot 'bind ,(symbol->string symbol) 'bad 'symbol 'name?)))
                ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
 	       ;(llvm:bind-global-var ,(symbol->string symbol) ,value)
 	       (ascii-print-color 0 7 10)
