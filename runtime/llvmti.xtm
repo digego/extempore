@@ -2120,6 +2120,8 @@
 
 (define impc:ti:array-ref-ptr-check
    (lambda (ast vars kts request?)
+      (if (<> (length ast) 3)
+          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))     
       (let ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
@@ -2136,6 +2138,8 @@
    (lambda (ast vars kts request?)
       ;(println 'request? request?)
       ;(println 'array-ref-check: 'ast: ast 'vars: vars 'kts: kts)
+      (if (<> (length ast) 3)
+          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
       (let ((a (impc:ti:type-check (cadr ast) vars kts '()))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
@@ -2169,6 +2173,8 @@
    (lambda (ast vars kts request?)
       ;(println 'request? request?)
       ;(println 'vector-ref-check: 'ast: ast 'vars: vars 'kts: kts)
+      (if (<> (length ast) 3)
+          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))     
       (let ((a (impc:ti:type-check (cadr ast) vars kts '()))
             ;; b should be i32
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
@@ -2200,6 +2206,8 @@
 
 (define impc:ti:pointer-ref-ptr-check
    (lambda (ast vars kts request?)
+      (if (<> (length ast) 3)
+          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))     
       (let ((a (impc:ti:type-check (cadr ast) vars kts request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
@@ -2213,7 +2221,9 @@
 
 (define impc:ti:pointer-ref-check
    (lambda (ast vars kts request?)
-      ;(println 'pointer-ref-check: 'ast: ast 'request? request?) ;'vars: vars 'kts: kts)
+      ;(println 'pointer-ref-check: 'ast: ast 'request? request?) ;'vars: vars 'kts: kts)     
+      (if (<> (length ast) 3)
+          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))     
       (let ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
@@ -2333,8 +2343,8 @@
 (define impc:ti:tuple-set-check
    (lambda (ast vars kts request?)
       ;(println 'tsetcheck ast) ; vars kts request?)
-      (if (< (length ast) 4)
-          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
+      (if (<> (length ast) 4)
+          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
       ;; (caddr ast) must be an integer 
       (if (not (integer? (caddr ast))) 
           (print-error 'Compiler 'Error: 'tuple-set! 'must 'use 'a 'literal 'integer 'index! ast))
@@ -2452,49 +2462,49 @@
 
 
 ;;(closure-set! closure a i32 5)
-(define impc:ti:closure-set-check
-   (lambda (ast vars kts request?)   
-      ;(println 'ast: ast)
-      (if (< (length ast) 5)
-          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
-      (let* (;; a should be a closure of some kind
-             (a (if (and (symbol? (cadr ast))
-                         (llvm:get-function (symbol->string (cadr ast))))
-                    #t ; // yes (cadr ast) is a globally defined closure
-                    (impc:ti:type-check (cadr ast) vars kts request?)))
-             ;; b should be a string (the var's name)
-             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*)))
-             ;; c should be a string (the type of b)
-             (c (impc:ti:type-check (cadddr ast) vars kts (list *impc:ir:si8*)))
-             ;; d should be a value of type c
-             (d (impc:ti:type-check (car (cddddr ast)) vars kts (impc:ir:get-type-from-str (cadddr ast)))))
-         ;; should return the type requested (i.e. c)
-         (impc:ir:get-type-from-str (cadddr ast)))))
+;; (define impc:ti:closure-set-check
+;;    (lambda (ast vars kts request?)   
+;;       ;(println 'ast: ast)
+;;       (if (<> (length ast) 5)
+;;           (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
+;;       (let* (;; a should be a closure of some kind
+;;              (a (if (and (symbol? (cadr ast))
+;;                          (llvm:get-function (symbol->string (cadr ast))))
+;;                     #t ; // yes (cadr ast) is a globally defined closure
+;;                     (impc:ti:type-check (cadr ast) vars kts request?)))
+;;              ;; b should be a string (the var's name)
+;;              (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*)))
+;;              ;; c should be a string (the type of b)
+;;              (c (impc:ti:type-check (cadddr ast) vars kts (list *impc:ir:si8*)))
+;;              ;; d should be a value of type c
+;;              (d (impc:ti:type-check (car (cddddr ast)) vars kts (impc:ir:get-type-from-str (cadddr ast)))))
+;;          ;; should return the type requested (i.e. c)
+;;          (impc:ir:get-type-from-str (cadddr ast)))))
 
 ;;(closure-ref closure a i32)
-(define impc:ti:closure-ref-check
-   (lambda (ast vars kts request?)     
-      (if (< (length ast) 4)
-          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
-      (let* (;; a should be a closure of some kind
-             (a (if (and (symbol? (cadr ast))
-                         (llvm:get-function (symbol->string (cadr ast))))
-                    #t ; // yes (cadr ast) is a globally defined closure
-                    (impc:ti:type-check (cadr ast) vars kts request?)))
-             ;; b should be a string (the var's name)
-             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*)))
-             ;; c should be a string (the type of b)
-             (c (impc:ti:type-check (cadddr ast) vars kts (list *impc:ir:si8*))))
-         ;; should return the type requested (i.e. c)
-         (impc:ir:get-type-from-str (cadddr ast)))))
+;; (define impc:ti:closure-ref-check
+;;    (lambda (ast vars kts request?)     
+;;       (if (<> (length ast) 4)
+;;           (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
+;;       (let* (;; a should be a closure of some kind
+;;              (a (if (and (symbol? (cadr ast))
+;;                          (llvm:get-function (symbol->string (cadr ast))))
+;;                     #t ; // yes (cadr ast) is a globally defined closure
+;;                     (impc:ti:type-check (cadr ast) vars kts request?)))
+;;              ;; b should be a string (the var's name)
+;;              (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*)))
+;;              ;; c should be a string (the type of b)
+;;              (c (impc:ti:type-check (cadddr ast) vars kts (list *impc:ir:si8*))))
+;;          ;; should return the type requested (i.e. c)
+;;          (impc:ir:get-type-from-str (cadddr ast)))))
 
 
 ;;(closure-set! closure a i32 5)
 (define impc:ti:closure-set-check
    (lambda (ast vars kts request?)   
       ;(println 'cset 'ast: ast 'request? request?)
-      (if (< (length ast) 4)
-          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
+      (if (<> (length ast) 5)
+          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
       (let* (;; a should be a closure of some kind
              (a (if (and (symbol? (cadr ast))
                          (llvm:get-function (symbol->string (cadr ast))))
@@ -2513,8 +2523,8 @@
 (define impc:ti:closure-ref-check
    (lambda (ast vars kts request?)
      ;(println 'cls 'ref 'check: ast 'request? request?)
-      (if (< (length ast) 3)
-          (print-error 'Compiler 'Error: 'missing 'operands 'in (sexpr->string ast)))
+      (if (<> (length ast) 4)
+          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
       (let* (;; a should be a closure of some kind
              (a (if (and (symbol? (cadr ast))
                          (llvm:get-function (symbol->string (cadr ast))))
