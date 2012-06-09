@@ -1958,6 +1958,20 @@
 		   (list *impc:ir:void*))))))
 
 
+(define impc:ti:push_zone-check
+  (lambda (ast vars kts request?)
+    (if (<> (length ast) 2)
+	(print-error 'Compiler 'Error: 'bad 'arity 'for (sexpr->string ast)))
+    (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
+    (list "%mzone*")))
+
+
+(define impc:ti:pop_zone-check
+  (lambda (ast vars kts request?)
+    ;(println 'memzonecheck ast (list? (cadr ast)))
+    (list *impc:ir:void*)))
+
+
 (define impc:ti:memzone-check
   (lambda (ast vars kts request?)
     (if (or (> (length ast) 4)
@@ -1970,6 +1984,7 @@
 	(begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
 	       (impc:ti:type-check (caddr ast) vars kts *impc:ir:si64*)
 	       (impc:ti:type-check (cadddr ast) vars kts request?)))))
+
 
 
 
@@ -2819,6 +2834,8 @@
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))            
             ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(push_zone))) (impc:ti:push_zone-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(pop_zone))) (impc:ti:pop_zone-check ast vars kts request?))	    
             ((and (list? ast) (member (car ast) '(memzone))) (impc:ti:memzone-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(callback))) (impc:ti:callback-check ast vars kts request?))	    
             ((and (list? ast) (member (car ast) '(llvm_sprintf))) (impc:ti:sprintf-check ast vars kts request?))

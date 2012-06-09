@@ -1916,6 +1916,41 @@
 ;;       (impc:ir:strip-space os))))
 
 
+(define impc:ir:compile:push_zone
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+	   (size-str (impc:ir:compiler (cadr ast) types))
+	   (size (impc:ir:gname)))
+	   
+      ;(println 'size: size)
+      
+      (if (<> (impc:ir:get-type-from-str (cadr size)) 2)
+	  (print-error 'Compiler 'Error: 'first 'push_zone 'argument 'must 'be 'a 'size 'argument '- 'i64 'not (cadr size)))
+      
+      (emit size-str os) ;; write size str
+      
+      (emit (impc:ir:gname "zone" "%mzone*")
+	    " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
+      (emit "call void @llvm_push_zone_stack(%mzone* " (car (impc:ir:gname)) ")\n" os)
+      (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
+      (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
+
+      (let ((zone (impc:ir:gname "zone")))
+	(impc:ir:gname "ret" (car zone) (cadr zone))) 	    
+      ;(impc:ir:gname "body" (car e) (cadr e))
+      (impc:ir:strip-space os))))
+
+
+(define impc:ir:compile:pop_zone
+  (lambda (ast types)
+    (let* ((os (make-string 0)))      
+      (emit (impc:ir:gname "oldzone" "%mzone*") " = call %mzone* @llvm_pop_zone_stack()\n" os)
+      (emit (impc:ir:gname "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+      (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "newzone")) " to i8*\n" os)
+      (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)      
+      (impc:ir:strip-space os))))
+
+
 (define impc:ir:compile:zone
   (lambda (ast types)
     (let* ((os (make-string 0))
@@ -3575,6 +3610,8 @@
              (cond ((member (car ast) '(make-env make-env-zone))
                     (impc:ir:compile:make-env ast types))
 		   ((equal? (car ast) 'memzone) (impc:ir:compile:zone ast types))
+		   ((equal? (car ast) 'push_zone) (impc:ir:compile:push_zone ast types))
+		   ((equal? (car ast) 'pop_zone) (impc:ir:compile:pop_zone ast types))
 		   ((member (car ast) '(impc_null))
 		    (string-append (impc:ir:gname "null" (if (null? hint?) "i8*" (impc:ir:get-type-str (car hint?))))
 		    		   " = bitcast i8* null to " (if (null? hint?) "i8*" (impc:ir:get-type-str (car hint?)))
