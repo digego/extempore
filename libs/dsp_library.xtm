@@ -838,40 +838,25 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; make-note should probably use relative not absolute time?
-;; if we decide to keep this we can remove start-time
-
-;; absolute time
-(definec make-note
-  (lambda (start-time freq:double amp:double dur 
-		      attack decay release sus-amp
-		      nstarts:double*
-		      idx:i64 kernel:[double,double,double,double,double]*)
-    (let ((env (if (< (+ attack decay) dur)
-		   (make-adsr start-time attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
-		   (make-adsr start-time 0.0 0.0 dur release 1.0 sus-amp))))
-      (lambda (sample:double time:double channel:double)
-	(if (> time (+ start-time dur release))
-	    (begin (pset! nstarts idx 9999999999999.0) 0.0)
-	    (kernel (- time start-time) channel freq (* (env time) amp)))))))
-
-
-;; relative time USING adsr-accum
+;; relative time USING adsr-accum + local mzone
 (definec make-note
   (lambda (start-time:double freq:double amp:double dur 
 		      attack:double decay:double release:double sus-amp:double
 		      nstarts:double*
-		      idx:i64 kernel:[double,double,double,double,double]*)
+		      idx:i64 kernel:[double,double,double,double,double]*
+		      notezone:mzone*)
     (let ((env (if (< (+ attack decay) dur)
-	  	   (make-adsr-accum 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
-	  	   (make-adsr-accum 0.0 0.0 0.0 dur release 1.0 sus-amp)))
-	  (t 0.0))
-      (lambda (sample:double time:double channel:double)
-	(if (< channel 1.0) (set! t (+ t 1.0)))
-	(if (< t (+ dur release))
-	    (kernel t channel freq (* (env t channel) amp))
-	    (begin (pset! nstarts idx 9999999999999.0) 0.0))))))
-
+		   (make-adsr-accum 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
+		   (make-adsr-accum 0.0 0.0 0.0 dur release 1.0 sus-amp)))
+	  (t 0.0)
+	  (ff (lambda (sample:double time:double channel:double)
+		(if (< channel 1.0) (set! t (+ t 1.0)))
+		(if (< t (+ dur release))
+		    (kernel t channel freq (* (env t channel) amp))
+		    (begin (pset! nstarts idx 9999999999999.0)
+			   (llvm_zone_destroy notezone)
+			   0.0)))))
+      ff)))
 
 (define-macro (define-instrument name note-kernel effect-kernel)
   `(definec ,name
@@ -882,7 +867,7 @@
 	    (release:double 1000.0)
 	    (sustain:double 0.6) ;; amplitude of the sustain
 	    (gain 2.0)
-	    (active 0)
+	    ;(active 0)
 	    (ii 0)
 	    (note-starts:double* (zalloc poly))
 	    (new-note (lambda (start freq dur amp)
@@ -892,18 +877,21 @@
 			  (dotimes (i poly) ;; check for free poly spot           
 			    (if (> (pref note-starts i) 9999999999998.0)
 				(set! free-note i)))
-			  (if (= 0 active)
-			      (begin (dotimes (iii poly)
-				       (pset! note-starts iii 9999999999999.0))
-				     (set! free-note -1)))			  
-			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
-			      (begin (pset! notes free-note
-					    (make-note start freq amp dur
-						       attack decay release sustain
-						       note-starts free-note
-						       (,note-kernel)))
-				     (pset! note-starts free-note start)
-				     1)
+			  ;; (if (= 0 active)
+			  ;;     (begin (dotimes (iii poly)
+			  ;; 	       (pset! note-starts iii 9999999999999.0))
+			  ;; 	     (set! free-note -1)))			  
+			  (if (> free-note -1) ;; if we found a free poly spot assign a note
+			      (let ((note_zone (push_zone (* 1024 10))))
+				(pset! notes free-note
+				       (make-note start freq amp dur
+						  attack decay release sustain
+						  note-starts free-note
+						  (,note-kernel)
+						  note_zone))
+				(pset! note-starts free-note start)
+				(pop_zone)
+				1)
 			      0)))))
        (dotimes (ii poly) ;; sets all notes to inactive
 	 (pset! note-starts ii 9999999999999.0))
@@ -924,14 +912,12 @@
 ;; it's a trade off!
 (definec _synth-note
   (lambda (time inst:[double,double,double,double,double*]* freq amp dur)
-    (memzone (* 1024 10)
-	     (dtoi64 (+ (- time (i64tod (now)))
-			dur
-			(* 20.0 *samplerate*))) ;; time padding
-      (let ((f (inst.new-note:[i64,double,double,double,double]*)))
-	(f time freq dur amp)
-	;; so that we only copy an integer from memzone
-	1))))
+    ;; allocate memzone
+    (let ((f (inst.new-note:[i64,double,double,double,double]*)))
+      (f time freq dur amp)
+      ;; so that we only copy an integer from memzone
+      1)))
+
 
 (definec midi2frq    
   (lambda (pitch)            
@@ -1255,8 +1241,6 @@
 		(* amp (hermite-interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
 
-
-
 (definec sampler-fx 400000
   (let ((reverbl (make-reverb 80.0))
 	(reverbr (make-reverb 79.0))	
@@ -1295,7 +1279,7 @@
 	    (sustain:double 1.0) ;; amplitude of the sustain
 	    (gain:double 2.0)
 	    (kk:i64 0) (ii:i64 0)
-	    (active:i64 0)
+	    ;(active:i64 0)
 	    (note-starts:double* (zalloc poly))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note:i64 -1)
@@ -1306,10 +1290,10 @@
 			  (dotimes (i poly) ;; check for free poly spot           
 			    (if (> (pref note-starts i) 9999999999998.0)
 				(set! free-note i)))
-			  (if (= 0 active)
-			      (begin (dotimes (iii poly)
-				       (pset! note-starts iii 9999999999999.0))
-				     (set! free-note -1)))
+			  ;; (if (= 0 active)
+			  ;;     (begin (dotimes (iii poly)
+			  ;; 	       (pset! note-starts iii 9999999999999.0))
+			  ;; 	     (set! free-note -1)))
 			  (if (> free-note -1) ;; if we found a free poly spot assign a note  
 			      (begin (dotimes (idxi 128)
 				       (let ((v (llabs (- idx idxi))))
@@ -1317,12 +1301,15 @@
 						  (< v closest))
 				      (begin (set! new-idx idxi)
 					     (set! closest v) 0))))
-				     (pset! notes free-note
-					    (make-note start freq amp dur
-						       attack decay release sustain
-						       note-starts free-note
-						       (,note-kernel samples samples-length samples-offsets samples-channels new-idx)))
-				     (pset! note-starts free-note start)
+				     (let ((note_zone (push_zone (* 1024 10))))
+				       (pset! notes free-note
+					      (make-note start freq amp dur
+							 attack decay release sustain
+							 note-starts free-note
+							 (,note-kernel samples samples-length samples-offsets samples-channels new-idx)
+							 note_zone))
+				       (pset! note-starts free-note start)
+				       (pop_zone))
 				     1)
 			      0)))))
        (dotimes (kk 128)
@@ -1426,12 +1413,12 @@
 
 (print)
 (ascii-print-color 1 7 10) 
-(print "All set to go!\n")
-(synth.active 1)
+(print "All set to go!\n")	      			
 (ascii-print-color 0 7 10)
-(print "'Synth' active = true\n")
-(sampler.active 1)
-(print "'Sampler' active = true\n")
+;(synth.active 1)
+;(print "'Synth' active = true\n")
+;(sampler.active 1)
+;(print "'Sampler' active = true\n")
 (print)
 (print "You have two default instruments loaded 'synth' and 'sampler'\n")
 (print)
