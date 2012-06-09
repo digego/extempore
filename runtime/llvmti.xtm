@@ -376,6 +376,15 @@
                     (apply list 'begin (cdar ast)))
                 (impc:ti:cond (cdr ast))))))
 
+(define impc:ti:list
+  (lambda (ast)
+    (if (null? ast) 'null
+	(list 'cons
+	      (car ast)
+	      (impc:ti:list (cdr ast))))))
+
+		
+
 ;; (define impc:ti:map   
 ;;    (lambda (ast)
 ;;       (list 'let 'maplloop (append (map (lambda (p l)
@@ -552,6 +561,8 @@
                         (impc:ti:first-transform (impc:ti:random (cdr ast)) inbody?))
                        ((eq? (car ast) 'quote)
                         (impc:ti:first-transform (impc:ti:quote (cadr ast)) inbody?))
+                       ((eq? (car ast) 'list)
+                        (impc:ti:first-transform (impc:ti:list (cdr ast)) inbody?))
                        ;; ((member (car ast) '(map for-each))
                        ;;  (impc:ti:first-transform (impc:ti:map (cdr ast)) inbody?))
                        ((eq? (car ast) 'case) 
@@ -1685,6 +1696,20 @@
 			   ;;(println 'avars: (assoc a vars))
 	 		   ;; gt for generics type
 	 		   (let ((tt (impc:ti:type-check a vars kts gt)))
+			     ;;;;;;;;
+			     ;; generics are unforgiving to choice
+			     ;; so if we have number choice then
+			     ;; let's always force i64 or double
+			     (if (or (equal? tt '(2 4))
+				     (equal? tt '(2 4 7))
+				     (equal? tt '(2 4 7 8)))
+				 (set! tt '(2)))
+			     (if (equal? tt '(0 1))
+				 (set! tt '(0)))
+			     ;;;;;;;;;;
+				 
+
+			     
 			     ;;(println 'avars2: (assoc a vars))
 			     ;(if (and (list? tt) (> (length tt) 1)) (set! tt (list tt)))
 	 		     ;;(println 'a: a 'tt: tt 'gt: gt)
@@ -1716,7 +1741,7 @@
 					  (= (length gt) (length (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))))
 				     (set! tt (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))
 				     (print-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
-
+			     
 			     ;; we might be able to update-vars based by matching our request 'gt vs our result 'tt
 			     (for-each
 			      (lambda (aa bb)
