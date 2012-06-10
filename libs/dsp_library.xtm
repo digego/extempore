@@ -29,6 +29,9 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; do you want to compile multichannel extensions
+;; usually NOT
+(define *build-multi-chan* #f)
 
 ;; bind some global audio values 
 (bind-val SAMPLERATE double (integer->real *au:samplerate*))
@@ -86,13 +89,15 @@
 	(if (> phase PI) (set! phase (- phase TWOPI)))
 	(* amp (_sin phase))))))
 
-(definec make-oscil-c
-  (lambda (phase)
-    (let ((mem 0.0)
-	  (osc (make-oscil phase)))
-      (lambda (chan amp freq)
-	(if (< chan 1.0) (set! mem (osc amp freq)))
-	mem))))
+
+(if *build-multi-chan*
+    (definec make-oscil-c
+      (lambda (phase)
+	(let ((mem 0.0)
+	      (osc (make-oscil phase)))
+	  (lambda (chan amp freq)
+	    (if (< chan 1.0) (set! mem (osc amp freq)))
+	    mem)))))
 
 
 ;; square oscillator
@@ -103,14 +108,17 @@
       (lambda (amp freq)
 	(* amp (tanh (* n (osc 1.0 freq))))))))
 
+
 ;; square oscillator multichannel
-(definec make-square-c
-  (lambda (phase)   
-    (let ((sqr (make-square phase))
-	  (mem 0.0))
-      (lambda (chan amp freq)	
-	(if (< chan 1.0) (set! mem (sqr amp freq)))
-	mem))))
+(if *build-multi-chan*
+    (definec make-square-c
+      (lambda (phase)   
+	(let ((sqr (make-square phase))
+	      (mem 0.0))
+	  (lambda (chan amp freq)	
+	    (if (< chan 1.0) (set! mem (sqr amp freq)))
+	    mem)))))
+
 
 ;; saw oscillator
 (definec make-saw
@@ -135,14 +143,16 @@
 	  (set! saw (* leak (+ saw (+ dc (/ (sin x) x)))))
 	  (* amp saw))))))
 
+
 ;; saw oscillator
-(definec make-saw-c
-  (lambda ()
-    (let ((mem 0.0)
-	  (saw (make-saw)))
-      (lambda (chan amp freq)
-	(if (< chan 1.0) (set! mem (saw amp freq)))
-	mem))))
+(if *build-multi-chan*
+    (definec make-saw-c
+      (lambda ()
+	(let ((mem 0.0)
+	      (saw (make-saw)))
+	  (lambda (chan amp freq)
+	    (if (< chan 1.0) (set! mem (saw amp freq)))
+	    mem)))))
 
 
 ;; pulse train
@@ -157,13 +167,14 @@
 	      amp
 	      0.0))))))
 
-(definec make-pulse-c
-  (lambda ()
-    (let ((pulse (make-pulse))
-	  (mem 0.0))
-      (lambda (chan amp freq)
-	(if (< chan 1.0) (set! mem (pulse amp freq)))
-	mem))))      
+(if *build-multi-chan*
+    (definec make-pulse-c
+      (lambda ()
+	(let ((pulse (make-pulse))
+	      (mem 0.0))
+	  (lambda (chan amp freq)
+	    (if (< chan 1.0) (set! mem (pulse amp freq)))
+	    mem)))))
 
 
 ;; iir comb without interpolation
@@ -184,13 +195,14 @@
 	  (set! time (+ time 1))
 	  y)))))
 
-(definec make-delay-c
-  (lambda (channels:i64 max-delay)
-    (let ((dlines:[double,double]** (alloc channels))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! dlines i (make-delay max-delay)))
-      (lambda (chan x)
-	((pref dlines (dtoi32 chan)) x)))))
+(if *build-multi-chan*
+    (definec make-delay-c
+      (lambda (channels:i64 max-delay)
+	(let ((dlines:[double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! dlines i (make-delay max-delay)))
+	  (lambda (chan x)
+	    ((pref dlines (dtoi32 chan)) x))))))
 
 
 ;; iir comb with interpolation
@@ -226,16 +238,17 @@
 	  y)))))
 
 
-(definec make-comb-c
-  (lambda (channels:i64 max-delay)
-    (let ((dlines:[double,double]** (alloc channels))
-	  (delay (i64tod max-delay))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! dlines i (make-comb max-delay)))
-      (lambda (chan x)
-	(let ((f (pref dlines (dtoi32 chan))))
-	  (f.delay delay)
-	  (f x))))))
+(if *build-multi-chan*
+    (definec make-comb-c
+      (lambda (channels:i64 max-delay)
+	(let ((dlines:[double,double]** (alloc channels))
+	      (delay (i64tod max-delay))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! dlines i (make-comb max-delay)))
+	  (lambda (chan x)
+	    (let ((f (pref dlines (dtoi32 chan))))
+	      (f.delay delay)
+	      (f x)))))))
 
 
 ;; flanger
@@ -248,14 +261,15 @@
 	(comb x)))))
 
 
-(definec make-flanger-c
-  (lambda (channels:i64 delay mod-phase mod-range mod-rate)
-    (let ((comb (make-comb-c channels (dtoi64 (+ delay mod-range))))
-	  (mod (make-oscil-c mod-phase))
-	  (i:i64 0))
-      (lambda (chan x)
-	(comb.delay (+ delay (mod chan mod-range mod-rate)))
-	(comb chan x)))))
+(if *build-multi-chan*
+    (definec make-flanger-c
+      (lambda (channels:i64 delay mod-phase mod-range mod-rate)
+	(let ((comb (make-comb-c channels (dtoi64 (+ delay mod-range))))
+	      (mod (make-oscil-c mod-phase))
+	      (i:i64 0))
+	  (lambda (chan x)
+	    (comb.delay (+ delay (mod chan mod-range mod-rate)))
+	    (comb chan x))))))
 
 
 ;; chorus
@@ -290,14 +304,15 @@
 	   (comb2 x)
 	   (comb3 x))))))
 
-(definec make-chorus-c
-  (lambda (channels:i64 phase)
-    (let ((dlines:[double,double]** (alloc channels))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! dlines i (make-chorus phase)))
-      (lambda (chan x)
-	(let ((f (pref dlines (dtoi32 chan))))
-	  (f x))))))
+(if *build-multi-chan*
+    (definec make-chorus-c
+      (lambda (channels:i64 phase)
+	(let ((dlines:[double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! dlines i (make-chorus phase)))
+	  (lambda (chan x)
+	    (let ((f (pref dlines (dtoi32 chan))))
+	      (f x)))))))
 
 
 ;; tap delay
@@ -337,14 +352,15 @@
 	  (set! time (+ time 1))
 	  y)))))
 
-(definec make-allpass-c
-  (lambda (channels:i64 delay)
-    (let ((lines:[double,double]** (alloc channels))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! lines i (make-allpass delay)))
-      (lambda (chan x)
-	(let ((f (pref lines (dtoi32 chan))))
-	  (f x))))))
+(if *build-multi-chan*
+    (definec make-allpass-c
+      (lambda (channels:i64 delay)
+	(let ((lines:[double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-allpass delay)))
+	  (lambda (chan x)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x)))))))
 
 
 ;; a dodgy reverb
@@ -392,14 +408,15 @@
 			       (dly3 wetin)
 			       (dly4 wetin)))))))))))
 
-(definec make-reverb-c
-  (lambda (channels:i64 size)
-    (let ((lines:[double,double]** (alloc channels))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! lines i (make-reverb size)))
-      (lambda (chan x)
-	(let ((f (pref lines (dtoi32 chan))))
-	  (f x))))))
+(if *build-multi-chan*
+    (definec make-reverb-c
+      (lambda (channels:i64 size)
+	(let ((lines:[double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-reverb size)))
+	  (lambda (chan x)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x)))))))
 
 
 ;; a dodgy bitcrusher
@@ -492,14 +509,15 @@
 	  (set! x1 x)
 	  y)))))
 
-(definec make-lpf-c
-  (lambda (channels:i64)
-    (let ((lines:[double,double,double]** (alloc channels))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! lines i (make-lpf)))
-      (lambda (chan x freq)
-	(let ((f (pref lines (dtoi32 chan))))
-	  (f x freq))))))
+(if *build-multi-chan*
+    (definec make-lpf-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-lpf)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x freq)))))))
 
 
 ;; biquad high-pass filter
@@ -546,14 +564,15 @@
 	  (set! x1 x)
 	  y)))))
 
-(definec make-hpf-c
-  (lambda (channels:i64)
-    (let ((lines:[double,double,double]** (alloc channels))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! lines i (make-hpf)))
-      (lambda (chan x freq)
-	(let ((f (pref lines (dtoi32 chan))))
-	  (f x freq))))))
+(if *build-multi-chan*
+    (definec make-hpf-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-hpf)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x freq)))))))
 
 
 ;; biquad band-pass filter
@@ -604,14 +623,15 @@
 	  y)))))
 
 
-(definec make-bpf-c
-  (lambda (channels:i64)
-    (let ((lines:[double,double,double]** (alloc channels))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! lines i (make-bpf)))
-      (lambda (chan x freq)
-	(let ((f (pref lines (dtoi32 chan))))
-	  (f x freq))))))
+(if *build-multi-chan*
+    (definec make-bpf-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-bpf)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x freq)))))))
 
 
 ;; biquad notch filter
@@ -661,14 +681,15 @@
 	  (set! x1 x)
 	  y)))))
 
-(definec make-notch-c
-  (lambda (channels:i64)
-    (let ((lines:[double,double,double]** (alloc channels))
-	  (i:i64 0))
-      (dotimes (i channels) (pset! lines i (make-notch)))
-      (lambda (chan x freq)
-	(let ((f (pref lines (dtoi32 chan))))
-	  (f x freq))))))
+(if *build-multi-chan*
+    (definec make-notch-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-notch)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x freq)))))))
 
 
 
@@ -702,16 +723,17 @@
 	  (set! y4 (- y4 (/ (pow y4 3.0) 6.0)))
 	  y4)))))
 
-(definec make-vcf-c
-  (lambda (channels:i64)
-    (let ((lines:[double,double,double]** (alloc channels))
-	  (res 0.5)
-	  (i:i64 0))
-      (dotimes (i channels) (pset! lines i (make-vcf)))
-      (lambda (chan x freq)
-	(let ((f (pref lines (dtoi32 chan))))
-	  (f.res res)
-	  (f x freq))))))
+(if *build-multi-chan*
+    (definec make-vcf-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (res 0.5)
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-vcf)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f.res res)
+	      (f x freq)))))))
 
 ;;
 ;; moog VCF v2.0
@@ -740,16 +762,17 @@
 	  out4)))))
 
 
-(definec make-vcf2-c
-  (lambda (channels:i64)
-    (let ((lines:[double,double,double]** (alloc channels))
-	  (res 0.5)
-	  (i:i64 0))
-      (dotimes (i channels) (pset! lines i (make-vcf2)))
-      (lambda (chan x freq)
-	(let ((f (pref lines (dtoi32 chan))))
-	  (f.res res)
-	  (f x freq))))))
+(if *build-multi-chan*
+    (definec make-vcf2-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (res 0.5)
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-vcf2)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f.res res)
+	      (f x freq)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
