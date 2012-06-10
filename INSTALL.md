@@ -5,13 +5,13 @@ may not be installed on your system.
 
 ## OS X
 - `LLVM 3.0`
-- `pthread` (if not using boost) *or* `boost` (if not using `pthread`)
-- `pcre` (Perl Compatible Regular Expressions)
+- `pthread` (if not using `boost`) *or* `boost` (if not using `pthread`)
+- `pcre` (Perl-compatible Regular Expressions)
 - `portaudio`
 
 ## Linux
-- `LLVM 3.0` (must be built from source)
-- `pthread` (if not using boost) *or* `boost` (if not using `pthread`)
+- `LLVM 3.0`
+- `pthread` (if not using `boost`) *or* `boost` (if not using `pthread`)
 - `pcre`
 - `portaudio`
 - `mesa GL` (openGL)
@@ -28,8 +28,8 @@ binary packages.
 
 LLVM *must* be version 3.0 and needs to be built from source, because
 a small patch to `LLParser.cpp` (an LLVM source file) is required. The
-patch file (`llparser.patch`) is supplied in the `extempore/extras`
-directory. You can get LLVM src from http://www.llvm.org/
+patch file `llparser.patch` is supplied in the `extempore/extras`
+directory. You can get the LLVM source from http://www.llvm.org/
 
 # Unix & OS X
 
@@ -38,7 +38,7 @@ patch just move into the `lib/AsmParser` directory and then apply the
 `llparser.patch` file which in can be found in `extempore/extras`.
 
 For example, if you've downloaded the LLVM source into `~/Code/llvm`
-and extempore into `~/Code/extempore`, then patching the file is as
+and cloned extempore into `~/Code/extempore`, then patching the file is as
 simple as
 
 ```shell
@@ -188,26 +188,40 @@ $ ./extempore
 There are some optional command line options that you may want to use
 you can get a list by running `./extempore --help`
 
-Once you've started extempore you can connect using either Telnet,
-Emacs (using the included `extras/extempore.el file)`, or vim (using
-the included `extras/extempore.vim`).
+Once you've started extempore you can connect using either telnet,
+emacs, or vim.
 
-If using Telnet the default extempore port to connect to is `7099`.
+## Telnet
 
-If you want ot use Emacs (recommended) then you'll need to call
-`M-x load-file` and then load `extempore/extras/extempore.el` after you've
-started emacs. Then switch to a blank buffer (`C-x b - new - return`) 
-and turn on `M-x scheme-mode` first then ``M-x extempore-mode`` and you're away.
-`C-x C-x` to eval an expression.
+If using telnet the default extempore port to connect to is `7099`.
+
+## Emacs
+
+Emacs currently has the most support for extempore programming. After
+starting emacs, the steps to get up and running with extempore are:
+
+1. Open a shell buffer `M-x shell`, `cd` to the extempore directory
+and start it up with `./extempore`
+2. Load `extras/extempore.el` with `M-x load-file` after you've
+started emacs
+3. Switch to an xtlang file (or create a new one)
+4. Enable first `M-x scheme-mode` and then `M-x extempore-mode`
+5. You're away. `C-x C-x` will eval an expression and `C-x C-r` will
+eval the region
   
-To avoid loading extempore.el everytime you start emacs you'll
-probably want to add the following to your `~/.emacs` file:
+This process (particularly having to load *both* `scheme-mode` and
+`extempore-mode` for every file) will improve soon as a more
+fully-fledged `extempore-mode` is developed.
+
+To avoid manually having to load `extempore.el` every time you start
+emacs (i.e. step 2) you'll probably want to add the following to your
+`~/.emacs`:
 
 ```elisp
 (autoload 'extempore-mode "/path/to/extempore.el" "" t)
 ```
 
-`extempore.el` can be found in the extras directory.
+## Vim
 
-If you want to use (g)Vim, see the instructions found in
+If you want to use (g)vim, see the instructions found in
 `extras/extempore.vim`.
