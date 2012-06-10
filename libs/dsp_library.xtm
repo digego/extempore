@@ -29,6 +29,23 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;; bind some global audio values 
+(bind-val SAMPLERATE double (integer->real *au:samplerate*))
+(bind-val CHANNELS i64 *au:channels*)
+(bind-val IN_CHANNELS i64 *au:in-channels*)
+(bind-val FRAMES i64 *au:block-size*)
+
+(definec print-audio-state
+  (lambda ()
+    (printf "    FRAMES: %lld\n" FRAMES)
+    (printf " OUT CHANS: %lld\n" CHANNELS)
+    (printf "  IN CHANS: %lld\n" IN_CHANNELS)
+    (printf "SAMPLERATE: %f\n" SAMPLERATE)))
+
+(print-audio-state)
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; silence
 (definec:dsp dsp
@@ -57,14 +74,14 @@
 (definec make-oscil
   (lambda (phase)
     (lambda (amp freq)
-      (let ((inc (* TWOPI (/ freq *samplerate*))))
+      (let ((inc (* TWOPI (/ freq SAMPLERATE))))
 	(set! phase (+ phase inc))
 	(* amp (sin phase))))))
 
 (definec make-oscil
   (lambda (phase)
     (lambda (amp freq)
-      (let ((inc (* TWOPI (/ freq *samplerate*))))
+      (let ((inc (* TWOPI (/ freq SAMPLERATE))))
 	(set! phase (+ phase inc))
 	(if (> phase PI) (set! phase (- phase TWOPI)))
 	(* amp (_sin phase))))))
@@ -104,7 +121,7 @@
 	  (leak 0.995)
 	  (saw 0.0))
       (lambda (amp freq)
-	(let* ((qmax (* 0.5 (/ *samplerate* freq)))
+	(let* ((qmax (* 0.5 (/ SAMPLERATE freq)))
 	       (dc (/ -0.498 qmax)))
 	  (set! p (+ p dp))
 	  (if (< p 0.0) 
@@ -134,7 +151,7 @@
     (let ((time -1.0)
 	  (width 100.0))
       (lambda (amp:double freq)
-	(let ((period (/ *samplerate* freq)))
+	(let ((period (/ SAMPLERATE freq)))
 	  (set! time (+ time 1.0))
 	  (if (< (modulo time period) width)
 	      amp
@@ -333,7 +350,7 @@
 ;; a dodgy reverb
 (definec make-reverb
   (lambda (size) ; size in ms
-    (let ((ms (/ *samplerate* 1000.0))
+    (let ((ms (/ SAMPLERATE 1000.0))
 	  (wet .25)
 	  (dly1 (make-delay (dtoi64 (* ms (* .192 size)))))
 	  (dly2 (make-delay (dtoi64 (* ms (* .373 size)))))
@@ -355,7 +372,7 @@
 ;; a dodgy reverb mk2
 (definec make-reverb
   (lambda (size) ; size in ms
-    (let ((ms (/ *samplerate* 1000.0))
+    (let ((ms (/ SAMPLERATE 1000.0))
 	  (wet .25)
 	  (dly1 (make-delay (dtoi64 (* ms (* .192 size)))))
 	  (dly2 (make-delay (dtoi64 (* ms (* .373 size)))))
@@ -452,7 +469,7 @@
 	;; recalculate coefficients
 	(if (or (<> freq oldfreq)
 		(<> res oldres))
-	    (let* ((omega (* TWOPI (/ freq *samplerate*)))
+	    (let* ((omega (* TWOPI (/ freq SAMPLERATE)))
 		   (sino (sin omega))
 		   (coso (cos omega))
 		   (alpha (/ sino (* 2.0 res))))
@@ -506,7 +523,7 @@
 	;; recalculate coefficients
 	(if (or (<> freq oldfreq)
 		(<> res oldres))
-	    (let* ((omega (* TWOPI (/ freq *samplerate*)))
+	    (let* ((omega (* TWOPI (/ freq SAMPLERATE)))
 		   (sino (sin omega))
 		   (coso (cos omega))
 		   (alpha (/ sino (* 2.0 res))))
@@ -561,7 +578,7 @@
 	;; recalculate coefficients
 	(if (or (<> freq oldfreq)
 		(<> bandwidth oldbw))
-	    (let* ((omega (* 1.0 TWOPI (/ freq *samplerate*)))
+	    (let* ((omega (* 1.0 TWOPI (/ freq SAMPLERATE)))
 		   (sino (sin omega))
 		   (coso (cos omega))
 		   (alpha (* sino (sinh (* (/ (log2 2.0) 2.0)
@@ -619,7 +636,7 @@
 	;; recalculate coefficients
 	(if (or (<> freq oldfreq)
 		(<> bandwidth oldbw))
-	    (let* ((omega (* TWOPI (/ freq *samplerate*)))
+	    (let* ((omega (* TWOPI (/ freq SAMPLERATE)))
 		   (sino (sin omega))
 		   (coso (cos omega))
 		   (alpha (* sino (sinh (* (/ (log2 2.0) 2.0)
@@ -666,9 +683,9 @@
 	  (x 0.0) (y1 0.0) (y2 0.0) (y3 0.0) (y4 0.0)
 	  (oldx 0.0) (oldy1 0.0) (oldy2 0.0) (oldy3 0.0))
       (lambda (in cutoff)
-	(let (;(f (* 2.0 (/ cutoff *samplerate*)))
-	      ;(f (* 1.8 (/ cutoff *samplerate*)))
-	      (f (* 1.75 (/ cutoff *samplerate*)))
+	(let (;(f (* 2.0 (/ cutoff SAMPLERATE)))
+	      ;(f (* 1.8 (/ cutoff SAMPLERATE)))
+	      (f (* 1.75 (/ cutoff SAMPLERATE)))
               ;(k (- (* 2.0 (sin (* f (/ PI 2.0)))) 1.0))
 	      (k (- (- (* 3.6 f) (* 1.6 (* f f))) 1.0))
 	      (p (* 0.5 (+ k 1.0)))
@@ -707,7 +724,7 @@
 	  (in1 0.0) (in2 0.0) (in3 0.0) (in4 0.0)
 	  (out1 0.0) (out2 0.0) (out3 0.0) (out4 0.0))
       (lambda (in cutoff)
-	(let ((f (/ (* 7.0 cutoff) (* 1.16 *samplerate*))) ;1.16))
+	(let ((f (/ (* 7.0 cutoff) (* 1.16 SAMPLERATE))) ;1.16))
 	      (f1 (- 1.0 f))
 	      (fb (* res 4.0 (- 1.0 (* 0.15 f f)))))
 	  (set! in (- in (* out4 fb)))
@@ -905,7 +922,7 @@
 
 
 ;; NOTE!
-;; (* 5.0 *samplerate*) is time padding
+;; (* 5.0 SAMPLERATE) is time padding
 ;; it is used because the decay length of the note may go
 ;; beyond the duration.
 ;; however making it longer means using more memory
@@ -994,9 +1011,9 @@
 
 
 (definec synth-fx 262144
-  (let ((dleft (dtoi64 (* 0.125 *samplerate*)))
+  (let ((dleft (dtoi64 (* 0.125 SAMPLERATE)))
 	(dlyl (make-delay dleft))
-	(dright (dtoi64 (* 0.33333333 *samplerate*)))
+	(dright (dtoi64 (* 0.33333333 SAMPLERATE)))
 	(dlyr (make-delay dright))
 	(pan .5)
 	(pan_old pan)
@@ -1076,7 +1093,7 @@
   (lambda (fname frames channels:i32 dat)
     (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc)))
       (tset! info 0 frames)
-      (tset! info 1 (dtoi32 *samplerate*))
+      (tset! info 1 (dtoi32 SAMPLERATE))
       (tset! info 2 channels)
       (tset! info 3 (+ 131072 2)) ;; + 6 for 32 bit float (+ 2 for 16 bit signed)
       (let ((audiofile (sf_open fname 32 info))

@@ -59,7 +59,7 @@
 
 #define SAMPLE float
 
-typedef void(*dsp_f_ptr_array)(void*,void*,SAMPLE*,SAMPLE*,float,float,void*);
+typedef void(*dsp_f_ptr_array)(void*,void*,SAMPLE*,SAMPLE*,SAMPLE,void*);
 typedef double(*dsp_f_ptr)(void*,void*,double,double,double,double*);
 
 namespace extemp {
@@ -82,7 +82,7 @@ namespace extemp {
 	}
 	void* getDSPClosure() { return dsp_closure; }
 	
-	void setDSPWrapperArray( void(*_wrapper)(void*,void*,SAMPLE*,SAMPLE*,float,float,void*) ) 
+	void setDSPWrapperArray( void(*_wrapper)(void*,void*,SAMPLE*,SAMPLE*,SAMPLE,void*) ) 
 	{ 
 	    if(dsp_wrapper != 0 || dsp_wrapper_array != 0) return;
 	    dsp_wrapper_array = _wrapper; 

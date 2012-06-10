@@ -895,23 +895,25 @@ namespace extemp {
 	}else if(AudioDevice::I()->getDSPWrapperArray()) { // if true then we must be buffer by buffer
 	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
 	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	    void (*closure) (float*,float*,float,float,void*) = * ((void(**)(float*,float*,float,float,void*)) cache_closure);
+	    void (*closure) (SAMPLE*,SAMPLE*,SAMPLE,void*) = * ((void(**)(SAMPLE*,SAMPLE*,SAMPLE,void*)) cache_closure);
 	    llvm_zone_t* zone = llvm_peek_zone_stack();
 	    SAMPLE* indat = (SAMPLE*) inputBuffer;
-	    SAMPLE* outdat = (SAMPLE*) outputBuffer;	    
-	    static SAMPLE bufin[32]; 
-	    static SAMPLE bufout[32];
-	    int soffset = 0; // sample chunk offset
-	    for(int i=0;i<UNIV::FRAMES/32;i++) { // how many chunks of 32 do we process?
-	      soffset = i*32*UNIV::CHANNELS;
-	      for(int j=0;j<UNIV::CHANNELS;j++) {
-		// turn interleaved into non-interleaved
-		if(inputBuffer) for(int k=0;k<32;k++) bufin[k] = indat[soffset+j+(k*UNIV::CHANNELS)];
-		cache_wrapper(zone, (void*)closure, bufin, bufout, (SAMPLE)(UNIV::DEVICE_TIME+(i*32)),(SAMPLE)j,userData);
-		// turn non-interleaved back into interleaved
-		for(int k=0;k<32;k++) outdat[(soffset+j+(k*UNIV::CHANNELS))] = bufout[k];
-	      }
-	    }
+	    SAMPLE* outdat = (SAMPLE*) outputBuffer;
+	    cache_wrapper(zone, (void*)closure, indat, outdat, (SAMPLE)UNIV::DEVICE_TIME, userData);
+
+	    // static SAMPLE bufin[32]; 
+	    // static SAMPLE bufout[32];
+	    // int soffset = 0; // sample chunk offset
+	    // for(int i=0;i<UNIV::FRAMES/32;i++) { // how many chunks of 32 do we process?
+	    //   soffset = i*32*UNIV::CHANNELS;
+	    //   for(int j=0;j<UNIV::CHANNELS;j++) {
+	    // 	// turn interleaved into non-interleaved
+	    // 	if(inputBuffer) for(int k=0;k<32;k++) bufin[k] = indat[soffset+j+(k*UNIV::CHANNELS)];
+	    // 	cache_wrapper(zone, (void*)closure, bufin, bufout, (SAMPLE)(UNIV::DEVICE_TIME+(i*32)),(SAMPLE)j,userData);
+	    // 	// turn non-interleaved back into interleaved
+	    // 	for(int k=0;k<32;k++) outdat[(soffset+j+(k*UNIV::CHANNELS))] = bufout[k];
+	    //   }
+	    // }
 	    //printf("soffset: %d\n",soffset);
 	    llvm_zone_reset(zone);
 	}else{ 

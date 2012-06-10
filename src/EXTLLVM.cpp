@@ -671,10 +671,25 @@ int64_t llvm_now()
     return extemp::UNIV::TIME;
 }
 
-double llvm_samplerate()
-{
-    return (double) extemp::UNIV::SAMPLERATE;
-}
+// double llvm_samplerate()
+// {
+//     return (double) extemp::UNIV::SAMPLERATE;
+// }
+
+// double llvm_frames()
+// {
+//   return (double) extemp::UNIV::FRAMES;
+// }
+
+// double llvm_channels_in()
+// {
+//     return (double) extemp::UNIV::CHANNELS;
+// }
+
+// double llvm_channels_out()
+// {
+//     return (double) extemp::UNIV::IN_CHANNELS;
+// }
 
 double imp_rand()
 {
@@ -1190,8 +1205,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_print_f32);						
 	    gv = M->getNamedValue(std::string("llvm_print_f64"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_print_f64);						
-	    gv = M->getNamedValue(std::string("llvm_samplerate"));
-	    EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
+	    // gv = M->getNamedValue(std::string("llvm_samplerate"));
+	    // EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
 	    gv = M->getNamedValue(std::string("llvm_now"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_now);
 	    gv = M->getNamedValue(std::string("llvm_zone_reset"));

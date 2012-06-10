@@ -14,6 +14,21 @@
 ;
 
 
+;; bind some global audio values 
+(bind-val SAMPLERATE double (integer->real *au:samplerate*))
+(bind-val CHANNELS i64 *au:channels*)
+(bind-val IN_CHANNELS i64 *au:in-channels*)
+(bind-val FRAMES i64 *au:block-size*)
+
+(definec print-audio-state
+  (lambda ()
+    (printf "    FRAMES: %lld\n" FRAMES)
+    (printf " OUT CHANS: %lld\n" CHANNELS)
+    (printf "  IN CHANS: %lld\n" IN_CHANNELS)
+    (printf "SAMPLERATE: %f\n" SAMPLERATE)))
+
+(print-audio-state)
+
 ;; compile sample by sample dsp code
 (definec dsp
   (lambda (in:double time:double channel:double	data:double*)

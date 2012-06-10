@@ -56,8 +56,8 @@
 ;; NOTE: then 100000 is extra memory for our
 ;; comb filters
 (definec dsp 1000000
-  (let ((combl (make-comb (dtoi64 (* 0.25 *samplerate*))))
-	(combr (make-comb (dtoi64 (* 0.33333333 *samplerate*)))))
+  (let ((combl (make-comb (dtoi64 (* 0.25 SAMPLERATE))))
+	(combr (make-comb (dtoi64 (* 0.33333333 SAMPLERATE)))))
     (lambda (in:double time:double chan:double dat:double*)
       (cond ((< chan 1.0)
 	     (combl (+ (* 1.0 (synth in time chan dat))
@@ -67,8 +67,6 @@
 		       (my-synth in time chan dat))))
 	    (else 0.0)))))
 
-;;make my-synth active
-(my-synth.active 1)
 
 ;; now start a temporal recursion to play the new synth
 (define loop2

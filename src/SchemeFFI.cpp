@@ -179,7 +179,8 @@ namespace extemp {
 	} integerTable[] = {
 	    { "*au:block-size*",	UNIV::FRAMES },
 	    { "*au:samplerate*",	UNIV::SAMPLERATE },
-	    { "*au:channels*",	UNIV::CHANNELS },
+	    { "*au:channels*",	        UNIV::CHANNELS },
+	    { "*au:in-channels*",	UNIV::IN_CHANNELS },
 	};
 
 	static struct {
