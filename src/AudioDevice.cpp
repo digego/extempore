@@ -851,6 +851,8 @@ namespace extemp {
 	void* cache_closure = 0;
 	if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE))); return 0; }
 	cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
+
+	double indata[UNIV::IN_CHANNELS];
 				
 	if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
 	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
@@ -862,25 +864,28 @@ namespace extemp {
 	    //llvm_push_zone_stack(zone);
 	    for(uint32_t i=0;i<UNIV::FRAMES;i++)
 	    {
-		uint32_t ii = i*UNIV::CHANNELS;
+		uint32_t iout = i*UNIV::CHANNELS;
+		uint32_t iin = i*UNIV::IN_CHANNELS;
 		SAMPLE* dat = (SAMPLE*) outputBuffer;
 		SAMPLE* in = (SAMPLE*) inputBuffer;
+		for(int k=0;k<UNIV::IN_CHANNELS;k++) indata[k]=(double)in[iin+k];
+
 		if(UNIV::IN_CHANNELS==UNIV::CHANNELS) {
 		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 		    {		  
-		      dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, (double)in[ii+k], (double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		      dat[iout+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, (double)in[iin+k], (double)(i+UNIV::DEVICE_TIME),(double)k,&(indata[0])));
 		      llvm_zone_reset(zone);
 		    }
 		}else if(UNIV::IN_CHANNELS==1){
 		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 		    {		  
-		      dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, (double)in[ii],(double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		      dat[iout+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, (double)in[iin], (double)(i+UNIV::DEVICE_TIME),(double)k,&(indata[0])));
 		      llvm_zone_reset(zone);
 		    }		  
 		}else{
 		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
 		    {		  
-		      dat[ii+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, /*(double)in[ii+k]*/0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,data));
+		      dat[iout+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, 0.0,(double)(i+UNIV::DEVICE_TIME),(double)k,&(indata[0])));
 		      llvm_zone_reset(zone);
 		    }
 		}
@@ -946,6 +951,16 @@ namespace extemp {
           exit(1);
 	}
 
+        
+	if( (UNIV::IN_CHANNELS != UNIV::CHANNELS) &&
+            (UNIV::IN_CHANNELS != 1) &&
+            (UNIV::IN_CHANNELS > 0)) {
+	  ascii_text_color(1,5,10);
+	  printf("Warning: dsp input will be 0.0, use data* for channel data\n");
+	  ascii_text_color(0,7,10);
+          printf("");
+        }
+           
         
         const   PaDeviceInfo *deviceInfo;
         const   PaHostApiInfo* apiInfo;
