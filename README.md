@@ -42,7 +42,7 @@ Extempore is released under a BSD style licence.
 
 # Links
 
-http://groups.google.com/group/extemporelang.
-http://vimeo.com/37293927 - graphics demo
-http://vimeo.com/21956071 - general introduction
-http://vimeo.com/20502359 - a more technical intro
+- http://groups.google.com/group/extemporelang.
+- http://vimeo.com/37293927 - graphics demo
+- http://vimeo.com/21956071 - general introduction
+- http://vimeo.com/20502359 - a more technical intro
