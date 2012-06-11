@@ -26,16 +26,16 @@ Most of the libraries are pretty standard and will either already be
 installed on your system, or can usually be easily installed from
 binary packages.
 
+# Unix & OS X
+
 LLVM *must* be version 3.0 and needs to be built from source, because
 a small patch to `LLParser.cpp` (an LLVM source file) is required. The
 patch file `llparser.patch` is supplied in the `extempore/extras`
 directory. You can get the LLVM source from http://www.llvm.org/
 
-# Unix & OS X
-
-To apply the
-patch just move into the `lib/AsmParser` directory and then apply the
-`llparser.patch` file which in can be found in `extempore/extras`.
+To apply the patch just move into the `lib/AsmParser` directory and
+then apply the `llparser.patch` file which in can be found in
+`extempore/extras`.
 
 For example, if you've downloaded the LLVM source into `~/Code/llvm`
 and cloned extempore into `~/Code/extempore`, then patching the file is as
@@ -123,13 +123,19 @@ on Linux/OS X.
 
 ## Patching LLVM
 
-There are a couple of options:
+LLVM *must* be version 3.0 and needs to be built from source, because
+a small patch to `LLParser.cpp` (an LLVM source file) is required. The
+patch file `llparser.patch` is supplied in the `extempore/extras`
+directory. You can get the LLVM source from http://www.llvm.org/
 
-1. Get GNU `patch` in the form of `patch.exe` and apply the patch in
-the same way as is described above in the Linux & OS X section
-2. Apply the patch manually - look at the file
+To apply the patch on Windows there are a couple of options:
+
+1. Get GNU patch in the form of `patch.exe`
+([maybe also check out this advice](http://irq5.wordpress.com/2011/06/26/gnu-patch-and-windows-uac/))
+and apply the patch in the same way as is described above in the Linux
+& OS X section 2. Apply the patch manually - look at the file
 `lib/AsmParser/LLparser.cpp` in the LLVM source directory and the
-patch file in a text editor and make the required changes by hand.  A
+patch file in a text editor and make the required changes by hand. A
 bit cumbersome, but you only have to do it to *compile* extempore.
 
 ## Building extempore
