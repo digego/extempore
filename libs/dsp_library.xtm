@@ -970,12 +970,15 @@
 
 ;; playnote wrapper
 (define-macro (play-note time inst pitch vol dur)
-  `(let ((duration (* 1.0 ,dur)))
-     (_synth-note (integer->real ,time) 
-		  (llvm:get-native-closure ,(symbol->string inst))
-		  (midi2frq (* 1.0 ,pitch))
-		  (/ (exp (/ ,vol 26.222)) 127.0)
-		  duration)))
+  `(let ((duration (* 1.0 ,dur))
+	 (native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (cptr? native)
+	 (_synth-note (integer->real ,time) 
+		      native
+		      (midi2frq (* 1.0 ,pitch))
+		      (/ (exp (/ ,vol 26.222)) 127.0)
+		      duration)
+	 (print-error 'No 'inst 'named ,(symbol->string inst)))))
 
 ;; make synth defaults
 (definec default-note
@@ -1411,13 +1414,15 @@
   (lambda (proc)
     (ipc:eval-string proc
 		     "(define-macro (play-note time inst pitch vol dur)
-                         `(let ((duration (* 1.0 ,dur)))
-                            (_synth-note (integer->real ,time) 
-		            (llvm:get-native-closure ,(symbol->string inst))
-     		            (midi2frq (* 1.0 ,pitch))
-		            (/ (exp (/ ,vol 26.222)) 127.0)
-		            duration)))")
-
+                         `(let ((duration (* 1.0 ,dur))
+	                        (native (llvm:get-native-closure ,(symbol->string inst))))
+                            (if (cptr? native)
+	                        (_synth-note (integer->real ,time) 
+		                             native
+		                             (midi2frq (* 1.0 ,pitch))
+		                             (/ (exp (/ ,vol 26.222)) 127.0)
+		                             duration)          
+	                        (print-error 'No 'inst 'named ,(symbol->string inst)))))")
     (ipc:definec proc '_synth-note)
     (ipc:definec proc 'midi2frq)))
 
