@@ -13,7 +13,10 @@
 (defvar extempore-keydef "\C-x\C-x")     ; key sequence to send a definition
 (defvar extempore-keyreg "\C-x\C-r")     ; key sequence to send a region
 (defvar extempore-port 7099)             ; TCP port to Extempore
-(defvar extempore-process nil)           ; process during TCP connection
+;(defvar extempore-process nil)           ; process during TCP connection
+;(make-local-variable 'extempore-process)
+(make-variable-buffer-local 'extempore-process)
+(setq extempore-process nil)
 
 (defun smart-tab ()
   "This smart tab is minibuffer compliant: it acts as usual in
