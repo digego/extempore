@@ -1,0 +1,103 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; You can get the source for kiss_fft from
+;; http://sourceforge.net/projects/kissfft/
+;;
+;; The basic kiss_fft library only requires the file kiss_fft.c
+;; You have to build this into a dyib yourself: on OSX this can be
+;; done with:
+;;
+;; gcc kiss_fft.c -dynamiclib -I/usr/include/malloc -o kiss_fft.1.2.9.dylib -current_version 1.2.9
+;;
+;; Then, copy the dylib into somewhere on your lib path, e.g. /usr/local/lib
+;;
+;; After that, this should all work
+
+(define kissfft
+  (sys:open-dylib "kiss_fft.1.2.9.dylib"))
+
+(if (not kissfft)
+    (print-error "Could not load dynamic library"))
+
+;; bind the required types and function signatures (see kiss_fft.h)
+
+(bind-type kiss_fft_cpx <float,float>)
+(bind-type kiss_fft_state <i32,i32,|64,i32|,|1,kiss_fft_cpx|>)
+(bind-alias kiss_fft_cfg kiss_fft_state*)
+
+(bind-lib kissfft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
+(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+(bind-lib kissfft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
+(bind-lib kissfft kiss_fft_cleanup [i8*,i8*]*)
+(bind-lib kissfft kiss_fft_next_fast_size [i32,i32]*)
+
+;; some helpers for working with complex numbers in xtlang
+
+(bind-type complexd <double,double>)
+
+(bind-func make-complex-signal
+  (lambda (re:double* im:double* com:complexd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr com i) 0 (pref re i))
+	(tset! (pref-ptr com i) 1 (pref im i))))
+    void))
+
+(bind-func complex-conjugate
+  (lambda (signal:complexd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr signal i)
+	       1
+	       (* -1.0 (tref (pref-ptr signal i) 1))))
+      void)))
+
+(bind-func complex-cart-to-pol
+  (lambda (cart:complexd* pol:complexd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr pol i)
+	       0
+	       (sqrt (+ (pow (tref (pref-ptr cart i) 0) 2.0)
+			(pow (tref (pref-ptr cart i) 1) 2.0))))
+	(tset! (pref-ptr pol i)
+	       1
+	       (atan2 (tref (pref-ptr cart i) 1)
+		      (tref (pref-ptr cart i) 0)))))
+    void))
+
+(bind-func complex-pol-to-cart
+  (lambda (pol:complexd* cart:complexd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr cart i)
+	       0
+	       (* (tref (pref-ptr pol i) 0)
+		  (cos (tref (pref-ptr pol i) 1))))
+	(tset! (pref-ptr cart i)
+	       0
+	       (* (tref (pref-ptr pol i) 0)
+		  (sin (tref (pref-ptr pol i) 1))))))
+    void))
+
+(bind-func real-fft
+  "calculate the (complex-valued) FFT of a real input signal"
+  (lambda (real-signal:double* complex-result:complexd* len:i64)
+    (let ((mycfg:kiss_fft_cfg (kiss_fft_alloc (i64toi32 len) 0 null null))
+	  (kiss-signal:kiss_fft_cpx* (salloc len))
+	  (kiss-result:kiss_fft_cpx* (salloc len))
+	  (complexd-ptr:complexd* (salloc 1))
+	  (kiss-cpx-ptr:kiss_fft_cpx* (salloc 1))
+	  (i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr kiss-signal i)
+	       1
+	       (dtof (pref real-signal i))))
+      (kiss_fft mycfg
+		kiss-signal
+		kiss-result)
+      (dotimes (i len)
+	(set! kiss-cpx-ptr (pref-ptr kiss-result i))
+	(set! complexd-ptr (pref-ptr complex-result i))
+	(tset! complexd-ptr 0 (ftod (tref kiss-cpx-ptr 0)))
+	(tset! complexd-ptr 1 (ftod (tref kiss-cpx-ptr 1)))))
+    void))
