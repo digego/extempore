@@ -49,6 +49,7 @@
 (print-audio-state)
 
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; silence
 (definec:dsp dsp
@@ -1168,14 +1169,19 @@
 	  (begin (printf "%s\n" (sf_strerror audiofile))
 		 0)))))
 
+	 (native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (cptr? native)
+
 
 ;; passing a length of 0 will read the whole file
-(define-macro (set-sampler-index inst fname index offset lgth)
-  `(set-sample-data_ (llvm:get-native-closure ,(symbol->string inst))
-		     ,fname
-		     (real->integer ,index)
-		     (real->integer ,offset)
-		     (real->integer ,lgth)))
+(define-macro (set-sampler-index inst fname index offset lgth)  
+  `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (cptr? native)
+	 (set-sample-data_ native
+			   ,fname
+			   (real->integer ,index)
+			   (real->integer ,offset)
+			   (real->integer ,lgth)))))
 
 
 ;; helper functions for setting an individual samples offset
@@ -1190,9 +1196,11 @@
 ;; (set-sample-offset sampler 60 50000)
 ;; this would offset the sample at index 60 by 50000 samples
 (define-macro (set-sample-offset inst index offset)
-  `(set-sample-offset_ (llvm:get-native-closure "sampler")
-		       (real->integer ,index)
-		       (real->integer ,offset)))
+  `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (cptr? native)	 
+	 (set-sample-offset_ native
+			     (real->integer ,index)
+			     (real->integer ,offset)))))
 
 
 
@@ -1468,3 +1476,5 @@
 (print "You have two default instruments loaded 'synth' and 'sampler'\n")
 (print)
 (dsp:set! dsp)
+
+(ipc:audio-setup "utility")
