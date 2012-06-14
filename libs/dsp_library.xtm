@@ -48,8 +48,6 @@
 
 (print-audio-state)
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; silence
 (definec:dsp dsp
@@ -75,12 +73,13 @@
       (let ((y (+ (* b x) (* c x (fabs x)))))
 	(+ (* p (- (* y (fabs y)) y)) y)))))
 
-(definec make-oscil
-  (lambda (phase)
-    (lambda (amp freq)
-      (let ((inc (* TWOPI (/ freq SAMPLERATE))))
-	(set! phase (+ phase inc))
-	(* amp (sin phase))))))
+;; (definec make-oscil
+;;   (lambda (phase)
+;;     (lambda (amp freq)
+;;       (let ((inc (* TWOPI (/ freq SAMPLERATE))))
+;; 	(set! phase (+ phase inc))
+;; 	(* amp (sin phase))))))
+
 
 (definec make-oscil
   (lambda (phase)
@@ -365,24 +364,24 @@
 
 
 ;; a dodgy reverb
-(definec make-reverb
-  (lambda (size) ; size in ms
-    (let ((ms (/ SAMPLERATE 1000.0))
-	  (wet .25)
-	  (dly1 (make-delay (dtoi64 (* ms (* .192 size)))))
-	  (dly2 (make-delay (dtoi64 (* ms (* .373 size)))))
-	  (dly3 (make-delay (dtoi64 (* ms (* .671 size)))))
-	  (dly4 (make-delay (dtoi64 (* ms (* .712 size)))))
-	  (ap1 (make-allpass (dtoi64 (* ms size))))
-	  (ap2 (make-allpass (dtoi64 (* ms (* .329 size))))))
-      (ap1.g .8)
-      (ap2.g .8)
-      (lambda (in)
-	(let ((wetin (* in wet)))
-	  (+ (* in (- 1.0 wet)) (ap1 (ap2 (+ (dly1 wetin)
-					     (dly2 wetin)
-					     (dly3 wetin)
-					     (dly4 wetin))))))))))
+;; (definec make-reverb
+;;   (lambda (size) ; size in ms
+;;     (let ((ms (/ SAMPLERATE 1000.0))
+;; 	  (wet .25)
+;; 	  (dly1 (make-delay (dtoi64 (* ms (* .192 size)))))
+;; 	  (dly2 (make-delay (dtoi64 (* ms (* .373 size)))))
+;; 	  (dly3 (make-delay (dtoi64 (* ms (* .671 size)))))
+;; 	  (dly4 (make-delay (dtoi64 (* ms (* .712 size)))))
+;; 	  (ap1 (make-allpass (dtoi64 (* ms size))))
+;; 	  (ap2 (make-allpass (dtoi64 (* ms (* .329 size))))))
+;;       (ap1.g .8)
+;;       (ap2.g .8)
+;;       (lambda (in)
+;; 	(let ((wetin (* in wet)))
+;; 	  (+ (* in (- 1.0 wet)) (ap1 (ap2 (+ (dly1 wetin)
+;; 					     (dly2 wetin)
+;; 					     (dly3 wetin)
+;; 					     (dly4 wetin))))))))))
 
 
 

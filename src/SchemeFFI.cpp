@@ -283,6 +283,7 @@ namespace extemp {
 	    { "llvm:convert-float",			&SchemeFFI::llvm_convert_float_constant },
  	    { "llvm:convert-double",			&SchemeFFI::llvm_convert_double_constant },
 	    { "llvm:count",				&SchemeFFI::llvm_count },
+	    { "llvm:count-set",				&SchemeFFI::llvm_count_set },
 	    { "llvm:count++",			&SchemeFFI::llvm_count_inc },
 	    { "llvm:call-closure",			&SchemeFFI::callClosure },
 	    { "llvm:print",				&SchemeFFI::printLLVMModule },
@@ -2253,6 +2254,11 @@ namespace extemp {
      }	
  
 
+    pointer SchemeFFI::llvm_count_set(scheme* _sc, pointer args)
+    {
+        EXTLLVM::LLVM_COUNT = ivalue(pair_car(args));
+	return mk_integer(_sc, EXTLLVM::LLVM_COUNT);		
+    }
 
 
     pointer SchemeFFI::llvm_count_inc(scheme* _sc, pointer args)

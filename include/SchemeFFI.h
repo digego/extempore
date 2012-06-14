@@ -152,6 +152,7 @@ namespace extemp {
 	static pointer llvm_convert_float_constant(scheme* _sc, pointer args);
 	static pointer llvm_convert_double_constant(scheme* _sc, pointer args);
 	static pointer llvm_count(scheme* _sc, pointer args);
+	static pointer llvm_count_set(scheme* _sc, pointer args);
 	static pointer llvm_count_inc(scheme* _sc, pointer args);
 	static pointer callClosure(scheme* _sc, pointer args);
 	static pointer printLLVMModule(scheme* _sc, pointer args);

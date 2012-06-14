@@ -1025,7 +1025,6 @@
       (impc:ir:gname "string" (car (impc:ir:gname "string")) (cadr (impc:ir:gname "string")))
       (impc:ir:strip-space os))))
 
-
 (define impc:ir:make-const-string
   (lambda (ast)
     (let* ((os (make-string 0))
@@ -1035,7 +1034,20 @@
 	  (let ((compile-str (string-append "@gs" (number->string *impc:ir:gstrcnt*)
 					    " = constant [" (number->string (+ 1 (string-length ast))) " x i8] c\""
 					    ast "\\00\"")))
-	    (llvm:compile compile-str)
+	    (llvm:compile compile-str)	    
+
+	    ;; this here for llvm precomp ;;;;;;;;;;
+	    ;; can be safely removed      ;;;;;;;;;;		      
+	    (if *impc:compiler:precomp-llvm*
+		(emit (sexpr->string
+		       `(let* ((ast ,ast)
+			       (compile-str (string-append "@gs" ,(number->string *impc:ir:gstrcnt*)
+							   " = constant [" (number->string (+ 1 (string-length ast))) " x i8] c\\\""
+							   ast "\\\\00\\\"")))
+			  (llvm:compile compile-str)))
+		       "\n\n"
+		       *impc:compiler:precomp*))
+	    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	    (set! strsym (string-append "@gs" (number->string *impc:ir:gstrcnt*)))
 	    (llvm:add-llvm-alias ast strsym)
 	    (set! *impc:ir:gstrcnt* (+ *impc:ir:gstrcnt* 1)))
@@ -3710,6 +3722,8 @@
                                                  (print-error "Compiler Failed On: " fstr)
                                                  (print-error "Compiler Failed"))					     
                                              (error "")))))
+		       (if *impc:compiler:precomp-llvm*
+			   (emit "(llvm:compile \"" fstr "\")\n\n" *impc:compiler:precomp*))
                        lstr))
                    ((member (car ast) '(clrun->)) ;; apply function  
                     (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; if closure is a global var? (i.e. global env)
