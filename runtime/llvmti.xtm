@@ -3684,22 +3684,7 @@
 		     (if (not (impc:ir:type? (cdr t)))
 			 (print-error 'Compiler 'Error: 'unresolved 'type 'error 'for 'symbol (car t))))
 		   types)
-		      ;; ;(println 't: t)
-                      ;; (cond ((and (list? t)
-                      ;;             (member *impc:ir:other* t))
-		      ;; 	     (println 'kkkkkkkkk t *impc:ir:other*)
-                      ;;        (print-error 'Compiler 'Error: 'unresolved 'type 'error 'for 'symbol (car t)))
-                      ;;       ((and (not (list? t))
-                      ;;             (pair? t)
-                      ;;             (equal? *impc:ir:other* (cdr t)))
-                      ;;        (print-error 'Compiler 'Error: 'unresolved 'type 'error 'for 'symbol (car t)))))
-                   ;; types)
-
 	 
-	 ;; ;; forward declare _callback (this is a bit of a hack :-(
-	 ;; (if (llvm:get-globalvar (string-append (symbol->string symname) "_var"))
-	 ;;     'donothing
-	 ;;     (llvm:compile (string-append "declare linkonce void @" (symbol->string symname) "_callback(i8*)\n"))) ;;{\nentry:\nret void\n}")))
          ;; compile to ir	 
          (define fstr (impc:ir:compiler newast types))
          ;; compile to x86 - i.e. call jit on any new ir functions to force jit compilation	
@@ -3710,7 +3695,6 @@
          (let* ((closure-type (cadr (impc:ir:gname)))
 		(closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
                 (compile-stub? (if (llvm:get-globalvar (string-append (symbol->string symname) "_var")) #f #t))
-		;(forward-declaration-of-callback (if compile-stub? (llvm:compile (string-append "declare void @" (symbol->string symname) "_callback(i8*)")) #f))
                 (fs (string-append "define ccc " closure-type " @" (string-append (symbol->string symname) "_maker")
                                    "(i8* %_impz){\nentry:\n"				   
                                    ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
@@ -3794,7 +3778,7 @@
 								'("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
                                       ")\nret " (impc:ir:get-type-str (car stub-type)) 
                                       (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-                                      "}"))
+                                      "}\n"))
 		(fscallback (string-append "define ccc void @" (string-append (symbol->string symname) "_callback(i8* %dat){\n"
 					   "entry:\n"
 					   (if (null? cb-struct-type)
@@ -3830,7 +3814,7 @@
 								     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
 					   ")\nret void\n" ; (impc:ir:get-type-str (car stub-type)) 
 					   ;(if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-					   "}")))
+					   "}\n")))
 		(fstub_scheme_valid #t) ;; this will be set to false if no valid conversion type to scheme is available (structs and arrays are not supported yet for example)
                 (fstub_scheme (string-append "define ccc i8* " ;(impc:ir:get-type-str (car stub-type))
 					     " @" (string-append (symbol->string symname) "_scheme(i8* %_sc, i8* %args)\n"
@@ -4103,7 +4087,8 @@
 			  (ascii-print-color 0 7 10)))
 	       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		      (error ""))))))))
-	     
+	
+
 ;; alias for definec (should replace definec)
 (define-macro (bind-func . args)
   (if (regex:match? (symbol->string (car args)) ":")
@@ -4125,7 +4110,8 @@
 			   (ascii-print-color 0 7 10)
 			   (print)))
 	    `(impc:ti:parametric-poly-pass '(definec ,@args))))
-      `(impc:ti:parametric-poly-pass '(definec ,@args))))      
+      `(impc:ti:parametric-poly-pass '(definec ,@args))))
+
 
 (define-macro (bind-typevar name . args)
   (if (string? name) (set! name (string->symbol name)))

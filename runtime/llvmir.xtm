@@ -1045,7 +1045,7 @@
 
 
 			   
-;; this looks scary but it's basically all just
+;; This looks scary but it's basically all just
 ;; making and filling an environment structure
 ;; for a particular closure
 (define impc:ir:compile:make-closureenv
@@ -2225,57 +2225,134 @@
 
 
 
-(define impc:ir:compiler:set!
-   (lambda (ast types)
-      (let* ((os (make-string 0))
-             (s2 (impc:ir:compiler (caddr ast) types))
-             (vv (impc:ir:gname)))
-         (emit s2 os)
-	 (if (llvm:get-globalvar (symbol->string (cadr ast)))
-	     (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
-				  (symbol->string (cadr ast)) "\n") os)	     
-	     (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"				  
-				  (symbol->string (cadr ast)) "Ptr\n") os))
-         (impc:ir:strip-space os))))
+;; (define impc:ir:compiler:set!
+;;    (lambda (ast types)
+;;       (let* ((os (make-string 0))
+;;              (s2 (impc:ir:compiler (caddr ast) types))
+;;              (vv (impc:ir:gname)))
+;;          (emit s2 os)
+;; 	 (if (llvm:get-globalvar (symbol->string (cadr ast)))
+;; 	     (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+;; 				  (symbol->string (cadr ast)) "\n") os)	     
+;; 	     (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"				  
+;; 				  (symbol->string (cadr ast)) "Ptr\n") os))
+;;          (impc:ir:strip-space os))))
 
 
-;; new compiler set copies pointers
-;; this currently DOESN'T work for closures
+;; ;; new compiler set copies pointers
+;; ;; this currently DOESN'T work for closures
+;; (define impc:ir:compiler:set!
+;;    (lambda (ast types)     
+;;       (let* ((os (make-string 0))
+;;              (s2 (impc:ir:compiler (caddr ast) types))
+;;              (vv (impc:ir:gname))
+;; 	     (type (impc:ir:get-type-from-str (cadr vv))))
+;; 	 (emit "; do set!\n" os)
+;;          (emit s2 os)
+;; 	 (if (not (impc:ir:pointer? type)) ;; if this is a fixed pointer value
+;; 	     (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; are we are setting a global variable?
+;; 		 (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+;; 				      (symbol->string (cadr ast)) "\n") os)	     
+;; 		 (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
+;; 				      (symbol->string (cadr ast)) "Ptr\n") os))	     
+;; 	     ;(emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" 
+;; 	     ;			  (symbol->string (cadr ast)) "Ptr\n") os)
+;; 	     (if (impc:ir:closure? type) 
+;; 		 ;; unforunately closures just leak at the moment :(
+;; 		 ;; this is due to the fact that closures may not be the
+;; 		 ;; same size. therefore we can't just swap memory in place.
+;; 		 ;; until I come up with a solution I'm just going to malloc outside of any zone
+;; 		 ;; in other words we're just leaking here!
+;; 		 ;; Remember that this leak only happens if someone tries to set! a closure
+;; 		 (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr vv) " " (car vv) " to i8*\n"
+;; 		       (impc:ir:gname "ptr_size" "i64") " = call i64 @llvm_zone_ptr_size(i8* " (car (impc:ir:gname 1)) ")\n"
+;; 		       (impc:ir:gname "new_mem" "i8*") " = call i8* @malloc(i64 " (car (impc:ir:gname 1)) ")\n"
+;; 		       "call i8* @memcpy(i8* " (car (impc:ir:gname "new_mem")) ", i8* " (car (impc:ir:gname "ptr_one")) ", i64 " (car (impc:ir:gname "ptr_size")) ")\n"
+;; 		       (impc:ir:gname "new_cls" (cadr vv)) " = bitcast i8* " (car (impc:ir:gname 1)) " to " (cadr vv) "\n"
+;; 		       "store " (cadr vv) " " (car (impc:ir:gname "new_cls")) ", " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n" os)
+;; 		 ;; all other pointers (i.e. tuples and arrays) get copied into the existing closure environment
+;; 		 (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr vv) " " (car vv) " to i8*\n"
+;; 		       (impc:ir:gname "pload" (cadr vv)) " = load " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n"
+;; 		       (impc:ir:gname "ptr_two" "i8*") " = bitcast " (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1)) " to i8*\n"
+;; 		       (impc:ir:gname "copyres" "i32") " = call void @llvm_zone_copy_ptr(i8* " (car (impc:ir:gname "ptr_one")) ", i8* " (car (impc:ir:gname "ptr_two")) ")\n"
+;; 		       os)))
+;; 	 (impc:ir:strip-space os))))
+
+
+;; ;; THIS VERSION COPY's ZONE PTRs
+;; ;; BUT DOES NOT COPY SALLOC AND HALLOC PTRs
+;; (define impc:ir:compiler:set!
+;;    (lambda (ast types)     
+;;       (let* ((os (make-string 0))
+;;              (s2 (impc:ir:compiler (caddr ast) types))
+;;              (vv (impc:ir:gname))
+;; 	     (type (impc:ir:get-type-from-str (cadr vv))))
+;; 	 (emit "; do set!\n" os)
+;;          (emit s2 os)
+;; 	 (if (not (impc:ir:pointer? type)) ;; if this is a fixed pointer value
+;; 	     (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; are we are setting a global variable?
+;; 		 (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+;; 				      (symbol->string (cadr ast)) "\n") os)	     
+;; 		 (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
+;; 				      (symbol->string (cadr ast)) "Ptr\n") os))	     
+;; 	     ;(emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" 
+;; 	     ;			  (symbol->string (cadr ast)) "Ptr\n") os)
+;; 	     (if (impc:ir:closure? type) 
+;; 		 ;; unforunately closures just leak at the moment :(
+;; 		 ;; this is due to the fact that closures may not be the
+;; 		 ;; same size. therefore we can't just swap memory in place.
+;; 		 ;; until I come up with a solution I'm just going to malloc outside of any zone
+;; 		 ;; in other words we're just leaking here!
+;; 		 ;; Remember that this leak only happens if someone tries to set! a closure
+;; 		 (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr vv) " " (car vv) " to i8*\n"
+;; 		       (impc:ir:gname "ptr_size" "i64") " = call i64 @llvm_zone_ptr_size(i8* " (car (impc:ir:gname 1)) ")\n"
+;; 		       (impc:ir:gname "new_mem" "i8*") " = call i8* @malloc(i64 " (car (impc:ir:gname 1)) ")\n"
+;; 		       "call i8* @memcpy(i8* " (car (impc:ir:gname "new_mem")) ", i8* " (car (impc:ir:gname "ptr_one")) ", i64 " (car (impc:ir:gname "ptr_size")) ")\n"
+;; 		       (impc:ir:gname "new_cls" (cadr vv)) " = bitcast i8* " (car (impc:ir:gname 1)) " to " (cadr vv) "\n"
+;; 		       "store " (cadr vv) " " (car (impc:ir:gname "new_cls")) ", " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n" os)
+;; 		 ;; all other pointers (i.e. tuples and arrays) get copied into the existing closure environment
+;; 	         (let ((num (number->string (llvm:count++))))
+;; 		   (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr vv) " " (car vv) " to i8*\n"
+;; 			 (impc:ir:gname "pload" (cadr vv)) " = load " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n"
+;; 			 (impc:ir:gname "ptr_two" "i8*") " = bitcast " (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1)) " to i8*\n"
+;; 			 os)		   
+;; 		   ;; runtime check if llvm_zone_copy worked?
+;; 		   (emit (impc:ir:gname "check" "i1") " = call i1 @llvm_zone_copy_ptr(i8* " (car (impc:ir:gname "ptr_one")) ", i8* " (car (impc:ir:gname "ptr_two")) ")\n" os)
+;; 		   (emit  "br i1 " (car (impc:ir:gname "check")) ", label %then" num ", label %else" num "\n" os)
+
+;; 		   ;; if these pointers are NOT llvm zone pointers then just directly store pointer* into pointer** 
+;; 		   (emit "\nthen" num ":\n" os)
+;; 		   ;(emit "call void @llvm_print_i32(i32 111111)\n" os)
+;; 		   (emit "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n" os)
+;; 		   (emit  "br label %cont" num "\n" os)
+		   
+;; 		   ;; otherwise llvm_zone copy worked so do nothing
+;; 		   (emit "\nelse" num ":\n" os)
+;; 		   ;(emit "call void @llvm_print_i32(i32 222222)\n" os)		   
+;; 		   (emit "br label %cont" num "\n" os)
+
+;; 		   ;; continue
+;; 		   (emit "\ncont" num ":\n" os))))
+;;          (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))	 
+;; 	 (impc:ir:strip-space os))))
+
+
+;; THIS VERSION DOESN'T COPY ANYTHING!
 (define impc:ir:compiler:set!
-   (lambda (ast types)
-      (let* ((os (make-string 0))
-             (s2 (impc:ir:compiler (caddr ast) types))
-             (vv (impc:ir:gname))
-	     (type (impc:ir:get-type-from-str (cadr vv))))
-         (emit s2 os)	 	 
-	 (if (not (impc:ir:pointer? type)) ;; if this is a fixed pointer value
-	     (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; are we are setting a global variable?
-		 (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
-				      (symbol->string (cadr ast)) "\n") os)	     
-		 (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
-				      (symbol->string (cadr ast)) "Ptr\n") os))	     
-	     ;(emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %" 
-	     ;			  (symbol->string (cadr ast)) "Ptr\n") os)
-	     (if (impc:ir:closure? type) 
-		 ;; unforunately closures just leak at the moment :(
-		 ;; this is due to the fact that closures may not be the
-		 ;; same size. therefore we can't just swap memory in place.
-		 ;; until I come up with a solution I'm just going to malloc outside of any zone
-		 ;; in other words we're just leaking here!
-		 ;; Remember that this leak only happens if someone tries to set! a closure
-		 (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr vv) " " (car vv) " to i8*\n"
-		       (impc:ir:gname "ptr_size" "i64") " = call i64 @llvm_zone_ptr_size(i8* " (car (impc:ir:gname 1)) ")\n"
-		       (impc:ir:gname "new_mem" "i8*") " = call i8* @malloc(i64 " (car (impc:ir:gname 1)) ")\n"
-		       "call i8* @memcpy(i8* " (car (impc:ir:gname "new_mem")) ", i8* " (car (impc:ir:gname "ptr_one")) ", i64 " (car (impc:ir:gname "ptr_size")) ")\n"
-		       (impc:ir:gname "new_cls" (cadr vv)) " = bitcast i8* " (car (impc:ir:gname 1)) " to " (cadr vv) "\n"
-		       "store " (cadr vv) " " (car (impc:ir:gname "new_cls")) ", " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n" os)
-		 ;; all other pointers (i.e. tuples and arrays) get copied into the existing closure environment
-		 (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr vv) " " (car vv) " to i8*\n"
-		       (impc:ir:gname "pload" (cadr vv)) " = load " (cadr vv) "* %" (symbol->string (cadr ast)) "Ptr\n"		   
-		       (impc:ir:gname "ptr_two" "i8*") " = bitcast " (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1)) " to i8*\n"
-		       "call void @llvm_zone_copy_ptr(i8* " (car (impc:ir:gname "ptr_one")) ", i8* "
-		       (car (impc:ir:gname "ptr_two")) ")\n" os)))
-	 (impc:ir:strip-space os))))
+  (lambda (ast types)     
+    (let* ((os (make-string 0))
+	   (s2 (impc:ir:compiler (caddr ast) types))
+	   (vv (impc:ir:gname))
+	   (type (impc:ir:get-type-from-str (cadr vv))))
+      (emit "; do set!\n" os)
+      (emit s2 os)
+      (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; are we are setting a global variable?
+	  (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+			       (symbol->string (cadr ast)) "\n") os)	     
+	  (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
+			       (symbol->string (cadr ast)) "Ptr\n") os))
+      ;; ir:gname should be vv
+      (impc:ir:strip-space os))))
 
 
 

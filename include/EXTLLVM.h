@@ -51,10 +51,10 @@ typedef struct _llvm_callback_struct_ {
     void* dat;
   } _llvm_callback_struct_;
 
-
+void llvm_runtime_error(int error, void* arg);
 llvm_zone_t* llvm_zone_create(uint64_t size);
 llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone);
-void llvm_zone_copy_ptr(void* ptr1, void* ptr2);
+bool llvm_zone_copy_ptr(void* ptr1, void* ptr2);
 llvm_zone_t* llvm_zone_default();
 void llvm_zone_mark(llvm_zone_t* zone);
 uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
