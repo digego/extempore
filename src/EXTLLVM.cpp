@@ -1205,6 +1205,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_print_f32);						
 	    gv = M->getNamedValue(std::string("llvm_print_f64"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_print_f64);						
+
+	    gv = M->getNamedValue(std::string("ascii_text_color"));
+	    EE->updateGlobalMapping(gv,(void*)&ascii_text_color);
+	    
 	    // gv = M->getNamedValue(std::string("llvm_samplerate"));
 	    // EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
 	    gv = M->getNamedValue(std::string("llvm_now"));
