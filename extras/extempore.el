@@ -178,7 +178,7 @@ See `run-hooks'."
 	    ;; scheme
 	    "(\\(define\\(c\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\*?\\|"
 	    ;; xtlang
-	    "(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\|"
+	    "bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\|"
 	    ;; memzone
 	    "memzone\\)\\>"
 	    ;; Any whitespace and declared object.
@@ -359,6 +359,6 @@ indentation."
 (put 'dynamic-wind 'extempore-indent-function 3) ; r5rs?
 
 
-(provide 'extempore-major-mode)
+(provide 'extempore)
 
 ;;; extempore-major-mode.el ends here
