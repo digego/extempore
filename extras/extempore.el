@@ -139,6 +139,10 @@
     (put 'comment-region 'menu-enable 'mark-active)
     (put 'uncomment-region 'menu-enable 'mark-active)
     (put 'indent-region 'menu-enable 'mark-active)
+    ;; for interacting with the extempore process
+    (define-key map "\C-x\C-j" 'extempore-connect)
+    (define-key map "\C-x\C-x" 'extempore-send-definition)
+    (define-key map "\C-x\C-r" 'extempore-send-region)
     smap)
   "Keymap for Extempore mode.
 All commands in `lisp-mode-shared-map' are inherited by this map.")
@@ -160,10 +164,23 @@ Entry to this mode calls the value of `extempore-mode-hook'."
   :link '(custom-group-link :tag "Font Lock Faces group" font-lock-faces)
   :group 'lisp)
 
-(defcustom extempore-mode-hook nil
+(defcustom extempore-mode-hook (lambda ()
+				 (interactive)
+				 (make-variable-buffer-local 'extempore-process)
+				 (setq extempore-process nil))
   "Normal hook run when entering `extempore-mode'.
 See `run-hooks'."
   :type 'hook
+  :group 'extempore)
+
+(defcustom extempore-default-host "localhost"
+  "Default host where the extempore process is running."
+  :type 'string
+  :group 'extempore)
+
+(defcustom extempore-default-port 7099
+  "Default port where the extempore process is running."
+  :type 'integer
   :group 'extempore)
 
 (defconst extempore-font-lock-keywords-1
@@ -351,6 +368,62 @@ indentation."
 (put 'call-with-values 'extempore-indent-function 1) ; r5rs?
 (put 'dynamic-wind 'extempore-indent-function 3) ; r5rs?
 
+
+;; dealing with the (external) extempore process
+
+(defun extempore-connect (host port)
+  "Connect to the running extempore process, which must
+be running in another (shell-like) buffer."
+  (interactive "sHostname (leave blank for default): \nnPort (leave blank for default): ")
+  ;; (define-key scheme-mode-map extempore-keydef 'extempore-send-definition)
+  ;; (define-key scheme-mode-map extempore-keyreg 'extempore-send-region)
+  (if (not (null extempore-process))
+      (delete-process extempore-process))
+  (setq extempore-process
+	(open-network-stream "extempore" nil
+			     (if (null host) extempore-default-host host)
+			     (if (null port) extempore-default-port port)))
+  (set-process-filter extempore-process
+	'(lambda (proc str) (message (substring str 0 -1)))))
+
+(defun extempore-stop ()
+  "Terminate connection to the Extempore process"
+  (interactive)
+  (delete-process extempore-process)
+  (setq extempore-process nil))
+
+(defun extempore-send-definition ()
+  "Send the enclosing top-level def to Extempore server for evaluation"
+  (interactive)
+  (save-excursion
+    (mark-defun)
+    (let ((str (concat (buffer-substring (point) (mark))
+		       "\r\n")))
+      (process-send-string extempore-process str)
+      (redisplay) ; flash the def like Extempore
+      (sleep-for .25))))
+
+(defun extempore-send-region ()
+  "Send the current region (or all the buffer) to Extempore for evaluation"
+  (interactive)
+  (save-excursion
+    (if mark-active
+	(unless (= (point) (region-beginning)) (exchange-point-and-mark))
+      (progn (goto-char (point-min)) (set-mark (point-max))))
+    (let ((start (region-beginning)) (end (region-end)))
+      (while (re-search-forward "^[^\n;]*(" end t)
+	(extempore-send-definition)
+	(end-of-defun)))))
+
+;; misc bits and pieces
+
+(defun xpb1 (name duration)
+  (interactive "sName: \nsDuration: ")
+  (insert (concat "(define " name
+		  "\n  (lambda (beat dur)\n    "
+		  "(callback (*metro* (+ beat (* .5 " duration "))) '"
+		  name " (+ beat " duration ") " duration ")))\n\n"
+		  "(" name " (*metro* 'get-beat 4) " duration ")")))
 
 (provide 'extempore)
 
