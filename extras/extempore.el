@@ -24,9 +24,6 @@
   (let ((st (make-syntax-table))
 	(i 0))
     ;; Symbol constituents
-    ;; We used to treat chars 128-256 as symbol-constituent, but they
-    ;; should be valid word constituents (Bug#8843).  Note that valid
-    ;; identifier characters are Scheme-implementation dependent.
     (while (< i ?0)
       (modify-syntax-entry i "_   " st)
       (setq i (1+ i)))
@@ -110,7 +107,7 @@
   (set (make-local-variable 'parse-sexp-ignore-comments) t)
   (set (make-local-variable 'lisp-indent-function) 'extempore-indent-function)
   (setq mode-line-process '("" extempore-mode-line-process))
-  (set (make-local-variable 'imenu-case-fold-search) t)
+  ;; (set (make-local-variable 'imenu-case-fold-search) t)
   (set (make-local-variable 'font-lock-defaults)
        '((extempore-font-lock-keywords
 	  extempore-font-lock-keywords-1 extempore-font-lock-keywords-2)
@@ -185,10 +182,7 @@ See `run-hooks'."
 	    "[ \t]*(?"
 	    "\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
-	   '(6 (cond ((match-beginning 3) font-lock-function-name-face)
-		     ((match-beginning 5) font-lock-variable-name-face)
-		     (t font-lock-type-face))
-	       nil t))
+	   '(4 font-lock-function-name-face))
      ))
   "Subdued expressions to highlight in Extempore modes.")
 
@@ -223,9 +217,9 @@ See `run-hooks'."
     (modify-syntax-entry ?#  "'" st)
     st))
 
-(put 'lambda 'scheme-doc-string-elt 2)
+(put 'lambda 'extempore-doc-string-elt 2)
 ;; Docstring's pos in a `define' depends on whether it's a var or fun def.
-(put 'define 'scheme-doc-string-elt
+(put 'define 'extempore-doc-string-elt
      (lambda ()
        ;; The function is called with point right after "define".
        (forward-comment (point-max))
@@ -304,7 +298,7 @@ indentation."
 		(funcall method state indent-point normal-indent)))))))
 
 
-;;; Let is different in Scheme
+;;; 'let' is different in Scheme/xtlang
 
 (defun would-be-symbol (string)
   (not (string-equal (substring string 0 1) "(")))
