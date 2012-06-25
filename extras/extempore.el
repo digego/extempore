@@ -139,10 +139,6 @@
     (put 'comment-region 'menu-enable 'mark-active)
     (put 'uncomment-region 'menu-enable 'mark-active)
     (put 'indent-region 'menu-enable 'mark-active)
-    ;; for interacting with the extempore process
-    (define-key map "\C-x\C-j" 'extempore-connect)
-    (define-key map "\C-x\C-x" 'extempore-send-definition)
-    (define-key map "\C-x\C-r" 'extempore-send-region)
     smap)
   "Keymap for Extempore mode.
 All commands in `lisp-mode-shared-map' are inherited by this map.")
@@ -157,17 +153,16 @@ buffer, some additional commands will be defined, for evaluating
 expressions and controlling the extempore process.
 
 Entry to this mode calls the value of `extempore-mode-hook'."
-  (extempore-mode-variables))
+  (extempore-mode-variables)
+  (make-variable-buffer-local 'extempore-process)
+  (setq extempore-process nil))
 
 (defgroup extempore nil
   "Editing Extempore code."
   :link '(custom-group-link :tag "Font Lock Faces group" font-lock-faces)
   :group 'lisp)
 
-(defcustom extempore-mode-hook (lambda ()
-				 (interactive)
-				 (make-variable-buffer-local 'extempore-process)
-				 (setq extempore-process nil))
+(defcustom extempore-mode-hook nil
   "Normal hook run when entering `extempore-mode'.
 See `run-hooks'."
   :type 'hook
@@ -182,6 +177,13 @@ See `run-hooks'."
   "Default port where the extempore process is running."
   :type 'integer
   :group 'extempore)
+
+(defun extempore-keybindings (keymap)
+  (define-key keymap (kbd "C-x C-j") 'extempore-connect)
+  (define-key keymap (kbd "C-x C-x") 'extempore-send-definition)
+  (define-key keymap (kbd "C-x C-r") 'extempore-send-region))
+
+(extempore-keybindings extempore-mode-map)
 
 (defconst extempore-font-lock-keywords-1
   (eval-when-compile
@@ -427,4 +429,4 @@ be running in another (shell-like) buffer."
 
 (provide 'extempore)
 
-;;; extempore-major-mode.el ends here
+;;; extempore.el ends here
