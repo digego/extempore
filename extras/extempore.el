@@ -9,12 +9,9 @@
 ;; Commentary:
 
 ;; The major mode for editing Extempore code, which is a mixture of
-;; Scheme and xtlang - a strongly-typed, scheme-like language.  The
-;; Extempore project page is at http://github.com/digego/extempore
-;;
-;; TODO In the future this mode will also provide functionality for
-;; running and interacting with an inferior Extempore process in
-;; another Emacs buffer.
+;; Scheme and xtlang---a strongly-typed, scheme-like language.  See
+;; the Extempore project page at http://github.com/digego/extempore
+;; for more details.
 
 ;;; Code:
 
