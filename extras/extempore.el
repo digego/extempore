@@ -152,7 +152,8 @@ In addition, if an Extempore process is running in a shell
 buffer, some additional commands will be defined, for evaluating
 expressions and controlling the extempore process.
 
-Entry to this mode calls the value of `extempore-mode-hook'.")
+Entry to this mode calls the value of `extempore-mode-hook'."
+  (extempore-mode-variables))
 
 (defgroup extempore nil
   "Editing Extempore code."
