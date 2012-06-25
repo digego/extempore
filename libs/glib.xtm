@@ -31,6 +31,7 @@
 (bind-alias GHashTable i8*) ;; GHashTable in GLib is actually an opaque struct (not pointer to struct)
 (bind-alias GRegex i8*) ;; GRegex in GLib is actually an opaque struct (not pointer to struct)
 (bind-alias GMatchInfo i8*) ;; GMatchInfo in GLib is actually an opaque struct (not pointer to struct)
+(bind-alias GDir i8) ;; GDir is an opaque struct
 (bind-alias gconstpointer i8*)
 (bind-alias gpointer i8*)
 (bind-alias gchar i8)
@@ -92,6 +93,20 @@
 (bind-lib gliblib g_setenv [gboolean,gchar*]*)
 (bind-lib gliblib g_unsetenv [void,gchar*]*)
 (bind-lib gliblib g_spaced_primes_closest [guint,guint]*)
+
+;; file system stuff
+
+(bind-val G_FILE_TEST_IS_REGULAR i32 1)
+(bind-val G_FILE_TEST_IS_SYMLINK i32 2)
+(bind-val G_FILE_TEST_IS_DIR i32 4)
+(bind-val G_FILE_TEST_IS_EXECUTABLE i32 8)
+(bind-val G_FILE_TEST_EXISTS i32 16)
+
+(bind-lib gliblib g_file_test [gboolean,gchar*,i32]*)
+(bind-lib gliblib g_dir_open [GDir*,gchar*,guint,GError**]*)
+(bind-lib gliblib g_dir_close [void,GDir*]*)
+(bind-lib gliblib g_dir_read_name [gchar*,GDir*]*)
+(bind-lib gliblib g_dir_rewind [void,GDir*]*)
 
 ;; regex stuff
 (bind-lib gliblib g_match_info_matches [gboolean,GMatchInfo]*)
