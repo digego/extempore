@@ -148,11 +148,9 @@ All commands in `lisp-mode-shared-map' are inherited by this map.")
   "Major mode for editing Extempore code.
 This mode has been adapted from `scheme-mode'.
 
-In addition, if an inferior Extempore process is running, some additional
-commands will be defined, for evaluating expressions and controlling
-the interpreter, and the state of the process will be displayed in the
-mode line of all Extempore buffers. Use \\[run-extempore] to
-start an inferior Extempore.
+In addition, if an Extempore process is running in a shell
+buffer, some additional commands will be defined, for evaluating
+expressions and controlling the extempore process.
 
 Entry to this mode calls the value of `extempore-mode-hook'.")
 
