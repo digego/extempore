@@ -128,7 +128,7 @@
 	(map (make-sparse-keymap "Extempore")))
     (set-keymap-parent smap lisp-mode-shared-map)
     (define-key smap [menu-bar extempore] (cons "Extempore" map))
-    (define-key map [run-extempore] '("Run Inferior Extempore" . run-extempore))
+    ;; (define-key map [run-extempore] '("Run Inferior Extempore" . run-extempore))
     (define-key map [uncomment-region]
       '("Uncomment Out Region" . (lambda (beg end)
 				   (interactive "r")
