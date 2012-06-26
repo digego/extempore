@@ -13,6 +13,12 @@
 ;; the Extempore project page at http://github.com/digego/extempore
 ;; for more details.
 
+;; To set up Emacs to automatically load this major mode for any .xtm
+;; files, add the following lines to your .emacs
+
+;; (autoload 'extempore-mode "/path/to/extempore/extras/extempore.el" "" t)
+;; (add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
+
 ;;; Code:
 
 (require 'lisp-mode)
