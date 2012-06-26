@@ -209,7 +209,7 @@ See `run-hooks'."
      ;; Declarations
      (list (concat
 	    ;; scheme
-	    "(\\(define\\(c\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\*?\\|"
+	    "(\\(define\\(\\|c\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\*?\\|"
 	    ;; xtlang
 	    "bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\|"
 	    ;; memzone
@@ -269,11 +269,19 @@ See `run-hooks'."
 	     t)
 	"\\>") 1)
       ;; closure type annotations (i.e. specified with a colon)
-      '("(bind-func\\s-+\\sw+\\(:\\S-+\\)\\>"
-	(1 font-lock-type-face t))
-      ;; type/alias definitions
-      '("(bind-\\(type\\|alias\\)\\s-+\\sw+\\s-+\\(\\S-+\\)\\>"
-	(2 font-lock-type-face))
+      '("(bind-func\\s-+\\S-+\\(:\\S-+\\)\\>"
+        (1 font-lock-type-face t))
+      ;; bind-type/alias
+      '("(bind-\\(type\\|alias\\)\\s-+\\S-+\\s-+\\(\\S-+\\))"
+        (2 font-lock-type-face))
+      ;; bind-lib
+      (list "(bind-lib\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+            '(1 font-lock-keyword-face)
+            '(2 font-lock-function-name-face)
+            '(3 font-lock-type-face))
+      ;; bind-val
+      '("(bind-val\\s-+\\S-+\\s-+\\(\\S-+\\)\\>"
+        (1 font-lock-type-face))
       ;; other type annotations
       '(":\\S-+\\>"
 	(0 font-lock-type-face))
