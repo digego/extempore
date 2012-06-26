@@ -186,6 +186,16 @@ See `run-hooks'."
   :type 'boolean
   :group 'extempore)
 
+;; from emacs-starter-kit
+
+(defface extempore-paren-face
+  '((((class color) (background dark))
+     (:foreground "grey50"))
+    (((class color) (background light))
+     (:foreground "grey55")))
+  "Face used to dim parentheses in extempore."
+  :group 'extempore)
+
 (defun extempore-keybindings (keymap)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-x C-x") 'extempore-send-definition)
@@ -259,7 +269,7 @@ See `run-hooks'."
 	     t)
 	"\\>") 1)
       ;; closure type annotations (i.e. specified with a colon)
-      '("(bind-func\\s-+\\sw+:\\(\\S-+\\)\\>"
+      '("(bind-func\\s-+\\sw+\\(:\\S-+\\)\\>"
 	(1 font-lock-type-face t))
       ;; type/alias definitions
       '("(bind-\\(type\\|alias\\)\\s-+\\sw+\\s-+\\(\\S-+\\)\\>"
@@ -267,8 +277,14 @@ See `run-hooks'."
       ;; other type annotations
       '(":\\S-+\\>"
 	(0 font-lock-type-face))
+      ;; float and int literals
+      '("\\<\\([[:digit:]]?+\\)\\|\\([[:digit:]]?*\\.[[:digit:]]?*\\)\\|\\([[:digit:]]?+\\.[[:digit:]]?+\\)\\>"
+	(0 font-lock-constant-face))
       )))
   "Gaudy expressions to highlight in Extempore modes.")
+
+(font-lock-add-keywords 'extempore-mode
+                        '(("(\\|)" . 'extempore-paren-face)))
 
 (defvar extempore-font-lock-keywords extempore-font-lock-keywords-1
   "Default expressions to highlight in Extempore modes.")
