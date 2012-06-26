@@ -1,7 +1,7 @@
 ;;; extempore.el
 
 ;; Author: Ben Swift <ben.swift@anu.edu.au>
-;; Adapted from: scheme.el
+;; Adapted from: scheme.el by Bill Rozas and Dave Love
 ;; Also includes some work done by Hector Levesque and Andrew Sorensen
 
 ;; TODO add licence info
