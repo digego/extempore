@@ -175,6 +175,11 @@ See `run-hooks'."
   :type 'integer
   :group 'extempore)
 
+(defcustom extempore-use-pretty-lambdas t
+  "Use pretty (greek symbol) lambdas in buffer?"
+  :type 'boolean
+  :group 'extempore)
+
 (defun extempore-keybindings (keymap)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-x C-x") 'extempore-send-definition)
@@ -423,6 +428,15 @@ be running in another (shell-like) buffer."
 		  "(callback (*metro* (+ beat (* .5 " duration "))) '"
 		  name " (+ beat " duration ") " duration ")))\n\n"
 		  "(" name " (*metro* 'get-beat 4) " duration ")")))
+
+;; for greek symbol lambdas: from emacs-starter-kit
+
+(if extempore-use-pretty-lambdas
+    (font-lock-add-keywords
+     nil `(("(?\\(lambda\\>\\)"
+	    (0 (progn (compose-region (match-beginning 1) (match-end 1)
+				      ,(make-char 'greek-iso8859-7 107))
+		      nil))))))
 
 (provide 'extempore)
 
