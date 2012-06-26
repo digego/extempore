@@ -225,7 +225,8 @@ See `run-hooks'."
 	       "do" "dotimes" "else" "for-each" "if" "lambda"
 	       "let" "let*" "let-syntax" "letrec" "letrec-syntax"
 	       "and" "or"
-	       "map" "syntax" "syntax-rules") t)
+	       "map" "syntax" "syntax-rules"
+	       "print" "println" "printf") t)
 	"\\>") 1)
       ;; It wouldn't be Scheme w/o named-let.
       '("(let\\s-+\\(\\sw+\\)"
@@ -233,18 +234,39 @@ See `run-hooks'."
       ;; type coercion stuff
       (cons
        (concat
-	(regexp-opt
-	 (let ((types '("i1" "i8" "i16" "i32" "i64" "float" "double")))
-	   (apply 'append (mapcar (lambda (a)
-				    (mapcar (lambda (b)
-					      (concat a "to" b))
-					    (remove a types)))
-				  types)))
-	 t)
+	"(" (regexp-opt
+	     (let ((types '("i1" "i8" "i16" "i32" "i64" "f" "d")))
+	       (apply 'append (mapcar (lambda (a)
+					(mapcar (lambda (b)
+						  (concat a "to" b))
+						(remove a types)))
+				      types)))
+	     t)
 	"\\>") 1)
-      ;; type annotations
+      ;; important xtlang functions
+      (cons
+       (concat
+	"(" (regexp-opt
+	     '("aref" "aset!" "afill!" "aref-ptr"
+	       "array-ref" "array-set!" "array-fill!" "array-ref-ptr"
+	       "tref" "tset!" "tfill!" "tref-ptr"
+	       "tuple-ref" "tuple-set!" "tuple-fill!" "tuple-ref-ptr"
+	       "pref" "pset!" "pfill!" "pref-ptr"
+	       "pointer-ref" "pointer-set!" "pointer-fill!" "pointer-ref-ptr"
+	       "alloc" "salloc" "halloc" "zalloc"
+	       "stack-alloc" "heap-alloc" "zone-alloc"
+	       "callback")
+	     t)
+	"\\>") 1)
+      ;; closure type annotations (i.e. specified with a colon)
+      '("(bind-func\\s-+\\sw+:\\(\\S-+\\)\\>"
+	(1 font-lock-type-face t))
+      ;; type/alias definitions
+      '("(bind-\\(type\\|alias\\)\\s-+\\sw+\\s-+\\(\\S-+\\)\\>"
+	(2 font-lock-type-face))
+      ;; other type annotations
       '(":\\S-+\\>"
-	(0 font-lock-type-face t))
+	(0 font-lock-type-face))
       )))
   "Gaudy expressions to highlight in Extempore modes.")
 
