@@ -224,6 +224,21 @@ See `run-hooks'."
       ;; It wouldn't be Scheme w/o named-let.
       '("(let\\s-+\\(\\sw+\\)"
 	(1 font-lock-function-name-face))
+      ;; type coercion stuff
+      (cons
+       (concat
+	(regexp-opt
+	 (let ((types '("i1" "i8" "i16" "i32" "i64" "float" "double")))
+	   (apply 'append (mapcar (lambda (a)
+				    (mapcar (lambda (b)
+					      (concat a "to" b))
+					    (remove a types)))
+				  types)))
+	 t)
+	"\\>") 1)
+      ;; type annotations
+      '(":\\S-+\\>"
+	(0 font-lock-type-face t))
       )))
   "Gaudy expressions to highlight in Extempore modes.")
 
