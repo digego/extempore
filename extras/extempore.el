@@ -378,17 +378,28 @@ indentation."
 (defun extempore-connect (host port)
   "Connect to the running extempore process, which must
 be running in another (shell-like) buffer."
-  (interactive "sHostname (leave blank for default): \nnPort (leave blank for default): ")
-  ;; (define-key scheme-mode-map extempore-keydef 'extempore-send-definition)
-  ;; (define-key scheme-mode-map extempore-keyreg 'extempore-send-region)
+  (interactive (let ((read-host (read-from-minibuffer
+				  (concat "Hostname (default "
+					  extempore-default-host
+					  "):")))
+		     (read-port (read-from-minibuffer
+				  (concat "Port (default "
+					  (number-to-string extempore-default-port)
+					  "):"))))
+		 (list (if (string-equal read-host "")
+			   extempore-default-host
+			 read-host)
+		       (if (string-equal read-port "")
+			   extempore-default-port
+			 (string-to-number read-port)))))
   (if (not (null extempore-process))
       (delete-process extempore-process))
   (setq extempore-process
 	(open-network-stream "extempore" nil
-			     (if (null host) extempore-default-host host)
-			     (if (null port) extempore-default-port port)))
+			     host
+			     port))
   (set-process-filter extempore-process
-	'(lambda (proc str) (message (substring str 0 -1)))))
+		      '(lambda (proc str) (message (substring str 0 -1)))))
 
 (defun extempore-stop ()
   "Terminate connection to the Extempore process"
