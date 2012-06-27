@@ -222,7 +222,7 @@ See `run-hooks'."
        (1 font-lock-function-name-face))
      ;; definitions
      (list (concat
-	    "(\\(define\\(\\|c\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)"
+	    "(\\(define\\(\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)"
 	    ;; Any whitespace and declared object.
 	    "[ \t]*(?"
 	    "\\(\\sw+\\)?")
