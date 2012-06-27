@@ -286,8 +286,8 @@ See `run-hooks'."
       '(":\\S-+\\>"
 	(0 font-lock-type-face))
       ;; float and int literals
-      '("\\<\\([[:digit:]]?+\\)\\|\\([[:digit:]]?*\\.[[:digit:]]?*\\)\\|\\([[:digit:]]?+\\.[[:digit:]]?+\\)\\>"
-	(0 font-lock-constant-face))
+      '("\\_<[-+]?[/.[:digit:]]+?\\_>"
+        (0 font-lock-constant-face))
       )))
   "Gaudy expressions to highlight in Extempore modes.")
 
