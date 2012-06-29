@@ -1,0 +1,278 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; You can get the source for kiss_fft from
+;; http://sourceforge.net/projects/kissfft/
+;;
+;; The basic kiss_fft library only requires the file kiss_fft.c
+;; You have to build this into a dyib yourself: on OSX this can be
+;; done with:
+;;
+;; gcc kiss_fft.c -dynamiclib -I/usr/include/malloc -o kiss_fft.1.2.9.dylib -current_version 1.2.9
+;;
+;; Then, copy the dylib into somewhere on your lib path, e.g. /usr/local/lib
+;;
+;; After that, this should all work
+
+(define kissfft
+  (sys:open-dylib "kiss_fft.1.2.9.dylib"))
+
+(if (not kissfft)
+    (print-error "Could not load dynamic library"))
+
+;; bind the required types and function signatures (see kiss_fft.h)
+
+(bind-type kiss_fft_cpx <float,float>)
+(bind-type kiss_fft_state <i32,i32,|64,i32|,|1,kiss_fft_cpx|>)
+(bind-alias kiss_fft_cfg kiss_fft_state*)
+
+(bind-lib kissfft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
+(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+(bind-lib kissfft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
+(bind-lib kissfft kiss_fft_cleanup [i8*,i8*]*)
+(bind-lib kissfft kiss_fft_next_fast_size [i32,i32]*)
+
+;; some helpers for working with complex numbers in xtlang
+
+(bind-type complexd <double,double>)
+(bind-type complexf <float,float>)
+
+(bind-func fill-complex-buffer-complexf
+  (lambda (re:float* im:float* com:complexf* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr com i) 0 (pref re i))
+	(tset! (pref-ptr com i) 1 (pref im i))))
+    void))
+
+(bind-func fill-complex-buffer-complexd
+  (lambda (re:double* im:double* com:complexd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr com i) 0 (pref re i))
+	(tset! (pref-ptr com i) 1 (pref im i))))
+    void))
+
+(bind-poly fill-complex-buffer fill-complex-buffer-complexf)
+(bind-poly fill-complex-buffer fill-complex-buffer-complexd)
+
+(bind-func conjugate-complexf
+  (lambda (signal:complexf* conj:complexf* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr conj i)
+	       1
+	       (* -1.0 (tref (pref-ptr signal i) 1))))
+      void)))
+
+(bind-func conjugate-complexd
+  (lambda (signal:complexd* conj:complexd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr conj i)
+	       1
+	       (* -1.0 (tref (pref-ptr signal i) 1))))
+      void)))
+
+(bind-poly conjugate-complex conjugate-complexf)
+(bind-poly conjugate-complex conjugate-complexd)
+
+(bind-func buffer-cart-to-pol-complexf
+  (lambda (cart:complexf* pol:complexf* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr pol i)
+	       0
+	       (sqrtf (+ (powf (tref (pref-ptr cart i) 0) 2.0)
+                         (powf (tref (pref-ptr cart i) 1) 2.0))))
+	(tset! (pref-ptr pol i)
+	       1
+	       (atan2f (tref (pref-ptr cart i) 1)
+                       (tref (pref-ptr cart i) 0)))))
+    void))
+
+(bind-func buffer-pol-to-cart-complexf
+  (lambda (pol:complexf* cart:complexf* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr cart i)
+	       0
+	       (* (tref (pref-ptr pol i) 0)
+		  (cosf (tref (pref-ptr pol i) 1))))
+	(tset! (pref-ptr cart i)
+	       1
+	       (* (tref (pref-ptr pol i) 0)
+		  (sinf (tref (pref-ptr pol i) 1))))))
+    void))
+
+(bind-func buffer-cart-to-pol-complexd
+  (lambda (cart:complexd* pol:complexd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr pol i)
+	       0
+	       (sqrt (+ (pow (tref (pref-ptr cart i) 0) 2.0)
+			(pow (tref (pref-ptr cart i) 1) 2.0))))
+	(tset! (pref-ptr pol i)
+	       1
+	       (atan2 (tref (pref-ptr cart i) 1)
+		      (tref (pref-ptr cart i) 0)))))
+    void))
+
+(bind-func buffer-pol-to-cart-complexd
+  (lambda (pol:complexd* cart:complexd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr cart i)
+	       0
+	       (* (tref (pref-ptr pol i) 0)
+		  (cos (tref (pref-ptr pol i) 1))))
+	(tset! (pref-ptr cart i)
+	       1
+	       (* (tref (pref-ptr pol i) 0)
+		  (sin (tref (pref-ptr pol i) 1))))))
+    void))
+
+(bind-poly buffer-cart-to-pol buffer-cart-to-pol-complexf)
+(bind-poly buffer-cart-to-pol buffer-cart-to-pol-complexd)
+(bind-poly buffer-pol-to-cart buffer-pol-to-cart-complexf)
+(bind-poly buffer-pol-to-cart buffer-pol-to-cart-complexd)
+
+(bind-func buffer-re-only-complexf
+  "helper function for working with the kiss_fft lib"
+  (lambda (in-complexf:complexf*
+      out-float:float*
+      len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(pset! out-float
+	       i
+	       (tref (pref-ptr in-complexf i) 0))))
+    void))
+
+(bind-func buffer-im-only-complexf
+  "helper function for working with the kiss_fft lib"
+  (lambda (in-complexf:complexf*
+      out-float:float*
+      len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(pset! out-float
+	       i
+	       (tref (pref-ptr in-complexf i) 1))))
+    void))
+
+(bind-func buffer-re-only-complexd
+  "helper function for working with the kiss_fft lib"
+  (lambda (in-complexd:complexd*
+      out-double:double*
+      len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(pset! out-double
+	       i
+	       (tref (pref-ptr in-complexd i) 0))))
+    void))
+
+(bind-func buffer-im-only-complexd
+  "helper function for working with the kiss_fft lib"
+  (lambda (in-complexd:complexd*
+      out-double:double*
+      len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(pset! out-double
+	       i
+	       (tref (pref-ptr in-complexd i) 1))))
+    void))
+
+(bind-poly buffer-re-only buffer-re-only-complexf)
+(bind-poly buffer-im-only buffer-re-only-complexf)
+(bind-poly buffer-re-only buffer-re-only-complexd)
+(bind-poly buffer-im-only buffer-re-only-complexd)
+
+(bind-func buffer-complexd-to-complexf
+  "helper function for working with the kiss_fft lib"
+  (lambda (in-complexd:complexd*
+      out-complexf:complexf*
+      len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+        (tset! (pref-ptr out-complexf i)
+               0
+               (dtof (tref (pref-ptr in-complexd i) 0)))
+        (tset! (pref-ptr out-complexf i)
+               1
+               (dtof (tref (pref-ptr in-complexd i) 1)))))
+    void))
+
+(bind-func buffer-complexf-to-complexd
+  "helper function for working with the kiss_fft lib"
+  (lambda (in-complexf:complexf*
+      out-complexd:complexd*
+      len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+        (tset! (pref-ptr out-complexd i)
+               0
+               (ftod (tref (pref-ptr in-complexf i) 0)))
+        (tset! (pref-ptr out-complexd i)
+               1
+               (ftod (tref (pref-ptr in-complexf i) 1)))))
+    void))
+
+;; perform the FFTs
+
+(bind-func fft-complexf
+  "calculate the (complex-valued) FFT of a real input signal"
+  (lambda (in:complexf* out:complexf* len:i64)
+    (let ((fft-config:kiss_fft_cfg (kiss_fft_alloc
+                                    (i64toi32 len)
+                                    0 null null)))
+      (kiss_fft fft-config
+                (cast in kiss_fft_cpx*)
+                (cast out kiss_fft_cpx*)))
+    void))
+
+(bind-func fft-complexd
+  "calculate the (complex-valued) FFT of a real input signal"
+  (lambda (in:complexd* out:complexd* len:i64)
+    (let ((inf:complexf* (salloc len))
+          (outf:complexf* (salloc len)))
+      (buffer-complexd-to-complexf in inf len)
+      (fft-complexf inf outf len)
+      (buffer-complexf-to-complexd outf out len))
+    void))
+
+(bind-poly fft fft-complexf)
+(bind-poly fft fft-complexd)
+
+(bind-func inverse-fft-complexf
+  "calculate the (complex-valued) FFT of a real input signal"
+  (lambda (in:complexf* out:complexf* len:i64)
+    (let ((fft-config:kiss_fft_cfg (kiss_fft_alloc
+                                    (i64toi32 len)
+                                    1 null null))
+          (i 0))
+      (kiss_fft fft-config
+                (cast in kiss_fft_cpx*)
+                (cast out kiss_fft_cpx*)))
+    (dotimes (i len)
+      (tset! (pref-ptr out i)
+             0
+             (/ (tref (pref-ptr out i) 0) (i64tof len)))
+      (tset! (pref-ptr out i)
+             1
+             (/ (tref (pref-ptr out i) 1) (i64tof len))))
+    void))
+
+(bind-func inverse-fft-complexd
+  "calculate the (complex-valued) FFT of a real input signal"
+  (lambda (in:complexd* out:complexd* len:i64)
+    (let ((inf:complexf* (salloc len))
+          (outf:complexf* (salloc len)))
+      (buffer-complexd-to-complexf in inf len)
+      (inverse-fft-complexf inf outf len)
+      (buffer-complexf-to-complexd outf out len))
+    void))
+
+(bind-poly inverse-fft inverse-fft-complexf)
+(bind-poly inverse-fft inverse-fft-complexd)
