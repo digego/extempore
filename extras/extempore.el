@@ -271,6 +271,9 @@ See `run-hooks'."
      ;; bind-val
      '("(bind-val\\s-+\\S-+\\s-+\\(\\S-+\\)\\>"
        (1 font-lock-type-face))
+     ;; cast
+     '("(cast\\s-+\\S-+\\s-+\\(\\S-+\\)\\_>"
+       (1 font-lock-type-face))
      ;; other type annotations
      '(":\\S-+\\>"
        (0 font-lock-type-face))
