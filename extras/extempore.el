@@ -246,7 +246,7 @@ See `run-hooks'."
       (concat
        "(" (regexp-opt
             '("begin" "cond" "dotimes" "if" "else"  "lambda"
-              "let" "and" "or" "callback" "printf"
+              "let" "and" "or" "callback" "printf" "cast"
               "aref" "aset!" "afill!" "aref-ptr"
               "array-ref" "array-set!" "array-fill!" "array-ref-ptr"
               "tref" "tset!" "tfill!" "tref-ptr"
@@ -287,7 +287,7 @@ See `run-hooks'."
                                                  (concat a "to" b))
                                                (remove a types)))
                                      types))) t) "\\>")
-      '(1 font-lock-function-name-face))
+      '(1 font-lock-type-face))
      )))
 
 (font-lock-add-keywords 'extempore-mode
