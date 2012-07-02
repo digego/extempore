@@ -10,13 +10,23 @@
 			 (sys:open-dylib "Horde3D.dll")
 			 (sys:open-dylib "Horde3D.framework/Horde3D"))))
 
+(if (or (eq? #f hordelib)
+	(not hordelib)) 
+    (print-error "Could not load 'Horde3d' dynamic library"))
+
+
 (define hordeutlib (if (string=? "Linux" (sys:platform))
 		       (sys:open-dylib "libHorde3DUtils.so")
 		       (if (string=? "Windows" (sys:platform))
 			   (sys:open-dylib "Horde3DUtils.dll")
 			   (sys:open-dylib "Horde3DUtils.framework/Horde3DUtils"))))
 
+(if (or (eq? #f hordeutlib)
+	(not hordeutlib)) 
+    (print-error "Could not load 'Horde3d' dynamic library"))
 
+
+;; horde primary
 (bind-lib hordelib h3dInit [i1]*)
 (bind-lib hordelib h3dRelease [void]*)
 (bind-lib hordelib h3dSetOption [i8,i32,float]*)
@@ -41,6 +51,8 @@
 (bind-lib hordelib h3dAdvanceEmitterTime [void,i32,float]*)
 (bind-lib hordelib h3dGetNodeParamI [i32,i32,i32]*)
 (bind-lib hordelib h3dSetNodeParamI [void,i32,i32,i32]*)
+(bind-lib hordelib h3dGetNodeFlags [i32,i32]*)
+(bind-lib hordelib h3dSetNodeFlags [void,i32,i32,i1]*)
 (bind-lib hordelib h3dRender [void,i32]*)
 (bind-lib hordelib h3dFinalizeFrame [void]*)
 (bind-lib hordelib h3dClearOverlays [void]*)
@@ -52,10 +64,18 @@
 (bind-lib hordelib h3dUnloadResource [void,i32]*)
 (bind-lib hordelib h3dSetNodeTransMat [void,i32,float*]*)
 (bind-lib hordelib h3dGetNodeTransMats [void,i32,float**,float**]*)
+(bind-lib hordelib h3dGetRenderTargetData [i1,i32,i8*,i32,i32*,i32*,i32*,i8*,i32]*)
+(bind-lib hordelib h3dGetNodeChild [i32,i32,i32]*)
+(bind-lib hordelib h3dGetNodeParent [i32,i32]*)
+(bind-lib hordelib h3dSetNodeParent [i32,i32,i32]*)
+
+;; horde utils
 (bind-lib hordeutlib h3dutDumpMessages [i1]*)
 (bind-lib hordeutlib h3dutLoadResourcesFromDisk [i1,i8*]*)
 (bind-lib hordeutlib h3dutCreateGeometryRes [i32,i8*,i32,i32,float*,i32*,i32*,i32*,i32*,float*,float*]*)
 (bind-lib hordeutlib h3dutScreenshot [i1,i8*]*)
+(bind-lib hordeutlib h3dutShowFrameStats [void,i32,i32,i32]*)
+
 					     
 ;; global contants
 
