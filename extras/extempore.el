@@ -185,6 +185,11 @@ See `run-hooks'."
   :type 'boolean
   :group 'extempore)
 
+(defcustom extempore-tab-completion t
+  "Use <TAB> key for (contextual) symbol completion"
+  :type 'boolean
+  :group 'extempore)
+
 ;; from emacs-starter-kit
 
 (defface extempore-paren-face
@@ -198,9 +203,24 @@ See `run-hooks'."
 (defun extempore-keybindings (keymap)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-x C-x") 'extempore-send-definition)
-  (define-key keymap (kbd "C-x C-r") 'extempore-send-region))
+  (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
+  (define-key keymap (kbd "C-x C-b") 'extempore-send-buffer))
 
 (extempore-keybindings extempore-mode-map)
+
+(if extempore-tab-completion
+    (define-key extempore-mode-map (kbd "TAB")
+      '(lambda ()
+         (interactive)
+         (if (minibufferp)
+             (unless (minibuffer-complete)
+               (dabbrev-expand nil))
+           (if mark-active
+               (indent-region (region-beginning)
+                              (region-end))
+             (if (looking-at "\\_>")
+                 (dabbrev-expand nil)
+               (indent-for-tab-command)))))))
 
 (defconst extempore-font-lock-keywords-scheme
   (eval-when-compile
@@ -483,19 +503,32 @@ be running in another (shell-like) buffer."
   (interactive)
   (save-excursion
     (mark-defun)
-    (let ((str (concat (buffer-substring (point) (mark))
-		       "\r\n")))
-      (process-send-string extempore-process str)
-      (redisplay) ; flash the def like Extempore
-      (sleep-for .25))))
+    (if extempore-process
+        (let ((str (concat (buffer-substring (point) (mark))
+                           "\r\n")))
+          (process-send-string extempore-process str)
+          (redisplay) ; flash the def like Extempore
+          (sleep-for .25))
+      (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
 
 (defun extempore-send-region ()
-  "Send the current region (or all the buffer) to Extempore for evaluation"
+  "Send the current region to Extempore for evaluation"
   (interactive)
   (save-excursion
     (if mark-active
-	(unless (= (point) (region-beginning)) (exchange-point-and-mark))
-      (progn (goto-char (point-min)) (set-mark (point-max))))
+        (let ((start (region-beginning)) (end (region-end)))
+          (unless (= (point) (region-beginning)) (exchange-point-and-mark))
+          (while (re-search-forward "^[^\n;]*(" end t)
+            (extempore-send-definition)
+            (end-of-defun)))
+      (message "Region not active."))))
+
+(defun extempore-send-buffer ()
+  "Send the current buffer to Extempore for evaluation"
+  (interactive)
+  (save-excursion
+    (progn (goto-char (point-min))
+           (set-mark (point-max)))
     (let ((start (region-beginning)) (end (region-end)))
       (while (re-search-forward "^[^\n;]*(" end t)
 	(extempore-send-definition)
