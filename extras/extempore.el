@@ -242,9 +242,9 @@ See `run-hooks'."
        (1 font-lock-function-name-face))
      ;; definitions
      (list (concat
-	    "(\\(define\\(\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)"
+	    "(\\(define\\(\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)\\_>"
 	    ;; Any whitespace and declared object.
-	    "[ \t]*(?"
+	    "[ \t]*"
 	    "\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
 	   '(3 font-lock-function-name-face))
@@ -255,9 +255,9 @@ See `run-hooks'."
     (list
      ;; definitions
      (list (concat
-            "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)"
+	    "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\_>"
 	    ;; Any whitespace and declared object.
-	    "[ \t]*(?"
+	    "[ \t]*"
 	    "\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
 	   '(3 font-lock-function-name-face))
@@ -441,14 +441,15 @@ indentation."
 (put 'begin 'extempore-indent-function 0)
 (put 'case 'extempore-indent-function 1)
 (put 'delay 'extempore-indent-function 0)
-(put 'do 'extempore-indent-function 2)
+(put 'dotimes 'extempore-indent-function 1)
 (put 'lambda 'extempore-indent-function 1)
+(put 'bind-func 'extempore-indent-function 1)
 (put 'let 'extempore-indent-function 'extempore-let-indent)
-(put 'let* 'extempore-indent-function 1)
-(put 'letrec 'extempore-indent-function 1)
-(put 'let-values 'extempore-indent-function 1) ; SRFI 11
-(put 'let*-values 'extempore-indent-function 1) ; SRFI 11
-(put 'sequence 'extempore-indent-function 0) ; SICP, not r4rs
+(put 'let* 'extempore-indent-function 'extempore-let-indent)
+(put 'letrec 'extempore-indent-function 'extempore-let-indent)
+;; (put 'let-values 'extempore-indent-function 1) ; SRFI 11
+;; (put 'let*-values 'extempore-indent-function 1) ; SRFI 11
+;; (put 'sequence 'extempore-indent-function 0) ; SICP, not r4rs
 (put 'let-syntax 'extempore-indent-function 1)
 (put 'letrec-syntax 'extempore-indent-function 1)
 (put 'syntax-rules 'extempore-indent-function 1)
