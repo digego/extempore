@@ -441,14 +441,15 @@ indentation."
 (put 'begin 'extempore-indent-function 0)
 (put 'case 'extempore-indent-function 1)
 (put 'delay 'extempore-indent-function 0)
-(put 'do 'extempore-indent-function 2)
+(put 'dotimes 'extempore-indent-function 1)
 (put 'lambda 'extempore-indent-function 1)
+(put 'bind-func 'extempore-indent-function 1)
 (put 'let 'extempore-indent-function 'extempore-let-indent)
-(put 'let* 'extempore-indent-function 1)
-(put 'letrec 'extempore-indent-function 1)
-(put 'let-values 'extempore-indent-function 1) ; SRFI 11
-(put 'let*-values 'extempore-indent-function 1) ; SRFI 11
-(put 'sequence 'extempore-indent-function 0) ; SICP, not r4rs
+(put 'let* 'extempore-indent-function 'extempore-let-indent)
+(put 'letrec 'extempore-indent-function 'extempore-let-indent)
+;; (put 'let-values 'extempore-indent-function 1) ; SRFI 11
+;; (put 'let*-values 'extempore-indent-function 1) ; SRFI 11
+;; (put 'sequence 'extempore-indent-function 0) ; SICP, not r4rs
 (put 'let-syntax 'extempore-indent-function 1)
 (put 'letrec-syntax 'extempore-indent-function 1)
 (put 'syntax-rules 'extempore-indent-function 1)
