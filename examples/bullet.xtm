@@ -4,11 +4,14 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+
 (load "libs/horde3d_lib.xtm")
 (load "libs/bullet_lib.xtm")
 (load "libs/opengl_lib.xtm")
 
-(definec degToRad
+(bind-func degToRad
   (lambda (f:float)
     (* f (/ 3.141592 180.0))))
 
@@ -33,7 +36,7 @@
 (bind-val _deferredPipeRes i32 0)
 (bind-val env i32 0)
 
-(definec resize
+(bind-func resize
   (lambda (width:float height:float)
     ;; resize viewport
     (h3dSetNodeParamI _cam H3DCamera_ViewportXI 0)
@@ -44,10 +47,10 @@
     (h3dSetupCameraView _cam 20.0 (/ width height) 0.1 1000.0)
     1))
 
-(definec h3d_object_size
+(bind-func h3d_object_size
   (lambda (idx:i32)
-    (let ((sizes (heap-alloc 6 float))
-	  (results (heap-alloc 3 float)))
+    (let ((sizes:float* (halloc 6))
+	  (results:float* (halloc 3)))
       (h3dGetNodeAABB (pref _objects idx)
 		      (pref-ptr sizes 0) (pref-ptr sizes 1) (pref-ptr sizes 2)
 		      (pref-ptr sizes 3) (pref-ptr sizes 4) (pref-ptr sizes 5))
@@ -56,10 +59,10 @@
       (pset! results 2 (- (pref sizes 5) (pref sizes 2)))
       results)))
 
-(definec h3d_object_pos
+(bind-func h3d_object_pos
   (lambda (idx:i32)
-    (let ((sizes (heap-alloc 6 float))
-	  (results (heap-alloc 3 float)))
+    (let ((sizes:float* (halloc 6))
+	  (results:float* (halloc 3)))
       (h3dGetNodeAABB (pref _objects idx)
 		      (pref-ptr sizes 0) (pref-ptr sizes 1) (pref-ptr sizes 2)
 		      (pref-ptr sizes 3) (pref-ptr sizes 4) (pref-ptr sizes 5))
@@ -68,11 +71,11 @@
       (pset! results 2 (pref sizes 2))
       results)))
       
-(definec h3d_init
+(bind-func h3d_init
   (let ((hand -1)
 	(matRes -1)
 	(envRes -1)
-	(boxRes -1)
+	(boxRes:i32 -1)
 	(boxAnim1Res -1)
 	(boxAnim2Res -1)
 	(particleSysRes -1)
@@ -88,11 +91,11 @@
 	  (begin (h3dutDumpMessages)
 		 (printf "Failed to init Horde3D\n")))
       ;; set options
-      (h3dSetOption H3DOptions_LoadTextures 1)
-      (h3dSetOption H3DOptions_TexCompression 0)
-      (h3dSetOption H3DOptions_FastAnimation 0)
-      (h3dSetOption H3DOptions_MaxAnisotropy 4)
-      (h3dSetOption H3DOptions_ShadowMapSize 2048)
+      (h3dSetOption H3DOptions_LoadTextures 1.0)
+      (h3dSetOption H3DOptions_TexCompression 0.0)
+      (h3dSetOption H3DOptions_FastAnimation 0.0)
+      (h3dSetOption H3DOptions_MaxAnisotropy 0.0)
+      (h3dSetOption H3DOptions_ShadowMapSize 1028.0)
 
       ;; add resources
 
@@ -126,9 +129,9 @@
 	  (pset! _objects iii res)))
 
       ;; move objects
-      (let ((v3 (heap-alloc 3 float))
+      (let ((v3:float* (halloc 3))
 	    (across 40)
-	    (v4 (heap-alloc 4 float)))
+	    (v4:float* (halloc 4)))
 	(dotimes (z (i64toi32 2000))
 	  (let ((body (plCreateRigidBody null 1.0 (plNewBoxShape 1.0 1.0 1.0))))
 	    (plSetActivationState body 4)	    
@@ -139,8 +142,8 @@
 	    (plSetOrientation body v4)
 	    (plAddRigidBody dynWorld body))))
 
-      (let ((v33 (heap-alloc 3 float))
-	    (v44 (heap-alloc 4 float)))
+      (let ((v33:float* (halloc 3))
+	    (v44:float* (halloc 4)))
 	(dotimes (k 5)
 	  (let ((stiffbody (plCreateRigidBody null 0.0 (plNewBoxShape 10.0 10.0 1000.0))))
 	    (pset! _sbodies k stiffbody)
@@ -170,10 +173,10 @@
       1)))
 
 
-(definec mainLoop
+(bind-func mainLoop
   (let ((_at:double 0.0)
-	(matrix (heap-alloc 16 float))
-	(pos (heap-alloc 3 float))
+	(matrix:float* (halloc 16))
+	(pos:float* (halloc 3))
 	(fps:float 30.0)
 	(z:i32 0)
 	(k 0))
@@ -228,11 +231,11 @@
       (h3dutDumpMessages)
       1)))
 
-(definec rot
+(bind-func rot
   (lambda (deg x y z)
     (glRotated deg x y z)))
 
-(definec set-mouse-pos
+(bind-func set-mouse-pos
   (lambda (x y)
     (set! _x (/ (i64tof x) 5.0))
     (set! _y (/ (- 360.0 (i64tof y)) 4.5))
@@ -241,15 +244,18 @@
 ;; standard impromptu callback
 (define opengl-test
   (lambda (time degree)
-    (let ((c (clock:clock)))
-      (let ((evt (gl:get-event)))
-	(if (not (null? evt))
-	    (set-mouse-pos (cadr evt) (car evt))))
-      (mainLoop)
-      (gl:swap-buffers pr2)
-      (callback (+ time 50) 'opengl-test (+ time 512) (+ degree 0.001)))))
+    (let ((evt (if (string=? (sys:platform) "Linux")
+		   (gl:get-event pr2)
+		   (gl:get-event))))
+      (if (not (null? evt))
+	  (if (string=? (sys:platform) "Linux")	      
+	      (set-mouse-pos (caddr evt) (cadddr evt)) 
+	      (set-mouse-pos (cadr evt) (car evt)))))
+    (mainLoop)
+    (gl:swap-buffers pr2)
+    (callback (+ time 50) 'opengl-test (+ time 512) (+ degree 0.001))))
 
 
-(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+
 (h3d_init)
 (opengl-test (now) 0.0)
