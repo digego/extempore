@@ -10,15 +10,14 @@
 
 ;; must create openglview before calling gl-load-extensions
 (define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
-(gl-set-view 900.0 600.0)
+(gl-set-view 900.0 600.0 100.0)
 (gl-load-extensions)
-
 
 ;; a couple of shader helper functions
 (definec print-shader-info-log
   (lambda (obj:i32)
-    (let ((infologLength (salloc 1 i32))
-	  (charsWritten (salloc 1 i32)))
+    (let ((infologLength:i32* (salloc))
+	  (charsWritten:i32* (salloc)))
       (glGetShaderiv obj GL_INFO_LOG_LENGTH infologLength)
       (if (> (pref infologLength 0) 0)
 	  (let ((log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
@@ -30,8 +29,8 @@
 
 (definec print-program-info-log
   (lambda (obj:i32)
-    (let ((infologLength (salloc 1 i32))
-	  (charsWritten (salloc 1 i32)))
+    (let ((infologLength:i32* (salloc))
+	  (charsWritten:i32* (salloc)))
       (glGetProgramiv obj GL_INFO_LOG_LENGTH infologLength)
       (if (> (pref infologLength 0) 0)
 	  (let ((log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
@@ -51,19 +50,19 @@
   (lambda (fsource:i8* vsource:i8*)
     (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
 	  (vshader (glCreateShader GL_VERTEX_SHADER))
-	  (fcode (salloc 1 i8*))
-	  (vcode (salloc 1 i8*))
+	  (fcode:|1,i8*|* (salloc))
+	  (vcode:|1,i8*|* (salloc))
 	  (program (glCreateProgram))
-	  (temp (salloc 1 i32)))
+	  (temp:i32* (salloc)))
 
       (set! _program program)
       
-      (pset! fcode 0 fsource)
-      (pset! vcode 0 vsource)
+      (aset! fcode 0 fsource)
+      (aset! vcode 0 vsource)
       (printf "program %d\n" program)
       
-      (glShaderSource fshader 1 fcode (bitcast null i32*))
-      (glShaderSource vshader 1 vcode (bitcast null i32*))
+      (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
+      (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
 
       (set! _fshader fshader)
       (glCompileShader fshader)
@@ -89,7 +88,7 @@
       (glUniform1f (glGetUniformLocation _program "time") (dtof (* .025 degree)))
       (glUniform3f (glGetUniformLocation _program "unResolution") 900.0 600.0 0.0)
       (glLoadIdentity)
-      (glTranslated 0.0 0.0 -4.0)
+      (glTranslated 0.0 0.0 -3.0)
       (glClearColor 0.0 0.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (glBegin GL_QUADS)
@@ -348,4 +347,3 @@ void main() {
 
 (opengl-test (now) 0.0)
 (load-shaders fragshader vertshader)
-

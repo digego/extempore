@@ -3,9 +3,16 @@
 ;; Bullet Physics Library Bindings
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;(define bulletlib (sys:open-dylib "libBulletDynamics.so.2.79"))
-(define bulletlib (sys:open-dylib "BulletDynamics.dll"))
-;(define bulletlib (sys:open-dylib "BulletMultiThreaded.dll"))
+
+(define bulletlib (if (string=? "Linux" (sys:platform))
+		       (sys:open-dylib "libBulletDynamics.so.2.79")
+		       (if (string=? "Windows" (sys:platform))
+			   (sys:open-dylib "BulletDynamics.dll")
+			   (print-error "Where Do I find Bullet lib on OSX??"))))
+
+(if (or (eq? #f hordeutlib)
+	(not hordeutlib)) 
+    (print-error "Could not load 'Horde3d' dynamic library"))
 
 (bind-type _plPhysicsSdkHandle <i32>)
 (bind-alias plPhysicsSdkHandle _plPhysicsSdkHandle*)

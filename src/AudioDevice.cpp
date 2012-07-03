@@ -852,7 +852,8 @@ namespace extemp {
 	if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE))); return 0; }
 	cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !
 
-	double indata[UNIV::IN_CHANNELS];
+	//double indata[UNIV::IN_CHANNELS];
+	double* indata = (double*) malloc(UNIV::IN_CHANNELS*8);
 				
 	if(AudioDevice::I()->getDSPWrapper()) { // if true then we must be sample by sample
 	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();

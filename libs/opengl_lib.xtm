@@ -4,13 +4,57 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; first check if we are windows we need to load some extensions!
+(if (string=? (sys:platform) "Windows")
+    (begin (println "Loading OpenGL Extensions for Windows!!!!!")
+	   (gl:add-extension "glGetShaderiv")
+	   (gl:add-extension "glGetShaderInfoLog")
+	   (gl:add-extension "glGetProgramiv")
+	   (gl:add-extension "glGetProgramInfoLog")
+	   (gl:add-extension "glCreateShader")
+	   (gl:add-extension "glCreateProgram")
+	   (gl:add-extension "glShaderSource")
+	   (gl:add-extension "glCompileShader")
+	   (gl:add-extension "glAttachShader")
+	   (gl:add-extension "glLinkProgram")
+	   (gl:add-extension "glUseProgram")
+	   (gl:add-extension "glUniform1f")
+	   (gl:add-extension "glUniform1i")	   
+	   (gl:add-extension "glUniform2f")
+	   (gl:add-extension "glUniform1fv")
+	   (gl:add-extension "glUniform2fv")
+	   (gl:add-extension "glUniform3f")	   
+	   (gl:add-extension "glGetUniformLocation")
+	   (llvm:compile "declare i32 @glGetUniformBlockIndex(i32,i8*)")
+	   (gl:add-extension "glGetUniformBlockIndex")
+	   (llvm:compile "declare void @glUniformBlockBinding(i32,i32,i32)")	   
+	   (gl:add-extension "glUniformBlockBinding")
+	   (llvm:compile "declare void @glBindBufferRange(i32,i32,i32,i64,i64)")
+	   (gl:add-extension "glBindBufferRange")
+	   ;; frame buffer bits
+	   (llvm:compile "declare void @glGenFramebuffers(i32,i32*)")
+	   (gl:add-extension "glGenFramebuffers")
+	   (llvm:compile "declare void @glGenRenderbuffers(i32,i32*)")
+	   (gl:add-extension "glGenRenderbuffers")
+	   (llvm:compile "declare void @glBindFramebuffer(i32,i32)")
+	   (gl:add-extension "glBindFramebuffer")
+	   (llvm:compile "declare void @glBindRenderbuffer(i32,i32)")
+	   (gl:add-extension "glBindRenderbuffer")
+	   (llvm:compile "declare void @glRenderbufferStorage(i32,i32,i32,i32)")
+	   (gl:add-extension "glRenderbufferStorage")
+	   (llvm:compile "declare void @glFramebufferRenderbuffer(i32,i32,i32,i32)")
+	   (gl:add-extension "glFramebufferRenderbuffer")
+	   (llvm:compile "declare void @glFramebufferTexture(i32,i32,i32,i32)")
+	   (gl:add-extension "glFramebufferTexture")
+	   (llvm:compile "declare void @glFramebufferTexture1D(i32,i32,i32,i32,i32)")
+	   (gl:add-extension "glFramebufferTexture1D")
+	   (llvm:compile "declare void @glFramebufferTexture2D(i32,i32,i32,i32,i32)")	   
+	   (gl:add-extension "glFramebufferTexture2D")
+	   (llvm:compile "declare void @glFramebufferTexture3D(i32,i32,i32,i32,i32,i32)")	   
+	   (gl:add-extension "glFramebufferTexture3D")
+	   (llvm:compile "declare i32 @glCheckFramebufferStatus(i32)")
+	   (gl:add-extension "glCheckFramebufferStatus")))
 
-(if (string=? (sys:platform) "Linux")
-    (begin (llvm:compile "declare i32 @glGetUniformBlockIndex(i32, i8*);")
-	   (llvm:compile "declare void @glUniformBlockBinding(i32, i32, i32);")
-	   (llvm:compile "declare void @glBindBufferRange(i32,i32,i32,i32,i32);")))
-
-(bind-val GL_ONE_MINUS_SRC_ALPHA i32 771)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load SOIL
@@ -23,6 +67,26 @@
 		  (if (string=? "Windows" (sys:platform))
 		      (sys:open-dylib "Gl32.dll")
 		      (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))))
+
+
+;; if on windows also check for opengl32.dll			  
+(if (or (eq? #f libgl)
+	    (null? libgl)) 
+	(if (string=? "Windows" (sys:platform))
+	    (begin (set! libgl (sys:open-dylib "opengl32.dll"))
+		       (if (or (null? libgl)
+				       (eq? #f libgl))
+			       (print-error "Error loading opengl library")))	   
+		(print-error "Error loading opengl library")))
+
+
+
+(if (not (string=? (sys:platform) "Windows"))
+    (begin (llvm:compile "declare i32 @glGetUniformBlockIndex(i32, i8*);")
+	   (llvm:compile "declare void @glUniformBlockBinding(i32, i32, i32);")
+	   (llvm:compile "declare void @glBindBufferRange(i32,i32,i32,i32,i32);")))
+
+(bind-val GL_ONE_MINUS_SRC_ALPHA i32 771)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;  FBO stuff
@@ -59,18 +123,19 @@
 (bind-val GL_VIEWPORT_BIT i32 2048)
 (bind-val GL_ENABLE_BIT i32 8192)
 
-(bind-lib libgl glGenFramebuffers [void,i32,i32*]*)
-(bind-lib libgl glGenRenderbuffers [void,i32,i32*]*)
-(bind-lib libgl glBindFramebuffer [void,i32,i32]*)
-(bind-lib libgl glBindRenderbuffer [void,i32,i32]*)
-(bind-lib libgl glRenderbufferStorage [void,i32,i32,i32,i32]*)
-(bind-lib libgl glFramebufferRenderbuffer [void,i32,i32,i32,i32]*)
-(bind-lib libgl glFramebufferTexture [void,i32,i32,i32,i32]*)
-(bind-lib libgl glFramebufferTexture1D [void,i32,i32,i32,i32,i32]*)
-(bind-lib libgl glFramebufferTexture2D [void,i32,i32,i32,i32,i32]*)
-(bind-lib libgl glFramebufferTexture3D [void,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libgl glCheckFramebufferStatus [i32,i32]*)
-
+(if (not (string=? "Windows" (sys:platform)))
+	(begin 
+	(bind-lib libgl glGenFramebuffers [void,i32,i32*]*)
+	(bind-lib libgl glGenRenderbuffers [void,i32,i32*]*)
+	(bind-lib libgl glBindFramebuffer [void,i32,i32]*)
+	(bind-lib libgl glBindRenderbuffer [void,i32,i32]*)
+	(bind-lib libgl glRenderbufferStorage [void,i32,i32,i32,i32]*)
+	(bind-lib libgl glFramebufferRenderbuffer [void,i32,i32,i32,i32]*)
+	(bind-lib libgl glFramebufferTexture [void,i32,i32,i32,i32]*)
+	(bind-lib libgl glFramebufferTexture1D [void,i32,i32,i32,i32,i32]*)
+	(bind-lib libgl glFramebufferTexture2D [void,i32,i32,i32,i32,i32]*)
+	(bind-lib libgl glFramebufferTexture3D [void,i32,i32,i32,i32,i32,i32]*)
+	(bind-lib libgl glCheckFramebufferStatus [i32,i32]*)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GLU

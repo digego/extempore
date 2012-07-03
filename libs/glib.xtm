@@ -10,19 +10,36 @@
   (sys:open-dylib (if (string=? "Linux" (sys:platform))
 		      "libglib-2.0.so"
 		      (if (string=? "Windows" (sys:platform))
-			  (print-error "Where can I find glib on your platform?")
+			  "libglib-2.0-0.dll"
 			  "libglib-2.0.dylib"))))
 
-(if (not gliblib) (print-error "Could not load 'glib' dynamic library"))
+(if (or (eq? #f gliblib)
+	(not gliblib)) 
+    (print-error "Could not load 'glib' dynamic library"))
 
 (define giolib
   (sys:open-dylib (if (string=? "Linux" (sys:platform))
 		      "libgio-2.0.so"
 		      (if (string=? "Windows" (sys:platform))
-			  (print-error "Where can I find glib on your platform?")
+			  "libgio-2.0-0.dll"
 			  "libgio-2.0.dylib"))))
 
-(if (not giolib) (print-error "Could not load 'gio' dynamic library"))
+(if (or (eq? #f giolib)
+	(not giolib)) 
+    (print-error "Could not load 'gio' dynamic library"))
+
+
+(define gobjectlib
+  (sys:open-dylib (if (string=? "Linux" (sys:platform))
+		      "libgobject-2.0.so"
+		      (if (string=? "Windows" (sys:platform))
+			  "libgobject-2.0-0.dll"
+			  "libgobject-2.0.dylib"))))
+
+(if (or (eq? #f gobjectlib)
+	(not gobjectlib)) 
+    (print-error "Could not load 'gio' dynamic library"))
+
 
 ;; some GLib type aliases
 ;; note that some of these differ from GLib's actual implementation!
@@ -31,6 +48,7 @@
 (bind-alias GHashTable i8*) ;; GHashTable in GLib is actually an opaque struct (not pointer to struct)
 (bind-alias GRegex i8*) ;; GRegex in GLib is actually an opaque struct (not pointer to struct)
 (bind-alias GMatchInfo i8*) ;; GMatchInfo in GLib is actually an opaque struct (not pointer to struct)
+(bind-alias GDir i8) ;; GDir is an opaque struct
 (bind-alias gconstpointer i8*)
 (bind-alias gpointer i8*)
 (bind-alias gchar i8)
@@ -74,13 +92,6 @@
 (bind-type GError <GQuark,gint,gchar*>)
 (bind-type GValue <GType,|2,i64|>)
 
-;; hash table stuff
-(bind-lib gliblib g_hash_table_new [GHashTable,GHashFunc,GEqualFunc]*)
-(bind-lib gliblib g_hash_table_destroy [void,GHashTable]*)
-(bind-lib gliblib g_hash_table_insert [void,GHashTable,gpointer,gpointer]*)
-(bind-lib gliblib g_hash_table_lookup [gpointer,GHashTable,gpointer]*)
-(bind-lib gliblib g_str_hash [guint,gconstpointer]*)
-(bind-lib gliblib g_str_equal [gboolean,gconstpointer,gconstpointer]*)
 
 ;; misc stuff
 (bind-lib gliblib g_get_user_name [gchar*]*)
@@ -92,6 +103,20 @@
 (bind-lib gliblib g_setenv [gboolean,gchar*]*)
 (bind-lib gliblib g_unsetenv [void,gchar*]*)
 (bind-lib gliblib g_spaced_primes_closest [guint,guint]*)
+
+;; file system stuff
+
+(bind-val G_FILE_TEST_IS_REGULAR i32 1)
+(bind-val G_FILE_TEST_IS_SYMLINK i32 2)
+(bind-val G_FILE_TEST_IS_DIR i32 4)
+(bind-val G_FILE_TEST_IS_EXECUTABLE i32 8)
+(bind-val G_FILE_TEST_EXISTS i32 16)
+
+(bind-lib gliblib g_file_test [gboolean,gchar*,i32]*)
+(bind-lib gliblib g_dir_open [GDir*,gchar*,guint,GError**]*)
+(bind-lib gliblib g_dir_close [void,GDir*]*)
+(bind-lib gliblib g_dir_read_name [gchar*,GDir*]*)
+(bind-lib gliblib g_dir_rewind [void,GDir*]*)
 
 ;; regex stuff
 (bind-lib gliblib g_match_info_matches [gboolean,GMatchInfo]*)
@@ -124,20 +149,20 @@
 (bind-lib gliblib g_malloc [gpointer,gsize]*)
 
 ;; GObject stuff
-(bind-lib giolib g_object_ref [gpointer,gpointer]*)
-(bind-lib giolib g_object_unref [void,gpointer]*)
-(bind-lib giolib g_object_set_property [void,GObject*,gchar*,GValue*]*)
-(bind-lib giolib g_object_get_property [void,GObject*,gchar*,GValue*]*)
+(bind-lib gobjectlib g_object_ref [gpointer,gpointer]*)
+(bind-lib gobjectlib g_object_unref [void,gpointer]*)
+(bind-lib gobjectlib g_object_set_property [void,GObject*,gchar*,GValue*]*)
+(bind-lib gobjectlib g_object_get_property [void,GObject*,gchar*,GValue*]*)
 
 
 ;; signal stuff
 (bind-alias GClosure i8)
 (bind-alias GClosureNotify [void,gpointer,GClosure*]*)
-(bind-lib giolib g_signal_connect_data [gulong,gpointer,gchar*,GCallback,gpointer,GClosureNotify,i32]*)
+(bind-lib gobjectlib g_signal_connect_data [gulong,gpointer,gchar*,GCallback,gpointer,GClosureNotify,i32]*)
 (bind-func g_signal_connect (lambda (a:gpointer b:gchar* c:GCallback d:gpointer) (g_signal_connect_data a b c d null 0)))
-(bind-lib giolib g_signal_connect_object [gulong,gpointer,gchar*,GCallback,gpointer,i32]*)
-(bind-lib giolib g_signal_emitv [void,GValue*,guint,GQuark,GValue*]*)
-(bind-lib giolib g_signal_lookup [guint,gchar*,GType]*)
+(bind-lib gobjectlib g_signal_connect_object [gulong,gpointer,gchar*,GCallback,gpointer,i32]*)
+(bind-lib gobjectlib g_signal_emitv [void,GValue*,guint,GQuark,GValue*]*)
+(bind-lib gobjectlib g_signal_lookup [guint,gchar*,GType]*)
 
 
 ;; Main loop
@@ -150,25 +175,59 @@
 
 
 ;; value and TYPE STUFF
-(bind-lib giolib g_value_init [GValue*,GValue*,GType]*)
-(bind-lib giolib g_value_get_object [gpointer,GValue*]*)
-(bind-lib giolib g_value_get_string [gchar*,GValue*]*)
-(bind-lib giolib g_value_get_int [gint,GValue*]*)
-(bind-lib giolib g_value_set_string [void,GValue*,gchar*]*)
-(bind-lib giolib g_value_set_object [void,GValue*,gpointer]*)
-(bind-lib giolib g_value_set_boxed [void,GValue*,gpointer]*)
-(bind-lib giolib g_value_set_pointer [void,GValue*,gpointer]*)
-(bind-lib giolib g_value_set_boolean [void,GValue*,i32]*);gboolean]*)
-(bind-lib giolib g_value_set_static_string [void,GValue*,gchar*]*)
-(bind-lib giolib g_strdup_value_contents [gchar*,GValue*]*)
-(bind-lib giolib g_type_check_value [gboolean,GValue*]*)
-(bind-lib giolib g_type_check_value_holds [gboolean,GValue*,GType]*)
-(bind-lib giolib g_type_name_from_instance [gchar*,GTypeInstance*]*)
-(bind-lib giolib g_type_name_from_class [gchar*,GTypeClass*]*)
-(bind-lib giolib g_type_fundamental [GType,GType]*)
-(bind-lib giolib g_type_from_name [GType,gchar*]*)
-(bind-lib giolib g_type_init [void]*)
-(bind-lib giolib g_type_name [gchar*,GType]*)
+(bind-lib gobjectlib g_value_init [GValue*,GValue*,GType]*)
+(bind-lib gobjectlib g_value_get_object [gpointer,GValue*]*)
+(bind-lib gobjectlib g_value_get_string [gchar*,GValue*]*)
+(bind-lib gobjectlib g_value_get_int [gint,GValue*]*)
+(bind-lib gobjectlib g_value_set_string [void,GValue*,gchar*]*)
+(bind-lib gobjectlib g_value_set_object [void,GValue*,gpointer]*)
+(bind-lib gobjectlib g_value_set_boxed [void,GValue*,gpointer]*)
+(bind-lib gobjectlib g_value_set_pointer [void,GValue*,gpointer]*)
+(bind-lib gobjectlib g_value_set_boolean [void,GValue*,i32]*);gboolean]*)
+(bind-lib gobjectlib g_value_set_static_string [void,GValue*,gchar*]*)
+(bind-lib gobjectlib g_strdup_value_contents [gchar*,GValue*]*)
+(bind-lib gobjectlib g_type_check_value [gboolean,GValue*]*)
+(bind-lib gobjectlib g_type_check_value_holds [gboolean,GValue*,GType]*)
+(bind-lib gobjectlib g_type_name_from_instance [gchar*,GTypeInstance*]*)
+(bind-lib gobjectlib g_type_name_from_class [gchar*,GTypeClass*]*)
+(bind-lib gobjectlib g_type_fundamental [GType,GType]*)
+(bind-lib gobjectlib g_type_from_name [GType,gchar*]*)
+(bind-lib gobjectlib g_type_init [void]*)
+(bind-lib gobjectlib g_type_name [gchar*,GType]*)
 
 ;; type string stuff
 (bind-lib gliblib g_string_new [GString*,gchar*]*)
+
+;; hash tables
+(bind-alias GHashTable i8)
+(bind-alias GHashFunc [guint,gconstpointer]*)
+(bind-alias GEqualFunc [gboolean,gconstpointer,gconstpointer]*)
+
+;; hash and equal functions for g_hash_table_new
+(bind-lib gliblib g_direct_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib gliblib g_direct_hash [guint,gconstpointer]*)
+(bind-lib gliblib g_str_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib gliblib g_str_hash [guint,gconstpointer]*)
+(bind-lib gliblib g_int_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib gliblib g_int_hash [guint,gconstpointer]*)
+(bind-lib gliblib g_int64_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib gliblib g_int64_hash [guint,gconstpointer]*)
+(bind-lib gliblib g_double_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib gliblib g_double_hash [guint,gconstpointer]*)
+
+(bind-lib gliblib g_hash_table_new [GHashTable*,GHashFunc,GEqualFunc]*)
+(bind-lib gliblib g_hash_table_insert [void,GHashTable*,gpointer,gpointer]*)
+(bind-lib gliblib g_hash_table_replace [void,GHashTable*,gpointer,gpointer]*)
+(bind-lib gliblib g_hash_table_add [void,GHashTable*,gpointer]*)
+(bind-lib gliblib g_hash_table_contains [gboolean,GHashTable*,gconstpointer]*)
+(bind-lib gliblib g_hash_table_size [guint,GHashTable*]*)
+(bind-lib gliblib g_hash_table_lookup [gpointer,GHashTable*,gconstpointer]*)
+(bind-lib gliblib g_hash_table_remove [gboolean,GHashTable*,gconstpointer]*)
+(bind-lib gliblib g_hash_table_remove_all [void,GHashTable*]*)
+
+
+;; GSocket stuff
+(bind-alias GSocket i8)
+(bind-alias GInetAddress i8)
+(bind-lib giolib g_inet_address_new_from_string [GInetAddress*,gchar*]*)
+(bind-lib giolib g_inet_address_to_string [gchar*,GInetAddress*]*)

@@ -46,6 +46,8 @@
 (define *impc:compiler:verbose* #f)
 
 (define *impc:compiler:print-raw-llvm* #f)
+(define *impc:compiler:precomp* (make-string 0))
+(define *impc:compiler:precomp-llvm* #f)
 
 (define *impc:compiler:process* (ipc:get-process-name))
 ;(define *impc:compiler:process* "utility")
@@ -3684,22 +3686,7 @@
 		     (if (not (impc:ir:type? (cdr t)))
 			 (print-error 'Compiler 'Error: 'unresolved 'type 'error 'for 'symbol (car t))))
 		   types)
-		      ;; ;(println 't: t)
-                      ;; (cond ((and (list? t)
-                      ;;             (member *impc:ir:other* t))
-		      ;; 	     (println 'kkkkkkkkk t *impc:ir:other*)
-                      ;;        (print-error 'Compiler 'Error: 'unresolved 'type 'error 'for 'symbol (car t)))
-                      ;;       ((and (not (list? t))
-                      ;;             (pair? t)
-                      ;;             (equal? *impc:ir:other* (cdr t)))
-                      ;;        (print-error 'Compiler 'Error: 'unresolved 'type 'error 'for 'symbol (car t)))))
-                   ;; types)
-
 	 
-	 ;; ;; forward declare _callback (this is a bit of a hack :-(
-	 ;; (if (llvm:get-globalvar (string-append (symbol->string symname) "_var"))
-	 ;;     'donothing
-	 ;;     (llvm:compile (string-append "declare linkonce void @" (symbol->string symname) "_callback(i8*)\n"))) ;;{\nentry:\nret void\n}")))
          ;; compile to ir	 
          (define fstr (impc:ir:compiler newast types))
          ;; compile to x86 - i.e. call jit on any new ir functions to force jit compilation	
@@ -3710,7 +3697,6 @@
          (let* ((closure-type (cadr (impc:ir:gname)))
 		(closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
                 (compile-stub? (if (llvm:get-globalvar (string-append (symbol->string symname) "_var")) #f #t))
-		;(forward-declaration-of-callback (if compile-stub? (llvm:compile (string-append "declare void @" (symbol->string symname) "_callback(i8*)")) #f))
                 (fs (string-append "define ccc " closure-type " @" (string-append (symbol->string symname) "_maker")
                                    "(i8* %_impz){\nentry:\n"				   
                                    ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
@@ -3794,7 +3780,7 @@
 								'("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
                                       ")\nret " (impc:ir:get-type-str (car stub-type)) 
                                       (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-                                      "}"))
+                                      "}\n"))
 		(fscallback (string-append "define ccc void @" (string-append (symbol->string symname) "_callback(i8* %dat){\n"
 					   "entry:\n"
 					   (if (null? cb-struct-type)
@@ -3830,7 +3816,7 @@
 								     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
 					   ")\nret void\n" ; (impc:ir:get-type-str (car stub-type)) 
 					   ;(if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-					   "}")))
+					   "}\n")))
 		(fstub_scheme_valid #t) ;; this will be set to false if no valid conversion type to scheme is available (structs and arrays are not supported yet for example)
                 (fstub_scheme (string-append "define ccc i8* " ;(impc:ir:get-type-str (car stub-type))
 					     " @" (string-append (symbol->string symname) "_scheme(i8* %_sc, i8* %args)\n"
@@ -3960,7 +3946,8 @@
 	   ;;(println fstub)
             (if *impc:compiler:print* (println '------------------------------compiling 'maker----------------------------------->))
             (if *impc:compiler:print* (println fs))
-            (if *impc:compiler:print-raw-llvm* (print-full-nq fs)) 
+            (if *impc:compiler:print-raw-llvm* (print-full-nq fs))
+	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fs "\")\n\n" *impc:compiler:precomp*))
             (if *impc:compile*
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_maker"))
                        (if (not (llvm:compile fs))
@@ -3970,6 +3957,7 @@
             (if *impc:compiler:print* (println '--------------------------------compiling 'setter----------------------------------->))            
             (if *impc:compiler:print* (println fssetter))
             (if *impc:compiler:print-raw-llvm* (print-full-nq fssetter))
+	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fssetter "\")\n\n" *impc:compiler:precomp*))
             (if *impc:compile*
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_setter"))
                        ;(llvm:remove-globalvar (string-append (symbol->string symname) "_var"))
@@ -3985,7 +3973,8 @@
             ;                  (error "")))))
             (if *impc:compiler:print* (println '--------------------------------compiling 'getter----------------------------------->))            
             (if *impc:compiler:print* (println fsgetter))            
-            (if *impc:compiler:print-raw-llvm* (print-full-nq fsgetter)) 
+            (if *impc:compiler:print-raw-llvm* (print-full-nq fsgetter))
+	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fsgetter "\")\n\n" *impc:compiler:precomp*))
             (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_stub"))
                        (if (not (llvm:compile fsgetter))
@@ -3995,6 +3984,9 @@
             (if *impc:compiler:print* (println '--------------------------------compiling 'stubs----------------------------------->))            
             (if *impc:compiler:print* (println fstub))            
             (if *impc:compiler:print-raw-llvm* (print-full-nq fstub))
+	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fstub "\")\n\n" *impc:compiler:precomp*))
+	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fstub_native "\")\n\n" *impc:compiler:precomp*))
+	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fstub_scheme "\")\n\n" *impc:compiler:precomp*))	    
             (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_stub"))
                        (if (or (not (llvm:compile fstub))
@@ -4009,6 +4001,7 @@
 	   (if *impc:compiler:print* (println '----------------------------compiling 'callback----------------------------------->))
 	   (if *impc:compiler:print* (println fscallback))
 	   (if *impc:compiler:print-raw-llvm* (print-full-nq fscallback))
+	   (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fscallback "\")\n\n" *impc:compiler:precomp*))
 	   (if (and *impc:compile* compile-stub?) ;; only compile callback first time around!!!
 	       (begin ;(llvm:remove-function (string-append (symbol->string symname) "_stub"))
 	   	 (if (not (llvm:compile fscallback))
@@ -4064,6 +4057,7 @@
 	       (cdr res2))
 	     #f))))
 
+
 ;; definec takes optional type arguments after symname
 (define-macro (definec symname . args)
   (let ((zone-size *impc:default-zone-size*))
@@ -4074,12 +4068,14 @@
 	(begin (set! *impc:docstrings* (cons (cons symname (car args)) *impc:docstrings*))
 	       (set! args (cdr args))))
     (let ((types (cdr (reverse args)))
-	  (expr (car (reverse args))))
+	  (expr (car (reverse args)))
+	  (precomp_sexpr '()))
       (if (regex:match? (symbol->string symname) ":")
 	  (let ((sres (regex:split (symbol->string symname) ":")))
 	    (set! symname (string->symbol (car sres)))
 	    (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
       ;(print-full symname 'types: types 'e: expr 'args: args)
+
       `(define ,symname
 	 (let* ((res1 (impc:ti:run ',symname
 				   '(let ((,symname ,expr)) ,symname)
@@ -4088,12 +4084,48 @@
 					 (map (lambda (k) (list 'quote k)) types))))
 		(setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
 		(func (llvm:get-function (symbol->string ',symname))))
+
+	   (if *impc:compiler:precomp-llvm*
+	       (emit (sexpr->string
+		      '(define ,symname
+			 (let* ((setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
+				(func (llvm:get-function (symbol->string ',symname))))
+
+			   (if setter
+			       (llvm:run setter (sys:create-mzone ,zone-size))
+			       (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
+				      (error "")))
+			   (if func
+			       ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
+			       (if (llvm:get-scheme-function ,(symbol->string symname))
+				   (let ((ftype (llvm:get-function-args-withoutzone ,(symbol->string symname))))
+				     (ascii-print-color 0 7 10)
+				     (print "Compiled ")
+				     (ascii-print-color 1 2 10)
+				     (print ',symname)
+				     (ascii-print-color 0 7 10)
+				     (print " >>> ")
+				     (ascii-print-color 1 3 10)
+				     (print (string->symbol (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))))
+				     (ascii-print-color 0 7 10)
+				     (print)
+				     (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
+				   (begin (ascii-print-color 0 7 10)
+					  (print "There is no scheme stub available for ")
+					  (ascii-print-color 0 6 10)
+					  (println ,(symbol->string symname))
+					  (ascii-print-color 0 7 10)))
+			       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
+				      (error ""))))))
+		     
+		     *impc:compiler:precomp*))
+
 	   (if setter
 	       (llvm:run setter (sys:create-mzone ,zone-size))
 	       (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
 		      (error "")))
 	   (if func
-	       ;(lambda args (apply llvm:run func (sys:peek-memzone) args))
+	       ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 	       (if (llvm:get-scheme-function ,(symbol->string symname))
 		   (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
 		   (begin (ascii-print-color 0 7 10)
@@ -4103,7 +4135,8 @@
 			  (ascii-print-color 0 7 10)))
 	       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		      (error ""))))))))
-	     
+	
+
 ;; alias for definec (should replace definec)
 (define-macro (bind-func . args)
   (if (regex:match? (symbol->string (car args)) ":")
@@ -4125,13 +4158,15 @@
 			   (ascii-print-color 0 7 10)
 			   (print)))
 	    `(impc:ti:parametric-poly-pass '(definec ,@args))))
-      `(impc:ti:parametric-poly-pass '(definec ,@args))))      
+      `(impc:ti:parametric-poly-pass '(definec ,@args))))
+
 
 (define-macro (bind-typevar name . args)
   (if (string? name) (set! name (string->symbol name)))
   `(map (lambda (a)
 	  (impc:ti:add-vtype ',name a))
 	',args))
+
 
 ;; Definec-precomp is for setting up precompiled ir functions only
 (define definec-precomp
@@ -4277,94 +4312,12 @@
        (print-error 'Compiler 'Error: 'bindc 'only 'accepts 'cptr 'values!  'Try 'bind-val 'for 'numeric 'binds)))
 
 
-;; (define-macro (bind-val symbol type value)
-;;    (if (number? (eval value))
-;;        `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
-;;                    (llvm:compile (string-append "@" ,(symbol->string symbol)
-;;                                                 " = global "
-;;                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type))
-;; 						" "
-;; 						(atom->string ,value))))
-;;                ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
-;; 	       ;(llvm:bind-global-var ,(symbol->string symbol) ,value)
-;; 	       (ascii-print-color 0 7 10)
-;; 	       (print "Successfully bound ")
-;; 	       (ascii-print-color 1 2 10)
-;; 	       (print ',symbol)
-;; 	       (ascii-print-color 0 7 10)
-;; 	       (print " >>> ")
-;; 	       (ascii-print-color 1 3 10)
-;; 	       (print ',type)
-;; 	       (ascii-print-color 0 7 10)
-;; 	       (print))
-;;        (if (cptr? (eval value))
-;; 	   `(bindc ,symbol ,type ,value)
-;; 	   (print-error 'Compiler 'Error: 'bind-val 'only 'accepts 'numeric 'and 'cptr 'values!))))
-
-
 (define-macro (bind-val symbol type value)
-  (if (and (not (impc:ir:pointer? (impc:ir:convert-from-pretty-types type)))
-	   (or (impc:ir:number? (impc:ir:convert-from-pretty-types type)) ;(eval value))
-	       (impc:ir:boolean? (impc:ir:convert-from-pretty-types type)))) ;(eval value))
-       `(begin (if (llvm:get-globalvar ,(symbol->string symbol))
-		   (print-error 'Compiler 'Error: 'cannot 'rebind ,(symbol->string symbol))
-                   (if (not (llvm:compile (string-append "@" ,(symbol->string symbol)
-							 " = global "
-							 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type))
-							 " "
-							 (atom->string ,value))))
-		       (print-error 'Compiler 'Error: 'cannot 'bind ,(symbol->string symbol) 'bad 'symbol 'name?)))
-               ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
-	       ;(llvm:bind-global-var ,(symbol->string symbol) ,value)
-	       (ascii-print-color 0 7 10)
-	       (print "Bound ")
-	       (ascii-print-color 1 2 10)
-	       (print ',symbol)
-	       (ascii-print-color 0 7 10)
-	       (print " >>> ")
-	       (ascii-print-color 1 3 10)
-	       (print ',type)
-	       (ascii-print-color 0 7 10)
-	       (print))
-       (if (and (impc:ir:array? (impc:ir:convert-from-pretty-types type))
-		(not (impc:ir:pointer? (impc:ir:convert-from-pretty-types type))))
-	   (let* ((array-type (impc:ir:convert-from-pretty-types type))
-		  (sub-type (caddr array-type))
-		  (num (cadr array-type))
-		  (atypestr (impc:ir:get-type-str array-type))
-		  (subtypestr (impc:ir:get-type-str sub-type)))
-	     `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
-			 (llvm:compile (string-append "@" ,(symbol->string symbol)
-						      " = global "
-						      ,atypestr
-						      " [" ,subtypestr " " ,(if (list? value)
-										(atom->string (cadr value))
-										(atom->string value))
-						      ,(apply string-append (map (lambda (v)
-										   (string-append ", " subtypestr
-												  " " (atom->string v)))
-										 (if (list? value)
-										     (cddr value)
-										     (make-list-with-proc (- num 1)
-													  (lambda (i) value)))))
-						      "]"))
-			 (print-error 'Compiler 'Error: ',symbol 'is 'already 'bound))
-		     (ascii-print-color 0 7 10)
-		     (print "Bound ")
-		     (ascii-print-color 1 2 10)
-		     (print ',symbol)
-		     (ascii-print-color 0 7 10)
-		     (print " >>> ")
-		     (ascii-print-color 1 3 10)
-		     (print ',type)
-		     (ascii-print-color 0 7 10)
-		     (print)))
-	   (if (cptr? (eval value))
-	       `(bindc ,symbol ,type ,value)
-	       (print-error 'Compiler 'Error: 'bind-val 'only 'accepts 'numeric 'array 'and 'cptr 'values!)))))
-
-
-(define-macro (bind-val symbol type value)
+  (if *impc:compiler:precomp-llvm*
+      (emit (sexpr->string
+	     `(bind-val ,symbol ,type ,value))
+	    "\n\n"
+	    *impc:compiler:precomp*))
   (if (and (not (impc:ir:pointer? (impc:ir:convert-from-pretty-types type)))
 	   (or (impc:ir:number? (impc:ir:convert-from-pretty-types type)) ;(eval value))
 	       (impc:ir:boolean? (impc:ir:convert-from-pretty-types type)))) ;(eval value))
@@ -4393,6 +4346,8 @@
 		     (num (cadr array-type))
 		     (atypestr (impc:ir:get-type-str array-type))
 		     (subtypestr (impc:ir:get-type-str sub-type)))
+		(if (symbol? value)
+		    (set! value (symbol->string value)))
 		`(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
 			    (llvm:compile (string-append "@" ,(symbol->string symbol)
 							 " = global "
@@ -4426,6 +4381,8 @@
 		     (num (cadr array-type))
 		     (atypestr (impc:ir:get-type-str array-type))
 		     (subtypestr (impc:ir:get-type-str sub-type)))
+		(if (symbol? value)
+		    (set! value (symbol->string value)))
 		`(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
 			    (llvm:compile (string-append "@" ,(symbol->string symbol)
 							 " = global "
@@ -4434,6 +4391,7 @@
 										   (atom->string (cadr value))
 										   (atom->string (eval value)))
 							 ,(apply string-append (map (lambda (v)
+										      (if (symbol? v) (set! v (symbol->string v)))
 										      (string-append ", " subtypestr
 												     " " (atom->string (eval v))))
 										    (if (list? value)
@@ -4509,6 +4467,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type)
+  (if *impc:compiler:precomp-llvm*
+      (emit (sexpr->string
+	     `(bind-lib ,library ,symname ,type))
+	    "\n\n"
+	    *impc:compiler:precomp*))
   `(__dynamic-bind ,library ',symname ',type))
 
 (define __dynamic-bind

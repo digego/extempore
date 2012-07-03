@@ -115,6 +115,22 @@ double log2(double num) {
 }
 #endif
 
+
+// LLVM RUNTIME ERROR
+void llvm_runtime_error(int error,void* arg)
+{
+  ascii_text_color(0,2,10);
+  switch(error){
+  case 1:
+    printf("LLVM zptr_copy - invalid zptr! %p\n",arg);
+    break;    
+  default:
+    break;
+  }
+  ascii_text_color(0,7,10);
+  return;
+}
+
 //////////////////////////////////////////////////////////////////
 // this whole zone section should 
 // all be thread safe of course
@@ -401,18 +417,23 @@ uint64_t llvm_zone_ptr_size(void* ptr)
     //return extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_get_size(ptr);
 }
 
-void llvm_zone_copy_ptr(void* ptr1, void* ptr2)
+bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
 {
     uint64_t size1 = llvm_zone_ptr_size(ptr1);
     uint64_t size2 = llvm_zone_ptr_size(ptr2);
 
     if(size1 != size2) { 
-	printf("Bad LLVM ptr copy - size mismatch %p:%p %lld:%lld\n",ptr1,ptr2,size1,size2); 
-	exit(1);
+  //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2); 
+      return 1;
     }
+    if(size1 == 0) {
+  //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2); 
+      return 1;
+    }
+
     //printf("zone_copy_ptr: %p,%p,%lld,%lld\n",ptr2,ptr1,size1,size2);
     memcpy(ptr2, ptr1, size1);
-    return;		
+    return 0;		
 }
 
 
@@ -1160,6 +1181,9 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("llvm_zone_destroy"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);
 
+	    gv = M->getNamedValue(std::string("llvm_runtime_error"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_runtime_error);
+
 	    gv = M->getNamedValue(std::string("llvm_send_udp"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_send_udp);	  
 
@@ -1205,6 +1229,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_print_f32);						
 	    gv = M->getNamedValue(std::string("llvm_print_f64"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_print_f64);						
+
+	    gv = M->getNamedValue(std::string("ascii_text_color"));
+	    EE->updateGlobalMapping(gv,(void*)&ascii_text_color);
+	    
 	    // gv = M->getNamedValue(std::string("llvm_samplerate"));
 	    // EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
 	    gv = M->getNamedValue(std::string("llvm_now"));
