@@ -242,9 +242,9 @@ See `run-hooks'."
        (1 font-lock-function-name-face))
      ;; definitions
      (list (concat
-	    "(\\(define\\(\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)"
+	    "(\\(define\\(\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)\\_>"
 	    ;; Any whitespace and declared object.
-	    "[ \t]*(?"
+	    "[ \t]*"
 	    "\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
 	   '(3 font-lock-function-name-face))
@@ -255,9 +255,9 @@ See `run-hooks'."
     (list
      ;; definitions
      (list (concat
-            "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)"
+	    "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\_>"
 	    ;; Any whitespace and declared object.
-	    "[ \t]*(?"
+	    "[ \t]*"
 	    "\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
 	   '(3 font-lock-function-name-face))
