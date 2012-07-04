@@ -313,7 +313,7 @@ namespace extemp {
 		while(true) {
 #ifdef EXT_BOOST
 			boost::asio::ip::udp::endpoint sender;
-			int bytes_read = 0;
+			long bytes_read = 0;
 			try{
 				bytes_read = osc->getSocketFD()->receive_from(boost::asio::buffer(osc->getMessageData(),20000), sender); //*osc->getClientAddress());
 			}catch(std::exception& e){
@@ -321,15 +321,17 @@ namespace extemp {
 				exit(1);
 			}
 #else
-			int bytes_read = recvfrom(*osc->getSocketFD(), osc->getMessageData(), 256, 0, (struct sockaddr*)osc->getClientAddress(), (socklen_t *) osc->getClientAddressSize());
+			long bytes_read = recvfrom(*osc->getSocketFD(), osc->getMessageData(), 70000, 0, (struct sockaddr*)osc->getClientAddress(), (socklen_t *) osc->getClientAddressSize());
+
 #endif			
 			if(bytes_read > -1) {
+			  //printf("udp packet size(%lld)\n",bytes_read);
 				//std::cout << "OSC from client port: " << osc->getClientAddress() << " " << osc->getAddress() <<  std::endl;
 				char* args = osc->getMessageData();
-				int length = bytes_read; //osc->getMessageLength();
+				long length = bytes_read; //osc->getMessageLength();
 				double timestamp;
-				int pos = 0;
-                                int used = 0;
+				long pos = 0;
+                                long used = 0;
 				std::string address;// = new std::string;
 				std::string typetags;// = new std::string;
 				pos += OSC::getOSCString(args+pos,&address);
