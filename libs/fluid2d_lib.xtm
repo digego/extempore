@@ -8,26 +8,26 @@
 
 (bind-type fluidcube <i64,double,double,double,double*,double*,double*,double*,double*,double*,i64>)
 
-(definec fluid-ix
+(bind-func fluid-ix
   (lambda (x:i64 y:i64 N:i64)
     (+ x (* y N))))
 
 
-(definec fluid-cube-create
+(bind-func fluid-cube-create
   (lambda (size-x size-y diffusion viscosity dt:double)
-    (let ((cube (heap-alloc fluidcube))
-	  (size2:i64 (* size-x size-y 10))
-	  (s (heap-alloc size2 double))
-	  (density (heap-alloc size2 double))
-	  (Vx (heap-alloc size2 double))
-	  (Vy (heap-alloc size2 double))
-	  (Vx0 (heap-alloc size2 double))
-	  (Vy0 (heap-alloc size2 double)))
+    (let ((cube:fluidcube* (halloc))
+	  (size:i64 (* size-x size-y 10))
+	  (s:double* (halloc size))
+	  (density:double* (heap-alloc size))
+	  (Vx:double* (heap-alloc size))
+	  (Vy:double* (heap-alloc size))
+	  (Vx0:double* (heap-alloc size))
+	  (Vy0:double* (heap-alloc size)))
       (tfill! cube size-x dt diffusion viscosity s density Vx Vy Vx0 Vy0 size-y)
       cube)))
 
 
-(definec fluid-cube-add-density
+(bind-func fluid-cube-add-density
   (lambda (cube:fluidcube* x y amount:double)
     (let ((N (tref cube 0))
 	  (idx (+ x (* y N)))
@@ -37,7 +37,7 @@
       (+ density amount))))
 
 
-(definec fluid-cube-add-velocity
+(bind-func fluid-cube-add-velocity
   (lambda (cube:fluidcube* x y amount-x:double amount-y:double)
     (let ((N (tref cube 0))
 	  (idx (+ x (* y N)))
@@ -50,7 +50,7 @@
 
 ;; I don't want to reflect at boundary points
 ;; so just average everything.
-(definec fluid-set-boundary
+(bind-func fluid-set-boundary
   (lambda (b:i64 x:double* Ny:i64 N:i64)
     (let ((j 0)
 	  (i 0)
@@ -89,7 +89,7 @@
 
 
 
-(definec fluid-lin-solve
+(bind-func fluid-lin-solve
   (lambda (b:i64 x:double* x0:double* a c iter:i64 Ny:i64 N:i64)
     (let ((cRecip (/ 1.0 c))
 	  (k 0)
@@ -110,13 +110,13 @@
     1))
 
 
-(definec fluid-diffuse
+(bind-func fluid-diffuse
   (lambda (b:i64 x:double* x0:double* diff:double dt:double iter Ny N)
     (let ((a:double (* dt diff (i64tod (- N 2)))))
       (fluid-lin-solve b x x0 a (+ 1.0 (* 6.0 a)) iter Ny N))))
 
 
-(definec fluid-project
+(bind-func fluid-project
   (lambda (velocx:double* velocy:double* p:double* div:double* iter Ny N)
     (let ((j 0)
 	  (i 0)
@@ -159,7 +159,7 @@
     1)))
 
 
-(definec fluid-advect
+(bind-func fluid-advect
   (lambda (b:i64 d:double* d0:double* velocx:double* velocy:double* dt:double Ny:i64 N:i64)
     (let ((n-1 (i64tod (- N 1)))
 	  (ny-1 (i64tod (- Ny 1)))
@@ -212,7 +212,7 @@
       (fluid-set-boundary b d Ny N))))
 
 				 				       
-(definec fluid-step-cube
+(bind-func fluid-step-cube
   (lambda (cube:fluidcube*)
     (let ((N (tref cube 0))
 	  (Ny (tref cube 10))
@@ -266,10 +266,10 @@
 ;; 5 for density
 ;; 6 for x velocity
 ;; 7 for y velcority
-(definec fluid-cube-get-row 10000
-  (let ((_ds (salloc 2000 double))
-	(_xs (salloc 2000 double))
-	(_ys (salloc 2000 double)))
+(bind-func fluid-cube-get-row 10000
+  (let ((_ds:double* (salloc 2000))
+	(_xs:double* (salloc 2000))
+	(_ys:double* (salloc 2000)))
     (lambda (cube:fluidcube* type:i32 offset:i64)
       (let ((xN (tref cube 0))
 	    (yN (tref cube 10))
@@ -284,7 +284,7 @@
 	    ;; 	       ((= type 6) _xs)
 	    ;; 	       ((= type 7) _ys)
 	    ;; 	       (else _ds)))	    
-	    (dat (halloc xN double))
+	    (dat:double* (halloc xN))
 	    (i 0))
 	;(printf "type:%d:%p\n" type s)
 	(dotimes (i xN)
@@ -293,13 +293,13 @@
 	dat))))
 
 ;; row get helpers
-(definec fluid-cube-get-last-row
+(bind-func fluid-cube-get-last-row
   (lambda (cube:fluidcube* type)
     (let ((xN (tref cube 0))
 	  (yN (tref cube 10)))
       (fluid-cube-get-row cube type (* xN (- yN 2))))))
 
-(definec fluid-cube-get-first-row
+(bind-func fluid-cube-get-first-row
   (lambda (cube:fluidcube* type)
     (let ((xN (tref cube 0)))
       (fluid-cube-get-row cube type (* 1 xN)))))
@@ -308,10 +308,10 @@
 ;; 5 for density
 ;; 6 for x velocity
 ;; 7 for y velcority
-(definec fluid-cube-get-column 10000
-  (let ((_ds (salloc 2000 double))
-	(_xs (salloc 2000 double))
-	(_ys (salloc 2000 double)))
+(bind-func fluid-cube-get-column 10000
+  (let ((_ds:double* (salloc 2000))
+	(_xs:double* (salloc 2000))
+	(_ys:double* (salloc 2000)))
     (lambda (cube:fluidcube* type:i32 offset:i64)
       (let ((xN (tref cube 0))
 	    (yN (tref cube 10))
@@ -326,7 +326,7 @@
 	    ;; 	       ((= type 6) _xs)
 	    ;; 	       ((= type 7) _ys)
 	    ;; 	       (else _ds)))
-	    (dat (halloc yN double))
+	    (dat:double* (halloc yN))
 	    (i 0))
 	(dotimes (i yN)
 	  (pset! dat i (pref s (+ (* i xN) offset))))
@@ -337,12 +337,12 @@
 ;; 5 for density
 ;; 6 for x velocity
 ;; 7 for y velocity
-(definec fluid-cube-get-last-column
+(bind-func fluid-cube-get-last-column
   (lambda (cube type)
     (let ((xN (tref cube 0)))
       (fluid-cube-get-row cube type (- xN 2)))))
 
-(definec fluid-cube-get-first-column
+(bind-func fluid-cube-get-first-column
   (lambda (cube type)
     (fluid-cube-get-row cube type 1)))
 
@@ -351,7 +351,7 @@
 ;; 5 for density
 ;; 6 for x velocity
 ;; 7 for y velocity
-(definec fluid-cube-set-row
+(bind-func fluid-cube-set-row
   (lambda (cube:fluidcube* type:i32 offset:i64 vals:double*)
     (let ((xN (tref cube 0))
 	  (yN (tref cube 10))
@@ -371,26 +371,26 @@
       void)))
 
 ;; row set helpers
-(definec fluid-cube-set-last-row
+(bind-func fluid-cube-set-last-row
   (lambda (cube type vals)
     (let ((xN (tref cube 0))
 	  (yN (tref cube 10)))
       (fluid-cube-set-row cube type (* xN (- yN 2)) vals))))
 
 ;; I don't understand why I really need this 1st row offset
-(definec fluid-cube-set-first-row
+(bind-func fluid-cube-set-first-row
   (lambda (cube type vals)
     (let ((xN (tref cube 0)))
       (fluid-cube-set-row cube type (* 1 xN) vals))))
 
 ;; ;; row get helpers
-;; (definec fluid-cube-get-last-row
+;; (bind-func fluid-cube-get-last-row
 ;;   (lambda (cube:fluidcube* type)
 ;;     (let ((xN (tref cube 0))
 ;; 	  (yN (tref cube 10)))
 ;;       (fluid-cube-get-row cube type (* xN (- yN 2))))))
 
-;; (definec fluid-cube-get-first-row
+;; (bind-func fluid-cube-get-first-row
 ;;   (lambda (cube:fluidcube* type)
 ;;     (let ((xN (tref cube 0)))
 ;;       (fluid-cube-get-row cube type (* 1 xN)))))
@@ -399,7 +399,7 @@
 ;; 5 for density
 ;; 6 for x velocity
 ;; 7 for y velocity
-(definec fluid-cube-set-column
+(bind-func fluid-cube-set-column
   (lambda (cube:fluidcube* type:i32 offset:i64 vals:double*)
     (let ((xN (tref cube 0))
 	  (yN (tref cube 10))
@@ -418,12 +418,12 @@
       void)))
 
 ;; column set helpers
-(definec fluid-cube-set-last-column
+(bind-func fluid-cube-set-last-column
   (lambda (cube type vals)
     (let ((xN (tref cube 0)))
       (fluid-cube-set-column cube type (- xN 1) vals))))
 
-(definec fluid-cube-set-first-column
+(bind-func fluid-cube-set-first-column
   (lambda (cube type vals)
     (fluid-cube-set-column cube type 0 vals)))
 
@@ -441,11 +441,11 @@
 ;; 7 = y velocity
 ;;
 ;; where first (if true is first row else last)
-(definec send-fluid-row-osc
-  (let ((buf (halloc 5000 i8)))
+(bind-func send-fluid-row-osc
+  (let ((buf:i8* (halloc 5000)))
     (lambda (addy:i8* cube:fluidcube* type:i32 first:i32)
       (let ((types ",ii")
-	    (address (if (= 1 first) "/row/f" "/row/l"))
+	    (address (if (= (i64toi32 1) first) "/row/f" "/row/l"))
 	    (addressl 8)
 	    (typesl 4)
 	    (xN (tref cube 0))	    
@@ -459,7 +459,7 @@
 	    	     (else ds)))
 	    (i 0)
 	    (idx 0)
-	    (dat (if (= 1 first)
+	    (dat (if (= (i64toi32 1) first)
 		     (fluid-cube-get-first-row cube type)
 		     (fluid-cube-get-last-row cube type)))
 	    (length (+ addressl typesl 4 4 (* 4 xN))))
@@ -474,11 +474,11 @@
 	    (pset! args2 i (dtof (pref dat i)))))
 	(llvm_send_udp addy 4444 buf (i64toi32 length))))))
 
-(definec send-fluid-first-row-osc
+(bind-func send-fluid-first-row-osc
   (lambda (addy cube:fluidcube* type:i32)
     (send-fluid-row-osc addy cube type 1)))
 
-(definec send-fluid-last-row-osc
+(bind-func send-fluid-last-row-osc
   (lambda (addy cube:fluidcube* type:i32)
     (send-fluid-row-osc addy cube type 0)))
 
@@ -489,11 +489,11 @@
 ;; 6 = x velocity
 ;; 7 = y velocity
 ;; where first (if true is first row else last)
-(definec send-fluid-column-osc
-  (let ((buf (halloc 5000 i8)))
+(bind-func send-fluid-column-osc
+  (let ((buf:i8* (halloc 5000)))
     (lambda (addy:i8* cube:fluidcube* type:i32 first:i32)
       (let ((types ",ii")
-	    (address (if (= 1 first) "/col/f" "/col/l"))
+	    (address (if (= (i64toi32 1) first) "/col/f" "/col/l"))
 	    (addressl 8)
 	    (typesl 4)
 	    (xN (tref cube 0))
@@ -504,7 +504,7 @@
 		     (else (tref cube 5))))
 	    (i 0)
 	    (idx 0)
-	    (dat (if (= 1 first)
+	    (dat (if (= (i64toi32 1) first)
 		     (fluid-cube-get-first-column cube type)
 		     (fluid-cube-get-last-column cube type)))
 	    (length (+ addressl typesl 4 4 (* 4 yN))))
@@ -519,11 +519,11 @@
 	    (pset! args2 i (dtof (pref dat i)))))
 	(llvm_send_udp addy 4444 buf (i64toi32 length))))))
 
-(definec send-fluid-first-column-osc
+(bind-func send-fluid-first-column-osc
   (lambda (addy cube:fluidcube* type:i32)
     (send-fluid-column-osc addy cube type 1)))
 
-(definec send-fluid-last-column-osc
+(bind-func send-fluid-last-column-osc
   (lambda (addy cube:fluidcube* type:i32)
     (send-fluid-column-osc addy cube type 0)))
 

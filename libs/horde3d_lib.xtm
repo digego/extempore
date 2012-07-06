@@ -26,6 +26,17 @@
     (print-error "Could not load 'Horde3d' dynamic library"))
 
 
+(define new-horde #t)
+
+(if new-horde
+    (begin
+      (bind-lib hordelib h3dUpdateEmitter [void,i32,float]*)
+      (bind-lib hordelib h3dUpdateModel [void,i32,i32]*)
+      )
+    (begin
+      (bind-lib hordelib h3dAdvanceEmitterTime [void,i32,float]*)
+      ))
+    
 ;; horde primary
 (bind-lib hordelib h3dInit [i1]*)
 (bind-lib hordelib h3dRelease [void]*)
@@ -48,7 +59,6 @@
 (bind-lib hordelib h3dSetMaterialUniform [i1,i32,i8*,float,float,float,float]*)
 (bind-lib hordelib h3dSetModelAnimParams [void,i32,i32,float,float]*)
 (bind-lib hordelib h3dAddEmitterNode [i32,i32,i8*,i32,i32,i32,i32]*)
-(bind-lib hordelib h3dAdvanceEmitterTime [void,i32,float]*)
 (bind-lib hordelib h3dGetNodeParamI [i32,i32,i32]*)
 (bind-lib hordelib h3dSetNodeParamI [void,i32,i32,i32]*)
 (bind-lib hordelib h3dGetNodeFlags [i32,i32]*)
@@ -174,6 +184,13 @@
 
 ;; ROOT NODE
 (bind-val H3DRootNode i32 1)
+
+;; MODEL UPDATE FLAGS
+(if new-horde
+    (begin 
+      (bind-val H3DModelUpdateFlags_Animation i32 1)
+      (bind-val H3DModelUpdateFlags_Geometry i32 2)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some helper functions

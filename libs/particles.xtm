@@ -19,39 +19,39 @@
 (bind-type psystem <i64,i64*,float*,float*,float*,float*,float*,float*,float*,float*,float*,i32>)
 
 ;; psystem type helpers
-(definec psystem_size (lambda (psys:psystem*) (tref psys 0)))
-(definec psystem_states (lambda (psys:psystem*) (tref psys 1)))
-(definec psystem_xs (lambda (psys:psystem*) (tref psys 2)))
-(definec psystem_ys (lambda (psys:psystem*) (tref psys 3)))
-(definec psystem_xvs (lambda (psys:psystem*) (tref psys 4)))
-(definec psystem_yvs (lambda (psys:psystem*) (tref psys 5)))
-(definec psystem_sizes (lambda (psys:psystem*) (tref psys 6)))
-(definec psystem_reds (lambda (psys:psystem*) (tref psys 7)))
-(definec psystem_greens (lambda (psys:psystem*) (tref psys 8)))
-(definec psystem_blues (lambda (psys:psystem*) (tref psys 9)))
-(definec psystem_alphas (lambda (psys:psystem*) (tref psys 10)))
-(definec psystem_texid (lambda (psys:psystem*) (tref psys 11)))
+(bind-func psystem_size (lambda (psys:psystem*) (tref psys 0)))
+(bind-func psystem_states (lambda (psys:psystem*) (tref psys 1)))
+(bind-func psystem_xs (lambda (psys:psystem*) (tref psys 2)))
+(bind-func psystem_ys (lambda (psys:psystem*) (tref psys 3)))
+(bind-func psystem_xvs (lambda (psys:psystem*) (tref psys 4)))
+(bind-func psystem_yvs (lambda (psys:psystem*) (tref psys 5)))
+(bind-func psystem_sizes (lambda (psys:psystem*) (tref psys 6)))
+(bind-func psystem_reds (lambda (psys:psystem*) (tref psys 7)))
+(bind-func psystem_greens (lambda (psys:psystem*) (tref psys 8)))
+(bind-func psystem_blues (lambda (psys:psystem*) (tref psys 9)))
+(bind-func psystem_alphas (lambda (psys:psystem*) (tref psys 10)))
+(bind-func psystem_texid (lambda (psys:psystem*) (tref psys 11)))
 
 ;; create system
-(definec psystem_create
+(bind-func psystem_create
   (lambda (number texture_id)
-    (let ((psys (halloc psystem))
-	  (states (halloc number i64))
-	  (xs (halloc number float))
-	  (ys (halloc number float))
-	  (xvs (halloc number float))
-	  (yvs (halloc number float))
-	  (sizes (halloc number float))
-	  (reds (halloc number float))
-	  (greens (halloc number float))
-	  (blues (halloc number float))
-	  (alphas (halloc number float)))
+    (let ((psys:psystem* (halloc))
+	  (states:i64* (halloc number))
+	  (xs:float* (halloc number))
+	  (ys:float* (halloc number))
+	  (xvs:float* (halloc number))
+	  (yvs:float* (halloc number))
+	  (sizes:float* (halloc number))
+	  (reds:float* (halloc number))
+	  (greens:float* (halloc number))
+	  (blues:float* (halloc number))
+	  (alphas:float* (halloc number)))
       ;(printf "%p,%p,%p,%p,%p,%p,%p,%p,%p,%x\n" states xs ys xvs yvs sizes reds greens blues alphas)
       (tfill! psys number states xs ys xvs yvs sizes reds greens blues alphas texture_id)
       psys)))
 
 ;; destroy system
-(definec psystem_destroy
+(bind-func psystem_destroy
   (lambda (psys:psystem*)
     (free (tref psys 1))
     (free (tref psys 2))
@@ -68,7 +68,7 @@
 
 
 
-(definec psystem-particle-check
+(bind-func psystem-particle-check
   (lambda (psys:psystem* idx)
     (let ((states (psystem_states psys))
 	  (size (psystem_size psys)))
@@ -78,8 +78,8 @@
 	      (psystem-particle-check psys (+ idx 1)))))))
 
 
-(definec psystem-set-particle
-  (lambda (psys:psystem* idx x y s xx yy r g b a dur)
+(bind-func psystem-set-particle
+  (lambda (psys:psystem* idx:i64 x y s xx yy r g b a dur)
     (let ((size (psystem_size psys))
 	  (free-particle idx))
       (if (or (= free-particle -1)
@@ -108,7 +108,7 @@
 	    void)))))
 
 
-(definec psystem-add-particle
+(bind-func psystem-add-particle
   (lambda (psys:psystem* x y s xx yy r g b a dur)
     (let ((size (psystem_size psys))
 	  (free-particle (psystem-particle-check psys 0)))
@@ -119,10 +119,10 @@
 
 
 ;; draw system
-(definec psystem_draw 250000000
-  (let ((vertex_dat (zalloc 8000000 float))
-	(texcoord_dat (zalloc 8000000 float))
-	(color_dat (zalloc 16000000 float)))
+(bind-func psystem_draw 250000000
+  (let ((vertex_dat:float* (zalloc 8000000))
+	(texcoord_dat:float* (zalloc 8000000))
+	(color_dat:float* (zalloc 16000000)))
     (lambda (psys:psystem*)
       (let ((i 0)
 	    (size (psystem_size psys))
@@ -206,12 +206,13 @@
 	(glDepthMask GL_TRUE)
 	(glEnable GL_DEPTH_TEST)
   	(glDisable GL_COLOR_MATERIAL)
+	
 	1))))
 
 
 ;; subtract 1 from state
 ;; updates x,y position from xv,yv
-(definec psystem_update
+(bind-func psystem_update
   (lambda (psys:psystem*)
     (let ((size (psystem_size psys))
 	  (states (psystem_states psys))
