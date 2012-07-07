@@ -237,15 +237,23 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(bind-val GL_RGBA16F i32 34842)
+(bind-val GL_RGBA8 i32 32856)
 
 ;; creates an empty texture
 ;; suitable to back an FBO
 (bind-func fbo_create_texture
   (lambda (width height)
-    (let ((tex:i32* (salloc)))
+    (let ((id:i32* (salloc))
+	  (tex:i32* (salloc)))
+      (glGenRenderbuffers 1 id)
+      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+      (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA16F width height)
+      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER (pref id 0))
+
       (glGenTextures 1 tex)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
-      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_RGBA width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_RGBA16F width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_LINEAR)
@@ -257,11 +265,22 @@
 ;; create fbo depth buffer
 (bind-func fbo_create_depth_buffer
   (lambda (width height)
-    (let ((id:i32* (salloc)))
+    (let ((id:i32* (salloc))
+	  (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
-      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT24 width height)
-      (pref id 0))))
+      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER (pref id 0))
+
+      (glGenTextures 1 tex)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_LINEAR)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_LINEAR)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
+      (pref tex 0))))
 
 ;; structure to hold fbo data
 ;; fbo id          0
@@ -281,8 +300,12 @@
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
-      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_RECTANGLE_ARB texid 0); Attach the texture fbo_texture to the color buffer in our frame buffer
-      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER depthid)
+
+      ;; Attach the texture texid to the color buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_RECTANGLE_ARB texid 0)
+      ;; Attach the texture depthid to the depth buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_RECTANGLE_ARB depthid 0)
+
       (tfill! fbo (pref fboid 0) texid depthid width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
 	(if (<> status GL_FRAMEBUFFER_COMPLETE)
