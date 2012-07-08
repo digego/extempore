@@ -39,7 +39,7 @@
 (bind-val IN_CHANNELS i64 *au:in-channels*)
 (bind-val FRAMES i64 *au:block-size*)
 
-(definec print-audio-state
+(bind-func print-audio-state
   (lambda ()
     (printf "    FRAMES: %lld\n" FRAMES)
     (printf " OUT CHANS: %lld\n" CHANNELS)
@@ -58,7 +58,7 @@
 ;; high limit
 ;; low limit
 ;; then value
-(definec range-limit
+(bind-func range-limit
   (lambda (h:double l:double v:double)
     (if (< v l) l
 	(if (> v h) h
@@ -73,7 +73,7 @@
       (let ((y (+ (* b x) (* c x (fabs x)))))
 	(+ (* p (- (* y (fabs y)) y)) y)))))
 
-;; (definec make-oscil
+;; (bind-func make-oscil
 ;;   (lambda (phase)
 ;;     (lambda (amp freq)
 ;;       (let ((inc (* TWOPI (/ freq SAMPLERATE))))
@@ -81,7 +81,7 @@
 ;; 	(* amp (sin phase))))))
 
 
-(definec make-oscil
+(bind-func make-oscil
   (lambda (phase)
     (lambda (amp freq)
       (let ((inc (* TWOPI (/ freq SAMPLERATE))))
@@ -91,7 +91,7 @@
 
 
 (if *build-multi-chan*
-    (definec make-oscil-c
+    (bind-func make-oscil-c
       (lambda (phase)
 	(let ((mem 0.0)
 	      (osc (make-oscil phase)))
@@ -101,7 +101,7 @@
 
 
 ;; square oscillator
-(definec make-square
+(bind-func make-square
   (lambda (phase)   
     (let ((osc (make-oscil phase))	  
 	  (n 50.0))         
@@ -111,7 +111,7 @@
 
 ;; square oscillator multichannel
 (if *build-multi-chan*
-    (definec make-square-c
+    (bind-func make-square-c
       (lambda (phase)   
 	(let ((sqr (make-square phase))
 	      (mem 0.0))
@@ -121,7 +121,7 @@
 
 
 ;; saw oscillator
-(definec make-saw
+(bind-func make-saw
   (lambda ()
     (let ((p 0.0)
 	  (dp 1.0)
@@ -146,7 +146,7 @@
 
 ;; saw oscillator
 (if *build-multi-chan*
-    (definec make-saw-c
+    (bind-func make-saw-c
       (lambda ()
 	(let ((mem 0.0)
 	      (saw (make-saw)))
@@ -156,7 +156,7 @@
 
 
 ;; pulse train
-(definec make-pulse
+(bind-func make-pulse
   (lambda ()
     (let ((time -1.0)
 	  (width 100.0))
@@ -168,7 +168,7 @@
 	      0.0))))))
 
 (if *build-multi-chan*
-    (definec make-pulse-c
+    (bind-func make-pulse-c
       (lambda ()
 	(let ((pulse (make-pulse))
 	      (mem 0.0))
@@ -180,7 +180,7 @@
 ;; iir comb without interpolation
 ;; more efficient than comb if you
 ;; don't need variable length
-(definec make-delay
+(bind-func make-delay
   (lambda (max-delay)
     (let ((line:double* (zalloc max-delay))
 	  (time 0)
@@ -196,7 +196,7 @@
 	  y)))))
 
 (if *build-multi-chan*
-    (definec make-delay-c
+    (bind-func make-delay-c
       (lambda (channels:i64 max-delay)
 	(let ((dlines:[double,double]** (alloc channels))
 	      (i:i64 0))
@@ -206,7 +206,7 @@
 
 
 ;; iir comb with interpolation
-(definec make-comb
+(bind-func make-comb
   (lambda (max-delay)
     (let ((line:double* (zalloc max-delay))
 	  (in-head 0)
@@ -239,7 +239,7 @@
 
 
 (if *build-multi-chan*
-    (definec make-comb-c
+    (bind-func make-comb-c
       (lambda (channels:i64 max-delay)
 	(let ((dlines:[double,double]** (alloc channels))
 	      (delay (i64tod max-delay))
@@ -252,7 +252,7 @@
 
 
 ;; flanger
-(definec make-flanger
+(bind-func make-flanger
   (lambda (delay mod-phase mod-range mod-rate)
     (let ((comb (make-comb (dtoi64 (+ delay mod-range))))
 	  (mod (make-oscil mod-phase)))
@@ -262,7 +262,7 @@
 
 
 (if *build-multi-chan*
-    (definec make-flanger-c
+    (bind-func make-flanger-c
       (lambda (channels:i64 delay mod-phase mod-range mod-rate)
 	(let ((comb (make-comb-c channels (dtoi64 (+ delay mod-range))))
 	      (mod (make-oscil-c mod-phase))
@@ -273,7 +273,7 @@
 
 
 ;; chorus
-(definec make-chorus
+(bind-func make-chorus
   (lambda (phase)
     (let ((delay 700.0)
 	  (range 200.0)
@@ -305,7 +305,7 @@
 	   (comb3 x))))))
 
 (if *build-multi-chan*
-    (definec make-chorus-c
+    (bind-func make-chorus-c
       (lambda (channels:i64 phase)
 	(let ((dlines:[double,double]** (alloc channels))
 	      (i:i64 0))
@@ -316,7 +316,7 @@
 
 
 ;; tap delay
-(definec tap-delay
+(bind-func tap-delay
   (lambda (max-delay num-of-taps)
     (let ((line:double* (zalloc max-delay))
 	  (taps:i64* (zalloc num-of-taps))
@@ -334,7 +334,7 @@
 	  y)))))
 
 ;; allpass
-(definec make-allpass
+(bind-func make-allpass
   (lambda (delay)
     (let ((inline:double* (zalloc delay))
 	  (outline:double* (zalloc delay))
@@ -353,7 +353,7 @@
 	  y)))))
 
 (if *build-multi-chan*
-    (definec make-allpass-c
+    (bind-func make-allpass-c
       (lambda (channels:i64 delay)
 	(let ((lines:[double,double]** (alloc channels))
 	      (i:i64 0))
@@ -364,7 +364,7 @@
 
 
 ;; a dodgy reverb
-;; (definec make-reverb
+;; (bind-func make-reverb
 ;;   (lambda (size) ; size in ms
 ;;     (let ((ms (/ SAMPLERATE 1000.0))
 ;; 	  (wet .25)
@@ -386,7 +386,7 @@
 
 
 ;; a dodgy reverb mk2
-(definec make-reverb
+(bind-func make-reverb
   (lambda (size) ; size in ms
     (let ((ms (/ SAMPLERATE 1000.0))
 	  (wet .25)
@@ -409,7 +409,7 @@
 			       (dly4 wetin)))))))))))
 
 (if *build-multi-chan*
-    (definec make-reverb-c
+    (bind-func make-reverb-c
       (lambda (channels:i64 size)
 	(let ((lines:[double,double]** (alloc channels))
 	      (i:i64 0))
@@ -420,7 +420,7 @@
 
 
 ;; a dodgy bitcrusher
-(definec make-crusher
+(bind-func make-crusher
   (lambda (bits)
     (let ((amp 1.0))
       (lambda (in)
@@ -429,14 +429,14 @@
 
 
 ;; a dodgy amp distortion
-(definec make-distort
+(bind-func make-distort
   (lambda (gain)
     (let ((lim 0.5))
       (lambda (in)
 	(range-limit lim (* -1.0 lim) (* gain in))))))
 
 ;; a four channel mixer
-(definec mixquad
+(bind-func mixquad
   (lambda (c1 c2 c3 c4 chan in:double)
     (cond ((< chan 1.0) (* in c1))
 	  ((< chan 2.0) (* in c2))
@@ -447,7 +447,7 @@
 ;; a four channel mixer
 ;; cdat is an array of doubles values
 ;; each array element is a channels mix (between 0.0 and 1.0)
-(definec make-mixer
+(bind-func make-mixer
   (lambda (channels:i64)
     (let ((ch (i64tod channels)))
       (lambda (cdat:double* chan:double in:double)
@@ -466,7 +466,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; biquad low-pass filter
-(definec make-lpf
+(bind-func make-lpf
   (lambda ()
     (let* ((y1 0.0)
 	   (y2 0.0)
@@ -510,7 +510,7 @@
 	  y)))))
 
 (if *build-multi-chan*
-    (definec make-lpf-c
+    (bind-func make-lpf-c
       (lambda (channels:i64)
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
@@ -521,7 +521,7 @@
 
 
 ;; biquad high-pass filter
-(definec make-hpf
+(bind-func make-hpf
   (lambda ()
     (let* ((y1 0.0)
 	   (y2 0.0)
@@ -565,7 +565,7 @@
 	  y)))))
 
 (if *build-multi-chan*
-    (definec make-hpf-c
+    (bind-func make-hpf-c
       (lambda (channels:i64)
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
@@ -576,7 +576,7 @@
 
 
 ;; biquad band-pass filter
-(definec make-bpf
+(bind-func make-bpf
   (lambda () 
     (let* ((y1 0.0)
 	   (y2 0.0)
@@ -624,7 +624,7 @@
 
 
 (if *build-multi-chan*
-    (definec make-bpf-c
+    (bind-func make-bpf-c
       (lambda (channels:i64)
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
@@ -635,7 +635,7 @@
 
 
 ;; biquad notch filter
-(definec make-notch
+(bind-func make-notch
   (lambda () 
     (let* ((y1 0.0)
 	   (y2 0.0)
@@ -682,7 +682,7 @@
 	  y)))))
 
 (if *build-multi-chan*
-    (definec make-notch-c
+    (bind-func make-notch-c
       (lambda (channels:i64)
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
@@ -724,7 +724,7 @@
 	  y4)))))
 
 (if *build-multi-chan*
-    (definec make-vcf-c
+    (bind-func make-vcf-c
       (lambda (channels:i64)
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (res 0.5)
@@ -763,7 +763,7 @@
 
 
 (if *build-multi-chan*
-    (definec make-vcf2-c
+    (bind-func make-vcf2-c
       (lambda (channels:i64)
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (res 0.5)
@@ -784,13 +784,13 @@
 
 ;; time in samples (starting from 0)
 ;; apex (in samples) is after how many samples we hit 1.0 before decaying
-(definec impulse
+(bind-func impulse
   (lambda (time:double apex:double)
     (let ((h (* time apex)))
       (* h (exp (- 1.0 h))))))
 	  
 
-(definec make-line
+(bind-func make-line
   (lambda (x1:double y1:double x2 y2)
     (let* ((m (if (= 0.0 (- x2 x1)) 
 		  0.0 
@@ -799,7 +799,7 @@
       (lambda (time) (+ (* m time) c)))))
 
 
-(definec envelope-segments
+(bind-func envelope-segments
   (lambda (points:double* num-of-points:i64)
     (let ((lines:[double,double]** (zalloc num-of-points))
 	  (k 0))
@@ -812,7 +812,7 @@
 	  (pset! lines k (make-line x1 y1 x2 y2))))
       lines)))
 
-(definec make-envelope
+(bind-func make-envelope
   (lambda (points:double* num-of-points)
     (let ((klines:[double,double]** (envelope-segments points num-of-points))
 	  (line-length num-of-points))
@@ -828,7 +828,7 @@
 	  res)))))
 
 ;; make a convenience wrapper for asr
-(definec make-adsr
+(bind-func make-adsr
   (lambda (start-time atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
     (let* ((points 6)
 	   (data:double* (zalloc (* points 2))))
@@ -850,7 +850,7 @@
 
 
 ;; an accumulative adsr (random access not allowed! time must be linear).
-(definec make-adsr-accum
+(bind-func make-adsr-accum
   (lambda (start-time:double atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
     (let ((val (if (> (+ atk-dur dky-dur) 1.0) 0.0 peek-amp))
 	  (t1 atk-dur)
@@ -879,7 +879,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; relative time USING adsr-accum + local mzone
-(definec make-note
+(bind-func make-note
   (lambda (start-time:double freq:double amp:double dur 
 		      attack:double decay:double release:double sus-amp:double
 		      nstarts:double*
@@ -899,7 +899,7 @@
       ff)))
 
 (define-macro (define-instrument name note-kernel effect-kernel)
-  `(definec ,name
+  `(bind-func ,name
      (let* ((poly:i64 48)
 	    (notes:[double,double,double,double]** (zalloc poly))
 	    (attack:double 200.0)
@@ -950,7 +950,7 @@
 ;; beyond the duration.
 ;; however making it longer means using more memory
 ;; it's a trade off!
-(definec _synth-note
+(bind-func _synth-note
   (lambda (time inst:[double,double,double,double,double*]* freq amp dur)
     ;; allocate memzone
     (let ((f (inst.new-note:[i64,double,double,double,double]*)))
@@ -959,11 +959,11 @@
       1)))
 
 
-(definec midi2frq    
+(bind-func midi2frq    
   (lambda (pitch)            
     (* 440.0 (pow 2.0 (/ (- pitch 69.0) 12.0)))))
 
-(definec frq2midi
+(bind-func frq2midi
   (lambda (freq)            
     (+ (* 12.0 (log2 (/ freq 440.0))) 69.0)))
 
@@ -981,7 +981,7 @@
 	 (print-error 'No 'inst 'named ,(symbol->string inst)))))
 
 ;; make synth defaults
-(definec default-note
+(bind-func default-note
   (lambda ()
     (let ((sawl (make-saw))
 	  (sawr (make-saw)))
@@ -990,7 +990,7 @@
 	    (* amp (/ 200.0 freq) (sawl amp freq))
 	    (* amp (/ 200.0 freq) (sawr amp freq)))))))
 
-(definec default-effect
+(bind-func default-effect
   (lambda (in:double time:double chan:double dat:double*)
     in))
 
@@ -1001,7 +1001,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(definec synth-note
+(bind-func synth-note
   (let ((res 1.0)
 	(res_ 0.0)
 	(fxamp 0.0))
@@ -1036,7 +1036,7 @@
 		       		     (* freq 0.99))))))))))))
 
 
-(definec synth-fx 262144
+(bind-func synth-fx 262144
   (let ((dleft (dtoi64 (* 0.125 SAMPLERATE)))
 	(dlyl (make-delay dleft))
 	(dright (dtoi64 (* 0.33333333 SAMPLERATE)))
@@ -1087,7 +1087,7 @@
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
 
 ;; size of audio data in file (in bytes)
-(definec print-audio-file-info
+(bind-func print-audio-file-info
   (lambda (fname)
     (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
 	  (audiofile (sf_open fname 16 info))
@@ -1104,7 +1104,7 @@
       (sf_close audiofile))))
 
 ;; an audio buffer reader
-(definec read-audio-data
+(bind-func read-audio-data
   (lambda (fname dat offset num)
     ;(printf "in: %s %p %lld %lld\n" fname dat offset num)
     (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
@@ -1115,7 +1115,7 @@
       samples-read)))
 
 ;; write out an audio buffer
-(definec write-audio-data
+(bind-func write-audio-data
   (lambda (fname frames channels:i32 dat)
     (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc)))
       (tset! info 0 frames)
@@ -1139,7 +1139,7 @@
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 0 0) 
 ;; ;; this reads 5000 frames starting 1000 frames into the file
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000) 
-(definec set-sample-data_
+(bind-func set-sample-data_
   (lambda (inst:[double,double,double,double*]* fname index offset lgth)    
     (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
 	  (audiofile (sf_open fname 16 info))
@@ -1185,7 +1185,7 @@
 
 ;; helper functions for setting an individual samples offset
 ;; i.e. set sample index 60 to start at 40000 samples into the audio buffer
-(definec set-sample-offset_
+(bind-func set-sample-offset_
   (lambda (sampler:[double,double,double,double*]* index:i64 offset:i64)
     (let ((offsets (sampler.samples-offsets:|128,i64|*)))
       (pset! offsets index offset)
@@ -1209,7 +1209,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(definec hermite-interp
+(bind-func hermite-interp
   (lambda (fractional y1:double x0 x1 x2)
     (let ((c (* 0.5 (- x1 y1)))
 	  (v (- x0 x1))
@@ -1223,7 +1223,7 @@
 ;; linear sampler
 ;;
 ;; faster but noisy
-(definec sampler-note-linear
+(bind-func sampler-note-linear
   (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* index)
     (let ((idx-freq (midi2frq (i64tod index)))
 	  (phase (i64tod (pref samples-offsets index)))) ;; phase unit is audio frames
@@ -1243,7 +1243,7 @@
 ;; ;; hermite sampler (stereo version)
 ;; ;;
 ;; ;; slower but less noisy (default)
-;; (definec sampler-note-hermite
+;; (bind-func sampler-note-hermite
 ;;   (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* index)
 ;;     (let ((idx-freq (midi2frq (i64tod index)))
 ;; 	  (phase (i64tod (pref samples-offsets index)))) ;; phase unit is audio frames
@@ -1268,7 +1268,7 @@
 ;; hermite sampler  (multi-channels version)
 ;;
 ;; slower but less noisy (default)
-(definec sampler-note-hermite
+(bind-func sampler-note-hermite
   (lambda (samples:|128,double*|* samples-length:|128,i64|* samples-offsets:|128,i64|* samples-channels:|128,i64|* index)
     (let ((idx-freq (midi2frq (i64tod index)))
 	  (channels (pref samples-channels index))
@@ -1291,7 +1291,7 @@
 		(* amp (hermite-interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
 
-(definec sampler-fx 400000
+(bind-func sampler-fx 400000
   (let ((reverbl (make-reverb 80.0))
 	(reverbr (make-reverb 79.0))	
 	(pan .5)
@@ -1316,7 +1316,7 @@
 
 ;; make sampler instrument
 (define-macro (define-sampler name note-kernel effect-kernel)
-  `(definec ,name
+  `(bind-func ,name
      (let* ((poly:i64 48)
 	    (samples:|128,double*|* (zalloc)) ;; 128 samples
 	    (samples-length:|128,i64|* (zalloc)) ;; 128 samples
@@ -1430,8 +1430,8 @@
 		                             (/ (exp (/ ,vol 26.222)) 127.0)
 		                             duration)          
 	                        (print-error 'No 'inst 'named ,(symbol->string inst)))))")
-    (ipc:definec proc '_synth-note)
-    (ipc:definec proc 'midi2frq)))
+    (ipc:bind-func proc '_synth-note)
+    (ipc:bind-func proc 'midi2frq)))
 
 
 

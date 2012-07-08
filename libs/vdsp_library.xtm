@@ -159,7 +159,7 @@
 
 
 ;; pulse train
-(definec make-pulse-v
+(bind-func make-pulse-v
   (lambda ()
     (let ((vsr (vec_value T))
 	  (tc (vec_value 32.0))
@@ -179,7 +179,7 @@
 
 
 
-;; (definec make-delay
+;; (bind-func make-delay
 ;;   (lambda (max-delay)
 ;;     (let ((line:double* (zalloc max-delay))
 ;; 	  (time 0)
@@ -202,7 +202,7 @@
 ;;
 ;; hard to vectorize delay because of non-aligned
 ;; boundaries (i.e. not 16byte aligned for example)
-(definec make-delay-v
+(bind-func make-delay-v
   (lambda (delay:i32)
     (let ((line:float* (zalloc delay))
 	  (time:i32 0)
@@ -225,7 +225,7 @@
 ;;
 ;; hard to vectorize comb because of non-aligned
 ;; boundaries (i.e. not 16byte aligned for example)
-(definec make-comb-v
+(bind-func make-comb-v
   (lambda (max-delay)
     (let ((line:float* (zalloc max-delay))
 	  (vout:_abuf* (alloc))
@@ -261,7 +261,7 @@
 
 
 ;; ;; chorus
-(definec make-chorus-v
+(bind-func make-chorus-v
   (lambda (phase)
     (let ((delay 700.0)
 	  (range 200.0)
@@ -297,7 +297,7 @@
 ;;
 ;; hard to vectorize delay types
 ;; because of vector boundaries (i.e. 16byte)
-(definec make-allpass-v
+(bind-func make-allpass-v
   (lambda (delay)
     (let ((inline:float* (zalloc delay))
 	  (outline:float* (zalloc delay))
@@ -321,7 +321,7 @@
 
 
 ;; a dodgy reverb mk2
-(definec make-reverb-v
+(bind-func make-reverb-v
   (lambda (size:float) ; size in ms
     (let ((ms (dtof (/ *samplerate* 1000.0)))
 	  (wet (vec_value .25))
@@ -347,7 +347,7 @@
 
 
 ;; a dodgy bitcrusher
-(definec make-crusher-v
+(bind-func make-crusher-v
   (lambda (bits)
     (let ((amp 1.0)
 	  (vout:_abuf* (alloc))
@@ -410,13 +410,13 @@
 ;; time in samples (starting from 0)
 ;; apex (in samples) is after how many samples we hit 1.0 before decaying
 
-(definec impulsef
+(bind-func impulsef
   (lambda (time:float apex:float)
     (let ((h (* time apex)))
       (* h (expf (- 1.0 h))))))
 	  
 
-(definec make-linef
+(bind-func make-linef
   (lambda (x1:float y1:float x2 y2)
     (let* ((m (if (= (dtof 0.0) (- x2 x1)) 
 		  (dtof 0.0)
@@ -425,7 +425,7 @@
       (lambda (time) (+ (* m time) c)))))
 
 
-(definec envelope-segmentsf
+(bind-func envelope-segmentsf
   (lambda (points:float* num-of-points:i64)
     (let ((lines:[float,float]** (zalloc num-of-points))
 	  (k 0))
@@ -439,7 +439,7 @@
       lines)))
 
 
-(definec make-envelopef
+(bind-func make-envelopef
   (lambda (points:float* num-of-points)
     (let ((klines:[float,float]** (envelope-segmentsf points num-of-points))
 	  (line-length num-of-points))
@@ -456,7 +456,7 @@
 
 
 ;; make a convenience wrapper for asr
-(definec make-adsrf
+(bind-func make-adsrf
   (lambda (start-time atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
     (let* ((points 6)
 	   (data:float* (zalloc (* points 2))))
@@ -479,7 +479,7 @@
 
 
 ;; relative time
-(definec make-note-v
+(bind-func make-note-v
   (lambda (start-time:float freq:float amp:float dur 
 		      attack:float decay:float release:float sus-amp:float
 		      nstarts:float*
@@ -523,18 +523,18 @@
 ;; 	(vset! v i x))
 ;;       (pref v 0))))
 
-;; (definec test
+;; (bind-func test
 ;;   (lambda ()
 ;;     (lambda ()
 ;;       (let ((v (vec_value 0.0)))
 ;; 	(* v v)))))
 
-;; (definec t2
+;; (bind-func t2
 ;;   (lambda ()
 ;;     (let ((f (test)))
 ;;       (f))))
 
-;; (definec t3
+;; (bind-func t3
 ;;   (lambda ()
 ;;     (t2)
 ;;     void))
@@ -543,7 +543,7 @@
 
 
 (define-macro (define-instrument-v name note-kernel effect-kernel)
-  `(definec ,name
+  `(bind-func ,name
      (let* ((poly:i64 48)
 	    (notes:[_abuf*,_abuf*,float,float]** (zalloc poly))
 	    (attack:float 200.0)
@@ -605,7 +605,7 @@
 ;; beyond the duration.
 ;; however making it longer means using more memory
 ;; it's a trade off!
-(definec _synth-note
+(bind-func _synth-note
   (lambda (time inst:[_abuf*,_abuf*,float,float,i8*]* freq amp dur)
     (memzone (* 1024 100)
 	     (ftoi64 (+ (- time (i64tof (now)))
@@ -617,11 +617,11 @@
 	1))))
 
 
-(definec midi2frq    
+(bind-func midi2frq    
   (lambda (pitch)            
     (* 440.0 (pow 2.0 (/ (- pitch 69.0) 12.0)))))
 
-(definec frq2midi
+(bind-func frq2midi
   (lambda (freq)            
     (+ (* 12.0 (log2 (/ freq 440.0))) 69.0)))
 
@@ -637,7 +637,7 @@
 
 
 ;; make synth defaults
-(definec default-note-v
+(bind-func default-note-v
   (lambda ()
     (let ((oscl (make-oscil-v 0.0))
 	  (oscr (make-oscil-v 0.0)))
@@ -647,7 +647,7 @@
 	      (vec_new (* amp (/ vc200 freq) (oscl amp freq)))
 	      (vec_new (* amp (/ vc200 freq) (oscr amp freq)))))))))
 
-(definec default-effect-v
+(bind-func default-effect-v
   (lambda (in:_abuf* time:float chan:float dat:i8*)
     in))
 
@@ -690,7 +690,7 @@
 				    (vec_new (+ f2 (vec_new (* amp vcfr_range)))))))))))))
 
 
-(definec epad1-fx-v 2000000
+(bind-func epad1-fx-v 2000000
   (let ((d1 (make-comb-v 44100))
 	(d22 (make-comb-v 44100))
 	(c1 (make-chorus-v 0.0))
@@ -742,7 +742,7 @@
 
 
 ;; setup default synth to play
-(definec dsp-v
+(bind-func dsp-v
   (let ((epad_amp (vec_value 1.0))
 	(epad_zero (vec_value 0.0))
 	(i:i32 0))

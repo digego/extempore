@@ -151,7 +151,7 @@
 			   
 
 
-(definec gl-setup
+(bind-func gl-setup
   (lambda ()
     (glEnable GL_LIGHTING)
     (glEnable GL_LIGHT0)
@@ -188,7 +188,7 @@
 (bind-val GL_TEXTURE i32 5890)
 (bind-val GL_TEXTURE_MATRIX i32 2984)
 
-(definec gl-set-view
+(bind-func gl-set-view
   (lambda (w:double h:double depth:double)
     (glViewport 0 0 (dtoi32 w) (dtoi32 h))
     (glMatrixMode GL_PROJECTION)
@@ -199,7 +199,7 @@
     (gl-setup)
     1))
 
-(definec gl-look-at
+(bind-func gl-look-at
   (lambda (eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)
     (glLoadIdentity)
     (gluLookAt eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)))
@@ -323,7 +323,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; a couple of shader helper functions
-(definec print-shader-info-log
+(bind-func print-shader-info-log
   (lambda (obj:i32)
     (let ((infologLength (salloc 1 i32))
 	  (charsWritten (salloc 1 i32)))
@@ -336,7 +336,7 @@
 	    1)
 	  (begin (printf "Shader Info log: OK\n") 1)))))
 
-(definec print-program-info-log
+(bind-func print-program-info-log
   (lambda (obj:i32)
     (let ((infologLength (salloc 1 i32))
 	  (charsWritten (salloc 1 i32)))
@@ -350,7 +350,7 @@
 	  (begin (printf "Program Info log: OK\n") 1)))))
 
 ;; load shader (vert and frag shader)
-(definec create-shader
+(bind-func create-shader
   (lambda (vsource:i8* fsource:i8*)
     (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
 	  (vshader (glCreateShader GL_VERTEX_SHADER))
@@ -382,7 +382,7 @@
 
 
 
-(definec circle-line
+(bind-func circle-line
   (lambda (radius:double x:double y:double)
     (let ((k 0.0))
       (glLineWidth 3.0)
@@ -392,7 +392,7 @@
 	  (glVertex2d (+ x (* (cos angle) radius)) (+ y (* (sin angle) radius)))))
       (glEnd))))
 
-(definec circle-whole
+(bind-func circle-whole
   (lambda (radius:double x:double y:double)
     (let ((k 0.0))
       (glBegin GL_TRIANGLE_FAN)
@@ -401,7 +401,7 @@
 	  (glVertex2d (+ x (* (cos angle) radius)) (+ y (* (sin angle) radius)))))
       (glEnd))))
 
-(definec cube-whole
+(bind-func cube-whole
   (let ((dlist -1))
     (lambda ()
       (if (> dlist -1)

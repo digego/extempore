@@ -54,7 +54,7 @@
 ;; id of 0 means Create new texture
 ;; id > 0 means load image into existing texture
 ;; returns texture 
-(definec soil-load-tex
+(bind-func soil-load-tex
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y SOIL_FLAG_TEXTURE_RECTANGLE))))
       (if (= texid 0)
@@ -72,7 +72,7 @@
 
 ;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
 ;; if texid is zero then assign a new tex id otherwise use the texid provided
-(definec gl-load-tex
+(bind-func gl-load-tex
   (lambda (width height channels type data texid)
     (let* ((tex:i32* (salloc)))
       (pset! tex 0 texid)
@@ -100,7 +100,7 @@
 
 ;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
 ;; if texid is zero then assign a new tex id otherwise use the texid provided
-(definec gl-load-tex-bgr
+(bind-func gl-load-tex-bgr
   (lambda (width height channels type data texid)
     (let* ((tex:i32* (salloc)))
       (pset! tex 0 texid)
@@ -125,7 +125,7 @@
 		    data)
       (pref tex 0))))
 
-(definec gl-tex-width
+(bind-func gl-tex-width
   (lambda (tex)
     (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
     (let ((v (salloc)))
@@ -134,7 +134,7 @@
 
 
 ;; get texture height
-(definec gl-tex-height
+(bind-func gl-tex-height
   (lambda (tex)
     (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
     (let ((v (salloc)))
@@ -142,7 +142,7 @@
       (pref v 0))))
 
 
-(definec gl-draw-img
+(bind-func gl-draw-img
   (lambda (x y w h r texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
@@ -175,7 +175,7 @@
       void)))
 
 
-(definec gl-draw-img-from-img
+(bind-func gl-draw-img-from-img
   (lambda (ix iy tw th x y w h r texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
@@ -207,7 +207,7 @@
 
 
 
-(definec gl-draw-img-reverse
+(bind-func gl-draw-img-reverse
   (lambda (x y w h r texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))

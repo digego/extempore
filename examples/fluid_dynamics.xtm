@@ -29,11 +29,11 @@
 
 (bind-type fluidcube <i64,double,double,double,double*,double*,double*,double*,double*,double*,double*,double*>)
 
-(definec fluid-ix
+(bind-func fluid-ix
   (lambda (x:i64 y:i64 z:i64 N:i64)
     (+ x (* y N) (* z N N))))
 
-(definec fluid-cube-create
+(bind-func fluid-cube-create
   (lambda (size diffusion viscosity dt:double)
     (let ((cube:fluidcube* (heap-alloc))
 	  (size3:i64 (* size size size))
@@ -49,7 +49,7 @@
       cube)))
 
 
-(definec fluid-cube-add-density
+(bind-func fluid-cube-add-density
   (lambda (cube:fluidcube* x y z amount:double)
     (let ((N (tref cube 0))
 	  (idx (fluid-ix x y z N))
@@ -59,7 +59,7 @@
       (+ density amount))))
 	  
 
-(definec fluid-cube-add-velocity
+(bind-func fluid-cube-add-velocity
   (lambda (cube:fluidcube* x y z amount-x:double amount-y:double amount-z:double)
     (let ((N (tref cube 0))
 	  (idx (fluid-ix x y z N))
@@ -72,7 +72,7 @@
       cube)))
 
 
-(definec fluid-set-boundary
+(bind-func fluid-set-boundary
   (lambda (b:i64 x:double* N:i64)
     (let ((j 0)
 	  (i 0)
@@ -154,7 +154,7 @@
 
             	    
 
-(definec fluid-lin-solve
+(bind-func fluid-lin-solve
   (lambda (b:i64 x:double* x0:double* a c iter:i64 N:i64)
     (let ((cRecip (/ 1.0 c))
 	  (k 0)
@@ -178,13 +178,13 @@
     1))
 
 
-(definec fluid-diffuse
+(bind-func fluid-diffuse
   (lambda (b:i64 x:double* x0:double* diff:double dt:double iter N)
     (let ((a:double (* dt diff (i64tod (* (- N 2) (- N 2))))))
       (fluid-lin-solve b x x0 a (+ 1.0 (* 6.0 a)) iter N))))
 
 
-(definec fluid-project
+(bind-func fluid-project
   (lambda (velocx:double* velocy:double* velocz:double* p:double* div:double* iter N)
     (let ((j 0)
 	  (k 0)
@@ -240,7 +240,7 @@
     1)))
 
 
-(definec fluid-advect
+(bind-func fluid-advect
   (lambda (b:i64 d:double* d0:double* velocx:double* velocy:double* velocz:double* dt:double N:i64)
     (let ((n-2 (i64tod (- N 2)))
 	  (dtx (* dt n-2))
@@ -311,7 +311,7 @@
 				 
 				 
       
-(definec fluid-step-cube
+(bind-func fluid-step-cube
   (lambda (cube:fluidcube*)
     (let ((N (tref cube 0))
 	  (dt (tref cube 1))	  
@@ -353,12 +353,12 @@
       (fluid-advect 0 density s Vx Vy Vz dt N)
       cube)))
 
-(definec get-fluid-cube
+(bind-func get-fluid-cube
   (let ((cube (fluid-cube-create 22 0.001 0.001 0.002)))
     (lambda ()
       cube)))
 
-(definec clean-cube
+(bind-func clean-cube
   (lambda ()    
     (let ((densities (tref (get-fluid-cube) 5))
 	  (Vx (tref (get-fluid-cube) 6))
@@ -383,29 +383,29 @@
 (load "libs/opengl_lib.xtm")
 
  
-(definec add-density
+(bind-func add-density
   (lambda (x:i64 y:i64 z:i64 amount:double)
     (let ((cube (get-fluid-cube)))
       (fluid-cube-add-density cube x y z amount))))
 
-(definec add-velocity
+(bind-func add-velocity
   (lambda (x y z amount-x amount-y amount-z)
     (fluid-cube-add-velocity (get-fluid-cube) x y z amount-x amount-y amount-z)))
 
-(definec get-velocity
+(bind-func get-velocity
   (lambda (x y z)
     (let ((xs (tref (get-fluid-cube) 6))
 	  (size (tref (get-fluid-cube) 0)))
       (pref xs (fluid-ix x y z size)))))
 
 
-(definec look-at
+(bind-func look-at
   (lambda (eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)
     (glLoadIdentity)
     (gluLookAt eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)))
 
 
-(definec glCube
+(bind-func glCube
   (let ((dlist -1))
     (lambda ()
       (if (> dlist -1)
@@ -456,7 +456,7 @@
 
   ;; a trivial opengl draw loop
 ;; need to call glfwSwapBuffers to flush
-(definec my-gl-loop
+(bind-func my-gl-loop
   (let ((degree 0.0))
     (lambda ()    
       (look-at -30.5 30.0 50.0 20.5 3.5 -1.0 0.0 1.0 0.0)
