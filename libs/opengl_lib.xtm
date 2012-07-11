@@ -7,6 +7,7 @@
 ;; first check if we are windows we need to load some extensions!
 (if (string=? (sys:platform) "Windows")
     (begin (println "Loading OpenGL Extensions for Windows!!!!!")
+	   (gl:add-extension "glActiveTexture")
 	   (gl:add-extension "glGetShaderiv")
 	   (gl:add-extension "glGetShaderInfoLog")
 	   (gl:add-extension "glGetProgramiv")
@@ -282,6 +283,48 @@
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
       (pref tex 0))))
 
+;; creates an empty texture
+;; suitable to back an FBO
+(bind-func fbo_create_texture_sqr
+  (lambda (width height)
+    (let ((id:i32* (salloc))
+	  (tex:i32* (salloc)))
+      (glGenRenderbuffers 1 id)
+      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+      (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA8 width height)
+      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER (pref id 0))
+
+      (glGenTextures 1 tex)
+      (glBindTexture GL_TEXTURE_2D (pref tex 0))
+      (glTexImage2D GL_TEXTURE_2D 0 GL_RGBA8 width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+      (glBindTexture GL_TEXTURE_2D 0)
+      (pref tex 0))))
+
+
+;; create fbo depth buffer
+(bind-func fbo_create_depth_buffer_sqr
+  (lambda (width height)
+    (let ((id:i32* (salloc))
+	  (tex:i32* (salloc)))
+      (glGenRenderbuffers 1 id)
+      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER (pref id 0))
+
+      (glGenTextures 1 tex)
+      (glBindTexture GL_TEXTURE_2D (pref tex 0))
+      (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+      (glBindTexture GL_TEXTURE_2D 0)
+      (pref tex 0))))
+
 ;; structure to hold fbo data
 ;; fbo id          0
 ;; texture id      1
@@ -291,8 +334,9 @@
 (bind-type E_fbo <i32,i32,i32,i32,i32>)
 
 ;; create and return a frame buffer struct (E_fbo)
+;; if _texid is greater than 0 then use existing _texid
 (bind-func create-fbo
-  (lambda (width:i32 height:i32)
+  (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
     (let ((texid (fbo_create_texture width height))
 	  (depthid (fbo_create_depth_buffer width height))
 	  (fboid:i32* (salloc))
@@ -300,7 +344,11 @@
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+      (glClearColor 0.0 0.1 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
 
+      (if (> _texid 0) (set! texid _texid))
+      (if (> _depthid 0) (set! depthid _depthid))
       ;; Attach the texture texid to the color buffer of our fbo
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_RECTANGLE_ARB texid 0)
       ;; Attach the texture depthid to the depth buffer of our fbo
@@ -314,6 +362,38 @@
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       ;; return the extfbo struct
       fbo)))
+
+;; create and return a frame buffer struct (E_fbo)
+;; if _texid is greater than 0 then use existing _texid
+(bind-func create-fbo-sqr
+  (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
+    (let ((texid (fbo_create_texture_sqr width height))
+	  (depthid (fbo_create_depth_buffer_sqr width height))
+	  (fboid:i32* (salloc))
+	  (fbo:E_fbo* (halloc))) ;; heap alloc
+      (glGenFramebuffers 1 fboid)
+      ;; bind the fbo
+      (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+      (glClearColor 0.0 0.1 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+
+      (if (> _texid 0) (set! texid _texid))
+      (if (> _depthid 0) (set! texid _depthid))
+      ;; Attach the texture texid to the color buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D texid 0)
+      ;; Attach the texture depthid to the depth buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_2D depthid 0)
+
+      (tfill! fbo (pref fboid 0) texid depthid width height)
+      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
+	(printf "fb status %d\n" status)
+	(if (<> status GL_FRAMEBUFFER_COMPLETE)
+	    (set! fbo (cast null E_fbo*))))
+      ;; unbind the frame buffer
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      ;; return the extfbo struct
+      fbo)))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

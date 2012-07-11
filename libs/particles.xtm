@@ -129,8 +129,8 @@
 	    (texid (psystem_texid psys))
 	    (states (psystem_states psys))
 	    (state 0)
-	    (xs (psystem_xs psys))
-	    (ys (psystem_ys psys))
+	    (xs:float* (psystem_xs psys))
+	    (ys:float* (psystem_ys psys))
 	    (xvs (psystem_xvs psys))
 	    (yvs (psystem_yvs psys))
 	    (sizes (psystem_sizes psys))
@@ -139,11 +139,11 @@
 	    (blues (psystem_blues psys))
 	    (alphas(psystem_alphas psys))
 	    (cnt 0))
-	
+	;(printf "tid:%d\n" texid)
 	(glEnable GL_BLEND)
 	(glDisable GL_DEPTH_TEST)
 	(glDepthMask GL_FALSE)
-	(glBlendFunc GL_SRC_ALPHA  GL_ONE)
+	(glBlendFunc GL_SRC_ALPHA GL_ONE)
 	
 	(dotimes (i size)
 	  (set! state (pref states i))
@@ -154,6 +154,9 @@
 		    (s (pref sizes i))
 		    (x (- (pref xs i) (* 0.5 s)))
 		    (y (- (pref ys i) (* 0.5 s))))
+		(set! s (* s 0.1))
+		(set! x (* (dtof 2.0) (- (/ x 320.0) (dtof 0.5))))
+		(set! y (* (dtof 2.0) (- (/ y 160.0) (dtof 0.5))))
 		(pset! vdat 0 x) (pset! vdat 1 y)                    ;; v1
 		(pset! vdat 2 (+ x s)) (pset! vdat 3 y)              ;; v2
 		(pset! vdat 4 (+ x s)) (pset! vdat 5 (+ y s))        ;; v3
@@ -165,24 +168,29 @@
 		(pset! cdat 0 (pref reds i))                         ;; red
 		(pset! cdat 1 (pref greens i))                       ;; green
 		(pset! cdat 2 (pref blues i))                        ;; blue
-		(pset! cdat 3 (pref alphas i))
+		(pset! cdat 3 1.0) ;(pref alphas i))
 		(pset! cdat 4 (pref reds i))                         ;; red
 		(pset! cdat 5 (pref greens i))                       ;; green
 		(pset! cdat 6 (pref blues i))                        ;; blue
-		(pset! cdat 7 (pref alphas i))
+		(pset! cdat 7 1.0) ;(pref alphas i))
 		(pset! cdat 8 (pref reds i))                         ;; red
 		(pset! cdat 9 (pref greens i))                       ;; green
 		(pset! cdat 10 (pref blues i))                        ;; blue
-		(pset! cdat 11 (pref alphas i))
+		(pset! cdat 11 1.0) ;(pref alphas i))
 		(pset! cdat 12 (pref reds i))                         ;; red
 		(pset! cdat 13 (pref greens i))                       ;; green
 		(pset! cdat 14 (pref blues i))                        ;; blue
-		(pset! cdat 15 (pref alphas i))
+		(pset! cdat 15 1.0) ;(pref alphas i))
 		(set! cnt (+ cnt 1)))))
+	;(set! texid 0) ;(i64toi32 53))
 	(glEnable GL_COLOR_MATERIAL)
 	(if (> texid 0)
 	    (begin (glEnable GL_TEXTURE_2D)
 		   (glBindTexture GL_TEXTURE_2D texid)
+		   (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+		   (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+		   (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+		   (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
 		   (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_COMBINE)
 		   1))
 
@@ -200,13 +208,16 @@
 	(glDisableClientState GL_TEXTURE_COORD_ARRAY)
 
 	(if (> texid 0)
-	    (glDisable GL_TEXTURE_2D)
-	    (glDisable GL_COLOR_MATERIAL))
+	    (begin (glDisable GL_TEXTURE_2D)
+		   (glBindTexture GL_TEXTURE_2D 0)
+		   (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE)
+		   1))	
 	
 	(glDepthMask GL_TRUE)
 	(glEnable GL_DEPTH_TEST)
-  	(glDisable GL_COLOR_MATERIAL)
-	
+	(glDisable GL_COLOR_MATERIAL)
+	(glDisable GL_BLEND)
+
 	1))))
 
 
