@@ -11,7 +11,7 @@
 ;; change working directory
 (llvm:compile "declare i32 @chdir(i8*)")
 
-(definec change-working-dir
+(bind-func change-working-dir
   (lambda (path)
     (chdir path)))
 
@@ -21,7 +21,7 @@
 (bind-lib libglu gluErrorString [i8*,i32]*)
 
 
-(definec setup
+(bind-func setup
   (lambda ()
     (glEnable GL_LIGHTING)
     (glEnable GL_LIGHT0)
@@ -42,7 +42,7 @@
     (glEnable GL_DEPTH_TEST))))
 
 
-(definec gl-init
+(bind-func gl-init
   (lambda (w h)
     (setup)
     (glViewport 0 0 w h)
@@ -52,9 +52,9 @@
     (glMatrixMode 5888)
     (glEnable GL_NORMALIZE)
     (glEnable 2929)
-    1)))
+    1))
 	      
-(definec look-at
+(bind-func look-at
   (lambda (eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)
     (glLoadIdentity)
     (gluLookAt eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)))
@@ -62,7 +62,7 @@
 
 ;; a trivial opengl draw loop
 ;; need to call glfwSwapBuffers to flush
-(definec gl-callback
+(bind-func gl-callback
   (lambda (model display-list angle:double)
     (glClearColor 0.05 0.05 0.05 1.0)
     (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
@@ -88,7 +88,7 @@
 ;; (we'll need it before we build a display list)
 
 ;; code to open a window
-(definec open-window
+(bind-func open-window
   (lambda (width height)
     (if (> (glfwInit) 0)
 	(if (> (glfwOpenWindow width height 0 0 0 0 0 0 65537) 0)

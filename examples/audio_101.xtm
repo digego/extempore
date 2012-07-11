@@ -20,7 +20,7 @@
 (bind-val IN_CHANNELS i64 *au:in-channels*)
 (bind-val FRAMES i64 *au:block-size*)
 
-(definec print-audio-state
+(bind-func print-audio-state
   (lambda ()
     (printf "    FRAMES: %lld\n" FRAMES)
     (printf " OUT CHANS: %lld\n" CHANNELS)
@@ -30,7 +30,7 @@
 (print-audio-state)
 
 ;; compile sample by sample dsp code
-(definec dsp
+(bind-func dsp
   (lambda (in:double time:double channel:double	data:double*)
     (* .2 (random))))
 
@@ -43,7 +43,7 @@
 
 
 ;; recompile dsp to produce two sine wave in left and right
-(definec dsp
+(bind-func dsp
   (lambda (in:double time:double channel:double	data:double*)
     (cond ((= channel 0.0)
            (* 0.5 (sin (* 3.141592 2.0 200.0 (/ time 44100.0)))))
@@ -53,7 +53,7 @@
 
 
 ;; abstract out an oscillator function
-(definec make-oscil
+(bind-func make-oscil
    (lambda (phase)
       (lambda (amp freq)
          (let ((inc (* 3.141592 (* 2.0 (/ freq 44100.)))))
@@ -62,7 +62,7 @@
 
 
 ;; same example as above but using oscillator abstraction
-(definec dsp
+(bind-func dsp
   (let ((osc1 (make-oscil 0.0))
 	(osc2 (make-oscil 0.0)))
     (lambda (in:double time:double channel:double data:double*)
@@ -72,7 +72,7 @@
 
 
 ;; slightly more complex example
-(definec dsp
+(bind-func dsp
   (let ((oscs:|9,[double,double,double]*|* (zalloc))
 	(i 0))
     (dotimes (i 9)
@@ -97,7 +97,7 @@
 
 ;; modify one of the examples from above
 ;; adding freq1 and freq2 into closure environment
-(definec dsp
+(bind-func dsp
   (let ((osc1 (make-oscil 0.0))
 	(osc2 (make-oscil 0.0))
 	(freq1 220.0)
@@ -109,7 +109,7 @@
 
 ;; write accessor function for modification
 ;; of closure slots freq1 and freq2
-(definec change-freq
+(bind-func change-freq
   (lambda (freq1 freq2)
     (dsp.freq1:double freq1)
     (dsp.freq2:double freq2)))

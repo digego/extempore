@@ -42,7 +42,7 @@
 (bind-val env i32 0)
 
 
-(definec resize
+(bind-func resize
   (lambda (width:float height:float)
     ;; resize viewport
     (h3dSetNodeParamI _cam H3DCamera_ViewportXI 0)
@@ -56,7 +56,7 @@
     1))
 
 
-(definec h3d_init
+(bind-func h3d_init
   (let ((hand -1)
 	(matRes -1)
 	(envRes -1)
@@ -143,7 +143,7 @@
 
 
 
-(definec mainLoop
+(bind-func mainLoop
   (let ((fps:float 30.0))
     (lambda (_at:double)
       (set! _curFPS fps)
@@ -207,9 +207,9 @@
 (let ((proc "opengl"))
   (ipc:new proc 7095)  
   (sys:sleep 11025)
-  (ipc:definec proc 'mainLoop)
-  (ipc:definec proc 'h3d_init)
-  (ipc:definec proc 'resize)
+  (ipc:bind-func proc 'mainLoop)
+  (ipc:bind-func proc 'h3d_init)
+  (ipc:bind-func proc 'resize)
   (ipc:define proc 'opengl-test opengl-test)
   (ipc:define proc 'start start)
   (ipc:call-async proc 'start))

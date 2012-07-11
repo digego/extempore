@@ -10,7 +10,7 @@
 (define pr2 (gl:make-ctx ":0.0" #t 0.0 0.0 (* 3.0 1920.0) 1080.0))
 ;(gl-set-view 900.0 600.0)
 
-(definec gl-set-view-ext
+(bind-func gl-set-view-ext
   (lambda (w:double h:double fov:double depth:double)
     (glViewport 0 0 (dtoi32 w) (dtoi32 h))
     (glMatrixMode GL_PROJECTION)
@@ -87,7 +87,7 @@
 ;; are 32bit (i.e. not 64bit)
 ;; finally, osc messages are bit endian
 ;; so you'll likely need to swap your arguments
-(definec osc-receive-7020
+(bind-func osc-receive-7020
   (lambda (address:i8* types:i8* args:i8*)
     (let ((data (bitcast args i32*)))
       (printf "address:%s  type:%s arg1:%f arg2:%lld\n"
@@ -119,7 +119,7 @@
 ;; box size of 5*5
 (bind-val gridoffsets float* (sys:make-cptr (* 5 5 2 4)))
 
-(definec set-grid-offsets
+(bind-func set-grid-offsets
   (lambda (width:float height:float factor:float)
     (let ((xinc:float (/ factor width))
 	  (yinc:float (/ factor height))
@@ -142,7 +142,7 @@
 ;; (define myimg (soil-load-tex "/home/andrew/Pictures/paristwo.png" 0))
 (define myimg (soil-load-tex "../images/myparis.png" 0))
 
-(definec gl-loop
+(bind-func gl-loop
   (let ((cnt 0.0))
     (lambda (img:i32
 	     fbo1:E_fbo* fbo2:E_fbo*

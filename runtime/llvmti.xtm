@@ -4058,8 +4058,9 @@
 	     #f))))
 
 
-;; definec takes optional type arguments after symname
 (define-macro (definec symname . args)
+  "definec takes optional type arguments after symname.  definec is
+deprecated - use bind-func instead."
   (let ((zone-size *impc:default-zone-size*))
     (if (number? (car args))
 	(begin (set! zone-size (car args))
@@ -4169,7 +4170,7 @@
 
 
 ;; Definec-precomp is for setting up precompiled ir functions only
-(define definec-precomp
+(define bind-func-precomp
   (lambda (symname)
     (let ((zone-size *impc:default-zone-size*))
       (eval
@@ -4191,9 +4192,9 @@
        (interaction-environment)))))
 
 
-;; definec-ipc is for passing an already compiled (and setter'd) native function
-;; across to a non-primary process
-(define definec-ipc
+;; bind-func-ipc is for passing an already compiled (and setter'd)
+;; native function across to a non-primary process
+(define bind-func-ipc
   (lambda (symname)
     (let ((zone-size *impc:default-zone-size*))
       (eval
@@ -4214,18 +4215,10 @@
 		       (error "")))))
        (interaction-environment)))))
 
-(define ipc:definec
+(define ipc:bind-func
   (lambda (procname symname)
-    (ipc:call procname 'definec-ipc symname)))
+    (ipc:call procname 'bind-func-ipc symname)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-					
-;; macro helper for fx code au's							
-(define-macro (definec:dsp . args)
-   `(definec ,(car args)
-       (,(car args) . [double,double,double,double,double*]*)
-       ,(cadr args)))
-
 
 (define-macro (bind-alias symbol type)
   `(begin (impc:ir:add-type-alias ,(symbol->string symbol) ,(symbol->string type))
@@ -4529,6 +4522,6 @@
 (define-macro (define-wrapper local-sym native-sym)
   (let* ((types (cdr (llvm:get-function-args (symbol->string native-sym))))
 	 (args (map (lambda (t) (gensym)) types)))
-    `(definec ,local-sym
+    `(bind-func ,local-sym
        (lambda ,args
 	 ,(cons native-sym args)))))

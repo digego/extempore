@@ -49,28 +49,28 @@
 (bind-lib kinectlib kinect_shutdown [void]*)
 (bind-lib kinectlib kinect_smooth [i32,NUI_SKELETON_FRAME*,NUI_TRANSFORM_SMOOTH_PARAMETERS*]*)
 
-(definec kinect-start
+(bind-func kinect-start
   (lambda (v:i32)    
     (printf "kinect started: %d\n" (kinect_start NUI_INITIALIZE_FLAG_USES_SKELETON))))
 
-(definec kinect-shutdown
+(bind-func kinect-shutdown
   (lambda ()
     (kinect_shutdown)))
 
-(definec kinect-smooth-params
+(bind-func kinect-smooth-params
   (let ((smooth_params (zalloc 1 NUI_TRANSFORM_SMOOTH_PARAMETERS)))
     (lambda (skeleton smoothing correction prediction jitter_radius max_deviation_radius)
       (tfill! smooth_params smoothing correction prediction jitter_radius max_deviation_radius)
       (kinect_smooth skeleton smooth_params))))
 
-(definec kinect-smooth
+(bind-func kinect-smooth
   (let ((smooth_params (zalloc 1 NUI_TRANSFORM_SMOOTH_PARAMETERS)))
     (tfill! smooth_params (dtof 0.5) (dtof 0.5) (dtof 0.5) (dtof 0.05) (dtof 0.04))
     (lambda (skeleton)
       (kinect_smooth skeleton smooth_params))))
 
 
-(definec send-skeleton-osc  
+(bind-func send-skeleton-osc  
   (let ((skel-frame (zalloc 1 NUI_SKELETON_FRAME))
 	(pos (zalloc 100 double))
 	(buf (halloc 8000 i8))
@@ -116,7 +116,7 @@
 (bind-val _skeletons_ |6,|20,Vector4||* (sys:make-cptr (* 6 (* 20 4 4))))
 (bind-val _skeletons-alive_ |6,i1| 0)
 
-(definec receive-skel-osc
+(bind-func receive-skel-osc
   (lambda (address:i8* types:i8* args:i8* size:i32)
     (if (= (strncmp address "/kinect/skel" 12) 0)
 	(let ((skel-num (- (i8toi64 (pref address 13)) 48))

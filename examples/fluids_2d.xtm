@@ -24,7 +24,7 @@
 (llvm:optimize #t)
 
 
-;; (definec range-limit
+;; (bind-func range-limit
 ;;   (lambda (v:double l:double h:double)
 ;;     (if (< v l) l
 ;; 	(if (> v h) h
@@ -34,7 +34,7 @@
 (load "libs/opengl_lib.xtm")
 
 
-(definec range-limit
+(bind-func range-limit
   (lambda (h:double l:double v:double)
     (if (< v l) l
 	(if (> v h) h
@@ -50,12 +50,12 @@
 
 (bind-type fluidcube <i64,double,double,double,double*,double*,double*,double*,double*,double*,i64>)
 
-(definec fluid-ix
+(bind-func fluid-ix
   (lambda (x:i64 y:i64 N:i64)
     (+ x (* y N))))
 
 
-(definec fluid-cube-create
+(bind-func fluid-cube-create
   (lambda (size-x size-y diffusion viscosity dt:double)
     (let ((cube:fluidcube* (halloc))
 	  (size2:i64 (* size-x size-y 10))
@@ -69,7 +69,7 @@
       cube)))
 
 
-(definec fluid-cube-add-density
+(bind-func fluid-cube-add-density
   (lambda (cube:fluidcube* x y amount:double)
     (let ((N (tref cube 0))
 	  (idx (+ x (* y N)))
@@ -80,7 +80,7 @@
       (+ density amount))))
 
 
-(definec fluid-cube-add-velocity
+(bind-func fluid-cube-add-velocity
   (lambda (cube:fluidcube* x y amount-x:double amount-y:double)
     (let ((N (tref cube 0))
 	  (idx (+ x (* y N)))
@@ -92,12 +92,12 @@
 
 
 ;; I don't want boundary conditions for this one
-(definec fluid-set-boundary
+(bind-func fluid-set-boundary
   (lambda (b:i64 x:double* Ny:i64 N:i64)
       1))
 
 
-(definec fluid-lin-solve
+(bind-func fluid-lin-solve
   (lambda (b:i64 x:double* x0:double* a c iter:i64 Ny:i64 N:i64)
     (let ((cRecip (/ 1.0 c))
 	  (k 0)
@@ -118,13 +118,13 @@
     1))
 
 
-(definec fluid-diffuse
+(bind-func fluid-diffuse
   (lambda (b:i64 x:double* x0:double* diff:double dt:double iter Ny N)
     (let ((a:double (* dt diff (i64tod (- N 2)))))
       (fluid-lin-solve b x x0 a (+ 1.0 (* 6.0 a)) iter Ny N))))
 
 
-(definec fluid-project
+(bind-func fluid-project
   (lambda (velocx:double* velocy:double* p:double* div:double* iter Ny N)
     (let ((j 0)
 	  (i 0)
@@ -167,7 +167,7 @@
     1)))
 
 
-(definec fluid-advect
+(bind-func fluid-advect
   (lambda (b:i64 d:double* d0:double* velocx:double* velocy:double* dt:double Ny:i64 N:i64)
     (let ((n-1 (i64tod (- N 1)))
 	  (dtx (* dt n-1))
@@ -219,7 +219,7 @@
 
 				 
 				       
-(definec fluid-step-cube
+(bind-func fluid-step-cube
   (lambda (cube:fluidcube*)
     (let ((N (tref cube 0))
 	  (Ny (tref cube 10))
@@ -261,13 +261,13 @@
       cube)))
 
 
-(definec get-fluid-cube
+(bind-func get-fluid-cube
 ;   (let ((cube (fluid-cube-create 322 182 0.0002 0.00002 0.05)))    ; test
    (let ((cube (fluid-cube-create 322 182 0.0002 0.00002 0.05)))    ; test               
     (lambda ()
       cube)))
 
-(definec fluid-fsc
+(bind-func fluid-fsc
   (lambda ()
     (fluid-step-cube (get-fluid-cube))))
 
@@ -293,7 +293,7 @@
 (bind-val ubo i32 -1)
 (bind-val vehicles float* (sys:make-cptr (* 2000 4)))
 
-(definec init-osc-vars
+(bind-func init-osc-vars
   (lambda ()
     (let ((i 0))
       (dotimes (i 20)
@@ -317,41 +317,41 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
  
-(definec add-density
+(bind-func add-density
   (lambda (x:i64 y:i64 amount:double)
     (let ((cube (get-fluid-cube)))
       (fluid-cube-add-density cube x y amount))))
 
-(definec add-velocity
+(bind-func add-velocity
   (lambda (x y amount-x amount-y)
     (fluid-cube-add-velocity (get-fluid-cube) x y amount-x amount-y)))
 
-(definec get-velocity
+(bind-func get-velocity
   (lambda (x y)
     (let ((xs (tref (get-fluid-cube) 6))
 	  (size (tref (get-fluid-cube) 0)))
       (pref xs (+ x (* y size))))))
 
 
-(definec note-active
+(bind-func note-active
   (lambda (idx)
     (pref osc_alive idx)))
 
-(definec note-pitch
+(bind-func note-pitch
   (lambda (idx)
     (pref osc_xs idx)))
 
-(definec note-activity
+(bind-func note-activity
   (lambda (idx)
     (+ (pref osc_xxs idx)
        (pref osc_yys idx))))
 
-(definec note-grad
+(bind-func note-grad
   (lambda (idx)
     (pref osc_grads idx)))
 
 
-(definec update-fluid-sym-state
+(bind-func update-fluid-sym-state
   (lambda ()
     (let ((i 0))
       (dotimes (i 20)
@@ -368,7 +368,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; helpers for opengl rendering of fluidsym
-(definec set-data-arrays-lines
+(bind-func set-data-arrays-lines
   (lambda (cube:fluidcube* point_data:float* color_data:float* offset:float n:i64)
     (let ((ii:i64 0)
 	  (jj:i64 0)    
@@ -417,7 +417,7 @@
     void))
 
 
-(definec set-data-arrays-points
+(bind-func set-data-arrays-points
   (lambda (cube:fluidcube* point_data:float* color_data:float* offset:float n:i64)
     (let ((densities (tref cube 5))
 	  (ii:i64 0)
@@ -450,7 +450,7 @@
 
   ;; a trivial opengl draw loop
 ;; need to call glfwSwapBuffers to flush
-(definec gl-loop
+(bind-func gl-loop
   (let ((degree 0.0)
 	(point_data1:float* (halloc 10000000))
 	(color_data1:float* (halloc 10000000))
@@ -496,7 +496,7 @@
       1)))
 
 
-(definec burners
+(bind-func burners
   (lambda (time:double)
     (let ((i 0))      
       (dotimes (i 1)
@@ -546,14 +546,14 @@
 (gl-set-view 900.0 600.0 900.0)
 
 
-(begin (ipc:definec "fluid" 'fluid-fsc)
+(begin (ipc:bind-func "fluid" 'fluid-fsc)
        (sys:sleep 44100)
        (opengl-test (now) 0.0)
        (add-density 50 50 1000.0)
        (add-velocity 50 50 1000.0 1000.0))
 
 
-(definec set-dat
+(bind-func set-dat
   (lambda (x:double y:double)
     (if (> x 0.0)
 	(begin (pset! osc_alive 0 1)

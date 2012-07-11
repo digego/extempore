@@ -233,7 +233,7 @@ See `run-hooks'."
               "call-with-input-file" "call-with-output-file" "case" "cond"
               "do" "dotimes" "else" "for-each" "if" "lambda"
               "let" "let*" "let-syntax" "letrec" "letrec-syntax"
-              "and" "or"
+              "and" "or" "set!" "set-car!" "set-cdr!"
               "map" "syntax" "syntax-rules"
               "print" "println") t) "\\>")
       '(1 font-lock-keyword-face))

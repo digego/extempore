@@ -46,34 +46,34 @@
 ;;
 
 ;; help function
-(definec range-limit
+(bind-func range-limit
   (lambda (v:double l:double h:double)
     (if (< v l) l
 	(if (> v h) h
 	    v))))
 
 ;; I don't want boundary conditions for this one
-(definec fluid-set-boundary
+(bind-func fluid-set-boundary
   (lambda (b:i64 x:double* Ny:i64 N:i64)
     1))
 
-(definec get-fluid-cube-1
+(bind-func get-fluid-cube-1
 ;   (let ((cube (fluid-cube-create 322 182 0.0002 0.00002 0.05)))    ; test
    (let ((cube (fluid-cube-create 322 182 0.005 0.000000002 0.035)))    ; test               
     (lambda ()
       cube)))
 
-(definec fluid-fsc-1
+(bind-func fluid-fsc-1
   (lambda ()
     (fluid-step-cube (get-fluid-cube-1))))
 
-(definec get-fluid-cube-2
+(bind-func get-fluid-cube-2
 ;   (let ((cube (fluid-cube-create 322 182 0.0002 0.00002 0.05)))    ; test
    (let ((cube (fluid-cube-create 322 182 0.005 0.000000002 0.035)))    ; test               
     (lambda ()
       cube)))
 
-(definec fluid-fsc-2
+(bind-func fluid-fsc-2
   (lambda ()
     (fluid-step-cube (get-fluid-cube-2))))
 
@@ -98,7 +98,7 @@
 (bind-val ubo i32 -1)
 (bind-val vehicles float* (sys:make-cptr (* 2000 4)))
 
-(definec init-osc-vars
+(bind-func init-osc-vars
   (lambda ()
     (let ((i 0))
       (dotimes (i 20)
@@ -120,42 +120,42 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
  
-(definec add-density-1
+(bind-func add-density-1
   (lambda (x:i64 y:i64 amount:double)
     (let ((cube (get-fluid-cube-1)))
       (fluid-cube-add-density cube x y amount))))
 
-(definec add-density-2
+(bind-func add-density-2
   (lambda (x:i64 y:i64 amount:double)
     (let ((cube (get-fluid-cube-2)))
       (fluid-cube-add-density cube x y amount))))
 
-(definec add-velocity-1
+(bind-func add-velocity-1
   (lambda (x y amount-x amount-y)
     (fluid-cube-add-velocity (get-fluid-cube-1) x y amount-x amount-y)))
 
-(definec add-velocity-2
+(bind-func add-velocity-2
   (lambda (x y amount-x amount-y)
     (fluid-cube-add-velocity (get-fluid-cube-2) x y amount-x amount-y)))
 
-(definec note-active
+(bind-func note-active
   (lambda (idx)
     (pref osc_alive idx)))
 
-(definec note-pitch
+(bind-func note-pitch
   (lambda (idx)
     (pref osc_xs idx)))
 
-(definec note-activity
+(bind-func note-activity
   (lambda (idx)
     (+ (pref osc_xxs idx)
        (pref osc_yys idx))))
 
-(definec note-grad
+(bind-func note-grad
   (lambda (idx)
     (pref osc_grads idx)))
 
-(definec update-fluid-sym-state
+(bind-func update-fluid-sym-state
   (lambda ()
     (let ((i 0))
       (dotimes (i 20)
@@ -175,7 +175,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; helpers for opengl rendering of fluidsym
-(definec set-data-arrays-lines
+(bind-func set-data-arrays-lines
   (lambda (cube:fluidcube* point_data:float* color_data:float* xoffset:float yoffset:float n:i64)
     (let ((ii:i64 0)
 	  (jj:i64 0)    
@@ -218,7 +218,7 @@
     void))
 
 
-(definec set-data-arrays-points
+(bind-func set-data-arrays-points
   (lambda (cube:fluidcube* point_data:float* color_data:float* xoffset:float yoffset:float n:i64)
     (let ((densities (tref cube 5))
 	  (ii:i64 0)
@@ -246,7 +246,7 @@
     void))
 
 
-(definec set-data-particles
+(bind-func set-data-particles
   (lambda (cube:fluidcube* psys:psystem* cnt:i64 xoffset:float yoffset:float)
     (let ((densities (tref cube 5))
 	  (ii:i64 0)
@@ -311,7 +311,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(definec interp2d
+(bind-func interp2d
   (lambda (p1:Vector4* p2:Vector4* p3:Vector4* pos:float)
     (let ((x (+ (tref p1 0) (* (- (tref p2 0) (tref p1 0)) pos)))
 	  (y (+ (tref p1 1) (* (- (tref p2 1) (tref p1 1)) pos))))
@@ -323,26 +323,26 @@
 (bind-val scale-x double 0.1)
 (bind-val scale-y double 0.5)
 
-(definec set-scale-x
+(bind-func set-scale-x
   (lambda (val)
     (set! scale-x val)))
 
-(definec set-scale-y
+(bind-func set-scale-y
   (lambda (val)
     (set! scale-y val)))
 
-(definec set-offset-x
+(bind-func set-offset-x
   (lambda (val)
     (set! offset-x val)))
 
-(definec set-offset-y
+(bind-func set-offset-y
   (lambda (val)
     (set! offset-y val)))
 
 (set-scale-x 0.5)
 (set-scale-y 0.7)
 
-(definec add-density-v
+(bind-func add-density-v
  (lambda (v:Vector4* amt:double)
    (let ((xs (* (* 320.0 0.5) scale-x))
 	 (xy (* (* 360.0 0.5) scale-y))
@@ -354,7 +354,7 @@
 	 (add-density-2 xx (- yy 180) amt)))
    void))
 
-(definec add-density-xy
+(bind-func add-density-xy
  (lambda (x y amt:double)
    (let ((xs (* (* 320.0 0.5) scale-x))
 	 (xy (* (* 360.0 0.5) scale-y))
@@ -366,7 +366,7 @@
 	 (add-density-2 xx (- yy 180) amt)))
    void))
 
-(definec add-head
+(bind-func add-head
   (lambda (head:Vector4* w density)
     (let ((x (ftod (tref head 0)))
 	  (y (ftod (tref head 1))))
@@ -378,7 +378,7 @@
       void)))
     
 
-;; (definec ping-skel
+;; (bind-func ping-skel
 ;;   (let ((skel-frame (zalloc 1 NUI_SKELETON_FRAME))
 ;; 	(pos (zalloc 100 double)))
 ;;     (lambda ()
@@ -475,7 +475,7 @@
 ;;       void)))
 
 
-(definec draw-skeleton
+(bind-func draw-skeleton
   (lambda (positions:|20,Vector4|*)
     ;(printf "-----> %f\n" (ftod (tref (aref-ptr positions 0) 0)))    	    
     (let ((head (aref-ptr positions NUI_SKELETON_POSITION_HEAD))
@@ -562,7 +562,7 @@
 
 (bind-val texture1 i32 0)
 
-(definec load-tex
+(bind-func load-tex
   (lambda (id)
     ;(let ((t (gl-load-tex "C:/Users/andrew/Desktop/Extempore/Horde3D/textures/particles/star.png" id)))
     (let ((t (gl-load-tex "Horde3D/textures/particles/star.png" id)))      
@@ -574,7 +574,7 @@
 
 ;; a trivial opengl draw loop
 ;; need to call glfwSwapBuffers to flush
-(definec gl-loop
+(bind-func gl-loop
   (let (;(degree 0.0)
 	(i 0)
 	(point_data1 (halloc 10000000 float))
@@ -643,7 +643,7 @@
 
 ;; a trivial opengl draw loop
 ;; need to call glfwSwapBuffers to flush
-(definec gl-loop
+(bind-func gl-loop
   (let (;(degree 0.0)
 	(psys (psystem_create 50000 texture1))
 	(i 0))
@@ -674,7 +674,7 @@
       1)))
 
 
-(definec wind
+(bind-func wind
   (lambda ()
     (let ((i 0))
       (dotimes (i 12)
@@ -683,7 +683,7 @@
       void)))
 
 
-(definec update-borders
+(bind-func update-borders
   (lambda ()
     (let ((xs1 (fluid-cube-get-last-row (get-fluid-cube-1) 6))
 	  (ys1 (fluid-cube-get-last-row (get-fluid-cube-1) 7))
@@ -754,8 +754,8 @@
 (if *server* (kinect-start))
 
 (begin (println 'go)
-       (ipc:definec "fluid1" 'fluid-fsc-1)
-       (ipc:definec "fluid2" 'fluid-fsc-2)       
+       (ipc:bind-func "fluid1" 'fluid-fsc-1)
+       (ipc:bind-func "fluid2" 'fluid-fsc-2)       
        (println 'sleep)
        (sys:sleep 44100)
        (println 'startloop)
