@@ -190,6 +190,16 @@ See `run-hooks'."
   :type 'boolean
   :group 'extempore)
 
+(defcustom extempore-path nil
+  "Location of the extempore executable."
+  :type 'string
+  :group 'extempore)
+
+(defcustom extempore-process-args nil
+  "Arguments to pass to the extempore process started by `extempore-switch-to-process'."
+  :type 'string
+  :group 'extempore)
+
 ;; from emacs-starter-kit
 
 (defface extempore-paren-face
@@ -201,6 +211,7 @@ See `run-hooks'."
   :group 'extempore)
 
 (defun extempore-keybindings (keymap)
+  (define-key keymap (kbd "C-x C-y") 'extempore-switch-to-process)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-x C-x") 'extempore-send-definition)
   (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
@@ -222,21 +233,60 @@ See `run-hooks'."
                  (dabbrev-expand nil)
                (indent-for-tab-command)))))))
 
-(defconst extempore-font-lock-keywords-scheme
+(defconst extempore-font-lock-keywords-shared
   (eval-when-compile
     (list
      ;; built-ins
      (list
       (concat
-       "(" (regexp-opt
-            '("begin" "call-with-current-continuation" "call/cc"
-              "call-with-input-file" "call-with-output-file" "case" "cond"
-              "do" "dotimes" "else" "for-each" "if" "lambda"
-              "let" "let*" "let-syntax" "letrec" "letrec-syntax"
-              "and" "or" "set!" "set-car!" "set-cdr!"
-              "map" "syntax" "syntax-rules"
-              "print" "println") t) "\\>")
+       "("
+       (regexp-opt
+	'("or" "and" "let" "lambda" "if" "else" "dotimes" "cond"
+	  "begin" "set!") t)
+       "\\>")
+      '(1 font-lock-keyword-face t))
+     ;; arithmetic functions
+      (list
+       (regexp-opt
+	'("callback" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "=" "<" ">" "<=" ">=") 'symbols)
+       '(0 font-lock-function-name-face))
+	   ;; float and int literals
+      '("\\_<[-+]?[/.[:digit:]]+?\\_>"
+       (0 font-lock-constant-face)))))
+
+;; to generate the list of scheme functions, use
+
+;; (defun find-ops (ops)
+;;   (if (re-search-forward "\".*\"" nil t)
+;;       (find-ops (cons (buffer-substring-no-properties (+ (car (match-data)) 1)
+;;                                                       (- (cadr (match-data)) 1))
+;;                       ops))
+;;     (reverse ops)))
+
+;; (with-current-buffer "OPDefines.h"
+;;   (goto-char (point-min))
+;;   (find-ops '()))
+
+
+(defconst extempore-font-lock-keywords-scheme
+  (eval-when-compile
+    (list
+     ;; built-ins
+     (list
+      (regexp-opt
+       '("syntax-rules" "syntax" "map" "do"
+	 "letrec-syntax" "letrec" "eval" "apply"
+	 "quote" "quasiquote"
+	 "car" "caar" "caaar" "caaaar" "cdr" "cddr" "cdddr" "cddddr"
+	 "let-syntax" "let*" "for-each" "case"
+	 "call-with-output-file" "call-with-input-file"
+	 "call/cc" "call-with-current-continuation") 'symbols)
       '(1 font-lock-keyword-face))
+     ;; scheme functions
+     (list
+      (regexp-opt
+       '("list" "println" "print" "load" "gensym" "tracing" "make-closure" "defined?" "inexact->exact" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "current-input-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?") 'symbols)
+      '(1 font-lock-function-name-face))
      ;; It wouldn't be Scheme w/o named-let.
      '("(let\\s-+\\(\\sw+\\)"
        (1 font-lock-function-name-face))
@@ -247,42 +297,37 @@ See `run-hooks'."
 	    "[ \t]*"
 	    "\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
-	   '(3 font-lock-function-name-face))
-     )))
+	   '(3 font-lock-function-name-face)))))
 
 (defconst extempore-font-lock-keywords-xtlang
   (eval-when-compile
     (list
      ;; definitions
-     (list (concat
-	    "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\_>"
-	    ;; Any whitespace and declared object.
-	    "[ \t]*"
-	    "\\(\\sw+\\)?")
-	   '(1 font-lock-keyword-face)
-	   '(3 font-lock-function-name-face))
-     ;; important xtlang functions
      (list
       (concat
-       "(" (regexp-opt
-            '("begin" "cond" "dotimes" "if" "else"  "lambda"
-              "let" "and" "or" "callback" "printf" "cast"
-              "aref" "aset!" "afill!" "aref-ptr"
-              "array-ref" "array-set!" "array-fill!" "array-ref-ptr"
-              "tref" "tset!" "tfill!" "tref-ptr"
-              "tuple-ref" "tuple-set!" "tuple-fill!" "tuple-ref-ptr"
-              "pref" "pset!" "pfill!" "pref-ptr"
-              "pointer-ref" "pointer-set!" "pointer-fill!" "pointer-ref-ptr"
-              "alloc" "salloc" "halloc" "zalloc"
-              "stack-alloc" "heap-alloc" "zone-alloc")
-            t) "\\>")
-      '(1 font-lock-keyword-face))
+       "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\_>"
+       ;; Any whitespace and declared object.
+       "[ \t]*"
+       "\\(\\sw+\\)?")
+      '(1 font-lock-keyword-face)
+      '(3 font-lock-function-name-face))
+     ;; important xtlang functions
+     (list
+      (regexp-opt
+       '("zone-alloc" "heap-alloc" "stack-alloc" "zalloc" "halloc"
+	 "salloc" "alloc" "pointer-ref-ptr" "pointer-fill!"
+	 "pointer-set!" "pointer-ref" "pref-ptr" "pfill!" "pset!"
+	 "pref" "tuple-ref-ptr" "tuple-fill!" "tuple-set!"
+	 "tuple-ref" "tref-ptr" "tfill!" "tset!" "tref"
+	 "array-ref-ptr" "array-fill!" "array-set!" "array-ref"
+	 "aref-ptr" "afill!" "aset!" "aref" "cast" "printf") 'symbols)
+      '(1 font-lock-function-name-face))
      ;; closure type annotations (i.e. specified with a colon)
      '("(bind-func\\s-+\\S-+\\(:\\S-+\\)\\>"
        (1 font-lock-type-face t))
      ;; bind-type/alias
      '("(bind-\\(type\\|alias\\)\\s-+\\S-+\\s-+\\(\\S-+\\))"
-       (2 font-lock-type-face))
+       (2 font-lock-type-face t))
      ;; bind-lib
      '("(bind-lib\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
        (1 font-lock-keyword-face)
@@ -296,10 +341,7 @@ See `run-hooks'."
        (1 font-lock-type-face))
      ;; other type annotations
      '(":\\S-+\\>"
-       (0 font-lock-type-face))
-     ;; float and int literals
-     '("\\_<[-+]?[/.[:digit:]]+?\\_>"
-       (0 font-lock-constant-face))
+       (0 font-lock-type-face t))
      ;; type coercion stuff
      (list
       (concat
@@ -317,7 +359,8 @@ See `run-hooks'."
                         '(("(\\|)" . 'extempore-paren-face)))
 
 (defvar extempore-font-lock-keywords
-  (append extempore-font-lock-keywords-scheme
+  (append extempore-font-lock-keywords-shared
+	  extempore-font-lock-keywords-scheme
           extempore-font-lock-keywords-xtlang)
   "Expressions to highlight in extempore-mode.")
 
@@ -466,6 +509,28 @@ indentation."
 
 
 ;; dealing with the (external) extempore process
+
+(defun extempore-switch-to-process ()
+  "Switch to a shell buffer in which the extempore process is running.  If no such buffer exists, open a new *extempore* buffer and start a new extempore process.
+
+The location of the extempore executable should be set with `extempore-path'.
+
+The arguments passed to extempore can be customised through the variable `extempore-process-args'.
+
+Currently, the existence of an existing extempore process is determined by whether there is an *extempore* buffer."
+  (interactive)
+  (if (not extempore-path)
+      (message "Error: extempore-path undefined!")
+    (let ((extempore-buffer (get-buffer-create "*extempore*")))
+      (if (not extempore-buffer)
+	  (progn (shell extempore-buffer)
+		 (process-send-string extempore-buffer
+				      (concat "cd " extempore-path "\n"))
+		 (process-send-string extempore-buffer
+				      (concat "./extempore "
+					      (or extempore-process-args
+						  "") "\n")))
+	(display-buffer extempore-buffer)))))
 
 (defun extempore-connect (host port)
   "Connect to the running extempore process, which must
