@@ -558,16 +558,15 @@ Currently, the existence of an existing extempore process is determined by wheth
   (interactive)
   (if (not extempore-path)
       (message "Error: extempore-path undefined!")
-    (let ((extempore-buffer (get-buffer-create "*extempore*")))
-      (if (not extempore-buffer)
-	  (progn (shell extempore-buffer)
-		 (process-send-string extempore-buffer
-				      (concat "cd " extempore-path "\n"))
-		 (process-send-string extempore-buffer
-				      (concat "./extempore "
-					      (or extempore-process-args
-						  "") "\n")))
-	(display-buffer extempore-buffer)))))
+    (if (get-buffer "*extempore*")
+        (display-buffer "*extempore*")
+      (progn (shell "*extempore*")
+             (process-send-string "*extempore*"
+                                  (concat "cd " extempore-path "\n"))
+             (process-send-string "*extempore*"
+                                  (concat "./extempore "
+                                          (or extempore-process-args
+                                              "") "\n"))))))
 
 (defun extempore-connect (host port)
   "Connect to the running extempore process, which must
