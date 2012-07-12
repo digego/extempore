@@ -247,11 +247,11 @@ See `run-hooks'."
 (setq extempore-builtin-names
       '("or" "and" "let" "lambda" "if" "else" "dotimes" "cond"
         "begin" "set!" "syntax-rules" "syntax" "map" "do"
-	 "letrec-syntax" "letrec" "eval" "apply"
-	 "quote" "quasiquote" "car" "cdr"
-	 "let-syntax" "let*" "for-each" "case"
-	 "call-with-output-file" "call-with-input-file"
-	 "call/cc" "call-with-current-continuation"))
+        "letrec-syntax" "letrec" "eval" "apply"
+        "quote" "quasiquote" "car" "cdr"
+        "let-syntax" "let*" "for-each" "case"
+        "call-with-output-file" "call-with-input-file"
+        "call/cc" "call-with-current-continuation"))
 
 ;; TODO maybe parse the startup scheme files as well?
 
@@ -272,7 +272,7 @@ See `run-hooks'."
 ;;        extempore-builtin-names))
 
 (setq extempore-scheme-names
-      '("load" "gensym" "tracing" "make-closure" "defined?" "eval" "apply" "call-with-current-continuation" "inexact->exact" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "car" "cdr" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "=" "<" ">" "<=" ">=" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "current-input-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?"))
+      '("print" "println" "load" "gensym" "tracing" "make-closure" "defined?" "eval" "apply" "call-with-current-continuation" "inexact->exact" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "car" "cdr" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "=" "<" ">" "<=" ">=" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "current-input-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?"))
 
 (defun extempore-find-xtlang-names (names)
   (if (re-search-forward "(\\(member\\|equal\\?\\|eq\\?\\) \\((car ast)\\|ast\\) \'" nil t)
@@ -298,6 +298,9 @@ See `run-hooks'."
 (defconst extempore-font-lock-keywords-shared
   (eval-when-compile
     (list
+     ;; other type annotations (has to be first in list)
+     '(":\\S-+\\>"
+       (0 font-lock-type-face))
      ;; built-ins
      (list
       (concat
@@ -309,6 +312,9 @@ See `run-hooks'."
      ;; float and int literals
       '("\\_<[-+]?[/.[:digit:]]+?\\_>"
         (0 font-lock-constant-face))
+     ;; hack to make sure / gets highlighted as a function
+      '("\\_</\\_>"
+        (0 font-lock-function-name-face t))
       ;; boolean literals
       '("\\_<#[tf]\\_>"
        (0 font-lock-constant-face)))))
@@ -337,39 +343,43 @@ See `run-hooks'."
   (eval-when-compile
     (list
      ;; definitions
-     (list
-      (concat
-       "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\_>"
-       ;; Any whitespace and declared object.
-       "[ \t]*"
-       "\\(\\sw+\\)?")
-      '(1 font-lock-keyword-face)
-      '(3 font-lock-function-name-face))
+     ;; closure type annotations (i.e. specified with a colon)
+     '("(\\(bind-\\(func\\|poly\\)\\)\\s-+\\([^ :]+\\)\\(:\\S-*\\)?\\>"
+       (1 font-lock-keyword-face)
+       (3 font-lock-function-name-face)
+       (4 font-lock-type-face prepend t))
+     ;; (list
+     ;;  (concat
+     ;;   "(\\(bind-\\(func\\|poly\\)\\)\\_>"
+     ;;   ;; Any whitespace and declared object.
+     ;;   "\s-*"
+     ;;   "\\(\\sw+\\)?")
+     ;;  '(1 font-lock-keyword-face)
+     ;;  '(3 font-lock-function-name-face))
      ;; important xtlang functions
      (list
       (regexp-opt
        extempore-xtlang-names 'symbols)
       '(1 font-lock-function-name-face))
-     ;; closure type annotations (i.e. specified with a colon)
-     '("(bind-func\\s-+\\S-+\\(:\\S-+\\)\\>"
-       (1 font-lock-type-face t))
      ;; bind-type/alias
-     '("(bind-\\(type\\|alias\\)\\s-+\\S-+\\s-+\\(\\S-+\\))"
-       (2 font-lock-type-face t))
+     '("(\\(bind-\\(type\\|alias\\)\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+       (1 font-lock-keyword-face)
+       (3 font-lock-function-name-face)
+       (4 font-lock-type-face t))
      ;; bind-lib
-     '("(bind-lib\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+     '("(\\(bind-lib\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+       (1 font-lock-keyword-face)
+       (2 font-lock-constant-face)
+       (3 font-lock-function-name-face)
+       (4 font-lock-type-face t))
+     ;; bind-val
+     '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\>"
        (1 font-lock-keyword-face)
        (2 font-lock-function-name-face)
-       (3 font-lock-type-face))
-     ;; bind-val
-     '("(bind-val\\s-+\\S-+\\s-+\\(\\S-+\\)\\>"
-       (1 font-lock-type-face))
+       (3 font-lock-type-face t))
      ;; cast
      '("(cast\\s-+\\S-+\\s-+\\(\\S-+\\)\\_>"
        (1 font-lock-type-face))
-     ;; other type annotations
-     '(":\\S-+\\>"
-       (0 font-lock-type-face t))
      ;; type coercion stuff
      (list
       (concat
