@@ -233,6 +233,68 @@ See `run-hooks'."
                  (dabbrev-expand nil)
                (indent-for-tab-command)))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; generate function name lists from source files
+;;
+;; scheme ones from OPDefines.h
+;; xtlang from llvm.ti
+;; (these files need to be open in buffers for the below functions to
+;; work properly)
+;; 
+;; this stuff is currently a bit fragile, so I've hardcoded in the
+;; names as they stand at 14/7/12
+
+(setq extempore-builtin-names
+      '("or" "and" "let" "lambda" "if" "else" "dotimes" "cond"
+        "begin" "set!" "syntax-rules" "syntax" "map" "do"
+	 "letrec-syntax" "letrec" "eval" "apply"
+	 "quote" "quasiquote" "car" "cdr"
+	 "let-syntax" "let*" "for-each" "case"
+	 "call-with-output-file" "call-with-input-file"
+	 "call/cc" "call-with-current-continuation"))
+
+;; TODO maybe parse the startup scheme files as well?
+
+(defun extempore-find-scheme-names (names)
+  (if (re-search-forward "\".*\"" nil t)
+      (extempore-find-scheme-names
+       (cons (buffer-substring-no-properties
+              (+ (car (match-data)) 1)
+              (- (cadr (match-data)) 1))
+             names))
+    (delete-dups names)))
+
+;; (setq extempore-scheme-names
+;;       (cl-set-difference
+;;        (with-current-buffer "OPDefines.h"
+;;          (goto-char (point-min))
+;;          (extempore-find-scheme-names '()))
+;;        extempore-builtin-names))
+
+(setq extempore-scheme-names
+      '("load" "gensym" "tracing" "make-closure" "defined?" "eval" "apply" "call-with-current-continuation" "inexact->exact" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "car" "cdr" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "=" "<" ">" "<=" ">=" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "current-input-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?"))
+
+(defun extempore-find-xtlang-names (names)
+  (if (re-search-forward "(\\(member\\|equal\\?\\|eq\\?\\) \\((car ast)\\|ast\\) \'" nil t)
+      (let ((syms (read (thing-at-point 'sexp))))
+        (extempore-find-xtlang-names
+         (if (listp syms)
+             (append syms names)
+           (cons syms names))))
+    (delete-dups (mapcar 'symbol-name names))))
+
+;; (setq extempore-xtlang-names
+;;       (cl-set-difference
+;;        (with-current-buffer "llvmti.xtm"
+;;          (goto-char (point-min))
+;;          (extempore-find-xtlang-names '()))
+;;        (append extempore-builtin-names
+;;                extempore-scheme-names)
+;;        :test 'string-equal))
+
+(setq extempore-xtlang-names
+      '("random" "afill" "pfill" "tfill" "vfill" "free" "array" "tuple" "list" "~" "cset" "cref" "cast" "&" "bor" "ang-names" "<<" ">>" "nil" "printf" "sprintf" "null" "now" "pset" "pref-ptr" "vset" "vref" "aset" "aref" "aref-ptr" "tset" "tref" "tref-ptr" "salloc" "halloc" "zalloc" "alloc" "schedule" "%" "llvm_printf" "push_zone" "pop_zone" "memzone" "callback" "llvm_sprintf" "make-array" "array-set!" "array-ref" "array-ref-ptr" "pointer-set!" "pointer-ref" "pointer-ref-ptr" "stack-alloc" "heap-alloc" "zone-alloc" "make-tuple" "tuple-set!" "tuple-ref" "tuple-ref-ptr" "closure-set!" "closure-ref" "pref" "pdref" "impc_null" "bitcast" "void" "ifret" "ret->" "clrun->" "make-env-zone" "make-env" "<>"))
+
 (defconst extempore-font-lock-keywords-shared
   (eval-when-compile
     (list
@@ -241,55 +303,19 @@ See `run-hooks'."
       (concat
        "("
        (regexp-opt
-	'("or" "and" "let" "lambda" "if" "else" "dotimes" "cond"
-	  "begin" "set!") t)
+	extempore-builtin-names t)
        "\\>")
       '(1 font-lock-keyword-face t))
-     ;; arithmetic functions
-      (list
-       (regexp-opt
-	'("callback" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "=" "<" ">" "<=" ">=") 'symbols)
-       '(0 font-lock-function-name-face))
-	   ;; float and int literals
+     ;; float and int literals
       '("\\_<[-+]?[/.[:digit:]]+?\\_>"
+        (0 font-lock-constant-face))
+      ;; boolean literals
+      '("\\_<#[tf]\\_>"
        (0 font-lock-constant-face)))))
-
-;; to generate the list of scheme functions, use
-
-;; (defun find-ops (ops)
-;;   (if (re-search-forward "\".*\"" nil t)
-;;       (find-ops (cons (buffer-substring-no-properties (+ (car (match-data)) 1)
-;;                                                       (- (cadr (match-data)) 1))
-;;                       ops))
-;;     (reverse ops)))
-
-;; (with-current-buffer "OPDefines.h"
-;;   (goto-char (point-min))
-;;   (find-ops '()))
-
 
 (defconst extempore-font-lock-keywords-scheme
   (eval-when-compile
     (list
-     ;; built-ins
-     (list
-      (regexp-opt
-       '("syntax-rules" "syntax" "map" "do"
-	 "letrec-syntax" "letrec" "eval" "apply"
-	 "quote" "quasiquote"
-	 "car" "caar" "caaar" "caaaar" "cdr" "cddr" "cdddr" "cddddr"
-	 "let-syntax" "let*" "for-each" "case"
-	 "call-with-output-file" "call-with-input-file"
-	 "call/cc" "call-with-current-continuation") 'symbols)
-      '(1 font-lock-keyword-face))
-     ;; scheme functions
-     (list
-      (regexp-opt
-       '("list" "println" "print" "load" "gensym" "tracing" "make-closure" "defined?" "inexact->exact" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "current-input-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?") 'symbols)
-      '(1 font-lock-function-name-face))
-     ;; It wouldn't be Scheme w/o named-let.
-     '("(let\\s-+\\(\\sw+\\)"
-       (1 font-lock-function-name-face))
      ;; definitions
      (list (concat
 	    "(\\(define\\(\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)\\_>"
@@ -297,7 +323,15 @@ See `run-hooks'."
 	    "[ \t]*"
 	    "\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
-	   '(3 font-lock-function-name-face)))))
+	   '(3 font-lock-function-name-face))
+     ;; scheme functions
+     (list
+      (regexp-opt
+       extempore-scheme-names 'symbols)
+      '(1 font-lock-function-name-face))
+     ;; It wouldn't be Scheme w/o named-let.
+     '("(let\\s-+\\(\\sw+\\)"
+       (1 font-lock-function-name-face)))))
 
 (defconst extempore-font-lock-keywords-xtlang
   (eval-when-compile
@@ -314,13 +348,7 @@ See `run-hooks'."
      ;; important xtlang functions
      (list
       (regexp-opt
-       '("zone-alloc" "heap-alloc" "stack-alloc" "zalloc" "halloc"
-	 "salloc" "alloc" "pointer-ref-ptr" "pointer-fill!"
-	 "pointer-set!" "pointer-ref" "pref-ptr" "pfill!" "pset!"
-	 "pref" "tuple-ref-ptr" "tuple-fill!" "tuple-set!"
-	 "tuple-ref" "tref-ptr" "tfill!" "tset!" "tref"
-	 "array-ref-ptr" "array-fill!" "array-set!" "array-ref"
-	 "aref-ptr" "afill!" "aset!" "aref" "cast" "printf") 'symbols)
+       extempore-xtlang-names 'symbols)
       '(1 font-lock-function-name-face))
      ;; closure type annotations (i.e. specified with a colon)
      '("(bind-func\\s-+\\S-+\\(:\\S-+\\)\\>"
@@ -352,8 +380,7 @@ See `run-hooks'."
                                                  (concat a "to" b))
                                                (remove a types)))
                                      types))) t) "\\>")
-      '(1 font-lock-type-face))
-     )))
+      '(1 font-lock-type-face)))))
 
 (font-lock-add-keywords 'extempore-mode
                         '(("(\\|)" . 'extempore-paren-face)))
