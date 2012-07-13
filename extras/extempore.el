@@ -324,10 +324,7 @@ See `run-hooks'."
     (list
      ;; definitions
      (list (concat
-	    "(\\(define\\(\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)\\_>"
-	    ;; Any whitespace and declared object.
-	    "[ \t]*"
-	    "\\(\\sw+\\)?")
+	    "(\\(define\\(\\|-macro\\|-syntax\\|-instrument\\|-sampler\\)\\)\\_>\\s-*(?\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
 	   '(3 font-lock-function-name-face))
      ;; scheme functions
