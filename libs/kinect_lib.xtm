@@ -58,23 +58,23 @@
     (kinect_shutdown)))
 
 (bind-func kinect-smooth-params
-  (let ((smooth_params (zalloc 1 NUI_TRANSFORM_SMOOTH_PARAMETERS)))
+  (let ((smooth_params:NUI_TRANSFORM_SMOOTH_PARAMETERS* (zalloc)))
     (lambda (skeleton smoothing correction prediction jitter_radius max_deviation_radius)
       (tfill! smooth_params smoothing correction prediction jitter_radius max_deviation_radius)
       (kinect_smooth skeleton smooth_params))))
 
 (bind-func kinect-smooth
-  (let ((smooth_params (zalloc 1 NUI_TRANSFORM_SMOOTH_PARAMETERS)))
+  (let ((smooth_params:NUI_TRANSFORM_SMOOTH_PARAMETERS* (zalloc)))
     (tfill! smooth_params (dtof 0.5) (dtof 0.5) (dtof 0.5) (dtof 0.05) (dtof 0.04))
     (lambda (skeleton)
       (kinect_smooth skeleton smooth_params))))
 
 
 (bind-func send-skeleton-osc  
-  (let ((skel-frame (zalloc 1 NUI_SKELETON_FRAME))
-	(pos (zalloc 100 double))
-	(buf (halloc 8000 i8))
-	(data (halloc (* 20 4) float))) ;; 20 Vector4's
+  (let ((skel-frame:NUI_SKELETON_FRAME* (zalloc))
+	(pos:double* (zalloc 100))
+	(buf:i8* (halloc 8000))
+	(data:float* (halloc (* 20 4)))) ;; 20 Vector4's
     (lambda (addy port)
       (kinect_get_skeleton 100 skel-frame)
       (kinect-smooth-params skel-frame 0.5 0.5 0.5 0.05 0.04)
@@ -83,10 +83,10 @@
 	(dotimes (i 6)
 	  (let ((skel-data:NUI_SKELETON_DATA* (aref-ptr skels i))
 		(state (tref skel-data 0))
-		(position:Vector4* (tref-ptr skel-data  4))
+		(position:Vector4* (tref-ptr skel-data 4))
 		(positions:|20,Vector4|* (tref-ptr skel-data 5)))
 	    (if (= state 2)
-		(let ((address (salloc 15 i8))
+		(let ((address:i8* (salloc 15))
 		      (types ",b")
 		      (addressl 16)
 		      (typesl 4)
