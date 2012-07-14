@@ -6,6 +6,8 @@
 
 ;; load lib
 (load "libs/kinect_lib.xtm")
+
+(define ctx (gl:make-ctx "0" #f 0.0 0.0 900.0 600.0))
 (load "libs/opengl_lib.xtm")
 
 ;; start kinect with SKEL TRACKING
@@ -13,8 +15,8 @@
 
 ;; print active skels and their positions
 (bind-func ping-skel
-  (let ((skel-frame (zalloc 1 NUI_SKELETON_FRAME))
-	(pos (zalloc 100 double)))
+  (let ((skel-frame:NUI_SKELETON_FRAME* (zalloc))
+	(pos:double* (zalloc 100)))
     (lambda ()
       (kinect_get_skeleton 100 skel-frame)
       (kinect-smooth-params skel-frame 0.5 0.5 0.5 0.05 0.04)
@@ -73,9 +75,9 @@
 		      (glVertex4f (tref ankle_l 0) (tref ankle_l 1) (tref ankle_l 2) (tref ankle_l 3))		      
 		      (glEnd)
 		      1)))))
-	void))))
+	void)))
 
-(define ctx (gl:make-ctx "0" #f 0.0 0.0 900.0 600.0))
+
 (gl-set-view 900.0 600.0)
 
 (bind-func gl-draw

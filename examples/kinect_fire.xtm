@@ -277,30 +277,31 @@
     	  (let ((idx (+ (+ ii 1)
 			(* (+ jj 1) size))))
     	    (if (and (< cnt 50000)
-		     (> (pref densities idx) 0.01))
+		     (> (pref densities idx) 1.0))
     		(begin (pset! xs cnt (+ xoffset (i64tof ii)))
 		       (if (< ii 320)
 			   (add-velocity-1 ii jj
-					   (* 0.5 (- (random) .5))
-					   (* 0.5 (- (random) .5)))
+					   (* 0.05 (- (random) .5))
+					   (* 0.05 (- (random) .5)))
 			   (add-velocity-2 ii jj
-					   (* 0.5 (- (random) .5))
-					   (* 0.5 (- (random) .5))))
+					   (* 0.05 (- (random) .5))
+					   (* 0.05 (- (random) .5))))
     		       (pset! ys cnt (+ yoffset (i64tof jj)))
-    		       ;(set! cvar (dtof (pow (* 0.9 (pref densities idx)) 4.0)))
-		       (set! cvar (/ (dtof (* 0.5 (pref densities idx))) 50.0))
+		       (set! cvar (dtof (* 0.001 (pref densities idx))))
+    		       ;; ;; (set! cvar (dtof (pow (* 0.9 (pref densities idx)) 4.0)))
+		       ;; (set! cvar (/ (dtof (* 0.5 (pref densities idx))) 50.0))
 		       (if (< cvar mincvar) (set! mincvar cvar))
 		       (if (> cvar maxcvar) (set! maxcvar cvar))		       
     		       (pset! reds cnt red); (* cvar red))
     		       (pset! greens cnt green) ;(* cvar green))
     		       (pset! blues cnt blue) ;(* cvar blue)) ;(* cvar (- 1.0 blue)))	    
     		       (pset! alphas cnt (* 1.0 cvar))
-    		       (pset! sizes cnt (+ 15.0 (* (- 1.0 cvar) 15.0)))
+    		       (pset! sizes cnt (* .1 (- 1.0 cvar))) ;(+ .02 (* .1 (- 1.0 cvar)))) ;(+ 15.0 (* (- 1.0 cvar) 15.0)))
     		       (pset! states cnt 1) 
     		       (set! cnt (+ cnt 1))
     		       1)
     		1))))
-      ;(printf "min:%f max:%f cnt:%lld\n" (ftod mincvar) (ftod maxcvar) cnt)
+      (printf "min:%f max:%f cnt:%lld\n" (ftod mincvar) (ftod maxcvar) cnt)
       )    
     cnt))
 
@@ -497,7 +498,7 @@
 	  (foot_r (aref-ptr positions NUI_SKELETON_POSITION_FOOT_RIGHT))
 	  (foot_l (aref-ptr positions NUI_SKELETON_POSITION_FOOT_LEFT))
 	  ;(head-state (aref states NUI_SKELETON_POSITION_HEAD))
-	  (v4 (salloc Vector4))
+	  (v4:Vector4* (salloc))
 	  (k 0)
 	  (dens 10.0))
       ;; (printf "drawing %f,%f,%f,%f\n"
@@ -565,7 +566,7 @@
 (bind-func load-tex
   (lambda (id)
     ;(let ((t (gl-load-tex "C:/Users/andrew/Desktop/Extempore/Horde3D/textures/particles/star.png" id)))
-    (let ((t (gl-load-tex "Horde3D/textures/particles/star.png" id)))      
+    (let ((t (soil-load-tex-sqr "Horde3D/textures/particles/star.png" id)))      
       (set! texture1 t))))
 
 ;; 0 meaning load texture into new id
@@ -577,10 +578,10 @@
 (bind-func gl-loop
   (let (;(degree 0.0)
 	(i 0)
-	(point_data1 (halloc 10000000 float))
-	(color_data1 (halloc 10000000 float))
-	(point_data2 (halloc 10000000 float))
-	(color_data2 (halloc 10000000 float)))
+	(point_data1:float* (halloc 10000000))
+	(color_data1:float* (halloc 10000000))
+	(point_data2:float* (halloc 10000000))
+	(color_data2:float* (halloc 10000000)))
     (lambda ()
       ;; _skeletons-alive_ and _skeletons_ from kinect_lib.xtm
       (dotimes (i 6)
@@ -604,7 +605,7 @@
       (glEnable GL_POINT_SMOOTH)      
       (glPointSize 10.0)
 
-      (glRotated 90.0 0.0 0.0 1.0)
+      (glRotated 0.0 0.0 0.0 1.0)
       (glScaled 1.26 1.0 1.0)
       (glTranslated -160.0 -178.0 (* 2.3 -370.0))            
       
@@ -648,6 +649,7 @@
 	(psys (psystem_create 50000 texture1))
 	(i 0))
     (lambda ()
+      ;;(printf "t1:%d\n" texture1)
       ;; _skeletons-alive_ and _skeletons_ from kinect_lib.xtm
       (dotimes (i 6)
 	;(printf "alive %d:%d\n" i (pref _skeletons-alive_ i))
@@ -665,11 +667,14 @@
       (glColorMaterial GL_FRONT_AND_BACK GL_AMBIENT_AND_DIFFUSE)
       (glLoadIdentity)
 
-      (glRotated 90.0 0.0 0.0 1.0)
-      (glScaled 1.26 1.0 1.0)
-      (glTranslated -160.0 -178.0 (* 2.3 -370.0))            
+      ;(glActiveTexture GL_TEXTURE0)
+      ;(glRotated 90.0 0.0 0.0 1.0)
+      (glScaled 1.25 1.0 1.0)
+      ;(glTranslated -160.0 -178.0 (* 2.3 -370.0))
+      (glTranslated 0.0 0.0 -3.0)
+      ;(glTranslated 0.0 0.0 -100.0)
 
-      (psystem_draw psys)
+      (psystem_draw2 psys 360.0 320.0)
       
       1)))
 
@@ -678,8 +683,9 @@
   (lambda ()
     (let ((i 0))
       (dotimes (i 12)
-	;(add-density-1 (* i 30) 10 300.0)
-	(add-velocity-1 (* i 30) 5 (* 20.0 (- (random) .5)) 50.0))
+	;(add-density-1 (* i 30) 20 300.0)
+	(add-velocity-1 (* i 30) 10 0.0 0.0)
+	)
       void)))
 
 
@@ -730,8 +736,9 @@
     ;(fluid-step-cube (get-fluid-cube))
     (callback (+ time 0) 'opengl-test
 	      (if (< time (now))
-		  (+ time 5000)
-		  (+ time 1800))
+		  (begin ;(println 'missed)
+			 (+ time 5000))
+		  (+ time 1200))
 	      (+ degree 0.001))))
 
 
