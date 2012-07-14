@@ -190,6 +190,16 @@ See `run-hooks'."
   :type 'boolean
   :group 'extempore)
 
+(defcustom extempore-path nil
+  "Location of the extempore executable."
+  :type 'string
+  :group 'extempore)
+
+(defcustom extempore-process-args nil
+  "Arguments to pass to the extempore process started by `extempore-switch-to-process'."
+  :type 'string
+  :group 'extempore)
+
 ;; from emacs-starter-kit
 
 (defface extempore-paren-face
@@ -201,6 +211,7 @@ See `run-hooks'."
   :group 'extempore)
 
 (defun extempore-keybindings (keymap)
+  (define-key keymap (kbd "C-x C-y") 'extempore-switch-to-process)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-x C-x") 'extempore-send-definition)
   (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
@@ -222,84 +233,150 @@ See `run-hooks'."
                  (dabbrev-expand nil)
                (indent-for-tab-command)))))))
 
-(defconst extempore-font-lock-keywords-scheme
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; generate function name lists from source files
+;;
+;; scheme ones from OPDefines.h
+;; xtlang from llvm.ti
+;; (these files need to be open in buffers for the below functions to
+;; work properly)
+;; 
+;; this stuff is currently a bit fragile, so I've hardcoded in the
+;; names as they stand at 14/7/12
+
+(setq extempore-builtin-names
+      '("or" "and" "let" "lambda" "if" "else" "dotimes" "cond"
+        "begin" "set!" "syntax-rules" "syntax" "map" "do"
+        "letrec-syntax" "letrec" "eval" "apply"
+        "quote" "quasiquote" "car" "cdr"
+        "let-syntax" "let*" "for-each" "case"
+        "call-with-output-file" "call-with-input-file"
+        "call/cc" "call-with-current-continuation"))
+
+;; TODO maybe parse the startup scheme files as well?
+
+(defun extempore-find-scheme-names (names)
+  (if (re-search-forward "\".*\"" nil t)
+      (extempore-find-scheme-names
+       (cons (buffer-substring-no-properties
+              (+ (car (match-data)) 1)
+              (- (cadr (match-data)) 1))
+             names))
+    (delete-dups names)))
+
+;; (setq extempore-scheme-names
+;;       (cl-set-difference
+;;        (with-current-buffer "OPDefines.h"
+;;          (goto-char (point-min))
+;;          (extempore-find-scheme-names '()))
+;;        extempore-builtin-names))
+
+(setq extempore-scheme-names
+      '("print" "println" "load" "gensym" "tracing" "make-closure" "defined?" "eval" "apply" "call-with-current-continuation" "inexact->exact" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "car" "cdr" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "=" "<" ">" "<=" ">=" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "current-input-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?"))
+
+(defun extempore-find-xtlang-names (names)
+  (if (re-search-forward "(\\(member\\|equal\\?\\|eq\\?\\) \\((car ast)\\|ast\\) \'" nil t)
+      (let ((syms (read (thing-at-point 'sexp))))
+        (extempore-find-xtlang-names
+         (if (listp syms)
+             (append syms names)
+           (cons syms names))))
+    (delete-dups (mapcar 'symbol-name names))))
+
+;; (setq extempore-xtlang-names
+;;       (cl-set-difference
+;;        (with-current-buffer "llvmti.xtm"
+;;          (goto-char (point-min))
+;;          (extempore-find-xtlang-names '()))
+;;        (append extempore-builtin-names
+;;                extempore-scheme-names)
+;;        :test 'string-equal))
+
+(setq extempore-xtlang-names
+      '("random" "afill" "pfill" "tfill" "vfill" "free" "array" "tuple" "list" "~" "cset" "cref" "cast" "&" "bor" "ang-names" "<<" ">>" "nil" "printf" "sprintf" "null" "now" "pset" "pref-ptr" "vset" "vref" "aset" "aref" "aref-ptr" "tset" "tref" "tref-ptr" "salloc" "halloc" "zalloc" "alloc" "schedule" "%" "llvm_printf" "push_zone" "pop_zone" "memzone" "callback" "llvm_sprintf" "make-array" "array-set!" "array-ref" "array-ref-ptr" "pointer-set!" "pointer-ref" "pointer-ref-ptr" "stack-alloc" "heap-alloc" "zone-alloc" "make-tuple" "tuple-set!" "tuple-ref" "tuple-ref-ptr" "closure-set!" "closure-ref" "pref" "pdref" "impc_null" "bitcast" "void" "ifret" "ret->" "clrun->" "make-env-zone" "make-env" "<>"))
+
+(defconst extempore-font-lock-keywords-shared
   (eval-when-compile
     (list
+     ;; other type annotations (has to be first in list)
+     '(":\\S-+\\>"
+       (0 font-lock-type-face))
      ;; built-ins
      (list
       (concat
-       "(" (regexp-opt
-            '("begin" "call-with-current-continuation" "call/cc"
-              "call-with-input-file" "call-with-output-file" "case" "cond"
-              "do" "dotimes" "else" "for-each" "if" "lambda"
-              "let" "let*" "let-syntax" "letrec" "letrec-syntax"
-              "and" "or" "set!" "set-car!" "set-cdr!"
-              "map" "syntax" "syntax-rules"
-              "print" "println") t) "\\>")
-      '(1 font-lock-keyword-face))
-     ;; It wouldn't be Scheme w/o named-let.
-     '("(let\\s-+\\(\\sw+\\)"
-       (1 font-lock-function-name-face))
+       "("
+       (regexp-opt
+	extempore-builtin-names t)
+       "\\>")
+      '(1 font-lock-keyword-face t))
+     ;; float and int literals
+      '("\\_<[-+]?[/.[:digit:]]+?\\_>"
+        (0 font-lock-constant-face))
+     ;; hack to make sure / gets highlighted as a function
+      '("\\_</\\_>"
+        (0 font-lock-function-name-face t))
+      ;; boolean literals
+      '("\\_<#[tf]\\_>"
+       (0 font-lock-constant-face)))))
+
+(defconst extempore-font-lock-keywords-scheme
+  (eval-when-compile
+    (list
      ;; definitions
      (list (concat
-	    "(\\(define\\(\\|-syntax\\|-macro\\|-instrument\\|-sampler\\)\\)\\_>"
-	    ;; Any whitespace and declared object.
-	    "[ \t]*"
-	    "\\(\\sw+\\)?")
+	    "(\\(define\\(\\|-macro\\|-syntax\\|-instrument\\|-sampler\\)\\)\\_>\\s-*(?\\(\\sw+\\)?")
 	   '(1 font-lock-keyword-face)
 	   '(3 font-lock-function-name-face))
-     )))
+     ;; scheme functions
+     (list
+      (regexp-opt
+       extempore-scheme-names 'symbols)
+      '(1 font-lock-function-name-face))
+     ;; It wouldn't be Scheme w/o named-let.
+     '("(let\\s-+\\(\\sw+\\)"
+       (1 font-lock-function-name-face)))))
 
 (defconst extempore-font-lock-keywords-xtlang
   (eval-when-compile
     (list
      ;; definitions
-     (list (concat
-	    "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\_>"
-	    ;; Any whitespace and declared object.
-	    "[ \t]*"
-	    "\\(\\sw+\\)?")
-	   '(1 font-lock-keyword-face)
-	   '(3 font-lock-function-name-face))
+     ;; closure type annotations (i.e. specified with a colon)
+     '("(\\(bind-\\(func\\|poly\\)\\)\\s-+\\([^ :]+\\)\\(:\\S-*\\)?\\>"
+       (1 font-lock-keyword-face)
+       (3 font-lock-function-name-face)
+       (4 font-lock-type-face prepend t))
+     ;; (list
+     ;;  (concat
+     ;;   "(\\(bind-\\(func\\|poly\\)\\)\\_>"
+     ;;   ;; Any whitespace and declared object.
+     ;;   "\s-*"
+     ;;   "\\(\\sw+\\)?")
+     ;;  '(1 font-lock-keyword-face)
+     ;;  '(3 font-lock-function-name-face))
      ;; important xtlang functions
      (list
-      (concat
-       "(" (regexp-opt
-            '("begin" "cond" "dotimes" "if" "else"  "lambda"
-              "let" "and" "or" "callback" "printf" "cast"
-              "aref" "aset!" "afill!" "aref-ptr"
-              "array-ref" "array-set!" "array-fill!" "array-ref-ptr"
-              "tref" "tset!" "tfill!" "tref-ptr"
-              "tuple-ref" "tuple-set!" "tuple-fill!" "tuple-ref-ptr"
-              "pref" "pset!" "pfill!" "pref-ptr"
-              "pointer-ref" "pointer-set!" "pointer-fill!" "pointer-ref-ptr"
-              "alloc" "salloc" "halloc" "zalloc"
-              "stack-alloc" "heap-alloc" "zone-alloc")
-            t) "\\>")
-      '(1 font-lock-keyword-face))
-     ;; closure type annotations (i.e. specified with a colon)
-     '("(bind-func\\s-+\\S-+\\(:\\S-+\\)\\>"
-       (1 font-lock-type-face t))
+      (regexp-opt
+       extempore-xtlang-names 'symbols)
+      '(1 font-lock-function-name-face))
      ;; bind-type/alias
-     '("(bind-\\(type\\|alias\\)\\s-+\\S-+\\s-+\\(\\S-+\\))"
-       (2 font-lock-type-face))
+     '("(\\(bind-\\(type\\|alias\\)\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+       (1 font-lock-keyword-face)
+       (3 font-lock-function-name-face)
+       (4 font-lock-type-face t))
      ;; bind-lib
-     '("(bind-lib\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+     '("(\\(bind-lib\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+       (1 font-lock-keyword-face)
+       (2 font-lock-constant-face)
+       (3 font-lock-function-name-face)
+       (4 font-lock-type-face t))
+     ;; bind-val
+     '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\>"
        (1 font-lock-keyword-face)
        (2 font-lock-function-name-face)
-       (3 font-lock-type-face))
-     ;; bind-val
-     '("(bind-val\\s-+\\S-+\\s-+\\(\\S-+\\)\\>"
-       (1 font-lock-type-face))
+       (3 font-lock-type-face t))
      ;; cast
      '("(cast\\s-+\\S-+\\s-+\\(\\S-+\\)\\_>"
        (1 font-lock-type-face))
-     ;; other type annotations
-     '(":\\S-+\\>"
-       (0 font-lock-type-face))
-     ;; float and int literals
-     '("\\_<[-+]?[/.[:digit:]]+?\\_>"
-       (0 font-lock-constant-face))
      ;; type coercion stuff
      (list
       (concat
@@ -310,14 +387,14 @@ See `run-hooks'."
                                                  (concat a "to" b))
                                                (remove a types)))
                                      types))) t) "\\>")
-      '(1 font-lock-type-face))
-     )))
+      '(1 font-lock-type-face)))))
 
 (font-lock-add-keywords 'extempore-mode
                         '(("(\\|)" . 'extempore-paren-face)))
 
 (defvar extempore-font-lock-keywords
-  (append extempore-font-lock-keywords-scheme
+  (append extempore-font-lock-keywords-shared
+	  extempore-font-lock-keywords-scheme
           extempore-font-lock-keywords-xtlang)
   "Expressions to highlight in extempore-mode.")
 
@@ -466,6 +543,27 @@ indentation."
 
 
 ;; dealing with the (external) extempore process
+
+(defun extempore-switch-to-process ()
+  "Switch to a shell buffer in which the extempore process is running.  If no such buffer exists, open a new *extempore* buffer and start a new extempore process.
+
+The location of the extempore executable should be set with `extempore-path'.
+
+The arguments passed to extempore can be customised through the variable `extempore-process-args'.
+
+Currently, the existence of an existing extempore process is determined by whether there is an *extempore* buffer."
+  (interactive)
+  (if (not extempore-path)
+      (message "Error: extempore-path undefined!")
+    (if (get-buffer "*extempore*")
+        (display-buffer "*extempore*")
+      (progn (shell "*extempore*")
+             (process-send-string "*extempore*"
+                                  (concat "cd " extempore-path "\n"))
+             (process-send-string "*extempore*"
+                                  (concat "./extempore "
+                                          (or extempore-process-args
+                                              "") "\n"))))))
 
 (defun extempore-connect (host port)
   "Connect to the running extempore process, which must
