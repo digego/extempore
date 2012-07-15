@@ -321,21 +321,44 @@ void main() {
 
 #extension GL_ARB_texture_rectangle : enable
 
-uniform sampler2DRect tex1;
-uniform sampler2DRect img;
+uniform sampler2DRect baseBuf;
+uniform sampler2DRect blendBuf;
 uniform float       time;
 uniform float       opacity;
 
 varying vec2 TexCoord;
 
 void main() {
-    vec4 base = texture2DRect(tex1, TexCoord);
-    vec4 blend = texture2DRect(img, TexCoord);
+    vec4 base = texture2DRect(baseBuf, TexCoord);
+    vec4 blend = texture2DRect(blendBuf, TexCoord);
 
     vec4 result = blend + base;
          result = clamp(result, 0.0, 1.0);
 
     gl_FragColor = mix(base, result, opacity);
+}")
+
+(define green_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect baseBuf;
+uniform sampler2DRect blendBuf;
+uniform vec4          color;
+
+varying vec2 TexCoord;
+
+void main() {
+    vec4 base = texture2DRect(baseBuf, TexCoord);
+    vec4 blend = texture2DRect(blendBuf, TexCoord);
+
+    if(color == blend) {
+      gl_FragColor = base;
+    }else{
+      gl_FragColor = blend;
+    }
 }")
 
 (define dof_frag
@@ -404,6 +427,8 @@ void main( void ) {
 (bind-val dilate_shader i32 0)
 (bind-val erode_shader i32 0)
 (bind-val edge_shader i32 0)
+(bind-val blend_shader i32 0)
+(bind-val green_shader i32 0)
 (bind-val dof_shader i32 0)
 
 ;; must be called after initalizing opengl
@@ -419,6 +444,8 @@ void main( void ) {
 	   dilate_frag
 	   erode_frag
 	   edge_frag
+	   blend_frag
+	   green_frag
 	   dof_frag)
     (set! pass_shader (create-shader passthrough_vert passthrough_frag))
     (set! invert_shader (create-shader passthrough_vert invert_frag)) 
@@ -430,6 +457,8 @@ void main( void ) {
     (set! dilate_shader (create-shader passthrough_vert dilate_frag))
     (set! erode_shader (create-shader passthrough_vert erode_frag))
     (set! edge_shader (create-shader passthrough_vert edge_frag))
+    (set! blend_shader (create-shader passthrough_vert blend_frag))
+    (set! green_shader (create-shader passthrough_vert green_frag))
     (set! dof_shader (create-shader passthrough_vert dof_frag))
     void))
 
@@ -446,6 +475,8 @@ void main( void ) {
 	   dilate_frag
 	   erode_frag
 	   edge_frag
+	   blend_frag
+	   green_frag
 	   dof_frag)))
 	  
     
