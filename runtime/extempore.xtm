@@ -1120,3 +1120,14 @@
 
 (define-macro (dsp:set! name)
   `(_dsp:set! ,(symbol->string name)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; library-loading helpers ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-macro (define-lib libname)
+  (let ((platform (sys:platform)))
+    `(cond ((string=? platform "Linux") (sys:open-dylib (string-append ,libname ".so")))
+           ((string=? platform "Windows") (sys:open-dylib (string-append ,libname ".dll")))
+           ((string=? platform "OSX") (sys:open-dylib (string-append ,libname ".dylib")))
+          (else (print "Unknown platform: " ,platform)))))
