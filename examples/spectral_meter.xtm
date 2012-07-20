@@ -57,19 +57,47 @@
                          (dtoi64 (* 44100.0 len)))
         adat))))
 
+(load "libs/math.xtm")
+
 ;; set up the type alias for our dsp function
 (bind-alias DSP [double,double,double,double,double*]*)
 ;; dsp function - this will play the sound file.  Remember to
 ;; change the file path to an audio file on your system
-(bind-func dsp:DSP 50000000 ; make sure we allocate enough memory
-  (let ((audio_closure (create_audio_closure "/Users/ben/Desktop/peg.wav" 10.0))
-        (audio_data (audio_closure))
-        (window-size 441000)
-        (playhead 0))
+(bind-func dsp:DSP 100000000 ; make sure we allocate enough memory
+  (let ((audio_length 120.0)
+        (audio_closure (create_audio_closure "/Users/ben/Desktop/peg.wav"
+                                             audio_length))
+        (audio (audio_closure))
+        (playhead 0)
+        (window_size 4096)
+        (time_buffer:cpxd* (zalloc window_size))
+        (freq_buffer:cpxd* (zalloc window_size))
+        (i 0))
     (lambda (in time chan dat)
+      (if (and (= (modulo playhead window_size) 0)
+               (= chan 0.0))
+          (begin (dotimes (i window_size)
+                   (tset! (pref-ptr time_buffer i) 0
+                          (pref audio (+ i playhead))))
+                 (fft-cpxd time_buffer freq_buffer window_size)
+                 (buffer-cart-to-pol-cpxd freq_buffer freq_buffer
+                                          window_size)
+                 (dotimes (i window_size)
+                   (tset! (pref-ptr freq_buffer i) 0 0.0))
+                 (printf "fft[1]:%4.2f fft[10]:%6.2f fft[100]:%4.2f \n"
+                         (tref (pref-ptr freq_buffer 1) 1)
+                         (tref (pref-ptr freq_buffer 10) 0)
+                         (tref (pref-ptr freq_buffer 4095) 0))
+                 (buffer-pol-to-cart-cpxd freq_buffer freq_buffer
+                                          window_size)
+                 (inverse-fft-cpxd time_buffer freq_buffer window_size)
+                 (dotimes (i window_size)
+                   (pset! audio (+ i playhead)
+                          (tref (pref-ptr time_buffer i) 0)))))
       (if (= chan 1.0) ; increment playhead once per (stereo) pair of samples
-          (set! playhead (modulo (+ playhead 1) window-size)))
-      (pref audio_data (+ (dtoi64 chan) (* 2 playhead))))))
+          (set! playhead (modulo (+ playhead 1)
+                                 (* (dtoi64 audio_length) 44100))))
+      (pref audio (+ (dtoi64 chan) (* 2 playhead))))))
 
 (dsp:set! dsp)
 
