@@ -1,5 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 
+;;
 ;; spectral metering example
 ;;
 ;; This example uses the fft/ifft bindings from math.xtm to draw a
@@ -47,7 +47,7 @@
 ;; the (string) path to the audio file
 
 (bind-func create_audio_closure
-  (lambda (fname len)    
+  (lambda (fname len)
     (let ((offset 0.0) ; offset into sound file
           (adat:double* (zalloc (* 44100 2 (dtoi64 len)))))
       (lambda ()
@@ -56,6 +56,41 @@
                          (dtoi64 (* 44100.0 offset))
                          (dtoi64 (* 44100.0 len)))
         adat))))
+
+;; now, onto the fft/graphics stuff
+
+(define ctx (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+
+(load "libs/cairo_lib.xtm")
+(load "libs/opengl_lib.xtm")
+
+;; draw animated circles to an opengl context
+(bind-func spectrum_visualiser
+  (let ((width:i32 900)
+        (height:i32 600)
+        (surface (cairo_image_surface_create CAIRO_FORMAT_RGB24 width height))
+	(cr (cairo_create surface))
+	(i 0))
+    (lambda (spec_bins:|16,double|*)
+      (cairo_set_source_rgb cr 0.0 0.0 0.0)
+      (dotimes (i 16)
+      	(cairo_set_source_rgba cr 0.0 0.2 0.7 1.0)
+      	(cairo_rectangle cr
+                         (+ (* (i64tod i) 30.0) 100.0) 100.0
+                         25.0 (/ (aref spec_bins i) 10.0))
+      	(cairo_fill cr))
+      ;(cairo_surface_flush surface)
+      (cairo_image_surface_get_data surface))))
+
+;; draw surface data returned from test2
+(bind-func gl-draw 1000000
+  (lambda (spec_bins:|16,double|*)
+    (glLoadIdentity)
+    ;; (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    ;; ;; use tex num 5 repeatedly
+    ;; (gl-load-tex-bgr 900 600 4 GL_UNSIGNED_BYTE (spectrum_visualiser spec_bins) 5)
+    ;; (gl-draw-img-reverse -1.0 -1.0 2.0 2.0 180.0 5)
+    void))
 
 (load "libs/math.xtm")
 
@@ -72,7 +107,7 @@
         (window_size 4096)
         (time_buffer:cpxd* (zalloc window_size))
         (freq_buffer:cpxd* (zalloc window_size))
-        (spec_bins:|16,double|* (alloc)) ;use 16 bins for spectrogram
+        (spec_bins:|16,double|* (zalloc)) ;use 16 bins for spectrogram
         (i 0))
     (lambda (in time chan dat)
       (if (and (= (modulo playhead window_size) 0)
@@ -96,6 +131,7 @@
                      ;; (printf "s[%lld]: %3.1f " i sum)
                      ))
                  ;; (printf "\n")
+                 (gl-draw spec_bins)
                  ))
       (if (= chan 1.0) ; increment playhead once per (stereo) pair of samples
           (set! playhead (modulo (+ playhead 1)
@@ -104,65 +140,14 @@
 
 (dsp:set! dsp)
 
-;; now, onto the fft/graphics stuff
-
-(define ctx (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
-
-(load "libs/cairo_lib.xtm")
-(load "libs/opengl_lib.xtm")
-
-(bind-func cairo-draw-image
-  (lambda (cr:cairo_surface_t* image:cairo_surface_t* sx sy sw:double sh:double dx dy dw dh)
-    (let ((scalex (/ dw sw))
-	  (scaley (/ dh sh)))
-      (cairo_save cr)
-      (cairo_scale cr scalex scaley)
-      (cairo_set_source_surface cr image (- (* dx scalex) (* 1.0 sx)) (- (* dy scaley) (* 1.0 sy)))
-      (cairo_rectangle cr (/ dx scalex) (/ dy scaley) (/ dw scalex) (/ dh scaley))
-      (cairo_fill cr)
-      (cairo_restore cr)
-      void)))
-
-;; draw animated circles to an opengl context
-(bind-func test2
-  (let ((surface (cairo_image_surface_create CAIRO_FORMAT_RGB24 900 600))
-	(image (cairo_image_surface_create_from_png "image.png"))
-	(cr (cairo_create surface))	
-	(i 0.0)
-	(width 0.0)
-	(height 0.0))
-    (lambda (t:double)
-      ;; scale image to fullscreen background
-      (set! width (i32tod (cairo_image_surface_get_width image)))
-      (set! height (i32tod (cairo_image_surface_get_height image)))
-      (cairo-draw-image cr image 0.0 0.0 width height 0.0 0.0 900.0 600.0)
-            
-      (dotimes (i 200.0)
-      	(cairo_set_source_rgba cr (* .005 i) (* 0.005 i) 0.7 0.7)
-      	(cairo_arc cr
-      		   (+ 450.0 (* 350.0 (cos (* i t .00000003))))
-      		   (+ 300.0 (* 200.0 (sin (* i t .0000002))))
-      		   10.0 0.0 TWOPI)
-      	(cairo_stroke cr))
-      ;(cairo_surface_flush surface)
-      (cairo_image_surface_get_data surface))))
-        
-
-;; draw surface data returned from test2
-(bind-func gl-draw
-  (lambda ()
-    (glLoadIdentity)
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))    
-    ;; use tex num 5 repeatedly
-    (gl-load-tex-bgr 900 600 4 GL_UNSIGNED_BYTE (test2 (i64tod (now))) 5)
-    (gl-draw-img-reverse -1.0 -1.0 2.0 2.0 180.0 5)
-    void))
+;; note to self - maybe need to call glLoadIdentity from scheme?
+;; statefulness and all that
 
 ;; standard callback
-(define cairo-animation
+(define spectrum-animation
   (lambda (beat dur)
     (gl-draw)
-    (gl:swap-buffers ctx)    
+    (gl:swap-buffers ctx)
     (callback (*metro* (+ beat (* .5 dur))) 'cairo-animation (+ beat dur) dur)))
 
 (cairo-animation (*metro* 'get-beat 4) 1/12)
