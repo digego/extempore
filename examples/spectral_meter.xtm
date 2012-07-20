@@ -1,0 +1,137 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 
+;; spectral metering example
+;;
+;; This example uses the fft/ifft bindings from math.xtm to draw a
+;; real-time visualisation of the magnitude spectrum of an audio
+;; signal.
+
+;; First, we need to set up some functions to play a sound file.  This
+;; code is all taken from the sndfile.xtm example
+
+(define libsndfile
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libsndfile.so"))
+          ((string=? platform "Windows") (sys:open-dylib "libsndfile.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "libsndfile.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+;; bind 4 sndfile lib functions.  for more detail about what these
+;; functions do, look at the sndfile.h header file which came with
+;; your libsndfile src/package
+(bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
+(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
+(bind-lib libsndfile sf_strerror [i8*,i8*]*)
+
+;; an audio buffer reader
+(bind-func read-audio-file
+  (lambda (fname dat offset num)
+    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
+	  (audiofile (sf_open fname 16 info))
+	  (channels (i32toi64 (tref info 2)))
+	  (num-to-read (* num channels))
+	  (num-to-offset (* offset channels))
+	  (cnt (sf_seek audiofile num-to-offset 0))
+	  (samples-read (sf_read_double audiofile dat num-to-read)))
+      (if (<> null audiofile)
+          (begin
+            (printf "file name: %s\n" fname)
+            (printf "samplerate: %d\n" (tref info 1))
+            (printf "channels: %d\n" (tref info 2))
+            (printf "samples read: %lld\n" samples-read))
+          (printf "errors:\t\t %s\n" (sf_strerror audiofile)))
+      dat)))
+
+;; setup a closure to hold audio data.  This lambda takes one argument:
+;; the (string) path to the audio file
+
+(bind-func create_audio_closure
+  (lambda (fname len)    
+    (let ((offset 0.0) ; offset into sound file
+          (adat:double* (zalloc (* 44100 2 (dtoi64 len)))))
+      (lambda ()
+        (read-audio-file fname
+                         adat
+                         (dtoi64 (* 44100.0 offset))
+                         (dtoi64 (* 44100.0 len)))
+        adat))))
+
+;; set up the type alias for our dsp function
+(bind-alias DSP [double,double,double,double,double*]*)
+;; dsp function - this will play the sound file.  Remember to
+;; change the file path to an audio file on your system
+(bind-func dsp:DSP 50000000 ; make sure we allocate enough memory
+  (let ((audio_closure (create_audio_closure "/Users/ben/Desktop/peg.wav" 10.0))
+        (audio_data (audio_closure))
+        (window-size 441000)
+        (playhead 0))
+    (lambda (in time chan dat)
+      (if (= chan 1.0) ; increment playhead once per (stereo) pair of samples
+          (set! playhead (modulo (+ playhead 1) window-size)))
+      (pref audio_data (+ (dtoi64 chan) (* 2 playhead))))))
+
+(dsp:set! dsp)
+
+;; now, onto the fft/graphics stuff
+
+(define ctx (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+
+(load "libs/cairo_lib.xtm")
+(load "libs/opengl_lib.xtm")
+
+(bind-func cairo-draw-image
+  (lambda (cr:cairo_surface_t* image:cairo_surface_t* sx sy sw:double sh:double dx dy dw dh)
+    (let ((scalex (/ dw sw))
+	  (scaley (/ dh sh)))
+      (cairo_save cr)
+      (cairo_scale cr scalex scaley)
+      (cairo_set_source_surface cr image (- (* dx scalex) (* 1.0 sx)) (- (* dy scaley) (* 1.0 sy)))
+      (cairo_rectangle cr (/ dx scalex) (/ dy scaley) (/ dw scalex) (/ dh scaley))
+      (cairo_fill cr)
+      (cairo_restore cr)
+      void)))
+
+;; draw animated circles to an opengl context
+(bind-func test2
+  (let ((surface (cairo_image_surface_create CAIRO_FORMAT_RGB24 900 600))
+	(image (cairo_image_surface_create_from_png "image.png"))
+	(cr (cairo_create surface))	
+	(i 0.0)
+	(width 0.0)
+	(height 0.0))
+    (lambda (t:double)
+      ;; scale image to fullscreen background
+      (set! width (i32tod (cairo_image_surface_get_width image)))
+      (set! height (i32tod (cairo_image_surface_get_height image)))
+      (cairo-draw-image cr image 0.0 0.0 width height 0.0 0.0 900.0 600.0)
+            
+      (dotimes (i 200.0)
+      	(cairo_set_source_rgba cr (* .005 i) (* 0.005 i) 0.7 0.7)
+      	(cairo_arc cr
+      		   (+ 450.0 (* 350.0 (cos (* i t .00000003))))
+      		   (+ 300.0 (* 200.0 (sin (* i t .0000002))))
+      		   10.0 0.0 TWOPI)
+      	(cairo_stroke cr))
+      ;(cairo_surface_flush surface)
+      (cairo_image_surface_get_data surface))))
+        
+
+;; draw surface data returned from test2
+(bind-func gl-draw
+  (lambda ()
+    (glLoadIdentity)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))    
+    ;; use tex num 5 repeatedly
+    (gl-load-tex-bgr 900 600 4 GL_UNSIGNED_BYTE (test2 (i64tod (now))) 5)
+    (gl-draw-img-reverse -1.0 -1.0 2.0 2.0 180.0 5)
+    void))
+
+;; standard callback
+(define cairo-animation
+  (lambda (beat dur)
+    (gl-draw)
+    (gl:swap-buffers ctx)    
+    (callback (*metro* (+ beat (* .5 dur))) 'cairo-animation (+ beat dur) dur)))
+
+(cairo-animation (*metro* 'get-beat 4) 1/12)
