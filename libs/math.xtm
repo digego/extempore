@@ -1,4 +1,15 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; math.xtm                                                              ;;
+;;                                                                       ;;
+;; This is the xtlang math library.  It contains helpful type and        ;;
+;; closure definitions for working with complex numbers, bindings to fft ;;
+;; libraries, and other useful DSP things.                               ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Complex numbers & FFT
+;;
+;; These functions come from the kiss FFT library
+;; 
 ;; You can get the source for kiss_fft from
 ;; http://sourceforge.net/projects/kissfft/
 ;;
@@ -9,13 +20,16 @@
 ;; gcc kiss_fft.c -dynamiclib -I/usr/include/malloc -o kiss_fft.1.2.9.dylib -current_version 1.2.9
 ;;
 ;; Then, copy the dylib into somewhere on your lib path, e.g. /usr/local/lib
-;;
-;; After that, this should all work
 
-(define-lib kiss_fft.1.2.9)
+(define kissfft
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "kiss_fft.so"))
+          ((string=? platform "Windows") (sys:open-dylib "kiss_fft.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "kiss_fft.dylib"))
+          (else (print "Unknown platform: " platform)))))
 
-(if (not kiss_fft.1.2.9)
-    (print-error "Could not load dynamic library"))
+(if (not kissfft)
+    (print-error "Could not load kiss_fft dynamic library"))
 
 ;; bind the required types and function signatures (see kiss_fft.h)
 
@@ -23,16 +37,84 @@
 (bind-type kiss_fft_state <i32,i32,|64,i32|,|1,kiss_fft_cpx|>)
 (bind-alias kiss_fft_cfg kiss_fft_state*)
 
-(bind-lib kiss_fft.1.2.9 kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
-(bind-lib kiss_fft.1.2.9 kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
-(bind-lib kiss_fft.1.2.9 kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
-(bind-lib kiss_fft.1.2.9 kiss_fft_cleanup [i8*,i8*]*)
-(bind-lib kiss_fft.1.2.9 kiss_fft_next_fast_size [i32,i32]*)
+(bind-lib kissfft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
+(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+(bind-lib kissfft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
+(bind-lib kissfft kiss_fft_cleanup [i8*,i8*]*)
+(bind-lib kissfft kiss_fft_next_fast_size [i32,i32]*)
 
-;; some helpers for working with complex numbers in xtlang
+;; xtlang's complex types
 
 (bind-type cpxd <double,double>)
 (bind-type cpxf <float,float>)
+
+;; conversion functions
+
+(bind-func conjugate-cpxf
+  (lambda (cpx_val:cpxf*)
+    (let ((cpx_cnj:cpxf* (alloc 1)))
+      (tfill! cpx_cnj
+              (tref cpx_val 0)
+              (* -1.0 (tref cpx_val 1)))
+      cpx_cnj)))
+
+(bind-func conjugate-cpxd
+  (lambda (cpx_val:cpxd*)
+    (let ((cpx_cnj:cpxd* (alloc 1)))
+      (tfill! cpx_cnj
+              (tref cpx_val 0)
+              (* -1.0 (tref cpx_val 1)))
+      cpx_cnj)))
+
+(bind-poly conjugate-cpx conjugate-cpxf)
+(bind-poly conjugate-cpx conjugate-cpxd)
+
+(bind-func cart-to-pol-cpxf
+  (lambda (cart:cpxf*)
+    (let ((pol:cpxf* (alloc 1)))
+      (tfill! pol
+              (sqrtf (+ (powf (tref cart 0) 2.0)
+                        (powf (tref cart 1) 2.0)))
+              (atan2f (tref cart 1)
+                      (tref cart 0)))
+      pol)))
+
+(bind-func pol-to-cart-cpxf
+  (lambda (pol:cpxf*)
+    (let ((cart:cpxf* (alloc 1)))
+      (tfill! cart
+              (* (tref pol 0)
+                 (cosf (tref pol 1)))
+              (* (tref pol 0)
+                 (sinf (tref pol 1))))
+      cart)))
+
+(bind-func cart-to-pol-cpxd
+  (lambda (cart:cpxd*)
+    (let ((pol:cpxd* (alloc 1)))
+      (tfill! pol
+              (sqrt (+ (pow (tref cart 0) 2.0)
+                       (pow (tref cart 1) 2.0)))
+              (atan2 (tref cart 1)
+                     (tref cart 0)))
+      pol)))
+
+(bind-func pol-to-cart-cpxd
+  (lambda (pol:cpxd*)
+    (let ((cart:cpxd* (alloc 1)))
+      (tfill! cart
+              (* (tref pol 0)
+                 (cos (tref pol 1)))
+              (* (tref pol 0)
+                 (sin (tref pol 1))))
+      cart)))
+
+(bind-poly cart-to-pol cart-to-pol-cpxf)
+(bind-poly cart-to-pol cart-to-pol-cpxd)
+(bind-poly pol-to-cart pol-to-cart-cpxf)
+(bind-poly pol-to-cart pol-to-cart-cpxd)
+
+;; some helpers for working with buffers of cpxf/cpxd types
 
 (bind-func fill-complex-buffer-cpxf
   (lambda (re:float* im:float* com:cpxf* len:i64)
@@ -53,7 +135,7 @@
 (bind-poly fill-complex-buffer fill-complex-buffer-cpxf)
 (bind-poly fill-complex-buffer fill-complex-buffer-cpxd)
 
-(bind-func conjugate-cpxf
+(bind-func conjugate-buffer-cpxf
   (lambda (signal:cpxf* conj:cpxf* len:i64)
     (let ((i 0))
       (dotimes (i len)
@@ -62,7 +144,7 @@
 	       (* -1.0 (tref (pref-ptr signal i) 1))))
       void)))
 
-(bind-func conjugate-cpxd
+(bind-func conjugate-buffer-cpxd
   (lambda (signal:cpxd* conj:cpxd* len:i64)
     (let ((i 0))
       (dotimes (i len)
@@ -71,8 +153,8 @@
 	       (* -1.0 (tref (pref-ptr signal i) 1))))
       void)))
 
-(bind-poly conjugate-complex conjugate-cpxf)
-(bind-poly conjugate-complex conjugate-cpxd)
+(bind-poly conjugate-buffer conjugate-buffer-cpxf)
+(bind-poly conjugate-buffer conjugate-buffer-cpxd)
 
 (bind-func buffer-cart-to-pol-cpxf
   (lambda (cart:cpxf* pol:cpxf* len:i64)
@@ -134,6 +216,8 @@
 (bind-poly buffer-cart-to-pol buffer-cart-to-pol-cpxd)
 (bind-poly buffer-pol-to-cart buffer-pol-to-cart-cpxf)
 (bind-poly buffer-pol-to-cart buffer-pol-to-cart-cpxd)
+
+
 
 (bind-func buffer-re-only-cpxf
   "get the (float) real components of the complex buffer"
