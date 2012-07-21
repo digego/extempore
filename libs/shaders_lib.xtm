@@ -344,15 +344,21 @@ void main() {
 
 #extension GL_ARB_texture_rectangle : enable
 
-uniform sampler2DRect baseBuf;
-uniform sampler2DRect blendBuf;
-uniform vec4          color;
+uniform sampler2DRect tex_back;
+uniform sampler2DRect tex_front;
+uniform vec4 color;
+uniform float width;
+uniform float height;
+uniform int flipx;
+uniform int flipy;
 
 varying vec2 TexCoord;
 
 void main() {
-    vec4 base = texture2DRect(baseBuf, TexCoord);
-    vec4 blend = texture2DRect(blendBuf, TexCoord);
+    vec4 base = texture2DRect(tex_back, TexCoord);
+    float x = (flipx==0) ? TexCoord.x : width-TexCoord.x;
+    float y = (flipy==0) ? TexCoord.y : height-TexCoord.y;
+    vec4 blend = texture2DRect(tex_front, vec2(x,y));
 
     if(color == blend) {
       gl_FragColor = base;
@@ -360,6 +366,7 @@ void main() {
       gl_FragColor = blend;
     }
 }")
+
 
 (define dof_frag
 "
@@ -478,6 +485,3 @@ void main( void ) {
 	   blend_frag
 	   green_frag
 	   dof_frag)))
-	  
-    
-    
