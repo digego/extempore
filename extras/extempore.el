@@ -200,6 +200,19 @@ See `run-hooks'."
   :type 'string
   :group 'extempore)
 
+;; different faces for the scheme and xtlang defuns.  Feel free to set
+;; colours which work with your own colour scheme
+
+(defface scheme-defun-face
+  '(:inherit font-lock-keyword-face)
+  "Face used for scheme defuns."
+  :group 'extempore)
+
+(defface xtlang-defun-face
+  '(:inherit font-lock-variable-name-face)
+  "Face used for xtlang defuns."
+  :group 'extempore)
+
 ;; from emacs-starter-kit
 
 (defface extempore-paren-face
