@@ -64,22 +64,79 @@
 (load "libs/cairo_lib.xtm")
 (load "libs/opengl_lib.xtm")
 
+;; let's make a helper type for holding rgb 3-tuples
+(bind-alias rgb_colour <double,double,double>)
+
+(bind-func set_cairo_source_with_colour
+  (lambda (cr colour:rgb_colour*)
+    (cairo_set_source_rgb cr
+                          (tref colour 0)
+                          (tref colour 1)
+                          (tref colour 2))))
+
+(bind-func draw_spectral_bar
+  (lambda (cr num_bars:i64 bar_index:i64 bar_height:double colour_array:|3,rgb_colour|*)
+    (let ((bar_base_width 8.0)
+          (bar_xpos (+ (* (i64tod bar_index)
+                          (round (* bar_base_width 1.2)))
+                       100.0))
+          (bar_base_ypos 30.0)
+          (orange_break 200.0)  ;marks transition to orange levels
+          (red_break 400.0))    ;marks transition to red levels
+      ;; draw red bars
+      (if (> bar_height red_break)
+          (begin
+            (set_cairo_source_with_colour cr (aref-ptr colour_array 2))
+            (cairo_rectangle cr
+                             bar_xpos
+                             bar_base_ypos
+                             bar_base_width
+                             bar_height)
+            (cairo_fill cr)))
+      ;; draw orange bars
+      (if (> bar_height orange_break)
+          (begin
+            (set_cairo_source_with_colour cr (aref-ptr colour_array 1))
+            (cairo_rectangle cr
+                             bar_xpos
+                             bar_base_ypos
+                             bar_base_width
+                             (if (> bar_height red_break)
+                                  red_break bar_height))
+            (cairo_fill cr)))
+      ;; draw green bars
+      (set_cairo_source_with_colour cr (aref-ptr colour_array 0))
+      (cairo_rectangle cr
+                       bar_xpos
+                       bar_base_ypos
+                       bar_base_width
+                       (if (> bar_height orange_break)
+                           orange_break bar_height))
+      (cairo_fill cr)
+      )))
+
 ;; draw animated circles to an opengl context
 (bind-func spectrum_visualiser 1000000
   (let ((width:i32 900)
         (height:i32 600)
         (surface (cairo_image_surface_create CAIRO_FORMAT_RGB24 width height))
 	(cr (cairo_create surface))
-	(i 0))
+	(i:i64 0)
+        (num_bars:i64 64)
+        (peak_colours:|3,rgb_colour|* (alloc)))
+    ;; fill the colours for the spectral levels
+    (tfill! (aref-ptr peak_colours 0) 0.0 0.8 0.1) ;green
+    (tfill! (aref-ptr peak_colours 1) 0.6 0.5 0.0) ;orange
+    (tfill! (aref-ptr peak_colours 2) 1.0 0.2 0.0) ;red
+    ;; add some transforms so that the origin is at the bottom left
+    ;; hand corner
+    (cairo_scale cr 1.0 -1.0)
+    (cairo_translate cr 0.0 (i32tod (* -1 height)))
     (lambda (spec_bins:|64,double|*)
       (cairo_set_source_rgb cr 0.0 0.0 0.0)
-      (cairo_paint cr)
-      (dotimes (i 64)
-      	(cairo_set_source_rgba cr 0.0 0.8 0.1 0.4)
-      	(cairo_rectangle cr
-                         (+ (* (i64tod i) 10.0) 100.0) 10.0
-                         8.0 (* (aref spec_bins i) 20.0))
-      	(cairo_fill cr))
+      (cairo_paint_with_alpha cr 0.5)
+      (dotimes (i num_bars)
+        (draw_spectral_bar cr num_bars i (* 20.0 (aref spec_bins i)) peak_colours))
       ;(cairo_surface_flush surface)
       (cairo_image_surface_get_data surface))))
 
@@ -105,7 +162,7 @@
                                              audio_length))
         (audio (audio_closure))
         (playhead 0)
-        (window_size 4096)
+        (window_size 512)
         (time_buffer:cpxd* (zalloc window_size))
         (freq_buffer:cpxd* (zalloc window_size))
         (spec_bins:|64,double|* (zalloc)) ;use 64 bins for spectrogram
@@ -128,7 +185,7 @@
                      (set! sum 0.0)
                      (dotimes (j (* i bin_width) bin_width)
                        (set! sum (+ sum (magnitude-cpxd (pref-ptr freq_buffer j)))))
-                     (aset! spec_bins i (/ sum (i64tod bin_width)))
+                     (aset! spec_bins i (* 10.0 (log (floor (/ sum (i64tod bin_width))))))
                      ;; (printf "s[%lld]: %3.1f " i sum)
                      ))
                  ;; (printf "\n")
@@ -150,4 +207,4 @@
     (gl:swap-buffers ctx)
     (callback (*metro* (+ beat (* .5 dur))) 'spectrum-animation (+ beat dur) dur)))
 
-(spectrum-animation (*metro* 'get-beat 4) 1/60)
+(spectrum-animation (*metro* 'get-beat 4) 1/10)
