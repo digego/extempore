@@ -65,31 +65,32 @@
 (load "libs/opengl_lib.xtm")
 
 ;; draw animated circles to an opengl context
-(bind-func spectrum_visualiser
+(bind-func spectrum_visualiser 1000000
   (let ((width:i32 900)
         (height:i32 600)
         (surface (cairo_image_surface_create CAIRO_FORMAT_RGB24 width height))
 	(cr (cairo_create surface))
 	(i 0))
-    (lambda (spec_bins:|16,double|*)
+    (lambda (spec_bins:|64,double|*)
       (cairo_set_source_rgb cr 0.0 0.0 0.0)
-      (dotimes (i 16)
-      	(cairo_set_source_rgba cr 0.0 0.2 0.7 1.0)
+      (cairo_paint cr)
+      (dotimes (i 64)
+      	(cairo_set_source_rgba cr 0.0 0.8 0.1 0.4)
       	(cairo_rectangle cr
-                         (+ (* (i64tod i) 30.0) 100.0) 100.0
-                         25.0 (/ (aref spec_bins i) 10.0))
+                         (+ (* (i64tod i) 10.0) 100.0) 10.0
+                         8.0 (* (aref spec_bins i) 20.0))
       	(cairo_fill cr))
       ;(cairo_surface_flush surface)
       (cairo_image_surface_get_data surface))))
 
 ;; draw surface data returned from test2
 (bind-func gl-draw 1000000
-  (lambda (spec_bins:|16,double|*)
+  (lambda (spec_bins:|64,double|*)
     (glLoadIdentity)
-    ;; (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
     ;; ;; use tex num 5 repeatedly
-    ;; (gl-load-tex-bgr 900 600 4 GL_UNSIGNED_BYTE (spectrum_visualiser spec_bins) 5)
-    ;; (gl-draw-img-reverse -1.0 -1.0 2.0 2.0 180.0 5)
+    (gl-load-tex-bgr 900 600 4 GL_UNSIGNED_BYTE (spectrum_visualiser spec_bins) 5)
+    (gl-draw-img-reverse -1.0 -1.0 2.0 2.0 180.0 5)
     void))
 
 (load "libs/math.xtm")
@@ -107,7 +108,7 @@
         (window_size 4096)
         (time_buffer:cpxd* (zalloc window_size))
         (freq_buffer:cpxd* (zalloc window_size))
-        (spec_bins:|16,double|* (zalloc)) ;use 16 bins for spectrogram
+        (spec_bins:|64,double|* (zalloc)) ;use 64 bins for spectrogram
         (i 0))
     (lambda (in time chan dat)
       (if (and (= (modulo playhead window_size) 0)
@@ -122,8 +123,8 @@
                  (fft-cpxd time_buffer freq_buffer window_size)
                  (let ((j 0)
                        (sum 0.0)
-                       (bin_width (/ (/ window_size 16) 2)))
-                   (dotimes (i 16)
+                       (bin_width (/ (/ window_size 64) 2)))
+                   (dotimes (i 64)
                      (set! sum 0.0)
                      (dotimes (j (* i bin_width) bin_width)
                        (set! sum (+ sum (magnitude-cpxd (pref-ptr freq_buffer j)))))
@@ -131,7 +132,6 @@
                      ;; (printf "s[%lld]: %3.1f " i sum)
                      ))
                  ;; (printf "\n")
-                 (gl-draw spec_bins)
                  ))
       (if (= chan 1.0) ; increment playhead once per (stereo) pair of samples
           (set! playhead (modulo (+ playhead 1)
@@ -146,8 +146,8 @@
 ;; standard callback
 (define spectrum-animation
   (lambda (beat dur)
-    (gl-draw)
+    (gl-draw (dsp.spec_bins))
     (gl:swap-buffers ctx)
-    (callback (*metro* (+ beat (* .5 dur))) 'cairo-animation (+ beat dur) dur)))
+    (callback (*metro* (+ beat (* .5 dur))) 'spectrum-animation (+ beat dur) dur)))
 
-(cairo-animation (*metro* 'get-beat 4) 1/12)
+(spectrum-animation (*metro* 'get-beat 4) 1/60)
