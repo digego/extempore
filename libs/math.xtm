@@ -1,4 +1,271 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  MATH Library
+;;
+
+
+;;;;;;;;;; MATRIX ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; 
+;; matrix functions
+;;
+;; there are obviously faster options, but these
+;; are provided as a general option of last resort
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; 'pretty' print matrix (doubles)
+(bind-func mprintd
+  (lambda (m:double* r:i64 c:i64)
+    (let ((i 0) (j 0))
+      (dotimes (i r)
+	(printf "[")
+	(printf "% f" (pref m (* i c)))
+	(dotimes (j (- c 1))
+	  (printf ",% f" (pref m (+ 1 j (* i c)))))
+	(printf "]\n")
+	void))))
+
+;; 'pretty' print matrix (floats)
+(bind-func mprintf
+  (lambda (m:float* r:i64 c:i64)
+    (let ((i 0) (j 0))
+      (dotimes (i r)
+	(printf "[")
+	(printf "% f" (ftod (pref m (* i c))))
+	(dotimes (j (- c 1))
+	  (printf ",% f" (ftod (pref m (+ 1 j (* i c))))))
+	(printf "]\n")
+	void))))
+
+;; matrix multiplication (doubles)
+(bind-func mmuld
+  (lambda (ma:double* r1:i64 c1:i64 mb:double* r2:i64 c2:i64 mc:double*)
+    (if (= c1 r2)
+	(let ((r 0) (c 0) (k 0))
+	  (dotimes (r r1)
+	    (dotimes (c c2)
+	      (pset! mc (+ c (* r c2)) 0.0)
+	      (dotimes (k c1)
+		(pset! mc (+ c (* r c2))
+		       (+ (pref mc (+ c (* r c2)))
+			  (* (pref ma (+ k (* r c1)))
+			     (pref mb (+ (* k c2) c))))))))
+	  mc)
+	(begin (printf "bad matrix multiplication [%lld,%lld]*[%lld,%lld]\n"
+		       r1 c1 r2 c2)
+	       (cast null double*)))))
+
+;; matrix multiplication (floats)
+(bind-func mmulf
+  (lambda (ma:float* r1:i64 c1:i64 mb:float* r2:i64 c2:i64 mc:float*)
+    (if (= c1 r2)
+	(let ((r 0) (c 0) (k 0))
+	  (dotimes (r r1)
+	    (dotimes (c c2)
+	      (pset! mc (+ c (* r c2)) 0.0)
+	      (dotimes (k c1)
+		(pset! mc (+ c (* r c2))
+		       (+ (pref mc (+ c (* r c2)))
+			  (* (pref ma (+ k (* r c1)))
+			     (pref mb (+ (* k c2) c))))))))
+	  mc)
+	(begin (printf "bad matrix multiplication [%lld,%lld]*[%lld,%lld]\n"
+		       r1 c1 r2 c2)
+	       (cast null float*)))))
+
+;; matrix transposition (doubles)
+(bind-func mtransd
+  (lambda (ma:double* r1:i64 c1:i64 mb:double*)
+    (let ((i 0) (j 0))
+      (dotimes (i r1)
+	(dotimes (j c1)
+	  (pset! mb (+ (* j c1) i)
+		 (pref ma (+ (* i c1) j)))))
+      mb)))
+
+;; matrix transposition (floats)
+(bind-func mtransf
+  (lambda (ma:float* r1:i64 c1:i64 mb:float*)
+    (let ((i 0) (j 0))
+      (dotimes (i r1)
+	(dotimes (j c1)
+	  (pset! mb (+ (* j c1) i)
+		 (pref ma (+ (* i c1) j)))))
+      mb)))
+
+
+;; determinant (doubles)
+;; k is for sqr matrix
+(bind-func mdetrmd
+  (lambda (ma:double* k:i64)
+    (if (= k 1) (pref ma 0)
+	(let ((det:double 0.0) (s:double 1.0)
+	      (c 0) (i 0) (j 0) (m 0) (n 0)
+	      (mb:double* (salloc (* k k))))	 
+	  (dotimes (c k)
+	    (set! m 0) (set! n 0)
+	    (dotimes (i k)
+	      (dotimes (j k)
+		(pset! mb (+ (* i k) j) 0.0)
+		(if (and (<> i 0) (<> j c))
+		    (begin 
+		      (pset! mb (+ (* m (- k 1)) n)
+			     (pref ma (+ (* i k) j)))
+		      (if (< n (- k 2)) 
+			  (set! n (+ n 1))
+			  (begin 
+			    (set! n 0)
+			    (set! m (+ m 1)))))
+		    (begin 1))))
+	    (set! det (+ det (* s (* (pref ma c)
+				     (mdetrmd mb (- k 1))))))
+	    (set! s (* -1.0 s)))
+	  det))))
+
+;; determinant (floats)
+;; k is for sqr matrix
+(bind-func mdetrmf
+  (lambda (ma:float* k:i64)
+    (if (= k 1) (pref ma 0)
+	(let ((det:float 0.0) (s:float 1.0)
+	      (c 0) (i 0) (j 0) (m 0) (n 0)
+	      (mb:float* (salloc (* k k))))	 
+	  (dotimes (c k)
+	    (set! m 0) (set! n 0)
+	    (dotimes (i k)
+	      (dotimes (j k)
+		(pset! mb (+ (* i k) j) 0.0)
+		(if (and (<> i 0) (<> j c))
+		    (begin 
+		      (pset! mb (+ (* m (- k 1)) n)
+			     (pref ma (+ (* i k) j)))
+		      (if (< n (- k 2)) 
+			  (set! n (+ n 1))
+			  (begin 
+			    (set! n 0)
+			    (set! m (+ m 1)))))
+		    (begin 1))))
+	    (set! det (+ det (* s (* (pref ma c)
+				     (mdetrmf mb (- k 1))))))
+	    (set! s (* -1.0 s)))
+	  det))))
+
+
+;; invert matrix (doubles)
+(bind-func minvd
+  (lambda (ma:double* k:i64 inv:double*)
+    (let ((mb:double* (salloc (* k k)))
+	  (fac:double* (salloc (* k k)))
+	  (d:double 0.0)
+	  (i 0) (j 0) (m 0) (n 0) (q:i64 0) (p:i64 0))
+      (dotimes (q k)
+	(dotimes (p k)
+	  (set! m 0)
+	  (set! n 0)
+	  (dotimes (i k)
+	    (dotimes (j k)
+	      (pset! mb (+ (* i k) j) 0.0)
+	      (if (and (<> i q) (<> j p))
+		  (begin 
+		    (pset! mb (+ (* m (- k 1)) n)
+			   (pref ma (+ (* i k) j)))
+		    (if (< n (- k 2)) 
+			(set! n (+ n 1))
+			(begin 
+			  (set! n 0)
+			  (set! m (+ m 1)))))
+		  (begin 1))))
+	  (pset! fac (+ (* q k) p)
+		 (* (pow -1.0 (i64tod (+ q p)))
+		    (mdetrmd mb (- k 1))))))
+
+      (dotimes (i k)
+	(dotimes (j k)
+	  (pset! mb (+ (* i k) j)
+		 (pref fac (+ (* j k) i)))))
+      (set! d (mdetrmd ma k))
+      (dotimes (i k)
+	(dotimes (j k)
+	  (pset! inv (+ (* i k) j)
+		 (/ (pref mb (+ (* i k) j)) d))))      
+
+      inv)))
+
+;; invert matrix (floats)
+(bind-func minvf
+  (lambda (ma:float* k:i64 inv:float*)
+    (let ((mb:float* (salloc (* k k)))
+	  (fac:float* (salloc (* k k)))
+	  (d:float 0.0)
+	  (i 0) (j 0) (m 0) (n 0) (q:i64 0) (p:i64 0))
+      (dotimes (q k)
+	(dotimes (p k)
+	  (set! m 0)
+	  (set! n 0)
+	  (dotimes (i k)
+	    (dotimes (j k)
+	      (pset! mb (+ (* i k) j) 0.0)
+	      (if (and (<> i q) (<> j p))
+		  (begin 
+		    (pset! mb (+ (* m (- k 1)) n)
+			   (pref ma (+ (* i k) j)))
+		    (if (< n (- k 2)) 
+			(set! n (+ n 1))
+			(begin 
+			  (set! n 0)
+			  (set! m (+ m 1)))))
+		  (begin 1))))
+	  (pset! fac (+ (* q k) p)
+		 (* (powf -1.0 (i64tof (+ q p)))
+		    (mdetrmf mb (- k 1))))))
+
+      (dotimes (i k)
+	(dotimes (j k)
+	  (pset! mb (+ (* i k) j)
+		 (pref fac (+ (* j k) i)))))
+      (set! d (mdetrmf ma k))
+      (dotimes (i k)
+	(dotimes (j k)
+	  (pset! inv (+ (* i k) j)
+		 (/ (pref mb (+ (* i k) j)) d))))      
+
+      inv)))
+
+      
+;; a unit test of sorts (doubles only)     
+(bind-func _matrix_test
+  (lambda ()
+    (let ((s:i64 4)
+	  (ma:double* (salloc (* s s)))
+	  (mb:double* (salloc (* s s)))
+	  (inv:double* (salloc (* s s))))
+      ;(pfill! ma 4. 1. 1. 2. 3. 1. 1. 1. 1.)      
+      (pfill! ma 
+	      4. 1. 1. 1.
+	      2. 3. 1. 1. 
+	      1. 6. 5. 1.
+	      2. 2. 3. 1.)      
+      (minvd ma s inv)
+      (printf "\nmatrix a:      determinant:%f\n" (mdetrmd ma s))
+      (mprintd ma s s)
+      (printf "\ninverse of a:\n")
+      (mprintd inv s s)      
+      (printf "\nmatrix multiplication a*inv(a):\n")
+      (mmuld ma s s inv s s mb)
+      (mprintd mb s s)
+      (printf "\ntransposition of a:\n")
+      (mtransd ma 4 4 mb)
+      (mprintd mb s s)
+      (printf "\n")
+      void)))
+
+
+
+
+;;;;;;;;;  FFT ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;
 ;; You can get the source for kiss_fft from
 ;; http://sourceforge.net/projects/kissfft/
 ;;
@@ -273,4 +540,5 @@
 
 (bind-poly inverse-fft inverse-fft-cpxf)
 (bind-poly inverse-fft inverse-fft-cpxd)
+
 
