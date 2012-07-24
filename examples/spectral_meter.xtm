@@ -76,44 +76,50 @@
                            0.5)))
 
 (bind-func draw_spectral_bar
-  (lambda (cr num_bars:i64 bar_index bar_height colour_array:|3,rgb_colour|*)
-    (let ((bar_base_width (i64tod (- (/ 1080 num_bars) 1)))
-          (bar_width (+ bar_base_width
-                        (round (* (/ bar_base_width 4.0) (- (random) 0.5)))))
-          (bar_xpos (* (i64tod bar_index)
-                       bar_base_width))
-          (orange_break 550.0)  ;marks transition to orange levels
-          (red_break 650.0))    ;marks transition to red levels
-      ;; draw red bars
-      (if (> bar_height red_break)
-          (begin
-            (set_cairo_source_with_colour cr (aref-ptr colour_array 2))
-            (cairo_rectangle cr
-                             bar_xpos
-                             0.0
-                             bar_width
-                             bar_height)
-            (cairo_fill cr)))
-      ;; draw orange bars
-      (if (> bar_height orange_break)
-          (begin
-            (set_cairo_source_with_colour cr (aref-ptr colour_array 1))
-            (cairo_rectangle cr
-                             bar_xpos
-                             0.0
-                             bar_width
-                             (if (> bar_height red_break)
-                                  red_break bar_height))
-            (cairo_fill cr)))
-      ;; draw green bars
-      (set_cairo_source_with_colour cr (aref-ptr colour_array 0))
-      (cairo_rectangle cr
-                       bar_xpos
-                       0.0
-                       bar_width
-                       (if (> bar_height orange_break)
-                           orange_break bar_height))
-      (cairo_fill cr))))
+  (let ((orange_break 550.0)  ;marks transition to orange levels
+        (red_break 650.0)
+        (colour_array:|3,rgb_colour|* (alloc)))   ;marks transition to red levels
+    ;; fill the colours for the spectral levels
+    (tfill! (aref-ptr colour_array 0) 0.0 0.8 0.1) ;green
+    (tfill! (aref-ptr colour_array 1) 0.6 0.5 0.0) ;orange
+    (tfill! (aref-ptr colour_array 2) 1.0 0.2 0.0) ;red
+    (lambda (cr num_bars:i64 bar_index bar_height)
+      (let ((bar_base_width (i64tod (- (/ 1080 num_bars) 1)))
+            (bar_width (+ bar_base_width
+                          (round (* (* bar_base_width 0.5)
+                                    (- (random) 0.5)))))
+            (bar_xpos (* (i64tod bar_index)
+                         bar_base_width)))
+        ;; draw red bars
+        (if (> bar_height red_break)
+            (begin
+              (set_cairo_source_with_colour cr (aref-ptr colour_array 2))
+              (cairo_rectangle cr
+                               bar_xpos
+                               0.0
+                               bar_width
+                               bar_height)
+              (cairo_fill cr)))
+        ;; draw orange bars
+        (if (> bar_height orange_break)
+            (begin
+              (set_cairo_source_with_colour cr (aref-ptr colour_array 1))
+              (cairo_rectangle cr
+                               bar_xpos
+                               0.0
+                               bar_width
+                               (if (> bar_height red_break)
+                                   red_break bar_height))
+              (cairo_fill cr)))
+        ;; draw green bars
+        (set_cairo_source_with_colour cr (aref-ptr colour_array 0))
+        (cairo_rectangle cr
+                         bar_xpos
+                         0.0
+                         bar_width
+                         (if (> bar_height orange_break)
+                             orange_break bar_height))
+        (cairo_fill cr)))))
 
 ;; draw animated circles to an opengl context
 (bind-func spectrum_visualiser 1000000
@@ -122,12 +128,7 @@
         (surface (cairo_image_surface_create CAIRO_FORMAT_RGB24 width height))
 	(cr (cairo_create surface))
 	(i:i64 0)
-        (str_buf:i8* (alloc 100))
-        (peak_colours:|3,rgb_colour|* (alloc)))
-    ;; fill the colours for the spectral levels
-    (tfill! (aref-ptr peak_colours 0) 0.0 0.8 0.1) ;green
-    (tfill! (aref-ptr peak_colours 1) 0.6 0.5 0.0) ;orange
-    (tfill! (aref-ptr peak_colours 2) 1.0 0.2 0.0) ;red
+        (str_buf:i8* (alloc 100)))
     ;; add some transforms so that the origin is at the bottom left
     ;; hand corner
     (cairo_scale cr 1.0 -1.0)
@@ -142,7 +143,7 @@
       (cairo_set_source_rgb cr 0.0 0.0 0.0)
       (cairo_paint_with_alpha cr 0.5)
       (dotimes (i nbins)
-        (draw_spectral_bar cr nbins i (* 20.0 (pref spectrum i)) peak_colours))
+        (draw_spectral_bar cr nbins i (* 20.0 (pref spectrum i))))
       (cairo_set_source_rgb cr 1.0 1.0 1.0)
       (dotimes (i 5)
         (cairo_move_to cr (i64tod (+ 30 (* i (/ (i32toi64 width) 6)))) 300.0)
