@@ -558,13 +558,18 @@ indentation."
 ;; dealing with the (external) extempore process
 
 (defun extempore-switch-to-process ()
-  "Switch to a shell buffer in which the extempore process is running.  If no such buffer exists, open a new *extempore* buffer and start a new extempore process.
+  "Switch to a shell buffer in which the extempore process is
+running. If no such buffer exists, open a new *extempore* buffer
+and start a new extempore process.
 
-The location of the extempore executable should be set with `extempore-path'.
+The location of the extempore executable should be set with
+`extempore-path'.
 
-The arguments passed to extempore can be customised through the variable `extempore-process-args'.
+The arguments passed to extempore can be customised through the
+variable `extempore-process-args'.
 
-Currently, the existence of an existing extempore process is determined by whether there is an *extempore* buffer."
+Currently, the existence of an existing extempore process is
+determined by whether there is an *extempore* buffer."
   (interactive)
   (if (not extempore-path)
       (message "Error: extempore-path undefined!")
