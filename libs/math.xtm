@@ -5,12 +5,12 @@
 
 
 ;;;;;;;;;; MATRIX ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; 
+;;
 ;; matrix functions
 ;;
-;; there are obviously faster options, but these
-;; are provided as a general option of last resort
+;; there are obviously faster options (such as linking to BLAS or
+;; LAPACK or the like), but these ones are nice if you want to keep
+;; everything in xtlang.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -94,7 +94,6 @@
 		 (pref ma (+ (* i c1) j)))))
       mb)))
 
-
 ;; determinant (doubles)
 ;; k is for sqr matrix
 (bind-func mdetrmd
@@ -102,19 +101,19 @@
     (if (= k 1) (pref ma 0)
 	(let ((det:double 0.0) (s:double 1.0)
 	      (c 0) (i 0) (j 0) (m 0) (n 0)
-	      (mb:double* (salloc (* k k))))	 
+	      (mb:double* (salloc (* k k))))
 	  (dotimes (c k)
 	    (set! m 0) (set! n 0)
 	    (dotimes (i k)
 	      (dotimes (j k)
 		(pset! mb (+ (* i k) j) 0.0)
 		(if (and (<> i 0) (<> j c))
-		    (begin 
+		    (begin
 		      (pset! mb (+ (* m (- k 1)) n)
 			     (pref ma (+ (* i k) j)))
-		      (if (< n (- k 2)) 
+		      (if (< n (- k 2))
 			  (set! n (+ n 1))
-			  (begin 
+			  (begin
 			    (set! n 0)
 			    (set! m (+ m 1)))))
 		    (begin 1))))
@@ -130,19 +129,19 @@
     (if (= k 1) (pref ma 0)
 	(let ((det:float 0.0) (s:float 1.0)
 	      (c 0) (i 0) (j 0) (m 0) (n 0)
-	      (mb:float* (salloc (* k k))))	 
+	      (mb:float* (salloc (* k k))))
 	  (dotimes (c k)
 	    (set! m 0) (set! n 0)
 	    (dotimes (i k)
 	      (dotimes (j k)
 		(pset! mb (+ (* i k) j) 0.0)
 		(if (and (<> i 0) (<> j c))
-		    (begin 
+		    (begin
 		      (pset! mb (+ (* m (- k 1)) n)
 			     (pref ma (+ (* i k) j)))
-		      (if (< n (- k 2)) 
+		      (if (< n (- k 2))
 			  (set! n (+ n 1))
-			  (begin 
+			  (begin
 			    (set! n 0)
 			    (set! m (+ m 1)))))
 		    (begin 1))))
@@ -150,7 +149,6 @@
 				     (mdetrmf mb (- k 1))))))
 	    (set! s (* -1.0 s)))
 	  det))))
-
 
 ;; invert matrix (doubles)
 (bind-func minvd
@@ -167,19 +165,18 @@
 	    (dotimes (j k)
 	      (pset! mb (+ (* i k) j) 0.0)
 	      (if (and (<> i q) (<> j p))
-		  (begin 
+		  (begin
 		    (pset! mb (+ (* m (- k 1)) n)
 			   (pref ma (+ (* i k) j)))
-		    (if (< n (- k 2)) 
+		    (if (< n (- k 2))
 			(set! n (+ n 1))
-			(begin 
+			(begin
 			  (set! n 0)
 			  (set! m (+ m 1)))))
 		  (begin 1))))
 	  (pset! fac (+ (* q k) p)
 		 (* (pow -1.0 (i64tod (+ q p)))
 		    (mdetrmd mb (- k 1))))))
-
       (dotimes (i k)
 	(dotimes (j k)
 	  (pset! mb (+ (* i k) j)
@@ -188,8 +185,7 @@
       (dotimes (i k)
 	(dotimes (j k)
 	  (pset! inv (+ (* i k) j)
-		 (/ (pref mb (+ (* i k) j)) d))))      
-
+		 (/ (pref mb (+ (* i k) j)) d))))
       inv)))
 
 ;; invert matrix (floats)
@@ -207,12 +203,12 @@
 	    (dotimes (j k)
 	      (pset! mb (+ (* i k) j) 0.0)
 	      (if (and (<> i q) (<> j p))
-		  (begin 
+		  (begin
 		    (pset! mb (+ (* m (- k 1)) n)
 			   (pref ma (+ (* i k) j)))
-		    (if (< n (- k 2)) 
+		    (if (< n (- k 2))
 			(set! n (+ n 1))
-			(begin 
+			(begin
 			  (set! n 0)
 			  (set! m (+ m 1)))))
 		  (begin 1))))
@@ -228,29 +224,27 @@
       (dotimes (i k)
 	(dotimes (j k)
 	  (pset! inv (+ (* i k) j)
-		 (/ (pref mb (+ (* i k) j)) d))))      
-
+		 (/ (pref mb (+ (* i k) j)) d))))
       inv)))
 
-      
-;; a unit test of sorts (doubles only)     
+;; a unit test of sorts (doubles only)
 (bind-func _matrix_test
   (lambda ()
     (let ((s:i64 4)
 	  (ma:double* (salloc (* s s)))
 	  (mb:double* (salloc (* s s)))
 	  (inv:double* (salloc (* s s))))
-      ;(pfill! ma 4. 1. 1. 2. 3. 1. 1. 1. 1.)      
-      (pfill! ma 
+      ;(pfill! ma 4. 1. 1. 2. 3. 1. 1. 1. 1.)
+      (pfill! ma
 	      4. 1. 1. 1.
-	      2. 3. 1. 1. 
+	      2. 3. 1. 1.
 	      1. 6. 5. 1.
-	      2. 2. 3. 1.)      
+	      2. 2. 3. 1.)
       (minvd ma s inv)
       (printf "\nmatrix a:      determinant:%f\n" (mdetrmd ma s))
       (mprintd ma s s)
       (printf "\ninverse of a:\n")
-      (mprintd inv s s)      
+      (mprintd inv s s)
       (printf "\nmatrix multiplication a*inv(a):\n")
       (mmuld ma s s inv s s mb)
       (mprintd mb s s)
@@ -260,11 +254,7 @@
       (printf "\n")
       void)))
 
-
-
-
 ;;;;;;;;;  FFT ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 ;;
 ;; You can get the source for kiss_fft from
 ;; http://sourceforge.net/projects/kissfft/
@@ -540,5 +530,3 @@
 
 (bind-poly inverse-fft inverse-fft-cpxf)
 (bind-poly inverse-fft inverse-fft-cpxd)
-
-
