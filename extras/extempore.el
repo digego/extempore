@@ -312,7 +312,7 @@ See `run-hooks'."
   (eval-when-compile
     (list
      ;; other type annotations (has to be first in list)
-     '(":\\S-+\\>"
+     '(":[^ \t)]?+"
        (0 font-lock-type-face))
      ;; built-ins
      (list
@@ -354,7 +354,7 @@ See `run-hooks'."
     (list
      ;; definitions
      ;; closure type annotations (i.e. specified with a colon)
-     '("(\\(bind-\\(func\\|poly\\)\\)\\s-+\\([^ :]+\\)\\(:\\S-*\\)?\\>"
+     '("(\\(bind-\\(func\\|poly\\)\\)\\s-+\\([^ \t:]+\\)\\(:[^ \t)]?+\\)?"
        (1 font-lock-keyword-face)
        (3 font-lock-function-name-face)
        (4 font-lock-type-face prepend t))
@@ -372,23 +372,23 @@ See `run-hooks'."
        extempore-xtlang-names 'symbols)
       '(1 font-lock-function-name-face))
      ;; bind-type/alias
-     '("(\\(bind-\\(type\\|alias\\)\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+     '("(\\(bind-\\(type\\|alias\\)\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
        (1 font-lock-keyword-face)
        (3 font-lock-function-name-face)
        (4 font-lock-type-face t))
      ;; bind-lib
-     '("(\\(bind-lib\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\))"
+     '("(\\(bind-lib\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
        (1 font-lock-keyword-face)
        (2 font-lock-constant-face)
        (3 font-lock-function-name-face)
        (4 font-lock-type-face t))
      ;; bind-val
-     '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\>"
+     '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\)\\_>"
        (1 font-lock-keyword-face)
        (2 font-lock-function-name-face)
        (3 font-lock-type-face t))
      ;; cast
-     '("(cast\\s-+\\S-+\\s-+\\(\\S-+\\)\\_>"
+     '("(cast\\s-+\\S-+\\s-+\\([^ \t)]?+\\))"
        (1 font-lock-type-face))
      ;; type coercion stuff
      (list
@@ -558,13 +558,18 @@ indentation."
 ;; dealing with the (external) extempore process
 
 (defun extempore-switch-to-process ()
-  "Switch to a shell buffer in which the extempore process is running.  If no such buffer exists, open a new *extempore* buffer and start a new extempore process.
+  "Switch to a shell buffer in which the extempore process is
+running. If no such buffer exists, open a new *extempore* buffer
+and start a new extempore process.
 
-The location of the extempore executable should be set with `extempore-path'.
+The location of the extempore executable should be set with
+`extempore-path'.
 
-The arguments passed to extempore can be customised through the variable `extempore-process-args'.
+The arguments passed to extempore can be customised through the
+variable `extempore-process-args'.
 
-Currently, the existence of an existing extempore process is determined by whether there is an *extempore* buffer."
+Currently, the existence of an existing extempore process is
+determined by whether there is an *extempore* buffer."
   (interactive)
   (if (not extempore-path)
       (message "Error: extempore-path undefined!")
