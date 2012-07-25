@@ -2,7 +2,7 @@
 ;;
 ;; spectral metering example
 ;;
-;; This example uses the fft/ifft bindings from math.xtm to draw a
+;; This example uses the fft/ifft bindings from fft.xtm to draw a
 ;; real-time visualisation of the magnitude spectrum of an audio
 ;; signal.
 
@@ -17,8 +17,7 @@
           (else (print "Unknown platform: " platform)))))
 
 ;; bind 4 sndfile lib functions.  for more detail about what these
-;; functions do, look at the sndfile.h header file which came with
-;; your libsndfile src/package
+;; functions do, look at the sndfile.h header
 (bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
 (bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
 (bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
@@ -45,7 +44,6 @@
 
 ;; setup a closure to hold audio data.  This lambda takes one argument:
 ;; the (string) path to the audio file
-
 (bind-func create_audio_closure
   (lambda (fname len)
     (let ((offset 0.0) ; offset into sound file
@@ -58,15 +56,15 @@
         adat))))
 
 ;; now, onto the fft/graphics stuff
-
 (define ctx (gl:make-ctx ":0.0" #f 0.0 0.0 1080.0 720.0))
 
+;; load the libraries we need
 (load "libs/external/fft.xtm")
 (load "libs/external/cairo_lib.xtm")
 (load "libs/external/opengl_lib.xtm")
 
 ;; let's make a helper type for holding rgb 3-tuples
-(bind-alias rgb_colour <double,double,double>)
+(bind-type rgb_colour <double,double,double>)
 
 (bind-func set_cairo_source_with_colour
   (lambda (cr colour:rgb_colour*)
@@ -76,10 +74,11 @@
                            (tref colour 2)
                            0.8)))
 
+;; draw an individual 'bar' in the spectrum
 (bind-func draw_spectral_bar
   (let ((orange_break 500.0)  ;marks transition to orange levels
-        (red_break 650.0)
-        (colour_array:|3,rgb_colour|* (alloc)))   ;marks transition to red levels
+        (red_break 650.0)     ;marks transition to red levels
+        (colour_array:|3,rgb_colour|* (alloc)))
     ;; fill the colours for the spectral levels
     (tfill! (aref-ptr colour_array 0) 0.0 0.8 0.1) ;green
     (tfill! (aref-ptr colour_array 1) 0.6 0.5 0.0) ;orange
@@ -121,6 +120,7 @@
                              orange_break bar_height))
         (cairo_fill cr)))))
 
+;; draw the frequency markins on the spectral meter
 (bind-func draw_spectrum_key
   (let ((num_ticks:i64 8)
         (str_buf:i8* (alloc 100))
@@ -160,6 +160,8 @@
         (draw_spectrum_key cr nbins bar_width)
         (cairo_image_surface_get_data surface)))))
 
+;; take a frequency domain signal (freq_buffer) of length N, and return the
+;; average magnitude in n bins (with n < N)
 (bind-func bin_spectrum
   (let ((i:i64 0)
         (j:i64 0)
@@ -169,11 +171,12 @@
         (dotimes (i nbins)
           (set! sum 0.0)
           (dotimes (j (* i bin_width) bin_width)
-            (set! sum (+ sum (magnitude-cpxd (pref-ptr freq_buffer j)))))
+            (set! sum (+ sum (magnitude_cpxd (pref-ptr freq_buffer j)))))
           (pset! spectrum i (* 2.0 (/ sum (i64tod bin_width)))))))))
 
+;; take the time_domain signal (time_buffer) and return the spectrum
 (bind-func mag_spectrum
-  (let ((nbins 64) ; number of bins for spectrogram
+  (let ((nbins 256) ; number of bins for spectrogram
         (spectrum:double* (zalloc nbins))
         (i:i64 0))
     (lambda (audio:double* window_size time_buffer freq_buffer)
@@ -184,10 +187,10 @@
                (+ (pref audio (* 2 i)) ; L channel
                   (pref audio (+ 1 (* 2 i)))))) ; R channel
       ;; take DFT, store results in freq_buffer
-      (fft-cpxd time_buffer freq_buffer window_size)
+      (fft_cpxd time_buffer freq_buffer window_size)
       (bin_spectrum spectrum freq_buffer window_size nbins))))
 
-;; draw surface data returned from test2
+;; draw the surface data returned from spectrum_visualiser
 (bind-func gl-draw 1000000
   (lambda (spectrum:double* nbins)
     (glLoadIdentity)
@@ -207,7 +210,7 @@
                                              audio_length))
         (audio (audio_closure))
         (playhead 0)
-        (window_size 128)
+        (window_size 512)
         (time_buffer:cpxd* (zalloc window_size))
         (freq_buffer:cpxd* (zalloc window_size))
         (i:i64 0))
@@ -225,14 +228,14 @@
 
 (dsp:set! dsp)
 
-;; note to self - maybe need to call glLoadIdentity from scheme?
-;; statefulness and all that
-
-;; standard callback
+;; the animation callback - remember this is in scheme, not xtlang
 (define spectrum-animation
-  (lambda (beat dur)
+  (lambda (time fps)
     (gl-draw (mag_spectrum.spectrum) (mag_spectrum.nbins))
     (gl:swap-buffers ctx)
-    (callback (*metro* (+ beat (* .5 dur))) 'spectrum-animation (+ beat dur) dur)))
+    (callback (+ time (* 0.5 (/ *samplerate* fps)))
+              'spectrum-animation
+              (+ time (/ *samplerate* fps))
+              fps)))
 
-(spectrum-animation (*metro* 'get-beat 4) 1/10)
+(spectrum-animation (now) 30)
