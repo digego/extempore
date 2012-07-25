@@ -6,59 +6,11 @@
 ;; real-time visualisation of the magnitude spectrum of an audio
 ;; signal.
 
-;; First, we need to set up some functions to play a sound file.  This
-;; code is all taken from the sndfile.xtm example
-
-(define libsndfile
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:open-dylib "libsndfile.so"))
-          ((string=? platform "Windows") (sys:open-dylib "libsndfile.dll"))
-          ((string=? platform "OSX") (sys:open-dylib "libsndfile.dylib"))
-          (else (print "Unknown platform: " platform)))))
-
-;; bind 4 sndfile lib functions.  for more detail about what these
-;; functions do, look at the sndfile.h header
-(bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
-(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
-(bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
-(bind-lib libsndfile sf_strerror [i8*,i8*]*)
-
-;; an audio buffer reader
-(bind-func read-audio-file
-  (lambda (fname dat offset num)
-    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
-	  (audiofile (sf_open fname 16 info))
-	  (channels (i32toi64 (tref info 2)))
-	  (num-to-read (* num channels))
-	  (num-to-offset (* offset channels))
-	  (cnt (sf_seek audiofile num-to-offset 0))
-	  (samples-read (sf_read_double audiofile dat num-to-read)))
-      (if (<> null audiofile)
-          (begin
-            (printf "file name: %s\n" fname)
-            (printf "samplerate: %d\n" (tref info 1))
-            (printf "channels: %d\n" (tref info 2))
-            (printf "samples read: %lld\n" samples-read))
-          (printf "errors:\t\t %s\n" (sf_strerror audiofile)))
-      dat)))
-
-;; setup a closure to hold audio data.  This lambda takes one argument:
-;; the (string) path to the audio file
-(bind-func create_audio_closure
-  (lambda (fname len)
-    (let ((offset 0.0) ; offset into sound file
-          (adat:double* (zalloc (* 44100 2 (dtoi64 len)))))
-      (lambda ()
-        (read-audio-file fname
-                         adat
-                         (dtoi64 (* 44100.0 offset))
-                         (dtoi64 (* 44100.0 len)))
-        adat))))
-
-;; now, onto the fft/graphics stuff
+;; need to create the context before loading the graphics library
 (define ctx (gl:make-ctx ":0.0" #f 0.0 0.0 1080.0 720.0))
 
 ;; load the libraries we need
+(load "libs/external/sndfile_lib.xtm")
 (load "libs/external/fft.xtm")
 (load "libs/external/cairo_lib.xtm")
 (load "libs/external/opengl_lib.xtm")
@@ -166,29 +118,29 @@
   (let ((i:i64 0)
         (j:i64 0)
         (sum 0.0))
-    (lambda (spectrum:double* freq_buffer window_size nbins)
-      (let ((bin_width (/ (/ window_size nbins) 2)))
+    (lambda (spectrum:double* freq_buffer fft_window_size nbins)
+      (let ((bin_width (/ (/ fft_window_size nbins) 2)))
         (dotimes (i nbins)
           (set! sum 0.0)
           (dotimes (j (* i bin_width) bin_width)
             (set! sum (+ sum (magnitude_cpxd (pref-ptr freq_buffer j)))))
-          (pset! spectrum i (* 2.0 (/ sum (i64tod bin_width)))))))))
+          (pset! spectrum i (* 1.0 (/ sum (i64tod bin_width)))))))))
 
 ;; take the time_domain signal (time_buffer) and return the spectrum
 (bind-func mag_spectrum
-  (let ((nbins 256) ; number of bins for spectrogram
+  (let ((nbins 512) ; number of bins for spectrogram
         (spectrum:double* (zalloc nbins))
         (i:i64 0))
-    (lambda (audio:double* window_size time_buffer freq_buffer)
-      (dotimes (i window_size)
+    (lambda (audio:double* fft_window_size time_buffer freq_buffer)
+      (dotimes (i fft_window_size)
         ;; add sum of L and R channels into real component
         ;; of time_buffer (which is a buffer of complex values
         (tset! (pref-ptr time_buffer i) 0
                (+ (pref audio (* 2 i)) ; L channel
                   (pref audio (+ 1 (* 2 i)))))) ; R channel
       ;; take DFT, store results in freq_buffer
-      (fft_cpxd time_buffer freq_buffer window_size)
-      (bin_spectrum spectrum freq_buffer window_size nbins))))
+      (fft_cpxd time_buffer freq_buffer fft_window_size)
+      (bin_spectrum spectrum freq_buffer fft_window_size nbins))))
 
 ;; draw the surface data returned from spectrum_visualiser
 (bind-func gl-draw 1000000
@@ -205,24 +157,26 @@
 ;; dsp function - this will play the sound file.  Remember to
 ;; change the file path to an audio file on your system
 (bind-func dsp:DSP 100000000 ; make sure we allocate enough memory
-  (let ((audio_length 60.0)
-        (audio_closure (create_audio_closure "/Users/ben/Desktop/peg.wav"
-                                             audio_length))
-        (audio (audio_closure))
+  (let ((audio_length 60)
+        (audio:double* (zalloc (* 44100 2 audio_length)))
+        (samples_read (read_audio_file "/Users/ben/Desktop/peg.wav"
+                                       audio
+                                       0
+                                       (* 44100 audio_length)))
         (playhead 0)
-        (window_size 512)
-        (time_buffer:cpxd* (zalloc window_size))
-        (freq_buffer:cpxd* (zalloc window_size))
+        (fft_window_size 1024)
+        (time_buffer:cpxd* (zalloc fft_window_size))
+        (freq_buffer:cpxd* (zalloc fft_window_size))
         (i:i64 0))
     (lambda (in time chan dat)
-      (if (and (= (modulo playhead window_size) 0)
+      (if (and (= (modulo playhead fft_window_size) 0)
                (= chan 0.0))
-          (mag_spectrum (pref-ptr audio playhead) window_size
+          (mag_spectrum (pref-ptr audio playhead) fft_window_size
                         time_buffer freq_buffer))
       ;; increment playhead once per (stereo) pair of samples
       (if (= chan 1.0)
           (set! playhead (modulo (+ playhead 1)
-                                 (* (dtoi64 audio_length) 44100))))
+                                 (* audio_length 44100))))
       ;; play audio
       (pref audio (+ (dtoi64 chan) (* 2 playhead))))))
 
