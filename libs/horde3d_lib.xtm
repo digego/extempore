@@ -25,7 +25,7 @@
 	(not hordeutlib)) 
     (print-error "Could not load 'Horde3d' dynamic library"))
 
-(define new-horde #f)
+(define new-horde #t)
 
 (if new-horde
     (begin
@@ -54,12 +54,15 @@
 (bind-lib hordelib h3dFindResource [i32,i32,i8*]*)
 (bind-lib hordelib h3dGetNodeFindResult [i32,i32]*)
 (bind-lib hordelib h3dGetNodeAABB [void,i32,float*,float*,float*,float*,float*,float*]*)
-(bind-lib hordelib h3dSetNodeParamF [void,i32,i32,i32,float]*)
 (bind-lib hordelib h3dSetMaterialUniform [i1,i32,i8*,float,float,float,float]*)
 (bind-lib hordelib h3dSetModelAnimParams [void,i32,i32,float,float]*)
 (bind-lib hordelib h3dAddEmitterNode [i32,i32,i8*,i32,i32,i32,i32]*)
 (bind-lib hordelib h3dGetNodeParamI [i32,i32,i32]*)
 (bind-lib hordelib h3dSetNodeParamI [void,i32,i32,i32]*)
+(bind-lib hordelib h3dGetNodeParamStr [i8*,i32,i32]*)
+(bind-lib hordelib h3dSetNodeParamStr [void,i32,i32,i8*]*)
+(bind-lib hordelib h3dGetNodeParamF [float,i32,i32,i32]*)
+(bind-lib hordelib h3dSetNodeParamF [void,i32,i32,i32,float]*)
 (bind-lib hordelib h3dGetNodeFlags [i32,i32]*)
 (bind-lib hordelib h3dSetNodeFlags [void,i32,i32,i1]*)
 (bind-lib hordelib h3dRender [void,i32]*)
@@ -79,6 +82,7 @@
 (bind-lib hordelib h3dSetNodeParent [i32,i32,i32]*)
 (bind-lib hordelib h3dGetResParamI [i32,i32,i32,i32,i32]*)
 (bind-lib hordelib h3dSetResParamI [void,i32,i32,i32,i32,i32]*)
+(bind-lib hordelib h3dGetCameraProjMat [void,i32,float*]*)
 
 ;; horde utils
 (bind-lib hordeutlib h3dutDumpMessages [i1]*)
@@ -87,6 +91,7 @@
 (bind-lib hordeutlib h3dutScreenshot [i1,i8*]*)
 (bind-lib hordeutlib h3dutShowFrameStats [void,i32,i32,i32]*)
 (bind-lib hordeutlib h3dutPickRay [void,i32,float,float,float*,float*,float*,float*,float*,float*]*)
+(bind-lib hordeutlib h3dutPickNode [i32,i32,float,float]*)
 					     
 ;; global contants
 
@@ -137,6 +142,10 @@
 (bind-val H3DNodeFlags_NoCastShadow i32 2)
 (bind-val H3DNodeFlags_NoRayQuery i32 4)
 (bind-val H3DNodeFlags_Inactive i32 7)
+
+;; H3DNodeParams
+(bind-val H3DNodeParams_NameStr i32 1)
+(bind-val H3DNodeParams_AttachmentStr i32 2)
 
 ;; Model Node Params
 (bind-val H3DModel_GeoResI i32 200)

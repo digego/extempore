@@ -456,7 +456,38 @@
 
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Some coordinate helpers
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(bind-func get_2d_point 
+  (lambda (point4d:double* vmat:double* pmat:double* width:double height:double x:double* y:double*)
+    (let ((vpm:double* (zalloc 16))
+	  (point:double* (zalloc 4)))
+      (mmuld pmat 4 4 vmat 4 4 vpm)
+      (mmuld vpm 4 4 point4d 4 1 point)
+      (pset! x 0 (* (/ (+ (pref point 0) 1.0) 2.0) width))
+      (pset! y 0 (* (/ (- 1.0 (pref point 1)) 2.0) height))
+      void)))
+
+(bind-func get_3d_point
+  (lambda (x:double y:double width:double height:double vmat:double* pmat:double* point3d:double*)
+    (let ((vpmi:double* (salloc 16))
+	  (vpm:double* (salloc 16))		       
+	  (point:double* (salloc 4))
+	  (xx (- (* 2.0 (/ x width)) 1.0))
+	  (yy (- 1.0 (* 2.0 (/ y height)))))
+      (mmuld vmat 4 4 pmat 4 4 vpm)
+      (minvd vpm 4 vpmi)
+      (pfill! point xx yy 0.0 1.0)
+      (mmuld vpmi 4 4 point 4 1 point3d)
+      void)))
+      
+	  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;  GL DRAWING STUFF (deprecated use cairo)
 ;;
