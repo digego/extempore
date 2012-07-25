@@ -1064,73 +1064,13 @@
 ;; define default instrument called synth
 (define-instrument synth synth-note synth-fx)
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Audio File Reading Stuff
+;; SAMPLER STUFF
 ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; load highgui dynamic library
-(define libsndfile (if (string=? "Linux" (sys:platform))		       
-		       (sys:open-dylib "libsndfile.so.1")
-		       (if (string=? "OSX" (sys:platform))
-			   (sys:open-dylib "libsndfile.1.dylib")
-			   (sys:open-dylib "libsndfile-1.dll"))))
-
-
-;; bind 3 sndfile lib functions
-(bind-lib libsndfile sf_open [i8*,i8*,i32,<i64,i32,i32,i32,i32,i32>*]*)
-(bind-lib libsndfile sf_close [i32,i8*]*)
-(bind-lib libsndfile sf_write_sync [void,i8*]*)
-(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
-(bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
-(bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
-(bind-lib libsndfile sf_strerror [i8*,i8*]*)
-
-;; size of audio data in file (in bytes)
-(bind-func print-audio-file-info
-  (lambda (fname)
-    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
-	  (audiofile (sf_open fname 16 info))
-	  (channels (i32toi64 (tref info 2))))
-      (printf "---------------\n")
-      (printf "filename:\t %s\n" fname)
-      (printf "errors:\t\t %s\n" (sf_strerror audiofile))
-      (printf "samplerate:\t %d\n" (tref info 1))
-      (printf "channels:\t %d\n" (tref info 2))
-      (printf "frames:\t\t %lld\n" (tref info 0))
-      (printf "seconds:\t %f\n"
-      	      (/ (i64tod (/ (tref info 0) (i32toi64 (tref info 2))))
-      		 (i32tod (tref info 1))))
-      (sf_close audiofile))))
-
-;; an audio buffer reader
-(bind-func read-audio-data
-  (lambda (fname dat offset num)
-    ;(printf "in: %s %p %lld %lld\n" fname dat offset num)
-    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
-	  (audiofile (sf_open fname 16 info))
-	  (cnt (sf_seek audiofile offset 0))
-	  (samples-read (sf_read_double audiofile dat num)))
-      (sf_close audiofile)
-      samples-read)))
-
-;; write out an audio buffer
-(bind-func write-audio-data
-  (lambda (fname frames channels:i32 dat)
-    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc)))
-      (tset! info 0 frames)
-      (tset! info 1 (dtoi32 SAMPLERATE))
-      (tset! info 2 channels)
-      (tset! info 3 (+ 131072 2)) ;; + 6 for 32 bit float (+ 2 for 16 bit signed)
-      (let ((audiofile (sf_open fname 32 info))
-	    (samples-written (sf_write_double audiofile dat (* (i32toi64 channels) frames))))
-	(if (null? audiofile)
-	    (printf "error writing file: %s\n" (sf_strerror audiofile)))
-	(sf_write_sync audiofile)
-	(sf_close audiofile)
-	samples-written))))
+(load "libs/external/sndfile_lib.xtm")
 
 ;; helper function for adding sample data to sampler
 ;; this assumes stereo files at the moment!!
@@ -1168,18 +1108,18 @@
 	    (sf_close audiofile)
 	    1)
 	  (begin (printf "%s\n" (sf_strerror audiofile))
-		 0)))))
+		 0))))
 
 
-;; passing a length of 0 will read the whole file
-(define-macro (set-sampler-index inst fname index offset lgth)  
-  `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
-     (if (cptr? native)
-	 (set-sample-data_ native
-			   ,fname
-			   (real->integer ,index)
-			   (real->integer ,offset)
-			   (real->integer ,lgth)))))
+  ;; passing a length of 0 will read the whole file
+  (define-macro (set-sampler-index inst fname index offset lgth)  
+    `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+       (if (cptr? native)
+           (set-sample-data_ native
+                             ,fname
+                             (real->integer ,index)
+                             (real->integer ,offset)
+                             (real->integer ,lgth))))))
 
 
 ;; helper functions for setting an individual samples offset
@@ -1200,13 +1140,6 @@
 			     (real->integer ,index)
 			     (real->integer ,offset)))))
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; SAMPLER STUFF
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func hermite-interp
   (lambda (fractional y1:double x0 x1 x2)
