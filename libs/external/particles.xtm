@@ -72,7 +72,7 @@
   (lambda (psys:psystem* idx)
     (let ((states (psystem_states psys))
 	  (size (psystem_size psys)))
-      (if (> idx (- size 1)) -1	  
+      (if (> idx (- size 1)) -1
 	  (if (< (pref states idx) 1)
 	      idx
 	      (psystem-particle-check psys (+ idx 1)))))))
@@ -85,7 +85,7 @@
       (if (or (= free-particle -1)
 	      (> free-particle size))
 	  void ;; don't do anything if no free particles
-          (let ((states (tref psys 1))
+	  (let ((states (tref psys 1))
 		(xs (tref psys 2))
 		(ys (tref psys 3))
 		(xvs (tref psys 4))
@@ -115,7 +115,7 @@
       (if (= free-particle -1)
 	  void ;; don't do anything if no free particles
 	  (begin (psystem-set-particle psys free-particle x y s xx yy r g b a dur)
-		 void)))))		  
+		 void)))))
 
 
 ;; draw system
@@ -145,7 +145,7 @@
 	(glDisable GL_DEPTH_TEST)
 	(glDepthMask GL_FALSE)
 	(glBlendFunc GL_SRC_ALPHA GL_ONE)
-	
+
 	(dotimes (i size)
 	  (set! state (pref states i))
 	  (if (> state 0)
@@ -184,8 +184,8 @@
 	(glEnable GL_COLOR_MATERIAL)
 	(if (> texid 0)
 	    (begin (glActiveTexture GL_TEXTURE0)
-	           (glDisable GL_TEXTURE_RECTANGLE_ARB)
-	           (glEnable GL_TEXTURE_2D)
+		   (glDisable GL_TEXTURE_RECTANGLE_ARB)
+		   (glEnable GL_TEXTURE_2D)
 		   (glBindTexture GL_TEXTURE_2D texid)
 		   (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
 		   (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
@@ -196,11 +196,11 @@
 
 	(glEnableClientState GL_VERTEX_ARRAY)
 	(glEnableClientState GL_COLOR_ARRAY)
-	(glEnableClientState GL_TEXTURE_COORD_ARRAY)	
-	
+	(glEnableClientState GL_TEXTURE_COORD_ARRAY)
+
 	(glVertexPointer 2 GL_FLOAT 0 (bitcast vertex_dat i8*))
-	(glTexCoordPointer 2 GL_FLOAT 0 (bitcast texcoord_dat i8*))	
-	(glColorPointer 4 GL_FLOAT 0 (bitcast color_dat i8*))	
+	(glTexCoordPointer 2 GL_FLOAT 0 (bitcast texcoord_dat i8*))
+	(glColorPointer 4 GL_FLOAT 0 (bitcast color_dat i8*))
 	(glDrawArrays GL_QUADS 0 (* (i64toi32 cnt) 4))
 
 	(glDisableClientState GL_VERTEX_ARRAY)
@@ -213,7 +213,7 @@
 		   (glBindTexture GL_TEXTURE_2D 0)
 		   (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE)
 		   1))
-	
+
 	(glDepthMask GL_TRUE)
 	(glEnable GL_DEPTH_TEST)
 	(glDisable GL_COLOR_MATERIAL)
@@ -229,7 +229,7 @@
     (let ((size (psystem_size psys))
 	  (states (psystem_states psys))
 	  (xs (psystem_xs psys))
-	  (ys (psystem_ys psys))	  
+	  (ys (psystem_ys psys))
 	  (xvs (psystem_xvs psys))
 	  (yvs (psystem_yvs psys))
 	  (i 0)
@@ -241,5 +241,3 @@
 		   (pset! xs i (+ (pref xs i) (pref xvs i)))
 		   (pset! ys i (+ (pref ys i) (pref yvs i))))))
       cnt))) ;; return number of active particles
-    
-	
