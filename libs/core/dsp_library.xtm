@@ -707,9 +707,9 @@
 	  (oldx 0.0) (oldy1 0.0) (oldy2 0.0) (oldy3 0.0))
       (lambda (in cutoff)
 	(let (;(f (* 2.0 (/ cutoff SAMPLERATE)))
-	      ;(f (* 1.8 (/ cutoff SAMPLERATE)))
+                                        ;(f (* 1.8 (/ cutoff SAMPLERATE)))
 	      (f (* 1.75 (/ cutoff SAMPLERATE)))
-              ;(k (- (* 2.0 (sin (* f (/ PI 2.0)))) 1.0))
+                                        ;(k (- (* 2.0 (sin (* f (/ PI 2.0)))) 1.0))
 	      (k (- (- (* 3.6 f) (* 1.6 (* f f))) 1.0))
 	      (p (* 0.5 (+ k 1.0)))
 	      (scale (exp (* (- 1.0 p) 1.386249)))
@@ -790,7 +790,7 @@
   (lambda (time:double apex:double)
     (let ((h (* time apex)))
       (* h (exp (- 1.0 h))))))
-	  
+
 
 (bind-func make-line
   (lambda (x1:double y1:double x2 y2)
@@ -883,10 +883,10 @@
 ;; relative time USING adsr-accum + local mzone
 (bind-func make-note
   (lambda (start-time:double freq:double amp:double dur 
-		      attack:double decay:double release:double sus-amp:double
-		      nstarts:double*
-		      idx:i64 kernel:[double,double,double,double,double]*
-		      notezone:mzone*)
+                        attack:double decay:double release:double sus-amp:double
+                        nstarts:double*
+                        idx:i64 kernel:[double,double,double,double,double]*
+                        notezone:mzone*)
     (let ((env (if (< (+ attack decay) dur)
 		   (make-adsr-accum 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
 		   (make-adsr-accum 0.0 0.0 0.0 dur release 1.0 sus-amp)))
@@ -909,7 +909,7 @@
 	    (release:double 1000.0)
 	    (sustain:double 0.6) ;; amplitude of the sustain
 	    (gain 2.0)
-	    ;(active 0)
+                                        ;(active 0)
 	    (ii 0)
 	    (note-starts:double* (zalloc poly))
 	    (new-note (lambda (start freq dur amp)
@@ -1035,31 +1035,31 @@
 		 (+ (oscr2 1.0 (+ freq (* 5.0 (random))))
 		    (lpf2 (saw2 fxamp freq) (* 3.0 freq))
 		    (oscr 0.8 (+ freq (oscr3 (* 0.99 freq)
-		       		     (* freq 0.99))))))))))))
+                                             (* freq 0.99))))))))))))
 
 
 (bind-func synth-fx 262144
-  (let ((dleft (dtoi64 (* 0.125 SAMPLERATE)))
-	(dlyl (make-delay dleft))
-	(dright (dtoi64 (* 0.33333333 SAMPLERATE)))
-	(dlyr (make-delay dright))
-	(pan .5)
-	(pan_old pan)
-	(wet_ .0)
-	(wet .3))
-    (lambda (in:double time:double chan:double dat:double*)
-      (if (< pan_old pan) ;; interpolate pan
-	  (set! pan_old (+ pan_old .001))
-	  (set! pan_old (- pan_old .001)))
-      (if (<> wet wet_)
-	  (begin (dlyl.out wet)
-		 (dlyr.out wet)
-		 (set! wet_ wet)))
-      (cond ((< chan 1.0) 
-	     (dlyl (* 2.0 pan_old in)))
-	    ((< chan 2.0)
-	     (dlyr (* 2.0 (- 1.0 pan_old) in)))
-	    (else 0.0)))))
+           (let ((dleft (dtoi64 (* 0.125 SAMPLERATE)))
+                 (dlyl (make-delay dleft))
+                 (dright (dtoi64 (* 0.33333333 SAMPLERATE)))
+                 (dlyr (make-delay dright))
+                 (pan .5)
+                 (pan_old pan)
+                 (wet_ .0)
+                 (wet .3))
+             (lambda (in:double time:double chan:double dat:double*)
+               (if (< pan_old pan) ;; interpolate pan
+                   (set! pan_old (+ pan_old .001))
+                   (set! pan_old (- pan_old .001)))
+               (if (<> wet wet_)
+                   (begin (dlyl.out wet)
+                          (dlyr.out wet)
+                          (set! wet_ wet)))
+               (cond ((< chan 1.0) 
+                      (dlyl (* 2.0 pan_old in)))
+                     ((< chan 2.0)
+                      (dlyr (* 2.0 (- 1.0 pan_old) in)))
+                     (else 0.0)))))
 
 ;; define default instrument called synth
 (define-instrument synth synth-note synth-fx)
@@ -1083,7 +1083,7 @@
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000) 
 (bind-func set-sample-data_
   (lambda (inst:[double,double,double,double*]* fname index offset lgth)    
-    (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
+    (let ((info:sf_info* (zalloc))
 	  (audiofile (sf_open fname 16 info))
 	  (channels (i32toi64 (tref info 2)))		     
 	  (num (if (= 0 lgth)
@@ -1103,23 +1103,22 @@
 	    (pset! samples-channels index channels)    
 	    (pset! samples index adat)
 	    ;; the following line is a problem on windows and needs to be fixed!
-	    ; (free_after_delay olddat (* 10.0 44100.0)))
+                                        ; (free_after_delay olddat (* 10.0 44100.0)))
 	    (printf "%s:\t%lld(channels) %lld(frames):%f(k)\t\tinto index:%lld\n" fname channels (/ read channels) (/ (i64tod (* num 8)) 1024.) index)
 	    (sf_close audiofile)
 	    1)
 	  (begin (printf "%s\n" (sf_strerror audiofile))
-		 0))))
+		 0)))))
 
-
-  ;; passing a length of 0 will read the whole file
-  (define-macro (set-sampler-index inst fname index offset lgth)  
-    `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
-       (if (cptr? native)
-           (set-sample-data_ native
-                             ,fname
-                             (real->integer ,index)
-                             (real->integer ,offset)
-                             (real->integer ,lgth))))))
+;; passing a length of 0 will read the whole file
+(define-macro (set-sampler-index inst fname index offset lgth)  
+  `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (cptr? native)
+         (set-sample-data_ native
+                           ,fname
+                           (real->integer ,index)
+                           (real->integer ,offset)
+                           (real->integer ,lgth)))))
 
 
 ;; helper functions for setting an individual samples offset
@@ -1224,26 +1223,26 @@
 
 
 (bind-func sampler-fx 400000
-  (let ((reverbl (make-reverb 80.0))
-	(reverbr (make-reverb 79.0))	
-	(pan .5)
-	(pan_ pan)
-	(wet .25)
-	(wet_ wet))
-    ;; some reverb?
-    (reverbl.wet wet)
-    (reverbr.wet wet)
-    (lambda (in:double time:double chan:double dat:double*)      
-      (if (<> wet wet_)
-	  (begin (reverbl.wet wet)
-		 (reverbr.wet wet)
-		 (set! wet_ wet)))
-      (if (< pan pan_)
-	  (set! pan_ (- pan_ .001))
-	  (set! pan_ (+ pan_ .001)))
-      (if (< chan 1.0)
-	  (reverbl (* 1.5 (* pan_ in)))
-	  (reverbr (* 1.5 (* (- 1.0 pan_) in)))))))
+           (let ((reverbl (make-reverb 80.0))
+                 (reverbr (make-reverb 79.0))	
+                 (pan .5)
+                 (pan_ pan)
+                 (wet .25)
+                 (wet_ wet))
+             ;; some reverb?
+             (reverbl.wet wet)
+             (reverbr.wet wet)
+             (lambda (in:double time:double chan:double dat:double*)      
+               (if (<> wet wet_)
+                   (begin (reverbl.wet wet)
+                          (reverbr.wet wet)
+                          (set! wet_ wet)))
+               (if (< pan pan_)
+                   (set! pan_ (- pan_ .001))
+                   (set! pan_ (+ pan_ .001)))
+               (if (< chan 1.0)
+                   (reverbl (* 1.5 (* pan_ in)))
+                   (reverbr (* 1.5 (* (- 1.0 pan_) in)))))))
 
 
 ;; make sampler instrument
@@ -1261,7 +1260,7 @@
 	    (sustain:double 1.0) ;; amplitude of the sustain
 	    (gain:double 2.0)
 	    (kk:i64 0) (ii:i64 0)
-	    ;(active:i64 0)
+                                        ;(active:i64 0)
 	    (note-starts:double* (zalloc poly))
 	    (new-note (lambda (start freq dur amp)
 			(let ((free-note:i64 -1)
@@ -1281,8 +1280,8 @@
 				       (let ((v (llabs (- idx idxi))))
 					 (if (and (<> (aref samples-length idxi) 0)
 						  (< v closest))
-				      (begin (set! new-idx idxi)
-					     (set! closest v) 0))))
+                                             (begin (set! new-idx idxi)
+                                                    (set! closest v) 0))))
 				     (let ((note_zone (push_zone (* 1024 10))))
 				       (pset! notes free-note
 					      (make-note start freq amp dur
@@ -1321,7 +1320,7 @@
 		    (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
 			  ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
 		(if sharp (+ pc offset 1) (+ offset pc))))))))
-	      
+
 
 ;; must be stereo samples of type wav aif or ogg
 (define-macro (load-sampler sampler path)
@@ -1399,10 +1398,10 @@
 (ascii-print-color 1 7 10) 
 (print "All set to go!\n")	      			
 (ascii-print-color 0 7 10)
-;(synth.active 1)
-;(print "'Synth' active = true\n")
-;(sampler.active 1)
-;(print "'Sampler' active = true\n")
+                                        ;(synth.active 1)
+                                        ;(print "'Synth' active = true\n")
+                                        ;(sampler.active 1)
+                                        ;(print "'Sampler' active = true\n")
 (print)
 (print "You have two default instruments loaded 'synth' and 'sampler'\n")
 (print)
