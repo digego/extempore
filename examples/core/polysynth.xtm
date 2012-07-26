@@ -11,7 +11,19 @@
 ;;      [just have to put up with the audio delays while compiling
 ;;
 
-(load "libs/core/dsp_library.xtm")
+(load "libs/core/instruments.xtm")
+
+;; define default instrument called synth
+(define-instrument synth synth-note synth-fx)
+
+(bind-func dsp:DSP
+  (lambda (in time chan dat)
+    (cond ((< chan 2.0)
+	   (synth in time chan dat))
+	  (else 0.0))))
+
+(dsp:set! dsp)
+
 
 ;; first let's play with the default synth defined in dsp_library
 ;; the default synth is called .... synth
