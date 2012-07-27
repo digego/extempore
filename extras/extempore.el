@@ -196,7 +196,7 @@ See `run-hooks'."
   :group 'extempore)
 
 (defcustom extempore-process-args nil
-  "Arguments to pass to the extempore process started by `extempore-switch-to-process'."
+  "Arguments to pass to the extempore process started by `extempore-setup'."
   :type 'string
   :group 'extempore)
 
@@ -224,7 +224,7 @@ See `run-hooks'."
   :group 'extempore)
 
 (defun extempore-keybindings (keymap)
-  (define-key keymap (kbd "C-x C-y") 'extempore-switch-to-process)
+  (define-key keymap (kbd "C-x C-y") 'extempore-setup)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-x C-x") 'extempore-send-definition)
   (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
@@ -557,7 +557,7 @@ indentation."
 
 ;; dealing with the (external) extempore process
 
-(defun extempore-switch-to-process ()
+(defun extempore-setup ()
   "Switch to a shell buffer in which the extempore process is
 running. If no such buffer exists, open a new *extempore* buffer
 and start a new extempore process.
@@ -571,18 +571,17 @@ variable `extempore-process-args'.
 Currently, the existence of an existing extempore process is
 determined by whether there is an *extempore* buffer."
   (interactive)
-  (if (not extempore-path)
-      (message "Error: extempore-path undefined!")
-    (if (get-buffer "*extempore*")
-        (display-buffer "*extempore*")
+  (let ((extempore-trigger-string
+         (concat (concat "cd " extempore-path "\n")
+                 (concat "./extempore " (or extempore-process-args "") "\n"))))
+    (unless extempore-path
+      (error "Error: `extempore-path' not set!"))
+    ;; create a buffer for the shell & extempore processes
+    (unless (get-buffer "*extempore*")
       (progn (shell "*extempore*")
              (sit-for 1)
-             (process-send-string "*extempore*"
-                                  (concat "cd " extempore-path "\n"))
-             (process-send-string "*extempore*"
-                                  (concat "./extempore "
-                                          (or extempore-process-args
-                                              "") "\n"))))))
+             (process-send-string "*extempore*" extempore-trigger-string)))
+    (display-buffer "*extempore*")))
 
 (defun extempore-connect (host port)
   "Connect to the running extempore process, which must
