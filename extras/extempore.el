@@ -576,6 +576,7 @@ determined by whether there is an *extempore* buffer."
     (if (get-buffer "*extempore*")
         (display-buffer "*extempore*")
       (progn (shell "*extempore*")
+             (sit-for 1)
              (process-send-string "*extempore*"
                                   (concat "cd " extempore-path "\n"))
              (process-send-string "*extempore*"
