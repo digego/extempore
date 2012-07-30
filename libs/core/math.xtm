@@ -547,3 +547,26 @@
                1
                (ftod (tref (pref-ptr in_cpxf i) 1)))))
     void))
+
+;;;;;;;;;; WINDOWING ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; these window functions fill buffer which represents the
+;; associated window of length `window_length'.
+
+(bind-func window_hamming
+  (let ((i:i64 0))
+    (lambda (window_buffer:double* window_length)
+      (dotimes (i window_length)
+        (pset! window_buffer i
+               (* 0.5 (+ 1.0 (cos (/ (* TWOPI (i64tod i))
+                                     (i64tod (- window_length 1))))))))
+      void)))
+
+(bind-func window_hanning
+  (let ((i:i64 0))
+    (lambda (window_buffer:double* window_length)
+      (dotimes (i window_length)
+        (pset! window_buffer i
+               (+ 0.54 (* 0.46 (cos (/ (* TWOPI (i64tod i))
+                                       (i64tod (- window_length 1))))))))
+      void)))
