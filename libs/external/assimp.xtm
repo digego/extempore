@@ -1,0 +1,499 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; SOIL Image Stuff
+;;
+;; You will need to make sure you have the
+;; Simple OpengGL image library (SOIL) installed
+;; You can get source from here:
+;; http://www.lonesock.net/soil.html
+;; Make sure you make libSOIL.so.1 (or similar dylib) accessible
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; soil image lib
+(define soillib (sys:open-dylib "libSOIL.so.1"))
+(bind-lib soillib SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
+(bind-lib soillib SOIL_load_image [i8*,i8*,i32*,i32*,i32*,i32]*)
+
+
+;; load texture and returns texture number
+;; 16 is for verticle flip
+;; 512 is for GL_TEXTURE_RECTANGLE_ARB (otherwise GL_TEXTURE_2D)
+;; 4 is for repeat
+;; 8 multiply alpha
+(bind-func load-ogl-texture
+  (lambda (path idx:i32)
+    (let ((res (SOIL_load_OGL_texture path 4 idx (+ 4 8 16)))) ; (+ 512 16))))
+      (if (= 0 res)
+	  (printf "failed (%lld) to load %s\n" res path)
+	  (printf "successfully loaded %s as index: %d\n" path res)))))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; ASSIMP LIBRARY
+;;
+;; You will need to compile the Open Asset Import Library (ASSIMP)
+;; You can get source from here http://assimp.sourceforge.net/
+;; Make sure libassimp.so (or similar dylib) is accessible!
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; lib assimp
+(define libassimp (sys:open-dylib "libassimp.so"))
+;; lib GLU
+(define libglu (sys:open-dylib "libGLU.so"))
+
+(bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
+(bind-lib libglu gluPerspective [void,double,double,double,double]*)
+(bind-lib libglu gluErrorString [i8*,i32]*)
+
+(bind-type size_t i64)
+(bind-type aiString <size_t,|1024,i8|>)
+;(llvm:compile "%aiString = type {i64, |1024xi8|}
+(bind-type aiMatrix4x4 <float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float>)
+(bind-type aiMatrix3x3 <float,float,float,float,float,float,float,float,float>)
+(bind-type aiVector4D <float,float,float,float>)
+(bind-type aiVector3D <float,float,float>)
+(bind-type aiVector2D <float,float>)
+;; r g b a
+(bind-type aiColor4D <float,float,float,float>)
+(bind-type aiColor3D <float,float,float>)
+(bind-type aiQuaternion <float,float,float,float>)
+(bind-type aiTexel <i8,i8,i8,i8>) ;; b,g,r,a
+;; mTime,mValue
+(bind-type aiVectorKey <double,aiVector3D>)
+;; mTime,mValue
+(bind-type aiQuatKey <double,aiQuaternion>)
+;; mTime,mValue
+(bind-type aiMeshKey <double,i32>)
+;; mName(0),mTransformation(1),mParent(2),mNumChildren(3),mChildren(4),mNumMeshes(5),mMeshes(6)
+(bind-type aiNode <aiString,aiMatrix4x4,aiNode*,i32,aiNode**,i32,i32*>)
+;; mNumIndices,mIndicies
+(bind-type aiFace <i32,i32*>)
+;; mVertexId,mWeightm
+(bind-type aiVertexWeight <i32,float>)
+;; mName,mNumWeights,mWeights,mOffsetMatrix
+(bind-type aiBone <aiString,i32,aiVertexWeight*,aiMatrix4x4>)
+;; mVertices,mNormals,mTangents,mBitangents,mColors,mNumVertices
+(bind-type aiAnimMesh <aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|4,aiColor4D*|,|4,aiVector3D*|,i32>)
+;; mPrimitiveTypes(0),mNumVertices(1),mNumFaces(2),mVertices(3),mNormals(4),mTangents(5),mBitangents(6),mColors(7),mTextureCoords(8),mNumUVComponents(9),mFaces(10),mNumBones(11),mBones(12),mMaterialIndex(13),mName(14),mNumAnimMeshes(15)
+(bind-type aiMesh <i32,i32,i32,aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|4,aiColor4D*|,|4,aiVector3D*|,|4,i32|,aiFace*,i32,aiBone**,i32,aiString,i32,aiAnimMesh**>)
+;; mTranslation,mScaling,mRotation
+(bind-type aiUVTransform <aiVector2D,aiVector2D,float>)
+;; mKey(0),mSemantic(1),mIndex(2),mDataLength(3),mType(4),mData(5)
+(bind-type aiMaterialProperty <aiString,i32,i32,i32,i32,i8*>)
+;; mProperties,mNumProperties,mNumAllocated
+(bind-type aiMaterial <aiMaterialProperty**,i32,i32>)
+;; mNodeName,mNumPositionKeys,mPositionKeys,mNumRotationKeys,mRotationKeys,mNumScalingKeys,mScalingKeys,mPreState,mPostState
+(bind-type aiNodeAnim <aiString,i32,aiVectorKey*,i32,aiQuatKey*,aiVectorKey*,i32,i32>)
+;; mName,mNumKeys,mKeys
+(bind-type aiMeshAnim <aiString,i32,aiMeshKey*>)
+;; mName,mDuration,mTicksPerSecond,mNumChannels,mChannels,mNumMeshChannels,mMeshChannels
+(bind-type aiAnimation <aiString,double,double,i32,aiNodeAnim**,i32,aiMeshAnim**>)
+;; mWidth,mHeight,achFormatHint,pcData
+(bind-type aiTexture <i32,i32,i8*,aiTexel*>)
+;; mName,mType,mPosition,mDirection,mAttenuationConstant,mAttenuationLinear,mAttenuationQuadratic,mColorDiffuse,mColorSpecular,mColorAmbient,mAngleInnerCone,mAngleOuterCone
+(bind-type aiLight <aiString,i32,aiVector3D,aiVector3D,float,float,float,aiColor3D,aiColor3D,aiColor3D,float,float>)
+;; mName,mPosition,mUp,mLookAt,mHorizontalFOV,mClipPlaneNear,mClipPlaneFar,mAspect
+(bind-type aiCamera <aiString,aiVector3D,aiVector3D,aiVector3D,float,float,float,float>)
+;; mFlags(0),mRootNode(1),mNumMeshes(2),mMeshes(3),mNumMaterials(4),mMaterials(5),mNumAnimations(6),mAnimations(7),mNumTextures(8),mTextures(9),mNumLights(10),mLights(11),mNumCameras(12),mCameras(13)
+(bind-type aiScene <i32,aiNode*,i32,aiMesh**,i32,aiMaterial**,i32,aiAnimation**,i32,aiTexture**,i32,aiLight**,i32,aiCamera**>)
+
+(bind-lib libassimp aiImportFile [aiScene*,i8*,i32]*)
+(bind-lib libassimp aiReleaseImport [void,aiScene*]*)
+(bind-lib libassimp aiIdentityMatrix4 [void,aiMatrix4x4*]*)
+(bind-lib libassimp aiMultiplyMatrix4 [void,aiMatrix4x4*,aiMatrix4x4*]*)
+(bind-lib libassimp aiTransformVecByMatrix4 [void,aiVector3D*,aiMatrix4x4*]*)
+(bind-lib libassimp aiTransposeMatrix4 [void,aiMatrix4x4*]*)
+(bind-lib libassimp aiTransposeMatrix3 [void,aiMatrix3x3*]*)
+(bind-lib libassimp aiGetMaterialColor [i32,aiMaterial*,i8*,i32,i32,aiColor4D*]*)
+(bind-lib libassimp aiGetMaterialString [i32,aiMaterial*,i8*,i32,i32,aiString*]*)
+(bind-lib libassimp aiGetMaterialFloatArray [i32,aiMaterial*,i8*,i32,i32,float*,i32*]*)
+(bind-lib libassimp aiGetMaterialIntegerArray [i32,aiMaterial*,i8*,i32,i32,i32*,i32*]*)
+;; aiReturn (aiMaterial* mat, aiTextureType type, uint index, aiString* path, aiTextureMapping* mapping, uint* uvindex, float* blend, aiTextureOp* op, aiTextureMapMode* mapmode, uint* flags) 
+(bind-lib libassimp aiGetMaterialTexture [i32,aiMaterial*,i32,i32,aiString*,i32*,i32*,float*,i32*,i32*,i32*]*)
+;; uint (aiMaterial* mat,i32 type)
+(bind-lib libassimp aiGetMaterialTextureCount [i32,aiMaterial*,i32]*)
+
+
+(bind-func copy-matrix4
+  (lambda (src:aiMatrix4x4* dest:aiMatrix4x4*)
+    (tset! dest 0 (tref src 0))
+    (tset! dest 1 (tref src 1))
+    (tset! dest 2 (tref src 2))
+    (tset! dest 3 (tref src 3))
+    (tset! dest 4 (tref src 4))
+    (tset! dest 5 (tref src 5))
+    (tset! dest 6 (tref src 6))
+    (tset! dest 7 (tref src 7))
+    (tset! dest 8 (tref src 8))
+    (tset! dest 9 (tref src 9))
+    (tset! dest 10 (tref src 10))
+    (tset! dest 11 (tref src 11))
+    (tset! dest 12 (tref src 12))
+    (tset! dest 13 (tref src 13))
+    (tset! dest 14 (tref src 14))
+    (tset! dest 15 (tref src 15))
+    1))
+
+
+(bind-func aisgl_min
+  (lambda (a:float b:float)
+    (if (< a b) a b)))
+
+
+(bind-func aisgl_max
+  (lambda (a:float b:float)
+    (if (> a b) a b)))
+
+
+(bind-func print-ai-string
+  (lambda (str:aiString*)
+    (let ((size (tref str 0))
+	  (dat (bitcast (tref-ptr str 1) i8*)))
+      (printf "%.*s\n" size dat))))
+
+
+(bind-func get-bounding-box-for-node
+  (lambda (scene:aiScene* nd:aiNode* min:aiVector3D* max:aiVector3D* trafo:aiMatrix4x4*)
+    (let ((prev (stack-alloc aiMatrix4x4))
+	  (prevarr (bitcast prev float*))
+	  (minarr (bitcast min float*))
+	  (maxarr (bitcast max float*))
+	  (trafoarr (bitcast trafo float*)))
+
+      (copy-matrix4 trafo prev)
+      (aiMultiplyMatrix4 trafo (tref-ptr nd 1))
+      ;(printf "meshes: %lld\n" (tref nd 5))
+      (dotimes (n (tref nd 5))
+	;(printf "n: %lld\n" n)
+	(let ((mesh (aref (tref scene 3) (aref (tref nd 6) n)))
+	      (verts (tref mesh 3)))
+	  ;(printf "verts: %lld\n" (tref mesh 1))
+	  (dotimes (t (tref mesh 1))	   
+	    (let ((tmp (aref-ptr verts t))
+		  (tmparr (bitcast tmp float*)))
+	      (aiTransformVecByMatrix4 tmp trafo)
+	      (tset! min 0 (aisgl_min (tref min 0) (tref tmp 0)))
+	      (tset! min 1 (aisgl_min (tref min 1) (tref tmp 1)))
+	      (tset! min 2 (aisgl_min (tref min 2) (tref tmp 2)))
+	      (tset! max 0 (aisgl_max (tref max 0) (tref tmp 0)))
+	      (tset! max 1 (aisgl_max (tref max 1) (tref tmp 1)))
+	      (tset! max 2 (aisgl_max (tref max 2) (tref tmp 2)))))))
+      
+      (dotimes (nn (tref nd 3))
+	(let ((mynodes (tref nd 4))
+	      (next-node (aref mynodes nn)))
+	  ;(printf "node %d:%d\n" nn (tref nd 3))
+	  (get-bounding-box-for-node scene next-node min max trafo)))
+      (copy-matrix4 prev trafo))))
+
+
+(bind-func get-bounding-box
+  (lambda (scene:aiScene* min:aiVector3D* max:aiVector3D*)
+    (let ((trafo (stack-alloc aiMatrix4x4))
+	  (minarr (bitcast min float*))
+	  (maxarr (bitcast max float*)))	  
+      (aiIdentityMatrix4 trafo)
+      (dotimes (i 3)
+	(aset! minarr i 123151.0)
+	(aset! maxarr i -123151.0))
+      ;(printf "number of node meshes %d\n" (tref (tref scene 1) 5))
+      (get-bounding-box-for-node scene (tref scene 1) min max trafo))))
+
+
+(bind-func Color4f
+  (lambda (colour:aiColor4D*)
+    (glColor4f (tref colour 1) (tref colour 2) (tref colour 3) (tref colour 0))))
+
+
+(bind-func set_float4
+  (lambda (dat:float* a b c d)
+    (aset! dat 0 a)
+    (aset! dat 1 b)
+    (aset! dat 2 c)
+    (aset! dat 3 d)
+    1))
+
+(bind-func color4_to_float4
+  (lambda (colour:aiColor4D* dat:float*)
+    (aset! dat 0 (tref colour 0))
+    (aset! dat 1 (tref colour 1))
+    (aset! dat 2 (tref colour 2))
+    (aset! dat 3 (tref colour 3))
+    1))
+
+(bind-func apply_material
+  (lambda (mtl:aiMaterial* idx:i32)
+    (let ((c (bitcast (stack-alloc |4,float|) float*))
+	  (diffuse (stack-alloc aiColor4D))
+	  (specular (stack-alloc aiColor4D))
+	  (ambient (stack-alloc aiColor4D))
+	  (emission (stack-alloc aiColor4D))
+	  (max (stack-alloc i32))
+	  (wireframe (stack-alloc i32))
+	  (two_sided (stack-alloc i32))
+	  (shininess (stack-alloc float))
+	  (strength (stack-alloc float))
+	  (name (stack-alloc aiString))
+	  (texfile (stack-alloc aiString)))
+
+      ;; PRINT MATERIAL PARAMS
+      ;; mKey(0),mSemantic(1),mIndex(2),mDataLength(3),mType(4),mData(5)
+      (aiGetMaterialString mtl "?mat.name" 0 0 name)      
+      (printf "material %d name: " (+ idx 1))
+      (print-ai-string name)
+
+      ;; (printf "textures: diffuse:%d ambient:%d specular:%d normals:%d unknown:%d\n"
+      ;; 	      (aiGetMaterialTextureCount mtl 1)
+      ;; 	      (aiGetMaterialTextureCount mtl 3)
+      ;; 	      (aiGetMaterialTextureCount mtl 2)
+      ;; 	      (aiGetMaterialTextureCount mtl 6)
+      ;; 	      (aiGetMaterialTextureCount mtl 12))
+
+      
+      (if (= (aiGetMaterialTexture mtl 1 0 texfile null null null null null null) 0)
+	  (begin (printf "bind to index:%d texture name: " (+ 1 idx))
+		 ;(glDisable GL_BLEND)
+		 ;(glEnable GL_DEPTH_TEST)
+		 (print-ai-string texfile)
+		 (glBindTexture GL_TEXTURE_2D (+ 1 idx))))
+;	  (begin (glEnable GL_BLEND) (glDisable GL_DEPTH_TST)))
+      
+;      (dotimes (kk (tref mtl 1))
+;	(let ((property (aref (tref mtl 0) kk)))
+;	  (printf "\tproperty:\t")
+;	  (print-ai-string (tref-ptr property 0))
+;	  (printf "\tidx:%d datalgth:%d type:%d\n" (tref property 2) (tref property 3) (tref property 4))))
+
+      (set_float4 c 0.8 0.8 0.8 1.0)      
+      ;(if (= (aiGetMaterialColor mtl "$clr.diffuse" 0 0 diffuse) 0)
+      ;         (color4_to_float4 diffuse c))
+      ;(glMaterialfv GL_FRONT_AND_BACK GL_DIFFUSE c)
+      (glMaterialfv GL_FRONT_AND_BACK GL_DIFFUSE c)
+      
+      (set_float4 c 0.0 0.0 0.0 1.0)      
+      ;(if (= (aiGetMaterialColor mtl "$clr.specular" 0 0 specular) 0)
+      ;	  (color4_to_float4 specular c))
+      (glMaterialfv GL_FRONT_AND_BACK GL_SPECULAR c)
+
+      (set_float4 c 0.0 0.0 0.0 1.0)      
+      ;(if (= (aiGetMaterialColor mtl "$clr.ambient" 0 0 ambient) 0)
+      ;	  (color4_to_float4 ambient c))
+      (glMaterialfv GL_FRONT_AND_BACK GL_AMBIENT c)
+
+      (set_float4 c 0.0 0.0 0.0 1.0)      
+      ;(if (= (aiGetMaterialColor mtl "$clr.emissive" 0 0 emission) 0)
+     ; 	  (color4_to_float4 emission c))
+      (glMaterialfv GL_FRONT_AND_BACK GL_EMISSION c)
+
+      ;; (if (and (= (begin (aset! max 0 1)
+      ;; 			 (aiGetMaterialFloatArray mtl "$mat.shininess" 0 0 shininess max)) 0)
+      ;; 	       (= 0 (begin (aset! max 0 1)
+      ;; 			   (aiGetMaterialFloatArray mtl "$mat.shinpercent" 0 0 strength max))))
+      ;; 	   (glMaterialf GL_FRONT_AND_BACK GL_SHININESS (* (aref shininess 0) (aref strength 0)))
+      ;; 	   (begin (glMaterialf GL_FRONT_AND_BACK GL_SHININESS 0.0)
+      ;; 		  (set_float4 c 0.0 0.0 0.0 0.0)
+      ;; 		  (glMaterialfv GL_FRONT_AND_BACK GL_SPECULAR c)))
+
+;      (if (= 0 (begin (aset! max 0 1)
+;      		      (aiGetMaterialIntegerArray mtl "$mat.wireframe" 0 0 wireframe max)))
+;      	  (glPolygonMode GL_FRONT_AND_BACK (if (= 0 (aref wireframe 0)) GL_LINE GL_FILL))
+;      	  (glPolygonMode GL_FRONT_AND_BACK GL_FILL))
+
+      (if (and (= 0 (begin (aset! max 0 1)
+      			   (aiGetMaterialIntegerArray mtl "$mat.twosided" 0 0 two_sided max)))
+      	       (= 1 (aref two_sided 0)))
+      	  (glEnable GL_CULL_FACE)
+      	  (glDisable GL_CULL_FACE)))))
+
+
+(bind-func recursive_render
+  (lambda (scene:aiScene* nd:aiNode*)
+    (let ((m (tref-ptr nd 1)))
+      (aiTransposeMatrix4 m)
+      (glPushMatrix)
+      (glMultMatrixf (bitcast m float*))
+
+      ;; draw all meshes assigned to this node
+      (dotimes (n (tref nd 5))
+	(printf ">> mesh %d:%d\n" (+ n 1) (tref nd 5))
+	(let ((meshes (tref scene 3))
+	      (mesh (aref meshes (aref (tref nd 6) n)))
+	      (materials (tref scene 5))
+	      (material (aref materials (tref mesh 13)))
+	      (faces (tref mesh 10))
+	      (size-faces (tref mesh 2)))
+
+	  ;; random color per mesh
+	  ;(glColor4f (dtof (random)) (dtof (random)) (dtof (random)) 1.0)
+	  ;; one-to-one between texture id's and mesh id's
+
+	  (apply_material material (tref mesh 13))
+	  
+	  ;; (if (null? (tref mesh 4))
+	  ;;     (glDisable GL_LIGHTING)
+	  ;;     (glEnable GL_LIGHTING))
+
+	  ;; (if (null? (aref (tref-ptr mesh 7) 0))
+	  ;;     (glDisable GL_COLOR_MATERIAL)
+	  ;;     (glEnable GL_COLOR_MATERIAL))
+	  
+	  (dotimes (t:i32 size-faces)
+	    ;(printf ">>> face: %d:%d\n" t size-faces)
+	    (let ((face:aiFace* (aref-ptr faces t))
+		  (num_indicies (tref face 0))
+		  (face_mode (cond ((= 1 num_indicies) GL_POINTS)
+				   ((= 2 num_indicies) GL_LINES)
+				   ((= 3 num_indicies) GL_TRIANGLES)
+				   ((= 4 num_indicies) GL_QUADS)
+				   (else GL_POLYGON))))
+	      (glBegin face_mode)
+	      (dotimes (i num_indicies)
+		;(printf "indicies %d:%d\n" i num_indicies)
+		(let ((index (aref (tref face 1) i))
+		      (colors (aref (tref-ptr mesh 7) 0))
+		      (texturecoords (aref (tref-ptr mesh 8) 0))
+		      (normals (tref mesh 4))
+		      (vertices (tref mesh 3)))
+		  (if (not (null? colors))
+		      (begin ;(printf "setting colour\n")
+			     (Color4f (aref-ptr colors index))))
+		  (if (not (null? normals))		      
+		      (begin ;(printf "setting normal\n")
+			     (if (not (null? texturecoords))
+				 (begin ;(printf "setting texcoords %f %f\n" (ftod (tref (aref-ptr texturecoords index) 0)))
+					(glTexCoord2f (tref (aref-ptr texturecoords index) 0)
+						      (tref (aref-ptr texturecoords index) 1))
+					(glNormal3fv (bitcast (aref-ptr normals index) float*))))))
+		  (glVertex3fv (tref-ptr (aref-ptr vertices index) 0))))
+	      (glEnd)))))
+      
+      (dotimes (nn (tref nd 3))
+	(printf "> node %d:%d\n" (+ nn 1) (tref nd 3))	
+	(recursive_render scene (aref (tref nd 4) nn)))
+
+      (glPopMatrix))))
+
+
+
+(bind-func load-textures
+  (lambda (scene:aiScene*)
+    (let ((materials (tref scene 5))
+	  (num-of-mats (tref scene 4)))
+      (dotimes (i num-of-mats) 
+	(let ((mtl (aref materials i))
+	      (name (stack-alloc aiString))
+	      (texfile (stack-alloc aiString)))
+	  (if (= (aiGetMaterialTexture mtl 1 0 texfile null null null null null null) 0)
+	      (begin (aiGetMaterialString mtl "?mat.name" 0 0 name)      
+		     (printf "load texture for material %d name: " (+ 1 i))
+		     (print-ai-string name)
+		     (printf "textures: diffuse:%d specular:%d ambient:%d emissive:%d hight:%d normals:%d shininess:%d opacity:%d displacement:%d lightmap:%d reflect:%d unknown:%d\n"
+			     (aiGetMaterialTextureCount mtl 1)
+			     (aiGetMaterialTextureCount mtl 2)			     
+			     (aiGetMaterialTextureCount mtl 3)
+			     (aiGetMaterialTextureCount mtl 4)
+			     (aiGetMaterialTextureCount mtl 5)			     
+			     (aiGetMaterialTextureCount mtl 6)
+			     (aiGetMaterialTextureCount mtl 7)
+			     (aiGetMaterialTextureCount mtl 8)
+			     (aiGetMaterialTextureCount mtl 9)			     
+			     (aiGetMaterialTextureCount mtl 10)
+			     (aiGetMaterialTextureCount mtl 11)			     
+			     (aiGetMaterialTextureCount mtl 12))		     
+		     (printf "texture name: ")
+		     (print-ai-string texfile)
+		     (load-ogl-texture (bitcast (tref-ptr texfile 1) i8*) (+ 1 i)))))))))
+
+
+(bind-func build-display-list-from-node
+  (lambda (container:<aiScene*,aiVector3D*,aiVector3D*,aiVector3D*>* idx:i64)
+    (let ((scene (tref container 0))
+	  (scene_list 0)
+	  (root-node (tref scene 1))
+	  (children (tref root-node 4))
+	  (child (aref children idx)))
+      (printf "Try to build!\n")
+      (set! scene_list (glGenLists 1))
+      ;; load material textures?
+      (load-textures scene)
+      (glNewList scene_list GL_COMPILE)
+      (printf "Load model into GL Display List %d\n" scene_list);
+      (recursive_render scene child)
+      (glEndList)
+      scene_list)))
+
+(bind-func build-display-list
+  (lambda (container:<aiScene*,aiVector3D*,aiVector3D*,aiVector3D*>*)
+    (let ((scene (tref container 0))
+	  (scene_list 0))
+      (printf "Try to build!\n")
+      (set! scene_list (glGenLists 1))
+      ;; load material textures?
+      (load-textures scene)
+      (glNewList scene_list GL_COMPILE)
+      (printf "Load model into GL Display List %d\n" scene_list);
+      (recursive_render scene (tref scene 1))
+      (glEndList)
+      scene_list)))
+
+
+(bind-func draw-model
+  (let ((scene_list 0)
+	(scloaded:i64 0)
+	(texidx 0))
+    (lambda (container:<aiScene*,aiVector3D*,aiVector3D*,aiVector3D*>* display_list:i32)
+      (let ((tmp (stack-alloc float))
+	    (scene (tref container 0))
+	    (centre (tref container 1))
+	    (min (tref container 2))
+	    (max (tref container 3)))
+
+	;; scale the whole asset to fit into our view frustum
+	(aset! tmp 0 (- (tref max 0) (tref min 0)))
+	(aset! tmp 0 (aisgl_max (- (tref max 1) (tref min 1)) (aref tmp 0)))
+	(aset! tmp 0 (aisgl_max (- (tref max 2) (tref min 2)) (aref tmp 0)))
+	(aset! tmp 0 (/ 1.0 (aref tmp 0)))
+
+	(glScalef (aref tmp 0) (aref tmp 0) (aref tmp 0))
+
+	;; centre the model
+	(glTranslatef (- 0.0 (tref centre 0))
+		      (- 0.0 (tref centre 1))
+		      (- 0.0 (tref centre 2)))
+
+	(glEnable GL_TEXTURE_2D)
+	(glCallList display_list)
+	(glDisable GL_TEXTURE_2D)))))
+	
+	      
+    
+(bind-func load-asset
+  (lambda (path)
+    (let ((scene (aiImportFile path 498379))
+	  (centre (heap-alloc aiVector3D))
+	  (min (heap-alloc aiVector3D))
+	  (max (heap-alloc aiVector3D))
+	  (container (heap-alloc <aiScene*,aiVector3D*,aiVector3D*,aiVector3D*>)))
+      
+      (get-bounding-box scene min max)
+
+      (tset! centre 0 (* (+ (tref min 0) (tref max 0)) 0.5))
+      (tset! centre 1 (* (+ (tref min 1) (tref max 1)) 0.5))
+      (tset! centre 2 (* (+ (tref min 2) (tref max 2)) 0.5))
+
+      (printf "centre x:%f y:%f z:%f\n" (ftod (tref centre 0)) (ftod (tref centre 1)) (ftod (tref centre 2)))
+      (printf "min x:%f y:%f z:%f\n" (ftod (tref min 0)) (ftod (tref min 1)) (ftod (tref min 2)))      
+      (printf "max x:%f y:%f z:%f\n"(ftod  (tref max 0)) (ftod (tref max 1)) (ftod (tref max 2)))
+      ;(aiReleaseImport scene)
+      (tset! container 0 scene)
+      (tset! container 1 centre)
+      (tset! container 2 min)
+      (tset! container 3 max)
+      (printf "textures: %d\n" (tref scene 8))
+      ;(recursive_render scene (tref scene 1))
+      container)))

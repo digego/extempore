@@ -1,0 +1,233 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; (Core) instruments
+;; 
+;; This is for instruments which are solely written in scheme and
+;; xtlang - no binding to external (that is, C) libraries.
+;;
+;; Any instruments which depend on external libraries are
+;; in libs/external/instruments.xtm
+;; 
+
+(load "libs/core/audio_dsp.xtm")
+
+(define-macro (define-instrument name note-kernel effect-kernel)
+  `(bind-func ,name
+     (let* ((poly:i64 48)
+	    (notes:[double,double,double,double]** (zalloc poly))
+	    (attack:double 200.0)
+	    (decay:double 200.0)
+	    (release:double 1000.0)
+	    (sustain:double 0.6) ;; amplitude of the sustain
+	    (gain 2.0)
+                                        ;(active 0)
+	    (ii 0)
+	    (note-starts:double* (zalloc poly))
+	    (new-note (lambda (start freq dur amp)
+			(let ((free-note:i64 -1)
+			      (iii 0)
+			      (i 0))
+			  (dotimes (i poly) ;; check for free poly spot           
+			    (if (> (pref note-starts i) 9999999999998.0)
+				(set! free-note i)))
+			  ;; (if (= 0 active)
+			  ;;     (begin (dotimes (iii poly)
+			  ;; 	       (pset! note-starts iii 9999999999999.0))
+			  ;; 	     (set! free-note -1)))			  
+			  (if (> free-note -1) ;; if we found a free poly spot assign a note
+			      (let ((note_zone (push_zone (* 1024 10))))
+				(pset! notes free-note
+				       (make-note start freq amp dur
+						  attack decay release sustain
+						  note-starts free-note
+						  (,note-kernel)
+						  note_zone))
+				(pset! note-starts free-note start)
+				(pop_zone)
+				1)
+			      0)))))
+       (dotimes (ii poly) ;; sets all notes to inactive
+	 (pset! note-starts ii 9999999999999.0))
+       (lambda (in:double time:double chan:double dat:double*)
+	 (let ((out:double 0.0)
+	       (k 0))
+	   (dotimes (k poly) ;; sum all active notes          
+	     (if (< (pref note-starts k) time)
+		 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
+	   (* gain (,effect-kernel out time chan dat)))))))
+
+;; make synth defaults
+(bind-func default-note
+  (lambda ()
+    (let ((sawl (make-saw))
+	  (sawr (make-saw)))
+      (lambda (time:double chan:double freq:double amp:double)
+	(if (< chan 1.0)
+	    (* amp (/ 200.0 freq) (sawl amp freq))
+	    (* amp (/ 200.0 freq) (sawr amp freq)))))))
+
+(bind-func default-effect
+  (lambda (in:double time:double chan:double dat:double*)
+    in))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Default synth stuff
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func synth-note
+  (let ((res 1.0)
+	(res_ 0.0)
+	(fxamp 0.0))
+    (lambda ()
+      (let ((oscl (make-oscil 0.0))
+	    (oscl3 (make-oscil 0.0))
+	    (oscl2 (make-oscil 0.0))
+	    (oscr (make-oscil 0.25))
+	    (saw1 (make-saw))
+	    (saw2 (make-saw))
+	    (lpf1 (make-lpf))
+	    (lpf2 (make-lpf))
+	    (oscr3 (make-oscil 0.25))
+	    (oscr2 (make-oscil 0.25)))
+	(lpf2.res res)
+	(lpf1.res res)	
+	(lambda (time:double chan:double freq:double amp:double)
+	  (if (<> res res_)
+	      (begin (lpf2.res res)
+		     (lpf1.res res)
+		     (set! res_ res)))
+	  (if (< chan 1.0)
+	      (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude
+		 (+ (oscl2 1.0 (+ freq (* 10.0 (random))))
+		    (lpf1 (saw1 fxamp freq) (* 5.0 freq))
+		    (oscl 0.8 (+ freq (oscl3 (* 2.01 freq)
+					     (* freq 1.01))))))
+	      (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude	       
+		 (+ (oscr2 1.0 (+ freq (* 5.0 (random))))
+		    (lpf2 (saw2 fxamp freq) (* 3.0 freq))
+		    (oscr 0.8 (+ freq (oscr3 (* 0.99 freq)
+                                             (* freq 0.99))))))))))))
+
+
+(bind-func synth-fx 262144
+           (let ((dleft (dtoi64 (* 0.125 SAMPLERATE)))
+                 (dlyl (make-delay dleft))
+                 (dright (dtoi64 (* 0.33333333 SAMPLERATE)))
+                 (dlyr (make-delay dright))
+                 (pan .5)
+                 (pan_old pan)
+                 (wet_ .0)
+                 (wet .3))
+             (lambda (in:double time:double chan:double dat:double*)
+               (if (< pan_old pan) ;; interpolate pan
+                   (set! pan_old (+ pan_old .001))
+                   (set! pan_old (- pan_old .001)))
+               (if (<> wet wet_)
+                   (begin (dlyl.out wet)
+                          (dlyr.out wet)
+                          (set! wet_ wet)))
+               (cond ((< chan 1.0) 
+                      (dlyl (* 2.0 pan_old in)))
+                     ((< chan 2.0)
+                      (dlyr (* 2.0 (- 1.0 pan_old) in)))
+                     (else 0.0)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; An ipc helper for audio
+;;
+
+(define ipc:audio-setup
+  (lambda (proc)
+    (ipc:eval-string proc
+		     "(define-macro (play-note time inst pitch vol dur)
+                         `(let ((duration (* 1.0 ,dur))
+	                        (native (llvm:get-native-closure ,(symbol->string inst))))
+                            (if (cptr? native)
+	                        (_play-note (integer->real ,time) 
+		                             native
+		                             (midi2frq (* 1.0 ,pitch))
+		                             (/ (exp (/ ,vol 26.222)) 127.0)
+		                             duration)          
+	                        (print-error 'No 'inst 'named ,(symbol->string inst)))))")
+    (ipc:bind-func proc '_play-note)
+    (ipc:bind-func proc 'midi2frq)))
+
+;; (ipc:call (ipc:get-process-name) 'print)
+;; (ipc:call (ipc:get-process-name) 'ascii-print-color 1 7 10) 
+;; (ipc:call (ipc:get-process-name) 'print "All set to go!\n")
+;; (ipc:call (ipc:get-process-name) 'synth.active 1)
+;; (ipc:call (ipc:get-process-name) 'ascii-print-color 0 7 10)
+;; (ipc:call (ipc:get-process-name) 'print "'Synth' active = true\n")
+;; (ipc:call (ipc:get-process-name) 'sampler.active 1)
+;; (ipc:call (ipc:get-process-name) 'print "'Sampler' active = true\n")
+;; (ipc:call (ipc:get-process-name) 'print)
+;; (ipc:call (ipc:get-process-name) 'print "You have two default instruments loaded 'synth' and 'sampler'\n")
+;; (ipc:call (ipc:get-process-name) 'print)
+;; (ipc:call (ipc:get-process-name) 'callback 0 '_dsp:set! 'dsp)
+
+(ipc:audio-setup "utility")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; extempore-pad 
+;;
+(bind-func epad-note
+  (let ((res 0.1))
+    (lambda ()
+      (let ((oscl (make-square 0.0)) 
+	    (oscr (make-square 0.1))
+	    (o1 (make-oscil 0.0))
+	    (oscl2 (make-square (random)))
+	    (vcfl (make-vcf))
+	    (vcfr (make-vcf))	  
+	    (oscr2 (make-square (random)))
+	    (ramp 0.0)
+	    (a (+ 1.0 (* 0.02 (random))))
+	    (b (+ 1.0 (* 0.02 (random)))))
+	(vcfl.res (+ res 0.2))
+	(vcfr.res res)      
+	(lambda (time:double chan:double freq:double amp:double)
+	  (if (< chan 1.0)
+	      (* amp (vcfl (+ (oscl 0.3 freq)
+			      (oscl2 0.3 (+ freq a)))
+			   (+ 550.0 (* amp 8000.0))))
+	      (* amp (vcfr (+ (oscr 0.2 freq)
+			      (oscr2 0.2 (* freq b)))
+			   (+ 500.0 (* amp 10000.0))))))))))
+
+
+(bind-func epad-fx 2000000
+  (let ((pan .5)
+	(d1 (make-comb 44100))
+	(d22 (make-comb 44100))
+	(c1 (make-chorus 0.0))
+	(c2 (make-chorus 0.1))
+	(rev1 (make-reverb 200.0))
+	(rev2 (make-reverb 120.0))	
+	(vcf1 (make-vcf))
+	(del1 1000.0)
+	(del2 2000.0)
+	(ipan pan)
+	(opan (make-oscil 0.0))
+	(wet_ .0)
+	(wet .15))
+    (lambda (in:double time:double chan:double dat:double*)
+      (set! pan (+ 0.5 (opan 0.2 3.0)))
+      (rev1.wet wet)
+      (rev2.wet wet)
+      (cond ((< chan 1.0)
+	     (rev1 (c1 (* 2.0 pan in))))
+	    ((< chan 2.0)
+	     (rev2 (c2 (* 2.0 (- 1.0 pan) in))))
+	    (else 0.0)))))
+
+(define-instrument epad epad-note epad-fx)
+(epad.attack 1000.0)
+(epad.decay 1000.0)
+(epad.sustain 0.9)
+(epad.release 7000.0)
+;; epad is NOT active by default
+

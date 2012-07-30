@@ -1,0 +1,71 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Bullet Physics Library Bindings
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define bulletlib (if (string=? "Linux" (sys:platform))
+		       (sys:open-dylib "libBulletDynamics.so.2.79")
+		       (if (string=? "Windows" (sys:platform))
+			   (sys:open-dylib "BulletDynamics.dll")
+			   (print-error "Where Do I find Bullet lib on OSX??"))))
+
+(if (or (eq? #f hordeutlib)
+	(not hordeutlib)) 
+    (print-error "Could not load 'Horde3d' dynamic library"))
+
+(bind-type _plPhysicsSdkHandle <i32>)
+(bind-alias plPhysicsSdkHandle _plPhysicsSdkHandle*)
+(bind-type _plDynamicsWorldHandle <i32>)
+(bind-alias plDynamicsWorldHandle _plDynamicsWorldHandle*)
+(bind-type _plRigidBodyHandle <i32>)
+(bind-alias plRigidBodyHandle _plRigidBodyHandle*)
+(bind-type _plCollisionShapeHandle <i32>)
+(bind-alias plCollisionShapeHandle _plCollisionShapeHandle*)
+(bind-type _plConstraintHandle <i32>)
+(bind-alias plConstraintHandle _plConstraintHandle*)
+(bind-type _plMeshInterfaceHandle <i32>)
+(bind-alias plMeshInsterfaceHandle _plMeshInterfaceHandle*)
+(bind-type _plCollisionBroadphaseHandle <i32>)
+(bind-alias plCollisionBroadphaseHandle _plCollisionBroadphaseHandle*)
+(bind-type _plBroadphaseProxyHandle <i32>)
+(bind-alias plBroadphaseProxyHandle _plBroadphaseProxyHandle*)
+(bind-type _plCollisionWorldHandle <i32>)
+(bind-alias plCollisionWorldHandle _plCollisionWorldHandle*)
+
+(bind-alias plReal float)
+(bind-alias plVector3 plReal*)
+(bind-alias plQuaternion plReal*)
+
+(bind-type plRayCastResult <plRigidBodyHandle,plCollisionShapeHandle,plVector3,plVector3>)
+
+(bind-lib bulletlib plCreateDynamicsWorld [plDynamicsWorldHandle,plPhysicsSdkHandle]*)
+(bind-lib bulletlib plDeleteDynamicsWorld [void,plDynamicsWorldHandle]*)
+(bind-lib bulletlib plSetGravity [void,plDynamicsWorldHandle,plReal*]*)
+(bind-lib bulletlib plStepSimulation [void,plDynamicsWorldHandle,plReal,i32,plReal]*)
+
+(bind-lib bulletlib plCreateRigidBody [plRigidBodyHandle,i8*,float,plCollisionShapeHandle]*)
+(bind-lib bulletlib plDeleteRigidBody [void,plRigidBodyHandle]*)
+(bind-lib bulletlib plNewBulletSdk [plPhysicsSdkHandle]*)
+(bind-lib bulletlib plDeletePhysicsSdk [void,plPhysicsSdkHandle]*)
+
+(bind-lib bulletlib plNewConvexHullShape [plCollisionShapeHandle]*)
+(bind-lib bulletlib plAddVertex [void,plCollisionShapeHandle,plReal,plReal,plReal]*)
+(bind-lib bulletlib plNewBoxShape [plCollisionShapeHandle,plReal,plReal,plReal]*)
+(bind-lib bulletlib plNewSphereShape [plCollisionShapeHandle,plReal]*)
+(bind-lib bulletlib plNewCylinderShape [plCollisionShapeHandle,plReal,plReal]*)
+(bind-lib bulletlib plAddRigidBody [void,plDynamicsWorldHandle,plRigidBodyHandle]*)
+(bind-lib bulletlib plRemoveRigidBody [void,plDynamicsWorldHandle,plRigidBodyHandle]*)
+(bind-lib bulletlib plSetActivationState [void,plRigidBodyHandle,i32]*)
+
+(bind-lib bulletlib plSetPosition [void,plRigidBodyHandle,plVector3]*)
+(bind-lib bulletlib plGetPosition [void,plRigidBodyHandle,plVector3]*)
+(bind-lib bulletlib plSetOrientation [void,plRigidBodyHandle,plQuaternion]*)
+(bind-lib bulletlib plSetEuler [void,plReal,plReal,plReal,plQuaternion]*)
+(bind-lib bulletlib plSetOpenGLMatrix [void,plRigidBodyHandle,plReal*]*)
+(bind-lib bulletlib plGetOpenGLMatrix [void,plRigidBodyHandle,plReal*]*)
+(bind-lib bulletlib plClearForces [void,plRigidBodyHandle]*)
+(bind-lib bulletlib plSetAngularVelocity [void,plRigidBodyHandle,plReal*]*)
+(bind-lib bulletlib plSetLinearVelocity [void,plRigidBodyHandle,plReal*]*)
+
+(bind-lib bulletlib plRayCast [plRigidBodyHandle,plDynamicsWorldHandle,plVector3,plVector3,plRigidBodyHandle*,i32]*)

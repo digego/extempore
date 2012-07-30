@@ -158,7 +158,7 @@ namespace extemp {
 	struct sockaddr_in osc_client_address;
 #endif
 	int osc_client_address_size;
-	char message_data[20000];
+	char message_data[70000];
 	int message_length;
 	bool started;
 	int(*native)(char*,char*,char*,int); /* if not null then use this compiled function for callbacks */

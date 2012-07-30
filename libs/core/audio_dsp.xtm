@@ -1,0 +1,941 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A DSP Library.
+;;
+;; Please keep in mind that these functions
+;; are provided as EXAMPLES ONLY.  They are
+;; things that I've thown together and are
+;; not to be considered "production" in any way.
+;; In particular they are very very inefficient!!
+;;
+;; You will need to have libsndfile installed
+;; before evaluating this file.
+;;
+;; Please feel free to fix things and contribute
+;; extras juicy bits and pieces
+;;
+;; C-x h     ; selects whole buffer
+;; C-x C-r   ; eval selection
+;;
+;; Contains:
+;; Sine, Square, Saw, Pulse waves
+;; Delay, TapDelay, Comb (variable length delay)
+;; AllPass, Reverb, Flanger and Chorus
+;; LowPass, HighPass, BandPass and Notch filters
+;; BitCrusher
+;;
+;; Instrument abstraction
+;; + A default 'synth' and a default 'sampler'
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; do you want to compile multichannel extensions
+;; usually NOT
+(define *build-multi-chan* #f)
+
+;; bind some global audio values 
+(bind-val SAMPLERATE double (integer->real *au:samplerate*))
+(bind-val CHANNELS i64 *au:channels*)
+(bind-val IN_CHANNELS i64 *au:in-channels*)
+(bind-val FRAMES i64 *au:block-size*)
+
+(bind-alias DSP [double,double,double,double,double*]*)
+
+(bind-func print-audio-state
+  (lambda ()
+    (printf "    FRAMES: %lld\n" FRAMES)
+    (printf " OUT CHANS: %lld\n" CHANNELS)
+    (printf "  IN CHANS: %lld\n" IN_CHANNELS)
+    (printf "SAMPLERATE: %f\n" SAMPLERATE)))
+
+(print-audio-state)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; silence
+(bind-func dsp:DSP
+  (lambda (in time chan dat)
+    0.0))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; high limit
+;; low limit
+;; then value
+(bind-func range-limit
+  (lambda (h:double l:double v:double)
+    (if (< v l) l
+	(if (> v h) h
+	    v))))
+
+;; x values must fall within the range -PI ... PI
+(bind-func _sin
+  (let ((p 0.225) ; :_abuf* (alloc))
+	(b (/ 4.0 PI))
+	(c (/ -4.0 (* PI PI))))
+    (lambda (x)
+      (let ((y (+ (* b x) (* c x (fabs x)))))
+	(+ (* p (- (* y (fabs y)) y)) y)))))
+
+;; (bind-func make-oscil
+;;   (lambda (phase)
+;;     (lambda (amp freq)
+;;       (let ((inc (* TWOPI (/ freq SAMPLERATE))))
+;; 	(set! phase (+ phase inc))
+;; 	(* amp (sin phase))))))
+
+
+(bind-func make-oscil
+  (lambda (phase)
+    (lambda (amp freq)
+      (let ((inc (* TWOPI (/ freq SAMPLERATE))))
+	(set! phase (+ phase inc))
+	(if (> phase PI) (set! phase (- phase TWOPI)))
+	(* amp (_sin phase))))))
+
+
+(if *build-multi-chan*
+    (bind-func make-oscil-c
+      (lambda (phase)
+	(let ((mem 0.0)
+	      (osc (make-oscil phase)))
+	  (lambda (chan amp freq)
+	    (if (< chan 1.0) (set! mem (osc amp freq)))
+	    mem)))))
+
+
+;; square oscillator
+(bind-func make-square
+  (lambda (phase)   
+    (let ((osc (make-oscil phase))	  
+	  (n 50.0))         
+      (lambda (amp freq)
+	(* amp (tanh (* n (osc 1.0 freq))))))))
+
+
+;; square oscillator multichannel
+(if *build-multi-chan*
+    (bind-func make-square-c
+      (lambda (phase)   
+	(let ((sqr (make-square phase))
+	      (mem 0.0))
+	  (lambda (chan amp freq)	
+	    (if (< chan 1.0) (set! mem (sqr amp freq)))
+	    mem)))))
+
+
+;; saw oscillator
+(bind-func make-saw
+  (lambda ()
+    (let ((p 0.0)
+	  (dp 1.0)
+	  (x 0.0)
+	  (leak 0.995)
+	  (saw 0.0))
+      (lambda (amp freq)
+	(let* ((qmax (* 0.5 (/ SAMPLERATE freq)))
+	       (dc (/ -0.498 qmax)))
+	  (set! p (+ p dp))
+	  (if (< p 0.0) 
+	      (begin (set! p (- 0.0 p))
+		     (set! dp (- 0.0 dp)))
+	      (if (> p qmax)
+		  (begin (set! p (+ qmax (- qmax p)))
+			 (set! dp (- 0.0 dp)))))
+	  (set! x (* PI p))
+	  (if (< x 0.000001) (set! x 0.00001))
+	  (set! saw (* leak (+ saw (+ dc (/ (sin x) x)))))
+	  (* amp saw))))))
+
+
+;; saw oscillator
+(if *build-multi-chan*
+    (bind-func make-saw-c
+      (lambda ()
+	(let ((mem 0.0)
+	      (saw (make-saw)))
+	  (lambda (chan amp freq)
+	    (if (< chan 1.0) (set! mem (saw amp freq)))
+	    mem)))))
+
+
+;; pulse train
+(bind-func make-pulse
+  (lambda ()
+    (let ((time -1.0)
+	  (width 100.0))
+      (lambda (amp:double freq)
+	(let ((period (/ SAMPLERATE freq)))
+	  (set! time (+ time 1.0))
+	  (if (< (modulo time period) width)
+	      amp
+	      0.0))))))
+
+(if *build-multi-chan*
+    (bind-func make-pulse-c
+      (lambda ()
+	(let ((pulse (make-pulse))
+	      (mem 0.0))
+	  (lambda (chan amp freq)
+	    (if (< chan 1.0) (set! mem (pulse amp freq)))
+	    mem)))))
+
+
+;; iir comb without interpolation
+;; more efficient than comb if you
+;; don't need variable length
+(bind-func make-delay
+  (lambda (max-delay)
+    (let ((line:double* (zalloc max-delay))
+	  (time 0)
+	  (delay max-delay)
+	  (in 0.5)
+	  (out 0.5))
+      (lambda (x:double)
+	(let* ((n (modulo time delay))
+	       (delayed (pref line n))
+	       (y (+ (* in x) (* out delayed))))
+	  (pset! line n y)
+	  (set! time (+ time 1))
+	  y)))))
+
+(if *build-multi-chan*
+    (bind-func make-delay-c
+      (lambda (channels:i64 max-delay)
+	(let ((dlines:[double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! dlines i (make-delay max-delay)))
+	  (lambda (chan x)
+	    ((pref dlines (dtoi32 chan)) x))))))
+
+
+;; iir comb with interpolation
+(bind-func make-comb
+  (lambda (max-delay)
+    (let ((line:double* (zalloc max-delay))
+	  (in-head 0)
+	  (out-head 0)
+	  (delay_ (i64tod max-delay))
+	  (delay (i64tod max-delay))
+	  (alpha 0.0)
+	  (om_alpha 1.0)
+	  (in 1.0)
+	  (i 0)
+	  (out 0.5))
+      (dotimes (i max-delay) (pset! line i 0.0))
+      (lambda (x:double)
+	(if (<> delay delay_)
+	    (begin (set! delay_ delay)		 
+		   (set! alpha (- delay (floor delay)))
+		   (set! om_alpha (- 1.0 alpha))
+		   (set! out-head (- (+ max-delay in-head)
+				     (dtoi64 delay)))))
+	(let* ((ih:i64 (modulo in-head max-delay))
+	       (oh:i64 (modulo out-head max-delay))
+	       (delayed1 (pref line oh))
+	       (delayed2 (pref line (modulo (+ oh 1) max-delay)))
+	       (delayed (+ (* alpha delayed1) (* om_alpha delayed2))) 
+	       (y (+ (* in x) (* out delayed))))
+	  (pset! line ih y)
+	  (set! in-head (+ ih 1))
+	  (set! out-head (+ oh 1))
+	  y)))))
+
+
+(if *build-multi-chan*
+    (bind-func make-comb-c
+      (lambda (channels:i64 max-delay)
+	(let ((dlines:[double,double]** (alloc channels))
+	      (delay (i64tod max-delay))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! dlines i (make-comb max-delay)))
+	  (lambda (chan x)
+	    (let ((f (pref dlines (dtoi32 chan))))
+	      (f.delay delay)
+	      (f x)))))))
+
+
+;; flanger
+(bind-func make-flanger
+  (lambda (delay mod-phase mod-range mod-rate)
+    (let ((comb (make-comb (dtoi64 (+ delay mod-range))))
+	  (mod (make-oscil mod-phase)))
+      (lambda (x:double)
+	(comb.delay (+ delay (mod mod-range mod-rate)))
+	(comb x)))))
+
+
+(if *build-multi-chan*
+    (bind-func make-flanger-c
+      (lambda (channels:i64 delay mod-phase mod-range mod-rate)
+	(let ((comb (make-comb-c channels (dtoi64 (+ delay mod-range))))
+	      (mod (make-oscil-c mod-phase))
+	      (i:i64 0))
+	  (lambda (chan x)
+	    (comb.delay (+ delay (mod chan mod-range mod-rate)))
+	    (comb chan x))))))
+
+
+;; chorus
+(bind-func make-chorus
+  (lambda (phase)
+    (let ((delay 700.0)
+	  (range 200.0)
+	  (rate 0.1)
+	  (comb1 (make-comb (dtoi64 (+ delay range))))
+	  (comb2 (make-comb (dtoi64 (+ delay range))))
+	  (comb3 (make-comb (dtoi64 (+ delay range))))
+	  (mrng1 range)
+	  (mrng2 (* (random) range))
+	  (mrng3 (* (random) range))
+	  (mrte1 rate)
+	  (mrte2 (* rate 1.372))
+	  (mrte3 (* rate 0.792))
+	  (dly1 delay)
+	  (dly2 (* (random) delay))
+	  (dly3 (* (random) delay))
+	  (mod1 (make-oscil phase))
+	  (mod2 (make-oscil phase))
+	  (mod3 (make-oscil phase)))
+      (comb1.in .5)
+      (comb2.in .5)
+      (comb3.in .5)
+      (lambda (x:double)
+	(comb1.delay (+ dly1 (mod1 mrng1 mrte1)))
+	(comb2.delay (+ dly2 (mod2 mrng2 mrte2)))
+	(comb3.delay (+ dly3 (mod3 mrng3 mrte3)))
+	(+ (comb1 x)
+	   (comb2 x)
+	   (comb3 x))))))
+
+(if *build-multi-chan*
+    (bind-func make-chorus-c
+      (lambda (channels:i64 phase)
+	(let ((dlines:[double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! dlines i (make-chorus phase)))
+	  (lambda (chan x)
+	    (let ((f (pref dlines (dtoi32 chan))))
+	      (f x)))))))
+
+
+;; tap delay
+(bind-func tap-delay
+  (lambda (max-delay num-of-taps)
+    (let ((line:double* (zalloc max-delay))
+	  (taps:i64* (zalloc num-of-taps))
+	  (delay max-delay)
+	  (time 0))
+      (lambda (x:double)
+	(let ((y 0.0)
+	      (i 0)
+	      (n (modulo time delay))
+	      (gain (/ 1.0 (i64tod num-of-taps))))
+	  (pset! line n x)
+	  (dotimes (i num-of-taps)
+	    (set! y (+ y (* gain (pref line (modulo (+ (pref taps i) n) delay))))))
+	  (set! time (+ time 1))
+	  y)))))
+
+;; allpass
+(bind-func make-allpass
+  (lambda (delay)
+    (let ((inline:double* (zalloc delay))
+	  (outline:double* (zalloc delay))
+	  (time 0)
+	  (g 0.9))
+      (lambda (x)
+	(let* ((n (modulo time delay))
+	       (dy (pref outline n))
+	       (dx (pref inline n))
+	       (y (+ (* -1.0 g x)
+		     dx
+		     (* g dy))))
+	  (pset! inline n x)
+	  (pset! outline n y)
+	  (set! time (+ time 1))
+	  y)))))
+
+(if *build-multi-chan*
+    (bind-func make-allpass-c
+      (lambda (channels:i64 delay)
+	(let ((lines:[double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-allpass delay)))
+	  (lambda (chan x)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x)))))))
+
+
+;; a dodgy reverb
+;; (bind-func make-reverb
+;;   (lambda (size) ; size in ms
+;;     (let ((ms (/ SAMPLERATE 1000.0))
+;; 	  (wet .25)
+;; 	  (dly1 (make-delay (dtoi64 (* ms (* .192 size)))))
+;; 	  (dly2 (make-delay (dtoi64 (* ms (* .373 size)))))
+;; 	  (dly3 (make-delay (dtoi64 (* ms (* .671 size)))))
+;; 	  (dly4 (make-delay (dtoi64 (* ms (* .712 size)))))
+;; 	  (ap1 (make-allpass (dtoi64 (* ms size))))
+;; 	  (ap2 (make-allpass (dtoi64 (* ms (* .329 size))))))
+;;       (ap1.g .8)
+;;       (ap2.g .8)
+;;       (lambda (in)
+;; 	(let ((wetin (* in wet)))
+;; 	  (+ (* in (- 1.0 wet)) (ap1 (ap2 (+ (dly1 wetin)
+;; 					     (dly2 wetin)
+;; 					     (dly3 wetin)
+;; 					     (dly4 wetin))))))))))
+
+
+
+;; a dodgy reverb mk2
+(bind-func make-reverb
+  (lambda (size) ; size in ms
+    (let ((ms (/ SAMPLERATE 1000.0))
+	  (wet .25)
+	  (dly1 (make-delay (dtoi64 (* ms (* .192 size)))))
+	  (dly2 (make-delay (dtoi64 (* ms (* .373 size)))))
+	  (dly3 (make-delay (dtoi64 (* ms (* .671 size)))))
+	  (dly4 (make-delay (dtoi64 (* ms (* .712 size)))))
+	  (ap1 (make-allpass (dtoi64 (* ms size))))
+	  (ap3 (make-allpass (dtoi64 (* ms (* .929 size)))))
+	  (ap2 (make-allpass (dtoi64 (* ms (* .329 size))))))
+      (ap1.g .8)
+      (ap2.g .7)
+      (ap3.g .6)
+      (lambda (in)
+	(let ((wetin (* in wet)))
+	  (+ (* in (- 1.0 wet))
+	     (ap1 (ap2 (ap3 (+ (dly1 wetin)
+			       (dly2 wetin)
+			       (dly3 wetin)
+			       (dly4 wetin)))))))))))
+
+(if *build-multi-chan*
+    (bind-func make-reverb-c
+      (lambda (channels:i64 size)
+	(let ((lines:[double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-reverb size)))
+	  (lambda (chan x)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x)))))))
+
+
+;; a dodgy bitcrusher
+(bind-func make-crusher
+  (lambda (bits)
+    (let ((amp 1.0))
+      (lambda (in)
+	(* amp (/ (floor (* in (pow 2. bits))) 
+		  (pow 2. bits)))))))
+
+
+;; a dodgy amp distortion
+(bind-func make-distort
+  (lambda (gain)
+    (let ((lim 0.5))
+      (lambda (in)
+	(range-limit lim (* -1.0 lim) (* gain in))))))
+
+;; a four channel mixer
+(bind-func mixquad
+  (lambda (c1 c2 c3 c4 chan in:double)
+    (cond ((< chan 1.0) (* in c1))
+	  ((< chan 2.0) (* in c2))
+	  ((< chan 3.0) (* in c3))
+	  ((< chan 4.0) (* in c4))
+	  (else 0.0))))
+
+;; a four channel mixer
+;; cdat is an array of doubles values
+;; each array element is a channels mix (between 0.0 and 1.0)
+(bind-func make-mixer
+  (lambda (channels:i64)
+    (let ((ch (i64tod channels)))
+      (lambda (cdat:double* chan:double in:double)
+	(if (< chan channels)
+	    (* in (pref cdat (dtoi32 chan)))
+	    0.0)))))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; BiQuad coefficient formulae from 
+;; Audio EQ Cookbook Robert Bristow-Johnson
+;;
+;; http://www.musicdsp.org/files/Audio-EQ-Cookbook.txt
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; biquad low-pass filter
+(bind-func make-lpf
+  (lambda ()
+    (let* ((y1 0.0)
+	   (y2 0.0)
+	   (x1 0.0)
+	   (x2 0.0)
+	   (b0 0.0)
+	   (b1 0.0)
+	   (b2 0.0)
+	   (a0 0.0)
+	   (a1 0.0)
+	   (a2 0.0)
+	   (res 0.25)
+	   (oldres 0.0)
+	   (oldfreq 0.0))
+      (lambda (x freq)
+	;; if frequency changes
+	;; recalculate coefficients
+	(if (or (<> freq oldfreq)
+		(<> res oldres))
+	    (let* ((omega (* TWOPI (/ freq SAMPLERATE)))
+		   (sino (sin omega))
+		   (coso (cos omega))
+		   (alpha (/ sino (* 2.0 res))))
+	      (set! oldfreq freq)
+	      (set! oldres res)
+	      (set! b0 (/ (- 1.0 coso) 2.0))
+	      (set! b1 (- 1.0 coso))
+	      (set! b2 b0)
+	      (set! a0 (+ 1.0 alpha))
+	      (set! a1 (* -2.0 coso))
+	      (set! a2 (- 1.0 alpha))))
+	(let ((y (- (+ (* (/ b0 a0) x)
+		       (* (/ b1 a0) x1)
+		       (* (/ b2 a0) x2))
+		    (* (/ a1 a0) y1)
+		    (* (/ a2 a0) y2))))
+	  (set! y2 y1)
+	  (set! y1 y)
+	  (set! x2 x1)
+	  (set! x1 x)
+	  y)))))
+
+(if *build-multi-chan*
+    (bind-func make-lpf-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-lpf)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x freq)))))))
+
+
+;; biquad high-pass filter
+(bind-func make-hpf
+  (lambda ()
+    (let* ((y1 0.0)
+	   (y2 0.0)
+	   (x1 0.0)
+	   (x2 0.0)
+	   (b0 0.0)
+	   (b1 0.0)
+	   (b2 0.0)
+	   (a0 0.0)
+	   (a1 0.0)
+	   (a2 0.0)
+	   (res 0.25)
+	   (oldres 0.0)
+	   (oldfreq 0.0))
+      (lambda (x freq)
+	;; if frequency changes
+	;; recalculate coefficients
+	(if (or (<> freq oldfreq)
+		(<> res oldres))
+	    (let* ((omega (* TWOPI (/ freq SAMPLERATE)))
+		   (sino (sin omega))
+		   (coso (cos omega))
+		   (alpha (/ sino (* 2.0 res))))
+	      (set! oldfreq freq)
+	      (set! oldres res)
+	      (set! b0 (/ (+ 1.0 coso) 2.0))
+	      (set! b1 (* -1.0 (+ 1.0 coso)))
+	      (set! b2 b0)
+	      (set! a0 (+ 1.0 alpha))
+	      (set! a1 (* -2.0 coso))
+	      (set! a2 (- 1.0 alpha))))
+	(let ((y (- (+ (* (/ b0 a0) x)
+		       (* (/ b1 a0) x1)
+		       (* (/ b2 a0) x2))
+		    (* (/ a1 a0) y1)
+		    (* (/ a2 a0) y2))))
+	  (set! y2 y1)
+	  (set! y1 y)
+	  (set! x2 x1)
+	  (set! x1 x)
+	  y)))))
+
+(if *build-multi-chan*
+    (bind-func make-hpf-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-hpf)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x freq)))))))
+
+
+;; biquad band-pass filter
+(bind-func make-bpf
+  (lambda () 
+    (let* ((y1 0.0)
+	   (y2 0.0)
+	   (x1 0.0)
+	   (x2 0.0)
+	   (b0 0.0)
+	   (b1 0.0)
+	   (b2 0.0)
+	   (a0 0.0)
+	   (a1 0.0)
+	   (a2 0.0)
+	   (bandwidth 0.5)
+	   (oldfreq 0.0)
+	   (oldbw 0.0))
+      ;; bandwidth in octaves
+      (lambda (x freq)
+	;; if frequency or bandwidth change
+	;; recalculate coefficients
+	(if (or (<> freq oldfreq)
+		(<> bandwidth oldbw))
+	    (let* ((omega (* 1.0 TWOPI (/ freq SAMPLERATE)))
+		   (sino (sin omega))
+		   (coso (cos omega))
+		   (alpha (* sino (sinh (* (/ (log2 2.0) 2.0)
+					   bandwidth
+					   (/ omega sino))))))
+	      (set! oldfreq freq)
+	      (set! oldbw bandwidth)
+	      (set! b0 alpha)
+	      (set! b1 0.0) 
+	      (set! b2 (* -1.0 b0))
+	      (set! a0 (+ 1.0 alpha))
+	      (set! a1 (* -2.0 coso))
+	      (set! a2 (- 1.0 alpha))))
+	(let ((y (- (+ (* (/ b0 a0) x)
+		       (* (/ b1 a0) x1)
+		       (* (/ b2 a0) x2))
+		    (* (/ a1 a0) y1)
+		    (* (/ a2 a0) y2))))
+	  (set! y2 y1)
+	  (set! y1 y)
+	  (set! x2 x1)
+	  (set! x1 x)
+	  y)))))
+
+
+(if *build-multi-chan*
+    (bind-func make-bpf-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-bpf)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x freq)))))))
+
+
+;; biquad notch filter
+(bind-func make-notch
+  (lambda () 
+    (let* ((y1 0.0)
+	   (y2 0.0)
+	   (x1 0.0)
+	   (x2 0.0)
+	   (b0 0.0)
+	   (b1 0.0)
+	   (b2 0.0)
+	   (a0 0.0)
+	   (a1 0.0)
+	   (a2 0.0)	     
+	   (bandwidth 0.5) ; in ocatves
+	   (oldfreq 0.0)
+	   (oldbw 0.0))
+      ;; bandwidth in octaves
+      (lambda (x freq)
+	;; if frequency or bandwidth change
+	;; recalculate coefficients
+	(if (or (<> freq oldfreq)
+		(<> bandwidth oldbw))
+	    (let* ((omega (* TWOPI (/ freq SAMPLERATE)))
+		   (sino (sin omega))
+		   (coso (cos omega))
+		   (alpha (* sino (sinh (* (/ (log2 2.0) 2.0)
+					   bandwidth
+					   (/ omega sino))))))
+	      (set! oldfreq freq)
+	      (set! oldbw bandwidth)
+	      (set! b0 1.0)
+	      (set! b1 (* -2.0 coso)) 
+	      (set! b2 b0)
+	      (set! a0 (+ 1.0 alpha))
+	      (set! a1 b1)
+	      (set! a2 (- 1.0 alpha))))
+	(let ((y (- (+ (* (/ b0 a0) x)
+		       (* (/ b1 a0) x1)
+		       (* (/ b2 a0) x2))
+		    (* (/ a1 a0) y1)
+		    (* (/ a2 a0) y2))))
+	  (set! y2 y1)
+	  (set! y1 y)
+	  (set! x2 x1)
+	  (set! x1 x)
+	  y)))))
+
+(if *build-multi-chan*
+    (bind-func make-notch-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-notch)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f x freq)))))))
+
+
+
+;;
+;; moog VCF
+;;
+;; from Stilson/Smith CCRMA
+;;
+(bind-func make-vcf
+  (lambda ()
+    (let ((res 0.5) ;; 0.0 - 1.0
+	  (x 0.0) (y1 0.0) (y2 0.0) (y3 0.0) (y4 0.0)
+	  (oldx 0.0) (oldy1 0.0) (oldy2 0.0) (oldy3 0.0))
+      (lambda (in cutoff)
+	(let (;(f (* 2.0 (/ cutoff SAMPLERATE)))
+                                        ;(f (* 1.8 (/ cutoff SAMPLERATE)))
+	      (f (* 1.75 (/ cutoff SAMPLERATE)))
+                                        ;(k (- (* 2.0 (sin (* f (/ PI 2.0)))) 1.0))
+	      (k (- (- (* 3.6 f) (* 1.6 (* f f))) 1.0))
+	      (p (* 0.5 (+ k 1.0)))
+	      (scale (exp (* (- 1.0 p) 1.386249)))
+	      (r (* res scale)))
+	  (set! x (- in (* r y4)))
+	  (set! y1 (+ (* x  p) (* oldx  p) (* -1.0 k y1)))
+	  (set! y2 (+ (* y1 p) (* oldy1 p) (* -1.0 k y2)))
+	  (set! y3 (+ (* y2 p) (* oldy2 p) (* -1.0 k y3)))
+	  (set! y4 (+ (* y3 p) (* oldy3 p) (* -1.0 k y4)))
+
+	  (set! oldx x) (set! oldy1 y1) (set! oldy2 y2) (set! oldy3 y3)
+	  ;; y4 is output
+	  (set! y4 (- y4 (/ (pow y4 3.0) 6.0)))
+	  y4)))))
+
+(if *build-multi-chan*
+    (bind-func make-vcf-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (res 0.5)
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-vcf)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f.res res)
+	      (f x freq)))))))
+
+;;
+;; moog VCF v2.0
+;;
+;; from Stilson/Smith CCRMA
+;;
+(bind-func make-vcf2
+  (lambda ()
+    (let ((res 0.5) ;; 0.0 - 1.0
+	  (in1 0.0) (in2 0.0) (in3 0.0) (in4 0.0)
+	  (out1 0.0) (out2 0.0) (out3 0.0) (out4 0.0))
+      (lambda (in cutoff)
+	(let ((f (/ (* 7.0 cutoff) (* 1.16 SAMPLERATE))) ;1.16))
+	      (f1 (- 1.0 f))
+	      (fb (* res 4.0 (- 1.0 (* 0.15 f f)))))
+	  (set! in (- in (* out4 fb)))
+	  (set! in (* in 0.35013 f f f f))
+	  (set! out1 (+ in   (* 0.3 in1) (* f1 out1))) ;; Pole 1
+	  (set! in1 in)
+	  (set! out2 (+ out1 (* 0.3 in2) (* f1 out2)))  ;; Pole 2	  
+	  (set! in2 out1)
+	  (set! out3 (+ out2 (* 0.3 in3) (* f1 out3)))  ;; Pole 3
+	  (set! in3 out2)
+	  (set! out4 (+ out3 (* 0.3 in4) (* f1 out4)))  ;; Pole 4	  
+	  (set! in4 out3)
+	  out4)))))
+
+
+(if *build-multi-chan*
+    (bind-func make-vcf2-c
+      (lambda (channels:i64)
+	(let ((lines:[double,double,double]** (alloc channels))
+	      (res 0.5)
+	      (i:i64 0))
+	  (dotimes (i channels) (pset! lines i (make-vcf2)))
+	  (lambda (chan x freq)
+	    (let ((f (pref lines (dtoi32 chan))))
+	      (f.res res)
+	      (f x freq)))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; envelope stuff
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; time in samples (starting from 0)
+;; apex (in samples) is after how many samples we hit 1.0 before decaying
+(bind-func impulse
+  (lambda (time:double apex:double)
+    (let ((h (* time apex)))
+      (* h (exp (- 1.0 h))))))
+
+
+(bind-func make-line
+  (lambda (x1:double y1:double x2 y2)
+    (let* ((m (if (= 0.0 (- x2 x1)) 
+		  0.0 
+		  (/ (- y2 y1) (- x2 x1))))
+	   (c (- y2 (* m x2))))
+      (lambda (time) (+ (* m time) c)))))
+
+
+(bind-func envelope-segments
+  (lambda (points:double* num-of-points:i64)
+    (let ((lines:[double,double]** (zalloc num-of-points))
+	  (k 0))
+      (dotimes (k num-of-points)
+	(let* ((idx (* k 2))
+	       (x1 (pref points (+ idx 0)))
+	       (y1 (pref points (+ idx 1)))
+	       (x2 (pref points (+ idx 2)))
+	       (y2 (pref points (+ idx 3))))
+	  (pset! lines k (make-line x1 y1 x2 y2))))
+      lines)))
+
+(bind-func make-envelope
+  (lambda (points:double* num-of-points)
+    (let ((klines:[double,double]** (envelope-segments points num-of-points))
+	  (line-length num-of-points))
+      (lambda (time)
+	(let ((res -1.0)
+	      (k:i64 0))
+	  (dotimes (k num-of-points)
+	    (let ((line (pref klines k))
+		  (time-point (pref points (* k 2))))
+	      (if (or (= time time-point)
+		      (< time-point time))
+		  (set! res (line time)))))
+	  res)))))
+
+;; make a convenience wrapper for asr
+(bind-func make-adsr
+  (lambda (start-time atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
+    (let* ((points 6)
+	   (data:double* (zalloc (* points 2))))
+      (pset! data 0 start-time)
+      (pset! data 1 0.0)
+      (pset! data 2 (+ start-time atk-dur)) ;; point data
+      (pset! data 3 peek-amp)
+      (pset! data 4 (+ start-time atk-dur dky-dur))
+      (pset! data 5 sus-amp)
+      (pset! data 6 (+ start-time atk-dur dky-dur sus-dur))
+      (pset! data 7 sus-amp)
+      (pset! data 8 (+ start-time atk-dur dky-dur sus-dur rel-dur))
+      (pset! data 9 0.0)
+      (pset! data 10 (+ start-time atk-dur dky-dur sus-dur rel-dur 1.0)) ;; this to flatten out at 0.0
+      (pset! data 11 0.0)
+      (let ((f (make-envelope data points)))
+	(lambda (time:double)
+	  (f time))))))
+
+
+;; an accumulative adsr (random access not allowed! time must be linear).
+(bind-func make-adsr-accum
+  (lambda (start-time:double atk-dur dky-dur sus-dur rel-dur peek-amp sus-amp)
+    (let ((val (if (> (+ atk-dur dky-dur) 1.0) 0.0 peek-amp))
+	  (t1 atk-dur)
+	  (t2 (+ atk-dur dky-dur))
+	  (t3 (+ atk-dur dky-dur sus-dur))
+	  (t4 (+ atk-dur dky-dur sus-dur rel-dur))	  
+	  (inc1 (/ peek-amp atk-dur))
+	  (inc2 (* -1.0 (/ (- peek-amp sus-amp) dky-dur)))
+	  (inc3 (* -1.0 (/ sus-amp rel-dur))))
+      (lambda (time:double chan)
+	(if (< chan 1.0)
+	    (cond ((> time t4) (set! val 0.0))
+		  ((> time t3) (set! val (+ val inc3)))
+		  ((> time t2) val) ;; sustain (don't do anything with val)
+		  ((> time t1) (set! val (+ val inc2)))
+		  ((> time 0) (set! val (+ val inc1)))
+		  (else (set! val 0.0))))
+	val))))
+
+(bind-func hermite-interp
+  (lambda (fractional y1:double x0 x1 x2)
+    (let ((c (* 0.5 (- x1 y1)))
+	  (v (- x0 x1))
+	  (w (+ c v))
+	  (a (+ w v (* (- x2 x0) 0.5)))
+	  (b (+ w a)))
+      (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
+
+;;  midi/freq utilities
+
+(bind-func midi2frq    
+  (lambda (pitch)            
+    (* 440.0 (pow 2.0 (/ (- pitch 69.0) 12.0)))))
+
+(bind-func frq2midi
+  (lambda (freq)            
+    (+ (* 12.0 (log2 (/ freq 440.0))) 69.0)))
+
+;; making and playing notes
+
+;; relative time USING adsr-accum + local mzone
+(bind-func make-note
+  (lambda (start-time:double freq:double amp:double dur 
+                        attack:double decay:double release:double sus-amp:double
+                        nstarts:double*
+                        idx:i64 kernel:[double,double,double,double,double]*
+                        notezone:mzone*)
+    (let ((env (if (< (+ attack decay) dur)
+		   (make-adsr-accum 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus-amp)
+		   (make-adsr-accum 0.0 0.0 0.0 dur release 1.0 sus-amp)))
+	  (t 0.0)
+	  (ff (lambda (sample:double time:double channel:double)
+		(if (< channel 1.0) (set! t (+ t 1.0)))
+		(if (< t (+ dur release))
+		    (kernel t channel freq (* (env t channel) amp))
+		    (begin (pset! nstarts idx 9999999999999.0)
+			   (llvm_zone_destroy notezone)
+			   0.0)))))
+      ff)))
+
+
+;; NOTE!
+;; (* 5.0 SAMPLERATE) is time padding
+;; it is used because the decay length of the note may go
+;; beyond the duration.
+;; however making it longer means using more memory
+;; it's a trade off!
+(bind-func _play-note
+  (lambda (time inst:[double,double,double,double,double*]* freq amp dur)
+    ;; allocate memzone
+    (let ((f (inst.new-note:[i64,double,double,double,double]*)))
+      (f time freq dur amp)
+      ;; so that we only copy an integer from memzone
+      1)))
+
+;; playnote wrapper
+(define-macro (play-note time inst pitch vol dur)
+  `(let ((duration (* 1.0 ,dur))
+	 (native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (cptr? native)
+	 (_play-note (integer->real ,time) 
+		      native
+		      (midi2frq (* 1.0 ,pitch))
+		      (/ (exp (/ ,vol 26.222)) 127.0)
+		      duration)
+	 (print-error 'No 'inst 'named ,(symbol->string inst)))))

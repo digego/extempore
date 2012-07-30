@@ -1,0 +1,96 @@
+;;;;;;;;;  FFT ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Complex numbers & FFT
+;;
+;; These functions come from the kiss FFT library
+;; 
+;; You can get the source for kiss_fft from
+;; http://sourceforge.net/projects/kissfft/
+;;
+;; The basic kiss_fft library only requires the file kiss_fft.c
+;; You have to build this into a dyib yourself: on OSX this can be
+;; done with:
+;;
+;; gcc kiss_fft.c -dynamiclib -I/usr/include/malloc -o kiss_fft.1.2.9.dylib -current_version 1.2.9
+;;
+;; Then, copy the dylib into somewhere on your lib path, e.g. /usr/local/lib
+
+(load "libs/core/math.xtm")
+
+(define kissfft
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "kiss_fft.so"))
+          ((string=? platform "Windows") (sys:open-dylib "kiss_fft.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "kiss_fft.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+(if (not kissfft)
+    (print-error "Could not load kiss_fft dynamic library"))
+
+;; bind the required types and function signatures (see kiss_fft.h)
+
+(bind-type kiss_fft_cpx <float,float>)
+(bind-type kiss_fft_state <i32,i32,|64,i32|,|1,kiss_fft_cpx|>)
+(bind-alias kiss_fft_cfg kiss_fft_state*)
+
+(bind-lib kissfft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
+(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+(bind-lib kissfft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
+(bind-lib kissfft kiss_fft_cleanup [i8*,i8*]*)
+(bind-lib kissfft kiss_fft_next_fast_size [i32,i32]*)
+
+(bind-func fft_cpxf
+  "calculate the FFT of a real (float) input signal"
+  (lambda (in:cpxf* out:cpxf* len:i64)
+    (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
+                                    (i64toi32 len)
+                                    0 null null)))
+      (kiss_fft fft_config
+                (cast in kiss_fft_cpx*)
+                (cast out kiss_fft_cpx*)))
+    void))
+
+(bind-func fft_cpxd
+  "calculate the FFT of a real (double) input signal"
+  (lambda (in:cpxd* out:cpxd* len:i64)
+    (let ((inf:cpxf* (salloc len))
+          (outf:cpxf* (salloc len)))
+      (buffer_cpxd_to_cpxf in inf len)
+      (fft_cpxf inf outf len)
+      (buffer_cpxf_to_cpxd outf out len))
+    void))
+
+(bind-poly fft fft_cpxf)
+(bind-poly fft fft_cpxd)
+
+(bind-func inverse_fft_cpxf
+  "calculate the inverse FFT of a real (float) input signal"
+  (lambda (in:cpxf* out:cpxf* len:i64)
+    (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
+                                    (i64toi32 len)
+                                    1 null null))
+          (i 0))
+      (kiss_fft fft_config
+                (cast in kiss_fft_cpx*)
+                (cast out kiss_fft_cpx*)))
+    (dotimes (i len)
+      (tset! (pref-ptr out i)
+             0
+             (/ (tref (pref-ptr out i) 0) (i64tof len)))
+      (tset! (pref-ptr out i)
+             1
+             (/ (tref (pref-ptr out i) 1) (i64tof len))))
+    void))
+
+(bind-func inverse_fft_cpxd
+  "calculate the inverse FFT of a real (double) input signal"
+  (lambda (in:cpxd* out:cpxd* len:i64)
+    (let ((inf:cpxf* (salloc len))
+          (outf:cpxf* (salloc len)))
+      (buffer_cpxd_to_cpxf in inf len)
+      (inverse_fft_cpxf inf outf len)
+      (buffer_cpxf_to_cpxd outf out len))
+    void))
+
+(bind-poly inverse_fft inverse_fft_cpxf)
+(bind-poly inverse_fft inverse_fft_cpxd)

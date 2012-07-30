@@ -1,0 +1,487 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; shaders
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; draw a quad
+;; tw and th are framebuffer width and height
+(bind-func gl-draw-shader-quad
+  (lambda (x y w h r tw th)
+    (let ((hx (* -0.5 w))
+	  (hy (* -0.5 h))
+	  (xx (+ x (* .5 w)))
+	  (yy (+ y (* .5 h))))
+      (glPushMatrix)
+      (glTranslated xx yy 0.0)
+      (glRotated r 0.0 0.0 1.0)
+      (glBegin GL_QUADS)
+      (glTexCoord2d 0.0 0.0)
+      (glVertex2d hx hy)
+      (glTexCoord2d 0.0 th)
+      (glVertex2d hx (+ hy h))
+      (glTexCoord2d tw th)
+      (glVertex2d (+ hx w) (+ hy h))
+      (glTexCoord2d tw 0.0)
+      (glVertex2d (+ hx w) hy)
+      (glTexCoord2d 0.0 0.0)
+      (glEnd)
+      (glPopMatrix)
+      void)))
+
+
+;; Grid Offsets is used by convolution shaders
+;; box size of 5*5
+(bind-val shader_gridoffsets float* (sys:make-cptr (* 5 5 2 4)))
+
+(bind-func shader_set_grid_offsets
+  (lambda (width:float height:float factor:float)
+    (let ((xinc:float (/ factor width))
+	  (yinc:float (/ factor height))
+	  (i 0) (j 0))
+      (dotimes (i 5) ;; columns
+	(dotimes (j 5) ;; rows
+	  (pset! shader_gridoffsets (+ (* (+ (* i 5) j) 2) 0)
+		 (+ (* -2.0 xinc)
+		    (* (i32tof i) xinc)))
+	  (pset! shader_gridoffsets (+ (* (+ (* i 5) j) 2) 1)
+		 (+ (* -2.0 xinc)
+		    (* (i32tof i) yinc)))))
+      void)))
+
+
+;; vert shader
+(define passthrough_vert
+"// VERTEX SHADER
+// #version 330
+
+varying vec2 TexCoord;
+ 
+void main() {   
+   // pass through texture coordinate
+   //TexCoord =  gl_TextureMatrix[0].st * gl_MultiTexCoord0.st;   
+   TexCoord = gl_MultiTexCoord0.st;
+   gl_FrontColor = gl_Color;
+   gl_Position = ftransform();
+}")
+
+
+;; frag shader
+(define passthrough_frag
+"//  FRAGMENT SHADER
+// #version 330
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+
+varying vec2 TexCoord;
+
+void main() {
+   gl_FragColor = texture2DRect(tex1,TexCoord);
+}")
+
+
+;; frag shader
+(define greyscale_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+
+varying vec2 TexCoord;
+
+void main() {
+   float alpha = texture2DRect(tex1,TexCoord).a;
+   float grey = dot(texture2DRect(tex1,TexCoord).rgb, vec3(0.299, 0.587, 0.114));
+   gl_FragColor = vec4(vec3(grey),alpha);
+}")
+
+
+;; sepia
+(define sepia_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+
+varying vec2 TexCoord;
+
+void main() {
+   float alpha = texture2DRect(tex1,TexCoord).a;
+   float grey = dot(texture2DRect(tex1,TexCoord).rgb, vec3(0.299, 0.587, 0.114));
+   gl_FragColor = vec4(grey*vec3(1.2,1.0,0.8),alpha);
+}")
+
+
+(define invert_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+
+varying vec2 TexCoord;
+
+void main() {
+   float alpha = texture2DRect(tex1,TexCoord).a;
+   vec4 colour = texture2DRect(tex1,TexCoord);
+   gl_FragColor = vec4(1.0 - colour.rgb,alpha);
+}")
+
+
+(define gaussian_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+uniform vec2      texoffset[25];
+
+varying vec2 TexCoord;
+
+void main() {
+   vec4 sample[25];
+   for (int i = 0; i < 25; i++)
+   {
+      // Sample a grid around and including our texel
+      sample[i] = texture2DRect(tex1, TexCoord + texoffset[i]);
+   }
+ 
+   gl_FragColor = ((1.0  * (sample[0] + sample[4]  + sample[20] + sample[24])) +
+	           (4.0  * (sample[1] + sample[3]  + sample[5]  + sample[9] + sample[15] + sample[19] + sample[21] + sample[23])) +
+	           (7.0  * (sample[2] + sample[10] + sample[14] + sample[22])) +
+	           (16.0 * (sample[6] + sample[8]  + sample[16] + sample[18])) +
+	           (26.0 * (sample[7] + sample[11] + sample[13] + sample[17])) +
+	           (41.0 * sample[12])
+	           ) / 273.0;
+   //gl_FragColor = vec4(1.0,0.0,0.0,1.0);
+}")
+
+
+;;  Blur (median filter)
+(define blur_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+uniform vec2      texoffset[25];
+
+varying vec2 TexCoord;
+
+void main() {
+   gl_FragColor = vec4(0.0);
+ 
+   for (int i = 0; i < 25; i++)
+   {
+      // Sample a grid around and including our texel
+      gl_FragColor += texture2DRect(tex1, TexCoord + texoffset[i]);
+   }
+ 
+   gl_FragColor /= 25.0;
+}")
+
+
+;;  sharpen
+(define sharpen_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+uniform vec2      texoffset[25];
+
+varying vec2 TexCoord;
+
+void main() {
+    vec4 sample[25];
+ 
+    for (int i = 0; i < 25; i++)
+    {
+       // Sample a grid around and including our texel
+       sample[i] = texture2DRect(tex1, TexCoord + texoffset[i]);
+    }
+  
+    gl_FragColor = 25.0 * sample[12];
+ 
+    for (int i = 0; i < 25; i++)
+    {
+       if (i != 12)
+          gl_FragColor -= sample[i];
+    }
+}")
+
+(define dilate_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+uniform vec2      texoffset[25];
+
+varying vec2 TexCoord;
+
+void main() {  
+   vec4 sample[25];
+   vec4 maxValue = vec4(0.0);
+ 
+   for (int i = 0; i < 25; i++)
+   {
+      // Sample a grid around and including our texel
+      sample[i] = texture2DRect(tex1, TexCoord + texoffset[i]);
+ 
+      // Keep the maximum value		
+      maxValue = max(sample[i], maxValue);
+   }
+ 
+   gl_FragColor = maxValue;
+}")
+
+
+(define erode_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+uniform vec2      texoffset[25];
+
+varying vec2 TexCoord;
+
+void main() {
+    vec4 sample[25];
+    vec4 minValue = vec4(1.0);
+ 
+    for (int i = 0; i < 25; i++)
+    {
+        // Sample a grid around and including our texel
+        sample[i] = texture2DRect(tex1, TexCoord + texoffset[i]);
+ 
+        // Keep the minimum value		
+        minValue = min(sample[i], minValue);
+    }
+    gl_FragColor = minValue;
+}")
+
+
+(define edge_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex1;
+uniform float     time;
+uniform vec2      texoffset[25];
+
+varying vec2 TexCoord;
+
+void main() {
+    vec4 sample[25];
+ 
+    for (int i = 0; i < 25; i++)
+    {
+       // Sample a grid around and including our texel
+       sample[i] = texture2DRect(tex1, TexCoord + texoffset[i]);
+    }
+
+    gl_FragColor = 24.0 * sample[12];
+ 
+    for (int i = 0; i < 25; i++)
+    {
+	if (i != 12)
+	   gl_FragColor -= sample[i];
+    }
+}")
+
+
+(define blend_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect baseBuf;
+uniform sampler2DRect blendBuf;
+uniform float       time;
+uniform float       opacity;
+
+varying vec2 TexCoord;
+
+void main() {
+    vec4 base = texture2DRect(baseBuf, TexCoord);
+    vec4 blend = texture2DRect(blendBuf, TexCoord);
+
+    vec4 result = blend + base;
+         result = clamp(result, 0.0, 1.0);
+
+    gl_FragColor = mix(base, result, opacity);
+}")
+
+(define green_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect tex_back;
+uniform sampler2DRect tex_front;
+uniform vec4 color;
+uniform float width;
+uniform float height;
+uniform int flipx;
+uniform int flipy;
+
+varying vec2 TexCoord;
+
+void main() {
+    vec4 base = texture2DRect(tex_back, TexCoord);
+    float x = (flipx==0) ? TexCoord.x : width-TexCoord.x;
+    float y = (flipy==0) ? TexCoord.y : height-TexCoord.y;
+    vec4 blend = texture2DRect(tex_front, vec2(x,y));
+
+    if(color == blend) {
+      gl_FragColor = base;
+    }else{
+      gl_FragColor = blend;
+    }
+}")
+
+
+(define dof_frag
+"
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect dBuf;
+uniform sampler2DRect cBuf;
+//uniform vec2 frameBufSize;
+uniform float blur;
+uniform float fp;  // focal point
+uniform int show_depth;
+
+varying vec2 TexCoord;
+
+const float near = 0.1;
+const float far = 1000.0;
+const vec2 frameBufSize = vec2(1.0,1.0);
+
+vec4 blurKawase( const sampler2DRect tex, const vec2 texCoord, const vec2 texSize, const float iteration ) {
+	// Function assumes that tex is using bilinear hardware filtering
+	
+	vec2 dUV = (iteration + 0.5) / texSize;
+	
+	vec4 col = texture2DRect( tex, texCoord + vec2( -dUV.x, dUV.y ) );	// Top left
+	col += texture2DRect( tex, texCoord + dUV );		        // Top right
+	col += texture2DRect( tex, texCoord + vec2( dUV.x, -dUV.y ) );      // Bottom right
+	col += texture2DRect( tex, texCoord - dUV );		        // Bottom left
+	
+	return col * 0.25;
+}
+
+void main( void ) {
+        // get z depth from dBuf tex 
+	float depth = texture2DRect(dBuf,TexCoord).x;	
+
+        // scale depth buffer
+        depth *= far-near;
+        depth = (far+near)-depth;
+        depth = abs(depth - fp); // fp focal point
+
+        // show_depth is true display depth buffer
+        if (show_depth == 1) {
+          gl_FragColor = vec4(depth,depth,depth,1.0);  
+        } else { // else apply depth blur
+          gl_FragColor = blurKawase( cBuf, TexCoord, frameBufSize, depth * blur);
+        }
+}
+")
+
+
+(bind-func shader_setup_convolution_filter
+  (lambda (shader offset)
+    (shader_set_grid_offsets 1.0 1.0 offset) ;(* 2.0 (dtof (cos (* 2222.2 (i64tod (now)))))))
+    (glUniform2fv (glGetUniformLocation shader "texoffset") 25 shader_gridoffsets)
+    (glUniform1i (glGetUniformLocation shader "tex1") 0)))
+
+   
+(bind-val pass_shader i32 0)
+(bind-val invert_shader i32 0)
+(bind-val greyscale_shader i32 0)
+(bind-val sepia_shader i32 0)
+(bind-val gaussian_shader i32 0)
+(bind-val blur_shader i32 0)
+(bind-val sharpen_shader i32 0)
+(bind-val dilate_shader i32 0)
+(bind-val erode_shader i32 0)
+(bind-val edge_shader i32 0)
+(bind-val blend_shader i32 0)
+(bind-val green_shader i32 0)
+(bind-val dof_shader i32 0)
+
+;; must be called after initalizing opengl
+(bind-func _init-all-shaders
+  (lambda (passthrough_vert 
+	   passthrough_frag
+	   invert_frag
+	   greyscale_frag
+	   sepia_frag
+	   gaussian_frag
+	   blur_frag
+	   sharpen_frag
+	   dilate_frag
+	   erode_frag
+	   edge_frag
+	   blend_frag
+	   green_frag
+	   dof_frag)
+    (set! pass_shader (create-shader passthrough_vert passthrough_frag))
+    (set! invert_shader (create-shader passthrough_vert invert_frag)) 
+    (set! greyscale_shader (create-shader passthrough_vert greyscale_frag))
+    (set! sepia_shader (create-shader passthrough_vert sepia_frag))
+    (set! gaussian_shader (create-shader passthrough_vert gaussian_frag))
+    (set! blur_shader (create-shader passthrough_vert blur_frag))
+    (set! sharpen_shader (create-shader passthrough_vert sharpen_frag))
+    (set! dilate_shader (create-shader passthrough_vert dilate_frag))
+    (set! erode_shader (create-shader passthrough_vert erode_frag))
+    (set! edge_shader (create-shader passthrough_vert edge_frag))
+    (set! blend_shader (create-shader passthrough_vert blend_frag))
+    (set! green_shader (create-shader passthrough_vert green_frag))
+    (set! dof_shader (create-shader passthrough_vert dof_frag))
+    void))
+
+(define init-all-shaders
+  (lambda ()
+    (_init-all-shaders passthrough_vert
+	   passthrough_frag
+	   invert_frag
+	   greyscale_frag
+	   sepia_frag
+	   gaussian_frag
+	   blur_frag
+	   sharpen_frag
+	   dilate_frag
+	   erode_frag
+	   edge_frag
+	   blend_frag
+	   green_frag
+	   dof_frag)))
