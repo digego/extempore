@@ -15,52 +15,93 @@
 (load "libs/external/fft.xtm")
 (load "libs/external/opengl.xtm")
 
-;; take the time_domain signal (time_buffer) and return the
-;; (magnitude) spectrum
-(bind-func calculate_spectrum
-  (let ((spectrum:double* (* 2 (zalloc nbins))) ;double length because
-                                        ;we want the previous spectrum
-                                        ;as well as the current one
-                                        ;(to take the difference)
-        (i:i64 0))
-    (lambda (audio:double* window_size time_buffer freq_buffer)
-      (dotimes (i window_size)
-        ;; add sum of L and R channels into real component
-        ;; of time_buffer (which is a buffer of complex values
-        (tset! (pref-ptr time_buffer i) 0
-               (+ (pref audio (* 2 i)) ; L channel
-                  (pref audio (+ 1 (* 2 i)))))) ; R channel
-      ;; take DFT, store results in freq_buffer
-      (fft_cpxd time_buffer freq_buffer window_size)
-      (bin_spectrum spectrum freq_buffer window_size nbins))))
-
 ;; set up the type alias for our dsp function
 (bind-alias DSP [double,double,double,double,double*]*)
 ;; dsp function - this will play the sound file.  Remember to
 ;; change the file path to an audio file on your system
 (bind-func dsp:DSP 100000000 ; make sure we allocate enough memory
   (let ((audio_length 60)
-        (fft_window_size 1024)
+	(window_length:i64 1024)
         (audio:double* (zalloc (* 44100 2 audio_length)))
         (samples_read (read-audio-data "/Users/ben/Desktop/peg.wav"
                                        audio
                                        0
                                        (* 44100 audio_length)))
         (playhead 0)
-        (time_buffer:cpxd* (zalloc fft_window_size))
-        (freq_buffer:cpxd* (zalloc fft_window_size))
         (i:i64 0))
     (lambda (in time chan dat)
-      (if (and (= (modulo playhead fft_window_size) 0)
-               (= chan 0.0))
-          (mag_spectrum (pref-ptr audio playhead) fft_window_size
-                        time_buffer freq_buffer))
+      ;; (if (and (= (modulo playhead window_length) 0)
+      ;;          (= chan 0.0)))
       ;; increment playhead once per (stereo) pair of samples
       (if (= chan 1.0)
           (set! playhead (modulo (+ playhead 1)
                                  (* audio_length 44100))))
       ;; play audio
       (pref audio (+ (dtoi64 chan) (* 2 playhead))))))
+
+;; add sum of L and R channels into real component
+;; of time_buffer (which is a buffer of complex values)
+(bind-func preprocess_audio 100000
+  (let ((window_length (dsp.window_length))
+	(window_buffer:double* (zalloc window_length))
+	(i:i64 0))
+    (window_hanning window_buffer window_length)
+    (lambda (in_stereo:double* out:cpxd*)
+      (dotimes (i window_length)
+	(tset! (pref-ptr out i) 0
+	       (* (+ (pref in_stereo (* 2 i))         ; L channel
+		     (pref in_stereo (+ 1 (* 2 i))))  ; R channel
+		  (pref window_buffer i)))))))
+
+(bind-func rectified_difference
+  (lambda (curr:cpxd* prev:cpxd* len)
+    (let ((i:i64 0)
+	  (sum 0.0))
+      (dotimes (i (/ len 2)) ; the spectrum is real, so it will be symmetrical
+	(let ((diff (- (magnitude_cpxd (pref-ptr curr i))
+		       (magnitude_cpxd (pref-ptr prev i)))))
+	  (if (> diff 0.0)
+	      (set! sum (+ sum diff)))))
+      sum)))
+
+;; take the time_domain signal (time_buffer) and return the
+;; (magnitude) spectrum
+(bind-func spectral_difference 100000
+  (let ((window_length (dsp.window_length))
+	(time_buffer:cpxd* (zalloc window_length))
+	;;  double length freq buffer to accomodate both current
+	;;  spectrum and previous timestep's spectrum
+	(freq_buffer:cpxd* (zalloc (* 2 window_length)))
+	(freq_buffer_offset 0) ; for keeping track of the current/old values
+	;; values returned by the detection function
+	(detection_length 64)
+	(detection_buffer:double* (zalloc peak_detection_length))
+	(detection_buffer_offset 0))
+    (lambda (audio:double* window_length time_buffer freq_buffer)
+      (preprocess_audio audio time_buffer window_length)
+      ;; take DFT, store results in freq_buffer
+      (fft_cpxd time_buffer
+		(pref-ptr freq_buffer freq_buffer_offset)
+		window_length)
+      (pset! detection_buffer
+	     detection_buffer_offset
+	     (rectified_difference
+	      (pref-ptr freq_buffer freq_buffer_offset)
+	      (pref-ptr freq_buffer
+			(modulo (+ freq_buffer_offset
+				   (/ window_length 2))
+				window_length))))
+      (printf "rect diff = %f\n"
+	      (pref detection_buffer detection_buffer_offset))
+      (set! freq_buffer_offset
+	    (modulo (+ freq_buffer_offset
+		       (/ window_length 2))
+		    window_length))
+      (set! detection_buffer_offset
+	    (modulo (+ detection_buffer_offset 1)
+		    detection_length))
+      void
+      )))
 
 (dsp:set! dsp)
 
