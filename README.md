@@ -221,9 +221,8 @@ And you're done.
 - `CMAKE_CXX_FLAGS_DEBUG` and `CMAKE_C_FLAGS_DEBUG` (click advanced checkbox in cmake gui)
 - Make sure portaudio msvc general project settings are set to static lib
 - boost command line for bjam is:
-```bat
-jam --build-dir=<dir> toodset=msvc link=static address-model=64
---build-type=complete stage
+```
+bjam --build-dir=<dir> toodset=msvc link=static address-model=64 variant=release --build-type=complete stage
 ```
 - extempore msvs project settings needs `PCRE_STATIC` to be defined if you want to build against pcre static libs
 - extempore msvs project needs `EXT_BOOST` to be defined
