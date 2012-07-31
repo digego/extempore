@@ -125,6 +125,8 @@ namespace extemp {
 	void stop();
 	bool start();
 	bool withBanner() { return with_banner; }
+	int setPriority(int); 
+	int getPriority(); 
 		
 	std::string getLoadPath() { return load_path; };	
 	//pointer schemeApply(pointer func, pointer args);
@@ -178,7 +180,7 @@ namespace extemp {
 	bool libs_loaded;
 	std::string load_path;			
 	std::string name;
-	scheme* sc;		
+	scheme* sc;
 	EXTThread threadScheme;
 	EXTThread threadServer;
 #ifdef EXT_BOOST

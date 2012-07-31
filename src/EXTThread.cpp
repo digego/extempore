@@ -37,6 +37,10 @@
 
 #include "EXTThread.h"
 
+#ifdef TARGET_OS_WINDOWS
+#include <Windows.h>
+#endif
+
 #define _EXTTHREAD_DEBUG_
 
 
@@ -157,6 +161,34 @@ namespace extemp
 #endif
 	return result;
 		
+    }
+
+    int EXTThread::setPriority(int priority)
+    {
+#ifdef EXT_BOOST
+#ifdef TARGET_OS_WINDOWS
+        return (int) SetThreadPriority(bthread.native_handle(),priority);
+#else
+	return 0;
+#endif
+	return 0;
+#else
+
+#endif
+    }
+
+    int EXTThread::getPriority()
+    {
+#ifdef EXT_BOOST
+#ifdef TARGET_OS_WINDOWS
+        return (int) GetThreadPriority(bthread.native_handle());
+#else
+	return 0;
+#endif
+	return 0;
+#else
+
+#endif
     }
 	
     bool EXTThread::isRunning() 
