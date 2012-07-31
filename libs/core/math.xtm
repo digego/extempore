@@ -3,6 +3,87 @@
 ;;  MATH Library
 ;;
 
+;;;;;;;;;; VECTOR ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; some basic vector functions
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func vprintd
+  (lambda (v:double* lgth:i64)
+    (let ((i 0))
+      (printf "[")
+      (printf "% f" (pref v 0))
+      (dotimes (i (- lgth 1))
+	(printf ",% f" (pref v (+ i 1))))
+      (printf "]\n")
+      void)))
+
+(bind-func vprintf
+  (lambda (v:float* lgth:i64)
+    (let ((i 0))
+      (printf "[")
+      (printf "% f" (ftod (pref v 0)))
+      (dotimes (i (- lgth 1))
+	(printf ",% f" (ftod (pref v (+ i 1)))))
+      (printf "]\n")
+      void)))
+
+(bind-func vnormf
+  (lambda (v:float* lgth:i64 n:float*)
+    (let ((mag 0.0)
+	  (i 0))
+      (dotimes (i lgth)
+	(set! mag (+ mag (* (pref v i) (pref v i)))))
+      (set! mag (sqrtf mag))
+      (dotimes (i lgth)
+	(pset! n i (/ (pref v i) mag)))
+      void)))
+
+(bind-func vdotf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* lgth:i64)
+      (let ((res 0.0))
+	(dotimes (i lgth)
+	  (set! res (+ res (* (pref v1 i) (pref v2 i)))))
+	res))))
+
+(bind-func vsmulf
+  (lambda (s:float v1:float* lgth:i64 v2:float*)
+    (let ((i 0))
+      (dotimes (i lgth)
+	(pset! v2 i (* s (pref v1 i))))
+      void)))
+
+(bind-func vsdivf
+  (lambda (s:float v1:float* lgth:i64 v2:float*)
+    (let ((i 0))
+      (dotimes (i lgth)
+	(pset! v2 i (/ (pref v1 i) s)))
+      void)))
+	
+(bind-func vsumf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
+      (dotimes (i lgth)
+	(pset! v3 i (+ (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-func vsubf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
+      (dotimes (i lgth)
+	(pset! v3 i (- (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-func vdotd  
+  (let ((i 0))
+    (lambda (v1:double* v2:double* lgth:i64 v3:double*)
+      (dotimes (i lgth)
+	(pset! v3 i (* (pref v1 i) (pref v2 i))))
+      void)))
+      
+	
 
 ;;;;;;;;;; MATRIX ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
