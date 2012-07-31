@@ -605,7 +605,7 @@
 ;; beyond the duration.
 ;; however making it longer means using more memory
 ;; it's a trade off!
-(bind-func _synth-note
+(bind-func _play-note
   (lambda (time inst:[_abuf*,_abuf*,float,float,i8*]* freq amp dur)
     (memzone (* 1024 100)
 	     (ftoi64 (+ (- time (i64tof (now)))
@@ -628,7 +628,7 @@
 ;; playnote wrapper
 (define-macro (play-note time inst pitch vol dur)
   `(let ((duration (* 1.0 ,dur)))
-     (_synth-note (integer->real ,time) 
+     (_play-note (integer->real ,time) 
 		  (llvm:get-native-closure ,(symbol->string inst))
 		  (midi2frq (* 1.0 ,pitch))
 		  (/ (exp (/ ,vol 26.222)) 127.0)
@@ -761,7 +761,7 @@
 ;(dsp:set! dsp-v)
 
 
-(load "libs/core/pc-ivl-lib.xtm")
+(load "libs/core/pc_ivl.xtm")
 
 (define loop2
   (let ((s 'aeolian)
