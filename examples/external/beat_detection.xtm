@@ -15,24 +15,73 @@
 (load "libs/external/fft.xtm")
 (load "libs/external/opengl.xtm")
 
+(bind-val fft_window_length i64 256)
+
+;; add sum of L and R channels into real component
+;; of time_buffer (which is a buffer of complex values)
+(bind-func preprocess_audio 100000
+  (let ((window_buffer:double* (zalloc fft_window_length))
+	(i:i64 0))
+    (window_hanning window_buffer fft_window_length)
+    (lambda (in_stereo:double* out:cpxd*)
+      (dotimes (i fft_window_length)
+	(tset! (pref-ptr out i) 0
+	       (* (+ (pref in_stereo (* 2 i))         ; L channel
+		     (pref in_stereo (+ 1 (* 2 i))))  ; R channel
+		  (pref window_buffer i)))))))
+
+(bind-func rectified_difference
+  (lambda (curr:cpxd* prev:cpxd*)
+    (let ((i:i64 0)
+	  (sum 0.0))
+      (dotimes (i (/ fft_window_length 2)) ; the spectrum is real, so it will be symmetrical
+	(let ((diff (- (magnitude_cpxd (pref-ptr curr i))
+		       (magnitude_cpxd (pref-ptr prev i)))))
+	  (if (> diff 0.0)
+	      (set! sum (+ sum diff)))))
+      sum)))
+
+(bind-func onset_detection 10000000
+  (let ((dbuf_length (* 4 (dtoi64 SAMPLERATE)))
+	(dbuf:double* (zalloc dbuf_length))
+	(dbuf_offset:i64 0)
+	(mean 0.0))
+    (lambda (value)
+      (set! mean (+ mean (- (/ value (i64tod dbuf_length))
+			    (pref dbuf (modulo (- dbuf_offset 1)
+					       dbuf_length)))))
+      (pset! dbuf dbuf_offset value)
+      (set! dbuf_offset
+	      (modulo (+ dbuf_offset 1)
+		      dbuf_length))
+      (if (> value (* 500.0 mean)) 1 0))))
+
 ;; take the time_domain signal (time_buffer) and return the
 ;; (magnitude) spectrum
-(bind-func calculate_spectrum
-  (let ((spectrum:double* (* 2 (zalloc nbins))) ;double length because
-                                        ;we want the previous spectrum
-                                        ;as well as the current one
-                                        ;(to take the difference)
-        (i:i64 0))
-    (lambda (audio:double* window_size time_buffer freq_buffer)
-      (dotimes (i window_size)
-        ;; add sum of L and R channels into real component
-        ;; of time_buffer (which is a buffer of complex values
-        (tset! (pref-ptr time_buffer i) 0
-               (+ (pref audio (* 2 i)) ; L channel
-                  (pref audio (+ 1 (* 2 i)))))) ; R channel
+(bind-func spectral_difference 100000
+  (let ((time_buffer:cpxd* (zalloc fft_window_length))
+	;;  double length freq buffer to accomodate both current
+	;;  spectrum and previous timestep's spectrum
+	(fbuf_curr:cpxd* (zalloc (* 2 fft_window_length)))
+	(fbuf_prev (pref-ptr fbuf_curr fft_window_length))
+	(onset_detected 0))
+    (lambda (audio:double*)
+      (preprocess_audio audio time_buffer)
       ;; take DFT, store results in freq_buffer
-      (fft_cpxd time_buffer freq_buffer window_size)
-      (bin_spectrum spectrum freq_buffer window_size nbins))))
+      (fft_cpxd time_buffer fbuf_curr fft_window_length)
+      ;; (printf "fft[0] %f\n" (tref (pref fbuf_curr 0) 0))
+      ;; (printf "fft length %lld\n" fft_window_length)
+
+      (let ((value (rectified_difference fbuf_curr fbuf_prev))
+	    (tmp:cpxd* null))
+	(set! onset_detected
+	      (onset_detection value))
+	;; (if (= 1 onset_detected) (printf "%f\n" value))
+	;; some pointer jiggery-pokery
+	(set! tmp fbuf_curr)
+	(set! fbuf_curr fbuf_prev)
+	(set! fbuf_prev tmp)
+	value))))
 
 ;; set up the type alias for our dsp function
 (bind-alias DSP [double,double,double,double,double*]*)
@@ -40,27 +89,22 @@
 ;; change the file path to an audio file on your system
 (bind-func dsp:DSP 100000000 ; make sure we allocate enough memory
   (let ((audio_length 60)
-        (fft_window_size 1024)
-        (audio:double* (zalloc (* 44100 2 audio_length)))
-        (samples_read (read-audio-data "/Users/ben/Desktop/peg.wav"
-                                       audio
-                                       0
-                                       (* 44100 audio_length)))
-        (playhead 0)
-        (time_buffer:cpxd* (zalloc fft_window_size))
-        (freq_buffer:cpxd* (zalloc fft_window_size))
-        (i:i64 0))
+	(audio:double* (zalloc (* 44100 2 audio_length)))
+	(samples_read (read-audio-data "/Users/ben/Desktop/peg.wav"
+				       audio
+				       0
+				       (* 44100 audio_length)))
+	(playhead 0))
     (lambda (in time chan dat)
-      (if (and (= (modulo playhead fft_window_size) 0)
-               (= chan 0.0))
-          (mag_spectrum (pref-ptr audio playhead) fft_window_size
-                        time_buffer freq_buffer))
+      (if (and (= (modulo playhead fft_window_length) 0)
+	       (= chan 0.0))
+	  (spectral_difference (pref-ptr audio playhead)))
       ;; increment playhead once per (stereo) pair of samples
       (if (= chan 1.0)
-          (set! playhead (modulo (+ playhead 1)
-                                 (* audio_length 44100))))
+	  (set! playhead (modulo (+ playhead 2) ; +2 because it's stereo
+				 (* audio_length 44100))))
       ;; play audio
-      (pref audio (+ (dtoi64 chan) (* 2 playhead))))))
+      (pref audio (+ (dtoi64 chan) playhead)))))
 
 (dsp:set! dsp)
 
@@ -78,13 +122,13 @@
       (glEnd))))
 
 ;; the animation callback - remember this is in scheme, not xtlang
-(define spectrum-animation
+(define beat-visualisation
   (lambda (time fps)
     (gl-draw)
     (gl:swap-buffers ctx)
     (callback (+ time (* 0.5 (/ *samplerate* fps)))
-              'spectrum-animation
+	      'beat-visualisation
               (+ time (/ *samplerate* fps))
               fps)))
 
-(spectrum-animation (now) 30)
+(beat-visualisation (now) 30)
