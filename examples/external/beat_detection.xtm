@@ -1,9 +1,15 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; beat detection in extemopore
+;;; beat_detection.xtm -- real-time audio onset detection
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: kiss_fft, libsndfile
+
+;;; Commentary:
 
 ;; this example shows how we can use the fft functions to detect
-;; beat/event onsets (particularly noisy ones like drum hits).
+;; note/event onsets (especially noisy ones like drum hits).
+
+;;; Code:
 
 ;; need to create the context before loading the graphics library
 (define ctx (gl:make-ctx ":0.0" #f 0.0 0.0 1080.0 720.0))
@@ -35,26 +41,38 @@
     (let ((i:i64 0)
 	  (sum 0.0))
       (dotimes (i (/ fft_window_length 2)) ; the spectrum is real, so it will be symmetrical
-	(let ((diff (- (magnitude_cpxd (pref-ptr curr i))
-		       (magnitude_cpxd (pref-ptr prev i)))))
+	(let ((diff (* (- (magnitude_cpxd (pref-ptr curr i))
+			  (magnitude_cpxd (pref-ptr prev i)))
+		       (i64tod i))))
 	  (if (> diff 0.0)
 	      (set! sum (+ sum diff)))))
       sum)))
 
-(bind-func onset_detection 10000000
-  (let ((dbuf_length (* 4 (dtoi64 SAMPLERATE)))
+;; (bind-func median
+;;   (let ((i:i64 0))
+;;     (lambda (buff:double* len)
+;;       ())))
+
+(bind-func mean
+  (let ((i:i64 0))
+    (lambda (buff:double* len)
+      (dotimes (i len)
+	))))
+
+(bind-func onset_detection 100000
+  (let ((dbuf_length 1000)
 	(dbuf:double* (zalloc dbuf_length))
 	(dbuf_offset:i64 0)
-	(mean 0.0))
+	(sum 0.0))
     (lambda (value)
-      (set! mean (+ mean (- (/ value (i64tod dbuf_length))
-			    (pref dbuf (modulo (- dbuf_offset 1)
-					       dbuf_length)))))
       (pset! dbuf dbuf_offset value)
-      (set! dbuf_offset
-	      (modulo (+ dbuf_offset 1)
-		      dbuf_length))
-      (if (> value (* 500.0 mean)) 1 0))))
+      (set! sum (+ sum
+		    (- value
+		       (pref dbuf (modulo (- dbuf_offset 1)
+					  dbuf_length)))))
+      (set! dbuf_offset (modulo (+ dbuf_offset 1) dbuf_length))
+
+      (if (> value (* 500.0 (/ sum (i64tod dbuf_length)))) 1 0))))
 
 ;; take the time_domain signal (time_buffer) and return the
 ;; (magnitude) spectrum
@@ -64,24 +82,24 @@
 	;;  spectrum and previous timestep's spectrum
 	(fbuf_curr:cpxd* (zalloc (* 2 fft_window_length)))
 	(fbuf_prev (pref-ptr fbuf_curr fft_window_length))
-	(onset_detected 0))
+	(onset_detected:i64 0)
+	(detection_func_val 0.0))
     (lambda (audio:double*)
       (preprocess_audio audio time_buffer)
       ;; take DFT, store results in freq_buffer
       (fft_cpxd time_buffer fbuf_curr fft_window_length)
       ;; (printf "fft[0] %f\n" (tref (pref fbuf_curr 0) 0))
       ;; (printf "fft length %lld\n" fft_window_length)
-
-      (let ((value (rectified_difference fbuf_curr fbuf_prev))
-	    (tmp:cpxd* null))
+      (set! detection_func_val (rectified_difference fbuf_curr fbuf_prev))
+      (let ((tmp:cpxd* null))
 	(set! onset_detected
-	      (onset_detection value))
+	      (onset_detection detection_func_val))
 	;; (if (= 1 onset_detected) (printf "%f\n" value))
 	;; some pointer jiggery-pokery
 	(set! tmp fbuf_curr)
 	(set! fbuf_curr fbuf_prev)
 	(set! fbuf_prev tmp)
-	value))))
+	detection_func_val))))
 
 ;; set up the type alias for our dsp function
 (bind-alias DSP [double,double,double,double,double*]*)
@@ -109,26 +127,27 @@
 (dsp:set! dsp)
 
 (bind-func gl-draw
-  (let ((size 0.1))
-    (lambda (degree)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      (glLoadIdentity)
-      (glTranslated 0.0 -1.0 0.0)
-      (glBegin GL_QUADS)
-      (glVertex2d 0.0 0.0)
-      (glVertex2d size 0.0)
-      (glVertex2d size size)
-      (glVertex2d 0.0 size)       
-      (glEnd))))
+  (lambda (size)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    (glLoadIdentity)
+    (glTranslated -0.5 -1.0 0.0)
+    (glColor3d 0.3 0.0 1.0)
+    (glBegin GL_QUADS)
+    (glVertex2d 0.0 0.0)
+    (glVertex2d size 0.0)
+    (glVertex2d size size)
+    (glVertex2d 0.0 size)
+    (glEnd)))
 
 ;; the animation callback - remember this is in scheme, not xtlang
 (define beat-visualisation
   (lambda (time fps)
-    (gl-draw)
+    ;; (println "mean = " (onset_detection.sum))
+    (gl-draw (/ (spectral_difference.detection_func_val) 100000.0))
     (gl:swap-buffers ctx)
     (callback (+ time (* 0.5 (/ *samplerate* fps)))
 	      'beat-visualisation
               (+ time (/ *samplerate* fps))
               fps)))
 
-(beat-visualisation (now) 30)
+(beat-visualisation (now) 60)

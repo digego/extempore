@@ -1,15 +1,21 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
+;;; polysynth.xtm -- and example of using synth instruments
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
 ;; This example shows how to define your own polyphonic synths
 ;;
 ;; You will first need to load and compile audio_dsp.xtm
 ;;
 ;; Then you're OK to go
 ;;
-;; NOTE [at the moment compiling in a secondary thread is a little
-;;      [flakey.  I'm working on this so in the mean time you'll
-;;      [just have to put up with the audio delays while compiling
-;;
+;; NOTE: at the moment compiling in a secondary thread is a little
+;;       flakey.  I'm working on this so in the mean time you'll
+;;       just have to put up with the audio delays while compiling
+
+;;; Code:
 
 (load "libs/core/instruments.xtm")
 
@@ -18,18 +24,23 @@
 
 (bind-func dsp:DSP
   (lambda (in time chan dat)
+    (* 0.5 (random))))
+
+(bind-func dsp:[double,double,double,double,double*]*
+  (lambda (in time chan dat)
     (cond ((< chan 2.0)
 	   (synth in time chan dat))
 	  (else 0.0))))
 
 (dsp:set! dsp)
 
+(play-note (now) synth (random 60 90) 80 44100)
 
 ;; first let's play with the default synth defined in dsp_library
 ;; the default synth is called .... synth
 (define loop
   (lambda (beat offset dur)
-    (play-note (*metro* beat) synth (+ offset (random '(60 62 63 65 67))) 80 2000)
+    (play-note (*metro* beat) my-synth (+ offset (random '(60 62 63 65 67))) 80 2000)
     (callback (*metro* (+ beat (* dur .5))) 'loop
 	      (+ beat dur)
 	      offset
@@ -67,7 +78,7 @@
 ;;
 ;; NOTE: then 100000 is extra memory for our
 ;; comb filters
-(bind-func dsp 1000000
+(bind-func dsp:[double,double,double,double,double*]* 1000000
   (let ((combl (make-comb (dtoi64 (* 0.25 SAMPLERATE))))
 	(combr (make-comb (dtoi64 (* 0.33333333 SAMPLERATE)))))
     (lambda (in:double time:double chan:double dat:double*)
@@ -83,9 +94,9 @@
 ;; now start a temporal recursion to play the new synth
 (define loop2
   (lambda (beat dur)
-    (let ((pitch (random '(55 36 63 70 72))))
+    (let ((pitch (random '(55 36 63 70 72 72 75))))
       (play-note (*metro* beat) my-synth pitch 
-      		 (if (= pitch 36) 105 95) 3000)
+		 (if (= pitch 36) 105 95) 600)
       (callback (*metro* (+ beat (* dur .5))) 'loop2
 		(+ beat dur)
 		dur))))
@@ -115,12 +126,12 @@
 	(lambda (time:double chan:double freq:double amp:double)
 	  (cond ((< chan 1.0)
 		 (lpfl (* amp (+ (sawl (* 1.0 amp) freq) 
-				 (sawl2 amp (+ freq (modl 10.0 0.2)))))
+				 (sawl2 amp (+ freq (modl 100.0 0.2)))))
 		       (+ cof (lpflmod freq 1.0))))
 		((< chan 2.0)			     		  
 		 (lpfr (* amp (+ (sawr (* 1.0 amp) freq) 
 				 (sawr2 amp (+ freq (modr 50.0 0.5)))))
-		       (+ cof (lpfrmod 1400.0 2.0))))
+		       (+ cof (lpfrmod 1000.0 2.0))))
 		(else 0.0)))))))
 
 
