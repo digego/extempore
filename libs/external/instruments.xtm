@@ -249,35 +249,39 @@
 		 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
 	   (* gain (,effect-kernel out time chan dat)))))))
 
-
-(define audio-file-regex-match
+;; this will match e.g. 60.aiff (where 60 is the midi note number)
+(define parse-sample-name-1
   (lambda (fname)
-    (if (regex:match? fname "^.*[ABCDEFGabcdefg][#]?[0-9].*(wav|aif|aiff|ogg)$")
-	(let ((result (regex:matched fname "([ABCDEFGabcdefg])(.*)([0-9])")))
-	  (if (null? result) #f
-	      (let ((sharp (if (regex:match? (caddr result) "#") #t #f))
-		    (offset (+ 12 (* (string->number (cadddr result)) 12)))
-		    (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
-			  ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
-		(if sharp (+ pc offset 1) (+ offset pc))))))))
+    (let ((result (regex:matched fname "([0-9]*)\.(wav|aif|aiff|ogg)$")))
+      (if (null? result)
+          (begin (println "Error: cannot parse filename: " fname)
+                 #f)
+          (list fname (string->number (cadr result)))))))
 
+;; this will match e.g. Eb3.aiff (representing E flat 3)
+(define parse-sample-name-2
+  (lambda (fname)
+    (let ((result (regex:matched fname "^.*([ABCDEFG])([#b])??([0-9]).*\.(wav|aif|aiff|ogg)$")))
+        (if (null? result)
+            (begin (println "Error: cannot parse filename: " fname)
+                   #f)
+            (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                  (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                        ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+              (list fname (+ offset pc
+                             (cond ((string=? (caddr result) "#") 1)
+                                   ((string=? (caddr result) "b") -1)
+                                   (else 0)))))))))
 
 ;; must be stereo samples of type wav aif or ogg
-(define-macro (load-sampler sampler path)
+(define-macro (load-sampler sampler path parser)
   `(let ((files (sys:directory-list ,path)))
-     (println 'files: files)
      (for-each (lambda (f)
-		 (if (regex:match? f "([0-9]*)\.(wav|aif|aiff|ogg)$")
-		     (let ((result (regex:matched f "([0-9]*)\.(wav|aif|aiff|ogg)$")))
-		       (set-sampler-index ,sampler (if (string=? (sys:platform) "Windows")
-						       f
-						       (string-append ,path "/" f))
-					  (string->number (cadr result)) 0 0))
-		     (let ((result (audio-file-regex-match f)))
-		       (if (number? result)
-			   (set-sampler-index ,sampler
-					      (if (string=? (sys:platform) "Windows")
-						  f
-						  (string-append ,path "/" f))
-					      result 0 0)))))
+                 (let ((result (,parser f)))
+                   (if result
+                       (set-sampler-index ,sampler
+                                          (if (string=? (sys:platform) "Windows")
+                                              (car result)
+                                              (string-append ,path "/" (car result)))
+                                          (cadr result) 0 0))))
 	       files)))
