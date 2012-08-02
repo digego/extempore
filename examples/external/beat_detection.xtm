@@ -53,26 +53,26 @@
 ;;     (lambda (buff:double* len)
 ;;       ())))
 
-(bind-func mean
-  (let ((i:i64 0))
-    (lambda (buff:double* len)
-      (dotimes (i len)
-	))))
-
 (bind-func onset_detection 100000
-  (let ((dbuf_length 1000)
-	(dbuf:double* (zalloc dbuf_length))
-	(dbuf_offset:i64 0)
-	(sum 0.0))
+  (let ((dbuf_length 1000) ; this value might need some tweaking
+        (threshold 1010.0)  ; this value might need some tweaking
+        (dbuf:double* (zalloc dbuf_length))
+	(dbuf_offset 0)
+	(sum 0.0)
+        (cnt 0))
     (lambda (value)
-      (pset! dbuf dbuf_offset value)
-      (set! sum (+ sum
-		    (- value
-		       (pref dbuf (modulo (- dbuf_offset 1)
-					  dbuf_length)))))
+      ;; basic ringbuffer
+      (set! sum (+ sum  (- value (pref dbuf (modulo dbuf_offset dbuf_length)))))
       (set! dbuf_offset (modulo (+ dbuf_offset 1) dbuf_length))
-
-      (if (> value (* 500.0 (/ sum (i64tod dbuf_length)))) 1 0))))
+      (pset! dbuf dbuf_offset value)
+      ;; (if (= cnt 0)
+      ;;     (printf "value = %10.2f threshold = %10.2f\n"
+      ;;             value (* (/ sum (i64tod dbuf_length))
+      ;;                      threshold)))
+      (set! cnt (modulo (+ cnt 1) 400))
+      (if (> value (* (/ sum (i64tod dbuf_length))
+                      threshold))
+          value 0.0))))
 
 ;; take the time_domain signal (time_buffer) and return the
 ;; (magnitude) spectrum
@@ -82,7 +82,6 @@
 	;;  spectrum and previous timestep's spectrum
 	(fbuf_curr:cpxd* (zalloc (* 2 fft_window_length)))
 	(fbuf_prev (pref-ptr fbuf_curr fft_window_length))
-	(onset_detected:i64 0)
 	(detection_func_val 0.0))
     (lambda (audio:double*)
       (preprocess_audio audio time_buffer)
@@ -92,7 +91,7 @@
       ;; (printf "fft length %lld\n" fft_window_length)
       (set! detection_func_val (rectified_difference fbuf_curr fbuf_prev))
       (let ((tmp:cpxd* null))
-	(set! onset_detected
+	(set! detection_func_val
 	      (onset_detection detection_func_val))
 	;; (if (= 1 onset_detected) (printf "%f\n" value))
 	;; some pointer jiggery-pokery
@@ -108,15 +107,16 @@
 (bind-func dsp:DSP 100000000 ; make sure we allocate enough memory
   (let ((audio_length 60)
 	(audio:double* (zalloc (* 44100 2 audio_length)))
-	(samples_read (read-audio-data "/Users/ben/Desktop/peg.wav"
+	(samples_read (read-audio-data "/Users/ben/Music/samples/drums.wav"
 				       audio
 				       0
 				       (* 44100 audio_length)))
-	(playhead 0))
+	(playhead 0)
+        (onset_val 0.0))
     (lambda (in time chan dat)
       (if (and (= (modulo playhead fft_window_length) 0)
 	       (= chan 0.0))
-	  (spectral_difference (pref-ptr audio playhead)))
+	  (set! onset_val (spectral_difference (pref-ptr audio playhead))))
       ;; increment playhead once per (stereo) pair of samples
       (if (= chan 1.0)
 	  (set! playhead (modulo (+ playhead 2) ; +2 because it's stereo
@@ -127,26 +127,30 @@
 (dsp:set! dsp)
 
 (bind-func gl-draw
-  (lambda (size)
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-    (glLoadIdentity)
-    (glTranslated -0.5 -1.0 0.0)
-    (glColor3d 0.3 0.0 1.0)
-    (glBegin GL_QUADS)
-    (glVertex2d 0.0 0.0)
-    (glVertex2d size 0.0)
-    (glVertex2d size size)
-    (glVertex2d 0.0 size)
-    (glEnd)))
+  (let ((i 0.0)
+        (xval 0.0)
+        (audio_len (/ SAMPLERATE 30.0)))
+    (lambda (audio-ptr:double* playhead:i64)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      (glLoadIdentity)
+      (glTranslated -1.0 0.0 0.0)
+      (glBegin GL_TRIANGLES_STRIP)
+      (dotimes (i audio_len)
+        (glColor3d (random) (random) 1.0)
+        (set! xval (* 2.0 (/ i audio_len)))
+        (glVertex2d xval (+ (pref audio-ptr (+ (dtoi64 i) playhead)) (* 0.1 (random))))
+        (glVertex2d xval (- (pref audio-ptr (+ (dtoi64 i) playhead)) (* 0.1 (random)))))
+      (glEnd))))
 
 ;; the animation callback - remember this is in scheme, not xtlang
 (define beat-visualisation
   (lambda (time fps)
-    ;; (println "mean = " (onset_detection.sum))
-    (gl-draw (/ (spectral_difference.detection_func_val) 100000.0))
+    ;; (println "sum = " (onset_detection.sum) "onset_val = "(dsp.onset_val))
+    ;; (gl-draw (/ (dsp.onset_val) 5000.0))
+    (gl-draw (dsp.audio) (dsp.playhead))
     (gl:swap-buffers ctx)
     (callback (+ time (* 0.5 (/ *samplerate* fps)))
-	      'beat-visualisation
+              'beat-visualisation
               (+ time (/ *samplerate* fps))
               fps)))
 
