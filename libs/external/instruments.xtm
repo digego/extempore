@@ -1,6 +1,6 @@
 ;;; instruments.xtm -- instruments (external)
 
-;; Author: Andrew Sorensen
+;; Author: Andrew Sorensen, Ben Swift
 ;; Keywords: extempore
 ;; Required dylibs: libsndfile
 
@@ -284,6 +284,15 @@
                                    ((string=? (caddr result) "b") -1)
                                    (else 0)))))))))
 
+;; for the MIS piano samples (mf loudness only), avaliable from
+;; http://theremin.music.uiowa.edu/MISpiano.html
+(define parse-MIS-piano-mf
+  (lambda (fname)
+    (let ((result (parse-sample-name-2 fname)))
+      (and result
+           (and (regex:match? (car result) ".*\.mf\..*")
+                result)))))
+
 ;; for NI Akoustik piano samples
 ;; Stein-R(A-1)-V(077)-dB(3129)-T(ML)-M(22)-P(1956-04-01).WAV
 
@@ -291,13 +300,13 @@
 
 ;; must be stereo samples of type wav aif or ogg
 (define-macro (load-sampler sampler path parser offset length)
-  `(let ((file-list (sys:directory-list ,path))
-         (offset-list ,(if (atom? offset)
-                          `(make-list (length file-list) ,offset)
-                          offset))
-         (length-list ,(if (atom? length)
-                          `(make-list (length file-list) ,length)
-                          length)))
+  `(let* ((file-list (sys:directory-list ,path))
+          (offset-list ,(if (number? offset)
+                            `(make-list (length file-list) ,offset)
+                            offset))
+          (length-list ,(if (number? length)
+                            `(make-list (length file-list) ,length)
+                            length)))
      (for-each (lambda (f o l)
                  (let ((result (,parser f)))
                    (if result
