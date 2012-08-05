@@ -40,22 +40,19 @@
   (lambda (curr:cpxd* prev:cpxd*)
     (let ((i:i64 0)
 	  (sum 0.0))
-      (dotimes (i (/ fft_window_length 2)) ; the spectrum is real, so it will be symmetrical
+      ;; the spectrum is real (it will be symmetrical) so we only have
+      ;; to sum over the first half
+      (dotimes (i (/ fft_window_length 2))
 	(let ((diff (* (- (magnitude_cpxd (pref-ptr curr i))
 			  (magnitude_cpxd (pref-ptr prev i)))
-		       (i64tod i))))
-	  (if (> diff 0.0)
+		       (i64tod i)))) ; weight diffs by frequency
+	  (if (> diff 0.0) ; only take the positive differences
 	      (set! sum (+ sum diff)))))
       sum)))
 
-;; (bind-func median
-;;   (let ((i:i64 0))
-;;     (lambda (buff:double* len)
-;;       ())))
-
 (bind-func onset_detection 100000
-  (let ((dbuf_length 1000) ; this value might need some tweaking
-        (threshold 1010.0)  ; this value might need some tweaking
+  (let ((dbuf_length 10000) ; this value might need some tweaking
+        (threshold 1000.0)  ; this value might need some tweaking
         (dbuf:double* (zalloc dbuf_length))
 	(dbuf_offset 0)
 	(sum 0.0)
@@ -145,13 +142,12 @@
 ;; the animation callback - remember this is in scheme, not xtlang
 (define beat-visualisation
   (lambda (time fps)
-    ;; (println "sum = " (onset_detection.sum) "onset_val = "(dsp.onset_val))
-    ;; (gl-draw (/ (dsp.onset_val) 5000.0))
-    (gl-draw (dsp.audio) (dsp.playhead))
-    (gl:swap-buffers ctx)
+    (print-stars (/ (dsp.onset_val) 1000.0))
+    ;; (gl-draw (dsp.audio) (dsp.playhead))
+    ;; (gl:swap-buffers ctx)
     (callback (+ time (* 0.5 (/ *samplerate* fps)))
               'beat-visualisation
               (+ time (/ *samplerate* fps))
               fps)))
 
-(beat-visualisation (now) 60)
+(beat-visualisation (now) 20)
