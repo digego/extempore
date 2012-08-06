@@ -21,133 +21,110 @@
 (load "libs/external/fft.xtm")
 (load "libs/external/opengl.xtm")
 
-(bind-val fft_window_length i64 256)
+(bind-val buff_len_default i64 4096)
 
 ;; add sum of L and R channels into real component
 ;; of time_buffer (which is a buffer of complex values)
 (bind-func preprocess_audio 100000
-  (let ((window_buffer:double* (zalloc fft_window_length))
-	(i:i64 0))
-    (window_hanning window_buffer fft_window_length)
-    (lambda (in_stereo:double* out:cpxd*)
-      (dotimes (i fft_window_length)
+  (let ((window_buffer:double* (zalloc buff_len_default))
+        (refresh_window:i64 1)
+        (out:cpxd* (zalloc buff_len_default))
+        (i:i64 0))
+    (lambda (in_stereo:double* len)
+      (if (= refresh_window 1)
+          (begin (window_hanning window_buffer len)
+                 (set! refresh_window 0)))
+      (dotimes (i len)
+        ;; set processed values into the real part of the 'out'
+        ;; complex buffer
 	(tset! (pref-ptr out i) 0
 	       (* (+ (pref in_stereo (* 2 i))         ; L channel
 		     (pref in_stereo (+ 1 (* 2 i))))  ; R channel
-		  (pref window_buffer i)))))))
+		  (pref window_buffer i))))
+      out)))
 
-(bind-func rectified_difference
-  (lambda (curr:cpxd* prev:cpxd*)
-    (let ((i:i64 0)
-	  (sum 0.0))
-      ;; the spectrum is real (it will be symmetrical) so we only have
-      ;; to sum over the first half
-      (dotimes (i (/ fft_window_length 2))
-	(let ((diff (* (- (magnitude_cpxd (pref-ptr curr i))
-			  (magnitude_cpxd (pref-ptr prev i)))
-		       (i64tod i)))) ; weight diffs by frequency
-	  (if (> diff 0.0) ; only take the positive differences
-	      (set! sum (+ sum diff)))))
-      sum)))
+(bind-func rectified_difference 100000
+  (let ((prev_spectrum:double* (zalloc buff_len_default)))
+   (lambda (spectrum:cpxd* len)
+     (let ((i:i64 0)
+           (sum 0.0))
+       ;; the spectrum is real (it will be symmetrical) so we only have
+       ;; to sum over the first half
+       (dotimes (i (/ len 2))
+         (let ((magnitude (magnitude_cpxd (pref-ptr spectrum i)))
+               (diff (* (- magnitude (pref prev_spectrum i))
+                        ;; weight diffs by frequency
+                        (i64tod i))))
+           (pset! prev_spectrum i magnitude)
+           ;; only take the positive differences
+           (if (> diff 0.0) (set! sum (+ sum diff)))))
+       sum))))
 
 (bind-func onset_detection 100000
-  (let ((dbuf_length 10000) ; this value might need some tweaking
-        (threshold 1000.0)  ; this value might need some tweaking
-        (dbuf:double* (zalloc dbuf_length))
-	(dbuf_offset 0)
-	(sum 0.0)
-        (cnt 0))
+  (let ((max_val 0.0))
     (lambda (value)
       ;; basic ringbuffer
-      (set! sum (+ sum  (- value (pref dbuf (modulo dbuf_offset dbuf_length)))))
-      (set! dbuf_offset (modulo (+ dbuf_offset 1) dbuf_length))
-      (pset! dbuf dbuf_offset value)
-      ;; (if (= cnt 0)
-      ;;     (printf "value = %10.2f threshold = %10.2f\n"
-      ;;             value (* (/ sum (i64tod dbuf_length))
-      ;;                      threshold)))
-      (set! cnt (modulo (+ cnt 1) 400))
-      (if (> value (* (/ sum (i64tod dbuf_length))
-                      threshold))
-          value 0.0))))
-
-;; take the time_domain signal (time_buffer) and return the
-;; (magnitude) spectrum
-(bind-func spectral_difference 100000
-  (let ((time_buffer:cpxd* (zalloc fft_window_length))
-	;;  double length freq buffer to accomodate both current
-	;;  spectrum and previous timestep's spectrum
-	(fbuf_curr:cpxd* (zalloc (* 2 fft_window_length)))
-	(fbuf_prev (pref-ptr fbuf_curr fft_window_length))
-	(detection_func_val 0.0))
-    (lambda (audio:double*)
-      (preprocess_audio audio time_buffer)
-      ;; take DFT, store results in freq_buffer
-      (fft_cpxd time_buffer fbuf_curr fft_window_length)
-      ;; (printf "fft[0] %f\n" (tref (pref fbuf_curr 0) 0))
-      ;; (printf "fft length %lld\n" fft_window_length)
-      (set! detection_func_val (rectified_difference fbuf_curr fbuf_prev))
-      (let ((tmp:cpxd* null))
-	(set! detection_func_val
-	      (onset_detection detection_func_val))
-	;; (if (= 1 onset_detected) (printf "%f\n" value))
-	;; some pointer jiggery-pokery
-	(set! tmp fbuf_curr)
-	(set! fbuf_curr fbuf_prev)
-	(set! fbuf_prev tmp)
-	detection_func_val))))
+      ;; (set! sum (+ sum  (- value (pref dbuf (modulo dbuf_offset dbuf_length)))))
+      ;; (set! dbuf_offset (modulo (+ dbuf_offset 1) dbuf_length))
+      ;; (pset! dbuf dbuf_offset value)
+      ;; (if (> value (* (/ sum (i64tod dbuf_length))
+      ;;                 threshold))
+      (if (> value max_val)
+          (set! max_val value))
+      (if (> value (* 0.1 max_val))
+          1 0))))
 
 ;; set up the type alias for our dsp function
 (bind-alias DSP [double,double,double,double,double*]*)
 ;; dsp function - this will play the sound file.  Remember to
 ;; change the file path to an audio file on your system
 (bind-func dsp:DSP 100000000 ; make sure we allocate enough memory
-  (let ((audio_length 60)
-	(audio:double* (zalloc (* 44100 2 audio_length)))
-	(samples_read (read-audio-data "/Users/ben/Music/samples/drums.wav"
-				       audio
-				       0
-				       (* 44100 audio_length)))
-	(playhead 0)
-        (onset_val 0.0))
+  (let ((fft_len 256)
+        (freq_buffer:cpxd* (zalloc buff_len_default))
+        (audio (make_audio_closure "/Users/ben/Music/samples/drums.wav" 0 0))
+        (onset_flag 0)
+        (playhead null))
     (lambda (in time chan dat)
-      (if (and (= (modulo playhead fft_window_length) 0)
-	       (= chan 0.0))
-	  (set! onset_val (spectral_difference (pref-ptr audio playhead))))
-      ;; increment playhead once per (stereo) pair of samples
-      (if (= chan 1.0)
-	  (set! playhead (modulo (+ playhead 2) ; +2 because it's stereo
-				 (* audio_length 44100))))
-      ;; play audio
-      (pref audio (+ (dtoi64 chan) playhead)))))
+      (set! playhead (audio))
+      (if (and (= (modulo (dtoi64 time) fft_len) 0)
+               (= chan 0.0))
+          ;; have to let-bind the audio ptr, because we need to use it
+          ;; twice (once for the fft, once for playback) but we don't
+          ;; want to increment the audio playhead twice!
+          (begin (fft_cpxd (preprocess_audio playhead fft_len)
+                           freq_buffer fft_len)
+                 (set! onset_flag
+                       (+ onset_flag
+                          (onset_detection (rectified_difference freq_buffer
+                                                                 fft_len))))))
+      (pref playhead 0))))
 
 (dsp:set! dsp)
 
-(bind-func gl-draw
+(bind-func gl_draw
   (let ((i 0.0)
-        (xval 0.0)
-        (audio_len (/ SAMPLERATE 30.0)))
-    (lambda (audio-ptr:double* playhead:i64)
+        (len (/ SAMPLERATE 30.0)))
+    (lambda (ptr:double* onset_flag:i64)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (glLoadIdentity)
       (glTranslated -1.0 0.0 0.0)
-      (glBegin GL_TRIANGLES_STRIP)
-      (dotimes (i audio_len)
-        (glColor3d (random) (random) 1.0)
-        (set! xval (* 2.0 (/ i audio_len)))
-        (glVertex2d xval (+ (pref audio-ptr (+ (dtoi64 i) playhead)) (* 0.1 (random))))
-        (glVertex2d xval (- (pref audio-ptr (+ (dtoi64 i) playhead)) (* 0.1 (random)))))
+      (glBegin GL_LINES)
+      (if (> onset_flag 0)
+          (dotimes (i len)
+            (begin (glColor3d (/ i len) 0.0 0.3)
+                   (glVertex2d (* 2.0 (/ i len))
+                               (pref ptr (dtoi64 i))))))
       (glEnd))))
 
 ;; the animation callback - remember this is in scheme, not xtlang
 (define beat-visualisation
   (lambda (time fps)
-    (print-stars (/ (dsp.onset_val) 1000.0))
-    ;; (gl-draw (dsp.audio) (dsp.playhead))
-    ;; (gl:swap-buffers ctx)
+    (gl_draw (dsp.playhead) (dsp.onset_flag))
+    (gl:swap-buffers ctx)
+    (dsp.onset_flag 0)
     (callback (+ time (* 0.5 (/ *samplerate* fps)))
               'beat-visualisation
               (+ time (/ *samplerate* fps))
               fps)))
 
-(beat-visualisation (now) 20)
+(beat-visualisation (now) 60)
