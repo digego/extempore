@@ -571,17 +571,17 @@ variable `extempore-process-args'.
 Currently, the existence of an existing extempore process is
 determined by whether there is an *extempore* buffer."
   (interactive)
-  (let ((extempore-trigger-string
-         (concat (concat "cd " extempore-path "\n")
-                 (concat "./extempore " (or extempore-process-args "") "\n"))))
-    (unless extempore-path
-      (error "Error: `extempore-path' not set!"))
-    ;; create a buffer for the shell & extempore processes
-    (unless (get-buffer "*extempore*")
-      (progn (shell "*extempore*")
-             (sit-for 1)
-             (process-send-string "*extempore*" extempore-trigger-string)))
-    (display-buffer "*extempore*")))
+  (unless extempore-path
+    (error "Error: `extempore-path' not set!"))
+  ;; create a buffer for the shell & extempore processes
+  (unless (get-buffer "*extempore*")
+    (progn (shell "*extempore*")
+           (sit-for 1)
+           (process-send-string "*extempore*"
+                                (concat "cd " extempore-path
+                                        "\n./extempore --device "
+                                        (read-from-minibuffer "Device number: ") "\n"))))
+  (display-buffer "*extempore*"))
 
 (defun extempore-connect (host port)
   "Connect to the running extempore process, which must
