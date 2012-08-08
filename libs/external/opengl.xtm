@@ -27,6 +27,14 @@
 	   (gl:add-extension "glUniform3f")	   
 	   (gl:add-extension "glUniform4f")
 	   (gl:add-extension "glGetUniformLocation")
+	   (gl:add-extension "glGenBuffers")
+	   (gl:add-extension "glBindBuffer")
+	   (gl:add-extension "glBufferData")
+	   (gl:add-extension "glGetAttribLocation")
+	   (gl:add-extension "glBufferSubData")
+	   (gl:add-extension "glEnableVertexAttribArray")
+	   (gl:add-extension "glVertexAttribPointer")
+	   (gl:add-extension "glDisableVertexAttribArray")
 	   (llvm:compile "declare i32 @glGetUniformBlockIndex(i32,i8*)")
 	   (gl:add-extension "glGetUniformBlockIndex")
 	   (llvm:compile "declare void @glUniformBlockBinding(i32,i32,i32)")	   
@@ -88,6 +96,16 @@
 	   (llvm:compile "declare void @glUniformBlockBinding(i32, i32, i32);")
 	   (llvm:compile "declare void @glBindBufferRange(i32,i32,i32,i32,i32);")))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; missing opengl constants
+
+(bind-val GL_VIEWPORT_BIT i32 2048)
+(bind-val GL_ENABLE_BIT i32 8192)
+(bind-val GL_VERTEX_PROGRAM_POINT_SIZE i32 34370)
+(bind-val GL_COORD_REPLACE i32 34914)
+
 (bind-val GL_ONE_MINUS_SRC_ALPHA i32 771)
 (bind-val GL_ONE_MINUS_SRC_COLOR i32 769)
 (bind-val GL_ONE_MINUS_DST_COLOR i32 775)
@@ -124,8 +142,8 @@
 (bind-val GL_DEPTH_COMPONENT24 i32 33190)
 (bind-val GL_DEPTH_COMPONENT32 i32 33191)
 
-(bind-val GL_VIEWPORT_BIT i32 2048)
-(bind-val GL_ENABLE_BIT i32 8192)
+
+
 
 (if (not (string=? "Windows" (sys:platform)))
 	(begin 
@@ -209,32 +227,32 @@
     (gluLookAt eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)))
 
 
-(define gl-load-extensions
-  (lambda ()
-    (if (string=? (sys:platform) "Windows")
-	(begin (println "Loading OpenGL Extensions for Windows!!!!!")
-	       (gl:add-extension "glGetShaderiv")
-	       (gl:add-extension "glGetShaderInfoLog")
-	       (gl:add-extension "glGetProgramiv")
-	       (gl:add-extension "glGetProgramInfoLog")
-	       (gl:add-extension "glCreateShader")
-	       (gl:add-extension "glCreateProgram")
-	       (gl:add-extension "glShaderSource")
-	       (gl:add-extension "glCompileShader")
-	       (gl:add-extension "glAttachShader")
-	       (gl:add-extension "glLinkProgram")
-	       (gl:add-extension "glUseProgram")
-	       (gl:add-extension "glUniform1f")
-	       (gl:add-extension "glUniform1i")	   
-	       (gl:add-extension "glUniform2f")
-	       (gl:add-extension "glUniform1fv")
-	       (gl:add-extension "glUniform2fv")	   	   	   
-	       (gl:add-extension "glGetUniformLocation")
-	       (gl:add-extension "glGetUniformBlockIndex")
-	       (gl:add-extension "glUniformBlockBinding")
-	       (gl:add-extension "glBindBufferRange")
-	       (gl:add-extension "glUniform3f")
-	       (gl:add-extension "glUniform4f")))))
+;; (define gl-load-extensions
+;;   (lambda ()
+;;     (if (string=? (sys:platform) "Windows")
+;; 	(begin (println "Loading OpenGL Extensions for Windows!!!!!")
+;; 	       (gl:add-extension "glGetShaderiv")
+;; 	       (gl:add-extension "glGetShaderInfoLog")
+;; 	       (gl:add-extension "glGetProgramiv")
+;; 	       (gl:add-extension "glGetProgramInfoLog")
+;; 	       (gl:add-extension "glCreateShader")
+;; 	       (gl:add-extension "glCreateProgram")
+;; 	       (gl:add-extension "glShaderSource")
+;; 	       (gl:add-extension "glCompileShader")
+;; 	       (gl:add-extension "glAttachShader")
+;; 	       (gl:add-extension "glLinkProgram")
+;; 	       (gl:add-extension "glUseProgram")
+;; 	       (gl:add-extension "glUniform1f")
+;; 	       (gl:add-extension "glUniform1i")	   
+;; 	       (gl:add-extension "glUniform2f")
+;; 	       (gl:add-extension "glUniform1fv")
+;; 	       (gl:add-extension "glUniform2fv")	   	   	   
+;; 	       (gl:add-extension "glGetUniformLocation")
+;; 	       (gl:add-extension "glGetUniformBlockIndex")
+;; 	       (gl:add-extension "glUniformBlockBinding")
+;; 	       (gl:add-extension "glBindBufferRange")
+;; 	       (gl:add-extension "glUniform3f")
+;; 	       (gl:add-extension "glUniform4f")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -334,6 +352,29 @@
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
       (glBindTexture GL_TEXTURE_2D 0)
       (pref tex 0))))
+
+
+;;
+;; vbo id      0
+;; data size   1
+;; ptr to data 2
+;;
+(bind-type E_vbo <i32,i32,i8*>)
+
+;; asumming always GL_ARRAY_BUFFER at the moment
+;; type is one of GL_DYNAMIC_DRAW, GL_STATIC_DRAW, GL_STREAM_DRAW etc..
+(bind-func create-vbo
+  (lambda (size:i32 data:i8* type:i32)
+    (let ((vbo:E_vbo* (halloc))
+	  (vboid:i32* (salloc)))	  
+      (glGenBuffers 1 vboid)
+      (glBindBuffer GL_ARRAY_BUFFER (pref vboid 0))
+      (glBufferData GL_ARRAY_BUFFER size null type)
+      ;; (glBufferSubData GL_ARRAY_BUFFER 0 size data)
+      (tfill! vbo (pref vboid 0) size data)
+      (glBindBuffer GL_ARRAY_BUFFER 0)
+      vbo)))
+      
 
 ;; structure to hold fbo data
 ;; fbo id          0
