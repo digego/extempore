@@ -86,13 +86,13 @@ a small patch to `LLParser.cpp` (an LLVM source file) is required. The
 patch file `llparser.patch` is supplied in the `extempore/extras`
 directory. You can get the LLVM source from http://www.llvm.org/
 
-To apply the patch just move into the `lib/AsmParser` directory and
+To apply the patch just move into  `llvm/lib/AsmParser` directory and
 then apply the `llparser.patch` file which in can be found in
 `extempore/extras`.  For example (change `/path/to/extempore` to
 whatever directory you cloned the extempore source code into)
 
 ```shell
-$ cd /path/to/extempore/lib/AsmParser
+$ cd /path/to/llvm/lib/AsmParser
 $ patch < /path/to/extempore/extras/llparser.patch
 ```
 
