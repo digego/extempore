@@ -20,6 +20,7 @@
 
 ;;; Code:
 
+
 ;;;;;;;;;; VECTOR ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; some basic vector functions
@@ -56,6 +57,14 @@
       (dotimes (i lgth)
 	(pset! n i (/ (pref v i) mag)))
       void)))
+
+(bind-func vmagf
+  (lambda (v:float* lgth:i64)
+    (let ((mag 0.0)
+	  (i 0))
+      (dotimes (i lgth)
+	(set! mag (+ mag (* (pref v i) (pref v i)))))
+      (sqrtf mag))))
 
 (bind-func vdotf
   (let ((i 0))
@@ -98,6 +107,47 @@
     (lambda (v1:double* v2:double* lgth:i64 v3:double*)
       (dotimes (i lgth)
 	(pset! v3 i (* (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-func vmagd
+  (lambda (v:double* lgth:i64)
+    (let ((mag 0.0)
+	  (i 0))
+      (dotimes (i lgth)
+	(set! mag (+ mag (* (pref v i) (pref v i)))))
+      (sqrt mag))))
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Quaternions
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; angle in rads
+;; v is for axis vector (3d)
+;; quat is a user supplied 4d vector (x,y,z,w)
+(bind-func vaquatd
+  (lambda (angle:double v:double* quat:double*)
+    (let ((m (vmagd v 3))
+	  (s (/ (sin (* 0.5 angle)) m)))
+      (pfill! quat
+	      (* (pref v 0) s) (* (pref v 1) s) (* (pref v 2) s)
+	      (cos (* 0.5 angle)))
+      void)))
+
+;; angle in rads
+;; v is for axis vector (3d)
+;; quat is a user supplied 4d vector (x,y,z,w)
+(bind-func vaquatf
+  (lambda (angle:float v:float* quat:float*)
+    (let ((m (vmagf v 3))
+	  (s (/ (sinf (* 0.5 angle)) m)))
+      (pfill! quat
+	      (* (pref v 0) s) (* (pref v 1) s) (* (pref v 2) s)
+	      (cosf (* 0.5 angle)))
       void)))
       	
 
