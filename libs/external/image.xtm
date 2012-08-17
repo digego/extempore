@@ -65,7 +65,7 @@
 	  (printf "Error loading: %s\n" path))
       texid)))
 
-(definec soil-load-tex-sqr
+(bind-func soil-load-tex-sqr
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y))))
       (if (= texid 0)
@@ -164,6 +164,34 @@
 		    data)
       (pref tex 0))))
 
+;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
+;; if texid is zero then assign a new tex id otherwise use the texid provided
+(bind-func gl-load-tex-ext-bgr
+  (lambda (width height channels type data textype texid)
+    (let* ((tex:i32* (salloc)))
+      (pset! tex 0 texid)
+      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
+      (if (< texid 1) (glGenTextures 1 tex))
+      ;(printf "tex: %d\n" (pref tex 0))
+      (glBindTexture textype (pref tex 0))
+      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
+      (glTexParameteri textype GL_TEXTURE_WRAP_S GL_CLAMP)
+      (glTexParameteri textype GL_TEXTURE_WRAP_T GL_CLAMP)
+      (glTexParameteri textype GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri textype GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexImage2D textype 0 channels ;GL_RGBA
+		    width height
+		    0
+		    (cond ((= channels 1) GL_RED)
+			  ((= channels 3) GL_BGR)
+			  ((= channels 4) GL_BGRA) ;GL_RGBA)
+			  (else GL_BGRA))
+		    type
+		    ; GL_FLOAT; GL_UNSIGNED_BYTE
+		    data)
+      (pref tex 0))))
+
+
 (bind-func gl-tex-width
   (lambda (tex)
     (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
@@ -215,7 +243,7 @@
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
       void)))
 
-(definec gl-draw-img-ext
+(bind-func gl-draw-img-ext
   (lambda (x y w h r type texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
