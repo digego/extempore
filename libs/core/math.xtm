@@ -47,6 +47,20 @@
       (printf "]\n")
       void)))
 
+(bind-poly vprint vprintd)
+(bind-poly vprint vprintf)
+
+(bind-func vnormd
+  (lambda (v:double* lgth:i64 n:double*)
+    (let ((mag 0.0)
+	  (i 0))
+      (dotimes (i lgth)
+	(set! mag (+ mag (* (pref v i) (pref v i)))))
+      (set! mag (sqrt mag))
+      (dotimes (i lgth)
+	(pset! n i (/ (pref v i) mag)))
+      void)))
+
 (bind-func vnormf
   (lambda (v:float* lgth:i64 n:float*)
     (let ((mag 0.0)
@@ -58,56 +72,8 @@
 	(pset! n i (/ (pref v i) mag)))
       void)))
 
-(bind-func vmagf
-  (lambda (v:float* lgth:i64)
-    (let ((mag 0.0)
-	  (i 0))
-      (dotimes (i lgth)
-	(set! mag (+ mag (* (pref v i) (pref v i)))))
-      (sqrtf mag))))
-
-(bind-func vdotf
-  (let ((i 0))
-    (lambda (v1:float* v2:float* lgth:i64)
-      (let ((res 0.0))
-	(dotimes (i lgth)
-	  (set! res (+ res (* (pref v1 i) (pref v2 i)))))
-	res))))
-
-(bind-func vsmulf
-  (lambda (s:float v1:float* lgth:i64 v2:float*)
-    (let ((i 0))
-      (dotimes (i lgth)
-	(pset! v2 i (* s (pref v1 i))))
-      void)))
-
-(bind-func vsdivf
-  (lambda (s:float v1:float* lgth:i64 v2:float*)
-    (let ((i 0))
-      (dotimes (i lgth)
-	(pset! v2 i (/ (pref v1 i) s)))
-      void)))
-	
-(bind-func vsumf
-  (let ((i 0))
-    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
-      (dotimes (i lgth)
-	(pset! v3 i (+ (pref v1 i) (pref v2 i))))
-      void)))
-
-(bind-func vsubf
-  (let ((i 0))
-    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
-      (dotimes (i lgth)
-	(pset! v3 i (- (pref v1 i) (pref v2 i))))
-      void)))
-
-(bind-func vdotd  
-  (let ((i 0))
-    (lambda (v1:double* v2:double* lgth:i64 v3:double*)
-      (dotimes (i lgth)
-	(pset! v3 i (* (pref v1 i) (pref v2 i))))
-      void)))
+(bind-poly vnorm vnormd)
+(bind-poly vnorm vnormf)
 
 (bind-func vmagd
   (lambda (v:double* lgth:i64)
@@ -117,6 +83,140 @@
 	(set! mag (+ mag (* (pref v i) (pref v i)))))
       (sqrt mag))))
 
+(bind-func vmagf
+  (lambda (v:float* lgth:i64)
+    (let ((mag 0.0)
+	  (i 0))
+      (dotimes (i lgth)
+	(set! mag (+ mag (* (pref v i) (pref v i)))))
+      (sqrtf mag))))
+
+(bind-poly vmag vmagd)
+(bind-poly vmag vmagf)
+
+(bind-func vdotd
+  (let ((i 0))
+    (lambda (v1:double* v2:double* lgth:i64)
+      (let ((res 0.0))
+	(dotimes (i lgth)
+	  (set! res (+ res (* (pref v1 i) (pref v2 i)))))
+	res))))
+
+(bind-func vdotf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* lgth:i64)
+      (let ((res 0.0))
+	(dotimes (i lgth)
+	  (set! res (+ res (* (pref v1 i) (pref v2 i)))))
+	res))))
+
+(bind-poly vdot vdotd)
+(bind-poly vdot vdotf)
+
+(bind-func vsmuld
+  (lambda (s:double v1:double* lgth:i64 v2:double*)
+    (let ((i 0))
+      (dotimes (i lgth)
+	(pset! v2 i (* s (pref v1 i))))
+      void)))
+
+(bind-func vsmulf
+  (lambda (s:float v1:float* lgth:i64 v2:float*)
+    (let ((i 0))
+      (dotimes (i lgth)
+	(pset! v2 i (* s (pref v1 i))))
+      void)))
+
+(bind-poly vsmul vsmuld)
+(bind-poly vsmul vsmulf)
+
+(bind-func vsdivd
+  (lambda (s:double v1:double* lgth:i64 v2:double*)
+    (let ((i 0))
+      (dotimes (i lgth)
+	(pset! v2 i (/ (pref v1 i) s)))
+      void)))
+
+(bind-func vsdivf
+  (lambda (s:float v1:float* lgth:i64 v2:float*)
+    (let ((i 0))
+      (dotimes (i lgth)
+	(pset! v2 i (/ (pref v1 i) s)))
+      void)))
+
+(bind-poly vsdiv vsdivd)
+(bind-poly vsdiv vsdivf)
+
+(bind-func vsumd
+  (let ((i 0))
+    (lambda (v1:double* v2:double* lgth:i64 v3:double*)
+      (dotimes (i lgth)
+	(pset! v3 i (+ (pref v1 i) (pref v2 i))))
+      void)))
+	
+(bind-func vsumf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
+      (dotimes (i lgth)
+	(pset! v3 i (+ (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-poly vsum vsumd)
+(bind-poly vsum vsumf)
+
+(bind-func vsubd
+  (let ((i 0))
+    (lambda (v1:double* v2:double* lgth:i64 v3:double*)
+      (dotimes (i lgth)
+	(pset! v3 i (- (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-func vsubf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
+      (dotimes (i lgth)
+	(pset! v3 i (- (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-poly vsub vsubd)
+(bind-poly vsub vsubf)
+
+(bind-func vmuld  
+  (let ((i 0))
+    (lambda (v1:double* v2:double* lgth:i64 v3:double*)
+      (dotimes (i lgth)
+	(pset! v3 i (* (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-func vmulf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
+      (dotimes (i lgth)
+	(pset! v3 i (* (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-poly vmul vmuld)
+(bind-poly vmul vmulf)
+
+(bind-func vmagd
+  (lambda (v:double* lgth:i64)
+    (let ((mag 0.0)
+	  (i 0))
+      (dotimes (i lgth)
+	(set! mag (+ mag (* (pref v i) (pref v i)))))
+      (sqrt mag))))
+
+(bind-func vmagf
+  (lambda (v:float* lgth:i64)
+    (let ((mag 0.0)
+	  (i 0))
+      (dotimes (i lgth)
+	(set! mag (+ mag (* (pref v i) (pref v i)))))
+      (sqrtf mag))))
+
+
+(bind-poly vmag vmagd)
+(bind-poly vmag vmagf)
 
 
 
@@ -149,6 +249,9 @@
 	      (* (pref v 0) s) (* (pref v 1) s) (* (pref v 2) s)
 	      (cosf (* 0.5 angle)))
       void)))
+
+(bind-poly vaquat vaquatd)
+(bind-poly vaquat vaquatf)
       	
 
 ;;;;;;;;;; MATRIX ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -184,6 +287,9 @@
 	  (printf ",% f" (ftod (pref m (+ 1 j (* i c))))))
 	(printf "]\n")
 	void))))
+
+(bind-poly mprint mprintd)
+(bind-poly mprint mprintf)
 
 ;; matrix multiplication (doubles)
 (bind-func mmuld
@@ -221,6 +327,10 @@
 		       r1 c1 r2 c2)
 	       (cast null float*)))))
 
+(bind-poly mmul mmuld)
+(bind-poly mmul mmulf)
+
+
 ;; matrix transposition (doubles)
 (bind-func mtransd
   (lambda (ma:double* r1:i64 c1:i64 mb:double*)
@@ -240,6 +350,9 @@
 	  (pset! mb (+ (* j c1) i)
 		 (pref ma (+ (* i c1) j)))))
       mb)))
+
+(bind-poly mtrans mtransd)
+(bind-poly mtrans mtransf)
 
 ;; determinant (doubles)
 ;; k is for sqr matrix
@@ -296,6 +409,9 @@
 				     (mdetrmf mb (- k 1))))))
 	    (set! s (* -1.0 s)))
 	  det))))
+
+(bind-poly mdetrm mdetrmd)
+(bind-poly mdetrm mdetrmf)
 
 ;; invert matrix (doubles)
 (bind-func minvd
@@ -373,6 +489,11 @@
 	  (pset! inv (+ (* i k) j)
 		 (/ (pref mb (+ (* i k) j)) d))))
       inv)))
+
+;; poly to minv
+(bind-poly minv minvd)
+(bind-poly minv minvf)
+
 
 ;; a unit test of sorts (doubles only)
 (bind-func _matrix_test
