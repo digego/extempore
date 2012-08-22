@@ -4873,6 +4873,26 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     return -1;
 }
 
+// keys of assoc lst MUST be strings
+/*static*/ pointer assoc_strcmp(scheme *sc, pointer key, pointer lst) {
+    pointer x;
+    pointer pair;
+    char* lkey;
+    const char* skey = strvalue(key);
+    for (x = lst; is_pair(x); x = cdr(x)) {
+      pair = pair_car_sc(sc,x);
+      if(is_pair(pair)) {
+      	lkey = strvalue(pair_car_sc(sc,pair));
+      	if(0 == strcmp(lkey,skey)) {
+      	  return pair;
+      	}		
+      } else {
+      	return sc->F;
+      }      	
+    }
+    return sc->F;
+}
+
 /*static*/ pointer list_ref(scheme *sc, const int pos, pointer a) {
     pointer x;	
     for (int i=0; i<=pos; i++,a = cdr(a)) 

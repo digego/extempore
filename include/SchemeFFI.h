@@ -73,6 +73,9 @@ namespace extemp {
 	static pointer ipcSetPriority(scheme* _sc, pointer args);
 	static pointer ipcGetPriority(scheme* _sc, pointer args);
 
+	// misc scheme ties 
+	static pointer assocstrcmp(scheme* _sc, pointer args);
+
 	// num stuff
 	static pointer randomReal(scheme* _sc, pointer args);
 	static pointer randomInt(scheme* _sc, pointer args);

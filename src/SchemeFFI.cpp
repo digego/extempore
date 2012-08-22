@@ -202,6 +202,9 @@ namespace extemp {
 	    { "ipc:get-priority",       &SchemeFFI::ipcGetPriority },
 	    { "ipc:get-process-name",	&SchemeFFI::getNameOfCurrentProcess },
 
+	    // misc scheme ties
+	    { "assoc-strcmp",            &SchemeFFI::assocstrcmp },
+	    
 	    // number stuff
 	    { "random-real",		&SchemeFFI::randomReal },
 	    { "random-int",			&SchemeFFI::randomInt },
@@ -705,6 +708,13 @@ namespace extemp {
 	  if(alias_name == NULL) return mk_string(_sc, name);
 	  return mk_string(_sc, [alias_name UTF8String]);
 	*/
+    }
+
+    pointer SchemeFFI::assocstrcmp(scheme* _sc, pointer args)
+    {
+      pointer key = pair_car(args);
+      pointer alist = pair_cadr(args);
+      return assoc_strcmp(_sc,key,alist);
     }
 
     // number stuff	
