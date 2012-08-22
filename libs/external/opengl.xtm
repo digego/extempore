@@ -1,8 +1,14 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Some OPENGL helper stuff
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; opengl.xtm -- helper functions for working with openGL
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: openGL
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
 
 ;; first check if we are windows we need to load some extensions!
 (if (string=? (sys:platform) "Windows")
@@ -25,7 +31,16 @@
 	   (gl:add-extension "glUniform1fv")
 	   (gl:add-extension "glUniform2fv")
 	   (gl:add-extension "glUniform3f")	   
+	   (gl:add-extension "glUniform4f")
 	   (gl:add-extension "glGetUniformLocation")
+	   (gl:add-extension "glGenBuffers")
+	   (gl:add-extension "glBindBuffer")
+	   (gl:add-extension "glBufferData")
+	   (gl:add-extension "glGetAttribLocation")
+	   (gl:add-extension "glBufferSubData")
+	   (gl:add-extension "glEnableVertexAttribArray")
+	   (gl:add-extension "glVertexAttribPointer")
+	   (gl:add-extension "glDisableVertexAttribArray")
 	   (llvm:compile "declare i32 @glGetUniformBlockIndex(i32,i8*)")
 	   (gl:add-extension "glGetUniformBlockIndex")
 	   (llvm:compile "declare void @glUniformBlockBinding(i32,i32,i32)")	   
@@ -87,6 +102,16 @@
 	   (llvm:compile "declare void @glUniformBlockBinding(i32, i32, i32);")
 	   (llvm:compile "declare void @glBindBufferRange(i32,i32,i32,i32,i32);")))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; missing opengl constants
+
+(bind-val GL_VIEWPORT_BIT i32 2048)
+(bind-val GL_ENABLE_BIT i32 8192)
+(bind-val GL_VERTEX_PROGRAM_POINT_SIZE i32 34370)
+(bind-val GL_COORD_REPLACE i32 34914)
+
 (bind-val GL_ONE_MINUS_SRC_ALPHA i32 771)
 (bind-val GL_ONE_MINUS_SRC_COLOR i32 769)
 (bind-val GL_ONE_MINUS_DST_COLOR i32 775)
@@ -123,8 +148,8 @@
 (bind-val GL_DEPTH_COMPONENT24 i32 33190)
 (bind-val GL_DEPTH_COMPONENT32 i32 33191)
 
-(bind-val GL_VIEWPORT_BIT i32 2048)
-(bind-val GL_ENABLE_BIT i32 8192)
+
+
 
 (if (not (string=? "Windows" (sys:platform)))
 	(begin 
@@ -208,31 +233,32 @@
     (gluLookAt eyex eyey eyez centre-x centre-y centre-z up-x up-y up-z)))
 
 
-(define gl-load-extensions
-  (lambda ()
-    (if (string=? (sys:platform) "Windows")
-	(begin (println "Loading OpenGL Extensions for Windows!!!!!")
-	       (gl:add-extension "glGetShaderiv")
-	       (gl:add-extension "glGetShaderInfoLog")
-	       (gl:add-extension "glGetProgramiv")
-	       (gl:add-extension "glGetProgramInfoLog")
-	       (gl:add-extension "glCreateShader")
-	       (gl:add-extension "glCreateProgram")
-	       (gl:add-extension "glShaderSource")
-	       (gl:add-extension "glCompileShader")
-	       (gl:add-extension "glAttachShader")
-	       (gl:add-extension "glLinkProgram")
-	       (gl:add-extension "glUseProgram")
-	       (gl:add-extension "glUniform1f")
-	       (gl:add-extension "glUniform1i")	   
-	       (gl:add-extension "glUniform2f")
-	       (gl:add-extension "glUniform1fv")
-	       (gl:add-extension "glUniform2fv")	   	   	   
-	       (gl:add-extension "glGetUniformLocation")
-	       (gl:add-extension "glGetUniformBlockIndex")
-	       (gl:add-extension "glUniformBlockBinding")
-	       (gl:add-extension "glBindBufferRange")
-	       (gl:add-extension "glUniform3f")))))
+;; (define gl-load-extensions
+;;   (lambda ()
+;;     (if (string=? (sys:platform) "Windows")
+;; 	(begin (println "Loading OpenGL Extensions for Windows!!!!!")
+;; 	       (gl:add-extension "glGetShaderiv")
+;; 	       (gl:add-extension "glGetShaderInfoLog")
+;; 	       (gl:add-extension "glGetProgramiv")
+;; 	       (gl:add-extension "glGetProgramInfoLog")
+;; 	       (gl:add-extension "glCreateShader")
+;; 	       (gl:add-extension "glCreateProgram")
+;; 	       (gl:add-extension "glShaderSource")
+;; 	       (gl:add-extension "glCompileShader")
+;; 	       (gl:add-extension "glAttachShader")
+;; 	       (gl:add-extension "glLinkProgram")
+;; 	       (gl:add-extension "glUseProgram")
+;; 	       (gl:add-extension "glUniform1f")
+;; 	       (gl:add-extension "glUniform1i")	   
+;; 	       (gl:add-extension "glUniform2f")
+;; 	       (gl:add-extension "glUniform1fv")
+;; 	       (gl:add-extension "glUniform2fv")	   	   	   
+;; 	       (gl:add-extension "glGetUniformLocation")
+;; 	       (gl:add-extension "glGetUniformBlockIndex")
+;; 	       (gl:add-extension "glUniformBlockBinding")
+;; 	       (gl:add-extension "glBindBufferRange")
+;; 	       (gl:add-extension "glUniform3f")
+;; 	       (gl:add-extension "glUniform4f")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -251,12 +277,14 @@
 	  (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
-      (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA16F width height)
+      ;;(glRenderbufferStorage GL_RENDERBUFFER GL_RGBA16F width height)
+      (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA8 width height)
       (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER (pref id 0))
 
       (glGenTextures 1 tex)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
-      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_RGBA16F width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+      ;;(glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_RGBA16F width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_RGBA8 width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_LINEAR)
@@ -272,12 +300,14 @@
 	  (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
-      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+      ;;(glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT24 width height)
       (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER (pref id 0))
 
       (glGenTextures 1 tex)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
-      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      ;;(glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_DEPTH_COMPONENT24 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_LINEAR)
@@ -314,18 +344,43 @@
 	  (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
-      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+      ;;(glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT24 width height)
       (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER (pref id 0))
 
       (glGenTextures 1 tex)
       (glBindTexture GL_TEXTURE_2D (pref tex 0))
-      (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      ;;(glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT24 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
       (glBindTexture GL_TEXTURE_2D 0)
       (pref tex 0))))
+
+
+;;
+;; vbo id      0
+;; data size   1
+;; ptr to data 2
+;;
+(bind-type E_vbo <i32,i32,i8*>)
+
+;; asumming always GL_ARRAY_BUFFER at the moment
+;; type is one of GL_DYNAMIC_DRAW, GL_STATIC_DRAW, GL_STREAM_DRAW etc..
+(bind-func create-vbo
+  (lambda (size:i32 data:i8* type:i32)
+    (let ((vbo:E_vbo* (halloc))
+	  (vboid:i32* (salloc)))	  
+      (glGenBuffers 1 vboid)
+      (glBindBuffer GL_ARRAY_BUFFER (pref vboid 0))
+      (glBufferData GL_ARRAY_BUFFER size null type)
+      ;; (glBufferSubData GL_ARRAY_BUFFER 0 size data)
+      (tfill! vbo (pref vboid 0) size data)
+      (glBindBuffer GL_ARRAY_BUFFER 0)
+      vbo)))
+      
 
 ;; structure to hold fbo data
 ;; fbo id          0
@@ -346,8 +401,8 @@
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
-      (glClearColor 0.0 0.1 0.0 1.0)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      ;; (glClearColor 0.0 0.1 0.0 1.0)
+      ;; (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
 
       (if (> _texid 0) (set! texid _texid))
       (if (> _depthid 0) (set! depthid _depthid))
@@ -360,10 +415,45 @@
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
 	(if (<> status GL_FRAMEBUFFER_COMPLETE)
 	    (set! fbo (cast null E_fbo*))))
+
+      (glClearColor 0.0 1.0 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+
       ;; unbind the frame buffer
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       ;; return the extfbo struct
       fbo)))
+
+;; create and return a frame buffer struct (E_fbo)
+;; if _texid is greater than 0 then use existing _texid
+(bind-func create-fbo-no-depth
+  (lambda (width:i32 height:i32 _texid:i32)
+    (let ((texid (fbo_create_texture width height))
+	  (fboid:i32* (salloc))
+	  (fbo:E_fbo* (halloc))) ;; heap alloc
+      (glGenFramebuffers 1 fboid)
+      ;; bind the fbo
+      (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+      ;; (glClearColor 0.0 0.1 0.0 1.0)
+      ;; (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+
+      (if (> _texid 0) (set! texid _texid))
+      ;; Attach the texture texid to the color buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_RECTANGLE_ARB texid 0)
+
+      (tfill! fbo (pref fboid 0) texid -1 width height)
+      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
+	(if (<> status GL_FRAMEBUFFER_COMPLETE)
+	    (set! fbo (cast null E_fbo*))))
+
+      (glClearColor 0.0 1.0 0.0 1.0)
+      (glClear GL_COLOR_BUFFER_BIT)
+
+      ;; unbind the frame buffer
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      ;; return the extfbo struct
+      fbo)))
+
 
 ;; create and return a frame buffer struct (E_fbo)
 ;; if _texid is greater than 0 then use existing _texid
@@ -376,8 +466,8 @@
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
-      (glClearColor 0.0 0.1 0.0 1.0)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      ;; (glClearColor 0.0 0.1 0.0 1.0)
+      ;; (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
 
       (if (> _texid 0) (set! texid _texid))
       (if (> _depthid 0) (set! texid _depthid))
@@ -391,6 +481,40 @@
 	(printf "fb status %d\n" status)
 	(if (<> status GL_FRAMEBUFFER_COMPLETE)
 	    (set! fbo (cast null E_fbo*))))
+
+      (glClearColor 0.0 1.0 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+
+      ;; unbind the frame buffer
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      ;; return the extfbo struct
+      fbo)))
+
+
+;; create and return a frame buffer struct (E_fbo)
+;; if _texid is greater than 0 then use existing _texid
+(bind-func create-fbo-sqr-no-depth
+  (lambda (width:i32 height:i32 _texid:i32)
+    (let ((texid (fbo_create_texture_sqr width height))
+	  (fboid:i32* (salloc))
+	  (fbo:E_fbo* (halloc))) ;; heap alloc
+      (glGenFramebuffers 1 fboid)
+      ;; bind the fbo
+      (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+
+      (if (> _texid 0) (set! texid _texid))
+      ;; Attach the texture texid to the color buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D texid 0)
+
+      (tfill! fbo (pref fboid 0) texid -1 width height)
+      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
+	(printf "fb status %d\n" status)
+	(if (<> status GL_FRAMEBUFFER_COMPLETE)
+	    (set! fbo (cast null E_fbo*))))
+
+      (glClearColor 0.0 1.0 0.0 1.0)
+      (glClear GL_COLOR_BUFFER_BIT)
+
       ;; unbind the frame buffer
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       ;; return the extfbo struct
@@ -454,37 +578,6 @@
       (print-program-info-log program)
       program))
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Some coordinate helpers
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(bind-func get_2d_point 
-  (lambda (point4d:double* vmat:double* pmat:double* width:double height:double x:double* y:double*)
-    (let ((vpm:double* (zalloc 16))
-	  (point:double* (zalloc 4)))
-      (mmuld pmat 4 4 vmat 4 4 vpm)
-      (mmuld vpm 4 4 point4d 4 1 point)
-      (pset! x 0 (* (/ (+ (pref point 0) 1.0) 2.0) width))
-      (pset! y 0 (* (/ (- 1.0 (pref point 1)) 2.0) height))
-      void)))
-
-(bind-func get_3d_point
-  (lambda (x:double y:double width:double height:double vmat:double* pmat:double* point3d:double*)
-    (let ((vpmi:double* (salloc 16))
-	  (vpm:double* (salloc 16))		       
-	  (point:double* (salloc 4))
-	  (xx (- (* 2.0 (/ x width)) 1.0))
-	  (yy (- 1.0 (* 2.0 (/ y height)))))
-      (mmuld vmat 4 4 pmat 4 4 vpm)
-      (minvd vpm 4 vpmi)
-      (pfill! point xx yy 0.0 1.0)
-      (mmuld vpmi 4 4 point 4 1 point3d)
-      void)))
       
 	  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -561,3 +654,19 @@
 		 (glEnd)
 		 (glEndList)
 		 1)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; opengl misc
+
+(bind-val GL_VENDER i32 7936)
+(bind-val GL_RENDERER i32 7937)
+(bind-val GL_VERSION i32 7938)
+
+(bind-func gl_print_driver_info
+  (lambda ()
+    (printf "--------------------------\n")
+    (printf "OpenGL Driver:\nVender:%s\nRenderer:%s\nVersion:%s\n" (glGetString GL_VENDER) (glGetString GL_RENDERER) (glGetString GL_VERSION))
+    (printf "--------------------------\n")
+    void))

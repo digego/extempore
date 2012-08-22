@@ -1,0 +1,41 @@
+;;; win32.xtm -- Win32 api bits and pieces
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: kernel32.dll
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
+
+;; kernel32 stuff
+(define kernel32 (sys:open-dylib "Kernel32.dll"))
+
+(if (or (eq? #f kernel32)
+	(null? kernel32))
+    (print-error "Error loading kernel32 lib"))
+
+(bind-alias HANDLE i8*)
+(bind-alias DWORD i32)
+(bind-alias DWORD_PTR i64)
+(bind-alias PDWORD_PTR i64*) ;; pointer to DWORD_PTR
+
+(bind-val REALTIME_PRIORITY_CLASS i32 256)
+(bind-val HIGH_PRIORITY_CLASS i32 128)
+(bind-val ABOVE_NORMAL_PRIORITY_CLASS i32 32768)
+(bind-val NORMAL_PRIORITY_CLASS i32 32)
+(bind-val BELOW_NORMAL_PRIORITY_CLASS i32 16384)
+(bind-val IDLE_PRIORITY_CLASS i32 64)
+
+(bind-val ALL_PROCESSOR_GROUPS i32 -1)
+
+(bind-lib kernel32 GetCurrentProcess [HANDLE]*)
+(bind-lib kernel32 SetPriorityClass [i1,HANDLE,DWORD]*)
+(bind-lib kernel32 GetPriorityClass [DWORD,HANDLE]*)
+(bind-lib kernel32 GetProcessAffinityMask [i1,HANDLE,PDWORD_PTR,PDWORD_PTR]*)
+(bind-lib kernel32 SetProcessAffinityMask [i1,HANDLE,DWORD_PTR]*)
+(bind-lib kernel32 GetMaximumProcessorCount [DWORD,DWORD]*)
+(bind-lib kernel32 GetActiveProcessorCount [DWORD,DWORD]*)
+(bind-lib kernel32 SetProcessPriorityBoost [i1,HANDLE,i1]*)

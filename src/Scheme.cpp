@@ -4873,6 +4873,26 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     return -1;
 }
 
+// keys of assoc lst MUST be strings
+/*static*/ pointer assoc_strcmp(scheme *sc, pointer key, pointer lst) {
+    pointer x;
+    pointer pair;
+    char* lkey;
+    const char* skey = strvalue(key);
+    for (x = lst; is_pair(x); x = cdr(x)) {
+      pair = pair_car_sc(sc,x);
+      if(is_pair(pair)) {
+      	lkey = strvalue(pair_car_sc(sc,pair));
+      	if(0 == strcmp(lkey,skey)) {
+      	  return pair;
+      	}		
+      } else {
+      	return sc->F;
+      }      	
+    }
+    return sc->F;
+}
+
 /*static*/ pointer list_ref(scheme *sc, const int pos, pointer a) {
     pointer x;	
     for (int i=0; i<=pos; i++,a = cdr(a)) 
@@ -6299,7 +6319,7 @@ void scheme_load_file(scheme *sc, FILE *fin) {
     sc->inport=sc->loadport;
 	
     sc->func_called_by_extempore = sc->NIL;		
-    sc->call_end_time = extemp::UNIV::TIME+(uint64_t)(extemp::UNIV::SAMPLERATE*60*5); // 5 minutes	
+    sc->call_end_time = extemp::UNIV::TIME+(uint64_t)(extemp::UNIV::SAMPLERATE*60*60); // 60 minutes
 	
     try{
 	Eval_Cycle(sc, OP_T0LVL); 

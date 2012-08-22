@@ -358,7 +358,7 @@ namespace extemp {
 		SchemeProcess::SCHEME_MAP[sc] = this;					
 
 		return true;
-	}		
+	}		  
 
 	void SchemeProcess::stop()
 	{
@@ -366,6 +366,25 @@ namespace extemp {
 		running = false;		
 		scheme_deinit(sc);
 	}
+
+        int SchemeProcess::setPriority(int priority)
+	{
+	        threadScheme.setPriority(priority);
+		threadServer.setPriority(priority);
+		return 0;
+	}
+
+        int SchemeProcess::getPriority()
+	{
+	        int a = threadScheme.getPriority();
+		int b = threadServer.getPriority();
+		if(a != b) {
+		  printf("process priority mismatch, scm[%d] svr[%d]\n",a,b);
+		  return a;
+		}
+		return a;
+	}
+    
 
 	long long int SchemeProcess::getMaxDuration()
 	{

@@ -1,10 +1,14 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; GNOME GLib bindings
-;;
-;; This is here as a placeholder to be added to over time.
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; glib.xtm -- GNOME GLib bindings
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: libglib
+
+;;; Commentary:
+
+;; This binding file is incomplete, it will be added to over time.
+
+;;; Code:
 
 (define gliblib
   (sys:open-dylib (if (string=? "Linux" (sys:platform))
@@ -17,16 +21,16 @@
 	(not gliblib)) 
     (print-error "Could not load 'glib' dynamic library"))
 
-(define giolib
-  (sys:open-dylib (if (string=? "Linux" (sys:platform))
-		      "libgio-2.0.so"
-		      (if (string=? "Windows" (sys:platform))
-			  "libgio-2.0-0.dll"
-			  "libgio-2.0.dylib"))))
+;; (define giolib
+;;   (sys:open-dylib (if (string=? "Linux" (sys:platform))
+;; 		      "libgio-2.0.so"
+;; 		      (if (string=? "Windows" (sys:platform))
+;; 			  "libgio-2.0-0.dll"
+;; 			  "libgio-2.0.dylib"))))
 
-(if (or (eq? #f giolib)
-	(not giolib)) 
-    (print-error "Could not load 'gio' dynamic library"))
+;; (if (or (eq? #f giolib)
+;; 	(not giolib)) 
+;;     (print-error "Could not load 'gio' dynamic library"))
 
 
 (define gobjectlib
@@ -94,15 +98,27 @@
 
 
 ;; misc stuff
-(bind-lib gliblib g_get_user_name [gchar*]*)
-(bind-lib gliblib g_get_real_name [gchar*]*)
-(bind-lib gliblib g_get_host_name [gchar*]*)
-(bind-lib gliblib g_get_home_dir [gchar*]*)
-(bind-lib gliblib g_get_environ [gchar**]*)
-(bind-lib gliblib g_getenv [gchar*,gchar*]*)
-(bind-lib gliblib g_setenv [gboolean,gchar*]*)
-(bind-lib gliblib g_unsetenv [void,gchar*]*)
-(bind-lib gliblib g_spaced_primes_closest [guint,guint]*)
+(if (string=? "Windows" (sys:platform))
+    (begin
+      (bind-lib gliblib g_get_user_name_utf8 [gchar*]*)
+      (bind-lib gliblib g_get_real_name_utf8 [gchar*]*)
+      (bind-lib gliblib g_get_host_name [gchar*]*)
+      (bind-lib gliblib g_get_home_dir_utf8 [gchar*]*)
+      ;(bind-lib gliblib g_get_environ [gchar**]*)
+      (bind-lib gliblib g_getenv_utf8 [gchar*,gchar*]*)
+      (bind-lib gliblib g_setenv_utf8 [gboolean,gchar*]*)
+      (bind-lib gliblib g_unsetenv_utf8 [void,gchar*]*)
+      (bind-lib gliblib g_spaced_primes_closest [guint,guint]*))
+    (begin
+      (bind-lib gliblib g_get_user_name [gchar*]*)
+      (bind-lib gliblib g_get_real_name [gchar*]*)
+      (bind-lib gliblib g_get_host_name [gchar*]*)
+      (bind-lib gliblib g_get_home_dir [gchar*]*)
+      (bind-lib gliblib g_get_environ [gchar**]*)
+      (bind-lib gliblib g_getenv [gchar*,gchar*]*)
+      (bind-lib gliblib g_setenv [gboolean,gchar*]*)
+      (bind-lib gliblib g_unsetenv [void,gchar*]*)
+      (bind-lib gliblib g_spaced_primes_closest [guint,guint]*)))
 
 ;; file system stuff
 
@@ -112,11 +128,20 @@
 (bind-val G_FILE_TEST_IS_EXECUTABLE i32 8)
 (bind-val G_FILE_TEST_EXISTS i32 16)
 
-(bind-lib gliblib g_file_test [gboolean,gchar*,i32]*)
-(bind-lib gliblib g_dir_open [GDir*,gchar*,guint,GError**]*)
-(bind-lib gliblib g_dir_close [void,GDir*]*)
-(bind-lib gliblib g_dir_read_name [gchar*,GDir*]*)
-(bind-lib gliblib g_dir_rewind [void,GDir*]*)
+(if (string=? "Windows" (sys:platform))
+    (begin 
+      (bind-lib gliblib g_file_test_utf8 [gboolean,gchar*,i32]*)
+      (bind-lib gliblib g_dir_open_utf8 [GDir*,gchar*,guint,GError**]*)
+      (bind-lib gliblib g_dir_close [void,GDir*]*)
+      (bind-lib gliblib g_dir_read_name_utf8 [gchar*,GDir*]*)
+      (bind-lib gliblib g_dir_rewind [void,GDir*]*)
+      )
+    (begin
+      (bind-lib gliblib g_file_test [gboolean,gchar*,i32]*)
+      (bind-lib gliblib g_dir_open [GDir*,gchar*,guint,GError**]*)
+      (bind-lib gliblib g_dir_close [void,GDir*]*)
+      (bind-lib gliblib g_dir_read_name [gchar*,GDir*]*)
+      (bind-lib gliblib g_dir_rewind [void,GDir*]*)))
 
 ;; regex stuff
 (bind-lib gliblib g_match_info_matches [gboolean,GMatchInfo]*)
@@ -218,16 +243,16 @@
 (bind-lib gliblib g_hash_table_new [GHashTable*,GHashFunc,GEqualFunc]*)
 (bind-lib gliblib g_hash_table_insert [void,GHashTable*,gpointer,gpointer]*)
 (bind-lib gliblib g_hash_table_replace [void,GHashTable*,gpointer,gpointer]*)
-(bind-lib gliblib g_hash_table_add [void,GHashTable*,gpointer]*)
-(bind-lib gliblib g_hash_table_contains [gboolean,GHashTable*,gconstpointer]*)
+;; (bind-lib gliblib g_hash_table_add [void,GHashTable*,gpointer]*)
+;; (bind-lib gliblib g_hash_table_contains [gboolean,GHashTable*,gconstpointer]*)
 (bind-lib gliblib g_hash_table_size [guint,GHashTable*]*)
 (bind-lib gliblib g_hash_table_lookup [gpointer,GHashTable*,gconstpointer]*)
 (bind-lib gliblib g_hash_table_remove [gboolean,GHashTable*,gconstpointer]*)
 (bind-lib gliblib g_hash_table_remove_all [void,GHashTable*]*)
 
 
-;; GSocket stuff
-(bind-alias GSocket i8)
-(bind-alias GInetAddress i8)
-(bind-lib giolib g_inet_address_new_from_string [GInetAddress*,gchar*]*)
-(bind-lib giolib g_inet_address_to_string [gchar*,GInetAddress*]*)
+;; ;; GSocket stuff
+;; (bind-alias GSocket i8)
+;; (bind-alias GInetAddress i8)
+;; (bind-lib giolib g_inet_address_new_from_string [GInetAddress*,gchar*]*)
+;; (bind-lib giolib g_inet_address_to_string [gchar*,GInetAddress*]*)

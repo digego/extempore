@@ -4221,6 +4221,11 @@ deprecated - use bind-func instead."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-macro (bind-alias symbol type)
+  (if *impc:compiler:precomp-llvm*
+      (emit (sexpr->string
+	     `(bind-alias ,symbol ,type))
+	    "\n\n"
+	    *impc:compiler:precomp*))
   `(begin (impc:ir:add-type-alias ,(symbol->string symbol) ,(symbol->string type))
           (ascii-print-color 0 7 10)
 	  (print "Aliased ")
@@ -4235,6 +4240,11 @@ deprecated - use bind-func instead."
 	  (print)))
   
 (define-macro (bind-type symbol type)  
+  (if *impc:compiler:precomp-llvm*
+      (emit (sexpr->string
+	     `(bind-type ,symbol ,type))
+	    "\n\n"
+	    *impc:compiler:precomp*))
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<)
 	      (if (regex:match? ,(symbol->string type) "!") ;; then must be poly type
 		  (impc:ir:add-gpolytype ',symbol ',type)

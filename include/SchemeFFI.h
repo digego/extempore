@@ -70,6 +70,11 @@ namespace extemp {
 	static pointer ipcEval(scheme* _sc, pointer args);
 	static pointer ipcLoad(scheme* _sc, pointer args);
 	static pointer getNameOfCurrentProcess(scheme* _sc, pointer args);
+	static pointer ipcSetPriority(scheme* _sc, pointer args);
+	static pointer ipcGetPriority(scheme* _sc, pointer args);
+
+	// misc scheme ties 
+	static pointer assocstrcmp(scheme* _sc, pointer args);
 
 	// num stuff
 	static pointer randomReal(scheme* _sc, pointer args);

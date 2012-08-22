@@ -1,10 +1,14 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Simple Library Wrapper for SOIL
-;;
-;; http://www.lonesock.net/soil.html
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; image.xtm -- Simple Library Wrapper for SOIL
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: libSOIL
+
+;;; Commentary:
+
+;; taken from http://www.lonesock.net/soil.html
+
+;;; Code:
 
 ;; load soil library
 (define soillib (if (string=? "Linux" (sys:platform))
@@ -61,7 +65,7 @@
 	  (printf "Error loading: %s\n" path))
       texid)))
 
-(definec soil-load-tex-sqr
+(bind-func soil-load-tex-sqr
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y))))
       (if (= texid 0)
@@ -160,6 +164,34 @@
 		    data)
       (pref tex 0))))
 
+;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
+;; if texid is zero then assign a new tex id otherwise use the texid provided
+(bind-func gl-load-tex-ext-bgr
+  (lambda (width height channels type data textype texid)
+    (let* ((tex:i32* (salloc)))
+      (pset! tex 0 texid)
+      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
+      (if (< texid 1) (glGenTextures 1 tex))
+      ;(printf "tex: %d\n" (pref tex 0))
+      (glBindTexture textype (pref tex 0))
+      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
+      (glTexParameteri textype GL_TEXTURE_WRAP_S GL_CLAMP)
+      (glTexParameteri textype GL_TEXTURE_WRAP_T GL_CLAMP)
+      (glTexParameteri textype GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri textype GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexImage2D textype 0 channels ;GL_RGBA
+		    width height
+		    0
+		    (cond ((= channels 1) GL_RED)
+			  ((= channels 3) GL_BGR)
+			  ((= channels 4) GL_BGRA) ;GL_RGBA)
+			  (else GL_BGRA))
+		    type
+		    ; GL_FLOAT; GL_UNSIGNED_BYTE
+		    data)
+      (pref tex 0))))
+
+
 (bind-func gl-tex-width
   (lambda (tex)
     (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
@@ -185,9 +217,10 @@
 	  (yy (+ y (* .5 h)))
 	  (tw (i32tod (gl-tex-width texid)))
 	  (th (i32tod (gl-tex-height texid))))
+      (glDisable GL_TEXTURE_2D)
       (glEnable GL_TEXTURE_RECTANGLE_ARB)
-      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE) ;GL_REPLACE)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
+      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE) ;GL_REPLACE)
       ;(glDisable GL_DEPTH_TEST)
       (glPushMatrix)
       ;(glLoadIdentity)
@@ -210,21 +243,25 @@
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
       void)))
 
-(definec gl-draw-img-ext
+(bind-func gl-draw-img-ext
   (lambda (x y w h r type texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
 	  (xx (+ x (* .5 w)))
 	  (yy (+ y (* .5 h)))	  
+	  (op (if (= type GL_TEXTURE_RECTANGLE_ARB)
+		  GL_TEXTURE_2D
+		  GL_TEXTURE_RECTANGLE_ARB))
 	  (tw (if (= type GL_TEXTURE_RECTANGLE_ARB)
 		  (i32tod (gl-tex-width texid))
 		  1.0))
 	  (th (if (= type GL_TEXTURE_RECTANGLE_ARB)
 		  (i32tod (gl-tex-height texid))
 		  1.0)))
+      (glDisable op)
       (glEnable type)
-      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE) ;GL_REPLACE)
       (glBindTexture type texid)
+      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE) ;GL_REPLACE)
       ;(glDisable GL_DEPTH_TEST)
       (glPushMatrix)
       ;(glLoadIdentity)
@@ -255,8 +292,8 @@
 	  (xx (+ x (* .5 w)))
 	  (yy (+ y (* .5 h))))
       (glEnable GL_TEXTURE_RECTANGLE_ARB)
-      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE) ;GL_REPLACE)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
+      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE) ;GL_REPLACE)
       ;(glDisable GL_DEPTH_TEST)
       (glPushMatrix)
       ;(glLoadIdentity)
@@ -289,8 +326,8 @@
 	  (tw (i32tod (gl-tex-width texid)))
 	  (th (i32tod (gl-tex-height texid))))
       (glEnable GL_TEXTURE_RECTANGLE_ARB)
-      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE); GL_BLEND) ;REPLACE)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
+      (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE); GL_BLEND) ;REPLACE)
       (glPushMatrix)      
       ;(glLoadIdentity)
       (glTranslated xx yy 0.0)

@@ -57,6 +57,8 @@ namespace extemp
 	int cancel();
 	bool isRunning();
 	bool isCurrentThread();
+	int setPriority(int);
+	int getPriority();
 #ifdef EXT_BOOST
 	boost::thread& getBthread();
 #else

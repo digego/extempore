@@ -211,6 +211,7 @@ pointer reverse(scheme *sc, pointer a);
 pointer reverse_in_place(scheme *sc, pointer term, pointer list);
 pointer append(scheme *sc, pointer a, pointer b);
 int list_length(scheme *sc, pointer a);
+pointer assoc_strcmp(scheme *sc, pointer key, pointer alist);
 int is_real(pointer a);
 char * string_value(pointer p);
 pointer list_ref(scheme* sc, int pos, pointer a);

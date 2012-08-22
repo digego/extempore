@@ -1,18 +1,25 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Bullet Physics Library Bindings
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; bullet.xtm -- bullet physics library
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: libBulletDynamics, libhorde3d
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
 
 (define bulletlib (if (string=? "Linux" (sys:platform))
-		       (sys:open-dylib "libBulletDynamics.so.2.79")
+		       ;; (sys:open-dylib "libBulletDynamics.so.2.79")
+		       (sys:open-dylib "libBulletDynamics.so.2.80")
 		       (if (string=? "Windows" (sys:platform))
 			   (sys:open-dylib "BulletDynamics.dll")
 			   (print-error "Where Do I find Bullet lib on OSX??"))))
 
-(if (or (eq? #f hordeutlib)
-	(not hordeutlib)) 
-    (print-error "Could not load 'Horde3d' dynamic library"))
+(if (or (eq? #f bulletlib)
+	(not bulletlib)) 
+    (print-error "Could not load 'bullet' dynamic library"))
 
 (bind-type _plPhysicsSdkHandle <i32>)
 (bind-alias plPhysicsSdkHandle _plPhysicsSdkHandle*)
@@ -57,6 +64,8 @@
 (bind-lib bulletlib plAddRigidBody [void,plDynamicsWorldHandle,plRigidBodyHandle]*)
 (bind-lib bulletlib plRemoveRigidBody [void,plDynamicsWorldHandle,plRigidBodyHandle]*)
 (bind-lib bulletlib plSetActivationState [void,plRigidBodyHandle,i32]*)
+(bind-lib bulletlib plSetRestitution [void,plRigidBodyHandle,float]*)
+(bind-lib bulletlib plSetDeactivationTime [void,plRigidBodyHandle,float]*)
 
 (bind-lib bulletlib plSetPosition [void,plRigidBodyHandle,plVector3]*)
 (bind-lib bulletlib plGetPosition [void,plRigidBodyHandle,plVector3]*)

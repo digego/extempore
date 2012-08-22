@@ -198,8 +198,13 @@ namespace extemp {
 	    { "ipc:define",			&SchemeFFI::ipcDefine },
 	    { "ipc:eval-string",		&SchemeFFI::ipcEval },
 	    { "ipc:load",			&SchemeFFI::ipcLoad },
+	    { "ipc:set-priority",       &SchemeFFI::ipcSetPriority },
+	    { "ipc:get-priority",       &SchemeFFI::ipcGetPriority },
 	    { "ipc:get-process-name",	&SchemeFFI::getNameOfCurrentProcess },
 
+	    // misc scheme ties
+	    { "assoc-strcmp",            &SchemeFFI::assocstrcmp },
+	    
 	    // number stuff
 	    { "random-real",		&SchemeFFI::randomReal },
 	    { "random-int",			&SchemeFFI::randomInt },
@@ -676,6 +681,21 @@ namespace extemp {
 	return _sc->T;
     }
 
+    pointer SchemeFFI::ipcSetPriority(scheme* _sc, pointer args)
+    {
+	std::string process(string_value(pair_car(args)));
+	int priority = ivalue(pair_cadr(args));
+	SchemeProcess::I(process)->setPriority(priority);
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::ipcGetPriority(scheme* _sc, pointer args)
+    {
+	std::string process(string_value(pair_car(args)));
+	int priority = SchemeProcess::I(process)->getPriority();
+	return mk_integer(_sc, priority);
+    }
+
     pointer SchemeFFI::getNameOfCurrentProcess(scheme* _sc, pointer args)
     {
 	    const char* name = SchemeProcess::I(_sc)->getName().c_str();
@@ -688,6 +708,13 @@ namespace extemp {
 	  if(alias_name == NULL) return mk_string(_sc, name);
 	  return mk_string(_sc, [alias_name UTF8String]);
 	*/
+    }
+
+    pointer SchemeFFI::assocstrcmp(scheme* _sc, pointer args)
+    {
+      pointer key = pair_car(args);
+      pointer alist = pair_cadr(args);
+      return assoc_strcmp(_sc,key,alist);
     }
 
     // number stuff	
@@ -3024,14 +3051,14 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       PFD_SUPPORT_OPENGL |   // support OpenGL  
       PFD_DOUBLEBUFFER,      // double buffered  
       PFD_TYPE_RGBA,         // RGBA type  
-      32,                    // 24-bit color depth  
+      32,                    // 32-bit color depth  
       0, 0, 0, 0, 0, 0,      // color bits ignored  
       0,                     // no alpha buffer  
       0,                     // shift bit ignored  
       0,                     // no accumulation buffer  
       0, 0, 0, 0,            // accum bits ignored  
-      32,                    // 32-bit z-buffer      
-      0,                     // no stencil buffer  
+      24,                    // 24-bit z-buffer      
+      8,                     // no stencil buffer  
       0,                     // no auxiliary buffer  
       PFD_MAIN_PLANE,        // main layer  
       0,                     // reserved  

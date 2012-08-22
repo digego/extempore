@@ -1,9 +1,14 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; shaders
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; shaders.xtm -- GL shaders
 
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: openGL
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
 
 ;; draw a quad
 ;; tw and th are framebuffer width and height
@@ -338,6 +343,48 @@ void main() {
     gl_FragColor = mix(base, result, opacity);
 }")
 
+
+;; vert shader
+(define particles_vert
+"// VERTEX SHADER
+
+//varying vec2 TexCoord;
+
+in vec2 myVertex;
+in vec4 myColour;
+in float mySize;
+in vec2 myVelocity;
+in int myState;
+
+void main() {
+   gl_PointSize = mySize;
+   if(myState > 0) {
+     gl_FrontColor = myColour;
+   }else{
+     gl_FrontColor = vec4(0.0,0.0,0.0,0.0);
+   }
+   gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * vec4(myVertex.xy,0.0,1.0);
+   //TexCoord = gl_MultiTexCoord0.st;
+}")
+
+(define particles_frag
+"//  FRAGMENT SHADER
+// #version 330
+
+#version 120
+
+#extension GL_ARB_texture_rectangle : disable
+
+uniform sampler2D tex1;
+
+//varying vec2 TexCoord;
+
+void main() {
+   gl_FragColor = texture2D(tex1,gl_PointCoord)*gl_Color;
+   //gl_FragColor = gl_Color;
+}")
+
+
 (define green_frag
 "//  FRAGMENT SHADER
 // #version 330
@@ -349,6 +396,7 @@ uniform sampler2DRect tex_front;
 uniform vec4 color;
 uniform float width;
 uniform float height;
+uniform float scale_front;
 uniform int flipx;
 uniform int flipy;
 
@@ -358,7 +406,7 @@ void main() {
     vec4 base = texture2DRect(tex_back, TexCoord);
     float x = (flipx==0) ? TexCoord.x : width-TexCoord.x;
     float y = (flipy==0) ? TexCoord.y : height-TexCoord.y;
-    vec4 blend = texture2DRect(tex_front, vec2(x,y));
+    vec4 blend = texture2DRect(tex_front, vec2(x*scale_front,y*scale_front));
 
     if(color == blend) {
       gl_FragColor = base;
@@ -378,11 +426,14 @@ uniform sampler2DRect cBuf;
 uniform float blur;
 uniform float fp;  // focal point
 uniform int show_depth;
+uniform float dfact; // depth factor (shorten or make longer)
+uniform float near;
+uniform float far;
 
 varying vec2 TexCoord;
 
-const float near = 0.1;
-const float far = 1000.0;
+// const float near = 0.1;
+// const float far = 1000.0;
 const vec2 frameBufSize = vec2(1.0,1.0);
 
 vec4 blurKawase( const sampler2DRect tex, const vec2 texCoord, const vec2 texSize, const float iteration ) {
@@ -436,6 +487,7 @@ void main( void ) {
 (bind-val edge_shader i32 0)
 (bind-val blend_shader i32 0)
 (bind-val green_shader i32 0)
+(bind-val particles_shader i32 0)
 (bind-val dof_shader i32 0)
 
 ;; must be called after initalizing opengl
@@ -453,6 +505,8 @@ void main( void ) {
 	   edge_frag
 	   blend_frag
 	   green_frag
+	   particles_vert
+	   particles_frag
 	   dof_frag)
     (set! pass_shader (create-shader passthrough_vert passthrough_frag))
     (set! invert_shader (create-shader passthrough_vert invert_frag)) 
@@ -466,6 +520,7 @@ void main( void ) {
     (set! edge_shader (create-shader passthrough_vert edge_frag))
     (set! blend_shader (create-shader passthrough_vert blend_frag))
     (set! green_shader (create-shader passthrough_vert green_frag))
+    (set! particles_shader (create-shader particles_vert particles_frag))
     (set! dof_shader (create-shader passthrough_vert dof_frag))
     void))
 
@@ -484,4 +539,6 @@ void main( void ) {
 	   edge_frag
 	   blend_frag
 	   green_frag
+	   particles_vert
+	   particles_frag
 	   dof_frag)))
