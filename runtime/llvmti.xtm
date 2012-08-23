@@ -1329,7 +1329,7 @@
 
 	 ;; type inferencing for generic functions arguments
          (let ((res (map (lambda (a gt)
-	 		   ;(println 'a: a 'gt: gt)
+	 		   ;; (println 'a: a 'gt: gt)
 			   ;;(println 'avars: (assoc a vars))
 	 		   ;; gt for generics type
 	 		   (let ((tt (impc:ti:type-check a vars kts gt)))
@@ -1539,12 +1539,11 @@
 				       ftypes
 				       valid-args))))
 	
-	;; (println '-> ast 'valid-polys: valid-polys 'request: request?)	
+	;(println '-> ast 'valid-polys: valid-polys 'request: request?)	
 	(if (null? valid-polys)
 	    (print-error 'Compiler 'Error: 'no 'valid 'polymorphic 'options 'for: ast))
 	
-	;; (println 'valid-polysa: valid-polys 'request? request? 'ast: ast)
-	
+	;(println 'valid-polysa: valid-polys 'request? request? 'ast: ast)
 	(let ((returns (map (lambda (t)
 			      (cadr t))
 			    valid-polys)))
@@ -1554,8 +1553,8 @@
 	      ;; 		 (set! request? (list request?)))
 	      (set! returns (impc:ti:intersection* returns (list request?))))
 	  
-	  ;(println 'returns: returns)
-	  
+	  ;; (println 'valid-polysa: valid-polys 'returns: returns 'request? request?)
+
 	  (set! valid-polys (cl:remove #f
 			       (map (lambda (v)
 				      (if (member (cadr v) returns)
@@ -1563,7 +1562,6 @@
 					  #f))
 				    valid-polys)))
 	  ;; update valid-polys to reflect return types (from request?)
-	  ;(println 'valid-polysb: valid-polys 'request? request? 'ast: ast) 
 	  (impc:ti:update-var (car ast) vars kts valid-polys)
 	  
 	  ;(println 'returns: returns)
@@ -1715,11 +1713,34 @@
 
 (define impc:ti:begin-check
    (lambda (ast vars kts request?)
+      ;;(println 'request: request?)
       (let ((a (car (reverse (map (lambda (e)
+				    (println 'e: e)
                                      (impc:ti:type-check e vars kts request?))
                                   (cdr ast))))))
          (if *impc:ti:print-sub-checks* (println 'begin:> 'ast: ast 'a: a))
          a)))
+
+
+(define impc:ti:begin-check
+   (lambda (ast vars kts request?)
+      ;;(println 'request: request?)
+      ;; we should ONLY use request? on the LAST sexpr in the begin
+      ;; i.e. we should only use the LAST begin sexpr for a return type
+      (let ((sexplst (reverse (cdr ast))))
+	;; we need type check coverage for ALL sexpr's 
+	;; by only the last one counts towards the returned type
+	
+	;; so we start with type coverage
+	;; reverse order shouldn't matter because there
+	;; should be no type dependencies between these sexpressions
+	;; also we don't want to pass any request? to these
+	(map (lambda (e) (impc:ti:type-check e vars kts #f)) (cdr sexplst))
+	;; now we do the last sexpr in the begin for a return type
+	;; it SHOULD get passed the request?
+	(let ((res (impc:ti:type-check (car sexplst) vars kts request?)))
+	  ;; and return res
+	  res))))
 		 
 
 (define impc:ti:bitcast-check
@@ -2487,10 +2508,10 @@
 ;; try some possible substitutions!
 (define impc:ti:run-type-check
    (lambda (vars forced-types ast . cnt)
-      ;(println '------------------------------------)
-      ;(println 'forced-types forced-types)
-      ;(println 'vars: vars)
-      ;(println 'run-type-check 'ast: ast)
+      ;; (println '------------------------------------)
+      ;; (println 'forced-types forced-types)
+      ;; (println 'vars: vars)
+      ;; (println 'run-type-check 'ast: ast)
       ;(if (null? cnt) (sys:clear-log-view))
       (let* ((fvars (map (lambda (t) ;; add any forced-type values to vars
                             (if (assoc (car t) forced-types)
