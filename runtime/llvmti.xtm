@@ -807,7 +807,10 @@
 			(if (null? t) ;; if it doesn't we might need to reverse match!
 			    (let* ((positions (map (lambda (x)
 						     (if (atom? x)
-							 (print-error 'Compiler 'Error: 'severe 'type 'error: 'have 'you 'specified 'an 'incorrect 'type? x)
+							 (if (and (symbol? x)
+								  (regex:match? (symbol->string x) "!"))
+							     (print-error 'Compiler 'Error: 'generics 'error: 'this 'closure 'must 'have 'a 'suitable 'generic 'type 'signature)
+							     (print-error 'Compiler 'Error: 'severe 'type 'error: 'have 'you 'specified 'an 'incorrect 'type? x))
 							 (cl:position vs x)))
 						   all-vs))
 				   (position (cl:find-if number? positions))
