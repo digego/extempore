@@ -574,9 +574,17 @@
 			(list 'dotimes 
 			      (impc:ti:first-transform (cadr ast) inbody?)
 			      (cons 'begin (impc:ti:first-transform (cddr ast) inbody?))))
+                       ;; ((member (car ast) '(let let* letrec))
+                       ;;  (cons (impc:ti:first-transform (car ast) inbody?)
+                       ;;        (cons (impc:ti:first-transform (cadr ast) #f)
+                       ;;              (list (cons 'begin (impc:ti:first-transform (cddr ast) #t))))))
                        ((member (car ast) '(let let* letrec))
                         (cons (impc:ti:first-transform (car ast) inbody?)
-                              (cons (impc:ti:first-transform (cadr ast) #f)
+                              (cons (map (lambda (p)
+					   (list (impc:ti:first-transform (car p) #f)
+						 (impc:ti:first-transform (cadr p) #f))
+					   )
+					 (cadr ast))
                                     (list (cons 'begin (impc:ti:first-transform (cddr ast) #t))))))
                        ((and (symbol? (car ast))
                              (regex:match? (symbol->string (car ast)) ".*\\..*"))
@@ -601,8 +609,10 @@
                              (defined? (car ast))
                              (macro? (eval (car ast))))
                         (macro-expand ast))
-                       (else (cons (impc:ti:first-transform (car ast) inbody?)
-                                   (impc:ti:first-transform (cdr ast) inbody?)))))
+                       (else (cons ;(impc:ti:first-transform (car ast) inbody?)
+				   (impc:ti:first-transform (car ast) #t)
+                                   ;(impc:ti:first-transform (cdr ast) inbody?)))))
+                                   (impc:ti:first-transform (cdr ast) #t)))))
                 (else (cond ((eq? ast #f) '(impc_false))
                             ((eq? ast #t) '(impc_true))
 			    ((eq? ast 'cast) 'bitcast)
@@ -690,7 +700,9 @@
 			     ;(tl (impc:ir:get-type-str t))
 			     (tl (impc:ir:pretty-print-type t)))
 			;(println 'tl: tl)
-			(set! t1 (regex:replace t1 (car (regex:split (symbol->string (car v)) "(##)|(%)")) tl)))
+			(if (null? tl)
+			    (set! t1 (car v))
+			    (set! t1 (regex:replace t1 (car (regex:split (symbol->string (car v)) "(##)|(%)")) tl))))
 		      #f))
 		vars)
       ;(println '------ vs 't2: t1)
@@ -2598,6 +2610,13 @@
       ;(println 'symname: symname 'envvars: envvars 'ast: ast 'prev: prev)
       (if (atom? ast) ast
           (cond ((equal? (car ast) 'make-closure)
+		 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		 ;; these lines just added by AS
+		 (if (and (null? (cdr prev))
+			  (list? (car prev)))
+		     (set! prev (car prev)))
+		 ;; can safely be removed
+		 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                  (list (car ast)
 		       (cadr ast)
                        ;; global name
