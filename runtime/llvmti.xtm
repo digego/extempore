@@ -157,7 +157,7 @@
 	(set! type (impc:ir:get-type-from-pretty-str type)))
     (if (string? name)
 	(set! name (string->symbol name)))
-    (let ((v (assoc name *impc:ti:vtypes*)))
+    (let ((v (assoc-strcmp name *impc:ti:vtypes*)))
       (if v
 	  (if (member type v) #t
 	      (set-cdr! v (cons type (cdr v))))
@@ -177,13 +177,13 @@
 
 (define impc:ti:vtypes
   (lambda (name)
-    (let ((res (assoc name *impc:ti:vtypes*)))
+    (let ((res (assoc-strcmp name *impc:ti:vtypes*)))
       (if res (cdr res)
 	  #f))))
 
 (define impc:ti:vtype-match?
   (lambda (name type)
-    (let ((res (assoc name *impc:ti:vtypes*)))
+    (let ((res (assoc-strcmp name *impc:ti:vtypes*)))
       (if (list? res) (if (member type res) #t #f)
 	  #f))))
 
@@ -745,7 +745,7 @@
           (if (symbol? vs)
 	      (if (impc:ir:gpolytype-types (string->symbol (impc:ir:get-base-type (car (regex:split (car (regex:split (symbol->string vs) "##")) "%"))))) ;"\\$\\$\\$")) "%")))))
 		  (impc:ti:symbol-expand-generic-type vs vars all-vs)		  
-		  (if (not (assoc vs vars)) ;; if not in vars
+		  (if (not (assoc-strcmp vs vars)) ;; if not in vars
 		      (if (regex:match? (symbol->string vs) "^![^#]*$") ;; then check to see if symbol is a !gvar
 			  vs
 			  (print-error 'Compiler 'Error: 'variable 'not 'marked 'as 'free! (symbol->string vs) 'check 'the 'variable 'name 'in 'the 'polytype))
@@ -1141,12 +1141,13 @@
 ;; IS NEW
 (define impc:ti:symbol-check
    (lambda (ast vars kts request?)
+      (if (not (symbol? ast)) (print-error 'Tyring 'to 'symbol 'check 'a 'non-symbol: ast))
       ;(println 'symbolcheck 'ast: ast 'vars: vars 'request: request?)
       (if *impc:ti:print-sub-checks* (println 'sym:> 'ast: ast 'request? request?))
       ;; if a request is made - assume it's forced
       ;; find the intersection between the request
       ;; and the current values and force that intersection
-      (if (and (not (assoc ast vars))
+      (if (and (not (assoc-strcmp ast vars))
 	       (not (llvm:get-function (symbol->string ast)))
                (not (llvm:get-globalvar (symbol->string ast))))
           (print-error 'Compiler 'Error: 'unbound 'symbol: ast))

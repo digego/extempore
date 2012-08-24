@@ -108,7 +108,7 @@
 
 (define impc:ir:add-type-alias
   (lambda (name type)
-    (let ((v (assoc name *impc:ir:type-aliases*)))
+    (let ((v (assoc-strcmp name *impc:ir:type-aliases*)))
       (if v
 	  (begin (set-cdr! v type)
 		 #t)
@@ -117,7 +117,7 @@
 	  
 (define impc:ir:check-type-aliases
   (lambda (base ptr-depth)
-    (let ((res (assoc base *impc:ir:type-aliases*)))
+    (let ((res (assoc-strcmp base *impc:ir:type-aliases*)))
       (if res
 	  (let ((t (impc:ir:get-type-from-pretty-str (cdr res))))
 	    (dotimes (i ptr-depth) (set! t (impc:ir:pointer++ t)))
@@ -136,7 +136,7 @@
 (define impc:ir:add-gpolytype
   (lambda (name type)
     (if (string? type) (set! type (string->symbol type)))
-    (let ((v (assoc name *impc:ir:gpolytypes*)))
+    (let ((v (assoc-strcmp name *impc:ir:gpolytypes*)))
       (if v
 	  (set-cdr! v type)
 	  (set! *impc:ir:gpolytypes* (cons (cons name type) *impc:ir:gpolytypes*)))
@@ -145,9 +145,9 @@
 (define impc:ir:add-polytype
   (lambda (name tname ttype)
     (if (string? ttype) (set! ttype (string->symbol ttype)))
-    (let ((v (assoc name *impc:ir:polytypes*)))
+    (let ((v (assoc-strcmp name *impc:ir:polytypes*)))
       (if v
-	  (let ((p (assoc tname (cdr v))))
+	  (let ((p (assoc-strcmp tname (cdr v))))
 	    (if p		
 		(begin (set-car! (cdr p) ttype) #t)
 		(begin (set-cdr! v (cons (list tname ttype) (cdr v))) #t)))
@@ -157,7 +157,7 @@
 (define impc:ir:gpolytype-types
   (lambda (name)
     (if (string? name) (set! name (string->symbol name)))
-    (let ((res (assoc name *impc:ir:gpolytypes*)))      
+    (let ((res (assoc-strcmp name *impc:ir:gpolytypes*)))      
       (if res
 	  (cdr res)
 	  #f))))
@@ -165,7 +165,7 @@
 
 (define impc:ir:polytype-types
   (lambda (name)
-    (let ((res (assoc name *impc:ir:polytypes*)))
+    (let ((res (assoc-strcmp name *impc:ir:polytypes*)))
       (if res
 	  (map (lambda (p)
 		 (cadr p))
@@ -194,7 +194,7 @@
   (lambda (name ttype)
     (if (string? ttype)
 	(set! ftype (impc:ir:get-type-from-pretty-str ttype)))
-    (let ((res (assoc name *impc:ir:polytypes*)))
+    (let ((res (assoc-strcmp name *impc:ir:polytypes*)))
       (if res
 	  (let* ((r2 (map (lambda (p)
 			    ;(println 'ftype: ftype 'p: p)
@@ -233,7 +233,7 @@
     (let* ((res (regex:split (symbol->string (cadr code)) ":"))
 	   (name (string->symbol (car res)))
 	   (ftype (string->symbol (cadr res))))
-      (let ((v (assoc name *impc:ir:gpolys*)))
+      (let ((v (assoc-strcmp name *impc:ir:gpolys*)))
 	(if v
 	    (set-cdr! v (list ftype code))
 	    (set! *impc:ir:gpolys* (cons (list name ftype code) *impc:ir:gpolys*)))
@@ -243,9 +243,9 @@
   (lambda (name fname ftype)
     (if (string? ftype)
 	(set! ftype (impc:ir:get-type-from-pretty-str ftype)))
-    (let ((v (assoc name *impc:ir:polys*)))
+    (let ((v (assoc-strcmp name *impc:ir:polys*)))
       (if v
-	  (let ((p (assoc fname (cdr v))))
+	  (let ((p (assoc-strcmp fname (cdr v))))
 	    (if p		
 		(begin (set-car! (cdr p) ftype) #t)
 		(begin (set-cdr! v (cons (list fname ftype) (cdr v))) #t)))
@@ -254,7 +254,7 @@
 
 (define impc:ir:gpoly-types
   (lambda (name)
-    (let ((res (assoc name *impc:ir:gpolys*)))
+    (let ((res (assoc-strcmp name *impc:ir:gpolys*)))
       (if res
 	  (cdr res)
 	  #f))))
@@ -262,7 +262,7 @@
 
 (define impc:ir:poly-types
   (lambda (name)
-    (let ((res (assoc name *impc:ir:polys*)))
+    (let ((res (assoc-strcmp name *impc:ir:polys*)))
       (if res
 	  (map (lambda (p)
 		 (cadr p))
@@ -301,7 +301,7 @@
   (lambda (name ftype)
     (if (string? ftype)
 	(set! ftype (impc:ir:get-type-from-pretty-str ftype)))
-    (let ((res (assoc name *impc:ir:polys*)))
+    (let ((res (assoc-strcmp name *impc:ir:polys*)))
       (if res
 	  (let* ((r2 (map (lambda (p)
 			    ;(println 'ftype: ftype 'p: p)
