@@ -4897,7 +4897,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
 	  return sc->F;
 	}      	
       }
-    } else {
+    } else if(is_string(key)) {
       skey = strvalue(key);
       for (x = lst; is_pair(x); x = cdr(x)) {
 	pair = pair_car_sc(sc,x);
@@ -4910,6 +4910,10 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
 	  return sc->F;
 	}      	
       }      
+    } else {
+      // it not neccessarily a problem for the key to be a non-symbol/string
+      // although it should return false of course
+      // which it does after falling through to the final return
     }
     return sc->F;
 }
