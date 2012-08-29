@@ -288,8 +288,34 @@
 	(printf "]\n")
 	void))))
 
+;; 'pretty' print matrix (i64)
+(bind-func mprinti64
+  (lambda (m:i64* r:i64 c:i64)
+    (let ((i 0) (j 0))
+      (dotimes (i r)
+	(printf "[")
+	(printf "% lld" (pref m (* i c)))
+	(dotimes (j (- c 1))
+	  (printf ",% lld" (pref m (+ 1 j (* i c)))))
+	(printf "]\n")
+	void))))
+
+;; 'pretty' print matrix (i32)
+(bind-func mprinti32
+  (lambda (m:i32* r:i64 c:i64)
+    (let ((i 0) (j 0))
+      (dotimes (i r)
+	(printf "[")
+	(printf "% d" (pref m (* i c)))
+	(dotimes (j (- c 1))
+	  (printf ",% d" (pref m (+ 1 j (* i c)))))
+	(printf "]\n")
+	void))))
+
 (bind-poly mprint mprintd)
 (bind-poly mprint mprintf)
+(bind-poly mprint mprinti64)
+(bind-poly mprint mprinti32)
 
 ;; matrix multiplication (doubles)
 (bind-func mmuld
@@ -327,9 +353,46 @@
 		       r1 c1 r2 c2)
 	       (cast null float*)))))
 
+;; matrix multiplication (i64)
+(bind-func mmuli64
+  (lambda (ma:i64* r1:i64 c1:i64 mb:i64* r2:i64 c2:i64 mc:i64*)
+    (if (= c1 r2)
+	(let ((r 0) (c 0) (k 0))
+	  (dotimes (r r1)
+	    (dotimes (c c2)
+	      (pset! mc (+ c (* r c2)) 0)
+	      (dotimes (k c1)
+		(pset! mc (+ c (* r c2))
+		       (+ (pref mc (+ c (* r c2)))
+			  (* (pref ma (+ k (* r c1)))
+			     (pref mb (+ (* k c2) c))))))))
+	  mc)
+	(begin (printf "bad matrix multiplication [%lld,%lld]*[%lld,%lld]\n"
+		       r1 c1 r2 c2)
+	       (cast null i64*)))))
+
+;; matrix multiplication (i32)
+(bind-func mmuli32
+  (lambda (ma:i32* r1:i64 c1:i64 mb:i32* r2:i64 c2:i64 mc:i32*)
+    (if (= c1 r2)
+	(let ((r 0) (c 0) (k 0))
+	  (dotimes (r r1)
+	    (dotimes (c c2)
+	      (pset! mc (+ c (* r c2)) 0)
+	      (dotimes (k c1)
+		(pset! mc (+ c (* r c2))
+		       (+ (pref mc (+ c (* r c2)))
+			  (* (pref ma (+ k (* r c1)))
+			     (pref mb (+ (* k c2) c))))))))
+	  mc)
+	(begin (printf "bad matrix multiplication [%lld,%lld]*[%lld,%lld]\n"
+		       r1 c1 r2 c2)
+	       (cast null i32*)))))
+
 (bind-poly mmul mmuld)
 (bind-poly mmul mmulf)
-
+(bind-poly mmul mmuli64)
+(bind-poly mmul mmuli32)
 
 ;; matrix transposition (doubles)
 (bind-func mtransd
