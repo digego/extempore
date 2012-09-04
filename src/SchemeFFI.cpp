@@ -3307,8 +3307,12 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     //NSOpenGLContext *ctx = _openGLContext = [[NSOpenGLContext alloc] initWithFormat:fmt shareContext:nil];
     NSOpenGLView* view = [[NSOpenGLView alloc] initWithFrame:screenRect pixelFormat:fmt];
     
-    int windowStyleMask = NSTitledWindowMask;
-    if(fullscrn) windowStyleMask = NSBorderlessWindowMask;
+    int windowStyleMask;
+    if(fullscrn){
+      windowStyleMask = NSBorderlessWindowMask;
+    }else{
+      windowStyleMask = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask;
+    }
     NSWindow* window = [[NSWindow alloc] initWithContentRect:screenRect
     	      styleMask:windowStyleMask
     	      backing:NSBackingStoreBuffered
@@ -3322,8 +3326,8 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       [window setHasShadow:NO];
       [window makeKeyAndOrderFront:nil];
     }else{	
-      [window setTitle:@"OpenGL Window"];
-      [window orderFront:nil];				
+      [window setTitle:@"Extempore OpenGL Window"];
+      [window makeKeyAndOrderFront:nil];				
     }	
     
     [window display];	
