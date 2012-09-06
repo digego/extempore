@@ -10,28 +10,31 @@
 
 ;;; Code:
 
-(define hordelib (if (string=? "Linux" (sys:platform))
-		     (sys:open-dylib "libHorde3D.so")
-		     (if (string=? "Windows" (sys:platform))
-			 (sys:open-dylib "Horde3D.dll")
-			 (sys:open-dylib "Horde3D.framework/Horde3D"))))
+;; set the path to the Horde3D directory
+
+(define hordelib
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libHorde3D.so"))
+          ((string=? platform "Windows") (sys:open-dylib "Horde3D.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "/Library/Frameworks/Horde3D.framework/Horde3D"))
+          (else (print "Unknown platform: " platform)))))
 
 (if (or (eq? #f hordelib)
 	(not hordelib)) 
-    (print-error "Could not load 'Horde3d' dynamic library"))
+    (print-error "Could not load 'Horde3D' dynamic library"))
 
-
-(define hordeutlib (if (string=? "Linux" (sys:platform))
-		       (sys:open-dylib "libHorde3DUtils.so")
-		       (if (string=? "Windows" (sys:platform))
-			   (sys:open-dylib "Horde3DUtils.dll")
-			   (sys:open-dylib "Horde3DUtils.framework/Horde3DUtils"))))
+(define hordeutlib
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libHorde3DUtils.so"))
+          ((string=? platform "Windows") (sys:open-dylib "Horde3DUtils.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "/Library/Frameworks/Horde3DUtils.framework/Horde3DUtils"))
+          (else (print "Unknown platform: " platform)))))
 
 (if (or (eq? #f hordeutlib)
 	(not hordeutlib)) 
-    (print-error "Could not load 'Horde3d' dynamic library"))
+    (print-error "Could not load 'Horde3DUtils' dynamic library"))
 
-(define new-horde #t)
+(define new-horde #f)
 
 (if new-horde
     (begin
@@ -41,7 +44,7 @@
     (begin
       (bind-lib hordelib h3dAdvanceEmitterTime [void,i32,float]*)
       ))
-    
+
 ;; horde primary
 (bind-lib hordelib h3dInit [i1]*)
 (bind-lib hordelib h3dRelease [void]*)

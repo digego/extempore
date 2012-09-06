@@ -266,30 +266,77 @@
 
 ;; 'pretty' print matrix (doubles)
 (bind-func mprintd
-  (lambda (m:double* r:i64 c:i64)
-    (let ((i 0) (j 0))
-      (dotimes (i r)
-	(printf "[")
-	(printf "% f" (pref m (* i c)))
-	(dotimes (j (- c 1))
-	  (printf ",% f" (pref m (+ 1 j (* i c)))))
-	(printf "]\n")
-	void))))
+  (lambda (m:double* r:i64 c:i64 col_major:i1)
+    (let ((i 0) (j 0)
+          ;; helper closure for calculating offset
+          (idx (if col_major
+                   (lambda (x2:i64 y2:i64)
+                     (+ (* x2 c) y2))
+                   (lambda (x1:i64 y1:i64)
+                     (+ x1 (* y1 r))))))
+      (dotimes (j c)
+        (printf "[")
+        (dotimes (i r)
+          (printf " %f" (pref m (idx i j))))
+        (printf " ]\n")
+        void))))
 
 ;; 'pretty' print matrix (floats)
 (bind-func mprintf
-  (lambda (m:float* r:i64 c:i64)
-    (let ((i 0) (j 0))
-      (dotimes (i r)
-	(printf "[")
-	(printf "% f" (ftod (pref m (* i c))))
-	(dotimes (j (- c 1))
-	  (printf ",% f" (ftod (pref m (+ 1 j (* i c))))))
-	(printf "]\n")
-	void))))
+  (lambda (m:float* r:i64 c:i64 col_major:i1)
+    (let ((i 0) (j 0)
+          ;; helper closure for calculating offset
+          (idx (if col_major
+                   (lambda (x2:i64 y2:i64)
+                     (+ (* x2 c) y2))
+                   (lambda (x1:i64 y1:i64)
+                     (+ x1 (* y1 r))))))
+      (dotimes (j c)
+        (printf "[")
+        (dotimes (i r)
+          (printf " %f" (ftod (pref m (idx i j)))))
+        (printf " ]\n")
+        void))))
+
+;; 'pretty' print matrix (i64)
+(bind-func mprinti64
+  (lambda (m:i64* r:i64 c:i64 col_major:i1)
+    (let ((i 0) (j 0)
+          ;; helper closure for calculating offset
+          (idx (if col_major
+                   (lambda (x2:i64 y2:i64)
+                     (+ (* x2 c) y2))
+                   (lambda (x1:i64 y1:i64)
+                     (+ x1 (* y1 r))))))
+      (dotimes (j c)
+        (printf "[")
+        (dotimes (i r)
+          (printf "% lld" (pref m (idx i j))))
+        (printf " ]\n")
+        void))))
+
+;; 'pretty' print matrix (i32)
+(bind-func mprinti32
+  (lambda (m:i32* r:i64 c:i64 col_major:i1)
+    (let ((i 0) (j 0)
+          ;; helper closure for calculating offset
+          (idx (if col_major
+                   (lambda (x2:i64 y2:i64)
+                     (+ (* x2 c) y2))
+                   (lambda (x1:i64 y1:i64)
+                     (+ x1 (* y1 r))))))
+      (dotimes (j c)
+        (printf "[")
+        (dotimes (i r)
+          (printf " %d" (pref m (idx i j))))
+        (printf " ]\n")
+        void))))
+
 
 (bind-poly mprint mprintd)
 (bind-poly mprint mprintf)
+(bind-poly mprint mprinti64)
+(bind-poly mprint mprinti32)
 
 ;; matrix multiplication (doubles)
 (bind-func mmuld
@@ -327,9 +374,46 @@
 		       r1 c1 r2 c2)
 	       (cast null float*)))))
 
+;; matrix multiplication (i64)
+(bind-func mmuli64
+  (lambda (ma:i64* r1:i64 c1:i64 mb:i64* r2:i64 c2:i64 mc:i64*)
+    (if (= c1 r2)
+	(let ((r 0) (c 0) (k 0))
+	  (dotimes (r r1)
+	    (dotimes (c c2)
+	      (pset! mc (+ c (* r c2)) 0)
+	      (dotimes (k c1)
+		(pset! mc (+ c (* r c2))
+		       (+ (pref mc (+ c (* r c2)))
+			  (* (pref ma (+ k (* r c1)))
+			     (pref mb (+ (* k c2) c))))))))
+	  mc)
+	(begin (printf "bad matrix multiplication [%lld,%lld]*[%lld,%lld]\n"
+		       r1 c1 r2 c2)
+	       (cast null i64*)))))
+
+;; matrix multiplication (i32)
+(bind-func mmuli32
+  (lambda (ma:i32* r1:i64 c1:i64 mb:i32* r2:i64 c2:i64 mc:i32*)
+    (if (= c1 r2)
+	(let ((r 0) (c 0) (k 0))
+	  (dotimes (r r1)
+	    (dotimes (c c2)
+	      (pset! mc (+ c (* r c2)) 0)
+	      (dotimes (k c1)
+		(pset! mc (+ c (* r c2))
+		       (+ (pref mc (+ c (* r c2)))
+			  (* (pref ma (+ k (* r c1)))
+			     (pref mb (+ (* k c2) c))))))))
+	  mc)
+	(begin (printf "bad matrix multiplication [%lld,%lld]*[%lld,%lld]\n"
+		       r1 c1 r2 c2)
+	       (cast null i32*)))))
+
 (bind-poly mmul mmuld)
 (bind-poly mmul mmulf)
-
+(bind-poly mmul mmuli64)
+(bind-poly mmul mmuli32)
 
 ;; matrix transposition (doubles)
 (bind-func mtransd
