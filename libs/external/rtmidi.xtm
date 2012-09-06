@@ -1,0 +1,184 @@
+;;; rtmidi.xtm -- MIDI support for Extempore
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: rtmidi
+
+;;; Commentary:
+
+;; The rtmidi library is a cross-platform MIDI library by Gary P.
+;; Scavone.
+
+;; Source and documentation for the rtmidi library is available at
+;; http://music.mcgill.ca/~gary/rtmidi/
+
+;; Because rtmidi is a C++ library (and Extempore can only bind C libs
+;; at this stage), there is a project called CRtMidi which wraps
+;; (part) of the rtmidi API in a C interface. This interface is then
+;; bound dynamically in xtlang---that's what this file is for.
+
+;; to compile:
+;; clang++ -dynamiclib -Wall -D__MACOSX_CORE__ -o librtmidi.dylib RtMidi-C-Api.cpp -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
+
+;;; Code:
+
+(define librtmidi
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "librtmidi.so"))
+          ((string=? platform "Windows") (sys:open-dylib "librtmidi.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "librtmidi.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+(if (not librtmidi)
+    (print-error "Could not load librtmidi dynamic library"))
+
+;; bindings (see RtMidi.h)
+
+;; UNSPECIFIED,    /* Search for a working compiled API. */
+;; MACOSX_CORE,    /* Macintosh OS-X Core Midi API. */
+;; LINUX_ALSA,     /* The Advanced Linux Sound Architecture API. */
+;; UNIX_JACK,      /* The Jack Low-Latency MIDI Server API. */
+;; WINDOWS_MM,     /* The Microsoft Multimedia MIDI API. */
+;; WINDOWS_KS,     /* The Microsoft Kernel Streaming MIDI API. */
+;; RTMIDI_DUMMY    /* A compilable but non-functional API. */
+
+(bind-val RTMIDI_NOERROR i32 0)
+(bind-val RTMIDI_ERROR i32 1)
+
+(define *midi-note-off* 8)
+(define *midi-note-on* 9)
+
+(bind-val MIDI_NOTE_OFF i8 *midi-note-off*)
+(bind-val MIDI_NOTE_ON i8 *midi-note-on*)
+
+;; API enums
+
+(bind-val UNSPECIFIED i32 0)
+(bind-val MACOSX_CORE i32 1)
+(bind-val LINUX_ALSA  i32 2)
+(bind-val UNIX_JACK   i32 3)
+(bind-val WINDOWS_MM  i32 4)
+(bind-val WINDOWS_KS  i32 5)
+(bind-val RTMIDI_DUMMY i32 6)
+
+(bind-type midi_in_device <i8*>)
+(bind-type midi_out_device <i8*>)
+(bind-alias midi_callback [i8*,double,i64,i8*]*)
+
+;; midi input
+
+(bind-lib librtmidi newMidiInDevice [i32,midi_in_device*,i32,i8*]*)
+(bind-lib librtmidi deleteMidiInDevice [i32,midi_in_device*]*)
+
+(bind-lib librtmidi getInCurrentApi [i64,midi_in_device*]*)
+(bind-lib librtmidi getInPortCount [i64,midi_in_device*]*)
+(bind-lib librtmidi getInPortName [i8*,midi_in_device*,i64]*)
+
+(bind-lib librtmidi openInPort [i32,midi_in_device*,i64,i8*]*)
+(bind-lib librtmidi openInVirtualPort [i32,midi_in_device*,i8*]*)
+(bind-lib librtmidi closeInPort [i32,midi_in_device*]*)
+
+(bind-lib librtmidi setCallback [i32,midi_in_device*,i8*]*)
+(bind-lib librtmidi cancelCallback [i32,midi_in_device*]*)
+
+;; midi output
+
+(bind-lib librtmidi newMidiOutDevice [i32,midi_out_device*,i32,i8*]*)
+(bind-lib librtmidi deleteMidiOutDevice [i32,midi_out_device*]*)
+
+(bind-lib librtmidi getOutCurrentApi [i64,midi_out_device*]*)
+(bind-lib librtmidi getOutPortCount [i64,midi_out_device*]*)
+(bind-lib librtmidi getOutPortName [i8*,midi_out_device*,i64]*)
+
+(bind-lib librtmidi openOutPort [i32,midi_out_device*,i64,i8*]*)
+(bind-lib librtmidi openOutVirtualPort [i32,midi_out_device*,i8*]*)
+(bind-lib librtmidi closeOutPort [i32,midi_out_device*]*)
+(bind-lib librtmidi sendMessage [i32,midi_out_device*,i64,i8*]*)
+
+;; poly'ing
+
+(bind-poly newMidiDevice newMidiInDevice)
+(bind-poly newMidiDevice newMidiOutDevice)
+(bind-poly deleteMidiDevice deleteMidiInDevice)
+(bind-poly deleteMidiDevice deleteMidiOutDevice)
+(bind-poly getCurrentApi getInCurrentApi)
+(bind-poly getCurrentApi getOutCurrentApi)
+(bind-poly getPortCount getInPortCount)
+(bind-poly getPortCount getOutPortCount)
+(bind-poly getPortName getInPortName)
+(bind-poly getPortName getOutPortName)
+(bind-poly openPort openInPort)
+(bind-poly openPort openOutPort)
+(bind-poly openVirtualPort openInVirtualPort)
+(bind-poly openVirtualPort openOutVirtualPort)
+(bind-poly closePort closeInPort)
+(bind-poly closePort closeOutPort)
+
+;;  set up some input/output ports
+
+(bind-func query_in_ports
+  (lambda (dev:midi_in_device*)
+    (let ((num_ports (getPortCount dev))
+          (i:i64 0))
+      (dotimes (i num_ports)
+        (printf "Port %lld: %s\n" i (getPortName dev i)))
+      (printf "\n")
+      void)))
+
+(bind-func query_out_ports
+  (lambda (dev:midi_out_device*)
+    (let ((num_ports (getPortCount dev))
+          (i:i64 0))
+      (dotimes (i num_ports)
+        (printf "Port %lld: %s\n" i (getPortName dev i)))
+      (printf "\n")
+      void)))
+
+(bind-poly query_ports query_in_ports)
+(bind-poly query_ports query_out_ports)
+
+(bind-func midi_in
+  (let ((device:midi_in_device* (zalloc)))
+    (newMidiDevice device UNSPECIFIED "Extempore Virtual Midi Input")
+    (openVirtualPort device "Extempore Input")
+    (lambda ()
+      device)))
+
+(bind-func midi_out
+  (let ((device:midi_out_device* (zalloc)))
+    (newMidiOutDevice device UNSPECIFIED "Extempore Midi Output")
+    ;; (openVirtualPort device "Ben Port")
+    (openPort device 2 "Extempore Output")
+    (lambda ()
+      device)))
+
+(query_in_ports (midi_in))
+(query_out_ports (midi_out))
+
+;; testing
+
+(bind-func midi_callback
+  (let ((type:i8 0) (chan:i8 0) (a:i8 0) (b:i8 0))
+    (lambda (time:double len:i64 msg:i8*)
+      (set! type (>> (pref msg 0) 4))
+      (set! chan (& (pref msg 0) 15))
+      (set! a (pref msg 1))
+      (set! b (pref msg 2))
+      (printf "time = %f\ntype = %u\nchan = %u\na = %u\nb = %u\n---------------\n"
+              time (i8toi32 type) (i8toi32 chan) (i8toi32 a) (i8toi32 b))
+      void)))
+
+(bind-func register_midi_callback
+  (lambda ()
+    (setCallback (midi_in) (llvm_get_function_ptr "midi_callback_native"))))
+
+(register_midi_callback)
+
+(bind-func send_midi
+  (lambda (dev:midi_out_device* type chan a b)
+    (let ((msg:i8* (salloc 3)))
+      (pfill! msg (+ (<< type 4) chan) a b)
+      (sendMessage dev 3 msg))))
+
+(send_midi (midi_out) *midi-note-on* 0 60 80)
+(send_midi (midi_out) *midi-note-off* 0 60 80)
