@@ -81,17 +81,64 @@
 (define *impc:ir:ls_var* '())
 
 
+;; ;; GCHANGE
+;; ;; removes %b when returning base types (i.e. !head%b returns !head)
+;; (define impc:ir:get-base-type-g
+;;    (lambda (str)
+;;       (let* ((r1 (impc:ir:get-ptr-depth str))
+;;              (r2 (string-append "^([^%]*)%*[a-z]*" (apply string-append (make-list r1 "\\*")) "$")))
+;; 	;; (println str r2 "$1")
+;; 	(regex:replace str r2 "$1"))))
+
+;; ;; GCHANGE
+;; ;; does not remove %b when returning base types (i.e. !head%b returns !head%b
+;; (define impc:ir:get-base-type
+;;    (lambda (str)
+;;       (let* ((r1 (impc:ir:get-ptr-depth str))
+;;              (r2 (string-append "^(.*)" (apply string-append (make-list r1 "\\*")) "$")))
+;; 	;; (println str r2 "$1")
+;; 	(regex:replace str r2 "$1"))))
+
+
+;; GCHANGE
+;; removes %b when returning base types (i.e. !head%b returns !head)
+(define impc:ir:get-base-type-g
+   (lambda (str)
+      (let* ((r1 (car (regex:split str "##")))
+	     (r2 (impc:ir:get-ptr-depth r1))
+             (r3 (string-append "^([^%]*)%*[a-z]*" (apply string-append (make-list r2 "\\*")) "$")))
+	;; (println str r2 "$1")
+	(regex:replace r1 r3 "$1"))))
+
+
+;; GCHANGE
+;; does not remove %b when returning base types (i.e. !head%b returns !head%b
 (define impc:ir:get-base-type
    (lambda (str)
-      (let* ((r1 (impc:ir:get-ptr-depth str))
-             (r2 (string-append "^(.*)" (apply string-append (make-list r1 "\\*")) "$")))
-         (regex:replace str r2 "$1"))))
+      (let* ((r1 (car (regex:split str "##")))
+	     (r2 (impc:ir:get-ptr-depth r1))
+             (r3 (string-append "^(.*)" (apply string-append (make-list r2 "\\*")) "$")))
+	;; (println str r2 "$1")
+	(regex:replace r1 r3 "$1"))))
+
+
 
 (define impc:ir:get-ptr-depth
    (lambda (t)
       (if (string? t)
           (string-length (car (regex:matched t "([*]*)$")))
           (floor (/ (impc:ir:str-list-check t) *impc:ir:pointer*)))))
+
+
+(define impc:ir:get-ptr-depth
+   (lambda (t)
+      (if (string? t)
+          (string-length (car (regex:matched t "([*]*)$")))
+	  (let ((slc (impc:ir:str-list-check t)))	    
+	    ;(println 't: t 'slc: slc)
+	    (if (string? slc)
+		(impc:ir:get-ptr-depth slc)
+		(floor (/ (impc:ir:str-list-check slc) *impc:ir:pointer*)))))))
 
 (define impc:ir:clean-named-type
   (lambda (str)
@@ -374,9 +421,10 @@
 
 (define impc:ir:pretty-print-type
    (lambda (t)
-      ;(println 't-: t)
+      ;; (println 'type: t)
       (if (null? t)
-	  (print-error 'Compiler 'Error: 'trying 'to 'print 'null 'type!)
+	  (begin (println 'error 'trying 'to 'prettyprint 'null 'type: t) (error))
+	  ;(print-error 'Compiler 'Error: 'trying 'to 'print 'null 'type!)
 	  (if (string? t)
 	      (if (and (char=? (string-ref t 0) #\%)
 		       (not (null? (llvm:get-named-type (substring (impc:ir:get-base-type t) 1 (string-length (impc:ir:get-base-type t)))))))
@@ -464,6 +512,8 @@
 ;; 				  (if res res
 ;; 				      (print-error 'Compiler 'Error: 'cannot 'find 'type 'for string-type)))))))))))
 
+(define impc:ir:get-type-expand-poly #t)
+
 ;; now with pretty print support
 (define impc:ir:get-type-from-pretty-str
    (lambda (string-type . args)
@@ -506,31 +556,33 @@
 	       ((regex:match? base "!") (string->symbol base))	       
 	       ((or (impc:ir:gpolytype-types base)
 		    (impc:ir:gpolytype-types (car (regex:split base "%"))))
-		(let* ((sb (regex:split base "%"))
-		       (base2 (car sb))
-		       (extended (if (> (length sb) 1) (cadr sb) #f)))
+		(if impc:ir:get-type-expand-poly
+		    (let* ((sb (regex:split base "%"))
+			   (base2 (car sb))
+			   (extended (if (> (length sb) 1) (cadr sb) #f)))
 					;(string->symbol string-type))
-		  ;(println 'ppbase: base2 'string-type: string-type 'gtype: (impc:ir:gpolytype-types base2))
-		  (if (and (not (null? args))
-			   (string=? (car args) base2))
-		      (string->symbol string-type)
-		      (let ((type (impc:ir:get-type-from-pretty-str
-				   (apply string-append (symbol->string (impc:ir:gpolytype-types base2))
-					  (make-list-with-proc ptr-depth (lambda (i) "*")))
-				   base2)))
-			;(println 'type: type 'base: base 'base2: base2)
-			(if extended
-			    (map (lambda (k)
-				   ;(println 'k: k extended)
-				   (if (and (symbol? k)
-					    (regex:match? (symbol->string k) "!"))
-				       (string->symbol (string-append (symbol->string k) "%" extended))
+					;(println 'ppbase: base2 'string-type: string-type 'gtype: (impc:ir:gpolytype-types base2))
+		      (if (and (not (null? args))
+			       (string=? (car args) base2))
+			  (string->symbol string-type)
+			  (let ((type (impc:ir:get-type-from-pretty-str
+				       (apply string-append (symbol->string (impc:ir:gpolytype-types base2))
+					      (make-list-with-proc ptr-depth (lambda (i) "*")))
+				       base2)))
+					;(println 'type: type 'base: base 'base2: base2)
+			    (if extended
+				(map (lambda (k)
+					;(println 'k: k extended)
 				       (if (and (symbol? k)
-						(string=? (impc:ir:get-base-type (symbol->string k)) base2))
-					   (string->symbol string-type)
-					   k)))
-				 type)
-			    type)))))
+						(regex:match? (symbol->string k) "!"))
+					   (string->symbol (string-append (symbol->string k) "%" extended))
+					   (if (and (symbol? k)
+						    (string=? (impc:ir:get-base-type (symbol->string k)) base2))
+					       (string->symbol string-type)
+					       k)))
+				     type)
+				type))))
+		    (string->symbol string-type)))
 	       ((or (not (null? (llvm:get-named-type base)))
 		    (and (not (null? args))
 			 (equal? string-type (car args))))
@@ -651,6 +703,9 @@
 	    ((and (char=? (string-ref base 0) #\%)
 		  (not (null? (llvm:get-named-type (substring base 1 (string-length base))))))
 	     string-type)
+	    ((assoc-strcmp (string->symbol string-type) *impc:ti:generic-type-mappings*)
+	     (impc:ir:get-type-from-str (cdr (assoc-strcmp (string->symbol string-type) *impc:ti:generic-type-mappings*))))
+	    ;; ((regex:match? string-type "##") string-type)
 	    (else (let loop ((i -1))
 		    (if (string=? base (impc:ir:get-type-str i string-type))
 			(+ i offset)
@@ -725,7 +780,11 @@
 	     (if (and (char=? (string-ref type 0) #\%)
 		      (not (null? (llvm:get-named-type (substring (impc:ir:get-base-type type) 1 (string-length (impc:ir:get-base-type type)))))))
 		 type
-		 (impc:ir:str-list-check (impc:ir:get-type-from-str type))))	     
+		 (if (and (char=? (string-ref type 0) #\!))
+		     (impc:ir:str-list-check (impc:ir:get-type-from-str type))
+		     (if (assoc type *impc:ti:generic-type-mappings*)
+			 (cdr (assoc type *impc:ti:generic-type-mappings*))
+			 type))))
             ((list? type) ; complex type
              (cond ((impc:ir:closure? (car type)) (car type))
                    ((impc:ir:tuple? (car type)) (car type))

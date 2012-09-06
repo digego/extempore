@@ -3252,17 +3252,30 @@ inline pointer slot_value_in_env(pointer slot)
 
 
 /* ========== Evaluation Cycle ========== */
-static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int errnum) {	
+static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int errnum) {
     // closure stack trace
     int cnt = 0;
     char* fname = (char*) "toplevel";
     char* current = 0;	
     std::stringstream sss;
     if(is_symbol(sc->last_symbol_apply)) {
-	fname = symname_sc(sc,sc->last_symbol_apply);		
-	current = symname_sc(sc,sc->last_symbol_apply);				
+	fname = symname_sc(sc,sc->last_symbol_apply);
+	current = symname_sc(sc,sc->last_symbol_apply);
 	sss << symname_sc(sc,sc->last_symbol_apply);
     }
+
+    if(current==0) {
+      while(!sc->applied_symbol_names->empty() && cnt<10)
+	{
+	  pointer item = sc->applied_symbol_names->top();
+	  std::stringstream ss;
+	  extemp::UNIV::printSchemeCell(sc, ss, item, true);			
+	  std::cout << "stack-catch: " << ss.str() << std::endl; 
+	  cnt++;
+	  sc->applied_symbol_names->pop();		
+	}
+    }    
+
     while(!sc->applied_symbol_names->empty() && cnt<10 && current != 0)
     {
 	pointer item = sc->applied_symbol_names->top();
@@ -5907,13 +5920,7 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
 				i+1,
 				tests[j].kind,
 				ss.str().c_str());
-						
-//						ss << "\n ---- Code ----- \n";
-//						imp::SchemeInterface::printSchemeCell(sc, ss, sc->code);
-//						ss << "\n ---- Environ ---- \n";
-//						imp::SchemeInterface::printSchemeCell(sc, ss, sc->envir);
-//						std::cout << "ERROR: " << pcd->name << ": argument " << i+1 << " must be " << tests[j].kind << "  args: " << ss.str() << std::endl;
-			/////////						
+			///////// 
 		    }
 		}
 	    }

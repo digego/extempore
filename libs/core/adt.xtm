@@ -1,0 +1,178 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Extempore's native data types library
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;
+;; pairs
+
+(bind-type xpair_t <!first,!second>)
+
+(bind-func xpair:[xpair_t*,!first,!second]*
+  (lambda (a b)
+    (let ((pair (halloc)))
+      (tset! pair 0 a)
+      (tset! pair 1 b)
+      pair)))    
+
+(bind-func xfirst:[!first,xpair_t*]*	   
+  (lambda (a)
+    (tref a 0)))
+
+(bind-func xsecond:[!second,xpair_t*]*	   
+  (lambda (a)
+    (tref a 1)))
+
+;;;;;;;;;;;;;;;;;;;;
+;;
+;; lists
+
+(bind-type xlist <!head,xlist*>)
+
+(bind-func xjoin:[xlist*,!head,xlist*]*
+  (lambda (a b)
+    (let ((pair (halloc)))
+      (tset! pair 0 a)
+      (tset! pair 1 b)
+      pair)))
+
+(bind-func xhead:[!head,xlist*]*
+  (lambda (a)
+    (tref a 0)))
+
+(bind-func xtail:[xlist*,xlist*]*
+  (lambda (a)
+    (tref a 1)))
+
+;; macro list builder
+(define-macro (xlist . args)
+  (let loop ((lst args))
+    (if (null? lst)
+	'null
+	`(xjoin ,(car lst) ,(loop (cdr lst))))))
+
+(bind-func xlength:[i64,xlist*]*
+  (lambda (a)    
+    (if (null? a)
+	0
+	(+ 1 (xlength (xtail a))))))
+
+(bind-func xmap:[xlist%a*,[!head%a,!head%b]*,xlist%b*]*
+  (lambda (func lst)
+    (let ((f (lambda (l)
+	       (if (null? l)
+		   null
+		   (xjoin (func (xhead l)) (f (xtail l)))))))
+      (f lst))))
+
+
+
+(bind-func test1
+  (lambda ()
+    (let ((l1 (xjoin 1.0 null)))
+      (xmap (lambda (i) 
+	      (* i 2.0)) 
+	    l1))))
+
+
+(bind-func test2
+  (lambda ()
+    (let ((l1 (xlist 1.0 2.0 3.0 4.0)))
+      (xmap (lambda (i) 
+	      (printf "%f\n" (* i 2.0)))
+	    l1))))
+
+(test2)
+
+
+(bind-func test3
+  (lambda ()
+    (let ((l1 (xlist 1 2 3 4)))
+      (xmap (lambda (i) 
+	      (* i (xlength l1)))
+	    l1))))
+
+
+(bind-func test4
+  (lambda ()
+    (let ((l1 (xlist "andrew" "ben" "torben")))
+      (xmap (lambda (i)
+	      (if (= (strcmp i "andrew") 0)
+		  (printf "%s rocks\n" i)
+		  (printf "%s sucks\n" i)))
+	    l1))))
+
+(test4)
+
+
+(bind-func test5
+  (lambda ()
+    (let ((l1 (xlist (xlist "andrew" "london") 
+		     (xlist "ben" "new york")
+		     (xlist "torben" "moscow"))))
+      (xmap (lambda (i)
+	      (printf "%s rocks\n" (xhead i)))
+	    l1))))
+
+(test5)
+
+
+(bind-func test6
+  (lambda ()
+    (let ((l1 (xlist (xlist "andrew" "london") (xlist "ben" "new york") (xlist "torben" "moscow"))))
+      (xmap (lambda (i)
+	      (if (= (strcmp (xhead i) "andrew") 0)
+		  (printf "%s rocks %s\n" (xhead i) (xhead (xtail i)))
+		  (printf "%s sucks %s\n" (xhead i) (xhead (xtail i)))))
+	    l1))))
+
+(test6)
+
+
+(bind-func test7
+  (lambda ()
+    (let ((l1 (xlist (xlist "andrew" "london") 
+		     (xlist "ben" "new york") 
+		     (xlist "torben" "moscow"))))
+      (xmap (lambda (i)
+	      (xmap (lambda (k:i8*) 
+	      	      (printf "\t::%s\n" k))
+	      	    i)
+	      (if (= (strcmp (xhead i) "andrew") 0)
+	      	  (printf "%s rocks %s\n" (xhead i) (xhead (xtail i)))
+	      	  (printf "%s sucks %s\n" (xhead i) (xhead (xtail i))))
+	      (i64toi32 1))
+	    l1))))
+
+(test7)
+
+
+(bind-func test8
+  (lambda ()
+    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben"))))
+      l1)))
+
+
+(bind-func test9
+  (lambda ()
+    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben"))))
+      (xhead l1))))
+
+(bind-func test10
+  (lambda ()
+    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben")))
+	  (l2 (xhead l1)))
+      (printf "%s\n" (tref (xhead l1) 1))
+      l1)))
+
+(test10)
+
+(bind-func test11
+  (lambda ()
+    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben")))
+	  (l2 (xhead l1)))
+      (printf "%s\n" (xsecond (xhead (xtail l1))))
+      l1)))
+
+(test11)
