@@ -260,29 +260,36 @@
 
 ;; as a start, here are a couple of parser functions which might be useful:
 
+(define note-name-to-midi-number
+  (lambda (name)
+    (let ((result (regex:matched name "([ABCDEFG])([#b])?(-?[0-9])")))
+        (if (null? result)
+            #f
+            (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                  (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                        ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+              (+ offset pc
+                 (cond ((string=? (caddr result) "#") 1)
+                       ((string=? (caddr result) "b") -1)
+                       (else 0))))))))
+
 ;; this will match e.g. 60.aiff (where 60 is the midi note number)
 (define parse-sample-name-1
   (lambda (fname)
     (let ((result (regex:matched fname "([0-9]*)\.(wav|aif|aiff|ogg)$")))
       (if (null? result)
-          (begin (println "Error: cannot parse filename: " fname)
+          (begin (println 'Error: 'cannot 'parse 'filename: fname)
                  #f)
           (list fname (string->number (cadr result)))))))
 
 ;; this will match e.g. Eb3.aiff (representing E flat 3)
 (define parse-sample-name-2
   (lambda (fname)
-    (let ((result (regex:matched fname "^.*([ABCDEFG])([#b])?([0-9]).*\.(wav|aif|aiff|ogg)$")))
+    (let ((result (regex:matched fname "^.*([ABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
         (if (null? result)
-            (begin (println "Error: cannot parse filename: " fname)
+            (begin (println 'Error: 'cannot 'parse 'filename: fname)
                    #f)
-            (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
-                  (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
-                        ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
-              (list fname (+ offset pc
-                             (cond ((string=? (caddr result) "#") 1)
-                                   ((string=? (caddr result) "b") -1)
-                                   (else 0)))))))))
+            (list fname (note-name-to-midi-number (cadr result)))))))
 
 ;; for the MIS piano samples (mf loudness only), avaliable from
 ;; http://theremin.music.uiowa.edu/MISpiano.html
@@ -303,7 +310,15 @@
 ;; for NI Akoustik piano samples
 ;; Stein-R(A-1)-V(077)-dB(3129)-T(ML)-M(22)-P(1956-04-01).WAV
 
-;; insert NI parser function here
+(define parse-NI-piano-ff
+  (lambda (fname)
+    (let ((result (regex:matched fname ".*-R\\(([ABCDEFG][#b]?-?[0-9])\\)-.*-M\\(([0-9]*)\\)-.*")))
+      (if (null? result)
+          (begin (println 'Error: 'cannot 'parse 'file: fname)
+                 #f)
+          (if (= (string->number (caddr result)) 127)
+              (list fname (note-name-to-midi-number (cadr result)))
+              #f)))))
 
 ;; must be stereo samples of type wav aif or ogg
 (define-macro (load-sampler sampler path parser offset length)
