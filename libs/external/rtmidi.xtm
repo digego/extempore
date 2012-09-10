@@ -120,6 +120,7 @@
   (lambda (dev:midi_in_device*)
     (let ((num_ports (getPortCount dev))
           (i:i64 0))
+      (printf "--Input ports--\n")
       (dotimes (i num_ports)
         (printf "Port %lld: %s\n" i (getPortName dev i)))
       (printf "\n")
@@ -129,6 +130,7 @@
   (lambda (dev:midi_out_device*)
     (let ((num_ports (getPortCount dev))
           (i:i64 0))
+      (printf "--Output ports--\n")
       (dotimes (i num_ports)
         (printf "Port %lld: %s\n" i (getPortName dev i)))
       (printf "\n")
@@ -148,7 +150,7 @@
   (let ((device:midi_out_device* (zalloc)))
     (newMidiOutDevice device UNSPECIFIED "Extempore Midi Output")
     ;; (openVirtualPort device "Ben Port")
-    (openPort device 2 "Extempore Output")
+    (openPort device 0 "Extempore Output") ;; needs to be correct channel
     (lambda ()
       device)))
 
@@ -157,7 +159,7 @@
 
 ;; testing
 
-(bind-func midi_callback
+(bind-func midi_dump
   (let ((type:i8 0) (chan:i8 0) (a:i8 0) (b:i8 0))
     (lambda (time:double len:i64 msg:i8*)
       (set! type (>> (pref msg 0) 4))
@@ -170,9 +172,11 @@
 
 (bind-func register_midi_callback
   (lambda ()
-    (setCallback (midi_in) (llvm_get_function_ptr "midi_callback_native"))))
+    (setCallback (midi_in) (llvm_get_function_ptr "midi_dump_native"))))
 
-(register_midi_callback)
+;; (register_midi_callback)
+
+;; (cancelCallback (midi_in))
 
 (bind-func send_midi
   (lambda (dev:midi_out_device* type chan a b)
@@ -180,5 +184,32 @@
       (pfill! msg (+ (<< type 4) chan) a b)
       (sendMessage dev 3 msg))))
 
-(send_midi (midi_out) *midi-note-on* 0 60 80)
-(send_midi (midi_out) *midi-note-off* 0 60 80)
+;; (send_midi (midi_out) *midi-note-on* 0 60 80)
+;; (send_midi (midi_out) *midi-note-off* 0 60 80)
+
+(define *midi-chan* 0)
+
+(define play-midi ;; with *midi-chan* as a scheme global
+  (lambda (time dev pitch velocity duration)
+    (callback time 'send_midi dev *midi-note-on* *midi-chan* pitch velocity)
+    (callback (+ time (*metro* duration)) 'send_midi dev *midi-note-off* *midi-chan* pitch velocity)))
+
+;; (play-midi (now) (midi_out) 60 80 4)
+
+;; a midi-specific play macro
+
+(macro (playm args)
+  (if (symbol? (cadr args))
+      (if (> (length args) 5)
+	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+		      ,(car (cdr (cddddr args))))
+	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
+      (if (> (length args) 6)
+	  `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+		      (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))))
+	  `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+		      (*metro* 'dur ,(car (cdr (cddddr args))))))))
+
+;; Diskclavier setup
+
+(define piano (midi_out))
