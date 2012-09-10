@@ -872,22 +872,24 @@
 		 #t)		
                 (else #f)))))
 
+
 (define impc:ir:types-equal?
   (lambda (a b)
     (if (string? a)
-	(if (impc:ir:get-named-type (impc:ir:get-base-type (substring a 1 (string-length a))))
+	(if (not (null? (impc:ir:get-named-type (impc:ir:get-base-type (substring a 1 (string-length a))))))
 	    (let* ((nt (impc:ir:get-named-type (impc:ir:get-base-type (substring a 1 (string-length a)))))
 		   (ptrdepth (impc:ir:get-ptr-depth a))
 		   (strtype (apply string-append nt (make-list-with-proc ptrdepth (lambda (i) "*")))))
 	      (set! a (impc:ir:get-type-from-str strtype)))
 	    (set! a (impc:ir:get-type-from-str a))))
     (if (string? b)
-	(if (impc:ir:get-named-type (impc:ir:get-base-type (substring b 1 (string-length b))))
+	(if (not (null? (impc:ir:get-named-type (impc:ir:get-base-type (substring b 1 (string-length b))))))
 	    (let* ((nt (impc:ir:get-named-type (impc:ir:get-base-type (substring b 1 (string-length b)))))
 		   (ptrdepth (impc:ir:get-ptr-depth b))
 		   (strtype (apply string-append nt (make-list-with-proc ptrdepth (lambda (i) "*")))))
 	      (set! b (impc:ir:get-type-from-str strtype)))
 	    (set! b (impc:ir:get-type-from-str b))))
+    ;; (println 'equal? a b)
     (equal? a b)))
 
 (define impc:ir:other?
@@ -914,7 +916,8 @@
 	     (if (impc:ir:tuple? (car type)) #t #f))
 	 (let ((t (impc:ir:str-list-check type)))
 	   (if (symbol? t) #f ;; symbol will be poly type
-	       (if (string? t) #t
+	       (if (string? t) 
+		   (if (regex:match? t "^%") #t #f)
 		   (if (= (modulo t *impc:ir:pointer*) *impc:ir:tuple*)
 		       #t #f)))))))
 
@@ -3048,9 +3051,10 @@
 	 ;;       (set! val-str (string-append val-str (impc:ir:gname "val" element-type) " = bitcast " (cadr val) " " (car val) " to " element-type "\n") os)
 	 ;;       (set! val (impc:ir:gname))))
 	 
-	 ;(if (not (impc:ir:types-equal? element-type (impc:ir:get-type-from-str (cadr val))))
-         (if (not (equal? element-type
-	 		  (impc:ir:get-type-from-str (cadr val))))
+	 ;; (if (not (impc:ir:types-equal? element-type (impc:ir:get-type-from-str (cadr val))))
+         ;; (if (not (equal? element-type
+	 ;; 		  (impc:ir:get-type-from-str (cadr val))))
+	 (if (not (impc:ir:types-equal? element-type (cadr val)))
              (print-error 'Compiler 'Error: 'Type 'Mismatch: ast '- 'setting (cadr val) 'into 'index 
                           (string->symbol (number->string (caddr ast))) 'of (cadr var)))
          ;; type tests done
