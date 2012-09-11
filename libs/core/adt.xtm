@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Extempore's native data types library
+;; Extempore's data types library
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -11,10 +11,10 @@
 
 (bind-func xpair:[xpair_t*,!first,!second]*
   (lambda (a b)
-    (let ((pair (halloc)))
-      (tset! pair 0 a)
-      (tset! pair 1 b)
-      pair)))    
+    (let ((ppair (halloc)))
+      (tset! ppair 0 a)
+      (tset! ppair 1 b)
+      ppair)))    
 
 (bind-func xfirst:[!first,xpair_t*]*	   
   (lambda (a)
@@ -24,18 +24,20 @@
   (lambda (a)
     (tref a 1)))
 
+
 ;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; lists
+;;
 
 (bind-type xlist <!head,xlist*>)
 
 (bind-func xjoin:[xlist*,!head,xlist*]*
   (lambda (a b)
-    (let ((pair (halloc)))
-      (tset! pair 0 a)
-      (tset! pair 1 b)
-      pair)))
+    (let ((joinpair (halloc)))
+      (tset! joinpair 0 a)
+      (tset! joinpair 1 b)
+      joinpair)))
 
 (bind-func xhead:[!head,xlist*]*
   (lambda (a)
@@ -66,9 +68,28 @@
 		   (xjoin (func (xhead l)) (f (xtail l)))))))
       (f lst))))
 
+(bind-func xlast:[xlist*,xlist*]*
+  (lambda (a)
+    (if (null? (xtail a))
+	a
+	(xlast (xtail a)))))
 
 
-(bind-func test1
+(bind-func xappend:[xlist*,xlist*,xlist*]*
+  (lambda (a b)
+    (let ((p (xlast a)))
+      (tset! p 1 b)
+      a)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; TESTCODE
+
+
+;; xlist tests
+
+(bind-func xlist_test1
   (lambda ()
     (let ((l1 (xjoin 1.0 null)))
       (xmap (lambda (i) 
@@ -76,17 +97,17 @@
 	    l1))))
 
 
-(bind-func test2
+(bind-func xlist_test2
   (lambda ()
     (let ((l1 (xlist 1.0 2.0 3.0 4.0)))
       (xmap (lambda (i) 
 	      (printf "%f\n" (* i 2.0)))
 	    l1))))
 
-(test2)
+(xlist_test2)
 
 
-(bind-func test3
+(bind-func xlist_test3
   (lambda ()
     (let ((l1 (xlist 1 2 3 4)))
       (xmap (lambda (i) 
@@ -94,19 +115,19 @@
 	    l1))))
 
 
-(bind-func test4
+(bind-func xlist_test4
   (lambda ()
     (let ((l1 (xlist "andrew" "ben" "torben")))
       (xmap (lambda (i)
 	      (if (= (strcmp i "andrew") 0)
 		  (printf "%s rocks\n" i)
-		  (printf "%s sucks\n" i)))
+		  (printf "%s rolls\n" i)))
 	    l1))))
 
-(test4)
+(xlist_test4)
 
 
-(bind-func test5
+(bind-func xlist_test5
   (lambda ()
     (let ((l1 (xlist (xlist "andrew" "london") 
 		     (xlist "ben" "new york")
@@ -115,22 +136,23 @@
 	      (printf "%s rocks\n" (xhead i)))
 	    l1))))
 
-(test5)
+(xlist_test5)
 
 
-(bind-func test6
+(bind-func xlist_test6
   (lambda ()
     (let ((l1 (xlist (xlist "andrew" "london") (xlist "ben" "new york") (xlist "torben" "moscow"))))
       (xmap (lambda (i)
 	      (if (= (strcmp (xhead i) "andrew") 0)
 		  (printf "%s rocks %s\n" (xhead i) (xhead (xtail i)))
-		  (printf "%s sucks %s\n" (xhead i) (xhead (xtail i)))))
+		  (printf "%s rolls %s\n" (xhead i) (xhead (xtail i)))))
 	    l1))))
 
-(test6)
+(xlist_test6)
 
 
-(bind-func test7
+
+(bind-func xlist_test7
   (lambda ()
     (let ((l1 (xlist (xlist "andrew" "london") 
 		     (xlist "ben" "new york") 
@@ -141,38 +163,88 @@
 	      	    i)
 	      (if (= (strcmp (xhead i) "andrew") 0)
 	      	  (printf "%s rocks %s\n" (xhead i) (xhead (xtail i)))
-	      	  (printf "%s sucks %s\n" (xhead i) (xhead (xtail i))))
+	      	  (printf "%s rolls %s\n" (xhead i) (xhead (xtail i))))
 	      (i64toi32 1))
 	    l1))))
 
-(test7)
+(xlist_test7)
 
 
-(bind-func test8
+(bind-func xlist_test8
+  (lambda () 
+    (let ((l1 (xlist 1 2 3))
+	  (last (xlast l1)))
+      last)))
+
+
+(bind-func xlist_test8b
+  (lambda ()
+    (let ((l1 (xlist 1.0 2.0 3.0))
+	  (l2 (xlast l1)))
+      1)))
+
+
+(bind-func xlist_test9
+  (lambda ()
+    (let ((l1 (xlist 1 2 3))
+	  (last (xlast l1)))
+      (printf "%d\n" (xhead last)))))
+
+(xlist_test9)
+
+(bind-func xlist_test10
+  (lambda ()
+    (let ((l1 (xlist "andrew" "ben" "torben")))
+      (xmap (lambda (i)
+	      (printf "%s\n" i))
+	    l1)
+      void)))
+
+(xlist_test4)
+
+
+
+;; xpair tests
+
+(bind-func xpair_test8
   (lambda ()
     (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben"))))
       l1)))
-
-
-(bind-func test9
+ 
+(bind-func xpair_test9
   (lambda ()
     (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben"))))
       (xhead l1))))
 
-(bind-func test10
+
+(bind-func xpair_test10
   (lambda ()
     (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben")))
 	  (l2 (xhead l1)))
       (printf "%s\n" (tref (xhead l1) 1))
       l1)))
 
-(test10)
+(xpair_test10)
 
-(bind-func test11
+(bind-func xpair_test11
   (lambda ()
     (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben")))
 	  (l2 (xhead l1)))
       (printf "%s\n" (xsecond (xhead (xtail l1))))
       l1)))
 
-(test11)
+(xpair_test11)
+
+;; xappend test
+
+(bind-func xappend_test1
+  (lambda ()
+    (let ((l1 (xlist "a" "b" "c"))
+	  (l2 (xlist "d" "e" "f"))
+	  (l3 (xappend l1 l2)))
+      (xmap (lambda (k)
+	     (printf "%s\n" k))
+	   l3)
+      void)))
+      
+(xappend_test1)
