@@ -419,6 +419,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; sinusoidal LFOs
+
 (macro (cosr args)
    (if (> (length args) 4)
        `(+ ,(caddr args) (* ,(cadddr args) (cos (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
@@ -434,15 +436,43 @@
        `(+ ,(caddr args) (* ,(cadddr args) (tan (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
        `(+ ,(cadr args) (* ,(caddr args) (tan (* 2pi beat ,(cadddr args)))))))
 
-(define sawtooth
-  (lambda (x)
-    (let ((xmod2pi (modulo x 2pi)))
-      (* (/ 1 pi) (if (<= xmod2pi pi) xmod2pi (- xmod2pi 2pi))))))
+;; sawtooth wave LFO with period 2pi
 
-(macro (sawr args)
+(define ramp
+  (lambda (x)
+    (let ((xmod2pi (- x (* 2pi (floor (/ x 2pi))))))
+      (* (/ 1 pi) (if (< xmod2pi pi) xmod2pi (- xmod2pi 2pi))))))
+
+(macro (rampr args)
        (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (sawtooth (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (sawtooth (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (* ,(cadddr args) (ramp (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (ramp (* 2pi beat ,(cadddr args)))))))
+
+;; square wave LFO with period 2pi
+
+(define rect
+  (lambda (x)
+    (let ((xmod2pi (- x (* 2pi (floor (/ x 2pi))))))
+      (if (< xmod2pi pi) 1 0))))
+
+(macro (rectr args)
+   (if (> (length args) 4)
+       `(+ ,(caddr args) (* ,(cadddr args) (rectr (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (rectr (* 2pi beat ,(cadddr args)))))))
+
+;; triangle wave LFO with period 2pi
+
+(define tri-wave
+  (lambda (x)
+    (let ((xmod2pi (- x (* 2pi (floor (/ x 2pi))))))
+      (if (< xmod2pi pi)
+          (+ 1 (* (/ -1 pi) xmod2pi))
+          (- (* (/ 1 pi) xmod2pi) 1)))))
+
+(macro (trir args)
+   (if (> (length args) 4)
+       `(+ ,(caddr args) (* ,(cadddr args) (trir (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (trir (* 2pi beat ,(cadddr args)))))))
 
 ;; the play macro
 
