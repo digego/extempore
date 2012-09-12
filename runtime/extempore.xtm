@@ -420,15 +420,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (macro (cosr args)
-   (if (> (length args) 5)
+   (if (> (length args) 4)
        `(+ ,(caddr args) (* ,(cadddr args) (cos (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
        `(+ ,(cadr args) (* ,(caddr args) (cos (* 2pi beat ,(cadddr args)))))))
 
 (macro (sinr args)
-   `(+ ,(cadr args) (* ,(caddr args) (sin (* 2pi beat ,(cadddr args))))))
+       (if (> (length args) 4)
+       `(+ ,(caddr args) (* ,(cadddr args) (sin (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (sin (* 2pi beat ,(cadddr args)))))))
 
 (macro (tanr args)
-   `(+ ,(cadr args) (* ,(caddr args) (tan (* 2pi beat ,(cadddr args))))))
+       (if (> (length args) 4)
+       `(+ ,(caddr args) (* ,(cadddr args) (tan (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (tan (* 2pi beat ,(cadddr args)))))))
 
 (macro (play args)
   (if (symbol? (cadr args))
