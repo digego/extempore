@@ -434,6 +434,18 @@
        `(+ ,(caddr args) (* ,(cadddr args) (tan (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
        `(+ ,(cadr args) (* ,(caddr args) (tan (* 2pi beat ,(cadddr args)))))))
 
+(define sawtooth
+  (lambda (x)
+    (let ((xmod2pi (modulo x 2pi)))
+      (* (/ 1 pi) (if (<= xmod2pi pi) xmod2pi (- xmod2pi 2pi))))))
+
+(macro (sawr args)
+       (if (> (length args) 4)
+       `(+ ,(caddr args) (* ,(cadddr args) (sawtooth (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (sawtooth (* 2pi beat ,(cadddr args)))))))
+
+;; the play macro
+
 (macro (play args)
   (if (symbol? (cadr args))
       (if (> (length args) 5)
