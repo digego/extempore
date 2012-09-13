@@ -1702,9 +1702,10 @@
 		      (if (llvm:get-function (symbol->string ast))
 			  (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (llvm:get-function-args-withoutzone (symbol->string ast)))))
                           (list (impc:ir:pointer-- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string ast)))))))))
-	 ;(println 'sym: ast 'type: type 'request? request?)
+	 ;; (println 'sym: ast 'type: type 'kts: kts 'request? request?)
          (if (and request?
-                  (not (null? request?)))             
+		  (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
+                  (not (null? request?)))
              ;; (let ((intersection (cl:intersection (if (null? type) ;; if type is null then force request
              ;;                                          (if (atom? request?) (list request?) request?)
              ;;                                          (if (atom? type) (list type) type))
