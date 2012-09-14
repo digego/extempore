@@ -204,11 +204,9 @@
     (callback time 'send_midi dev *midi-note-on* *midi-chan* pitch velocity)
     (callback (+ time duration) 'send_midi dev *midi-note-off* *midi-chan* pitch velocity)))
 
-;; (play-midi (now) (midi_out) 60 80 4)
-
 ;; a midi-specific play macro
 
-(macro (play args)
+(macro (playm args)
   (if (symbol? (cadr args))
       (if (> (length args) 5)
 	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
@@ -219,7 +217,3 @@
 		      (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))))
 	  `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
 		      (*metro* 'dur ,(car (cdr (cddddr args))))))))
-
-;; Diskclavier setup
-
-(define piano (midi_out))
