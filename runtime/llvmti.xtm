@@ -2177,6 +2177,70 @@
     #t))
 
 
+;; recursion test
+(define *impc:ti:nativef-generics-recurse-test* 0)
+
+(define impc:ti:nativef-generics-check-code-for-return-type
+  (lambda (ast lambda-code gpoly-type vars res)
+    (let ((grtype '()))
+      ;;
+      ;; this section is here to check for a return type
+      ;; for this generic function.
+      ;; we do this by grabbing the gpoly's lambda code and
+      ;; sending it through type checking.
+      ;;
+      ;; This whole section can actually be taken out
+      ;;
+      (if (< *impc:ti:nativef-generics-recurse-test* 10)
+          (begin
+            ;; (println 'prevars: vars 'res: res)
+            (set! *impc:ti:nativef-generics-recurse-test*
+                  (+ *impc:ti:nativef-generics-recurse-test* 1))
+            ;; type inferencing for generic functions return argument!
+            (let* ((symname 'placeholder)
+                   (c1 (impc:ti:get-var-types lambda-code)) 
+                   (t1 (impc:ti:first-transform (car c1) #t))
+                   (t2 (impc:ti:mark-returns t1 symname #f #f #f))
+                   (t3 (impc:ti:closure:convert t2 (list symname)))
+                   (lvars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
+                   (trequest (impc:ti:type-unify gpoly-type (cl:copy-list vars)))
+                   (ttype '()))
+
+              ;; if trequest is not yet fulled defined
+              ;; then try to add variable arguments
+              ;; update lvars with res results
+              (for-each (lambda (s t) ;; symbol from lambda args and type from res
+                          ;; (println 's: s 't: t 'u: (impc:ti:type-unify t vars))
+                          (if (impc:ir:type? (impc:ti:type-unify t vars))
+                              (impc:ti:update-var s lvars '() (impc:ti:type-unify t vars))))
+                        (cadr lambda-code)
+                        res)
+
+              ;; (println 'pre-gpoly--> (car ast) 'res: res)
+              ;; (println 'lambda-code lambda-code)                
+              ;; (println 'prelvars: lvars)
+              ;; (println 'request?: trequest)
+              
+              (set! ttype (impc:ti:type-check t1 lvars '() trequest))
+
+              ;; (println 'post-gpoly--> (car ast) 'res: res)                
+              ;; (println 'postlvars: lvars)
+              ;; (println 'result: (car ast) 'type: ttype)
+              
+              (set! *impc:ti:nativef-generics-recurse-test* (- *impc:ti:nativef-generics-recurse-test* 1))
+              (if (< *impc:ti:nativef-generics-recurse-test* 0)
+                  (set! *impc:ti:nativef-generics-recurse-test* 0))
+              
+              (if (and (not (null? ttype))
+                       (impc:ir:closure? (car ttype))
+                       (impc:ir:type? (cadar ttype)))
+                  (begin
+                    (set! grtype (car ttype))))))
+          (begin ;; (println 'hit-recursion-limit)
+                 #f))
+      grtype)))
+
+
 ;; generics check
 (define impc:ti:nativef-generics
   (lambda (ast vars kts request?)
@@ -2187,7 +2251,10 @@
     (set! impc:ir:get-type-expand-poly #f)
     (let* ((gname (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
 	   (gnum (string->number (cadr (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
+           (gpoly-code (cadr (impc:ir:gpoly-types gname)))
+           (lambda-code (caddr gpoly-code))
 	   (gpoly-type (impc:ir:get-type-from-pretty-str (symbol->string (car (impc:ir:gpoly-types gname))))))
+
       (set! impc:ir:get-type-expand-poly #t)
       ;; (println 'gpoly-type1: gpoly-type)
       ;;(println 'gpoly-typeb:> (car (impc:ir:gpoly-types gname)))
@@ -2211,9 +2278,10 @@
       ;; (println 'b: (cdr ast) (cddr gpoly-type))
       ;; (println 'vars: vars)
 
-      ;; type inferencing for generic functions arguments
-      (let ((res (impc:ti:nativef-generics-check-args ast gpoly-type vars kts request?)))
-	
+      ;; type inferencing for generic functions arguments and return type
+      (let* ((res (impc:ti:nativef-generics-check-args ast gpoly-type vars kts request?))
+             (grtype (impc:ti:nativef-generics-check-code-for-return-type ast lambda-code gpoly-type vars res)))
+        
 	;; (println 'genericf: ast)
 	;; (println 'request? request? 'gpoly-type: (cadr gpoly-type) 'res: res 'vars: vars)
 	;; (println 'args: (car ast) 'args1: res)	
@@ -2277,8 +2345,24 @@
 	  ;; (println 'g-vars-b: vars)
 
 	  ;;(println 'gpoly-type gpoly-type)
-	  ;;(println 'gftype gftype)
-	  (impc:ti:update-var (car ast) vars kts (list gftype))))
+
+          ;; (impc:ti:update-var (car ast) vars kts (list gftype))))
+
+          ;; if grtype is VALID
+          ;; and if the return type of gftype is a symbol
+          ;; THEN update the return type of gftype (symbol)
+          ;; with the reified return type of grtype
+          (if (and (symbol? (cadr gftype))
+                   (impc:ir:type? grtype))
+              (impc:ti:update-var (cadr gftype) vars kts (cadr grtype)))
+
+          ;; (println 'vars: vars)
+          ;; (println 'request? request?)
+	  ;; (println 'gftype gftype (impc:ir:type? gftype))
+          ;; (println 'grtype grtype (impc:ir:type? grtype))
+          (if (impc:ir:type? grtype)
+              (impc:ti:update-var (car ast) vars kts (list grtype))
+              (impc:ti:update-var (car ast) vars kts (list gftype)))))
 
       ;; (println 'genericf-sig: (car ast) ': (assoc-strcmp (car ast) vars))
       ;; return request? or (cadr gpoly-type if no request was made
@@ -2420,11 +2504,14 @@
       ;(println 'vars: vars '(cadr ast) (cadr ast))
       ;; for the symbols we want to set each return type
       (for-each (lambda (e)
+                  ;; let should not impose return type request!
+                  ;; on individual parameter type checks
 		  ;; (println 'e: e)
 		  (let ((a (impc:ti:type-check (cadr e) vars kts
 					       (if (member (car e) kts)
 						   (cadr (assoc (car e) vars))
-						   request?))))
+                                                   #f))))
+						   ;; request?))))
 		    ;; (println '---update: (car e) 'with: a)  
 		    (impc:ti:update-var (car e) vars kts a)
 		    ;; (println '---vars: vars)
@@ -2851,6 +2938,7 @@
                                     ;;         #f)
                                     ;;     #f))))
 	(if (and (not (null? a))
+                 (not (symbol? (car a))) ;; symbol may not have yet been defined!!
 		 (not (impc:ir:tuple? (car a))))
 	    (print-error 'Compiler 'Error: 'invalid 'tuple-set-check 'type (impc:ir:get-type-str (car a))))
 	;; if (cadddr ast) is a symbol we should update
@@ -4062,11 +4150,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define impc:ti:run
    (lambda (symname code . args)
-      ;(println '-----------> 'impc:ti:run: symname)
+      ;; (println '-----------> 'impc:ti:run: symname)
       ;; (println 'code: code)
       ;(println 'args: args)
       (set! *impc:ir:ls_var* '())
       (set! *impc:ti:generic-type-mappings* '())
+      (set! *impc:ti:nativef-generics-recurse-test* 0)
       ;; don't want type checking to find existing native versions!
       (if *impc:compile*
           (begin ;(llvm:remove-globalvar (string-append (symbol->string symname) "_var"))
