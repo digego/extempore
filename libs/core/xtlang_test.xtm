@@ -1,0 +1,1153 @@
+;;; xtlang_test.xtm -- rudimentary unit testing for xtlang code
+
+;; Author: Ben Swift, Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
+;; an assert macro -- the workhorse of the unit testing framework
+
+(define *func-successes* '((correct)
+			   (incorrect)
+			   (compile)
+			   (no-compile)))
+
+(define-macro (change-test-result category func-sym)
+  `(for-each
+    (lambda (cat)
+      (if (equal? (car cat) ,category)
+	  (set-cdr! cat (if (not (member ,func-sym cat))
+			    (cons ,func-sym (cdr cat))))
+	  (set-cdr! cat (cl:remove ,func-sym (cdr cat)))))
+    *func-successes*))
+
+(define-macro (test-xtfunc form . retval)
+  `(let ((func-sym (quote ,(car form))))
+     (begin
+       (change-test-result 'no-compile func-sym)
+       (if (defined? func-sym)
+	   (begin (change-test-result 'compile func-sym)
+		  ,(if (null? retval)
+                       `(begin ,form
+                               (change-test-result 'correct func-sym))
+                       `(if (= ,form ,(car retval))
+                            (change-test-result 'correct func-sym)
+                            (change-test-result 'incorrect func-sym))))))))
+
+(define print-test-results
+  (lambda ()
+    (begin (println 'Test 'results:)
+	   (println '=====================)
+	   (println)
+	   (for-each (lambda (result)
+		       (println '*** (car result) '***)
+		       (println)
+		       (for-each (lambda (fn)
+				   (println '--> fn))
+				 (cdr result))
+		       (println))
+		     *func-successes*))))
+
+;; (bind-func non-compiling-func
+;;   (lambda (a)
+;;     a))
+
+;; (test-xtfunc (non-compiling-func))
+
+;; (bind-func compiling-func
+;;   (lambda (a)
+;;     (+ a 2)))
+
+;; (test-xtfunc (compiling-func))
+
+;; (bind-func calling-func
+;;   (lambda (a)
+;;     (+ a 2)))
+
+;; (test-xtfunc (calling-func 2))
+
+;; (print-test-results)
+
+;;;;;;;;;;;;;;;;;;
+;; xtlang tests ;;
+;;;;;;;;;;;;;;;;;;
+
+;; integer literals default to 64 bit integers
+(bind-func int-literal-test
+   (lambda (a)
+     (* a 5)))
+
+(test-xtfunc (int-literal-test 6) 30)
+
+;; float literals default to doubles
+(bind-func float-literal-test
+   (lambda (a)
+     (* a 5.0)))
+
+(test-xtfunc (float-literal-test 6.0) 30.0)
+
+;; you are free to recompile an existing closure
+(bind-func int-literal-test
+   (lambda (a)
+      (/ a 5)))
+
+(test-xtfunc (int-literal-test 30))
+
+(bind-func closure-test1
+   (let ((power 0))
+      (lambda (x)
+	 (set! power (+ power 1)) ;; set! for closure mutation as per scheme
+	 (* x power))))
+
+(test-xtfunc (closure-test1 2))
+
+(bind-func closure-returns-closure-test
+  (lambda ()
+    (lambda (x)
+      (* x 3))))
+
+(test-xtfunc (closure-returns-closure-test))
+
+(bind-func incrementer-test1
+   (lambda (i:i64)
+      (lambda (inc)
+	 (set! i (+ i inc))
+	 i)))
+
+(test-xtfunc (incrementer-test1 0))
+
+;; so we need to type f properly
+(bind-func incrementer-test2
+   (lambda (f:[i64,i64]* x)
+     (f x)))
+
+;; todo can testing use the output of previous tests?
+
+;; (test-xtfunc (closure-test2))
+;; ok so now we can call my-inc-maker
+;; which will return a closure
+;; which scheme stores as a generic cptr
+(define myf (incrementer-test1 0))
+
+;; and we can call my-in-maker-wrapper
+;; to appy myf
+(test-xtfunc (incrementer-test2 myf 1) 1)
+(test-xtfunc (incrementer-test2 myf 1) 2)
+(test-xtfunc (incrementer-test2 myf 1) 3)
+
+;; of course the wrapper is only required if you
+;; need interaction with the scheme world.
+;; otherwise you just call my-inc-maker directly
+
+;; this avoids the wrapper completely
+(bind-func incrementer-test3
+   (let ((f (incrementer-test1 0)))
+      (lambda ()
+	 (f 1))))
+
+(test-xtfunc (incrementer-test3) 1)
+(test-xtfunc (incrementer-test3) 2)
+(test-xtfunc (incrementer-test3) 3)
+
+;; hopefully you're getting the idea.
+;; note that once we've compiled something
+;; we can then use it any of our new
+;; function definitions.
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Closures can be recursive
+;;
+
+(bind-func recursive-closure-test
+  (lambda (a)
+    (if (< a 1)
+	(printf "done\n")
+	(begin (printf "a: %lld\n" a)
+	       (recursive-closure-test (- a 1))))))
+
+(test-xtfunc (recursive-closure-test))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a simple tuple example
+;;
+;; tuple types are represented as <type,type,type>*
+;;
+
+;; make and return a simple tuple
+(bind-func tuple-test1
+  (lambda ()
+    (let ((t:<i64,double,i32>* (alloc)))
+      t)))
+
+(test-xtfunc (tuple-test1))
+
+;; logview shows [<i64,double,i32>*]*
+;; i.e. a closure that takes no arguments
+;; and returns the tuple <i64,double,i32>*
+
+
+;; here's another tuple example
+;; note that my-test-7's return type is inferred
+;; by the tuple-reference index
+;; (i.e. i64 being tuple index 0)
+(bind-func tuple-test2
+  (lambda ()
+    (let ((a:<i64,double>* (alloc)) ; returns pointer to type <i64,double>
+	  (b 37)
+	  (c 6.4))
+      (tuple-set! a 0 b) ;; set i64 to 64
+      (tset! a 1 c) ;; set double to 6.4 - tset! is an alias for tuple-set!
+      (printf "tuple:1 %lld::%f\n" (tuple-ref a 0) (tref a 1))
+      ;; we can fill a tuple in a single call by using tfill!
+      (tfill! a 77 77.7)
+      (printf "tuple:2 %lld::%f\n" (tuple-ref a 0) (tuple-ref a 1))
+      (tuple-ref a 0))))
+
+(test-xtfunc (tuple-test2) 77)
+
+;; return first element which is i64
+;; should be 64 as we return the
+;; first element of the tuple
+;; (println (my-test-7)) ; 77
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; some array code with *casting*
+;; this function returns void
+(bind-func array-test1
+   (lambda ()
+      (let ((v1:|5,float|* (alloc))
+	    (v2:|5,float|* (alloc))
+	    (i 0)
+	    (k 0))
+	 (dotimes (i 5)
+	    ;; random returns double so "truncate" to float
+	    ;; which is what v expects
+	    (array-set! v1 i (dtof (random))))
+	 ;; we can use the afill! function to fill an array
+	 (afill! v2 1.1 2.2 3.3 4.4 5.5)
+	 (dotimes (k 5)
+	    ;; unfortunately printf doesn't like floats
+	    ;; so back to double for us :(
+	    (printf "val: %lld::%f::%f\n" k
+		    (ftod (array-ref v1 k))
+		    (ftod (aref v2 k)))))))
+
+(test-xtfunc (array-test1))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; some crazy array code with
+;; closures and arrays
+;; try to figure out what this all does
+;;
+;; this example uses the array type
+;; the pretty print for this type is
+;; |num,type| num elements of type
+;; |5,i64| is an array of 5 x i64
+;;
+;; An array is not a pointer type
+;; i.e. |5,i64| cannot be bitcast to i64*
+;;
+;; However an array can be a pointer
+;; i.e. |5,i64|* can be bitcast to i64*
+;; i.e. |5,i64|** to i64** etc..
+;;
+;; make-array returns a pointer to an array
+;; i.e. (make-array 5 i64) returns type |5,i64|*
+;;
+;; aref (array-ref) and aset! (array-set!)
+;; can operate with either pointers to arrays or
+;; standard pointers.
+;;
+;; in other words aref and aset! are happy
+;; to work with either i64* or |5,i64|*
+
+(bind-func array-test2
+   (lambda (v:|5,i64|*)
+      (let ((f (lambda (x)
+		  (* (array-ref v 2) x))))
+	f)))
+
+(bind-func array-test3
+  (lambda (v:|5,[i64,i64]*|*)
+    (let ((ff (aref v 0))) ; aref alias for array-ref
+      (ff 5))))
+
+(bind-func array-test4
+   (lambda ()
+      (let ((v:|5,[i64,i64]*|* (alloc)) ;; make an array of closures!
+	    (vv:|5,i64|* (alloc)))
+	 (array-set! vv 2 3)
+	 (aset! v 0 (array-test2 vv)) ;; aset! alias for array-set!
+	 (array-test3 v))))
+
+;; try to guess the answer before you call this!!
+(test-xtfunc (array-test4))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; some conditionals
+
+(bind-func cond-test1
+   (lambda (x:i64 y)
+      (if (> x y)
+	  x
+	  y)))
+
+(test-xtfunc (cond-test1 12 13))
+
+;; returns boolean true
+(bind-func cond-test2
+   (lambda (x:i64)
+      (cond ((= x 1) (printf "A\n"))
+	    ((= x 2) (printf "B\n"))
+	    ((= x 3) (printf "C\n"))
+	    ((= x 4) (printf "D\n"))
+	    (else (printf "E\n")))
+      #t))
+
+(test-xtfunc (cond-test2 1))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; making a linear envelop generator
+;; for signal processing and alike
+
+(bind-func envelope-segments
+  (lambda (points:double* num-of-points:i64)
+    (let ((lines:[double,double]** (zone-alloc num-of-points))
+	  (k 0))
+      (dotimes (k num-of-points)
+	(let* ((idx (* k 2))
+	       (x1 (pointer-ref points (+ idx 0)))
+	       (y1 (pointer-ref points (+ idx 1)))
+	       (x2 (pointer-ref points (+ idx 2)))
+	       (y2 (pointer-ref points (+ idx 3)))
+	       (m (if (= 0.0 (- x2 x1)) 0.0 (/ (- y2 y1) (- x2 x1))))
+	       (c (- y2 (* m x2)))
+	       (l (lambda (time) (+ (* m time) c))))
+	  (pointer-set! lines k l)))
+      lines)))
+
+(bind-func make-envelope
+   (lambda (points:double* num-of-points)
+      (let ((klines:[double,double]** (envelope-segments points num-of-points))
+	    (line-length num-of-points))
+	 (lambda (time)
+	    (let ((res -1.0)
+		  (k:i64 0))
+	       (dotimes (k num-of-points)
+		  (let ((line (pointer-ref klines k))
+			(time-point (pointer-ref points (* k 2))))
+		     (if (or (= time time-point)
+			     (< time-point time))
+			 (set! res (line time)))))
+	       res)))))
+
+;; make a convenience wrapper
+(bind-func env-wrap
+   (let* ((points 3)
+	  (data (zone-alloc (* points 2))))
+      (pointer-set! data 0 0.0) ;; point data
+      (pset! data 1 0.0)
+      (pset! data 2 2.0)
+      (pset! data 3 1.0)
+      (pset! data 4 4.0)
+      (pset! data 5 0.0)
+      (let ((f (make-envelope data points)))
+	 (lambda (time:double)
+	   (f time)))))
+
+(test-xtfunc (env-wrap 0.0) 0.0) ;; time 0.0 should give us 0.0
+(test-xtfunc (env-wrap 1.0) 0.5) ;; time 1.0 should give us 0.5
+(test-xtfunc (env-wrap 2.0) 1.0) ;; time 2.0 should be 1.0
+(test-xtfunc (env-wrap 2.5) 0.75) ;; going back down 0.75
+(test-xtfunc (env-wrap 4.0) 0.0) ;; to zero
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; direct access to a closures environment
+;;
+;; it is possible to directly access a closures
+;; environment in order to read or modify data
+;; at runtime.
+;;
+;; You do this using a dot operator
+;; To access an environment slot you use
+;; closure.slot:type
+;; So for example
+;; (f.a:i32)
+;; would return the 32bit integer symbol 'a'
+;; from the closure 'f'
+;;
+;; To set an environment slot you just
+;; add a value of the correct type
+;; for example
+;; (f.a:i32 565)
+;; would set 'a' in 'f' to 565
+;;
+;; let's create a closure that capture's 'a'
+
+
+(bind-func dot-access-test1
+  (let ((a:i32 6))
+    (lambda ()
+      (printf "a:%d\n" a)
+      a)))
+
+;; now let's create a new function
+;; that calls my-test14 twice
+;; once normally
+;; then we directly set the closures 'a' binding
+;; then call again
+;;
+(bind-func dot-access-test2
+  (lambda (x:i32)
+    (dot-access-test1)
+    (dot-access-test1.a:i32 x)
+    (dot-access-test1)))
+
+(test-xtfunc (dot-access-test2 9))
+
+;; of course this works just as well for
+;; non-global closures
+(bind-func dot-access-test3
+  (lambda (a:i32)
+    (let ((f (lambda ()
+	       (* 3 a))))
+      f)))
+
+(bind-func dot-access-test4
+  (lambda ()
+    (let ((f (dot-access-test3 5)))
+      (f.a:i32 7)
+      (f))))
+
+(test-xtfunc (dot-access-test4)) ;; 21
+
+;; and you can get and set closures also!
+(bind-func dot-access-test5
+  (lambda ()
+    (let ((f (lambda (x:i64) x)))
+      (lambda (z)
+	(f z)))))
+
+(test-xtfunc (dot-access-test5))
+
+(bind-func dot-access-test6
+  (lambda ()
+    (let ((t1 (dot-access-test5))
+	  (t2 (dot-access-test5)))
+      ;; identity of 5
+      (printf "%lld:%lld\n" (t1 5) (t2 5))
+      (t1.f:[i64,i64]* (lambda (x:i64) (* x x)))
+      ;; square of 5
+      (printf "%lld:%lld\n" (t1 5) (t2 5)))
+      ;; cube of 5
+      (t2.f:[i64,i64]* (lambda (y:i64) (* y y y)))
+      (printf "%lld:%lld\n" (t1 5) (t2 5))))
+
+(test-xtfunc (dot-access-test6)) ;; 5:5 > 25:5 > 25:125
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; named types
+
+;; it can sometimes be helpful to allocate
+;; a predefined tuple type on the stack
+;; you can do this using allocate
+(bind-type vec3 <double,double,double>)
+
+;; note that point is deallocated at the
+;; end of the function call.  You can
+;; stack allocate (stack-alloc)
+;; any valid type  (i64 for example)
+(bind-func salloc-test
+  (lambda ()
+    (let ((point:vec3* (stack-alloc)))
+      (tset! point 0 0.0)
+      (tset! point 1 -1.0)
+      (tset! point 2 1.0)
+      1)))
+
+(test-xtfunc (salloc-test)) ;; 1
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; aref-ptr and tref-ptr
+;;
+
+;; aref-ptr and tref-ptr return a pointer to an element
+;; just as aref and tref return elements aref-ptr and
+;; tref-ptr return a pointer to those elements.
+
+;; This allows you to do things like create an array
+;; with an offset
+(bind-func aref-ptr-test
+  (lambda ()
+    (let ((arr:|32,i64|* (alloc))
+	  (arroff (aref-ptr arr 16))
+	  (i 0)
+	  (k 0))
+      ;; load arr
+      (dotimes (i 32) (aset! arr i i))
+      (dotimes (k 16)
+	(printf "index: %lld\tarr: %lld\tarroff: %lld\n"
+		k (aref arr k) (pref arroff k))))))
+
+(test-xtfunc (aref-ptr-test))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; arrays
+;; Extempore lang supports arrays as for first class
+;; aggregate types (in other words as distinct from
+;; a pointer).
+;;
+;; an array is made up of a size and a type
+;; |32,i64| is an array of 32 elements of type i64
+;;
+
+(bind-type tuple-with-array <double,|32,|4,i32||,float>)
+
+(bind-func array-test5
+  (lambda ()
+    (let ((tup:tuple-with-array* (stack-alloc))
+	  (t2:|32,i64|* (stack-alloc)))
+      (aset! t2 0 9)
+      (tset! tup 2 5.5)
+      (aset! (aref-ptr (tref-ptr tup 1) 0) 0 0)
+      (aset! (aref-ptr (tref-ptr tup 1) 0) 1 1)
+      (aset! (aref-ptr (tref-ptr tup 1) 0) 2 2)
+      (printf "val: %lld %lld %f\n"
+	      (aref (aref-ptr (tref-ptr tup 1) 0) 1)
+	      (aref t2 0) (ftod (tref tup 2)))
+      (aref (aref-ptr (tref-ptr tup 1) 0) 1))))
+
+(test-xtfunc (array-test5) 1) ;; val: 1 9 5.5
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Global Variables
+;;
+;; You can allocate global variables using bind-val
+;;
+
+(bind-val g-var-a i32 5)
+
+;; increment g-var-a by inc
+;; and return new value of g-var-a
+(bind-func global-var-test1
+  (lambda (inc)
+    (set! g-var-a (+ g-var-a inc))
+    g-var-a))
+
+(test-xtfunc (global-var-test1 3) 8) ;; 8
+
+;; you can bind any primitive type
+(bind-val g-var-b double 5.5)
+(bind-val g-var-c i1 0)
+
+;; you can bind array types
+;; and choose to either
+;; a) assign a value to each element
+(bind-val g-var-a1 |5,i64| (list 1 2 3 4 5))
+;; or b) assign a default value to all elements
+;; for example initialize all 1024 double elements to 5.125
+(bind-val g-var-a2 |1024,double| 5.125)
+
+(bind-func global-var-test2
+  (lambda ()
+    (printf "a1[3]:%lld  a2[55]:%f\n" (aref g-var-a1 3) (aref g-var-a2 55))
+    1))
+
+(test-xtfunc (global-var-test2))
+
+;; finally you can use sys:make-cptr to allocate
+;; memory to any ptr type you like. It is up to
+;; you to however to ensure that you allocate an
+;; appropriate amount of space.
+(bind-val g-var-d |4,i32|* (sys:make-cptr (* 4 4)))
+(bind-val g-var-e tuple-with-array* (sys:make-cptr (+ 8 (* 32 (* 4 4)) 4)))
+
+(bind-func global-var-test3
+  (lambda ()
+    (tset! g-var-e 0 11.0)
+    (aset! g-var-d 0 55)
+    (printf "%f :: %d\n" (tref g-var-e 0) (aref g-var-d 0))
+    1))
+
+(test-xtfunc (global-var-test3)) ;; 11.000 :: 55
+
+(bind-val gvar-array |5,double| 0.0)
+
+(bind-func global-var-test4
+  (lambda ()
+    (aset! gvar-array 3 19.19)
+    (aref gvar-array 3)))
+
+(test-xtfunc (global-var-test4) 19.19) ;; -> 19.19
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Callbacks
+
+(bind-func callback-test
+  (lambda (time:i64 count:i64)
+    (printf "time: %lld:%lld\n" time count)
+    (callback (+ time 1000) callback-test1 (+ time 22050) (+ count 1))))
+
+(test-xtfunc (callback-test) (now) 0)
+
+;; compiling this will stop the callbacks
+;;
+;; of course we need to keep the type
+;; signature the same [void,i64,i64]*
+;;
+(bind-func callback-test
+  (lambda (time:i64 count:i64)
+    void))
+
+(test-xtfunc (callback-test))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; some memzone tests
+
+(bind-func memzone-test1
+  (lambda ()
+    (let ((b:|5,double|* (zalloc)))
+      (aset! b 0
+	(memzone 1024
+	   (let ((a:|10,double|* (zalloc)))
+	     (aset! a 0 3.5)
+	     (aref a 0))))
+      (let ((c:|9,i32|* (zalloc)))
+	(aset! c 0 99)
+	(aref b 0)))))
+
+(test-xtfunc (memzone-test1) 3.5)
+
+(bind-func memzone-test2
+  (lambda ()
+    (memzone 1024
+      (let ((k:|15,double|* (zalloc))
+	    (f (lambda (fa:|15,double|*)
+		 (memzone 1024
+		   (let ((a:|10,double|* (zalloc))
+			 (i 0))
+		     (dotimes (i 10)
+		       (aset! a i (* (aref fa i) (random))))
+		   a)))))
+	(f k)))))
+
+(test-xtfunc (memzone-test2))
+
+(bind-func memzone-test3
+  (lambda ()
+    (let ((v (memzone-test2))
+	  (i 0))
+      (dotimes (i 10) (printf "%lld:%f\n" i (aref v i))))))
+
+(test-xtfunc (memzone-test3)) ;; should print all 0.0's
+
+(bind-func memzone-test4
+  (lambda ()
+    (memzone 1024 (* 44100 10)
+      (let ((a:|5,double|* (alloc)))
+	(aset! a 0 5.5)
+	(aref a 0)))))
+
+(test-xtfunc (memzone-test4) 5.50000)
+
+;;
+;; Large allocation of memory on BUILD (i.e. when the closure is created)
+;; requires an optional argument (i.e. an amount of memory to allocate
+;; specifically for closure creation)
+;;
+;; This memory is automatically free'd whenever you recompile the closure
+;; (it will be destroyed and replaced by a new allocation of the
+;;  same amount or whatever new amount you have allocated for closure
+;;  compilation)
+;;
+(bind-func closure-zalloc-test 1000000
+  (let ((k:|100000,double|* (zalloc)))
+    (lambda ()
+      (aset! k 0 1.0)
+      (aref k 0))))
+
+(test-xtfunc (closure-zalloc-test 1000000))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Ad-Hoc Polymorphism
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; extempore supports ad-hoc polymorphism
+;; at some stage in the future this will
+;; be implicit - but for the moment
+;; it is explicitly defined using bind-poly
+
+;; ad-hoc polymorphism allows you to provide
+;; different specialisations depending on
+;; type.  In other words, a single 'name'
+;; can be bound to multiple function
+;; implementations each with a uniqute
+;; type.
+
+;; for example to create the type variable
+;; named 'cos' that ranges over the two
+;; closure types [double,double]* and [float,float]*
+;; you would call the two lines below
+
+(bind-poly cos* cos)
+(bind-poly cos* cosf)
+
+;; the first argument is the polymorphic type name ('cos*')
+;; the second argument is an implementation name ('cos' or 'cosf')
+;; the third argument is the type ([double,double]* or [float,float]*)
+
+;; now you can let the compiler
+;; decide whether to use cosf or cos
+
+;; here cos defaults to float
+;; this is because in this instance
+;; both [double,double]* and [float,float]*
+;; are acceptable.
+;;
+;; For this ambiguous ocurrence the  this instance the compiler chooses
+;; the last poly bound -> [float,float]*
+(bind-func poly-test1
+  (lambda (a)
+    (cos* a)))
+
+;; you could of course force the issue
+;; to [double,double]* by adding a type to a
+(bind-func poly-test2
+  (lambda (a:double)
+    (cos* a)))
+
+;; in a slightly more complex senario
+;; floorf requires a float
+(bind-func poly-test3
+  (lambda (a)
+    (floorf (cos* a))))
+
+;; note that forcing a to double in this case
+;; fails because there is no
+;; "cos" poly with signature [float,double]*
+
+;; (bind-func test43
+;;   (lambda (a:double)
+;;     (floorf (cos* a))))  ;; this fails although floor would work
+
+
+;; poly variables can be for functions of
+;; mixed argument lengths
+;;
+;; so for example:
+(bind-func poly-test4
+  (lambda (a:i8*)
+    (printf "%s\n" a)))
+
+(bind-func poly-test5
+  (lambda (a:i8* b:i8*)
+    (printf "%s %s\n" a b)))
+
+(bind-func poly-test6
+  (lambda (a:i8* b:i8* c:i8*)
+    (printf "%s %s %s\n" a b c)))
+
+;; bind these three functions to poly 'print'
+(bind-poly print poly-test4)
+(bind-poly print poly-test5)
+(bind-poly print poly-test6)
+
+(bind-func poly-test7
+  (lambda (a b c)
+    (print a)
+    (print a b)
+    (print a b c)))
+
+(test-xtfunc (poly-test7 "extempore's" "polymorphism" "rocks"))
+
+;; polys can Also specialize
+;; on the return type
+(bind-func poly-test8
+  (lambda (a:double)
+    (* a a)))
+
+(bind-func poly-test9
+  (lambda (a:double)
+    (dtoi64 (* a a))))
+
+(bind-poly sqrd poly-test8)
+(bind-poly sqrd poly-test9)
+
+;; specialize on [i64,double]*
+;;
+(bind-func poly-test10:[i64,double]*
+  (lambda (a)
+    (+ 1 (sqrd a))))
+
+;; specialize on [double,doube]*
+(bind-func poly-test11:[double,double]*
+  (lambda (a)
+    (+ 1.0 (sqrd a))))
+
+(test-xtfunc (poly-test10 5.0))
+(test-xtfunc (poly-test11 5.0))
+
+;;;;;;;;;;;;;;;;;;
+;; vector types
+
+(bind-func vector-test1
+  (lambda ()
+    (let ((v1:/4,float/* (alloc))
+	  (v2:/4,float/* (alloc))
+	  (v3:/4,float/* (alloc)))
+      (vfill! v1 4.0 3.0 2.0 1.0)
+      (vfill! v2 1.0 2.0 3.0 4.0)
+      (vfill! v3 5.0 5.0 5.0 5.0)
+      (let ((v4 (* v1 v2))
+	    (v5 (> v3 v4))) ;; unforunately vector conditionals don't work!
+	(printf "mul:%f:%f:%f:%f\n" (ftod (vref v4 0)) (ftod (vref v4 1)) (ftod (vref v4 2)) (ftod (vref v4 3)))
+	(printf "cmp:%d:%d:%d:%d\n" (i1toi32 (vref v5 0)) (i1toi32 (vref v5 1)) (i1toi32 (vref v5 2)) (i1toi32 (vref v5 3)))
+	void))))
+
+(test-xtfunc (vector-test1))
+
+(bind-func vector-test2
+  (lambda ()
+    (let ((v1:/4,float/* (alloc))
+	  (v2:/4,float/* (alloc)))
+      (vfill! v1 1.0 2.0 4.0 8.0)
+      (vfill! v2 2.0 2.5 2.25 2.125)
+      (* v1 v2))))
+
+(bind-func vector-test3
+  (lambda ()
+    (let ((a (vector-test2)))
+      (printf "%f:%f:%f:%f\n"
+	      (ftod (vref a 0))
+	      (ftod (vref a 1))
+	      (ftod (vref a 2))
+	      (ftod (vref a 3)))
+      void)))
+
+(test-xtfunc (vector-test3))
+
+;; vectorised sine func
+(bind-func vsinf4
+  (let ((p:/4,float/* (alloc))
+	(b:/4,float/* (alloc))
+	(c:/4,float/* (alloc))
+	(f1:/4,float/* (alloc))
+	(f2:/4,float/* (alloc))
+	(i:i32 0)
+	(p_ 0.225)
+	(b_ (dtof (/ 4.0 PI)))
+	(c_ (dtof (/ -4.0 (* PI PI)))))
+    (dotimes (i 4) (vset! p i p_) (vset! b i b_) (vset! c i c_))
+    (lambda (x:/4,float/)
+      ;; no SIMD for abs yet!
+      (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
+      (let ((y (+ (* b x) (* c x f1))))
+	;; no SIMD for abs yet!
+	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+	(+ (* p (- (* y f2) y)) y)))))
+
+(bind-func vcosf4
+  (let ((p:/4,float/* (alloc))
+	(b:/4,float/* (alloc))
+	(c:/4,float/* (alloc))
+	(d:/4,float/* (alloc))
+	(f1:/4,float/* (alloc))
+	(f2:/4,float/* (alloc))
+	(i:i32 0)
+	(p_ 0.225)
+	(d_ (dtof (/ PI 2.0)))
+	(b_ (dtof (/ 4.0 PI)))
+	(c_ (dtof (/ -4.0 (* PI PI)))))
+    (dotimes (i 4)
+      (vset! p i p_) (vset! b i b_) (vset! c i c_) (vset! d i d_))
+    (lambda (x:/4,float/)
+      ;; offset x for cos
+      (set! x (+ x d))
+      ;; no SIMD for abs yet!
+      (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
+      (let ((y (+ (* b x) (* c x f1))))
+	;; no SIMD for abs yet!
+	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+	(+ (* p (- (* y f2) y)) y)))))
+
+
+(bind-func vector-test4
+  (lambda ()
+    (let ((a:/4,float/* (alloc)))
+      (vfill! a 0.1 0.2 0.3 0.4)
+      (let ((b (vsinf4 (pref a 0)))
+	    (c (vcosf4 (pref a 0))))
+	(printf "precision inaccuracy is expected:\n")
+	(printf " sinf:\t%f,%f,%f,%f\n"
+		(ftod (sinf 0.1))
+		(ftod (sinf 0.2))
+		(ftod (sinf 0.3))
+		(ftod (sinf 0.4)))
+	(printf "vsinf:\t%f,%f,%f,%f\n"
+		(ftod (vref b 0))
+		(ftod (vref b 1))
+		(ftod (vref b 2))
+		(ftod (vref b 3)))
+	(printf " cosf:\t%f,%f,%f,%f\n"
+		(ftod (cosf 0.1))
+		(ftod (cosf 0.2))
+		(ftod (cosf 0.3))
+		(ftod (cosf 0.4)))
+	(printf "vcosf:\t%f,%f,%f,%f\n"
+		(ftod (vref c 0))
+		(ftod (vref c 1))
+		(ftod (vref c 2))
+		(ftod (vref c 3)))
+	void))))
+
+(test-xtfunc (vector-test4))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; ADT testing
+
+(load "libs/core/adt.xtm")
+
+;; xlist tests
+
+(bind-func xlist_test1
+  (lambda ()
+    (let ((l1 (xjoin 1.0 null)))
+      (xmap (lambda (i)
+	      (* i 2.0))
+	    l1))))
+
+(test-xtfunc (xlist_test1))
+
+(bind-func xlist_test2
+  (lambda ()
+    (let ((l1 (xlist 1.0 2.0 3.0 4.0)))
+      (xmap (lambda (i)
+	      (printf "%f\n" (* i 2.0)))
+	    l1))))
+
+(test-xtfunc (xlist_test2))
+
+
+(bind-func xlist_test3
+  (lambda ()
+    (let ((l1 (xlist 1 2 3 4)))
+      (xmap (lambda (i)
+	      (* i (xlength l1)))
+	    l1))))
+
+(test-xtfunc (xlist_test3))
+
+(bind-func xlist_test4
+  (lambda ()
+    (let ((l1 (xlist "andrew" "ben" "torben")))
+      (xmap (lambda (i)
+	      (if (= (strcmp i "andrew") 0)
+		  (printf "%s rocks\n" i)
+		  (printf "%s rolls\n" i)))
+	    l1))))
+
+(test-xtfunc (xlist_test4))
+
+(bind-func xlist_test5
+  (lambda ()
+    (let ((l1 (xlist (xlist "andrew" "london")
+		     (xlist "ben" "new york")
+		     (xlist "torben" "moscow"))))
+      (xmap (lambda (i)
+	      (printf "%s rocks\n" (xhead i)))
+	    l1))))
+
+(test-xtfunc (xlist_test5))
+
+
+(bind-func xlist_test6
+  (lambda ()
+    (let ((l1 (xlist (xlist "andrew" "london") (xlist "ben" "new york") (xlist "torben" "moscow"))))
+      (xmap (lambda (i)
+	      (if (= (strcmp (xhead i) "andrew") 0)
+		  (printf "%s rocks %s\n" (xhead i) (xhead (xtail i)))
+		  (printf "%s rolls %s\n" (xhead i) (xhead (xtail i)))))
+	    l1))))
+
+(test-xtfunc (xlist_test6))
+
+(bind-func xlist_test7
+  (lambda ()
+    (let ((l1 (xlist (xlist "andrew" "london")
+		     (xlist "ben" "new york")
+		     (xlist "torben" "moscow"))))
+      (xmap (lambda (i)
+	      (xmap (lambda (k:i8*)
+		      (printf "\t::%s\n" k))
+		    i)
+	      (if (= (strcmp (xhead i) "andrew") 0)
+		  (printf "%s rocks %s\n" (xhead i) (xhead (xtail i)))
+		  (printf "%s rolls %s\n" (xhead i) (xhead (xtail i))))
+	      (i64toi32 1))
+	    l1))))
+
+(test-xtfunc (xlist_test7))
+
+
+(bind-func xlist_test8
+  (lambda ()
+    (let ((l1 (xlist 1 2 3))
+	  (last (xlast l1)))
+      last)))
+
+(test-xtfunc (xlist_test8))
+
+(bind-func xlist_test8b
+  (lambda ()
+    (let ((l1 (xlist 1.0 2.0 3.0))
+	  (l2 (xlast l1)))
+      1)))
+
+(test-xtfunc (xlist_test8b))
+
+(bind-func xlist_test9
+  (lambda ()
+    (let ((l1 (xlist 1 2 3))
+	  (last (xlast l1)))
+      (printf "%d\n" (xhead last)))))
+
+(test-xtfunc (xlist_test9))
+
+(bind-func xlist_test10
+  (lambda ()
+    (let ((l1 (xlist "andrew" "ben" "torben")))
+      (xmap (lambda (i)
+	      (printf "%s\n" i))
+	    l1)
+      void)))
+
+(test-xtfunc (xlist_test4))
+
+
+
+;; xpair tests
+
+(bind-func xpair_test1
+  (lambda ()
+    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben"))))
+      l1)))
+
+(test-xtfunc (xpair_test1))
+
+(bind-func xpair_test2
+  (lambda ()
+    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben"))))
+      (xhead l1))))
+
+(test-xtfunc (xpair_test2))
+
+(bind-func xpair_test3
+  (lambda ()
+    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben")))
+	  (l2 (xhead l1)))
+      (printf "%s\n" (tref (xhead l1) 1))
+      l1)))
+
+(test-xtfunc (xpair_test3))
+
+(bind-func xpair_test4
+  (lambda ()
+    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben")))
+	  (l2 (xhead l1)))
+      (printf "%s\n" (xsecond (xhead (xtail l1))))
+      l1)))
+
+(test-xtfunc (xpair_test4))
+
+(bind-func xpair_test5
+  (lambda ()
+    (let ((l1 (xpair (xlist 1 2) (xlist 1 2))))
+      l1)))
+
+(test-xtfunc (xpair_test5))
+
+;; xappend test
+
+(bind-func xappend_test1
+  (lambda ()
+    (let ((l1 (xlist "a" "b" "c"))
+	  (l2 (xlist "d" "e" "f"))
+	  (l3 (xappend l1 l2)))
+      (xmap (lambda (k)
+	     (printf "%s\n" k))
+	   l3)
+      void)))
+
+(test-xtfunc (xappend_test1))
+
+;; xtree tests
+
+(bind-func tree-test1
+  (lambda ()
+    (let ((a (xlist 1 2)))
+      (xtree a))))
+
+(test-xtfunc (tree-test1))
+
+(bind-func tree-test2
+  (lambda ()
+    (let ((leaf (xleaf 1)))
+      leaf)))
+
+(test-xtfunc (tree-test2))
+
+;; (bind-func tree-test3
+;;   (lambda ()
+;;     (let ((root (xtree (xleaf 5)))
+;;           (leaf1 (xtree (xleaf 13)))
+;;           (leaf2 (xleaf 17))
+;;           (leaf3 (xleaf 3))
+;;           )
+;;       (xadd_child leaf1 leaf3)
+;;       (xadd_child root leaf1)
+;;       (xadd_child root leaf2)
+;;       ;; (xprint_tree root 0)
+;;       void)))
+
+;; (test-xtfunc (tree-test3))
+
+(bind-func xnth_test1
+  (lambda ()
+    (let ((a (xlist 1.0 2.0 3.0)))
+      (printf "pointer = %p\n" (xsecond (xnth_tail a 0)))
+      (xhead (xnth_tail a 0)))))
+
+(test-xtfunc (xnth_test1) 1.0)
+
+
+(bind-func xinsert_test
+  (lambda ()
+    (let ((a (xlist 1 2 3)))
+      (xinsert a (xlength a) 6)
+      (xnth a 3))))
+
+(test-xtfunc (xinsert_test) 6)
+
+;; print out the results of all the tests!
+
+(print-test-results)
