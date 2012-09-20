@@ -267,7 +267,12 @@ and start it up with `./extempore`
 folder) or create a new one
 3. You're away. `C-x C-x` will eval an expression and `C-x C-r` will
 eval the region
-  
+
+*Version note*: the Emacs major mode (`extempore-mode`) only works
+ with Emacs 24 because it inherits from `prog-mode`. If for some
+ reason you have to stick on Emacs 23, you can use the Extempore minor
+ mode (`extras/extempore-minor.el`).
+
 *Windows note*: if you choose to use emacs on windows (recommended)
 and run extempore in a `shell` or `eshell` then you should
 set `--term ansi` as an option when starting extempore.
