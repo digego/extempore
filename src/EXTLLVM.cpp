@@ -64,7 +64,8 @@
 #include <arpa/inet.h>
 #endif
 
-
+#include <unistd.h>
+ 
 //#include "llvm/Analysis/DebugInfo.h"
 //#include "llvm/Analysis/Verifier.h"
 #include "llvm/Assembly/Parser.h"
