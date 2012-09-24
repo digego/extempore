@@ -39,6 +39,7 @@
 #include <sstream>
 #include <math.h>
 
+#include <unistd.h>
 #include <stdlib.h>
 
 #ifdef EXT_BOOST

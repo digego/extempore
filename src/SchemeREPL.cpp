@@ -48,7 +48,8 @@
 #include <sys/socket.h>    /* socket interface functions  */
 #include <netdb.h>         /* host to IP resolution       */
 #endif
-
+ 
+#include <unistd.h>
 #include <iostream>
 #include <sstream>    
 #include <string.h>

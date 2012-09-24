@@ -78,7 +78,7 @@ Linux:
 - `LLVM 3.0`
 - `pthread` (if not using `boost`) *or* `boost` (if not using `pthread`)
 - `pcre`
-- `portaudio`
+- `portaudio v19`
 - `mesa GL` (openGL)
 
 LLVM *must* be version 3.0 and needs to be built from source, because
