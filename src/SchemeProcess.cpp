@@ -54,6 +54,7 @@
 #include <sys/select.h>
 #endif
 
+#include <unistd.h>
 #include <stdlib.h>
 #include "UNIV.h"
 
