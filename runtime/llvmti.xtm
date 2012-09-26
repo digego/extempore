@@ -1045,14 +1045,20 @@
 							""))
 					  ;; (gen-type (symbol->string (impc:ir:gpolytype-types (cadr split))))
 					  (named-type (impc:ir:get-type-from-str (llvm:get-named-type k)))
-					  (match (map (lambda (a b)
-							(if (equal? a b) #t
-							    (if (and (symbol? a)
-								     (regex:match? gen-type (symbol->string a)))
-								#t
-								#f)))
-						      t ;; type coming in
-						      named-type)))
+                                          (domatch? (if (and (list? named-type)
+                                                             (= (length named-type) (length t)))
+                                                        #t #f))
+					  (match (if domatch?
+                                                     (map (lambda (a b)
+                                                            ;; (println 'aa a 'bb b)
+                                                            (if (equal? a b) #t
+                                                                (if (and (symbol? a)
+                                                                         (regex:match? gen-type (symbol->string a)))
+                                                                    #t
+                                                                    #f)))
+                                                          t ;; type coming in
+                                                          named-type)
+                                                     (list k))))
 				     (if (member #f match) #f k)))
 				 named-types)))
 		   (set! res (cl:remove-if-not string? res))
