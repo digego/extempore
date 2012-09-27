@@ -345,6 +345,25 @@
 
 ;; for NI Akoustik piano samples
 ;; Stein-R(A-1)-V(077)-dB(3129)-T(ML)-M(22)-P(1956-04-01).WAV
+(define parse-NI-piano-pp
+  (lambda (file-list)
+    (let loop ((unparsed-files file-list)
+               (samp-data-list '())
+               (loaded-notes '()))
+      (if (null? unparsed-files)
+          samp-data-list
+          (let ((result (regex:matched (car unparsed-files)
+                                       ".*-R\\(([ABCDEFG][#b]?-?[0-9])\\)-.*-M\\(([0-9]*)\\)-.*")))
+            (if (null? result)
+                (loop (cdr unparsed-files) samp-data-list loaded-notes)
+                (if (member (cadr result) loaded-notes)
+                    (loop (cdr unparsed-files) samp-data-list loaded-notes)
+                    (loop (cdr unparsed-files)
+                          (cons (list (car unparsed-files)
+                                      (+ 12 (note-name-to-midi-number (cadr result)))
+                                      0 0)
+                                samp-data-list)
+                          (cons (cadr result) loaded-notes)))))))))
 
 ;; a helpful map for General MIDI drum note numbers
 
