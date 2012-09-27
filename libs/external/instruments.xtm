@@ -250,13 +250,35 @@
 	   (* gain (,effect-kernel out time chan dat)))))))
 
 
-;; load-sampler now requires you to supply your own function for parsing
-;; the midi note numbers out of the sample names in the directory
+;; load-sampler now requires you to supply your own function for
+;; parsing the sample metadata from the sample names
 
-;; the supplied function should take one argument (the sample name) and
-;; return a list with two elements: first element is the sample name, and
-;; the second element is the midi note number.  If no suitable number can
-;; be parsed from the sample name the function should return false.
+;; the supplied function (parser) takes one argument: a list of the
+;; files in the directory (the sample name) and
+;; return a list of four-element lists: filename, midi note number,
+;; sample offset and sample length (or 0 for the whole sample).
+
+;; As an example, if the directory contains the files:
+;; ("A1.wav" "B1.wav" "C2.wav" ...)
+
+;; the parser function should return the list
+;; (("A1.wav" 33 0 0)
+;;  ("B1.wav" 35 0 0)
+;;  ("C2.wav" 36 0 0))
+
+;; must be stereo samples of type wav aif or ogg
+(define-macro (load-sampler sampler path parser)
+  `(let ((file-list (sys:directory-list ,path)))
+     (for-each (lambda (samp-data)
+                 (if samp-data
+                     (set-sampler-index ,sampler
+                                        (if (string=? (sys:platform) "Windows")
+                                            (car samp-data)
+                                            (string-append ,path "/" (car samp-data)))
+                                        (cadr samp-data)
+                                        (caddr samp-data)
+                                        (cadddr samp-data))))
+	       (,parser file-list))))
 
 ;; as a start, here are a couple of parser functions which might be useful:
 
@@ -274,72 +296,57 @@
                        (else 0))))))))
 
 ;; this will match e.g. 60.aiff (where 60 is the midi note number)
-(define parse-sample-name-1
-  (lambda (fname)
-    (let ((result (regex:matched fname "([0-9]*)\.(wav|aif|aiff|ogg)$")))
-      (if (null? result)
-          (begin (println 'Error: 'cannot 'parse 'filename: fname)
-                 #f)
-          (list fname (string->number (cadr result)))))))
+(define parse-sample-names-1
+  (lambda (file-list)
+    (map (lambda (fname)
+           (let ((result (regex:matched fname "([0-9]*)\.(wav|aif|aiff|ogg)$")))
+             (if (null? result)
+                 (begin (println 'Error: 'cannot 'parse 'filename: fname)
+                        #f)
+                 (list fname                          ; filename    
+                       (string->number (cadr result)) ; midi note number
+                       0                              ; offset
+                       0))))                          ; length (0 for whole sample)
+         file-list)))
 
 ;; this will match e.g. Eb3.aiff (representing E flat 3)
-(define parse-sample-name-2
-  (lambda (fname)
-    (let ((result (regex:matched fname "^.*([ABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
-        (if (null? result)
-            (begin (println 'Error: 'cannot 'parse 'filename: fname)
-                   #f)
-            (list fname (note-name-to-midi-number (cadr result)))))))
+(define parse-sample-names-2
+  (lambda (file-list)
+    (map (lambda (fname)
+           (let ((result (regex:matched fname "^.*([ABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
+             (if (null? result)
+                 (begin (println 'Error: 'cannot 'parse 'filename: fname)
+                        #f)
+                 (list fname                                    ; filename                   
+                       (note-name-to-midi-number (cadr result)) ; midi note number           
+                       0                                        ; offset                     
+                       0))))                                    ; length (0 for whole sample)
+         file-list)))
 
 ;; for the MIS piano samples (mf loudness only), avaliable from
 ;; http://theremin.music.uiowa.edu/MISpiano.html
 (define parse-MIS-piano-mf
-  (lambda (fname)
-    (let ((result (parse-sample-name-2 fname)))
-      (and result
-           (and (regex:match? (car result) ".*\.mf\..*")
-                result)))))
+  (lambda (file-list)
+    (map (lambda (samp-data)
+           (if (and samp-data
+                    (regex:match? (car samp-data) ".*\.mf\..*"))
+               samp-data
+               #f))
+         (parse-sample-names-2 file-list))))
 
 (define parse-MIS-piano-ff
-  (lambda (fname)
-    (let ((result (parse-sample-name-2 fname)))
-      (and result
-           (and (regex:match? (car result) ".*\.ff\..*")
-                result)))))
+  (lambda (file-list)
+    (map (lambda (samp-data)
+           (if (and samp-data
+                    (regex:match? (car samp-data) ".*\.ff\..*"))
+               samp-data
+               #f))
+         (parse-sample-names-2 file-list))))
 
 ;; for NI Akoustik piano samples
 ;; Stein-R(A-1)-V(077)-dB(3129)-T(ML)-M(22)-P(1956-04-01).WAV
 
-(define parse-NI-piano-ff
-  (lambda (fname)
-    (let ((result (regex:matched fname ".*-R\\(([ABCDEFG][#b]?-?[0-9])\\)-.*-M\\(([0-9]*)\\)-.*")))
-      (if (null? result)
-          (begin (println 'Error: 'cannot 'parse 'file: fname)
-                 #f)
-          (if (= (string->number (caddr result)) 127)
-              (list fname (+ 12 (note-name-to-midi-number (cadr result))))
-              #f)))))
-
-;; must be stereo samples of type wav aif or ogg
-(define-macro (load-sampler sampler path parser offset length)
-  `(let* ((file-list (sys:directory-list ,path))
-          (offset-list ,(if (number? offset)
-                            `(make-list (length file-list) ,offset)
-                            offset))
-          (length-list ,(if (number? length)
-                            `(make-list (length file-list) ,length)
-                            length)))
-     (for-each (lambda (f o l)
-                 (let ((result (,parser f)))
-                   (if result
-                       (set-sampler-index ,sampler
-                                          (if (string=? (sys:platform) "Windows")
-                                              (car result)
-                                              (string-append ,path "/" (car result)))
-                                          (cadr result) o l))))
-	       file-list
-               offset-list
-               length-list)))
+;; a helpful map for General MIDI drum note numbers
 
 (define drum-map
   '((35 . "Bass Drum 2")
