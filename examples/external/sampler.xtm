@@ -82,13 +82,11 @@
 ;; file we loaded earlier contains a helper macro called
 ;; `load-sampler'.
 
-;; The load-sampler macro takes 5 arguments (just like
+;; The load-sampler macro takes 3 arguments (just like
 ;; set-sampler-index):
 ;; 1) the sampler instrument to load the audio data into
 ;; 2) the (full or relative) path to the directory where the files are
 ;; 3) the name parser function (see below)
-;; 4) an offset for the samples (or list of offsets)
-;; 5) a length for the samples (or list of lengths)
 
 ;; So, say the files are stored in a directory like
 ;; A0.aiff
@@ -104,32 +102,33 @@
 ;; audio data into.  Because there are heaps of different naming
 ;; conventions which a sample library might use for their files,
 ;; `load-sampler' instead asks you to provide a function which it will
-;; apply to each filename, and this function should return a list with
-;; the filename and the appropriate sample index.  As an example, this
-;; function will work for files named with the A0.aiff shown above
+;; apply to the list of filenames, and return a list where each
+;; element has the filename and the appropriate sample index, offset
+;; and length values.  As an example, this
+;; function will work for files named with the A0.aiff convention shown above
 
-(define parse-sample-name-2
-  (lambda (fname)
-    (let ((result (regex:matched fname "^.*([ABCDEFG])([#b])?([0-9]).*\.(wav|aif|aiff|ogg)$")))
-        (if (null? result)
-            (begin (println "Error: cannot parse filename: " fname)
-                   #f)
-            (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
-                  (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
-                        ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
-              (list fname (+ offset pc
-                             (cond ((string=? (caddr result) "#") 1)
-                                   ((string=? (caddr result) "b") -1)
-                                   (else 0)))))))))
+(define parse-sample-names-2
+  (lambda (file-list)
+    (map (lambda (fname)
+           (let ((result (regex:matched fname "^.*([ABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
+             (if (null? result)
+                 (begin (println 'Error: 'cannot 'parse 'filename: fname)
+                        #f)
+                 (list fname                                    ; filename                   
+                       (note-name-to-midi-number (cadr result)) ; midi note number           
+                       0                                        ; offset                     
+                       0))))                                    ; length (0 for whole sample)
+         file-list)))
 
-;; if we call `parse-sample-name-2' with the filename Eb3.aiff, for
-;; instance
+;; if we call `parse-sample-names-2' with a list of files, we get
 
-(println (parse-sample-name-2 "Eb3.aiff"))
+(println (parse-sample-names-2 '("A1.wav" "B1.wav" "C2.wav")))
 
-;; see how the function returns ("Eb3.aiff" 51), a list with the
-;; filename as first element and the index number as the second
-;; element.
+;; each element of the returned list contains the filename, the midi
+;; note number, and the offset and length values (which will both be 0
+;; in most cases).  Even if you've got weirdly named samples, as long
+;; as your parser returns the data in this way then the sampler will
+;; know how to load itself up.
 
 ;; The MIS piano samples available from
 ;; http://theremin.music.uiowa.edu/MISpiano.html use this convention:
@@ -138,20 +137,19 @@
 ;; use:
 
 (define parse-MIS-piano-mf
-  (lambda (fname)
-    ;; map from letter note names into numbers as above
-    (let ((result (parse-sample-name-2 fname)))
-      (and result
-           ;; only include the mf samples
-           (and (regex:match? (car result) ".*\.mf\..*")
-                result)))))
+  (lambda (file-list)
+    (map (lambda (samp-data)
+           (if (and samp-data
+                    (regex:match? (car samp-data) ".*\.mf\..*"))
+               samp-data
+               #f))
+         (parse-sample-names-2 file-list))))
 
 ;; So, to load all the mf samples into the sampler:
 
 (load-sampler sampler
               "path/to/MIS-piano-samples"
-              parse-MIS-piano-mf
-              0 0)
+              parse-MIS-piano-mf)
 
 ;; the final two arguments (offset and length) are zero, meaning that
 ;; the samper should use an offset of zero and the full length of the
