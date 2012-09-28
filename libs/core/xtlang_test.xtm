@@ -1102,19 +1102,41 @@
 
 ;; xtree tests
 
-(bind-func tree-test1
+;; create a one node tree!
+(bind-func xtree-test1
   (lambda ()
-    (let ((a (xlist 1 2)))
-      (xtree a))))
+    (let ((t (xtree 1)))
+      t)))
 
-(test-xtfunc (tree-test1))
+(test-xtfunc (xtree-test1))
 
-(bind-func tree-test2
+;; create tree with two leaf nodes
+(bind-func xtree-test2
   (lambda ()
-    (let ((leaf (xleaf 1)))
-      leaf)))
+    (let ((t1 (xtree 1))
+          (t2 (xtree 2))
+          (t3 (xtree 3)))
+      (xtree_add_child t1 t2)
+      (xtree_add_child t1 t3)
+      t3)))
 
-(test-xtfunc (tree-test2))
+(test-xtfunc (xtree-test2))
+
+(bind-func xtree-test3
+  (lambda (a:i64 b:i64 c:i64)
+    (let ((t1 (xtree a))
+          (t2 (xtree b))
+          (t3 (xtree c)))
+      (printf "children:%lld\n" (xtree_add_child t1 t2))
+      (printf "children:%lld\n" (xtree_add_child t1 t3))
+      (printf "children:%lld\n\n" (xtree_children t1))
+      (xtree_print_i64 t1)
+      (printf "\n\n%p:%p:%p\n" (xtree_child t1 1) t2 t3)
+      (printf "child 1 val:%lld\n" (xtree_value (xtree_child t1 1)))
+      (printf "child 2 val:%lld\n" (xtree_value (xtree_child t1 0)))
+      void)))
+
+(test-xtfunc (xtree-test3 1 2 3))
 
 ;; (bind-func tree-test3
 ;;   (lambda ()

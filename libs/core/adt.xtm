@@ -135,58 +135,67 @@
 ;; TREES ;;
 ;;;;;;;;;;;
 
-(bind-type xtree_t <!a>)
+;; xlist_t*~i8* is specialised for <i8*,xlist_t*>*
+(bind-type xtree_t <!value,i64,xlist_t*~i8*>)
 
-(bind-func xtree:[xlist_t*,!a]*
+(bind-func xtree:[xtree_t*,!value]*
   (lambda (a)
-    (xlist a)))
+    (let ((tree (halloc)))
+      (tset! tree 0 a)
+      (tset! tree 1 (i32toi64 0))
+      (tset! tree 2 (cast null xlist_t*~i8*))
+      tree)))
 
-(bind-func xleaf:[xlist_t*,!a]*
-  (lambda (a)
-    (xlist a)))
+(bind-func xtree_children:[i64,xtree_t*]*
+  (lambda (t)
+    (tref t 1)))
 
-(bind-func xnode:[xlist_t*,xlist_t*]*
-  (lambda (a)
-    (let ((b (xlist a)))
-      (xtree b))))
+(bind-func xtree_value:[!value,xtree_t*]*
+  (lambda (t)
+    (tref t 0)))
 
-(bind-func xvalue:[!head,xlist_t*]*
-  (lambda (node)
-    (tref node 0)))
+(bind-func xtree_child:[xtree_t*,xtree_t*,i64]*
+  (lambda (t n)
+    (if (> (tref t 1) n)
+        (xnth (cast (tref t 2) xlist_t*~i8*) n)
+        null)))
 
-(bind-func xdescendants:[!a,xtree_t*]*
-  (lambda (node)
-    (xtail (tref node 0))))
+(bind-func xtree_nodes:[xlist_t*,xtree_t*]*
+  (lambda (t)
+    (cast (tref t 2) xlist_t*~i8*)))
 
-(bind-func xleaf_p:[bool,xtree_t*]*
-  (lambda (node)
-    (xempty_p (get_descendants node))))
-
-(bind-func xadd_child:[xtree_t*,xtree_t*,xtree_t*]*
+(bind-func xtree_add_child:[i64,xtree_t*,xtree_t*]*
   (lambda (parent child)
-    (let ((par_list (tref parent 0))
-          (child_list (tref child 0)))
-      (xtree (xinsert par_list 1 child_list)))))
+    (let ((children (tref parent 2))
+          (newchildren (xjoin (cast child i8*) children)))
+      (tset! parent 2 newchildren)
+      (tset! parent 1 (+ 1 (tref parent 1)))
+      (tref parent 1))))
 
-(bind-func xadd_child:[xlist_t*,xlist_t*,!a]*
-           (lambda (parent child)
-             (xappend parent (xlist child))))
+(bind-func xtree_print_i64:[i32,xtree_t*]*
+  (lambda (tree)
+    (if (= (xtree_children tree) 0)
+        (printf " %lld" (xtree_value tree))
+        (begin (printf "\n%lld\n" (xtree_value tree))
+               (xmap (lambda (t)
+                      (xtree_print_i64 (cast t xtree_t*~i64)))
+                     (xtree_nodes tree))
+               (i64toi32 1)))))
 
-(bind-func xprint_node:[i32,xlist_t*,i64]*
-  (lambda (node depth)
-    (printf "value = %lld:%lld\n" depth (xhead node))))
+;; ;; xtree test ;; should move this to 
+;; (bind-func test3
+;;   (lambda (a:i64 b:i64 c:i64)
+;;     (let ((t1 (xtree a))
+;;           (t2 (xtree b))
+;;           (t3 (xtree c)))
+;;       (printf "children:%lld\n" (xtree_add_child t1 t2))
+;;       (printf "children:%lld\n" (xtree_add_child t1 t3))
+;;       (printf "children:%lld\n" (xtree_children t1))
+;;       (xtree_print_i64 t1)
+;;       (printf "%p:%p:%p\n" (xtree_child t1 1) t2 t3)
+;;       (printf "child 1 val:%lld\n" (xtree_value (xtree_child t1 1)))
+;;       (printf "child 2 val:%lld\n" (xtree_value (xtree_child t1 0)))
+;;       ;; (xtree_child t1 0)
+;;       void)))
 
-(bind-func xprint_tree:[i64,xlist_t*,i64]*
-  (lambda (tree depth)
-    (if (null? tree)
-        1
-        (begin (xprint_node (xhead tree) depth)
-               (xmap (lambda (n)
-                       (xprint_tree (xlist n) (+ depth 1)))
-                     (xtail tree))
-               1))))
-
-
-;;;;;;;;;;;;;
-;; STRINGS ;;
-;;;;;;;;;;;;;
+;; (test3 1 2 3)
