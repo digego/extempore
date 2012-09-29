@@ -1753,6 +1753,13 @@
    (lambda (ast vars kts request?)
       (if (not (symbol? ast)) (print-error 'Tyring 'to 'symbol 'check 'a 'non-symbol: ast))
       ;; (println 'symbolcheck 'ast: ast 'vars: vars 'request: request?)
+      ;; if we get a generic function here it means that someone
+      ;; is trying to pass it as a value (which is illegal!)
+      (if (and (symbol? ast)
+               (impc:ir:gpoly-types (string->symbol (impc:ir:get-base-type (symbol->string ast)))))
+               ;; (regex:match? (symbol->string ast) "##")
+               ;; (not (regex:match? (symbol->string ast) "!")))
+          (print-error 'Compiler 'Error: 'trying 'to 'use 'generic 'function 'as 'value: ast))
       (if *impc:ti:print-sub-checks* (println 'sym:> 'ast: ast 'request? request?))
       ;; if a request is made - assume it's forced
       ;; find the intersection between the request
