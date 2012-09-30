@@ -512,7 +512,7 @@
                  ;; (ttype (impc:ir:get-type-from-pretty-str (symbol->string ntype)))
                  (depth (impc:ir:get-ptr-depth (car split)))
                  (base (impc:ir:get-base-type (car split)))
-                 (ts (regex:split (cadr split) ","))
+                 (ts (cdr split)) ;(regex:split (cadr split) ","))
                  (hash 0)
                  (newtype (symbol->string ntype)))
             (if (<> (length ts) (length gvars))
@@ -531,18 +531,18 @@
 
 
 ;; takes any type with generic specialisations
-;; and returns tye type with any specialisations (i.e. ~'s)
+;; and returns type with any specialisations (i.e. ~'s)
 ;; turned into proper hashed named types
 (define impc:ti:generic-spec-to-hashed
   (lambda (t)
     (if (symbol? t) (set! t (symbol->string t)))
-    (let* ((v (regex:matched t "[^<>,]*~[^<>,]*"))
+    (let* ((v (regex:matched t "[^\\[<>\\]|/,]*~[^\\[<>\\]|/,]*"))
            (s (impc:ti:generic-type-specification (string->symbol (car v))))
            (n (regex:replace t (string-append "\\Q" (car v) "\\E") (symbol->string s))))
+      ;; (println 'v v 's s 'n n)
       (if (regex:match? n "~")
           (impc:ti:generic-spec-to-hashed n)
           (string->symbol n)))))
-
 
     
 (define *unique-polynum* 0)
@@ -4787,22 +4787,29 @@ deprecated - use bind-func instead."
 (define-macro (bind-func . args)
   (if (regex:match? (symbol->string (car args)) ":")
       (let ((res (regex:split (symbol->string (car args)) ":")))
+        ;(println 'res: res)
 	(if (or (regex:match? (cadr res) "!")
 		(cl:find-if (lambda (v) (eq? v #t))
 			    (map (lambda (k)
 				   (if (assoc (string->symbol k) *impc:ir:gpolytypes*) #t #f))
-				 (regex:split (cadr res) "[,|*\\[\\]]"))))
-	    (begin (impc:ir:add-gpoly (cons 'bind-func args))
-		   `(begin (ascii-print-color 0 7 10)
-			   (print "Added generic ")
-			   (ascii-print-color 1 2 10)
-			   (print ,(car res))
-			   (ascii-print-color 0 7 10)
-			   (print " >>> ")
-			   (ascii-print-color 1 3 10)
-			   (print ,(cadr res))
-			   (ascii-print-color 0 7 10)
-			   (print)))
+				 (regex:split (cadr res) "[~,|*\\[\\]]"))))
+	    (begin (if (regex:match? (cadr res) "~") ;; if this is a specialized type then we probably aren't generic
+                       (begin (set-car! args (string->symbol (string-append (car res) ":" (symbol->string (impc:ti:generic-spec-to-hashed (string->symbol (cadr res)))))))
+                              ;; (println 'args: args)
+                              `(bind-func ,@args))
+                              ;; `(impc:ti:parametric-poly-pass '(definec ,@args)))
+                       (begin
+                         (impc:ir:add-gpoly (cons 'bind-func args))
+                         `(begin (ascii-print-color 0 7 10)
+                                 (print "Added generic ")
+                                 (ascii-print-color 1 2 10)
+                                 (print ,(car res))
+                                 (ascii-print-color 0 7 10)
+                                 (print " >>> ")
+                                 (ascii-print-color 1 3 10)
+                                 (print ,(cadr res))
+                                 (ascii-print-color 0 7 10)
+                                 (print)))))
 	    `(impc:ti:parametric-poly-pass '(definec ,@args))))
       `(impc:ti:parametric-poly-pass '(definec ,@args))))
 
