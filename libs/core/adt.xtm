@@ -7,6 +7,149 @@
 (bind-alias bool i1)
 
 ;;;;;;;;;;;;;;;;;;;;
+;;
+
+(bind-func xempty_p:[bool,!a]*
+  (lambda (a)
+    (if (null? a) #t #f)))
+
+
+;;;;;;;;;;;;;;;;;;;;
+;;
+;; Boxing helpers
+;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; tag num and data
+(bind-type xbox_t <i64,i8*,i8*>)
+
+(bind-func xunboxi1:[i1,xbox_t*]*
+  (lambda (box)
+    (let ((key (tref box 0))
+          (val (tref box 1)))
+      ;;(if (<> 8 key) (printf "bad type conversion! from %lld->%lld!\n" key 8))
+      (i64toi1 (ptrtoi64 val)))))
+
+(bind-func xunboxi8:[i8,xbox_t*]*
+  (lambda (box)
+    (let ((key (tref box 0))
+          (val (tref box 1)))
+      ;;(if (<> 6 key) (printf "bad type conversion from %lld->%lld!\n" key 6))
+      (i64toi8 (ptrtoi64 val)))))
+
+(bind-func xunboxi32:[i32,xbox_t*]*
+  (lambda (box)
+    (let ((key (tref box 0))
+          (val (tref box 1)))
+      ;;(if (<> 4 key) (printf "bad type conversion from %lld->%lld!\n" key 4))
+      (i64toi32 (ptrtoi64 val)))))
+
+(bind-func xunboxi64:[i64,xbox_t*]*
+  (lambda (box)
+    (let ((key (tref box 0))
+          (val (tref box 1)))
+      ;;(if (<> 2 key) (printf "bad type conversion from %lld->%lld!\n" key 2))
+      (ptrtoi64 val))))
+
+(bind-func xunboxfloat:[float,xbox_t*]*
+  (lambda (box)
+    (let ((key (tref box 0))
+          (val (tref box 1)))
+      ;;(if (<> 1 key) (printf "bad type conversion from %lld->%lld!\n" key 1))
+      (i64tof (ptrtoi64 val)))))
+
+(bind-func xunboxdouble:[double,xbox_t*]*
+  (lambda (box)
+    (let ((key (tref box 0))
+          (val (tref box 1)))
+      ;;(if (<> 0 key) (printf "bad type conversion from %lld->%lld!\n" key 0))
+      (i64tod (ptrtoi64 val)))))
+
+(bind-func xunboxptr:[i8*,xbox_t*]*
+  (lambda (box)
+    (let ((key (tref box 0))
+          (val (tref box 1)))
+      ;;(if (<> -1 key) (printf "bad type conversion from %lld->%lld!\n" key -1))
+      val)))
+
+(bind-poly xunbox xunboxgen)
+(bind-poly xunbox xunboxi1)
+(bind-poly xunbox xunboxi8)
+(bind-poly xunbox xunboxi32)
+(bind-poly xunbox xunboxi64)
+(bind-poly xunbox xunboxfloat)
+(bind-poly xunbox xunboxdouble)
+(bind-poly xunbox xunboxptr)
+      
+
+(bind-func xbox1:[xbox_t*,double]*
+  (lambda (val)
+    (let ((box:xbox_t* (halloc)))
+      (tset! box 0 0)
+      (tset! box 1 (i64toptr (dtoi64 val)))
+      box)))
+
+(bind-func xbox2:[xbox_t*,float]*
+  (lambda (val)
+    (let ((box:xbox_t* (halloc)))
+      (tset! box 0 1)
+      (tset! box 1 (i64toptr (ftoi64 val)))
+      box)))
+
+(bind-func xbox3:[xbox_t*,i64]*
+  (lambda (val)
+    (let ((box:xbox_t* (halloc)))
+      (tset! box 0 2)
+      (tset! box 1 (i64toptr val))
+      box)))
+
+(bind-func xbox4:[xbox_t*,i32]*
+  (lambda (val)
+    (let ((box:xbox_t* (halloc)))
+      (tset! box 0 4)
+      (tset! box 1 (i64toptr (i32toi64 val)))
+      box)))
+
+(bind-func xbox5:[xbox_t*,i8]*
+  (lambda (val)
+    (let ((box:xbox_t* (halloc)))
+      (tset! box 0 6)
+      (tset! box 1 (i64toptr (i8toi64 val)))
+      box)))
+
+(bind-func xbox6:[xbox_t*,i1]*
+  (lambda (val)
+    (let ((box:xbox_t* (halloc)))
+      (tset! box 0 8)
+      (tset! box 1 (i64toptr (i1toi64 val)))
+      box)))
+
+(bind-func xbox7:[xbox_t*,i8*]*
+  (lambda (val)
+    (let ((box:xbox_t* (halloc)))
+      (tset! box 0 -1)
+      (tset! box 1 val)
+      box)))
+
+(bind-func xbox8:[xbox_t*,i8*,i8*]*
+  (lambda (val name)
+    (let ((box:xbox_t* (halloc)))
+      (tset! box 0 -1)
+      (tset! box 1 val)
+      (tset! box 2 name)      
+      box)))
+
+(bind-poly xbox xbox1)
+(bind-poly xbox xbox2)
+(bind-poly xbox xbox3)
+(bind-poly xbox xbox4)
+(bind-poly xbox xbox5)
+(bind-poly xbox xbox6)
+(bind-poly xbox xbox7)
+(bind-poly xbox xbox8)
+
+
+;;;;;;;;;;;;;;;;;;;;
 ;; pairs
 
 (bind-type xpair_t <!first,!second>)
@@ -115,9 +258,6 @@
       (tset! p 1 b)
       a)))
 
-(bind-func xempty_p:[bool,xlist_t*]
-  (lambda (a)
-    (if (null? a) #t #f)))
 
 ;; (bind-func xreverse:[xlist_t*,xlist_t*]
 ;;   (lambda (a)
@@ -182,20 +322,27 @@
                      (xtree_nodes tree))
                (i64toi32 1)))))
 
-;; ;; xtree test ;; should move this to 
-;; (bind-func test3
-;;   (lambda (a:i64 b:i64 c:i64)
-;;     (let ((t1 (xtree a))
-;;           (t2 (xtree b))
-;;           (t3 (xtree c)))
-;;       (printf "children:%lld\n" (xtree_add_child t1 t2))
-;;       (printf "children:%lld\n" (xtree_add_child t1 t3))
-;;       (printf "children:%lld\n" (xtree_children t1))
-;;       (xtree_print_i64 t1)
-;;       (printf "%p:%p:%p\n" (xtree_child t1 1) t2 t3)
-;;       (printf "child 1 val:%lld\n" (xtree_value (xtree_child t1 1)))
-;;       (printf "child 2 val:%lld\n" (xtree_value (xtree_child t1 0)))
-;;       ;; (xtree_child t1 0)
-;;       void)))
 
-;; (test3 1 2 3)
+;;;;;;;;;;;;;
+;; STRINGS ;;
+;;;;;;;;;;;;;
+
+(bind-type xstring_t <i64,i8*>)
+
+(bind-func xstring
+  (lambda (s)
+    (let ((str:xstring_t* (halloc))
+          (lgth (strlen s))
+          (news:i8* (halloc (+ 1 lgth))))
+      (strcpy news s)
+      (tset! str 0 (strlen s))
+      (tset! str 1 news)
+      str)))
+
+(bind-func xstring_length
+  (lambda (str:xstring_t*)
+    (tref str 0)))
+
+(bind-func xstring_cstr
+  (lambda (str:xstring_t*)
+    (tref str 1)))
