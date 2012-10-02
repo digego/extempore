@@ -674,6 +674,7 @@
                 (else (cond ((eq? ast #f) '(impc_false))
                             ((eq? ast #t) '(impc_true))
 			    ((eq? ast 'cast) 'bitcast)
+			    ((eq? ast 'convert) 'bitconvert)                            
 			    ((eq? ast '&) 'bitwise-and)
 			    ((eq? ast 'bor) 'bitwise-or) ; can't use a pipe
 			    ((eq? ast '^) 'bitwise-eor)
@@ -2712,7 +2713,17 @@
         ;; for the symbols we want to set each return type
         ;;(impc:ti:update-var (cadr ast) vars kts (impc:ir:convert-from-pretty-types (caddr ast)))
         (list (impc:ir:convert-from-pretty-types (caddr ast))))))
-		 
+
+
+(define impc:ti:bitconvert-check
+  (lambda (ast vars kts request?)
+    ;; (println 'bitcastcheck'req: request?)
+    (if (null? (cddr ast))
+        (if request? (list request?) (list))
+        ;; for the symbols we want to set each return type
+        ;;(impc:ti:update-var (cadr ast) vars kts (impc:ir:convert-from-pretty-types (caddr ast)))
+        (list (impc:ir:convert-from-pretty-types (caddr ast))))))
+
 
 (define impc:ti:if-check
    (lambda (ast vars kts request?)
@@ -3425,6 +3436,7 @@
             ((and (list? ast) (member (car ast) '(null?))) (impc:ti:null?-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(impc_null))) (impc:ti:null-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(bitcast))) (impc:ti:bitcast-check ast vars kts request?))
+	    ((and (list? ast) (member (car ast) '(bitconvert))) (impc:ti:bitconvert-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(void))) (impc:ti:void-check ast vars kts request?))
 	    ((and (list? ast) ;; generic function		  
 		  (symbol? (car ast))
