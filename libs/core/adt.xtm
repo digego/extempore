@@ -14,139 +14,27 @@
     (if (null? a) #t #f)))
 
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Boxing helpers
+;; a start for some super simple boxing
 ;;
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; tag num and data
 (bind-type xbox_t <i64,i8*,i8*>)
 
-(bind-func xunboxi1:[i1,xbox_t*]*
-  (lambda (box)
-    (let ((key (tref box 0))
-          (val (tref box 1)))
-      ;;(if (<> 8 key) (printf "bad type conversion! from %lld->%lld!\n" key 8))
-      (i64toi1 (ptrtoi64 val)))))
-
-(bind-func xunboxi8:[i8,xbox_t*]*
-  (lambda (box)
-    (let ((key (tref box 0))
-          (val (tref box 1)))
-      ;;(if (<> 6 key) (printf "bad type conversion from %lld->%lld!\n" key 6))
-      (i64toi8 (ptrtoi64 val)))))
-
-(bind-func xunboxi32:[i32,xbox_t*]*
-  (lambda (box)
-    (let ((key (tref box 0))
-          (val (tref box 1)))
-      ;;(if (<> 4 key) (printf "bad type conversion from %lld->%lld!\n" key 4))
-      (i64toi32 (ptrtoi64 val)))))
-
-(bind-func xunboxi64:[i64,xbox_t*]*
-  (lambda (box)
-    (let ((key (tref box 0))
-          (val (tref box 1)))
-      ;;(if (<> 2 key) (printf "bad type conversion from %lld->%lld!\n" key 2))
-      (ptrtoi64 val))))
-
-(bind-func xunboxfloat:[float,xbox_t*]*
-  (lambda (box)
-    (let ((key (tref box 0))
-          (val (tref box 1)))
-      ;;(if (<> 1 key) (printf "bad type conversion from %lld->%lld!\n" key 1))
-      (i64tof (ptrtoi64 val)))))
-
-(bind-func xunboxdouble:[double,xbox_t*]*
-  (lambda (box)
-    (let ((key (tref box 0))
-          (val (tref box 1)))
-      ;;(if (<> 0 key) (printf "bad type conversion from %lld->%lld!\n" key 0))
-      (i64tod (ptrtoi64 val)))))
-
-(bind-func xunboxptr:[i8*,xbox_t*]*
-  (lambda (box)
-    (let ((key (tref box 0))
-          (val (tref box 1)))
-      ;;(if (<> -1 key) (printf "bad type conversion from %lld->%lld!\n" key -1))
-      val)))
-
-(bind-poly xunbox xunboxgen)
-(bind-poly xunbox xunboxi1)
-(bind-poly xunbox xunboxi8)
-(bind-poly xunbox xunboxi32)
-(bind-poly xunbox xunboxi64)
-(bind-poly xunbox xunboxfloat)
-(bind-poly xunbox xunboxdouble)
-(bind-poly xunbox xunboxptr)
-      
-
-(bind-func xbox1:[xbox_t*,double]*
+(bind-func xbox:[xbox_t*,!a]*
   (lambda (val)
     (let ((box:xbox_t* (halloc)))
       (tset! box 0 0)
-      (tset! box 1 (i64toptr (dtoi64 val)))
+      (tset! box 1 (convert val i8*))
       box)))
-
-(bind-func xbox2:[xbox_t*,float]*
-  (lambda (val)
-    (let ((box:xbox_t* (halloc)))
-      (tset! box 0 1)
-      (tset! box 1 (i64toptr (ftoi64 val)))
-      box)))
-
-(bind-func xbox3:[xbox_t*,i64]*
-  (lambda (val)
-    (let ((box:xbox_t* (halloc)))
-      (tset! box 0 2)
-      (tset! box 1 (i64toptr val))
-      box)))
-
-(bind-func xbox4:[xbox_t*,i32]*
-  (lambda (val)
-    (let ((box:xbox_t* (halloc)))
-      (tset! box 0 4)
-      (tset! box 1 (i64toptr (i32toi64 val)))
-      box)))
-
-(bind-func xbox5:[xbox_t*,i8]*
-  (lambda (val)
-    (let ((box:xbox_t* (halloc)))
-      (tset! box 0 6)
-      (tset! box 1 (i64toptr (i8toi64 val)))
-      box)))
-
-(bind-func xbox6:[xbox_t*,i1]*
-  (lambda (val)
-    (let ((box:xbox_t* (halloc)))
-      (tset! box 0 8)
-      (tset! box 1 (i64toptr (i1toi64 val)))
-      box)))
-
-(bind-func xbox7:[xbox_t*,i8*]*
-  (lambda (val)
-    (let ((box:xbox_t* (halloc)))
-      (tset! box 0 -1)
-      (tset! box 1 val)
-      box)))
-
-(bind-func xbox8:[xbox_t*,i8*,i8*]*
-  (lambda (val name)
-    (let ((box:xbox_t* (halloc)))
-      (tset! box 0 -1)
-      (tset! box 1 val)
-      (tset! box 2 name)      
-      box)))
-
-(bind-poly xbox xbox1)
-(bind-poly xbox xbox2)
-(bind-poly xbox xbox3)
-(bind-poly xbox xbox4)
-(bind-poly xbox xbox5)
-(bind-poly xbox xbox6)
-(bind-poly xbox xbox7)
-(bind-poly xbox xbox8)
+             
+(bind-func xunbox:[!a,xbox_t*]*
+  (lambda (box)
+    (let ((key (tref box 0))
+          (val (tref box 1)))
+      (convert val))))
 
 
 ;;;;;;;;;;;;;;;;;;;;

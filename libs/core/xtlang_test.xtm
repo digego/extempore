@@ -921,12 +921,13 @@
 
 (test-xtfunc (vector-test4))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; ADT testing
 
 (load "libs/core/adt.xtm")
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; xlist tests
 
 (bind-func xlist_test1
@@ -1044,7 +1045,38 @@
 (test-xtfunc (xlist_test4))
 
 
+(bind-func xnth_test1
+  (lambda ()
+    (let ((a (xlist 1.0 2.0 3.0)))
+      (printf "pointer = %p\n" (xsecond (xnth_tail a 0)))
+      (xhead (xnth_tail a 0)))))
 
+(test-xtfunc (xnth_test1) 1.0)
+
+
+(bind-func xinsert_test
+  (lambda ()
+    (let ((a (xlist 1 2 3)))
+      (xinsert a (xlength a) 6)
+      (xnth a 3))))
+
+(test-xtfunc (xinsert_test) 6)
+
+(bind-func xappend_test1
+  (lambda ()
+    (let ((l1 (xlist "a" "b" "c"))
+	  (l2 (xlist "d" "e" "f"))
+	  (l3 (xappend l1 l2)))
+      (xmap (lambda (k)
+	     (printf "%s\n" k))
+	   l3)
+      void)))
+
+(test-xtfunc (xappend_test1))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; xpair tests
 
 (bind-func xpair_test1
@@ -1086,32 +1118,19 @@
 
 (test-xtfunc (xpair_test5))
 
-;; xappend test
-
-(bind-func xappend_test1
-  (lambda ()
-    (let ((l1 (xlist "a" "b" "c"))
-	  (l2 (xlist "d" "e" "f"))
-	  (l3 (xappend l1 l2)))
-      (xmap (lambda (k)
-	     (printf "%s\n" k))
-	   l3)
-      void)))
-
-(test-xtfunc (xappend_test1))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; xtree tests
 
 ;; create a one node tree!
-(bind-func xtree-test1
+(bind-func xtree_test1
   (lambda ()
     (let ((t (xtree 1)))
       t)))
 
-(test-xtfunc (xtree-test1))
+(test-xtfunc (xtree_test1))
 
 ;; create tree with two leaf nodes
-(bind-func xtree-test2
+(bind-func xtree_test2
   (lambda ()
     (let ((t1 (xtree 1))
           (t2 (xtree 2))
@@ -1120,9 +1139,9 @@
       (xtree_add_child t1 t3)
       t3)))
 
-(test-xtfunc (xtree-test2))
+(test-xtfunc (xtree_test2))
 
-(bind-func xtree-test3
+(bind-func xtree_test3
   (lambda (a:i64 b:i64 c:i64)
     (let ((t1 (xtree a))
           (t2 (xtree b))
@@ -1136,40 +1155,79 @@
       (printf "child 2 val:%lld\n" (xtree_value (xtree_child t1 0)))
       void)))
 
-(test-xtfunc (xtree-test3 1 2 3))
+(test-xtfunc (xtree_test3 1 2 3))
 
-;; (bind-func tree-test3
-;;   (lambda ()
-;;     (let ((root (xtree (xleaf 5)))
-;;           (leaf1 (xtree (xleaf 13)))
-;;           (leaf2 (xleaf 17))
-;;           (leaf3 (xleaf 3))
-;;           )
-;;       (xadd_child leaf1 leaf3)
-;;       (xadd_child root leaf1)
-;;       (xadd_child root leaf2)
-;;       ;; (xprint_tree root 0)
-;;       void)))
 
-;; (test-xtfunc (tree-test3))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; some generic closure tests
 
-(bind-func xnth_test1
+
+;; specialize on return type only
+(bind-func gclosure_test_maker1:[[!a,!a]*]*
   (lambda ()
-    (let ((a (xlist 1.0 2.0 3.0)))
-      (printf "pointer = %p\n" (xsecond (xnth_tail a 0)))
-      (xhead (xnth_tail a 0)))))
+    (lambda (k) (* k k))))
 
-(test-xtfunc (xnth_test1) 1.0)
-
-
-(bind-func xinsert_test
+(bind-func gclosure_test1
   (lambda ()
-    (let ((a (xlist 1 2 3)))
-      (xinsert a (xlength a) 6)
-      (xnth a 3))))
+    (let ((f (gclosure_test_maker1)))
+      (f 5.0))))
 
-(test-xtfunc (xinsert_test) 6)
+(test-xtfunc (gclosure_test1))
 
+(bind-func gclosure_test2
+  (lambda ()
+    (let ((f (gclosure_test_maker1)))
+      (f 5))))
+
+(test-xtfunc (gclosure_test2))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; some xbox/xunbox tests
+;;
+;; also provides coverage for bitconvert
+;; and for xnth and xlist
+;;
+
+(bind-func xbox_test1
+  (lambda ()
+    (let ((dat1:i64* (halloc))
+          (dat2:double* (halloc)))
+      (pset! dat1 0 3)
+      (pset! dat2 0 3.0)
+      (let ((l1 (xbox 2.0))
+            (l2 (xbox 2))
+            (l3 (xbox dat1))
+            (l4 (xbox dat2))
+            (l5 (xbox "result should be 36.0"))
+            (lst (xlist l5 l1 l2 l3 l4)))
+        lst))))
+
+(bind-func xbox_test2
+  (lambda (a:double b:i64 c:i64* d:double*)
+    (* a
+       (convert b double)
+       (convert (pref c 0) double)
+       (pref d 0))))
+
+
+(bind-func xbox_test3
+  (lambda ()
+    (let ((lst (xbox_test1))
+          (str:i8* (xunbox (xnth lst 0))))
+      (printf "%s:%f" str
+              (xbox_test2 (xunbox (xnth lst 1))
+                          (xunbox (xnth lst 2))
+                          (xunbox (xnth lst 3))
+                          (xunbox (xnth lst 4)))))))
+
+(test-xtfunc (xbox_test3))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; FINISH!
+;;
 ;; print out the results of all the tests!
 
 (print-test-results)
