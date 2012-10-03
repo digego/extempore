@@ -533,12 +533,21 @@
 ;; takes any type with generic specialisations
 ;; and returns type with any specialisations (i.e. ~'s)
 ;; turned into proper hashed named types
+;;
+;; currently this only works when there is a SINGLE ~ type
 (define impc:ti:generic-spec-to-hashed
   (lambda (t)
     (if (symbol? t) (set! t (symbol->string t)))
-    (let* ((v (regex:matched t "[^\\[<>\\]|/,]*~[^\\[<>\\]|/,]*"))
-           (s (impc:ti:generic-type-specification (string->symbol (car v))))
-           (n (regex:replace t (string-append "\\Q" (car v) "\\E") (symbol->string s))))
+    (let* ((aa (regex:matched t "~.*~"))
+           (bb (regex:matched t "[^~]*[,\\[<]([^~]*)"))
+           ;; (kkkkk (println 'aa: aa))
+           ;; (kkkkkk (println 'bb: bb))
+           (v (if (or (null? aa)
+                      (null? bb))
+                  (print-error 'Compiler 'Error: 'trying 'to 'parse 'generic 'spec 'without '~ t)
+                  (string-append (cadr bb) (car aa))))
+           (s (impc:ti:generic-type-specification (string->symbol v)))
+           (n (regex:replace t (string-append "\\Q" v "\\E") (symbol->string s))))
       ;; (println 'v v 's s 'n n)
       (if (regex:match? n "~")
           (impc:ti:generic-spec-to-hashed n)
