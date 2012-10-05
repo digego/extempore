@@ -533,7 +533,7 @@ indentation."
 (put 'delay 'extempore-indent-function 0)
 (put 'dotimes 'extempore-indent-function 1)
 (put 'lambda 'extempore-indent-function 1)
-(put 'bind-func 'extempore-indent-function 1)
+(put 'bind-func 'extempore-indent-function 'defun)
 (put 'let 'extempore-indent-function 'extempore-let-indent)
 (put 'let* 'extempore-indent-function 'extempore-let-indent)
 (put 'letrec 'extempore-indent-function 'extempore-let-indent)
