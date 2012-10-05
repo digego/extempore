@@ -1225,6 +1225,109 @@
 
 (test-xtfunc (xbox_test3))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; xobject tests
+;;
+
+(load "libs/core/xobject.xtm")
+
+;;
+;; add some simple objects
+;;
+(bind-object date day:i32 month:i32 year:i32)
+(bind-object person age:i64 firstname:i8* surname:i8* birthday:xobj_date_t*)
+(bind-object cat name:i8* birthday:xobj_date_t*)
+(bind-object dog name:i8* age:i64)
+
+;; print current state of object graph
+(test-xtfunc (xobj_print_classes))
+
+;;
+;; add a basic print method
+;; for date, person, cat and dog
+;;
+(bind-method date print:[void]*
+  (lambda ()
+    (printf "%d/%d/%d\n"
+            (xobj_get_day self)
+            (xobj_get_month self)
+            (xobj_get_year self))
+    void))
+
+(bind-method person print:[void]*
+  (lambda ()
+    (printf "%s is %d years old and talks\n"
+            (xobj_get_firstname self)
+            (xobj_get_age self))
+    void))
+
+(bind-method dog print:[void]*
+  (lambda ()
+    (printf "%s barks!\n"
+            (xobj_get_name self))
+    void))
+
+(bind-method cat print:[void]*
+  (lambda ()
+    (printf "%s the cat was born on "
+            (xobj_get_name self))
+    (xobj_print (xobj_get_birthday self))
+    void))
+
+
+;; test building a dog
+;; and then printing the dog
+(bind-func xobject_test_1
+  (lambda ()
+    (let ((dog:xobj_dog_t* (xobj_build "Rex" 4)))
+      (xobj_print dog)
+      void)))
+
+(test-xtfunc (xobject_test_1))
+
+
+;; test building a cat
+;; and then printing a cat
+(bind-func xobject_test_2
+  (lambda ()
+    (let ((date:xobj_date_t* (xobj_build 09 03 2009))
+          (cat:xobj_cat_t* (xobj_build "Moggy" date)))
+      (xobj_print cat)
+      void)))
+
+(test-xtfunc (xobject_test_2))
+
+
+;;
+;; test runtime vs compile time dispatch
+;;
+(bind-func xobject_test3
+  (lambda ()
+    (let ((dog:xobj_dog_t* (xobj_build "Spot" 7))
+          (date1:xobj_date_t* (xobj_build 11 11 2001))
+          (cat:xobj_cat_t* (xobj_build "Felix" date1))
+          (date2:xobj_date_t* (xobj_build 03 10 2002))
+          (person:xobj_person_t* (xobj_build 10 "John" "Doe" date2))
+          (creatures (xlist (cast dog xobject_t*)
+                            (cast cat xobject_t*)
+                            (cast person xobject_t*))))
+      (printf "\n------- compile time dispatch -------\n")
+      (xobj_print dog)
+      (xobj_print cat)
+      (xobj_print person)
+      (printf "---------- runtime dispatch ---------\n")
+      (xmap (lambda (o:xobject_t*) (xobj_print o) 1) creatures)
+      (printf "-------------------------------------\n")
+      creatures)))
+
+(test-xtfunc (xobject_test3))
+
+
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; FINISH!
 ;;
