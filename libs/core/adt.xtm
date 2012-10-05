@@ -72,6 +72,13 @@
       (tset! joinpair 1 b)
       joinpair)))
 
+(bind-func xconj:[xlist_t*,!head,xlist_t*]*
+  (lambda (a b)
+    (let ((joinpair (halloc)))
+      (tset! joinpair 0 a)
+      (tset! joinpair 1 b)
+      joinpair)))
+
 (bind-func xhead:[!head,xlist_t*]*
   (lambda (a)
     (tref a 0)))
@@ -147,17 +154,28 @@
       a)))
 
 
-;; (bind-func xreverse:[xlist_t*,xlist_t*]
-;;   (lambda (a)
-;;     (let ((rlist:xlist_t* (halloc)))
-;;       ())))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; TEMPORARY!!
+;; a very dodgy dictionary based on
+;; an assoc list
+;;
+;; the "dictionary" is any xlist
+;; of xpairs where pair is any (i8*,!a)
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; xposition (nth)
-;; xinsert
-;; xsort
-;; xsortedp
-;; xdelete
-;; xmember
+(bind-func xdict_match:[i1,xpair_t*,i8*]*
+  (lambda (p key)
+    (if (= (convert 0 i32) (strcmp (xfirst p) key)) 1 0)))
+
+(bind-func xdict_find:[!second,xlist_t*,i8*]*
+  (lambda (dict key)
+    (if (null? dict) (convert null)
+        (if (xdict_match (xhead dict) key)
+            (xsecond (xhead dict))
+            (xdict_find (xtail dict) key)))))
+
 
 ;;;;;;;;;;;
 ;; TREES ;;
