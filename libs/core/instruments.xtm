@@ -235,3 +235,50 @@
 (epad.release 7000.0)
 ;; epad is NOT active by default
 
+;;;;;;;;;;;;;;;;;;;;;
+;; extempore organ ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; change drawbar_pos and recompile to change the organ tone
+
+(bind-func organ-note
+  (let ((num_drawbars 9)
+        (freq_ratio:double* (zalloc num_drawbars))
+        (drawbar_pos:i64* (zalloc num_drawbars)))
+    (pfill! freq_ratio 0.5 1.5 1.0 2.0 3.0 4.0 5.0 6.0 8.0)
+    (pfill! drawbar_pos 8 8 8 0 0 0 0 0 0)
+    (lambda ()
+      (let ((tonewheel:[double,double,double]** (zalloc (* 2 num_drawbars)))
+            (freq_smudge:double* (zalloc num_drawbars))
+            (i 0))
+        (dotimes (i num_drawbars)
+          (pset! tonewheel (* i 2) (make-oscil 0.0)) ; left
+          (pset! tonewheel (+ (* i 2) 1) (make-oscil 0.0)) ; right
+          (pset! freq_smudge i (* 3.0 (random))))
+        (lambda (time:double chan:double freq:double amp:double)
+          (if (< chan 2.0)
+              (let ((sum 0.0))
+                (dotimes (i num_drawbars)
+                  ;; (printf "i = %lld" i)
+                  (set! sum (+ sum (* (/ (i64tod (pref drawbar_pos i)) 8.0)
+                                      ((pref tonewheel (+ (* 2 i) (dtoi64 chan)))
+                                       amp
+                                       (+ (* freq (pref freq_ratio i))
+                                          (pref freq_smudge i)))))))
+                (/ sum (i64tod num_drawbars)))))))))
+
+(bind-func organ-fx 100000
+  (let ((flanl (make-flanger 1.0 0.0 0.6 1.0))
+        (flanr (make-flanger 1.0 0.0 0.6 1.0))
+        (treml (make-oscil 0.0))
+        (tremr (make-oscil 0.0))
+        (trem_amp 0.1)
+        (trem_freq .0))
+    (lambda (in:double time:double chan:double dat:double*)
+      (cond ((= chan 0.0)
+             (* (flanl in)
+                (+ 1.0 (treml trem_amp trem_freq))))
+            ((= chan 1.0)
+             (* (flanr in)
+                (+ 1.0 (tremr trem_amp (* 1.1 trem_freq)))))
+            (else 0.0)))))
