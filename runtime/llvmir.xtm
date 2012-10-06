@@ -3445,7 +3445,9 @@
       (let ((from (impc:ir:get-type-from-str (cadr at)))
             (to (impc:ir:get-type-from-str type-str)))
         ;; (println 'convert: from '-> to)
-        (cond ((and (impc:ir:pointer? from) ;; must be pointer -> pointer
+        (cond ((and (number? to) (= to -1))
+               (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*)))               
+              ((and (impc:ir:pointer? from) ;; must be pointer -> pointer
                     (impc:ir:pointer? to))  ;; do standard bitcast
                (emit (string-append (impc:ir:gname "val" type-str) 
                                     " = bitcast " (cadr at) " " (car at) " to " type-str "\n") os))
