@@ -290,10 +290,10 @@
 ;; with comparator closure argument (sig = [void,!a,i64,[i1,!a,!a]*]*)
 
 
-(bind-func xsub-sort:[void,!a,i64,i64]*
-  (lambda (dat left right)
+(bind-func xsub-sortd
+  (lambda (dat:double* left right)
     (if (< left right)
-        (let ((tmp null)
+        (let ((tmp 0.0)
               (swap (lambda (x y)
                       (set! tmp (pref dat x))
                       (pset! dat x (pref dat y))
@@ -308,9 +308,10 @@
                        (set! index (+ index 1)))))
           (swap right index)
           (xsub-sort dat left (- index 1))
-          (xsub-sort dat (+ index 1) right)))))
+          (xsub-sort dat (+ index 1) right))
+        void)))
 
-(bind-func xsort:[!a,!a,i64]*
-  (lambda (arr n)
+(bind-func xsortd
+  (lambda (arr:double* n)
     (xsub-sort arr 0 (- n 1))
-    dat))
+    arr))
