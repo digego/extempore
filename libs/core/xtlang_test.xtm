@@ -1336,25 +1336,30 @@
 ;; SORTING ;;
 ;;;;;;;;;;;;;
 
-(bind-func test_xsortd
+(bind-func test_xsort_general
   (let ((buflen 4)
         (input:double* (zalloc buflen))
-        (correct 0)
         (i 0))
-    (pfill! input 8.3 4.2 5.7 2.3)
-    (lambda ()
-      (xsortd input buflen)
-      (dotimes (i buflen)
-        (printf "sorted[%lld] = %f\n"
-                i (pref input i))
-        (if (and (<> i 0)
-                 (< (pref input (- i 1)) (pref input i)))
-            (set! correct (+ correct 1))))
-      (printf "percentage correct = %5.2f%%\n"
-              (* 100.0 (/ (i64tod correct) (i64tod (- buflen 1)))))
-      void)))
+    (pfill! input 8.3 0.0 -5.7 2.3)
+    (lambda (sort_cls:[double*,double*,i64]*)
+      (let ((incorrect 0))
+        (sort_cls input buflen)
+        (dotimes (i buflen)
+          ;; (printf "sorted[%lld] = %f\n" i (pref input i))
+          (if (and (<> i 0)
+                   (not (< (pref input (- i 1)) (pref input i))))
+              (set! incorrect (+ incorrect 1))))
+        (printf "incorrectly sorted elements: %lld\npercentage correct = %5.2f%%\n"
+                incorrect
+                (* 100.0 (/ (i64tod (- buflen incorrect))
+                            (i64tod buflen))))
+        incorrect))))
 
-(test-xtfunc (test_xsortd))
+(bind-func test_xquicksortd
+  (lambda ()
+    (test_xsort_general xquicksortd)))
+
+(test-xtfunc (test_xquicksortd) 0)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; FINISH!
