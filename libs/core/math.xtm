@@ -21,6 +21,28 @@
 ;;; Code:
 
 
+(bind-func deg2rad_f
+  (lambda (degrees:float)
+    (/ degrees 57.2957795)))
+
+(bind-func deg2rad_d
+  (lambda (degrees:double)
+    (/ degrees 57.2957795)))
+
+(bind-func rad2deg_f
+  (lambda (rad:float)
+    (* 57.2957795 rad)))
+
+(bind-func rad2deg_d
+  (lambda (rad:double)
+    (* 57.2957795 rad)))
+
+(bind-poly deg2rad deg2rad_d)
+(bind-poly deg2rad deg2rad_f)
+(bind-poly rad2deg rad2deg_d)
+(bind-poly rad2deg rad2deg_f)
+
+
 ;;;;;;;;;; VECTOR ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; some basic vector functions
@@ -577,6 +599,79 @@
 ;; poly to minv
 (bind-poly minv minvd)
 (bind-poly minv minvf)
+
+;; some helpful matrix builders
+;;
+;; axis is the unit vector
+;; around which you want to rotate
+;;
+;; column major!
+;;
+;; mat is a pointer to memory to
+;; store the 4x4 matrix in
+(bind-func rot_matrix_about_axis_d
+  (lambda (theta:double axis:double* mat:double*)
+    (let ((x (pref axis 0))
+          (y (pref axis 1))
+          (z (pref axis 2))
+          (cost (cos theta))
+          (sint (sin theta))
+          (mcost (- 1.0 cost)))
+      (pset! mat 0 (+ cost (* (* x x) mcost)))
+      (pset! mat 1 (+ (* (* y x) mcost) (* z sint)))
+      (pset! mat 2 (- (* (* z x) mcost) (* y sint)))
+      (pset! mat 3 0.0)
+      (pset! mat 4 (- (* (* x y) mcost) (* z sint)))
+      (pset! mat 5 (+ cost (* (* y y) mcost)))
+      (pset! mat 6 (+ (* (* z y) mcost) (* x sint)))
+      (pset! mat 7 0.0)      
+      (pset! mat 8 (+ (* (* x z) mcost) (* y sint)))
+      (pset! mat 9 (- (* (* y z) mcost) (* x sint)))
+      (pset! mat 10 (+ cost (* (* z z) mcost)))
+      (pset! mat 11 0.0)
+      (pset! mat 12 0.0)
+      (pset! mat 13 0.0)
+      (pset! mat 14 0.0)
+      (pset! mat 15 1.0)      
+      mat)))
+
+;; some helpful matrix builders
+;;
+;; axis is the unit vector
+;; around which you want to rotate
+;;
+;; column major!
+;;
+;; mat is a pointer to memory to
+;; store the 4x4 matrix in
+(bind-func rot_matrix_about_axis_f
+  (lambda (theta:float axis:float* mat:float*)
+    (let ((x (pref axis 0))
+          (y (pref axis 1))
+          (z (pref axis 2))
+          (cost (cosf theta))
+          (sint (sinf theta))
+          (mcost (- 1.0 cost)))
+      (pset! mat 0 (+ cost (* (* x x) mcost)))
+      (pset! mat 1 (+ (* (* y x) mcost) (* z sint)))
+      (pset! mat 2 (- (* (* z x) mcost) (* y sint)))
+      (pset! mat 3 0.0)
+      (pset! mat 4 (- (* (* x y) mcost) (* z sint)))
+      (pset! mat 5 (+ cost (* (* y y) mcost)))
+      (pset! mat 6 (+ (* (* z y) mcost) (* x sint)))
+      (pset! mat 7 0.0)      
+      (pset! mat 8 (+ (* (* x z) mcost) (* y sint)))
+      (pset! mat 9 (- (* (* y z) mcost) (* x sint)))
+      (pset! mat 10 (+ cost (* (* z z) mcost)))
+      (pset! mat 11 0.0)
+      (pset! mat 12 0.0)
+      (pset! mat 13 0.0)
+      (pset! mat 14 0.0)
+      (pset! mat 15 1.0)
+      mat)))
+
+(bind-poly rot_matrix_about_axis rot_matrix_about_axis_d)
+(bind-poly rot_matrix_about_axis rot_matrix_about_axis_f)
 
 ;;;;;;;;;; COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

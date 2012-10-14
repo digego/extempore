@@ -5,7 +5,15 @@
 
 ;;; Commentary:
 
-;;
+;; a test suite for xtlang code. Currently, the tests cannot be run
+;; with (load "libs/core/xtlang_test.xtm"), because the first failing
+;; compilation will stop the evaluation of the file.
+
+;; The way to run all the tests, then, is to use the evaluate-buffer
+;; functionality of your editor (in Emacs, bound to C-x C-b by
+;; default) to send the forms one at a time to the compiler. After all
+;; the tests are run, a summary of the results will be printed to the
+;; log.
 
 ;;; Code:
 
@@ -1324,9 +1332,34 @@
 
 (test-xtfunc (xobject_test3))
 
+;;;;;;;;;;;;;
+;; SORTING ;;
+;;;;;;;;;;;;;
 
+(bind-func test_xsort_general
+  (let ((buflen 4)
+        (input:double* (zalloc buflen))
+        (i 0))
+    (pfill! input 8.3 0.0 -5.7 2.3)
+    (lambda (sort_cls:[double*,double*,i64]*)
+      (let ((incorrect 0))
+        (sort_cls input buflen)
+        (dotimes (i buflen)
+          ;; (printf "sorted[%lld] = %f\n" i (pref input i))
+          (if (and (<> i 0)
+                   (not (< (pref input (- i 1)) (pref input i))))
+              (set! incorrect (+ incorrect 1))))
+        (printf "incorrectly sorted elements: %lld\npercentage correct = %5.2f%%\n"
+                incorrect
+                (* 100.0 (/ (i64tod (- buflen incorrect))
+                            (i64tod buflen))))
+        incorrect))))
 
+(bind-func test_xquicksortd
+  (lambda ()
+    (test_xsort_general xquicksortd)))
 
+(test-xtfunc (test_xquicksortd) 0)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; FINISH!

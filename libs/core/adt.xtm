@@ -252,3 +252,66 @@
 (bind-func xstring_cstr
   (lambda (str:xstring_t*)
     (tref str 1)))
+
+;;;;;;;;;;;;;;;;
+;; ALGORITHMS ;;
+;;;;;;;;;;;;;;;;
+
+;; void quick_sort (int *a, int n) {
+;;     if (n < 2)
+;;         return;
+;;     int p = a[n / 2];
+;;     int *l = a;
+;;     int *r = a + n - 1;
+;;     while (l <= r) {
+;;         while (*l < p)
+;;             l++;
+;;         while (*r > p)
+;;             r--;
+;;         if (l <= r) {
+;;             int t = *l;
+;;             *l++ = *r;
+;;             *r-- = t;
+;;         }
+;;     }
+;;     quick_sort(a, r - a + 1);
+;;     quick_sort(l, a + n - l);
+;; }
+ 
+;; int main () {
+;;     int a[] = {4, 65, 2, -31, 0, 99, 2, 83, 782, 1};
+;;     int n = sizeof a / sizeof a[0];
+;;     quick_sort(a, n);
+;;     return 0;
+;; }
+
+;; an in-place (quick)sort
+
+;; with comparator closure argument (sig = [void,!a,i64,[i1,!a,!a]*]*)
+
+
+(bind-func xsub-quicksortd
+  (lambda (dat:double* left right)
+    (if (< left right)
+        (let ((tmp 0.0)
+              (swap (lambda (x y)
+                      (set! tmp (pref dat x))
+                      (pset! dat x (pref dat y))
+                      (pset! dat y tmp)))
+              (pivot (pref dat right))
+              (index left)
+              (i 0))
+          (dotimes (i left (- right left))
+            (if (or (< (pref dat i) pivot)
+                    (= (pref dat i) pivot))
+                (begin (swap i index)
+                       (set! index (+ index 1)))))
+          (swap right index)
+          (xsub-quicksortd dat left (- index 1))
+          (xsub-quicksortd dat (+ index 1) right))
+        void)))
+
+(bind-func xquicksortd
+  (lambda (arr:double* n)
+    (xsub-quicksortd arr 0 (- n 1))
+    arr))
