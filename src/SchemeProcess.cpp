@@ -542,16 +542,12 @@ namespace extemp {
 		std::stringstream ss;
 		std::string load_path = scm->getLoadPath();
 
-		scm->loadFile("extempore.xtm", load_path.c_str());
-		//printf("Loaded... extempore.xtm\n");
+		scm->loadFile("scheme.xtm", load_path.c_str());
+		//printf("Loaded... scheme.xtm\n");
 		scm->loadFile("llvmir.xtm", load_path.c_str()); 
 		//printf("Loaded... llvmir.xtm\n");
 		scm->loadFile("llvmti.xtm", load_path.c_str());		
 		//printf("Loaded... llvmti.xtm\n");
-		scm->loadFile("comlist.xtm", load_path.c_str());
-		//printf("Loaded... comlist.xtm\n");
-		scm->loadFile("sort.xtm", load_path.c_str());
-		//printf("Loading... sort.xtm\n");
                 if(scm->getInitFile().compare("") != 0) {
 		  scm->loadFile(scm->getInitFile().c_str());
                 }
