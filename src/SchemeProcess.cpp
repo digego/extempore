@@ -511,7 +511,7 @@ namespace extemp {
 		*ss << "##                                      ##" << std::endl;        		    		
 		*ss << "##           andrew@moso.com.au         ##" << std::endl;            
 		*ss << "##                                      ##" << std::endl;
-		*ss << "##            (c) 2005-2011             ##" << std::endl;    
+		*ss << "##            (c) 2005-2012             ##" << std::endl;
 		*ss << "##                                      ##" << std::endl;        
 		*ss << "##########################################" << std::endl;
 		*ss << "     ################################" << std::endl;
