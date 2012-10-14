@@ -21,6 +21,8 @@
 	(not bulletlib)) 
     (print-error "Could not load 'bullet' dynamic library"))
 
+(define _extended_bullet #t)
+
 (bind-type _plPhysicsSdkHandle <i32>)
 (bind-alias plPhysicsSdkHandle _plPhysicsSdkHandle*)
 (bind-type _plDynamicsWorldHandle <i32>)
@@ -39,6 +41,10 @@
 (bind-alias plBroadphaseProxyHandle _plBroadphaseProxyHandle*)
 (bind-type _plCollisionWorldHandle <i32>)
 (bind-alias plCollisionWorldHandle _plCollisionWorldHandle*)
+(if _extended_bullet
+    (begin
+      (bind-type _plHingeConstraintHandle <i32>)
+      (bind-alias plHingeConstraintHandle _plHingeConstraintHandle*)))
 
 (bind-alias plReal float)
 (bind-alias plVector3 plReal*)
@@ -48,7 +54,8 @@
 
 (bind-lib bulletlib plCreateDynamicsWorld [plDynamicsWorldHandle,plPhysicsSdkHandle]*)
 (bind-lib bulletlib plDeleteDynamicsWorld [void,plDynamicsWorldHandle]*)
-;; (bind-lib bulletlib plSetGravity [void,plDynamicsWorldHandle,plReal*]*)
+(if _extended_bullet    
+    (bind-lib bulletlib plSetGravity [void,plDynamicsWorldHandle,plReal*]*))
 (bind-lib bulletlib plStepSimulation [void,plDynamicsWorldHandle,plReal,i32,plReal]*)
 
 (bind-lib bulletlib plCreateRigidBody [plRigidBodyHandle,i8*,float,plCollisionShapeHandle]*)
@@ -63,9 +70,13 @@
 (bind-lib bulletlib plNewCylinderShape [plCollisionShapeHandle,plReal,plReal]*)
 (bind-lib bulletlib plAddRigidBody [void,plDynamicsWorldHandle,plRigidBodyHandle]*)
 (bind-lib bulletlib plRemoveRigidBody [void,plDynamicsWorldHandle,plRigidBodyHandle]*)
-;; (bind-lib bulletlib plSetActivationState [void,plRigidBodyHandle,i32]*)
-;; (bind-lib bulletlib plSetRestitution [void,plRigidBodyHandle,float]*)
-;; (bind-lib bulletlib plSetDeactivationTime [void,plRigidBodyHandle,float]*)
+(if _extended_bullet
+    (begin
+      (bind-lib bulletlib plAddHinge [void,plDynamicsWorldHandle,plHingeConstraintHandle]*)
+      (bind-lib bulletlib plRemoveHinge [void,plDynamicsWorldHandle,plHingeConstraintHandle]*)      
+      (bind-lib bulletlib plSetActivationState [void,plRigidBodyHandle,i32]*)
+      (bind-lib bulletlib plSetRestitution [void,plRigidBodyHandle,float]*)
+      (bind-lib bulletlib plSetDeactivationTime [void,plRigidBodyHandle,float]*)))
 
 (bind-lib bulletlib plSetPosition [void,plRigidBodyHandle,plVector3]*)
 (bind-lib bulletlib plGetPosition [void,plRigidBodyHandle,plVector3]*)
@@ -73,8 +84,11 @@
 (bind-lib bulletlib plSetEuler [void,plReal,plReal,plReal,plQuaternion]*)
 (bind-lib bulletlib plSetOpenGLMatrix [void,plRigidBodyHandle,plReal*]*)
 (bind-lib bulletlib plGetOpenGLMatrix [void,plRigidBodyHandle,plReal*]*)
-;; (bind-lib bulletlib plClearForces [void,plRigidBodyHandle]*)
-;; (bind-lib bulletlib plSetAngularVelocity [void,plRigidBodyHandle,plReal*]*)
-;; (bind-lib bulletlib plSetLinearVelocity [void,plRigidBodyHandle,plReal*]*)
-
-;; (bind-lib bulletlib plRayCast [plRigidBodyHandle,plDynamicsWorldHandle,plVector3,plVector3,plRigidBodyHandle*,i32]*)
+(if _extended_bullet
+    (begin
+      (bind-lib bulletlib plClearForces [void,plRigidBodyHandle]*)
+      (bind-lib bulletlib plSetAngularVelocity [void,plRigidBodyHandle,plReal*]*)
+      (bind-lib bulletlib plSetLinearVelocity [void,plRigidBodyHandle,plReal*]*)
+      (bind-lib bulletlib plCreateHingeConstraint [plHingeConstraintHandle,plRigidBodyHandle,plVector3,plVector3,i1]*)
+      (bind-lib bulletlib plSetHingeLimit [void,plHingeConstraintHandle,plReal,plReal]*)
+      (bind-lib bulletlib plRayCast [plRigidBodyHandle,plDynamicsWorldHandle,plVector3,plVector3,plRigidBodyHandle*,i32]*)))
