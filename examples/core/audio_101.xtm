@@ -23,14 +23,14 @@
 (bind-val IN_CHANNELS i64 *au:in-channels*)
 (bind-val FRAMES i64 *au:block-size*)
 
-(bind-func print-audio-state
+(bind-func print_audio_state
   (lambda ()
     (printf "    FRAMES: %lld\n" FRAMES)
     (printf " OUT CHANS: %lld\n" CHANNELS)
     (printf "  IN CHANS: %lld\n" IN_CHANNELS)
     (printf "SAMPLERATE: %f\n" SAMPLERATE)))
 
-(print-audio-state)
+(print_audio_state)
 
 ;; compile sample by sample dsp code
 (bind-func dsp
@@ -56,7 +56,7 @@
 
 
 ;; abstract out an oscillator function
-(bind-func make-oscil
+(bind-func osc_c
    (lambda (phase)
       (lambda (amp freq)
          (let ((inc (* 3.141592 (* 2.0 (/ freq 44100.)))))
@@ -66,8 +66,8 @@
 
 ;; same example as above but using oscillator abstraction
 (bind-func dsp
-  (let ((osc1 (make-oscil 0.0))
-	(osc2 (make-oscil 0.0)))
+  (let ((osc1 (osc_c 0.0))
+	(osc2 (osc_c 0.0)))
     (lambda (in:double time:double channel:double data:double*)
       (cond ((= channel 1.0) (osc1 0.5 200.0))
 	    ((= channel 0.0) (osc2 0.5 210.0))
@@ -79,7 +79,7 @@
   (let ((oscs:|9,[double,double,double]*|* (zalloc))
 	(i 0))
     (dotimes (i 9)
-       (aset! oscs i (make-oscil 0.0)))
+       (aset! oscs i (osc_c 0.0)))
     (lambda (a:double b:double c:double d:double*)
       (cond ((= c 0.0) ;; left channel
              (+ ((aref oscs 0) (+ 0.3 ((aref oscs 2) 0.2 1.0)) 60.0)
@@ -101,8 +101,8 @@
 ;; modify one of the examples from above
 ;; adding freq1 and freq2 into closure environment
 (bind-func dsp
-  (let ((osc1 (make-oscil 0.0))
-	(osc2 (make-oscil 0.0))
+  (let ((osc1 (osc_c 0.0))
+	(osc2 (osc_c 0.0))
 	(freq1 220.0)
 	(freq2 220.0))
     (lambda (in:double time:double channel:double data:double*)
@@ -112,7 +112,7 @@
 
 ;; write accessor function for modification
 ;; of closure slots freq1 and freq2
-(bind-func change-freq
+(bind-func change_freq
   (lambda (freq1 freq2)
     (dsp.freq1:double freq1)
     (dsp.freq2:double freq2)))
@@ -122,7 +122,7 @@
 ;; for event level control
 (define loop
   (lambda (time freq dir)
-    (change-freq
+    (change_freq
      (* 1.0 (random 100 500))
      (* 1.0 freq))
     (callback time 'loop (+ time (* 20.0 freq))

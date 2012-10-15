@@ -43,7 +43,7 @@
 ;; are 32bit (i.e. not 64bit)
 ;; finally, osc messages are bit endian
 ;; so you'll likely need to swap your arguments
-(bind-func osc-receive-7020
+(bind-func osc_receive_7020
   (lambda (address:i8* types:i8* args:i8*)
     (let ((data (bitcast args i32*)))
       (printf "address:%s  type:%s arg1:%f arg2:%lld\n"
@@ -54,15 +54,15 @@
 ;; define a sending address
 (define addy3 (cons "localhost" 7020))
 
-;; start server pointing to native wrapper around osc-receive-7020 closure
-(io:osc:start-server 7020 "osc-receive-7020" (llvm:get-native-function "osc-receive-7020"))
+;; start server pointing to native wrapper around osc_receive_7020 closure
+(io:osc:start-server 7020 "osc_receive_7020" (llvm:get-native-function "osc_receive_7020"))
 
 ;; Send a test message
 (io:osc:send (now) addy3 "/native/test" 5.5 1234)
 
 ;; my native message sender
 ;; NOTE osc-strings must be padded to 32bit multiples
-(bind-func my-osc-send
+(bind-func my_osc_send
   (lambda (address a:float b:i32)
     (let ((types ",fi")
 	  (mod (modulo (+ (strlen address) 1) 4))
@@ -80,4 +80,4 @@
       (llvm_send_udp "localhost" 7020 data (i64toi32 length)))))
 
 ;; Send another test message
-(my-osc-send "/native/mytest" 6.6 4321)
+(my_osc_send "/native/mytest" 6.6 4321)
