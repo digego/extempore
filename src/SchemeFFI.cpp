@@ -1482,7 +1482,7 @@ namespace extemp {
 	{
 	    std::string errstr;
 	    llvm::raw_string_ostream ss(errstr);
-	    pa.Print("Impromptu",ss);
+	    pa.Print("Extempore",ss);
 	    printf("%s\n",ss.str().c_str());
 	    // if the number of functions in module has changed when calling runFunction 
 	    // then we assume a stub was made and appended to the end of the modules function list.
