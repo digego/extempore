@@ -27,21 +27,21 @@
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
 
 ;; an audio buffer reader
-(bind-func read-audio-file
+(bind-func read_audio_file
   (lambda (fname dat offset num)
     (let ((info:<i64,i32,i32,i32,i32,i32>* (zalloc))
 	  (audiofile (sf_open fname 16 info))
 	  (channels (i32toi64 (tref info 2)))
-	  (num-to-read (* num channels))
-	  (num-to-offset (* offset channels))
-	  (cnt (sf_seek audiofile num-to-offset 0))
-	  (samples-read (sf_read_double audiofile dat num-to-read)))
+	  (num_to_read (* num channels))
+	  (num_to_offset (* offset channels))
+	  (cnt (sf_seek audiofile num_to_offset 0))
+	  (samples_read (sf_read_double audiofile dat num_to_read)))
       (if (<> null audiofile)
           (begin
             (printf "file name: %s\n" fname)
             (printf "samplerate: %d\n" (tref info 1))
             (printf "channels: %d\n" (tref info 2))
-            (printf "samples read: %lld\n" samples-read))
+            (printf "samples read: %lld\n" samples_read))
           (printf "errors:\t\t %s\n" (sf_strerror audiofile)))
       dat)))
 
@@ -53,7 +53,7 @@
     (let ((len 40.0)
           (offset 0.0)
           (adat:double* (zalloc (* 44100 2 (dtoi64 len))))
-          (adat2 (read-audio-file fname
+          (adat2 (read_audio_file fname
                                   adat
                                   (dtoi64 (* 44100.0 offset))
                                   (dtoi64 (* 44100.0 len)))))
