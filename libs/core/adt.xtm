@@ -241,7 +241,7 @@
           (lgth (strlen s))
           (news:i8* (halloc (+ 1 lgth))))
       (strcpy news s)
-      (tset! str 0 (strlen s))
+      (tset! str 0 lgth)
       (tset! str 1 news)
       str)))
 
@@ -249,9 +249,68 @@
   (lambda (str:xstring_t*)
     (tref str 0)))
 
-(bind-func xstring_cstr
+(bind-func cstring_from_xstring
   (lambda (str:xstring_t*)
     (tref str 1)))
+
+(bind-func xstring_cmp
+  (lambda (s1:xstring_t* s2:xstring_t*)
+    (strcmp (cstring_from_xstring s1)
+            (cstring_from_xstring s2))))
+
+(bind-func xstring_concat
+  (lambda (s1:xstring_t* s2:xstring_t*)
+    (let ((str:xstring_t* (halloc))
+          (lgth (+ (xstring_length s1)
+                   (xstring_length s2)))
+          (news:i8* (halloc (+ 1 lgth))))
+      (strcpy news (cstring_from_xstring s1))
+      (strcpy (pref-ptr news (xstring_length s1))
+              (cstring_from_xstring s2))
+      (tset! str 0 lgth)
+      (tset! str 1 news)
+      str)))
+
+;; levenshtein edit distance
+
+;; (bind-func lev_dist
+;;   (lambda (s:xstring_t* t:xstring_t*)
+;;     (let ((i 0) (j 0) (k 0)
+;; 	  ;; column-major indexing closure
+;; 	  (idx (lambda (x y)
+;; 		 (+ x (* y (+ tlen 1)))))
+;;           (slen (xstring_length s))
+;;           (tlen (xstring_length t))
+;;           (dsize (* (+ slen 1) (+ tlen 1)))
+;; 	  (d:i64* (salloc dsize)))
+;;       (printf "allocated %lld i64s\n" dsize)
+;;       (dotimes (i (+ slen 1))
+;; 	(printf "[0,%lld] = %lld\n" (idx 0 i) i)
+;; 	(pset! d (idx 0 i) i))
+;;       (dotimes (j (+ tlen 1))
+;; 	(printf "[%lld,0] = %lld\n" (idx j 0) j)
+;; 	(pset! d (idx j 0) j))
+;;       (printf "\ninitial matrix:\n\n")
+;;       ;; (dotimes (k dsize) (printf "%lld " (pref d k)))
+;;       ;; (printf "\n\n")
+;;       (mprint d (+ tlen 1) (+ slen 1) (i64toi1 1))
+;;       (dotimes (i tlen 1)
+;; 	(dotimes (j slen 1)
+;; 	  (if (= (pref s (- i 1))
+;; 		 (pref t (- j 1)))
+;; 	      (pset! d (idx i j) (pref d (idx (- i 1) (- j 1))))
+;; 	      (pset! d (idx i j) (let ((del (+ (pref d (idx (- i 1) j)) 1))
+;; 				       (ins (+ (pref d (idx i (- j 1))) 1))
+;; 				       (sub (+ (pref d (idx (- i 1) (- j 1))) 1)))
+;; 				   ;; (printf "\ni:%lld j:%lld del:%lld ins:%lld sub:%lld\n"
+;; 				   ;;         i j del ins sub)
+;; 				   (if (< ins del)
+;; 				       (if (< sub ins)
+;; 					   sub ins)
+;; 				       (if (< sub del)
+;; 					   sub del)))))))
+;;       (mprint d (+ tlen 1) (+ slen 1) (i64toi1 1))
+;;       (pref d (- (idx (+ tlen 1) (+ slen 1)) 1)))))
 
 ;;;;;;;;;;;;;;;;
 ;; ALGORITHMS ;;
