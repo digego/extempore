@@ -235,6 +235,14 @@
 
 (bind-type xstring_t <i64,i8*>)
 
+(bind-func print_xstring
+  (lambda (xs:xstring_t*)
+    (printf "%s" (tref xs 1))))
+
+(bind-func println_xstring
+  (lambda (xs:xstring_t*)
+    (printf "%s\n" (tref xs 1))))
+
 (bind-func xstring
   (lambda (s)
     (let ((str:xstring_t* (halloc))
@@ -253,23 +261,30 @@
   (lambda (str:xstring_t*)
     (tref str 1)))
 
+(bind-func xstring_cat
+  (lambda (s1:xstring_t* s2:xstring_t*)
+    (xstring (strcat (tref s1 1)
+                     (tref s2 1)))))
+
 (bind-func xstring_cmp
   (lambda (s1:xstring_t* s2:xstring_t*)
-    (strcmp (cstring_from_xstring s1)
-            (cstring_from_xstring s2))))
+    (strcmp (tref s1 1)
+            (tref s2 1))))
 
-(bind-func xstring_concat
-  (lambda (s1:xstring_t* s2:xstring_t*)
-    (let ((str:xstring_t* (halloc))
-          (lgth (+ (xstring_length s1)
-                   (xstring_length s2)))
-          (news:i8* (halloc (+ 1 lgth))))
-      (strcpy news (cstring_from_xstring s1))
-      (strcpy (pref-ptr news (xstring_length s1))
-              (cstring_from_xstring s2))
-      (tset! str 0 lgth)
-      (tset! str 1 news)
-      str)))
+;; (bind-func xstring_spn
+;;   (lambda (s1:xstring_t* s2:xstring_t*)
+;;     (strspn (tref s1 1)
+;;             (tref s2 1))))
+
+;; (bind-func xstring_cspn
+;;   (lambda (s1:xstring_t* s2:xstring_t*)
+;;     (strcspn (tref s1 1)
+;;              (tref s2 1))))
+
+;; (bind-func xstring_pbrk
+;;   (lambda (s1:xstring_t* s2:xstring_t*)
+;;     (xstring (strpbrk (tref s1 1)
+;;                       (tref s2 1)))))
 
 ;; levenshtein edit distance
 
