@@ -3300,11 +3300,13 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
 	position = location; //a->_debugger->_size;
 	std::stringstream ss;
 	extemp::UNIV::printSchemeCell(sc, ss, a, true);			
-	sprintf(msg, "position:(%d) in function \"%s\"\n%s\nwith: %s\nTrace: %s",position,fname,s,ss.str().c_str(),sss.str().c_str());
+	//sprintf(msg, "position:(%d) in function \"%s\"\n%s\nwith: %s\nTrace: %s",position,fname,s,ss.str().c_str(),sss.str().c_str());
+	sprintf(msg, "%s %s\nTrace: %s",s,ss.str().c_str(),sss.str().c_str());
 	sc->error_position = position;
     }else{
 	position = location; //sc->code->_size;
-	sprintf(msg, "position:(%d) in function \"%s\"\n%s\nTrace: %s",position,fname,s,sss.str().c_str());
+	//sprintf(msg, "position:(%d) in function \"%s\"\n%s\nTrace: %s",position,fname,s,sss.str().c_str());
+        sprintf(msg, "%s\nTrace: %s",s,sss.str().c_str());
 	sc->error_position = position;
     }
     std::cout << msg << std::endl;

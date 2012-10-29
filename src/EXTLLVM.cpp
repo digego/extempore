@@ -915,12 +915,12 @@ bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
   char a[256];
   char b[256];
   if(!rsplit((char*)"\\.", symbol, (char*) a, (char*) b)) {
-    printf("Eval error: not valid dot syntax\n");
+    //printf("Eval error: not valid dot syntax\n");
     return false;
   }
   pointer x=find_slot_in_env(sc,sc->envir,mk_symbol(sc,a),1);
   if(x==sc->NIL) { // || !is_closure(x)) { // then we failed
-    printf("Eval error: not valid dot syntax: bad value\n");
+    //printf("Eval error: not valid dot syntax: bad value\n");
     return false;
   }else{
     llvm::Module* M = extemp::EXTLLVM::I()->M;
@@ -930,7 +930,7 @@ bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
     if(func) {
       return true;
     }else{
-      printf("Eval error: No compiler match for %s\n",symbol);
+      //printf("Eval error: No compiler match for %s\n",symbol);
       return false; 
     }
   }
