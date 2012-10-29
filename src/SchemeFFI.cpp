@@ -1628,18 +1628,18 @@ namespace extemp {
 
 	    tmp_name = ss2.str().c_str();
 
-	    if(a->getType()->isStructTy()) {	      
-	      rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
-	      //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
-	      //tmp_name = tmp_str_b;
-	      tmp_name = tmp_str_a;
-	    }
+	    // if(a->getType()->isStructTy()) {	      
+	    //   rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	    //   printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	    //   //tmp_name = tmp_str_b;
+	    //   tmp_name = tmp_str_a;
+	    // }
 
 	    pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
 	    _sc->imp_env->erase(p);
 	    p = cons(_sc, str, p);			
 	    funcargs++;
-	}			
+	}
 	return reverse(_sc, p);				
     }
 
