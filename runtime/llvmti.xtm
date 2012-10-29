@@ -3810,7 +3810,7 @@
    (lambda (symname ast types envvars . prev)
       ;; (println 'symname: symname 'envvars: envvars 'ast: ast 'prev: prev)
       (if (atom? ast) ast
-          (cond ((equal? (car ast) 'make-closure)
+          (cond ((equal? (car ast) '__make-closure)
 		 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 		 ;; these lines just added by AS
 		 (if (and (null? (cdr prev))
@@ -3920,7 +3920,7 @@
 				(impc:ti:add-types-to-source symname jj types envvars ast))
 			      (cdr ast)))))
 		;; environments
-                ((member (car ast) '(make-env make-env-zone))
+                ((member (car ast) '(__make-env __make-env-zone))
                  (list (car ast)
 		       (cadr ast)
                        (map (lambda (p)
@@ -4055,12 +4055,12 @@
 				 ;(println 'poly!var (car ast))
 				 (set! syms (append (list (car ast)) syms))
 				 (f (cdr ast)))
-				((equal? (car ast) 'make-closure)
+				((equal? (car ast) '__make-closure)
 				 (if (not (null? (cl:intersection (cadddr ast) syms)))
 				     (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car (cl:intersection (caddr ast) syms))) 'as 'a 'shadow 'variable))			      
 				 (set! syms (cl:remove-duplicates (append (caddr ast) (cadddr ast) syms)))
 				 (f (car (cddddr ast))))
-				((member (car ast) '(make-env make-env-zone))
+				((member (car ast) '(__make-env __make-env-zone))
 				 (set! syms
 				       (append (map (lambda (p)
 						      (if (member (car p) syms)
@@ -4112,7 +4112,7 @@
              (if (equal? (car ast) 'lambda)
                  (let (;(env (impc:ti:block:check-for-free-syms ast esyms))
 		       (allocate-mem-for-vars? (impc:ti:allocate-var? (cdr ast))))
-		   (list 'make-closure allocate-mem-for-vars? 
+		   (list '__make-closure allocate-mem-for-vars? 
 			 ;; name of compiled function is always last 
 			 ;; so we can remove it by dropping it off the end
 			 (cdr (reverse (cl:remove-duplicates esyms))) ;env 
@@ -4124,7 +4124,7 @@
 					     (car binding))
 					   (cadr ast))))
 		       ;(free-syms (impc:ti:block:check-for-free-syms (cddr ast) (append bindings esyms))))
-		       (cons 'make-env
+		       (cons '__make-env
 			     (cons allocate-mem-for-vars?
 				   (list (impc:ti:closure:convert (cadr ast) (append bindings esyms))
 					 (impc:ti:closure:convert (caddr ast) (append bindings esyms))))))
@@ -4199,7 +4199,7 @@
             (cond ((null? alst) '())
                   ((atom? alst) '())
                   ((pair? alst)		   
-                   (if (equal? (car alst) 'make-closure)
+                   (if (equal? (car alst) '__make-closure)
 		       (set! blst (cons (caddr alst) blst)))
                    (loop (car alst))
                    (loop (cdr alst)))))
