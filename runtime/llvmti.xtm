@@ -380,16 +380,16 @@
    (lambda (ast)
       (list 'if ast #f #t)))
 
-(define impc:ti:case
-   (lambda (expr body)
-      (if (null? body)
-          '(list)
-          `(if ,(if (eq? 'else (caar body))
-                    #t
-                    (list 'member expr (cons 'list (caar body))))
-               ,@(cdar body)
-               ,(impc:ti:case expr (cdr body))))))
-                             
+;; (define impc:ti:case
+;;   (lambda (expr body)    
+;;     (if (null? body)
+;;         '(list)
+;;         `(if ,(if (eq? 'else (caar body))
+;;                   #t
+;;                   (list 'member expr (cons 'list (caar body))))
+;;              ,@(cdar body)
+;;              ,(impc:ti:case expr (cdr body))))))
+
 
 (define impc:ti:quote
    (lambda (ast)
@@ -580,8 +580,8 @@
                         (impc:ti:first-transform (impc:ti:list (cdr ast)) inbody?))
                        ;; ((member (car ast) '(map for-each))
                        ;;  (impc:ti:first-transform (impc:ti:map (cdr ast)) inbody?))
-                       ((eq? (car ast) 'case) 
-                        (impc:ti:first-transform (impc:ti:case (cadr ast) (cddr ast)) inbody?))
+                       ;; ((eq? (car ast) 'case) 
+                       ;;  (impc:ti:first-transform (impc:ti:case (cadr ast) (cddr ast)) inbody?))
 		       ((eq? (car ast) 'afill!)
 			(impc:ti:first-transform (impc:ti:afill! (cdr ast)) inbody?))
 		       ((eq? (car ast) 'pfill!)
