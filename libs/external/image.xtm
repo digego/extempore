@@ -58,14 +58,14 @@
 ;; id of 0 means Create new texture
 ;; id > 0 means load image into existing texture
 ;; returns texture 
-(bind-func soil-load-tex
+(bind-func gl_load_image
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y SOIL_FLAG_TEXTURE_RECTANGLE))))
       (if (= texid 0)
 	  (printf "Error loading: %s\n" path))
       texid)))
 
-(bind-func soil-load-tex-sqr
+(bind-func gl_load_image_sqr
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y))))
       (if (= texid 0)
@@ -79,144 +79,181 @@
 (bind-val GL_3_BYTES i32 5128)
 (bind-val GL_4_BYTES i32 5129)
 (bind-val GL_BGRA i32 32993)
-	  
-
-;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
-;; if texid is zero then assign a new tex id otherwise use the texid provided
-(bind-func gl-load-tex
-  (lambda (width height channels type data texid)
-    (let* ((tex:i32* (salloc)))
-      (pset! tex 0 texid)
-      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
-      (if (< texid 1) (glGenTextures 1 tex))
-      ;(printf "tex: %d\n" (pref tex 0))
-      (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
-      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
-      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP)
-      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP)
-      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_NEAREST)
-      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_NEAREST)
-      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_RGB)
-			  ((= channels 4) GL_RGBA) ;GL_RGBA)
-			  (else GL_RGBA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
-      (pref tex 0))))
-
-
-;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
-;; if texid is zero then assign a new tex id otherwise use the texid provided
-(bind-func gl-load-tex-ext
-  (lambda (width height channels type data textype texid)
-    (let* ((tex:i32* (salloc)))
-      (pset! tex 0 texid)
-      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
-      (if (< texid 1) (glGenTextures 1 tex))
-      ;(printf "tex: %d\n" (pref tex 0))
-      (glBindTexture textype (pref tex 0))
-      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
-      (glTexParameteri textype GL_TEXTURE_WRAP_S GL_CLAMP)
-      (glTexParameteri textype GL_TEXTURE_WRAP_T GL_CLAMP)
-      (glTexParameteri textype GL_TEXTURE_MAG_FILTER GL_NEAREST)
-      (glTexParameteri textype GL_TEXTURE_MIN_FILTER GL_NEAREST)
-      (glTexImage2D textype 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_RGB)
-			  ((= channels 4) GL_RGBA) ;GL_RGBA)
-			  (else GL_RGBA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
-      (pref tex 0))))
-
-
-;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
-;; if texid is zero then assign a new tex id otherwise use the texid provided
-(bind-func gl-load-tex-bgr
-  (lambda (width height channels type data texid)
-    (let* ((tex:i32* (salloc)))
-      (pset! tex 0 texid)
-      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
-      (if (< texid 1) (glGenTextures 1 tex))
-      ;(printf "tex: %d\n" (pref tex 0))
-      (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
-      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
-      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP)
-      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP)
-      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_NEAREST)
-      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_NEAREST)
-      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_BGR)
-			  ((= channels 4) GL_BGRA) ;GL_RGBA)
-			  (else GL_BGRA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
-      (pref tex 0))))
-
-;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
-;; if texid is zero then assign a new tex id otherwise use the texid provided
-(bind-func gl-load-tex-ext-bgr
-  (lambda (width height channels type data textype texid)
-    (let* ((tex:i32* (salloc)))
-      (pset! tex 0 texid)
-      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
-      (if (< texid 1) (glGenTextures 1 tex))
-      ;(printf "tex: %d\n" (pref tex 0))
-      (glBindTexture textype (pref tex 0))
-      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
-      (glTexParameteri textype GL_TEXTURE_WRAP_S GL_CLAMP)
-      (glTexParameteri textype GL_TEXTURE_WRAP_T GL_CLAMP)
-      (glTexParameteri textype GL_TEXTURE_MAG_FILTER GL_NEAREST)
-      (glTexParameteri textype GL_TEXTURE_MIN_FILTER GL_NEAREST)
-      (glTexImage2D textype 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_BGR)
-			  ((= channels 4) GL_BGRA) ;GL_RGBA)
-			  (else GL_BGRA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
-      (pref tex 0))))
-
-
-(bind-func gl-tex-width
-  (lambda (tex)
-    (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
-    (let ((v (salloc)))
-      (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_WIDTH v)
-      (pref v 0))))
 
 
 ;; get texture height
-(bind-func gl-tex-height
+;; for TEXTURE_2D only!
+(bind-func gl_tex_height_sqr
   (lambda (tex)
+    (glDisable GL_TEXTURE_RECTANGLE_ARB)
+    (glEnable GL_TEXTURE_2D)    
+    (glBindTexture GL_TEXTURE_2D tex)
+    (let ((v:|1,i32|* (salloc)))
+      (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_HEIGHT (cast v))
+      (glDisable GL_TEXTURE_2D)
+      (glBindTexture GL_TEXTURE_2D 0)
+      (aref v 0))))
+
+;; get texture-width
+;; for TEXTURE_2D only!
+(bind-func gl_tex_width_sqr
+  (lambda (tex)
+    (glDisable GL_TEXTURE_RECTANGLE_ARB)
+    (glEnable GL_TEXTURE_2D)    
+    (glBindTexture GL_TEXTURE_2D tex)
+    (let ((v:|1,i32|* (salloc)))
+      (glGetTexLevelParameteriv GL_TEXTURE_2D 0 GL_TEXTURE_WIDTH (cast v))
+      (glDisable GL_TEXTURE_2D)
+      (glBindTexture GL_TEXTURE_2D 0)      
+      (aref v 0))))
+
+;; get texture-width
+;; for TEXTURE_RECTANGLE only!
+(bind-func gl_tex_width
+  (lambda (tex)
+    (glDisable GL_TEXTURE_2D)
+    (glEnable GL_TEXTURE_RECTANGLE_ARB)    
     (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
-    (let ((v (salloc)))
-      (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_HEIGHT v)
-      (pref v 0))))
+    (let ((v:|1,i32|* (salloc)))
+      (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_WIDTH (cast v))
+      (glDisable GL_TEXTURE_RECTANGLE_ARB)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)      
+      (aref v 0))))
+
+;; get texture height
+;; for TEXTURE_RECTANGLE only!
+(bind-func gl_tex_height
+  (lambda (tex)
+    (glDisable GL_TEXTURE_2D)
+    (glEnable GL_TEXTURE_RECTANGLE_ARB)    
+    (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
+    (let ((v:|1,i32|* (salloc)))
+      (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_HEIGHT (cast v))
+      (glDisable GL_TEXTURE_RECTANGLE_ARB)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)            
+      (aref v 0))))
 
 
-(bind-func gl-draw-img
+;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
+;; if texid is zero then assign a new tex id otherwise use the texid provided
+(bind-func gl_load_tex
+  (lambda (width height channels type data texid)
+    (let* ((tex:i32* (salloc)))
+      (pset! tex 0 texid)
+      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
+      (if (< texid 1) (glGenTextures 1 tex))
+      ;(printf "tex: %d\n" (pref tex 0))
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
+      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 channels ;GL_RGBA
+		    width height
+		    0
+		    (cond ((= channels 1) GL_RED)
+			  ((= channels 3) GL_RGB)
+			  ((= channels 4) GL_RGBA) ;GL_RGBA)
+			  (else GL_RGBA))
+		    type
+		    ; GL_FLOAT; GL_UNSIGNED_BYTE
+		    data)
+      (pref tex 0))))
+
+
+;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
+;; if texid is zero then assign a new tex id otherwise use the texid provided
+(bind-func gl_load_tex_ext
+  (lambda (width height channels type data textype texid)
+    (let* ((tex:i32* (salloc)))
+      (pset! tex 0 texid)
+      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
+      (if (< texid 1) (glGenTextures 1 tex))
+      ;(printf "tex: %d\n" (pref tex 0))
+      (glBindTexture textype (pref tex 0))
+      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
+      (glTexParameteri textype GL_TEXTURE_WRAP_S GL_CLAMP)
+      (glTexParameteri textype GL_TEXTURE_WRAP_T GL_CLAMP)
+      (glTexParameteri textype GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri textype GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexImage2D textype 0 channels ;GL_RGBA
+		    width height
+		    0
+		    (cond ((= channels 1) GL_RED)
+			  ((= channels 3) GL_RGB)
+			  ((= channels 4) GL_RGBA) ;GL_RGBA)
+			  (else GL_RGBA))
+		    type
+		    ; GL_FLOAT; GL_UNSIGNED_BYTE
+		    data)
+      (pref tex 0))))
+
+
+;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
+;; if texid is zero then assign a new tex id otherwise use the texid provided
+(bind-func gl_load_tex_bgr
+  (lambda (width height channels type data texid)
+    (let* ((tex:i32* (salloc)))
+      (pset! tex 0 texid)
+      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
+      (if (< texid 1) (glGenTextures 1 tex))
+      ;(printf "tex: %d\n" (pref tex 0))
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
+      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 channels ;GL_RGBA
+		    width height
+		    0
+		    (cond ((= channels 1) GL_RED)
+			  ((= channels 3) GL_BGR)
+			  ((= channels 4) GL_BGRA) ;GL_RGBA)
+			  (else GL_BGRA))
+		    type
+		    ; GL_FLOAT; GL_UNSIGNED_BYTE
+		    data)
+      (pref tex 0))))
+
+;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
+;; if texid is zero then assign a new tex id otherwise use the texid provided
+(bind-func gl_load_tex_ext_bgr
+  (lambda (width height channels type data textype texid)
+    (let* ((tex:i32* (salloc)))
+      (pset! tex 0 texid)
+      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
+      (if (< texid 1) (glGenTextures 1 tex))
+      ;(printf "tex: %d\n" (pref tex 0))
+      (glBindTexture textype (pref tex 0))
+      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
+      (glTexParameteri textype GL_TEXTURE_WRAP_S GL_CLAMP)
+      (glTexParameteri textype GL_TEXTURE_WRAP_T GL_CLAMP)
+      (glTexParameteri textype GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri textype GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexImage2D textype 0 channels ;GL_RGBA
+		    width height
+		    0
+		    (cond ((= channels 1) GL_RED)
+			  ((= channels 3) GL_BGR)
+			  ((= channels 4) GL_BGRA) ;GL_RGBA)
+			  (else GL_BGRA))
+		    type
+		    ; GL_FLOAT; GL_UNSIGNED_BYTE
+		    data)
+      (pref tex 0))))
+
+
+
+(bind-func gl_draw_img
   (lambda (x y w h r texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
 	  (xx (+ x (* .5 w)))
 	  (yy (+ y (* .5 h)))
-	  (tw (i32tod (gl-tex-width texid)))
-	  (th (i32tod (gl-tex-height texid))))
+	  (tw (i32tod (gl_tex_width texid)))
+	  (th (i32tod (gl_tex_height texid))))
       (glDisable GL_TEXTURE_2D)
       (glEnable GL_TEXTURE_RECTANGLE_ARB)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
@@ -243,7 +280,7 @@
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
       void)))
 
-(bind-func gl-draw-img-ext
+(bind-func gl_draw_img_ext
   (lambda (x y w h r type texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
@@ -253,10 +290,10 @@
 		  GL_TEXTURE_2D
 		  GL_TEXTURE_RECTANGLE_ARB))
 	  (tw (if (= type GL_TEXTURE_RECTANGLE_ARB)
-		  (i32tod (gl-tex-width texid))
+		  (i32tod (gl_tex_width texid))
 		  1.0))
 	  (th (if (= type GL_TEXTURE_RECTANGLE_ARB)
-		  (i32tod (gl-tex-height texid))
+		  (i32tod (gl_tex_height texid))
 		  1.0)))
       (glDisable op)
       (glEnable type)
@@ -285,7 +322,7 @@
       void)))
 
 
-(bind-func gl-draw-img-from-img
+(bind-func gl_draw_img_from_img
   (lambda (ix iy tw th x y w h r texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
@@ -317,14 +354,14 @@
 
 
 
-(bind-func gl-draw-img-reverse
+(bind-func gl_draw_img_reverse
   (lambda (x y w h r texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
 	  (xx (+ x (* .5 w)))
 	  (yy (+ y (* .5 h)))
-	  (tw (i32tod (gl-tex-width texid)))
-	  (th (i32tod (gl-tex-height texid))))
+	  (tw (i32tod (gl_tex_width texid)))
+	  (th (i32tod (gl_tex_height texid))))
       (glEnable GL_TEXTURE_RECTANGLE_ARB)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
       (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE); GL_BLEND) ;REPLACE)
