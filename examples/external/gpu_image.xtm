@@ -7,12 +7,12 @@
 
 (load "libs/external/opengl.xtm")
 
-;; must create openglview before calling gl-load-extensions
+;; must create openglview before calling gl_load_extensions
 ;(define pr2 (gl:make-ctx ":0.0" #t 0.0 0.0 900.0 600.0))
 (define pr2 (gl:make-ctx ":0.0" #t 0.0 0.0 (* 3.0 1920.0) 1080.0))
-;(gl-set-view 900.0 600.0)
+;(gl_set_view 900.0 600.0)
 
-(bind-func gl-set-view-ext
+(bind-func gl_set_view_ext
   (lambda (w:double h:double fov:double depth:double)
     (glViewport 0 0 (dtoi32 w) (dtoi32 h))
     (glMatrixMode GL_PROJECTION)
@@ -20,14 +20,12 @@
     (gluPerspective fov (/ w h) 1.0 depth)
     (glMatrixMode GL_MODELVIEW)
     (glEnable GL_DEPTH_TEST)
-    (gl-setup)
+    (gl_setup)
     1))
 
-;(gl-set-view-ext (* 3.0 1920.0) 1080.0 55.0 2000.0)
-;(gl-set-view-ext (* 3.0 1920.0) 1080.0 35.0 2000.0)
-(gl-set-view-ext (* 3.0 1920.0) 1080.0 21.24 (* 3.0 1920.0))
-
-(gl-load-extensions) ;; for windows 
+;(gl_set_view_ext (* 3.0 1920.0) 1080.0 55.0 2000.0)
+;(gl_set_view_ext (* 3.0 1920.0) 1080.0 35.0 2000.0)
+(gl_set_view_ext (* 3.0 1920.0) 1080.0 21.24 (* 3.0 1920.0))
 
 (define scr-width (* 3.0 1920.0))
 (define scr-height 1080.0)
@@ -63,20 +61,20 @@
   (lambda (a)
     (tref a 1)))
 
-(bind-func add-key-value-b
+(bind-func add_key_value_b
   (lambda (key:i8* val:double dict:list*)
     (let ((p:<i8*,double>* (zalloc)))
       (tfill! p key val)
       (cons p dict))))
 
-(bind-func value-for-key
+(bind-func value_for_key
   (lambda (key:i8* dict:list* val:double*)
     (let ((e:<i8*,double>* (car dict)))
       (if (null? e)
 	  0
 	  (if (= (strcmp (tref e 0) key) 0)
 	      (begin (pset! val 0 (tref e 1)) 1)
-	      (value-for-key key (cdr dict) val))))))
+	      (value_for_key key (cdr dict) val))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -89,7 +87,7 @@
 ;; are 32bit (i.e. not 64bit)
 ;; finally, osc messages are bit endian
 ;; so you'll likely need to swap your arguments
-(bind-func osc-receive-7020
+(bind-func osc_receive_7020
   (lambda (address:i8* types:i8* args:i8*)
     (let ((data (bitcast args i32*)))
       (printf "address:%s  type:%s arg1:%f arg2:%lld\n"
@@ -121,7 +119,7 @@
 ;; box size of 5*5
 (bind-val gridoffsets float* (sys:make-cptr (* 5 5 2 4)))
 
-(bind-func set-grid-offsets
+(bind-func set_grid_offsets
   (lambda (width:float height:float factor:float)
     (let ((xinc:float (/ factor width))
 	  (yinc:float (/ factor height))
@@ -139,12 +137,9 @@
 
 
 ;; image to use
-;; (define myimg (soil-load-tex "/home/andrew/Pictures/paris.png" 0))
-;; (define myimg (soil-load-tex "/home/andrew/Pictures/aacell1.png" 0))
-;; (define myimg (soil-load-tex "/home/andrew/Pictures/paristwo.png" 0))
-(define myimg (soil-load-tex "../images/myparis.png" 0))
+(define myimg (gl_load_image "image.png" 0))
 
-(bind-func gl-loop
+(bind-func gl_loop
   (let ((cnt 0.0))
     (lambda (img:i32
 	     fbo1:E_fbo* fbo2:E_fbo*
@@ -154,13 +149,13 @@
       (set! cnt (+ cnt 5.0))
       
       (glLoadIdentity)
-      ;(gl-look-at 0.0 0.0 (+ 1000.0 (* 100.0 (cos (* cnt .01)))) 0.0 0.0 0.0 0.0 1.0 0.0)
-      ;(gl-look-at 0.0 0.0 1300.0 0.0 0.0 0.0 0.0 1.0 0.0)
-      ;(gl-look-at 0.0 0.0 1037.0 0.0 0.0 0.0 0.0 1.0 0.0)
-      (gl-look-at 0.0 0.0 2880.0 0.0 0.0 0.0 0.0 1.0 0.0)                        
+      ;(gl_look_at 0.0 0.0 (+ 1000.0 (* 100.0 (cos (* cnt .01)))) 0.0 0.0 0.0 0.0 1.0 0.0)
+      ;(gl_look_at 0.0 0.0 1300.0 0.0 0.0 0.0 0.0 1.0 0.0)
+      ;(gl_look_at 0.0 0.0 1037.0 0.0 0.0 0.0 0.0 1.0 0.0)
+      (gl_look_at 0.0 0.0 2880.0 0.0 0.0 0.0 0.0 1.0 0.0)                        
       
-      ;(set-grid-offsets 1.0 1.0 1.0) ;(* 2.0 (dtof (cos (* .00005 (i64tod (now)))))))
-      (set-grid-offsets 1.0 1.0 (* 2.0 (dtof (cos (* .00002 (i64tod (now)))))))
+      ;(set_grid_offsets 1.0 1.0 1.0) ;(* 2.0 (dtof (cos (* .00005 (i64tod (now)))))))
+      (set_grid_offsets 1.0 1.0 (* 2.0 (dtof (cos (* .00002 (i64tod (now)))))))
       
       ;; shader pass 1
       (glBindFramebuffer GL_FRAMEBUFFER (tref fbo1 0))    
@@ -170,22 +165,22 @@
       (glUniform1i (glGetUniformLocation s1 "tex1") 0)
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      ;; (gl-draw-img-from-img
+      ;; (gl_draw_img_from_img
       ;;  (modulo cnt 9000.0) 0.0       
       ;;  scr_width 512.0
       ;;  (* scr_width -0.5) (* scr_height -0.5)
       ;;  (* 1.0 scr_width) (* 1.0 scr_height) 0.0 img)      
-      (gl-draw-img-from-img
+      (gl_draw_img_from_img
        (modulo cnt 9000.0) 0.0       
        scr_width 170.6
        (* scr_width -0.5) (* scr_height -0.5)
        (* 1.0 scr_width) (* 0.3333333 scr_height) 0.0 img)
-      (gl-draw-img-from-img
+      (gl_draw_img_from_img
        (modulo (* 1.1 cnt) 9000.0) 170.6
        scr_width 170.6
        (* scr_width -0.5) (+ (* scr_height -0.5) (* 0.3333333 scr_height))
        (* 1.0 scr_width) (* 0.3333333 scr_height) 0.0 img)
-      (gl-draw-img-from-img
+      (gl_draw_img_from_img
        (modulo (* 1.2 cnt) 9000.0) 341.2       
        scr_width 170.6
        (* scr_width -0.5) (+ (* scr_height -0.5) (* 0.6666666 scr_height))
@@ -201,9 +196,9 @@
       (glUniform1i (glGetUniformLocation s2 "tex1") 0)
       (glClearColor 1.0 0.0 0.0 1.0)      
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      (gl-draw-img (* scr_width -0.5) (* scr_height -0.5)
+      (gl_draw_img (* scr_width -0.5) (* scr_height -0.5)
       		   scr_width scr_height 0.0 (tref fbo1 1))
-      ;(gl-draw-img -450.0 -300.0 900.0 600.0 0.0 (tref fbo1 1))
+      ;(gl_draw_img -450.0 -300.0 900.0 600.0 0.0 (tref fbo1 1))
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
 
@@ -215,9 +210,9 @@
       (glUniform1i (glGetUniformLocation s3 "tex1") 0)
       (glClearColor 0.0 1.0 1.0 1.0)      
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      (gl-draw-img (* scr_width -0.5) (* scr_height -0.5)
+      (gl_draw_img (* scr_width -0.5) (* scr_height -0.5)
       		   scr_width scr_height 0.0 (tref fbo2 1))      
-      ;(gl-draw-img -450.0 -300.0 900.0 600.0 0.0 (tref fbo2 1))
+      ;(gl_draw_img -450.0 -300.0 900.0 600.0 0.0 (tref fbo2 1))
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
 
@@ -229,9 +224,9 @@
       (glUniform1i (glGetUniformLocation s4 "tex1") 0)
       (glClearColor 1.0 1.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      (gl-draw-img (* scr_width -0.5) (* scr_height -0.5)
+      (gl_draw_img (* scr_width -0.5) (* scr_height -0.5)
       		   scr_width scr_height 0.0 (tref fbo1 1))      
-      ;(gl-draw-img -450.0 -300.0 900.0 600.0 0.0 (tref fbo1 1))
+      ;(gl_draw_img -450.0 -300.0 900.0 600.0 0.0 (tref fbo1 1))
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
       
@@ -241,22 +236,22 @@
       (glUniform1i (glGetUniformLocation s5 "tex1") 0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       
-      (gl-draw-img (* scr_width -0.5) (* scr_height -0.5) scr_width scr_height 0.0 (tref fbo2 1))
+      (gl_draw_img (* scr_width -0.5) (* scr_height -0.5) scr_width scr_height 0.0 (tref fbo2 1))
       
-      ;; (gl-draw-img-from-img
+      ;; (gl_draw_img_from_img
       ;;  (+ 1000.0 (* 1000.0 (cos (* .001 cnt)))) 0.0 ;(modulo cnt 10000.0) 0.0
       ;;  scr_width 512.0
       ;;  (* scr_width -0.5) (* scr_height -0.5)
       ;;  scr_width scr_height 0.0 img)
       
 
-      ;; (gl-draw-img-b 0.0 0.0 ;(modulo cnt 10000.0) 0.0
+      ;; (gl_draw_img_b 0.0 0.0 ;(modulo cnt 10000.0) 0.0
       ;; 		     3000.0 512.0
       ;; 		     (* scr_width -0.5) (* scr_height -0.5)
       ;; 		     scr_width scr_height 0.0 img)
       
 
-      ;; (gl-draw-img-b (modulo cnt 10000.0) 0.0
+      ;; (gl_draw_img_b (modulo cnt 10000.0) 0.0
       ;; 		     scr_width 512.0
       ;; 		     (* scr_width -0.5) (* scr_height -0.5)
       ;; 		     scr_width scr_height 0.0 img)
@@ -272,7 +267,7 @@
 	(println 'im-late))
     (define tt (now))
     (define distance 80.0)
-    (gl-loop myimg fbo1 fbo2
+    (gl_loop myimg fbo1 fbo2
 	     *shader1* *shader2* *shader3* *shader4* *shader5*)
     (gl:swap-buffers pr2)
     (callback (+ time 200) 'opengl-test (+ time 600) (+ degree 0.01)))) ; distance)))
