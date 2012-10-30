@@ -38,7 +38,7 @@
 (load "libs/external/opengl.xtm")
 
 
-(bind-func range-limit
+(bind-func range_limit
   (lambda (h:double l:double v:double)
     (if (< v l) l
 	(if (> v h) h
@@ -54,54 +54,54 @@
 
 (bind-type fluidcube <i64,double,double,double,double*,double*,double*,double*,double*,double*,i64>)
 
-(bind-func fluid-ix
+(bind-func fluid_ix
   (lambda (x:i64 y:i64 N:i64)
     (+ x (* y N))))
 
 
-(bind-func fluid-cube-create
-  (lambda (size-x size-y diffusion viscosity dt:double)
+(bind-func fluid_cube_create
+  (lambda (size_x size_y diffusion viscosity dt:double)
     (let ((cube:fluidcube* (halloc))
-	  (size2:i64 (* size-x size-y 10))
+	  (size2:i64 (* size_x size_y 10))
 	  (s:double* (halloc size2))
 	  (density:double* (heap-alloc size2))
 	  (Vx:double* (heap-alloc size2))
 	  (Vy:double* (heap-alloc size2))
 	  (Vx0:double* (heap-alloc size2))
 	  (Vy0:double* (heap-alloc size2)))
-      (tfill! cube size-x dt diffusion viscosity s density Vx Vy Vx0 Vy0 size-y)
+      (tfill! cube size_x dt diffusion viscosity s density Vx Vy Vx0 Vy0 size_y)
       cube)))
 
 
-(bind-func fluid-cube-add-density
+(bind-func fluid_cube_add_density
   (lambda (cube:fluidcube* x y amount:double)
     (let ((N (tref cube 0))
 	  (idx (+ x (* y N)))
-	  (density-ptr:double* (tref cube 5))
-	  (density (pref density-ptr idx)))
+	  (density_ptr:double* (tref cube 5))
+	  (density (pref density_ptr idx)))
       ;(printf "idx: %d:%d:%d:%d\n" idx N x y)
-      (pset! density-ptr idx (+ density amount))
+      (pset! density_ptr idx (+ density amount))
       (+ density amount))))
 
 
-(bind-func fluid-cube-add-velocity
-  (lambda (cube:fluidcube* x y amount-x:double amount-y:double)
+(bind-func fluid_cube_add_velocity
+  (lambda (cube:fluidcube* x y amount_x:double amount_y:double)
     (let ((N (tref cube 0))
 	  (idx (+ x (* y N)))
 	  (_Vx (tref cube 6))
 	  (_Vy (tref cube 7)))
-      (pset! _Vx idx (+ amount-x (pref _Vx idx)))
-      (pset! _Vy idx (+ amount-y (pref _Vy idx)))
+      (pset! _Vx idx (+ amount_x (pref _Vx idx)))
+      (pset! _Vy idx (+ amount_y (pref _Vy idx)))
       cube)))
 
 
 ;; I don't want boundary conditions for this one
-(bind-func fluid-set-boundary
+(bind-func fluid_set_boundary
   (lambda (b:i64 x:double* Ny:i64 N:i64)
       1))
 
 
-(bind-func fluid-lin-solve
+(bind-func fluid_lin_solve
   (lambda (b:i64 x:double* x0:double* a c iter:i64 Ny:i64 N:i64)
     (let ((cRecip (/ 1.0 c))
 	  (k 0)
@@ -118,17 +118,17 @@
 				 (pref x (+ i (* (+ j 1) N)))
 				 (pref x (+ (+ i 1) (* (+ j 2) N)))
 				 (pref x (+ (+ i 1) (* j N)))))))))))
-      (fluid-set-boundary b x Ny N))
+      (fluid_set_boundary b x Ny N))
     1))
 
 
-(bind-func fluid-diffuse
+(bind-func fluid_diffuse
   (lambda (b:i64 x:double* x0:double* diff:double dt:double iter Ny N)
     (let ((a:double (* dt diff (i64tod (- N 2)))))
-      (fluid-lin-solve b x x0 a (+ 1.0 (* 6.0 a)) iter Ny N))))
+      (fluid_lin_solve b x x0 a (+ 1.0 (* 6.0 a)) iter Ny N))))
 
 
-(bind-func fluid-project
+(bind-func fluid_project
   (lambda (velocx:double* velocy:double* p:double* div:double* iter Ny N)
     (let ((j 0)
 	  (i 0)
@@ -145,9 +145,9 @@
 	  (pset! p (+ (+ i 1) (* (+ j 1) N)) 0.0)
 	  1))
     
-      (fluid-set-boundary 0 div Ny N)
-      (fluid-set-boundary 0 p Ny N)
-      (fluid-lin-solve 0 p div 1.0 6.0 iter Ny N)
+      (fluid_set_boundary 0 div Ny N)
+      (fluid_set_boundary 0 p Ny N)
+      (fluid_lin_solve 0 p div 1.0 6.0 iter Ny N)
 
       (dotimes (jj (- Ny 1))
 	(dotimes (ii (- N 1))
@@ -165,17 +165,17 @@
 		       (i64tod N))))
 	  1))
 
-    (fluid-set-boundary 1 velocx Ny N)
-    (fluid-set-boundary 2 velocy Ny N)
+    (fluid_set_boundary 1 velocx Ny N)
+    (fluid_set_boundary 2 velocy Ny N)
     
     1)))
 
 
-(bind-func fluid-advect
+(bind-func fluid_advect
   (lambda (b:i64 d:double* d0:double* velocx:double* velocy:double* dt:double Ny:i64 N:i64)
-    (let ((n-1 (i64tod (- N 1)))
-	  (dtx (* dt n-1))
-	  (dty (* dt n-1))
+    (let ((n_1 (i64tod (- N 1)))
+	  (dtx (* dt n_1))
+	  (dty (* dt n_1))
 	  (jfloat 0.0) (ifloat 0.0)
 	  (s0 0.0) (s1 0.0) (t0 0.0) (t1 0.0)
 	  (i0 0.0) (i0i 0) (i1 0.0) (i1i 0)
@@ -219,11 +219,11 @@
 		    (* s1 (+ (* t0 (pref d0 (+ i1i (* j0i N))))
 			     (* t1 (pref d0 (+ i1i (* j1i N))))))))))
 	  
-      (fluid-set-boundary b d Ny N))))
+      (fluid_set_boundary b d Ny N))))
 
 				 
 				       
-(bind-func fluid-step-cube
+(bind-func fluid_step_cube
   (lambda (cube:fluidcube*)
     (let ((N (tref cube 0))
 	  (Ny (tref cube 10))
@@ -240,40 +240,40 @@
 	  (Vx0 (tref cube 8))
 	  (Vy0 (tref cube 9))
 	  (time (now)))
-      (fluid-diffuse 1 Vx0 Vx visc dt iter Ny N)
-      (fluid-diffuse 2 Vy0 Vy visc dt iter Ny N)
+      (fluid_diffuse 1 Vx0 Vx visc dt iter Ny N)
+      (fluid_diffuse 2 Vy0 Vy visc dt iter Ny N)
       
       (dotimes (k (* Ny N))
       	(pset! Vx k 0.0)
       	(pset! Vy k 0.0))
 
-      (fluid-project Vx0 Vy0 Vx Vy iter Ny N)
+      (fluid_project Vx0 Vy0 Vx Vy iter Ny N)
 
-      (fluid-advect 1 Vx Vx0 Vx0 Vy0 dt Ny N)
-      (fluid-advect 2 Vy Vy0 Vx0 Vy0 dt Ny N)
+      (fluid_advect 1 Vx Vx0 Vx0 Vy0 dt Ny N)
+      (fluid_advect 2 Vy Vy0 Vx0 Vy0 dt Ny N)
 
       (dotimes (kk (* Ny N))
       	(pset! Vx0 kk 0.0)
       	(pset! Vy0 kk 0.0))      
             
-      (fluid-project Vx Vy Vx0 Vy0 iter Ny N)
+      (fluid_project Vx Vy Vx0 Vy0 iter Ny N)
 
-      (fluid-diffuse 0 s density diff dt iter Ny N)
-      (fluid-advect 0 density s Vx Vy dt Ny N)      
+      (fluid_diffuse 0 s density diff dt iter Ny N)
+      (fluid_advect 0 density s Vx Vy dt Ny N)      
 
       ;(printf "time: %lld:%lld\n" (now) (- (now) time))
       cube)))
 
 
-(bind-func get-fluid-cube
-;   (let ((cube (fluid-cube-create 322 182 0.0002 0.00002 0.05)))    ; test
-   (let ((cube (fluid-cube-create 322 182 0.0002 0.00002 0.05)))    ; test               
+(bind-func get_fluid_cube
+;   (let ((cube (fluid_cube_create 322 182 0.0002 0.00002 0.05)))    ; test
+   (let ((cube (fluid_cube_create 322 182 0.0002 0.00002 0.05)))    ; test               
     (lambda ()
       cube)))
 
-(bind-func fluid-fsc
+(bind-func fluid_fsc
   (lambda ()
-    (fluid-step-cube (get-fluid-cube))))
+    (fluid_step_cube (get_fluid_cube))))
 
 
 
@@ -297,7 +297,7 @@
 (bind-val ubo i32 -1)
 (bind-val vehicles float* (sys:make-cptr (* 2000 4)))
 
-(bind-func init-osc-vars
+(bind-func init_osc_vars
   (lambda ()
     (let ((i 0))
       (dotimes (i 20)
@@ -310,7 +310,7 @@
 	(pset! osc_grads i 0.0)
 	(pset! osc_alive i 0)))))
 
-(init-osc-vars)
+(init_osc_vars)
 
 
 
@@ -321,65 +321,65 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
  
-(bind-func add-density
+(bind-func add_density
   (lambda (x:i64 y:i64 amount:double)
-    (let ((cube (get-fluid-cube)))
-      (fluid-cube-add-density cube x y amount))))
+    (let ((cube (get_fluid_cube)))
+      (fluid_cube_add_density cube x y amount))))
 
-(bind-func add-velocity
-  (lambda (x y amount-x amount-y)
-    (fluid-cube-add-velocity (get-fluid-cube) x y amount-x amount-y)))
+(bind-func add_velocity
+  (lambda (x y amount_x amount_y)
+    (fluid_cube_add_velocity (get_fluid_cube) x y amount_x amount_y)))
 
-(bind-func get-velocity
+(bind-func get_velocity
   (lambda (x y)
-    (let ((xs (tref (get-fluid-cube) 6))
-	  (size (tref (get-fluid-cube) 0)))
+    (let ((xs (tref (get_fluid_cube) 6))
+	  (size (tref (get_fluid_cube) 0)))
       (pref xs (+ x (* y size))))))
 
 
-(bind-func note-active
+(bind-func note_active
   (lambda (idx)
     (pref osc_alive idx)))
 
-(bind-func note-pitch
+(bind-func note_pitch
   (lambda (idx)
     (pref osc_xs idx)))
 
-(bind-func note-activity
+(bind-func note_activity
   (lambda (idx)
     (+ (pref osc_xxs idx)
        (pref osc_yys idx))))
 
-(bind-func note-grad
+(bind-func note_grad
   (lambda (idx)
     (pref osc_grads idx)))
 
 
-(bind-func update-fluid-sym-state
+(bind-func update_fluid_sym_state
   (lambda ()
     (let ((i 0))
       (dotimes (i 20)
-	(if (> (note-active i) 0)
-	    (let ((x (dtoi64 (range-limit (* 322.0 (- (* 1.1 (pref osc_xs i)) .05)) 1.0 321.0)))
+	(if (> (note_active i) 0)
+	    (let ((x (dtoi64 (range_limit (* 322.0 (- (* 1.1 (pref osc_xs i)) .05)) 1.0 321.0)))
 		  (ya (pref osc_ys i))
 		  (y (dtoi64 (+ 1.0 (* 181.0 ya))))
 		  (xx (pref osc_xxs i))
 		  (yy (pref osc_yys i)))
-	      (add-velocity x y (* 1000.0 xx) (* -1000.0 yy))
+	      (add_velocity x y (* 1000.0 xx) (* -1000.0 yy))
 	      1)			    
 	    1))
       1)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; helpers for opengl rendering of fluidsym
-(bind-func set-data-arrays-lines
+(bind-func set_data_arrays_lines
   (lambda (cube:fluidcube* point_data:float* color_data:float* offset:float n:i64)
     (let ((ii:i64 0)
 	  (jj:i64 0)    
 	  (Vx (tref cube 6))
 	  (Vy (tref cube 7))
 	  (size (tref cube 0))
-	  (size-y (tref cube 10))
+	  (size_y (tref cube 10))
 	  (cnt 0)
 	  (xv 0.0) (yv 0.0) (norm 0.0) (n1 0.2)
 	  (idx 0)
@@ -388,7 +388,7 @@
 	  (green (dtof 0.0))
 	  (trans (dtof 0.9))
 	  (mn:double 0.0))
-      (dotimes (jj (- size-y 2))
+      (dotimes (jj (- size_y 2))
 	(dotimes (ii (- size 2))
 	  ;; (let ((idx (+ (+ ii 1) (* (+ jj 1) size)))
 	  ;; 	(xv (pref Vx idx))
@@ -421,7 +421,7 @@
     void))
 
 
-(bind-func set-data-arrays-points
+(bind-func set_data_arrays_points
   (lambda (cube:fluidcube* point_data:float* color_data:float* offset:float n:i64)
     (let ((densities (tref cube 5))
 	  (ii:i64 0)
@@ -429,7 +429,7 @@
 	  (Vx (tref cube 6))
 	  (Vy (tref cube 7))
 	  (size (tref cube 0))
-	  (size-y (tref cube 10))
+	  (size_y (tref cube 10))
 	  (cvar:float 0.0)
 	  (cnt 0)
 	  (idx 0)
@@ -437,7 +437,7 @@
 	  (blue (dtof 0.1))
 	  (green (dtof 0.2))) ;(dtof .2)))
       (dotimes (ii (- size 2))
-	(dotimes (jj (- size-y 2))
+	(dotimes (jj (- size_y 2))
 ;	  (let ((idx (+ (+ ii 1) (* (+ jj 1) size))))
 	  (set! idx (+ (+ ii 1) (* (+ jj 1) size)))
 	  (pset! point_data (+ 0 (* 2 cnt)) (i64tof ii))
@@ -454,7 +454,7 @@
 
   ;; a trivial opengl draw loop
 ;; need to call glfwSwapBuffers to flush
-(bind-func gl-loop
+(bind-func gl_loop
   (let ((degree 0.0)
 	(point_data1:float* (halloc 10000000))
 	(color_data1:float* (halloc 10000000))
@@ -464,7 +464,7 @@
       (glEnable GL_BLEND)
       (glBlendFunc GL_SRC_ALPHA (+ GL_SRC_ALPHA 1))
       
-      (update-fluid-sym-state)
+      (update_fluid_sym_state)
       (glDisable GL_DEPTH_TEST)
       
       (glClearColor 0.0 0.0 0.0 1.0)
@@ -484,15 +484,15 @@
       (glEnableClientState GL_VERTEX_ARRAY)
       (glEnableClientState GL_COLOR_ARRAY)
 
-      (set-data-arrays-points (get-fluid-cube) point_data1 color_data1 0.0 1)     
+      (set_data_arrays_points (get_fluid_cube) point_data1 color_data1 0.0 1)     
       (glVertexPointer 2 GL_FLOAT 0 (bitcast point_data1 i8*))
       (glColorPointer 4 GL_FLOAT 0 (bitcast color_data1 i8*))	
-      (glDrawArrays GL_POINTS 0 (i64toi32 (/ (* 320 180) 1))) ; size-y)))      
+      (glDrawArrays GL_POINTS 0 (i64toi32 (/ (* 320 180) 1))) ; size_y)))      
       
-      (set-data-arrays-lines (get-fluid-cube) point_data2 color_data2 0.0 1)
+      (set_data_arrays_lines (get_fluid_cube) point_data2 color_data2 0.0 1)
       (glVertexPointer 2 GL_FLOAT 0 (bitcast point_data2 i8*))
       (glColorPointer 4 GL_FLOAT 0 (bitcast color_data2 i8*))	
-      (glDrawArrays GL_LINES 0 (i64toi32 (/ (* 320 180 2) 1))) ; size-y)))
+      (glDrawArrays GL_LINES 0 (i64toi32 (/ (* 320 180 2) 1))) ; size_y)))
       
       (glDisableClientState GL_VERTEX_ARRAY)
       (glDisableClientState GL_COLOR_ARRAY)
@@ -504,17 +504,17 @@
   (lambda (time:double)
     (let ((i 0))      
       (dotimes (i 1)
-      	(add-density 250 130 50.0)
-      	(add-velocity 250 130 (* 10.0 (cos (* time .00001))) (* 10.0 (cos (* time .0001))))
-      	(add-density 2 80 100.0)	
-      	(add-velocity 2 80 10.0 0.0)
-	(add-density 150 2 200.0)
-      	(add-velocity 150 2 0.0 (* 50.0 (cos (* time 0.00005))))))
+      	(add_density 250 130 50.0)
+      	(add_velocity 250 130 (* 10.0 (cos (* time .00001))) (* 10.0 (cos (* time .0001))))
+      	(add_density 2 80 100.0)	
+      	(add_velocity 2 80 10.0 0.0)
+	(add_density 150 2 200.0)
+      	(add_velocity 150 2 0.0 (* 50.0 (cos (* time 0.00005))))))
     void))
 
 
 ;;
-;; opengl-test includes two sources
+;; opengl_test includes two sources
 ;; of constant wind speed
 ;;
 ;; bottom->top: straight up the middle
@@ -531,12 +531,12 @@
     	(println 'gl-behind (- time (now))))
 
     (burners time)
-    (gl-loop)
+    (gl_loop)
     (gl:swap-buffers pr2)    
 
-    (ipc:call-async "fluid" 'fluid-fsc)
+    (ipc:call-async "fluid" 'fluid_fsc)
     
-    ;(fluid-step-cube (get-fluid-cube))
+    ;(fluid_step_cube (get_fluid_cube))
     (callback (+ time 0) 'opengl-test
 	      (if (< time (now))
 		  (+ time 5000)
@@ -547,17 +547,17 @@
 
 ;(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1000.0 1000.0))
 (define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
-(gl-set-view 900.0 600.0 900.0)
+(gl_set_view 900.0 600.0 900.0)
 
 
-(begin (ipc:bind-func "fluid" 'fluid-fsc)
+(begin (ipc:bind-func "fluid" 'fluid_fsc)
        (sys:sleep 44100)
        (opengl-test (now) 0.0)
-       (add-density 50 50 1000.0)
-       (add-velocity 50 50 1000.0 1000.0))
+       (add_density 50 50 1000.0)
+       (add_velocity 50 50 1000.0 1000.0))
 
 
-(bind-func set-dat
+(bind-func set_dat
   (lambda (x:double y:double)
     (if (> x 0.0)
 	(begin (pset! osc_alive 0 1)
@@ -579,10 +579,10 @@
 	       (if (not (null? evt))
 		   (let ((x (real->integer (/ (cadr evt) 2.803)))
 			 (y (real->integer (/ (- 600.0 (car evt)) 3.314))))
-		     (set-dat (range-limit (/ x 320.0) 2. 320.0)
-			      (range-limit (/ y 180.0) 2. 180.0))
+		     (set_dat (range_limit (/ x 320.0) 2. 320.0)
+			      (range_limit (/ y 180.0) 2. 180.0))
 		     1)
-		   (begin (set-dat -1.0 0.0)
+		   (begin (set_dat -1.0 0.0)
 			  1))))
 	    ((string=? (sys:platform) "Linux")
 	     (let ((evt (gl:get-event pr2)))
@@ -590,13 +590,13 @@
 			(= (length evt) 4))
 		   (let ((x (real->integer (/ (caddr evt) 2.803)))
 			 (y (real->integer (/ (- 600.0 (cadddr evt)) 3.314))))
-		     (set-dat (range-limit (/ x 320.0) 2. 320.0)
-			      (range-limit (/ y 180.0) 2. 180.0))
+		     (set_dat (range_limit (/ x 320.0) 2. 320.0)
+			      (range_limit (/ y 180.0) 2. 180.0))
 		     1)
-		   (begin (set-dat -1.0 0.0)
+		   (begin (set_dat -1.0 0.0)
 			  1))))
 	    ((string=? (sys:platform) "OSX")
-	     (set-dat .5 ;(+ 5.0 (* 300.0 (random)))
+	     (set_dat .5 ;(+ 5.0 (* 300.0 (random)))
 		      .5) ;(+ 2.0 (* 170.0 (random))))
 	     ;; mouse events not implemented on osx yet!
 	     1)
