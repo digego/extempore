@@ -269,7 +269,43 @@
 (bind-func xstring_cmp
   (lambda (s1:xstring_t* s2:xstring_t*)
     (strcmp (tref s1 1)
-            (tref s2 1))))
+	    (tref s2 1))))
+
+;; levenshtein edit distance
+
+(bind-func xstring_levenshtein
+  (lambda (s:xstring_t* t:xstring_t*)
+    (let ((i 0) (j 0)
+	  ;; column-major indexing closure
+	  (s_cstr (cstring_from_xstring s))
+	  (slen:i64 (xstring_length s))
+	  (t_cstr (cstring_from_xstring t))
+	  (tlen:i64 (xstring_length t))
+	  (row:i64* (salloc (+ slen 1)))
+	  (prev_row:i64* (salloc (+ slen 1)))
+	  (min3 (lambda (a:i64 b c)
+		  (if (< a b)
+		      (if (< a c)
+			  a c)
+		      (if (< b c)
+			  b c)))))
+      (dotimes (i (+ tlen 1))
+	(pset! prev_row i i))
+      (dotimes (i slen)
+	(pset! row 0 (+ i 1))
+	(dotimes (j tlen)
+	  (pset! row (+ j 1)
+		 (min3 (+ (pref row j) 1)
+		       (+ 1 (pref prev_row (+ j 1)))
+		       (+ (pref prev_row j)
+			  (if (= (pref s_cstr j)
+				 (pref t_cstr i))
+			      0 1)))))
+	(let ((tmp_row:i64* null))
+	  (set! tmp_row prev_row)
+	  (set! prev_row row)
+	  (set! row tmp_row)))
+      (pref prev_row tlen))))
 
 ;; (bind-func xstring_spn
 ;;   (lambda (s1:xstring_t* s2:xstring_t*)
@@ -285,47 +321,6 @@
 ;;   (lambda (s1:xstring_t* s2:xstring_t*)
 ;;     (xstring (strpbrk (tref s1 1)
 ;;                       (tref s2 1)))))
-
-;; levenshtein edit distance
-
-;; (bind-func lev_dist
-;;   (lambda (s:xstring_t* t:xstring_t*)
-;;     (let ((i 0) (j 0) (k 0)
-;; 	  ;; column-major indexing closure
-;; 	  (idx (lambda (x y)
-;; 		 (+ x (* y (+ tlen 1)))))
-;;           (slen (xstring_length s))
-;;           (tlen (xstring_length t))
-;;           (dsize (* (+ slen 1) (+ tlen 1)))
-;; 	  (d:i64* (salloc dsize)))
-;;       (printf "allocated %lld i64s\n" dsize)
-;;       (dotimes (i (+ slen 1))
-;; 	(printf "[0,%lld] = %lld\n" (idx 0 i) i)
-;; 	(pset! d (idx 0 i) i))
-;;       (dotimes (j (+ tlen 1))
-;; 	(printf "[%lld,0] = %lld\n" (idx j 0) j)
-;; 	(pset! d (idx j 0) j))
-;;       (printf "\ninitial matrix:\n\n")
-;;       ;; (dotimes (k dsize) (printf "%lld " (pref d k)))
-;;       ;; (printf "\n\n")
-;;       (mprint d (+ tlen 1) (+ slen 1) (i64toi1 1))
-;;       (dotimes (i tlen 1)
-;; 	(dotimes (j slen 1)
-;; 	  (if (= (pref s (- i 1))
-;; 		 (pref t (- j 1)))
-;; 	      (pset! d (idx i j) (pref d (idx (- i 1) (- j 1))))
-;; 	      (pset! d (idx i j) (let ((del (+ (pref d (idx (- i 1) j)) 1))
-;; 				       (ins (+ (pref d (idx i (- j 1))) 1))
-;; 				       (sub (+ (pref d (idx (- i 1) (- j 1))) 1)))
-;; 				   ;; (printf "\ni:%lld j:%lld del:%lld ins:%lld sub:%lld\n"
-;; 				   ;;         i j del ins sub)
-;; 				   (if (< ins del)
-;; 				       (if (< sub ins)
-;; 					   sub ins)
-;; 				       (if (< sub del)
-;; 					   sub del)))))))
-;;       (mprint d (+ tlen 1) (+ slen 1) (i64toi1 1))
-;;       (pref d (- (idx (+ tlen 1) (+ slen 1)) 1)))))
 
 ;;;;;;;;;;;;;;;;
 ;; ALGORITHMS ;;
