@@ -696,6 +696,19 @@
 ;; if you want to bind a global pointer, then the third 'value'
 ;; argument is the size of the memory to allocate (in elements, not in bytes)
 
+(bind-val g_ptr0 double* 10)
+
+(bind-func test_g_ptr0
+  (lambda ()
+    (let ((sum 0.0)
+          (i 0))
+      (dotimes (i 10)
+        (pset! g_ptr0 i (i64tod i))
+        (set! sum (+ sum (pref g_ptr0 i))))
+      sum)))
+
+(test-xtfunc (test_g_ptr0) 45.0)
+
 (bind-val g_ptr1 |4,i32|* 2)
 (bind-val g_ptr2 <i64,double>* 4)
 

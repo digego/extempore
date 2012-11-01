@@ -5059,7 +5059,8 @@ deprecated - use bind-func instead."
                                              " = external global i8*"))
                 (llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
                 (impc:print-bound-message ,symbol ,type)))
-            ((or (impc:ir:number? t) (impc:ir:boolean? t))
+            ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
+                  (not (impc:ir:pointer? t)))
              `(begin
                 (llvm:compile
                  (string-append "@" ,(symbol->string symbol)
@@ -5072,7 +5073,11 @@ deprecated - use bind-func instead."
                  `(begin (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                       " = external global "
                                                       ,(impc:ir:get-type-str t)))
-                         (llvm:bind-global-var ,(symbol->string symbol) ,(sys:make-cptr (* value (/ (sys:pointer-size) 8)))))
+                         (llvm:bind-global-var ,(symbol->string symbol)
+                                               ,(sys:make-cptr (* value (if (impc:ir:number? t)
+                                                                            (impc:ir:get-type-size t)
+                                                                            (/ (sys:pointer-size) 8)))))
+                         (impc:print-bound-message ,symbol ,type))
                  `(print-error 'Compiler 'Error: 'when 'binding 'global 'pointers, 'third 'argument 'should 'be 'size 'of 'buffer 'to 'allocate)))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin
