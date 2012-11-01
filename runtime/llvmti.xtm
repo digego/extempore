@@ -5066,7 +5066,7 @@ deprecated - use bind-func instead."
                  (string-append "@" ,(symbol->string symbol)
                                 " = global "
                                 ,(impc:ir:get-type-str t) " "
-                                ,(atom->string value)))
+                                ,(atom->string (eval value))))
                 (impc:print-bound-message ,symbol ,type)))
             ((impc:ir:pointer? t)
              (if (integer? (eval value))
@@ -5074,9 +5074,10 @@ deprecated - use bind-func instead."
                                                       " = external global "
                                                       ,(impc:ir:get-type-str t)))
                          (llvm:bind-global-var ,(symbol->string symbol)
-                                               ,(sys:make-cptr (* value (if (impc:ir:number? t)
-                                                                            (impc:ir:get-type-size t)
-                                                                            (/ (sys:pointer-size) 8)))))
+                                               ,(sys:make-cptr (* (eval value)
+                                                                  (if (impc:ir:number? t)
+                                                                      (impc:ir:get-type-size t)
+                                                                      (/ (sys:pointer-size) 8)))))
                          (impc:print-bound-message ,symbol ,type))
                  `(print-error 'Compiler 'Error: 'when 'binding 'global 'pointers, 'third 'argument 'should 'be 'size 'of 'buffer 'to 'allocate)))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
