@@ -103,6 +103,7 @@ namespace extemp {
 	static pointer dataSETi64(scheme* _sc, pointer args);
 	static pointer dataSETdouble(scheme* _sc, pointer args);
 	static pointer cptrToString(scheme* _sc, pointer args);
+	static pointer stringToCptr(scheme* _sc, pointer args);
 	static pointer stringStrip(scheme* _sc, pointer args);
 	static pointer stringHash(scheme* _sc, pointer args);
 	static pointer stringJoin(scheme* _sc, pointer args);

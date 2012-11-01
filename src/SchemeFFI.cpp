@@ -245,6 +245,7 @@ namespace extemp {
 	    { "cptr:set-double",            &SchemeFFI::dataSETdouble },
 	    { "cptr->string",            &SchemeFFI::cptrToString },
 	    { "cptr:get-string",            &SchemeFFI::cptrToString },
+	    { "string->cptr",            &SchemeFFI::stringToCptr },
 	    { "string-strip",		&SchemeFFI::stringStrip },
 	    { "string-hash",		&SchemeFFI::stringHash },
 	    { "string-join",		&SchemeFFI::stringJoin },
@@ -421,10 +422,18 @@ namespace extemp {
     }
 
     pointer SchemeFFI::cptrToString(scheme* _sc, pointer args)
-    {       
+    {
         char* cptr = (char*) cptr_value(pair_car(args));
 	char* cstr = (char*) cptr;
 	return mk_string(_sc, cstr);
+    }
+
+    pointer SchemeFFI::stringToCptr(scheme* _sc, pointer args)
+    {
+        char* cstr = (char*) cptr_value(pair_car(args));
+	char* cptr = (char*) malloc(strlen(cstr) + 1);
+        strcpy(cptr, cstr);
+	return mk_cptr(_sc, cptr);
     }
 
     pointer SchemeFFI::asciiColor(scheme* _sc, pointer args)
