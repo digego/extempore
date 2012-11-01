@@ -711,17 +711,32 @@
 (bind-val g-var-b double 5.5)
 (bind-val g-var-c i1 0)
 
-;; you can bind array types
-;; and choose to either
-;; a) assign a value to each element
-(bind-val g-var-a1 |5,i64| (list 1 2 3 4 5))
-;; or b) assign a default value to all elements
-;; for example initialize all 1024 double elements to 5.125
-(bind-val g-var-a2 |1024,double| 5.125)
+;; you can bind pointers to array types
+;; you have to initially bind a null ptr, and then alloc some memory
+;; using alloc/halloc/zalloc
+(bind-val g-var-a1 double* null)
+
+;; we need create a closure to do this, because the alloc functions
+;; aren't available in Scheme-land
+(bind-func my_scheme_malloc
+  (lambda (size:i64)
+    (let ((heap_ptr:double* (halloc size)))
+      (set! g-var-a1 heap_ptr)
+      g-var-a1)))
+
+(my_scheme_malloc 8)
+
+(bind-func my_fill_buffer
+  (lambda (value)
+    (let ((i 0))
+      (dotimes (i 0)
+	(pset! g-var-a1 i value)))))
+
+(my_fill_buffer 15.0)
 
 (bind-func test31
   (lambda ()
-    (printf "a1[3]:%lld  a2[55]:%f\n" (aref g-var-a1 3) (aref g-var-a2 55))
+    (printf "a1[3]:%f  a2[5]:%f\n" (pref g-var-a1 3) (pref g-var-a1 5))
     1))
 
 (test31)
