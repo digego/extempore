@@ -476,10 +476,12 @@ namespace extemp {
     }
 
     pointer SchemeFFI::makeCptr(scheme* _sc, pointer args)
-    {
-        void* ptr = malloc(ivalue(pair_car(args)));
-	    return mk_cptr(_sc, ptr);
-    }
+    {                                                     
+         long num_bytes = ivalue(pair_car(args));            
+         void* ptr = malloc(num_bytes);                      
+         memset(ptr,0,num_bytes);                            
+         return mk_cptr(_sc, ptr);                           
+    }                                                     
 
 #ifdef EXT_BOOST
 	pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
