@@ -1302,6 +1302,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&r32value);
 	    gv = M->getNamedValue(std::string("mk_float"));
 	    EE->updateGlobalMapping(gv,(void*)&mk_float);
+	    gv = M->getNamedValue(std::string("is_real"));
+	    EE->updateGlobalMapping(gv,(void*)&is_real);
 
 	    gv = M->getNamedValue(std::string("i64value"));
 	    EE->updateGlobalMapping(gv,(void*)&i64value);
@@ -1319,16 +1321,24 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&i1value);			    
 	    gv = M->getNamedValue(std::string("mk_i1"));
 	    EE->updateGlobalMapping(gv,(void*)&mk_i1);
+	    gv = M->getNamedValue(std::string("is_integer"));
+	    EE->updateGlobalMapping(gv,(void*)&is_integer);
+
 
 	    gv = M->getNamedValue(std::string("string_value"));
 	    EE->updateGlobalMapping(gv,(void*)&string_value);			    
 	    gv = M->getNamedValue(std::string("mk_string"));
 	    EE->updateGlobalMapping(gv,(void*)&mk_string);
+	    gv = M->getNamedValue(std::string("is_string"));
+	    EE->updateGlobalMapping(gv,(void*)&is_string);
 
 	    gv = M->getNamedValue(std::string("cptr_value"));
 	    EE->updateGlobalMapping(gv,(void*)&cptr_value);			    
 	    gv = M->getNamedValue(std::string("mk_cptr"));
 	    EE->updateGlobalMapping(gv,(void*)&mk_cptr);
+	    gv = M->getNamedValue(std::string("is_cptr"));
+	    EE->updateGlobalMapping(gv,(void*)&is_cptr);
+            
 
 	    gv = M->getNamedValue(std::string("list_ref"));
 	    EE->updateGlobalMapping(gv,(void*)&list_ref);
