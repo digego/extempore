@@ -5140,6 +5140,8 @@ deprecated - use bind-func instead."
   (lambda (name)
     (if (symbol? name)
 	(set! name (symbol->string name)))
+    (if (not (llvm:get-function-args-withoutzone name))
+        (print-error 'Compiler 'Error: 'bad 'xtlang 'closure 'named name))    
     (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*)
 	  (map (lambda (x) (impc:ir:get-type-from-str x))
 	       (llvm:get-function-args-withoutzone name)))))
