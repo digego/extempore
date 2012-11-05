@@ -218,7 +218,7 @@
 	(begin (printf "a: %lld\n" a)
 	       (recursive-closure-test (- a 1))))))
 
-(test-xtfunc (recursive-closure-test))
+(test-xtfunc (recursive-closure-test 3c))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; a simple tuple example
@@ -730,7 +730,7 @@
     (printf "time: %lld:%lld\n" time count)
     (callback (+ time 1000) callback-test (+ time 22050) (+ count 1))))
 
-(test-xtfunc (callback-test) (now) 0)
+(test-xtfunc (callback-test (now) 0))
 
 ;; compiling this will stop the callbacks
 ;;
@@ -898,12 +898,12 @@
 (bind-poly print poly-test6)
 
 (bind-func poly-test7
-  (lambda (a b c)
-    (print a)
-    (print a b)
-    (print a b c)))
+  (lambda ()
+    (print "extempore's")
+    (print "extempore's" "polymorphism")
+    (print "extempore's" "polymorphism" "rocks")))
 
-(test-xtfunc (poly-test7 "extempore's" "polymorphism" "rocks"))
+(test-xtfunc (poly-test7))
 
 ;; polys can Also specialize
 ;; on the return type
@@ -1484,11 +1484,11 @@
 ;;;;;;;;;;;;;;;;;;;
 
 (bind-func test_xstring_cmp
-  (lambda (cstr1:i8* cstr2:i8*)
-    (xstring_cmp (xstring cstr1)
-                 (xstring cstr2))))
+  (lambda ()
+    (xstring_cmp (xstring "foo")
+		 (xstring "foo"))))
 
-(test-xtfunc (test_xstring_cmp "foo" "foo") 0)
+(test-xtfunc (test_xstring_cmp) 0)
 
 (bind-func test_xstring_cat
   (lambda ()
@@ -1501,13 +1501,11 @@
 (test-xtfunc (test_xstring_cat) 0)
 
 (bind-func test_xstring_levenshtein
-  (lambda (cstr1:i8* cstr2:i8*)
-    (xstring_levenshtein (xstring cstr1)
-			 (xstring cstr2))))
+  (lambda ()
+    (xstring_levenshtein (xstring "foo")
+			 (xstring "bor"))))
 
-(test-xtfunc (test_xstring_levenshtein "foo" "foo") 0)
-(test-xtfunc (test_xstring_levenshtein "foo" "bar") 3)
-(test-xtfunc (test_xstring_levenshtein "foo" "bor") 2)
+(test-xtfunc (test_xstring_levenshtein) 2)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; FINISH!
