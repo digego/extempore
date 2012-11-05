@@ -222,11 +222,12 @@ And you're done.
 - Make sure portaudio msvc general project settings are set to static lib
 - boost command line for bjam is:
 ```
-bjam --build-dir=<dir> toodset=msvc link=static address-model=64 variant=release --build-type=complete stage
+bjam --build-dir=<dir> toolset=msvc link=static address-model=64 variant=release --build-type=complete stage
 ```
 - extempore msvs project settings needs `PCRE_STATIC` to be defined if you want to build against pcre static libs
 - extempore msvs project needs `EXT_BOOST` to be defined
 - `pcreposix.lib` needs to come before `pcre.lib` in link list
+- You might need to add PA_WDMKS_NO_KSGUID_LIB if you compiling portaudio for 64bit.
 
 # Running Extempore
 
