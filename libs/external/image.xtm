@@ -11,21 +11,19 @@
 ;;; Code:
 
 ;; load soil library
-(define soillib (if (string=? "Linux" (sys:platform))
-		    (sys:open-dylib "libSOIL.so.1")
-		    (if (string=? "Windows" (sys:platform))
-			(sys:open-dylib "soil.dll")
-			(sys:open-dylib "libSOIL.dylib"))))
+(define libsoil
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libSOIL.so"))
+	  ((string=? platform "Windows") (sys:open-dylib "libSOIL.dll"))
+	  ((string=? platform "OSX") (sys:open-dylib "libSOIL.dylib"))
+	  (else (print "Unknown platform: " platform)))))
 
-(if (null? soillib) (print-error "Error loading SOIL image library\n"))
+(bind-lib libsoil SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
+;; (bind-lib libsoil SOIL_load_OGL_cubemap [i32,i8*,i8*,i8*,i8*,i8*,i8*,i32,i32,i32]*)
+;; (bind-lib libsoil SOIL_load_OGL_single_cubemap [i32,i8*,i32,i32,i32]*)
 
-
-(bind-lib soillib SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
-;; (bind-lib soillib SOIL_load_OGL_cubemap [i32,i8*,i8*,i8*,i8*,i8*,i8*,i32,i32,i32]*)
-;; (bind-lib soillib SOIL_load_OGL_single_cubemap [i32,i8*,i32,i32,i32]*)
-
-(bind-lib soillib SOIL_load_image [i8*,i8*,i32*,i32*,i32*,i32]*)
-;(bind-lib soillib SOIL_save_image [i32,i8*,i32,i32,i32,i32,i8*]*)
+(bind-lib libsoil SOIL_load_image [i8*,i8*,i32*,i32*,i32*,i32]*)
+;(bind-lib libsoil SOIL_save_image [i32,i8*,i32,i32,i32,i32,i8*]*)
 ;(bind-lib solilib SOIL_save_screenshot [i32,i8*,i32,i32,i32,i32,i32]*)
 
 
