@@ -218,7 +218,7 @@
 	(begin (printf "a: %lld\n" a)
 	       (recursive-closure-test (- a 1))))))
 
-(test-xtfunc (recursive-closure-test))
+(test-xtfunc (recursive-closure-test 3c))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; a simple tuple example
@@ -646,9 +646,8 @@
 
 
 
-;; for tuples, arrays and vectors, the third argument to bind-val is
-;; *ignored*. The array/vector will have all elements initialised to
-;; zero, it is up to you to initialise it properly.
+;; for tuples, arrays and vectors, bind-val only takes *two*
+;; arguments. The tuple/array/vector will be initialised to zero.
 
 (bind-val g_tuple1 <i64,i64>)
 (bind-val g_tuple2 <double,double>)
@@ -662,7 +661,7 @@
 
 (test-xtfunc (test_g_tuple) 1)
 
-;; now, the same thing with arrays
+;; same thing with arrays
 
 (bind-val g_array1 |10,double|)
 (bind-val g_array2 |10,i64|)
@@ -678,7 +677,7 @@
 
 (test-xtfunc (test_g_array11) 1)
 
-;; now, if we loop over and set some values into the arrays
+;; but if we loop over and set some values into the arrays
 
 (bind-func test_g_array2
   (lambda ()
@@ -692,6 +691,20 @@
          (aref g_array2 5)))))
 
 (test-xtfunc (test_g_array2) 1)
+
+;; just to test, let's try a large array
+
+(bind-val g_array3 |100000000,i64|)
+
+(bind-func test_g_array3
+  (lambda ()
+    (let ((i 0))
+      (dotimes (i 100000000)
+	(pset! g_array3 i i))
+      (= (pref g_array3 87654321)
+	 87654321))))
+
+(test-xtfunc (test_g_array3) 1)
 
 ;; if you want to bind a global pointer, then the third 'value'
 ;; argument is the size of the memory to allocate (in elements, not in bytes)
@@ -728,9 +741,9 @@
 (bind-func callback-test
   (lambda (time:i64 count:i64)
     (printf "time: %lld:%lld\n" time count)
-    (callback (+ time 1000) callback-test1 (+ time 22050) (+ count 1))))
+    (callback (+ time 1000) callback-test (+ time 22050) (+ count 1))))
 
-(test-xtfunc (callback-test) (now) 0)
+(test-xtfunc (callback-test (now) 0))
 
 ;; compiling this will stop the callbacks
 ;;
@@ -898,12 +911,12 @@
 (bind-poly print poly-test6)
 
 (bind-func poly-test7
-  (lambda (a b c)
-    (print a)
-    (print a b)
-    (print a b c)))
+  (lambda ()
+    (print "extempore's")
+    (print "extempore's" "polymorphism")
+    (print "extempore's" "polymorphism" "rocks")))
 
-(test-xtfunc (poly-test7 "extempore's" "polymorphism" "rocks"))
+(test-xtfunc (poly-test7))
 
 ;; polys can Also specialize
 ;; on the return type
@@ -1484,11 +1497,11 @@
 ;;;;;;;;;;;;;;;;;;;
 
 (bind-func test_xstring_cmp
-  (lambda (cstr1:i8* cstr2:i8*)
-    (xstring_cmp (xstring cstr1)
-                 (xstring cstr2))))
+  (lambda ()
+    (xstring_cmp (xstring "foo")
+		 (xstring "foo"))))
 
-(test-xtfunc (test_xstring_cmp "foo" "foo") 0)
+(test-xtfunc (test_xstring_cmp) 0)
 
 (bind-func test_xstring_cat
   (lambda ()
@@ -1501,13 +1514,11 @@
 (test-xtfunc (test_xstring_cat) 0)
 
 (bind-func test_xstring_levenshtein
-  (lambda (cstr1:i8* cstr2:i8*)
-    (xstring_levenshtein (xstring cstr1)
-			 (xstring cstr2))))
+  (lambda ()
+    (xstring_levenshtein (xstring "foo")
+			 (xstring "bor"))))
 
-(test-xtfunc (test_xstring_levenshtein "foo" "foo") 0)
-(test-xtfunc (test_xstring_levenshtein "foo" "bar") 3)
-(test-xtfunc (test_xstring_levenshtein "foo" "bor") 2)
+(test-xtfunc (test_xstring_levenshtein) 2)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; FINISH!
