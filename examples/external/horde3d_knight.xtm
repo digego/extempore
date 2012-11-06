@@ -21,6 +21,9 @@
 ;; first load libfile
 (load "libs/external/horde3d.xtm")
 
+;; set path to Horde resources
+(bind-val resources_path i8* "/path/to/Horde3Dresources")
+
 ;; globals
 (bind-val _knight i32 0)
 (bind-val light i32 0)
@@ -82,8 +85,6 @@
       (h3dSetOption H3DOptions_MaxAnisotropy 4.0)
       (h3dSetOption H3DOptions_ShadowMapSize 2048.0)
 
-      ;; add resources
-
       ;; set resources
       (set! _hdrPipeRes (h3dAddResource H3DResTypes_Pipeline "pipelines/hdr.pipeline.xml" 0))
       (set! _forwardPipeRes (h3dAddResource H3DResTypes_Pipeline "pipelines/forward.pipeline.xml" 0))
@@ -95,7 +96,7 @@
       (set! particleSysRes (h3dAddResource H3DResTypes_SceneGraph "particles/particleSys1/particleSys1.scene.xml" 0))
 
       ;; load resources: you might need to change this for your system
-      (if (h3dutLoadResourcesFromDisk "../Horde3D")
+      (if (h3dutLoadResourcesFromDisk resources_path)
       	  (printf "succesfully loaded resouces\n")
       	  (printf "failed to load resources\n"))
 
@@ -117,6 +118,7 @@
       				   0.1 0.1   0.1)
       (h3dSetupModelAnimStage _knight 0 knightAnim1Res 0 "" #f)
       (h3dSetupModelAnimStage _knight 1 knightAnim2Res 0 "" #f)
+
       ;; attach particle system to hand joint
       (h3dFindNodes _knight "Bip01_R_Hand" H3DNodeTypes_Joint)
       (set! hand (h3dGetNodeFindResult 0))
