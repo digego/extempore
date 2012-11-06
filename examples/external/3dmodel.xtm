@@ -13,6 +13,10 @@
 
 ;;; Code:
 
+(define ctx (gl:make-ctx ":0.0" #f 0.0 0.0 640.0 480.0))
+
+(load "libs/external/assimp.xtm")
+
 ;; change working directory
 (llvm:compile "declare i32 @chdir(i8*)")
 
@@ -30,12 +34,12 @@
   (lambda ()
     (glEnable GL_LIGHTING)
     (glEnable GL_LIGHT0)
-    (let ((diffuse1 (heap-alloc 4 float))
-	  (specular (heap-alloc 4 float))
-	  (position1 (heap-alloc 4 float)))
-      (aset! diffuse1 0 0.7) (aset! diffuse1 1 0.7) (aset! diffuse1 2 0.7) (aset! diffuse1 3 1.0)      
-      (aset! specular 0 0.0) (aset! specular 2 0.0) (aset! specular 3 0.0) (aset! specular 4 1.0)
-      (aset! position1 0 10.0) (aset! position1 1 10.0) (aset! position1 2 10.0) (aset! position1 3 0.0)
+    (let ((diffuse1:float* (halloc 4))
+	  (specular:float* (halloc 4))
+	  (position1:float* (halloc 4)))
+      (pset! diffuse1 0 0.7) (pset! diffuse1 1 0.7) (pset! diffuse1 2 0.7) (pset! diffuse1 3 1.0)      
+      (pset! specular 0 0.0) (pset! specular 2 0.0) (pset! specular 3 0.0) (pset! specular 4 1.0)
+      (pset! position1 0 10.0) (pset! position1 1 10.0) (pset! position1 2 10.0) (pset! position1 3 0.0)
 
       (glLightfv GL_LIGHT0 GL_DIFFUSE diffuse1)
       (glLightfv GL_LIGHT0 GL_SPECULAR specular)
@@ -66,13 +70,13 @@
 
 
 ;; a trivial opengl draw loop
-;; need to call glfwSwapBuffers to flush
 (bind-func gl-callback
   (lambda (model display-list angle:double)
     (glClearColor 0.05 0.05 0.05 1.0)
     (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
     (glLoadIdentity)
-    
+    (draw-model model display-list)
+
     (gluLookAt (* 2.0 (cos angle))
 	       (* 0.5 (cos angle))
 	       (* 2.0 (sin angle))
@@ -82,34 +86,19 @@
     ;; you might need this rotatation depending on the model
     ;(glRotated -90. 1.0 0.0 0.0)    
     (draw-model model display-list)
-    (glfwSwapBuffers)
     1))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; NOW START OPENGL AND LOAD THE MODEL
 
-;; first initalize opengl
-;; (we'll need it before we build a display list)
-
-;; code to open a window
-(bind-func open-window
-  (lambda (width height)
-    (if (> (glfwInit) 0)
-	(if (> (glfwOpenWindow width height 0 0 0 0 0 0 65537) 0)
-	    (begin (glfwSwapInterval 0) 1)
-	    0)
-	0)))
-
-;; open window
-(define res (open-window 640 480))
 
 ;; init gl
 (gl-init 640 480)
 
-
 ;; change CWD to where your model lives!
-(change-working-dir "/home/andrew/Documents/code/assimp/test/models/Collada")
+;;(change-working-dir "/home/andrew/Documents/code/assimp/test/models/Collada")
+(change-working-dir "/home/andrew/Documents/models/monkey")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; WARNING!!!
@@ -118,7 +107,7 @@
 ;; if the following line segfaults that will be the reason
 ;; (don't worry if you're using the assimp examples they're all tiny)
 ;;
-(define model (load-asset "duck.dae"))
+(define model (load-asset "monkey.dae"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; make a display list
@@ -128,6 +117,7 @@
 (define gl-loop
   (lambda (time angle)
     (gl-callback model dlist angle)
+    (gl:swap-buffers ctx)    
     (callback (+ time 500) 'gl-loop (+ time 1000) (+ angle .05))))
 
 ;; start loop
