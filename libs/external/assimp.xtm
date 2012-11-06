@@ -15,9 +15,15 @@
 ;;; Code:
 
 ;; soil image lib
-(define soillib (sys:open-dylib "libSOIL.so.1"))
-(bind-lib soillib SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
-(bind-lib soillib SOIL_load_image [i8*,i8*,i32*,i32*,i32*,i32]*)
+(define libsoil
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libSOIL.so.1"))
+          ((string=? platform "Windows") (sys:open-dylib "libSOIL.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "libSOIL.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+(bind-lib libsoil SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
+(bind-lib libsoil SOIL_load_image [i8*,i8*,i32*,i32*,i32*,i32]*)
 
 
 ;; load texture and returns texture number
@@ -45,9 +51,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; lib assimp
-(define libassimp (sys:open-dylib "libassimp.so"))
-;; lib GLU
-(define libglu (sys:open-dylib "libGLU.so"))
+(define libassimp
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libassimp.so"))
+          ((string=? platform "Windows") (sys:open-dylib "libassimp.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "libassimp.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+;; libGLU
+(define libglu
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libGLU.so"))
+          ((string=? platform "Windows") (sys:open-dylib "libGLU.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "/usr/X11R6/lib/libGLU.1.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
 
 (bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
 (bind-lib libglu gluPerspective [void,double,double,double,double]*)
