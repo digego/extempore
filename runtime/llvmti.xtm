@@ -4546,10 +4546,14 @@
 										   "")
 										  ((or (not (number? t))
 										       (> t 9))
-										   (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
-                                                                                                  (impc:ti:scm_rt_check_string n)
-                                                                                                  "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
-												  n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n"))
+                                                                                   (if (= t 106)
+                                                                                       (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                                          (impc:ti:scm_rt_check_string n)
+                                                                                                          n " = call ccc i8*  @string_value(i8* " n "_val)\n")
+                                                                                       (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                      "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
+                                                                                                      n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
 										  ((= t 0) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc double @r64value(i8* " n "_val)\n"))
