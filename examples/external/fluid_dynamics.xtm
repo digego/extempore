@@ -460,18 +460,24 @@
 ;; need to call glfwSwapBuffers to flush
 (bind-func my-gl-loop
   (let ((degree 0.0))
-    (lambda ()    
-      (look-at -30.5 30.0 50.0 20.5 3.5 -1.0 0.0 1.0 0.0)
+    (lambda ()
+      
       (glEnable GL_BLEND)
-      (glBlendFunc GL_SRC_ALPHA (+ GL_SRC_ALPHA 1))      
+      (glBlendFunc GL_SRC_ALPHA (+ GL_SRC_ALPHA 1))            
+      (glDisable GL_DEPTH_TEST)
+
+
       (glClearColor 1.0 0.5 .0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (glColorMaterial GL_FRONT_AND_BACK GL_AMBIENT_AND_DIFFUSE)
-      (glDisable GL_DEPTH_TEST)
       (glEnable GL_COLOR_MATERIAL)
 
       (glColor4d 0.0 0.0 0.0 1.0)
       (glLineWidth 1.0)
+
+      (glLoadIdentity)
+      (look-at -30.5 30.0 50.0 20.5 3.5 -1.0 0.0 1.0 0.0)
+      
       (fluid-step-cube (get-fluid-cube))
       (let ((densities (tref (get-fluid-cube) 5))
 	    (i:double 0.0)
@@ -554,9 +560,10 @@
 
 
 (define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
-(gl-set-view 1024.0 768.0 100.0)
+(gl_set_view 1024.0 768.0 200.0)
 (opengl-test (now) 0.0)
 (smoke-signal (now))
+
 
 ;; eval this again if you want to clean the cube at some point!
 ; (clean-cube)
