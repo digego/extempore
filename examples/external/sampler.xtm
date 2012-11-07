@@ -46,7 +46,7 @@
 ;; first let's just read in one sample
 ;; we'll choose an index of 60 - the midi note number for middle C
 ;; make sure your audio file is long enough for the params below!!
-(set-sampler-index sampler "/Users/ben/Desktop/peg.wav" 60 0 0)
+(set-sampler-index sampler "/Users/ben/Desktop/xtm-assets/peg.wav" 60 0 0)
 
 ;; playing back at 60 should playback without pitch shift
 (play-note (now) sampler 60 80 100000)
@@ -183,14 +183,13 @@
 (loop2 (*metro* 'get-beat 4) 4 0)
 
 ;; make some more samplers
-(define-sampler sampler2 sampler_note sampler_fx)
-(define-sampler sampler3 sampler_note sampler_fx)
+(define-sampler sampler2 sampler_note_hermite_c sampler_fx)
+(define-sampler sampler3 sampler_note_hermite_c sampler_fx)
 
 ;; add new samplers to dsp
 (bind-func dsp:DSP
   (lambda (in time chan dat)
-    (cond ((< chan 2.0) (+ (synth in time chan dat)
-			   (sampler in time chan dat)
+    (cond ((< chan 2.0) (+ (sampler in time chan dat)
 			   (sampler2 in time chan dat)
 			   (sampler3 in time chan dat)))
 	  (else 0.0))))
