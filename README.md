@@ -26,9 +26,18 @@ project to provide back-end code generation across a variety of
 architectures.
 
 - http://groups.google.com/group/extemporelang.
+
+Extempore documentation can be found here:
+
+- http://benswift.me/extempore-docs/index.html
+
+
+Some Extempore Related Videos:
+- http://vimeo.com/52964510 - interactive physics simulation
 - http://vimeo.com/37293927 - graphics demo
 - http://vimeo.com/21956071 - general introduction
 - http://vimeo.com/20502359 - a more technical intro
+
 
 # Licence
 
