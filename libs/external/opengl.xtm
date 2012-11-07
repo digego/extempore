@@ -164,11 +164,13 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GLU
-(define libglu (if (string=? "Linux" (sys:platform))
-		   (sys:open-dylib "/usr/lib/libGLU.so")
-		   (if (string=? "Windows" (sys:platform))
-		       (sys:open-dylib "Glu32.dll")
-		       (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))))
+(define libglu
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "/usr/lib/libGLU.so"))
+          ((string=? platform "Windows") (sys:open-dylib "Glu32.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))
+          (else (print "Unknown platform: " platform)))))
+
 
 (bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
 (bind-lib libglu gluPerspective [void,double,double,double,double]*)
