@@ -42,40 +42,24 @@
     (while (< i 128)
       (modify-syntax-entry i "_   " st)
       (setq i (1+ i)))
-
     ;; Whitespace
     (modify-syntax-entry ?\t "    " st)
     (modify-syntax-entry ?\n ">   " st)
     (modify-syntax-entry ?\f "    " st)
     (modify-syntax-entry ?\r "    " st)
     (modify-syntax-entry ?\s "    " st)
-
-    ;; These characters are delimiters but otherwise undefined.
-    ;; Brackets and braces balance for editing convenience.
-    (modify-syntax-entry ?\[ "(]  " st)
-    (modify-syntax-entry ?\] ")[  " st)
-    (modify-syntax-entry ?{ "(}  " st)
-    (modify-syntax-entry ?} "){  " st)
-    (modify-syntax-entry ?\| "\" 23bn" st)
-    ;; Guile allows #! ... !# comments.
-    ;; But SRFI-22 defines the comment as #!...\n instead.
-    ;; Also Guile says that the !# should be on a line of its own.
-    ;; It's too difficult to get it right, for too little benefit.
-    ;; (modify-syntax-entry ?! "_ 2" st)
-
-    ;; Other atom delimiters
+    ;; paren delimiters
     (modify-syntax-entry ?\( "()  " st)
     (modify-syntax-entry ?\) ")(  " st)
-    ;; It's used for single-line comments as well as for #;(...) sexp-comments.
-    (modify-syntax-entry ?\; "< 2 " st)
+    ;; comment delimiters
+    (modify-syntax-entry ?\; "<   " st)
     (modify-syntax-entry ?\" "\"   " st)
     (modify-syntax-entry ?' "'   " st)
     (modify-syntax-entry ?` "'   " st)
-
     ;; Special characters
     (modify-syntax-entry ?, "'   " st)
     (modify-syntax-entry ?@ "'   " st)
-    (modify-syntax-entry ?# "' 14" st)
+    (modify-syntax-entry ?# "'   " st)
     (modify-syntax-entry ?\\ "\\   " st)
     st))
 
@@ -383,7 +367,7 @@ See `run-hooks'."
        (3 font-lock-function-name-face)
        (4 font-lock-type-face t))
      ;; bind-val
-     '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\)\\_>"
+     '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]?+\\)"
        (1 font-lock-keyword-face)
        (2 font-lock-function-name-face)
        (3 font-lock-type-face t))
