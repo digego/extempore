@@ -1054,8 +1054,12 @@ namespace extemp {
 	std::cout << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;	
 	ascii_text_color(0,7,10);
         std::cout << "Input Device\t: " << std::flush;
-	ascii_text_color(1,6,10);	
-	std::cout << (Pa_GetDeviceInfo( inputDevice ))->name << std::endl;	
+	ascii_text_color(1,6,10);
+        if(UNIV::AUDIO_IN_DEVICE != -1) {
+          std::cout << (Pa_GetDeviceInfo( inputDevice ))->name << std::endl;	
+        }else{
+          std::cout << std::endl;
+        }
 	ascii_text_color(0,7,10);
         std::cout << "SampleRate\t: " << std::flush;
 	ascii_text_color(1,6,10);	
