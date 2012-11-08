@@ -47,7 +47,7 @@ You can also join the Extempore community:
 
 # Installation on Linux & OS X
 
-_More detailed instructions can be found here:_ [http://benswift.me/2012-11-06-building-extempore-on-osx-linux.html]
+_More detailed instructions can be found at_ http://benswift.me/2012-11-06-building-extempore-on-osx-linux.html
 
 Building Extempore depends on the following libraries (you can
 probably get them through your favourite package manager).
@@ -61,7 +61,7 @@ probably get them through your favourite package manager).
 LLVM *must* be version 3.0 and needs to be built from source, because
 a small patch to `LLParser.cpp` (an LLVM source file) is required. You
 can get the LLVM v3.0 source from
-[http://llvm.org/releases/download.html#3.0]. 
+http://llvm.org/releases/download.html#3.0. 
 
 The patch file `llparser.patch` is supplied in the `extempore/extras`
 directory.
@@ -102,7 +102,7 @@ Voila... you should be done.
 
 # Installation on Windows 7
 
-_More detailed instructions can be found here:_ [http://benswift.me/2012-11-05-building-extempore-on-windows.html]
+_More detailed instructions can be found at_ http://benswift.me/2012-11-05-building-extempore-on-windows.html
 
 Extempore has thus far only been tested on Windows 7 64-bit, but if you
 can get it to build/run on other flavours of Windows then do let us
@@ -194,7 +194,7 @@ bjam --build-dir=<dir> toolset=msvc link=static address-model=64 variant=release
 
 # Running Extempore
 
-You don't need to do anyting special to run extempore, it'll just run
+You don't need to do anything special to run extempore, it'll just run
 in any terminal (or command prompt on Windows).
 
 ```shell
@@ -211,7 +211,7 @@ editors.
 There are some optional command line options that you may want to use
 you can get a list by running `./extempore --help`
 
-For more detail see this post on [interacting with the Exempore compiler](http://benswift.me/2012-09-26-interacting-with-the-extempore-compiler.html).
+For more detail, see this post on [interacting with the Exempore compiler](http://benswift.me/2012-09-26-interacting-with-the-extempore-compiler.html).
 
 **Telnet**
 
