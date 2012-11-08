@@ -303,6 +303,7 @@ int is_syntax(pointer p);
 int is_proc(pointer p);
 int is_foreign(pointer p);
 int is_cptr(pointer p);
+int is_cptr_or_str(pointer p);
 void* cptr_value(pointer p);
 char* syntaxname(pointer p);
 int is_closure(pointer p);

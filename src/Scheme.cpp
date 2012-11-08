@@ -578,6 +578,7 @@ int is_syntax(pointer p)   { return (typeflag(p)&T_SYNTAX); }
 int is_proc(pointer p)     { return (type(p)==T_PROC); }
 int is_foreign(pointer p)  { return (type(p)==T_FOREIGN); }
 int is_cptr(pointer p) { return (type(p) == T_CPTR); }
+int is_cptr_or_str(pointer p) { return (is_cptr(p) | is_string(p)); }
 //int is_objc(pointer p) { return (type(p) == T_OBJC); }
 
 void* cptr_value(pointer p) 

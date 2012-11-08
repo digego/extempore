@@ -1338,6 +1338,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&mk_cptr);
 	    gv = M->getNamedValue(std::string("is_cptr"));
 	    EE->updateGlobalMapping(gv,(void*)&is_cptr);
+	    gv = M->getNamedValue(std::string("is_cptr_or_str"));
+	    EE->updateGlobalMapping(gv,(void*)&is_cptr_or_str);
             
 
 	    gv = M->getNamedValue(std::string("list_ref"));
