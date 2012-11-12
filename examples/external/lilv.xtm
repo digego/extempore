@@ -1,109 +1,77 @@
+;;; 3dmodel.xtm -- a very simple LV2 Host example
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore, lv2
+
+;;; Commentary:
+
+;; This is the most trivial little LV2 host using the most
+;; trivial little lv2 plugin: http://plugin.org.uk/swh-plugins/amp
+;;
+;; Also, there are a few hard paths that in this file
+;; that you'll need to change to something suitable
+
+;;; Code:
 
 (load "libs/external/lilv.xtm")
 
-(bind-val lilv_world LilvWorld*)
-(bind-val lilv_plugins LilvPlugins*)
+;; first initialize the LV2 world
+(lilv_init_world)
 
-(bind-func print_all_plugin_ports
-  (lambda (plugin)
-    (let ((ports (lilv_plugin_get_num_ports plugin))
-          (port:LilvPort* null)
-          (name:LilvNode* null)
-          (i:i32 0))
-      (printf "num of ports: %d\n" ports)
-      (dotimes (i ports)
-        (set! port (lilv_plugin_get_port_by_index plugin i))
-        (set! name (lilv_port_get_name plugin port))
-        (printf "port name: %s\n" (lilv_node_as_string name)))
-      void)))
-
-(bind-func print_all_lv2_plugins
-  (lambda ()
-    (let ((size:i32 (lilv_plugins_size lilv_plugins))
-          (i:i32 0)
-          (plugin:LilvPlugin* null)
-          (name:LilvNode* null)
-          (iterator:LilvIter* (lilv_plugins_begin lilv_plugins)))
-      (printf "total number of plugins found: %d\n" size)
-      (dotimes (i size)        
-        (set! plugin (lilv_plugins_get lilv_plugins iterator))
-        (set! name (lilv_plugin_get_name plugin))        
-        (printf "lv2 plugin: %s\n" (lilv_node_as_string name))
-        (set! iterator (lilv_plugins_next lilv_plugins iterator)))
-      void)))
-
-;; init and load lilv_world & lilv_plugins
-(bind-func init_lilv_world
-  (lambda ()
-    (set! lilv_world (lilv_world_new))
-    (lilv_world_load_all lilv_world)
-    (set! lilv_plugins (lilv_world_get_all_plugins lilv_world))
-    void))
-
-(init_lilv_world)
-(print_all_lv2_plugins)
-
-(bind-func load_plugin
-  (lambda (uri samplerate)
-    (let ((uri_node (lilv_new_uri lilv_world uri))
-          (plugin (lilv_plugins_get_by_uri lilv_plugins uri_node))
-          (name (lilv_plugin_get_name plugin)))
-      (printf "loading lv2plug: %s\n" (lilv_node_as_string name))
-      (lilv_plugin_instantiate plugin samplerate null))))
-
-
-;; activate plugin
-(bind-func lilv_activate
-  (lambda (instance:LilvInstance*)
-    (let ((descriptor (tref instance 0))
-          (handle (tref instance 1))
-          (activate_fptr (tref descriptor 3)))
-      (activate_fptr handle))))
-
-
-(bind-func lilv_connect_to_port
-  (lambda (instance:LilvInstance* port:i32 data:i8*)
-    (let ((descriptor (tref instance 0))
-          (handle (tref instance 1))
-          (connect_fptr (tref descriptor 2)))
-      (connect_fptr handle port data)
-      void)))
-
+;; second print all installed lv2 plugins on system
+(lilv_print_all_lv2_plugins)
 
 ;; it helps to have a little wrapper for each plugin
+;; so this wrapper gives us a nice 'functional' style
+;; by returning a closure wrapper for us.
 (bind-func init_lv2_amp
-  (let ((instance:LilvInstance* null)
-        (descriptor null)
-        (handle null)
-        (run null)
-        (in_buf:float* (halloc))
-        (out_buf:float* (halloc))
-        (gain_buf:float* (halloc))
-        (amp_run null))
-    (lambda (samplerate)
-      (if (null? instance)
-          (begin (set! instance (load_plugin "http://plugin.org.uk/swh-plugins/amp" samplerate))
-                 (set! descriptor (tref instance 0))
-                 (printf "decriptor name: %s\n" (tref descriptor 0))
-                 (set! handle (tref instance 1))
-                 (set! run (tref descriptor 4))
-                 (lilv_connect_to_port instance 0 (cast gain_buf))
-                 (lilv_connect_to_port instance 1 (cast in_buf))
-                 (lilv_connect_to_port instance 2 (cast out_buf))))
-      (if (null? instance)
-          (set! amp_run (lambda (in amp)
-                          (pset! gain_buf 0 (dtof amp))
-                          (pset! in_buf 0 (dtof in))
-                          (run handle 1)
-                          (ftod (pref out_buf 0)))))
-      (printf "amp_run %p\n" amp_run)
-      amp_run)))
+  (lambda (samplerate)
+    (let ((in_buf:float* (halloc))
+          (out_buf:float* (halloc))
+          (gain_buf:float* (halloc))
+          (instance (lilv_load_plugin "http://plugin.org.uk/swh-plugins/amp" samplerate))
+          (descriptor (tref instance 0))
+          (handle (tref instance 1))
+          (run (tref descriptor 4)))
+      (printf "decriptor name: %s\n" (tref descriptor 0))
+      ;; setup ports
+      (lilv_connect_to_port instance 0 (cast gain_buf))
+      (lilv_connect_to_port instance 1 (cast in_buf))
+      (lilv_connect_to_port instance 2 (cast out_buf))
+      ;; create closure wrapper 
+      (lambda (in amp)
+        (pset! gain_buf 0 (dtof amp))
+        (pset! in_buf 0 (dtof in))
+        (fptrcall run handle 1)
+        (ftod (pref out_buf 0))))))
 
 
+;; initialize amp and call with two arguments
+;; first arg is input sample
+;; second argument is amplitidue in DB
+;;
+;; oscillate between -10db and -70db
 (bind-func dsp:[double,double,double,double,double*]*
   (let ((amp (init_lv2_amp 44100.0)))
     (lambda (in time chan dat)
-      (* .1 (random)))))
+      (amp (random) (+ -40.0 (* 30.0 (cos (* time .0005))))))))
+
+;; set dsp
+(dsp:set! dsp)
 
 
-;;(dsp:set! dsp)
+;;;; NOTICE that each time you compile dsp you load a new
+;;;; instance of AMP
+;;;; TO AVOID INSTANTIATING A NEW AMP EACH RECOMPILE OF DSP
+;;;; YOU CAN USE A GLOBALLY BOUND AMP LIKE BELOW
+
+;; (bind-val amp_ [double,double,double]*)
+
+;; (bind-func init_global_amp_
+;;   (lambda (samplerate)
+;;     (set! amp_ (init_lv2_amp samplerate))
+;;     void))
+
+;; (init_global_amp_ 44100.0)
+;;
+;;;; NOW YOU CAN USE amp_ in dsp and remove amp from let

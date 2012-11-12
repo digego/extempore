@@ -1,5 +1,29 @@
+;;; lilv.xtm -- an LV2 Host Library
 
-(define lilvlib (sys:open-dylib "liblilv-0.so"))
+;; Author: Andrew Sorensen
+;; Keywords: extempore, lv2
+;; Required dylibs: liblilv
+
+;;; Commentary:
+
+;; You will need to make sure you have the
+;; liblilv library installed.
+;; Simple OpengGL image library (SOIL) installed
+;; You can get source from here:
+;; http://www.lonesock.net/soil.html
+;; Make sure you make liblilv-0.so (or similar dylib) accessible
+
+;;; Code:
+
+;; lilv lib
+(define lilvlib
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "liblilv-0.so"))
+          ((string=? platform "Windows") (sys:open-dylib "liblilv.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "liblilv.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+(if (null? lilvlib) (print-error "Error loading lilv library"))
 
 (bind-alias LV2_Handle i8*)
 (bind-type LV2_Feature <i8*,i8*>)
@@ -156,3 +180,73 @@
 ;; PLUGIN INSTANCE
 (bind-lib lilvlib lilv_plugin_instantiate [LilvInstance*,LilvPlugin*,double,LV2_Feature**]*)
 (bind-lib lilvlib lilv_instance_free [void,LilvInstance*]*)
+
+
+(bind-val lilv_world LilvWorld*)
+(bind-val lilv_plugins LilvPlugins*)
+
+
+(bind-func lilv_print_all_plugin_ports
+  (lambda (plugin)
+    (let ((ports (lilv_plugin_get_num_ports plugin))
+          (port:LilvPort* null)
+          (name:LilvNode* null)
+          (i:i32 0))
+      (printf "num of ports: %d\n" ports)
+      (dotimes (i ports)
+        (set! port (lilv_plugin_get_port_by_index plugin i))
+        (set! name (lilv_port_get_name plugin port))
+        (printf "port[%d]: %s\n" i (lilv_node_as_string name)))
+      void)))
+
+(bind-func lilv_print_all_lv2_plugins
+  (lambda ()
+    (let ((size:i32 (lilv_plugins_size lilv_plugins))
+          (i:i32 0)
+          (plugin:LilvPlugin* null)
+          (name:LilvNode* null)
+          (iterator:LilvIter* (lilv_plugins_begin lilv_plugins)))
+      (printf "total number of plugins found: %d\n" size)
+      (dotimes (i size)        
+        (set! plugin (lilv_plugins_get lilv_plugins iterator))
+        (set! name (lilv_plugin_get_name plugin))        
+        (printf "lv2 plugin: %s\n" (lilv_node_as_string name))
+        (set! iterator (lilv_plugins_next lilv_plugins iterator)))
+      void)))
+
+
+
+;; init and load lilv_world & lilv_plugins
+(bind-func lilv_init_world
+  (lambda ()
+    (set! lilv_world (lilv_world_new))
+    (lilv_world_load_all lilv_world)
+    (set! lilv_plugins (lilv_world_get_all_plugins lilv_world))
+    void))
+
+(bind-func lilv_load_plugin
+  (lambda (uri samplerate)
+    (let ((uri_node (lilv_new_uri lilv_world uri))
+          (plugin (lilv_plugins_get_by_uri lilv_plugins uri_node))
+          (name (lilv_plugin_get_name plugin)))
+      (printf "loading lv2plug: %s\n" (lilv_node_as_string name))
+      (lilv_print_all_plugin_ports plugin)
+      (lilv_plugin_instantiate plugin samplerate null))))
+
+;; activate plugin
+(bind-func lilv_activate
+  (lambda (instance:LilvInstance*)
+    (let ((descriptor (tref instance 0))
+          (handle (tref instance 1))
+          (activate_fptr (tref descriptor 3)))
+      (fptrcall activate_fptr handle)
+      void)))
+    
+
+(bind-func lilv_connect_to_port
+  (lambda (instance:LilvInstance* port:i32 data:i8*)
+    (let ((descriptor (tref instance 0))
+          (handle (tref instance 1))
+          (connect_fptr (tref descriptor 2)))
+      (fptrcall connect_fptr handle port data)
+      void)))
