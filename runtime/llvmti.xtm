@@ -1701,14 +1701,26 @@
           (assoc sym vars))))
 		  
 (define impc:ti:get-var
-   (lambda (sym vars)
-      (if (not (assoc sym vars))
-          (if (llvm:get-global-variable-type (symbol->string sym))
-              (cons sym (- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string sym)))
-                           *impc:ir:pointer*))
-              (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist))
-          (assoc sym vars))))
-		  
+  (lambda (sym vars)
+    (if (not (assoc sym vars))
+        (if (llvm:get-global-variable-type (symbol->string sym))
+            (cons sym (- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string sym)))
+                         *impc:ir:pointer*))
+            (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist))
+        (assoc sym vars))))
+
+
+(define impc:ti:get-var
+  (lambda (sym vars)
+    (if (not (assoc sym vars))
+        (if (llvm:get-global-variable-type (symbol->string sym))
+            (let ((t (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string sym)))))
+              (if (list? t)
+                  (cons sym (cons (- (car t) *impc:ir:pointer*) (cdr t)))
+                  (cons sym (- t *impc:ir:pointer*))))
+            (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist))
+        (assoc sym vars))))
+
 
 ;; clear all vars
 (define impc:ti:clear-all-vars
@@ -3341,6 +3353,77 @@
          ; and return the new closure's return type
          (if (list? ret) ret
              (list ret)))))
+
+
+;; for fptrcall
+;; which has the form
+;; (fptrcall fptr ... args)
+(define impc:ti:fptrcall-check
+  (lambda (ast vars kts request?)
+    (println 'ast: ast)
+    (let* ((fptr (impc:ti:type-check (cadr ast) vars kts #f))
+           (lllll (println 'fptr fptr))
+           (ctype (if (impc:ir:closure? (car fptr))
+                      (car fptr)
+                      (print-error 'Compiler 'Error: 'bad 'fptr 'type! 'in 'fptrcall)))
+           (lllllll (println 'ctype ctype))
+           ;; get argument expression types
+           (res (map (lambda (e t)
+                       ;;(println 'e: e 't: t)
+                       (let ((res (impc:ti:type-check e vars kts
+                                                      (if (symbol? t) 
+                                                          (impc:ti:symbol-check t vars kts #f)
+                                                          t))))
+                         ;; if t is a symbol then add res to t
+                         (if (symbol? t)
+                             (if (or (and (list? res)
+                                          (impc:ir:type? (car res)))
+                                     (impc:ir:type? res))
+                                 (impc:ti:force-var t vars kts res)
+                                 (impc:ti:update-var t vars kts res)))
+                         res))
+                     (cddr ast)
+                     (if (<> (length (cddr ctype))
+                             (length (cddr ast)))
+                         (print-error 'Compiler 'Error: 'bad 'arity 'in ast 'for 'type (impc:ir:pretty-print-type ctype))
+                         (cddr ctype)))))                     
+      (cadr ctype))))
+
+
+
+;; for fptrcall
+;; which has the form
+;; (fptrcall fptr ... args)
+(define impc:ti:fptrcall-check
+  (lambda (ast vars kts request?)
+    (let* ((fptr (impc:ti:type-check (cadr ast) vars kts #f)))
+      (if (null? fptr)
+          (list)
+          (let* ((ctype (if (impc:ir:closure? (car fptr))
+                           (car fptr)
+                           (print-error 'Compiler 'Error: 'bad 'fptr 'type! 'in 'fptrcall)))
+                (res (map (lambda (e t)
+                            ;;(println 'e: e 't: t)
+                            (let ((res (impc:ti:type-check e vars kts
+                                                           (if (symbol? t) 
+                                                               (impc:ti:symbol-check t vars kts #f)
+                                                               t))))
+                              ;; if t is a symbol then add res to t
+                              (if (symbol? t)
+                                  (if (or (and (list? res)
+                                               (impc:ir:type? (car res)))
+                                          (impc:ir:type? res))
+                                      (impc:ti:force-var t vars kts res)
+                                      (impc:ti:update-var t vars kts res)))
+                              res))
+                          (cddr ast)
+                          (if (<> (length (cddr ctype))
+                                  (length (cddr ast)))
+                              (print-error 'Compiler 'Error: 'bad 'arity 'in ast 'for 'type (impc:ir:pretty-print-type ctype))
+                              (cddr ctype)))))                     
+            (cadr ctype))))))
+
+
 			 
 
 (define impc:ti:dotimes-check
@@ -3467,6 +3550,7 @@
 	    ((and (list? ast) (member (car ast) '(bitcast))) (impc:ti:bitcast-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(bitconvert))) (impc:ti:bitconvert-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(void))) (impc:ti:void-check ast vars kts request?))
+	    ((and (list? ast) (member (car ast) '(fptrcall))) (impc:ti:fptrcall-check ast vars kts request?))
 	    ((and (list? ast) ;; generic function		  
 		  (symbol? (car ast))
 		  (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")

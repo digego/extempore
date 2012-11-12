@@ -3829,6 +3829,59 @@
          (impc:ir:strip-space os))))
 
 
+(define impc:ir:compiler:fptrcall
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+           (fptrstr (impc:ir:compiler (cadr ast) types))           
+           (fptr (impc:ir:gname))
+           (ftypes (impc:ir:get-type-from-str (cadr fptr)))
+           (ftypestr (string-append (impc:ir:get-type-str (cadr ftypes))
+                                    " (" (if (null? (cddr ftypes)) ")"
+                                             (string-append (impc:ir:get-type-str (caddr ftypes))
+                                                            (apply string-append (map (lambda (v)
+                                                                                        (string-append ", " (impc:ir:get-type-str v)))
+                                                                                      (cdddr ftypes)))
+                                                            ")"
+                                                            (apply string-append (make-list-with-proc
+                                                                                  1
+                                                                                  ;;(- (impc:ir:get-ptr-depth ftypes) 1)
+                                                                                  (lambda (kk) "*")))))))
+           (args (map (lambda (a hint)
+                        (cons (impc:ir:compiler a types hint) (impc:ir:gname)))
+                      (cddr ast)
+                      (cddr ftypes))))
+      (if (<> (length args) (length (cddr ftypes)))
+          (print-error 'Compiler 'Error: ast 'Wrong 'number 'of 'arguments))
+      (emit fptrstr os)
+      (emit (apply string-append (map (lambda (p) (car p)) args)) os)
+      (emit (impc:ir:gname "fptr" ftypestr) " = bitcast " (cadr fptr) " " (car fptr) " to " ftypestr "\n" os)      
+      ;; (if (= (impc:ir:get-ptr-depth ftypes) 2)
+      ;;     (begin (emit (impc:ir:gname "fptr_" (string-append ftypestr "*")) " = bitcast " (cadr fptr) " " (car fptr) " to " ftypestr "*\n" os)
+      ;;            (emit (impc:ir:gname "fptr" ftypestr) " = load " (cadr (impc:ir:gname "fptr_")) " " (car (impc:ir:gname "fptr_")) "\n" os))
+      ;;     (if (= (impc:ir:get-ptr-depth ftypes) 1)
+      ;;         (emit (impc:ir:gname "fptr" ftypestr) " = bitcast " (cadr fptr) " " (car fptr) " to " ftypestr "\n" os)
+      ;;         (print-error 'Compiler 'Error: 'bad 'function 'ptr 'type 'in ast 'type: ftypestr)))
+      (emit (string-append (if (impc:ir:void? (cadr ftypes))
+                               (begin (impc:ir:gname "res" "void") "")
+                               (string-append (impc:ir:gname "res" (impc:ir:get-type-str (cadr ftypes))) " = "))
+                           "call ccc " 
+                           (impc:ir:get-type-str (cadr ftypes)) " " (car (impc:ir:gname "fptr")) "("
+                           (apply string-append 
+                                  (map (lambda (p ft i)
+                                         (let ((atype (cadr (cdr p)))
+                                               (aname (car (cdr p))))
+                                           (if (not (equal? (impc:ir:get-type-from-str atype)
+                                                            ft)) ;(impc:ir:get-type-from-str ft)))
+                                               (print-error 'Compiler 'Error: 'function 'argument 'does 'not 'match. 'Expected ft 'but 'got atype 'ast: ast))
+                                           (string-append (if (> i 0) ", " "")
+                                                          atype " " aname)))
+                                       args (cddr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
+                           ")\n") os)
+      (impc:ir:strip-space os))))
+
+
+
+
 (define impc:ir:compiler
    (lambda (ast types . hint?)
       ;(println 'compiler: ast 'hint?: hint?)
@@ -4038,6 +4091,8 @@
                    ;;                        "\n"))))
                    ((equal? (car ast) 'ret->) ;; return from function
 		    (impc:ir:compiler:ret ast types hint?))
+                   ((equal? (car ast) 'fptrcall)
+                    (impc:ir:compiler:fptrcall ast types hint?))
                    ((equal? (car ast) 'if)
                     (impc:ir:compiler:if ast types))
                    ((equal? (car ast) 'begin)
