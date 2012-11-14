@@ -30,15 +30,14 @@ For more detail on what the Extempore project is all about, see
 
 To see Extempore in action, check out these videos:
 
-- http://vimeo.com/52964510 - interactive, distributed, physics simulation
-- http://vimeo.com/37293927 - graphics demo
-- http://vimeo.com/21956071 - general introduction
-- http://vimeo.com/20502359 - a more technical intro
+- [interactive, distributed, physics simulation](http://vimeo.com/52964510)
+- [graphics demo](http://vimeo.com/37293927)
+- [general introduction](http://vimeo.com/21956071)
+- [a more technical intro](http://vimeo.com/20502359)
 
 # Documentation
 
-More Extempore documentation can be found at
-[http://benswift.me/extempore-docs/index.html]
+More Extempore documentation can be found at http://benswift.me/extempore-docs/index.html
 
 You can also join the Extempore community:
 
