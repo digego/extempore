@@ -64,7 +64,9 @@
 #include <arpa/inet.h>
 #endif
 
+#ifndef TARGET_OS_WINDOWS
 #include <unistd.h>
+#endif
  
 //#include "llvm/Analysis/DebugInfo.h"
 //#include "llvm/Analysis/Verifier.h"

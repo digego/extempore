@@ -41,7 +41,9 @@
 #include "SchemeREPL.h"
 #include "EXTLLVM.h"
 #include <string>
+#ifndef TARGET_OS_WINDOWS
 #include <unistd.h>
+#endif
 #ifdef TARGET_OS_MAC
 #include <Cocoa/Cocoa.h>
 #include <AppKit/AppKit.h>

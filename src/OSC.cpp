@@ -39,7 +39,9 @@
 #include <sstream>
 #include <math.h>
 
+#ifndef TARGET_OS_WINDOWS
 #include <unistd.h>
+#endif
 #include <stdlib.h>
 
 #ifdef EXT_BOOST

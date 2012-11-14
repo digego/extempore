@@ -48,8 +48,10 @@
 #include <sys/socket.h>    /* socket interface functions  */
 #include <netdb.h>         /* host to IP resolution       */
 #endif
- 
+
+#ifndef TARGET_OS_WINDOWS
 #include <unistd.h>
+#endif
 #include <iostream>
 #include <sstream>    
 #include <string.h>

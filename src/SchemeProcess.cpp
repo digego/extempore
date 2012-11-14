@@ -54,7 +54,9 @@
 #include <sys/select.h>
 #endif
 
+#ifndef TARGET_OS_WINDOWS
 #include <unistd.h>
+#endif
 #include <stdlib.h>
 #include "UNIV.h"
 
