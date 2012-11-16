@@ -5204,7 +5204,9 @@ deprecated - use bind-func instead."
                  (string-append "@" ,(symbol->string symbol)
                                 " = global "
                                 ,(impc:ir:get-type-str t) " "
-                                ,(atom->string (eval value))))
+                                ,(if (= t 1)
+                                     (llvm:convert-float (atom->string (eval value)))
+                                     (atom->string (eval value)))))
                 (impc:print-bound-message ,symbol ,type)))
             ((impc:ir:pointer? t)
              (if (integer? (eval value))
