@@ -785,6 +785,27 @@
                 (* drive_minus_1 absx)
                 1.0)))))))
 
+;; based on Steve Harris's Valve Saturation lv2 plugin
+;; http://plugin.org.uk/
+
+(bind-func saturation_c
+  "level: [0.0,1.0] character: [0.0,1.0]"
+  (lambda (level character)
+    (let ((itm1 0.0)
+          (otm1 0.0))
+      (lambda (x)
+        (let ((q (- level 0.999))
+              (dist (+ (* character 40.0) 0.1))
+              (fx (if (= x q)
+                      (/ (/ 1.0 (+ dist q))
+                         (- 1.0 (exp (* dist q))))
+                      (/ (/ (- x q)
+                            (+ (- 1.0 (exp (* -1.0 dist (- x q)))) q))
+                         (- 1.0 (exp (* dist q)))))))
+          (set! otm1 (- (+ (* 0.999 otm1) fx) itm1))
+          (set! itm1 fx)
+          otm1)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; envelope stuff
