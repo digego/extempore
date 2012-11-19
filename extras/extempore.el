@@ -1,23 +1,56 @@
-;;; extempore.el
+;;; extempore.el --- Emacs major mode for Extempore source files
 
-;; Author: Ben Swift <ben.swift@anu.edu.au>
+;; Author: Ben Swift <benjamin.j.swift@gmail.com>
+;; Keywords: Extempore
+
 ;; Adapted from: scheme.el by Bill Rozas and Dave Love
 ;; Also includes some work done by Hector Levesque and Andrew Sorensen
 
-;; TODO add licence info
+;; Copyright (c) 2011-2012, Andrew Sorensen
+
+;; All rights reserved.
+
+;; Redistribution and use in source and binary forms, with or without 
+;; modification, are permitted provided that the following conditions are met:
+
+;; 1. Redistributions of source code must retain the above copyright notice, 
+;;    this list of conditions and the following disclaimer.
+
+;; 2. Redistributions in binary form must reproduce the above copyright notice,
+;;    this list of conditions and the following disclaimer in the documentation 
+;;    and/or other materials provided with the distribution.
+
+;; Neither the name of the authors nor other contributors may be used to endorse
+;; or promote products derived from this software without specific prior written 
+;; permission.
+
+;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+;; ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
+;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
+;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
+;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
+;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
+;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+;; POSSIBILITY OF SUCH DAMAGE.
 
 ;; Commentary:
 
-;; The major mode for editing Extempore code, which is a mixture of
-;; Scheme and xtlang---a strongly-typed, scheme-like language.  See
-;; the Extempore project page at http://github.com/digego/extempore
-;; for more details.
+;; A major mode for editing Extempore code. See the Extempore project
+;; page at http://github.com/digego/extempore for more details.
+
+;; Installation:
 
 ;; To set up Emacs to automatically load this major mode for any .xtm
 ;; files, add the following lines to your .emacs
 
 ;; (autoload 'extempore-mode "/path/to/extempore/extras/extempore.el" "" t)
 ;; (add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
+
+;; Currently, extempore.el requires Emacs 24, because it inherits from
+;; prog-mode (via lisp-mode)
 
 ;;; Code:
 
