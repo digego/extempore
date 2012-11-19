@@ -34,7 +34,6 @@
 (dolist (p '(markdown-mode
              yasnippet
              yasnippet-bundle
-             paredit
              smex
              ido-ubiquitous
              magit
