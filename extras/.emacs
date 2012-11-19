@@ -160,7 +160,7 @@
 ;; extempore ;;
 ;;;;;;;;;;;;;;;
 
-;; set this to wherever you put the extempore source directory
+;; change this to wherever you put the extempore source directory
 (setq extempore-path "/path/to/extempore")
 
 (autoload 'extempore-mode (concat extempore-path "/extras/extempore.el") "" t)
@@ -172,3 +172,10 @@
 
 (add-to-list 'auto-mode-alist '(".*gitconfig$" . conf-unix-mode))
 (add-to-list 'auto-mode-alist '(".*gitignore$" . conf-unix-mode))
+
+;; you can remove this once you've set up your extempore-path
+
+(if (string-equal extempore-path "/path/to/extempore")
+    (progn (find-file user-init-file)
+           (search-forward "/path/to/extempore" nil t 2)
+           (message "You need to set your Extempore path!")))
