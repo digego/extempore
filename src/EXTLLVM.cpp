@@ -1126,7 +1126,7 @@ namespace extemp {
 	    FILE* fp;
 	    if((fp = fopen(load_path,"rb")) == NULL)
 	    {
-		printf("Could not open %s",load_path);
+		printf("Could not open %s\n",load_path);
 		exit(1);
 	    }
 			
