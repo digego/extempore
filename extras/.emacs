@@ -17,6 +17,11 @@
 ;; The only other thing you have to change manually is the
 ;; extempore-path variable (further down in this file).
 
+;; Further info:
+
+;; https://github.com/digego/extempore
+;; http://benswift.me/extempore-docs/
+
 ;;;;;;;;;;
 ;; elpa ;;
 ;;;;;;;;;;
