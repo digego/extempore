@@ -775,7 +775,7 @@
 ;; http://plugin.org.uk/
 
 (bind-func overdrive_c
-  "Drive range: [1.0,3.0]"
+  "Drive range:[1.0,3.0]"
   (lambda (drive)
     (let ((drive_minus_1 (- drive 1.0)))
       (lambda (x)
@@ -789,7 +789,7 @@
 ;; http://plugin.org.uk/
 
 (bind-func saturation_c
-  "level: [0.0,1.0] character: [0.0,1.0]"
+  "level:[0.0,1.0] character:[0.0,1.0]"
   (lambda (level character)
     (let ((itm1 0.0)
           (otm1 0.0))
@@ -805,6 +805,14 @@
           (set! otm1 (- (+ (* 0.999 otm1) fx) itm1))
           (set! itm1 fx)
           otm1)))))
+
+(bind-func ringmod_c
+  "freq feedback:[0.0,1.0]"
+  (lambda ()
+    (let ((osc (osc_c 0.0)))
+      (lambda (x freq feedback)
+        (+ (* (- 1.0 feedback) x)
+           (* feedback (* x (osc freq 1.0))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
