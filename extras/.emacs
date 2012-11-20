@@ -1,12 +1,15 @@
-;; This file is a 'starter' .emacs ('dot emacs') file if you're new to
-;; Emacs. When Emacs starts, it looks in your home directory for a
-;; file called .emacs, and if it finds one it loads it up. This is
-;; where your own Emacs configuration and personalisations go.
+;; This file is a 'starter' .emacs ('dot emacs') file, which might
+;; come in handy if you're new to Emacs. When Emacs starts, it looks
+;; in your home directory for a file called .emacs, and if it finds
+;; one it loads it up. This is where your own Emacs configuration and
+;; personalisations go.
 
 ;; This file has a few handy defaults, and also sets up Emacs to work
 ;; nicely with Extempore. Feel free to mess with it as much as you
 ;; like: tweaking one's .emacs is something of a right of passage for
 ;; Emacs users :)
+
+;; Installation:
 
 ;; To 'install' this file, just copy it to your home directory, e.g.
 ;; 
@@ -14,8 +17,8 @@
 ;; 
 ;; after that, Emacs will load the file on startup.
 
-;; The only other thing you have to change manually is the
-;; extempore-path variable (further down in this file).
+;; You'll also need to change the `extempore-path' variable (further
+;; down in this file) to point to your Extempore source directory.
 
 ;; Further info:
 
