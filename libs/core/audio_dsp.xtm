@@ -688,7 +688,38 @@
 	    (let ((f (pref lines (dtoi32 chan))))
 	      (f x freq)))))))
 
+;; Hilbert transform filter
 
+(bind-func hilbert_c
+  "n = filter order (should be 2^n + 1)"
+  (lambda (n)
+    (let ((i 0)
+          (h_n:double* (alloc n))
+          (x_n:double* (alloc n))
+          (x_ptr 0))
+      ;; set up the coefficients
+      (dotimes (i n (/ (* n -1) 2))
+        (pset! h_n
+               (+ i (/ n 2))
+               (* (/ 2.0 (* (i64tod i) PI))
+                  (pow (sin (/ (* (i64tod i) PI) 2.0)) 2.0))))
+      ;; h[0] = 0
+      (pset! h_n (+ 1 (/ n 2)) 0.0)
+      (lambda (x)
+        (pset! x_n x_ptr x)
+        (let ((out 0.0))
+          (dotimes (i n)
+            (set! out (+ out (* (pref h_n i)
+                                (pref x_n (modulo (+ i x_ptr (- n 1)) n))))))
+          (modulo (set! x_ptr (+ x_ptr 1)) n)
+          out)))))
+
+(bind-func env_follow_c
+  (lambda (n)
+    (let ((hilb (hilbert_c n)))
+      (lambda (x)
+        (sqrt (+ (pow x 2.0)
+                 (pow (hilb x) 2.0)))))))
 
 ;;
 ;; moog VCF
