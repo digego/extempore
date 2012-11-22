@@ -134,6 +134,14 @@
 	    (if (< chan 1.0) (set! mem (sqr amp freq)))
 	    mem)))))
 
+;; rect wave oscillator - useful for pulse width modulation
+(bind-func rect_c
+  (lambda (phase)
+    (lambda (amp freq duty)
+      (let ((inc (/ freq SAMPLERATE)))
+	(set! phase (+ phase inc))
+	(if (> phase 1.0) (set! phase (- phase 1.0)))
+	(if (< phase duty) amp (* -1.0 amp))))))
 
 ;; saw oscillator
 (bind-func saw_c
