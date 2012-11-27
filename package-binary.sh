@@ -1,6 +1,6 @@
 # package up the binary extempore executable
 
-BIN_DIR=extempore-$(date "+%Y%m%d")
+BIN_DIR=extempore-$(uname)-$(date "+%Y%m%d")
 
 echo "Creating extempore binary archive in ${BIN_DIR}"
 
