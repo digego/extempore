@@ -382,7 +382,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Next Some OpenGL Stuff
 
+(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
+;;(define pr2 (gl:make-ctx ":0.0" #t 0.0 0.0 1920.0 1200.0))
+
 (load "libs/external/opengl.xtm")
+
+(gl_set_view 1024.0 768.0 200.0)
+;;(gl_set_view 1920.0 1200.0 1000.0)
+
+(bind-func some_gl_init
+  (lambda ()
+    (glEnable GL_BLEND)
+    (glBlendFunc GL_SRC_ALPHA (+ GL_SRC_ALPHA 1))            
+    (glDisable GL_DEPTH_TEST)))
 
  
 (bind-func add-density
@@ -461,12 +473,8 @@
 (bind-func my-gl-loop
   (let ((degree 0.0))
     (lambda ()
-      
-      (glEnable GL_BLEND)
-      (glBlendFunc GL_SRC_ALPHA (+ GL_SRC_ALPHA 1))            
-      (glDisable GL_DEPTH_TEST)
-
-      (glClearColor 1.0 0.5 .0 1.0)
+      ;; (glClearColor 1.0 0.5 0.0 1.0)
+      (glClearColor 0.0 0.0 0.0 1.0)      
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
 
       (glColor4d 0.0 0.0 0.0 1.0)
@@ -486,9 +494,9 @@
       	    (size (tref (get-fluid-cube) 0))
       	    (sized (i64tod size))
       	    (cvar 0.0))
-
+        
 	(glTranslated 10.0 11.0 11.0)
-	(glRotated (* 500.0 degree) 0.0 1.0 0.0)	
+        (glRotated (* 300.0 degree) 0.0 1.0 0.0)
         (glTranslated -10.0 -11.0 -11.0)
 	
       	(dotimes (i 0. sized)
@@ -501,10 +509,10 @@
 		(glPushMatrix)
 		(glTranslated i j k)
 		(set! cvar (pref densities idx))
-		(glColor4d 0.0 0.0 0.0 cvar)
+		(glColor4d 0.8 1.0 0.4 cvar)
 		(glCube)
 		;; turn 0.2 to 0.0 to stop drawing vertex arrows
-		(glColor4d 1.0 0.0 0.0 0.2)
+		(glColor4d 1.0 1.0 1.0 1.0)
 		;; if you're having performance problems you
 		;; could start by commenting out the next 4 lines
 		;; i.e. stop drawing the red velocity arrows
@@ -539,7 +547,9 @@
     ;; 1000.0 is wind speed from bottom to top
     (add-velocity 11 1 11 0.0 1000.0 0.0)
     ;; 600.0 is wind speed from left to right
-    (add-velocity 2 5 11 600.0 0.0 (* 300.0 (cos (* 120.0 degree))))
+    (add-velocity 2 5 11 300.0 0.0 (+ 200.0 (* 200.0 (cos (* 100.0 degree)))))
+    ;; everynow and then remove smoke from cube
+    (if (< (modulo degree 1.0) 0.005) (clean-cube))
     (gl:swap-buffers pr2)
     (callback time 'opengl-test (+ time 3000) (+ degree 0.001))))
 
@@ -549,18 +559,15 @@
 ;;
 (define smoke-signal
   (lambda (time)
-    ;(println 't)
     ;; increase 300.0 to kick more smoke into the system 
-    (add-density 2 5 11 (* (random) 50.0))
+    (add-density 2 5 11 (+ 1.0 (* (random) 100.0)))    
     ;; decrease (random 4 9) to inject smoke more often
     (callback (+ time 4410) 'smoke-signal (+ time (* 40000 (random 4 9))))))
 
 
-(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
-(gl_set_view 1024.0 768.0 200.0)
 (opengl-test (now) 0.0)
+(some_gl_init)
 (smoke-signal (now))
-
 
 ;; eval this again if you want to clean the cube at some point!
 ; (clean-cube)
