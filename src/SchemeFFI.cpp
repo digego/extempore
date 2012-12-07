@@ -3320,7 +3320,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     
     int windowStyleMask;
     if(fullscrn){
-      windowStyleMask = NSBorderlessWindowMask;
+      windowStyleMask = NSFullScreenWindowMask;
     }else{
       windowStyleMask = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask;
     }
