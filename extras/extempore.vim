@@ -30,11 +30,11 @@
 "   - clean up code a bit
 
 " Define all of the Extempore commands
-command! -nargs=* ExtemporeOpenConnection :python open()<CR>
-command! -nargs=* ExtemporeCloseConnection :python close()<CR>
-command! -nargs=* ExtemporeSendEnclosingBlock :python send_enclosing_block()<CR>
-command! -nargs=* ExtemporeSendEntireFile :python send_entire_file()<CR>
-command! -nargs=* ExtemporeSendSelection :python send_selection()<CR>
+command! -nargs=* ExtemporeOpenConnection :python open()
+command! -nargs=* ExtemporeCloseConnection :python close()
+command! -nargs=* ExtemporeSendEnclosingBlock :python send_enclosing_block()
+command! -nargs=* ExtemporeSendEntireFile :python send_entire_file()
+command! -nargs=* ExtemporeSendSelection :python send_selection()
 
 " These are the mappings I found to be convenient, which
 " didn't interfere with my own personal setup. Feel free to change them.
