@@ -184,8 +184,10 @@
   (lambda ()
     (setCallback (midi_in) (llvm_get_function_ptr "midi_dump_native"))))
 
+;; to register Extempore for as a midi sink, uncomment this line
 ;; (register_midi_callback)
 
+;; to stop Extempore recieving midi:
 ;; (cancelCallback (midi_in))
 
 (bind-func send_midi
@@ -194,26 +196,25 @@
       (pfill! msg (+ (<< type 4) chan) a b)
       (sendMessage dev 3 msg))))
 
-;; (send_midi (midi_out) *midi-note-on* 0 60 80)
-;; (send_midi (midi_out) *midi-note-off* 0 60 80)
+;; test sending & recieving midi
+;; (send_midi (midi_out) *midi-note-on* 0 60 80 0)
+;; (send_midi (midi_out) *midi-note-off* 0 66 80 0)
 
-(define *midi-chan* 0)
-
-(define play-midi ;; with *midi-chan* as a scheme global
-  (lambda (time dev pitch velocity duration)
-    (callback time 'send_midi dev *midi-note-on* *midi-chan* pitch velocity)
-    (callback (+ time duration) 'send_midi dev *midi-note-off* *midi-chan* pitch velocity)))
+(define play-midi
+  (lambda (time dev pitch velocity duration channel)
+    (callback time 'send_midi dev *midi-note-on* channel pitch velocity)
+    (callback (+ time duration) 'send_midi dev *midi-note-off* channel pitch velocity)))
 
 ;; a midi-specific play macro
 
 (macro (playm args)
   (if (symbol? (cadr args))
-      (if (> (length args) 5)
-	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
-		      ,(car (cdr (cddddr args))))
-	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
       (if (> (length args) 6)
+	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+		      ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))
+	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
+      (if (> (length args) 7)
 	  `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-		      (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))))
+		      (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))) ,(car (cdddr (cddddr args))))
 	  `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-		      (*metro* 'dur ,(car (cdr (cddddr args))))))))
+		      (*metro* 'dur ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))))))
