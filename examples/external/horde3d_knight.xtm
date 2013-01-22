@@ -162,12 +162,13 @@
       (let ((cnt (h3dFindNodes _particleSys "" H3DNodeTypes_Emitter))
 	    (i 0))
       	(dotimes (i cnt)
-      	  (h3dAdvanceEmitterTime (h3dGetNodeFindResult i) (/ 1.0 _curFPS))))
+      	  (h3dUpdateEmitter (h3dGetNodeFindResult i) (/ 1.0 _curFPS))))
       (h3dSetNodeTransform _particleSys2 (* 12.0 (dtof (sin _at))) 2.0 (* 12.0 (dtof (cos _at))) 0.0 0.0 0.0 1.0 1.0 1.0)
       (let ((cnt3 (h3dFindNodes _particleSys2 "" H3DNodeTypes_Emitter))
 	    (i3 0))
       	(dotimes (i3 cnt3)
-      	  (h3dAdvanceEmitterTime (h3dGetNodeFindResult i3) (/ 1.0 _curFPS))))
+      	  (h3dUpdateEmitter (h3dGetNodeFindResult i3) (/ 1.0 _curFPS))))
+      (h3dUpdateModel _knight 1)
 
       (h3dSetNodeTransform light 4.0 9.0 3.0
 			         -60.0 0.0  0.0
@@ -192,6 +193,7 @@
 ;; standard impromptu callback
 (define opengl-test
   (lambda (beat dur)
+    (set! dur 1/16)
     (if (< (*metro* beat) (now))
     	(println 'opengl-test-behind (- (*metro* beat) (now))))
     (mainLoop beat)
@@ -219,3 +221,4 @@
   (ipc:define proc 'opengl-test opengl-test)
   (ipc:define proc 'start start)
   (ipc:call-async proc 'start))
+
