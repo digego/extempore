@@ -2870,7 +2870,8 @@ namespace extemp {
     if ( swapFlag )
       glXSwapBuffers(dpy, glxWin);
 
-    swapInterval(0);    
+    if(swapInterval!=0)
+	swapInterval(0);    
 
     pointer list = _sc->NIL;
     _sc->imp_env->insert(list);
