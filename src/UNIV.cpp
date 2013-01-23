@@ -104,9 +104,18 @@ void ascii_text_color(int attr, int fg, int bg)
     printf("%s", command);
   }
 #else
-  char command[13];
-  /* Command is the control command to the terminal */
+  char command[20];  
+  if(attr>1) attr=0;
+  if(bg==10) bg=9; // background default is 9 NOT 10
+  // if simple term (that doesn't support defaults)
+  // then default to black background and white text
+  if (extemp::UNIV::EXT_TERM == 2) {
+    attr=0
+    if(bg==9) bg=0;
+    if(fg==9) fg=7;
+  }
   sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
+  command[strlen(command)]=0;
   printf("%s", command);
 #endif
 }

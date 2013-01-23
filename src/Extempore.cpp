@@ -140,6 +140,8 @@ int main(int argc, char** argv)
         case OPT_TERM:
           if(strcmp(args.OptionArg(),"cmd")==0) {
 	    extemp::UNIV::EXT_TERM = 1;
+          }else if(strcmp(args.OptionArg(),"basic")==0) {
+            extemp::UNIV::EXT_TERM = 2;
 	  }else{
 	    extemp::UNIV::EXT_TERM = 0;
 	  }
@@ -168,7 +170,7 @@ int main(int argc, char** argv)
 	  std::cout << "            --help: prints this menu" << std::endl;	
 	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	  std::cout << "            --port: port for primary process [7099]" << std::endl;	
-	  std::cout << "            --term: either ansi or cmd" << std::endl;	
+	  std::cout << "            --term: either ansi, cmd (windows), or basic (for simpler ansi terms)" << std::endl;	
 	  std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
 	  std::cout << "      --samplerate: audio samplerate" << std::endl; 
 	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
