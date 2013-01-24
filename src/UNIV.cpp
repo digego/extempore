@@ -110,7 +110,7 @@ void ascii_text_color(int attr, int fg, int bg)
   // if simple term (that doesn't support defaults)
   // then default to black background and white text
   if (extemp::UNIV::EXT_TERM == 2) {
-    attr=0
+    attr=0;
     if(bg==9) bg=0;
     if(fg==9) fg=7;
   }
