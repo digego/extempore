@@ -55,7 +55,7 @@
 ;; gaussian random number X ~ N(0,1)
 ;; algorithm by Marsaglia http://c-faq.com/lib/gaussian.html
 
-(bind-func randn
+(bind-func dsp_randn
   (let ((phase 0))
     (lambda ()
       (let ((u1 (random))
@@ -65,7 +65,7 @@
 	    (s (+ (* v1 v1) (* v2 v2))))
 	(if (= phase 0)
 	    (if (or (> s 1.0) (= s 0.0) (= s 1.0))
-		(randn)
+		(dsp_randn)
 		(* v1 (sqrt (/ (* -2.0 (log s)) s))))
 	    (begin (set! phase (- 1 phase))
 		   (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))
@@ -181,7 +181,7 @@
 (bind-func white_c
   (lambda ()
     (lambda ()
-      (* 0.33 (randn)))))
+      (* 0.33 (dsp_randn)))))
 
 ;; pink noise generator
 ;; uses Paul Kellet's economy method
@@ -190,10 +190,10 @@
   (lambda ()
     (let ((b0 0.0) (b1 0.0) (b2 0.0))
       (lambda ()
-        (set! b0 (+ (* b0 0.99765) (* (randn) 0.0555179)))
-        (set! b1 (+ (* b1 0.96300) (* (randn) 0.2965164)))
-        (set! b2 (+ (* b2 0.57000) (* (randn) 1.0526913)))
-        (* 0.33 (+ b0 b1 b2 (* (randn) 0.1848)))))))
+        (set! b0 (+ (* b0 0.99765) (* (dsp_randn) 0.0555179)))
+        (set! b1 (+ (* b1 0.96300) (* (dsp_randn) 0.2965164)))
+        (set! b2 (+ (* b2 0.57000) (* (dsp_randn) 1.0526913)))
+        (* 0.33 (+ b0 b1 b2 (* (dsp_randn) 0.1848)))))))
 
 ;; pulse train
 (bind-func pulse_c
