@@ -182,6 +182,8 @@ typedef struct num {
     } value;
 } num;
 
+extern "C" 
+{
 scheme *scheme_init_new();
 scheme *scheme_init_new_custom_alloc(func_alloc malloc, func_dealloc free);
 int scheme_init(scheme *sc);
@@ -319,7 +321,7 @@ void setimmutable(pointer p);
 
 void load_file(scheme *sc, FILE *fin);
 void load_string(scheme *sc, const char *input);
-
+}
 
 #endif
 

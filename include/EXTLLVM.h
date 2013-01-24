@@ -51,11 +51,12 @@ typedef struct _llvm_callback_struct_ {
     void* dat;
   } _llvm_callback_struct_;
 
+extern "C"
+{
 void llvm_runtime_error(int error, void* arg);
 llvm_zone_t* llvm_zone_create(uint64_t size);
 llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone);
 bool llvm_zone_copy_ptr(void* ptr1, void* ptr2);
-llvm_zone_t* llvm_zone_default();
 void llvm_zone_mark(llvm_zone_t* zone);
 uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size);
@@ -71,6 +72,28 @@ void* llvm_get_function_ptr(char* n);
 pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
+
+
+
+  void* llvm_memset(void* ptr, int32_t c, int64_t n);
+  int llvm_printf(char* format, ...);
+  int llvm_sprintf(char* str, char* format, ...);
+  void llvm_send_udp(char* host, int port, void* message, int message_length);
+  double imp_rand();
+  int64_t imp_rand1(double a);
+  int64_t imp_rand2(double a, double b);
+
+
+  struct closure_address_table* new_address_table();
+  struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, struct closure_address_table* table);
+  struct closure_address_table* get_address_table(const char* name, closure_address_table* table);
+  uint32_t get_address_offset(const char* name, closure_address_table* table);
+  char* get_address_type(const char* name, closure_address_table* table);
+  bool check_address_exists(const char* name, closure_address_table* table);
+  bool check_address_type(const char* name, closure_address_table* table, const char* type);
+
+
+}
 
 ///////////////////////////////////////////////////
 // this added for dogdy continuations support
