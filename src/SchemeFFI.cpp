@@ -105,7 +105,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Analysis/Verifier.h"
-#include "llvm/Target/TargetData.h"
+//#include "llvm/Target/TargetData.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/PassManager.h"
 #include "llvm/ADT/StringExtras.h"
@@ -157,6 +157,24 @@ char* cstrstrip (char* inputStr)
 
     return inputStr;
 }
+
+static inline std::string xtm_ftostr(double V) {
+  char Buffer[200];
+  sprintf(Buffer, "%20.6e", V);
+  char *B = Buffer;
+  while (*B == ' ') ++B;
+  return B;
+}
+
+static inline std::string xtm_ftostr(const llvm::APFloat& V) {
+  if (&V.getSemantics() == &llvm::APFloat::IEEEdouble)
+    return xtm_ftostr(V.convertToDouble());
+  else if (&V.getSemantics() == &llvm::APFloat::IEEEsingle)
+    return xtm_ftostr((double)V.convertToFloat());
+  return "<unknown format in ftostr>"; // error
+}
+
+
 
 
 #define nelem(table) sizeof(table) / sizeof(table[0])
@@ -1495,7 +1513,7 @@ namespace extemp {
 	{
 	    std::string errstr;
 	    llvm::raw_string_ostream ss(errstr);
-	    pa.Print("Extempore",ss);
+	    pa.print("Extempore",ss);
 	    printf("%s\n",ss.str().c_str());
 	    // if the number of functions in module has changed when calling runFunction 
 	    // then we assume a stub was made and appended to the end of the modules function list.
@@ -2224,7 +2242,10 @@ namespace extemp {
 	bool isDouble = false; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
 	double Val = isDouble ? apf.convertToDouble() :
 	apf.convertToFloat();
-	std::string StrVal = llvm::ftostr(apf);
+        // char hexstr[128];
+        // apf.convertToHexString(hexstr,0,false,llvm::APFloat::rmTowardZero);
+        // std::string StrVal(hexstr);
+	std::string StrVal = xtm_ftostr(apf);
 		
 	// Check to make sure that the stringized number is not some string like
 	// "Inf" or NaN, that atof will accept, but the lexer will not.  Check
@@ -2278,7 +2299,11 @@ namespace extemp {
  	bool ignored;
  	bool isDouble = true; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
  	double Val = isDouble ? apf.convertToDouble() : apf.convertToFloat();
- 	std::string StrVal = llvm::ftostr(apf);
+
+        // char hexstr[128];
+        // apf.convertToHexString(hexstr,0,false,llvm::APFloat::rmTowardZero);
+        // std::string StrVal(hexstr);
+ 	std::string StrVal = xtm_ftostr(apf);
  		
  	// Check to make sure that the stringized number is not some string like
  	// "Inf" or NaN, that atof will accept, but the lexer will not.  Check
