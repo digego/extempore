@@ -845,6 +845,83 @@
 	      (f.res res)
 	      (f x freq)))))))
 
+;; State Variable Filter adapted from
+;; http://www.musicdsp.org/archive.php?classid=3#142 (it is possible
+;; to get all the hp, lp, bp and notch output values in one function,
+;; however they are currently provided in separate functions)
+
+(bind-val SVF_LOWPASS i64 1)
+(bind-val SVF_HIGHPASS i64 2)
+(bind-val SVF_BANDPASS i64 3)
+(bind-val SVF_NOTCH i64 4)
+(bind-val SVF_PEAK i64 5)
+
+(bind-func min2d
+  (lambda (a:double b)
+    (if (< a b) a b)))
+
+(bind-func svf_c
+  "Returns a (state variable) filter closure"
+  (lambda (type)
+    ;; old values
+    (let ((cutoff_ 0.0)
+          (resonance_ 0.0)
+          (drive 0.0)
+          (freq 0.0)
+          (damp 0.0)
+          (notch 0.0)
+          (low 0.0)
+          (high 0.0)
+          (band 0.0)
+          (peak 0.0)
+          (out 0.0))
+      (lambda (in cutoff resonance)
+        ;; recalculate some values if cutoff or resonance have changed
+        (if (or (<> cutoff cutoff_)
+                (<> resonance resonance_))
+            (begin
+              (set! cutoff_ cutoff)
+              (set! resonance_ resonance)
+              (set! freq (* 2.0 (sin (* PI (min2d 0.25 (/ cutoff (* SAMPLERATE 2.0)))))))
+              (set! damp (min2d (* 2.0 (- 1.0 (pow resonance 0.25)))
+                                (min2d 2.0 (- (/ 2.0 freq) (* freq 0.5)))))))
+        (set! notch (- in (* damp band)))
+        (set! low (+ low (* freq band)))
+        (set! high (- notch low))
+        (set! band (- (+ (* freq high) band)
+                      (* drive band band band)))
+        ;; this is a bit filthy - needs a macro
+        (set! out (* 0.5 (if (= type SVF_LOWPASS)
+                             low
+                             (if (= type SVF_HIGHPASS)
+                                 high
+                                 (if (= type SVF_BANDPASS)
+                                     band
+                                     (if (= type SVF_NOTCH)
+                                         notch
+                                         (if (= type SVF_PEAK)
+                                             peak
+                                             0.0)))))))
+        ;; now do it all again (because it's oversampled for
+        ;; stability)
+        (set! notch (- in (* damp band)))
+        (set! low (+ low (* freq band)))
+        (set! high (- notch low))
+        (set! band (- (+ (* freq high) band)
+                      (* drive band band band)))
+        ;; this is a bit filthy - needs a macro
+        (set! out (+ out (* 0.5 (if (= type SVF_LOWPASS)
+                                    low
+                                    (if (= type SVF_HIGHPASS)
+                                        high
+                                        (if (= type SVF_BANDPASS)
+                                            band
+                                            (if (= type SVF_NOTCH)
+                                                notch
+                                                (if (= type SVF_PEAK)
+                                                    peak
+                                                    0.0))))))))))))
+
 ;; based on Steve Harris's foverdrive lv2 plugin
 ;; http://plugin.org.uk/
 
