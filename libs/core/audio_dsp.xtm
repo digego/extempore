@@ -1080,6 +1080,17 @@
 	  (b (+ w a)))
       (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
 
+;; linear fade closure
+
+(bind-func fade_c
+  (lambda (phase)
+    (lambda (amp freq)
+      (let ((inc (/ freq SAMPLERATE)))
+	(if (> phase 1.0)
+            amp
+            (begin (set! phase (+ phase inc))
+                   (* phase amp)))))))
+
 ;;  midi/freq utilities
 
 (bind-func midi2frq    
