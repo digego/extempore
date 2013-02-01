@@ -13,7 +13,7 @@
 ;;; Code:
 
 ; Define basic diatonic major
-(define *pc-diatonic-major*
+(define *pc:diatonic-major*
    '((i . (0 . ^))
      (i6 . (0 . ^6))
      (i64 . (0 . ^64))
@@ -55,7 +55,7 @@
      ))
 	
 ;; Define basic diatonic minor
-(define *pc-diatonic-minor*
+(define *pc:diatonic-minor*
    '((i . (0 . -))
      (i6 . (0 . -6))
      (i64 . (0 . -64))
@@ -109,7 +109,7 @@
      ))
 
 ;; various scales defined as pc sets
-(define *pc-scales*
+(define *pc:scales*
    '((pentatonic . (2 2 3 2))
      (wholetone . (2 2 2 2 2))
      (chromatic . (1 1 1 1 1 1 1 1 1 1 1))
@@ -132,7 +132,7 @@
      (locrian . (1 2 2 1 2 2))))
 
 ; Define basic chord symbols
-(define *pc-chord-syms*
+(define *pc:chord-syms*
    '((^ . (0 4 7))
      (^sus . (0 5 7))
      (^6 . (4 7 0))
@@ -171,7 +171,7 @@
      (-7b5 . (0 3 6 9))))
 
 
-(define *pc-chord-syms-scales*
+(define *pc:chord-syms-scales*
    '((^ . 'ionian)
      (^sus . 'mixolydian)
      (^6 . 'ionian)
@@ -211,7 +211,7 @@
 
 
 ;; returns a scale based on a chord (standard jazz translations)
-(define *pc-chord->scale*
+(define *pc:chord->scale*
    '((i . (0 . ionian))
      (i7 . (0 . ionian))
      (ii . (2 . dorian))
@@ -235,7 +235,7 @@
 ;; 
 ;; retuns true or false
 ;;
-(define pc-?
+(define pc:?
    (lambda (pitch pc)
       (if (list? (member (modulo pitch 12) pc))
           #t
@@ -250,12 +250,12 @@
 ;;
 ;; returns quntized pitch or #f if non available
 ;;
-(define pc-quantize
+(define pc:quantize
    (lambda (pitch-in pc)
       (let loop ((inc 0)
                  (pitch (round pitch-in)))
-         (cond ((pc-? (+ pitch inc) pc) (+ pitch inc))
-               ((pc-? (- pitch inc) pc) (- pitch inc))
+         (cond ((pc:? (+ pitch inc) pc) (+ pitch inc))
+               ((pc:? (- pitch inc) pc) (- pitch inc))
                ((< inc 7) (loop (+ inc 1) pitch))
                (else (print-notification "no pc value to quantize to" pitch pc)
                      #f)))))
@@ -268,12 +268,12 @@
 ;;
 ;; returns quntized pitch or #f if non available
 ;;
-(define pc-quantize-low
+(define pc:quantize-low
    (lambda (pitch-in pc)
       (let loop ((inc 0)
                  (pitch (round pitch-in)))
-         (cond ((pc-? (- pitch inc) pc) (- pitch inc))
-               ((pc-? (+ pitch inc) pc) (+ pitch inc))
+         (cond ((pc:? (- pitch inc) pc) (- pitch inc))
+               ((pc:? (+ pitch inc) pc) (+ pitch inc))
                ((< inc 7) (loop (+ inc 1) pitch))
                (else (print-notification "no pc value to quantize to" pitch pc)
                      #f)))))
@@ -288,7 +288,7 @@
 ;;
 ;; returns -1 if no valid pitch was found 
 ;;
-(define pc-random
+(define pc:random
    (lambda (lower upper pc)
       (if (null? pc) 
           -1
@@ -306,19 +306,19 @@
 ;; 3rd: pitch class  
 ;;
 ;; example: 
-;; (pc-relative 64 -2 '(0 2 4 5 7 9 11)) => 60
-;; (pc-relative 69 3 '(0 2 4 5 7 9 11)) => 74 
+;; (pc:relative 64 -2 '(0 2 4 5 7 9 11)) => 60
+;; (pc:relative 69 3 '(0 2 4 5 7 9 11)) => 74 
 ;; 
-(define pc-relative
+(define pc:relative
    (lambda (pitch i pc)
       (if (= i 0) pitch
           (let ((inc (if (negative? i) - +)))
              (let loop ((p (inc pitch 1)) (cnt 0))
-                (if (pc-? p pc) (set! cnt (inc cnt 1)))
+                (if (pc:? p pc) (set! cnt (inc cnt 1)))
                 (if (= cnt i) p
                     (loop (inc p 1) cnt)))))))
 
-;; pc-make-chord
+;; pc:make-chord
 ;; creates a list of "number" pitches between "lower" and "upper" 
 ;; bounds from the given "pc".  a division of the bounds
 ;; by the number of elements requested breaks down the selection into
@@ -334,9 +334,9 @@
 ;; arg4: pitch class 
 ;;
 ;; example: c7  
-;; (pc-make-chord 60 85 4 '(0 4 7 10)) => (60 70 76 79) 
+;; (pc:make-chord 60 85 4 '(0 4 7 10)) => (60 70 76 79) 
 ;; 
-(define pc-make-chord
+(define pc:make-chord
    (lambda (lower upper number pc)
       (let ((chord '()))
          (let loop ((l lower)
@@ -349,9 +349,9 @@
                      (cl:sort (cl:remove -1 chord) <)) ; lowest pitch to highest pitch remove -1s
                 (let* ((range (- u l))
                        (gap (round (/ range n)))
-                       (pitch (pc-random l (+ l gap) p)))
+                       (pitch (pc:random l (+ l gap) p)))
                    (if (< pitch 0) ; if new pitch is -1 try from whole range
-                       (set! chord (cons (pc-random lower upper p) chord))
+                       (set! chord (cons (pc:random lower upper p) chord))
                        (set! chord (cons pitch chord)))
                    (loop (+ l gap)
                          u
@@ -361,7 +361,7 @@
                              pc))))))))
 
 ;; Returns a scale degree of a given value (pitch) based on a pc
-(define pc-degree
+(define pc:degree
    (lambda (value pc)
       (let loop ((i 1)
                  (lst pc))
@@ -373,18 +373,18 @@
 
 
 ;; quantize the values of lst to pc
-(define pc-quantize-list
+(define pc:quantize-list
    (lambda (lst pc)
       (map (lambda (i)
-              (pc-quantize i pc))
+              (pc:quantize i pc))
            lst)))
 
 
 ;; retrograde list
-(define ivl-retrograde reverse)
+(define ivl:retrograde reverse)
 
 ;; invert list paying no attention to key
-(define ivl-invert
+(define ivl:invert
    (lambda (lst . args)      
       (let ((pivot (if (null? args)
                        (car lst)
@@ -394,14 +394,14 @@
                               (cdr lst))))))
 
 ;; transpose list paying no attention to key
-(define ivl-transpose
+(define ivl:transpose
    (lambda (val lst)
       (map (lambda (i)
               (+ i val))
            lst))) 
 
 ;; expand/contract list by factor paying no attention to key
-(define ivl-expand/contract
+(define ivl:expand/contract
    (lambda (lst factor)
       (cons (car lst)
             (let loop ((old (car lst))
@@ -418,61 +418,61 @@
 
 
 ;; invert the values of lst quantizing to pc
-(define pc-invert
+(define pc:invert
    (lambda (lst pc . args)
       (if (null? args)
-          (pc-quantize-list (ivl-invert lst) pc)
-          (pc-quantize-list (ivl-invert lst (car args)) pc))))   
+          (pc:quantize-list (ivl:invert lst) pc)
+          (pc:quantize-list (ivl:invert lst (car args)) pc))))   
 
 ;; transpose the values of lst quantizing to pc
-(define pc-transpose
+(define pc:transpose
    (lambda (val lst pc)
-      (pc-quantize-list (ivl-transpose val lst) pc)))
+      (pc:quantize-list (ivl:transpose val lst) pc)))
 
 ;; expand/contract lst by factor quantizing to pc
-(define ivl-expand/contract
+(define ivl:expand/contract
    (lambda (lst factor pc)
-      (pc-quantize-list (ivl-expand/contract lst factor) pc)))
+      (pc:quantize-list (ivl:expand/contract lst factor) pc)))
 
 ;; returns a scale type based on a chord type (basic jazz modal theory)
-(define pc-chord->scale
+(define pc:chord->scale
    (lambda (root type)
-      (pc-scale (modulo (+ (cadr (assoc type *pc-chord->scale*)) root) 12)
-                (cddr (assoc type *pc-chord->scale*)))))
+      (pc:scale (modulo (+ (cadr (assoc type *pc:chord->scale*)) root) 12)
+                (cddr (assoc type *pc:chord->scale*)))))
 
 ;; returns a scale type based on a given root
-(define pc-scale
+(define pc:scale
    (lambda (root type)
-      (if (assoc type *pc-scales*)
-          (let loop ((l (cdr (assoc type *pc-scales*)))
+      (if (assoc type *pc:scales*)
+          (let loop ((l (cdr (assoc type *pc:scales*)))
                      (current root)
                      (newlst '()))
              (if (null? l)
                  (reverse (cons current newlst))
                  (loop (cdr l) (modulo (+ current (car l)) 12) (cons current newlst))))
-          (begin (print-notification "Scale type not found." *pc-scales*) #f))))
+          (begin (print-notification "Scale type not found." *pc:scales*) #f))))
 
 
 ;; returns a chord following basic diatonic harmony rules
 ;; based on root (0 for C etc.) maj/min ('- or '^) and degree (i-vii) 
-(define pc-diatonic
+(define pc:diatonic
    (lambda (root maj-min degree)   
       (let ((val (assoc degree     
                         (if (equal? '^ maj-min)
-                            *pc-diatonic-major*
-                            *pc-diatonic-minor*))))
-         (pc-chord (modulo (+ root (cadr val)) 12) (cddr val)))))
+                            *pc:diatonic-major*
+                            *pc:diatonic-minor*))))
+         (pc:chord (modulo (+ root (cadr val)) 12) (cddr val)))))
 
 
 
 
 ;; returns a chord given a root and type
-;; see *pc-chord-syms* for currently available types
+;; see *pc:chord-syms* for currently available types
 ;; 
-;; e.g. (pc-chord 0 '^7)  => '(0 4 7 11)
-(define pc-chord
+;; e.g. (pc:chord 0 '^7)  => '(0 4 7 11)
+(define pc:chord
    (lambda (root type)
-      (let ((chord (assoc type *pc-chord-syms*)))
+      (let ((chord (assoc type *pc:chord-syms*)))
          (if chord
              (let loop ((l (cdr chord))
                         (newlst '()))
@@ -484,16 +484,16 @@
 
 ;; returns chord options for root in maj-min key of pc
 ;;
-;; e.g. (pc-chord-options 0 '^ (pc-scale 0 'ionian)) => ((0 4 7) (0 4 7 11) (0 5 7) (0 4 7 11 2) (0 4 7 11 6))
-(define pc-chord-options
+;; e.g. (pc:chord-options 0 '^ (pc:scale 0 'ionian)) => ((0 4 7) (0 4 7 11) (0 5 7) (0 4 7 11 2) (0 4 7 11 6))
+(define pc:chord-options
    (lambda (root maj-min pc)
       (let ((major7 '(^ ^7 ^sus ^9 ^7#4))
             (dom7 '(^ 7 ^sus 9))
             (minor7 '(- -7 -sus -9))
             (dim7 '(o -7b5 o7))
-            (degree (pc-degree root pc)))
+            (degree (pc:degree root pc)))
          (map (lambda (sym)
-                 (pc-chord root sym))
+                 (pc:chord root sym))
               (if (equal? maj-min '^)
                   (case degree
                         ((-1) '())
@@ -514,10 +514,10 @@
 ;; where fixed is as close as the chord allows to fix-point
 ;; defaults to bottom
 ;;
-;; (pc-make-chord-fixed 60 3 '(0 3 7))      => (60 63 67)
-;; (pc-make-chord-fixed 60 3 '(0 3 7) 'top) => (51 55 60)
+;; (pc:make-chord-fixed 60 3 '(0 3 7))      => (60 63 67)
+;; (pc:make-chord-fixed 60 3 '(0 3 7) 'top) => (51 55 60)
 ;;
-(define pc-make-chord-fixed
+(define pc:make-chord-fixed
    (lambda (fix-point number pc . args)
       (if (< number 1) 
           '()
@@ -546,14 +546,14 @@
                         new-lst)))))))
 
 
-(define pc-distance-of-chord
+(define pc:distance-of-chord
    (lambda (chd pc)
       (apply + (map (lambda (p)
-                       (pc-distance p pc))
+                       (pc:distance p pc))
                     chd))))
 
 ;; distance between pitch and a pc
-(define pc-distance
+(define pc:distance
    (lambda (pitch pc)
       (let ((p (modulo pitch 12)))
          (car (cl:sort (map (lambda (class)
@@ -563,16 +563,16 @@
 
 ;; returns the pitch in plst that is closest to the pc set
 ;; if multiple pitches in plst are the closest return the first
-(define pc-find-closest
+(define pc:find-closest
    (lambda (plst pc)
       (cdar (cl:sort (map (lambda (p)
-                            (cons (pc-distance p pc) p))
+                            (cons (pc:distance p pc) p))
                          plst)                    
                      (lambda (a b) (if (< (car a) (car b)) #t #f))))))
 
 
 ;; find shortest part movement from chord to pc
-(define pc-move-chord
+(define pc:move-chord
    (lambda (chord pc . args)
       (let loop ((pci pc)
                  (chda chord)
@@ -580,10 +580,10 @@
          (if (null? pci) (set! pci pc))
          (if (null? chda)
              (cl:sort chdb <)
-             (let* ((match (pc-find-closest chda pci))
+             (let* ((match (pc:find-closest chda pci))
                     (new-pitch (if (> (random) .5)
-                                   (pc-quantize-low match pci)
-                                   (pc-quantize match pci))))
+                                   (pc:quantize-low match pci)
+                                   (pc:quantize match pci))))
                 (loop (remove-first (modulo new-pitch 12) pci)
                       (remove-first match chda)
                       (cons new-pitch chdb)))))))
@@ -591,7 +591,7 @@
 
 ;; returns the type of scale given a pc or the pc itself
 ;; if no known scale is found
-(define pc-scale-from-pc
+(define pc:scale-from-pc
    (lambda (pc)
       (let ((scale (let loop ((scale pc)
                               (ivls '()))
@@ -601,7 +601,7 @@
                                                      (if (< v 0)
                                                          (+ 12 v)
                                                          v)) ivls))))))
-         (let check ((scales *pc-scales*))
+         (let check ((scales *pc:scales*))
             (if (null? scales) 
                 pc
                 (if (equal? scale (cdar scales))    
@@ -611,35 +611,35 @@
 ;; returns a pc-set based on a list of intervals
 ;; plst is the seed for the progression
 ;; usually this will be a list with one element
-(define pc-from-intervals
+(define pc:from-intervals
    (lambda (plst intervals)
       (if (null? intervals)
           (reverse plst)
-          (pc-from-intervals (cons (modulo (+ (car plst)
+          (pc:from-intervals (cons (modulo (+ (car plst)
                                               (car ivls)) 
                                            12)
                                    plst)
                              (cdr intervals)))))
 
 ;returns a pc-set based on a list of steps a beginning pitch class and a pc-set
-(define pc-from-steps
+(define pc:from-steps
    (lambda (pitch steps pc)
       (let loop ((slst steps)
                  (plst (list pitch)))
          (if (null? slst)
              (reverse plst)
              (loop (cdr slst) 
-                   (cons (modulo (pc-relative (car plst) (car slst) pc) 7) plst))))))
+                   (cons (modulo (pc:relative (car plst) (car slst) pc) 7) plst))))))
 
 ;; attempts to return a reasonable scale based on the chord and root provided
-(define pc-scale-from-chord
+(define pc:scale-from-chord
    (lambda (root chord)
       (let ((res (cl:find-if (lambda (v)
                                 (equal? (car v) chord))
                              (map (lambda (scale)              
                                      (cons (cl:intersection chord scale) scale))
                                   (map (lambda (type)
-                                          (pc-scale root type))
+                                          (pc:scale root type))
                                        '(ionian aeolian mixolydian lydian phrygian locrian 
                                                 dorian lydian-mixolydian wholetone chromatic))))))
          (if (pair? res)
@@ -648,26 +648,26 @@
             
 
 ;; genereate a melody from a list of steps in a (pc) pitch class
-(define pc-melody-by-step
+(define pc:melody-by-step
    (lambda (starting-pitch steps pc . args)
       (if (null? steps)
           (reverse (car args))
           (if (null? args)
-              (pc-melody-by-step starting-pitch steps pc (cons starting-pitch args))
-              (pc-melody-by-step (pc-relative starting-pitch (car steps) pc) 
+              (pc:melody-by-step starting-pitch steps pc (cons starting-pitch args))
+              (pc:melody-by-step (pc:relative starting-pitch (car steps) pc) 
                                  (cdr steps)
                                  pc                                
-                                 (cons (pc-relative starting-pitch (car steps) pc) (car args)))))))
+                                 (cons (pc:relative starting-pitch (car steps) pc) (car args)))))))
 
 
 ;; generate a meldoy from a list of intervals
-(define ivl-melody-by-ivl
+(define ivl:melody-by-ivl
    (lambda (starting-pitch ivls . args)
       (if (null? ivls)
           (reverse (car args))
           (if (null? args)
-              (ivl-melody-by-ivl starting-pitch ivls (cons starting-pitch args))
-              (ivl-melody-by-ivl (+ starting-pitch (car ivls)) (cdr ivls) 
+              (ivl:melody-by-ivl starting-pitch ivls (cons starting-pitch args))
+              (ivl:melody-by-ivl (+ starting-pitch (car ivls)) (cdr ivls) 
                                  (cons (+ starting-pitch (car ivls)) (car args)))))))
 
                  
