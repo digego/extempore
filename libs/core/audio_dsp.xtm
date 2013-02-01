@@ -28,11 +28,15 @@
 ;; usually NOT
 (define *build-multi-chan* #f)
 
-;; bind some global audio values 
-(bind-val SAMPLERATE double (integer->real *au:samplerate*))
-(bind-val CHANNELS i64 *au:channels*)
-(bind-val IN_CHANNELS i64 *au:in-channels*)
-(bind-val FRAMES i64 *au:block-size*)
+;; bind some global audio values
+(if (not (llvm:get-globalvar "SAMPLERATE"))
+    (bind-val SAMPLERATE double (integer->real *au:samplerate*)))
+(if (not (llvm:get-globalvar "CHANNELS"))
+    (bind-val CHANNELS i64 *au:channels*))
+(if (not (llvm:get-globalvar "IN_CHANNELS"))
+    (bind-val IN_CHANNELS i64 *au:in-channels*))
+(if (not (llvm:get-globalvar "FRAMES"))
+    (bind-val FRAMES i64 *au:block-size*))
 
 (bind-alias DSP [double,double,double,double,double*]*)
 
@@ -845,6 +849,88 @@
 	      (f.res res)
 	      (f x freq)))))))
 
+;; State Variable Filter adapted from
+;; http://www.musicdsp.org/archive.php?classid=3#142 (it is possible
+;; to get all the hp, lp, bp and notch output values in one function,
+;; however they are currently provided in separate functions)
+
+(if (not (llvm:get-globalvar "SVF_LOWPASS"))
+    (bind-val SVF_LOWPASS i64 1))
+(if (not (llvm:get-globalvar "SVF_HIGHPASS"))
+    (bind-val SVF_HIGHPASS i64 2))
+(if (not (llvm:get-globalvar "SVF_BANDPASS"))
+    (bind-val SVF_BANDPASS i64 3))
+(if (not (llvm:get-globalvar "SVF_NOTCH"))
+    (bind-val SVF_NOTCH i64 4))
+(if (not (llvm:get-globalvar "SVF_PEAK"))
+    (bind-val SVF_PEAK i64 5))
+
+(bind-func min2d
+  (lambda (a:double b)
+    (if (< a b) a b)))
+
+(bind-func svf_c
+  "Returns a (state variable) filter closure"
+  (lambda (type)
+    ;; old values
+    (let ((cutoff_ 0.0)
+          (resonance_ 0.0)
+          (drive 0.0)
+          (freq 0.0)
+          (damp 0.0)
+          (notch 0.0)
+          (low 0.0)
+          (high 0.0)
+          (band 0.0)
+          (peak 0.0)
+          (out 0.0))
+      (lambda (in cutoff resonance)
+        ;; recalculate some values if cutoff or resonance have changed
+        (if (or (<> cutoff cutoff_)
+                (<> resonance resonance_))
+            (begin
+              (set! cutoff_ cutoff)
+              (set! resonance_ resonance)
+              (set! freq (* 2.0 (sin (* PI (min2d 0.25 (/ cutoff (* SAMPLERATE 2.0)))))))
+              (set! damp (min2d (* 2.0 (- 1.0 (pow resonance 0.25)))
+                                (min2d 2.0 (- (/ 2.0 freq) (* freq 0.5)))))))
+        (set! notch (- in (* damp band)))
+        (set! low (+ low (* freq band)))
+        (set! high (- notch low))
+        (set! band (- (+ (* freq high) band)
+                      (* drive band band band)))
+        ;; this is a bit filthy - needs a macro
+        (set! out (* 0.5 (if (= type SVF_LOWPASS)
+                             low
+                             (if (= type SVF_HIGHPASS)
+                                 high
+                                 (if (= type SVF_BANDPASS)
+                                     band
+                                     (if (= type SVF_NOTCH)
+                                         notch
+                                         (if (= type SVF_PEAK)
+                                             peak
+                                             0.0)))))))
+        ;; now do it all again (because it's oversampled for
+        ;; stability)
+        (set! notch (- in (* damp band)))
+        (set! low (+ low (* freq band)))
+        (set! high (- notch low))
+        (set! band (- (+ (* freq high) band)
+                      (* drive band band band)))
+        ;; this is a bit filthy - needs a macro
+        (set! out (+ out (* 0.5 (if (= type SVF_LOWPASS)
+                                    low
+                                    (if (= type SVF_HIGHPASS)
+                                        high
+                                        (if (= type SVF_BANDPASS)
+                                            band
+                                            (if (= type SVF_NOTCH)
+                                                notch
+                                                (if (= type SVF_PEAK)
+                                                    peak
+                                                    0.0))))))))))))
+
 ;; based on Steve Harris's foverdrive lv2 plugin
 ;; http://plugin.org.uk/
 
@@ -944,13 +1030,13 @@
 
 ;; make a convenience wrapper for asr
 (bind-func adsr_c
-  (lambda (start_time atk_dur dky_dur sus_dur rel_dur peek_amp sus_amp)
+  (lambda (start_time atk_dur dky_dur sus_dur rel_dur peak_amp sus_amp)
     (let* ((points 6)
 	   (data:double* (zalloc (* points 2))))
       (pset! data 0 start_time)
       (pset! data 1 0.0)
       (pset! data 2 (+ start_time atk_dur)) ;; point data
-      (pset! data 3 peek_amp)
+      (pset! data 3 peak_amp)
       (pset! data 4 (+ start_time atk_dur dky_dur))
       (pset! data 5 sus_amp)
       (pset! data 6 (+ start_time atk_dur dky_dur sus_dur))
@@ -966,14 +1052,14 @@
 
 ;; an accumulative adsr (random access not allowed! time must be linear).
 (bind-func adsr_accum_c
-  (lambda (start_time:double atk_dur dky_dur sus_dur rel_dur peek_amp sus_amp)
-    (let ((val (if (> (+ atk_dur dky_dur) 1.0) 0.0 peek_amp))
+  (lambda (start_time:double atk_dur dky_dur sus_dur rel_dur peak_amp sus_amp)
+    (let ((val (if (> (+ atk_dur dky_dur) 1.0) 0.0 peak_amp))
 	  (t1 atk_dur)
 	  (t2 (+ atk_dur dky_dur))
 	  (t3 (+ atk_dur dky_dur sus_dur))
 	  (t4 (+ atk_dur dky_dur sus_dur rel_dur))	  
-	  (inc1 (/ peek_amp atk_dur))
-	  (inc2 (* -1.0 (/ (- peek_amp sus_amp) dky_dur)))
+	  (inc1 (/ peak_amp atk_dur))
+	  (inc2 (* -1.0 (/ (- peak_amp sus_amp) dky_dur)))
 	  (inc3 (* -1.0 (/ sus_amp rel_dur))))
       (lambda (time:double chan)
 	(if (< chan 1.0)
@@ -993,6 +1079,17 @@
 	  (a (+ w v (* (- x2 x0) 0.5)))
 	  (b (+ w a)))
       (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
+
+;; linear fade closure
+
+(bind-func fade_c
+  (lambda (phase)
+    (lambda (amp freq)
+      (let ((inc (/ freq SAMPLERATE)))
+	(if (> phase 1.0)
+            amp
+            (begin (set! phase (+ phase inc))
+                   (* phase amp)))))))
 
 ;;  midi/freq utilities
 
