@@ -668,6 +668,36 @@ be running in another (shell-like) buffer."
 	(extempore-send-definition)
 	(end-of-defun)))))
 
+;; eldoc completion
+
+(require 'eldoc)
+
+(defun extempore-fnsym-in-current-sexp ()
+  (save-excursion
+    (let ((argument-index (1- (eldoc-beginning-of-sexp))))
+      ;; If we are at the beginning of function name, this will be -1.
+      (when (< argument-index 0)
+	(setq argument-index 0))
+      ;; Don't do anything if current word is inside a string.
+      (if (= (or (char-after (1- (point))) 0) ?\")
+	  nil
+	(current-word)))))
+
+(make-variable-buffer-local 'eldoc-documentation-function)
+
+(defun extempore-eldoc-documentation-function ()
+  (if extempore-process
+      (let*  ((fnsym (extempore-fnsym-in-current-sexp))
+              (fnstr (if fnsym (process-send-string
+                                extempore-process
+                                (concat "(get-eldoc-string "
+                                        fnsym
+                                        ")\r\n"))
+                       "#f\n")))
+        (if (or (not fnstr) (string-equal (substring fnstr 0 2) "#f"))
+            nil
+          fnstr))))
+
 ;; misc bits and pieces
 
 (defun xpb1 (name duration)
