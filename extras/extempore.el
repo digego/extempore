@@ -99,8 +99,13 @@
 (defvar extempore-mode-abbrev-table nil)
 (define-abbrev-table 'extempore-mode-abbrev-table ())
 
-;; imenu stuff goes here in scheme-mode - not implemented for
-;; extempore mode yet.
+(defvar extempore-imenu-generic-expression
+  '((nil ;"Scheme"
+     "(\\(define-\\(\\|macro\\|instrument\\|sampler\\)\\)\\s-+\\([^ \t:]+\\)" 3)
+    (nil ;"xtlang"
+     "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\s-+\\([^ \t:]+\\ )" 3))
+  "Imenu generic expression for Extempore mode.  See `imenu-generic-expression'.")
+
 
 (defun extempore-mode-variables ()
   (set-syntax-table extempore-mode-syntax-table)
@@ -128,6 +133,7 @@
   (set (make-local-variable 'lisp-indent-function) 'extempore-indent-function)
   (setq mode-line-process '("" extempore-mode-line-process))
   ;; (set (make-local-variable 'imenu-case-fold-search) t)
+  (setq imenu-generic-expression extempore-imenu-generic-expression)
   (set (make-local-variable 'font-lock-defaults)
        '(extempore-font-lock-keywords
 	 nil t (("+-*/.<>=!?$%_&~^:" . "w") (?#. "w 14"))
