@@ -723,6 +723,39 @@ be running in another (shell-like) buffer."
 				      ,(make-char 'greek-iso8859-7 107))
 		      nil))))))
 
+;; visual annotations
+
+(defun extempore-beginning-of-defun-function (&optional arg)
+  (beginning-of-defun arg))
+
+(defun extempore-inside-scheme-defun-p ()
+  (save-excursion
+    (extempore-beginning-of-defun-function)
+    (looking-at "(define")))
+
+(defun extempore-inside-xtlang-defun-p ()
+  (save-excursion
+    (extempore-beginning-of-defun-function)
+    (looking-at "(bind")))
+
+(defun extempore-get-fn-name ()
+  (save-excursion
+    (extempore-beginning-of-defun-function)
+    (forward-char)
+    (if (or (extempore-inside-xtlang-defun-p)
+            (extempore-inside-scheme-defun-p))
+        (progn (forward-symbol 1) (forward-char)
+               (current-word))
+      nil)))
+
+(defvar extempore-tr-annotation-spinners nil
+  "A list of all the currently animating TR annotations.")
+
+(defface extempore-keyword-annotation-face
+  '((t (:underline t :overline t :inherit font-lock-keyword-face)))
+  "Face for visual annotations of keywords."
+  :group 'extempore)
+
 (provide 'extempore)
 
 ;;; extempore.el ends here
