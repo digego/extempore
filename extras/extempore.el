@@ -102,9 +102,9 @@
 
 (defvar extempore-imenu-generic-expression
   '((nil ;"Scheme"
-     "(\\(define-\\(\\|macro\\|instrument\\|sampler\\)\\)\\s-+\\([^ \t:]+\\)" 3)
+     "(\\(define\\(\\|-macro\\|-instrument\\|-sampler\\)\\)\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3)
     (nil ;"xtlang"
-     "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\s-+\\([^ \t:]+\\ )" 3))
+     "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3))
   "Imenu generic expression for Extempore mode.  See `imenu-generic-expression'.")
 
 
