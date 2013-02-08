@@ -89,8 +89,9 @@
     (modify-syntax-entry ?\" "\"   " st)
     (modify-syntax-entry ?' "'   " st)
     (modify-syntax-entry ?` "'   " st)
+    ;; in xtlang, commas are used in type annotations
+    (modify-syntax-entry ?, "_   " st)
     ;; Special characters
-    (modify-syntax-entry ?, "'   " st)
     (modify-syntax-entry ?@ "'   " st)
     (modify-syntax-entry ?# "'   " st)
     (modify-syntax-entry ?\\ "\\   " st)
@@ -136,7 +137,7 @@
   (setq imenu-generic-expression extempore-imenu-generic-expression)
   (set (make-local-variable 'font-lock-defaults)
        '(extempore-font-lock-keywords
-	 nil t (("+-*/.<>=!?$%_&~^:" . "w") (?#. "w 14"))
+	 nil t (("+-*/,.<>=!?$%_&~^:" . "w") (?#. "w 14"))
 	 beginning-of-defun
 	 (font-lock-mark-block-function . mark-defun)
 	 (font-lock-syntactic-face-function
