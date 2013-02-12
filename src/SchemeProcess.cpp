@@ -902,7 +902,7 @@ namespace extemp {
 						// if we get to 1024 assume we aren't going to get a TERMINATION_CHAR and bomb out
 						if(j>(1024*10)) {
 							ascii_text_color(1,1,10);
-							printf("Error reading eval string from server socket. No terminator received before 10M limit.\n");
+							printf("Error reading eval string from server socket. No terminator received before 10MB limit.\n");
 							ascii_text_color(0,7,10);
 							in_streams[sock]->str("");														
 							evalstr = "";
