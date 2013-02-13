@@ -611,6 +611,16 @@ determined by whether there is an *extempore* buffer."
 (defun extempore-default-process-filter (proc str)
   (message (substring str 0 -1)))
 
+;;; SLIP escape codes
+;; END       ?\300    /* indicates end of packet */
+;; ESC       ?\333    /* indicates byte stuffing */
+;; ESC_END   ?\334    /* ESC ESC_END means END data byte */
+;; ESC_ESC   ?\335    /* ESC ESC_ESC means ESC data byte */
+
+;; todo need to write this function
+(defun extempore-slip-process-filter (proc str)
+  (message (substring str 0 -1)))
+
 (defun extempore-connect (host port)
   "Connect to the running extempore process, which must
 be running in another (shell-like) buffer."
@@ -653,7 +663,12 @@ be running in another (shell-like) buffer."
                            "\r\n")))
           (process-send-string extempore-process str)
           (redisplay) ; flash the def like Extempore
-          (sleep-for .25))
+	  (sleep-for .25)
+	  ;; add to TR animation list, if appropriate
+	  (if (extempore-inside-tr-defun-p)
+	      (add-to-list 'extempore-tr-defun-list
+			   (vector (extempore-fnsym-in-current-sexp)
+				   (current-buffer)))))
       (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
 
 (defun extempore-send-region ()
@@ -762,10 +777,6 @@ be running in another (shell-like) buffer."
     (extempore-beginning-of-defun-function)
     (extempore-xtlang-defun-name)))
 
-(defun extempore-get-callback-details ()
-  (save-excursion
-    (looking-at "(callback\\s-+")))
-
 (defun extempore-inside-tr-defun-p ()
   (save-excursion
     (extempore-end-of-defun-function)
@@ -781,6 +792,10 @@ be running in another (shell-like) buffer."
          nil t)
         (cons (match-beginning 0) (1- (match-end 0)))
       nil)))
+
+;; maintain list of all the TR functions
+
+(defvar extempore-tr-defun-list nil)
 
 ;; construct overlays
 
@@ -889,11 +904,12 @@ be running in another (shell-like) buffer."
 (defun extempore-tr-watcher-filter (proc str)
   (message (substring str 0 -1))
   (let ((buf (process-buffer proc)))
-    (with-current-buffer buf
-      (let ((mtch (string-match "(begin-tr \\([^ \t\n:]+\\) \\([0-9.]+\\))" str))
-            (tr-name (match-string 1 str))
-            (tr-period (string-to-number (match-string 2 str))))
-        (extempore-add-tr-overlays tr-name tr-period)))))
+    (if buf
+	(with-current-buffer buf
+	  (let ((mtch (string-match "(begin-tr \\([^ \t\n:]+\\) \\([0-9.]+\\))" str))
+		(tr-name (match-string 1 str))
+		(tr-period (string-to-number (match-string 2 str))))
+	    (extempore-add-tr-overlays tr-name tr-period))))))
 
 (defun extempore-add-tr-watcher ()
   (if extempore-process
