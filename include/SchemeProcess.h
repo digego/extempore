@@ -106,6 +106,7 @@ namespace extemp {
 /* #endif */
 	//Thread functions
 	static void* impromptu_server_thread(void* obj_p);
+	static void* impromptu_slip_server_thread(void* obj_p); /* for OSC over TCP */
 	static void* impromptu_task_executer(void* obj_p);		
 		
 	long long int getMaxDuration();
