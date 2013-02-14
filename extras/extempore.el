@@ -642,17 +642,69 @@ be running in another (shell-like) buffer."
   (delete-process extempore-process)
   (setq extempore-process nil))
 
+;;; SLIP escape codes
+;; END       ?\300    /* indicates end of packet */
+;; ESC       ?\333    /* indicates byte stuffing */
+;; ESC_END   ?\334    /* ESC ESC_END means END data byte */
+;; ESC_ESC   ?\335    /* ESC ESC_ESC means ESC data byte */
+
+(defvar extempore-slip-end-string (char-to-string ?\300))
+(defvar extempore-slip-esc-string (char-to-string ?\333))
+(defvar extempore-slip-esc-end-string (char-to-string ?\334))
+(defvar extempore-slip-esc-esc-string (char-to-string ?\335))
+(defvar extempore-slip-escaping-regexp
+  (concat "[" extempore-slip-esc-string extempore-slip-end-string "]"))
+(defvar extempore-slip-unescaping-regexp (concat extempore-slip-esc-string "."))
+
+(defun extempore-slip-escape-packet (packet-string)
+  (concat
+   extempore-slip-end-string
+   (replace-regexp-in-string extempore-slip-escaping-regexp
+                             (lambda (s)
+                               (if (string-equal s extempore-slip-end-string)
+                                   (concat extempore-slip-esc-string
+                                           extempore-slip-esc-end-string)
+                                 (concat extempore-slip-esc-string
+                                         extempore-slip-esc-esc-string)))
+                             packet-string)
+   extempore-slip-end-string))
+
+(replace-regexp-in-string extempore-slip-escaping-regexp
+                             (lambda (s)
+                               (if (string-equal s extempore-slip-end-string)
+                                   (concat extempore-slip-esc-string
+                                           extempore-slip-esc-end-string)
+                                 (concat extempore-slip-esc-string
+                                         extempore-slip-esc-esc-string)))
+                             "À")
+
+(defun extempore-slip-unescape-packet (packet-string)
+  (if (and (string-equal (substring packet-string 0 1)
+                         extempore-slip-end-string)
+           (string-equal (substring packet-string -1)
+                         extempore-slip-end-string))
+      (replace-regexp-in-string extempore-slip-unescaping-regexp
+                                (lambda (s)
+                                  (if (string-equal (substring s 1)
+                                                    extempore-slip-esc-end-string)
+                                      extempore-slip-end-string
+                                    extempore-slip-esc-string))
+                                (substring packet-string 1 -1))
+    (progn (message "Dropping malformed SLIP packet.")
+           nil)))
+
+;; updated to use SLIP packetization
 (defun extempore-send-definition ()
   "Send the enclosing top-level def to Extempore server for evaluation"
   (interactive)
   (save-excursion
     (mark-defun)
     (if extempore-process
-        (let ((str (concat (buffer-substring (point) (mark))
-                           "\r\n")))
-          (process-send-string extempore-process str)
-          (redisplay) ; flash the def like Extempore
-          (sleep-for .25))
+        (progn (process-send-string
+                extempore-process
+                (extempore-slip-escape-packet (buffer-substring (point) (mark))))
+               (redisplay) ; flash the def like Extempore
+               (sleep-for .25))
       (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
 
 (defun extempore-send-region ()
