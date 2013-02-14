@@ -69,10 +69,10 @@
 // constants for SLIP TCP-packetizing
 // from http://tools.ietf.org/html/rfc1055
 
-#define END             0300    /* indicates end of packet */
-#define ESC             0333    /* indicates byte stuffing */
-#define ESC_END         0334    /* ESC ESC_END means END data byte */
-#define ESC_ESC         0335    /* ESC ESC_ESC means ESC data byte */
+#define SLIP_END             0300    /* indicates begin/end of packet */
+#define SLIP_ESC             0333    /* indicates byte stuffing */
+#define SLIP_ESC_END         0334    /* ESC ESC_END means END data byte */
+#define SLIP_ESC_ESC         0335    /* ESC ESC_ESC means ESC data byte */
 
 // FD_COPY IS BSD ONLY
 #ifndef FD_COPY
@@ -1100,11 +1100,22 @@ namespace extemp {
 						*in_streams[sock] << buf;
 						evalstr = in_streams[sock]->str();
 
-						//if(evalstr[evalstr.length()-1] == TERMINATION_CHAR) { // 23 here is an end of transmission block (ascii ETB)
-						if(evalstr[evalstr.length()-1] == 10 && evalstr[evalstr.length()-2] == 13) {
-							in_streams[sock]->str("");							
-							pos++;
-							break;
+                                                // use SLIP (RFC 1055) to packetize the stream
+						if(evalstr[0] == SLIP_END && evalstr[evalstr.length()-1] == SLIP_END) {
+                                                  // reconstruct escaped 'BEGIN' & 'END' data bytes
+                                                  for(std::string::iterator it=evalstr.begin()+1; it < evalstr.end()-2; it++){
+                                                    if(*it == SLIP_ESC){
+                                                      if(*(it+1) == SLIP_ESC_ESC){
+                                                        evalstr.replace(it, it+2, 1, SLIP_ESC);
+                                                      }else if(*(it+1) == SLIP_ESC_END){
+                                                        evalstr.replace(it, it+2, 1, SLIP_END);
+                                                      }
+                                                    }
+                                                  }
+                                                  // clear input stream to wait for new input
+                                                  in_streams[sock]->str("");
+                                                  pos++;
+                                                  break;
 						}
 						// if we get to 1024 assume we aren't going to get a TERMINATION_CHAR and bomb out
 						if(j>(1024*10)) {
