@@ -602,8 +602,9 @@ determined by whether there is an *extempore* buffer."
     (progn (shell "*extempore*")
            (sit-for 1)
            (process-send-string "*extempore*"
-                                (concat "cd " extempore-path
-                                        "\n./extempore --device "
+                                (concat "cd " extempore-path "\n"
+                                        (if (string-equal system-type "windows-nt") "" "./")
+                                        "extempore --device "
                                         (read-from-minibuffer "Device number: ") "\n"))))
   (display-buffer "*extempore*"))
 
