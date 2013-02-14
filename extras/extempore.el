@@ -669,15 +669,6 @@ be running in another (shell-like) buffer."
                              packet-string)
    extempore-slip-end-string))
 
-(replace-regexp-in-string extempore-slip-escaping-regexp
-                             (lambda (s)
-                               (if (string-equal s extempore-slip-end-string)
-                                   (concat extempore-slip-esc-string
-                                           extempore-slip-esc-end-string)
-                                 (concat extempore-slip-esc-string
-                                         extempore-slip-esc-esc-string)))
-                             "À")
-
 (defun extempore-slip-unescape-packet (packet-string)
   (if (and (string-equal (substring packet-string 0 1)
                          extempore-slip-end-string)
@@ -756,9 +747,8 @@ be running in another (shell-like) buffer."
         ;; send the documentation request
         (if fnsym (process-send-string
                    extempore-process
-                   (concat "(get-eldoc-string "
-                           fnsym
-                           ")\r\n")))
+                   (extempore-slip-escape-packet
+                    (concat "(get-eldoc-string " fnsym ")"))))
         ;; always return nil, docstring comes back through the process
         ;; filter
         nil)))
