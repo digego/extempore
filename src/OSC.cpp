@@ -1,34 +1,34 @@
 /*
-* Copyright (c) 2011, Andrew Sorensen 
+* Copyright (c) 2011, Andrew Sorensen
 *
 * All rights reserved.
 *
 *
-* Redistribution and use in source and binary forms, with or without 
+* Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are met:
 *
-* 1. Redistributions of source code must retain the above copyright notice, 
+* 1. Redistributions of source code must retain the above copyright notice,
 *    this list of conditions and the following disclaimer.
 *
 * 2. Redistributions in binary form must reproduce the above copyright notice,
-*    this list of conditions and the following disclaimer in the documentation 
+*    this list of conditions and the following disclaimer in the documentation
 *    and/or other materials provided with the distribution.
 *
 * Neither the name of the authors nor other contributors may be used to endorse
-* or promote products derived from this software without specific prior written 
+* or promote products derived from this software without specific prior written
 * permission.
 *
 *
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-* AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-* ARE DISCLEXTD. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
-* LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
-* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
-* SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
-* INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
-* CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-* ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+* AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+* ARE DISCLEXTD. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+* LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+* SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+* INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+* CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+* ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 * POSSIBILITY OF SUCH DAMAGE.
 *
 */
@@ -45,7 +45,7 @@
 #include <stdlib.h>
 
 #ifdef EXT_BOOST
-// header boost/asio.h from OSC.h 
+// header boost/asio.h from OSC.h
 #else
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -56,13 +56,21 @@
 #include <arpa/inet.h>
 #endif
 
+// constants for SLIP TCP-packetizing
+// from http://tools.ietf.org/html/rfc1055
 
+#define SLIP_END      0300    /* indicates begin/end of packet */
+#define SLIP_ESC      0333    /* indicates byte stuffing */
+#define SLIP_ESC_END  0334    /* ESC ESC_END means END data byte */
+#define SLIP_ESC_ESC  0335    /* ESC ESC_ESC means ESC data byte */
 
+#define OSC_UDP_TYPE  1
+#define OSC_TCP_TYPE  2
 
 ///////////////////////////////////////////////
 //
 // THIS IS UGLY AND INEFFICIENT CHANGE ME!
-// 
+//
 // swap using char pointers
 //
 uint64_t swap64f(double d)
@@ -84,7 +92,7 @@ uint64_t swap64f(double d)
 }
 
 // unswap using char pointers
-double unswap64f(uint64_t a) 
+double unswap64f(uint64_t a)
 {
 
 	double d;
@@ -119,7 +127,7 @@ uint32_t swap32f(float f)
 }
 
 // unswap using char pointers
-float unswap32f(uint32_t a) 
+float unswap32f(uint32_t a)
 {
 
 	float f;
@@ -154,7 +162,7 @@ uint64_t  swap64i(uint64_t d)
 }
 
 // unswap using char pointers
-uint64_t unswap64i(uint64_t a) 
+uint64_t unswap64i(uint64_t a)
 {
 
 	uint64_t d;
@@ -189,7 +197,7 @@ uint32_t swap32i(uint32_t f)
 }
 
 // unswap using char pointers
-uint32_t unswap32i(uint32_t a) 
+uint32_t unswap32i(uint32_t a)
 {
 
 	uint32_t f;
@@ -211,7 +219,7 @@ uint32_t unswap32i(uint32_t a)
 
 namespace extemp {
 
-	std::map<scheme*, OSC*> OSC::SCHEME_MAP;	
+	std::map<scheme*, OSC*> OSC::SCHEME_MAP;
 	//OSC* OSC::singleton = NULL;
 	//scheme* OSC::sc = NULL;
 
@@ -222,7 +230,7 @@ namespace extemp {
 			if(typetags[i] == 'i') {
 				pos += 4;
 			}else if(typetags[i] == 'f'){
-				pos += 4; 
+				pos += 4;
 			}else if(typetags[i] == 'd'){
 				pos += 8;
 			}else if(typetags[i] == 's'){
@@ -277,7 +285,7 @@ namespace extemp {
 			}else if(typetags[i] == 't'){
 				double timestamp = 0.0;
 				pos += OSC::getOSCTimestamp(args+pos, &timestamp);
-				ss << " " << timestamp;				
+				ss << " " << timestamp;
 				// }else if(typetags[i] == 'b'){
 				// 	NSData* osc_data;
 				// 	pos += OSC::getOSCData(args+pos, &osc_data);
@@ -326,7 +334,7 @@ namespace extemp {
 #else
 			long bytes_read = recvfrom(*osc->getSocketFD(), osc->getMessageData(), 70000, 0, (struct sockaddr*)osc->getClientAddress(), (socklen_t *) osc->getClientAddressSize());
 
-#endif			
+#endif
 			if(bytes_read > -1) {
 			  //printf("udp packet size(%lld)\n",bytes_read);
 				//std::cout << "OSC from client port: " << osc->getClientAddress() << " " << osc->getAddress() <<  std::endl;
@@ -342,7 +350,7 @@ namespace extemp {
 				if(address.find("#bundle") != std::string::npos) {
 #ifdef _OSC_DEBUG_
 					std::cout << "OSC BUNDLE:: " << length <<  "  args: " << args << std::endl;
-#endif									
+#endif
 					pos += OSC::getOSCTimestamp(args+pos, &timestamp); // skip time tag
 					while(pos < length) {
                                                 int size = 0;
@@ -351,9 +359,9 @@ namespace extemp {
                                                 //Used += res;
                                                 //don't add res from getting size to used
                                                 pos += res;
-#ifdef _OSC_DEBUG_					
+#ifdef _OSC_DEBUG_
 					        std::cout << "\t--> bundle msg   size(" << size << ") pos(" << pos-4 << ")" << std::endl;
-#endif										
+#endif
 						//pos += 4; // skip element size
 						address.clear();
 						typetags.clear();
@@ -363,10 +371,10 @@ namespace extemp {
                                                   return 0;
 						}
                                                 used += res;
-                                                pos += res; 
+                                                pos += res;
 						res = OSC::getOSCString(args+pos,&typetags);
                                                 used += res;
-                                                pos += res; 
+                                                pos += res;
 						if(osc->getNative() == NULL) {
 							int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,args+pos);
 							if(ret_from_call < 0) break;
@@ -388,7 +396,7 @@ namespace extemp {
 						int (*native) (char*,char*,char*,int) = osc->getNative();
 						native((char*)address.c_str(),(char*)typetags.c_str(),args+pos,length-used);
 					}
-				}				
+				}
 				char reply[256];
 				memset(reply,0,256);
 #ifdef EXT_BOOST
@@ -409,7 +417,7 @@ namespace extemp {
 		return NULL;
 	}
 
-	OSC::OSC() : threadOSC(), message_length(0), started(false) 
+	OSC::OSC() : threadOSC(), message_length(0), started(false)
 	{
 #ifdef EXT_BOOST
 		io_service = new boost::asio::io_service;
@@ -427,16 +435,16 @@ namespace extemp {
 		//scm->addGlobalCptr((char*)"*io:osc-send-msg*",mk_cb(this,OSC,sendOSC));
 		scm->addForeignFunc((char*)"io:osc:start-server", &OSC::registerScheme);
 		scm->addForeignFunc((char*)"io:osc:set-real-64bit?", &OSC::set_real_type);
-		scm->addForeignFunc((char*)"io:osc:set-integer-64bit?", &OSC::set_integer_type);			
+		scm->addForeignFunc((char*)"io:osc:set-integer-64bit?", &OSC::set_integer_type);
 		scm->addForeignFunc((char*)"io:osc:send-from-server-socket?", &OSC::send_from_server_socket);
 
 		//scm->addGlobal("*samplerate*",mk_integer(scm->getSchemeEnv(),AUHost::SAMPLERATE));
 	}
 
 	int OSC::setOSCString(char* data, std::string* str) {
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "SET OSC STRING = " << *str << std::endl;
-#endif	
+#endif
 		int n = 4 - (int)fmod((double)str->length(),4.0);
 		for(int i=0;i<n;++i) {
 			str->push_back('\0');
@@ -454,7 +462,7 @@ namespace extemp {
 			if (data[str_cnt] == '\0') break;
 			str->push_back(data[str_cnt]);
 		}
-		str_cnt += (4 - (int)fmod((double)str_cnt,4.0));		
+		str_cnt += (4 - (int)fmod((double)str_cnt,4.0));
 
 		//added because we need to quote quotes to add to scheme expressions
 		for(int i=0;i<str->length();i++)
@@ -469,16 +477,16 @@ namespace extemp {
 			}
 		}
 
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "GET OSC STRING = " << *str << std::endl;
-#endif				
-		return str_cnt;        
+#endif
+		return str_cnt;
 	}
 
 	int OSC::setOSCfloat(char* data, float* f) {
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "SET OSC FLOAT 32 = " << *f << std::endl;
-#endif        	
+#endif
 		uint32_t sf = swap32f(*f);
 		char* byte_array = (char*) &sf;
 		for(int i=0;i<4;++i) {
@@ -489,17 +497,17 @@ namespace extemp {
 
 	int OSC::getOSCfloat(const char* data, float* f) {
 		*f = unswap32f(*((uint32_t*)data));
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "OSC FLOAT 32 = " << *f << std::endl;
-#endif        
+#endif
 		return 4;
 	}
 
 
 	int OSC::setOSCdouble(char* data, double* f) {
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "SET OSC FLOAT 64 = " << *f << std::endl;
-#endif        	
+#endif
 		uint64_t sf = swap64f(*f);
 		char* byte_array = (char*) &sf;
 		for(int i=0;i<8;++i) {
@@ -510,9 +518,9 @@ namespace extemp {
 
 	int OSC::getOSCdouble(const char* data, double* f) {
 		*f = unswap64f(*((uint64_t*)data));
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "OSC FLOAT 64 = " << *f << std::endl;
-#endif        
+#endif
 		return 8;
 	}
 
@@ -522,7 +530,7 @@ namespace extemp {
 		uint32_t fractional = unswap32i(dat[1]);
 
 		if((seconds == 0) && (fractional == 1)) {
-			*d = 0.0; 
+			*d = 0.0;
 			return 8;
 		}
 		//std::cout << "seconds:" << seconds << " fraction:" << fractional << std::endl;
@@ -537,7 +545,7 @@ namespace extemp {
 #ifdef TARGET_OS_WINDOWS
 		uint32_t seconds = (uint32_t) d;
 #else
-		uint32_t seconds = trunc(d); 
+		uint32_t seconds = trunc(d);
 #endif
 
 		double fractional = d - (double) seconds;
@@ -552,14 +560,14 @@ namespace extemp {
 		*sf = swap32i(fractionali);
 
 		// great! now we have both bits of the NTP puzzle, we just need to jam them into a datastream
-		return 8;		
+		return 8;
 	}
 
 
 	int OSC::setOSCInt(char* data, int* i) {
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "SET OSC INT = " << *i << std::endl;
-#endif        		
+#endif
 		*i = swap32i(*i);
 		char* byte_array = (char*) i;
 		for(int i=0;i<4;++i) {
@@ -571,9 +579,9 @@ namespace extemp {
 
 	int OSC::getOSCInt(const char* data, int* i) {
 		*i = unswap32i(*((int*) data));
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "OSC INT = " << *i << std::endl;
-#endif        
+#endif
 		return 4;
 	}
 
@@ -588,9 +596,9 @@ namespace extemp {
 
 	int OSC::getOSCLong(const char* data, int64_t* l) {
 		*l = unswap64i(*((int64_t*)data));
-#ifdef _OSC_DEBUG_        
+#ifdef _OSC_DEBUG_
 		std::cout << "OSC LONG = " << *l << std::endl;
-#endif        
+#endif
 		return 8;
 	}
 
@@ -600,7 +608,7 @@ namespace extemp {
 		int end = 0;
 		for(int i=0;i<=num;++i) {
 			end = input->find('/',start+1);
-			if(i < num) start = end; 
+			if(i < num) start = end;
 		}
 		start++; //skip over the "/"
 		output->append(input->substr(start,end-start));
@@ -610,7 +618,7 @@ namespace extemp {
 	{
 #ifdef _OSC_DEBUG_
 		printf("CLEAR MESSAGE BUFFER\n");
-#endif				
+#endif
 		message_length = 0;
 		int cnt = -1;
 		do {
@@ -629,7 +637,7 @@ namespace extemp {
 	{
 #ifdef _OSC_DEBUG_
 		printf("PROCESS ARGS\n");
-#endif					
+#endif
 		OSC* osc = OSC::I(_sc);
 		int ret = 0;
 		int tmpsize = 1024;
@@ -640,7 +648,7 @@ namespace extemp {
 				ret = OSC::setOSCString(*ptr,&str);
 				typetags += "s";
 			}else if(is_pair(pair_car(arg))) {
-				typetags += "[";  
+				typetags += "[";
 				processArgs(pair_car(arg),tmp,ptr,lgth,typetags,_sc);
 				typetags += "]";
 				ret = 0;
@@ -655,28 +663,28 @@ namespace extemp {
 				{
 					int val = ivalue(pair_car(arg));
 					ret = OSC::setOSCInt(*ptr, &val);
-					typetags += "i";									
+					typetags += "i";
 				}
 				else
 				{
 					int64_t val = ivalue(pair_car(arg));
 					ret = OSC::setOSCLong(*ptr, &val);
-					typetags += "h";				
+					typetags += "h";
 				}
 			}else if(is_real(pair_car(arg))){
 				if(osc->scheme_real_type == 'f') {
 					float val = (float) rvalue(pair_car(arg));
-					ret = OSC::setOSCfloat(*ptr, &val);					
+					ret = OSC::setOSCfloat(*ptr, &val);
 					typetags += "f";
 				}else{
 					double val = (double) rvalue(pair_car(arg));
 					ret = OSC::setOSCdouble(*ptr, &val);
-					typetags += "d";					
+					typetags += "d";
 				}
 			}
-			*lgth += ret; *ptr += ret;			
+			*lgth += ret; *ptr += ret;
 			arg = pair_cdr(arg);
-		}	
+		}
 	}
 
 	//pointer OSC::sendOSC(scheme* _sc, pointer args)
@@ -713,7 +721,7 @@ namespace extemp {
 		if (!hen) {
 			printf("OSC Error: Could no resolve host name\n");
 			delete t->getArg();
-			return;			
+			return;
 		}
 
 		memset(&sa, 0, sizeof(sa));
@@ -721,7 +729,7 @@ namespace extemp {
 		sa.sin_family = AF_INET;
 		sa.sin_port = htons(port);
 		memcpy(&sa.sin_addr.s_addr, hen->h_addr_list[0], hen->h_length);
-#endif		
+#endif
 
 
 #ifdef EXT_BOOST
@@ -734,7 +742,7 @@ namespace extemp {
 		if(OSC::I(_sc)->send_from_serverfd) {
 			fd = *(OSC::I(_sc)->getSocketFD()); //  getSendFD();
 		}else{
-			fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);			
+			fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		}
 #endif
 
@@ -750,7 +758,7 @@ namespace extemp {
 		int lgth = 0;
 		processArgs(arg,&tmp,&ptr,&lgth,typetags,_sc);
 
-		char* message = (char*) malloc(1024+tmpsize);		
+		char* message = (char*) malloc(1024+tmpsize);
 		ptr = message;
 		ret = OSC::setOSCString(ptr, &address);
 		length += ret; ptr += ret;
@@ -780,19 +788,19 @@ namespace extemp {
 		{
 #ifdef _OSC_DEBUG_
 			std::cout << "OSC Send Error: " << err << std::endl;
-#endif		
+#endif
 			if(err == EMSGSIZE) {
 				printf("Error: OSC message too large: UDP 8k message MAX\n");
 			}else{
     			        printf("Error: Problem sending OSC message: %d\n",err);
-			}			
+			}
 
 		}
 
 		free(tmp);
 		free(message);
 
-		delete t->getArg();		
+		delete t->getArg();
 		return;
 		//return _sc->NIL;
 	}
@@ -857,12 +865,12 @@ namespace extemp {
 		int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
 		osc_address->port(port);
 
-		try{ 
+		try{
 			boost::asio::ip::udp::socket* sock = new boost::asio::ip::udp::socket(*osc->getIOService()); //(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 			sock->open(boost::asio::ip::udp::v4());
 			//boost::asio::socket_base::non_blocking_io command(true);
 			//sock->io_control(command);
-			sock->bind(*osc_address); 
+			sock->bind(*osc_address);
 
 			osc->setSocket(sock);
 			printf("Starting OSC server on port: %d calling back to %s\n",port,name);
@@ -871,33 +879,223 @@ namespace extemp {
 			return _sc->NIL;
 		}
 #else
-		struct sockaddr_in* osc_address = osc->getAddress();
+		// check type of connection: UDP (default) or TCP
+		if(list_length(_sc,args) == 3 &&
+                   strncmp(string_value(pair_caddr(args)), "TCP", 4) == 0){
+                  osc->setConnectionType(OSC_TCP_TYPE);
+                }else
+                  osc->setConnectionType(OSC_UDP_TYPE);
 
-		memset((char*) osc_address, 0, sizeof(*osc_address));
-		int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
-		printf("Starting OSC server on port: %d calling back to %s\n",port,name);
+                // set up a UDP 'connection'
+                if(osc->getConnectionType == OSC_UDP_TYPE){
 
-		osc_address->sin_family = AF_INET;
-		osc_address->sin_port = htons(port);
-		osc_address->sin_addr.s_addr = htonl(INADDR_ANY); //set server's IP address
+                  struct sockaddr_in* osc_address = osc->getAddress();
 
-		int socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-		if(socket_fd == -1) {
-			printf("Error opening OSC socket\n");
-			std::cout << "Error opening OSC socket"<< std::endl;
-		}
-		fcntl(socket_fd, F_SETFL, O_NONBLOCK); //set to non-blocking socket
+                  memset((char*) osc_address, 0, sizeof(*osc_address));
+                  int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
+                  printf("Starting OSC server on port: %d calling back to %s\n",port,name);
 
-		if(bind(socket_fd, (struct sockaddr*) osc_address, sizeof(*osc_address)) == -1) {
-			printf("Error opening OSC socket\n");
-			std::cout << "Error binding OSC address to socket" << std::endl;
-		}		
+                  osc_address->sin_family = AF_INET;
+                  osc_address->sin_port = htons(port);
+                  osc_address->sin_addr.s_addr = htonl(INADDR_ANY); //set server's IP address
 
-		*(osc->getSocketFD())=socket_fd;
+                  int socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+                  if(socket_fd == -1) {
+                    printf("Error opening OSC socket\n");
+                    std::cout << "Error opening OSC socket"<< std::endl;
+                  }
+                  fcntl(socket_fd, F_SETFL, O_NONBLOCK); //set to non-blocking socket
 
-		// setup client struct.
-		struct sockaddr_in* osc_client_address = osc->getClientAddress();
-		*(osc->getClientAddressSize())=sizeof(*osc_client_address);
+                  if(bind(socket_fd, (struct sockaddr*) osc_address, sizeof(*osc_address)) == -1) {
+                    printf("Error opening OSC socket\n");
+                    std::cout << "Error binding OSC address to socket" << std::endl;
+                  }
+
+                  *(osc->getSocketFD())=socket_fd;
+
+                  // setup client struct.
+                  struct sockaddr_in* osc_client_address = osc->getClientAddress();
+                  *(osc->getClientAddressSize())=sizeof(*osc_client_address);
+                  
+                }else{          // set up a TCP socket for the OSC connection
+                  osc->setSocketFD(scm->getServerSocket());
+                  osc->setClientAddressSize(sizeof(osc_client_address));
+
+                  fd_set rfd; //open read sockets (man select for more info)
+                  std::vector<int> client_sockets;
+                  std::map<int,std::stringstream*> in_streams;
+                  FD_ZERO(&rfd); //zero out open sockets
+                  //printf("SERVER SOCKET FD_SET: %d\n",socket_fd);
+                  FD_SET(socket_fd, &rfd); //add server socket to open sockets list
+                  int highest_fd = socket_fd+1;
+                  //printf("FD SIZE=%d  and %d\n",highest_fd,FD_SETSIZE);
+                  int BUFLEN = 1024;
+                  char buf[BUFLEN+1];
+                  while(scm->getRunning()) {
+                    fd_set c_rfd;
+                    FD_ZERO(&c_rfd);
+                    FD_COPY(&rfd,&c_rfd);
+                    timeval pause;
+                    pause.tv_sec = 1;
+                    pause.tv_usec = 0;
+                    int res = select(highest_fd, &c_rfd, NULL, NULL, &pause);
+                    if(res >= 0) {
+                    }else{
+                      struct stat buf;
+                      std::vector<int>::iterator pos = client_sockets.begin();
+                      while(pos != client_sockets.end()) {
+                        int result = fstat(*pos,&buf);
+                        if(result < 0) {
+                          FD_CLR(*pos,&rfd);
+                          client_sockets.erase(pos);
+                          break;
+                        }
+                        pos++;
+                      }
+                      ascii_text_color(1,1,10);
+                      printf("%s SERVER ERROR: %s\n",scm->name.c_str(),strerror(errno));
+                      ascii_text_color(0,7,10);
+                      continue;
+                    }
+                    if(FD_ISSET(socket_fd, &c_rfd)) { //check if we have any new accpets on our server socket
+                      res = accept(socket_fd,(struct sockaddr *)&osc_client_address, (socklen_t *) &osc_client_address_size);
+                      if(res < 0) {
+                        std::cout << "Bad Accept in Server Socket Handling" << std::endl;
+                        continue; //continue on error
+                      }
+                      if(res >= highest_fd) highest_fd = res+1;
+                      FD_SET(res, &rfd); //add new socket to the FD_SET
+                      ascii_text_color(1,3,10);
+                      printf("New Client Connection \n");
+                      ascii_text_color(0,7,10);
+                      client_sockets.push_back(res);
+                      in_streams[res] = new std::stringstream;
+                      std::stringstream* ss = new std::stringstream;
+                      if(with_banner) SchemeProcess::banner(ss);
+                      else *ss << "Welcome to extempore!";
+                      uint64_t time = UNIV::TIME;
+                      int hours = time / UNIV::HOUR;
+                      time -= hours * UNIV::HOUR;
+                      int minutes = time / UNIV::MINUTE;
+                      time -= minutes * UNIV::MINUTE;
+                      int seconds = time / UNIV::SECOND;
+                      char prompt[28];
+                      sprintf(prompt, "[extempore %.2d:%.2d:%.2d]: ",hours,minutes,seconds);
+                      if(with_banner) *ss << prompt;
+                      write(res, ss->str().c_str(), ss->str().length()+1);
+                      continue;
+                    }
+                    std::vector<int>::iterator pos = client_sockets.begin();
+
+                    while(pos != client_sockets.end()) { // check through all fd's for matches against FD_ISSET
+                      if(FD_ISSET(*pos, &c_rfd)) { //see if any client sockets have data for us
+                        int sock = *pos;
+                        std::string evalstr = "\r\n";
+                        for(int j=0; true; j++) { //read from stream in BUFLEN blocks
+                          memset(buf, 0, BUFLEN+1);
+                          res = read(sock, buf, BUFLEN);
+                          if(res == 0) { //close the socket
+                            FD_CLR(sock, &rfd);
+                            delete(in_streams[sock]);
+                            in_streams[sock] = 0;
+                            ascii_text_color(1,3,10);
+                            std::cout << "Close Client Socket" << std::endl;
+                            ascii_text_color(0,7,10);
+                            pos = client_sockets.erase(pos);
+                            close(sock);
+                            break;
+                          }else if(res < 0){
+                            ascii_text_color(1,1,10);
+                            printf("Error with socket read from extempore process %s",strerror(errno));
+                            ascii_text_color(0,7,10);
+                            pos++;
+                            break;
+                          }
+
+                          *in_streams[sock] << buf;
+                          evalstr = in_streams[sock]->str();
+
+                          //if(evalstr[evalstr.length()-1] == TERMINATION_CHAR) { // 23 here is an end of transmission block (ascii ETB)
+                          if(evalstr[evalstr.length()-1] == 10 && evalstr[evalstr.length()-2] == 13) {
+                            in_streams[sock]->str("");
+                            pos++;
+                            break;
+                          }
+                          // if we get to 1024 assume we aren't going to get a TERMINATION_CHAR and bomb out
+                          if(j>(1024*10)) {
+                            ascii_text_color(1,1,10);
+                            printf("Error reading eval string from server socket. No terminator received before 10MB limit.\n");
+                            ascii_text_color(0,7,10);
+                            in_streams[sock]->str("");
+                            evalstr = "";
+                            break;
+                          }
+                        }
+                        // there can be a number of separate expressions in a single string
+                        int subexprs = 0;
+                        for(int k=0;k<evalstr.length()-1;k++) { // remote -1
+                          // if(evalstr[k] == TERMINATION_CHAR) subexptrs++;
+                          if(evalstr[k] == 13 && evalstr[k+1] == 10) subexprs++;
+                        }
+                        int subexprspos = 0;
+                        int subexprsnext = 0;
+                        for(int y=0;y<subexprs;y++) {
+                          for( ; subexprsnext<evalstr.length();subexprsnext++) // remove -1
+                            {
+                              //if(evalstr[subexprsnext] == TERMINATION_CHAR) break;
+                              if(evalstr[subexprsnext] == 13 && evalstr[subexprsnext+1] == 10) break;
+                            }
+                          if(evalstr != "#break#" && evalstr != "") {
+                            if(guard.isOwnedByCurrentThread())
+                              {
+                                printf("Extempore interpreter server thread trying to relock. Dropping Task!. Let me know andrew@moso.com.au\n");
+                              }
+                            else
+                              {
+                                guard.lock();
+                                char c[8];
+                                sprintf(c, "%i", sock);
+                                subexprsnext++;
+                                std::string* s = new std::string(evalstr.substr(subexprspos,(subexprsnext-subexprspos)));
+                                //std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << y << ">><" << subexprspos << "," << (subexprsnext-subexprspos) << "> " << *s << std::endl;
+                                subexprspos = subexprsnext;
+                                taskq.push(SchemeTask(extemp::UNIV::TIME, scm->getMaxDuration(), s, c, 0));// Task<std::string*>(0l, NULL, new std::string(evalstr), c));
+                                guard.signal(); //Notify();
+                                guard.unlock();
+                                // if this is an ipc call don't wait for a reply
+                                //if(0==strncmp(s->c_str(), "(ipc", 4)) continue;
+                              }
+                          }
+                        }
+                      }else{
+                        pos++;
+                      }
+                    }
+                  }
+                  //std::cout << "Close any client sockets" << std::endl;
+                  std::vector<int>::iterator pos = client_sockets.begin();
+                  while(pos != client_sockets.end()) { // check through all fd's for matches against FD_ISSET
+                    int sock = *pos;
+                    if(sock<0) {
+                      std::cout << "BAD FILE DESCRIPTOR!" << std::endl;
+                      pos = client_sockets.erase(pos); // erase returns next pos
+                      continue;
+                    }
+                    FD_CLR(sock, &rfd);
+                    delete(in_streams[sock]);
+                    in_streams[sock] = 0;
+                    std::cout << "CLOSE CLIENT-SOCKET" << std::endl;
+                    close(sock);
+                    std::cout << "DONE-CLOSING_CLIENT" << std::endl;
+                    pos = client_sockets.erase(pos); // erase returns next pos
+                  }
+                  if(close(socket_fd)) {
+                    std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
+                    perror(NULL);
+                  }
+                  std::cout << "Exiting server thread" << std::endl;
+                  return obj_p;
+                }
 #endif
 
 		if(!osc->getStarted()) {
@@ -908,4 +1106,3 @@ namespace extemp {
 		return _sc->NIL;
 	}
 } //End Namespace
-
