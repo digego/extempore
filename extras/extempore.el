@@ -648,6 +648,7 @@ be running in another (shell-like) buffer."
 ;; ESC_END   ?\334    /* ESC ESC_END means END data byte */
 ;; ESC_ESC   ?\335    /* ESC ESC_ESC means ESC data byte */
 
+(defvar extempore-use-slip-tcp-connection nil)
 (defvar extempore-slip-end-string (char-to-string ?\300))
 (defvar extempore-slip-esc-string (char-to-string ?\333))
 (defvar extempore-slip-esc-end-string (char-to-string ?\334))
@@ -693,7 +694,10 @@ be running in another (shell-like) buffer."
     (if extempore-process
         (progn (process-send-string
                 extempore-process
-                (extempore-slip-escape-packet (buffer-substring (point) (mark))))
+                (if extempore-use-slip-tcp-connection
+                    (extempore-slip-escape-packet
+                     (buffer-substring (point) (mark)))
+                  (concat (buffer-substring (point) (mark)) "\r\n")))
                (redisplay) ; flash the def like Extempore
                (sleep-for .25))
       (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
@@ -737,12 +741,14 @@ be running in another (shell-like) buffer."
 	  nil
 	(current-word)))))
 
+;; eldoc
+(defvar extempore-use-eldoc nil)
 (make-variable-buffer-local 'eldoc-documentation-function)
 
 ;; currently doesn't actually return the symbol, but sends the request
 ;; which is echoed back through whichever process filter is active
 (defun extempore-eldoc-documentation-function ()
-  (if extempore-process
+  (if (and extempore-use-eldoc extempore-process)
       (let ((fnsym (extempore-fnsym-in-current-sexp)))
         ;; send the documentation request
         (if fnsym (process-send-string
@@ -802,10 +808,6 @@ be running in another (shell-like) buffer."
   (save-excursion
     (extempore-beginning-of-defun-function)
     (extempore-xtlang-defun-name)))
-
-(defun extempore-get-callback-details ()
-  (save-excursion
-    (looking-at "(callback\\s-+")))
 
 (defun extempore-inside-tr-defun-p ()
   (save-excursion
