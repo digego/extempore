@@ -34,6 +34,7 @@
 */
 
 #include "OSC.h"
+#include "SchemeProcess.h"
 #include <string>
 #include <iomanip>
 #include <sstream>
@@ -50,6 +51,7 @@
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <netdb.h>         /* host to IP resolution       */
 #include <sys/fcntl.h>
@@ -860,35 +862,34 @@ namespace extemp {
 		scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
 		// setup server port
-#ifdef EXT_BOOST
-		boost::asio::ip::udp::endpoint* osc_address = osc->getAddress();
-		int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
-		osc_address->port(port);
-
-		try{
-			boost::asio::ip::udp::socket* sock = new boost::asio::ip::udp::socket(*osc->getIOService()); //(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-			sock->open(boost::asio::ip::udp::v4());
-			//boost::asio::socket_base::non_blocking_io command(true);
-			//sock->io_control(command);
-			sock->bind(*osc_address);
-
-			osc->setSocket(sock);
-			printf("Starting OSC server on port: %d calling back to %s\n",port,name);
-		}catch(std::exception& e){
-			std::cout << "Error establishing OSC socket: is address allready used?" << std::endl;
-			return _sc->NIL;
-		}
-#else
 		// check type of connection: UDP (default) or TCP
 		if(list_length(_sc,args) == 3 &&
                    strncmp(string_value(pair_caddr(args)), "TCP", 4) == 0){
                   osc->setConnectionType(OSC_TCP_TYPE);
-                }else
+                }else{
                   osc->setConnectionType(OSC_UDP_TYPE);
-
+                }
                 // set up a UDP 'connection'
-                if(osc->getConnectionType == OSC_UDP_TYPE){
-
+                if(osc->getConnectionType() == OSC_UDP_TYPE){
+#ifdef EXT_BOOST
+                  boost::asio::ip::udp::endpoint* osc_address = osc->getAddress();
+                  int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
+                  osc_address->port(port);
+                  
+                  try{
+                    boost::asio::ip::udp::socket* sock = new boost::asio::ip::udp::socket(*osc->getIOService()); //(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+                    sock->open(boost::asio::ip::udp::v4());
+                    //boost::asio::socket_base::non_blocking_io command(true);
+                    //sock->io_control(command);
+                    sock->bind(*osc_address);
+                    
+                    osc->setSocket(sock);
+                    printf("Starting OSC server on port: %d calling back to %s\n",port,name);
+                  }catch(std::exception& e){
+                    std::cout << "Error establishing OSC socket: is address allready used?" << std::endl;
+                    return _sc->NIL;
+                  }
+#else
                   struct sockaddr_in* osc_address = osc->getAddress();
 
                   memset((char*) osc_address, 0, sizeof(*osc_address));
@@ -916,12 +917,27 @@ namespace extemp {
                   // setup client struct.
                   struct sockaddr_in* osc_client_address = osc->getClientAddress();
                   *(osc->getClientAddressSize())=sizeof(*osc_client_address);
+#endif
+                  if(!osc->getStarted()) {
+                    osc->getThread().create(&osc_mesg_callback, osc);
+                    osc->setStarted(true);
+                  }
+                  osc->sc = _sc;
+                  return _sc->NIL;
                   
-                }else{          // set up a TCP socket for the OSC connection
+                }
+#ifndef EXT_BOOST                
+                if(osc->getConnectionType() == OSC_TCP_TYPE){
+                  // set up a TCP socket for the OSC connection
+                  // this code is taken largely from impromptu_server_thread() in SchemeProcess.cpp
+                  EXTMonitor& guard = scm->getGuard();
+                  std::queue<SchemeTask>& taskq = scm->getQueue();
+
                   osc->setSocketFD(scm->getServerSocket());
-                  osc->setClientAddressSize(sizeof(osc_client_address));
+                  osc->setClientAddressSize(sizeof(osc->getClientAddress()));
 
                   fd_set rfd; //open read sockets (man select for more info)
+                  int socket_fd = *(osc->getSocketFD());
                   std::vector<int> client_sockets;
                   std::map<int,std::stringstream*> in_streams;
                   FD_ZERO(&rfd); //zero out open sockets
@@ -953,12 +969,12 @@ namespace extemp {
                         pos++;
                       }
                       ascii_text_color(1,1,10);
-                      printf("%s SERVER ERROR: %s\n",scm->name.c_str(),strerror(errno));
+                      printf("%s SERVER ERROR: %s\n",scm->getName().c_str(),strerror(errno));
                       ascii_text_color(0,7,10);
                       continue;
                     }
-                    if(FD_ISSET(socket_fd, &c_rfd)) { //check if we have any new accpets on our server socket
-                      res = accept(socket_fd,(struct sockaddr *)&osc_client_address, (socklen_t *) &osc_client_address_size);
+                    if(FD_ISSET(socket_fd, &c_rfd)) { //check if we have any new accepts on our server socket
+                      res = accept(socket_fd,(struct sockaddr *)osc->getClientAddress(), (socklen_t *)osc->getClientAddressSize());
                       if(res < 0) {
                         std::cout << "Bad Accept in Server Socket Handling" << std::endl;
                         continue; //continue on error
@@ -971,8 +987,6 @@ namespace extemp {
                       client_sockets.push_back(res);
                       in_streams[res] = new std::stringstream;
                       std::stringstream* ss = new std::stringstream;
-                      if(with_banner) SchemeProcess::banner(ss);
-                      else *ss << "Welcome to extempore!";
                       uint64_t time = UNIV::TIME;
                       int hours = time / UNIV::HOUR;
                       time -= hours * UNIV::HOUR;
@@ -981,16 +995,16 @@ namespace extemp {
                       int seconds = time / UNIV::SECOND;
                       char prompt[28];
                       sprintf(prompt, "[extempore %.2d:%.2d:%.2d]: ",hours,minutes,seconds);
-                      if(with_banner) *ss << prompt;
+                      *ss << prompt;
                       write(res, ss->str().c_str(), ss->str().length()+1);
                       continue;
                     }
                     std::vector<int>::iterator pos = client_sockets.begin();
-
+                    
                     while(pos != client_sockets.end()) { // check through all fd's for matches against FD_ISSET
                       if(FD_ISSET(*pos, &c_rfd)) { //see if any client sockets have data for us
                         int sock = *pos;
-                        std::string evalstr = "\r\n";
+                        std::string packetstr = "";
                         for(int j=0; true; j++) { //read from stream in BUFLEN blocks
                           memset(buf, 0, BUFLEN+1);
                           res = read(sock, buf, BUFLEN);
@@ -1013,10 +1027,28 @@ namespace extemp {
                           }
 
                           *in_streams[sock] << buf;
-                          evalstr = in_streams[sock]->str();
+                          packetstr = in_streams[sock]->str();
 
-                          //if(evalstr[evalstr.length()-1] == TERMINATION_CHAR) { // 23 here is an end of transmission block (ascii ETB)
-                          if(evalstr[evalstr.length()-1] == 10 && evalstr[evalstr.length()-2] == 13) {
+                          // use SLIP (RFC 1055) to packetize the stream
+                          bool packetstr_open = 0; //false
+                          for(std::string::iterator it=packetstr.begin(); it < packetstr.end(); it++){
+                            if(*it == SLIP_END){
+                              if(packetstr_open){
+                                packetstr_open = 0;
+                                packetstr.erase(it, packetstr.end());
+                              }else{
+                                packetstr_open = 1;
+                                packetstr.erase(0);
+                              }  
+                            }
+                            if(packetstr_open && *it == SLIP_ESC){
+                              if(*(it+1) == SLIP_ESC_ESC){
+                                packetstr.replace(it, it+2, 1, SLIP_ESC);
+                              }else{
+                                packetstr.replace(it, it+2, 1, SLIP_END);
+                              }
+                            }
+                            // clear input stream ready for new input
                             in_streams[sock]->str("");
                             pos++;
                             break;
@@ -1027,46 +1059,10 @@ namespace extemp {
                             printf("Error reading eval string from server socket. No terminator received before 10MB limit.\n");
                             ascii_text_color(0,7,10);
                             in_streams[sock]->str("");
-                            evalstr = "";
+                            packetstr = "";
                             break;
                           }
-                        }
-                        // there can be a number of separate expressions in a single string
-                        int subexprs = 0;
-                        for(int k=0;k<evalstr.length()-1;k++) { // remote -1
-                          // if(evalstr[k] == TERMINATION_CHAR) subexptrs++;
-                          if(evalstr[k] == 13 && evalstr[k+1] == 10) subexprs++;
-                        }
-                        int subexprspos = 0;
-                        int subexprsnext = 0;
-                        for(int y=0;y<subexprs;y++) {
-                          for( ; subexprsnext<evalstr.length();subexprsnext++) // remove -1
-                            {
-                              //if(evalstr[subexprsnext] == TERMINATION_CHAR) break;
-                              if(evalstr[subexprsnext] == 13 && evalstr[subexprsnext+1] == 10) break;
-                            }
-                          if(evalstr != "#break#" && evalstr != "") {
-                            if(guard.isOwnedByCurrentThread())
-                              {
-                                printf("Extempore interpreter server thread trying to relock. Dropping Task!. Let me know andrew@moso.com.au\n");
-                              }
-                            else
-                              {
-                                guard.lock();
-                                char c[8];
-                                sprintf(c, "%i", sock);
-                                subexprsnext++;
-                                std::string* s = new std::string(evalstr.substr(subexprspos,(subexprsnext-subexprspos)));
-                                //std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << y << ">><" << subexprspos << "," << (subexprsnext-subexprspos) << "> " << *s << std::endl;
-                                subexprspos = subexprsnext;
-                                taskq.push(SchemeTask(extemp::UNIV::TIME, scm->getMaxDuration(), s, c, 0));// Task<std::string*>(0l, NULL, new std::string(evalstr), c));
-                                guard.signal(); //Notify();
-                                guard.unlock();
-                                // if this is an ipc call don't wait for a reply
-                                //if(0==strncmp(s->c_str(), "(ipc", 4)) continue;
-                              }
-                          }
-                        }
+                        } 
                       }else{
                         pos++;
                       }
@@ -1094,15 +1090,7 @@ namespace extemp {
                     perror(NULL);
                   }
                   std::cout << "Exiting server thread" << std::endl;
-                  return obj_p;
                 }
 #endif
-
-		if(!osc->getStarted()) {
-			osc->getThread().create(&osc_mesg_callback, osc);
-			osc->setStarted(true);
-		}
-		osc->sc = _sc;
-		return _sc->NIL;
 	}
 } //End Namespace
