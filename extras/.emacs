@@ -48,8 +48,8 @@
              ido-ubiquitous
              magit
              org))
-  (when (not (package-installed-p p))
-    (package-install p)))
+  (if (not (package-installed-p p))
+      (package-install p)))
 
 ;; (package-initialize)
 
@@ -127,6 +127,11 @@
 ;; appearance ;;
 ;;;;;;;;;;;;;;;;
 
+;; change this to whichever theme you like
+;; use 'M-x load theme' to select a theme
+(load-theme 'wombat t)
+(add-to-list 'default-frame-alist '(background-mode . dark))
+
 (dolist (mode '(menu-bar-mode tool-bar-mode scroll-bar-mode))
   (when (fboundp mode) (funcall mode -1)))
 
@@ -163,7 +168,7 @@
 ;; extempore ;;
 ;;;;;;;;;;;;;;;
 
-;; change this to wherever you put the extempore source directory
+;; TODO change this to wherever you put the extempore source directory
 (setq extempore-path "/path/to/extempore")
 
 (autoload 'extempore-mode (concat extempore-path "/extras/extempore.el") "" t)
