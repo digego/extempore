@@ -89,8 +89,9 @@
     (modify-syntax-entry ?\" "\"   " st)
     (modify-syntax-entry ?' "'   " st)
     (modify-syntax-entry ?` "'   " st)
+    ;; in xtlang, commas are used in type annotations
+    (modify-syntax-entry ?, "_   " st)
     ;; Special characters
-    (modify-syntax-entry ?, "'   " st)
     (modify-syntax-entry ?@ "'   " st)
     (modify-syntax-entry ?# "'   " st)
     (modify-syntax-entry ?\\ "\\   " st)
@@ -99,8 +100,13 @@
 (defvar extempore-mode-abbrev-table nil)
 (define-abbrev-table 'extempore-mode-abbrev-table ())
 
-;; imenu stuff goes here in scheme-mode - not implemented for
-;; extempore mode yet.
+(defvar extempore-imenu-generic-expression
+  '((nil ;"Scheme"
+     "(\\(define\\(\\|-macro\\|-instrument\\|-sampler\\)\\)\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3)
+    (nil ;"xtlang"
+     "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3))
+  "Imenu generic expression for Extempore mode.  See `imenu-generic-expression'.")
+
 
 (defun extempore-mode-variables ()
   (set-syntax-table extempore-mode-syntax-table)
@@ -128,9 +134,10 @@
   (set (make-local-variable 'lisp-indent-function) 'extempore-indent-function)
   (setq mode-line-process '("" extempore-mode-line-process))
   ;; (set (make-local-variable 'imenu-case-fold-search) t)
+  (setq imenu-generic-expression extempore-imenu-generic-expression)
   (set (make-local-variable 'font-lock-defaults)
        '(extempore-font-lock-keywords
-	 nil t (("+-*/.<>=!?$%_&~^:" . "w") (?#. "w 14"))
+	 nil t (("+-*/,.<>=!?$%_&~^:" . "w") (?#. "w 14"))
 	 beginning-of-defun
 	 (font-lock-mark-block-function . mark-defun)
 	 (font-lock-syntactic-face-function
@@ -595,10 +602,24 @@ determined by whether there is an *extempore* buffer."
     (progn (shell "*extempore*")
            (sit-for 1)
            (process-send-string "*extempore*"
-                                (concat "cd " extempore-path
-                                        "\n./extempore --device "
+                                (concat "cd " extempore-path "\n"
+                                        (if (string-equal system-type "windows-nt") "" "./")
+                                        "extempore --device "
                                         (read-from-minibuffer "Device number: ") "\n"))))
   (display-buffer "*extempore*"))
+
+(defun extempore-default-process-filter (proc str)
+  (message (substring str 0 -1)))
+
+;;; SLIP escape codes
+;; END       ?\300    /* indicates end of packet */
+;; ESC       ?\333    /* indicates byte stuffing */
+;; ESC_END   ?\334    /* ESC ESC_END means END data byte */
+;; ESC_ESC   ?\335    /* ESC ESC_ESC means ESC data byte */
+
+;; todo need to write this function
+(defun extempore-slip-process-filter (proc str)
+  (message (substring str 0 -1)))
 
 (defun extempore-connect (host port)
   "Connect to the running extempore process, which must
@@ -624,7 +645,7 @@ be running in another (shell-like) buffer."
 			     host
 			     port))
   (set-process-filter extempore-process
-		      '(lambda (proc str) (message (substring str 0 -1)))))
+		      'extempore-default-process-filter))
 
 (defun extempore-stop ()
   "Terminate connection to the Extempore process"
@@ -642,7 +663,12 @@ be running in another (shell-like) buffer."
                            "\r\n")))
           (process-send-string extempore-process str)
           (redisplay) ; flash the def like Extempore
-          (sleep-for .25))
+	  (sleep-for .25)
+	  ;; add to TR animation list, if appropriate
+	  (if (extempore-inside-tr-defun-p)
+	      (add-to-list 'extempore-tr-defun-list
+			   (vector (extempore-fnsym-in-current-sexp)
+				   (current-buffer)))))
       (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
 
 (defun extempore-send-region ()
@@ -668,6 +694,39 @@ be running in another (shell-like) buffer."
 	(extempore-send-definition)
 	(end-of-defun)))))
 
+;; eldoc completion
+
+(require 'eldoc)
+;; (require 'thingatpt)
+
+(defun extempore-fnsym-in-current-sexp ()
+  (save-excursion
+    (let ((argument-index (1- (eldoc-beginning-of-sexp))))
+      ;; If we are at the beginning of function name, this will be -1.
+      (when (< argument-index 0)
+	(setq argument-index 0))
+      ;; Don't do anything if current word is inside a string.
+      (if (= (or (char-after (1- (point))) 0) ?\")
+	  nil
+	(current-word)))))
+
+(make-variable-buffer-local 'eldoc-documentation-function)
+
+;; currently doesn't actually return the symbol, but sends the request
+;; which is echoed back through whichever process filter is active
+(defun extempore-eldoc-documentation-function ()
+  (if extempore-process
+      (let ((fnsym (extempore-fnsym-in-current-sexp)))
+        ;; send the documentation request
+        (if fnsym (process-send-string
+                   extempore-process
+                   (concat "(get-eldoc-string "
+                           fnsym
+                           ")\r\n")))
+        ;; always return nil, docstring comes back through the process
+        ;; filter
+        nil)))
+
 ;; misc bits and pieces
 
 (defun xpb1 (name duration)
@@ -686,6 +745,195 @@ be running in another (shell-like) buffer."
 	    (0 (progn (compose-region (match-beginning 1) (match-end 1)
 				      ,(make-char 'greek-iso8859-7 107))
 		      nil))))))
+
+;; temporal-recursion animations
+
+(defun extempore-beginning-of-defun-function (&optional arg)
+  (beginning-of-defun arg))
+
+(defun extempore-end-of-defun-function (&optional arg)
+  (end-of-defun arg))
+
+;; these could all be made more elegant using (sexp-at-point) to read
+;; in the actual s-expressions, but this is probably a bit quicker
+
+(defun extempore-scheme-defun-name ()
+  (save-excursion
+    (looking-at "(\\(define-\\(\\|macro\\|instrument\\|sampler\\)\\)\\s-+\\([^ \t\n:]+\\)")
+    (match-string 3)))
+
+(defun extempore-inside-scheme-defun-p ()
+  (save-excursion
+    (extempore-beginning-of-defun-function)
+    (extempore-scheme-defun-name)))
+
+(defun extempore-xtlang-defun-name ()
+  (save-excursion
+    (looking-at "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\s-+\\([^ \t\n:]+\\)")
+    (match-string 3)))
+
+(defun extempore-inside-xtlang-defun-p ()
+  (save-excursion
+    (extempore-beginning-of-defun-function)
+    (extempore-xtlang-defun-name)))
+
+(defun extempore-inside-tr-defun-p ()
+  (save-excursion
+    (extempore-end-of-defun-function)
+    (search-backward ")" nil t 2)
+    (looking-at "(callback")))
+
+(defun extempore-find-defn-bounds (name)
+  "Find the definition of the function `name'."
+  (save-excursion
+    (goto-char (point-max))
+    (if (re-search-backward
+         (concat "(\\(\\(bind-func\\)\\|\\(define\\)\\)\\s-+" name "[ \t\n:]")
+         nil t)
+        (cons (match-beginning 0) (1- (match-end 0)))
+      nil)))
+
+;; maintain list of all the TR functions
+
+(defvar extempore-tr-defun-list nil)
+
+;; construct overlays
+
+(defun extempore-make-tr-flash-overlay (name bounds)
+  (if bounds
+      (let ((overlay (make-overlay (car bounds)
+                                   (cdr bounds)
+                                   nil t nil)))
+        ;; (overlay-put overlay 'face '(:inverse-video t))
+        (overlay-put overlay 'evaporate t)
+        overlay)))
+
+(defun extempore-update-tr-flash-overlay (overlay flag)
+  (if flag
+      (overlay-put overlay 'face '(:inverse-video t))
+    (if (equal (overlay-get overlay 'face) '(:inverse-video t))
+        (overlay-put overlay 'face '(:inverse-video nil)))))
+
+(defun extempore-make-tr-clock-overlay (name bounds)
+  (if bounds
+      (let* ((defun-start (car bounds))
+             (overlay (make-overlay defun-start
+                                    (1+ defun-start)
+                                    nil t nil)))
+        (overlay-put overlay 'face '(:underline t :overline t))
+        (overlay-put overlay 'evaporate t)
+        overlay)))
+
+(defun extempore-update-tr-clock-overlay (overlay val beg end)
+  (move-overlay overlay
+                beg
+                (max (1+ beg) (round (+ beg (* val (- end beg)))))))
+
+(defvar extempore-tr-overlay-list nil
+  "The currently animating TR overlay data.")
+
+(defun extempore-delete-tr-overlays-for-name (name)
+  (delete-if (lambda (a)
+               (if (string-equal (aref a 0) name)
+                   (progn (delete-overlay (aref a 1)) t)
+                 nil))
+             extempore-tr-overlay-list))
+
+(defun extempore-add-tr-overlays (name period)
+  (interactive "sfn name: \nnperiod: ")
+  (extempore-delete-tr-overlays-for-name name)
+  (let ((bounds (extempore-find-defn-bounds name)))
+    (if bounds
+        (add-to-list 'extempore-tr-overlay-list
+                     (vector name
+                             (extempore-make-tr-flash-overlay name bounds)
+                             (extempore-make-tr-clock-overlay name bounds)
+                             period
+                             0.0)
+                     t))))
+
+;; animate the overlays
+
+(defvar extempore-tr-animation-update-period (/ 1.0 20))
+
+(defun extempore-update-tr-overlays ()
+  (dolist (annot extempore-tr-overlay-list)
+    ;; update counter
+    (let* ((val (+ (aref annot 4)
+                   (/ extempore-tr-animation-update-period (aref annot 3))))
+           (flash-flag (> val 1.0))
+           (val (mod val 1.0))
+           (flash-overlay (aref annot 1)))
+      (extempore-update-tr-flash-overlay flash-overlay flash-flag)
+      (extempore-update-tr-clock-overlay (aref annot 2)
+                                         val
+                                         (overlay-start flash-overlay)
+                                         (overlay-end flash-overlay))
+      (aset annot 4 val))))
+
+;; managing the animation timer
+
+(defvar extempore-tr-animation-timer nil)
+
+(defun extempore-tr-animation-running-p ()
+  (and extempore-tr-animation-timer
+       extempore-tr-overlay-list))
+
+(defun extempore-cancel-tr-animation-timer ()
+  (interactive)
+  (message "Cancelling TR animiation timer.")
+  (if extempore-tr-animation-timer
+      (cancel-timer extempore-tr-animation-timer))
+  (remove-overlays)
+  (setq extempore-tr-animation-timer nil
+        extempore-tr-overlay-list nil))
+
+(defun extempore-start-tr-animation-timer ()
+  (interactive)
+  (if (extempore-tr-animation-running-p)
+      (progn (message "Restarting TR animation timer.")
+             (extempore-cancel-tr-animation-timer))
+    (message "Starting TR animation timer."))
+  (setq extempore-tr-animation-timer
+        (run-with-timer 0
+                        extempore-tr-animation-update-period
+                        'extempore-update-tr-overlays)))
+
+;; auto-detection of TR loops for animation
+
+(defun extempore-tr-watcher-filter (proc str)
+  (message (substring str 0 -1))
+  (let ((buf (process-buffer proc)))
+    (if buf
+	(with-current-buffer buf
+	  (let ((mtch (string-match "(begin-tr \\([^ \t\n:]+\\) \\([0-9.]+\\))" str))
+		(tr-name (match-string 1 str))
+		(tr-period (string-to-number (match-string 2 str))))
+	    (extempore-add-tr-overlays tr-name tr-period))))))
+
+(defun extempore-add-tr-watcher ()
+  (if extempore-process
+      (set-process-filter
+       extempore-process
+       'extempore-tr-watcher-filter)
+    (message "Can't start TR watcher: not connected to an Extempore process.")))
+
+(defun extempore-remove-tr-watcher ()
+  (if extempore-process
+      (set-process-filter
+       extempore-process
+       'extempore-default-process-filter)
+    (message "Can't remove TR watcher: not connected to an Extempore process.")))
+
+(defun extempore-start-tr-animation ()
+  (interactive)
+  (extempore-start-tr-animation-timer)
+  (extempore-add-tr-watcher))
+
+(defun extempore-stop-tr-animation ()
+  (interactive)
+  (extempore-cancel-tr-animation-timer)
+  (extempore-add-tr-watcher))
 
 (provide 'extempore)
 

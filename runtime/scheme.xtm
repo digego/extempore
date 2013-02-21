@@ -1639,3 +1639,16 @@
 	((string? seq)
 	 (list->string (cl:sort! (string->list seq) less?)))
 	(else (cl:sort! (append seq '()) less?))))
+
+;; for eldoc integration
+
+(define-macro (get-eldoc-string sym) 
+  `(let ((scmdoc (and (defined? (quote ,sym))
+                      (get-closure-code ,sym)))
+         (xtdoc (xtm-closure-doc ,sym)))
+     (cond (scmdoc
+            (cons (quote ,sym) (cadr scmdoc)))
+           (xtdoc
+            (list (quote ,sym) ': (if (pair? xtdoc) (cdr xtdoc) xtdoc)))
+           (else
+            #f))))
