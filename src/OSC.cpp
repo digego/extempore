@@ -540,12 +540,19 @@ namespace extemp {
             *in_streams[sock] << buf;
             slip_str = in_streams[sock]->str();
 
-            if(slip_str[0] == SLIP_END &&
-               slip_str[slip_str.length()-1] == SLIP_END){
-              // strip the termination characters
-              slip_str.erase(0,1);
-              slip_str.erase(slip_str.length()-1,1);
+            // clear any line noise
+            size_t first_esc = slip_str.find(SLIP_END);
+            if(first_esc==std::string::npos){
+              slip_str.clear();
+              in_streams[sock]->str("");
+              pos++;
+              break;
+            }
 
+            if(slip_str[slip_str.length()-1] == SLIP_END){
+              // strip the termination characters
+              slip_str.erase(first_esc,1);
+              slip_str.erase(slip_str.length()-1,1);
               // use SLIP (RFC 1055) to packetize the stream
               for(std::string::iterator it=slip_str.begin(); it < slip_str.end(); it++){
                 if(*it == SLIP_ESC){
