@@ -438,7 +438,7 @@ namespace extemp {
   {
     // seed rng for process
     // UNIV::initRand();
-    
+
     scm_osc_pair *sop = (scm_osc_pair*) obj_p;
     SchemeProcess* scm = (SchemeProcess*)sop->scm_p;
     OSC* osc = (OSC*)sop->osc_p;
@@ -447,7 +447,7 @@ namespace extemp {
     EXTMonitor& guard = scm->getGuard();
     std::queue<SchemeTask>& taskq = scm->getQueue();
 
-    int server_socket = scm->getServerSocket();
+    int socket_fd = *(osc->getSocketFD());
     struct sockaddr_in client_address;
     int client_address_size = sizeof(client_address);
 
@@ -455,9 +455,9 @@ namespace extemp {
     std::vector<int> client_sockets;
     std::map<int,std::stringstream*> in_streams;
     FD_ZERO(&rfd); //zero out open sockets
-    //printf("SERVER SOCKET FD_SET: %d\n",server_socket);
-    FD_SET(server_socket, &rfd); //add server socket to open sockets list
-    int highest_fd = server_socket+1;
+    //printf("SERVER SOCKET FD_SET: %d\n",socket_fd);
+    FD_SET(socket_fd, &rfd); //add server socket to open sockets list
+    int highest_fd = socket_fd+1;
     //printf("FD SIZE=%d  and %d\n",highest_fd,FD_SETSIZE);
     int BUFLEN = 1024;
     char buf[BUFLEN+1];
@@ -487,8 +487,8 @@ namespace extemp {
         ascii_text_color(0,7,10);
         continue;
       }
-      if(FD_ISSET(server_socket, &c_rfd)) { //check if we have any new accpets on our server socket
-        res = accept(server_socket,(struct sockaddr *)&client_address, (socklen_t *) &client_address_size);
+      if(FD_ISSET(socket_fd, &c_rfd)) { //check if we have any new accpets on our server socket
+        res = accept(socket_fd,(struct sockaddr *)&client_address, (socklen_t *) &client_address_size);
         if(res < 0) {
           std::cout << "Bad Accept in Server Socket Handling" << std::endl;
           continue; //continue on error
@@ -531,12 +531,12 @@ namespace extemp {
 
             *in_streams[sock] << buf;
             slip_str = in_streams[sock]->str();
-            
+
             if(slip_str[slip_str[0]] == SLIP_END && slip_str[slip_str.length()-1] == SLIP_END) {
               // strip the termination characters
               slip_str.erase(0,1);
               slip_str.erase(slip_str.length()-1,1);
-              
+
               // use SLIP (RFC 1055) to packetize the stream
               for(std::string::iterator it=slip_str.begin(); it < slip_str.end(); it++){
                 if(*it == SLIP_ESC){
@@ -620,7 +620,7 @@ namespace extemp {
       std::cout << "DONE-CLOSING_CLIENT" << std::endl;
       pos = client_sockets.erase(pos); // erase returns next pos
     }
-    if(close(server_socket)) {
+    if(close(socket_fd)) {
       std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
       perror(NULL);
     }
@@ -1057,10 +1057,11 @@ namespace extemp {
   pointer OSC::registerScheme(scheme* _sc, pointer args) {
     OSC* osc = new OSC(); //OSC::I();
     SCHEME_MAP[_sc] = osc;
+    int port = ivalue(pair_car(args));
     memset(osc->fname,0,256);
     char* name = string_value(pair_cadr(args));
     strcpy(osc->fname,name);
-
+    
     // should we use native callback?
     if(pair_cddr(args) != _sc->NIL && is_cptr(pair_caddr(args))) {
       osc->setNative( (int(*)(char*,char*,char*,int)) cptr_value(pair_caddr(args)));
@@ -1103,9 +1104,7 @@ namespace extemp {
 #else
       // UDP setup
       struct sockaddr_in* osc_address = osc->getAddress();
-
       memset((char*) osc_address, 0, sizeof(*osc_address));
-      int port = ivalue(pair_car(args));
       printf("Starting OSC server on port: %d calling back to %s\n",port,name);
 
       osc_address->sin_family = AF_INET;
@@ -1141,13 +1140,12 @@ namespace extemp {
     // TCP setup
     if(osc->getConnectionType() == OSC_TCP_TYPE){
 
-      // SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
-      // scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
-
-      SchemeProcess* scm = new SchemeProcess(std::string(UNIV::PWD),"tcp-osc-server", port, 0);
-      scm->start();
-      
+      SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
       scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
+
+      // SchemeProcess* scm = new extemp::SchemeProcess(std::string(UNIV::PWD), std::string("tcp-osc-server"), port, 0);
+      // scm->start();
+      // scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
 #ifdef EXT_BOOST
     // todo insert boost TCP-OSC stuff here
@@ -1157,17 +1155,44 @@ namespace extemp {
         std::cout << "Error opening (TCP) OSC socket" << std::endl;
         return _sc->F;
       }
-      int flag = 1;
-      int result = setsockopt(socket_fd,       /* socket affected */
-                              IPPROTO_TCP,     /* set option at TCP level */
-                              TCP_NODELAY,     /* name of option */
-                              (char *) &flag,  /* the cast is historical cruft */
-                              sizeof(int));    /* length of option value */
+      int t_reuse = 1;
+      int result = setsockopt(socket_fd,          /* socket affected */
+                              IPPROTO_TCP,        /* set option at TCP level */
+                              TCP_NODELAY,        /* name of option */
+                              (char *) &t_reuse,  /* the cast is historical cruft */
+                              sizeof(t_reuse));   /* length of option value */
+      result += setsockopt(socket_fd,
+                           SOL_SOCKET,
+                           SO_REUSEADDR,
+                           (char *) &t_reuse,
+                           sizeof(t_reuse));
+
       if (result < 0) {
         std::cout << "Error opening (TCP) OSC socket"<< std::endl;
         return _sc->F;
       }
-      scm->setServerSocket(socket_fd);
+      // Bind Server Socket
+      struct sockaddr_in server_address;
+      size_t server_address_size = sizeof(server_address);
+
+      //start socket
+      memset((char*) &server_address, 0, server_address_size);
+
+      server_address.sin_family = AF_INET;
+      server_address.sin_port = htons(port);
+      server_address.sin_addr.s_addr = htonl(INADDR_ANY); //set server's IP
+
+      if(bind(socket_fd, (struct sockaddr*) &server_address, server_address_size) == -1) {
+        std::cout << "Error binding TCP OSC server address to socket" << std::endl;
+        return _sc->F;
+      }
+      if(listen(socket_fd, 5) == -1) {
+        std::cout << "Problem listening on TCP OSC socket." << std::endl;
+        return _sc->F;
+      }
+
+      osc->setSocketFD(socket_fd);
+
 #endif
       if(!osc->getStarted()) {
         struct scm_osc_pair sop;
