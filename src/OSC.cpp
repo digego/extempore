@@ -532,7 +532,7 @@ namespace extemp {
             *in_streams[sock] << buf;
             slip_str = in_streams[sock]->str();
 
-            if(slip_str[slip_str[0]] == SLIP_END && slip_str[slip_str.length()-1] == SLIP_END) {
+	     if(slip_str[0] == SLIP_END && slip_str[slip_str.length()-1] == SLIP_END){
               // strip the termination characters
               slip_str.erase(0,1);
               slip_str.erase(slip_str.length()-1,1);
@@ -1192,6 +1192,10 @@ namespace extemp {
       }
 
       osc->setSocketFD(socket_fd);
+
+      ascii_text_color(1,3,10);
+      printf("New TCP OSC connection\n");
+      ascii_text_color(0,7,10);
 
 #endif
       if(!osc->getStarted()) {
