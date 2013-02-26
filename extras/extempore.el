@@ -687,19 +687,34 @@ be running in another (shell-like) buffer."
 
 ;; updated to use SLIP packetization
 (defun extempore-send-definition ()
-  "Send the enclosing top-level def to Extempore server for evaluation"
+  "Send the enclosing top-level def to Extempore server for evaluation."
+  (interactive)
+  (extempore-send-crlf-definition))
+
+(defun extempore-send-crlf-definition ()
+  "Use SLIP to packetize the stream."
   (interactive)
   (save-excursion
     (mark-defun)
     (if extempore-process
         (progn (process-send-string
                 extempore-process
-                (if extempore-use-slip-tcp-connection
-                    (extempore-slip-escape-packet
-                     (buffer-substring (point) (mark)))
-                  (concat (buffer-substring (point) (mark)) "\r\n")))
+                (concat (buffer-substring (point) (mark)) "\r\n"))
                (redisplay) ; flash the def like Extempore
-               (sleep-for .25))
+               (sleep-for .1))
+      (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
+
+(defun extempore-send-slip-definition ()
+  "Use CRLF to packetize the stream."
+  (interactive)
+  (save-excursion
+    (mark-defun)
+    (if extempore-process
+        (progn (process-send-string
+                extempore-process
+                (extempore-slip-escape-packet (buffer-substring (point) (mark))))
+               (redisplay) ; flash the def like Extempore
+               (sleep-for .1))
       (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
 
 (defun extempore-send-region ()
