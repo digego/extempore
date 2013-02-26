@@ -119,7 +119,7 @@
 #include <GL/glx.h>
 #include <GL/gl.h>
 #elif TARGET_OS_MAC
-#include <Cocoa/Cococa.h>
+#include <Cocoa/Cocoa.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <AppKit/AppKit.h>
 #include <OpenGL/OpenGL.h>
