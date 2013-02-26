@@ -636,7 +636,7 @@ be running in another (shell-like) buffer."
   (set-process-filter extempore-process
 		      'extempore-default-process-filter))
 
-(defun extempore-stop ()
+(defun extempore-disconnect ()
   "Terminate connection to the Extempore process"
   (interactive)
   (delete-process extempore-process)
