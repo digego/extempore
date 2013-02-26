@@ -437,7 +437,7 @@ namespace extemp {
   void* tcp_osc_server_thread(void* obj_p)
   {
     // seed rng for process
-    UNIV::initRand();
+    // UNIV::initRand();
     
     scm_osc_pair *sop = (scm_osc_pair*) obj_p;
     SchemeProcess* scm = (SchemeProcess*)sop->scm_p;
@@ -1068,9 +1068,6 @@ namespace extemp {
       osc->setNative(NULL);
     }
 
-    SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
-    scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
-
     // setup server port
     // check type of connection: UDP (default) or TCP
     if(list_length(_sc,args) == 3 &&
@@ -1081,6 +1078,10 @@ namespace extemp {
     }
 
     if(osc->getConnectionType() == OSC_UDP_TYPE){
+
+      SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
+      scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
+
 #ifdef EXT_BOOST
       boost::asio::ip::udp::endpoint* osc_address = osc->getAddress();
       int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
@@ -1139,6 +1140,15 @@ namespace extemp {
     }
     // TCP setup
     if(osc->getConnectionType() == OSC_TCP_TYPE){
+
+      // SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
+      // scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
+
+      SchemeProcess* scm = new SchemeProcess(std::string(UNIV::PWD),"tcp-osc-server", port, 0);
+      scm->start();
+      
+      scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
+
 #ifdef EXT_BOOST
     // todo insert boost TCP-OSC stuff here
 #else
@@ -1148,7 +1158,7 @@ namespace extemp {
         return _sc->F;
       }
       int flag = 1;
-      int result = setsockopt(socket_fd,            /* socket affected */
+      int result = setsockopt(socket_fd,       /* socket affected */
                               IPPROTO_TCP,     /* set option at TCP level */
                               TCP_NODELAY,     /* name of option */
                               (char *) &flag,  /* the cast is historical cruft */
@@ -1157,7 +1167,7 @@ namespace extemp {
         std::cout << "Error opening (TCP) OSC socket"<< std::endl;
         return _sc->F;
       }
-      osc->setSocketFD(socket_fd);
+      scm->setServerSocket(socket_fd);
 #endif
       if(!osc->getStarted()) {
         struct scm_osc_pair sop;
