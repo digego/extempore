@@ -62,10 +62,10 @@
 // constants for SLIP TCP-packetizing
 // from http://tools.ietf.org/html/rfc1055
 
-#define SLIP_END      0300    /* indicates begin/end of packet */
-#define SLIP_ESC      0333    /* indicates byte stuffing */
-#define SLIP_ESC_END  0334    /* ESC ESC_END means END data byte */
-#define SLIP_ESC_ESC  0335    /* ESC ESC_ESC means ESC data byte */
+#define SLIP_END      (char)0300    /* indicates begin/end of packet */
+#define SLIP_ESC      (char)0333    /* indicates byte stuffing */
+#define SLIP_ESC_END  (char)0334    /* ESC ESC_END means END data byte */
+#define SLIP_ESC_ESC  (char)0335    /* ESC ESC_ESC means ESC data byte */
 
 #define OSC_UDP_TYPE  1
 #define OSC_TCP_TYPE  2
@@ -540,16 +540,16 @@ namespace extemp {
             *in_streams[sock] << buf;
             slip_str = in_streams[sock]->str();
 
-            if((unsigned char)slip_str[0] == SLIP_END &&
-               (unsigned char)slip_str[slip_str.length()-1] == SLIP_END){
+            if(slip_str[0] == SLIP_END &&
+               slip_str[slip_str.length()-1] == SLIP_END){
               // strip the termination characters
               slip_str.erase(0,1);
               slip_str.erase(slip_str.length()-1,1);
 
               // use SLIP (RFC 1055) to packetize the stream
               for(std::string::iterator it=slip_str.begin(); it < slip_str.end(); it++){
-                if((unsigned char)*it == SLIP_ESC){
-                  if((unsigned char)*(it+1) == SLIP_ESC_ESC){
+                if(*it == SLIP_ESC){
+                  if(*(it+1) == SLIP_ESC_ESC){
                     slip_str.replace(it, it+2, 1, SLIP_ESC);
                   }else{
                     slip_str.replace(it, it+2, 1, SLIP_END);
