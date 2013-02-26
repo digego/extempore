@@ -448,6 +448,14 @@ namespace extemp {
     std::queue<SchemeTask>& taskq = scm->getQueue();
 
     int socket_fd = *(osc->getSocketFD());
+
+    if(socket_fd < 0){
+      ascii_text_color(1,1,10);
+        printf("Bad TCP-OSC socket: %s\n", strerror(errno));
+        ascii_text_color(0,7,10);
+        return obj_p;
+    }
+    
     struct sockaddr_in client_address;
     int client_address_size = sizeof(client_address);
 
@@ -624,6 +632,7 @@ namespace extemp {
       std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
       perror(NULL);
     }
+    delete sop;
     std::cout << "Exiting server thread" << std::endl;
     return obj_p;
   }
@@ -1199,10 +1208,10 @@ namespace extemp {
 
 #endif
       if(!osc->getStarted()) {
-        struct scm_osc_pair sop;
-        sop.scm_p = scm;
-        sop.osc_p = osc;
-        osc->getThread().create(&tcp_osc_server_thread, &sop);
+        scm_osc_pair* sop = new scm_osc_pair;
+        sop->scm_p = scm;
+        sop->osc_p = osc;
+        osc->getThread().create(&tcp_osc_server_thread, sop);
         osc->setStarted(true);
       }
       osc->sc = _sc;
