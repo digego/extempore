@@ -321,6 +321,74 @@ namespace extemp {
     return pos;
   }
 
+  // this is a filthy hack.
+  int send_scheme_process_call(SchemeProcess* scm, char* fname, double t, std::string& address, std::string& typetags, char* args)
+  {
+#ifdef _OSC_DEBUG_
+    std::cout << "[OSC]  ADDRESS: " << address << "  TAGS: " << typetags << std::endl;
+#endif
+
+    int pos = 0;
+    std::stringstream ss;
+    ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
+    //ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
+    for(int i=1; i<typetags.size(); ++i) {
+      if(typetags[i] == 'i') {
+        int osc_int = 0;
+        pos += OSC::getOSCInt(args+pos,&osc_int);
+        ss << " " << osc_int;
+      }else if(typetags[i] == 'f'){
+        float osc_float = 0.0f;
+        pos += OSC::getOSCfloat(args+pos,&osc_float);
+        ss << " " << osc_float;
+      }else if(typetags[i] == 'd'){
+        double osc_double = 0.0;
+        pos += OSC::getOSCdouble(args+pos,&osc_double);
+        ss << " " << osc_double;
+      }else if(typetags[i] == 's'){
+        std::string osc_str;
+        pos += OSC::getOSCString(args+pos, &osc_str);
+        ss << " \"" << osc_str << "\"";
+      }else if(typetags[i] == 'h'){
+        int64_t osc_long = 0;
+        pos += OSC::getOSCLong(args+pos,&osc_long);
+        ss << " " << osc_long;
+      }else if(typetags[i] == 't'){
+        double timestamp = 0.0;
+        pos += OSC::getOSCTimestamp(args+pos, &timestamp);
+        ss << " " << timestamp;
+        // }else if(typetags[i] == 'b'){
+        // 	NSData* osc_data;
+        // 	pos += OSC::getOSCData(args+pos, &osc_data);
+        // 	char str[64];
+        // 	sprintf(str,"%p",osc_data);
+        // 	ss << " \"" << str << "\"";
+
+        //}else if(typetags[i] == ',') {
+        //if it's a comma just skip over it
+        //}else if (typetags[i] == ' ') {
+        // if it's a space just skip over it
+      }else if(typetags[i] == '[') {
+        ss << " (list ";
+      }else if(typetags[i] == ']') {
+        ss << ")";
+      }else{
+        printf("Bad or unsuppored argument type (%c) - dropping message\n",typetags[i]);
+        return -1;
+      }
+    }
+    ss << ")";
+    if(scm != NULL) {
+#ifdef _OSC_DEBUG_
+      std::cout << "SEND SCHEME: " << ss.str() << std::endl;
+#endif
+      scm->createSchemeTask(new std::string(ss.str()),"OSC TASK",5);
+    } else {
+      printf("No OSC Registered\n");
+    }
+    return pos;
+  }
+
   void* osc_mesg_callback(void* obj_p)
   {
     OSC* osc = (OSC*) obj_p;
@@ -515,7 +583,7 @@ namespace extemp {
       while(pos != client_sockets.end()) { // check through all fd's for matches against FD_ISSET
         if(FD_ISSET(*pos, &c_rfd)) { //see if any client sockets have data for us
           int sock = *pos;
-          std::string slip_str = "";
+	  std::string slip_str = "";
           for(int j=0; true; j++) { //read from stream in BUFLEN blocks
             memset(buf, 0, BUFLEN+1);
             res = read(sock, buf, BUFLEN);
@@ -538,28 +606,28 @@ namespace extemp {
             }
 
             *in_streams[sock] << buf;
-            slip_str = in_streams[sock]->str();
+	    slip_str = in_streams[sock]->str();
 
             // clear any line noise
-            size_t first_esc = slip_str.find(SLIP_END);
+	    size_t first_esc = slip_str.find(SLIP_END);
             if(first_esc==std::string::npos){
-              slip_str.clear();
+	      slip_str.clear();
               in_streams[sock]->str("");
               pos++;
               break;
             }
 
-            if(slip_str[slip_str.length()-1] == SLIP_END){
+	    if(slip_str[slip_str.length()-1] == SLIP_END){
               // strip the termination characters
-              slip_str.erase(first_esc,1);
-              slip_str.erase(slip_str.length()-1,1);
+	      slip_str.erase(first_esc,1);
+	      slip_str.erase(slip_str.length()-1,1);
               // use SLIP (RFC 1055) to packetize the stream
-              for(std::string::iterator it=slip_str.begin(); it < slip_str.end(); it++){
+	      for(std::string::iterator it=slip_str.begin(); it < slip_str.end(); it++){
                 if(*it == SLIP_ESC){
                   if(*(it+1) == SLIP_ESC_ESC){
-                    slip_str.replace(it, it+2, 1, SLIP_ESC);
+		    slip_str.replace(it, it+2, 1, SLIP_ESC);
                   }else{
-                    slip_str.replace(it, it+2, 1, SLIP_END);
+		    slip_str.replace(it, it+2, 1, SLIP_END);
                   }
                 }
               }
@@ -574,46 +642,46 @@ namespace extemp {
               printf("Error reading eval string from server socket. No terminator received before 10MB limit.\n");
               ascii_text_color(0,7,10);
               in_streams[sock]->str("");
-              slip_str = "";
+	      slip_str = "";
               break;
             }
           }
           // there can be a number of separate expressions in a single string
           // int subexprs = 0;
-          // for(int k=0;k<slip_str.length()-1;k++) { // remote -1
-          //   // if(slip_str[k] == TERMINATION_CHAR) subexptrs++;
-          //   if(slip_str[k] == 13 && slip_str[k+1] == 10) subexprs++;
+	  // for(int k=0;k<slip_str.length()-1;k++) { // remote -1
+	  //   // if(slip_str[k] == TERMINATION_CHAR) subexptrs++;
+	  //   if(slip_str[k] == 13 && slip_str[k+1] == 10) subexprs++;
           // }
           // int subexprspos = 0;
           // int subexprsnext = 0;
           // for(int y=0;y<subexprs;y++) {
-          //   for( ; subexprsnext<slip_str.length();subexprsnext++) // remove -1
+	  //   for( ; subexprsnext<slip_str.length();subexprsnext++) // remove -1
           //   {
-          //     //if(slip_str[subexprsnext] == TERMINATION_CHAR) break;
-          //     if(slip_str[subexprsnext] == 13 && slip_str[subexprsnext+1] == 10) break;
+	  //     //if(slip_str[subexprsnext] == TERMINATION_CHAR) break;
+	  //     if(slip_str[subexprsnext] == 13 && slip_str[subexprsnext+1] == 10) break;
           //   }
-          //   if(slip_str != "#break#" && slip_str != "") {
+	  //   if(slip_str != "#break#" && slip_str != "") {
           //     if(guard.isOwnedByCurrentThread())
           //     {
           //       printf("Extempore interpreter server thread trying to relock. Dropping Task!. Let me know andrew@moso.com.au\n");
           //     }
           //     else
           //     {
-          guard.lock();
-          char c[8];
-          sprintf(c, "%i", sock);
-          // subexprsnext++;
-          std::string* s = new std::string(slip_str);
-          //std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << y << ">><" << subexprspos << "," << (subexprsnext-subexprspos) << "> " << *s << std::endl;
-          // subexprspos = subexprsnext;
-          taskq.push(SchemeTask(extemp::UNIV::TIME, scm->getMaxDuration(), s, c, 0));// Task<std::string*>(0l, NULL, new std::string(slip_str), c));
-          guard.signal(); //Notify();
-          guard.unlock();
-          // if this is an ipc call don't wait for a reply
-          //if(0==strncmp(s->c_str(), "(ipc", 4)) continue;
-          //     }
-          //   }
-          // }
+	  guard.lock();
+	  char c[8];
+	  sprintf(c, "%i", sock);
+	  // subexprsnext++;
+	  std::string* s = new std::string(slip_str);
+	  //std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << y << ">><" << subexprspos << "," << (subexprsnext-subexprspos) << "> " << *s << std::endl;
+	  // subexprspos = subexprsnext;
+	  taskq.push(SchemeTask(extemp::UNIV::TIME, scm->getMaxDuration(), s, c, 0));// Task<std::string*>(0l, NULL, new std::string(slip_str), c));
+	  guard.signal(); //Notify();
+	  guard.unlock();
+	  // if this is an ipc call don't wait for a reply
+	  //if(0==strncmp(s->c_str(), "(ipc", 4)) continue;
+	  //     }
+	  //   }
+	  // }
         }else{
           pos++;
         }
@@ -642,7 +710,7 @@ namespace extemp {
     }
     delete sop;
     std::cout << "Exiting server thread" << std::endl;
-    return obj_p;
+    return NULL;
   }
 #endif
 
