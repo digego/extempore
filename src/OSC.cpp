@@ -529,7 +529,7 @@ namespace extemp {
 
     fd_set rfd; //open read sockets (man select for more info)
     std::vector<int> client_sockets;
-    std::map<int,std::stringstream*> in_streams;
+    std::map<int,std::vector<char>*> data_map;
     FD_ZERO(&rfd); //zero out open sockets
     //printf("SERVER SOCKET FD_SET: %d\n",socket_fd);
     FD_SET(socket_fd, &rfd); //add server socket to open sockets list
@@ -572,67 +572,71 @@ namespace extemp {
         if(res >= highest_fd) highest_fd = res+1;
         FD_SET(res, &rfd); //add new socket to the FD_SET
         client_sockets.push_back(res);
-        in_streams[res] = new std::stringstream;
-        std::stringstream* ss = new std::stringstream;
-        *ss << "OSC connected over TCP.";
-        write(res, ss->str().c_str(), ss->str().length()+1);
+        data_map[res] = new std::vector<char>;
+        std::string outstr ("OSC connected over TCP.");
+        write(res, outstr.c_str(), outstr.length()+1);
         continue;
       }
       std::vector<int>::iterator pos = client_sockets.begin();
-
+      std::vector<char> oscpacket;
+      
       while(pos != client_sockets.end()) { // check through all fd's for matches against FD_ISSET
         if(FD_ISSET(*pos, &c_rfd)) { //see if any client sockets have data for us
           int sock = *pos;
-	  std::string slip_str = "";
           for(int j=0; true; j++) { //read from stream in BUFLEN blocks
             memset(buf, 0, BUFLEN+1);
             res = read(sock, buf, BUFLEN);
             if(res == 0) { //close the socket
               FD_CLR(sock, &rfd);
-              delete(in_streams[sock]);
-              in_streams[sock] = 0;
+              delete(data_map[sock]);
+              data_map[sock] = 0;
               ascii_text_color(1,3,10);
-              std::cout << "Close Client Socket" << std::endl;
+              std::cout << "Closed TCP-OSC Socket" << std::endl;
               ascii_text_color(0,7,10);
               pos = client_sockets.erase(pos);
               close(sock);
               break;
             }else if(res < 0){
               ascii_text_color(1,1,10);
-              printf("Error with socket read from extempore process %s",strerror(errno));
+              printf("Error with socket read for TCP OSC socket: %s",strerror(errno));
               ascii_text_color(0,7,10);
               pos++;
               break;
             }
-
-            *in_streams[sock] << buf;
-	    slip_str = in_streams[sock]->str();
-
+            
+            // append the buffer to the data vector
+            std::vector<char> data = *data_map[sock];
+            data.insert(data.end(), buf, buf+res);
+            std::vector<char>::iterator it = data.begin();
+            
             // clear any line noise
-	    size_t first_esc = slip_str.find(SLIP_END);
-            if(first_esc==std::string::npos){
-	      slip_str.clear();
-              in_streams[sock]->str("");
-              pos++;
-              break;
+            while(*it != SLIP_END && it < data.end()){
+              it++;
             }
+            data.erase(data.begin(), it+1);
 
-	    if(slip_str[slip_str.length()-1] == SLIP_END){
-              // strip the termination characters
-	      slip_str.erase(first_esc,1);
-	      slip_str.erase(slip_str.length()-1,1);
-              // use SLIP (RFC 1055) to packetize the stream
-	      for(std::string::iterator it=slip_str.begin(); it < slip_str.end(); it++){
-                if(*it == SLIP_ESC){
-                  if(*(it+1) == SLIP_ESC_ESC){
-		    slip_str.replace(it, it+2, 1, SLIP_ESC);
-                  }else{
-		    slip_str.replace(it, it+2, 1, SLIP_END);
-                  }
+            // this will be super-inefficient for data.lenth() >
+            // 1024, because it starts from the beginning of the
+            // data each time
+            while(it < data.end()){
+              if(*it == SLIP_ESC){
+                if(*(it+1) == SLIP_ESC_ESC){
+                  data.erase(it, it+2);
+                  data.insert(it, SLIP_ESC);
+                  it++;
+                }else{
+                  data.erase(it, it+2);
+                  data.insert(it, SLIP_END);
+                  it++;
                 }
               }
-              // clear input stream ready for new input
-              in_streams[sock]->str("");
+              it++;
+            }
+            // remove final SLIP_END
+            if(*data.end() == SLIP_END){
+              // data.erase(it);
+              data.pop_back();
+              oscpacket = data;
               pos++;
               break;
             }
@@ -641,47 +645,111 @@ namespace extemp {
               ascii_text_color(1,1,10);
               printf("Error reading eval string from server socket. No terminator received before 10MB limit.\n");
               ascii_text_color(0,7,10);
-              in_streams[sock]->str("");
-	      slip_str = "";
+              data_map[sock]->clear();
               break;
             }
           }
           // there can be a number of separate expressions in a single string
           // int subexprs = 0;
-	  // for(int k=0;k<slip_str.length()-1;k++) { // remote -1
-	  //   // if(slip_str[k] == TERMINATION_CHAR) subexptrs++;
-	  //   if(slip_str[k] == 13 && slip_str[k+1] == 10) subexprs++;
+	  // for(int k=0;k<data.length()-1;k++) { // remote -1
+	  //   // if(data[k] == TERMINATION_CHAR) subexptrs++;
+	  //   if(data[k] == 13 && data[k+1] == 10) subexprs++;
           // }
           // int subexprspos = 0;
           // int subexprsnext = 0;
           // for(int y=0;y<subexprs;y++) {
-	  //   for( ; subexprsnext<slip_str.length();subexprsnext++) // remove -1
+	  //   for( ; subexprsnext<data.length();subexprsnext++) // remove -1
           //   {
-	  //     //if(slip_str[subexprsnext] == TERMINATION_CHAR) break;
-	  //     if(slip_str[subexprsnext] == 13 && slip_str[subexprsnext+1] == 10) break;
+	  //     //if(data[subexprsnext] == TERMINATION_CHAR) break;
+	  //     if(data[subexprsnext] == 13 && data[subexprsnext+1] == 10) break;
           //   }
-	  //   if(slip_str != "#break#" && slip_str != "") {
+	  //   if(data != "#break#" && data != "") {
           //     if(guard.isOwnedByCurrentThread())
           //     {
           //       printf("Extempore interpreter server thread trying to relock. Dropping Task!. Let me know andrew@moso.com.au\n");
           //     }
           //     else
           //     {
-	  guard.lock();
-	  char c[8];
-	  sprintf(c, "%i", sock);
-	  // subexprsnext++;
-	  std::string* s = new std::string(slip_str);
-	  //std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << y << ">><" << subexprspos << "," << (subexprsnext-subexprspos) << "> " << *s << std::endl;
-	  // subexprspos = subexprsnext;
-	  taskq.push(SchemeTask(extemp::UNIV::TIME, scm->getMaxDuration(), s, c, 0));// Task<std::string*>(0l, NULL, new std::string(slip_str), c));
-	  guard.signal(); //Notify();
-	  guard.unlock();
-	  // if this is an ipc call don't wait for a reply
-	  //if(0==strncmp(s->c_str(), "(ipc", 4)) continue;
-	  //     }
-	  //   }
-	  // }
+
+          // process the OSC data (should be its own method)
+          char* args = (char*)oscpacket.data();
+          long length = oscpacket.size(); //osc->getMessageLength();
+          double timestamp;
+          long oscpos = 0;
+          long used = 0;
+          std::string address;// = new std::string;
+          std::string typetags;// = new std::string;
+          oscpos += OSC::getOSCString(args+oscpos,&address);
+          used += oscpos;
+          if(address.find("#bundle") != std::string::npos) {
+#ifdef _OSC_DEBUG_
+            std::cout << "OSC BUNDLE:: " << length <<  "  args: " << args << std::endl;
+#endif
+            oscpos += OSC::getOSCTimestamp(args+oscpos, &timestamp); // skip time tag
+            while(oscpos < length) {
+              int size = 0;
+              used = 0;
+              int res = OSC::getOSCInt(args+oscpos,&size);
+              //Used += res;
+              //don't add res from getting size to used
+              oscpos += res;
+#ifdef _OSC_DEBUG_
+              std::cout << "\t--> bundle msg   size(" << size << ") oscpos(" << oscpos-4 << ")" << std::endl;
+#endif
+              //oscpos += 4; // skip element size
+              address.clear();
+              typetags.clear();
+              res = OSC::getOSCString(args+oscpos,&address);
+              if(address.find("#bundle") != std::string::npos) {
+                std::cout << "WARNING!!!!! Extempore OSC doesn't support recursive bundles!" << std::endl;
+                return 0;
+              }
+              used += res;
+              oscpos += res;
+              res = OSC::getOSCString(args+oscpos,&typetags);
+              used += res;
+              oscpos += res;
+              if(osc->getNative() == NULL) {
+                int ret_from_call = send_scheme_process_call(scm,osc->fname,timestamp,address,typetags,args+oscpos);
+                if(ret_from_call < 0) break;
+                else oscpos += size-used; //ret_from_call;
+              }else{
+                int (*native) (char*,char*,char*,int) = osc->getNative();
+                native((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,size-used);
+                oscpos += size-used; //get_message_length(typetags, args);
+              }
+            }
+          }else{
+            if(osc->getNative() == NULL) {
+              oscpos += OSC::getOSCString(args+oscpos,&typetags);
+              oscpos += send_scheme_process_call(scm,osc->fname,0.0,address,typetags,args+oscpos);
+            }else{
+              int res = OSC::getOSCString(args+oscpos,&typetags);
+              oscpos+=res;
+              used+=res;
+              int (*native) (char*,char*,char*,int) = osc->getNative();
+              native((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,length-used);
+            }
+          }
+          char reply[256];
+          memset(reply,0,256);
+#ifdef EXT_BOOST
+          std::string caller = osc->getClientAddress()->address().to_string();
+#else
+          std::string caller(inet_ntoa(client_address.sin_addr));
+#endif
+          oscpacket.clear();
+          // *old code here*
+	  // guard.lock();
+	  // char c[8];
+	  // sprintf(c, "%i", sock);
+	  // // subexprsnext++;
+	  // std::string* s = new std::string(data);
+	  // //std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << y << ">><" << subexprspos << "," << (subexprsnext-subexprspos) << "> " << *s << std::endl;
+	  // // subexprspos = subexprsnext;
+	  // taskq.push(SchemeTask(extemp::UNIV::TIME, scm->getMaxDuration(), s, c, 0));// Task<std::string*>(0l, NULL, new std::string(data), c));
+	  // guard.signal(); //Notify();
+	  // guard.unlock();
         }else{
           pos++;
         }
@@ -697,8 +765,8 @@ namespace extemp {
         continue;
       }
       FD_CLR(sock, &rfd);
-      delete(in_streams[sock]);
-      in_streams[sock] = 0;
+      delete(data_map[sock]);
+      data_map[sock] = 0;
       std::cout << "CLOSE CLIENT-SOCKET" << std::endl;
       close(sock);
       std::cout << "DONE-CLOSING_CLIENT" << std::endl;
