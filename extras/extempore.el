@@ -250,7 +250,7 @@ See `run-hooks'."
 (defun extempore-keybindings (keymap)
   (define-key keymap (kbd "C-x C-y") 'extempore-setup)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
-  (define-key keymap (kbd "C-x C-x") 'extempore-send-definition)
+  (define-key keymap (kbd "C-x C-x") 'extempore-send-defn-at-point)
   (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
   (define-key keymap (kbd "C-x C-b") 'extempore-send-buffer))
 
@@ -685,37 +685,64 @@ be running in another (shell-like) buffer."
     (progn (message "Dropping malformed SLIP packet.")
            nil)))
 
-;; updated to use SLIP packetization
-(defun extempore-send-definition ()
-  "Send the enclosing top-level def to Extempore server for evaluation."
-  (interactive)
-  (extempore-send-crlf-definition))
+(defun extempore-make-osc-string (str)
+  (concat str (make-string (- 4 (mod (length str) 4)) ?\0)))
 
-(defun extempore-send-crlf-definition ()
-  "Use SLIP to packetize the stream."
+;; sending code to the Extempore compiler
+
+;; from http://emacswiki.org/emacs/ElispCookbook
+(defun chomp (str)
+  "Chomp leading and tailing whitespace from STR."
+  (while (string-match "\\`\n+\\|^\\s-+\\|\\s-+$\\|\n+\\'" str)
+    (setq str (replace-match "" t t str)))
+  str)
+
+(defun extempore-get-crlf-defn-around-point ()
+  "Get CRLF-terminated defn string from current defn."
   (interactive)
   (save-excursion
     (mark-defun)
-    (if extempore-process
-        (progn (process-send-string
-                extempore-process
-                (concat (buffer-substring (point) (mark)) "\r\n"))
-               (redisplay) ; flash the def like Extempore
-               (sleep-for .1))
-      (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
+    (concat (buffer-substring-no-properties (point) (mark)) "\r\n")))
 
-(defun extempore-send-slip-definition ()
-  "Use CRLF to packetize the stream."
+(defun extempore-get-osc-defn-around-point ()
+  "Get OSC defn string from current defn."
   (interactive)
   (save-excursion
     (mark-defun)
-    (if extempore-process
-        (progn (process-send-string
-                extempore-process
-                (extempore-slip-escape-packet (buffer-substring (point) (mark))))
-               (redisplay) ; flash the def like Extempore
+    (concat (extempore-make-osc-string "/eval")
+            (extempore-make-osc-string ",s")
+            (extempore-make-osc-string (chomp (buffer-substring-no-properties (point) (mark)))))))
+
+(defun extempore-get-slip-defn-around-point ()
+  "Get SLIP-packetized defn string from current defn."
+  (interactive)
+  (save-excursion
+    (mark-defun)
+    (extempore-slip-escape-packet
+     (chomp (buffer-substring-no-properties (point) (mark))))))
+
+(defun extempore-get-slip-osc-defn-around-point ()
+  "Get SLIP-packetized OSC defn string from current defn."
+  (interactive)
+  (extempore-slip-escape-packet (extempore-get-osc-defn-around-point)))
+
+(defun extempore-send-defn (defn-str)
+  (interactive)
+  (if extempore-process
+        (progn (process-send-string extempore-process defn-str)
+               (redisplay)
                (sleep-for .1))
-      (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j")))))
+      (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j"))))
+
+(defun extempore-send-defn-at-point ()
+  "Send the enclosing top-level defn to Extempore server for evaluation."
+  (interactive)
+  ;; change this to whichever type of defn you're using
+  (extempore-send-defn (extempore-get-crlf-defn-around-point)))
+
+(defun extempore-send-slip-osc-defn-at-point ()
+  (interactive)
+  (extempore-send-defn (extempore-get-slip-osc-defn-around-point)))
 
 (defun extempore-send-region ()
   "Send the current region to Extempore for evaluation"
@@ -725,7 +752,7 @@ be running in another (shell-like) buffer."
         (let ((start (region-beginning)) (end (region-end)))
           (unless (= (point) (region-beginning)) (exchange-point-and-mark))
           (while (re-search-forward "^[^\n;]*(" end t)
-            (extempore-send-definition)
+            (extempore-send-defn-at-point)
             (end-of-defun)))
       (message "Region not active."))))
 
@@ -737,7 +764,7 @@ be running in another (shell-like) buffer."
            (set-mark (point-max)))
     (let ((start (region-beginning)) (end (region-end)))
       (while (re-search-forward "^[^\n;]*(" end t)
-	(extempore-send-definition)
+	(extempore-send-defn-at-point)
 	(end-of-defun)))))
 
 ;; eldoc completion

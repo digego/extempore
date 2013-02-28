@@ -609,15 +609,13 @@ namespace extemp {
             data.insert(data.end(), buf, buf+res);
             std::vector<char>::iterator it = data.begin();
             
-            // clear any line noise
+            // clear any line noise & newlines
             while(*it != SLIP_END && it < data.end()){
               it++;
             }
+
             data.erase(data.begin(), it+1);
 
-            // this will be super-inefficient for data.lenth() >
-            // 1024, because it starts from the beginning of the
-            // data each time
             while(it < data.end()){
               if(*it == SLIP_ESC){
                 if(*(it+1) == SLIP_ESC_ESC){
@@ -634,7 +632,6 @@ namespace extemp {
             }
             // remove final SLIP_END
             if(*data.end() == SLIP_END){
-              // data.erase(it);
               data.pop_back();
               oscpacket = data;
               pos++;
@@ -671,74 +668,79 @@ namespace extemp {
           //     else
           //     {
 
-          // process the OSC data (should be its own method)
           char* args = (char*)oscpacket.data();
           long length = oscpacket.size(); //osc->getMessageLength();
-          double timestamp;
-          long oscpos = 0;
-          long used = 0;
-          std::string address;// = new std::string;
-          std::string typetags;// = new std::string;
-          oscpos += OSC::getOSCString(args+oscpos,&address);
-          used += oscpos;
-          if(address.find("#bundle") != std::string::npos) {
-#ifdef _OSC_DEBUG_
-            std::cout << "OSC BUNDLE:: " << length <<  "  args: " << args << std::endl;
-#endif
-            oscpos += OSC::getOSCTimestamp(args+oscpos, &timestamp); // skip time tag
-            while(oscpos < length) {
-              int size = 0;
-              used = 0;
-              int res = OSC::getOSCInt(args+oscpos,&size);
-              //Used += res;
-              //don't add res from getting size to used
-              oscpos += res;
-#ifdef _OSC_DEBUG_
-              std::cout << "\t--> bundle msg   size(" << size << ") oscpos(" << oscpos-4 << ")" << std::endl;
-#endif
-              //oscpos += 4; // skip element size
-              address.clear();
-              typetags.clear();
-              res = OSC::getOSCString(args+oscpos,&address);
+
+          if(length > 0 && args != NULL)
+            {
+              
+              // process the OSC data (should be its own method)
+              double timestamp;
+              long oscpos = 0;
+              long used = 0;
+              std::string address;// = new std::string;
+              std::string typetags;// = new std::string;
+              oscpos += OSC::getOSCString(args+oscpos,&address);
+              used += oscpos;
               if(address.find("#bundle") != std::string::npos) {
-                std::cout << "WARNING!!!!! Extempore OSC doesn't support recursive bundles!" << std::endl;
-                return 0;
-              }
-              used += res;
-              oscpos += res;
-              res = OSC::getOSCString(args+oscpos,&typetags);
-              used += res;
-              oscpos += res;
-              if(osc->getNative() == NULL) {
-                int ret_from_call = send_scheme_process_call(scm,osc->fname,timestamp,address,typetags,args+oscpos);
-                if(ret_from_call < 0) break;
-                else oscpos += size-used; //ret_from_call;
-              }else{
-                int (*native) (char*,char*,char*,int) = osc->getNative();
-                native((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,size-used);
-                oscpos += size-used; //get_message_length(typetags, args);
-              }
-            }
-          }else{
-            if(osc->getNative() == NULL) {
-              oscpos += OSC::getOSCString(args+oscpos,&typetags);
-              oscpos += send_scheme_process_call(scm,osc->fname,0.0,address,typetags,args+oscpos);
-            }else{
-              int res = OSC::getOSCString(args+oscpos,&typetags);
-              oscpos+=res;
-              used+=res;
-              int (*native) (char*,char*,char*,int) = osc->getNative();
-              native((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,length-used);
-            }
-          }
-          char reply[256];
-          memset(reply,0,256);
-#ifdef EXT_BOOST
-          std::string caller = osc->getClientAddress()->address().to_string();
-#else
-          std::string caller(inet_ntoa(client_address.sin_addr));
+#ifdef _OSC_DEBUG_
+                std::cout << "OSC BUNDLE:: " << length <<  "  args: " << args << std::endl;
 #endif
-          oscpacket.clear();
+                oscpos += OSC::getOSCTimestamp(args+oscpos, &timestamp); // skip time tag
+                while(oscpos < length) {
+                  int size = 0;
+                  used = 0;
+                  int res = OSC::getOSCInt(args+oscpos,&size);
+                  //Used += res;
+                  //don't add res from getting size to used
+                  oscpos += res;
+#ifdef _OSC_DEBUG_
+                  std::cout << "\t--> bundle msg   size(" << size << ") oscpos(" << oscpos-4 << ")" << std::endl;
+#endif
+                  //oscpos += 4; // skip element size
+                  address.clear();
+                  typetags.clear();
+                  res = OSC::getOSCString(args+oscpos,&address);
+                  if(address.find("#bundle") != std::string::npos) {
+                    std::cout << "WARNING!!!!! Extempore OSC doesn't support recursive bundles!" << std::endl;
+                    return 0;
+                  }
+                  used += res;
+                  oscpos += res;
+                  res = OSC::getOSCString(args+oscpos,&typetags);
+                  used += res;
+                  oscpos += res;
+                  if(osc->getNative() == NULL) {
+                    int ret_from_call = send_scheme_process_call(scm,osc->fname,timestamp,address,typetags,args+oscpos);
+                    if(ret_from_call < 0) break;
+                    else oscpos += size-used; //ret_from_call;
+                  }else{
+                    int (*native) (char*,char*,char*,int) = osc->getNative();
+                    native((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,size-used);
+                    oscpos += size-used; //get_message_length(typetags, args);
+                  }
+                }
+              }else{
+                if(osc->getNative() == NULL) {
+                  oscpos += OSC::getOSCString(args+oscpos,&typetags);
+                  oscpos += send_scheme_process_call(scm,osc->fname,0.0,address,typetags,args+oscpos);
+                }else{
+                  int res = OSC::getOSCString(args+oscpos,&typetags);
+                  oscpos+=res;
+                  used+=res;
+                  int (*native) (char*,char*,char*,int) = osc->getNative();
+                  native((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,length-used);
+                }
+              }
+              char reply[256];
+              memset(reply,0,256);
+#ifdef EXT_BOOST
+              std::string caller = osc->getClientAddress()->address().to_string();
+#else
+              std::string caller(inet_ntoa(client_address.sin_addr));
+#endif
+              oscpacket.clear();
+            }
           // *old code here*
 	  // guard.lock();
 	  // char c[8];
