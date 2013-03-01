@@ -710,7 +710,7 @@ be running in another (shell-like) buffer."
   (concat evalstr "\r\n"))
 
 (defun extempore-make-osc-evalstr (evalstr)
-  (concat (extempore-make-osc-string "/eval")
+  (concat (extempore-make-osc-string "/caas/eval")
           (extempore-make-osc-string ",s")
           (extempore-make-osc-string evalstr)))
 
@@ -721,12 +721,12 @@ be running in another (shell-like) buffer."
   (extempore-slip-escape-string (extempore-make-osc-evalstr evalstr)))
 
 (defun extempore-set-connection-type (type)
-  (interactive "sType:")
+  (interactive "sType (TCP or OSC-TCP):")
   (cond ((string-equal type "TCP")
          (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr))
-        ((string-equal type "SLIP-OSC")
+        ((string-equal type "OSC-TCP")
          (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr))
-        (t (message "Unrecognised connection type; currently, extempore.el only supports \"TCP\" and \"SLIP-OSC\""))))
+        (t (message "Unrecognised connection type; currently, extempore.el only supports \"TCP\" and \"OSC-TCP\""))))
 
 (defun extempore-send-defn (defn-str)
   (interactive)

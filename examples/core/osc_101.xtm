@@ -12,7 +12,6 @@
 ;; start three osc servers
 (io:osc:start-server 7009 "osc-receive-7009")
 (io:osc:start-server 7019 "osc-receive-7019")
-(io:osc:start-server 7029 "osc-receive-7029" "TCP")
 
 ; Prints all messages to the log
 (define (osc-receive-7009 timestamp address . args)
@@ -21,18 +20,13 @@
 (define (osc-receive-7019 timestamp address . args)
    (println 'port 7019 address '-> args))
 
-(define (osc-receive-7029 timestamp address . args)
-   (println 'port 7029 address '-> args))
-
 ;; define a sending address
 (define addy1 (cons "localhost" 7009))
 (define addy2 (cons "localhost" 7019))
-(define addy3 (cons "localhost" 7029))
 
 ;; Some a test message delayed by 4 seconds
 (io:osc:send (+ (now) (* *second* 4)) addy1 "/test/msg" "Hello" 500 6.6 "World")
 (io:osc:send (+ (now) (* *second* 4)) addy2 "/test/msg" "Hello" 500 6.6 "World")
-(io:osc:send (+ (now) (* *second* 4)) addy3 "/test/msg" "Hello" 500 6.6 "World")
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -88,3 +82,41 @@
 ;; Send another test message
 
 (my_osc_send "/native/mytest" 6.6 4321)
+
+
+;; OSC messages can also be recieved over TCP. This is parcicularly
+;; useful for taking advantage of the Extempore compiler-as-a-service
+;; (CaaS)
+
+;; We can define a function which, if it recieves an OSC message with
+;; the address '/caas/eval' will evaluate the (string) argument
+
+(define (osc-caas-callback timestamp address . args)
+  (if (string=? address "/caas/eval")
+      (eval (string->sexpr (car args))
+            (interaction-environment))))
+
+;; Now, start an OSC-over-TCP server on port 7029
+
+(io:osc:start-server 7029 "osc-caas-callback" "TCP")
+
+;; you can then connect to the compiler on port 7029 and send code
+;; strings for compilation. The extempore.el emacs mode already has
+;; support for this:
+
+;; 1. start the TCP-OSC server (as above)
+;;
+;; 2. connect to that port:
+;;    `M-x extempore-connect RET localhost RET 7029 RET'
+;;
+;; 3. switch to using OSC to send defuns
+;;    `M-x extempore-set-connection-type RET OSC-TCP'
+;;
+;; 4. evaluate code as usual with C-x C-x (`extempore-send-defn-at-point')
+;;
+;; Note that because Emacs uses per-buffer connections, you can have
+;; some buffers which are connected normally (plain TCP), and some
+;; which use OSC-over-TCP. If you set the connection type in each
+;; buffer properly (with `extempore-set-connection-type') then C-x C-x
+;; should just work in each buffer.
+
