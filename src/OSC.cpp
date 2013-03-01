@@ -614,6 +614,11 @@ namespace extemp {
               it++;
             }
 
+            if(it >= data.end()){
+              data.clear();
+              break;
+            }
+
             data.erase(data.begin(), it+1);
 
             while(it < data.end()){
