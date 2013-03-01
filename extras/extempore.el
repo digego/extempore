@@ -145,7 +145,11 @@
 	 (parse-sexp-lookup-properties . t)
 	 (font-lock-extra-managed-props syntax-table)))
   (set (make-local-variable 'lisp-doc-string-elt-property)
-       'extempore-doc-string-elt))
+       'extempore-doc-string-elt)
+  ;; for connecting to the Extempore CaaS server
+  (set (make-variable-buffer-local 'extempore-process) nil)
+  (set (make-variable-buffer-local 'extempore-process-evalstr-fn)
+       #'extempore-make-crlf-evalstr))
 
 (defvar extempore-mode-line-process "")
 
@@ -179,9 +183,7 @@ buffer, some additional commands will be defined, for evaluating
 expressions and controlling the extempore process.
 
 Entry to this mode calls the value of `extempore-mode-hook'."
-  (extempore-mode-variables)
-  (make-variable-buffer-local 'extempore-process)
-  (setq extempore-process nil))
+  (extempore-mode-variables))
 
 (defgroup extempore nil
   "Editing Extempore code."
@@ -657,7 +659,7 @@ be running in another (shell-like) buffer."
   (concat "[" extempore-slip-esc-string extempore-slip-end-string "]"))
 (defvar extempore-slip-unescaping-regexp (concat extempore-slip-esc-string "."))
 
-(defun extempore-slip-escape-packet (packet-string)
+(defun extempore-slip-escape-string (str)
   (concat
    extempore-slip-end-string
    (replace-regexp-in-string extempore-slip-escaping-regexp
@@ -667,13 +669,13 @@ be running in another (shell-like) buffer."
                                            extempore-slip-esc-end-string)
                                  (concat extempore-slip-esc-string
                                          extempore-slip-esc-esc-string)))
-                             packet-string)
+                             str)
    extempore-slip-end-string))
 
-(defun extempore-slip-unescape-packet (packet-string)
-  (if (and (string-equal (substring packet-string 0 1)
+(defun extempore-slip-unescape-string (str)
+  (if (and (string-equal (substring str 0 1)
                          extempore-slip-end-string)
-           (string-equal (substring packet-string -1)
+           (string-equal (substring str -1)
                          extempore-slip-end-string))
       (replace-regexp-in-string extempore-slip-unescaping-regexp
                                 (lambda (s)
@@ -681,7 +683,7 @@ be running in another (shell-like) buffer."
                                                     extempore-slip-esc-end-string)
                                       extempore-slip-end-string
                                     extempore-slip-esc-string))
-                                (substring packet-string 1 -1))
+                                (substring str 1 -1))
     (progn (message "Dropping malformed SLIP packet.")
            nil)))
 
@@ -697,34 +699,34 @@ be running in another (shell-like) buffer."
     (setq str (replace-match "" t t str)))
   str)
 
-(defun extempore-get-crlf-defn-around-point ()
-  "Get CRLF-terminated defn string from current defn."
+(defun extempore-get-defn-around-point ()
+  "Get defn string from current top-level defn around point."
   (interactive)
   (save-excursion
     (mark-defun)
-    (concat (buffer-substring-no-properties (point) (mark)) "\r\n")))
+    (chomp (buffer-substring-no-properties (point) (mark)))))
 
-(defun extempore-get-osc-defn-around-point ()
-  "Get OSC defn string from current defn."
-  (interactive)
-  (save-excursion
-    (mark-defun)
-    (concat (extempore-make-osc-string "/eval")
-            (extempore-make-osc-string ",s")
-            (extempore-make-osc-string (chomp (buffer-substring-no-properties (point) (mark)))))))
+(defun extempore-make-crlf-evalstr (evalstr)
+  (concat evalstr "\r\n"))
 
-(defun extempore-get-slip-defn-around-point ()
-  "Get SLIP-packetized defn string from current defn."
-  (interactive)
-  (save-excursion
-    (mark-defun)
-    (extempore-slip-escape-packet
-     (chomp (buffer-substring-no-properties (point) (mark))))))
+(defun extempore-make-osc-evalstr (evalstr)
+  (concat (extempore-make-osc-string "/eval")
+          (extempore-make-osc-string ",s")
+          (extempore-make-osc-string evalstr)))
 
-(defun extempore-get-slip-osc-defn-around-point ()
-  "Get SLIP-packetized OSC defn string from current defn."
-  (interactive)
-  (extempore-slip-escape-packet (extempore-get-osc-defn-around-point)))
+(defun extempore-make-slip-evalstr (evalstr)
+  (extempore-slip-escape-string evalstr))
+
+(defun extempore-make-slip-osc-evalstr (evalstr)
+  (extempore-slip-escape-string (extempore-make-osc-evalstr evalstr)))
+
+(defun extempore-set-connection-type (type)
+  (interactive "sType:")
+  (cond ((string-equal type "TCP")
+         (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr))
+        ((string-equal type "SLIP-OSC")
+         (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr))
+        (t (message "Unrecognised connection type; currently, extempore.el only supports \"TCP\" and \"SLIP-OSC\""))))
 
 (defun extempore-send-defn (defn-str)
   (interactive)
@@ -737,12 +739,9 @@ be running in another (shell-like) buffer."
 (defun extempore-send-defn-at-point ()
   "Send the enclosing top-level defn to Extempore server for evaluation."
   (interactive)
-  ;; change this to whichever type of defn you're using
-  (extempore-send-defn (extempore-get-crlf-defn-around-point)))
-
-(defun extempore-send-slip-osc-defn-at-point ()
-  (interactive)
-  (extempore-send-defn (extempore-get-slip-osc-defn-around-point)))
+  (extempore-send-defn
+   (funcall extempore-process-evalstr-fn
+            (extempore-get-defn-around-point))))
 
 (defun extempore-send-region ()
   "Send the current region to Extempore for evaluation"
@@ -795,7 +794,7 @@ be running in another (shell-like) buffer."
         ;; send the documentation request
         (if fnsym (process-send-string
                    extempore-process
-                   (extempore-slip-escape-packet
+                   (extempore-slip-escape-string
                     (concat "(get-eldoc-string " fnsym ")"))))
         ;; always return nil, docstring comes back through the process
         ;; filter
