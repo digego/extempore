@@ -403,7 +403,8 @@
                           (+ freq
                              (o2 (* (* H freq) I)
                                  (* H freq))))))
-        (* 3.0 res)))))
+        (* 1.0 res)))))
+
 
 (bind-func simplefm_fx 700000
   (let ((o1 (osc_c 0.0))
@@ -419,7 +420,7 @@
         (revl (reverb_c 70.0))
         (revr (reverb_c 60.0))
         (_wet 0.15)
-        (wet _wet))        
+        (wet _wet))
     (vcfl.res res)
     (vcfr.res res)
     (revl.wet wet)
@@ -434,9 +435,11 @@
                  (vcfl.res res)
                  (vcfr.res res)))
       (cond ((< chan 0.5)
-             (revl (vcfl (del1 (cl in)) (+ 8000.0 (o1 6000.0 0.3)))))
+             (revl (vcfl (del1 (cl in))
+                         (+ 8000.0 (o1 6000.0 0.3)))))
             ((< chan 1.5)
-             (revr (vcfr (del2 (cr in)) (+ 8000.0 (o2 6000.0 0.3)))))
+             (revr (vcfr (del2 (cr in))
+                         (+ 8000.0 (o2 6000.0 0.3)))))
             (else 0.0)))))
 
 (define-instrument simplefm simplefm_note_c simplefm_fx)
@@ -444,3 +447,66 @@
 (simplefm.decay 100.0)
 (simplefm.sustain 0.8)
 (simplefm.release 5000.0)
+
+
+;; A simple FM pad
+;; default is quite organy
+
+;; You can push I higher than 1.0
+;; But only when H is low
+(bind-func fmpad_note_c
+  (lambda (nargs:i64 dargs:double*)
+    (let ((o1 (osc_c 0.0))
+          (o2 (osc_c 0.0))
+          (o3 (osc_c 0.0))
+          (I (if (> nargs 0) (pref dargs 0) 0.2)) ;; modulation index (generally 0.0-1.0)
+          (H (if (> nargs 1) (pref dargs 1) 2.0)) ;; harmonicity ratio (whole numbers 1.0 - 20.0)
+          (res 0.0))
+      (lambda (time:double chan:double freq:double amp:double)
+        (if (< chan 0.5)
+            (set! res (o1 (* (/ 5.0 (log freq)) amp)
+                          (+ freq
+                             (o2 (* (* H freq) I)
+                                 (* H freq))))))
+        (* 1.0 res)))))
+
+
+(bind-func fmpad_fx 700000
+  (let ((o1 (osc_c 0.0))
+        (o2 (osc_c (* 0.5 PI))) 
+        (cl (chorus_c 0.0))
+        (cr (chorus_c 0.314))
+        (vcfl (vcf_c))
+        (vcfr (vcf_c))
+        (_res 0.4)        
+        (res _res)
+        (revl (reverb_c 70.0))
+        (revr (reverb_c 60.0))
+        (_wet 0.3)
+        (wet _wet))
+    (vcfl.res res)
+    (vcfr.res res)
+    (revl.wet wet)
+    (revr.wet wet)
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (<> wet _wet)
+          (begin (set! _wet wet)
+                 (revl.wet wet)
+                 (revr.wet wet)))
+      (if (<> res _res)
+          (begin (set! _res res)
+                 (vcfl.res res)
+                 (vcfr.res res)))
+      (cond ((< chan 0.5)
+             (revl (vcfl (cl in) ;(del1 (cl in))
+                         (+ 8000.0 (o1 6000.0 0.6)))))
+            ((< chan 1.5)
+             (revr (vcfr (cr in)
+                         (+ 8000.0 (o2 6000.0 0.6)))))
+            (else 0.0)))))
+
+(define-instrument fmpad fmpad_note_c fmpad_fx)
+(fmpad.attack 10000.0)
+(fmpad.decay 100.0)
+(fmpad.sustain 1.0)
+(fmpad.release 5000.0)
