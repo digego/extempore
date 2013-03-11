@@ -1090,6 +1090,7 @@ namespace extemp {
           factory.setEngineKind(llvm::EngineKind::JIT);
           factory.setAllocateGVsWithCode(false);
           factory.setTargetOptions(Opts);
+          factory.setOptLevel(llvm::CodeGenOpt::Aggressive); // llvm::CodeGenOpt::None
           EE = factory.create();
           EE->DisableLazyCompilation(true);
 
