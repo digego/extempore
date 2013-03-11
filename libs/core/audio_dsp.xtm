@@ -256,14 +256,14 @@
 	  (in_head 0)
 	  (out_head 0)
 	  (delay_ (i64tod max_delay))
-	  (delay (i64tod max_delay))
+	  ;;(delay (i64tod max_delay))
 	  (alpha 0.0)
 	  (om_alpha 1.0)
 	  (in 1.0)
 	  (i 0)
 	  (out 0.5))
       (dotimes (i max_delay) (pset! line i 0.0))
-      (lambda (x:double)
+      (lambda (x:double delay:double)
 	(if (<> delay delay_)
 	    (begin (set! delay_ delay)		 
 		   (set! alpha (- delay (floor delay)))
@@ -286,13 +286,12 @@
     (bind-func comb_mc_c
       (lambda (channels:i64 max_delay)
 	(let ((dlines:[double,double]** (alloc channels))
-	      (delay (i64tod max_delay))
+	      ;;(delay (i64tod max_delay))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! dlines i (comb_c max_delay)))
-	  (lambda (chan x)
+	  (lambda (chan x delay)
 	    (let ((f (pref dlines (dtoi32 chan))))
-	      (f.delay delay)
-	      (f x)))))))
+	      (f x delay)))))))
 
 
 ;; flanger
@@ -301,8 +300,7 @@
     (let ((comb (comb_c (dtoi64 (+ delay mod_range))))
 	  (mod (osc_c mod_phase)))
       (lambda (x:double)
-	(comb.delay (+ delay (mod mod_range mod_rate)))
-	(comb x)))))
+	(comb x (+ delay (mod mod_range mod_rate)))))))
 
 
 (if *build-multi-chan*
@@ -312,8 +310,7 @@
 	      (mod (osc_mc_c mod_phase))
 	      (i:i64 0))
 	  (lambda (chan x)
-	    (comb.delay (+ delay (mod chan mod_range mod_rate)))
-	    (comb chan x))))))
+	    (comb chan x (+ delay (mod chan mod_range mod_rate))))))))
 
 
 ;; chorus
@@ -341,12 +338,9 @@
       (comb2.in .5)
       (comb3.in .5)
       (lambda (x:double)
-	(comb1.delay (+ dly1 (mod1 mrng1 mrte1)))
-	(comb2.delay (+ dly2 (mod2 mrng2 mrte2)))
-	(comb3.delay (+ dly3 (mod3 mrng3 mrte3)))
-	(+ (comb1 x)
-	   (comb2 x)
-	   (comb3 x))))))
+	(+ (comb1 x (+ dly1 (mod1 mrng1 mrte1)))
+	   (comb2 x (+ dly2 (mod2 mrng2 mrte2)))
+	   (comb3 x (+ dly3 (mod3 mrng3 mrte3))))))))
 
 (if *build-multi-chan*
     (bind-func chorus_mc_c
