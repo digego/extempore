@@ -214,6 +214,15 @@ int main(int argc, char** argv)
     extemp::EXTLLVM::I()->initLLVM();
     extemp::SchemeProcess* primary = 0;
 
+#ifdef TARGET_OS_MAC
+    // we need to instantiate NSApp before potentially
+    // calling something OSXy (like a window) inside
+    // an initfile.
+    // We DONT want to start the run loop though as it
+    // never exits - do that below
+    [NSApplication sharedApplication];
+#endif
+
     if(initfile_on) { // if a file needs to be loaded from the command line
        primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0, initfile);
     }else{
