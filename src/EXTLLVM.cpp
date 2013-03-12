@@ -1092,6 +1092,8 @@ namespace extemp {
           factory.setAllocateGVsWithCode(false);
           factory.setTargetOptions(Opts);
           factory.setUseMCJIT(false);
+          factory.setOptLevel(llvm::CodeGenOpt::Aggressive); // llvm::CodeGenOpt::None
+
           EE = factory.create();
           EE->DisableLazyCompilation(true);
 

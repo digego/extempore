@@ -52,24 +52,40 @@
 ;; however making it longer means using more memory
 ;; it's a trade off!
 (bind-func _play_note
-  (lambda (time inst:[double,double,double,double,double*]* freq amp dur)
+  (lambda (time inst:[double,double,double,double,double*]* freq amp dur nargs:i64 dargs)
     ;; allocate memzone
-    (let ((f (inst.new_note:[i64,double,double,double,double]*)))
-      (f time freq dur amp)
+    (let ((f (inst.new_note:[i64,double,double,double,double,i64,double*]*)))
+      (f time freq dur amp nargs dargs)
       ;; so that we only copy an integer from memzone
       1)))
 
 ;; playnote wrapper
-(define-macro (play-note time inst pitch vol dur)
-  `(let ((duration (* 1.0 ,dur))
-	 (native (llvm:get-native-closure ,(symbol->string inst))))
-     (if (cptr? native)
-	 (_play_note (integer->real ,time)
-		      native
-		      (midi2frq (* 1.0 ,pitch))
-		      (/ (exp (/ ,vol 26.222)) 127.0)
-		      duration)
-	 (print-error 'No 'inst 'named ,(symbol->string inst)))))
+(define-macro (play-note time inst pitch vol dur . args)  
+  (let ((nargs (length args)))
+    `(let ((duration (* 1.0 ,dur))
+           (dargs (sys:make-cptr ,(* 8 nargs))) ;; doubles
+           (native (llvm:get-native-closure ,(symbol->string inst))))
+       (dotimes (i ,nargs) (cptr:set-double dargs (* i 8) (eval (list-ref ',args i))))
+       (if (cptr? native)
+           (_play_note (integer->real ,time)
+                       native
+                       (midi2frq (* 1.0 ,pitch))
+                       (/ (exp (/ ,vol 26.222)) 127.0)
+                       duration
+                       ,nargs
+                       dargs)
+           (print-error 'No 'inst 'named ,(symbol->string inst))))))
+
+
+;; the play macro
+(macro (play args)
+  (if (symbol? (cadr args))
+      `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+                  ,@(cdr (cddddr args)))
+      `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+                  (*metro* 'dur ,(car (cdr (cddddr args))))
+                  ,@(cddr (cddddr args)))))
+
 
 ;; a macro for making extemore instruments
 ;; see http://benswift.me/2012-09-28-making-an-instrument.html
@@ -83,28 +99,23 @@
 	    (release:double 1000.0)
 	    (sustain:double 0.6) ;; amplitude of the sustain
 	    (gain 2.0)
-                                        ;(active 0)
 	    (ii 0)
 	    (note_starts:double* (zalloc poly))
-	    (new_note (lambda (start freq dur amp)
+	    (new_note (lambda (start freq dur amp nargs:i64 dargs)
 			(let ((free_note:i64 -1)
 			      (iii 0)
 			      (i 0))
 			  (dotimes (i poly) ;; check for free poly spot           
 			    (if (> (pref note_starts i) 9999999999998.0)
 				(set! free_note i)))
-			  ;; (if (= 0 active)
-			  ;;     (begin (dotimes (iii poly)
-			  ;; 	       (pset! note_starts iii 9999999999999.0))
-			  ;; 	     (set! free_note -1)))			  
 			  (if (> free_note -1) ;; if we found a free poly spot assign a note
 			      (let ((note_zone (push_zone (* 1024 10))))
 				(pset! notes free_note
 				       (note_c start freq amp dur
-						  attack decay release sustain
-						  note_starts free_note
-						  (,note_kernel)
-						  note_zone))
+                                               attack decay release sustain
+                                               note_starts free_note
+                                               (,note_kernel nargs dargs)
+                                               note_zone))
 				(pset! note_starts free_note start)
 				(pop_zone)
 				1)
@@ -121,7 +132,7 @@
 
 ;; make synth defaults
 (bind-func default_note_c
-  (lambda ()
+  (lambda (nargs:i64 dargs:double*)
     (let ((sawl (saw_c))
 	  (sawr (saw_c)))
       (lambda (time:double chan:double freq:double amp:double)
@@ -129,9 +140,11 @@
 	    (* amp (/ 200.0 freq) (sawl amp freq))
 	    (* amp (/ 200.0 freq) (sawr amp freq)))))))
 
-(bind-func default_effect
+(bind-func default_fx
   (lambda (in:double time:double chan:double dat:double*)
     in))
+
+(define-instrument definst default_note_c default_fx)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -143,7 +156,7 @@
   (let ((res 1.0)
 	(res_ 0.0)
 	(fxamp 0.0))
-    (lambda ()
+    (lambda (nargs:i64 dargs:double*)
       (let ((oscl (osc_c 0.0))
 	    (oscl3 (osc_c 0.0))
 	    (oscl2 (osc_c 0.0))
@@ -175,27 +188,27 @@
 
 
 (bind-func synth_fx 262144
-           (let ((dleft (dtoi64 (* 0.125 SAMPLERATE)))
-                 (dlyl (delay_c dleft))
-                 (dright (dtoi64 (* 0.33333333 SAMPLERATE)))
-                 (dlyr (delay_c dright))
-                 (pan .5)
-                 (pan_old pan)
-                 (wet_ .0)
-                 (wet .3))
-             (lambda (in:double time:double chan:double dat:double*)
-               (if (< pan_old pan) ;; interpolate pan
-                   (set! pan_old (+ pan_old .001))
-                   (set! pan_old (- pan_old .001)))
-               (if (<> wet wet_)
-                   (begin (dlyl.out wet)
-                          (dlyr.out wet)
-                          (set! wet_ wet)))
-               (cond ((< chan 1.0) 
-                      (dlyl (* 2.0 pan_old in)))
-                     ((< chan 2.0)
-                      (dlyr (* 2.0 (- 1.0 pan_old) in)))
-                     (else 0.0)))))
+  (let ((dleft (dtoi64 (* 0.125 SAMPLERATE)))
+        (dlyl (delay_c dleft))
+        (dright (dtoi64 (* 0.33333333 SAMPLERATE)))
+        (dlyr (delay_c dright))
+        (pan .5)
+        (pan_old pan)
+        (wet_ .0)
+        (wet .3))
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (< pan_old pan) ;; interpolate pan
+          (set! pan_old (+ pan_old .001))
+          (set! pan_old (- pan_old .001)))
+      (if (<> wet wet_)
+          (begin (dlyl.out wet)
+                 (dlyr.out wet)
+                 (set! wet_ wet)))
+      (cond ((< chan 1.0) 
+             (dlyl (* 2.0 pan_old in)))
+            ((< chan 2.0)
+             (dlyr (* 2.0 (- 1.0 pan_old) in)))
+            (else 0.0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -203,7 +216,7 @@
 ;;
 (bind-func epad_note_c
   (let ((res 0.1))
-    (lambda ()
+    (lambda (nargs:i64 dargs:double*)
       (let ((oscl (square_c 0.0)) 
 	    (oscr (square_c 0.1))
 	    (o1 (osc_c 0.0))
@@ -228,8 +241,6 @@
 
 (bind-func epad_fx 2000000
   (let ((pan .5)
-	(d1 (comb_c 44100))
-	(d22 (comb_c 44100))
 	(c1 (chorus_c 0.0))
 	(c2 (chorus_c 0.1))
 	(rev1 (reverb_c 200.0))
@@ -256,7 +267,6 @@
 (epad.decay 1000.0)
 (epad.sustain 0.9)
 (epad.release 7000.0)
-;; epad is NOT active by default
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; extempore organ ;;
@@ -270,7 +280,7 @@
         (drawbar_pos:i64* (zalloc num_drawbars)))
     (pfill! freq_ratio 0.5 1.5 1.0 2.0 3.0 4.0 5.0 6.0 8.0)
     (pfill! drawbar_pos 8 8 8 0 0 0 0 0 0)
-    (lambda ()
+    (lambda (nargs:i64 dargs:double*)
       (let ((tonewheel:[double,double,double]** (zalloc (* 2 num_drawbars)))
             (freq_smudge:double* (zalloc num_drawbars))
             (i 0))
@@ -307,7 +317,7 @@
             (else 0.0)))))
 
 (bind-func fuzz_bass_note_c
-  (lambda ()
+  (lambda (nargs:i64 dargs:double*)
     (let ((sawl1 (saw_c))
           (sawr1 (saw_c))
           (sawl2 (saw_c))
@@ -346,7 +356,7 @@
 ;; shimmer pad
 
 (bind-func shimmer_pad_note_c
-  (lambda ()
+  (lambda (nargs:i64 dargs:double*)
     (let ((rectl (rect_c 0.0))
           (rectr (rect_c 0.0))
           (lfol (osc_c 0.0))
@@ -361,16 +371,142 @@
               (else 0.0))))))
 
 (bind-func shimmer_pad_fx
-  (let ((combl (comb_c 10))
-        (combr (comb_c 11)))
+  (let ((dl (delay_c 10))
+        (dr (delay_c 11)))
     (lambda (in:double time:double chan:double dat:double*)
       (cond ((= chan 0.0)
-             (combl in))
+             (dl in))
             ((= chan 1.0)
-             (combr in))
+             (dr in))
             (else 0.0)))))
 
 (define-instrument shimmer_pad shimmer_pad_note_c shimmer_pad_fx)
 (shimmer_pad.attack 22050.0)
 (shimmer_pad.sustain 1.0)
 (shimmer_pad.release 44100.0)
+
+
+;; A simple FM synth
+
+;; You can push I higher than 1.0
+;; But only when H is low
+(bind-func simplefm_note_c
+  (lambda (nargs:i64 dargs:double*)
+    (let ((o1 (osc_c 0.0))
+          (o2 (osc_c 0.0))
+          (I (if (> nargs 0) (pref dargs 0) 0.1)) ;; modulation index (generally 0.0-1.0)
+          (H (if (> nargs 1) (pref dargs 1) 10.0)) ;; harmonicity ratio (whole numbers 1.0 - 20.0)
+          (res 0.0))
+      (lambda (time:double chan:double freq:double amp:double)
+        (if (< chan 0.5)
+            (set! res (o1 (* (/ 5.0 (log freq)) amp)
+                          (+ freq
+                             (o2 (* (* H freq) I)
+                                 (* H freq))))))
+        (* 1.0 res)))))
+
+
+(bind-func simplefm_fx 700000
+  (let ((o1 (osc_c 0.0))
+        (o2 (osc_c (* 0.5 PI))) 
+        (cl (chorus_c 0.0))
+        (cr (chorus_c 0.314))
+        (del1 (delay_c (dtoi64 (/ SAMPLERATE 2.0))))
+        (del2 (delay_c (dtoi64 (/ SAMPLERATE 3.0))))
+        (vcfl (vcf_c))
+        (vcfr (vcf_c))
+        (_res 0.4)        
+        (res _res)
+        (revl (reverb_c 70.0))
+        (revr (reverb_c 60.0))
+        (_wet 0.15)
+        (wet _wet))
+    (vcfl.res res)
+    (vcfr.res res)
+    (revl.wet wet)
+    (revr.wet wet)
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (<> wet _wet)
+          (begin (set! _wet wet)
+                 (revl.wet wet)
+                 (revr.wet wet)))
+      (if (<> res _res)
+          (begin (set! _res res)
+                 (vcfl.res res)
+                 (vcfr.res res)))
+      (cond ((< chan 0.5)
+             (revl (vcfl (del1 (cl in))
+                         (+ 8000.0 (o1 6000.0 0.3)))))
+            ((< chan 1.5)
+             (revr (vcfr (del2 (cr in))
+                         (+ 8000.0 (o2 6000.0 0.3)))))
+            (else 0.0)))))
+
+(define-instrument simplefm simplefm_note_c simplefm_fx)
+(simplefm.attack 100.0)
+(simplefm.decay 100.0)
+(simplefm.sustain 0.8)
+(simplefm.release 5000.0)
+
+
+;; A simple FM pad
+;; default is quite organy
+
+;; You can push I higher than 1.0
+;; But only when H is low
+(bind-func fmpad_note_c
+  (lambda (nargs:i64 dargs:double*)
+    (let ((o1 (osc_c 0.0))
+          (o2 (osc_c 0.0))
+          (o3 (osc_c 0.0))
+          (I (if (> nargs 0) (pref dargs 0) 0.2)) ;; modulation index (generally 0.0-1.0)
+          (H (if (> nargs 1) (pref dargs 1) 2.0)) ;; harmonicity ratio (whole numbers 1.0 - 20.0)
+          (res 0.0))
+      (lambda (time:double chan:double freq:double amp:double)
+        (if (< chan 0.5)
+            (set! res (o1 (* (/ 5.0 (log freq)) amp)
+                          (+ freq
+                             (o2 (* (* H freq) I)
+                                 (* H freq))))))
+        (* 1.0 res)))))
+
+
+(bind-func fmpad_fx 700000
+  (let ((o1 (osc_c 0.0))
+        (o2 (osc_c (* 0.5 PI))) 
+        (cl (chorus_c 0.0))
+        (cr (chorus_c 0.314))
+        (vcfl (vcf_c))
+        (vcfr (vcf_c))
+        (_res 0.4)        
+        (res _res)
+        (revl (reverb_c 70.0))
+        (revr (reverb_c 60.0))
+        (_wet 0.3)
+        (wet _wet))
+    (vcfl.res res)
+    (vcfr.res res)
+    (revl.wet wet)
+    (revr.wet wet)
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (<> wet _wet)
+          (begin (set! _wet wet)
+                 (revl.wet wet)
+                 (revr.wet wet)))
+      (if (<> res _res)
+          (begin (set! _res res)
+                 (vcfl.res res)
+                 (vcfr.res res)))
+      (cond ((< chan 0.5)
+             (revl (vcfl (cl in) ;(del1 (cl in))
+                         (+ 8000.0 (o1 6000.0 0.6)))))
+            ((< chan 1.5)
+             (revr (vcfr (cr in)
+                         (+ 8000.0 (o2 6000.0 0.6)))))
+            (else 0.0)))))
+
+(define-instrument fmpad fmpad_note_c fmpad_fx)
+(fmpad.attack 10000.0)
+(fmpad.decay 100.0)
+(fmpad.sustain 1.0)
+(fmpad.release 5000.0)
