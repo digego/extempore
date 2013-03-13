@@ -427,7 +427,6 @@
 (bind-func reverb_c
   (lambda (size) ; size in ms
     (let ((ms (/ SAMPLERATE 1000.0))
-	  (wet .25)
 	  (dly1 (delay_c (dtoi64 (* ms (* .192 size)))))
 	  (dly2 (delay_c (dtoi64 (* ms (* .373 size)))))
 	  (dly3 (delay_c (dtoi64 (* ms (* .671 size)))))
@@ -438,7 +437,7 @@
       (ap1.g .8)
       (ap2.g .7)
       (ap3.g .6)
-      (lambda (in)
+      (lambda (in wet)
 	(let ((wetin (* in wet)))
 	  (+ (* in (- 1.0 wet))
 	     (ap1 (ap2 (ap3 (+ (dly1 wetin)
@@ -459,9 +458,9 @@
 
 ;; a dodgy bitcrusher
 (bind-func crusher_c
-  (lambda (bits)
+  (lambda ()
     (let ((amp 1.0))
-      (lambda (in)
+      (lambda (in bits)
 	(* amp (/ (floor (* in (pow 2. bits))) 
 		  (pow 2. bits)))))))
 
@@ -769,13 +768,10 @@
 ;;
 (bind-func vcf_c
   (lambda ()
-    (let ((res 0.5) ;; 0.0 - 1.0
-	  (x 0.0) (y1 0.0) (y2 0.0) (y3 0.0) (y4 0.0)
+    (let ((x 0.0) (y1 0.0) (y2 0.0) (y3 0.0) (y4 0.0)
 	  (oldx 0.0) (oldy1 0.0) (oldy2 0.0) (oldy3 0.0))
-      (lambda (in cutoff)
-	(let (;(f (* 2.0 (/ cutoff SAMPLERATE)))
-                                        ;(f (* 1.8 (/ cutoff SAMPLERATE)))
-	      (f (* 1.75 (/ cutoff SAMPLERATE)))
+      (lambda (in cutoff res)
+	(let ((f (* 1.75 (/ cutoff SAMPLERATE)))
                                         ;(k (- (* 2.0 (sin (* f (/ PI 2.0)))) 1.0))
 	      (k (- (- (* 3.6 f) (* 1.6 (* f f))) 1.0))
 	      (p (* 0.5 (+ k 1.0)))
