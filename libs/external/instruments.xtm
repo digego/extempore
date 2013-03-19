@@ -166,26 +166,18 @@
 
 
 (bind-func sampler_fx 400000
-           (let ((reverbl (reverb_c 80.0))
-                 (reverbr (reverb_c 79.0))
-                 (pan .5)
-                 (pan_ pan)
-                 (wet .25)
-                 (wet_ wet))
-             ;; some reverb?
-             (reverbl.wet wet)
-             (reverbr.wet wet)
-             (lambda (in:double time:double chan:double dat:double*)
-               (if (<> wet wet_)
-                   (begin (reverbl.wet wet)
-                          (reverbr.wet wet)
-                          (set! wet_ wet)))
-               (if (< pan pan_)
-                   (set! pan_ (- pan_ .001))
-                   (set! pan_ (+ pan_ .001)))
-               (if (< chan 1.0)
-                   (reverbl (* 1.5 (* pan_ in)))
-                   (reverbr (* 1.5 (* (- 1.0 pan_) in)))))))
+  (let ((reverbl (reverb_c 80.0))
+        (reverbr (reverb_c 79.0))
+        (pan .5)
+        (pan_ pan)
+        (wet .25))
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (< pan pan_)
+          (set! pan_ (- pan_ .001))
+          (set! pan_ (+ pan_ .001)))
+      (if (< chan 1.0)
+          (reverbl (* 1.5 (* pan_ in)) wet)
+          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet)))))
 
 
 ;; make sampler instrument
