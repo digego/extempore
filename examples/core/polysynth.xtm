@@ -49,7 +49,7 @@
 ;; 
 ;; lets try a simple sawwave synth note kernel
 (bind-func saw_synth_note_c
-  (lambda ()
+  (lambda (nargs:i64 dargs:double*)
     (let ((sawl (saw_c))
 	  (sawr (saw_c)))
       (lambda (time:double chan:double freq:double amp:double)
@@ -60,23 +60,23 @@
 	      (else 0.0))))))
 
 ;; make a new saw_synth with this new note kernel
-(define-instrument saw_synth saw_synth_note_c default_effect)
+(define-instrument saw_synth saw_synth_note_c default_fx)
     
 
-;; let's add some delay (via a stereo pair of comb filters) to the
+;; let's add some delay (via a stereo pair of delays) to the
 ;; global audio output
 ;;
 ;; NOTE: then 100000 is extra memory for our
-;; comb filters
+;; delays
 (bind-func dsp:[double,double,double,double,double*]* 1000000
-  (let ((combl (comb_c (dtoi64 (* 0.25 SAMPLERATE))))
-	(combr (comb_c (dtoi64 (* 0.33333333 SAMPLERATE)))))
+  (let ((delayl (delay_c (dtoi64 (* 0.25 SAMPLERATE))))
+	(delayr (delay_c (dtoi64 (* 0.33333333 SAMPLERATE)))))
     (lambda (in:double time:double chan:double dat:double*)
       (cond ((< chan 1.0)
-	     (combl (+ (* 1.0 (synth in time chan dat))
+	     (delayl (+ (* 1.0 (synth in time chan dat))
 		       (saw_synth in time chan dat))))
 	    ((< chan 2.0)	     
-	     (combr (+ (* 1.0 (synth in time chan dat))
+	     (delayr (+ (* 1.0 (synth in time chan dat))
 		       (saw_synth in time chan dat))))
 	    (else 0.0)))))
 
@@ -101,7 +101,7 @@
 (bind-func saw_synth_note_c
   (let ((res 15.0)
 	(cof 8000.0))
-    (lambda ()
+    (lambda (nargs:i64 dargs:double*)
       (let ((sawl (saw_c))
 	    (sawl2 (saw_c))
 	    (modl (osc_c 0.0))
@@ -112,17 +112,17 @@
 	    (modr (osc_c 0.0))
 	    (lpfr (lpf_c))
 	    (lpfrmod (osc_c 0.0)))
-	(lpfl.res res)
-	(lpfr.res res)
 	(lambda (time:double chan:double freq:double amp:double)
 	  (cond ((< chan 1.0)
 		 (lpfl (* amp (+ (sawl (* 1.0 amp) freq) 
 				 (sawl2 amp (+ freq (modl 100.0 0.2)))))
-		       (+ cof (lpflmod freq 1.0))))
+		       (+ cof (lpflmod freq 1.0))
+                       res))
 		((< chan 2.0)			     		  
 		 (lpfr (* amp (+ (sawr (* 1.0 amp) freq) 
 				 (sawr2 amp (+ freq (modr 50.0 0.5)))))
-		       (+ cof (lpfrmod 1000.0 2.0))))
+		       (+ cof (lpfrmod 1000.0 2.0))
+                       res))
 		(else 0.0)))))))
 
 

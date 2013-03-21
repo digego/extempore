@@ -167,8 +167,6 @@
 	    (lpf2 (lpf_c))
 	    (oscr3 (osc_c 0.25))
 	    (oscr2 (osc_c 0.25)))
-	(lpf2.res res)
-	(lpf1.res res)	
 	(lambda (time:double chan:double freq:double amp:double)
 	  (if (<> res res_)
 	      (begin (lpf2.res res)
@@ -177,12 +175,12 @@
 	  (if (< chan 1.0)
 	      (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude
 		 (+ (oscl2 1.0 (+ freq (* 10.0 (random))))
-		    (lpf1 (saw1 fxamp freq) (* 5.0 freq))
+		    (lpf1 (saw1 fxamp freq) (* 5.0 freq) res)
 		    (oscl 0.8 (+ freq (oscl3 (* 2.01 freq)
 					     (* freq 1.01))))))
 	      (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude	       
 		 (+ (oscr2 1.0 (+ freq (* 5.0 (random))))
-		    (lpf2 (saw2 fxamp freq) (* 3.0 freq))
+		    (lpf2 (saw2 fxamp freq) (* 3.0 freq) res)
 		    (oscr 0.8 (+ freq (oscr3 (* 0.99 freq)
                                              (* freq 0.99))))))))))))
 
@@ -332,13 +330,15 @@
                                (sawl2 amp (* freq smudge2)))
                             (* 4.0 freq)
                             0.3)
-                     (* 8.0 freq)))
+                     (* 8.0 freq)
+                     0.5))
               ((= chan 1.0)
                (lpfr (ringr (+ (sawr1 amp (* freq smudge1))
                           (sawr2 amp (* freq smudge2)))
                        (* 4.0 freq)
                        0.3)
-                     (* 8.0 freq)))
+                     (* 8.0 freq)
+                     0.5))
               (else 0.0))))))
 
 (bind-func fuzz_bass_fx 10000000
@@ -363,9 +363,9 @@
           (lpfr (lpf_c)))
       (lambda (time:double chan:double freq:double amp:double)
         (cond ((= chan 0.0)
-               (lpfl (rectl amp freq (+ 0.5 (lfol 0.3 0.9))) (* 8.0 freq)))
+               (lpfl (rectl amp freq (+ 0.5 (lfol 0.3 0.9))) (* 8.0 freq) 0.5))
               ((= chan 1.0)
-               (lpfr (rectl amp freq (+ 0.5 (lfor 0.3 1.0))) (* 8.0 freq)))
+               (lpfr (rectl amp freq (+ 0.5 (lfor 0.3 1.0))) (* 8.0 freq) 0.5))
               (else 0.0))))))
 
 (bind-func shimmer_pad_fx

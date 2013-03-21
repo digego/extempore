@@ -515,10 +515,9 @@
 	   (a0 0.0)
 	   (a1 0.0)
 	   (a2 0.0)
-	   (res 0.25)
 	   (oldres 0.0)
 	   (oldfreq 0.0))
-      (lambda (x freq)
+      (lambda (x freq res)
 	;; if frequency changes
 	;; recalculate coefficients
 	(if (or (<> freq oldfreq)
@@ -552,9 +551,9 @@
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (lpf_c)))
-	  (lambda (chan x freq)
+	  (lambda (chan x freq res)
 	    (let ((f (pref lines (dtoi32 chan))))
-	      (f x freq)))))))
+	      (f x freq res)))))))
 
 
 ;; biquad high-pass filter
@@ -570,10 +569,9 @@
 	   (a0 0.0)
 	   (a1 0.0)
 	   (a2 0.0)
-	   (res 0.25)
 	   (oldres 0.0)
 	   (oldfreq 0.0))
-      (lambda (x freq)
+      (lambda (x freq res)
 	;; if frequency changes
 	;; recalculate coefficients
 	(if (or (<> freq oldfreq)
@@ -607,9 +605,9 @@
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (hpf_c)))
-	  (lambda (chan x freq)
+	  (lambda (chan x freq res)
 	    (let ((f (pref lines (dtoi32 chan))))
-	      (f x freq)))))))
+	      (f x freq res)))))))
 
 
 ;; biquad band-pass filter
@@ -625,11 +623,10 @@
 	   (a0 0.0)
 	   (a1 0.0)
 	   (a2 0.0)
-	   (bandwidth 0.5)
 	   (oldfreq 0.0)
 	   (oldbw 0.0))
       ;; bandwidth in octaves
-      (lambda (x freq)
+      (lambda (x freq bandwidth)
 	;; if frequency or bandwidth change
 	;; recalculate coefficients
 	(if (or (<> freq oldfreq)
@@ -666,9 +663,9 @@
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (bpf_c)))
-	  (lambda (chan x freq)
+	  (lambda (chan x freq bandwidth)
 	    (let ((f (pref lines (dtoi32 chan))))
-	      (f x freq)))))))
+	      (f x freq bandwidth)))))))
 
 
 ;; biquad notch filter
@@ -684,11 +681,10 @@
 	   (a0 0.0)
 	   (a1 0.0)
 	   (a2 0.0)	     
-	   (bandwidth 0.5) ; in ocatves
 	   (oldfreq 0.0)
 	   (oldbw 0.0))
       ;; bandwidth in octaves
-      (lambda (x freq)
+      (lambda (x freq bandwidth)
 	;; if frequency or bandwidth change
 	;; recalculate coefficients
 	(if (or (<> freq oldfreq)
@@ -724,9 +720,9 @@
 	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (notch_c)))
-	  (lambda (chan x freq)
+	  (lambda (chan x freq bandwidth)
 	    (let ((f (pref lines (dtoi32 chan))))
-	      (f x freq)))))))
+	      (f x freq bandwith)))))))
 
 ;; Hilbert transform filter
 
