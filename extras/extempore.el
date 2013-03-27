@@ -10,30 +10,30 @@
 
 ;; All rights reserved.
 
-;; Redistribution and use in source and binary forms, with or without 
+;; Redistribution and use in source and binary forms, with or without
 ;; modification, are permitted provided that the following conditions are met:
 
-;; 1. Redistributions of source code must retain the above copyright notice, 
+;; 1. Redistributions of source code must retain the above copyright notice,
 ;;    this list of conditions and the following disclaimer.
 
 ;; 2. Redistributions in binary form must reproduce the above copyright notice,
-;;    this list of conditions and the following disclaimer in the documentation 
+;;    this list of conditions and the following disclaimer in the documentation
 ;;    and/or other materials provided with the distribution.
 
 ;; Neither the name of the authors nor other contributors may be used to endorse
-;; or promote products derived from this software without specific prior written 
+;; or promote products derived from this software without specific prior written
 ;; permission.
 
-;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-;; ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
-;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
-;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
-;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
-;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
-;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+;; ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;; POSSIBILITY OF SUCH DAMAGE.
 
 ;; Commentary:
@@ -277,7 +277,7 @@ See `run-hooks'."
 ;; xtlang from llvm.ti
 ;; (these files need to be open in buffers for the below functions to
 ;; work properly)
-;; 
+;;
 ;; this stuff is currently a bit fragile, so I've hardcoded in the
 ;; names as they stand at 14/7/12
 
@@ -793,10 +793,6 @@ be running in another (shell-like) buffer."
         (cons (match-beginning 0) (1- (match-end 0)))
       nil)))
 
-;; maintain list of all the TR functions
-
-(defvar extempore-tr-defun-list nil)
-
 ;; construct overlays
 
 (defun extempore-make-tr-flash-overlay (name bounds)
@@ -829,47 +825,89 @@ be running in another (shell-like) buffer."
                 beg
                 (max (1+ beg) (round (+ beg (* val (- end beg)))))))
 
-(defvar extempore-tr-overlay-list nil
-  "The currently animating TR overlay data.")
+(defvar extempore-tr-anim-alist nil
+  "List of TR animations.
 
-(defun extempore-delete-tr-overlays-for-name (name)
-  (delete-if (lambda (a)
-               (if (string-equal (aref a 0) name)
-                   (progn (delete-overlay (aref a 1)) t)
-                 nil))
-             extempore-tr-overlay-list))
+Each element is a pair, with a name as the car, and then a list
+of vectors as the cdr.
 
-(defun extempore-add-tr-overlays (name period)
-  (interactive "sfn name: \nnperiod: ")
-  (extempore-delete-tr-overlays-for-name name)
+  (fn-name . ([flash-overlay clock-overlay delta-t time-to-live] ...))
+
+You shouldn't have to modify this list directly, use
+`extempore-add-anim-to-alist' and
+`extempore-delete-tr-anim' instead.")
+
+(defun extempore-delete-tr-anim (name)
+  (setq extempore-tr-anim-alist (assq-delete-all name extempore-tr-anim-alist)))
+
+(defun extempore-create-anim-vector (delta-t)
+  (vector (extempore-make-tr-flash-overlay name bounds)
+	  (extempore-make-tr-clock-overlay name bounds)
+	  delta-t    ; total time
+	  delta-t))  ; time-to-live
+
+(defun extempore-add-anim-to-alist (name delta-t)
+  (extempore-delete-tr-anim name)
   (let ((bounds (extempore-find-defn-bounds name)))
     (if bounds
-        (add-to-list 'extempore-tr-overlay-list
-                     (vector name
-                             (extempore-make-tr-flash-overlay name bounds)
-                             (extempore-make-tr-clock-overlay name bounds)
-                             period
-                             0.0)
+	(add-to-list 'extempore-tr-anim-alist
+		     (list name (extempore-create-anim-vector delta-t))
                      t))))
+
+(defun extempore-get-tr-anims-for-name (name)
+  (let ((anim (assoc name extempore-tr-anim-alist)))
+    (if anim
+	(cdr anim)
+      nil)))
+
+(defun extempore-get-active-tr-anims (name)
+  (remove-if-not (lambda (x) (aref x 3)) (extempore-get-tr-anims-for-name name)))
+
+(defun extempore-get-dormant-tr-anims (name)
+  (remove-if (lambda (x) (aref x 3)) (extempore-get-tr-anims-for-name name)))
+
+(defun extempore-reset-tr-anim (anim delta-t)
+  (aset anim 2 delta-t)
+  (aset anim 3 delta-t))
+
+(defun extempore-trigger-tr-anim (name delta-t)
+  (interactive "sfn name: \nndelta-t: ")
+  (let ((anim-list (extempore-get-dormant-tr-anims name)))
+    (if anim-list
+	(extempore-reset-tr-anim (car anim-list) delta-t)
+      (extempore-add-anim-to-alist name delta-t))))
 
 ;; animate the overlays
 
 (defvar extempore-tr-animation-update-period (/ 1.0 20))
 
-(defun extempore-update-tr-overlays ()
-  (dolist (annot extempore-tr-overlay-list)
-    ;; update counter
-    (let* ((val (+ (aref annot 4)
-                   (/ extempore-tr-animation-update-period (aref annot 3))))
-           (flash-flag (> val 1.0))
-           (val (mod val 1.0))
-           (flash-overlay (aref annot 1)))
-      (extempore-update-tr-flash-overlay flash-overlay flash-flag)
-      (extempore-update-tr-clock-overlay (aref annot 2)
-                                         val
-                                         (overlay-start flash-overlay)
-                                         (overlay-end flash-overlay))
-      (aset annot 4 val))))
+(defun extempore-tr-update-anims ()
+  (dolist (anim (apply #'append (mapcar #'cdr extempore-tr-anim-alist)))
+    (let ((ttl (aref anim 3))
+	  (flash-overlay (aref anim 0)))
+      (if (not (numberp ttl))
+	  ;; finish 'flash'
+	  (extempore-update-tr-flash-overlay flash-overlay nil)
+	(if (<= ttl 0)
+	    ;; trigger 'flash'
+	    (progn
+	      (extempore-update-tr-clock-overlay (aref anim 1)
+						 0.0
+						 (overlay-start flash-overlay)
+						 (overlay-end flash-overlay))
+	      (extempore-update-tr-flash-overlay flash-overlay t)
+	      (aset anim 3 nil))
+	  (progn
+	    ;; decrement the ttl value
+	    (aset anim 3
+		  (- ttl extempore-tr-animation-update-period))
+	    ;; update the 'clock' overlay
+	    (extempore-update-tr-clock-overlay (aref anim 1)
+					       (/ (- (aref anim 2)
+						     (aref anim 3))
+						  (aref anim 2))
+					       (overlay-start flash-overlay)
+					       (overlay-end flash-overlay))))))))
 
 ;; managing the animation timer
 
@@ -877,7 +915,7 @@ be running in another (shell-like) buffer."
 
 (defun extempore-tr-animation-running-p ()
   (and extempore-tr-animation-timer
-       extempore-tr-overlay-list))
+       extempore-tr-anim-alist))
 
 (defun extempore-cancel-tr-animation-timer ()
   (interactive)
@@ -886,7 +924,7 @@ be running in another (shell-like) buffer."
       (cancel-timer extempore-tr-animation-timer))
   (remove-overlays)
   (setq extempore-tr-animation-timer nil
-        extempore-tr-overlay-list nil))
+	extempore-tr-anim-alist nil))
 
 (defun extempore-start-tr-animation-timer ()
   (interactive)
@@ -897,7 +935,7 @@ be running in another (shell-like) buffer."
   (setq extempore-tr-animation-timer
         (run-with-timer 0
                         extempore-tr-animation-update-period
-                        'extempore-update-tr-overlays)))
+			'extempore-tr-update-anims)))
 
 ;; auto-detection of TR loops for animation
 
