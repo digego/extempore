@@ -149,23 +149,22 @@
 
 ;; saw oscillator
 (bind-func saw_c
-  (lambda ()
-    (let ((p 0.0)
-	  (dp 1.0)
+  (lambda (phase)
+    (let ((dp 1.0)
 	  (x 0.0)
 	  (leak 0.995)
 	  (saw 0.0))
       (lambda (amp freq)
 	(let* ((qmax (* 0.5 (/ SAMPLERATE freq)))
 	       (dc (/ -0.498 qmax)))
-	  (set! p (+ p dp))
-	  (if (< p 0.0) 
-	      (begin (set! p (- 0.0 p))
+	  (set! phase (+ phase dp))
+	  (if (< phase 0.0) 
+	      (begin (set! phase (- 0.0 phase))
 		     (set! dp (- 0.0 dp)))
-	      (if (> p qmax)
-		  (begin (set! p (+ qmax (- qmax p)))
+	      (if (> phase qmax)
+		  (begin (set! phase (+ qmax (- qmax phase)))
 			 (set! dp (- 0.0 dp)))))
-	  (set! x (* PI p))
+	  (set! x (* PI phase))
 	  (if (< x 0.000001) (set! x 0.00001))
 	  (set! saw (* leak (+ saw (+ dc (/ (sin x) x)))))
 	  (* amp saw))))))
@@ -174,9 +173,9 @@
 ;; saw oscillator
 (if *build-multi-chan*
     (bind-func saw_mc_c
-      (lambda ()
+      (lambda (phase)
 	(let ((mem 0.0)
-	      (saw (saw_c)))
+	      (saw (saw_c phase)))
 	  (lambda (chan amp freq)
 	    (if (< chan 1.0) (set! mem (saw amp freq)))
 	    mem)))))
