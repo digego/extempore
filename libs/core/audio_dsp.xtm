@@ -975,6 +975,14 @@
     (let ((h (* time apex)))
       (* h (exp (- 1.0 h))))))
 
+(bind-func linear_c
+  (let ((time 0.0))
+    (lambda (start:double end:double dur:double)
+      (let* ((m (/ (- end start) dur))
+             (c (- end (* m dur))))
+        (lambda (inc)
+          (set! time (+ time inc))
+          (+ (* m time) c))))))
 
 (bind-func line_c
   (lambda (x1:double y1:double x2 y2)
@@ -983,7 +991,6 @@
 		  (/ (- y2 y1) (- x2 x1))))
 	   (c (- y2 (* m x2))))
       (lambda (time) (+ (* m time) c)))))
-
 
 (bind-func envelope_segments
   (lambda (points:double* num_of_points:i64)
@@ -1066,7 +1073,6 @@
       (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
 
 ;; linear fade closure
-
 (bind-func fade_c
   (lambda (phase)
     (lambda (amp freq)
@@ -1094,17 +1100,74 @@
 (define ipc:audio-setup
   (lambda (proc)
     (ipc:eval-string proc
-		     "(define-macro (play-note time inst pitch vol dur)
-			 `(let ((duration (* 1.0 ,dur))
-				(native (llvm:get-native-closure ,(symbol->string inst))))
-			    (if (cptr? native)
-				(_play_note (integer->real ,time)
-					     native
-					     (midi2frq (* 1.0 ,pitch))
-					     (/ (exp (/ ,vol 26.222)) 127.0)
-					     duration)
-				(print-error 'No 'inst 'named ,(symbol->string inst)))))")
+                     "(define-macro (play-note time inst pitch vol dur . args)  
+                       (let ((nargs (length args)))
+                         `(let ((duration (* 1.0 ,dur))
+                                (dargs (sys:make-cptr ,(* 8 nargs))) ;; doubles
+                                (native (llvm:get-native-closure ,(symbol->string inst))))
+                            (dotimes (i ,nargs) (cptr:set-double dargs (* i 8) (eval (list-ref ',args i))))
+                            (if (cptr? native)
+                                (_play_note (integer->real ,time)
+                                            native
+                                            (midi2frq (* 1.0 ,pitch))
+                                            (/ (exp (/ ,vol 26.222)) 127.0)
+                                            duration
+                                            ,nargs
+                                            dargs)
+                                (print-error 'No 'inst 'named ,(symbol->string inst))))))
+                     ;; passing a length of 0 will read the whole file
+                     (define-macro (set-sampler-index inst fname index offset lgth)
+                       `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+                          (if (cptr? native)
+                              (set_sample_data_ native
+                                                ,fname
+                                                (real->integer ,index)
+                                                (real->integer ,offset)
+                                                (real->integer ,lgth)))))
+                     ;; this will match e.g. 60.aiff (where 60 is the midi note number)
+                     (define parse-sample-names-1
+                       (lambda (file-list)
+                         (map (lambda (fname)
+                                (let ((result (regex:matched fname \"([0-9]*)\.(wav|aif|aiff|ogg)$\")))
+                                  (if (null? result)
+                                      (begin (println 'Error: 'cannot 'parse 'filename: fname)
+                                             #f)
+                                      (list fname                          
+                                            (string->number (cadr result)) 
+                                            0                              
+                                            0))))                          
+                              file-list)))
+                     ;; must be stereo samples of type wav aif or ogg
+                     (define-macro (load-sampler sampler path . args)
+                       (let ((parser (if (null? args) 'parse-sample-names-1 (car args))))
+                         `(let ((file-list (sys:directory-list ,path)))
+                            (for-each (lambda (samp-data)
+                                        (if samp-data
+                                            (set-sampler-index ,sampler
+                                                               (if (string=? (sys:platform) \"Windows\")
+                                                                   (car samp-data)
+                                                                   (string-append ,path \"/\" (car samp-data)))
+                                                               (cadr samp-data)
+                                                               (caddr samp-data)
+                                                               (cadddr samp-data))))
+                                      (,parser file-list)))))
+                     ;; (set-sample-offset sampler 60 50000)
+                     ;; this would offset the sample at index 60 by 50000 samples
+                     (define-macro (set-sample-offset inst index offset)
+                       `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+                          (if (cptr? native)
+                              (set_sample_offset_ native
+                                                  (real->integer ,index)
+                                                  (real->integer ,offset)))))
+                     ;; the play macro
+                     (macro (play args)
+                            (if (symbol? (cadr args))
+                                `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+                                            ,@(cdr (cddddr args)))
+                                `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+                                            (*metro* 'dur ,(car (cdr (cddddr args))))
+                                            ,@(cddr (cddddr args)))))")
     (ipc:bind-func proc '_play_note)
     (ipc:bind-func proc 'midi2frq)))
 
-;; (ipc:audio-setup "utility")
+(ipc:audio-setup "utility")
