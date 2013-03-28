@@ -984,6 +984,16 @@
           (set! time (+ time inc))
           (+ (* m time) c))))))
 
+(bind-func linear_mc_c
+  (let ((time 0.0))
+    (lambda (start:double end:double dur:double)
+      (let* ((m (/ (- end start) dur))
+             (c (- end (* m dur))))
+        (lambda (chan inc)
+          (if (< chan 0.5)
+              (set! time (+ time inc)))
+          (+ (* m time) c))))))
+
 (bind-func line_c
   (lambda (x1:double y1:double x2 y2)
     (let* ((m (if (= 0.0 (- x2 x1)) 
