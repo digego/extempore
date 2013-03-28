@@ -284,8 +284,7 @@
 (if *build-multi-chan*
     (bind-func comb_mc_c
       (lambda (channels:i64 max_delay)
-	(let ((dlines:[double,double]** (alloc channels))
-	      ;;(delay (i64tod max_delay))
+	(let ((dlines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! dlines i (comb_c max_delay)))
 	  (lambda (chan x delay)
@@ -447,12 +446,12 @@
 (if *build-multi-chan*
     (bind-func reverb_mc_c
       (lambda (channels:i64 size)
-	(let ((lines:[double,double]** (alloc channels))
+	(let ((lines:[double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (reverb_c size)))
-	  (lambda (chan x)
+	  (lambda (chan x wet)
 	    (let ((f (pref lines (dtoi32 chan))))
-	      (f x)))))))
+	      (f x wet)))))))
 
 
 ;; a dodgy bitcrusher
@@ -577,7 +576,7 @@
 (if *build-multi-chan*
     (bind-func lpf_mc_c
       (lambda (channels:i64)
-	(let ((lines:[double,double,double]** (alloc channels))
+	(let ((lines:[double,double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (lpf_c)))
 	  (lambda (chan x freq res)
@@ -631,7 +630,7 @@
 (if *build-multi-chan*
     (bind-func hpf_mc_c
       (lambda (channels:i64)
-	(let ((lines:[double,double,double]** (alloc channels))
+	(let ((lines:[double,double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (hpf_c)))
 	  (lambda (chan x freq res)
@@ -689,7 +688,7 @@
 (if *build-multi-chan*
     (bind-func bpf_mc_c
       (lambda (channels:i64)
-	(let ((lines:[double,double,double]** (alloc channels))
+	(let ((lines:[double,double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (bpf_c)))
 	  (lambda (chan x freq bandwidth)
@@ -746,12 +745,12 @@
 (if *build-multi-chan*
     (bind-func notch_mc_c
       (lambda (channels:i64)
-	(let ((lines:[double,double,double]** (alloc channels))
+	(let ((lines:[double,double,double,double]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (notch_c)))
 	  (lambda (chan x freq bandwidth)
 	    (let ((f (pref lines (dtoi32 chan))))
-	      (f x freq bandwith)))))))
+	      (f x freq bandwidth)))))))
 
 ;; Hilbert transform filter
 
@@ -816,14 +815,13 @@
 (if *build-multi-chan*
     (bind-func vcf_mc_c
       (lambda (channels:i64)
-	(let ((lines:[double,double,double]** (alloc channels))
+	(let ((lines:[double,double,double,double]** (alloc channels))
 	      (res 0.5)
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (vcf_c)))
 	  (lambda (chan x freq)
 	    (let ((f (pref lines (dtoi32 chan))))
-	      (f.res res)
-	      (f x freq)))))))
+	      (f x freq res)))))))
 
 ;;
 ;; moog VCF v2.0
@@ -1131,83 +1129,3 @@
 (bind-func frq2midi
   (lambda (freq)            
     (+ (* 12.0 (log2 (/ freq 440.0))) 69.0)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; An ipc helper for audio
-;;
-
-(define ipc:audio-setup
-  (lambda (proc)
-    (ipc:eval-string proc
-                     "(define-macro (play-note time inst pitch vol dur . args)  
-                       (let ((nargs (length args)))
-                         `(let ((duration (* 1.0 ,dur))
-                                (dargs (sys:make-cptr ,(* 8 nargs))) ;; doubles
-                                (native (llvm:get-native-closure ,(symbol->string inst))))
-                            (dotimes (i ,nargs) (cptr:set-double dargs (* i 8) (eval (list-ref ',args i))))
-                            (if (cptr? native)
-                                (_play_note (integer->real ,time)
-                                            native
-                                            (midi2frq (* 1.0 ,pitch))
-                                            (/ (exp (/ ,vol 26.222)) 127.0)
-                                            duration
-                                            ,nargs
-                                            dargs)
-                                (print-error 'No 'inst 'named ,(symbol->string inst))))))
-                     ;; passing a length of 0 will read the whole file
-                     (define-macro (set-sampler-index inst fname index offset lgth)
-                       `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
-                          (if (cptr? native)
-                              (set_sample_data_ native
-                                                ,fname
-                                                (real->integer ,index)
-                                                (real->integer ,offset)
-                                                (real->integer ,lgth)))))
-                     ;; this will match e.g. 60.aiff (where 60 is the midi note number)
-                     (define parse-sample-names-1
-                       (lambda (file-list)
-                         (map (lambda (fname)
-                                (let ((result (regex:matched fname \"([0-9]*)\.(wav|aif|aiff|ogg)$\")))
-                                  (if (null? result)
-                                      (begin (println 'Error: 'cannot 'parse 'filename: fname)
-                                             #f)
-                                      (list fname                          
-                                            (string->number (cadr result)) 
-                                            0                              
-                                            0))))                          
-                              file-list)))
-                     ;; must be stereo samples of type wav aif or ogg
-                     (define-macro (load-sampler sampler path . args)
-                       (let ((parser (if (null? args) 'parse-sample-names-1 (car args))))
-                         `(let ((file-list (sys:directory-list ,path)))
-                            (for-each (lambda (samp-data)
-                                        (if samp-data
-                                            (set-sampler-index ,sampler
-                                                               (if (string=? (sys:platform) \"Windows\")
-                                                                   (car samp-data)
-                                                                   (string-append ,path \"/\" (car samp-data)))
-                                                               (cadr samp-data)
-                                                               (caddr samp-data)
-                                                               (cadddr samp-data))))
-                                      (,parser file-list)))))
-                     ;; (set-sample-offset sampler 60 50000)
-                     ;; this would offset the sample at index 60 by 50000 samples
-                     (define-macro (set-sample-offset inst index offset)
-                       `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
-                          (if (cptr? native)
-                              (set_sample_offset_ native
-                                                  (real->integer ,index)
-                                                  (real->integer ,offset)))))
-                     ;; the play macro
-                     (macro (play args)
-                            (if (symbol? (cadr args))
-                                `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
-                                            ,@(cdr (cddddr args)))
-                                `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-                                            (*metro* 'dur ,(car (cdr (cddddr args))))
-                                            ,@(cddr (cddddr args)))))")
-    (ipc:bind-func proc '_play_note)
-    (ipc:bind-func proc 'midi2frq)))
-
-(ipc:audio-setup "utility")
