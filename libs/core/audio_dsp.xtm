@@ -471,6 +471,28 @@
       (lambda (in)
 	(range_limit lim (* -1.0 lim) (* gain in))))))
 
+;; mono in (ignores anything in on channel 2)
+;; pan value [0.0-1.0]
+(bind-func pan2
+  (let ((out 0.0))
+    (lambda (x:double chan pan)
+      (if (< chan 0.5)
+          (begin (set! out x) (* (- 1.0 pan) out))
+          (* pan out)))))
+
+;; mono in (ignores all other channels)
+;; pan value [0.0-1.0]
+(bind-func pan_mc
+  (lambda (channels)
+    (let ((v:double 0.0)
+          (out:double 0.0))
+      (lambda (x:double chan pan)
+        (if (< chan 0.5) (set! out x))
+        (set! v (fabs (- (* (- channels 1.0) pan) chan)))
+        (if (> v 1.0) 0.0
+            (* (- 1.0 v) out))))))
+
+
 ;; simple stereo weights
 (bind-func mix2
   (lambda (x:double chan left right)
