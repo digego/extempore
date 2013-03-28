@@ -712,10 +712,12 @@ be running in another (shell-like) buffer."
 
 (make-variable-buffer-local 'eldoc-documentation-function)
 
+(defvar extempore-eldoc-active nil)
+
 ;; currently doesn't actually return the symbol, but sends the request
 ;; which is echoed back through whichever process filter is active
 (defun extempore-eldoc-documentation-function ()
-  (if extempore-process
+  (if (and extempore-process extempore-eldoc-active)
       (let ((fnsym (extempore-fnsym-in-current-sexp)))
         ;; send the documentation request
         (if fnsym (process-send-string
@@ -913,11 +915,7 @@ You shouldn't have to modify this list directly, use
 
 (defvar extempore-tr-animation-timer nil)
 
-(defun extempore-tr-animation-running-p ()
-  (and extempore-tr-animation-timer
-       extempore-tr-anim-alist))
-
-(defun extempore-cancel-tr-animation-timer ()
+(defun extempore-stop-tr-animation-timer ()
   (interactive)
   (message "Cancelling TR animiation timer.")
   (if extempore-tr-animation-timer
@@ -928,50 +926,44 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-start-tr-animation-timer ()
   (interactive)
-  (if (extempore-tr-animation-running-p)
-      (progn (message "Restarting TR animation timer.")
-             (extempore-cancel-tr-animation-timer))
+  (if extempore-tr-animation-timer
+      (progn (extempore-stop-tr-animation-timer)
+	     (message "Restarting TR animation timer."))
     (message "Starting TR animation timer."))
   (setq extempore-tr-animation-timer
-        (run-with-timer 0
-                        extempore-tr-animation-update-period
+	(run-with-timer 0
+			extempore-tr-animation-update-period
 			'extempore-tr-update-anims)))
 
-;; auto-detection of TR loops for animation
-
-(defun extempore-tr-watcher-filter (proc str)
+(defun extempore-tr-animation-filter (proc str)
   (message (substring str 0 -1))
   (let ((buf (process-buffer proc)))
     (if buf
 	(with-current-buffer buf
-	  (let ((mtch (string-match "(begin-tr \\([^ \t\n:]+\\) \\([0-9.]+\\))" str))
-		(tr-name (match-string 1 str))
-		(tr-period (string-to-number (match-string 2 str))))
-	    (extempore-add-tr-overlays tr-name tr-period))))))
+	  (if (string-match "(extempore-trigger-tr-anim" str)
+	      ;; assume the string is good to go
+	      (eval (read str)))))))
 
-(defun extempore-add-tr-watcher ()
-  (if extempore-process
-      (set-process-filter
-       extempore-process
-       'extempore-tr-watcher-filter)
-    (message "Can't start TR watcher: not connected to an Extempore process.")))
-
-(defun extempore-remove-tr-watcher ()
-  (if extempore-process
-      (set-process-filter
-       extempore-process
-       'extempore-default-process-filter)
-    (message "Can't remove TR watcher: not connected to an Extempore process.")))
+;; high-level control of TR animations: these are the functions that
+;; the programmer should use to turn things on/off
 
 (defun extempore-start-tr-animation ()
   (interactive)
-  (extempore-start-tr-animation-timer)
-  (extempore-add-tr-watcher))
+  (if extempore-process
+      (progn (set-process-filter
+	      extempore-process
+	      'extempore-tr-animation-filter)
+	     (extempore-start-tr-animation-timer))
+    (message "Can't start TR animations: bufffer is not connected
+    to an Extempore process.")))
 
 (defun extempore-stop-tr-animation ()
   (interactive)
-  (extempore-cancel-tr-animation-timer)
-  (extempore-add-tr-watcher))
+  (extempore-stop-tr-animation-timer)
+  (if extempore-process
+      (set-process-filter
+       extempore-process
+       'extempore-default-process-filter)))
 
 (provide 'extempore)
 
