@@ -471,13 +471,20 @@
       (lambda (in)
 	(range_limit lim (* -1.0 lim) (* gain in))))))
 
-;; a four channel mixer
-(bind-func mixquad
-  (lambda (c1 c2 c3 c4 chan in:double)
-    (cond ((< chan 1.0) (* in c1))
-	  ((< chan 2.0) (* in c2))
-	  ((< chan 3.0) (* in c3))
-	  ((< chan 4.0) (* in c4))
+;; simple stereo weights
+(bind-func mix2
+  (lambda (x:double chan left right)
+    (cond ((< chan 0.5) (* x left))
+          ((< chan 1.5) (* x right))
+          (else 0.0))))            
+
+;; simple quad weights
+(bind-func mix4
+  (lambda (x:double chan c1 c2 c3 c4)
+    (cond ((< chan 0.5) (* x c1))
+	  ((< chan 1.5) (* x c2))
+	  ((< chan 2.5) (* x c3))
+	  ((< chan 3.5) (* x c4))
 	  (else 0.0))))
 
 ;; a four channel mixer
