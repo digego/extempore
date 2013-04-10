@@ -170,14 +170,30 @@
         (reverbr (reverb_c 79.0))
         (pan .5)
         (pan_ pan)
-        (wet .25))
+        (wet .5)
+        (fb .5))
     (lambda (in:double time:double chan:double dat:double*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
       (if (< chan 1.0)
-          (reverbl (* 1.5 (* pan_ in)) wet)
-          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet)))))
+          (reverbl (* 1.5 (* pan_ in)) wet fb)
+          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
+
+(bind-func drums_fx 400000
+  (let ((reverbl (reverb_c 80.0))
+        (reverbr (reverb_c 79.0))
+        (pan .5)
+        (pan_ pan)
+        (wet .5)
+        (fb .5))
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (< pan pan_)
+          (set! pan_ (- pan_ .001))
+          (set! pan_ (+ pan_ .001)))
+      (if (< chan 1.0)
+          (reverbl (* 1.5 (* pan_ in)) wet fb)
+          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
 
 ;; make sampler instrument
