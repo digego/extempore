@@ -98,9 +98,9 @@
 ;;
 ;; faster but noisy
 (bind-func sampler_note_linear_c
-  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index)
+  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index offset:i64)
     (let ((idx_freq (midi2frq (i64tod index)))
-	  (phase (i64tod (pref samples_offsets index)))) ;; phase unit is audio frames
+	  (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
 	(let ((rate (/ freq idx_freq))
 	      (pos (if (< chan 1.0) ;; only increment once per frame
@@ -143,10 +143,10 @@
 ;;
 ;; slower but less noisy (default)
 (bind-func sampler_note_hermite_c
-  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index)
+  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index offset)
     (let ((idx_freq (midi2frq (i64tod index)))
 	  (channels (pref samples_channels index))
-	  (phase (i64tod (pref samples_offsets index)))) ;; phase unit is audio frames
+	  (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
 	(let ((rate (/ freq idx_freq))
 	      (pos (if (< chan 1.0) ;; only increment once per frame
@@ -222,10 +222,6 @@
                          (dotimes (i poly) ;; check for free poly spot
                            (if (> (pref note_starts i) 9999999999998.0)
                                (set! free_note i)))
-                         ;; (if (= 0 active)
-                         ;;     (begin (dotimes (iii poly)
-                         ;; 	       (pset! note_starts iii 9999999999999.0))
-                         ;; 	     (set! free_note -1)))
                          (if (> free_note -1) ;; if we found a free poly spot assign a note
                              (begin (dotimes (idxi 128)
                                       (let ((v (llabs (- idx idxi))))
@@ -238,7 +234,9 @@
                                              (note_c start freq amp dur
                                                         attack decay release sustain
                                                         note_starts free_note
-                                                        (,note_kernel samples samples_length samples_offsets samples_channels new_idx)
+                                                        (if (> nargs 0)
+                                                            (,note_kernel samples samples_length samples_offsets samples_channels new_idx (pref dargs 0))
+                                                            (,note_kernel samples samples_length samples_offsets samples_channels new_idx 0.0))
                                                         note_zone))
                                       (pset! note_starts free_note start)
                                       (pop_zone))
