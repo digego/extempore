@@ -698,8 +698,25 @@ be running in another (shell-like) buffer."
     (progn (message "Dropping malformed SLIP packet.")
            nil)))
 
+;; OSC (strings only at the moment)
+
 (defun extempore-make-osc-string (str)
-  (concat str (make-string (- 4 (mod (length str) 4)) ?\0)))
+  (concat str (make-string (- 4 (mod (length str) 4)) (char-to-string ?\0))))
+
+(defun extempore-extract-osc-string (str &optional start)
+  (and (string-match "[^\0]*" str start)
+       (match-string 0 str)))
+
+(defun extempore-extract-osc-address (str)
+  (extempore-extract-osc-string str 0))
+
+(defun extempore-extract-osc-type-tag (str)
+  (and (string-match ",[^\0]*" str)
+       (substring (match-string 0 str) 1)))
+
+(defun extempore-osc-args-index (str)
+  (and (string-match ",[^\0]*[\0]*" str)
+       (match-end 0)))
 
 ;; sending code to the Extempore compiler
 
@@ -831,6 +848,7 @@ be running in another (shell-like) buffer."
 				      ,(make-char 'greek-iso8859-7 107))
 		      nil))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; temporal-recursion animations
 
 (defun extempore-beginning-of-defun-function (&optional arg)
@@ -1018,15 +1036,6 @@ You shouldn't have to modify this list directly, use
 			extempore-tr-animation-update-period
 			'extempore-tr-update-anims)))
 
-(defun extempore-tr-animation-filter (proc str)
-  (message (substring str 0 -1))
-  (let ((buf (process-buffer proc)))
-    (if buf
-	(with-current-buffer buf
-	  (if (string-match "(extempore-trigger-tr-anim" str)
-	      ;; assume the string is good to go
-	      (eval (read str)))))))
-
 ;; high-level control of TR animations: these are the functions that
 ;; the programmer should use to turn things on/off
 
@@ -1047,6 +1056,42 @@ You shouldn't have to modify this list directly, use
       (set-process-filter
        extempore-process
        'extempore-default-process-filter)))
+
+;; a basic UDP packet server for recieving animation triggers
+
+(defvar extempore-tr-anim-udp-server nil)
+(defvar extempore-tr-anim-udp-port 7097)
+
+(defun extempore-tr-animation-filter (proc str)
+  (message str)
+  (let ((buf (process-buffer proc))
+        (payload (substring str (extempore-osc-args-index str))))
+    (if buf
+	(with-current-buffer buf
+          ;; assume the string is good to go
+          (eval (read payload))))))
+
+(defun extempore-create-tr-anim-server (port)
+  (make-network-process
+   :name "tr-anim-server"
+   :buffer (current-buffer)
+   :coding 'binary
+   :service port
+   :type 'datagram
+   :family 'ipv4
+   :server t
+   :filter #'extempore-tr-animation-filter))
+
+(defun extempore-start-tr-anim-osc-server ()
+  (interactive)
+  (if extempore-tr-anim-udp-server
+      (delete-process extempore-tr-anim-udp-server))
+  (progn (setq extempore-tr-anim-udp-server
+               (extempore-create-tr-anim-server
+                extempore-tr-anim-udp-port))
+         (message "Starting UDP listener for animation messages...")))
+
+;; (extempore-start-tr-anim-osc-server)
 
 (provide 'extempore)
 
