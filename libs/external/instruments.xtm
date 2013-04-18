@@ -98,9 +98,9 @@
 ;;
 ;; faster but noisy
 (bind-func sampler_note_linear_c
-  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index)
+  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index offset:i64)
     (let ((idx_freq (midi2frq (i64tod index)))
-	  (phase (i64tod (pref samples_offsets index)))) ;; phase unit is audio frames
+	  (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
 	(let ((rate (/ freq idx_freq))
 	      (pos (if (< chan 1.0) ;; only increment once per frame
@@ -143,10 +143,10 @@
 ;;
 ;; slower but less noisy (default)
 (bind-func sampler_note_hermite_c
-  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index)
+  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index offset)
     (let ((idx_freq (midi2frq (i64tod index)))
 	  (channels (pref samples_channels index))
-	  (phase (i64tod (pref samples_offsets index)))) ;; phase unit is audio frames
+	  (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
 	(let ((rate (/ freq idx_freq))
 	      (pos (if (< chan 1.0) ;; only increment once per frame
@@ -166,26 +166,34 @@
 
 
 (bind-func sampler_fx 400000
-           (let ((reverbl (reverb_c 80.0))
-                 (reverbr (reverb_c 79.0))
-                 (pan .5)
-                 (pan_ pan)
-                 (wet .25)
-                 (wet_ wet))
-             ;; some reverb?
-             (reverbl.wet wet)
-             (reverbr.wet wet)
-             (lambda (in:double time:double chan:double dat:double*)
-               (if (<> wet wet_)
-                   (begin (reverbl.wet wet)
-                          (reverbr.wet wet)
-                          (set! wet_ wet)))
-               (if (< pan pan_)
-                   (set! pan_ (- pan_ .001))
-                   (set! pan_ (+ pan_ .001)))
-               (if (< chan 1.0)
-                   (reverbl (* 1.5 (* pan_ in)))
-                   (reverbr (* 1.5 (* (- 1.0 pan_) in)))))))
+  (let ((reverbl (reverb_c 80.0))
+        (reverbr (reverb_c 79.0))
+        (pan .5)
+        (pan_ pan)
+        (wet .5)
+        (fb .5))
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (< pan pan_)
+          (set! pan_ (- pan_ .001))
+          (set! pan_ (+ pan_ .001)))
+      (if (< chan 1.0)
+          (reverbl (* 1.5 (* pan_ in)) wet fb)
+          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
+
+(bind-func drums_fx 400000
+  (let ((reverbl (reverb_c 80.0))
+        (reverbr (reverb_c 79.0))
+        (pan .5)
+        (pan_ pan)
+        (wet .5)
+        (fb .5))
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (< pan pan_)
+          (set! pan_ (- pan_ .001))
+          (set! pan_ (+ pan_ .001)))
+      (if (< chan 1.0)
+          (reverbl (* 1.5 (* pan_ in)) wet fb)
+          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
 
 ;; make sampler instrument
@@ -205,7 +213,7 @@
            (kk:i64 0) (ii:i64 0)
            ;;(active:i64 0)
            (note_starts:double* (zalloc poly))
-           (new_note (lambda (start freq dur amp)
+           (new_note (lambda (start freq dur amp nargs:i64 dargs:double*)
                        (let ((free_note:i64 -1)
                              (idx (dtoi64 (floor (frq2midi freq))))
                              (closest 1000000)
@@ -214,10 +222,6 @@
                          (dotimes (i poly) ;; check for free poly spot
                            (if (> (pref note_starts i) 9999999999998.0)
                                (set! free_note i)))
-                         ;; (if (= 0 active)
-                         ;;     (begin (dotimes (iii poly)
-                         ;; 	       (pset! note_starts iii 9999999999999.0))
-                         ;; 	     (set! free_note -1)))
                          (if (> free_note -1) ;; if we found a free poly spot assign a note
                              (begin (dotimes (idxi 128)
                                       (let ((v (llabs (- idx idxi))))
@@ -230,7 +234,9 @@
                                              (note_c start freq amp dur
                                                         attack decay release sustain
                                                         note_starts free_note
-                                                        (,note_kernel samples samples_length samples_offsets samples_channels new_idx)
+                                                        (if (> nargs 0)
+                                                            (,note_kernel samples samples_length samples_offsets samples_channels new_idx (pref dargs 0))
+                                                            (,note_kernel samples samples_length samples_offsets samples_channels new_idx 0.0))
                                                         note_zone))
                                       (pset! note_starts free_note start)
                                       (pop_zone))

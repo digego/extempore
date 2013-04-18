@@ -82,7 +82,6 @@
 
 //#include "llvm/ModuleProvider.h"
 
-#include "llvm/ExecutionEngine/JIT.h"
 // #include "llvm/ExecutionEngine/Interpreter.h"
 // #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Target/TargetOptions.h"
@@ -95,6 +94,7 @@
 #include "llvm/PassManager.h"
 
 #include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 
@@ -1079,6 +1079,7 @@ namespace extemp {
           Opts.JITEmitDebugInfo = true;
   
           llvm::InitializeNativeTarget();
+          llvm::InitializeNativeTargetAsmPrinter();
           llvm::LLVMContext &context = llvm::getGlobalContext();
           //llvm::IRBuilder<> theBuilder(context);
   
@@ -1090,6 +1091,9 @@ namespace extemp {
           factory.setEngineKind(llvm::EngineKind::JIT);
           factory.setAllocateGVsWithCode(false);
           factory.setTargetOptions(Opts);
+          factory.setUseMCJIT(false);
+          factory.setOptLevel(llvm::CodeGenOpt::Aggressive); // llvm::CodeGenOpt::None
+
           EE = factory.create();
           EE->DisableLazyCompilation(true);
 

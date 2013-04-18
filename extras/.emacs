@@ -73,9 +73,6 @@
 (setq visible-bell t
       inhibit-startup-message t
       color-theme-is-global t
-      sentence-end-double-space nil
-      shift-select-mode nil
-      mouse-yank-at-point t
       uniquify-buffer-name-style 'forward
       whitespace-style '(face trailing lines-tail tabs)
       whitespace-line-column 80
@@ -87,7 +84,7 @@
 (add-to-list 'safe-local-variable-values '(lexical-binding . t))
 (add-to-list 'safe-local-variable-values '(whitespace-line-column . 80))
 
-;; Set this to whatever browser you use
+;; TODO Set this to whatever browser you use
 ;; (setq browse-url-browser-function 'browse-url-firefox)
 ;; (setq browse-url-browser-function 'browse-default-macosx-browser)
 ;; (setq browse-url-browser-function 'browse-default-windows-browser)

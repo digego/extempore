@@ -453,8 +453,8 @@
 
 (macro (rampr args)
        (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (ramp (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (ramp (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (+ (* .5 ,(cadddr args)) (* .5 ,(cadddr args) (ramp (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args)))))))
+       `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (ramp (* 2pi beat ,(cadddr args))))))))
 
 ;; square wave LFO with period 2pi
 
@@ -465,8 +465,8 @@
 
 (macro (rectr args)
    (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (rectr (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (rectr (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (* ,(cadddr args) (rect (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (rect (* 2pi beat ,(cadddr args)))))))
 
 ;; triangle wave LFO with period 2pi
 
@@ -479,22 +479,9 @@
 
 (macro (trir args)
    (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (trir (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (trir (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (* ,(cadddr args) (tri-wave (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (tri-wave (* 2pi beat ,(cadddr args)))))))
 
-;; the play macro
-
-(macro (play args)
-  (if (symbol? (cadr args))
-      (if (> (length args) 5)
-	  `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
-		      ,(car (cdr (cddddr args))))
-	  `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
-      (if (> (length args) 6)
-	  `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-		      (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))))
-	  `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-		      (*metro* 'dur ,(car (cdr (cddddr args))))))))
 
 
 ; creates a rhythm of a given length
@@ -1643,7 +1630,8 @@
 ;; for eldoc integration
 
 (define-macro (get-eldoc-string sym) 
-  `(let ((scmdoc (and (defined? (quote ,sym))
+  `(let ((scmdoc (and (symbol? (quote ,sym))
+                      (defined? (quote ,sym))
                       (get-closure-code ,sym)))
          (xtdoc (xtm-closure-doc ,sym)))
      (cond (scmdoc

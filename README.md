@@ -51,16 +51,16 @@ _More detailed instructions can be found at_ http://benswift.me/2012-11-06-build
 Building Extempore depends on the following libraries (you can
 probably get them through your favourite package manager).
 
-- `LLVM 3.0`
+- `LLVM 3.2`
 - `pthread`
 - `pcre` (Perl-compatible Regular Expressions)
 - `portaudio v1.9`
 - `mesa GL` (Linux only)
 
-LLVM *must* be version 3.0 and needs to be built from source, because
+LLVM *must* be version 3.2 and needs to be built from source, because
 a small patch to `LLParser.cpp` (an LLVM source file) is required. You
-can get the LLVM v3.0 source from
-http://llvm.org/releases/download.html#3.0. 
+can get the LLVM v3.2 source from
+http://llvm.org/releases/download.html#3.2. 
 
 The patch file `llparser.patch` is supplied in the `extempore/extras`
 directory.
@@ -110,17 +110,17 @@ improve and streamline the Windows build process, then patches are
 welcome :)
 
 On Windows 7, building Extempore requires the following libraries:
-- `LLVM 3.0`
+- `LLVM 3.2`
 - `pcre`
 - `boost v1.47`
 - `portaudio v1.9`
 
 Boost is *mandatory* on Windows, and you will need to
-build pcre, boost, portaudio and LLVM 3.0 yourself.
+build pcre, boost, portaudio and LLVM 3.2 yourself.
 
 To do this, the source directories will need to be on the 'include path':
 
-- `llvm-3.0`
+- `llvm-3.2`
 - `boost_1_47_0`
 - `pcre-8.12`
 - `portaudio`
@@ -133,7 +133,7 @@ building the above libs
 - `my_pcre_build` - use `cmake` to create then build using msvc
 - build `portaudio` using provided msvc project (`portaudio/build/msvc/portaudio.sln`)
 
-LLVM *must* be version 3.0 and needs to be built from source, because
+LLVM *must* be version 3.2 and needs to be built from source, because
 a small patch to `LLParser.cpp` (an LLVM source file) is required. The
 patch file `llparser.patch` is supplied in the `extempore/extras`
 directory. You can get the LLVM source from http://www.llvm.org/
