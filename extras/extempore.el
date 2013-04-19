@@ -812,8 +812,13 @@ be running in another (shell-like) buffer."
 
 ;; eldoc
 
+(defcustom extempore-eldoc-active nil
+  "If non-nil, attempt to display live argument lists for the
+  function under point."
+  :type 'boolean
+  :group 'extempore)
+
 (make-variable-buffer-local 'eldoc-documentation-function)
-(defvar extempore-eldoc-active nil)
 
 ;; currently doesn't actually return the symbol, but sends the request
 ;; which is echoed back through whichever process filter is active
