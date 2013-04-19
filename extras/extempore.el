@@ -931,59 +931,63 @@ be running in another (shell-like) buffer."
 (defun extempore-update-tr-clock-overlay (overlay val beg end)
   (move-overlay overlay
                 beg
-                (max (1+ beg) (round (+ beg (* val (- end beg)))))))
+                (max (1+ beg) (floor (+ beg (* val (- end beg)))))))
 
 (defvar extempore-tr-anim-alist nil
   "List of TR animations.
 
-Each element is a pair, with a name as the car, and then a list
-of vectors as the cdr.
+Each element is a list, with a name as the first element, and then a list
+of vectors as the cdr:
 
-  (fn-name . ([flash-overlay clock-overlay delta-t time-to-live] ...))
+  (fn-name [flash-overlay clock-overlay delta-t time-to-live] ...)
 
 You shouldn't have to modify this list directly, use
-`extempore-add-anim-to-alist' and
+`extempore-add-new-anim-to-name' and
 `extempore-delete-tr-anim' instead.")
 
 (defun extempore-delete-tr-anim (name)
-  (setq extempore-tr-anim-alist (assq-delete-all name extempore-tr-anim-alist)))
+  (cl-delete-if (lambda (x) (string= name (car x)))
+                extempore-tr-anim-alist))
 
 (defun extempore-create-anim-vector (delta-t)
   (vector (extempore-make-tr-flash-overlay name bounds)
 	  (extempore-make-tr-clock-overlay name bounds)
 	  delta-t    ; total time
-	  delta-t))  ; time-to-live
+	  (- delta-t 0.2)))                   ; time-to-live
 
-(defun extempore-add-anim-to-alist (name delta-t)
-  (extempore-delete-tr-anim name)
-  (let ((bounds (extempore-find-defn-bounds name)))
+(defun extempore-add-new-anim-to-name (name delta-t)
+  (let ((bounds (extempore-find-defn-bounds name))
+        (anim-list (extempore-get-tr-anims-for-name name)))
     (if bounds
-	(add-to-list 'extempore-tr-anim-alist
-		     (list name (extempore-create-anim-vector delta-t))
-                     t))))
+        (if anim-list
+            (setcdr anim-list
+                    (cons (extempore-create-anim-vector delta-t)
+                          (cdr anim-list)))
+          (add-to-list 'extempore-tr-anim-alist
+                       (list name (extempore-create-anim-vector delta-t)))))))
 
 (defun extempore-get-tr-anims-for-name (name)
-  (let ((anim (assoc name extempore-tr-anim-alist)))
-    (if anim
-	(cdr anim)
-      nil)))
+  (assoc name extempore-tr-anim-alist))
 
-(defun extempore-get-active-tr-anims (name)
-  (remove-if-not (lambda (x) (aref x 3)) (extempore-get-tr-anims-for-name name)))
+(defun extempore-get-active-tr-anims (anim-list)
+  (remove-if-not (lambda (x) (aref x 3)) anim-list))
 
-(defun extempore-get-dormant-tr-anims (name)
-  (remove-if (lambda (x) (aref x 3)) (extempore-get-tr-anims-for-name name)))
+(defun extempore-get-dormant-tr-anims (anim-list)
+  (remove-if (lambda (x) (aref x 3)) anim-list))
 
-(defun extempore-reset-tr-anim (anim delta-t)
+(defun extempore-reactivate-tr-anim (anim delta-t)
   (aset anim 2 delta-t)
   (aset anim 3 delta-t))
 
 (defun extempore-trigger-tr-anim (name delta-t)
   (interactive "sfn name: \nndelta-t: ")
-  (let ((anim-list (extempore-get-dormant-tr-anims name)))
+  (let ((anim-list (extempore-get-tr-anims-for-name name)))
     (if anim-list
-	(extempore-reset-tr-anim (car anim-list) delta-t)
-      (extempore-add-anim-to-alist name delta-t))))
+        (let ((dormant-anims (extempore-get-dormant-tr-anims anim-list)))
+          (if dormant-anims
+              (extempore-reactivate-tr-anim (car dormant-anims) delta-t)
+            (extempore-add-new-anim-to-name name delta-t)))
+      (extempore-add-new-anim-to-name name delta-t))))
 
 ;; animate the overlays
 
