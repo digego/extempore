@@ -1041,31 +1041,14 @@ You shouldn't have to modify this list directly, use
 			extempore-tr-animation-update-period
 			'extempore-tr-update-anims)))
 
-;; high-level control of TR animations: these are the functions that
-;; the programmer should use to turn things on/off
-
-(defun extempore-start-tr-animation ()
-  (interactive)
-  (if extempore-process
-      (progn (set-process-filter
-	      extempore-process
-	      'extempore-tr-animation-filter)
-	     (extempore-start-tr-animation-timer))
-    (message "Can't start TR animations: bufffer is not connected
-    to an Extempore process.")))
-
-(defun extempore-stop-tr-animation ()
-  (interactive)
-  (extempore-stop-tr-animation-timer)
-  (if extempore-process
-      (set-process-filter
-       extempore-process
-       'extempore-default-process-filter)))
-
-;; a basic UDP packet server for recieving animation triggers
+;;  UDP server for recieving animation triggers
 
 (defvar extempore-tr-anim-udp-server nil)
-(defvar extempore-tr-anim-udp-port 7097)
+
+(defcustom extempore-tr-anim-udp-server-port 7097
+  "Port for the the extempore TR-animation UDP server."
+  :type 'integer
+  :group 'extempore)
 
 (defun extempore-tr-animation-filter (proc str)
   (if (string= (extempore-extract-osc-address str) "/anim")
@@ -1082,14 +1065,42 @@ You shouldn't have to modify this list directly, use
    :server t
    :filter #'extempore-tr-animation-filter))
 
-(defun extempore-start-tr-anim-osc-server ()
+(defun extempore-stop-tr-anim-osc-server ()
   (interactive)
   (if extempore-tr-anim-udp-server
-      (delete-process extempore-tr-anim-udp-server))
+      (progn (delete-process extempore-tr-anim-udp-server)
+             (setq extempore-tr-anim-udp-server nil)
+             (message "Deleting UDP listener."))))
+
+(defun extempore-start-tr-anim-osc-server ()
+  (interactive)
+  (extempore-stop-tr-anim-osc-server)
   (progn (setq extempore-tr-anim-udp-server
                (extempore-create-tr-anim-server
-                extempore-tr-anim-udp-port))
-         (message "Starting UDP listener for animation messages...")))
+                extempore-tr-anim-udp-server-port))
+         (message "Starting UDP listener for animation messages.")))
+
+;; high-level control of TR animations: these are the functions that
+;; the programmer should use to turn things on/off
+
+(defun extempore-start-tr-animation ()
+  (interactive)
+  (if extempore-process
+      (progn (extempore-start-tr-animation-timer)
+             (extempore-start-tr-anim-osc-server))
+    (message "Can't start TR animations: bufffer is not connected
+    to an Extempore process.")))
+
+(defun extempore-stop-tr-animation ()
+  (interactive)
+  (extempore-stop-tr-animation-timer)
+  (extempore-stop-tr-anim-osc-server))
+
+(defun extempore-toggle-tr-animation ()
+  (interactive)
+  (if extempore-tr-animation-timer
+      (extempore-stop-tr-animation)
+    (extempore-start-tr-animation)))
 
 (provide 'extempore)
 
