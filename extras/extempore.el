@@ -1063,18 +1063,13 @@ You shouldn't have to modify this list directly, use
 (defvar extempore-tr-anim-udp-port 7097)
 
 (defun extempore-tr-animation-filter (proc str)
-  (message str)
-  (let ((buf (process-buffer proc))
-        (payload (substring str (extempore-osc-args-index str))))
-    (if buf
-	(with-current-buffer buf
-          ;; assume the string is good to go
-          (eval (read payload))))))
+  (if (string= (extempore-extract-osc-address str) "/anim")
+      (eval (read (substring str (extempore-osc-args-index str))))))
 
 (defun extempore-create-tr-anim-server (port)
   (make-network-process
    :name "tr-anim-server"
-   :buffer (current-buffer)
+   ;; :buffer (current-buffer)
    :coding 'binary
    :service port
    :type 'datagram
@@ -1090,8 +1085,6 @@ You shouldn't have to modify this list directly, use
                (extempore-create-tr-anim-server
                 extempore-tr-anim-udp-port))
          (message "Starting UDP listener for animation messages...")))
-
-;; (extempore-start-tr-anim-osc-server)
 
 (provide 'extempore)
 

@@ -23,30 +23,28 @@
 ;; re-define some infrastructure to support callbacks
 ;; (original version in runtime/scheme.xtm)
 
+;; need to start a sever before we can send (not sure why)
+(io:osc:start-server 7009 "TR-anim-client-port")
+
+;; set port to #f to disable
+(define *tr-anim-osc-server-port* 7097)
+
 (define ta-send-anim-trigger
   (lambda (func-name delta-t)
-    (let ((anim-eval-str
-           (string-append
-            "(extempore-trigger-tr-anim \"" 
-            func-name "\" "
-            (number->string delta-t) ")")))
-      anim-eval-str)))
-
-;; doesn't work:
-;; (call-cpp-at-time (now) 0 *callback*
-;;                   (list string->symbol anim-eval-str)
-;;                   (current-environment))
+    (io:osc:send (now)
+                 (cons "localhost" *tr-anim-osc-server-port*)
+                 "/anim"
+                 (string-append
+                  "(extempore-trigger-tr-anim \"" 
+                  func-name "\" "
+                  (number->string delta-t) ")"))))
 
 (define (callback time func . args)
   (let ((payload (if (symbol? func)
 		     (cons callback-adapter (cons func args))
                      (cons func args))))
     (call-cpp-at-time time 2 *callback* payload (current-environment))
-    ;; send animation countdown
-    (if (symbol? func)
+    ;; send animation trigger
+    (if (and (symbol? func) *tr-anim-osc-server-port*)
         (ta-send-anim-trigger (symbol->string func) (/ (- time (now)) *au:samplerate*)))))
 
-
-;; need to start a sever before we can send
-(io:osc:start-server 7009 "TR-anim-server-dummy")
-(io:osc:send (now) (cons "localhost" 7097) "/anim" "(message \"animate this!\")")
