@@ -1,8 +1,8 @@
 OSX_FRAMEWORKS := \
-	-framework cocoa \
-	-framework coreaudio \
-	-framework glut \
-	-framework opengl \
+	-framework Cocoa \
+	-framework CoreAudio \
+	-framework GLUT \
+	-framework OpenGL \
 
 PLATFORM_LIBS := -lpcre
 
