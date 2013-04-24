@@ -147,7 +147,7 @@
   (set (make-local-variable 'lisp-doc-string-elt-property)
        'extempore-doc-string-elt))
 
-(defvar extempore-mode-line-process "")
+(defvar extempore-mode-line-process nil)
 
 (defvar extempore-mode-map
   (let ((smap (make-sparse-keymap))
@@ -181,6 +181,7 @@ expressions and controlling the extempore process.
 Entry to this mode calls the value of `extempore-mode-hook'."
   (extempore-mode-variables)
   (make-variable-buffer-local 'extempore-process)
+  (make-variable-buffer-local 'extempore-mode-line-process)
   (setq extempore-process nil))
 
 (defgroup extempore nil
@@ -638,12 +639,15 @@ be running in another (shell-like) buffer."
 		       (if (string-equal read-port "")
 			   extempore-default-port
 			 (string-to-number read-port)))))
-  (if (not (null extempore-process))
-      (delete-process extempore-process))
-  (setq extempore-process
-	(open-network-stream "extempore" nil
-			     host
-			     port))
+  ;; restart the connection if already connected
+  (when extempore-process
+    (extempore-stop))
+  (progn (setq extempore-process
+               (open-network-stream "extempore" nil
+                                    host
+                                    port))
+         (setq extempore-mode-line-process
+               (format "%s:%d" host port)))
   (set-process-filter extempore-process
 		      'extempore-default-process-filter))
 
@@ -651,7 +655,8 @@ be running in another (shell-like) buffer."
   "Terminate connection to the Extempore process"
   (interactive)
   (delete-process extempore-process)
-  (setq extempore-process nil))
+  (setq extempore-process nil)
+  (setq extempore-mode-line-process nil))
 
 (defun extempore-send-definition ()
   "Send the enclosing top-level def to Extempore server for evaluation"
