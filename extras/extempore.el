@@ -610,7 +610,7 @@ determined by whether there is an *extempore* buffer."
                                         (read-from-minibuffer "Device number: ") "\n"))))
   (display-buffer "*extempore*"))
 
-(defun extempore-default-process-filter (proc str)
+(defun extempore-crlf-process-filter (proc str)
   (message (substring str 0 -1)))
 
 ;;; SLIP escape codes
@@ -619,41 +619,54 @@ determined by whether there is an *extempore* buffer."
 ;; ESC_END   ?\334    /* ESC ESC_END means END data byte */
 ;; ESC_ESC   ?\335    /* ESC ESC_ESC means ESC data byte */
 
-;; todo need to write this function
 (defun extempore-slip-process-filter (proc str)
-  (message (substring str 0 -1)))
+  (message (extempore-slip-unescape-string str)))
 
-(defun extempore-connect (host port)
-  "Connect to the running extempore process, which must
-be running in another (shell-like) buffer."
-  (interactive (let ((read-host (read-from-minibuffer
-				  (concat "Hostname (default "
-					  extempore-default-host
-					  "):")))
-		     (read-port (read-from-minibuffer
-				  (concat "Port (default "
-					  (number-to-string extempore-default-port)
-					  "):"))))
-		 (list (if (string-equal read-host "")
-			   extempore-default-host
-			 read-host)
-		       (if (string-equal read-port "")
-			   extempore-default-port
-			 (string-to-number read-port)))))
-  (if (not (null extempore-process))
-      (delete-process extempore-process))
-  (setq extempore-process
-	(open-network-stream "extempore" nil
-			     host
-			     port))
-  (set-process-filter extempore-process
-		      'extempore-default-process-filter))
+;; connection management
+
+(defun extempore-connect-tcp ()
+  (setq extempore-process (open-network-stream "extempore" nil host port))
+  (set-process-filter extempore-process #'extempore-crlf-process-filter)
+  (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr))
+
+(defun extempore-connect-tcp-osc ()
+  (setq extempore-process (open-network-stream "extempore" nil host port))
+  (set-process-filter extempore-process #'extempore-slip-process-filter)
+  (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr))
 
 (defun extempore-disconnect ()
   "Terminate connection to the Extempore process"
   (interactive)
   (delete-process extempore-process)
   (setq extempore-process nil))
+
+(defun extempore-connect (host port type)
+  "Connect to the running extempore process, which must
+be running in another (shell-like) buffer."
+  (interactive
+   ;; get args interactively
+   (let ((read-host (read-from-minibuffer
+                     (concat "Hostname (default "
+                             extempore-default-host
+                             "):")))
+         (read-port (read-from-minibuffer
+                     (concat "Port (default "
+                             (number-to-string extempore-default-port)
+                             "):")))
+         (read-type (read-from-minibuffer
+                     (concat "Connction type (default TCP):"))))
+     (list (if (string-equal read-host "") extempore-default-host read-host)
+           (if (string-equal read-port "") extempore-default-port (string-to-number read-port))
+           (if (string-equal read-type "") "TCP" read-type))))
+  (unless (member type '("TCP" "OSC-TCP"))
+    (error "Unsupported connection type: %s. Currently, Extempore only supports TCP and OSC-TCP connections." type))
+  ;; kill existing connection
+  (when extempore-process (extempore-disconnect))
+  ;; set up connection of `type'
+  (cond ((string-equal type "TCP")
+         (extempore-connect-tcp))
+        ((string-equal type "OSC-TCP")
+         (extempore-connect-tcp-osc))))
 
 ;;; SLIP escape codes
 ;; END       ?\300    /* indicates end of packet */
@@ -748,13 +761,7 @@ be running in another (shell-like) buffer."
 (defun extempore-make-slip-osc-evalstr (evalstr)
   (extempore-slip-escape-string (extempore-make-osc-evalstr evalstr)))
 
-(defun extempore-set-connection-type (type)
-  (interactive "sType (TCP or OSC-TCP):")
-  (cond ((string-equal type "TCP")
-         (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr))
-        ((string-equal type "OSC-TCP")
-         (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr))
-        (t (message "Unrecognised connection type; currently, extempore.el only supports \"TCP\" and \"OSC-TCP\""))))
+;; sending definitions (code) from the Emacs buffer
 
 (defun extempore-send-defn (defn-str)
   (interactive)
@@ -762,7 +769,7 @@ be running in another (shell-like) buffer."
         (progn (process-send-string extempore-process defn-str)
                (redisplay)
                (sleep-for .1))
-      (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with C-x C-j"))))
+      (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)"))))
 
 (defun extempore-send-defn-at-point ()
   "Send the enclosing top-level defn to Extempore server for evaluation."
@@ -826,11 +833,9 @@ be running in another (shell-like) buffer."
   (if (and extempore-process extempore-eldoc-active)
       (let ((fnsym (extempore-fnsym-in-current-sexp)))
         ;; send the documentation request
-        (if fnsym (process-send-string
-                   extempore-process
-                   (extempore-slip-escape-string
-                    (concat "(get-eldoc-string " fnsym ")"))))
-        ;; always return nil, docstring comes back through the process
+        (if fnsym (extempore-send-defn (funcall extempore-process-evalstr-fn
+                                                (concat "(get-eldoc-string " fnsym ")"))))
+        ;; always return nil; docstring comes back through the process
         ;; filter
         nil)))
 
