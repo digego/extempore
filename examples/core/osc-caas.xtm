@@ -1,0 +1,42 @@
+;;; osc-caas.xtm -- Extempore compiler-as-a-service over a TCP-OSC connection
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: 
+
+;;; Commentary:
+
+;; This example code shows how to connect to the Extempore compiler
+;; via an 'OSC over TCP' connection (on port 7029).
+
+;; Any messages with the address "/caas/eval" will be evaluated as
+;; normal (i.e. as though they were sent over the 'regular' TCP
+;; connection)
+
+;;; Code:
+
+;; start the TCP-OSC server
+
+(io:osc:start-server 7029 "osc-caas-callback" "TCP")
+
+(define (osc-caas-callback timestamp address . args)
+  (if (string=? address "/caas/eval")
+      (eval (string->sexpr (car args))
+            (interaction-environment))
+      (println 'Unknown 'OSC 'address: address)))
+
+;; set it up (this isn't code for Extempore; eval in emacs with 'C-x C-e')
+
+(extempore-connect "localhost" 7029 "TCP-OSC")
+
+;; testing
+
+(println 3)
+
+(define test
+  (lambda (a)
+    (* 2 a)))
+
+(println (test 3))
+
+;; currently: error at 0x101f892f8 when running polysynth.xtm
