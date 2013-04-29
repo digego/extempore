@@ -714,7 +714,7 @@ be running in another (shell-like) buffer."
 ;; OSC (strings only at the moment)
 
 (defun extempore-make-osc-string (str)
-  (concat str (make-string (- 4 (mod (length str) 4)) (char-to-string ?\0))))
+  (concat str (make-vector (- 4 (mod (length str) 4)) ?\0)))
 
 (defun extempore-extract-osc-string (str &optional start)
   (and (string-match "[^\0]*" str start)
