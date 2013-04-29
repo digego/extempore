@@ -632,7 +632,7 @@ determined by whether there is an *extempore* buffer."
 (defun extempore-connect-tcp-osc ()
   (setq extempore-process (open-network-stream "extempore" nil host port))
   (set-process-filter extempore-process #'extempore-slip-process-filter)
-  (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr))
+  (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr))
 
 (defun extempore-disconnect ()
   "Terminate connection to the Extempore process"
