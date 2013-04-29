@@ -148,10 +148,9 @@
        'extempore-doc-string-elt)
   ;; for connecting to the Extempore CaaS server
   (set (make-variable-buffer-local 'extempore-process) nil)
+  (set (make-variable-buffer-local 'extempore-mode-line-process) "")
   (set (make-variable-buffer-local 'extempore-process-evalstr-fn)
        #'extempore-make-crlf-evalstr))
-
-(defvar extempore-mode-line-process "")
 
 (defvar extempore-mode-map
   (let ((smap (make-sparse-keymap))
@@ -629,21 +628,26 @@ determined by whether there is an *extempore* buffer."
 
 ;; connection management
 
-(defun extempore-connect-tcp ()
+(defun extempore-connect-tcp (host port)
   (setq extempore-process (open-network-stream "extempore" nil host port))
   (set-process-filter extempore-process #'extempore-crlf-process-filter)
-  (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr))
+  (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr)
+  (setq extempore-mode-line-process
+        (format "(TCP)%s:%d" (if (string= host "localhost") "" host) port)))
 
-(defun extempore-connect-tcp-osc ()
+(defun extempore-connect-tcp-osc (host port)
   (setq extempore-process (open-network-stream "extempore" nil host port))
   (set-process-filter extempore-process #'extempore-slip-process-filter)
-  (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr))
+  (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr)
+  (setq extempore-mode-line-process
+        (format "(TCP-OSC)%s:%d" (if (string= host "localhost") "" host) port)))
 
 (defun extempore-disconnect ()
   "Terminate connection to the Extempore process"
   (interactive)
   (delete-process extempore-process)
-  (setq extempore-process nil))
+  (setq extempore-process nil)
+  (setq extempore-mode-line-process ""))
 
 (defun extempore-connect (host port type)
   "Connect to the running extempore process, which must
@@ -666,9 +670,9 @@ be running in another (shell-like) buffer."
   (when extempore-process (extempore-disconnect))
   ;; set up connection of `type'
   (cond ((string-equal type "TCP")
-         (extempore-connect-tcp))
+         (extempore-connect-tcp host port))
         ((string-equal type "TCP-OSC")
-         (extempore-connect-tcp-osc))))
+         (extempore-connect-tcp-osc host port))))
 
 ;;; SLIP escape codes
 ;; END       ?\300    /* indicates end of packet */
