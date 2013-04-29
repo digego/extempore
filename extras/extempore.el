@@ -132,7 +132,6 @@
   (set (make-local-variable 'comment-column) 40)
   (set (make-local-variable 'parse-sexp-ignore-comments) t)
   (set (make-local-variable 'lisp-indent-function) 'extempore-indent-function)
-  (setq mode-line-process '("" extempore-mode-line-process))
   ;; (set (make-local-variable 'imenu-case-fold-search) t)
   (setq imenu-generic-expression extempore-imenu-generic-expression)
   (set (make-local-variable 'font-lock-defaults)
@@ -148,9 +147,11 @@
        'extempore-doc-string-elt)
   ;; for connecting to the Extempore CaaS server
   (set (make-variable-buffer-local 'extempore-process) nil)
-  (set (make-variable-buffer-local 'extempore-mode-line-process) "")
+  (set (make-variable-buffer-local 'mode-line-process) nil)
   (set (make-variable-buffer-local 'extempore-process-evalstr-fn)
-       #'extempore-make-crlf-evalstr))
+       #'extempore-make-crlf-evalstr)
+    ;; mode line process
+  (setq mode-line-process nil))
 
 (defvar extempore-mode-map
   (let ((smap (make-sparse-keymap))
@@ -632,15 +633,15 @@ determined by whether there is an *extempore* buffer."
   (setq extempore-process (open-network-stream "extempore" nil host port))
   (set-process-filter extempore-process #'extempore-crlf-process-filter)
   (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr)
-  (setq extempore-mode-line-process
-        (format "(TCP)%s:%d" (if (string= host "localhost") "" host) port)))
+  (setq mode-line-process
+        (format "%s:%d(TCP)" (if (string= host "localhost") "" (concat ":" host)) port)))
 
 (defun extempore-connect-tcp-osc (host port)
   (setq extempore-process (open-network-stream "extempore" nil host port))
   (set-process-filter extempore-process #'extempore-slip-process-filter)
   (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr)
-  (setq extempore-mode-line-process
-        (format "(TCP-OSC)%s:%d" (if (string= host "localhost") "" host) port)))
+  (setq mode-line-process
+        (format "%s:%d(TCP-OSC)" (if (string= host "localhost") "" (concat ":" host)) port)))
 
 (defun extempore-disconnect ()
   "Terminate connection to the Extempore process"
@@ -648,7 +649,7 @@ determined by whether there is an *extempore* buffer."
   (delete-process extempore-process)
   (setq extempore-process nil
         extempore-process-evalstr-fn nil
-        extempore-mode-line-process ""))
+        mode-line-process nil))
 
 (defun extempore-connect (host port type)
   "Connect to the running extempore process, which must
