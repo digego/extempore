@@ -646,8 +646,9 @@ determined by whether there is an *extempore* buffer."
   "Terminate connection to the Extempore process"
   (interactive)
   (delete-process extempore-process)
-  (setq extempore-process nil)
-  (setq extempore-mode-line-process ""))
+  (setq extempore-process nil
+        extempore-process-evalstr-fn nil
+        extempore-mode-line-process ""))
 
 (defun extempore-connect (host port type)
   "Connect to the running extempore process, which must
