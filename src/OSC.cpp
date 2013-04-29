@@ -1354,7 +1354,7 @@ namespace extemp {
       osc->setSocketFD(socket_fd);
 
       ascii_text_color(1,3,10);
-      printf("New TCP OSC connection\n");
+      printf("New TCP-OSC connection\n");
       ascii_text_color(0,7,10);
 
 #endif
