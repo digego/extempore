@@ -206,6 +206,11 @@ See `run-hooks'."
   :type 'integer
   :group 'extempore)
 
+(defcustom extempore-default-connection-type "TCP"
+  "Default connection type (either \"TCP\" or \"TCP-OSC\"."
+  :type 'string
+  :group 'extempore)
+
 (defcustom extempore-use-pretty-lambdas t
   "Use pretty (greek symbol) lambdas in buffer?"
   :type 'boolean
@@ -646,15 +651,12 @@ be running in another (shell-like) buffer."
   (interactive
    ;; get args interactively
    (let ((read-host (read-from-minibuffer
-                     (concat "Hostname (default "
-                             extempore-default-host
-                             "):")))
+                     (format "Hostname (default %s):" extempore-default-host)))
          (read-port (read-from-minibuffer
-                     (concat "Port (default "
-                             (number-to-string extempore-default-port)
-                             "):")))
+                     (format "Port (default %d):" extempore-default-port)))
          (read-type (read-from-minibuffer
-                     (concat "Connction type (default TCP):"))))
+                     (format "Connction type (default %s):" extempore-default-connection-type
+))))
      (list (if (string-equal read-host "") extempore-default-host read-host)
            (if (string-equal read-port "") extempore-default-port (string-to-number read-port))
            (if (string-equal read-type "") "TCP" read-type))))
