@@ -658,14 +658,14 @@ be running in another (shell-like) buffer."
      (list (if (string-equal read-host "") extempore-default-host read-host)
            (if (string-equal read-port "") extempore-default-port (string-to-number read-port))
            (if (string-equal read-type "") "TCP" read-type))))
-  (unless (member type '("TCP" "OSC-TCP"))
-    (error "Unsupported connection type: %s. Currently, Extempore only supports TCP and OSC-TCP connections." type))
+  (unless (member type '("TCP" "TCP-OSC"))
+    (error "Unsupported connection type: %s. Currently, Extempore only supports TCP and TCP-OSC connections." type))
   ;; kill existing connection
   (when extempore-process (extempore-disconnect))
   ;; set up connection of `type'
   (cond ((string-equal type "TCP")
          (extempore-connect-tcp))
-        ((string-equal type "OSC-TCP")
+        ((string-equal type "TCP-OSC")
          (extempore-connect-tcp-osc))))
 
 ;;; SLIP escape codes
