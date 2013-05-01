@@ -830,7 +830,7 @@ namespace extemp {
 
   int OSC::getOSCString(const char* data, std::string* str) {
     int str_cnt = 0;
-    for( ;str_cnt<256; ++str_cnt) {
+    for( ;str_cnt<4096; ++str_cnt) {
       if (data[str_cnt] == '\0') break;
       str->push_back(data[str_cnt]);
     }
