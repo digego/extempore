@@ -106,8 +106,8 @@ namespace extemp {
 		memcpy(sc->name,_name.c_str(),_name.length()+1);
 		max_duration = sc->call_default_time;
 		//scheme_set_output_port_file(sc, stdout);
-		memset(scheme_outport_string,0,256);
-		scheme_set_output_port_string(sc,scheme_outport_string,&scheme_outport_string[255]);
+		memset(scheme_outport_string,0,SCHEME_OUTPORT_STRING_LENGTH);
+		scheme_set_output_port_string(sc,scheme_outport_string,&scheme_outport_string[SCHEME_OUTPORT_STRING_LENGTH-1]);
 		FILE *initscm = fopen(std::string(load_path).append("init.xtm").c_str(),"r");
 		if(!initscm) {
 			std::cout << "ERROR: Could not locate file: init.xtm" << std::endl << "Exiting system!!" << std::endl;
@@ -617,7 +617,7 @@ namespace extemp {
 						if(sc->retcode != 0) { //scheme error
 							sc->outport->_object._port->rep.string.curr = scm->scheme_outport_string; //this line sets the sc->outport's current index back to the start of scheme_outport_string						
 							//write(return_socket, scm->scheme_outport_string, strlen(scm->scheme_outport_string)+1);							
-							memset(scm->scheme_outport_string,0,256);
+							memset(scm->scheme_outport_string,0,SCHEME_OUTPORT_STRING_LENGTH);
 						}							
 					}
 					delete evalString;					
@@ -656,7 +656,7 @@ namespace extemp {
 #else
 							write(return_socket, scm->scheme_outport_string, strlen(scm->scheme_outport_string)+1);
 #endif
-							memset(scm->scheme_outport_string,0,256);
+							memset(scm->scheme_outport_string,0,SCHEME_OUTPORT_STRING_LENGTH);
 						}else{
 							ss.str("");		
 							UNIV::printSchemeCell(sc, ss, sc->value);
@@ -697,7 +697,7 @@ namespace extemp {
 						if(sc->retcode != 0) { //scheme error
 							sc->outport->_object._port->rep.string.curr = scm->scheme_outport_string; //this line sets the sc->outport's current index back to the start of scheme_outport_string						
 							//write(return_socket, scm->scheme_outport_string, strlen(scm->scheme_outport_string)+1);							
-							memset(scm->scheme_outport_string,0,256);
+							memset(scm->scheme_outport_string,0,SCHEME_OUTPORT_STRING_LENGTH);
 						}												
 					}else{
 						ss.str("");
@@ -719,7 +719,7 @@ namespace extemp {
 						if(sc->retcode != 0) { //scheme error
 							sc->outport->_object._port->rep.string.curr = scm->scheme_outport_string; //this line sets the sc->outport's current index back to the start of scheme_outport_string						
 							//write(return_socket, scm->scheme_outport_string, strlen(scm->scheme_outport_string)+1);							
-							memset(scm->scheme_outport_string,0,256);
+							memset(scm->scheme_outport_string,0,SCHEME_OUTPORT_STRING_LENGTH);
 						}																		
 					}else{
 						ss.str("");

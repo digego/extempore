@@ -162,8 +162,10 @@ namespace extemp {
 	void setLoadedLibs(bool v) { libs_loaded = v; }
 	bool loadedLibs() {return libs_loaded; }
 	//std::vector<int>* getClientSockets() { return &client_sockets; }
-		
-	char scheme_outport_string[256];		
+
+        #define SCHEME_OUTPORT_STRING_LENGTH 25600
+	char scheme_outport_string[SCHEME_OUTPORT_STRING_LENGTH];
+
 	static bool CAPS_THROUGH; //send caps lock through to editor window or block?
 		
 	static std::vector<SchemeProcess*> INSTANCES;		
