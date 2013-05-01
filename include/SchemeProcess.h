@@ -163,7 +163,7 @@ namespace extemp {
 	bool loadedLibs() {return libs_loaded; }
 	//std::vector<int>* getClientSockets() { return &client_sockets; }
 
-        #define SCHEME_OUTPORT_STRING_LENGTH 25600
+        #define SCHEME_OUTPORT_STRING_LENGTH 256
 	char scheme_outport_string[SCHEME_OUTPORT_STRING_LENGTH];
 
 	static bool CAPS_THROUGH; //send caps lock through to editor window or block?
