@@ -150,7 +150,7 @@
   (set (make-variable-buffer-local 'mode-line-process) nil)
   (set (make-variable-buffer-local 'extempore-process-evalstr-fn)
        #'extempore-make-crlf-evalstr)
-    ;; mode line process
+  ;; mode line process
   (setq mode-line-process nil))
 
 (defvar extempore-mode-map
@@ -354,13 +354,13 @@ See `run-hooks'."
        "\\>")
       '(1 font-lock-keyword-face t))
      ;; float and int literals
-      '("\\_<[-+]?[/.[:digit:]]+?\\_>"
-        (0 font-lock-constant-face))
+     '("\\_<[-+]?[/.[:digit:]]+?\\_>"
+       (0 font-lock-constant-face))
      ;; hack to make sure / gets highlighted as a function
-      '("\\_</\\_>"
-        (0 font-lock-function-name-face t))
-      ;; boolean literals
-      '("\\_<#[tf]\\_>"
+     '("\\_</\\_>"
+       (0 font-lock-function-name-face t))
+     ;; boolean literals
+     '("\\_<#[tf]\\_>"
        (0 font-lock-constant-face)))))
 
 (defconst extempore-font-lock-keywords-scheme
@@ -527,7 +527,7 @@ indentation."
 	       (lisp-indent-specform method state
 				     indent-point normal-indent))
 	      (method
-		(funcall method state indent-point normal-indent)))))))
+               (funcall method state indent-point normal-indent)))))))
 
 
 ;;; 'let' is different in Scheme/xtlang
@@ -662,7 +662,7 @@ be running in another (shell-like) buffer."
                      (format "Port (default %d):" extempore-default-port)))
          (read-type (read-from-minibuffer
                      (format "Connction type (default %s):" extempore-default-connection-type
-))))
+                             ))))
      (list (if (string-equal read-host "") extempore-default-host read-host)
            (if (string-equal read-port "") extempore-default-port (string-to-number read-port))
            (if (string-equal read-type "") "TCP" read-type))))
@@ -774,10 +774,10 @@ be running in another (shell-like) buffer."
 (defun extempore-send-defn (defn-str)
   (interactive)
   (if extempore-process
-        (progn (process-send-string extempore-process defn-str)
-               (redisplay)
-               (sleep-for .1))
-      (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)"))))
+      (progn (process-send-string extempore-process defn-str)
+             (redisplay)
+             (sleep-for .1))
+    (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)"))))
 
 (defun extempore-send-defn-at-point ()
   "Send the enclosing top-level defn to Extempore server for evaluation."
