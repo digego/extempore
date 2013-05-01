@@ -6,37 +6,65 @@
 
 ;;; Commentary:
 
+;; OSC messages can also be recieved over TCP. This is parcicularly
+;; useful for taking advantage of the Extempore compiler-as-a-service
+;; (CaaS)
+
 ;; This example code shows how to connect to the Extempore compiler
 ;; via an 'OSC over TCP' connection (on port 7029).
 
-;; Any messages with the address "/caas/eval" will be evaluated as
-;; normal (i.e. as though they were sent over the 'regular' TCP
-;; connection)
-
 ;;; Code:
 
-;; start the TCP-OSC server
+;; define a function which, if it recieves an OSC message with the
+;; address '/caas/eval' will evaluate the (string) argument
 
-(io:osc:start-server 7029 "osc-caas-callback" "TCP")
-
-(define (osc-caas-callback timestamp address . args)
+(define (caas-compiler-callback timestamp address . args)
   (if (string=? address "/caas/eval")
       (eval (string->sexpr (car args))
             (interaction-environment))
       (println 'Unknown 'OSC 'address: address)))
 
-;; set it up (this isn't code for Extempore; eval in emacs with 'C-x C-e')
+;; start an OSC-over-TCP server on port 7029 (note the third "TCP" argument)
+(io:osc:start-server 7029 "caas-compiler-callback" "TCP")
 
-(extempore-connect "localhost" 7029 "TCP-OSC")
+;; you can then connect to the compiler on port 7029 and send code
+;; strings for compilation. The extempore.el emacs mode already has
+;; support for this:
 
-;; testing
+;; 1. start the TCP-OSC server (as above)
+;;
+;; 2. connect to that port:
+;;    `M-x extempore-connect RET localhost RET 7029 RET TCP-OSC'
+;;
+;; 3. evaluate code as usual with C-x C-x (`extempore-send-defn-at-point')
+;;
+;; Note that because Emacs uses per-buffer connections, you can have
+;; some buffers which are connected normally (plain TCP), and some
+;; which use OSC-over-TCP: C-x C-x should just work in each buffer.
 
-(println 3)
+;; Test that it works properly (although make sure you print things:
+;; currently the results of computation are not 'echoed' in the
+;; minibuffer as is the case with the regular TCP connection to the
+;; compiler.
 
-(define test
+(println 'it 'works!)
+
+(define doubler
   (lambda (a)
-    (* 2 a)))
+    (* a 2)))
 
-(println (test 3))
+(println (doubler 5))
+(println (doubler (random 5)))
 
-;; currently: error at 0x101f892f8 when running polysynth.xtm
+;; xtlang code will work fine as well
+
+(bind-func xtdoubler
+  (lambda (a:i64)
+    (printf "2 x %lld = %lld\n" a (* a 2))))
+
+(xtdoubler (random 5))
+
+;; Local Variables:
+;; extempore-default-port: 7029
+;; extempore-default-connection-type: "TCP-OSC"
+;; End:

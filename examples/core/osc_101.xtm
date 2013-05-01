@@ -28,15 +28,12 @@
 (io:osc:send (+ (now) (* *second* 4)) addy1 "/test/msg" "Hello" 500 6.6 "World")
 (io:osc:send (+ (now) (* *second* 4)) addy2 "/test/msg" "Hello" 500 6.6 "World")
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; OSC messages can also be sent and received
 ;; using extempore lang compiled code
 ;;
-
-
-;; a couple of things to keep in mind
+;; a couple of things to keep in mind:
 ;; args is the complete list of arguments
 ;;
 ;; by default all extempore osc ints and floats
@@ -82,41 +79,3 @@
 ;; Send another test message
 
 (my_osc_send "/native/mytest" 6.6 4321)
-
-
-;; OSC messages can also be recieved over TCP. This is parcicularly
-;; useful for taking advantage of the Extempore compiler-as-a-service
-;; (CaaS)
-
-;; We can define a function which, if it recieves an OSC message with
-;; the address '/caas/eval' will evaluate the (string) argument
-
-(define (osc-caas-callback timestamp address . args)
-  (if (string=? address "/caas/eval")
-      (eval (string->sexpr (car args))
-            (interaction-environment))))
-
-;; Now, start an OSC-over-TCP server on port 7029
-
-(io:osc:start-server 7029 "osc-caas-callback" "TCP")
-
-;; you can then connect to the compiler on port 7029 and send code
-;; strings for compilation. The extempore.el emacs mode already has
-;; support for this:
-
-;; 1. start the TCP-OSC server (as above)
-;;
-;; 2. connect to that port:
-;;    `M-x extempore-connect RET localhost RET 7029 RET'
-;;
-;; 3. switch to using OSC to send defuns
-;;    `M-x extempore-set-connection-type RET OSC-TCP'
-;;
-;; 4. evaluate code as usual with C-x C-x (`extempore-send-defn-at-point')
-;;
-;; Note that because Emacs uses per-buffer connections, you can have
-;; some buffers which are connected normally (plain TCP), and some
-;; which use OSC-over-TCP. If you set the connection type in each
-;; buffer properly (with `extempore-set-connection-type') then C-x C-x
-;; should just work in each buffer.
-
