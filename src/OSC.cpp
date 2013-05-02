@@ -1232,7 +1232,7 @@ namespace extemp {
     // setup server port
     // check type of connection: UDP (default) or TCP
     if(list_length(_sc,args) == 3 &&
-       strncmp(string_value(pair_caddr(args)), "TCP", 4) == 0){
+       strncmp(string_value(pair_caddr(args)), "TCP-OSC", 4) == 0){
       osc->setConnectionType(OSC_TCP_TYPE);
     }else{
       osc->setConnectionType(OSC_UDP_TYPE);
@@ -1312,7 +1312,7 @@ namespace extemp {
 #else
       int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
       if(socket_fd == -1) {
-        std::cout << "Error opening (TCP) OSC socket" << std::endl;
+        std::cout << "Error opening TCP-OSC socket" << std::endl;
         return _sc->F;
       }
       int t_reuse = 1;
@@ -1328,7 +1328,7 @@ namespace extemp {
                            sizeof(t_reuse));
 
       if (result < 0) {
-        std::cout << "Error opening (TCP) OSC socket"<< std::endl;
+        std::cout << "Error opening TCP-OSC socket"<< std::endl;
         return _sc->F;
       }
       // Bind Server Socket
@@ -1343,18 +1343,18 @@ namespace extemp {
       server_address.sin_addr.s_addr = htonl(INADDR_ANY); //set server's IP
 
       if(bind(socket_fd, (struct sockaddr*) &server_address, server_address_size) == -1) {
-        std::cout << "Error binding TCP OSC server address to socket" << std::endl;
+        std::cout << "Error binding TCP-OSC server address to socket" << std::endl;
         return _sc->F;
       }
       if(listen(socket_fd, 5) == -1) {
-        std::cout << "Problem listening on TCP OSC socket." << std::endl;
+        std::cout << "Problem listening on TCP-OSC socket." << std::endl;
         return _sc->F;
       }
 
       osc->setSocketFD(socket_fd);
 
       ascii_text_color(1,3,10);
-      printf("New TCP-OSC connection\n");
+      printf("Started TCP-OSC server on port %d\n", port);
       ascii_text_color(0,7,10);
 
 #endif
