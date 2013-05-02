@@ -848,6 +848,12 @@ be running in another (shell-like) buffer."
         ;; filter
         nil)))
 
+(add-hook 'extempore-mode-hook
+          '(lambda ()
+             (turn-on-eldoc-mode)
+             (setq eldoc-documentation-function
+                   'extempore-eldoc-documentation-function)))
+
 ;; misc bits and pieces
 
 (defun xpb1 (name duration)
