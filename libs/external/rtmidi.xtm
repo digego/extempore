@@ -208,7 +208,7 @@
 ;; a midi-specific play macro
 
 (macro (playm args)
-  (if (symbol? (cadr args))
+  (if (not (symbol? (cadr args)))
       (if (> (length args) 6)
 	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
 		      ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))
@@ -218,3 +218,35 @@
 		      (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))) ,(car (cdddr (cddddr args))))
 	  `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
 		      (*metro* 'dur ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))))))
+
+(macro (playm args)
+  (if (symbol? (cadr args))
+      `(play-midi (*metro* beat) ,(cadr args)
+                  (real->integer ,(caddr args))
+                  (real->integer ,(cadddr args))
+                  (*metro* 'dur ,(car (cddddr args))) 0)
+      `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args)
+                  (real->integer ,(cadddr args))
+                  (real->integer ,(car (cddddr args)))
+                  (*metro* 'dur ,(cadr (cddddr args))) 0)))
+
+;; uncomment if you want to use play instead of playm
+;;
+;; (macro (play args)
+;;   (if (symbol? (cadr args))
+;;       `(play-midi (*metro* beat) ,(cadr args)
+;;                   (real->integer ,(caddr args))
+;;                   (real->integer ,(cadddr args))
+;;                   (*metro* 'dur ,(car (cddddr args))) 0)
+;;       `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args)
+;;                   (real->integer ,(cadddr args))
+;;                   (real->integer ,(car (cddddr args)))
+;;                   (*metro* 'dur ,(cadr (cddddr args))) 0)))
+
+
+(define midiout (midi_out))
+
+;; (let ((beat (*metro* 'get-beat 1)))
+;;   (playm midiout 60. 70.8 1.0))
+
+(play-midi (now) (midi_out) 72 20 10000 0)
