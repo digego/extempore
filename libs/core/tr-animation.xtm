@@ -1,0 +1,50 @@
+;;; tr-animation.xtm -- in-buffer animation support for temporal recursions
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: 
+
+;;; Commentary:
+
+;; Currently, this only works with Emacs, but in principle should be
+;; extensible to other editors. These functions require the use of the
+;; extempore major mode extempore.el which ships with Extempore in the
+;; extras/ directory.
+
+;; To set up the animations, you need to do three things:
+
+;; 1. load this file in an Extempore session (load "libs/core/tr-animation.xtm")
+;; 2. in an Extempore buffer in Emacs, call `M-x extempore-start-tr-animation'
+;; 3. use the `callback-anim' macro provided here instead of the usual
+;;    `callback' macro (all the arguments are the same, though).
+
+;;; Code:
+
+;; re-define some infrastructure to support callbacks
+;; (original version in runtime/scheme.xtm)
+
+;; need to start a sever before we can send (not sure why)
+(io:osc:start-server 7009 "TR-anim-client-port")
+
+;; set port to #f to disable
+(define *tr-anim-osc-server-port* 7097)
+
+(define ta-send-anim-trigger
+  (lambda (func-name delta-t)
+    (io:osc:send (now)
+                 (cons "localhost" *tr-anim-osc-server-port*)
+                 "/anim"
+                 (string-append
+                  "(extempore-trigger-tr-anim \"" 
+                  func-name "\" "
+                  (number->string delta-t) ")"))))
+
+(define (callback time func . args)
+  (let ((payload (if (symbol? func)
+		     (cons callback-adapter (cons func args))
+                     (cons func args))))
+    (call-cpp-at-time time 2 *callback* payload (current-environment))
+    ;; send animation trigger
+    (if (and (symbol? func) *tr-anim-osc-server-port*)
+        (ta-send-anim-trigger (symbol->string func) (/ (- time (now)) *au:samplerate*)))))
+

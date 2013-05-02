@@ -63,9 +63,12 @@ uint64_t unswap64i(uint64_t a);
 uint32_t swap32i(uint32_t f);
 uint32_t unswap32i(uint32_t a);
 
+typedef struct scm_osc_pair {
+  void* scm_p;
+  void* osc_p;
+} scm_osc_pair;
 
 //#define _OSC_DEBUG_
-
 
 namespace extemp {
     
@@ -110,6 +113,7 @@ namespace extemp {
 	boost::asio::ip::udp::endpoint* getAddress() { return osc_address; }
 	boost::asio::ip::udp::endpoint* getClientAddress() { return osc_client_address; }
 	int* getClientAddressSize() { return &osc_client_address_size; }
+	void setClientAddressSize(int addr_size) { osc_client_address_size = addr_size; }
 	char* getMessageData() { return message_data; }
 	int getMessageLength() { return message_length; }
 	boost::asio::ip::udp::socket* getSendFD() { return send_socket; }
@@ -121,11 +125,15 @@ namespace extemp {
 	struct sockaddr_in* getAddress() { return &osc_address; }
 	struct sockaddr_in* getClientAddress() { return &osc_client_address; }
 	int* getClientAddressSize() { return &osc_client_address_size; }
+	void setClientAddressSize(int addr_size) { osc_client_address_size = addr_size; }
+	int getConnectionType() { return conn_type; }
+	void setConnectionType(int type) { conn_type = type; }
 	char* getMessageData() { return message_data; }
 	int getMessageLength() { return message_length; }
 	int getSendFD() { return send_socket_fd; }
 	void setSendFD(int fd) { send_socket_fd = fd; }		
 	int* getSocketFD() { return &socket_fd; }
+	void setSocketFD(int fd) { socket_fd = fd; }
 #endif
 	EXTThread& getThread() { return threadOSC; }
 	bool getStarted() { return started; }
@@ -141,10 +149,10 @@ namespace extemp {
 	char scheme_real_type;
 	char scheme_integer_type;
 	bool send_from_serverfd;
-		
+
     private:
-	static OSC* singleton;
-	EXTThread threadOSC;
+      static OSC* singleton;
+      EXTThread threadOSC;
 #ifdef EXT_BOOST
 	boost::asio::ip::udp::socket* socket;
 	boost::asio::ip::udp::socket* send_socket;
@@ -152,16 +160,17 @@ namespace extemp {
 	boost::asio::ip::udp::endpoint* osc_client_address;
 	boost::asio::io_service* io_service;
 #else
-	int socket_fd;
+        int socket_fd;
 	int send_socket_fd;
 	struct sockaddr_in osc_address;
 	struct sockaddr_in osc_client_address;
 #endif
-	int osc_client_address_size;
-	char message_data[70000];
-	int message_length;
-	bool started;
-	int(*native)(char*,char*,char*,int); /* if not null then use this compiled function for callbacks */
+      int conn_type;          // UDP (1) or TCP (2)
+      int osc_client_address_size;
+      char message_data[70000];
+      int message_length;
+      bool started;
+      int(*native)(char*,char*,char*,int); /* if not null then use this compiled function for callbacks */
     };
 
 } //End Namespace
