@@ -827,7 +827,7 @@ be running in another (shell-like) buffer."
 
 ;; eldoc
 
-(defcustom extempore-eldoc-active nil
+(defcustom extempore-eldoc-active t
   "If non-nil, attempt to display live argument lists for the
   function under point."
   :type 'boolean
