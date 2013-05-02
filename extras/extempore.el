@@ -753,6 +753,7 @@ be running in another (shell-like) buffer."
   (interactive)
   (save-excursion
     (mark-defun)
+    (redisplay)
     (chomp (buffer-substring-no-properties (point) (mark)))))
 
 (defun extempore-make-crlf-evalstr (evalstr)
