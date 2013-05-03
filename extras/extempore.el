@@ -631,6 +631,7 @@ determined by whether there is an *extempore* buffer."
 
 (defun extempore-connect-tcp (host port)
   (setq extempore-process (open-network-stream "extempore" nil host port))
+  (set-process-coding-system extempore-process 'iso-latin-1 'iso-latin-1)
   (set-process-filter extempore-process #'extempore-crlf-process-filter)
   (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr)
   (setq mode-line-process
@@ -638,6 +639,7 @@ determined by whether there is an *extempore* buffer."
 
 (defun extempore-connect-tcp-osc (host port)
   (setq extempore-process (open-network-stream "extempore" nil host port))
+  (set-process-coding-system extempore-process 'iso-latin-1 'iso-latin-1)  
   (set-process-filter extempore-process #'extempore-slip-process-filter)
   (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr)
   (setq mode-line-process
