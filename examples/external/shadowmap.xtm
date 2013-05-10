@@ -1,0 +1,162 @@
+;;; opengl_101.xtm -- Simplest possible OpenGL example
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
+(load "libs/external/opengl.xtm")
+(load "libs/external/shaders.xtm")
+(load "libs/core/math.xtm")
+
+;; this is similar to gl_look_at
+;; but returns a suitable VIEW matrix
+(bind-func get_view_matrix
+  (lambda (vEye vTarget vUp matrix:float*)
+    (let ((vz:float* (salloc 3))
+          (vy:float* (salloc 3))
+          (vx:float* (salloc 3))
+          (i 0)
+          (mat:float* (salloc 16))
+          (mtmp1:float* (salloc 16))          
+          (vtmp1:float* (salloc 3))
+          (vtmp2:float* (salloc 3)))
+      (vsub vEye vTarget 3 vtmp1)
+      (vnorm vtmp1 3 vz)
+      (vcross vUp vz vtmp1)
+      (vnorm vtmp1 3 vx)
+      (vcross vz vx vy)
+      (pfill! mat
+             (pref vx 0) (pref vx 1) (pref vx 1) 0.0
+             (pref vy 0) (pref vy 1) (pref vy 2) 0.0
+             (pref vz 0) (pref vz 1) (pref vz 2) 0.0
+             (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
+      (minvf mat 4 mtmp1)
+      (dotimes (i 16) (pset! matrix i (pref mtmp1 i)))
+      void)))
+
+
+;; a trivial opengl draw loop
+(bind-func my-gl-loop
+  (let ((size 0.01)
+        (matrix:float* (alloc 16))
+        (eye:float* (alloc 4))
+        (target:float* (alloc 3))
+        (up:float* (alloc 3))        
+        (mata:float* (alloc 4))
+        (matd:float* (alloc 4))        
+        (mats:float* (alloc 4))
+        (matss:float* (alloc 1)))
+    (lambda (degree:double)
+      (let ((v:float* (salloc 4))
+            (ld:float* (salloc 4))
+            (cd:float* (salloc 4))            
+            (e:float* (salloc 4))
+            (d:float* (salloc 4))
+            (s:float* (salloc 4))
+            (a:float* (salloc 4)))
+        (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+
+        ;; (pfill! v ;(+ -5.0 (dtof (% (* .1 degree) 5.0)))
+        ;;         (* 200.0 (dtof (cos (* 0.05 degree))))
+        ;;         (+ 30.0 (* 30.0 (dtof (sin (* 0.1 degree)))) )
+        ;;         (+ 150.0 (* 150.0 (dtof (cos (* 0.1 degree)))) 1.0))
+        (pfill! v 0.0 2.0 5.0 1.0)
+        (pfill! a 1.0 1.0 1.0 1.0)
+        (pfill! s 1.0 1.0 1.0 1.0)
+        (pfill! d 1.0 1.0 1.0 1.0)
+        (pfill! e
+                (dtof (* 10.0 (cos (* .01 degree))))
+                (dtof (+ 5.0 (* 5.0 (cos (* .005 degree)))))
+                5.0
+                1.0)
+        ;;(pfill! ld 0.0 -1.0 -1.0 1.0)
+        ;;(pfill! cd 0.0 0.0 0.0 1.0)
+        (gl_look_at (ftod (pref e 0))
+                    (ftod (pref e 1))
+                    (ftod (pref e 2))
+                    0.0 0.0 0.0 0.0 1.0 0.0)
+        
+        (glUniform4fv (glGetUniformLocation light_shader "LightPos") 1 v)
+        (glUniform4fv (glGetUniformLocation light_shader "LightAmbient") 1 a)
+        (glUniform4fv (glGetUniformLocation light_shader "LightSpecular") 1 s)
+        (glUniform4fv (glGetUniformLocation light_shader "LightDiffuse") 1 d)
+        (glUniform4fv (glGetUniformLocation light_shader "CameraPos") 1 e)
+        (glUniform4fv (glGetUniformLocation light_shader "LightDir") 1 ld)
+        (glUniform4fv (glGetUniformLocation light_shader "CameraDir") 1 cd))
+      (let ((i:double 0.0))
+	(dotimes (i 1.0 1.0)
+          ;(glPushMatrix)
+          (pfill! mata 0.0 0.0 0.0 1.0)
+          (glUniform4fv (glGetUniformLocation light_shader "MatAmbient") 1 mata)
+          (pfill! matd 0.0 0.0 1.0 1.0)
+          (glUniform4fv (glGetUniformLocation light_shader "MatDiffuse") 1 matd)
+          (pfill! mats 1.0 1.0 1.0 1.0)
+          (glUniform4fv (glGetUniformLocation light_shader "MatSpecular") 1 mats)
+          (glUniform1f (glGetUniformLocation light_shader "MatShininess") 50.0)
+
+          ;; static cube
+          (cube-whole)
+
+          ;; sphere 1
+          (glTranslated 1.0 2.0 -2.0)
+          (glutSolidSphere 1.0 50 50)
+          (glTranslated -1.0 -2.0 2.0)
+
+          ;; rotating cube
+          (glTranslated -2.0 0.0 1.0)                     
+          (glTranslated 0.5 0.5 0.5)
+	  (glRotated (* 3.0 degree) 1.0 1.0 1.0)
+          (glTranslated -0.5 -0.5 -0.5)
+          (cube-whole)
+          (glRotated (* -3.0 degree) 1.0 1.0 1.0)          
+          (glTranslated 2.0 0.0 -1.0)
+          
+          ;; wall
+          (pfill! mata 0.0 0.0 0.0 1.0)
+          (glUniform4fv (glGetUniformLocation light_shader "MatAmbient") 1 mata)
+          (pfill! matd 1.0 0.3 0.2 1.0)
+          (glUniform4fv (glGetUniformLocation light_shader "MatDiffuse") 1 matd)
+          (pfill! mats 0.5 0.5 0.5 1.0)
+          (glUniform4fv (glGetUniformLocation light_shader "MatSpecular") 1 mats)
+          (glUniform1f (glGetUniformLocation light_shader "MatShininess") 500.0)
+          
+          (glTranslated -5.0 -2.0 -5.0)
+          (glScaled 10.0 10.0 0.01)
+          (cube-whole)
+          (glScaled .1 0.1 100.0)
+          (glTranslated 5.0 2.0 5.0)
+
+          ;; ceiling
+          (glTranslated -5.0 -2.0 -5.0)
+          (glScaled 10.0 0.01 10.0)
+          (cube-whole)
+          (glScaled 0.1 100.0 0.1)
+          (glTranslated 5.0 2.0 5.0)          
+
+          ;(glPopMatrix)
+          )))))
+
+(bind-func use-program
+  (lambda ()
+    (glUseProgram light_shader)))
+
+
+;; standard impromptu callback 
+(define opengl-test
+  (lambda (degree)
+    (my-gl-loop degree)
+    (gl:swap-buffers glctx)
+    (callback (+ (now) 1000) 'opengl-test (+ degree .5))))
+
+
+(define glctx (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
+(gl_set_view 1024. 768. 100.0)
+(init-all-shaders)
+(use-program)
+(opengl-test 70.0)
+

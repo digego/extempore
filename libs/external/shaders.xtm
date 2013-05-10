@@ -68,6 +68,7 @@ void main() {
    //TexCoord =  gl_TextureMatrix[0].st * gl_MultiTexCoord0.st;   
    TexCoord = gl_MultiTexCoord0.st;
    gl_FrontColor = gl_Color;
+   //gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex; //this same as line below
    gl_Position = ftransform();
 }")
 
@@ -470,6 +471,75 @@ void main( void ) {
 
 
 
+(define light_vert
+  "
+varying vec3 N, L, E, V;
+uniform vec4 LightPos;
+uniform vec4 CameraPos;
+
+void main()
+{
+  gl_Position = ftransform();
+  vec4 vPosition = gl_ModelViewMatrix * gl_Vertex;
+  N = gl_NormalMatrix * gl_Normal; //normal
+  L = LightPos.xyz - vPosition.xyz; // light
+  if(LightPos.w == 0.0) L = LightPos.xyz;
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // eye
+  //E = (vec4(0.0,0.0,10.0,1.0) - vPosition).xyz; // eye
+}
+")
+
+(define light_frag
+  "
+varying vec3 N, L, E, V;
+uniform vec4 LightAmbient;
+uniform vec4 LightDiffuse;
+uniform vec4 LightSpecular;
+uniform vec4 LightDir;
+uniform vec4 CameraDir;
+uniform float MatShininess;
+uniform vec4 MatAmbient;
+uniform vec4 MatDiffuse;
+uniform vec4 MatSpecular;
+
+vec4 product(vec4 a,vec4 b)
+{
+   return vec4(a[0]*b[0],a[1]*b[1],a[2]*b[2],a[3]*b[3]);
+}
+
+void main()
+{
+  vec3 NN = normalize(N);
+  vec3 LL = normalize(L);
+  vec3 EE = normalize(E);
+  vec3 VV = normalize(V);
+  vec4 Color = vec4(0.0,0.0,0.0,0.0);
+
+  //vec4 AmbientProduct = LightAmbient*MatAmbient;
+  //vec4 SpecularProduct = LightSpecular*MatSpecular;
+  //vec4 DiffuseProduct = LightDiffuse*MatDiffuse;
+  vec4 AmbientProduct = product(LightAmbient,MatAmbient);
+  vec4 SpecularProduct = product(LightSpecular,MatSpecular);
+  vec4 DiffuseProduct = product(LightDiffuse,MatDiffuse);
+
+  vec4 ambient,diffuse,specular;
+
+  vec3 H = normalize(LL+EE);
+  float Kd = max(dot(LL,NN),0.0);
+  Kd = dot(LL,NN);
+
+  ambient = AmbientProduct;
+  diffuse = Kd*DiffuseProduct;
+  float Ks = pow(max(dot(NN, H), 0.0),MatShininess);
+  if(dot(LL,NN) < 0.0) specular = vec4(0.0,0.0,0.0,1.0);
+  else specular = Ks*SpecularProduct;
+  gl_FragColor = vec4((ambient + diffuse + specular).xyz,1.0);
+  //gl_FragColor = vec4(Color,1.0);
+}
+")
+
+
 (bind-func shader_setup_convolution_filter
   (lambda (shader offset)
     (shader_set_grid_offsets 1.0 1.0 offset) ;(* 2.0 (dtof (cos (* 2222.2 (i64tod (now)))))))
@@ -491,25 +561,28 @@ void main( void ) {
 (bind-val green_shader i32 0)
 (bind-val particles_shader i32 0)
 (bind-val dof_shader i32 0)
+(bind-val light_shader i32 0)
 
 ;; must be called after initalizing opengl
 (bind-func _init-all-shaders
   (lambda (passthrough_vert 
-	   passthrough_frag
-	   invert_frag
-	   greyscale_frag
-	   sepia_frag
-	   gaussian_frag
-	   blur_frag
-	   sharpen_frag
-	   dilate_frag
-	   erode_frag
-	   edge_frag
-	   blend_frag
-	   green_frag
-	   particles_vert
-	   particles_frag
-	   dof_frag)
+      passthrough_frag
+      invert_frag
+      greyscale_frag
+      sepia_frag
+      gaussian_frag
+      blur_frag
+      sharpen_frag
+      dilate_frag
+      erode_frag
+      edge_frag
+      blend_frag
+      green_frag
+      particles_vert
+      particles_frag
+      dof_frag
+      light_vert
+      light_frag)
     (set! pass_shader (create-shader passthrough_vert passthrough_frag))
     (set! invert_shader (create-shader passthrough_vert invert_frag)) 
     (set! greyscale_shader (create-shader passthrough_vert greyscale_frag))
@@ -524,23 +597,26 @@ void main( void ) {
     (set! green_shader (create-shader passthrough_vert green_frag))
     (set! particles_shader (create-shader particles_vert particles_frag))
     (set! dof_shader (create-shader passthrough_vert dof_frag))
+    (set! light_shader (create-shader light_vert light_frag))
     void))
 
 (define init-all-shaders
   (lambda ()
     (_init-all-shaders passthrough_vert
-	   passthrough_frag
-	   invert_frag
-	   greyscale_frag
-	   sepia_frag
-	   gaussian_frag
-	   blur_frag
-	   sharpen_frag
-	   dilate_frag
-	   erode_frag
-	   edge_frag
-	   blend_frag
-	   green_frag
-	   particles_vert
-	   particles_frag
-	   dof_frag)))
+                       passthrough_frag
+                       invert_frag
+                       greyscale_frag
+                       sepia_frag
+                       gaussian_frag
+                       blur_frag
+                       sharpen_frag
+                       dilate_frag
+                       erode_frag
+                       edge_frag
+                       blend_frag
+                       green_frag
+                       particles_vert
+                       particles_frag
+                       dof_frag
+                       light_vert
+                       light_frag)))
