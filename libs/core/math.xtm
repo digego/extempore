@@ -153,6 +153,36 @@
 (bind-poly vdot vdotd)
 (bind-poly vdot vdotf)
 
+;; for 3d only SO NO LGTH
+(bind-func vcrossd
+  (let ((i 0))
+    (lambda (v1:double* v2:double* v3:double*)
+      (pfill! v3
+              (- (* (pref v1 1) (pref v2 2))
+                 (* (pref v2 1) (pref v1 2)))
+              (- (* (pref v2 0) (pref v1 2))
+                 (* (pref v1 0) (pref v2 2)))
+              (- (* (pref v1 0) (pref v2 1))
+                 (* (pref v2 0) (pref v1 1))))
+      void)))
+
+
+;; for 3d only SO NO LGTH
+(bind-func vcrossf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* v3:float*)
+      (pfill! v3
+              (- (* (pref v1 1) (pref v2 2))
+                 (* (pref v2 1) (pref v1 2)))
+              (- (* (pref v2 0) (pref v1 2))
+                 (* (pref v1 0) (pref v2 2)))
+              (- (* (pref v1 0) (pref v2 1))
+                 (* (pref v2 0) (pref v1 1))))
+      void)))
+
+(bind-poly vcross vcrossd)
+(bind-poly vcross vcrossf)
+
 (bind-func vsmuld
   (lambda (s:double v1:double* lgth:i64 v2:double*)
     (let ((i 0))
@@ -573,7 +603,7 @@
 	(dotimes (j k)
 	  (pset! inv (+ (* i k) j)
 		 (/ (pref mb (+ (* i k) j)) d))))
-      inv)))
+      void)))
 
 ;; invert matrix (floats)
 (bind-func minvf
@@ -612,7 +642,9 @@
 	(dotimes (j k)
 	  (pset! inv (+ (* i k) j)
 		 (/ (pref mb (+ (* i k) j)) d))))
-      inv)))
+      void)))
+
+
 
 ;; poly to minv
 (bind-poly minv minvd)
