@@ -139,6 +139,199 @@
 #endif
 
 
+#ifdef TARGET_OS_MAC
+
+  // BasicOpenGLView
+  @interface BasicOpenGLView : NSOpenGLView
+  {
+    NSMutableDictionary * stanStringAttrib;
+    int eventType;
+    float x;
+    float y;
+    int mbutton;
+    char c;
+  }
+
+  + (NSOpenGLPixelFormat*) basicPixelFormat;
+  - (id)initWithFrame:(NSRect)frameRect pixelFormat:(NSOpenGLPixelFormat *)format;
+  - (float) getX;
+  - (float) getY;
+  - (int) getMButton;
+  - (char) getC;
+  - (int) getEventType;
+  - (void) setEventType:(int)t;
+  - (void) resizeGL;  
+  - (void)keyDown:(NSEvent *)theEvent;
+  - (void) mouseDown:(NSEvent *)theEvent;
+  - (void) rightMouseDown:(NSEvent *)theEvent;
+  - (void) otherMouseDown:(NSEvent *)theEvent;
+  - (void) mouseUp:(NSEvent *)theEvent;
+  - (void) rightMouseUp:(NSEvent *)theEvent;
+  - (void) otherMouseUp:(NSEvent *)theEvent;
+  - (void) mouseDragged:(NSEvent *)theEvent;
+  - (void) scrollWheel:(NSEvent *)theEvent;
+  - (void) rightMouseDragged:(NSEvent *)theEvent;
+  - (void) otherMouseDragged:(NSEvent *)theEvent;
+  - (BOOL) acceptsFirstResponder;
+  - (BOOL) becomeFirstResponder;
+  - (BOOL) resignFirstResponder;
+@end
+
+@implementation BasicOpenGLView
+
+- (id)initWithFrame:(NSRect)frameRect pixelFormat:(NSOpenGLPixelFormat *)format
+{
+    self = [super initWithFrame: frameRect pixelFormat: format];
+    x = 0.0f;
+    y = 0.0f;
+    mbutton = 0; // 1 2 or 3 (0 for no mouse)
+    c = '0';
+    eventType = -1; // key down (1)  mouse down (2)  mouse up (3)
+                    // mouse drag (4) 
+    return self;
+}
+
+- (float) getX { return x; }
+- (float) getY { return y; }
+- (int) getMButton {return mbutton; }
+- (char) getC { return c; }
+- (int) getEventType { return eventType; }
+- (void) setEventType:(int)t { eventType = t; return; }
+
+  // STUFF FOR BasicOpenGLView
+-(void)keyDown:(NSEvent *)theEvent
+{
+    NSString *characters = [theEvent characters];
+    if ([characters length]) {
+        unichar character = [characters characterAtIndex:0];
+        eventType = 1;
+        c = (char) character;
+    }    
+    return;
+}
+ 
+- (void)mouseDown:(NSEvent *)theEvent // trackball
+{
+    if ([theEvent modifierFlags] & NSControlKeyMask) // send to pan
+        [self rightMouseDown:theEvent];
+    else if ([theEvent modifierFlags] & NSAlternateKeyMask) // send to dolly
+        [self otherMouseDown:theEvent];
+    else {
+      NSPoint location = [theEvent locationInWindow];
+      eventType = 2;
+      x = location.x;
+      y = location.y;
+      mbutton = 1;
+    }
+    return;
+}
+ 
+- (void)rightMouseDown:(NSEvent *)theEvent // pan
+{
+    NSPoint location = [theEvent locationInWindow];
+    eventType = 2;
+    x = location.x;
+    y = location.y;     
+    mbutton = 2;
+    return;
+}
+ 
+- (void)otherMouseDown:(NSEvent *)theEvent //dolly
+{
+    NSPoint location = [theEvent locationInWindow];
+    eventType = 2;
+    x = location.x;
+    y = location.y;     
+    mbutton = 3;
+    return;
+}
+ 
+- (void)mouseUp:(NSEvent *)theEvent
+{
+    NSPoint location = [theEvent locationInWindow];
+    eventType = 3;
+    x = location.x;
+    y = location.y;
+    mbutton = 1;
+    return;
+}
+ 
+- (void)rightMouseUp:(NSEvent *)theEvent
+{
+    NSPoint location = [theEvent locationInWindow];
+    eventType = 3;
+    x = location.x;
+    y = location.y;
+    mbutton = 2;
+    return;
+}
+ 
+- (void)otherMouseUp:(NSEvent *)theEvent
+{
+    NSPoint location = [theEvent locationInWindow];
+    eventType = 3;
+    x = location.x;
+    y = location.y;
+    mbutton = 3;
+    return;
+}
+ 
+- (void)mouseDragged:(NSEvent *)theEvent
+{
+    NSPoint location = [theEvent locationInWindow];
+    eventType = 4;
+    x = location.x;
+    y = location.y;
+    mbutton = 1;
+    return;
+}
+ 
+- (void)scrollWheel:(NSEvent *)theEvent
+{
+    float wheelDelta = [theEvent deltaX] +[theEvent deltaY] + [theEvent deltaZ];
+    return;
+}
+ 
+- (void)rightMouseDragged:(NSEvent *)theEvent
+{
+    NSPoint location = [theEvent locationInWindow];
+    eventType = 4;
+    x = location.x;
+    y = location.y;
+    mbutton = 2;
+    return;
+}
+ 
+- (void)otherMouseDragged:(NSEvent *)theEvent
+{
+    NSPoint location = [theEvent locationInWindow];
+    eventType = 4;
+    x = location.x;
+    y = location.y;
+    mbutton = 3;
+    return;
+}
+
+- (BOOL)acceptsFirstResponder
+{
+  return YES;
+}
+ 
+- (BOOL)becomeFirstResponder
+{
+  return  YES;
+}
+ 
+- (BOOL)resignFirstResponder
+{
+  return YES;
+}
+@end
+#endif 
+
+
+
+
 char* cstrstrip (char* inputStr)
 {
     char *start, *end;
@@ -321,11 +514,8 @@ namespace extemp {
 	    { "impc:ir:getname",			&SchemeFFI::impcirGetName },
 	    { "impc:ir:gettype",			&SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			&SchemeFFI::impcirAdd },
-#if defined (TARGET_OS_LINUX)
 	    { "gl:get-event",			&SchemeFFI::getEvent },
-#endif
 #if defined (TARGET_OS_WINDOWS)
-	    { "gl:get-event",			&SchemeFFI::getEvent },
 	    { "gl:add-extension",           &SchemeFFI::addGLExtension },
 #endif
 	    { "gl:make-ctx",			    &SchemeFFI::makeGLContext },	    
@@ -3284,10 +3474,55 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 #elif TARGET_OS_MAC
 
+  pointer SchemeFFI::getEvent(scheme* _sc, pointer args)
+  {
+    BasicOpenGLView* view = (BasicOpenGLView*) cptr_value(pair_car(args));
+    switch([view getEventType]) {
+    case 1: {
+      pointer list = _sc->NIL;
+      _sc->imp_env->insert(list);
+      pointer tlist = cons(_sc,mk_integer(_sc,[view getC]),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      _sc->imp_env->insert(list);
+      tlist = cons(_sc,mk_integer(_sc,[view getEventType]),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      [view setEventType:-1];
+      return list;
+    }
+    case 2:
+    case 3:
+    case 4: {
+      pointer list = _sc->NIL;
+      _sc->imp_env->insert(list);
+      pointer tlist = cons(_sc,mk_integer(_sc,[view getY]),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      _sc->imp_env->insert(list);
+      tlist = cons(_sc,mk_integer(_sc,[view getX]),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,[view getMButton]),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      tlist = cons(_sc,mk_integer(_sc,[view getEventType]),list);
+      _sc->imp_env->erase(list);
+      list = tlist;
+      [view setEventType:-1];
+      return list;
+    }
+    default: {      
+      [view setEventType:-1];
+      return _sc->NIL;
+    }
+    }
+  }
+
   pointer SchemeFFI::glSwapBuffers(scheme* _sc, pointer args)
   {    
     //return objc_glSwapBuffers(_sc, args);
-    NSOpenGLView* view = (NSOpenGLView*) cptr_value(pair_car(args));
+    BasicOpenGLView* view = (BasicOpenGLView*) cptr_value(pair_car(args));
     CGLContextObj ctx = (CGLContextObj) [[view openGLContext] CGLContextObj];
     CGLLockContext(ctx);
     [[view openGLContext] flushBuffer];
@@ -3301,13 +3536,15 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
   {
     //    return objc_glMakeContextCurrent(_sc, args);
     CGLContextObj ctx = CGLGetCurrentContext();
-    NSOpenGLView* view = (NSOpenGLView*) cptr_value(pair_car(args));
+    BasicOpenGLView* view = (BasicOpenGLView*) cptr_value(pair_car(args));
     ctx = (CGLContextObj) [[view openGLContext] CGLContextObj];
     //CGLLockContext(ctx);
     CGLSetCurrentContext(ctx);
     //CGLUnlockContext(ctx);    
     return _sc->T;
   }
+
+
 
 
   pointer SchemeFFI::makeGLContext(scheme* _sc, pointer args)
@@ -3365,7 +3602,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
     NSOpenGLPixelFormat* fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes: (NSOpenGLPixelFormatAttribute*) array]; 
     //NSOpenGLContext *ctx = _openGLContext = [[NSOpenGLContext alloc] initWithFormat:fmt shareContext:nil];
-    NSOpenGLView* view = [[NSOpenGLView alloc] initWithFrame:screenRect pixelFormat:fmt];
+    BasicOpenGLView* view = [[BasicOpenGLView alloc] initWithFrame:screenRect pixelFormat:fmt];
     
     int windowStyleMask;
     if(fullscrn){

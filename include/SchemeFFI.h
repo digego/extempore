@@ -182,12 +182,8 @@ namespace extemp {
 	static pointer ad_getClockTime(scheme* _sc, pointer args);
 	static pointer ad_setTime(scheme* _sc, pointer args);
 
-#if defined (TARGET_OS_LINUX)
-	// some XWindows guff
 	static pointer getEvent(scheme* _sc, pointer args);
-#endif
 #if defined (TARGET_OS_WINDOWS)
-	static pointer getEvent(scheme* _sc, pointer args);
 	static pointer addGLExtension(scheme* _sc, pointer args);
 #endif
 	static pointer makeGLContext(scheme* _sc, pointer args);
