@@ -22,8 +22,27 @@
           ((string=? platform "OSX") (sys:open-dylib "libsndfile.dylib"))
           (else (print "Unknown platform: " platform)))))
 
+(bind-val SF_LOOP_NONE i32 800)
+(bind-val SF_LOOP_FORWARD i32 801)
+(bind-val SF_LOOP_BACKWARD i32 802)
+(bind-val SF_LOOP_ALTERNATING i32 803)
+
+(bind-val SFC_GET_INSTRUMENT i32 4304) ;; 0x10D0
+(bind-val SFC_GET_LOOP_INFO i32 4320) ;; 0x10E0
+
 (bind-type sf_info <i64,i32,i32,i32,i32,i32>)
 (bind-type sf_format_info <i32,i8*,i8*>)
+;; mode,start,end,count
+
+(bind-type _sf_loop_ <i32,i32,i32,i32>)
+;; 270 bytes
+;; gain,basenote,detune,velocity_lo,velocity_hi,key_lo,key_hi,loop_count,loops
+(bind-type SF_INSTRUMENT <i32,i8,i8,i8,i8,i8,i8,i32,|16,_sf_loop_|>)
+;; 44 bytes
+;; time_sig_num time_sig_den loop_mode num_beats bpm root_key future[6]
+(bind-type SF_LOOP_INFO <|2,i8|,|2,i8|,i32,i32,float,i32,|6,i32|>)
+(bind-val SF_FALSE i32 0)
+(bind-val SF_TRUE i32 1)
 
 (bind-lib libsndfile sf_open [i8*,i8*,i32,sf_info*]*)
 (bind-lib libsndfile sf_close [i32,i8*]*)
@@ -32,6 +51,7 @@
 (bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
 (bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
+(bind-lib libsndfile sf_command [i32,i8*,i32,i8*,i32]*)
 
 ;; struct accessors
 
@@ -59,21 +79,39 @@
   (lambda (info:sf_info*)
     (i32toi64 (tref info 5))))
 
+
 ;; size of audio data in file (in bytes)
 (bind-func print_audio_file_info
   (lambda (fname)
     (let ((info:sf_info* (zalloc))
-	  (audiofile (sf_open fname 16 info))
+	  (audiofile (sf_open fname 16 info))          
 	  (channels (i32toi64 (tref info 2))))
-      (printf "---------------\n")
-      (printf "filename:    %s\n" fname)
-      (printf "samplerate:  %d\n" (tref info 1))
-      (printf "channels:    %d\n" (tref info 2))
-      (printf "frames:      %lld\n" (tref info 0))
-      (printf "seconds:     %f\n"
-      	      (/ (i64tod (/ (tref info 0) (i32toi64 (tref info 2))))
-      		 (i32tod (tref info 1))))
-      (sf_close audiofile))))
+      (printf "audiofile %p\n" audiofile)
+      (if (null? audiofile)
+          (begin (printf "Bad audio file!\n")
+                 void)
+          (begin
+            (printf "---------------\n")
+            (printf "filename:    %s\n" fname)
+            (printf "samplerate:  %d\n" (tref info 1))
+            (printf "channels:    %d\n" (tref info 2))
+            (printf "frames:      %lld\n" (tref info 0))
+            (printf "seconds:     %f\n"
+                    (/ (i64tod (/ (tref info 0) (i32toi64 (tref info 2))))
+                       (i32tod (tref info 1))))
+            (let ((loops:SF_LOOP_INFO* (alloc))
+                  (lp1 (sf_command audiofile SFC_GET_LOOP_INFO (cast loops i8*) 44)))
+              (if (= lp1 SF_TRUE)
+                  (printf "loop-mode:   %d - bpm(%f)\n" (tref loops 2) (ftod (tref loops 4)))
+                  (printf "loop-mode:\n")))
+            (let ((inst:SF_INSTRUMENT* (alloc))
+                  (lp2 (sf_command audiofile SFC_GET_INSTRUMENT (cast inst i8*) 270)))
+              (if (= lp2 SF_TRUE)
+                  (printf "num loops:   %d\n" (tref inst 7))
+                  (printf "num loops:   0\n")))
+            (sf_close audiofile)
+            void)))))
+
 
 ;; an audio buffer reader
 (bind-func read_audio_data
