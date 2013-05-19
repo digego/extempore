@@ -85,7 +85,7 @@ bool regex_split(char* str, char** a, char** b);
 
 
   struct closure_address_table* new_address_table();
-  struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, struct closure_address_table* table);
+  struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table);
   struct closure_address_table* get_address_table(const char* name, closure_address_table* table);
   uint32_t get_address_offset(const char* name, closure_address_table* table);
   char* get_address_type(const char* name, closure_address_table* table);

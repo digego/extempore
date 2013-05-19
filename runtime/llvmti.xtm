@@ -100,20 +100,8 @@
                    ;(print 'ast: ast 'types: types)
                    (cond ((null? ast) '())
                          ((atom? ast) ast)
-                         ;; ((equal? (car ast) 'dotimes)
-                         ;;  (list* 'dotimes
-                         ;;         (list (if (regex:match? (symbol->string (caadr ast)) ":")
-                         ;;                   (let ((t (regex:split (symbol->string (caadr ast)) ":")))
-                         ;;                       (if (regex:match? (cadr t) "^\\<|\\[")
-                         ;;                           (if (not (regex:match? (cadr t) "\\>|\\]"))
-                         ;;                               (print-error 'Compiler 'Error: 'Syntax 'error: 'bad 'type (cadr t))))
-                         ;;                      (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
-                         ;;                      (string->symbol (car t)))
-                         ;;                   (caadr ast))
-                         ;;               (cadadr ast))
-                         ;;         (f (cddr ast))))
-                         ((equal? (car ast) 'lambda)
-                          (list* 'lambda
+                         ((member (car ast) '(lambda lambdaz lambdas lambdah))
+                          (list* (car ast) ;; 'lambda
                                  (map (lambda (a)
                                         (if (and (list? a)
                                                  (eq? (car a) '*colon-hook*))
@@ -426,13 +414,14 @@
 
 ;; no anonymous lambdas !!!
 (define impc:ti:lambda
-   (lambda (ast)
-      (let* ((fname (gensym))
-             (rest (cons (impc:ti:first-transform (cadr ast) #t)
-                         (list (cons 'begin (impc:ti:first-transform (cddr ast) #t)))))
-             (expr (cons 'lambda rest)))
-         `(let ((,fname ,expr))
-             (begin ,fname)))))
+  (lambda (ast)
+    (let* ((fname (gensym))
+           (rest (cons (impc:ti:first-transform (cadr ast) #t)
+                       (list (cons 'begin (impc:ti:first-transform (cddr ast) #t)))))
+           ;;(expr (cons 'lambda rest)))
+           (expr (cons (car ast) rest)))
+      `(let ((,fname ,expr))
+         (begin ,fname)))))
 
 
 ;; replace (* 2 3 4 5) or (+ 2 3 4 5)
@@ -620,7 +609,7 @@
                         (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
 		       ((member (car ast) '(bitwise-not ~))
 			(impc:ti:bitwise-not-to-eor ast inbody?))
-                       ((eq? (car ast) 'lambda)
+                       ((member (car ast) '(lambda lambdas lambdaz lambdah))
                         (if inbody?
                             (impc:ti:lambda ast)
                             (cons (impc:ti:first-transform (car ast) inbody?)
@@ -1790,8 +1779,8 @@
 
 ;; IS NEW
 (define impc:ti:symbol-check
-   (lambda (ast vars kts request?)
-     (if (not (symbol? ast)) (print-error 'Tyring 'to 'symbol 'check 'a 'non-symbol: ast))
+  (lambda (ast vars kts request?)
+     (if (not (symbol? ast)) (print-error 'Trying 'to 'symbol 'check 'a 'non-symbol: ast))
      
      ;; (if (regex:match? (symbol->string ast) "!")
      ;;     (print-error 'Compiler 'Error: 'bad 'symbol 'name: ast 'no (symbol->string '!) 'allowed))
@@ -3548,7 +3537,7 @@
             ((and (atom? ast) (string? ast)) (impc:ti:string-check ast vars kts request?))
             ((atom? ast) (print-error 'Compiler 'Error: 'internal 'error 'unhandled 'atom: ast))
             ((and (list? ast) (member (car ast) '(let let* letrec))) (impc:ti:let-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(lambda))) (impc:ti:lambda-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(lambda lambdas lambdah lambdaz))) (impc:ti:lambda-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(* / + - % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right bitwise-not))) (impc:ti:math-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))            
@@ -3840,7 +3829,7 @@
 ;; if we fail to unify completely the first time
 ;; try some possible substitutions!
 (define impc:ti:run-type-check
-   (lambda (vars forced-types ast . cnt)
+  (lambda (vars forced-types ast . cnt)
       ;; (println '------------------------------------)
       ;; (println 'forced-types forced-types)
       ;; (println 'vars: vars)
@@ -3854,7 +3843,8 @@
                          vars))
 	     ;(lll (println 'vars1: vars))
              (kts (map (lambda (x) (car x)) forced-types)) ;; just need symbols from forced-types
-	     ;; fvars gets modified 'in place' during this next operation	     
+	     ;; fvars gets modified 'in place' during this next
+             ;; operation	     
              (ret (impc:ti:type-check ast fvars kts #f))
 	     ;; (llllllll (println 'pre-unified-vars: fvars))
              (u (impc:ti:unify fvars))
@@ -3931,7 +3921,7 @@
    (lambda (symname ast types envvars . prev)
       ;; (println 'symname: symname 'envvars: envvars 'ast: ast 'prev: prev)
       (if (atom? ast) ast
-          (cond ((equal? (car ast) '__make-closure)
+          (cond ((member (car ast) '(__make-closure __make-closure-s __make-closure-h __make-closure-z))
 		 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 		 ;; these lines just added by AS
 		 (if (and (null? (cdr prev))
@@ -4094,8 +4084,8 @@
                                           (list (car a) (impc:ti:mark-returns (cadr a) (car a) #f #f #t)))
                                        (cadr ast)))
                             (impc:ti:mark-returns (cddr ast) name #t #f blocked?)))
-                   ((member (car ast) '(lambda))
-                    (append '(lambda) (list (cadr ast))
+                   ((member (car ast) '(lambda lambdas lambdah lambdaz))
+                    (append (list (car ast)) (list (cadr ast))
                             ;; lambda always unblocks because lambdas always need a return
                             (impc:ti:mark-returns (cddr ast) name #t #f #f)))
                    ;((equal? (car ast) 'dotimes)
@@ -4181,7 +4171,7 @@
 				 ;(println 'poly!var (car ast))
 				 (set! syms (append (list (car ast)) syms))
 				 (f (cdr ast)))
-				((equal? (car ast) '__make-closure)
+				((member (car ast) '(__make-closure __make-closure-s __make-closure-h __make-closure-z))
 				 (if (not (null? (cl:intersection (cadddr ast) syms)))
 				     (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car (cl:intersection (cadddr ast) syms))) 'as 'a 'shadow 'variable))
 				 (set! syms (cl:remove-duplicates (append (caddr ast) (cadddr ast) syms)))
@@ -4225,20 +4215,35 @@
 (define impc:ti:allocate-var?
   (lambda (ast)
     (cond ((null? ast) #f)
-	  ((eq? ast 'lambda) #t)
+	  ((member ast '(lambda lambdaz lambdas lambdah)) #t)
 	  ((pair? ast)
 	   (or (impc:ti:allocate-var? (car ast))
 	       (impc:ti:allocate-var? (cdr ast))))
 	  (else #f))))
 
+(define impc:ti:allocate-var?
+  (lambda (ast)
+    (cond ((null? ast) 0)
+	  ((member ast '(lambda lambdaz)) 3)
+          ((eq? ast 'lambdah) 1)
+          ((eq? ast 'lambdas) 2)
+	  ((pair? ast)
+	   (let ((a (impc:ti:allocate-var? (car ast)))
+                 (b (impc:ti:allocate-var? (cdr ast))))
+             (if (> a b) a b)))
+	  (else 0))))
+
 ;; adds make-closure and make-env tags
 (define impc:ti:closure:convert
    (lambda (ast esyms)
       (cond ((pair? ast)
-             (if (equal? (car ast) 'lambda)
+             (if (member (car ast) '(lambda lambdas lambdaz lambdah))
                  (let (;(env (impc:ti:block:check-for-free-syms ast esyms))
 		       (allocate-mem-for-vars? (impc:ti:allocate-var? (cdr ast))))
-		   (list '__make-closure allocate-mem-for-vars? 
+		   (list (cond ((eq? (car ast) 'lambdah) '__make-closure-h)
+                               ((eq? (car ast) 'lambdas) '__make-closure-s)
+                               (else '__make-closure-z))
+                         allocate-mem-for-vars?
 			 ;; name of compiled function is always last 
 			 ;; so we can remove it by dropping it off the end
 			 (cdr (reverse (cl:remove-duplicates esyms))) ;env 
@@ -4271,7 +4276,7 @@
                   (eq? (car ast) closure-sym))
              (if (and (not (null? (cdr ast)))
                       (list? (cadr ast))
-                      (eq? (caadr ast) 'lambda))
+                      (member (caadr ast) '(lambda lambdas lambdah lambdaz)))
                  (cadr (cadr ast))
                  '()))
             (else (append (impc:ti:get-closure-arg-symbols closure-sym (car ast))
@@ -4325,7 +4330,7 @@
             (cond ((null? alst) '())
                   ((atom? alst) '())
                   ((pair? alst)		   
-                   (if (equal? (car alst) '__make-closure)
+                   (if (member (car alst) '(__make-closure __make-closure-h __make-closure-z __make-closure-s))
 		       (set! blst (cons (caddr alst) blst)))
                    (loop (car alst))
                    (loop (cdr alst)))))
