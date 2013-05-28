@@ -487,6 +487,7 @@ namespace extemp {
 	    { "llvm:get-function",			&SchemeFFI::get_function },
 	    { "llvm:get-globalvar",			&SchemeFFI::get_globalvar },
 	    { "llvm:get-function-args",		&SchemeFFI::get_function_args },
+	    { "llvm:get-function-varargs",	&SchemeFFI::get_function_varargs },
 	    { "llvm:get-function-type",		&SchemeFFI::get_function_type },
 	    { "llvm:get-function-calling-conv",	&SchemeFFI::get_function_calling_conv },
 	    { "llvm:get-global-variable-type",	&SchemeFFI::get_global_variable_type },
@@ -1800,6 +1801,20 @@ namespace extemp {
 	int cc = func->getCallingConv();
 	return mk_integer(_sc, cc);
     }
+
+    pointer SchemeFFI::get_function_varargs(scheme* _sc, pointer args)
+    {
+	using namespace llvm;
+
+	Module* M = EXTLLVM::I()->M;
+	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+	if(func == 0)
+	{
+	    return _sc->F;
+	}	
+        return func->isVarArg() ? _sc->T : _sc->F;
+    }
+
 
     pointer SchemeFFI::get_function_type(scheme* _sc, pointer args)
     {

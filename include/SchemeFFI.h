@@ -145,6 +145,7 @@ namespace extemp {
 	static pointer get_function(scheme* _sc, pointer args);
 	static pointer get_globalvar(scheme* _sc, pointer args);		
 	static pointer get_function_args(scheme* _sc, pointer args);		
+	static pointer get_function_varargs(scheme* _sc, pointer args);
 	static pointer get_function_type(scheme* _sc, pointer args);		
 	static pointer get_function_calling_conv(scheme* _sc, pointer args);		
 	static pointer get_global_variable_type(scheme* _sc, pointer args);		
