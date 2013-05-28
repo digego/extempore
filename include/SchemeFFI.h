@@ -139,6 +139,7 @@ namespace extemp {
 			
 	// llvm stuff
         static pointer optimizeCompiles(scheme* _sc, pointer args);
+        static pointer verifyCompiles(scheme* _sc, pointer args);
 	static pointer compile(scheme* _sc, pointer args);
 	static pointer bind_global_var(scheme* _sc, pointer args);		
 	static pointer get_function(scheme* _sc, pointer args);

@@ -1680,6 +1680,12 @@ namespace extemp {
         EXTLLVM::OPTIMIZE_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0; 
         return _sc->T;
     }
+
+    pointer SchemeFFI::verifyCompiles(scheme* _sc, pointer args)
+    {
+        EXTLLVM::VERIFY_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0; 
+        return _sc->T;
+    }
 	
     pointer SchemeFFI::compile(scheme* _sc, pointer args)
     {
@@ -1717,18 +1723,20 @@ namespace extemp {
 	    }			
 	    return _sc->F;
 	}else{
-	    std::string Err;
-	    if (verifyModule(*M, ReturnStatusAction, &Err)) {
-		printf("%s\n%s","Parsed, but not valid!\n",Err.c_str());
-		if(num_of_funcs != M->getFunctionList().size()) {
-		    iplist<Function>::iterator iter = M->getFunctionList().end();
-		    Function* func = dyn_cast<Function>(--iter);
-		    //std::cout << "REMOVING ON FAIL: " << *func << std::endl;
-		    func->dropAllReferences();
-		    func->removeFromParent();
-		}							
-		return _sc->F;
-	    } 
+            if (extemp::EXTLLVM::VERIFY_COMPILES) {
+              std::string Err;
+              if (verifyModule(*M, ReturnStatusAction, &Err)) {
+	        printf("%s\n%s","Parsed, but not valid!\n",Err.c_str());
+	        if(num_of_funcs != M->getFunctionList().size()) {
+                  iplist<Function>::iterator iter = M->getFunctionList().end();
+                  Function* func = dyn_cast<Function>(--iter);
+                  //std::cout << "REMOVING ON FAIL: " << *func << std::endl;
+                  func->dropAllReferences();
+                  func->removeFromParent();
+	        }							
+	        return _sc->F;
+              } 
+            }
 	    return _sc->T;
 	}
     }
