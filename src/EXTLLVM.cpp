@@ -1347,6 +1347,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&i32value);			    
 	    gv = M->getNamedValue(std::string("mk_i32"));
 	    EE->updateGlobalMapping(gv,(void*)&mk_i32);
+	    gv = M->getNamedValue(std::string("i16value"));
+	    EE->updateGlobalMapping(gv,(void*)&i16value);			    
+	    gv = M->getNamedValue(std::string("mk_i16"));
+	    EE->updateGlobalMapping(gv,(void*)&mk_i16);
 	    gv = M->getNamedValue(std::string("i8value"));
 	    EE->updateGlobalMapping(gv,(void*)&i8value);			    
 	    gv = M->getNamedValue(std::string("mk_i8"));

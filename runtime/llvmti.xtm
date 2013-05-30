@@ -728,7 +728,9 @@
     (if (atom? t) #f
 	(if (and (number? (car t))           ;; if list starts with a number (i.e. not a symbol)
 		 (<> (car t) *impc:ir:void*) ;; if not void
-		 (> (modulo (car t) *impc:ir:pointer*) 10)) ;; if proper complex type (tuple,array,closure)
+                 ;; if proper complex type (tuple,array,closure)
+		 (member (modulo (car t) *impc:ir:pointer*)
+                         (list *impc:ir:tuple* *impc:ir:array* *impc:ir:vector* *impc:ir:closure*))) 
 	    #t
 	    #f))))
 
@@ -1101,7 +1103,8 @@
 	  ((and (list? t)
 		(not (null? t))
 		(number? (car t))
-		(= *impc:ir:tuple* (modulo (car t) *impc:ir:pointer*)))
+		;;(= *impc:ir:tuple* (modulo (car t) *impc:ir:pointer*)))                
+                (impc:ir:tuple? (car t)))
 	   ;; first check all sub tuples for possible normalization!	   
 	   (set! t (map (lambda (a) (impc:ti:type-normalize a)) t))
 	   (let ((named-types (cl:remove-if-not string? t)))
@@ -1181,121 +1184,7 @@
 	       lists))
       #t)))
 
-;; (define impc:ti:type-unify
-;;   (lambda (t vars)
-;;     ;; (println 'type-unify: t)
-;;     (cond ((atom? t)
-;; 	   (if (and (symbol? t)
-;; 	   	    (assoc t vars))
-;; 	       (impc:ti:type-unify (cdr (assoc t vars)) vars)
-;; 	       (if (and (symbol? t)
-;; 	   		(impc:ir:gpolytype-types (string->symbol (impc:ir:get-base-type (car (regex:split (car (regex:split (symbol->string t) "##")) "%"))))))
-;; 	   	   (impc:ti:reify-generic-type t vars '())
-;; 	   	   t)))
-;; 	  ((list? t)
-;; 	   (cond ((impc:ti:complex-type? t)		  
-;; 		  (map (lambda (v) (impc:ti:type-unify v vars)) t))
-;; 		 (else (let* ((trick (impc:ti:type-normalize 
-;; 				      (map (lambda (v)
-;; 					     (impc:ti:type-unify v vars))
-;; 					   t)))
-;; 			      (typelgth (if (list? (car trick)) (length (car trick)) 1))
-;; 			      (atoms (cl:remove-duplicates (cl:remove #f (map (lambda (v) (if (and (atom? v) (not (null? v))) v #f)) trick))))
-;; 			      (lists (cl:remove #f (map (lambda (v) (if (list? v) v #f)) trick))))
-			 
-;; 			 ;; (println)
-;; 			 ;; (println 'type: t)
-;; 			 ;; (println 'typelgth: typelgth)
-;; 			 ;; (println 'trick: trick)
-;; 			 ;; (println 'atoms: atoms)
-;; 			 ;; (println 'lists: lists)
-;; 			 ;; (println)
 
-;; 			 (set! lists (apply impc:ti:unify-lists lists))
-
-;; 			 ;; typelgth helps us to decide if the returned type has
-;; 			 ;; been artificially shortened because of unification
-;; 			 ;; for example (f (112 2 3) (112 2 3) (112 2 sym))
-;; 			 ;; may unify as (112 2) if sym cannot be expanded.
-;; 			 ;; this length check basically says we cannot unify
-;; 			 ;; succesfully in this instance so return null
-;; 			 (if (<> (length lists) typelgth)
-;; 			     (set! lists '()))
-;; 			 (let ((result (if (null? atoms) lists
-;; 					   (if (> (length atoms) 1)
-;; 					       (append atoms lists)
-;; 					       (if (or (null? lists)
-;; 						       (member (car atoms) lists))
-;; 						   (car atoms)
-;; 						   (append atoms lists))))))
-;; 			   ;; if result is a firm type then we 
-;; 			   (if (impc:ir:type? result)			       
-;; 			       (impc:ti:check-to-update-generic-vars result t vars))
-;; 			   result)))))
-;; 	  ((pair? t)
-;; 	   (impc:ti:type-unify (cdr t) vars))
-;; 	  (else (print-error 'Compiler 'Error: 'bad 'type t 'in 'unification)))))
-
-
-;; this is the old type-unify (but works)
-(define impc:ti:type-unify
-  (lambda (t vars)
-    ;; (println 'type-unify: t)
-    (cond ((atom? t)
-	   (if (and (symbol? t)
-	   	    (assoc t vars))
-	       (impc:ti:type-unify (cdr (assoc t vars)) vars)
-	       (if (and (symbol? t)
-	   		(impc:ir:gpolytype-types (string->symbol (impc:ir:get-base-type (car (regex:split (car (regex:split (symbol->string t) "##")) "%"))))))
-	   	   (impc:ti:reify-generic-type t vars '())
-	   	   t)))
-	  ((list? t)
-	   (cond ((impc:ti:complex-type? t)		  
-		  (map (lambda (v) (impc:ti:type-unify v vars)) t))
-		 (else (let* ((trick (impc:ti:type-normalize 
-				      (map (lambda (v)					     
-					     (impc:ti:type-unify v vars))
-					   t)))
-			      (typelgth (if (list? (car trick)) (length (car trick)) 1))
-			      (atoms (cl:remove-duplicates (cl:remove #f (map (lambda (v) (if (and (atom? v) (not (null? v))) v #f)) trick))))
-			      (lists (cl:remove #f (map (lambda (v) (if (list? v) v #f)) trick))))
-			 
-			 (set! lists (apply impc:ti:unify-lists lists))
-
-			 ;; (println)
-			 ;; (println 'type: t)
-			 ;; (println 'typelgth: typelgth)
-			 ;; (println 'trick: trick)
-			 ;; (println 'atoms: atoms)
-			 ;; (println 'lists: lists)
-			 ;; (println)
-
-			 ;; typelgth helps us to decide if the returned type has
-			 ;; been artificially shortened because of unification
-			 ;; for example (f (112 2 3) (112 2 3) (112 2 sym))
-			 ;; may unify as (112 2) if sym cannot be expanded.
-			 ;; this length check basically says we cannot unify
-			 ;; succesfully in this instance so return null
-			 (if (<> (length lists) typelgth)
-			     (set! lists '()))
-			 (let ((result (if (null? atoms) lists
-					   (if (> (length atoms) 1)
-					       (append atoms lists)
-					       (if (or (null? lists)
-						       (member (car atoms) lists))
-						   (car atoms)
-						   (append atoms lists))))))
-			   ;; if result is a firm type then we 
-			   (if (impc:ir:type? result)			       
-			       (impc:ti:check-to-update-generic-vars result t vars))
-			   ;; (println 'type: t 'result: result 'vars: vars)
-			   result)))))
-	  ((pair? t)
-	   (impc:ti:type-unify (cdr t) vars))
-	  (else (print-error 'Compiler 'Error: 'bad 'type t 'in 'unification)))))
-
-
-;; this is the new type unify (but doesn't work)
 ;;
 ;; IF TYPE CANNOT BE UNIFIED SUCCESSFULLY THEN WE SHOULD RETURN NULL '()
 ;; i.e. if we have ((114 0 0) (14 0 0)) don't return this -> return '()
@@ -1304,8 +1193,7 @@
   (lambda (t vars)
     ;; (println 'type-unify: t)
     (cond ((atom? t)
-	   (if (and (symbol? t)
-	   	    (assoc t vars))
+	   (if (and (symbol? t) (assoc t vars))
 	       (let ((r (impc:ti:type-unify (cdr (assoc t vars)) vars)))
 		 (if (null? r) t r)) ;; if r is NULL or false return t
 	       (if (and (symbol? t)
@@ -1770,11 +1658,11 @@
                     (print-error '-> 'You 'might 'be 'using 'a 'pref 'where 'you 'should 'be 'using 'a 'tref?)))
         (if (integer? ast)  ;; preference goes to start of list
             (if (or (= 1 ast) (= 0 ast))
-                (list *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8* *impc:ir:i1*)
+                (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8* *impc:ir:i1*)
                 (if (< ast 256)
-                    (list *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8*)
-                    (list *impc:ir:si64* *impc:ir:si32*)))  ;*impc:ir:double* *impc:ir:float*))
-            (list *impc:ir:double* *impc:ir:float*)))))
+                    (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8*)
+                    (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16*)))  ;*impc:ir:fp64* *impc:ir:fp32*))
+            (list *impc:ir:fp64* *impc:ir:fp32*)))))
 
 
 ;; IS NEW
@@ -1832,11 +1720,11 @@
 
 
 (define impc:ti:math-check
-   (lambda (ast vars kts request?)
+  (lambda (ast vars kts request?)
       (let* ((a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
              (b (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars))
 	     (t (impc:ti:type-unify (list a b) vars)))
-         ;; (println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)
+         ;;(println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)
          (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
          (if (not (null? t))
              (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
@@ -1991,12 +1879,13 @@
 	     ;; generics are unforgiving to choice
 	     ;; so if we have number choice then
 	     ;; let's always force i64 or double
-	     (if (or (equal? tt '(2 4))
-		     (equal? tt '(2 4 7))
-		     (equal? tt '(2 4 7 8)))
-		 (set! tt '(2)))
-	     (if (equal? tt '(0 1))
-		 (set! tt '(0)))
+	     (if (or (equal? tt (list *impc:ir:si64* *impc:ir:si32*))
+                     (equal? tt (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16*))
+		     (equal? tt (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8*))
+		     (equal? tt (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8* *impc:ir:i1*)))
+		 (set! tt (list *impc:ir:si64*)))
+	     (if (equal? tt (list *impc:ir:fp64* *impc:ir:fp32*))
+		 (set! tt (list *impc:ir:fp64*)))
 
 	     ;; (println 1 'a: a 'tt: tt 'gt: gt)
 	     (if (and (list? tt) (= (length tt) 1)) (set! tt (car tt)))
@@ -2802,7 +2691,6 @@
              (set! t c))
          (if (null? c)
              (set! t b))
-	 ;(println '-> 'a: a 'b: b 'c: c 't: t)
          ;; return intersection of b and c
          (if (null? t)
              (print-error 'Compiler 'Error: 'cannot 'unify 'then b 'and 'else c 'in ast) ;(map (lambda (v) (impc:ir:get-type-str v)) b) 'and 'else (map (lambda (v) (impc:ir:get-type-str v)) c) 'clauses 'in ast)
@@ -3280,7 +3168,7 @@
 		  (list? res)
 		  (> (length res) 1)
 		  (not (member #f (map (lambda (t) (impc:ir:floating-point? t)) res))))
-             (set! res (list *impc:ir:double*))) ;; force doubles
+             (set! res (list *impc:ir:fp64*))) ;; force doubles
          (if (and (not (impc:ti:complex-type? res))
 		  (list? res)
 		  (> (length res) 1)
@@ -3329,7 +3217,7 @@
                        (cdr ast)	       
                        (if (or (null? ctype)
 			       (and (number? (car ctype))
-				    (= (car ctype) 211))
+				    (= (car ctype) (+ *impc:ir:closure* (* 2 *impc:ir:pointer*))))
                                (not (impc:ir:closure? (car ctype))))
                            (make-list (length (cdr ast)) #f)
                            ;; if we are using an existing definition then check arity
@@ -3451,15 +3339,16 @@
 (define impc:ti:dotimes-check
    (lambda (ast vars kts request?)
       (let ((a (impc:ti:type-check (cadr (cadr ast)) vars kts 
-                                   (list *impc:ir:double* *impc:ir:float* *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8*))))
+                                   (cl:sort (list *impc:ir:fp64* *impc:ir:fp32*
+                                                  *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8*) <))))
          ;; if numeric? and multiple choice - then force a type!
          (if (number? (cadr (cadr ast)))
              (cond ((equal? (cl:sort a <)
-                            (cl:sort (list *impc:ir:double* *impc:ir:float* *impc:ir:si64* *impc:ir:si32* *impc:ir:ui8*) <))
+                            (cl:sort (list *impc:ir:fp64* *impc:ir:fp32* *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8*) <))
                     (set! a (list *impc:ir:si64*)))
                    ((equal? (cl:sort a <) 
-                            (cl:sort (list *impc:ir:double* *impc:ir:float*) <))
-                    (set! a (list *impc:ir:double*)))
+                            (cl:sort (list *impc:ir:fp64* *impc:ir:fp32*) <))
+                    (set! a (list *impc:ir:fp64*)))
                    (else 'leave-a-alone)))                                   
          ;; (car (cadr ast)) should be a symbol that we want to update with a
          (if (not (symbol? (car (cadr ast)))) (print-error 'Compiler 'Error: 'bad 'form 'for 'dotimes. 'Needs 'a 'symbol ast))
@@ -3841,7 +3730,7 @@
                                    (cons (car t) (list tt)))
                                 t))
                          vars))
-	     ;(lll (println 'vars1: vars))
+	     ;; (lll (println 'vars1: vars))
              (kts (map (lambda (x) (car x)) forced-types)) ;; just need symbols from forced-types
 	     ;; fvars gets modified 'in place' during this next
              ;; operation	     
@@ -4342,11 +4231,11 @@
     (let* ((lowest (if (< a b) a b))
 	   (highest (if (= a lowest) b a))
 	   (caststr (string-append (if (impc:ir:floating-point? highest)
-				       (if (= highest 0) "d" "f")
+				       (if (= highest *impc:ir:fp64*) "d" "f")
 				       (impc:ir:pretty-print-type highest))
 				   "to"
 				   (if (impc:ir:floating-point? lowest)
-				       (if (= lowest 0) "d" "f")
+				       (if (= lowest *impc:ir:fp64*) "d" "f")
 				       (impc:ir:pretty-print-type lowest)))))
       caststr)))
 
@@ -4355,7 +4244,7 @@
 ;; particular math coercions of forced types
 (define impc:ti:coercion-run
   (lambda (ast forced-types)
-    ;(println 'ast: ast)
+    ;; (println 'ast: ast)
     (if (pair? ast)
 	(cond ((member (car ast) '(< > * / = + - <>))
 	       (let ((a (assoc (cadr ast) forced-types))
@@ -4364,6 +4253,7 @@
 			  (not (impc:ir:vector? (cdr a)))
 			  (<> (cdr a) (cdr b)))
 		     (let ((ret (string->symbol (impc:ti:numeric-cast-operator (cdr a) (cdr b)))))
+                       ;; (println '> (cdr a) (cdr b))
 		       (if (> (cdr a) (cdr b))
 			   `(,(car ast) (,ret ,(cadr ast)) ,(caddr ast))
 			   `(,(car ast) ,(cadr ast) (,ret ,(caddr ast)))))
@@ -4637,9 +4527,10 @@
 										   (set! fstub_scheme_valid #f)
 										   "")
 										  ((or (not (number? t))
-										       (> t 9))
+										       (not (or (impc:ir:number? t)
+                                                                                                (impc:ir:void? t)))) 
                                                                                    (if (and (number? t)
-                                                                                            (= t 106))
+                                                                                            (= t (+ *impc:ir:pointer* *impc:ir:si8*)))
                                                                                        (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
@@ -4647,34 +4538,40 @@
                                                                                                       (impc:ti:scm_rt_check_string n)
                                                                                                       "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
                                                                                                       n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
-										  ((= t 0) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+										  ((= t *impc:ir:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc double @r64value(i8* " n "_val)\n"))
-										  ((= t 1) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+										  ((= t *impc:ir:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc float  @r32value(i8* " n "_val)\n"))
-										  ((= t 2) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+										  ((= t *impc:ir:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-										  ((= t 3) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+										  ((= t *impc:ir:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-										  ((= t 4) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+										  ((= t *impc:ir:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-										  ((= t 5) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+										  ((= t *impc:ir:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-										  ((= t 6) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+										  ((= t *impc:ir:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                          (impc:ti:scm_rt_check_string n)
+                                                                                                          n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+										  ((= t *impc:ir:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                          (impc:ti:scm_rt_check_string n)
+                                                                                                          n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+										  ((= t *impc:ir:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-										  ((= t 7) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+										  ((= t *impc:ir:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-										  ((= t 8) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+										  ((= t *impc:ir:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i1  @i1value(i8* " n "_val)\n"))
-										  ((= t 9) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+										  ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
                                                                                                           (impc:ti:scm_rt_check_string n)
                                                                                                           n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
 										  (else (error "Compiler Error: 'bad 'type 'in 'scheme 'stub")))))
@@ -4712,20 +4609,23 @@
 						      (set! fstub_scheme_valid #f)
 						      "")
 						     ((or (not (number? t))
-							  (> t 9))
+							  (not (or (impc:ir:number? t)
+                                                                   (impc:ir:void? t))))
 						      (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
 								     "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
-						     ((= t -1) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
-						     ((= t 0) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
-						     ((= t 1) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
-						     ((= t 2) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
-						     ((= t 3) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n") 
-						     ((= t 4) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
-						     ((= t 5) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")  
-						     ((= t 6) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
-						     ((= t 7) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")	 
-						     ((= t 8) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
-						     ((= t 9) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+						     ((= t *impc:ir:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
+						     ((= t *impc:ir:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
+						     ((= t *impc:ir:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
+						     ((= t *impc:ir:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+						     ((= t *impc:ir:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n") 
+						     ((= t *impc:ir:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+						     ((= t *impc:ir:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")  
+						     ((= t *impc:ir:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+						     ((= t *impc:ir:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")  
+						     ((= t *impc:ir:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+						     ((= t *impc:ir:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")	 
+						     ((= t *impc:ir:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
+						     ((= t *impc:ir:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
 						     (else (error 'Compiler 'Error: 'return 'type 'error 'in 'scheme 'stub))))
 					     
 					     "ret i8* %res\n"
@@ -5193,7 +5093,7 @@ deprecated - use bind-func instead."
                  (string-append "@" ,(symbol->string symbol)
                                 " = global "
                                 ,(impc:ir:get-type-str t) " "
-                                ,(if (= t 1)
+                                ,(if (= t *impc:ir:fp32*)
                                      (llvm:convert-float (atom->string (eval value)))
                                      (atom->string (eval value)))))
                 (impc:print-bound-message ,symbol ,type)))

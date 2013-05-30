@@ -466,6 +466,11 @@ int i32value(pointer p)
     return (int) ivalue(p);
 }
 
+short i16value(pointer p)      
+{ 	
+    return (short) ivalue(p);
+}
+
 char i8value(pointer p)      
 { 	
   return (char) ivalue(p);
@@ -1544,6 +1549,10 @@ pointer mk_i64(scheme *sc, long long num) {
 
 pointer mk_i32(scheme *sc, int num) {
     return mk_integer(sc, num);
+}
+
+pointer mk_i16(scheme *sc, short num) {
+    return mk_integer(sc, (int)num);
 }
 
 pointer mk_i8(scheme *sc, char num) {

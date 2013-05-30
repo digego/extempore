@@ -34,25 +34,32 @@
 ;; 
 
 ;; base types
+;;
+;; MAKE SURE SIGNED VERSIONS ARE
+;; LOWER THAN UNSIGNED VERSIONS
+;; i.e. si64 should be lower than ui64
+;;
 (define *impc:ir:badtype* -2)
 (define *impc:ir:void* -1)
-(define *impc:ir:double* 0)
-(define *impc:ir:float* 1)
+(define *impc:ir:fp64* 0)
+(define *impc:ir:fp32* 1)
 (define *impc:ir:si64* 2)
 (define *impc:ir:ui64* 3)
 (define *impc:ir:si32* 4)
 (define *impc:ir:ui32* 5)
-(define *impc:ir:si8* 6)
-(define *impc:ir:ui8* 7)
-(define *impc:ir:i1* 8)
-(define *impc:ir:char* 9)
-(define *impc:ir:null* 10)
-(define *impc:ir:closure* 11)
-(define *impc:ir:tuple* 12)
-(define *impc:ir:array* 13)
-(define *impc:ir:vector* 14)
+(define *impc:ir:si16* 6)
+(define *impc:ir:ui16* 7)
+(define *impc:ir:si8* 8)
+(define *impc:ir:ui8* 9)
+(define *impc:ir:i1* 10)
+(define *impc:ir:char* 11)
+(define *impc:ir:null* 12)
+(define *impc:ir:closure* 13)
+(define *impc:ir:tuple* 14)
+(define *impc:ir:array* 15)
+(define *impc:ir:vector* 16)
 ;; this should be incremented to represent the lowest native type
-(define *impc:ir:lowest-base-type* 15)
+(define *impc:ir:lowest-base-type* 17)
 
 ;; and a non-type
 (define *impc:ir:other* 1000)
@@ -154,7 +161,7 @@
 ;; type aliases
 ;;
 
-(define *impc:ir:type-aliases* (list (cons "size_t" (if (= 64 (sys:pointer-size)) "i64" "i32"))))
+(define *impc:ir:type-aliases* (list (cons "size_t" (if (= (sys:pointer-size) 64) "i64" "i32"))))
 
 (define impc:ir:add-type-alias
   (lambda (name type)
@@ -740,18 +747,19 @@
 		       (apply string-append "<" (number->string (cadr type)) " x " (apply impc:ir:get-type-str (caddr type) args) ">"
 			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
 		      (else (print-error 'Compiler 'Error: 'bad 'complex 'type! type))))
-	       ((= type -1) "void")
+	       ((= type *impc:ir:void*) "void")
 	       ((< type 0) ;; this here for recursive llvm ir type defs only!
-		(let ((base (* -1 (modulo type -100)))
-		      (ptr-depth (floor (/ type -100))))
+		(let ((base (* -1 (modulo type (* -1 *impc:ir:pointer*))))
+		      (ptr-depth (floor (/ type (* -1 *impc:ir:pointer*)))))
 		  ;(apply string-append "REC" (make-list ptr-depth "*"))))
 		  (apply string-append "\\" (number->string base) (make-list ptr-depth "*"))))
-	       (else (let ((base (modulo type 100))
-			   (ptr-depth (floor (/ type 100))))
-		       (string-append (cond ((= base *impc:ir:double*) "double")
-					    ((= base *impc:ir:float*) "float")
+	       (else (let ((base (modulo type *impc:ir:pointer*))
+			   (ptr-depth (floor (/ type *impc:ir:pointer*))))
+		       (string-append (cond ((= base *impc:ir:fp64*) "double")
+					    ((= base *impc:ir:fp32*) "float")
 					    ((member base (list *impc:ir:si64* *impc:ir:ui64*)) "i64")
 					    ((member base (list *impc:ir:si32* *impc:ir:ui32*)) "i32")
+					    ((member base (list *impc:ir:si16* *impc:ir:ui16*)) "i16")
 					    ((member base (list *impc:ir:si8* *impc:ir:ui8* *impc:ir:char*)) "i8")
 					    ((= base *impc:ir:i1*) "i1")
 					    ((string? (car args))
@@ -813,8 +821,9 @@
 	     (impc:ir:get-type-size (impc:ir:get-type-from-str type)))
 	 (let ((t (impc:ir:str-list-check type)))
 	   (if (impc:ir:pointer? t) (/ (sys:pointer-size) 8) ;; in bytes not bits
-	       (cond ((member t (list *impc:ir:double* *impc:ir:si64* *impc:ir:ui64*)) 8) ; 8 byte stuff
-		     ((member t (list *impc:ir:float* *impc:ir:si32* *impc:ir:ui32*)) 4) ; 4 byte stuff
+	       (cond ((member t (list *impc:ir:fp64* *impc:ir:si64* *impc:ir:ui64*)) 8) ; 8 byte stuff
+		     ((member t (list *impc:ir:fp32* *impc:ir:si32* *impc:ir:ui32*)) 4) ; 4 byte stuff
+		     ((member t (list *impc:ir:si16* *impc:ir:ui16*)) 2) ; 2 byte stuff
 		     ((member t (list *impc:ir:char* *impc:ir:si8* *impc:ir:ui8* *impc:ir:i1*)) 1) ; 1 bytes stuff
 		     ((= t *impc:ir:closure*) (* (impc:ir:get-type-size "i8*") 3))
 		     ((= t *impc:ir:array*) (* (impc:ir:get-type-size (caddr type)) (cadr type)))
@@ -963,7 +972,7 @@
        (if (string? t) #f
 	   (if (>= t *impc:ir:other*) #f
 	       (if (member (modulo t *impc:ir:pointer*) 
-			   (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si8*)) 
+			   (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:si8*)) 
 		   #t #f))))))
 
 (define impc:ir:floating-point?
@@ -972,7 +981,7 @@
        (if (string? t) #f
 	   (if (>= t *impc:ir:other*) #f
 	       (if (member t ;;(modulo t *impc:ir:pointer*) 
-			   (list *impc:ir:double* *impc:ir:float*)) 
+			   (list *impc:ir:fp64* *impc:ir:fp32*)) 
 		   #t #f))))))
 
 (define impc:ir:fixed-point?
@@ -980,8 +989,9 @@
      (let ((t (impc:ir:str-list-check type)))
        (if (string? t) #f
 	   (if (member t ;;(modulo t *impc:ir:pointer*)
-		       (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si8*
-			     *impc:ir:ui64* *impc:ir:ui32* *impc:ir:ui8*
+		       (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:si8*
+			     *impc:ir:ui64* *impc:ir:ui32* *impc:ir:ui16* *impc:ir:ui8* 
+                             *impc:ir:char*
 			     *impc:ir:i1*))
 	       #t #f)))))
 
@@ -1465,18 +1475,18 @@
 ;;                     (emit "\n; let value assignment\n" os)
 ;;                     ;; (emit (string-append "%" symstr " = bitcast " typestr " " 
 ;;                     ;;                         (if (and (number? (cadr p))
-;;                     ;;                                  (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+;;                     ;;                                  (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
 ;;                     ;;                             (llvm:convert-float (car (impc:ir:gname)))
 ;;                     ;;                             (car (impc:ir:gname)))
 ;;                     ;;                         " to " typestr "\n") os)                    		    
 ;;                     (emit (string-append "%" symstr " = select i1 true, " typestr " " 
 ;;                                             (if (and (number? (cadr p))
-;;                                                      (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+;;                                                      (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
 ;;                                                 (llvm:convert-float (car e)) ;(impc:ir:gname)))
 ;;                                                 (car e)) ;(impc:ir:gname)))
 ;;                                             ", " typestr " "
 ;;                                             (if (and (number? (cadr p))
-;;                                                      (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+;;                                                      (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
 ;;                                                 (llvm:convert-float (car e)) ; (impc:ir:gname)))
 ;;                                                 (car e)) ;(impc:ir:gname)))
 ;; 					    "\n") os)
@@ -1517,20 +1527,21 @@
 	   (env-zone-tmp '()))
       (map (lambda (p)
              (set! *impc:ir:sym-name-stack* (cons (caar p) *impc:ir:sym-name-stack*))
-	     ;;(println 'p: p (cadr p)) ;'ast: ast)
+	     ;; (println 'p: p (cadr p)) ;'ast: ast)
+             ;; (println 'p2: (cadr p))
 	     (let* ((symstr (symbol->string (caar p)))
 		    (symtype (cdr (assoc (caar p) types)))
 		    (value (impc:ir:compiler (cadr p) types symtype)) ; os)
 		    (typestr (cadr (impc:ir:gname)))
 		    (e (impc:ir:gname)))	       
 	       ;; (println 'symstr: symstr 'symtype: symtype)
-	       ;;(println 'typestr: typestr)
+	       ;; (println 'typestr: typestr)
 	       (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
 			(impc:ir:number? (cdr (assoc (caar p) types)))
 			(impc:ir:number? (impc:ir:get-type-from-str typestr)))
 		   (set! typestr (impc:ir:get-type-str (cdr (assoc (caar p) types)))))
 	       ;; type check
-	       ;;(if (not (impc:ir:types-equal? typestr (cdr (assoc (caar p) types))))
+               ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc (caar p) types)))
 	       (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
 				(cdr (assoc (caar p) types))))
 		   (print-error 'Compiler 'Error:  'Type 'Mismatch 'for ; 'symbol 'in (cadr p)
@@ -1560,12 +1571,12 @@
 	       (emit "\n; let value assignment\n" os)
 	       (emit (string-append "%" symstr " = select i1 true, " typestr " " 
 				    (if (and (number? (cadr p))
-					     (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
 					(llvm:convert-float (car e)) ;(impc:ir:gname)))
 					(car e)) ;(impc:ir:gname)))
 				    ", " typestr " "
 				    (if (and (number? (cadr p))
-					     (= *impc:ir:float* (impc:ir:get-type-from-str typestr)))
+					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
 					(llvm:convert-float (car e)) ; (impc:ir:gname)))
 					(car e)) ;(impc:ir:gname)))
 				    "\n") os)
@@ -2041,7 +2052,7 @@
 	   
       ;(println 'size: size)
       
-      (if (<> (impc:ir:get-type-from-str (cadr size)) 2)
+      (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
 	  (print-error 'Compiler 'Error: 'first 'push_zone 'argument 'must 'be 'a 'size 'argument '- 'i64 'not (cadr size)))
       
       (emit size-str os) ;; write size str
@@ -2083,10 +2094,10 @@
 	   (etype (impc:ir:get-type-from-str (cadr e))))
       ;(println 'size: size 'body1: body1 'body2: body2)
       
-      (if (<> (impc:ir:get-type-from-str (cadr size)) 2)
+      (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
 	  (print-error 'Compiler 'Error: 'first 'memzone 'argument 'must 'be 'a 'size 'argument '- 'i64 'not (cadr size)))
       (if (and (= (length ast) 4)
-	       (<> (impc:ir:get-type-from-str (cadr body1)) 2))
+	       (<> (impc:ir:get-type-from-str (cadr body1)) *impc:ir:si64*))
 	  (print-error 'Compiler 'Error: 'optional 'second 'memzone 'argument 'must 'be 'a 'delay 'argument '- 'i64 'not (cadr body1)))
 	       
       (emit size-str os) ;; write size str
@@ -3189,7 +3200,7 @@
 ;;             (emit b os)
 ;;             ;; do llvm float constant check
 ;;             (if (and (impc:ir:number? (impc:ir:get-type-from-str type))
-;; 		     (= *impc:ir:float* (impc:ir:get-type-from-str type)))
+;; 		     (= *impc:ir:fp32* (impc:ir:get-type-from-str type)))
 ;;                 (begin (if (number? n1) (set-car! aval (llvm:convert-float (car aval))))
 ;;                        (if (number? n2) (set-car! bval (llvm:convert-float (car bval))))))
 
@@ -3245,13 +3256,13 @@
             ;(println (cadr aval) '>> (cadr bval) '>> type '>> hint?)
             ;; do llvm float constant check
             (if (and (number? type)
-		     (= *impc:ir:float* (impc:ir:get-type-from-str type)))
+		     (= *impc:ir:fp32* (impc:ir:get-type-from-str type)))
                 (begin (if (number? (cadr ast)) (set-car! aval (llvm:convert-float (car aval))))
                        (if (number? (caddr ast)) (set-car! bval (llvm:convert-float (car bval))))))
 
             ;; do llvm double constant check       
             (if (and (number? type)
-		     (= *impc:ir:double* (impc:ir:get-type-from-str type)))
+		     (= *impc:ir:fp64* (impc:ir:get-type-from-str type)))
                 (begin (if (number? (cadr ast)) (set-car! aval (number->string (* 1.0 (cadr ast)))))
                        (if (number? (caddr ast)) (set-car! bval (number->string (* 1.0 (caddr ast)))))))
 
@@ -3319,11 +3330,11 @@
          (emit b os)            
          ;(print (car aval) '>> (car bval) '>> type)
          ;; do llvm float constant check
-         (if (= *impc:ir:float* (impc:ir:get-type-from-str type))
+         (if (= *impc:ir:fp32* (impc:ir:get-type-from-str type))
              (begin (if (number? (cadr ast)) (set-car! aval (llvm:convert-float (car aval))))
                     (if (number? (caddr ast)) (set-car! bval (llvm:convert-float (car bval))))))     
          ;; do llvm double constant check       
-         (if (= *impc:ir:double* (impc:ir:get-type-from-str type))
+         (if (= *impc:ir:fp64* (impc:ir:get-type-from-str type))
              (begin (if (number? (cadr ast)) (set-car! aval (number->string (* 1.0 (cadr ast)))))
                     (if (number? (caddr ast)) (set-car! bval (number->string (* 1.0 (caddr ast)))))))
             
@@ -3386,12 +3397,12 @@
             ;(print (car aval) '>> (car bval) '>> type)
             ;; do llvm float constant check
             (if (and (number? type)
-		     (= *impc:ir:float* (impc:ir:get-type-from-str type)))
+		     (= *impc:ir:fp32* (impc:ir:get-type-from-str type)))
                 (begin (if (number? (cadr ast)) (set-car! aval (llvm:convert-float (car aval))))
                        (if (number? (caddr ast)) (set-car! bval (llvm:convert-float (car bval))))))     
             ;; do llvm double constant check       
             (if (and (number? type)
-		     (= *impc:ir:double* (impc:ir:get-type-from-str type)))
+		     (= *impc:ir:fp64* (impc:ir:get-type-from-str type)))
                 (begin (if (number? (cadr ast)) (set-car! aval (number->string (* 1.0 (cadr ast)))))
                        (if (number? (caddr ast)) (set-car! bval (number->string (* 1.0 (caddr ast)))))))
 	    ;; dereference any vector pointers
@@ -3494,7 +3505,7 @@
       (let ((from (impc:ir:get-type-from-str (cadr at)))
             (to (impc:ir:get-type-from-str type-str)))
         ;; (println 'convert: from '-> to)
-        (cond ((and (number? to) (= to -1))
+        (cond ((and (number? to) (= to *impc:ir:void*))
                (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*)))               
               ((and (impc:ir:pointer? from) ;; must be pointer -> pointer
                     (impc:ir:pointer? to))  ;; do standard bitcast
@@ -3507,64 +3518,80 @@
                ;; first convert pointer to int
                (emit (impc:ir:gname "val1" "i64") " = ptrtoint " (impc:ir:get-type-str from) " " (car at) " to i64\n" os)
                ;; now convert i64 into correct final type
-               (cond ((= to 0) (emit (impc:ir:gname "val" type-str) " = sitofp i64 " (car (impc:ir:gname "val1")) " to double\n" os))
-                     ((= to 1) (emit (impc:ir:gname "val" type-str) " = sitofp i64 " (car (impc:ir:gname "val1")) " to float\n" os))
-                     ((= to 2) (emit (impc:ir:gname "val" type-str) " = bitcast i64 " (car (impc:ir:gname "val1")) " to i64\n" os))
-                     ((= to 4) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i32\n" os))
-                     ((= to 6) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i8\n" os))
-                     ((= to 8) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i1\n" os))
+               (cond ((= to *impc:ir:fp64*) (emit (impc:ir:gname "val" type-str) " = sitofp i64 " (car (impc:ir:gname "val1")) " to double\n" os))
+                     ((= to *impc:ir:fp32*) (emit (impc:ir:gname "val" type-str) " = sitofp i64 " (car (impc:ir:gname "val1")) " to float\n" os))
+                     ((= to *impc:ir:si64*) (emit (impc:ir:gname "val" type-str) " = bitcast i64 " (car (impc:ir:gname "val1")) " to i64\n" os))
+                     ((= to *impc:ir:si32*) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i32\n" os))
+                     ((= to *impc:ir:si16*) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i16\n" os))                     
+                     ((= to *impc:ir:si8*) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i8\n" os))
+                     ((= to *impc:ir:i1*) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i1\n" os))
                      (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
               ((impc:ir:pointer? to) ;; from must be a value
                ;; first convert from to i64
-               (cond ((= from 0) (emit (impc:ir:gname "val1" "i64") " = fptosi double " (car at) " to i64\n" os))
-                     ((= from 1) (emit (impc:ir:gname "val1" "i64") " = fptosi float " (car at) " to i64\n" os))
-                     ((= from 2) (emit (impc:ir:gname "val1" "i64") " = bitcast i64 " (car at) " to i64\n" os))
-                     ((= from 4) (emit (impc:ir:gname "val1" "i64") " = sext i32 " (car at) " to i64\n" os))
-                     ((= from 6) (emit (impc:ir:gname "val1" "i64") " = sext i8 " (car at) " to i64\n" os))
-                     ((= from 8) (emit (impc:ir:gname "val1" "i64") " = zext i1 " (car at) " to i64\n" os))
+               (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val1" "i64") " = fptosi double " (car at) " to i64\n" os))
+                     ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val1" "i64") " = fptosi float " (car at) " to i64\n" os))
+                     ((= from *impc:ir:si64*) (emit (impc:ir:gname "val1" "i64") " = bitcast i64 " (car at) " to i64\n" os))
+                     ((= from *impc:ir:si32*) (emit (impc:ir:gname "val1" "i64") " = sext i32 " (car at) " to i64\n" os))
+                     ((= from *impc:ir:si16*) (emit (impc:ir:gname "val1" "i64") " = sext i16 " (car at) " to i64\n" os))                     
+                     ((= from *impc:ir:si8*) (emit (impc:ir:gname "val1" "i64") " = sext i8 " (car at) " to i64\n" os))
+                     ((= from *impc:ir:i1*) (emit (impc:ir:gname "val1" "i64") " = zext i1 " (car at) " to i64\n" os))
                      (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to)))
                (emit (impc:ir:gname "val" type-str) " = inttoptr i64 " (car (impc:ir:gname "val1")) " to " type-str "\n" os))
-              ((= to 0)
-               (cond ((= from 1) (emit (impc:ir:gname "val" "double") " = fpext float " (car at) " to double\n" os))
-                     ((= from 2) (emit (impc:ir:gname "val" "double") " = sitofp i64 " (car at) " to double\n" os))
-                     ((= from 4) (emit (impc:ir:gname "val" "double") " = sitofp i32 " (car at) " to double\n" os))
-                     ((= from 6) (emit (impc:ir:gname "val" "double") " = sitofp i8 " (car at) " to double\n" os))
-                     ((= from 8) (emit (impc:ir:gname "val" "double") " = uitofp i1 " (car at) " to double\n" os))
+              ((= to *impc:ir:fp64*)
+               (cond ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "double") " = fpext float " (car at) " to double\n" os))
+                     ((= from *impc:ir:si64*) (emit (impc:ir:gname "val" "double") " = sitofp i64 " (car at) " to double\n" os))
+                     ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "double") " = sitofp i32 " (car at) " to double\n" os))
+                     ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "double") " = sitofp i16 " (car at) " to double\n" os))                     
+                     ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "double") " = sitofp i8 " (car at) " to double\n" os))
+                     ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "double") " = uitofp i1 " (car at) " to double\n" os))
                      (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
-              ((= to 1)
-               (cond ((= from 0) (emit (impc:ir:gname "val" "float") " = fptrunc double " (car at) " to float\n" os))
-                     ((= from 2) (emit (impc:ir:gname "val" "float") " = sitofp i64 " (car at) " to float\n" os))
-                     ((= from 4) (emit (impc:ir:gname "val" "float") " = sitofp i32 " (car at) " to float\n" os))
-                     ((= from 6) (emit (impc:ir:gname "val" "float") " = sitofp i8 " (car at) " to float\n" os))
-                     ((= from 8) (emit (impc:ir:gname "val" "float") " = uitofp i1 " (car at) " to float\n" os))
+              ((= to *impc:ir:fp32*)
+               (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "float") " = fptrunc double " (car at) " to float\n" os))
+                     ((= from *impc:ir:si64*) (emit (impc:ir:gname "val" "float") " = sitofp i64 " (car at) " to float\n" os))
+                     ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "float") " = sitofp i32 " (car at) " to float\n" os))
+                     ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "float") " = sitofp i16 " (car at) " to float\n" os))
+                     ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "float") " = sitofp i8 " (car at) " to float\n" os))
+                     ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "float") " = uitofp i1 " (car at) " to float\n" os))
                      (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
-              ((= to 2)
-               (cond ((= from 0) (emit (impc:ir:gname "val" "i64") " = fptosi double " (car at) " to i64\n" os))
-                     ((= from 1) (emit (impc:ir:gname "val" "i64") " = fptosi float " (car at) " to i64\n" os))
-                     ((= from 4) (emit (impc:ir:gname "val" "i64") " = sext i32 " (car at) " to i64\n" os))
-                     ((= from 6) (emit (impc:ir:gname "val" "i64") " = sext i8 " (car at) " to i64\n" os))
-                     ((= from 8) (emit (impc:ir:gname "val" "i64") " = zext i1 " (car at) " to i64\n" os))
+              ((= to *impc:ir:si64*)
+               (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i64") " = fptosi double " (car at) " to i64\n" os))
+                     ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i64") " = fptosi float " (car at) " to i64\n" os))
+                     ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "i64") " = sext i32 " (car at) " to i64\n" os))
+                     ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "i64") " = sext i16 " (car at) " to i64\n" os))
+                     ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "i64") " = sext i8 " (car at) " to i64\n" os))
+                     ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "i64") " = zext i1 " (car at) " to i64\n" os))
                      (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
-              ((= to 4)
-               (cond ((= from 0) (emit (impc:ir:gname "val" "i32") " = fptosi double " (car at) " to i32\n" os))
-                     ((= from 1) (emit (impc:ir:gname "val" "i32") " = fptosi float " (car at) " to i32\n" os))
-                     ((= from 2) (emit (impc:ir:gname "val" "i32") " = trunc i64 " (car at) " to i32\n" os))
-                     ((= from 6) (emit (impc:ir:gname "val" "i32") " = sext i8 " (car at) " to i32\n" os))
-                     ((= from 8) (emit (impc:ir:gname "val" "i32") " = zext i1 " (car at) " to i32\n" os))
+              ((= to *impc:ir:si32*)
+               (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i32") " = fptosi double " (car at) " to i32\n" os))
+                     ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i32") " = fptosi float " (car at) " to i32\n" os))
+                     ((= from *impc:ir:si64*) (emit (impc:ir:gname "val" "i32") " = trunc i64 " (car at) " to i32\n" os))
+                     ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "i32") " = sext i16 " (car at) " to i32\n" os))                     
+                     ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "i32") " = sext i8 " (car at) " to i32\n" os))
+                     ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "i32") " = zext i1 " (car at) " to i32\n" os))
                      (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
-              ((= to 6)
-               (cond ((= from 0) (emit (impc:ir:gname "val" "i8") " = fptosi double " (car at) " to i8\n" os))
-                     ((= from 1) (emit (impc:ir:gname "val" "i8") " = fptosi float " (car at) " to i8\n" os))
-                     ((= from 2) (emit (impc:ir:gname "val" "i8") " = trunc i64 " (car at) " to i8\n" os))
-                     ((= from 4) (emit (impc:ir:gname "val" "i8") " = trunc i32 " (car at) " to i8\n" os))
-                     ((= from 8) (emit (impc:ir:gname "val" "i8") " = zext i1 " (car at) " to i8\n" os))
+              ((= to *impc:ir:si16*)
+               (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i16") " = fptosi double " (car at) " to i16\n" os))
+                     ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i16") " = fptosi float " (car at) " to i16\n" os))
+                     ((= from *impc:ir:si64*) (emit (impc:ir:gname "val" "i16") " = trunc i64 " (car at) " to i16\n" os))
+                     ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "i16") " = sext i32 " (car at) " to i16\n" os))                     
+                     ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "i16") " = sext i8 " (car at) " to i16\n" os))
+                     ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "i16") " = zext i1 " (car at) " to i16\n" os))
                      (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
-              ((= to 8)
-               (cond ((= from 0) (emit (impc:ir:gname "val" "i1") " = fptoui double " (car at) " to i1\n" os))
-                     ((= from 1) (emit (impc:ir:gname "val" "i1") " = fptoui float " (car at) " to i1\n" os))
-                     ((= from 2) (emit (impc:ir:gname "val" "i1") " = trunc i64 " (car at) " to i1\n" os))
-                     ((= from 4) (emit (impc:ir:gname "val" "i1") " = trunc i32 " (car at) " to i1\n" os))
-                     ((= from 6) (emit (impc:ir:gname "val" "i1") " = trunc i8 " (car at) " to i1\n" os))
+              ((= to *impc:ir:si8*)
+               (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i8") " = fptosi double " (car at) " to i8\n" os))
+                     ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i8") " = fptosi float " (car at) " to i8\n" os))
+                     ((= from *impc:ir:si64*) (emit (impc:ir:gname "val" "i8") " = trunc i64 " (car at) " to i8\n" os))
+                     ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "i8") " = trunc i32 " (car at) " to i8\n" os))
+                     ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "i8") " = trunc i16 " (car at) " to i8\n" os))
+                     ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "i8") " = zext i1 " (car at) " to i8\n" os))
+                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
+              ((= to *impc:ir:i1*)
+               (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i1") " = fptoui double " (car at) " to i1\n" os))
+                     ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i1") " = fptoui float " (car at) " to i1\n" os))
+                     ((= from *impc:ir:si64*) (emit (impc:ir:gname "val" "i1") " = trunc i64 " (car at) " to i1\n" os))
+                     ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "i1") " = trunc i32 " (car at) " to i1\n" os))
+                     ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "i1") " = trunc i16 " (car at) " to i1\n" os))
+                     ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "i1") " = trunc i8 " (car at) " to i1\n" os))
                      (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))))
       (impc:ir:strip-space os))))
 
@@ -4004,7 +4031,7 @@
 				   (print-error 'Compiler 'Error: 'bad 'numeric 'value: ast 'require 'type: (string->symbol (impc:ir:pretty-print-type (car hint?)))))))
                     (if (and (not (null? hint?))
                              (impc:ir:number? (car hint?)))
-                        (if (= *impc:ir:float* (car hint?))
+                        (if (= *impc:ir:fp32* (car hint?))
                             (impc:ir:gname (llvm:convert-float (number->string ast)) (impc:ir:get-type-str (car hint?)))
                             (impc:ir:gname (number->string ast) (impc:ir:get-type-str (car hint?))))
                         (impc:ir:gname (number->string ast) (if (integer? ast) "i64" "double")))
