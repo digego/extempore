@@ -1,4 +1,4 @@
-;;; math.xtm -- extempore math library
+;; math.xtm -- extempore math library
 
 ;; Author: Andrew Sorensen, Ben Swift
 ;; Keywords: extempore
@@ -19,6 +19,14 @@
 ;; - windowing
 
 ;;; Code:
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; GLOBAL to let other libraries know that
+;; math.xtm has already been loaded
+;; 
+(define xtmlib_math_loaded #t)
 
 
 (bind-func deg2rad_f
@@ -115,24 +123,6 @@
 (bind-poly vnorm vnormd)
 (bind-poly vnorm vnormf)
 
-(bind-func vmagd
-  (lambda (v:double* lgth:i64)
-    (let ((mag 0.0)
-	  (i 0))
-      (dotimes (i lgth)
-	(set! mag (+ mag (* (pref v i) (pref v i)))))
-      (sqrt mag))))
-
-(bind-func vmagf
-  (lambda (v:float* lgth:i64)
-    (let ((mag 0.0)
-	  (i 0))
-      (dotimes (i lgth)
-	(set! mag (+ mag (* (pref v i) (pref v i)))))
-      (sqrtf mag))))
-
-(bind-poly vmag vmagd)
-(bind-poly vmag vmagf)
 
 (bind-func vdotd
   (let ((i 0))
@@ -650,6 +640,19 @@
 (bind-poly minv minvd)
 (bind-poly minv minvf)
 
+(bind-func mcopyf
+  (lambda (m1:float* row col m2:float*)
+    (memcpy (cast m2 i8*) (cast m1 i8*) (* row col 4))
+    void))
+
+(bind-func mcopyd
+  (lambda (m1:double* row col m2:double*)
+    (memcpy (cast m2 i8*) (cast m1 i8*) (* row col 8))
+    void))
+
+(bind-poly mcopy mcopyf)
+(bind-poly mcopy mcopyd)
+
 ;; some helpful matrix builders
 ;;
 ;; axis is the unit vector
@@ -1041,3 +1044,4 @@
                (+ 0.54 (* 0.46 (cos (/ (* TWOPI (i64tod i))
                                        (i64tod (- window_length 1))))))))
       void)))
+
