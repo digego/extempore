@@ -227,6 +227,20 @@
 
 (test-xtfunc (recursive-closure-test 3))
 
+;; check TAIL OPTIMIZATION
+;; if there is no tail call optimiation
+;; in place then this should blow the
+;; stack and crash the test
+(bind-func tail_opt_test
+  (lambda (n:i64)
+    (let ((a:float* (salloc 8000)))
+      (if (= n 0)
+          (printf "tail opt test passed!\n")
+          (tail_opt_test (- n 1))))))
+
+(test-xtfunc (tail_opt_test 200))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; a simple tuple example
 ;;
