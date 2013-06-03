@@ -196,6 +196,11 @@ See `run-hooks'."
   :type 'hook
   :group 'extempore)
 
+(defcustom extempore-default-device-number nil
+  "Default device (passed as Extempore's --device option)."
+  :type 'integer
+  :group 'extempore)
+
 (defcustom extempore-default-host "localhost"
   "Default host where the extempore process is running."
   :type 'string
@@ -258,8 +263,10 @@ See `run-hooks'."
   (define-key keymap (kbd "C-x C-y") 'extempore-setup)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-x C-x") 'extempore-send-defn-at-point)
+  (define-key keymap (kbd "C-M-x") 'extempore-send-defn-at-point)
   (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
-  (define-key keymap (kbd "C-x C-b") 'extempore-send-buffer))
+  (define-key keymap (kbd "C-x C-b") 'extempore-send-buffer)
+  (define-key keymap (kbd "C-x y") 'extempore-toggle-tr-animation))
 
 (extempore-keybindings extempore-mode-map)
 
@@ -608,11 +615,17 @@ determined by whether there is an *extempore* buffer."
   (unless (get-buffer "*extempore*")
     (progn (shell "*extempore*")
            (sit-for 1)
-           (process-send-string "*extempore*"
-                                (concat "cd " extempore-path "\n"
-                                        (if (string-equal system-type "windows-nt") "" "./")
-                                        "extempore --device "
-                                        (read-from-minibuffer "Device number: ") "\n"))))
+	   (process-send-string
+	    "*extempore*"
+	    (concat "cd " extempore-path "\n"
+		    (if (string-equal system-type "windows-nt") "" "./")
+		    "extempore --device "
+		    (let ((device-number (read-from-minibuffer
+					  (format "Device number (default %d): " extempore-default-device-number))))
+		      (if (string= device-number "")
+			  (number-to-string extempore-default-device-number)
+			device-number))
+		    "\n"))))
   (display-buffer "*extempore*"))
 
 (defun extempore-crlf-process-filter (proc str)
@@ -639,7 +652,7 @@ determined by whether there is an *extempore* buffer."
 
 (defun extempore-connect-tcp-osc (host port)
   (setq extempore-process (open-network-stream "extempore" nil host port))
-  (set-process-coding-system extempore-process 'iso-latin-1 'iso-latin-1)  
+  (set-process-coding-system extempore-process 'iso-latin-1 'iso-latin-1)
   (set-process-filter extempore-process #'extempore-slip-process-filter)
   (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr)
   (setq mode-line-process
@@ -828,6 +841,8 @@ be running in another (shell-like) buffer."
 	  nil
 	(current-word)))))
 
+;; " (to stop ST2's string highlighting stuffing up)
+
 ;; eldoc
 
 (defcustom extempore-eldoc-active t
@@ -935,10 +950,10 @@ be running in another (shell-like) buffer."
         overlay)))
 
 (defun extempore-update-tr-flash-overlay (overlay flag)
-  (if flag
-      (overlay-put overlay 'face '(:inverse-video t))
-    (if (equal (overlay-get overlay 'face) '(:inverse-video t))
-        (overlay-put overlay 'face '(:inverse-video nil)))))
+  ;; (if flag
+  ;;     (overlay-put overlay 'face '(:inverse-video t))
+  ;;   (overlay-put overlay 'face '(:inverse-video nil)))
+  nil)
 
 (defun extempore-make-tr-clock-overlay (name bounds)
   (if bounds
@@ -953,7 +968,7 @@ be running in another (shell-like) buffer."
 (defun extempore-update-tr-clock-overlay (overlay val beg end)
   (move-overlay overlay
                 beg
-                (max (1+ beg) (floor (+ beg (* val (- end beg)))))))
+		(min end (max (1+ beg) (round (+ beg (* val (- end beg))))))))
 
 (defvar extempore-tr-anim-alist nil
   "List of TR animations.
@@ -961,7 +976,7 @@ be running in another (shell-like) buffer."
 Each element is a list, with a name as the first element, and then a list
 of vectors as the cdr:
 
-  (fn-name [flash-overlay clock-overlay delta-t time-to-live] ...)
+  (fn-name [flash-overlay clock-overlay delta-t time-to-live flash-frames-to-live] ...)
 
 You shouldn't have to modify this list directly, use
 `extempore-add-new-anim-to-name' and
@@ -972,10 +987,11 @@ You shouldn't have to modify this list directly, use
                 extempore-tr-anim-alist))
 
 (defun extempore-create-anim-vector (delta-t)
-  (vector (extempore-make-tr-flash-overlay name bounds)
-	  (extempore-make-tr-clock-overlay name bounds)
+  (vector (extempore-make-tr-clock-overlay name bounds)
+	  (extempore-make-tr-flash-overlay name bounds)
 	  delta-t    ; total time
-	  (- delta-t 0.2)))                   ; time-to-live
+	  delta-t    ; time-to-live
+	  0))        ; flash-frames to live
 
 (defun extempore-add-new-anim-to-name (name delta-t)
   (let ((bounds (extempore-find-defn-bounds name))
@@ -1018,30 +1034,36 @@ You shouldn't have to modify this list directly, use
 (defun extempore-tr-update-anims ()
   (dolist (anim (apply #'append (mapcar #'cdr extempore-tr-anim-alist)))
     (let ((ttl (aref anim 3))
-	  (flash-overlay (aref anim 0)))
-      (if (not (numberp ttl))
-	  ;; finish 'flash'
-	  (extempore-update-tr-flash-overlay flash-overlay nil)
-	(if (<= ttl 0)
-	    ;; trigger 'flash'
-	    (progn
-	      (extempore-update-tr-clock-overlay (aref anim 1)
+	  (ftl (aref anim 4))
+	  (flash-overlay (aref anim 1)))
+      ;; update ttl value
+      (if (numberp ttl)
+	  (setq ttl (aset anim 3 (- ttl extempore-tr-animation-update-period))))
+      ;; finish 'flash' animation
+      (if (> ftl 0)
+	  (progn (if (= ftl 1)
+		     (progn (extempore-update-tr-flash-overlay flash-overlay nil)
+			    (extempore-update-tr-clock-overlay (aref anim 0)
 						 0.0
 						 (overlay-start flash-overlay)
 						 (overlay-end flash-overlay))
-	      (extempore-update-tr-flash-overlay flash-overlay t)
-	      (aset anim 3 nil))
-	  (progn
-	    ;; decrement the ttl value
-	    (aset anim 3
-		  (- ttl extempore-tr-animation-update-period))
-	    ;; update the 'clock' overlay
-	    (extempore-update-tr-clock-overlay (aref anim 1)
-					       (/ (- (aref anim 2)
-						     (aref anim 3))
-						  (aref anim 2))
-					       (overlay-start flash-overlay)
-					       (overlay-end flash-overlay))))))))
+			    (aset anim 3 nil)))
+		 (aset anim 4 (- ftl 1)))
+	(if (numberp ttl)
+	    ;; trigger 'flash' animation
+	    (if (<= ttl 0)
+		(progn
+		  ;; num of frames the flash overlay lives for
+		  (aset anim 4 2)
+		  (extempore-update-tr-flash-overlay flash-overlay t))
+	      ;; update the 'clock' overlay
+	      (extempore-update-tr-clock-overlay (aref anim 0)
+						 (/ (- (aref anim 2)
+						       (aref anim 3))
+						    (aref anim 2))
+						 (overlay-start flash-overlay)
+						 (overlay-end flash-overlay))
+	      ))))))
 
 ;; managing the animation timer
 
@@ -1127,6 +1149,141 @@ You shouldn't have to modify this list directly, use
   (if extempore-tr-animation-timer
       (extempore-stop-tr-animation)
     (extempore-start-tr-animation)))
+
+;; interactive repeated evaluation of defun under point
+
+(defvar extempore-repeated-eval-timer nil)
+
+(defun extempore-start-repeated-eval (time-interval)
+  "takes a time interval (in seconds)"
+  (interactive "nTime interval (sec):")
+  (setq extempore-repeated-eval-timer
+	(run-with-timer 0 time-interval 'extempore-send-defn-at-point)))
+
+(defun extempore-stop-repeated-eval ()
+  (interactive)
+  (cancel-timer extempore-repeated-eval-timer)
+  (setq extempore-repeated-eval-timer nil))
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; extempore logger ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+(define-minor-mode extempore-logger-mode
+  "This minor mode automatically logs all keystrokes (and
+  extempore code sent for evaluation) in all Extempore buffers."
+  :global t
+  :init-value nil
+  :lighter nil
+  :keymap nil
+  :group 'extempore
+
+  (if extempore-logger-mode
+      (extempore-logger-start-logging)
+    (extempore-logger-stop-logging)))
+
+;; advising funcitions for logging
+
+(defun extempore-logger-advise-functions (func-list)
+  "Advise (via defadvice) the key extempore-mode functions"
+  (mapc (lambda (function) 
+          (ad-add-advice
+           function
+           '(extempore-logger-advice nil t (advice . (lambda () (extempore-logger-log-current-command (ad-get-args 0)))))
+           'after 'first)
+          (ad-activate function))
+        func-list))
+
+(defun extempore-logger-unadvise-functions (func-list)
+  "Remove advice from special extempore-mode functions"
+  (mapc (lambda (function) 
+          (ad-remove-advice function 'after 'extempore-logger-advice))
+        func-list))
+
+(defvar extempore-logger-special-functions
+  '(extempore-send-defn
+    extempore-connect
+    extempore-disconnect)
+  "A list of extempore-mode functions to specifically instrument for logging")
+
+;; start and stop functions
+
+(defun extempore-logger-start-logging ()
+  (message "Starting Extempore logger...")
+  (add-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
+  (setq extempore-logger-logfile (extempore-logger-new-logfile))
+  (extempore-logger-advise-functions extempore-logger-special-functions)
+  (extempore-logger-start-idle-write-timer))
+
+(defun extempore-logger-stop-logging ()
+  (remove-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
+  (extempore-logger-flush)
+  (setq extempore-logger-logfile nil)
+  (extempore-logger-unadvise-functions extempore-logger-special-functions)
+  (extempore-logger-stop-idle-write-timer))
+
+;; capturing all commands in memory
+
+(defvar extempore-logger-cache nil)
+
+(defun extempore-logger-log-current-command (&optional arg-list)
+  (if (and (equal major-mode 'extempore-mode) (symbolp real-last-command))
+      (setq extempore-logger-cache
+            (cons (if arg-list
+                      (mapconcat '(lambda (x)
+                                    (replace-regexp-in-string
+                                     "[\r\n]" " " (format "%s" x)))
+                                 (cons (format-time-string "%T.%3N")
+                                       (cons (buffer-name)
+                                             (cons (symbol-name real-this-command)
+                                                   arg-list)))
+                                 ",")
+                    (concat (format-time-string "%T.%3N") ","
+                            (buffer-name) ","
+                            (symbol-name real-last-command)))
+                  extempore-logger-cache))))
+
+(defun extempore-logger-pre-command-hook ()
+  (extempore-logger-log-current-command)) 
+
+;; writing command list to file
+
+(defvar extempore-logger-logfile nil)
+
+(defun extempore-logger-new-logfile ()
+  (interactive)
+  (let* ((log-dir (concat (or extempore-path user-emacs-directory) "extempore-logger/"))
+         (dir-created (unless (file-exists-p log-dir)
+                        (make-directory log-dir)))
+         (logfile-name
+          (concat log-dir 
+                  (format-time-string "%Y%m%d-%H%M%S")
+                  (if (yes-or-no-p "For logging purposes, is this a 'start from scratch' livecoding performance?")
+                      ".perf.log"
+                    ".prac.log"))))
+    (if (file-exists-p logfile-name)
+        (progn (message "Extempore logfile %s already exists" logfile-name)
+               nil)
+      logfile-name)))
+
+(defun extempore-logger-flush ()
+  (if extempore-logger-logfile
+      (append-to-file (mapconcat 'identity extempore-logger-cache "\n")
+                      nil
+                      extempore-logger-logfile)))
+
+(defvar extempore-logger-write-timer nil)
+(defvar extempore-logger-write-timer-interval 10.0)
+
+(defun extempore-logger-start-idle-write-timer ()
+  (setq extempore-logger-write-timer
+        (run-with-idle-timer extempore-logger-write-timer-interval
+                             t
+                             'extempore-logger-flush)))
+
+(defun extempore-logger-stop-idle-write-timer ()
+  (cancel-timer extempore-logger-write-timer)
+  (setq extempore-logger-write-timer nil))
 
 (provide 'extempore)
 
