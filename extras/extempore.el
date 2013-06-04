@@ -1218,11 +1218,17 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-logger-stop-logging ()
   (remove-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
-  (extempore-logger-flush)
+  (call-interactively 'extempore-logger-finish-logfile)
   (setq extempore-logger-logfile nil)
   (extempore-logger-unadvise-functions extempore-logger-special-functions)
   (extempore-logger-stop-idle-write-timer))
 
+(defun extempore-logger-new-session ()
+  (interactive)
+  (if extempore-logger-logfile
+      (extempore-logger-stop-logging))
+  (extempore-logger-start-logging))
+(extempore-logger-stop-logging)
 ;; capturing all commands in memory
 
 (defvar extempore-logger-cache nil)
@@ -1269,9 +1275,18 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-logger-flush ()
   (if extempore-logger-logfile
-      (append-to-file (mapconcat 'identity extempore-logger-cache "\n")
-                      nil
-                      extempore-logger-logfile)))
+      (progn (append-to-file (mapconcat 'identity extempore-logger-cache "\n")
+                             nil
+                             extempore-logger-logfile)
+             (setq extempore-logger-cache nil))))
+
+(defun extempore-logger-finish-logfile (comment)
+  (interactive "sAny comments about this particular session? ")
+  (setq extempore-logger-cache
+        (cons (concat (format-time-string "%T.%3N") ",comment," comment)
+              extempore-logger-cache))
+  (extempore-logger-flush)
+  (async-shell-command (format "bzip2 %s" extempore-logger-logfile)))
 
 (defvar extempore-logger-write-timer nil)
 (defvar extempore-logger-write-timer-interval 10.0)
