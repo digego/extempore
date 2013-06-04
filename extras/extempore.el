@@ -1209,9 +1209,10 @@ You shouldn't have to modify this list directly, use
 ;; start and stop functions
 
 (defun extempore-logger-start-logging ()
-  (message "Starting Extempore logger...")
+  (message "Starting Extempore keylogger")
   (add-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
-  (setq extempore-logger-logfile (extempore-logger-new-logfile))
+  (unless extempore-logger-logfile
+      (setq extempore-logger-logfile (extempore-logger-new-logfile)))
   (extempore-logger-advise-functions extempore-logger-special-functions)
   (extempore-logger-start-idle-write-timer))
 
