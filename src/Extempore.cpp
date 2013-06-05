@@ -223,28 +223,38 @@ int main(int argc, char** argv)
     [NSApplication sharedApplication];
 #endif
 
+    extemp::AudioDevice* dev = extemp::AudioDevice::I();
+    dev->start();
+
+    extemp::SchemeProcess* utility = new extemp::SchemeProcess(runtimedir, utility_name, utility_port, 0);
+    utility->start();
+
+    extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
+    utility_repl->connectToProcessAtHostname(host,utility_port);
+
+
     if(initfile_on) { // if a file needs to be loaded from the command line
        primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0, initfile);
     }else{
        primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0);
     }
-
-    extemp::SchemeProcess* utility = new extemp::SchemeProcess(runtimedir, utility_name, utility_port, 0);
-    extemp::AudioDevice* dev = extemp::AudioDevice::I();
-
     primary->start();
-    utility->start();
-    dev->start();
 
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name);
     primary_repl->connectToProcessAtHostname(host,primary_port);
-    extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
-    utility_repl->connectToProcessAtHostname(host,utility_port);
-
 
 #ifdef TARGET_OS_MAC
+    if(initfile_on) { // if a file needs to be loaded from the command line
+      printf("Load Init File: %s\n",initfile.c_str());
+      primary->loadFile(initfile,std::string(""));
+    }
     [[NSApplication sharedApplication] run];
 #else
+    if(initfile_on) { // if a file needs to be loaded from the command line
+      printf("Load Init File: %s\n",initfile.c_str());
+      primary->loadFile(initfile,std::string(""));
+    }
+
     while(1) {
 #ifdef TARGET_OS_WINDOWS
       Sleep(5000);

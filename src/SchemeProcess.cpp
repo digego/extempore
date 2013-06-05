@@ -455,8 +455,12 @@ namespace extemp {
 
 	bool SchemeProcess::loadFile(const std::string file, const std::string path)
 	{
-
-		FILE* impscm = fopen(std::string(path).append("/").append(file).c_str(),"r");
+                FILE* impscm = 0;
+                if(strlen(path.c_str())>0) {
+                  impscm = fopen(std::string(path).append("/").append(file).c_str(),"r");
+                } else {
+                  impscm = fopen(file.c_str(),"r");
+                }
 		if(!impscm) {
 			std::cout << "ERROR: Unable to locate file: " << path << "/" << file << std::endl;
 			return false;
@@ -550,9 +554,9 @@ namespace extemp {
 		//printf("Loaded... llvmir.xtm\n");
 		scm->loadFile("llvmti.xtm", load_path.c_str());		
 		//printf("Loaded... llvmti.xtm\n");
-                if(scm->getInitFile().compare("") != 0) {
-		  scm->loadFile(scm->getInitFile().c_str());
-                }
+                // if(scm->getInitFile().compare("") != 0) {
+		//   scm->loadFile(scm->getInitFile().c_str());
+                // }
 
 		// scm->loadFile("mbe.xtm", [resources UTF8String]);
 		// printf("Loading... mbe.xtm\n");
