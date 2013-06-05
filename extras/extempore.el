@@ -1276,7 +1276,7 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-logger-flush ()
   (if extempore-logger-logfile
-      (progn (append-to-file (mapconcat 'identity extempore-logger-cache "\n")
+      (progn (append-to-file (mapconcat 'identity (nreverse extempore-logger-cache) "\n")
                              nil
                              extempore-logger-logfile)
              (setq extempore-logger-cache nil))))
