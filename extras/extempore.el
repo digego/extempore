@@ -1175,7 +1175,7 @@ You shouldn't have to modify this list directly, use
   extempore code sent for evaluation) in all Extempore buffers."
   :global t
   :init-value nil
-  :lighter nil
+  :lighter " ExLog"
   :keymap nil
   :group 'extempore
 
