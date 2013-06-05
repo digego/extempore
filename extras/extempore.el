@@ -1238,9 +1238,10 @@ You shouldn't have to modify this list directly, use
 (defvar extempore-logger-datetime-format-string "%Y-%m-%d %T.%3N")
 
 (defun extempore-logger-log-current-command (&optional arg-list)
-  (if (and (equal major-mode 'extempore-mode) (symbolp real-last-command))
+  (if (and (equal major-mode 'extempore-mode)
+           (symbolp real-last-command))
       (setq extempore-logger-cache
-            (cons (if arg-list
+            (cons (if (and arg-list real-this-command)
                       (mapconcat '(lambda (x)
                                     (replace-regexp-in-string
                                      "[\r\n]" " " (format "%s" x)))
@@ -1265,8 +1266,7 @@ You shouldn't have to modify this list directly, use
   (let* ((log-dir (concat (or extempore-path user-emacs-directory) "extempore-logger/"))
          (dir-created (unless (file-exists-p log-dir) (make-directory log-dir)))
          (logfile-name (concat log-dir
-                               (format-time-string "%Y%m%d-%T")
-                               "-" user-login-name
+                               (format-time-string "%Y%m%dT%H%M%S-") user-login-name
                                (if is-performance ".perf.log" ".prac.log"))))
     (if (file-exists-p logfile-name)
         (progn (message "Extempore logfile %s already exists" logfile-name)
