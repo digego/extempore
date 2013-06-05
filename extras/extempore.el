@@ -1180,7 +1180,7 @@ You shouldn't have to modify this list directly, use
 
   (if extempore-logger-mode
       (extempore-logger-start-logging)
-    (extempore-logger-stop-logging)))
+    (call-interactively 'extempore-logger-stop-logging)))
 
 ;; advising funcitions for logging
 
@@ -1209,16 +1209,17 @@ You shouldn't have to modify this list directly, use
 ;; start and stop functions
 
 (defun extempore-logger-start-logging ()
-  (message "Starting Extempore keylogger")
   (add-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
   (unless extempore-logger-logfile
-      (setq extempore-logger-logfile (extempore-logger-new-logfile)))
+    (setq extempore-logger-logfile
+          (extempore-logger-new-logfile (yes-or-no-p "For logging purposes, is this a 'start from scratch' livecoding performance?"))))
   (extempore-logger-advise-functions extempore-logger-special-functions)
   (extempore-logger-start-idle-write-timer))
 
-(defun extempore-logger-stop-logging ()
+(defun extempore-logger-stop-logging (comment)
+  (interactive "sAny comments about this particular session? ")
   (remove-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
-  (call-interactively 'extempore-logger-finish-logfile)
+  (extempore-logger-finish-logfile comment)
   (setq extempore-logger-logfile nil)
   (extempore-logger-unadvise-functions extempore-logger-special-functions)
   (extempore-logger-stop-idle-write-timer))
@@ -1226,9 +1227,9 @@ You shouldn't have to modify this list directly, use
 (defun extempore-logger-new-session ()
   (interactive)
   (if extempore-logger-logfile
-      (extempore-logger-stop-logging))
+      (call-interactively 'extempore-logger-stop-logging))
   (extempore-logger-start-logging))
-(extempore-logger-stop-logging)
+
 ;; capturing all commands in memory
 
 (defvar extempore-logger-cache nil)
@@ -1257,17 +1258,12 @@ You shouldn't have to modify this list directly, use
 
 (defvar extempore-logger-logfile nil)
 
-(defun extempore-logger-new-logfile ()
-  (interactive)
+(defun extempore-logger-new-logfile (is-performance)
   (let* ((log-dir (concat (or extempore-path user-emacs-directory) "extempore-logger/"))
-         (dir-created (unless (file-exists-p log-dir)
-                        (make-directory log-dir)))
-         (logfile-name
-          (concat log-dir 
-                  (format-time-string "%Y%m%d-%H%M%S")
-                  (if (yes-or-no-p "For logging purposes, is this a 'start from scratch' livecoding performance?")
-                      ".perf.log"
-                    ".prac.log"))))
+         (dir-created (unless (file-exists-p log-dir) (make-directory log-dir)))
+         (logfile-name (concat log-dir
+                               (format-time-string "%Y%m%d-%H%M%S")
+                               (if is-performance ".perf.log" ".prac.log"))))
     (if (file-exists-p logfile-name)
         (progn (message "Extempore logfile %s already exists" logfile-name)
                nil)
@@ -1280,11 +1276,11 @@ You shouldn't have to modify this list directly, use
                              extempore-logger-logfile)
              (setq extempore-logger-cache nil))))
 
-(defun extempore-logger-finish-logfile (comment)
-  (interactive "sAny comments about this particular session? ")
-  (setq extempore-logger-cache
-        (cons (concat (format-time-string "%T.%3N") ",comment," comment)
-              extempore-logger-cache))
+(defun extempore-logger-finish-logfile (&optional comment)
+  (if comment
+      (setq extempore-logger-cache
+            (cons (concat (format-time-string "%T.%3N") ",comment," comment)
+                  extempore-logger-cache)))
   (extempore-logger-flush)
   (async-shell-command (format "bzip2 %s" extempore-logger-logfile)))
 
