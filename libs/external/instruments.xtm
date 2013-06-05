@@ -37,33 +37,33 @@
 (bind-func set_sample_data_
   (lambda (inst:[double,double,double,double*]* fname index offset lgth)
     (let ((info:sf_info* (zalloc))
-	  (audiofile (sf_open fname 16 info))
-	  (channels (i32toi64 (tref info 2)))
-	  (num (if (= 0 lgth)
-		   (* (- (tref info 0) offset) channels)
-		   (* lgth channels))))
+          (audiofile (sf_open fname 16 info))
+          (channels (i32toi64 (tref info 2)))
+          (num (if (= 0 lgth)
+                   (* (- (tref info 0) offset) channels)
+                   (* lgth channels))))
       (if (<> null audiofile)
-	  (let ((adat:double* (halloc (* num 2)))
-		(samples:|128,double*|* (inst.samples))
-		(samples_channels:|128,i64|* (inst.samples_channels))
-		(samples_length:|128,i64|* (inst.samples_length))
-		(samples_read (read_audio_data fname adat (* offset channels) num))
-		(olddat (if (<> 0 (pref samples_length index))
-			    (bitcast (pref samples index) i8*)
-			    null)))
+          (let ((adat:double* (halloc (* num 2)))
+                (samples:|128,double*|* (inst.samples))
+                (samples_channels:|128,i64|* (inst.samples_channels))
+                (samples_length:|128,i64|* (inst.samples_length))
+                (samples_read (read_audio_data fname adat (* offset channels) num))
+                (olddat (if (<> 0 (pref samples_length index))
+                            (bitcast (pref samples index) i8*)
+                            null)))
             (printf "%lld samples read" samples_read)
-	    (pset! samples_length index (/ samples_read channels)) ;num)
-	    (pset! samples_channels index channels)
-	    (pset! samples index adat)
-	    ;; the following line is a problem on windows and needs to be fixed!
+            (pset! samples_length index (/ samples_read channels)) ;num)
+            (pset! samples_channels index channels)
+            (pset! samples index adat)
+            ;; the following line is a problem on windows and needs to be fixed!
                                         ; (free_after_delay olddat (* 10.0 44100.0)))
-	    (printf "%s:\t%lld(channels) %lld(frames):%f(k)\t\tinto index:%lld\n"
+            (printf "%s:\t%lld(channels) %lld(frames):%f(k)\t\tinto index:%lld\n"
                     fname channels (/ samples_read channels)
                     (/ (i64tod (* num 8)) 1024.) index)
-	    (sf_close audiofile)
-	    1)
-	  (begin (printf "%s\n" (sf_strerror audiofile))
-		 0)))))
+            (sf_close audiofile)
+            1)
+          (begin (printf "%s\n" (sf_strerror audiofile))
+                 0)))))
 
 ;; passing a length of 0 will read the whole file
 (define-macro (set-sampler-index inst fname index offset lgth)
@@ -90,9 +90,9 @@
 (define-macro (set-sample-offset inst index offset)
   `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
      (if (cptr? native)
-	 (set_sample_offset_ native
-			     (real->integer ,index)
-			     (real->integer ,offset)))))
+         (set_sample_offset_ native
+                             (real->integer ,index)
+                             (real->integer ,offset)))))
 
 ;; linear sampler
 ;;
@@ -100,17 +100,17 @@
 (bind-func sampler_note_linear_c
   (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index offset:i64)
     (let ((idx_freq (midi2frq (i64tod index)))
-	  (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
+          (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
-	(let ((rate (/ freq idx_freq))
-	      (pos (if (< chan 1.0) ;; only increment once per frame
-		       (set! phase (+ phase rate))
-		       phase))
-	      (posi (dtoi64 (floor pos)))
-	      (posx (+ (* posi 2) (dtoi64 chan)))
-	      (lgth (- (pref samples_length index) 10))
-	      (dat (pref samples index)))
-	  (* amp (if (> posi lgth) 0.0 (pref dat posx))))))))
+        (let ((rate (/ freq idx_freq))
+              (pos (if (< chan 1.0) ;; only increment once per frame
+                       (set! phase (+ phase rate))
+                       phase))
+              (posi (dtoi64 (floor pos)))
+              (posx (+ (* posi 2) (dtoi64 chan)))
+              (lgth (- (pref samples_length index) 10))
+              (dat (pref samples index)))
+          (* amp (if (> posi lgth) 0.0 (pref dat posx))))))))
 
 
 
@@ -145,24 +145,24 @@
 (bind-func sampler_note_hermite_c
   (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index offset)
     (let ((idx_freq (midi2frq (i64tod index)))
-	  (channels (pref samples_channels index))
-	  (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
+          (channels (pref samples_channels index))
+          (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
       (lambda (time:double chan:double freq:double amp:double)
-	(let ((rate (/ freq idx_freq))
-	      (pos (if (< chan 1.0) ;; only increment once per frame
-		       (set! phase (+ phase rate))
-		       phase))
-	      (posi (dtoi64 (floor pos)))
-	      (posx (+ (* posi channels) (if (< (dtoi64 chan) channels) (dtoi64 chan) 0)))
-	      (lgth (- (pref samples_length index) 10))
-	      (dat (pref samples index)))
-	  (if (< (fabs (- rate 1.0)) 0.01)
-	      (if (> posi lgth) 0.0 (* amp (pref dat posx)))
-	      (let ((y1 (if (or (> posi lgth) (< posi 1)) 0.0 (pref dat (- posx channels))))
-		    (x0 (if (> posi lgth) 0.0 (pref dat posx)))
-		    (x1 (if (> (+ posi 1) lgth) 0.0 (pref dat (+ posx channels))))
-		    (x2 (if (> (+ posi 2) lgth) 0.0 (pref dat (+ posx (* 2 channels))))))
-		(* amp (hermite_interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
+        (let ((rate (/ freq idx_freq))
+              (pos (if (< chan 1.0) ;; only increment once per frame
+                       (set! phase (+ phase rate))
+                       phase))
+              (posi (dtoi64 (floor pos)))
+              (posx (+ (* posi channels) (if (< (dtoi64 chan) channels) (dtoi64 chan) 0)))
+              (lgth (- (pref samples_length index) 10))
+              (dat (pref samples index)))
+          (if (< (fabs (- rate 1.0)) 0.01)
+              (if (> posi lgth) 0.0 (* amp (pref dat posx)))
+              (let ((y1 (if (or (> posi lgth) (< posi 1)) 0.0 (pref dat (- posx channels))))
+                    (x0 (if (> posi lgth) 0.0 (pref dat posx)))
+                    (x1 (if (> (+ posi 1) lgth) 0.0 (pref dat (+ posx channels))))
+                    (x2 (if (> (+ posi 2) lgth) 0.0 (pref dat (+ posx (* 2 channels))))))
+                (* amp (hermite_interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
 
 (bind-func sampler_fx 400000
@@ -232,28 +232,28 @@
                                     (let ((note_zone (push_zone (* 1024 10))))
                                       (pset! notes free_note
                                              (note_c start freq amp dur
-                                                        attack decay release sustain
-                                                        note_starts free_note
-                                                        (if (> nargs 0)
-                                                            (,note_kernel samples samples_length samples_offsets samples_channels new_idx (pref dargs 0))
-                                                            (,note_kernel samples samples_length samples_offsets samples_channels new_idx 0.0))
-                                                        note_zone))
+                                                     attack decay release sustain
+                                                     note_starts free_note
+                                                     (if (> nargs 0)
+                                                         (,note_kernel samples samples_length samples_offsets samples_channels new_idx (pref dargs 0))
+                                                         (,note_kernel samples samples_length samples_offsets samples_channels new_idx 0.0))
+                                                     note_zone))
                                       (pset! note_starts free_note start)
                                       (pop_zone))
                                     1)
                              0)))))
        (dotimes (kk 128)
-	 (aset! samples_offsets kk 0)
-	 (aset! samples_length kk 0))
+         (aset! samples_offsets kk 0)
+         (aset! samples_length kk 0))
        (dotimes (ii poly) ;; sets all notes to inactive
-	 (pset! note_starts ii 9999999999999.0))
+         (pset! note_starts ii 9999999999999.0))
        (lambda (in:double time:double chan:double dat:double*)
-	 (let ((out:double 0.0)
-	       (k:i64 0))
-	   (dotimes (k poly) ;; sum all active notesx
-	     (if (< (pref note_starts k) time)
-		 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
-	   (* gain (,effect_kernel out time chan dat)))))))
+         (let ((out:double 0.0)
+               (k:i64 0))
+           (dotimes (k poly) ;; sum all active notesx
+             (if (< (pref note_starts k) time)
+                 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
+           (* gain (,effect_kernel out time chan dat)))))))
 
 
 ;; load-sampler now requires you to supply your own function for
@@ -284,22 +284,22 @@
                                         (cadr samp-data)
                                         (caddr samp-data)
                                         (cadddr samp-data))))
-	       (,parser file-list))))
+               (,parser file-list))))
 
 ;; as a start, here are a couple of parser functions which might be useful:
 
 (define note-name-to-midi-number
   (lambda (name)
     (let ((result (regex:matched name "([ABCDEFG])([#b])?(-?[0-9])")))
-        (if (null? result)
-            #f
-            (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
-                  (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
-                        ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
-              (+ offset pc
-                 (cond ((string=? (caddr result) "#") 1)
-                       ((string=? (caddr result) "b") -1)
-                       (else 0))))))))
+      (if (null? result)
+          #f
+          (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                      ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+            (+ offset pc
+               (cond ((string=? (caddr result) "#") 1)
+                     ((string=? (caddr result) "b") -1)
+                     (else 0))))))))
 
 ;; this will match e.g. 60.aiff (where 60 is the midi note number)
 (define parse-sample-names-1
