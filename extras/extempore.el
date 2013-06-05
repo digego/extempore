@@ -266,7 +266,8 @@ See `run-hooks'."
   (define-key keymap (kbd "C-M-x") 'extempore-send-defn-at-point)
   (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
   (define-key keymap (kbd "C-x C-b") 'extempore-send-buffer)
-  (define-key keymap (kbd "C-x y") 'extempore-toggle-tr-animation))
+  (define-key keymap (kbd "C-x y") 'extempore-toggle-tr-animation)
+  (define-key keymap (kbd "C-x C-l") 'extempore-logger-mode))
 
 (extempore-keybindings extempore-mode-map)
 
