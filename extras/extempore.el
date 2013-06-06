@@ -1226,7 +1226,8 @@ You shouldn't have to modify this list directly, use
 (defvar extempore-logger-special-functions
   '(extempore-send-defn
     extempore-connect
-    extempore-disconnect)
+    extempore-disconnect
+    yas/expand-snippet)
   "A list of extempore-mode functions to specifically instrument for logging")
 
 ;; logging commands to memory
