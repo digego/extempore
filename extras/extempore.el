@@ -1248,8 +1248,8 @@ You shouldn't have to modify this list directly, use
                    (concat (format-time-string extempore-logger-datetime-format-string) ","
                            (buffer-name) ","
                            (symbol-name command)
-                           (format ",%s" pref-arg)
-                           (format ",%s" arg-list)))
+                           (format ",%s," pref-arg)
+                           (prin1-to-string (prin1-to-string arg-list))))
                   extempore-logger-cache))))
 
 (defun extempore-logger-pre-command-hook ()
