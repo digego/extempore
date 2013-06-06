@@ -1212,7 +1212,7 @@ You shouldn't have to modify this list directly, use
   (mapc (lambda (function) 
           (ad-add-advice
            function
-           '(extempore-logger-advice nil t (advice . (lambda () (extempore-logger-log-current-command (ad-get-args 0)))))
+	   '(extempore-logger-advice nil t (advice . (lambda () (extempore-logger-log-command real-this-command current-prefix-arg (ad-get-args 0)))))
            'after 'first)
           (ad-activate function))
         func-list))
@@ -1238,26 +1238,19 @@ You shouldn't have to modify this list directly, use
 
 (defvar extempore-logger-datetime-format-string "%Y-%m-%d %T.%3N")
 
-(defun extempore-logger-log-current-command (&optional arg-list)
+(defun extempore-logger-log-command (command pref-arg arg-list)
   (if (and (equal major-mode 'extempore-mode)
-           (symbolp real-last-command))
+	   (symbolp command))
       (setq extempore-logger-cache
-            (cons (if (and arg-list real-this-command)
-                      (mapconcat '(lambda (x)
-                                    (replace-regexp-in-string
-                                     "[\r\n]" " " (format "%s" x)))
-                                 (cons (format-time-string extempore-logger-datetime-format-string)
-                                       (cons (buffer-name)
-                                             (cons (symbol-name real-this-command)
-                                                   arg-list)))
-                                 ",")
-                    (concat (format-time-string extempore-logger-datetime-format-string) ","
-                            (buffer-name) ","
-                            (symbol-name real-last-command)))
+	    (cons (concat (format-time-string extempore-logger-datetime-format-string) ","
+			  (buffer-name) ","
+			  (symbol-name command)
+			  (format ",%s" pref-arg)
+			  (format ",%s" arg-list))
                   extempore-logger-cache))))
 
 (defun extempore-logger-pre-command-hook ()
-  (extempore-logger-log-current-command)) 
+  (extempore-logger-log-command real-this-command current-prefix-arg nil))
 
 ;; writing command list to file
 
