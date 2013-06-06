@@ -1243,11 +1243,13 @@ You shouldn't have to modify this list directly, use
   (if (and (equal major-mode 'extempore-mode)
            (symbolp command))
       (setq extempore-logger-cache
-            (cons (concat (format-time-string extempore-logger-datetime-format-string) ","
-                          (buffer-name) ","
-                          (symbol-name command)
-                          (format ",%s" pref-arg)
-                          (format ",%s" arg-list))
+            (cons (replace-regexp-in-string
+                   "[\r\n]" " "
+                   (concat (format-time-string extempore-logger-datetime-format-string) ","
+                           (buffer-name) ","
+                           (symbol-name command)
+                           (format ",%s" pref-arg)
+                           (format ",%s" arg-list)))
                   extempore-logger-cache))))
 
 (defun extempore-logger-pre-command-hook ()
