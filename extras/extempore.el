@@ -672,18 +672,14 @@ determined by whether there is an *extempore* buffer."
 be running in another (shell-like) buffer."
   (interactive
    ;; get args interactively
-   (let ((read-host (read-from-minibuffer
-                     (format "Hostname (default %s):" extempore-default-host)))
-         (read-port (read-from-minibuffer
-                     (format "Port (default %d):" extempore-default-port)))
-         (read-type (read-from-minibuffer
-                     (format "Connction type (default %s):" extempore-default-connection-type
-                             ))))
-     (list (if (string-equal read-host "") extempore-default-host read-host)
-           (if (string-equal read-port "") extempore-default-port (string-to-number read-port))
-           (if (string-equal read-type "") "TCP" read-type))))
-  (unless (member type '("TCP" "TCP-OSC"))
-    (error "Unsupported connection type: %s. Currently, Extempore only supports TCP and TCP-OSC connections." type))
+   (let ((read-host (ido-completing-read
+                     "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host))
+         (read-port (string-to-number
+                     (ido-completing-read
+                      "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port))))
+         (read-type (ido-completing-read
+                     "Connection type: " '("TCP" "TCP-OSC") nil t nil nil extempore-default-connection-type)))
+     (list read-host read-port read-type)))
   ;; kill existing connection
   (when extempore-process (extempore-disconnect))
   ;; set up connection of `type'
