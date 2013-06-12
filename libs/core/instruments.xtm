@@ -91,7 +91,7 @@
 ;; a macro for making extemore instruments
 ;; see http://benswift.me/2012-09-28-making-an-instrument.html
 
-(define-macro (define-instrument name note_kernel effect_kernel)
+(define-macro (define-instrument name note_kernel effect_kernel . args)
   `(bind-func ,name
      (let* ((poly:i64 48)
             (notes:[double,double,double,double]** (zalloc poly))
@@ -110,7 +110,7 @@
                             (if (> (pref note_starts i) 9999999999998.0)
                                 (set! free_note i)))
                           (if (> free_note -1) ;; if we found a free poly spot assign a note
-                              (let ((note_zone (push_zone (* 1024 10))))
+                              (let ((note_zone (push_zone (* 1024 ,(if (null? args) 10 (car args))))))
                                 (pset! notes free_note
                                        (note_c start freq amp dur
                                                attack decay release sustain
