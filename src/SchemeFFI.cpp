@@ -811,6 +811,11 @@ namespace extemp {
     pointer SchemeFFI::ipcCall(scheme* _sc, pointer args)
     {
 	std::string process(string_value(pair_car(args)));
+        SchemeREPL* repl = SchemeREPL::I(process);
+        if(!repl) {
+          std::cout << "BAD IPC: Process name '" << process << "' does not exist!" << std::endl;
+          return _sc->F;
+        }
  	std::stringstream ss;
 	pointer sym = pair_cadr(args);
 	args = pair_cddr(args);
@@ -844,7 +849,7 @@ namespace extemp {
 	    }
 	}
 	std::string str = "("+std::string(symname(sym))+ss.str()+")";
-	SchemeREPL::I(process)->writeString(str);
+        repl->writeString(str);
 	return _sc->T;
     }
     
@@ -3560,6 +3565,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     //    return objc_glMakeContextCurrent(_sc, args);
     CGLContextObj ctx = CGLGetCurrentContext();
     BasicOpenGLView* view = (BasicOpenGLView*) cptr_value(pair_car(args));
+    //NSOpenGLView* view = (NSOpenGLView*) cptr_value(pair_car(args));
     ctx = (CGLContextObj) [[view openGLContext] CGLContextObj];
     //CGLLockContext(ctx);
     CGLSetCurrentContext(ctx);
@@ -3624,7 +3630,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       };
 
     NSOpenGLPixelFormat* fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes: (NSOpenGLPixelFormatAttribute*) array]; 
-    //NSOpenGLContext *ctx = _openGLContext = [[NSOpenGLContext alloc] initWithFormat:fmt shareContext:nil];
+    //NSOpenGLView* view = [[NSOpenGLView alloc] initWithFrame:screenRect pixelFormat:fmt];
     BasicOpenGLView* view = [[BasicOpenGLView alloc] initWithFrame:screenRect pixelFormat:fmt];
     
     int windowStyleMask;
@@ -3674,7 +3680,8 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     // tlist = cons(_sc,mk_cptr(_sc,(void*)hdc),list);
     // _sc->imp_env->erase(list);
     // list = tlist;
-    [pool release];
+
+    //[pool release];
     
     return mk_cptr(_sc, view); //list; //_cons(_sc, mk_cptr(_sc, (void*)dpy),mk_cptr(_sc,(void*)glxWin),1);
   }
