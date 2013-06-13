@@ -1575,21 +1575,6 @@
                  '())))))
 
 
-(define impc:ti:get-var
-   (lambda (sym vars)
-      (if (not (assoc sym vars))
-          (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist)
-          (assoc sym vars))))
-		  
-(define impc:ti:get-var
-  (lambda (sym vars)
-    (if (not (assoc sym vars))
-        (if (llvm:get-global-variable-type (symbol->string sym))
-            (cons sym (- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string sym)))
-                         *impc:ir:pointer*))
-            (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist))
-        (assoc sym vars))))
-
 
 (define impc:ti:get-var
   (lambda (sym vars)
@@ -1598,7 +1583,9 @@
             (let ((t (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string sym)))))
               (if (list? t)
                   (cons sym (cons (- (car t) *impc:ir:pointer*) (cdr t)))
-                  (cons sym (- t *impc:ir:pointer*))))
+                  (if (string? t)
+                      (cons sym (impc:ir:pointer-- t))
+                      (cons sym (- t *impc:ir:pointer*)))))
             (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist))
         (assoc sym vars))))
 
