@@ -1,10 +1,10 @@
 require 'formula'
 
-class Llvm < Formula
+class ExtemporeLlvm < Formula
   homepage  'http://llvm.org/'
   url       'http://llvm.org/releases/3.2/llvm-3.2.src.tar.gz'
   sha1      '42d139ab4c9f0c539c60f5ac07486e9d30fc1280'
-  keg_only "Specially patched LLVM for use in building Extempore."
+  keg_only "This is a specially patched LLVM for use in building Extempore."
 
   option 'with-asan', 'Include support for -faddress-sanitizer (from compiler-rt)'
   option 'all-targets', 'Build all target backends'
@@ -42,20 +42,13 @@ class Llvm < Formula
     system "./configure", *args
     system "make install"
 
-    # install llvm python bindings
-    (share/'llvm/bindings').install buildpath/'bindings/python'
-  end
-
-  def test
-    system "#{bin}/llvm-config", "--version"
   end
 
   def caveats; <<-EOS.undent
     This is a specifically patched version of LLVM for building Extempore.
-    It shouldn't get in the way of the Xcode-provided LLVM install.
+    It shouldn't get in the way of any other LLVM install.
 
     If you have any problems, raise them on extemporelang@googlegroups.com
-    If you already have LLVM installed, then "brew upgrade llvm" might not work.
     EOS
   end
 
