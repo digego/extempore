@@ -13,3 +13,5 @@ DIST_FILES="extempore runtime libs examples extras make-tags.sh README.md"
 cp -R $DIST_FILES $DIST_DIR
 tar -cvzf ${DIST_DIR}.tar.gz $DIST_DIR
 rm -r $DIST_DIR
+
+echo "sha1 $(shasum ${DIST_DIR}.tar.gz) (needed for homebrew formula)"
