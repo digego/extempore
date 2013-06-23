@@ -10,6 +10,8 @@
 
 ;;; Code:
 
+(define xtmlib_soil_loaded #t)
+
 ;; load soil library
 (define libsoil
   (let ((platform (sys:platform)))
@@ -25,7 +27,6 @@
 (bind-lib libsoil SOIL_load_image [i8*,i8*,i32*,i32*,i32*,i32]*)
 ;(bind-lib libsoil SOIL_save_image [i32,i8*,i32,i32,i32,i32,i8*]*)
 ;(bind-lib solilib SOIL_save_screenshot [i32,i8*,i32,i32,i32,i32,i32]*)
-
 
 (bind-val SOIL_FLAG_POWER_OF_TWO i32 1)
 (bind-val SOIL_FLAG_MIPMAPS i32 2)
@@ -56,14 +57,14 @@
 ;; id of 0 means Create new texture
 ;; id > 0 means load image into existing texture
 ;; returns texture 
-(bind-func gl_load_image
+(bind-func gl_load_image_rect
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y SOIL_FLAG_TEXTURE_RECTANGLE))))
       (if (= texid 0)
 	  (printf "Error loading: %s\n" path))
       texid)))
 
-(bind-func gl_load_image_sqr
+(bind-func gl_load_image
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y))))
       (if (= texid 0)
@@ -81,7 +82,7 @@
 
 ;; get texture height
 ;; for TEXTURE_2D only!
-(bind-func gl_tex_height_sqr
+(bind-func gl_tex_height
   (lambda (tex)
     (glDisable GL_TEXTURE_RECTANGLE_ARB)
     (glEnable GL_TEXTURE_2D)    
@@ -94,7 +95,7 @@
 
 ;; get texture-width
 ;; for TEXTURE_2D only!
-(bind-func gl_tex_width_sqr
+(bind-func gl_tex_width
   (lambda (tex)
     (glDisable GL_TEXTURE_RECTANGLE_ARB)
     (glEnable GL_TEXTURE_2D)    
@@ -107,7 +108,7 @@
 
 ;; get texture-width
 ;; for TEXTURE_RECTANGLE only!
-(bind-func gl_tex_width
+(bind-func gl_tex_width_rect
   (lambda (tex)
     (glDisable GL_TEXTURE_2D)
     (glEnable GL_TEXTURE_RECTANGLE_ARB)    
@@ -120,7 +121,7 @@
 
 ;; get texture height
 ;; for TEXTURE_RECTANGLE only!
-(bind-func gl_tex_height
+(bind-func gl_tex_height_rect
   (lambda (tex)
     (glDisable GL_TEXTURE_2D)
     (glEnable GL_TEXTURE_RECTANGLE_ARB)    
@@ -134,7 +135,7 @@
 
 ;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
 ;; if texid is zero then assign a new tex id otherwise use the texid provided
-(bind-func gl_load_tex
+(bind-func gl_load_tex_rect
   (lambda (width height channels type data texid)
     (let* ((tex:i32* (salloc)))
       (pset! tex 0 texid)
@@ -148,6 +149,33 @@
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_NEAREST)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_NEAREST)
       (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 channels ;GL_RGBA
+		    width height
+		    0
+		    (cond ((= channels 1) GL_RED)
+			  ((= channels 3) GL_RGB)
+			  ((= channels 4) GL_RGBA) ;GL_RGBA)
+			  (else GL_RGBA))
+		    type
+		    ; GL_FLOAT; GL_UNSIGNED_BYTE
+		    data)
+      (pref tex 0))))
+
+;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
+;; if texid is zero then assign a new tex id otherwise use the texid provided
+(bind-func gl_load_tex
+  (lambda (width height channels type data texid)
+    (let* ((tex:i32* (salloc)))
+      (pset! tex 0 texid)
+      ;(printf "load image: size: w:%d h:%d: channels:%d\n" width height channels)
+      (if (< texid 1) (glGenTextures 1 tex))
+      ;(printf "tex: %d\n" (pref tex 0))
+      (glBindTexture GL_TEXTURE_2D (pref tex 0))
+      ;;(glPixelStorei GL_UNPACK_ALIGNMENT 1) ;; this causes problems!!!
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexImage2D GL_TEXTURE_2D 0 channels ;GL_RGBA
 		    width height
 		    0
 		    (cond ((= channels 1) GL_RED)
@@ -250,8 +278,8 @@
 	  (hy (* -0.5 h))
 	  (xx (+ x (* .5 w)))
 	  (yy (+ y (* .5 h)))
-	  (tw (i32tod (gl_tex_width texid)))
-	  (th (i32tod (gl_tex_height texid))))
+	  (tw (i32tod (gl_tex_width_rect texid)))
+	  (th (i32tod (gl_tex_height_rect texid))))
       (glDisable GL_TEXTURE_2D)
       (glEnable GL_TEXTURE_RECTANGLE_ARB)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
@@ -288,10 +316,10 @@
 		  GL_TEXTURE_2D
 		  GL_TEXTURE_RECTANGLE_ARB))
 	  (tw (if (= type GL_TEXTURE_RECTANGLE_ARB)
-		  (i32tod (gl_tex_width texid))
+		  (i32tod (gl_tex_width_rect texid))
 		  1.0))
 	  (th (if (= type GL_TEXTURE_RECTANGLE_ARB)
-		  (i32tod (gl_tex_height texid))
+		  (i32tod (gl_tex_height_rect texid))
 		  1.0)))
       (glDisable op)
       (glEnable type)
@@ -351,15 +379,14 @@
       void)))
 
 
-
 (bind-func gl_draw_img_reverse
   (lambda (x y w h r texid)
     (let ((hx (* -0.5 w))
 	  (hy (* -0.5 h))
 	  (xx (+ x (* .5 w)))
 	  (yy (+ y (* .5 h)))
-	  (tw (i32tod (gl_tex_width texid)))
-	  (th (i32tod (gl_tex_height texid))))
+	  (tw (i32tod (gl_tex_width_rect texid)))
+	  (th (i32tod (gl_tex_height_rect texid))))
       (glEnable GL_TEXTURE_RECTANGLE_ARB)
       (glBindTexture GL_TEXTURE_RECTANGLE_ARB texid)
       (glTexEnvi GL_TEXTURE_ENV GL_TEXTURE_ENV_MODE GL_REPLACE); GL_BLEND) ;REPLACE)
