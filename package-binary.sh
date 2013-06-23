@@ -1,16 +1,17 @@
+#!/bin/bash
 # package up the binary extempore executable
 
-BIN_DIR=extempore-$(uname)-$(date "+%Y%m%d")
+DIST_DIR=extempore-$(uname)-$(date "+%Y%m%d")
 
-echo "Creating extempore binary archive in ${BIN_DIR}"
+echo "Creating extempore binary archive in ${DIST_DIR}"
 
-mkdir $BIN_DIR
+mkdir $DIST_DIR
 
-cp extempore $BIN_DIR
+# list of files to go in the binary distribution
+DIST_FILES="extempore runtime libs examples extras make-tags.sh README.md"
 
-echo 'see http://benswift.me/2012-10-30-downloading-and-installing-extempore.html 
-for instructions on how to get up and running with Extempore.' > $BIN_DIR/README.md
+cp -R $DIST_FILES $DIST_DIR
+tar -cvzf ${DIST_DIR}.tar.gz $DIST_DIR
+rm -r $DIST_DIR
 
-tar -cvzf ${BIN_DIR}.tar.gz $BIN_DIR
-
-rm -r $BIN_DIR
+echo "sha1 $(shasum ${DIST_DIR}.tar.gz) (needed for homebrew formula)"
