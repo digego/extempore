@@ -2,7 +2,7 @@ require 'formula'
 
 class Extempore < Formula
   homepage 'http://extempore.moso.com.au'
-  url 'http://extempore.moso.com.au/tarballs/extempore-Darwin-20130621.tar.gz'
+  url 'http://extempore.moso.com.au/extras/extempore-Darwin-20130621.tar.gz'
   sha1 '9338ac634adf4a2e447e1a3f84e4d100a773e67e'
   keg_only "See 'Caveats' below."
 
