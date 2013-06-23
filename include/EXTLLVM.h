@@ -73,7 +73,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
 
-
+unsigned long string_hash(unsigned char* str);
 
   void* llvm_memset(void* ptr, int32_t c, int64_t n);
   int llvm_printf(char* format, ...);
