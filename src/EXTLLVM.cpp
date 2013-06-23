@@ -500,7 +500,7 @@ char* extitoa(int64_t val) {
   return buf;//&buf[i+1];        
 }
 
-static unsigned long string_hash(unsigned char* str) 
+unsigned long string_hash(unsigned char* str) 
 {
   unsigned long hash = 0;
   int c;
@@ -1107,6 +1107,7 @@ namespace extemp {
           factory.setTargetOptions(Opts);
           factory.setUseMCJIT(false);
           factory.setOptLevel(llvm::CodeGenOpt::Aggressive); // llvm::CodeGenOpt::None
+          //factory.setOptLevel(llvm::CodeGenOpt::None);
 
           EE = factory.create();
           EE->DisableLazyCompilation(true);
