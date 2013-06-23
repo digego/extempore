@@ -554,32 +554,25 @@ namespace extemp {
 		//printf("Loaded... llvmir.xtm\n");
 		scm->loadFile("llvmti.xtm", load_path.c_str());		
 		//printf("Loaded... llvmti.xtm\n");
-                // if(scm->getInitFile().compare("") != 0) {
-		//   scm->loadFile(scm->getInitFile().c_str());
-                // }
-
-		// scm->loadFile("mbe.xtm", [resources UTF8String]);
-		// printf("Loading... mbe.xtm\n");
-		// scm->loadFile("au.xtm", [resources UTF8String]);
-		// printf("Loading... au.xtm\n");
-		// scm->loadFile("graphics.xtm", [resources UTF8String]);
-		// printf("Loading... graphics.xtm\n");
-		// scm->loadFile("openglconst.xtm", [resources UTF8String]);
-		// printf("Loading... openglconst.xtm\n");
-		// scm->loadFile("auvisualui.xtm", [resources UTF8String]);
-		// printf("Loading... auvisualui.xtm\n");
-		// scm->loadFile("vdspveclib.xtm", [resources UTF8String]);
-		// printf("Loading... spaces.xtm\n");
-		// scm->loadFile("spaces.xtm", [resources UTF8String]);
-		// printf("Loading... match.xtm\n");
-		// scm->loadFile("match.xtm", [resources UTF8String]);
-		// 
+               
+                scm->setLoadedLibs(true);
+ 
+                // load any init file provided
+                if(scm->getInitFile().compare("") != 0) {
+                  sleep(2);
+                  ascii_text_color(0,5,10);
+                  printf("\n\nRunning File: %s ...\n\n",scm->getInitFile().c_str());
+                  ascii_text_color(0,7,10);
+                  printf("");
+                  sleep(2); // sleep to make sure NSApp runloops etc. are initialized
+		  scm->loadFile(scm->getInitFile().c_str());
+                }
 
 		// //////////////////////////////////////////////////
 		// // this added for dodgy continuations support
                 // ucontext_t* ctx = scm->getContext();
 		// ///////////////////////////////////////////////
-		scm->setLoadedLibs(true);
+	
                 
 		while(scm->getRunning()) {
                		// /////////////////////////////////////////////

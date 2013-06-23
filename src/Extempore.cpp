@@ -232,7 +232,6 @@ int main(int argc, char** argv)
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
     utility_repl->connectToProcessAtHostname(host,utility_port);
 
-
     if(initfile_on) { // if a file needs to be loaded from the command line
        primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0, initfile);
     }else{
@@ -244,17 +243,8 @@ int main(int argc, char** argv)
     primary_repl->connectToProcessAtHostname(host,primary_port);
 
 #ifdef TARGET_OS_MAC
-    if(initfile_on) { // if a file needs to be loaded from the command line
-      printf("Load Init File: %s\n",initfile.c_str());
-      primary->loadFile(initfile,std::string(""));
-    }
     [[NSApplication sharedApplication] run];
 #else
-    if(initfile_on) { // if a file needs to be loaded from the command line
-      printf("Load Init File: %s\n",initfile.c_str());
-      primary->loadFile(initfile,std::string(""));
-    }
-
     while(1) {
 #ifdef TARGET_OS_WINDOWS
       Sleep(5000);
@@ -263,6 +253,5 @@ int main(int argc, char** argv)
 #endif
     }
 #endif
-
     return 0;
 }
