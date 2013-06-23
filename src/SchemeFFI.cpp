@@ -92,6 +92,7 @@
 #include "llvm/LLVMContext.h"
 #include "llvm/CallingConv.h"
 #include "llvm/Module.h"
+#include "llvm/DataLayout.h"
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Instructions.h"
@@ -486,6 +487,8 @@ namespace extemp {
 	    { "llvm:bind-global-var",		&SchemeFFI::bind_global_var },
 	    { "llvm:get-function",			&SchemeFFI::get_function },
 	    { "llvm:get-globalvar",			&SchemeFFI::get_globalvar },
+            { "llvm:get-struct-size",           &SchemeFFI::get_struct_size },
+            { "llvm:get-named-struct-size",           &SchemeFFI::get_named_struct_size },
 	    { "llvm:get-function-args",		&SchemeFFI::get_function_args },
 	    { "llvm:get-function-varargs",	&SchemeFFI::get_function_varargs },
 	    { "llvm:get-function-type",		&SchemeFFI::get_function_type },
@@ -1820,6 +1823,53 @@ namespace extemp {
         return func->isVarArg() ? _sc->T : _sc->F;
     }
 
+    pointer SchemeFFI::get_struct_size(scheme* _sc, pointer args)
+    {
+	using namespace llvm;
+
+	PassManager* PM = extemp::EXTLLVM::I()->PM;
+	char* struct_type_str = string_value(pair_car(args));
+        unsigned long hash = string_hash((unsigned char*)struct_type_str);
+        char name[128];
+        sprintf(name,"_xtmT%lld",hash);
+        char assm[1024];
+        sprintf(assm,"%%%s = type %s",name,struct_type_str);
+        //printf("parse this! %s\n",assm);
+	SMDiagnostic pa;
+        // Don't!! write this into the default module!
+	const Module* newM = ParseAssemblyString(assm, NULL, pa, getGlobalContext());        
+        if(newM == 0)
+        {
+          return _sc->F;
+        }
+        StructType* type = newM->getTypeByName(std::string(name));
+	if(type == 0)
+	{
+	    return _sc->F;
+	}
+        DataLayout* layout = new DataLayout(newM);
+        const StructLayout* sl = layout->getStructLayout(type);
+        long size = sl->getSizeInBytes();
+        delete layout;
+        return mk_integer(_sc,size);       
+    }
+
+    pointer SchemeFFI::get_named_struct_size(scheme* _sc, pointer args)
+    {
+	using namespace llvm;
+
+	Module* M = EXTLLVM::I()->M;
+        StructType* type = M->getTypeByName(std::string(string_value(pair_car(args))));
+	if(type == 0)
+	{
+	    return _sc->F;
+	}
+        DataLayout* layout = new DataLayout(M);
+        const StructLayout* sl = layout->getStructLayout(type);
+        long size = sl->getSizeInBytes();
+        delete layout;
+        return mk_integer(_sc,size);       
+    }
 
     pointer SchemeFFI::get_function_type(scheme* _sc, pointer args)
     {
@@ -3656,7 +3706,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       [window makeKeyAndOrderFront:nil];				
     }	
     
-    [window display];	
+    [window display];
   
     GLint swapInt = 1;
     [[view openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
@@ -3666,7 +3716,9 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     CGLSetCurrentContext(ctx);
     CGLLockContext(ctx);
     
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    // glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    // int glerrors = glGetError();
+    // printf("OpenGL Context Errors: %d\n",glerrors);
     CGLEnable( ctx, kCGLCEMPEngine);				
     
     CGLUnlockContext(ctx);
