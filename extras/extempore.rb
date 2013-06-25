@@ -8,6 +8,7 @@ class Extempore < Formula
 
   depends_on 'pcre'
   depends_on 'portaudio'
+  depends_on 'assimp' => :recommended
 
   def install
     # for building from source (currently unused)
