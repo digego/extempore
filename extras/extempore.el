@@ -887,8 +887,37 @@ be running in another (shell-like) buffer."
 				      ,(make-char 'greek-iso8859-7 107))
 		      nil))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; temporal-recursion animations
+;; interactive repeated evaluation of defun under point
+
+(defvar extempore-repeated-eval-timer nil)
+
+(defun extempore-start-repeated-eval (time-interval)
+  "takes a time interval (in seconds)"
+  (interactive "nTime interval (sec):")
+  (setq extempore-repeated-eval-timer
+	(run-with-timer 0 time-interval 'extempore-send-defn-at-point)))
+
+(defun extempore-stop-repeated-eval ()
+  (interactive)
+  (cancel-timer extempore-repeated-eval-timer)
+  (setq extempore-repeated-eval-timer nil))
+
+;;;;;;;;;;;;;;;;
+;; animations ;;
+;;;;;;;;;;;;;;;;
+
+(define-minor-mode extempore-tr-animation-mode
+  "This minor mode automatically logs all keystrokes (and
+  extempore code sent for evaluation) in all Extempore buffers."
+  :global t
+  :init-value nil
+  :lighter " ExAnim"
+  :keymap nil
+  :group 'extempore
+
+  (if extempore-tr-animation-mode
+      (extempore-start-tr-animation)
+    (extempore-stop-tr-animation)))
 
 (defun extempore-beginning-of-defun-function (&optional arg)
   (beginning-of-defun arg))
@@ -985,10 +1014,10 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-create-anim-vector (delta-t)
   (vector (extempore-make-tr-clock-overlay name bounds)
-	  (extempore-make-tr-flash-overlay name bounds)
-	  delta-t    ; total time
-	  delta-t    ; time-to-live
-	  0))        ; flash-frames to live
+          (extempore-make-tr-flash-overlay name bounds)
+          delta-t    ; total time
+          delta-t  ; time-to-live
+          0))        ; flash-frames to live
 
 (defun extempore-add-new-anim-to-name (name delta-t)
   (let ((bounds (extempore-find-defn-bounds name))
@@ -1015,7 +1044,6 @@ You shouldn't have to modify this list directly, use
   (aset anim 3 delta-t))
 
 (defun extempore-trigger-tr-anim (name delta-t)
-  (interactive "sfn name: \nndelta-t: ")
   (let ((anim-list (extempore-get-tr-anims-for-name name)))
     (if anim-list
         (let ((dormant-anims (extempore-get-dormant-tr-anims anim-list)))
@@ -1146,21 +1174,6 @@ You shouldn't have to modify this list directly, use
   (if extempore-tr-animation-timer
       (extempore-stop-tr-animation)
     (extempore-start-tr-animation)))
-
-;; interactive repeated evaluation of defun under point
-
-(defvar extempore-repeated-eval-timer nil)
-
-(defun extempore-start-repeated-eval (time-interval)
-  "takes a time interval (in seconds)"
-  (interactive "nTime interval (sec):")
-  (setq extempore-repeated-eval-timer
-	(run-with-timer 0 time-interval 'extempore-send-defn-at-point)))
-
-(defun extempore-stop-repeated-eval ()
-  (interactive)
-  (cancel-timer extempore-repeated-eval-timer)
-  (setq extempore-repeated-eval-timer nil))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; extempore logger ;;
