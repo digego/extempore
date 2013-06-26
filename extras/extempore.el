@@ -902,6 +902,21 @@ be running in another (shell-like) buffer."
   (cancel-timer extempore-repeated-eval-timer)
   (setq extempore-repeated-eval-timer nil))
 
+;; processing compiler output for .xtmh files
+
+(defun extempore-create-xtmh-header (libname)
+  (interactive "slibname: ")
+  (if (yes-or-no-p "This is going to munge up the current buffer---do you know what you're doing?")
+      (progn
+        ;; bind-lib-val
+        (goto-char (point-min))
+        (while (search-forward-regexp "^Bound \\(.*\\) >>> \\(.*\\)$" nil t)
+          (replace-match (concat "(bind-lib-val " libname " \\1 \\2)") t))
+        ;; bind-lib-func
+        (goto-char (point-min))
+        (while (search-forward-regexp "^Compiled \\(.*\\) >>> \\(.*\\)$" nil t)
+          (replace-match (concat "(bind-lib-func " libname " \\1 \\2)") t)))))
+
 ;;;;;;;;;;;;;;;;
 ;; animations ;;
 ;;;;;;;;;;;;;;;;
@@ -1295,21 +1310,6 @@ You shouldn't have to modify this list directly, use
 (defun extempore-logger-stop-idle-write-timer ()
   (cancel-timer extempore-logger-write-timer)
   (setq extempore-logger-write-timer nil))
-
-;; processing compiler output for .xtmh files
-
-(defun extempore-create-xtmh-header (libname)
-  (interactive "slibname: ")
-  (if (yes-or-no-p "This is going to munge up the current buffer---do you know what you're doing?")
-      (progn
-        ;; bind-lib-val
-        (goto-char (point-min))
-        (while (search-forward-regexp "^Bound \\(.*\\) >>> \\(.*\\)$" nil t)
-          (replace-match (concat "(bind-lib-val " libname " \\1 \\2)") t))
-        ;; bind-lib-func
-        (goto-char (point-min))
-        (while (search-forward-regexp "^Compiled \\(.*\\) >>> \\(.*\\)$" nil t)
-          (replace-match (concat "(bind-lib-func " libname " \\1 \\2)") t)))))
 
 (provide 'extempore)
 
