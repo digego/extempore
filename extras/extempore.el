@@ -976,9 +976,9 @@ be running in another (shell-like) buffer."
         overlay)))
 
 (defun extempore-update-tr-flash-overlay (overlay flag)
-  ;; (if flag
-  ;;     (overlay-put overlay 'face '(:inverse-video t))
-  ;;   (overlay-put overlay 'face '(:inverse-video nil)))
+  (if flag
+      (overlay-put overlay 'face '(:inverse-video t))
+    (overlay-put overlay 'face '(:inverse-video nil)))
   nil)
 
 (defun extempore-make-tr-clock-overlay (name bounds)
