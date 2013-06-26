@@ -1095,7 +1095,6 @@ You shouldn't have to modify this list directly, use
 (defvar extempore-tr-animation-timer nil)
 
 (defun extempore-stop-tr-animation-timer ()
-  (interactive)
   (message "Cancelling TR animiation timer.")
   (if extempore-tr-animation-timer
       (cancel-timer extempore-tr-animation-timer))
@@ -1104,7 +1103,6 @@ You shouldn't have to modify this list directly, use
 	extempore-tr-anim-alist nil))
 
 (defun extempore-start-tr-animation-timer ()
-  (interactive)
   (if extempore-tr-animation-timer
       (progn (extempore-stop-tr-animation-timer)
 	     (message "Restarting TR animation timer."))
@@ -1139,14 +1137,12 @@ You shouldn't have to modify this list directly, use
    :filter #'extempore-tr-animation-filter))
 
 (defun extempore-stop-tr-anim-osc-server ()
-  (interactive)
   (if extempore-tr-anim-udp-server
       (progn (delete-process extempore-tr-anim-udp-server)
              (setq extempore-tr-anim-udp-server nil)
              (message "Deleting UDP listener."))))
 
 (defun extempore-start-tr-anim-osc-server ()
-  (interactive)
   (extempore-stop-tr-anim-osc-server)
   (progn (setq extempore-tr-anim-udp-server
                (extempore-create-tr-anim-server
@@ -1157,7 +1153,6 @@ You shouldn't have to modify this list directly, use
 ;; the programmer should use to turn things on/off
 
 (defun extempore-start-tr-animation ()
-  (interactive)
   (if extempore-process
       (progn (extempore-start-tr-animation-timer)
              (extempore-start-tr-anim-osc-server))
@@ -1165,15 +1160,8 @@ You shouldn't have to modify this list directly, use
     to an Extempore process.")))
 
 (defun extempore-stop-tr-animation ()
-  (interactive)
   (extempore-stop-tr-animation-timer)
   (extempore-stop-tr-anim-osc-server))
-
-(defun extempore-toggle-tr-animation ()
-  (interactive)
-  (if extempore-tr-animation-timer
-      (extempore-stop-tr-animation)
-    (extempore-start-tr-animation)))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; extempore logger ;;
