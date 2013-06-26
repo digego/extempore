@@ -979,7 +979,7 @@ be running in another (shell-like) buffer."
         (cons (match-beginning 0) (1- (match-end 0)))
       nil)))
 
-;; construct overlays
+;; flash overlay
 
 (defun extempore-make-tr-flash-overlay (name bounds)
   (if bounds
@@ -988,6 +988,7 @@ be running in another (shell-like) buffer."
                                    nil t nil)))
         ;; (overlay-put overlay 'face '(:inverse-video t))
         (overlay-put overlay 'evaporate t)
+        (overlay-put overlay 'priority 2)
         overlay)))
 
 (defun extempore-update-tr-flash-overlay (overlay flag)
@@ -995,6 +996,8 @@ be running in another (shell-like) buffer."
       (overlay-put overlay 'face '(:inverse-video t))
     (overlay-put overlay 'face '(:inverse-video nil)))
   nil)
+
+;; clock overlay
 
 (defun extempore-make-tr-clock-overlay (name bounds)
   (if bounds
@@ -1004,12 +1007,34 @@ be running in another (shell-like) buffer."
                                     nil t nil)))
         (overlay-put overlay 'face '(:underline t :overline t))
         (overlay-put overlay 'evaporate t)
+        (overlay-put overlay 'priority 1)
         overlay)))
 
 (defun extempore-update-tr-clock-overlay (overlay val beg end)
   (move-overlay overlay
                 beg
+                (min end (max (1+ beg) (round (+ beg (* val (- end beg))))))))
+
+;; tetris-overlay
+
+(defvar extempore-tetris-anim-str "*")
+
+(defun extempore-make-tr-tetris-overlay (name bounds)
+  (if bounds
+      (let* ((tetris-lh-point (cdr bounds))
+             (tetris-rh-point fill-column)
+             (overlay (make-overlay defun-start
+                                    (1+ defun-start)
+                                    nil t nil)))
+        (overlay-put overlay 'face '(:underline t :overline t))
+        (overlay-put overlay 'evaporate t)
+        overlay)))
+
+(defun extempore-update-tr-tetris-overlay (overlay val beg end)
+  (move-overlay overlay
+                beg
 		(min end (max (1+ beg) (round (+ beg (* val (- end beg))))))))
+
 
 (defvar extempore-tr-anim-alist nil
   "List of TR animations.
