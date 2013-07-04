@@ -10,18 +10,14 @@
 
 ;; if not primary process
 (if (not (ipc:get-process-name "primary"))
-    (print-error 'Please 'load 'xtm 'libraries 'into 'the 'primary 'process))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
 ;; if already loaded then break!
 (if (defined? 'xtmlib_sndfile_loaded)
-    (print-error 'Sound 'File 'already 'loaded)) ;; break to top level
+    (sys:load-escape "SNDFILE already loaded"))
 
 ;;; Code:
 
-(define xtmlib_sndfile_loaded #t)
-
-;; (dirty) check to see if audio_dsp.xtm has already been loaded
-(if (not (llvm:get-globalvar "SAMPLERATE"))
-    (load "libs/core/audio_dsp.xtm"))
+(sys:load "libs/core/audio_dsp.xtm")
 
 ;; load the libsndfile dynamic library
 (define libsndfile
@@ -30,6 +26,13 @@
           ((string=? platform "Windows") (sys:open-dylib "libsndfile.dll"))
           ((string=? platform "OSX") (sys:open-dylib "libsndfile.dylib"))
           (else (print "Unknown platform: " platform)))))
+
+(if (or (eq? #f libsndfile)
+        (null? libsndfile))
+    (sys:load-escape "Error loading libsndfile dynamic library"))
+
+(define xtmlib_sndfile_loaded #t)
+
 
 (bind-val SF_LOOP_NONE i32 800)
 (bind-val SF_LOOP_FORWARD i32 801)
