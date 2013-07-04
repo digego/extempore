@@ -23,7 +23,6 @@
           ((string=? platform "OSX") (sys:open-dylib "/Users/sorensen/Documents/code/assimp/lib/libassimp.dylib"))
           (else (print "Unknown platform: " platform)))))
 
-;; if on windows also check for opengl32.dll			  
 (if (or (eq? #f libassimp)
         (null? libassimp))
     (sys:load-escape "Error loading assimp library"))
@@ -49,6 +48,22 @@
 	  (begin (printf "failed (%lld) to load %s\n" res path)
                  0)
 	  (begin (printf "...tex:> id(%d) loaded path:%s\n" res path)
+                 res)))))
+
+;; load texture and returns texture number
+;; 16 is for verticle flip
+;; 512 is for GL_TEXTURE_RECTANGLE_ARB (otherwise GL_TEXTURE_2D)
+;; 4 is for repeat
+;; 8 multiply alpha
+(bind-func ai_load_ogl_texture_from_buffer
+  (lambda (data datalgth idx:i32)
+    (printf "load ogl texture\n")
+    (let ((res (SOIL_load_OGL_texture_from_memory data datalgth 4 idx (+ 4 8 16)))) ; (+ 512 16))))
+      (printf "loaded ogl texture %d\n" res)
+      (if (= res 0)
+	  (begin (printf "failed (%d) to load embedded texture\n" res)
+                 0)
+	  (begin (printf "...tex:> id(%d) loaded embedded texture\n" res)
                  res)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -476,10 +491,21 @@
           (let ((s1 (cast (tref-ptr texfile 1) i8*))
                 (lgth (+ (strlen dir) (tref texfile 0) 1))
                 (s2 (salloc lgth)))
-            (memset s2 0 lgth)
-            (memcpy s2 dir (strlen dir))
-            (memcpy (pref-ptr s2 (strlen dir)) s1 (tref texfile 0))
-            (set! texid (ai_load_ogl_texture s2 0))))
+            (if (= (pref s1 0) 42)
+                (let ((texidx:i32 (atoi (pref-ptr s1 1)))
+                      (texture:aiTexture* (pref (tref scene 9) texidx))
+                      (achformat (tref texture 2))
+                      (texwidth (tref texture 0))
+                      (texheight (tref texture 1))
+                      (texdata (cast (tref texture 3) i8*))
+                      (datasize (if (= texheight 0) texwidth (* 4 texwidth texheight))))
+                  ;;(printf "tidx:%d of num:%d w:%d h:%d size:%d\n" texidx (tref scene 8) texwidth texheight datasize)
+                  (set! texid (ai_load_ogl_texture_from_buffer texdata datasize 0)))
+                (begin 
+                  (memset s2 0 lgth)
+                  (memcpy s2 dir (strlen dir))
+                  (memcpy (pref-ptr s2 (strlen dir)) s1 (tref texfile 0))
+                  (set! texid (ai_load_ogl_texture s2 0))))))
       (tset! aimesh 1 texid)
       (if (= (aiGetMaterialColor material "$clr.diffuse" 0 0 color) 0)
           (ai_color4_to_float4 color diffuse))
@@ -501,6 +527,7 @@
           (begin (tset! aimesh 7 0.0) 1))
       (tset! aimesh 8 (pref facemode 0))
       void)))
+
 
 
 ;; returns the scenes top level node as ai_node*
@@ -539,6 +566,7 @@
 ;; returns the scenes top level node as ai_node*
 (bind-func ai_build_scene  
   (lambda (scene:aiScene* dir:i8*)
+    (printf "embedded textures: %d\n" (tref scene 8))
     (let ((root:ai_node* (halloc)))
       ;; (printf "\nNew Scene ... %p\n" scene)
       (ai_build_node scene (tref scene 1) root null dir)
