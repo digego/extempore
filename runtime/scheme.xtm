@@ -612,7 +612,7 @@
 							 (* *au:samplerate* g-tempo))))
 		     (set! g-tempo (/ 60 (car args)))
 		     (set! mark time)
-					 (println 'total-beats total-beats 'samp-env (samp-env total-beats))
+                     (println 'total-beats total-beats 'samp-env (samp-env total-beats))
 		     (set! samp-env (beat-pos total-beats
 					      (samp-env total-beats)
 					      (+ total-beats 1.0)
@@ -1640,3 +1640,51 @@
             (list (quote ,sym) ': (if (pair? xtdoc) (cdr xtdoc) xtdoc)))
            (else
             #f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Load which safely breaks on calling sys:load-escape
+;;
+(define *sys:load-escape-stack* (list *sys:toplevel-continuation*))
+
+(define sys:load-escape
+  (lambda (msg)
+    (let ((k (car *sys:load-escape-stack*)))
+      (if (not (equal? *sys:toplevel-continuation* k))
+          (set! *sys:load-escape-stack* (cdr *sys:load-escape-stack*)))
+      (k msg))))
+
+;; a 'safe' load for xtm libraries
+;; here is the 'header' code for each lib
+;; just change second conditional to
+;; add appropriate lib naming
+;;
+;; ;; if not primary process
+;; (if (not (ipc:get-process-name "primary"))
+;;    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; ;; if already loaded then break!
+;; (if (defined? 'xtmlib_math_loaded)
+;;    (sys:load-escape "Math already loaded"))
+;;
+;;
+(define sys:load
+  (lambda (path)
+    (let ((in (open-input-file path))
+          (msg (call/cc
+                (lambda (k)
+                  (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
+                  ""))))
+      (if (string=? msg "")
+          (let loop ((sexpr (read in)))
+            (if (eof-object? sexpr)
+                (close-input-port in)
+                (begin
+                  (eval sexpr (interaction-environment))
+                  (loop (read in))))
+            #t)
+          (let ((words (regex:split msg " ")))
+            (close-input-port in)
+            (ascii-print-color 0 5 10)
+            (for-each (lambda (w) (print w "")) words)
+            (ascii-print-color 0 7 10)
+            (println)
+            #f)))))
