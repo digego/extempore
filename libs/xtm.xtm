@@ -3,27 +3,31 @@
 ;; to compile std.bc file
 ;;
 ;; first export module to bitcode:
+;;
 ;; (llvm:export-module "/tmp/xtm.bc")
 ;;
-;; (load "libs/core/math.xtm")
-;; (load "libs/external/opengl.xtm")
-;; (load "libs/external/shaders.xtm")
-;; (load "libs/external/assimp.xtm")
-;; (load "libs/core/audio_dsp.xtm")
-;; (load "libs/core/instruments.xtm")
-;; (load "libs/external/sndfile.xtm")
-;; (load "libs/external/instruments.xtm")
+;; (sys:load "libs/core/math.xtm")
+;; (sys:load "libs/external/opengl.xtm")
+;; (sys:load "libs/external/shaders.xtm")
+;; (sys:load "libs/external/assimp.xtm")
+;; (sys:load "libs/core/audio_dsp.xtm")
+;; (sys:load "libs/core/instruments.xtm")
+;; (sys:load "libs/external/sndfile.xtm")
+;; (sys:load "libs/external/instruments.xtm")
 
 ;;
 ;; then compile bitcode file:
 ;; /home/andrew/Documents/code/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt xtm.bc
+;; or
+;; /Users/sorensen/Documents/code/llvm-3.2/Release+Asserts/bin/llc -O3 -relocation-model=pic -tailcallopt xtm.bc
+;;
+;; then compile dynamic library
 ;; gcc --shared -g xtm.s -o xtm.so
 ;; or 
 ;; clang -O3 -dynamiclib -undefined dynamic_lookup xtm.s -o xtm.dylib
 ;;
 ;; emacs regex: Compiled \(.*\) >>> \(.*\) -> (bind-lib-func stdlib \1 \2)
 ;;
-
 
 ;; if not primary process
 (if (not (ipc:get-process-name "primary"))
@@ -223,6 +227,7 @@
 	  (else (print "Unknown platform: " platform)))))
 
 (bind-lib libsoil SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
+(bind-lib libsoil SOIL_load_OGL_texture_from_memory [i32,i8*,i32,i32,i32,i32]*)
 (bind-lib libsoil SOIL_load_image [i8*,i8*,i32*,i32*,i32*,i32]*)
 
 (bind-lib-val stdlib SOIL_FLAG_POWER_OF_TWO i32 1)
@@ -349,7 +354,6 @@
 (bind-lib-val stdlib GL_RGBA16F i32 34842)
 (bind-lib-val stdlib GL_RGBA8 i32 32856)
 
-(bind-lib-val stdlib GL_VENDER i32 7936)
 (bind-lib-val stdlib GL_RENDERER i32 7937)
 
 (if (not (string=? "Windows" (sys:platform)))
@@ -1215,6 +1219,7 @@ else
 (bind-lib libassimp aiGetMaterialTextureCount [i32,aiMaterial*,i32]*)
 
 (bind-lib-func stdlib ai_load_ogl_texture [i32,i8*,i32]*)
+(bind-lib-func stdlib ai_load_ogl_texture_from_buffer [i32,i8*,i32,i32]*)
 (bind-lib-func stdlib aiGetMaterialFloat [i32,aiMaterial*,i8*,i32,i32,float*]*)
 (bind-lib-func stdlib ai_copy_matrix4 [i64,aiMatrix4x4*,aiMatrix4x4*]*)
 (bind-lib-func stdlib ai_matrix4_to_float [void,aiMatrix4x4*,float*]*)
