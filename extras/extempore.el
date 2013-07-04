@@ -887,8 +887,52 @@ be running in another (shell-like) buffer."
 				      ,(make-char 'greek-iso8859-7 107))
 		      nil))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; temporal-recursion animations
+;; interactive repeated evaluation of defun under point
+
+(defvar extempore-repeated-eval-timer nil)
+
+(defun extempore-start-repeated-eval (time-interval)
+  "takes a time interval (in seconds)"
+  (interactive "nTime interval (sec):")
+  (setq extempore-repeated-eval-timer
+	(run-with-timer 0 time-interval 'extempore-send-defn-at-point)))
+
+(defun extempore-stop-repeated-eval ()
+  (interactive)
+  (cancel-timer extempore-repeated-eval-timer)
+  (setq extempore-repeated-eval-timer nil))
+
+;; processing compiler output for .xtmh files
+
+(defun extempore-create-xtmh-header (libname)
+  (interactive "slibname: ")
+  (if (yes-or-no-p "This is going to munge up the current buffer---do you know what you're doing?")
+      (progn
+        ;; bind-lib-val
+        (goto-char (point-min))
+        (while (search-forward-regexp "^Bound \\(.*\\) >>> \\(.*\\)$" nil t)
+          (replace-match (concat "(bind-lib-val " libname " \\1 \\2)") t))
+        ;; bind-lib-func
+        (goto-char (point-min))
+        (while (search-forward-regexp "^Compiled \\(.*\\) >>> \\(.*\\)$" nil t)
+          (replace-match (concat "(bind-lib-func " libname " \\1 \\2)") t)))))
+
+;;;;;;;;;;;;;;;;
+;; animations ;;
+;;;;;;;;;;;;;;;;
+
+(define-minor-mode extempore-tr-animation-mode
+  "This minor mode automatically logs all keystrokes (and
+  extempore code sent for evaluation) in all Extempore buffers."
+  :global t
+  :init-value nil
+  :lighter " ExAnim"
+  :keymap nil
+  :group 'extempore
+
+  (if extempore-tr-animation-mode
+      (extempore-start-tr-animation)
+    (extempore-stop-tr-animation)))
 
 (defun extempore-beginning-of-defun-function (&optional arg)
   (beginning-of-defun arg))
@@ -935,7 +979,7 @@ be running in another (shell-like) buffer."
         (cons (match-beginning 0) (1- (match-end 0)))
       nil)))
 
-;; construct overlays
+;; flash overlay
 
 (defun extempore-make-tr-flash-overlay (name bounds)
   (if bounds
@@ -944,13 +988,16 @@ be running in another (shell-like) buffer."
                                    nil t nil)))
         ;; (overlay-put overlay 'face '(:inverse-video t))
         (overlay-put overlay 'evaporate t)
+        (overlay-put overlay 'priority 2)
         overlay)))
 
 (defun extempore-update-tr-flash-overlay (overlay flag)
-  ;; (if flag
-  ;;     (overlay-put overlay 'face '(:inverse-video t))
-  ;;   (overlay-put overlay 'face '(:inverse-video nil)))
+  (if flag
+      (overlay-put overlay 'face '(:inverse-video t))
+    (overlay-put overlay 'face '(:inverse-video nil)))
   nil)
+
+;; clock overlay
 
 (defun extempore-make-tr-clock-overlay (name bounds)
   (if bounds
@@ -960,12 +1007,34 @@ be running in another (shell-like) buffer."
                                     nil t nil)))
         (overlay-put overlay 'face '(:underline t :overline t))
         (overlay-put overlay 'evaporate t)
+        (overlay-put overlay 'priority 1)
         overlay)))
 
 (defun extempore-update-tr-clock-overlay (overlay val beg end)
   (move-overlay overlay
                 beg
+                (min end (max (1+ beg) (round (+ beg (* val (- end beg))))))))
+
+;; tetris-overlay
+
+(defvar extempore-tetris-anim-str "*")
+
+(defun extempore-make-tr-tetris-overlay (name bounds)
+  (if bounds
+      (let* ((tetris-lh-point (cdr bounds))
+             (tetris-rh-point fill-column)
+             (overlay (make-overlay defun-start
+                                    (1+ defun-start)
+                                    nil t nil)))
+        (overlay-put overlay 'face '(:underline t :overline t))
+        (overlay-put overlay 'evaporate t)
+        overlay)))
+
+(defun extempore-update-tr-tetris-overlay (overlay val beg end)
+  (move-overlay overlay
+                beg
 		(min end (max (1+ beg) (round (+ beg (* val (- end beg))))))))
+
 
 (defvar extempore-tr-anim-alist nil
   "List of TR animations.
@@ -985,10 +1054,10 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-create-anim-vector (delta-t)
   (vector (extempore-make-tr-clock-overlay name bounds)
-	  (extempore-make-tr-flash-overlay name bounds)
-	  delta-t    ; total time
-	  delta-t    ; time-to-live
-	  0))        ; flash-frames to live
+          (extempore-make-tr-flash-overlay name bounds)
+          delta-t    ; total time
+          delta-t  ; time-to-live
+          0))        ; flash-frames to live
 
 (defun extempore-add-new-anim-to-name (name delta-t)
   (let ((bounds (extempore-find-defn-bounds name))
@@ -1015,7 +1084,6 @@ You shouldn't have to modify this list directly, use
   (aset anim 3 delta-t))
 
 (defun extempore-trigger-tr-anim (name delta-t)
-  (interactive "sfn name: \nndelta-t: ")
   (let ((anim-list (extempore-get-tr-anims-for-name name)))
     (if anim-list
         (let ((dormant-anims (extempore-get-dormant-tr-anims anim-list)))
@@ -1067,7 +1135,6 @@ You shouldn't have to modify this list directly, use
 (defvar extempore-tr-animation-timer nil)
 
 (defun extempore-stop-tr-animation-timer ()
-  (interactive)
   (message "Cancelling TR animiation timer.")
   (if extempore-tr-animation-timer
       (cancel-timer extempore-tr-animation-timer))
@@ -1076,7 +1143,6 @@ You shouldn't have to modify this list directly, use
 	extempore-tr-anim-alist nil))
 
 (defun extempore-start-tr-animation-timer ()
-  (interactive)
   (if extempore-tr-animation-timer
       (progn (extempore-stop-tr-animation-timer)
 	     (message "Restarting TR animation timer."))
@@ -1111,14 +1177,12 @@ You shouldn't have to modify this list directly, use
    :filter #'extempore-tr-animation-filter))
 
 (defun extempore-stop-tr-anim-osc-server ()
-  (interactive)
   (if extempore-tr-anim-udp-server
       (progn (delete-process extempore-tr-anim-udp-server)
              (setq extempore-tr-anim-udp-server nil)
              (message "Deleting UDP listener."))))
 
 (defun extempore-start-tr-anim-osc-server ()
-  (interactive)
   (extempore-stop-tr-anim-osc-server)
   (progn (setq extempore-tr-anim-udp-server
                (extempore-create-tr-anim-server
@@ -1129,7 +1193,6 @@ You shouldn't have to modify this list directly, use
 ;; the programmer should use to turn things on/off
 
 (defun extempore-start-tr-animation ()
-  (interactive)
   (if extempore-process
       (progn (extempore-start-tr-animation-timer)
              (extempore-start-tr-anim-osc-server))
@@ -1137,30 +1200,8 @@ You shouldn't have to modify this list directly, use
     to an Extempore process.")))
 
 (defun extempore-stop-tr-animation ()
-  (interactive)
   (extempore-stop-tr-animation-timer)
   (extempore-stop-tr-anim-osc-server))
-
-(defun extempore-toggle-tr-animation ()
-  (interactive)
-  (if extempore-tr-animation-timer
-      (extempore-stop-tr-animation)
-    (extempore-start-tr-animation)))
-
-;; interactive repeated evaluation of defun under point
-
-(defvar extempore-repeated-eval-timer nil)
-
-(defun extempore-start-repeated-eval (time-interval)
-  "takes a time interval (in seconds)"
-  (interactive "nTime interval (sec):")
-  (setq extempore-repeated-eval-timer
-	(run-with-timer 0 time-interval 'extempore-send-defn-at-point)))
-
-(defun extempore-stop-repeated-eval ()
-  (interactive)
-  (cancel-timer extempore-repeated-eval-timer)
-  (setq extempore-repeated-eval-timer nil))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; extempore logger ;;
@@ -1294,21 +1335,6 @@ You shouldn't have to modify this list directly, use
 (defun extempore-logger-stop-idle-write-timer ()
   (cancel-timer extempore-logger-write-timer)
   (setq extempore-logger-write-timer nil))
-
-;; processing compiler output for .xtmh files
-
-(defun extempore-create-xtmh-header (libname)
-  (interactive "slibname: ")
-  (if (yes-or-no-p "This is going to munge up the current buffer---do you know what you're doing?")
-      (progn
-        ;; bind-lib-val
-        (goto-char (point-min))
-        (while (search-forward-regexp "^Bound \\(.*\\) >>> \\(.*\\)$" nil t)
-          (replace-match (concat "(bind-lib-val " libname " \\1 \\2)") t))
-        ;; bind-lib-func
-        (goto-char (point-min))
-        (while (search-forward-regexp "^Compiled \\(.*\\) >>> \\(.*\\)$" nil t)
-          (replace-match (concat "(bind-lib-func " libname " \\1 \\2)") t)))))
 
 (provide 'extempore)
 
