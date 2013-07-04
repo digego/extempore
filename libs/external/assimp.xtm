@@ -8,6 +8,13 @@
 
 ;;; Code:
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_assimp_loaded)
+    (sys:load-escape "Assimp already loaded")) ;; break to top level
+
 ;; lib assimp
 (define libassimp
   (let ((platform (sys:platform)))
@@ -19,18 +26,16 @@
 ;; if on windows also check for opengl32.dll			  
 (if (or (eq? #f libassimp)
         (null? libassimp))
-    (print-error "Error loading assimp library"))
+    (sys:load-escape "Error loading assimp library"))
 
 
 (define xtmlib_assimp_loaded #t)
 
 
-;; Load SOIL
-(if (not (defined? 'xtmlib_opengl_loaded))
-    (load "libs/xtmstd.xtm"))
-
-(if (not (defined? 'xtmlibs_shaders_loaded))
-    (load "libs/external/shaders.xtm"))
+;; load SOIL
+(sys:load "libs/external/image.xtm")
+;; load shaders
+(sys:load "libs/external/shaders.xtm")
 
 ;; load texture and returns texture number
 ;; 16 is for verticle flip

@@ -24,6 +24,15 @@
 
 ;;; Code:
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_audio_loaded)
+    (sys:load-escape "Audio already loaded")) ;; break to top level
+
+(define xtmlib_audio_loaded #t)
+
 ;; do you want to compile multichannel extensions
 ;; usually NOT
 (define *build-multi-chan* #t)

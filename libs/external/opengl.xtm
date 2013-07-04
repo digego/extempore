@@ -10,16 +10,19 @@
 
 ;;; Code:
 
+
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_opengl_loaded)
+    (sys:load-escape "OpenGL already loaded")) ;; break to top level
+
 (define xtmlib_opengl_loaded #t)
 
 ;; first make sure that math.xtm is loaded
-(if (not (defined? 'xtmlib_math_loaded))
-    (load "libs/core/math.xtm"))
-
-;; Load SOIL
-(if (not (defined? 'xtmlib_soil_loaded))
-    (load "libs/external/image.xtm"))
-
+(sys:load "libs/core/math.xtm")
+(sys:load "libs/external/image.xtm")
 
 ;; first check if we are windows we need to load some extensions!
 (if (string=? (sys:platform) "Windows")
@@ -511,7 +514,7 @@
       (if (> (pref infologLength 0) 1)
 	  (let ((log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
 	    (glGetProgramInfoLog obj (pref infologLength 0) charsWritten log)
-	    (printf "printProgramInfoLog: %s\n" log)
+	    (printf "Program Info Log:\n %s\n" log)
 	    (free log)
 	    1)
 	  (begin (printf "Program Info log: OK\n") 1)))))

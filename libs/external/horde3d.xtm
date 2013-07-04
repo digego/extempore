@@ -8,6 +8,13 @@
 
 ;; 
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_horde3d_loaded)
+    (sys:load-escape "Horde 3D already loaded")) ;; break to top level
+
 ;;; Code:
 
 ;; set the path to the Horde3D directory
@@ -21,7 +28,7 @@
 
 (if (or (eq? #f hordelib)
 	(not hordelib)) 
-    (print-error "Could not load 'Horde3D' dynamic library"))
+    (sys:load-escape "Could not load 'Horde3D' dynamic library"))
 
 (define hordeutlib
   (let ((platform (sys:platform)))
@@ -32,7 +39,9 @@
 
 (if (or (eq? #f hordeutlib)
 	(not hordeutlib)) 
-    (print-error "Could not load 'Horde3DUtils' dynamic library"))
+    (sys:load-escape "Could not load 'Horde3DUtils' dynamic library"))
+
+(define xtmlib_horde3d_loaded #t)
 
 (define new-horde #t)
 

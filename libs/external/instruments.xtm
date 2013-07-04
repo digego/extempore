@@ -16,17 +16,25 @@
 
 ;;; Code:
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_audioinstx_loaded)
+    (sys:load-escape "External Instruments already loaded")) ;; break to top level
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; SAMPLER
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; a dodgy lib-dependency checker hack:
-;; only load 'core/instruments' if it hasn't already been loaded
-(if (not (llvm:get-globalvar "SAMPLERATE"))
-    (load "libs/core/instruments.xtm"))
-(load "libs/external/sndfile.xtm")
+(sys:load "libs/core/instruments.xtm")
+
+(sys:load "libs/external/sndfile.xtm")
+
+(define xtmlib_audioinstx_loaded #t)
 
 ;; helper function for adding sample data to sampler
 ;; this assumes stereo files at the moment!!

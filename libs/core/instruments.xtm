@@ -13,7 +13,14 @@
 
 ;;; Code:
 
-(load "libs/core/audio_dsp.xtm")
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_audioinst_loaded)
+    (sys:load-escape "Instruments already loaded")) ;; break to top level
+
+(define xtmlib_audioinst_loaded #t)
 
 ;; making and playing notes
 

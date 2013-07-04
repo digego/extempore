@@ -10,6 +10,13 @@
 
 ;;; Code:
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_soil_loaded)
+    (sys:load-escape "SOIL already loaded")) ;; break to top level
+
 (define xtmlib_soil_loaded #t)
 
 ;; load soil library
@@ -18,7 +25,7 @@
     (cond ((string=? platform "Linux") (sys:open-dylib "libSOIL.so"))
 	  ((string=? platform "Windows") (sys:open-dylib "libSOIL.dll"))
 	  ((string=? platform "OSX") (sys:open-dylib "libSOIL.dylib"))
-	  (else (print "Unknown platform: " platform)))))
+	  (else (sys:load-escape "Unknown platform for soil lib")))))
 
 (bind-lib libsoil SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
 ;; (bind-lib libsoil SOIL_load_OGL_cubemap [i32,i8*,i8*,i8*,i8*,i8*,i8*,i32,i32,i32]*)

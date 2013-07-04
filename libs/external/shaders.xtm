@@ -10,6 +10,14 @@
 
 ;;; Code:
 
+
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_shaders_loaded)
+    (sys:load-escape "Shaders already loaded")) ;; break to top level
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; GLOBAL to let other libraries know that
@@ -43,31 +51,28 @@
       void)))
 
 
-;; Grid Offsets isx used by convolution shaders
-;; box size of 5*5
-(bind-val shader_gridoffsets float* (* 5 5 2 4))
-
+;; matrix should be float* 5x5
 (bind-func shader_set_grid_offsets
-  (lambda (width:float height:float factor:float)
+  (lambda (matrix:float* width:float height:float factor:float)
     (let ((xinc:float (/ factor width))
 	  (yinc:float (/ factor height))
 	  (i 0) (j 0))
       (dotimes (i 5) ;; columns
 	(dotimes (j 5) ;; rows
-	  (pset! shader_gridoffsets (+ (* (+ (* i 5) j) 2) 0)
+	  (pset! matrix (+ (* (+ (* i 5) j) 2) 0)
 		 (+ (* -2.0 xinc)
 		    (* (i32tof i) xinc)))
-	  (pset! shader_gridoffsets (+ (* (+ (* i 5) j) 2) 1)
+	  (pset! matrix (+ (* (+ (* i 5) j) 2) 1)
 		 (+ (* -2.0 xinc)
 		    (* (i32tof i) yinc)))))
       void)))
 
 
-
+;; matrix should be float* 5x5
 (bind-func shader_setup_convolution_filter
-  (lambda (shader offset)
-    (shader_set_grid_offsets 1.0 1.0 offset) ;(* 2.0 (dtof (cos (* 2222.2 (i64tod (now)))))))
-    (glUniform2fv (glGetUniformLocation shader "texoffset") 25 shader_gridoffsets)
+  (lambda (matrix:float* shader offset)
+    (shader_set_grid_offsets matrix 1.0 1.0 offset) ;(* 2.0 (dtof (cos (* 2222.2 (i64tod (now)))))))
+    (glUniform2fv (glGetUniformLocation shader "texoffset") 25 matrix)
     (glUniform1i (glGetUniformLocation shader "tex1") 0)))
 
 

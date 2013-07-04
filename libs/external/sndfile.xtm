@@ -8,7 +8,16 @@
 
 ;; 
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (print-error 'Please 'load 'xtm 'libraries 'into 'the 'primary 'process))
+;; if already loaded then break!
+(if (defined? 'xtmlib_sndfile_loaded)
+    (print-error 'Sound 'File 'already 'loaded)) ;; break to top level
+
 ;;; Code:
+
+(define xtmlib_sndfile_loaded #t)
 
 ;; (dirty) check to see if audio_dsp.xtm has already been loaded
 (if (not (llvm:get-globalvar "SAMPLERATE"))

@@ -7,18 +7,31 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_particlesvbo_loaded)
+    (sys:load-escape "Particles VBO already loaded")) ;; break to top level
+
+(define xtmlib_particlesvbo_loaded #t)
+
+(sys:load "libs/external/opengl.xtm")
+
 
 ;; 0 1 2 3 4 5 6    7         8         9
 ;; x,y,r,g,b,a,size,xvelocity,yvelocity,state
 (bind-type particle_t <float,float,float,float,float,float,float,float,float,i32>)
 (bind-type psystem <i32,i32,particle_t*,E_vbo*>)
 
+(bind-val particle_shader i32 (create_shader particles-vert particles-frag))
+
 ;; create system
 (bind-func psystem_create
   (lambda (number:i32 texture_id)
     (let ((psys:psystem* (halloc))
 	  (particles:particle_t* (halloc number))
-	  (vbo (create-vbo (* number 40) (cast particles i8*) GL_STREAM_DRAW)))
+	  (vbo (create_vbo (* number 40) (cast particles i8*) GL_STREAM_DRAW)))
       (tfill! psys number texture_id particles vbo)
       psys)))
 
@@ -88,7 +101,7 @@
       ;; (printf "%d,%d,%d,%d,%d\n" my_vertex my_colour my_velocity my_state my_size)
       (glEnable GL_BLEND)
       (glDisable GL_DEPTH_TEST)
-      (glDepthMask GL_FALSE)      
+      (glDepthMask GL_FALSE)
       (glBlendFunc GL_SRC_ALPHA GL_ONE)
       
       (glEnable GL_POINT_SPRITE)
