@@ -32,7 +32,16 @@
 (if (defined? 'xtmlib_xtm_loaded)
     (sys:load-escape "XTM standard lib already loaded")) ;; break to top level
 
-(define stdlib (sys:open-dylib "libs/xtm.dylib"))
+(define stdlib
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libs/xtm.so"))
+          ((string=? platform "Windows") (sys:open-dylib "libs/xtm.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "libs/xtm.dylib"))
+          (else (print "Unknown platform: " platform) #f))))
+
+(if (or (eq? #f stdlib)
+	(not stdlib)) 
+    (sys:load-escape "Could not load 'xtm' dynamic library"))
 
 (ascii-print-color 0 6 10)
 (println)

@@ -104,7 +104,7 @@
 		       (if (or (null? libgl)
 				       (eq? #f libgl))
 			       (print-error "Error loading opengl library")))	   
-		(print-error "Error loading opengl library")))
+		(sys:load-escape "Error loading opengl library")))
 
 (if (not (string=? (sys:platform) "Windows"))
     (begin (llvm:compile "declare i32 @glGetUniformBlockIndex(i32, i8*);")
@@ -178,6 +178,9 @@
           ((string=? platform "OSX") (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))
           (else (print "Unknown platform: " platform)))))
 
+(if (or (eq? #f libglu)
+	(not libglu)) 
+    (sys:load-escape "Could not load 'glu' dynamic library"))
 
 (bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
 (bind-lib libglu gluPerspective [void,double,double,double,double]*)
