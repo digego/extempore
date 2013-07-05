@@ -1,7 +1,14 @@
 #!/bin/bash
 # package up the binary extempore executable
 
-DIST_DIR=extempore-$(uname)-$(date "+%Y%m%d")
+case $(uname) in
+    Linux) SHLIB_EXT=so ;;
+    Darwin) SHLIB_EXT=dylib ;;
+    *) echo Cannot package for OS:  $(uname) >&2 ; exit 1 ;;
+esac
+
+DIST_DIR=extempore-$(uname)-$(date "+%Y.%m.%d")
+DIST_SHLIBS="assimp cairo rtmidi"
 
 echo "Creating extempore binary archive in ${DIST_DIR}"
 
