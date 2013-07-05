@@ -1,33 +1,35 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; to compile std.bc file
+;; to compile xtm.bc file
 ;;
 ;; first export module to bitcode:
-;;
-;; (llvm:export-module "/tmp/xtm.bc")
-;;
-;; (sys:load "libs/core/math.xtm")
-;; (sys:load "libs/external/opengl.xtm")
-;; (sys:load "libs/external/shaders.xtm")
-;; (sys:load "libs/external/assimp.xtm")
-;; (sys:load "libs/core/audio_dsp.xtm")
-;; (sys:load "libs/core/instruments.xtm")
-;; (sys:load "libs/external/sndfile.xtm")
-;; (sys:load "libs/external/instruments.xtm")
 
-;;
-;; then compile bitcode file:
-;; /home/andrew/Documents/code/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt xtm.bc
-;; or
-;; /Users/sorensen/Documents/code/llvm-3.2/Release+Asserts/bin/llc -O3 -relocation-model=pic -tailcallopt xtm.bc
-;;
-;; then compile dynamic library
-;; gcc --shared -g xtm.s -o xtm.so
-;; or 
-;; clang -O3 -dynamiclib -undefined dynamic_lookup xtm.s -o xtm.dylib
-;;
-;; emacs regex: Compiled \(.*\) >>> \(.*\) -> (bind-lib-func stdlib \1 \2)
-;;
+(define *compile-xtm-stdlib* #f)
+
+(if *compile-xtm-stdlib*
+    (begin (sys:load "libs/core/math.xtm")
+           (sys:load "libs/external/opengl.xtm")
+           (sys:load "libs/external/shaders.xtm")
+           (sys:load "libs/external/assimp.xtm")
+           (sys:load "libs/core/audio_dsp.xtm")
+           (sys:load "libs/core/instruments.xtm")
+           (sys:load "libs/external/sndfile.xtm")
+           (sys:load "libs/external/instruments.xtm")))
+
+(if *compile-xtm-stdlib*
+    (llvm:export-module "/tmp/xtm.bc"))
+
+;; Now, here are the shell invocations:
+
+;; Linux:
+;; /path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && gcc --shared -g /tmp/xtm.s -o ./xtm.so
+
+;; OSX:
+;; /path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && clang -O3 -dynamiclib -undefined dynamic_lookup /tmp/xtm.s -o ./xtm.dylib
+
+;; emacs regex for generating the header file:
+;; Compiled \(.*\) >>> \(.*\) -> (bind-lib-func stdlib \1 \2)
+
 
 ;; if not primary process
 (if (not (ipc:get-process-name "primary"))
@@ -1160,7 +1162,7 @@ else
   (let ((platform (sys:platform)))
     (cond ((string=? platform "Linux") (sys:open-dylib "libassimp.so"))
           ((string=? platform "Windows") (sys:open-dylib "libassimp.dll"))
-          ((string=? platform "OSX") (sys:open-dylib "/Users/sorensen/Documents/code/assimp/lib/libassimp.dylib"))
+          ((string=? platform "OSX") (sys:open-dylib "libassimp.dylib"))
           (else (print "Unknown platform: " platform)))))
 
 ;; if on windows also check for opengl32.dll			  
