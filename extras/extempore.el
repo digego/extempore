@@ -1297,7 +1297,7 @@ You shouldn't have to modify this list directly, use
 (defvar extempore-logger-logfile nil)
 
 (defun extempore-logger-new-logfile (is-performance)
-  (let* ((log-dir (concat (or extempore-path user-emacs-directory) "extempore-logger/"))
+  (let* ((log-dir (concat (or extempore-path user-emacs-directory) "extras/keylogs/"))
          (dir-created (unless (file-exists-p log-dir) (make-directory log-dir)))
          (logfile-name (concat log-dir
                                (format-time-string "%Y%m%dT%H%M%S-") user-login-name
