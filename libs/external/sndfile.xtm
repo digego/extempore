@@ -126,6 +126,9 @@
 
 
 ;; an audio buffer reader
+;;
+;; if dat is set to null then 
+;; read_audio_data will return number of frames*channels
 (bind-func read_audio_data
   (lambda (fname dat offset num)
     (let ((info:sf_info* (zalloc))
@@ -141,9 +144,13 @@
             (printf "file name:     %s\n" fname)
             (printf "samplerate:    %d\n" (tref info 1))
             (printf "channels:      %d\n" (tref info 2))
+            (printf "frames:        %d\n" (tref info 0))
             (printf "samples read:  %lld\n" samples_read))
           (printf "errors:  %s\n" (sf_strerror audiofile)))
-      samples_read)))
+      (if (null? dat)
+          (* (tref info 0) channels) ;; frames * channels
+          samples_read))))
+
 
 ;; an audio buffer reader (returns a value)
 (bind-func audiofile_c
