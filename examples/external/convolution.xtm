@@ -1,0 +1,70 @@
+;;
+;; convolution.xtm
+;;
+;; a naive time domain convolution example:
+;; obviously you should use frq domain for this
+;; but this is a nice obvious example, and also
+;; can be useful for situations using *SMALL* IR's
+;;
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: libsndfile
+;;
+
+;;; Code:
+
+;; need instruments loaded and libsndfile
+(sys:load "libs/xtm.xtm")
+(sys:load "libs/external/sndfile.xtm")
+(sys:load "libs/external/instruments.xtm")
+
+;;
+;; native convolution
+;; 
+;; this assumes stereo in and stereo IR file!
+;;
+;; lgth is size of IR in frames
+;; anything bigger than lgth 500 is
+;; going to make xtm work VERY hard
+;;
+(bind-func conv_st_c
+  (lambda (path lgth:i64) 
+    (let ((_l1 (read_audio_data path null 0 0)) ;; get num frames*channels
+          (t:i64 0) (i:i64 0) (k:i64 0) (p:i64 0) (sum 0.0)
+          (ir:double* (zalloc (* lgth 2 4)))   ;; interleaved
+          (buf:double* (zalloc (* lgth 2 4)))) ;; interleaved
+      (memset (cast buf i8*) 0 (* lgth 2 4))
+      (memset (cast ir i8*) 0 (* lgth 2 4))       
+      (if (< _l1 lgth)
+          (set! lgth (read_audio_data path ir 0 _l1))
+          (set! lgth (read_audio_data path ir 0 lgth)))
+      ;;(if (< lgth _l1) (printf "Only using part of %s for IR\n" path))
+      (lambda (in:double wet:double)
+        (pset! buf t in)
+        (set! sum 0.0) (set! k (- lgth (+ 1 (% t 1)))) (set! p t)
+        (dotimes (i (/ lgth 2))
+          (set! sum (+ sum (* (pref ir k) (pref buf p))))
+          (set! p (+ p 2)) (set! k (- k 2))
+          (if (> p lgth) (set! p (- p lgth)))
+          (if (= p lgth) (set! p 0)))
+        (set! t (% (+ t 1) lgth))
+        ;;(set! chan (if (= chan 0) 1 0))
+        (* 1.0 sum)))))
+
+(bind-func dsp:DSP 1000000
+  (let ((conv (conv_st_c "/Users/sorensen/Documents/samples/IR/scala.wav" 1000)))
+    (lambda (in time chan dat)
+      (* 1.0 (conv (* 1.0 (synth in time chan dat)) 1.0)))))
+
+(dsp:set! dsp)
+
+;; turn off synth reverb
+(synth_fx.wet 0.0)
+
+;; make some noise
+(define test
+  (lambda (beat dur)
+    (play synth (random '(48 55 60 62 63 72))  80 .1)
+    (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
+
+(test (*metro* 'get-beat 4) 1)
