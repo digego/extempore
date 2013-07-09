@@ -1,0 +1,192 @@
+;;; jansson.xtm -- Extempore bindings for the jansson JSON library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: jansson (v2.4), curl
+
+;;; Commentary:
+
+;; jansson is a library for pulling down and working with JSON data.
+;; This Extempore library provides a Extempore bindings, allowing the
+;; Extempore to download and use JSON data in Extempore.
+
+;; You'll need to build the jansson library as a shared library to use
+;; jansson.xtm
+
+;; On OSX, you can get it through homebrew (brew install jansson) and
+;; it should just work
+
+;;; Code:
+
+;; First, need to load the cURL library
+
+(sys:load "libs/external/curl.xtm")
+
+(define libjansson
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libjansson.so"))
+          ((string=? platform "Windows") (sys:open-dylib "libjansson.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "libjansson.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+;; the json_type enums
+(bind-val JSON_OBJECT enum 0)
+(bind-val JSON_ARRAY enum 1)
+(bind-val JSON_STRING enum 2)
+(bind-val JSON_INTEGER enum 3)
+(bind-val JSON_REAL enum 4)
+(bind-val JSON_TRUE enum 5)
+(bind-val JSON_FALSE enum 6)
+(bind-val JSON_NULL enum 7)
+
+;; base type
+;; <json_type,refcount>
+(bind-type json_t <enum,size_t>)
+
+;; line, column, position, source, text
+(bind-type json_error_t <i32,i32,i32,i8*,i8*>)
+
+;; creating JSON objects
+(bind-lib libjansson json_object [json_t*]*)
+(bind-lib libjansson json_array [json_t*]*)
+(bind-lib libjansson json_string [json_t*,i8*]*)
+(bind-lib libjansson json_string_nocheck [json_t*,i8*]*)
+(bind-lib libjansson json_integer [json_t*,i64]*)
+(bind-lib libjansson json_real [json_t*,double]*)
+(bind-lib libjansson json_true [json_t*]*)
+(bind-lib libjansson json_false [json_t*]*)
+(bind-lib libjansson json_null [json_t*]*)
+
+(bind-lib libjansson json_delete [void,json_t]*)
+
+;; JSON arrays
+(bind-lib libjansson json_array_size [size_t,json_t*]*)
+(bind-lib libjansson json_array_get [json_t*,json_t*,size_t]*)
+(bind-lib libjansson json_array_set_new [i32,json_t*,size_t,json_t*]*)
+(bind-lib libjansson json_array_append_new [i32,json_t*,json_t*]*)
+(bind-lib libjansson json_array_insert_new [i32,json_t*,size_t,json_t*]*)
+(bind-lib libjansson json_array_remove [i32,json_t*,size_t]*)
+(bind-lib libjansson json_array_clear [i32,json_t*]*)
+(bind-lib libjansson json_array_extend [i32,json_t*,json_t*]*)
+
+;; JSON objects
+(bind-lib libjansson json_object_size [size_t,json_t*]*)
+(bind-lib libjansson json_object_get [json_t*,json_t*,i8*]*)
+(bind-lib libjansson json_object_set_new [i32,json_t*,i8*,json_t*]*)
+(bind-lib libjansson json_object_set_new_nocheck [i32,json_t*,i8*,json_t*]*)
+(bind-lib libjansson json_object_del [i32,json_t*,i8*]*)
+(bind-lib libjansson json_object_clear [i32,json_t*]*)
+(bind-lib libjansson json_object_update [i32,json_t*,json_t*]*)
+(bind-lib libjansson json_object_update_existing [i32,json_t*,json_t*]*)
+(bind-lib libjansson json_object_update_missing [i32,json_t*,json_t*]*)
+(bind-lib libjansson json_object_iter [i8*,json_t*]*)
+(bind-lib libjansson json_object_iter_next [i8*,json_t*,i8*]*)
+(bind-lib libjansson json_object_iter_key [i8*,i8*]*)
+(bind-lib libjansson json_object_iter_value [json_t*,i8*]*)
+(bind-lib libjansson json_object_iter_set_new [i32,json_t*,i8*,json_t*]*)
+
+;; accessing values
+(bind-lib libjansson json_string_value [i8*,json_t*]*)
+(bind-lib libjansson json_integer_value [i64,json_t*]*)
+(bind-lib libjansson json_real_value [double,json_t*]*)
+(bind-lib libjansson json_number_value [double,json_t*]*)
+
+;; setting values
+(bind-lib libjansson json_string_set [i32,json_t*,i8*]*)
+(bind-lib libjansson json_string_set_nocheck [i32,json_t*,i8*]*)
+(bind-lib libjansson json_integer_set [i32,json_t*,i64]*)
+(bind-lib libjansson json_real_set [i32,json_t*,double]*)
+
+(bind-lib libjansson json_equal [i32,json_t*,json_t*]*)
+
+;; decoding JSON data
+(bind-lib libjansson json_loads [json_t*,i8*,size_t,json_error_t*]*)
+(bind-lib libjansson json_loadb [json_t*,i8*,size_t,size_t,json_error_t*]*)
+
+;; print JSON data to string
+(bind-lib libjansson json_dumps [i8*,json_t*,size_t]*)
+
+;; type functions
+
+(bind-func json_typeof
+  (lambda (json:json_t*)
+    (tref json 0)))
+
+(bind-func json_is_object
+  (lambda (json:json_t*)
+    (= (json_typeof json) JSON_OBJECT)))
+(bind-func json_is_array
+  (lambda (json:json_t*)
+    (= (json_typeof json) JSON_ARRAY)))
+
+(bind-func json_is_string
+  (lambda (json:json_t*)
+    (= (json_typeof json) JSON_STRING)))
+
+(bind-func json_is_integer
+  (lambda (json:json_t*)
+    (= (json_typeof json) JSON_INTEGER)))
+
+(bind-func json_is_real
+  (lambda (json:json_t*)
+    (= (json_typeof json) JSON_REAL)))
+
+(bind-func json_is_true
+  (lambda (json:json_t*)
+    (= (json_typeof json) JSON_TRUE)))
+
+(bind-func json_is_false
+  (lambda (json:json_t*)
+    (= (json_typeof json) JSON_FALSE)))
+
+(bind-func json_is_null
+  (lambda (json:json_t*)
+    (= (json_typeof json) JSON_NULL)))
+
+(bind-func json_print_type
+  (lambda (json:json_t*)
+    (let ((type (tref json 0)))
+      (cond ((= type JSON_OBJECT) (printf "JSON type: %s\n" "object"))
+            ((= type JSON_ARRAY) (printf "JSON type: %s\n" "array"))
+            ((= type JSON_STRING) (printf "JSON type: %s\n" "string"))
+            ((= type JSON_INTEGER) (printf "JSON type: %s\n" "integer"))
+            ((= type JSON_REAL) (printf "JSON type: %s\n" "real"))
+            ((= type JSON_TRUE) (printf "JSON type: %s\n" "true"))
+            ((= type JSON_FALSE) (printf "JSON type: %s\n" "false"))
+            ((= type JSON_NULL) (printf "JSON type: %s\n" "null"))
+            (else (printf "JSON error: unsupported type.\n")))
+      (i64toi32 0))))
+
+;; iterators
+
+(bind-func json_obj_iterator
+  (lambda (object:json_t* iter:i8*)
+    (if (null? iter)
+        0
+        (begin (printf "%s\n" (json_object_iter_key iter))
+               (json_obj_iterator object (json_object_iter_next object iter))))))
+
+(bind-func json_object_print_keys
+  (let ()
+    (lambda (object:json_t*)
+      (if (json_is_object object)
+          (json_obj_iterator object (json_object_iter object))
+          (begin (printf "Error: argument is not a JSON object.%\n") 0))
+      0)))
+
+;; pulling JSON data from the web
+(bind-func json_dump_url 101000
+  (let ((dat:i8* (zalloc 100000))
+        (err:json_error_t* (zalloc))
+        (i 0)) ;; necessary to get around compiler bug!
+    (lambda (url)
+      (let ((cdat (curl_request url dat))
+            (json (json_loads (tref cdat 0) 0 err)))
+        (if (null? json)
+            (printf "JSON error on line %d: %s\n" (tref err 0) (tref err 4))
+            (let ((dump_str (json_dumps json 2)))
+              (begin
+                (chunked_printf dump_str)
+                (free dump_str)
+                (printf "\n"))))
+        0))))
