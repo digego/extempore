@@ -48,6 +48,7 @@
 (bind-val CURLOPT_INFILESIZE CURLoption 14)
 (bind-val CURLOPT_CONNECT_ONLY CURLoption 141)
 (bind-val CURLOPT_USERAGENT CURLoption 10018)
+(bind-val CURLOPT_HTTPHEADER CURLoption 10023)
 
 (bind-val CURLINFO_RESPONSE_CODE CURLINFO 2097154) ;; 0x200000 + 2
 
@@ -70,6 +71,12 @@
 (bind-lib libcurl curl_easy_recv [CURLcode,CURL,i8*,size_t,size_t*]*)
 (bind-lib libcurl curl_easy_send [CURLcode,CURL,i8*,size_t,size_t*]*)
 (bind-lib libcurl curl_easy_strerror [i8*,CURLcode]*)
+
+;; slists (for adding extra headers)
+
+(bind-type curl_slist <i8*,curl_slist*>)
+(bind-lib libcurl curl_slist_append [curl_slist*,curl_slist*,i8*]*)
+(bind-lib libcurl curl_slist_free_all [void,curl_slist*]*)
 
 (bind-type curl_dat <i8*,size_t>)
 
@@ -105,7 +112,7 @@
 ;; here are some convenience xtlang functions for the different types
 ;; of requests you might want to make
 
-(bind-func curl_setopt_regular_request
+(bind-func curl_setopts_basic
   (lambda (handle cdat:curl_dat*)
     (curl_easy_setopt handle
                       CURLOPT_WRITEFUNCTION
@@ -118,62 +125,73 @@
     ;; user agent string
     (curl_easy_setopt handle CURLOPT_USERAGENT (curl_version))))
 
+(bind-func curl_setopts_authenticate
+  (lambda (handle user:i8* password:i8*)
+    (let ((userpass:i8* (salloc 256)))
+      (sprintf userpass "%s:%s" user password)
+      (curl_easy_setopt handle CURLOPT_USERPWD userpass))))
+
+(bind-func curl_setopts_header
+  (let ((header_slist:curl_slist* null))
+    (lambda (handle header_string:i8*)
+      (set! header_slist (curl_slist_append header_slist header_string))
+      (curl_easy_setopt handle CURLOPT_HTTPHEADER (cast header_slist i8*))
+      header_slist)))
+
+(bind-func curl_perform_request
+  (lambda (handle cdat:curl_dat*)
+    (let ((status (curl_easy_perform handle)))
+        (if (<> status 0)
+            (begin (printf "Error accessing URL: %s\n" (curl_easy_strerror status))
+                   (tset! cdat 0 null)
+                   (tset! cdat 1 0)
+                   cdat)
+            (begin
+              (curl_easy_cleanup handle)
+              ;; null-terminate the dat buffer
+              (let ((ptr (tref cdat 0)))
+                (pset! ptr (tref cdat 1) 0))
+              cdat)))))
+
 (bind-func curl_request
   (let ((handle:CURL null)
         (cdat:curl_dat* (zalloc)))
     (lambda (url:i8* dat:i8*)
-      ;; initialise data structures
+      ;; init data structures
       (set! handle (curl_easy_init))
       (tset! cdat 0 dat)
       (tset! cdat 1 0)
       (curl_easy_setopt handle CURLOPT_URL url)
-      ;; setopts
-      (curl_setopt_regular_request handle cdat)
-      ;; curl perform request
-      (let ((status (curl_easy_perform handle)))
-        (if (<> status 0)
-            (begin (printf "Error accessing URL: %s\n" (curl_easy_strerror status))
-                   (tset! cdat 0 null)
-                   (tset! cdat 1 0)
-                   cdat)
-            (begin
-              (curl_easy_cleanup handle)
-              ;; null-terminate the dat buffer
-              (let ((ptr (tref cdat 0)))
-                (pset! ptr (tref cdat 1) 0))
-              cdat))))))
+      (curl_setopts_basic handle cdat)
+      (curl_perform_request handle cdat))))
 
-(bind-func curl_setopt_authenticated_request
-  (lambda (handle cdat user:i8* password:i8*)
-    (let ((userpass:i8* (salloc 256)))
-      (sprintf userpass "%s:%s" user password)
-      (curl_setopt_regular_request handle cdat)
-      (curl_easy_setopt handle CURLOPT_USERPWD userpass))))
-
-(bind-func curl_auth_request
+(bind-func curl_request_with_auth
   (let ((handle:CURL null)
         (cdat:curl_dat* (zalloc)))
-    (lambda (url:i8* dat:i8* password:i8* user:i8*)
-      ;; initialise data structures
+    (lambda (url:i8* dat:i8* user:i8* password:i8*)
+      ;; init data structures
       (set! handle (curl_easy_init))
       (tset! cdat 0 dat)
       (tset! cdat 1 0)
       (curl_easy_setopt handle CURLOPT_URL url)
-      ;; setopts
-      (curl_setopt_authenticated_request handle cdat password user)
-      ;; curl perform request
-      (let ((status (curl_easy_perform handle)))
-        (if (<> status 0)
-            (begin (printf "Error accessing URL: %s\n" (curl_easy_strerror status))
-                   (tset! cdat 0 null)
-                   (tset! cdat 1 0)
-                   cdat)
-            (begin
-              (curl_easy_cleanup handle)
-              ;; null-terminate the dat buffer
-              (let ((ptr (tref cdat 0)))
-                (pset! ptr (tref cdat 1) 0))
-              cdat))))))
+      (curl_setopts_basic handle cdat)
+      (curl_setopts_authenticate handle user password)
+      (curl_perform_request handle cdat))))
+
+(bind-func curl_request_with_header
+  (let ((handle:CURL null)
+        (cdat:curl_dat* (zalloc)))
+    (lambda (url:i8* dat:i8* header:i8*)
+      ;; init data structures
+      (set! handle (curl_easy_init))
+      (tset! cdat 0 dat)
+      (tset! cdat 1 0)
+      (curl_easy_setopt handle CURLOPT_URL url)
+      (curl_setopts_basic handle cdat)
+      (let ((header_slist (curl_setopts_header handle header)))
+        (curl_perform_request handle cdat)
+        (curl_slist_free_all header_slist))
+      cdat)))
 
 (bind-func chunked_printf
   (let ((chunk_size 1000))
