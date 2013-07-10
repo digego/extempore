@@ -12,12 +12,27 @@
 
 ;;; Code:
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_curl_loaded)
+    (sys:load-escape "Curl already loaded")) ;; break to top level
+
+
 (define libcurl
   (let ((platform (sys:platform)))
     (cond ((string=? platform "Linux") (sys:open-dylib "libcurl.so"))
           ((string=? platform "Windows") (sys:open-dylib "libcurl.dll"))
           ((string=? platform "OSX") (sys:open-dylib "libcurl.dylib"))
           (else (print "Unknown platform: " platform)))))
+
+(if (or (eq? #f libcurl)
+        (null? libcurl))
+    (sys:load-escape "Error loading curl library"))
+
+(define xtmlib_curl_loaded #t)
+
 
 ;; the basic cURL 'object'
 (bind-alias CURL i8*)

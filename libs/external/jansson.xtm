@@ -20,6 +20,13 @@
 
 ;; First, need to load the cURL library
 
+;; if not primary process
+(if (not (ipc:get-process-name "primary"))
+    (sys:load-escape "Please load xtm libraries into the primary process"))
+;; if already loaded then break!
+(if (defined? 'xtmlib_jansson_loaded)
+    (sys:load-escape "Jansson already loaded")) ;; break to top level
+
 (sys:load "libs/external/curl.xtm")
 
 (define libjansson
@@ -29,6 +36,12 @@
           ((string=? platform "OSX") (sys:open-dylib "libjansson.dylib"))
           (else (print "Unknown platform: " platform)))))
 
+(if (or (eq? #f libjansson)
+        (null? libjansson))
+    (sys:load-escape "Error loading jansson library"))
+
+(define xtmlib_jansson_loaded #t)
+ 
 ;; the json_type enums
 (bind-val JSON_OBJECT enum 0)
 (bind-val JSON_ARRAY enum 1)
