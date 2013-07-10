@@ -97,7 +97,7 @@
     (glUniform1f (glGetUniformLocation shader "LinearAttenuation") 0.0)
     (glUniform1f (glGetUniformLocation shader "QuadraticAttenuation") 0.0)
     (glUniform1f (glGetUniformLocation shader "SpotExponent") power)
-    (glUniform1f (glGetUniformLocation shader "SpotAngle") (- 1.0 (/ angle 180.0)))    
+    (glUniform1f (glGetUniformLocation shader "SpotAngle") (- 1.0 (/ angle 180.0)))
     (glUniform4fv (glGetUniformLocation shader "LightPos") 1 position)
     (glUniform4fv (glGetUniformLocation shader "LightAmbient") 1 ambient)
     (glUniform4fv (glGetUniformLocation shader "LightSpecular") 1 specular)
@@ -109,6 +109,40 @@
       (pset! direction 3 0.0)
       (glUniform4fv (glGetUniformLocation shader "SpotDir") 1 direction))
     void))
+
+(bind-func shader_update_lights
+  (let ((i:i32 0)
+        (ca:float* (alloc 10)) ;; contant attenuation
+        (la:float* (alloc 10)) ;; linear attenuation
+        (qa:float* (alloc 10)) ;; quadratic attenuation
+        (sa:float* (alloc 10)) ;; spot angle
+        (dir:float* (alloc (* 10 4))) ;; spot dir
+        (tmp:float* (alloc (* 10 4))))
+    (dotimes (i 10)
+      (pset! ca i 1.0) (pset! la i 0.0) (pset! qa i 0.0))
+    (lambda (shader:i32 numlights:i32 position target angle:float* power ambient diffuse specular)
+      (dotimes (i numlights) (pset! sa i (- 1.0 (/ (pref angle i) 180.0))))
+      (glUniform1f (glGetUniformLocation shader "numlights") (i32tof numlights))
+      (glUniform1fv (glGetUniformLocation shader "ConstantAttenuation") numlights ca)
+      (glUniform1fv (glGetUniformLocation shader "LinearAttenuation") numlights la)
+      (glUniform1fv (glGetUniformLocation shader "QuadraticAttenuation") numlights qa)
+      (glUniform1fv (glGetUniformLocation shader "SpotExponent") numlights power)
+      (glUniform1fv (glGetUniformLocation shader "SpotAngle") numlights sa)
+      (glUniform4fv (glGetUniformLocation shader "LightPos") numlights position)
+      (glUniform4fv (glGetUniformLocation shader "LightAmbient") numlights ambient)
+      (glUniform4fv (glGetUniformLocation shader "LightSpecular") numlights specular)
+      (glUniform4fv (glGetUniformLocation shader "LightDiffuse") numlights diffuse)
+      (dotimes (i numlights)
+        (vsub (pref-ptr target (* i 4))
+              (pref-ptr position (* i 4))
+              3
+              (pref-ptr tmp (* i 4)))
+        (vnorm (pref-ptr tmp (* i 4))
+               3
+               (pref-ptr dir (* i 4)))
+        (pset! (pref-ptr dir (* i 4)) 3 0.0))
+      (glUniform4fv (glGetUniformLocation shader "SpotDir") numlights dir)
+      void)))
 
 ;; when working with OpenGL
 ;; extempore's mmul is pre mutipled (not post as in GLSL)
@@ -155,6 +189,51 @@
         (mmul mlv 4 4 p 4 4 mlvp)
         (mmul mlvp 4 4 biasmc 4 4 mlvpb)
         (glUniformMatrix4fv (glGetUniformLocation id "LightModelViewProjectionMatrix") 1 GL_FALSE mlvpb))
+      (let ((mv (salloc 48))
+            (mvp (pref-ptr mv 16))
+            (mn (pref-ptr mv 32)))
+        (mmul m 4 4 v 4 4 mv) ;; final mv set
+        (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
+        (minv mn 4 mvp) ;; using mvp as a temporary      
+        (mat4_to_mat3 mvp mn)  ;; final mn set
+        (mmul mv 4 4 p 4 4 mvp) ;; final mvp set
+        (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
+        (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
+        (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
+        (glUniformMatrix3fv (glGetUniformLocation id "NormalMatrix") 1 GL_FALSE mn)      
+        (glUniformMatrix4fv (glGetUniformLocation id "ModelViewMatrix") 1 GL_FALSE mv)
+        (glUniformMatrix4fv (glGetUniformLocation id "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
+        void))))
+
+
+;; when working with OpenGL
+;; extempore's mmul is pre mutipled (not post as in GLSL)
+;; so the same matrix mul is post in GLSL and pre in XTM (i.e. here!)
+(bind-func shader_update_matrices_lvs
+  (let ((i:i32 0)
+        (mlvpb:float* (alloc (* 10 16)))
+        (biasmc:float* (alloc 16))
+        (biasmr:float* (alloc 16)))
+    (pfill! biasmc
+            0.5 0.0 0.0 0.0
+            0.0 0.5 0.0 0.0
+            0.0 0.0 0.5 0.0
+            0.5 0.5 0.5 1.0)    
+    (pfill! biasmr
+            0.5 0.0 0.0 0.5
+            0.0 0.5 0.0 0.5
+            0.0 0.0 0.5 0.5
+            0.0 0.0 0.0 1.0)   
+    (lambda (id:i32 m:float* v p:float* lights:i32 lv:float*) ;; lv is lights
+      ;; view
+      (dotimes (i lights)
+        (let ((mlv:float* (salloc 16))
+              (mlvp:float* (salloc 16)))
+          (mmul m 4 4 (pref-ptr lv (* i 16)) 4 4 mlv)
+          (mmul mlv 4 4 p 4 4 mlvp)
+          (mmul mlvp 4 4 biasmc 4 4 (pref-ptr mlvpb (* i 16)))))
+      (glUniformMatrix4fv (glGetUniformLocation id "LightModelViewProjectionMatrix")
+                          lights GL_FALSE mlvpb)
       (let ((mv (salloc 48))
             (mvp (pref-ptr mv 16))
             (mn (pref-ptr mv 32)))
@@ -818,6 +897,7 @@ void main()
 //#version 120
 varying vec3 N, L, E, V;
 varying float D;
+
 uniform vec4 LightAmbient;
 uniform vec4 LightDiffuse;
 uniform vec4 LightSpecular;
@@ -907,5 +987,287 @@ else
   } else {
      gl_FragColor = vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
   }
+}
+")
+
+
+(define xtmvert-xtm
+  "
+#version 120
+
+attribute vec4 xtmVertex;
+attribute vec3 xtmNormal;
+attribute vec3 xtmUVW;
+attribute vec4 xtmColor;
+
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+
+void main()
+{
+  gl_Position = ModelViewProjectionMatrix * xtmVertex;
+  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  N = NormalMatrix * xtmNormal; //normal
+  float j = 0.5;
+  for(int i=0; j<numlights; i++, j+=1.0) {
+    L[i] = (LightPos[i] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+    if(LightPos[i].w == 0.0) L[i] = LightPos[i].xyz; // i.e. if LightPos is already a direction vector
+    D[i] = length(L[i]);
+    lightVertexPosition[i] = LightModelViewProjectionMatrix[i] * xtmVertex;
+  }
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  Color = xtmColor;  
+}
+")
+
+
+(define xtmfrag
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;  
+  for(int i=0; j<numlights; i++, j+=1.0) 
+  {
+    vec4 ambient,diffuse,specular;
+    vec3 HV;
+    float pf; // powerfactor
+    float nDotHV, nDotLL;
+    float attenuation, spotDot, spotAttenuation;
+    vec4 TexColor; // texture color
+  
+    vec3 NN = normalize(N); // surface normal
+    vec3 LL = normalize(L[i]); // light vector
+    vec3 EE = normalize(E); // eye vector
+    vec3 VV = normalize(V); // vertex 3d
+
+    attenuation = 1.0 / (ConstantAttenuation[i] + (LinearAttenuation[i] * D[i]) + (QuadraticAttenuation[i] * D[i] * D[i]));
+
+    spotDot = dot(-LL, normalize(SpotDir[i].xyz));
+
+    if(spotDot < SpotAngle[i])
+      spotAttenuation = 0.0;
+    else
+      spotAttenuation = pow(spotDot, SpotExponent[i]);  
+
+    attenuation *= spotAttenuation;
+
+    HV = normalize(LL+EE); // half vector
+    nDotLL = max(0.0, dot(NN,LL));
+    nDotHV = max(0.0, dot(NN,HV));
+
+    if(nDotLL==0.0)
+      pf = 0.0;
+    else
+      pf = pow(nDotHV, MaterialShininess);
+
+    ambient = LightAmbient[i] * MaterialAmbient * attenuation;
+    diffuse = LightDiffuse[i] * MaterialDiffuse * nDotLL * attenuation;
+    specular = LightSpecular[i] * MaterialSpecular * pf * attenuation;
+
+    //calc shadows
+    float shadowValue = 0.0;
+    vec4 lightVertexPosition2 = lightVertexPosition[i];
+    lightVertexPosition2 /= lightVertexPosition2.w;
+
+    //float bias = 0.005;
+
+    float aa = mod((j-0.5),2.0);
+    float bb = floor((j-0.5)/2.0);
+    vec2 offset = vec2(0.5*aa,0.5*bb);
+
+    //vec2 offset = vec2(1920.0*mod(j,1.0),1200.0*((i<2)?0:1));
+
+    // softer shadowing by adding dither
+    for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+      for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.5)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+          shadowValue+=1.0;
+      }
+    }
+    shadowValue/=16.0;
+    //shadowValue=1.0;
+
+    if(IsTextured>0.5) {
+      vec4 texcolor = LightDiffuse[i] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+      outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+    } else {
+      outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+    }
+  }
+  //gl_FragColor = vec4(outcolor.xyz,1.0);
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")
+
+
+
+(define xtmfrag
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 TexColor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  for(int i=0; j<numlights; i++, j+=1.0) 
+  {  
+    vec3 LL = normalize(L[i]); // light vector
+    attenuation = 1.0 / (ConstantAttenuation[i] + (LinearAttenuation[i] * D[i]) + (QuadraticAttenuation[i] * D[i] * D[i]));
+    spotDot = dot(-LL, normalize(SpotDir[i].xyz));
+
+    if(spotDot < SpotAngle[i])
+      spotAttenuation = 0.0;
+    else
+      spotAttenuation = pow(spotDot, SpotExponent[i]);  
+
+    attenuation *= spotAttenuation;
+
+    HV = normalize(LL+EE); // half vector
+    nDotLL = max(0.0, dot(NN,LL));
+    nDotHV = max(0.0, dot(NN,HV));
+
+    if(nDotLL==0.0)
+      pf = 0.0;
+    else
+      pf = pow(nDotHV, MaterialShininess);
+
+    ambient = LightAmbient[i] * MaterialAmbient * attenuation;
+    diffuse = LightDiffuse[i] * MaterialDiffuse * nDotLL * attenuation;
+    specular = LightSpecular[i] * MaterialSpecular * pf * attenuation;
+
+    //calc shadows
+    float shadowValue = 0.0;
+    vec4 lightVertexPosition2 = lightVertexPosition[i];
+    lightVertexPosition2 /= lightVertexPosition2.w;
+
+    float aa = mod((j-0.5),2.0);
+    float bb = floor((j-0.5)/2.0);
+    vec2 offset = vec2(0.5*aa,0.5*bb);
+
+    // softer shadowing by adding dither
+    for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+      for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.5)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+          shadowValue+=1.0;
+      }
+    }
+    shadowValue/=16.0;
+
+    if(IsTextured>0.5) {
+      vec4 texcolor = LightDiffuse[i] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+      outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+    } else {
+      outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+    }
+  }
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
 }
 ")

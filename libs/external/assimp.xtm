@@ -654,7 +654,7 @@
 
 
 (bind-func assimp_draw_node
-  (lambda (node:ai_node* shader:i32 model:float* view:float* projection:float* light:float*)
+  (lambda (node:ai_node* shader:i32 model:float* view:float* projection:float* lights:i32 light:float*)
     (let ((i:i32 0)
           (children (tref node 4))
           (meshes (tref node 6))
@@ -670,19 +670,19 @@
             (mtrans transmat 4 4 m2)
             (mmul m2 4 4 model 4 4 m)
             1))
-      (shader_update_matrices_lv shader m view projection light)      
+      (shader_update_matrices_lvs shader m view projection lights light)
       ;; first draw meshes
       (dotimes (i (tref node 5))
         (assimp_draw_mesh (pref-ptr meshes i) shader))
       ;; then draw other children recursively
       (dotimes (i (tref node 3))
-        (assimp_draw_node (pref-ptr children i) shader model view projection light))
+        (assimp_draw_node (pref-ptr children i) shader model view projection lights light))
       void)))
 
 
 (bind-func assimp_draw_model
-  (lambda (scene:ai_node* shader:i32 model view projection light)
-    (assimp_draw_node scene shader model view projection light)
+  (lambda (scene:ai_node* shader:i32 model view projection lights light)
+    (assimp_draw_node scene shader model view projection lights light)
     void))
 
 

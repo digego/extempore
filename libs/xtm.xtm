@@ -416,8 +416,10 @@
 (bind-lib-func stdlib shader_setup_convolution_filter [void,float*,i32,float]*)
 (bind-lib-func stdlib shader_update_camera [void,i32,float*,float*]*)
 (bind-lib-func stdlib shader_update_light [void,i32,float*,float*,float,float,float*,float*,float*]*)
+(bind-lib-func stdlib shader_update_lights [void,i32,i32,float*,float*,float*,float*,float*,float*,float*]*)
 (bind-lib-func stdlib shader_update_matrices [void,i32,float*,float*,float*]*)
 (bind-lib-func stdlib shader_update_matrices_lv [void,i32,float*,float*,float*,float*]*)
+(bind-lib-func stdlib shader_update_matrices_lvs [void,i32,float*,float*,float*,i32,float*]*);
 (bind-lib-func stdlib shader_update_material [void,i32,float*,float*,float*,float]*)
 
 
@@ -1059,6 +1061,7 @@ void main()
 //#version 120
 varying vec3 N, L, E, V;
 varying float D;
+
 uniform vec4 LightAmbient;
 uniform vec4 LightDiffuse;
 uniform vec4 LightSpecular;
@@ -1151,6 +1154,288 @@ else
 }
 ")
 
+
+(define xtmvert-xtm
+  "
+#version 120
+
+attribute vec4 xtmVertex;
+attribute vec3 xtmNormal;
+attribute vec3 xtmUVW;
+attribute vec4 xtmColor;
+
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+
+void main()
+{
+  gl_Position = ModelViewProjectionMatrix * xtmVertex;
+  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  N = NormalMatrix * xtmNormal; //normal
+  float j = 0.5;
+  for(int i=0; j<numlights; i++, j+=1.0) {
+    L[i] = (LightPos[i] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+    if(LightPos[i].w == 0.0) L[i] = LightPos[i].xyz; // i.e. if LightPos is already a direction vector
+    D[i] = length(L[i]);
+    lightVertexPosition[i] = LightModelViewProjectionMatrix[i] * xtmVertex;
+  }
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  Color = xtmColor;  
+}
+")
+
+
+(define xtmfrag
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;  
+  for(int i=0; j<numlights; i++, j+=1.0) 
+  {
+    vec4 ambient,diffuse,specular;
+    vec3 HV;
+    float pf; // powerfactor
+    float nDotHV, nDotLL;
+    float attenuation, spotDot, spotAttenuation;
+    vec4 TexColor; // texture color
+  
+    vec3 NN = normalize(N); // surface normal
+    vec3 LL = normalize(L[i]); // light vector
+    vec3 EE = normalize(E); // eye vector
+    vec3 VV = normalize(V); // vertex 3d
+
+    attenuation = 1.0 / (ConstantAttenuation[i] + (LinearAttenuation[i] * D[i]) + (QuadraticAttenuation[i] * D[i] * D[i]));
+
+    spotDot = dot(-LL, normalize(SpotDir[i].xyz));
+
+    if(spotDot < SpotAngle[i])
+      spotAttenuation = 0.0;
+    else
+      spotAttenuation = pow(spotDot, SpotExponent[i]);  
+
+    attenuation *= spotAttenuation;
+
+    HV = normalize(LL+EE); // half vector
+    nDotLL = max(0.0, dot(NN,LL));
+    nDotHV = max(0.0, dot(NN,HV));
+
+    if(nDotLL==0.0)
+      pf = 0.0;
+    else
+      pf = pow(nDotHV, MaterialShininess);
+
+    ambient = LightAmbient[i] * MaterialAmbient * attenuation;
+    diffuse = LightDiffuse[i] * MaterialDiffuse * nDotLL * attenuation;
+    specular = LightSpecular[i] * MaterialSpecular * pf * attenuation;
+
+    //calc shadows
+    float shadowValue = 0.0;
+    vec4 lightVertexPosition2 = lightVertexPosition[i];
+    lightVertexPosition2 /= lightVertexPosition2.w;
+
+    //float bias = 0.005;
+
+    float aa = mod((j-0.5),2.0);
+    float bb = floor((j-0.5)/2.0);
+    vec2 offset = vec2(0.5*aa,0.5*bb);
+
+    //vec2 offset = vec2(1920.0*mod(j,1.0),1200.0*((i<2)?0:1));
+
+    // softer shadowing by adding dither
+    for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+      for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.5)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+          shadowValue+=1.0;
+      }
+    }
+    shadowValue/=16.0;
+    //shadowValue=1.0;
+
+    if(IsTextured>0.5) {
+      vec4 texcolor = LightDiffuse[i] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+      outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+    } else {
+      outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+    }
+  }
+  //gl_FragColor = vec4(outcolor.xyz,1.0);
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")
+
+
+
+(define xtmfrag
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 TexColor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  for(int i=0; j<numlights; i++, j+=1.0) 
+  {  
+    vec3 LL = normalize(L[i]); // light vector
+    attenuation = 1.0 / (ConstantAttenuation[i] + (LinearAttenuation[i] * D[i]) + (QuadraticAttenuation[i] * D[i] * D[i]));
+    spotDot = dot(-LL, normalize(SpotDir[i].xyz));
+
+    if(spotDot < SpotAngle[i])
+      spotAttenuation = 0.0;
+    else
+      spotAttenuation = pow(spotDot, SpotExponent[i]);  
+
+    attenuation *= spotAttenuation;
+
+    HV = normalize(LL+EE); // half vector
+    nDotLL = max(0.0, dot(NN,LL));
+    nDotHV = max(0.0, dot(NN,HV));
+
+    if(nDotLL==0.0)
+      pf = 0.0;
+    else
+      pf = pow(nDotHV, MaterialShininess);
+
+    ambient = LightAmbient[i] * MaterialAmbient * attenuation;
+    diffuse = LightDiffuse[i] * MaterialDiffuse * nDotLL * attenuation;
+    specular = LightSpecular[i] * MaterialSpecular * pf * attenuation;
+
+    //calc shadows
+    float shadowValue = 0.0;
+    vec4 lightVertexPosition2 = lightVertexPosition[i];
+    lightVertexPosition2 /= lightVertexPosition2.w;
+
+    float aa = mod((j-0.5),2.0);
+    float bb = floor((j-0.5)/2.0);
+    vec2 offset = vec2(0.5*aa,0.5*bb);
+
+    // softer shadowing by adding dither
+    for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+      for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.5)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+          shadowValue+=1.0;
+      }
+    }
+    shadowValue/=16.0;
+
+    if(IsTextured>0.5) {
+      vec4 texcolor = LightDiffuse[i] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+      outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+    } else {
+      outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+    }
+  }
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")
+
 (println 'SHADERS 'LOADED)
 
 ;;; ASSIMP SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1237,8 +1522,8 @@ else
 (bind-lib-func stdlib ai_build_scene [ai_node*,aiScene*,i8*]*)
 (bind-lib-func stdlib assimp_load_asset [ai_node*,i8*,i8*]*)
 (bind-lib-func stdlib assimp_draw_mesh [void,ai_mesh*,i32]*)
-(bind-lib-func stdlib assimp_draw_node [void,ai_node*,i32,float*,float*,float*,float*]*)
-(bind-lib-func stdlib assimp_draw_model [void,ai_node*,i32,float*,float*,float*,float*]*)
+(bind-lib-func stdlib assimp_draw_node [void,ai_node*,i32,float*,float*,float*,i32,float*]*)
+(bind-lib-func stdlib assimp_draw_model [void,ai_node*,i32,float*,float*,float*,i32,float*]*)
 (bind-lib-func stdlib ai_load_textures [void,aiScene*]*)
 
 (println 'ASSIMP 'LOADED)
