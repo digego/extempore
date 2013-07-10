@@ -165,7 +165,7 @@ int main(int argc, char** argv)
 #endif
           break;
         case OPT_HELP:
-	default:
+	default:    
 	  std::cout << "Extempore's command line options: " << std::endl;
 	  std::cout << "            --help: prints this menu" << std::endl;	
 	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
@@ -186,6 +186,10 @@ int main(int argc, char** argv)
 	  char* val = args.OptionArg();
 	  char a[256];
 	  char b[256];
+          if(!rmatch("--",key)) {
+            std::cout << "Poorly formed arg: " << key << std::endl;
+            return 1;
+          }
 	  rsplit("--",key,a,b);
 	  //std::cout << "ADD-ARG: " << b << " " << val << std::endl;
 	  extemp::UNIV::CMDPARAMS[std::string(b)] = std::string(val);
