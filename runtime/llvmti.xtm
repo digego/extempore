@@ -2804,12 +2804,17 @@
 	    (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*)))
 	    ;; c should be of type a*
 	    (c (impc:ti:type-check (cadddr ast) vars kts (if (null? a) #f
-							     (if (and (not (impc:ir:type? a))
-								      (impc:ir:array? (car a)))
-								 (list (caddr (car a)))
-								 (list (impc:ir:pointer-- (car a))))))))
+                                                             (if (atom? a)
+                                                                 (list (impc:ir:pointer-- a))
+                                                                 (if (and (not (impc:ir:type? a))
+                                                                          (impc:ir:array? (car a)))
+                                                                     (list (caddr (car a)))
+                                                                     (list (impc:ir:pointer-- (car a)))))))))
+       (if (not (impc:ir:pointer? a))
+           (print-error 'Compiler 'Error: 'trying 'to 'pset! 'into 'a 'value! a))
        ;; array set check will return the type of the value set
        c)))
+
 
 (define impc:ti:pointer-ref-ptr-check
    (lambda (ast vars kts request?)
