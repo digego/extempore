@@ -8,12 +8,8 @@
 
 ;;; Code:
 
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_assimp_loaded)
-    (sys:load-escape "Assimp already loaded")) ;; break to top level
+;; lib-loading config
+(sys:load-preload-check 'assimp)
 
 ;; lib assimp
 (define libassimp
@@ -27,9 +23,7 @@
         (null? libassimp))
     (sys:load-escape "Error loading assimp library"))
 
-
-(define xtmlib_assimp_loaded #t)
-
+(define *xtmlib-assimp-loaded* #t)
 
 ;; load SOIL
 (sys:load "libs/external/image.xtm")

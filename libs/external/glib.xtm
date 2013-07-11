@@ -10,14 +10,8 @@
 
 ;;; Code:
 
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_glib_loaded)
-    (sys:load-escape "GLIB already loaded")) ;; break to top level
-
-
+;; lib-loading config
+(sys:load-preload-check 'glib)
 
 (define gliblib
   (sys:open-dylib (if (string=? "Linux" (sys:platform))
@@ -53,9 +47,7 @@
 	(not gobjectlib)) 
     (sys:load-escape "Could not load 'gio' dynamic library"))
 
-
-(define xtmlib_glib_loaded #t)
-
+(define *xtmlib-glib-loaded* #t)
 
 ;; some GLib type aliases
 ;; note that some of these differ from GLib's actual implementation!

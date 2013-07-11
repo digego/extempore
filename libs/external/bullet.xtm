@@ -8,13 +8,8 @@
 
 ;;
 
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_xtm_loaded)
-    (sys:load-escape "XTM standard lib already loaded")) ;; break to top level
-
+;; lib-loading config
+(sys:load-preload-check 'bullet)
 
 ;;; Code:
 
@@ -29,11 +24,9 @@
 	(not bulletlib)) 
     (sys:load-escape "Could not load 'bullet' dynamic library"))
 
-(define xtmlib_bullet_loaded #t)
+(define *xtmlib-bullet-loaded* #t)
 
 (define _extended_bullet #f)
-
-
 
 (bind-type _plPhysicsSdkHandle <i32>)
 (bind-alias plPhysicsSdkHandle _plPhysicsSdkHandle*)
