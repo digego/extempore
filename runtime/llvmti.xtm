@@ -2941,7 +2941,7 @@
 
 (define impc:ti:tuple-set-check
    (lambda (ast vars kts request?)
-      ;(println 'tsetcheck ast) ; vars kts request?)
+      ;; (println 'tsetcheck ast) ; vars kts request?)
       (if (<> (length ast) 4)
           (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
       ;; (caddr ast) must be an integer 
@@ -2985,7 +2985,9 @@
 	;; it's type with c but for polymorphic cases
 	;; we should ensure that we also do a type-unification
 	(if (symbol? (cadddr ast))
-	    (let* ((types (cdr (assoc (cadddr ast) vars)))
+	    (let* ((types (if (assoc (cadddr ast) vars)
+                              (cdr (assoc (cadddr ast) vars))
+                              (impc:ti:type-check (cadddr ast) vars kts req?)))
 		   (utype (impc:ti:type-unify (list c types) vars)))
 	      ;(println 'types: types 'utype: utype 'c: (list c types))
 	      (if (null? utype)
