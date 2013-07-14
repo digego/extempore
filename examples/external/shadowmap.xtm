@@ -105,7 +105,7 @@
     ;; camera always up and pointing to centre
     (pfill! target 0.0 0.0 0.0 1.0) ;; position vector gets w==1.0
     (pfill! up 0.0 1.0 0.0 0.0) ;; direction vector gets w==0.0
-    (lambda (model1:ai_node* model2:ai_node* model3:ai_node* degree:double)
+    (lambda (model1:xtm_node* model2:xtm_node* model3:xtm_node* degree:double)
       ;; first grab the fbo
       (set! fbo (get-fbo))
       ;; setup light on a slow dolly back and forth
@@ -142,19 +142,17 @@
       ;; draw scene
       (glViewport 0 0 (ftoi32 (* 2.0 width)) (ftoi32 (* 2.0 height))) ;; shadow map is big!
       (glEnable GL_CULL_FACE) ;; face culling ON for shadowmapping
+      (glCullFace GL_FRONT)      
       (glClearColor 0.0 0.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (fill_identity_matrix model_matrix)
       (translate_matrix model_matrix -3.0 -2.9 -1.0)
       (scale_matrix model_matrix 1.5 1.5 1.5)
-      (glCullFace GL_FRONT)
       (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)      
       (assimp_draw_model model3 simpleshader model_matrix light_view_matrix projection_matrix 1 light_view_matrix)
       (fill_identity_matrix model_matrix)
-      (glCullFace GL_FRONT)      
       (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)            
       (assimp_draw_model model2 simpleshader model_matrix light_view_matrix projection_matrix 1 light_view_matrix)
-      (glCullFace GL_BACK)      
       (assimp_draw_model model1 simpleshader model_matrix light_view_matrix projection_matrix 1 light_view_matrix)            
       ;; turn everything off
       (glBindFramebuffer GL_FRAMEBUFFER 0)
@@ -218,9 +216,10 @@
 
 (gl_print_error)
 
-(define peppino (assimp_load_asset path "peppino.blend"))
-(define scene (assimp_load_asset path "scene.blend"))
-(define dome (assimp_load_asset path "dome_cut.blend"))
+(define peppino (assimp_load_model path "peppino.blend"))
+(define scene (assimp_load_model path "scene.blend"))
+;; flip winding order so inside of dome is the front face
+(define dome (assimp_load_model path "dome_cut.blend" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
 (gl_print_error)
 

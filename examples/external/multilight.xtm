@@ -45,7 +45,7 @@
 ;; make sure you include / on the end
 (define path "/Users/sorensen/Documents/models/")
 
-(define fullscreen #t)
+(define fullscreen #f)
 ;; (define width 1920.0)
 ;; (define height 1200.0)
 (define width 1024.0)
@@ -67,30 +67,11 @@
 (sys:load "libs/external/shaders.xtm")
 (sys:load "libs/external/assimp.xtm")
 
-;; (bind-val simpleshader i32 (create_shader_xtm simple-vert-xtm simple-frag))
-;; (bind-val shadowshader i32 (create_shader_xtm light-and-shade-vert-xtm light-and-shade-frag))
-
 (bind-val simpleshader i32 (create_shader_xtm simple-vert-xtm simple-frag))
 (bind-val shadowshader i32 (create_shader_xtm xtmvert-xtm xtmfrag))
 
-;; make fbo global so it doesn't get
-;; created between compiles of gl_render
-;; which is NOT very safe!!
-;;
-;; idx start from 1 (i.e. same as light index)
-;; (bind-func get-fbo2
-;;   (let ((i:i32 0)
-;;         (fbo:E_fbo** (alloc 10))) ;; 10 lights max
-;;     (dotimes (i 10)
-;;       (pset! fbo i (create_fbo (ftoi32 (* 2.0 width)) (ftoi32 (* 2.0 height)) 0 0))
-;;       (gl_print_error))
-;;     (lambda (idx:i32)
-;;       (if (> idx 10) (printf "Only 10 lights supported!"))
-;;       (if (< idx 1) (printf "Min idx of 1"))
-;;       (pref fbo (- idx 1)))))
-
 (bind-func get-fbo
-  (let ((fbo:E_fbo* (create_fbo (ftoi32 (* 2.0 1024.0)) (ftoi32 (* 2.0 1024.0)) 0 0)))
+  (let ((fbo:E_fbo* (create_fbo (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
     (lambda ()
       fbo)))
 
@@ -136,7 +117,7 @@
     ;; camera always up and pointing to centre
     (pfill! target 0.0 0.0 0.0 1.0) ;; position vector gets w==1.0
     (pfill! up 0.0 1.0 0.0 0.0) ;; direction vector gets w==0.0
-    (lambda (model1:ai_node* model2:ai_node* model3:ai_node* degree:double)
+    (lambda (model1:xtm_node* model2:xtm_node* model3:xtm_node* degree:double)
       ;; setup rotating spot light 
       (pfill! (pref-ptr _spottgt 0)
               (dtof (* 5.0 (cos (* degree .05))))
@@ -182,41 +163,33 @@
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
 
       (pset! _angle 0 40.0)
-      (pset! _power 0 60.0)      
+      (pset! _power 0 60.0) ;; 60      
       (pset! _angle 1 60.0)
-      (pset! _power 1 40.0)      
+      (pset! _power 1 40.0) ;; 40 
       (pset! _angle 2 60.0)
-      (pset! _power 2 60.0)
+      (pset! _power 2 60.0) ;; 60
       
       (dotimes (i lights)
         (set! light_view_matrix (pref-ptr _light_view_matrix (* i 16)))
         (set! spottgt (pref-ptr _spottgt (* i 4)))
         (set! spotpos (pref-ptr _spotpos (* i 4)))
-        ;; (pset! _angle i 30.0)
-        ;; (pset! _power i 30.0)        
-        ;; bind framebuffer to write depth info into
-        ;; (glBindFramebuffer GL_FRAMEBUFFER (tref fbo 0))
-        ;; (glUseProgram simpleshader)
         ;; run once for each light!
         (fill_view_matrix light_view_matrix spotpos spottgt up)
         (fill_identity_matrix model_matrix)
         (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)
         ;; draw scene into shadowmap (divided into 1/4s (i.e. up to 4 shadowmaps)
         ;; shadow map atlas size (1024.*1024.)
-        ;;(printf "a:%f b:%f\n" (% (i32tod i) 2.0) (/ (i32tod i) 2.0))
-        (glViewport (* (% i 2) 1024) (* (ftoi32 (/ (i32tof i) 2.0)) 1024) 1024 1024)
+        (glViewport (* (% i 4) 1024) (* (ftoi32 (/ (i32tof i) 4.0)) 1024) 1024 1024)
         (glEnable GL_CULL_FACE) ;; face culling ON for shadowmapping
+        (glCullFace GL_FRONT)
         (fill_identity_matrix model_matrix)
         (translate_matrix model_matrix -3.0 -2.9 -1.0)
         (scale_matrix model_matrix 1.5 1.5 1.5)
-        (glCullFace GL_FRONT)
         (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)
         (assimp_draw_model model3 simpleshader model_matrix light_view_matrix projection_matrix lights _light_view_matrix)
         (fill_identity_matrix model_matrix)
-        (glCullFace GL_FRONT)      
         (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)
         (assimp_draw_model model2 simpleshader model_matrix light_view_matrix projection_matrix lights _light_view_matrix)
-        (glCullFace GL_BACK)      
         (assimp_draw_model model1 simpleshader model_matrix light_view_matrix projection_matrix
                             lights _light_view_matrix))
       
@@ -286,21 +259,17 @@
 ;; standard impromptu callback
 (define opengl-loop
   (lambda (time dur model1 model2 model3 degree)
-    ;; (if (> (now) time)
-    ;;     (println 'falling 'behind: (- (now) time)))
     (let ((v (now)))
       (gl_render model1 model2 model3 degree)
-      ;;(println 'T1: (- (now) v))            
       (gl:swap-buffers glctx)
-      ;;(println 'T2: (- (now) v)))
       )
     (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur model1 model2 model3 (+ degree .5))))
 
 (gl_print_error)
 
-(define peppino (assimp_load_asset path "peppino.blend"))
-(define scene (assimp_load_asset path "scene.blend"))
-(define dome (assimp_load_asset path "dome_cut.blend"))
+(define peppino (assimp_load_model path "peppino.blend"))
+(define scene (assimp_load_model path "scene.blend"))
+(define dome (assimp_load_model path "dome_cut.blend" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
 (gl_print_error)
 
