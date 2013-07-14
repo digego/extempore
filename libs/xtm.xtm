@@ -7,7 +7,8 @@
 (define *compile-xtm-stdlib* #f)
 
 (if *compile-xtm-stdlib*
-    (begin (sys:load "libs/core/math.xtm")
+    (begin (gl:make-ctx ":0.0" #f 0.0 0.0 200 100)
+           (sys:load "libs/core/math.xtm")
            (sys:load "libs/external/opengl.xtm")
            (sys:load "libs/external/shaders.xtm")
            (sys:load "libs/external/assimp.xtm")
@@ -411,6 +412,55 @@
 
 (define xtmlib_shaders_loaded #t)
 
+(bind-alias XTMRENDERCB [void,i64,i32,float*,float*,float*,i8*]*)
+
+(bind-type xtm_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
+(bind-type xtm_node <i8*,float*,xtm_node*,i32,xtm_node*,i32,xtm_mesh*>)
+(bind-type xtm_camera <float*,float*,float*>)
+(bind-type xtm_lights <float*,float*,float*,float*,float*,float*,float*,float*,float*,i32>)
+
+(bind-val xtm_render_s1 i32 0)
+(bind-val xtm_render_s2 i32 0)
+(bind-val xtm_render_x i32 0)
+(bind-val xtm_render_y i32 0)
+(bind-val xtm_render_w i32 1024)
+(bind-val xtm_render_h i32 768)
+(bind-val xtm_render_angle float 35.0)
+(bind-val xtm_render_near float 0.1)
+(bind-val xtm_render_far float 100.0)
+
+(bind-lib-func stdlib xtm_build_mesh_vbo [E_vbo*,float*,i32]*)
+(bind-lib-func stdlib xtm_make_node_a [xtm_node*,i8*,float*,i32,float,float,float]*)
+
+(bind-lib-func stdlib xtm_get_camera [xtm_camera*]*)
+(bind-lib-func stdlib xtm_camera_pos [void,float,float,float]*)
+(bind-lib-func stdlib xtm_camera_tgt [void,float,float,float]*)
+(bind-lib-func stdlib xtm_camera_up [void,float,float,float]*)
+(bind-lib-func stdlib xtm_camera_view [void,float*]*)
+(bind-lib-func stdlib xtm_update_camera [void,i32]*)
+
+(bind-lib-func stdlib xtm_get_lights [xtm_lights*]*)
+(bind-lib-func stdlib xtm_light_pos [void,i32,float,float,float]*)
+(bind-lib-func stdlib xtm_light_tgt [void,i32,float,float,float]*)
+(bind-lib-func stdlib xtm_light_up [void,i32,float,float,float]*)
+(bind-lib-func stdlib xtm_light_ambient [void,i32,float,float,float,float]*)
+(bind-lib-func stdlib xtm_light_diffuse [void,i32,float,float,float,float]*)
+(bind-lib-func stdlib xtm_light_specular [void,i32,float,float,float,float]*)
+(bind-lib-func stdlib xtm_light_power [void,i32,float]*)
+(bind-lib-func stdlib xtm_light_angle [void,i32,float]*)
+(bind-lib-func stdlib xtm_light_view [void,i32,float*]*)
+(bind-lib-func stdlib xtm_update_lights [void,i32]*)
+(bind-lib-func stdlib xtm_update_matrices [void,i32,float*,float*,float*]*)
+(bind-lib-func stdlib xtm_draw_mesh [void,xtm_mesh*,i32]*)
+(bind-lib-func stdlib xtm_draw_node [void,xtm_node*,i32,float*,float*,float*]*)
+(bind-lib-func stdlib xtm_draw_model [void,xtm_node*,i32,float*,float*,float*]*)
+
+(bind-lib-func stdlib xtm_render_setup_a [void,i32,i32,i8*,i8*,i8*,i8*]*)
+(bind-lib-func stdlib xtm_render_setup_b [void,i32,i32,float,float,i8*,i8*,i8*,i8*]*)
+(bind-lib-func stdlib xtm_render_setup_c [void,i32,i32,i32,i32,float,float,float,i8*,i8*,i8*,i8*]*)
+
+(bind-lib-func stdlib xtm_render [i64,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,i8*]*)
+
 (bind-lib-func stdlib gl_draw_shader_quad [void,double,double,double,double,double,double,double]*)
 (bind-lib-func stdlib shader_set_grid_offsets [void,float*,float,float,float]*)
 (bind-lib-func stdlib shader_setup_convolution_filter [void,float*,i32,float]*)
@@ -421,6 +471,31 @@
 (bind-lib-func stdlib shader_update_matrices_lv [void,i32,float*,float*,float*,float*]*)
 (bind-lib-func stdlib shader_update_matrices_lvs [void,i32,float*,float*,float*,i32,float*]*);
 (bind-lib-func stdlib shader_update_material [void,i32,float*,float*,float*,float]*)
+
+(bind-poly xtm_make_node xtm_make_node_a)
+
+(bind-poly xtm_render_setup xtm_render_setup_a)
+(bind-poly xtm_render_setup xtm_render_setup_b)
+(bind-poly xtm_render_setup xtm_render_setup_c)
+
+(define xtm_render_setup
+  (lambda (w h . args)
+    (if (null? args)
+        (xtm_render_setup_a w h
+                            simple-vert-xtm simple-frag
+                            xtmvert-xtm xtmfrag)
+        (cond ((= (length args) 2)
+               (xtm_render_setup_b w h (car args) (cadr args)
+                                   simple-vert-xtm simple-frag
+                                   xtmvert-xtm xtmfrag))
+              ((= (length args) 5)
+               (xtm_render_setup_c w h (car args) (cadr args)
+                                   (caddr args) (cadddr args)
+                                   (car (cddddr args))
+                                   simple-vert-xtm simple-frag
+                                   xtmvert-xtm xtmfrag))
+              (else (println 'Wrong 'number 'or 'args 'for 'xtm_render_setup))))))
+
 
 
 ;; load up glsl code
@@ -1206,126 +1281,6 @@ void main()
 }
 ")
 
-
-(define xtmfrag
-  "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
-
-uniform vec4 LightAmbient[10];
-uniform vec4 LightDiffuse[10];
-uniform vec4 LightSpecular[10];
-uniform float ConstantAttenuation[10];
-uniform float LinearAttenuation[10];
-uniform float QuadraticAttenuation[10];
-uniform float SpotAngle[10];
-uniform vec4 SpotDir[10];
-uniform float SpotExponent[10];
-
-uniform float numlights;
-
-uniform vec4 CameraDir;
-uniform float MaterialShininess;
-uniform vec4 MaterialAmbient;
-uniform vec4 MaterialDiffuse;
-uniform vec4 MaterialSpecular;
-
-uniform mat4 ModelMatrix;
-uniform mat4 ViewMatrix;
-uniform mat4 ProjectionMatrix;
-uniform mat4 NormalMatrix;
-uniform mat4 ModelViewMatrix;
-uniform mat4 ModelViewProjectionMatrix;
-
-uniform sampler2D shadowMap;
-uniform sampler2D tex1;
-uniform float IsTextured;
-
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
-
-void main()
-{
-  vec4 outcolor = vec4(0.0);
-  float j = 0.5;  
-  for(int i=0; j<numlights; i++, j+=1.0) 
-  {
-    vec4 ambient,diffuse,specular;
-    vec3 HV;
-    float pf; // powerfactor
-    float nDotHV, nDotLL;
-    float attenuation, spotDot, spotAttenuation;
-    vec4 TexColor; // texture color
-  
-    vec3 NN = normalize(N); // surface normal
-    vec3 LL = normalize(L[i]); // light vector
-    vec3 EE = normalize(E); // eye vector
-    vec3 VV = normalize(V); // vertex 3d
-
-    attenuation = 1.0 / (ConstantAttenuation[i] + (LinearAttenuation[i] * D[i]) + (QuadraticAttenuation[i] * D[i] * D[i]));
-
-    spotDot = dot(-LL, normalize(SpotDir[i].xyz));
-
-    if(spotDot < SpotAngle[i])
-      spotAttenuation = 0.0;
-    else
-      spotAttenuation = pow(spotDot, SpotExponent[i]);  
-
-    attenuation *= spotAttenuation;
-
-    HV = normalize(LL+EE); // half vector
-    nDotLL = max(0.0, dot(NN,LL));
-    nDotHV = max(0.0, dot(NN,HV));
-
-    if(nDotLL==0.0)
-      pf = 0.0;
-    else
-      pf = pow(nDotHV, MaterialShininess);
-
-    ambient = LightAmbient[i] * MaterialAmbient * attenuation;
-    diffuse = LightDiffuse[i] * MaterialDiffuse * nDotLL * attenuation;
-    specular = LightSpecular[i] * MaterialSpecular * pf * attenuation;
-
-    //calc shadows
-    float shadowValue = 0.0;
-    vec4 lightVertexPosition2 = lightVertexPosition[i];
-    lightVertexPosition2 /= lightVertexPosition2.w;
-
-    //float bias = 0.005;
-
-    float aa = mod((j-0.5),2.0);
-    float bb = floor((j-0.5)/2.0);
-    vec2 offset = vec2(0.5*aa,0.5*bb);
-
-    //vec2 offset = vec2(1920.0*mod(j,1.0),1200.0*((i<2)?0:1));
-
-    // softer shadowing by adding dither
-    for(float x=-0.0004; x<=0.0004; x+=0.0002) {
-      for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.5)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
-          shadowValue+=1.0;
-      }
-    }
-    shadowValue/=16.0;
-    //shadowValue=1.0;
-
-    if(IsTextured>0.5) {
-      vec4 texcolor = LightDiffuse[i] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
-      outcolor += vec4((texcolor.xyz*shadowValue),1.0);
-    } else {
-      outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
-    }
-  }
-  //gl_FragColor = vec4(outcolor.xyz,1.0);
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
-}
-")
-
-
-
 (define xtmfrag
   "
 //#version 120
@@ -1412,14 +1367,14 @@ void main()
     vec4 lightVertexPosition2 = lightVertexPosition[i];
     lightVertexPosition2 /= lightVertexPosition2.w;
 
-    float aa = mod((j-0.5),2.0);
-    float bb = floor((j-0.5)/2.0);
-    vec2 offset = vec2(0.5*aa,0.5*bb);
+    float aa = mod((j-0.5),4.0);
+    float bb = floor((j-0.5)/4.0);
+    vec2 offset = vec2(0.25*aa,0.25*bb);
 
     // softer shadowing by adding dither
     for(float x=-0.0004; x<=0.0004; x+=0.0002) {
       for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.5)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
           shadowValue+=1.0;
       }
     }
@@ -1432,7 +1387,17 @@ void main()
       outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
     }
   }
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+  float nl = numlights;
+  if(numlights<0.5) {
+    nl = 1.0;
+    float dotE = max(0.0, dot(NN,EE));
+    if(IsTextured>0.5) {
+      outcolor.xyz = texture2D(tex1,UVWCoord.xy).xyz*dotE;
+    }else{
+      outcolor.xyz = MaterialDiffuse.xyz*dotE;
+    }
+  }
+  gl_FragColor = vec4(outcolor.xyz/nl,1.0);
 }
 ")
 
@@ -1455,8 +1420,87 @@ void main()
         (null? libassimp))
     (sys:load-escape "Error loading assimp library"))
 
-
 (define xtmlib_assimp_loaded #t)
+
+(bind-val aiProcess_CalcTangentSpace i32 1)
+(bind-val aiProcess_JoinIdenticalVertices i32 2)
+(bind-val aiProcess_MakeLeftHanded i32 4)
+(bind-val aiProcess_Triangulate i32 8)
+(bind-val aiProcess_RemoveComponent i32 16)
+(bind-val aiProcess_GenNormals i32 32)
+(bind-val aiProcess_GenSmoothNormals i32 64)
+(bind-val aiProcess_SplitLargeMeshes i32 128)
+(bind-val aiProcess_PreTransformVertices i32 256)
+(bind-val aiProcess_LimitBoneWeights i32 512)
+(bind-val aiProcess_ValidateDataStructure i32 1024)
+(bind-val aiProcess_ImproveCacheLocality i32 2048)
+(bind-val aiProcess_RemoveRedundantMaterials i32 4096)
+(bind-val aiProcess_FixInfacingNormals i32 8192)
+(bind-val aiProcess_SortByPType i32 32768)
+(bind-val aiProcess_FindDegenerates i32 65536)
+(bind-val aiProcess_FindInvalidData i32 131072)
+(bind-val aiProcess_GenUVCoords i32 262144)
+(bind-val aiProcess_TransformUVCoords i32 524288)
+(bind-val aiProcess_FindInstances i32 1048576)
+(bind-val aiProcess_OptimizeMeshes i32 2097152)
+(bind-val aiProcess_OptimizeGraph i32 4194304)
+(bind-val aiProcess_FlipUVs i32 8388608)
+(bind-val aiProcess_FlipWindingOrder i32 16777216)
+(bind-val aiProcess_SplitByBoneCount i32 33554432)
+(bind-val aiProcess_Debone i32 67108864)
+
+(define  aiProcess_CalcTangentSpace  1)
+(define  aiProcess_JoinIdenticalVertices  2)
+(define  aiProcess_MakeLeftHanded  4)
+(define  aiProcess_Triangulate  8)
+(define  aiProcess_RemoveComponent  16)
+(define  aiProcess_GenNormals  32)
+(define  aiProcess_GenSmoothNormals  64)
+(define  aiProcess_SplitLargeMeshes  128)
+(define  aiProcess_PreTransformVertices  256)
+(define  aiProcess_LimitBoneWeights  512)
+(define  aiProcess_ValidateDataStructure  1024)
+(define  aiProcess_ImproveCacheLocality  2048)
+(define  aiProcess_RemoveRedundantMaterials  4096)
+(define  aiProcess_FixInfacingNormals  8192)
+(define  aiProcess_SortByPType  32768)
+(define  aiProcess_FindDegenerates  65536)
+(define  aiProcess_FindInvalidData  131072)
+(define  aiProcess_GenUVCoords  262144)
+(define  aiProcess_TransformUVCoords  524288)
+(define  aiProcess_FindInstances  1048576)
+(define  aiProcess_OptimizeMeshes  2097152)
+(define  aiProcess_OptimizeGraph  4194304)
+(define  aiProcess_FlipUVs  8388608)
+(define  aiProcess_FlipWindingOrder  16777216)
+(define  aiProcess_SplitByBoneCount  33554432)
+(define  aiProcess_Debone 67108864)
+(ipc:define "utility"  'aiProcess_CalcTangentSpace  1)
+(ipc:define "utility"  'aiProcess_JoinIdenticalVertices  2)
+(ipc:define "utility"  'aiProcess_MakeLeftHanded  4)
+(ipc:define "utility"  'aiProcess_Triangulate  8)
+(ipc:define "utility"  'aiProcess_RemoveComponent  16)
+(ipc:define "utility"  'aiProcess_GenNormals  32)
+(ipc:define "utility"  'aiProcess_GenSmoothNormals  64)
+(ipc:define "utility"  'aiProcess_SplitLargeMeshes  128)
+(ipc:define "utility"  'aiProcess_PreTransformVertices  256)
+(ipc:define "utility"  'aiProcess_LimitBoneWeights  512)
+(ipc:define "utility"  'aiProcess_ValidateDataStructure  1024)
+(ipc:define "utility"  'aiProcess_ImproveCacheLocality  2048)
+(ipc:define "utility"  'aiProcess_RemoveRedundantMaterials  4096)
+(ipc:define "utility"  'aiProcess_FixInfacingNormals  8192)
+(ipc:define "utility"  'aiProcess_SortByPType  32768)
+(ipc:define "utility"  'aiProcess_FindDegenerates  65536)
+(ipc:define "utility"  'aiProcess_FindInvalidData  131072)
+(ipc:define "utility"  'aiProcess_GenUVCoords  262144)
+(ipc:define "utility"  'aiProcess_TransformUVCoords  524288)
+(ipc:define "utility"  'aiProcess_FindInstances  1048576)
+(ipc:define "utility"  'aiProcess_OptimizeMeshes  2097152)
+(ipc:define "utility"  'aiProcess_OptimizeGraph  4194304)
+(ipc:define "utility"  'aiProcess_FlipUVs  8388608)
+(ipc:define "utility"  'aiProcess_FlipWindingOrder  16777216)
+(ipc:define "utility"  'aiProcess_SplitByBoneCount  33554432)
+(ipc:define "utility"  'aiProcess_Debone 67108864)
 
 (bind-type aiString <size_t,|1024,i8|>)
 (bind-type aiMatrix4x4 <float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float>)
@@ -1488,9 +1532,6 @@ void main()
 (bind-type aiCamera <aiString,aiVector3D,aiVector3D,aiVector3D,float,float,float,float>) ;; good
 (bind-type aiScene <i32,aiNode*,i32,aiMesh**,i32,aiMaterial**,i32,aiAnimation**,i32,aiTexture**,i32,aiLight**,i32,aiCamera**,i8*>) ;; good
 
-(bind-type ai_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
-(bind-type ai_node <i8*,float*,ai_node*,i32,ai_node*,i32,ai_mesh*>)
-
 (bind-lib libassimp aiImportFile [aiScene*,i8*,i32]*)
 (bind-lib libassimp aiReleaseImport [void,aiScene*]*)
 (bind-lib libassimp aiIdentityMatrix4 [void,aiMatrix4x4*]*)
@@ -1517,14 +1558,25 @@ void main()
 (bind-lib-func stdlib ai_color4_to_float4 [i64,aiColor4D*,float*]*)
 (bind-lib-func stdlib ai_apply_material [void,aiMaterial*,i32]*)
 (bind-lib-func stdlib ai_build_mesh_vbo [E_vbo*,aiMesh*,i32*]*)
-(bind-lib-func stdlib ai_build_mesh [void,aiScene*,aiMesh*,ai_mesh*,i8*]*)
-(bind-lib-func stdlib ai_build_node [void,aiScene*,aiNode*,ai_node*,ai_node*,i8*]*)
-(bind-lib-func stdlib ai_build_scene [ai_node*,aiScene*,i8*]*)
-(bind-lib-func stdlib assimp_load_asset [ai_node*,i8*,i8*]*)
-(bind-lib-func stdlib assimp_draw_mesh [void,ai_mesh*,i32]*)
-(bind-lib-func stdlib assimp_draw_node [void,ai_node*,i32,float*,float*,float*,i32,float*]*)
-(bind-lib-func stdlib assimp_draw_model [void,ai_node*,i32,float*,float*,float*,i32,float*]*)
+(bind-lib-func stdlib ai_build_mesh [void,aiScene*,aiMesh*,xtm_mesh*,i8*]*)
+(bind-lib-func stdlib ai_build_node [void,aiScene*,aiNode*,xtm_node*,xtm_node*,i8*]*)
+(bind-lib-func stdlib ai_build_scene [xtm_node*,aiScene*,i8*]*)
+(bind-lib-func stdlib assimp_load_model_a [xtm_node*,i8*,i8*,i32]*)
+(bind-lib-func stdlib assimp_load_model_b [xtm_node*,i8*,i8*]*)
+;; (bind-lib-func stdlib assimp_draw_mesh [void,xtm_mesh*,i32]*)
+(bind-lib-func stdlib assimp_draw_node [void,xtm_node*,i32,float*,float*,float*,i32,float*]*)
+(bind-lib-func stdlib assimp_draw_model [void,xtm_node*,i32,float*,float*,float*,i32,float*]*)
 (bind-lib-func stdlib ai_load_textures [void,aiScene*]*)
+
+(bind-poly assimp_load_model assimp_load_model_a)
+(bind-poly assimp_load_model assimp_load_model_b)
+
+;; poly has no binding for scheme
+(define assimp_load_model
+  (lambda (dir file . args)
+    (if (null? args)
+        (assimp_load_model_b dir file)
+        (assimp_load_model_a dir file (car args)))))
 
 (println 'ASSIMP 'LOADED)
 

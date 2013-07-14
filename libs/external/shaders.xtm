@@ -25,7 +25,7 @@
 ;; GLOBAL to let other libraries know that
 ;; math.xtm has already been loaded
 ;; 
-(define xtmlibs_shaders_loaded #t)
+(define xtmlib_shaders_loaded #t)
 
 ;; draw a quad
 ;; tw and th are framebuffer width and height
@@ -144,6 +144,7 @@
       (glUniform4fv (glGetUniformLocation shader "SpotDir") numlights dir)
       void)))
 
+
 ;; when working with OpenGL
 ;; extempore's mmul is pre mutipled (not post as in GLSL)
 ;; so the same matrix mul is post in GLSL and pre in XTM (i.e. here!)
@@ -251,7 +252,6 @@
         void))))
 
 
-
 (bind-func shader_update_material
   (lambda (id:i32 ambient:float* diffuse:float* specular:float* shininess:float)
     (glUniform4fv (glGetUniformLocation id "MaterialAmbient") 1 ambient)
@@ -259,6 +259,525 @@
     (glUniform4fv (glGetUniformLocation id "MaterialSpecular") 1 specular)
     (glUniform1f (glGetUniformLocation id "MaterialShininess") shininess)
     void))
+
+
+;; vbo(0),texid(1),diffuse(2),ambient(3),specular(4),emissive(5),shininess(6),opacity(7),facemode(8) (GL_TRIANGLE,GL_QUAD etc..)
+(bind-type xtm_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
+;; name(0),transmat(1),parent(2),num_children(3),chidren(4),num_of_meshes(5),meshes(6)
+(bind-type xtm_node <i8*,float*,xtm_node*,i32,xtm_node*,i32,xtm_mesh*>)
+
+(bind-func xtm_build_mesh_vbo
+  (lambda (verts:float* num_verts:i32)
+    (let ((i:i32 0)
+          (vert:float* null)
+          (n1:float* (salloc 3))          
+          (norm:float* (salloc 3))
+          (vbostride:i32 14) ;; 4d+3d+3d+4d
+          (vbodata:float* (halloc (* num_verts vbostride))))
+      (dotimes (i num_verts)
+        (set! vert (pref-ptr verts (* i 3)))
+        (if (= (% i 3) 0)
+            (if (> i (- num_verts 2))
+                (begin (pfill! norm 0.0 1.0 0.0) 1)
+                (begin
+                  (vcrossf vert (pref-ptr vert 3) n1)
+                  (vsmul -1.0 n1 3 norm)
+                  1))
+            1)
+        (pfill! (pref-ptr vbodata (* i vbostride))
+                (pref vert 0) ;; x 
+                (pref vert 1) ;; y
+                (pref vert 2) ;; z
+                1.0) ;; position data needs w==1
+        ;; auto gen normal
+        (pfill! (pref-ptr vbodata (+ 4 (* i vbostride)))
+                (pref norm 0)
+                (pref norm 1)
+                (pref norm 2))
+        ;; auto gen texcoords
+        (if (= (% i 3) 0)
+            (pfill! (pref-ptr vbodata (+ 7 (* i vbostride))) 0.0 0.0 0.0)
+            (if (= (% i 3) 1)
+                (pfill! (pref-ptr vbodata (+ 7 (* i vbostride))) 0.5 1.0 0.0)
+                (pfill! (pref-ptr vbodata (+ 7 (* i vbostride))) 1.0 0.0 0.0))
+            0.0)
+        ;; color is green
+        (pfill! (pref-ptr vbodata (+ 10 (* i vbostride))) 0.2 1.0 0.2 1.0))
+      (let ((vbo (create_vbo (* num_verts vbostride 4) (cast vbodata i8*) GL_STATIC_DRAW)))
+        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))        
+        (glBufferData GL_ARRAY_BUFFER (tref vbo 1) (tref vbo 2) GL_STATIC_DRAW)
+        (glBindBuffer GL_ARRAY_BUFFER 0)
+        vbo))))
+
+;;(bind-type xtm_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
+
+(bind-func xtm_make_node_a
+  (lambda (name:i8* verts:float* num_verts:i32 r g b)
+    (let ((mesh:xtm_mesh* (halloc))
+          (node:xtm_node* (halloc))
+          (transmat:float* (halloc 16))
+          (vbostride:i32 14) ;; 4d+3d+3d+4d
+          (vbodata:float* null)
+          (shininess:float 1.0)
+          (opacity:float 1.0)
+          (diffuse:float* (halloc 4))
+          (ambient:float* (halloc 4))
+          (specular:float* (halloc 4))
+          (emissive:float* (halloc 4))
+          (vbo:E_vbo* (xtm_build_mesh_vbo verts num_verts)))
+      (pfill! ambient 0.0 0.0 0.0 1.0)
+      (pfill! diffuse r   g   b   1.0)
+      (pfill! specular 1.0 1.0 1.0 1.0)
+      (pfill! emissive 0.0 0.0 0.0 1.0)
+      (tfill! mesh vbo 0 diffuse ambient specular emissive shininess opacity GL_TRIANGLES)
+      (fill_identity_matrix transmat)
+      (tfill! node name transmat null 0 null 1 mesh)
+      node)))
+
+(bind-poly xtm_make_node xtm_make_node_a)
+
+(bind-type xtm_camera <float*,float*,float*>)
+
+(bind-func xtm_get_camera
+  (let ((camera:xtm_camera* (zalloc))
+        (p:float* (zalloc 4))
+        (t:float* (zalloc 4))
+        (u:float* (zalloc 4)))
+    (pfill! p 0.0 5.0 10.0)
+    (pfill! t 0.0 2.0 0.0)
+    (pfill! u 0.0 1.0 0.0)
+    (tfill! camera p t u)
+    (lambda ()
+      camera)))
+      
+(bind-func xtm_camera_pos
+  (lambda (x y z)
+   (pfill! (tref (xtm_get_camera) 0) x y z 1.0)
+   void))
+
+(bind-func xtm_camera_tgt
+  (lambda (x y z)
+    (pfill! (tref (xtm_get_camera) 1) x y z 1.0)
+    void))
+
+(bind-func xtm_camera_up
+  (lambda (x y z)
+    (pfill! (tref (xtm_get_camera) 2) x y z 0.0)
+    void))
+
+(bind-func xtm_camera_view
+  (let ((camera:xtm_camera* null))
+    (lambda (view:float*)
+      (set! camera (xtm_get_camera))
+      (fill_view_matrix view (tref camera 0) (tref camera 1) (tref camera 2))
+      void)))
+
+(bind-func xtm_update_camera
+  (lambda (shader)
+    (shader_update_camera shader (tref (xtm_get_camera) 0) (tref (xtm_get_camera) 1))
+    void))
+
+
+;; position(0) target(1) up(2) ambient(3) diffuse(4) specular(5) power(6) angle(7) matrices(8) numlights(9)
+;; (bind-type xtm_light <|40,float|,|40,float|,|40,float|,|40,float|,|40,float|,|40,float|,|10,float|,|10,float|>)
+;; (bind-type xtm_lights <|40,float|,|40,float|,|40,float|,|40,float|,|40,float|,|40,float|,|10,float|,|10,float|>)
+(bind-type xtm_lights <float*,float*,float*,float*,float*,float*,float*,float*,float*,i32>)
+
+(bind-func xtm_get_lights
+  (let ((i 0)
+        (lights:xtm_lights* (zalloc))
+        (p:float* (zalloc (* 10 4)))
+        (t:float* (zalloc (* 10 4)))
+        (u:float* (zalloc (* 10 4)))
+        (a:float* (zalloc (* 10 4)))
+        (d:float* (zalloc (* 10 4)))
+        (s:float* (zalloc (* 10 4)))
+        (pow:float* (zalloc 10))
+        (ang:float* (zalloc 10))
+        (matrices:float* (zalloc (* 10 16))))
+    (dotimes (i 10)
+      (pfill! (pref-ptr d (* i 4)) 1.0 0.8 0.5 1.0)
+      (pfill! (pref-ptr s (* i 4)) 1.0 1.0 1.0 1.0)
+      (pfill! (pref-ptr a (* i 4)) 1.0 0.8 0.5 1.0)
+      (pfill! (pref-ptr p (* i 4)) 1.0 10.0 10.0 1.0)
+      (pfill! (pref-ptr t (* i 4)) 0.0 0.0 0.0 1.0) ;;looking at origin
+      (pfill! (pref-ptr u (* i 4)) 0.0 1.0 0.0 0.0)
+      (pfill! (pref-ptr ang i) 60.0)
+      (pfill! (pref-ptr pow i) 30.0)
+      (fill_view_matrix (pref-ptr matrices (* i 16))
+                        (pref-ptr p (* i 4)) ;; position
+                        (pref-ptr t (* i 4)) ;; target
+                        (pref-ptr u (* i 4)))) ;; up
+    (tfill! lights p t u a d s pow ang matrices 0)
+    (lambda ()
+      lights)))
+
+(bind-func xtm_light_pos
+  (let ((lights:xtm_lights* null))
+    (lambda (light:i32 x y z)
+      (set! lights (xtm_get_lights))
+      (if (> light (tref lights 9)) (tset! lights 9 light))
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)
+          (let ((a:float* (pref-ptr (tref lights 0) (* light 4))))
+            (pfill! a x y z 1.0)
+            void)))))
+
+(bind-func xtm_light_tgt
+  (let ((lights:xtm_lights* null))  
+    (lambda (light:i32 x y z)
+      (set! lights (xtm_get_lights))
+      (if (> light (tref lights 9)) (tset! lights 9 light))          
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)        
+          (let ((a:float* (pref-ptr (tref lights 1) (* light 4))))
+            (pfill! a x y z 1.0)
+            void)))))
+
+(bind-func xtm_light_up
+  (let ((lights:xtm_lights* null))    
+    (lambda (light:i32 x y z)
+      (set! lights (xtm_get_lights))      
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)                
+          (let ((a:float* (pref-ptr (tref lights 2) (* light 4))))
+            (pfill! a x y z 0.0)
+            void)))))
+
+(bind-func xtm_light_ambient
+  (let ((lights:xtm_lights* null))        
+    (lambda (light:i32 r g b a)
+      (set! lights (xtm_get_lights))      
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)                
+          (let ((arr:float* (pref-ptr (tref lights 3) (* light 4))))
+            (pfill! arr r g b a)
+            void)))))
+
+(bind-func xtm_light_diffuse
+  (let ((lights:xtm_lights* null))        
+    (lambda (light:i32 r g b a)
+      (set! lights (xtm_get_lights))      
+      (if (> light (tref lights 9)) (tset! lights 9 light))          
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)                
+          (let ((arr:float* (pref-ptr (tref lights 4) (* light 4))))
+            (pfill! arr r g b a)
+            void)))))
+
+(bind-func xtm_light_specular
+  (let ((lights:xtm_lights* null))    
+    (lambda (light:i32 r g b a)
+      (set! lights (xtm_get_lights))      
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)                
+          (let ((arr:float* (pref-ptr (tref lights 5) (* light 4))))
+            (pfill! arr r g b a)
+            void)))))
+
+(bind-func xtm_light_power
+  (let ((lights:xtm_lights* null))        
+    (lambda (light:i32 power)
+      (set! lights (xtm_get_lights))      
+      (if (> light (tref lights 9)) (tset! lights 9 light))
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)                
+          (begin (pset! (tref lights 6) light power) void)))))
+
+(bind-func xtm_light_angle
+  (let ((lights:xtm_lights* null))        
+    (lambda (light:i32 angle)
+      (set! lights (xtm_get_lights))      
+      (if (> light (tref lights 9)) (tset! lights 9 light))
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)        
+          (begin (pset! (tref lights 7) light angle) void)))))
+
+(bind-func xtm_light_view
+  (let ((lights:xtm_lights* null))
+    (lambda (light:i32 view:float*)
+      (set! lights (xtm_get_lights))
+      (set! light (- light 1))
+      (if (or (< light 0) (> light 9))
+          (begin (printf "No such light!\n") void)            
+          (begin (fill_view_matrix (pref-ptr (tref lights 8) (* light 16))
+                                   (pref-ptr (tref lights 0) (* light 4)) ;; position
+                                   (pref-ptr (tref lights 1) (* light 4)) ;; target
+                                   (pref-ptr (tref lights 2) (* light 4))) ;; up
+                 (if (not (null? view))
+                     (mcopy (pref-ptr (tref lights 8) (* light 16)) 4 4 view))
+                 void)))))
+
+(bind-func xtm_update_lights
+  (lambda (shader:i32)
+    (let ((lights (xtm_get_lights)))
+      (shader_update_lights shader (tref lights 9)
+                            (tref lights 0) (tref lights 1)
+                            (tref lights 7) (tref lights 6)
+                            (tref lights 3) (tref lights 4)
+                            (tref lights 5)))))
+
+(bind-func xtm_update_matrices
+  (lambda (shader:i32 model:float* view:float* projection:float*)
+    (let ((lights (xtm_get_lights)))
+      (shader_update_matrices_lvs shader model view projection (tref lights 9) (tref lights 8)))))
+
+
+
+(bind-func xtm_draw_mesh
+  (let ((vert:i32 0)
+        (first -1)
+        (norm:i32 1)
+        (uvw:i32 2)
+        (color:i32 3))
+    (lambda (mesh:xtm_mesh* shader:i32)
+      ;; (printf "draw mesh\n")
+      (let ((vbo (tref mesh 0))
+            (texid (tref mesh 1))
+            (diffuse (tref mesh 2))
+            (ambient (tref mesh 3))
+            (specular (tref mesh 4))
+            (shininess (tref mesh 6))
+            (facemode (tref mesh 8)))
+        (set! shininess (dtof 100.0))
+        (if (not (null? ambient))
+            (glUniform4fv (glGetUniformLocation shader "MaterialAmbient") 1 ambient))
+        (if (not (null? diffuse))
+            (glUniform4fv (glGetUniformLocation shader "MaterialDiffuse") 1 diffuse))
+        (if (not (null? specular))
+            (glUniform4fv (glGetUniformLocation shader "MaterialSpecular") 1 specular))
+        (glUniform1f (glGetUniformLocation shader "MaterialShininess") shininess)
+        ;; (printf "texid %d\n" texid)
+        ;; texture stuff
+        (if (> texid 0)
+            (begin
+              (glActiveTexture GL_TEXTURE2)
+              
+              (glBindTexture GL_TEXTURE_2D texid)
+              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+              (glUniform1f (glGetUniformLocation shader "IsTextured") 1.0)
+              (glUniform1i (glGetUniformLocation shader "tex1") 2))
+            (begin
+              (glUniform1f (glGetUniformLocation shader "IsTextured") 0.0)))
+        ;; vbo stuff
+        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))        
+        (glEnableVertexAttribArray vert) ;; 56
+        (glVertexAttribPointer vert 4 GL_FLOAT GL_FALSE 56 null)
+        (glEnableVertexAttribArray norm) 
+        (glVertexAttribPointer norm 3 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 16))
+        (glEnableVertexAttribArray uvw) 
+        (glVertexAttribPointer uvw 3 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 28))
+        (glEnableVertexAttribArray color) 
+        (glVertexAttribPointer color 4 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 40))
+        (glDrawArrays facemode 0 (/ (tref vbo 1) 56))
+        (glDisableVertexAttribArray vert)
+        (glDisableVertexAttribArray norm)
+        (glDisableVertexAttribArray uvw)
+        (glDisableVertexAttribArray color)
+        (glBindBuffer GL_ARRAY_BUFFER 0)
+        ;; undo texture stuff
+        (glActiveTexture GL_TEXTURE2)
+        (glBindTexture GL_TEXTURE_2D 0)
+        void))))
+
+
+(bind-func xtm_draw_node
+  (lambda (node:xtm_node* shader:i32 model:float* view:float* projection:float*)
+    (let ((i:i32 0)
+          (lights (xtm_get_lights))
+          (children (tref node 4))
+          (meshes (tref node 6))
+          (transmat:float* (tref node 1))
+          (m2:float* (salloc 16))
+          (m:float* (salloc 16)))
+      ;; (printf "draw node: %s\n" (tref node 0))
+      ;;(mprint transmat 4 4 1)      
+      ;;(mprintf model 4 4 1)
+      (if (null? transmat)
+          (begin (memcpy (cast m i8*) (cast model i8*) (* 4 16)) 1)
+          (begin
+            (mtrans transmat 4 4 m2)
+            (mmul m2 4 4 model 4 4 m)
+            1))
+      (xtm_update_matrices shader m view projection)
+      ;; first draw meshes
+      (dotimes (i (tref node 5))
+        (xtm_draw_mesh (pref-ptr meshes i) shader))
+      ;; then draw other children recursively
+      (dotimes (i (tref node 3))
+        (xtm_draw_node (pref-ptr children i) shader model view projection))
+      void)))
+
+
+(bind-func xtm_draw_model
+  (lambda (scene:xtm_node* shader:i32 model view projection)
+    (xtm_draw_node scene shader model view projection)
+    void))
+
+(bind-val xtm_render_s1 i32 0)
+(bind-val xtm_render_s2 i32 0)
+(bind-val xtm_render_x i32 0)
+(bind-val xtm_render_y i32 0)
+(bind-val xtm_render_w i32 1024)
+(bind-val xtm_render_h i32 768)
+(bind-val xtm_render_angle float 35.0)
+(bind-val xtm_render_near float 0.1)
+(bind-val xtm_render_far float 100.0)
+
+(bind-func xtm_render_setup_a
+  (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8*)
+    (set! xtm_render_w w)
+    (set! xtm_render_h h)
+    (set! xtm_render_s1 (create_shader_xtm s1v s1f))
+    (set! xtm_render_s2 (create_shader_xtm s2v s2f))
+    (printf "XTM Render Setup Complete\n")
+    void))
+
+(bind-func xtm_render_setup_b
+  (lambda (w h n f s1v s1f s2v s2f)
+    (set! xtm_render_near n)
+    (set! xtm_render_far f)
+    (xtm_render_setup_a w h s1v s1f s2v s2f)
+    void))
+
+(bind-func xtm_render_setup_c
+  (lambda (x y w h n f a s1v s1f s2v s2f)
+    (set! xtm_render_x x)
+    (set! xtm_render_y y)
+    (set! xtm_render_angle a)    
+    (xtm_render_setup_b w h n f s1v s1f s2v s2f)
+    void))
+
+(bind-poly xtm_render_setup xtm_render_setup_a)
+(bind-poly xtm_render_setup xtm_render_setup_b)
+(bind-poly xtm_render_setup xtm_render_setup_c)
+
+(define xtm_render_setup
+  (lambda (w h . args)
+    (if (null? args)
+        (xtm_render_setup_a w h
+                            simple-vert-xtm simple-frag
+                            xtmvert-xtm xtmfrag)
+        (cond ((= (length args) 2)
+               (xtm_render_setup_b w h (car args) (cadr args)
+                                   simple-vert-xtm simple-frag
+                                   xtmvert-xtm xtmfrag))
+              ((= (length args) 5)
+               (xtm_render_setup_c w h (car args) (cadr args)
+                                   (caddr args) (cadddr args)
+                                   (car (cddddr args))
+                                   simple-vert-xtm simple-frag
+                                   xtmvert-xtm xtmfrag))
+              (else (println 'Wrong 'number 'or 'args 'for 'xtm_render_setup))))))
+
+
+(bind-alias XTMRENDERCB [void,i64,i32,float*,float*,float*,i8*]*)
+
+;;
+;; near  = 0.1
+;; far   = 100.0
+;; angle = 35.0
+;;
+(bind-func xtm_render
+  (let ((i:i32 0)
+        (frame:i64 0)
+        (lights:xtm_lights* (xtm_get_lights))
+        (camera:xtm_camera* (xtm_get_camera))
+        (model:float* (alloc 16))
+        (view:float* (alloc 16))
+        (projection:float* (alloc 16))
+        (fbo:E_fbo* (create_fbo (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
+    (lambda (pre:XTMRENDERCB opaque:XTMRENDERCB transparent:XTMRENDERCB post:XTMRENDERCB data:i8*)
+      (glShadeModel GL_SMOOTH)
+      (glEnable GL_DEPTH_TEST)
+      (glEnable GL_TEXTURE_2D)
+      ;; seutp projection matrix            
+      (fill_projection_matrix projection xtm_render_angle
+                              (i32tof (/ xtm_render_w xtm_render_h))
+                              xtm_render_near xtm_render_far)      
+
+      (if (not (null? pre))
+          (begin
+            ;; each cycle set lights back to 0
+            (tset! (xtm_get_lights) 9 0)            
+            (xtm_camera_view view)       ;; set view
+            (fill_identity_matrix model) ;; set model
+            (pre frame 0 model view projection data)))
+
+      (glBindFramebuffer GL_FRAMEBUFFER (tref fbo 0))
+      (glUseProgram xtm_render_s1)
+      ;; clear shadow buffer
+      (glClearColor 0.0 0.0 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      (if (not (null? opaque))
+          (dotimes (i (tref lights 9))
+            ;; 4 x 4 shadow texture texture
+            (glViewport (* (% i 4) 1024) (* (ftoi32 (/ (i32tof i) 4.0)) 1024) 1024 1024)
+            (glEnable GL_CULL_FACE) ;; face culling ON for shadowmapping
+            (glCullFace GL_FRONT)
+            (fill_identity_matrix model)  ;; set model matrix
+            (xtm_light_view (+ i 1) view) ;; set view matrix
+            (xtm_update_matrices xtm_render_s1 model view projection)
+            (opaque frame xtm_render_s1 model view projection data)))
+      ;; turn off shadow FBO
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      (glUseProgram 0)      
+      ;;
+      ;; Finally render the scene to the window
+      ;; using the shadow FBO's depth buffer as a shadow map
+      ;;      
+      ;; make sure we are not writing to a framebuffer!
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      (glUseProgram xtm_render_s2)
+      ;; setup shadowmap texture from FBO
+      (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
+      (glBindTexture GL_TEXTURE_2D (tref fbo 2))      
+      (glUniform1i (glGetUniformLocation xtm_render_s2 "shadowMap") 0)      
+      ;;(shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
+      ;; draw scene
+      (glViewport xtm_render_x xtm_render_y xtm_render_w xtm_render_h)
+      (glDisable GL_CULL_FACE) ;; turn face culling off
+      ;; clear main framebuffer
+      (glClearColor 0.0 0.0 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      (if (not (null? opaque))
+          (begin
+            ;; setup matrices
+            (xtm_camera_view view)       ;; setup view
+            (fill_identity_matrix model) ;; setup model
+            (xtm_update_lights xtm_render_s2) ;; update lights on shader
+            (xtm_update_camera xtm_render_s2) ;; update camera on shader
+            (xtm_update_matrices xtm_render_s2 model view projection) ;; update mats on shader
+            (opaque frame xtm_render_s2 model view projection data)))
+      ;; turn everything off again.
+      (glActiveTexture GL_TEXTURE0)
+      (glBindTexture GL_TEXTURE_2D 0)
+      ;;
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      (glUseProgram 0)
+
+      (if (not (null? post))
+          (begin
+            (xtm_camera_view view)       ;; setup view
+            (fill_identity_matrix model) ;; setup model            
+            (post frame 0 model view projection data)))      
+      ;;
+      (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
+      ;; print errors?
+      (gl_print_error)
+      (set! frame (+ frame 1))
+    )))
 
 
 ;; vert shader
@@ -1086,125 +1605,6 @@ varying vec4 Color;
 void main()
 {
   vec4 outcolor = vec4(0.0);
-  float j = 0.5;  
-  for(int i=0; j<numlights; i++, j+=1.0) 
-  {
-    vec4 ambient,diffuse,specular;
-    vec3 HV;
-    float pf; // powerfactor
-    float nDotHV, nDotLL;
-    float attenuation, spotDot, spotAttenuation;
-    vec4 TexColor; // texture color
-  
-    vec3 NN = normalize(N); // surface normal
-    vec3 LL = normalize(L[i]); // light vector
-    vec3 EE = normalize(E); // eye vector
-    vec3 VV = normalize(V); // vertex 3d
-
-    attenuation = 1.0 / (ConstantAttenuation[i] + (LinearAttenuation[i] * D[i]) + (QuadraticAttenuation[i] * D[i] * D[i]));
-
-    spotDot = dot(-LL, normalize(SpotDir[i].xyz));
-
-    if(spotDot < SpotAngle[i])
-      spotAttenuation = 0.0;
-    else
-      spotAttenuation = pow(spotDot, SpotExponent[i]);  
-
-    attenuation *= spotAttenuation;
-
-    HV = normalize(LL+EE); // half vector
-    nDotLL = max(0.0, dot(NN,LL));
-    nDotHV = max(0.0, dot(NN,HV));
-
-    if(nDotLL==0.0)
-      pf = 0.0;
-    else
-      pf = pow(nDotHV, MaterialShininess);
-
-    ambient = LightAmbient[i] * MaterialAmbient * attenuation;
-    diffuse = LightDiffuse[i] * MaterialDiffuse * nDotLL * attenuation;
-    specular = LightSpecular[i] * MaterialSpecular * pf * attenuation;
-
-    //calc shadows
-    float shadowValue = 0.0;
-    vec4 lightVertexPosition2 = lightVertexPosition[i];
-    lightVertexPosition2 /= lightVertexPosition2.w;
-
-    //float bias = 0.005;
-
-    float aa = mod((j-0.5),2.0);
-    float bb = floor((j-0.5)/2.0);
-    vec2 offset = vec2(0.5*aa,0.5*bb);
-
-    //vec2 offset = vec2(1920.0*mod(j,1.0),1200.0*((i<2)?0:1));
-
-    // softer shadowing by adding dither
-    for(float x=-0.0004; x<=0.0004; x+=0.0002) {
-      for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.5)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
-          shadowValue+=1.0;
-      }
-    }
-    shadowValue/=16.0;
-    //shadowValue=1.0;
-
-    if(IsTextured>0.5) {
-      vec4 texcolor = LightDiffuse[i] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
-      outcolor += vec4((texcolor.xyz*shadowValue),1.0);
-    } else {
-      outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
-    }
-  }
-  //gl_FragColor = vec4(outcolor.xyz,1.0);
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
-}
-")
-
-
-
-(define xtmfrag
-  "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
-
-uniform vec4 LightAmbient[10];
-uniform vec4 LightDiffuse[10];
-uniform vec4 LightSpecular[10];
-uniform float ConstantAttenuation[10];
-uniform float LinearAttenuation[10];
-uniform float QuadraticAttenuation[10];
-uniform float SpotAngle[10];
-uniform vec4 SpotDir[10];
-uniform float SpotExponent[10];
-
-uniform float numlights;
-
-uniform vec4 CameraDir;
-uniform float MaterialShininess;
-uniform vec4 MaterialAmbient;
-uniform vec4 MaterialDiffuse;
-uniform vec4 MaterialSpecular;
-
-uniform mat4 ModelMatrix;
-uniform mat4 ViewMatrix;
-uniform mat4 ProjectionMatrix;
-uniform mat4 NormalMatrix;
-uniform mat4 ModelViewMatrix;
-uniform mat4 ModelViewProjectionMatrix;
-
-uniform sampler2D shadowMap;
-uniform sampler2D tex1;
-uniform float IsTextured;
-
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
-
-void main()
-{
-  vec4 outcolor = vec4(0.0);
   float j = 0.5;
   vec4 ambient,diffuse,specular;
   vec3 HV;
@@ -1248,14 +1648,14 @@ void main()
     vec4 lightVertexPosition2 = lightVertexPosition[i];
     lightVertexPosition2 /= lightVertexPosition2.w;
 
-    float aa = mod((j-0.5),2.0);
-    float bb = floor((j-0.5)/2.0);
-    vec2 offset = vec2(0.5*aa,0.5*bb);
+    float aa = mod((j-0.5),4.0);
+    float bb = floor((j-0.5)/4.0);
+    vec2 offset = vec2(0.25*aa,0.25*bb);
 
     // softer shadowing by adding dither
     for(float x=-0.0004; x<=0.0004; x+=0.0002) {
       for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.5)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
           shadowValue+=1.0;
       }
     }
@@ -1268,6 +1668,17 @@ void main()
       outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
     }
   }
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+  float nl = numlights;
+  if(numlights<0.5) {
+    nl = 1.0;
+    float dotE = max(0.0, dot(NN,EE));
+    if(IsTextured>0.5) {
+      outcolor.xyz = texture2D(tex1,UVWCoord.xy).xyz*dotE;
+    }else{
+      outcolor.xyz = MaterialDiffuse.xyz*dotE;
+    }
+  }
+  gl_FragColor = vec4(outcolor.xyz/nl,1.0);
 }
 ")
+

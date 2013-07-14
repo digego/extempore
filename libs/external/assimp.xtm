@@ -66,22 +66,6 @@
 	  (begin (printf "...tex:> id(%d) loaded embedded texture\n" res)
                  res)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; these are the most important external types
-;;
-;; call ai_build_scene to return top level ai_node*
-
-;; ai_build_scene heap allocates everything
-;; there is an assumption that models will be
-;; loaded for the duration of the session
-;; (i.e. all nodes and meshes)
-;;
-;; vbo(0),texid(1),diffuse(2),ambient(3),specular(4),emissive(5),shininess(6),opacity(7),facemode(8) (GL_TRIANGLE,GL_QUAD etc..)
-(bind-type ai_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
-;; name(0),transmat(1),parent(2),num_children(3),chidren(4),num_of_meshes(5),meshes(6)
-(bind-type ai_node <i8*,float*,ai_node*,i32,ai_node*,i32,ai_mesh*>)
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -119,6 +103,33 @@
 (bind-val aiProcess_FlipWindingOrder i32 16777216)
 (bind-val aiProcess_SplitByBoneCount i32 33554432)
 (bind-val aiProcess_Debone i32 67108864)
+
+(define  aiProcess_CalcTangentSpace  1)
+(define  aiProcess_JoinIdenticalVertices  2)
+(define  aiProcess_MakeLeftHanded  4)
+(define  aiProcess_Triangulate  8)
+(define  aiProcess_RemoveComponent  16)
+(define  aiProcess_GenNormals  32)
+(define  aiProcess_GenSmoothNormals  64)
+(define  aiProcess_SplitLargeMeshes  128)
+(define  aiProcess_PreTransformVertices  256)
+(define  aiProcess_LimitBoneWeights  512)
+(define  aiProcess_ValidateDataStructure  1024)
+(define  aiProcess_ImproveCacheLocality  2048)
+(define  aiProcess_RemoveRedundantMaterials  4096)
+(define  aiProcess_FixInfacingNormals  8192)
+(define  aiProcess_SortByPType  32768)
+(define  aiProcess_FindDegenerates  65536)
+(define  aiProcess_FindInvalidData  131072)
+(define  aiProcess_GenUVCoords  262144)
+(define  aiProcess_TransformUVCoords  524288)
+(define  aiProcess_FindInstances  1048576)
+(define  aiProcess_OptimizeMeshes  2097152)
+(define  aiProcess_OptimizeGraph  4194304)
+(define  aiProcess_FlipUVs  8388608)
+(define  aiProcess_FlipWindingOrder  16777216)
+(define  aiProcess_SplitByBoneCount  33554432)
+(define  aiProcess_Debone 67108864)
 
 (bind-type aiString <size_t,|1024,i8|>)
 ;(llvm:compile "%aiString = type {i64, |1024xi8|}
@@ -470,7 +481,7 @@
  
 
 (bind-func ai_build_mesh
-  (lambda (scene:aiScene* mesh:aiMesh* aimesh:ai_mesh* dir:i8*)
+  (lambda (scene:aiScene* mesh:aiMesh* aimesh:xtm_mesh* dir:i8*)
     ;; (printf "\tBuild Mesh\n")
     (let ((facemode:i32* (salloc)) 
           (vbo:E_vbo* null)
@@ -530,19 +541,19 @@
 
 
 
-;; returns the scenes top level node as ai_node*
+;; returns the scenes top level node as xtm_node*
 (bind-func ai_build_node
-  (lambda (scene:aiScene* node:aiNode* _node:ai_node* parent:ai_node* dir:i8*)
+  (lambda (scene:aiScene* node:aiNode* _node:xtm_node* parent:xtm_node* dir:i8*)
     (let ((i:i32 0)
           (ain:aiString* (tref-ptr node 0))
           (namelgth (tref ain 0))
           (name:i8* (halloc (+ 1 namelgth)))
           (numchildren:i32 (tref node 3))
           (children:aiNode** (tref node 4))          
-          (_children:ai_node* (halloc (+ 1 numchildren)))
+          (_children:xtm_node* (halloc (+ 1 numchildren)))
           (nummeshes:i32 (tref node 5))
           (meshes:aiMesh** (tref scene 3))          
-          (_meshes:ai_mesh* (halloc (+ 1 nummeshes)))
+          (_meshes:xtm_mesh* (halloc (+ 1 nummeshes)))
           (transmat:float* (halloc 16)))
       (memset name 0 (+ namelgth 1))
       (memcpy name (cast (tref-ptr ain 1) i8*) namelgth)
@@ -563,98 +574,59 @@
       void)))
 
 
-;; returns the scenes top level node as ai_node*
+;; returns the scenes top level node as xtm_node*
 (bind-func ai_build_scene  
   (lambda (scene:aiScene* dir:i8*)
     (printf "embedded textures: %d\n" (tref scene 8))
-    (let ((root:ai_node* (halloc)))
+    (let ((root:xtm_node* (halloc)))
       ;; (printf "\nNew Scene ... %p\n" scene)
       (ai_build_node scene (tref scene 1) root null dir)
       root)))
 
 
-(bind-func assimp_load_asset
-  (lambda (dir file)
+;; where post is any post processing required
+;; if value is 0 then use default
+;; of (+ aiProcess_FindDegenerates aiProcess_Triangulate)
+;; if value > 0 then use post exactly as defined
+;; which means the user must add AT LEAST aiProcess_Triangulate
+;;
+(bind-func assimp_load_model_a
+  (lambda (dir file post)
     (let ((lgth (+ (strlen dir) (strlen file) 1))
           (scene:aiScene* null)
           (path:i8* (salloc lgth)))
       (memset path 0 lgth)
       (memcpy path dir (strlen dir))
       (memcpy (pref-ptr path (strlen dir)) file (strlen file))
-      (set! scene (aiImportFile path (+ aiProcess_FindDegenerates aiProcess_Triangulate)))
+      (if (> post 0)
+          (set! scene (aiImportFile path post))
+          (set! scene (aiImportFile path (+ aiProcess_FindDegenerates aiProcess_OptimizeMeshes aiProcess_Triangulate))))
       ;;(set! scene (aiImportFile path 498379))
-      (let ((root:ai_node*
+      (let ((root:xtm_node*
              (if (null? scene)
-                 (begin (printf "Bad Asset! %s\n" path) (cast null ai_node*))
+                 (begin (printf "Bad Asset! %s\n" path) (cast null xtm_node*))
                  (ai_build_scene scene dir))))
         (if (not (null? scene))
             (begin ;; (printf "delete scene: %p\n" scene)
                    (aiReleaseImport scene)))
         root))))
 
+(bind-func assimp_load_model_b
+  (lambda (dir file)
+    (assimp_load_model_a dir file 0)))
 
-(bind-func assimp_draw_mesh
-  (let ((vert:i32 0)
-        (first -1)
-        (norm:i32 1)
-        (uvw:i32 2)
-        (color:i32 3))
-    (lambda (mesh:ai_mesh* shader:i32)
-      ;; (printf "draw mesh\n")
-      (let ((vbo (tref mesh 0))
-            (texid (tref mesh 1))
-            (diffuse (tref mesh 2))
-            (ambient (tref mesh 3))
-            (specular (tref mesh 4))
-            (shininess (tref mesh 6))
-            (facemode (tref mesh 8)))
-        (set! shininess (dtof 100.0))
-        (if (not (null? ambient))
-            (glUniform4fv (glGetUniformLocation shader "MaterialAmbient") 1 ambient))
-        (if (not (null? diffuse))
-            (glUniform4fv (glGetUniformLocation shader "MaterialDiffuse") 1 diffuse))
-        (if (not (null? specular))
-            (glUniform4fv (glGetUniformLocation shader "MaterialSpecular") 1 specular))
-        (glUniform1f (glGetUniformLocation shader "MaterialShininess") shininess)
-        ;; (printf "texid %d\n" texid)
-        ;; texture stuff
-        (if (> texid 0)
-            (begin
-              (glActiveTexture GL_TEXTURE2)
-              
-              (glBindTexture GL_TEXTURE_2D texid)
-              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-              (glUniform1f (glGetUniformLocation shader "IsTextured") 1.0)
-              (glUniform1i (glGetUniformLocation shader "tex1") 2))
-            (begin
-              (glUniform1f (glGetUniformLocation shader "IsTextured") 0.0)))
-        ;; vbo stuff
-        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))        
-        (glEnableVertexAttribArray vert) ;; 56
-        (glVertexAttribPointer vert 4 GL_FLOAT GL_FALSE 56 null)
-        (glEnableVertexAttribArray norm) 
-        (glVertexAttribPointer norm 3 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 16))
-        (glEnableVertexAttribArray uvw) 
-        (glVertexAttribPointer uvw 3 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 28))
-        (glEnableVertexAttribArray color) 
-        (glVertexAttribPointer color 4 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 40))
-        (glDrawArrays facemode 0 (/ (tref vbo 1) 56))
-        (glDisableVertexAttribArray vert)
-        (glDisableVertexAttribArray norm)
-        (glDisableVertexAttribArray uvw)
-        (glDisableVertexAttribArray color)
-        (glBindBuffer GL_ARRAY_BUFFER 0)
-        ;; undo texture stuff
-        (glActiveTexture GL_TEXTURE2)
-        (glBindTexture GL_TEXTURE_2D 0)
-        void))))
+(bind-poly assimp_load_model assimp_load_model_a)
+(bind-poly assimp_load_model assimp_load_model_b)
 
+;; poly has no binding for scheme
+(define assimp_load_model
+  (lambda (dir file . args)
+    (if (null? args)
+        (assimp_load_model_b dir file)
+        (assimp_load_model_a dir file (car args)))))
 
 (bind-func assimp_draw_node
-  (lambda (node:ai_node* shader:i32 model:float* view:float* projection:float* lights:i32 light:float*)
+  (lambda (node:xtm_node* shader:i32 model:float* view:float* projection:float* lights:i32 light:float*)
     (let ((i:i32 0)
           (children (tref node 4))
           (meshes (tref node 6))
@@ -673,7 +645,7 @@
       (shader_update_matrices_lvs shader m view projection lights light)
       ;; first draw meshes
       (dotimes (i (tref node 5))
-        (assimp_draw_mesh (pref-ptr meshes i) shader))
+        (xtm_draw_mesh (pref-ptr meshes i) shader))
       ;; then draw other children recursively
       (dotimes (i (tref node 3))
         (assimp_draw_node (pref-ptr children i) shader model view projection lights light))
@@ -681,7 +653,7 @@
 
 
 (bind-func assimp_draw_model
-  (lambda (scene:ai_node* shader:i32 model view projection lights light)
+  (lambda (scene:xtm_node* shader:i32 model view projection lights light)
     (assimp_draw_node scene shader model view projection lights light)
     void))
 
