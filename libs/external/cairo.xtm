@@ -10,13 +10,8 @@
 
 ;;; Code:
 
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_cairo_loaded)
-    (sys:load-escape "Cairo already loaded")) ;; break to top level
-
+;; lib-loading config
+(sys:load-preload-check 'cairo)
 
 (define cairolib
   (if (string=? "Linux" (sys:platform))
@@ -27,7 +22,7 @@
 
 (if (null? cairolib) (sys:load-escape "Error loading cairo library"))
 
-(define xtmlib_cairo_loaded #t)
+(define *xtmlib-cairo-loaded* #t)
 
 ;; complex structs with i8 name cheat (i.e. must be pointers)
 (bind-alias cairo_t i8)

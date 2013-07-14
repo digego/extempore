@@ -1653,19 +1653,15 @@
           (set! *sys:load-escape-stack* (cdr *sys:load-escape-stack*)))
       (k msg))))
 
-;; a 'safe' load for xtm libraries
-;; here is the 'header' code for each lib
-;; just change second conditional to
-;; add appropriate lib naming
-;;
-;; ;; if not primary process
-;; (if (not (ipc:get-process-name "primary"))
-;;    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; ;; if already loaded then break!
-;; (if (defined? 'xtmlib_math_loaded)
-;;    (sys:load-escape "Math already loaded"))
-;;
-;;
+(define sys:load-preload-check
+  (lambda (libname)
+    (if (not (or (symbol? libname) (string? libname)))
+        (sys:load-escape "Error: lib-name must be symbol or string."))
+    (if (not (ipc:get-process-name "primary"))
+        (sys:load-escape "Error: xtlang libs must be loaded in primary process."))
+    (if (defined? (string->symbol (string-append "*xtmlib-" (atom->string libname) "-loaded*")))
+        (sys:load-escape (string-append (atom->string libname) " already loaded")))))
+
 (define sys:load
   (lambda (path)
     (let ((in (open-input-file path))

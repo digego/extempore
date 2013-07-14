@@ -10,14 +10,8 @@
 
 ;;; Code:
 
-
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_shaders_loaded)
-    (sys:load-escape "Shaders already loaded")) ;; break to top level
-
+;; lib-loading config
+(sys:load-preload-check 'shaders)
 (sys:load "libs/external/opengl.xtm")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -25,7 +19,7 @@
 ;; GLOBAL to let other libraries know that
 ;; math.xtm has already been loaded
 ;; 
-(define xtmlib_shaders_loaded #t)
+(define *xtmlib-shaders-loaded* #t)
 
 ;; draw a quad
 ;; tw and th are framebuffer width and height

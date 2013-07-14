@@ -16,13 +16,8 @@
 
 ;;; Code:
 
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_audioinstx_loaded)
-    (sys:load-escape "External Instruments already loaded")) ;; break to top level
-
+;; lib-loading config
+(sys:load-preload-check 'audio-inst-ext)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -34,7 +29,7 @@
 
 (sys:load "libs/external/sndfile.xtm")
 
-(define xtmlib_audioinstx_loaded #t)
+(define *xtmlib-audio-inst-ext-loaded* #t)
 
 ;; helper function for adding sample data to sampler
 ;; this assumes stereo files at the moment!!

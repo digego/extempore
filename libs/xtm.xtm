@@ -4,40 +4,40 @@
 ;;
 ;; first export module to bitcode:
 
-(define *compile-xtm-stdlib* #f)
+(define load-libs-for-stdlib-compilation
+  (lambda ()
+    (sys:load "libs/core/math.xtm")
+    (sys:load "libs/external/opengl.xtm")
+    (sys:load "libs/external/shaders.xtm")
+    (sys:load "libs/external/assimp.xtm")
+    (sys:load "libs/core/audio_dsp.xtm")
+    (sys:load "libs/core/instruments.xtm")
+    (sys:load "libs/external/sndfile.xtm")
+    (sys:load "libs/external/instruments.xtm")
+    ;; export the module to bitcode
+    (llvm:export-module "/tmp/xtm.bc")
+    ;; print further instructions
+    (print "\nLLVM bitcode for the xtlang standard library exported to \"/tmp/xtm.bc\". To finish compiling the stdlib, enter the following command in a terminal window (inserting the proper path to your LLVM install):\n\n")
+    (cond ((string=? (sys:platform) "Linux")
+           (print "/path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && gcc --shared -g /tmp/xtm.s -o ./xtm.so\n"))
+          ((string=? (sys:platform) "OSX")
+           (print "/path/to/llvm-3.2/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && clang -O3 -dynamiclib -undefined dynamic_lookup /tmp/xtm.s -o ./xtm.dylib\n"))
+          (else (print "Sorry, cannot find the appropriate compilation command for your platform at this time.")))))
 
-(if *compile-xtm-stdlib*
-    (begin (gl:make-ctx ":0.0" #f 0.0 0.0 200 100)
-           (sys:load "libs/core/math.xtm")
-           (sys:load "libs/external/opengl.xtm")
-           (sys:load "libs/external/shaders.xtm")
-           (sys:load "libs/external/assimp.xtm")
-           (sys:load "libs/core/audio_dsp.xtm")
-           (sys:load "libs/core/instruments.xtm")
-           (sys:load "libs/external/sndfile.xtm")
-           (sys:load "libs/external/instruments.xtm")))
-
-(if *compile-xtm-stdlib*
-    (llvm:export-module "/tmp/xtm.bc"))
-
-;; Now, here are the shell invocations:
+;; Here are the shell invocations for
 
 ;; Linux:
 ;; /path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && gcc --shared -g /tmp/xtm.s -o ./xtm.so
 
 ;; OSX:
-;; /path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && clang -O3 -dynamiclib -undefined dynamic_lookup /tmp/xtm.s -o ./xtm.dylib
+;; /usr/local/Cellar/extempore-llvm/3.2/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && clang -O3 -dynamiclib -undefined dynamic_lookup /tmp/xtm.s -o ./xtm.dylib
 
 ;; emacs regex for generating the header file:
 ;; Compiled \(.*\) >>> \(.*\) -> (bind-lib-func stdlib \1 \2)
 
 
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_xtm_loaded)
-    (sys:load-escape "XTM standard lib already loaded")) ;; break to top level
+;; lib-loading config
+(sys:load-preload-check 'stdlib)
 
 (define stdlib
   (let ((platform (sys:platform)))
@@ -59,10 +59,9 @@
 
 ;;;;;;  MATH SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(if (defined? 'xtmlib_math_loaded)
-    (sys:load-escape "Sorry cannot load xtm standard lib: math already preloaded"))
-
-(define xtmlib_math_loaded #t)
+;; lib-loading config
+(sys:load-preload-check 'math)
+(define *xtmlib-math-loaded* #t)
 
 (bind-type cpxd <double,double>)
 (bind-type cpxf <float,float>)
@@ -217,10 +216,9 @@
 
 ;;;;;;  IMAGE SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(if (defined? 'xtmlib_image_loaded)
-    (sys:load-escape "Sorry cannot load xtm standard lib: image already preloaded"))
-
-(define xtmlib_image_loaded #t)
+;; lib-loading config
+(sys:load-preload-check 'image)
+(define *xtmlib-image-loaded* #t)
 
 (define libsoil
   (let ((platform (sys:platform)))
@@ -281,11 +279,9 @@
 
 ;;;;;;;;;; OPENGL SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(if (defined? 'xtmlib_opengl_loaded)
-    (sys:load-escape "Sorry cannot load xtm standard lib: opengl already preloaded"))
-
-(define xtmlib_opengl_loaded #t)
-
+;; lib-loading config
+(sys:load-preload-check 'opengl)
+(define *xtmlib-opengl-loaded* #t)
 
 (bind-type E_vbo <i32,i32,i8*>)
 (bind-type E_fbo <i32,i32,i32,i32,i32>)
@@ -410,7 +406,9 @@
 
 ;;; SHADER SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define xtmlib_shaders_loaded #t)
+;; lib-loading config
+(sys:load-preload-check 'shaders)
+(define *xtmlib-shaders-loaded* #t)
 
 (bind-alias XTMRENDERCB [void,i64,i32,float*,float*,float*,i8*]*)
 
@@ -1405,8 +1403,8 @@ void main()
 
 ;;; ASSIMP SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(if (defined? 'xtmlib_assimp_loaded)
-    (sys:load-escape "Sorry cannot load xtm standard lib: assimp already preloaded"))
+;; lib-loading config
+(sys:load-preload-check 'assimp)
 
 (define libassimp
   (let ((platform (sys:platform)))
@@ -1420,7 +1418,7 @@ void main()
         (null? libassimp))
     (sys:load-escape "Error loading assimp library"))
 
-(define xtmlib_assimp_loaded #t)
+(define *xtmlib-assimp-loaded* #t)
 
 (bind-val aiProcess_CalcTangentSpace i32 1)
 (bind-val aiProcess_JoinIdenticalVertices i32 2)
@@ -1585,10 +1583,8 @@ void main()
 
 (load "libs/core/pc_ivl.xtm")
 
-(if (defined? 'xtmlib_audio_loaded)
-    (sys:load-escape "Sorry cannot load xtm standard lib: audio already preloaded"))
-
-(define xtmlib_audio_loaded #t)
+;; lib-loading config
+(sys:load-preload-check 'audio-inst-ext)
 
 (bind-alias DSP [double,double,double,double,double*]*)
 
@@ -2088,8 +2084,7 @@ void main()
 
 ;; (ipc:audio-setup "utility")
 
-(define xtmlib_audioinst_loaded #t)
-(define xtmlib_audioinstx_loaded #t)
+(define *xtmlib-audio-inst-ext-loaded* #t)
 
 (println 'AUDIO 'LOADED)
 
@@ -2098,3 +2093,5 @@ void main()
 (println)
 (println 'Finished 'loading 'xtm 'standard 'lib)
 (println)
+
+(define *xtmlib-stdlib-loaded* #t)

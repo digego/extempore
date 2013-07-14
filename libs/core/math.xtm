@@ -20,21 +20,9 @@
 
 ;;; Code:
 
-
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_math_loaded)
-    (sys:load-escape "Math already loaded"))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; GLOBAL to let other libraries know that
-;; math.xtm has already been loaded
-;; 
-(define xtmlib_math_loaded #t)
-
+;; lib-loading config
+(sys:load-preload-check 'math)
+(define *xtmlib-math-loaded* #t)
 
 (bind-func deg2rad_f
   (lambda (degrees:float)

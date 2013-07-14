@@ -8,14 +8,10 @@
 
 ;; 
 
-;; if not primary process
-(if (not (ipc:get-process-name "primary"))
-    (sys:load-escape "Please load xtm libraries into the primary process"))
-;; if already loaded then break!
-(if (defined? 'xtmlib_sndfile_loaded)
-    (sys:load-escape "SNDFILE already loaded"))
-
 ;;; Code:
+
+;; lib-loading config
+(sys:load-preload-check 'sndfile)
 
 (sys:load "libs/core/audio_dsp.xtm")
 
@@ -31,8 +27,7 @@
         (null? libsndfile))
     (sys:load-escape "Error loading libsndfile dynamic library"))
 
-(define xtmlib_sndfile_loaded #t)
-
+(define *xtmlib-sndfile-loaded* #t)
 
 (bind-val SF_LOOP_NONE i32 800)
 (bind-val SF_LOOP_FORWARD i32 801)
