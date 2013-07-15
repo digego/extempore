@@ -1771,7 +1771,7 @@ void main()
 (bind-lib-func stdlib shimmer_pad [double,double,double,double,double*]*)
 (bind-lib-func stdlib simplefm_note_c [[double,double,double,double,double]*,i64,double*]*)
 (bind-lib-func stdlib simplefm_fx [double,double,double,double,double*]* 700000)
-(bind-lib-func stdlib simplefm [double,double,double,double,double*]*)
+(bind-lib-func stdlib fmsynth [double,double,double,double,double*]*)
 (bind-lib-func stdlib fmpad_note_c [[double,double,double,double,double]*,i64,double*]*)
 (bind-lib-func stdlib fmpad_fx [double,double,double,double,double*]* 700000)
 (bind-lib-func stdlib fmpad [double,double,double,double,double*]*)
@@ -1793,8 +1793,9 @@ void main()
 (bind-lib-func stdlib set_sample_offset_ [i64,[double,double,double,double*]*,i64,i64]*)
 (bind-lib-func stdlib sampler_note_linear_c [[double,double,double,double,double]*,|128,double*|*,|128,i64|*,|128,i64|*,i64,double]*)
 (bind-lib-func stdlib sampler_note_hermite_c [[double,double,double,double,double]*,|128,double*|*,|128,i64|*,|128,i64|*,|128,i64|*,i64,double]*)
-(bind-lib-func stdlib sampler_fx [double,double,double,double,double*]* 700000)
-(bind-lib-func stdlib drums_fx [double,double,double,double,double*]* 700000)
+(bind-lib-func stdlib sampler1_fx [double,double,double,double,double*]* 700000)
+(bind-lib-func stdlib sampler2_fx [double,double,double,double,double*]* 700000)
+(bind-lib-func stdlib sampler3_fx [double,double,double,double,double*]* 700000)
 
 
 (define-macro (play-note time inst pitch vol dur . args)  
@@ -2085,6 +2086,14 @@ void main()
 ;; (ipc:audio-setup "utility")
 
 (define *xtmlib-audio-inst-ext-loaded* #t)
+
+(define-sampler sampler1 sampler_note_hermite_c sampler1_fx)
+(define-sampler sampler2 sampler_note_hermite_c sampler2_fx)
+(define-sampler sampler3 sampler_note_hermite_c sampler3_fx)
+
+(sampler1_fx.wet 0.05)
+(sampler2_fx.wet 0.05)
+(sampler3_fx.wet 0.05)
 
 (println 'AUDIO 'LOADED)
 

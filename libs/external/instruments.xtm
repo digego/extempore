@@ -171,7 +171,7 @@
                 (* amp (hermite_interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
 
-(bind-func sampler_fx 400000
+(bind-func sampler1_fx 400000
   (let ((reverbl (reverb_c 80.0))
         (reverbr (reverb_c 79.0))
         (pan .5)
@@ -186,7 +186,22 @@
           (reverbl (* 1.5 (* pan_ in)) wet fb)
           (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
-(bind-func drums_fx 400000
+(bind-func sampler2_fx 400000
+  (let ((reverbl (reverb_c 80.0))
+        (reverbr (reverb_c 79.0))
+        (pan .5)
+        (pan_ pan)
+        (wet .5)
+        (fb .5))
+    (lambda (in:double time:double chan:double dat:double*)
+      (if (< pan pan_)
+          (set! pan_ (- pan_ .001))
+          (set! pan_ (+ pan_ .001)))
+      (if (< chan 1.0)
+          (reverbl (* 1.5 (* pan_ in)) wet fb)
+          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
+
+(bind-func sampler3_fx 400000
   (let ((reverbl (reverb_c 80.0))
         (reverbr (reverb_c 79.0))
         (pan .5)
@@ -260,6 +275,11 @@
              (if (< (pref note_starts k) time)
                  (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
            (* gain (,effect_kernel out time chan dat)))))))
+
+
+(define-sampler sampler1 sampler_note_hermite_c sampler1_fx)
+(define-sampler sampler2 sampler_note_hermite_c sampler2_fx)
+(define-sampler sampler3 sampler_note_hermite_c sampler3_fx)
 
 
 ;; load-sampler now requires you to supply your own function for
