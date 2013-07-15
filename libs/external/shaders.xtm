@@ -629,8 +629,15 @@
 (bind-val xtm_render_near float 0.1)
 (bind-val xtm_render_far float 100.0)
 
+(bind-func xtm_render_fbo
+  (let ((fbo:E_fbo* null))
+    (lambda ()
+      (if (null? fbo) (set! fbo (create_fbo (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
+      fbo)))
+
 (bind-func xtm_render_setup_a
   (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8*)
+    (xtm_render_fbo)    
     (set! xtm_render_w w)
     (set! xtm_render_h h)
     (set! xtm_render_s1 (create_shader_xtm s1v s1f))
@@ -642,15 +649,15 @@
   (lambda (w h n f s1v s1f s2v s2f)
     (set! xtm_render_near n)
     (set! xtm_render_far f)
-    (xtm_render_setup_a w h s1v s1f s2v s2f)
+    (xtm_render_setup_a w h s1v s1f s2v s2f)        
     void))
 
 (bind-func xtm_render_setup_c
   (lambda (x y w h n f a s1v s1f s2v s2f)
     (set! xtm_render_x x)
     (set! xtm_render_y y)
-    (set! xtm_render_angle a)    
-    (xtm_render_setup_b w h n f s1v s1f s2v s2f)
+    (set! xtm_render_angle a)
+    (xtm_render_setup_b w h n f s1v s1f s2v s2f)        
     void))
 
 (bind-poly xtm_render_setup xtm_render_setup_a)
@@ -693,7 +700,7 @@
         (projection:float* (alloc 16))
         (fbo:E_fbo* null))
     (lambda (pre:XTMRENDERCB opaque:XTMRENDERCB transparent:XTMRENDERCB post:XTMRENDERCB data:i8*)
-      (if (null? fbo) (create_fbo (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0))
+      (set! fbo (xtm_render_fbo))
       (glShadeModel GL_SMOOTH)
       (glEnable GL_DEPTH_TEST)
       (glEnable GL_TEXTURE_2D)
