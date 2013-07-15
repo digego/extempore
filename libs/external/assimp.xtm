@@ -177,10 +177,14 @@
 (bind-type aiCamera <aiString,aiVector3D,aiVector3D,aiVector3D,float,float,float,float>) ;; good
 ;; mFlags(0),mRootNode(1),mNumMeshes(2),mMeshes(3),mNumMaterials(4),mMaterials(5),mNumAnimations(6),mAnimations(7),mNumTextures(8),mTextures(9),mNumLights(10),mLights(11),mNumCameras(12),mCameras(13)
 (bind-type aiScene <i32,aiNode*,i32,aiMesh**,i32,aiMaterial**,i32,aiAnimation**,i32,aiTexture**,i32,aiLight**,i32,aiCamera**,i8*>) ;; good
+(bind-type aiExportFormatDesc <i8*,i8*,i8*>)
 ;;
 ;; (bind-type aicontainer <aiScene*,aiVector3D*,aiVector3D*,aiVector3D*>)
 
 (bind-lib libassimp aiImportFile [aiScene*,i8*,i32]*)
+(bind-lib libassimp aiExportScene [i32,aiScene*,i8*,i8*,i32]*)
+(bind-lib libassimp aiGetExportFormatCount [size_t]*)
+(bind-lib libassimp aiGetExportFormatDescription [aiExportFormatDesc*,size_t]*)
 (bind-lib libassimp aiReleaseImport [void,aiScene*]*)
 (bind-lib libassimp aiIdentityMatrix4 [void,aiMatrix4x4*]*)
 (bind-lib libassimp aiMultiplyMatrix4 [void,aiMatrix4x4*,aiMatrix4x4*]*)
@@ -313,7 +317,6 @@
 (bind-func aiColor4f
   (lambda (colour:aiColor4D*)
     (glColor4f (tref colour 1) (tref colour 2) (tref colour 3) (tref colour 0))))
-
 
 
 (bind-func ai_color4_to_float4
@@ -577,7 +580,6 @@
       (ai_build_node scene (tref scene 1) root null dir)
       root)))
 
-
 ;; where post is any post processing required
 ;; if value is 0 then use default
 ;; of (+ aiProcess_FindDegenerates aiProcess_Triangulate)
@@ -594,7 +596,7 @@
       (memcpy (pref-ptr path (strlen dir)) file (strlen file))
       (if (> post 0)
           (set! scene (aiImportFile path post))
-          (set! scene (aiImportFile path (+ aiProcess_FindDegenerates aiProcess_OptimizeMeshes aiProcess_Triangulate))))
+          (set! scene (aiImportFile path (+ aiProcess_FindDegenerates aiProcess_PreTransformVertices aiProcess_OptimizeMeshes aiProcess_OptimizeGraph aiProcess_Triangulate))))
       ;;(set! scene (aiImportFile path 498379))
       (let ((root:xtm_node*
              (if (null? scene)
@@ -683,3 +685,23 @@
 		     (ai_load_ogl_texture (bitcast (tref-ptr texfile 1) i8*) (+ 1 i)))))))))
 
 
+(bind-func ai_print_export_formats
+  (lambda ()
+    (let ((i 0)
+          (desc:aiExportFormatDesc* null)
+          (cnt (aiGetExportFormatCount)))
+      (printf "**************************\n")      
+      (dotimes (i cnt)
+        (set! desc (aiGetExportFormatDescription i))
+        (printf "------\nid(%s):ext(%s)\n%s\n" (tref desc 0) (tref desc 2) (tref desc 1)))
+      (printf "**************************\n")
+      void)))
+
+(bind-func ai_convert
+  (lambda (fin fout format:i8* aiprocess)
+    (printf "Convert 3D File to %s\n" format)
+    (let ((scene (aiImportFile fin aiprocess)))
+      (printf "Scene successfully imported\n" scene)
+      (aiExportScene scene format fout aiprocess)
+      (printf "\n Done exporting scene\n")
+      void)))

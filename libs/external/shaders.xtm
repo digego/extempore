@@ -565,7 +565,7 @@
             (begin
               (glUniform1f (glGetUniformLocation shader "IsTextured") 0.0)))
         ;; vbo stuff
-        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))        
+        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
         (glEnableVertexAttribArray vert) ;; 56
         (glVertexAttribPointer vert 4 GL_FLOAT GL_FALSE 56 null)
         (glEnableVertexAttribArray norm) 
@@ -621,6 +621,7 @@
 
 (bind-val xtm_render_s1 i32 0)
 (bind-val xtm_render_s2 i32 0)
+(bind-val xtm_render_s3 i32 0)
 (bind-val xtm_render_x i32 0)
 (bind-val xtm_render_y i32 0)
 (bind-val xtm_render_w i32 1024)
@@ -636,28 +637,29 @@
       fbo)))
 
 (bind-func xtm_render_setup_a
-  (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8*)
+  (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8* s2f_nl:i8*)
     (xtm_render_fbo)    
     (set! xtm_render_w w)
     (set! xtm_render_h h)
     (set! xtm_render_s1 (create_shader_xtm s1v s1f))
     (set! xtm_render_s2 (create_shader_xtm s2v s2f))
+    (set! xtm_render_s3 (create_shader_xtm s2v s2f_nl))
     (printf "XTM Render Setup Complete\n")
     void))
 
 (bind-func xtm_render_setup_b
-  (lambda (w h n f s1v s1f s2v s2f)
+  (lambda (w h n f s1v s1f s2v s2f s2f_nl)
     (set! xtm_render_near n)
     (set! xtm_render_far f)
-    (xtm_render_setup_a w h s1v s1f s2v s2f)        
+    (xtm_render_setup_a w h s1v s1f s2v s2f s2f_nl)     
     void))
 
 (bind-func xtm_render_setup_c
-  (lambda (x y w h n f a s1v s1f s2v s2f)
+  (lambda (x y w h n f a s1v s1f s2v s2f s2f_nl)
     (set! xtm_render_x x)
     (set! xtm_render_y y)
     (set! xtm_render_angle a)
-    (xtm_render_setup_b w h n f s1v s1f s2v s2f)        
+    (xtm_render_setup_b w h n f s1v s1f s2v s2f s2f_nl)
     void))
 
 (bind-poly xtm_render_setup xtm_render_setup_a)
@@ -669,17 +671,17 @@
     (if (null? args)
         (xtm_render_setup_a w h
                             simple-vert-xtm simple-frag
-                            xtmvert-xtm xtmfrag)
+                            xtmvert-xtm xtmfrag xtmfrag_nolight)
         (cond ((= (length args) 2)
                (xtm_render_setup_b w h (car args) (cadr args)
                                    simple-vert-xtm simple-frag
-                                   xtmvert-xtm xtmfrag))
+                                   xtmvert-xtm xtmfrag xtmfrag_nolight))
               ((= (length args) 5)
                (xtm_render_setup_c w h (car args) (cadr args)
                                    (caddr args) (cadddr args)
                                    (car (cddddr args))
                                    simple-vert-xtm simple-frag
-                                   xtmvert-xtm xtmfrag))
+                                   xtmvert-xtm xtmfrag xtmfrag_nolight))
               (else (println 'Wrong 'number 'or 'args 'for 'xtm_render_setup))))))
 
 
@@ -695,6 +697,9 @@
         (frame:i64 0)
         (lights:xtm_lights* (xtm_get_lights))
         (camera:xtm_camera* (xtm_get_camera))
+        (activelights:i32 0)
+        (sh1:i32 0)
+        (sh2:i32 0)
         (model:float* (alloc 16))
         (view:float* (alloc 16))
         (projection:float* (alloc 16))
@@ -707,7 +712,7 @@
       ;; seutp projection matrix            
       (fill_projection_matrix projection xtm_render_angle
                               (i32tof (/ xtm_render_w xtm_render_h))
-                              xtm_render_near xtm_render_far)      
+                              xtm_render_near xtm_render_far)
 
       (if (not (null? pre))
           (begin
@@ -718,7 +723,8 @@
             (pre frame 0 model view projection data)))
 
       (glBindFramebuffer GL_FRAMEBUFFER (tref fbo 0))
-      (glUseProgram xtm_render_s1)
+      (set! sh1 xtm_render_s1)
+      (glUseProgram sh1)
       ;; clear shadow buffer
       (glClearColor 0.0 0.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
@@ -730,22 +736,25 @@
             (glCullFace GL_FRONT)
             (fill_identity_matrix model)  ;; set model matrix
             (xtm_light_view (+ i 1) view) ;; set view matrix
-            (xtm_update_matrices xtm_render_s1 model view projection)
-            (opaque frame xtm_render_s1 model view projection data)))
+            (xtm_update_matrices sh1 model view projection)
+            (opaque frame sh1 model view projection data)))
       ;; turn off shadow FBO
       (glBindFramebuffer GL_FRAMEBUFFER 0)
-      (glUseProgram 0)      
+      (glUseProgram 0)
+      ;;
+      (set! activelights (tref lights 9))      
       ;;
       ;; Finally render the scene to the window
       ;; using the shadow FBO's depth buffer as a shadow map
       ;;      
       ;; make sure we are not writing to a framebuffer!
       (glBindFramebuffer GL_FRAMEBUFFER 0)
-      (glUseProgram xtm_render_s2)
+      (set! sh2 (if (> activelights 0) xtm_render_s2 xtm_render_s3))
+      (glUseProgram sh2)
       ;; setup shadowmap texture from FBO
       (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
       (glBindTexture GL_TEXTURE_2D (tref fbo 2))      
-      (glUniform1i (glGetUniformLocation xtm_render_s2 "shadowMap") 0)      
+      (glUniform1i (glGetUniformLocation sh2 "shadowMap") 0)      
       ;;(shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
       ;; draw scene
       (glViewport xtm_render_x xtm_render_y xtm_render_w xtm_render_h)
@@ -758,10 +767,10 @@
             ;; setup matrices
             (xtm_camera_view view)       ;; setup view
             (fill_identity_matrix model) ;; setup model
-            (xtm_update_lights xtm_render_s2) ;; update lights on shader
-            (xtm_update_camera xtm_render_s2) ;; update camera on shader
-            (xtm_update_matrices xtm_render_s2 model view projection) ;; update mats on shader
-            (opaque frame xtm_render_s2 model view projection data)))
+            (xtm_update_lights sh2) ;; update lights on shader
+            (xtm_update_camera sh2) ;; update camera on shader
+            (xtm_update_matrices sh2 model view projection) ;; update mats on shader
+            (opaque frame sh2 model view projection data)))
       ;; turn everything off again.
       (glActiveTexture GL_TEXTURE0)
       (glBindTexture GL_TEXTURE_2D 0)
@@ -1681,6 +1690,72 @@ void main()
     }
   }
   gl_FragColor = vec4(outcolor.xyz/nl,1.0);
+}
+")
+
+
+(define xtmfrag_nolight
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 TexColor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  float dotE = max(0.0, dot(NN,EE));
+  if(IsTextured>0.5) {
+    outcolor.xyz = texture2D(tex1,UVWCoord.xy).xyz*dotE;
+  }else{
+    outcolor.xyz = MaterialDiffuse.xyz*dotE;
+  }
+  gl_FragColor = vec4(outcolor.xyz,1.0);
 }
 ")
 

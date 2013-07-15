@@ -419,6 +419,7 @@
 
 (bind-val xtm_render_s1 i32 0)
 (bind-val xtm_render_s2 i32 0)
+(bind-val xtm_render_s3 i32 0)
 (bind-val xtm_render_x i32 0)
 (bind-val xtm_render_y i32 0)
 (bind-val xtm_render_w i32 1024)
@@ -454,9 +455,9 @@
 (bind-lib-func stdlib xtm_draw_model [void,xtm_node*,i32,float*,float*,float*]*)
 
 (bind-lib-func stdlib xtm_render_fbo [E_fbo*]*)
-(bind-lib-func stdlib xtm_render_setup_a [void,i32,i32,i8*,i8*,i8*,i8*]*)
-(bind-lib-func stdlib xtm_render_setup_b [void,i32,i32,float,float,i8*,i8*,i8*,i8*]*)
-(bind-lib-func stdlib xtm_render_setup_c [void,i32,i32,i32,i32,float,float,float,i8*,i8*,i8*,i8*]*)
+(bind-lib-func stdlib xtm_render_setup_a [void,i32,i32,i8*,i8*,i8*,i8*,i8*]*)
+(bind-lib-func stdlib xtm_render_setup_b [void,i32,i32,float,float,i8*,i8*,i8*,i8*,i8*]*)
+(bind-lib-func stdlib xtm_render_setup_c [void,i32,i32,i32,i32,float,float,float,i8*,i8*,i8*,i8*,i8*]*)
 
 (bind-lib-func stdlib xtm_render [i64,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,i8*]*)
 
@@ -482,19 +483,18 @@
     (if (null? args)
         (xtm_render_setup_a w h
                             simple-vert-xtm simple-frag
-                            xtmvert-xtm xtmfrag)
+                            xtmvert-xtm xtmfrag xtmfrag_nolight)
         (cond ((= (length args) 2)
                (xtm_render_setup_b w h (car args) (cadr args)
                                    simple-vert-xtm simple-frag
-                                   xtmvert-xtm xtmfrag))
+                                   xtmvert-xtm xtmfrag xtmfrag_nolight))
               ((= (length args) 5)
                (xtm_render_setup_c w h (car args) (cadr args)
                                    (caddr args) (cadddr args)
                                    (car (cddddr args))
                                    simple-vert-xtm simple-frag
-                                   xtmvert-xtm xtmfrag))
+                                   xtmvert-xtm xtmfrag xtmfrag_nolight))
               (else (println 'Wrong 'number 'or 'args 'for 'xtm_render_setup))))))
-
 
 
 ;; load up glsl code
@@ -1400,6 +1400,72 @@ void main()
 }
 ")
 
+(define xtmfrag_nolight
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 TexColor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  float dotE = max(0.0, dot(NN,EE));
+  if(IsTextured>0.5) {
+    outcolor.xyz = texture2D(tex1,UVWCoord.xy).xyz*dotE;
+  }else{
+    outcolor.xyz = MaterialDiffuse.xyz*dotE;
+  }
+  gl_FragColor = vec4(outcolor.xyz,1.0);
+}
+")
+
+
 (println 'SHADERS 'LOADED)
 
 ;;; ASSIMP SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1530,8 +1596,12 @@ void main()
 (bind-type aiLight <aiString,i32,aiVector3D,aiVector3D,float,float,float,aiColor3D,aiColor3D,aiColor3D,float,float>) ;; good
 (bind-type aiCamera <aiString,aiVector3D,aiVector3D,aiVector3D,float,float,float,float>) ;; good
 (bind-type aiScene <i32,aiNode*,i32,aiMesh**,i32,aiMaterial**,i32,aiAnimation**,i32,aiTexture**,i32,aiLight**,i32,aiCamera**,i8*>) ;; good
+(bind-type aiExportFormatDesc <i8*,i8*,i8*>)
 
 (bind-lib libassimp aiImportFile [aiScene*,i8*,i32]*)
+(bind-lib libassimp aiExportScene [i32,aiScene*,i8*,i8*,i32]*)
+(bind-lib libassimp aiGetExportFormatCount [size_t]*)
+(bind-lib libassimp aiGetExportFormatDescription [aiExportFormatDesc*,size_t]*)
 (bind-lib libassimp aiReleaseImport [void,aiScene*]*)
 (bind-lib libassimp aiIdentityMatrix4 [void,aiMatrix4x4*]*)
 (bind-lib libassimp aiMultiplyMatrix4 [void,aiMatrix4x4*,aiMatrix4x4*]*)
@@ -1566,6 +1636,9 @@ void main()
 (bind-lib-func stdlib assimp_draw_node [void,xtm_node*,i32,float*,float*,float*,i32,float*]*)
 (bind-lib-func stdlib assimp_draw_model [void,xtm_node*,i32,float*,float*,float*,i32,float*]*)
 (bind-lib-func stdlib ai_load_textures [void,aiScene*]*)
+(bind-lib-func stdlib ai_print_export_formats [void]*)
+(bind-lib-func stdlib ai_convert [void,i8*,i8*,i8*,i32]*)
+
 
 (bind-poly assimp_load_model assimp_load_model_a)
 (bind-poly assimp_load_model assimp_load_model_b)
