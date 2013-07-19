@@ -119,6 +119,21 @@ double log2(double num) {
 }
 #endif
 
+void* malloc16 (size_t s) {
+  unsigned char *p;
+  unsigned char *porig = (unsigned char*) malloc (s + 0x10);   // allocate extra
+  if (porig == NULL) return NULL;                              // catch out of memory
+  p = (unsigned char*) (((uintptr_t) porig + 16) & (~0x0f));   // insert padding
+  *(p-1) = p - porig;                                          // store padding size
+  return p;
+}
+
+void free16(void *p) {
+  unsigned char *porig = (unsigned char*) p;  // work out original
+  porig = porig - *(porig-1);                 // by subtracting padding
+  free (porig);                               // then free that
+}
+
 
 // LLVM RUNTIME ERROR
 void llvm_runtime_error(int error,void* arg)
@@ -304,7 +319,11 @@ llvm_zone_t* llvm_pop_zone_stack()
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
     llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
+#ifdef TARGET_OS_WINDOWS
     zone->memory = malloc((size_t) size);
+#else
+    zone->memory = valloc((size_t) size);
+#endif
     zone->mark = 0;
     zone->offset = 0;
     zone->size = size;
@@ -1380,6 +1399,10 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("is_cptr_or_str"));
 	    EE->updateGlobalMapping(gv,(void*)&is_cptr_or_str);
             
+	    gv = M->getNamedValue(std::string("malloc16"));
+	    EE->updateGlobalMapping(gv,(void*)&malloc16);
+	    gv = M->getNamedValue(std::string("free16"));
+	    EE->updateGlobalMapping(gv,(void*)&free16);
 
 	    gv = M->getNamedValue(std::string("list_ref"));
 	    EE->updateGlobalMapping(gv,(void*)&list_ref);
