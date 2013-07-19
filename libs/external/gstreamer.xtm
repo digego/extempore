@@ -10,16 +10,22 @@
 
 ;;; Code:
 
+(sys:load-preload-check 'gstreamer)
+
+;; make sure that glib is loaded
+(sys:load "libs/external/glib.xtm")
+
 (define gstlib
   (sys:open-dylib (if (string=? "Linux" (sys:platform))
-		      "libgstreamer-0.10.so"
-		      (if (string=? "Windows" (sys:platform))
-			  (print-error "Where can I find gstreamer on your platform?")
-			  (print-error "Where can I find gstreamer on your platform?")))))
+		      "libgstreamer-1.0.so"
+                      (if (string=? "OSX" (sys:platform))
+                          "libgstreamer-1.0.dylib"
+                          (print-error "Where can I find gstreamer on your platform?")))))
 
-(if (not gstlib) (print-error 'Could 'not load 'gstream 'dynamic 'library))
+(if (not gstlib)
+    (sys:load-escape "Could not load 'gstreamer' dynamic library"))
 
-(load "libs/external/glib.xtm")
+(define *xtmlib-gstreamer-loaded* #t)
 
 (bind-alias GstState i32)
 (bind-val GST_STATE_VOID_PENDING i32 0)
@@ -90,7 +96,6 @@
 (bind-alias GstStateChange i32) ;; enum
 (bind-alias GstStateChangeReturn i32) ;; enum
 
-(bind-alias GCond i8) ;; not really i8
 (bind-alias GStaticRecMutex i8) ;; not really i8
 (bind-alias GstBus i8) ;; not really i8
 (bind-alias GstClock i8) ;; not really i8
@@ -109,16 +114,24 @@
 (bind-type GstElementDetails <gchar*,gchar*,gchar*,gchar*>)
 (bind-type GstStructure <GType,GQuark,gint,GArray*,gpointer>)
 (bind-type GstObject <gint,GMutex*,gchar*,gchar*,GstObject*,guint32>)
-(bind-type GstMiniObject <GTypeInstance,i32,i32,i8*>)
+;; (bind-type GstMiniObject <GTypeInstance,i32,i32,i8*>)
+(bind-type GstMiniObject <GType,gint,gint,guint,i8*,i8*,i8*,guint,gpointer>)
 (bind-type GstCaps <GType,gint,GstCapsFlags,i8*,|4,gpointer|>)
 (bind-type GstBuffer <GstMiniObject,i8*,guint,GstClockTime,GstClockTime,GstCaps*,i64,i64,i8*,GFreeFunc,GstBuffer*,GstBufferPrivate*,gpointer>)
+
+(bind-alias GstMiniObjectCopyFunction [GstMiniObject*,GstMiniObject*]*)
+(bind-alias GstMiniObjectDisposeFunction [gboolean,GstMiniObject*]*)
+(bind-alias GstMiniObjectFreeFunction [void,GstMiniObject*]*)
+
 ;; 3 message type
 ;; 4 time
 ;; 5 gst_object
 ;; 6 gst_structure
 ;;
 ;; I add the i32 padding at the END because sizeof reports 104 (I Don't know why!)
-(bind-type GstMessage <GstMiniObject,GMutex*,GCond*,GstMessageType,guint64,GstObject*,GstStructure*,|4,gpointer|,i32>)
+;;(bind-type GstMessage <GstMiniObject,GMutex*,GCond*,GstMessageType,guint64,GstObject*,GstStructure*,|4,gpointer|,i32>)
+;; miniobj(0) type(1) timestamp(2) src(3) seqnum(4) lock(5) cond(6)    
+(bind-type GstMessage <GstMiniObject,GstMessageType,guint64,GstObject*,guint32,GMutex,GCond>)
 
 (bind-lib gstlib gst_version_string [gchar*]*)
 
@@ -127,7 +140,7 @@
 (bind-lib gstlib gst_object_ref [gpointer,gpointer]*)
 (bind-lib gstlib gst_object_unref [void,gpointer]*)
 (bind-lib gstlib gst_object_ref_sink [void,gpointer]*)
-(bind-lib gstlib gst_object_sink [void,gpointer]*)
+;; (bind-lib gstlib gst_object_sink [void,gpointer]*) ;; missing in 1.0+?
 
 (bind-lib gstlib gst_init [void,i32*,i8**]*)
 (bind-lib gstlib gst_init_check [gboolean,i32*,i8**,GError**]*)
@@ -147,7 +160,7 @@
 (bind-lib gstlib gst_element_link [gboolean,GstElement*,GstElement*]*)
 (bind-lib gstlib gst_element_unlink [void,GstElement*,GstElement*]*)
 (bind-lib gstlib gst_element_add_pad [gboolean,GstElement*,GstPad*]*)
-(bind-lib gstlib gst_element_get_pad [GstPad*,GstElement*,gchar*]*)
+;; (bind-lib gstlib gst_element_get_pad [GstPad*,GstElement*,gchar*]*) ;; missing 1.0+
 (bind-lib gstlib gst_element_set_state [GstStateChangeReturn,GstElement*,GstState]*)
 (bind-lib gstlib gst_element_get_static_pad [GstPad*,GstElement*,gchar*]*)
 
@@ -177,6 +190,7 @@
 
 ;; messages
 (bind-lib gstlib gst_message_parse_error [void,GstMessage*,GError**,gchar**]*)
+(bind-lib gstlib gst_message_type_get_name [gchar*,GstMessageType]*)
 (bind-lib gstlib gst_message_new_eos [GstMessage*,GstObject*]*)
 
 ;; gst caps and structure stuff
@@ -188,11 +202,11 @@
 (bind-lib gstlib gst_structure_get_string [gchar*,GstStructure*,gchar*]*)
 (bind-lib gstlib gst_structure_get_clock_time [gboolean,GstStructure*,gchar*,GstClockTime*]*)
 
-;; gst mini object stuff
-(bind-lib gstlib gst_value_set_mini_object [void,GValue*,GstMiniObject*]*)
-(bind-lib gstlib gst_value_take_mini_object [void,GValue*,GstMiniObject*]*)
-(bind-lib gstlib gst_value_get_mini_object [GstMiniObject*,GValue*]*)
-(bind-lib gstlib gst_value_dup_mini_object [GstMiniObject*,GValue*]*)
+;; gst mini object stuff NOT IN 1.0+?
+;; (bind-lib gstlib gst_value_set_mini_object [void,GValue*,GstMiniObject*]*)
+;; (bind-lib gstlib gst_value_take_mini_object [void,GValue*,GstMiniObject*]*)
+;; (bind-lib gstlib gst_value_get_mini_object [GstMiniObject*,GValue*]*)
+;; (bind-lib gstlib gst_value_dup_mini_object [GstMiniObject*,GValue*]*)
 
 
 ;(bind-lib gstlib gst_video_convert_frame [GstBuffer*,GstBuffer*,GstCaps*,GstClockTime,GError**]*)
