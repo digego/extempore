@@ -1,0 +1,173 @@
+;; a simple SIMD audio test case
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+
+;;; Code:
+
+(if (not (llvm:get-globalvar "SAMPLERATE"))
+    (begin (bind-val SAMPLERATE double (integer->real *au:samplerate*))
+           (bind-val SR double (integer->real *au:samplerate*))))
+(if (not (llvm:get-globalvar "CHANNELS"))
+    (bind-val CHANNELS i64 *au:channels*))
+(if (not (llvm:get-globalvar "IN_CHANNELS"))
+    (bind-val IN_CHANNELS i64 *au:in-channels*))
+(if (not (llvm:get-globalvar "FRAMES"))
+    (bind-val FRAMES i64 *au:block-size*))
+(if (not (llvm:get-globalvar "VFRAMES"))
+    (bind-val VFRAMES i32 (* (/ *au:block-size* 4)
+                             *au:channels*)))
+
+(bind-func print_audio_state
+  (lambda ()
+    (printf "    FRAMES: %lld\n" FRAMES)
+    (printf "   VFRAMES: %d\n" VFRAMES)    
+    (printf " OUT CHANS: %lld\n" CHANNELS)
+    (printf "  IN CHANS: %lld\n" IN_CHANNELS)
+    (printf "SAMPLERATE: %f\n" SAMPLERATE)))
+
+(print_audio_state)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; this example is sample-by-sample
+;;
+;; x values must fall within the range -PI ... PI
+(bind-func _sin
+  (let ((p 0.225) ; :_abuf* (alloc))
+	(b (/ 4.0 PI))
+	(c (/ -4.0 (* PI PI))))
+    (lambda (x)
+      (let ((y (+ (* b x) (* c x (fabs x)))))
+	(+ (* p (- (* y (fabs y)) y)) y)))))
+
+
+(bind-func osc_c
+  (lambda (phase)
+    (lambda (amp freq)
+      (let ((inc (* TWOPI (/ freq SAMPLERATE))))
+	(set! phase (+ phase inc))
+	(if (> phase PI) (set! phase (- phase TWOPI)))
+	(* amp (_sin phase))))))
+
+(bind-alias DSP [double,double,double,double,double*]*)
+
+(bind-func dsp:DSP 1000000
+  (let ((i:i32 0)
+        (half:i32 40)        
+        (all:i32 (* half 2))
+        (amp:double (/ 1.0 (i32tod half)))
+        (os:[double,double,double]** (alloc all))
+        (freqs:double* (alloc all))
+        (out:double 0.0))
+    (dotimes (i all)
+      (pset! freqs i (* (random) 1000.0))
+      (pset! os i (osc_c 0.0)))
+    (lambda (in time chan dat)
+      (set! out 0.0)
+      (if (< chan 0.5)
+          (dotimes (i half)
+            (set! out (+ out ((pref os i) amp (pref freqs i)))))
+          (dotimes (i half)
+            (set! out (+ out ((pref os (+ i half)) amp (pref freqs (+ i half)))))))
+      out)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; This example is buffer-by-buffer
+;;
+;; some scalar constants
+(define *srflt* (llvm:convert-float (number->string (integer->real *samplerate*))))
+(define *pi* (llvm:convert-float (number->string pi)))
+(define *2pi* (llvm:convert-float (number->string (* 2.0 pi))))
+(bind-val SRf float *srflt*)
+(bind-val PIf float *pi*)
+(bind-val TWOPIf float *2pi*)
+
+(bind-alias VDSP [void,float*,float*,float,i8*]*)
+
+(bind-func v4val
+  (lambda (val:float)
+    (let ((v4:/4,float/* (alloc)))
+      (vfill! v4 val val val val)
+      v4)))
+
+;; v4fabsf expects stack allocation use
+(bind-func v4fabsf
+  (lambda (x:/4,float/*)
+    (let ((i 0) (y:/4,float/* (salloc)))
+      (dotimes (i 4)
+        (vset! y i (fabsf (vref x i))))
+      y)))
+
+;; x values must fall within the range -PI ... PI
+(bind-func _vsin
+  (let ((i 0)
+        (p (v4val 0.225))
+	(b (v4val (/ 4.0 PIf)))
+        (y:/4,float/* (zalloc))
+	(c (v4val (/ -4.0 (* PIf PIf)))))
+    (lambda (x:/4,float/*)
+      (pset! y 0 (+ (* b x) (* c x (v4fabsf x)))) 
+      (pset! y 0 (+ (* p (- (* y (v4fabsf y)) y)) y))
+      y)))
+
+(bind-func oscv_mc_c
+  (lambda (phase chans)
+    (let ((i:i32 0) (p 0)
+          (y:/4,float/* (alloc))
+          (vphase:/4,float/* (alloc))
+          (srv (v4val SRf))
+          (twopiv (v4val TWOPIf)))
+      (vset! vphase 0 phase)
+      (lambda (amp:/4,float/* freq:/4,float/*)
+        (let ((inc (* TWOPIf (/ (vref freq 0) SRf))))
+          (dotimes (i 4)
+            (vset! vphase i phase)
+            (if (= (% p chans) 0)
+                (begin (set! phase (+ phase inc))
+                       (if (> phase PIf) (set! phase (- phase TWOPIf)))))
+            (set! p (+ p 1)))
+          (pset! y 0 (* amp (_vsin vphase)))
+          y)))))
+
+
+(bind-func vdsp:VDSP 1000000
+  (let ((i:i32 0) (j:i32 0)
+        (half:i32 40)
+        (noise:/4,float/* (alloc))
+        (zero:/4,float/* (alloc))
+        (amp (v4val (/ 2.0 (i32tof half))))
+        (os:[/4,float/*,/4,float/*,/4,float/*]** (alloc half))
+        (freqs:/4,float/** (alloc half)))
+    (vfill! zero 0.0 0.0 0.0 0.0)
+    (dotimes (i half)
+      (pset! freqs i (v4val (* (dtof (random)) 1000.0)))
+      (pset! os i (oscv_mc_c 0.0 2)))
+    (lambda (in out time dat)
+     (memset (cast out i8*) 0 (* CHANNELS FRAMES 4))
+      (let ((vout (cast out /4,float/*)))
+        (dotimes (i half)
+          (dotimes (j VFRAMES)
+            (pset! vout j
+                   (+ (pref vout j)
+                      ((pref os i) amp (pref freqs i))))))
+        void))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  run as normal dsp
+
+;; (dsp:set! dsp)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  or run as SIMD dsp
+
+(dsp:set! vdsp)
+
+
