@@ -1487,6 +1487,81 @@
 
 
 
+;; A practical vector examples
+;; Three variations on a theme
+;;
+;; Vector Proc Example XTLang
+;;
+(bind-func vtest_a
+  (let ((iters:i64 80000000)
+        (i:i64 0)
+        (a:float* (halloc iters))
+        (b:float* (halloc iters))
+        (c:float* (halloc iters)))
+    (dotimes (i iters)
+      (pset! a i (i64tof i))
+      (pset! b i (i64tof i)))
+    (lambda ()
+      (dotimes (i iters)
+        (pset! c i (* (pref a i) (pref b i))))
+      (if (= (ftoi64 (pref c 80000))
+             (* 80000 80000))
+          (printf "good sample!\n")
+          (printf "bad sample!\n"))
+      c)))
+
+(bind-func vtest_b
+  (let ((iters:i64 80000000)
+        (i:i64 0)
+        (a:float* (halloc iters))
+        (b:float* (halloc iters))        
+        (c:float* (halloc iters)))
+    (dotimes (i iters)
+      (pset! a i (i64tof i))
+      (pset! b i (i64tof i)))
+    (lambda ()
+      (dotimes (i (/ iters 4))
+        (pset! (cast c /4,float/*) i
+               (* (pref (cast a /4,float/*) i)
+                  (pref (cast b /4,float/*) i))))
+      (if (= (ftoi64 (pref c 80000))
+             (* 80000 80000))
+          (printf "good sample!\n")
+          (printf "bad sample!\n"))
+      c)))
+
+(bind-func vtest_c
+  (let ((iters:i64 80000000)
+        (i 0)
+        (a:/4,float/* (halloc (/ iters 4)))
+        (b:/4,float/* (halloc (/ iters 4)))
+        (c:/4,float/* (halloc (/ iters 4))))
+    (dotimes (i iters)
+      (pset! (cast a float*) i (i64tof i))
+      (pset! (cast b float*) i (i64tof i)))
+    (lambda ()
+      (dotimes (i (/ iters 4))
+        (pset! c i (* (pref a i) (pref b i))))
+      (if (= (ftoi64 (pref (cast c float*) 80000))
+             (* 80000 80000))
+          (printf "good sample!\n")
+          (printf "bad sample!\n"))
+      (cast c float*))))
+
+
+(let ((t (clock:clock)))
+  (vtest_a)
+  (println 'Vec 'Test 'A '-> 'Seconds (list (- (clock:clock) t))))
+
+(let ((t (clock:clock)))
+  (vtest_b)
+  (println 'Vec 'Test 'B '-> 'Seconds (list (- (clock:clock) t))))
+
+(let ((t (clock:clock)))
+  (vtest_c)
+  (println 'Vec 'Test 'C '-> 'Seconds (list (- (clock:clock) t))))
+
+
 
 
 
