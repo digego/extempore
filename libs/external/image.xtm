@@ -12,7 +12,6 @@
 
 ;; lib-loading config
 (sys:load-preload-check 'image)
-(define *xtmlib-image-loaded* #t)
 
 ;; load soil library
 (define libsoil
@@ -21,6 +20,11 @@
 	  ((string=? platform "Windows") (sys:open-dylib "libSOIL.dll"))
 	  ((string=? platform "OSX") (sys:open-dylib "libSOIL.dylib"))
 	  (else (sys:load-escape "Unknown platform for soil lib")))))
+
+(if (null? libsoil) 
+    (sys:load-escape "Could not load libSOIL\n"))
+
+(define *xtmlib-image-loaded* #t)
 
 
 (bind-lib libsoil SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
