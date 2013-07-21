@@ -524,8 +524,6 @@
     (let ((lights (xtm_get_lights)))
       (shader_update_matrices_lvs shader model view projection (tref lights 9) (tref lights 8)))))
 
-
-
 (bind-func xtm_draw_mesh
   (let ((vert:i32 0)
         (first -1)
@@ -622,6 +620,7 @@
 (bind-val xtm_render_s1 i32 0)
 (bind-val xtm_render_s2 i32 0)
 (bind-val xtm_render_s3 i32 0)
+(bind-val xtm_render_s4 i32 0)
 (bind-val xtm_render_x i32 0)
 (bind-val xtm_render_y i32 0)
 (bind-val xtm_render_w i32 1024)
@@ -630,6 +629,22 @@
 (bind-val xtm_render_near float 0.1)
 (bind-val xtm_render_far float 100.0)
 
+
+(bind-func xtm_draw_tex
+  (lambda (shader:i32 tex:i32 m v p)
+    (glUseProgram shader)
+    (shader_update_matrices shader m v p)
+    ;; setup shadowmap texture from FBO
+    (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
+    (glBindTexture GL_TEXTURE_2D tex)
+    (glUniform1i (glGetUniformLocation shader "tex1") 0)
+    ;; (glViewport x y w h)
+    (gl_draw_shader_quad 0.0 0.0 1.0 1.0 0.0 1.0 1.0)
+    (glBindTexture GL_TEXTURE_2D 0)
+    (glUseProgram 0)
+    void))
+
+
 (bind-func xtm_render_fbo
   (let ((fbo:E_fbo* null))
     (lambda ()
@@ -637,29 +652,30 @@
       fbo)))
 
 (bind-func xtm_render_setup_a
-  (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8* s2f_nl:i8*)
+  (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8* s2f_nl:i8* s4v:i8* s4f:i8*)
     (xtm_render_fbo)    
     (set! xtm_render_w w)
     (set! xtm_render_h h)
     (set! xtm_render_s1 (create_shader_xtm s1v s1f))
     (set! xtm_render_s2 (create_shader_xtm s2v s2f))
     (set! xtm_render_s3 (create_shader_xtm s2v s2f_nl))
+    (set! xtm_render_s4 (create_shader_xtm s4v s4f))
     (printf "XTM Render Setup Complete\n")
     void))
 
 (bind-func xtm_render_setup_b
-  (lambda (w h n f s1v s1f s2v s2f s2f_nl)
+  (lambda (w h n f s1v s1f s2v s2f s2f_nl s4v s4f)
     (set! xtm_render_near n)
     (set! xtm_render_far f)
-    (xtm_render_setup_a w h s1v s1f s2v s2f s2f_nl)     
+    (xtm_render_setup_a w h s1v s1f s2v s2f s2f_nl s4v s4f)     
     void))
 
 (bind-func xtm_render_setup_c
-  (lambda (x y w h n f a s1v s1f s2v s2f s2f_nl)
+  (lambda (x y w h n f a s1v s1f s2v s2f s2f_nl s4v s4f)
     (set! xtm_render_x x)
     (set! xtm_render_y y)
     (set! xtm_render_angle a)
-    (xtm_render_setup_b w h n f s1v s1f s2v s2f s2f_nl)
+    (xtm_render_setup_b w h n f s1v s1f s2v s2f s2f_nl s4v s4f)
     void))
 
 (bind-poly xtm_render_setup xtm_render_setup_a)
@@ -671,17 +687,20 @@
     (if (null? args)
         (xtm_render_setup_a w h
                             simple-vert-xtm simple-frag
-                            xtmvert-xtm xtmfrag xtmfrag_nolight)
+                            xtmvert-xtm xtmfrag xtmfrag_nolight
+                            quad-vert quad-frag)
         (cond ((= (length args) 2)
                (xtm_render_setup_b w h (car args) (cadr args)
                                    simple-vert-xtm simple-frag
-                                   xtmvert-xtm xtmfrag xtmfrag_nolight))
+                                   xtmvert-xtm xtmfrag xtmfrag_nolight
+                                   quad-vert quad-frag))
               ((= (length args) 5)
                (xtm_render_setup_c w h (car args) (cadr args)
                                    (caddr args) (cadddr args)
                                    (car (cddddr args))
                                    simple-vert-xtm simple-frag
-                                   xtmvert-xtm xtmfrag xtmfrag_nolight))
+                                   xtmvert-xtm xtmfrag xtmfrag_nolight
+                                   quad-vert quad-frag))
               (else (println 'Wrong 'number 'or 'args 'for 'xtm_render_setup))))))
 
 
@@ -782,7 +801,7 @@
           (begin
             (xtm_camera_view view)       ;; setup view
             (fill_identity_matrix model) ;; setup model            
-            (post frame 0 model view projection data)))      
+            (post frame xtm_render_s4 model view projection data)))
       ;;
       (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
       ;; print errors?
