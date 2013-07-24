@@ -25,6 +25,18 @@
 (if (not gstlib)
     (sys:load-escape "Could not load 'gstreamer' dynamic library"))
 
+
+(define gstapplib
+  (sys:open-dylib (if (string=? "Linux" (sys:platform))
+		      "libgstapp-1.0.so"
+                      (if (string=? "OSX" (sys:platform))
+                          "libgstapp-1.0.dylib"
+                          (print-error "Where can I find gstreamer on your platform?")))))
+
+(if (not gstapplib)
+    (sys:load-escape "Could not load 'gstreamer' app library\nMake sure you have install at least the core plugins!"))
+
+
 (define *xtmlib-gstreamer-loaded* #t)
 
 (bind-alias GstState i32)
@@ -102,13 +114,14 @@
 (bind-alias GstClockTimeDiff i64)
 (bind-alias GstElementFactory i8) ;; opaque struct
 (bind-alias GstPipeline i8) ;; opaque struct
-(bind-alias GstBin i8) ;; opaque struct
+;;(bind-alias GstBin i8) ;; opaque struct
 (bind-alias GstPad i8) ;; opaque struct
 ;(bind-alias GstObject i8) ;; opaque struct
 (bind-alias GstEvent i8) ;; opaque struct
 (bind-alias GstBufferPrivate i8) ;; opaque
 (bind-alias GstClockTime i64)
 (bind-alias GstCapsFlags i32)
+(bind-alias GstMapFlags i32)
 
 (bind-type GstElement <GStaticRecMutex*,GCond*,guint32,GstState,GstState,GstState,GstStateChangeReturn,GstBus*,GstClock*,GstClockTimeDiff,guint16,GList,guint16,GList,guint16,GList,guint32>)
 (bind-type GstElementDetails <gchar*,gchar*,gchar*,gchar*>)
@@ -118,6 +131,9 @@
 (bind-type GstMiniObject <GType,gint,gint,guint,i8*,i8*,i8*,guint,gpointer>)
 (bind-type GstCaps <GType,gint,GstCapsFlags,i8*,|4,gpointer|>)
 (bind-type GstBuffer <GstMiniObject,i8*,guint,GstClockTime,GstClockTime,GstCaps*,i64,i64,i8*,GFreeFunc,GstBuffer*,GstBufferPrivate*,gpointer>)
+(bind-type GstBin <gint,GList*,guint32,GstBus*,GList*,gboolean,gboolean,gboolean,GstClock*,GstElement*>)
+(bind-type GstMemory <GstMiniObject,i8*,GstMemory*,gsize,gsize,gsize,gsize>)
+(bind-type GstMapInfo <GstMemory*,GstMapFlags,guint8,gsize,gsize>)
 
 (bind-alias GstMiniObjectCopyFunction [GstMiniObject*,GstMiniObject*]*)
 (bind-alias GstMiniObjectDisposeFunction [gboolean,GstMiniObject*]*)
@@ -165,12 +181,19 @@
 (bind-lib gstlib gst_element_get_static_pad [GstPad*,GstElement*,gchar*]*)
 
 ;; bins
+(bind-lib gstlib gst_bin_new [GstElement*,gchar*]*)
 (bind-lib gstlib gst_bin_add [gboolean,GstBin*,GstElement*]*)
 (bind-lib gstlib gst_bin_remove [gboolean,GstBin*,GstElement*]*)
 (bind-lib gstlib gst_bin_get_by_name [GstElement*,GstBin*,gchar*]*)
 
 ;; buffer
 (bind-lib gstlib gst_buffer_new [GstBuffer*]*)
+(bind-lib gstlib gst_buffer_get_size [gsize,GstBuffer*]*)
+;;(bind-lib gstlib gst_buffer_unref [void,GstBuffer*]*)
+(bind-lib gstlib gst_buffer_map [gboolean,GstBuffer*,GstMapInfo*,GstMapFlags]*)
+(bind-lib gstlib gst_buffer_extract [gsize,GstBuffer*,gsize,gpointer,gsize]*)
+(bind-lib gstlib gst_buffer_fill [gsize,GstBuffer*,gsize,gpointer,gsize]*)
+(bind-lib gstlib gst_buffer_memset [gsize,GstBuffer*,gsize,guint8,gsize]*)
 
 ;; buss
 (bind-alias GstBusSyncReply i32) ;; enum
@@ -185,6 +208,9 @@
 (bind-lib gstlib gst_pad_link [GstPadLinkReturn,GstPad*,GstPad*]*)
 (bind-lib gstlib gst_pad_unlink [gboolean,GstPad*,GstPad*]*)
 
+;; ghost pad
+(bind-lib gstlib gst_ghost_pad_new [GstPad*,gchar*,GstPad*]*)
+
 ;; events
 (bind-lib gstlib gst_event_new_seek [GstEvent*,gdouble,GstFormat,GstSeekFlags,GstSeekType,gint64,GstSeekType,gint64]*)
 
@@ -197,10 +223,18 @@
 (bind-lib gstlib gst_caps_get_structure [GstStructure*,GstCaps*,guint]*)
 (bind-lib gstlib gst_caps_to_string [gchar*,GstCaps*]*)
 (bind-lib gstlib gst_caps_from_string [GstCaps*,gchar*]*)
+(bind-lib gstlib gst_caps_new_empty_simple [GstCaps*,i8*]*)
+;; (bind-lib gstlib gst_caps_unref [void,GstCaps*]*)
 (bind-lib gstlib gst_structure_get_int [gboolean,GstStructure*,gchar*,gint*]*)
 (bind-lib gstlib gst_structure_get_double [gboolean,GstStructure*,gchar*,gdouble*]*)
 (bind-lib gstlib gst_structure_get_string [gchar*,GstStructure*,gchar*]*)
 (bind-lib gstlib gst_structure_get_clock_time [gboolean,GstStructure*,gchar*,GstClockTime*]*)
+(bind-lib gstlib gst_structure_get_value [GValue*,GstStructure*,gchar*]*)
+
+
+;; gst value
+(bind-lib gstlib gst_value_get_fraction_numerator [gint,GValue*]*)
+(bind-lib gstlib gst_value_get_fraction_denominator [gint,GValue*]*)
 
 ;; gst mini object stuff NOT IN 1.0+?
 ;; (bind-lib gstlib gst_value_set_mini_object [void,GValue*,GstMiniObject*]*)
@@ -208,5 +242,30 @@
 ;; (bind-lib gstlib gst_value_get_mini_object [GstMiniObject*,GValue*]*)
 ;; (bind-lib gstlib gst_value_dup_mini_object [GstMiniObject*,GValue*]*)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; GstApp src/sink stuff
+;;
 
-;(bind-lib gstlib gst_video_convert_frame [GstBuffer*,GstBuffer*,GstCaps*,GstClockTime,GError**]*)
+(bind-alias GstSample i8) ;; opaque
+(bind-alias GstAppSink i8) ;; opaque
+(bind-alias GstSample i8) ;; opaque
+
+(bind-alias GstFlowReturn i32)
+(bind-val GST_FLOW_OK i32 0)
+(bind-val GST_FLOW_EOS i32 -3)
+(bind-val GST_FLOW_NOT_NEGOTIATED i32 -4)
+(bind-val GST_FLOW_ERROR i32 -5)
+(bind-val GST_FLOW_NOT_SUPPORTED i32 -6)
+
+;; (bind-type GstAppSinkCallbacks <[void,GstAppSink*,gpointer]*,[GstFlowReturn,GstAppSink*,gpointer]*,[GstFlowReturn,GstAppSink*,gpointer]*>)
+(bind-type GstAppSinkCallbacks <i8*,i8*,i8*>) ;;[void,GstAppSink*,gpointer]*,[GstFlowReturn,GstAppSink*,gpointer]*,[GstFlowReturn,GstAppSink*,gpointer]*>)
+(bind-lib gstapplib gst_app_sink_set_callbacks [void,GstAppSink*,GstAppSinkCallbacks*,gpointer,GDestroyNotify]*)
+(bind-lib gstapplib gst_app_sink_pull_sample [GstSample*,GstAppSink*]*)
+(bind-lib gstapplib gst_app_sink_pull_preroll [GstSample*,GstAppSink*]*)
+(bind-lib gstapplib gst_app_sink_set_caps [void,GstSample*,GstCaps*]*)
+(bind-lib gstapplib gst_app_sink_is_eos [gboolean,GstAppSink*]*)
+
+(bind-lib gstapplib gst_sample_get_buffer [GstBuffer*,GstSample*]*)
+(bind-lib gstapplib gst_sample_get_caps [GstCaps*,GstSample*]*)
+(bind-lib gstapplib gst_sample_get_info [GstStructure*,GstSample*]*)
