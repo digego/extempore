@@ -42,7 +42,7 @@
 (bind-val vplay i1 0)
 
 (bind-func xtm_decode 5000000
-  (let ((dat:i8* (alloc (* 600 400 3))))
+  (let ((dat:i8* (alloc (* 1200 800 3))))
     (lambda (playz:GstElement* sink:GstElement* time rate preroll:i1)
       (if (<> (gst_app_sink_is_eos (cast sink GstAppSink*)) 0)
           (begin
@@ -63,10 +63,10 @@
                   (set! vplay #t)
                   (set! rate (ftoi64 (/ 44100.0 (/ (i32tof num) (i32tof denom)))))
                   (printf "Play format: %s\n" (gst_caps_to_string caps))))
-            (set! xsize (gst_buffer_extract buffer 0 dat (* 3 600 400)))
+            (set! xsize (gst_buffer_extract buffer 0 dat (* 3 1200 800)))
             ;; load texture into 11
-            (if (= xsize (* 3 600 400))
-                (set! texid (gl_load_tex 600 400 3 GL_UNSIGNED_BYTE dat texid)))
+            (if (= xsize (* 3 1200 800))
+                (set! texid (gl_load_tex 1200 800 3 GL_UNSIGNED_BYTE dat texid)))
             (if (or preroll
                     (and (> rate 0)
                          (> xsize 0)))
@@ -85,13 +85,13 @@
         (let ((playz (gst_element_factory_make "playbin" "play"))
               (sinkz (gst_element_factory_make "appsink" "app_sink"))
               (bus (gst_pipeline_get_bus (cast playz GstPipeline*)))
-              (caps:GstCaps* (gst_caps_from_string "video/x-raw,format=RGB,width=600,height=400"))
+              (caps:GstCaps* (gst_caps_from_string "video/x-raw,format=RGB,width=1200,height=800"))
               (rgbFilter:GstElement* (gst_element_factory_make "capsfilter" "rgb_filter"))
               (appBin:GstElement* (gst_bin_new "app_bin"))
               (rgbSinkPad:GstPad* null)
               (ghostPad:GstPad* null)
               (gv:GValue* (alloc)))
-          ;; force video decode to RGB 600x400
+          ;; force video decode to RGB 1200x800
           (gst_app_sink_set_caps (cast sinkz i8*) caps)
           ;; Replace the default window sink with appsink,
           (g_value_init gv G_TYPE_OBJECT)
