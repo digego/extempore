@@ -59,19 +59,25 @@
 (bind-alias GDir i8) ;; GDir is an opaque struct
 (bind-alias gconstpointer i8*)
 (bind-alias gpointer i8*)
+(bind-alias gint8 i8)
+(bind-alias guint8 i8)
 (bind-alias gchar i8)
+(bind-alias guchar i8)
 (bind-alias guint i32)
 (bind-alias gdouble double)
 (bind-alias gulong i64)
+(bind-alias glong i64)
 (bind-alias gfloat float)
 (bind-alias gssize i64)
 (bind-alias gsize i64)
 (bind-alias gint64 i64)
 (bind-alias guint64 i64)
-(bind-alias guint16 |2,i8|)
+(bind-alias gint16 i16)
+(bind-alias guint16 i16)
+(bind-alias gint32 i32)
 (bind-alias guint32 i32)
 (bind-alias gint i32)
-(bind-alias gboolean i1) ;; WARNING GLib defines this as i32
+(bind-alias gboolean i32) ;; WARNING GLib defines this as i32
 (bind-alias GQuark i32)
 (bind-alias GRegexMatchFlags i32)
 ;(bind-alias GObject i8) ;; opaque struct
@@ -99,6 +105,7 @@
 (bind-type GError <GQuark,gint,gchar*>)
 (bind-type GValue <GType,|2,i64|>)
 
+(bind-alias GDestroyNotify [void,gpointer]*)
 
 ;; misc stuff
 (if (string=? "Windows" (sys:platform))
@@ -179,6 +186,7 @@
 ;; GObject stuff
 (bind-lib gobjectlib g_object_ref [gpointer,gpointer]*)
 (bind-lib gobjectlib g_object_unref [void,gpointer]*)
+(bind-lib gobjectlib g_object_set_data [void,GObject*,gchar*,gpointer]*)
 (bind-lib gobjectlib g_object_set_property [void,GObject*,gchar*,GValue*]*)
 (bind-lib gobjectlib g_object_get_property [void,GObject*,gchar*,GValue*]*)
 
@@ -204,9 +212,33 @@
 
 ;; value and TYPE STUFF
 (bind-lib gobjectlib g_value_init [GValue*,GValue*,GType]*)
-(bind-lib gobjectlib g_value_get_object [gpointer,GValue*]*)
+(bind-lib gobjectlib g_value_unset [void,GValue*]*)
+(bind-lib gobjectlib g_value_reset [GValue,GValue*]*)
 (bind-lib gobjectlib g_value_get_string [gchar*,GValue*]*)
+(bind-lib gobjectlib g_value_get_char [gchar,GValue*]*)
+(bind-lib gobjectlib g_value_get_uchar [guchar,GValue*]*)
 (bind-lib gobjectlib g_value_get_int [gint,GValue*]*)
+(bind-lib gobjectlib g_value_get_uint [guint,GValue*]*)
+(bind-lib gobjectlib g_value_get_int64 [gint64,GValue*]*)
+(bind-lib gobjectlib g_value_get_uint64 [guint64,GValue*]*)
+(bind-lib gobjectlib g_value_get_long [gint64,GValue*]*)
+(bind-lib gobjectlib g_value_get_ulong [guint64,GValue*]*)
+(bind-lib gobjectlib g_value_get_float [gfloat,GValue*]*)
+(bind-lib gobjectlib g_value_get_double [gdouble,GValue*]*)
+(bind-lib gobjectlib g_value_get_object [gpointer,GValue*]*)
+(bind-lib gobjectlib g_value_get_boxed [gpointer,GValue*]*)
+(bind-lib gobjectlib g_value_get_pointer [gpointer,GValue*]*)
+(bind-lib gobjectlib g_value_get_boolean [gboolean,GValue*]*)
+(bind-lib gobjectlib g_value_set_char [void,GValue*,gchar]*)
+(bind-lib gobjectlib g_value_set_uchar [void,GValue*,guchar]*)
+(bind-lib gobjectlib g_value_set_int [void,GValue*,gint]*)
+(bind-lib gobjectlib g_value_set_uint [void,GValue*,guint]*)
+(bind-lib gobjectlib g_value_set_int64 [void,GValue*,gint64]*)
+(bind-lib gobjectlib g_value_set_uint64 [void,GValue*,guint64]*)
+(bind-lib gobjectlib g_value_set_long [void,GValue*,glong]*)
+(bind-lib gobjectlib g_value_set_ulong [void,GValue*,gulong]*)
+(bind-lib gobjectlib g_value_set_float [void,GValue*,float]*)
+(bind-lib gobjectlib g_value_set_double [void,GValue*,double]*)
 (bind-lib gobjectlib g_value_set_string [void,GValue*,gchar*]*)
 (bind-lib gobjectlib g_value_set_object [void,GValue*,gpointer]*)
 (bind-lib gobjectlib g_value_set_boxed [void,GValue*,gpointer]*)
@@ -218,7 +250,7 @@
 (bind-lib gobjectlib g_type_check_value_holds [gboolean,GValue*,GType]*)
 (bind-lib gobjectlib g_type_name_from_instance [gchar*,GTypeInstance*]*)
 (bind-lib gobjectlib g_type_name_from_class [gchar*,GTypeClass*]*)
-(bind-lib gobjectlib g_type_fundamental [GType,GType]*)
+;; (bind-lib gobjectlib g_type_fundamental [GType,GType]*)
 (bind-lib gobjectlib g_type_from_name [GType,gchar*]*)
 (bind-lib gobjectlib g_type_init [void]*)
 (bind-lib gobjectlib g_type_name [gchar*,GType]*)
@@ -259,3 +291,360 @@
 ;; (bind-alias GInetAddress i8)
 ;; (bind-lib giolib g_inet_address_new_from_string [GInetAddress*,gchar*]*)
 ;; (bind-lib giolib g_inet_address_to_string [gchar*,GInetAddress*]*)
+
+;; 
+;; where '2' is the G_TYPE_FUNDAMENTAL_SHIFT
+;;
+(bind-func g_type_fundamental
+  (lambda (v:i64)
+    (<< v 2)))
+
+(bind-func g_print_value_type
+  (lambda (v:GValue*)
+    (printf "valtype: %s\n" (tref v 0))
+    void))
+
+
+;; 2 is shift
+(bind-val G_TYPE_INVALID GType (g_type_fundamental 0))
+(bind-val G_TYPE_NONE GType (g_type_fundamental  1))
+(bind-val G_TYPE_INTERFACE GType (g_type_fundamental  2))
+(bind-val G_TYPE_CHAR GType (g_type_fundamental  3))
+(bind-val G_TYPE_UCHAR GType (g_type_fundamental  4))
+(bind-val G_TYPE_BOOLEAN GType (g_type_fundamental  5))
+(bind-val G_TYPE_INT GType (g_type_fundamental  6))
+(bind-val G_TYPE_UINT GType (g_type_fundamental  7))
+(bind-val G_TYPE_LONG GType (g_type_fundamental  8))
+(bind-val G_TYPE_ULONG GType (g_type_fundamental  9))
+(bind-val G_TYPE_INT64 GType (g_type_fundamental  10))
+(bind-val G_TYPE_UINT64 GType (g_type_fundamental  11))
+(bind-val G_TYPE_ENUM GType (g_type_fundamental  12))
+(bind-val G_TYPE_FLAGS GType (g_type_fundamental  13))
+(bind-val G_TYPE_FLOAT GType (g_type_fundamental  14))
+(bind-val G_TYPE_DOUBLE GType (g_type_fundamental  15))
+(bind-val G_TYPE_STRING GType (g_type_fundamental  16))
+(bind-val G_TYPE_POINTER GType (g_type_fundamental  17))
+(bind-val G_TYPE_BOXED GType (g_type_fundamental  18))
+(bind-val G_TYPE_PARAM GType (g_type_fundamental  19))
+(bind-val G_TYPE_OBJECT GType (g_type_fundamental  20))
+(bind-val G_TYPE_VARIANT GType (g_type_fundamental  21))
+
+(bind-func gchar_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_CHAR)
+      (g_value_set_char gv value)
+      gv)))
+
+(bind-func guchar_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_UCHAR)
+      (g_value_set_uchar gv value)
+      gv)))
+
+(bind-func gint_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_INT)
+      (g_value_set_int gv value)
+      gv)))
+
+(bind-func guint_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_UINT)
+      (g_value_set_uint gv value)
+      gv)))
+
+(bind-func gint64_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_INT64)
+      (g_value_set_int64 gv value)
+      gv)))
+
+(bind-func guint64_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_UINT64)
+      (g_value_set_uint64 gv value)
+      gv)))
+
+(bind-func gfloat_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_FLOAT)
+      (g_value_set_float gv value)
+      gv)))
+
+(bind-func gdouble_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_DOUBLE)
+      (g_value_set_double gv value)
+      gv)))
+
+(bind-func glong_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_LONG)
+      (g_value_set_long gv value)
+      gv)))
+
+(bind-func gulong_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_ULONG)
+      (g_value_set_ulong gv value)
+      gv)))
+
+(bind-func gstring_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_STRING)
+      (g_value_set_string gv value)
+      gv)))
+
+(bind-func gboolean_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_BOOLEAN)
+      (g_value_set_boolean gv value)
+      gv)))
+
+(bind-func gpointer_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_POINTER)
+      (g_value_set_pointer gv value)
+      gv)))
+
+(bind-func gobject_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_OBJECT)
+      (g_value_set_object gv value)
+      gv)))
+
+(bind-func gboxed_alloc
+  (lambda (value)
+    (let ((gv:GValue* (alloc)))
+      (g_value_init gv G_TYPE_BOXED)
+      (g_value_set_boxed gv value)
+      gv)))
+
+(bind-func gchar_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_CHAR)
+      (g_value_set_char gv value)
+      gv)))
+
+(bind-func guchar_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_UCHAR)
+      (g_value_set_uchar gv value)
+      gv)))
+
+(bind-func gint_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_INT)
+      (g_value_set_int gv value)
+      gv)))
+
+(bind-func guint_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_UINT)
+      (g_value_set_uint gv value)
+      gv)))
+
+(bind-func gint64_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_INT64)
+      (g_value_set_int64 gv value)
+      gv)))
+
+(bind-func guint64_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_UINT64)
+      (g_value_set_uint64 gv value)
+      gv)))
+
+(bind-func gfloat_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_FLOAT)
+      (g_value_set_float gv value)
+      gv)))
+
+(bind-func gdouble_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_DOUBLE)
+      (g_value_set_double gv value)
+      gv)))
+
+(bind-func glong_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_LONG)
+      (g_value_set_long gv value)
+      gv)))
+
+(bind-func gulong_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_ULONG)
+      (g_value_set_ulong gv value)
+      gv)))
+
+(bind-func gstring_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_STRING)
+      (g_value_set_string gv value)
+      gv)))
+
+(bind-func gboolean_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_BOOLEAN)
+      (g_value_set_boolean gv value)
+      gv)))
+
+(bind-func gpointer_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_POINTER)
+      (g_value_set_pointer gv value)
+      gv)))
+
+(bind-func gobject_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_OBJECT)
+      (g_value_set_object gv value)
+      gv)))
+
+(bind-func gboxed_halloc
+  (lambda (value)
+    (let ((gv:GValue* (halloc)))
+      (g_value_init gv G_TYPE_BOXED)
+      (g_value_set_boxed gv value)
+      gv)))
+
+
+(bind-func gchar_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_CHAR)
+      (g_value_set_char gv value)
+      gv)))
+
+(bind-func guchar_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_UCHAR)
+      (g_value_set_uchar gv value)
+      gv)))
+
+(bind-func gint_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_INT)
+      (g_value_set_int gv value)
+      gv)))
+
+(bind-func guint_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_UINT)
+      (g_value_set_uint gv value)
+      gv)))
+
+(bind-func gint64_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_INT64)
+      (g_value_set_int64 gv value)
+      gv)))
+
+(bind-func guint64_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_UINT64)
+      (g_value_set_uint64 gv value)
+      gv)))
+
+(bind-func gfloat_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_FLOAT)
+      (g_value_set_float gv value)
+      gv)))
+
+(bind-func gdouble_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_DOUBLE)
+      (g_value_set_double gv value)
+      gv)))
+
+(bind-func glong_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_LONG)
+      (g_value_set_long gv value)
+      gv)))
+
+(bind-func gulong_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_ULONG)
+      (g_value_set_ulong gv value)
+      gv)))
+
+(bind-func gstring_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_STRING)
+      (g_value_set_string gv value)
+      gv)))
+
+(bind-func gboolean_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_BOOLEAN)
+      (g_value_set_boolean gv value)
+      gv)))
+
+(bind-func gpointer_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_POINTER)
+      (g_value_set_pointer gv value)
+      gv)))
+
+(bind-func gobject_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_OBJECT)
+      (g_value_set_object gv value)
+      gv)))
+
+(bind-func gboxed_zalloc
+  (lambda (value)
+    (let ((gv:GValue* (zalloc)))
+      (g_value_init gv G_TYPE_BOXED)
+      (g_value_set_boxed gv value)
+      gv)))
+
+
+
+
