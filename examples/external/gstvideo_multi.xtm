@@ -87,12 +87,15 @@
 
 (bind-func playbin_bus_call:GstBusFunc
   (lambda (bus msg data)
-    (let ((playz (cast data GstElement*))
+    (let ((playz (tref (cast data userdata*) 1))
 	  (msgtype (tref msg 1))
 	  (time (tref msg 2))
           (seq (tref msg 4)))
-      (cond ((= msgtype GST_MESSAGE_EOS)
-	     (printf "EOS!\n")
+      (cond ((<> (& GST_MESSAGE_EOS msgtype) 0)
+             ;; (printf "END OF STREAM!\n")
+             (gst_element_set_state playz GST_STATE_NULL)
+             (gst_object_unref (cast playz gpointer)) ;; does playz release sink?
+             (free data)
 	     1)
 	    ((<> (& GST_MESSAGE_ERROR msgtype) 0)
 	     (let ((debug:|1,i8*|* (alloc))
@@ -156,16 +159,11 @@
   (lambda (sink:GstAppSink* data:gpointer)
     (let ((quad (tref (cast data userdata*) 0))
           (playz (tref (cast data userdata*) 1)))
-      (gst_element_set_state playz GST_STATE_NULL)      
-      ;; (gst_object_unref (cast sink gpointer))     
-      (gst_object_unref (cast playz gpointer)) ;; does playz release sink?    
-      (free data)
-      ;;(printf "Free OBJS[%d] playz(%p) sink(%p)\n" quad playz sink)
       (cond ((= quad 1) (set! vplay1 #f) (set! sampledata1dirty #f))
             ((= quad 2) (set! vplay2 #f) (set! sampledata2dirty #f))
             ((= quad 3) (set! vplay3 #f) (set! sampledata3dirty #f))
             ((= quad 4) (set! vplay4 #f) (set! sampledata4dirty #f)))
-      (printf "Finished Decoding[%d]!\n" quad)      
+      (printf "Finished Decoding[%d]!\n" quad)            
       void)))
 
 ;; path must be a valid URI to media
@@ -310,4 +308,6 @@
 
 ;; (xtm_play "file:///Users/sorensen/Movies/cave.mov")
 ;; (xtm_play "file:///Users/sorensen/Movies/stp_model.mov")
+;; (xtm_play "file:///Users/sorensen/Movies/stp_model.mov")
+;; (xtm_play "file:///Users/sorensen/Movies/cave.mov")
 
