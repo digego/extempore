@@ -420,6 +420,7 @@
 (bind-val xtm_render_s1 i32 0)
 (bind-val xtm_render_s2 i32 0)
 (bind-val xtm_render_s3 i32 0)
+(bind-val xtm_render_s4 i32 0)
 (bind-val xtm_render_x i32 0)
 (bind-val xtm_render_y i32 0)
 (bind-val xtm_render_w i32 1024)
@@ -457,9 +458,9 @@
 (bind-lib-func stdlib xtm_draw_tex [void,i32,i32,float*,float*,float*]*)
 
 (bind-lib-func stdlib xtm_render_fbo [E_fbo*]*)
-(bind-lib-func stdlib xtm_render_setup_a [void,i32,i32,i8*,i8*,i8*,i8*,i8*]*)
-(bind-lib-func stdlib xtm_render_setup_b [void,i32,i32,float,float,i8*,i8*,i8*,i8*,i8*]*)
-(bind-lib-func stdlib xtm_render_setup_c [void,i32,i32,i32,i32,float,float,float,i8*,i8*,i8*,i8*,i8*]*)
+(bind-lib-func stdlib xtm_render_setup_a [void,i32,i32,i8*,i8*,i8*,i8*,i8*,i8*,i8*]*)
+(bind-lib-func stdlib xtm_render_setup_b [void,i32,i32,float,float,i8*,i8*,i8*,i8*,i8*,i8*,i8*]*)
+(bind-lib-func stdlib xtm_render_setup_c [void,i32,i32,i32,i32,float,float,float,i8*,i8*,i8*,i8*,i8*,i8*,i8*]*)
 
 (bind-lib-func stdlib xtm_render [i64,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,[void,i64,i32,float*,float*,float*,i8*]*,i8*]*)
 
@@ -485,17 +486,20 @@
     (if (null? args)
         (xtm_render_setup_a w h
                             simple-vert-xtm simple-frag
-                            xtmvert-xtm xtmfrag xtmfrag_nolight)
+                            xtmvert-xtm xtmfrag xtmfrag_nolight
+                            quad-vert quad-frag)
         (cond ((= (length args) 2)
                (xtm_render_setup_b w h (car args) (cadr args)
                                    simple-vert-xtm simple-frag
-                                   xtmvert-xtm xtmfrag xtmfrag_nolight))
+                                   xtmvert-xtm xtmfrag xtmfrag_nolight
+                                   quad-vert quad-frag))
               ((= (length args) 5)
                (xtm_render_setup_c w h (car args) (cadr args)
                                    (caddr args) (cadddr args)
                                    (car (cddddr args))
                                    simple-vert-xtm simple-frag
-                                   xtmvert-xtm xtmfrag xtmfrag_nolight))
+                                   xtmvert-xtm xtmfrag xtmfrag_nolight
+                                   quad-vert quad-frag))
               (else (println 'Wrong 'number 'or 'args 'for 'xtm_render_setup))))))
 
 
