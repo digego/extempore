@@ -799,8 +799,13 @@
 
       (if (not (null? post))
           (begin
+            ;; post is usually 2D? so no DEPTH test by default!
+            (glDisable GL_DEPTH_TEST)                  
             (xtm_camera_view view)       ;; setup view
-            (fill_identity_matrix model) ;; setup model            
+            (fill_identity_matrix model) ;; setup model
+            ;; should probably really pass in 0 for shader id here!
+            ;; as we don't want ANY shaders running by default in
+            ;; the post processing stage.
             (post frame xtm_render_s4 model view projection data)))
       ;;
       (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
