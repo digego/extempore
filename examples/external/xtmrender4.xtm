@@ -54,7 +54,7 @@
 (define glctx (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
 
 ;; first try to load from prebuilt stdlib
-;; (sys:load "libs/xtm.xtm")
+(sys:load "libs/xtm.xtm")
 ;; failing that compile on-the-fly
 (sys:load "libs/core/math.xtm")
 (sys:load "libs/external/opengl.xtm")
@@ -129,28 +129,11 @@
       (xtm_draw_node (pref nodes 3) shader m v p)
       void)))
 
-(bind-func post:XTMRENDERCB
-  (let ((img (gl_load_image "/Users/sorensen/Pictures/profile.png" 0)))
-    (lambda (frame shader m v p data)
-      ;; first draw img 'into' the scene
-      (translate_matrix m -4.0 -0.0 11.0)
-      (scale_matrix m 4.0 4.0 0.0)
-      (rotate_matrix m (* 3.1415 (cosf (* .1 (i64tof frame)))) 0.0 1.0 0.0)      
-      (xtm_draw_tex shader img m v p)
-       ;; now draw as overlay in bottom right
-      (fill_orthographic_matrix p -1.0 1.0 -1.0 1.0 -1.0 1.0)
-      (fill_identity_matrix m)
-      (fill_identity_matrix v)      
-      (scale_matrix m 0.5 0.5 0.0)
-      (translate_matrix m 1.5 -1.5 0.0)
-      (xtm_draw_tex shader img m v p)
-      void)))
-
 (bind-func gl_render
   (let ((models:xtm_node** (alloc 4)))
     (lambda (model1:xtm_node* model2:xtm_node* model3:xtm_node* model4:xtm_node*)
       (pfill! models model1 model2 model3 model4)
-      (xtm_render prerender render null post (cast models i8*))
+      (xtm_render prerender render null null (cast models i8*))
       void)))
 
 ;; standard impromptu callback
