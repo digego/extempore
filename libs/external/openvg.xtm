@@ -1,0 +1,198 @@
+;;; openvg.xtm -- Vector Graphics (currently from ShivaVG
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: libShivaVG
+
+;;; Commentary:
+
+;;; Code:
+
+;; lib-loading config
+(sys:load-preload-check 'openvg)
+
+;; load soil library
+(define shivalib
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "shiva.so"))
+	  ((string=? platform "Windows") (sys:open-dylib "shiva.dll"))
+	  ((string=? platform "OSX") (sys:open-dylib "shiva.dylib"))
+	  (else (sys:load-escape "Unknown platform for OpenVG lib")))))
+
+(if (null? shivalib) 
+    (sys:load-escape "Could not load OpenVG\n"))
+
+(sys:load "libs/external/image.xtm")
+
+(define *xtmlib-openvg-loaded* #t)
+
+(bind-alias VGboolean i32)
+(bind-val VG_FALSE i32 0)
+(bind-val VG_TRUE i32 1)
+(bind-alias VGint i32)
+(bind-alias VGuint i32)
+(bind-alias VGbitfield i32)
+(bind-alias VGfloat float)
+(bind-alias VGbyte i8)
+(bind-alias VGubyte i8)
+(bind-alias VGshort i16)
+
+(bind-alias VGHandle i8*)
+(bind-alias VGPath i8*)
+(bind-alias VGPaint i8*)
+(bind-alias VGImage i8*)
+
+(bind-val VG_PATH_FORMAT_STANDARD i32 0)
+
+(bind-alias enum i32)
+
+;; enums
+(bind-alias VGPathDatatype i32)
+(bind-val VG_PATH_DATATYPE_F i32 3)
+
+(bind-alias VGPathCapabilities i32)
+(bind-val VG_PATH_CAPABILITY_ALL i32 (real->integer (- (expt 2 12) 1)))
+
+(bind-alias VGPathAbsRel i32)
+(bind-val VG_ABSOLUTE i32 0)
+(bind-val VG_RELATIVE i32 1)
+
+(bind-alias VGPathSegment i32)
+(bind-val VG_CLOSE_PATH i32 0)
+(bind-val VG_MOVE_TO i32 2)
+(bind-val VG_LINE_TO i32 4)
+(bind-val VG_HLINE_TO i32 6)
+(bind-val VG_VLINE_TO i32 8)
+(bind-val VG_QUAD_TO i32 10)
+(bind-val VG_CUBIC_TO i32 12)
+(bind-val VG_SCUBIC_TO i32 14)
+(bind-val VG_SCCWARC_TO i32 16)
+(bind-val VG_SCWARC_TO i32 18)
+(bind-val VG_LCCWARC_TO i32 20)
+(bind-val VG_LCWARC_TO i32 22)
+
+(bind-alias VGPaintMode i32)
+(bind-val VG_STROKE_PATH i32 1)
+(bind-val VG_FILL_PATH i32 2)
+
+(bind-alias VGErrorCode i32)
+(bind-val VG_NO_ERROR i32 0)
+
+(bind-alias VGParamType i32)
+(bind-val VG_MATRIX_MODE i32 4352)
+(bind-val VG_FILL_RULE i32 4353)
+(bind-val VG_IMAGE_QUALITY i32 4354)
+(bind-val VG_RENDERING_QUALITY i32 4355)
+(bind-val VG_BLEND_MODE i32 4356)
+(bind-val VG_IMAGE_MODE i32 4357)
+
+(bind-alias VGPaintParamType i32)
+(bind-val VG_PAINT_TYPE i32 6656)
+(bind-val VG_PAINT_COLOR i32 6657)
+
+(bind-alias VGPaintType i32)
+(bind-val VG_PAINT_TYPE_COLOR i32 6912)
+(bind-val VG_PAINT_TYPE_LINEAR_GRADIENT i32 6913)
+(bind-val VG_PAINT_TYPE_RADIAL_GRADIENT i32 6914)
+(bind-val VG_PAINT_TYPE_PATTERN i32 6915)
+
+(bind-val VG_CLEAR_COLOR i32 4385)
+(bind-val VG_STROKE_LINE_WIDTH i32 4368)
+
+(bind-alias VGMatrixMode i32)
+(bind-val VG_MATRIX_PATH_USER_TO_SURFACE i32 5120)
+(bind-val VG_MATRIX_IMAGE_USER_TO_SURFACE i32 5121)
+(bind-val VG_MATRIX_FILL_PAINT_TO_USER i32 5122)
+(bind-val VG_MATRIX_STROKE_PAINT_TO_USER i32 5123)
+
+(bind-alias VGImageFormat i32)
+(bind-val VG_sRGBX_8888 i32 0)
+(bind-val VG_sRGBA_8888 i32 1)
+(bind-val VG_sRGBA_8888_PRE i32 2)
+(bind-val VG_lRGBX_8888 i32 7)
+(bind-val VG_lRGBA_8888 i32 8)
+(bind-val VG_lRGBA_8888_PRE i32 9)
+
+(bind-val VG_lARGB_8888 i32 200)
+
+(bind-alias VGBlendMode i32)
+(bind-val VG_BLEND_SRC i32 8192)
+
+(bind-alias VGImageMode i32)
+(bind-val VG_DRAW_IMAGE_NORMAL i32 7936)
+(bind-val VG_DRAW_IMAGE_MULTIPLY i32 7937)
+(bind-val VG_DRAW_IMAGE_STENCIL i32 7938)
+
+(bind-alias VGRenderingQuality i32)
+(bind-val VG_RENDERING_QUALITY_BETTER i32 4610)
+
+(bind-val VG_IMAGE_QUALITY_BETTER i32 4)
+
+
+(bind-lib shivalib vgCreateContextSH [VGboolean,VGint,VGint]*)
+(bind-lib shivalib vgCreatePath [VGPath,VGint,VGPathDatatype,VGfloat,VGfloat,VGint,VGint,VGbitfield]*)
+(bind-lib shivalib vgClearPath [void,VGPath,VGbitfield]*)
+(bind-lib shivalib vgDestroyPath [void,VGPath]*)
+(bind-lib shivalib vgClear [void,VGint,VGint,VGint,VGint]*)
+(bind-lib shivalib vgAppendPath [void,VGPath,VGPath]*)
+(bind-lib shivalib vgAppendPathData [void,VGPath,VGint,VGubyte*,i8*]*)
+(bind-lib shivalib vgDrawPath [void,VGPath,VGbitfield]*)
+(bind-lib shivalib vgPathBounds [void,VGPath,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
+(bind-lib shivalib vgCreatePaint [VGPaint]*)
+(bind-lib shivalib vgDestroyPaint [void,VGPaint]*)
+(bind-lib shivalib vgSetPaint [void,VGPaint,VGbitfield]*)
+;; (bind-lib shivalib vgSetColor [void,VGPaint,VGuint]*)
+(bind-lib shivalib vgSetfv [void,VGParamType,VGint,VGfloat*]*)
+(bind-lib shivalib vgSetiv [void,VGParamType,VGint,VGint*]*)
+(bind-lib shivalib vgSeti [void,VGParamType,VGint]*)
+(bind-lib shivalib vgSetf [void,VGParamType,VGfloat]*)
+
+(bind-lib shivalib vgLoadIdentity [void]*)
+(bind-lib shivalib vgTranslate [void,VGfloat,VGfloat]*)
+(bind-lib shivalib vgScale [void,VGfloat,VGfloat]*)
+(bind-lib shivalib vgRotate [void,VGfloat]*)
+
+
+
+(bind-lib shivalib vgSetParameterfv [void,VGHandle,VGint,VGint,VGfloat*]*)
+(bind-lib shivalib vgSetParameteri [void,VGHandle,VGint,VGint]*)
+(bind-lib shivalib vgGetError [VGErrorCode]*)
+
+;; image
+(bind-lib shivalib vgCreateImage [VGImage,VGImageFormat,VGint,VGint,VGbitfield]*)
+(bind-lib shivalib vgImageSubData [void,VGImage,i8*,VGint,VGImageFormat,VGint,VGint,VGint,VGint]*)
+(bind-lib shivalib vgDrawImage [void,VGImage]*)
+
+;; vgu
+(bind-lib shivalib vguLine [VGErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
+(bind-lib shivalib vguEllipse [VGErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
+
+(bind-func vgCreateContext
+  (lambda (w h)
+    (vgCreateContextSH w h)))
+
+(bind-func xtm_create_vgpath
+  (lambda ()
+    (vgCreatePath VG_PATH_FORMAT_STANDARD VG_PATH_DATATYPE_F
+                  1.0 0.0 0 0
+                  VG_PATH_CAPABILITY_ALL)))
+
+(bind-func xtm_create_vgimage
+  (lambda (path)
+    (let ((w:i32* (alloc))
+          (h:i32* (alloc))
+          (c:i32* (alloc))
+          (i 0)
+          (row:i8* null)
+          (data:i8* (SOIL_load_image path w h c SOIL_LOAD_RGBA))
+          (img (vgCreateImage VG_lARGB_8888 (pref w 0) (pref h 0)
+                              VG_IMAGE_QUALITY_BETTER)))
+      ;; flip image
+      (dotimes (i (pref h 0))
+        (set! row (pref-ptr data (* i (* (pref w 0) 4))))
+        (vgImageSubData img row (* (pref w 0) 4) VG_lARGB_8888
+                        0
+                        (- (pref h 0) i 1)  (pref w 0) 1))
+      img)))
+      
+

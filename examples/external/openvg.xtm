@@ -1,0 +1,115 @@
+;;; gstreamer.xtm -- Simple GStreamer playbin example
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: gstreamer
+
+;;; Commentary:
+
+;; A simple 'synchronous' gstreamer example
+;; plays back a single video file
+;;
+;; This is about as simple an example as
+;; possible that still uses the standard
+;; extempore rendering pipeline
+
+;;; Code:
+
+(define fullscreen #f)
+;; (define width 1920.0)
+;; (define height 1200.0)
+(define width 1024.0)
+(define height 768.0)
+
+(bind-val width float width)
+(bind-val height float height)
+
+;; setup opengl
+(define glctx (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+
+;; first try to load from prebuilt stdlib
+;; (sys:load "libs/xtm.xtm")
+;; failing that compile on-the-fly
+(sys:load "libs/core/math.xtm")
+(sys:load "libs/external/opengl.xtm")
+(sys:load "libs/external/shaders.xtm")
+(sys:load "libs/external/assimp.xtm")
+(sys:load "libs/external/openvg.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; NOW GL STUFF!
+;;
+(bind-func post:XTMRENDERCB
+  (let ((img:VGImage null))
+    (lambda (frame shader m v p data)
+      (if (null? img)
+          (set! img (xtm_create_vgimage "/Users/sorensen/Pictures/profile.png")))          
+      (let ((path (xtm_create_vgpath))
+            (stroke (vgCreatePaint))
+            (fill (vgCreatePaint))
+            (i:i64 0)
+            (color:float* (salloc 4))
+            (color1:float* (salloc 4))
+            (color2:float* (salloc 4)))
+        (glDisable GL_DEPTH_TEST)
+	(vgSetParameteri stroke VG_PAINT_TYPE VG_PAINT_TYPE_COLOR)
+	(vgSetParameteri fill VG_PAINT_TYPE VG_PAINT_TYPE_COLOR)
+        
+        (pfill! color 0.0 0.0 0.0 1.0)        
+        (vgSetfv VG_CLEAR_COLOR 4 color)        
+        (vgClear 0 0 1024 768)
+
+        (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+        (vgLoadIdentity)
+        (vgSeti VG_IMAGE_MODE VG_DRAW_IMAGE_NORMAL)  
+        (vgDrawImage img)
+
+        (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+        (vgLoadIdentity)
+        
+        (pfill! color1 1.0 0.0 0.0 0.5)
+        (vgSetParameterfv fill VG_PAINT_COLOR 4 color1)        
+        (pfill! color2 0.0 0.0 1.0 0.5)
+        (vgSetParameterfv stroke VG_PAINT_COLOR 4 color2)
+
+        (dotimes (i 200)
+          (vguEllipse path
+                      (+ 512. (* 200.0 (cosf (* (i64tof i) 0.00025 (i64tof frame)))))
+                      (+ 400. (* 100.0 (tanf (* 0.0001 (i64tof i) (i64tof frame)))))
+                      30. 30.))
+        (vgSetPaint stroke VG_STROKE_PATH)
+        (vgSetPaint fill VG_FILL_PATH)        
+        (vgSetf VG_STROKE_LINE_WIDTH 10.0)
+        (vgDrawPath path (+ VG_FILL_PATH VG_STROKE_PATH))
+                
+        (vgDestroyPath path)
+        (vgDestroyPaint stroke)
+        (vgDestroyPaint fill)
+       )
+              
+      (if (<> (vgGetError) 0)
+          (printf "VG Error %d\n" (vgGetError)))
+      void)))
+
+(bind-func gl_render
+  (lambda ()
+    (xtm_render null null null post null)
+    void))
+
+;; standard impromptu callbacks 
+(define opengl-loop
+  (lambda (time dur degree)
+    (let ((v (now)))
+      (gl_render)
+      (gl:swap-buffers glctx)
+      )
+    (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) 1200 (+ degree .5))))
+
+;; init xtm render pipeline
+(xtm_render_setup (real->integer width) (real->integer height))
+
+(println 'VGContext (vgCreateContext (real->integer width) (real->integer height)))
+
+;; start opengl loop
+(opengl-loop (now) 1200 70.0)
