@@ -1,30 +1,30 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; to compile xtm.bc file
+;; to compile xtm.{dylib,so,dll} shared library (for faster loading)
+
+;; ;; first compile the xtlang code you want in the shared lib
 ;;
-;; first export module to bitcode:
+;; (sys:load "libs/core/math.xtm")
+;; (sys:load "libs/external/opengl.xtm")
+;; (sys:load "libs/external/shaders.xtm")
+;; (sys:load "libs/external/assimp.xtm")
+;; (sys:load "libs/core/audio_dsp.xtm")
+;; (sys:load "libs/core/instruments.xtm")
+;; (sys:load "libs/external/sndfile.xtm")
+;; (sys:load "libs/external/instruments.xtm")
 
-(define load-libs-for-stdlib-compilation
-  (lambda ()
-    (sys:load "libs/core/math.xtm")
-    (sys:load "libs/external/opengl.xtm")
-    (sys:load "libs/external/shaders.xtm")
-    (sys:load "libs/external/assimp.xtm")
-    (sys:load "libs/core/audio_dsp.xtm")
-    (sys:load "libs/core/instruments.xtm")
-    (sys:load "libs/external/sndfile.xtm")
-    (sys:load "libs/external/instruments.xtm")
-    ;; export the module to bitcode
-    (llvm:export-module "/tmp/xtm.bc")
-    ;; print further instructions
-    (print "\nLLVM bitcode for the xtlang standard library exported to \"/tmp/xtm.bc\". To finish compiling the stdlib, enter the following command in a terminal window (inserting the proper path to your LLVM install):\n\n")
-    (cond ((string=? (sys:platform) "Linux")
-           (print "/path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && gcc --shared -g /tmp/xtm.s -o ./xtm.so\n"))
-          ((string=? (sys:platform) "OSX")
-           (print "/path/to/llvm-3.2/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && clang -O3 -dynamiclib -undefined dynamic_lookup /tmp/xtm.s -o ./xtm.dylib\n"))
-          (else (print "Sorry, cannot find the appropriate compilation command for your platform at this time.")))))
+;; ;; then export the module to bitcode
+;;
+;; (begin (llvm:export-module "/tmp/xtm.bc")
+;;        ;; print further instructions
+;;        (print "\nLLVM bitcode for the xtlang standard library exported to \"/tmp/xtm.bc\". To finish compiling the stdlib, enter the following command in a terminal window (inserting the proper path to your LLVM install):\n\n")
+;;        (cond ((string=? (sys:platform) "Linux")
+;;               (print "/path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && gcc --shared -g /tmp/xtm.s -o ./xtm.so\n"))
+;;              ((string=? (sys:platform) "OSX")
+;;               (print "/path/to/llvm-3.2/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && clang -O3 -dynamiclib -undefined dynamic_lookup /tmp/xtm.s -o ./xtm.dylib\n"))
+;;              (else (print "Sorry, cannot find the appropriate compilation command for your platform at this time."))))
 
-;; Here are the shell invocations for
+;; ;; Then compile bitcode into a shared lib
 
 ;; Linux:
 ;; /path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtm.bc && gcc --shared -g /tmp/xtm.s -o ./xtm.so
@@ -34,7 +34,6 @@
 
 ;; emacs regex for generating the header file:
 ;; Compiled \(.*\) >>> \(.*\) -> (bind-lib-func stdlib \1 \2)
-
 
 ;; lib-loading config
 (sys:load-preload-check 'stdlib)
