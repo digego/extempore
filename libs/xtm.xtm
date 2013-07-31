@@ -1728,10 +1728,17 @@ void main()
           ((string=? platform "OSX") (sys:open-dylib "libsndfile.dylib"))
           (else (print "Unknown platform: " platform)))))
 
+(if (or (eq? #f libsndfile)
+        (null? libsndfile))
+    (sys:load-escape "Error loading libsndfile dynamic library"))
+
+(define *xtmlib-sndfile-loaded* #t)
+
 (bind-type sf_info <i64,i32,i32,i32,i32,i32>)
 (bind-type sf_format_info <i32,i8*,i8*>)
 
 (bind-lib libsndfile sf_open [i8*,i8*,i32,sf_info*]*)
+(bind-lib libsndfile sf_open_fd [i8*,i32,i32,sf_info*,i32]*)
 (bind-lib libsndfile sf_close [i32,i8*]*)
 (bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
 (bind-lib libsndfile sf_write_sync [void,i8*]*)
@@ -1858,6 +1865,9 @@ void main()
 (bind-lib-func stdlib sawbass_note_c [[double,double,double,double,double]*,i64,double*]*)
 (bind-lib-func stdlib sawbass_fx [double,double,double,double,double*]* 700000)
 (bind-lib-func stdlib sawbass [double,double,double,double,double*]*)
+(bind-lib-func stdlib subbass_note_c [[double,double,double,double,double]*,i64,double*]*)
+(bind-lib-func stdlib subbass_fx [double,double,double,double,double*]* 100000)
+(bind-lib-func stdlib subbass [double,double,double,double,double*]*)
 (bind-lib-func stdlib sf_frames [i64,sf_info*]*)
 (bind-lib-func stdlib sf_samplerate [i64,sf_info*]*)
 (bind-lib-func stdlib sf_channels [i64,sf_info*]*)
@@ -1876,7 +1886,9 @@ void main()
 (bind-lib-func stdlib sampler1_fx [double,double,double,double,double*]* 700000)
 (bind-lib-func stdlib sampler2_fx [double,double,double,double,double*]* 700000)
 (bind-lib-func stdlib sampler3_fx [double,double,double,double,double*]* 700000)
-
+(bind-lib-func stdlib sampler1 [double,double,double,double,double*]*)
+(bind-lib-func stdlib sampler2 [double,double,double,double,double*]*)
+(bind-lib-func stdlib sampler3 [double,double,double,double,double*]*)
 
 (define-macro (play-note time inst pitch vol dur . args)  
   (let ((nargs (length args)))
@@ -2165,15 +2177,15 @@ void main()
 
 ;; (ipc:audio-setup "utility")
 
+;;;;;;;
+;; setup some instrument parameters
+
+(subbass.attack 500.0)
+(subbass.decay 500.0)
+(subbass.sustain 0.8)
+(subbass.release 500.0)
+
 (define *xtmlib-audio-inst-ext-loaded* #t)
-
-(define-sampler sampler1 sampler_note_hermite_c sampler1_fx)
-(define-sampler sampler2 sampler_note_hermite_c sampler2_fx)
-(define-sampler sampler3 sampler_note_hermite_c sampler3_fx)
-
-(sampler1_fx.wet 0.05)
-(sampler2_fx.wet 0.05)
-(sampler3_fx.wet 0.05)
 
 (println 'AUDIO 'LOADED)
 

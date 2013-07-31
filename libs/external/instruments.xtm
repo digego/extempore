@@ -41,8 +41,8 @@
 ;; ;; this reads 5000 frames starting 1000 frames into the file
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000)
 (bind-func set_sample_data_
-  (lambda (inst:[double,double,double,double*]* fname index offset lgth)
-    (let ((info:sf_info* (zalloc))
+  (lambda (inst:[double,double,double,double*]* fname index:i64 offset lgth)
+    (let ((info:sf_info* (salloc))
           (audiofile (sf_open fname 16 info))
           (channels (i32toi64 (tref info 2)))
           (num (if (= 0 lgth)
@@ -57,19 +57,17 @@
                 (olddat (if (<> 0 (pref samples_length index))
                             (bitcast (pref samples index) i8*)
                             null)))
-            (printf "%lld samples read" samples_read)
+            (printf "%lld samples read\n" samples_read)
             (pset! samples_length index (/ samples_read channels)) ;num)
             (pset! samples_channels index channels)
             (pset! samples index adat)
-            ;; the following line is a problem on windows and needs to be fixed!
-                                        ; (free_after_delay olddat (* 10.0 44100.0)))
-            (printf "%s:\t%lld(channels) %lld(frames):%f(k)\t\tinto index:%lld\n"
-                    fname channels (/ samples_read channels)
-                    (/ (i64tod (* num 8)) 1024.) index)
             (sf_close audiofile)
+            (if (not (null? olddat)) (free olddat))            
             1)
-          (begin (printf "%s\n" (sf_strerror audiofile))
-                 0)))))
+          (begin
+            (sf_close audiofile)
+            (printf "%s\n" (sf_strerror audiofile))
+            0)))))
 
 ;; passing a length of 0 will read the whole file
 (define-macro (set-sampler-index inst fname index offset lgth)
@@ -176,7 +174,7 @@
         (reverbr (reverb_c 79.0))
         (pan .5)
         (pan_ pan)
-        (wet .5)
+        (wet .1)
         (fb .5))
     (lambda (in:double time:double chan:double dat:double*)
       (if (< pan pan_)
@@ -191,7 +189,7 @@
         (reverbr (reverb_c 79.0))
         (pan .5)
         (pan_ pan)
-        (wet .5)
+        (wet .1)
         (fb .5))
     (lambda (in:double time:double chan:double dat:double*)
       (if (< pan pan_)
@@ -206,7 +204,7 @@
         (reverbr (reverb_c 79.0))
         (pan .5)
         (pan_ pan)
-        (wet .5)
+        (wet .1)
         (fb .5))
     (lambda (in:double time:double chan:double dat:double*)
       (if (< pan pan_)

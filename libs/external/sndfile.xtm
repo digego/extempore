@@ -52,6 +52,7 @@
 (bind-val SF_TRUE i32 1)
 
 (bind-lib libsndfile sf_open [i8*,i8*,i32,sf_info*]*)
+(bind-lib libsndfile sf_open_fd [i8*,i32,i32,sf_info*,i32]*)
 (bind-lib libsndfile sf_close [i32,i8*]*)
 (bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
 (bind-lib libsndfile sf_write_sync [void,i8*]*)
@@ -140,7 +141,8 @@
             (printf "samplerate:    %d\n" (tref info 1))
             (printf "channels:      %d\n" (tref info 2))
             (printf "frames:        %d\n" (tref info 0))
-            (printf "samples read:  %lld\n" samples_read))
+            (printf "samples read:  %lld\n" samples_read)
+            (sf_close audiofile))
           (printf "errors:  %s\n" (sf_strerror audiofile)))
       (if (null? dat)
           (* (tref info 0) channels) ;; frames * channels
