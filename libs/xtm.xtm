@@ -2032,14 +2032,27 @@ void main()
                            (real->integer ,offset)
                            (real->integer ,lgth)))))
 
+
+;; passing a length of 0 will read the whole file
+(define-macro (set-sampler-index inst fname index offset lgth)
+  `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (and (cptr? native)
+              (> ,index 0)
+              (< ,index 128))
+         (set_sample_data_ native
+                           ,fname
+                           (real->integer ,index)
+                           (real->integer ,offset)
+                           (real->integer ,lgth)))))
+
 ;; (set-sample-offset sampler 60 50000)
 ;; this would offset the sample at index 60 by 50000 samples
-(define-macro (set-sample-offset inst index offset)
-  `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
-     (if (cptr? native)
-	 (set_sample_offset_ native
-			     (real->integer ,index)
-			     (real->integer ,offset)))))
+;; (define-macro (set-sample-offset inst index offset)
+;;   `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+;;      (if (cptr? native)
+;; 	 (set_sample_offset_ native
+;; 			     (real->integer ,index)
+;; 			     (real->integer ,offset)))))
 
 
 (define note-name-to-midi-number
@@ -2085,19 +2098,35 @@ void main()
 
 
 ;; must be stereo samples of type wav aif or ogg
-(define-macro (load-sampler sampler path . args)
-  (let ((parser (if (null? args) 'parse-sample-names-1 (car args))))
-    `(let ((file-list (sys:directory-list ,path)))
-       (for-each (lambda (samp-data)
-                   (if samp-data
-                       (set-sampler-index ,sampler
-                                          (if (string=? (sys:platform) "Windows")
-                                              (car samp-data)
-                                              (string-append ,path "/" (car samp-data)))
-                                          (cadr samp-data)
-                                          (caddr samp-data)
-                                          (cadddr samp-data))))
-                 (,parser file-list)))))
+(define-macro (load-sampler sampler path parser . args)
+  `(let ((file-list (sys:directory-list ,path)))
+     (for-each (lambda (samp-data)
+                 (if samp-data
+                     (set-sampler-index ,sampler
+                                        (if (string=? (sys:platform) "Windows")
+                                            (car samp-data)
+                                            (string-append ,path "/" (car samp-data)))
+                                        ,(if (null? args)
+                                             '(cadr samp-data)
+                                             `(+ ,(car args) (cadr samp-data)))
+                                        (caddr samp-data)
+                                        (cadddr samp-data))))
+               (,parser file-list))))
+
+;; must be stereo samples of type wav aif or ogg
+;; (define-macro (load-sampler sampler path . args)
+;;   (let ((parser (if (null? args) 'parse-sample-names-1 (car args))))
+;;     `(let ((file-list (sys:directory-list ,path)))
+;;        (for-each (lambda (samp-data)
+;;                    (if samp-data
+;;                        (set-sampler-index ,sampler
+;;                                           (if (string=? (sys:platform) "Windows")
+;;                                               (car samp-data)
+;;                                               (string-append ,path "/" (car samp-data)))
+;;                                           (cadr samp-data)
+;;                                           (caddr samp-data)
+;;                                           (cadddr samp-data))))
+;;                  (,parser file-list)))))
 
 
 
