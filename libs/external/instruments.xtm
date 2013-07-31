@@ -57,7 +57,7 @@
                 (olddat (if (<> 0 (pref samples_length index))
                             (bitcast (pref samples index) i8*)
                             null)))
-            (printf "%lld samples read\n" samples_read)
+            (printf "%lld samples read into: %lld\n" samples_read index)
             (pset! samples_length index (/ samples_read channels)) ;num)
             (pset! samples_channels index channels)
             (pset! samples index adat)
@@ -72,7 +72,9 @@
 ;; passing a length of 0 will read the whole file
 (define-macro (set-sampler-index inst fname index offset lgth)
   `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
-     (if (cptr? native)
+     (if (and (cptr? native)
+              (> ,index 0)
+              (< ,index 128))
          (set_sample_data_ native
                            ,fname
                            (real->integer ,index)
@@ -297,7 +299,7 @@
 ;;  ("C2.wav" 36 0 0))
 
 ;; must be stereo samples of type wav aif or ogg
-(define-macro (load-sampler sampler path parser)
+(define-macro (load-sampler sampler path parser . args)
   `(let ((file-list (sys:directory-list ,path)))
      (for-each (lambda (samp-data)
                  (if samp-data
@@ -305,7 +307,9 @@
                                         (if (string=? (sys:platform) "Windows")
                                             (car samp-data)
                                             (string-append ,path "/" (car samp-data)))
-                                        (cadr samp-data)
+                                        ,(if (null? args)
+                                             '(cadr samp-data)
+                                             `(+ ,(car args) (cadr samp-data)))
                                         (caddr samp-data)
                                         (cadddr samp-data))))
                (,parser file-list))))
