@@ -2056,7 +2056,7 @@ void main()
 
 (define note-name-to-midi-number
   (lambda (name)
-    (let ((result (regex:matched name "([ABCDEFG])([#b])?(-?[0-9])")))
+    (let ((result (regex:matched name "([abcdefgABCDEFG])([#b])?(-?[0-9])")))
         (if (null? result)
             #f
             (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
@@ -2085,7 +2085,7 @@ void main()
 (define parse-sample-names-2
   (lambda (file-list)
     (map (lambda (fname)
-           (let ((result (regex:matched fname "^.*([ABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
+           (let ((result (regex:matched fname "^.*([abcdefgABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
              (if (null? result)
                  (begin (println 'Error: 'cannot 'parse 'filename: fname)
                         #f)
@@ -2118,7 +2118,7 @@ void main()
 (define ipc:audio-setup
   (lambda (proc)
     (ipc:eval-string proc
-                     "(define-macro (play-note time inst pitch vol dur . args)  
+                      "(define-macro (play-note time inst pitch vol dur . args)  
                        (let ((nargs (length args)))
                          `(let ((duration (* 1.0 ,dur))
                                 (dargs (sys:make-cptr ,(* 8 nargs))) ;; doubles
@@ -2142,18 +2142,44 @@ void main()
                                                 (real->integer ,index)
                                                 (real->integer ,offset)
                                                 (real->integer ,lgth)))))
+                     ;; note name to midi num
+                     (define note-name-to-midi-number
+                       (lambda (name)
+                         (let ((result (regex:matched name "([abcdefgABCDEFG])([#b])?(-?[0-9])")))
+                           (if (null? result)
+                               #f
+                               (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                                     (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                                           ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+                                 (+ offset pc
+                                    (cond ((string=? (caddr result) "#") 1)
+                                          ((string=? (caddr result) "b") -1)
+                                          (else 0))))))))
                      ;; this will match e.g. 60.aiff (where 60 is the midi note number)
                      (define parse-sample-names-1
                        (lambda (file-list)
                          (map (lambda (fname)
-                                (let ((result (regex:matched fname \"([0-9]*)\.(wav|aif|aiff|ogg)$\")))
+                                (let ((result (regex:matched fname "([0-9]*)\.(wav|aif|aiff|ogg)$")))
                                   (if (null? result)
                                       (begin (println 'Error: 'cannot 'parse 'filename: fname)
                                              #f)
-                                      (list fname                          
-                                            (string->number (cadr result)) 
-                                            0                              
-                                            0))))                          
+                                      (list fname                          ; filename    
+                                            (string->number (cadr result)) ; midi note number
+                                            0                              ; offset
+                                            0))))                          ; length (0 for whole sample)
+                              file-list)))
+                     ;; this will match e.g. Eb3.aiff (representing E flat 3)
+                     (define parse-sample-names-2
+                       (lambda (file-list)
+                         (map (lambda (fname)
+                                (let ((result (regex:matched fname "^.*([abcdefgABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
+                                  (if (null? result)
+                                      (begin (println 'Error: 'cannot 'parse 'filename: fname)
+                                             #f)
+                                      (list fname                                    ; filename                   
+                                            (note-name-to-midi-number (cadr result)) ; midi note number           
+                                            0                                        ; offset                     
+                                            0))))                                    ; length (0 for whole sample)
                               file-list)))
                      ;; must be stereo samples of type wav aif or ogg
                      (define-macro (load-sampler sampler path . args)

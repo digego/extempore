@@ -319,16 +319,16 @@
 
 (define note-name-to-midi-number
   (lambda (name)
-    (let ((result (regex:matched name "([ABCDEFG])([#b])?(-?[0-9])")))
-      (if (null? result)
-          #f
-          (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
-                (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
-                      ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
-            (+ offset pc
-               (cond ((string=? (caddr result) "#") 1)
-                     ((string=? (caddr result) "b") -1)
-                     (else 0))))))))
+    (let ((result (regex:matched name "([abcdefgABCDEFG])([#b])?(-?[0-9])")))
+        (if (null? result)
+            #f
+            (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                  (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                        ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+              (+ offset pc
+                 (cond ((string=? (caddr result) "#") 1)
+                       ((string=? (caddr result) "b") -1)
+                       (else 0))))))))
 
 ;; this will match e.g. 60.aiff (where 60 is the midi note number)
 (define parse-sample-names-1
@@ -348,7 +348,7 @@
 (define parse-sample-names-2
   (lambda (file-list)
     (map (lambda (fname)
-           (let ((result (regex:matched fname "^.*([ABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
+           (let ((result (regex:matched fname "^.*([abcdefgABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
              (if (null? result)
                  (begin (println 'Error: 'cannot 'parse 'filename: fname)
                         #f)
@@ -357,6 +357,7 @@
                        0                                        ; offset                     
                        0))))                                    ; length (0 for whole sample)
          file-list)))
+
 
 ;; for the MIS piano samples (mf loudness only), avaliable from
 ;; http://theremin.music.uiowa.edu/MISpiano.html
