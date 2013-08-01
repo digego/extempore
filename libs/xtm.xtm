@@ -2098,35 +2098,20 @@ void main()
 
 
 ;; must be stereo samples of type wav aif or ogg
-(define-macro (load-sampler sampler path parser . args)
-  `(let ((file-list (sys:directory-list ,path)))
-     (for-each (lambda (samp-data)
-                 (if samp-data
-                     (set-sampler-index ,sampler
-                                        (if (string=? (sys:platform) "Windows")
-                                            (car samp-data)
-                                            (string-append ,path "/" (car samp-data)))
-                                        ,(if (null? args)
-                                             '(cadr samp-data)
-                                             `(+ ,(car args) (cadr samp-data)))
-                                        (caddr samp-data)
-                                        (cadddr samp-data))))
-               (,parser file-list))))
-
-;; must be stereo samples of type wav aif or ogg
-;; (define-macro (load-sampler sampler path . args)
-;;   (let ((parser (if (null? args) 'parse-sample-names-1 (car args))))
-;;     `(let ((file-list (sys:directory-list ,path)))
-;;        (for-each (lambda (samp-data)
-;;                    (if samp-data
-;;                        (set-sampler-index ,sampler
-;;                                           (if (string=? (sys:platform) "Windows")
-;;                                               (car samp-data)
-;;                                               (string-append ,path "/" (car samp-data)))
-;;                                           (cadr samp-data)
-;;                                           (caddr samp-data)
-;;                                           (cadddr samp-data))))
-;;                  (,parser file-list)))))
+(define-macro (load-sampler sampler path . args)
+  (let ((parser (if (null? args) 'parse-sample-names-1 (car args)))
+        (midioffset (if (= (length args) 2) (cadr args) 0)))
+    `(let ((file-list (sys:directory-list ,path)))
+       (for-each (lambda (samp-data)
+                   (if samp-data
+                       (set-sampler-index ,sampler
+                                          (if (string=? (sys:platform) "Windows")
+                                              (car samp-data)
+                                              (string-append ,path "/" (car samp-data)))
+                                          (+ ,midioffset (cadr samp-data))
+                                          (caddr samp-data)
+                                          (cadddr samp-data))))
+                 (,parser file-list)))))
 
 
 
