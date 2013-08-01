@@ -2042,21 +2042,42 @@ void main()
 (bind-lib-func stdlib sampler2 [double,double,double,double,double*]*)
 (bind-lib-func stdlib sampler3 [double,double,double,double,double*]*)
 
-(define-macro (play-note time inst pitch vol dur . args)  
-  (let ((nargs (length args)))
-    `(let ((duration (* 1.0 ,dur))
-           (dargs (sys:make-cptr ,(* 8 nargs))) ;; doubles
-           (native (llvm:get-native-closure ,(symbol->string inst))))
-       (dotimes (i ,nargs) (cptr:set-double dargs (* i 8) (eval (list-ref ',args i))))
-       (if (cptr? native)
-           (_play_note (integer->real ,time)
-                       native
-                       (midi2frq (* 1.0 ,pitch))
-                       (/ (exp (/ ,vol 26.222)) 127.0)
-                       duration
-                       ,nargs
-                       dargs)
-           (print-error 'No 'inst 'named ,(symbol->string inst))))))
+;; (define-macro (play-note time inst pitch vol dur . args)  
+;;   (let ((nargs (length args)))
+;;     `(let ((duration (* 1.0 ,dur))
+;;            (dargs (sys:make-cptr ,(* 8 nargs))) ;; doubles
+;;            (native (llvm:get-native-closure ,(symbol->string inst))))
+;;        (dotimes (i ,nargs) (cptr:set-double dargs (* i 8) (eval (list-ref ',args i))))
+;;        (if (cptr? native)
+;;            (_play_note (integer->real ,time)
+;;                        native
+;;                        (midi2frq (* 1.0 ,pitch))
+;;                        (/ (exp (/ ,vol 26.222)) 127.0)
+;;                        duration
+;;                        ,nargs
+;;                        dargs)
+;;            (print-error 'No 'inst 'named ,(symbol->string inst))))))
+
+(define play-note
+  (lambda (time inst pitch vol dur . args)
+    (let ((nargs (length args)))
+      (let ((duration (* 1.0 dur))
+            (dargs (sys:make-cptr (* 8 nargs))) ;; doubles
+            (native (if (procedure? inst)
+                        (llvm:get-native-closure (llvm:ffi-get-name inst))
+                        (llvm:get-native-closure (if (symbol? inst)
+                                                     (symbol->string inst)
+                                                     inst)))))
+        (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
+        (if (cptr? native)
+            (_play_note (integer->real time)
+                        native
+                        (midi2frq (* 1.0 pitch))
+                        (/ (exp (/ vol 26.222)) 127.0)
+                        duration
+                        nargs
+                        dargs)
+            (print-error 'No 'inst 'named (symbol->string inst)))))))
 
 
 ;; the play macro
@@ -2271,7 +2292,8 @@ void main()
 (define ipc:audio-setup
   (lambda (proc)
     (ipc:eval-string proc
-                      "(define-macro (play-note time inst pitch vol dur . args)  
+                      ";;old play-note
+                      (define-macro (play-note time inst pitch vol dur . args)  
                        (let ((nargs (length args)))
                          `(let ((duration (* 1.0 ,dur))
                                 (dargs (sys:make-cptr ,(* 8 nargs))) ;; doubles
@@ -2286,6 +2308,27 @@ void main()
                                             ,nargs
                                             dargs)
                                 (print-error 'No 'inst 'named ,(symbol->string inst))))))
+                      ;; new playnote
+                      (define play-note
+                        (lambda (time inst pitch vol dur . args)
+                          (let ((nargs (length args)))
+                            (let ((duration (* 1.0 dur))
+                                  (dargs (sys:make-cptr (* 8 nargs))) ;; doubles
+                                  (native (if (procedure? inst)
+                                              (llvm:get-native-closure (llvm:ffi-get-name inst))
+                                              (llvm:get-native-closure (if (symbol? inst)
+                                                                           (symbol->string inst)
+                                                                           inst)))))
+                              (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
+                              (if (cptr? native)
+                                  (_play_note (integer->real time)
+                                              native
+                                              (midi2frq (* 1.0 pitch))
+                                              (/ (exp (/ vol 26.222)) 127.0)
+                                              duration
+                                              nargs
+                                              dargs)
+                                  (print-error 'No 'inst 'named (symbol->string inst)))))))
                      ;; passing a length of 0 will read the whole file
                      (define-macro (set-sampler-index inst fname index offset lgth)
                        `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
