@@ -104,6 +104,9 @@
 #define DEBUG_ZONE_ALLOC 0
 #define LEAKY_ZONES 1
 
+// llvm_scheme foreign function -> string name
+// also is not thread safe!
+std::map<foreign_func,std::string> LLVM_SCHEME_FF_MAP;
 
 // this must be global. we should therefore
 // make it thread safe but I'm not going to bother
@@ -111,6 +114,7 @@
 std::map<void*,uint64_t> LLVM_ZONE_ALLOC_MAP;
 // same as above.
 std::map<std::string,std::string> LLVM_STR_CONST_MAP;
+
 extemp::EXTMutex alloc_mutex("alloc mutex");
 
 #ifdef TARGET_OS_WINDOWS
@@ -134,6 +138,16 @@ void free16(void *p) {
   free (porig);                               // then free that
 }
 
+const char* llvm_scheme_ff_get_name(foreign_func ff) 
+{
+   return (LLVM_SCHEME_FF_MAP[ff]).c_str();
+}
+
+void llvm_scheme_ff_set_name(foreign_func ff,const char* name) 
+{
+  LLVM_SCHEME_FF_MAP[ff] = std::string(name);
+  return;
+}
 
 // LLVM RUNTIME ERROR
 void llvm_runtime_error(int error,void* arg)

@@ -485,6 +485,8 @@ namespace extemp {
 	    { "llvm:optimize",			&SchemeFFI::optimizeCompiles },
 	    { "llvm:compile",			&SchemeFFI::compile },
 	    { "llvm:bind-global-var",		&SchemeFFI::bind_global_var },
+            { "llvm:ffi-set-name",             &SchemeFFI::ff_set_name },
+            { "llvm:ffi-get-name",             &SchemeFFI::ff_get_name },
 	    { "llvm:get-function",			&SchemeFFI::get_function },
 	    { "llvm:get-globalvar",			&SchemeFFI::get_globalvar },
             { "llvm:get-struct-size",           &SchemeFFI::get_struct_size },
@@ -1768,7 +1770,24 @@ namespace extemp {
 	EXTLLVM::I()->EE->lock.release();
 	return _sc->T;
     }
-	
+
+    pointer SchemeFFI::ff_set_name(scheme* _sc, pointer args)
+    {
+       pointer x = pair_car(args);
+       foreign_func ff = x->_object._ff;
+       char* name = string_value(pair_cadr(args));
+       llvm_scheme_ff_set_name(ff,name);
+       return _sc->T;
+    }
+
+    pointer SchemeFFI::ff_get_name(scheme* _sc, pointer args)
+    {
+       pointer x = pair_car(args);
+       foreign_func ff = x->_object._ff;
+       const char* name = llvm_scheme_ff_get_name(ff);
+       return mk_string(_sc,name);
+    }
+
     pointer SchemeFFI::get_function(scheme* _sc, pointer args)
     {
 	using namespace llvm;

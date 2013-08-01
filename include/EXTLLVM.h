@@ -53,6 +53,8 @@ typedef struct _llvm_callback_struct_ {
 
 extern "C"
 {
+const char*  llvm_scheme_ff_get_name(foreign_func ff);
+void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
 void llvm_runtime_error(int error, void* arg);
 llvm_zone_t* llvm_zone_create(uint64_t size);
 llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone);

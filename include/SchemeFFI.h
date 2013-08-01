@@ -142,6 +142,8 @@ namespace extemp {
         static pointer verifyCompiles(scheme* _sc, pointer args);
 	static pointer compile(scheme* _sc, pointer args);
 	static pointer bind_global_var(scheme* _sc, pointer args);		
+        static pointer ff_set_name(scheme* _sc, pointer args);
+        static pointer ff_get_name(scheme* _sc, pointer args);
 	static pointer get_function(scheme* _sc, pointer args);
 	static pointer get_globalvar(scheme* _sc, pointer args);		
 	static pointer get_struct_size(scheme* _sc, pointer args);		
