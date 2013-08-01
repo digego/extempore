@@ -257,6 +257,27 @@
 	    (if (< chan 1.0) (set! mem (pulse amp freq width)))
 	    mem)))))
 
+;; linear fade closure
+(bind-func fade_c
+  (lambda ()
+    (let ((t 0.0)
+	  (inc (/ 1.0 SR)))
+      (lambda (initial:double final dur)
+	(set! t (+ t inc))
+	(if (< t 0.0)
+	    initial
+	    (if (> t dur)
+		final
+		(* (/ t dur) (- final initial))))))))
+
+(if *build-multi-chan*
+    (bind-func fade_mc_c
+      (lambda ()
+	(let ((val 0.0)
+	      (fader (fader_c )))
+	  (lambda (chan initial final dur)
+	    (if (< chan 1.0) (set! val (fader initial final dur)))
+	    val)))))
 
 ;; iir comb without interpolation
 ;; more efficient than comb if you
@@ -1450,16 +1471,6 @@
 	  (a (+ w v (* (- x2 x0) 0.5)))
 	  (b (+ w a)))
       (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
-
-;; linear fade closure
-(bind-func fade_c
-  (lambda (phase)
-    (lambda (amp freq)
-      (let ((inc (/ freq SAMPLERATE)))
-	(if (> phase 1.0)
-            amp
-            (begin (set! phase (+ phase inc))
-                   (* phase amp)))))))
 
 ;;  midi/freq utilities
 
