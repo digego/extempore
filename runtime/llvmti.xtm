@@ -4849,6 +4849,9 @@ deprecated - use bind-func instead."
                                            (print (string->symbol (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))))
                                            (ascii-print-color 0 7 10)
                                            (print)))
+                                     (llvm:ffi-set-name
+                                      (llvm:get-scheme-function ,(symbol->string symname))
+                                      ,(symbol->string symname))
 				     (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
 				   (begin (ascii-print-color 0 7 10)
 					  (print "There is no scheme stub available for ")
@@ -4871,7 +4874,11 @@ deprecated - use bind-func instead."
 	   (if func
 	       ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 	       (if (llvm:get-scheme-function ,(symbol->string symname))
-		   (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
+		   (begin
+                     (llvm:ffi-set-name
+                      (llvm:get-scheme-function ,(symbol->string symname))
+                      ,(symbol->string symname))                     
+                     (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
 		   (begin (ascii-print-color 0 7 10)
 			  (print "There is no scheme stub available for ")
 			  (ascii-print-color 0 6 10)
@@ -4945,7 +4952,11 @@ deprecated - use bind-func instead."
 	    (if func
 		;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 		(if (llvm:get-scheme-function ,(symbol->string symname))
-		    (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
+                    (begin
+                      (llvm:ffi-set-name
+                       (llvm:get-scheme-function ,(symbol->string symname))
+                       ,(symbol->string symname))
+                      (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))))
 		(begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
 		       (error "")))))
        (interaction-environment)))))
@@ -4962,8 +4973,12 @@ deprecated - use bind-func instead."
 		 (func (llvm:get-function (symbol->string ',symname))))
 	    ;(println 'scmfunc: (llvm:get-scheme-function ,(symbol->string symname)))
 	    (if func
-		(if (llvm:get-scheme-function ,(symbol->string symname))		    
-		    (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))
+		(if (llvm:get-scheme-function ,(symbol->string symname))
+                    (begin
+                      (llvm:ffi-set-name
+                       (llvm:get-scheme-function ,(symbol->string symname))
+                       ,(symbol->string symname))                      
+                      (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
 		    (begin (ascii-print-color 0 7 10)
 			   (print "There is no scheme stub available for ")
 			   (ascii-print-color 0 6 10)
@@ -5263,6 +5278,9 @@ deprecated - use bind-func instead."
      ;;(println (llvm:get-scheme-function ,(symbol->string symname)))
      (if (llvm:get-scheme-function ,(symbol->string symname))
          (begin
+           (llvm:ffi-set-name
+            (llvm:get-scheme-function ,(symbol->string symname))
+            ,(symbol->string symname))           
            (eval (define ,symname
                    (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
                  (interaction-environment))))
