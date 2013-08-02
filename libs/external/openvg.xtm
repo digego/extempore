@@ -301,44 +301,142 @@
 (bind-val VG_VERSION enum 8962)
 (bind-val VG_EXTENSIONS enum 8963)
 
+;; VGU enums
 
-(bind-lib libopenvg vgCreateContextSH [VGboolean,VGint,VGint]*)
-(bind-lib libopenvg vgCreatePath [VGPath,VGint,VGPathDatatype,VGfloat,VGfloat,VGint,VGint,VGbitfield]*)
-(bind-lib libopenvg vgClearPath [void,VGPath,VGbitfield]*)
-(bind-lib libopenvg vgDestroyPath [void,VGPath]*)
-(bind-lib libopenvg vgClear [void,VGint,VGint,VGint,VGint]*)
-(bind-lib libopenvg vgAppendPath [void,VGPath,VGPath]*)
-(bind-lib libopenvg vgAppendPathData [void,VGPath,VGint,VGubyte*,i8*]*)
-(bind-lib libopenvg vgDrawPath [void,VGPath,VGbitfield]*)
-(bind-lib libopenvg vgPathBounds [void,VGPath,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
-(bind-lib libopenvg vgCreatePaint [VGPaint]*)
-(bind-lib libopenvg vgDestroyPaint [void,VGPaint]*)
-(bind-lib libopenvg vgSetPaint [void,VGPaint,VGbitfield]*)
-;; (bind-lib libopenvg vgSetColor [void,VGPaint,VGuint]*)
+(bind-alias VGUErrorCode enum)
+(bind-val VGU_NO_ERROR enum 0)
+(bind-val VGU_BAD_HANDLE_ERROR enum 61440)
+(bind-val VGU_ILLEGAL_ARGUMENT_ERROR enum 61441)
+(bind-val VGU_OUT_OF_MEMORY_ERROR enum 61442)
+(bind-val VGU_PATH_CAPABILITY_ERROR enum 61443)
+(bind-val VGU_BAD_WARP_ERROR enum 61444)
+
+(bind-alias VGUArcType enum)
+(bind-val VGU_ARC_OPEN enum 61696)
+(bind-val VGU_ARC_CHORD enum 61697)
+(bind-val VGU_ARC_PIE enum 61698)
+
+;; closures
+
+(bind-lib libopenvg vgGetError [VGErrorCode]*)
+(bind-lib libopenvg vgFlush [void]*)
+(bind-lib libopenvg vgFinish [void]*)
+
+(bind-lib libopenvg vgSetf [void,VGParamType,VGfloat]*)
+(bind-lib libopenvg vgSeti [void,VGParamType,VGint]*)
 (bind-lib libopenvg vgSetfv [void,VGParamType,VGint,VGfloat*]*)
 (bind-lib libopenvg vgSetiv [void,VGParamType,VGint,VGint*]*)
-(bind-lib libopenvg vgSeti [void,VGParamType,VGint]*)
-(bind-lib libopenvg vgSetf [void,VGParamType,VGfloat]*)
 
-(bind-lib libopenvg vgLoadIdentity [void]*)
-(bind-lib libopenvg vgTranslate [void,VGfloat,VGfloat]*)
-(bind-lib libopenvg vgScale [void,VGfloat,VGfloat]*)
-(bind-lib libopenvg vgRotate [void,VGfloat]*)
-
-
+(bind-lib libopenvg vgGetf [VGfloat,VGParamType]*)
+(bind-lib libopenvg vgGeti [VGint,VGParamType]*)
+(bind-lib libopenvg vgGetVectorSize [VGint,VGParamType]*)
+(bind-lib libopenvg vgGetfv [void,VGParamType,VGint,VGfloat*]*)
+(bind-lib libopenvg vgGetiv [void,VGParamType,VGint,VGint*]*)
 
 (bind-lib libopenvg vgSetParameterfv [void,VGHandle,VGint,VGint,VGfloat*]*)
 (bind-lib libopenvg vgSetParameteri [void,VGHandle,VGint,VGint]*)
-(bind-lib libopenvg vgGetError [VGErrorCode]*)
+
+(bind-lib libopenvg vgSetParameterf [void,VGHandle,VGParamType,VGfloat]*)
+(bind-lib libopenvg vgSetParameteri [void,VGHandle,VGParamType,VGint]*)
+(bind-lib libopenvg vgSetParameterfv [void,VGHandle,VGParamType,VGint,VGfloat*]*)
+(bind-lib libopenvg vgSetParameteriv [void,VGHandle,VGParamType,VGint,VGint*]*)
+
+(bind-lib libopenvg vgGetParameterf [VGfloat,VGHandle,VGParamType,VGfloat]*)
+(bind-lib libopenvg vgGetParameteri [VGint,VGHandle,VGParamType,VGint]*)
+(bind-lib libopenvg vgGetParameterVectorSize [VGint,VGHandle,VGParamType]*)
+(bind-lib libopenvg vgGetParameterfv [VGHandle,VGParamType,VGint,VGfloat*]*)
+(bind-lib libopenvg vgGetParameteriv [VGHandle,VGParamType,VGint,VGint*]*)
+
+(bind-lib libopenvg vgLoadIdentity [void]*)
+(bind-lib libopenvg vgLoadMatrix [void,VGfloat*]*)
+(bind-lib libopenvg vgGetMatrix [void,VGfloat*]*)
+(bind-lib libopenvg vgMultMatrix [void,VGfloat*]*)
+(bind-lib libopenvg vgTranslate [void,VGfloat,VGfloat]*)
+(bind-lib libopenvg vgScale [void,VGfloat,VGfloat]*)
+(bind-lib libopenvg vgShear [void,VGfloat,VGfloat]*)
+(bind-lib libopenvg vgRotate [void,VGfloat]*)
+
+
+(bind-lib libopenvg vgMask [void,VGImage,VGMaskOperation,VGint,VGint,VGint,VGint]*)
+(bind-lib libopenvg vgClear [void,VGint,VGint,VGint,VGint]*)
+
+;; path
+(bind-lib libopenvg vgCreatePath [VGPath,VGint,VGPathDatatype,VGfloat,VGfloat,VGint,VGint,VGbitfield]*)
+(bind-lib libopenvg vgClearPath [void,VGPath,VGbitfield]*)
+(bind-lib libopenvg vgDestroyPath [void,VGPath]*)
+(bind-lib libopenvg vgRemovePathCapabilities [void,VGPath,VGBitfield]*)
+(bind-lib libopenvg vgGetPathCapabilities [VGBitfield,VGPath]*)
+(bind-lib libopenvg vgAppendPath [void,VGPath,VGPath]*)
+(bind-lib libopenvg vgAppendPathData [void,VGPath,VGint,VGubyte*,i8*]*)
+(bind-lib libopenvg vgModifyPathCoords [void,VGPath,VGint,VGint,i8*]*)
+(bind-lib libopenvg vgPathBounds [void,VGPath,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
+(bind-lib libopenvg vgTransformPath [void,VGPath,VGPath]*)
+(bind-lib libopenvg vgInterpolatePath [VGboolean,VGPath,VGPath,VGPath,VGfloat]*)
+(bind-lib libopenvg vgPathLength [VGboolean,VGPath,VGint,VGint]*)
+(bind-lib libopenvg vgPointAlongPath [void,VGPath,VGint,VGint,VGfloat,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
+(bind-lib libopenvg vgPathBounds [void,VGPath,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
+(bind-lib libopenvg vgPathTransformedBounds [void,VGPath,VGfloat,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
+(bind-lib libopenvg vgDrawPath [void,VGPath,VGbitfield]*)
+
+;; paint
+(bind-lib libopenvg vgCreatePaint [VGPaint]*)
+(bind-lib libopenvg vgDestroyPaint [void,VGPaint]*)
+(bind-lib libopenvg vgSetPaint [void,VGPaint,VGbitfield]*)
+(bind-lib libopenvg vgGetPaint [VGPaint,VGPaintMode]*)
+(bind-lib libopenvg vgSetColor [void,VGPaint,VGuint]*)
+(bind-lib libopenvg vgGetColor [VGuint,VGPaint]*)
+(bind-lib libopenvg vgPaintPattern [void,VGPaint,VGImage]*)
 
 ;; image
 (bind-lib libopenvg vgCreateImage [VGImage,VGImageFormat,VGint,VGint,VGbitfield]*)
+(bind-lib libopenvg vgDestroyImage [void,VGImage]*)
 (bind-lib libopenvg vgImageSubData [void,VGImage,i8*,VGint,VGImageFormat,VGint,VGint,VGint,VGint]*)
+(bind-lib libopenvg vgGetImageSubData [void,VGImage,i8*,VGint,VGImageFormat,VGint,VGint,VGint,VGint]*)
 (bind-lib libopenvg vgDrawImage [void,VGImage]*)
 
-;; vgu
+(bind-lib libopenvg vgChildImage [VGImage,VGImage,VGint,VGint,VGint,VGint]*)
+(bind-lib libopenvg vgGetParent [VGImage,VGImage]*)
+(bind-lib libopenvg vgCopyImage [void,VGImage,VGint,VGint,VGImage,VGint,VGint,VGint,VGint,VGboolean]*)(bind-lib libopenvg vgDrawImage [void,VGImage]*)
+(bind-lib libopenvg vgSetPixels [void,VGint,VGint,VGImage,VGint,VGint,VGint,VGint]*)
+(bind-lib libopenvg vgWritePixels [void,i8*,VGint,VGImageFormat,VGint,VGint,VGint,VGint]*)
+(bind-lib libopenvg vgGetPixels [void,VGImage,VGint,VGint,VGint,VGint,VGint,VGint]*)
+(bind-lib libopenvg vgReadPixels [void,i8*,VGint,VGImageFormat,VGint,VGint,VGint,VGint]*)
+(bind-lib libopenvg vgCopyPixels [void,VGint,VGint,VGint,VGint,VGint,VGint]*)
+
+(bind-lib libopenvg vgColorMatrix [void,VGImage,VGImage,VGfloat*]*)
+(bind-lib libopenvg vgConvolve [void,VGImage,VGImage,VGint,VGint,VGint,VGint,VGshort*,VGfloat,VGfloat,VGTilingMode]*)
+(bind-lib libopenvg vgSeparableConvolve [void,VGImage,VGImage,VGint,VGint,VGint,VGint,VGshort*,VGshort*,VGfloat,VGfloat,VGTilingMode]*)
+(bind-lib libopenvg vgGaussianBlur [void,VGImage,VGImage,VGfloat,VGfloat,VGTilingMode]*)
+(bind-lib libopenvg vgLookup [void,VGImage,VGImage,VGubyte*,VGubyte*,VGubyte*,VGubyte*,VGboolean,VGboolean]*)
+(bind-lib libopenvg vgLookupSingle [void,VGImage,VGImage,VGuint*,VGImageChannel,VGboolean,VGboolean]*)
+
+(bind-lib libopenvg vgHardwareQuery [VGHardwareQueryResult,VGHardwareQueryType,VGint]*)
+(bind-lib libopenvg vgGetString [VGubyte*,VGStringID]*)
+
+(bind-val OVG_SH_blend_src_out i32 1)
+(bind-val OVG_SH_blend_dst_out i32 1)
+(bind-val OVG_SH_blend_src_atop i32 1)
+(bind-val OVG_SH_blend_dst_atop i32 1)
+
+(bind-lib libopenvg vgCreateContextSH [VGboolean,VGint,VGint]*)
+(bind-lib libopenvg vgResizeSurfaceSH [void,VGint,VGint]*)
+(bind-lib libopenvg vgDestroyContextSH [void]*)
+
+;; VGU closures
+
 (bind-lib libopenvg vguLine [VGErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
 (bind-lib libopenvg vguEllipse [VGErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
+(bind-lib libopenvg vguLine [VGUErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
+(bind-lib libopenvg vguPolygon [VGUErrorCode,VGPath,VGfloat*,VGint,VGboolean]*)
+(bind-lib libopenvg vguRect [VGUErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
+(bind-lib libopenvg vguRoundRect [VGUErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat]*)  
+(bind-lib libopenvg vguEllipse [VGUErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
+(bind-lib libopenvg vguArc [VGUErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGUArcType]*)
+(bind-lib libopenvg vguComputeWarpQuadToSquare [VGUErrorCode,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat*]*)
+(bind-lib libopenvg vguComputeWarpSquareToQuad [VGUErrorCode,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat*]*)
+(bind-lib libopenvg vguComputeWarpQuadToQuad [VGUErrorCode,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat,VGfloat*]*)
+
+;; helpful xtlang functions
 
 (bind-func vgCreateContext
   (lambda (w h)
