@@ -887,6 +887,14 @@ be running in another (shell-like) buffer."
 				      ,(make-char 'greek-iso8859-7 107))
 		      nil))))))
 
+;; useful for converting C header files to xtlang headers
+(defun hex-to-decimal-at-point ()
+  (interactive)
+  (let ((hex-str (word-at-point)))
+    (if hex-str
+	(progn (kill-word 1)
+	       (insert (number-to-string (string-to-number hex-str 16)))))))
+
 ;; interactive repeated evaluation of defun under point
 
 (defvar extempore-repeated-eval-timer nil)
