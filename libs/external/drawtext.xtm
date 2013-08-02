@@ -13,6 +13,17 @@
 
 ;;; Code:
 
+(sys:load-preload-check 'libdrawtext)
+
+(define libdrawtext
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libdrawtext.so"))
+	  ((string=? platform "Windows") (sys:open-dylib "libdrawtext.dll"))
+	  ((string=? platform "OSX") (sys:open-dylib "libdrawtext.dylib"))
+	  (else (print "Unknown platform: " platform)))))
+
+(define *xtmlib-libdrawtext-loaded* #f)
+
 (bind-alias dtx_font i8)
 (bind-alias dtx_glyphmap i8)
 
@@ -62,14 +73,15 @@
 ;; glyphmaps.
 
 ;; struct dtx_glyphmap *dtx_create_glyphmap_range(struct dtx_font *fnt, int sz, int cstart, int cend);
-(bind-lib libdrawtext dtx_create_font_glyphmap_range [dtx_glyphmap*,dtx_font*,i32,i32,i32]*)
+(bind-lib libdrawtext dtx_create_glyphmap_range [dtx_glyphmap*,dtx_font*,i32,i32,i32]*)
 
 (bind-lib libdrawtext dtx_free_glyphmap [void,dtx_glyphmap*]*)
 
 ;; returns a pointer to the raster image of a glyphmap (1 byte per
 ;; pixel grayscale)
 ;; unsigned char *dtx_get_glyphmap_image(struct dtx_glyphmap *gmap);
-(bind-lib libdrawtext dtx_get_glyphmap_image [i8*,dtx_glyphmap*]*)
+;; (bind-lib libdrawtext dtx_get_glyphmap_image [i8*,dtx_glyphmap*]*)
+
 ;; returns the width of the glyphmap image in pixels
 ;; int dtx_get_glyphmap_width(struct dtx_glyphmap *gmap);
 (bind-lib libdrawtext dtx_get_glyphmap_width [i32,dtx_glyphmap*]*)
@@ -98,7 +110,8 @@
 ;;  - DTX_NBUF: every call to dtx_string gets rendered immediately.
 ;;  - DTX_LBUF: renders when the buffer is full or the string contains a newline.
 ;;  - DTX_FBUF: renders only when the buffer is full (you must call dtx_flush explicitly).
-(bind-lib libdrawtext dtx_draw_buffering [void,enum]*)
+
+;; (bind-lib libdrawtext dtx_draw_buffering [void,enum]*)
 
 ;; Sets the vertex attribute indices to use for passing vertex and
 ;; texture coordinate data. By default both are -1 which means you
@@ -119,7 +132,7 @@
 (bind-lib libdrawtext dtx_string [void,i8*]*)
 
 ;; render any pending glyphs (see dtx_draw_buffering)
-void dtx_flush(void);
+;; void dtx_flush(void);
 (bind-lib libdrawtext dtx_flush [void]*)
 
 ;;;;;;;;;;;;;;;
@@ -160,7 +173,7 @@ void dtx_flush(void);
 ;; size gets calculated and returned, which is useful for figuring out
 ;; how much memory to allocate for the utf-8 buffer.
 ;; size_t dtx_utf8_from_string(const wchar_t *str, char *buf);
-(bind-lib libdrawtext dtx_utf8_from_char_code [size_t,i32,i8*]*)
+(bind-lib libdrawtext dtx_utf8_from_string [size_t,i32,i8*]*)
 
 
 ;;;;;;;;;;;;;
@@ -193,3 +206,5 @@ void dtx_flush(void);
 
 ;; int dtx_char_at_pt(const char *str, float pt);
 (bind-lib libdrawtext dtx_char_at_pt [i32,i8*,float]*)
+
+(define *xtmlib-libdrawtext-loaded* #t)
