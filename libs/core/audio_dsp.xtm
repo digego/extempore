@@ -61,6 +61,70 @@
     0.0))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;; amount of curve
+;;
+;; width is duration of the curve
+;;
+;; the 'power' value of the curve
+;; can be negative!
+;;
+;; 1.0 or 0.0 = flat (returns 1.0)
+;; 1.01 = close to linear
+;; 2.0 = normal value
+;; 6.0 = steeper curve etc..
+;;
+;; time 0.0 -> width
+(bind-func gain
+  (lambda (time:double width power)
+    (let ((amp 1.0)
+          (p power)
+          (t (/ time width)))
+      (if (< p 0.0)
+          (begin (set! p (fabs p))
+                 (set! t (- 1.0 t))))
+      (let ((out (* amp (/ (- (pow p t) 1.0) (- p 1.0)))))
+        (if (> out amp) amp
+            (if (< out 0.0) 0.0
+                out))))))
+
+
+;; given current channel
+;; and pan value [0.0-1.0]
+;; returns value betwee n [0.0-1.0]
+;; uses CHANNELS
+(bind-func panner
+  (lambda (chan pan)
+    (let ((cn1 (i64tod (- CHANNELS 1))))
+      (- 1.0 (/ (fabs (- (* pan cn1) chan)) cn1)))))
+
+
+;; a repeating hann signal of width
+;;
+;; where a cycle is
+;; time 0.0 -> width
+;; 
+;; repeat is:
+;; 1.0 - repeat immediately
+;; 2.0 - repeat after two cycles
+;; 4.0 - repeat after four cycles etc..
+;;
+(bind-func hann
+  (lambda (time:double width:double repeat:double)
+    (if (> (% time (* width repeat)) width) 0.0
+        (* 0.5
+           (- 1.0
+              (cos (* TWOPI (/ time width))))))))
+
+;; time in samples (starting from 0)
+;; apex (in samples) is after how many samples we hit 1.0 before decaying
+(bind-func impulse
+  (lambda (time:double apex:double)
+    (let ((h (* time apex)))
+      (* h (exp (- 1.0 h))))))
+
+
+
 ;; gaussian random number X ~ N(0,1)
 ;; algorithm by Marsaglia http://c-faq.com/lib/gaussian.html
 
@@ -274,7 +338,7 @@
     (bind-func fade_mc_c
       (lambda ()
 	(let ((val 0.0)
-	      (fader (fader_c )))
+	      (fader (fade_c )))
 	  (lambda (chan initial final dur)
 	    (if (< chan 1.0) (set! val (fader initial final dur)))
 	    val)))))
@@ -1349,21 +1413,6 @@
 ;; envelope stuff
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; a repeating hann signal of width
-(bind-func hann
-  (lambda (time:double width:double repeat:double)
-    (* 0.5
-       (- 1.0
-          (cos (/ (* TWOPI (% time repeat))
-                  (- width 1.0)))))))
-
-;; time in samples (starting from 0)
-;; apex (in samples) is after how many samples we hit 1.0 before decaying
-(bind-func impulse
-  (lambda (time:double apex:double)
-    (let ((h (* time apex)))
-      (* h (exp (- 1.0 h))))))
 
 (bind-func linear_c
   (let ((time 0.0))
