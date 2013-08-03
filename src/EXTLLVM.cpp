@@ -294,12 +294,9 @@ llvm_zone_t* llvm_peek_zone_stack()
       llvm_zone_t* z = llvm_zone_create(1024*1024*1); // default root zone is 1M
       llvm_push_zone_stack(z);
       stack = llvm_threads_get_zone_stack();
-      //#if DEBUG_ZONE_STACK      
-      ascii_text_color(0,3,10);
+#if DEBUG_ZONE_STACK      
       printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
-      ascii_text_color(0,7,10);
-      printf(""); 
-      //#endif      
+#endif      
       return z;
     }else{
       z = stack->head;
