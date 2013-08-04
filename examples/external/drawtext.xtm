@@ -1,0 +1,49 @@
+;;; drawtext.xtm -- drawing text with OpenGL and libdrawtext
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libdrawtext
+
+;;; Commentary:
+
+;; A simple example of how to draw text straight into an OpenGL
+;; context using the librdrawtext library (available at
+;; http://nuclear.mutantstargoat.com/sw/libdrawtext/)
+
+;;; Code:
+
+(sys:load "libs/external/drawtext.xtm")
+
+(define width 1024.0)
+(define height 768.0)
+(bind-val width float 1024.0)
+(bind-val height float 768.0)
+(define fullscreen #f)
+
+(define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+
+(bind-func gl_render
+  ;; put the path to any TrueType (.ttf) font file here
+  (let ((font (dtx_open_font "/Library/Fonts/Arial.ttf" 24)))
+    (if (null? font)
+	(printf "Error opening font.\n"))
+    (lambda ()
+      (glClear (+ GL_COLOR_BUFFER_BIT
+		  GL_DEPTH_BUFFER_BIT))
+      (glLoadIdentity)
+      (glScaled 0.003 0.003 0.003)
+      (glRotated (* 360.0 (random)) (random) 0.0 1.0)
+      ;; set the RGB color for the text
+      (glColor3d (random) (random) (random))
+      (dtx_string "Look ma,\n\nI'm drawing text\nin OpenGL!"))))
+
+(define gl-loop
+  (lambda (time delta-t)
+    (gl_render)
+    (gl:swap-buffers *gl-ctx*)
+    (callback (+ time (* *second* delta-t) 0.5)
+	      'gl-loop
+	      (+ time (* *second* delta-t))
+	      delta-t)))
+
+(gl-loop (now) 1)
