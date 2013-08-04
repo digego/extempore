@@ -41,7 +41,7 @@
 ;; ;; this reads 5000 frames starting 1000 frames into the file
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000)
 (bind-func set_sample_data_
-  (lambda (inst:[double,double,double,double*]* fname index:i64 offset lgth bank:i32)
+  (lambda (inst:[double,double,double,double*]* fname index:i64 offset lgth bank:i32 print:i32)
     (let ((info:sf_info* (salloc))
           (audiofile (sf_open fname 16 info))
           (channels (i32toi64 (tref info 2)))
@@ -53,11 +53,11 @@
                 (samples:|20,|128,double*||* (inst.samples))
                 (samples_channels:|20,|128,i64||* (inst.samples_channels))
                 (samples_length:|20,|128,i64||* (inst.samples_length))
-                (samples_read (read_audio_data fname adat (* offset channels) num))
+                (samples_read (read_audio_data fname adat (* offset channels) num print))
                 (olddat (if (<> 0 (pref (aref-ptr samples_length bank) index))
                             (bitcast (pref (aref-ptr samples bank) index) i8*)
                             null)))
-            (printf "%lld samples read into: %lld\n" samples_read index)
+            ;;(printf "%lld samples read into: %lld\n" samples_read index)
             (aset! (aref-ptr samples_length bank) index (/ samples_read channels)) ;num)
             (aset! (aref-ptr samples_channels bank) index channels)
             (aset! (aref-ptr samples bank) index adat)
@@ -69,8 +69,24 @@
             (printf "%s\n" (sf_strerror audiofile))
             0)))))
 
+(bind-func clear_sample_data_
+  (lambda (inst:[double,double,double,double*]* index:i64 bank:i32)
+    (let ((samples:|20,|128,double*||* (inst.samples))
+          (samples_channels:|20,|128,i64||* (inst.samples_channels))
+          (samples_length:|20,|128,i64||* (inst.samples_length))          
+          (olddat (if (<> 0 (pref (aref-ptr samples_length bank) index))
+                      (bitcast (pref (aref-ptr samples bank) index) i8*)
+                      null)))
+      (aset! (aref-ptr samples_length bank) index 0)
+      (aset! (aref-ptr samples_channels bank) index 0)
+      (aset! (aref-ptr samples bank) index null)
+      (if (null? olddat) 0
+          (begin (free olddat)
+                 1)))))
+    
+
 ;; passing a length of 0 will read the whole file
-(define-macro (set-sampler-index inst fname index offset lgth bank)
+(define-macro (set-sampler-index inst fname index offset lgth bank print?)
   `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
      (if (and (cptr? native)
               (> ,index 0)
@@ -80,7 +96,8 @@
                            (real->integer ,index)
                            (real->integer ,offset)
                            (real->integer ,lgth)
-                           (real->integer ,bank)))))
+                           (real->integer ,bank)
+                           ,(if (> print? 0) 1 0)))))
 
 
 
@@ -280,6 +297,7 @@
 (define-sampler sampler2 sampler_note_hermite_c sampler2_fx)
 (define-sampler sampler3 sampler_note_hermite_c sampler3_fx)
 
+
 ;; load-sampler now requires you to supply your own function for
 ;; parsing the sample metadata from the sample names
 
@@ -296,25 +314,48 @@
 ;;  ("B1.wav" 35 0 0)
 ;;  ("C2.wav" 36 0 0))
 
-
 ;; must be stereo samples of type wav aif or ogg
 (define-macro (load-sampler sampler path . args)
   (let ((bank (if (> (length args) 0) (car args) 0))
         (parser (if (> (length args) 1) (cadr args) 'parse-sample-names-1))
         (midioffset (if (> (length args) 2) (caddr args) 0)))
-    (println bank parser midioffset)
-    `(let ((file-list (sys:directory-list ,path)))
+    `(let ((cnt 0)
+           (file-list (sys:directory-list ,path)))
        (for-each (lambda (samp-data)
                    (if samp-data
-                       (set-sampler-index ,sampler
-                                          (if (string=? (sys:platform) "Windows")
-                                              (car samp-data)
-                                              (string-append ,path "/" (car samp-data)))
-                                          (+ ,midioffset (cadr samp-data))
-                                          (caddr samp-data)
-                                          (cadddr samp-data)
-                                          ,bank)))
-                 (,parser file-list)))))
+                       (begin
+                         (set! cnt (+ cnt 1))                         
+                         (set-sampler-index ,sampler
+                                            (if (string=? (sys:platform) "Windows")
+                                                (car samp-data)
+                                                (string-append ,path "/" (car samp-data)))
+                                            (+ ,midioffset (cadr samp-data))
+                                            (caddr samp-data)
+                                            (cadddr samp-data)
+                                            ,bank
+                                            0))))
+                 (,parser file-list))
+       (ascii-print-color 0 6 10)              
+       (print 'Loaded cnt 'files 'into 'bank#: ,bank)
+       (ascii-print-color 0 7 10)       
+       (println)
+       )))
+
+
+(define-macro (clear-sampler sampler . args)
+  (let ((bank (if (> (length args) 0) (car args) 0)))
+    `(let ((native (llvm:get-native-closure ,(symbol->string sampler)))
+           (cnt 0))
+       (dotimes (i 128)
+         (if (> (clear_sample_data_ native (real->integer i) (real->integer ,bank)) 0)
+             (set! cnt (+ cnt 1))))
+       (ascii-print-color 0 6 10)              
+       (print 'Cleared cnt 'slots 'from 'bank#: ,bank)
+       (ascii-print-color 0 7 10)
+       (println)
+       #t)))
+
+
 
 ;; as a start, here are a couple of parser functions which might be useful:
 
@@ -337,7 +378,8 @@
     (map (lambda (fname)
            (let ((result (regex:matched fname "([0-9]*)\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
              (if (null? result)
-                 (begin (println 'Error: 'cannot 'parse 'filename: fname)
+                 (begin (if (not (regex:match? fname "^\\."))
+                            (println 'Error: 'cannot 'parse 'filename: fname))
                         #f)
                  (list fname                          ; filename    
                        (string->number (cadr result)) ; midi note number
@@ -351,9 +393,12 @@
     (map (lambda (fname)
            (let ((result (regex:matched fname "^.*([abcdefgABCDEFG][#b]?[0-9]).*\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
              (if (null? result)
-                 (begin (println 'Error: 'cannot 'parse 'filename: fname)
-                        (println 'Regex-result: result)
-                        #f)
+                 (begin
+                   (if (not (regex:match? fname "^\\."))
+                       (begin
+                         (println 'Error: 'cannot 'parse 'filename: fname)
+                         (println 'Regex-result: result)))
+                   #f)
                  (list fname                                    ; filename                   
                        (note-name-to-midi-number (cadr result)) ; midi note number           
                        0                                        ; offset                     
@@ -505,3 +550,60 @@
     ("open-triangle" . 81)
     ("mute-surdo" . 86)
     ("open-surdo" . 87)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; An ipc helper for audio
+;;
+(define ipc:audio-setup
+  (lambda (proc)
+    (ipc:eval-string proc
+                     ";; new playnote
+                     (define play-note
+                       (lambda (time inst pitch vol dur . args)
+                         (let* ((nargs (length args))
+                               (duration (* 1.0 dur))
+                               (dargs (sys:make-cptr (* 8 nargs))) ;; doubles
+                               (native (if (procedure? inst)
+                                           (llvm:get-native-closure (llvm:ffi-get-name inst))
+                                           (llvm:get-native-closure (if (symbol? inst)
+                                                                        (symbol->string inst)
+                                                                        inst)))))
+                           (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
+                           (if (cptr? native)
+                               (_play_note (integer->real time)
+                                           native
+                                           (midi2frq (* 1.0 pitch))
+                                           (/ (exp (/ vol 26.222)) 127.0)
+                                           duration
+                                           nargs
+                                           dargs)
+                               (print-error 'No 'inst 'named (symbol->string inst))))))
+                     ;; note name to midi num
+                     (define note-name-to-midi-number
+                       (lambda (name)
+                         (let ((result (regex:matched name \"([abcdefgABCDEFG])([#b])?(-?[0-9])\")))
+                           (if (null? result)
+                               #f
+                               (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                                     (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                                           ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+                                 (+ offset pc
+                                    (cond ((string=? (caddr result) \"#\") 1)
+                                          ((string=? (caddr result) \"b\") -1)
+                                          (else 0))))))))
+                     ;; the play macro
+                     (macro (play args)
+                            (if (symbol? (cadr args))
+                                `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+                                            ,@(cdr (cddddr args)))
+                                `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+                                            (*metro* 'dur ,(car (cdr (cddddr args))))
+                                            ,@(cddr (cddddr args)))))")
+    (ipc:bind-func proc '_play_note)
+    (ipc:bind-func proc 'midi2frq)))
+
+;; (println 'Establish 'audio 'on 'utility 'process)
+;; (ipc:audio-setup "utility")
+
