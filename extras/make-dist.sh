@@ -9,7 +9,7 @@ esac
 
 DIST_ARCHIVE=extempore-$(uname)-$(date "+%Y.%m.%d")
 DIST_FILES="extempore libs examples extras README.md runtime/code.ir runtime/init.xtm runtime/llvmir.xtm runtime/llvmti.xtm runtime/scheme.xtm"
-DIST_SHLIBS="libassimp libcairo librtmidi libSOIL libsndfile libOpenVG"
+DIST_SHLIBS="libassimp libcairo librtmidi libSOIL libsndfile libOpenVG libdrawtext"
 
 mkdir -p $DIST_ARCHIVE/runtime/lib
 
