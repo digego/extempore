@@ -3,7 +3,7 @@
 ;; to compile xtm.{dylib,so,dll} shared library (for faster loading)
 
 ;; ;; first compile the xtlang code you want in the shared lib
-;;
+
 ;; (sys:load "libs/core/math.xtm")
 ;; (sys:load "libs/core/audio_dsp.xtm")
 ;; (sys:load "libs/core/instruments.xtm")
@@ -13,6 +13,7 @@
 ;; (sys:load "libs/external/assimp.xtm")
 ;; (sys:load "libs/external/sndfile.xtm")
 ;; (sys:load "libs/external/openvg.xtm")
+;; (sys:load "libs/external/drawtext.xtm")
 ;; (println 'done 'loading!)
 
 ;; ;; then export the module to bitcode
@@ -2248,14 +2249,17 @@ void main()
 (define *xtmlib-openvg-loaded* #f)
 (print "Loading openvg library\t\t... ")
 
-(bind-alias VGboolean i32)
 (bind-alias VGint i32)
-(bind-alias VGuint i32)
+(bind-alias i32 i32)
 (bind-alias VGbitfield i32)
 (bind-alias VGfloat float)
-(bind-alias VGbyte i8)
+(bind-alias VGByte i8)
 (bind-alias VGubyte i8)
 (bind-alias VGshort i16)
+
+(bind-alias VGboolean i32)
+(bind-lib-val stdlib VG_FALSE i32)
+(bind-lib-val stdlib VG_TRUE i32)
 
 (bind-alias VGHandle i8*)
 (bind-alias VGPath i8*)
@@ -2263,67 +2267,115 @@ void main()
 (bind-alias VGImage i8*)
 
 ;; enums
-(bind-alias VGPathDatatype enum)
-
-(bind-alias VGPathCapabilities enum)
-
-(bind-alias VGPathAbsRel enum)
-(bind-alias VGPathSegment enum)
-(bind-alias VGPaintMode enum)
 (bind-alias VGErrorCode enum)
 (bind-alias VGParamType enum)
+(bind-alias VGRenderingQuality enum)
+(bind-alias VGPixelLayout enum)
+(bind-alias VGMatrixMode enum)
+(bind-alias VGMaskOperation enum)
+(bind-alias VGPathDatatype enum)
+(bind-alias VGPathAbsRel enum)
+(bind-alias VGPathSegment enum)
+(bind-alias VGPathCommand enum)
+(bind-alias VGPathCapabilities enum)
+(bind-alias VGPathParamType enum)
+(bind-alias VGCapStyle enum)
+(bind-alias VGJoinStyle enum)
+(bind-alias VGFillRule enum)
+(bind-alias VGPaintMode enum)
 (bind-alias VGPaintParamType enum)
 (bind-alias VGPaintType enum)
-(bind-alias VGMatrixMode enum)
+(bind-alias VGColorRampSpreadMode enum)
+(bind-alias VGTilingMode enum)
 (bind-alias VGImageFormat enum)
-(bind-alias VGBlendMode enum)
+(bind-alias VGImageQuality enum)
+(bind-alias VGImageParamType enum)
 (bind-alias VGImageMode enum)
-(bind-alias VGRenderingQuality enum)
+(bind-alias VGImageChannel enum)
+(bind-alias VGBlendMode enum)
+(bind-alias VGHardwareQueryType enum)
+(bind-alias VGHardwareQueryResult enum)
+(bind-alias VGStringID enum)
+(bind-alias VGUErrorCode enum)
+(bind-alias VGUArcType enum)
 
-(bind-lib libopenvg vgCreateContextSH [VGboolean,VGint,VGint]*)
-(bind-lib libopenvg vgCreatePath [VGPath,VGint,VGPathDatatype,VGfloat,VGfloat,VGint,VGint,VGbitfield]*)
-(bind-lib libopenvg vgClearPath [void,VGPath,VGbitfield]*)
-(bind-lib libopenvg vgDestroyPath [void,VGPath]*)
-(bind-lib libopenvg vgClear [void,VGint,VGint,VGint,VGint]*)
-(bind-lib libopenvg vgAppendPath [void,VGPath,VGPath]*)
-(bind-lib libopenvg vgAppendPathData [void,VGPath,VGint,VGubyte*,i8*]*)
-(bind-lib libopenvg vgDrawPath [void,VGPath,VGbitfield]*)
-(bind-lib libopenvg vgPathBounds [void,VGPath,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
-(bind-lib libopenvg vgCreatePaint [VGPaint]*)
-(bind-lib libopenvg vgDestroyPaint [void,VGPaint]*)
-(bind-lib libopenvg vgSetPaint [void,VGPaint,VGbitfield]*)
-;; (bind-lib libopenvg vgSetColor [void,VGPaint,VGuint]*)
-(bind-lib libopenvg vgSetfv [void,VGParamType,VGint,VGfloat*]*)
-(bind-lib libopenvg vgSetiv [void,VGParamType,VGint,VGint*]*)
-(bind-lib libopenvg vgSeti [void,VGParamType,VGint]*)
-(bind-lib libopenvg vgSetf [void,VGParamType,VGfloat]*)
-(bind-lib libopenvg vgLoadIdentity [void]*)
-(bind-lib libopenvg vgTranslate [void,VGfloat,VGfloat]*)
-(bind-lib libopenvg vgScale [void,VGfloat,VGfloat]*)
-(bind-lib libopenvg vgRotate [void,VGfloat]*)
-(bind-lib libopenvg vgSetParameterfv [void,VGHandle,VGint,VGint,VGfloat*]*)
-(bind-lib libopenvg vgSetParameteri [void,VGHandle,VGint,VGint]*)
-(bind-lib libopenvg vgGetError [VGErrorCode]*)
-(bind-lib libopenvg vgCreateImage [VGImage,VGImageFormat,VGint,VGint,VGbitfield]*)
-(bind-lib libopenvg vgImageSubData [void,VGImage,i8*,VGint,VGImageFormat,VGint,VGint,VGint,VGint]*)
-(bind-lib libopenvg vgDrawImage [void,VGImage]*)
-(bind-lib libopenvg vguLine [VGErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
-(bind-lib libopenvg vguEllipse [VGErrorCode,VGPath,VGfloat,VGfloat,VGfloat,VGfloat]*)
+(bind-lib-val stdlib VG_NO_ERROR i32)
+(bind-lib-val stdlib VG_BAD_HANDLE_ERROR i32)
+(bind-lib-val stdlib VG_ILLEGAL_ARGUMENT_ERROR i32)
+(bind-lib-val stdlib VG_OUT_OF_MEMORY_ERROR i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_ERROR i32)
+(bind-lib-val stdlib VG_UNSUPPORTED_IMAGE_FORMAT_ERROR i32)
+(bind-lib-val stdlib VG_UNSUPPORTED_PATH_FORMAT_ERROR i32)
+(bind-lib-val stdlib VG_IMAGE_IN_USE_ERROR i32)
+(bind-lib-val stdlib VG_NO_CONTEXT_ERROR i32)
 
-(define *xtmlib-openvg-loaded* #t)
-(ascii-print-color 0 2 10)
-(print "[YES]")
-(ascii-print-color 0 7 10)
-(println)
+(bind-lib-val stdlib VG_MATRIX_MODE i32)
+(bind-lib-val stdlib VG_FILL_RULE i32)
+(bind-lib-val stdlib VG_IMAGE_QUALITY i32)
+(bind-lib-val stdlib VG_RENDERING_QUALITY i32)
+(bind-lib-val stdlib VG_BLEND_MODE i32)
+(bind-lib-val stdlib VG_IMAGE_MODE i32)
+(bind-lib-val stdlib VG_SCISSOR_RECTS i32)
+(bind-lib-val stdlib VG_STROKE_LINE_WIDTH i32)
+(bind-lib-val stdlib VG_STROKE_CAP_STYLE i32)
+(bind-lib-val stdlib VG_STROKE_JOIN_STYLE i32)
+(bind-lib-val stdlib VG_STROKE_MITER_LIMIT i32)
+(bind-lib-val stdlib VG_STROKE_DASH_PATTERN i32)
+(bind-lib-val stdlib VG_STROKE_DASH_PHASE i32)
+(bind-lib-val stdlib VG_STROKE_DASH_PHASE_RESET i32)
+(bind-lib-val stdlib VG_TILE_FILL_COLOR i32)
+(bind-lib-val stdlib VG_CLEAR_COLOR i32)
+(bind-lib-val stdlib VG_MASKING i32)
+(bind-lib-val stdlib VG_SCISSORING i32)
+(bind-lib-val stdlib VG_PIXEL_LAYOUT i32)
+(bind-lib-val stdlib VG_SCREEN_LAYOUT i32)
+(bind-lib-val stdlib VG_FILTER_FORMAT_LINEAR i32)
+(bind-lib-val stdlib VG_FILTER_FORMAT_PREMULTIPLIED i32)
+(bind-lib-val stdlib VG_FILTER_CHANNEL_MASK i32)
+(bind-lib-val stdlib VG_MAX_SCISSOR_RECTS i32)
+(bind-lib-val stdlib VG_MAX_DASH_COUNT i32)
+(bind-lib-val stdlib VG_MAX_KERNEL_SIZE i32)
+(bind-lib-val stdlib VG_MAX_SEPARABLE_KERNEL_SIZE i32)
+(bind-lib-val stdlib VG_MAX_COLOR_RAMP_STOPS i32)
+(bind-lib-val stdlib VG_MAX_IMAGE_WIDTH i32)
+(bind-lib-val stdlib VG_MAX_IMAGE_HEIGHT i32)
+(bind-lib-val stdlib VG_MAX_IMAGE_PIXELS i32)
+(bind-lib-val stdlib VG_MAX_IMAGE_BYTES i32)
+(bind-lib-val stdlib VG_MAX_FLOAT i32)
+(bind-lib-val stdlib VG_MAX_GAUSSIAN_STD_DEVIATION i32)
 
-;; libOpenVG
-(bind-lib-val stdlib VG_FALSE i32)
-(bind-lib-val stdlib VG_TRUE i32)
+(bind-lib-val stdlib VG_RENDERING_QUALITY_NONANTIALIASED i32)
+(bind-lib-val stdlib VG_RENDERING_QUALITY_FASTER i32)
+(bind-lib-val stdlib VG_RENDERING_QUALITY_BETTER i32)
+
+(bind-lib-val stdlib VG_PIXEL_LAYOUT_UNKNOWN i32)
+(bind-lib-val stdlib VG_PIXEL_LAYOUT_RGB_VERTICAL i32)
+(bind-lib-val stdlib VG_PIXEL_LAYOUT_BGR_VERTICAL i32)
+(bind-lib-val stdlib VG_PIXEL_LAYOUT_RGB_HORIZONTAL i32)
+(bind-lib-val stdlib VG_PIXEL_LAYOUT_BGR_HORIZONTAL i32)
+
+(bind-lib-val stdlib VG_MATRIX_PATH_USER_TO_SURFACE i32)
+(bind-lib-val stdlib VG_MATRIX_IMAGE_USER_TO_SURFACE i32)
+(bind-lib-val stdlib VG_MATRIX_FILL_PAINT_TO_USER i32)
+(bind-lib-val stdlib VG_MATRIX_STROKE_PAINT_TO_USER i32)
+
+(bind-lib-val stdlib VG_CLEAR_MASK i32)
+(bind-lib-val stdlib VG_FILL_MASK i32)
+(bind-lib-val stdlib VG_SET_MASK i32)
+(bind-lib-val stdlib VG_UNION_MASK i32)
+(bind-lib-val stdlib VG_INTERSECT_MASK i32)
+(bind-lib-val stdlib VG_SUBTRACT_MASK i32)
+
 (bind-lib-val stdlib VG_PATH_FORMAT_STANDARD i32)
+
+(bind-lib-val stdlib VG_PATH_DATATYPE_S_8 i32)
+(bind-lib-val stdlib VG_PATH_DATATYPE_S_16 i32)
+(bind-lib-val stdlib VG_PATH_DATATYPE_S_32 i32)
 (bind-lib-val stdlib VG_PATH_DATATYPE_F i32)
+
 (bind-lib-val stdlib VG_ABSOLUTE i32)
 (bind-lib-val stdlib VG_RELATIVE i32)
-(bind-lib-val stdlib VG_PATH_CAPABILITY_ALL i32)
+
 (bind-lib-val stdlib VG_CLOSE_PATH i32)
 (bind-lib-val stdlib VG_MOVE_TO i32)
 (bind-lib-val stdlib VG_LINE_TO i32)
@@ -2331,32 +2383,98 @@ void main()
 (bind-lib-val stdlib VG_VLINE_TO i32)
 (bind-lib-val stdlib VG_QUAD_TO i32)
 (bind-lib-val stdlib VG_CUBIC_TO i32)
+(bind-lib-val stdlib VG_SQUAD_TO i32)
 (bind-lib-val stdlib VG_SCUBIC_TO i32)
 (bind-lib-val stdlib VG_SCCWARC_TO i32)
 (bind-lib-val stdlib VG_SCWARC_TO i32)
 (bind-lib-val stdlib VG_LCCWARC_TO i32)
 (bind-lib-val stdlib VG_LCWARC_TO i32)
+
+;; I *think* these are all correct!
+(bind-alias i32 i32)
+(bind-lib-val stdlib VG_MOVE_TO_ABS i32)
+(bind-lib-val stdlib VG_MOVE_TO_REL i32)
+(bind-lib-val stdlib VG_LINE_TO_ABS i32)
+(bind-lib-val stdlib VG_LINE_TO_REL i32)
+(bind-lib-val stdlib VG_HLINE_TO_ABS i32)
+(bind-lib-val stdlib VG_HLINE_TO_REL i32)
+(bind-lib-val stdlib VG_VLINE_TO_ABS i32)
+(bind-lib-val stdlib VG_VLINE_TO_REL i32)
+(bind-lib-val stdlib VG_QUAD_TO_ABS i32)
+(bind-lib-val stdlib VG_QUAD_TO_REL i32)
+(bind-lib-val stdlib VG_CUBIC_TO_ABS i32)
+(bind-lib-val stdlib VG_CUBIC_TO_REL i32)
+(bind-lib-val stdlib VG_SQUAD_TO_ABS i32)
+(bind-lib-val stdlib VG_SQUAD_TO_REL i32)
+(bind-lib-val stdlib VG_SCUBIC_TO_ABS i32)
+(bind-lib-val stdlib VG_SCUBIC_TO_REL i32)
+(bind-lib-val stdlib VG_SCCWARC_TO_ABS i32)
+(bind-lib-val stdlib VG_SCCWARC_TO_REL i32)
+(bind-lib-val stdlib VG_SCWARC_TO_ABS i32)
+(bind-lib-val stdlib VG_SCWARC_TO_REL i32)
+(bind-lib-val stdlib VG_LCCWARC_TO_ABS i32)
+(bind-lib-val stdlib VG_LCCWARC_TO_REL i32)
+(bind-lib-val stdlib VG_LCWARC_TO_ABS i32)
+(bind-lib-val stdlib VG_LCWARC_TO_REL i32)
+
+(bind-lib-val stdlib VG_PATH_CAPABILITY_APPEND_FROM i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_APPEND_TO i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_MODIFY i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_TRANSFORM_FROM i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_TRANSFORM_TO i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_INTERPOLATE_FROM i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_INTERPOLATE_TO i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_PATH_LENGTH i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_POINT_ALONG_PATH i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_TANGENT_ALONG_PATH i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_PATH_BOUNDS i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_PATH_TRANSFORMED_BOUNDS i32)
+(bind-lib-val stdlib VG_PATH_CAPABILITY_ALL i32)
+
+(bind-lib-val stdlib VG_PATH_FORMAT i32)
+(bind-lib-val stdlib VG_PATH_DATATYPE i32)
+(bind-lib-val stdlib VG_PATH_SCALE i32)
+(bind-lib-val stdlib VG_PATH_BIAS i32)
+(bind-lib-val stdlib VG_PATH_NUM_SEGMENTS i32)
+(bind-lib-val stdlib VG_PATH_NUM_COORDS i32)
+
+(bind-lib-val stdlib VG_CAP_BUTT i32)
+(bind-lib-val stdlib VG_CAP_ROUND i32)
+(bind-lib-val stdlib VG_CAP_SQUARE i32)
+
+(bind-lib-val stdlib VG_JOIN_MITER i32)
+(bind-lib-val stdlib VG_JOIN_ROUND i32)
+(bind-lib-val stdlib VG_JOIN_BEVEL i32)
+
+(bind-lib-val stdlib VG_EVEN_ODD i32)
+(bind-lib-val stdlib VG_NON_ZERO i32)
+
 (bind-lib-val stdlib VG_STROKE_PATH i32)
 (bind-lib-val stdlib VG_FILL_PATH i32)
-(bind-lib-val stdlib VG_NO_ERROR i32)
-(bind-lib-val stdlib VG_MATRIX_MODE i32)
-(bind-lib-val stdlib VG_FILL_RULE i32)
-(bind-lib-val stdlib VG_IMAGE_QUALITY i32)
-(bind-lib-val stdlib VG_RENDERING_QUALITY i32)
-(bind-lib-val stdlib VG_BLEND_MODE i32)
-(bind-lib-val stdlib VG_IMAGE_MODE i32)
+
 (bind-lib-val stdlib VG_PAINT_TYPE i32)
 (bind-lib-val stdlib VG_PAINT_COLOR i32)
+(bind-lib-val stdlib VG_PAINT_COLOR_RAMP_SPREAD_MODE i32)
+(bind-lib-val stdlib VG_PAINT_COLOR_RAMP_PREMULTIPLIED i32)
+(bind-lib-val stdlib VG_PAINT_COLOR_RAMP_STOPS i32)
+(bind-lib-val stdlib VG_PAINT_LINEAR_GRADIENT i32)
+(bind-lib-val stdlib VG_PAINT_RADIAL_GRADIENT i32)
+(bind-lib-val stdlib VG_PAINT_PATTERN_TILING_MODE i32)
+
 (bind-lib-val stdlib VG_PAINT_TYPE_COLOR i32)
 (bind-lib-val stdlib VG_PAINT_TYPE_LINEAR_GRADIENT i32)
 (bind-lib-val stdlib VG_PAINT_TYPE_RADIAL_GRADIENT i32)
 (bind-lib-val stdlib VG_PAINT_TYPE_PATTERN i32)
-(bind-lib-val stdlib VG_CLEAR_COLOR i32)
-(bind-lib-val stdlib VG_STROKE_LINE_WIDTH i32)
-(bind-lib-val stdlib VG_MATRIX_PATH_USER_TO_SURFACE i32)
-(bind-lib-val stdlib VG_MATRIX_IMAGE_USER_TO_SURFACE i32)
-(bind-lib-val stdlib VG_MATRIX_FILL_PAINT_TO_USER i32)
-(bind-lib-val stdlib VG_MATRIX_STROKE_PAINT_TO_USER i32)
+
+(bind-lib-val stdlib VG_COLOR_RAMP_SPREAD_PAD i32)
+(bind-lib-val stdlib VG_COLOR_RAMP_SPREAD_REPEAT i32)
+(bind-lib-val stdlib VG_COLOR_RAMP_SPREAD_REFLECT i32)
+
+(bind-lib-val stdlib VG_TILE_FILL i32)
+(bind-lib-val stdlib VG_TILE_PAD i32)
+(bind-lib-val stdlib VG_TILE_REPEAT i32)
+(bind-lib-val stdlib VG_TILE_REFLECT i32)
+
 (bind-lib-val stdlib VG_sRGBX_8888 i32)
 (bind-lib-val stdlib VG_sRGBA_8888 i32)
 (bind-lib-val stdlib VG_sRGBA_8888_PRE i32)
@@ -2364,15 +2482,389 @@ void main()
 (bind-lib-val stdlib VG_lRGBA_8888 i32)
 (bind-lib-val stdlib VG_lRGBA_8888_PRE i32)
 (bind-lib-val stdlib VG_lARGB_8888 i32)
-(bind-lib-val stdlib VG_BLEND_SRC i32)
+
+(bind-lib-val stdlib VG_IMAGE_QUALITY_NONANTIALIASED i32)
+(bind-lib-val stdlib VG_IMAGE_QUALITY_FASTER i32)
+(bind-lib-val stdlib VG_IMAGE_QUALITY_BETTER i32)
+
+(bind-lib-val stdlib VG_IMAGE_FORMAT i32)
+(bind-lib-val stdlib VG_IMAGE_WIDTH i32)
+(bind-lib-val stdlib VG_IMAGE_HEIGHT i32)
+
 (bind-lib-val stdlib VG_DRAW_IMAGE_NORMAL i32)
 (bind-lib-val stdlib VG_DRAW_IMAGE_MULTIPLY i32)
 (bind-lib-val stdlib VG_DRAW_IMAGE_STENCIL i32)
-(bind-lib-val stdlib VG_RENDERING_QUALITY_BETTER i32)
-(bind-lib-val stdlib VG_IMAGE_QUALITY_BETTER i32)
+
+(bind-lib-val stdlib VG_RED i32)
+(bind-lib-val stdlib VG_GREEN i32)
+(bind-lib-val stdlib VG_BLUE i32)
+(bind-lib-val stdlib VG_ALPHA i32)
+
+(bind-lib-val stdlib VG_BLEND_SRC i32)
+(bind-lib-val stdlib VG_BLEND_SRC_OVER i32)
+(bind-lib-val stdlib VG_BLEND_DST_OVER i32)
+(bind-lib-val stdlib VG_BLEND_SRC_IN i32)
+(bind-lib-val stdlib VG_BLEND_DST_IN i32)
+(bind-lib-val stdlib VG_BLEND_MULTIPLY i32)
+(bind-lib-val stdlib VG_BLEND_SCREEN i32)
+(bind-lib-val stdlib VG_BLEND_DARKEN i32)
+(bind-lib-val stdlib VG_BLEND_LIGHTEN i32)
+(bind-lib-val stdlib VG_BLEND_ADDITIVE i32)
+(bind-lib-val stdlib VG_BLEND_SRC_OUT_SH i32)
+(bind-lib-val stdlib VG_BLEND_DST_OUT_SH i32)
+(bind-lib-val stdlib VG_BLEND_SRC_ATOP_SH i32)
+(bind-lib-val stdlib VG_BLEND_DST_ATOP_SH i32)
+
+(bind-lib-val stdlib VG_IMAGE_FORMAT_QUERY i32)
+(bind-lib-val stdlib VG_PATH_DATATYPE_QUERY i32)
+
+(bind-lib-val stdlib VG_HARDWARE_ACCELERATED i32)
+(bind-lib-val stdlib VG_HARDWARE_UNACCELERATED i32)
+
+(bind-lib-val stdlib VG_VENDOR i32)
+(bind-lib-val stdlib VG_RENDERER i32)
+(bind-lib-val stdlib VG_VERSION i32)
+(bind-lib-val stdlib VG_EXTENSIONS i32)
+
+(bind-lib-val stdlib VGU_NO_ERROR i32)
+(bind-lib-val stdlib VGU_BAD_HANDLE_ERROR i32)
+(bind-lib-val stdlib VGU_ILLEGAL_ARGUMENT_ERROR i32)
+(bind-lib-val stdlib VGU_OUT_OF_MEMORY_ERROR i32)
+(bind-lib-val stdlib VGU_PATH_CAPABILITY_ERROR i32)
+(bind-lib-val stdlib VGU_BAD_WARP_ERROR i32)
+
+(bind-lib-val stdlib VGU_ARC_OPEN i32)
+(bind-lib-val stdlib VGU_ARC_CHORD i32)
+(bind-lib-val stdlib VGU_ARC_PIE i32)
+
+(bind-lib libopenvg vgGetError [i32]*)
+(bind-lib libopenvg vgFlush [void]*)
+(bind-lib libopenvg vgFinish [void]*)
+
+(bind-lib libopenvg vgSetf [void,i32,float]*)
+(bind-lib libopenvg vgSeti [void,i32,i32]*)
+(bind-lib libopenvg vgSetfv [void,i32,i32,float*]*)
+(bind-lib libopenvg vgSetiv [void,i32,i32,i32*]*)
+
+(bind-lib libopenvg vgGetf [float,i32]*)
+(bind-lib libopenvg vgGeti [i32,i32]*)
+(bind-lib libopenvg vgGetVectorSize [i32,i32]*)
+(bind-lib libopenvg vgGetfv [void,i32,i32,float*]*)
+(bind-lib libopenvg vgGetiv [void,i32,i32,i32*]*)
+
+(bind-lib libopenvg vgSetParameterf [void,i8,i32,float]*)
+(bind-lib libopenvg vgSetParameteri [void,i8,i32,i32]*)
+(bind-lib libopenvg vgSetParameterfv [void,i8,i32,i32,float*]*)
+(bind-lib libopenvg vgSetParameteriv [void,i8,i32,i32,i32*]*)
+
+(bind-lib libopenvg vgGetParameterf [float,i8,i32,float]*)
+(bind-lib libopenvg vgGetParameteri [i32,i8,i32,i32]*)
+(bind-lib libopenvg vgGetParameterVectorSize [i32,i8,i32]*)
+(bind-lib libopenvg vgGetParameterfv [i8,i32,i32,float*]*)
+(bind-lib libopenvg vgGetParameteriv [i8,i32,i32,i32*]*)
+
+(bind-lib libopenvg vgLoadIdentity [void]*)
+(bind-lib libopenvg vgLoadMatrix [void,float*]*)
+(bind-lib libopenvg vgGetMatrix [void,float*]*)
+(bind-lib libopenvg vgMultMatrix [void,float*]*)
+(bind-lib libopenvg vgTranslate [void,float,float]*)
+(bind-lib libopenvg vgScale [void,float,float]*)
+(bind-lib libopenvg vgShear [void,float,float]*)
+(bind-lib libopenvg vgRotate [void,float]*)
+
+
+(bind-lib libopenvg vgMask [void,i8,i32,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgClear [void,i32,i32,i32,i32]*)
+
+;; path
+(bind-lib libopenvg vgCreatePath [i8,i32,i32,float,float,i32,i32,i32]*)
+(bind-lib libopenvg vgClearPath [void,i8,i32]*)
+(bind-lib libopenvg vgDestroyPath [void,i8]*)
+(bind-lib libopenvg vgRemovePathCapabilities [void,i8,i32]*)
+(bind-lib libopenvg vgGetPathCapabilities [i32,i8]*)
+(bind-lib libopenvg vgAppendPath [void,i8,i8]*)
+(bind-lib libopenvg vgAppendPathData [void,i8,i32,i8*,i8*]*)
+(bind-lib libopenvg vgModifyPathCoords [void,i8,i32,i32,i8*]*)
+(bind-lib libopenvg vgTransformPath [void,i8,i8]*)
+(bind-lib libopenvg vgInterpolatePath [i32,i8,i8,i8,float]*)
+(bind-lib libopenvg vgPathLength [i32,i8,i32,i32]*)
+(bind-lib libopenvg vgPointAlongPath [void,i8,i32,i32,float,float*,float*,float*,float*]*)
+(bind-lib libopenvg vgPathBounds [void,i8,float*,float*,float*,float*]*)
+(bind-lib libopenvg vgPathTransformedBounds [void,i8,float,float*,float*,float*,float*]*)
+(bind-lib libopenvg vgDrawPath [void,i8,i32]*)
+
+;; paint
+(bind-lib libopenvg vgCreatePaint [i8]*)
+(bind-lib libopenvg vgDestroyPaint [void,i8]*)
+(bind-lib libopenvg vgSetPaint [void,i8,i32]*)
+
+;; these functions arent in my shlib for some reason!
+;; (bind-lib libopenvg vgGetPaint [i8,i32]*)
+;; (bind-lib libopenvg vgSetColor [void,i8,i32]*)
+;; (bind-lib libopenvg vgGetColor [i32,i8]*)
+(bind-lib libopenvg vgPaintPattern [void,i8,i8]*)
+
+;; image
+(bind-lib libopenvg vgCreateImage [i8,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgDestroyImage [void,i8]*)
+(bind-lib libopenvg vgImageSubData [void,i8,i8*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgGetImageSubData [void,i8,i8*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgChildImage [i8,i8,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgGetParent [i8,i8]*)
+(bind-lib libopenvg vgCopyImage [void,i8,i32,i32,i8,i32,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgDrawImage [void,i8]*)
+
+(bind-lib libopenvg vgSetPixels [void,i32,i32,i8,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgWritePixels [void,i8*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgGetPixels [void,i8,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgReadPixels [void,i8*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libopenvg vgCopyPixels [void,i32,i32,i32,i32,i32,i32]*)
+
+(bind-lib libopenvg vgColorMatrix [void,i8,i8,float*]*)
+(bind-lib libopenvg vgConvolve [void,i8,i8,i32,i32,i32,i32,i16*,float,float,i32]*)
+(bind-lib libopenvg vgSeparableConvolve [void,i8,i8,i32,i32,i32,i32,i16*,i16*,float,float,i32]*)
+(bind-lib libopenvg vgGaussianBlur [void,i8,i8,float,float,i32]*)
+(bind-lib libopenvg vgLookup [void,i8,i8,i8*,i8*,i8*,i8*,i32,i32]*)
+(bind-lib libopenvg vgLookupSingle [void,i8,i8,i32*,i32,i32,i32]*)
+
+(bind-lib libopenvg vgHardwareQuery [i32,i32,i32]*)
+(bind-lib libopenvg vgGetString [i8*,i32]*)
+
+(bind-lib-val stdlib OVG_SH_blend_src_out i32)
+(bind-lib-val stdlib OVG_SH_blend_dst_out i32)
+(bind-lib-val stdlib OVG_SH_blend_src_atop i32)
+(bind-lib-val stdlib OVG_SH_blend_dst_atop i32)
+
+(bind-lib libopenvg vgCreateContextSH [i32,i32,i32]*)
+(bind-lib libopenvg vgResizeSurfaceSH [void,i32,i32]*)
+(bind-lib libopenvg vgDestroyContextSH [void]*)
+
+;; VGU closures
+
+(bind-lib libopenvg vguLine [i32,i8,float,float,float,float]*)
+(bind-lib libopenvg vguPolygon [i32,i8,float*,i32,i32]*)
+(bind-lib libopenvg vguRect [i32,i8,float,float,float,float]*)
+(bind-lib libopenvg vguRoundRect [i32,i8,float,float,float,float,float,float]*)  
+(bind-lib libopenvg vguEllipse [i32,i8,float,float,float,float]*)
+(bind-lib libopenvg vguArc [i32,i8,float,float,float,float,float,float,i32]*)
+(bind-lib libopenvg vguComputeWarpQuadToSquare [i32,float,float,float,float,float,float,float,float,float*]*)
+(bind-lib libopenvg vguComputeWarpSquareToQuad [i32,float,float,float,float,float,float,float,float,float*]*)
+(bind-lib libopenvg vguComputeWarpQuadToQuad [i32,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float*]*)
+
 (bind-lib-func stdlib vgCreateContext [i32,i32,i32]*)
 (bind-lib-func stdlib xtm_create_vgpath [i8*]*)
 (bind-lib-func stdlib xtm_create_vgimage [i8*,i8*]*)
+
+(define *xtmlib-openvg-loaded* #t)
+(ascii-print-color 0 2 10)
+(print "[YES]")
+(ascii-print-color 0 7 10)
+(println)
+
+;;;;;;;;;;;;;;;;;
+;; libdrawtext ;;
+;;;;;;;;;;;;;;;;;
+
+(sys:load-preload-check 'drawtext)
+
+(define libdrawtext
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libdrawtext.so"))
+	  ((string=? platform "Windows") (sys:open-dylib "libdrawtext.dll"))
+	  ((string=? platform "OSX") (sys:open-dylib "libdrawtext.dylib"))
+	  (else (print "Unknown platform: " platform)))))
+
+(define *xtmlib-drawtext-loaded* #f)
+(print "Loading drawtext library\t\t...")
+
+(bind-alias dtx_font i8)
+(bind-alias dtx_glyphmap i8)
+
+(bind-lib-val stdlib DTX_NBF i32)	;; unbuffered
+(bind-lib-val stdlib DTX_LBF i32)	;; line buffered
+(bind-lib-val stdlib DTX_FBF i32)	;; fully buffered
+
+;; <x,y,width,height>
+(bind-type dtx_box <float,float,float,float>)
+
+;; Open a truetype/opentype/whatever font.
+
+;; If sz is non-zero, the default ASCII glyphmap at the requested
+;; point size is automatically created as well, and ready to use.
+
+;; To use other unicode ranges and different font sizes you must first
+;; call dtx_prepare or dtx_prepare_range before issuing any drawing
+;; calls, otherwise nothing will be rendered.
+
+;; struct dtx_font *dtx_open_font(const char *fname, int sz);
+(bind-lib libdrawtext dtx_open_font [i8*,i8*,i32]*)
+;; void dtx_close_font(struct dtx_font *fnt);
+(bind-lib libdrawtext dtx_close_font [void,i8*]*)
+
+;; prepare an ASCII glyphmap for the specified font size
+;; void dtx_prepare(struct dtx_font *fnt, int sz);
+(bind-lib libdrawtext dtx_prepare [void,i8*,i32]*)
+
+;; prepare an arbitrary unicode range glyphmap for the specified font size
+;; void dtx_prepare_range(struct dtx_font *fnt, int sz, int cstart, int cend);
+(bind-lib libdrawtext dtx_prepare_range [void,i8*,i32,i32,i32]*)
+
+;; Finds the glyphmap that contains the specified character code and
+;; matches the requested size. Returns null if it hasn't been created
+;; (you should call dtx_prepare/dtx_prepare_range).
+;; struct dtx_glyphmap *dtx_get_font_glyphmap(struct dtx_font *fnt, int sz, int code);
+(bind-lib libdrawtext dtx_get_font_glyphmap [i8*,i8*,i32,i32]*)
+
+;; Finds the glyphmap that contains the specified unicode range and
+;; matches the rested font size. Will automatically generate one if it
+;; can't find it.
+;; struct dtx_glyphmap *dtx_get_font_glyphmap_range(struct dtx_font *fnt, int sz, int cstart, int cend);
+(bind-lib libdrawtext dtx_get_font_glyphmap_range [i8*,i8*,i32,i32,i32]*)
+
+;; Creates and returns a glyphmap for a particular unicode range and
+;; font size. The generated glyphmap is added to the font's list of
+;; glyphmaps.
+
+;; struct dtx_glyphmap *dtx_create_glyphmap_range(struct dtx_font *fnt, int sz, int cstart, int cend);
+(bind-lib libdrawtext dtx_create_glyphmap_range [i8*,i8*,i32,i32,i32]*)
+
+(bind-lib libdrawtext dtx_free_glyphmap [void,i8*]*)
+
+;; returns a pointer to the raster image of a glyphmap (1 byte per
+;; pixel grayscale)
+;; unsigned char *dtx_get_glyphmap_image(struct dtx_glyphmap *gmap);
+;; (bind-lib libdrawtext dtx_get_glyphmap_image [i8*,i8*]*)
+
+;; returns the width of the glyphmap image in pixels
+;; int dtx_get_glyphmap_width(struct dtx_glyphmap *gmap);
+(bind-lib libdrawtext dtx_get_glyphmap_width [i32,i8*]*)
+;; returns the height of the glyphmap image in pixels
+;; int dtx_get_glyphmap_height(struct dtx_glyphmap *gmap);
+(bind-lib libdrawtext dtx_get_glyphmap_height [i32,i8*]*)
+
+;; The following functions can be used even when the library is
+;; compiled without freetype support. (TODO)
+
+;; struct dtx_glyphmap *dtx_load_glyphmap(const char *fname);
+;; struct dtx_glyphmap *dtx_load_glyphmap_stream(FILE *fp);
+;; int dtx_save_glyphmap(const char *fname, const struct dtx_glyphmap *gmap);
+;; int dtx_save_glyphmap_stream(FILE *fp, const struct dtx_glyphmap *gmap);
+
+
+;;;;;;;;;;;;;;;
+;; rendering ;;
+;;;;;;;;;;;;;;;
+
+;; before drawing anything this function must set the font to use
+;; void dtx_use_font(struct dtx_font *fnt, int sz);
+(bind-lib libdrawtext dtx_use_font [void,i8*,i32]*)
+
+;; /sets the buffering mode
+;;  - DTX_NBUF: every call to dtx_string gets rendered immediately.
+;;  - DTX_LBUF: renders when the buffer is full or the string contains a newline.
+;;  - DTX_FBUF: renders only when the buffer is full (you must call dtx_flush explicitly).
+
+;; (bind-lib libdrawtext dtx_draw_buffering [void,i32]*)
+
+;; Sets the vertex attribute indices to use for passing vertex and
+;; texture coordinate data. By default both are -1 which means you
+;; don't have to use a shader, and if you do they are accessible
+;; through gl_Vertex and gl_MultiTexCoord0, as usual.
+;;
+;; NOTE: If you are using OpenGL ES 2.x or OpenGL >= 3.1 pure
+;; (non-compatibility) context you must specify valid attribute
+;; indices.
+;; void dtx_vertex_attribs(int vert_attr, int tex_attr);
+(bind-lib libdrawtext dtx_vertex_attribs [void,i32,i32]*)
+
+;; draws a single glyph at the origin
+;; void dtx_glyph(int code);
+(bind-lib libdrawtext dtx_glyph [void,i32]*)
+;; draws a utf-8 string starting at the origin. \n \r and \t are handled appropriately.
+;; void dtx_string(const char *str);
+(bind-lib libdrawtext dtx_string [void,i8*]*)
+
+;; render any pending glyphs (see dtx_draw_buffering)
+;; void dtx_flush(void);
+(bind-lib libdrawtext dtx_flush [void]*)
+
+;;;;;;;;;;;;;;;
+;; encodings ;;
+;;;;;;;;;;;;;;;
+
+;; returns a pointer to the next character in a utf-8 stream
+;; char *dtx_utf8_next_char(char *str);
+(bind-lib libdrawtext dtx_utf8_next_char [i8*,i8*]*)
+
+;; returns the unicode character codepoint of the utf-8 character starting at str
+;; int dtx_utf8_char_code(const char *str);
+(bind-lib libdrawtext dtx_utf8_char_code [i32,i8*]*)
+
+;; returns the number of bytes of the utf-8 character starting at str
+;; int dtx_utf8_nbytes(const char *str);
+(bind-lib libdrawtext dtx_utf8_nbytes [i32,i8*]*)
+
+;; returns the number of utf-8 character in a zero-terminated utf-8 string
+;; int dtx_utf8_char_count(const char *str);
+(bind-lib libdrawtext dtx_utf8_char_count [i32,i8*]*)
+
+;; Converts a unicode code-point to a utf-8 character by filling in
+;; the buffer passed at the second argument, and returns the number of
+;; bytes taken by that utf-8 character.
+;; 
+;; It's valid to pass a null buffer pointer, in which case only the
+;; byte count is returned (useful to figure out how much memory to
+;; allocate for a buffer).
+;; size_t dtx_utf8_from_char_code(int code, char *buf);
+(bind-lib libdrawtext dtx_utf8_from_char_code [i64,i32,i8*]*)
+
+;; Converts a unicode utf-16 wchar_t string to utf-8, filling in the
+;; buffer passed at the second argument. Returns the size of the
+;; resulting string in bytes.
+
+;; It's valid to pass a null buffer pointer, in which case only the
+;; size gets calculated and returned, which is useful for figuring out
+;; how much memory to allocate for the utf-8 buffer.
+;; size_t dtx_utf8_from_string(const wchar_t *str, char *buf);
+(bind-lib libdrawtext dtx_utf8_from_string [i64,i32,i8*]*)
+
+
+;;;;;;;;;;;;;
+;; metrics ;;
+;;;;;;;;;;;;;
+
+;; float dtx_line_height(void);
+(bind-lib libdrawtext dtx_line_height [float]*)
+
+;; rendered dimensions of a single glyph
+;; void dtx_glyph_box(int code, struct dtx_box *box);
+(bind-lib libdrawtext dtx_glyph_box [void,i32,dtx_box*]*)
+;; float dtx_glyph_width(int code);
+(bind-lib libdrawtext dtx_glyph_width [float,i32]*)
+;; float dtx_glyph_height(int code);
+(bind-lib libdrawtext dtx_glyph_height [float,i32]*)
+
+;; rendered dimensions of a string
+;; void dtx_string_box(const char *str, struct dtx_box *box);
+(bind-lib libdrawtext dtx_string_box [void,i8*,dtx_box*]*)
+;; float dtx_string_width(const char *str);
+(bind-lib libdrawtext dtx_string_width [float,i8*]*)
+;; float dtx_string_height(const char *str);
+(bind-lib libdrawtext dtx_string_height [float,i8*]*)
+
+;; returns the horizontal position of the n-th character of the
+;; rendered string (useful for placing cursors)
+;; float dtx_char_pos(const char *str, int n);
+(bind-lib libdrawtext dtx_char_pos [float,i8*,i32]*)
+
+;; int dtx_char_at_pt(const char *str, float pt);
+(bind-lib libdrawtext dtx_char_at_pt [i32,i8*,float]*)
+
+(define *xtmlib-drawtext-loaded* #t)
+(ascii-print-color 0 2 10)
+(print "[YES]")
+(ascii-print-color 0 7 10)
+(println)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
