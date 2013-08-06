@@ -421,11 +421,23 @@ See `run-hooks'."
        (2 font-lock-constant-face)
        (3 font-lock-function-name-face)
        (4 font-lock-type-face t))
+     ;; bind-lib-func
+     '("(\\(bind-lib-func\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+       (1 font-lock-keyword-face)
+       (2 font-lock-constant-face)
+       (3 font-lock-function-name-face)
+       (4 font-lock-type-face t))
      ;; bind-val
      '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]?+\\)"
        (1 font-lock-keyword-face)
        (2 font-lock-function-name-face)
        (3 font-lock-type-face t))
+     ;; bind-lib-val
+     '("(\\(bind-lib-val\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+       (1 font-lock-keyword-face)
+       (2 font-lock-constant-face)
+       (3 font-lock-function-name-face)
+       (4 font-lock-type-face t))
      ;; cast
      '("(cast\\s-+\\S-+\\s-+\\([^ \t)]?+\\))"
        (1 font-lock-type-face))
