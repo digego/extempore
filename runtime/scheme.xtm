@@ -1684,3 +1684,16 @@
             (ascii-print-color 0 7 10)
             (println)
             #f)))))
+
+;; llvm module export helper
+
+(define llvm-export-current-xtlang-module
+  (lambda ()
+    (llvm:export-module "/tmp/xtlang-module.bc")
+    ;; print further instructions
+    (print "\nLLVM bitcode for the xtlang standard library exported to \"/tmp/xtlang-module.bc\". To finish compiling the stdlib, enter the following command in a terminal window (inserting the proper path to your LLVM install):\n\n")
+    (cond ((string=? (sys:platform) "Linux")
+	   (print "/path/to/llvm-3.2/Release/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtlang-module.bc && gcc --shared -g /tmp/xtlang-module.s -o ./xtlang-module.so\n"))
+	  ((string=? (sys:platform) "OSX")
+	   (print "/path/to/llvm-3.2/bin/llc -O3 -relocation-model=pic -tailcallopt /tmp/xtlang-module.bc && clang -O3 -dynamiclib -undefined dynamic_lookup /tmp/xtlang-module.s -o ./xtlang-module.dylib\n"))
+	  (else (print "Sorry, cannot find the appropriate compilation command for your platform at this time.")))))
