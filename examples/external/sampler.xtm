@@ -35,18 +35,20 @@
 ;; ogg, wav or aif should all be fine
 
 ;; then load up a few excerpts from the file
-;; set-sampler-index takes 5 arguments:
+;; set-sampler-index takes 7 arguments:
 ;; 1) the instrument to load into (in the example above, it's 'sampler')
 ;; 2) the audio file to load from
 ;; 3) an index (from 0-127) to load into. This should be the base
 ;; frequency of the sample, e.g. a middle C sample should be loaded into 60.
 ;; 4) an offset in samples (frames without channels)
 ;; 5) a duration or length in samples to read
+;; 6) a 'sample bank' index (starting from 0)
+;; 7) a flag (0 or 1) indicating whether or not to print info about the sample
 
 ;; first let's just read in one sample
 ;; we'll choose an index of 60 - the midi note number for middle C
 ;; make sure your audio file is long enough for the params below!!
-(set-sampler-index sampler "/Users/ben/Desktop/xtm-assets/peg.wav" 60 0 0)
+(set-sampler-index sampler "/Users/ben/Desktop/xtm-assets/peg.wav" 60 0 0 0 1)
 
 ;; playing back at 60 should playback without pitch shift
 (play-note (now) sampler 60 80 100000)
@@ -82,11 +84,12 @@
 ;; file we loaded earlier contains a helper macro called
 ;; `load-sampler'.
 
-;; The load-sampler macro takes 3 arguments (just like
+;; The load-sampler macro takes 4 arguments (just like
 ;; set-sampler-index):
 ;; 1) the sampler instrument to load the audio data into
 ;; 2) the (full or relative) path to the directory where the files are
-;; 3) the name parser function (see below)
+;; 3) the sample bank index (starting from 0)
+;; 4) the name parser function (see below)
 
 ;; So, say the files are stored in a directory like
 ;; A0.aiff
@@ -145,10 +148,11 @@
                #f))
          (parse-sample-names-2 file-list))))
 
-;; So, to load all the mf samples into the sampler:
+;; So, to load all the mf samples into sampler bank 1
 
 (load-sampler sampler
-              "path/to/MIS-piano-samples"
+              "/Users/ben/Music/sample-libs/piano/MIS"
+              1
               parse-MIS-piano-mf)
 
 ;; the final two arguments (offset and length) are zero, meaning that
@@ -165,9 +169,9 @@
 
 (define loop2
   (lambda (beat dur root)
-    (play 3 sampler 36 100 dur)
+    (play 3 sampler 36 100 dur 0)
     (for-each (lambda (p offset)
-                (play (+ offset) sampler p 100 dur))
+                (play (+ offset) sampler p 100 dur) 1)
               (pc:make-chord 40 84 7
                              (pc:chord root (if (member root '(10 8))
                                                 '^7
@@ -178,7 +182,6 @@
               (if (member root '(0 8))
                   (random '(2 7 10))
                   (random '(0 8))))))
-
 
 (loop2 (*metro* 'get-beat 4) 4 0)
 
