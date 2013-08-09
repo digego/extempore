@@ -996,7 +996,7 @@ namespace extemp {
 	  mbstowcs_s(&converted_chars,wstr,ccc_size, ccc, _TRUNCATE);
       void* lib_handle = LoadLibrary(wstr);
 #else
-      void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY); //RTLD_NOW);
+      void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY|RTLD_GLOBAL);
 #endif
 	if (!lib_handle)
 	{
