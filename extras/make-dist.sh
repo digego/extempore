@@ -8,23 +8,19 @@ case $(uname) in
 esac
 
 DIST_ARCHIVE=extempore-$(uname)-$(date "+%Y.%m.%d")
-DIST_FILES="extempore libs examples extras README.md runtime/code.ir runtime/init.xtm runtime/llvmir.xtm runtime/llvmti.xtm runtime/scheme.xtm"
+DIST_FILES="extempore libs examples extras README.md runtime"
 DIST_SHLIBS="libassimp libcairo librtmidi libSOIL libsndfile libOpenVG libdrawtext"
 
 mkdir -p $DIST_ARCHIVE/runtime/lib
 
 cp -R $DIST_FILES $DIST_ARCHIVE
-# need to handle runtime specially (because of shlibs)
-# cp runtime/* $DIST_ARCHIVE/runtime
-# copy the shlibs into runtime/lib
+# check all the required shared libs are there
 for f in $DIST_SHLIBS
 do
     SHLIB_REL_PATH=runtime/lib/$f.$SHLIB_EXT
-    if [ -a $SHLIB_REL_PATH ]
+    if [ ! -f $SHLIB_REL_PATH ]
     then
-        cp -r runtime/lib/$f.$SHLIB_EXT $DIST_ARCHIVE/runtime/lib
-    else
-        echo "Error: cannot find ${f}.  Add ${SHLIB_REL_PATH} and try again."
+        echo "Error: cannot find ${f}.  Add ${SHLIB_REL_PATH} to the runtime/lib directory and try again."
         exit 1
     fi
 done
