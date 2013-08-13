@@ -1307,19 +1307,19 @@ You shouldn't have to modify this list directly, use
                            (buffer-name) ","
                            (symbol-name command)
                            (format ",%s," pref-arg)
-                           (prin1-to-string (prin1-to-string arg-list))))
+                           (prin1-to-string arg-list)))
                   extempore-logger-cache))))
 
 (defun extempore-logger-add-comment (comment)
   (interactive "sAny comments about this particular session? ")
   (if (equal major-mode 'extempore-mode)
       (setq extempore-logger-cache
-            (cons (replace-regexp-in-string
-                   "[\r\n]" " "
-                   (concat (format-time-string extempore-logger-datetime-format-string) ","
-                           (buffer-name) ","
-                           "user-comment,nil,"
-                           (prin1-to-string (prin1-to-string comment))))
+            (cons (concat (format-time-string extempore-logger-datetime-format-string) ","
+                          (buffer-name) ","
+                          "comment,nil,"
+                          (replace-regexp-in-string
+                           "[\r\n]" " "
+                           (prin1-to-string comment)))
                   extempore-logger-cache))))
 
 (defun extempore-logger-pre-command-hook ()
@@ -1343,7 +1343,7 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-logger-flush ()
   (if extempore-logger-logfile
-      (progn (append-to-file (mapconcat 'identity (nreverse extempore-logger-cache) "\n")
+      (progn (append-to-file (concat (mapconcat 'identity (nreverse extempore-logger-cache) "\n") "\n")
                              nil
                              extempore-logger-logfile)
              (setq extempore-logger-cache nil))))
