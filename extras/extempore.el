@@ -1238,20 +1238,21 @@ You shouldn't have to modify this list directly, use
 
   (if extempore-logger-mode
       (extempore-logger-start-logging)
-    (call-interactively 'extempore-logger-stop-logging)))
+    (extempore-logger-stop-logging)))
 
 (defun extempore-logger-start-logging ()
   (add-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
   (unless extempore-logger-logfile
     (setq extempore-logger-logfile
-          (extempore-logger-new-logfile (yes-or-no-p "For logging purposes, is this a 'start from scratch' livecoding performance?"))))
+          (extempore-logger-new-logfile)))
+  (call-interactively 'extempore-logger-add-comment)
   (extempore-logger-advise-functions extempore-logger-special-functions)
   (extempore-logger-start-idle-write-timer))
 
-(defun extempore-logger-stop-logging (comment)
-  (interactive "sAny comments about this particular session? ")
+(defun extempore-logger-stop-logging ()
   (remove-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
-  (extempore-logger-finish-logfile comment)
+  (call-interactively 'extempore-logger-add-comment)
+  (extempore-logger-finish-logfile)
   (setq extempore-logger-logfile nil)
   (extempore-logger-unadvise-functions extempore-logger-special-functions)
   (extempore-logger-stop-idle-write-timer))
@@ -1309,6 +1310,18 @@ You shouldn't have to modify this list directly, use
                            (prin1-to-string (prin1-to-string arg-list))))
                   extempore-logger-cache))))
 
+(defun extempore-logger-add-comment (comment)
+  (interactive "sAny comments about this particular session? ")
+  (if (equal major-mode 'extempore-mode)
+      (setq extempore-logger-cache
+            (cons (replace-regexp-in-string
+                   "[\r\n]" " "
+                   (concat (format-time-string extempore-logger-datetime-format-string) ","
+                           (buffer-name) ","
+                           "user-comment,nil,"
+                           (prin1-to-string (prin1-to-string comment))))
+                  extempore-logger-cache))))
+
 (defun extempore-logger-pre-command-hook ()
   (extempore-logger-log-command real-this-command current-prefix-arg nil))
 
@@ -1316,12 +1329,13 @@ You shouldn't have to modify this list directly, use
 
 (defvar extempore-logger-logfile nil)
 
-(defun extempore-logger-new-logfile (is-performance)
+(defun extempore-logger-new-logfile ()
   (let* ((log-dir (concat (or extempore-path user-emacs-directory) "keylogs/"))
          (dir-created (unless (file-exists-p log-dir) (make-directory log-dir)))
          (logfile-name (concat log-dir
-                               (format-time-string "%Y%m%dT%H%M%S-") user-login-name
-                               (if is-performance ".perf.log" ".prac.log"))))
+                               (format-time-string "%Y%m%dT%H%M%S-")
+                               user-login-name
+                               ".keylog")))
     (if (file-exists-p logfile-name)
         (progn (message "Extempore logfile %s already exists" logfile-name)
                nil)
@@ -1334,12 +1348,7 @@ You shouldn't have to modify this list directly, use
                              extempore-logger-logfile)
              (setq extempore-logger-cache nil))))
 
-(defun extempore-logger-finish-logfile (&optional comment)
-  (if comment
-      (setq extempore-logger-cache
-            (cons (concat (format-time-string extempore-logger-datetime-format-string)
-                          ",comment," (prin1-to-string comment))
-                  extempore-logger-cache)))
+(defun extempore-logger-finish-logfile ()  
   (extempore-logger-flush)
   (async-shell-command (format "bzip2 %s" extempore-logger-logfile)))
 
