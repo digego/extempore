@@ -203,7 +203,7 @@ int main(int argc, char** argv)
     std::cout << "##                                      ##" << std::endl;        		    		
     std::cout << "##           andrew@moso.com.au         ##" << std::endl;            
     std::cout << "##                                      ##" << std::endl;
-    std::cout << "##            (c) 2010-2012             ##" << std::endl;    
+    std::cout << "##            (c) 2010-2013             ##" << std::endl;    
     std::cout << "##                                      ##" << std::endl;        
     std::cout << "##########################################" << std::endl;
     std::cout << "     ################################" << std::endl;

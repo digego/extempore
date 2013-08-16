@@ -250,7 +250,7 @@ If you want to use (g)vim, see the instructions found in
 
 # Licence
 
-Copyright (c) 2011-2012, Andrew Sorensen
+Copyright (c) 2011-2013, Andrew Sorensen
 
 All rights reserved.
 
