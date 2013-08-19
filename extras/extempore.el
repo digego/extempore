@@ -663,6 +663,16 @@ determined by whether there is an *extempore* buffer."
                      extempore-connection-list)
              "")))))
 
+(defun extempore-sync-connections ()
+  (interactive)
+  (dolist (proc extempore-connection-list)
+    (let ((res (process-status proc)))
+      (unless (member res '(run open))
+        (setq extempore-connection-list
+                     (delete proc extempore-connection-list))
+        (delete-process proc))))
+  (extempore-update-mode-line))
+
 (defun extempore-get-connection (host port)
   (find-if (lambda (proc)
              (and (string= host (process-contact proc :host))
@@ -704,10 +714,8 @@ determined by whether there is an *extempore* buffer."
      (list nil nil)))
   (let ((proc (extempore-get-connection host port)))
     (if proc
-        (progn (setq extempore-connection-list
-                     (delete proc extempore-connection-list))
-               (delete-process proc)
-               (extempore-update-mode-line))
+        (progn (delete-process proc)
+               (extempore-sync-connections))
       (message "No current connections to %s on port %d" host port))))
 
 (defun extempore-disconnect-all ()
@@ -728,6 +736,7 @@ determined by whether there is an *extempore* buffer."
                      (ido-completing-read
                       "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
      (list read-host read-port)))
+  (extempore-sync-connections)
   (extempore-new-connection host port))
 
 ;;; SLIP escape codes
@@ -880,7 +889,7 @@ determined by whether there is an *extempore* buffer."
 (defun extempore-eval-defn-or-region ()
   (interactive)
   (if (region-active-p)
-      (extempore-eval-region)
+      (extempore-eval-current-region)
     (extempore-eval-defn-at-point)))
 
 ;; eldoc completion
