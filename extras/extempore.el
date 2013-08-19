@@ -829,7 +829,7 @@ determined by whether there is an *extempore* buffer."
 
 ;; 'blinking' defuns as they are evaluated
 
-(defvar extempore-blink-delay 0.3)
+(defvar extempore-blink-delay 0.2)
 
 (defvar  extempore-current-region-overlay
   (let ((overlay (make-overlay (point) (point))))
@@ -849,7 +849,7 @@ determined by whether there is an *extempore* buffer."
       (progn
         (dolist (proc extempore-connection-list)
          (process-send-string proc evalstring))
-        (sleep-for .1))
+        (sleep-for extempore-blink-delay))
     (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)"))))
 
 (defun extempore-mark-current-defn ()
@@ -863,6 +863,7 @@ determined by whether there is an *extempore* buffer."
   (save-excursion
     (extempore-mark-current-defn)
     (extempore-blink-region (point) (mark))
+    (redisplay)
     (extempore-send-evalstring
      (extempore-make-crlf-evalstr
       (chomp (buffer-substring-no-properties (point) (mark)))))))
