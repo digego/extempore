@@ -237,7 +237,7 @@ See `run-hooks'."
   :group 'extempore)
 
 (defface extempore-blink-eval-face
-  '((t (:inherit highlight)))
+  '((t (:foreground "#FF00FF" :weight bold :inherit nil)))
   "Face used for 'blinking' code when it is evaluated."
   :group 'extempore)
 
