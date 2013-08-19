@@ -1273,11 +1273,11 @@ You shouldn't have to modify this list directly, use
 ;; the programmer should use to turn things on/off
 
 (defun extempore-start-tr-animation ()
-  (if extempore-process
+  (extempore-sync-connections)
+  (if extempore-connection-list
       (progn (extempore-start-tr-animation-timer)
              (extempore-start-tr-anim-osc-server))
-    (message "Can't start TR animations: bufffer is not connected
-    to an Extempore process.")))
+    (message "Can't start TR animations: this buffer has no active connections to an Extempore process.")))
 
 (defun extempore-stop-tr-animation ()
   (extempore-stop-tr-animation-timer)
