@@ -146,9 +146,9 @@
   (set (make-local-variable 'lisp-doc-string-elt-property)
        'extempore-doc-string-elt)
   ;; for connecting to the Extempore CaaS server
-  (set (make-variable-buffer-local 'extempore-process) nil)
+  (set (make-variable-buffer-local 'extempore-connection-list) nil)
   (set (make-variable-buffer-local 'mode-line-process) nil)
-  (set (make-variable-buffer-local 'extempore-process-evalstr-fn)
+  (set (make-variable-buffer-local 'extempore-connection-evalstr-fn)
        #'extempore-make-crlf-evalstr)
   ;; mode line process
   (setq mode-line-process nil))
@@ -236,18 +236,10 @@ See `run-hooks'."
   :type 'string
   :group 'extempore)
 
-;; different faces for the scheme and xtlang defuns.  Feel free to set
-;; colours which work with your own colour scheme
-
-;; (defface extempore-scheme-defun-face
-;;   '((t (:inherit font-lock-keyword-face)))
-;;   "Face used for scheme defuns."
-;;   :group 'extempore)
-
-;; (defface extempore-xtlang-defun-face
-;;   '((t (:inherit font-lock-variable-name-face)))
-;;   "Face used for xtlang defuns."
-;;   :group 'extempore)
+(defface extempore-blink-eval-face
+  '((t (:inherit highlight)))
+  "Face used for 'blinking' code when it is evaluated."
+  :group 'extempore)
 
 ;; from emacs-starter-kit
 
@@ -262,11 +254,11 @@ See `run-hooks'."
 (defun extempore-keybindings (keymap)
   (define-key keymap (kbd "C-x C-y") 'extempore-setup)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
-  (define-key keymap (kbd "C-x C-x") 'extempore-send-defn-at-point)
-  (define-key keymap (kbd "C-M-x") 'extempore-send-defn-at-point)
-  (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
-  (define-key keymap (kbd "C-x C-b") 'extempore-send-buffer)
-  (define-key keymap (kbd "C-x y") 'extempore-toggle-tr-animation)
+  (define-key keymap (kbd "C-x C-x") 'extempore-eval-defn-at-point)
+  (define-key keymap (kbd "C-x C-r") 'extempore-eval-current-region)
+  (define-key keymap (kbd "C-x C-b") 'extempore-eval-buffer)
+  (define-key keymap (kbd "C-M-x")   'extempore-eval-defn-or-region)
+  (define-key keymap (kbd "C-x y")   'extempore-tr-animation-mode)
   (define-key keymap (kbd "C-x C-l") 'extempore-logger-mode))
 
 (extempore-keybindings extempore-mode-map)
@@ -655,50 +647,88 @@ determined by whether there is an *extempore* buffer."
 
 ;; connection management
 
-(defun extempore-connect-tcp (host port)
-  (setq extempore-process (open-network-stream "extempore" nil host port))
-  (set-process-coding-system extempore-process 'iso-latin-1 'iso-latin-1)
-  (set-process-filter extempore-process #'extempore-crlf-process-filter)
-  (setq extempore-process-evalstr-fn #'extempore-make-crlf-evalstr)
-  (setq mode-line-process
-        (format "%s:%d(TCP)" (if (string= host "localhost") "" (concat ":" host)) port)))
+(defun extempore-update-mode-line ()
+  (let ((nprocs (length extempore-connection-list))
+        (gethostportstr ))
+    (setq mode-line-process
+          (if (< nprocs 1)
+              ""
+            (mapconcat
+             'identity
+             (mapcar (lambda (proc)
+                       (let ((host (process-contact proc :host)))
+                         (concat " "
+                                 (if (string= host "localhost") "" (concat host ":"))
+                                 (number-to-string (process-contact proc :service)))))
+                     extempore-connection-list)
+             "")))))
 
-(defun extempore-connect-tcp-osc (host port)
-  (setq extempore-process (open-network-stream "extempore" nil host port))
-  (set-process-coding-system extempore-process 'iso-latin-1 'iso-latin-1)
-  (set-process-filter extempore-process #'extempore-slip-process-filter)
-  (setq extempore-process-evalstr-fn #'extempore-make-slip-osc-evalstr)
-  (setq mode-line-process
-        (format "%s:%d(TCP-OSC)" (if (string= host "localhost") "" (concat ":" host)) port)))
+(defun extempore-get-connection (host port)
+  (find-if (lambda (proc)
+             (and (string= host (process-contact proc :host))
+                  (= port (process-contact proc :service))))
+            extempore-connection-list))
 
-(defun extempore-disconnect ()
-  "Terminate connection to the Extempore process"
+(defun extempore-new-connection (host port)
+  (if (extempore-get-connection host port)
+      (message "Already connected to %s on port %d" host port)
+      (let ((proc (open-network-stream "extempore" nil host port)))
+        (if proc
+            (progn
+              (set-process-coding-system proc 'iso-latin-1 'iso-latin-1)
+              (set-process-filter proc #'extempore-crlf-process-filter)
+              (add-to-list 'extempore-connection-list proc t)
+              (extempore-update-mode-line))))))
+
+(defun extempore-disconnect (host port)
+  "Terminate a specific connection to an Extempore process"
+  (interactive
+   (if extempore-connection-list
+       (let ((read-host (ido-completing-read
+                         "Hostname: " (cl-remove-duplicates
+                                       (mapcar (lambda (proc)
+                                                 (process-contact proc :host))
+                                               extempore-connection-list)
+                                       :test 'string=)
+                         nil nil nil nil (process-contact (car extempore-connection-list) :host)))
+             (read-port (string-to-number
+                         (ido-completing-read
+                          "Port: " (cl-remove-duplicates
+                                    (mapcar (lambda (proc)
+                                              (number-to-string
+                                               (process-contact proc :service)))
+                                            extempore-connection-list)
+                                    :test 'string=)
+                          nil nil nil nil (number-to-string (process-contact (car extempore-connection-list) :service))))))
+         (list read-host read-port))
+     (list nil nil)))
+  (let ((proc (extempore-get-connection host port)))
+    (if proc
+        (progn (setq extempore-connection-list
+                     (delete proc extempore-connection-list))
+               (delete-process proc)
+               (extempore-update-mode-line))
+      (message "No current connections to %s on port %d" host port))))
+
+(defun extempore-disconnect-all ()
+  "Terminate all connections (for this buffer)"
   (interactive)
-  (delete-process extempore-process)
-  (setq extempore-process nil
-        extempore-process-evalstr-fn nil
-        mode-line-process nil))
+  (dolist (proc extempore-connection-list)
+    (delete-process proc))
+  (setq extempore-connection-list nil)
+  (extempore-update-mode-line))
 
-(defun extempore-connect (host port type)
-  "Connect to the running extempore process, which must
-be running in another (shell-like) buffer."
+(defun extempore-connect (host port)
+  "Connect to an Extempore process running on `host' and `port'."
   (interactive
    ;; get args interactively
    (let ((read-host (ido-completing-read
                      "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host))
          (read-port (string-to-number
                      (ido-completing-read
-                      "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port))))
-         (read-type (ido-completing-read
-                     "Connection type: " '("TCP" "TCP-OSC") nil t nil nil extempore-default-connection-type)))
-     (list read-host read-port read-type)))
-  ;; kill existing connection
-  (when extempore-process (extempore-disconnect))
-  ;; set up connection of `type'
-  (cond ((string-equal type "TCP")
-         (extempore-connect-tcp host port))
-        ((string-equal type "TCP-OSC")
-         (extempore-connect-tcp-osc host port))))
+                      "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
+     (list read-host read-port)))
+  (extempore-new-connection host port))
 
 ;;; SLIP escape codes
 ;; END       ?\300    /* indicates end of packet */
@@ -763,22 +793,7 @@ be running in another (shell-like) buffer."
   (and (string-match ",[^\0]*[\0]*" str)
        (match-end 0)))
 
-;; sending code to the Extempore compiler
-
-;; from http://emacswiki.org/emacs/ElispCookbook
-(defun chomp (str)
-  "Chomp leading and tailing whitespace from STR."
-  (while (string-match "\\`\n+\\|^\\s-+\\|\\s-+$\\|\n+\\'" str)
-    (setq str (replace-match "" t t str)))
-  str)
-
-(defun extempore-get-defn-around-point ()
-  "Get defn string from current top-level defn around point."
-  (interactive)
-  (save-excursion
-    (mark-defun)
-    (redisplay)
-    (chomp (buffer-substring-no-properties (point) (mark)))))
+;; correct escaping of eval strings
 
 (defun extempore-make-crlf-evalstr (evalstr)
   (concat evalstr "\r\n"))
@@ -794,45 +809,79 @@ be running in another (shell-like) buffer."
 (defun extempore-make-slip-osc-evalstr (evalstr)
   (extempore-slip-escape-string (extempore-make-osc-evalstr evalstr)))
 
+;; sending code to the Extempore compiler
+
+;; from http://emacswiki.org/emacs/ElispCookbook
+(defun chomp (str)
+  "Chomp leading and tailing whitespace from STR."
+  (while (string-match "\\`\n+\\|^\\s-+\\|\\s-+$\\|\n+\\'" str)
+    (setq str (replace-match "" t t str)))
+  str)
+
+;; 'blinking' defuns as they are evaluated
+
+(defvar extempore-blink-delay 0.3)
+
+(defvar  extempore-current-region-overlay
+  (let ((overlay (make-overlay (point) (point))))
+    (overlay-put overlay 'face  'extempore-blink-eval-face)
+    overlay)
+  "The overlay for highlighting currently evaluated region or line.")
+
+(defun extempore-blink-region (start end)
+  (move-overlay extempore-current-region-overlay start end)
+  (run-with-timer extempore-blink-delay nil
+                  (lambda () (delete-overlay extempore-current-region-overlay))))
+
 ;; sending definitions (code) from the Emacs buffer
 
-(defun extempore-send-defn (defn-str)
-  (interactive)
-  (if extempore-process
-      (progn (process-send-string extempore-process defn-str)
-             (redisplay)
-             (sleep-for .1))
+(defun extempore-send-evalstring (evalstring)
+  (if extempore-connection-list
+      (progn
+        (dolist (proc extempore-connection-list)
+         (process-send-string proc evalstring))
+        (sleep-for .1))
     (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)"))))
 
-(defun extempore-send-defn-at-point ()
+(defun extempore-mark-current-defn ()
+  (mark-defun)
+  (if (and (looking-at "^$") (not (eobp)))
+      (forward-char 1)))
+
+(defun extempore-eval-defn-at-point ()
   "Send the enclosing top-level defn to Extempore server for evaluation."
   (interactive)
-  (extempore-send-defn
-   (funcall extempore-process-evalstr-fn
-            (extempore-get-defn-around-point))))
+  (save-excursion
+    (extempore-mark-current-defn)
+    (extempore-blink-region (point) (mark))
+    (extempore-send-evalstring
+     (extempore-make-crlf-evalstr
+      (chomp (buffer-substring-no-properties (point) (mark)))))))
 
-(defun extempore-send-region ()
+(defun extempore-eval-current-region ()
   "Send the current region to Extempore for evaluation"
   (interactive)
   (save-excursion
-    (if mark-active
+    (if (region-active-p)
         (let ((start (region-beginning)) (end (region-end)))
           (unless (= (point) (region-beginning)) (exchange-point-and-mark))
           (while (re-search-forward "^[^\n;]*(" end t)
-            (extempore-send-defn-at-point)
+            (extempore-eval-defn-at-point)
             (end-of-defun)))
       (message "Region not active."))))
 
-(defun extempore-send-buffer ()
+(defun extempore-eval-buffer ()
   "Send the current buffer to Extempore for evaluation"
   (interactive)
   (save-excursion
-    (progn (goto-char (point-min))
-           (set-mark (point-max)))
-    (let ((start (region-beginning)) (end (region-end)))
-      (while (re-search-forward "^[^\n;]*(" end t)
-	(extempore-send-defn-at-point)
-	(end-of-defun)))))
+    (mark-whole-buffer)
+    (extempore-eval-current-region)))
+
+(defun extempore-eval-defn-or-region ()
+  (interactive)
+  (if (region-active-p)
+      (extempore-eval-region)
+    (extempore-eval-defn-at-point)))
 
 ;; eldoc completion
 
@@ -865,11 +914,12 @@ be running in another (shell-like) buffer."
 ;; currently doesn't actually return the symbol, but sends the request
 ;; which is echoed back through whichever process filter is active
 (defun extempore-eldoc-documentation-function ()
-  (if (and extempore-process extempore-eldoc-active)
+  (if (and extempore-connection-list extempore-eldoc-active)
       (let ((fnsym (extempore-fnsym-in-current-sexp)))
         ;; send the documentation request
-        (if fnsym (extempore-send-defn (funcall extempore-process-evalstr-fn
-                                                (concat "(get-eldoc-string " fnsym ")"))))
+        (if fnsym (extempore-send-evalstring
+                   (extempore-make-crlf-evalstr
+                            (concat "(get-eldoc-string " fnsym ")"))))
         ;; always return nil; docstring comes back through the process
         ;; filter
         nil)))
@@ -915,7 +965,7 @@ be running in another (shell-like) buffer."
   "takes a time interval (in seconds)"
   (interactive "nTime interval (sec):")
   (setq extempore-repeated-eval-timer
-	(run-with-timer 0 time-interval 'extempore-send-defn-at-point)))
+	(run-with-timer 0 time-interval 'extempore-eval-defn-at-point)))
 
 (defun extempore-stop-repeated-eval ()
   (interactive)
@@ -1282,7 +1332,7 @@ You shouldn't have to modify this list directly, use
         func-list))
 
 (defvar extempore-logger-special-functions
-  '(extempore-send-defn
+  '(extempore-send-evalstring
     extempore-connect
     extempore-disconnect
     yas/expand-snippet)
