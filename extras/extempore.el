@@ -55,6 +55,8 @@
 ;;; Code:
 
 (require 'lisp-mode)
+(require 'cl-lib)
+(require 'eldoc)
 
 (defvar extempore-mode-syntax-table
   (let ((st (make-syntax-table))
@@ -677,7 +679,7 @@ determined by whether there is an *extempore* buffer."
   (find-if (lambda (proc)
              (and (string= host (process-contact proc :host))
                   (= port (process-contact proc :service))))
-            extempore-connection-list))
+           extempore-connection-list))
 
 (defun extempore-new-connection (host port)
   (if (extempore-get-connection host port)
@@ -894,9 +896,6 @@ determined by whether there is an *extempore* buffer."
     (extempore-eval-defn-at-point)))
 
 ;; eldoc completion
-
-(require 'eldoc)
-;; (require 'thingatpt)
 
 (defun extempore-fnsym-in-current-sexp ()
   (save-excursion
