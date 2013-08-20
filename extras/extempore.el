@@ -621,18 +621,18 @@ determined by whether there is an *extempore* buffer."
   ;; create a buffer for the shell & extempore processes
   (unless (get-buffer "*extempore*")
     (progn (shell "*extempore*")
-           (sit-for 1)
-	   (process-send-string
-	    "*extempore*"
-	    (concat "cd " extempore-path "\n"
-		    (if (string-equal system-type "windows-nt") "" "./")
-		    "extempore --device "
-		    (let ((device-number (read-from-minibuffer
-					  (format "Device number (default %d): " extempore-default-device-number))))
-		      (if (string= device-number "")
-			  (number-to-string extempore-default-device-number)
-			device-number))
-		    "\n"))))
+           (sit-for .5)
+           (process-send-string
+            "*extempore*"
+            (concat "cd " extempore-path "\n"
+                    (if (string-equal system-type "windows-nt") "" "./")
+                    "extempore --device "
+                    (let ((device-number (read-from-minibuffer
+                                          (format "Device number (default %d): " extempore-default-device-number))))
+                      (if (string= device-number "")
+                          (number-to-string extempore-default-device-number)
+                        device-number))
+                    " " extempore-process-args "\n"))))
   (display-buffer "*extempore*"))
 
 (defun extempore-crlf-process-filter (proc str)
