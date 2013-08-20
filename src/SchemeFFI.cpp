@@ -437,7 +437,10 @@ namespace extemp {
 
 	    // DSP sys stuff
 	    { "sys:set-dsp-closure",	&SchemeFFI::setDSPClosure },
+	    { "sys:set-dspmt-closure",	&SchemeFFI::setDSPMTClosure },
 	    { "sys:set-dsp-wrapper",	&SchemeFFI::setDSPWrapper },
+	    { "sys:set-dspmt-wrapper",	&SchemeFFI::setDSPMTWrapper },
+            { "sys:init-mt-audio",      &SchemeFFI::initMTAudio },
 	    { "sys:set-dsp-wrapper-array",	&SchemeFFI::setDSPWrapperArray },
 
 	    // memory zone stuff
@@ -2783,6 +2786,12 @@ namespace extemp {
 	AudioDevice::I()->setDSPClosure(cptr_value(pair_car(args)));
 	return _sc->T;
     }
+
+    pointer SchemeFFI::setDSPMTClosure(scheme* _sc, pointer args)
+    {
+      AudioDevice::I()->setDSPMTClosure(cptr_value(pair_car(args)),ivalue(pair_cadr(args)));
+	return _sc->T;
+    }
 	
     pointer SchemeFFI::setDSPWrapper(scheme* _sc, pointer args)
     {
@@ -2796,6 +2805,19 @@ namespace extemp {
 	return _sc->T;
     }
 
+    pointer SchemeFFI::setDSPMTWrapper(scheme* _sc, pointer args)
+    {
+      AudioDevice::I()->setDSPMTWrapper((dsp_f_ptr_sum)cptr_value(pair_car(args)),
+                                         (dsp_f_ptr)cptr_value(pair_cadr(args)));
+      return _sc->T;
+    }
+
+    pointer SchemeFFI::initMTAudio(scheme* _sc, pointer args)
+    {
+      AudioDevice::I()->initMTAudio(ivalue(pair_car(args)));
+      return _sc->T;
+    }
+  
 
   ////////////////////////////////////////////////////////////////
   //  SOME XWindows guff

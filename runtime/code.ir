@@ -3177,6 +3177,19 @@ entry:
 ret double %result
 }
 
+define double @imp_dsp_sum_wrapper(i8* %_impz, i8* %closure, double* %sample, double %time, double %channel, double* %data) 
+{
+entry:
+%closureVal = bitcast i8* %closure to <{ i8*, i8*, double (i8*,i8*,double*,double,double,double*)*}>*
+; apply closure 
+%fPtr = getelementptr <{i8*, i8*, double (i8*, i8*, double*, double, double, double*)*}>* %closureVal, i32 0, i32 2
+%ePtr = getelementptr <{i8*, i8*, double (i8*, i8*, double*, double, double, double*)*}>* %closureVal, i32 0, i32 1
+%f = load double (i8*, i8*, double*,double,double,double*)** %fPtr
+%e = load i8** %ePtr
+%result = tail call fastcc double %f(i8* %_impz, i8* %e, double* %sample, double %time, double %channel, double* %data)
+ret double %result
+}
+
 define float* @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i32 %frames, i32 %time, i32 %channels) 
 {
 entry:

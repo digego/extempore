@@ -94,8 +94,11 @@ namespace extemp {
 	static pointer dirlist(scheme* _sc, pointer args);
 	// dsp bits
 	static pointer setDSPClosure(scheme* _sc, pointer args);
+	static pointer setDSPMTClosure(scheme* _sc, pointer args);
 	static pointer setDSPWrapper(scheme* _sc, pointer args);
+	static pointer setDSPMTWrapper(scheme* _sc, pointer args);
 	static pointer setDSPWrapperArray(scheme* _sc, pointer args);
+        static pointer initMTAudio(scheme* _sc, pointer args);
 		
 	// misc stuff
 	static pointer dataGETi64(scheme* _sc, pointer args);

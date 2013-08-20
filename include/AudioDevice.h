@@ -61,6 +61,7 @@
 
 typedef void(*dsp_f_ptr_array)(void*,void*,SAMPLE*,SAMPLE*,SAMPLE,void*);
 typedef double(*dsp_f_ptr)(void*,void*,double,double,double,double*);
+typedef double(*dsp_f_ptr_sum)(void*,void*,double*,double,double,double*);
 
 namespace extemp {
 
@@ -81,19 +82,46 @@ namespace extemp {
 	    dsp_closure = _dsp_func; 
 	}
 	void* getDSPClosure() { return dsp_closure; }
+
+	void setDSPMTClosure(void* _dsp_func, int idx) 
+	{
+	    if(dsp_mt_closure[idx] != 0) { printf("You can only set me once!\nBut you are allowed to re-definec me as often as you like!\n"); return; }
+	    dsp_mt_closure[idx] = _dsp_func;
+	}
+	void* getDSPMTClosure(int idx) { return dsp_mt_closure[idx]; }
 	
 	void setDSPWrapperArray( void(*_wrapper)(void*,void*,SAMPLE*,SAMPLE*,SAMPLE,void*) ) 
 	{ 
-	    if(dsp_wrapper != 0 || dsp_wrapper_array != 0) return;
+	    if(dsp_wrapper != 0 || dsp_wrapper_sum != 0 || dsp_wrapper_array != 0) return;
 	    dsp_wrapper_array = _wrapper; 
 	}
 	void setDSPWrapper( double(*_wrapper)(void*,void*,double,double,double,double*) ) 
 	{ 
-	    if(dsp_wrapper_array != 0 || dsp_wrapper != 0) return;
+	    if(dsp_wrapper_array != 0 || dsp_wrapper_sum != 0 || dsp_wrapper != 0) return;
 	    dsp_wrapper = _wrapper;
 	}
+	void setDSPMTWrapper( double(*_wrapper)(void*,void*,double*,double,double,double*),
+                              double(*_wrappera)(void*,void*,double,double,double,double*)) 
+	{ 
+	    if(dsp_wrapper_array != 0 || dsp_wrapper_sum != 0 || dsp_wrapper != 0) return;
+	    dsp_wrapper_sum = _wrapper;
+            dsp_wrapper = _wrappera;
+	}
+
+        void initMTAudio(int);
+
+        EXTThread** getMTThreads() { return threads; } 
+        int getNumThreads() { return numthreads; } 
+        int* getWaitSignals() { return signals_wait; }
+        int* getDoneSignals() { return signals_done; }
 	dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
 	dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
+	dsp_f_ptr_sum getDSPSUMWrapper() { return dsp_wrapper_sum; }
+
+        double* getDSPMTInBuffer() { return inbuf; }
+        double* getDSPMTOutBuffer() { return outbuf; }
+        //void setDSPMTOutBuffer(double* ob) { outbuf = ob; }
+        //void setDSPMTInBuffer(double* ib) { inbuf = ib; }
 
 #if defined (JACK_AUDIO)
 	jack_port_t** out_ports() { return output_ports; }
@@ -105,12 +133,13 @@ namespace extemp {
 
 #else  //  must be portaudio
         static void printDevices();
-         
+        
 #endif
 
 	static double CLOCKBASE;
 	static double REALTIME;
 	static double CLOCKOFFSET;
+        int thread_idx[128];
 
     private:
 	bool started;
@@ -127,10 +156,18 @@ namespace extemp {
 #endif
 	float* buffer;
 	void* dsp_closure;
+        void* dsp_mt_closure[4];
 	dsp_f_ptr dsp_wrapper;
+	//dsp_f_ptr dsp_wrapper_mt[4];
+        dsp_f_ptr_sum dsp_wrapper_sum;
 	dsp_f_ptr_array dsp_wrapper_array;
-	
+	double* outbuf;
+        double* inbuf;
 	static AudioDevice SINGLETON;
+        EXTThread** threads;
+        int* signals_wait;
+        int* signals_done;
+        int numthreads;
     };
 
 } //End Namespace

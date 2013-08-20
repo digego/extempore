@@ -1137,7 +1137,7 @@
 
 ;; this for buffered version
 (define _dsp:set!
-   (lambda (name)
+   (lambda (name . args)
       (let* ((nn (if (symbol? name) (symbol->string name) name))
 	     (ft (llvm:get-function-args-withoutzone nn))
 	     (ct (if ft
@@ -1157,10 +1157,26 @@
 				 (+ *impc:ir:double* *impc:ir:pointer*))) ;; sample by sample form FX
 		(sys:set-dsp-wrapper (llvm:get-function-pointer "imp_dsp_wrapper"))
 		(sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))) ;; whole buffer
+	       ((equal? ct (list *impc:ir:double*
+				 (+ *impc:ir:double* *impc:ir:pointer*)
+				 *impc:ir:double*
+				 *impc:ir:double*
+				 (+ *impc:ir:double* *impc:ir:pointer*))) ;; sample by sample form FX
+		(sys:set-dspmt-wrapper (llvm:get-function-pointer "imp_dsp_sum_wrapper")
+                                       (llvm:get-function-pointer "imp_dsp_wrapper"))
+                (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))
+                (dotimes (i (length args))                  
+                  (sys:set-dspmt-closure (llvm:get-function-pointer (string-append (list-ref args i) "_getter")) i))
+                (sys:init-mt-audio (length args))
+                )
 	       (else (print-error 'Bad 'closure 'signature 'for 'dsp:set! ct))))))
 
 (define-macro (dsp:set! name)
   `(_dsp:set! ,(symbol->string name)))
+
+(define-macro (dsp:set! . names)
+  (let ((lst (map (lambda (n) (symbol->string n)) names)))
+    `(_dsp:set! ,@lst)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; library-loading helpers ;;
