@@ -676,10 +676,10 @@ determined by whether there is an *extempore* buffer."
   (extempore-update-mode-line))
 
 (defun extempore-get-connection (host port)
-  (find-if (lambda (proc)
-             (and (string= host (process-contact proc :host))
-                  (= port (process-contact proc :service))))
-           extempore-connection-list))
+  (cl-find-if (lambda (proc)
+		(and (string= host (process-contact proc :host))
+		     (= port (process-contact proc :service))))
+	      extempore-connection-list))
 
 (defun extempore-new-connection (host port)
   (if (extempore-get-connection host port)
