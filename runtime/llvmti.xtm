@@ -3403,21 +3403,25 @@
       (list (caddr ast))))
 
 (define impc:ti:closure-in-first-position
-   (lambda (ast vars kts request?)
-      ;; first check return type of car ast (which will be a closure)
-      ;; then check against it's arg types
-      (let ((type (impc:ti:type-check (car ast) vars kts request?)))
-	(if (null? type)
-	    (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure 'expression ast))
-	(if (not (impc:ir:type? type))
-	    (set! type (car type)))
-	(if (<> (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (car type))
-	    (print-error 'Compiler Error: 'Bad 'type 'for 'closure 'expression ast)
-	    (begin (map (lambda (a b) 
-			  (impc:ti:type-check b vars kts a))
-			(cddr type)
-			(cdr ast))
-		   (cadr type))))))	  
+  (lambda (ast vars kts request?)
+    ;; first check return type of car ast (which will be a closure)
+    ;; then check against it's arg types
+    (let ((type (impc:ti:type-check (car ast) vars kts request?)))
+      (if (null? type)
+          (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure 'expression ast))
+      (if (not (impc:ir:type? type))
+          (set! type (car type)))
+      (if (not (list? type))
+          (print-error 'Compiler 'Error: 'Bad 'closure 'call ast))
+      (if (<> (length (cddr type)) (length (cdr ast)))
+          (print-error 'Compiler 'Error: 'Wrong 'number 'of 'arguments 'for 'closure 'expression ast))
+      (if (<> (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (car type))
+          (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure 'expression ast)
+          (begin (map (lambda (a b) 
+                        (impc:ti:type-check b vars kts a))
+                      (cddr type)
+                      (cdr ast))
+                 (cadr type))))))	  
 
 ;; vars is statefull and will be modified in place
 (define impc:ti:type-check
