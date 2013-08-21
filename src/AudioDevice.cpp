@@ -861,23 +861,26 @@ namespace extemp {
     //  PORT AUDIO
     //-----------------------------------  
   void* audioCallbackMT(void* dat) {    
-    printf("Starting RT Audio Process\n");
-    int idx = *((int*) dat);
-
 #ifdef TARGET_OS_MAC
     Float64 clockFrequency = AudioGetHostClockFrequency();
     set_realtime(clockFrequency*.01,clockFrequency*.005,clockFrequency*.005); //HZ/160,HZ/3300,HZ/2200);
 #elif TARGET_OS_LINUX
+    static struct timespec MT_SLEEP_DURATION = {0,1000};
     pthread_t pt = pthread_self();
     int policy;
     sched_param param;
     pthread_getschedparam(pt,&policy,&param);
-    param.sched_priority = 50;
+    param.sched_priority = 20;
     policy = SCHED_RR; // SCHED_FIFO
-    pthread_setschedparam(pt,policy,&param);
+    int res = pthread_setschedparam(pt,policy,&param);
+    if(res != 0) {
+      printf("Failed to set realtime priority for Audio thread\nERR:%s\n",strerror(res));
+    }
 #elif TARGET_OS_WINDOWS // fix for RT windows
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
+    printf("Starting RT Audio Process\n");
+    int idx = *((int*) dat);
     
     dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
     dsp_f_ptr cache_wrapper = dsp_wrapper;
@@ -904,7 +907,11 @@ namespace extemp {
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
       double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
 
+#ifdef TARGET_OS_LINUX
+      while(signals_wait[idx]) { nanosleep(&MT_SLEEP_DURATION ,NULL); } // spin
+#else
       while(signals_wait[idx]) { } // spin
+#endif
 
       uint64_t LTIME = UNIV::DEVICE_TIME;
       for(uint32_t i=0;i<UNIV::FRAMES;i++) {
