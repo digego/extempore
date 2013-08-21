@@ -1,0 +1,32 @@
+;;; create-stdlib.xtm -- an Extempore 'script' file for creating the stdlib
+
+;; Author: Andrew Sorensen, Ben Swift
+;; Keywords: extempore
+;; Required dylibs: 
+
+;;; Commentary:
+
+;; This file compiles (and exports) the xtlang code which forms the
+;; standard library. It can be run at Extempore startup through the
+;; --run command line argument, e.g.
+
+;; shell> ./extempore --run libs/create-stdlib.xtm
+
+;; To finish the stdlib compilation process, you'll need to compile
+;; the bitcode in the exported module with llc (the required arguments
+;; will be printed to the Extempore log once the module is exported.
+
+;;; Code:
+
+(sys:load "libs/core/math.xtm")
+(sys:load "libs/core/audio_dsp.xtm")
+(sys:load "libs/core/instruments.xtm")
+(sys:load "libs/external/instruments.xtm")
+(sys:load "libs/external/opengl.xtm")
+(sys:load "libs/external/shaders.xtm")
+(sys:load "libs/external/assimp.xtm")
+(sys:load "libs/external/sndfile.xtm")
+(sys:load "libs/external/openvg.xtm")
+(sys:load "libs/external/drawtext.xtm")
+(println 'done 'loading!)
+(llvm-export-current-xtlang-module "xtm")
