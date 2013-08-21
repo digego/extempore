@@ -651,8 +651,8 @@
     (vgDestroyImage image)))
 
 (bind-func xtm_set_vgimage_subdata
-  (lambda (image data x y width height)
-    (vgImageSubData image data 4 VG_lARGB_8888 x y width height)))
+  (lambda (image data data_stride x y width height)
+    (vgImageSubData image data data_stride VG_lARGB_8888 x y width height)))
 
 (bind-func xtm_load_vgimage
   (lambda (path)
@@ -669,7 +669,69 @@
       ;; flip image
       (dotimes (i h)
         (set! row (pref-ptr data (* i (* w 4))))
-        (xtm_set_vgimage_subdata img row 0 (- h i 1) w 1))
+	(xtm_set_vgimage_subdata img row (* w 4) 0 (- h i 1) w 1))
       img)))
+
+;; working with colours, dealing with double -> uint8 conversions, etc.
+;; clip input values into [0.0,1.0]
+
+(bind-func xtm_set_color32
+  (lambda (c32_data:i8* r g b a)
+    (pset! c32_data 0 (dtoui8 (* (if (< r 0.0) 0.0 (if (> r 1.0) 1.0 r)) 256.0)))
+    (pset! c32_data 1 (dtoui8 (* (if (< g 0.0) 0.0 (if (> g 1.0) 1.0 g)) 256.0)))
+    (pset! c32_data 2 (dtoui8 (* (if (< b 0.0) 0.0 (if (> b 1.0) 1.0 b)) 256.0)))
+    (pset! c32_data 3 (dtoui8 (* (if (< a 0.0) 0.0 (if (> a 1.0) 1.0 a)) 256.0)))))
+
+(bind-func xtm_color32_red
+  (lambda (c32_data:i8*)
+    (/ (ui8tod (pref c32_data 0)) 256.0)))
+
+(bind-func xtm_set_color32_red
+  (lambda (c32_data:i8* red)
+    (pset! c32_data 0 (dtoui8 (* (if (< red 0.0)
+				     0.0
+				     (if (> red 1.0)
+					 1.0
+					 red))
+				 256.0)))))
+
+(bind-func xtm_color32_green
+  (lambda (c32_data:i8*)
+    (/ (ui8tod (pref c32_data 1)) 256.0)))
+
+(bind-func xtm_set_color32_green
+  (lambda (c32_data:i8* green)
+    (pset! c32_data 1 (dtoui8 (* (if (< green 0.0)
+				     0.0
+				     (if (> green 1.0)
+					 1.0
+					 green))
+				 256.0)))))
+
+(bind-func xtm_color32_blue
+  (lambda (c32_data:i8*)
+    (/ (ui8tod (pref c32_data 2)) 256.0)))
+
+(bind-func xtm_set_color32_blue
+  (lambda (c32_data:i8* blue)
+    (pset! c32_data 2 (dtoui8 (* (if (< blue 0.0)
+				     0.0
+				     (if (> blue 1.0)
+					 1.0
+					 blue))
+				 256.0)))))
+
+(bind-func xtm_color32_alpha
+  (lambda (c32_data:i8*)
+    (/ (ui8tod (pref c32_data 3)) 256.0)))
+
+(bind-func xtm_set_color32_alpha
+  (lambda (c32_data:i8* alpha)
+    (pset! c32_data 3 (dtoui8 (* (if (< alpha 0.0)
+				     0.0
+				     (if (> alpha 1.0)
+					 1.0
+					 alpha))
+				 256.0)))))
 
 (define *xtmlib-openvg-loaded* #t)
