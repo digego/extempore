@@ -917,7 +917,8 @@
       (bind-lib libgl glBindRenderbuffer [void,i32,i32]*)
       (bind-lib libgl glRenderbufferStorage [void,i32,i32,i32,i32]*)
       (bind-lib libgl glFramebufferRenderbuffer [void,i32,i32,i32,i32]*)
-      (bind-lib libgl glFramebufferTexture [void,i32,i32,i32,i32]*)
+      (if (sys:symbol-cptr libgl "glFramebufferTexture")
+          (bind-lib libgl glFramebufferTexture [void,i32,i32,i32,i32]*))
       (bind-lib libgl glFramebufferTexture1D [void,i32,i32,i32,i32,i32]*)
       (bind-lib libgl glFramebufferTexture2D [void,i32,i32,i32,i32,i32]*)
       (bind-lib libgl glFramebufferTexture3D [void,i32,i32,i32,i32,i32,i32]*)
@@ -2041,7 +2042,7 @@ void main()
 
 (define libassimp
   (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:open-dylib "libassimp.so"))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libassimp.so.3"))
           ((string=? platform "Windows") (sys:open-dylib "libassimp.dll"))
           ((string=? platform "OSX") (sys:open-dylib "libassimp.dylib"))
           (else (print "Unknown platform: " platform)))))

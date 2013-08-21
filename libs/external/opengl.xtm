@@ -19,6 +19,7 @@
 
 (define *xtmlib-opengl-loaded* #t)
 
+
 ;; first check if we are windows we need to load some extensions!
 (if (string=? (sys:platform) "Windows")
     (begin (println "Loading OpenGL Extensions for Windows!!!!!")
@@ -149,20 +150,20 @@
 (bind-val GL_DEPTH_COMPONENT24 i32 33190)
 ;; (bind-val GL_DEPTH_COMPONENT32 i32 33191)
 
-
 (if (not (string=? "Windows" (sys:platform)))
-	(begin 
-	(bind-lib libgl glGenFramebuffers [void,i32,i32*]*)
-	(bind-lib libgl glGenRenderbuffers [void,i32,i32*]*)
-	(bind-lib libgl glBindFramebuffer [void,i32,i32]*)
-	(bind-lib libgl glBindRenderbuffer [void,i32,i32]*)
-	(bind-lib libgl glRenderbufferStorage [void,i32,i32,i32,i32]*)
-	(bind-lib libgl glFramebufferRenderbuffer [void,i32,i32,i32,i32]*)
-	(bind-lib libgl glFramebufferTexture [void,i32,i32,i32,i32]*)
-	(bind-lib libgl glFramebufferTexture1D [void,i32,i32,i32,i32,i32]*)
-	(bind-lib libgl glFramebufferTexture2D [void,i32,i32,i32,i32,i32]*)
-	(bind-lib libgl glFramebufferTexture3D [void,i32,i32,i32,i32,i32,i32]*)
-	(bind-lib libgl glCheckFramebufferStatus [i32,i32]*)))
+    (begin      
+      (bind-lib libgl glGenFramebuffers [void,i32,i32*]*)
+      (bind-lib libgl glGenRenderbuffers [void,i32,i32*]*)
+      (bind-lib libgl glBindFramebuffer [void,i32,i32]*)
+      (bind-lib libgl glBindRenderbuffer [void,i32,i32]*)
+      (bind-lib libgl glRenderbufferStorage [void,i32,i32,i32,i32]*)
+      (bind-lib libgl glFramebufferRenderbuffer [void,i32,i32,i32,i32]*)
+      (if (sys:symbol-cptr libgl "glFramebufferTexture")
+          (bind-lib libgl glFramebufferTexture [void,i32,i32,i32,i32]*))
+      (bind-lib libgl glFramebufferTexture1D [void,i32,i32,i32,i32,i32]*)
+      (bind-lib libgl glFramebufferTexture2D [void,i32,i32,i32,i32,i32]*)
+      (bind-lib libgl glFramebufferTexture3D [void,i32,i32,i32,i32,i32,i32]*)
+      (bind-lib libgl glCheckFramebufferStatus [i32,i32]*)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GLU
@@ -179,8 +180,7 @@
 
 (bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
 (bind-lib libglu gluPerspective [void,double,double,double,double]*)
-(bind-lib libglu gluErrorString [i8*,i32]*)
-			   
+(bind-lib libglu gluErrorString [i8*,i32]*)			   
 
 (bind-func gl_setup
   (lambda ()

@@ -431,7 +431,8 @@ namespace extemp {
 	    { "sys:platform",		&SchemeFFI::platform },
 	    { "sys:cmdarg",		&SchemeFFI::cmdarg },
 	    { "sys:open-dylib",		&SchemeFFI::openDynamicLib },
-	    { "sys:close-dylib",		&SchemeFFI::closeDynamicLib },
+	    { "sys:close-dylib",	&SchemeFFI::closeDynamicLib },
+	    { "sys:symbol-cptr",	&SchemeFFI::symbol_pointer },
 	    { "sys:make-cptr",		&SchemeFFI::makeCptr },
 	    { "sys:directory-list",     &SchemeFFI::dirlist },
 
@@ -2679,6 +2680,22 @@ namespace extemp {
 	ss << *func;
 	printf("%s",str.c_str());
 	return _sc->T;		
+    }
+
+    pointer SchemeFFI::symbol_pointer(scheme* _sc, pointer args)
+    {
+	void* library = cptr_value(pair_car(args));
+	char* symname = string_value(pair_cadr(args));
+		
+#ifdef TARGET_OS_WINDOWS
+        void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
+#else
+	void* ptr = dlsym(library, symname);
+#endif
+	if(!ptr) {
+	    return _sc->F;
+	}
+	return mk_cptr(_sc,ptr);
     }
 	
     pointer SchemeFFI::bind_symbol(scheme* _sc, pointer args)

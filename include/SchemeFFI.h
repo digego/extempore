@@ -172,6 +172,7 @@ namespace extemp {
 	static pointer callClosure(scheme* _sc, pointer args);
 	static pointer printLLVMModule(scheme* _sc, pointer args);
 	static pointer printLLVMFunction(scheme* _sc, pointer args);
+	static pointer symbol_pointer(scheme* _sc, pointer args);
 	static pointer bind_symbol(scheme* _sc, pointer args);
 	static pointer get_named_type(scheme* _sc, pointer args);
         static pointer export_llvmmodule_bitcode(scheme* _sc, pointer args);
