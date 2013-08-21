@@ -55,8 +55,10 @@
 ;;; Code:
 
 (require 'lisp-mode)
-(require 'cl-lib)
 (require 'eldoc)
+;; to support both 24.3 and earlier
+(unless (require 'cl-lib nil t)
+  (require 'cl))
 
 (defvar extempore-mode-syntax-table
   (let ((st (make-syntax-table))
