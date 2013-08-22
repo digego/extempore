@@ -15,7 +15,7 @@ endif
 #PLATFORM_LIBS := -ldl -lm -ljack -lboost_thread -lboost_system -lboost_filesystem  -lm -lpcre /usr/lib/nvidia-current/libGL.so
 PLATFORM_LIBS += -lpcre -lGL -lX11 #/usr/lib/nvidia-current/libGL.so
 
-PLATFORM_CXXFLAGS :=
+PLATFORM_CXXFLAGS := -g -O3
 PLATFORM_LDFLAGS :=
 
 PLATFORM_DEFINES := -DTARGET_OS_LINUX
