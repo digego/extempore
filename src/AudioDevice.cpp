@@ -1095,7 +1095,21 @@ namespace extemp {
 	  printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
           exit(1);
 	}
-
+        
+        if((int)UNIV::AUDIO_DEVICE > (numDevices-1)) {
+	  ascii_text_color(0,1,10);
+          printf("Output device not valid! %d\n",(int)UNIV::AUDIO_DEVICE);
+	  ascii_text_color(0,7,10);
+          printf("\n");
+          exit(1);
+        }
+        if((int)UNIV::AUDIO_IN_DEVICE > (numDevices-1)) {
+	  ascii_text_color(0,1,10);
+          printf("Input device not valid! %d\n",(int)UNIV::AUDIO_IN_DEVICE);
+	  ascii_text_color(0,7,10);
+          printf("\n");
+          exit(1);
+        }
         
 	if( (UNIV::IN_CHANNELS != UNIV::CHANNELS) &&
             (UNIV::IN_CHANNELS != 1) &&
