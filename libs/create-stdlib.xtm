@@ -16,6 +16,72 @@
 ;; the bitcode in the exported module with llc (the required arguments
 ;; will be printed to the Extempore log once the module is exported.
 
+(bind-func command
+  (lambda (cmd:i8*)
+    (system cmd)))
+
+(bind-func get_llvm_path
+  (lambda ()
+    (getenv "EXT_LLVM_DIR")))
+
+(define llvm-compile-xtlang-module
+  (lambda args
+    (let* ((basename (if (null? args) "xtlang-module" (car args)))
+           (bitcode-file (string-append "/tmp/" basename ".bc"))
+           (asm-file (string-append "/tmp/" basename ".s"))
+           (shared-lib-file
+            (cond ((string=? (sys:platform) "Linux")
+             (string-append "/tmp/" basename ".so"))
+            ((string=? (sys:platform) "OSX")
+             (string-append "/tmp/" basename ".dylib"))
+            ((string=? (sys:platform) "Windows")
+             (string-append "./" basename ".dll"))
+            (else ""))))
+      (if (string=? "" (cptr->string (get_llvm_path)))
+          (print-error 'You 'must 'set 'EXT_LLVM_DIR!))
+      (println 'Looking 'for 'llc 'in (cptr->string (get_llvm_path)))
+      ;; print further instructions
+      (cond ((string=? (sys:platform) "Linux")
+             (command "rm /tmp/xtm*")
+             (llvm:export-module bitcode-file)
+             (let ((res (command (string-append (cptr->string (get_llvm_path))
+                                                "/bin/llc -O3 -relocation-model=pic -tailcallopt "
+                                                bitcode-file " && gcc --shared -g " asm-file " -o " shared-lib-file "\n"))))
+               (if (<> res 0)
+                   (begin
+                     (ascii-print-color 0 1 10)
+                     (println)
+                     (println 'Failed 'to 'compile 'stdlib)                     
+                     (ascii-print-color 0 7 10)
+                     (println))
+                   (begin
+                     (ascii-print-color 0 2 10)
+                     (println)
+                     (println 'Successfully 'compiled 'stdlib: '/tmp/xtm.so)                     
+                     (ascii-print-color 0 7 10)
+                     (println)))))
+            ((string=? (sys:platform) "OSX")
+             (command "rm /tmp/xtm*")
+             (llvm:export-module bitcode-file)             
+             (let ((res (command (string-append (cptr->string (get_llvm_path))
+                                                "/bin/llc -O3 -relocation-model=pic -tailcallopt " bitcode-file
+                                                " && clang -O3 -dynamiclib -undefined dynamic_lookup "
+                                                asm-file " -o " shared-lib-file "\n"))))
+               (if (<> res 0)
+                   (begin
+                     (ascii-print-color 0 1 10)
+                     (println)
+                     (println 'Failed 'to 'compile 'stdlib)                     
+                     (ascii-print-color 0 7 10)
+                     (println))
+                   (begin
+                     (ascii-print-color 0 2 10)
+                     (println)
+                     (println 'Successfully 'compiled 'stdlib: '/tmp/xtm.dylib)
+                     (ascii-print-color 0 7 10)
+                     (println)))))
+            (else (print "Sorry, cannot find the appropriate compilation command for your platform at this time."))))))
+
 ;;; Code:
 
 (sys:load "libs/core/math.xtm")
@@ -28,5 +94,5 @@
 (sys:load "libs/external/sndfile.xtm")
 (sys:load "libs/external/openvg.xtm")
 (sys:load "libs/external/drawtext.xtm")
-(println 'done 'loading!)
-(llvm-export-current-xtlang-module "xtm")
+;; (println 'done 'loading!)
+(llvm-compile-xtlang-module "xtm")
