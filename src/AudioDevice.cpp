@@ -141,7 +141,7 @@ int set_realtime(float period, float computation, float constraint) {
     ttcpolicy.period=period; // HZ/160
     ttcpolicy.computation=computation; // HZ/3300;
     ttcpolicy.constraint=constraint; // HZ/2200;
-    ttcpolicy.preemptible=1;
+    ttcpolicy.preemptible=1; // 1 
  
     if ((ret=thread_policy_set(threadport,
         THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&ttcpolicy,
@@ -862,8 +862,10 @@ namespace extemp {
     //-----------------------------------  
   void* audioCallbackMT(void* dat) {    
 #ifdef TARGET_OS_MAC
+    static struct timespec MT_SLEEP_DURATION = {0,1000};
     Float64 clockFrequency = AudioGetHostClockFrequency();
-    set_realtime(clockFrequency*.01,clockFrequency*.005,clockFrequency*.005); //HZ/160,HZ/3300,HZ/2200);
+    // set_realtime(clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
+    set_realtime(clockFrequency*.01,clockFrequency*.007,clockFrequency*.008);
 #elif TARGET_OS_LINUX
     static struct timespec MT_SLEEP_DURATION = {0,1000};
     pthread_t pt = pthread_self();
@@ -907,10 +909,10 @@ namespace extemp {
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
       double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
 
-#ifdef TARGET_OS_LINUX
-      while(signals_wait[idx]) { nanosleep(&MT_SLEEP_DURATION ,NULL); } // spin
-#else
+#ifdef TARGET_OS_WINDOWS
       while(signals_wait[idx]) { } // spin
+#else
+      while(signals_wait[idx]) { nanosleep(&MT_SLEEP_DURATION ,NULL); } // spin
 #endif
 
       uint64_t LTIME = UNIV::DEVICE_TIME;
