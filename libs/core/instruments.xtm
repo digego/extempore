@@ -181,7 +181,6 @@
 
 (bind-func synth_note_c
   (let ((res 1.0)
-        (res_ 0.0)
         (fxamp 0.0))
     (lambda (nargs:i64 dargs:double*)
       (let ((oscl (osc_c 0.0))
@@ -195,10 +194,6 @@
             (oscr3 (osc_c 0.25))
             (oscr2 (osc_c 0.25)))
         (lambda (time:double chan:double freq:double amp:double)
-          (if (<> res res_)
-              (begin (lpf2.res res)
-                     (lpf1.res res)
-                     (set! res_ res)))
           (if (< chan 1.0)
               (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude
                  (+ (oscl2 1.0 (+ freq (* 10.0 (random))))
