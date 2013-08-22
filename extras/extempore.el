@@ -968,6 +968,28 @@ determined by whether there is an *extempore* buffer."
 	(progn (kill-word 1)
 	       (insert (number-to-string (string-to-number hex-str 16)))))))
 
+(defun note-to-midi-at-point ()
+  (interactive)
+  (let ((note-str (looking-at "\\([a-gA-G]\\)\\(#\\|b\\)?\\([0-9]\\)")))
+    (if note-str
+        (let* ((data (match-data))
+               (pc (case (mod (- (mod (string-to-char (buffer-substring
+                                                       (nth 2 data)
+                                                       (nth 3 data)))
+                                      16) 3) 7)
+                     ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11)))
+               (offset (+ 12 (* (string-to-number (buffer-substring (nth 6 data)
+                                                                  (nth 7 data)))
+                                12)))
+               (sharp-flat (and (nth 4 data)
+                                (buffer-substring (nth 4 data)
+                                                  (nth 5 data)))))
+          (replace-match (number-to-string
+                          (+ offset pc
+                             (if sharp-flat
+                                 (if (string= sharp-flat "#") 1 -1)
+                               0))))))))
+
 ;; interactive repeated evaluation of defun under point
 
 (defvar extempore-repeated-eval-timer nil)
