@@ -1,0 +1,61 @@
+;;; mtaudio.xtm -- basic multithreaded audio example
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Simple example running multiple instruments each in
+;; its own dedicated RT thread
+
+;;; Code:
+
+;; needs xtm.xtm
+(sys:load "libs/xtm.xtm")
+
+;; normal dsp definiton to be run
+;; on RT audio thread #1
+(bind-func dsp1:DSP
+  (lambda (in time chan dat)
+    (fmsynth in time chan dat)))
+
+;; normal dsp definiton to be run
+;; on RT audio thread #2
+(bind-func dsp2:DSP
+  (lambda (in time chan dat)
+    (synth in time chan dat)))
+
+;; normal dsp definiton to be run
+;; on RT audio thread #3
+(bind-func dsp3:DSP
+  (lambda (in time chan dat)
+    (epad in time chan dat)))
+
+;; dspmt takes 3 inputs (i.e. from dsp1 dsp2 and dsp3)
+;; in is of type double*
+(bind-func dspmt:DSPMT
+  ;;(lambda (in:double* time:double chan:double dat:double*)
+  (lambda (in time chan dat)
+    (+ (* .5 (pref in 0))
+       (* .5 (pref in 1))
+       (* .5 (pref in 2)))))
+
+;; first argument is exected to be
+;; a closure of type DSPMT
+;; after that 'n' number of standard
+;; DSP closures defines the number
+;; of parallel audio threads to run.
+;; DSPMT's first argument will contain
+;; 'n' number of input samples -
+;; one per RT audio thread
+(dsp:set! dspmt dsp1 dsp2 dsp3)
+
+;; make some noise
+(define t1
+  (lambda (beat dur)
+    (play fmsynth (random 40 70) 80 dur)
+    (play synth (random 40 70) 80 dur)
+    (play epad (random 40 70) 80 dur)
+    (callback (*metro* (+ beat (* .5 dur))) 't1 (+ beat dur) dur)))
+
+(t1 (*metro* 'get-beat 4) 1/4)
