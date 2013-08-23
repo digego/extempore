@@ -2750,8 +2750,8 @@ namespace extemp {
 	char* n = string_value(pair_car(args));
 	char nk[256];
 	char* name = nk;
-	strcpy(name,n);
-	if (name[0] == '%') name = name++;	
+	strcpy(name,n);        
+	if (name[0] == '%') name = name+1;	
 
 	int ptrdepth = 0;
 	while(name[strlen(name)-1] == '*') {
