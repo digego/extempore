@@ -89,7 +89,8 @@
 ;;
 (define *impc:ir:ls_var* '())
 
-;; the symbol that we are currently binding to
+;; a list of currently valid local symbols!
+;; NOT including global symbols
 (define *impc:ir:sym-name-stack* '())
 
 
@@ -1394,7 +1395,8 @@
          ;; next we pull the function arguments
          (emit "\n; setup arguments\n" os)          
          (dotimes (i (length args))
-            (let* ((a (list-ref args i)))
+           (let* ((a (list-ref args i)))
+              (set! *impc:ir:sym-name-stack* (cons (car a) *impc:ir:sym-name-stack*))
 	      (if (> allocate-mem? 0)
 		  (begin ;; (println 'yes: allocate-mem? 'mem: ast)
                          (cond ((= allocate-mem? 1)
@@ -1414,6 +1416,7 @@
 				   ", " (impc:ir:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)))
          (emit "\n" os)
          ;; compile body
+         ;; (println '_compin: *impc:ir:sym-name-stack*)                  
 	 (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
 	 (define body-str (impc:ir:compiler code types))
 	 ;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
@@ -1423,6 +1426,8 @@
 			   (emit (car v) " = alloca " (cdr v) "\n" os))
 			 (car *impc:ir:ls_var*))))
 	 (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
+         (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length args)))
+         ;; (println 'compout: *impc:ir:sym-name-stack*)         
 	 (emit "\n" os)
 	 (emit body-str os)
 	 
@@ -1533,7 +1538,7 @@
 	   (env-zone-tmp '()))
       (map (lambda (p)
              (set! *impc:ir:sym-name-stack* (cons (caar p) *impc:ir:sym-name-stack*))
-	     ;; (println 'p: p (cadr p)) ;'ast: ast)
+             ;; (println '__envin: *impc:ir:sym-name-stack*)                   
              ;; (println 'p2: (cadr p))
 	     (let* ((symstr (symbol->string (caar p)))
 		    (symtype (cdr (assoc (caar p) types)))
@@ -1593,7 +1598,7 @@
 ;		   (emit (cdr value) os))))                 
 	   (caddr ast))
 
-      (set! *impc:ir:sym-name-stack* (cdr *impc:ir:sym-name-stack*))
+;      (set! *impc:ir:sym-name-stack* (cdr *impc:ir:sym-name-stack*))
       
       ;; fill in and lambda environments now
       (map (lambda (a)
@@ -1610,7 +1615,9 @@
 			(emit (car v) " = alloca " (cdr v) "\n" os))
 		      (car *impc:ir:ls_var*))))
       (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
-      (emit envbody-str os)	 	 
+      (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length (caddr ast))))
+      ;; (println '_envout: *impc:ir:sym-name-stack*)      
+      (emit envbody-str os)
       ;;(emit (impc:ir:compiler (cdddr ast) types) os)
       (impc:ir:strip-space os))))
 
@@ -2158,7 +2165,8 @@
 				   (if (impc:ir:closure? (cdr (assoc (car ast) types)))
 				       (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure (sexpr->string (car ast)) 'remember 'that 'closures 'must 'be 'pointers)
 				       (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure (sexpr->string (car ast)))))))
-             (recursive-call (if (eq? (car ast) (car *impc:ir:sym-name-stack*)) #t #f))
+             ;;(recursive-call (if (eq? (car ast) (car *impc:ir:sym-name-stack*)) #t #f))
+             (recursive-call (if (member (car ast) *impc:ir:sym-name-stack*) #t #f))             
              (os (make-string 0))
              (ftype (impc:ir:make-function-str functiontype #t))
              (clstype (string-append "<{i8*, i8*, " ftype "*}>*"))
@@ -2486,9 +2494,11 @@
       (emit s2 os)
       (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; are we are setting a global variable?
 	  (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
-			       (symbol->string (cadr ast)) "\n") os)	     
-	  (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
-			       (symbol->string (cadr ast)) "Ptr\n") os))
+			       (symbol->string (cadr ast)) "\n") os)
+          (if (member (cadr ast) *impc:ir:sym-name-stack*)              
+              (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
+                                   (symbol->string (cadr ast)) "Ptr\n") os)
+              (print-error 'Compiler 'Error: 'undefined 'symbol: (cadr ast))))
       ;; ir:gname should be vv
       (impc:ir:strip-space os))))
 
@@ -4017,8 +4027,11 @@
              (cond ((symbol? ast)
                     (if (or (assoc ast types)
                             (llvm:get-globalvar (symbol->string ast)))
-                        (if (assoc ast types) 
-                            (impc:ir:compile:eval-var ast (cdr (assoc ast types)))
+                        (if (assoc ast types)
+                            (begin
+                              (if (not (member ast *impc:ir:sym-name-stack*))                                  
+                                  (print-error 'Compiler 'Error: 'undefined 'symbol: ast)
+                                  (impc:ir:compile:eval-var ast (cdr (assoc ast types)))))
                             (impc:ir:compile:eval-gvar ast))
 			(if (llvm:get-function (symbol->string ast))
 			    (if (llvm:get-function (string-append (symbol->string ast) "_getter"))
