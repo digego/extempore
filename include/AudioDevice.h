@@ -156,7 +156,7 @@ namespace extemp {
 #endif
 	float* buffer;
 	void* dsp_closure;
-        void* dsp_mt_closure[4];
+        void* dsp_mt_closure[128];
 	dsp_f_ptr dsp_wrapper;
 	//dsp_f_ptr dsp_wrapper_mt[4];
         dsp_f_ptr_sum dsp_wrapper_sum;
