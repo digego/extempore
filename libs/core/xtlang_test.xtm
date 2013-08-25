@@ -237,6 +237,7 @@
           (printf "tail opt test passed!\n")
           (tail_opt_test (- n 1))))))
 
+(println 'A 'segfault 'here 'incidates 'that 'tail-call-optimizations 'are 'not 'working!)
 (test-xtfunc (tail_opt_test 200))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -513,10 +514,11 @@
       (printf "%lld:%lld\n" (t1 5) (t2 5))
       (t1.f:[i64,i64]* (lambda (x:i64) (* x x)))
       ;; square of 5
-      (printf "%lld:%lld\n" (t1 5) (t2 5)))
+      (printf "%lld:%lld\n" (t1 5) (t2 5))
       ;; cube of 5
       (t2.f:[i64,i64]* (lambda (y:i64) (* y y y)))
-      (printf "%lld:%lld\n" (t1 5) (t2 5))))
+      (printf "%lld:%lld\n" (t1 5) (t2 5))
+      void)))
 
 (test-xtfunc (dot-access-test6)) ;; 5:5 > 25:5 > 25:125
 
@@ -1376,7 +1378,7 @@
   (lambda ()
     (let ((lst (xbox_test1))
           (str:i8* (xunbox (xnth lst 0))))
-      (printf "%s:%f" str
+      (printf "%s:%f\n" str
               (xbox_test2 (xunbox (xnth lst 1))
                           (xunbox (xnth lst 2))
                           (xunbox (xnth lst 3))
