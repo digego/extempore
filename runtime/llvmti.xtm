@@ -357,6 +357,22 @@
                     (apply list 'begin (cdar ast)))
                 (impc:ti:cond (cdr ast))))))
 
+(define impc:ti:cond
+  (lambda (ast)
+    (cl:remove '()
+      (if (null? ast) '()          
+          (list 'if (caar ast) 
+                (if (null? (cdar ast))
+                    (print-error 'Compiler 'Error: 'poorly 'formed 'cond 'expression: ast)
+                    (apply list 'begin (cdar ast)))
+                (if (and
+                     (not (null? (cdr ast)))
+                     (eq? (caadr ast) 'else))
+                    (apply list 'begin (cdadr ast))
+                    (if (not (null? (cdr ast)))
+                        (impc:ti:cond (cdr ast)))))))))
+
+
 (define impc:ti:list
   (lambda (ast)
     (if (null? ast) 'null
@@ -4317,7 +4333,8 @@
    (lambda (symname code . args)
       ;; (println '-----------> 'impc:ti:run: symname)
       ;; (println 'code: code)
-      ;(println 'args: args)
+      ;; (println 'args: args)
+      (set! *impc:ir:sym-name-stack* '())
       (set! *impc:ir:ls_var* '())
       (set! *impc:ti:generic-type-mappings* '())
       (set! *impc:ti:nativef-generics-recurse-test* 0)
