@@ -698,6 +698,7 @@
 
 (define ipc:audio-setup
   (lambda (proc)
+    (ipc:load proc "libs/core/pc_ivl.xtm")
     (ipc:eval-string proc
                      ";; new playnote
                      (define play-note
@@ -752,6 +753,23 @@
 (subbass.decay 500.0)
 (subbass.sustain 0.8)
 (subbass.release 500.0)
+
+(bind-func dsp:DSP
+  (lambda (in time chan dat)
+    (+ (fmsynth in time chan dat)
+       (synth in time chan dat)
+       (sampler in time chan dat))))
+
+(define xtm_audio_setup
+  (lambda ()
+    (ipc:audio-setup "utility")
+    (ipc:bind-func "utility" 'fmsynth)
+    (ipc:bind-func "utility" 'synth)
+    (ipc:bind-func "utility" 'sampler)
+    (dsp:set! dsp)))
+
+;; load pc ivl library 
+(load "libs/core/pc_ivl.xtm")
 
 (define *xtmlib-audio-inst-ext-loaded* #t)
 (ascii-print-color 0 2 10)
