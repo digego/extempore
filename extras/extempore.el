@@ -105,10 +105,14 @@
 (define-abbrev-table 'extempore-mode-abbrev-table ())
 
 (defvar extempore-imenu-generic-expression
-  '((nil ;"Scheme"
-     "(\\(define\\(\\|-macro\\|-instrument\\|-sampler\\)\\)\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3)
-    (nil ;"xtlang"
-     "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3))
+  '(("scheme"
+     "(\\(define\\(\\|-macro\\)\\)\\s-+(?\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3)
+    ("instruments"
+     "(\\(define\\(\\|-instrument\\|-sampler\\)\\)\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3)
+    ("xtlang"
+     "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\)\\)\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 3)
+    ("xtlang"
+     "(bind-lib\\s-+\\(\\sw\\|\\s_\\)+\\s-+\\(\\(\\sw\\|\\s_\\)+\\)\\_>" 2))
   "Imenu generic expression for Extempore mode.  See `imenu-generic-expression'.")
 
 
