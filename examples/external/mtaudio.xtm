@@ -33,12 +33,14 @@
 
 ;; dspmt takes 3 inputs (i.e. from dsp1 dsp2 and dsp3)
 ;; in is of type double*
-(bind-func dspmt:DSPMT
-  ;;(lambda (in:double* time:double chan:double dat:double*)
-  (lambda (in time chan dat)
-    (+ (* .5 (pref in 0))
-       (* .5 (pref in 1))
-       (* .5 (pref in 2)))))
+(bind-func dspmt:DSPMT 1000000
+  (let ((reverb (reverb_mc_c 2 100.)))
+    (lambda (in time chan dat)
+      (reverb chan
+              (+ (* 0.5 (pref in 0))
+                 (* 0.5 (pref in 1))
+                 (* 0.5 (pref in 2)))
+              0.5 0.5))))
 
 ;; first argument is exected to be
 ;; a closure of type DSPMT
@@ -53,9 +55,16 @@
 ;; make some noise
 (define t1
   (lambda (beat dur)
-    (play fmsynth (random 40 70) 80 dur)
-    (play synth (random 40 70) 80 dur)
-    (play epad (random 40 70) 80 dur)
+    (play fmsynth (random 40 70) 80 (* 4.0 dur))
+    (play synth (random 60 80) 80 (* 1.0 dur))
+    (play epad (random 30 50) 80 (* 1.0 dur))
     (callback (*metro* (+ beat (* .5 dur))) 't1 (+ beat dur) dur)))
 
 (t1 (*metro* 'get-beat 4) 1/4)
+
+(define t2
+  (lambda (beat dur)
+    (println 'Audio Load: (* 100. (sys:audio-load)) '%)
+    (callback (*metro* (+ beat (* .5 dur))) 't2 (+ beat dur) dur)))
+
+(t2 (*metro* 'get-beat 4) 4)

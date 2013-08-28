@@ -112,8 +112,6 @@ namespace extemp {
 
         EXTThread** getMTThreads() { return threads; } 
         int getNumThreads() { return numthreads; } 
-        int* getWaitSignals() { return signals_wait; }
-        int* getDoneSignals() { return signals_done; }
 	dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
 	dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
 	dsp_f_ptr_sum getDSPSUMWrapper() { return dsp_wrapper_sum; }
@@ -132,8 +130,9 @@ namespace extemp {
 #elif defined (COREAUDIO)
 
 #else  //  must be portaudio
-        static void printDevices();
-        
+        PaStream* getPaStream() { return stream; }
+        static double getCPULoad();
+        static void printDevices();       
 #endif
 
 	static double CLOCKBASE;
@@ -158,15 +157,12 @@ namespace extemp {
 	void* dsp_closure;
         void* dsp_mt_closure[128];
 	dsp_f_ptr dsp_wrapper;
-	//dsp_f_ptr dsp_wrapper_mt[4];
         dsp_f_ptr_sum dsp_wrapper_sum;
 	dsp_f_ptr_array dsp_wrapper_array;
 	double* outbuf;
         double* inbuf;
 	static AudioDevice SINGLETON;
         EXTThread** threads;
-        int* signals_wait;
-        int* signals_done;
         int numthreads;
     };
 

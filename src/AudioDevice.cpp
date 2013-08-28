@@ -50,6 +50,7 @@
 #include <mach/thread_policy.h>
 #include <sys/sysctl.h>
 #include <time.h>
+#include <libkern/OSAtomic.h>
 #endif
 
 #include <stdlib.h>
@@ -860,14 +861,18 @@ namespace extemp {
     //-----------------------------------
     //  PORT AUDIO
     //-----------------------------------  
+#define NANO_SLEEP_DURATION 25000  
+    static volatile int32_t _atomic_thread_done_cnt = 0;
+    static volatile int64_t _signal_cnt = 0;
+#ifndef TARGET_OS_WINDOWS
+    static struct timespec MT_SLEEP_DURATION = {0,NANO_SLEEP_DURATION};
+#endif
   void* audioCallbackMT(void* dat) {    
 #ifdef TARGET_OS_MAC
-    static struct timespec MT_SLEEP_DURATION = {0,1000};
     Float64 clockFrequency = AudioGetHostClockFrequency();
-    // set_realtime(clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
-    set_realtime(clockFrequency*.01,clockFrequency*.007,clockFrequency*.008);
+    //set_realtime(clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
+    set_realtime(clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif TARGET_OS_LINUX
-    static struct timespec MT_SLEEP_DURATION = {0,1000};
     pthread_t pt = pthread_self();
     int policy;
     sched_param param;
@@ -882,7 +887,8 @@ namespace extemp {
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     printf("Starting RT Audio Process\n");
-    int idx = *((int*) dat);
+    int idx = *((int*) dat);    
+    int64_t lcount = 0; // local count
     
     dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
     dsp_f_ptr cache_wrapper = dsp_wrapper;
@@ -897,23 +903,28 @@ namespace extemp {
     outbuf = outbuf+(UNIV::CHANNELS*UNIV::FRAMES*idx);
     double* inbuf = AudioDevice::I()->getDSPMTInBuffer();
     double* indata = (double*) malloc(UNIV::IN_CHANNELS*8);
-
-    int* signals_wait = AudioDevice::I()->getWaitSignals();
-    int* signals_done = AudioDevice::I()->getDoneSignals();
-    signals_done[idx] = 0;
-    signals_wait[idx] = 1;
     
     for(;;) {
       void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
       void* cache_closure = 0;
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
       double (*closure) (double,double,double,double*) = * ((double(**)(double,double,double,double*)) cache_closure);
-
+      int cnt = 0;
 #ifdef TARGET_OS_WINDOWS
-      while(signals_wait[idx]) { } // spin
+      printf("MT Audio on Windows NOT Implemented!\n")
+      while(_signal_cnt <= lcount) { 
+        //sleep??
+        cnt++; 
+        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
+      } // spin
 #else
-      while(signals_wait[idx]) { nanosleep(&MT_SLEEP_DURATION ,NULL); } // spin
-#endif
+      while(_signal_cnt <= lcount) { // wait);
+        nanosleep(&MT_SLEEP_DURATION ,NULL); 
+        cnt++; 
+        if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
+      } // spin
+#endif    
+      lcount++; 
 
       uint64_t LTIME = UNIV::DEVICE_TIME;
       for(uint32_t i=0;i<UNIV::FRAMES;i++) {
@@ -941,10 +952,17 @@ namespace extemp {
               }
           }
       }
-      signals_wait[idx] = 1;
-      signals_done[idx] = 1;
+
+#ifdef TARGET_OS_LINUX
+      _sync_fetch_and_add(&_atomic_thread_done_cnt,1);
+#elif TARGET_OS_MAC
+      OSAtomicAdd32(1,&_atomic_thread_done_cnt);
+#else
+      // NOT ATOMIC SUPPORT ON WINDOWS YET!!!!
+      // IN OTHER WORDS BROKEN!!!!!!!!!!!!!!!!
+      _atomic_thread_done_cnt++;
+#endif
     }
-    //printf("FINISHED IDX:%d\n",idx);
     return 0;
   }
 
@@ -968,7 +986,13 @@ namespace extemp {
 	if(dsp_closure == 0) { memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE))); return 0; }
 	cache_closure = ((void*(*)()) dsp_closure)(); 
 
-	double* indata = (double*) malloc(UNIV::IN_CHANNELS*8);
+	double indata[256]; // 256 channels MAX!
+
+        // print underflow/overflow
+        if(statusFlags & 0x00000004) 
+          printf("PORTAUDIO: Audio Output Underlow\n");
+        if(statusFlags & 0x00000008) 
+          printf("PORTAUDIO: Audio Output Overflow\n");
 				
 	if(AudioDevice::I()->getDSPWrapper() && !AudioDevice::I()->getDSPSUMWrapper()) { // if true then we must be sample by sample
 	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
@@ -1018,24 +1042,32 @@ namespace extemp {
 	    cache_wrapper(zone, (void*)closure, indat, outdat, (SAMPLE)UNIV::DEVICE_TIME, userData);
 	    llvm_zone_reset(zone);
         }else if(AudioDevice::I()->getDSPSUMWrapper()) { // if true then multichannel
+          //printf("main in\n");
           int numthreads = AudioDevice::I()->getNumThreads();
+          
           double in[numthreads];
-          int* signals_wait = AudioDevice::I()->getWaitSignals();
-          int* signals_done = AudioDevice::I()->getDoneSignals();
           double* inb = AudioDevice::I()->getDSPMTInBuffer();
           SAMPLE* input = (SAMPLE*) inputBuffer;
           for(int i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = (double) input[i]; 
-          for(int jj=0;jj<numthreads;jj++) signals_wait[jj] = 1;
-          // start computing in audio threads
-          for(int jj=0;jj<numthreads;jj++) signals_wait[jj] = 0;
-          // and wait until all threads are done!
-          int wait=1;
-          while(wait) { // naive spin!
-            wait = 0;
-            for(int jj=0;jj<numthreads;jj++)
-              if(signals_done[jj] == 0) wait = 1;
-          }       
-          for(int jj=0;jj<numthreads;jj++) signals_done[jj] = 0;
+          // start computing in all audio threads
+          _signal_cnt++;
+          int cnt=0;
+#ifdef TARGET_OS_MAC
+          while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
+            cnt++;
+            if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+            nanosleep(&MT_SLEEP_DURATION ,NULL);
+          }
+#elif TARGET_OS_LINUX
+          while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
+            cnt++
+            if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+            nanosleep(&MT_SLEEP_DURATION ,NULL);
+          }
+#else
+          printf("NO SUPPORT FOR MT AUDIO ON WINDOWS!\n");
+          exit(1);
+#endif
           dsp_f_ptr_sum dsp_wrapper = AudioDevice::I()->getDSPSUMWrapper();
           dsp_f_ptr_sum cache_wrapper = dsp_wrapper;
           double (*closure) (double*,double,double,double*) = * ((double(**)(double*,double,double,double*)) cache_closure);
@@ -1058,7 +1090,8 @@ namespace extemp {
                   dat[iout+k] = audio_sanity((SAMPLE)cache_wrapper(zone, (void*)closure, in, (double)(i+UNIV::DEVICE_TIME),(double)k,&(indata[0])));
                   llvm_zone_reset(zone);
                 }
-	    }
+          }
+          //printf("main out\n");          
 	}else{ 
 	    //zero out audiobuffer
 	    memset(outputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)));
@@ -1258,17 +1291,18 @@ namespace extemp {
     {
        numthreads = num;
        threads = (EXTThread**) malloc(sizeof(EXTThread*)*numthreads);       
-       signals_wait = (int*) malloc(numthreads*sizeof(int));
-       signals_done = (int*) malloc(numthreads*sizeof(int));
        inbuf = (double*) malloc(UNIV::IN_CHANNELS*UNIV::FRAMES*8);
        outbuf = (double*) malloc(UNIV::CHANNELS*UNIV::FRAMES*8*numthreads);
        for(int i=0;i<128;i++) thread_idx[i] = i;
        for(int i=0;i<numthreads;i++) {
-         signals_wait[i] = 1;
          threads[i] = new EXTThread();
          threads[i]->create(audioCallbackMT, &thread_idx[i]);
        }
     }
+  double AudioDevice::getCPULoad() {    
+    PaStream* stream = AudioDevice::I()->getPaStream();
+    return Pa_GetStreamCpuLoad(stream);
+  }
 
   void AudioDevice::printDevices() {
 	Pa_Initialize();
