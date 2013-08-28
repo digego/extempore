@@ -442,6 +442,7 @@ namespace extemp {
 	    { "sys:set-dsp-wrapper",	&SchemeFFI::setDSPWrapper },
 	    { "sys:set-dspmt-wrapper",	&SchemeFFI::setDSPMTWrapper },
             { "sys:init-mt-audio",      &SchemeFFI::initMTAudio },
+            { "sys:audio-load",         &SchemeFFI::getAudioLoad },
 	    { "sys:set-dsp-wrapper-array",	&SchemeFFI::setDSPWrapperArray },
 
 	    // memory zone stuff
@@ -2833,6 +2834,12 @@ namespace extemp {
     {
       AudioDevice::I()->initMTAudio(ivalue(pair_car(args)));
       return _sc->T;
+    }
+
+    pointer SchemeFFI::getAudioLoad(scheme* _sc, pointer args)
+    {
+      double load = AudioDevice::getCPULoad();
+      return mk_real(_sc,load);
     }
   
 
