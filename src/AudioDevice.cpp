@@ -923,7 +923,7 @@ namespace extemp {
         cnt++; 
         if (0 == (cnt%100000)) printf("Still locked in %d cnt(%lld:%lld)\n!",idx,lcount,_signal_cnt);
       } // spin
-#endif    
+#endif
       lcount++; 
 
       uint64_t LTIME = UNIV::DEVICE_TIME;
@@ -954,10 +954,11 @@ namespace extemp {
       }
 
 #ifdef TARGET_OS_LINUX
-      _sync_fetch_and_add(&_atomic_thread_done_cnt,1);
+      __sync_fetch_and_add(&_atomic_thread_done_cnt,1);
 #elif TARGET_OS_MAC
       OSAtomicAdd32(1,&_atomic_thread_done_cnt);
 #else
+      printf("NO MT Audio Support on Windows Yet!!\n");
       // NOT ATOMIC SUPPORT ON WINDOWS YET!!!!
       // IN OTHER WORDS BROKEN!!!!!!!!!!!!!!!!
       _atomic_thread_done_cnt++;
@@ -1050,8 +1051,9 @@ namespace extemp {
           SAMPLE* input = (SAMPLE*) inputBuffer;
           for(int i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = (double) input[i]; 
           // start computing in all audio threads
+          _atomic_thread_done_cnt = 0;
           _signal_cnt++;
-          int cnt=0;
+          int cnt=0;          
 #ifdef TARGET_OS_MAC
           while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
             cnt++;
@@ -1060,7 +1062,7 @@ namespace extemp {
           }
 #elif TARGET_OS_LINUX
           while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
-            cnt++
+            cnt++;
             if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
             nanosleep(&MT_SLEEP_DURATION ,NULL);
           }
