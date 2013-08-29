@@ -1194,10 +1194,10 @@ You shouldn't have to modify this list directly, use
   (assoc name extempore-tr-anim-alist))
 
 (defun extempore-get-active-tr-anims (anim-list)
-  (remove-if-not (lambda (x) (aref x 3)) anim-list))
+  (cl-remove-if-not (lambda (x) (aref x 3)) anim-list))
 
 (defun extempore-get-dormant-tr-anims (anim-list)
-  (remove-if (lambda (x) (aref x 3)) anim-list))
+  (cl-remove-if (lambda (x) (aref x 3)) anim-list))
 
 (defun extempore-reactivate-tr-anim (anim delta-t)
   (aset anim 2 delta-t)
