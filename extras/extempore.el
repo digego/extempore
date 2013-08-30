@@ -1517,35 +1517,39 @@ buffer."
   (setq extempore-slave-buffer-server
         (make-network-process
          :name "extempore-slave-buffer-server"
-         ;; :buffer (current-buffer)
+         :buffer nil
          :coding 'iso-latin-1
          :service port
          :family 'ipv4
          :server t
+         :sentinel #'extempore-slave-buffer-server-sentinel
          :filter #'extempore-slave-buffer-server-filter))
   (unless extempore-slave-buffer-server
     (message "Error: couldn't start the slave buffer server.")
     extempore-slave-buffer-server))
 
 (defun extempore-slave-buffer-cleanup-dead-connections ()
+  (interactive)
   (dolist (proc (process-list))
     (if (string= (substring (process-name proc) 0 4) "esb-")
-      (unless (member (process-status proc) '(run open))
-        (delete-process proc)))))
+        (unless (member (process-status proc) '(run open))
+          (delete-process proc)))))
 
 (defun extempore-slave-buffer-delete-all-connections ()
+  (interactive)
   (dolist (proc (process-list))
     (if (string= (substring (process-name proc) 0 4) "esb-")
-      (delete-process proc))))
+        (delete-process proc))))
 
 (defun extempore-slave-buffer-server-sentinel (proc str)
-  (message "extempore server: %s" str))
+  (message "extempore slave buffer server: %s" str proc))
 
 (defun extempore-slave-buffer-create-buffer (proc buffer-name)
   (let ((buf (get-buffer-create buffer-name)))
     (set-process-buffer proc buf)
     (with-current-buffer buf
       (buffer-disable-undo)
+      (set-auto-mode)
       (read-only-mode 1))
     (message "extempore slave buffer set up: %s" buffer-name)
     buf))
@@ -1555,26 +1559,38 @@ buffer."
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (delete-region (point-min) (point-max))
-        (insert buffer-text))
-      (if (not (eq buf curr-buf))
-          (set-window-start (get-buffer-window buf) start-pos)))))
+        (insert buffer-text)
+        (if (not (eq buf curr-buf))
+            (set-window-start (get-buffer-window buf) start-pos))))))
+
+(setq extempore-slave-buffer-partial-str nil)
 
 (defun extempore-slave-buffer-server-filter (proc str)
-  (let ((request-list (read str))
-        (proc-buf (process-buffer proc)))    
-    (cond ((not (= (length request-list) 3))
-           (message "Error: malformed buffer state recieved from master buffer."))
-          ((null proc-buf)
-           (extempore-slave-buffer-update-slave-buffer
-            (extempore-slave-buffer-create-buffer proc (car request-list))
-            (cadr request-list)
-            (caddr request-list)))
-          ((string= (buffer-name proc-buf)
-                    (car request-list))
-           (extempore-slave-buffer-update-slave-buffer proc-buf
-                                                (cadr request-list)
-                                                (caddr request-list)))
-          (t (message "extempore slave buffer mode: received state from wrong buffer.")))))
+  ;; the global `extempore-slave-buffer-partial-str' is for handling
+  ;; buffer text recieved by the filter in multiple chunks
+  (setq extempore-slave-buffer-partial-str
+        (concat extempore-slave-buffer-partial-str str))
+  (let ((request-list (ignore-errors (read extempore-slave-buffer-partial-str))))
+    (if request-list
+        (progn (setq extempore-slave-buffer-partial-str nil)
+               (extempore-slave-buffer-dispatch-request proc request-list)))))
+
+(defun extempore-slave-buffer-dispatch-request (proc request-list)
+  (let ((proc-buf (process-buffer proc)))
+    (cond
+     ((not (= (length request-list) 3))
+      (message "Error: malformed buffer state recieved from master buffer."))
+     ((null proc-buf)
+      (extempore-slave-buffer-update-slave-buffer
+       (extempore-slave-buffer-create-buffer proc (car request-list))
+       (cadr request-list)
+       (caddr request-list)))
+     ((string= (buffer-name proc-buf)
+               (car request-list))
+      (extempore-slave-buffer-update-slave-buffer proc-buf
+                                                  (cadr request-list)
+                                                  (caddr request-list)))
+     (t (message "extempore slave buffer mode: received state from wrong buffer.")))))
 
 (defun extempore-slave-buffer-sync-slave-buffer (buf)
   (with-current-buffer buf
@@ -1582,18 +1598,21 @@ buffer."
       (if proc
           (process-send-string proc
                                (prin1-to-string
-                                (list (buffer-name)
+                                (list (concat (buffer-name) "@" (host-name) "<slave>")
                                       (buffer-substring-no-properties (point-min) (point-max))
                                       (window-start))))))))
 
-(defvar extempore-slave-buffer-refresh-interval 0.5
+(defvar extempore-slave-buffer-refresh-interval 1.0
   "The refresh interval (in seconds) for syncing the slave buffers")
 
 (defun extempore-slave-buffer-setup-buffer (buf host port)
-  (if (open-network-stream (concat "esb-" host ":" (number-to-string port))
-                           buf host port)
-      (message "extempore slave buffer: sucessfully opened slave buffer on %s:%s" host port)
-    (message "extempore slave buffer: couldn't connect to %s:%s" host port)))
+  (let ((proc (open-network-stream (concat "esb-" host ":" (number-to-string port))
+                                   buf host port)))
+    (if proc
+        (progn
+          (set-process-sentinel proc #'extempore-slave-buffer-server-sentinel)
+          (message "extempore slave buffer: sucessfully opened slave buffer on %s:%s" host port))
+      (message "extempore slave buffer: couldn't connect to %s:%s" host port))))
 
 (defun extempore-slave-buffer-start-timer (buf time-interval)
   (run-with-timer 0 time-interval #'extempore-slave-buffer-sync-slave-buffer buf))
