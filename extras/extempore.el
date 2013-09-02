@@ -1560,7 +1560,10 @@ buffer."
       (let ((inhibit-read-only t))
         (delete-region (point-min) (point-max))
         (insert buffer-text)
-        (if (not (eq buf curr-buf))
+        ;; if slave buffer is not the current buffer, have if follow
+        ;; the master (remote) cursor position
+        (if (and (get-buffer-window buf)
+                 (not (eq buf curr-buf)))
             (set-window-start (get-buffer-window buf) start-pos))))))
 
 (setq extempore-slave-buffer-partial-str nil)
