@@ -152,14 +152,7 @@
 	 (parse-sexp-lookup-properties . t)
 	 (font-lock-extra-managed-props syntax-table)))
   (set (make-local-variable 'lisp-doc-string-elt-property)
-       'extempore-doc-string-elt)
-  ;; for connecting to the Extempore CaaS server
-  (set (make-variable-buffer-local 'extempore-connection-list) nil)
-  (set (make-variable-buffer-local 'mode-line-process) nil)
-  (set (make-variable-buffer-local 'extempore-connection-evalstr-fn)
-       #'extempore-make-crlf-evalstr)
-  ;; mode line process
-  (setq mode-line-process nil))
+       'extempore-doc-string-elt))
 
 (defvar extempore-mode-map
   (let ((smap (make-sparse-keymap))
@@ -669,6 +662,11 @@ determined by whether there is an *extempore* buffer."
   (message (extempore-slip-unescape-string str)))
 
 ;; connection management
+
+(make-variable-buffer-local 'mode-line-process)
+(setq mode-line-process nil)
+(make-variable-buffer-local 'extempore-connection-list)
+(setq extempore-connection-list nil)
 
 (defun extempore-update-mode-line ()
   (let ((nprocs (length extempore-connection-list))
@@ -1572,7 +1570,7 @@ If you don't want to be prompted for this name each time, set the
         (delete-process proc))))
 
 (defun extempore-sb-server-sentinel (proc str)
-  (message "esb: %s" str proc))
+  (message "esb: %s" str))
 
 (defun extempore-sb-create-slave-buffer (proc buffer-name buffer-mode)
   (let ((buf (get-buffer-create buffer-name)))
@@ -1696,7 +1694,7 @@ If you don't want to be prompted for this name each time, set the
                  (progn (cancel-timer extempore-sb-push-timer)
                         (setq extempore-sb-push-timer nil)))
              (message "esb: stopped syncing buffer: %s" (buffer-name)))
-    (message "esb: not currently pushing this buffer" (buffer-name))))
+    (message "esb: not currently pushing this buffer")))
 
 (defun extempore-sb-slave-buffer-p (buf)
   (let ((proc (get-buffer-process buf)))
