@@ -266,8 +266,10 @@ See `run-hooks'."
   (define-key keymap (kbd "C-x C-r") 'extempore-eval-current-region)
   (define-key keymap (kbd "C-x C-b") 'extempore-eval-buffer)
   (define-key keymap (kbd "C-M-x")   'extempore-eval-defn-or-region)
-  (define-key keymap (kbd "C-x y")   'extempore-tr-animation-mode)
-  (define-key keymap (kbd "C-x C-l") 'extempore-logger-mode))
+  ;; (define-key keymap (kbd "C-x y")   'extempore-tr-animation-mode)
+  (define-key keymap (kbd "C-x C-l") 'extempore-logger-mode)
+  (define-key keymap (kbd "C-c c s") 'extempore-sb-mode)
+  (define-key keymap (kbd "C-c c p") 'extempore-sb-toggle-current-buffer))
 
 (extempore-keybindings extempore-mode-map)
 
@@ -1465,11 +1467,11 @@ You shouldn't have to modify this list directly, use
   (cancel-timer extempore-logger-write-timer)
   (setq extempore-logger-write-timer nil))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; extempore slave buffer (esb) minor mode ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; extempore slave buffer minor mode ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-minor-mode esb-mode
+(define-minor-mode extempore-sb-mode
   "This minor allows emacs to create a 'slave' buffer on
 another (potentially remote) emacs instance.
 
@@ -1483,68 +1485,96 @@ buffer."
   :keymap nil
   :group 'extempore
 
-  (if esb-mode
-      (call-interactively #'esb-start)
-    (esb-stop)))
+  (if extempore-sb-mode
+      (call-interactively #'extempore-sb-start)
+    (extempore-sb-stop)))
 
-(defvar esb-server nil)
-
-(defcustom esb-server-port 7096
+(defcustom extempore-sb-server-port 7096
   "Port for the the extempore slave buffer server."
   :type 'integer
   :group 'extempore)
 
-(defun esb-stop ()
-  (if esb-server
-      (progn (delete-process esb-server)
-             (setq esb-server nil)
-             (cancel-function-timers #'esb-sync-slave-buffer)
-             (esb-delete-all-connections)
+(defcustom extempore-sb-host-name nil
+  "Host name to use sending slave buffers around.
+
+If you don't want to be prompted for this name each time, set the
+`extempore-sb-host-name' variable, either through customize or in your
+.emacs"
+  :type 'string
+  :group 'extempore)
+
+(defvar extempore-sb-refresh-interval 0.5
+  "The refresh interval (in seconds) for syncing the slave buffers")
+
+(defvar extempore-sb-server nil)
+
+(defun extempore-sb-stop ()
+  (if extempore-sb-server
+      (progn (delete-process extempore-sb-server)
+             (setq extempore-sb-server nil)
+             (cancel-function-timers #'extempore-sb-sync-slave-buffer)
+             (extempore-sb-delete-all-connections)
              (message "Stopped esb server."))))
 
-(defun esb-start (port)
+(defun extempore-sb-start (port)
   (interactive
    (list (string-to-number
-          (ido-completing-read "Port: "
-                               (list (number-to-string esb-server-port))
-                               nil nil nil nil
-                               (number-to-string esb-server-port)))))
-  (esb-stop)
-  (esb-create-server port)
+          (ido-completing-read
+           "Port: "
+           (list (number-to-string extempore-sb-server-port))
+           nil nil nil nil
+           (number-to-string extempore-sb-server-port)))))
+  (extempore-sb-stop)
+  (extempore-sb-create-server port)
+  (if (null extempore-sb-host-name)
+      (setq extempore-sb-host-name
+            (let ((default-host-name
+                    (if (boundp 'user-login-name)
+                        user-login-name
+                      (if (functionp 'host-name)
+                          (host-name)
+                        "remote-host"))))
+              (ido-completing-read
+               "Your name: "
+               (list default-host-name)
+               nil nil nil nil
+               default-host-name))))
   (message "Started esb server."))
 
-(defun esb-create-server (port)
-  (setq esb-server
+(defun extempore-sb-create-server (port)
+  (setq extempore-sb-server
         (make-network-process
-         :name "esb-server"
+         :name "extempore-sb-server"
          :buffer nil
          :coding 'iso-latin-1
          :service port
          :family 'ipv4
          :server t
-         :sentinel #'esb-server-sentinel
-         :filter #'esb-server-filter))
-  (unless esb-server
+         :sentinel #'extempore-sb-server-sentinel
+         :filter #'extempore-sb-server-filter))
+  (unless extempore-sb-server
     (message "esb error: couldn't start the server.")
-    esb-server))
+    extempore-sb-server))
 
-(defun esb-cleanup-dead-connections ()
+(defun extempore-sb-cleanup-dead-connections ()
   (interactive)
   (dolist (proc (process-list))
-    (if (string= (substring (process-name proc) 0 4) "esb-")
+    (if (ignore-errors (string= (substring (process-name proc) 0 13)
+                                "extempore-sb-"))
         (unless (member (process-status proc) '(run open))
           (delete-process proc)))))
 
-(defun esb-delete-all-connections ()
+(defun extempore-sb-delete-all-connections ()
   (interactive)
   (dolist (proc (process-list))
-    (if (string= (substring (process-name proc) 0 4) "esb-")
+    (if (ignore-errors (string= (substring (process-name proc) 0 13)
+                                "extempore-sb-"))
         (delete-process proc))))
 
-(defun esb-server-sentinel (proc str)
+(defun extempore-sb-server-sentinel (proc str)
   (message "esb: %s" str proc))
 
-(defun esb-create-slave-buffer (proc buffer-name buffer-mode)
+(defun extempore-sb-create-slave-buffer (proc buffer-name buffer-mode)
   (let ((buf (get-buffer-create buffer-name)))
     (set-process-buffer proc buf)
     (with-current-buffer buf
@@ -1554,13 +1584,7 @@ buffer."
     (message "esb: created slave buffer %s" buffer-name)
     buf))
 
-(defun esb-slave-buffer-p (buf)
-  (let ((proc (get-buffer-process buf)))
-    (if (and proc (string= (substring (process-name proc) 0 4) "esb-"))
-        t
-      nil)))
-
-(defun esb-update-slave-buffer (buf buffer-text pt)
+(defun extempore-sb-update-slave-buffer (buf buffer-text pt)
   (with-current-buffer buf
     (let ((inhibit-read-only t)
           (curr-pt (point)))
@@ -1572,96 +1596,121 @@ buffer."
           (set-window-point (get-buffer-window buf)
                             (if (eq (window-buffer) buf) curr-pt pt))))))
 
-(make-variable-buffer-local 'esb-partial-data)
-(setq esb-partial-data nil)
+(make-variable-buffer-local 'extempore-sb-partial-data)
+(setq extempore-sb-partial-data nil)
 
-(defun esb-server-filter (proc str)
-  ;; the global `esb-partial-data' is for handling
+(defun extempore-sb-server-filter (proc str)
+  ;; the global `extempore-sb-partial-data' is for handling
   ;; buffer text recieved by the filter in multiple chunks
   (let ((proc-buf (process-buffer proc)))
     (if (null proc-buf)
         (let ((data (ignore-errors (read str))))
-          (if data (esb-create-slave-buffer proc (car data) (cadr data))))
+          (if data
+              (extempore-sb-create-slave-buffer proc (car data) (cadr data))))
       (with-current-buffer proc-buf
-        (setq esb-partial-data (concat esb-partial-data str))
-        (let ((data (ignore-errors (read esb-partial-data))))
-          (if data (progn (setq esb-partial-data nil)
-                          (esb-dispatch-received-data proc-buf data))))))))
+        (setq extempore-sb-partial-data (concat extempore-sb-partial-data str))
+        (let ((data (ignore-errors (read extempore-sb-partial-data))))
+          (if data
+              (progn (setq extempore-sb-partial-data nil)
+                     (extempore-sb-dispatch-received-data proc-buf data))))))))
 
 ;; (buffer-name major-mode position buffer-text)
 
-(defun esb-dispatch-received-data (buf data)
+(defun extempore-sb-dispatch-received-data (buf data)
   (cond
    ((not (and (sequencep data) (= (length data) 4)))
-    (setq esb-partial-data nil)
+    (setq extempore-sb-partial-data nil)
     (message "esb error: malformed buffer state recieved from remote host."))
    ((string= (buffer-name buf)
              (car data))
-    (esb-update-slave-buffer buf
-                             (cadddr data)
-                             (caddr data)))
+    (extempore-sb-update-slave-buffer buf
+                                      (cadddr data)
+                                      (caddr data)))
    (t (message "esb error: received state from wrong buffer."))))
 
-(defun esb-sync-slave-buffer (buf)
+(defun extempore-sb-slave-buffer-name (buffer-name host-name)
+  (concat buffer-name "@" host-name "<slave>"))
+
+(defun extempore-sb-sync-slave-buffer (buf)
   (with-current-buffer buf
     (let ((proc (get-buffer-process buf)))
       (if proc
           (process-send-string
            proc
            (prin1-to-string
-            (list (concat (buffer-name) "@" (host-name) "<slave>")
+            (list (extempore-sb-slave-buffer-name
+                   (buffer-name)
+                   extempore-sb-host-name)
                   major-mode
                   (point)
                   (buffer-substring-no-properties (point-min) (point-max)))))))))
 
-(defvar esb-refresh-interval 1.0
-  "The refresh interval (in seconds) for syncing the slave buffers")
-
-(defun esb-setup-buffer (buf host port)
-  (let ((proc (open-network-stream (concat "esb-push-to-" host ":" (number-to-string port))
-                                   buf host port)))
+(defun extempore-sb-setup-buffer (buf host port)
+  (let ((proc (open-network-stream
+               (concat "extempore-sb-push-to-" host ":" (number-to-string port))
+               buf host port)))
     (if proc
         (progn
-          (set-process-sentinel proc #'esb-server-sentinel)
+          (set-process-sentinel proc #'extempore-sb-server-sentinel)
           (with-current-buffer buf
-              (process-send-string
-               proc
-               (prin1-to-string
-                (list (concat (buffer-name) "@" (host-name) "<slave>")
-                      major-mode
-                      0
-                      "setup"))))
+            (process-send-string
+             proc
+             (prin1-to-string
+              (list (extempore-sb-slave-buffer-name
+                     (buffer-name)
+                     extempore-sb-host-name)
+                    major-mode
+                    0
+                    "setup"))))
           (message "esb: created slave buffer on %s:%s" host port))
       (message "esb: couldn't connect to %s:%s" host port))))
 
-(make-variable-buffer-local 'esb-push-timer)
+(make-variable-buffer-local 'extempore-sb-push-timer)
 
-(defun esb-start-timer (buf time-interval)
-  (setq esb-push-timer (run-with-timer 0 time-interval #'esb-sync-slave-buffer buf)))
+(defun extempore-sb-start-timer (buf time-interval)
+  (setq extempore-sb-push-timer
+        (run-with-timer 0 time-interval #'extempore-sb-sync-slave-buffer buf)))
 
-(defun esb-push-current-buffer (host port)
+(defun extempore-sb-push-current-buffer (host port)
   (interactive
    (let ((read-host (ido-completing-read
-                     "Hostname: " (list "localhost") nil nil nil nil "localhost"))
+                     "Hostname: "
+                     (list "localhost")
+                     nil nil nil nil
+                     "localhost"))
          (read-port (string-to-number
                      (ido-completing-read
                       "Port: "
-                      (list (number-to-string esb-server-port))
+                      (list (number-to-string extempore-sb-server-port))
                       nil nil nil nil
-                      (number-to-string esb-server-port)))))
+                      (number-to-string extempore-sb-server-port)))))
      (list read-host read-port)))
-  (esb-setup-buffer (current-buffer) host port)
-  (esb-start-timer (current-buffer) esb-refresh-interval))
+  (extempore-sb-setup-buffer (current-buffer) host port)
+  (extempore-sb-start-timer (current-buffer) extempore-sb-refresh-interval))
 
-(defun esb-stop-pushing-current-buffer ()
+(defun extempore-sb-stop-pushing-current-buffer ()
   (interactive)
   (if (get-buffer-process (current-buffer))
       (progn (delete-process nil)
-             (if esb-push-timer
-                 (progn (cancel-timer esb-push-timer)
-                        (setq esb-push-timer nil)))
+             (if extempore-sb-push-timer
+                 (progn (cancel-timer extempore-sb-push-timer)
+                        (setq extempore-sb-push-timer nil)))
              (message "esb: stopped syncing buffer: %s" (buffer-name)))
     (message "esb: not currently pushing this buffer" (buffer-name))))
+
+(defun extempore-sb-slave-buffer-p (buf)
+  (let ((proc (get-buffer-process buf)))
+    (if (and proc
+             (ignore-errors (string= (substring (process-name proc) 0 13)
+                                     "extempore-sb-")))
+        t
+      nil)))
+
+(defun extempore-sb-toggle-current-buffer ()
+  (interactive)
+  (if (extempore-sb-slave-buffer-p (current-buffer))
+      (extempore-sb-stop-pushing-current-buffer)
+    (call-interactively #'extempore-sb-push-current-buffer)))
 
 (provide 'extempore)
 
