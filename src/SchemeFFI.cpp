@@ -435,6 +435,7 @@ namespace extemp {
 	    { "sys:symbol-cptr",	&SchemeFFI::symbol_pointer },
 	    { "sys:make-cptr",		&SchemeFFI::makeCptr },
 	    { "sys:directory-list",     &SchemeFFI::dirlist },
+            { "sys:expand-path",           &SchemeFFI::pathExpansion },
 
 	    // DSP sys stuff
 	    { "sys:set-dsp-closure",	&SchemeFFI::setDSPClosure },
@@ -703,6 +704,27 @@ namespace extemp {
          memset(ptr,0,num_bytes);                            
          return mk_cptr(_sc, ptr);                           
     }                                                     
+
+  pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {    
+    char exp_path[1024];
+    memset(exp_path,0,1024);
+  #ifdef TARGET_OS_WIN
+    char* path = string_value(pair_car(args));
+    char* exp_path = path;
+  #else
+    char* path = string_value(pair_car(args));
+    if(path[0] == '~') {
+      char* h = getenv("HOME");      
+      strcpy(exp_path,h);
+      strcat(exp_path,&path[1]);
+    }else{
+      realpath(path,exp_path);
+    }
+    
+  #endif  
+    return mk_string(_sc,exp_path);
+  }
+
 
 #ifdef EXT_BOOST
 	pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
