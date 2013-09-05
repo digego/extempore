@@ -291,21 +291,6 @@ See `run-hooks'."
 ;; this stuff is currently a bit fragile, so I've hardcoded in the
 ;; names as they stand at 14/7/12
 
-(defvar extempore-builtin-names
-      '("or" "and" "let" "lambda" "if" "else" "dotimes" "cond"
-        "begin" "syntax-rules" "syntax" "map" "do"
-        "letrec-syntax" "letrec" "eval" "apply"
-        "quote" "quasiquote"
-        "let-syntax" "let*" "for-each" "case"
-        "call-with-output-file" "call-with-input-file"
-        "call/cc" "call-with-current-continuation")
-      "Extempore language builtin names - used for font locking (colouring).
-
-This list is curated by hand - it's usually pretty up to date,
-but shouldn't be relied on as an Extempore language reference.")
-
-;; TODO maybe parse the startup scheme files as well?
-
 (defun extempore-find-scheme-names (names)
   (if (re-search-forward "\".*\"" nil t)
       (extempore-find-scheme-names
@@ -321,13 +306,6 @@ but shouldn't be relied on as an Extempore language reference.")
 ;;          (goto-char (point-min))
 ;;          (extempore-find-scheme-names '()))
 ;;        extempore-builtin-names))
-
-(defvar extempore-scheme-names
-  '("set!" "caaaar" "cdaaar" "cadaar" "cddaar" "caadar" "cdadar" "caddar" "cdddar" "caaadr" "cdaadr" "cadadr" "cddadr" "caaddr" "cdaddr" "cadddr" "cddddr" "caaar" "cdaar" "cadar" "cddar" "caadr" "cdadr" "caddr" "cdddr" "caar" "cdar" "cadr" "cddr" "car" "cdr" "print" "println" "load" "gensym" "tracing" "make-closure" "defined?" "eval" "apply" "call-with-current-continuation" "inexact->exact" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "%" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "car" "cdr" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "sexpr->string" "string->sexpr" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "=" "<" ">" "<=" ">=" "member" "equal?" "eq?" "eqv?" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "current-input-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?" "macro-expand")
-  "scheme language builtin names - used for font locking (colouring).
-
-This list is curated by hand - it's usually pretty up to date,
-but shouldn't be relied on as an Extempore language reference.")
 
 (defun extempore-find-xtlang-names (names)
   (if (re-search-forward "(\\(member\\|equal\\?\\|eq\\?\\) \\((car ast)\\|ast\\) \'" nil t)
@@ -347,126 +325,120 @@ but shouldn't be relied on as an Extempore language reference.")
 ;;                extempore-scheme-names)
 ;;        :test 'string-equal))
 
-;; this 'xtlang builtin names' list is curated by hand - it's usually
-;; pretty up to date, but shouldn't be relied on as an Extempore
-;; language reference
-
-(defvar extempore-xtlang-names
-  '("random" "afill!" "pfill!" "tfill!" "vfill!" "array-fill!" "pointer-fill!" "tuple-fill!" "vector-fill!" "free" "array" "tuple" "list" "~" "cset!" "cref" "cast" "&" "bor" "ang-names" "<<" ">>" "nil" "printf" "sprintf" "null" "now" "pset!" "pref-ptr" "vset!" "vref" "aset!" "aref" "aref-ptr" "tset!" "tref" "tref-ptr" "salloc" "halloc" "zalloc" "alloc" "schedule" "expf" "logf" "sinf" "cosf" "tanf" "asinf" "acosf" "atanf" "sqrtf" "exptf" "floorf" "ceilingf" "truncatef" "roundf" "llvm_printf" "push_zone" "pop_zone" "memzone" "callback" "llvm_sprintf" "make-array" "array-set!" "array-ref" "array-ref-ptr" "pointer-set!" "pointer-ref" "pointer-ref-ptr" "stack-alloc" "heap-alloc" "zone-alloc" "make-tuple" "tuple-set!" "tuple-ref" "tuple-ref-ptr" "closure-set!" "closure-ref" "pref" "pdref" "impc_null" "bitcast" "void" "ifret" "ret->" "clrun->" "make-env-zone" "make-env" "<>")
-  "xtlang language builtin names - used for font locking (colouring).
-
-This list is curated by hand - it's usually pretty up to date,
-but shouldn't be relied on as an Extempore language reference.")
-
-(defconst extempore-font-lock-keywords-shared
-  (eval-when-compile
-    (list
-     ;; other type annotations (has to be first in list)
-     '(":[^ \t)]?+"
-       (0 font-lock-type-face))
-     ;; built-ins
-     (list
-      (concat
-       "("
-       (regexp-opt extempore-builtin-names t)
-       "\\>")
-      '(1 font-lock-keyword-face t))
-     ;; float and int literals
-     '("\\_<[-+]?[/.[:digit:]]+?\\_>"
-       (0 font-lock-constant-face))
-     ;; hack to make sure / gets highlighted as a function
-     '("\\_</\\_>"
-       (0 font-lock-function-name-face t))
-     ;; boolean literals
-     '("\\_<#[tf]\\_>"
-       (0 font-lock-constant-face)))))
-
 (defconst extempore-font-lock-keywords-scheme
+  ;; scheme language builtin & function names - used for font locking
+  ;; (colouring).
+  ;; This list is curated by hand - it's usually pretty up to date,
+  ;; but shouldn't be relied on as an Extempore language reference.
   (eval-when-compile
-    (list
-     ;; definitions
-     (list (concat
-	    "(\\(define\\(\\|-macro\\|-syntax\\|-instrument\\|-sampler\\)\\)\\_>\\s-*(?\\(\\sw+\\)?")
-	   '(1 font-lock-keyword-face)
-	   '(3 font-lock-function-name-face))
-     ;; scheme functions
-     (list
-      (regexp-opt extempore-scheme-names 'symbols)
-      '(1 font-lock-function-name-face))
-     ;; It wouldn't be Scheme w/o named-let.
-     '("(let\\s-+\\(\\sw+\\)"
-       (1 font-lock-function-name-face)))))
+    (let ((extempore-builtin-names '("or" "and" "let" "lambda" "if" "else" "dotimes" "cond" "begin" "syntax-rules" "syntax" "map" "do" "letrec-syntax" "letrec" "eval" "apply" "quote" "quasiquote" "let-syntax" "let*" "for-each" "case" "call-with-output-file" "call-with-input-file" "call/cc" "call-with-current-continuation"))
+          (extempore-scheme-names '("set!" "caaaar" "cdaaar" "cadaar" "cddaar" "caadar" "cdadar" "caddar" "cdddar" "caaadr" "cdaadr" "cadadr" "cddadr" "caaddr" "cdaddr" "cadddr" "cddddr" "caaar" "cdaar" "cadar" "cddar" "caadr" "cdadr" "caddr" "cdddr" "caar" "cdar" "cadr" "cddr" "car" "cdr" "print" "println" "load" "gensym" "tracing" "make-closure" "defined?" "inexact->exact" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "%" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "car" "cdr" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "sexpr->string" "string->sexpr" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "=" "<" ">" "<=" ">=" "member" "equal?" "eq?" "eqv?" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "current-input-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?" "macro-expand")))
+      (list
+       ;; other type annotations (has to be first in list)
+       '(":[^ \t)]?+"
+         (0 font-lock-type-face))
+       ;; built-ins
+       (list
+        (concat
+         "("
+         (regexp-opt extempore-builtin-names t)
+         "\\>")
+        '(1 font-lock-keyword-face t))
+       ;; float and int literals
+       '("\\_<[-+]?[/.[:digit:]]+?\\_>"
+         (0 font-lock-constant-face))
+       ;; hack to make sure / gets highlighted as a function
+       '("\\_</\\_>"
+         (0 font-lock-function-name-face t))
+       ;; boolean literals
+       '("\\_<#[tf]\\_>"
+         (0 font-lock-constant-face))
+       ;; definitions
+       (list (concat
+              "(\\(define\\(\\|-macro\\|-syntax\\|-instrument\\|-sampler\\)\\)\\_>\\s-*(?\\(\\sw+\\)?")
+             '(1 font-lock-keyword-face)
+             '(3 font-lock-function-name-face))
+       ;; scheme functions
+       (list
+        (regexp-opt extempore-scheme-names 'symbols)
+        '(1 font-lock-function-name-face))
+       ;; It wouldn't be Scheme w/o named-let.
+       '("(let\\s-+\\(\\sw+\\)"
+         (1 font-lock-function-name-face))))))
 
 (defconst extempore-font-lock-keywords-xtlang
+  ;; xtlang language builtin names - used for font locking (colouring).
+  ;; This list is curated by hand - it's usually pretty up to date,
+  ;; but shouldn't be relied on as an Extempore language reference.
   (eval-when-compile
-    (list
-     ;; definitions
-     ;; closure type annotations (i.e. specified with a colon)
-     '("(\\(bind-\\(func\\|poly\\)\\)\\s-+\\([^ \t:]+\\)\\(:[^ \t)]?+\\)?"
-       (1 font-lock-keyword-face)
-       (3 font-lock-function-name-face)
-       (4 font-lock-type-face prepend t))
-     ;; (list
-     ;;  (concat
-     ;;   "(\\(bind-\\(func\\|poly\\)\\)\\_>"
-     ;;   ;; Any whitespace and declared object.
-     ;;   "\s-*"
-     ;;   "\\(\\sw+\\)?")
-     ;;  '(1 font-lock-keyword-face)
-     ;;  '(3 font-lock-function-name-face))
-     ;; important xtlang functions
-     (list
-      (regexp-opt extempore-xtlang-names 'symbols)
-      '(1 font-lock-function-name-face))
-     ;; bind-type/alias
-     '("(\\(bind-\\(type\\|alias\\)\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
-       (1 font-lock-keyword-face)
-       (3 font-lock-function-name-face)
-       (4 font-lock-type-face t))
-     ;; bind-lib
-     '("(\\(bind-lib\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
-       (1 font-lock-keyword-face)
-       (2 font-lock-constant-face)
-       (3 font-lock-function-name-face)
-       (4 font-lock-type-face t))
-     ;; bind-lib-func
-     '("(\\(bind-lib-func\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
-       (1 font-lock-keyword-face)
-       (2 font-lock-constant-face)
-       (3 font-lock-function-name-face)
-       (4 font-lock-type-face t))
-     ;; bind-val
-     '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]?+\\)"
-       (1 font-lock-keyword-face)
-       (2 font-lock-function-name-face)
-       (3 font-lock-type-face t))
-     ;; bind-lib-val
-     '("(\\(bind-lib-val\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
-       (1 font-lock-keyword-face)
-       (2 font-lock-constant-face)
-       (3 font-lock-function-name-face)
-       (4 font-lock-type-face t))
-     ;; cast
-     '("(cast\\s-+\\S-+\\s-+\\([^ \t)]?+\\))"
-       (1 font-lock-type-face))
-     ;; type coercion stuff
-     (list
-      (concat
-       "(" (regexp-opt
-            (let ((types '("i1" "i8" "i16" "i32" "i64" "f" "d")))
-              (apply 'append (mapcar (lambda (a)
-                                       (mapcar (lambda (b)
-                                                 (concat a "to" b))
-                                               (remove a types)))
-                                     types))) t) "\\>")
-      '(1 font-lock-type-face)))))
+    (let ((extempore-xtlang-names '("random" "afill!" "pfill!" "tfill!" "vfill!" "array-fill!" "pointer-fill!" "tuple-fill!" "vector-fill!" "free" "array" "tuple" "list" "~" "cset!" "cref" "cast" "&" "bor" "ang-names" "<<" ">>" "nil" "printf" "sprintf" "null" "now" "pset!" "pref-ptr" "vset!" "vref" "aset!" "aref" "aref-ptr" "tset!" "tref" "tref-ptr" "salloc" "halloc" "zalloc" "alloc" "schedule" "expf" "logf" "sinf" "cosf" "tanf" "asinf" "acosf" "atanf" "sqrtf" "exptf" "floorf" "ceilingf" "truncatef" "roundf" "llvm_printf" "push_zone" "pop_zone" "memzone" "callback" "llvm_sprintf" "make-array" "array-set!" "array-ref" "array-ref-ptr" "pointer-set!" "pointer-ref" "pointer-ref-ptr" "stack-alloc" "heap-alloc" "zone-alloc" "make-tuple" "tuple-set!" "tuple-ref" "tuple-ref-ptr" "closure-set!" "closure-ref" "pref" "pdref" "impc_null" "bitcast" "void" "ifret" "ret->" "clrun->" "make-env-zone" "make-env" "<>")))
+      (list
+       ;; definitions
+       ;; closure type annotations (i.e. specified with a colon)
+       '("(\\(bind-\\(func\\|poly\\)\\)\\s-+\\([^ \t:]+\\)\\(:[^ \t)]?+\\)?"
+         (1 font-lock-keyword-face)
+         (3 font-lock-function-name-face)
+         (4 font-lock-type-face prepend t))
+       ;; (list
+       ;;  (concat
+       ;;   "(\\(bind-\\(func\\|poly\\)\\)\\_>"
+       ;;   ;; Any whitespace and declared object.
+       ;;   "\s-*"
+       ;;   "\\(\\sw+\\)?")
+       ;;  '(1 font-lock-keyword-face)
+       ;;  '(3 font-lock-function-name-face))
+       ;; important xtlang functions
+       (list
+        (regexp-opt extempore-xtlang-names 'symbols)
+        '(1 font-lock-function-name-face))
+       ;; bind-type/alias
+       '("(\\(bind-\\(type\\|alias\\)\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+         (1 font-lock-keyword-face)
+         (3 font-lock-function-name-face)
+         (4 font-lock-type-face t))
+       ;; bind-lib
+       '("(\\(bind-lib\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+         (1 font-lock-keyword-face)
+         (2 font-lock-constant-face)
+         (3 font-lock-function-name-face)
+         (4 font-lock-type-face t))
+       ;; bind-lib-func
+       '("(\\(bind-lib-func\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+         (1 font-lock-keyword-face)
+         (2 font-lock-constant-face)
+         (3 font-lock-function-name-face)
+         (4 font-lock-type-face t))
+       ;; bind-val
+       '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]?+\\)"
+         (1 font-lock-keyword-face)
+         (2 font-lock-function-name-face)
+         (3 font-lock-type-face t))
+       ;; bind-lib-val
+       '("(\\(bind-lib-val\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+         (1 font-lock-keyword-face)
+         (2 font-lock-constant-face)
+         (3 font-lock-function-name-face)
+         (4 font-lock-type-face t))
+       ;; cast
+       '("(cast\\s-+\\S-+\\s-+\\([^ \t)]?+\\))"
+         (1 font-lock-type-face))
+       ;; type coercion stuff
+       (list
+        (concat
+         "(" (regexp-opt
+              (let ((types '("i1" "i8" "i16" "i32" "i64" "f" "d")))
+                (apply 'append (mapcar (lambda (a)
+                                         (mapcar (lambda (b)
+                                                   (concat a "to" b))
+                                                 (remove a types)))
+                                       types))) t) "\\>")
+        '(1 font-lock-type-face))))))
 
 (font-lock-add-keywords 'extempore-mode
                         '(("(\\|)" . 'extempore-paren-face)))
 
 (defvar extempore-font-lock-keywords
-  (append extempore-font-lock-keywords-shared
-          extempore-font-lock-keywords-scheme
+  (append extempore-font-lock-keywords-scheme
           extempore-font-lock-keywords-xtlang)
   "Expressions to highlight in extempore-mode.")
 
@@ -1375,7 +1347,7 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-logger-advise-functions (func-list)
   "Advise (via defadvice) the key extempore-mode functions"
-  (mapc (lambda (function) 
+  (mapc (lambda (function)
           (ad-add-advice
            function
 	   '(extempore-logger-advice nil t (advice . (lambda () (extempore-logger-log-command real-this-command current-prefix-arg (ad-get-args 0)))))
@@ -1385,7 +1357,7 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-logger-unadvise-functions (func-list)
   "Remove advice from special extempore-mode functions"
-  (mapc (lambda (function) 
+  (mapc (lambda (function)
           (ad-remove-advice function 'after 'extempore-logger-advice))
         func-list))
 
@@ -1456,7 +1428,7 @@ You shouldn't have to modify this list directly, use
                              extempore-logger-logfile)
              (setq extempore-logger-cache nil))))
 
-(defun extempore-logger-finish-logfile ()  
+(defun extempore-logger-finish-logfile ()
   (extempore-logger-flush)
   (async-shell-command (format "bzip2 %s" extempore-logger-logfile)))
 
@@ -1484,7 +1456,7 @@ another (potentially remote) emacs instance.
 This read-only slave buffer will stay in sync with the master,
 showing the text and current window position of the 'master'
 buffer."
-  
+
   :global t
   :init-value nil
   :lighter " esb"
@@ -1729,4 +1701,3 @@ If you don't want to be prompted for this name each time, set the
 (provide 'extempore)
 
 ;;; extempore.el ends here
-
