@@ -853,21 +853,26 @@ determined by whether there is an *extempore* buffer."
 
 (defun extempore-mark-current-defn ()
   (mark-defun)
-  (if (and (looking-at "^$") (not (eobp)))
-      (forward-char 1)))
+  (if (and (bolp) (eolp))
+      (forward-char 1))
+  (set-mark (- (mark) 1)))
 
 (defun extempore-eval-defn-at-point ()
   "Send the enclosing top-level defn to Extempore server for evaluation."
   (interactive)
   (save-excursion
     (extempore-mark-current-defn)
-    ;; to blink evals in slave buffers
-    (if extempore-sb-server (setq extempore-sb-eval-markers (cons (point) (mark))))
-    (extempore-blink-region (point) (mark))
-    (redisplay)
-    (extempore-send-evalstring
-     (extempore-make-crlf-evalstr
-      (chomp (buffer-substring-no-properties (point) (mark)))))))
+    (let* ((eval-point (point))
+           (eval-mark (mark))
+           (evalstring (extempore-make-crlf-evalstr
+                        (chomp (buffer-substring-no-properties eval-point eval-mark)))))
+      ;; to remove the highlighting
+      (set-mark eval-point)
+      ;; to blink evals in slave buffers
+      (if extempore-sb-server (setq extempore-sb-eval-markers (cons eval-point eval-mark)))
+      (extempore-blink-region eval-point eval-mark)
+      (redisplay)
+      (extempore-send-evalstring evalstring))))
 
 (defun extempore-eval-current-region ()
   "Send the current region to Extempore for evaluation"
