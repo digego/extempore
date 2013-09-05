@@ -852,16 +852,22 @@ determined by whether there is an *extempore* buffer."
 
 (defvar extempore-blink-delay 0.2)
 
-(defvar  extempore-current-region-overlay
-  (let ((overlay (make-overlay (point) (point))))
-    (overlay-put overlay 'face  'extempore-blink-eval-face)
-    overlay)
-  "The overlay for highlighting currently evaluated region or line.")
+(defun extempore-make-eval-overlay ()
+  (let ((overlay (make-overlay 0 0)))
+    (overlay-put overlay 'face 'extempore-blink-eval-face)
+    overlay))
 
-(defun extempore-blink-region (start end)
-  (move-overlay extempore-current-region-overlay start end)
+;; overlay for highlighting currently evaluated region or line
+(setq extempore-eval-overlay (extempore-make-eval-overlay))
+
+;; for blinking evals in slave buffers (see `extempore-sb-mode')
+(make-variable-buffer-local 'extempore-sb-eval-markers)
+(setq extempore-sb-eval-markers nil)
+
+(defun extempore-blink-region (start end &optional buf)
+  (move-overlay extempore-eval-overlay start end buf)
   (run-with-timer extempore-blink-delay nil
-                  (lambda () (delete-overlay extempore-current-region-overlay))))
+                  (lambda () (delete-overlay extempore-eval-overlay))))
 
 ;; sending definitions (code) from the Emacs buffer
 
@@ -883,6 +889,8 @@ determined by whether there is an *extempore* buffer."
   (interactive)
   (save-excursion
     (extempore-mark-current-defn)
+    ;; to blink evals in slave buffers
+    (if extempore-sb-server (setq extempore-sb-eval-markers (cons (point) (mark))))
     (extempore-blink-region (point) (mark))
     (redisplay)
     (extempore-send-evalstring
@@ -1501,7 +1509,7 @@ If you don't want to be prompted for this name each time, set the
   :type 'string
   :group 'extempore)
 
-(defvar extempore-sb-refresh-interval 0.5
+(defvar extempore-sb-refresh-interval 0.2
   "The refresh interval (in seconds) for syncing the slave buffers")
 
 (defvar extempore-sb-server nil)
@@ -1582,7 +1590,7 @@ If you don't want to be prompted for this name each time, set the
     (message "esb: created slave buffer %s" buffer-name)
     buf))
 
-(defun extempore-sb-update-slave-buffer (buf buffer-text pt)
+(defun extempore-sb-update-slave-buffer (buf buffer-text pt eval-region)
   (with-current-buffer buf
     (let ((inhibit-read-only t)
           (curr-pt (point)))
@@ -1591,8 +1599,12 @@ If you don't want to be prompted for this name each time, set the
       ;; if slave buffer is visible, and is not the current buffer,
       ;; have if follow the master (remote) cursor position
       (if (get-buffer-window buf)
-          (set-window-point (get-buffer-window buf)
-                            (if (eq (window-buffer) buf) curr-pt pt))))))
+          (progn (set-window-point (get-buffer-window buf)
+                                   (if (eq (window-buffer) buf) curr-pt pt))
+                 (if eval-region
+                     (extempore-blink-region (car eval-region)
+                                       (cdr eval-region)
+                                       buf)))))))
 
 (make-variable-buffer-local 'extempore-sb-partial-data)
 (setq extempore-sb-partial-data nil)
@@ -1612,18 +1624,19 @@ If you don't want to be prompted for this name each time, set the
               (progn (setq extempore-sb-partial-data nil)
                      (extempore-sb-dispatch-received-data proc-buf data))))))))
 
-;; (buffer-name major-mode position buffer-text)
+;; (buffer-name major-mode position buffer-text eval-markers)
 
 (defun extempore-sb-dispatch-received-data (buf data)
   (cond
-   ((not (and (sequencep data) (= (length data) 4)))
+   ((not (and (sequencep data) (= (length data) 5)))
     (setq extempore-sb-partial-data nil)
     (message "esb error: malformed buffer state recieved from remote host."))
    ((string= (buffer-name buf)
              (car data))
     (extempore-sb-update-slave-buffer buf
-                                      (cadddr data)
-                                      (caddr data)))
+                                      (nth 3 data)
+                                      (nth 2 data)
+                                      (nth 4 data)))
    (t (message "esb error: received state from wrong buffer."))))
 
 (defun extempore-sb-slave-buffer-name (buffer-name host-name)
@@ -1633,15 +1646,18 @@ If you don't want to be prompted for this name each time, set the
   (with-current-buffer buf
     (let ((proc (get-buffer-process buf)))
       (if proc
-          (process-send-string
-           proc
-           (prin1-to-string
-            (list (extempore-sb-slave-buffer-name
-                   (buffer-name)
-                   extempore-sb-host-name)
-                  major-mode
-                  (point)
-                  (buffer-substring-no-properties (point-min) (point-max)))))))))
+          (progn
+            (process-send-string
+             proc
+             (prin1-to-string
+              (list (extempore-sb-slave-buffer-name
+                     (buffer-name)
+                     extempore-sb-host-name)
+                    major-mode
+                    (point)
+                    (buffer-substring-no-properties (point-min) (point-max))
+                    extempore-sb-eval-markers)))
+            (setq extempore-sb-eval-markers nil))))))
 
 (defun extempore-sb-setup-buffer (buf host port)
   (let ((proc (open-network-stream
