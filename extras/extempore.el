@@ -866,8 +866,7 @@ determined by whether there is an *extempore* buffer."
 (defun extempore-mark-current-defn ()
   (mark-defun)
   (if (and (bolp) (eolp))
-      (forward-char 1))
-  (set-mark (- (mark) 1)))
+      (forward-char 1)))
 
 (defun extempore-eval-defn-at-point ()
   "Send the enclosing top-level defn to Extempore server for evaluation."
