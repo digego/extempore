@@ -1594,25 +1594,29 @@ If you don't want to be prompted for this name each time, set the
                                                   (cdr eval-region)
                                                   buf)))))))
 
+;; `extempore-sb-partial-data' is for handling buffer text recieved by
+;; the filter in multiple chunks
 (make-variable-buffer-local 'extempore-sb-partial-data)
 (setq extempore-sb-partial-data nil)
 
 (defun extempore-sb-server-filter (proc str)
-  ;; the global `extempore-sb-partial-data' is for handling
-  ;; buffer text recieved by the filter in multiple chunks
   (let ((proc-buf (process-buffer proc)))
     (if (null proc-buf)
         (let ((data (ignore-errors (read str))))
-          (if data
-              (extempore-sb-create-slave-buffer proc (car data) (cadr data))))
+	  (if (and data (string= (car data) "esb-data"))
+	      (extempore-sb-create-slave-buffer proc (cadr data) (caddr data))))
       (with-current-buffer proc-buf
         (setq extempore-sb-partial-data (concat extempore-sb-partial-data str))
-        (let ((data (ignore-errors (read extempore-sb-partial-data))))
-          (if data
-              (progn (setq extempore-sb-partial-data nil)
-                     (extempore-sb-dispatch-received-data proc-buf data))))))))
+	(if (not (ignore-errors (string= (substring extempore-sb-partial-data 0 11)
+					 "(\"esb-data\"")))
+	    (setq extempore-sb-partial-data nil)
+	  (let ((data (ignore-errors (read extempore-sb-partial-data))))
+	    (if data
+		(progn (setq extempore-sb-partial-data nil)
+		       (extempore-sb-dispatch-received-data proc-buf (cdr data))))))))))
 
-;; (buffer-name major-mode position buffer-text eval-markers)
+;; data list (only the cdr of this list passed to the dispatch function)
+;; ("esb-data" buffer-name major-mode position buffer-text eval-markers)
 
 (defun extempore-sb-dispatch-received-data (buf data)
   (cond
@@ -1638,7 +1642,8 @@ If you don't want to be prompted for this name each time, set the
             (process-send-string
              proc
              (prin1-to-string
-              (list (extempore-sb-slave-buffer-name
+	      (list "esb-data"
+		    (extempore-sb-slave-buffer-name
                      (buffer-name)
                      extempore-sb-host-name)
                     major-mode
@@ -1658,7 +1663,8 @@ If you don't want to be prompted for this name each time, set the
             (process-send-string
              proc
              (prin1-to-string
-              (list (extempore-sb-slave-buffer-name
+	      (list "esb-data"
+		    (extempore-sb-slave-buffer-name
                      (buffer-name)
                      extempore-sb-host-name)
                     major-mode
