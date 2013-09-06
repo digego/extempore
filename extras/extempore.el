@@ -1482,7 +1482,7 @@ buffer."
       (call-interactively #'extempore-sb-start)
     (extempore-sb-stop)))
 
-(defcustom extempore-sb-server-port 7096
+(defcustom extempore-sb-server-port 8420
   "Port for the the extempore slave buffer server."
   :type 'integer
   :group 'extempore)
