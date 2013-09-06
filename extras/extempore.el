@@ -242,6 +242,11 @@ See `run-hooks'."
   "Face used for 'blinking' code when it is evaluated."
   :group 'extempore)
 
+(defface extempore-sb-blink-eval-face
+  '((t (:foreground "#00FFFF" :weight bold :inherit nil)))
+  "Face used for 'blinking' code in slave buffers."
+  :group 'extempore)
+
 ;; from emacs-starter-kit
 
 (defface extempore-paren-face
@@ -822,24 +827,30 @@ determined by whether there is an *extempore* buffer."
 
 ;; 'blinking' defuns as they are evaluated
 
-(defvar extempore-blink-delay 0.2)
+(defvar extempore-blink-eval-duration 0.3)
 
-(defun extempore-make-eval-overlay ()
+(defun extempore-make-blink-eval-overlay (face-sym)
   (let ((overlay (make-overlay 0 0)))
-    (overlay-put overlay 'face 'extempore-blink-eval-face)
+    (overlay-put overlay 'face face-sym)
     overlay))
 
 ;; overlay for highlighting currently evaluated region or line
-(setq extempore-eval-overlay (extempore-make-eval-overlay))
+(setq extempore-blink-eval-overlay
+      (extempore-make-blink-eval-overlay 'extempore-blink-eval-face))
+;; slave buffer version
+(setq extempore-sb-blink-eval-overlay
+      (extempore-make-blink-eval-overlay 'extempore-sb-blink-eval-face))
 
 ;; for blinking evals in slave buffers (see `extempore-sb-mode')
 (make-variable-buffer-local 'extempore-sb-eval-markers)
 (setq extempore-sb-eval-markers nil)
 
-(defun extempore-blink-region (start end &optional buf)
-  (move-overlay extempore-eval-overlay start end buf)
-  (run-with-timer extempore-blink-delay nil
-                  (lambda () (delete-overlay extempore-eval-overlay))))
+(defun extempore-blink-eval-region (overlay start end &optional buf)
+  (move-overlay overlay start end buf)
+  (run-with-timer extempore-blink-eval-duration
+                  nil
+                  (lambda (overlay) (delete-overlay overlay))
+                  overlay))
 
 ;; sending definitions (code) from the Emacs buffer
 
@@ -848,7 +859,7 @@ determined by whether there is an *extempore* buffer."
       (progn
         (dolist (proc extempore-connection-list)
          (process-send-string proc evalstring))
-        (sleep-for extempore-blink-delay))
+        (sleep-for extempore-blink-eval-duration))
     (message (concat "Buffer " (buffer-name) " is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)"))))
 
 (defun extempore-mark-current-defn ()
@@ -870,7 +881,7 @@ determined by whether there is an *extempore* buffer."
       (set-mark eval-point)
       ;; to blink evals in slave buffers
       (if extempore-sb-server (setq extempore-sb-eval-markers (cons eval-point eval-mark)))
-      (extempore-blink-region eval-point eval-mark)
+      (extempore-blink-eval-region extempore-blink-eval-overlay eval-point eval-mark)
       (redisplay)
       (extempore-send-evalstring evalstring))))
 
@@ -1579,9 +1590,10 @@ If you don't want to be prompted for this name each time, set the
           (progn (set-window-point (get-buffer-window buf)
                                    (if (eq (window-buffer) buf) curr-pt pt))
                  (if eval-region
-                     (extempore-blink-region (car eval-region)
-                                       (cdr eval-region)
-                                       buf)))))))
+                     (extempore-blink-eval-region extempore-sb-blink-eval-overlay
+                                                  (car eval-region)
+                                                  (cdr eval-region)
+                                                  buf)))))))
 
 (make-variable-buffer-local 'extempore-sb-partial-data)
 (setq extempore-sb-partial-data nil)
