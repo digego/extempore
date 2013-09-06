@@ -827,7 +827,7 @@ determined by whether there is an *extempore* buffer."
 
 ;; 'blinking' defuns as they are evaluated
 
-(defvar extempore-blink-eval-duration 0.3)
+(defvar extempore-blink-eval-duration 0.2)
 
 (defun extempore-make-blink-eval-overlay (face-sym)
   (let ((overlay (make-overlay 0 0)))
