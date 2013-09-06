@@ -847,6 +847,7 @@ determined by whether there is an *extempore* buffer."
 
 (defun extempore-blink-eval-region (overlay start end &optional buf)
   (move-overlay overlay start end buf)
+  (redisplay)
   (run-with-timer extempore-blink-eval-duration
                   nil
                   (lambda (overlay) (delete-overlay overlay))
@@ -882,7 +883,6 @@ determined by whether there is an *extempore* buffer."
       ;; to blink evals in slave buffers
       (if extempore-sb-server (setq extempore-sb-eval-markers (cons eval-point eval-mark)))
       (extempore-blink-eval-region extempore-blink-eval-overlay eval-point eval-mark)
-      (redisplay)
       (extempore-send-evalstring evalstring))))
 
 (defun extempore-eval-current-region ()
