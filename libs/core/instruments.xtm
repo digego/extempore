@@ -588,3 +588,49 @@
 (subbass.sustain 0.8)
 (subbass.release 500.0)
 
+
+
+
+(bind-func sawlead_note_c
+  (lambda (nargs:i64 dargs:double*)
+    (let ((sawl1 (saw_c 0.0))
+          (sawr1 (saw_c 0.2))
+          (sawl2 (saw_c 0.0))
+          (sawr2 (saw_c 0.1))
+          (smudge1 (+ 1.0 (* 0.005 (dsp_randn))))
+          (smudge2 (+ 1.0 (* 0.005 (dsp_randn)))))
+      (lambda (time:double chan:double freq:double amp:double)
+        (cond ((< chan 0.5)
+               (+ (sawl1 amp (* freq smudge1))
+                  (sawl2 amp (* freq smudge2))))
+              ((< chan 1.5)
+               (+ (sawr1 amp (* freq smudge1))
+                  (sawr2 amp (* freq smudge2))))
+              (else 0.0))))))
+
+(bind-func sawlead_fx 10000000
+  (let ((lfo1l (osc_c 0.0))
+        (lfo1r (osc_c 0.3))
+        (r1 (reverb_c 200.0))
+        (r2 (reverb_c 120.0))
+        (rev .15)
+        (combl (comb_c 30.0))
+        (combr (comb_c 30.0)))
+    (lambda (in:double time:double chan:double dat:double*)
+      (cond ((< chan 0.5)
+             (r1 (combl in
+                        (+ 4.0 (lfo1l 1.6 2.0))
+                        0.8 0.8)
+                 rev 0.5))
+            ((< chan 1.5)
+             (r2 (combr in
+                        (+ 3.0 (lfo1r 1.9 1.0))
+                        0.8 0.8)
+                 rev 0.5))             
+            (else 0.0)))))
+
+(define-instrument sawlead sawlead_note_c sawlead_fx)
+(sawlead.attack 40.0)
+(sawlead.decay 120.0)
+(sawlead.release 400.0)
+(sawlead.sustain 0.75)

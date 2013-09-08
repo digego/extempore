@@ -430,6 +430,9 @@
 (bind-lib-func stdlib subbass_note_c [[double,double,double,double,double]*,i64,double*]*)
 (bind-lib-func stdlib subbass_fx [double,double,double,double,double*]* 100000)
 (bind-lib-func stdlib subbass [double,double,double,double,double*]*)
+(bind-lib-func stdlib sawlead_note_c [[double,double,double,double,double]*,i64,double*]*)
+(bind-lib-func stdlib sawlead_fx [double,double,double,double,double*]* 100000)
+(bind-lib-func stdlib sawlead [double,double,double,double,double*]*)
 (bind-lib-func stdlib sf_frames [i64,sf_info*]*)
 (bind-lib-func stdlib sf_samplerate [i64,sf_info*]*)
 (bind-lib-func stdlib sf_channels [i64,sf_info*]*)
@@ -752,27 +755,39 @@
 ;;;;;;;
 ;; setup some instrument parameters
 
+(sampler_fx.wet .025)
+(sampler1_fx.wet .025)
+(sampler2_fx.wet .025)
+(sampler3_fx.wet .025)
+
 (subbass.attack 500.0)
 (subbass.decay 500.0)
 (subbass.sustain 0.8)
 (subbass.release 500.0)
 
+(sawlead.attack 40.0)
+(sawlead.decay 120.0)
+(sawlead.release 400.0)
+(sawlead.sustain 0.75)
+
 (bind-func dsp:DSP
   (lambda (in time chan dat)
     (+ (fmsynth in time chan dat)
-       (synth in time chan dat)
+       (subbass in time chan dat)
+       (sawlead in time chan dat)
        (sampler in time chan dat))))
 
 (define xtm_audio_setup
   (lambda ()
     (ipc:audio-setup "utility")
     (ipc:bind-func "utility" 'fmsynth)
-    (ipc:bind-func "utility" 'synth)
+    (ipc:bind-func "utility" 'sawlead)
+    (ipc:bind-func "utility" 'subbass)    
     (ipc:bind-func "utility" 'sampler)
     (dsp:set! dsp)
     (ascii-print-color 0 6 10)
     (print "Default Audio Initalized\n")
-    (print "instruments: fmsynth, synth and sampler\n")
+    (print "instruments: fmsynth, subbass, sawlead and sampler\n")
     (print "defined  in: 'primary' & 'utility'\n")
     (ascii-print-color 0 7 10)
     (println)))
