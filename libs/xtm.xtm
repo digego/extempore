@@ -431,7 +431,7 @@
 (bind-lib-func stdlib subbass_fx [double,double,double,double,double*]* 100000)
 (bind-lib-func stdlib subbass [double,double,double,double,double*]*)
 (bind-lib-func stdlib sawlead_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib sawlead_fx [double,double,double,double,double*]* 100000)
+(bind-lib-func stdlib sawlead_fx [double,double,double,double,double*]* 1000000)
 (bind-lib-func stdlib sawlead [double,double,double,double,double*]*)
 (bind-lib-func stdlib sf_frames [i64,sf_info*]*)
 (bind-lib-func stdlib sf_samplerate [i64,sf_info*]*)
@@ -727,6 +727,89 @@
                                            nargs
                                            dargs)
                                (print-error 'No 'inst 'named (symbol->string inst))))))
+                     ;; load sampler                     
+                     (define-macro (load-sampler sampler path . args)
+                       (let ((bank (if (> (length args) 0) (car args) 0))
+                             (parser (if (> (length args) 1) (cadr args) 'parse-sample-names-1))
+                             (midioffset (if (> (length args) 2) (caddr args) 0)))
+                         `(let ((cnt 0)
+                                (file-list (sys:directory-list ,(sys:expand-path path))))
+                            (for-each (lambda (samp-data)
+                                        (if samp-data
+                                            (begin
+                                              (set! cnt (+ cnt 1))                         
+                                              (set-sampler-index ,sampler
+                                                                 (if (string=? (sys:platform) \"Windows\")
+                                                                     (car samp-data)
+                                                                     (string-append ,(sys:expand-path path) \"/\" (car samp-data)))
+                                                                 (+ ,midioffset (cadr samp-data))
+                                                                 (caddr samp-data)
+                                                                 (cadddr samp-data)
+                                                                 ,bank
+                                                                 0))))
+                                      (,parser file-list))
+                            (ascii-print-color 0 6 10)              
+                            (print 'Loaded cnt 'files 'into 'bank#: ,bank)
+                            (ascii-print-color 0 7 10)       
+                            (println)
+                            )))
+                     ;; clear sampler
+                     (define-macro (clear-sampler sampler . args)
+                       (let ((bank (if (> (length args) 0) (car args) 0)))
+                         `(let ((native (llvm:get-native-closure ,(symbol->string sampler)))
+                                (cnt 0))
+                            (dotimes (i 128)
+                              (if (> (clear_sample_data_ native (real->integer i) (real->integer ,bank)) 0)
+                                  (set! cnt (+ cnt 1))))
+                            (ascii-print-color 0 6 10)              
+                            (print 'Cleared cnt 'slots 'from 'bank#: ,bank)
+                            (ascii-print-color 0 7 10)
+                            (println)
+                            #t)))
+                     ;; set sampler index
+                     (define-macro (set-sampler-index inst fname index offset lgth bank print?)
+                       `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+                          (if (and (cptr? native)
+                                   (> ,index 0)
+                                   (< ,index 128))
+                              (set_sample_data_ native
+                                                ,fname
+                                                (real->integer ,index)
+                                                (real->integer ,offset)
+                                                (real->integer ,lgth)
+                                                (real->integer ,bank)
+                                                ,(if (> print? 0) 1 0)))))
+                     ;; this will match e.g. 60.aiff (where 60 is the midi note number)
+                     (define parse-sample-names-1
+                       (lambda (file-list)
+                         (map (lambda (fname)
+                                (let ((result (regex:matched fname \"([0-9]*)\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$\")))
+                                  (if (null? result)
+                                      (begin (if (not (regex:match? fname \"^\\.\"))
+                                                 (println 'Error: 'cannot 'parse 'filename: fname))
+                                             #f)
+                                      (list fname                          ; filename    
+                                            (string->number (cadr result)) ; midi note number
+                                            0                              ; offset
+                                            0))))                          ; length (0 for whole sample)
+                              file-list)))
+                     ;; this will match e.g. Eb3.aiff (representing E flat 3)
+                     (define parse-sample-names-2
+                       (lambda (file-list)
+                         (map (lambda (fname)
+                                (let ((result (regex:matched fname \"^.*([abcdefgABCDEFG][#b]?[0-9]).*\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$\")))
+                                  (if (null? result)
+                                      (begin
+                                        (if (not (regex:match? fname \"^\\.\"))
+                                            (begin
+                                              (println 'Error: 'cannot 'parse 'filename: fname)
+                                              (println 'Regex-result: result)))
+                                        #f)
+                                      (list fname                                    ; filename                   
+                                            (note-name-to-midi-number (cadr result)) ; midi note number           
+                                            0                                        ; offset                     
+                                            0))))                                    ; length (0 for whole sample)
+                              file-list)))
                      ;; note name to midi num
                      (define note-name-to-midi-number
                        (lambda (name)
@@ -748,6 +831,8 @@
                                 `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
                                             (*metro* 'dur ,(car (cdr (cddddr args))))
                                             ,@(cddr (cddddr args)))))")
+    (ipc:bind-func proc 'set_sample_data_)
+    (ipc:bind-func proc 'clear_sample_data_)
     (ipc:bind-func proc '_play_note)
     (ipc:bind-func proc 'midi2frq)))
 
@@ -777,6 +862,7 @@
        (sawlead in time chan dat)
        (sampler in time chan dat))))
 
+
 (define xtm_audio_setup
   (lambda ()
     (ipc:audio-setup "utility")
@@ -784,6 +870,10 @@
     (ipc:bind-func "utility" 'sawlead)
     (ipc:bind-func "utility" 'subbass)    
     (ipc:bind-func "utility" 'sampler)
+    (ipc:bind-func "utility" 'fmsynth_fx)
+    (ipc:bind-func "utility" 'sawlead_fx)
+    (ipc:bind-func "utility" 'subbass_fx)    
+    (ipc:bind-func "utility" 'sampler_fx)
     (dsp:set! dsp)
     (ascii-print-color 0 6 10)
     (print "Default Audio Initalized\n")
