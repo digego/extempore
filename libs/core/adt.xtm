@@ -120,7 +120,7 @@
   (lambda (lst idx)
     (xhead (xnth_tail lst idx))))
 
-;; insert val into list at idx 
+;; insert val into list at idx
 
 (bind-func xinsert:[xlist_t*,xlist_t*,i64,!a]*
   (lambda (lst idx value)
@@ -130,6 +130,14 @@
               (new_cell (xjoin value (xtail pre_cell))))
           (tset! pre_cell 1 new_cell)
           lst))))
+
+(bind-func xdelete:[!a,xlist_t*,i64]*
+  (lambda (lst idx)
+    (let ((pre_cell (xnth_tail lst (- idx 1)))
+          (cell (xtail pre_cell))
+          (post_cell (xtail cell)))
+      (tset! pre_cell 1 post_cell)
+      (xhead cell))))
 
 ;; ;; a macro for printing lists
 ;; (bind-func print_xlist:[i32,xlist_t*,i8*]*
