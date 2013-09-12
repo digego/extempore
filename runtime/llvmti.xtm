@@ -2339,26 +2339,28 @@
 		(if (<> (length (list request?)) (length (list (cadr gpoly-type))))
 		    (set! request? #f))))
 
-	
 	(if request?
 	    (if (and (list? request?)
 		     (atom? (cadr gpoly-type))
 		     (symbol? (cadr gpoly-type)))
 		(impc:ti:update-var (cadr gpoly-type) vars kts request?)
-		(for-each
-		 (lambda (aa bb)
-		   ;;(println '_a_: aa 'bb: bb)
-		   (if (and (atom? aa)
-			    (symbol? aa)
-			    (assoc-strcmp aa vars))
-		       (impc:ti:update-var aa vars kts bb)))
-		 (if (atom? request?)
-		     (list (cadr gpoly-type))
-		     (cadr gpoly-type))
-		 (if (atom? request?)
-		     (list request?)
-		     request?))))
-
+                (if (and (list? request?)
+                         (number? (cadr gpoly-type))
+                         (member (cadr gpoly-type) request?))
+                    (set! request? (cadr gpoly-type))
+                    (for-each
+                     (lambda (aa bb)
+                       ;;(println '_a_: aa 'bb: bb)
+                       (if (and (atom? aa)
+                                (symbol? aa)
+                                (assoc-strcmp aa vars))
+                           (impc:ti:update-var aa vars kts bb)))
+                     (if (atom? request?)
+                         (list (cadr gpoly-type))
+                         (cadr gpoly-type))
+                     (if (atom? request?)
+                         (list request?)
+                         request?)))))
 	;; (set! gpoly-type gpoly-type-x)	  
 
 	;; if request? is not a fully formed type
