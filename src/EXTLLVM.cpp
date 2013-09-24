@@ -665,6 +665,111 @@ long long llvm_get_next_prime(long long start)
     return -1;
 }
 
+/////////////////////////////////////////////
+//
+// some native threading support xtlang
+//
+/////////////////////////////////////////////
+
+void* thread_fork(void*(*start_routine)(void*),void* args) {
+#ifdef TARGET_OS_WINDOWS
+  return NULL;
+#else
+  pthread_t* t = (pthread_t*) malloc(sizeof(pthread_t));
+  int res = pthread_create(t,NULL,start_routine,args);
+  if(res == 0) return t;
+  else return NULL;
+#endif
+}
+
+int thread_join(void* thread) {
+#ifdef TARGET_OS_WINDOWS
+  return NULL;
+#else
+  pthread_t* t = (pthread_t*) thread;
+  return pthread_join(*t,NULL);
+#endif
+}
+
+int thread_kill(void* thread) {
+#ifdef TARGET_OS_WINDOWS
+  return NULL;
+#else
+  pthread_t* t = (pthread_t*) thread;
+  return pthread_cancel(*t);
+#endif
+}
+
+void* thread_self() {
+#ifdef TARGET_OS_WINDOWS
+  return NULL;
+#else
+  pthread_t t = pthread_self();
+  return &t;
+#endif  
+}
+
+// return value is number of nanosecs sleep missed by
+int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
+#ifdef TARGET_OS_WINDOWS
+  return NULL;
+#else
+  struct timespec a, b;
+  a.tv_sec = secs;
+  a.tv_nsec = nanosecs;
+  nanosleep(&a,&b);
+  return b.tv_nsec;
+#endif  
+}
+
+void* mutex_create() {
+#ifdef TARGET_OS_WINDOWS
+  return NULL;
+#else
+  pthread_mutex_t* mutex = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
+  int res = pthread_mutex_init(mutex,NULL);
+  if(res == 0) return mutex;
+  else return NULL;
+#endif
+}
+
+int mutex_destroy(void* mutex) {
+#ifdef TARGET_OS_WINDOWS
+  return NULL;
+#else
+  pthread_mutex_t* m = (pthread_mutex_t*) mutex;
+  return pthread_mutex_destroy(m);
+#endif
+}
+
+int mutex_lock(void* mutex) {
+#ifdef TARGET_OS_WINDOWS
+  return -1;
+#else
+  pthread_mutex_t* m = (pthread_mutex_t*) mutex;
+  return pthread_mutex_lock(m);
+#endif
+}
+
+int mutex_unlock(void* mutex) {
+#ifdef TARGET_OS_WINDOWS
+  return -1;
+#else
+  pthread_mutex_t* m = (pthread_mutex_t*) mutex;
+  return pthread_mutex_unlock(m);
+#endif
+}
+
+int mutex_trylock(void* mutex) {
+#ifdef TARGET_OS_WINDOWS
+  return -1;
+#else
+  pthread_mutex_t* m = (pthread_mutex_t*) mutex;
+  return pthread_mutex_trylock(m);
+#endif
+}
+
+
 
 /////////////////////////////////////////////////
 // This added for dodgy continuations support
@@ -1417,6 +1522,28 @@ namespace extemp {
 
 	    gv = M->getNamedValue(std::string("list_ref"));
 	    EE->updateGlobalMapping(gv,(void*)&list_ref);
+
+	    gv = M->getNamedValue(std::string("thread_fork"));
+	    EE->updateGlobalMapping(gv,(void*)&thread_fork);
+	    gv = M->getNamedValue(std::string("thread_join"));
+	    EE->updateGlobalMapping(gv,(void*)&thread_join);
+	    gv = M->getNamedValue(std::string("thread_kill"));
+	    EE->updateGlobalMapping(gv,(void*)&thread_kill);
+	    gv = M->getNamedValue(std::string("thread_self"));
+	    EE->updateGlobalMapping(gv,(void*)&thread_self);
+	    gv = M->getNamedValue(std::string("thread_sleep"));
+	    EE->updateGlobalMapping(gv,(void*)&thread_sleep);
+
+	    gv = M->getNamedValue(std::string("mutex_create"));
+	    EE->updateGlobalMapping(gv,(void*)&mutex_create);
+	    gv = M->getNamedValue(std::string("mutex_destroy"));
+	    EE->updateGlobalMapping(gv,(void*)&mutex_destroy);
+	    gv = M->getNamedValue(std::string("mutex_lock"));
+	    EE->updateGlobalMapping(gv,(void*)&mutex_lock);
+	    gv = M->getNamedValue(std::string("mutex_unlock"));
+	    EE->updateGlobalMapping(gv,(void*)&mutex_unlock);
+	    gv = M->getNamedValue(std::string("mutex_trylock"));
+	    EE->updateGlobalMapping(gv,(void*)&mutex_trylock);
 
 
 	}	
