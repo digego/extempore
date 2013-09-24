@@ -2228,7 +2228,7 @@
       ;;
       ;; This whole section can actually be taken out
       ;;
-      (if (< *impc:ti:nativef-generics-recurse-test* 10)
+      (if (< *impc:ti:nativef-generics-recurse-test* 1)
           (begin
             ;; (println 'prevars: vars 'res: res)
             (set! *impc:ti:nativef-generics-recurse-test*
@@ -3744,10 +3744,25 @@
 ;; 				r)))))))))
 
 
+
+(define *type-check-continuation* '())
+
+(define impc:ti:run-type-check
+  (lambda (vars forced-types ast)
+    ;; (println '------------------------------------)
+    ;; (println 'forced-types forced-types)
+    ;; (println 'vars: vars)
+    ;; (println 'run-type-check 'ast: ast)    
+    (let ((typelist (call/cc (lambda (k) (set! *type-check-continuation* k) '()))))
+      (if (null? typelist)
+          (set! typelist (impc:ti:run-type-check* vars forced-types ast)))
+      ;; (println 'unified 'types: typelist)
+      typelist)))
+
 ;; run the type checker
 ;; if we fail to unify completely the first time
 ;; try some possible substitutions!
-(define impc:ti:run-type-check
+(define impc:ti:run-type-check*
   (lambda (vars forced-types ast . cnt)
       ;; (println '------------------------------------)
       ;; (println 'forced-types forced-types)
@@ -3775,55 +3790,53 @@
                     (impc:ti:find-unresolved-simple-types u))))
 	 ;(println 'fvars: fvars) 	
 	 ;(println 'types: u) 
-         (if *impc:ti:print-unifications* (println 'tirun:> a '-> u))
-         ;; if we have unified types then return them otherwise run through options!
-         (if tt 
-             u
-	     (if (and (not (null? cnt))
-		      (member u (car cnt)))
-		 u
-		 (begin ;; (println 'failed-type-check-pass-with: u)
-			(if (not a) ;; this run is for generics
-			    (begin ;; (println 'bingo1)
-			      (impc:ti:clear-all-vars fvars)
-			      (let* ((ret (impc:ti:run-type-check fvars 
-								  ;; kts for all solved types
-								  (cl:remove #f (map (lambda (k)
-										       (if (impc:ir:type? (cdr k)) k #f))
-										     u))
-								  ast (cons u (if (null? cnt) cnt (car cnt))))))
-				ret))
-			    ;; try unresolved simple types
-			    (begin ;; (println 'bingo2: a)
-				   (let ((res (map (lambda (x)   ;; call run-type-check for each version of a simple type 
-						     ;; first clear vars
-						     (impc:ti:clear-all-vars fvars)				    
-						     (impc:ti:run-type-check fvars 
-									     ;; as well as all simple types which have resolved fully
-									     (append (cl:remove-if-not (lambda (z) (and (not (list? z))
-															(pair? z))) u)
-										     ;; and any simple types that unify on x
-										     (cl:remove 'failed 
-												(map (lambda (k)
-												       (if (null? (cl:intersection (list x) (cdr k)))
-													   'failed
-													   (cons (car k) x)))
-												     (impc:ti:find-unresolved-simple-types u)))
-										     forced-types)
-									     ;; ast (cons u (car cnt))))
-									     ast (cons u (if (null? cnt) cnt (car cnt)))))
-						   (cdr (car a)))))				     
-				     ;; then see what versions might be OK?
-				     (let ((r (cl:find-if (lambda (x) 
-						     (cl:every (lambda (x) x) (impc:ti:unity? x)))
-						   res)))
-				       (if (not r)  ;; if no options are any good then :(
-					   (apply print-error 'Compiler 'Error: 'could 'not 'resolve 'types:
-						  (map (lambda (x) (symbol->string (car x)))
-						       (cl:remove-if (lambda (x)
-								       (impc:ir:type? (cdr x)))
-								     (car res)))))
-				       r))))))))))
+        (if *impc:ti:print-unifications* (println 'tirun:> a '-> u))
+         ;; if we have unified types then return them through continuation        
+        (if (or tt
+                (and (not (null? cnt))
+                     (member u (car cnt))))
+            (*type-check-continuation* u))
+        (if (not a) ;; this run is for generics
+            (begin ;; (println 'bingo1)
+              (impc:ti:clear-all-vars fvars)
+              (let* ((ret (impc:ti:run-type-check* fvars 
+                                                   ;; kts for all solved types
+                                                   (cl:remove #f (map (lambda (k)
+                                                                        (if (impc:ir:type? (cdr k)) k #f))
+                                                                      u))
+                                                   ast (cons u (if (null? cnt) cnt (car cnt))))))
+                ret))
+            ;; try unresolved simple types
+            (begin ;; (println 'bingo2: a)
+              (let ((res (map (lambda (x)   ;; call run-type-check for each version of a simple type 
+                                ;; first clear vars
+                                (impc:ti:clear-all-vars fvars)				    
+                                (impc:ti:run-type-check* fvars 
+                                                         ;; as well as all simple types which have resolved fully
+                                                         (append (cl:remove-if-not (lambda (z) (and (not (list? z))
+                                                                                               (pair? z))) u)
+                                                                 ;; and any simple types that unify on x
+                                                                 (cl:remove 'failed 
+                                                                            (map (lambda (k)
+                                                                                   (if (null? (cl:intersection (list x) (cdr k)))
+                                                                                       'failed
+                                                                                       (cons (car k) x)))
+                                                                                 (impc:ti:find-unresolved-simple-types u)))
+                                                                 forced-types)
+                                                         ;; ast (cons u (car cnt))))
+                                                         ast (cons u (if (null? cnt) cnt (car cnt)))))
+                              (cdr (car a)))))				     
+                ;; then see what versions might be OK?
+                (let ((r (cl:find-if (lambda (x) 
+                                       (cl:every (lambda (x) x) (impc:ti:unity? x)))
+                                     res)))
+                  (if (not r)  ;; if no options are any good then :(
+                      (apply print-error 'Compiler 'Error: 'could 'not 'resolve 'types:
+                             (map (lambda (x) (symbol->string (car x)))
+                                  (cl:remove-if (lambda (x)
+                                                  (impc:ir:type? (cdr x)))
+                                                (car res)))))
+                  r)))))))
 
             
 ;;
