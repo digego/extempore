@@ -46,7 +46,7 @@ You can also join the Extempore community:
 
 # Installation on Linux & OS X
 
-_More detailed instructions can be found at_ http://benswift.me/2012-11-06-building-extempore-on-osx-linux.html
+_More detailed instructions can be found_ [here](http://benswift.me/2013-03-20-building-extempore-on-osx-linux.html)
 
 Building Extempore depends on the following libraries (you can
 probably get them through your favourite package manager).
@@ -101,7 +101,8 @@ Voila... you should be done.
 
 # Installation on Windows 7
 
-_More detailed instructions can be found at_ http://benswift.me/2012-11-05-building-extempore-on-windows.html
+_More detailed instructions can be found_
+[here](http://benswift.me/2013-03-20-building-extempore-on-windows.html)
 
 Extempore has thus far only been tested on Windows 7 64-bit, but if you
 can get it to build/run on other flavours of Windows then do let us
