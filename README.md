@@ -211,7 +211,8 @@ editors.
 There are some optional command line options that you may want to use
 you can get a list by running `./extempore --help`
 
-For more detail, see this post on [interacting with the Exempore compiler](http://benswift.me/2013-03-20-building-extempore-on-osx-linux.html).
+For more detail, see this post on
+[interacting with the Exempore compiler](http://benswift.me/2012-09-26-interacting-with-the-extempore-compiler.html).
 
 **Telnet**
 
