@@ -24,7 +24,7 @@
 ;; pairs <address,rate>
 (define *topclock-registered-address* '())
 ;; ip client (assume wireless interface "en0" not "eth0")
-(define *iplocal* (sys:interface-address "en1"))
+(define *iplocal* (sys:interface-address "en0"))
 ;; topclock port
 (define *topclock-port* 5555)
 ;; epoch adjustments for NTP Jan 1st 1900
@@ -121,9 +121,9 @@
 ;; 'string' is ipaddress string (client must convert hostname to IP)
 ;; 'double' is the 'stream' rate which is in beats at current BPM (0.125 for 8th notes as example)
 (define topclock-register
-  (lambda (server)
+  (lambda (server rate)
     (io:osc:send (now) (cons server *topclock-port*) "/topclock/register"
-                 *iplocal* 1/32)))
+                 *iplocal* rate)))
 
 
 ;; sends OSC message /topclock/bpm
@@ -146,15 +146,13 @@
     (topclock-sync server) 
     (callback (+ (now) 10000) 'topclock-sync-regular server)))
 
-(topclock-sync-regular "10.0.1.8")
-(topclock-query-bpm "10.0.1.8")
-
 ;; server proc streams to all registered ip addresses
 ;; at whatever specified rate (in beats) the client provided
 (define topclock-streamer
   (lambda (beat dur)
     (for-each (lambda (client)
-                (if (modulo beat (cdr client))
+                (if (and (> (cdr client) 0)
+                         (modulo beat (cdr client)))
                     (io:osc:send (now) (cons (car client) *topclock-port*) "/topclock/stream"
                                  (1970->1900 (samples->clock (*metro* beat)))
                                  (*metro* 'get-tempo)
@@ -166,13 +164,20 @@
 
 ;; connect to topclock server
 (define topclock-start-streamer
-  (lambda (server)
-    (topclock-streamer (*metro* 'get-beat 4) 1/32)))
+  (lambda (server rate)
+    (topclock-streamer (*metro* 'get-beat 4) rate)))
 
-;; make sure first clock sync has happened
-;; and that metro query has happened
-;; so offset by 100000 samples
-(callback (+ (now) 100000) 'topclock-start-streamer "10.0.1.8")
+(define topclock-start
+  (lambda (server)
+    (topclock-sync-regular server)
+    (topclock-register server 0) ;; rate of 0 means don't stream anything!
+    ;; let sync happen before bpm
+    (callback (+ (now) 10000) 'topclock-query-bpm server)
+    ;; let bpm happen before streamer start
+    (callback (+ (now) 20000) 'topclock-start-streamer server 1/32)
+    (println 'topclock-started)))
+
+(topclock-start "10.0.1.8")
 
 (bind-func dsp:DSP 1000000
   (let ((t 0.0))
