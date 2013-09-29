@@ -53,24 +53,14 @@
                     (msg-delay (- t4 t1))
                     (offset (/ (+ (- t2 t1) (- t3 t4)) 2.0)))
                (if (< msg-delay .1) (clock:adjust-offset offset))))
-            ((string=? address "/topclock/register/request")
+            ((string=? address "/topclock/register")
              (let ((mark (*metro* 'get-mark))
                    (tempo (*metro* 'get-tempo)))
                (println 'registering 'client (car args) 'at 'rate (cadr args))
-               (io:osc:send (now) (cons (car args) *topclock-port*) "/topclock/register/response"
-                            tempo (1970->1900 (samples->clock (car mark))) (cdr mark))
                (set! *topclock-registered-address*
                      (cons (cons (car args) (cadr args))
                            *topclock-registered-address*))))
-            ((string=? address "/topclock/register/response")
-             (let ((tempo (car args))
-                   (time (1900->1970 (cadr args)))
-                   (beat (caddr args)))
-               (set! oldbpm tempo)
-               (*metro* 'set-tempo tempo (clock->samples time) beat)
-               (println 'registration: bpm: tempo 'current-beat: beat)))
             ((string=? address "/topclock/stream")
-             (println 'stream)
              (let ((time (1900->1970 (car args)))
                    (bpm (cadr args))
                    (beat (caddr args))
@@ -81,10 +71,22 @@
                    (begin (set! oldbpm bpm)
                           (println '*metro* bpm (clock->samples time) beat (* 1. (*metro* 'get-beat 1/32)))
                           (*metro* 'set-tempo bpm (clock->samples time) beat)))))
+            ((string=? address "/topclock/bpm/request")
+             (let ((mark (*metro* 'get-mark))
+                   (tempo (*metro* 'get-tempo)))
+               (io:osc:send (now) (cons (car args) *topclock-port*) "/topclock/bpm/reply"
+                            tempo (1970->1900 (samples->clock (car mark))) (cdr mark))))
+            ((string=? address "/topclock/bpm/reply")
+             (let ((bpm (car args))
+                   (time (1900->1970 (cadr args)))
+                   (beat (caddr args)))
+               (println 'tempo: bpm 'time: time 'beat: beat)
+               (*metro* 'set-tempo bpm (clock->samples time) beat)))
             ((string=? address "/topclock/bpm/update")
              (let ((time (1900->1970 (car args)))
                    (bpm (cadr args))
                    (beat (caddr args)))
+               (println 'Update! bpm)
                (set! oldbpm bpm)
                (*metro* 'set-tempo bpm (clock->samples time) beat)))
             ((string=? address "/topclock/bpm/new")
@@ -93,6 +95,7 @@
                    (beat (caddr args)))
                (if (>= beat (*metro* 'get-beat 1/32))
                    (for-each (lambda (c)
+                               (println 'c: c)
                                (io:osc:send (now) (cons (car c) *topclock-port*) "/topclock/bpm/update"
                                             time bpm beat))
                              *topclock-registered-address*))))
@@ -119,7 +122,7 @@
 ;; 'double' is the 'stream' rate which is in beats at current BPM (0.125 for 8th notes as example)
 (define topclock-register
   (lambda (server)
-    (io:osc:send (now) (cons server *topclock-port*) "/topclock/register/request"
+    (io:osc:send (now) (cons server *topclock-port*) "/topclock/register"
                  *iplocal* 1/32)))
 
 
@@ -132,13 +135,19 @@
     (io:osc:send (now) (cons server *topclock-port*) "/topclock/bpm/new"
                  (1970->1900 (samples->clock time)) bpm beat)))
 
+;; query server for current bpm
+(define topclock-query-bpm
+  (lambda (server)
+    (io:osc:send (now) (cons server *topclock-port*) "/topclock/bpm/request"
+                 *iplocal*)))
+
 (define topclock-sync-regular
   (lambda (server)
     (topclock-sync server) 
     (callback (+ (now) 10000) 'topclock-sync-regular server)))
 
 (topclock-sync-regular "10.0.1.8")
-(callback (+ (now) 1000) 'topclock-register "10.0.1.8")
+(topclock-query-bpm "10.0.1.8")
 
 ;; server proc streams to all registered ip addresses
 ;; at whatever specified rate (in beats) the client provided
@@ -161,8 +170,9 @@
     (topclock-streamer (*metro* 'get-beat 4) 1/32)))
 
 ;; make sure first clock sync has happened
-;; so offset by 200000 samples
-(callback (+ (now) 200000) 'topclock-start-streamer "10.0.1.8")
+;; and that metro query has happened
+;; so offset by 100000 samples
+(callback (+ (now) 100000) 'topclock-start-streamer "10.0.1.8")
 
 (bind-func dsp:DSP 1000000
   (let ((t 0.0))
@@ -184,7 +194,7 @@
              (> (random) .8))
         (topclock-bpm "10.0.1.8" (*metro* beat) (random 90 180) beat))
     (if (= (modulo beat 4) 0)        
-        (play fmsynth 72 80 .1)
+        (play fmsynth 67 80 .1)
         (play fmsynth 60 80 .1))
     (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
 
