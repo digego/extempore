@@ -443,8 +443,10 @@ namespace extemp {
 	    { "sys:set-dsp-wrapper",	&SchemeFFI::setDSPWrapper },
 	    { "sys:set-dspmt-wrapper",	&SchemeFFI::setDSPMTWrapper },
             { "sys:init-mt-audio",      &SchemeFFI::initMTAudio },
+            { "sys:init-mt-audio-buf",      &SchemeFFI::initMTAudioBuf },
             { "sys:audio-load",         &SchemeFFI::getAudioLoad },
 	    { "sys:set-dsp-wrapper-array",	&SchemeFFI::setDSPWrapperArray },
+	    { "sys:set-dspmt-wrapper-array",	&SchemeFFI::setDSPMTWrapperArray },
 
 	    // memory zone stuff
     	    { "sys:create-mzone",		&SchemeFFI::createMallocZone },
@@ -2852,9 +2854,22 @@ namespace extemp {
       return _sc->T;
     }
 
+    pointer SchemeFFI::setDSPMTWrapperArray(scheme* _sc, pointer args)
+    {
+      AudioDevice::I()->setDSPMTWrapperArray((dsp_f_ptr_sum_array)cptr_value(pair_car(args)),
+                                             (dsp_f_ptr_array)cptr_value(pair_cadr(args)));
+	return _sc->T;
+    }
+
     pointer SchemeFFI::initMTAudio(scheme* _sc, pointer args)
     {
       AudioDevice::I()->initMTAudio(ivalue(pair_car(args)));
+      return _sc->T;
+    }
+
+    pointer SchemeFFI::initMTAudioBuf(scheme* _sc, pointer args)
+    {
+      AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(args)));
       return _sc->T;
     }
 

@@ -3204,17 +3204,30 @@ entry:
 ret double %result
 }
 
-define float* @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i32 %frames, i32 %time, i32 %channels) 
+define void @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, float %time, i8* %data) 
 {
 entry:
-%closureVal = bitcast i8* %closure to <{ i8*, i8*, float* (i8*,i8*,float*,float*,i32,i32,i32)*}>*
+%closureVal = bitcast i8* %closure to <{ i8*, i8*, void (i8*,i8*,float*,float*,float,i8*)*}>*
 ; apply closure 
-%fPtr = getelementptr <{i8*, i8*, float* (i8*, i8*, float*, float*, i32, i32, i32)*}>* %closureVal, i32 0, i32 2
-%ePtr = getelementptr <{i8*, i8*, float* (i8*, i8*, float*, float*, i32, i32, i32)*}>* %closureVal, i32 0, i32 1
-%f = load float* (i8*, i8*, float*,float*,i32,i32,i32)** %fPtr
+%fPtr = getelementptr <{i8*, i8*, void (i8*, i8*, float*, float*, float, i8*)*}>* %closureVal, i32 0, i32 2
+%ePtr = getelementptr <{i8*, i8*, void (i8*, i8*, float*, float*, float, i8*)*}>* %closureVal, i32 0, i32 1
+%f = load void (i8*, i8*, float*,float*,float,i8*)** %fPtr
 %e = load i8** %ePtr
-%result = tail call fastcc float* %f(i8* %_impz, i8* %e, float* %datain, float* %dataout, i32 %frames, i32 %time, i32 %channels)
-ret float* %result
+tail call fastcc void %f(i8* %_impz, i8* %e, float* %datain, float* %dataout, float %time, i8* %data)
+ret void
+}
+
+define void @imp_dsp_sum_wrapper_array(i8* %_impz, i8* %closure, float** %datain, float* %dataout, float %time, i8* %data) 
+{
+entry:
+%closureVal = bitcast i8* %closure to <{ i8*, i8*, void (i8*,i8*,float**,float*,float,i8*)*}>*
+; apply closure 
+%fPtr = getelementptr <{i8*, i8*, void (i8*, i8*, float**, float*, float, i8*)*}>* %closureVal, i32 0, i32 2
+%ePtr = getelementptr <{i8*, i8*, void (i8*, i8*, float**, float*, float, i8*)*}>* %closureVal, i32 0, i32 1
+%f = load void (i8*, i8*, float**,float*,float,i8*)** %fPtr
+%e = load i8** %ePtr
+tail call fastcc void %f(i8* %_impz, i8* %e, float** %datain, float* %dataout, float %time, i8* %data)
+ret void
 }
 
 define i8* @impc_get_env(i8* %impz, i8* %closure)

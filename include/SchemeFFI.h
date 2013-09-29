@@ -99,7 +99,9 @@ namespace extemp {
 	static pointer setDSPWrapper(scheme* _sc, pointer args);
 	static pointer setDSPMTWrapper(scheme* _sc, pointer args);
 	static pointer setDSPWrapperArray(scheme* _sc, pointer args);
+	static pointer setDSPMTWrapperArray(scheme* _sc, pointer args);
         static pointer initMTAudio(scheme* _sc, pointer args);
+        static pointer initMTAudioBuf(scheme* _sc, pointer args);
         static pointer getAudioLoad(scheme* _sc, pointer args);
 		
 	// misc stuff
