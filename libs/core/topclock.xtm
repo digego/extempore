@@ -26,7 +26,7 @@
 ;; past offsets
 (define *topclock-offsets* (list 0 0 0 0 0 0 0 0 0 0 0 0))
 ;; ip client (assume wireless interface "en0" not "eth0")
-(define *iplocal* (sys:interface-address "en0"))
+(define *iplocal* (sys:interface-address "en1"))
 ;; topclock port
 (define *topclock-port* 5555)
 ;; epoch adjustments for NTP Jan 1st 1900
@@ -115,9 +115,11 @@
                  (1970->1900 (samples->clock time)) bpm)))
 
 (define topclock-sync-regular
-  (lambda (server beat dur)
+  (lambda (server)
     (topclock-sync server) 
-    (callback (*metro* (+ beat (* .5 dur))) 'topclock-sync-regular server (+ beat dur) 1/4)))
+    (callback (+ (now) 10000) 'topclock-sync-regular server)))
+
+(topclock-sync-regular "10.0.1.8")
 
 ;; server proc streams to all registered ip addresses
 ;; at whatever specified rate (in beats) the client provided
@@ -134,17 +136,15 @@
     (callback (*metro* (+ beat (* .5 dur))) 'topclock-streamer
               (+ beat dur) dur)))
 
-;; start topclock streamer
-(callback (+ (now) *second*) 'topclock-streamer (*metro* 'get-beat 4) 1/32)
-
 ;; connect to topclock server
-(define topclock-connect
+(define topclock-start
   (lambda (server)
-    (topclock-register server)
-    ;; start clock updater
-    (topclock-sync-regular server (*metro* 'get-beat 1) 1/4)))
+    (topclock-streamer (*metro* 'get-beat 4) 1/32)
+    (topclock-register server)))
 
-(topclock-connect "10.0.1.8")
+;; make sure first clock sync has happened
+;; so offset by 200000 samples
+(callback (+ (now) 200000) topclock-start "10.0.1.8")
 
 (bind-func dsp:DSP 1000000
   (let ((t 0.0))
@@ -170,4 +170,8 @@
         (play fmsynth 60 80 .1))
     (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
 
-(test (*metro* 'get-beat 4) 1)
+(define teststart
+  (lambda ()    
+    (test (*metro* 'get-beat 4) 1)))
+
+(callback (+ (now) 500000) 'teststart)
