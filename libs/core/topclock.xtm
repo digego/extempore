@@ -1,0 +1,173 @@
+;;; topclock.xtm -- distributed OSC clock (core)
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+;;; Code:
+
+;; lib-loading config
+
+;; This is designed for simplicity so the following holds
+
+;; * work with IPADDRESS so no name resolving required
+;; * with single double precision time (epoch of NTP)
+;; * registration to avoid UDP broadcasting (disabled by many
+;; switches)
+;; * direct host->host (make grid higher level concern)
+;; * everyone sends *offset* clock times (not system)
+
+(sys:load "libs/core/instruments.xtm")
+(sys:load "libs/external/libc.xtm")
+
+;; pairs <address,rate>
+(define *topclock-registered-address* '()) ;;'(("127.0.0.1" . 1/32)))
+;; past offsets
+(define *topclock-offsets* (list 0 0 0 0 0 0 0 0 0 0 0 0))
+;; ip client (assume wireless interface "en0" not "eth0")
+(define *iplocal* (sys:interface-address "en0"))
+;; topclock port
+(define *topclock-port* 5555)
+;; epoch adjustments for NTP Jan 1st 1900
+(define *Epoch-1900-1970* 2208988800.0)
+
+(define 1900->1970
+  (lambda (time)
+    (- time *Epoch-1900-1970*)))
+
+(define 1970->1900
+  (lambda (time)
+    (+ time *Epoch-1900-1970*)))
+
+;; OSC reciever (for both client and server)
+(define topclock-receive
+  (let ((oldbpm 0.0))
+    (lambda (timestamp address . args)
+      (cond ((string=? address "/topclock/sync/request")
+             (io:osc:send (now) (cons (car args) *topclock-port*) "/topclock/sync/response"
+                          (cadr args) (1970->1900 (clock:clock))))
+            ((string=? address "/topclock/sync/response")
+             (let* ((t1 (1900->1970 (car args)))
+                    (t2 (1900->1970 (cadr args))) ;; t2 
+                    (t3 (1900->1970 (cadr args))) ;; and t3 the same
+                    (t4 (clock:clock))
+                    (msg-delay (- t4 t1))
+                    (offset (/ (+ (- t2 t1) (- t3 t4)) 2.0)))
+               (if (< (math:std-deviation *topclock-offsets*) .002)
+                   (begin ;; (println 'Update 'Clock 'Offset)
+                     (clock:adjust-offset (/ (apply + *topclock-offsets*) 12))))
+               ;; offset is adjustment from local system UTC time.
+               (set! *topclock-offsets* (cons offset (reverse (cdr (reverse *topclock-offsets*)))))))               
+            ((string=? address "/topclock/register")
+             (println 'registering 'client (car args) 'at 'rate (cadr args))
+             (set! *topclock-registered-address*
+                   (cons (cons (car args) (cadr args))
+                         *topclock-registered-address*)))
+            ((string=? address "/topclock/stream")
+             (let ((time (1900->1970 (car args)))
+                   (bpm (cadr args))
+                   (beat (caddr args))
+                   (num (cadddr args))
+                   (denom (car (cddddr args))))
+               ;; don't worry about metre (num/denom) for testing               
+               (if (<> bpm oldbpm)
+                   (begin (set! oldbpm bpm)
+                          (*metro* 'set-tempo bpm (clock->samples time) beat)))))
+            ((string=? address "/topclock/bpm")
+             (let ((time (1900->1970 (car args)))
+                   (bpm (cadr args)))
+               (*metro* 'set-tempo bpm (clock->samples time))))
+            (else (println 'bad 'osc 'message: address))))))
+
+;; start topclock osc receiver (both client and server)
+(io:osc:start-server *topclock-port* "topclock-receive")
+;; use doubles for OSC real nums:
+(io:osc:set-real-64bit? #t)
+
+;; sends OSC message /topclock/sync/request
+;; of type <string,double>
+;; 'string' is ipaddress string (client must convert hostname to IP)
+;; 'double' is the system time in seconds (UTC with epoch of Jan 1 1900 (i.e. NTP))
+(define topclock-sync
+  (lambda (server)
+    (io:osc:send (now) (cons server *topclock-port*) "/topclock/sync/request"
+                 *iplocal* (1970->1900 (clock:clock)))))
+
+
+;; sends OSC message /topclock/register
+;; of type <string,double>
+;; 'string' is ipaddress string (client must convert hostname to IP)
+;; 'double' is the 'stream' rate which is in beats at current BPM (0.125 for 8th notes as example)
+(define topclock-register
+  (lambda (server)
+    (io:osc:send (now) (cons server *topclock-port*) "/topclock/register"
+                 *iplocal* 1/32)))
+
+
+;; sends OSC message /topclock/bpm
+;; of type <double,double>
+;; 'double' is time (UTC epoch 1900)
+;; 'bpm' beats per minute
+(define topclock-bpm
+  (lambda (server time bpm)
+    (io:osc:send (- time 1000) (cons server *topclock-port*) "/topclock/bpm"
+                 (1970->1900 (samples->clock time)) bpm)))
+
+(define topclock-sync-regular
+  (lambda (server beat dur)
+    (topclock-sync server) 
+    (callback (*metro* (+ beat (* .5 dur))) 'topclock-sync-regular server (+ beat dur) 1/4)))
+
+;; server proc streams to all registered ip addresses
+;; at whatever specified rate (in beats) the client provided
+(define topclock-streamer
+  (lambda (beat dur)
+    (for-each (lambda (client)
+                (if (modulo beat (cdr client))
+                    (io:osc:send (now) (cons (car client) *topclock-port*) "/topclock/stream"
+                                 (1970->1900 (samples->clock (*metro* beat)))
+                                 (*metro* 'get-tempo)
+                                 (rational->real beat)
+                                 0 0))) ;; don't worry about num and denum for tests              
+              *topclock-registered-address*)
+    (callback (*metro* (+ beat (* .5 dur))) 'topclock-streamer
+              (+ beat dur) dur)))
+
+;; start topclock streamer
+(callback (+ (now) *second*) 'topclock-streamer (*metro* 'get-beat 4) 1/32)
+
+;; connect to topclock server
+(define topclock-connect
+  (lambda (server)
+    (topclock-register server)
+    ;; start clock updater
+    (topclock-sync-regular server (*metro* 'get-beat 1) 1/4)))
+
+(topclock-connect "10.0.1.8")
+
+(bind-func dsp:DSP 1000000
+  (let ((t 0.0))
+    (lambda (in time chan dat)
+      (if (= t 0.0) (set! t time))
+      (if (< chan 1.5)
+          (+ (fmsynth in time chan dat)
+             0.0)
+          0.0))))
+
+(dsp:set! dsp)
+
+(fmsynth_fx.wet .05)
+(fmsynth_fx.dfb .05)
+
+(define test
+  (lambda (beat dur)
+    (if (and (= (modulo beat 4) 0)
+             (> (random) .8))
+        (topclock-bpm "10.0.1.8" (*metro* beat) (random 90 180)))
+    (if (= (modulo beat 4) 0)        
+        (play fmsynth 72 80 .1)
+        (play fmsynth 60 80 .1))
+    (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
+
+(test (*metro* 'get-beat 4) 1)
