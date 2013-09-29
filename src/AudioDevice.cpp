@@ -1206,7 +1206,7 @@ namespace extemp {
           SAMPLE* outdat = (SAMPLE*) outputBuffer;
           indats[0] = AudioDevice::I()->getDSPMTOutBufferArray();
           for(int jj=1;jj<numthreads;jj++) {
-            Indats[jj] = indats[0]+(UNIV::FRAMES*UNIV::CHANNELS*jj);
+            indats[jj] = indats[0]+(UNIV::FRAMES*UNIV::CHANNELS*jj);
           }
           cache_wrapper(zone, (void*)closure, indats, outdat, (SAMPLE)UNIV::DEVICE_TIME, userData);
           llvm_zone_reset(zone);
