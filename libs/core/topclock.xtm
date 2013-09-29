@@ -45,9 +45,11 @@
   (let ((oldbpm 0.0))
     (lambda (timestamp address . args)
       (cond ((string=? address "/topclock/sync/request")
+             ;; (println 'sync 'request)
              (io:osc:send (now) (cons (car args) *topclock-port*) "/topclock/sync/response"
                           (cadr args) (1970->1900 (clock:clock))))
             ((string=? address "/topclock/sync/response")
+             ;; (println 'sync 'response)
              (let* ((t1 (1900->1970 (car args)))
                     (t2 (1900->1970 (cadr args))) ;; t2 
                     (t3 (1900->1970 (cadr args))) ;; and t3 the same
@@ -59,12 +61,13 @@
                      (clock:adjust-offset (/ (apply + *topclock-offsets*) 12))))
                ;; offset is adjustment from local system UTC time.
                (set! *topclock-offsets* (cons offset (reverse (cdr (reverse *topclock-offsets*)))))))               
-            ((string=? address "/topclock/register")
-             (println 'registering 'client (car args) 'at 'rate (cadr args))
+            ((string=? address "/topclock/register")             
+             ;; (println 'registering 'client (car args) 'at 'rate (cadr args))
              (set! *topclock-registered-address*
                    (cons (cons (car args) (cadr args))
                          *topclock-registered-address*)))
             ((string=? address "/topclock/stream")
+             (println 'stream)
              (let ((time (1900->1970 (car args)))
                    (bpm (cadr args))
                    (beat (caddr args))
@@ -73,11 +76,27 @@
                ;; don't worry about metre (num/denom) for testing               
                (if (<> bpm oldbpm)
                    (begin (set! oldbpm bpm)
+                          (println '*metro* bpm (clock->samples time) beat)
                           (*metro* 'set-tempo bpm (clock->samples time) beat)))))
-            ((string=? address "/topclock/bpm")
+            ((string=? address "/topclock/bpm/update")
+             ;; (println 'bpmupdate)
              (let ((time (1900->1970 (car args)))
-                   (bpm (cadr args)))
-               (*metro* 'set-tempo bpm (clock->samples time))))
+                   (bpm (cadr args))
+                   (beat (caddr args)))
+               (println 'bpm 'update (clock->samples time) bpm beat)
+               (set! oldbpm bpm)
+               (*metro* 'set-tempo bpm (clock->samples time) beat)))
+            ((string=? address "/topclock/bpm/new")
+             ;; (println 'newbpm)
+             (let ((time (car args)) ;;(1900->1970 (car args)))
+                   (bpm (cadr args))
+                   (beat (caddr args)))
+               (for-each (lambda (c)
+                           (io:osc:send (now) (cons (car c) *topclock-port*) "/topclock/bpm/update"
+                                        time bpm beat))
+                         *topclock-registered-address*)))
+               ;; (set! oldbpm bpm)
+               ;; (*metro* 'set-tempo bpm (clock->samples time))))
             (else (println 'bad 'osc 'message: address))))))
 
 ;; start topclock osc receiver (both client and server)
@@ -102,7 +121,7 @@
 (define topclock-register
   (lambda (server)
     (io:osc:send (now) (cons server *topclock-port*) "/topclock/register"
-                 *iplocal* 1/64)))
+                 *iplocal* 1/32)))
 
 
 ;; sends OSC message /topclock/bpm
@@ -110,9 +129,9 @@
 ;; 'double' is time (UTC epoch 1900)
 ;; 'bpm' beats per minute
 (define topclock-bpm
-  (lambda (server time bpm)
-    (io:osc:send (- time 1000) (cons server *topclock-port*) "/topclock/bpm"
-                 (1970->1900 (samples->clock time)) bpm)))
+  (lambda (server time bpm beat)
+    (io:osc:send (now) (cons server *topclock-port*) "/topclock/bpm/new"
+                 (1970->1900 (samples->clock time)) bpm beat)))
 
 (define topclock-sync-regular
   (lambda (server)
@@ -139,7 +158,7 @@
 ;; connect to topclock server
 (define topclock-start
   (lambda (server)
-    (topclock-streamer (*metro* 'get-beat 4) 1/64)
+    ;; (topclock-streamer (*metro* 'get-beat 4) 1/32)
     (topclock-register server)))
 
 ;; make sure first clock sync has happened
@@ -164,10 +183,10 @@
   (lambda (beat dur)
     (if (and (= (modulo beat 4) 0)
              (> (random) .8))
-        (topclock-bpm "10.0.1.8" (*metro* beat) (random 90 180)))
+        (topclock-bpm "10.0.1.8" (*metro* beat) (random 90 180) beat))
     (if (= (modulo beat 4) 0)        
-        (play fmsynth 77 80 .1)
-        (play fmsynth 65 80 .1))
+        (play fmsynth 72 80 .1)
+        (play fmsynth 60 80 .1))
     (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
 
 (define teststart
