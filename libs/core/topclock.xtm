@@ -22,11 +22,9 @@
 (sys:load "libs/external/libc.xtm")
 
 ;; pairs <address,rate>
-(define *topclock-registered-address* '()) ;;'(("127.0.0.1" . 1/32)))
-;; past offsets
-(define *topclock-offsets* (list 0 0 0 0 0 0 0 0 0 0 0 0))
+(define *topclock-registered-address* '())
 ;; ip client (assume wireless interface "en0" not "eth0")
-(define *iplocal* (sys:interface-address "en0"))
+(define *iplocal* (sys:interface-address "en1"))
 ;; topclock port
 (define *topclock-port* 5555)
 ;; epoch adjustments for NTP Jan 1st 1900
@@ -45,22 +43,16 @@
   (let ((oldbpm 0.0))
     (lambda (timestamp address . args)
       (cond ((string=? address "/topclock/sync/request")
-             ;; (println 'sync 'request)
              (io:osc:send (now) (cons (car args) *topclock-port*) "/topclock/sync/response"
                           (cadr args) (1970->1900 (clock:clock))))
             ((string=? address "/topclock/sync/response")
-             ;; (println 'sync 'response)
              (let* ((t1 (1900->1970 (car args)))
                     (t2 (1900->1970 (cadr args))) ;; t2 
                     (t3 (1900->1970 (cadr args))) ;; and t3 the same
                     (t4 (clock:clock))
                     (msg-delay (- t4 t1))
                     (offset (/ (+ (- t2 t1) (- t3 t4)) 2.0)))
-               (if (< (math:std-deviation *topclock-offsets*) .002)
-                   (begin ;; (println 'Update 'Clock 'Offset)
-                     (clock:adjust-offset (/ (apply + *topclock-offsets*) 12))))
-               ;; offset is adjustment from local system UTC time.
-               (set! *topclock-offsets* (cons offset (reverse (cdr (reverse *topclock-offsets*)))))))               
+               (if (< msg-delay .1) (clock:adjust-offset offset))))
             ((string=? address "/topclock/register/request")
              (let ((mark (*metro* 'get-mark))
                    (tempo (*metro* 'get-tempo)))
@@ -74,30 +66,28 @@
              (let ((tempo (car args))
                    (time (1900->1970 (cadr args)))
                    (beat (caddr args)))
+               (set! oldbpm tempo)
                (*metro* 'set-tempo tempo (clock->samples time) beat)
-               (println 'register-response 'bpm: tempo 'beat: beat 'current-beat: (- (*metro* 'get-beat 1) 1))))
-            ;; ((string=? address "/topclock/stream")
-            ;;  (println 'stream)
-            ;;  (let ((time (1900->1970 (car args)))
-            ;;        (bpm (cadr args))
-            ;;        (beat (caddr args))
-            ;;        (num (cadddr args))
-            ;;        (denom (car (cddddr args))))
-            ;;    ;; don't worry about metre (num/denom) for testing               
-            ;;    (if (<> bpm oldbpm)
-            ;;        (begin (set! oldbpm bpm)
-            ;;               (println '*metro* bpm (clock->samples time) beat (* 1. (*metro* 'get-beat 1/32)))
-            ;;               (*metro* 'set-tempo bpm (clock->samples time) beat)))))
+               (println 'registration: bpm: tempo 'current-beat: beat)))
+            ((string=? address "/topclock/stream")
+             (println 'stream)
+             (let ((time (1900->1970 (car args)))
+                   (bpm (cadr args))
+                   (beat (caddr args))
+                   (num (cadddr args))
+                   (denom (car (cddddr args))))
+               ;; don't worry about metre (num/denom) for testing               
+               (if (<> bpm oldbpm)
+                   (begin (set! oldbpm bpm)
+                          (println '*metro* bpm (clock->samples time) beat (* 1. (*metro* 'get-beat 1/32)))
+                          (*metro* 'set-tempo bpm (clock->samples time) beat)))))
             ((string=? address "/topclock/bpm/update")
-             ;; (println 'bpmupdate)
              (let ((time (1900->1970 (car args)))
                    (bpm (cadr args))
                    (beat (caddr args)))
                (set! oldbpm bpm)
-               (*metro* 'set-tempo bpm (clock->samples time) beat)
-               (println 'bpm 'update 't: (clock:clock) 's: (clock->samples time) bpm beat (* 1.0 (*metro* 'get-beat 1/32)))))
+               (*metro* 'set-tempo bpm (clock->samples time) beat)))
             ((string=? address "/topclock/bpm/new")
-             ;; (println 'newbpm)
              (let ((time (car args)) ;;(1900->1970 (car args)))
                    (bpm (cadr args))
                    (beat (caddr args)))
@@ -106,8 +96,6 @@
                                (io:osc:send (now) (cons (car c) *topclock-port*) "/topclock/bpm/update"
                                             time bpm beat))
                              *topclock-registered-address*))))
-               ;; (set! oldbpm bpm)
-               ;; (*metro* 'set-tempo bpm (clock->samples time))))
             (else (println 'bad 'osc 'message: address))))))
 
 ;; start topclock osc receiver (both client and server)
@@ -150,6 +138,7 @@
     (callback (+ (now) 10000) 'topclock-sync-regular server)))
 
 (topclock-sync-regular "10.0.1.8")
+(callback (+ (now) 1000) 'topclock-register "10.0.1.8")
 
 ;; server proc streams to all registered ip addresses
 ;; at whatever specified rate (in beats) the client provided
@@ -167,14 +156,13 @@
               (+ beat dur) dur)))
 
 ;; connect to topclock server
-(define topclock-start
+(define topclock-start-streamer
   (lambda (server)
-    ;; (topclock-streamer (*metro* 'get-beat 4) 1/32)
-    (topclock-register server)))
+    (topclock-streamer (*metro* 'get-beat 4) 1/32)))
 
 ;; make sure first clock sync has happened
 ;; so offset by 200000 samples
-(callback (+ (now) 200000) topclock-start "10.0.1.8")
+(callback (+ (now) 200000) 'topclock-start-streamer "10.0.1.8")
 
 (bind-func dsp:DSP 1000000
   (let ((t 0.0))
