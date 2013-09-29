@@ -26,7 +26,7 @@
 ;; past offsets
 (define *topclock-offsets* (list 0 0 0 0 0 0 0 0 0 0 0 0))
 ;; ip client (assume wireless interface "en0" not "eth0")
-(define *iplocal* (sys:interface-address "en1"))
+(define *iplocal* (sys:interface-address "en0"))
 ;; topclock port
 (define *topclock-port* 5555)
 ;; epoch adjustments for NTP Jan 1st 1900
@@ -61,11 +61,21 @@
                      (clock:adjust-offset (/ (apply + *topclock-offsets*) 12))))
                ;; offset is adjustment from local system UTC time.
                (set! *topclock-offsets* (cons offset (reverse (cdr (reverse *topclock-offsets*)))))))               
-            ((string=? address "/topclock/register")             
-             ;; (println 'registering 'client (car args) 'at 'rate (cadr args))
-             (set! *topclock-registered-address*
-                   (cons (cons (car args) (cadr args))
-                         *topclock-registered-address*)))
+            ((string=? address "/topclock/register/request")
+             (let ((mark (*metro* 'get-mark))
+                   (tempo (*metro* 'get-tempo)))
+               (println 'registering 'client (car args) 'at 'rate (cadr args))
+               (io:osc:send (now) (cons (car args) *topclock-port*) "/topclock/register/response"
+                         tempo (1970->1900 (samples->clock (car mark))) (cdr mark))
+               (set! *topclock-registered-address*
+                     (cons (cons (car args) (cadr args))
+                           *topclock-registered-address*))))
+            ((string=? address "/topclock/register/response")
+             (let ((tempo (car args))
+                   (time (1900->1970 (cadr args)))
+                   (beat (caddr args)))
+               (println 'register-response 'bpm tempo 'time (clock->samples time) 'beat beat)
+               (*metro* 'set-tempo tempo (clock->samples time) beat)))
             ((string=? address "/topclock/stream")
              (println 'stream)
              (let ((time (1900->1970 (car args)))
@@ -83,7 +93,7 @@
              (let ((time (1900->1970 (car args)))
                    (bpm (cadr args))
                    (beat (caddr args)))
-               (println 'bpm 'update (clock->samples time) bpm beat)
+               (println 'bpm 'update (clock->samples time) bpm beat (* 1.0 (*metro* 'get-beat 1/32)))
                (set! oldbpm bpm)
                (*metro* 'set-tempo bpm (clock->samples time) beat)))
             ((string=? address "/topclock/bpm/new")
@@ -91,10 +101,11 @@
              (let ((time (car args)) ;;(1900->1970 (car args)))
                    (bpm (cadr args))
                    (beat (caddr args)))
-               (for-each (lambda (c)
-                           (io:osc:send (now) (cons (car c) *topclock-port*) "/topclock/bpm/update"
-                                        time bpm beat))
-                         *topclock-registered-address*)))
+               (if (>= beat (*metro* 'get-beat 1/32))
+                   (for-each (lambda (c)
+                               (io:osc:send (now) (cons (car c) *topclock-port*) "/topclock/bpm/update"
+                                            time bpm beat))
+                             *topclock-registered-address*))))
                ;; (set! oldbpm bpm)
                ;; (*metro* 'set-tempo bpm (clock->samples time))))
             (else (println 'bad 'osc 'message: address))))))
@@ -120,7 +131,7 @@
 ;; 'double' is the 'stream' rate which is in beats at current BPM (0.125 for 8th notes as example)
 (define topclock-register
   (lambda (server)
-    (io:osc:send (now) (cons server *topclock-port*) "/topclock/register"
+    (io:osc:send (now) (cons server *topclock-port*) "/topclock/register/request"
                  *iplocal* 1/32)))
 
 
