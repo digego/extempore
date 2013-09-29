@@ -4365,7 +4365,10 @@
              (c1 (impc:ti:get-var-types c)) ;; this is a cons pair of (ast . types)
 	     ;(ll (println 'c1vt: c1))
 	     ;(ct2 (now))
-             (t1 (impc:ti:first-transform (car c1) #t)) ;; car is ast
+             (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
+             (c2 (impc:ti:get-var-types ta)) ;; it is possible for macros in the first-transform to introduce new var-types
+             (cc (append (cdr c2) (cdr c1)))
+             (t1 (car c2))
 	     ;(lllll (println 't1: t1))
 	     ;(ct3 (now))	     
              (t2 (impc:ti:mark-returns t1 symname #f #f #f))
@@ -4377,7 +4380,7 @@
              (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
 	     ;(llllllllllll (println 'vars: vars))	     
 	     ;(ct6 (now))	     
-             (forced-types (apply impc:ti:handle-forced-types t1 (append (cdr c1) args)))
+             (forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
 	     ;(lllllllllllll (println 'forced-types: forced-types))
 	     ;(ct7 (now))
 	     (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
