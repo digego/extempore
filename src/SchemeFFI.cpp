@@ -425,6 +425,8 @@ namespace extemp {
 	    { "real->rational",		&SchemeFFI::realToRational },
 	    { "rational->real",		&SchemeFFI::rationalToReal },
 	    { "integer->real",		&SchemeFFI::integerToReal },
+            { "rational->n",               &SchemeFFI::rationalToNumerator },
+            { "rational->d",               &SchemeFFI::rationalToDenominator },
 
 	    // sys stuff
 	    { "sys:pointer-size",		&SchemeFFI::pointerSize },
@@ -1006,6 +1008,21 @@ namespace extemp {
 	long long vali = (long long) val;
 	double remain = val - (double)vali;
 	return mk_rational(_sc, ((long long)(remain*10000000.0))+(vali*10000000ll), 10000000ll);
+    }
+
+    pointer SchemeFFI::rationalToNumerator(scheme* _sc, pointer args)
+    {
+        pointer rat = pair_car(args);
+        if(!is_rational(rat)) 
+          return mk_integer(_sc, ivalue(rat));
+        return mk_integer(_sc,rat->_object._number.value.ratvalue.n);
+    }
+
+    pointer SchemeFFI::rationalToDenominator(scheme* _sc, pointer args)
+    {
+        pointer rat = pair_car(args);
+        if(!is_rational(rat)) return mk_integer(_sc,1);
+        return mk_integer(_sc,rat->_object._number.value.ratvalue.d);
     }
 	
     pointer SchemeFFI::realToInteger(scheme* _sc, pointer args)

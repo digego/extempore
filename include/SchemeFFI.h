@@ -83,6 +83,8 @@ namespace extemp {
 	static pointer rationalToReal(scheme* _sc, pointer args);
 	static pointer realToRational(scheme* _sc, pointer args);
 	static pointer realToInteger(scheme* _sc, pointer args);
+	static pointer rationalToNumerator(scheme* _sc, pointer args);
+	static pointer rationalToDenominator(scheme* _sc, pointer args);
 		
 	// sys stuff
 	static pointer openDynamicLib(scheme* _sc, pointer args);
