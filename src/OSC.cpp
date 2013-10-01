@@ -260,7 +260,7 @@ namespace extemp {
     return pos;
   }
 
-  int send_scheme_call(scheme* _sc, char* fname, double t, std::string& address, std::string& typetags, char* args)
+  int send_scheme_call(scheme* _sc, char* fname, double t, std::string& address, std::string& typetags, std::string& netaddy, int netport, char* args)
   {
 #ifdef _OSC_DEBUG_
     std::cout << "[OSC]  ADDRESS: " << address << "  TAGS: " << typetags << std::endl;
@@ -268,7 +268,11 @@ namespace extemp {
 
     int pos = 0;
     std::stringstream ss;
-    ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
+    if(OSC::I(_sc)->msg_include_netaddr) {
+      ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\" \"" << netaddy << "\" " << netport;
+    }else{
+      ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
+    }
     //ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
     for(int i=1; i<typetags.size(); ++i) {
       if(typetags[i] == 'i') {
@@ -395,6 +399,7 @@ namespace extemp {
     return pos;
   }
 
+
   void* osc_mesg_callback(void* obj_p)
   {
     OSC* osc = (OSC*) obj_p;
@@ -408,9 +413,12 @@ namespace extemp {
         std::cout << "OSC Message Receive Exception: " << e.what() << std::endl;
         exit(1);
       }
+      std::string netaddy = osc->getClientAddress()->address().to_string();
+      int netport = (int) osc->getClientAddress()->port();
 #else
       long bytes_read = recvfrom(*osc->getSocketFD(), osc->getMessageData(), 70000, 0, (struct sockaddr*)osc->getClientAddress(), (socklen_t *) osc->getClientAddressSize());
-
+      std::string netaddy(inet_ntoa(osc->getClientAddress()->sin_addr));
+      int netport = (int) ntohs(osc->getClientAddress()->sin_port);
 #endif
       if(bytes_read > -1) {
         //printf("udp packet size(%lld)\n",bytes_read);
@@ -453,7 +461,7 @@ namespace extemp {
             used += res;
             pos += res;
             if(osc->getNative() == NULL) {
-              int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,args+pos);
+              int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,netaddy,netport,args+pos);
               if(ret_from_call < 0) break;
               else pos += size-used; //ret_from_call;
             }else{
@@ -465,7 +473,7 @@ namespace extemp {
         }else{
           if(osc->getNative() == NULL) {
             pos += OSC::getOSCString(args+pos,&typetags);
-            pos += send_scheme_call(osc->sc,osc->fname,0.0,address,typetags,args+pos);
+            pos += send_scheme_call(osc->sc,osc->fname,0.0,address,typetags,netaddy,netport,args+pos);
           }else{
             int res = OSC::getOSCString(args+pos,&typetags);
             pos+=res;
@@ -812,7 +820,8 @@ namespace extemp {
     osc_address = new boost::asio::ip::udp::endpoint();
     osc_client_address = new boost::asio::ip::udp::endpoint();
 #endif
-    send_from_serverfd = 0;
+    send_from_serverfd = 1; // default to true!
+    msg_include_netaddr = 0;
     scheme_real_type = 'f';
     scheme_integer_type = 'i';
   }
@@ -825,6 +834,7 @@ namespace extemp {
     scm->addForeignFunc((char*)"io:osc:set-real-64bit?", &OSC::set_real_type);
     scm->addForeignFunc((char*)"io:osc:set-integer-64bit?", &OSC::set_integer_type);
     scm->addForeignFunc((char*)"io:osc:send-from-server-socket?", &OSC::send_from_server_socket);
+    scm->addForeignFunc((char*)"io:osc:netaddress?", &OSC::set_msg_include_netaddr);
 
     //scm->addGlobal("*samplerate*",mk_integer(scm->getSchemeEnv(),AUHost::SAMPLERATE));
   }
@@ -1229,6 +1239,17 @@ namespace extemp {
     return _sc->T;
   }
 
+  pointer OSC::set_msg_include_netaddr(scheme* _sc, pointer args) {
+    OSC* osc = OSC::I(_sc);
+
+    if(pair_car(args)==_sc->T)
+      {
+        osc->msg_include_netaddr = 1;
+      }else{
+      osc->msg_include_netaddr = 0;
+    }
+    return _sc->T;
+  }
 
   pointer OSC::registerScheme(scheme* _sc, pointer args) {
     OSC* osc = new OSC(); //OSC::I();
@@ -1292,6 +1313,9 @@ namespace extemp {
         printf("Error opening OSC socket\n");
         std::cout << "Error opening OSC socket"<< std::endl;
       }
+      int broadcastEnable=1;
+      int ret = setsockopt(socket_fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+
       fcntl(socket_fd, F_SETFL, O_NONBLOCK); //set to non-blocking socket
 
       if(bind(socket_fd, (struct sockaddr*) osc_address, sizeof(*osc_address)) == -1) {
@@ -1340,6 +1364,11 @@ namespace extemp {
       result += setsockopt(socket_fd,
                            SOL_SOCKET,
                            SO_REUSEADDR,
+                           (char *) &t_reuse,
+                           sizeof(t_reuse));
+      result += setsockopt(socket_fd,
+                           SOL_SOCKET,
+                           SO_BROADCAST,
                            (char *) &t_reuse,
                            sizeof(t_reuse));
 

@@ -109,6 +109,7 @@ namespace extemp {
 	static pointer set_real_type(scheme* _sc, pointer args);		
 	static pointer set_integer_type(scheme* _sc, pointer args);
 	static pointer send_from_server_socket(scheme* _sc, pointer args);		
+	static pointer set_msg_include_netaddr(scheme* _sc, pointer args);
 #ifdef EXT_BOOST
 	boost::asio::ip::udp::endpoint* getAddress() { return osc_address; }
 	boost::asio::ip::udp::endpoint* getClientAddress() { return osc_client_address; }
@@ -149,6 +150,7 @@ namespace extemp {
 	char scheme_real_type;
 	char scheme_integer_type;
 	bool send_from_serverfd;
+        bool msg_include_netaddr;
 
     private:
       static OSC* singleton;
