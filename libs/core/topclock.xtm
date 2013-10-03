@@ -9,26 +9,36 @@
 
 ;; lib-loading config
 
-;; This is designed for simplicity so the following holds
+;; This code makes the following assumptions
 
-;; * work with IPADDRESS so no name resolving required
-;; * with single double precision time (epoch of NTP)
-;; * registration to avoid UDP broadcasting (disabled by many
-;; switches)
-;; * direct host->host (make grid higher level concern)
-;; * everyone sends *offset* clock times (not system)
+;; firstly that ip address and port information
+;; are avilable to osc:receive
 
-(sys:load "libs/core/instruments.xtm")
-(sys:load "libs/external/libc.xtm")
+;; secondly that broadcasting on "255.255.255.255" is
+;; available on the current network.
 
-;; pairs <address,rate>
-(define *topclock-registered-address* '())
-;; ip client (assume wireless interface "en0" not "eth0")
-(define *iplocal* (sys:interface-address "en0"))
 ;; topclock port
 (define *topclock-port* 5555)
 ;; epoch adjustments for NTP Jan 1st 1900
 (define *Epoch-1900-1970* 2208988800.0)
+;; election value
+(define *election-val* (random))
+;; master?
+(define *master* #f)
+;; master ip (something valid to start with)
+(define *masterip* "127.0.0.1") ;; 
+(define *oldmasterip* "127.0.0.1") ;; something valid
+;; the time of the last stream message
+;; from the current master
+;; give ouselves 1 second breathing room
+;; for startup
+(define *topclock-lastmsg* (+ 1. (clock:clock)))
+;; did we win!
+(define *election-winner* #f)
+(define *topclock-broadcast* (cons "255.255.255.255" *topclock-port*))
+(define *topclock-print-stream* #f)
+
+;;;; some helper functions ;;;;;;;
 
 (define 1900->1970
   (lambda (time)
@@ -38,173 +48,228 @@
   (lambda (time)
     (+ time *Epoch-1900-1970*)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; q for query
+;; r for response
+
 ;; OSC reciever (for both client and server)
 (define topclock-receive
-  (let ((oldbpm 0.0))
-    (lambda (timestamp address . args)
-      (cond ((string=? address "/topclock/sync/request")
-             (io:osc:send (now) (cons (car args) *topclock-port*) "/topclock/sync/response"
-                          (cadr args) (1970->1900 (clock:clock))))
-            ((string=? address "/topclock/sync/response")
+  (let ((oldbpm (*metro* 'get-tempo))
+        (oldcycle 4)
+        (broadcast *topclock-broadcast*))
+    (lambda (timestamp address srcip srcport . args)
+      (cond ((string=? address "/clock/master/q")
+             ;; if current master send reponse
+             ;; srcport need not be same as *topclock-port*
+             (if *master* 
+                 (io:osc:send (now) (cons srcip srcport) "/clock/master/r")))
+            ((string=? address "/clock/master/r")
+             ;; if we get a message it must be from master
+             ;; so we can set the *mastersip* to whatever the srcip is
+             (set! *mastersip* srcip)) ;; master port must be *topclock-port*
+            ((string=? address "/clock/election/q")
+             ;; someone has asked for an election!
+             ;; if we have a higher election-val OR we are allready the master
+             ;; then send a message back, otherwise don't!
+             (let ((election-val (car args)))
+               (if (or *master*
+                       (> *election-val* election-val))
+                   (io:osc:send (now) (cons srcip srcport) "/clock/election/r"))))
+            ((string=? address "/clock/election/r")
+             ;; if we receive an election reply 
+             ;; then we are definitely NOT the master
+             ;; also don't try for re-election again
+             ;; for AT LEAST 5 seconds!
+             (set! *topclock-lastmsg* (+ 5. (clock:clock)))
+             (set! *election-winner* #f))
+            ((string=? address "/clock/sync/q")
+             ;; if someone asks for a clocksync (from any IP and any PORT)
+             ;; and we are the master then send a reply
+             ;; first arg is t1 (from client) we add t2 to reply
+             (if *master*
+                 (io:osc:send (now) (cons srcip srcport) "/clock/sync/r"
+                              (car args) (1970->1900 (clock:clock)))))
+            ((string=? address "/clock/sync/r")
+             ;; clock syncs come from current master
              (let* ((t1 (1900->1970 (car args)))
                     (t2 (1900->1970 (cadr args))) ;; t2 
                     (t3 (1900->1970 (cadr args))) ;; and t3 the same
                     (t4 (clock:clock))
                     (msg-delay (- t4 t1))
                     (offset (/ (+ (- t2 t1) (- t3 t4)) 2.0)))
-               (if (< msg-delay .1) (clock:adjust-offset offset))))
-            ((string=? address "/topclock/register")
-             (let ((mark (*metro* 'get-mark))
-                   (tempo (*metro* 'get-tempo)))
-               (println 'registering 'client (car args) 'at 'rate (cadr args))
-               (set! *topclock-registered-address*
-                     (cons (cons (car args) (cadr args))
-                           *topclock-registered-address*))))
-            ((string=? address "/topclock/stream")
+               (clock:adjust-offset offset)))
+            ((string=? address "/clock/bpm/set")
+             ;; bpm changes are sent to master only (i.e. not broadcast)
+             ;; to ensure that we don't have the problem where some
+             ;; clients GET the message but the master DOESN'T!
+             (if *master*
+                 (let ((time (1900->1970 (car args)))
+                       (bpm (cadr args))                   
+                       (beat-n (caddr args))
+                       (beat-d (cadddr args))
+                       (cycle (car (cddddr args))))
+                   (set! oldbpm bpm)
+                   (set! oldcycle cycle)
+                   (*metro* 'set-cycle cycle)
+                   (*metro* 'set-tempo bpm (clock->samples time) (/ beat-n beat-d))
+                   ;; broadcast new bpm details as bpm/update
+                   (io:osc:send (now) *topclock-broadcast* "/clock/bpm/update"
+                                (1970->1900 time) bpm beat-n beat-d cycle))))
+            ((string=? address "/clock/bpm/update")
+             ;; bpm/update is same as bpm/set but is a broadcast
+             ;; call from the master
+             ;; (i.e. we don't care so much if this UDP packet gets lost
+             (let ((time (1900->1970 (car args)))                   
+                   (bpm (cadr args))
+                   (beat-n (caddr args))
+                   (beat-d (cadddr args))
+                   (cycle (car (cddddr args))))
+               (if (and (not *master*) (or (<> bpm oldbpm) (<> oldcycle cycle)))
+                   (begin
+                     (set! oldbpm bpm)
+                     (set! oldcycle cycle)
+                     (*metro* 'set-cycle cycle)
+                     (*metro* 'set-tempo bpm (clock->samples time) (/ beat-n beat-d))))))
+            ((string=? address "/clock/bpm/q")
+             ;; ask what the current bpm is
+             ;; when it was set
+             ;; and what the running beat total was when set
+             (let* ((mark (*metro* 'get-mark))
+                    (time (1970->1900 (samples->clock (car mark))))
+                    (bpm (*metro* 'get-tempo))
+                    (cycle (*metro* 'get-cycle))
+                    (total-beats (cdr mark)))
+               (io:osc:send (now) (cons srcip srcport) "/clock/bpm/r"
+                            time bpm (rational->n total-beats) (rational->d total-beats) cycle)))
+            ((string=? address "/clock/bpm/r")
              (let ((time (1900->1970 (car args)))
                    (bpm (cadr args))
-                   (beat (caddr args))
-                   (num (cadddr args))
-                   (denom (car (cddddr args))))
-               ;; don't worry about metre (num/denom) for testing               
-               (if (<> bpm oldbpm)
-                   (begin (set! oldbpm bpm)
-                          (println '*metro* bpm (clock->samples time) beat (* 1. (*metro* 'get-beat 1/32)))
-                          (*metro* 'set-tempo bpm (clock->samples time) beat)))))
-            ((string=? address "/topclock/bpm/request")
-             (let ((mark (*metro* 'get-mark))
-                   (tempo (*metro* 'get-tempo)))
-               (io:osc:send (now) (cons (car args) *topclock-port*) "/topclock/bpm/reply"
-                            tempo (1970->1900 (samples->clock (car mark))) (cdr mark))))
-            ((string=? address "/topclock/bpm/reply")
-             (let ((bpm (car args))
-                   (time (1900->1970 (cadr args)))
-                   (beat (caddr args)))
-               (println 'tempo: bpm 'time: time 'beat: beat)
-               (*metro* 'set-tempo bpm (clock->samples time) beat)))
-            ((string=? address "/topclock/bpm/update")
-             (let ((time (1900->1970 (car args)))
-                   (bpm (cadr args))
-                   (beat (caddr args)))
-               (println 'Update! bpm)
+                   (beat-n (caddr args))
+                   (beat-d (cadddr args))
+                   (cycle (car (cddddr args))))
                (set! oldbpm bpm)
-               (*metro* 'set-tempo bpm (clock->samples time) beat)))
-            ((string=? address "/topclock/bpm/new")
-             (let ((time (car args)) ;;(1900->1970 (car args)))
+               (set! oldcycle cycle)               
+               (*metro* 'set-cycle cycle)
+               (*metro* 'set-tempo bpm (clock->samples time) (/ beat-n beat-d))))
+            ((string=? address "/clock/stream")
+             ;; stream sends out at a rate of 1/16 the current tempo
+             ;; bpmt is the time that the bpm change occured
+             (let ((time (1900->1970 (car args)))
                    (bpm (cadr args))
-                   (beat (caddr args)))
-               (if (>= beat (*metro* 'get-beat 1/32))
-                   (for-each (lambda (c)
-                               (println 'c: c)
-                               (io:osc:send (now) (cons (car c) *topclock-port*) "/topclock/bpm/update"
-                                            time bpm beat))
-                             *topclock-registered-address*))))
+                   (beat-n (caddr args))
+                   (beat-d (cadddr args))
+                   (cycle (car (cddddr args))))
+               (if *topclock-print-stream* (println 'clock 'stream: srcip time bpm (/ beat-n beat-d) cycle))
+               ;; update masterip and lastmsg time
+               (set! *masterip* srcip)
+               (if (not (string=? *masterip* *oldmasterip*))
+                   (begin (ascii-print-color 0 5 10)
+                          (println)
+                          (println 'There 'is 'a 'new 'topclock 'in 'town! srcip)
+                          (println)
+                          (ascii-print-color 0 7 10)
+                          (set! *master* #f)
+                          (set! *oldmasterip* *masterip*)))
+               (set! *topclock-lastmsg* (clock:clock))
+               ;; check for bpm updates (redundancy for missed bpm/update events)
+               (if (and (not *master*) (or (<> bpm oldbpm) (<> cycle oldcycle)))
+                   (io:osc:send (now) (cons *masterip* *topclock-port*) "/clock/bpm/q"))))
             (else (println 'bad 'osc 'message: address))))))
 
 ;; start topclock osc receiver (both client and server)
 (io:osc:start-server *topclock-port* "topclock-receive")
-;; use doubles for OSC real nums:
+;; send doubles for OSC real nums:
 (io:osc:set-real-64bit? #t)
+;; have OSC emit both source IP and PORT
+(io:osc:netaddress? #t)
 
-;; sends OSC message /topclock/sync/request
-;; of type <string,double>
-;; 'string' is ipaddress string (client must convert hostname to IP)
-;; 'double' is the system time in seconds (UTC with epoch of Jan 1 1900 (i.e. NTP))
-(define topclock-sync
-  (lambda (server)
-    (io:osc:send (now) (cons server *topclock-port*) "/topclock/sync/request"
-                 *iplocal* (1970->1900 (clock:clock)))))
-
-
-;; sends OSC message /topclock/register
-;; of type <string,double>
-;; 'string' is ipaddress string (client must convert hostname to IP)
-;; 'double' is the 'stream' rate which is in beats at current BPM (0.125 for 8th notes as example)
-(define topclock-register
-  (lambda (server rate)
-    (io:osc:send (now) (cons server *topclock-port*) "/topclock/register"
-                 *iplocal* rate)))
-
-
-;; sends OSC message /topclock/bpm
+;; sends OSC message /clock/bpm/set to current master
 ;; of type <double,double>
-;; 'double' is time (UTC epoch 1900)
+;; 'time' is double (UTC epoch 1900)
 ;; 'bpm' beats per minute
+;; 'beat' is the beat that this change fell on (should be synonymous with time)
 (define topclock-bpm
-  (lambda (server time bpm beat)
-    (io:osc:send (now) (cons server *topclock-port*) "/topclock/bpm/new"
-                 (1970->1900 (samples->clock time)) bpm beat)))
+  (lambda (time bpm beat cycle) 
+    (io:osc:send (now) (cons *masterip* *topclock-port*) "/clock/bpm/set"
+                 (1970->1900 (samples->clock time)) bpm
+                 (rational->n beat) (rational->d beat) cycle)))
 
-;; query server for current bpm
-(define topclock-query-bpm
-  (lambda (server)
-    (io:osc:send (now) (cons server *topclock-port*) "/topclock/bpm/request"
-                 *iplocal*)))
 
-(define topclock-sync-regular
-  (lambda (server)
-    (topclock-sync server) 
-    (callback (+ (now) 10000) 'topclock-sync-regular server)))
-
-;; server proc streams to all registered ip addresses
-;; at whatever specified rate (in beats) the client provided
+;; topclock streamer
+;; only starts if this client becomes
+;; the master by winning a public election
+;; broadcasts "/clock/stream" messages
 (define topclock-streamer
   (lambda (beat dur)
-    (for-each (lambda (client)
-                (if (and (> (cdr client) 0)
-                         (modulo beat (cdr client)))
-                    (io:osc:send (now) (cons (car client) *topclock-port*) "/topclock/stream"
-                                 (1970->1900 (samples->clock (*metro* beat)))
-                                 (*metro* 'get-tempo)
-                                 (rational->real beat)
-                                 0 0))) ;; don't worry about num and denum for tests              
-              *topclock-registered-address*)
-    (callback (*metro* (+ beat (* .5 dur))) 'topclock-streamer
-              (+ beat dur) dur)))
+    (let* ((bpm (*metro* 'get-tempo))
+           (cycle (*metro* 'get-cycle)))
+      (io:osc:send (*metro* beat) *topclock-broadcast* "/clock/stream"
+                   (1970->1900 (samples->clock (*metro* beat)))
+                   bpm (rational->n beat) (rational->d beat) cycle)
+      (if *master*
+          (callback (*metro* (+ beat (* .5 dur))) 'topclock-streamer (+ beat dur) dur)))))
 
-;; connect to topclock server
-(define topclock-start-streamer
-  (lambda (server rate)
-    (topclock-streamer (*metro* 'get-beat 4) rate)))
+;; call a general election!
+;; this is a broadcast call
+;; if there is an existing master
+;; that master will continue in the rolw
+;; if there is NO master then the peer
+;; with the highest *election-val* will
+;; become the new master.
+(define topclock-election
+  (lambda ()
+    ;; assume we won :)
+    (set! *election-winner* #t)
+    (ascii-print-color 0 5 10)
+    (println 'Nominating 'myself 'in 'topclock 'election!)
+    (ascii-print-color 0 7 10)
+    ;; send message to the world!
+    (io:osc:send (now) *topclock-broadcast* "/clock/election/q" *election-val*)
+    ;; wait 4 seconds to find out if we really won!
+    ;; if we didn't someone will have forced our
+    ;; *election-winner* to #f
+    (sys:sleep (* *au:samplerate* 4.0))
+    (if *election-winner*
+        (begin
+          (set! *master* #t)
+          (ascii-print-color 1 5 10)
+          (println 'Which 'I 'Won!)
+          (ascii-print-color 0 7 10)
+          (topclock-streamer (*metro* 'get-beat 1) 1/4))
+        (begin
+          (ascii-print-color 1 5 10)
+          (println 'Which 'I 'lost!)
+          (ascii-print-color 0 7 10)))
+    (set! *election-winner* #f)))
 
-(define topclock-start
-  (lambda (server)
-    (topclock-sync-regular server)
-    (topclock-register server 0) ;; rate of 0 means don't stream anything!
-    ;; let sync happen before bpm
-    (callback (+ (now) 10000) 'topclock-query-bpm server)
-    ;; let bpm happen before streamer start
-    (callback (+ (now) 20000) 'topclock-start-streamer server 1/32)
-    (println 'topclock-started)))
+;; a regular sync to the current master clock
+;; this loop is run by all clients
+;; (including the master!)
+;;
+;; also *topclock-lastsync* should never be
+;; more than 1/2 second old..
+;; if we get to more than 2 seconds old call
+;; a general election!  because the master
+;; must have died!
+(define topclock-sync
+  (lambda ()
+    (io:osc:send (now) (cons *masterip* *topclock-port*) "/clock/sync/q"
+                 (1970->1900 (clock:clock)))
+    ;; if not master and last streamed message
+    ;; was more than 3 seconds ago
+    ;; then call a general election!
+    (if (and (not *master*)
+             (> (- (clock:clock) *topclock-lastmsg*) 3.0))
+        (topclock-election))
+    (callback (+ (now) 10000) 'topclock-sync)))
 
-(topclock-start "10.0.1.8")
-
-(bind-func dsp:DSP 1000000
-  (let ((t 0.0))
-    (lambda (in time chan dat)
-      (if (= t 0.0) (set! t time))
-      (if (< chan 1.5)
-          (+ (fmsynth in time chan dat)
-             0.0)
-          0.0))))
-
-(dsp:set! dsp)
-
-(fmsynth_fx.wet .05)
-(fmsynth_fx.dfb .05)
-
-(define test
-  (lambda (beat dur)
-    (if (and (= (modulo beat 4) 0)
-             (> (random) .8))
-        (topclock-bpm "10.0.1.8" (*metro* beat) (random 90 180) beat))
-    (if (= (modulo beat 4) 0)        
-        (play fmsynth 67 80 .1)
-        (play fmsynth 60 80 .1))
-    (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
-
-(define teststart
-  (lambda ()    
-    (test (*metro* 'get-beat 4) 1)))
-
-(callback (+ (now) 500000) 'teststart)
+(ascii-print-color 0 5 10)
+(println)
+(println 'Starting 'TOPClock!)
+(ascii-print-color 0 7 10)
+(println)
+;; start clock sync
+;; all clients (including master)
+;; will run this loop
+(topclock-sync)
