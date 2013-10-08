@@ -1214,6 +1214,20 @@
 	      (sys:open-dylib ,(string-append (symbol->string libname) ".dylib")))
 	     (else (begin (println "Unknown platform: " platform) nil))))))
 
+;; filename wrangling
+
+(define sys:file-path-components
+  (lambda (file-path)
+    (let ((base (regex:matched file-path "(.*)/(.*)\\.(.*)")))
+      (and (not (null? base))
+           (cdr base)))))
+
+;; Check if (prebuilt) lib exists in runtime/lib first, otherwise
+;; search LDPATH as usual
+(define sys:load-dylib
+  (lambda (lib-name)
+    (or (sys:open-dylib (string-append "runtime/lib/" lib-name))
+        (sys:open-dylib lib-name))))
 
 ;;;;;;;;;;;;;;;;;
 ;; comlist.xtm ;;
