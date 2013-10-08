@@ -87,16 +87,16 @@
 
 (define libgl
   (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:open-dylib "libGL.so"))
-          ((string=? platform "Windows") (sys:open-dylib "Gl32.dll"))
-          ((string=? platform "OSX") (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))
+    (cond ((string=? platform "Linux") (sys:load-dylib "libGL.so"))
+          ((string=? platform "Windows") (sys:load-dylib "Gl32.dll"))
+          ((string=? platform "OSX") (sys:load-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))
           (else (print "Unknown platform: " platform)))))
 
 ;; if on windows also check for opengl32.dll			  
 (if (or (eq? #f libgl)
 	    (null? libgl)) 
 	(if (string=? "Windows" (sys:platform))
-	    (begin (set! libgl (sys:open-dylib "opengl32.dll"))
+	    (begin (set! libgl (sys:load-dylib "opengl32.dll"))
 		       (if (or (null? libgl)
 				       (eq? #f libgl))
 			       (print-error "Error loading opengl library")))	   
@@ -169,9 +169,9 @@
 ;; Load GLU
 (define libglu
   (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:open-dylib "libGLU.so"))
-          ((string=? platform "Windows") (sys:open-dylib "Glu32.dll"))
-          ((string=? platform "OSX") (sys:open-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))
+    (cond ((string=? platform "Linux") (sys:load-dylib "libGLU.so"))
+          ((string=? platform "Windows") (sys:load-dylib "Glu32.dll"))
+          ((string=? platform "OSX") (sys:load-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))
           (else (print "Unknown platform: " platform)))))
 
 (if (or (eq? #f libglu)

@@ -1207,11 +1207,11 @@
   `(define ,libname
      (let ((platform (sys:platform)))
        (cond ((string=? platform "Linux")
-	      (sys:open-dylib ,(string-append (symbol->string libname) ".so")))
+	      (sys:load-dylib ,(string-append (symbol->string libname) ".so")))
 	     ((string=? platform "Windows")
-	      (sys:open-dylib ,(string-append (symbol->string libname) ".dll")))
+	      (sys:load-dylib ,(string-append (symbol->string libname) ".dll")))
 	     ((string=? platform "OSX")
-	      (sys:open-dylib ,(string-append (symbol->string libname) ".dylib")))
+	      (sys:load-dylib ,(string-append (symbol->string libname) ".dylib")))
 	     (else (begin (println "Unknown platform: " platform) nil))))))
 
 ;; filename wrangling
@@ -1226,8 +1226,8 @@
 ;; search LDPATH as usual
 (define sys:load-dylib
   (lambda (lib-name)
-    (or (sys:open-dylib (string-append "runtime/lib/" lib-name))
-        (sys:open-dylib lib-name))))
+    (or (sys:load-dylib (string-append "runtime/lib/" lib-name))
+        (sys:load-dylib lib-name))))
 
 ;;;;;;;;;;;;;;;;;
 ;; comlist.xtm ;;
