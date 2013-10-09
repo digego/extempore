@@ -550,7 +550,7 @@ int llvm_printf(char* format, ...)
 #else
     char* ret = (char*) alloca(2048);
 #endif
-    int returnval = vsprintf(ret, format, ap);
+    int returnval = vsnprintf(ret, 2048, format, ap);
     printf("%s",ret);
     fflush(stdout);	
     va_end(ap);
