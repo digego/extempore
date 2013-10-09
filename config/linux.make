@@ -16,7 +16,7 @@ endif
 PLATFORM_LIBS += -lpcre -lGL -lX11 #/usr/lib/nvidia-current/libGL.so
 
 PLATFORM_CXXFLAGS := -g -O3
-PLATFORM_LDFLAGS :=
+PLATFORM_LDFLAGS := -Wl,--export-dynamic
 
 PLATFORM_DEFINES := -DTARGET_OS_LINUX
 PLATFORM_CXX := g++
