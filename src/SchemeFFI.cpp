@@ -1047,13 +1047,13 @@ namespace extemp {
 	if (!lib_handle)
 	{
 #ifdef TARGET_OS_WINDOWS
-	  std::cout << "Error loading library" << GetLastError() << std::endl;
-	  printf("For Library Path: %ls\n",wstr);
+	  //std::cout << "Error loading library" << GetLastError() << std::endl;
+	  //printf("For Library Path: %ls\n",wstr);
 	  return _sc->F;
 #else                       
-	  fprintf(stderr, "%s\n", dlerror());
+	  //fprintf(stderr, "%s\n", dlerror());
 #endif
-	    return _sc->F;
+	  return _sc->F;
 	}
 	return mk_cptr(_sc,lib_handle);
     }
