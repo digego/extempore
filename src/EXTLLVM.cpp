@@ -546,11 +546,11 @@ int llvm_printf(char* format, ...)
     va_list ap;
     va_start(ap,format);
 #ifdef TARGET_OS_WINDOWS
-    char* ret = (char*) _alloca(8192);
+    char* ret = (char*) _alloca(2048);
 #else
-    char* ret = (char*) alloca(8192);
+    char* ret = (char*) alloca(2048);
 #endif
-    int returnval = vsnprintf(ret, 8192, format, ap);
+    int returnval = vsnprintf(ret, 2048, format, ap);
     printf("%s",ret);
     fflush(stdout);	
     va_end(ap);
