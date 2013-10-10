@@ -666,11 +666,14 @@
           (row:i8* null)
           (img (xtm_create_vgimage w h))
           (i 0))
-      ;; flip image
-      (dotimes (i h)
-        (set! row (pref-ptr data (* i (* w 4))))
-	(xtm_set_vgimage_subdata img row (* w 4) 0 (- h i 1) w 1))
-      img)))
+      (if (null? data)
+          (begin (printf "Error: image not loaded\n") null)
+          ;; flip image
+          (begin
+            (dotimes (i h)
+              (set! row (pref-ptr data (* i (* w 4))))
+              (xtm_set_vgimage_subdata img row (* w 4) 0 (- h i 1) w 1))
+            img)))))
 
 ;; working with colours, dealing with double -> uint8 conversions, etc.
 ;; clip input values into [0.0,1.0]

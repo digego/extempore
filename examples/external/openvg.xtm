@@ -31,43 +31,46 @@
 (sys:load "libs/external/assimp.xtm")
 (sys:load "libs/external/openvg.xtm")
 
-(bind-func post:XTMRENDERCB
-  (lambda (frame shader m v p data)
-    (let ((path (xtm_create_vgpath))
-          (stroke (vgCreatePaint))
-          (fill (vgCreatePaint))
-          (i 0))
-      (xtm_vg_setup)
-      (xtm_vg_clear 0.0 0.0 0.0 1.0 (ftoi32 width) (ftoi32 height))
-      (xtm_paint_setup_fill fill 1.0 0.0 0.0 0.5)
-      (xtm_paint_setup_stroke stroke 0.0 0.0 1.0 0.5 10.0)
-      ;; create the path (using the add_circle closure)
-      (dotimes (i 200)
-        (xtm_add_ellipse
-         path
-         (+ 512. (* 200.0 (cosf (* (i64tof i) 0.00025 (i64tof frame)))))
-         (+ 400. (* 100.0 (tanf (* 0.0001 (i64tof i) (i64tof frame)))))
-         30.
-         30.))
-      ;; draw the path
-      (xtm_draw_path path)
-      ;; cleanup
-      (xtm_destroy_paint fill)
-      (xtm_destroy_paint stroke)
-      (xtm_vg_print_error))
-    void))
-
-(bind-func gl_render
-  (lambda ()
-    (xtm_render null null null post null)
-    void))
-
 ;; init xtm render pipeline
 (xtm_render_setup (real->integer width) (real->integer height))
 
 (let ((vg-ctx-res (xtm_create_vg_context (real->integer width) (real->integer height))))
   (if (<> vg-ctx-res 1)
       (xtm_vg_print_error)))
+
+(bind-func post:XTMRENDERCB
+  (let ((image:VGImage (xtm_load_vgimage "assets/images/image.png")))
+    (lambda (frame shader m v p data)
+      (let ((path (xtm_create_vgpath))
+            (stroke (vgCreatePaint))
+            (fill (vgCreatePaint))
+            (i 0))
+        (xtm_vg_setup)
+        (xtm_vg_clear 0.0 0.0 0.0 1.0 (ftoi32 width) (ftoi32 height))
+        (xtm_paint_setup_fill fill 1.0 0.0 0.0 0.5)
+        (xtm_paint_setup_stroke stroke 0.0 0.0 1.0 0.5 10.0)
+        ;; create the path (using the add_circle closure)
+        (dotimes (i 200)
+          (xtm_add_ellipse
+           path
+           (+ 512. (* 200.0 (cosf (* (i64tof i) 0.00025 (i64tof frame)))))
+           (+ 400. (* 100.0 (tanf (* 0.0001 (i64tof i) (i64tof frame)))))
+           30.
+           30.))
+        ;; draw the image
+        (if (null? image) void (vgDrawImage image))
+        ;; draw the paths
+        (xtm_draw_path path)
+        ;; cleanup
+        (xtm_destroy_paint fill)
+        (xtm_destroy_paint stroke)
+        (xtm_vg_print_error))
+      void)))
+
+(bind-func gl_render
+  (lambda ()
+    (xtm_render null null null post null)
+    void))
 
 (define gl-loop
   (lambda (time delta-t)
