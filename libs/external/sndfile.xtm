@@ -13,7 +13,28 @@
 ;; lib-loading config
 (sys:load-preload-check 'sndfile)
 
-(sys:load "libs/core/audio_dsp.xtm")
+;; bind some global audio values
+(if (not (llvm:get-globalvar "SAMPLERATE"))
+    (begin (bind-val SAMPLERATE double (integer->real *au:samplerate*))
+           (bind-val SR double (integer->real *au:samplerate*))))
+(if (not (llvm:get-globalvar "CHANNELS"))
+    (bind-val CHANNELS i64 *au:channels*))
+(if (not (llvm:get-globalvar "IN_CHANNELS"))
+    (bind-val IN_CHANNELS i64 *au:in-channels*))
+(if (not (llvm:get-globalvar "FRAMES"))
+    (bind-val FRAMES i64 *au:block-size*))
+
+(bind-alias DSP [double,double,double,double,double*]*)
+(bind-alias DSPMT [double,double*,double,double,double*]*)
+
+(bind-func print_audio_state
+  (lambda ()
+    (printf "    FRAMES: %lld\n" FRAMES)
+    (printf " OUT CHANS: %lld\n" CHANNELS)
+    (printf "  IN CHANS: %lld\n" IN_CHANNELS)
+    (printf "SAMPLERATE: %f\n" SAMPLERATE)))
+
+(print_audio_state)
 
 ;; load the libsndfile dynamic library
 (define libsndfile
