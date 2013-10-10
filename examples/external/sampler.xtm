@@ -189,3 +189,24 @@
                   (random '(0 8))))))
 
 (loop2 (*metro* 'get-beat 4) 4 0)
+
+;; finally, let's load up a piano. There are some piano samples in
+;; assets/samples/piano which are named according to the midi pitch
+;; number they represent (so we'll want to use parse-sample-names-1)
+
+(load-sampler sampler "assets/samples/piano" 2 parse-sample-names-1)
+
+(define chromatic-scale
+  (lambda (beat dur pitch)
+    (play sampler pitch (cosr 50 20 1/4) (* dur 1.4) 2)
+    (callback (*metro* (+ beat (* .5 dur))) 'chromatic-scale (+ beat dur) dur
+              (if (< pitch 108) (+ pitch 1) 24))))
+
+(chromatic-scale (*metro* 'get-beat 4) 1/4 24)
+
+;; try messing around with the ADSR parameters to see how it affects the sound
+
+(sampler.attack 20.0)
+(sampler.decay 20.0)
+(sampler.release 400.0)
+(sampler.sustain 1.0)
