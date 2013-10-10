@@ -21,3 +21,7 @@ PLATFORM_LDFLAGS := -Wl,--export-dynamic
 PLATFORM_DEFINES := -DTARGET_OS_LINUX
 PLATFORM_CXX := g++
 PLATFORM_LD := g++
+
+ifdef EXT_BUILD_GENERIC
+PLATFORM_CXXFLAGS += -mtune=generic
+endif

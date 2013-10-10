@@ -2,7 +2,7 @@
 
 ;; Author: Andrew Sorensen, Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: 
+;; Required dylibs:
 
 ;;; Commentary:
 
@@ -24,71 +24,74 @@
   (lambda ()
     (getenv "EXT_LLVM_DIR")))
 
+(bind-func check_build_generic
+  (lambda ()
+    (getenv "EXT_BUILD_GENERIC")))
+
 ;; check for EXT_LLVM_DIR
 (if (string=? "" (cptr->string (get_llvm_path)))
     (print-error 'You 'must 'set 'EXT_LLVM_DIR! 'before 'calling 'create-stlib.xtm))
 
+(begin
+  (ascii-print-color 0 2 10)
+  (print (string-append "\n\nCompiling xtlang stdlib"
+                        (if (string=? "1" (cptr->string (check_build_generic)))
+                            " for binary distribution" "")
+                        "...\n\n\n"))
+  (ascii-print-color 0 7 10))
 
 (define llvm-compile-xtlang-module
   (lambda args
-    (let* ((basename (if (null? args) "xtlang-module" (car args)))
-           (bitcode-file (string-append "/tmp/" basename ".bc"))
-           (asm-file (string-append "/tmp/" basename ".s"))
-           (shared-lib-file
-            (cond ((string=? (sys:platform) "Linux")
-             (string-append "/tmp/" basename ".so"))
-            ((string=? (sys:platform) "OSX")
-             (string-append "/tmp/" basename ".dylib"))
-            ((string=? (sys:platform) "Windows")
-             (string-append "./" basename ".dll"))
-            (else ""))))
-      (if (string=? "" (cptr->string (get_llvm_path)))
-          (print-error 'You 'must 'set 'EXT_LLVM_DIR!))
-      (println 'Looking 'for 'llc 'in (cptr->string (get_llvm_path)))
+    (let* ((platform (sys:platform))
+           (basename (if (null? args) "xtlang-module" (car args)))
+           (bitcode-path (string-append "/tmp/" basename ".bc"))
+           (asm-path (string-append "/tmp/" basename ".s"))
+           (shlib-path
+            (cond ((string=? platform "Linux")
+                   (string-append "/tmp/" basename ".so"))
+                  ((string=? platform "OSX")
+                   (string-append "/tmp/" basename ".dylib"))
+                  ((string=? platform "Windows")
+                   (string-append "./" basename ".dll"))
+                  (else "")))
+           (llvm-path (cptr->string (get_llvm_path)))
+           (build-generic
+            (string=? "1" (cptr->string (check_build_generic))))
+           (compilation-command
+            (string-append
+             (cptr->string (get_llvm_path))
+             "/bin/llc -O3 -relocation-model=pic -tailcallopt "
+             (if build-generic "-mcpu=generic " "")
+             bitcode-path " && "
+             (cond ((string=? platform "Linux")
+                    "gcc -O3 --shared -g ")
+                   ((string=? platform "OSX")
+                    (string-append "clang -O3 -dynamiclib -undefined dynamic_lookup "
+                                   (if build-generic  "-mmacosx-version-min=10.6 " ""))))
+             (if build-generic " -mtune=generic " "") asm-path
+             " -o " shlib-path "\n")))
+      (if (string=? platform "Windows")
+          (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
+      (if (string=? "" llvm-path)
+          (print-error 'You 'must 'set 'EXT_LLVM_DIR 'to 'compile 'the 'stdlib)
+          (println 'Looking 'for 'llc 'in (cptr->string (get_llvm_path))))
       ;; print further instructions
-      (cond ((string=? (sys:platform) "Linux")
-             (command "rm /tmp/xtm*")
-             (llvm:export-module bitcode-file)
-             (let ((res (command (string-append (cptr->string (get_llvm_path))
-                                                "/bin/llc -O3 -relocation-model=pic -tailcallopt "
-                                                bitcode-file
-                                                " && gcc -O3 --shared -g "
-                                                asm-file " -o " shared-lib-file "\n"))))
-               (if (<> res 0)
-                   (begin
-                     (ascii-print-color 0 1 10)
-                     (println)
-                     (println 'Failed 'to 'compile 'stdlib)                     
-                     (ascii-print-color 0 7 10)
-                     (println))
-                   (begin
-                     (ascii-print-color 0 2 10)
-                     (println)
-                     (println 'Successfully 'compiled 'stdlib: '/tmp/xtm.so)                     
-                     (ascii-print-color 0 7 10)
-                     (println)))))
-            ((string=? (sys:platform) "OSX")
-             (command "rm /tmp/xtm*")
-             (llvm:export-module bitcode-file)             
-             (let ((res (command (string-append (cptr->string (get_llvm_path))
-                                                "/bin/llc -O3 -relocation-model=pic -tailcallopt "
-                                                bitcode-file
-                                                " && clang -O3 -dynamiclib -undefined dynamic_lookup "
-                                                asm-file " -o " shared-lib-file "\n"))))
-               (if (<> res 0)
-                   (begin
-                     (ascii-print-color 0 1 10)
-                     (println)
-                     (println 'Failed 'to 'compile 'stdlib)                     
-                     (ascii-print-color 0 7 10)
-                     (println))
-                   (begin
-                     (ascii-print-color 0 2 10)
-                     (println)
-                     (println 'Successfully 'compiled 'stdlib: '/tmp/xtm.dylib)
-                     (ascii-print-color 0 7 10)
-                     (println)))))
-            (else (print "Sorry, cannot find the appropriate compilation command for your platform at this time."))))))
+      (command (string-append "rm /tmp/" basename "*"))
+      (llvm:export-module bitcode-path)
+      (print "compile command:\n " compilation-command "\n\n")
+      (let ((res (command compilation-command)))
+        (if (<> res 0)
+            (begin
+              (ascii-print-color 0 1 10)
+              (println)
+              (print "Failed to compile stdlib.")
+              (ascii-print-color 0 7 10)
+              (println))
+            (begin
+              (ascii-print-color 0 2 10)
+              (print "\nSuccessfully compiled stdlib: " shlib-path "\n")
+              (ascii-print-color 0 7 10)
+              (print "\nTo finish installation, move the shared lib into your extempore/libs directory\n\ne.g. mv" shlib-path "libs\n")))))))
 
 ;;; Code:
 (sys:load "libs/core/math.xtm")

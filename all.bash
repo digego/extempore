@@ -41,6 +41,10 @@ else
     unset EXT_BOOST
 fi
 
+# check if builing generic binary for distribution
+if [ "$EXT_BUILD_GENERIC" = "1" ]; then
+    echo "building binary for distribution..."
+fi
 
 EXT_USER_ARGS=$@
 export EXT_USER_ARGS
