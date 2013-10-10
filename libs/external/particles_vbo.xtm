@@ -18,7 +18,7 @@
 (bind-type particle_t <float,float,float,float,float,float,float,float,float,i32>)
 (bind-type psystem <i32,i32,particle_t*,E_vbo*>)
 
-(bind-val particle_shader i32 (create_shader particles-vert particles-frag))
+(bind-val particle_shader i32 (create_shader particles-vert particles-frag 0 0))
 
 ;; create system
 (bind-func psystem_create
@@ -38,16 +38,6 @@
     void))
 
 
-;; (bind-func psystem-particle-check
-;;   (lambda (psys:psystem* idx)
-;;     (let ((states (psystem_states psys))
-;; 	  (size (psystem_size psys)))
-;;       (if (> idx (- size 1)) -1	  
-;; 	  (if (< (pref states idx) 1)
-;; 	      idx
-;; 	      (psystem-particle-check psys (+ idx 1)))))))
-
-
 (bind-func psystem-set-particle
   (lambda (psys:psystem* idx:i32 x y s xx yy r g b a state)
     (let ((size (tref psys 0))
@@ -58,16 +48,6 @@
           (let ((particle (pref-ptr (tref psys 2) idx)))
 	    (tfill! particle x y r b g a s xx yy state) 
 	    void)))))
-
-
-;; (bind-func psystem-add-particle
-;;   (lambda (psys:psystem* x y s xx yy r g b a dur)
-;;     (let ((size (psystem_size psys))
-;; 	  (free-particle (psystem-particle-check psys 0)))
-;;       (if (= free-particle -1)
-;; 	  void ;; don't do anything if no free particles
-;; 	  (begin (psystem-set-particle psys free-particle x y s xx yy r g b a dur)
-;; 		 void)))))		  
 
 
 ;; draw system
@@ -86,11 +66,11 @@
 	  (cnt 0))
       (if (= my_vertex -1)
 	  (begin 
-	    (set! my_vertex (glGetAttribLocation particles_shader "myVertex"))
-	    (set! my_colour (glGetAttribLocation particles_shader "myColour"))
-	    (set! my_size (glGetAttribLocation particles_shader "mySize"))
-	    (set! my_velocity (glGetAttribLocation particles_shader "myVelocity"))
-	    (set! my_state (glGetAttribLocation particles_shader "myState"))))
+	    (set! my_vertex (glGetAttribLocation particle_shader "myVertex"))
+	    (set! my_colour (glGetAttribLocation particle_shader "myColour"))
+	    (set! my_size (glGetAttribLocation particle_shader "mySize"))
+	    (set! my_velocity (glGetAttribLocation particle_shader "myVelocity"))
+	    (set! my_state (glGetAttribLocation particle_shader "myState"))))
 
       ;; (printf "%d,%d,%d,%d,%d\n" my_vertex my_colour my_velocity my_state my_size)
       (glEnable GL_BLEND)
@@ -104,7 +84,7 @@
       ;; (glDisable GL_DEPTH_TEST)
       ;; (glDepthMask GL_FALSE)
 
-      (glUseProgram particles_shader)
+      (glUseProgram particle_shader)
 
       ;; (printf "shader errors: %d\n" (glGetError))
 
@@ -114,7 +94,7 @@
       (glBufferSubData GL_ARRAY_BUFFER 0 (tref vbo 1) (tref vbo 2))
 
       (glEnableVertexAttribArray my_vertex)
-      ;; (printf "%d\n" (glGetAttribLocation particles_shader "myPointSize"))
+      ;; (printf "%d\n" (glGetAttribLocation particle_shader "myPointSize"))
       (glVertexAttribPointer my_vertex 2 GL_FLOAT GL_FALSE 40 null) ;(pref-ptr (cast null i8*) 0))
 
       (glEnableVertexAttribArray my_colour)
@@ -145,7 +125,7 @@
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
       (glTexEnvi GL_POINT_SPRITE GL_COORD_REPLACE 1)
-      (glUniform1i (glGetUniformLocation particles_shader "tex1") 0)
+      (glUniform1i (glGetUniformLocation particle_shader "tex1") 0)
 
       (glDrawArrays GL_POINTS 0 size)
 

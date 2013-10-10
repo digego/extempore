@@ -10,11 +10,17 @@
 
 ;;; Code:
 
+;; must create opengl context before calling sys:load
+(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+
+;; try xtm first
+(sys:load "libs/xtm.xtm")
+;; otherwise fall through
+(sys:load "libs/core/math.xtm")
 (sys:load "libs/external/opengl.xtm")
 
-;; must create openglview before calling gl-load-extensions
-(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
 (gl_set_view 900.0 600.0 100.0)
+
 ;; (gl-load-extensions)
 
 ;; a couple of shader helper functions
@@ -54,16 +60,16 @@
   (lambda (fsource:i8* vsource:i8*)
     (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
 	  (vshader (glCreateShader GL_VERTEX_SHADER))
-	  (fcode:|1,i8*|* (salloc))
-	  (vcode:|1,i8*|* (salloc))
-	  (program (glCreateProgram))
+          (prgm:i32 (glCreateProgram))
+          (vcode:|1,i8*|* (salloc))
+          (fcode:|1,i8*|* (salloc))
 	  (temp:i32* (salloc)))
-
-      (set! _program program)
+      
+      (set! _program prgm)
       
       (aset! fcode 0 fsource)
       (aset! vcode 0 vsource)
-      (printf "program %d\n" program)
+      (printf "prgm %d\n" prgm)
       
       (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
       (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
@@ -71,19 +77,19 @@
       (set! _fshader fshader)
       (glCompileShader fshader)
       (set! _vshader vshader)
-      (glCompileShader vshader))
+      (glCompileShader vshader)
     
-      (glAttachShader program fshader)
-      (glAttachShader program vshader)
+      (glAttachShader prgm fshader)
+      (glAttachShader prgm vshader)
       
-      (glLinkProgram program)
-      ;(glValidateProgram program)
-      (glUseProgram program)
+      (glLinkProgram prgm)
+      ;(glValidatePrgm prgm)
+      (glUseProgram prgm)
       ;;
       (print-shader-info-log fshader)
       (print-shader-info-log vshader)
-      (print-program-info-log program)
-      (glUseProgram program)))
+      (print-program-info-log prgm)
+      (glUseProgram prgm))))
 
 ;; draw a simple quad which fills the whole screen space
 (bind-func opengl-draw

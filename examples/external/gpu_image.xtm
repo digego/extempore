@@ -5,12 +5,18 @@
 
 ;;; Code:
 
-(sys:load "libs/external/opengl.xtm")
-
 ;; must create openglview before calling gl_load_extensions
-;(define pr2 (gl:make-ctx ":0.0" #t 0.0 0.0 900.0 600.0))
-(define pr2 (gl:make-ctx ":0.0" #t 0.0 0.0 (* 3.0 1920.0) 1080.0))
-;(gl_set_view 900.0 600.0)
+(define width 1024.)
+(define height 768.)
+(bind-val width double width)
+(bind-val height double height)
+(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 width height))
+
+;; if available
+(sys:load "libs/xtm.xtm")
+;; else fallthrough
+(sys:load "libs/core/math.xtm")
+(sys:load "libs/external/opengl.xtm")
 
 (bind-func gl_set_view_ext
   (lambda (w:double h:double fov:double depth:double)
@@ -23,12 +29,10 @@
     (gl_setup)
     1))
 
-;(gl_set_view_ext (* 3.0 1920.0) 1080.0 55.0 2000.0)
-;(gl_set_view_ext (* 3.0 1920.0) 1080.0 35.0 2000.0)
-(gl_set_view_ext (* 3.0 1920.0) 1080.0 21.24 (* 3.0 1920.0))
+(gl_set_view_ext width height 21.24 (* 2. width))
 
-(define scr-width (* 3.0 1920.0))
-(define scr-height 1080.0)
+(define scr-width width)
+(define scr-height height)
 (bind-val scr_width double scr-width)
 (bind-val scr_height double scr-height)
 
@@ -107,11 +111,11 @@
 ;(define fbotex1 (create-texture 900 600))
 ;(define fbodepth1 (create-depth-buffer 900 600))
 ;(define fbo1 (create-fbo fbotex1 fbodepth1 900 600))
-(define fbo1 (create-fbo (real->integer scr-width) (real->integer scr-height)))
+(define fbo1 (create_fbo_rect (real->integer scr-width) (real->integer scr-height) 0 0))
 
 ;(define fbotex2 (create-texture 900 600))
 ;(define fbodepth2 (create-depth-buffer 900 600))
-(define fbo2 (create-fbo (real->integer scr-width) (real->integer scr-height)))
+(define fbo2 (create_fbo_rect (real->integer scr-width) (real->integer scr-height) 0 0))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -137,7 +141,7 @@
 
 
 ;; image to use
-(define myimg (gl_load_image "image.png" 0))
+(define myimg (gl_load_image_rect "assets/images/image.png" 0))
 
 (bind-func gl_loop
   (let ((cnt 0.0))
@@ -149,10 +153,7 @@
       (set! cnt (+ cnt 5.0))
       
       (glLoadIdentity)
-      ;(gl_look_at 0.0 0.0 (+ 1000.0 (* 100.0 (cos (* cnt .01)))) 0.0 0.0 0.0 0.0 1.0 0.0)
-      ;(gl_look_at 0.0 0.0 1300.0 0.0 0.0 0.0 0.0 1.0 0.0)
-      ;(gl_look_at 0.0 0.0 1037.0 0.0 0.0 0.0 0.0 1.0 0.0)
-      (gl_look_at 0.0 0.0 2880.0 0.0 0.0 0.0 0.0 1.0 0.0)                        
+      (gl_look_at 0.0 0.0 2000. 0.0 0.0 0.0 0.0 1.0 0.0)                        
       
       ;(set_grid_offsets 1.0 1.0 1.0) ;(* 2.0 (dtof (cos (* .00005 (i64tod (now)))))))
       (set_grid_offsets 1.0 1.0 (* 2.0 (dtof (cos (* .00002 (i64tod (now)))))))
@@ -165,23 +166,18 @@
       (glUniform1i (glGetUniformLocation s1 "tex1") 0)
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      ;; (gl_draw_img_from_img
-      ;;  (modulo cnt 9000.0) 0.0       
-      ;;  scr_width 512.0
-      ;;  (* scr_width -0.5) (* scr_height -0.5)
-      ;;  (* 1.0 scr_width) (* 1.0 scr_height) 0.0 img)      
       (gl_draw_img_from_img
-       (modulo cnt 9000.0) 0.0       
+       (modulo cnt 1000.0) 0.0       
        scr_width 170.6
        (* scr_width -0.5) (* scr_height -0.5)
        (* 1.0 scr_width) (* 0.3333333 scr_height) 0.0 img)
       (gl_draw_img_from_img
-       (modulo (* 1.1 cnt) 9000.0) 170.6
+       (modulo (* 1.1 cnt) 1000.0) 170.6
        scr_width 170.6
        (* scr_width -0.5) (+ (* scr_height -0.5) (* 0.3333333 scr_height))
        (* 1.0 scr_width) (* 0.3333333 scr_height) 0.0 img)
       (gl_draw_img_from_img
-       (modulo (* 1.2 cnt) 9000.0) 341.2       
+       (modulo (* 1.2 cnt) 1000.0) 341.2       
        scr_width 170.6
        (* scr_width -0.5) (+ (* scr_height -0.5) (* 0.6666666 scr_height))
        (* 1.0 scr_width) (* 0.3333333 scr_height) 0.0 img)            
@@ -234,43 +230,23 @@
       (glUseProgram s5)
       (glUniform2fv (glGetUniformLocation s5 "texoffset") 25 gridoffsets)
       (glUniform1i (glGetUniformLocation s5 "tex1") 0)
+      (glClearColor 0.0 0.0 1.0 1.0)      
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       
       (gl_draw_img (* scr_width -0.5) (* scr_height -0.5) scr_width scr_height 0.0 (tref fbo2 1))
-      
-      ;; (gl_draw_img_from_img
-      ;;  (+ 1000.0 (* 1000.0 (cos (* .001 cnt)))) 0.0 ;(modulo cnt 10000.0) 0.0
-      ;;  scr_width 512.0
-      ;;  (* scr_width -0.5) (* scr_height -0.5)
-      ;;  scr_width scr_height 0.0 img)
-      
-
-      ;; (gl_draw_img_b 0.0 0.0 ;(modulo cnt 10000.0) 0.0
-      ;; 		     3000.0 512.0
-      ;; 		     (* scr_width -0.5) (* scr_height -0.5)
-      ;; 		     scr_width scr_height 0.0 img)
-      
-
-      ;; (gl_draw_img_b (modulo cnt 10000.0) 0.0
-      ;; 		     scr_width 512.0
-      ;; 		     (* scr_width -0.5) (* scr_height -0.5)
-      ;; 		     scr_width scr_height 0.0 img)
-      
 
       (glFlush))))
 
 
 ;; standard impromptu callback to call openg-draw
 (define opengl-test
-  (lambda (time degree) ; distance)
-    (if (< time (now))
-	(println 'im-late))
+  (lambda (time degree)
     (define tt (now))
     (define distance 80.0)
     (gl_loop myimg fbo1 fbo2
 	     *shader1* *shader2* *shader3* *shader4* *shader5*)
     (gl:swap-buffers pr2)
-    (callback (+ time 200) 'opengl-test (+ time 600) (+ degree 0.01)))) ; distance)))
+    (callback (+ time 200) 'opengl-test (+ time 1500) (+ degree 0.01)))) ; distance)))
 
       		 		 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -574,16 +550,16 @@ void main() {
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define pass_shader (create-shader passthrough_vert passthrough_frag))
-(define invert_shader (create-shader passthrough_vert invert_frag))
-(define greyscale_shader (create-shader passthrough_vert greyscale_frag))
-(define sepia_shader (create-shader passthrough_vert sepia_frag))
-(define gaussian_shader (create-shader passthrough_vert gaussian_frag))
-(define blur_shader (create-shader passthrough_vert blur_frag))
-(define sharpen_shader (create-shader passthrough_vert sharpen_frag))
-(define dilate_shader (create-shader passthrough_vert dilate_frag))
-(define erode_shader (create-shader passthrough_vert erode_frag))
-(define edge_shader (create-shader passthrough_vert edge_frag))
+(define pass_shader (create_shader passthrough_vert passthrough_frag))
+(define invert_shader (create_shader passthrough_vert invert_frag))
+(define greyscale_shader (create_shader passthrough_vert greyscale_frag))
+(define sepia_shader (create_shader passthrough_vert sepia_frag))
+(define gaussian_shader (create_shader passthrough_vert gaussian_frag))
+(define blur_shader (create_shader passthrough_vert blur_frag))
+(define sharpen_shader (create_shader passthrough_vert sharpen_frag))
+(define dilate_shader (create_shader passthrough_vert dilate_frag))
+(define erode_shader (create_shader passthrough_vert erode_frag))
+(define edge_shader (create_shader passthrough_vert edge_frag))
 
 (define *shader1* dilate_shader)
 (define *shader2* erode_shader)
@@ -598,4 +574,4 @@ void main() {
 (define *shader5* pass_shader)
 ;(define *shader5* sharpen_shader)
 
-(opengl-test (now) 0.0)
+(callback (+ (now) 10000) 'opengl-test (+ (now) 10000) 0.0)

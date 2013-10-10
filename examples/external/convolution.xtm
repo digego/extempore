@@ -15,8 +15,9 @@
 
 ;;; Code:
 
-;; need instruments loaded and libsndfile
+;; try loading xtm.xtm first
 (sys:load "libs/xtm.xtm")
+;; failing that fall through to these
 (sys:load "libs/external/sndfile.xtm")
 (sys:load "libs/external/instruments.xtm")
 
@@ -31,15 +32,15 @@
 ;;
 (bind-func conv_st_c
   (lambda (path lgth:i64) 
-    (let ((_l1 (read_audio_data path null 0 0)) ;; get num frames*channels
+    (let ((_l1 (read_audio_data path null 0 0 1)) ;; get num frames*channels
           (t:i64 0) (i:i64 0) (k:i64 0) (p:i64 0) (sum 0.0)
           (ir:double* (zalloc (* lgth 2 4)))   ;; interleaved
           (buf:double* (zalloc (* lgth 2 4)))) ;; interleaved
       (memset (cast buf i8*) 0 (* lgth 2 4))
       (memset (cast ir i8*) 0 (* lgth 2 4))       
       (if (< _l1 lgth)
-          (set! lgth (read_audio_data path ir 0 _l1))
-          (set! lgth (read_audio_data path ir 0 lgth)))
+          (set! lgth (read_audio_data path ir 0 _l1 0))
+          (set! lgth (read_audio_data path ir 0 lgth 0)))
       (lambda (in:double wet:double)
         (pset! buf t in)
         (set! sum 0.0) (set! k (- lgth (+ 1 (% t 1)))) (set! p t)
@@ -54,7 +55,7 @@
 
 ;; make sure you put your stereo IR file in here!!
 (bind-func dsp:DSP 1000000
-  (let ((conv (conv_st_c "/Users/sorensen/Documents/samples/IR/scala.wav" 1000)))
+  (let ((conv (conv_st_c "assets/ir/hall.wav" 1000)))
     (lambda (in time chan dat)
       (* 1.0 (conv (* 1.0 (synth in time chan dat)) 1.0)))))
 

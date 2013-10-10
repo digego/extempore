@@ -621,6 +621,9 @@
 (bind-val xtm_render_s2 i32 0)
 (bind-val xtm_render_s3 i32 0)
 (bind-val xtm_render_s4 i32 0)
+(bind-val xtm_render_light_shaders |8,i32|)
+(bind-val xtm_render_simple_shader i32 0)
+(bind-val xtm_render_quad_shader i32 0)
 (bind-val xtm_render_x i32 0)
 (bind-val xtm_render_y i32 0)
 (bind-val xtm_render_w i32 1024)
@@ -629,6 +632,25 @@
 (bind-val xtm_render_near float 0.1)
 (bind-val xtm_render_far float 100.0)
 
+(bind-func xtm_render_init_light_shaders
+  (lambda (a1 a2 b1 b2 c1 c2 d1 d2 e1 e2 f1 f2)
+    (aset! xtm_render_light_shaders 0 (create_shader_xtm a1 a2))
+    (aset! xtm_render_light_shaders 1 (create_shader_xtm b1 b2))
+    (aset! xtm_render_light_shaders 2 (create_shader_xtm c1 c2))
+    (aset! xtm_render_light_shaders 3 (create_shader_xtm d1 d2))
+    (aset! xtm_render_light_shaders 4 (create_shader_xtm e1 e2))
+    (aset! xtm_render_light_shaders 5 (create_shader_xtm f1 f2))
+    void))
+
+(bind-func xtm_render_init_simple_shader
+  (lambda (v f)
+    (set! xtm_render_simple_shader (create_shader_xtm v f))
+    void))
+
+(bind-func xtm_render_init_quad_shader
+  (lambda (v f)
+    (set! xtm_render_quad_shader (create_shader_xtm v f))
+    void))
 
 (bind-func xtm_draw_tex
   (lambda (shader:i32 tex:i32 m v p)
@@ -644,7 +666,6 @@
     (glUseProgram 0)
     void))
 
-
 (bind-func xtm_render_fbo
   (let ((fbo:E_fbo* null))
     (lambda ()
@@ -656,10 +677,10 @@
     (xtm_render_fbo)    
     (set! xtm_render_w w)
     (set! xtm_render_h h)
-    (set! xtm_render_s1 (create_shader_xtm s1v s1f))
-    (set! xtm_render_s2 (create_shader_xtm s2v s2f))
-    (set! xtm_render_s3 (create_shader_xtm s2v s2f_nl))
-    (set! xtm_render_s4 (create_shader_xtm s4v s4f))
+    ;; (set! xtm_render_s1 (create_shader_xtm s1v s1f))
+    ;; (set! xtm_render_s2 (create_shader_xtm s2v s2f))
+    ;; (set! xtm_render_s3 (create_shader_xtm s2v s2f_nl))
+    ;; (set! xtm_render_s4 (create_shader_xtm s4v s4f))
     (printf "XTM Render Setup Complete\n")
     void))
 
@@ -684,6 +705,9 @@
 
 (define xtm_render_setup
   (lambda (w h . args)
+    (xtm_render_init_quad_shader quad-vert quad-frag)
+    (xtm_render_init_simple_shader simple-vert-xtm simple-frag)
+    (xtm_render_init_light_shaders xtmvert0 xtmfrag0 xtmvert1 xtmfrag1 xtmvert2 xtmfrag2 xtmvert3 xtmfrag3 xtmvert4 xtmfrag4 xtmvert5 xtmfrag5)
     (if (null? args)
         (xtm_render_setup_a w h
                             simple-vert-xtm simple-frag
@@ -742,7 +766,8 @@
             (pre frame 0 model view projection data)))
 
       (glBindFramebuffer GL_FRAMEBUFFER (tref fbo 0))
-      (set! sh1 xtm_render_s1)
+      ;;(set! sh1 xtm_render_s1)
+      (set! sh1 xtm_render_simple_shader)
       (glUseProgram sh1)
       ;; clear shadow buffer
       (glClearColor 0.0 0.0 0.0 1.0)
@@ -761,14 +786,16 @@
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
       ;;
-      (set! activelights (tref lights 9))      
+      (set! activelights (tref lights 9))
+      (if (> activelights 5) (set! activelights (i64toi32 5)))
       ;;
       ;; Finally render the scene to the window
       ;; using the shadow FBO's depth buffer as a shadow map
       ;;      
       ;; make sure we are not writing to a framebuffer!
       (glBindFramebuffer GL_FRAMEBUFFER 0)
-      (set! sh2 (if (> activelights 0) xtm_render_s2 xtm_render_s3))
+      (set! sh2 (aref xtm_render_light_shaders activelights))
+      ;;(set! sh2 (if (> activelights 0) xtm_render_s2 xtm_render_s3))
       (glUseProgram sh2)
       ;; setup shadowmap texture from FBO
       (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
@@ -806,7 +833,7 @@
             ;; should probably really pass in 0 for shader id here!
             ;; as we don't want ANY shaders running by default in
             ;; the post processing stage.
-            (post frame xtm_render_s4 model view projection data)))
+            (post frame xtm_render_quad_shader model view projection data)))
       ;;
       (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
       ;; print errors?
@@ -1783,3 +1810,1478 @@ void main()
 }
 ")
 
+(define xtmvert0
+  "
+#version 120
+
+attribute vec4 xtmVertex;
+attribute vec3 xtmNormal;
+attribute vec3 xtmUVW;
+attribute vec4 xtmColor;
+
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+
+void main()
+{
+  gl_Position = ModelViewProjectionMatrix * xtmVertex;
+  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  N = NormalMatrix * xtmNormal; //normal
+  float j = 0.5;
+
+  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
+  D[0] = length(L[0]);
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  Color = xtmColor;  
+}
+")
+
+(define xtmvert1
+  "
+#version 120
+
+attribute vec4 xtmVertex;
+attribute vec3 xtmNormal;
+attribute vec3 xtmUVW;
+attribute vec4 xtmColor;
+
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+
+void main()
+{
+  gl_Position = ModelViewProjectionMatrix * xtmVertex;
+  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  N = NormalMatrix * xtmNormal; //normal
+  float j = 0.5;
+
+  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
+  D[0] = length(L[0]);
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  Color = xtmColor;  
+}
+")
+
+(define xtmfrag0
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 TexColor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  float dotE = max(0.0, dot(NN,EE));
+  if(IsTextured>0.5) {
+    outcolor.xyz = texture2D(tex1,UVWCoord.xy).xyz*dotE;
+  }else{
+    outcolor.xyz = MaterialDiffuse.xyz*dotE;
+  }
+  gl_FragColor = vec4(outcolor.xyz,1.0);
+}
+")
+
+
+(define xtmfrag1
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 TexColor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  vec3 LL = normalize(L[0]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[0] + (LinearAttenuation[0] * D[0]) + (QuadraticAttenuation[0] * D[0] * D[0]));
+  spotDot = dot(-LL, normalize(SpotDir[0].xyz));
+
+  if(spotDot < SpotAngle[0])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[0]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[0] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[0] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[0] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  float shadowValue = 0.0;
+  vec4 lightVertexPosition2 = lightVertexPosition[0];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  float aa = mod((j-0.5),4.0);
+  float bb = floor((j-0.5)/4.0);
+  vec2 offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    vec4 texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")
+
+(define xtmvert2
+  "
+#version 120
+
+attribute vec4 xtmVertex;
+attribute vec3 xtmNormal;
+attribute vec3 xtmUVW;
+attribute vec4 xtmColor;
+
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+
+void main()
+{
+  gl_Position = ModelViewProjectionMatrix * xtmVertex;
+  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  N = NormalMatrix * xtmNormal; //normal
+  float j = 0.5;
+  
+  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
+  D[0] = length(L[0]);
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+
+  L[1] = (LightPos[1] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[1].w == 0.0) L[1] = LightPos[1].xyz; // i.e. if LightPos is already a direction vector
+  D[1] = length(L[1]);
+  lightVertexPosition[1] = LightModelViewProjectionMatrix[1] * xtmVertex;
+
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  Color = xtmColor;  
+}
+")
+
+(define xtmfrag2
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 texcolor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  // light 1
+  vec3 LL = normalize(L[0]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[0] + (LinearAttenuation[0] * D[0]) + (QuadraticAttenuation[0] * D[0] * D[0]));
+  spotDot = dot(-LL, normalize(SpotDir[0].xyz));
+
+  if(spotDot < SpotAngle[0])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[0]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[0] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[0] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[0] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  float shadowValue = 0.0;
+  vec4 lightVertexPosition2 = lightVertexPosition[0];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  float aa = mod((j-0.5),4.0);
+  float bb = floor((j-0.5)/4.0);
+  vec2 offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    vec4 texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 2
+  j += 1.0;
+  LL = normalize(L[1]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[1] + (LinearAttenuation[1] * D[1]) + (QuadraticAttenuation[1] * D[1] * D[1]));
+  spotDot = dot(-LL, normalize(SpotDir[1].xyz));
+
+  if(spotDot < SpotAngle[1])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[1]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[1] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[1] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[1] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[1];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[1] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")
+
+(define xtmvert3
+  "
+#version 120
+
+attribute vec4 xtmVertex;
+attribute vec3 xtmNormal;
+attribute vec3 xtmUVW;
+attribute vec4 xtmColor;
+
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+
+void main()
+{
+  gl_Position = ModelViewProjectionMatrix * xtmVertex;
+  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  N = NormalMatrix * xtmNormal; //normal
+  float j = 0.5;
+  
+  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
+  D[0] = length(L[0]);
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+
+  L[1] = (LightPos[1] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[1].w == 0.0) L[1] = LightPos[1].xyz; // i.e. if LightPos is already a direction vector
+  D[1] = length(L[1]);
+  lightVertexPosition[1] = LightModelViewProjectionMatrix[1] * xtmVertex;
+
+  L[2] = (LightPos[2] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[2].w == 0.0) L[2] = LightPos[2].xyz; // i.e. if LightPos is already a direction vector
+  D[2] = length(L[2]);
+  lightVertexPosition[2] = LightModelViewProjectionMatrix[2] * xtmVertex;
+
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  Color = xtmColor;  
+}
+")
+
+(define xtmfrag3
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 texcolor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  // light 1
+  vec3 LL = normalize(L[0]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[0] + (LinearAttenuation[0] * D[0]) + (QuadraticAttenuation[0] * D[0] * D[0]));
+  spotDot = dot(-LL, normalize(SpotDir[0].xyz));
+
+  if(spotDot < SpotAngle[0])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[0]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[0] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[0] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[0] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  float shadowValue = 0.0;
+  vec4 lightVertexPosition2 = lightVertexPosition[0];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  float aa = mod((j-0.5),4.0);
+  float bb = floor((j-0.5)/4.0);
+  vec2 offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 2
+  j += 1.0;
+  LL = normalize(L[1]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[1] + (LinearAttenuation[1] * D[1]) + (QuadraticAttenuation[1] * D[1] * D[1]));
+  spotDot = dot(-LL, normalize(SpotDir[1].xyz));
+
+  if(spotDot < SpotAngle[1])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[1]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[1] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[1] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[1] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[1];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[1] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 3
+  j += 1.0;
+  LL = normalize(L[2]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[2] + (LinearAttenuation[2] * D[2]) + (QuadraticAttenuation[2] * D[2] * D[2]));
+  spotDot = dot(-LL, normalize(SpotDir[2].xyz));
+
+  if(spotDot < SpotAngle[2])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[2]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[2] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[2] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[2] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[2];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[2] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")
+
+(define xtmvert4
+  "
+#version 120
+
+attribute vec4 xtmVertex;
+attribute vec3 xtmNormal;
+attribute vec3 xtmUVW;
+attribute vec4 xtmColor;
+
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+
+void main()
+{
+  gl_Position = ModelViewProjectionMatrix * xtmVertex;
+  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  N = NormalMatrix * xtmNormal; //normal
+  float j = 0.5;
+  
+  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
+  D[0] = length(L[0]);
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+
+  L[1] = (LightPos[1] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[1].w == 0.0) L[1] = LightPos[1].xyz; // i.e. if LightPos is already a direction vector
+  D[1] = length(L[1]);
+  lightVertexPosition[1] = LightModelViewProjectionMatrix[1] * xtmVertex;
+
+  L[2] = (LightPos[2] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[2].w == 0.0) L[2] = LightPos[2].xyz; // i.e. if LightPos is already a direction vector
+  D[2] = length(L[2]);
+  lightVertexPosition[2] = LightModelViewProjectionMatrix[2] * xtmVertex;
+
+  L[3] = (LightPos[3] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[3].w == 0.0) L[3] = LightPos[3].xyz; // i.e. if LightPos is already a direction vector
+  D[3] = length(L[3]);
+  lightVertexPosition[3] = LightModelViewProjectionMatrix[3] * xtmVertex;
+
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  Color = xtmColor;  
+}
+")
+
+(define xtmfrag4
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 texcolor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  // light 1
+  vec3 LL = normalize(L[0]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[0] + (LinearAttenuation[0] * D[0]) + (QuadraticAttenuation[0] * D[0] * D[0]));
+  spotDot = dot(-LL, normalize(SpotDir[0].xyz));
+
+  if(spotDot < SpotAngle[0])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[0]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[0] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[0] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[0] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  float shadowValue = 0.0;
+  vec4 lightVertexPosition2 = lightVertexPosition[0];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  float aa = mod((j-0.5),4.0);
+  float bb = floor((j-0.5)/4.0);
+  vec2 offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 2
+  j += 1.0;
+  LL = normalize(L[1]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[1] + (LinearAttenuation[1] * D[1]) + (QuadraticAttenuation[1] * D[1] * D[1]));
+  spotDot = dot(-LL, normalize(SpotDir[1].xyz));
+
+  if(spotDot < SpotAngle[1])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[1]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[1] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[1] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[1] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[1];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[1] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 3
+  j += 1.0;
+  LL = normalize(L[2]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[2] + (LinearAttenuation[2] * D[2]) + (QuadraticAttenuation[2] * D[2] * D[2]));
+  spotDot = dot(-LL, normalize(SpotDir[2].xyz));
+
+  if(spotDot < SpotAngle[2])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[2]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[2] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[2] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[2] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[2];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[2] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 4
+  j += 1.0;
+  LL = normalize(L[3]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[3] + (LinearAttenuation[3] * D[3]) + (QuadraticAttenuation[3] * D[3] * D[3]));
+  spotDot = dot(-LL, normalize(SpotDir[3].xyz));
+
+  if(spotDot < SpotAngle[3])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[3]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[3] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[3] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[3] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[3];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[3] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")
+
+(define xtmvert5
+  "
+#version 120
+
+attribute vec4 xtmVertex;
+attribute vec3 xtmNormal;
+attribute vec3 xtmUVW;
+attribute vec4 xtmColor;
+
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+
+void main()
+{
+  gl_Position = ModelViewProjectionMatrix * xtmVertex;
+  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  N = NormalMatrix * xtmNormal; //normal
+  float j = 0.5;
+  
+  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
+  D[0] = length(L[0]);
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+
+  L[1] = (LightPos[1] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[1].w == 0.0) L[1] = LightPos[1].xyz; // i.e. if LightPos is already a direction vector
+  D[1] = length(L[1]);
+  lightVertexPosition[1] = LightModelViewProjectionMatrix[1] * xtmVertex;
+
+  L[2] = (LightPos[2] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[2].w == 0.0) L[2] = LightPos[2].xyz; // i.e. if LightPos is already a direction vector
+  D[2] = length(L[2]);
+  lightVertexPosition[2] = LightModelViewProjectionMatrix[2] * xtmVertex;
+
+  L[3] = (LightPos[3] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[3].w == 0.0) L[3] = LightPos[3].xyz; // i.e. if LightPos is already a direction vector
+  D[3] = length(L[3]);
+  lightVertexPosition[3] = LightModelViewProjectionMatrix[3] * xtmVertex;
+
+  L[4] = (LightPos[4] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  if(LightPos[4].w == 0.0) L[4] = LightPos[4].xyz; // i.e. if LightPos is already a direction vector
+  D[4] = length(L[4]);
+  lightVertexPosition[4] = LightModelViewProjectionMatrix[4] * xtmVertex;
+
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  Color = xtmColor;  
+}
+")
+
+(define xtmfrag5
+  "
+//#version 120
+varying vec3 N, E, V;
+varying vec3 L[10];
+varying float D[10];
+
+uniform vec4 LightAmbient[10];
+uniform vec4 LightDiffuse[10];
+uniform vec4 LightSpecular[10];
+uniform float ConstantAttenuation[10];
+uniform float LinearAttenuation[10];
+uniform float QuadraticAttenuation[10];
+uniform float SpotAngle[10];
+uniform vec4 SpotDir[10];
+uniform float SpotExponent[10];
+
+uniform float numlights;
+
+uniform vec4 CameraDir;
+uniform float MaterialShininess;
+uniform vec4 MaterialAmbient;
+uniform vec4 MaterialDiffuse;
+uniform vec4 MaterialSpecular;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat4 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+uniform sampler2D shadowMap;
+uniform sampler2D tex1;
+uniform float IsTextured;
+
+varying vec4 lightVertexPosition[10];
+varying vec3 UVWCoord;
+varying vec4 Color;
+
+void main()
+{
+  vec4 outcolor = vec4(0.0);
+  float j = 0.5;
+  vec4 ambient,diffuse,specular;
+  vec3 HV;
+  float pf; // powerfactor
+  float nDotHV, nDotLL;
+  float attenuation, spotDot, spotAttenuation;
+  vec4 texcolor; // texture color
+
+  vec3 NN = normalize(N); // surface normal
+  vec3 EE = normalize(E); // eye vector
+  vec3 VV = normalize(V); // vertex 3d
+
+  // light 1
+  vec3 LL = normalize(L[0]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[0] + (LinearAttenuation[0] * D[0]) + (QuadraticAttenuation[0] * D[0] * D[0]));
+  spotDot = dot(-LL, normalize(SpotDir[0].xyz));
+
+  if(spotDot < SpotAngle[0])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[0]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[0] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[0] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[0] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  float shadowValue = 0.0;
+  vec4 lightVertexPosition2 = lightVertexPosition[0];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  float aa = mod((j-0.5),4.0);
+  float bb = floor((j-0.5)/4.0);
+  vec2 offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 2
+  j += 1.0;
+  LL = normalize(L[1]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[1] + (LinearAttenuation[1] * D[1]) + (QuadraticAttenuation[1] * D[1] * D[1]));
+  spotDot = dot(-LL, normalize(SpotDir[1].xyz));
+
+  if(spotDot < SpotAngle[1])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[1]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[1] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[1] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[1] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[1];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[1] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 3
+  j += 1.0;
+  LL = normalize(L[2]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[2] + (LinearAttenuation[2] * D[2]) + (QuadraticAttenuation[2] * D[2] * D[2]));
+  spotDot = dot(-LL, normalize(SpotDir[2].xyz));
+
+  if(spotDot < SpotAngle[2])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[2]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[2] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[2] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[2] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[2];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[2] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 4
+  j += 1.0;
+  LL = normalize(L[3]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[3] + (LinearAttenuation[3] * D[3]) + (QuadraticAttenuation[3] * D[3] * D[3]));
+  spotDot = dot(-LL, normalize(SpotDir[3].xyz));
+
+  if(spotDot < SpotAngle[3])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[3]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[3] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[3] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[3] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[3];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[3] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  // light 5
+  j += 1.0;
+  LL = normalize(L[4]); // light vector
+  attenuation = 1.0 / (ConstantAttenuation[4] + (LinearAttenuation[4] * D[4]) + (QuadraticAttenuation[4] * D[4] * D[4]));
+  spotDot = dot(-LL, normalize(SpotDir[4].xyz));
+
+  if(spotDot < SpotAngle[4])
+    spotAttenuation = 0.0;
+  else
+    spotAttenuation = pow(spotDot, SpotExponent[4]);  
+
+  attenuation *= spotAttenuation;
+
+  HV = normalize(LL+EE); // half vector
+  nDotLL = max(0.0, dot(NN,LL));
+  nDotHV = max(0.0, dot(NN,HV));
+
+  if(nDotLL==0.0)
+    pf = 0.0;
+  else
+    pf = pow(nDotHV, MaterialShininess);
+
+  ambient = LightAmbient[4] * MaterialAmbient * attenuation;
+  diffuse = LightDiffuse[4] * MaterialDiffuse * nDotLL * attenuation;
+  specular = LightSpecular[4] * MaterialSpecular * pf * attenuation;
+
+  //calc shadows
+  shadowValue = 0.0;
+  lightVertexPosition2 = lightVertexPosition[4];
+  lightVertexPosition2 /= lightVertexPosition2.w;
+
+  aa = mod((j-0.5),4.0);
+  bb = floor((j-0.5)/4.0);
+  offset = vec2(0.25*aa,0.25*bb);
+
+  // softer shadowing by adding dither
+  for(float x=-0.0004; x<=0.0004; x+=0.0002) {
+    for(float y=-0.0004; y<=0.0004; y+=0.0002) {
+      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        shadowValue+=1.0;
+    }
+  }
+  shadowValue/=16.0;
+
+  if(IsTextured>0.5) {
+    texcolor = LightDiffuse[4] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    outcolor += vec4((texcolor.xyz*shadowValue),1.0);
+  } else {
+    outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+  }
+
+  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")

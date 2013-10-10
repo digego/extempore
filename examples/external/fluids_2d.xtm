@@ -27,16 +27,12 @@
 ;; optimize compiles
 (llvm:optimize #t)
 
+(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
 
-;; (bind-func range-limit
-;;   (lambda (v:double l:double h:double)
-;;     (if (< v l) l
-;; 	(if (> v h) h
-;; 	    v))))
-
-;(sys:load "../libs/core/audio_dsp.xtm")
+;; try xtm first
+(sys:load "libs/xtm.xtm");
+;; else fallback
 (sys:load "libs/external/opengl.xtm")
-
 
 (bind-func range_limit
   (lambda (h:double l:double v:double)
@@ -544,11 +540,7 @@
 	      (+ degree 0.001))))
 
 
-
-;(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 1000.0 1000.0))
-(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
 (gl_set_view 900.0 600.0 900.0)
-
 
 (begin (ipc:bind-func "fluid" 'fluid_fsc)
        (sys:sleep 44100)

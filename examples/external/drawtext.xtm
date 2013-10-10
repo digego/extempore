@@ -12,8 +12,6 @@
 
 ;;; Code:
 
-(sys:load "libs/external/drawtext.xtm")
-
 (define width 1024.0)
 (define height 768.0)
 (bind-val width float 1024.0)
@@ -22,9 +20,14 @@
 
 (define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
 
+;; fist try to load xtm.xtm
+(sys:load "libs/xtm.xtm")
+;; else fall through
+(sys:load "libs/external/drawtext.xtm")
+
 (bind-func gl_render
   ;; put the path to any TrueType (.ttf) font file here
-  (let ((font (dtx_open_font "/Library/Fonts/Arial.ttf" 24)))
+  (let ((font (dtx_open_font "assets/fonts/Arial.ttf" 24)))
     (if (null? font)
 	(printf "Error opening font.\n"))
     (lambda ()

@@ -39,7 +39,7 @@
 ;;; Code:
 
 ;; make sure you include / on the end
-(define path (sys:expand-path "~/Documents/models/"))
+(define path "assets/models/")
 
 (define fullscreen #f)
 ;; (define width 1920.0)
@@ -102,9 +102,10 @@
 ;; standard impromptu callback
 (define opengl-loop
   (lambda (time dur model1 model2 model3 degree)
-    (let ((v (now)))
+    (let ((v (clock:clock)))
       (gl_render model1 model2 model3)
       (gl:swap-buffers glctx)
+      (println (- v (clock:clock)))
       )
     (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur
               model1 model2 model3 (+ degree .5))))

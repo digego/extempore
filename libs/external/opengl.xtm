@@ -10,15 +10,13 @@
 
 ;;; Code:
 
-;; lib-loading config
-(sys:load-preload-check 'opengl)
-
 ;; first make sure that math.xtm is loaded
 (sys:load "libs/core/math.xtm")
 (sys:load "libs/external/soil.xtm")
 
+;; lib-loading config
+(sys:load-preload-check 'opengl)
 (define *xtmlib-opengl-loaded* #t)
-
 
 ;; first check if we are windows we need to load some extensions!
 (if (string=? (sys:platform) "Windows")
@@ -442,11 +440,16 @@
       ;; Attach the texture depthid to the depth buffer of our fbo
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_2D depthid 0)
       (tfill! fbo (pref fboid 0) texid depthid width height)
-      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
+      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER))
+            (err:i32 (glGetError)))
 	(if (<> status GL_FRAMEBUFFER_COMPLETE)
-	    (begin
-              (printf "GL ERR: FRAMEBUFFER err: %d\n" status)
-              (set! fbo (cast null E_fbo*)))))
+            (if (<> err GL_NO_ERROR)
+                (begin (printf "GL ERR: FRAMEBUFFER err: %d\n" err)
+                       (set! fbo (cast null E_fbo*))
+                       1)
+                (begin
+                  (printf "Possible framebuf error?: %d\n" err)
+                  1))))
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       ;; unbind the frame buffer
