@@ -35,16 +35,6 @@
 (if (not librtmidi)
     (print-error "Could not load librtmidi dynamic library"))
 
-;; bindings (see RtMidi.h)
-
-;; UNSPECIFIED,    /* Search for a working compiled API. */
-;; MACOSX_CORE,    /* Macintosh OS-X Core Midi API. */
-;; LINUX_ALSA,     /* The Advanced Linux Sound Architecture API. */
-;; UNIX_JACK,      /* The Jack Low-Latency MIDI Server API. */
-;; WINDOWS_MM,     /* The Microsoft Multimedia MIDI API. */
-;; WINDOWS_KS,     /* The Microsoft Kernel Streaming MIDI API. */
-;; RTMIDI_DUMMY    /* A compilable but non-functional API. */
-
 (bind-val RTMIDI_NOERROR i32 0)
 (bind-val RTMIDI_ERROR i32 1)
 
@@ -64,9 +54,9 @@
 (bind-val MIDI_CHANNEL_PRESSURE i8 *midi-channel-pressure*)
 (bind-val MIDI_PITCH_BEND i8 *midi-pitch-bend*)
 
-;; API enums
+;; API selection enums
 
-(bind-val UNSPECIFIED i32 0)
+(bind-val UNSPECIFIED i32 0) ;; try to auto-detect the platform
 (bind-val MACOSX_CORE i32 1)
 (bind-val LINUX_ALSA  i32 2)
 (bind-val UNIX_JACK   i32 3)
@@ -110,69 +100,100 @@
 
 ;; poly'ing
 
-(bind-poly newMidiDevice newMidiInDevice)
-(bind-poly newMidiDevice newMidiOutDevice)
-(bind-poly deleteMidiDevice deleteMidiInDevice)
-(bind-poly deleteMidiDevice deleteMidiOutDevice)
-(bind-poly getCurrentApi getInCurrentApi)
-(bind-poly getCurrentApi getOutCurrentApi)
-(bind-poly getPortCount getInPortCount)
-(bind-poly getPortCount getOutPortCount)
-(bind-poly getPortName getInPortName)
-(bind-poly getPortName getOutPortName)
-(bind-poly openPort openInPort)
-(bind-poly openPort openOutPort)
-(bind-poly openVirtualPort openInVirtualPort)
-(bind-poly openVirtualPort openOutVirtualPort)
-(bind-poly closePort closeInPort)
-(bind-poly closePort closeOutPort)
+;; (bind-poly newMidiDevice newMidiInDevice)
+;; (bind-poly newMidiDevice newMidiOutDevice)
+;; (bind-poly deleteMidiDevice deleteMidiInDevice)
+;; (bind-poly deleteMidiDevice deleteMidiOutDevice)
+;; (bind-poly getCurrentApi getInCurrentApi)
+;; (bind-poly getCurrentApi getOutCurrentApi)
+;; (bind-poly getPortCount getInPortCount)
+;; (bind-poly getPortCount getOutPortCount)
+;; (bind-poly getPortName getInPortName)
+;; (bind-poly getPortName getOutPortName)
+;; (bind-poly openPort openInPort)
+;; (bind-poly openPort openOutPort)
+;; (bind-poly openVirtualPort openInVirtualPort)
+;; (bind-poly openVirtualPort openOutVirtualPort)
+;; (bind-poly closePort closeInPort)
+;; (bind-poly closePort closeOutPort)
 
 ;;  set up some input/output ports
 
-(bind-func query_in_ports
+(bind-func midi_query_inports
   (lambda (dev:midi_in_device*)
-    (let ((num_ports (getPortCount dev))
+    (let ((num_ports (getInPortCount dev))
           (i:i64 0))
       (printf "--Input ports--\n")
       (dotimes (i num_ports)
-        (printf "Port %lld: %s\n" i (getPortName dev i)))
+	(printf "Port %lld: %s\n" i (getInPortName dev i)))
       (printf "\n")
       void)))
 
-(bind-func query_out_ports
+(bind-func midi_query_outports
   (lambda (dev:midi_out_device*)
-    (let ((num_ports (getPortCount dev))
+    (let ((num_ports (getOutPortCount dev))
           (i:i64 0))
       (printf "--Output ports--\n")
       (dotimes (i num_ports)
-        (printf "Port %lld: %s\n" i (getPortName dev i)))
+	(printf "Port %lld: %s\n" i (getOutPortName dev i)))
       (printf "\n")
       void)))
 
-(bind-poly query_ports query_in_ports)
-(bind-poly query_ports query_out_ports)
+(bind-poly midi_query_ports midi_query_inports)
+(bind-poly midi_query_ports midi_query_outports)
 
-(bind-func midi_in
-  (let ((device:midi_in_device* (zalloc)))
-    (newMidiDevice device UNSPECIFIED "Extempore Virtual Midi Input")
-    (openVirtualPort device "Extempore Input")
+;; device/port creation
+
+(bind-func midi_new_indevice
+  (let ((device:midi_in_device* (halloc)))
     (lambda ()
+      (newMidiInDevice device UNSPECIFIED "Extempore Midi Input Device")
       device)))
 
-(bind-func midi_out
-  (let ((device:midi_out_device* (zalloc)))
-    (newMidiOutDevice device UNSPECIFIED "Extempore Midi Output")
-    ;; (openVirtualPort device "Ben Port")
-    (openPort device 0 "Extempore Output") ;; needs to be correct channel
+(bind-func midi_new_outdevice
+  (let ((device:midi_out_device* (halloc)))
     (lambda ()
+      (newMidiOutDevice device UNSPECIFIED "Extempore Midi Output Device")
       device)))
 
-(query_in_ports (midi_in))
-(query_out_ports (midi_out))
+(bind-func midi_open_inport
+  (lambda (device:midi_in_device* port)
+    (openInPort device port "Extempore Input Port")))
 
-;; testing
+(bind-func midi_open_virtual_inport
+  (lambda (device:midi_in_device*)
+    (openInVirtualPort device "Extempore Virtual Input Port")))
 
-(bind-func midi_dump
+(bind-func midi_open_outport
+  (lambda (device:midi_out_device* port)
+    (openOutPort device port "Extempore Output Port")))
+
+(bind-func midi_open_virtual_outport
+  (lambda (device:midi_out_device*)
+    (openOutVirtualPort device "Extempore Virtual Output Port")))
+
+;; device/port destruction
+
+(bind-func midi_delete_indevice
+  (lambda (device:midi_in_device*)
+    (deleteMidiInDevice device)))
+
+(bind-func midi_delete_outdevice
+  (lambda (device:midi_out_device*)
+    (deleteMidiOutDevice device)))
+
+(bind-func midi_close_inport
+  (lambda (device:midi_in_device*)
+    (closeInPort device)))
+
+(bind-func midi_close_outport
+  (lambda (device:midi_out_device*)
+    (closeOutPort device)))
+
+;; (bind-poly midi_delete_device midi_delete_indevice)
+;; (bind-poly midi_delete_device midi_delete_outdevice)
+
+(bind-func midi_default_callback
   (let ((type:i8 0) (chan:i8 0) (a:i8 0) (b:i8 0))
     (lambda (time:double len:i64 msg:i8*)
       (set! type (>> (pref msg 0) 4))
@@ -183,73 +204,110 @@
               time (i8toi32 type) (i8toi32 chan) (i8toi32 a) (i8toi32 b))
       void)))
 
-(bind-func midi_register_callback
+(bind-func midi_register_device
+  "Register a midi sink/source"
+  (lambda (device:midi_in_device* callback_name:i8*)
+    (let ((len (strlen callback_name))
+	  (callback_name_native:i8* (salloc (+ len 8))))
+      (strncpy callback_name_native callback_name (+ 1 len))
+      (strncpy (pref-ptr callback_name_native len) "_native" 8)
+      (printf "\nregistering %s as MIDI callback function\n\n" callback_name_native)
+      (setCallback device (llvm_get_function_ptr callback_name_native)))))
+
+(bind-func midi_unregister_device
+  "Register Extempore as a midi sink/source"
+  (lambda (device:midi_in_device*)
+    (cancelCallback device)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; default Extempore MIDI connectivity ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define *midi-in-device* #f)
+(define *midi-out-device* #f)
+
+(define midi-register-events
   (lambda ()
-    (setCallback (midi_in) (llvm_get_function_ptr "midi_dump_native"))))
+    (set! *midi-in-device* (midi_new_indevice))
+    (midi_register_device *midi-in-device* "midi_default_callback")
+    (set! *midi-out-device* (midi_new_outdevice))))
 
-;; to register Extempore for as a midi sink, uncomment this line
-(midi_register_callback)
+(midi-register-events)
 
-;; to stop Extempore recieving midi:
-;; (cancelCallback (midi_in))
+(define midi-deregister-events
+  (lambda ()
+    (midi_delete_indevice *midi-in-device*)
+    (set! *midi-in-device* #f)
+    (midi_delete_outdevice *midi-out-device*)
+    (set! *midi-out-device* #f)
+    (print "Deregstered Extempore MIDI input/output devices.\n")))
 
-(bind-func send_midi
-  (lambda (dev:midi_out_device* type chan a b)
+(midi-deregister-events)
+
+
+;; TODO I'm up to here
+
+;; (midi_unregister_device *midi-extempore-virtual-inp)
+
+(midi_query_inports (midi_new_indevice))
+(midi_query_outports (midi_new_outdevice))
+
+(bind-func midi_send
+  (lambda (device:midi_out_device* type chan a b)
     (let ((msg:i8* (salloc 3)))
       (pfill! msg (+ (<< type 4) chan) a b)
-      (sendMessage dev 3 msg))))
+      (sendMessage device 3 msg))))
 
 ;; test sending & recieving midi
-;; (send_midi (midi_out) *midi-note-on* 0 60 80 0)
-;; (send_midi (midi_out) *midi-note-off* 0 66 80 0)
+;; (midi_send (midi_new_outdevice) *midi-note-on* 0 60 80 0)
+;; (midi_send (midi_new_outdevice) *midi-note-off* 0 66 80 0)
 
-(define play-midi
-  (lambda (time dev pitch velocity duration channel)
-    (callback time 'send_midi dev *midi-note-on* channel pitch velocity)
-    (callback (+ time duration) 'send_midi dev *midi-note-off* channel pitch velocity)))
+(define play-midi-note
+  (lambda (time device pitch velocity duration channel)
+    (callback time 'midi_send device *midi-note-on* channel pitch velocity)
+    (callback (+ time duration) 'midi_send device *midi-note-off* channel pitch velocity)))
 
 ;; a midi-specific play macro
 
-(macro (playm args)
-  (if (not (symbol? (cadr args)))
-      (if (> (length args) 6)
-	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
-		      ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))
-	  `(play-midi (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
-      (if (> (length args) 7)
-	  `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-		      (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))) ,(car (cdddr (cddddr args))))
-	  `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-		      (*metro* 'dur ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))))))
+;; (define-macro (mplay args)
+;;   (if (not (symbol? (cadr args)))
+;;       (if (> (length args) 6)
+;;           `(play-midi-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+;;                       ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))
+;;           `(play-midi-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
+;;       (if (> (length args) 7)
+;;           `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+;;                       (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))) ,(car (cdddr (cddddr args))))
+;;           `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+;;                       (*metro* 'dur ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))))))
 
-(macro (playm args)
+(define-macro (mplay args)
   (if (symbol? (cadr args))
-      `(play-midi (*metro* beat) ,(cadr args)
-                  (real->integer ,(caddr args))
-                  (real->integer ,(cadddr args))
-                  (*metro* 'dur ,(car (cddddr args))) 0)
-      `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args)
-                  (real->integer ,(cadddr args))
-                  (real->integer ,(car (cddddr args)))
-                  (*metro* 'dur ,(cadr (cddddr args))) 0)))
+      `(play-midi-note (*metro* beat) ,(cadr args)
+		       (real->integer ,(caddr args))
+		       (real->integer ,(cadddr args))
+		       (*metro* 'dur ,(car (cddddr args))) 0)
+      `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args)
+		       (real->integer ,(cadddr args))
+		       (real->integer ,(car (cddddr args)))
+		       (*metro* 'dur ,(cadr (cddddr args))) 0)))
 
-;; uncomment if you want to use play instead of playm
+;; uncomment if you want to use play instead of mplay
 ;;
 ;; (macro (play args)
 ;;   (if (symbol? (cadr args))
-;;       `(play-midi (*metro* beat) ,(cadr args)
+;;       `(play-midi-note (*metro* beat) ,(cadr args)
 ;;                   (real->integer ,(caddr args))
 ;;                   (real->integer ,(cadddr args))
 ;;                   (*metro* 'dur ,(car (cddddr args))) 0)
-;;       `(play-midi (*metro* (+ beat ,(cadr args))) ,(caddr args)
+;;       `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args)
 ;;                   (real->integer ,(cadddr args))
 ;;                   (real->integer ,(car (cddddr args)))
 ;;                   (*metro* 'dur ,(cadr (cddddr args))) 0)))
 
 
-(define midiout (midi_out))
-
 ;; (let ((beat (*metro* 'get-beat 1)))
-;;   (playm midiout 60. 70.8 1.0))
+;;   (mplay midiout 60. 70.8 1.0))
 
-(play-midi (now) (midi_out) 72 20 10000 0)
+(play-midi-note (now) *midi-in-device* 72 20 10000 0)
