@@ -213,6 +213,47 @@
 (ascii-print-color 0 7 10)
 (println)
 
+;;; FFT   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(sys:load-preload-check 'fft)
+
+(define kissfft
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:load-dylib "kiss_fft.so"))
+          ((string=? platform "Windows") (sys:load-dylib "kiss_fft.dll"))
+          ((string=? platform "OSX") (sys:load-dylib "kiss_fft.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+(define *xtmlib-fft-loaded* #f)
+(print "Loading FFT library...         ")
+
+(bind-type kiss_fft_cpx <float,float>)
+(bind-type kiss_fft_state <i32,i32,|64,i32|,|1,kiss_fft_cpx|>)
+(bind-alias kiss_fft_cfg kiss_fft_state*)
+
+(bind-lib kissfft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
+(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+(bind-lib kissfft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
+(bind-lib kissfft kiss_fft_cleanup [i8*,i8*]*)
+(bind-lib kissfft kiss_fft_next_fast_size [i32,i32]*)
+
+(bind-lib-func stdlib fft_cpxf [void,cpxf*,cpxf*,i64]*)
+(bind-lib-func stdlib fft_cpxd [void,cpxd*,cpxd*,i64]*)
+(bind-lib-func stdlib inverse_fft_cpxf [void,cpxf*,cpxf*,i64]*)
+(bind-lib-func stdlib inverse_fft_cpxd [void,cpxd*,cpxd*,i64]*)
+
+(bind-poly fft fft_cpxf)
+(bind-poly fft fft_cpxd)
+(bind-poly inverse_fft inverse_fft_cpxf)
+(bind-poly inverse_fft inverse_fft_cpxd)
+
+(define *xtmlib-fft-loaded* #t)
+(ascii-print-color 0 2 10)
+(print "[YES]")
+(ascii-print-color 0 7 10)
+(println)
+
+
 ;;; AUDIO SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (sys:load "libs/core/pc_ivl.xtm")
@@ -894,7 +935,133 @@
 (ascii-print-color 0 7 10)
 (println)
 
+;;; RTMIDI ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(sys:load-preload-check 'rtmidi)
+
+(define librtmidi
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:load-dylib "librtmidi.so"))
+          ((string=? platform "Windows") (sys:load-dylib "librtmidi.dll"))
+          ((string=? platform "OSX") (sys:load-dylib "librtmidi.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+(define *xtmlib-rtmidi-loaded* #f)
+(print "Loading MIDI library...        ")
+
+(bind-lib-val stdlib RTMIDI_NOERROR i32)
+(bind-lib-val stdlib RTMIDI_ERROR i32)
+
+(define *midi-note-off* 8)              ;; key, velocity
+(define *midi-note-on* 9)               ;; key, velocity
+(define *midi-aftertouch* 10)            ;; key, touch
+(define *midi-continuous-controller* 11) ;; controller, value
+(define *midi-patch-change* 12)           ;;
+(define *midi-channel-pressure* 13)      ;;
+(define *midi-pitch-bend* 14)            ;; lsb (7 bits), msb (7 bits)
+
+(bind-lib-val stdlib MIDI_NOTE_OFF i8)
+(bind-lib-val stdlib MIDI_NOTE_ON i8)
+(bind-lib-val stdlib MIDI_AFTERTOUCH i8)
+(bind-lib-val stdlib MIDI_CONTINUOUS_CONTROLLER i8)
+(bind-lib-val stdlib MIDI_PATCH_CHANGE i8)
+(bind-lib-val stdlib MIDI_CHANNEL_PRESSURE i8)
+(bind-lib-val stdlib MIDI_PITCH_BEND i8)
+
+(bind-lib-val stdlib UNSPECIFIED i32) ;; try to auto-detect the platform
+(bind-lib-val stdlib MACOSX_CORE i32)
+(bind-lib-val stdlib LINUX_ALSA  i32)
+(bind-lib-val stdlib UNIX_JACK   i32)
+(bind-lib-val stdlib WINDOWS_MM  i32)
+(bind-lib-val stdlib WINDOWS_KS  i32)
+(bind-lib-val stdlib RTMIDI_DUMMY i32)
+
+(bind-type midi_in_device <i8*>)
+(bind-type midi_out_device <i8*>)
+(bind-alias midi_callback [i8*,double,i64,i8*]*)
+
+(bind-lib librtmidi newMidiInDevice [i32,midi_in_device*,i32,i8*]*)
+(bind-lib librtmidi deleteMidiInDevice [i32,midi_in_device*]*)
+(bind-lib librtmidi getInCurrentApi [i64,midi_in_device*]*)
+(bind-lib librtmidi getInPortCount [i64,midi_in_device*]*)
+(bind-lib librtmidi getInPortName [i8*,midi_in_device*,i64]*)
+(bind-lib librtmidi openInPort [i32,midi_in_device*,i64,i8*]*)
+(bind-lib librtmidi openInVirtualPort [i32,midi_in_device*,i8*]*)
+(bind-lib librtmidi closeInPort [i32,midi_in_device*]*)
+(bind-lib librtmidi setCallback [i32,midi_in_device*,i8*]*)
+(bind-lib librtmidi cancelCallback [i32,midi_in_device*]*)
+(bind-lib librtmidi newMidiOutDevice [i32,midi_out_device*,i32,i8*]*)
+(bind-lib librtmidi deleteMidiOutDevice [i32,midi_out_device*]*)
+(bind-lib librtmidi getOutCurrentApi [i64,midi_out_device*]*)
+(bind-lib librtmidi getOutPortCount [i64,midi_out_device*]*)
+(bind-lib librtmidi getOutPortName [i8*,midi_out_device*,i64]*)
+(bind-lib librtmidi openOutPort [i32,midi_out_device*,i64,i8*]*)
+(bind-lib librtmidi openOutVirtualPort [i32,midi_out_device*,i8*]*)
+(bind-lib librtmidi closeOutPort [i32,midi_out_device*]*)
+(bind-lib librtmidi sendMessage [i32,midi_out_device*,i64,i8*]*)
+
+(bind-lib-func stdlib midi_query_inports [void,midi_in_device*]*)
+(bind-lib-func stdlib midi_query_outports [void,midi_out_device*]*)
+(bind-lib-func stdlib midi_new_indevice [midi_in_device*]*)
+(bind-lib-func stdlib midi_new_outdevice [midi_out_device*]*);
+
+(bind-lib-func stdlib midi_open_inport [i32,midi_in_device*,i64]*)
+(bind-lib-func stdlib midi_open_virtual_inport [i32,midi_in_device*]*)
+(bind-lib-func stdlib midi_open_outport [i32,midi_out_device*,i64]*)
+(bind-lib-func stdlib midi_open_virtual_outport [i32,midi_out_device*]*)
+
+(bind-lib-func stdlib midi_delete_indevice [i32,midi_in_device*]*)
+(bind-lib-func stdlib midi_delete_outdevice [i32,midi_out_device*]*)
+(bind-lib-func stdlib midi_close_inport [i32,midi_in_device*]*)
+(bind-lib-func stdlib midi_close_outport [i32,midi_out_device*]*)
+(bind-lib-func stdlib midi_default_callback [void,double,i64,i8*]*)
+(bind-lib-func stdlib midi_register_device [i32,midi_in_device*,i8*]*)
+(bind-lib-func stdlib midi_unregister_device [i32,midi_in_device*]*)
+(bind-lib-func stdlib midi_send [i32,midi_out_device*,i8,i8,i8,i8]*);
+
+(bind-poly midi_query_ports midi_query_inports)
+(bind-poly midi_query_ports midi_query_outports)
+
+;; need to also define these on other procs (like utility!)
+
+(define *midi-in-device* #f)
+(define *midi-out-device* #f)
+
+(define midi-register-events
+  (lambda ()
+    (set! *midi-in-device* (midi_new_indevice))
+    (midi_register_device *midi-in-device* "midi_default_callback")
+    (set! *midi-out-device* (midi_new_outdevice))))
+
+(define midi-deregister-events
+  (lambda ()
+    (midi_delete_indevice *midi-in-device*)
+    (set! *midi-in-device* #f)
+    (midi_delete_outdevice *midi-out-device*)
+    (set! *midi-out-device* #f)
+    (print "Deregstered Extempore MIDI input/output devices.\n")))
+
+(define play-midi-note
+  (lambda (time device pitch velocity duration channel)
+    (callback time 'midi_send device *midi-note-on* channel pitch velocity)
+    (callback (+ time duration) 'midi_send device *midi-note-off* channel pitch velocity)))
+
+(define-macro (mplay args)
+  (if (symbol? (cadr args))
+      `(play-midi-note (*metro* beat) ,(cadr args)
+		       (real->integer ,(caddr args))
+		       (real->integer ,(cadddr args))
+		       (*metro* 'dur ,(car (cddddr args))) 0)
+      `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args)
+		       (real->integer ,(cadddr args))
+		       (real->integer ,(car (cddddr args)))
+		       (*metro* 'dur ,(cadr (cddddr args))) 0)))
+
+(define *xtmlib-rtmidi-loaded* #t)
+(ascii-print-color 0 2 10)
+(print "[YES]")
+(ascii-print-color 0 7 10)
+(println)
 
 ;;;;;;  IMAGE SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -3673,16 +3840,16 @@ void main()
       (bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
       (bind-lib libglu gluPerspective [void,double,double,double,double]*)
       (bind-lib libglu gluErrorString [i8*,i32]*)
-      ;; (bind-lib-func stdlib gl_look_at [void,double,double,double,double,double,double,double,double,double]*)
-      ;; (bind-lib-func stdlib gl_set_view [i64,double,double,double]*)
       (ascii-print-color 0 2 10)
       (print "[YES]")
       (ascii-print-color 0 7 10)
       (println))
     (begin
+      (print "Loading glu library...         ")      
       (ascii-print-color 0 1 10)
       (print "[NO]")
-      (ascii-print-color 0 7 10)))
+      (ascii-print-color 0 7 10)
+      (println)))
 
 
 ;;; ASSIMP SETUP ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
