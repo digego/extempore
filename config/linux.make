@@ -6,16 +6,16 @@ else
 PLATFORM_LIBS += -pthread
 endif
 
-#ifdef JACK_AUDIO
-#PLATFORM_LIBS += -ljack
-#else
-#PLATFORM_LIBS += -lportaudio
-#endif
+ifdef JACK_AUDIO
+PLATFORM_LIBS += -ljack
+else
+PLATFORM_LIBS += -lportaudio
+endif
 
 ifdef EXT_BUILD_GENERIC
-PLATFORM_LIBS += -Wl,-Bstatic -lpcre -portaudio -Wl,-Bdynamic -lGL -lX11
+PLATFORM_LIBS += -Wl,-Bstatic -lpcre -Wl,-Bdynamic -lGL -lX11
 else
-PLATFORM_LIBS += -lpcre -lportaudio -lGL -lX11
+PLATFORM_LIBS += -lpcre -lGL -lX11
 endif
 
 PLATFORM_CXXFLAGS := -g -O3
