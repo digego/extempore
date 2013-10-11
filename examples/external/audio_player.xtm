@@ -1,0 +1,49 @@
+;;; audio_player.xtm -- a simple audio file player example
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libsndfile
+
+;;; Commentary:
+
+;; You should have a wave file in your assets directory called
+;; assets/bb.wav - if you don't you can grab the whole assets
+;; directory from http://extempore.moso.com.au/extras/assets.tgz
+
+;;; Code:
+
+(sys:load "libs/external/sndfile.xtm")
+
+(bind-func dsp:DSP 20000000 ; make sure we allocate enough memory
+  (let ((audio_file_path "assets/samples/bb.wav")
+        ;; get number of audio samples in file
+        (nsamp (read_audio_data audio_file_path null 0 0 0))
+        ;; allocate memory buffer for audio samples
+        (audio_data:double* (zalloc nsamp))
+        ;; read audio samples into buffer
+        (samples_read (read_audio_data audio_file_path audio_data 0 nsamp 1))
+        ;; markers for keeping track of playback position
+        (playhead 0)
+        (i 0))
+    (if (or (= nsamp 0) (< samples_read nsamp))
+        (printf "Error reading audio file.\n"))
+    (lambda (in time chan dat)
+      ;; increment playhead (this is the most basic playback possible
+      ;; - it's not channel aware, it just steps through the buffer
+      ;; one sample at a time)
+      (set! playhead (modulo (+ playhead 1) nsamp))
+      ;; play audio
+      (* 2.0 (pref audio_data playhead)))))
+
+;; now set the dsp closure to start the audio
+(dsp:set! dsp)
+
+(bind-func dsp:DSP 20000000 ; make sure we allocate enough memory
+  (let ((audio_player (audiofile_c "assets/samples/bb.wav" 0 0)))
+    (lambda (in time chan dat)
+      ;; all we have to do is call the audio_player closure
+      (* 3.0 (audio_player)))))
+
+;; more sophistication is required to playback audio files with a
+;; different number of channels to the output device - see the
+;; functions in libs/examples/sndfile.xtm for more details

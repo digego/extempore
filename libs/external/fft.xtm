@@ -6,19 +6,16 @@
 
 ;;; Commentary:
 
-;; You can get the source for kiss_fft from
-;; http://sourceforge.net/projects/kissfft/
-;;
-;; The basic kiss_fft library only requires the file kiss_fft.c
-;; You have to build this into a dyib yourself: on OSX this can be
-;; done with:
-;;
-;; clang kiss_fft.c -dynamiclib -I/usr/include/malloc -o kiss_fft.1.3.0.dylib -current_version 1.3.0
-;;
-;; Then, copy the dylib into somewhere on your lib path, e.g. /usr/local/lib 
+;; Bindings for KissFFT: http://kissfft.sourceforge.net
+
+;; An Extempore-ready (will build a shared kiss_fft shared lib) branch
+;; is up at https://github.com/benswift/kiss_fft
+
+;; To build the shared lib, clone the above git repo and
+
+;; make shared && make install
 
 ;;; Code:
-
 
 (sys:load "libs/core/math.xtm")
 
@@ -77,15 +74,15 @@
           (i 0))
       (kiss_fft fft_config
                 (cast in kiss_fft_cpx*)
-                (cast out kiss_fft_cpx*)))
-    (dotimes (i len)
-      (tset! (pref-ptr out i)
-             0
-             (/ (tref (pref-ptr out i) 0) (i64tof len)))
-      (tset! (pref-ptr out i)
-             1
-             (/ (tref (pref-ptr out i) 1) (i64tof len))))
-    void))
+                (cast out kiss_fft_cpx*))
+      (dotimes (i len)
+        (tset! (pref-ptr out i)
+               0
+               (/ (tref (pref-ptr out i) 0) (i64tof len)))
+        (tset! (pref-ptr out i)
+               1
+               (/ (tref (pref-ptr out i) 1) (i64tof len))))
+      void)))
 
 (bind-func inverse_fft_cpxd
   "calculate the inverse FFT of a real (double) input signal"
