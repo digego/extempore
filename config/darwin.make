@@ -1,6 +1,8 @@
 OSX_FRAMEWORKS := \
 	-framework Cocoa \
 	-framework CoreAudio \
+        -framework AudioToolbox \
+        -framework AudioUnit \
 	-framework GLUT \
 	-framework OpenGL \
 
