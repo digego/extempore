@@ -710,8 +710,8 @@ namespace extemp {
     }                                                     
 
   pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {    
-    char exp_path[1024];
-    memset(exp_path,0,1024);
+    char exp_path[8192];
+    memset(exp_path,0,8192);
   #ifdef TARGET_OS_WIN
     char* path = string_value(pair_car(args));
     char* exp_path = path;
