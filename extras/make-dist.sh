@@ -2,14 +2,16 @@
 # create a binary extempore archive for distribution
 
 case $(uname) in
-    Linux) SHLIB_EXT=so ;;
-    Darwin) SHLIB_EXT=dylib ;;
+    Linux) SHLIB_EXT=so PLATFORM=linux ;;
+    Darwin) SHLIB_EXT=dylib PLATFORM=osx ;;
     *) echo Cannot package for OS:  $(uname) >&2 ; exit 1 ;;
 esac
 
-DIST_ARCHIVE=extempore-$(uname)-$(date "+%Y.%m.%d")
+DIST_ARCHIVE=extempore-$PLATFORM-$(date "+%Y%m%d")
 DIST_FILES="extempore libs examples extras README.md runtime"
 DIST_SHLIBS="libassimp librtmidi libSOIL libsndfile libOpenVG libdrawtext"
+
+echo $DIST_ARCHIVE
 
 mkdir -p $DIST_ARCHIVE/runtime/lib
 
@@ -25,10 +27,10 @@ do
     fi
 done
 # tar up the archive
-tar -czf ${DIST_ARCHIVE}.tar.gz $DIST_ARCHIVE
+tar -czf ${DIST_ARCHIVE}.tgz $DIST_ARCHIVE
 rm -rf $DIST_ARCHIVE
 
 echo "Successfully created Extempore distribution archive."
-echo "sha1: $(shasum ${DIST_ARCHIVE}.tar.gz)"
+echo "sha1: $(shasum ${DIST_ARCHIVE}.tgz)"
 
 exit 0
