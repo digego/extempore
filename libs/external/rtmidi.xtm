@@ -25,10 +25,6 @@
 
 ;;; Code:
 
-(sys:load-preload-check 'librtmidi)
-(define *xtmlib-librtmidi-loaded* #f)
-(print "Loading librtmidi library...")
-
 (define librtmidi
   (let ((platform (sys:platform)))
     (cond ((string=? platform "Linux") (sys:load-dylib "librtmidi.so"))
@@ -121,291 +117,197 @@
 ;; (bind-poly closePort closeInPort)
 ;; (bind-poly closePort closeOutPort)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; connection management ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  set up some input/output ports
 
-(define *midi-max-devices* 32)
-(bind-val MIDI_MAX_DEVICES i64 *midi-max-devices*)
-;; midi devices are stored in the global arrays
-;; MIDI_{IN,OUT}DEVICE_ARRAY and accessed through their (integer)
-;; index
-(bind-val MIDI_INDEVICE_ARRAY midi_in_device** (* (sys:pointer-size) *midi-max-devices*))
-(bind-val MIDI_OUTDEVICE_ARRAY midi_out_device** (* (sys:pointer-size) *midi-max-devices*))
+(bind-func midi_query_inports
+  (lambda (dev:midi_in_device*)
+    (let ((num_ports (getInPortCount dev))
+          (i:i64 0))
+      (printf "--Input ports--\n")
+      (dotimes (i num_ports)
+	(printf "Port %lld: %s\n" i (getInPortName dev i)))
+      (printf "\n")
+      void)))
 
-;; (define MIDI_INDEVICE_ARRAY (sys:make-cptr (* (sys:pointer-size) *midi-max-devices*)))
-;; (bind-scm MIDI_INDEVICE_ARRAY midi_in_device** MIDI_INDEVICE_ARRAY)
+(bind-func midi_query_outports
+  (lambda (dev:midi_out_device*)
+    (let ((num_ports (getOutPortCount dev))
+          (i:i64 0))
+      (printf "--Output ports--\n")
+      (dotimes (i num_ports)
+	(printf "Port %lld: %s\n" i (getOutPortName dev i)))
+      (printf "\n")
+      void)))
 
-(bind-func midi_indevice_from_id
-  (lambda (device_id)
-    (let ((device (pref MIDI_INDEVICE_ARRAY device_id)))
-      (if (null? device)
-          (begin (printf "Error: no MIDI input device at id %lld\n" device_id)
-                 null)
-          device))))
+(bind-poly midi_query_ports midi_query_inports)
+(bind-poly midi_query_ports midi_query_outports)
 
-(bind-func midi_outdevice_from_id
-  (lambda (device_id)
-    (let ((device (pref MIDI_OUTDEVICE_ARRAY device_id)))
-      (if (null? device)
-          (begin (printf "Error: no MIDI output device at id %lld\n" device_id)
-                 null)
-          device))))
-
-(bind-func midi_next_available_indevice_id
-  (lambda ()
-    (let ((i 0)
-          (available_id -1))
-      (dotimes (i MIDI_MAX_DEVICES)
-        (if (and (null? (pref MIDI_INDEVICE_ARRAY i))
-                 (= available_id -1))
-            (set! available_id i)))
-      available_id)))
-
-(bind-func midi_next_available_outdevice_id
-  (lambda ()
-    (let ((i 0)
-          (available_id -1))
-      (dotimes (i MIDI_MAX_DEVICES)
-        (if (and (null? (pref MIDI_OUTDEVICE_ARRAY i))
-                 (= available_id -1))
-            (set! available_id i)))
-      available_id)))
-
-;; creating/destroying devices
+;; device/port creation
 
 (bind-func midi_new_indevice
-  (lambda ()
-    (let ((device:midi_in_device* (halloc))
-          (device_id (midi_next_available_indevice_id)))
-      (if (< device_id 0)
-          (begin (printf "Error: no available MIDI device IDs\n")
-                 -1)
-          (begin (newMidiInDevice device UNSPECIFIED "Extempore Midi Input Device")
-                 (pset! MIDI_INDEVICE_ARRAY device_id device)
-                 device_id)))))
+  (let ((device:midi_in_device* (halloc)))
+    (lambda ()
+      (newMidiInDevice device UNSPECIFIED "Extempore Midi Input Device")
+      device)))
 
 (bind-func midi_new_outdevice
-  (lambda ()
-    (let ((device:midi_out_device* (halloc))
-          (device_id (midi_next_available_outdevice_id)))
-      (if (< device_id 0)
-          (begin (printf "Error: no available MIDI device IDs\n")
-                 -1)
-          (begin (newMidiOutDevice device UNSPECIFIED "Extempore Midi Output Device")
-                 (pset! MIDI_OUTDEVICE_ARRAY device_id device)
-                 device_id)))))
-
-(bind-func midi_delete_indevice
-  (lambda (device_id)
-    (let ((device (midi_indevice_from_id device_id)))
-      (if (not (null? device))
-          (begin
-            (deleteMidiInDevice device)
-            (pset! MIDI_INDEVICE_ARRAY device_id null)
-            (free device)))
-      void)))
-
-(bind-func midi_delete_outdevice
-  (lambda (device_id)
-    (let ((device (midi_outdevice_from_id device_id)))
-      (if (not (null? device))
-          (begin
-            (deleteMidiOutDevice device)
-            (pset! MIDI_OUTDEVICE_ARRAY device_id null)
-            (free device)))
-      void)))
-
-;; opening/closing ports
+  (let ((device:midi_out_device* (halloc)))
+    (lambda ()
+      (newMidiOutDevice device UNSPECIFIED "Extempore Midi Output Device")
+      device)))
 
 (bind-func midi_open_inport
-  (lambda (device_id port)
-    (let ((device (midi_indevice_from_id device_id)))
-      (if (not (null? device))
-          (openInPort device port "Extempore Input Port"))
-      void)))
+  (lambda (device:midi_in_device* port)
+    (openInPort device port "Extempore Input Port")))
 
 (bind-func midi_open_virtual_inport
-  (lambda (device_id)
-    (let ((device (midi_indevice_from_id device_id)))
-      (if (not (null? device))
-          (openInVirtualPort device "Extempore Virtual Input Port"))
-      void)))
+  (lambda (device:midi_in_device*)
+    (openInVirtualPort device "Extempore Virtual Input Port")))
 
 (bind-func midi_open_outport
-  (lambda (device_id port)
-    (let ((device (midi_outdevice_from_id device_id)))
-      (if (not (null? device))
-          (openOutPort device port "Extempore Output Port"))
-      void)))
+  (lambda (device:midi_out_device* port)
+    (openOutPort device port "Extempore Output Port")))
 
 (bind-func midi_open_virtual_outport
-  (lambda (device_id)
-    (let ((device (midi_outdevice_from_id device_id)))
-      (if (not (null? device))
-          (openOutVirtualPort device "Extempore Virtual Output Port"))
-      void)))
+  (lambda (device:midi_out_device*)
+    (openOutVirtualPort device "Extempore Virtual Output Port")))
+
+;; device/port destruction
+
+(bind-func midi_delete_indevice
+  (lambda (device:midi_in_device*)
+    (deleteMidiInDevice device)))
+
+(bind-func midi_delete_outdevice
+  (lambda (device:midi_out_device*)
+    (deleteMidiOutDevice device)))
 
 (bind-func midi_close_inport
-  (lambda (device_id)
-    (let ((device (midi_indevice_from_id device_id)))
-      (if (not (null? device))
-          (closeInPort device))
-      void)))
+  (lambda (device:midi_in_device*)
+    (closeInPort device)))
 
 (bind-func midi_close_outport
-  (lambda (device_id)
-    (let ((device (midi_outdevice_from_id device_id)))
-      (if (not (null? device))
-          (closeOutPort device))
-      void)))
+  (lambda (device:midi_out_device*)
+    (closeOutPort device)))
 
-(bind-func extempore_midi_callback
-  (lambda (type:i64 chan:i64 a:i64 b:i64)
-    (printf "MIDI recieved: type:%3lld  chan:%3lld  a:%3lld  b:%3lld\n" type chan a b)
-    (printf "To handle this message, re-define \'extempore_midi_callback\'\n")))
+;; (bind-poly midi_delete_device midi_delete_indevice)
+;; (bind-poly midi_delete_device midi_delete_outdevice)
 
-(bind-func midi_message_parser
+(bind-func midi_default_callback
   (let ((type:i8 0) (chan:i8 0) (a:i8 0) (b:i8 0))
     (lambda (time:double len:i64 msg:i8*)
       (set! type (>> (pref msg 0) 4))
       (set! chan (& (pref msg 0) 15))
       (set! a (pref msg 1))
       (set! b (pref msg 2))
-      (extempore_midi_callback (i8toi64 type) (i8toi64 chan) (i8toi64 a) (i8toi64 b))
+      (printf "time = %f\ntype = %u\nchan = %u\na = %u\nb = %u\n---------------\n"
+              time (i8toi32 type) (i8toi32 chan) (i8toi32 a) (i8toi32 b))
       void)))
 
-(bind-func midi_set_callback
+(bind-func midi_register_device
   "Register a midi sink/source"
-  (lambda (device_id callback_name:i8*)
+  (lambda (device:midi_in_device* callback_name:i8*)
     (let ((len (strlen callback_name))
-          (callback_name_native:i8* (salloc (+ len 8)))
-          (device (midi_indevice_from_id device_id)))
-      (if (not (null? device))
-          (begin (strncpy callback_name_native callback_name (+ 1 len))
-                 (strncpy (pref-ptr callback_name_native len) "_native" 8)
-                 (printf "\nregistering %s as callback function for MIDI source %lld\n\n" callback_name)
-                 (setCallback device (llvm_get_function_ptr callback_name_native))))
-      void)))
+	  (callback_name_native:i8* (salloc (+ len 8))))
+      (strncpy callback_name_native callback_name (+ 1 len))
+      (strncpy (pref-ptr callback_name_native len) "_native" 8)
+      (printf "\nregistering %s as MIDI callback function\n\n" callback_name_native)
+      (setCallback device (llvm_get_function_ptr callback_name_native)))))
 
-(bind-func midi_remove_callback
-  "Register a midi sink/source"
-  (lambda (device_id)
-    (let ((device (midi_indevice_from_id device_id)))
-      (if (not (null? device))
-          (begin (printf "Removing midi callback.\n")
-                 (cancelCallback device)))
-      void)))
+(bind-func midi_unregister_device
+  "Register Extempore as a midi sink/source"
+  (lambda (device:midi_in_device*)
+    (cancelCallback device)))
 
-;;  query input/output ports
 
-;; todo: rename these to sources/destinations
-(bind-func midi_print_source_ports
-  (lambda (device_id)
-    (let ((device (pref MIDI_INDEVICE_ARRAY device_id)))
-      (if (not (null? device))    
-          (let ((num_ports (getInPortCount device))
-                (i:i64 0))
-            (printf "--------------\nSource device %lld\n--------------\nPorts:\n" device_id)
-            (if (= num_ports 0)
-                (begin (printf "No input ports.\n") void)
-                (dotimes (i num_ports)
-                  (printf "[%lld] %s\n" i (getInPortName device i))))
-            (printf "\n")))
-      void)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; default Extempore MIDI connectivity ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func midi_print_destination_ports
-  (lambda (device_id)
-    (let ((device (pref MIDI_OUTDEVICE_ARRAY device_id)))
-      (if (not (null? device))
-          (let ((num_ports (getOutPortCount device))
-                (i:i64 0))
-            (printf "---------------\nDestination device %lld\n---------------\nPorts:\n" device_id)
-            (if (= num_ports 0)
-                (begin (printf "No ouput ports.\n") void)
-                (dotimes (i num_ports)
-                  (printf "[%lld] %s\n" i (getOutPortName device i))))
-            (printf "\n")))
-      void)))
-
-;; (bind-poly midi_print_ports midi_print_isource_)
-;; (bind-poly midi_print_ports midi_print_destination_ports)
-
-(bind-func midi_print_sources
-  (lambda ()
-    (let ((i 0))
-      (dotimes (i MIDI_MAX_DEVICES)
-        (let ((device (pref MIDI_INDEVICE_ARRAY i)))
-          (if (not (null? device))
-              (midi_print_source_ports i))))
-      void)))
-
-(bind-func midi_print_destinations
-  (lambda ()
-    (let ((i 0))
-      (dotimes (i MIDI_MAX_DEVICES)
-        (let ((device (pref MIDI_OUTDEVICE_ARRAY i)))
-          (if (not (null? device))
-              (midi_print_destination_ports i))))
-      void)))
-
-;; default midi source/destination device indexes
-;; source = midi_in_device, destination = midi_out_device
-(define *extempore-midi-source* #f)
-(define *extempore-midi-destination* #f)
+(define *midi-in-device* #f)
+(define *midi-out-device* #f)
 
 (define midi-register-events
   (lambda ()
-    (set! *extempore-midi-source* (midi_new_indevice))
-    (midi_open_virtual_inport *extempore-midi-source*)
-    (midi_set_callback *extempore-midi-source* "midi_message_parser")
-    (set! *extempore-midi-destination* (midi_new_outdevice))
-    (midi_open_virtual_outport *extempore-midi-destination*)
-    (midi_print_destinations)))
+    (set! *midi-in-device* (midi_new_indevice))
+    (midi_register_device *midi-in-device* "midi_default_callback")
+    (set! *midi-out-device* (midi_new_outdevice))))
+
+;; (midi-register-events)
 
 (define midi-deregister-events
   (lambda ()
-    (midi_delete_indevice *extempore-midi-source*)
-    (set! *extempore-midi-source* #f)
-    (midi_delete_outdevice *extempore-midi-destination*)
-    (set! *extempore-midi-destination* #f)
+    (midi_delete_indevice *midi-in-device*)
+    (set! *midi-in-device* #f)
+    (midi_delete_outdevice *midi-out-device*)
+    (set! *midi-out-device* #f)
     (print "Deregstered Extempore MIDI input/output devices.\n")))
 
-;; send midi message
+;; (midi-deregister-events)
 
-(bind-func midi_send_message
-  (lambda (device_id type chan a b)
-    (let ((device (pref MIDI_OUTDEVICE_ARRAY device_id)))
-      (if (not (null? device))
-          (let ((msg:i8* (salloc 3)))
-            (pfill! msg (+ (<< type 4) chan) a b)
-            (sendMessage device 3 msg)))
-      void)))
+
+;; TODO I'm up to here
+
+;; (midi_unregister_device *midi-extempore-virtual-inp)
+
+;; (midi_query_inports (midi_new_indevice))
+;; (midi_query_outports (midi_new_outdevice))
+
+(bind-func midi_send
+  (lambda (device:midi_out_device* type chan a b)
+    (let ((msg:i8* (salloc 3)))
+      (pfill! msg (+ (<< type 4) chan) a b)
+      (sendMessage device 3 msg))))
 
 ;; test sending & recieving midi
-;; (midi_send_message (midi_new_outdevice) *midi-note-on* 0 60 80 0)
-;; (midi_send_message (midi_new_outdevice) *midi-note-off* 0 66 80 0)
+;; (midi_send (midi_new_outdevice) *midi-note-on* 0 60 80 0)
+;; (midi_send (midi_new_outdevice) *midi-note-off* 0 66 80 0)
 
-(define midi-play-note
-  (lambda (time device-id pitch velocity duration channel)
-    (callback time 'midi_send_message device-id *midi-note-on* channel pitch velocity)
-    (callback (+ time duration) 'midi_send_message device-id *midi-note-off* channel pitch velocity)))
+(define play-midi-note
+  (lambda (time device pitch velocity duration channel)
+    (callback time 'midi_send device *midi-note-on* channel pitch velocity)
+    (callback (+ time duration) 'midi_send device *midi-note-off* channel pitch velocity)))
 
 ;; a midi-specific play macro
-(macro (mplay args)
-  (if (symbol? (cadr args))
-      `(midi-play-note (*metro* beat)
-                       (real->integer ,(cadr args))
-                       (real->integer ,(caddr args))
-                       (real->integer ,(cadddr args))
-                       (*metro* 'dur ,(car (cddddr args)))
-                       0)
-      `(midi-play-note (*metro* (+ beat ,(cadr args)))
-                       (real->integer ,(caddr args))
-                       (real->integer ,(cadddr args))
-                       (real->integer ,(car (cddddr args)))
-                       (*metro* 'dur ,(cadr (cddddr args)))
-                       0)))
 
-(define *xtmlib-librtmidi-loaded* #t)
-(print "done.\n")
+;; (define-macro (mplay args)
+;;   (if (not (symbol? (cadr args)))
+;;       (if (> (length args) 6)
+;;           `(play-midi-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+;;                       ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))
+;;           `(play-midi-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
+;;       (if (> (length args) 7)
+;;           `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+;;                       (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))) ,(car (cdddr (cddddr args))))
+;;           `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+;;                       (*metro* 'dur ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))))))
+
+(define-macro (mplay args)
+  (if (symbol? (cadr args))
+      `(play-midi-note (*metro* beat) ,(cadr args)
+		       (real->integer ,(caddr args))
+		       (real->integer ,(cadddr args))
+		       (*metro* 'dur ,(car (cddddr args))) 0)
+      `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args)
+		       (real->integer ,(cadddr args))
+		       (real->integer ,(car (cddddr args)))
+		       (*metro* 'dur ,(cadr (cddddr args))) 0)))
+
+;; uncomment if you want to use play instead of mplay
+;;
+;; (macro (play args)
+;;   (if (symbol? (cadr args))
+;;       `(play-midi-note (*metro* beat) ,(cadr args)
+;;                   (real->integer ,(caddr args))
+;;                   (real->integer ,(cadddr args))
+;;                   (*metro* 'dur ,(car (cddddr args))) 0)
+;;       `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args)
+;;                   (real->integer ,(cadddr args))
+;;                   (real->integer ,(car (cddddr args)))
+;;                   (*metro* 'dur ,(cadr (cddddr args))) 0)))
+
+
+;; (let ((beat (*metro* 'get-beat 1)))
+;;   (mplay midiout 60. 70.8 1.0))
+
+;; (play-midi-note (now) *midi-in-device* 72 20 10000 0)
