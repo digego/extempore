@@ -343,8 +343,8 @@
 (bind-lib libopenvg vgSetParameterfv [void,VGHandle,VGParamType,VGint,VGfloat*]*)
 (bind-lib libopenvg vgSetParameteriv [void,VGHandle,VGParamType,VGint,VGint*]*)
 
-(bind-lib libopenvg vgGetParameterf [VGfloat,VGHandle,VGParamType,VGfloat]*)
-(bind-lib libopenvg vgGetParameteri [VGint,VGHandle,VGParamType,VGint]*)
+(bind-lib libopenvg vgGetParameterf [VGfloat,VGHandle,VGParamType]*)
+(bind-lib libopenvg vgGetParameteri [VGint,VGHandle,VGParamType]*)
 (bind-lib libopenvg vgGetParameterVectorSize [VGint,VGHandle,VGParamType]*)
 (bind-lib libopenvg vgGetParameterfv [VGHandle,VGParamType,VGint,VGfloat*]*)
 (bind-lib libopenvg vgGetParameteriv [VGHandle,VGParamType,VGint,VGint*]*)
@@ -541,6 +541,10 @@
     (vgDrawPath path (+ VG_STROKE_PATH VG_FILL_PATH))
     (vgDestroyPath path)))
 
+(bind-func xtm_clear_path
+  (lambda (path)
+    (vgClearPath path VG_PATH_CAPABILITY_ALL)))
+
 (bind-func xtm_destroy_path
   (lambda (path)
     (vgDestroyPath path)))
@@ -562,6 +566,51 @@
   (lambda (path)
     (vgDrawPath path VG_FILL_PATH)
     (vgDestroyPath path)))
+
+;; paths
+
+(bind-func xtm_add_line
+  (lambda (path x1 y1 x2 y2)
+    (vguLine path x1 y1 x2 y2)))
+
+;; convenience functions for adding shapes to path
+;; from vgu.h
+
+(bind-func xtm_add_line
+  (lambda (path x1 y1 x2 y2)
+    (vguLine path x1 y1 x2 y2)))
+
+(bind-func xtm_add_polygon
+  (lambda (path points:VGfloat* npoints closed)
+    (vguPolygon path points npoints closed)))
+
+(bind-func xtm_add_poly3
+  (lambda (path x1 y1 x2 y2 x3 y3)
+    (let ((points:VGfloat* (salloc 6)))
+      (pfill! points x1 y1 x2 y2 x3 y3)
+      (vguPolygon path points 3 VG_TRUE))))
+
+(bind-func xtm_add_poly4
+  (lambda (path x1 y1 x2 y2 x3 y3 x4 y4)
+    (let ((points:VGfloat* (salloc 8)))
+      (pfill! points x1 y1 x2 y2 x3 y3 x4 y4)
+      (vguPolygon path points 4 VG_TRUE))))
+
+(bind-func xtm_add_rect
+  (lambda (path x y w h)
+    (vguRect path x y w h)))
+
+(bind-func xtm_add_round_rect
+  (lambda (path x y w h arcw arch)
+    (vguRoundRect path x y w h arcw arch)))
+
+(bind-func xtm_add_ellipse
+  (lambda (path cx cy w h)
+    (vguEllipse path cx cy w h)))
+
+(bind-func xtm_add_arc
+  (lambda (path x y w h start_angle angle_extent arc_type)
+    (vguArc path x y w h start_angle angle_extent arc_type)))
 
 ;; higher-level path drawing with xtlang closures
 
@@ -612,32 +661,6 @@
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
       void)))
-
-;; add shapes to path
-
-(bind-func xtm_add_line
-  (lambda (path x1 y1 x2 y2)
-    (vguLine path x1 y1 x2 y2)))
-
-(bind-func xtm_add_polygon
-  (lambda (path points:VGfloat* npoints closed)
-    (vguPolygon path points npoints closed)))
-
-(bind-func xtm_add_rect
-  (lambda (path x y w h)
-    (vguRect path x y w h)))
-
-(bind-func xtm_add_round_rect
-  (lambda (path x y w h arcw arch)
-    (vguRoundRect path x y w h arcw arch)))
-
-(bind-func xtm_add_ellipse
-  (lambda (path cx cy w h)
-    (vguEllipse path cx cy w h)))
-
-(bind-func xtm_add_arc
-  (lambda (path x y w h start_angle angle_extent arc_type)
-    (vguArc path x y w h start_angle angle_extent arc_type)))
 
 ;; images
 
