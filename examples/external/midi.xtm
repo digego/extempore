@@ -1,0 +1,43 @@
+;;; midi.xtm -- sending/recieving MIDI in Extempore
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: rtmidi
+
+;;; Commentary:
+
+;; The rtmidi library is a cross-platform MIDI library by Gary P.
+;; Scavone.
+
+;; Source and documentation for the rtmidi library is available at
+;; http://music.mcgill.ca/~gary/rtmidi/
+
+;; If you installed an Extempore binary, then you should have the
+;; rtmidi lib in your runtime/lib directory. If not, see instructions
+;; in libs/external/rtmidi.xtm for how to build a rtmidi library that
+;; Extempore can use.
+
+(sys:load "libs/external/rtmidi.xtm")
+
+;; register Extempore as a MIDI destination
+(set! *extempore-midi-destination* (midi_new_indevice))
+(midi_open_virtual_inport *extempore-midi-destination*)
+(midi_set_callback *extempore-midi-destination* "midi_message_parser")
+(midi_print_destinations)
+
+;; register Extempore as a MIDI source
+(set! *extempore-midi-source* (midi_new_outdevice))
+(midi_print_sources)
+
+;; open up a MIDI port to Extempore's destination device
+
+;; make sure the second argument matches the port number of the
+;; "Extempore Virtual Input Port" from (midi_print_destinations)
+(midi_open_outport *extempore-midi-source* 0)
+(midi_print_sources)
+
+;; test things by playing a note
+(midi-play-note (now) *extempore-midi-source* (random 72 84) 20 *second* 0)
+
+(let ((beat (*metro* 'get-beat 1)))
+  (mplay *extempore-midi-source* (random 72 84) 20 1 0))
