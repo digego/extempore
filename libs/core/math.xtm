@@ -843,6 +843,14 @@
 	(tset! (pref-ptr com i) 1 (pref im i))))
     void))
 
+(bind-func fill_cpx_buffer_cpxf_reonly
+  (lambda (re:float* com:cpxf* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr com i) 0 (pref re i))
+	(tset! (pref-ptr com i) 1 0.0)))
+    void))
+
 (bind-func fill_cpx_buffer_cpxd
   (lambda (re:double* im:double* com:cpxd* len:i64)
     (let ((i 0))
@@ -851,8 +859,53 @@
 	(tset! (pref-ptr com i) 1 (pref im i))))
     void))
 
+(bind-func fill_cpx_buffer_cpxd_reonly
+  (lambda (re:double* com:cpxd* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(tset! (pref-ptr com i) 0 (pref re i))
+	(tset! (pref-ptr com i) 1 0.0)))
+    void))
+
 (bind-poly fill_cpx_buffer fill_cpx_buffer_cpxf)
 (bind-poly fill_cpx_buffer fill_cpx_buffer_cpxd)
+(bind-poly fill_cpx_buffer fill_cpx_buffer_cpxf_reonly)
+(bind-poly fill_cpx_buffer fill_cpx_buffer_cpxd_reonly)
+
+(bind-func pour_cpx_buffer_cpxf
+  (lambda (com:cpxf re:float* im:float* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(pset! re i (tset (pref-ptr com i) 0)) 
+	(pset! im i (tref (pref-ptr com i) 1))))
+    void))
+
+(bind-func pour_cpx_buffer_cpxd
+  (lambda (com:cpxd* re:double* im:double* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(pset! re i (tref (pref-ptr com i) 0))
+	(pset! im i (tref (pref-ptr com i) 1))))
+    void))
+
+(bind-func pour_cpx_buffer_cpxf_reonly
+  (lambda (com:cpxf re:float* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(pset! re i (tset (pref-ptr com i) 0)) ))
+    void))
+
+(bind-func pour_cpx_buffer_cpxd_reonly
+  (lambda (com:cpxd* re:double* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+	(pset! re i (tref (pref-ptr com i) 0))))
+    void))
+
+(bind-poly pour_cpx_buffer pour_cpx_buffer_cpxf)
+(bind-poly pour_cpx_buffer pour_cpx_buffer_cpxd)
+(bind-poly pour_cpx_buffer pour_cpx_buffer_cpxf_reonly)
+(bind-poly pour_cpx_buffer pour_cpx_buffer_cpxd_reonly)
 
 (bind-func conjugate_buffer_cpxf
   (lambda (signal:cpxf* conj:cpxf* len:i64)
@@ -1039,4 +1092,3 @@
                (+ 0.54 (* 0.46 (cos (/ (* TWOPI (i64tod i))
                                        (i64tod (- window_length 1))))))))
       void)))
-
