@@ -730,8 +730,253 @@
 (bind-type cpxd <double,double>)
 (bind-type cpxf <float,float>)
 
-;; conversion functions
+;; complex addition (in zone!)
+(bind-func cpxd_add
+  (lambda (a:cpxd* b:cpxd*)
+    (let ((c:cpxd* (zalloc 1)))
+      (tset! c 0 (+ (tref a 0) (tref b 0)))
+      (tset! c 1 (+ (tref a 1) (tref b 1)))
+      c)))
 
+;; complex subtraction (in zone!)
+(bind-func cpxd_sub
+  (lambda (a:cpxd* b:cpxd*)
+    (let ((c:cpxd* (zalloc 1)))
+      (tset! c 0 (- (tref a 0) (tref b 0)))
+      (tset! c 1 (- (tref a 1) (tref b 1)))
+      c)))
+
+;; complex multiplication (in zone!)
+(bind-func cpxd_mul
+  (lambda (a:cpxd* b:cpxd*)
+    (let ((c:cpxd* (zalloc 1)))
+      (tset! c 0 (- (* (tref a 0) (tref b 0))
+                    (* (tref a 1) (tref b 1))))             
+      (tset! c 1 (+ (* (tref a 0) (tref b 1))
+                    (* (tref a 1) (tref b 0))))
+      c)))
+
+;; complex division (in zone!)
+(bind-func cpxd_div
+  (lambda (a:cpxd* b:cpxd*)
+    (let ((c:cpxd* (zalloc 1))
+          (i (+ (* (tref a 0) (tref b 0))
+                (* (tref a 1) (tref b 1))))
+          (j (+ (* (tref b 0) (tref b 0))
+                (* (tref b 1) (tref b 1))))
+          (k (- (* (tref a 1) (tref b 0))
+                (* (tref a 0) (tref b 1)))))
+      (tset! c 0 (/ i j))
+      (tset! c 1 (/ k j))
+      c)))
+
+(bind-func cpxd_print
+  (lambda (val:cpxd*)
+    (if (or (= (tref val 1) 0.0)
+            (> (tref val 1) 0.0)) 
+        (printf "%.2f+%.2fi" (tref val 0) (tref val 1))
+        (printf "%.2f%.2fi" (tref val 0) (tref val 1))
+        void)))
+
+;; complex addition (in zone!)
+(bind-func cpxf_add
+  (lambda (a:cpxf* b:cpxf*)
+    (let ((c:cpxf* (zalloc 1)))
+      (tset! c 0 (+ (tref a 0) (tref b 0)))
+      (tset! c 1 (+ (tref a 1) (tref b 1)))
+      c)))
+
+;; complex subtraction (in zone!)
+(bind-func cpxf_sub
+  (lambda (a:cpxf* b:cpxf*)
+    (let ((c:cpxf* (zalloc 1)))
+      (tset! c 0 (- (tref a 0) (tref b 0)))
+      (tset! c 1 (- (tref a 1) (tref b 1)))
+      c)))
+
+;; complex multiplication (in zone!)
+(bind-func cpxf_mul
+  (lambda (a:cpxf* b:cpxf*)
+    (let ((c:cpxf* (zalloc 1)))
+      (tset! c 0 (- (* (tref a 0) (tref b 0))
+                    (* (tref a 1) (tref b 1))))             
+      (tset! c 1 (+ (* (tref a 0) (tref b 1))
+                    (* (tref a 1) (tref b 0))))
+      c)))
+
+;; complex division (in zone!)
+(bind-func cpxf_div
+  (lambda (a:cpxf* b:cpxf*)
+    (let ((c:cpxf* (zalloc 1))
+          (i (+ (* (tref a 0) (tref b 0))
+                (* (tref a 1) (tref b 1))))
+          (j (+ (* (tref b 0) (tref b 0))
+                (* (tref b 1) (tref b 1))))
+          (k (- (* (tref a 1) (tref b 0))
+                (* (tref a 0) (tref b 1)))))
+      (tset! c 0 (/ i j))
+      (tset! c 1 (/ k j))
+      c)))
+
+(bind-func cpxf_print
+  (lambda (val:cpxf*)
+    (if (or (= (tref val 1) 0.0)
+            (> (tref val 1) 0.0)) 
+        (printf "%.2f+%.2fi" (tref val 0) (tref val 1))
+        (printf "%.2f%.2fi" (tref val 0) (tref val 1))
+        void)))
+
+
+;; complex addition
+(bind-func cpxd_add_buf
+  (lambda (a:cpxd* b:cpxd* c:cpxd* lgth)
+    (let ((i 0))
+      (dotimes (i lgth)
+        (tset! (pref-ptr c i) 0
+               (+ (tref (pref-ptr a i) 0)
+                  (tref (pref-ptr b i) 0)))
+        (tset! (pref-ptr c i) 1
+               (+ (tref (pref-ptr a i) 1)
+                  (tref (pref-ptr b i) 1))))
+      void)))
+
+;; complex subtraction (in zone!)
+(bind-func cpxd_sub_buf
+  (lambda (a:cpxd* b:cpxd* c:cpxd* lgth)
+    (let ((i 0))
+      (dotimes (i lgth)
+        (tset! (pref-ptr c i) 0
+               (- (tref (pref-ptr a i) 0)
+                  (tref (pref-ptr b i) 0)))
+        (tset! (pref-ptr c i) 1
+               (- (tref (pref-ptr a i) 1)
+                  (tref (pref-ptr b i) 1))))
+      void)))
+
+;; complex multiplication (in zone!)
+(bind-func cpxd_mul_buf
+  (lambda (a:cpxd* b:cpxd* c:cpxd* lgth)
+    (let ((i 0))
+      (dotimes (i lgth)
+        (tset! (pref-ptr c i) 0
+               (- (* (tref (pref-ptr a i) 0)
+                     (tref (pref-ptr b i) 0))
+                  (* (tref (pref-ptr a i) 1)
+                     (tref (pref-ptr b i) 1))))
+        (tset! (pref-ptr c i) 1
+               (+ (* (tref (pref-ptr a i) 0)
+                     (tref (pref-ptr b i) 1))
+                  (* (tref (pref-ptr a i) 1)
+                     (tref (pref-ptr b i) 0)))))
+      void)))
+
+;; complex division (in zone!)
+(bind-func cpxd_div_buf
+  (lambda (a:cpxd* b:cpxd* c:cpxd* lgth)
+    (let ((i 0) (j 0.0) (k 0.0) (l 0.0))          
+      (dotimes (i lgth)
+        (set! j (+ (* (tref (pref-ptr a i) 0)
+                      (tref (pref-ptr b i) 0))
+                   (* (tref (pref-ptr a i) 1)
+                      (tref (pref-ptr b i) 1))))
+        (set! k (+ (* (tref (pref-ptr b i) 0)
+                      (tref (pref-ptr b i) 0))
+                   (* (tref (pref-ptr b i) 1)
+                      (tref (pref-ptr b i) 1))))
+        (set! l (- (* (tref (pref-ptr a i) 1)
+                      (tref (pref-ptr b i) 0))
+                   (* (tref (pref-ptr a i) 0)
+                      (tref (pref-ptr b i) 1))))
+        (tset! (pref-ptr c i) 0 (/ j k))
+        (tset! (pref-ptr c i) 1 (/ l k)))
+      void)))
+
+
+;; complex addition
+(bind-func cpxf_add_buf
+  (lambda (a:cpxf* b:cpxf* c:cpxf* lgth)
+    (let ((i 0))
+      (dotimes (i lgth)
+        (tset! (pref-ptr c i) 0
+               (+ (tref (pref-ptr a i) 0)
+                  (tref (pref-ptr b i) 0)))
+        (tset! (pref-ptr c i) 1
+               (+ (tref (pref-ptr a i) 1)
+                  (tref (pref-ptr b i) 1))))
+      void)))
+
+;; complex subtraction (in zone!)
+(bind-func cpxf_sub_buf
+  (lambda (a:cpxf* b:cpxf* c:cpxf* lgth)
+    (let ((i 0))
+      (dotimes (i lgth)
+        (tset! (pref-ptr c i) 0
+               (- (tref (pref-ptr a i) 0)
+                  (tref (pref-ptr b i) 0)))
+        (tset! (pref-ptr c i) 1
+               (- (tref (pref-ptr a i) 1)
+                  (tref (pref-ptr b i) 1))))
+      void)))
+
+;; complex multiplication (in zone!)
+(bind-func cpxf_mul_buf
+  (lambda (a:cpxf* b:cpxf* c:cpxf* lgth)
+    (let ((i 0))
+      (dotimes (i lgth)
+        (tset! (pref-ptr c i) 0
+               (- (* (tref (pref-ptr a i) 0)
+                     (tref (pref-ptr b i) 0))
+                  (* (tref (pref-ptr a i) 1)
+                     (tref (pref-ptr b i) 1))))
+        (tset! (pref-ptr c i) 1
+               (+ (* (tref (pref-ptr a i) 0)
+                     (tref (pref-ptr b i) 1))
+                  (* (tref (pref-ptr a i) 1)
+                     (tref (pref-ptr b i) 0)))))
+      void)))
+
+;; complex division (in zone!)
+(bind-func cpxf_div_buf
+  (lambda (a:cpxf* b:cpxf* c:cpxf* lgth)
+    (let ((i 0) (j 0.0) (k 0.0) (l 0.0))          
+      (dotimes (i lgth)
+        (set! j (+ (* (tref (pref-ptr a i) 0)
+                      (tref (pref-ptr b i) 0))
+                   (* (tref (pref-ptr a i) 1)
+                      (tref (pref-ptr b i) 1))))
+        (set! k (+ (* (tref (pref-ptr b i) 0)
+                      (tref (pref-ptr b i) 0))
+                   (* (tref (pref-ptr b i) 1)
+                      (tref (pref-ptr b i) 1))))
+        (set! l (- (* (tref (pref-ptr a i) 1)
+                      (tref (pref-ptr b i) 0))
+                   (* (tref (pref-ptr a i) 0)
+                      (tref (pref-ptr b i) 1))))
+        (tset! (pref-ptr c i) 0 (/ j k))
+        (tset! (pref-ptr c i) 1 (/ l k)))
+      void)))
+
+
+(bind-poly cpxadd cpxf_add)
+(bind-poly cpxadd cpxd_add)
+(bind-poly cpxadd cpxf_add_buf)
+(bind-poly cpxadd cpxd_add_buf)
+(bind-poly cpxsub cpxf_sub)
+(bind-poly cpxsub cpxd_sub)
+(bind-poly cpxsub cpxf_sub_buf)
+(bind-poly cpxsub cpxd_sub_buf)
+(bind-poly cpxdiv cpxf_mul)
+(bind-poly cpxdiv cpxd_mul)
+(bind-poly cpxdiv cpxf_mul_buf)
+(bind-poly cpxdiv cpxd_mul_buf)
+(bind-poly cpxdiv cpxf_div)
+(bind-poly cpxdiv cpxd_div)
+(bind-poly cpxdiv cpxf_div_buf)
+(bind-poly cpxdiv cpxd_div_buf)
+(bind-poly cpxprint cpxf_print)
+(bind-poly cpxprint cpxd_print)           
+
+;; conversion functions
 (bind-func conjugate_cpxf
   (lambda (cpx_val:cpxf*)
     (let ((cpx_cnj:cpxf* (alloc 1)))
