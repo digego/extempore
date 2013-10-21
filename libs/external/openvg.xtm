@@ -22,9 +22,9 @@
 (define libopenvg
   (let ((platform (sys:platform)))
     (cond ((string=? platform "Linux") (sys:load-dylib "libOpenVG.so"))
-	  ((string=? platform "Windows") (sys:load-dylib "libOpenVG.dll"))
-	  ((string=? platform "OSX") (sys:load-dylib "libOpenVG.dylib"))
-	  (else (sys:load-escape "Unknown platform for OpenVG lib")))))
+          ((string=? platform "Windows") (sys:load-dylib "libOpenVG.dll"))
+          ((string=? platform "OSX") (sys:load-dylib "libOpenVG.dylib"))
+          (else (sys:load-escape "Unknown platform for OpenVG lib")))))
 
 (if (null? libopenvg)
     (sys:load-escape "Could not load OpenVG\n"))
@@ -373,7 +373,7 @@
 (bind-lib libopenvg vgModifyPathCoords [void,VGPath,VGint,VGint,i8*]*)
 (bind-lib libopenvg vgTransformPath [void,VGPath,VGPath]*)
 (bind-lib libopenvg vgInterpolatePath [VGboolean,VGPath,VGPath,VGPath,VGfloat]*)
-(bind-lib libopenvg vgPathLength [VGboolean,VGPath,VGint,VGint]*)
+(bind-lib libopenvg vgPathLength [VGfloat,VGPath,VGint,VGint]*)
 (bind-lib libopenvg vgPointAlongPath [void,VGPath,VGint,VGint,VGfloat,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
 (bind-lib libopenvg vgPathBounds [void,VGPath,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
 (bind-lib libopenvg vgPathTransformedBounds [void,VGPath,VGfloat,VGfloat*,VGfloat*,VGfloat*,VGfloat*]*)
@@ -616,10 +616,10 @@
 
 (bind-func xtm_add_polyd
   (lambda (path points:double* npoints closed)
-    (let ((pointsf:VGfloat* (zalloc npoints))
-	  (i 0))
+    (let ((pointsf:VGfloat* (salloc npoints))
+          (i 0))
       (dotimes (i npoints)
-	(pset! pointsf i (dtof (pref points i))))
+        (pset! pointsf i (dtof (pref points i))))
       (vguPolygon path pointsf (i64toi32 npoints) closed))))
 
 (bind-poly xtm_add_poly xtm_add_polyf)
@@ -629,13 +629,13 @@
   (lambda (path x1 y1 x2 y2 x3 y3)
     (let ((points:VGfloat* (salloc 6)))
       (pfill! points x1 y1 x2 y2 x3 y3)
-      (vguPolygon path points 3 VG_TRUE))))
+      (vguPolygon path points 6 VG_TRUE))))
 
 (bind-func xtm_add_trid
   (lambda (path x1 y1 x2 y2 x3 y3)
     (let ((points:double* (salloc 6)))
       (pfill! points x1 y1 x2 y2 x3 y3)
-      (xtm_add_poly path points 3 VG_TRUE))))
+      (xtm_add_poly path points 6 VG_TRUE))))
 
 (bind-poly xtm_add_tri xtm_add_trif)
 (bind-poly xtm_add_tri xtm_add_trid)
@@ -644,13 +644,13 @@
   (lambda (path x1 y1 x2 y2 x3 y3 x4 y4)
     (let ((points:VGfloat* (salloc 8)))
       (pfill! points x1 y1 x2 y2 x3 y3 x4 y4)
-      (vguPolygon path points 4 VG_TRUE))))
+      (vguPolygon path points 8 VG_TRUE))))
 
 (bind-func xtm_add_quadd
   (lambda (path x1 y1 x2 y2 x3 y3 x4 y4)
     (let ((points:double* (salloc 8)))
       (pfill! points x1 y1 x2 y2 x3 y3 x4 y4)
-      (xtm_add_poly path points 4 VG_TRUE))))
+      (xtm_add_poly path points 8 VG_TRUE))))
 
 (bind-poly xtm_add_quad xtm_add_quadf)
 (bind-poly xtm_add_quad xtm_add_quadd)
@@ -695,16 +695,59 @@
 (bind-func xtm_add_arcd
   (lambda (path x y w h start_angle angle_extent arc_type)
     (vguArc path
-	    (dtof x)
-	    (dtof y)
-	    (dtof w)
-	    (dtof h)
-	    (dtof start_angle)
-	    (dtof angle_extent)
-	    arc_type)))
+            (dtof x)
+            (dtof y)
+            (dtof w)
+            (dtof h)
+            (dtof start_angle)
+            (dtof angle_extent)
+            arc_type)))
 
 (bind-poly xtm_add_arc xtm_add_arcf)
 (bind-poly xtm_add_arc xtm_add_arcd)
+
+;; path length
+
+(bind-func xtm_path_lengthf
+  (lambda (path start_segment num_segments)
+    (vgPathLength path start_segment num_segments)))
+
+(bind-func xtm_path_lengthd
+  (lambda (path start_segment num_segments)
+    (ftod (vgPathLength path (i64toi32 start_segment) (i64toi32 num_segments)))))
+
+(bind-poly xtm_path_length xtm_path_lengthf)
+(bind-poly xtm_path_length xtm_path_lengthd)
+
+(bind-type xpoint <double,double>)
+
+;; these wrappers only check first segment of the path
+(bind-func xtm_point_along_path
+  (lambda (path distance point:xpoint*)
+    (let ((ptf:VGfloat* (salloc 2)))
+      (vgPointAlongPath path
+                        0 1 ;; just use segment 0
+                        distance
+                        (pref-ptr ptf 0)
+                        (pref-ptr ptf 1)
+                        null null) ;; don't calculate tangent
+      (tset! point 0 (ftod (pref ptf 0)))
+      (tset! point 1 (ftod (pref ptf 1)))
+      void)))
+
+(bind-func xtm_point_along_path_norm
+  "normalised version: 0.0 <= distance <= 1.0"
+  (lambda (path distance point)
+    (let ((len (xtm_path_length path 0 1)))
+      (if (> len 0.0)
+          (begin
+            (xtm_point_along_path path distance point)
+            (tset! point 0 (/ (tref point 0) len))
+            (tset! point 1 (/ (tref point 1) len))
+            void)
+          (begin (printf "Error: path length <= 0.0\n")
+                 void))
+      void)))
 
 ;; higher-level path drawing with xtlang closures
 
@@ -719,9 +762,9 @@
 (bind-func xtm_draw_lined
   (lambda (x1 y1 x2 y2)
     (let ((path (xtm_create_vgpath))
-	  (vgu_err (xtm_add_lined path x1 y1 x2 y2)))
+          (vgu_err (xtm_add_lined path x1 y1 x2 y2)))
       (if (= vgu_err VGU_NO_ERROR)
-	  (xtm_draw_path path))
+          (xtm_draw_path path))
       void)))
 
 (bind-poly xtm_draw_line xtm_draw_linef)
@@ -738,9 +781,9 @@
 (bind-func xtm_draw_polyd
   (lambda (points:double* npoints closed)
     (let ((path (xtm_create_vgpath))
-	  (vgu_err (xtm_add_polyd path points npoints closed)))
+          (vgu_err (xtm_add_polyd path points npoints closed)))
       (if (= vgu_err VGU_NO_ERROR)
-	  (xtm_draw_path path))
+          (xtm_draw_path path))
       void)))
 
 (bind-poly xtm_draw_poly xtm_draw_polyf)
@@ -749,9 +792,9 @@
 (bind-func xtm_draw_trid
   (lambda (x1 y1 x2 y2 x3 y3)
     (let ((path (xtm_create_vgpath))
-	  (vgu_err (xtm_add_trid path x1 y1 x2 y2 x3 y3)))
+          (vgu_err (xtm_add_trid path x1 y1 x2 y2 x3 y3)))
       (if (= vgu_err VGU_NO_ERROR)
-	  (xtm_draw_path path))
+          (xtm_draw_path path))
       void)))
 
 ;; no xtm_draw trif for the moment
@@ -760,9 +803,9 @@
 (bind-func xtm_draw_quadd
   (lambda ( x1 y1 x2 y2 x3 y3 x4 y4)
     (let ((path (xtm_create_vgpath))
-	  (vgu_err (xtm_add_quadd path x1 y1 x2 y2 x3 y3 x4 y4)))
+          (vgu_err (xtm_add_quadd path x1 y1 x2 y2 x3 y3 x4 y4)))
       (if (= vgu_err VGU_NO_ERROR)
-	  (xtm_draw_path path))
+          (xtm_draw_path path))
       void)))
 
 ;; no xtm_draw quadf for the moment
@@ -779,9 +822,9 @@
 (bind-func xtm_draw_rectd
   (lambda (x y w h)
     (let ((path (xtm_create_vgpath))
-	  (vgu_err (xtm_add_rectd path x y w h)))
+          (vgu_err (xtm_add_rectd path x y w h)))
       (if (= vgu_err VGU_NO_ERROR)
-	  (xtm_draw_path path))
+          (xtm_draw_path path))
       void)))
 
 (bind-poly xtm_draw_rect xtm_draw_rectf)
@@ -798,9 +841,9 @@
 (bind-func xtm_draw_round_rectd
   (lambda (x y w h arcw arch)
     (let ((path (xtm_create_vgpath))
-	  (vgu_err (xtm_add_round_rectd path x y w h arcw arch)))
+          (vgu_err (xtm_add_round_rectd path x y w h arcw arch)))
       (if (= vgu_err VGU_NO_ERROR)
-	  (xtm_draw_path path))
+          (xtm_draw_path path))
       void)))
 
 (bind-poly xtm_draw_round_rect xtm_draw_round_rectf)
@@ -817,9 +860,9 @@
 (bind-func xtm_draw_ellipsed
   (lambda (cx cy w h)
     (let ((path (xtm_create_vgpath))
-	  (vgu_err (xtm_add_ellipsed path cx cy w h)))
+          (vgu_err (xtm_add_ellipsed path cx cy w h)))
       (if (= vgu_err VGU_NO_ERROR)
-	  (xtm_draw_path path))
+          (xtm_draw_path path))
       void)))
 
 (bind-poly xtm_draw_ellipse xtm_draw_ellipsef)
@@ -836,9 +879,9 @@
 (bind-func xtm_draw_arcd
   (lambda (x y w h start_angle angle_extent arc_type)
     (let ((path (xtm_create_vgpath))
-	  (vgu_err (xtm_add_arcd path x y w h start_angle angle_extent arc_type)))
+          (vgu_err (xtm_add_arcd path x y w h start_angle angle_extent arc_type)))
       (if (= vgu_err VGU_NO_ERROR)
-	  (xtm_draw_path path))
+          (xtm_draw_path path))
       void)))
 
 (bind-poly xtm_draw_arc xtm_draw_arcf)
@@ -869,7 +912,7 @@
           (h (pref h_ptr 0))
           (c (pref c_ptr 0))
           (row:i8* null)
-	  (img (xtm_create_vgimage (i32toi64 w) (i32toi64 h)))
+          (img (xtm_create_vgimage (i32toi64 w) (i32toi64 h)))
           (i 0))
       (if (null? data)
           (begin (printf "Error: image not loaded\n") null)
@@ -877,13 +920,13 @@
           (begin
             (dotimes (i h)
               (set! row (pref-ptr data (* i (* w 4))))
-	      (xtm_set_vgimage_subdata img
-				       row
-				       (i32toi64 (* w 4))
-				       0
-				       (i32toi64 (- h i 1))
-				       (i32toi64 w)
-				       1))
+              (xtm_set_vgimage_subdata img
+                                       row
+                                       (i32toi64 (* w 4))
+                                       0
+                                       (i32toi64 (- h i 1))
+                                       (i32toi64 w)
+                                       1))
             img)))))
 
 ;; working with colours, dealing with double -> uint8 conversions, etc.
@@ -903,11 +946,11 @@
 (bind-func xtm_set_color32_red
   (lambda (c32_data:i8* red)
     (pset! c32_data 0 (dtoui8 (* (if (< red 0.0)
-				     0.0
-				     (if (> red 1.0)
-					 1.0
-					 red))
-				 256.0)))))
+                                     0.0
+                                     (if (> red 1.0)
+                                         1.0
+                                         red))
+                                 256.0)))))
 
 (bind-func xtm_color32_green
   (lambda (c32_data:i8*)
@@ -916,11 +959,11 @@
 (bind-func xtm_set_color32_green
   (lambda (c32_data:i8* green)
     (pset! c32_data 1 (dtoui8 (* (if (< green 0.0)
-				     0.0
-				     (if (> green 1.0)
-					 1.0
-					 green))
-				 256.0)))))
+                                     0.0
+                                     (if (> green 1.0)
+                                         1.0
+                                         green))
+                                 256.0)))))
 
 (bind-func xtm_color32_blue
   (lambda (c32_data:i8*)
@@ -929,11 +972,11 @@
 (bind-func xtm_set_color32_blue
   (lambda (c32_data:i8* blue)
     (pset! c32_data 2 (dtoui8 (* (if (< blue 0.0)
-				     0.0
-				     (if (> blue 1.0)
-					 1.0
-					 blue))
-				 256.0)))))
+                                     0.0
+                                     (if (> blue 1.0)
+                                         1.0
+                                         blue))
+                                 256.0)))))
 
 (bind-func xtm_color32_alpha
   (lambda (c32_data:i8*)
@@ -942,10 +985,10 @@
 (bind-func xtm_set_color32_alpha
   (lambda (c32_data:i8* alpha)
     (pset! c32_data 3 (dtoui8 (* (if (< alpha 0.0)
-				     0.0
-				     (if (> alpha 1.0)
-					 1.0
-					 alpha))
-				 256.0)))))
+                                     0.0
+                                     (if (> alpha 1.0)
+                                         1.0
+                                         alpha))
+                                 256.0)))))
 
 (define *xtmlib-openvg-loaded* #t)
