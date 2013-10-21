@@ -476,7 +476,7 @@
 
 (bind-func xtm_create_vg_context
   (lambda (w h)
-    (vgCreateContextSH w h)))
+    (vgCreateContextSH (i64toi32 w) (i64toi32 h))))
 
 (bind-func xtm_vg_setup
   (lambda ()
@@ -498,9 +498,9 @@
 (bind-func xtm_vg_clear_rect
   (lambda (r g b a x y w h)
     (let ((clear_colour:xtm_colour* (salloc)))
-      (afill! clear_colour r g b a)
+      (afill! clear_colour (dtof r) (dtof g) (dtof b) (dtof a))
       (vgSetfv VG_CLEAR_COLOR 4 (cast clear_colour VGfloat*))
-      (vgClear x y w h))))
+      (vgClear (i64toi32 x) (i64toi32 y) (i64toi32 w) (i64toi32 h)))))
 
 (bind-func xtm_vg_clear
   (lambda (r g b a w h)
@@ -508,23 +508,50 @@
 
 ;; paint
 
-(bind-func xtm_paint_setup
+(bind-func xtm_paint_setupf
   (lambda (paint r g b a)
     (let ((paint_colour:xtm_colour* (salloc)))
       (vgSetParameteri paint VG_PAINT_TYPE VG_PAINT_TYPE_COLOR)
       (afill! paint_colour r g b a)
       (vgSetParameterfv paint VG_PAINT_COLOR 4 (cast paint_colour VGfloat*)))))
 
-(bind-func xtm_paint_setup_stroke
+(bind-func xtm_paint_setupd
+  (lambda (paint r g b a)
+    (let ((paint_colour:xtm_colour* (salloc)))
+      (vgSetParameteri paint VG_PAINT_TYPE VG_PAINT_TYPE_COLOR)
+      (afill! paint_colour (dtof r) (dtof g) (dtof b) (dtof a))
+      (vgSetParameterfv paint VG_PAINT_COLOR 4 (cast paint_colour VGfloat*)))))
+
+(bind-poly xtm_paint_setup xtm_paint_setupf)
+(bind-poly xtm_paint_setup xtm_paint_setupd)
+
+(bind-func xtm_paint_setup_strokef
   (lambda (paint r g b a width)
-    (xtm_paint_setup paint r g b a)
+    (xtm_paint_setupf paint r g b a)
     (vgSetPaint paint VG_STROKE_PATH)
     (vgSetf VG_STROKE_LINE_WIDTH width)))
 
-(bind-func xtm_paint_setup_fill
+(bind-func xtm_paint_setup_stroked
+  (lambda (paint r g b a width)
+    (xtm_paint_setupd paint r g b a)
+    (vgSetPaint paint VG_STROKE_PATH)
+    (vgSetf VG_STROKE_LINE_WIDTH (dtof width))))
+
+(bind-poly xtm_paint_setup_stroke xtm_paint_setup_strokef)
+(bind-poly xtm_paint_setup_stroke xtm_paint_setup_stroked)
+
+(bind-func xtm_paint_setup_fillf
   (lambda (paint r g b a)
-    (xtm_paint_setup paint r g b a)
+    (xtm_paint_setupf paint r g b a)
     (vgSetPaint paint VG_FILL_PATH)))
+
+(bind-func xtm_paint_setup_filld
+  (lambda (paint r g b a)
+    (xtm_paint_setupd paint r g b a)
+    (vgSetPaint paint VG_FILL_PATH)))
+
+(bind-poly xtm_paint_setup_fill xtm_paint_setup_fillf)
+(bind-poly xtm_paint_setup_fill xtm_paint_setup_filld)
 
 (bind-func xtm_destroy_paint
   (lambda (paint)
@@ -569,52 +596,119 @@
 
 ;; paths
 
-(bind-func xtm_add_line
-  (lambda (path x1 y1 x2 y2)
-    (vguLine path x1 y1 x2 y2)))
-
 ;; convenience functions for adding shapes to path
 ;; from vgu.h
 
-(bind-func xtm_add_line
+(bind-func xtm_add_linef
   (lambda (path x1 y1 x2 y2)
     (vguLine path x1 y1 x2 y2)))
 
-(bind-func xtm_add_polygon
+(bind-func xtm_add_lined
+  (lambda (path x1 y1 x2 y2)
+    (vguLine path (dtof x1) (dtof y1) (dtof x2) (dtof y2))))
+
+(bind-poly xtm_add_line xtm_add_linef)
+(bind-poly xtm_add_line xtm_add_lined)
+
+(bind-func xtm_add_polyf
   (lambda (path points:VGfloat* npoints closed)
     (vguPolygon path points npoints closed)))
 
-(bind-func xtm_add_poly3
+(bind-func xtm_add_polyd
+  (lambda (path points:double* npoints closed)
+    (let ((pointsf:VGfloat* (zalloc npoints))
+	  (i 0))
+      (dotimes (i npoints)
+	(pset! pointsf i (dtof (pref points i))))
+      (vguPolygon path pointsf (i64toi32 npoints) closed))))
+
+(bind-poly xtm_add_poly xtm_add_polyf)
+(bind-poly xtm_add_poly xtm_add_polyd)
+
+(bind-func xtm_add_trif
   (lambda (path x1 y1 x2 y2 x3 y3)
     (let ((points:VGfloat* (salloc 6)))
       (pfill! points x1 y1 x2 y2 x3 y3)
       (vguPolygon path points 3 VG_TRUE))))
 
-(bind-func xtm_add_poly4
+(bind-func xtm_add_trid
+  (lambda (path x1 y1 x2 y2 x3 y3)
+    (let ((points:double* (salloc 6)))
+      (pfill! points x1 y1 x2 y2 x3 y3)
+      (xtm_add_poly path points 3 VG_TRUE))))
+
+(bind-poly xtm_add_tri xtm_add_trif)
+(bind-poly xtm_add_tri xtm_add_trid)
+
+(bind-func xtm_add_quadf
   (lambda (path x1 y1 x2 y2 x3 y3 x4 y4)
     (let ((points:VGfloat* (salloc 8)))
       (pfill! points x1 y1 x2 y2 x3 y3 x4 y4)
       (vguPolygon path points 4 VG_TRUE))))
 
-(bind-func xtm_add_rect
+(bind-func xtm_add_quadd
+  (lambda (path x1 y1 x2 y2 x3 y3 x4 y4)
+    (let ((points:double* (salloc 8)))
+      (pfill! points x1 y1 x2 y2 x3 y3 x4 y4)
+      (xtm_add_poly path points 4 VG_TRUE))))
+
+(bind-poly xtm_add_quad xtm_add_quadf)
+(bind-poly xtm_add_quad xtm_add_quadd)
+
+(bind-func xtm_add_rectf
   (lambda (path x y w h)
     (vguRect path x y w h)))
 
-(bind-func xtm_add_round_rect
+(bind-func xtm_add_rectd
+  (lambda (path x y w h)
+    (vguRect path (dtof x) (dtof y) (dtof w) (dtof h))))
+
+(bind-poly xtm_add_rect xtm_add_rectf)
+(bind-poly xtm_add_rect xtm_add_rectd)
+
+(bind-func xtm_add_round_rectf
   (lambda (path x y w h arcw arch)
     (vguRoundRect path x y w h arcw arch)))
 
-(bind-func xtm_add_ellipse
+(bind-func xtm_add_round_rectd
+  (lambda (path x y w h arcw arch)
+    (vguRoundRect path (dtof x) (dtof y) (dtof w) (dtof h) (dtof arcw) (dtof arch))))
+
+(bind-poly xtm_add_round_rect xtm_add_round_rectf)
+(bind-poly xtm_add_round_rect xtm_add_round_rectd)
+
+(bind-func xtm_add_ellipsef
   (lambda (path cx cy w h)
     (vguEllipse path cx cy w h)))
 
-(bind-func xtm_add_arc
+(bind-func xtm_add_ellipsed
+  (lambda (path cx cy w h)
+    (vguEllipse path (dtof cx) (dtof cy) (dtof w) (dtof h))))
+
+(bind-poly xtm_add_ellipse xtm_add_ellipsef)
+(bind-poly xtm_add_ellipse xtm_add_ellipsed)
+
+(bind-func xtm_add_arcf
   (lambda (path x y w h start_angle angle_extent arc_type)
     (vguArc path x y w h start_angle angle_extent arc_type)))
 
+(bind-func xtm_add_arcd
+  (lambda (path x y w h start_angle angle_extent arc_type)
+    (vguArc path
+	    (dtof x)
+	    (dtof y)
+	    (dtof w)
+	    (dtof h)
+	    (dtof start_angle)
+	    (dtof angle_extent)
+	    arc_type)))
+
+(bind-poly xtm_add_arc xtm_add_arcf)
+(bind-poly xtm_add_arc xtm_add_arcd)
+
 ;; higher-level path drawing with xtlang closures
 
-(bind-func xtm_draw_line
+(bind-func xtm_draw_linef
   (lambda (x1 y1 x2 y2)
     (let ((path (xtm_create_vgpath))
           (vgu_err (vguLine path x1 y1 x2 y2)))
@@ -622,7 +716,18 @@
           (xtm_draw_path path))
       void)))
 
-(bind-func xtm_draw_polygon
+(bind-func xtm_draw_lined
+  (lambda (x1 y1 x2 y2)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_lined path x1 y1 x2 y2)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
+(bind-poly xtm_draw_line xtm_draw_linef)
+(bind-poly xtm_draw_line xtm_draw_lined)
+
+(bind-func xtm_draw_polyf
   (lambda (points:VGfloat* npoints closed)
     (let ((path (xtm_create_vgpath))
           (vgu_err (vguPolygon path points npoints closed)))
@@ -630,7 +735,40 @@
           (xtm_draw_path path))
       void)))
 
-(bind-func xtm_draw_rect
+(bind-func xtm_draw_polyd
+  (lambda (points:double* npoints closed)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_polyd path points npoints closed)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
+(bind-poly xtm_draw_poly xtm_draw_polyf)
+(bind-poly xtm_draw_poly xtm_draw_polyd)
+
+(bind-func xtm_draw_trid
+  (lambda (x1 y1 x2 y2 x3 y3)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_trid path x1 y1 x2 y2 x3 y3)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
+;; no xtm_draw trif for the moment
+(bind-poly xtm_draw_tri xtm_draw_trid)
+
+(bind-func xtm_draw_quadd
+  (lambda ( x1 y1 x2 y2 x3 y3 x4 y4)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_quadd path x1 y1 x2 y2 x3 y3 x4 y4)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
+;; no xtm_draw quadf for the moment
+(bind-poly xtm_draw_quad xtm_draw_quadd)
+
+(bind-func xtm_draw_rectf
   (lambda (x y w h)
     (let ((path (xtm_create_vgpath))
           (vgu_err (vguRect path x y w h)))
@@ -638,7 +776,18 @@
           (xtm_draw_path path))
       void)))
 
-(bind-func xtm_draw_round_rect
+(bind-func xtm_draw_rectd
+  (lambda (x y w h)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_rectd path x y w h)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
+(bind-poly xtm_draw_rect xtm_draw_rectf)
+(bind-poly xtm_draw_rect xtm_draw_rectd)
+
+(bind-func xtm_draw_round_rectf
   (lambda (x y w h arcw arch)
     (let ((path (xtm_create_vgpath))
           (vgu_err (vguRoundRect path x y w h arcw arch)))
@@ -646,7 +795,18 @@
           (xtm_draw_path path))
       void)))
 
-(bind-func xtm_draw_ellipse
+(bind-func xtm_draw_round_rectd
+  (lambda (x y w h arcw arch)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_round_rectd path x y w h arcw arch)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
+(bind-poly xtm_draw_round_rect xtm_draw_round_rectf)
+(bind-poly xtm_draw_round_rect xtm_draw_round_rectd)
+
+(bind-func xtm_draw_ellipsef
   (lambda (cx cy w h)
     (let ((path (xtm_create_vgpath))
           (vgu_err (vguEllipse path cx cy w h)))
@@ -654,7 +814,18 @@
           (xtm_draw_path path))
       void)))
 
-(bind-func xtm_draw_arc
+(bind-func xtm_draw_ellipsed
+  (lambda (cx cy w h)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_ellipsed path cx cy w h)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
+(bind-poly xtm_draw_ellipse xtm_draw_ellipsef)
+(bind-poly xtm_draw_ellipse xtm_draw_ellipsed)
+
+(bind-func xtm_draw_arcf
   (lambda (x y w h start_angle angle_extent arc_type)
     (let ((path (xtm_create_vgpath))
           (vgu_err (vguArc path x y w h start_angle angle_extent arc_type)))
@@ -662,12 +833,23 @@
           (xtm_draw_path path))
       void)))
 
+(bind-func xtm_draw_arcd
+  (lambda (x y w h start_angle angle_extent arc_type)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_arcd path x y w h start_angle angle_extent arc_type)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
+(bind-poly xtm_draw_arc xtm_draw_arcf)
+(bind-poly xtm_draw_arc xtm_draw_arcd)
+
 ;; images
 
 ;; this image stuff assumes VG_lARGB_8888 image format
 (bind-func xtm_create_vgimage
   (lambda (width height)
-    (vgCreateImage VG_lARGB_8888 width height VG_IMAGE_QUALITY_BETTER)))
+    (vgCreateImage VG_lARGB_8888 (i64toi32 width) (i64toi32 height) VG_IMAGE_QUALITY_BETTER)))
 
 (bind-func xtm_destroy_vgimage
   (lambda (image)
@@ -675,7 +857,7 @@
 
 (bind-func xtm_set_vgimage_subdata
   (lambda (image data data_stride x y width height)
-    (vgImageSubData image data data_stride VG_lARGB_8888 x y width height)))
+    (vgImageSubData image data (i64toi32 data_stride) VG_lARGB_8888 (i64toi32 x) (i64toi32 y) (i64toi32 width) (i64toi32 height))))
 
 (bind-func xtm_load_vgimage
   (lambda (path)
@@ -687,7 +869,7 @@
           (h (pref h_ptr 0))
           (c (pref c_ptr 0))
           (row:i8* null)
-          (img (xtm_create_vgimage w h))
+	  (img (xtm_create_vgimage (i32toi64 w) (i32toi64 h)))
           (i 0))
       (if (null? data)
           (begin (printf "Error: image not loaded\n") null)
@@ -695,7 +877,13 @@
           (begin
             (dotimes (i h)
               (set! row (pref-ptr data (* i (* w 4))))
-              (xtm_set_vgimage_subdata img row (* w 4) 0 (- h i 1) w 1))
+	      (xtm_set_vgimage_subdata img
+				       row
+				       (i32toi64 (* w 4))
+				       0
+				       (i32toi64 (- h i 1))
+				       (i32toi64 w)
+				       1))
             img)))))
 
 ;; working with colours, dealing with double -> uint8 conversions, etc.

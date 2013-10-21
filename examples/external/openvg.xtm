@@ -16,8 +16,8 @@
 (define width 1024.0)
 (define height 768.0)
 
-(bind-val width float width)
-(bind-val height float height)
+(bind-val width double width)
+(bind-val height double height)
 
 ;; setup opengl
 (define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
@@ -25,10 +25,7 @@
 ;; first try to load from prebuilt stdlib
 (sys:load "libs/xtm.xtm")
 ;; failing that compile on-the-fly
-(sys:load "libs/core/math.xtm")
-(sys:load "libs/external/opengl.xtm")
 (sys:load "libs/external/shaders.xtm")
-(sys:load "libs/external/assimp.xtm")
 (sys:load "libs/external/openvg.xtm")
 
 ;; init xtm render pipeline
@@ -44,17 +41,17 @@
       (let ((path (xtm_create_vgpath))
             (stroke (vgCreatePaint))
             (fill (vgCreatePaint))
-            (i 0))
+	    (i 0.0))
         (xtm_vg_setup)
-        (xtm_vg_clear 0.0 0.0 0.0 1.0 (ftoi32 width) (ftoi32 height))
+	;; (xtm_vg_clear 0.0 0.0 0.0 1.0 (ftoi32 width) (ftoi32 height))
         (xtm_paint_setup_fill fill 1.0 0.0 0.0 0.5)
         (xtm_paint_setup_stroke stroke 0.0 0.0 1.0 0.5 10.0)
         ;; create the path (using the add_circle closure)
-        (dotimes (i 200)
+	(dotimes (i 200.0)
           (xtm_add_ellipse
            path
-           (+ 512. (* 200.0 (cosf (* (i64tof i) 0.00025 (i64tof frame)))))
-           (+ 400. (* 100.0 (tanf (* 0.0001 (i64tof i) (i64tof frame)))))
+	   (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (i64tod frame)))))
+	   (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (i64tod frame)))))
            30.
            30.))
         ;; draw the image
@@ -64,8 +61,8 @@
         ;; cleanup
         (xtm_destroy_paint fill)
         (xtm_destroy_paint stroke)
-        (xtm_vg_print_error))
-      void)))
+	(xtm_vg_print_error)
+	void))))
 
 (bind-func gl_render
   (lambda ()
