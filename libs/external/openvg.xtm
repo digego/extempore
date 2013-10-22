@@ -472,14 +472,16 @@
 
 ;; setup
 
-(bind-func xtm_create_vg_context
+(bind-func xtm_vg_create_context
   (lambda (w h)
     (vgCreateContextSH (i64toi32 w) (i64toi32 h))))
 
-(bind-func xtm_vg_setup
+(bind-func xtm_vg_reset_matrices
   (lambda ()
     (glDisable GL_DEPTH_TEST)
     (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgLoadIdentity)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
     (vgLoadIdentity)))
 
 (bind-func xtm_create_vgpath
@@ -704,11 +706,11 @@
 (bind-poly xtm_add_arc xtm_add_arcf)
 (bind-poly xtm_add_arc xtm_add_arcd)
 
-;; path capabilities
-
-
-
 ;; path length
+
+(bind-func xtm_path_num_segments
+  (lambda (path)
+    (i32toi64 (vgGetParameteri path VG_PATH_NUM_SEGMENTS))))
 
 (bind-func xtm_path_lengthf
   (lambda (path start_segment num_segments)
@@ -724,6 +726,7 @@
 (bind-type xpoint <double,double>)
 
 ;; these wrappers only check first segment of the path
+
 (bind-func xtm_point_along_path
   (lambda (path distance point:xpoint*)
     (let ((ptf:VGfloat* (salloc 2)))
@@ -889,6 +892,60 @@
 (bind-poly xtm_draw_arc xtm_draw_arcf)
 (bind-poly xtm_draw_arc xtm_draw_arcd)
 
+;; path transformations
+
+(bind-func xtm_path_translatef
+  (lambda (tx ty)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgTranslate tx ty)))
+
+(bind-func xtm_path_translated
+  (lambda (tx ty)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgTranslate (dtof tx) (dtof ty))))
+
+(bind-poly xtm_path_translate xtm_path_translatef)
+(bind-poly xtm_path_translate xtm_path_translated)
+
+(bind-func xtm_path_scalef
+  (lambda (sx sy)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgScale sx sy)))
+
+(bind-func xtm_path_scaled
+  (lambda (sx sy)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgScale (dtof sx) (dtof sy))))
+
+(bind-poly xtm_path_scale xtm_path_scalef)
+(bind-poly xtm_path_scale xtm_path_scaled)
+
+(bind-func xtm_path_shearf
+  (lambda (shx shy)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgShear shx shy)))
+
+(bind-func xtm_path_sheard
+  (lambda (shx shy)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgShear (dtof shx) (dtof shy))))
+
+(bind-poly xtm_path_shear xtm_path_shearf)
+(bind-poly xtm_path_shear xtm_path_sheard)
+
+(bind-func xtm_path_rotatef
+  (lambda (angle)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgRotate angle)))
+
+(bind-func xtm_path_rotated
+  (lambda (angle)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)
+    (vgRotate (dtof angle))))
+
+(bind-poly xtm_path_rotate xtm_path_rotatef)
+(bind-poly xtm_path_rotate xtm_path_rotated)
+
 ;; images
 
 ;; this image stuff assumes VG_lARGB_8888 image format
@@ -930,6 +987,79 @@
                                        (i32toi64 w)
                                        1))
             img)))))
+
+(bind-func xtm_draw_vgimage
+  (lambda (image)
+    (vgDrawImage image)))
+
+;; image transformations
+
+(bind-func xtm_vgimage_translatef
+  (lambda (tx ty)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgTranslate tx ty)))
+
+(bind-func xtm_vgimage_translated
+  (lambda (tx ty)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgTranslate (dtof tx) (dtof ty))))
+
+(bind-poly xtm_vgimage_translate xtm_vgimage_translatef)
+(bind-poly xtm_vgimage_translate xtm_vgimage_translated)
+
+(bind-func xtm_vgimage_scalef
+  (lambda (sx sy)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgScale sx sy)))
+
+(bind-func xtm_vgimage_scaled
+  (lambda (sx sy)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgScale (dtof sx) (dtof sy))))
+
+(bind-poly xtm_vgimage_scale xtm_vgimage_scalef)
+(bind-poly xtm_vgimage_scale xtm_vgimage_scaled)
+
+(bind-func xtm_vgimage_shearf
+  (lambda (shx shy)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgShear shx shy)))
+
+(bind-func xtm_vgimage_sheard
+  (lambda (shx shy)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgShear (dtof shx) (dtof shy))))
+
+(bind-poly xtm_vgimage_shear xtm_vgimage_shearf)
+(bind-poly xtm_vgimage_shear xtm_vgimage_sheard)
+
+(bind-func xtm_vgimage_rotatef
+  (lambda (angle)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgRotate angle)))
+
+(bind-func xtm_vgimage_rotated
+  (lambda (angle)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgRotate (dtof angle))))
+
+(bind-poly xtm_vgimage_rotate xtm_vgimage_rotatef)
+(bind-poly xtm_vgimage_rotate xtm_vgimage_rotated)
+
+(bind-func xtm_scale_and_draw_vgimagef
+  (lambda (image xscale yscale)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgScale xscale yscale) 
+    (vgDrawImage image)))
+
+(bind-func xtm_scale_and_draw_vgimaged
+  (lambda (image xscale yscale)
+    (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
+    (vgScale (dtof xscale) (dtof yscale)) 
+    (vgDrawImage image)))
+
+(bind-poly xtm_scale_and_draw_vgimage xtm_scale_and_draw_vgimagef)
+(bind-poly xtm_scale_and_draw_vgimage xtm_scale_and_draw_vgimaged)
 
 ;; working with colours, dealing with double -> uint8 conversions, etc.
 ;; clip input values into [0.0,1.0]
