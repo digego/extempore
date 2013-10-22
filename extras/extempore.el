@@ -1022,25 +1022,32 @@ determined by whether there is an *extempore* buffer."
 
 (defun extempore-create-xtmh-header (libname)
   (interactive "slibname: ")
-  (if (yes-or-no-p "This is going to munge up the current buffer---do you know what you're doing?")
-      (let ((case-fold-search nil)
-            ;; bind-val
-            (goto-char (point-min))
-            (while (search-forward-regexp "^Bound \\(.*\\) >>> \\(.*\\)$" nil t)
-              (replace-match (concat "(bind-lib-val " libname " \\1 \\2)") t))
-            ;; bind-func
-            (goto-char (point-min))
-            (while (search-forward-regexp "^Compiled \\(.*\\) >>> \\(.*\\)$" nil t)
-              (replace-match (concat "(bind-lib-func " libname " \\1 \\2)") t))
-            ;; bind-alias (and replace aliases in output)
-            (goto-char (point-min))
-            (while (search-forward-regexp "^Aliased \\(.*\\) >>> \\(.*\\)$" nil t)
-              (let ((alias (match-string 1))
-                    (value (match-string 2)))
-                (replace-match (concat "(bind-alias \\1 \\2)") t)
-                (save-excursion
-                  (while (search-forward-regexp (format "\\<%s\\>" alias) nil t)
-                    (replace-match value t)))))))))
+  (unless (region-active-p)
+    (error "You need to highlight the compiler output you want to process"))
+  (let ((compiler-output (buffer-substring-no-properties (point) (mark)))
+        (case-fold-search nil))
+    (with-temp-buffer
+      ;; bind-val
+      (insert compiler-output)
+      (goto-char (point-min))
+      (while (search-forward-regexp "^Bound \\(.*\\) >>> \\(.*\\)$" nil t)
+        (replace-match (concat "(bind-lib-val " libname " \\1 \\2)") t))
+      ;; bind-func
+      (goto-char (point-min))
+      (while (search-forward-regexp "^Compiled \\(.*\\) >>> \\(.*\\)$" nil t)
+        (replace-match (concat "(bind-lib-func " libname " \\1 \\2)") t))
+      ;; bind-alias (and replace aliases in output)
+      (goto-char (point-min))
+      (while (search-forward-regexp "^Aliased \\(.*\\) >>> \\(.*\\)$" nil t)
+        (let ((alias (match-string 1))
+              (value (match-string 2)))
+          (replace-match (concat "(bind-alias \\1 \\2)") t)
+          (save-excursion
+            (while (search-forward-regexp (format "\\<%s\\>" alias) nil t)
+              (replace-match value t)))))
+      (kill-region (point-min)
+                   (point-max))
+      (message "Processed output copied to kill ring."))))
 
 ;;;;;;;;;;;;;;;;
 ;; animations ;;
