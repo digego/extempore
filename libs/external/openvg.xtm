@@ -439,38 +439,36 @@
 
 ;; helpful xtlang functions
 
-(bind-func xtm_vg_error_string
-  (let ((error_string:i8* (zalloc 256)))
-    (lambda (error_code:VGErrorCode)
-      (cond ((or (= error_code VG_BAD_HANDLE_ERROR)
-                 (= error_code VGU_BAD_HANDLE_ERROR))
-             (sprintf error_string "OpenVG Error: BAD_HANDLE\n"))
-            ((or (= error_code VG_ILLEGAL_ARGUMENT_ERROR)
-                 (= error_code VGU_ILLEGAL_ARGUMENT_ERROR))
-             (sprintf error_string "OpenVG Error: ILLEGAL_ARGUMENT\n"))
-            ((or (= error_code VG_OUT_OF_MEMORY_ERROR)
-                 (= error_code VGU_OUT_OF_MEMORY_ERROR))
-             (sprintf error_string "OpenVG Error: OUT_OF_MEMORY\n"))
-            ((or (= error_code VG_PATH_CAPABILITY_ERROR)
-                 (= error_code VGU_PATH_CAPABILITY_ERROR))
-             (sprintf error_string "OpenVG Error: PATH_CAPABILITY\n"))
-            ((= error_code VG_UNSUPPORTED_IMAGE_FORMAT_ERROR)
-             (sprintf error_string "OpenVG Error: UNSUPPORTED_IMAGE_FORMAT\n"))
-            ((= error_code VG_UNSUPPORTED_PATH_FORMAT_ERROR)
-             (sprintf error_string "OpenVG Error: UNSUPPORTED_PATH_FORMAT\n"))
-            ((= error_code VG_IMAGE_IN_USE_ERROR)
-             (sprintf error_string "OpenVG Error: IMAGE_IN_USE\n"))
-            ((= error_code VG_NO_CONTEXT_ERROR)
-             (sprintf error_string "OpenVG Error: NO_CONTEXT\n"))
-            ((= error_code VGU_BAD_WARP_ERROR)
-             (sprintf error_string "OpenVG Error: BAD_WARP\n"))
-            ((<> error_code VG_NO_ERROR)
-             (sprintf error_string "OpenVG Error: unknown error code %d\n") error_code))
-      error_string)))
-
 (bind-func xtm_vg_print_error
   (lambda ()
-    (printf "%s" (xtm_vg_error_string (vgGetError)))))
+    (let ((error_code (vgGetError)))
+      (cond ((= error_code VG_NO_ERROR)
+             0)
+            ((= error_code VG_BAD_HANDLE_ERROR)
+             (or (= error_code VG_BAD_HANDLE_ERROR)
+                 (= error_code VGU_BAD_HANDLE_ERROR))
+             (printf "OpenVG Error: BAD_HANDLE\n"))
+            ((or (= error_code VG_ILLEGAL_ARGUMENT_ERROR)
+                 (= error_code VGU_ILLEGAL_ARGUMENT_ERROR))
+             (printf "OpenVG Error: ILLEGAL_ARGUMENT\n"))
+            ((or (= error_code VG_OUT_OF_MEMORY_ERROR)
+                 (= error_code VGU_OUT_OF_MEMORY_ERROR))
+             (printf "OpenVG Error: OUT_OF_MEMORY\n"))
+            ((or (= error_code VG_PATH_CAPABILITY_ERROR)
+                 (= error_code VGU_PATH_CAPABILITY_ERROR))
+             (printf "OpenVG Error: PATH_CAPABILITY\n"))
+            ((= error_code VG_UNSUPPORTED_IMAGE_FORMAT_ERROR)
+             (printf "OpenVG Error: UNSUPPORTED_IMAGE_FORMAT\n"))
+            ((= error_code VG_UNSUPPORTED_PATH_FORMAT_ERROR)
+             (printf "OpenVG Error: UNSUPPORTED_PATH_FORMAT\n"))
+            ((= error_code VG_IMAGE_IN_USE_ERROR)
+             (printf "OpenVG Error: IMAGE_IN_USE\n"))
+            ((= error_code VG_NO_CONTEXT_ERROR)
+             (printf "OpenVG Error: NO_CONTEXT\n"))
+            ((= error_code VGU_BAD_WARP_ERROR)
+             (printf "OpenVG Error: BAD_WARP\n"))
+            ((<> error_code VG_NO_ERROR)
+             (printf "OpenVG Error: unknown error code %d\n") error_code)))))
 
 ;; setup
 
@@ -705,6 +703,10 @@
 
 (bind-poly xtm_add_arc xtm_add_arcf)
 (bind-poly xtm_add_arc xtm_add_arcd)
+
+;; path capabilities
+
+
 
 ;; path length
 
