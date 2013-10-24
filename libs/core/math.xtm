@@ -965,10 +965,10 @@
 (bind-poly cpxsub cpxd_sub)
 (bind-poly cpxsub cpxf_sub_buf)
 (bind-poly cpxsub cpxd_sub_buf)
-(bind-poly cpxdiv cpxf_mul)
-(bind-poly cpxdiv cpxd_mul)
-(bind-poly cpxdiv cpxf_mul_buf)
-(bind-poly cpxdiv cpxd_mul_buf)
+(bind-poly cpxmul cpxf_mul)
+(bind-poly cpxmul cpxd_mul)
+(bind-poly cpxmul cpxf_mul_buf)
+(bind-poly cpxmul cpxd_mul_buf)
 (bind-poly cpxdiv cpxf_div)
 (bind-poly cpxdiv cpxd_div)
 (bind-poly cpxdiv cpxf_div_buf)
@@ -1315,25 +1315,71 @@
                (ftod (tref (pref-ptr in_cpxf i) 1)))))
     void))
 
-;;;;;;;;;; WINDOWING ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;; DFT/IDFT for teaching purposes ;;;;;;;;;;;;;;;;
 
-;; these window functions fill buffer which represents the
-;; associated window of length `window_length'.
-
-(bind-func window_hamming
-  (let ((i:i64 0))
-    (lambda (window_buffer:double* window_length)
-      (dotimes (i window_length)
-        (pset! window_buffer i
-               (* 0.5 (+ 1.0 (cos (/ (* TWOPI (i64tod i))
-                                     (i64tod (- window_length 1))))))))
+;; real in -> complex out
+(bind-func dft
+  (lambda (in:double* out:cpxd* lgth)
+    (let ((n:i64 0) (k:i64 0) (tmp 0.0) (cpx:cpxd* null) (N (i64tod lgth)))
+      (memset (cast out i8*) 0 (* lgth 16))      
+      (dotimes (k lgth)
+        (set! cpx (pref-ptr out k))
+        (dotimes (n lgth)
+          (set! tmp (* (i64tod (* k n)) (/ TWOPI N)))
+          (tset! cpx 0
+                 (+ (tref cpx 0)
+                    (* (pref in n) (cos tmp))))
+          (tset! cpx 1
+                 (- (tref cpx 1)
+                    (* (pref in n) (sin tmp))))))
       void)))
+
+;; complex in -> real out
+(bind-func idft
+  (lambda (in:cpxd* out:double* lgth)
+    (let ((n:i64 0) (k:i64 0) (tmp 0.0) (cpx:cpxd* null) (N (i64tod lgth)))
+      (dotimes (n lgth)
+        (pset! out n 0.0)
+        (dotimes (k lgth)
+          (set! cpx (pref-ptr in k))
+          (set! tmp (* (i64tod (* k n)) (/ TWOPI N)))
+          (pset! out n
+                 (+ (pref out n)
+                    (- (* (tref cpx 0) (cos tmp))
+                       (* (tref cpx 1) (sin tmp))))))
+        ;; scale
+        (pset! out n (/ (pref out n) N)))
+      void)))
+
+;;;;;;;;;; WINDOWING ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func window_hanning
   (let ((i:i64 0))
     (lambda (window_buffer:double* window_length)
       (dotimes (i window_length)
         (pset! window_buffer i
-               (+ 0.54 (* 0.46 (cos (/ (* TWOPI (i64tod i))
-                                       (i64tod (- window_length 1))))))))
+               (* (pref window_buffer i)
+                  (- 0.5 (* 0.5 (cos (/ (* TWOPI (i64tod i))
+                                        (i64tod (- window_length 1)))))))))
       void)))
+
+;; where t is time between [0.0 - 1.0]
+(bind-func hanning
+  (lambda (t)
+    (- 0.5 (* 0.5
+              (cos (* TWOPI t))))))
+
+(bind-func window_hamming
+  (let ((i:i64 0))
+    (lambda (window_buffer:double* window_length)
+      (dotimes (i window_length)
+        (pset! window_buffer i
+               (* (pref window_buffer i)
+                  (- 0.54 (* 0.46 (cos (/ (* TWOPI (i64tod i))
+                                          (i64tod (- window_length 1)))))))))
+      void)))
+
+;; where to is [0.0 - 1.0]
+(bind-func hamming
+  (lambda (t)
+    (- 0.54 (* 0.46 (cos (* TWOPI t))))))
