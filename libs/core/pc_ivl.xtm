@@ -317,14 +317,13 @@
 ;; 
 (define pc:relative
   (lambda (pitch i pc)
-    (if (not (integer? i))
-        (print-error 'Error 'in 'pc:relative, 'i 'must 'be 'an 'integer)
-        (if (= i 0) pitch
-            (let ((inc (if (negative? i) - +)))
-              (let loop ((p (inc pitch 1)) (cnt 0))
-                (if (pc:? p pc) (set! cnt (inc cnt 1)))
-                (if (= cnt i) p
-                    (loop (inc p 1) cnt))))))))
+    (set! i (real->integer (round i)))
+    (if (= i 0) pitch
+	(let ((inc (if (negative? i) - +)))
+	  (let loop ((p (inc pitch 1)) (cnt 0))
+	    (if (pc:? p pc) (set! cnt (inc cnt 1)))
+	    (if (= cnt i) p
+		(loop (inc p 1) cnt)))))))
 
 ;; pc:make-chord
 ;; creates a list of "number" pitches between "lower" and "upper" 
