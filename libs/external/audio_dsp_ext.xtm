@@ -1,0 +1,123 @@
+;;; audio_dsp.xtm -- audio DSP library
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: kiss-fft, libsndfile
+
+;;; Commentary:
+
+;;
+;; extended audio_dsp for spectral and
+;; snd file related fucntionality
+;;
+;; hopefully we can bring this back
+;; into core/audio_dsp once we have
+;; native sndfile and fft options.
+;;
+
+;;; Code:
+
+;; lib-loading config
+(sys:load-preload-check 'audio-dsp-ext)
+(define *xtmlib-audio-dsp-ext-loaded* #t)
+
+(sys:load "libs/core/math.xtm")
+(sys:load "libs/external/fft.xtm")
+(sys:load "libs/external/sndfile.xtm")
+
+;; uniform partitioned convolution in frq domain
+;; expects mono aif/wav audio file at samplerate
+(bind-func spectral_convolution_c
+  (lambda (path:i8* lgth:i64)
+    (let ((_irlgth (read_audio_data path null 0 0 1)) ;; get size of ir file (assumes mono!!)
+          (irlgth (+ _irlgth (- lgth (% _irlgth lgth)))) ;; pad to whole multiple of lgth
+          (parts (/ irlgth lgth)) ;; how many partitions
+          (po 0) ;; partition offset
+          (irs:cpxd* (zalloc (* 2 irlgth))) ;; storage for all IR FFT 'partitions'
+          (ffts:cpxd* (zalloc (* 2 irlgth))) ;; storage for all total forward ffts
+          (aorb:i1 #t) ;; #t for a #f for b          
+          (irtaila:double* (zalloc lgth)) ;; buffer ir tail
+          (irtailb:double* (zalloc lgth))
+          (drya:double* (zalloc lgth)) ;; buffer input signal
+          (dryb:double* (zalloc lgth))
+          (t1:i64 0) (i:i64 0) (out:double 0.0) (j:i64 0)
+          (padlgth (* lgth 2)) ;; padlgth is for convolution buffers          
+          (A:cpxd* (zalloc padlgth)) 
+          (B:cpxd* (zalloc padlgth)) 
+          (output:double* (zalloc lgth))) ;; buffer output
+      (printf "IR:(%.1f seconds) Partitions(size:%lld num:%lld)\n" (/ (i64tod irlgth) SR) lgth parts)
+      ;; partition and store IR spectra (circlar convolution so padded)
+      (dotimes (i parts)
+        (memset (cast A i8*) 0 (* 16 padlgth)) ;; zero pad
+        (read_audio_data path output (* i lgth) lgth 0)
+        (fill_cpx_buffer output A lgth)
+        (fft A (pref-ptr irs (* i padlgth)) padlgth))
+      (lambda (in:double dry:double wet:double)
+        ;; store 'input' data which is 'ahead of out' by lgth samples
+        (pset! (if aorb drya dryb) t1 in)
+        ;; set output which is lgth samples behind 'in'
+        (set! out ;; out is always delayed by lgth
+              (+ (* dry (pref (if aorb dryb drya) t1)) ;; playback 'delayed' input
+                 (* 4.0 wet ;; wet output signal 
+                    (+ (pref output t1) ;; overlap-add current-output with ...
+                       (pref (if aorb irtaila irtailb) t1))))) ;; delayed-irtail
+        ;; increment time
+        (set! t1 (+ t1 1))
+        ;; if we have buffered lgth samples then run convolution
+        (if (= t1 lgth)
+            (let ((_fft:cpxd* (pref-ptr ffts (* po padlgth)))
+                  (_ir:cpxd* null))
+              ;; fill W with incoming signal zero padded to lgth*2
+              (memset (cast A i8*) 0 (* padlgth 16))
+              (fill_cpx_buffer (if aorb drya dryb) A lgth)
+              ;; forward FFT of incoming signal
+              (fft A B padlgth)
+              ;; store FFT to use 'now' and also for 'delayed' use
+              (memcpy (cast _fft i8*) (cast B i8*) (* padlgth 16))
+              ;; run convolution over all partions
+              (dotimes (i parts)
+                (set! j (% (+ parts (- po i)) parts))
+                (set! _fft (pref-ptr ffts (* j padlgth)))                
+                (set! _ir (pref-ptr irs (* i padlgth)))
+                (cpxmul _fft _ir A padlgth)
+                (cpxadd A B B padlgth))
+              ;; after convolution is complete back to time domain!
+              (ifft B A padlgth)
+              ;; scale complex output W
+              (scpxmul (/ 1.0 (i64tod parts)) A padlgth)
+              ;; write first half of complex output for immediate playback
+              (pour_cpx_buffer A output lgth)
+              ;; write second half of complex output into irtail for overlap-add
+              (pour_cpx_buffer (pref-ptr A lgth) (if aorb irtaila irtailb) lgth)
+              ;; reset everything for next cycle
+              (set! aorb (if aorb #f #t)) ;; swap buffers
+              (set! po (% (+ po 1) parts))
+              (set! t1 0)))
+        ;; simply return out
+        out))))
+
+;; poly wrapper for spectral_convolution_c
+(bind-func spectral_convolution_c_
+  (lambda (path:i8*)
+    (spectral_convolution_c path (* 4 FRAMES))))
+
+(bind-poly creverb_c spectral_convolution_c)
+(bind-poly creverb_c spectral_convolution_c_)
+
+(bind-func creverb_st_c_a
+  (lambda (pathl pathr lgth)
+    (let ((convl (spectral_convolution_c pathl lgth))
+          (convr (spectral_convolution_c pathr lgth)))
+      (lambda (chan in dry wet)
+        (cond ((< chan 0.5)
+               (convl in dry wet))
+              ((< chan 1.5)
+               (convr in dry wet))
+              (else 0.0))))))
+
+(bind-func creverb_st_c_b
+  (lambda (pathl pathr)
+    (creverb_st_c_a pathl pathr (* FRAMES 4))))
+
+(bind-poly creverb_st_c creverb_st_c_a)
+(bind-poly creverb_st_c creverb_st_c_b)

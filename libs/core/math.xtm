@@ -956,6 +956,25 @@
         (tset! (pref-ptr c i) 1 (/ l k)))
       void)))
 
+;; scalar * complex buffer in-place!
+(bind-func scpxd_mul
+  (lambda (s:double cpx:cpxd* lgth)
+    (let ((i 0) (a:cpxd* cpx))
+      (dotimes (i lgth)
+        (set! a (pref-ptr cpx i))
+        (tset! a 0 (* (tref a 0) s))
+        (tset! a 1 (* (tref a 1) s)))
+      void)))
+
+;; scalar * complex buffer in-place!
+(bind-func scpxf_mul
+  (lambda (s:float cpx:cpxf* lgth)
+    (let ((i 0) (a:cpxf* cpx))
+      (dotimes (i lgth)
+        (set! a (pref-ptr cpx i))
+        (tset! a 0 (* (tref a 0) s))
+        (tset! a 1 (* (tref a 1) s)))
+      void)))
 
 (bind-poly cpxadd cpxf_add)
 (bind-poly cpxadd cpxd_add)
@@ -974,7 +993,9 @@
 (bind-poly cpxdiv cpxf_div_buf)
 (bind-poly cpxdiv cpxd_div_buf)
 (bind-poly cpxprint cpxf_print)
-(bind-poly cpxprint cpxd_print)           
+(bind-poly cpxprint cpxd_print)
+(bind-poly scpxmul scpxd_mul)
+(bind-poly scpxmul scpxf_mul)
 
 ;; conversion functions
 (bind-func conjugate_cpxf

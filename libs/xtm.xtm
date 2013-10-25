@@ -145,6 +145,8 @@
 (bind-lib-func stdlib cpxf_div_buf [void,cpxf*,cpxf*,cpxf*,i64]*)
 (bind-lib-func stdlib cpxd_print [void,cpxd*]*)
 (bind-lib-func stdlib cpxf_print [void,cpxf*]*)
+(bind-lib-func stdlib scpxd_mul [void,double,cpxd*,i64]*)
+(bind-lib-func stdlib scpxf_mul [void,float,cpxf*,i64]*)
 
 (bind-lib-func stdlib conjugate_buffer_cpxf [void,cpxf*,cpxf*,i64]*)
 (bind-lib-func stdlib conjugate_buffer_cpxd [void,cpxd*,cpxd*,i64]*)
@@ -158,9 +160,14 @@
 (bind-lib-func stdlib buffer_im_only_cpxd [void,cpxd*,double*,i64]*)
 (bind-lib-func stdlib buffer_cpxd_to_cpxf [void,cpxd*,cpxf*,i64]*)
 (bind-lib-func stdlib buffer_cpxf_to_cpxd [void,cpxf*,cpxd*,i64]*)
-(bind-lib-func stdlib window_hamming [void,double*,i64]*)
-(bind-lib-func stdlib window_hanning [void,double*,i64]*)
 
+(bind-lib-func stdlib dft [void,double*,cpxd*,i64]*)
+(bind-lib-func stdlib idft [void,cpxd*,double*,i64]*)
+
+(bind-lib-func stdlib window_hamming [void,double*,i64]*)
+(bind-lib-func stdlib hamming [double,double]*)
+(bind-lib-func stdlib window_hanning [void,double*,i64]*)
+(bind-lib-func stdlib hanning [double,double]*)
 
 (bind-poly deg2rad deg2rad_d)
 (bind-poly deg2rad deg2rad_f)
@@ -246,16 +253,18 @@
 (bind-poly cpxsub cpxd_sub)
 (bind-poly cpxsub cpxf_sub_buf)
 (bind-poly cpxsub cpxd_sub_buf)
-(bind-poly cpxdiv cpxf_mul)
-(bind-poly cpxdiv cpxd_mul)
-(bind-poly cpxdiv cpxf_mul_buf)
-(bind-poly cpxdiv cpxd_mul_buf)
+(bind-poly cpxmul cpxf_mul)
+(bind-poly cpxmul cpxd_mul)
+(bind-poly cpxmul cpxf_mul_buf)
+(bind-poly cpxmul cpxd_mul_buf)
 (bind-poly cpxdiv cpxf_div)
 (bind-poly cpxdiv cpxd_div)
 (bind-poly cpxdiv cpxf_div_buf)
 (bind-poly cpxdiv cpxd_div_buf)
 (bind-poly cpxprint cpxf_print)
-(bind-poly cpxprint cpxd_print)           
+(bind-poly cpxprint cpxd_print)
+(bind-poly scpxmul scpxd_mul)
+(bind-poly scpxmul scpxf_mul)
 
 
 (define *xtmlib-math-loaded* #t)
@@ -499,33 +508,33 @@
 (bind-lib-func stdlib default_fx [double,double,double,double,double*]*)
 (bind-lib-func stdlib definst [double,double,double,double,double*]*)
 (bind-lib-func stdlib synth_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib synth_fx [double,double,double,double,double*]* 800000)
+(bind-lib-func stdlib synth_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib synth [double,double,double,double,double*]*)
 (bind-lib-func stdlib epad_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib epad_fx [double,double,double,double,double*]* 800000)
+(bind-lib-func stdlib epad_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib epad [double,double,double,double,double*]*)
 (bind-lib-func stdlib organ_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib organ_fx [double,double,double,double,double*]* 800000)
+(bind-lib-func stdlib organ_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib fuzz_bass_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib fuzz_bass_fx [double,double,double,double,double*]* 700000)
+(bind-lib-func stdlib fuzz_bass_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib fuzz_bass [double,double,double,double,double*]*)
 (bind-lib-func stdlib shimmer_pad_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib shimmer_pad_fx [double,double,double,double,double*]* 700000)
+(bind-lib-func stdlib shimmer_pad_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib shimmer_pad [double,double,double,double,double*]*)
 (bind-lib-func stdlib fmsynth_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib fmsynth_fx [double,double,double,double,double*]* 700000)
+(bind-lib-func stdlib fmsynth_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib fmsynth [double,double,double,double,double*]*)
 (bind-lib-func stdlib fmpad_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib fmpad_fx [double,double,double,double,double*]* 700000)
+(bind-lib-func stdlib fmpad_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib fmpad [double,double,double,double,double*]*)
 (bind-lib-func stdlib sawbass_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib sawbass_fx [double,double,double,double,double*]* 700000)
+(bind-lib-func stdlib sawbass_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib sawbass [double,double,double,double,double*]*)
 (bind-lib-func stdlib subbass_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib subbass_fx [double,double,double,double,double*]* 100000)
+(bind-lib-func stdlib subbass_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib subbass [double,double,double,double,double*]*)
 (bind-lib-func stdlib sawlead_note_c [[double,double,double,double,double]*,i64,double*]*)
-(bind-lib-func stdlib sawlead_fx [double,double,double,double,double*]* 1000000)
+(bind-lib-func stdlib sawlead_fx [double,double,double,double,double*]* (* 1024 1024))
 (bind-lib-func stdlib sawlead [double,double,double,double,double*]*)
 (bind-lib-func stdlib sf_frames [i64,sf_info*]*)
 (bind-lib-func stdlib sf_samplerate [i64,sf_info*]*)
@@ -930,6 +939,21 @@
     (ipc:bind-func proc '_play_note)
     (ipc:bind-func proc 'midi2frq)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; audio-dsp-ext extended
+;;
+
+(sys:load-preload-check 'audio-dsp-ext)
+
+(bind-lib-func stdlib spectral_convolution_c [[double,double]*,double,double,double,double]*)
+(bind-lib-func stdlib spectral_convolution_c_ [[double,double,double,double]*,i8*]*)
+(bind-lib-func stdlib creverb_st_c_a [[double,double,double,double,double]*,i8*,i8*,i64]*)
+(bind-lib-func stdlib creverb_st_c_b [[double,double,double,double,double]*,i8*,i8*]*)
+(bind-poly creverb_c spectral_convolution_c)
+(bind-poly creverb_c spectral_convolution_c_)
+(bind-poly creverb_st_c creverb_st_c_a)
+(bind-poly creverb_st_c creverb_st_c_b)
 
 ;;;;;;;
 ;; setup some instrument parameters
@@ -979,10 +1003,12 @@
 ;; load pc ivl library 
 (load "libs/core/pc_ivl.xtm")
 
+
 ;; set *all* audio lib symbols
 (define *xtmlib-audio-dsp-loaded* #t)
 (define *xtmlib-audio-inst-loaded* #t)
 (define *xtmlib-audio-inst-ext-loaded* #t)
+(define *xtmlib-audio-dsp-ext-loaded* #t)
 (ascii-print-color 0 2 10)
 (print "[YES]")
 (ascii-print-color 0 7 10)
@@ -1201,15 +1227,17 @@
           ((string=? platform "OSX") (sys:load-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))
           (else (print "Unknown platform: " platform)))))
 
-;; if on windows also check for opengl32.dll			  
-(if (or (eq? #f libgl)
-	    (null? libgl)) 
-	(if (string=? "Windows" (sys:platform))
-	    (begin (set! libgl (sys:load-dylib "opengl32.dll"))
-		       (if (or (null? libgl)
-				       (eq? #f libgl))
-			       (sys:load-escape "Error loading opengl library")))	   
-		(sys:load-escape "Error loading opengl library")))
+;; check opengl alternatives
+(if (or (eq? #f libgl) (null? libgl))
+    (cond ((string=? "Windows" (sys:platform))
+           (set! libgl (sys:load-dylib "opengl32.dll"))
+           (if (or (null? libgl) (eq? #f libgl))
+               (sys:load-escape "Error loading opengl library")))
+          ((string=? "Linux" (sys:platform))
+           (set! libgl (sys:load-dylib "libGL.so.1"))
+           (if (or (null? libgl) (eq? #f libgl))
+               (sys:load-escape "Error loading opengl library")))
+          (else (sys:load-escape "Error loading opengl library"))))
 
 (if (not (string=? (sys:platform) "Windows"))
     (begin (llvm:compile "declare i32 @glGetUniformBlockIndex(i32, i8*);")
@@ -3884,8 +3912,15 @@ void main()
           ((string=? platform "OSX") (sys:load-dylib "/System/Library/Frameworks/OpenGL.framework/OpenGL"))
           (else (print "Unknown platform: " platform)))))
 
-(if (not (and (eq? #f libglu)
-              (not libglu)))
+;; check glu alternatives
+(if (or (eq? #f libglu) (null? libglu))
+    (cond ((string=? "Linux" (sys:platform))
+           (set! libglu (sys:load-dylib "libGLU.so.1"))
+           (if (or (null? libglu) (eq? #f libglu))
+               (sys:load-escape "Error loading opengl library")))
+          (else (sys:load-escape "Error loading opengl library"))))
+
+(if (not (and (eq? #f libglu) (not libglu)))
     (begin
       (print "Loading glu library...         ")
       (bind-lib-func stdlib gl_set_view [i64,double,double,double]*)
