@@ -22,8 +22,7 @@
 
 ;; lib-loading config
 (sys:load-preload-check 'fft)
-(define *xtmlib-fft-loaded* #t)
-
+(define *xtmlib-fft-loaded* #f)
 
 (define kissfft
   (let ((platform (sys:platform)))
@@ -37,7 +36,17 @@
 
 ;; bind the required types and function signatures (see kiss_fft.h)
 
-(bind-type kiss_fft_cpx <float,float>)
+;; type of kiss_fft_should be whatever the kiss_fft shared library was
+;; been built with (check kiss_fft.h:47)
+
+(define *double-precision-fft* #t)
+
+(if *double-precision-fft*
+    (begin (bind-alias kiss_fft_scalar double)
+           (bind-alias kiss_fft_cpx cpxd))
+    (begin (bind-alias kiss_fft_scalar float)
+           (bind-alias kiss_fft_cpx cpxf)))
+
 (bind-type kiss_fft_state <i32,i32,|64,i32|,|1,kiss_fft_cpx|>)
 (bind-alias kiss_fft_cfg kiss_fft_state*)
 
@@ -47,60 +56,48 @@
 (bind-lib kissfft kiss_fft_cleanup [i8*,i8*]*)
 (bind-lib kissfft kiss_fft_next_fast_size [i32,i32]*)
 
-(bind-func fft_cpxf
-  "calculate the FFT of a real (float) input signal"
-  (lambda (in:cpxf* out:cpxf* len:i64)
+;; tools/kiss_fftr.h
+(bind-lib kissfft kiss_fftr [i8*,kiss_fft_cfg,kiss_fft_scalar*,kiss_fft_cpx*]*)
+(bind-lib kissfft kiss_fftri [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_scalar*]*)
+
+;; complex input
+
+(bind-func fft
+  "calculate the FFT of an input signal"
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
     (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
                                     (i64toi32 len)
                                     0 null null)))
-      (kiss_fft fft_config
-                (cast in kiss_fft_cpx*)
-                (cast out kiss_fft_cpx*)))
+      (kiss_fft fft_config in out))
     void))
 
-(bind-func fft_cpxd
-  "calculate the FFT of a real (double) input signal"
-  (lambda (in:cpxd* out:cpxd* len:i64)
-    (let ((inf:cpxf* (salloc len))
-          (outf:cpxf* (salloc len)))
-      (buffer_cpxd_to_cpxf in inf len)
-      (fft_cpxf inf outf len)
-      (buffer_cpxf_to_cpxd outf out len))
-    void))
-
-(bind-poly fft fft_cpxf)
-(bind-poly fft fft_cpxd)
-
-(bind-func inverse_fft_cpxf
-  "calculate the inverse FFT of a real (float) input signal"
-  (lambda (in:cpxf* out:cpxf* len:i64)
+(bind-func ffti
+  "calculate the inverse FFT of a signal"
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
     (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
                                     (i64toi32 len)
-                                    1 null null))
-          (i 0))
-      (kiss_fft fft_config
-                (cast in kiss_fft_cpx*)
-                (cast out kiss_fft_cpx*))
-      (dotimes (i len)
-        (tset! (pref-ptr out i)
-               0
-               (/ (tref (pref-ptr out i) 0) (i64tof len)))
-        (tset! (pref-ptr out i)
-               1
-               (/ (tref (pref-ptr out i) 1) (i64tof len))))
+                                    1 null null)))
+      (kiss_fft fft_config in out)
       void)))
 
-(bind-func inverse_fft_cpxd
-  "calculate the inverse FFT of a real (double) input signal"
-  (lambda (in:cpxd* out:cpxd* len:i64)
-    (let ((inf:cpxf* (salloc len))
-          (outf:cpxf* (salloc len)))
-      (buffer_cpxd_to_cpxf in inf len)
-      (inverse_fft_cpxf inf outf len)
-      (buffer_cpxf_to_cpxd outf out len))
+;; real-valued input
+
+(bind-func fftr
+  "calculate the FFT of a real-valued input signal"
+  (lambda (in:kiss_fft_scalar* out:kiss_fft_cpx* len:i64)
+    (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
+                                    (i64toi32 len)
+                                    0 null null)))
+      (kiss_fftr fft_config in out))
     void))
 
-(bind-poly inverse_fft inverse_fft_cpxf)
-(bind-poly inverse_fft inverse_fft_cpxd)
-(bind-poly ifft inverse_fft_cpxf)
-(bind-poly ifft inverse_fft_cpxd)
+(bind-func fftri
+  "calculate the FFT of a real-valued input signal"
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_scalar* len:i64)
+    (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
+                                    (i64toi32 len)
+                                    0 null null)))
+      (kiss_fftri fft_config in out))
+    void))
+
+(define *xtmlib-fft-loaded* #t)
