@@ -517,6 +517,15 @@
 		 (cdr ast)
 		 (make-list-with-proc (length ast) (lambda (i) i))))))
 
+(define impc:ti:letz
+  (lambda (ast)
+    (if (or (list? (car (cadr ast)))
+            (not (number? (eval (cadr ast)))))
+        (print-error 'Compiler 'Error: 'letz 'requires 'a 'zone 'size 'as 'its 'first 'argument)
+        `(memzone ,(cadr ast)
+           (let ,(caddr ast) ,@(cdddr ast))))))
+             
+
 
 ;; This function expects a generic type with specification
 ;;
@@ -597,6 +606,8 @@
 		  					     "##" ;"$$$"
 		  					     (number->string *unique-polynum*)))
 		  	      (impc:ti:first-transform (cdr ast) inbody?)))
+                       ((eq? (car ast) 'letz)
+                        (impc:ti:first-transform (impc:ti:letz ast) inbody?))
 		       ((eq? (car ast) 'and) 
                         (impc:ti:first-transform (impc:ti:and (cdr ast)) inbody?))
                        ((eq? (car ast) 'random)
@@ -709,7 +720,7 @@
                                    (impc:ti:first-transform (cdr ast) #t)))))
                 (else (cond ((eq? ast #f) '(impc_false))
                             ((eq? ast #t) '(impc_true))
-			    ((eq? ast 'cast) 'bitcast)
+			    ((eq? ast 'cast) 'bitcast)                            
 			    ((eq? ast 'convert) 'bitconvert)                            
 			    ((eq? ast '&) 'bitwise-and)
 			    ((eq? ast 'bor) 'bitwise-or) ; can't use a pipe
@@ -738,6 +749,7 @@
 			    ((eq? ast 'zalloc) 'zone-alloc)
 			    ((eq? ast 'alloc) 'zone-alloc)
 			    ((eq? ast 'schedule) 'callback)
+                            ((eq? ast 'randomf) 'imp_randf)
 			    ((eq? ast 'void) '(void))
                             (else ast)))))))
 
@@ -1510,22 +1522,42 @@
 ;;
 ;; i.e. (211 (2) (211 3 3) (xlist*##123)) should be
 ;; (211 2 (211 3 3) xlist*##123)
+
+;; (define impc:ti:type-clean
+;;   (lambda (type)
+;;     (if (or (null? type)
+;; 	    (not (list? type)))
+;; 	type
+;; 	(if (and (list? type) 
+;; 		 (list? (car type)))
+;; 	    (list (impc:ti:type-clean (car type)))
+;; 	    (map (lambda (k)
+;; 		   (if (list? k)
+;; 		       (if (= (length k) 1)
+;; 			   (car k)
+;; 			   k)
+;; 		       k))	   
+;; 		 type)))))
+
+
+;; this function removes any uneccessary lists
+;; it just checks for lists of 1 element and
+;; extracts the atom from the list
+;;
+;; i.e. (211 (2) (211 3 3) (xlist*##123)) should be
+;; (211 2 (211 3 3) xlist*##123)
 (define impc:ti:type-clean
   (lambda (type)
     (if (or (null? type)
 	    (not (list? type)))
 	type
-	(if (and (list? type) 
-		 (list? (car type)))
-	    (list (impc:ti:type-clean (car type)))
-	    (map (lambda (k)
-		   (if (list? k)
-		       (if (= (length k) 1)
-			   (car k)
-			   k)
-		       k))	   
-		 type)))))
-
+        (map (lambda (k)
+               (if (list? k)
+                   (if (= (length k) 1)
+                       (car k)
+                       k)
+                   k))	   
+             type))))
 
 
 ;; don't allow update to add to kts values
