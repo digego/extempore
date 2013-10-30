@@ -554,6 +554,7 @@ namespace extemp {
 		//printf("Loaded... llvmir.xtm\n");
 		scm->loadFile("llvmti.xtm", load_path.c_str());		
 		//printf("Loaded... llvmti.xtm\n");
+                scm->loadFile("extempore.xtm", load_path.c_str());
                
                 scm->setLoadedLibs(true);
  
