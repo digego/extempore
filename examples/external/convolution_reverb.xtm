@@ -23,10 +23,10 @@
 ;; convolution reverb takes mono
 ;; files as input (i.e. separates left and right)
 (bind-func dsp:DSP 100000000
-  (let ((reverb (creverb_st_c "assets/ir/minster_short_l.aif"
-                              "assets/ir/minster_short_r.aif"))
+  (let ((reverb (creverb_st_c "assets/ir/minsterl.aif"
+                              "assets/ir/minsterr.aif"))
         (wet 2.0)
-        (dry 0.3))
+        (dry 0.3))    
     (lambda (in time chan dat)
       (reverb chan (sampler in time chan dat) dry wet))))
 
@@ -38,9 +38,13 @@
 (sampler.release 5000)
 (sampler.attack 2000)
 
+(dsp.wet 5.0)
+(dsp.dry 1.0)
+
 ;; make some noise
 (define test
   (lambda (beat dur)
+    (println (* 100. (sys:audio-load)))
     (play sampler 72 120 10.0 0 0.2)
     (play 2 sampler 77 120 10.0 0 0.8)
     (play 4 sampler 68 125 8.0 0 0.6)
