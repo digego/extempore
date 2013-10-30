@@ -1569,7 +1569,7 @@
 (sys:load "libs/external/fft.xtm")
 
 (bind-func test_fft
-  (lambda (fft_length print)
+  (lambda (fft_length printq)
     (let ((signal:double* (zalloc fft_length))
           (in:cpxd* (zalloc fft_length))
           (out:cpxd* (zalloc fft_length))
@@ -1579,13 +1579,13 @@
       (dotimes (i fft_length)
         (pset! signal i (cos (/ (* TWOPI (i64tod i)) (i64tod fft_length)))))
       (fill_cpx_buffer signal in fft_length)
-      (if (= print 1)
+      (if (= printq 1)
           (dotimes (i fft_length)
             (printf "in[%lld] = %f+%fi\n" i
                     (tref (pref-ptr in i) 0)
                     (tref (pref-ptr in i) 1))))
       (fft in out fft_length)
-      (if (= print 1)
+      (if (= printq 1)
           (dotimes (i fft_length)
             (printf "out[%lld] = %f+%fi\n" i
                     (tref (pref-ptr out i) 0)
@@ -1605,7 +1605,7 @@
 ;; test real-only ffts
 
 (bind-func test_fftr
-  (lambda (fft_length print)
+  (lambda (fft_length printq)
     (let ((signal:double* (zalloc fft_length))
           (in:double* (zalloc fft_length))
           (out:cpxd* (zalloc fft_length))
@@ -1615,11 +1615,11 @@
       (dotimes (i fft_length)
         (pset! signal i (cos (/ (* TWOPI (i64tod i)) (i64tod fft_length))))
         (pset! in i (cos (/ (* TWOPI (i64tod i)) (i64tod fft_length)))))
-      (if (= print 1)
+      (if (= printq 1)
           (dotimes (i fft_length)
             (printf "in[%lld] = %f+%fi\n" i (pref in i) (pref in i))))
       (fftr in out fft_length)
-      (if (= print 1)
+      (if (= printq 1)
           (dotimes (i (+ 1 (/ fft_length 2)))
             (printf "out[%lld] = %f+%fi\n" i
                     (tref (pref-ptr out i) 0)
