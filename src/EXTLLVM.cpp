@@ -41,6 +41,7 @@
 #include "Scheme.h"
 #include "pcre.h"
 #include "OSC.h"
+#include "math.h"
 
 #ifdef TARGET_OS_WINDOWS
 #include <malloc.h>
@@ -851,12 +852,21 @@ int64_t llvm_now()
 //     return (double) extemp::UNIV::IN_CHANNELS;
 // }
 
-double imp_rand()
+double imp_randd()
 {
 #ifdef EXT_BOOST
   return extemp::UNIV::random();
 #else
     return (double)rand()/(double)RAND_MAX;
+#endif
+}
+
+double imp_randf()
+{
+#ifdef EXT_BOOST
+  return extemp::UNIV::random();
+#else
+    return (float)rand()/(float)RAND_MAX;
 #endif
 }
 /*
@@ -1445,7 +1455,9 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&unswap32f);	
 
 	    gv = M->getNamedValue(std::string("imp_rand"));
-	    EE->updateGlobalMapping(gv,(void*)&imp_rand);	
+	    EE->updateGlobalMapping(gv,(void*)&imp_randd);	
+	    gv = M->getNamedValue(std::string("imp_randf"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_randf);	
 	    gv = M->getNamedValue(std::string("imp_rand1"));
 	    EE->updateGlobalMapping(gv,(void*)&imp_rand1);	
 	    gv = M->getNamedValue(std::string("imp_rand2"));
@@ -1545,7 +1557,9 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("mutex_trylock"));
 	    EE->updateGlobalMapping(gv,(void*)&mutex_trylock);
 
-
+            // gv = M->getNamedValue(std::string("cosd"));
+            // EE->updateGlobalMapping(gv,(void*)&cos);
+            
 	}	
 	return;
     }

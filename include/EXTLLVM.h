@@ -81,7 +81,8 @@ unsigned long string_hash(unsigned char* str);
   int llvm_printf(char* format, ...);
   int llvm_sprintf(char* str, char* format, ...);
   void llvm_send_udp(char* host, int port, void* message, int message_length);
-  double imp_rand();
+  double imp_randd();
+  double imp_randf();
   int64_t imp_rand1(double a);
   int64_t imp_rand2(double a, double b);
 
