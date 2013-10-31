@@ -57,6 +57,9 @@
 
 #include <iostream>
 #include <sstream>
+#ifndef TARGET_OS_WINDOWS
+#include <execinfo.h>
+#endif
 
 #include <pcre.h>
 #include "EXTLLVM.h"
@@ -69,7 +72,7 @@
 #define _SCHEME_SOURCE
 #include "SchemePrivate.h"
 #ifndef WIN32
-# include <unistd.h>
+#include <unistd.h>
 #endif
 #if USE_DL
 # include "dynload.h"
@@ -212,6 +215,15 @@ inline void insert_treadmill(scheme* sc, pointer p)
     if(p->_list_colour == 0)
     {
 	std::cout << "ERROR: should not be inserting a free cell on the grey list!!!" << p << std::endl;
+#ifndef TARGET_OS_WINDOWS
+        void* callstack[128];
+        int i, frames = backtrace(callstack, 128);
+        char** strs = backtrace_symbols(callstack, frames);
+        for (i = 0; i < frames; ++i) {
+          printf("%s\n", strs[i]);
+        }
+        free(strs);
+#endif
     }
 	
     // if black don't insert again	
@@ -242,7 +254,7 @@ inline void insert_treadmill(scheme* sc, pointer p)
 	if(p->_colour == sc->dark)
 	{			
 #ifdef TREADMILL_CHECKS	
-	    std::cout << "WARNING: inserting during flip ... this should be OK?" << p << std::endl;			
+          //std::cout << "WARNING: inserting during flip ... this should be OK?" << p << std::endl;			
 #endif			
 	    sc->mutex->unlock();
 	    return;
@@ -319,7 +331,7 @@ inline void insert_treadmill(scheme* sc, pointer p)
 	sc->treadmill_scan = p;		
 		
 #ifdef TREADMILL_CHECKS
-	printf("SCAN == TOP.  set SCAN to %p for insert\n",p);
+	//printf("SCAN == TOP.  set SCAN to %p for insert\n",p);
 #endif
     }
 	
@@ -1302,7 +1314,7 @@ static int alloc_cellseg(scheme *sc, int n) {
     //std::cout << sc->fcells << " number of free cells" << std::endl;	
 	
 #ifdef TREADMILL_CHECKS
-    printf("////////////// SANITY CHECK TREADMILL AFTER ALLOCATION /////////////\n");
+    //printf("////////////// SANITY CHECK TREADMILL AFTER ALLOCATION /////////////\n");
     if(sc->treadmill_bottom->_ccw->_list_colour != 0)
     {
 	printf("_CCW OF BOTTOM SHOULD BE FREE CELL!\n");
@@ -1347,9 +1359,9 @@ static int alloc_cellseg(scheme *sc, int n) {
     }			
     //if(frees+ecrus != CELL_SEGSIZE)
     //{
-    printf("FREES(%d)  ECRUS(%d)  TOTAL(%d)  CELLSEG(%lld)\n",frees,ecrus,frees+ecrus,sc->total_memory_allocated);
+    //printf("FREES(%d)  ECRUS(%d)  TOTAL(%d)  CELLSEG(%lld)\n",frees,ecrus,frees+ecrus,sc->total_memory_allocated);
     //}
-    printf("------------- FINISHED SANITY CHECK TREADMILL AFTER ALLOCATION ---------------\n");
+    //printf("------------- FINISHED SANITY CHECK TREADMILL AFTER ALLOCATION ---------------\n");
 #endif
 		
     char str[256];
@@ -1997,11 +2009,11 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 #endif
 	
 #ifdef TREADMILL_CHECKS
-    std::cout << "START FLIP*******************************************************************************************    Scheme Instance:" << sc << std::endl << std::flush;	
+    //std::cout << "START FLIP*******************************************************************************************    Scheme Instance:" << sc << std::endl << std::flush;	
     ///////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
     // Some very basic sanity checking
-    printf("==============FLIP SANITY CHECKS====================\n");
+    //printf("==============FLIP SANITY CHECKS====================\n");
     if(sc->treadmill_top != sc->treadmill_scan) {
 	printf("Top & Scan must match!  Catastrophic error in GC\n");			
     }
@@ -2042,8 +2054,8 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 	blacks++;
 	black_check = black_check->_ccw;
     }		
-    printf("BLACKS(%lld)  ECRUS(%lld)  TOTAL(%lld)  SEGSIZE(%lld)\n",blacks,ecruscells,blacks+ecruscells,sc->total_memory_allocated);
-    printf("-----------------DONE FLIP SANITY CHECKS-----------------\n");	
+    //printf("BLACKS(%lld)  ECRUS(%lld)  TOTAL(%lld)  SEGSIZE(%lld)\n",blacks,ecruscells,blacks+ecruscells,sc->total_memory_allocated);
+    //printf("-----------------DONE FLIP SANITY CHECKS-----------------\n");	
     /////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////
 #endif
@@ -2199,7 +2211,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
     ///////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////
     // Some very basic sanity checking
-    printf("==============POST MARK SANITY CHECKS====================\n");
+    //printf("==============POST MARK SANITY CHECKS====================\n");
     if(sc->treadmill_top->_list_colour != 1 || sc->treadmill_bottom->_list_colour != 1) {
 	printf("Top & Bottom must both be ecru!   TOP(%d) BOTTOM(%d) Catastrophic error in GC\n",sc->treadmill_top->_list_colour,sc->treadmill_bottom->_list_colour);			
     }
@@ -2262,11 +2274,11 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 	greys++;
 	grey_check = grey_check->_ccw;
     }			
-    printf("GREYS(%lld)  WHITES(%lld)  ECRUS(%lld)  TOTAL(%lld)  SEGSIZE(%lld)\n",greys,whites,ecrus,greys+whites+ecrus,sc->total_memory_allocated);
-    printf("-----------------DONE FLIP SANITY CHECKS-----------------\n");	
+    //printf("GREYS(%lld)  WHITES(%lld)  ECRUS(%lld)  TOTAL(%lld)  SEGSIZE(%lld)\n",greys,whites,ecrus,greys+whites+ecrus,sc->total_memory_allocated);
+    //printf("-----------------DONE FLIP SANITY CHECKS-----------------\n");	
     /////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////
-    std::cout << "FINISHED FLIP**********************************************************************************************************************************" << std::endl << std::flush;	
+    //std::cout << "FINISHED FLIP**********************************************************************************************************************************" << std::endl << std::flush;	
 #endif
 		
     sc->treadmill_flip_active = false;	
