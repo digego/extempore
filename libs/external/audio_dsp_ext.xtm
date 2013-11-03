@@ -21,6 +21,9 @@
 (sys:load-preload-check 'audio-dsp-ext)
 (define *xtmlib-audio-dsp-ext-loaded* #t)
 
+;; first try
+(sys:load "libs/xtm.xtm")
+;; else try
 (sys:load "libs/core/math.xtm")
 (sys:load "libs/external/fft.xtm")
 (sys:load "libs/external/sndfile.xtm")
@@ -35,15 +38,16 @@
           (po 0) ;; partition offset
           (irs:cpxd* (zalloc (* 2 irlgth))) ;; storage for all IR FFT 'partitions'
           (ffts:cpxd* (zalloc (* 2 irlgth))) ;; storage for all total forward ffts
+          (padlgth (* lgth 2)) ;; padlgth is for convolution buffers                    
           (aorb:i1 #t) ;; #t for a #f for b          
           (irtaila:double* (zalloc lgth)) ;; buffer ir tail
           (irtailb:double* (zalloc lgth))
-          (drya:double* (zalloc lgth)) ;; buffer input signal
-          (dryb:double* (zalloc lgth))
+          (drya:double* (zalloc padlgth)) ;; buffer input signal
+          (dryb:double* (zalloc padlgth))
           (t1:i64 0) (i:i64 0) (out:double 0.0) (j:i64 0)
-          (padlgth (* lgth 2)) ;; padlgth is for convolution buffers          
           (A:cpxd* (zalloc padlgth)) 
-          (B:cpxd* (zalloc padlgth)) 
+          (B:cpxd* (zalloc padlgth))
+          (a:double* (zalloc padlgth))
           (output:double* (zalloc lgth))) ;; buffer output
       (printf "IR:(%.1f seconds) Partitions(size:%lld num:%lld)\n" (/ (i64tod irlgth) SR) lgth parts)
       ;; partition and store IR spectra (circlar convolution so padded)
@@ -67,11 +71,8 @@
         (if (= t1 lgth)
             (let ((_fft:cpxd* (pref-ptr ffts (* po padlgth)))
                   (_ir:cpxd* null))
-              ;; fill W with incoming signal zero padded to lgth*2
-              (memset (cast A i8*) 0 (* padlgth 16))
-              (fill_cpx_buffer (if aorb drya dryb) A lgth)
               ;; forward FFT of incoming signal
-              (fft A B padlgth)
+              (fftr (if aorb drya dryb) B padlgth)
               ;; store FFT to use 'now' and also for 'delayed' use
               (memcpy (cast _fft i8*) (cast B i8*) (* padlgth 16))
               ;; run convolution over all partions
@@ -82,19 +83,20 @@
                 (cpxmul _fft _ir A padlgth)
                 (cpxadd A B B padlgth))
               ;; after convolution is complete back to time domain!
-              (ifft B A padlgth)
-              ;; scale complex output W
-              (scpxmul (/ 1.0 (i64tod parts)) A padlgth)
-              ;; write first half of complex output for immediate playback
-              (pour_cpx_buffer A output lgth)
-              ;; write second half of complex output into irtail for overlap-add
-              (pour_cpx_buffer (pref-ptr A lgth) (if aorb irtaila irtailb) lgth)
+              (ifftr B a padlgth)
+              (let ((scale:double (/ 1.0 (i64tod (* lgth parts))))
+                    (tail (if aorb irtaila irtailb)))
+                (dotimes (i lgth)
+                  (pset! output i (* (pref a i) scale)))
+                (dotimes (i lgth)
+                  (pset! tail i (* (pref a (+ lgth i)) scale))))
               ;; reset everything for next cycle
               (set! aorb (if aorb #f #t)) ;; swap buffers
               (set! po (% (+ po 1) parts))
               (set! t1 0)))
         ;; simply return out
         out))))
+
 
 ;; poly wrapper for spectral_convolution_c
 (bind-func spectral_convolution_c_
