@@ -570,78 +570,31 @@
 		   b
 		   (if (= (car beat) b) #t #f)))))))
 
-; creates a metronome object
-; metro is basically a linear function that returns
-; a time in absolute samples when given a time in beats.
-;
-; metro is instantiated with a starting tempo.
-; you can call the metro with the following symbols
-;
-; 'get-time ; which is also the default
-; 'get-beat
-; 'get-tempo
-; 'set-tempo
-; 'dur
-;
-(define make-metro
-  (lambda (start-tempo . args)
-     (let* ((offset (if (null? args) (now) (caar args)))
-	    (mark offset)
-	    (loffset 0.0)
-	    (total-beats (if (null? args) 0 (cdar args)))
-	    (g-tempo (/ 60 start-tempo))
-	    (beat-pos (lambda (x1 y1 x2 y2)
-			 (let* ((m (if (= 0 (- x2 x1)) 0 (/ (- y2 y1) (- x2 x1))))
-				(c (- y1 (* m x1))))
-			    (lambda (time)
-			       (+ (* time m) c)))))
-	    (samp-env (beat-pos total-beats mark (+ total-beats 1.0) (+ mark (* g-tempo *au:samplerate*)))))
-	(lambda (sym . args)
-	   (cond ((number? sym)
-		  (+ (samp-env sym) loffset)) ;mark))
-		  ;(+ (samp-env sym) 0))
-		 ((equal? sym 'get-mark)
-		  (cons mark total-beats))
-		 ((equal? sym 'get-time)
-		  (+ (samp-env (car args)) loffset)) ;mark))
-		 ;; (+ (samp-env (car args)) 0))
-		 ((equal? sym 'set-tempo)
-		  (let ((time (if (null? (cdr args)) (now) (cadr args)))
-			(val (* *au:samplerate* g-tempo 0.125)))
-		     ;(print 'time-a time 'total-beats total-beats 'mark mark)
-                    (set! time (+ time (- val (modulo (- time mark) val))))
-                    (set! total-beats (+ total-beats (/ (- time mark)
-                                                        (* *au:samplerate* g-tempo))))
-                    ;; (println 'time-b time 'total-beats total-beats 'mark mark (samp-env total-beats))
-                    (set! g-tempo (/ 60 (car args)))
-                    (set! mark time)
-                    (set! samp-env (beat-pos total-beats
-                                             mark
-                                             (+ total-beats 1.0)
-                                             (+ mark (* g-tempo *au:samplerate*))))
-                                        ;(print 'get-time (samp-env total-beats))
-                    (car args)))
-		 ((equal? sym 'get-tempo) (* (/ 1 g-tempo) 60))
-		 ((equal? sym 'dur) (* *au:samplerate* g-tempo (car args)))
-		 ((equal? sym 'push) (set! loffset (+ loffset 256)))
-		 ((equal? sym 'pull) (set! loffset (- loffset 256)))
-		 ((equal? sym 'get-beat)
-		  (let ((val (+ total-beats
-				(/ (- (now) mark)
-				   (* *au:samplerate* g-tempo))))
-			(quantize (if (null? args) 1.0 (car args))))
-		     ;(print 'val (* 1.0 val))
-		     (real->rational (+ val (- quantize (modulo val quantize))))))
-		 (else 'bad-method-name))))))
 
-
+;; creates a metronome object
+;; metro is basically a linear function that returns
+;; a time in absolute samples when given a time in beats.
+;;
+;; metro is instantiated with a starting tempo.
+;; you can call the metro with the following symbols
+;;
+;; 'get-time ; which is also the default
+;; 'get-beat
+;; 'get-tempo
+;; 'set-tempo
+;; 'get-cycle
+;; 'set-cycle
+;; 'pos
+;; 'dur
+;
 (define make-metro
   (lambda (start-tempo . args)
     (let* ((offset (if (null? args) (now) (caar args)))
-           (cycle 4) ;; this is basically the meter
+           (cycle 4)
            (mark offset)
            (loffset 0.0)
            (total-beats (if (null? args) 0 (cdar args)))
+           (cycle-beats total-beats)
            (g-tempo (/ 60 start-tempo))
            (beat-pos (lambda (x1 y1 x2 y2)
                        (let* ((m (if (= 0 (- x2 x1)) 0 (/ (- y2 y1) (- x2 x1))))
@@ -658,16 +611,19 @@
               ((equal? sym 'get-time)
                (+ (samp-env (car args)) loffset)) ;mark))
               ((equal? sym 'get-cycle) cycle)
-              ((equal? sym 'set-cycle) (set! cycle (car args)))
-              ((equal? sym 'pos) (modulo (- (car args) total-beats) cycle))
+              ((equal? sym 'get-cycle-mark) cycle-beats)
+              ((equal? sym 'set-cycle)
+               (set! cycle-beats (cadr args))
+               (set! cycle (car args)))
+              ((equal? sym 'pos) (modulo (- (car args) cycle-beats) cycle))
               ((equal? sym 'beat-at-time) (rational->real (beat-env (car args))))
               ((equal? sym 'set-tempo)
                (let ((time (if (null? (cdr args)) (now) (cadr args))))
                  (if (null? (cddr args))
-                     (set! total-beats (+ total-beats (/ (- time mark)
-                                                         (* *au:samplerate* g-tempo))))
+                     (set! total-beats
+                           (+ total-beats (/ (- time mark)
+                                             (* *au:samplerate* g-tempo))))
                      (set! total-beats (caddr args)))
-                 ;; (println 'time-b time 'total-beats total-beats 'mark mark (samp-env total-beats))
                  (set! g-tempo (/ 60 (car args)))
                  (set! mark time)
                  (set! samp-env (beat-pos total-beats
@@ -688,12 +644,12 @@
                              (/ (- (now) mark)
                                 (* *au:samplerate* g-tempo))))
                      (quantize (if (null? args) 1.0 (car args))))
-                                        ;(print 'val (* 1.0 val))
                  (real->rational (+ val (- quantize (modulo val quantize))))))
               (else 'bad-method-name))))))
 
 
 (define *metro* (make-metro 120 '(0 . 0)))
+
 
 (define-macro (set-signal! variable value dur . rate)
    (let ((r (if (null? rate) 1/16 (car rate))))
