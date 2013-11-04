@@ -17,12 +17,13 @@
 
 ;; To 'install' this file, just copy it to your home directory, e.g.
 ;; 
-;;   $ cp /path/to/Extempore/extras/.emacs ~
+;;   $ cp /path/to/extempore/extras/.emacs ~
 ;; 
 ;; after that, Emacs will load the file on startup.
 
-;; You'll also need to change the `extempore-path' variable (further
-;; down in this file) to point to your Extempore source directory.
+;; You'll also need to change the `user-extempore-directory' variable
+;; (further down in this file) to point to your Extempore source
+;; directory.
 
 ;; If you're already an Emacs user...
 
@@ -185,19 +186,19 @@
 ;;;;;;;;;;;;;;;
 
 ;; set the path to your extempore-directory
-(setq extempore-path "/path/to/extempore")
-(autoload 'extempore-mode (concat extempore-path "/extras/extempore.el") "" t)
+(setq user-extempore-directory "/path/to/extempore/")
+(autoload 'extempore-mode (concat user-extempore-directory "extras/extempore.el") "" t)
 (add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
 
-(autoload #'llvm-mode (concat extempore-path "extras/llvm-mode.el")
+(autoload #'llvm-mode (concat user-extempore-directory "extras/llvm-mode.el")
   "Major mode for editing LLVM IR files" t)
 
 (add-to-list 'auto-mode-alist '("\\.ir$" . llvm-mode))
 (add-to-list 'auto-mode-alist '("\\.ll$" . llvm-mode))
 
 ;; you can delete this once you've setup your extempore path
-(if (string-equal extempore-path "/path/to/extempore")
+(if (string-equal user-extempore-directory "/path/to/extempore/")
     (if user-init-file
         (progn (find-file user-init-file)
-               (search-forward "/path/to/extempore" nil t 2)
+               (search-forward "/path/to/extempore/" nil t 2)
                (message "You need to set your Extempore path!"))))
