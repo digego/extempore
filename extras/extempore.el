@@ -227,8 +227,8 @@ See `run-hooks'."
   :type 'boolean
   :group 'extempore)
 
-(defcustom extempore-path nil
-  "Location of the extempore executable."
+(defcustom user-extempore-directory nil
+  "Location of the extempore directory."
   :type 'string
   :group 'extempore)
 
@@ -928,11 +928,11 @@ If there is a process already running in `*extempore*', switch to that buffer.
 \(Type \\[describe-mode] in the process buffer for a list of commands.)"
 
   (interactive (list (read-string "Run Extempore: extempore " extempore-program-args)))
-  (unless extempore-path
-    (error "Error: `extempore-path' not set!"))
+  (unless user-extempore-directory
+    (error "Error: `user-extempore-directory' not set!\n\nNote that this var used to be called `extempore-path', so you may need to update your .emacs"))
   (if (not (comint-check-proc "*extempore*"))
-      (let ((default-directory extempore-path))
-        (set-buffer (apply #'make-comint "extempore" (concat extempore-path "extempore") nil
+      (let ((default-directory user-extempore-directory))
+        (set-buffer (apply #'make-comint "extempore" (concat user-extempore-directory "extempore") nil
                            (split-string-and-unquote program-args)))
         (inferior-extempore-mode)))
   (setq extempore-buffer "*extempore*")
@@ -1629,7 +1629,7 @@ You shouldn't have to modify this list directly, use
 (defvar extempore-logger-logfile nil)
 
 (defun extempore-logger-new-logfile ()
-  (let* ((log-dir (concat (or extempore-path user-emacs-directory) "keylogs/"))
+  (let* ((log-dir (concat (or user-extempore-directory user-emacs-directory) "keylogs/"))
          (dir-created (unless (file-exists-p log-dir) (make-directory log-dir)))
          (logfile-name (concat log-dir
                                (format-time-string "%Y%m%dT%H%M%S-")
