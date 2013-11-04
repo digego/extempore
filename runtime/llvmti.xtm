@@ -434,7 +434,7 @@
 (define impc:ti:random
    (lambda (ast)
       (case (length ast)
-            ((0) (append (list 'imp_rand) ast))
+            ((0) (append (list 'imp_randd) ast))
             ((1) (append (list 'imp_rand1) ast))
             ((2) (append (list 'imp_rand2) ast)))))
 
@@ -1539,13 +1539,26 @@
 ;; 		       k))	   
 ;; 		 type)))))
 
-
 ;; this function removes any uneccessary lists
 ;; it just checks for lists of 1 element and
 ;; extracts the atom from the list
 ;;
 ;; i.e. (211 (2) (211 3 3) (xlist*##123)) should be
 ;; (211 2 (211 3 3) xlist*##123)
+;; (define impc:ti:type-clean
+;;   (lambda (type)
+;;     (if (or (null? type)
+;;             (atom? type)
+;;             (impc:ir:type? type)) ;; (note to andrew) remove this line for GC crash!
+;; 	type
+;;         (map (lambda (k)
+;;                (if (list? k)
+;;                    (if (= (length k) 1)
+;;                        (car k)
+;;                        k)
+;;                    k))	   
+;;              type))))
+
 (define impc:ti:type-clean
   (lambda (type)
     (if (or (null? type)
@@ -1555,9 +1568,9 @@
         (map (lambda (k)
                (if (list? k)
                    (if (= (length k) 1)
-                       (car k)
-                       k)
-                   k))	   
+                       (impc:ti:type-clean (car k))
+                       (impc:ti:type-clean k))
+                   k))
              type))))
 
 
