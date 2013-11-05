@@ -1,4 +1,4 @@
-;;; xtlang_test.xtm -- rudimentary unit testing for xtlang code
+;;; libs.xtm -- tests for xtlang code which calls external libs
 
 ;; Author: Ben Swift, Andrew Sorensen
 ;; Keywords: extempore
@@ -18,66 +18,7 @@
 
 ;;; Code:
 
-(define *func-successes* '((correct)
-			   (incorrect)
-			   (compile)
-			   (no-compile)))
-
-(define-macro (change-test-result category func-sym)
-  `(for-each
-    (lambda (cat)
-      (if (equal? (car cat) ,category)
-	  (set-cdr! cat (if (not (member ,func-sym cat))
-			    (cons ,func-sym (cdr cat))))
-	  (set-cdr! cat (cl:remove ,func-sym (cdr cat)))))
-    *func-successes*))
-
-(define-macro (test-xtfunc form . retval)
-  `(let ((func-sym (quote ,(car form))))
-     (begin
-       (change-test-result 'no-compile func-sym)
-       (if (defined? func-sym)
-	   (begin (change-test-result 'compile func-sym)
-		  ,(if (null? retval)
-                       `(begin ,form
-                               (change-test-result 'correct func-sym))
-                       `(if (= ,form ,(car retval))
-                            (change-test-result 'correct func-sym)
-                            (change-test-result 'incorrect func-sym))))))))
-
-(define print-test-results
-  (lambda ()
-    (begin (println 'Test 'results:)
-	   (println '=====================)
-	   (println)
-	   (for-each (lambda (result)
-		       (println '*** (car result) '***)
-		       (println)
-		       (for-each (lambda (fn)
-				   (println '--> fn))
-				 (cdr result))
-		       (println))
-		     *func-successes*))))
-
-;; (bind-func non-compiling-func
-;;   (lambda (a)
-;;     a))
-
-;; (test-xtfunc (non-compiling-func))
-
-;; (bind-func compiling-func
-;;   (lambda (a)
-;;     (+ a 2)))
-
-;; (test-xtfunc (compiling-func))
-
-;; (bind-func calling-func
-;;   (lambda (a)
-;;     (+ a 2)))
-
-;; (test-xtfunc (calling-func 2))
-
-;; (print-test-results)
+(sys:load "tests/test.xtm")
 
 ;;;;;;;;;;;;;;;
 ;; fft tests ;;
