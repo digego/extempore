@@ -1605,7 +1605,9 @@ You shouldn't have to modify this list directly, use
                                   (symbol-name command)
                                   event)
                           (prin1-to-string
-                           (if (equal command 'extempore-send-definition)
+			   (if (member command '(extempore-send-definition
+						 extempore-send-region
+						 extempore-send-buffer))
                                (prin1-to-string
                                 (read (concat "(" (buffer-substring-no-properties (car arg-list) (cadr arg-list)) ")")))
                              (prin1-to-string arg-list))))
