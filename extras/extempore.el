@@ -1586,14 +1586,21 @@ You shouldn't have to modify this list directly, use
 (defvar extempore-logger-special-functions
   '(extempore-send-region
     extempore-connect
-    extempore-disconnect
-    yas-expand-snippet)
+    extempore-disconnect)
   "A list of extempore-mode functions to specifically instrument for logging")
 
 (defvar extempore-logger-cache nil
   "An in-memory cache of logged commands, which is flushed to
   disk when the system is idle through
   `extempore-logger-flush'.")
+
+(defun extempore-logger-yasnippet-hook ()
+  (extempore-logger-log-current-command 'yas-expand
+					nil
+					(list yas-snippet-beg yas-snippet-end)))
+
+(add-hook 'yas-after-exit-snippet-hook
+	  'extempore-logger-yasnippet-hook)
 
 (defun extempore-logger-log-current-command (command event arg-list)
   (if (and (equal major-mode 'extempore-mode)
@@ -1602,13 +1609,14 @@ You shouldn't have to modify this list directly, use
             (cons (concat (format-time-string "%Y-%m-%d %T.%3N")
                           (format ",%s,%s,%s," 
                                   (buffer-name)
-                                  (symbol-name command)
-                                  event)
-                          (prin1-to-string
-			   (if (member command '(extempore-send-definition
+				  (symbol-name command)
+				  event)
+			  (prin1-to-string
+			   (if (member command '(yas-expand
+						 extempore-send-definition
 						 extempore-send-region
 						 extempore-send-buffer))
-                               (prin1-to-string
+			       (prin1-to-string
                                 (read (concat "(" (buffer-substring-no-properties (car arg-list) (cadr arg-list)) ")")))
                              (prin1-to-string arg-list))))
                   extempore-logger-cache))))
