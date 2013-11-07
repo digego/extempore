@@ -2485,11 +2485,14 @@
 
 ;; THIS VERSION DOESN'T COPY ANYTHING!
 (define impc:ir:compiler:set!
-  (lambda (ast types)     
+  (lambda (ast types)
     (let* ((os (make-string 0))
-	   (s2 (impc:ir:compiler (caddr ast) types))
+           (t (if (assoc (cadr ast) types) (cdr (assoc (cadr ast) types)) #f))
+	   (s2 (if t
+                   (impc:ir:compiler (caddr ast) types t)
+                   (impc:ir:compiler (caddr ast) types)))
 	   (vv (impc:ir:gname))
-	   (type (impc:ir:get-type-from-str (cadr vv))))
+           (type (impc:ir:get-type-from-str (cadr vv))))           
       (emit "; do set!\n" os)
       (emit s2 os)
       (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; are we are setting a global variable?
@@ -3245,8 +3248,9 @@
                                       '()
                                       (car hint?)))))
                 (a (impc:ir:compiler (cadr ast) types))
-                (aval (impc:ir:gname))                
-                (b (impc:ir:compiler (caddr ast) types))
+                (aval (impc:ir:gname))
+                (t (impc:ir:get-type-from-str (cadr aval)))
+                (b (impc:ir:compiler (caddr ast) types t))
                 (bval (impc:ir:gname))
 		(os (make-string 0))
                 (type (cadr aval)))
@@ -3656,7 +3660,7 @@
 
 ;; if that might need to return a value
 (define impc:ir:compiler:if
-   (lambda (ast types)
+  (lambda (ast types . hint?)
       (let* ((os (make-string 0))
              (elset (if (or (null? (cdddr ast))
                             (null? (cadddr ast)))
@@ -3669,7 +3673,9 @@
                                  "label %else" num "\n") os)
          ;; do then
          (emit  "\nthen" num ":\n" os)
-         (emit (impc:ir:compiler (caddr ast) types) os)
+         (if (not (null? hint?))
+             (emit (impc:ir:compiler (caddr ast) types (car hint?)) os)
+             (emit (impc:ir:compiler (caddr ast) types) os))
 	 (if (not (impc:ir:void? (cadr (impc:ir:gname))))
 	     (emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
 				  ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os))
@@ -3679,7 +3685,9 @@
          ;; do else if requried
          (if elset
              (begin (emit  "\nelse" num ":\n" os)
-                    (emit (impc:ir:compiler (cadddr ast) types) os)
+                    (if (not (null? hint?))
+                        (emit (impc:ir:compiler (cadddr ast) types (car hint?)) os)
+                        (emit (impc:ir:compiler (cadddr ast) types) os))
 		    (if (not (impc:ir:void? (cadr (impc:ir:gname))))
 			(emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
 					     ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os))
@@ -4177,7 +4185,9 @@
 			(impc:ir:compiler:bitwise (cl:position (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right)) ast types (car hint?))
 			(impc:ir:compiler:bitwise (cl:position (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right)) ast types)))
                    ((equal? (car ast) 'if)
-                    (impc:ir:compiler:if ast types))
+                    (if (not (null? hint?))
+                        (impc:ir:compiler:if ast types (car hint?))
+                        (impc:ir:compiler:if ast types)))
                    ((equal? (car ast) 'ifret)
                     (impc:ir:compiler:ifret ast types))					
                    ((and (symbol? (car ast))

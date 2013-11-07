@@ -57,12 +57,12 @@
 
 #define BUFFERED_AUDIO
 
-#define SAMPLE float
+#define SAMPLE double
 
-typedef void(*dsp_f_ptr_array)(void*,void*,SAMPLE*,SAMPLE*,SAMPLE,void*);
-typedef void(*dsp_f_ptr_sum_array)(void*,void*,SAMPLE**,SAMPLE*,SAMPLE,void*);
-typedef double(*dsp_f_ptr)(void*,void*,double,double,double,double*);
-typedef double(*dsp_f_ptr_sum)(void*,void*,double*,double,double,double*);
+typedef void(*dsp_f_ptr_array)(void*,void*,float*,float*,float,void*);
+typedef void(*dsp_f_ptr_sum_array)(void*,void*,float**,float*,float,void*);
+typedef SAMPLE(*dsp_f_ptr)(void*,void*,SAMPLE,SAMPLE,int,SAMPLE*);
+typedef SAMPLE(*dsp_f_ptr_sum)(void*,void*,SAMPLE*,SAMPLE,int,SAMPLE*);
 
 namespace extemp {
 
@@ -91,25 +91,25 @@ namespace extemp {
 	}
 	void* getDSPMTClosure(int idx) { return dsp_mt_closure[idx]; }
 	
-	void setDSPWrapperArray( void(*_wrapper)(void*,void*,SAMPLE*,SAMPLE*,SAMPLE,void*) ) 
+	void setDSPWrapperArray( void(*_wrapper)(void*,void*,float*,float*,float,void*) ) 
 	{ 
 	    if(dsp_wrapper != 0 || dsp_wrapper_sum != 0 || dsp_wrapper_array != 0 || dsp_wrapper_sum_array != 0) return;
 	    dsp_wrapper_array = _wrapper; 
 	}
-	void setDSPWrapper( double(*_wrapper)(void*,void*,double,double,double,double*) ) 
+	void setDSPWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE,SAMPLE,int,SAMPLE*) ) 
 	{ 
 	    if(dsp_wrapper_array != 0 || dsp_wrapper_sum != 0 || dsp_wrapper != 0 || dsp_wrapper_sum_array != 0) return;
 	    dsp_wrapper = _wrapper;
 	}
-	void setDSPMTWrapper( double(*_wrapper)(void*,void*,double*,double,double,double*),
-                              double(*_wrappera)(void*,void*,double,double,double,double*)) 
+	void setDSPMTWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE*,SAMPLE,int,SAMPLE*),
+                              SAMPLE(*_wrappera)(void*,void*,SAMPLE,SAMPLE,int,SAMPLE*)) 
 	{ 
 	    if(dsp_wrapper_array != 0 || dsp_wrapper_sum != 0 || dsp_wrapper != 0 || dsp_wrapper_sum_array != 0) return;
 	    dsp_wrapper_sum = _wrapper;
             dsp_wrapper = _wrappera;
 	}
-	void setDSPMTWrapperArray( void(*_wrapper)(void*,void*,SAMPLE**,SAMPLE*,SAMPLE,void*),
-                                   void(*_wrappera)(void*,void*,SAMPLE*,SAMPLE*,SAMPLE,void*))
+	void setDSPMTWrapperArray( void(*_wrapper)(void*,void*,float**,float*,float,void*),
+                                   void(*_wrappera)(void*,void*,float*,float*,float,void*))
 	{ 
 	    if(dsp_wrapper_array != 0 || dsp_wrapper_sum != 0 || dsp_wrapper != 0 || dsp_wrapper_sum_array != 0) return;
 	    dsp_wrapper_sum_array = _wrapper;
@@ -126,26 +126,16 @@ namespace extemp {
 	dsp_f_ptr_sum getDSPSUMWrapper() { return dsp_wrapper_sum; }
 	dsp_f_ptr_sum_array getDSPSUMWrapperArray() { return dsp_wrapper_sum_array; }
 
-        double* getDSPMTInBuffer() { return inbuf; }
-        double* getDSPMTOutBuffer() { return outbuf; }
+        SAMPLE* getDSPMTInBuffer() { return inbuf; }
+        SAMPLE* getDSPMTOutBuffer() { return outbuf; }
         float* getDSPMTInBufferArray() { return inbuf_f; }
         float* getDSPMTOutBufferArray() { return outbuf_f; }
         //void setDSPMTOutBuffer(double* ob) { outbuf = ob; }
         //void setDSPMTInBuffer(double* ib) { inbuf = ib; }
 
-#if defined (JACK_AUDIO)
-	jack_port_t** out_ports() { return output_ports; }
-	jack_port_t** in_ports() { return input_ports; }
-#elif defined (___ALSA_AUDIO___)
-	snd_pcm_t* get_pcm_handle() { return pcm_handle; }	
-	float* getBuffer() { return buffer; }
-#elif defined (COREAUDIO)
-
-#else  //  must be portaudio
         PaStream* getPaStream() { return stream; }
         static double getCPULoad();
         static void printDevices();       
-#endif
 
 	static double CLOCKBASE;
 	static double REALTIME;
@@ -154,17 +144,7 @@ namespace extemp {
 
     private:
 	bool started;
-#if defined (JACK_AUDIO)
-	jack_client_t *client;
-	jack_port_t** input_ports;
-	jack_port_t** output_ports;
-#elif defined (___ALSA_AUDIO___) // ALSA NOT CURRENTLY SUPPORTED
-	snd_pcm_t *pcm_handle;
-#elif defined (COREAUDIO) //TARGET_OS_MAC)
-	AudioDeviceID device;
-#else 
 	PaStream* stream;
-#endif
 	float* buffer;
 	void* dsp_closure;
         void* dsp_mt_closure[128];
@@ -172,8 +152,8 @@ namespace extemp {
         dsp_f_ptr_sum dsp_wrapper_sum;
 	dsp_f_ptr_array dsp_wrapper_array;
 	dsp_f_ptr_sum_array dsp_wrapper_sum_array;
-	double* outbuf;
-        double* inbuf;
+	SAMPLE* outbuf;
+        SAMPLE* inbuf;
 	float* outbuf_f;
         float* inbuf_f;
 	static AudioDevice SINGLETON;

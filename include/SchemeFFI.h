@@ -109,8 +109,10 @@ namespace extemp {
 	// misc stuff
 	static pointer dataGETi64(scheme* _sc, pointer args);
 	static pointer dataGETdouble(scheme* _sc, pointer args);	
+	static pointer dataGETfloat(scheme* _sc, pointer args);	
 	static pointer dataSETi64(scheme* _sc, pointer args);
 	static pointer dataSETdouble(scheme* _sc, pointer args);
+	static pointer dataSETfloat(scheme* _sc, pointer args);
 	static pointer cptrToString(scheme* _sc, pointer args);
 	static pointer stringToCptr(scheme* _sc, pointer args);
 	static pointer stringStrip(scheme* _sc, pointer args);

@@ -264,7 +264,7 @@
 
 (define impc:ti:parametric-poly-pass
   (lambda (ast)
-    ;(println 'impc:ti:parametric-poly-pass ast)
+    ;; (println 'impc:ti:parametric-poly-pass ast)
     (if (not (impc:ti:check-for-vtypes ast))
 	(eval ast (interaction-environment)) ;; if not generic func compile normally
 	(let* ((storeprint print) ;; set print to nothing but store original as storeprint
@@ -275,8 +275,8 @@
 			   ;(println 'fname: fname)
 			   (let ((val (call/cc (lambda (k)
 						 (set! print-error (lambda args
-								     ;(println "andrew world")
-								     ;(apply pprint-error args)
+                                                                     ;; (println "andrew world")
+								     ;;(apply pprint-error args)
 								     (k #f)))
 						 #t))))
 			     ;(println 'bingo: val 'fname: fname)
@@ -1585,7 +1585,7 @@
 
      ;; (if (regex:match? (symbol->string sym) "v4")
      ;; 	 (println 'sym sym 't: t))
-
+     
      ;; don't ever add oursevles (i.e. sym) as a type arg or NULL
      (if (or (null? t)
 	     (and (list? t)
@@ -1598,7 +1598,7 @@
 	       (if (and (not (assoc sym vars))
 			(not (llvm:get-function (symbol->string sym)))
 			(not (llvm:get-globalvar (symbol->string sym))))
-		   (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist)
+		   (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist 'updatevar)
 		   (let ((pair (assoc sym vars)))
 		     (if pair
 			 (let ((pair-rest (cdr pair)))
@@ -1627,13 +1627,13 @@
 ;; do allow force-var to overwrite kts values
 (define impc:ti:force-var
    (lambda (sym vars kts t)
-
-      (set! t (impc:ti:type-clean t))
+     (set! t (impc:ti:type-clean t))
 
       ;(if (equal? sym 'length) (begin (println '-> 'forcing 'length t))) ; (error)))     
       ;(if (equal? sym 'l) (println '-> 'forcing 'l t))     
       ;(println 'force-var:> sym 'in: vars 'with: t 'kts: kts)
       (if (and (not (assoc sym vars))
+               (not (llvm:get-function (symbol->string sym)))               
                (not (llvm:get-globalvar (symbol->string sym))))
           (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist)
           (let ((pair (assoc sym vars)))             
@@ -1649,7 +1649,6 @@
                  '())))))
 
 
-
 (define impc:ti:get-var
   (lambda (sym vars)
     (if (not (assoc sym vars))
@@ -1660,7 +1659,7 @@
                   (if (string? t)
                       (cons sym (impc:ir:pointer-- t))
                       (cons sym (- t *impc:ir:pointer*)))))
-            (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist))
+            (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist 'getvar))
         (assoc sym vars))))
 
 
@@ -1769,11 +1768,12 @@
 		   (impc:ti:update-var ast vars kts (list request?))
 		   request?)
 		 (let ((intersection (impc:ti:type-unify (list request? type) vars)))
-		   ;(println 'intersection intersection 'request? request? 'type: type)
+		   ;; (println 'intersection intersection 'request? request? 'type: type)
 		   (if (not (null? intersection))
-		       (begin ;; (println 'bing ast 'request? request? 'type: type 'intersection: intersection)
-			      ;; (println vars)
-			 (impc:ti:update-var ast vars kts (list intersection))
+		       (begin 
+                         ;; andrew change
+			 (impc:ti:force-var ast vars kts (list intersection))                         
+                         ;;(impc:ti:update-var ast vars kts (list intersection))
 			 (list intersection))
 		       type)))
 	     type))))
@@ -1782,40 +1782,49 @@
 
 (define impc:ti:math-check
   (lambda (ast vars kts request?)
-      (let* ((a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
-             (b (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars))
-	     (t (impc:ti:type-unify (list a b) vars)))
-         ;;(println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)
-         (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
-         (if (not (null? t))
-             (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
-                    (if (symbol? (caddr ast)) (impc:ti:force-var (caddr ast) vars kts t))
-		    (if (and (not (null? t)) ;; this here because math functions always return non-pointer vectors
-			     (impc:ir:vector? t) ;; we want to do this because these vectors are always stack allocated
-			     (impc:ir:pointer? t)) ;; also these vectors are immutable (i.e. cannot use vector-set!)
-			(impc:ir:pointer-- t)
-			t))
-             (cond ((impc:ir:vector? a)
-		    (if (symbol? (cadr ast)) (impc:ti:update-var (cadr ast) vars kts a))
-		    (if (impc:ir:pointer? a) (impc:ir:pointer-- a) a))
-		   ((impc:ir:vector? b)
-		    (if (symbol? (caddr ast)) (impc:ti:update-var (cadr ast) vars kts b))
-		    (if (impc:ir:pointer? b) (impc:ir:pointer-- b) b))
-	           ((not (cl:find-if symbol? (cdr ast))) t) ;; return t
-                   ((and (symbol? (cadr ast)) 
-                         (symbol? (caddr ast))                         
-                         (not (null? (cdr (impc:ti:get-var (cadr ast) vars))))
-                         (not (null? (cdr (impc:ti:get-var (caddr ast) vars)))))
-                    ;; if both are symbols and their types cannot unify on anything
-                    ;; then we have a problem!  So force both types to NULL
-                    (impc:ti:force-var (cadr ast) vars kts '())
-                    (impc:ti:force-var (caddr ast) vars kts '())
-                    t) ;; and return t (which should be NULL)                   
-                   ((and (symbol? (cadr ast)) (not (null? b)))
-                    (impc:ti:update-var (cadr ast) vars kts b) b) ;; return b
-                   ((and (symbol? (caddr ast)) (not (null? a)))
-                    (impc:ti:update-var (caddr ast) vars kts a) a) ;; return a
-                   (else t))))))
+    ;; if request is false
+    (if (not request?)
+        (begin (if (member (cadr ast) kts) (set! request? (cdr (assoc (cadr ast) vars))))
+               (if (member (caddr ast) kts) (set! request? (cdr (assoc (caddr ast) vars))))))    
+    ;; cleanup request!
+    (if (and (list? request?)
+             (= 1 (length request?)))
+        (set! request? (car request?)))
+    ;; now start type checking    
+    (let* ((a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
+           (b (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars))
+           (t (impc:ti:type-unify (list a b) vars)))
+      ;; (println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)
+      (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
+      (if (not (null? t))
+          (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
+                 (if (symbol? (caddr ast)) (impc:ti:force-var (caddr ast) vars kts t))
+                 (if (and (not (null? t)) ;; this here because math functions always return non-pointer vectors
+                          (impc:ir:vector? t) ;; we want to do this because these vectors are always stack allocated
+                          (impc:ir:pointer? t)) ;; also these vectors are immutable (i.e. cannot use vector-set!)
+                     (impc:ir:pointer-- t)
+                     t))
+          (cond ((impc:ir:vector? a)
+                 (if (symbol? (cadr ast)) (impc:ti:update-var (cadr ast) vars kts a))
+                 (if (impc:ir:pointer? a) (impc:ir:pointer-- a) a))
+                ((impc:ir:vector? b)
+                 (if (symbol? (caddr ast)) (impc:ti:update-var (cadr ast) vars kts b))
+                 (if (impc:ir:pointer? b) (impc:ir:pointer-- b) b))
+                ((not (cl:find-if symbol? (cdr ast))) t) ;; return t
+                ((and (symbol? (cadr ast)) 
+                      (symbol? (caddr ast))                         
+                      (not (null? (cdr (impc:ti:get-var (cadr ast) vars))))
+                      (not (null? (cdr (impc:ti:get-var (caddr ast) vars)))))
+                 ;; if both are symbols and their types cannot unify on anything
+                 ;; then we have a problem!  So force both types to NULL
+                 (impc:ti:force-var (cadr ast) vars kts '())
+                 (impc:ti:force-var (caddr ast) vars kts '())
+                 t) ;; and return t (which should be NULL)                   
+                ((and (symbol? (cadr ast)) (not (null? b)))
+                 (impc:ti:update-var (cadr ast) vars kts b) b) ;; return b
+                ((and (symbol? (caddr ast)) (not (null? a)))
+                 (impc:ti:update-var (caddr ast) vars kts a) a) ;; return a
+                (else t))))))
 				   
 
 (define impc:ti:compare-check
@@ -2459,8 +2468,8 @@
 ;; polymorphic version
 (define impc:ti:nativef-poly-check
    (lambda (ast vars kts request?)
-      ;; (println 'type-checking: (car ast))
-      ;(println 'poly-check 'ast: ast 'vars: vars 'request: request?)
+     ;; (println 'type-checking: (car ast))
+     ;; (println 'poly-check 'ast: ast 'vars: vars 'request: request?)     
       (let* ((polyf (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
  	     (ftypes (impc:ir:poly-types polyf))
 	     (valid-lgth (map (lambda (type)
@@ -2468,11 +2477,12 @@
 					(length ast)) #f #t))
 			      ftypes))
 	     (valid-args (map (lambda (type valid)
-				;(println 'type: type valid)
+				;; (println 'type: type valid)
 				(if valid
 				    (let* ((checked-types
 					    (map (lambda (a t)
-						   (let ((t2 (impc:ti:type-unify (impc:ti:type-check a vars kts t) vars)))
+                                                   ;; andrew's change here!
+						   (let ((t2 (impc:ti:type-unify (impc:ti:type-check a vars kts #f) vars)))
 						     ;; (println 'a: a 't: t 't2: t2)
 						     t2))
 						 (cdr ast)
@@ -2484,7 +2494,7 @@
 							   (if (and (string? ct) (string? ft))
 							       (if (string=? ct ft) #t #f)
 							       (if (list? ct)
-								   #f ;;(if (member ft ct) #t #f)
+								   (if (member ft ct) #t #f) ;; #f
 								   #f))))
 						     checked-types
 						     (cddr type))))
@@ -2498,33 +2508,48 @@
 					 (if valid type '()))
 				       ftypes
 				       valid-args))))
+        
+        ;; (println 'ftypes: ftypes)
 	;; (println 'va valid-args)
 	;; (println '-> ast 'valid-polys: valid-polys 'request: request?)
 
 	(if (null? valid-polys)
-	    (print-error 'Compiler 'Error: 'no 'valid 'polymorphic 'options 'for: ast 'vars: vars))
+            (set! valid-polys (list (car ftypes))))
+            ;; (set! valid-polys (list (car ftypes))))
+	    ;; (print-error 'Compiler 'Error: 'no 'valid 'polymorphic 'options 'for: ast 'vars: vars))
 	
 	;(println 'valid-polysa: valid-polys 'request? request? 'ast: ast)
 	(let ((returns (map (lambda (t)
 			      (cadr t))
 			    valid-polys)))
-	  ;(println 'returnsa: returns 'request? request?)
-	  (if request?
-	      ;; (begin (if (atom? request?)
-	      ;; 		 (set! request? (list request?)))
-	      (set! returns (impc:ti:intersection* returns (list request?))))
-	  
-	  ;; (println 'valid-polysa: valid-polys 'returns: returns 'request? request?)
 
+	  (if request?
+              (if (list? request?)
+                  (set! returns (impc:ti:intersection* returns request?))
+                  (set! returns (impc:ti:intersection* returns (list request?)))))
+	  
 	  (set! valid-polys (cl:remove #f
 			       (map (lambda (v)
 				      (if (member (cadr v) returns)
 					  v
 					  #f))
 				    valid-polys)))
+
+
+          ;; if we have a single valid poly
+          ;; then we can try type-checking against
+          ;; the correct function signature!
+          (if (= 1 (length valid-polys))
+              (map (lambda (a t)
+                     (let ((t2 (impc:ti:type-unify (impc:ti:type-check a vars kts t) vars)))
+                       ;; (println 'a: a 't: t 't2: t2)
+                       t2))
+                   (cdr ast)
+                   (cddr (car valid-polys))))
+          
+          ;; (println 'updatepoly: valid-polys 'ast: ast)               
 	  ;; update valid-polys to reflect return types (from request?)
 	  (impc:ti:update-var (car ast) vars kts valid-polys)
-	  
 	  ;(println 'returns: returns)
 	  returns))))
 
@@ -2730,7 +2755,9 @@
 
 (define impc:ti:bitconvert-check
   (lambda (ast vars kts request?)
-    ;; (println 'bitcastcheck'req: request?)
+    ;; don't pass on request because convert
+    ;; is by definition expecting a different arg to its return!
+    (impc:ti:type-check (cadr ast) vars kts #f) 
     (if (null? (cddr ast))
         (if request? (list request?) (list))
         ;; for the symbols we want to set each return type
@@ -3884,6 +3911,89 @@
                                                 (car res)))))
                   r)))))))
 
+
+
+;; run the type checker
+;; if we fail to unify completely the first time
+;; try some possible substitutions!
+(define impc:ti:run-type-check*
+  (lambda (vars forced-types ast . cnt)
+      ;; (println '------------------------------------)
+      ;; (println 'forced-types forced-types)
+      ;; (println 'vars: vars)
+      ;; (println 'run-type-check 'ast: ast)
+      ;(if (null? cnt) (sys:clear-log-view))
+      (let* ((fvars (map (lambda (t) ;; add any forced-type values to vars
+                            (if (assoc (car t) forced-types)
+                                (let ((tt (cdr (assoc (car t) forced-types))))
+                                   (cons (car t) (list tt)))
+                                t))
+                         vars))
+	     ;; (lll (println 'vars1: vars))
+             (kts (map (lambda (x) (car x)) forced-types)) ;; just need symbols from forced-types
+	     ;; fvars gets modified 'in place' during this next
+             ;; operation	     
+             (ret (impc:ti:type-check ast fvars kts #f))
+	     ;; (llllllll (println 'pre-unified-vars: fvars))
+             (u (impc:ti:unify fvars))
+	     ;; (lllll (println 'post-unified-vars: u))
+             (t (impc:ti:unity? u))
+	     ;(lllllll (println (println 'cccccc)))
+             (tt (cl:every (lambda (x) x) t))
+             (a (if tt #t
+                    (impc:ti:find-unresolved-simple-types u))))
+	 ;(println 'fvars: fvars) 	
+	 ;(println 'types: u) 
+        (if *impc:ti:print-unifications* (println 'tirun:> a '-> u))
+         ;; if we have unified types then return them through continuation        
+        (if (or tt
+                (and (not (null? cnt))
+                     (list? (car cnt))
+                     (member u (car cnt))))
+            (*type-check-continuation* u))
+        (cond ((and (not (null? cnt))
+                    (eq? #f (car cnt)))
+               u)
+              ((not a) ;; this run is for generics
+               (impc:ti:clear-all-vars fvars)
+               (let* ((ret (impc:ti:run-type-check* fvars 
+                                                    ;; kts for all solved types
+                                                    (cl:remove #f (map (lambda (k)
+                                                                         (if (impc:ir:type? (cdr k)) k #f))
+                                                                       u))
+                                                    ast (cons u (if (null? cnt) cnt (car cnt))))))
+                 ret))
+              (else ;; (println 'bingo2: a)               
+               (let ((res (map (lambda (x)   ;; call run-type-check for each version of a simple type
+                                 ;; first clear vars
+                                 (impc:ti:clear-all-vars fvars)				    
+                                 (impc:ti:run-type-check* fvars 
+                                                          ;; as well as all simple types which have resolved fully
+                                                          (append (cl:remove-if-not (lambda (z) (and (not (list? z))
+                                                                                                (pair? z))) u)
+                                                                  ;; and any simple types that unify on x
+                                                                  (cl:remove 'failed 
+                                                                             (map (lambda (k)
+                                                                                    (if (null? (cl:intersection (list x) (cdr k)))
+                                                                                        'failed
+                                                                                        (cons (car k) x)))
+                                                                                  (impc:ti:find-unresolved-simple-types u)))
+                                                                  forced-types)
+                                                          ast #f))
+                                                          ;; ast (cons u (if (null? cnt) cnt (car cnt)))))
+                               (cdr (car a)))))
+                 ;; then see what versions might be OK?
+                 (let ((r (cl:find-if (lambda (x) 
+                                        (cl:every (lambda (x) x) (impc:ti:unity? x)))
+                                      res)))
+                   (if (not r)  ;; if no options are any good then :(
+                       (apply print-error 'Compiler 'Error: 'could 'not 'resolve 'types:
+                              (map (lambda (x) (symbol->string (car x)))
+                                   (cl:remove-if (lambda (x)
+                                                   (impc:ir:type? (cdr x)))
+                                                 (car res)))))
+                   r)))))))
+
             
 ;;
 ;; 
@@ -4213,7 +4323,7 @@
 
 ;; adds make-closure and make-env tags
 (define impc:ti:closure:convert
-   (lambda (ast esyms)
+  (lambda (ast esyms)
       (cond ((pair? ast)
              (if (member (car ast) '(lambda lambdas lambdaz lambdah))
                  (let (;(env (impc:ti:block:check-for-free-syms ast esyms))
@@ -4427,14 +4537,14 @@
 	     ;(llllllllllll (println 'vars: vars))	     
 	     ;(ct6 (now))	     
              (forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
-	     ;(lllllllllllll (println 'forced-types: forced-types))
+	     ;; (lllllllllllll (println 'forced-types: forced-types))
 	     ;(ct7 (now))
 	     (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
 	     ;(ct8 (now))	     
 	     (t5 (impc:ti:coercion-run t3 forced-types)) ;; also there is doubling dipping here :(
 	     ;(ct9 (now))
              (typespre (impc:ti:run-type-check vars forced-types t4))
-	     ;(lllllll (println 'types-pre: typespre))
+	     ;; (lllllll (println 'types-pre: typespre))
 	     (types (impc:ti:type-normalize typespre))
 	     ;(lllllllll (println 'types-normal: types))
 	     ;(ct10 (now))
@@ -4462,6 +4572,10 @@
 						  x)))
 					types)))
 
+         ;; just added by andrew (can be safely removed)
+         (if (null? types)
+             (print-error 'Compiler 'Error: 'could 'note 'resolve (symbol->string symname)))
+
          ;; if we didn't unify print error and bomb out!	
          (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
 	     (begin 
@@ -4473,7 +4587,7 @@
 
 	 ;; if we have type checked ok then set addtypes to source and create new ast
 	 (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list)))
-
+         
          ;; if this function has been defined before make sure we aren't changing its signature!!
          (if (and (llvm:get-function (symbol->string symname))
                   (or (<> (length (llvm:get-function-args-withoutzone (symbol->string symname)))

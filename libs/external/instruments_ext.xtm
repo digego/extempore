@@ -41,17 +41,17 @@
 ;; ;; this reads 5000 frames starting 1000 frames into the file
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000)
 (bind-func set_sample_data_
-  (lambda (inst:[double,double,double,double*]* fname index:i64 offset lgth bank:i32 print:i32)
+  (lambda (inst:[SAMPLE,SAMPLE,SAMPLE,SAMPLE*]* fname index:i64 offset lgth bank:i32 print:i32)
     (let ((info:sf_info* (salloc))
           (audiofile (sf_open fname 16 info))
-          (channels (i32toi64 (tref info 2)))
+          (channels:i64 (convert (tref info 2)))
           (num (if (= 0 lgth)
                    (- (tref info 0) offset)
                    lgth)))
       (if (<> null audiofile)
-          (let ((adat:double* (halloc (* num channels)))
-                (samples:|20,|128,double*||* (inst.samples))
-                (samples_channels:|20,|128,i64||* (inst.samples_channels))
+          (let ((adat:SAMPLE* (halloc (* num channels)))
+                (samples:|20,|128,SAMPLE*||* (inst.samples))
+                (samples_channels:|20,|128,i32||* (inst.samples_channels))
                 (samples_length:|20,|128,i64||* (inst.samples_length))
                 (samples_read (read_audio_data fname adat (* offset channels) num print))
                 (olddat (if (<> 0 (pref (aref-ptr samples_length bank) index))
@@ -59,7 +59,7 @@
                             null)))
             ;;(printf "%lld samples read into: %lld\n" samples_read index)
             (aset! (aref-ptr samples_length bank) index (/ samples_read channels)) ;num)
-            (aset! (aref-ptr samples_channels bank) index channels)
+            (aset! (aref-ptr samples_channels bank) index (convert channels))
             (aset! (aref-ptr samples bank) index adat)
             (sf_close audiofile)
             (if (not (null? olddat)) (free olddat))            
@@ -70,9 +70,9 @@
             0)))))
 
 (bind-func clear_sample_data_
-  (lambda (inst:[double,double,double,double*]* index:i64 bank:i32)
-    (let ((samples:|20,|128,double*||* (inst.samples))
-          (samples_channels:|20,|128,i64||* (inst.samples_channels))
+  (lambda (inst:[SAMPLE,SAMPLE,SAMPLE,SAMPLE*]* index:i64 bank:i32)
+    (let ((samples:|20,|128,SAMPLE*||* (inst.samples))
+          (samples_channels:|20,|128,i32||* (inst.samples_channels))
           (samples_length:|20,|128,i64||* (inst.samples_length))          
           (olddat (if (<> 0 (pref (aref-ptr samples_length bank) index))
                       (bitcast (pref (aref-ptr samples bank) index) i8*)
@@ -104,7 +104,7 @@
 ;; helper functions for setting an individual samples offset
 ;; i.e. set sample index 60 to start at 40000 samples into the audio buffer
 (bind-func set_sample_offset_
-  (lambda (sampler:[double,double,double,double*]* index:i64 offset:i64)
+  (lambda (sampler:[SAMPLE,SAMPLE,SAMPLE,SAMPLE*]* index:i64 offset:i64)
     (let ((offsets:|128,i64|* (sampler.samples_offsets)))
       (pset! offsets index offset)
       1)))
@@ -123,17 +123,17 @@
 ;;
 ;; faster but noisy
 (bind-func sampler_note_linear_c
-  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index pan:double offset:i64)
-    (let ((idx_freq (midi2frq (i64tod index)))
-          (phase (i64tod (+ offset (pref samples_offsets index))))) ;; phase unit is audio frames
-      (lambda (time:double chan:double freq:double amp:double)
+  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index pan:SAMPLE offset:i64)
+    (let ((idx_freq:SAMPLE (midi2frq (convert index)))
+          (phase:SAMPLE (convert (+ offset (pref samples_offsets index))))) ;; phase unit is audio frames
+      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
         (let ((rate (/ freq idx_freq))
-              (pos (if (< chan 1.0) ;; only increment once per frame
-                       (set! phase (+ phase rate))
-                       phase))
-              (posi (dtoi64 (floor pos)))
-              (posx (+ (* posi 2) (dtoi64 chan)))
-              (lgth (- (pref samples_length index) 10))
+              (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
+                              (set! phase (+ phase rate))
+                              phase))
+              (posi:i32 (convert (floor pos))) 
+              (posx (+ (* posi 2) chan))
+              (lgth:i32 (convert (- (pref samples_length index) 10)))
               (dat (pref samples index)))
           (* amp (if (> posi lgth) 0.0 (pref dat posx))))))))
 
@@ -142,18 +142,18 @@
 ;;
 ;; slower but less noisy (default)
 (bind-func sampler_note_hermite_c
-  (lambda (samples:|128,double*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index pan:double offset:double)
-    (let ((idx_freq (midi2frq (i64tod index)))
-          (channels (pref samples_channels index))
-          (phase (+ offset (i64tod (pref samples_offsets index))))) ;; phase unit is audio frames
-      (lambda (time:double chan:double freq:double amp:double)
+  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i32|* index pan:SAMPLE offset:SAMPLE)
+    (let ((idx_freq (midi2frq (convert index)))
+          (channels:i64 (convert (pref samples_channels index)))
+          (phase (+ offset (convert (pref samples_offsets index))))) ;; phase unit is audio frames
+      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
         (let ((rate (/ freq idx_freq))              
-              (pos (if (< chan 1.0) ;; only increment once per frame
+              (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
                        (set! phase (+ phase rate))
                        phase))
-              (posi (dtoi64 (floor pos)))
-              (posx (+ (* posi channels) (if (< (dtoi64 chan) channels) (dtoi64 chan) 0)))
-              (lgth (- (pref samples_length index) 10))
+              (posi:i64 (convert (floor pos)))
+              (posx (+ (* posi channels) (if (< (i32toi64 chan) channels) (i32toi64 chan) 0)))
+              (lgth:i64 (- (pref samples_length index) 10))
               (dat (pref samples index)))
           (if (< (fabs (- rate 1.0)) 0.01)
               (if (> posi lgth) 0.0 (* amp (panner chan pan) (pref dat posx)))
@@ -172,11 +172,11 @@
         (pan_ pan)
         (wet .1)
         (fb .5))
-    (lambda (in:double time:double chan:double dat:double*)
+    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
-      (if (< chan 1.0)
+      (if (= chan 0)
           (reverbl (* 1.5 (* pan_ in)) wet fb)
           (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
@@ -187,11 +187,11 @@
         (pan_ pan)
         (wet .1)
         (fb .5))
-    (lambda (in:double time:double chan:double dat:double*)
+    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
-      (if (< chan 1.0)
+      (if (= chan 0)
           (reverbl (* 1.5 (* pan_ in)) wet fb)
           (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
@@ -202,11 +202,11 @@
         (pan_ pan)
         (wet .1)
         (fb .5))
-    (lambda (in:double time:double chan:double dat:double*)
+    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
-      (if (< chan 1.0)
+      (if (= chan 0)
           (reverbl (* 1.5 (* pan_ in)) wet fb)
           (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
@@ -217,11 +217,11 @@
         (pan_ pan)
         (wet .1)
         (fb .5))
-    (lambda (in:double time:double chan:double dat:double*)
+    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
-      (if (< chan 1.0)
+      (if (= chan 0)
           (reverbl (* 1.5 (* pan_ in)) wet fb)
           (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
@@ -229,23 +229,23 @@
 (define-macro (define-sampler name note_kernel effect_kernel)
   `(bind-func ,name 100000
      (let ((poly:i64 48)
-           (samples:|20,|128,double*||* (zalloc)) ;; 128 samples * 20 'banks'
+           (samples:|20,|128,SAMPLE*||* (zalloc)) ;; 128 samples * 20 'banks'
            (samples_length:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
-           (samples_channels:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
+           (samples_channels:|20,|128,i32||* (zalloc)) ;; 128 samples * 10
            (samples_offsets:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
-           (notes:[double,double,double,double]** (zalloc poly))
-           (attack:double 200.0)
-           (decay:double 200.0)
-           (release:double 1000.0)
-           (sustain:double 1.0) ;; amplitude of the sustain
-           (gain:double 2.0)
+           (notes:[SAMPLE,SAMPLE,SAMPLE,i32]** (zalloc poly))
+           (attack:SAMPLE 200.0)
+           (decay:SAMPLE 200.0)
+           (release:SAMPLE 1000.0)
+           (sustain:SAMPLE 1.0) ;; amplitude of the sustain
+           (gain:SAMPLE 2.0)
            (kk:i64 0) (ii:i64 0)
            ;;(active:i64 0)
-           (note_starts:double* (zalloc poly))
-           (new_note (lambda (start freq dur amp nargs:i64 dargs:double*)
+           (note_starts:SAMPLE* (zalloc poly))
+           (new_note (lambda (start freq dur amp nargs:i64 dargs:SAMPLE*)
                        (let ((free_note:i64 -1)
-                             (bank:i32 (if (< nargs 1) (i64toi32 0) (dtoi32 (pref dargs 0))))
-                             (idx (dtoi64 (floor (frq2midi freq))))
+                             (bank:i32 (if (< nargs 1) (i64toi32 0) (convert (pref dargs 0))))
+                             (idx:i64 (convert (floor (frq2midi freq))))
                              (closest 1000000)
                              (i:i64 0) (iii:i64 0) (idxi:i64 0)
                              (new_idx idx))
@@ -283,8 +283,8 @@
            (aset! (aref-ptr samples_length ii) kk 0)))
        (dotimes (ii poly) ;; sets all notes to inactive
          (pset! note_starts ii 9999999999999.0))
-       (lambda (in:double time:double chan:double dat:double*)
-         (let ((out:double 0.0)
+       (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+         (let ((out:SAMPLE 0.0)
                (k:i64 0))
            (dotimes (k poly) ;; sum all active notesx
              (if (< (pref note_starts k) time)

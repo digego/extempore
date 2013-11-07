@@ -13,29 +13,6 @@
 ;; lib-loading config
 (sys:load-preload-check 'sndfile)
 
-;; bind some global audio values
-(if (not (llvm:get-globalvar "SAMPLERATE"))
-    (begin (bind-val SAMPLERATE double (integer->real *au:samplerate*))
-           (bind-val SR double (integer->real *au:samplerate*))))
-(if (not (llvm:get-globalvar "CHANNELS"))
-    (bind-val CHANNELS i64 *au:channels*))
-(if (not (llvm:get-globalvar "IN_CHANNELS"))
-    (bind-val IN_CHANNELS i64 *au:in-channels*))
-(if (not (llvm:get-globalvar "FRAMES"))
-    (bind-val FRAMES i64 *au:block-size*))
-
-(bind-alias DSP [double,double,double,double,double*]*)
-(bind-alias DSPMT [double,double*,double,double,double*]*)
-
-(bind-func print_audio_state
-  (lambda ()
-    (printf "    FRAMES: %lld\n" FRAMES)
-    (printf " OUT CHANS: %lld\n" CHANNELS)
-    (printf "  IN CHANS: %lld\n" IN_CHANNELS)
-    (printf "SAMPLERATE: %f\n" SAMPLERATE)))
-
-(print_audio_state)
-
 ;; load the libsndfile dynamic library
 (define libsndfile
   (let ((platform (sys:platform)))
@@ -49,6 +26,8 @@
     (sys:load-escape "Error loading libsndfile dynamic library"))
 
 (define *xtmlib-sndfile-loaded* #t)
+
+(sys:load "libs/core/audio_dsp.xtm")
 
 (bind-val SF_LOOP_NONE i32 800)
 (bind-val SF_LOOP_FORWARD i32 801)
@@ -79,8 +58,15 @@
 (bind-lib libsndfile sf_write_sync [void,i8*]*)
 (bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
 (bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_read_float [i64,i8*,float*,i64]*)
+(bind-lib libsndfile sf_write_float [i64,i8*,float*,i64]*)
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
 (bind-lib libsndfile sf_command [i32,i8*,i32,i8*,i32]*)
+
+(bind-poly sf_read sf_read_double)
+(bind-poly sf_read sf_read_float)
+(bind-poly sf_write sf_write_double)
+(bind-poly sf_write sf_write_float)
 
 ;; struct accessors
 
@@ -146,14 +132,14 @@
 ;; if dat is set to null then 
 ;; read_audio_data will return number of frames*channels
 (bind-func read_audio_data
-  (lambda (fname dat offset num print:i32)
+  (lambda (fname dat:SAMPLE* offset num print:i32)
     (let ((info:sf_info* (salloc))
 	  (audiofile (sf_open fname 16 info))
 	  (channels (i32toi64 (tref info 2)))
 	  (num_to_read (* num channels))
 	  (num_to_offset (* offset channels))
 	  (cnt (sf_seek audiofile num_to_offset 0))
-	  (samples_read (sf_read_double audiofile dat num_to_read)))
+	  (samples_read (sf_read audiofile dat num_to_read)))
       (if (<> null audiofile)
           (begin
             (if (> print 0)
@@ -178,11 +164,11 @@
           (audio_file (sf_open fname 16 info))
 	  (channels (sf_channels info))
           (buffer_len (* channels (sf_frames info)))
-	  (audio_dat (zalloc buffer_len))
+	  (audio_dat:SAMPLE* (zalloc buffer_len))
 	  (num_to_read (if (= 0 num) buffer_len (* num channels)))
 	  (num_to_offset (* offset channels))
 	  (cnt (sf_seek audio_file num_to_offset 0))
-	  (samples_read (sf_read_double audio_file audio_dat num_to_read))
+	  (samples_read (sf_read audio_file audio_dat num_to_read))
           (playhead 0))
       (if (<> null audio_file)
           (begin
@@ -208,11 +194,11 @@
           (audio_file (sf_open fname 16 info))
 	  (channels (sf_channels info))
           (buffer_len (* channels (sf_frames info)))
-	  (audio_dat (zalloc buffer_len))
+	  (audio_dat:SAMPLE* (zalloc buffer_len))
 	  (num_to_read (if (= 0 num) buffer_len (* num channels)))
 	  (num_to_offset (* offset channels))
 	  (cnt (sf_seek audio_file num_to_offset 0))
-	  (samples_read (sf_read_double audio_file audio_dat num_to_read))
+	  (samples_read (sf_read audio_file audio_dat num_to_read))
           (playhead 0))
       (if (<> null audio_file)
           (begin
@@ -233,16 +219,16 @@
 
 ;; write out an audio buffer
 (bind-func write_audio_data
-  (lambda (fname frames channels:i32 dat)
+  (lambda (fname frames channels:i32 dat:SAMPLE*)
     (let ((info:sf_info* (zalloc)))
       (tset! info 0 frames)
-      (tset! info 1 (dtoi32 SAMPLERATE))
+      (tset! info 1 (convert SAMPLERATE))
       (tset! info 2 channels)
       (tset! info 3 (+ 131072 2)) ;; + 6 for 32 bit float (+ 2 for 16 bit signed)
       (let ((audiofile (sf_open fname 32 info))
-	    (samples_written (sf_write_double audiofile
-                                              dat
-                                              (* (i32toi64 channels) frames))))
+	    (samples_written (sf_write audiofile
+                                       dat
+                                       (* (i32toi64 channels) frames))))
 	(if (null? audiofile)
 	    (printf "error writing file: %s\n" (sf_strerror audiofile)))
 	(sf_write_sync audiofile)

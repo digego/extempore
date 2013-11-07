@@ -1557,8 +1557,46 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("mutex_trylock"));
 	    EE->updateGlobalMapping(gv,(void*)&mutex_trylock);
 
-            // gv = M->getNamedValue(std::string("cosd"));
-            // EE->updateGlobalMapping(gv,(void*)&cos);
+            gv = M->getNamedValue(std::string("cosd"));
+            EE->updateGlobalMapping(gv,(void*)&cos);
+            gv = M->getNamedValue(std::string("tand"));
+            EE->updateGlobalMapping(gv,(void*)&tan);
+            gv = M->getNamedValue(std::string("sind"));
+            EE->updateGlobalMapping(gv,(void*)&sin);
+            gv = M->getNamedValue(std::string("coshd"));
+            EE->updateGlobalMapping(gv,(void*)&cosh);
+            gv = M->getNamedValue(std::string("tanhd"));
+            EE->updateGlobalMapping(gv,(void*)&tanh);
+            gv = M->getNamedValue(std::string("sinhd"));
+            EE->updateGlobalMapping(gv,(void*)&sinh);
+            gv = M->getNamedValue(std::string("acosd"));
+            EE->updateGlobalMapping(gv,(void*)&acos);
+            gv = M->getNamedValue(std::string("asind"));
+            EE->updateGlobalMapping(gv,(void*)&asin);
+            gv = M->getNamedValue(std::string("atand"));
+            EE->updateGlobalMapping(gv,(void*)&atan);
+            gv = M->getNamedValue(std::string("atan2d"));
+            EE->updateGlobalMapping(gv,(void*)&atan2);
+            gv = M->getNamedValue(std::string("ceild"));
+            EE->updateGlobalMapping(gv,(void*)&ceil);
+            gv = M->getNamedValue(std::string("floord"));
+            EE->updateGlobalMapping(gv,(void*)&floor);
+            gv = M->getNamedValue(std::string("expd"));
+            EE->updateGlobalMapping(gv,(void*)&exp);
+            gv = M->getNamedValue(std::string("fmodd"));
+            EE->updateGlobalMapping(gv,(void*)&fmod);
+            gv = M->getNamedValue(std::string("powd"));
+            EE->updateGlobalMapping(gv,(void*)&pow);
+            gv = M->getNamedValue(std::string("logd"));
+            EE->updateGlobalMapping(gv,(void*)&log);
+            gv = M->getNamedValue(std::string("log2d"));
+            EE->updateGlobalMapping(gv,(void*)&log2);
+            gv = M->getNamedValue(std::string("log10d"));
+            EE->updateGlobalMapping(gv,(void*)&log10);
+            gv = M->getNamedValue(std::string("sqrtd"));
+            EE->updateGlobalMapping(gv,(void*)&sqrt);
+            gv = M->getNamedValue(std::string("fabsd"));
+            EE->updateGlobalMapping(gv,(void*)&fabs);
             
 	}	
 	return;

@@ -464,8 +464,10 @@ namespace extemp {
 	    // misc stuff
 	    { "cptr:get-i64",            &SchemeFFI::dataGETi64 },
 	    { "cptr:get-double",            &SchemeFFI::dataGETdouble },
+	    { "cptr:get-float",            &SchemeFFI::dataGETfloat },
 	    { "cptr:set-i64",            &SchemeFFI::dataSETi64 },
 	    { "cptr:set-double",            &SchemeFFI::dataSETdouble },
+	    { "cptr:set-float",            &SchemeFFI::dataSETfloat },
 	    { "cptr->string",            &SchemeFFI::cptrToString },
 	    { "cptr:get-string",            &SchemeFFI::cptrToString },
 	    { "string->cptr",            &SchemeFFI::stringToCptr },
@@ -629,6 +631,14 @@ namespace extemp {
 	return mk_real(_sc,ptr[0]);
     }
 
+    pointer SchemeFFI::dataGETfloat(scheme* _sc, pointer args)
+    {       
+        char* cptr = (char*) cptr_value(pair_car(args));
+	int64_t offset = ivalue(pair_cadr(args));
+	float* ptr = (float*) (cptr+offset); 
+	return mk_real(_sc,ptr[0]);
+    }
+
     pointer SchemeFFI::dataSETi64(scheme* _sc, pointer args)
     {       
         char* cptr = (char*) cptr_value(pair_car(args));
@@ -644,6 +654,15 @@ namespace extemp {
 	int64_t offset = ivalue(pair_cadr(args));
 	double* ptr = (double*) (cptr+offset);
 	ptr[0] = (double) rvalue(pair_caddr(args));
+	return _sc->T;
+    }
+
+    pointer SchemeFFI::dataSETfloat(scheme* _sc, pointer args)
+    {       
+        char* cptr = (char*) cptr_value(pair_car(args));
+	int64_t offset = ivalue(pair_cadr(args));
+	float* ptr = (float*) (cptr+offset);
+	ptr[0] = (float) rvalue(pair_caddr(args));
 	return _sc->T;
     }
 
