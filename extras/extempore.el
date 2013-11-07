@@ -1549,7 +1549,8 @@ You shouldn't have to modify this list directly, use
           (extempore-logger-new-logfile)))
   (call-interactively 'extempore-logger-add-comment)
   (extempore-logger-advise-functions extempore-logger-special-functions)
-  (extempore-logger-start-idle-write-timer))
+  ;; (extempore-logger-start-idle-write-timer)
+  )
 
 (defun extempore-logger-stop-logging ()
   (remove-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
@@ -1557,7 +1558,8 @@ You shouldn't have to modify this list directly, use
   (extempore-logger-finish-logfile)
   (setq extempore-logger-logfile nil)
   (extempore-logger-unadvise-functions extempore-logger-special-functions)
-  (extempore-logger-stop-idle-write-timer))
+  ;; (extempore-logger-stop-idle-write-timer)
+  )
 
 (defun extempore-logger-new-session ()
   (interactive)
