@@ -861,7 +861,7 @@ double imp_randd()
 #endif
 }
 
-double imp_randf()
+float imp_randf()
 {
 #ifdef EXT_BOOST
   return extemp::UNIV::random();

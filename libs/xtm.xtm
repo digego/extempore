@@ -325,12 +325,16 @@
 (define *xtmlib-audio-inst-ext-loaded* #f)
 (print "Loading audio library...       ")
 
-(bind-alias DSP [double,double,double,double,double*]*)
-(bind-alias DSPMT [double,double*,double,double,double*]*)
+(bind-alias DSP [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*)
+(bind-alias DSPMT [SAMPLE,SAMPLE*,i64,i64,SAMPLE*]*)
+
+(bind-val SPI SAMPLE 3.1415926535897932384626433832795028841971693993751058209749)
+(bind-val STWOPI SAMPLE 6.2831853071795864769252867665590057683943387987502116419498)
+(bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669)
 
 ;; bind vals in library
-(bind-lib-val stdlib SAMPLERATE double)
-(bind-lib-val stdlib SR double)
+(bind-lib-val stdlib SAMPLERATE SAMPLE)
+(bind-lib-val stdlib SR SAMPLE)
 (bind-lib-val stdlib CHANNELS i64)
 (bind-lib-val stdlib IN_CHANNELS i64)
 (bind-lib-val stdlib FRAMES i64)
@@ -350,7 +354,7 @@
 ;;
 ;; CHANGE AUDIO VARIABLES TO REFLECT CURRENT STATE 
 (bind-func setup_audio_vals
-  (lambda (a:double b:i64 c:i64 d:i64)
+  (lambda (a:SAMPLE b:i64 c:i64 d:i64)
     (set! SVF_LOWPASS 1)
     (set! SVF_HIGHPASS 2)
     (set! SVF_BANDPASS 3)
@@ -402,7 +406,14 @@
 (bind-lib libsndfile sf_write_sync [void,i8*]*)
 (bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
 (bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_read_float [i64,i8*,float*,i64]*)
+(bind-lib libsndfile sf_write_float [i64,i8*,float*,i64]*)
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
+
+(bind-poly sf_read sf_read_double)
+(bind-poly sf_read sf_read_float)
+(bind-poly sf_write sf_write_double)
+(bind-poly sf_write sf_write_float)
 
 (define *xtmlib-sndfile-loaded* #t)
 
@@ -480,7 +491,7 @@
 (bind-lib-func stdlib vcf_c [[double,double,double,double]*,i64]*)
 (bind-lib-func stdlib vcf3_c [[double,double,double,double]*,i64]*)
 (bind-lib-func stdlib vcf_mc_c [[double,double,double,double,double]*,i64,i64]*)
-(bind-lib-func stdlib min2d [double,double,double]*)
+(bind-lib-func stdlib min2 [double,double,double]*)
 (bind-lib-func stdlib svf_c [[double,double,double,double]*,i64]*)
 (bind-lib-func stdlib overdrive_c [[double,double]*,double]*)
 (bind-lib-func stdlib saturation_c [[double,double,double,double]*]*)

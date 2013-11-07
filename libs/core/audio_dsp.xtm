@@ -47,8 +47,8 @@
 (if (not (llvm:get-globalvar "FRAMES"))
     (bind-val FRAMES i64 *au:block-size*))
 
-(bind-alias DSP [SAMPLE,SAMPLE,SAMPLE,i32,SAMPLE*]*)
-(bind-alias DSPMT [SAMPLE,SAMPLE*,SAMPLE,i32,SAMPLE*]*)
+(bind-alias DSP [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*)
+(bind-alias DSPMT [SAMPLE,SAMPLE*,i64,i64,SAMPLE*]*)
 
 (bind-func print_audio_state
   (lambda ()
@@ -80,18 +80,19 @@
 ;; 6.0 = steeper curve etc..
 ;;
 ;; time 0.0 -> width
-(bind-func gain
-  (lambda (time:SAMPLE width power:SAMPLE)
+(bind-func gain:[SAMPLE,i64,i64,SAMPLE]*
+  (lambda (time width power)
     (let ((amp 1.0)
-          (p:SAMPLE power)
-          (t (/ time width)))
+          (p:double (convert power))
+          (t (/ (i64tod time) (i64tod width))))
       (if (< p 0.0)
           (begin (set! p (fabs p))
                  (set! t (- 1.0 t))))
       (let ((out (* amp (/ (- (pow p t) 1.0) (- p 1.0)))))
-        (if (> out amp) amp
-            (if (< out 0.0) 0.0
-                out))))))
+        (convert
+         (if (> out amp) amp
+             (if (< out 0.0) 0.0
+                 out)))))))
 
 
 ;; given current channel
@@ -99,7 +100,7 @@
 ;; returns value betwee n [0.0-1.0]
 ;; uses CHANNELS
 (bind-func panner
-  (lambda (chan:i32 pan)
+  (lambda (chan:i64 pan)
     (let ((cn1:SAMPLE (convert (- CHANNELS 1))))
       (- 1.0 (/ (fabs (- (* pan cn1) (convert chan))) cn1)))))
 
@@ -115,17 +116,18 @@
 ;; 4.0 - repeat after four cycles etc..
 ;;
 (bind-func hann
-  (lambda (time:SAMPLE width:SAMPLE repeat:SAMPLE)
+  (lambda (time:i64 width:i64 repeat:i64)
     (if (> (% time (* width repeat)) width) 0.0
         (* 0.5
            (- 1.0
-              (cos (* STWOPI (/ time width))))))))
+              (cos (* STWOPI (/ (convert time)
+                                (convert width)))))))))
 
 ;; time in samples (starting from 0)
 ;; apex (in samples) is after how many samples we hit 1.0 before decaying
 (bind-func impulse
-  (lambda (time:SAMPLE apex:SAMPLE)
-    (let ((h (* time apex)))
+  (lambda (time:i64 apex:i64)
+    (let ((h:SAMPLE (convert (* time apex))))
       (* h (exp (- 1.0 h))))))
 
 
@@ -187,7 +189,7 @@
       (lambda (phase)
 	(let ((mem 0.0)
 	      (osc (osc_c phase)))
-	  (lambda (chan:i32 amp freq)
+	  (lambda (chan:i64 amp freq)
 	    (if (< chan 1.0) (set! mem (osc amp freq)))
 	    mem)))))
 
@@ -283,7 +285,7 @@
       (lambda (phase)
 	(let ((mem 0.0)
 	      (saw (saw_c phase)))
-	  (lambda (chan:i32 amp freq)
+	  (lambda (chan:i64 amp freq)
 	    (if (< chan 1.0) (set! mem (saw amp freq)))
 	    mem)))))
 
@@ -390,7 +392,7 @@
 	(let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! dlines i (delay_c max_delay)))
-	  (lambda (chan:i32 x wet feedback)
+	  (lambda (chan:i64 x wet feedback)
 	    ((pref dlines chan) x wet feedback))))))
 
 (if *build-multi-chan*
@@ -400,7 +402,7 @@
 	      (i:i64 0))
 	  (pset! dlines 0 (delay_c d1))
 	  (pset! dlines 1 (delay_c d2))
-	  (lambda (chan:i32 x wet feedback)
+	  (lambda (chan:i64 x wet feedback)
 	    ((pref dlines chan) x wet feedback))))))
 
 ;; iir comb without interpolation
@@ -409,13 +411,13 @@
 ;;
 ;; offset is for metro 'get-mark offset
 (bind-func delay_t_c 
-  (lambda (max_delay offset:SAMPLE)
+  (lambda (max_delay offset:i64)
     (let ((delay max_delay)
           (line:SAMPLE* (zalloc delay))
 	  ;; (time 0)
           (n 0)
           (y 0.0))
-      (lambda (x:SAMPLE time:SAMPLE wet:SAMPLE feedback:SAMPLE)
+      (lambda (x:SAMPLE time:i64 wet:SAMPLE feedback:SAMPLE)
         (set! n (modulo (convert (- time offset)) delay))
         (set! y (pref line n))
         ;;(set! time (+ time 1))
@@ -425,58 +427,29 @@
 
 (if *build-multi-chan*
     (bind-func delay_t_mc_c
-      (lambda (channels:i64 max_delay offset)
-	(let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
+      (lambda (channels:i64 max_delay:i64 offset:i64)
+	(let ((dlines:[SAMPLE,SAMPLE,i64,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! dlines i (delay_t_c max_delay offset)))
-	  (lambda (chan:i32 x time:SAMPLE wet:SAMPLE feedback)
+	  (lambda (chan:i64 x time:i64 wet:SAMPLE feedback)
 	    ((pref dlines chan) x time wet feedback))))))
 
 (if *build-multi-chan*
     (bind-func delay_t_st_c
       (lambda (d1 d2 offset)
-	(let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc 2))
+	(let ((dlines:[SAMPLE,SAMPLE,i64,SAMPLE,SAMPLE]** (alloc 2))
 	      (i:i64 0))
 	  (pset! dlines 0 (delay_t_c d1 offset))
 	  (pset! dlines 1 (delay_t_c d2 offset))
-	  (lambda (chan:i32 x time wet feedback)
+	  (lambda (chan:i64 x time wet feedback)
 	    ((pref dlines chan) x time wet feedback))))))
 
 
-;; iir comb with interpolation
-(bind-func comb_old_c
-  (lambda (max_delay)
-    (let ((line:double* (zalloc max_delay))
-	  (in_head 0)
-	  (out_head 0)
-	  (delay_ (i64tod max_delay))
-	  ;;(delay (i64tod max_delay))
-	  (alpha 0.0)
-	  (om_alpha 1.0)
-	  (in 1.0)
-	  (i 0)
-	  (out 0.5))
-      (dotimes (i max_delay) (pset! line i 0.0))
-      (lambda (x:double delay:double)
-	(if (<> delay delay_)
-	    (begin (set! delay_ delay)		 
-		   (set! alpha (- delay (floor delay)))
-		   (set! om_alpha (- 1.0 alpha))
-		   (set! out_head (- (+ max_delay in_head)
-				     (dtoi64 delay)))))
-	(let* ((ih:i64 (modulo in_head max_delay))
-	       (oh:i64 (modulo out_head max_delay))
-	       (delayed1 (pref line oh))
-	       (delayed2 (pref line (modulo (+ oh 1) max_delay)))
-	       (delayed (+ (* alpha delayed1) (* om_alpha delayed2))) 
-	       (y (+ (* in x) (* out delayed))))
-	  (pset! line ih y)
-	  (set! in_head (+ ih 1))
-	  (set! out_head (+ oh 1))
-	  y)))))
 
 
 ;; iir comb with interpolation
+;; delay for COMB needs to stay
+;; as a fractional argument (i.e. float)
 (bind-func comb_c
   (lambda (max_delay:i64)    
     (let ((maxdelay max_delay)
@@ -517,7 +490,7 @@
 	(let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! dlines i (comb_c max_delay)))
-	  (lambda (chan:i32 x delay wet feedback)
+	  (lambda (chan:i64 x delay wet feedback)
 	    (let ((f (pref dlines chan)))
 	      (f x delay wet feedback)))))))
 
@@ -537,7 +510,7 @@
 	(let ((comb (comb_mc_c channels (convert (+ delay mod_range))))
 	      (mod (osc_mc_c mod_phase))
 	      (i:i64 0))
-	  (lambda (chan:i32 x wet feedback)
+	  (lambda (chan:i64 x wet feedback)
 	    (comb chan x (+ delay (mod chan mod_range mod_rate)) wet feedback))))))
 
 ;; chorus
@@ -572,7 +545,7 @@
 	(let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! dlines i (chorus_c phase)))
-	  (lambda (chan:i32 x wet fb)
+	  (lambda (chan:i64 x wet fb)
 	    (let ((f (pref dlines chan)))
 	      (f x wet fb)))))))
 
@@ -640,7 +613,7 @@
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (allpass_c delay)))
-	  (lambda (chan:i32 x wet)
+	  (lambda (chan:i64 x wet)
 	    (let ((f (pref lines chan)))
 	      (f x wet)))))))
 
@@ -716,7 +689,7 @@
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (reverb_c size)))
-	  (lambda (chan:i32 x wet fb)
+	  (lambda (chan:i64 x wet fb)
 	    (let ((f (pref lines chan)))
 	      (f x wet fb)))))))
 
@@ -740,7 +713,7 @@
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (reverb2_c size)))
-	  (lambda (chan:i32 x wet)
+	  (lambda (chan:i64 x wet)
 	    (let ((f (pref lines chan)))
 	      (f x wet)))))))
 
@@ -773,7 +746,7 @@
 	(let ((holds:[SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! holds i (hold3_c)))
-	  (lambda (chan:i32 x h)
+	  (lambda (chan:i64 x h)
 	    (let ((f (pref holds chan)))
 	      (f x h)))))))
 
@@ -796,7 +769,7 @@
 ;; pan value [0.0-1.0]
 (bind-func pan2
   (let ((out:SAMPLE 0.0))
-    (lambda (x:SAMPLE chan:i32 pan)
+    (lambda (x:SAMPLE chan:i64 pan)
       (if (= chan 0)
           (begin (set! out x) (* (- 1.0 pan) out))
           (* pan out)))))
@@ -808,7 +781,7 @@
       (lambda (channels)
         (let ((v:SAMPLE 0.0)
               (out:SAMPLE 0.0))
-          (lambda (x:SAMPLE chan:i32 pan)
+          (lambda (x:SAMPLE chan:i64 pan)
             (if (= chan 0) (set! out x))
             (set! v (fabs (- (* (- channels 1.0) pan) (convert chan))))
             (if (> v 1.0) 0.0
@@ -817,7 +790,7 @@
 
 ;; simple stereo weights
 (bind-func mix2
-  (lambda (x:SAMPLE chan:i32 left right)
+  (lambda (x:SAMPLE chan:i64 left right)
     (cond ((= chan 0) (* x left))
           ((= chan 1) (* x right))
           (else 0.0))))
@@ -836,7 +809,7 @@
 ;; each array element is a channels mix (between 0.0 and 1.0)
 (bind-func mixer_c
   (lambda (channels:i64)
-    (lambda (cdat:SAMPLE* chan:i32 in:SAMPLE)
+    (lambda (cdat:SAMPLE* chan:i64 in:SAMPLE)
       (if (< chan channels)
           (* in (pref cdat chan))
           0.0))))
@@ -900,7 +873,7 @@
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (lpf_c)))
-	  (lambda (chan:i32 x freq res)
+	  (lambda (chan:i64 x freq res)
 	    (let ((f (pref lines chan)))
 	      (f x freq res)))))))
 
@@ -954,7 +927,7 @@
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (hpf_c)))
-	  (lambda (chan:i32 x freq res)
+	  (lambda (chan:i64 x freq res)
 	    (let ((f (pref lines chan)))
 	      (f x freq res)))))))
 
@@ -1012,7 +985,7 @@
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (bpf_c)))
-	  (lambda (chan:i32 x freq bandwidth)
+	  (lambda (chan:i64 x freq bandwidth)
 	    (let ((f (pref lines chan)))
 	      (f x freq bandwidth)))))))
 
@@ -1069,7 +1042,7 @@
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (notch_c)))
-	  (lambda (chan:i32 x freq bandwidth)
+	  (lambda (chan:i64 x freq bandwidth)
 	    (let ((f (pref lines chan)))
 	      (f x freq bandwidth)))))))
 
@@ -1230,7 +1203,7 @@
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
 	  (dotimes (i channels) (pset! lines i (vcf_c type)))
-	  (lambda (chan:i32 x freq res)
+	  (lambda (chan:i64 x freq res)
 	    (let ((f (pref lines chan)))
 	      (f x freq res)))))))
 
@@ -1363,13 +1336,13 @@
 (bind-func hann_c
   "window of width samples - repeating every repeat samples"
   (lambda ()
-    (let ((cnt -1.0))
-      (lambda (width)
-        (set! cnt (+ cnt 1.0))
+    (let ((cnt -1))
+      (lambda (width:i64)
+        (set! cnt (+ cnt 1))
         (* 0.5
            (- 1.0
-              (cos (/ (* STWOPI (% cnt width))
-                      (- width 1.0)))))))))
+              (cos (/ (* STWOPI (convert (% cnt width)))
+                      (- (convert width) 1.0)))))))))
 
 ;; hann
 (if *build-multi-chan*
@@ -1377,20 +1350,20 @@
       (lambda ()   
 	(let ((h (hann_c))
 	      (mem 0.0))
-	  (lambda (chan:i32 width)	
-	    (if (< chan 0.5) (set! mem (h width)))
+	  (lambda (chan:i64 width:i64)	
+	    (if (= chan 0) (set! mem (h width)))
 	    mem)))))
 
 
 (bind-func hann_t_c
   "window of width samples - repeating every repeat samples"
   (lambda (offset)
-    (lambda (time width)      
+    (lambda (time:i64 width:i64)      
       ;;(set! cnt (+ cnt 1.0))
       (* 0.5
          (- 1.0
-            (cos (/ (* STWOPI (% (- time offset) width))
-                    (- width 1.0))))))))
+            (cos (/ (* STWOPI (convert (% (- time offset) width)))
+                    (- (convert width) 1.0))))))))
 
 ;; hann with time
 (if *build-multi-chan*
@@ -1398,7 +1371,7 @@
       (lambda (offset)   
 	(let ((h (hann_t_c offset))
 	      (mem 0.0))
-	  (lambda (chan:i32 time width)	
+	  (lambda (chan:i64 time:i64 width:i64)	
 	    (if (< chan 0.5) (set! mem (h time width)))
 	    mem)))))
 
@@ -1407,16 +1380,16 @@
   "window of 'width' samples, repeating every 'repeat' samples
    with an offset of 'offset' samples"
   (lambda ()
-    (let ((cnt -1.0))
-      (lambda (width offset repeat)
-        (if (> cnt repeat) (set! cnt -1.0))        
-        (set! cnt (+ cnt 1.0))
-        (if (and (or (> cnt offset) (< offset 0.1))
+    (let ((cnt -1))
+      (lambda (width:i64 offset:i64 repeat:i64)
+        (if (> cnt repeat) (set! cnt -1))        
+        (set! cnt (+ cnt 1))
+        (if (and (or (> cnt offset) (= offset 0))
                  (< cnt (+ width offset)))
             (* 0.5
                (- 1.0
-                  (cos (/ (* STWOPI (% (- cnt offset) width))
-                          (- width 1.0)))))
+                  (cos (/ (* STWOPI (convert (% (- cnt offset) width)))
+                          (convert (- width 1))))))
             0.0)))))
  
 
@@ -1485,38 +1458,38 @@
 
 ;; make a convenience wrapper for asr
 (bind-func adsr_c
-  (lambda (start_time atk_dur dky_dur sus_dur rel_dur peak_amp sus_amp)
+  (lambda (start_time:i64 atk_dur:i64 dky_dur:i64 sus_dur:i64 rel_dur:i64 peak_amp sus_amp)
     (let* ((points 6)
 	   (data:SAMPLE* (zalloc (* points 2))))
-      (pset! data 0 start_time)
+      (pset! data 0 (convert start_time))
       (pset! data 1 0.0)
-      (pset! data 2 (+ start_time atk_dur)) ;; point data
+      (pset! data 2 (convert (+ start_time atk_dur))) ;; point data
       (pset! data 3 peak_amp)
-      (pset! data 4 (+ start_time atk_dur dky_dur))
+      (pset! data 4 (convert (+ start_time atk_dur dky_dur)))
       (pset! data 5 sus_amp)
-      (pset! data 6 (+ start_time atk_dur dky_dur sus_dur))
+      (pset! data 6 (convert (+ start_time atk_dur dky_dur sus_dur)))
       (pset! data 7 sus_amp)
-      (pset! data 8 (+ start_time atk_dur dky_dur sus_dur rel_dur))
+      (pset! data 8 (convert (+ start_time atk_dur dky_dur sus_dur rel_dur)))
       (pset! data 9 0.0)
-      (pset! data 10 (+ start_time atk_dur dky_dur sus_dur rel_dur 1.0)) ;; this to flatten out at 0.0
+      (pset! data 10 (convert (+ start_time atk_dur dky_dur sus_dur rel_dur 1))) ;; this to flatten out at 0.0
       (pset! data 11 0.0)
       (let ((f (envelope_c data points)))
-	(lambda (time:SAMPLE)
-	  (f time))))))
+	(lambda (time:i64)
+	  (f (convert time)))))))
 
 
 ;; an accumulative adsr (random access not allowed! time must be linear).
 (bind-func adsr_accum_c
-  (lambda (start_time:SAMPLE atk_dur dky_dur sus_dur rel_dur peak_amp sus_amp)
-    (let ((val:SAMPLE (if (> (+ atk_dur dky_dur) 1.0) 0.0 peak_amp))
+  (lambda (start_time:i64 atk_dur:i64 dky_dur:i64 sus_dur:i64 rel_dur:i64 peak_amp:SAMPLE sus_amp:SAMPLE)
+    (let ((val:SAMPLE (if (> (+ atk_dur dky_dur) 1) 0.0 peak_amp))
 	  (t1 atk_dur)
 	  (t2 (+ atk_dur dky_dur))
 	  (t3 (+ atk_dur dky_dur sus_dur))
-	  (t4 (+ atk_dur dky_dur sus_dur rel_dur))	  
-	  (inc1 (/ peak_amp atk_dur))
-	  (inc2 (* -1.0 (/ (- peak_amp sus_amp) dky_dur)))
-	  (inc3 (* -1.0 (/ sus_amp rel_dur))))
-      (lambda (time:SAMPLE chan:i32)
+	  (t4 (+ atk_dur dky_dur sus_dur rel_dur))
+	  (inc1:SAMPLE (/ peak_amp (convert atk_dur)))
+	  (inc2 (* -1.0 (/ (- peak_amp sus_amp) (convert dky_dur))))
+	  (inc3 (* -1.0 (/ sus_amp (convert rel_dur)))))
+      (lambda (time:i64 chan:i64)
 	(if (= chan 0)
 	    (cond ((> time t4) (set! val 0.0))
 		  ((> time t3) (set! val (+ val inc3)))

@@ -7,10 +7,6 @@
 
 ;; This example shows how to define your own polyphonic synths
 
-;; NOTE: at the moment compiling in a secondary thread is a little
-;;       flakey.  I'm working on this so in the mean time you'll
-;;       just have to put up with the audio delays while compiling
-
 ;;; Code:
 
 ;; load the core/instruments library, which provides (among other
@@ -23,9 +19,9 @@
 ;; define a default instrument called synth
 (define-instrument synth synth_note_c synth_fx)
 
-(bind-func dsp:[double,double,double,double,double*]*
+(bind-func dsp:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]*
   (lambda (in time chan dat)
-    (cond ((< chan 2.0)
+    (cond ((< chan 2)
 	   (synth in time chan dat))
 	  (else 0.0))))
 
@@ -52,13 +48,13 @@
 ;; 
 ;; lets try a simple sawwave synth note kernel
 (bind-func saw_synth_note_c
-  (lambda (nargs:i64 dargs:double*)
+  (lambda (nargs:i64 dargs:SAMPLE*)
     (let ((sawl (saw_c 0.0))
 	  (sawr (saw_c 0.0)))
-      (lambda (time:double chan:double freq:double amp:double)
-	(cond ((< chan 1.0)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
+	(cond ((= chan 0)
 	       (sawl amp freq))
-	      ((< chan 2.0)
+	      ((= chan 0)
 	       (sawr amp freq))
 	      (else 0.0))))))
 
@@ -70,15 +66,15 @@
 ;;
 ;; NOTE: then 100000 is extra memory for our
 ;; delays
-(bind-func dsp:[double,double,double,double,double*]* 1000000
-  (let ((delayl (delay_c (* 0.25 SAMPLERATE)))
-	(delayr (delay_c (* 0.33333333 SAMPLERATE))))
-    (lambda (in:double time:double chan:double dat:double*)
-      (cond ((< chan 1.0)
+(bind-func dsp:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* 1000000
+  (let ((delayl (delay_c (convert (* SAMPLERATE 0.25))))
+	(delayr (delay_c (convert (* SAMPLERATE 0.33333333)))))
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+      (cond ((= chan 0)
 	     (delayl (+ (* 1.0 (synth in time chan dat))
                         (saw_synth in time chan dat))
                      0.5 0.3))
-	    ((< chan 2.0)	     
+	    ((= chan 1)	     
 	     (delayr (+ (* 1.0 (synth in time chan dat))
                         (saw_synth in time chan dat))
                      0.5 0.3))
@@ -105,7 +101,7 @@
 (bind-func saw_synth_note_c
   (let ((res 15.0)
 	(cof 8000.0))
-    (lambda (nargs:i64 dargs:double*)
+    (lambda (nargs:i64 dargs:SAMPLE*)
       (let ((sawl (saw_c 0.0))
 	    (sawl2 (saw_c 0.0))
 	    (modl (osc_c 0.0))
@@ -116,13 +112,13 @@
 	    (modr (osc_c 0.0))
 	    (lpfr (lpf_c))
 	    (lpfrmod (osc_c 0.0)))
-	(lambda (time:double chan:double freq:double amp:double)
-	  (cond ((< chan 1.0)
+	(lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
+	  (cond ((= chan 0)
 		 (lpfl (* amp (+ (sawl (* 1.0 amp) freq) 
 				 (sawl2 amp (+ freq (modl 100.0 0.2)))))
 		       (+ cof (lpflmod freq 1.0))
                        res))
-		((< chan 2.0)			     		  
+		((= chan 1)			     		  
 		 (lpfr (* amp (+ (sawr (* 1.0 amp) freq) 
 				 (sawr2 amp (+ freq (modr 50.0 0.5)))))
 		       (+ cof (lpfrmod 1000.0 2.0))

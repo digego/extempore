@@ -23,27 +23,28 @@
 
 ;; relative time USING adsr_accum + local mzone
 (bind-func note_c
-  (lambda (start_time:SAMPLE
+  (lambda (start_time:i64
       freq:SAMPLE
       amp:SAMPLE
-      dur:SAMPLE
-      attack:SAMPLE
-      decay:SAMPLE
-      release:SAMPLE
+      dur:i64
+      attack:i64
+      decay:i64
+      release:i64
       sus_amp:SAMPLE
-      nstarts:SAMPLE*
+      nstarts:i64*
       idx:i64
-      kernel:[SAMPLE,SAMPLE,i32,SAMPLE,SAMPLE]*
+      kernel:[SAMPLE,i64,i64,SAMPLE,SAMPLE]*
       notezone:mzone*)
     (let ((env (if (< (+ attack decay) dur)
-                   (adsr_accum_c 0.0 attack decay (- dur (+ attack decay)) release 1.0 sus_amp)
-                   (adsr_accum_c 0.0 0.0 0.0 dur release 1.0 sus_amp)))
-          (t:SAMPLE 0.0)
-          (ff (lambda (sample:SAMPLE time:SAMPLE channel:i32)
-                (if (< channel 1.0) (set! t (+ t 1.0)))
+                   (adsr_accum_c 0 attack decay (- dur (+ attack decay)) release 1.0 sus_amp)
+                   (adsr_accum_c 0 0 0 dur release 1.0 sus_amp)))
+          (t 0)
+          (ff (lambda (sample:SAMPLE time:i64 channel:i64)
+                (if (= channel 0) (set! t (+ t 1)))
                 (if (< t (+ dur release))
                     (kernel t channel freq (* (env t channel) amp))
-                    (begin (pset! nstarts idx 9999999999999.0)
+                    ;; (begin (pset! nstarts idx 9999999999999.0)
+                    (begin (pset! nstarts idx 999999999)
                            (llvm_zone_destroy notezone)
                            0.0)))))
       ff)))
@@ -56,7 +57,7 @@
 ;; however making it longer means using more memory
 ;; it's a trade off!
 (bind-func _play_note
-  (lambda (time inst:[SAMPLE,SAMPLE,SAMPLE,i32,SAMPLE*]* freq amp dur nargs:i64 dargs)
+  (lambda (time inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* freq amp dur nargs:i64 dargs)
     (if (> freq 10.0)        
         (let ((f (inst.new_note:[i64,SAMPLE,SAMPLE,SAMPLE,SAMPLE,i64,SAMPLE*]*)))
           (f time freq dur amp nargs dargs)
@@ -74,7 +75,7 @@
            (dotimes (i ,nargs) (cptr:set-double dargs (* i 8) (eval (list-ref ',args i))))
            (dotimes (i ,nargs) (cptr:set-float dargs (* i 4) (eval (list-ref ',args i)))))
        (if (cptr? native)
-           (_play_note (integer->real ,time)
+           (_play_note time
                        native
                        (midi2frq (* 1.0 ,pitch))
                        (/ (exp (/ ,vol 26.222)) 127.0)
@@ -98,7 +99,7 @@
           (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
           (dotimes (i nargs) (cptr:set-float dargs (* i 4) (eval (list-ref args i)))))
       (if (cptr? native)
-          (_play_note (integer->real time)
+          (_play_note time
                       native
                       (midi2frq (* 1.0 pitch))
                       (/ (exp (/ vol 26.222)) 127.0)
@@ -124,21 +125,22 @@
 (define-macro (define-instrument name note_kernel effect_kernel . args)
   `(bind-func ,name
      (let* ((poly:i64 48)
-            (notes:[SAMPLE,SAMPLE,SAMPLE,i32]** (zalloc poly))
-            (attack:SAMPLE 200.0)
-            (decay:SAMPLE 200.0)
-            (release:SAMPLE 1000.0)
+            (notes:[SAMPLE,SAMPLE,i64,i64]** (zalloc poly))
+            (attack:i64 200)
+            (decay:i64 200)
+            (release:i64 1000)
             (sustain:SAMPLE 0.6) ;; amplitude of the sustain
             (gain 2.0)
             (ii 0)
-            (note_starts:SAMPLE* (zalloc poly))
-            (new_note (lambda (start freq dur amp nargs:i64 dargs)
+            (note_starts:i64* (zalloc poly))
+            (new_note (lambda (start:i64 freq:SAMPLE dur:i64 amp:SAMPLE nargs:i64 dargs:SAMPLE*)
                         (let ((free_note:i64 -1)
                               (iii 0)
                               (i 0))
-                          (dotimes (i poly) ;; check for free poly spot           
-                            (if (> (pref note_starts i) 9999999999998.0)
-                                (set! free_note i)))
+                          (dotimes (i poly) ;; check for free poly spot
+                            ;;(printf "%d:%f\n" i (ftod (pref note_starts i)))
+                            (if (> (pref note_starts i) 9999999999998)
+                                (set! free_note i)))          
                           (if (> free_note -1) ;; if we found a free poly spot assign a note
                               (let ((note_zone (push_zone (* 1024 ,(if (null? args) 10 (car args))))))
                                 (pset! notes free_note
@@ -152,8 +154,8 @@
                                 1)
                               0)))))
        (dotimes (ii poly) ;; sets all notes to inactive
-         (pset! note_starts ii 9999999999999.0))
-       (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+         (pset! note_starts ii 9999999999999))
+       (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
          (let ((out:SAMPLE 0.0)
                (k 0))
            (dotimes (k poly) ;; sum all active notes          
@@ -166,13 +168,13 @@
   (lambda (nargs:i64 dargs:SAMPLE*)
     (let ((sawl (saw_c 0.0))
           (sawr (saw_c 0.0)))
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (if (= chan 0)
             (* amp (/ 200.0 freq) (sawl amp freq))
             (* amp (/ 200.0 freq) (sawr amp freq)))))))
 
 (bind-func default_fx
-  (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+  (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
     in))
 
 (define-instrument definst default_note_c default_fx)
@@ -197,7 +199,7 @@
             (lpf2 (lpf_c))
             (oscr3 (osc_c 0.25))
             (oscr2 (osc_c 0.25)))
-        (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+        (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
           (if (< chan 1.0)
               (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude
                  (+ (oscl2 1.0 (+ freq (* 10.0 (random))))
@@ -220,7 +222,7 @@
         (pan_old pan)
         (wet 1.0)
         (fb 0.5))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (if (< pan_old pan) ;; interpolate pan
           (set! pan_old (+ pan_old .001))
           (set! pan_old (- pan_old .001)))
@@ -231,10 +233,10 @@
             (else 0.0)))))
 
 (define-instrument synth synth_note_c synth_fx)
-(synth.attack 1000.0)
-(synth.decay 1000.0)
+(synth.attack 1000)
+(synth.decay 1000)
 (synth.sustain 0.9)
-(synth.release 7000.0)
+(synth.release 7000)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -255,7 +257,7 @@
             (ramp 0.0)
             (a (+ 1.0 (* 0.02 (random))))
             (b (+ 1.0 (* 0.02 (random)))))
-        (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+        (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
           (if (= chan 0)
               (* amp (vcfl (+ (oscl 0.3 freq nval)
                               (oscl2 0.3 (+ freq a) nval))
@@ -279,7 +281,7 @@
         (wet 0.2)
         (fb 0.5)
         (opan (osc_c 0.0)))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)      
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)      
       (set! pan (+ 0.5 (opan 0.2 3.0)))
       (cond ((= chan 0)
              (rev1 (c1 (* 2.0 pan in) cwet cfb)
@@ -290,10 +292,10 @@
             (else 0.0)))))
 
 (define-instrument epad epad_note_c epad_fx)
-(epad.attack 1000.0)
-(epad.decay 1000.0)
+(epad.attack 1000)
+(epad.decay 1000)
 (epad.sustain 0.9)
-(epad.release 7000.0)
+(epad.release 7000)
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; extempore organ ;;
@@ -302,7 +304,7 @@
 ;; change drawbar_pos and recompile to change the organ tone
 
 (bind-func organ_note_c
-  (let ((num_drawbars:i32 9)
+  (let ((num_drawbars:i64 9)
         (freq_ratio:SAMPLE* (zalloc num_drawbars))
         (drawbar_pos:SAMPLE* (zalloc num_drawbars)))
     (pfill! freq_ratio 0.5 1.5 1.0 2.0 3.0 4.0 5.0 6.0 8.0)
@@ -310,12 +312,12 @@
     (lambda (nargs:i64 dargs:SAMPLE*)
       (let ((tonewheel:[SAMPLE,SAMPLE,SAMPLE]** (zalloc (* 2 num_drawbars)))
             (freq_smudge:SAMPLE* (zalloc num_drawbars))
-            (i:i32 0))
+            (i:i64 0))
         (dotimes (i num_drawbars)
           (pset! tonewheel (* i 2) (osc_c 0.0)) ; left
           (pset! tonewheel (+ (* i 2) 1) (osc_c 0.0)) ; right
           (pset! freq_smudge i (* 3.0 (random))))
-        (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+        (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
           (if (< chan 2)
               (let ((sum 0.0))
                 (dotimes (i num_drawbars)
@@ -336,7 +338,7 @@
         (wet 0.5)
         (fb 0.5)
         (trem_freq .0))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (cond ((= chan 0)
              (* (flanl in wet fb)
                 (+ 1.0 (treml trem_amp trem_freq))))
@@ -346,15 +348,15 @@
             (else 0.0)))))
 
 (define-instrument organ organ_note_c organ_fx)
-(organ.attack 200.0)
-(organ.decay 200.0)
-(organ.release 200.0)
+(organ.attack 200)
+(organ.decay 200)
+(organ.release 200)
 (organ.sustain 0.6)
 
 ;; fuzz bass
 
 (bind-func fuzz_bass_note_c
-  (lambda (nargs:i64 dargs:double*)
+  (lambda (nargs:i64 dargs:SAMPLE*)
     (let ((sawl1 (saw_c 0.0))
           (sawr1 (saw_c 0.0))
           (sawl2 (saw_c 0.0))
@@ -365,7 +367,7 @@
           (lpfr (lpf_c))
           (ringl (ringmod_c))
           (ringr (ringmod_c)))
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (cond ((= chan 0)
                (lpfl (ringl (+ (sawl1 amp (* freq smudge1))
                                (sawl2 amp (* freq smudge2)))
@@ -383,13 +385,13 @@
               (else 0.0))))))
 
 (bind-func fuzz_bass_fx 10000000
-  (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+  (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
     in))
 
 (define-instrument fuzz_bass fuzz_bass_note_c fuzz_bass_fx)
-(fuzz_bass.attack 20.0)
-(fuzz_bass.decay 20.0)
-(fuzz_bass.release 100.0)
+(fuzz_bass.attack 20)
+(fuzz_bass.decay 20)
+(fuzz_bass.release 100)
 (fuzz_bass.sustain 0.6)
 
 ;; shimmer pad
@@ -402,7 +404,7 @@
           (lfor (osc_c 0.0))
           (lpfl (lpf_c))
           (lpfr (lpf_c)))
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (cond ((= chan 0)
                (lpfl (rectl amp freq (+ 0.5 (lfol 0.3 0.9))) (* 8.0 freq) 0.5))
               ((= chan 1)
@@ -414,7 +416,7 @@
         (dr (delay_c 11))
         (wet 0.5)
         (fb 0.5))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (cond ((= chan 0)
              (dl in wet fb))
             ((= chan 1)
@@ -422,9 +424,11 @@
             (else 0.0)))))
 
 (define-instrument shimmer_pad shimmer_pad_note_c shimmer_pad_fx)
-(shimmer_pad.attack 44100.0)
+(shimmer_pad.attack 44100)
+(shimmer_pad.decay 500)
+(shimmer_pad.release 44100)
 (shimmer_pad.sustain 1.0)
-(shimmer_pad.release 44100.0)
+
 
 
 ;; A simple FM synth
@@ -438,7 +442,7 @@
           (I (if (> nargs 0) (pref dargs 0) 0.1)) ;; modulation index (generally 0.0-1.0)
           (H (if (> nargs 1) (pref dargs 1) 10.0)) ;; harmonicity ratio (whole numbers 1.0 - 20.0)
           (out:SAMPLE 0.0))
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (if (= chan 0)
             (set! out (o1 (* (/ 5.0 (log freq)) amp)
                           (+ freq
@@ -465,7 +469,7 @@
         (dfb 0.5)
         (wet 0.2)
         (fb 0.3))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (cond ((= chan 0)
              (revl (vcfl (del1 (cl in cwet cfb) dwet dfb)
                          (+ 8000.0 (o1 6000.0 0.3))
@@ -481,11 +485,10 @@
             (else 0.0)))))
 
 (define-instrument fmsynth fmsynth_note_c fmsynth_fx)
-(fmsynth.attack 100.0)
-(fmsynth.decay 100.0)
+(fmsynth.attack 100)
+(fmsynth.decay 100)
+(fmsynth.release 5000)
 (fmsynth.sustain 0.8)
-(fmsynth.release 5000.0)
-
 
 ;; A simple FM pad
 ;; default is quite organy
@@ -500,7 +503,7 @@
           (I (if (> nargs 0) (pref dargs 0) 0.2)) ;; modulation index (generally 0.0-1.0)
           (H (if (> nargs 1) (pref dargs 1) 2.0)) ;; harmonicity ratio (whole numbers 1.0 - 20.0)
           (res:SAMPLE 0.0))
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (if (= chan 0)
             (set! res (o1 (* (/ 5.0 (log freq)) amp)
                           (+ freq
@@ -523,7 +526,7 @@
         (revr (reverb_c 60.0))
         (wet 0.3)
         (fb 0.3))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (cond ((= chan 0)
              (revl (vcfl (cl in cwet cfb) ;(del1 (cl in))
                          (+ 8000.0 (o1 6000.0 0.6))
@@ -537,10 +540,11 @@
             (else 0.0)))))
 
 (define-instrument fmpad fmpad_note_c fmpad_fx)
-(fmpad.attack 10000.0)
-(fmpad.decay 100.0)
+(fmpad.attack 10000)
+(fmpad.decay 100)
+(fmpad.release 5000)
 (fmpad.sustain 1.0)
-(fmpad.release 5000.0)
+
 
 
 ;; 
@@ -549,7 +553,7 @@
 (bind-func sawbass_note_c
   (lambda (nargs:i64 dargs:SAMPLE*)
     (let ((osc (saw_mc_c 0.0)))
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (* amp (osc chan amp freq))))))
 
 
@@ -558,21 +562,20 @@
         (vcf (vcf_mc_c 1 2))
         (del (delay_t_st_c
               (convert (* SR (/ 1.0 2.1)))
-              (convert (* SR (/ 1.0 2.0))) 0.0))
-        (h (hann_t_mc_c 0.0)))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+              (convert (* SR (/ 1.0 2.0))) 0))
+        (h (hann_t_mc_c 0)))
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (del chan (* 1.0
                    (vcf chan (cl chan in 1.0 0.6)
-                        (+ 350.0 (* 3000.0 (h chan time (* SR 8.))))
+                        (+ 350.0 (* 3000.0 (h chan time (convert (* SR 8.)))))
                         0.75))
            time 0.8 0.5))))
 
 (define-instrument sawbass sawbass_note_c sawbass_fx)
-(sawbass.attack 100.0)
-(sawbass.decay 100.0)
+(sawbass.attack 100)
+(sawbass.decay 100)
+(sawbass.release 1000)
 (sawbass.sustain 1.0)
-(sawbass.release 1000.0)
-
 
 ;; 
 ;; simple sine subbass
@@ -580,19 +583,18 @@
 (bind-func subbass_note_c
   (lambda (nargs:i64 dargs:SAMPLE*)
     (let ((osc (osc_mc_c 0.0)))
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (* amp (osc chan amp freq))))))
 
 (bind-func subbass_fx
-  (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+  (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
     in))
 
 (define-instrument subbass subbass_note_c subbass_fx)
-(subbass.attack 500.0)
-(subbass.decay 500.0)
+(subbass.attack 500)
+(subbass.decay 500)
+(subbass.release 500)
 (subbass.sustain 0.8)
-(subbass.release 500.0)
-
 
 
 
@@ -604,7 +606,7 @@
           (sawr2 (saw_c 0.1))
           (smudge1 (+ 1.0 (* 0.005 (dsp_randn))))
           (smudge2 (+ 1.0 (* 0.005 (dsp_randn)))))
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (cond ((= chan 0)
                (+ (sawl1 amp (* freq smudge1))
                   (sawl2 amp (* freq smudge2))))
@@ -621,7 +623,7 @@
         (rev .15)
         (combl (comb_c 30))
         (combr (comb_c 30)))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (cond ((= chan 0)
              (r1 (combl in
                         (+ 4.0 (lfo1l 1.6 2.0))
@@ -635,7 +637,7 @@
             (else 0.0)))))
 
 (define-instrument sawlead sawlead_note_c sawlead_fx)
-(sawlead.attack 40.0)
-(sawlead.decay 120.0)
-(sawlead.release 400.0)
+(sawlead.attack 40)
+(sawlead.decay 120)
+(sawlead.release 400)
 (sawlead.sustain 0.75)

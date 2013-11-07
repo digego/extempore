@@ -241,7 +241,7 @@ namespace extemp {
     void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
     void* cache_closure = 0;
     cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
-    SAMPLE (*closure) (SAMPLE,SAMPLE,int,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,SAMPLE,int,SAMPLE*)) cache_closure);
+    SAMPLE (*closure) (SAMPLE,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,long,long,SAMPLE*)) cache_closure);
     
     SAMPLE* data = 0; 
     llvm_zone_t* zone = llvm_peek_zone_stack();
@@ -254,7 +254,7 @@ namespace extemp {
       void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
       void* cache_closure = 0;
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
-      SAMPLE (*closure) (SAMPLE,SAMPLE,int,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,SAMPLE,int,SAMPLE*)) cache_closure);
+      SAMPLE (*closure) (SAMPLE,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,long,long,SAMPLE*)) cache_closure);
       int cnt = 0;
 #ifdef TARGET_OS_WINDOWS
       printf("MT Audio on Windows NOT Implemented!\n")
@@ -279,21 +279,21 @@ namespace extemp {
           for(int k=0;k<UNIV::IN_CHANNELS;k++) indata[k]=(SAMPLE)inbuf[iin+k];
 
           if(UNIV::IN_CHANNELS==UNIV::CHANNELS) {
-            for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+            for(uint64_t k=0; k<UNIV::CHANNELS; k++)
               {		  
-                outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, (SAMPLE)inbuf[iin+k], (SAMPLE)(i+LTIME),k,&(indata[0])));
+                outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, (SAMPLE)inbuf[iin+k], (i+LTIME),k,&(indata[0])));
                 llvm_zone_reset(zone);
               }
           }else if(UNIV::IN_CHANNELS==1){
-            for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+            for(uint64_t k=0; k<UNIV::CHANNELS; k++)
               {		  
-                outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, (SAMPLE)inbuf[iin], (SAMPLE)(i+LTIME),k,&(indata[0])));
+                outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, (SAMPLE)inbuf[iin], (i+LTIME),k,&(indata[0])));
                 llvm_zone_reset(zone);
               }		  
           }else{
-            for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+            for(uint64_t k=0; k<UNIV::CHANNELS; k++)
               {		  
-                outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, 0.0,(SAMPLE)(i+LTIME),k,&(indata[0])));
+                outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, 0.0, (i+LTIME),k,&(indata[0])));
                 llvm_zone_reset(zone);
               }
           }
@@ -342,7 +342,7 @@ namespace extemp {
     void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
     void* cache_closure = 0;
     cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
-    void (*closure) (float*,float*,float,void*) = *((void(**)(float*,float*,float,void*)) cache_closure);
+    void (*closure) (float*,float*,long,void*) = *((void(**)(float*,float*,long,void*)) cache_closure);
     float* data = 0; 
     llvm_zone_t* zone = llvm_peek_zone_stack();
     float* outbuf = AudioDevice::I()->getDSPMTOutBufferArray();
@@ -353,7 +353,7 @@ namespace extemp {
       void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
       void* cache_closure = 0;
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
-      void (*closure) (float*,float*,float,void*) = *((void(**)(float*,float*,float,void*)) cache_closure);
+      void (*closure) (float*,float*,long,void*) = *((void(**)(float*,float*,long,void*)) cache_closure);
       int cnt = 0;
 #ifdef TARGET_OS_WINDOWS
       printf("MT Audio on Windows NOT Implemented!\n")
@@ -420,12 +420,12 @@ namespace extemp {
 	if(AudioDevice::I()->getDSPWrapper() && !AudioDevice::I()->getDSPSUMWrapper()) { // if true then we must be sample by sample
 	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
 	    dsp_f_ptr cache_wrapper = dsp_wrapper;
-	    SAMPLE (*closure) (SAMPLE,SAMPLE,int,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,SAMPLE,int,SAMPLE*)) cache_closure);
+	    SAMPLE (*closure) (SAMPLE,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,long,long,SAMPLE*)) cache_closure);
 	    SAMPLE* data = 0; 
 	    //llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
 	    llvm_zone_t* zone = llvm_peek_zone_stack();
 	    //llvm_push_zone_stack(zone);
-	    for(uint32_t i=0;i<UNIV::FRAMES;i++)
+	    for(uint64_t i=0;i<UNIV::FRAMES;i++)
 	    {
 		uint32_t iout = i*UNIV::CHANNELS;
 		uint32_t iin = i*UNIV::IN_CHANNELS;
@@ -434,21 +434,21 @@ namespace extemp {
 		for(int k=0;k<UNIV::IN_CHANNELS;k++) indata[k]=(SAMPLE)in[iin+k];
 
 		if(UNIV::IN_CHANNELS==UNIV::CHANNELS) {
-		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+		  for(uint64_t k=0; k<UNIV::CHANNELS; k++)
 		    {		  
-		      dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, (SAMPLE)in[iin+k], (SAMPLE)(i+UNIV::DEVICE_TIME),k,&(indata[0])));
+		      dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, (SAMPLE)in[iin+k], (i+UNIV::DEVICE_TIME),k,&(indata[0])));
 		      llvm_zone_reset(zone);
 		    }
 		}else if(UNIV::IN_CHANNELS==1){
-		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+		  for(uint64_t k=0; k<UNIV::CHANNELS; k++)
 		    {		  
-		      dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, (SAMPLE)in[iin], (SAMPLE)(i+UNIV::DEVICE_TIME),k,&(indata[0])));
+		      dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, (SAMPLE)in[iin], (i+UNIV::DEVICE_TIME),k,&(indata[0])));
 		      llvm_zone_reset(zone);
 		    }		  
 		}else{
-		  for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+		  for(uint64_t k=0; k<UNIV::CHANNELS; k++)
 		    {		  
-		      dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, 0.0,(SAMPLE)(i+UNIV::DEVICE_TIME),k,&(indata[0])));
+		      dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, 0.0, (i+UNIV::DEVICE_TIME),k,&(indata[0])));
 		      llvm_zone_reset(zone);
 		    }
 		}
@@ -458,11 +458,11 @@ namespace extemp {
         }else if(AudioDevice::I()->getDSPWrapperArray() && !AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then we must be buffer by buffer
 	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
 	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	    void (*closure) (float*,float*,float,void*) = * ((void(**)(float*,float*,float,void*)) cache_closure);
+	    void (*closure) (float*,float*,long,void*) = * ((void(**)(float*,float*,long,void*)) cache_closure);
 	    llvm_zone_t* zone = llvm_peek_zone_stack();
 	    float* indat = (float*) inputBuffer;
 	    float* outdat = (float*) outputBuffer;
-	    cache_wrapper(zone, (void*)closure, indat, outdat, (float)UNIV::DEVICE_TIME, userData);
+	    cache_wrapper(zone, (void*)closure, indat, outdat, UNIV::DEVICE_TIME, userData);
 	    llvm_zone_reset(zone);
         }else if(AudioDevice::I()->getDSPSUMWrapper()) { // if true then multichannel
           //printf("main in\n");
@@ -494,24 +494,24 @@ namespace extemp {
 #endif
           dsp_f_ptr_sum dsp_wrapper = AudioDevice::I()->getDSPSUMWrapper();
           dsp_f_ptr_sum cache_wrapper = dsp_wrapper;
-          SAMPLE (*closure) (SAMPLE*,SAMPLE,int,SAMPLE*) = * ((SAMPLE(**)(SAMPLE*,SAMPLE,int,SAMPLE*)) cache_closure);
+          SAMPLE (*closure) (SAMPLE*,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE*,long,long,SAMPLE*)) cache_closure);
           llvm_zone_t* zone = llvm_peek_zone_stack();
           SAMPLE* indats[numthreads];
           indats[0] = AudioDevice::I()->getDSPMTOutBuffer();
           for(int jj=1;jj<numthreads;jj++) {
             indats[jj] = indats[0]+(UNIV::FRAMES*UNIV::CHANNELS*jj);
           }
-          for(uint32_t i=0;i<UNIV::FRAMES;i++) {
+          for(uint64_t i=0;i<UNIV::FRAMES;i++) {
               uint32_t iout = i*UNIV::CHANNELS;
               uint32_t iin = i*UNIV::IN_CHANNELS;
               float* dat = (float*) outputBuffer;
 
-              for(uint32_t k=0; k<UNIV::CHANNELS; k++)
+              for(uint64_t k=0; k<UNIV::CHANNELS; k++)
                 {		  
                   for(int jj=0;jj<numthreads;jj++) {
                     in[jj] = indats[jj][iout+k];
                   }
-                  dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, in, (SAMPLE)(i+UNIV::DEVICE_TIME),k,&(indata[0])));
+                  dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, in, (i+UNIV::DEVICE_TIME),k,&(indata[0])));
                   llvm_zone_reset(zone);
                 }
           }
@@ -545,7 +545,7 @@ namespace extemp {
 #endif
           dsp_f_ptr_sum_array dsp_wrapper = AudioDevice::I()->getDSPSUMWrapperArray();
           dsp_f_ptr_sum_array cache_wrapper = dsp_wrapper;
-          void (*closure) (float**,float*,float,void*) = * ((void(**)(float**,float*,float,void*)) cache_closure);
+          void (*closure) (float**,float*,long,void*) = * ((void(**)(float**,float*,long,void*)) cache_closure);
           llvm_zone_t* zone = llvm_peek_zone_stack();
           //float** indat = (float**) 
           float* indats[numthreads];
@@ -554,7 +554,7 @@ namespace extemp {
           for(int jj=1;jj<numthreads;jj++) {
             indats[jj] = indats[0]+(UNIV::FRAMES*UNIV::CHANNELS*jj);
           }
-          cache_wrapper(zone, (void*)closure, indats, outdat, (float)UNIV::DEVICE_TIME, userData);
+          cache_wrapper(zone, (void*)closure, indats, outdat, UNIV::DEVICE_TIME, userData);
           llvm_zone_reset(zone);
           //printf("main out\n");          
 	}else{ 

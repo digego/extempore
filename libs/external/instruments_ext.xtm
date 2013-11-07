@@ -126,14 +126,14 @@
   (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index pan:SAMPLE offset:i64)
     (let ((idx_freq:SAMPLE (midi2frq (convert index)))
           (phase:SAMPLE (convert (+ offset (pref samples_offsets index))))) ;; phase unit is audio frames
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (let ((rate (/ freq idx_freq))
               (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
                               (set! phase (+ phase rate))
                               phase))
-              (posi:i32 (convert (floor pos))) 
+              (posi:i64 (convert (floor pos))) 
               (posx (+ (* posi 2) chan))
-              (lgth:i32 (convert (- (pref samples_length index) 10)))
+              (lgth:i64 (convert (- (pref samples_length index) 10)))
               (dat (pref samples index)))
           (* amp (if (> posi lgth) 0.0 (pref dat posx))))))))
 
@@ -142,17 +142,17 @@
 ;;
 ;; slower but less noisy (default)
 (bind-func sampler_note_hermite_c
-  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i32|* index pan:SAMPLE offset:SAMPLE)
+  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index pan:SAMPLE offset:SAMPLE)
     (let ((idx_freq (midi2frq (convert index)))
           (channels:i64 (convert (pref samples_channels index)))
           (phase (+ offset (convert (pref samples_offsets index))))) ;; phase unit is audio frames
-      (lambda (time:SAMPLE chan:i32 freq:SAMPLE amp:SAMPLE)
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (let ((rate (/ freq idx_freq))              
               (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
                        (set! phase (+ phase rate))
                        phase))
               (posi:i64 (convert (floor pos)))
-              (posx (+ (* posi channels) (if (< (i32toi64 chan) channels) (i32toi64 chan) 0)))
+              (posx (+ (* posi channels) (if (< chan channels) chan 0)))
               (lgth:i64 (- (pref samples_length index) 10))
               (dat (pref samples index)))
           (if (< (fabs (- rate 1.0)) 0.01)
@@ -172,7 +172,7 @@
         (pan_ pan)
         (wet .1)
         (fb .5))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
@@ -187,7 +187,7 @@
         (pan_ pan)
         (wet .1)
         (fb .5))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
@@ -202,7 +202,7 @@
         (pan_ pan)
         (wet .1)
         (fb .5))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
@@ -217,7 +217,7 @@
         (pan_ pan)
         (wet .1)
         (fb .5))
-    (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (if (< pan pan_)
           (set! pan_ (- pan_ .001))
           (set! pan_ (+ pan_ .001)))
@@ -231,18 +231,18 @@
      (let ((poly:i64 48)
            (samples:|20,|128,SAMPLE*||* (zalloc)) ;; 128 samples * 20 'banks'
            (samples_length:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
-           (samples_channels:|20,|128,i32||* (zalloc)) ;; 128 samples * 10
+           (samples_channels:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
            (samples_offsets:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
-           (notes:[SAMPLE,SAMPLE,SAMPLE,i32]** (zalloc poly))
-           (attack:SAMPLE 200.0)
-           (decay:SAMPLE 200.0)
-           (release:SAMPLE 1000.0)
+           (notes:[SAMPLE,SAMPLE,i64,i64]** (zalloc poly))
+           (attack:i64 200)
+           (decay:i64 200)
+           (release:i64 1000)
            (sustain:SAMPLE 1.0) ;; amplitude of the sustain
            (gain:SAMPLE 2.0)
            (kk:i64 0) (ii:i64 0)
            ;;(active:i64 0)
-           (note_starts:SAMPLE* (zalloc poly))
-           (new_note (lambda (start freq dur amp nargs:i64 dargs:SAMPLE*)
+           (note_starts:i64* (zalloc poly))
+           (new_note (lambda (start:i64 freq dur amp nargs:i64 dargs:SAMPLE*)
                        (let ((free_note:i64 -1)
                              (bank:i32 (if (< nargs 1) (i64toi32 0) (convert (pref dargs 0))))
                              (idx:i64 (convert (floor (frq2midi freq))))
@@ -250,7 +250,7 @@
                              (i:i64 0) (iii:i64 0) (idxi:i64 0)
                              (new_idx idx))
                          (dotimes (i poly) ;; check for free poly spot
-                           (if (> (pref note_starts i) 9999999999998.0)
+                           (if (> (pref note_starts i) 9999999999998)
                                (set! free_note i)))
                          (if (> free_note -1) ;; if we found a free poly spot assign a note
                              (begin (dotimes (idxi 128)
@@ -282,8 +282,8 @@
            (aset! (aref-ptr samples_offsets ii) kk 0)
            (aset! (aref-ptr samples_length ii) kk 0)))
        (dotimes (ii poly) ;; sets all notes to inactive
-         (pset! note_starts ii 9999999999999.0))
-       (lambda (in:SAMPLE time:SAMPLE chan:i32 dat:SAMPLE*)
+         (pset! note_starts ii 9999999999999))
+       (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
          (let ((out:SAMPLE 0.0)
                (k:i64 0))
            (dotimes (k poly) ;; sum all active notesx
