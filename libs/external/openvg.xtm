@@ -472,9 +472,26 @@
 
 ;; setup
 
-(bind-func xtm_vg_create_context
+(bind-func xtm_vg_create_contexti32
+  (lambda (w h)
+    (vgCreateContextSH w h)))
+
+(bind-func xtm_vg_create_contexti64
   (lambda (w h)
     (vgCreateContextSH (i64toi32 w) (i64toi32 h))))
+
+(bind-func xtm_vg_create_contextf
+  (lambda (w h)
+    (vgCreateContextSH (ftoi32 w) (ftoi32 h))))
+
+(bind-func xtm_vg_create_contextd
+  (lambda (w h)
+    (vgCreateContextSH (dtoi32 w) (dtoi32 h))))
+
+(bind-poly xtm_vg_create_context xtm_vg_create_contexti32)
+(bind-poly xtm_vg_create_context xtm_vg_create_contexti64)
+(bind-poly xtm_vg_create_context xtm_vg_create_contextf)
+(bind-poly xtm_vg_create_context xtm_vg_create_contextd)
 
 (bind-func xtm_vg_reset_matrices
   (lambda ()
@@ -495,16 +512,34 @@
 (bind-alias xtm_colour |4,VGfloat|)
 (bind-alias xtm_color xtm_colour)
 
-(bind-func xtm_vg_clear_rect
+(bind-func xtm_vg_clear_rect32
+  (lambda (r g b a x y w h)
+    (let ((clear_colour:xtm_colour* (salloc)))
+      (afill! clear_colour r g b a)
+      (vgSetfv VG_CLEAR_COLOR 4 (cast clear_colour VGfloat*))
+      (vgClear x y w h))))
+
+(bind-func xtm_vg_clear_rect64
   (lambda (r g b a x y w h)
     (let ((clear_colour:xtm_colour* (salloc)))
       (afill! clear_colour (dtof r) (dtof g) (dtof b) (dtof a))
       (vgSetfv VG_CLEAR_COLOR 4 (cast clear_colour VGfloat*))
       (vgClear (i64toi32 x) (i64toi32 y) (i64toi32 w) (i64toi32 h)))))
 
-(bind-func xtm_vg_clear
+(bind-poly xtm_vg_clear_rect xtm_vg_clear_rect32)
+(bind-poly xtm_vg_clear_rect xtm_vg_clear_rect64)
+
+;; perhaps need 32 and 64-bit versions of this one as well?
+(bind-func xtm_vg_clear32
+  (lambda (r g b a w h)
+    (xtm_vg_clear_rect32 r g b a 0 0 w h)))
+
+(bind-func xtm_vg_clear64
   (lambda (r g b a w h)
     (xtm_vg_clear_rect r g b a 0 0 w h)))
+
+(bind-poly xtm_vg_clear xtm_vg_clear32)
+(bind-poly xtm_vg_clear xtm_vg_clear64)
 
 ;; paint
 
@@ -794,6 +829,14 @@
 (bind-poly xtm_draw_poly xtm_draw_polyf)
 (bind-poly xtm_draw_poly xtm_draw_polyd)
 
+(bind-func xtm_draw_trif
+  (lambda (x1 y1 x2 y2 x3 y3)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_trif path x1 y1 x2 y2 x3 y3)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
 (bind-func xtm_draw_trid
   (lambda (x1 y1 x2 y2 x3 y3)
     (let ((path (xtm_create_vgpath))
@@ -802,18 +845,26 @@
           (xtm_draw_path path))
       void)))
 
-;; no xtm_draw trif for the moment
+(bind-poly xtm_draw_tri xtm_draw_trif)
 (bind-poly xtm_draw_tri xtm_draw_trid)
 
+(bind-func xtm_draw_quadf
+  (lambda (x1 y1 x2 y2 x3 y3 x4 y4)
+    (let ((path (xtm_create_vgpath))
+	  (vgu_err (xtm_add_quadf path x1 y1 x2 y2 x3 y3 x4 y4)))
+      (if (= vgu_err VGU_NO_ERROR)
+	  (xtm_draw_path path))
+      void)))
+
 (bind-func xtm_draw_quadd
-  (lambda ( x1 y1 x2 y2 x3 y3 x4 y4)
+  (lambda (x1 y1 x2 y2 x3 y3 x4 y4)
     (let ((path (xtm_create_vgpath))
           (vgu_err (xtm_add_quadd path x1 y1 x2 y2 x3 y3 x4 y4)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
       void)))
 
-;; no xtm_draw quadf for the moment
+(bind-poly xtm_draw_quad xtm_draw_quadf)
 (bind-poly xtm_draw_quad xtm_draw_quadd)
 
 (bind-func xtm_draw_rectf
@@ -892,7 +943,7 @@
 (bind-poly xtm_draw_arc xtm_draw_arcf)
 (bind-poly xtm_draw_arc xtm_draw_arcd)
 
-;; path transformations
+;; path matrix transformations
 
 (bind-func xtm_path_translatef
   (lambda (tx ty)
@@ -992,7 +1043,7 @@
   (lambda (image)
     (vgDrawImage image)))
 
-;; image transformations
+;; image matrix transformations
 
 (bind-func xtm_vgimage_translatef
   (lambda (tx ty)
