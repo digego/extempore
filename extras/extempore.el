@@ -1619,9 +1619,9 @@ You shouldn't have to modify this list directly, use
 						 extempore-send-region
 						 extempore-send-buffer))
 			       (prin1-to-string
-                                (read (concat "(" (buffer-substring-no-properties (car arg-list) (cadr arg-list)) ")")))
-                             (prin1-to-string arg-list))))
-                  extempore-logger-cache))))
+				(read (concat "(" (remove ?\# (buffer-substring-no-properties (car arg-list) (cadr arg-list))) ")")))
+			     (prin1-to-string arg-list))))
+		  extempore-logger-cache))))
 
 (defun extempore-logger-add-comment (comment)
   (interactive "sAny comments about this particular session? ")
