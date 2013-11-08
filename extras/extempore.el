@@ -1663,7 +1663,7 @@ You shouldn't have to modify this list directly, use
 
 (defun extempore-logger-finish-logfile ()
   (extempore-logger-flush)
-  (async-shell-command (format "bzip2 %s" extempore-logger-logfile)))
+  (async-shell-command (format "gzip %s" extempore-logger-logfile)))
 
 (defvar extempore-logger-write-timer nil)
 (defvar extempore-logger-write-timer-interval 10.0)
