@@ -31,6 +31,10 @@
     (bind-alias cpxSAMPLE cpxd)
     (bind-alias cpxSAMPLE cpxf))
 
+(if (= 1 (audio_64bit))
+    (bind-val cpxSAMPLE_SIZE i64 16)
+    (bind-val cpxSAMPLE_SIZE i64 8))
+
 ;; uniform partitioned convolution in frq domain
 ;; expects mono aif/wav audio file at samplerate
 (bind-func spectral_convolution_c
@@ -55,7 +59,7 @@
       (printf "IR:(%.1f seconds) Partitions(size:%lld num:%lld)\n" (ftod (/ (convert irlgth) (convert SR))) lgth parts)
       ;; partition and store IR spectra (circlar convolution so padded)
       (dotimes (i parts)
-        (memset (cast A i8*) 0 (* 16 padlgth)) ;; zero pad
+        (memset (cast A i8*) 0 (* cpxSAMPLE_SIZE padlgth)) ;; zero pad
         (read_audio_data path output (* i lgth) lgth 0)
         (fill_cpx_buffer output A lgth)
         (fft A (pref-ptr irs (* i padlgth)) padlgth))
@@ -77,7 +81,7 @@
               ;; forward FFT of incoming signal
               (fftr (if aorb drya dryb) B padlgth)
               ;; store FFT to use 'now' and also for 'delayed' use
-              (memcpy (cast _fft i8*) (cast B i8*) (* padlgth 16))
+              (memcpy (cast _fft i8*) (cast B i8*) (* padlgth cpxSAMPLE_SIZE))
               ;; run convolution over all partions
               (dotimes (i parts)
                 (set! j (% (+ parts (- po i)) parts))
@@ -113,7 +117,7 @@
   (lambda (pathl pathr lgth)
     (let ((convl (spectral_convolution_c pathl lgth))
           (convr (spectral_convolution_c pathr lgth)))
-      (lambda (chan:i32 in dry wet)
+      (lambda (chan:i64 in dry wet)
         (cond ((= chan 0)
                (convl in dry wet))
               ((= chan 1)

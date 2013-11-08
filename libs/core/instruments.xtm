@@ -43,8 +43,7 @@
                 (if (= channel 0) (set! t (+ t 1)))
                 (if (< t (+ dur release))
                     (kernel t channel freq (* (env t channel) amp))
-                    ;; (begin (pset! nstarts idx 9999999999999.0)
-                    (begin (pset! nstarts idx 999999999)
+                    (begin (pset! nstarts idx 9999999999999)
                            (llvm_zone_destroy notezone)
                            0.0)))))
       ff)))
@@ -59,7 +58,7 @@
 (bind-func _play_note
   (lambda (time inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* freq amp dur nargs:i64 dargs)
     (if (> freq 10.0)        
-        (let ((f (inst.new_note:[i64,SAMPLE,SAMPLE,SAMPLE,SAMPLE,i64,SAMPLE*]*)))
+        (let ((f (inst.new_note:[i64,i64,SAMPLE,i64,SAMPLE,i64,SAMPLE*]*)))
           (f time freq dur amp nargs dargs)
           ;; so that we only copy an integer from memzone
           1)
@@ -88,7 +87,7 @@
 (define play-note
   (lambda (time inst pitch vol dur . args)
     (let* ((nargs (length args))
-           (duration (* 1.0 dur))
+           (duration dur)
            (dargs (sys:make-cptr (* (if (audio_64bit) 8 4) nargs))) ;; doubles
            (native (if (procedure? inst)
                        (llvm:get-native-closure (llvm:ffi-get-name inst))
@@ -99,11 +98,11 @@
           (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
           (dotimes (i nargs) (cptr:set-float dargs (* i 4) (eval (list-ref args i)))))
       (if (cptr? native)
-          (_play_note time
+          (_play_note (real->integer time)
                       native
                       (midi2frq (* 1.0 pitch))
                       (/ (exp (/ vol 26.222)) 127.0)
-                      duration
+                      (real->integer duration)
                       nargs
                       dargs)
           (print-error 'No 'inst 'named (symbol->string inst))))))
@@ -140,7 +139,7 @@
                           (dotimes (i poly) ;; check for free poly spot
                             ;;(printf "%d:%f\n" i (ftod (pref note_starts i)))
                             (if (> (pref note_starts i) 9999999999998)
-                                (set! free_note i)))          
+                                (set! free_note i)))
                           (if (> free_note -1) ;; if we found a free poly spot assign a note
                               (let ((note_zone (push_zone (* 1024 ,(if (null? args) 10 (car args))))))
                                 (pset! notes free_note
