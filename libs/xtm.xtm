@@ -356,7 +356,7 @@
 ;;
 ;; CHANGE AUDIO VARIABLES TO REFLECT CURRENT STATE 
 (bind-func setup_audio_vals
-  (lambda (a:float b:i64 c:i64 d:i64)
+  (lambda (a:SAMPLE b:i64 c:i64 d:i64)
     (set! SVF_LOWPASS 1)
     (set! SVF_HIGHPASS 2)
     (set! SVF_BANDPASS 3)
@@ -582,9 +582,9 @@
 
 ;; external/instruments_ext.xtm
 
-(bind-lib-func stdlib set_sample_data_ [i64,[float,float,float,float*]*,i8*,i64,i64,i64,i32,i32]*)
-(bind-lib-func stdlib clear_sample_data_ [i64,[float,float,float,float*]*,i64,i32]*)
-(bind-lib-func stdlib set_sample_offset_ [i64,[float,float,float,float*]*,i64,i64]*)
+(bind-lib-func stdlib set_sample_data_ [i64,[float,float,i64,i64,float*]*,i8*,i64,i64,i64,i32,i32]*)
+(bind-lib-func stdlib clear_sample_data_ [i64,[float,float,i64,i64,float*]*,i64,i32]*)
+(bind-lib-func stdlib set_sample_offset_ [i64,[float,float,i64,i64,float*]*,i64,i64]*)
 (bind-lib-func stdlib sampler_note_linear_c [[float,i64,i64,float,float]*,|128,float*|*,|128,i64|*,|128,i64|*,i64,float,i64]*)
 (bind-lib-func stdlib sampler_note_hermite_c [[float,i64,i64,float,float]*,|128,float*|*,|128,i64|*,|128,i64|*,|128,i64|*,i64,float,float]*)
 (bind-lib-func stdlib sampler_fx [float,float,i64,i64,float*]* 400000)
@@ -600,8 +600,8 @@
 
 (bind-lib-func stdlib spectral_convolution_c [[float,float,float,float]*,i8*,i64]*)
 (bind-lib-func stdlib spectral_convolution_c_ [[float,float,float,float]*,i8*]*)
-(bind-lib-func stdlib creverb_st_c_a [[float,float,float,float,float]*,i8*,i8*,i64]*)
-(bind-lib-func stdlib creverb_st_c_b [[float,float,float,float,float]*,i8*,i8*]*)
+(bind-lib-func stdlib creverb_st_c_a [[float,i64,float,float,float]*,i8*,i8*,i64]*)
+(bind-lib-func stdlib creverb_st_c_b [[float,i64,float,float,float]*,i8*,i8*]*)
 (bind-poly creverb_c spectral_convolution_c)
 (bind-poly creverb_c spectral_convolution_c_)
 (bind-poly creverb_st_c creverb_st_c_a)
@@ -642,11 +642,11 @@
 	  (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
 	  (dotimes (i nargs) (cptr:set-float dargs (* i 4) (eval (list-ref args i)))))
       (if (cptr? native)
-	  (_play_note time
+	  (_play_note (real->integer time)
                       native
                       (midi2frq (* 1.0 pitch))
                       (/ (exp (/ vol 26.222)) 127.0)
-                      duration
+                      (real->integer duration)
                       nargs
                       dargs)
           (print-error 'No 'inst 'named (symbol->string inst))))))
@@ -727,32 +727,33 @@
 			     (real->integer ,index)
 			     (real->integer ,offset)))))
 
+
 ;; make sampler instrument
 (define-macro (define-sampler name note_kernel effect_kernel)
   `(bind-func ,name 100000
      (let ((poly:i64 48)
-	   (samples:|20,|128,SAMPLE*||* (zalloc)) ;; 128 samples * 20 'banks'
+           (samples:|20,|128,SAMPLE*||* (zalloc)) ;; 128 samples * 20 'banks'
            (samples_length:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
            (samples_channels:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
            (samples_offsets:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
-	   (notes:[SAMPLE,SAMPLE,i64,i64]** (zalloc poly))
-	   (attack:i64 200)
-	   (decay:i64 200)
-	   (release:i64 1000)
-	   (sustain:SAMPLE 1.0) ;; amplitude of the sustain
-	   (gain:SAMPLE 2.0)
+           (notes:[SAMPLE,SAMPLE,i64,i64]** (zalloc poly))
+           (attack:i64 200)
+           (decay:i64 200)
+           (release:i64 1000)
+           (sustain:SAMPLE 1.0) ;; amplitude of the sustain
+           (gain:SAMPLE 2.0)
            (kk:i64 0) (ii:i64 0)
            ;;(active:i64 0)
-	   (note_starts:i64* (zalloc poly))
-	   (new_note (lambda (start:i64 freq dur amp nargs:i64 dargs:SAMPLE*)
+           (note_starts:i64* (zalloc poly))
+           (new_note (lambda (start:i64 freq dur amp nargs:i64 dargs:SAMPLE*)
                        (let ((free_note:i64 -1)
-			     (bank:i32 (if (< nargs 1) (i64toi32 0) (convert (pref dargs 0))))
-			     (idx:i64 (convert (floor (frq2midi freq))))
+                             (bank:i32 (if (< nargs 1) (i64toi32 0) (convert (pref dargs 0))))
+                             (idx:i64 (convert (floor (frq2midi freq))))
                              (closest 1000000)
                              (i:i64 0) (iii:i64 0) (idxi:i64 0)
                              (new_idx idx))
                          (dotimes (i poly) ;; check for free poly spot
-			   (if (> (pref note_starts i) 9999999999998)
+                           (if (> (pref note_starts i) 9999999999998)
                                (set! free_note i)))
                          (if (> free_note -1) ;; if we found a free poly spot assign a note
                              (begin (dotimes (idxi 128)
@@ -784,14 +785,16 @@
            (aset! (aref-ptr samples_offsets ii) kk 0)
            (aset! (aref-ptr samples_length ii) kk 0)))
        (dotimes (ii poly) ;; sets all notes to inactive
-	 (pset! note_starts ii 9999999999999))
+         (pset! note_starts ii 9999999999999))
        (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
-	 (let ((out:SAMPLE 0.0)
+         (let ((out:SAMPLE 0.0)
                (k:i64 0))
            (dotimes (k poly) ;; sum all active notesx
              (if (< (pref note_starts k) time)
                  (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
            (* gain (,effect_kernel out time chan dat)))))))
+
+
 
 ;; must be stereo samples of type wav aif or ogg
 (define-macro (load-sampler sampler path . args)
