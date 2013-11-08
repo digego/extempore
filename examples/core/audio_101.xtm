@@ -18,7 +18,8 @@
 ;;; Code:
 
 ;; bind some global audio values 
-(bind-val SAMPLERATE double (integer->real *au:samplerate*))
+(bind-val SAMPLERATE SAMPLE (integer->real *au:samplerate*))
+(bind-val SR SAMPLE (integer->real *au:samplerate*))
 (bind-val CHANNELS i64 *au:channels*)
 (bind-val IN_CHANNELS i64 *au:in-channels*)
 (bind-val FRAMES i64 *au:block-size*)
@@ -34,8 +35,8 @@
 
 ;; compile sample by sample dsp code
 (bind-func dsp
-  (lambda (in:double time:double channel:double	data:double*)
-    (* .2 (random))))
+  (lambda (in:SAMPLE time:i64 channel:i64	data:SAMPLE*)
+    (* .2 (dtof (random)))))
 
 
 ;; set compiled function named "dsp" to be the dsp callback
@@ -47,11 +48,11 @@
 
 ;; recompile dsp to produce two sine wave in left and right
 (bind-func dsp
-  (lambda (in:double time:double channel:double	data:double*)
+  (lambda (in:SAMPLE time:i64 channel:i64	data:SAMPLE*)
     (cond ((= channel 0.0)
-           (* 0.5 (sin (* 3.141592 2.0 200.0 (/ time 44100.0)))))
+	   (* 0.5 (sin (* 3.141592 2.0 200.0 (/ (i64tof time) SR)))))
           ((= channel 1.0)
-           (* 0.5 (sin (* 3.141592 2.0 210.0 (/ time 44100.0)))))
+	   (* 0.5 (sin (* 3.141592 2.0 210.0 (/ (i64tof time) SR)))))
           (else	0.0))))
 
 
@@ -59,7 +60,7 @@
 (bind-func osc_c
    (lambda (phase)
       (lambda (amp freq)
-         (let ((inc (* 3.141592 (* 2.0 (/ freq 44100.)))))
+	 (let ((inc (* 3.141592 (* 2.0 (/ freq SR)))))
             (set! phase (+ phase inc))
             (* amp (sin phase))))))
 
@@ -68,7 +69,7 @@
 (bind-func dsp
   (let ((osc1 (osc_c 0.0))
 	(osc2 (osc_c 0.0)))
-    (lambda (in:double time:double channel:double data:double*)
+    (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
       (cond ((= channel 1.0) (osc1 0.5 200.0))
 	    ((= channel 0.0) (osc2 0.5 210.0))
 	    (else 0.0)))))
@@ -76,11 +77,11 @@
 
 ;; slightly more complex example
 (bind-func dsp
-  (let ((oscs:|9,[double,double,double]*|* (zalloc))
+  (let ((oscs:|9,[SAMPLE,SAMPLE,SAMPLE]*|* (zalloc))
 	(i 0))
     (dotimes (i 9)
        (aset! oscs i (osc_c 0.0)))
-    (lambda (a:double b:double c:double d:double*)
+    (lambda (a:SAMPLE b:i64 c:i64 d:SAMPLE*)
       (cond ((= c 0.0) ;; left channel
              (+ ((aref oscs 0) (+ 0.3 ((aref oscs 2) 0.2 1.0)) 60.0)
 		((aref oscs 3) 0.2 220.0)
@@ -105,7 +106,7 @@
 	(osc2 (osc_c 0.0))
 	(freq1 220.0)
 	(freq2 220.0))
-    (lambda (in:double time:double channel:double data:double*)
+    (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
       (cond ((= channel 1.0) (osc1 0.3 freq1))
 	    ((= channel 0.0) (osc2 0.3 freq2))
 	    (else 0.0)))))
@@ -114,8 +115,8 @@
 ;; of closure slots freq1 and freq2
 (bind-func change_freq
   (lambda (freq1 freq2)
-    (dsp.freq1:double freq1)
-    (dsp.freq2:double freq2)))
+    (dsp.freq1:SAMPLE freq1)
+    (dsp.freq2:SAMPLE freq2)))
 
 
 ;; a "normal scheme" temporal recursion
