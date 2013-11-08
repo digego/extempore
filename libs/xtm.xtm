@@ -4598,9 +4598,7 @@ void main()
 (bind-lib libopenvg vguComputeWarpQuadToQuad [i32,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float*]*)
 (bind-lib-func stdlib xtm_vg_print_error [i32]*)
 (bind-lib-func stdlib xtm_vg_create_contexti32 [i32,i32,i32]*)
-(bind-lib-func stdlib xtm_vg_create_contexti64 [i32,i64,i64]*)
 (bind-lib-func stdlib xtm_vg_create_contextf [i32,float,float]*)
-(bind-lib-func stdlib xtm_vg_create_contextd [i32,double,double]*)
 (bind-lib-func stdlib xtm_vg_reset_matrices [void]*)
 (bind-lib-func stdlib xtm_create_vgpath [i8*]*)
 (bind-alias xtm_colour |4,float|)
@@ -4696,10 +4694,14 @@ void main()
 (bind-lib-func stdlib xtm_color32_alpha [double,i8*]*)
 (bind-lib-func stdlib xtm_set_color32_alpha [i8,i8*,double]*)
 
+;; a scheme helper for xtm_vg_create_context
+(define xtm-vg-create-context
+  (lambda (w h)
+    (xtm_vg_create_contexti32 (real->integer w)
+			      (real->integer h))))
+
 (bind-poly xtm_vg_create_context xtm_vg_create_contexti32)
-(bind-poly xtm_vg_create_context xtm_vg_create_contexti64)
 (bind-poly xtm_vg_create_context xtm_vg_create_contextf)
-(bind-poly xtm_vg_create_context xtm_vg_create_contextd)
 
 (bind-poly xtm_vg_clear_rect xtm_vg_clear_rect32)
 (bind-poly xtm_vg_clear_rect xtm_vg_clear_rect64)

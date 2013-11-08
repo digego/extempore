@@ -476,22 +476,18 @@
   (lambda (w h)
     (vgCreateContextSH w h)))
 
-(bind-func xtm_vg_create_contexti64
-  (lambda (w h)
-    (vgCreateContextSH (i64toi32 w) (i64toi32 h))))
-
 (bind-func xtm_vg_create_contextf
   (lambda (w h)
     (vgCreateContextSH (ftoi32 w) (ftoi32 h))))
 
-(bind-func xtm_vg_create_contextd
-  (lambda (w h)
-    (vgCreateContextSH (dtoi32 w) (dtoi32 h))))
-
 (bind-poly xtm_vg_create_context xtm_vg_create_contexti32)
-(bind-poly xtm_vg_create_context xtm_vg_create_contexti64)
 (bind-poly xtm_vg_create_context xtm_vg_create_contextf)
-(bind-poly xtm_vg_create_context xtm_vg_create_contextd)
+
+;; a scheme helper for xtm_vg_create_context
+(define xtm-vg-create-context
+  (lambda (w h)
+    (xtm_vg_create_contexti32 (real->integer w)
+			      (real->integer h))))
 
 (bind-func xtm_vg_reset_matrices
   (lambda ()

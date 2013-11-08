@@ -15,9 +15,8 @@
 ;; (define height 1200.0)
 (define width 1024.0)
 (define height 768.0)
-
-(bind-val width double width)
-(bind-val height double height)
+(bind-val width float width)
+(bind-val height float height)
 
 ;; setup opengl
 (define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
@@ -29,11 +28,8 @@
 (sys:load "libs/external/openvg.xtm")
 
 ;; init xtm render pipeline
-(xtm_render_setup (real->integer width) (real->integer height))
-
-(let ((vg-ctx-res (xtm_vg_create_context (real->integer width) (real->integer height))))
-  (if (<> vg-ctx-res 1)
-      (xtm_vg_print_error)))
+(xtm_render_setup width height)
+(if (<> (xtm-vg-create-context width height) 1) (xtm_vg_print_error))
 
 (bind-func post:XTMRENDERCB
   (let ((image:VGImage (xtm_load_vgimage "assets/images/image.png")))
@@ -50,8 +46,8 @@
 	(dotimes (i 200.0)
           (xtm_add_ellipse
            path
-	   (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (i64tod frame)))))
-	   (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (i64tod frame)))))
+	   (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (i64tof frame)))))
+	   (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (i64tof frame)))))
            30.
            30.))
         ;; draw the image
