@@ -889,6 +889,9 @@ namespace extemp {
 	    else if(pair_car(args) == _sc->T) {
 		ss << "#t";
 	    }
+            else if(pair_car(args) == _sc->EOF_OBJ) {
+                // igore end of file
+            }
 	    else if(is_closure(pair_car(args))) {
 		std::stringstream tmp;
 		UNIV::printSchemeCell(_sc, tmp, closure_code(pair_car(args)), true);
@@ -927,6 +930,9 @@ namespace extemp {
 	}
 	else if(value == _sc->T) {
 	    ss << "#t";
+	}
+	else if(value == _sc->EOF_OBJ) {
+          // ignore eof
 	}
 	else if(is_closure(value)) {
 	    std::stringstream tmp;

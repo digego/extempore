@@ -5949,7 +5949,7 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
 		    if(i<n) {
 			ok=0;
 			std::stringstream ss;
-			// imp::SchemeInterface::printSchemeCell(sc, ss, sc->args, true);
+			extemp::UNIV::printSchemeCell(sc, ss, sc->args, true);
 			sprintf(msg,"function(%s): argument %d must be: %s\nargument values: %s",
 				pcd->name,
 				i+1,

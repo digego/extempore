@@ -479,6 +479,8 @@ namespace extemp {
 	    }else{
 		ss << std::fixed << std::showpoint << /* << std::setprecision(15) <<*/ rvalue(val);
 	    }
+        }else if(_sc->EOF_OBJ == val){
+          ss << "#<EOF>";
 	}else{
 	    ss << "UNKOWN VALUE: " << val << " (GC'd?) ";
 	}
