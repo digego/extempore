@@ -24,6 +24,31 @@
 (sys:load-preload-check 'math)
 (define *xtmlib-math-loaded* #t)
 
+;;;;;;;;;;;;;;; some simple predicates trailing p for predicate ;;;;
+
+(bind-func even64
+  (lambda (x)
+    (if (= (bitwise-and x 1) 0) #t #f)))
+
+(bind-func even32
+  (lambda (x:i32)
+    (if (= (bitwise-and x 1) 0) #t #f)))
+
+(bind-func odd64
+  (lambda (x)
+    (if (= (bitwise-and x 1) 0) #f #t)))
+
+(bind-func odd32
+  (lambda (x:i32)
+    (if (= (bitwise-and x 1) 0) #f #t)))
+
+(bind-poly evenp even64)
+(bind-poly evenp even32)
+(bind-poly oddp odd64)
+(bind-poly oddp odd32)
+
+;;;;;;;;;;;;;;;;;;;; radians
+
 (bind-func deg2rad_f
   (lambda (degrees:float)
     (/ degrees 57.2957795)))
@@ -895,28 +920,44 @@
 ;; complex addition
 (bind-func cpxf_add_buf
   (lambda (a:cpxf* b:cpxf* c:cpxf* lgth)
-    (let ((i 0))
-      (dotimes (i lgth)
-        (tset! (pref-ptr c i) 0
-               (+ (tref (pref-ptr a i) 0)
-                  (tref (pref-ptr b i) 0)))
-        (tset! (pref-ptr c i) 1
-               (+ (tref (pref-ptr a i) 1)
-                  (tref (pref-ptr b i) 1))))
-      void)))
+    (if (evenp lgth)
+        (let ((aa:/4,float/* (cast a))
+              (bb:/4,float/* (cast b))
+              (cc:/4,float/* (cast c))
+              (k 0))
+          (dotimes (k (/ lgth 2))
+            (pset! cc k (+ (pref-ptr aa k) (pref-ptr bb k)))
+            void))    
+        (let ((i 0))
+          (dotimes (i lgth)
+            (tset! (pref-ptr c i) 0
+                   (+ (tref (pref-ptr a i) 0)
+                      (tref (pref-ptr b i) 0)))
+            (tset! (pref-ptr c i) 1
+                   (+ (tref (pref-ptr a i) 1)
+                      (tref (pref-ptr b i) 1))))
+          void))))
 
 ;; complex subtraction (in zone!)
 (bind-func cpxf_sub_buf
   (lambda (a:cpxf* b:cpxf* c:cpxf* lgth)
-    (let ((i 0))
-      (dotimes (i lgth)
-        (tset! (pref-ptr c i) 0
-               (- (tref (pref-ptr a i) 0)
-                  (tref (pref-ptr b i) 0)))
-        (tset! (pref-ptr c i) 1
-               (- (tref (pref-ptr a i) 1)
-                  (tref (pref-ptr b i) 1))))
-      void)))
+    (if (evenp lgth)
+        (let ((aa:/4,float/* (cast a))
+              (bb:/4,float/* (cast b))
+              (cc:/4,float/* (cast c))
+              (i 0))
+          (dotimes (i (/ lgth 2))
+            (pset! cc i (- (pref-ptr aa i) (pref-ptr bb i)))
+            void))    
+        (let ((i 0))
+          (dotimes (i lgth)
+            (tset! (pref-ptr c i) 0
+                   (- (tref (pref-ptr a i) 0)
+                      (tref (pref-ptr b i) 0)))
+            (tset! (pref-ptr c i) 1
+                   (- (tref (pref-ptr a i) 1)
+                      (tref (pref-ptr b i) 1))))
+          void))))
 
 ;; complex multiplication (in zone!)
 (bind-func cpxf_mul_buf
