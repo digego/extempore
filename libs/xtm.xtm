@@ -287,25 +287,25 @@
 (define *xtmlib-fft-loaded* #f)
 (print "Loading FFT library...         ")
 
-(bind-alias kiss_fft_scalar double)
-(bind-alias kiss_fft_cpx cpxd)
+(bind-alias kiss_fft_scalar float)
+(bind-alias kiss_fft_cpx cpxf)
 
 (bind-alias kiss_fft_cfg i8*)
 (bind-alias kiss_fftr_cfg i8*)
 
 (bind-lib kissfft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
-(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,cpxd*,cpxd*]*)
-(bind-lib kissfft kiss_fft_stride [i8*,kiss_fft_cfg,cpxd*,cpxd*,i32]*)
+(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,cpxf*,cpxf*]*)
+(bind-lib kissfft kiss_fft_stride [i8*,kiss_fft_cfg,cpxf*,cpxf*,i32]*)
 (bind-lib kissfft kiss_fft_cleanup [i8*,i8*]*)
 (bind-lib kissfft kiss_fft_next_fast_size [i32,i32]*)
 (bind-lib kissfft kiss_fftr_alloc [kiss_fftr_cfg,i32,i32,i8*,i64*]*)
-(bind-lib kissfft kiss_fftr [i8*,kiss_fftr_cfg,double*,cpxd*]*)
-(bind-lib kissfft kiss_fftri [i8*,kiss_fftr_cfg,cpxd*,double*]*)
+(bind-lib kissfft kiss_fftr [i8*,kiss_fftr_cfg,float*,cpxf*]*)
+(bind-lib kissfft kiss_fftri [i8*,kiss_fftr_cfg,cpxf*,float*]*)
 
-(bind-lib-func stdlib fft [void,cpxd*,cpxd*,i64]*)
-(bind-lib-func stdlib ifft [void,cpxd*,cpxd*,i64]*)
-(bind-lib-func stdlib fftr [void,double*,cpxd*,i64]*)
-(bind-lib-func stdlib ifftr [void,cpxd*,double*,i64]*)
+(bind-lib-func stdlib fft [void,cpxf*,cpxf*,i64]*)
+(bind-lib-func stdlib ifft [void,cpxf*,cpxf*,i64]*)
+(bind-lib-func stdlib fftr [void,float*,cpxf*,i64]*)
+(bind-lib-func stdlib ifftr [void,cpxf*,float*,i64]*)
 
 (define *xtmlib-fft-loaded* #t)
 (ascii-print-color 0 2 10)
@@ -597,6 +597,14 @@
 (bind-lib-func stdlib sampler3 [float,float,i64,i64,float*]* 100000)
 
 ;; external/audio_dsp_ext.xtm
+
+(if (= 1 (audio_64bit))
+    (bind-alias cpxSAMPLE cpxd)
+    (bind-alias cpxSAMPLE cpxf))
+
+(if (= 1 (audio_64bit))
+    (bind-val cpxSAMPLE_SIZE i64 16)
+    (bind-val cpxSAMPLE_SIZE i64 8))
 
 (bind-lib-func stdlib spectral_convolution_c [[float,float,float,float]*,i8*,i64]*)
 (bind-lib-func stdlib spectral_convolution_c_ [[float,float,float,float]*,i8*]*)
