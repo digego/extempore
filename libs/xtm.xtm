@@ -609,25 +609,6 @@
 
 ;; here's all the necessary scheme stuff from all the audio & instrument files
 
-;; playnote wrapper
-(define-macro (play-note time inst pitch vol dur . args)
-  (let ((nargs (length args)))
-    `(let ((duration (* 1.0 ,dur))
-	   (dargs (sys:make-cptr ,(* (if (audio_64bit) 8 4) nargs)))
-	   (native (llvm:get-native-closure ,(symbol->string inst))))
-       (if (audio_64bit)
-	   (dotimes (i ,nargs) (cptr:set-double dargs (* i 8) (eval (list-ref ',args i))))
-	   (dotimes (i ,nargs) (cptr:set-float dargs (* i 4) (eval (list-ref ',args i)))))
-       (if (cptr? native)
-	   (_play_note time
-		       native
-		       (midi2frq (* 1.0 ,pitch))
-		       (/ (exp (/ ,vol 26.222)) 127.0)
-		       duration
-		       ,nargs
-		       dargs)
-	   (print-error 'No 'inst 'named ,(symbol->string inst))))))
-
 (define play-note
   (lambda (time inst pitch vol dur . args)
     (let* ((nargs (length args))
@@ -638,7 +619,7 @@
 		       (llvm:get-native-closure (if (symbol? inst)
 						    (symbol->string inst)
 						    inst)))))
-      (if (audio_64bit)
+      (if (= (audio_64bit) 1)
 	  (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
 	  (dotimes (i nargs) (cptr:set-float dargs (* i 4) (eval (list-ref args i)))))
       (if (cptr? native)
