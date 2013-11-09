@@ -12,25 +12,23 @@
 (sys:load "libs/core/instruments.xtm")
 (sys:load "libs/core/pc_ivl.xtm")
 
-(llvm:export-module "/tmp/audio.bc")
-
-(bind-func dsp:[double,double,double,double,double*]*
+(bind-func dsp:DSP
   (lambda (in time chan dat)
     (cond ((< chan 2.0)
-	   (+ (* 2.0 (simplefm in time chan dat))
+	   (+ (* 1.0 (fmsynth in time chan dat))
               (* 1.0 (fmpad in time chan dat))))
 	  (else 0.0))))
 
 (dsp:set! dsp)
 
-(play-note (now) simplefm (random 60 90) 80 44100)
+(play-note (now) fmsynth (random 60 90) 80 44100)
 
 (define root 0)
 
 ;; first let's play with synth
 (define l1
   (lambda (beat dur cell)
-    (play simplefm (pc:quantize (car cell) (pc:scale root 'aeolian))
+    (play fmsynth (pc:quantize (car cell) (pc:scale root 'aeolian))
           (cosr 90 10 2) (* dur .2) 0.1 10.0)
     (callback (*metro* (+ beat (* dur .5))) 'l1
 	      (+ beat dur)
@@ -40,11 +38,20 @@
 
 (l1 (*metro* 'get-beat 4) 1/4 '(60 63 62 67 72 65 84 77 65 67)) ;; start one playing quavers
 
+(fmpad_fx.wet 0.2)
+(fmpad_fx.cwet 1.0)
+(fmpad_fx.cfb 0.8)
+(fmpad_fx.fb 0.5)
+(fmpad_fx.res 0.4)
+
+(fmpad.attack 100000)
+(fmpad.release 100000)
+
 (define l2
   (lambda (beat dur)
     (set! root (modulo (random '(0 2 5 7)) 12))
     (map (lambda (p)
-           (play fmpad p 80 dur 1.0 1.0))
+           (play fmpad p 70 (* .75 dur) 0.5 1.0))
          (pc:make-chord 40 80 4 (pc:chord root '-7)))
     (callback (*metro* (+ beat (* .95 dur))) 'l2 (+ beat dur)
               dur)))
