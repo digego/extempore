@@ -2826,6 +2826,68 @@
       (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
       (impc:ir:strip-space os))))
 
+;;
+;; takes a vector and b vector
+;; vector a and b must be same type
+;; the length of a and b then define
+;; the number of args that (vshuffle takes)
+;; these args are index values into both a and b
+;;
+;; i.e. assuming /4,float/* for a and b
+;; (vshuffle a b 0 3 4 5)
+;; returns a new vector which is made up of
+;; 0 -> first element of a
+;; 3 -> last element of a
+;; 4 -> first element of b
+;; 5 -> second element of b
+;;
+;; (vshuffle a null 0 2 1 3)
+;; just shuffles a only
+;;
+(define impc:ir:compiler:vector-shuffle
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+	   (index-str (impc:ir:compiler (caddr ast) types *impc:ir:si32*)) ;; i32
+           (a-str (impc:ir:compiler (cadr ast) types))
+	   (aval (impc:ir:gname))
+	   (_at (impc:ir:get-type-from-str (cadr aval)))
+           (b-str (impc:ir:compiler (caddr ast) types))
+           (bval (impc:ir:gname))
+	   (_bt (impc:ir:get-type-from-str (cadr bval)))
+           (args (cdddr ast)))
+      ;; type tests
+      (if (and (number? _bt) (<> _bt 108))
+          (if (or (not (impc:ir:vector? _at))
+                  (not (impc:ir:vector? _bt))
+                  (<> (cadr _at) (cadr _bt)))
+              (print-error 'Compiler 'Error: 'Shuffle 'Type 'Mismatch: _at 'and _bt 'must 'be 'same 'type 'vectors)))
+      ;; total shuffle elements must match vector length
+      (if (<> (length (cdddr ast))
+              (cadr _at))
+	  (print-error 'Compiler 'Error: 'Number 'of 'shuffle 'elements 'must 'match 'vector 'size: (cadr _at)))
+      ;; type tests done
+      (emit "; shuffle vector\n" os)      
+      (emit a-str os)
+      (emit b-str os)
+      ;; dereference any vector pointers
+      (if (impc:ir:pointer? (cadr aval))
+          (begin (emit (impc:ir:gname "val" (impc:ir:get-type-str (impc:ir:pointer-- (cadr aval)))) " = load " (cadr aval) " " (car aval) "\n" os)
+                 (set! aval (impc:ir:gname))))
+      (if (and (list? _bt)
+               (impc:ir:pointer? (cadr bval)))
+          (begin (emit (impc:ir:gname "val" (impc:ir:get-type-str (impc:ir:pointer-- (cadr bval)))) " = load " (cadr bval) " " (car bval) "\n" os)
+                 (set! bval (impc:ir:gname))))
+      (emit (impc:ir:gname "vect" (impc:ir:get-type-str (impc:ir:pointer-- _at)))
+            " = shufflevector "
+            (cadr aval) " " (car aval) ", "
+            (cadr aval) " " (if (number? _bt) "undef" (car bval)) ", "
+            (string-append "<" (number->string (cadr _at)) " x i32> <i32 " (number->string (car args))
+                           (apply string-append (map (lambda (a) (string-append ", i32 " (number->string a)))
+                                                     (cdr args)))
+                           ">") os)
+      (impc:ir:strip-space os))))
+
+
 
 (define impc:ir:compiler:zone-alloc-without-size
   (lambda (ast types hint?)
@@ -4132,6 +4194,8 @@
                     (impc:ir:compiler:vector-set ast types))
                    ((equal? (car ast) 'vector-ref)
                     (impc:ir:compiler:vector-ref ast types))
+                   ((equal? (car ast) 'vector-shuffle)
+                    (impc:ir:compiler:vector-shuffle ast types))
                    ((equal? (car ast) 'pointer-ref)
                     (impc:ir:compiler:pointer-ref ast types))
                    ((equal? (car ast) 'pointer-ref-ptr)

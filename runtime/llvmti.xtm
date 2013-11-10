@@ -738,6 +738,7 @@
 			    ((eq? ast 'pref-ptr) 'pointer-ref-ptr)
 			    ((eq? ast 'vset!) 'vector-set!)
 			    ((eq? ast 'vref) 'vector-ref)
+                            ((eq? ast 'vshuffle) 'vector-shuffle)
 			    ((eq? ast 'aset!) 'array-set!)
 			    ((eq? ast 'aref) 'array-ref)
 			    ((eq? ast 'aref-ptr) 'array-ref-ptr)
@@ -2886,6 +2887,16 @@
 		 (list (caddr (car a))))))))
 
 
+(define impc:ti:vector-shuffle-check
+  (lambda (ast vars kts request?)
+    ;;(println 'vector-ref-check: 'ast: ast 'vars: vars 'kts: kts)
+    (let ((a (impc:ti:type-check (cadr ast) vars kts request?))
+          (b (impc:ti:type-check (caddr ast) vars kts request?)))
+      (if (impc:ir:type? a) (set! a (list a)))
+      (if (impc:ir:pointer? (car a))
+          (impc:ir:pointer-- (car a))
+          (car a)))))
+
 
 (define impc:ti:pointer-set-check
   (lambda (ast vars kts request?)
@@ -3541,7 +3552,8 @@
             ((and (list? ast) (member (car ast) '(llvm_sprintf))) (impc:ti:sprintf-check ast vars kts request?))
             ;((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(vector-set!))) (impc:ti:vector-set-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(vector-ref))) (impc:ti:vector-ref-check ast vars kts request?))	    
+            ((and (list? ast) (member (car ast) '(vector-ref))) (impc:ti:vector-ref-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(vector-shuffle))) (impc:ti:vector-shuffle-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-set!))) (impc:ti:array-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref))) (impc:ti:array-ref-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(array-ref-ptr))) (impc:ti:array-ref-ptr-check ast vars kts request?))
