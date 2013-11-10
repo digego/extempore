@@ -1,0 +1,51 @@
+(sys:load "libs/xtm.xtm")
+(xtm_audio_setup)
+
+(load-sampler sampler "assets/samples/808/" 0)
+
+(sampler.attack 300)
+(sampler.decay 300)
+(sampler.release 500)
+
+(define test808
+  (lambda (beat dur)
+    (play sampler 
+          (case (modulo beat 4) 
+            ((0 1 2 3) 59)
+            ((1/2 3/2 5/2 7/2) 51)
+            (else -1))
+          160 .05)
+    (play sampler (random '(60 58 55 64)) (cosr 120 40 7/3) .01)
+    (callback (*metro* (+ beat (* .5 dur))) 'test808 (+ beat dur) dur)))
+
+(test808 (*metro* 'get-beat 4) 1/4)
+
+(fmsynth_fx.wet .17)
+(fmsynth_fx.dfb .15)
+
+(define bass
+  (lambda (beat ps ds)
+    (play fmsynth (- (car ps) 12) (cosr 60 40 7/3) (* .6 (car ds))
+          (trir 0.0 2.0 5/3) 0.5)
+    (callback (*metro* (+ beat (* .5 (car ds)))) 'bass (+ beat (car ds))
+              (rotate ps -1)
+              (rotate ds -1))))
+
+(bass (*metro* 'get-beat 4)
+      (make-list-with-proc
+       16
+       (lambda (i)
+         (random '(60 60 72 72 62 67 70)))) '(1/4))
+
+(define m2
+  (lambda (beat ps ds)
+    (play fmsynth (car ps) (cosr 65 25 5/3) (* .6 (car ds)) 0.5 10.0)
+    (play fmsynth (+ 7 (car ps)) (cosr 60 20 7/3) (* .6 (car ds)) 0.5 10.0)
+    (play fmsynth (+ 12 (car ps)) (cosr 60 15 2/3) (* .6 (car ds)) 0.5 10.0)
+    (callback (*metro* (+ beat (* .5 (car ds)))) 'm2 (+ beat (car ds))
+              (if (= (modulo beat 36) 0)
+                  (jumble ps)
+                  (rotate ps -1))
+              (rotate ds -1))))
+
+(m2 (*metro* 'get-beat 4) '(60 62 67 65 72 70 58) '(1/4))
