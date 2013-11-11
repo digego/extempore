@@ -67,6 +67,41 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; some simple conversions 
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func amp2db  
+  (lambda (x:SAMPLE)
+    (* 20. (log10 x))))
+
+(bind-func db2amp
+  (lambda (x:SAMPLE)
+    (pow 10. (/ x 20.))))
+
+
+;; root mean squared (mono passthrough)
+;; grab current rms value from val:
+;;
+;; updates VAL every FRAMES
+;; passes mono signal straight through
+;;
+;; val as DB
+;;
+(bind-func rms_c
+  (lambda ()
+    (let ((d:SAMPLE* (alloc FRAMES))
+          (t 0)
+          (val:SAMPLE 0.0))
+      (lambda (x:SAMPLE)
+        (pset! d (% t FRAMES) (* x x))
+        (set! t (+ t 1))
+        (if (= 0 (% t FRAMES))
+            (set! val (amp2db (sqrt (mean d)))))
+        x))))
+
 ;; amount of curve
 ;;
 ;; width is duration of the curve

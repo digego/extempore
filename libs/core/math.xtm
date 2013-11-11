@@ -26,28 +26,28 @@
 
 ;;;;;;;;;;;;;;; some simple predicates trailing p for predicate ;;;;
 
-(bind-func even64
+(bind-func eveni64
   (lambda (x)
     (if (= (bitwise-and x 1) 0) #t #f)))
 
-(bind-func even32
+(bind-func eveni32
   (lambda (x:i32)
     (if (= (bitwise-and x 1) 0) #t #f)))
 
-(bind-func odd64
+(bind-func oddi64
   (lambda (x)
     (if (= (bitwise-and x 1) 0) #f #t)))
 
-(bind-func odd32
+(bind-func oddi32
   (lambda (x:i32)
     (if (= (bitwise-and x 1) 0) #f #t)))
 
-(bind-poly evenp even64)
-(bind-poly evenp even32)
-(bind-poly oddp odd64)
-(bind-poly oddp odd32)
+(bind-poly evenp eveni64)
+(bind-poly evenp eveni32)
+(bind-poly oddp oddi64)
+(bind-poly oddp oddi32)
 
-;;;;;;;;;;;;;;;;;;;; radians
+;;;;;;;;;;;;;;;;;;;; radians and degrees
 
 (bind-func deg2rad_f
   (lambda (degrees:float)
@@ -70,6 +70,142 @@
 (bind-poly rad2deg rad2deg_d)
 (bind-poly rad2deg rad2deg_f)
 
+
+;;;;;;;;;;;;;;;; default sort!
+
+(bind-func _qsortd
+  (lambda (dat:double* left right)
+    (if (< left right)
+        (let ((tmp 0.0)
+              (swap (lambdas (x y)
+                      (set! tmp (pref dat x))
+                      (pset! dat x (pref dat y))
+                      (pset! dat y tmp)))
+              (pivot (pref dat right))
+              (index left)
+              (i 0))
+          (dotimes (i left (- right left))
+            (if (or (< (pref dat i) pivot)
+                    (= (pref dat i) pivot))
+                (begin (swap i index)
+                       (set! index (+ index 1)))))
+          (swap right index)
+          (_qsortd dat left (- index 1))
+          (_qsortd dat (+ index 1) right))
+        void)))
+
+(bind-func _qsortf
+  (lambda (dat:float* left right)
+    (if (< left right)
+        (let ((tmp 0.0)
+              (swap (lambdas (x y)
+                      (set! tmp (pref dat x))
+                      (pset! dat x (pref dat y))
+                      (pset! dat y tmp)))
+              (pivot (pref dat right))
+              (index left)
+              (i 0))
+          (dotimes (i left (- right left))
+            (if (or (< (pref dat i) pivot)
+                    (= (pref dat i) pivot))
+                (begin (swap i index)
+                       (set! index (+ index 1)))))
+          (swap right index)
+          (_qsortf dat left (- index 1))
+          (_qsortf dat (+ index 1) right))
+        void)))
+
+(bind-func sortd
+  (lambda (arr:double* lgth)
+    (_qsortd arr 0 (- lgth 1))
+    arr))
+
+(bind-func sortf
+  (lambda (arr:float* lgth)
+    (_qsortf arr 0 (- lgth 1))
+    arr))
+
+(bind-poly sort sortd)
+(bind-poly sort sortf)
+
+;;;;;;;;;;;;;;;; mean, median, mode
+;; need to extend these to ints
+
+(bind-func meand
+  (lambda (x:double* lgth:i64)
+    (let ((s 0.0) (i 0))
+      (dotimes (i lgth)
+        (set! s (+ s (pref x i))))
+      (/ s (i64tod lgth)))))
+
+(bind-func meanf
+  (lambda (x:float* lgth:i64)
+    (let ((s 0.0) (i 0))
+      (dotimes (i lgth)
+        (set! s (+ s (pref x i))))
+      (/ s (i64tof lgth)))))
+
+(bind-poly mean meand)
+(bind-poly mean meanf)
+
+(bind-func mediand
+  (lambda (x:double* lgth:i64)
+    (let ((h (sort x lgth))
+          (idx (dtoi64 (ceil (/ (i64tod lgth) 2.0)))))
+      (if (evenp lgth)
+          (/ (+ (pref h idx) (pref h (- idx 1))) 2.0)
+          (pref h idx)))))
+
+(bind-func medianf
+  (lambda (x:float* lgth:i64)
+    (let ((h (sort x lgth))
+          (idx (dtoi64 (ceil (/ (i64tod lgth) 2.0)))))
+      (if (evenp lgth)
+          (/ (+ (pref h idx) (pref h (- idx 1))) 2.0)
+          (pref h idx)))))
+
+(bind-poly median mediand)
+(bind-poly median medianf)
+
+;; naive mode needs to be replaced!
+(bind-func moded
+  (lambda (x:double* lgth:i64)
+    (let ((h (sort x lgth))
+          (p 0.0) (l 0) (largest 0) (j:double 0.0) (i 0))
+      (dotimes (i lgth)
+        (if (= p (pref x i))
+            (set! l (+ l 1)) ;; increment l
+            (set! l 0))
+        (set! p (pref x i))
+        (if (> l largest)
+            (begin
+              (set! largest l)
+              (set! j p))))
+      j)))
+
+(bind-func modef
+  (lambda (x:float* lgth:i64)
+    (let ((h (sort x lgth))
+          (p 0.0) (l 0) (largest 0) (j:float 0.0) (i 0))
+      (dotimes (i lgth)
+        (if (= p (pref x i))
+            (set! l (+ l 1)) ;; increment l
+            (set! l 0))
+        (set! p (pref x i))
+        (if (> l largest)
+            (begin
+              (set! largest l)
+              (set! j p))))
+      j)))
+
+(bind-poly mode modef)
+(bind-poly mode moded)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; random numbers
+;;
 
 ;; gaussian random number X ~ N(0,1)
 ;; algorithm by Marsaglia http://c-faq.com/lib/gaussian.html
