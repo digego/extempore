@@ -147,11 +147,13 @@
     (let ((mv (salloc 48))
           (mvp (pref-ptr mv 16))
           (mn (pref-ptr mv 32)))
-      (mmul m 4 4 v 4 4 mv) ;; final mv set
+      ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
+      (mmul4 m v mv) ;; final mv set
       (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
       (minv mn 4 mvp) ;; using mvp as a temporary      
       (mat4_to_mat3 mvp mn)  ;; final mn set
-      (mmul mv 4 4 p 4 4 mvp) ;; final mvp set
+      ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
+      (mmul4 mv p mvp)
       (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
       (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
       (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
@@ -180,18 +182,23 @@
       (let ((mlv:float* (salloc 16))
             (mlvp:float* (salloc 16))
             (mlvpb:float* (salloc 16)))
-        (mmul m 4 4 lv 4 4 mlv)
-        (mmul mlv 4 4 p 4 4 mlvp)
-        (mmul mlvp 4 4 biasmc 4 4 mlvpb)
+        ;;(mmul m 4 4 lv 4 4 mlv)
+        (mmul4 m lv mlv)
+        ;;(mmul mlv 4 4 p 4 4 mlvp)
+        (mmul4 mlv p mlvp)
+        ;;(mmul mlvp 4 4 biasmc 4 4 mlvpb)
+        (mmul4 mlvp biasmc mlvpb)
         (glUniformMatrix4fv (glGetUniformLocation id "LightModelViewProjectionMatrix") 1 GL_FALSE mlvpb))
       (let ((mv (salloc 48))
             (mvp (pref-ptr mv 16))
             (mn (pref-ptr mv 32)))
-        (mmul m 4 4 v 4 4 mv) ;; final mv set
+        ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
+        (mmul4 m v mv) ;; final mv set
         (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
         (minv mn 4 mvp) ;; using mvp as a temporary      
         (mat4_to_mat3 mvp mn)  ;; final mn set
-        (mmul mv 4 4 p 4 4 mvp) ;; final mvp set
+        ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
+        (mmul4 mv p mvp) ;; final mvp set
         (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
         (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
         (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
@@ -224,19 +231,24 @@
       (dotimes (i lights)
         (let ((mlv:float* (salloc 16))
               (mlvp:float* (salloc 16)))
-          (mmul m 4 4 (pref-ptr lv (* i 16)) 4 4 mlv)
-          (mmul mlv 4 4 p 4 4 mlvp)
-          (mmul mlvp 4 4 biasmc 4 4 (pref-ptr mlvpb (* i 16)))))
+          ;; (mmul m 4 4 (pref-ptr lv (* i 16)) 4 4 mlv)
+          (mmul4 m (pref-ptr lv (* i 16)) mlv)
+          ;;(mmul mlv 4 4 p 4 4 mlvp)
+          (mmul4 mlv p mlvp)
+          ;; (mmul mlvp 4 4 biasmc 4 4 (pref-ptr mlvpb (* i 16)))))
+          (mmul4 mlvp biasmc (pref-ptr mlvpb (* i 16)))))
       (glUniformMatrix4fv (glGetUniformLocation id "LightModelViewProjectionMatrix")
                           lights GL_FALSE mlvpb)
       (let ((mv (salloc 48))
             (mvp (pref-ptr mv 16))
             (mn (pref-ptr mv 32)))
-        (mmul m 4 4 v 4 4 mv) ;; final mv set
+        ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
+        (mmul4 m v mv) ;; final mv set
         (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
         (minv mn 4 mvp) ;; using mvp as a temporary      
         (mat4_to_mat3 mvp mn)  ;; final mn set
-        (mmul mv 4 4 p 4 4 mvp) ;; final mvp set
+        ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
+        (mmul4 mv p mvp) ;; final mvp set
         (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
         (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
         (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
@@ -600,7 +612,8 @@
           (begin (memcpy (cast m i8*) (cast model i8*) (* 4 16)) 1)
           (begin
             (mtrans transmat 4 4 m2)
-            (mmul m2 4 4 model 4 4 m)
+            ;;(mmul m2 4 4 model 4 4 m)
+            (mmul4 m2 model m)
             1))
       (xtm_update_matrices shader m view projection)
       ;; first draw meshes

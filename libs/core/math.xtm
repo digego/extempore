@@ -635,10 +635,37 @@
 		       r1 c1 r2 c2)
 	       (cast null i32*)))))
 
+
+;; optimized 4x4 matrix only!!!
+;; NEED TO ALSO DO integers and doubles!!
+(bind-func mmul4f
+  (lambda (ma:float* mb:float* mc:float*)
+    (let ((row1:/4,float/* (cast (pref-ptr mb 0)))
+          (row2:/4,float/* (cast (pref-ptr mb 4)))
+          (row3:/4,float/* (cast (pref-ptr mb 8)))
+          (row4:/4,float/* (cast (pref-ptr mb 12)))
+          (out:/4,float/* (cast mc))
+          (tmp:/4,float/* null) (i 0))
+      (dotimes (i 4)
+        (set! tmp (cast (pref-ptr ma (* 4 i))))
+        (let ((a (vshuffle tmp null 0 0 0 0))
+              (b (vshuffle tmp null 1 1 1 1))
+              (c (vshuffle tmp null 2 2 2 2))
+              (d (vshuffle tmp null 3 3 3 3)))
+          (pset! out i
+                 (+ (+ (* a row1)
+                       (* b row2))
+                    (+ (* c row3)
+                       (* d row4))))))
+      mc)))
+
+
 (bind-poly mmul mmuld)
 (bind-poly mmul mmulf)
 (bind-poly mmul mmuli64)
 (bind-poly mmul mmuli32)
+(bind-poly mmul4 mmul4f)
+
 
 ;; matrix transposition (doubles)
 (bind-func mtransd
