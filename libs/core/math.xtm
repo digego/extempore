@@ -140,10 +140,19 @@
 
 (bind-func meanf
   (lambda (x:float* lgth:i64)
-    (let ((s 0.0) (i 0))
-      (dotimes (i lgth)
-        (set! s (+ s (pref x i))))
-      (/ s (i64tof lgth)))))
+    (if (= (& lgth 3) 0) ;; i.e. mod 4
+        (let ((xx:/4,float/* (cast x))
+              (sum:/4,float/* (alloc))
+              (j 0))
+          (dotimes (j (/ lgth 4))
+            (pset! sum 0 (+ (pref-ptr xx j) sum)))
+          (/ (+ (vref sum 0) (vref sum 1)
+                (vref sum 2) (vref sum 3))
+             (i64tof lgth)))
+        (let ((s 0.0) (i 0))
+          (dotimes (i lgth)
+            (set! s (+ s (pref x i))))
+          (/ s (i64tof lgth))))))
 
 (bind-poly mean meand)
 (bind-poly mean meanf)
@@ -171,7 +180,7 @@
 (bind-func moded
   (lambda (x:double* lgth:i64)
     (let ((h (sort x lgth))
-          (p 0.0) (l 0) (largest 0) (j:double 0.0) (i 0))
+          (p NaNd) (l 0) (largest 0) (j:double 0.0) (i 0))
       (dotimes (i lgth)
         (if (= p (pref x i))
             (set! l (+ l 1)) ;; increment l
@@ -186,7 +195,7 @@
 (bind-func modef
   (lambda (x:float* lgth:i64)
     (let ((h (sort x lgth))
-          (p 0.0) (l 0) (largest 0) (j:float 0.0) (i 0))
+          (p NaNf) (l 0) (largest 0) (j:float 0.0) (i 0))
       (dotimes (i lgth)
         (if (= p (pref x i))
             (set! l (+ l 1)) ;; increment l
