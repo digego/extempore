@@ -25,10 +25,16 @@
 (bind-func dsp:DSP 100000000
   (let ((reverb (creverb_st_c "assets/ir/minsterl.aif"
                               "assets/ir/minsterr.aif"))
+        (rms (rms_st_c))
+        (left:SAMPLE 0.0)
+        (right:SAMPLE 0.0)
         (wet 2.0)
-        (dry 0.3))    
-    (lambda (in time chan dat)
-      (reverb chan (sampler in time chan dat) dry wet))))
+        (dry 0.3))
+    (lambda (in:SAMPLE time chan dat:SAMPLE*)
+      (if (= 0 (% time FRAMES))
+          (begin (set! left (rms.left))
+                 (set! right (rms.right))))
+      (rms chan (* 1.0 (reverb chan (sampler in time chan dat) dry wet))))))
 
 (dsp:set! dsp)
 
@@ -56,7 +62,7 @@
 
 (define print-load
   (lambda (beat dur)
-    (println 'load: (* 100. (sys:audio-load)))
+    (println 'load: (* 100. (sys:audio-load)) 'db: (list (dsp.left) (dsp.right)))
     (callback (*metro* (+ beat (* .5 dur))) 'print-load (+ beat dur) dur)))
 
 (print-load (*metro* 'get-beat 4) 1)
