@@ -85,21 +85,48 @@
 ;; root mean squared (mono passthrough)
 ;; grab current rms value from val:
 ;;
-;; updates VAL every FRAMES
+;; updates db every FRAMES
 ;; passes mono signal straight through
 ;;
-;; val as DB
+;; DB is (RMS is +3db - i.e. dBFS with sine 1.0 at 0.0db)
 ;;
 (bind-func rms_c
   (lambda ()
     (let ((d:SAMPLE* (alloc FRAMES))
           (t 0)
-          (val:SAMPLE 0.0))
+          (db:SAMPLE 0.0))
       (lambda (x:SAMPLE)
         (pset! d (% t FRAMES) (* x x))
         (set! t (+ t 1))
         (if (= 0 (% t FRAMES))
-            (set! val (amp2db (sqrt (mean d FRAMES)))))
+            (set! db (+ 3.0 (amp2db (sqrt (mean d FRAMES))))))
+        x))))
+
+;; rms
+;;
+;; left and right are db
+;; (RMS is +3db - i.e. dBFS with sine 1.0 at 0.0db)
+;;
+(bind-func rms_st_c
+  (lambda ()
+    (let ((lgth (* 1 FRAMES))
+          (dl:SAMPLE* (alloc lgth))
+          (dr:SAMPLE* (alloc lgth))
+          (t 0)
+          (left:SAMPLE 0.0)
+          (right:SAMPLE 0.0))
+      (lambda (chan:i64 x:SAMPLE)
+        (if (= chan 0)
+            (begin (pset! dl (% t lgth) (* x x))
+                   (set! t (+ t 1))
+                   ;;(printf "left %f\n" (ftod left))
+                   (if (= 0 (% t lgth))
+                       (begin
+                         (set! left (+ 3.0 (amp2db (sqrt (mean dl lgth)))))
+                         (set! right (+ 3.0 (amp2db (sqrt (mean dr lgth)))))))
+                   void)
+            (begin (pset! dr (% t lgth) (* x x))
+                   void))
         x))))
 
 ;; amount of curve
@@ -245,8 +272,8 @@
       (lambda (phase)   
 	(let ((sqr (square_c phase))
 	      (mem 0.0))
-	  (lambda (chan amp freq n)	
-	    (if (< chan 1.0) (set! mem (sqr amp freq n)))
+	  (lambda (chan:i64 amp freq n)	
+	    (if (= chan 0) (set! mem (sqr amp freq n)))
 	    mem)))))
 
 ;; a 'leaky' integrator
@@ -277,8 +304,8 @@
       (lambda (phase)
 	(let ((mem 0.0)
 	      (tri (triangle_c phase)))
-	  (lambda (chan amp freq n)
-	    (if (< chan 1.0) (set! mem (tri amp freq n)))
+	  (lambda (chan:i64 amp freq n)
+	    (if (= chan 0) (set! mem (tri amp freq n)))
 	    mem)))))
 
 ;; rect wave oscillator - useful for pulse width modulation
@@ -321,7 +348,7 @@
 	(let ((mem 0.0)
 	      (saw (saw_c phase)))
 	  (lambda (chan:i64 amp freq)
-	    (if (< chan 1.0) (set! mem (saw amp freq)))
+	    (if (= chan 0) (set! mem (saw amp freq)))
 	    mem)))))
 
 ;; white noise generator
@@ -359,8 +386,8 @@
       (lambda ()
 	(let ((pulse (pulse_c))
 	      (mem 0.0))
-	  (lambda (chan amp freq width)
-	    (if (< chan 1.0) (set! mem (pulse amp freq width)))
+	  (lambda (chan:i64 amp freq width)
+	    (if (= chan 0) (set! mem (pulse amp freq width)))
 	    mem)))))
 
 ;; linear fade closure
