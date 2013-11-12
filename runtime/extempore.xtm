@@ -39,12 +39,32 @@
 
 (suppress-compiler-messages #t)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SETUP NAN's
+(bind-val NaNf float 0.0)
+(bind-val NaNd double 0.0)
+
+(bind-func __set_float_nans
+  (lambda ()
+    (let ((nan32 #x7FC00000)
+          (nan64 #x7FFC000000000000)
+          (n32:i32* (alloc))
+          (n64:i64* (alloc)))
+      (pset! n32 0 nan32)
+      (pset! n64 0 nan64)
+      (set! NaNf (pref (cast n32 float*) 0))
+      (set! NaNd (pref (cast n64 double*) 0))
+      void)))
+
+(__set_float_nans)
+
+
 ;;;;;;;;;;;;; this for audio ;;;;;;;;;;;;;;;;;;
 ;; THESE ALL NEED TO BE CHANGED TOGETHER!!!!
 (bind-alias SAMPLE float)
 (bind-func audio_64bit (lambda () #f))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- 
+
 (bind-poly random imp_randf)
 (bind-poly random imp_randd)
 
