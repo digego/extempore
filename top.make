@@ -23,15 +23,17 @@ LD := $(PLATFORM_LD)
 
 CXXFLAGS := \
 	-w -O3 -MMD \
+	$(CPPFLAGS) \
 	$(LLVM_CXXFLAGS) \
 	$(PLATFORM_CXXFLAGS) \
 	$(DEFINES) \
 	$(EXT_USER_ARGS) \
 	-Iinclude \
-        -fexceptions \
-        -frtti \
+  -fexceptions \
+  -frtti \
 
 LDFLAGS := \
+	$(LDFLAGS) \
 	$(EXT_LLVM_LDFLAGS) \
 	$(PLATFORM_LDFLAGS) \
 
