@@ -1136,12 +1136,32 @@
           (% (set! x_ptr (+ x_ptr 1)) n)
           out)))))
 
-(bind-func env_follow_c
+(bind-func hilb_env_follow_c
   (lambda (n)
     (let ((hilb (hilbert_c n)))
       (lambda (x:SAMPLE)
         (sqrt (+ (pow x 2.0)
                  (pow (hilb x) 2.0)))))))
+
+
+(bind-func env_follow_c
+  (lambda (ms:SAMPLE)
+    (let ((y1 0.0)
+          (coeff (/ 1000. (* ms SR))))      
+      (lambda (x:SAMPLE)
+        (set! y1 (+ x (* coeff (- y1 x))))
+        y1))))
+
+
+(bind-func atkrel_env_follow_c
+  (lambda (atk:SAMPLE rel:SAMPLE)
+    (let ((y1 0.0)
+          (atkcoeff (/ 1000. (* atk SR)))
+          (relcoeff (/ 1000. (* rel SR))))          
+      (lambda (x)
+        (set! y1 (+ x (* (if (> x y1) atkcoeff relcoeff) (- y1 x))))
+        y1))))
+
 
 ;;
 ;; moog VCF

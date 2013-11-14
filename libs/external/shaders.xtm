@@ -637,6 +637,7 @@
 (bind-val xtm_render_light_shaders |8,i32|)
 (bind-val xtm_render_simple_shader i32 0)
 (bind-val xtm_render_quad_shader i32 0)
+(bind-val xtm_render_dof_shader i32 0)
 (bind-val xtm_render_x i32 0)
 (bind-val xtm_render_y i32 0)
 (bind-val xtm_render_w i32 1024)
@@ -665,6 +666,11 @@
     (set! xtm_render_quad_shader (create_shader_xtm v f))
     void))
 
+(bind-func xtm_render_init_dof_shader
+  (lambda (v f)
+    (set! xtm_render_dof_shader (create_shader_xtm v f))
+    void))
+
 (bind-func xtm_draw_tex
   (lambda (shader:i32 tex:i32 m v p)
     (glUseProgram shader)
@@ -679,7 +685,67 @@
     (glUseProgram 0)
     void))
 
+
+;; fp represents the focal point
+;; as a distance from the current camera location (in meters)
+;;
+;; dof is the depth of field 1.1 is very shallow 1.5 is quite deep
+;;
+(bind-func xtm_dof_fx
+  (let ((show_depth 0)
+        (near 0.0)
+        (far 0.0)
+        (dof 1.4)
+        (blur 2.0))
+    (lambda (fbo:E_fbo* fp model view projection)
+      (let ((shader (xtm_render_dof_shader))
+            (framebufsize:float* (alloc 2)))
+        (glDisable GL_DEPTH_TEST)                        
+        (glUseProgram xtm_render_dof_shader)
+        (shader_update_matrices xtm_render_dof_shader model view projection)
+        (glActiveTexture GL_TEXTURE0)            
+        (glBindTexture GL_TEXTURE_2D (tref fbo 2))
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+        (glActiveTexture GL_TEXTURE2)
+        (glBindTexture GL_TEXTURE_2D (tref fbo 1))
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+        (glUniform1i (glGetUniformLocation xtm_render_dof_shader "dBuf") 0)
+        (glUniform1i (glGetUniformLocation xtm_render_dof_shader "cBuf") 2)
+        (glUniform1f (glGetUniformLocation xtm_render_dof_shader "blur") blur)
+        (glUniform1f (glGetUniformLocation xtm_render_dof_shader "dof") dof)
+        (if (> near -0.01)
+            (glUniform1f (glGetUniformLocation xtm_render_dof_shader "near") near)
+            (glUniform1f (glGetUniformLocation xtm_render_dof_shader "near") xtm_render_near))            
+        (if (> far 0.0)
+            (glUniform1f (glGetUniformLocation xtm_render_dof_shader "far") far)
+            (glUniform1f (glGetUniformLocation xtm_render_dof_shader "far") xtm_render_far))
+        (set! fp (/ fp far))
+        (glUniform1f (glGetUniformLocation xtm_render_dof_shader "fp") fp)        
+        (pfill! framebufsize (i32tof xtm_render_w) (i32tof xtm_render_h))
+        (glUniform2fv (glGetUniformLocation xtm_render_dof_shader "frameBufSize") 1 framebufsize)
+        (glUniform1i (glGetUniformLocation xtm_render_dof_shader "show_depth") show_depth)        
+        (gl_draw_shader_quad 0.0 0.0 1.0 1.0 0.0 1.0 1.0)        
+        (glActiveTexture GL_TEXTURE0) 
+        (glBindTexture GL_TEXTURE_2D 0)
+        (glActiveTexture GL_TEXTURE2) 
+        (glBindTexture GL_TEXTURE_2D 0)
+        (glUseProgram 0)
+        void))))      
+      
+
 (bind-func xtm_render_fbo
+  (let ((fbo:E_fbo* null))
+    (lambda ()
+      (if (null? fbo) (set! fbo (create_fbo xtm_render_w xtm_render_h 0 0)))
+      fbo)))
+
+(bind-func xtm_shader_fbo
   (let ((fbo:E_fbo* null))
     (lambda ()
       (if (null? fbo) (set! fbo (create_fbo (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
@@ -687,9 +753,10 @@
 
 (bind-func xtm_render_setup_a
   (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8* s2f_nl:i8* s4v:i8* s4f:i8*)
-    (xtm_render_fbo)    
     (set! xtm_render_w w)
     (set! xtm_render_h h)
+    (xtm_shader_fbo)        
+    (xtm_render_fbo)        
     ;; (set! xtm_render_s1 (create_shader_xtm s1v s1f))
     ;; (set! xtm_render_s2 (create_shader_xtm s2v s2f))
     ;; (set! xtm_render_s3 (create_shader_xtm s2v s2f_nl))
@@ -719,6 +786,7 @@
 (define xtm_render_setup
   (lambda (w h . args)
     (xtm_render_init_quad_shader quad-vert quad-frag)
+    (xtm_render_init_dof_shader quad-vert dof_frag)
     (xtm_render_init_simple_shader simple-vert-xtm simple-frag)
     (xtm_render_init_light_shaders xtmvert0 xtmfrag0 xtmvert1 xtmfrag1 xtmvert2 xtmfrag2 xtmvert3 xtmfrag3 xtmvert4 xtmfrag4 xtmvert5 xtmfrag5)
     (if (null? args)
@@ -756,14 +824,17 @@
         (lights:xtm_lights* (xtm_get_lights))
         (camera:xtm_camera* (xtm_get_camera))
         (activelights:i32 0)
+        (framebufsize:float* (alloc 2))
         (sh1:i32 0)
         (sh2:i32 0)
         (model:float* (alloc 16))
         (view:float* (alloc 16))
         (projection:float* (alloc 16))
-        (fbo:E_fbo* null))
+        (shadow_fbo:E_fbo* null)
+        (render_fbo:E_fbo* null))
     (lambda (pre:XTMRENDERCB opaque:XTMRENDERCB transparent:XTMRENDERCB post:XTMRENDERCB data:i8*)
-      (set! fbo (xtm_render_fbo))
+      (set! shadow_fbo (xtm_shader_fbo))
+      (set! render_fbo (xtm_render_fbo))      
       (glShadeModel GL_SMOOTH)
       (glEnable GL_DEPTH_TEST)
       (glEnable GL_TEXTURE_2D)
@@ -780,7 +851,7 @@
             (fill_identity_matrix model) ;; set model
             (pre frame 0 model view projection data)))
 
-      (glBindFramebuffer GL_FRAMEBUFFER (tref fbo 0))
+      (glBindFramebuffer GL_FRAMEBUFFER (tref shadow_fbo 0))
       ;;(set! sh1 xtm_render_s1)
       (set! sh1 xtm_render_simple_shader)
       (glUseProgram sh1)
@@ -809,12 +880,14 @@
       ;;      
       ;; make sure we are not writing to a framebuffer!
       (glBindFramebuffer GL_FRAMEBUFFER 0)
+      ;; actually we want to render to the render fbo
+      (glBindFramebuffer GL_FRAMEBUFFER (tref render_fbo 0))
       (set! sh2 (aref xtm_render_light_shaders activelights))
       ;;(set! sh2 (if (> activelights 0) xtm_render_s2 xtm_render_s3))
       (glUseProgram sh2)
       ;; setup shadowmap texture from FBO
       (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
-      (glBindTexture GL_TEXTURE_2D (tref fbo 2))      
+      (glBindTexture GL_TEXTURE_2D (tref shadow_fbo 2))      
       (glUniform1i (glGetUniformLocation sh2 "shadowMap") 0)      
       ;;(shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
       ;; draw scene
@@ -839,11 +912,18 @@
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
 
-      (if (not (null? post))
+      (if (null? post)
+          (begin ;; if no post then just render fbo            
+            (glDisable GL_DEPTH_TEST)
+            (fill_identity_matrix model)
+            (fill_identity_matrix view)         
+            (fill_orthographic_matrix projection -0.5 0.5 -0.5 0.5 -0.5 0.5)          
+            (xtm_draw_tex xtm_render_quad_shader (tref render_fbo 1) model view projection)
+            )
           (begin
             ;; post is usually 2D? so no DEPTH test by default!
             (glDisable GL_DEPTH_TEST)                  
-            (xtm_camera_view view)       ;; setup view
+            (xtm_camera_view view)       ;; get view from current settings
             (fill_identity_matrix model) ;; setup model
             ;; should probably really pass in 0 for shader id here!
             ;; as we don't want ANY shaders running by default in
@@ -3298,5 +3378,72 @@ void main()
   }
 
   gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+}
+")
+
+(define quad-vert
+  "
+#version 120
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+
+varying vec2 TexCoord;
+ 
+void main() {   
+   TexCoord = gl_MultiTexCoord0.st;
+   gl_FrontColor = gl_Color;
+   gl_Position = ModelViewProjectionMatrix * gl_Vertex;
+}
+")
+
+(define dof_frag
+"
+#version 120
+uniform sampler2D dBuf;
+uniform sampler2D cBuf;
+uniform float blur;
+uniform float dof;
+uniform float fp;  // focal point
+uniform int show_depth;
+uniform float near;
+uniform float far;
+uniform vec2 frameBufSize;
+
+varying vec2 TexCoord;
+
+vec4 blurKawase( const sampler2D tex, const vec2 texCoord, const vec2 texSize, const float iteration ) {
+	// Function assumes that tex is using bilinear hardware filtering
+	
+	vec2 dUV = (iteration + 0.5) / texSize;
+	
+	vec4 col = texture2D( tex, texCoord + vec2( -dUV.x, dUV.y ) );	// Top left
+	col += texture2D( tex, texCoord + dUV );		        // Top right
+	col += texture2D( tex, texCoord + vec2( dUV.x, -dUV.y ) );      // Bottom right
+	col += texture2D( tex, texCoord - dUV );		        // Bottom left
+	
+	return col * 0.25;
+}
+
+void main( void ) {
+        // get z depth from dBuf tex 
+	float depth = texture2D(dBuf,TexCoord).x;	
+
+        // linearly scale depth buffer
+        depth = (near*2.0) / ((far+near) - (depth*(far-near)));
+        // depth to focal point
+        depth = log(1.0+abs(depth-fp)) / log(dof);
+
+        // show_depth is true display depth buffer
+        if (show_depth == 1) {
+          gl_FragColor = vec4(depth,depth,depth,1.0);  
+        } else { // else apply depth blur
+          gl_FragColor = blurKawase( cBuf, TexCoord, frameBufSize, depth * blur);
+        }
+        // gl_FragColor = texture2D(cBuf,TexCoord);
 }
 ")

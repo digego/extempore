@@ -72,6 +72,12 @@
 (bind-lib-func stdlib _qsortf [void,float*,i64,i64]*)
 (bind-lib-func stdlib sortd [double*,double*,i64]*)
 (bind-lib-func stdlib sortf [float*,float*,i64]*)
+(bind-lib-func stdlib lognf [float,float,float]*)
+(bind-lib-func stdlib lognd [double,double,double]*)
+(bind-lib-func stdlib mind [double,double*,i64]*)
+(bind-lib-func stdlib minf [double,double*,i64]*)
+(bind-lib-func stdlib maxd [double,double*,i64]*)
+(bind-lib-func stdlib maxf [double,double*,i64]*)
 (bind-lib-func stdlib meand [double,double*,i64]*)
 (bind-lib-func stdlib meanf [float,float*,i64]*)
 (bind-lib-func stdlib mediand [double,double*,i64]*)
@@ -193,6 +199,12 @@
 (bind-poly rad2deg rad2deg_f)
 (bind-poly sort sortd)
 (bind-poly sort sortf)
+(bind-poly logn lognd)
+(bind-poly logn lognf)
+(bind-poly min mind)
+(bind-poly min minf)
+(bind-poly max maxd)
+(bind-poly max maxf)
 (bind-poly mean meand)
 (bind-poly mean meanf)
 (bind-poly median mediand)
@@ -1547,6 +1559,7 @@
 (bind-lib-func stdlib xtm_render_init_quad_shader [void,i8*,i8*]*)
 
 (bind-lib-func stdlib xtm_render_fbo [E_fbo*]*)
+(bind-lib-func stdlib xtm_shader_fbo [E_fbo*]*)
 (bind-lib-func stdlib xtm_render_setup_a [void,i32,i32,i8*,i8*,i8*,i8*,i8*,i8*,i8*]*)
 (bind-lib-func stdlib xtm_render_setup_b [void,i32,i32,float,float,i8*,i8*,i8*,i8*,i8*,i8*,i8*]*)
 (bind-lib-func stdlib xtm_render_setup_c [void,i32,i32,i32,i32,float,float,float,i8*,i8*,i8*,i8*,i8*,i8*,i8*]*)
@@ -4041,6 +4054,54 @@ void main()
   gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
 }
 ")
+
+(define dof_frag
+"
+#version 120
+uniform sampler2D dBuf;
+uniform sampler2D cBuf;
+uniform float blur;
+uniform float dof;
+uniform float fp;  // focal point
+uniform int show_depth;
+uniform float near;
+uniform float far;
+uniform vec2 frameBufSize;
+
+varying vec2 TexCoord;
+
+vec4 blurKawase( const sampler2D tex, const vec2 texCoord, const vec2 texSize, const float iteration ) {
+	// Function assumes that tex is using bilinear hardware filtering
+	
+	vec2 dUV = (iteration + 0.5) / texSize;
+	
+	vec4 col = texture2D( tex, texCoord + vec2( -dUV.x, dUV.y ) );	// Top left
+	col += texture2D( tex, texCoord + dUV );		        // Top right
+	col += texture2D( tex, texCoord + vec2( dUV.x, -dUV.y ) );      // Bottom right
+	col += texture2D( tex, texCoord - dUV );		        // Bottom left
+	
+	return col * 0.25;
+}
+
+void main( void ) {
+        // get z depth from dBuf tex 
+	float depth = texture2D(dBuf,TexCoord).x;	
+
+        // linearly scale depth buffer
+        depth = (near*2.0) / ((far+near) - (depth*(far-near)));
+        // depth to focal point
+        depth = log(1.0+abs(depth-fp)) / log(dof);
+
+        // show_depth is true display depth buffer
+        if (show_depth == 1) {
+          gl_FragColor = vec4(depth,depth,depth,1.0);  
+        } else { // else apply depth blur
+          gl_FragColor = blurKawase( cBuf, TexCoord, frameBufSize, depth * blur);
+        }
+        // gl_FragColor = texture2D(cBuf,TexCoord);
+}
+")
+
 
 (define *xtmlib-shaders-loaded* #t)
 (ascii-print-color 0 2 10)
