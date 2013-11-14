@@ -42,7 +42,7 @@
 
 (define *impc:compile* #t)
 (define *impc:compiler:print* #f)
-(define *impc:compiler:print-types* #f)
+(define *impc:compiler:print-ast* #f)
 (define *impc:compiler:verbose* #f)
 
 (define *impc:compiler:print-raw-llvm* #f)
@@ -523,6 +523,19 @@
         (print-error 'Compiler 'Error: 'letz 'requires 'a 'zone 'size 'as 'its 'first 'argument)
         `(memzone ,(cadr ast)
                   (let ,(caddr ast) ,@(cdddr ast))))))
+
+
+(define impc:ti:>=
+  (lambda (ast)
+    `(or (> ,(cadr ast) ,(caddr ast))
+         (= ,(cadr ast) ,(caddr ast)))))
+
+(define impc:ti:<=
+  (lambda (ast)
+    `(or (< ,(cadr ast) ,(caddr ast))
+         (= ,(cadr ast) ,(caddr ast)))))
+
+  
              
 
 
@@ -607,6 +620,10 @@
 		  	      (impc:ti:first-transform (cdr ast) inbody?)))
                        ((eq? (car ast) 'letz)
                         (impc:ti:first-transform (impc:ti:letz ast) inbody?))
+                       ((eq? (car ast) '>=)
+                        (impc:ti:first-transform (impc:ti:gteq ast) inbody?))
+                       ((eq? (car ast) '<=)
+                        (impc:ti:first-transform (impc:ti:lteq ast) inbody?))
 		       ((eq? (car ast) 'and) 
                         (impc:ti:first-transform (impc:ti:and (cdr ast)) inbody?))
                        ((eq? (car ast) 'random)
@@ -4621,10 +4638,10 @@
                                                  (map (lambda (x) (impc:ir:get-type-from-str x))
                                                       (llvm:get-function-args-withoutzone (symbol->string symname)))))))
 	 ;(print-error "stop")
-         (if *impc:compiler:print-types* (println '---------------------------------))
-         (if *impc:compiler:print-types* (println 'types: types))
+         (if *impc:compiler:print-ast* (println '---------------------------------))
+         (if *impc:compiler:print-ast* (println 'types: types))
          ;(println 'ctypes: converted-types)
-         (if *impc:compiler:print-types* (println 'newast: newast))
+         (if *impc:compiler:print-ast* (println 'newast: newast))
 
          ;; check for unfound types
          (for-each (lambda (t)		     
