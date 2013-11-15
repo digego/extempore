@@ -83,6 +83,9 @@ namespace extemp {
 	    dsp_closure = _dsp_func; 
 	}
 	void* getDSPClosure() { return dsp_closure; }
+        bool getZeroLatency() { return zerolatency; }
+        void setZeroLatency(bool z) { zerolatency = z; }
+        bool getToggle () { toggle = toggle ? FALSE : TRUE; return toggle; } 
 
 	void setDSPMTClosure(void* _dsp_func, int idx) 
 	{
@@ -116,8 +119,8 @@ namespace extemp {
             dsp_wrapper_array = _wrappera;
 	}
 
-        void initMTAudio(int);
-        void initMTAudioBuf(int);
+        void initMTAudio(int,bool);
+        void initMTAudioBuf(int,bool);
 
         EXTThread** getMTThreads() { return threads; } 
         int getNumThreads() { return numthreads; } 
@@ -159,6 +162,8 @@ namespace extemp {
 	static AudioDevice SINGLETON;
         EXTThread** threads;
         int numthreads;
+        bool zerolatency;
+        bool toggle;
     };
 
 } //End Namespace

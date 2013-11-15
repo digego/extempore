@@ -246,11 +246,20 @@ namespace extemp {
     SAMPLE* data = 0; 
     llvm_zone_t* zone = llvm_peek_zone_stack();
     SAMPLE* outbuf = AudioDevice::I()->getDSPMTOutBuffer();
-    outbuf = outbuf+(UNIV::CHANNELS*UNIV::FRAMES*idx);
+    SAMPLE* outbufa = outbuf+(UNIV::CHANNELS*UNIV::FRAMES*idx*2);
+    SAMPLE* outbufb = outbuf+(UNIV::CHANNELS*UNIV::FRAMES*idx*2)+(UNIV::CHANNELS*UNIV::FRAMES);
     SAMPLE* inbuf = AudioDevice::I()->getDSPMTInBuffer();
     SAMPLE* indata = (SAMPLE*) malloc(UNIV::IN_CHANNELS*8);
+    bool zerolatency = AudioDevice::I()->getZeroLatency();
+    bool toggle = FALSE;
     
     for(;;) {
+      toggle = toggle ? FALSE : TRUE;
+      if(zerolatency) {
+        outbuf = outbufa;
+      }else{
+        outbuf = toggle ? outbufa : outbufb;
+      }
       void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
       void* cache_closure = 0;
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
@@ -271,7 +280,7 @@ namespace extemp {
       } // spin
 #endif
       lcount++; 
-
+      //printf("process audio thread ...\n");
       uint64_t LTIME = UNIV::DEVICE_TIME;
       for(uint32_t i=0;i<UNIV::FRAMES;i++) {
           uint32_t iout = i*UNIV::CHANNELS;
@@ -379,7 +388,7 @@ namespace extemp {
 #elif TARGET_OS_MAC
       OSAtomicAdd32(1,&_atomic_thread_done_cnt);
 #else
-      // NOT ATOMIC SUPPORT ON WINDOWS YET!!!!
+      // NO ATOMIC SUPPORT ON WINDOWS YET!!!!
       // IN OTHER WORDS BROKEN!!!!!!!!!!!!!!!!
       _atomic_thread_done_cnt++;
 #endif
@@ -467,6 +476,7 @@ namespace extemp {
         }else if(AudioDevice::I()->getDSPSUMWrapper()) { // if true then multichannel
           //printf("main in\n");
           int numthreads = AudioDevice::I()->getNumThreads();
+          bool zerolatency = AudioDevice::I()->getZeroLatency();
           
           SAMPLE in[numthreads];
           SAMPLE* inb = AudioDevice::I()->getDSPMTInBuffer();
@@ -474,32 +484,44 @@ namespace extemp {
           for(int i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = (SAMPLE) input[i]; 
           // start computing in all audio threads
           _atomic_thread_done_cnt = 0;
-          _signal_cnt++;
           int cnt=0;          
 #ifdef TARGET_OS_MAC
-          while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
-            cnt++;
-            if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
-            nanosleep(&MT_SLEEP_DURATION ,NULL);
+          if(zerolatency) {
+            _signal_cnt++;
+            while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
+              cnt++;
+              if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+              nanosleep(&MT_SLEEP_DURATION ,NULL);
+            }
           }
 #elif TARGET_OS_LINUX
-          while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
-            cnt++;
-            if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
-            nanosleep(&MT_SLEEP_DURATION ,NULL);
+          if(zerolatency) {
+            _signal_cnt++;
+            while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
+              cnt++;
+              if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+              nanosleep(&MT_SLEEP_DURATION ,NULL);
+            }
           }
 #else
           printf("NO SUPPORT FOR MT AUDIO ON WINDOWS!\n");
           exit(1);
 #endif
+          //printf("process audio sum ...\n");
           dsp_f_ptr_sum dsp_wrapper = AudioDevice::I()->getDSPSUMWrapper();
           dsp_f_ptr_sum cache_wrapper = dsp_wrapper;
           SAMPLE (*closure) (SAMPLE*,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE*,long,long,SAMPLE*)) cache_closure);
           llvm_zone_t* zone = llvm_peek_zone_stack();
-          SAMPLE* indats[numthreads];
-          indats[0] = AudioDevice::I()->getDSPMTOutBuffer();
+          bool toggle = AudioDevice::I()->getToggle();
+          SAMPLE* indats[numthreads];                    
+          indats[0] = AudioDevice::I()->getDSPMTOutBuffer();          
+          // if we are NOT running zerolatency
+          // and toggle is FALSE then use alternate buffers
+          if(!zerolatency && !toggle) { 
+            indats[0] = indats[0] + UNIV::FRAMES*UNIV::CHANNELS;
+          }
           for(int jj=1;jj<numthreads;jj++) {
-            indats[jj] = indats[0]+(UNIV::FRAMES*UNIV::CHANNELS*jj);
+            indats[jj] = indats[0] + (UNIV::FRAMES*UNIV::CHANNELS*jj*2);
           }
           for(uint64_t i=0;i<UNIV::FRAMES;i++) {
               uint32_t iout = i*UNIV::CHANNELS;
@@ -515,6 +537,28 @@ namespace extemp {
                   llvm_zone_reset(zone);
                 }
           }
+#ifdef TARGET_OS_MAC
+          if(!zerolatency) {
+            _signal_cnt++;
+            while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
+              cnt++;
+              if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+              nanosleep(&MT_SLEEP_DURATION ,NULL);
+            }
+          }
+#elif TARGET_OS_LINUX
+          if(!zerolatency) {
+            _signal_cnt++;
+            while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
+              cnt++;
+              if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
+              nanosleep(&MT_SLEEP_DURATION ,NULL);
+            }
+          }
+#else
+          printf("NO SUPPORT FOR MT AUDIO ON WINDOWS!\n");
+          exit(1);
+#endif
           //printf("main out\n");          
         }else if(AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then both MT and buffer based
           int numthreads = AudioDevice::I()->getNumThreads();
@@ -752,12 +796,16 @@ namespace extemp {
 	started = false;
     }
 
-    void AudioDevice::initMTAudio(int num)
+    void AudioDevice::initMTAudio(int num,bool _zerolatency)
     {
        numthreads = num;
+       zerolatency = _zerolatency;
+       toggle = TRUE;
        threads = (EXTThread**) malloc(sizeof(EXTThread*)*numthreads);       
        inbuf = (SAMPLE*) malloc(UNIV::IN_CHANNELS*UNIV::FRAMES*sizeof(SAMPLE));
-       outbuf = (SAMPLE*) malloc(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)*numthreads);
+       // outbuf * 2 for double buffering
+       outbuf = (SAMPLE*) malloc(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)*numthreads*2);
+       memset(outbuf,0,UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)*numthreads*2);
        for(int i=0;i<128;i++) thread_idx[i] = i;
        for(int i=0;i<numthreads;i++) {
          threads[i] = new EXTThread();
@@ -765,9 +813,10 @@ namespace extemp {
        }
     }
 
-    void AudioDevice::initMTAudioBuf(int num)
+    void AudioDevice::initMTAudioBuf(int num, bool _zerolatency)
     {
        numthreads = num;
+       zerolatency = _zerolatency;
        threads = (EXTThread**) malloc(sizeof(EXTThread*)*numthreads);       
        inbuf_f = (float*) malloc(UNIV::IN_CHANNELS*UNIV::FRAMES*4);
        outbuf_f = (float*) malloc(UNIV::CHANNELS*UNIV::FRAMES*4*numthreads);

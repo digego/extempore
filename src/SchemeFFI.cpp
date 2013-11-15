@@ -2905,13 +2905,17 @@ namespace extemp {
 
     pointer SchemeFFI::initMTAudio(scheme* _sc, pointer args)
     {
-      AudioDevice::I()->initMTAudio(ivalue(pair_car(args)));
+      pointer val = pair_cadr(args);
+      bool zerolatency = (val == _sc->T) ? TRUE : FALSE;
+      AudioDevice::I()->initMTAudio(ivalue(pair_car(args)),zerolatency);
       return _sc->T;
     }
 
     pointer SchemeFFI::initMTAudioBuf(scheme* _sc, pointer args)
     {
-      AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(args)));
+      pointer val = pair_cadr(args);
+      bool zerolatency = (val == _sc->T) ? TRUE : FALSE;
+      AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(args)),zerolatency);
       return _sc->T;
     }
 
