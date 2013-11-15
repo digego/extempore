@@ -213,14 +213,6 @@
 	    (begin (set! phase (- 1 phase))
 		   (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))
 
-;; high limit
-;; low limit
-;; then value
-(bind-func range_limit
-  (lambda (h:SAMPLE l:SAMPLE v:SAMPLE)
-    (if (< v l) l
-	(if (> v h) h
-	    v))))
 
 ;; x values must fall within the range -PI ... PI
 (bind-func _sin
@@ -827,7 +819,7 @@
   (lambda (gain)
     (let ((lim 0.5))
       (lambda (in:SAMPLE)
-	(range_limit lim (* -1.0 lim) (* gain in))))))
+	(clamp lim (* -1.0 lim) (* gain in))))))
 
 ;; mono in (ignores anything in on channel 2)
 ;; pan value [0.0-1.0]
