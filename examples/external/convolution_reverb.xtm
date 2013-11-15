@@ -24,9 +24,15 @@
 (sys:load "libs/external/audio_dsp_ext.xtm")
 (sys:load "libs/external/instruments_ext.xtm")
 
+;; just for processing sampler
+(bind-func dsp1:DSP
+  (let ((gain 1.0))
+    (lambda (in time chan dat)
+      (* gain (sampler in time chan dat)))))
+
 ;; convolution reverb takes mono
 ;; files as input (i.e. separates left and right)
-(bind-func dsp:DSP 100000000
+(bind-func dspsum:DSPMT 100000000
   (let ((reverb (creverb_st_c "assets/ir/minsterl.aif"
                               "assets/ir/minsterr.aif"))
         (rms (rms_st_c))
@@ -34,13 +40,18 @@
         (right:SAMPLE 0.0)
         (wet 2.0)
         (dry 0.3))
-    (lambda (in:SAMPLE time chan dat:SAMPLE*)
+    (lambda (in:SAMPLE* time chan dat:SAMPLE*)
       (if (= 0 (% time FRAMES))
           (begin (set! left (rms.left))
                  (set! right (rms.right))))
-      (rms chan (* 1.0 (reverb chan (sampler in time chan dat) dry wet))))))
+      (rms chan (reverb chan (pref in 0) dry wet)))))
 
-(dsp:set! dsp)
+;; #f runs dspsum in parallel to dsp1
+;; i.e. double buffered.
+;; this introduces FRAMES latency
+;; but means dspsum can process at the
+;; same time as dsp1
+(dsp:set! #f dspsum dsp1)
 
 ;; load up the sampler!
 (load-sampler sampler "~/Documents/samples/soprano/")
@@ -48,8 +59,9 @@
 (sampler.release 5000)
 (sampler.attack 2000)
 
-(dsp.wet 2.0)
-(dsp.dry 0.0)
+(dspsum.wet 2.0)
+(dspsum.dry 0.0)
+(dsp1.gain 2.0)
 
 ;; make some noise
 (define test
@@ -64,9 +76,23 @@
 
 (test (*metro* 'get-beat 4) 16)
 
+(bind-func console_print
+  (lambda (cpu:double rmsl:double rmsr:double)
+    (ascii_text_color 0 0 1)
+    (printf "Load:%f RMS: %f %f \r" (* 100. cpu) rmsl rmsr)
+    void))
+
+;; blank lines
+(print-full)
+(print-full-nq "Convolution Reverb\n")
+(print-full-nq "-------------------------------\n")
+
+
 (define print-load
   (lambda (beat dur)
-    (println 'load: (* 100. (sys:audio-load)) 'db: (list (dsp.left) (dsp.right)))
+    (ascii-print-color 0 2 8)
+    (console_print (sys:audio-load) (dspsum.left) (dspsum.right))
     (callback (*metro* (+ beat (* .5 dur))) 'print-load (+ beat dur) dur)))
 
 (print-load (*metro* 'get-beat 4) 1)
+
