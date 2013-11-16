@@ -1718,9 +1718,12 @@
 ;;             (close-input-port in)              
 ;;             #f)))))
 
+(define *global-sysload-evals* (make-list-with-proc 10 (lambda (i) #f)))
+
 (define sys:load
   (lambda (path)
-    (let ((in (open-input-file path)))
+    (let ((in (open-input-file path))
+          (cnt 0))
       (if (not in)
           (begin (ascii-print-color 0 5 10)
                  (print "Error: couldn't find file " path "\n")
@@ -1731,10 +1734,12 @@
                         (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
                         ""))))
             (if (string=? msg "")
-                (begin
+                (begin                  
                   (let loop ((sexpr (read in)))
                     (if (not (eof-object? sexpr))
                         (begin
+                          (set! *global-sysload-evals* (cons sexpr *global-sysload-evals*))
+                          (set! *global-sysload-evals* (list-head *global-sysload-evals* 10))
                           (eval sexpr (interaction-environment))
                           (loop (read in)))))
                   (close-input-port in)
