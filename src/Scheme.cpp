@@ -2399,10 +2399,10 @@ static void* treadmill_scanner(void* obj)
 		sc->treadmill_scan = sc->treadmill_scan->_ccw;				
 		total_previous_scan++;
 
-		// if(!(count%100)) {		// force a yield every now and then?		
-		//     sc->mutex->unlock(); 
-		//     sc->mutex->lock();
-		// }
+		if(!(count%100)) {		// force a yield every now and then?		
+		    sc->mutex->unlock(); 
+		    sc->mutex->lock();
+		}
 		count++;
 				
 	    }
