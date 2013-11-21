@@ -1071,27 +1071,29 @@
 (define ipc:audio-setup
   (lambda (proc)
     (ipc:eval-string proc
-                     ";; new playnote
+                     ";; play-note
                      (define play-note
                        (lambda (time inst pitch vol dur . args)
                          (let* ((nargs (length args))
-                               (duration (* 1.0 dur))
-                               (dargs (sys:make-cptr (* 8 nargs))) ;; doubles
-                               (native (if (procedure? inst)
-                                           (llvm:get-native-closure (llvm:ffi-get-name inst))
-                                           (llvm:get-native-closure (if (symbol? inst)
-                                                                        (symbol->string inst)
-                                                                        inst)))))
-                           (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
+                                (duration (* 1.0 dur))
+                                (dargs (sys:make-cptr (* (if (audio_64bit) 8 4) nargs))) ;; doubles
+                                (native (if (procedure? inst)
+                                            (llvm:get-native-closure (llvm:ffi-get-name inst))
+                                            (llvm:get-native-closure (if (symbol? inst)
+                                                                         (symbol->string inst)
+                                                                         inst)))))
+                           (if (= (audio_64bit) 1)
+                               (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
+                               (dotimes (i nargs) (cptr:set-float dargs (* i 4) (eval (list-ref args i)))))
                            (if (cptr? native)
-                               (_play_note (integer->real time)
+                               (_play_note (real->integer time)
                                            native
                                            (midi2frq (* 1.0 pitch))
                                            (/ (exp (/ vol 26.222)) 127.0)
-                                           duration
+                                           (real->integer duration)
                                            nargs
                                            dargs)
-                               (print-error 'No 'inst 'named (symbol->string inst))))))
+                               (print-error 'No 'inst 'named (symbol->string inst))))))                     
                      ;; note name to midi num
                      (define note-name-to-midi-number
                        (lambda (name)
@@ -1113,6 +1115,7 @@
                                 `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
                                             (*metro* 'dur ,(car (cdr (cddddr args))))
                                             ,@(cddr (cddddr args)))))")
+    (ipc:bind-func proc 'audio_64bit)
     (ipc:bind-func proc '_play_note)
     (ipc:bind-func proc 'midi2frq)))
 
