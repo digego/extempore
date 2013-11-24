@@ -2906,7 +2906,7 @@ namespace extemp {
     pointer SchemeFFI::initMTAudio(scheme* _sc, pointer args)
     {
       pointer val = pair_cadr(args);
-      bool zerolatency = (val == _sc->T) ? TRUE : FALSE;
+      bool zerolatency = (val == _sc->T) ? true : false;
       AudioDevice::I()->initMTAudio(ivalue(pair_car(args)),zerolatency);
       return _sc->T;
     }
@@ -2914,7 +2914,7 @@ namespace extemp {
     pointer SchemeFFI::initMTAudioBuf(scheme* _sc, pointer args)
     {
       pointer val = pair_cadr(args);
-      bool zerolatency = (val == _sc->T) ? TRUE : FALSE;
+      bool zerolatency = (val == _sc->T) ? true : false;
       AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(args)),zerolatency);
       return _sc->T;
     }

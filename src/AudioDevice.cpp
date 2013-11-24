@@ -251,10 +251,10 @@ namespace extemp {
     SAMPLE* inbuf = AudioDevice::I()->getDSPMTInBuffer();
     SAMPLE* indata = (SAMPLE*) malloc(UNIV::IN_CHANNELS*8);
     bool zerolatency = AudioDevice::I()->getZeroLatency();
-    bool toggle = FALSE;
+    bool toggle = false;
     
     for(;;) {
-      toggle = toggle ? FALSE : TRUE;
+      toggle = toggle ? false : true;
       if(zerolatency) {
         outbuf = outbufa;
       }else{
@@ -800,7 +800,7 @@ namespace extemp {
     {
        numthreads = num;
        zerolatency = _zerolatency;
-       toggle = TRUE;
+       toggle = true;
        threads = (EXTThread**) malloc(sizeof(EXTThread*)*numthreads);       
        inbuf = (SAMPLE*) malloc(UNIV::IN_CHANNELS*UNIV::FRAMES*sizeof(SAMPLE));
        // outbuf * 2 for double buffering

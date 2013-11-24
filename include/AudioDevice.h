@@ -85,7 +85,7 @@ namespace extemp {
 	void* getDSPClosure() { return dsp_closure; }
         bool getZeroLatency() { return zerolatency; }
         void setZeroLatency(bool z) { zerolatency = z; }
-        bool getToggle () { toggle = toggle ? FALSE : TRUE; return toggle; } 
+        bool getToggle () { toggle = toggle ? false : true; return toggle; } 
 
 	void setDSPMTClosure(void* _dsp_func, int idx) 
 	{
