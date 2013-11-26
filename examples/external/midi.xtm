@@ -17,27 +17,65 @@
 ;; in libs/external/rtmidi.xtm for how to build a rtmidi library that
 ;; Extempore can use.
 
+;; try xtm.xtm
+(sys:load "libs/xtm.xtm")
+;; otherwise
+(sys:load "libs/core/audio_dsp.xtm")
 (sys:load "libs/external/rtmidi.xtm")
 
-;; register Extempore as a MIDI destination
-(set! *extempore-midi-destination* (midi_new_indevice))
-(midi_open_virtual_inport *extempore-midi-destination*)
-(midi_set_callback *extempore-midi-destination* "midi_message_parser")
-(midi_print_destinations)
+;; trivial dsp routine with exposed freq param
+(bind-func dsp:DSP
+  (let ((freql:SAMPLE 110.)
+        (freqr:SAMPLE 110.)
+        (oscl (osc_c 0.0))
+        (oscr (osc_c 0.0)))
+    (lambda (in time chan dat)
+      (if (= chan 0)
+          (oscl 0.2 freql)
+          (oscr 0.2 freqr)))))
 
-;; register Extempore as a MIDI source
-(set! *extempore-midi-source* (midi_new_outdevice))
-(midi_print_sources)
+(dsp:set! dsp)
 
-;; open up a MIDI port to Extempore's destination device
+(define *midi-in* (midi_new_indevice))
+(define *midi-out* (midi_new_outdevice))
+(define *midi-cc 11) ;; midi control change
 
-;; make sure the second argument matches the port number of the
-;; "Extempore Virtual Input Port" from (midi_print_destinations)
-(midi_open_outport *extempore-midi-source* 0)
-(midi_print_sources)
+;; query for valid midi output devices
+(midi_query_outports *midi-out*)
+;; query for valid midi input
+(midi_query_inports *midi-in*)
 
-;; test things by playing a note
-(midi-play-note (now) *extempore-midi-source* (random 72 84) 20 *second* 0)
+;; write a midi receiver which will
+;; use control change messages to change
+;; the pitch of an oscillator
+(bind-func midi_cc_receive
+  (let ((type:i8 0) (chan:i8 0) (a:i8 0) (b:float 0.)
+        (left:i8 1) (right:i8 2))
+    (lambda (time:double len:i64 msg:i8*)
+      (set! type (>> (pref msg 0) 4))
+      (set! chan (& (pref msg 0) 15))
+      (set! a (pref msg 1))
+      (set! b (i8tof (pref msg 2)))
+      (if (= a left) (dsp.freql (+ 110. (pow b 1.25))))
+      (if (= a right) (dsp.freqr (+ 110. (pow b 1.25))))
+      void)))
 
-(let ((beat (*metro* 'get-beat 1)))
-  (mplay *extempore-midi-source* (random 72 84) 20 1 0))
+;; register an *midi-in* to "midi_callback"
+(midi_register_device *midi-in* "midi_cc_receive")
+;; open an input port (assuming port 0)
+(midi_open_inport *midi-in* 0)
+;; should now be printing any incoming midi data
+
+;; now open output port (assuming port 0)
+(midi_open_outport *midi-out* 0)
+;; and send a stream of control messages
+(midi_send *midi-out* 11 0 8 90)
+
+;; stream control change message back out!
+(define stream-messages
+  (lambda (beat dur)
+    (midi_send *midi-out* *midi-cc* 0 1 (real->integer (cosr 60 60 1/4)))
+    (callback (*metro* (+ beat (* .5 dur))) 'stream-messages (+ beat dur) dur)))
+
+(stream-messages (*metro* 'get-beat 4) 1/4)
+
