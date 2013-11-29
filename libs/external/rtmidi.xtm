@@ -2,7 +2,7 @@
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: rtmidi
+;; Required dylibs: librtmidic
 
 ;;; Commentary:
 
@@ -13,23 +13,23 @@
 ;; http://music.mcgill.ca/~gary/rtmidi/
 
 ;; Because rtmidi is a C++ library (and Extempore can only bind C libs
-;; at this stage), there is a project called CRtMidi which wraps
-;; (part) of the rtmidi API in a C interface. This interface is then
-;; bound dynamically in xtlang---that's what this file is for.
+;; at this stage), there is a project called librtmidic (note the
+;; trailing 'c') which wraps (part) of the rtmidi API in a C
+;; interface. This library wraps this rtmidi-C interface in xtlang for
+;; use in Extempore.
 
-;; to compile:
-
-;; 1. get the 'Extempore-ified' fork of RTMidi from
-;;    https://github.com/benswift/rtmidi-c-api
-;; 2. build and isntall the c-API-wrapped shared lib with ./make-cshlib
+;; you get build librtmidic through homebrew (just tap
+;; benswift/extempore on OSX or benswift/extemporelinux on Linux), or
+;; you can build it yourself - source is available at
+;; https://github.com/benswift/rtmidi-c-api
 
 ;;; Code:
 
 (define librtmidi
   (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "librtmidi.so"))
-          ((string=? platform "Windows") (sys:load-dylib "librtmidi.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "librtmidi.dylib"))
+    (cond ((string=? platform "Linux") (sys:load-dylib "librtmidic.so"))
+	  ((string=? platform "Windows") (sys:load-dylib "librtmidic.dll"))
+	  ((string=? platform "OSX") (sys:load-dylib "librtmidic.dylib"))
           (else (print "Unknown platform: " platform)))))
 
 (if (not librtmidi)
