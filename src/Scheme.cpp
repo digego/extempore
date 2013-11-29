@@ -93,6 +93,7 @@
 #define ULONG_LONG_MAX UINT64_MAX
 #else
 #define stricmp strcmp //strcasecmp
+#define ULONG_LONG_MAX UINT64_MAX
 #endif
 //#endif
 
