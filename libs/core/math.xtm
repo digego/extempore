@@ -269,7 +269,7 @@
 ;; gaussian random number X ~ N(0,1)
 ;; algorithm by Marsaglia http://c-faq.com/lib/gaussian.html
 
-(bind-func randn
+(bind-func randnd
   (let ((phase 0))
     (lambda ()
       (let ((u1:double (random))
@@ -279,10 +279,28 @@
             (s (+ (* v1 v1) (* v2 v2))))
         (if (= phase 0)
             (if (or (> s 1.0) (= s 0.0) (= s 1.0))
-                (randn)
+                (randnd)
                 (* v1 (sqrt (/ (* -2.0 (log s)) s))))
             (begin (set! phase (- 1 phase))
                    (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))
+
+(bind-func randnf
+  (let ((phase 0))
+    (lambda ()
+      (let ((u1:float (random))
+            (u2:float (random))
+            (v1 (- (* 2.0 u1) 1.0))
+            (v2 (- (* 2.0 u2) 1.0))
+            (s (+ (* v1 v1) (* v2 v2))))
+        (if (= phase 0)
+            (if (or (> s 1.0) (= s 0.0) (= s 1.0))
+                (randnf)
+                (* v1 (sqrt (/ (* -2.0 (log s)) s))))
+            (begin (set! phase (- 1 phase))
+                   (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))
+
+(bind-poly randn randnd)
+(bind-poly randn randnf)
 
 ;;;;;;;;;; VECTOR ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
