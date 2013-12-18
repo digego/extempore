@@ -243,11 +243,11 @@
 (if *build-multi-chan*
     (bind-func osc_mc_c
       (lambda (phase)
-	(let ((mem 0.0)
+	(let ((val 0.0)
 	      (osc (osc_c phase)))
 	  (lambda (chan:i64 amp freq)
-	    (if (< chan 1.0) (set! mem (osc amp freq)))
-	    mem)))))
+	    (if (= chan 0) (set! val (osc amp freq)))
+	    val)))))
 
 ;; square oscillator
 ;; where 'n' is how squared off the wave is
@@ -402,8 +402,8 @@
       (lambda ()
 	(let ((val 0.0)
 	      (fader (fade_c )))
-	  (lambda (chan initial final dur)
-	    (if (< chan 1.0) (set! val (fader initial final dur)))
+	  (lambda (chan:i64 initial final dur)
+	    (if (= chan 0) (set! val (fader initial final dur)))
 	    val)))))
 
 ;; iir comb without interpolation
@@ -1491,7 +1491,7 @@
       (let* ((m (/ (- end start) dur))
              (c (- end (* m dur))))
         (lambda (chan inc)
-          (if (< chan 0.5)
+          (if (= chan 0)
               (set! time (+ time inc)))
           (+ (* m time) c))))))
 
