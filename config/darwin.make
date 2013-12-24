@@ -14,9 +14,7 @@ else
 PLATFORM_LIBS += -lpthread
 endif
 
-ifndef COREAUDIO
 PLATFORM_LIBS += -lportaudio
-endif
 
 PLATFORM_LIBS += $(OSX_FRAMEWORKS)
 
