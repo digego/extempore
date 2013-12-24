@@ -87,7 +87,7 @@
 (bind-lib-func stdlib moded [double,double*,i64]*)
 (bind-lib-func stdlib modef [float,float*,i64]*)
 (bind-lib-func stdlib randnd [double]*)
-(bind-lib-func stdlib randnf [double]*)
+(bind-lib-func stdlib randnf [float]*)
 (bind-lib-func stdlib vprintd [void,double*,i64]*)
 (bind-lib-func stdlib vprintf [void,float*,i64]*)
 (bind-lib-func stdlib vnormd [void,double*,i64,double*]*)
@@ -216,8 +216,6 @@
 (bind-poly median medianf)
 (bind-poly mode moded)
 (bind-poly mode modef)
-(bind-poly randn randnd)
-(bind-poly randn randnf)
 (bind-poly vprint vprintd)
 (bind-poly vprint vprintf)
 (bind-poly vnorm vnormd)
@@ -311,7 +309,8 @@
 (bind-poly cpxprint cpxd_print)
 (bind-poly scpxmul scpxd_mul)
 (bind-poly scpxmul scpxf_mul)
-
+(bind-poly guassr randnd)
+(bind-poly guassr randnf)
 
 (define *xtmlib-math-loaded* #t)
 (ascii-print-color 0 2 10)
@@ -522,7 +521,7 @@
 (bind-lib-func stdlib pulse_c [[float,float,float,float]*]*)
 (bind-lib-func stdlib pulse_mc_c [[float,i64,float,float,float]*]*)
 (bind-lib-func stdlib fade_c [[float,float,float,float]*]*)
-(bind-lib-func stdlib fade_mc_c [[float,i64,float,float,float]*]*)
+(bind-lib-func stdlib fade_mc_c [[float,float,float,float,float]*]*)
 (bind-lib-func stdlib delay_old_c [[float,float]*,i64]*)
 (bind-lib-func stdlib delay_c [[float,float,float,float]*,i64]*)
 (bind-lib-func stdlib delay_mc_c [[float,i64,float,float,float]*,i64,i64]*)
@@ -581,7 +580,7 @@
 (bind-lib-func stdlib hann_t_mc_c [[float,i64,i64,i64]*,i64]*)
 (bind-lib-func stdlib hann_e_c [[float,i64,i64,i64]*]*)
 (bind-lib-func stdlib linear_c [[float,float]*,float,float,float]*)
-(bind-lib-func stdlib linear_mc_c [[float,i64,float]*,float,float,float]*)
+(bind-lib-func stdlib linear_mc_c [[float,float,float]*,float,float,float]*)
 (bind-lib-func stdlib line_c [[float,float]*,float,float,float,float]*)
 (bind-lib-func stdlib envelope_segments [[float,float]**,float*,i64]*)
 (bind-lib-func stdlib envelope_c [[float,float]*,float*,i64]*)
@@ -1185,9 +1184,9 @@
 
 (define librtmidi
   (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "librtmidic.so"))
-          ((string=? platform "Windows") (sys:load-dylib "librtmidic.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "librtmidic.dylib"))
+    (cond ((string=? platform "Linux") (sys:load-dylib "librtmidi.so"))
+          ((string=? platform "Windows") (sys:load-dylib "librtmidi.dll"))
+          ((string=? platform "OSX") (sys:load-dylib "librtmidi.dylib"))
           (else (print "Unknown platform: " platform)))))
 
 (define *xtmlib-rtmidi-loaded* #f)
