@@ -98,58 +98,74 @@
    (lambda (name)
      (llvm:get-function-args name)))
 
+
+
+;; regex:type-split pair is like regex split
+;; but only splits on 'first' occurence
+(define regex:type-split
+  (lambda (str char)
+    (let ((p (regex:split str char)))
+      (if (and (> (length p) 1)
+               (> (length (cdr p)) 1))
+          (list (car p) (apply string-append (cadr p) ":" (cddr p)))
+          p))))
+                  
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; strips pretty-types from source code 
 ;; returns a cons of (the-new-ast any-explicit-types)
 ;; 
 (define impc:ti:get-var-types
-   (lambda (ast)
-      (let* ((types '())
-             (f (lambda (ast)
-                   ;(print 'ast: ast 'types: types)
-                   (cond ((null? ast) '())
-                         ((atom? ast) ast)
-                         ((member (car ast) '(lambda lambdaz lambdas lambdah))
-                          (list* (car ast) ;; 'lambda
-                                 (map (lambda (a)
-                                        (if (and (list? a)
-                                                 (eq? (car a) '*colon-hook*))
-                                            (print-error 'Compiler 'Error: 'double 'colon 'error 'for 'var (caddr a)))
-                                        (if (regex:match? (symbol->string a) ":")
-                                            (let ((t (regex:split (symbol->string a) ":")))                                                                                              
-                                               (if (regex:match? (cadr t) "^\\<|\\[")
-                                                   (if (not (regex:match? (cadr t) "\\>|\\]"))
-                                                       (print-error 'Compiler 'Error: 'Syntax 'error: 'bad 'type (cadr t))))
-                                               (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
-                                               (string->symbol (car t)))
-                                            a))
-                                     (cadr ast))
-                                (f (cddr ast))))
-                         ((member (car ast) '(let let* letrec))
-                          (list* (car ast)
-                                 (map (lambda (a)
-                                        (if (or (atom? a)
-                                                (null? (cdr a))
-                                                (list? (car a))
-                                                (> (length (cdr a)) 1))
-                                             (print-error 'Compiler 'Error: 'syntax 'error: 'badly 'formed 'let 'expression (sexpr->string a)))
-                                        (if (and (list? (car a))
-                                                 (eq? (car (car a)) '*colon-hook*))
-                                            (print-error 'Compiler 'Error: 'double 'colon 'error 'for 'var (caddr (car a))))                                        
-                                         (if (regex:match? (symbol->string (car a)) ":")
-                                             (let ((t (regex:split (symbol->string (car a)) ":")))
-                                                (if (regex:match? (cadr t) "^\\<|\\[")
-                                                    (if (not (regex:match? (cadr t) "\\>|\\]"))
-                                                        (print-error 'Compiler 'Error: 'Syntax 'error: 'bad 'type (cadr t))))                                               
-                                                (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))                                               
-                                                (list (string->symbol (car t)) (car (f (cdr a)))))
-                                             (list (car a) (car (f (cdr a))))))
-                                      (cadr ast))
-                                 (f (cddr ast))))
-                         ((pair? ast) 
-                          (cons (f (car ast))
-                                (f (cdr ast))))))))
-         (cons (f ast) types))))
+  (lambda (ast)
+    (let* ((types '())
+           (f (lambda (ast)
+                ;;(print 'ast: ast 'types: types)
+                (cond ((null? ast) '())
+                      ((atom? ast) ast)
+                      ((member (car ast) '(lambda lambdaz lambdas lambdah))
+                       (list* (car ast) ;; 'lambda
+                              (map (lambda (a)
+                                     (if (and (list? a)
+                                              (eq? (car a) '*colon-hook*))
+                                         (print-error 'Compiler 'Error: 'double 'colon 'error 'for 'var (caddr a)))
+                                     (if (regex:match? (symbol->string a) ":")
+                                         (let ((t (regex:type-split (symbol->string a) ":")))
+                                           (if (regex:match? (cadr t) "^\\<|\\[")
+                                               (if (not (regex:match? (cadr t) "\\>|\\]"))
+                                                   (print-error 'Compiler 'Error: 'Syntax 'error: 'bad 'type (cadr t))))
+                                           (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
+                                           (string->symbol (car t)))
+                                         a))
+                                   (cadr ast))
+                              (f (cddr ast))))
+                      ((member (car ast) '(let let* letrec))
+                       (list* (car ast)
+                              (map (lambda (a)
+                                     (if (or (atom? a)
+                                             (null? (cdr a))
+                                             (list? (car a))
+                                             (> (length (cdr a)) 1))
+                                         (print-error 'Compiler 'Error: 'syntax 'error: 'badly 'formed 'let 'expression (sexpr->string a)))
+                                     (if (and (list? (car a))
+                                              (eq? (car (car a)) '*colon-hook*))
+                                         (print-error 'Compiler 'Error: 'double 'colon 'error 'for 'var (caddr (car a)))) 
+                                     (if (regex:match? (symbol->string (car a)) ":")
+                                         (let ((t (regex:type-split (symbol->string (car a)) ":")))
+                                           (if (regex:match? (cadr t) "^\\<|\\[")
+                                               (if (not (regex:match? (cadr t) "\\>|\\]"))
+                                                   (print-error 'Compiler 'Error: 'Syntax 'error: 'bad 'type (cadr t)))) 
+                                           (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
+                                           (list (string->symbol (car t)) (car (f (cdr a)))))
+                                         (list (car a) (car (f (cdr a))))))
+                                   (cadr ast))
+                              (f (cddr ast))))
+                      ((pair? ast) 
+                       (cons (f (car ast))
+                             (f (cdr ast))))))))
+      (cons (f ast) types))))
+
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -535,71 +551,6 @@
     `(or (< ,(cadr ast) ,(caddr ast))
          (= ,(cadr ast) ,(caddr ast)))))
 
-  
-             
-
-
-;; This function expects a generic type with specification
-;;
-;; so for example:
-;; xlist_t*~i8*
-;;
-;; which goes to intermediate:
-;; <i8*,xlist_t*>
-;;
-;; and will specialise to:
-;; xlist_t--8491014222608498578*
-;; 
-(define impc:ti:generic-type-specification
-  (lambda (t)
-    (let ((split (regex:split (symbol->string t) "~")))
-      (if (null? (impc:ir:get-named-type (impc:ir:get-base-type (car split))))
-          (print-error 'Compiler 'Error: 'don't 'use '~ 'in 'non 'generic 'types 'or 'variables: t)
-          (let* ((ntype (impc:ir:get-named-type (impc:ir:get-base-type (car split))))
-                 (gvars (cl:remove-duplicates (regex:match-all (symbol->string ntype) "![a-z_A-Z]*")))
-                 ;; (ttype (impc:ir:get-type-from-pretty-str (symbol->string ntype)))
-                 (depth (impc:ir:get-ptr-depth (car split)))
-                 (base (impc:ir:get-base-type (car split)))
-                 (ts (cdr split)) ;(regex:split (cadr split) ","))
-                 (ctype 0)
-                 (newtype (symbol->string ntype)))
-            (if (<> (length ts) (length gvars))
-                (print-error 'Compiler 'Error: 'mismatched 'types ts '-> gvars))
-            (map (lambda (t g)
-                   (set! newtype (regex:replace-all newtype g t)))
-                 ts gvars)
-            (set! ctype (cname-encode newtype))
-            (set! newtype (regex:replace newtype
-                                         (string-append base "")
-                                         (string-append base "--" ctype)))
-            (set! newtype (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str newtype (string-append base "--" ctype))))
-            (println 'llv-compile: (string-append "%" (string-append base "--" (number->string hash)) " = type " newtype))
-            (llvm:compile (string-append "%" (string-append base "--" ctype) " = type " newtype))
-            (string->symbol (apply string-append base "--" ctype (make-list depth "*"))))))))
-
-
-;; takes any type with generic specialisations
-;; and returns type with any specialisations (i.e. ~'s)
-;; turned into proper hashed named types
-;;
-;; currently this only works when there is a SINGLE ~ type
-(define impc:ti:generic-spec-to-hashed
-  (lambda (t)
-    (if (symbol? t) (set! t (symbol->string t)))
-    (let* ((aa (regex:matched t "~.*~"))
-           (bb (regex:matched t "[^~]*[,\\[<]([^~]*)"))
-           ;; (kkkkk (println 'aa: aa))
-           ;; (kkkkkk (println 'bb: bb))
-           (v (if (or (null? aa)
-                      (null? bb))
-                  (print-error 'Compiler 'Error: 'trying 'to 'parse 'generic 'spec 'without '~ t)
-                  (string-append (cadr bb) (car aa))))
-           (s (impc:ti:generic-type-specification (string->symbol v)))
-           (n (regex:replace t (string-append "\\Q" v "\\E") (symbol->string s))))
-      ;; (println 'v v 's s 'n n)
-      (if (regex:match? n "~")
-          (impc:ti:generic-spec-to-hashed n)
-          (string->symbol n)))))
 
     
 (define *unique-polynum* 0)
@@ -704,15 +655,12 @@
 					   )
 					 (cadr ast))
                                     (list (cons 'begin (impc:ti:first-transform (cddr ast) #t))))))
-                       ((and (symbol? (car ast)) ;; transform generic like xlist_t*~i8*
-                             (regex:match? (symbol->string (car ast)) "~"))
-                        (list (impc:ti:generic-type-specification (car ast))))
                        ((and (symbol? (car ast))
                              (regex:match? (symbol->string (car ast)) ".*\\..*"))
                         (if (regex:match? (symbol->string (car ast)) ".*\\..*:.*")
                             (let* ((subs (regex:split (symbol->string (car ast)) "\\."))
                                    (a (string->symbol (car subs)))
-                                   (subs2 (regex:split (cadr subs) ":"))
+                                   (subs2 (regex:type-split (cadr subs) ":"))
                                    (b (string->symbol (car subs2)))
                                    (c (string->symbol (cadr subs2))))
 			      (if (= (length ast) 1)
@@ -2643,29 +2591,29 @@
 
 
 (define impc:ti:let-check
-   (lambda (ast vars kts request?)
-      ;(println 'vars: vars '(cadr ast) (cadr ast))
-      ;; for the symbols we want to set each return type
-      (for-each (lambda (e)
-                  ;; let should not impose return type request!
-                  ;; on individual parameter type checks
-		  ;; (println 'e: e)
-		  (let ((a (impc:ti:type-check (cadr e) vars kts
-					       (if (member (car e) kts)
-						   (cadr (assoc (car e) vars))
-                                                   #f))))
-						   ;; request?))))
-		    ;; (println '---update: (car e) 'with: a)  
-		    (impc:ti:update-var (car e) vars kts a)
-		    ;; (println '---vars: vars)
-		    ))
-                (cadr ast))
-      ;; then return the return type for the whole let
-      ;; which should have a begin body! so caddr should work
-      ;(println 'letvars: vars)
-      (let ((ret (impc:ti:type-check (caddr ast) vars kts request?)))
-	;; (println 'letret: ret)
-	ret)))
+  (lambda (ast vars kts request?)
+    ;;(println 'vars: vars '(cadr ast) (cadr ast))
+    ;; for the symbols we want to set each return type
+    (for-each (lambda (e)
+                ;; let should not impose return type request!
+                ;; on individual parameter type checks
+                ;; (println 'e: e)
+                (let ((a (impc:ti:type-check (cadr e) vars kts
+                                             (if (member (car e) kts)
+                                                 (cadr (assoc (car e) vars))
+                                                 #f))))
+                  ;; request?))))
+                  ;; (println '---update: (car e) 'with: a)  
+                  (impc:ti:update-var (car e) vars kts a)
+                  ;; (println '---vars: vars)
+                  ))
+              (cadr ast))
+    ;; then return the return type for the whole let
+    ;; which should have a begin body! so caddr should work
+                                        ;(println 'letvars: vars)
+    (let ((ret (impc:ti:type-check (caddr ast) vars kts request?)))
+      ;; (println 'letret: ret)
+      ret)))
 
 	  
 
@@ -4559,10 +4507,10 @@
                  (llvm:erase-function (string-append (symbol->string symname) "_setter"))
                  (llvm:erase-function (string-append (symbol->string symname) "_maker"))))  
       (let* ((c code)
-	     ;(l (println 'c: code))
+	     ;; (l (println 'c: code))
 	     ;(ct1 (now))	     
              (c1 (impc:ti:get-var-types c)) ;; this is a cons pair of (ast . types)
-	     ;(ll (println 'c1vt: c1))
+	     ;; (ll (println 'c1vt: c1))
 	     ;(ct2 (now))
              (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
              (c2 (impc:ti:get-var-types ta)) ;; it is possible for macros in the first-transform to introduce new var-types
@@ -4622,7 +4570,7 @@
          ;; if we didn't unify print error and bomb out!	
          (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
 	     (begin 
-	       (println 'types_: types)
+	       ;; (println 'types_: types)
 	       (print-error 'Compiler 'Error: 'could 'not 'resolve (symbol->string symname) 'unresolved 'types:
 				 (cl:remove 'good (map (lambda (x y) (if y 'good (symbol->string (car x)))) 
 						       types (impc:ti:unity? types)))
@@ -5054,7 +5002,7 @@ deprecated - use bind-func instead."
 	  (expr (car (reverse args)))
 	  (precomp_sexpr '()))
       (if (regex:match? (symbol->string symname) ":")
-	  (let ((sres (regex:split (symbol->string symname) ":")))
+	  (let ((sres (regex:type-split (symbol->string symname) ":")))
 	    (set! symname (string->symbol (car sres)))
 	    (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
       ;(print-full symname 'types: types 'e: expr 'args: args)
@@ -5146,31 +5094,26 @@ deprecated - use bind-func instead."
   (if (impc:ir:gpoly-types (car args))
       (print-error 'Compiler 'Error: (car args) 'already 'bound 'as 'generic 'closure))
   (if (regex:match? (symbol->string (car args)) ":")
-      (let ((res (regex:split (symbol->string (car args)) ":")))
+      (let ((res (regex:type-split (symbol->string (car args)) ":")))
         ;(println 'res: res)
 	(if (or (regex:match? (cadr res) "!")
 		(cl:find-if (lambda (v) (eq? v #t))
 			    (map (lambda (k)
 				   (if (assoc (string->symbol k) *impc:ir:gpolytypes*) #t #f))
 				 (regex:split (cadr res) "[~,|*\\[\\]]"))))
-	    (begin (if (regex:match? (cadr res) "~") ;; if this is a specialized type then we probably aren't generic
-                       (begin (set-car! args (string->symbol (string-append (car res) ":" (symbol->string (impc:ti:generic-spec-to-hashed (string->symbol (cadr res)))))))
-                              ;; (println 'args: args)
-                              `(bind-func ,@args))
-                              ;; `(impc:ti:parametric-poly-pass '(definec ,@args)))
-                       (begin
-                         (impc:ir:add-gpoly (cons 'bind-func args))
-                         `(if (equal? *impc:compiler:message:level* 'high)
-                              (begin (ascii-print-color 0 7 10)
-                                     (print "Generic: ")
-                                     (ascii-print-color 1 2 10)
-                                     (print ,(car res))
-                                     (ascii-print-color 0 7 10)
-                                     (print " >>> ")
-                                     (ascii-print-color 1 3 10)
-                                     (print ,(cadr res))
-                                     (ascii-print-color 0 7 10)
-                                     (print))))))
+            (begin
+              (impc:ir:add-gpoly (cons 'bind-func args))
+              `(if (equal? *impc:compiler:message:level* 'high)
+                   (begin (ascii-print-color 0 7 10)
+                          (print "Generic: ")
+                          (ascii-print-color 1 2 10)
+                          (print ,(car res))
+                          (ascii-print-color 0 7 10)
+                          (print " >>> ")
+                          (ascii-print-color 1 3 10)
+                          (print ,(cadr res))
+                          (ascii-print-color 0 7 10)
+                          (print))))
 	    `(impc:ti:parametric-poly-pass '(definec ,@args))))
       `(impc:ti:parametric-poly-pass '(definec ,@args))))
 
@@ -5273,8 +5216,6 @@ deprecated - use bind-func instead."
 	     `(bind-type ,symbol ,type))
 	    "\n\n"
 	    *impc:compiler:precomp*))
-  (if (regex:match? (symbol->string type) "~")
-      (set! type (impc:ti:generic-spec-to-hashed type)))
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<)
               (begin
                 ;; and on with the show!
