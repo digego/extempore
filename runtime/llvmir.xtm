@@ -290,11 +290,13 @@
 
 (define impc:ir:add-gpoly
   (lambda (code)
+    ;; (println 'code: (cadr code))
     (if (not (regex:match? (symbol->string (cadr code)) ":"))
 	(print-error 'Compile 'Error: 'generic 'functions 'must 'supply 'type))
-    (let* ((res (regex:split (symbol->string (cadr code)) ":"))
+    (let* ((res (regex:type-split (symbol->string (cadr code)) ":"))
 	   (name (string->symbol (car res)))
 	   (ftype (string->symbol (cadr res))))
+      ;; (println 'ftype: ftype 'res: res)
       (let ((v (assoc-strcmp name *impc:ir:gpolys*)))
 	(if v
 	    (set-cdr! v (list ftype code))
@@ -440,6 +442,15 @@
 		      (apply impc:ir:get-type-from-pretty-str (cadr t1) args))))
        t2)))
 
+(define impc:ir:get-pretty-tuple-arg-strings
+  (lambda (string-type . args)
+    (let* ((s1 (regex:replace string-type "\\<(.*)\\>?.*" "$1"))
+           (t1 (impc:ir:get-type-joiner
+                (cl:remove-if (lambda (x) (string=? x "")) 
+                              (regex:match-all s1 impc:ir:regex-tc-or-a)))))
+      t1)))
+
+
 (define impc:ir:get-type-from-pretty-tuple
   (lambda (string-type . args)
     (let* ((s1 (regex:replace string-type "\\<(.*)\\>?.*" "$1"))
@@ -448,6 +459,15 @@
                               (regex:match-all s1 impc:ir:regex-tc-or-a))))
            (t2 (map (lambda (x) (apply impc:ir:get-type-from-pretty-str x args)) t1)))
       t2)))
+
+(define impc:ir:get-pretty-closure-arg-strings
+  (lambda (string-type . args)
+    (let* ((s1 (regex:replace string-type "\\[(.*)\\]?.*" "$1"))
+           (t1 (impc:ir:get-type-joiner
+                (cl:remove-if (lambda (x)
+                                (string=? x "")) 
+                              (regex:match-all s1 impc:ir:regex-tc-or-a)))))
+      t1)))
 
 (define impc:ir:get-type-from-pretty-closure
   (lambda (string-type . args)
@@ -600,15 +620,34 @@
                ((regex:match? base "\\|.*\\|\\**") ;; |3,double| is an array
                 (cons (+ offset *impc:ir:array*) (apply impc:ir:get-type-from-pretty-array string-type args)))
                ((regex:match? base ":<")
-                (let ((p (regex:split base ":")))
+                (let ((p (regex:type-split base ":")))
+                  ;; (println 'kit: base 'P: p)
                   (if (string=? (car p) "")
                       (error))
-                  (impc:ir:get-type-from-pretty-str
-                   (apply string-append "%" (car p) "--"
-                          (if (= (length p) 2)
-                              (cname-encode (cadr p))
-                              (cname-encode (apply string-append (cadr p) (map (lambda (x) (string-append ":" x)) (cddr p)))))
-                          (make-list-with-proc ptr-depth (lambda (i) "*"))))))
+                  (if (and (impc:ir:gpolytype-types (car p)) ;; if still generic
+                           (regex:match? (cadr p) "!"))
+                      (let* ((gtype (impc:ir:gpolytype-types (car p)))
+                             (gtype-all (regex:match-all (symbol->string gtype) "(![a-zA-Z0-9-_]*)"))
+                             (type-all (regex:match-all (cadr p) "(![a-zA-Z0-9-_]*)")))
+                        ;; THEY CAN BE DIFFERENT LENGTHS BECAUSE WE
+                        ;; MIGHT HAVE ACUTAL TYPES REPLACING GVARS
+                        ;; (i.e. List:<!a,List*>* might be List:<i64,List*>*
+                        ;; meaning one less gvar!
+                        ;; (if (<> (length gtype-all) (length type-all))
+                        ;;     (print-error 'Compiler 'Error: 'generic 'type 'mismatch 'in base 'between (symbol->string (cadr p)) 'and gtype))
+                        (impc:ir:get-type-from-pretty-str (apply string-append (car p) (make-list ptr-depth "*"))
+                                                          (list (car p) (cons
+                                                                         (cons (car p) base)
+                                                                         (map (lambda (a b)
+                                                                                ;; (println 'a: a 'b: b)
+                                                                                (cons a b))
+                                                                              gtype-all type-all)))))
+                      (impc:ir:get-type-from-pretty-str ;; otherwise fully typed
+                       (apply string-append "%" (car p) "--"
+                              (if (= (length p) 2)
+                                  (cname-encode (cadr p))
+                                  (cname-encode (apply string-append (cadr p) (map (lambda (x) (string-append ":" x)) (cddr p)))))
+                              (make-list-with-proc ptr-depth (lambda (i) "*")))))))
 	       ((and (char=? (string-ref base 0) #\%)
 	       	     (not (null? (llvm:get-named-type (substring base 1 (string-length base))))))
 		string-type)
@@ -618,19 +657,48 @@
                 (let* ((sb (regex:split base "%"))
                        (base2 (car sb))
                        (extended (if (> (length sb) 1) (cadr sb) #f)))
-					;(string->symbol string-type))
-					;(println 'ppbase: base2 'string-type: string-type 'gtype: (impc:ir:gpolytype-types base2))
+                  ;; (println 'args: args 'base2: base2 'st: string-type)
+                  ;; (println 'base2: (impc:ir:gpolytype-types base2))
                   (if (and (not (null? args))
+                           (atom? (car args))
                            (string=? (car args) base2))
                       (string->symbol string-type)
-                      (let ((type (impc:ir:get-type-from-pretty-str
-                                   (apply string-append (symbol->string (impc:ir:gpolytype-types base2))
-                                          (make-list-with-proc ptr-depth (lambda (i) "*")))
-                                   base2)))
-					;(println 'type: type 'base: base 'base2: base2)
+                      (let* ((type (impc:ir:get-type-from-pretty-str
+                                    (apply string-append (symbol->string (impc:ir:gpolytype-types base2))
+                                           (make-list-with-proc ptr-depth (lambda (i) "*")))
+                                    base2)))
+                        ;; if we have come from a defined generic type                        
+                        ;; i.e. List:<!a,List*>
+                        ;; then do a replace all on gvars
+                        ;; (println 'type-pre: type)
+                        (if (and (not (null? args))
+                                 (list? (car args))
+                                 (string=? (caar args) base2))
+                            (let ((ptrs (map (lambda (k)
+                                               (if (atom? k)
+                                                   (impc:ir:get-ptr-depth (atom->string k))
+                                                   (impc:ir:get-ptr-depth k)))
+                                             type))
+                                  (bases (map (lambda (k)
+                                                (if (symbol? k)
+                                                    (impc:ir:get-base-type (atom->string k))
+                                                    k))
+                                              type)))
+                              ;; (println '%%%%%%%%%%%%%%%%%%)
+                              ;; (println 'bases bases 'ptrs ptrs)
+                              ;; (println 'typea type)
+                              (set! type (replace-all bases (cadar args)))
+                              ;; (println 'typeb type)
+                              (set! extended #f)
+                              (set! type (map (lambda (k p)
+                                                ;; (println 'k: k 'p: p)
+                                                (if (string? k)
+                                                    (string->symbol (apply string-append k (make-list p "*")))
+                                                    k))
+                                              type ptrs))))
+                        ;; (println 'type: type 'extended: extended)
                         (if extended
                             (map (lambda (k)
-					;(println 'k: k extended)
                                    (if (and (symbol? k)
                                             (regex:match? (symbol->string k) "!"))
                                        (string->symbol (string-append (symbol->string k) "%" extended))
