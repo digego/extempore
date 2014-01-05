@@ -1587,8 +1587,13 @@
                 (l (map (lambda (k) (string? k)) (cdr p))))
            (if (and (member #t l)
                     (not (member t (cdr p))))
-               (begin (println 'ERROR 't: t 'for: p)
-                      (error)))))
+               (begin
+                 (if (regex:match? t "^%")
+                     (print-error 'Compiler 'Error: 'setting
+                                  (impc:ir:pretty-print-type (impc:ir:get-named-type t))
+                                  'into p)
+                     (print-error 'Compiler 'Error: 'type 'mismatch 'setting t
+                                  'into p))))))
 
      ;; don't ever add oursevles (i.e. sym) as a type arg or NULL
      (if (or (null? t)
@@ -5369,6 +5374,8 @@ deprecated - use bind-func instead."
 	     `(bind-type ,symbol ,type))
 	    "\n\n"
 	    *impc:compiler:precomp*))
+  (if (<> (impc:ir:get-ptr-depth type) 0)
+      (print-error 'Compiler 'Error: 'make 'sure type 'is 'not 'a 'pointer))
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<)
               (begin
                 ;; and on with the show!
