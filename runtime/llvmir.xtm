@@ -224,6 +224,30 @@
 	  (cdr res)
 	  #f))))
 
+;; (define impc:ir:gpolytype-types
+;;   (lambda (name)
+;;     ;; (println 'gpolytype-types name)
+;;     (if (string? name) (set! name (string->symbol name)))
+;;     (let ((res (assoc-strcmp name *impc:ir:gpolytypes*)))
+;;       (if res
+;;           (string->symbol
+;;            (impc:ir:pretty-print-type
+;;             (cons 14
+;;                   (map (lambda (x)
+;;                          (let ((basex (impc:ir:get-base-type x))
+;;                                (ptrsx (impc:ir:get-ptr-depth x)))
+;;                            (if (and (not (equal? (string->symbol basex) name))
+;;                                     (impc:ir:gpolytype-types basex))
+;;                                (string->symbol (apply string-append
+;;                                                       basex ":" 
+;;                                                       (impc:ir:pretty-print-type (impc:ir:gpolytype-types basex))
+;;                                                       (make-list ptrsx "*")))
+;;                                (if (equal? (string->symbol basex) name)
+;;                                    (string->symbol x)
+;;                                    (impc:ir:get-type-from-pretty-str x)))))
+;;                        (impc:ir:get-pretty-tuple-arg-strings (symbol->string (cdr res)))))))
+;; 	  #f))))
+
 
 (define impc:ir:polytype-types
   (lambda (name)
@@ -322,6 +346,31 @@
       (if res
 	  (cdr res)
 	  #f))))
+
+
+;; (define impc:ir:gpoly-types
+;;   (lambda (name)
+;;     (let ((res (assoc-strcmp name *impc:ir:gpolys*)))
+;;       ;; (println 'name: name 'res: (if res (cadr res) #f))
+;;       (if res
+;;           (let ((ptrs (impc:ir:get-ptr-depth (cadr res))))
+;;             (cons 
+;;              (string->symbol
+;;               (impc:ir:pretty-print-type
+;;                (cons (+ *impc:ir:closure* *impc:ir:pointer* (* *impc:ir:pointer* ptrs))
+;;                      (map (lambda (x)
+;;                             (let ((basex (car (regex:type-split (impc:ir:get-base-type x) ":")))
+;;                                   (ptrsx (impc:ir:get-ptr-depth x)))
+;;                               (if (impc:ir:gpolytype-types basex)
+;;                                   (string->symbol (apply string-append
+;;                                                          basex ":" 
+;;                                                          (impc:ir:pretty-print-type (impc:ir:gpolytype-types basex))
+;;                                                          (make-list ptrsx "*")))
+;;                                   (impc:ir:get-type-from-pretty-str x))))
+;;                           (impc:ir:get-pretty-closure-arg-strings (symbol->string (cadr res)))))))
+;;              (cddr res)))
+;; 	  #f))))
+
 
 
 (define impc:ir:poly-types
@@ -490,9 +539,9 @@
 		       (not (null? (llvm:get-named-type (substring (impc:ir:get-base-type t) 1 (string-length (impc:ir:get-base-type t)))))))
                   (if (regex:match? t "--")
                       (let* ((base (impc:ir:get-base-type t))
-                            (ptrs (impc:ir:get-ptr-depth t))
-                            (p (regex:split base "--")))
-                        (string-append (substring (car p) 1 (string-length (car p)))                                       
+                             (ptrs (impc:ir:get-ptr-depth t))
+                             (p (regex:split base "--")))
+                        (string-append (substring (car p) 1 (string-length (car p)))
                                        ":"
                                        (cname-decode (cadr p))
                                        (apply string-append (make-list-with-proc ptrs (lambda (i) "*")))
@@ -620,27 +669,47 @@
                ((regex:match? base "\\|.*\\|\\**") ;; |3,double| is an array
                 (cons (+ offset *impc:ir:array*) (apply impc:ir:get-type-from-pretty-array string-type args)))
                ((regex:match? base ":<")
-                (let ((p (regex:type-split base ":")))
+                (let* ((p (regex:type-split base ":"))
+                       (ags (impc:ir:get-pretty-tuple-arg-strings (cadr p)))
+                       (anypolys (cl:find-if                                  
+                                  (lambda (x) (not (equal? x #f)))
+                                  (map (lambda (k)
+                                         (if (equal? (impc:ir:get-base-type k) (car p)) ;; strip recursives
+                                             #f
+                                             (impc:ir:gpolytype-types (impc:ir:get-base-type k))))
+                                      ags))))
                   ;; (println 'kit: base 'P: p)
+                  ;; (println 't (cadr p))
+                  ;; (println 'ags: ags)
+                  ;; (println 'anypolys anypolys)
                   (if (string=? (car p) "")
                       (error))
                   (if (and (impc:ir:gpolytype-types (car p)) ;; if still generic
-                           (regex:match? (cadr p) "!"))
+                           (or (regex:match? (cadr p) "!") ;; any gvars
+                               anypolys))
                       (let* ((gtype (impc:ir:gpolytype-types (car p)))
-                             (gtype-all (regex:match-all (symbol->string gtype) "(![a-zA-Z0-9-_]*)"))
-                             (type-all (regex:match-all (cadr p) "(![a-zA-Z0-9-_]*)")))
-                        ;; THEY CAN BE DIFFERENT LENGTHS BECAUSE WE
-                        ;; MIGHT HAVE ACUTAL TYPES REPLACING GVARS
-                        ;; (i.e. List:<!a,List*>* might be List:<i64,List*>*
-                        ;; meaning one less gvar!
-                        ;; (if (<> (length gtype-all) (length type-all))
-                        ;;     (print-error 'Compiler 'Error: 'generic 'type 'mismatch 'in base 'between (symbol->string (cadr p)) 'and gtype))
+                             ;; (gtype-all (regex:match-all (symbol->string gtype) "(![a-zA-Z0-9-_]*)"))
+                             ;; (type-all (regex:match-all (cadr p) "(![a-zA-Z0-9-_]*)")))
+                             (gtype-all (impc:ir:get-pretty-tuple-arg-strings (symbol->string gtype)))
+                             (type-all (impc:ir:get-pretty-tuple-arg-strings (cadr p))))
+                        ;; (println 'gtype-all gtype-all)
+                        ;; (println 'type-all type-all)
+                        ;; (println 'hitmarck gtype-all type-all)
+                        ;; (println 'actuals gtype (cadr p))
+                        (if (<> (length gtype-all) (length type-all))
+                            (print-error 'Compiler 'Error: 'generic 'type 'mismatch 'in base 'between (symbol->string (cadr p)) 'and gtype))
                         (impc:ir:get-type-from-pretty-str (apply string-append (car p) (make-list ptr-depth "*"))
                                                           (list (car p) (cons
                                                                          (cons (car p) base)
                                                                          (map (lambda (a b)
-                                                                                ;; (println 'a: a 'b: b)
-                                                                                (cons a b))
+                                                                                (let ((aa (impc:ir:get-type-from-pretty-str a))
+                                                                                      (bb (impc:ir:get-type-from-pretty-str b)))
+                                                                                  ;; (println 'a a 'b b)
+                                                                                  ;; (println 'aa aa 'bb bb)
+                                                                                  ;; (println (impc:ir:type? aa) '- (impc:ir:type? bb))
+                                                                                  (if (impc:ir:type? aa) (set! a aa))
+                                                                                  (if (impc:ir:type? bb) (set! b bb))
+                                                                                  (cons a b)))
                                                                               gtype-all type-all)))))
                       (impc:ir:get-type-from-pretty-str ;; otherwise fully typed
                        (apply string-append "%" (car p) "--"
@@ -685,7 +754,7 @@
                                                     k))
                                               type)))
                               ;; (println '%%%%%%%%%%%%%%%%%%)
-                              ;; (println 'bases bases 'ptrs ptrs)
+                              ;;(println 'bases bases 'ptrs ptrs)
                               ;; (println 'typea type)
                               (set! type (replace-all bases (cadar args)))
                               ;; (println 'typeb type)
@@ -836,7 +905,7 @@
 			(+ i offset)
 			(if (< i *impc:ir:lowest-base-type*)
 			    (loop (+ i 1))
-			    (begin (println 'Compiler 'Error: 'bad 'type: string-type))))))))))
+			    (begin (error) (println 'Compiler 'Error: 'bad 'type: string-type))))))))))
 
 
 (define impc:ir:get-type-str
