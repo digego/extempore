@@ -537,6 +537,23 @@
 		 (cdr ast)
 		 (make-list-with-proc (length ast) (lambda (i) i))))))
 
+;; simple tuple binding
+;; (let ((tuple:<i32,double,i32,i64>* (alloc))
+;;       ((var1 0) (var2 0.0)))
+;;   (tbind tuple _ var2 _ var1)
+;;
+;;   would match var2 to the double
+;;   and var1 to the i64
+;;
+(define-macro (tbind data . args)
+  (cons 'begin
+        (map (lambda (x n)
+               (if (not (eq? x '_))
+                   `(set! ,x (tref ,data ,n))))
+             args
+             (make-list-with-proc (length args) (lambda (i) (real->integer i))))))
+
+
 (define impc:ti:letz
   (lambda (ast)
     (if (not (number? (eval (cadr ast))))
