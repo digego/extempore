@@ -3314,10 +3314,13 @@
    (lambda (ast vars kts request?)
       (let* ((sym (impc:ti:get-var (cadr ast) vars))
              (a (impc:ti:type-check (caddr ast) vars kts (cdr sym))))
-         (if *impc:ti:print-sub-checks* (println 'set!:> 'ast: ast 'a: a))
-	 ;; if sym is not a global var then add return type to sym
-	 (if (assoc (car sym) vars) 
-	     (impc:ti:update-var (car sym) vars kts a))
+        (if *impc:ti:print-sub-checks* (println 'set!:> 'ast: ast 'a: a))
+        ;; if sym is not a global var then add return type to sym
+        (if (and (assoc (car sym) vars)
+                 (member a (cdr (assoc (car sym) vars))))
+            (impc:ti:force-var (car sym) vars '() a)
+            (if (assoc (car sym) vars) 
+                (impc:ti:update-var (car sym) vars kts a)))
          a)))
 
 (define impc:ti:pdref-check
