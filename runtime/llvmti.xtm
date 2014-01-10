@@ -40,8 +40,8 @@
 (define *impc:ti:print-main-check* #f)
 (define *impc:ti:print-unifications* #f)
 
-(define *impc:ti:print-full-generic-types* #f)
-(define *impc:ti:print-code-specialization-compiles* #f)
+(define *impc:ti:print-full-generic-types* #t)
+(define *impc:ti:print-code-specialization-compiles* #t)
 
 (define *impc:compile* #t)
 (define *impc:compiler:print* #f)
@@ -828,7 +828,8 @@
                                          (if (regex:match? x "^!")
                                              #f
                                              (or (regex:match? x gpolyname)
-                                                 (impc:ir:type? x)))))
+                                                 (impc:ir:type? (impc:ir:get-type-from-pretty-str x))))))
+                                                 ;; (impc:ir:type? x)))))
                                    es)))
             (if (null? tr) (set! validelements? #t))
             (set! elements es))
@@ -1657,32 +1658,43 @@
       ;; if a request is made - assume it's forced
       ;; find the intersection between the request
       ;; and the current values and force that intersection
-      (if (and (not (assoc-strcmp ast vars))
-	       (not (llvm:get-function (symbol->string ast)))
-               (not (llvm:get-globalvar (symbol->string ast))))
-          (print-error 'Compiler 'Error: 'unbound 'symbol: ast))
-      (let ((type (if (assoc ast vars)
-                      (cdr (assoc ast vars))
-		      (if (llvm:get-function (symbol->string ast))
-			  (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (llvm:get-function-args-withoutzone (symbol->string ast)))))
-                          (list (impc:ir:pointer-- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string ast)))))))))
-         (if (and request?
-		  (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
-                  (not (null? request?)))
-	     (if (null? type)
-		 (begin
-		   (impc:ti:update-var ast vars kts (list request?))
-		   request?)
-		 (let ((intersection (impc:ti:type-unify (list request? type) vars)))
-		   ;; (println 'intersection intersection 'request? request? 'type: type)
-		   (if (not (null? intersection))
-		       (begin 
-                         ;; andrew change
-			 (impc:ti:force-var ast vars kts (list intersection))                         
-                         ;;(impc:ti:update-var ast vars kts (list intersection))
-			 (list intersection))
-		       type)))
-	     type))))
+      (let ((polytype #f))
+        (if (and (not (assoc-strcmp ast vars))
+                 (not (llvm:get-function (symbol->string ast)))
+                 (not (llvm:get-globalvar (symbol->string ast))))          
+            (if (and (regex:match? (symbol->string ast) ":")
+                     (impc:ir:gpoly-types
+                      (string->symbol (car (regex:type-split (symbol->string ast) ":")))))
+                (let* ((p (regex:type-split (symbol->string ast) ":"))
+                       (etype (cname-encode (cadr p))))
+                  (begin
+                    (set! request? #f)
+                    (set! ast (string->symbol (string-append (car p) "--" etype)))
+                    (set! polytype (impc:ir:get-type-from-pretty-str (cadr p)))))
+                (print-error 'Compiler 'Error: 'unbound 'symbol: ast)))
+        (let ((type (if polytype polytype
+                        (if (assoc ast vars)
+                            (cdr (assoc ast vars))
+                            (if (llvm:get-function (symbol->string ast))
+                                (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (llvm:get-function-args-withoutzone (symbol->string ast)))))
+                                (list (impc:ir:pointer-- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string ast))))))))))
+          (if (and request?
+                   (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
+                   (not (null? request?)))
+              (if (null? type)
+                  (begin
+                    (impc:ti:update-var ast vars kts (list request?))
+                    request?)
+                  (let ((intersection (impc:ti:type-unify (list request? type) vars)))
+                    ;; (println 'intersection intersection 'request? request? 'type: type)
+                    (if (not (null? intersection))
+                        (begin 
+                          ;; andrew change
+                          (impc:ti:force-var ast vars kts (list intersection))                         
+                          ;;(impc:ti:update-var ast vars kts (list intersection))
+                          (list intersection))
+                        type)))
+              type)))))
 
 
 
@@ -2672,8 +2684,35 @@
     ;; which should have a begin body! so caddr should work
                                         ;(println 'letvars: vars)
     (let ((ret (impc:ti:type-check (caddr ast) vars kts request?)))
-      ;; (println 'letret: ret)
       ret)))
+
+
+(define impc:ti:let-check
+  (lambda (ast vars kts request?)
+    ;; (println 'letchk: ast)
+    ;; (println 'vars: vars '(cadr ast) (cadr ast))
+    ;; for the symbols we want to set each return type
+    (let ((internalreq?
+           (if (equal? `(begin ,(caar (cadr ast)))
+                       (caddr ast))
+               request? #f)))
+      (for-each (lambda (e)
+                  ;; let should not impose return type request!
+                  ;; on individual parameter type checks
+                  ;; (println 'e: e 'request? request?)
+                  (let ((a (impc:ti:type-check (cadr e) vars kts
+                                               (if (member (car e) kts)
+                                                   (cadr (assoc (car e) vars))
+                                                   internalreq?))))
+                    ;; (println '---update: (car e) 'with: a)  
+                    (impc:ti:update-var (car e) vars kts a)
+                    ;; (println '---vars: vars)
+                    ))
+                (cadr ast))
+      ;; then return the return type for the whole let
+      ;; which should have a begin body! so caddr should work
+      (let ((ret (impc:ti:type-check (caddr ast) vars kts request?)))
+        ret))))
 
 	  
 
@@ -2752,35 +2791,35 @@
          a)))
 
 
-(define impc:ti:begin-check
-   (lambda (ast vars kts request?)
-      ;;(println 'request: request?)
-      (let ((a (car (reverse (map (lambda (e)
-                                     (impc:ti:type-check e vars kts request?))
-                                  (cdr ast))))))
-         (if *impc:ti:print-sub-checks* (println 'begin:> 'ast: ast 'a: a))
-         a)))
+;; (define impc:ti:begin-check
+;;   (lambda (ast vars kts request?)
+;;     (let ((a (car (reverse (map (lambda (e)
+;;                                   ;; (println 'e: e)
+;;                                   (impc:ti:type-check e vars kts request?))
+;;                                 (cdr ast))))))
+;;       (if *impc:ti:print-sub-checks* (println 'begin:> 'ast: ast 'a: a))
+;;       a)))
 
 
 (define impc:ti:begin-check
-   (lambda (ast vars kts request?)
-      ;;(println 'request: request?)
-      ;; we should ONLY use request? on the LAST sexpr in the begin
-      ;; i.e. we should only use the LAST begin sexpr for a return type
-      (let ((sexplst (reverse (cdr ast))))
-	;; we need type check coverage for ALL sexpr's 
-	;; by only the last one counts towards the returned type
-	
-	;; so we start with type coverage
-	;; reverse order shouldn't matter because there
-	;; should be no type dependencies between these sexpressions
-	;; also we don't want to pass any request? to these
-	(map (lambda (e) (impc:ti:type-check e vars kts #f)) (cdr sexplst))
-	;; now we do the last sexpr in the begin for a return type
-	;; it SHOULD get passed the request?
-	(let ((res (impc:ti:type-check (car sexplst) vars kts request?)))
-	  ;; and return res
-	  res))))
+  (lambda (ast vars kts request?)
+    ;;(println 'request: request?)
+    ;; we should ONLY use request? on the LAST sexpr in the begin
+    ;; i.e. we should only use the LAST begin sexpr for a return type
+    (let ((sexplst (reverse (cdr ast))))
+      ;; we need type check coverage for ALL sexpr's 
+      ;; by only the last one counts towards the returned type
+      
+      ;; so we start with type coverage
+      ;; reverse order shouldn't matter because there
+      ;; should be no type dependencies between these sexpressions
+      ;; also we don't want to pass any request? to these
+      (map (lambda (e) (impc:ti:type-check e vars kts #f)) (cdr sexplst))
+      ;; now we do the last sexpr in the begin for a return type
+      ;; it SHOULD get passed the request?
+      (let ((res (impc:ti:type-check (car sexplst) vars kts request?)))
+        ;; and return res
+        res))))
 		 
 
 (define impc:ti:bitcast-check
@@ -4059,7 +4098,29 @@
 (define impc:ti:add-types-to-source
   (lambda (symname ast types envvars . prev)
       ;; (println 'symname: symname 'envvars: envvars 'ast: ast 'prev: prev)
-      (if (atom? ast) ast
+      (if (atom? ast) ;; ast
+          (if (and (symbol? ast)
+                   (regex:match? (symbol->string ast) ":"))
+              (let* ((p (regex:type-split (symbol->string ast) ":"))
+                     (ptrs (impc:ir:get-ptr-depth ast))
+                     (poly? (impc:ir:gpoly-types (string->symbol (car p))))
+                     (etype (cname-encode (cadr p))))
+                (if poly?
+                    (begin 
+                      (if (not (llvm:get-function (string-append (car p) "--" etype)))
+                          (let ((code (caddr (cadr (impc:ir:gpoly-types (string->symbol (car p))))))
+                                (pfunc (string->symbol (string-append (car p) "--" etype))))
+                            (set! code `(let ((,pfunc ,code)) ,pfunc))
+                            (impc:ti:run pfunc code (cons pfunc (string->symbol (cadr p))))
+                            (impc:ir:add-poly (string->symbol (car p)) pfunc (cadr p))
+                            (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
+                              (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
+                              (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
+                              (sys:pop-memzone)) ;; don't destroy - this happens in _setter func
+                            pfunc))                      
+                      (string->symbol (string-append (car p) "--" etype)))
+                    (print-error 'Compiler 'Error: 'Bad 'Symbol ast))) 
+              ast)
           (cond ((member (car ast) '(__make-closure __make-closure-s __make-closure-h __make-closure-z))
 		 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 		 ;; these lines just added by AS
