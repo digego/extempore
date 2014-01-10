@@ -124,6 +124,42 @@
                    (cons (func (car l)) (f (cdr l)))))))
       (f xs))))
 
+(bind-func map2:[List:<!a,List*>*,[!a,!b,!c]*,List:<!b,List*>*,List:<!c,List*>*]*
+  (lambda (func xs1 xs2)
+    (let ((f (lambda (l1 l2)
+               (if (null? l1)
+                   null
+                   (cons (func (car l1) (car l2))
+                         (f (cdr l1) (cdr l2)))))))
+      (f xs1 xs2))))
+
+(bind-func map3:[List:<!a,List*>*,[!a,!b,!c,!d]*,List:<!b,List*>*,List:<!c,List*>*,List:<!d,List*>*]*
+  (lambda (func xs1 xs2 xs3)
+    (let ((f (lambda (l1 l2 l3)
+               (if (null? l1)
+                   null
+                   (cons (func (car l1) (car l2) (car l3))
+                         (f (cdr l1) (cdr l2) (cdr l3)))))))
+      (f xs1 xs2 xs3))))
+
+(bind-func filter:[List:<!a,List*>*,[bool,!a]*,List:<!a,List*>*]*
+  (lambda (pred xs)    
+    (let ((f (lambda (l)
+               (if (null? l)
+                   null
+                   (if (pred (car l))
+                       (cons (car l) (f (cdr l)))
+                       (f (cdr l)))))))
+      (f xs))))
+
+(bind-func for-each:[!a,[!a,!b]*,List:<!b,List*>*]*
+  (lambda (func xs)
+    (let ((f (lambda (l)
+               (if (null? l) (convert null)
+                   (begin (func (car l))
+                          (f (cdr l)))))))
+      (f xs))))
+
 (bind-func last:[List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a)
     (if (null? (cdr a))
