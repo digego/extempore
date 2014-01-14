@@ -44,7 +44,7 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;; pairs
 
-(bind-type Pair <!a,!b>)
+(bind-type Pair <!x,!y>)
 
 (bind-func first:[!a,Pair:<!a,!b>*]* 
   (lambda (a)
@@ -60,7 +60,7 @@
 ;; lists
 ;;
 
-(bind-type List <!a,List*>)
+(bind-type List <!x,List*>)
 
 (bind-func cons:[List:<!a,List*>*,!a,List:<!a,List*>*]*
   (lambda (x y)
@@ -152,10 +152,10 @@
                        (f (cdr l)))))))
       (f xs))))
 
-(bind-func for-each:[!a,[!a,!b]*,List:<!b,List*>*]*
+(bind-func for-each:[void,[!k,!z]*,List:<!z,List*>*]*
   (lambda (func xs)
     (let ((f (lambda (l)
-               (if (null? l) (convert null)
+               (if (null? l) void
                    (begin (func (car l))
                           (f (cdr l)))))))
       (f xs))))
@@ -172,19 +172,15 @@
       (tset! p 1 b)
       a)))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; TEMPORARY!!
-;; a very dodgy dictionary based on
-;; an assoc list
+;; a dodgy dictionary based on an assoc list
 ;;
-;; the "dictionary" is any xlist
-;; of xpairs where pair is any (i8*,!a)
+;; the "dictionary" is any List of Pairs
+;; where the pair is any <i8*,!a>
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; this fails
 (bind-func dict_find:[!x,List:<Pair:<i8*,!x>*,List*>*,i8*]*
   (lambda (dict key)
     (if (null? dict) (convert null)
@@ -192,21 +188,6 @@
             (second (car dict))
             (dict_find (cdr dict) key)))))
 
-;; ;; this works
-;; (bind-func dict_find:[!b,List:<Pair:<!a,!b>*,List*>*,i8*]*
-;;   (lambda (dict key)
-;;     (if (null? dict) (convert null)
-;;         (if (= (i64toi32 0) (strcmp (first (car dict)) key))
-;;             (second (car dict))
-;;             (dict_find (cdr dict) key)))))
-
-;; ;; and this works
-;; (bind-func dict_find:[!b,List:<!a,List*>*,i8*]*
-;;   (lambda (dict key)
-;;     (if (null? dict) (convert null)
-;;         (if (= (i64toi32 0) (strcmp (first (car dict)) key))
-;;             (second (car dict))
-;;             (dict_find (cdr dict) key)))))
 
 
 
