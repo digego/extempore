@@ -1269,6 +1269,7 @@ namespace extemp {
     // setup server port
     // check type of connection: UDP (default) or TCP
     if(list_length(_sc,args) == 3 &&
+       is_string(pair_caddr(args)) &&
        strncmp(string_value(pair_caddr(args)), "TCP-OSC", 4) == 0){
       osc->setConnectionType(OSC_TCP_TYPE);
     }else{
