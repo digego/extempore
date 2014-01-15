@@ -195,14 +195,38 @@
 (define *impc:ir:gpolytypes* (list))
 (define *impc:ir:polytypes* (list))
 
+;; where finds and replaces
+;; are equal length lists
+(define regex:replace-everything
+  (lambda (str finds replaces)
+    (if (<> (length finds) (length replaces))
+        (print-error 'Compiler 'Error: 'regex:replace-everything
+                     'expects 'an 'equal 'number 'of 'finds 'and 'replaces))
+    (for-each (lambda (find replace)
+                (let ((s (regex:replace-all str find replace)))
+                  (set! str s)))
+              finds replaces)
+    str))
+
 (define impc:ir:add-gpolytype
-  (lambda (name type)
-    (if (string? type) (set! type (string->symbol type)))
-    (let ((v (assoc-strcmp name *impc:ir:gpolytypes*)))
-      (if v
-	  (set-cdr! v type)
-	  (set! *impc:ir:gpolytypes* (cons (cons name type) *impc:ir:gpolytypes*)))
-      #t)))
+  (let ((pcnt 0))
+    (lambda (name type)
+      (set! pcnt (+ pcnt 1))
+      (if (symbol? type) (set! type (symbol->string type)))
+      (let* ((syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
+             (newsyms (map (lambda (s)
+                             (string-append "!g" 
+                                            (substring s 1 (string-length s))
+                                            "_"
+                                            (number->string pcnt)))
+                           syms))
+             (newtype (string->symbol (regex:replace-everything type syms newsyms)))
+             (v (assoc-strcmp name *impc:ir:gpolytypes*)))
+        ;; (println 'gtype-name: name 'type: type 'newtype: newtype)
+        (if v
+            (set-cdr! v newtype)
+            (set! *impc:ir:gpolytypes* (cons (cons name newtype) *impc:ir:gpolytypes*)))
+        #t))))
 
 (define impc:ir:add-polytype
   (lambda (name tname ttype)
@@ -217,7 +241,7 @@
 		 #t)))))
 
 (define impc:ir:gpolytype-types
-  (lambda (name)
+  (lambda (name)    
     (if (string? name) (set! name (string->symbol name)))
     (let ((res (assoc-strcmp name *impc:ir:gpolytypes*)))      
       (if res
@@ -313,19 +337,35 @@
 (define *impc:ir:polys* (list))
 
 (define impc:ir:add-gpoly
-  (lambda (code)
-    ;; (println 'code: (cadr code))
-    (if (not (regex:match? (symbol->string (cadr code)) ":"))
-	(print-error 'Compile 'Error: 'generic 'functions 'must 'supply 'type))
-    (let* ((res (regex:type-split (symbol->string (cadr code)) ":"))
-	   (name (string->symbol (car res)))
-	   (ftype (string->symbol (cadr res))))
-      ;; (println 'ftype: ftype 'res: res)
-      (let ((v (assoc-strcmp name *impc:ir:gpolys*)))
-	(if v
-	    (set-cdr! v (list ftype code))
-	    (set! *impc:ir:gpolys* (cons (list name ftype code) *impc:ir:gpolys*)))
-	#t))))
+  (let ((pcnt 100))
+    (lambda (code)
+      (set! pcnt (+ pcnt 1))
+      ;; (println 'code: (cadr code))
+      (if (not (regex:match? (symbol->string (cadr code)) ":"))
+          (print-error 'Compile 'Error: 'generic 'functions 'must 'supply 'type))
+      (let* ((res (regex:type-split (symbol->string (cadr code)) ":"))
+             (name (string->symbol (car res)))
+             ;; (ftype (string->symbol (cadr res))))
+             (type (cadr res))
+             (syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
+             (newsyms (map (lambda (s)
+                             (string-append "!g" 
+                                            (substring s 1 (string-length s))
+                                            "_"
+                                            (number->string pcnt)))
+                           syms))
+             (newtype (string->symbol (regex:replace-everything type syms newsyms)))
+             (newcode (list 'bind-func
+                            (string->symbol (string-append (symbol->string name)
+                                                           ":"
+                                                           (symbol->string newtype)))
+                            (caddr code))))
+        (let ((v (assoc-strcmp name *impc:ir:gpolys*)))
+          (if v
+              (set-cdr! v (list newtype newcode))
+              (set! *impc:ir:gpolys* (cons (list name newtype newcode) *impc:ir:gpolys*)))
+          #t)))))
+
 
 (define impc:ir:add-poly
   (lambda (name fname ftype)
