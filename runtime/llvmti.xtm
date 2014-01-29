@@ -541,11 +541,13 @@
             ((2) (append (list 'imp_rand2) ast)))))
 
 
+(define *anonlambdanum* 0)
 
 ;; no anonymous lambdas !!!
 (define impc:ti:lambda
   (lambda (ast)
-    (let* ((fname (gensym))
+    (set! *anonlambdanum* (+ 1 *anonlambdanum*))
+    (let* ((fname (string->symbol (string-append "_anon_lambda_" (number->string *anonlambdanum*))))
            (rest (cons (impc:ti:first-transform (cadr ast) #t)
                        (list (cons 'begin (impc:ti:first-transform (cddr ast) #t)))))
            ;;(expr (cons 'lambda rest)))
