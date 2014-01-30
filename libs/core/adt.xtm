@@ -8,39 +8,6 @@
 (sys:load-preload-check 'adt)
 (define *xtmlib-adt-loaded* #t)
 
-(bind-alias bool i1)
-
-;;;;;;;;;;;;;;;;;;;;
-;;
-
-;; (bind-func xempty_p:[bool,!a]*
-;;   (lambda (a)
-;;     (if (null? a) #t #f)))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; a start for some super simple boxing
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; tag num and data
-;; (bind-type xbox_t <i64,i8*,i8*>)
-
-;; (bind-func xbox:[xbox_t*,!a]*
-;;   (lambda (val)
-;;     (let ((box:xbox_t* (halloc)))
-;;       (tset! box 0 0)
-;;       (tset! box 1 (convert val i8*))
-;;       box)))
-             
-;; (bind-func xunbox:[!a,xbox_t*]*
-;;   (lambda (box)
-;;     (let ((key (tref box 0))
-;;           (val (tref box 1)))
-;;       (convert val))))
-
-
 ;;;;;;;;;;;;;;;;;;;;
 ;; pairs
 
@@ -55,11 +22,9 @@
     (tref a 1)))
 
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; singly linked lists
 ;;
-;; lists
-;;
-
 (bind-type List <!x,List*>)
 
 (bind-func cons:[List:<!a,List*>*,!a,List:<!a,List*>*]*
@@ -124,6 +89,14 @@
                    (cons (func (car l)) (f (cdr l)))))))
       (f xs))))
 
+(bind-func map1:[List:<!a,List*>*,[!a,!b]*,List:<!b,List*>*]*
+  (lambda (func xs)
+    (let ((f (lambda (l)
+               (if (null? l)
+                   null
+                   (cons (func (car l)) (f (cdr l)))))))
+      (f xs))))
+
 (bind-func map2:[List:<!a,List*>*,[!a,!b,!c]*,List:<!b,List*>*,List:<!c,List*>*]*
   (lambda (func xs1 xs2)
     (let ((f (lambda (l1 l2)
@@ -172,16 +145,17 @@
       (tset! p 1 b)
       a)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; a dodgy dictionary based on an assoc list
+;; a simple 'assoc' dictionary
 ;;
 ;; the "dictionary" is any List of Pairs
 ;; where the pair is any <i8*,!a>
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func dict_find:[!x,List:<Pair:<i8*,!x>*,List*>*,i8*]*
+(bind-func dict_find:[!a,List:<Pair:<i8*,!a>*,List*>*,i8*]*
   (lambda (dict key)
     (if (null? dict) (convert null)
         (if (= (i64toi32 0) (strcmp (first (car dict)) key))
@@ -189,126 +163,19 @@
             (dict_find (cdr dict) key)))))
 
 
-
-
 ;;;;;;;;;;;
 ;; TREES ;;
 ;;;;;;;;;;;
 
-;; xlist_t*~i8*~ is specialised for <i8*,xlist_t*>*
-;; (bind-type xtree_t <!value,i64,xlist_t*~i8*~>)
-;; (bind-type Tree <!a,List:<Tree:<!a,List*>*,List*>*>*>)
+;; start of binary tree ...
 
-;; ;; override constructor
-;; ;; (bind-func Tree:[Tree:<!a,List:<!a,List*>*]*
-;; ;;   (lambda (a)
-;; ;;     (let ((tree (halloc)))
-;; ;;       (tset! tree 0 a)      
-;; ;;       (tset! tree 1 (cast null xlist_t*~i8*~))
-;; ;;       tree)))
+(bind-type BTree <!_a,BTree*,BTree*>)
 
-;; (bind-func tree_children:[i64,Tree:<!a,List<!b,List*>*>*]*
-;;   (lambda (t)
-;;     (length (tref t 1))))
+(bind-func BLeaf:[BTree:<!a,BTree*,BTree*>*,!a]*
+  (lambda (x)
+    (let ((t (BTree x null null)))
+      t)))
 
-
-;; (bind-func tree_children:[i64,Tree:<!a,i64,List:<!b,List*>*]*
-;;   (lambda (t)
-;;     (tref t 1)))
-
-;; (bind-func xtree_value:[!value,xtree_t*]*
-;;   (lambda (t)
-;;     (tref t 0)))
-
-;; (bind-func xtree_child:[xtree_t*,xtree_t*,i64]*
-;;   (lambda (t n)
-;;     (if (> (tref t 1) n)
-;;         (xnth (cast (tref t 2) xlist_t*~i8*~) n)
-;;         null)))
-
-;; (bind-func xtree_nodes:[xlist_t*,xtree_t*]*
-;;   (lambda (t)
-;;     (cast (tref t 2) xlist_t*~i8*~)))
-
-;; (bind-func xtree_add_child:[i64,xtree_t*,xtree_t*]*
-;;   (lambda (parent child)
-;;     (let ((children (tref parent 2))
-;;           (newchildren (xjoin (cast child i8*) children)))
-;;       (tset! parent 2 newchildren)
-;;       (tset! parent 1 (+ 1 (tref parent 1)))
-;;       (tref parent 1))))
-
-;; (bind-func xtree_print_i64:[i32,xtree_t*]*
-;;   (lambda (tree)
-;;     (if (= (xtree_children tree) 0)
-;;         (printf " %lld" (xtree_value tree))
-;;         (begin (printf "\n%lld\n" (xtree_value tree))
-;;                (xmap (lambda (t)
-;;                       (xtree_print_i64 (cast t xtree_t*~i64~)))
-;;                      (xtree_nodes tree))
-;;                (i64toi32 1)))))
-
-
-;;;;;;;;;;;;;;;;
-;; ALGORITHMS ;;
-;;;;;;;;;;;;;;;;
-
-;; void quick_sort (int *a, int n) {
-;;     if (n < 2)
-;;         return;
-;;     int p = a[n / 2];
-;;     int *l = a;
-;;     int *r = a + n - 1;
-;;     while (l <= r) {
-;;         while (*l < p)
-;;             l++;
-;;         while (*r > p)
-;;             r--;
-;;         if (l <= r) {
-;;             int t = *l;
-;;             *l++ = *r;
-;;             *r-- = t;
-;;         }
-;;     }
-;;     quick_sort(a, r - a + 1);
-;;     quick_sort(l, a + n - l);
-;; }
- 
-;; int main () {
-;;     int a[] = {4, 65, 2, -31, 0, 99, 2, 83, 782, 1};
-;;     int n = sizeof a / sizeof a[0];
-;;     quick_sort(a, n);
-;;     return 0;
-;; }
-
-;; an in-place (quick)sort
-
-;; with comparator closure argument (sig = [void,!a,i64,[i1,!a,!a]*]*)
-
-
-(bind-func xsub-quicksortd
-  (lambda (dat:double* left right)
-    (if (< left right)
-        (let ((tmp 0.0)
-              (swap (lambdas (x y)
-                      (set! tmp (pref dat x))
-                      (pset! dat x (pref dat y))
-                      (pset! dat y tmp)))
-              (pivot (pref dat right))
-              (index left)
-              (i 0))
-          (dotimes (i left (- right left))
-            (if (or (< (pref dat i) pivot)
-                    (= (pref dat i) pivot))
-                (begin (swap i index)
-                       (set! index (+ index 1)))))
-          (swap right index)
-          (xsub-quicksortd dat left (- index 1))
-          (xsub-quicksortd dat (+ index 1) right))
-        void)))
-
-(bind-func xquicksortd
-  (lambda (arr:double* n)
-    (xsub-quicksortd arr 0 (- n 1))
-    arr))
-
+(bind-func btree_value:[!a,BTree*]*
+  (lambda (t)
+    (tref 0 t)))
