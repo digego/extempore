@@ -40,8 +40,8 @@
 (define *impc:ti:print-main-check* #f)
 (define *impc:ti:print-unifications* #f)
 
-(define *impc:ti:print-full-generic-types* #t)
-(define *impc:ti:print-code-specialization-compiles* #t)
+(define *impc:ti:print-full-generic-types* #f)
+(define *impc:ti:print-code-specialization-compiles* #f)
 
 (define *impc:compile* #t)
 (define *impc:compiler:print* #f)
@@ -60,6 +60,9 @@
 (define *impc:default-zone-size* (* 8 1024))
 
 (define *impc:compiler:message:level* 'high)
+
+(define *impc:alphabetlist* '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
+(define *impc:alphabetidxlist* '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
 
 (define suppress-compiler-messages
   (lambda (bool)
@@ -127,7 +130,7 @@
                 ;;(print 'ast: ast 'types: types)
                 (cond ((null? ast) '())
                       ((atom? ast) ast)
-                      ((member (car ast) '(lambda lambdaz lambdas lambdah))
+                      ((member (car ast) *impc:lambdaslist*)
                        (list* (car ast) ;; 'lambda                              
                               (map (lambda (a)
                                      (if (and (list? a)
@@ -143,7 +146,7 @@
                                          a))
                                    (cadr ast))
                               (f (cddr ast))))
-                      ((member (car ast) '(let let* letrec))
+                      ((member (car ast) *impc:letslist*)
                        (list* (car ast)
                               (map (lambda (a)
                                      (if (or (atom? a)
@@ -183,6 +186,7 @@
       (set! n (+ n 1))
       (string->symbol (string-append (symbol->string x) "_s_" (number->string n))))))
 
+(define *impc:letslist* '(let let* letrec))
 
 ;; this code expects that all pretty types
 ;; have already been removed from the ast!
@@ -192,7 +196,7 @@
                   (cond ((atom? ast) ast)
                         ((null? ast) ast)
                         ((list? ast)
-                         (cond ((member (car ast) '(let letz))
+                         (cond ((member (car ast) *impc:letslist*)
                                 ;; first find and replace all shadow vars
                                 (let* ((replace-pairs
                                         (cl:remove
@@ -220,7 +224,7 @@
                                   (cons (car newast)
                                         (cons (map (lambda (x) (cons (car x) (f (cdr x)))) (cadr newast))
                                               (f (cddr newast))))))
-                               ((member (car ast) '(lambda Lambdaz lambdas lambdah))
+                               ((member (car ast) *impc:lambdaslist*)
                                 (let* ((replace-pairs
                                         (cl:remove
                                          #f
@@ -676,6 +680,9 @@
     
 (define *unique-polynum* 0)
 
+(define *impc:mathbinaryaritylist* '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
+(define *impc:lambdaslist* '(lambda lambdas lambdaz lambdah))
+
 (define impc:ti:first-transform
    (lambda (ast inbody?)
       ;(println inbody? 'transforming-ast: ast)
@@ -721,12 +728,12 @@
                         (impc:ti:first-transform (impc:ti:tuple ast) inbody?))     
                        ((eq? (car ast) 'not) 
                         (impc:ti:first-transform (impc:ti:not (cadr ast)) inbody?))
-		       ((and (member (car ast) '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
+		       ((and (member (car ast) *impc:mathbinaryaritylist*) ;; '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
                              (<> (length ast) 3))
                         (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
 		       ((member (car ast) '(bitwise-not ~))
 			(impc:ti:bitwise-not-to-eor ast inbody?))
-                       ((member (car ast) '(lambda lambdas lambdaz lambdah))
+                       ((member (car ast) *impc:lambdaslist*) 
                         (if inbody?
                             (impc:ti:lambda ast)
                             (cons (impc:ti:first-transform (car ast) inbody?)
@@ -749,7 +756,7 @@
 				  (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast))))))
                        ((eq? (car ast) 'doloop) (impc:ti:doloop ast inbody?))                       
                        ((eq? (car ast) 'dotimes) (impc:ti:dotimes ast inbody?))
-                       ((member (car ast) '(let let* letrec))
+                       ((member (car ast) *impc:letslist*)
                         (cons (impc:ti:first-transform (car ast) inbody?)
                               (cons (map (lambda (p)
 					   (list (impc:ti:first-transform (car p) #f)
@@ -3740,9 +3747,12 @@
             ((and (atom? ast) (symbol? ast)) (impc:ti:symbol-check ast vars kts request?)) ;#f)) ;request?))
             ((and (atom? ast) (string? ast)) (impc:ti:string-check ast vars kts request?))
             ((atom? ast) (print-error 'Compiler 'Error: 'internal 'error 'unhandled 'atom: ast))
-            ((and (list? ast) (member (car ast) '(let let* letrec))) (impc:ti:let-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(lambda lambdas lambdah lambdaz))) (impc:ti:lambda-check ast vars kts request?))
-	    ((and (list? ast) (member (car ast) '(* / + - % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right bitwise-not))) (impc:ti:math-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) *impc:letslist*)) (impc:ti:let-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) *impc:lambdaslist*)) (impc:ti:lambda-check ast vars kts request?))
+	    ((and (list? ast) (member (car ast)
+                                      *impc:mathbinaryaritylist*))
+                                      ;; '(* / + - % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right bitwise-not)))
+             (impc:ti:math-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))            
             ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))
@@ -4137,14 +4147,14 @@
                             (list (impc:ti:mark-returns (caddr ast) name in-body? last-pair? blocked?))
                             (if (not (null? (cdddr ast)))
                                 (list (impc:ti:mark-returns (cadddr ast) name in-body? last-pair? blocked?)))))
-                   ((member (car ast) '(let* let letrec))
+                   ((member (car ast) *impc:letslist*)
                     (append (list (car ast))
                             (list (map (lambda (a)
                                           ;; let assigns always block (lambda can override but nothing else)
                                           (list (car a) (impc:ti:mark-returns (cadr a) (car a) #f #f #t)))
                                        (cadr ast)))
                             (impc:ti:mark-returns (cddr ast) name #t #f blocked?)))
-                   ((member (car ast) '(lambda lambdas lambdah lambdaz))
+                   ((member (car ast) *impc:lambdaslist*)
                     (append (list (car ast)) (list (cadr ast))
                             ;; lambda always unblocks because lambdas always need a return
                             (impc:ti:mark-returns (cddr ast) name #t #f #f)))
@@ -4338,7 +4348,7 @@
 (define impc:ti:allocate-var?
   (lambda (ast)
     (cond ((null? ast) #f)
-	  ((member ast '(lambda lambdaz lambdas lambdah)) #t)
+	  ((member ast *impc:lambdaslist*) #t)
 	  ((pair? ast)
 	   (or (impc:ti:allocate-var? (car ast))
 	       (impc:ti:allocate-var? (cdr ast))))
@@ -4360,7 +4370,7 @@
 (define impc:ti:closure:convert
   (lambda (ast esyms)
       (cond ((pair? ast)
-             (if (member (car ast) '(lambda lambdas lambdaz lambdah))
+             (if (member (car ast) *impc:lambdaslist*)
                  (let (;(env (impc:ti:block:check-for-free-syms ast esyms))
 		       (allocate-mem-for-vars? (impc:ti:allocate-var? (cdr ast))))
 		   (list (cond ((eq? (car ast) 'lambdah) '__make-closure-h)
@@ -4372,7 +4382,7 @@
 			 (cdr (reverse (cl:remove-duplicates esyms))) ;env 
 			 (cadr ast)
 			 (impc:ti:closure:convert (caddr ast) (append (cadr ast) esyms))))
-                 (if (member (car ast) '(let let* letrec))
+                 (if (member (car ast) *impc:letslist*)
                      (let* ((allocate-mem-for-vars? (impc:ti:allocate-var? ast))
                             (bindings (map (lambda (binding) 
 					     (car binding))
@@ -4399,11 +4409,11 @@
                   (eq? (car ast) closure-sym))
              (if (and (not (null? (cdr ast)))
                       (list? (cadr ast))
-                      (member (caadr ast) '(lambda lambdas lambdah lambdaz)))
+                      (member (caadr ast) *impc:lambdaslist*))
                  (cadr (cadr ast))
                  '()))
             (else (append (impc:ti:get-closure-arg-symbols closure-sym (car ast))
-                          (impc:ti:get-closure-arg-symbols closure-sym (cdr ast)))))))    
+                          (impc:ti:get-closure-arg-symbols closure-sym (cdr ast)))))))
 
 
 (define impc:ti:handle-forced-types
@@ -5012,7 +5022,7 @@
                         ;; (println 'simpletype simpletype)
                         (ascii-print-color 0 7 10)
                         (if (regex:match? (symbol->string symname) "--")
-                            (print "Special: ")
+                            (print "Specized: ")
                             (print "Compiled: "))
                         (ascii-print-color 1 2 10)
                         (if (regex:match? (symbol->string symname) "--")
@@ -5170,7 +5180,7 @@ deprecated - use bind-func instead."
               ;;(impc:ir:add-gpoly (cons 'bind-func args))
               `(if (equal? *impc:compiler:message:level* 'high)
                    (begin (ascii-print-color 0 7 10)
-                          (print "Generic: ")
+                          (print "Generic_: ")
                           (ascii-print-color 1 2 10)
                           (print ,(car res))
                           (ascii-print-color 0 7 10)
@@ -5277,8 +5287,8 @@ deprecated - use bind-func instead."
 (define build-type-dataconstructor
   (lambda (name type generic)
     (let* ((a (impc:ir:get-pretty-tuple-arg-strings type))
-           (arglst1 '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
-           (arglst2 '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
+           (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
+           (arglst2 *impc:alphabetidxlist*) ;; '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
            (namestr (symbol->string name))
            (ctype (string-append "["
                                  (if generic
@@ -5669,7 +5679,7 @@ deprecated - use bind-func instead."
 ;; Wrap a native, bound C function, allowing it to be called from scheme
 (define-macro (bind-wrapper local-sym native-sym)
   (let* ((types (cdr (llvm:get-function-args (symbol->string native-sym))))
-	 (args (map (lambda (t v) v) types '(a b c d e f g h i j k l m n o p))))
+	 (args (map (lambda (t v) v) types *impc:alphabetlist*))) ;; '(a b c d e f g h i j k l m n o p))))
     `(bind-func ,local-sym
        (lambda ,args
 	 ,(cons native-sym args)))))
