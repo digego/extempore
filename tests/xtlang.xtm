@@ -219,6 +219,24 @@
 ;; (println (my-test-7)) ; 77
 
 
+;; tbind binds variables to values
+;; based on tuple structure
+;; _ (underscore) means don't attempt
+;; to match against this position in
+;; the tuple (i.e. skip)
+(bind-func tuple-bind-test
+  (lambda ()
+    (let ((t1:<i32,float,<i32,float>*,double>* (alloc))
+          (t2:<i32,float>* (alloc))
+          (a 0) (b:float 0.0) (c 0.0))
+      (tfill! t2 3 3.3)
+      (tfill! t1 1 2.0 t2 4.0)
+      (tbind t1 a b _ c)
+      c)))
+
+(test-xtfunc (tuple-bind-test) 4.0)
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some array code with *casting*
 ;; this function returns void

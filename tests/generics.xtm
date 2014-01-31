@@ -1,0 +1,283 @@
+;;; generics.xtm -- rudimentary unit testing for xtlang code
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; a test suite for xtlang generics code.
+
+;;; Code:
+
+(define start_time (now))
+
+(sys:load "tests/test.xtm")
+
+
+;; (define *impc:ti:print-full-generic-types* #t)
+;; (define *impc:ti:print-code-specialization-compiles* #t)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 
+;; generic types
+;;
+
+;; Generic Point {x,y}
+(bind-type Point <!a,!a>)
+
+;; make and return a Point
+(bind-func test_point_1
+  (lambda ()
+    (let ((x (Point 1.0 2.0)))
+      x)))
+
+(bind-func test_point_2
+  (lambda ()
+    (let ((x (Point 1 2)))
+      x)))
+
+;; print the point
+(bind-func test_point_3
+  (lambda ()
+    (let ((x (test_point_1))
+          (y (test_point_2)))
+      (println x y))))
+
+(test-xtfunc (test_point_3))
+
+
+;; Generic Size {width,height}
+(bind-type Size <!a,!a>)
+;; points and size must be the same primitive type!
+(bind-type Rectangle <Point*,Size*>)
+;; this basically the same as Rectangle
+(bind-type RectangleA <Point:<!a,!a>*,Size:<!a,!a>*>)
+;; this allows *different* point and size primitives
+(bind-type RectangleB <Point:<!a,!a>*,Size:<!b,!b>*>)
+
+;; make some rectangles
+(bind-func test_rectangle_1
+  (lambda ()
+    (let ((a (Rectangle (Point 1 2) (Size 3 4)))
+          (b (RectangleA (Point 5 6) (Size 7 8)))
+          (c (RectangleB (Point 9. 10.) (Size 11 12))))
+      c)))
+
+(bind-func test_rectangle_2
+  (lambda ()
+    (let ((a (Rectangle (Point 1 2) (Size 3 4)))
+          (b (RectangleA (Point 5 6) (Size 7 8)))
+          (c (RectangleB (Point 9. 10.) (Size 11 12))))
+      (println a)
+      (println b)
+      (println c))))
+
+(test-xtfunc (test_rectangle_2))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; recursive generic types
+;;
+
+(bind-type Tree <!a,Tree*,Tree*>)
+
+(bind-func Leaf:[Tree:<!a,Tree*,Tree*>*,!a]*
+  (lambda (x)
+    (let ((t (Tree x null null)))
+      t)))
+
+(bind-func tree_value:[!a,Tree*]*
+  (lambda (t)
+    (tref t 0)))
+
+(bind-func print_tree:[void,Tree*]*
+  (lambda (t)
+    (let ((f (lambda (t)
+               (if (null? t) void
+                   (begin
+                     (printout (tree_value t) " ")
+                     (f (tref t 1))
+                     (f (tref t 2))
+                     void)))))      
+      (f t)
+      (println))))
+
+
+(bind-func tree_test
+  (lambda ()
+    (let ((t1 (Leaf 3))
+          (t2 (Leaf 4))
+          (t3 (Tree 2 t1 t2))
+          (t4 (Tree 1 t3 null))
+          (t5 (Leaf (Point 3.0 4.0)))
+          (t6 (Tree (Point 1.0 2.0) t5 null)))
+      (println)
+      (printout "Integer Tree: ")
+      (print_tree t4)
+      (printout "Point Tree: ")
+      (print_tree t6)
+      (println))))
+
+(test-xtfunc (tree_test))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; ADT Testing
+;;
+;;
+
+(sys:load "libs/core/adt.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; list tests
+;;
+
+;; a generic list printing function!
+
+(bind-func print_list:[void,List*]*
+  (lambda (xs)
+    (if (null? xs) void
+        (begin
+          (printout (car xs))
+          (for-each (lambda (x) (printout "," x)) (cdr xs))
+          (println)))))
+
+(bind-func test_list_1
+  (lambda ()
+    (let ((l (list 1 2 3 4 5)))
+      (print_list l)
+      (car (cdr l)))))
+
+(test-xtfunc (test_list_1) 2)
+
+(bind-func test_list_2
+  (lambda ()
+    (let ((l (list 1 2 3 4 5))
+          (l2 (map (lambda (x) (* x x)) l)))
+      (print_list l2))))
+
+(test-xtfunc (test_list_2))
+
+;; note that f is type checked independtly
+;; at the moment and so requires explicit
+;; type in this instance.
+(bind-func test_list_3
+  (lambda ()
+    (let ((l (list 1.0 2.0 3.0 4.0))
+          (f (lambda (x:double) (* x x)))
+          (l2 (map f l)))
+      (print_list l2))))
+
+(test-xtfunc (test_list_3))
+
+;; map2
+(bind-func test_list_4
+  (lambda ()
+    (let ((l1 (list 1 2 3 4))
+          (l2 (list 1.0 2.0 3.0 4.0)))
+      (map2 (lambda (a b) (Pair a b)) l1 l2))))
+
+(bind-func test_list_5
+  (lambda ()
+    (let ((l (test_list_4)))
+      (for-each (lambda (x) (println x)) l))))
+
+(test-xtfunc (test_list_5))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; lists of lists
+
+(bind-func test_list_6
+  (lambda ()
+    (let ((l1 (list 1 2 3))
+          (l2 (list l1 l1 l1)))
+      l2)))
+
+(bind-func test_list_7
+  (lambda ()
+    (let ((l1 (list 1 2 3))
+          (l2 (list l1 l1))
+          (l3 (list l2 l2)))
+      l3)))
+
+(bind-func test_list_8
+  (lambda ()
+    (let ((l1 (list (Point 1 2) (Point 3 4) (Point 5 6)))
+          (l2 (list l1 l1 l1)))
+      (for-each (lambda (x)                  
+                  ;; type inferencer needs a
+                  ;; little help here
+                  ;; (should try to fix this!
+                  (for-each (lambda (x:Point:<i64,i64>*)
+                              (printout x ","))
+                            x)
+                  (println))                
+                l2)
+      l2)))
+
+(test-xtfunc (test_list_8))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; test some list functions
+;;
+
+(bind-func test_append_insert_length
+  (lambda ()
+    (let ((v1 (list 1 2 3 4))
+          (v2 (list 5 6 7 8))
+          (v3 (append v1 v2)))
+      (insert v3 4 77)
+      (print_list v3)
+      (println "length:" (length v3))
+      (length v3))))
+
+(test-xtfunc (test_append_insert_length) 9)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; assoc lists
+
+(bind-func test_assoc_1
+  (lambda ()
+    (let ((dict (list (Pair (Str "Andrew") 40)
+                      (Pair (Str "Alison") 39)
+                      (Pair (Str "Ben") 28))))
+      dict)))
+
+(bind-func test_assoc_2
+  (lambda ()
+    (let ((dict (test_assoc_1)))
+      (print_list dict)
+      ;; (for-each (lambda (p) (println p)) dict)
+      (println "Ben is" (dict_find dict (Str "Ben")) "years old")
+      (println "Andrew is" (dict_find dict (Str "Andrew")) "years old")
+      void)))
+
+(test-xtfunc (test_assoc_2))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; BTree
+
+(bind-func btree_test_1
+  (lambda ()
+    (let ((t1 (BLeaf 3))
+          (t2 (BLeaf 4))
+          (t3 (BTree 2 t1 t2))
+          (t4 (BTree 1 t3 null)))
+      (print_btree t4)
+      t3)))
+
+(test-xtfunc (btree_test_1))
+
+
+(print-test-results)
+
+(println 'total-time: (* 1.0 (/ (- (now) start_time) *samplerate*)) 'seconds)
+
