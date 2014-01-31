@@ -155,12 +155,20 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func dict_find:[!a,List:<Pair:<i8*,!a>*,List*>*,i8*]*
+(bind-func dict_find:[!a,List:<Pair:<String*,!a>*,List*>*,String*]*
+  (lambda (dict key)
+    (if (null? dict) (convert null)
+        (if (string_cmp (first (car dict)) key)
+            (second (car dict))
+            (dict_find (cdr dict) key)))))
+
+(bind-func dict_find_2:[!a,List:<Pair:<i8*,!a>*,List*>*,i8*]*
   (lambda (dict key)
     (if (null? dict) (convert null)
         (if (= (i64toi32 0) (strcmp (first (car dict)) key))
             (second (car dict))
-            (dict_find (cdr dict) key)))))
+            (dict_find_2 (cdr dict) key)))))
+
 
 
 ;;;;;;;;;;;
@@ -178,4 +186,16 @@
 
 (bind-func btree_value:[!a,BTree*]*
   (lambda (t)
-    (tref 0 t)))
+    (tref t 0)))
+
+(bind-func print_btree:[void,BTree*]*
+  (lambda (t)
+    (let ((f (lambda (t)
+               (if (null? t) void
+                   (begin
+                     (printout (btree_value t) " ")
+                     (f (tref t 1))
+                     (f (tref t 2))
+                     void)))))      
+      (f t)
+      (println))))

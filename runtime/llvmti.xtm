@@ -486,7 +486,45 @@
 	      (car ast)
 	      (impc:ti:list (cdr ast))))))
 
-		
+
+(define impc:ti:println
+  (lambda (ast)
+    (if (null? ast)
+        `(print_return)
+        `(begin
+           ,(if (string? (car ast))
+                (list 'llvm_printf "%s" (car ast))
+                (list 'print (car ast)))
+           ,@(flatten-1 (map (lambda (x)
+                               (if (string? x)
+                                   (list
+                                    (list 'print_space)
+                                    (list 'llvm_printf "%s" x))
+                                   (list
+                                    (list 'print_space)
+                                    (list 'print x))))
+                             (cdr ast)))
+           (print_return)))))
+
+(define impc:ti:println2
+  (lambda (ast)
+    (if (null? ast)
+        `(print_return)
+        `(begin
+           ,(if (string? (car ast))
+                (list 'llvm_printf "%s" (car ast))
+                (list 'print (car ast)))
+           ,@(flatten-1 (map (lambda (x)
+                               (if (string? x)
+                                   (list
+                                    ;; (list 'print_space)
+                                    (list 'llvm_printf "%s" x))
+                                   (list
+                                    ;; (list 'print_space)
+                                    (list 'print x))))
+                             (cdr ast)))))))
+
+
 
 ;; (define impc:ti:map   
 ;;    (lambda (ast)
@@ -709,6 +747,10 @@
                         (impc:ti:first-transform (impc:ti:quote (cadr ast)) inbody?))
                        ((eq? (car ast) 'list)
                         (impc:ti:first-transform (impc:ti:list (cdr ast)) inbody?))
+                       ((eq? (car ast) 'println)
+                        (impc:ti:first-transform (impc:ti:println (cdr ast)) inbody?))
+                       ((eq? (car ast) 'printout)
+                        (impc:ti:first-transform (impc:ti:println2 (cdr ast)) inbody?))
 		       ((eq? (car ast) 'afill!)
 			(impc:ti:first-transform (impc:ti:afill! (cdr ast)) inbody?))
 		       ((eq? (car ast) 'pfill!)
@@ -970,9 +1012,18 @@
                                              elements)))
                      (newtype3 (impc:ir:get-type-str newtype2)))
                 ;; (println 'nt1 newtype1 'nt2 newtype2 'nt3 newtype3)
-		;; ok now we have a type we need to add it to llvm and polytype
-                ;; (println 'newtype! newname 'totype: newtype3)
-		(llvm:compile (string-append "%" newname " = type " newtype3))
+		;; ok now we have a type we need to add it to llvm and
+                ;; polytype
+                ;;(println 'newtype! newname 'totype: newtype3)
+                (if (null? (llvm:get-named-type newname))
+                    (begin ;; if this is a new reification of a generic type then ...
+                           (llvm:compile (string-append "%" newname " = type " newtype3))
+                           ;; we should probably also build dataconstructors for the new
+                           ;; concrete type?? (at least for printing reasons)
+                           ;; because build-type-dataconstructor needs to be called from
+                           ;; the top level, we should call use callback to add to queue
+                           (callback (now) 'build-type-dataconstructor (string->symbol newname) newtype1 #f)
+                           'done))
                 (let ((rettype (apply string-append "%" newname (make-list ptrdepth "*"))))
                   ;; (println 'oldvs: vs)
                   ;; (set! vs (string->symbol
@@ -1990,8 +2041,9 @@
   (lambda (x)
     (if (and (string? x)
              (regex:match? x "^%")
+             (regex:match? x "--")
              (if (null? (impc:ir:get-named-type x))
-                 (print-error 'Compiler 'Error: x is 'not 'valid 'named 'type)
+                 (print-error 'Compiler 'Error: x 'is 'not 'valid 'named 'type)
                  #t))
         (let* ((gpolyname (regex:replace-all x "^%([^-]*).*$" "$1"))
                (ptrdepth (impc:ir:get-ptr-depth x))
@@ -5287,6 +5339,7 @@ deprecated - use bind-func instead."
 (define build-type-dataconstructor
   (lambda (name type generic)
     (let* ((a (impc:ir:get-pretty-tuple-arg-strings type))
+           (compiler-suppress-on (if (equal? *impc:compiler:message:level* 'low) #f #t))
            (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
            (arglst2 *impc:alphabetidxlist*) ;; '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
            (namestr (symbol->string name))
@@ -5304,38 +5357,45 @@ deprecated - use bind-func instead."
                                             (map (lambda (x) (string-append "," x)) a)))
                                  "]*"))
            (nameandtype (string->symbol (string-append namestr "" ":" ctype)))
-           (z_nameandtype (string->symbol (string-append namestr "_z" ":" ctype)))           
-           (s_nameandtype (string->symbol (string-append namestr "_s" ":" ctype)))
+           (print_name (string->symbol (string-append namestr "_print" ":[void," (symbol->string name) "*]*")))
            (h_nameandtype (string->symbol (string-append namestr "_h" ":" ctype)))
            (argslist (map (lambda (a b) b) a arglst1)) 
            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
+      ;; (println 'dataconstructor: 'name: name 'type: type)
       (suppress-compiler-messages #t)
+      (if (not generic)
+          (begin
+            (eval `(bind-func ,print_name
+                     (lambda (x)
+                       (printout
+                        ,(if (regex:match? namestr "--")
+                             (if *impc:ti:print-full-generic-types*
+                                 (impc:ir:pretty-print-type namestr)
+                                 (car (regex:type-split namestr "--")))
+                             namestr)
+                        ":<"
+                        ,(list 'tref 'x 0)
+                        ,@(impc:ti:flatten-1 (map (lambda (y z) (list "," (list 'tref 'x (+ 1 z)))) (cdr a) arglst2))
+                        ">")
+                       void))
+                  (interaction-environment))
+            (eval `(bind-poly print ,(string->symbol (string-append namestr "_print")))
+                  (interaction-environment))))
       (eval `(bind-func ,nameandtype
                (lambda ,argslist
                  (let ((obj (zalloc)))
                    ,@body
                    obj)))
             (interaction-environment))      
-      (eval `(bind-func ,z_nameandtype
-               (lambda ,argslist
-                 (let ((obj (zalloc)))
-                   ,@body
-                   obj)))
-            (interaction-environment))
-      (eval `(bind-func ,s_nameandtype
-               (lambda ,argslist
-                 (let ((obj (salloc)))
-                   ,@body
-                   obj)))
-            (interaction-environment))
       (eval `(bind-func ,h_nameandtype
                (lambda ,argslist
                  (let ((obj (halloc)))
                    ,@body
                    obj)))
             (interaction-environment))
-      (suppress-compiler-messages #f))))
-                 
+      (if compiler-suppress-on
+          (suppress-compiler-messages #f)
+          'donothing))))
 
 
 (define-macro (bind-type symbol type)
@@ -5380,15 +5440,15 @@ deprecated - use bind-func instead."
                 (ascii-print-color 1 3 10)
                 (print ',type)
                 (ascii-print-color 0 7 10)
-                ;; now compile data constructor
-                (print)
-                (build-type-dataconstructor
-                 ',symbol
-                 (if (impc:ir:gpolytype-types ',symbol)
-                     (symbol->string (impc:ir:gpolytype-types ',symbol))
-                     (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))
-                 (if (impc:ir:gpolytype-types ',symbol) #t #f))                                                
-                ))))
+                (print)))
+          ;; now compile data constructor          
+          (build-type-dataconstructor
+           ',symbol
+           (if (impc:ir:gpolytype-types ',symbol)
+               (symbol->string (impc:ir:gpolytype-types ',symbol))
+               (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))
+           (if (impc:ir:gpolytype-types ',symbol) #t #f))))
+
 
 
 (define-macro (bind-tvar symbol . types)
@@ -5683,3 +5743,54 @@ deprecated - use bind-func instead."
     `(bind-func ,local-sym
        (lambda ,args
 	 ,(cons native-sym args)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; very dodgy 
+;; generic constraints
+;;
+;; simply forces supplied specialisations
+;; add to polys and remove gpoly
+;;
+;; for example
+;;
+;; (bind-func test:[!a,!a]*
+;;   (lambda (x) (* x x)))
+;;
+;; (generic-constraint test [i32,i32]* [float,float]*)
+;;
+(define _generic-constraint
+  (lambda (sym . types)
+    (if (not (impc:ir:gpoly-types (string->symbol sym)))
+        (print-error 'Compiler 'Error: 'no 'generic 'function 'named: sym)
+        (let ((printspec *impc:ti:print-code-specialization-compiles*))          
+          (set! *impc:ti:print-code-specialization-compiles* #t)   
+          (for-each
+           (lambda (t)
+             (let ((etype (cname-encode t)))
+               (if (not (llvm:get-function (string-append sym "--" etype)))
+                   (let* ((code (caddr (cadr (impc:ir:gpoly-types (string->symbol sym)))))
+                          (pfunc (string->symbol (string-append sym "--" etype))))
+                     (set! code `(let ((,pfunc ,code)) ,pfunc))
+                     (impc:ti:run pfunc code (cons pfunc (string->symbol t)))
+                     (impc:ir:add-poly (string->symbol sym) pfunc t)
+                     (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
+                       (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
+                       (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
+                       (sys:pop-memzone)) ;; don't destroy - this happens in _setter func
+                     pfunc))))
+           types)
+          (set! *impc:ti:print-code-specialization-compiles* printspec)
+          (set! *impc:ir:gpolys*
+                (cl:remove-if (lambda (x)
+                                (if (string=? (symbol->string (car x)) sym)
+                                    #t #f))
+                              *impc:ir:gpolys*))
+          
+          #t))))
+
+(define-macro (generic-constraint sym . args)
+  (apply _generic-constraint
+         (symbol->string sym)
+         (map (lambda (x) (symbol->string x)) args)))
