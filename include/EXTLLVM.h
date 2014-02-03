@@ -83,8 +83,14 @@ unsigned long string_hash(unsigned char* str);
   void llvm_send_udp(char* host, int port, void* message, int message_length);
   double imp_randd();
   float imp_randf();
-  int64_t imp_rand1(double a);
-  int64_t imp_rand2(double a, double b);
+  int64_t imp_rand1_i64(int64_t a);
+  int64_t imp_rand2_i64(int64_t a, int64_t b);
+  int32_t imp_rand1_i32(int32_t a);
+  int32_t imp_rand2_i32(int32_t a, int32_t b);
+  double imp_rand1_d(double a);
+  double imp_rand2_d(double a, double b);
+  float imp_rand1_f(float a);
+  float imp_rand2_f(float a, float b);
 
 
   struct closure_address_table* new_address_table();

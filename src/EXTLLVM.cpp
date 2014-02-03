@@ -881,61 +881,78 @@ float imp_randf()
     return (float)rand()/(float)RAND_MAX;
 #endif
 }
-/*
-define double @imp_rand()
-{
-entry:
-%tmp = call i32 @rand()
-%tmp1 = sitofp i32 %tmp to double
-%tmp2 = fdiv double %tmp1, 32767.0 ; 2147483647.0
-ret double %tmp2
-}
-*/
 
-int64_t imp_rand1(double a)
+int64_t imp_rand1_i64(int64_t a)
 {
 #ifdef EXT_BOOST
   return (int64_t) extemp::UNIV::random()*a;
 #else
-  return (int64_t)((double)rand()/(double)RAND_MAX)*a;
+  return (int64_t) (((double)rand()/(double)RAND_MAX)*(double)a);
 #endif
 }
 
-/*
-define i64 @imp_rand1(double %a)
-{
-entry:
-%tmp = call i32 @rand()
-%tmp1 = sitofp i32 %tmp to double
-%tmp2 = fdiv double %tmp1, 32767.0 ; 2147483647.0
-%tmp3 = fmul double %a, %tmp2
-%tmp4 = fptosi double %tmp3 to i64
-ret i64 %tmp4
-}
-*/
-
-int64_t imp_rand2(double a, double b)
+int64_t imp_rand2_i64(int64_t a, int64_t b)
 {
 #ifdef EXT_BOOST
-  return (int64_t) a+(extemp::UNIV::random()*(b-a));
+  return (int64_t) a+(extemp::UNIV::random()*((double)b-(double)a));
 #else
-  return (int64_t) a+(((double)rand()/(double)RAND_MAX)*(b-a));
+  return (int64_t) a+(((double)rand()/(double)RAND_MAX)*((double)b-(double)a));
 #endif
 }
-/*
-define i64 @imp_rand2(double %a, double %b)
+
+int32_t imp_rand1_i32(int32_t a)
 {
-entry:
-%tmp = call i32 @rand()
-%tmp1 = sitofp i32 %tmp to double
-%tmp2 = fdiv double %tmp1, 32767.0 ; 2147483647.0
-%tmp3 = fsub double %b, %a
-%tmp4 = fmul double %tmp3, %tmp2
-%tmp5 = fadd double %a, %tmp4
-%tmp6 = fptosi double %tmp5 to i64
-ret i64 %tmp6
+#ifdef EXT_BOOST
+  return (int32_t) extemp::UNIV::random()*(double)a;
+#else
+  return (int32_t) (((double)rand()/(double)RAND_MAX)*(double)a);
+#endif
 }
-*/
+
+int32_t imp_rand2_i32(int32_t a, int32_t b)
+{
+#ifdef EXT_BOOST
+  return (int32_t) a+(extemp::UNIV::random()*((double)b-(double)a));
+#else
+  return (int32_t) a+(((double)rand()/(double)RAND_MAX)*((double)b-(double)a));
+#endif
+}
+
+double imp_rand1_d(double a)
+{
+#ifdef EXT_BOOST
+  return extemp::UNIV::random()*a;
+#else
+  return ((double)rand()/(double)RAND_MAX)*a;
+#endif
+}
+
+double imp_rand2_d(double a, double b)
+{
+#ifdef EXT_BOOST
+  return a+(extemp::UNIV::random()*(b-a));
+#else
+  return a+(((double)rand()/(double)RAND_MAX)*(b-a));
+#endif
+}
+
+float imp_rand1_f(float a)
+{
+#ifdef EXT_BOOST
+  return extemp::UNIV::random()*a;
+#else
+  return ((double)rand()/(double)RAND_MAX)*a;
+#endif
+}
+
+float imp_rand2_f(float a, float b)
+{
+#ifdef EXT_BOOST
+  return a+((float)extemp::UNIV::random()*(b-a));
+#else
+  return a+(((float)rand()/(float)RAND_MAX)*(b-a));
+#endif
+}
 
 
 ///////////////////////////////////
@@ -1470,10 +1487,22 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&imp_randd);	
 	    gv = M->getNamedValue(std::string("imp_randf"));
 	    EE->updateGlobalMapping(gv,(void*)&imp_randf);	
-	    gv = M->getNamedValue(std::string("imp_rand1"));
-	    EE->updateGlobalMapping(gv,(void*)&imp_rand1);	
-	    gv = M->getNamedValue(std::string("imp_rand2"));
-	    EE->updateGlobalMapping(gv,(void*)&imp_rand2);	
+	    gv = M->getNamedValue(std::string("imp_rand1_i64"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand1_i64);	
+	    gv = M->getNamedValue(std::string("imp_rand2_i64"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand2_i64);	
+	    gv = M->getNamedValue(std::string("imp_rand1_i32"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand1_i32);	
+	    gv = M->getNamedValue(std::string("imp_rand2_i32"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand2_i32);	
+	    gv = M->getNamedValue(std::string("imp_rand1_d"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand1_d);	
+	    gv = M->getNamedValue(std::string("imp_rand2_d"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand2_d);	
+	    gv = M->getNamedValue(std::string("imp_rand1_f"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand1_f);	
+	    gv = M->getNamedValue(std::string("imp_rand2_f"));
+	    EE->updateGlobalMapping(gv,(void*)&imp_rand2_f);	
 
 
 #ifdef TARGET_OS_WINDOWS
