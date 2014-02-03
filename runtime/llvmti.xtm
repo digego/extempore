@@ -688,12 +688,12 @@
                   (let ,(caddr ast) ,@(cdddr ast))))))
 
 
-(define impc:ti:>=
+(define impc:ti:gteq
   (lambda (ast)
     `(or (> ,(cadr ast) ,(caddr ast))
          (= ,(cadr ast) ,(caddr ast)))))
 
-(define impc:ti:<=
+(define impc:ti:lteq
   (lambda (ast)
     `(or (< ,(cadr ast) ,(caddr ast))
          (= ,(cadr ast) ,(caddr ast)))))
@@ -5873,9 +5873,9 @@ deprecated - use bind-func instead."
 ;; (bind-func test:[!a,!a]*
 ;;   (lambda (x) (* x x)))
 ;;
-;; (generic-constraint test [i32,i32]* [float,float]*)
+;; (constrain-generic test [i32,i32]* [float,float]*)
 ;;
-(define _generic-constraint
+(define _constrain-generic
   (lambda (sym . types)
     (if (not (impc:ir:gpoly-types (string->symbol sym)))
         (print-error 'Compiler 'Error: 'no 'generic 'function 'named: sym)
@@ -5905,7 +5905,43 @@ deprecated - use bind-func instead."
           
           #t))))
 
-(define-macro (generic-constraint sym . args)
-  (apply _generic-constraint
+(define-macro (constraint-generic sym . args)
+  (apply _constrain-generic
+         (symbol->string sym)
+         (map (lambda (x) (symbol->string x)) args)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; force specializations on a generic funtion
+;;
+;; i.e. (specialize-generic blah [i32,i32]* [i64,i64]*)
+;;
+(define _specialize-generic
+  (lambda (sym . types)
+    (if (not (impc:ir:gpoly-types (string->symbol sym)))
+        (print-error 'Compiler 'Error: 'no 'generic 'function 'named: sym)
+        (let ((printspec *impc:ti:print-code-specialization-compiles*))          
+          (set! *impc:ti:print-code-specialization-compiles* #t)   
+          (for-each
+           (lambda (t)
+             (let ((etype (cname-encode t)))
+               (if (not (llvm:get-function (string-append sym "--" etype)))
+                   (let* ((code (caddr (cadr (impc:ir:gpoly-types (string->symbol sym)))))
+                          (pfunc (string->symbol (string-append sym "--" etype))))
+                     (set! code `(let ((,pfunc ,code)) ,pfunc))
+                     (impc:ti:run pfunc code (cons pfunc (string->symbol t)))
+                     (impc:ir:add-poly (string->symbol sym) pfunc t)
+                     (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
+                       (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
+                       (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
+                       (sys:pop-memzone)) ;; don't destroy - this happens in _setter func
+                     pfunc))))
+           types)
+          (set! *impc:ti:print-code-specialization-compiles* printspec)
+          #t))))
+
+(define-macro (specialize-generic sym . args)
+  (apply _specialize-generic
          (symbol->string sym)
          (map (lambda (x) (symbol->string x)) args)))
