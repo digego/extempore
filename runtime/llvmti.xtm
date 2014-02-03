@@ -5718,7 +5718,21 @@ deprecated - use bind-func instead."
        (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
        (bind-lib-func-no-scm ,library ,name ,(string->symbol dctype))
        (bind-lib-func-no-scm ,library ,(string->symbol (string-append namestr "_h")) ,(string->symbol dctype))
-       (bind-lib-func ,library ,(string->symbol (string-append namestr "_print")) ,(string->symbol ptype))
+       ;; at the moment we have to build _print (i.e. cannot link to _print because of generics)
+       (bind-func ,(string->symbol (string-append namestr "_print" ":" ptype))
+         (lambda (x)
+           (printout
+            ,(if (regex:match? namestr "--")
+                 (if *impc:ti:print-full-generic-types*
+                     (impc:ir:pretty-print-type namestr)
+                     (car (regex:type-split namestr "--")))
+                 namestr)
+            ":<"
+            ,(list 'tref 'x 0)
+            ,@(impc:ti:flatten-1 (map (lambda (y z) (list "," (list 'tref 'x (+ 1 z)))) (cdr a) *impc:alphabetidxlist*))
+            ">")
+           void))
+       ;; (bind-lib-func ,library ,(string->symbol (string-append namestr "_print")) ,(string->symbol ptype))
        (bind-poly print ,(string->symbol (string-append namestr "_print"))))))
 
 ;;; this here for binding to CLOSURE in dylib
