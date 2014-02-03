@@ -5735,6 +5735,23 @@ deprecated - use bind-func instead."
        ;; (bind-lib-func ,library ,(string->symbol (string-append namestr "_print")) ,(string->symbol ptype))
        (bind-poly print ,(string->symbol (string-append namestr "_print"))))))
 
+
+;;; this here for bindig to existing types
+;;
+;; this binds constructors but NO prints
+;; and no scheme wrappers
+;;
+(define-macro (bind-lib-type-no-scm-no-print library name type . args)
+  (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
+         (namestr (symbol->string name))
+         (typestr (symbol->string type))          
+         (dctype (string-append "[" namestr "*," (string-join a ",") "]*"))
+         (ptype (string-append "[void," namestr "*]*")))
+    `(begin
+       (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
+       (bind-lib-func-no-scm ,library ,name ,(string->symbol dctype))
+       (bind-lib-func-no-scm ,library ,(string->symbol (string-append namestr "_h")) ,(string->symbol dctype)))))
+
 ;;; this here for binding to CLOSURE in dylib
 ;;
 ;; arg is for *optional* zone size arg
@@ -5909,6 +5926,33 @@ deprecated - use bind-func instead."
   (apply _constrain-generic
          (symbol->string sym)
          (map (lambda (x) (symbol->string x)) args)))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; specialize generic type!
+;;
+(define _specialize-type
+  (lambda (sym . types)
+    (if (not (impc:ir:gpolytype-types (string->symbol sym)))
+        (print-error 'Compiler 'Error: 'no 'generic 'type 'named: sym)
+        (let ((printspec *impc:ti:print-code-specialization-compiles*))          
+          (set! *impc:ti:print-code-specialization-compiles* #t)
+          (for-each
+           (lambda (t)
+             (let ((newname (string-append sym "--" (cname-encode t))))
+               (llvm:compile (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
+               (build-type-dataconstructor (string->symbol newname) t #f)))
+           types)
+          (set! *impc:ti:print-code-specialization-compiles* printspec)
+          #t))))
+
+(define-macro (specialize-type sym . args)
+  (apply _specialize-type
+         (symbol->string sym)
+         (map (lambda (x) (symbol->string x)) args)))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
