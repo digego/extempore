@@ -58,6 +58,14 @@
 
 (__set_float_nans)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; some global aliases
+
+(bind-alias bool i1)
+(if (= (sys:pointer-size) 64)
+    (bind-alias size_t i64)
+    (bind-alias size_t i32))
+(bind-alias enum i32)
 
 ;;;;;;;;;;;;; this for audio ;;;;;;;;;;;;;;;;;;
 ;; THESE ALL NEED TO BE CHANGED TOGETHER!!!!
@@ -108,5 +116,134 @@
 (bind-poly sqrt sqrtd)
 (bind-poly fabs fabsf)
 (bind-poly fabs fabsd)
+
+;;;;;;;;;;;;;;;;
+;; printing
+
+;; prints a line break
+(bind-func print_return
+  (lambda () (printf "\n") void))
+
+;; prints a space
+(bind-func print_space
+  (lambda () (printf " ") void))
+
+(bind-func print_i1
+  (lambda (x:i1) (printf "%d" x) void))
+
+(bind-func print_i8
+  (lambda (x:i8) (printf "%d" x) void))
+
+(bind-func print_i32
+  (lambda (x:i32) (printf "%d" x) void))
+
+(bind-func print_i64
+  (lambda (x:i64) (printf "%lld" x) void))
+
+(bind-func print_f
+  (lambda (x:float) (printf "%f" (ftod x)) void))
+
+(bind-func print_d
+  (lambda (x:double) (printf "%f" x) void))
+
+(bind-poly print print_i1)
+(bind-poly print print_i8)
+(bind-poly print print_i32)
+(bind-poly print print_i64)
+(bind-poly print print_f)
+(bind-poly print print_d)
+
+;; generics here for catchall!
+(bind-func print:[void,!a]
+  (lambda (x) (printf "___") void))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; XTLang strings
+
+(bind-type String <size_t,i8*>)
+
+;; create easy Data constructors from CStrings
+(bind-func Str
+  (lambda (s)
+    (let ((lgth (strlen s))
+          (news:i8* (zalloc (+ 1 lgth))))
+      (strcpy news s)
+      (let ((str (String lgth news)))
+        str))))
+
+(bind-func Str_h
+  (lambda (s)
+    (let ((lgth (strlen s))
+          (news:i8* (halloc (+ 1 lgth))))
+      (String_h lgth news))))
+
+;; Override default String print!
+(bind-func String_print:[void,String*]*
+  (lambda (x)
+    (printf "'%s'" (tref x 1))
+    void))
+
+(bind-func string_length
+  (lambda (str:String*)
+    (tref str 0)))
+
+(bind-func cstr_from_string
+  (lambda (str:String*)
+    (tref str 1)))
+
+(bind-func string_cat
+  (lambda (s1:String* s2:String*)
+    (Str (strcat (tref s1 1) (tref s2 1)))))
+
+(bind-func string_cat_h
+  (lambda (s1:String* s2:String*)
+    (Str_h (strcat (tref s1 1) (tref s2 1)))))
+
+(bind-func string_cmp
+  (lambda (s1:String* s2:String*)
+    (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
+        #t #f)))
+
+;; levenshtein edit distance
+(bind-func string_levenshtein
+  (lambda (s:String* t:String*)
+    (let ((i 0) (j 0)
+	  ;; column-major indexing closure
+	  (s_cstr (cstr_from_string s))
+	  (slen:i64 (string_length s))
+	  (t_cstr (cstr_from_string t))
+	  (tlen:i64 (string_length t))
+	  (row:i64* (salloc (+ slen 1)))
+	  (prev_row:i64* (salloc (+ slen 1)))
+	  (min3 (lambda (a:i64 b c)
+		  (if (< a b)
+		      (if (< a c)
+			  a c)
+		      (if (< b c)
+			  b c)))))
+      (dotimes (i (+ tlen 1))
+	(pset! prev_row i i))
+      (dotimes (i slen)
+	(pset! row 0 (+ i 1))
+	(dotimes (j tlen)
+	  (pset! row (+ j 1)
+		 (min3 (+ (pref row j) 1)
+		       (+ 1 (pref prev_row (+ j 1)))
+		       (+ (pref prev_row j)
+			  (if (= (pref s_cstr j)
+				 (pref t_cstr i))
+			      0 1)))))
+	(let ((tmp_row:i64* null))
+	  (set! tmp_row prev_row)
+	  (set! prev_row row)
+	  (set! row tmp_row)))
+      (pref prev_row tlen))))
+
+(bind-func string_similarity
+  (lambda (s:String* t:String*)
+    (/ 1.0 (i64tod (+ 1 (string_levenshtein s t))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (suppress-compiler-messages #f)

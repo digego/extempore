@@ -8,299 +8,194 @@
 (sys:load-preload-check 'adt)
 (define *xtmlib-adt-loaded* #t)
 
-(bind-alias bool i1)
-
-;;;;;;;;;;;;;;;;;;;;
-;;
-
-(bind-func xempty_p:[bool,!a]*
-  (lambda (a)
-    (if (null? a) #t #f)))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; a start for some super simple boxing
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; tag num and data
-(bind-type xbox_t <i64,i8*,i8*>)
-
-(bind-func xbox:[xbox_t*,!a]*
-  (lambda (val)
-    (let ((box:xbox_t* (halloc)))
-      (tset! box 0 0)
-      (tset! box 1 (convert val i8*))
-      box)))
-             
-(bind-func xunbox:[!a,xbox_t*]*
-  (lambda (box)
-    (let ((key (tref box 0))
-          (val (tref box 1)))
-      (convert val))))
-
-
 ;;;;;;;;;;;;;;;;;;;;
 ;; pairs
 
-(bind-type xpair_t <!first,!second>)
+(bind-type Pair <!x,!y>)
 
-(bind-func xpair:[xpair_t*,!first,!second]*
-  (lambda (a b)
-    (let ((ppair (halloc)))
-      (tset! ppair 0 a)
-      (tset! ppair 1 b)
-      ppair)))    
-
-(bind-func xfirst:[!first,xpair_t*]*	   
+(bind-func first:[!a,Pair:<!a,!b>*]* 
   (lambda (a)
     (tref a 0)))
 
-(bind-func xsecond:[!second,xpair_t*]*	   
+(bind-func second:[!b,Pair:<!a,!b>*]*	   
   (lambda (a)
     (tref a 1)))
 
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; singly linked lists
 ;;
-;; lists
-;;
+(bind-type List <!x,List*>)
 
-(bind-type xlist_t <!head,xlist_t*>)
+(bind-func cons:[List:<!a,List*>*,!a,List:<!a,List*>*]*
+  (lambda (x y)
+    (let ((obj (alloc)))
+      (tset! obj 0 x)
+      (tset! obj 1 y)
+      obj)))
 
-(bind-func xjoin:[xlist_t*,!head,xlist_t*]*
-  (lambda (a b)
-    (let ((joinpair (halloc)))
-      (tset! joinpair 0 a)
-      (tset! joinpair 1 b)
-      joinpair)))
-
-(bind-func xconj:[xlist_t*,!head,xlist_t*]*
-  (lambda (a b)
-    (let ((joinpair (halloc)))
-      (tset! joinpair 0 a)
-      (tset! joinpair 1 b)
-      joinpair)))
-
-(bind-func xhead:[!head,xlist_t*]*
+(bind-func car:[!a,List:<!a,List*>*]*
   (lambda (a)
     (tref a 0)))
 
-(bind-func xtail:[xlist_t*,xlist_t*]*
+(bind-func cdr:[List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a)
     (tref a 1)))
 
-;; macro list builder
-(define-macro (xlist . args)
-  (let loop ((lst args))
-    (if (null? lst)
-	'null
-	`(xjoin ,(car lst) ,(loop (cdr lst))))))
-
-(bind-func xlength:[i64,xlist_t*]*
+(bind-func length:[i64,List:<!a,List*>*]*
   (lambda (a)    
     (if (null? a)
 	0
-	(+ 1 (xlength (xtail a))))))
+	(+ 1 (length (cdr a))))))
 
-(bind-func xnth_tail_:[xlist_t*,xlist_t*,i64,i64]*
+(bind-func _nth_tail:[List:<!a,List*>*,List:<!a,List*>*,i64,i64]*
   (lambda (lst idx cnt)
     (if (or (= cnt idx) (> cnt idx))
         lst
-        (xnth_tail_ (xtail lst)
-               idx
-               (+ cnt 1)))))
+        (_nth_tail (cdr lst)
+                   idx
+                   (+ cnt 1)))))
 
-(bind-func xnth_tail:[xlist_t*,xlist_t*,i64]*
+(bind-func nth_tail:[List:<!a,List*>*,List:<!a,List*>*,i64]*
   (lambda (lst idx)
-    (xnth_tail_ lst idx 0)))
+    (_nth_tail lst idx 0)))
 
-(bind-func xnth:[!a,xlist_t*,i64]*
+(bind-func nth:[!a,List:<!a,List*>*,i64]*
   (lambda (lst idx)
-    (xhead (xnth_tail lst idx))))
+    (car (nth_tail lst idx))))
 
-;; insert val into list at idx
-
-(bind-func xinsert:[xlist_t*,xlist_t*,i64,!a]*
+(bind-func insert:[List:<!a,List*>*,List:<!a,List*>*,i64,!a]*
   (lambda (lst idx value)
     (if (= idx 0)
-        (xjoin value lst)
-        (let ((pre_cell (xnth_tail lst (- idx 1)))
-              (new_cell (xjoin value (xtail pre_cell))))
+        (cons value lst)
+        (let ((pre_cell (nth_tail lst (- idx 1)))
+              (new_cell (cons value (cdr pre_cell))))
           (tset! pre_cell 1 new_cell)
           lst))))
 
-(bind-func xdelete:[!a,xlist_t*,i64]*
+(bind-func delete:[!a,List:<!a,List*>*,i64]*
   (lambda (lst idx)
-    (let ((pre_cell (xnth_tail lst (- idx 1)))
-          (cell (xtail pre_cell))
-          (post_cell (xtail cell)))
+    (let ((pre_cell (nth_tail lst (- idx 1)))
+          (cell (cdr pre_cell))
+          (post_cell (cdr cell)))
       (tset! pre_cell 1 post_cell)
-      (xhead cell))))
+      (car cell))))
 
-;; ;; a macro for printing lists
-;; (bind-func print_xlist:[i32,xlist_t*,i8*]*
-;;   (lambda (lst format)
-;;     (printf "%\n" )))
-
-(bind-func xmap:[xlist_t%a*,[!head%a,!head%b]*,xlist_t%b*]*
-  (lambda (func lst)
+(bind-func map:[List:<!a,List*>*,[!a,!b]*,List:<!b,List*>*]*
+  (lambda (func xs)
     (let ((f (lambda (l)
-	       (if (null? l)
-		   null
-		   (xjoin (func (xhead l)) (f (xtail l)))))))
-      (f lst))))
+               (if (null? l)
+                   null
+                   (cons (func (car l)) (f (cdr l)))))))
+      (f xs))))
 
-(bind-func xlast:[xlist_t*,xlist_t*]*
+(bind-func map1:[List:<!a,List*>*,[!a,!b]*,List:<!b,List*>*]*
+  (lambda (func xs)
+    (let ((f (lambda (l)
+               (if (null? l)
+                   null
+                   (cons (func (car l)) (f (cdr l)))))))
+      (f xs))))
+
+(bind-func map2:[List:<!a,List*>*,[!a,!b,!c]*,List:<!b,List*>*,List:<!c,List*>*]*
+  (lambda (func xs1 xs2)
+    (let ((f (lambda (l1 l2)
+               (if (null? l1)
+                   null
+                   (cons (func (car l1) (car l2))
+                         (f (cdr l1) (cdr l2)))))))
+      (f xs1 xs2))))
+
+(bind-func map3:[List:<!a,List*>*,[!a,!b,!c,!d]*,List:<!b,List*>*,List:<!c,List*>*,List:<!d,List*>*]*
+  (lambda (func xs1 xs2 xs3)
+    (let ((f (lambda (l1 l2 l3)
+               (if (null? l1)
+                   null
+                   (cons (func (car l1) (car l2) (car l3))
+                         (f (cdr l1) (cdr l2) (cdr l3)))))))
+      (f xs1 xs2 xs3))))
+
+(bind-func filter:[List:<!a,List*>*,[bool,!a]*,List:<!a,List*>*]*
+  (lambda (pred xs)    
+    (let ((f (lambda (l)
+               (if (null? l)
+                   null
+                   (if (pred (car l))
+                       (cons (car l) (f (cdr l)))
+                       (f (cdr l)))))))
+      (f xs))))
+
+(bind-func for-each:[void,[!k,!z]*,List:<!z,List*>*]*
+  (lambda (func xs)
+    (let ((f (lambda (l)
+               (if (null? l) void
+                   (begin (func (car l))
+                          (f (cdr l)))))))
+      (f xs))))
+
+(bind-func last:[List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a)
-    (if (null? (xtail a))
+    (if (null? (cdr a))
 	a
-	(xlast (xtail a)))))
+	(last (cdr a)))))
 
-
-(bind-func xappend:[xlist_t*,xlist_t*,xlist_t*]*
+(bind-func append:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a b)
-    (let ((p (xlast a)))
+    (let ((p (last a)))
       (tset! p 1 b)
       a)))
+
+(bind-func list_print:[void,List*]*
+  (lambda (xs)
+    (if (null? xs) void
+        (begin
+          (printout (car xs))
+          (for-each (lambda (x) (printout "," x)) (cdr xs))
+          (println)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; TEMPORARY!!
-;; a very dodgy dictionary based on
-;; an assoc list
+;; a simple 'assoc' dictionary
 ;;
-;; the "dictionary" is any xlist
-;; of xpairs where pair is any (i8*,!a)
+;; the "dictionary" is any List of Pairs
+;; where the pair is any <i8*,!a>
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func xdict_match:[i1,xpair_t*,i8*]*
-  (lambda (p key)
-    (if (= (convert 0 i32) (strcmp (xfirst p) key)) 1 0)))
-
-(bind-func xdict_find:[!second,xlist_t*,i8*]*
+(bind-func dict_find:[!z,List:<Pair:<String*,!z>*,List*>*,String*]*
   (lambda (dict key)
     (if (null? dict) (convert null)
-        (if (xdict_match (xhead dict) key)
-            (xsecond (xhead dict))
-            (xdict_find (xtail dict) key)))))
+        (if (string_cmp (first (car dict)) key)
+            (second (car dict))
+            (dict_find (cdr dict) key)))))
 
 
 ;;;;;;;;;;;
 ;; TREES ;;
 ;;;;;;;;;;;
 
-;; xlist_t*~i8*~ is specialised for <i8*,xlist_t*>*
-(bind-type xtree_t <!value,i64,xlist_t*~i8*~>)
+;; start of binary tree ...
 
-(bind-func xtree:[xtree_t*,!value]*
-  (lambda (a)
-    (let ((tree (halloc)))
-      (tset! tree 0 a)
-      (tset! tree 1 (i32toi64 0))
-      (tset! tree 2 (cast null xlist_t*~i8*~))
-      tree)))
+(bind-type BTree <!_a,BTree*,BTree*>)
 
-(bind-func xtree_children:[i64,xtree_t*]*
-  (lambda (t)
-    (tref t 1)))
+(bind-func BLeaf:[BTree:<!a,BTree*,BTree*>*,!a]*
+  (lambda (x)
+    (let ((t (BTree x null null)))
+      t)))
 
-(bind-func xtree_value:[!value,xtree_t*]*
+(bind-func btree_value:[!a,BTree*]*
   (lambda (t)
     (tref t 0)))
 
-(bind-func xtree_child:[xtree_t*,xtree_t*,i64]*
-  (lambda (t n)
-    (if (> (tref t 1) n)
-        (xnth (cast (tref t 2) xlist_t*~i8*~) n)
-        null)))
-
-(bind-func xtree_nodes:[xlist_t*,xtree_t*]*
+(bind-func print_btree:[void,BTree*]*
   (lambda (t)
-    (cast (tref t 2) xlist_t*~i8*~)))
-
-(bind-func xtree_add_child:[i64,xtree_t*,xtree_t*]*
-  (lambda (parent child)
-    (let ((children (tref parent 2))
-          (newchildren (xjoin (cast child i8*) children)))
-      (tset! parent 2 newchildren)
-      (tset! parent 1 (+ 1 (tref parent 1)))
-      (tref parent 1))))
-
-(bind-func xtree_print_i64:[i32,xtree_t*]*
-  (lambda (tree)
-    (if (= (xtree_children tree) 0)
-        (printf " %lld" (xtree_value tree))
-        (begin (printf "\n%lld\n" (xtree_value tree))
-               (xmap (lambda (t)
-                      (xtree_print_i64 (cast t xtree_t*~i64~)))
-                     (xtree_nodes tree))
-               (i64toi32 1)))))
-
-
-;;;;;;;;;;;;;;;;
-;; ALGORITHMS ;;
-;;;;;;;;;;;;;;;;
-
-;; void quick_sort (int *a, int n) {
-;;     if (n < 2)
-;;         return;
-;;     int p = a[n / 2];
-;;     int *l = a;
-;;     int *r = a + n - 1;
-;;     while (l <= r) {
-;;         while (*l < p)
-;;             l++;
-;;         while (*r > p)
-;;             r--;
-;;         if (l <= r) {
-;;             int t = *l;
-;;             *l++ = *r;
-;;             *r-- = t;
-;;         }
-;;     }
-;;     quick_sort(a, r - a + 1);
-;;     quick_sort(l, a + n - l);
-;; }
- 
-;; int main () {
-;;     int a[] = {4, 65, 2, -31, 0, 99, 2, 83, 782, 1};
-;;     int n = sizeof a / sizeof a[0];
-;;     quick_sort(a, n);
-;;     return 0;
-;; }
-
-;; an in-place (quick)sort
-
-;; with comparator closure argument (sig = [void,!a,i64,[i1,!a,!a]*]*)
-
-
-(bind-func xsub-quicksortd
-  (lambda (dat:double* left right)
-    (if (< left right)
-        (let ((tmp 0.0)
-              (swap (lambdas (x y)
-                      (set! tmp (pref dat x))
-                      (pset! dat x (pref dat y))
-                      (pset! dat y tmp)))
-              (pivot (pref dat right))
-              (index left)
-              (i 0))
-          (dotimes (i left (- right left))
-            (if (or (< (pref dat i) pivot)
-                    (= (pref dat i) pivot))
-                (begin (swap i index)
-                       (set! index (+ index 1)))))
-          (swap right index)
-          (xsub-quicksortd dat left (- index 1))
-          (xsub-quicksortd dat (+ index 1) right))
-        void)))
-
-(bind-func xquicksortd
-  (lambda (arr:double* n)
-    (xsub-quicksortd arr 0 (- n 1))
-    arr))
-
+    (let ((f (lambda (t)
+               (if (null? t) void
+                   (begin
+                     (printout (btree_value t) " ")
+                     (f (tref t 1))
+                     (f (tref t 2))
+                     void)))))      
+      (f t)
+      (println))))

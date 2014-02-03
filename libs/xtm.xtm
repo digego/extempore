@@ -57,8 +57,10 @@
 (print "Loading math library...        ")
 (define *xtmlib-math-loaded* #f)
 
-(bind-type cpxd <double,double>)
-(bind-type cpxf <float,float>)
+;; (bind-type cpxd <double,double>)
+(bind-lib-type stdlib cpxd <double,double>)
+;; (bind-type cpxf <float,float>)
+(bind-lib-type stdlib cpxf <float,float>)
 
 (bind-lib-func stdlib eveni64 [i1,i64]*)
 (bind-lib-func stdlib eveni32 [i1,i32]*)
@@ -166,8 +168,8 @@
 (bind-lib-func stdlib cpxf_div [cpxf*,cpxf*,cpxf*]*)
 (bind-lib-func stdlib cpxd_div_buf [void,cpxd*,cpxd*,cpxd*,i64]*)
 (bind-lib-func stdlib cpxf_div_buf [void,cpxf*,cpxf*,cpxf*,i64]*)
-(bind-lib-func stdlib cpxd_print [void,cpxd*]*)
-(bind-lib-func stdlib cpxf_print [void,cpxf*]*)
+;; (bind-lib-func stdlib cpxd_print [void,cpxd*]*)
+;; (bind-lib-func stdlib cpxf_print [void,cpxf*]*)
 (bind-lib-func stdlib scpxd_mul [void,double,cpxd*,i64]*)
 (bind-lib-func stdlib scpxf_mul [void,float,cpxf*,i64]*)
 
@@ -305,8 +307,8 @@
 (bind-poly cpxdiv cpxd_div)
 (bind-poly cpxdiv cpxf_div_buf)
 (bind-poly cpxdiv cpxd_div_buf)
-(bind-poly cpxprint cpxf_print)
-(bind-poly cpxprint cpxd_print)
+;; (bind-poly cpxprint cpxf_print)
+;; (bind-poly cpxprint cpxd_print)
 (bind-poly scpxmul scpxd_mul)
 (bind-poly scpxmul scpxf_mul)
 (bind-poly guassr randnd)
@@ -450,11 +452,17 @@
 (bind-lib-val stdlib SFC_GET_INSTRUMENT i32)
 (bind-lib-val stdlib SFC_GET_LOOP_INFO i32)
 
-(bind-type sf_info <i64,i32,i32,i32,i32,i32>)
-(bind-type sf_format_info <i32,i8*,i8*>)
-(bind-type _sf_loop_ <i32,i32,i32,i32>)
-(bind-type SF_INSTRUMENT <i32,i8,i8,i8,i8,i8,i8,i32,|16,_sf_loop_|>)
-(bind-type SF_LOOP_INFO <|2,i8|,|2,i8|,i32,i32,float,i32,|6,i32|>)
+;; (bind-type sf_info <i64,i32,i32,i32,i32,i32>)
+(bind-lib-type stdlib sf_info <i64,i32,i32,i32,i32,i32>)
+;; (bind-type sf_format_info <i32,i8*,i8*>)
+(bind-lib-type stdlib sf_format_info <i32,i8*,i8*>)
+;;(bind-type _sf_loop_ <i32,i32,i32,i32>)
+(bind-lib-type stdlib _sf_loop_ <i32,i32,i32,i32>)
+;;(bind-type SF_INSTRUMENT <i32,i8,i8,i8,i8,i8,i8,i32,|16,_sf_loop_|>)
+(bind-lib-type-no-scm stdlib SF_INSTRUMENT <i32,i8,i8,i8,i8,i8,i8,i32,|16,_sf_loop_|>)
+;;(bind-type SF_LOOP_INFO <|2,i8|,|2,i8|,i32,i32,float,i32,|6,i32|>)
+(bind-lib-type-no-scm stdlib SF_LOOP_INFO <|2,i8|,|2,i8|,i32,i32,float,i32,|6,i32|>)
+
 
 (bind-lib-val stdlib SF_FALSE i32)
 (bind-lib-val stdlib SF_TRUE i32)
@@ -1184,9 +1192,9 @@
 
 (define librtmidi
   (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "librtmidi.so"))
-          ((string=? platform "Windows") (sys:load-dylib "librtmidi.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "librtmidi.dylib"))
+    (cond ((string=? platform "Linux") (sys:load-dylib "librtmidic.so"))
+          ((string=? platform "Windows") (sys:load-dylib "librtmidic.dll"))
+          ((string=? platform "OSX") (sys:load-dylib "librtmidic.dylib"))
           (else (print "Unknown platform: " platform)))))
 
 (define *xtmlib-rtmidi-loaded* #f)
@@ -1219,8 +1227,10 @@
 (bind-lib-val stdlib WINDOWS_KS  i32)
 (bind-lib-val stdlib RTMIDI_DUMMY i32)
 
-(bind-type midi_in_device <i8*>)
-(bind-type midi_out_device <i8*>)
+;; (bind-type midi_in_device <i8*>)
+(bind-lib-type stdlib midi_in_device <i8*>)
+;; (bind-type midi_out_device <i8*>)
+(bind-lib-type stdlib midi_out_device <i8*>)
 (bind-alias midi_callback [i8*,double,i64,i8*]*)
 
 (bind-lib librtmidi newMidiInDevice [i32,midi_in_device*,i32,i8*]*)
@@ -1381,8 +1391,10 @@
 (define *xtmlib-opengl-loaded* #f)
 (print "Loading opengl library...      ")
 
-(bind-type E_vbo <i32,i32,i8*>)
-(bind-type E_fbo <i32,i32,i32,i32,i32>)
+;; (bind-type E_vbo <i32,i32,i8*>)
+(bind-lib-type stdlib E_vbo <i32,i32,i8*>)
+;; (bind-type E_fbo <i32,i32,i32,i32,i32>)
+(bind-lib-type stdlib E_fbo <i32,i32,i32,i32,i32>)
 
 (define libgl
   (let ((platform (sys:platform)))
@@ -1515,10 +1527,14 @@
 
 (bind-alias XTMRENDERCB [void,i64,i32,float*,float*,float*,i8*]*)
 
-(bind-type xtm_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
-(bind-type xtm_node <i8*,float*,xtm_node*,i32,xtm_node*,i32,xtm_mesh*>)
-(bind-type xtm_camera <float*,float*,float*>)
-(bind-type xtm_lights <float*,float*,float*,float*,float*,float*,float*,float*,float*,i32>)
+;; (bind-type xtm_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
+(bind-lib-type stdlib xtm_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
+;; (bind-lib-type stdlib xtm_node <i8*,float*,xtm_node*,i32,xtm_node*,i32,xtm_mesh*>)
+(bind-lib-type stdlib xtm_node <i8*,float*,xtm_node*,i32,xtm_node*,i32,xtm_mesh*>)
+;;(bind-type xtm_camera <float*,float*,float*>)
+(bind-lib-type stdlib xtm_camera <float*,float*,float*>)
+;; (bind-type xtm_lights <float*,float*,float*,float*,float*,float*,float*,float*,float*,i32>)
+(bind-lib-type stdlib xtm_lights <float*,float*,float*,float*,float*,float*,float*,float*,float*,i32>)
 
 (bind-val xtm_render_s1 i32 0)
 (bind-val xtm_render_s2 i32 0)
@@ -4254,36 +4270,67 @@ void main( void ) {
 (ipc:define "utility"  'aiProcess_SplitByBoneCount  33554432)
 (ipc:define "utility"  'aiProcess_Debone 67108864)
 
-(bind-type aiString <size_t,|1024,i8|>)
-(bind-type aiMatrix4x4 <float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float>)
-(bind-type aiMatrix3x3 <float,float,float,float,float,float,float,float,float>)
-(bind-type aiVector4D <float,float,float,float>)
-(bind-type aiVector3D <float,float,float>)
-(bind-type aiVector2D <float,float>)
-(bind-type aiColor4D <float,float,float,float>)
-(bind-type aiColor3D <float,float,float>)
-(bind-type aiQuaternion <float,float,float,float>)
-(bind-type aiTexel <i8,i8,i8,i8>) ;; b,g,r,a
-(bind-type aiVectorKey <double,aiVector3D>) ;; good
-(bind-type aiQuatKey <double,aiQuaternion>) ;; good
-(bind-type aiMeshKey <double,i32>) ;; good
-(bind-type aiNode <aiString,aiMatrix4x4,aiNode*,i32,aiNode**,i32,i32*,i8*>) ;; good 1144
-(bind-type aiFace <i32,i32*>) ;; good
-(bind-type aiVertexWeight <i32,float>) ;; good
-(bind-type aiBone <aiString,i32,aiVertexWeight*,aiMatrix4x4>) ;; good
-(bind-type aiAnimMesh <aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,i32>) ;; good
-(bind-type aiMesh <i32,i32,i32,aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,|8,i32|,aiFace*,i32,aiBone**,i32,aiString,i32,aiAnimMesh**,i64>) ;; i64 on end is padding
-(bind-type aiUVTransform <aiVector2D,aiVector2D,float>) ;; good
-(bind-type aiMaterialProperty <aiString,i32,i32,i32,i32,i8*>) ;; good
-(bind-type aiMaterial <aiMaterialProperty**,i32,i32>) ;; good
-(bind-type aiNodeAnim <aiString,i32,aiVectorKey*,i32,aiQuatKey*,i32,aiVectorKey*,i32,i32>) ;; good
-(bind-type aiMeshAnim <aiString,i32,aiMeshKey*>) ;; good
-(bind-type aiAnimation <aiString,double,double,i32,aiNodeAnim**,i32,aiMeshAnim**>) ;; good
-(bind-type aiTexture <i32,i32,|4,i8|,aiTexel*>) ;; good
-(bind-type aiLight <aiString,i32,aiVector3D,aiVector3D,float,float,float,aiColor3D,aiColor3D,aiColor3D,float,float>) ;; good
-(bind-type aiCamera <aiString,aiVector3D,aiVector3D,aiVector3D,float,float,float,float>) ;; good
-(bind-type aiScene <i32,aiNode*,i32,aiMesh**,i32,aiMaterial**,i32,aiAnimation**,i32,aiTexture**,i32,aiLight**,i32,aiCamera**,i8*>) ;; good
-(bind-type aiExportFormatDesc <i8*,i8*,i8*>)
+;; (bind-type aiString <size_t,|1024,i8|>)
+;; (bind-type aiMatrix4x4 <float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float>)
+;; (bind-type aiMatrix3x3 <float,float,float,float,float,float,float,float,float>)
+;; (bind-type aiVector4D <float,float,float,float>)
+;; (bind-type aiVector3D <float,float,float>)
+;; (bind-type aiVector2D <float,float>)
+;; (bind-type aiColor4D <float,float,float,float>)
+;; (bind-type aiColor3D <float,float,float>)
+;; (bind-type aiQuaternion <float,float,float,float>)
+;; (bind-type aiTexel <i8,i8,i8,i8>) ;; b,g,r,a
+;; (bind-type aiVectorKey <double,aiVector3D>) ;; good
+;; (bind-type aiQuatKey <double,aiQuaternion>) ;; good
+;; (bind-type aiMeshKey <double,i32>) ;; good
+;; (bind-type aiNode <aiString,aiMatrix4x4,aiNode*,i32,aiNode**,i32,i32*,i8*>) ;; good 1144
+;; (bind-type aiFace <i32,i32*>) ;; good
+;; (bind-type aiVertexWeight <i32,float>) ;; good
+;; (bind-type aiBone <aiString,i32,aiVertexWeight*,aiMatrix4x4>) ;; good
+;; (bind-type aiAnimMesh <aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,i32>) ;; good
+;; (bind-type aiMesh <i32,i32,i32,aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,|8,i32|,aiFace*,i32,aiBone**,i32,aiString,i32,aiAnimMesh**,i64>) ;; i64 on end is padding
+;; (bind-type aiUVTransform <aiVector2D,aiVector2D,float>) ;; good
+;; (bind-type aiMaterialProperty <aiString,i32,i32,i32,i32,i8*>) ;; good
+;; (bind-type aiMaterial <aiMaterialProperty**,i32,i32>) ;; good
+;; (bind-type aiNodeAnim <aiString,i32,aiVectorKey*,i32,aiQuatKey*,i32,aiVectorKey*,i32,i32>) ;; good
+;; (bind-type aiMeshAnim <aiString,i32,aiMeshKey*>) ;; good
+;; (bind-type aiAnimation <aiString,double,double,i32,aiNodeAnim**,i32,aiMeshAnim**>) ;; good
+;; (bind-type aiTexture <i32,i32,|4,i8|,aiTexel*>) ;; good
+;; (bind-type aiLight <aiString,i32,aiVector3D,aiVector3D,float,float,float,aiColor3D,aiColor3D,aiColor3D,float,float>) ;; good
+;; (bind-type aiCamera <aiString,aiVector3D,aiVector3D,aiVector3D,float,float,float,float>) ;; good
+;; (bind-type aiScene <i32,aiNode*,i32,aiMesh**,i32,aiMaterial**,i32,aiAnimation**,i32,aiTexture**,i32,aiLight**,i32,aiCamera**,i8*>) ;; good
+;; (bind-type aiExportFormatDesc <i8*,i8*,i8*>)
+
+(bind-lib-type-no-scm stdlib aiString <size_t,|1024,i8|>)
+(bind-lib-type stdlib aiMatrix4x4 <float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float>)
+(bind-lib-type stdlib aiMatrix3x3 <float,float,float,float,float,float,float,float,float>)
+(bind-lib-type stdlib aiVector4D <float,float,float,float>)
+(bind-lib-type stdlib aiVector3D <float,float,float>)
+(bind-lib-type stdlib aiVector2D <float,float>)
+(bind-lib-type stdlib aiColor4D <float,float,float,float>)
+(bind-lib-type stdlib aiColor3D <float,float,float>)
+(bind-lib-type stdlib aiQuaternion <float,float,float,float>)
+(bind-lib-type stdlib aiTexel <i8,i8,i8,i8>) ;; b,g,r,a
+(bind-lib-type-no-scm stdlib aiVectorKey <double,aiVector3D>) ;; good
+(bind-lib-type-no-scm stdlib aiQuatKey <double,aiQuaternion>) ;; good
+(bind-lib-type stdlib aiMeshKey <double,i32>) ;; good
+(bind-lib-type-no-scm stdlib aiNode <aiString,aiMatrix4x4,aiNode*,i32,aiNode**,i32,i32*,i8*>) ;; good 1144
+(bind-lib-type stdlib aiFace <i32,i32*>) ;; good
+(bind-lib-type stdlib aiVertexWeight <i32,float>) ;; good
+(bind-lib-type-no-scm stdlib aiBone <aiString,i32,aiVertexWeight*,aiMatrix4x4>) ;; good
+(bind-lib-type-no-scm stdlib aiAnimMesh <aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,i32>) ;; good
+(bind-lib-type-no-scm stdlib aiMesh <i32,i32,i32,aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,|8,i32|,aiFace*,i32,aiBone**,i32,aiString,i32,aiAnimMesh**,i64>) ;; i64 on end is padding
+(bind-lib-type-no-scm stdlib aiUVTransform <aiVector2D,aiVector2D,float>) ;; good
+(bind-lib-type-no-scm stdlib aiMaterialProperty <aiString,i32,i32,i32,i32,i8*>) ;; good
+(bind-lib-type-no-scm stdlib aiMaterial <aiMaterialProperty**,i32,i32>) ;; good
+(bind-lib-type-no-scm stdlib aiNodeAnim <aiString,i32,aiVectorKey*,i32,aiQuatKey*,i32,aiVectorKey*,i32,i32>) ;; good
+(bind-lib-type-no-scm stdlib aiMeshAnim <aiString,i32,aiMeshKey*>) ;; good
+(bind-lib-type-no-scm stdlib aiAnimation <aiString,double,double,i32,aiNodeAnim**,i32,aiMeshAnim**>) ;; good
+(bind-lib-type-no-scm stdlib aiTexture <i32,i32,|4,i8|,aiTexel*>) ;; good
+(bind-lib-type-no-scm stdlib aiLight <aiString,i32,aiVector3D,aiVector3D,float,float,float,aiColor3D,aiColor3D,aiColor3D,float,float>) ;; good
+(bind-lib-type-no-scm stdlib aiCamera <aiString,aiVector3D,aiVector3D,aiVector3D,float,float,float,float>) ;; good
+(bind-lib-type-no-scm stdlib aiScene <i32,aiNode*,i32,aiMesh**,i32,aiMaterial**,i32,aiAnimation**,i32,aiTexture**,i32,aiLight**,i32,aiCamera**,i8*>) ;; good
+(bind-lib-type-no-scm stdlib aiExportFormatDesc <i8*,i8*,i8*>)
 
 (bind-lib libassimp aiImportFile [aiScene*,i8*,i32]*)
 (bind-lib libassimp aiExportScene [i32,aiScene*,i8*,i8*,i32]*)
@@ -4741,7 +4788,8 @@ void main( void ) {
 (bind-lib-func stdlib xtm_path_lengthf [float,i8*,i32,i32]*)
 (bind-lib-func stdlib xtm_path_lengthd [double,i8*,i64,i64]*)
 
-(bind-type xpoint <double,double>)
+;; (bind-type xpoint <double,double>)
+(bind-lib-type stdlib xpoint <double,double>)
 
 (bind-lib-func stdlib xtm_point_along_path [void,i8*,float,xpoint*]*)
 (bind-lib-func stdlib xtm_point_along_path_norm [void,i8*,float,xpoint*]*)

@@ -219,6 +219,24 @@
 ;; (println (my-test-7)) ; 77
 
 
+;; tbind binds variables to values
+;; based on tuple structure
+;; _ (underscore) means don't attempt
+;; to match against this position in
+;; the tuple (i.e. skip)
+(bind-func tuple-bind-test
+  (lambda ()
+    (let ((t1:<i32,float,<i32,float>*,double>* (alloc))
+          (t2:<i32,float>* (alloc))
+          (a 0) (b:float 0.0) (c 0.0))
+      (tfill! t2 3 3.3)
+      (tfill! t1 1 2.0 t2 4.0)
+      (tbind t1 a b _ c)
+      c)))
+
+(test-xtfunc (tuple-bind-test) 4.0)
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some array code with *casting*
 ;; this function returns void
@@ -480,6 +498,19 @@
 
 (test-xtfunc (salloc-test)) ;; 1
 
+;; all named types have 2 default constructors
+;; name (zone alloation) + name_h (heap allocation)
+;; and a default print poly
+(bind-func data-constructor-test
+  (lambda ()
+    (let ((v1 (vec3 1.0 2.0 3.0))
+          (v2 (vec3_h 4.0 5.0 6.0)))
+      (println v1 v2)
+      ;; halloced vec3 needs freeing
+      (free v2)
+      void)))
+
+(test-xtfunc (data-constructor-test))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -863,15 +894,15 @@
     (printf "%s %s %s\n" a b c)))
 
 ;; bind these three functions to poly 'print'
-(bind-poly print poly-test4)
-(bind-poly print poly-test5)
-(bind-poly print poly-test6)
+(bind-poly testprint poly-test4)
+(bind-poly testprint poly-test5)
+(bind-poly testprint poly-test6)
 
 (bind-func poly-test7
   (lambda ()
-    (print "extempore's")
-    (print "extempore's" "polymorphism")
-    (print "extempore's" "polymorphism" "rocks")))
+    (testprint "extempore's")
+    (testprint "extempore's" "polymorphism")
+    (testprint "extempore's" "polymorphism" "rocks")))
 
 (test-xtfunc (poly-test7))
 
@@ -1017,485 +1048,6 @@
 
 (test-xtfunc (vector-test4))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; ADT testing
-
-(sys:load "libs/core/adt.xtm")
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; xlist tests
-
-(bind-func xlist_test1
-  (lambda ()
-    (let ((l1 (xjoin 1.0 null)))
-      (xmap (lambda (i)
-	      (* i 2.0))
-	    l1))))
-
-(test-xtfunc (xlist_test1))
-
-(bind-func xlist_test2
-  (lambda ()
-    (let ((l1 (xlist 1.0 2.0 3.0 4.0)))
-      (xmap (lambda (i)
-	      (printf "%f\n" (* i 2.0)))
-	    l1))))
-
-(test-xtfunc (xlist_test2))
-
-
-(bind-func xlist_test3
-  (lambda ()
-    (let ((l1 (xlist 1 2 3 4)))
-      (xmap (lambda (i)
-	      (* i (xlength l1)))
-	    l1))))
-
-(test-xtfunc (xlist_test3))
-
-(bind-func xlist_test4
-  (lambda ()
-    (let ((l1 (xlist "andrew" "ben" "torben")))
-      (xmap (lambda (i)
-	      (if (= (strcmp i "andrew") 0)
-		  (printf "%s rocks\n" i)
-		  (printf "%s rolls\n" i)))
-	    l1))))
-
-(test-xtfunc (xlist_test4))
-
-(bind-func xlist_test5
-  (lambda ()
-    (let ((l1 (xlist (xlist "andrew" "london")
-		     (xlist "ben" "new york")
-		     (xlist "torben" "moscow"))))
-      (xmap (lambda (i)
-	      (printf "%s rocks\n" (xhead i)))
-	    l1))))
-
-(test-xtfunc (xlist_test5))
-
-
-(bind-func xlist_test6
-  (lambda ()
-    (let ((l1 (xlist (xlist "andrew" "london") (xlist "ben" "new york") (xlist "torben" "moscow"))))
-      (xmap (lambda (i)
-	      (if (= (strcmp (xhead i) "andrew") 0)
-		  (printf "%s rocks %s\n" (xhead i) (xhead (xtail i)))
-		  (printf "%s rolls %s\n" (xhead i) (xhead (xtail i)))))
-	    l1))))
-
-(test-xtfunc (xlist_test6))
-
-(bind-func xlist_test7
-  (lambda ()
-    (let ((l1 (xlist (xlist "andrew" "london")
-		     (xlist "ben" "new york")
-		     (xlist "torben" "moscow"))))
-      (xmap (lambda (i)
-	      (xmap (lambda (k:i8*)
-		      (printf "\t::%s\n" k))
-		    i)
-	      (if (= (strcmp (xhead i) "andrew") 0)
-		  (printf "%s rocks %s\n" (xhead i) (xhead (xtail i)))
-		  (printf "%s rolls %s\n" (xhead i) (xhead (xtail i))))
-	      (i64toi32 1))
-	    l1))))
-
-(test-xtfunc (xlist_test7))
-
-
-(bind-func xlist_test8
-  (lambda ()
-    (let ((l1 (xlist 1 2 3))
-	  (last (xlast l1)))
-      last)))
-
-(test-xtfunc (xlist_test8))
-
-(bind-func xlist_test8b
-  (lambda ()
-    (let ((l1 (xlist 1.0 2.0 3.0))
-	  (l2 (xlast l1)))
-      1)))
-
-(test-xtfunc (xlist_test8b))
-
-(bind-func xlist_test9
-  (lambda ()
-    (let ((l1 (xlist 1 2 3))
-	  (last (xlast l1)))
-      (printf "%d\n" (xhead last)))))
-
-(test-xtfunc (xlist_test9))
-
-(bind-func xlist_test10
-  (lambda ()
-    (let ((l1 (xlist "andrew" "ben" "torben")))
-      (xmap (lambda (i)
-	      (printf "%s\n" i))
-	    l1)
-      void)))
-
-(test-xtfunc (xlist_test4))
-
-
-(bind-func xnth_test1
-  (lambda ()
-    (let ((a (xlist 1.0 2.0 3.0)))
-      (printf "pointer = %p\n" (xsecond (xnth_tail a 0)))
-      (xhead (xnth_tail a 0)))))
-
-(test-xtfunc (xnth_test1) 1.0)
-
-
-(bind-func xinsert_test
-  (lambda ()
-    (let ((a (xlist 1 2 3)))
-      (xinsert a (xlength a) 6)
-      (xnth a 3))))
-
-(test-xtfunc (xinsert_test) 6)
-
-(bind-func xinsert_delete_test
-  (lambda ()
-    (let ((l1 (xlist 5.0 4.0 3.0 2.0 1.0))
-          (i:i64 0)
-          (lgth (xlength l1)))
-      (dotimes (i (xlength l1))
-        (printf "%f," (xnth l1 i)))
-      (printf "\n")      
-      (xinsert l1 2 7.0)
-      (dotimes (i (xlength l1))
-        (printf "%f," (xnth l1 i)))
-      (printf "\n")
-      (xdelete l1 2)
-      (dotimes (i (xlength l1))
-        (printf "%f," (xnth l1 i)))
-      (printf "\n")
-      (xlength l1))))
-
-(test-xtfunc (xinsert_delete_test) 5)
-
-
-(bind-func xappend_test1
-  (lambda ()
-    (let ((l1 (xlist "a" "b" "c"))
-	  (l2 (xlist "d" "e" "f"))
-	  (l3 (xappend l1 l2)))
-      (xmap (lambda (k)
-	     (printf "%s\n" k))
-	   l3)
-      void)))
-
-(test-xtfunc (xappend_test1))
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; xpair tests
-
-(bind-func xpair_test1
-  (lambda ()
-    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben"))))
-      l1)))
-
-(test-xtfunc (xpair_test1))
-
-(bind-func xpair_test2
-  (lambda ()
-    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben"))))
-      (xhead l1))))
-
-(test-xtfunc (xpair_test2))
-
-(bind-func xpair_test3
-  (lambda ()
-    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben")))
-	  (l2 (xhead l1)))
-      (printf "%s\n" (tref (xhead l1) 1))
-      l1)))
-
-(test-xtfunc (xpair_test3))
-
-(bind-func xpair_test4
-  (lambda ()
-    (let ((l1 (xlist (xpair 1 "andrew") (xpair 2 "ben")))
-	  (l2 (xhead l1)))
-      (printf "%s\n" (xsecond (xhead (xtail l1))))
-      l1)))
-
-(test-xtfunc (xpair_test4))
-
-(bind-func xpair_test5
-  (lambda ()
-    (let ((l1 (xpair (xlist 1 2) (xlist 1 2))))
-      l1)))
-
-(test-xtfunc (xpair_test5))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; xtree tests
-
-;; create a one node tree!
-(bind-func xtree_test1
-  (lambda ()
-    (let ((t (xtree 1)))
-      t)))
-
-(test-xtfunc (xtree_test1))
-
-;; create tree with two leaf nodes
-(bind-func xtree_test2
-  (lambda ()
-    (let ((t1 (xtree 1))
-          (t2 (xtree 2))
-          (t3 (xtree 3)))
-      (xtree_add_child t1 t2)
-      (xtree_add_child t1 t3)
-      t3)))
-
-(test-xtfunc (xtree_test2))
-
-(bind-func xtree_test3
-  (lambda (a:i64 b:i64 c:i64)
-    (let ((t1 (xtree a))
-          (t2 (xtree b))
-          (t3 (xtree c)))
-      (printf "children:%lld\n" (xtree_add_child t1 t2))
-      (printf "children:%lld\n" (xtree_add_child t1 t3))
-      (printf "children:%lld\n\n" (xtree_children t1))
-      (xtree_print_i64 t1)
-      (printf "\n\n%p:%p:%p\n" (xtree_child t1 1) t2 t3)
-      (printf "child 1 val:%lld\n" (xtree_value (xtree_child t1 1)))
-      (printf "child 2 val:%lld\n" (xtree_value (xtree_child t1 0)))
-      void)))
-
-(test-xtfunc (xtree_test3 1 2 3))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; some generic closure tests
-
-
-;; specialize on return type only
-(bind-func gclosure_test_maker1:[[!a,!a]*]*
-  (lambda ()
-    (lambda (k) (* k k))))
-
-(bind-func gclosure_test1
-  (lambda ()
-    (let ((f (gclosure_test_maker1)))
-      (f 5.0))))
-
-(test-xtfunc (gclosure_test1))
-
-(bind-func gclosure_test2
-  (lambda ()
-    (let ((f (gclosure_test_maker1)))
-      (f 5))))
-
-(test-xtfunc (gclosure_test2))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; some xbox/xunbox tests
-;;
-;; also provides coverage for bitconvert
-;; and for xnth and xlist
-;;
-
-(bind-func xbox_test1
-  (lambda ()
-    (let ((dat1:i64* (halloc))
-          (dat2:double* (halloc)))
-      (pset! dat1 0 3)
-      (pset! dat2 0 3.0)
-      (let ((l1 (xbox 2.0))
-            (l2 (xbox 2))
-            (l3 (xbox dat1))
-            (l4 (xbox dat2))
-            (l5 (xbox "result should be 36.0"))
-            (lst (xlist l5 l1 l2 l3 l4)))
-        lst))))
-
-(bind-func xbox_test2
-  (lambda (a:double b:i64 c:i64* d:double*)
-    (* a
-       (convert b double)
-       (convert (pref c 0) double)
-       (pref d 0))))
-
-
-(bind-func xbox_test3
-  (lambda ()
-    (let ((lst (xbox_test1))
-          (str:i8* (xunbox (xnth lst 0))))
-      (printf "%s:%f\n" str
-              (xbox_test2 (xunbox (xnth lst 1))
-                          (xunbox (xnth lst 2))
-                          (xunbox (xnth lst 3))
-                          (xunbox (xnth lst 4)))))))
-
-(test-xtfunc (xbox_test3))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; xobject tests
-;;
-
-(sys:load "libs/core/xobject.xtm")
-
-;;
-;; add some simple objects
-;;
-(bind-object date day:i32 month:i32 year:i32)
-(bind-object person age:i64 firstname:i8* surname:i8* birthday:xobj_date_t*)
-(bind-object cat name:i8* birthday:xobj_date_t*)
-(bind-object dog name:i8* age:i64)
-
-;; print current state of object graph
-(test-xtfunc (xobj_print_classes))
-
-;;
-;; add a basic print method
-;; for date, person, cat and dog
-;;
-(bind-method date print:[void]*
-  (lambda ()
-    (printf "%d/%d/%d\n"
-            (xobj_get_day self)
-            (xobj_get_month self)
-            (xobj_get_year self))
-    void))
-
-(bind-method person print:[void]*
-  (lambda ()
-    (printf "%s is %d years old and talks\n"
-            (xobj_get_firstname self)
-            (xobj_get_age self))
-    void))
-
-(bind-method dog print:[void]*
-  (lambda ()
-    (printf "%s barks!\n"
-            (xobj_get_name self))
-    void))
-
-(bind-method cat print:[void]*
-  (lambda ()
-    (printf "%s the cat was born on "
-            (xobj_get_name self))
-    (xobj_print (xobj_get_birthday self))
-    void))
-
-
-;; test building a dog
-;; and then printing the dog
-(bind-func xobject_test_1
-  (lambda ()
-    (let ((dog:xobj_dog_t* (xobj_build "Rex" 4)))
-      (xobj_print dog)
-      void)))
-
-(test-xtfunc (xobject_test_1))
-
-
-;; test building a cat
-;; and then printing a cat
-(bind-func xobject_test_2
-  (lambda ()
-    (let ((date:xobj_date_t* (xobj_build 09 03 2009))
-          (cat:xobj_cat_t* (xobj_build "Moggy" date)))
-      (xobj_print cat)
-      void)))
-
-(test-xtfunc (xobject_test_2))
-
-
-;;
-;; test runtime vs compile time dispatch
-;;
-(bind-func xobject_test3
-  (lambda ()
-    (let ((dog:xobj_dog_t* (xobj_build "Spot" 7))
-          (date1:xobj_date_t* (xobj_build 11 11 2001))
-          (cat:xobj_cat_t* (xobj_build "Felix" date1))
-          (date2:xobj_date_t* (xobj_build 03 10 2002))
-          (person:xobj_person_t* (xobj_build 10 "John" "Doe" date2))
-          (creatures (xlist (cast dog xobject_t*)
-                            (cast cat xobject_t*)
-                            (cast person xobject_t*))))
-      (printf "\n------- compile time dispatch -------\n")
-      (xobj_print dog)
-      (xobj_print cat)
-      (xobj_print person)
-      (printf "---------- runtime dispatch ---------\n")
-      (xmap (lambda (o:xobject_t*) (xobj_print o) 1) creatures)
-      (printf "-------------------------------------\n")
-      creatures)))
-
-(test-xtfunc (xobject_test3))
-
-;;;;;;;;;;;;;
-;; SORTING ;;
-;;;;;;;;;;;;;
-
-(bind-func test_xsort_general
-  (let ((buflen 4)
-        (input:double* (zalloc buflen))
-        (i 0))
-    (pfill! input 8.3 0.0 -5.7 2.3)
-    (lambda (sort_cls:[double*,double*,i64]*)
-      (let ((incorrect 0))
-        (sort_cls input buflen)
-        (dotimes (i buflen)
-          (if (and (<> i 0)
-                   (not (< (pref input (- i 1)) (pref input i))))
-              (set! incorrect (+ incorrect 1))))
-        (printf "incorrectly sorted elements: %lld\npercentage correct = %5.2f%%\n"
-                incorrect
-                (* 100.0 (/ (i64tod (- buflen incorrect))
-                            (i64tod buflen))))
-        incorrect))))
-
-(bind-func test_xquicksortd
-  (lambda ()
-    (test_xsort_general xquicksortd)))
-
-(test-xtfunc (test_xquicksortd) 0)
-
-;;;;;;;;;;;;;;;;;;;
-;; xstring tests ;;
-;;;;;;;;;;;;;;;;;;;
-
-(bind-func test_xstring_cmp
-  (lambda ()
-    (xstring_cmp (xstring "foo")
-		 (xstring "foo"))))
-
-(test-xtfunc (test_xstring_cmp) 0)
-
-(bind-func test_xstring_cat
-  (lambda ()
-    (let ((result (xstring_cat (xstring "foo")
-                               (xstring "bar"))))
-      (println_xstring result)
-      (xstring_cmp result 
-                   (xstring "foobar")))))
-
-(test-xtfunc (test_xstring_cat) 0)
-
-(bind-func test_xstring_levenshtein
-  (lambda ()
-    (xstring_levenshtein (xstring "foo")
-			 (xstring "bor"))))
-
-(test-xtfunc (test_xstring_levenshtein) 2)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; syntax highlighting tests ;;

@@ -113,6 +113,12 @@ namespace extemp {
 	static pointer dataSETi64(scheme* _sc, pointer args);
 	static pointer dataSETdouble(scheme* _sc, pointer args);
 	static pointer dataSETfloat(scheme* _sc, pointer args);
+
+        static pointer Base64Encode(scheme* _sc, pointer args);
+        static pointer Base64Decode(scheme* _sc, pointer args);
+        static pointer CNameEncode(scheme* _sc, pointer args);
+        static pointer CNameDecode(scheme* _sc, pointer args);
+
 	static pointer cptrToString(scheme* _sc, pointer args);
 	static pointer stringToCptr(scheme* _sc, pointer args);
 	static pointer stringStrip(scheme* _sc, pointer args);

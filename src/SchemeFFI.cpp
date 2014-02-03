@@ -89,6 +89,15 @@
 
 /////////////////////// llvm includes
 #include "llvm/Assembly/Parser.h"
+#ifdef EXT_LLVM33
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/CallingConv.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/DataLayout.h"
+#else
 #include "llvm/LLVMContext.h"
 #include "llvm/CallingConv.h"
 #include "llvm/Module.h"
@@ -96,6 +105,7 @@
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Instructions.h"
+#endif
 #include "llvm/Bitcode/ReaderWriter.h"
 //#include "llvm/ModuleProvider.h"
 #include "llvm/ExecutionEngine/JIT.h"
@@ -473,6 +483,10 @@ namespace extemp {
 	    { "string->cptr",            &SchemeFFI::stringToCptr },
 	    { "string-strip",		&SchemeFFI::stringStrip },
 	    { "string-hash",		&SchemeFFI::stringHash },
+	    { "base64-encode",		&SchemeFFI::Base64Encode },
+	    { "base64-decode",		&SchemeFFI::Base64Decode },
+	    { "cname-encode",		&SchemeFFI::CNameEncode },
+	    { "cname-decode",		&SchemeFFI::CNameDecode },
 	    { "string-join",		&SchemeFFI::stringJoin },
 	    { "call-cpp-at-time",		&SchemeFFI::callCPPAtTime },
 	    { "now",			&SchemeFFI::getTime },
@@ -1121,6 +1135,42 @@ namespace extemp {
 #else
 	  return mk_string(_sc, "");
 #endif
+    }
+
+    // positions base64[62] = '+' and base64[63] == '/'
+    pointer SchemeFFI::Base64Encode(scheme* _sc, pointer args)
+    {
+      const unsigned char* dat = (const unsigned char*) cptr_value(pair_car(args));
+      size_t datlength = ivalue(pair_cadr(args));
+      size_t lth = 0;
+      char* res = base64_encode(dat,datlength,&lth);
+      return mk_string(_sc,res);
+    }
+    // positions base64[62] = '+' and base64[63] == '/'
+    pointer SchemeFFI::Base64Decode(scheme* _sc, pointer args)
+    {
+      char* str = string_value(pair_car(args));
+      size_t lth = 0;
+      unsigned char* res = base64_decode(str,strlen(str),&lth);      
+      return mk_string(_sc,(char*)res);
+    }
+
+    // positions base64[62] = '_' and base64[63] == '-'
+    pointer SchemeFFI::CNameEncode(scheme* _sc, pointer args)
+    {
+      char* str = string_value(pair_car(args));
+      size_t lth = 0;
+      char* res = cname_encode(str,strlen(str),&lth);
+      return mk_string(_sc,res);
+    }
+
+    // positions base64[62] = '_' and base64[63] == '-'
+    pointer SchemeFFI::CNameDecode(scheme* _sc, pointer args)
+    {
+      char* str = string_value(pair_car(args));
+      size_t lth = 0;
+      char* res = (char*) cname_decode(str,strlen(str),&lth);
+      return mk_string(_sc,res);
     }
 
     pointer SchemeFFI::stringHash(scheme* _sc, pointer args)
@@ -2011,7 +2061,7 @@ namespace extemp {
 	if(func == 0)
 	{
 	    return _sc->F;
-	}			
+	}
 
         std::string typestr;
 	llvm::raw_string_ostream ss(typestr);
@@ -2019,11 +2069,13 @@ namespace extemp {
 
 	const char* tmp_name = ss.str().c_str();
 
-	if(func->getReturnType()->isStructTy()) {	      
+	if(func->getReturnType()->isStructTy()) {
+          std::cout << "TMPNAMAA: " << tmp_name << std::endl;
 	  rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
 	  tmp_name = tmp_str_a;
+          std::cout << "TMPNAMAB: " << tmp_name << std::endl;	
 	}
-	
+
 	pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
 	pointer p = cons(_sc, str, _sc->NIL); 
 
@@ -2038,12 +2090,11 @@ namespace extemp {
 
 	    tmp_name = ss2.str().c_str();
 
-	    // if(a->getType()->isStructTy()) {	      
-	    //   rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
-	    //   printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
-	    //   //tmp_name = tmp_str_b;
-	    //   tmp_name = tmp_str_a;
-	    // }
+	    if(a->getType()->isStructTy()) {	      
+	      rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	      //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
+	      tmp_name = tmp_str_a;
+	    }
 
 	    pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
 	    _sc->imp_env->erase(p);
