@@ -5657,6 +5657,22 @@ deprecated - use bind-func instead."
                      (print)))
 	  (print-error 'Compiler 'Error: 'could 'not 'bind! symname)))))
 
+
+(define-macro (remove-func symname)
+  `(begin 
+     (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var"))
+     (llvm:erase-function ,(symbol->string symname))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_setter"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_getter"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_callback"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_native"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
+     (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var_zone"))
+     (if (llvm:get-function ,(string-append (symbol->string symname) "_scheme"))         
+         (llvm:erase-function ,(string-append (symbol->string symname) "_scheme")))))
+
+
 ;;; this here for bindig to existing types
 ;;
 ;;
@@ -5670,9 +5686,22 @@ deprecated - use bind-func instead."
        (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
        (bind-lib-func ,library ,name ,(string->symbol dctype))
        (bind-lib-func ,library ,(string->symbol (string-append namestr "_h")) ,(string->symbol dctype))
-       (bind-lib-func ,library ,(string->symbol (string-append namestr "_print")) ,(string->symbol ptype))
+       ;; at the moment we have to build _print (i.e. cannot link to _print because of generics)
+       (bind-func ,(string->symbol (string-append namestr "_print" ":" ptype))
+         (lambda (x)
+           (printout
+            ,(if (regex:match? namestr "--")
+                 (if *impc:ti:print-full-generic-types*
+                     (impc:ir:pretty-print-type namestr)
+                     (car (regex:type-split namestr "--")))
+                 namestr)
+            ":<"
+            ,(list 'tref 'x 0)
+            ,@(impc:ti:flatten-1 (map (lambda (y z) (list "," (list 'tref 'x (+ 1 z)))) (cdr a) *impc:alphabetidxlist*))
+            ">")
+           void))
+       ;; (bind-lib-func ,library ,(string->symbol (string-append namestr "_print")) ,(string->symbol ptype))
        (bind-poly print ,(string->symbol (string-append namestr "_print"))))))
-
 
 ;;; this here for bindig to existing types
 ;;
