@@ -166,6 +166,21 @@
   (lambda (x) (printf "___") void))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; equality
+
+;; this is the catch-all for equality testing
+;; covers all numeric types
+;; will also catch all for all pointer types
+;; which compares against memory address
+;; otherwise expect poly override
+;;
+;; i.e. see string below
+(bind-func equal:[bool,!a,!b]*
+  "Basic equality check"
+  (lambda (a b)
+    (= a b)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; XTLang strings
 
@@ -213,6 +228,9 @@
     (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
         #t #f)))
 
+;; bind to eq
+(bind-poly equal string_cmp)
+
 ;; levenshtein edit distance
 (bind-func string_levenshtein
   (lambda (s:String* t:String*)
@@ -251,6 +269,9 @@
 (bind-func string_similarity
   (lambda (s:String* t:String*)
     (/ 1.0 (i64tod (+ 1 (string_levenshtein s t))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
