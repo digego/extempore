@@ -289,6 +289,66 @@
 (test-xtfunc (btree_test_1))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; a maybe monad test
+;;
+
+(bind-type Maybe <i1,!a>)
+
+(bind-func return_maybe:[Maybe:<i1,!a>*,!a]*
+  (lambda (x)
+    (let ((maybe (Maybe #t x)))
+      maybe)))
+
+(bind-func nothing_maybe:[Maybe*,!a]*
+  (lambda (x)
+    (let ((maybe (Maybe #f x)))
+      maybe)))
+
+(bind-func bind_maybe:[Maybe:<i1,!b>*,Maybe:<i1,!a>*,[Maybe:<i1,!b>*,!a]*]*
+  (lambda (m f)
+    (if (tref m 0)
+        (f (tref m 1))
+        (nothing_maybe 0))))
+
+;; multiply to maybe int
+(bind-func maybe_mul:[Maybe:<i1,i32>*,Maybe:<i1,i32>*,Maybe:<i1,i32>*]*
+  (lambda (a b)
+    (bind_maybe
+     a (lambda (x:i32)
+         (bind_maybe
+          b (lambda (y:i32)
+              (let ((z (* x y)))
+                (if (> z (i64toi32 50))
+                    (nothing_maybe 0)
+                    (return_maybe z)))))))))
+
+(bind-func maybe_print
+  (lambda (x:i32)
+    (let ((w (printf "%d\n" x)))
+      (if (>= w 0)
+          (return_maybe w)
+          (nothing_maybe 0)))))
+
+(bind-func test
+  (lambda (w:i32)
+    (let ((x (return_maybe w))
+          (y (return_maybe (i64toi32 5)))
+          (z (return_maybe (i64toi32 2)))
+          (res (maybe_mul x (maybe_mul y z))))
+      (bind_maybe res maybe_print)
+      void)))
+      
+;; should print 30 40 and 50
+(test-xtfunc (test 3))
+(test-xtfunc (test 4))
+;; but NOT 60
+(test-xtfunc (test 6))
+;; and of course 20 is ok!
+(test-xtfunc (test 2))
+
+
 (print-test-results)
 
 (println 'total-time: (* 1.0 (/ (- (now) start_time) *samplerate*)) 'seconds)
