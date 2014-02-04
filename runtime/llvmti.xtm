@@ -979,10 +979,13 @@
 	  (set! t1 (impc:ti:reify-generic-type-expand t1 gnum spec vars))
           ;; (println '->B: t1 'ptrdepth: ptrdepth 'gpoly: gpolyname)
           (let* ((s1 (regex:replace t1 "\\<(.*)\\>?.*" "$1"))
-                 (es (impc:ir:get-type-joiner
+                 (es2 (impc:ir:get-type-joiner
                       (cl:remove-if (lambda (x) (string=? x ""))
                                     ;;  (regex:match? x gpolyname)))
                                     (regex:match-all s1 impc:ir:regex-tc-or-a))))
+                 (es (map (lambda (x) (if (string? (impc:ir:get-type-from-pretty-str x))
+                                      (impc:ir:get-type-from-pretty-str x) x))
+                           es2))                 
                  (tr (cl:remove-if (lambda (x)
                                      ;; (println 'x: x 'gpolyname: gpolyname)
                                      (if (regex:match? x ":")
@@ -2395,12 +2398,14 @@
 ;; then we try to get back from %xlist--2812497382948 to set !head##289
 (define impc:ti:reverse-set-bangs-from-reified
   (lambda (poly reified gnum vars)
-    ;; (println 'reverse-bangs: 'poly: poly 'gnum: gnum)
-    ;; (println ''reified reified)
-    ;; (println 'polyt: (impc:ir:get-type-from-pretty-str
-    (if (not (regex:match? (symbol->string poly) ":"))
+    ;; (println 'reverse-bangs: poly 'gnum: gnum)
+    ;; (println 'reified: reified)
+    ;; (println 'pretty: (impc:ir:pretty-print-type reified))
+    (if (and (not (list? poly))
+             (not (regex:match? (symbol->string poly) ":")))
         'done ;; we can only check reified if poly IS a list (not a reference to a list!)
-        (let* ((gpolytype (impc:ir:get-type-from-pretty-str (car (regex:type-split (symbol->string poly) "##"))))
+        (let* ((gpolytype (if (list? poly) poly
+                              (impc:ir:get-type-from-pretty-str (car (regex:type-split (symbol->string poly) "##")))))
                (namedtype (impc:ir:get-type-from-str (impc:ir:get-named-type reified))))
           ;; (println 'poly: poly 'gnum gnum)
           ;; (println 'reified: (impc:ir:get-named-type reified))
@@ -2410,14 +2415,17 @@
                   (length namedtype))
               (print-error 'Compiler 'Error: 'type 'mismatch 'for poly -> gpolytype 'against reified '-> namedtype))
           (for-each (lambda (a b)
+                      ;; (println 'a: a 'b: b)
                       (if (symbol? b)
                           (if (regex:match? (symbol->string b) "^!")
                               (impc:ti:update-var
                                (string->symbol (string-append (symbol->string b) "##" (number->string gnum)))
-                               vars '() a))))
-                    namedtype gpolytype)))))
-          
-
+                               vars '() a)))
+                      (if (and (string? a)
+                               (not (string=? a reified)) ;; watch out for recursive!
+                               (regex:match? a "--"))
+                          (impc:ti:reverse-set-bangs-from-reified b a gnum vars)))
+                    namedtype gpolytype)))))          
 
 ;; 
 ;; first for generic functions we do a gnum test
@@ -2440,30 +2448,28 @@
     ;; if we can improve them with any reified types we may have
     (for-each (lambda (k)
 		(if (symbol? k)
-		    (if (not (null? (assoc-strcmp k vars)))
-			(let ((v (cdr (assoc-strcmp k vars))))
-			  ;; (println 'v: v)
-			  (if (string? v)
-			      (impc:ti:reverse-set-bangs-from-reified k v gnum vars)
-			      (if (and (list? v)
-				       (= (length v) 1)
-				       (string? (car v)))
-				  (impc:ti:reverse-set-bangs-from-reified k (car v) gnum vars)))))))
+                    (if (assoc-strcmp k vars) ;;(not (null? (assoc-strcmp k vars)))
+                        (let ((v (cdr (assoc-strcmp k vars))))
+                          (if (string? v)
+                              (impc:ti:reverse-set-bangs-from-reified k v gnum vars)
+                              (if (and (list? v)
+                                       (= (length v) 1)
+                                       (string? (car v)))
+                                  (impc:ti:reverse-set-bangs-from-reified k (car v) gnum vars)))))))
 	      (cdr gpoly-type))
-
-
     ;; attempt to reify any gtype symbols that don't currenty have type values (i.e. not var entry)
     (for-each (lambda (a)
     		(if (and (symbol? a) 
     			 (regex:match? (symbol->string a) "##")
-    			 (null? (cdr (assoc-strcmp a vars))))
+                         (not (assoc-strcmp a vars)))
+    			 ;; (null? (cdr (assoc-strcmp a vars))))
     		    ;; should call this impc:ti:symbol-tryto-reify-generic-type
     		    (let ((res (impc:ti:reify-generic-type a vars '())))
     		      (if (not (equal? res a))
     			  (begin ;; (println 'genupdate: a '-> res)				 
-    				 (impc:ti:update-var a vars kts res))))))			 
+                            (impc:ti:update-var a vars kts res))))))			 
     	      (cdr gftype))            
-   
+    
     #t))
 
 
