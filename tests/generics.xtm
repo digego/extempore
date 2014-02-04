@@ -126,20 +126,10 @@
 ;; list tests
 ;;
 
-;; a generic list printing function!
-
-(bind-func print_list:[void,List*]*
-  (lambda (xs)
-    (if (null? xs) void
-        (begin
-          (printout (car xs))
-          (for-each (lambda (x) (printout "," x)) (cdr xs))
-          (println)))))
-
 (bind-func test_list_1
   (lambda ()
     (let ((l (list 1 2 3 4 5)))
-      (print_list l)
+      (list_print l)
       (car (cdr l)))))
 
 (test-xtfunc (test_list_1) 2)
@@ -148,7 +138,7 @@
   (lambda ()
     (let ((l (list 1 2 3 4 5))
           (l2 (map (lambda (x) (* x x)) l)))
-      (print_list l2))))
+      (list_print l2))))
 
 (test-xtfunc (test_list_2))
 
@@ -160,7 +150,7 @@
     (let ((l (list 1.0 2.0 3.0 4.0))
           (f (lambda (x:double) (* x x)))
           (l2 (map f l)))
-      (print_list l2))))
+      (list_print l2))))
 
 (test-xtfunc (test_list_3))
 
@@ -168,7 +158,7 @@
   (lambda ()
     (let ((lst (list 1 2 3)))
       (set_car (nth_tail lst 1) 5)
-      (print_list lst)
+      (list_print lst)
       (= (nth lst 1) 5))))
 
 (test-xtfunc (test_set_car) 1)
@@ -178,7 +168,7 @@
     (let ((lst1 (list 1 2 3))
 	  (lst2 (list 4 5 6)))
       (set_cdr (nth_tail lst1 2) lst2)
-      (print_list lst1)
+      (list_print lst1)
       (= (length lst1) 6))))
 
 (test-xtfunc (test_set_cdr) 1)
@@ -242,7 +232,7 @@
           (v2 (list 5 6 7 8))
           (v3 (append v1 v2)))
       (insert v3 4 77)
-      (print_list v3)
+      (list_print v3)
       (println "length:" (length v3))
       (length v3))))
 
@@ -277,7 +267,7 @@
 (bind-func test_assoc_2
   (lambda ()
     (let ((dict (test_assoc_1)))
-      (print_list dict)
+      (list_print dict)
       ;; (for-each (lambda (p) (println p)) dict)
       (println "Ben is" (dict_find dict (Str "Ben")) "years old")
       (println "Andrew is" (dict_find dict (Str "Andrew")) "years old")
