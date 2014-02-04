@@ -5208,9 +5208,13 @@ deprecated - use bind-func instead."
 
 ;; alias for definec (should replace definec)
 (define-macro (bind-func . args)
-  ;; (println 'args: args)
+  ;; (println 'args: args)  
   (if (list? (car args))
       (print-error 'Compiler 'Error: 'bind-func 'requires 'a 'name!))
+  ;; if doc-string exists!
+  (if (string? (cadr args))
+      (begin (set! *impc:docstrings* (cons (cons (car args) (cadr args)) *impc:docstrings*))
+             (set! args (append (list (car args)) (cddr args)))))
   (if (impc:ir:poly-types (car args))
       (print-error 'Compiler 'Error: (car args) 'already 'bound 'as 'poly 'function))
   (if (impc:ir:gpoly-types (car args))
