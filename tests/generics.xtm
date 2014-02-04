@@ -121,14 +121,6 @@
 (test-xtfunc (tree_test))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; ADT Testing
-;;
-;;
-
-(sys:load "libs/core/adt.xtm")
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; list tests
@@ -312,16 +304,16 @@
         (f (tref m 1))
         (nothing_maybe 0))))
 
-;; multiply to maybe int
-(bind-func maybe_mul:[Maybe:<i1,i32>*,Maybe:<i1,i32>*,Maybe:<i1,i32>*]*
-  (lambda (a b)
+;; maybe multiply i32 
+(bind-func maybe_mul
+  (lambda (a:Maybe:<i1,i32>* b:Maybe:<i1,i32>*)
     (bind_maybe
      a (lambda (x:i32)
          (bind_maybe
           b (lambda (y:i32)
               (let ((z (* x y)))
                 (if (> z (i64toi32 50))
-                    (nothing_maybe 0)
+                    (nothing_maybe (i64toi32 0))
                     (return_maybe z)))))))))
 
 (bind-func maybe_print
