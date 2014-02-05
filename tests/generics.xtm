@@ -334,50 +334,51 @@
 
 (bind-type Maybe <i1,!a>)
 
-(bind-func return_maybe:[Maybe:<i1,!a>*,!a]*
+;; Maybe's data constructor IS unit/return
+;;
+;; this is a convenience UNIT defined for
+;; the default (TRUE) case
+(bind-func Maybe:[Maybe:<i1,!a>*,!a]*
   (lambda (x)
-    (let ((maybe (Maybe #t x)))
-      maybe)))
-
-(bind-func nothing_maybe:[Maybe*,!a]*
-  (lambda (x)
-    (let ((maybe (Maybe #f x)))
-      maybe)))
+    (let ((m (alloc)))
+      (tset! m 0 #t)
+      (tset! m 1 x)
+      m)))
 
 (bind-func bind_maybe:[Maybe:<i1,!b>*,Maybe:<i1,!a>*,[Maybe:<i1,!b>*,!a]*]*
   (lambda (m f)
     (if (tref m 0)
         (f (tref m 1))
-        (nothing_maybe 0))))
+        (Maybe #f (tref m 1))))) ;; false case
 
-;; maybe multiply i32 
-(bind-func maybe_mul
-  (lambda (a:Maybe:<i1,i32>* b:Maybe:<i1,i32>*)
+;; maybe multiply
+(bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
+  (lambda (a b)
     (bind_maybe
-     a (lambda (x:i32)
+     a (lambda (x)
          (bind_maybe
-          b (lambda (y:i32)
+          b (lambda (y)
               (let ((z (* x y)))
-                (if (> z (i64toi32 50))
-                    (nothing_maybe (i64toi32 0))
-                    (return_maybe z)))))))))
+                (if (> z (convert 50))
+                    (Maybe #f z)
+                    (Maybe #t z)))))))))
 
-(bind-func maybe_print
-  (lambda (x:i32)
-    (let ((w (printf "%d\n" x)))
+(bind-func maybe_print_i64
+  (lambda (x:i64)
+    (let ((w (i32toi64 (printf "%d\n" x))))
       (if (>= w 0)
-          (return_maybe w)
-          (nothing_maybe 0)))))
+          (Maybe #t w)
+          (Maybe #f w)))))
 
 (bind-func test
-  (lambda (w:i32)
-    (let ((x (return_maybe w))
-          (y (return_maybe (i64toi32 5)))
-          (z (return_maybe (i64toi32 2)))
+  (lambda (w:i64)
+    (let ((x (Maybe w))
+          (y (Maybe 5))
+          (z (Maybe 2))
           (res (maybe_mul x (maybe_mul y z))))
-      (bind_maybe res maybe_print)
-      void)))
-      
+     (bind_maybe res maybe_print_i64)
+     void)))
+
 ;; should print 30 40 and 50
 (test-xtfunc (test 3))
 (test-xtfunc (test 4))

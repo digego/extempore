@@ -204,7 +204,8 @@ int main(int argc, char** argv)
     std::cout << std::endl;
     std::cout << "------------- Extempore -------------- " << std::endl;
     ascii_text_color(0,9,10);
-    std::cout << "andrew@moso.com.au (c) 2010-2014" << std::endl;
+    std::cout << "Andrew Sorensen (c) 2010-2014" << std::endl;
+    std::cout << "andrew@moso.com.au, @digego" << std::endl;
     std::cout << std::endl;
     ascii_text_color(0,9,10);
 		
