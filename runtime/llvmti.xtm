@@ -192,7 +192,7 @@
 ;; have already been removed from the ast!
 (define impc:ti:rename-all-shadow-vars
   (lambda (full-ast syms)
-    (letrec ((f (lambda (ast)
+    (letrec ((f (lambda (ast fname)
                   (cond ((atom? ast) ast)
                         ((null? ast) ast)
                         ((list? ast)
@@ -205,7 +205,11 @@
                                           (map (lambda (x)
                                                  (let* ((pair (regex:type-split (symbol->string (car x)) ":"))
                                                         (sym (string->symbol (car pair))))
-                                                   (if (member sym syms)
+                                                   (if (or (member sym syms)
+                                                           (impc:ir:gpoly-types sym)
+                                                           (and (not (equal? sym fname))
+                                                                (llvm:get-function (symbol->string sym)))
+                                                           (llvm:get-globalvar (symbol->string sym)))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
@@ -222,8 +226,8 @@
                                        (newast (replace-all ast replace-pairs)))
                                   ;; now make sure we have code coverage!
                                   (cons (car newast)
-                                        (cons (map (lambda (x) (cons (car x) (f (cdr x)))) (cadr newast))
-                                              (f (cddr newast))))))
+                                        (cons (map (lambda (x) (cons (car x) (f (cdr x) fname))) (cadr newast))
+                                              (f (cddr newast) fname)))))
                                ((member (car ast) *impc:lambdaslist*)
                                 (let* ((replace-pairs
                                         (cl:remove
@@ -232,7 +236,10 @@
                                           (map (lambda (x)
                                                  (let* ((pair (regex:type-split (symbol->string x) ":"))
                                                         (sym (string->symbol (car pair))))
-                                                   (if (member sym syms)
+                                                   (if (or (member sym syms)
+                                                           (and (not (equal? sym fname))
+                                                                (llvm:get-function (symbol->string sym)))
+                                                           (llvm:get-globalvar (symbol->string sym)))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
@@ -249,12 +256,14 @@
                                        (newast (replace-all ast replace-pairs)))
                                   (cons (car ast)
                                         (cons (cadr newast)
-                                              (f (cddr newast))))))
+                                              (f (cddr newast) fname)))))
                                ((pair? ast)
-                                (cons (f (car ast))
-                                      (f (cdr ast))))
+                                (cons (f (car ast) fname)
+                                      (f (cdr ast) fname)))
                                (else ast)))))))
-      (f full-ast))))
+      (if (equal? (car full-ast) 'let)
+          (f full-ast (caaadr full-ast))
+          (f full-ast '___no_sym___)))))
 
 
 
