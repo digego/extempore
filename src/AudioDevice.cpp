@@ -422,9 +422,9 @@ namespace extemp {
 
         // print underflow/overflow
         if(statusFlags & 0x00000004) 
-          printf("PORTAUDIO: Audio Output Underlow\n");
+          printf("Audio underflow: pushing extempore to hard?\n");
         if(statusFlags & 0x00000008) 
-          printf("PORTAUDIO: Audio Output Overflow\n");
+          printf("Audio output overflow\n");
 
 	if(AudioDevice::I()->getDSPWrapper() && !AudioDevice::I()->getDSPSUMWrapper()) { // if true then we must be sample by sample
 	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
@@ -625,8 +625,7 @@ namespace extemp {
     }
 
     void AudioDevice::start()
-    {
-
+    {        
 	Pa_Initialize();
         //printf("\n-----Available Audio Drivers-------\n");
         PaError err;
@@ -715,8 +714,8 @@ namespace extemp {
 
 	if(err != paNoError) {
    	    ascii_text_color(1,1,10);            
-	    std::cerr << "PortAudio Initialization Error: " << Pa_GetErrorText(err) << std::endl;
-	    std::cerr << "PortAudio Device: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
+	    std::cerr << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
+	    std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
 	    ascii_text_color(0,7,10); 
 	    exit(1);
 	}
@@ -730,8 +729,8 @@ namespace extemp {
 	
 	if(err != paNoError) {        
            ascii_text_color(1,1,10);    
-           std::cout << "PortAudio ERROR: " << Pa_GetErrorText(err) << std::endl; 
-           std::cerr << "PortAudio Device: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
+           std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl; 
+           std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;
 	   ascii_text_color(0,7,10); 
 	   exit(1);
         }
@@ -744,8 +743,8 @@ namespace extemp {
 	//queueThread->Start();
 	started = true;
 
-	ascii_text_color(1,7,10);
-	std::cout << "---PortAudio---" << std::endl;
+	// ascii_text_color(1,7,10);
+	// std::cout << "---PortAudio---" << std::endl;
 	ascii_text_color(0,7,10);
         std::cout << "Output Device\t: " << std::flush;
 	ascii_text_color(1,6,10);	
