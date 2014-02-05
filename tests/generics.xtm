@@ -122,6 +122,32 @@
 
 (test-xtfunc (tree_test))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; arity overload
+;;
+
+(bind-func polygen:[!a,!a]*
+  (lambda (x)
+    (* 1 x)))
+
+(bind-func polygen:[!a,!a,!a]*
+  (lambda (x y)
+    (* 1 x y)))
+
+(bind-func polygen:[!a,!a,!a,!a]*
+  (lambda (x y z)
+    (* 1 x y z)))
+
+(bind-func arity_test
+  (lambda (x:i32 y:i32 z:i32)
+    (let ((a (polygen x))
+          (b (polygen x y))
+          (c (polygen x y z)))
+      (println a b c)
+      c)))
+
+(test-xtfunc (arity_test 1 2 3) 6)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -180,7 +206,7 @@
   (lambda ()
     (let ((l1 (list 1 2 3 4))
           (l2 (list 1.0 2.0 3.0 4.0)))
-      (map2 (lambda (a b) (Pair a b)) l1 l2))))
+      (map (lambda (a b) (Pair a b)) l1 l2))))
 
 (bind-func test_list_5
   (lambda ()
@@ -364,4 +390,3 @@
 (print-test-results)
 
 (println 'total-time: (* 1.0 (/ (- (now) start_time) *samplerate*)) 'seconds)
-
