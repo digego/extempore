@@ -196,14 +196,26 @@ int main(int argc, char** argv)
       }
     }
 
-    ascii_text_color(1,7,10);	    
+    ascii_text_color(0,9,10);	    
     std::cout << "##########################################" << std::endl;
     std::cout << "##                                      ##" << std::endl;        
-    std::cout << "##               EXTEMPORE              ##" << std::endl;        
-    std::cout << "##                                      ##" << std::endl;        		    		
-    std::cout << "##           andrew@moso.com.au         ##" << std::endl;            
+    std::cout << "##               ";
+    ascii_text_color(0,6,10);
+    std::cout << "EXTEMPORE";
+    ascii_text_color(0,9,10);
+    std::cout << "              ##" << std::endl;
     std::cout << "##                                      ##" << std::endl;
-    std::cout << "##            (c) 2010-2013             ##" << std::endl;    
+    std::cout << "##           ";
+    ascii_text_color(0,6,10);
+    std::cout << "andrew@moso.com.au";
+    ascii_text_color(0,9,10);
+    std::cout << "         ##" << std::endl;            
+    std::cout << "##                                      ##" << std::endl;
+    std::cout << "##            ";
+    ascii_text_color(0,6,10);
+    std::cout << "(c) 2010-2014";
+    ascii_text_color(0,9,10);
+    std::cout << "             ##" << std::endl;    
     std::cout << "##                                      ##" << std::endl;        
     std::cout << "##########################################" << std::endl;
     std::cout << "     ################################" << std::endl;
