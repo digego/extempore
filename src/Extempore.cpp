@@ -105,6 +105,11 @@ int main(int argc, char** argv)
     int primary_port = 7099;
     int utility_port = 7098;
 
+#ifndef TARGET_OS_WINDOWS
+    // redirect stderr to NULL
+    freopen("/tmp/","w",stderr);
+#endif
+
     // more evil windows termination code
     #ifdef TARGET_OS_WINDOWS
        SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );

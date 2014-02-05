@@ -626,16 +626,7 @@ namespace extemp {
 
     void AudioDevice::start()
     {        
-#ifdef TARGET_OS_WINDOWS
-      Pa_Initialize();
-#else
-        FILE* _stdout = stdout;
-        freopen("/tmp/xtmpaerr.txt","w",stdout);
-	Pa_Initialize();
-        fflush(stdout);
-        fclose(stdout);
-        freopen("/dev/tty","w",stdout);
-#endif
+        Pa_Initialize();
         //printf("\n-----Available Audio Drivers-------\n");
         PaError err;
 
@@ -842,9 +833,9 @@ namespace extemp {
 
   void AudioDevice::printDevices() {
 	Pa_Initialize();
-        ascii_text_color(0,9,10);
+        ascii_text_color(0,2,10);
         printf("\n-----Available Audio Drivers-----------------------------\n");
-        ascii_text_color(0,6,10);
+        ascii_text_color(0,9,10);
         PaError err;
 
 	int numDevices = Pa_GetDeviceCount();
@@ -861,7 +852,7 @@ namespace extemp {
           apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
 	  printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
 	}    
-        ascii_text_color(0,9,10);
+        ascii_text_color(0,2,10);
         printf("----------------------------------------------------------\n\n");
         ascii_text_color(0,9,10);
 #ifdef TARGET_OS_WINDOWS
