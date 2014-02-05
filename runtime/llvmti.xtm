@@ -4131,12 +4131,15 @@
 			(code (caddr (cadr (impc:ir:gpoly-types polyname arity))))
 			;(lllll (println 'actual-code (caddr (cadr (impc:ir:gpoly-types polyname)))))
 			(exists (if (string=? type "") #f (impc:ir:check-poly polyname type))))
-                   ;; (println 'polyname: polyname 'arity: arity
+                   ;; (println 'polyname: polyname 'type: type 'exists: exists 'changed: (impc:ir:gpoly-src-changed polyname arity))
                    ;; (impc:ir:gpoly-src-changed polyname arity))
                    ;; (println 'p: (car ast) 'exists: exists 'changed: (impc:ir:gpoly-src-changed polyname arity))
-		   (if (or (and exists
-                                #t)
-                                ;; (not (impc:ir:gpoly-src-changed polyname arity)))
+		   (if (or (if exists
+                               (if (and (regex:match? (symbol->string exists) "--")
+                                        (impc:ir:gpoly-src-changed polyname arity))
+                                   #f
+                                   #t)
+                               #f)
                            (string=? (car (regex:split (symbol->string (car ast)) "##")) 
                                      (car (regex:split (symbol->string symname) "--"))))
 		       (if (string=? (car (regex:split (symbol->string (car ast)) "##")) 
@@ -4152,7 +4155,8 @@
 					       (impc:ti:add-types-to-source symname jj types envvars ast))
 					     (cdr ast)))))
 		       (let ((pfunc (string->symbol (string-append (car (regex:split (symbol->string (car ast)) "##")) "--" (cname-encode type)))))
-                         ;; (impc:ir:gpoly-src-compiled polyname arity)
+                         ;; (println 'pfund: pfunc)
+                         (impc:ir:gpoly-src-compiled polyname arity)
 			 (set! code `(let ((,pfunc ,code)) ,pfunc))
 			 ;(print)
 			 ;; (println 'pfunc: pfunc 'type: type 'code: code)
