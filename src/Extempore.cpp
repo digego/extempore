@@ -153,9 +153,9 @@ int main(int argc, char** argv)
 	  extemp::UNIV::AUDIO_IN_DEVICE = atoi(args.OptionArg());
           break;
 #if !(defined (JACK_AUDIO) || defined (___ALSA_AUDIO___) || defined (COREAUDIO))
-	case OPT_PRT_DEVICES:
+	case OPT_PRT_DEVICES:          
           extemp::AudioDevice::printDevices();
-	  return -1;
+	  return 1;
 #endif
         case OPT_REALTIME:
 #ifdef TARGET_OS_WINDOWS          
@@ -195,36 +195,13 @@ int main(int argc, char** argv)
 	  extemp::UNIV::CMDPARAMS[std::string(b)] = std::string(val);
       }
     }
-
-    ascii_text_color(0,9,10);	    
-    std::cout << "##########################################" << std::endl;
-    std::cout << "##                                      ##" << std::endl;        
-    std::cout << "##               ";
-    ascii_text_color(0,6,10);
-    std::cout << "EXTEMPORE";
+    ascii_text_color(0,7,10);	    
+    std::cout << std::endl;
+    std::cout << "------------- Extempore -------------- " << std::endl;
     ascii_text_color(0,9,10);
-    std::cout << "              ##" << std::endl;
-    std::cout << "##                                      ##" << std::endl;
-    std::cout << "##           ";
-    ascii_text_color(0,6,10);
-    std::cout << "andrew@moso.com.au";
-    ascii_text_color(0,9,10);
-    std::cout << "         ##" << std::endl;            
-    std::cout << "##                                      ##" << std::endl;
-    std::cout << "##            ";
-    ascii_text_color(0,6,10);
-    std::cout << "(c) 2010-2014";
-    ascii_text_color(0,9,10);
-    std::cout << "             ##" << std::endl;    
-    std::cout << "##                                      ##" << std::endl;        
-    std::cout << "##########################################" << std::endl;
-    std::cout << "     ################################" << std::endl;
-    std::cout << "          ######################" << std::endl;
-    std::cout << "               ############" << std::endl;
-    std::cout << "                    ##" << std::endl;
+    std::cout << "andrew@moso.com.au (c) 2010-2014" << std::endl;
     std::cout << std::endl;
     ascii_text_color(0,9,10);
-    fflush(NULL);    
 		
     extemp::UNIV::PWD = runtimedir.c_str();
     extemp::EXTLLVM::I()->initLLVM();
@@ -240,7 +217,10 @@ int main(int argc, char** argv)
 #endif
 
     extemp::AudioDevice* dev = extemp::AudioDevice::I();
-    dev->start();
+    dev->start();    
+    ascii_text_color(0,7,10);	        
+    std::cout << "---------------------------------------" << std::endl;
+    ascii_text_color(0,9,10);	            
 
     extemp::SchemeProcess* utility = new extemp::SchemeProcess(runtimedir, utility_name, utility_port, 0);
     utility->start();
@@ -257,6 +237,7 @@ int main(int argc, char** argv)
 
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name);
     primary_repl->connectToProcessAtHostname(host,primary_port);
+
 
 #ifdef TARGET_OS_MAC
     [[NSApplication sharedApplication] run];

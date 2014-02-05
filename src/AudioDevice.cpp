@@ -626,7 +626,16 @@ namespace extemp {
 
     void AudioDevice::start()
     {        
+#ifdef TARGET_OS_WINDOWS
+      Pa_Initialize();
+#else
+        FILE* _stdout = stdout;
+        freopen("/tmp/xtmpaerr.txt","w",stdout);
 	Pa_Initialize();
+        fflush(stdout);
+        fclose(stdout);
+        freopen("/dev/tty","w",stdout);
+#endif
         //printf("\n-----Available Audio Drivers-------\n");
         PaError err;
 
@@ -782,7 +791,7 @@ namespace extemp {
 	// ascii_text_color(1,6,10);	
 	// std::cout << ((UNIV::INTERLEAVED==0) ? "TRUE" : "FALSE") << std::endl << std::flush;
 	// ascii_text_color(0,7,10);	
-	std::cout << std::endl << std::flush;
+	std::cout << std::flush;
 	//ascii_text_color(0,7,10);
 
     }
@@ -833,7 +842,9 @@ namespace extemp {
 
   void AudioDevice::printDevices() {
 	Pa_Initialize();
-        printf("\n-----Available Audio Drivers-------\n");
+        ascii_text_color(0,9,10);
+        printf("\n-----Available Audio Drivers-----------------------------\n");
+        ascii_text_color(0,6,10);
         PaError err;
 
 	int numDevices = Pa_GetDeviceCount();
@@ -850,8 +861,17 @@ namespace extemp {
           apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
 	  printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
 	}    
-        printf("-----------------------------------\n\n");
+        ascii_text_color(0,9,10);
+        printf("----------------------------------------------------------\n\n");
+        ascii_text_color(0,9,10);
+#ifdef TARGET_OS_WINDOWS
         Pa_Terminate();
+#else
+        fflush(stdout);
+        freopen("/dev/null","w",stdout); // throttle termination messages
+        Pa_Terminate();
+        fflush(stdout);
+#endif
         return;
   }
 
