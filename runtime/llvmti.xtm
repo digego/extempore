@@ -5938,11 +5938,12 @@ deprecated - use bind-func instead."
           (set! *impc:ti:print-code-specialization-compiles* #t)   
           (for-each
            (lambda (t)
-             (let ((etype (cname-encode t)))
+             (let ((etype (cname-encode t)))               
                (if (not (llvm:get-function (string-append sym "--" etype)))
-                   (let* ((arity (- (length (impc:ir:get-pretty-closure-arg-strings etype)) 1))
+                   (let* ((arity (- (length (impc:ir:get-pretty-closure-arg-strings t)) 1))
                           (code (caddr (cadr (impc:ir:gpoly-types (string->symbol sym) arity))))
                           (pfunc (string->symbol (string-append sym "--" etype))))
+                     (println 'arity: arity 'code: code 'pfunc: pfunc)
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
                      (impc:ti:run pfunc code (cons pfunc (string->symbol t)))
                      (impc:ir:add-poly (string->symbol sym) pfunc t)
@@ -5961,7 +5962,7 @@ deprecated - use bind-func instead."
           
           #t))))
 
-(define-macro (constraint-generic sym . args)
+(define-macro (constrain-generic sym . args)
   (apply _constrain-generic
          (symbol->string sym)
          (map (lambda (x) (symbol->string x)) args)))
