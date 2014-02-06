@@ -14,8 +14,8 @@
 (sys:load "tests/test.xtm")
 
 
-;; (define *impc:ti:print-full-generic-types* #t)
-;; (define *impc:ti:print-code-specialization-compiles* #t)
+(define *impc:ti:print-full-generic-types* #f)
+(define *impc:ti:print-code-specialization-compiles* #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 
@@ -346,18 +346,25 @@
       (tset! m 1 x)
       m)))
 
-(bind-func bind_maybe:[Maybe:<i1,!b>*,Maybe:<i1,!a>*,[Maybe:<i1,!b>*,!a]*]*
+(bind-func bind:[Maybe:<i1,!b>*,Maybe:<i1,!a>*,[Maybe:<i1,!b>*,!a]*]*
   (lambda (m f)
     (if (tref m 0)
         (f (tref m 1))           ;; true  Maybe
         (Maybe #f (tref m 1))))) ;; false Maybe (nothing)
 
+(constrain-generic
+ bind
+ [Maybe:<i1,i64>*,Maybe:<i1,i64>*,[Maybe:<i1,i64>*,i64]*]*
+ [Maybe:<i1,i32>*,Maybe:<i1,i32>*,[Maybe:<i1,i32>*,i32]*]* 
+ [Maybe:<i1,float>*,Maybe:<i1,float>*,[Maybe:<i1,float>*,float]*]*
+ [Maybe:<i1,double>*,Maybe:<i1,double>*,[Maybe:<i1,double>*,double]*]*)
+
 ;; maybe multiply
 (bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
   (lambda (a b)
-    (bind_maybe
+    (bind
      a (lambda (x)
-         (bind_maybe
+         (bind
           b (lambda (y)
               (let ((z (* x y)))
                 ;; stop computation if result
@@ -368,19 +375,20 @@
 
 ;; create a haskell style do syntax
 ;; but we'll use a let style form
-(macro (maybe_do args)
+;; mlet for monadic-let -- bad name :(
+(macro (mlet args)
        (letrec ((f (lambda (xs body)
                      (if (null? xs) body
-                         `(bind_maybe ,(caar xs)
-                                      (lambda (,(cadar xs))
-                                        ,(f (cdr xs) body)))))))
+                         `(bind ,(cadar xs)
+                                (lambda (,(caar xs))
+                                  ,(f (cdr xs) body)))))))
          (f (cadr args) (caddr args))))
 
 ;; which makes maybe_mul considerably more readable
 (bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
   (lambda (a b)
-    (maybe_do ((a x)
-               (b y))
+    (mlet ((x a)
+           (y b))
       (let ((z (* x y)))
         ;; stop computation if result
         ;; is greater than 50
@@ -401,9 +409,11 @@
           (y (Maybe 5))
           (z (Maybe 2))
           (result (maybe_mul x (maybe_mul y z))))
-      (bind_maybe (Maybe 5) (lambda (x) (Maybe (* x x))))
-      (bind_maybe result Maybe:[Maybe:<i1,i64>*,i64]*)
-      (bind_maybe result maybe_print_i64)
+      (bind result Maybe:[Maybe:<i1,i64>*,i64]*)      
+      (bind (Maybe 5) (lambda (x) (Maybe (* x x))))
+      (bind (Maybe 6.0) (lambda (x) (Maybe (* x x))))
+      (bind (Maybe 5) (lambda (x) (Maybe (* x x))))
+      (bind result maybe_print_i64)      
      void)))
 
 ;; should print 30 40 and 50

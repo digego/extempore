@@ -2738,8 +2738,7 @@
 ;; polymorphic version
 (define impc:ti:nativef-poly-check
    (lambda (ast vars kts request?)
-     ;; (println 'type-checking: (car ast))
-     ;; (println 'poly-check 'ast: ast 'vars: vars 'request: request?)     
+     ;; (println 'poly-checking: (car ast))
       (let* ((polyf (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
  	     (ftypes (impc:ir:poly-types polyf))
 	     (valid-lgth (map (lambda (type)
@@ -2747,46 +2746,53 @@
 					(length ast)) #f #t))
 			      ftypes))
 	     (valid-args (map (lambda (type valid)
-				;; (println 'type: type valid)
+                                ;; (println 'type: type 'valid: valid)
 				(if valid
-				    (let* ((checked-types
-					    (map (lambda (a t)
+                                    (let* ((checked-types
+                                            (map (lambda (a t)
                                                    ;; andrew's change here!
-						   (let ((t2 (impc:ti:type-unify (impc:ti:type-check a vars kts #f) vars)))
-						     ;; (println 'a: a 't: t 't2: t2)
-						     t2))
-						 (cdr ast)
-						 (cddr type)))
-					   (ct2 (map (lambda (ct ft) ;; checked type against poly type
-						       ;; (println 'ct: ct 'ft: ft)
-						       (if (and (number? ct) (number? ft))
-							   (if (= ct ft) #t #f)
-							   (if (and (string? ct) (string? ft))
-							       (if (string=? ct ft) #t #f)
-							       (if (list? ct)
-								   (if (member ft ct) #t #f) ;; #f
-								   #f))))
-						     checked-types
-						     (cddr type))))
-				      (if (member #f ct2) #f #t))
-				    #f))
+                                                   (let ((t2 (impc:ti:type-unify (impc:ti:type-check a vars kts #f) vars)))
+                                                     ;; (println 'a: a 't: t 't2: t2)
+                                                     t2))
+                                                 (cdr ast)
+                                                 (cddr type)))
+                                           (ct2 (map (lambda (ct ft) ;; checked type against poly type
+                                                       ;; (println 'ct: ct 'ft: ft)
+                                                       (if (and (number? ct) (number? ft))
+                                                           (if (= ct ft) #t #f)
+                                                           (if (and (string? ct) (string? ft))
+                                                               (if (string=? ct ft) #t #f)
+                                                               (if (list? ct)
+                                                                   (if (member ft ct) #t #f) ;; #f
+                                                                   #f))))
+                                                     (if request?
+                                                         (cons request? checked-types)
+                                                         checked-types)
+                                                     (if request?
+                                                         (cdr type)
+                                                         (cddr type)))))
+                                      ct2)
+                                (list #f)))
 			      ftypes
 			      valid-lgth))
-	     (valid-polys (remove '()
-				  (map (lambda (type valid)
-					 ;; (println 'type: type 'valid: valid)
-					 (if valid type '()))
-				       ftypes
-				       valid-args))))
-        
+             (weighted-choices (map (lambda (l) (length (cl:remove #f l))) valid-args))
+             (best-result (apply max weighted-choices))
+             (valid-polys
+              (cl:remove #f (map (lambda (type weight)
+                                   (if (or
+                                        (= weight 0)
+                                        (< weight best-result)) #f
+                                       type))
+                                 ftypes
+                                 weighted-choices))))
         ;; (println 'ftypes: ftypes)
+        ;; (println 'weighted-choices: weighted-choices 'request? request?)
 	;; (println 'va valid-args)
 	;; (println '-> ast 'valid-polys: valid-polys 'request: request?)
 
 	(if (null? valid-polys)
             (set! valid-polys (list (car ftypes))))
-            ;; (set! valid-polys (list (car ftypes))))
-	    ;; (print-error 'Compiler 'Error: 'no 'valid 'polymorphic 'options 'for: ast 'vars: vars))
+        ;; (print-error 'Compiler 'Error: 'no 'valid 'polymorphic 'options 'for: ast 'vars: vars))
 	
 	;(println 'valid-polysa: valid-polys 'request? request? 'ast: ast)
 	(let ((returns (map (lambda (t)
@@ -5958,7 +5964,7 @@ deprecated - use bind-func instead."
                    (let* ((arity (- (length (impc:ir:get-pretty-closure-arg-strings t)) 1))
                           (code (caddr (cadr (impc:ir:gpoly-types (string->symbol sym) arity))))
                           (pfunc (string->symbol (string-append sym "--" etype))))
-                     (println 'arity: arity 'code: code 'pfunc: pfunc)
+                     ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
                      (impc:ti:run pfunc code (cons pfunc (string->symbol t)))
                      (impc:ir:add-poly (string->symbol sym) pfunc t)
