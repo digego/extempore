@@ -349,11 +349,30 @@
     (set! *impc:ir:gpoly-needs-update*
           (cl:remove-if (lambda (x) (equal? x (cons name arity))) *impc:ir:gpoly-needs-update*))))
 
+(define impc:ir:generics-apply-macros
+  (lambda (ast)
+    (cond ((atom? ast) ast)
+          ((and (list? ast)
+                (symbol? (car ast))
+                (not (eq? 'dotimes (car ast)))
+                (defined? (car ast))                
+                (macro? (eval (car ast))))
+           (macro-expand ast))
+          ((pair? ast)
+           (cons (impc:ir:generics-apply-macros (car ast))
+                 (impc:ir:generics-apply-macros (cdr ast))))
+          (else ast))))
+
 (define impc:ir:add-gpoly
   (let ((pcnt 100))
     (lambda (code)
-      (set! pcnt (+ pcnt 1))
-      ;; (println 'code: (cadr code))
+      (set! pcnt (+ pcnt 1))      
+      ;; (println 'code-pre-macro: code)
+      ;; apply any macros to generic code!
+      (set! code (cons (car code)
+                       (list (cadr code)
+                             (impc:ir:generics-apply-macros (caddr code)))))
+      ;; (println 'code-post-macro: code)
       (if (not (regex:match? (symbol->string (cadr code)) ":"))
           (print-error 'Compile 'Error: 'generic 'functions 'must 'supply 'type))
       (let* ((res (regex:type-split (symbol->string (cadr code)) ":"))

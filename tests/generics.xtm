@@ -336,8 +336,9 @@
 
 ;; Maybe's data constructor IS unit/return
 ;;
-;; this is a convenience UNIT defined for
-;; the default (TRUE) case
+;; but really UNIT should take a single
+;; arg, so it has type [Maybe*,!a]*
+;; so we can override on arity as below
 (bind-func Maybe:[Maybe:<i1,!a>*,!a]*
   (lambda (x)
     (let ((m (alloc)))
@@ -348,8 +349,8 @@
 (bind-func bind_maybe:[Maybe:<i1,!b>*,Maybe:<i1,!a>*,[Maybe:<i1,!b>*,!a]*]*
   (lambda (m f)
     (if (tref m 0)
-        (f (tref m 1))
-        (Maybe #f (tref m 1))))) ;; false case
+        (f (tref m 1))           ;; true  Maybe
+        (Maybe #f (tref m 1))))) ;; false Maybe (nothing)
 
 ;; maybe multiply
 (bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
@@ -359,24 +360,50 @@
          (bind_maybe
           b (lambda (y)
               (let ((z (* x y)))
+                ;; stop computation if result
+                ;; is greater than 50
                 (if (> z (convert 50))
                     (Maybe #f z)
                     (Maybe #t z)))))))))
 
+;; create a haskell style do syntax
+;; but we'll use a let style form
+(macro (maybe_do args)
+       (letrec ((f (lambda (xs body)
+                     (if (null? xs) body
+                         `(bind_maybe ,(caar xs)
+                                      (lambda (,(cadar xs))
+                                        ,(f (cdr xs) body)))))))
+         (f (cadr args) (caddr args))))
+
+;; which makes maybe_mul considerably more readable
+(bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
+  (lambda (a b)
+    (maybe_do ((a x)
+               (b y))
+      (let ((z (* x y)))
+        ;; stop computation if result
+        ;; is greater than 50
+        (if (> z (convert 50)) 
+            (Maybe #f z)
+            (Maybe #t z))))))
+          
 (bind-func maybe_print_i64
   (lambda (x:i64)
-    (let ((w (i32toi64 (printf "%d\n" x))))
+    (let ((w (printf "%lld\n" x)))
       (if (>= w 0)
-          (Maybe #t w)
-          (Maybe #f w)))))
+          (Maybe #t x)
+          (Maybe #f x)))))
 
 (bind-func test
   (lambda (w:i64)
     (let ((x (Maybe w))
           (y (Maybe 5))
           (z (Maybe 2))
-          (res (maybe_mul x (maybe_mul y z))))
-     (bind_maybe res maybe_print_i64)
+          (result (maybe_mul x (maybe_mul y z))))
+      (bind_maybe (Maybe 5) (lambda (x) (Maybe (* x x))))
+      (bind_maybe result Maybe:[Maybe:<i1,i64>*,i64]*)
+      (bind_maybe result maybe_print_i64)
      void)))
 
 ;; should print 30 40 and 50
