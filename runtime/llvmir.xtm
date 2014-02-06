@@ -2664,6 +2664,34 @@
          (impc:ir:strip-space os))))
 
 
+(define impc:ir:compiler:while-loop
+ (lambda (ast types)
+   (let* ((os (make-string 0))
+	  (loop-num-string (number->string (llvm:count++)))
+	  (loop (string-append "%loop" loop-num-string))
+	  (after (string-append "%after" loop-num-string)))
+     (emit "; while loop\n" os)
+     ;; initial test
+     (emit (impc:ir:compiler (car ast) types) os)
+     (emit "br i1 " (car (impc:ir:gname))
+	   ", label " loop
+	   ", label " after
+	   "\n" os)
+
+     ;; loop body
+     (emit  "\nloop" loop-num-string ":\n" os)
+     (emit (impc:ir:compiler (cdr ast) types) os)
+
+     ;; re-test loop condition
+     (emit (impc:ir:compiler (car ast) types) os)
+     (emit "br i1 " (car (impc:ir:gname))
+	   ", label " loop
+	   ", label " after
+	   "\n" os)
+     (emit  "\nafter" loop-num-string ":\n" os)
+     (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
+     ;; (println 'output 'string:) (println os)
+     (impc:ir:strip-space os))))
 
 ;; (define impc:ir:compiler:set!
 ;;    (lambda (ast types)
@@ -4476,6 +4504,8 @@
                     (impc:ir:compiler:null ast types))
                    ((equal? (car ast) 'dotimes)
                     (impc:ir:compiler:loop (cdr ast) types))
+		   ((equal? (car ast) 'while)
+		    (impc:ir:compiler:while-loop (cdr ast) types))
                    ;; ((equal? (car ast) 'make-array)
                    ;;  (impc:ir:compiler:make-array ast types))
                    ((equal? (car ast) 'array-ref)

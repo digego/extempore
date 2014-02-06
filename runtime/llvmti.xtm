@@ -724,6 +724,11 @@
           (impc:ti:first-transform (cadr ast) inbody?)
           (cons 'begin (impc:ti:first-transform (cddr ast) inbody?)))))
 
+(define impc:ti:while
+  (lambda (ast inbody?)
+    (list 'while
+	  (impc:ti:first-transform (cadr ast) inbody?)
+	  (cons 'begin (impc:ti:first-transform (cddr ast) inbody?)))))
     
 (define *unique-polynum* 0)
 
@@ -807,6 +812,7 @@
 				  (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast))))))
                        ((eq? (car ast) 'doloop) (impc:ti:doloop ast inbody?))                       
                        ((eq? (car ast) 'dotimes) (impc:ti:dotimes ast inbody?))
+		       ((eq? (car ast) 'while) (impc:ti:while ast inbody?))
                        ((member (car ast) *impc:letslist*)
                         (cons (impc:ti:first-transform (car ast) inbody?)
                               (cons (map (lambda (p)
@@ -3747,6 +3753,14 @@
          ;; dotimes returns void
          (list *impc:ir:void*))))
 
+(define impc:ti:while-check
+  (lambda (ast vars kts request?)
+    (let ((type (impc:ti:type-check (cadr ast) vars kts #f))
+	  (body (impc:ti:type-check (caddr ast) vars kts #f)))
+      (if (not (or (null? type)
+		   (= (car type) *impc:ir:i1*)))
+	  (print-error 'Compiler 'Error: 'while 'loop 'test 'must 'be 'boolean 'var 'or '<, '>, '<> 'or '= 'expression))
+      (list *impc:ir:void*))))
 
 (define impc:ti:printf-check
    (lambda (ast vars kts request?)
@@ -3824,7 +3838,8 @@
                                       ;; '(* / + - % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right bitwise-not)))
              (impc:ti:math-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
-            ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))            
+	    ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))
+	    ((and (list? ast) (member (car ast) '(while))) (impc:ti:while-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(push_zone))) (impc:ti:push_zone-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(pop_zone))) (impc:ti:pop_zone-check ast vars kts request?))	    
