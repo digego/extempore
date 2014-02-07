@@ -173,6 +173,43 @@
       (cons (f ast) types))))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; expand types
+;;
+;; takes and {...} types and should fully expand
+;; types must be generic
+;;
+
+(define impc:ti:expand-generic-types
+  (lambda (types)
+    (map (lambda (t)
+           (let* ((type (symbol->string (cdr t)))
+                  (p (regex:type-split type ":")))
+             (if (and (assoc-strcmp (string->symbol (car p)) *impc:ir:gpolytypes*)
+                      (regex:match? (cadr p) "^{"))
+                 (let* ((ptrdepth (impc:ir:get-ptr-depth (cadr p)))
+                        (base (impc:ir:get-base-type (cadr p)))
+                        (evs1 (string-append "<" (substring base 1 (- (string-length base) 1)) ">"))
+                        (expvars (impc:ir:get-pretty-tuple-arg-strings evs1))
+                        (gtype (symbol->string (cdr (assoc-strcmp (string->symbol (car p)) *impc:ir:gpolytypes*))))
+                        (gvars (regex:match-all gtype "(![A-Za-z0-9_]*)"))
+                        (vars (cl:remove-duplicates gvars)))
+                   (if (<> (length vars) (length expvars))
+                       (print-error 'Compiler 'Error: 'expansion 'arity 'error: (cdr t) '-> (string->symbol (string-append (car p) ":" gtype))))
+                   (for-each (lambda (x y)
+                               (set! gtype (regex:replace-all gtype x y)))
+                             vars expvars)
+                   (cons (car t)
+                         (string->symbol
+                          (apply string-append
+                                 (car p) ":"
+                                 gtype (make-list ptrdepth "*")))))
+                 t)))
+         types)))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Rename any shadow variables in code
@@ -4688,7 +4725,8 @@
              (shadow-code (impc:ti:rename-all-shadow-vars ta '()))             
              ;; (llll (println 'shadow-code shadow-code))
              (c2 (impc:ti:get-var-types shadow-code)) ;; it is possible for macros in the first-transform to introduce new var-types
-             (cc (append (cdr c2) (cdr c1)))             
+             (ccc (append (cdr c2) (cdr c1)))
+             (cc (impc:ti:expand-generic-types ccc))
              (t1 (car c2))
              (t2 (impc:ti:mark-returns t1 symname #f #f #f))
              (t3 (impc:ti:closure:convert t2 (list symname)))
