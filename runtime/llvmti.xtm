@@ -3197,6 +3197,14 @@
            (if (not (impc:ir:pointer? (if (impc:ir:type? a) a
                                           (if (list? a) (car a) a))))
                (print-error 'Compiler 'Error: 'trying 'to 'pset! 'into 'a 'value! a)))
+       
+       (if (and (list? c) (= 1 (length c))) (set! c (car c)))
+       
+       (if (and (symbol? (cadr ast))
+                (impc:ir:type? c))
+           (if (string? c)
+               (impc:ti:update-var (cadr ast) vars kts (string-append c "*"))
+               (impc:ti:update-var (cadr ast) vars kts (impc:ir:pointer++ c))))
        ;; array set check will return the type of the value set
        c)))
 
