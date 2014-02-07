@@ -425,6 +425,27 @@
 (test-xtfunc (test 2))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; type expansion
+;;
+
+(bind-type TypeA <!a,!a>)
+(bind-type TypeB <TypeA:<!a,!a>*,!a>)
+(bind-type TypeC <TypeA*,!a>)
+(bind-type TypeD <!a,[!b,!a]*,!b>)
+
+(bind-func test_exp2
+  (lambda ()
+    (let ((a:TypeA:{i64}* (alloc))
+          (b:TypeB:{i64}* (alloc))
+          (c:TypeC:{i64,i32}* (alloc))
+          (d:TypeD:{float,double}* (alloc)))
+      d)))
+
+(test-xtfunc (test_exp2))
+
+
 (print-test-results)
 
 (println 'total-time: (* 1.0 (/ (- (now) start_time) *samplerate*)) 'seconds)
