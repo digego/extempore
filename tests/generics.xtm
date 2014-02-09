@@ -215,6 +215,11 @@
 
 (test-xtfunc (test_list_5))
 
+;; spec'd funcs
+(bind-func test_map_pair
+  (lambda (l1 l2)
+    (map Pair:$[i64,double]* l1 l2)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; lists of lists
@@ -352,12 +357,21 @@
         (f (tref m 1))           ;; true  Maybe
         (Maybe #f (tref m 1))))) ;; false Maybe (nothing)
 
-(constrain-generic
+;; short-hand
+(constrain-generic 
  bind
- [Maybe:<i1,i64>*,Maybe:<i1,i64>*,[Maybe:<i1,i64>*,i64]*]*
- [Maybe:<i1,i32>*,Maybe:<i1,i32>*,[Maybe:<i1,i32>*,i32]*]* 
- [Maybe:<i1,float>*,Maybe:<i1,float>*,[Maybe:<i1,float>*,float]*]*
- [Maybe:<i1,double>*,Maybe:<i1,double>*,[Maybe:<i1,double>*,double]*]*)
+ $[i64,i64]*
+ $[i32,i32]*
+ $[float,float]*
+ $[double,double]*)
+
+;; long-hand
+;; (constrain-generic
+;;  bind
+;;  [Maybe:<i1,i64>*,Maybe:<i1,i64>*,[Maybe:<i1,i64>*,i64]*]*
+;;  [Maybe:<i1,i32>*,Maybe:<i1,i32>*,[Maybe:<i1,i32>*,i32]*]* 
+;;  [Maybe:<i1,float>*,Maybe:<i1,float>*,[Maybe:<i1,float>*,float]*]*
+;;  [Maybe:<i1,double>*,Maybe:<i1,double>*,[Maybe:<i1,double>*,double]*]*)
 
 ;; maybe multiply
 (bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
@@ -437,14 +451,42 @@
 
 (bind-func test_exp2
   (lambda ()
-    (let ((a:TypeA:{i64}* (alloc))
-          (b:TypeB:{i64}* (alloc))
-          (c:TypeC:{i64,i32}* (alloc))
-          (d:TypeD:{float,double}* (alloc)))
+    (let ((a:TypeA:$<i64>* (alloc))
+          (b:TypeB:$<i64>* (alloc))
+          (c:TypeC:$<i64,i32>* (alloc))
+          (d:TypeD:$<float,double>* (alloc)))
       d)))
 
 (test-xtfunc (test_exp2))
 
+(bind-func gen_exp:[!a,[!a,!b]*,!b]*
+  (lambda (f x)
+    (f x)))
+
+(bind-func test_gen_e
+  (lambda ()
+    (let ((f (lambda (x) (i64tod x))))
+      (gen_exp:$[double,i64]* f 2))))
+
+(bind-func test_gen_list
+  (lambda ()
+    (let ((lst (list gen_exp:$[i32,i64]* gen_exp:$[i32,i64]*)))
+      lst)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; specialize
+;;
+
+(bind-type TypeK <!a,!a>)
+
+(specialize-type TypeK $<i32> $<i64>)
+
+(bind-func spec_gen_f:[!a,!a]*
+  (lambda (x)
+    (* x x)))
+
+(specialize-generic spec_gen_f $[i32]* $[double]* $[float]*)
 
 (print-test-results)
 
