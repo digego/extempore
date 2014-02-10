@@ -2488,7 +2488,8 @@
     ;; (println 'reified: reified)
     ;; (println 'pretty: (impc:ir:pretty-print-type reified))
     (if (and (not (list? poly))
-             (not (regex:match? (symbol->string poly) ":")))
+             (or (not (symbol? poly))
+                 (not (regex:match? (symbol->string poly) ":"))))
         'done ;; we can only check reified if poly IS a list (not a reference to a list!)
         (let* ((gpolytype (if (list? poly) poly
                               (impc:ir:get-type-from-pretty-str (car (regex:type-split (symbol->string poly) "##")))))
@@ -5519,8 +5520,8 @@ deprecated - use bind-func instead."
                        (printout
                         ,(if (regex:match? namestr "--")
                              ;; (if *impc:ti:print-full-generic-types*
-                             (impc:ir:pretty-print-type namestr)
-                             ;;    (car (regex:type-split namestr "--")))
+                             ;; (impc:ir:pretty-print-type namestr)
+                             (string-append "!" (car (regex:type-split namestr "--")))
                              namestr)
                         ":<"
                         ,(list 'tref 'x 0)

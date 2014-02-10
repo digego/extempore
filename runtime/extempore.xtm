@@ -186,20 +186,37 @@
 
 (bind-type String <size_t,i8*>)
 
+;; override default constructors
+(bind-func String
+  (lambda (lgth s)
+    (let ((news:i8* (zalloc lgth))
+          (str:String* (zalloc)))
+      (strcpy news s)
+      (tset! str 0 lgth)
+      (tset! str 1 news)
+      str)))
+
+(bind-func String_h
+  (lambda (lgth s)
+    (let ((news:i8* (halloc lgth))
+          (str:String* (halloc)))
+      (strcpy news s)
+      (tset! str 0 lgth)
+      (tset! str 1 news)
+      str)))
+
 ;; create easy Data constructors from CStrings
 (bind-func Str
   (lambda (s)
     (let ((lgth (strlen s))
-          (news:i8* (zalloc (+ 1 lgth))))
-      (strcpy news s)
-      (let ((str (String lgth news)))
-        str))))
+          (str (String lgth s)))
+      str)))
 
 (bind-func Str_h
   (lambda (s)
     (let ((lgth (strlen s))
-          (news:i8* (halloc (+ 1 lgth))))
-      (String_h lgth news))))
+          (str (String_h lgth s)))
+      str)))
 
 ;; Override default String print!
 (bind-func String_print:[void,String*]*
@@ -217,11 +234,19 @@
 
 (bind-func string_cat
   (lambda (s1:String* s2:String*)
-    (Str (strcat (tref s1 1) (tref s2 1)))))
+    (let ((size (+ (tref s1 0) (tref s2 0)))
+          (news:i8* (zalloc size)))
+      (strcpy news (tref s1 1))
+      (strncat news (tref s2 1) size)
+      (Str news))))
 
 (bind-func string_cat_h
   (lambda (s1:String* s2:String*)
-    (Str_h (strcat (tref s1 1) (tref s2 1)))))
+    (let ((size (+ (tref s1 0) (tref s2 0)))
+          (news:i8* (zalloc size)))
+      (strcpy news (tref s1 1))
+      (strncat news (tref s2 1) size)
+      (Str_h news))))
 
 (bind-func string_cmp
   (lambda (s1:String* s2:String*)
