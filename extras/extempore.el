@@ -106,21 +106,21 @@
 
 (defvar extempore-imenu-generic-expression
   '(("scheme"
-     "(define\\(\\|-macro\\)\\s-+(?\\(\\sw+\\)\\_>" 2)
+     "(define\\(\\|-macro\\)\\s-+(?\\(\\S-+\\)\\_>" 2)
     ("instrument"
-     "(define-\\(instrument\\|sampler\\)\\s-+\\(\\sw+\\)\\_>" 2)
+     "(define-\\(instrument\\|sampler\\)\\s-+\\(\\S-+\\)\\_>" 2)
     ("type"
-     "(bind-\\(type\\|alias\\)\\s-+\\(\\sw+\\)\\_>" 2)
+     "(bind-\\(type\\|alias\\)\\s-+\\(\\S-+\\)\\_>" 2)
     ("type" ;; bind-lib-type
-     "(bind-lib-\\(type\\|alias\\)\\s-+\\(\\sw+\\)\\s-+\\(\\sw+\\)\\_>" 3)
+     "(bind-lib-\\(type\\|alias\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\_>" 3)
     ("val"
-     "(bind-val\\s-+\\(\\sw+\\)\\_>" 1)
+     "(bind-val\\s-+\\(\\S-+\\)\\_>" 1)
     ("val" ;; bind-lib-val
-     "(bind-lib-val\\s-+\\(\\sw+\\)\\s-+\\(\\sw+\\)\\_>" 2)
+     "(bind-lib-val\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\_>" 2)
     ("func"
-     "(bind-func\\s-+\\(\\sw+\\)\\_>" 1)
+     "(bind-func\\s-+\\(\\S-+\\)\\_>" 1)
     ("func" ;; bind-lib-func
-     "(bind-lib-func\\s-+\\(\\sw+\\)\\s-+\\(\\sw+\\)\\_>" 2))
+     "(bind-lib-func\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\_>" 2))
   "Imenu generic expression for Extempore mode.  See `imenu-generic-expression'.")
 
 
