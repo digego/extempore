@@ -116,8 +116,6 @@
           (list (car p) (apply string-append (cadr p)
                                (map (lambda (k) (string-append ":" k)) (cddr p))))
           p))))
-                  
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; strips pretty-types from source code 
@@ -135,12 +133,12 @@
                               (map (lambda (a)
                                      (if (and (list? a)
                                               (eq? (car a) '*colon-hook*))
-                                         (print-error 'Compiler 'Error: 'double 'colon 'error 'for 'var (caddr a)))
+					 (impc:compiler:print-double-colon-error (caddr a)))
                                      (if (regex:match? (symbol->string a) ":")
                                          (let ((t (regex:type-split (symbol->string a) ":")))
                                            (if (regex:match? (cadr t) "^\\<|\\[")
                                                (if (not (regex:match? (cadr t) "\\>|\\]"))
-                                                   (print-error 'Compiler 'Error: 'Syntax 'error: 'bad 'type (cadr t))))
+						   (impc:compiler:print-bad-type-error (cadr t))))
                                            (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
                                            (string->symbol (car t)))
                                          a))
@@ -153,15 +151,15 @@
                                              (null? (cdr a))
                                              (list? (car a))
                                              (> (length (cdr a)) 1))
-                                         (print-error 'Compiler 'Error: 'syntax 'error: 'badly 'formed 'let 'expression (sexpr->string a)))
+					 (impc:compiler:print-badly-formed-expression-error 'let a))
                                      (if (and (list? (car a))
                                               (eq? (car (car a)) '*colon-hook*))
-                                         (print-error 'Compiler 'Error: 'double 'colon 'error 'for 'var (caddr (car a)))) 
+					 (impc:compiler:print-double-colon-error (caddr (car a))))
                                      (if (regex:match? (symbol->string (car a)) ":")
                                          (let ((t (regex:type-split (symbol->string (car a)) ":")))
                                            (if (regex:match? (cadr t) "^\\<|\\[")
                                                (if (not (regex:match? (cadr t) "\\>|\\]"))
-                                                   (print-error 'Compiler 'Error: 'Syntax 'error: 'bad 'type (cadr t)))) 
+						   (impc:compiler:print-bad-type-error (cadr t))))
                                            (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
                                            (list (string->symbol (car t)) (car (f (cdr a)))))
                                          (list (car a) (car (f (cdr a))))))
@@ -199,14 +197,14 @@
                           (assoc-strcmp (string->symbol name) *impc:ir:gpolytypes*)))
                  (gtype (if gtt
                             (symbol->string (if func? (caddr gtt) (cdr gtt)))
-                            (print-error 'Compiler 'Error: 'cannot 'expand 'on 'non-generic name)))
+			    (impc:compiler:print-cannot-expand-non-generic-error name)))
                  (xvars (if func?
                            (impc:ir:get-pretty-closure-arg-strings base)
                            (impc:ir:get-pretty-tuple-arg-strings base)))
                  (_gvars (regex:match-all gtype "(![A-Za-z0-9_]*)"))
                  (gvars (cl:remove-duplicates _gvars)))
             (if (<> (length gvars) (length xvars))
-                (print-error 'Compiler 'Error: 'expansion 'arity 'error: (cdr t) '-> (string->symbol (string-append (car p) ":" gtype))))
+		(impc:compiler:print-expansion-arity-error (cdr t) (string->symbol (string-append (car p) ":" gtype))))
             (for-each (lambda (x y)
                         (set! gtype (regex:replace-all gtype x y)))
                       gvars xvars)
@@ -481,7 +479,7 @@
 		(ascii-print-color 0 7 10)
 		(print) (print)
 		#t)
-	      (begin (print-error 'Compile 'Error: 'failed 'to 'find 'any 'valid 'forms 'for 'generic 'function: name)
+	      (begin (impc:compiler:print-no-valid-forms-for-generic-error name)
 		     #f))))))
 
 	
@@ -526,7 +524,7 @@
       (if (null? ast) '()          
           (list 'if (caar ast) 
                 (if (null? (cdar ast))
-                    (print-error 'Compiler 'Error: 'poorly 'formed 'cond 'expression: ast)
+		    (impc:compiler:print-badly-formed-expression-error 'cond ast)
                     (apply list 'begin (cdar ast)))
                 (if (and
                      (not (null? (cdr ast)))
@@ -672,7 +670,7 @@
       (let ((op (car ast))
             (inlst (cdr ast)))
          (if (< (length inlst) 2)
-                (print-error 'Compiler 'Error: 'Bad 'arity 'in 'math 'expr ast))
+		(impc:compiler:print-bad-arity-error ast))
          (let loop ((rest (cddr inlst))
                     (lst (list op 
                                (impc:ti:first-transform (car inlst) inbody?) 
@@ -740,7 +738,7 @@
 (define impc:ti:letz
   (lambda (ast)
     (if (not (number? (eval (cadr ast))))
-        (print-error 'Compiler 'Error: 'letz 'requires 'a 'zone 'size 'as 'its 'first 'argument)
+	(impc:compiler:print-needs-zone-size-error 'letz)
         `(memzone ,(cadr ast)
                   (let ,(caddr ast) ,@(cdddr ast))))))
 
@@ -1164,7 +1162,7 @@
 		  (if (not (assoc-strcmp vs vars)) ;; if not in vars
 		      (if (regex:match? (symbol->string vs) "^![^#]*$") ;; then check to see if symbol is a !gvar
 			  vs
-			  (print-error 'Compiler 'Error: 'variable 'not 'marked 'as 'free! (symbol->string vs) 'check 'the 'variable 'name 'in 'the 'polytype))
+			  (impc:compiler:print-variable-not-marked-as-free-error vs))
 		      ;; check to see a type has been defined
 		      ;; otherwise return null
 		      (let ((t (cdr (assoc-strcmp vs vars))))
@@ -1469,7 +1467,7 @@
 				     '()))))))) ;; if we still have mixed choice of complex types then return NULL
 	  ((pair? t)
 	   (impc:ti:type-unify (cdr t) vars))
-	  (else (print-error 'Compiler 'Error: 'bad 'type t 'in 'unification)))))
+	  (else (impc:compiler:print-bad-type-error t)))))
 
 
 (define impc:ti:generic-type-details
@@ -1747,11 +1745,8 @@
                     (not (member t (cdr p))))
                (begin
                  (if (regex:match? t "^%")
-                     (print-error 'Compiler 'Error: 'setting
-                                  (impc:ir:pretty-print-type (impc:ir:get-named-type t))
-                                  'into p)
-                     (print-error 'Compiler 'Error: 'type 'mismatch 'setting t
-                                  'into p))))))
+		     (impc:compiler:print-type-mismatch-error (impc:ir:pretty-print-type (impc:ir:get-named-type t)) p)
+		     (impc:compiler:print-type-mismatch-error t p))))))
      ;; don't ever add oursevles (i.e. sym) as a type arg or NULL
      (if (or (null? t)
              (equal? t #f)
@@ -1767,7 +1762,7 @@
 			(not (llvm:get-function (symbol->string sym)))
 			(not (llvm:get-globalvar (symbol->string sym))))
 		   (begin ;; (error)
-                          (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist 'updatevar))
+	 (impc:compiler:print-missing-type-error sym))
 		   (let ((pair (assoc-strcmp sym vars)))
 		     (if pair
 			 (let ((pair-rest (cdr pair)))
@@ -1812,7 +1807,7 @@
       (if (and (not (assoc-strcmp sym vars))
                (not (llvm:get-function (symbol->string sym)))               
                (not (llvm:get-globalvar (symbol->string sym))))
-          (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist)
+	  (impc:compiler:print-missing-identifier-error sym 'variable)
           (let ((pair (assoc-strcmp sym vars)))             
              (if pair
                  (if (impc:ir:type? t)
@@ -1837,7 +1832,7 @@
                   (if (string? t)
                       (cons sym (impc:ir:pointer-- t))
                       (cons sym (- t *impc:ir:pointer*)))))
-            (print-error 'Compiler 'Error: 'var (symbol->string sym) 'does 'not 'exist 'getvar))
+	    (impc:compiler:print-missing-identifier-error sym 'variable))
         (assoc-strcmp sym vars))))
 
 
@@ -1892,8 +1887,16 @@
                (let* ((t1 (impc:ti:numeric-check ast vars kts #f))
                       (t2 (cl:intersection (list request?) t1)))
                  t2))
-              (else (print-error 'Compiler 'Error: 'shouldn't 'reach 'here 'in 'numeric 'check 'request? request?)
-                    (print-error '-> 'You 'might 'be 'using 'a 'pref 'where 'you 'should 'be 'using 'a 'tref?)))
+	      (else
+	       (print-with-colors 'red 'default #t (print "Compiler Error:"))
+	       (print "shouldn't reach here in numeric check - request?: ")
+	       (print-with-colors 'blue 'default #f (print request?))
+	       (print "\nYou might be using a ")
+	       (print-with-colors 'blue 'default #t (print "pref"))
+	       (print " where you should be using a ")
+	       (print-with-colors 'blue 'default #t (print "tref"))
+	       (println)
+	       (error "")))
         (if (integer? ast)  ;; preference goes to start of list
             (if (or (= 1 ast) (= 0 ast))
                 (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8* *impc:ir:i1*)
@@ -1908,7 +1911,8 @@
   (lambda (ast vars kts request?)
     ;; (println 'symcheck 'ast: ast 'vars: vars)
     ;; (println 'vars: vars)
-     (if (not (symbol? ast)) (print-error 'Trying 'to 'symbol 'check 'a 'non-symbol: ast))
+    (if (not (symbol? ast))
+	(impc:compiler:print-compiler-error "Trying to symbol check a non-symbol" ast))
      (if (and
           (assoc-strcmp ast vars)
           (impc:ir:type? (impc:ti:type-unify (cdr (assoc-strcmp ast vars)) vars)))
@@ -1925,7 +1929,7 @@
                     (impc:ir:gpoly-exists? (string->symbol (impc:ir:get-base-type (symbol->string ast)))))
                ;; (regex:match? (symbol->string ast) "##")
                ;; (not (regex:match? (symbol->string ast) "!")))
-               (print-error 'Compiler 'Error: 'trying 'to 'use 'generic 'function 'as 'value: ast))
+	       (impc:compiler:print-compiler-error "trying to use generic function as value" ast))
            (if *impc:ti:print-sub-checks* (println 'sym:> 'ast: ast 'request? request?))
            ;; if a request is made - assume it's forced
            ;; find the intersection between the request
@@ -1944,7 +1948,7 @@
                          (set! request? #f)
                          (set! ast (string->symbol (string-append (car p) "--" etype)))
                          (set! polytype (impc:ir:get-type-from-pretty-str (cadr p)))))
-                     (begin (print-error 'Compiler 'Error: 'unbound 'symbol: ast))))
+		     (begin (impc:compiler:print-missing-identifier-error name 'symbol))))
              (let ((type (if polytype polytype
                              (if (assoc-strcmp ast vars)
                                  (cdr (assoc-strcmp ast vars))
@@ -2074,7 +2078,7 @@
 
          (if (<> (length ftype) 
                  (length ast))
-             (print-error 'Compiler 'Error: 'bad 'arity 'in 'call ast))
+	     (impc:compiler:print-compiler-error "bad arity in call" ast))
 
          ;; we don't care what we get back because we already know the return type
          (for-each (lambda (a t)
@@ -2104,7 +2108,7 @@
 
       (if (<> (length ftype) 
               (length ast))
-          (print-error 'Compiler 'Error: 'bad 'arity 'in 'call ast))
+	  (impc:compiler:print-compiler-error "bad arity in call" ast))
 
       ;; we don't care what we get back because we already know the return type
       (for-each (lambda (a t)
@@ -2132,7 +2136,7 @@
              (regex:match? x "^%")
              (regex:match? x "--")
              (if (null? (impc:ir:get-named-type x))
-                 (print-error 'Compiler 'Error: x 'is 'not 'valid 'named 'type)
+		 (impc:compiler:print-missing-type-error x)
                  #t))
         (let* ((gpolyname (regex:replace-all x "^%([^-]*).*$" "$1"))
                (ptrdepth (impc:ir:get-ptr-depth x))
@@ -2500,7 +2504,8 @@
           ;; (println 'named: namedtype)
           (if (<> (length gpolytype)
                   (length namedtype))
-              (print-error 'Compiler 'Error: 'type 'mismatch 'for poly -> gpolytype 'against reified '-> namedtype))
+	      ;; not sure if this error message will work properly:
+	      (impc:compiler:print-type-mismatch-error (list poly gpolytype) (list reified namedtype)))
           (for-each (lambda (a b)
                       ;; (println 'a: a 'b: b)
                       (if (symbol? b)
@@ -2596,8 +2601,7 @@
                    (ttype '()))
               ;; this here as a check (could be removed)
               (if (not (null? (cl:intersection lvarnames extantsyms)))
-                  (print-error 'Compiler 'Error: 'shadow 'vars 'found 'when 'specialising 'generic 'code
-                               (cl:intersection lvarnames extantsyms)))
+		  (impc:compiler:print-compiler-error "shadow vars found when specialising generic code" (cl:intersection lvarnames extantsyms)))
               ;; this is another check (could be removed)              
               (for-each (lambda (x)
                           (if (member (car x) lvarnames)
@@ -2666,7 +2670,7 @@
           ;;(println 'gpoly-typeb:> (car (impc:ir:gpoly-types gname)))
           (if (<> (length (cdr gpoly-type))
                   (length ast))
-              (print-error 'Compiler 'Error: 'bad 'arity 'in 'generics 'call ast))
+	      (impc:compiler:print-compiler-error "bad arity in generics call" ast))
 
           ;; add ##gnum's to all gpoly types (both !bangs like !head and gpoly types like xlist*)
           (set! gpoly-type
@@ -2869,7 +2873,7 @@
            ;; (if (null? valid-polys)
            ;;     (set! valid-polys (list (car ftypes))))
            (if (null? valid-polys)
-               (print-error 'Compiler 'Error: 'no 'valid 'polymorphic 'options 'for: ast))
+	       (impc:compiler:print-compiler-error "no valid polymorphic options" ast))
            
                                         ;(println 'valid-polysa: valid-polys 'request? request? 'ast: ast)
            (let ((returns (map (lambda (t)
@@ -2920,7 +2924,7 @@
 		   (list *impc:ir:void*))
 	    (begin (if (<> (+ 2 (length ftype))
 			   (length ast))
-		       (print-error 'Compiler 'Error: 'bad 'arity 'in 'call ast))
+		       (impc:compiler:print-compiler-error "bad arity in call" ast))
 		   ;; we don't care what we get back
 		   (for-each (lambda (a t)
 			       (if (symbol? a) (impc:ti:update-var a vars kts t))
@@ -2934,7 +2938,7 @@
 (define impc:ti:push_zone-check
   (lambda (ast vars kts request?)
     (if (<> (length ast) 2)
-	(print-error 'Compiler 'Error: 'bad 'arity 'for (sexpr->string ast)))
+	(impc:compiler:print-compiler-error "bad arity in call" ast))
     (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
     (list "%mzone*")))
 
@@ -2949,7 +2953,7 @@
   (lambda (ast vars kts request?)
     (if (or (> (length ast) 4)
 	    (< (length ast) 3))
-	(print-error 'Compiler 'Error: 'memzone 'must 'be 'of 'the 'form '(memzone size [delay] body) 'where "delay" 'is 'optional 'and "body" 'is 'a 'let, 'begin, 'lambda 'etc..))
+	(impc:compiler:print-compiler-error  "memzone must be of the form (memzone size [delay] body) where \"delay\" is optional and \"body\" is a let, begin, lambda etc.."))
     ;(println 'memzonecheck ast (list? (cadr ast)))
     (if (= (length ast) 3)
 	(begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
@@ -3000,7 +3004,7 @@
 		    (impc:ir:pointer? (car a))
 		    (impc:ir:pointer? a))
 		(list *impc:ir:i1*)
-		(print-error 'Compiler 'Error: 'null? 'must 'take 'a 'pointer 'type (sexpr->string ast)))))))
+		(impc:compiler:print-compiler-error "null must take a pointer type" ast))))))
 
 
 (define impc:ti:null-check
@@ -3050,8 +3054,7 @@
          (if (and t
                   (or (not (list? t));(not (impc:ir:type? t))
                       (not (impc:ir:closure? t))))
-             (print-error 'Compiler 'Error: 'type 'error 'calculating 'return 'type: ast 
-                          'have 'you 'specified 'an 'incorrect 'closure 'type?))
+	     (impc:compiler:print-compiler-error "type error calculating return type - have you specified an incorrect closure type?" ast))
          (if *impc:ti:print-sub-checks* (println 'ret:> 'ast: ast 'a: a 'sym: sym))
          (if t
              ;; if the return value is a symbol then it should be
@@ -3144,14 +3147,14 @@
 (define impc:ti:void-check
   (lambda (ast vars kts request?)
     (if (> (length ast) 1)
-	(print-error 'Compiler 'Error: 'void 'does 'not 'take 'any 'arguments)
+	(impc:compiler:print-compiler-error "void does not take any arguments")
 	(list *impc:ir:void*))))
 
 
 (define impc:ti:array-set-check
    (lambda (ast vars kts request?)
      (if (<> (length ast) 4)
-	 (print-error 'Compiler 'Error: 'error 'parsing (atom->string (car ast)) 'incorrect 'number 'of 'arguments))
+	 (impc:compiler:print-bad-arity-error (car ast)))
      (let* ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
 	    ;; b should be fixed point types
 	    (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*)))
@@ -3165,7 +3168,7 @@
 		    (not (impc:ir:array? (car a))))
 	       (and (not (null? a))
 		    (> (impc:ir:get-ptr-depth (car a)) 1)))
-	   (print-error 'Compiler 'Error: 'invalid 'aset! 'type (impc:ir:get-type-str (car a))))
+	   (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a) c)))
        ;; array set check will return the value set
        c)))
 
@@ -3173,7 +3176,7 @@
 (define impc:ti:array-ref-ptr-check
    (lambda (ast vars kts request?)
       (if (<> (length ast) 3)
-          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))     
+	  (impc:compiler:print-bad-arity-error ast))
       (let ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
@@ -3182,7 +3185,7 @@
 	    a
 	    (if (or (not (impc:ir:array? (car a)))
 		    (> (impc:ir:get-ptr-depth (car a)) 1))
-		(print-error 'Compiler 'Error: 'invalid 'array-ref-ptr 'type (impc:ir:get-type-str (car a)) 'in ast)
+	  (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a)))
 		(list (impc:ir:pointer++ (caddr (car a)))))))))
 
 
@@ -3191,7 +3194,7 @@
       ;(println 'request? request?)
       ;(println 'array-ref-check: 'ast: ast 'vars: vars 'kts: kts)
       (if (<> (length ast) 3)
-          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
+	  (impc:compiler:print-bad-arity-error ast))
       (let ((a (impc:ti:type-check (cadr ast) vars kts '()))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
@@ -3200,14 +3203,14 @@
              a
 	     (if (or (not (impc:ir:array? (car a)))
 		     (> (impc:ir:get-ptr-depth (car a)) 1))
-		 (print-error 'Compiler 'Error: 'invalid 'array-ref 'type (impc:ir:get-type-str (car a)) 'in ast)
+	   (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a)))
 		 (list (caddr (car a))))))))
 
 (define impc:ti:vector-set-check
    (lambda (ast vars kts request?)
      ;(println 'ast: ast 'vars: vars)
      (if (<> (length ast) 4)
-	 (print-error 'Compiler 'Error: 'error 'parsing (atom->string (car ast)) 'incorrect 'number 'of 'arguments))
+	 (impc:compiler:print-bad-arity-error ast))
      (let* ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
 	    ;; b should be i32
 	    (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*)))
@@ -3217,7 +3220,7 @@
 		    (not (impc:ir:vector? (car a))))
 	       (and (not (null? a))
 		    (> (impc:ir:get-ptr-depth (car a)) 1)))
-	   (print-error 'Compiler 'Error: 'invalid 'vset! 'type (impc:ir:get-type-str (car a))))
+	   (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a))))
        ;; vector set returns a whole new vector!  check llvm ir doc
        a)))
 
@@ -3226,7 +3229,7 @@
       ;(println 'request? request?)
       ;(println 'vector-ref-check: 'ast: ast 'vars: vars 'kts: kts)
       (if (<> (length ast) 3)
-          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))     
+	  (impc:compiler:print-bad-arity-error ast))
       (let ((a (impc:ti:type-check (cadr ast) vars kts '()))
             ;; b should be i32
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
@@ -3235,7 +3238,7 @@
              a
 	     (if (or (not (impc:ir:vector? (car a)))
 		     (> (impc:ir:get-ptr-depth (car a)) 1))
-		 (print-error 'Compiler 'Error: 'invalid 'vector-ref 'type (impc:ir:get-type-str (car a)) 'in ast)
+	   (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a)))
 		 (list (caddr (car a))))))))
 
 
@@ -3253,7 +3256,7 @@
 (define impc:ti:pointer-set-check
   (lambda (ast vars kts request?)
      (if (<> (length ast) 4)
-	 (print-error 'Compiler 'Error: 'error 'parsing (atom->string (car ast)) 'incorrect 'number 'of 'arguments ': ast))
+	 (impc:compiler:print-bad-arity-error ast))
      (let* ((a (impc:ti:type-check (cadr ast) vars kts request?))
 	    ;; b should be fixed point types
 	    (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*)))
@@ -3268,7 +3271,7 @@
        (if (not (null? a))
            (if (not (impc:ir:pointer? (if (impc:ir:type? a) a
                                           (if (list? a) (car a) a))))
-               (print-error 'Compiler 'Error: 'trying 'to 'pset! 'into 'a 'value! a)))
+	       (impc:compiler:print-bad-type-error a "trying to pset! into a value")))
        
        (if (and (list? c) (= 1 (length c))) (set! c (car c)))
        
@@ -3284,7 +3287,7 @@
 (define impc:ti:pointer-ref-ptr-check
    (lambda (ast vars kts request?)
       (if (<> (length ast) 3)
-          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))     
+	  (impc:compiler:print-bad-arity-error ast))
       (let ((a (impc:ti:type-check (cadr ast) vars kts request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
@@ -3300,7 +3303,7 @@
    (lambda (ast vars kts request?)
       ;(println 'pointer-ref-check: 'ast: ast 'request? request?) ;'vars: vars 'kts: kts)     
       (if (<> (length ast) 3)
-          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))     
+	  (impc:compiler:print-bad-arity-error ast))
       (let ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
@@ -3407,10 +3410,10 @@
    (lambda (ast vars kts request?)
       ;; (println 'tsetcheck ast) ; vars kts request?)
       (if (<> (length ast) 4)
-          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
+	  (impc:compiler:print-bad-arity-error ast))
       ;; (caddr ast) must be an integer 
       (if (not (integer? (caddr ast))) 
-          (print-error 'Compiler 'Error: 'tuple-set! 'must 'use 'a 'literal 'integer 'index! ast))
+	  (impc:compiler:print-bad-type-error (caddr ast) "tuple-set! must use a literal integer index"))
       (let* (;; a should be a tuple of some kind
              (a (let ((res (impc:ti:type-check (cadr ast) vars kts request?)))
 		  (if (null? res) res
@@ -3428,7 +3431,7 @@
 			    (list? a))
 		       (if (impc:ir:tuple? (car a))
                            (if (> (+ 2 (caddr ast)) (length (car a)))
-                               (print-error 'Compiler 'Error: 'tuple 'index 'beyond 'bounds ast)
+			       (impc:compiler:print-index-oob-error 'tuple ast)
                                (list-ref (car a) (+ 1 (caddr ast))))
 			   #f)
 		       #f))
@@ -3444,7 +3447,7 @@
 	(if (and (not (null? a))
                  (not (symbol? (car a))) ;; symbol may not have yet been defined!!
 		 (not (impc:ir:tuple? (car a))))
-	    (print-error 'Compiler 'Error: 'invalid 'tuple-set-check 'type (impc:ir:get-type-str (car a))))
+	    (impc:compiler:print-bad-type-error (caddr ast) (string-append "invalid tuple-set-check type " (impc:ir:get-type-str (car a)))))
 	;; if (cadddr ast) is a symbol we should update
 	;; it's type with c but for polymorphic cases
 	;; we should ensure that we also do a type-unification
@@ -3466,7 +3469,7 @@
    (lambda (ast vars kts request?)
       ;; (caddr ast) must be an integer    
       (if (not (integer? (caddr ast))) 
-          (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'literal 'integer 'index! ast))
+	  (impc:compiler:print-bad-type-error (caddr ast) "tuple-ref must use a literal integer index"))
       (let* (; a should be a tuple of some kind!
             (a (impc:ti:type-check (cadr ast) vars kts #f)) ;;(if (impc:ir:type? request?)
 							    ;;(impc:ir:tuple? request?)
@@ -3495,7 +3498,7 @@
 	    ;;'()))))
 	    (if (null? a)
 		'()
-		(print-error 'Compiler 'Error: 'invalid 'tuple-ref-ptr 'type (impc:ir:get-type-str (car a))))))))
+		(impc:compiler:print-bad-type-error (caddr ast) (string-append "invalid tuple-ref-ptr type " (impc:ir:get-type-str (car a)))))))))
 
 
 (define impc:ti:tuple-ref-check
@@ -3503,7 +3506,7 @@
       ;(println 'ref-check ast request?) ;kts vars)
       ;; (caddr ast) must be an integer    
       (if (not (integer? (caddr ast))) 
-          (print-error 'Compiler 'Error: 'tuple-ref 'must 'use 'a 'literal 'integer 'index! ast))
+	  (impc:compiler:print-bad-type-error (caddr ast) "tuple-ref must use a literal integer index"))
       (let* (; a should be a tuple of some kind!
             (a (impc:ti:type-check (cadr ast) vars kts #f)) ;(if (and (impc:ir:type? request?)
 							;	(impc:ir:tuple? request?))
@@ -3527,11 +3530,11 @@
 		 (impc:ir:tuple? (car a)))
 	    (begin (if (>= (caddr ast) 
 			   (- (length (car a)) 1))
-		       (print-error 'Compiler 'Error: 'tuple 'index 'beyond 'type 'boundary ast))	    
+		       (impc:compiler:print-index-oob-error 'tuple ast))
 		   (list-ref (car a) (+ 1 (caddr ast))))
 	    (if (null? a)
 		'()
-		(print-error 'Compiler 'Error: 'invalid 'tuple-ref 'type (impc:ir:get-type-str (car a))))))))
+		(impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a)) "in tuple-ref"))))))
 ;	    '()))))
 
 
@@ -3540,7 +3543,7 @@
    (lambda (ast vars kts request?)   
       ;(println 'cset 'ast: ast 'request? request?)
       (if (<> (length ast) 5)
-          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
+	  (impc:compiler:print-bad-arity-error ast))
       (let* (;; a should be a closure of some kind
              (a (if (and (symbol? (cadr ast))
                          (llvm:get-function (symbol->string (cadr ast))))
@@ -3560,7 +3563,7 @@
    (lambda (ast vars kts request?)
      ;(println 'cls 'ref 'check: ast 'request? request?)
       (if (<> (length ast) 4)
-          (print-error 'Compiler 'Error: 'invalid 'number 'of 'operands 'in (sexpr->string ast)))
+	  (impc:compiler:print-bad-arity-error ast))
       (let* (;; a should be a closure of some kind
              (a (if (and (symbol? (cadr ast))
                          (llvm:get-function (symbol->string (cadr ast))))
@@ -3598,7 +3601,7 @@
 	 (if (and (impc:ir:type? a)
 		  (impc:ir:pointer? a))
 	     (impc:ir:pointer-- a)
-	     (print-error 'Compiler 'Error: 'ptrref 'takes 'a 'pointer 'argument 'not a)))))
+	     (impc:compiler:print-bad-type-error a "pref needs a pointer argument")))))
       
 
 (define impc:ti:pref-check
@@ -3611,7 +3614,7 @@
       (if (and (impc:ir:type? a)
 	       (impc:ir:pointer? a))
 	  (impc:ir:pointer++ a)
-	  (print-error 'Compiler 'Error: 'ptrref 'takes 'a 'pointer 'argument 'not a)))))
+	  (impc:compiler:print-bad-type-error a "pref needs a pointer argument")))))
 
 
 (define impc:ti:lambda-check
@@ -3678,7 +3681,7 @@
                         (cdr (assoc-strcmp (car ast) vars))
                         (if (llvm:get-globalvar (symbol->string (car ast)))
                             (list (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (car ast)))))
-                            (print-error 'Compiler 'Error: 'no 'closure 'named: (car ast)))))
+			    (impc:compiler:print-missing-identifier-error (car ast) 'closure))))
 	     ;; (llllllll (println 'ctype: ctype))
              ;; get argument expression types
              (res (map (lambda (e t)
@@ -3708,7 +3711,7 @@
                            ;; if we are using an existing definition then check arity
                            (if (<> (length (cddr (car ctype)))
                                    (length (cdr ast)))
-                               (print-error 'Compiler 'Error: 'bad 'arity 'for ast)
+			       (impc:compiler:print-bad-arity-error ast)
                                (cddr (car ctype))))))
 	     ;; (lllll (println 'res: res 'from (car ast) 'request? request?))
 	     
@@ -3760,7 +3763,7 @@
            (lllll (println 'fptr fptr))
            (ctype (if (impc:ir:closure? (car fptr))
                       (car fptr)
-                      (print-error 'Compiler 'Error: 'bad 'fptr 'type! 'in 'fptrcall)))
+		      (impc:compiler:print-bad-type-error (car fptr) "bad fptr type in fptrcall")))
            (lllllll (println 'ctype ctype))
            ;; get argument expression types
            (res (map (lambda (e t)
@@ -3780,7 +3783,7 @@
                      (cddr ast)
                      (if (<> (length (cddr ctype))
                              (length (cddr ast)))
-                         (print-error 'Compiler 'Error: 'bad 'arity 'in ast 'for 'type (impc:ir:pretty-print-type ctype))
+			 (impc:compiler:print-bad-arity-error ast)
                          (cddr ctype)))))                     
       (cadr ctype))))
 
@@ -3796,7 +3799,7 @@
           (list)
           (let* ((ctype (if (impc:ir:closure? (car fptr))
                            (car fptr)
-                           (print-error 'Compiler 'Error: 'bad 'fptr 'type! 'in 'fptrcall)))
+			   (impc:compiler:print-bad-type-error (car fptr) "bad fptr type in fptrcall")))
                 (res (map (lambda (e t)
                             ;;(println 'e: e 't: t)
                             (let ((res (impc:ti:type-check e vars kts
@@ -3814,7 +3817,7 @@
                           (cddr ast)
                           (if (<> (length (cddr ctype))
                                   (length (cddr ast)))
-                              (print-error 'Compiler 'Error: 'bad 'arity 'in ast 'for 'type (impc:ir:pretty-print-type ctype))
+			      (impc:compiler:print-bad-arity-error ast)
                               (cddr ctype)))))                     
             (cadr ctype))))))
 
@@ -3836,7 +3839,8 @@
                     (set! a (list *impc:ir:fp64*)))
                    (else 'leave-a-alone)))                                   
          ;; (car (cadr ast)) should be a symbol that we want to update with a
-         (if (not (symbol? (car (cadr ast)))) (print-error 'Compiler 'Error: 'bad 'form 'for 'dotimes. 'Needs 'a 'symbol ast))
+	 (if (not (symbol? (car (cadr ast))))
+	     (impc:compiler:print-badly-formed-expression-error 'dotimes ast))
          (impc:ti:update-var (car (cadr ast)) vars kts a) 
          ;; stretch over body code but don't worry about return types
          (impc:ti:type-check (caddr ast) vars kts #f)
@@ -3849,7 +3853,7 @@
 	  (body (impc:ti:type-check (caddr ast) vars kts #f)))
       (if (not (or (null? type)
 		   (= (car type) *impc:ir:i1*)))
-	  (print-error 'Compiler 'Error: 'while 'loop 'test 'must 'be 'boolean 'var 'or '<, '>, '<> 'or '= 'expression))
+	  (impc:compiler:print-bad-type-error (car type) "test expression in while loop must return a boolean"))
       (list *impc:ir:void*))))
 
 (define impc:ti:printf-check
@@ -3894,15 +3898,15 @@
     ;; then check against it's arg types
     (let ((type (impc:ti:type-check (car ast) vars kts request?)))
       (if (null? type)
-          (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure 'expression ast))
+	  (impc:compiler:print-bad-type-error "unknown-type" ast))
       (if (not (impc:ir:type? type))
           (set! type (car type)))
       (if (not (list? type))
-          (print-error 'Compiler 'Error: 'Bad 'closure 'call ast))
+	  (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type type) ast))
       (if (<> (length (cddr type)) (length (cdr ast)))
-          (print-error 'Compiler 'Error: 'Wrong 'number 'of 'arguments 'for 'closure 'expression ast))
+	  (impc:compiler:print-bad-arity-error ast))
       (if (<> (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (car type))
-          (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure 'expression ast)
+	  (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type (car type)) ast)
           (begin (map (lambda (a b) 
                         (impc:ti:type-check b vars kts a))
                       (cddr type)
@@ -3920,7 +3924,7 @@
             ((and (atom? ast) (number? ast)) (impc:ti:numeric-check ast vars kts request?))
             ((and (atom? ast) (symbol? ast)) (impc:ti:symbol-check ast vars kts request?)) ;#f)) ;request?))
             ((and (atom? ast) (string? ast)) (impc:ti:string-check ast vars kts request?))
-            ((atom? ast) (print-error 'Compiler 'Error: 'internal 'error 'unhandled 'atom: ast))
+	    ((atom? ast) (impc:compiler:print-compiler-error "internal error unhandled atom" ast))
             ((and (list? ast) (member (car ast) *impc:letslist*)) (impc:ti:let-check ast vars kts request?))
             ((and (list? ast) (member (car ast) *impc:lambdaslist*)) (impc:ti:lambda-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast)
@@ -4125,11 +4129,11 @@
                                         (cl:every (lambda (x) x) (impc:ti:unity? x)))
                                       res)))
                    (if (not r)  ;; if no options are any good then :(
-                       (apply print-error 'Compiler 'Error: 'could 'not 'resolve 'types:
-                              (map (lambda (x) (symbol->string (car x)))
-                                   (cl:remove-if (lambda (x)
-                                                   (impc:ir:type? (cdr x)))
-                                                 (car res)))))
+		       (impc:compiler:print-could-not-resolve-type-error
+			(map (lambda (x) (symbol->string (car x)))
+			     (cl:remove-if (lambda (x)
+					     (impc:ir:type? (cdr x)))
+					   (car res)))))
                    r)))))))
 
             
@@ -4160,7 +4164,7 @@
                           (let* ((arity (- (length (impc:ir:get-pretty-closure-arg-strings (cadr p))) 1))
                                  (ptypes (impc:ir:gpoly-types (string->symbol (car p)) arity))
                                  (tmp (if (not ptypes)
-                                          (print-error 'Compiler 'Error: 'incorrect 'arity 'for 'poly (car p))))
+					  (impc:compiler:print-bad-arity-error ast)))
                                  (code (caddr (cadr (impc:ir:gpoly-types (string->symbol (car p)) arity))))
                                  (pfunc (string->symbol (string-append (car p) "--" etype))))
                             (set! code `(let ((,pfunc ,code)) ,pfunc))
@@ -4173,7 +4177,7 @@
                             pfunc))                      
                       (begin ;; (println 'here!)
                              (string->symbol (string-append (car p) "--" etype))))
-                    (print-error 'Compiler 'Error: 'Bad 'Symbol ast))) 
+		    (impc:compiler:print-missing-identifier-error ast 'variable)))
               ast)
           (cond ((member (car ast) '(__make-closure __make-closure-s __make-closure-h __make-closure-z))
 		 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -4209,8 +4213,8 @@
                                 ;(print 'clrunargs-> arg type)
                                 (let ((a (impc:ti:add-types-to-source symname arg types envvars ast)))
                                    (if (null? type) 
-                                       (print-error 'Compiler 'Error: 'cannot 'infer 'closure 'type 'for 
-                                                    (symbol->string (cadr ast)))
+				       (impc:compiler:print-could-not-resolve-type-error
+					(symbol->string (cadr ast)))
                                        a)))
                              (cddr ast)
                              (cdddr (if (not (assoc-strcmp (cadr ast) types)) ;; if not in local env then get types from global var
@@ -4228,11 +4232,11 @@
 		 ;; (println 'compile 'generic? ast)
 		 ;; (println 'types types)
 		 (if (null? (cdr (assoc-strcmp (car ast) types)))
-		     (print-error 'Compiler 'Error: 'could 'not 'resolve 'generic: ast 'types: types))
+		     (impc:compiler:print-could-not-resolve-generic-type-error types ast))
 		 
 		 (let* ((polyname (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
 			(type (if (null? (cdr (assoc-strcmp (car ast) types)))
-				  (print-error 'Compiler 'Error: 'unresolved 'type (car ast))
+				  (impc:compiler:print-could-not-resolve-type-error (car ast))
 				  (impc:ir:pretty-print-type (cdr (assoc-strcmp (car ast) types)))))
                         (arity (- (length (impc:ir:get-pretty-closure-arg-strings type)) 1))
 			(code (caddr (cadr (impc:ir:gpoly-types polyname arity))))
@@ -4348,7 +4352,7 @@
                    ; (append '(dotimes) (list (cadr ast)) (impc:ti:mark-returns (cddr ast) name #t #f blocked?)))                   
                    ((equal? (car ast) 'begin)
                     (if (null? (cdr ast))
-                        (print-error 'Compiler 'Error: 'no 'return 'value 'for 'body ast))
+			(impc:compiler:print-no-retval-error ast))
                     (let* ((rev (reverse (cdr ast)))
                            (last (car rev))
                            (rest (reverse (cdr rev)))
@@ -4458,9 +4462,7 @@
 				      (impc:ir:gpoly-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
                                  (if (not (impc:ir:gpoly-types (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
                                                                  (length (cdr ast))))
-                                     (print-error 'Compiler 'Error: 'generic 'type
-                                                  (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
-                                                  'does 'not 'support 'an 'arity 'of (length (cdr ast))))                                            
+				     (impc:compiler:print-bad-arity-error (car (regex:split (symbol->string (car ast)) "##"))))
 				 ;; (println 'generics ast (regex:split (symbol->string (car ast)) "(\\$\\$\\$)|(--)"))
 				 (let* ((gname (string->symbol (car (regex:split (symbol->string (car ast)) "(##)|(--)"))))
                                         (gnum (string->number (cadr (regex:split (symbol->string (car ast)) "(##)|(--)"))))
@@ -4498,14 +4500,14 @@
 				 (f (cdr ast)))
 				((member (car ast) '(__make-closure __make-closure-s __make-closure-h __make-closure-z))
 				 (if (not (null? (cl:intersection (cadddr ast) syms)))
-				     (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car (cl:intersection (cadddr ast) syms))) 'as 'a 'shadow 'variable))
+				     (impc:compiler:print-shadow-var-error (car (cl:intersection (cadddr ast) syms)) 'as 'a 'shadow 'variable))
 				 (set! syms (cl:remove-duplicates (append (caddr ast) (cadddr ast) syms)))
 				 (f (car (cddddr ast))))
 				((member (car ast) '(__make-env __make-env-zone))
 				 (set! syms
 				       (append (map (lambda (p)
 						      (if (member (car p) syms)
-							  (print-error 'Compiler 'Error: 'Sorry 'single 'definition 'variables 'only! 'caught 'trying 'to 'redefine (symbol->string (car p)) p 'as 'a 'shadow 'variable))
+							  (impc:compiler:print-shadow-var-error (car p)))
 						      (car p))
 						    (caddr ast))
 					       syms))
@@ -4615,7 +4617,7 @@
                                        (map (lambda (tt)
                                                (if (not (or (symbol? tt)
                                                             (list? tt)))
-                                                   (print-error 'Compiler 'Error: 'Bad 'fixed 'type t)))
+						   (impc:compiler:print-bad-type-error t "bad fixed type")))
                                             (if (list? t) (cdr t) (list (cdr t))))
                                        (cons (car t) (impc:ir:convert-from-pretty-types (cdr t)))) 
                                     args))
@@ -4626,7 +4628,7 @@
 		 					  (if (<> (length (cdddr t)) (length (impc:ti:get-closure-arg-symbols (car t) t1)))
 		 					      (begin
 		 						;(println '------ (cdddr t) (impc:ti:get-closure-arg-symbols (car t) t1))
-		 						(print-error 'Compiler 'Error: 'bad 'type (cdr t) 'for (car t)))
+		      (impc:compiler:print-bad-type-error (cdr t) (car t)))
 		 					      (append (map (lambda (sym type)
 		 							     (cons sym type))
 		 							   (impc:ti:get-closure-arg-symbols (car t) t1)
@@ -4639,9 +4641,9 @@
                                                 (if (and (assoc-strcmp (caar types) (cdr types))
                                                          (not (equal? (cdr (assoc-strcmp (caar types) (cdr types)))
                                                                       (cdr (car types)))))
-                                                    (print-error 'Compiler 'Error: 'Type 'mismatch 'with 'fixed 'types
-                                                                 (assoc-strcmp (caar types) (cdr types))
-                                                                 'and (car types) '- 'do 'you 'have 'a 'conflicing 'closure 'type?)
+						    (impc:compiler:print-type-mismatch-error
+						     (assoc-strcmp (caar types) (cdr types))
+						     (car types))
                                                     (loop (cdr types)))))))
              ;(print 'checked checked-for-duplicates 'forced-types-udpated forced-types-updated 'forced: forced-types)
              checked-for-duplicates))))
@@ -4803,7 +4805,7 @@
 
          ;; just added by andrew (can be safely removed)
          (if (null? types)
-             (print-error 'Compiler 'Error: 'could 'note 'resolve (symbol->string symname)))
+	     (impc:compiler:print-could-not-resolve-type-error symname))
          
          ;; (println 'final-types: types)
 
@@ -4811,10 +4813,10 @@
          (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
 	     (begin 
 	       ;; (println 'types_: types)
-	       (print-error 'Compiler 'Error: 'could 'not 'resolve (symbol->string symname) 'unresolved 'types:
-				 (cl:remove 'good (map (lambda (x y) (if y 'good (symbol->string (car x)))) 
-						       types (impc:ti:unity? types)))
-				 'you 'could 'try 'forcing 'the 'type 'of 'one 'or 'more 'of 'these 'symbols)))
+	       (impc:compiler:print-could-not-resolve-type-error
+	  (cl:remove 'good (map (lambda (x y) (if y 'good (symbol->string (car x))))
+				types (impc:ti:unity? types)))
+	  "you could try forcing the type of one or more of these symbols")))
 
 	 ;; if we have type checked ok then set addtypes to source and create new ast
 	 (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list)))
@@ -4832,15 +4834,14 @@
                                                  (map (lambda (x) (impc:ir:get-type-from-str x))
                                                       (llvm:get-function-args-withoutzone (symbol->string symname))))
                                            (cdr (assoc-strcmp symname types))))))
-             (print-error 'Compiler 'Error: 'sorry 'the 'compiler 'does 'not 'currently
-			              'allow 'you 'to 'redefine 'or 'overload 'the 'type 'signature 'of 'existing 'functions. 
-						  'in 'this 'case (symbol->string symname) 'to: 
-                          (impc:ir:pptype (cdr (assoc-strcmp symname types))) 'from:
-                          (impc:ir:pptype (cons (+ *impc:ir:closure*
-						   *impc:ir:pointer*
-                                                   *impc:ir:pointer*)
-                                                 (map (lambda (x) (impc:ir:get-type-from-str x))
-                                                      (llvm:get-function-args-withoutzone (symbol->string symname)))))))
+	     (impc:compiler:print-no-redefinitions-error
+	      symname
+	      (impc:ir:pptype (cons (+ *impc:ir:closure*
+				       *impc:ir:pointer*
+				       *impc:ir:pointer*)
+				    (map (lambda (x) (impc:ir:get-type-from-str x))
+					 (llvm:get-function-args-withoutzone (symbol->string symname)))))
+	      (impc:ir:pptype (cdr (assoc-strcmp symname types)))))
 	 ;(print-error "stop")
          (if *impc:compiler:print-ast* (println '---------------------------------))
          (if *impc:compiler:print-ast* (println 'types: types))
@@ -4850,7 +4851,7 @@
          ;; check for unfound types
          (for-each (lambda (t)		     
 		     (if (not (impc:ir:type? (cdr t)))
-			 (print-error 'Compiler 'Error: 'unresolved 'type 'error 'for 'symbol (car t))))
+			 (impc:compiler:print-could-not-resolve-type-error (car t))))
 		   types)
 	 
          ;; compile to ir	 
@@ -5145,8 +5146,7 @@
             (if *impc:compile*
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_maker"))
                        (if (not (llvm:compile fs))
-                           (begin (print-error "Compiler Failed")
-                                  (error "")))
+			   (impc:compiler:print-compiler-error "compiler failed"))
                        (if *impc:compiler:print* (print-notification "compiled maker"))))
             (if *impc:compiler:print* (println '--------------------------------compiling 'setter----------------------------------->))            
             (if *impc:compiler:print* (println fssetter))
@@ -5154,8 +5154,7 @@
 	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fssetter "\")\n\n" *impc:compiler:precomp*))
             (if *impc:compile*
                 (begin (if (not (llvm:compile fssetter))
-                           (begin (print-error "Compiler Failed")
-                                  (error "")))
+			   (impc:compiler:print-compiler-error "compiler failed"))
                        (if *impc:compiler:print* (print-notification "compiled setter"))))
             (if *impc:compiler:print* (println '--------------------------------compiling 'getter----------------------------------->))            
             (if *impc:compiler:print* (println fsgetter))            
@@ -5163,8 +5162,7 @@
 	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fsgetter "\")\n\n" *impc:compiler:precomp*))
             (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
                 (begin (if (not (llvm:compile fsgetter))
-                           (begin (print-error "Compiler Failed")
-                                  (error ""))) 
+			   (impc:compiler:print-compiler-error "compiler failed"))
                        (if *impc:compiler:print* (print-notification "compiled stub"))))
             (if *impc:compiler:print* (println '--------------------------------compiling 'stubs----------------------------------->))            
             (if *impc:compiler:print* (println fstub))
@@ -5180,8 +5178,7 @@
                 (begin (if (or (not (llvm:compile fstub))
 			       (not (llvm:compile fstub_native))
 			       (not (if fstub_scheme_valid (llvm:compile fstub_scheme) #t)))
-                           (begin (print-error "Compiler Failed building stubs!")
-                                  (error "")))
+			   (impc:compiler:print-compiler-error "compiler failed building stubs!"))
 		       ;; bind fstub_scheme
 		       (if *impc:compiler:print*
 			   (print-notification "compiled stubs"))))
@@ -5192,8 +5189,7 @@
 	   (if (and *impc:compile* compile-stub?) ;; only compile callback first time around!!!
 	       (begin 
 	   	 (if (not (llvm:compile fscallback))
-	   	     (begin (print-error 'Compiler 'Failed:)
-	   		    (error "")))
+		     (impc:compiler:print-compiler-error "compiler failed"))
 	   	 (if *impc:compiler:print* (print-notification "compiled callback"))))	   	    
 
             (if *impc:compile*
@@ -5287,35 +5283,20 @@ deprecated - use bind-func instead."
                                  (llvm:run setter (sys:peek-memzone))
                                  (sys:pop-memzone) ;; don't destroy here should happen in _setter
                                  )
-			       (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
-				      (error "")))
+			       (impc:compiler:print-missing-compiled-function-setter-error ,symname))
 			   (if func
 			       ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 			       (if (llvm:get-scheme-function ,(symbol->string symname))
 				   (let ((ftype (llvm:get-function-args-withoutzone ,(symbol->string symname))))
                                      (if (equal? *impc:compiler:message:level* 'high)
-                                         (begin
-                                           (ascii-print-color 0 7 10)
-                                           (print "Compiled ")
-                                           (ascii-print-color 1 2 10)
-                                           (print ',symname)
-                                           (ascii-print-color 0 7 10)
-                                           (print " >>> ")
-                                           (ascii-print-color 1 3 10)
-                                           (print (string->symbol (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))))
-                                           (ascii-print-color 0 7 10)
-                                           (print)))
+					 (impc:compiler:print-binding-details-to-log  "Compiled:" ',symname
+					   (string->symbol (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype))))))
                                      (llvm:ffi-set-name
                                       (llvm:get-scheme-function ,(symbol->string symname))
                                       ,(symbol->string symname))
 				     (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
-				   (begin (ascii-print-color 0 7 10)
-					  (print "There is no scheme stub available for ")
-					  (ascii-print-color 0 6 10)
-					  (println ,(symbol->string symname))
-					  (ascii-print-color 0 7 10)))
-			       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
-				      (error ""))))))
+				   (impc:compiler:print-no-scheme-stub-notification ,symname))
+			       (impc:compiler:print-missing-compiled-function-error ,symname)))))
 		     
 		     *impc:compiler:precomp*))
 
@@ -5325,8 +5306,7 @@ deprecated - use bind-func instead."
                  (llvm:run setter (sys:peek-memzone))
                  (sys:pop-memzone) ;; don't destroy here - should happen in _setter
                  )
-	       (begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
-		      (error "")))
+	       (impc:compiler:print-missing-compiled-function-setter-error ,symname))
 	   (if func
 	       ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 	       (if (llvm:get-scheme-function ,(symbol->string symname))
@@ -5335,28 +5315,23 @@ deprecated - use bind-func instead."
                       (llvm:get-scheme-function ,(symbol->string symname))
                       ,(symbol->string symname))                     
                      (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
-		   (begin (ascii-print-color 0 7 10)
-			  (print "There is no scheme stub available for ")
-			  (ascii-print-color 0 6 10)
-			  (println ,(symbol->string symname))
-			  (ascii-print-color 0 7 10)))
-	       (begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
-		      (error ""))))))))
+		   (impc:compiler:print-no-scheme-stub-notification ,symname))
+	       (impc:compiler:print-missing-compiled-function-error ,symname)))))))
 	
 
 ;; alias for definec (should replace definec)
 (define-macro (bind-func . args)
   ;; (println 'args: args)
   (if (list? (car args))
-      (print-error 'Compiler 'Error: 'bind-func 'requires 'a 'name!))
+      (impc:compiler:print-compiler-error "bind-func requires a name!"))
   ;; if doc-string exists!
   (if (string? (cadr args))
       (begin (set! *impc:docstrings* (cons (cons (car args) (cadr args)) *impc:docstrings*))
              (set! args (append (list (car args)) (cddr args)))))
   (if (impc:ir:poly-types (car args))
-      (print-error 'Compiler 'Error: (car args) 'already 'bound 'as 'poly 'function))
+      (impc:compiler:print-already-bound-error (car args) "poly function"))
   (if (impc:ir:gpoly-exists? (car args))
-      (print-error 'Compiler 'Error: (car args) 'already 'bound 'as 'generic 'closure))
+      (impc:compiler:print-already-bound-error (car args) "generic closure"))
   (if (regex:match? (symbol->string (car args)) ":")
       (let* ((res (regex:type-split (symbol->string (car args)) ":"))
              (name (car res))
@@ -5416,8 +5391,7 @@ deprecated - use bind-func instead."
                   (llvm:run setter (sys:peek-memzone))
                   (sys:pop-memzone) ;; don't destroy here - should happend in _setter
                   )
-		(begin (print-error 'no 'compiled 'function ',symname 'setter  '... 'turn 'on 'compilation?)
-		       (error "")))
+		(impc:compiler:print-missing-compiled-function-setter-error ,symname))
 	    ;;(println 'scheme_func: (llvm:get-scheme-function ,(symbol->string symname)))
 	    (if func
 		;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
@@ -5427,8 +5401,7 @@ deprecated - use bind-func instead."
                        (llvm:get-scheme-function ,(symbol->string symname))
                        ,(symbol->string symname))
                       (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))))
-		(begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
-		       (error "")))))
+		(impc:compiler:print-missing-compiled-function-error ,symname))))
        (interaction-environment)))))
 
 
@@ -5455,8 +5428,7 @@ deprecated - use bind-func instead."
 			   (println ,(symbol->string symname))
 			   (ascii-print-color 0 7 10)))		    
 		;(lambda args (apply llvm:run func (sys:peek-memzone) args))
-		(begin (print-error 'no 'compiled 'function ',symname  '... 'turn 'on 'compilation?)
-		       (error "")))))
+		(impc:compiler:print-missing-compiled-function-error ,symname))))
        (interaction-environment)))))
 
 (define ipc:bind-func
@@ -5554,7 +5526,7 @@ deprecated - use bind-func instead."
 	    "\n\n"
 	    *impc:compiler:precomp*))
   (if (<> (impc:ir:get-ptr-depth type) 0)
-      (print-error 'Compiler 'Error: 'make 'sure type 'is 'not 'a 'pointer))
+      (impc:compiler:print-bad-type-error type "cannot be a pointer"))
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<)
               (let* ((ags (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
                      ;; expand all non-explict generic types
@@ -5577,19 +5549,9 @@ deprecated - use bind-func instead."
                                                  (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str
                                                                         newtype
                                                                         ,(symbol->string symbol)))))))
-	      (print-error 'Compiler 'Error: 'type 'must 'be 'a 'tuple 'type))
+	      (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
           (if (equal? *impc:compiler:message:level* 'high)
-              (begin
-                (ascii-print-color 0 7 10)
-                (print "DataType: ")
-                (ascii-print-color 1 2 10)
-                (print ',symbol)
-                (ascii-print-color 0 7 10)
-                (print " >>> ")
-                (ascii-print-color 1 3 10)
-                (print ',type)
-                (ascii-print-color 0 7 10)
-                (print)))
+	      (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
           ;; now compile data constructor          
           (build-type-dataconstructor
            ',symbol
@@ -5604,20 +5566,11 @@ deprecated - use bind-func instead."
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<) ; (impc:ir:tuple? (impc:ir:get-type-from-pretty-str ,(symbol->string type)))
 	      (llvm:compile (string-append "%" ,(symbol->string symbol) " = type "
 					   ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type) (symbol->string symbol)))))
-	      (print-error 'Compiler 'Error: 'only 'named 'tuple 'types 'are 'supported))
+	      (impc:compiler:print-bad-type-error ,type "only named tuple types are supported"))
           (if (equal? *impc:compiler:message:level* 'high)
-              (begin          
-                (ascii-print-color 0 7 10)
-                (print "SetValue: ")
-                (ascii-print-color 1 2 10)
-                (print ',symbol)
-                (ascii-print-color 0 7 10)
-                (print " >>> ")
-                (ascii-print-color 1 3 10)
-                ;;(print ',type)
-                (print (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))
-                (ascii-print-color 0 7 10)
-                (print)))))
+	      (impc:compiler:print-type-details-to-log
+	       ,symbol
+	       (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol)))))))
 
 ;; Ben's helper macros
 
@@ -5692,7 +5645,7 @@ deprecated - use bind-func instead."
                                                                       (impc:ir:get-type-size t)
                                                                       (/ (sys:pointer-size) 8)))))
                          (impc:print-bound-message ,symbol ,type))
-                 `(print-error 'Compiler 'Error: 'when 'binding 'global 'pointers, 'third 'argument 'should 'be 'size 'of 'buffer 'to 'allocate)))
+		 `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate")))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin
                 (llvm:compile
@@ -5701,15 +5654,14 @@ deprecated - use bind-func instead."
                   " = global "
                   ,(impc:ir:get-type-str t) " zeroinitializer"))
                 (impc:print-bound-message ,symbol ,type)))
-            (else (print-error 'Compiler 'Error: 'unknown 'pointer 'type type))))))
-
+	    (else (impc:compiler:print-missing-type-error type))))))
 
 (define impc:ir:get-function-type
   (lambda (name)
     (if (symbol? name)
 	(set! name (symbol->string name)))
     (if (not (llvm:get-function-args-withoutzone name))
-        (print-error 'Compiler 'Error: 'bad 'xtlang 'closure 'named name))    
+	(impc:compiler:print-missing-identifier-error name 'closure))
     (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*)
 	  (map (lambda (x) (impc:ir:get-type-from-str x))
 	       (llvm:get-function-args-withoutzone name)))))
@@ -5717,23 +5669,12 @@ deprecated - use bind-func instead."
 
 (define-macro (bind-poly poly_sym implementation_sym)
   (if (impc:ir:gpoly-exists? implementation_sym)
-      (print-error 'Compiler 'Error: 'bind-poly 'only 'accepts 'monomorphic 'functions 'not: implementation_sym))
+      (impc:compiler:print-compiler-error (string-append "bind-poly only accepts monomorphic functions, not " (symbol->string implementation_sym))))
   (let ((type (impc:ir:get-function-type implementation_sym)))
     ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
     `(begin (impc:ir:add-poly ',poly_sym ',implementation_sym ',type)
             (if (equal? *impc:compiler:message:level* 'high)
-                (begin
-                  (ascii-print-color 0 7 10)
-                  (print "Overload: ")
-                  (ascii-print-color 1 2 10)
-                  (print ',poly_sym)
-                  (ascii-print-color 0 7 10)
-                  (print " >>> ")
-                  (ascii-print-color 1 3 10)
-                  (print ,(impc:ir:pretty-print-type type))
-                  (ascii-print-color 0 7 10)
-                  (print))))))
-	  
+		(impc:compiler:print-binding-details-to-log "Overload:" ',poly_sym ,(impc:ir:pretty-print-type type))))))
 
 (define-macro (bind-scm symbol type value)
    (if (cptr? (eval value))
@@ -5745,21 +5686,10 @@ deprecated - use bind-func instead."
                ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
 	       (llvm:bind-global-var ,(symbol->string symbol) ,value)
                (if (equal? *impc:compiler:message:level* 'high)
-                   (begin
-                     (ascii-print-color 0 7 10)
-                     (print "Foriegn: ")
-                     (ascii-print-color 1 2 10)
-                     (print ',symbol)
-                     (ascii-print-color 0 7 10)
-                     (print " >>> ")
-                     (ascii-print-color 1 3 10)
-                     (print ',type)
-                     (ascii-print-color 0 7 10)
-                     ;;(print " from scheme:" ,value)
-                     (print))))
+		   (impc:compiler:print-binding-details-to-log "Foreign:" ',symbol ',type)))
        (if (number? (eval value))
 	   `(bind-val ,symbol ,type ,value)
-	   (print-error 'Compiler 'Error: 'bind-scm 'only 'accepts 'cptr 'or 'numeric 'values!))))
+	   (impc:compiler:print-compiler-error "bind-scm only accepts cptr or numeric values!"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; this here for wrapping llvm dynamic binds
@@ -5804,7 +5734,7 @@ deprecated - use bind-func instead."
                      (ascii-print-color 0 9 10)
                      ;;(print " from lib: " library)
                      (print)))
-	  (print-error 'Compiler 'Error: 'could 'not 'bind! symname)))))
+	  (impc:compiler:print-compiler-error (string-append "could not bind!" (symbol->string symname)))))))
 
 
 (define-macro (remove-func symname)
@@ -6044,7 +5974,7 @@ deprecated - use bind-func instead."
 (define _constrain-generic
   (lambda (sym . types)
     (if (not (impc:ir:gpoly-exists? (string->symbol sym)))
-        (print-error 'Compiler 'Error: 'no 'generic 'function 'named: sym)
+	(impc:compiler:print-missing-identifier-error sym "generic function")
         (let ((printspec *impc:ti:print-code-specialization-compiles*))          
           (set! *impc:ti:print-code-specialization-compiles* #t)   
           (for-each
@@ -6091,7 +6021,7 @@ deprecated - use bind-func instead."
   (lambda (sym . types)
     ;; (println 'sym: sym types)
     (if (not (impc:ir:gpolytype-types (string->symbol sym)))
-        (print-error 'Compiler 'Error: 'no 'generic 'type 'named: sym)
+	(impc:compiler:print-missing-generic-type-error sym)
         (let ((printspec *impc:ti:print-code-specialization-compiles*))          
           (set! *impc:ti:print-code-specialization-compiles* #t)
           (for-each
@@ -6125,7 +6055,7 @@ deprecated - use bind-func instead."
 (define _specialize-generic
   (lambda (sym . types)
     (if (not (impc:ir:gpoly-exists? (string->symbol sym)))
-        (print-error 'Compiler 'Error: 'no 'generic 'function 'named: sym)
+	(impc:compiler:print-missing-identifier-error sym "generic function")
         (let ((printspec *impc:ti:print-code-specialization-compiles*))          
           (set! *impc:ti:print-code-specialization-compiles* #t)   
           (for-each
