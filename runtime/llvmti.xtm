@@ -332,17 +332,7 @@
 	      (set-cdr! v (cons type (cdr v))))
 	  (set! *impc:ti:vtypes* (cons (list name type) *impc:ti:vtypes*)))
       (if (equal? *impc:compiler:message:level* 'high)
-          (begin
-            (ascii-print-color 0 7 10)
-            (print "Appended type variable ")
-            (ascii-print-color 1 2 10)
-            (print name)
-            (ascii-print-color 0 7 10)
-            (print " >>> ")
-            (ascii-print-color 1 3 10)
-            (print type)
-            (ascii-print-color 0 7 10)
-            (print)))
+          (impc:compiler:print-binding-details-to-log "Appended type variable " name type))
       #t)))
 
 
@@ -459,28 +449,15 @@
 	  (print)
 	  (if (> (length (cl:remove '() (cl:remove #f res))) 0)
 	      (begin
-		(ascii-print-color 0 7 10)
-		(print 'Compiled 'generic 'function )
-		(ascii-print-color 1 2 10)
-		(print "" name)
-		(ascii-print-color 0 7 10)
-		(print)
-		(ascii-print-color 1 3 10)
-		(for-each (lambda (k)
-			    (print)
-			    (print "\t" (impc:ir:pretty-print-type k)))
-			  (cl:remove '() (cl:remove #f res)))
-		(ascii-print-color 0 7 10)
-		(print)
-		(print)
-		(print ".... ")
-		(ascii-print-color 1 2 10)
-		(print name)
-		(ascii-print-color 0 7 10)
-		(print) (print)
-		#t)
+          (print "Compiled generic function")
+          (print-with-colors 'green 'default #t name)
+          (print-with-colors 'blue 'default #t 
+                             (for-each (lambda (k)
+                                         (print " " (impc:ir:pretty-print-type k)))
+                                       (cl:remove '() (cl:remove #f res))))
+          #t)
 	      (begin (impc:compiler:print-no-valid-forms-for-generic-error name)
-		     #f))))))
+               #f))))))
 
 	
 
@@ -5212,25 +5189,16 @@
                                                           ",")
                                              "]*")))
                         ;; (println 'type2 type2)
-                        ;; (println 'simpletype simpletype)
-                        (ascii-print-color 0 7 10)
-                        (if (regex:match? (symbol->string symname) "--")
-                            (print "Specized: ")
-                            (print "Compiled: "))
-                        (ascii-print-color 1 2 10)
-                        (if (regex:match? (symbol->string symname) "--")
-                            (let ((p (regex:split (symbol->string symname) "--")))
-                              (print (string->symbol (car p))))
-                            (print symname))
-                        ;;(print symname)
-                        (ascii-print-color 0 7 10)
-                        (print " >>> ")
-                        (ascii-print-color 1 3 10)
-                        (if *impc:ti:print-full-generic-types*
-                            (print (string->symbol (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))))
-                            (print (string->symbol simpletype)))
-                        (ascii-print-color 0 7 10)
-                        (print)))))
+                        ;; (println 'simpletype simpletype)                        
+                        (impc:compiler:print-binding-details-to-log 
+                         (if (regex:match? (symbol->string symname) "--") "Specized:" "Compiled:")
+                         (if (regex:match? (symbol->string symname) "--")
+                             (let ((p (regex:split (symbol->string symname) "--")))
+                               (car p))
+                             symname)
+                         (if *impc:ti:print-full-generic-types*
+                             (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))
+                             simpletype))))))
             (cadr (impc:ir:gname))))))
 
 (define-macro (xtm-closure-doc name)
@@ -5285,8 +5253,10 @@
 			       (if (llvm:get-scheme-function ,(symbol->string symname))
 				   (let ((ftype (llvm:get-function-args-withoutzone ,(symbol->string symname))))
                                      (if (equal? *impc:compiler:message:level* 'high)
-					 (impc:compiler:print-binding-details-to-log  "Compiled:" ',symname
-					   (string->symbol (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype))))))
+                                         (impc:compiler:print-binding-details-to-log
+                                          "Compiled:"
+                                          ',symname
+                                          (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))))
                                      (llvm:ffi-set-name
                                       (llvm:get-scheme-function ,(symbol->string symname))
                                       ,(symbol->string symname))
@@ -5418,11 +5388,7 @@
                        (llvm:get-scheme-function ,(symbol->string symname))
                        ,(symbol->string symname))                      
                       (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
-		    (begin (ascii-print-color 0 7 10)
-			   (print "There is no scheme stub available for ")
-			   (ascii-print-color 0 6 10)
-			   (println ,(symbol->string symname))
-			   (ascii-print-color 0 7 10)))		    
+		    (impc:compiler:print-no-scheme-stub-notification ',symname))		    
 		;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 		(impc:compiler:print-missing-compiled-function-error ',symname))))
        (interaction-environment)))))
@@ -5440,18 +5406,12 @@
 	    *impc:compiler:precomp*))
   `(begin (impc:ir:add-type-alias ,(symbol->string symbol) ,(symbol->string type))
           (if (equal? *impc:compiler:message:level* 'high)
-              (begin
-                (ascii-print-color 0 7 10)
-                (print "SetAlias: ")
-                (ascii-print-color 1 2 10)
-                (print ',symbol)
-                (ascii-print-color 0 7 10)
-                (print " >>> ")
-                (ascii-print-color 1 3 10)
+              (impc:compiler:print-binding-details-to-log
+               "SetAlias:"
+                ',symbol
                 ;;(print ',type)
-                (print (impc:ir:pretty-print-type ,(symbol->string symbol))) ; (llvm:get-named-type ,(symbol->string symbol))))
-                (ascii-print-color 0 7 10)
-                (print)))))
+                (impc:ir:pretty-print-type ,(symbol->string symbol)) ; (llvm:get-named-type ,(symbol->string symbol))))
+                ))))
 
 (define build-type-dataconstructor
   (lambda (name type generic . args)
@@ -5572,17 +5532,7 @@
 
 (define-macro (impc:print-bound-message symbol type)
   `(if (equal? *impc:compiler:message:level* 'high)
-       (begin          
-         (ascii-print-color 0 7 10)
-         (print "SetValue: ")
-         (ascii-print-color 1 2 10)
-         (print ',symbol)
-         (ascii-print-color 0 7 10)
-         (print " >>> ")
-         (ascii-print-color 1 3 10)
-         (print ',type)
-         (ascii-print-color 0 7 10)
-         (print))))
+       (impc:compiler:print-binding-details-to-log "SetValue:" ',symbol ',type)))
 
 (define-macro (impc:pretty-print-vars . varlist)
   (map (lambda (var)
@@ -5719,17 +5669,7 @@
       (if (and (llvm:compile ircode)
 	       (llvm:bind-symbol library (symbol->string symname)))
           (if (equal? *impc:compiler:message:level* 'high)
-              (begin (ascii-print-color 0 9 10)
-                     (print "SetValue: ")
-                     (ascii-print-color 1 2 10)
-                     (print (symbol->string symname))
-                     (ascii-print-color 0 9 10)
-                     (print " >>> ")
-                     (ascii-print-color 1 3 10)
-                     (print type)
-                     (ascii-print-color 0 9 10)
-                     ;;(print " from lib: " library)
-                     (print)))
+              (impc:compiler:print-binding-details-to-log "SetValue:" symname type))
 	  (impc:compiler:print-compiler-error (string-append "could not bind!" (symbol->string symname)))))))
 
 
