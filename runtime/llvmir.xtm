@@ -93,6 +93,279 @@
 ;; NOT including global symbols
 (define *impc:ir:sym-name-stack* '())
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Compiler error printing
+
+(define impc:compiler:print-double-colon-error
+  (lambda (var)
+    (print-with-colors 'red 'default #t (print "Syntax Error:"))
+    (print " double colon error for ")
+    (print-with-colors 'blue 'default #t (print var "\n"))
+    (error "")))
+
+(define impc:compiler:print-bad-type-error
+  (lambda (type . message)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (print " bad type ")
+    (print-with-colors 'blue 'default #t (print type))
+    (if (not (null? message))
+	(print " " (car message)))
+    (println)
+    (error "")))
+
+(define impc:compiler:print-bad-type-error-with-ast
+  (lambda (type message ast)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (print " bad type ")
+    (print-with-colors 'blue 'default #t (print type))
+    (print " " message " ")
+    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (error "")))
+
+(define impc:compiler:print-badly-formed-expression-error
+  (lambda (expr-type ast)
+    (print-with-colors 'red 'default #t (print "Syntax Error:"))
+    (print " badly formed ")
+    (print-with-colors 'green 'default #t (print expr-type))
+    (print " expression:\n")
+    (print-with-colors 'ast 'default #t (print ast "\n"))
+    (error "")))
+
+(define impc:compiler:print-index-oob-error
+  (lambda (type ast)
+    (print-with-colors 'red 'default #t (print "Syntax Error:"))
+    (print " ")
+    (print-with-colors 'green 'default #t (print type))
+    (print " index out of bounds: ")
+    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (error "")))
+
+(define impc:compiler:print-cannot-expand-non-generic-error
+  (lambda (name)
+    (print-with-colors 'red 'default #t (print "Generics Error:"))
+    (print " cannot expand on non-generic ")
+    (print-with-colors 'blue 'default #t (print name "\n"))
+    (error "")))
+
+(define impc:compiler:print-expansion-arity-error
+  (lambda (before after)
+    (print-with-colors 'red 'default #t (print "Generics Error:"))
+    (print " expansion arity error ")
+    (print-with-colors 'blue 'default #f (print before))
+    (print " -> ")
+    (print-with-colors 'blue 'default #f (print after "\n"))
+    (error "")))
+
+(define impc:compiler:print-no-valid-forms-for-generic-error
+  (lambda (name)
+    (print-with-colors 'red 'default #t (print "Generics Error:"))
+    (print " cannot find any valid forms for generic function ")
+    (print-with-colors 'blue 'default #t (print name "\n"))
+    (error "")))
+
+(define impc:compiler:print-shadow-var-error
+  (lambda (name)
+    (print-with-colors 'red 'default #t (print "Compiler Error:"))
+    (print " cannot define ")
+    (print-with-colors 'green 'default #t (print name))
+    (print " as a shadow variable\n")
+    (error "")))
+
+(define impc:compiler:print-already-bound-error
+  (lambda (name type)
+    (print-with-colors 'red 'default #t (print "Compiler Error:"))
+    (print-with-colors 'green 'default #t (print name))
+    (print " already bound as ")
+    (print-with-colors 'blue 'default #t (print type "\n"))
+    (error "")))
+
+(define impc:compiler:print-no-redefinitions-error
+  (lambda (name oldtype newtype)
+    (print-with-colors 'red 'default #t (print "Compiler Error:"))
+    (print " cannot redefine or overload the type signature of existing functions.  In this case, ")
+    (print-with-colors 'green 'default #t (print name)) (print " from ")
+    (print-with-colors 'blue 'default #t (print oldtype)) (print " to ")
+    (print-with-colors 'blue 'default #t (print newtype))
+    (error "")))
+
+(define impc:compiler:print-bad-arity-error
+  (lambda (ast)
+    (print-with-colors 'red 'default #t (print "Syntax Error:"))
+    (print " bad arity in expression:\n")
+    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (error "")))
+
+(define impc:compiler:print-no-retval-error
+  (lambda (ast)
+    (print-with-colors 'red 'default #t (print "Syntax Error:"))
+    (print " no return value for body: ")
+    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (error "")))
+
+(define impc:compiler:print-needs-zone-size-error
+  (lambda (expr-name)
+    (print-with-colors 'red 'default #t (print "Syntax Error:"))
+    (print " ")
+    (print-with-colors 'green 'default #t (print expr-name))
+    (print " requires a zone size as its first argument\n")
+    (error "")))
+
+(define impc:compiler:print-needs-zone-delay-error
+  (lambda (expr-name)
+    (print-with-colors 'red 'default #t (print "Syntax Error:"))
+    (print " ")
+    (print-with-colors 'green 'default #t (print expr-name))
+    (print " requires an ")
+    (print-with-colors 'blue 'default #f (print "i64"))
+    (print " delay as its second argument\n")
+    (error "")))
+
+(define impc:compiler:print-variable-not-marked-as-free-error
+  (lambda (vs)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (print " variable " )
+    (print-with-colors 'blue 'default #t (print vs))
+    (print " not marked as free - check the variable name in the polytype\n")
+    (error "")))
+
+(define impc:compiler:print-type-mismatch-error
+  (lambda (name got . in)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (if (not (null? expected))
+	(begin (print " In ")
+	       (print-with-colors 'green 'default #t
+				  (print  (car expected)))
+	       (print ",")))
+    (print " got " )
+    (print-with-colors 'blue 'default #t (print got))
+    (print ", was expecting ")
+    (print-with-colors 'blue 'default #t (print expected "\n"))
+    (error "")))
+
+(define impc:compiler:print-type-conflict-error
+  (lambda (type1 type2 ast)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (print " type conflict between " )
+    (print-with-colors 'blue 'default #t (print type1))
+    (print " and ")
+    (print-with-colors 'blue 'default #t (print type2))
+    (print " in ")
+    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (error "")))
+
+(define impc:compiler:print-if-type-conflict-error
+  (lambda (then else)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (print " type conflict between then " )
+    (print-with-colors 'blue 'default #t (print then))
+    (print " and else ")
+    (print-with-colors 'blue 'default #t (print else))
+    (print " branch of " )
+    (print-with-colors 'green 'default #t (print  "if"))
+    (print " statement\n")
+    (error "")))
+
+(define impc:compiler:print-unsupported-conversion-error
+  (lambda (from to)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (print " unsupported conversion from " )
+    (print-with-colors 'blue 'default #t (print from))
+    (print " to ")
+    (print-with-colors 'blue 'default #t (print to "\n"))
+    (error "")))
+
+(define impc:compiler:print-missing-type-error
+  (lambda (type)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (print " cannot find type " )
+    (print-with-colors 'blue 'default #t (print type "\n"))
+    (error "")))
+
+(define impc:compiler:print-could-not-resolve-type-error
+  (lambda (types . message)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (if (list? types)
+	(print " couldn't resolve types: ")
+	(print " couldn't resolve type: "))
+    (print-with-colors 'blue 'default #t (print types))
+    (if (not (null? message))
+	(print " " (car message)))
+    (println)
+    (error "")))
+
+(define impc:compiler:print-could-not-resolve-generic-type-error
+  (lambda (types ast)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (if (list? types)
+	(print " couldn't resolve generic types: ")
+	(print " couldn't resolve generic type: "))
+    (print-with-colors 'blue 'default #t (print types))
+    (print " ")
+    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (error "")))
+
+(define impc:compiler:print-missing-identifier-error
+  (lambda (name type)
+    (print-with-colors 'red 'default #t (print "Compiler Error:"))
+    (print " cannot find ")
+    (print-with-colors 'blue 'default #t (print type))
+    (print " ")
+    (print-with-colors 'green 'default #t (print name "\n"))
+    (error "")))
+
+(define impc:compiler:print-missing-generic-type-error
+  (lambda (type-name)
+    (print-with-colors 'red 'default #t (print "Type Error:"))
+    (print " cannot find generic type ")
+    (print-with-colors 'blue 'default #t (print type-name "\n"))
+    (error "")))
+
+(define impc:compiler:print-missing-compiled-function-error
+  (lambda (name)
+    (print-with-colors 'red 'default #t (print "Compiler Error:"))
+    (print " no compiled function ")
+    (print-with-colors 'green 'default #t (print name))
+    (print ", perhaps you need to turn on compilation?\n")
+    (error "")))
+
+(define impc:compiler:print-missing-compiled-function-setter-error
+  (lambda (name)
+    (print-with-colors 'red 'default #t (print "Compiler Error:"))
+    (print " no compiled function ")
+    (print-with-colors 'green 'default #t (print name))
+    (print "setter, perhaps you need to turn on compilation?\n")
+    (error "")))
+
+(define impc:compiler:print-compiler-error
+  (lambda (message . ast)
+    (print-with-colors 'red 'default #t (print "Compiler Error:"))
+    (print " " message)
+    (if (not (null? ast))
+	(begin (print " ast: ")
+	       (print-with-colors 'yellow 'default #t (print (car ast)))))
+    (println)
+    (error "")))
+
+(define impc:compiler:print-compiler-failed-error
+  (lambda ()
+    (print-with-colors 'red 'default #t (print "Compiler Failed."))
+    (error "")))
+
+(define impc:compiler:print-binding-details-to-log
+  (lambda (lead-string symname type)
+    (print lead-string " ")
+    (print-with-colors 'green 'default #t (print symname))
+    (print " >>> ")
+    (print-with-colors 'yellow 'default #t  (print type))
+    (println)))
+
+(define impc:compiler:print-no-scheme-stub-notification
+  (lambda (symname)
+    (print "There is no ")
+    (print-with-colors 'cyan 'default #t (print  "scheme stub"))
+    (print " available for ")
+    (print-with-colors 'green 'default #t (print symname "\n"))))
+
 
 ;; ;; GCHANGE
 ;; ;; removes %b when returning base types (i.e. !head%b returns !head)
@@ -198,8 +471,7 @@
 (define regex:replace-everything
   (lambda (str finds replaces)
     (if (<> (length finds) (length replaces))
-        (print-error 'Compiler 'Error: 'regex:replace-everything
-                     'expects 'an 'equal 'number 'of 'finds 'and 'replaces))
+	(impc:compiler:print-compiler-error "regex:replace-everything expects an equal number of finds and replaces"))
     (for-each (lambda (find replace)
                 (let ((s (regex:replace-all str find replace)))
                   (set! str s)))
@@ -374,7 +646,7 @@
                              (impc:ir:generics-apply-macros (caddr code)))))
       ;; (println 'code-post-macro: code)
       (if (not (regex:match? (symbol->string (cadr code)) ":"))
-          (print-error 'Compile 'Error: 'generic 'functions 'must 'supply 'type))
+	  (impc:compiler:print-compiler-error "generic functions must supply type"))
       (let* ((res (regex:type-split (symbol->string (cadr code)) ":"))
              (name (string->symbol (car res)))
              ;; (ftype (string->symbol (cadr res))))
@@ -434,7 +706,7 @@
                                 (not (string=? name (symbol->string (car x))))))
                              *impc:ir:gpolys*)))
       (if (> (length res) 1)
-          (print-error 'Compiler 'Error: 'incorrect 'number 'of 'gpolys *impc:ir:gpolys*))
+	  (impc:compiler:print-compiler-error (string-append "incorrect number of gpolys" (sexpr->string *impc:ir:gpolys*))))
       (if (and res
                (not (null? res)))
           (cddr (car res))
@@ -565,7 +837,7 @@
 	    (t1 (cl:remove-if (lambda (x) (string=? x "")) 
 			      (regex:match-all s1 impc:ir:regex-tc-or-a)))
 	    (num? (if (regex:match? (car t1) "[a-zA-Z]") ;; (car t1) should be numbers only!
-		      (print-error 'Compiler 'Error: 'syntax 'error 'first 'element 'should 'be 'a 'number: string-type)))
+		      (impc:compiler:print-bad-type-error string-type "first element must be a number")))
 	    (t2 (list (string->number (car t1))
 		      (apply impc:ir:get-type-from-pretty-str (cadr t1) args))))
        t2)))
@@ -576,7 +848,7 @@
 	    (t1 (cl:remove-if (lambda (x) (string=? x "")) 
 			      (regex:match-all s1 impc:ir:regex-tc-or-a)))
 	    (num? (if (regex:match? (car t1) "[a-zA-Z]") ;; (car t1) should be numbers only!
-		      (print-error 'Compiler 'Error: 'syntax 'error 'first 'element 'should 'be 'a 'number: string-type)))
+		      (impc:compiler:print-bad-type-error string-type "first element must be a number")))
 	    (t2 (list (string->number (car t1))
 		      (apply impc:ir:get-type-from-pretty-str (cadr t1) args))))
        t2)))
@@ -728,7 +1000,7 @@
     ;; (println 'ir:get-type-from-pretty-str 'stype: string-type 'args: args)
       (if (or (not (string? string-type))
               (string=? "" string-type))
-          (print-error 'Compiler 'Error: 'Internal 'error 'impc:ir:get-type-from-str 'must 'take 'a 'string 'not string-type))
+	  (impc:compiler:print-compiler-error (string-append "Internal error: impc:ir:get-type-from-str must take a string, not " (sexpr->string string-type))))
       (let* ((ptr-depth (impc:ir:get-ptr-depth string-type))
              (offset (* ptr-depth 100))
              ;(expand-closures? (if (null? args) #f (car args)))
@@ -736,7 +1008,7 @@
              (base (impc:ir:get-base-type string-type)))
          ;; (println 'base: base 'ptr-depth: ptr-depth (string? base))
 	 (if (< (string-length base) 1)
-	     (print-error 'Compiler 'Error: 'illegal 'type: string-type))
+	     (impc:compiler:print-bad-type-error string-type "Illegal type"))
          (cond ((string=? base "void") *impc:ir:void*)
 	       ;((string=? base "size_t") (+ offset (if (= 64 (sys:pointer-size))
 	       ;					       *impc:ir:ui64*
@@ -787,7 +1059,7 @@
                         ;; (println 'hitmarck gtype-all type-all)
                         ;; (println 'actuals gtype (cadr p))
                         (if (<> (length gtype-all) (length type-all))
-                            (print-error 'Compiler 'Error: 'generic 'type 'mismatch 'in base 'between (symbol->string (cadr p)) 'and gtype))
+			    (impc:compiler:print-type-mismatch-error (cadr p) gtype))
                         (impc:ir:get-type-from-pretty-str (apply string-append (car p) (make-list ptr-depth "*"))
                                                           (list (car p) (cons
                                                                          (cons (car p) base)
@@ -908,7 +1180,7 @@
 				;; if everything else fails try type aliases
 				(let ((res (impc:ir:check-type-aliases base ptr-depth)))
 				  (if res res
-				      (print-error 'Compiler 'Error: 'cannot 'find 'type 'for string-type)))))))))))
+				      (impc:compiler:print-could-not-resolve-type-error string-type)))))))))))
 
 
 (define impc:ir:convert-from-pretty-types
@@ -979,7 +1251,7 @@
     ;(println 'ir:get-type-from-str 'string-type: string-type 'args: args)
     (if (or (not (string? string-type))
 	    (string=? "" string-type))
-	(print-error 'Compiler 'Error: 'Internal 'error 'impc:ir:get-type-from-str 'must 'take 'a 'string 'not string-type))
+	(impc:compiler:print-compiler-error (string-append "Internal error: impc:ir:get-type-from-str must take a string, not " (sexpr->string string-type))))
     (let* ((ptr-depth (impc:ir:get-ptr-depth string-type))
 	   (offset (* ptr-depth 100))
 	   ;;(expand-closures? (if (null? args) #f (car args)))
@@ -1041,7 +1313,7 @@
 		      ((impc:ir:vector? (car type))
 		       (apply string-append "<" (number->string (cadr type)) " x " (apply impc:ir:get-type-str (caddr type) args) ">"
 			      (make-list (impc:ir:get-ptr-depth (car type)) "*")))
-		      (else (print-error 'Compiler 'Error: 'bad 'complex 'type! type))))
+		      (else (impc:compiler:print-bad-type-error type "bad complex type"))))
 	       ((= type *impc:ir:void*) "void")
 	       ((< type 0) ;; this here for recursive llvm ir type defs only!
 		(let ((base (* -1 (modulo type (* -1 *impc:ir:pointer*))))
@@ -1059,8 +1331,7 @@
 					    ((= base *impc:ir:i1*) "i1")
 					    ((string? (car args))
 					     (string-append "%" (car args)))
-					    (else (print-error 'Compiler 'Error: 'bad 'type
-							       (if (null? args) type (car args)))))
+					    (else (impc:compiler:print-bad-type-error (if (null? args) type (car args)))))
 				      (apply string-append (make-list ptr-depth "*")))))))))
 
 
@@ -1108,7 +1379,7 @@
      (if (string? type)
 	 ;; if this is a named type string
 	 (if (char=? (string-ref type 0) #\%)
-	     (begin (if (not (impc:ir:tuple? type)) (print-error 'Compiler 'Error: 'bad 'named 'type: type))
+	     (begin (if (not (impc:ir:tuple? type)) (impc:compiler:print-bad-type-error type "bad named type"))
 		    (if (impc:ir:pointer? type)
 			(/ (sys:pointer-size) 8) ;; in bytes not bits
 			(let ((t2 (llvm:get-named-type (substring type 1 (string-length type)))))
@@ -1127,7 +1398,7 @@
                       ;;(apply + (map (lambda (x) (impc:ir:get-type-size x)) (cdr type)))
                       (llvm:get-struct-size (impc:ir:get-type-str type))
                       )		      
-		     (else (print-error 'Compiler 'Error: 'bad 'type 'in 'get-size))))))))
+		     (else (impc:compiler:print-bad-type-error t "bad type in get-size"))))))))
 
 
 (define impc:ir:pointer--
@@ -1338,7 +1609,7 @@
 	(dotimes (i (length args))
 		 (if (> i 0) (emit ", " os))
 		 (if (symbol? (list-ref args i))
-		     (print-error 'Compiler 'Error: 'Unresolved 'Type: (list-ref args i)))
+		     (impc:compiler:print-could-not-resolve-type-error (list-ref args i)))
 		 (emit (impc:ir:get-type-str (list-ref args i)) os))
 	(emit ")" os) 	 
 	(impc:ir:strip-space os))))
@@ -1846,12 +2117,11 @@
 	       ;; type check
                ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc-strcmp (caar p) types)))
 	       (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
-				(cdr (assoc-strcmp (caar p) types))))
-		   (print-error 'Compiler 'Error:  'Type 'Mismatch 'for ; 'symbol 'in (cadr p)
-				'symbol: (symbol->string (caar p))
-				(string->symbol (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))) 
-				'does 'not 'match 'use 'of 
-				(string->symbol typestr)))
+			  (cdr (assoc-strcmp (caar p) types))))
+	     (impc:compiler:print-type-mismatch-error
+	      (string->symbol typestr)
+	      (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))
+	      (caar p)))
 					;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
 					;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
 
@@ -1917,7 +2187,7 @@
 (define impc:ir:compiler:closure-from-getter
    (lambda (name)
       (if (not (llvm:get-function (string-append name "_getter")))
-          (print-error 'Compiler 'Error: 'no 'global 'closure 'named name)
+	  (impc:compiler:print-missing-identifier-error name 'closure)
           (let* ((os (make-string 0))
                  (type (cons (+ *impc:ir:pointer* *impc:ir:pointer* *impc:ir:closure*) 
                              (map (lambda (x) (impc:ir:get-type-from-str x))
@@ -2207,7 +2477,7 @@
 	   (val (impc:ir:gname))
 	   (type (- (impc:ir:get-type-from-str (cadr val)) *impc:ir:pointer*)))
       (if (not (impc:ir:pointer? val))
-	  (print-error 'Compiler 'Error: 'ptrdref 'must 'take 'a 'pointer 'argument 'not: val))
+	  (impc:compiler:print-bad-type-error-with-ast val "ptrdef must take a pointer argument" ast))
       (emit val-str os)
       (emit (impc:ir:gname "val" (impc:ir:get-type-str type)) " = load " (cadr val) " " (car val) "\n" os)
       (impc:ir:strip-space os))))
@@ -2358,7 +2628,7 @@
       ;(println 'size: size)
       
       (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
-	  (print-error 'Compiler 'Error: 'first 'push_zone 'argument 'must 'be 'a 'size 'argument '- 'i64 'not (cadr size)))
+	  (impc:compiler:print-needs-zone-size-error 'push_zone))
       
       (emit size-str os) ;; write size str
       
@@ -2400,10 +2670,10 @@
       ;(println 'size: size 'body1: body1 'body2: body2)
       
       (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
-	  (print-error 'Compiler 'Error: 'first 'memzone 'argument 'must 'be 'a 'size 'argument '- 'i64 'not (cadr size)))
+	  (impc:compiler:print-needs-zone-size-error 'memzone))
       (if (and (= (length ast) 4)
 	       (<> (impc:ir:get-type-from-str (cadr body1)) *impc:ir:si64*))
-	  (print-error 'Compiler 'Error: 'optional 'second 'memzone 'argument 'must 'be 'a 'delay 'argument '- 'i64 'not (cadr body1)))
+	  (impc:compiler:print-needs-zone-delay-error 'memzone))
 	       
       (emit size-str os) ;; write size str
       
@@ -2425,8 +2695,7 @@
       ;; then we'll need to copy the value onto the new zone
       ;; before destroying the existing zone
       (if (impc:ir:closure? etype)
-	  (print-error 'Compiler 'Error: 'you 'are 'currently 'not 'allowed 'to 'return 'a 'closure
-		       'from 'a 'memzone)
+	  (impc:compiler:print-compiler-error "you are not allowed to return a closure from a memzone")
 	  (if (impc:ir:pointer? etype)
 	      (begin (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr e) " " (car e) " to i8*\n"
 			   (impc:ir:gname "ptr_size" "i64") " = call i64 @llvm_zone_ptr_size(i8* " (car (impc:ir:gname "ptr_one")) ")\n"
@@ -2455,8 +2724,8 @@
                                         (= 2 (impc:ir:get-ptr-depth (cdr (assoc-strcmp (car ast) types)))))
                                    (cddr (assoc-strcmp (car ast) types))
 				   (if (impc:ir:closure? (cdr (assoc-strcmp (car ast) types)))
-				       (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure (sexpr->string (car ast)) 'remember 'that 'closures 'must 'be 'pointers)
-				       (print-error 'Compiler 'Error: 'Bad 'type 'for 'closure (sexpr->string (car ast)))))))
+				       (impc:compiler:print-bad-type-error (car ast) "remember that closures must be pointers")
+				       (impc:compiler:print-bad-type-error (car ast) "bad type for closure")))))
              ;;(recursive-call (if (eq? (car ast) (car *impc:ir:sym-name-stack*)) #t #f))
              (recursive-call (if (member (car ast) *impc:ir:sym-name-stack*) #t #f))             
              (os (make-string 0))
@@ -2595,12 +2864,14 @@
 		  
 	 (if (not (equal? (cdr (assoc-strcmp (caar ast) types))
 			  (impc:ir:get-type-from-str (cadr num))))
-	     (print-error 'Compiler 'Error: 'type 'conflict 'in 'dotimes: iterator-type (cadr num) ': (car ast)))
+
+       ;; (print-error 'Compiler 'Error: 'type 'conflict 'in 'dotimes: iterator-type (cadr num) ': (car ast))
+       (impc:compiler:print-type-mismatch-error iterator-type (cadr num) (car ast)))
 
 	 (if (and start-value?
 		  (not (equal? (cdr (assoc-strcmp (caar ast) types))
 			       (impc:ir:get-type-from-str (cadr start)))))
-	     (print-error 'Compiler 'Error: 'type 'conflict 'in 'dotimes: iterator-type (cadr start) ': (car ast)))
+	     (impc:compiler:print-type-mismatch-error iterator-type (cadr num) (car ast)))
 
          (if start-value?
 	     (emit (string-append "store " (cadr start) " " (car start) ", "
@@ -2821,7 +3092,7 @@
           (if (member (cadr ast) *impc:ir:sym-name-stack*)              
               (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
                                    (symbol->string (cadr ast)) "Ptr\n") os)
-              (print-error 'Compiler 'Error: 'undefined 'symbol: (cadr ast))))
+	      (impc:compiler:print-missing-identifier-error (cadr ast) 'variable)))
       ;; ir:gname should be vv
       (impc:ir:strip-space os))))
 
@@ -2836,7 +3107,7 @@
                 (t (impc:ir:get-type-from-str (cadr idx)))
                 (tt (impc:ir:convert-from-pretty-types (caddr ast))))
             (if (not (impc:ir:fixed-point? t))
-                (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'size 'must 'be 'fixed-point 'not (impc:ir:get-type-str t)))                         
+		(impc:compiler:print-bad-type-error-with-ast (impc:ir:pretty-print-type t) "array size must be an integer" ast))
             (emit idx-str os)
 	    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
             (if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
@@ -2875,11 +3146,11 @@
 	     (tt '()))
          ;; type tests
 	(if (not (impc:ir:array? ttype))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: 'invalid 'array 'type (sexpr->string (cadr var)) ': ast))
+	    (impc:compiler:print-bad-type-error-with-ast (cadr var) "invalid array type" ast))
 	(if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	    (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-str t) "array index must be an integer" ast))
         (if (and (integer? (caddr ast)) (> (+ 1 (caddr ast)) (cadr ttype)))
-            (print-error 'Compiler 'Error: 'aref 'beyond 'array 'bounds: ast))
+	    (impc:compiler:print-index-oob-error 'array ast))
 	(emit index-str os)
 	(emit var-str os)
 	(emit "; array ref\n" os)
@@ -2905,18 +3176,18 @@
 	     (ttype (impc:ir:get-type-from-str (cadr var))))
          ;; type tests
          (if (not (impc:ir:array? ttype))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: 'invalid 'array 'type (sexpr->string (cadr var)) ': ast))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr var) "invalid array type" ast))
 	 (if (> (impc:ir:get-ptr-depth ttype) 1.0)
-	     (print-error 'Compiler 'Error: 'Type 'Mismatch: 'ptr 'depth 'to 'great 'for 'array-set! (sexpr->string (cadr var)) ': ast))
+	     (impc:compiler:print-compiler-error "pointer depth too great for array-set!" ast))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	     (impc:compiler:print-bad-type-error-with (cadr idx) "index must be an integer" ast))
         (if (and (integer? (caddr ast)) (> (+ 1 (caddr ast)) (cadr ttype)))
-            (print-error 'Compiler 'Error: 'aref-ptr 'beyond 'array 'bounds: ast))         
+	    (impc:compiler:print-index-oob-error 'array ast))
          (emit index-str os)
          (emit var-str os)
          (emit "; array ref\n" os)
 	 (if (not (impc:ir:pointer? ttype)) ;; must be an array if we're not a pointer
-	     (print-error 'Compiler 'Error: 'array-ref-ptr 'must 'take 'a 'pointer 'to 'an 'array 'not (cadr ttype))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr ttype) "array-ref-ptr must take a pointer to an array" ast)
 	     (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
 				  " = getelementptr " (cadr var) " " (car var)
 				  ", i32 0, " (cadr idx) " " (car idx) "\n") os))
@@ -2938,25 +3209,25 @@
              (val (impc:ir:gname)))
          ;; type tests
          (if (not (impc:ir:array? ttype))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: 'invalid 'array 'type (cadr var)))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr var) "invalid array type" ast))
 	 (if (> (impc:ir:get-ptr-depth ttype) 1.0)
-	     (print-error 'Compiler 'Error: 'Type 'Mismatch: 'ptr 'depth 'to 'great 'for 'array-set! (cadr var)))
+	     (impc:compiler:print-compiler-error "pointer depth too great for aset!" ast))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: 'index 'must 'be 'fixed-point 'not (sexpr->string (cadr idx)) ': ast))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
          (if (not (equal? (impc:ir:get-type-from-str (cadr val)) ;(impc:ir:get-type-from-str (cadr var))
 			  (if (impc:ir:array? ttype)
 			      (caddr ttype)
 			      (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var))))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast '- 'setting (cadr val) 'into (cadr var)))
+	     (impc:compiler:print-type-mismatch-error (cadr val) (cadr var) (car ast)))
         (if (and (integer? (caddr ast)) (> (+ 1 (caddr ast)) (cadr ttype)))
-            (print-error 'Compiler 'Error: 'aset! 'beyond 'array 'bounds: ast))
+	    (impc:compiler:print-index-oob-error 'array ast))
          ;; type tests done
          (emit index-str os)
          (emit var-str os)
          (emit val-str os)
          (emit "; set array\n" os)
 	 (if (not (impc:ir:pointer? ttype)) ;; must be an array if we're not a pointer
-	     (print-error 'Compiler 'Error: 'aset! 'needs 'a 'pointer 'to 'an 'array 'not (sexpr->string (cadr ttype)))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr ttype) "aset! must take a pointer to an array" ast)
 	     ;(begin (emit (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = insertvalue " 
 	     ;		  (cadr var) " " (car var) ", " (cadr val) " " (car val) ", " (car idx) "\n" os))
 	     (begin (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
@@ -2980,13 +3251,13 @@
          ;; type tests
 	(if (and (not (impc:ir:pointer? ttype))
 		 (not (impc:ir:array? ttype)))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'or 'array 'not (cadr var)))
+	    (impc:compiler:print-bad-type-error-with-ast (cadr var) "array must take a pointer to an array" ast))
 	;; (if (and (= 1.0 (impc:ir:get-ptr-depth ttype))
 	;; 	 (or (impc:ir:closure? ttype)))
 	;;     ;;(impc:ir:tuple? ttype)))
 	;;     (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
 	(if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))	 
+	    (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
 	(emit index-str os)
 	(emit var-str os)
 	(emit "; pointer ref\n" os)
@@ -3018,13 +3289,13 @@
 	     (ttype (impc:ir:get-type-from-str (cadr var))))
          ;; type tests
          (if (not (impc:ir:pointer? ttype))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
+	     (impc:compiler:print-bad-type-error-with-ast ttype "array must be a pointer" ast))
 	 (if (and (= 1.0 (impc:ir:get-ptr-depth ttype))
 		  (or (impc:ir:closure? ttype)))
 		      ;(impc:ir:tuple? ttype)))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
+	     (impc:compiler:print-bad-type-error-with-ast ttype "array must be a pointer" ast))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))	 
+	     (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
          (emit index-str os)
          (emit var-str os)
          (emit "; pointer ref\n" os)
@@ -3052,22 +3323,22 @@
              (val (impc:ir:gname)))
          ;; type tests
          (if (not (impc:ir:pointer? ttype))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
+	     (impc:compiler:print-bad-type-error-with-ast ttype "array must be a pointer" ast))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	     (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-from-str (cadr idx))  "index must be an integer" ast))
 	 (if (and (= 1.0 (impc:ir:get-ptr-depth ttype))
 		  (or (impc:ir:closure? ttype)
 		      (impc:ir:tuple? ttype)))
 	     (if (impc:ir:tuple? ttype)
-		 (print-error 'Compiler 'Error: 'in 'pointer-ref (sexpr->string (cadr ast)) 'cannot 'be 'a 'tuple 'type: (cadr var) 'maybe 'you 'want (string-append (cadr var) "*"))
-		 (print-error 'Compiler 'Error: 'in 'pointer-ref (sexpr->string (cadr ast)) 'cannot 'be 'the 'closure 'type: (cadr var) 'maybe 'you 'want (string-append (cadr var) "*"))))
+	   (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be a tuple type, maybe you want " (cadr var) "*") ast)
+		 (impc:compiler:print-bad-type-error-ast (cadr var) (string-append "cannot be a closure type, maybe you want " (cadr var) "*") ast)))
 
          (if (not (equal? (impc:ir:get-type-from-str (cadr val)) ;(impc:ir:get-type-from-str (cadr var))
 			  (if (impc:ir:array? ttype)
 			      (caddr ttype)
 			      (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var))))))
                           ;(impc:ir:pointer++ (impc:ir:get-type-from-str (cadr val)))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast '- 'setting (cadr val) 'into (cadr var)))
+	     (impc:compiler:print-type-mismatch-error (cadr val) (cadr var) (car ast)))
          ;; type tests done
          (emit index-str os)
          (emit var-str os)
@@ -3097,9 +3368,9 @@
 	     (tt '()))
          ;; type tests
 	(if (not (impc:ir:vector? ttype))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: 'invalid 'vector 'type (sexpr->string (cadr var)) ': ast))
+	    (impc:compiler:print-bad-type-error-with-ast (cadr var) "invalid vector type" ast))
 	(if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	    (impc:compiler:print-bad-type-error-with-ast ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
 	(emit index-str os)
 	(emit var-str os)
 	(emit "; vector ref\n" os)
@@ -3129,9 +3400,9 @@
 	   (val (impc:ir:gname)))
       ;; type tests
       (if (not (impc:ir:vector? ttype))
-	  (print-error 'Compiler 'Error: 'Type 'Mismatch: 'invalid 'vector 'type (cadr var)))
+	  (impc:compiler:print-bad-type-error-with-ast ttype "invalid vector type" ast))
       (if (> (impc:ir:get-ptr-depth ttype) 1.0)
-	  (print-error 'Compiler 'Error: 'Type 'Mismatch: 'ptr 'depth 'to 'great 'for 'vector-set! (cadr var)))
+	  (impc:compiler:print-bad-type-error-with (cadr var) "pointer depth too great for vector-set!" ast))
       ;; type tests done
       (emit index-str os)
       (emit var-str os)
@@ -3142,7 +3413,7 @@
 	        (impc:ir:gname "vect2" (cadr (impc:ir:gname "vect"))) " = insertelement " (cadr (impc:ir:gname "vect")) " " (car (impc:ir:gname "vect"))
 		", " (cadr val) " " (car val) ", i32 " (car idx) "\n"
 		"store " (cadr (impc:ir:gname "vect2")) " " (car (impc:ir:gname "vect2")) ", " (cadr var) " " (car var) "\n" os)
-	  (print-error 'Compiler 'Error: 'vset! 'needs 'to 'be 'a 'pointer 'to 'a 'vector))
+	  (impc:compiler:print-bad-type-error-with-ast ttype "vset! needs to be a pointer to a vector" ast))
       (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
       (impc:ir:strip-space os))))
 
@@ -3239,7 +3510,7 @@
 	     ;; 	     (impc:ir:pointer-- (impc:ir:convert-from-pretty-types (car hint?)))
 	     ;; 	     (impc:ir:convert-from-pretty-types (caddr ast)))))
 	(if (not (impc:ir:fixed-point? t))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'size 'must 'be 'fixed-point 'not (impc:ir:get-type-str t)))                         
+	    (impc:compiler:print-bad-type-error-with (impc:ir:get-type-str t) "alloc size must be an integer" ast))
 	(emit idx-str os)
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	(if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
@@ -3296,7 +3567,7 @@
 	     (tt (impc:ir:pointer-- (car hint?)))) ;(impc:ir:convert-from-pretty-types (car hint?)))))	     
 	     ;;(tt (impc:ir:convert-from-pretty-types (caddr ast))))
 	(if (not (impc:ir:fixed-point? t))
-	    (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'size 'must 'be 'fixed-point 'not (impc:ir:get-type-str t)))                         
+	    (impc:compiler:print-bad-type-error-with (impc:ir:get-type-str t) "alloc size must be an integer"))
 	(emit idx-str os)
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	(if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
@@ -3390,11 +3661,11 @@
              (element-type (list-ref (cdr tuple-type) (caddr ast))))
          ;; type tests
          (if (not (impc:ir:tuple? (impc:ir:get-type-from-str (cadr var))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'tuple 'must 'be 'tuple 'not (cadr var)))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr var) "must be a tuple" ast))
          (if (not (integer? (caddr ast)))
-             (print-error 'Compiler 'Error: 'tuple-ref 'must 'have 'a 'static 'integer 'as 'its 'index 'not: (caddr ast)))
+	     (impc:compiler:print-bad-type-error (caddr ast) "tref index must be an integer"))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
          ;(emit index-str os)
          (emit var-str os)
          (emit "; tuple ref\n" os)
@@ -3413,7 +3684,7 @@
 	 ;; this code here to support basic type recursion (only depth \2)
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	 (if (> (impc:ir:get-ptr-depth tuple-type) 1)
-	     (print-error "Compiler Error: trying to ref from a tuple pointer " ast)
+	     (impc:compiler:print-bad-type-error tuple-type "trying to ref from a tuple pointer" ast)
 	     (if (< (impc:ir:get-ptr-depth tuple-type) 1)
 		    (emit (string-append (impc:ir:gname "val" ttstr) " = extractvalue " 
 					 (cadr var) " " (car var) ", " (car idx) "\n") os)		 
@@ -3448,11 +3719,11 @@
              (element-type (list-ref (cdr tuple-type) (caddr ast))))
          ;; type tests
          (if (not (impc:ir:tuple? (impc:ir:get-type-from-str (cadr var))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'tuple 'must 'be 'tuple 'not (cadr var)))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr var) "must be a tuple" ast))
          (if (not (integer? (caddr ast)))
-             (print-error 'Compiler 'Error: 'tuple-ref 'must 'have 'a 'static 'integer 'as 'its 'index 'not: (caddr ast)))
+	     (impc:compiler:print-bad-type-error (caddr ast) "tref index must be an integer"))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
          ;(emit index-str os)
          (emit var-str os)
          (emit "; tuple ref\n" os)
@@ -3471,7 +3742,7 @@
 	 ;; this code here to support basic type recursion (only depth \2)
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	 (if (<> (impc:ir:get-ptr-depth tuple-type) 1)
-	     (print-error "Compiler Error: trying to ref-ptr from bad tuple type " tuple-type))
+	     (impc:compiler:print-bad-type-error-with-ast tuple-type "bad tuple type" ast))
 	 (emit (string-append (impc:ir:gname "val" (string-append ttstr "*")) " = getelementptr " 
 			      (cadr var) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
          (impc:ir:strip-space os))))
@@ -3502,9 +3773,9 @@
          ;(println 'var: var 'idx: idx 'val: val 'elementtype: element-type)
          ;; type tests
          (if (not (impc:ir:tuple? (impc:ir:get-type-from-str (cadr var))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'tuple 'must 'be 'pointer 'not (cadr var)))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr var) "tuple must be a pointer" ast))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'index 'must 'be 'fixed-point 'not (cadr idx)))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
 
 	 ;; ;; check to see if we have type equivelency but not type equality
 	 ;; ;; i.e. check to see if a given 'named type' is equivelent to the
@@ -3519,8 +3790,7 @@
          ;; (if (not (equal? element-type
 	 ;; 		  (impc:ir:get-type-from-str (cadr val))))
 	 (if (not (impc:ir:types-equal? element-type (cadr val)))
-             (print-error 'Compiler 'Error: 'Type 'Mismatch: ast '- 'setting (cadr val) 'into 'index 
-                          (string->symbol (number->string (caddr ast))) 'of (cadr var)))
+	     (impc:compiler:print-type-conflict-error (cadr val) (caddr ast) ast))
          ;; type tests done
          (emit index-str os)
          (emit var-str os)
@@ -3529,7 +3799,7 @@
          (define ttstr (impc:ir:get-type-str element-type))
 	 ;; (println '(cadr var) (cadr var) '(car var) (car var) '(cadr val) (cadr val) '(car val) (car val) '(car idx) (car idx))
 	 (if (<> (impc:ir:get-ptr-depth tuple-type) 1)
-	     (print-error 'Compiler 'Error: 'cannot 'set 'element 'into 'tuple 'type tuple-type '-> ast))
+	     (impc:compiler:print-bad-type-error-with-ast tuple-type "cannot set element into tuple type" ast))
 	 (emit (string-append (impc:ir:gname "val" (string-append ttstr "*")) " = getelementptr " 
 			      (cadr var) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
 	 (emit (string-append "store " (cadr val) " " (car val) ", " 
@@ -3643,7 +3913,7 @@
 			      (impc:ir:pointer? (cadr bval)))
 			 (and (impc:ir:vector? (cadr aval))
 			      (impc:ir:vector? (cadr bval)))))
-                (print-error 'Compiler 'Error: 'Bad 'type 'in 'math 'expression: ast  '>>> (cadr aval) 'or (cadr bval)))
+		(impc:compiler:print-type-conflict-error (cadr aval) (cadr bval) ast))
 	    
             (if (and (impc:ir:number? (cadr aval))
 		     (<> (impc:ir:get-type-from-str (cadr aval))
@@ -3652,7 +3922,7 @@
 		    (set-car! (cdr aval) (cadr bval))
 		    (if (number? (caddr ast))
 			(set-car! (cdr bval) (cadr aval))
-			(print-error 'Compiler 'Error: 'Type 'mismatch 'in 'math 'expression: ast 'between 'arg1: (string->symbol (cadr aval)) 'and 'arg2: (string->symbol (cadr bval))))))
+			(impc:compiler:print-type-conflict-error (cadr aval) (cadr bval) ast))))
 	    
             (emit a os)
             (emit b os)            
@@ -3728,7 +3998,7 @@
          ;; sanity check
          (if (not (and (impc:ir:number? (cadr aval))
                        (impc:ir:number? (cadr bval))))
-             (print-error 'Compiler 'Error: 'Bad 'type 'in 'modulo 'expression: ast  '>>> (cadr aval) 'or (cadr bval)))
+	     (impc:compiler:print-type-conflict-error (cadr aval) (cadr bval) ast))
          (emit a os)
          (emit b os)            
          ;(print (car aval) '>> (car bval) '>> type)
@@ -3783,7 +4053,7 @@
 			      (impc:ir:number? (cadr bval)))
 			 (and (impc:ir:vector? (cadr aval))
 			      (impc:ir:vector? (cadr bval)))))
-                (print-error 'Compiler 'Error: 'Bad 'type 'in 'math 'expression: ast  '>>> (cadr aval) 'or (cadr bval)))
+		(impc:compiler:print-type-conflict-error (cadr aval) (cadr bval) ast))
 	    
             (if (and (impc:ir:number? (cadr aval))
 		     (<> (impc:ir:get-type-from-str (cadr aval))
@@ -3792,7 +4062,7 @@
 		    (set-car! (cdr aval) (cadr bval))
 		    (if (number? (caddr ast))
 			(set-car! (cdr bval) (cadr aval))
-			(print-error 'Compiler 'Error: 'Type 'mismatch 'in 'math 'expression: ast 'between 'arg1: (string->symbol (cadr aval)) 'and 'arg2: (string->symbol (cadr bval))))))
+			(impc:compiler:print-type-conflict-error (cadr aval) (cadr bval) ast))))
 	    
 	    (set! type (if (null? type-hint) (cadr aval) (impc:ir:get-type-str type-hint)))
             (emit a os)
@@ -3879,7 +4149,7 @@
     ;; (println 'bitcast-hint: hint? ast (cddr ast))
     (if (and (null? (car hint?))
              (null? (cddr ast)))
-        (print-error 'Compiler 'Error: 'unable 'to 'resolve ast 'try 'forcing 'the 'cast?))        
+	(impc:compiler:print-could-not-resolve-type-error ast "try forcing the cast"))
     (let* ((os (make-string 0))
            (a (impc:ir:compiler (cadr ast) types))             
            (at (impc:ir:gname))
@@ -3897,7 +4167,7 @@
     ;; (println 'bitconvert-hint: hint? ast (cddr ast))
     (if (and (null? (car hint?))
              (null? (cddr ast)))
-        (print-error 'Compiler 'Error: 'unable 'to 'resolve ast 'try 'forcing 'the 'conversion?))        
+	(impc:compiler:print-could-not-resolve-type-error ast "try forcing the conversion"))
     (let* ((os (make-string 0))
            (a (impc:ir:compiler (cadr ast) types))             
            (at (impc:ir:gname))
@@ -3928,7 +4198,7 @@
                      ((= to *impc:ir:si16*) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i16\n" os))                     
                      ((= to *impc:ir:si8*) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i8\n" os))
                      ((= to *impc:ir:i1*) (emit (impc:ir:gname "val" type-str) " = trunc i64 " (car (impc:ir:gname "val1")) " to i1\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
+		     (else (impc:compiler:print-unsupported-conversion-error from to))))
               ((impc:ir:pointer? to) ;; from must be a value
                ;; first convert from to i64
                (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val1" "i64") " = fptosi double " (car at) " to i64\n" os))
@@ -3938,7 +4208,7 @@
                      ((= from *impc:ir:si16*) (emit (impc:ir:gname "val1" "i64") " = sext i16 " (car at) " to i64\n" os))                     
                      ((= from *impc:ir:si8*) (emit (impc:ir:gname "val1" "i64") " = sext i8 " (car at) " to i64\n" os))
                      ((= from *impc:ir:i1*) (emit (impc:ir:gname "val1" "i64") " = zext i1 " (car at) " to i64\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to)))
+		     (else (impc:compiler:print-unsupported-conversion-error from to)))
                (emit (impc:ir:gname "val" type-str) " = inttoptr i64 " (car (impc:ir:gname "val1")) " to " type-str "\n" os))
               ((= to *impc:ir:fp64*)
                (cond ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "double") " = fpext float " (car at) " to double\n" os))
@@ -3947,7 +4217,7 @@
                      ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "double") " = sitofp i16 " (car at) " to double\n" os))                     
                      ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "double") " = sitofp i8 " (car at) " to double\n" os))
                      ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "double") " = uitofp i1 " (car at) " to double\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
+		     (else (impc:compiler:print-unsupported-conversion-error from to))))
               ((= to *impc:ir:fp32*)
                (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "float") " = fptrunc double " (car at) " to float\n" os))
                      ((= from *impc:ir:si64*) (emit (impc:ir:gname "val" "float") " = sitofp i64 " (car at) " to float\n" os))
@@ -3955,7 +4225,7 @@
                      ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "float") " = sitofp i16 " (car at) " to float\n" os))
                      ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "float") " = sitofp i8 " (car at) " to float\n" os))
                      ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "float") " = uitofp i1 " (car at) " to float\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
+		     (else (impc:compiler:print-unsupported-conversion-error from to))))
               ((= to *impc:ir:si64*)
                (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i64") " = fptosi double " (car at) " to i64\n" os))
                      ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i64") " = fptosi float " (car at) " to i64\n" os))
@@ -3963,7 +4233,7 @@
                      ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "i64") " = sext i16 " (car at) " to i64\n" os))
                      ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "i64") " = sext i8 " (car at) " to i64\n" os))
                      ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "i64") " = zext i1 " (car at) " to i64\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
+		     (else (impc:compiler:print-unsupported-conversion-error from to))))
               ((= to *impc:ir:si32*)
                (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i32") " = fptosi double " (car at) " to i32\n" os))
                      ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i32") " = fptosi float " (car at) " to i32\n" os))
@@ -3971,7 +4241,7 @@
                      ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "i32") " = sext i16 " (car at) " to i32\n" os))                     
                      ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "i32") " = sext i8 " (car at) " to i32\n" os))
                      ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "i32") " = zext i1 " (car at) " to i32\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
+		     (else (impc:compiler:print-unsupported-conversion-error from to))))
               ((= to *impc:ir:si16*)
                (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i16") " = fptosi double " (car at) " to i16\n" os))
                      ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i16") " = fptosi float " (car at) " to i16\n" os))
@@ -3979,7 +4249,7 @@
                      ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "i16") " = sext i32 " (car at) " to i16\n" os))                     
                      ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "i16") " = sext i8 " (car at) " to i16\n" os))
                      ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "i16") " = zext i1 " (car at) " to i16\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
+		     (else (impc:compiler:print-unsupported-conversion-error from to))))
               ((= to *impc:ir:si8*)
                (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i8") " = fptosi double " (car at) " to i8\n" os))
                      ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i8") " = fptosi float " (car at) " to i8\n" os))
@@ -3987,7 +4257,7 @@
                      ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "i8") " = trunc i32 " (car at) " to i8\n" os))
                      ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "i8") " = trunc i16 " (car at) " to i8\n" os))
                      ((= from *impc:ir:i1*) (emit (impc:ir:gname "val" "i8") " = zext i1 " (car at) " to i8\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))
+		     (else (impc:compiler:print-unsupported-conversion-error from to))))
               ((= to *impc:ir:i1*)
                (cond ((= from *impc:ir:fp64*) (emit (impc:ir:gname "val" "i1") " = fptoui double " (car at) " to i1\n" os))
                      ((= from *impc:ir:fp32*) (emit (impc:ir:gname "val" "i1") " = fptoui float " (car at) " to i1\n" os))
@@ -3995,7 +4265,7 @@
                      ((= from *impc:ir:si32*) (emit (impc:ir:gname "val" "i1") " = trunc i32 " (car at) " to i1\n" os))
                      ((= from *impc:ir:si16*) (emit (impc:ir:gname "val" "i1") " = trunc i16 " (car at) " to i1\n" os))
                      ((= from *impc:ir:si8*) (emit (impc:ir:gname "val" "i1") " = trunc i8 " (car at) " to i1\n" os))
-                     (else (print-error 'Compiler 'Error: 'unsupported 'value 'conversion from '-> to))))))
+		     (else (impc:compiler:print-unsupported-conversion-error from to))))))
       (impc:ir:strip-space os))))
 
 
@@ -4035,8 +4305,7 @@
          (if (and elset 
                   (not (equal? (impc:ir:get-type-from-str (cadr a)) 
                                (impc:ir:get-type-from-str (cadr b)))))                               
-             (print-error 'Compiler 'error: ast 'type 'conflict 'in 
-                          'between 'then (cadr a) 'and 'else (cadr b)))
+	     (impc:compiler:print-if-type-conflict-error (cadr a) (cadr b)))
          (impc:ir:strip-space os))))
 
 
@@ -4082,7 +4351,7 @@
          (if (and elset 
                   (not (equal? (impc:ir:get-type-from-str (cadr a)) 
                                (impc:ir:get-type-from-str (cadr b)))))                               
-             (print-error 'Compiler 'error: 'type 'conflict 'between 'then (cadr a) 'and 'else (cadr b) ': (sexpr->string ast)))
+	     (impc:compiler:print-if-type-conflict-error (cadr a) (cadr b)))
          
          (emit  "\nifcont" num ":\n" os)
 	 (if (not (impc:ir:void? (cadr a)))
@@ -4177,8 +4446,7 @@
 			     (if val val
 				 (if (assoc-strcmp (caddr ast) types)
 				     0
-				     (print-error 'Compiler 'Error: 'no 'valid
-						  'closure 'with 'name: (caddr ast))))))
+				     (impc:compiler:print-missing-identifier-error (caddr ast) 'closure)))))
              (ftypes (if (assoc-strcmp (caddr ast) types)
 			 (map (lambda (a) (impc:ir:get-type-str a)) (cddr (assoc-strcmp (caddr ast) types)))
 			 (llvm:get-function-args-withoutzone fname)))
@@ -4200,9 +4468,9 @@
 	     (total_size2 (apply + (map (lambda (a) (impc:ir:get-type-size (cadr (cdr a)))) args))))
 
 	(if (not (impc:ir:fixed-point? (cadr time)))
-	    (print-error 'Compiler 'Error: 'arg '1 'of 'callback 'must 'be 'a '64bit 'time 'integer))
+	    (impc:compiler:print-compiler-error "arg 1 of callback must be an i64 time value"))
 	(if (<> (length args) (length (cdr ftypes)))
-	    (print-error 'Compiler 'Error: ast 'Wrong 'number 'of 'arguments))
+	    (impc:compiler:print-bad-arity-error ast))
 
 	(emit timestr os)
 	(emit (impc:ir:gname "dat1_" "i8*") " = call ccc i8* @malloc(i64 " (number->string total_size1) ")\n"
@@ -4323,7 +4591,7 @@
                       (cdr ast)
                       (cdr ftypes))))
       (if (<> (length args) (length (cdr ftypes)))
-          (print-error 'Compiler 'Error: ast 'Wrong 'number 'of 'arguments))
+	  (impc:compiler:print-bad-arity-error ast))
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; new for impz stuff	 
       ;; (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
@@ -4347,7 +4615,7 @@
                                         ;(if (not (string=? atype ft))
                                            (if (not (equal? (impc:ir:get-type-from-str atype)
                                                             (impc:ir:get-type-from-str ft)))
-                                               (print-error 'Compiler 'Error: 'function 'argument 'does 'not 'match. 'Expected ft 'but 'got atype 'ast: ast))
+					       (impc:compiler:print-type-mismatch-error ft atype ast))
                                            (string-append (if (> i 0) ", " "")
                                                           atype " " aname)))
                                        args (cdr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
@@ -4377,7 +4645,7 @@
                       (cddr ast)
                       (cddr ftypes))))
       (if (<> (length args) (length (cddr ftypes)))
-          (print-error 'Compiler 'Error: ast 'Wrong 'number 'of 'arguments))
+	  (impc:compiler:print-bad-arity-error ast))
       (emit fptrstr os)
       (emit (apply string-append (map (lambda (p) (car p)) args)) os)
       (emit (impc:ir:gname "fptr" ftypestr) " = bitcast " (cadr fptr) " " (car fptr) " to " ftypestr "\n" os)      
@@ -4398,7 +4666,7 @@
                                                (aname (car (cdr p))))
                                            (if (not (equal? (impc:ir:get-type-from-str atype)
                                                             ft)) ;(impc:ir:get-type-from-str ft)))
-                                               (print-error 'Compiler 'Error: 'function 'argument 'does 'not 'match. 'Expected ft 'but 'got atype 'ast: ast))
+					       (impc:compiler:print-type-mismatch-error ft atype ast))
                                            (string-append (if (> i 0) ", " "")
                                                           atype " " aname)))
                                        args (cddr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
@@ -4420,7 +4688,7 @@
                         (if (assoc-strcmp ast types)
                             (begin
                               (if (not (member ast *impc:ir:sym-name-stack*))                                  
-                                  (print-error 'Compiler 'Error: 'undefined 'symbol: ast)
+				  (impc:compiler:print-missing-identifier-error ast 'variable)
                                   (impc:ir:compile:eval-var ast (cdr (assoc-strcmp ast types)))))
                             (impc:ir:compile:eval-gvar ast))
 			(if (llvm:get-function (symbol->string ast))
@@ -4432,13 +4700,13 @@
 						 " = bitcast " (car ftypes)
 						 " (" (string-join (cdr ftypes) ",")
 						 ")* @" name " to i8*\n")))
-			    (print-error 'Compiler 'Error: 'Unbound 'symbol ast))))
+			    (impc:compiler:print-missing-identifier-error ast 'variable))))
                    ((number? ast)
 		    (if (not (null? hint?))
 			(begin (if (and (integer? ast) (impc:ir:floating-point? (car hint?)))
-				   (print-error 'Compiler 'Error: 'bad 'numeric 'value: ast 'require 'type: (string->symbol (impc:ir:pretty-print-type (car hint?)))))
+				   (impc:compiler:print-type-mismatch-error ast (impc:ir:pretty-print-type (car hint?))))
 			       (if (and (not (integer? ast)) (impc:ir:fixed-point? (car hint?)))
-				   (print-error 'Compiler 'Error: 'bad 'numeric 'value: ast 'require 'type: (string->symbol (impc:ir:pretty-print-type (car hint?)))))))
+				   (impc:compiler:print-type-mismatch-error ast (impc:ir:pretty-print-type (car hint?))))))
                     (if (and (not (null? hint?))
                              (impc:ir:number? (car hint?)))
                         (if (= *impc:ir:fp32* (car hint?))
@@ -4448,7 +4716,7 @@
                     "")
                    ((string? ast)
 		    (impc:ir:make-const-string ast))
-		   (else (print-error "bad or unsupported atom type -> " ast) (error ""))))
+		   (else (impc:compiler:print-compiler-error "bad or unsupported atom type" ast))))
             ((list? ast)
              (cond ((member (car ast) '(__make-env __make-env-zone))
                     (impc:ir:compile:make-env ast types))
@@ -4473,8 +4741,8 @@
                            (begin (llvm:remove-function (caddr ast))
                                   (if (not (llvm:compile fstr))
                                       (begin (if *impc:compiler:verbose*
-                                                 (print-error "Compiler Failed On: " fstr)
-                                                 (print-error "Compiler Failed"))					     
+						 (impc:compiler:print-compiler-error "compiler failed on " fstr)
+						 (impc:compiler:print-compiler-error "compiler failed"))
                                              (error "")))))
 		       (if *impc:compiler:precomp-llvm*
 			   (emit "(llvm:compile \"" fstr "\")\n\n" *impc:compiler:precomp*))
@@ -4554,7 +4822,7 @@
 				    (impc:ir:compiler:modulo ast types))
                    ((member (car ast) '(> < <> =)) 
                     (if (<> (length ast) 3)
-                        (print-error 'Compiler 'Error: ast 'bad 'arity))                    
+			(impc:compiler:print-bad-arity-error ast))
                     (if (not (null? hint?))                        
                         (impc:ir:compiler:cmp (cl:position (car ast) '(> < <> =)) ast types (car hint?))
                         (impc:ir:compiler:cmp (cl:position (car ast) '(> < <> =)) ast types)))
@@ -4566,7 +4834,7 @@
                         (impc:ir:compiler:math (cl:position (car ast) '(+ - * / %)) ast types)))
 		   ((member (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
 		    (if (<> (length ast) 3)
-			(print-error 'Compiler 'Error: ast 'bad 'arity))
+			(impc:compiler:print-bad-arity-error ast))
 		    (if (not (null? hint?))                    
 			(impc:ir:compiler:bitwise (cl:position (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right)) ast types (car hint?))
 			(impc:ir:compiler:bitwise (cl:position (car ast) '(bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right)) ast types)))
@@ -4585,7 +4853,7 @@
                                          (cdr ast)))
                               (va (impc:ir:gname "val" "i32")))
 			  (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) (impc:ir:pointer++ *impc:ir:si8*))
-			      (print-error 'Compiler 'Error: 'Type 'Mismatch ast 'First 'argument 'must 'be 'a 'format 'string))
+			      (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) "first argument must be a format string" ast))
                            (string-append (apply string-append (map (lambda (a) (car a)) args))
                                           "\n" va " = call i32 (i8*, ...)* @llvm_printf("
                                           (caddr (car args)) " " (cadr (car args))
@@ -4602,9 +4870,9 @@
 					     (cdr ast)))				  
 				  (va (impc:ir:gname "val" "i32")))
 			      (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) (impc:ir:pointer++ *impc:ir:si8*))
-			      	  (print-error 'Compiler 'Error: 'Type 'Mismatch ast 'First 'argument 'must 'be 'allocated 'memory))
+				  (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) "first argument must be allocated memory" ast))
 			      (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (cadr args))))) (impc:ir:pointer++ *impc:ir:si8*))
-			      	  (print-error 'Compiler 'Error: 'Type 'Mismatch ast 'Second 'argument 'must 'be 'format 'string))
+				  (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-from-str (car (cdr (cdr (cadr args))))) "second argument must be a format string" ast))
 			      (string-append (apply string-append (map (lambda (a) (car a)) args))
 					     "\n" va " = call i32 (i8*,i8*, ...)* @llvm_sprintf("
 					     (caddr (car args)) " " (cadr (car args)) ", "

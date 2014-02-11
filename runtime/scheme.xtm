@@ -41,6 +41,31 @@
 ;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;; POSSIBILITY OF SUCH DAMAGE.
 
+;; pretty printing
+
+(define-macro (print-with-colors fg bg bold . body)
+  `(let ((colors '((black . 0)
+		   (red . 1)
+		   (green . 2)
+		   (yellow . 3)
+		   (blue . 4)
+		   (magenta . 5)
+		   (cyan . 6)
+		   (white . 7)
+		   (default . 10)
+		   (none . 10))))
+     (ascii-print-color (if ,bold 1 0)
+			(cdr (assoc ,fg colors))
+			(cdr (assoc ,bg colors)))
+     ,@body
+     ;; return colors to normal
+     (ascii-print-color 0 7 10)))
+
+(define print-error
+	(lambda args
+		(apply pprint-error args)
+		(error "")))
+
 ;;
 ;; GENERAL UTILITY FUNCTIONS AND VARS
 ;;
@@ -1074,11 +1099,6 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define print-error
-	(lambda args
-		(apply pprint-error args)
-		(error "")))
 
 (define bench
    (lambda (func . args)
