@@ -27,12 +27,13 @@
 
 (sys:load-preload-check 'test)
 (define *xtmlib-test-loaded* #f)
-(print "Loading test library...")
+(print "\nLoading test library...")
 
-(define *func-successes* '((correct)
-			   (incorrect)
-			   (compile)
-			   (no-compile)))
+(define *func-successes*
+  '((correct)
+    (incorrect)
+    (compile)
+    (no-compile)))
 
 (define-macro (change-test-result category func-sym)
   `(for-each
@@ -58,17 +59,21 @@
 
 (define print-test-results
   (lambda ()
-    (begin (println 'Test 'results:)
-	   (println '=====================)
-	   (println)
-	   (for-each (lambda (result)
-		       (println '*** (car result) '***)
-		       (println)
-		       (for-each (lambda (fn)
-				   (println '--> fn))
-				 (cdr result))
-		       (println))
-		     *func-successes*))))
+    (println)
+    (print-with-colors 'black 'cyan #t (print " Test results "))
+    (print "\n\n")
+    (for-each (lambda (result)
+                (let ((colour (cdr (assoc (car result) '((correct . green)
+                                                         (incorrect . yellow)
+                                                         (compile . magenta)
+                                                         (no-compile . red))))))
+                  (print-with-colors 'cyan 'default #t (print (car result) "\n\n"))
+                  (for-each (lambda (fn)
+                              (print "- ")
+                              (print-with-colors colour 'default #f (print fn "\n")))
+                            (cdr result))
+                  (println)))
+              *func-successes*)))
 
 (define *xtmlib-test-loaded* #t)
-(print "done.\n")
+(print-with-colors 'green 'default #f (print " done.\n\n"))
