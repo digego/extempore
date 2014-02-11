@@ -5248,8 +5248,6 @@
 
 
 (define-macro (definec symname . args)
-  "definec takes optional type arguments after symname.  definec is
-deprecated - use bind-func instead."
   (let ((zone-size *impc:default-zone-size*))
     (if (number? (car args))
 	(begin (set! zone-size (car args))
@@ -5265,7 +5263,6 @@ deprecated - use bind-func instead."
 	    (set! symname (string->symbol (car sres)))
 	    (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
       ;(print-full symname 'types: types 'e: expr 'args: args)
-
       `(define ,symname
 	 (let* ((res1 (impc:ti:run ',symname
 				   '(let ((,symname ,expr)) ,symname)
@@ -5274,7 +5271,6 @@ deprecated - use bind-func instead."
 					 (map (lambda (k) (list 'quote k)) types))))
 		(setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
 		(func (llvm:get-function (symbol->string ',symname))))
-
 	   (if *impc:compiler:precomp-llvm*
 	       (emit (sexpr->string
 		      '(define ,symname
@@ -5521,7 +5517,7 @@ deprecated - use bind-func instead."
                         ,(if (regex:match? namestr "--")
                              ;; (if *impc:ti:print-full-generic-types*
                              ;; (impc:ir:pretty-print-type namestr)
-                             (string-append "" "!" (car (regex:type-split namestr "--")))
+                             (string-append "!" (car (regex:type-split namestr "--")))
                              namestr)
                         ":<"
                         ,(list 'tref 'x 0)
