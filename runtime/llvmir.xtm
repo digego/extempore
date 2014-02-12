@@ -96,18 +96,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Compiler error printing
 
+(define *impc:compiler:pretty-print-name-color* 'green)
+(define *impc:compiler:pretty-print-type-color* 'yellow)
+(define *impc:compiler:pretty-print-error-color* 'red)
+(define *impc:compiler:pretty-print-code-color* 'blue)
+
 (define impc:compiler:print-double-colon-error
   (lambda (var)
-    (print-with-colors 'red 'default #t (print "Syntax Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
     (print " double colon error for ")
-    (print-with-colors 'blue 'default #t (print var "\n"))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print var "\n"))
     (error "")))
 
 (define impc:compiler:print-bad-type-error
   (lambda (type . message)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (print " bad type ")
-    (print-with-colors 'blue 'default #t (print type))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type))
     (if (not (null? message))
 	(print " " (car message)))
     (println)
@@ -115,183 +122,203 @@
 
 (define impc:compiler:print-bad-type-error-with-ast
   (lambda (type message ast)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (print " bad type ")
-    (print-with-colors 'blue 'default #t (print type))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type))
     (print " " message " ")
-    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
     (error "")))
 
 (define impc:compiler:print-badly-formed-expression-error
   (lambda (expr-type ast)
-    (print-with-colors 'red 'default #t (print "Syntax Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
     (print " badly formed ")
-    (print-with-colors 'green 'default #t (print expr-type))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print expr-type))
     (print " expression:\n")
-    (print-with-colors 'ast 'default #t (print ast "\n"))
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
     (error "")))
 
 (define impc:compiler:print-index-oob-error
   (lambda (type ast)
-    (print-with-colors 'red 'default #t (print "Syntax Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
     (print " ")
-    (print-with-colors 'green 'default #t (print type))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print type))
     (print " index out of bounds: ")
-    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
     (error "")))
 
 (define impc:compiler:print-cannot-expand-non-generic-error
   (lambda (name)
-    (print-with-colors 'red 'default #t (print "Generics Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Generics Error"))
     (print " cannot expand on non-generic ")
-    (print-with-colors 'blue 'default #t (print name "\n"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print name "\n"))
     (error "")))
 
 (define impc:compiler:print-expansion-arity-error
   (lambda (before after)
-    (print-with-colors 'red 'default #t (print "Generics Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Generics Error"))
     (print " expansion arity error ")
-    (print-with-colors 'blue 'default #f (print before))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print before))
     (print " -> ")
-    (print-with-colors 'blue 'default #f (print after "\n"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print after "\n"))
     (error "")))
 
 (define impc:compiler:print-no-valid-forms-for-generic-error
   (lambda (name)
-    (print-with-colors 'red 'default #t (print "Generics Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Generics Error"))
     (print " cannot find any valid forms for generic function ")
-    (print-with-colors 'blue 'default #t (print name "\n"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print name "\n"))
     (error "")))
 
 (define impc:compiler:print-shadow-var-error
   (lambda (name)
-    (print-with-colors 'red 'default #t (print "Compiler Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
     (print " cannot define ")
-    (print-with-colors 'green 'default #t (print name))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
     (print " as a shadow variable\n")
     (error "")))
 
 (define impc:compiler:print-already-bound-error
   (lambda (name type)
-    (print-with-colors 'red 'default #t (print "Compiler Error"))
-    (print-with-colors 'green 'default #t (print name))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
     (print " already bound as ")
-    (print-with-colors 'blue 'default #t (print type "\n"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type "\n"))
     (error "")))
 
 (define impc:compiler:print-no-redefinitions-error
   (lambda (name oldtype newtype)
-    (print-with-colors 'red 'default #t (print "Compiler Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
     (print " cannot redefine or overload the type signature of existing functions.  In this case, ")
-    (print-with-colors 'green 'default #t (print name)) (print " from ")
-    (print-with-colors 'blue 'default #t (print oldtype)) (print " to ")
-    (print-with-colors 'blue 'default #t (print newtype))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name)) (print " from ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print oldtype)) (print " to ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print newtype "\n"))
     (error "")))
 
 (define impc:compiler:print-bad-arity-error
   (lambda (ast)
-    (print-with-colors 'red 'default #t (print "Syntax Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
     (print " bad arity in expression:\n")
-    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
     (error "")))
 
 (define impc:compiler:print-no-retval-error
   (lambda (ast)
-    (print-with-colors 'red 'default #t (print "Syntax Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
     (print " no return value for body: ")
-    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
     (error "")))
 
 (define impc:compiler:print-needs-zone-size-error
   (lambda (expr-name)
-    (print-with-colors 'red 'default #t (print "Syntax Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
     (print " ")
-    (print-with-colors 'green 'default #t (print expr-name))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print expr-name))
     (print " requires a zone size as its first argument\n")
     (error "")))
 
 (define impc:compiler:print-needs-zone-delay-error
   (lambda (expr-name)
-    (print-with-colors 'red 'default #t (print "Syntax Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
     (print " ")
-    (print-with-colors 'green 'default #t (print expr-name))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print expr-name))
     (print " requires an ")
-    (print-with-colors 'blue 'default #f (print "i64"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print "i64"))
     (print " delay as its second argument\n")
     (error "")))
 
 (define impc:compiler:print-variable-not-marked-as-free-error
   (lambda (vs)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (print " variable " )
-    (print-with-colors 'blue 'default #t (print vs))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print vs))
     (print " not marked as free - check the variable name in the polytype\n")
     (error "")))
 
 (define impc:compiler:print-type-mismatch-error
   (lambda (name got . in)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (if (not (null? expected))
 	(begin (print " In ")
-	       (print-with-colors 'green 'default #t
+	       (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
 				  (print  (car expected)))
 	       (print ",")))
     (print " got " )
-    (print-with-colors 'blue 'default #t (print got))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print got))
     (print ", was expecting ")
-    (print-with-colors 'blue 'default #t (print expected "\n"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print expected "\n"))
     (error "")))
 
 (define impc:compiler:print-type-conflict-error
   (lambda (type1 type2 ast)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (print " type conflict between " )
-    (print-with-colors 'blue 'default #t (print type1))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type1))
     (print " and ")
-    (print-with-colors 'blue 'default #t (print type2))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type2))
     (print " in ")
-    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
     (error "")))
 
 (define impc:compiler:print-if-type-conflict-error
   (lambda (then else)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (print " type conflict between " )
-    (print-with-colors 'green 'default #t (print "then"))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print "then"))
     (print " (")
-    (print-with-colors 'blue 'default #t (print then))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print then))
     (print ") and ")
-    (print-with-colors 'green 'default #t (print "else"))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print "else"))
     (print " (")
-    (print-with-colors 'blue 'default #t (print else))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print else))
     (print ") branch of " )
-    (print-with-colors 'green 'default #t (print  "if"))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print  "if"))
     (print " statement\n")
     (error "")))
 
 (define impc:compiler:print-unsupported-conversion-error
   (lambda (from to)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (print " unsupported conversion from " )
-    (print-with-colors 'blue 'default #t (print from))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print from))
     (print " to ")
-    (print-with-colors 'blue 'default #t (print to "\n"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print to "\n"))
     (error "")))
 
 (define impc:compiler:print-missing-type-error
   (lambda (type)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (print " cannot find type " )
-    (print-with-colors 'blue 'default #t (print type "\n"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type "\n"))
     (error "")))
 
 (define impc:compiler:print-could-not-resolve-type-error
   (lambda (types . message)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (if (list? types)
 	(print " couldn't resolve types: ")
 	(print " couldn't resolve type: "))
-    (print-with-colors 'blue 'default #t (print types))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print types))
     (if (not (null? message))
 	(print " " (car message)))
     (println)
@@ -299,66 +326,74 @@
 
 (define impc:compiler:print-could-not-resolve-generic-type-error
   (lambda (types ast)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (if (list? types)
 	(print " couldn't resolve generic types: ")
 	(print " couldn't resolve generic type: "))
-    (print-with-colors 'blue 'default #t (print types))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print types))
     (print " ")
-    (print-with-colors 'yellow 'default #t (print ast "\n"))
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
     (error "")))
 
 (define impc:compiler:print-missing-identifier-error
   (lambda (name type)
-    (print-with-colors 'red 'default #t (print "Compiler Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
     (print " cannot find " type " ")
-    (print-with-colors 'green 'default #t (print name "\n"))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n"))
     (error "")))
 
 (define impc:compiler:print-missing-generic-type-error
   (lambda (type-name)
-    (print-with-colors 'red 'default #t (print "Type Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
     (print " cannot find generic type ")
-    (print-with-colors 'blue 'default #t (print type-name "\n"))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type-name "\n"))
     (error "")))
 
 (define impc:compiler:print-missing-compiled-function-error
   (lambda (name)
-    (print-with-colors 'red 'default #t (print "Compiler Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
     (print " no compiled function ")
-    (print-with-colors 'green 'default #t (print name))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
     (print ", perhaps you need to turn on compilation?\n")
     (error "")))
 
 (define impc:compiler:print-missing-compiled-function-setter-error
   (lambda (name)
-    (print-with-colors 'red 'default #t (print "Compiler Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
     (print " no compiled function ")
-    (print-with-colors 'green 'default #t (print name))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
     (print "setter, perhaps you need to turn on compilation?\n")
     (error "")))
 
 (define impc:compiler:print-compiler-error
   (lambda (message . ast)
-    (print-with-colors 'red 'default #t (print "Compiler Error"))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
     (print " " message)
     (if (not (null? ast))
 	(begin (print " ast: ")
-	       (print-with-colors 'yellow 'default #t (print (car ast)))))
+	       (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f
+                            (print (car ast)))))
     (println)
     (error "")))
 
 (define impc:compiler:print-compiler-failed-error
   (lambda ()
-    (print-with-colors 'red 'default #t (print "Compiler Failed."))
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Failed."))
     (error "")))
 
 (define impc:compiler:print-binding-details-to-log
   (lambda (lead-string symname type)
     (print lead-string " ")
-    (print-with-colors 'green 'default #t (print symname))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
     (print " >>> ")
-    (print-with-colors 'yellow 'default #t  (print type))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
     (println)))
 
 (define impc:compiler:print-no-scheme-stub-notification
@@ -366,7 +401,7 @@
     (print "There is no ")
     (print-with-colors 'cyan 'default #t (print  "scheme stub"))
     (print " available for ")
-    (print-with-colors 'green 'default #t (print symname "\n"))))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname "\n"))))
 
 
 ;; ;; GCHANGE
