@@ -120,6 +120,16 @@
     (println)
     (error "")))
 
+(define impc:compiler:print-bad-numeric-value-error
+  (lambda (value expected-type)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " bad numeric value ")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print value))
+    (print ", should be ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print expected-type "\n"))    
+    (error "")))
+
 (define impc:compiler:print-bad-type-error-with-ast
   (lambda (type message ast)
     (print-with-colors *impc:compiler:pretty-print-error-color*
@@ -4742,9 +4752,9 @@
                    ((number? ast)
 		    (if (not (null? hint?))
 			(begin (if (and (integer? ast) (impc:ir:floating-point? (car hint?)))
-				   (impc:compiler:print-type-mismatch-error ast (impc:ir:pretty-print-type (car hint?))))
+				   (impc:compiler:print-bad-numeric-value-error ast (impc:ir:pretty-print-type (car hint?))))
 			       (if (and (not (integer? ast)) (impc:ir:fixed-point? (car hint?)))
-				   (impc:compiler:print-type-mismatch-error ast (impc:ir:pretty-print-type (car hint?))))))
+				   (impc:compiler:print-bad-numeric-value-error ast (impc:ir:pretty-print-type (car hint?))))))
                     (if (and (not (null? hint?))
                              (impc:ir:number? (car hint?)))
                         (if (= *impc:ir:fp32* (car hint?))
