@@ -610,19 +610,29 @@
 (bind-func tap_delay_c
   (lambda (max_delay num_of_taps)
     (let ((line:SAMPLE* (zalloc max_delay))
-	  (taps:i64* (zalloc num_of_taps))
-	  (delay max_delay)
-	  (time 0))
+          (taps:i64* (zalloc num_of_taps))
+          (delay max_delay)
+          (time 0))
       (lambda (x:SAMPLE)
-	(let ((y 0.0)
-	      (i 0)
-	      (n (modulo time delay))
-	      (gain (/ 1.0 (convert num_of_taps))))
-	  (pset! line n x)
-	  (dotimes (i num_of_taps)
-	    (set! y (+ y (* gain (pref line (% (+ (pref taps i) n) delay))))))
-	  (set! time (+ time 1))
-	  y)))))
+        (let ((y 0.0)
+              (i 0)
+              (n (modulo time delay))
+              (gain (/ 1.0 (convert num_of_taps))))
+          (pset! line n x)
+          (dotimes (i num_of_taps)
+            (set! y (+ y (* gain (pref line (% (+ (pref taps i) n) delay))))))
+          (set! time (+ time 1))
+          y)))))
+
+(if *build-multi-chan*
+    (bind-func tap_delay_mc_c
+      (lambda (nchan:i64 max_delay num_of_taps)
+        (let ((tap_delay_buf:[SAMPLE,SAMPLE]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan)
+            (pset! tap_delay_buf i (tap_delay_c max_delay num_of_taps)))
+          (lambda (chan x)
+            ((pref tap_delay_buf chan) x))))))
 
 ;; allpass
 (bind-func allpass_old_c
