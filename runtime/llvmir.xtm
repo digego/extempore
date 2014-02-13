@@ -250,14 +250,15 @@
     (error "")))
 
 (define impc:compiler:print-type-mismatch-error
-  (lambda (name got . in)
+  (lambda (got expected . name)
     (print-with-colors *impc:compiler:pretty-print-error-color*
                        'default #t (print "Type Error"))
-    (if (not (null? expected))
-	(begin (print " In ")
-	       (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
-				  (print  (car expected)))
-	       (print ",")))
+
+    (if (not (null? name))
+        (begin (print " In ")
+               (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
+                                  (print  (car name)))
+               (print ",")))
     (print " got " )
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print got))
     (print ", was expecting ")
