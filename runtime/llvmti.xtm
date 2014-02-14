@@ -192,15 +192,15 @@
                  (xtype (substring (cadr p) 1 (string-length (cadr p))))
                  (ptrdepth (impc:ir:get-ptr-depth xtype))
                  (base (impc:ir:get-base-type xtype))
-                 (gtt (if func?
-                          (assoc-strcmp (string->symbol name) *impc:ir:gpolys*)
-                          (assoc-strcmp (string->symbol name) *impc:ir:gpolytypes*)))
-                 (gtype (if gtt
-                            (symbol->string (if func? (caddr gtt) (cdr gtt)))
-			    (impc:compiler:print-cannot-expand-non-generic-error name)))
                  (xvars (if func?
                            (impc:ir:get-pretty-closure-arg-strings base)
-                           (impc:ir:get-pretty-tuple-arg-strings base)))
+                           (impc:ir:get-pretty-tuple-arg-strings base)))                 
+                 (gtt (if func?
+                          (impc:ir:gpoly-types (string->symbol name) (length xvars))
+                          (assoc-strcmp (string->symbol name) *impc:ir:gpolytypes*)))
+                 (gtype (if gtt
+                            (symbol->string (if func? (car gtt) (cdr gtt)))
+			    (impc:compiler:print-cannot-expand-non-generic-error name)))
                  (_gvars (regex:match-all gtype "(![A-Za-z0-9_]*)"))
                  (gvars (cl:remove-duplicates _gvars)))
             (if (<> (length gvars) (length xvars))
@@ -5440,7 +5440,7 @@
                         ,(if (regex:match? namestr "--")
                              ;; (if *impc:ti:print-full-generic-types*
                              ;; (impc:ir:pretty-print-type namestr)
-                             (string-append "" "!" (car (regex:type-split namestr "--")))
+                             (string-append "!" (car (regex:type-split namestr "--")))
                              namestr)
                         ":<"
                         ,(list 'tref 'x 0)
