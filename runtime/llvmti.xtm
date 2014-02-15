@@ -180,6 +180,21 @@
 ;; types must be generic
 ;;
 
+(define impc:ti:expand-generic-type-func-gpoly-arity
+  (lambda (name xvararity)
+    (let* ((all-gpolys (cl:remove-if-not (lambda (x) (equal? (car x) name)) *impc:ir:gpolys*))
+           (all-gtypes (map (lambda (x) (caddr x)) all-gpolys))
+           (all-type-arity (map (lambda (x) (length
+                                        (cl:remove-duplicates
+                                         (regex:match-all (symbol->string x)
+                                                          "(![A-Za-z0-9_]*)"))))
+                                all-gtypes))
+           (res (cl:remove #f (map (lambda (x y) (if (= x xvararity) y #f)) all-type-arity all-gtypes))))
+      (if (<> (length res) 1)
+          (impc:compiler:print-expansion-arity-error name (string->symbol (string-append "no_valid_arity_for_" (atom->string xvararity) "_gvar")))
+          res))))
+
+
 (define impc:ti:expand-generic-type
   (lambda (t)
     (let* ((t2 (symbol->string t))
@@ -194,9 +209,9 @@
                  (base (impc:ir:get-base-type xtype))
                  (xvars (if func?
                            (impc:ir:get-pretty-closure-arg-strings base)
-                           (impc:ir:get-pretty-tuple-arg-strings base)))                 
+                           (impc:ir:get-pretty-tuple-arg-strings base)))
                  (gtt (if func?
-                          (impc:ir:gpoly-types (string->symbol name) (length xvars))
+                          (impc:ti:expand-generic-type-func-gpoly-arity (string->symbol name) (length xvars))
                           (assoc-strcmp (string->symbol name) *impc:ir:gpolytypes*)))
                  (gtype (if gtt
                             (symbol->string (if func? (car gtt) (cdr gtt)))
