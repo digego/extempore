@@ -3506,17 +3506,16 @@
 							  ; #f))) ;request?))
             ;; b should be fixed point -- llvm structs only support 32bit indexes
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
-
+	(if (impc:ir:type? a)
+	    (set! a (list a)))        
 	;; unify a?
 	(if (not (null? a)) (set! a (impc:ti:type-unify (car a) vars)))
 	(if (impc:ir:type? a) (set! a (list a)))
-
 	;; we MUST expand named types!
 	(if (not (null? a)) (set! a (impc:ti:try-to-resolve-named-types (car a) vars)))
 	(if (impc:ir:type? a) (set! a (list a)))
 
 	;; (println 'tupref-check 'a: a 'ast: ast (list-ref (car a) (+ 1 (caddr ast))))
-
 	(if (and (not (null? a))
 		 (list? a)
 		 (impc:ir:tuple? (car a)))
