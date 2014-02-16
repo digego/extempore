@@ -1154,7 +1154,8 @@
 		  (if (not (assoc-strcmp vs vars)) ;; if not in vars
 		      (if (regex:match? (symbol->string vs) "^![^#]*$") ;; then check to see if symbol is a !gvar
 			  vs
-			  (impc:compiler:print-variable-not-marked-as-free-error vs))
+			  ;; (impc:compiler:print-variable-not-marked-as-free-error vs))
+                          vs)
 		      ;; check to see a type has been defined
 		      ;; otherwise return null
 		      (let ((t (cdr (assoc-strcmp vs vars))))
@@ -3469,8 +3470,7 @@
 							    ;;#f))) ;request?))
             ;; b should be fixed point -- llvm structs only support 32bit indexes
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
-	(if (impc:ir:type? a)
-	    (set! a (list a)))
+	(if (and (not (null? a)) (or (atom? a) (impc:ir:type? a)))  (set! a (list a)))        
 
 	;; check for named types
 	(if (not (null? a)) (set! a (impc:ti:try-to-resolve-named-types (car a) vars)))
@@ -3490,7 +3490,9 @@
 	    ;;'()))))
 	    (if (null? a)
 		'()
-		(impc:compiler:print-bad-type-error (caddr ast) (string-append "invalid tuple-ref-ptr type " (impc:ir:get-type-str (car a)))))))))
+		;; (impc:compiler:print-bad-type-error (caddr ast) (string-append "invalid tuple-ref-ptr type " (impc:ir:get-type-str (car a)))))))))                
+                a)))))
+
 
 
 (define impc:ti:tuple-ref-check
@@ -3506,16 +3508,13 @@
 							  ; #f))) ;request?))
             ;; b should be fixed point -- llvm structs only support 32bit indexes
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*))))
-	(if (impc:ir:type? a)
-	    (set! a (list a)))        
+	(if (and (not (null? a)) (or (atom? a) (impc:ir:type? a))) (set! a (list a)))        
 	;; unify a?
 	(if (not (null? a)) (set! a (impc:ti:type-unify (car a) vars)))
-	(if (impc:ir:type? a) (set! a (list a)))
+	(if (and (not (null? a)) (or (atom? a) (impc:ir:type? a))) (set! a (list a)))
 	;; we MUST expand named types!
 	(if (not (null? a)) (set! a (impc:ti:try-to-resolve-named-types (car a) vars)))
-	(if (impc:ir:type? a) (set! a (list a)))
-
-	;; (println 'tupref-check 'a: a 'ast: ast (list-ref (car a) (+ 1 (caddr ast))))
+	(if (and (not (null? a)) (or (atom? a) (impc:ir:type? a)))  (set! a (list a)))
 	(if (and (not (null? a))
 		 (list? a)
 		 (impc:ir:tuple? (car a)))
@@ -3525,8 +3524,9 @@
 		   (list-ref (car a) (+ 1 (caddr ast))))
 	    (if (null? a)
 		'()
-		(impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a)) "in tuple-ref"))))))
-;	    '()))))
+                ;; (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a)) "in tuple-ref"))))))                
+                a)))))
+
 
 
 ;;(closure-set! closure a i32 5)
@@ -3621,7 +3621,9 @@
 	 (begin (map (lambda (sym req)
 		       ;; (println 'larg: sym 'req: req)
 		       (if (symbol? sym)
-			   (impc:ti:update-var sym vars kts req)))
+                           (if (atom? req)
+                               (impc:ti:update-var sym vars kts (list req))
+                               (impc:ti:update-var sym vars kts req))))
 		     (cadr ast)
 		     (cddr request?))
 		;; finally set request? to the return type
@@ -4803,7 +4805,7 @@
          ;; if we didn't unify print error and bomb out!	
          (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
 	     (begin 
-	       ;; (println 'types_: types)
+	       (println 'types_: types)
 	       (impc:compiler:print-could-not-resolve-type-error
 	  (cl:remove 'good (map (lambda (x y) (if y 'good (symbol->string (car x))))
 				types (impc:ti:unity? types)))

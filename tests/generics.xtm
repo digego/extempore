@@ -308,6 +308,24 @@
 
 (test-xtfunc (test_list_swap) 1)
 
+
+;; test filter and map arity 2
+(bind-func test_list_filter
+  (lambda ()
+    (let ((l1 (list (Point 1.0 2.0) (Point 3.0 4.0)))
+          (l2 (list (Size 1.0 1.0) (Size 2.0 2.0)))
+          (r1 (Rectangle (Point 5.0 6.0) (Size 3.0 3.0)))
+          (l3 (map (lambda (x y)
+                     (Rectangle x y))
+                   l1 l2)))
+      (for-each (lambda (x) (println x)) (cons r1 l3))
+      (car (filter (lambda (j)
+                     (if (= 3.0 (tref (tref j 1) 0))
+                         #t #f))
+                   (cons r1 l3))))))
+
+(test-xtfunc (test_list_filter))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; assoc lists
@@ -438,7 +456,7 @@
           (y (Maybe 5))
           (z (Maybe 2))
           (result (maybe_mul x (maybe_mul y z))))
-      (bind result Maybe:[Maybe:<i1,i64>*,i64]*)      
+      (bind result Maybe:[Maybe:<i1,i64>*,i64]*)
       (bind (Maybe 5) (lambda (x) (Maybe (* x x))))
       (bind (Maybe 6.0) (lambda (x) (Maybe (* x x))))
       (bind (Maybe 5) (lambda (x) (Maybe (* x x))))
