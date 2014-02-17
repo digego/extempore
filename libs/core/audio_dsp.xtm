@@ -311,6 +311,15 @@
 	(if (> phase 1.0) (set! phase (- phase 1.0)))
 	(if (< phase duty) amp (* -1.0 amp))))))
 
+(if *build-multi-chan*
+    (bind-func rect_mc_c
+      (lambda (phase)
+        (let ((val 0.0)
+              (rect (rect_c phase)))
+          (lambda (chan:i64 amp freq duty)
+            (if (= chan 0) (set! val (rect amp freq duty)))
+            val)))))
+
 ;; saw oscillator
 (bind-func saw_c
   (lambda (phase)
