@@ -181,6 +181,36 @@
 	a
 	(last (cdr a)))))
 
+(bind-func range:[List:<!a,List*>*,!a]*
+  (lambda (end)
+    (let ((val (- end (convert 1)))
+          (result null))
+      (while (>= val (convert 0))
+        (set! result (cons val result))
+        (set! val (- val (convert 1))))
+      result)))
+
+(bind-func range:[List:<!a,List*>*,!a,!a]*
+  (lambda (start end)
+    (let ((val (- end (convert 1)))
+          (result null))
+      (while (>= val start)
+        (set! result (cons val result))
+        (set! val (- val (convert 1))))
+      result)))
+
+(bind-func range:[List:<!a,List*>*,!a,!a,!a]*
+  (lambda (start end step)
+    (if (< step 1)
+        (begin (println "Problem in call to range: step must be positive")
+               null)
+        (let ((val start)
+              (result null))
+          (while (< val end)
+            (set! result (cons val result))
+            (set! val (+ val step)))
+          (reverse result)))))
+
 (bind-func append:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a b)
     (let ((p (last a)))
