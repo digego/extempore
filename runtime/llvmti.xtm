@@ -3843,9 +3843,10 @@
 (define impc:ti:while-check
   (lambda (ast vars kts request?)
     (let ((type (impc:ti:type-check (cadr ast) vars kts #f))
-	  (body (impc:ti:type-check (caddr ast) vars kts #f)))
-      (if (not (or (null? type)
-		   (= (car type) *impc:ir:i1*)))
+          (body (impc:ti:type-check (caddr ast) vars kts #f)))
+      (if (not (or (and (number? type) (= type *impc:ir:i1*))
+                   (= (car type) *impc:ir:i1*)
+                   (null? type)))
 	  (impc:compiler:print-bad-type-error (car type) "test expression in while loop must return a boolean"))
       (list *impc:ir:void*))))
 
