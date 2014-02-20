@@ -87,6 +87,14 @@
       (tset! pre_cell 1 post_cell)
       (car cell))))
 
+(bind-func reverse:[List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (lst)
+    (let ((rev (lambda (old new)
+                 (if (null? old)
+                     new
+                     (rev (cdr old) (cons (car old) new))))))
+      (rev lst (convert null)))))
+
 (bind-func map:[List:<!a,List*>*,[!a,!b]*,List:<!b,List*>*]*
   (lambda (func xs)
     (let ((f (lambda (l)
@@ -143,6 +151,46 @@
 		       (f (cdr l)))))))
       (f lst))))
 
+(bind-func any:[bool,[bool,!a]*,List:<!a,List*>*]*
+  (lambda (pred lst)
+    (let ((f (lambda (l)
+               (if (null? l)
+                   #f
+                   (if (pred (car l))
+                       #t
+                       (f (cdr l)))))))
+      (f lst))))
+
+(bind-func any:[bool,[bool,!a,!b]*,List:<!a,List*>*,List:<!b,List*>*]*
+  (lambda (pred lst1 lst2)
+    (let ((f (lambda (l1 l2)
+               (if (or (null? l1) (null? l2))
+                   #f
+                   (if (pred (car l1) (car l2))
+                       #t
+                       (f (cdr l1) (cdr l2)))))))
+      (f lst1 lst2))))
+
+(bind-func every:[bool,[bool,!a]*,List:<!a,List*>*]*
+  (lambda (pred lst)
+    (let ((f (lambda (l)
+               (if (null? l)
+                   #t
+                   (if (not (pred (car l)))
+                       #f
+                       (f (cdr l)))))))
+      (f lst))))
+
+(bind-func every:[bool,[bool,!a,!b]*,List:<!a,List*>*,List:<!b,List*>*]*
+  (lambda (pred lst1 lst2)
+    (let ((f (lambda (l1 l2)
+               (if (or (null? l1) (null? l2))
+                   #t
+                   (if (not (pred (car l1) (car l2)))
+                       #f
+                       (f (cdr l1) (cdr l2)))))))
+      (f lst1 lst2))))
+
 (bind-func for-each:[void,[!a,!b]*,List:<!b,List*>*]*
   (lambda (func xs)
     (let ((f (lambda (l)
@@ -173,6 +221,36 @@
 	a
 	(last (cdr a)))))
 
+(bind-func range:[List:<!a,List*>*,!a]*
+  (lambda (end)
+    (let ((val (- end (convert 1)))
+          (result null))
+      (while (>= val (convert 0))
+        (set! result (cons val result))
+        (set! val (- val (convert 1))))
+      result)))
+
+(bind-func range:[List:<!a,List*>*,!a,!a]*
+  (lambda (start end)
+    (let ((val (- end (convert 1)))
+          (result null))
+      (while (>= val start)
+        (set! result (cons val result))
+        (set! val (- val (convert 1))))
+      result)))
+
+(bind-func range:[List:<!a,List*>*,!a,!a,!a]*
+  (lambda (start end step)
+    (if (< step 1)
+        (begin (println "Problem in call to range: step must be positive")
+               null)
+        (let ((val start)
+              (result null))
+          (while (< val end)
+            (set! result (cons val result))
+            (set! val (+ val step)))
+          (reverse result)))))
+
 (bind-func append:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a b)
     (let ((p (last a)))
@@ -196,6 +274,23 @@
       (set_car (nth_tail lst j) ith_val))
     lst))
 
+;; fold/reduce
+
+(bind-func foldl:[!b,[!b,!b,!a]*,!b,List:<!a,List*>*]*
+  (lambda (fn start lst)
+    (let ((fold (lambda (l r) ; list result
+                  (if (null? l)
+                      r
+                      (fold (cdr l) (fn r (car l)))))))
+      (fold lst start))))
+
+(bind-func foldr:[!b,[!b,!a,!b]*,!b,List:<!a,List*>*]*
+  (lambda (fn end lst)
+    (let ((fold (lambda (l r) ; list result
+                  (if (null? l)
+                      r
+                      (fold (cdr l) (fn (car l) r))))))
+      (fold (reverse lst) end))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
