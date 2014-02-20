@@ -274,6 +274,23 @@
       (set_car (nth_tail lst j) ith_val))
     lst))
 
+;; fold/reduce
+
+(bind-func foldl:[!b,[!b,!b,!a]*,!b,List:<!a,List*>*]*
+  (lambda (fn start lst)
+    (let ((fold (lambda (l r) ; list result
+                  (if (null? l)
+                      r
+                      (fold (cdr l) (fn r (car l)))))))
+      (fold lst start))))
+
+(bind-func foldr:[!b,[!b,!a,!b]*,!b,List:<!a,List*>*]*
+  (lambda (fn end lst)
+    (let ((fold (lambda (l r) ; list result
+                  (if (null? l)
+                      r
+                      (fold (cdr l) (fn (car l) r))))))
+      (fold (reverse lst) end))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;

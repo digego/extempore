@@ -389,6 +389,50 @@
 
 (test-xtfunc (test_list_range_2) 3)
 
+;; foldl/foldr
+
+(bind-func test_foldl_1
+  (lambda ()
+    (let ((plus (lambda (a:i64 b) (+ a b)))
+          (lst (list 1 2 3 4)))
+      (foldl plus 0 lst))))
+
+(test-xtfunc (test_foldl_1) 10)
+
+(bind-func test_foldl_2
+  (lambda ()
+    (let ((lst (range 10. 30.)))
+      (foldl (lambda (a:double b)
+               (let ((x (+ a b)))
+                 (if (= (% (convert (/ x 2.0) i64) 2) 0)
+                     x
+                     0.)))
+             0. lst))))
+
+(test-xtfunc (test_foldl_2) 57)
+
+(bind-func test_foldr_1
+  (lambda ()
+    (let ((lst (range 10.))
+          (fn (lambda (lower:double upper) (random lower upper)))
+          (res (foldr fn 10. lst)))
+      res)))
+
+(test-xtfunc (test_foldr_1))
+
+(bind-func test_foldr_2
+  (lambda ()
+    (let ((lst (range 10))
+          (fn (lambda (a:i64 b) (cons a b)))
+          (res (foldr fn null lst)))
+      (list_print res)
+      (and (= (nth lst 4)
+              (nth res 4))
+           (= (nth lst 6)
+              (nth res 6))))))
+
+(test-xtfunc (test_foldr_2) 1)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; assoc lists
