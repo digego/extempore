@@ -56,17 +56,15 @@
 	0
 	(+ 1 (length (cdr a))))))
 
-(bind-func _nth_tail:[List:<!a,List*>*,List:<!a,List*>*,i64,i64]*
-  (lambda (lst idx cnt)
-    (if (or (= cnt idx) (> cnt idx))
-        lst
-        (_nth_tail (cdr lst)
-                   idx
-                   (+ cnt 1)))))
-
 (bind-func nth_tail:[List:<!a,List*>*,List:<!a,List*>*,i64]*
   (lambda (lst idx)
-    (_nth_tail lst idx 0)))
+    (let ((nt (lambda (l i cnt)
+                (if (or (= cnt i) (> cnt i))
+                    l
+                    (nt (cdr l)
+                               i
+                               (+ cnt 1))))))
+      (nt lst idx 0))))
 
 (bind-func nth:[!a,List:<!a,List*>*,i64]*
   (lambda (lst idx)

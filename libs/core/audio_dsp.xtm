@@ -311,6 +311,15 @@
 	(if (> phase 1.0) (set! phase (- phase 1.0)))
 	(if (< phase duty) amp (* -1.0 amp))))))
 
+(if *build-multi-chan*
+    (bind-func rect_mc_c
+      (lambda (phase)
+        (let ((val 0.0)
+              (rect (rect_c phase)))
+          (lambda (chan:i64 amp freq duty)
+            (if (= chan 0) (set! val (rect amp freq duty)))
+            val)))))
+
 ;; saw oscillator
 (bind-func saw_c
   (lambda (phase)
@@ -388,14 +397,12 @@
 (bind-func fade_c
   (lambda ()
     (let ((t 0.0)
-	  (inc (/ 1.0 SR)))
+          (inc (/ 1.0 SR)))
       (lambda (initial:SAMPLE final dur)
-	(set! t (+ t inc))
-	(if (< t 0.0)
-	    initial
-	    (if (> t dur)
-		final
-		(* (/ t dur) (- final initial))))))))
+        (set! t (+ t inc))
+        (if (> t dur)
+            final
+            (+ initial (* (/ t dur) (- final initial))))))))
 
 (if *build-multi-chan*
     (bind-func fade_mc_c
