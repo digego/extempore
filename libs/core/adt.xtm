@@ -151,6 +151,26 @@
 		       (f (cdr l)))))))
       (f lst))))
 
+(bind-func any:[bool,[bool,!a]*,List:<!a,List*>*]*
+  (lambda (pred lst)
+    (let ((f (lambda (l)
+               (if (null? l)
+                   #f
+                   (if (pred (car l))
+                       #t
+                       (f (cdr l)))))))
+      (f lst))))
+
+(bind-func any:[bool,[bool,!a,!b]*,List:<!a,List*>*,List:<!b,List*>*]*
+  (lambda (pred lst1 lst2)
+    (let ((f (lambda (l1 l2)
+               (if (or (null? l1) (null? l2))
+                   #f
+                   (if (pred (car l1) (car l2))
+                       #t
+                       (f (cdr l1) (cdr l2)))))))
+      (f lst1 lst2))))
+
 (bind-func for-each:[void,[!a,!b]*,List:<!b,List*>*]*
   (lambda (func xs)
     (let ((f (lambda (l)
