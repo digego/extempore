@@ -88,6 +88,15 @@
 	(cons (loop (car tree)) (loop (cdr tree)))
 	tree)))
 
+(define (tree-member mem tree)
+  (if (member #t
+              (flatten
+               (let loop ((tree tree))
+                 (if (pair? tree)
+                     (cons (loop (car tree)) (loop (cdr tree)))
+                     (if (null? tree) '()
+                         (if (equal? tree mem) #t #f))))))
+      #t #f))
 
 (define remove-first
    (lambda (obj lst)
