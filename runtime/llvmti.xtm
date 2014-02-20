@@ -1717,6 +1717,31 @@
                    k))
              type))))
 
+;; this is here for whenever we get
+;; new 'argument' information about
+;; a locally bound lambda which might help
+;; us to derive new return type information
+(define impc:ti:type-check-bound-lambda
+  (lambda (sym vars kts t)
+    (if (not (assoc-strcmp sym *impc:ti:bound-lambdas*))
+        #f
+        (let* ((f (cadr (assoc-strcmp sym *impc:ti:bound-lambdas*)))
+               (args (cadr f))
+               (body (caddr f))
+               (estr (sexpr->string body))
+               (recursive? (regex:match? estr (string-append "(" "\\(\\s*" (symbol->string sym) "\\s" ")|(\\(\\s*callback)")))
+               (rettype '()))
+          (if (not recursive?)
+              (begin
+                (for-each (lambda (x y)
+                            ;; (println 'lambda 'x: x 'y: y)
+                            (impc:ti:update-var x vars kts y))
+                          args (cddr t))
+                (set! rettype (impc:ti:type-check (caddr (cadr (assoc-strcmp sym *impc:ti:bound-lambdas*)))
+                                                  vars kts #f))
+                (if (impc:ir:type? rettype)
+                    rettype
+                    #f)))))))
 
 ;; don't allow update to add to kts values
 (define impc:ti:update-var
@@ -1725,8 +1750,9 @@
     ;; i.e. change (211 4 (0) (1) 0)) -> (211 4 0 1 0) 
     ;;
     (if (and (list? t)
-              (= (length t) 1)
-              (string? (car t)))
+             (= (length t) 1)
+             (or (string? (car t))
+                 (impc:ir:type? (car t))))             
          (set! t (car t)))
      (set! t (impc:ti:type-clean t))
      ;; (println 'b1: t)
@@ -1763,7 +1789,17 @@
 			 (let ((pair-rest (cdr pair)))
 			   (if (or (impc:ir:type? t)
                                    (impc:ti:complex-type? t))
-			       (begin ;; uncomment the following lines to do reverse bang tests
+			       (begin
+                                 ;; if 't' is a closure without a return type
+                                 ;; but has new argument types then we might be able
+                                 ;; to infer the return type from the arg types
+                                 (if (and (impc:ir:closure? t)
+                                          (not (impc:ir:type? t)))
+                                     (begin
+                                       (let ((res (impc:ti:type-check-bound-lambda sym vars kts t)))
+                                         (if res
+                                             (set-car! (cdr t) res)))))                                 
+                                 ;; uncomment the following lines to do reverse bang tests
 				 (if (and (string? t) ;; if a named type
                                           (regex:match? (symbol->string sym) "##"))
                                      (let ((gtd (impc:ti:generic-type-details sym)))
@@ -2022,8 +2058,8 @@
    (lambda (ast vars kts request?)
       (let* ((n1 (if (number? (cadr ast)) (caddr ast) (cadr ast)))
 	     (n2 (if (number? (cadr ast)) (cadr ast) (caddr ast)))
-	     (a (impc:ti:type-unify (impc:ti:type-check n1 vars kts request?) vars))
-             (b (impc:ti:type-unify (impc:ti:type-check n2 vars kts request?) vars))
+	     (a (impc:ti:type-unify (impc:ti:type-check n1 vars kts #f) vars)) ;; removed request?
+             (b (impc:ti:type-unify (impc:ti:type-check n2 vars kts #f) vars)) ;; removed request?
 	     (t (impc:ti:type-unify (list a b) vars)))
 	 ;; (println 'a a 'b b 't t)
          (if *impc:ti:print-sub-checks* (println 'compare:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
@@ -2602,11 +2638,21 @@
                           (if (member (car x) lvarnames)
                               (println 'Type 'Collision 'On x)))
                         vars)
+
               ;; update newvars to include incoming argument types
-              (for-each (lambda (s t)
-                          (impc:ti:update-var s newvars '() (impc:ti:type-unify t vars)))
+              (for-each (lambda (s t a)
+                          ;; (println 's: s 't: t 'a: a)
+                          (if (and (impc:ir:closure? t) (assoc-strcmp a *impc:ti:bound-lambdas*))
+                              (set! *impc:ti:bound-lambdas*
+                                    (cons (cons s (replace-all (cdr (assoc-strcmp a *impc:ti:bound-lambdas*))
+                                                               (list (cons a s))))
+                                          *impc:ti:bound-lambdas*)))
+                          (impc:ti:update-var s newvars '() (impc:ti:type-unify t vars))
+                          )
                         (cadr s1) ;;lambda-code)
-                        args)
+                        args
+                        (cdr ast))
+
               ;; NOW DO ACTUAL TYPE CHECK!
               (set! ttype (impc:ti:type-check t1 newvars kts trequest))
               ;; don't let any local vars (lvars) escape back up to a
@@ -3579,13 +3625,18 @@
       (let* ((sym (impc:ti:get-var (cadr ast) vars))
              (a (impc:ti:type-check (caddr ast) vars kts (cdr sym))))
         (if *impc:ti:print-sub-checks* (println 'set!:> 'ast: ast 'a: a))
+        ;; (println 'a: a 'sym: sym)
+        (if (and (list? a)
+                 (= (length a) 1)
+                 (impc:ir:type? (car a)))
+            (set! a (car a)))
         ;; if sym is not a global var then add return type to sym
         (if (and (assoc-strcmp (car sym) vars)
                  (member a (cdr (assoc-strcmp (car sym) vars))))
             (impc:ti:force-var (car sym) vars '() a)
             (if (assoc-strcmp (car sym) vars) 
                 (impc:ti:update-var (car sym) vars kts a)))
-         a)))
+        a)))
 
 (define impc:ti:pdref-check
    (lambda (ast vars kts request?)      
@@ -3723,26 +3774,6 @@
 			       (not (null? request?)))
 			  request?
 			  '()))))
-
-        ;; if we don't have a return type
-        ;; and the closure being called is defined in a local let
-        ;; then we might be able to get a return type by
-        ;; rechecking the original lambda
-        (if (and (null? ret)
-                 (assoc-strcmp (car ast) *impc:ti:bound-lambdas*))
-            (let* ((f (caddr (cadr (assoc-strcmp (car ast) *impc:ti:bound-lambdas*))))
-                   (estr (sexpr->string f))
-                   ;; (llllll (println 'estr: estr (car ast)))
-                   (recursive? (regex:match? estr (string-append "(" "\\(\\s*" (symbol->string (car ast)) "\\s" ")|(\\(\\s*callback)")))
-                   ;; (lllll (println 'recursive? recursive?))
-                   (rettype '()))
-              (if (not recursive?)
-                  (begin
-                    (set! rettype (impc:ti:type-check (caddr (cadr (assoc-strcmp (car ast) *impc:ti:bound-lambdas*)))
-                                                      vars kts #f))
-                    ;; (println 'rettype: rettype)
-                    (if (impc:ir:type? rettype)
-                        (set! ret rettype))))))
 
         (if *impc:ti:print-sub-checks* (println 'closure:> 'ast: ast 'res: res 'ret: ret))
         (if (assoc-strcmp (car ast) vars)
@@ -4077,6 +4108,18 @@
              ;; operation
              (ret (impc:ti:type-check ast fvars kts #f))
 	     ;; (llllllll (println 'pre-unified-vars: fvars))
+             ;;;;;; a final check across all anonymous lambdas ;;;;;;
+             ;; can safely just removed this ret2 code
+             (ret2 (map (lambda (x)
+                          ;; only do redundant type check over anonymous lambdas
+                          (if (and (assoc-strcmp (car x) fvars)
+                                   (regex:match? (symbol->string (car x)) "_anon_lambda"))
+                              (begin ;; (println 'anon-lambda-check: x)
+                                     (impc:ti:type-check-bound-lambda
+                                      (car x) fvars kts
+                                      (cadr (assoc-strcmp (car x) fvars))))))
+                        *impc:ti:bound-lambdas*))
+             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
              (u (impc:ti:unify fvars))
 	     ;; (lllll (println 'post-unified-vars: u))
              (t (impc:ti:unity? u))
