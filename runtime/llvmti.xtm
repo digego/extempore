@@ -53,7 +53,9 @@
 (define *impc:compiler:precomp-llvm* #f)
 
 (define *impc:compiler:process* (ipc:get-process-name))
-;(define *impc:compiler:process* "utility")
+;;(define *impc:compiler:process* "utility")
+
+(define *impc:ti:bound-lambdas* '())
 
 (define *impc:zone* (sys:default-mzone))
 
@@ -2967,6 +2969,9 @@
                        (caddr ast))
                request? #f)))
       (for-each (lambda (e)
+                  (if (and (list? (cadr e))
+                           (equal? (caadr e) 'lambda))
+                      (set! *impc:ti:bound-lambdas* (cons e *impc:ti:bound-lambdas*)))
                   (if (and #f
                            (assoc-strcmp (car e) vars)
                            (impc:ir:type? (impc:ti:type-unify (cdr (assoc-strcmp (car e) vars)) vars)))
@@ -3706,20 +3711,6 @@
                                    (length (cdr ast)))
 			       (impc:compiler:print-bad-arity-error ast)
                                (cddr (car ctype))))))
-	     ;; (lllll (println 'res: res 'from (car ast) 'request? request?))
-	     
-             ;; if there was a request that will be the return type
-             ;; otherwise if we already have a type defined we can use it's return type
-             ;; otherwise we cannot know it
-	     
-             ;; (ret (if (and request?
-             ;;               (not (null? request?)))
-             ;;          request?
-             ;;          (if (or (null? ctype) 
-             ;;                  (not (impc:ir:closure? (car ctype))))
-             ;;              '()
-             ;;              (cadr (car ctype))))))
-
 	     ;; if we already have a type defined we can use it's return type
 	     ;; otherwise
              ;; if there was a request that will be the return type
@@ -3733,17 +3724,32 @@
 			  request?
 			  '()))))
 
-         (if *impc:ti:print-sub-checks* (println 'closure:> 'ast: ast 'res: res 'ret: ret))
-         ; set the closure type for the symbol (if not a global var)
-	 ;(if (not (null? ret))
-	 ;(println 'setting-closure-type: (list (impc:ir:pointer++ (impc:ir:pointer++ (list* *impc:ir:closure* ret res)))))
-	 (if (assoc-strcmp (car ast) vars)
-	     (impc:ti:update-var (car ast) vars kts
-				 (list (impc:ir:pointer++ (impc:ir:pointer++ (list* *impc:ir:closure* ret res))))))
-	 ;(println 'return: ret 'request? request?) ; 'from (car ast) 'vars: vars)
-         ; and return the new closure's return type
-         (if (list? ret) ret
-             (list ret)))))
+        ;; if we don't have a return type
+        ;; and the closure being called is defined in a local let
+        ;; then we might be able to get a return type by
+        ;; rechecking the original lambda
+        (if (and (null? ret)
+                 (assoc-strcmp (car ast) *impc:ti:bound-lambdas*))
+            (let* ((f (caddr (cadr (assoc-strcmp (car ast) *impc:ti:bound-lambdas*))))
+                   (estr (sexpr->string f))
+                   ;; (llllll (println 'estr: estr (car ast)))
+                   (recursive? (regex:match? estr (string-append "(" "\\(\\s*" (symbol->string (car ast)) "\\s" ")|(\\(\\s*callback)")))
+                   ;; (lllll (println 'recursive? recursive?))
+                   (rettype '()))
+              (if (not recursive?)
+                  (begin
+                    (set! rettype (impc:ti:type-check (caddr (cadr (assoc-strcmp (car ast) *impc:ti:bound-lambdas*)))
+                                                      vars kts #f))
+                    ;; (println 'rettype: rettype)
+                    (if (impc:ir:type? rettype)
+                        (set! ret rettype))))))
+
+        (if *impc:ti:print-sub-checks* (println 'closure:> 'ast: ast 'res: res 'ret: ret))
+        (if (assoc-strcmp (car ast) vars)
+            (impc:ti:update-var (car ast) vars kts
+                                (list (impc:ir:pointer++ (impc:ir:pointer++ (list* *impc:ir:closure* ret res))))))
+        (if (list? ret) ret
+            (list ret)))))
 
 
 ;; for fptrcall
@@ -4740,6 +4746,7 @@
       ;; (println 'args: args)
       (set! *impc:ir:sym-name-stack* '())
       (set! *impc:ir:ls_var* '())
+      (set! *impc:ti:bound-lambdas* '())
       (set! *impc:ti:generic-type-mappings* '())
       (set! *impc:ti:nativef-generics-recurse-test* 0)
       ;; don't want type checking to find existing native versions!
