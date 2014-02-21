@@ -2707,6 +2707,44 @@
                                       (impc:ir:get-pretty-closure-arg-strings
                                        (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":")))))))
           ;; (println 'gpolycode: gpoly-code)
+
+          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ;; this is all here purely for generating nicer compiler errors!
+          ;; and can be removed safely without effecting any functionality
+          (for-each (lambda (a b)
+                      ;; (println 'a: a 'b: b)
+                      (if (symbol? a)
+                          (begin (set! a (assoc-strcmp a vars))
+                                 (if (and (symbol? b)
+                                          (list? a)
+                                          (> (length a) 1)
+                                          (regex:match? (symbol->string b) ":")) ;; generic!
+                                     (let* ((bb (car (regex:type-split (symbol->string b) ":")))
+                                            (ptrdepth (impc:ir:get-ptr-depth (symbol->string b)))
+                                            (aa (cond ((string? (cadr a))
+                                                       (cadr (regex:matched (cadr a) "%([^-]*).*")))
+                                                      ((symbol? (cadr a))
+                                                       (car (regex:type-split (symbol->string (cadr a)) ":")))
+                                                      (else (cadr a))))
+                                            (aptrdepth (impc:ir:get-ptr-depth (cadr a))))
+                                       ;; (println 'aa: aa 'bb: bb)
+                                       (if (or (not (string? aa))
+                                               (and (not (equal? aa bb))
+                                                    (not (regex:match? aa "^!"))))
+                                           (impc:compiler:print-type-mismatch-error
+                                            (if (and (list? aa)
+                                                     (not (impc:ir:type? aa)))
+                                                aa
+                                                (if (string? aa)
+                                                    (apply string-append aa (make-list aptrdepth "*"))
+                                                    (impc:ir:pretty-print-type aa)))
+                                            (apply string-append bb (make-list ptrdepth "*"))
+                                            (car (regex:type-split (symbol->string (car ast)) "##")))))))))
+                    (cdr ast)
+                    (cddr gpoly-type))
+          ;;
+          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
           ;; (gpoly-type (impc:ir:get-type-from-pretty-str (symbol->string (car (impc:ir:gpoly-types gname))))))
           
           
@@ -2724,22 +2762,7 @@
                 (impc:ti:type-unify
                  (impc:ti:nativef-generics-make-gtypes-unique gpoly-type gnum)
                  vars))
-          ;; (println 'gpoly-type: gpoly-type)
-          ;; (println 'gpoly-type2: gpoly-type)
-          ;; (println 'gpoly-code: gpoly-code)
-
-          ;; (println 'pt_: gpoly-type)
-          ;; (println 'ptx: gpoly-type-x)
-          ;; (println 'gtypes: *impc:ti:generic-type-mappings*)
-
-          ;; (set! gpoly-type gpoly-type-x)
           
-          ;; (println 'gpoly-type2:> gpoly-type)
-          ;; (println 'b: (cdr ast) (cddr gpoly-type))
-          ;; (println 'vars: vars)
-
-          ;; (println 'ast: ast 'gpoly-type: gpoly-type)
-          ;; (println 'varsin: vars)
           ;; type inferencing for generic functions arguments and return type
           (let* ((res (impc:ti:nativef-generics-check-args ast gpoly-type vars kts request?))
                  (resb (map (lambda (x) (impc:ti:type-normalize (impc:ti:type-unify x vars))) res))
@@ -2749,20 +2772,7 @@
                             req?
                             (impc:ti:nativef-generics-check-return-type
                              ast lambda-code gpoly-type gnum (cl:copy-list vars) resb)))
-                 (grtype (impc:ti:type-unify rtype vars))) ;;(cons 213
-            ;;(cons (cadr rtype) resb)))) 
-            ;; (println 'vars: vars)
-            ;; (println 'ast: ast)
-            ;; (println 'args: resb)         
-            ;; (println 'grtype: grtype)
-            ;; (println 'varsout: vars)
-            ;; (println 'req? (impc:ir:type? (cadr req?)) 'type?: (impc:ir:type? grtype) 'grtype: ast)
-            ;;(println 'poly: grtype 'request? request?)
-
-            ;; (println 'genericf: ast)
-            ;; (println 'grtype: grtype)
-            ;; (println 'request? request? 'gpoly-type: (cadr gpoly-type) 'res: res 'vars: vars)
-            ;; (println 'args: (car ast) 'args1: res)	
+                 (grtype (impc:ti:type-unify rtype vars)))
 
             ;; check to see if for-each is possible (i.e. request and (cadr gpoly-type)) are same length
             (if (list? request?)
@@ -2820,16 +2830,7 @@
               ;; (println 'gftype gftype)
               ;; (println 'gftype: gftype 'gpoly-type gpoly-type)
               (set! gftype (impc:ti:type-clean (car gftype)))
-              ;; (println 'gftype-b gftype)          
-              ;; (println (car ast) 'gftype: gftype)	  
-              ;; (println 'g-vars-a: vars)	  
-              ;; this is a call for *inplace* changes to vars (i.e. impc:ti:update-var)
               (impc:ti:nativef-generics-final-tests ast gpoly-type gftype gnum vars kts)
-              ;; (println 'g-vars-b: vars)
-              ;;(println 'gpoly-type gpoly-type)
-
-              ;; (impc:ti:update-var (car ast) vars kts (list gftype))))
-
               ;; if grtype is VALID
               ;; and if the return type of gftype is a symbol
               ;; THEN update the return type of gftype (symbol)
@@ -5513,7 +5514,7 @@
                         ,(if (regex:match? namestr "--")
                              ;; (if *impc:ti:print-full-generic-types*
                              ;; (impc:ir:pretty-print-type namestr)
-                             (string-append "!" (car (regex:type-split namestr "--")))
+                             (string-append "!" "" (car (regex:type-split namestr "--")))
                              namestr)
                         ":<"
                         ,(list 'tref 'x 0)
