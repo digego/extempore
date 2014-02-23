@@ -2027,7 +2027,19 @@
     (let* ((a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
            (b (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars))
            (t (impc:ti:type-unify (list a b) vars)))
-      ;; (println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)
+      ;; (println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)      
+      (if (and (impc:ir:type? b)
+               (impc:ir:type? a)
+               (not (and (impc:ir:vector? a)   ;; we are allowed to multiply
+                         (impc:ir:vector? b))) ;; a Vector by a Vector*
+               (not (equal? a b)))
+          (impc:compiler:print-type-conflict-error (impc:ir:pretty-print-type a)
+                                                   (impc:ir:pretty-print-type b)
+                                                   ast))
+      (if (and (impc:ir:type? t)
+               (impc:ir:pointer? t)
+               (not (impc:ir:vector? t)))
+          (impc:compiler:print-type-mismatch-error (impc:ir:pretty-print-type t) "number" (symbol->string (car ast))))
       (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
       (if (not (null? t))
           (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
@@ -2658,9 +2670,24 @@
                         (cadr s1) ;;lambda-code)
                         args
                         (cdr ast))
-
               ;; NOW DO ACTUAL TYPE CHECK!
-              (set! ttype (impc:ti:type-check t1 newvars kts trequest))
+              (let ((toplvl? (if *impc:compiler:top-level-generic-error* #f #t)))
+                (if toplvl? (set! *impc:compiler:top-level-generic-error*
+                                  (cons (car (regex:type-split (symbol->string (car ast)) "##"))
+                                        (map (lambda (t a)
+                                               ;; (println 't: t 'a: a)
+                                               (if (null? t)
+                                                   (if (atom? a)
+                                                       (cons "?" (atom->string a))
+                                                       (sexpr->string a))
+                                                   (cons (impc:ir:pretty-print-type t)
+                                                         (if (atom? a)
+                                                             (atom->string a)
+                                                             (sexpr->string a)))))
+                                             args
+                                             (cdr ast)))))
+                (set! ttype (impc:ti:type-check t1 newvars kts trequest))
+                (if toplvl? (set! *impc:compiler:top-level-generic-error* #f)))
               ;; don't let any local vars (lvars) escape back up to a
               ;; level where they will not mean anything!!!!
               (set! ttype (replace-all ttype (map (lambda (x) (cons x '())) lvarnames)))
@@ -2927,18 +2954,19 @@
            (let ((returns (map (lambda (t)
                                  (cadr t))
                                valid-polys)))
-
-             (if request?
-                 (if (list? request?)
-                     (set! returns (impc:ti:intersection* returns request?))
-                     (set! returns (impc:ti:intersection* returns (list request?)))))
-             
-             (set! valid-polys (cl:remove #f
-                                          (map (lambda (v)
-                                                 (if (member (cadr v) returns)
-                                                     v
-                                                     #f))
-                                               valid-polys)))
+             ;; (println 'returns returns 'request? request?)
+             ;; (println 'vars: vars)
+             ;; (if request?
+             ;;     (if (list? request?)
+             ;;         (set! returns (impc:ti:intersection* returns request?))
+             ;;        (set! returns (impc:ti:intersection* returns (list request?)))))
+             ;; (println 'returns2 returns)
+             ;; (set! valid-polys (cl:remove #f
+             ;;                              (map (lambda (v)
+             ;;                                     (if (member (cadr v) returns)
+             ;;                                         v
+             ;;                                         #f))
+             ;;                                   valid-polys)))
 
              ;; if we have a single valid poly
              ;; then we can try type-checking against

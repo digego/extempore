@@ -259,32 +259,56 @@
     (print " not marked as free - check the variable name in the polytype\n")
     (error "")))
 
+(define *impc:compiler:top-level-generic-error* #f)
+
 (define impc:compiler:print-type-mismatch-error
   (lambda (got expected . name)
+    
+    (if *impc:compiler:top-level-generic-error*
+        (begin
+          (set! name (list (car *impc:compiler:top-level-generic-error*)))))
+    (if (and (not (null? name))
+             (list? (car name))
+             (symbol? (caar name)))        
+        (set! name (list (car (regex:type-split (symbol->string (caar name)) "--")))))
+
     (print-with-colors *impc:compiler:pretty-print-error-color*
                        'default #t (print "Type Error"))
 
     (if (not (null? name))
-        (begin (print " In ")
+        (begin (print " calling ")
                (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
                                   (print  (car name)))
                (print ",")))
+
     (print " got " )
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print got))
     (print ", was expecting ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print expected "\n"))
+
+    (if *impc:compiler:top-level-generic-error*
+        (set! *impc:compiler:top-level-generic-error* #f))
     (error "")))
+
 
 (define impc:compiler:print-type-conflict-error
   (lambda (type1 type2 ast)
     (print-with-colors *impc:compiler:pretty-print-error-color*
                        'default #t (print "Type Error"))
-    (print " type conflict between " )
+    (print " conflicting " )
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type1))
-    (print " and ")
+    (print " with ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type2))
-    (print " in ")
-    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
+    (if *impc:compiler:top-level-generic-error*
+        (begin
+          (print " calling ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #f
+                             (print (car *impc:compiler:top-level-generic-error*)))
+          (print "\n")
+          (set! *impc:compiler:top-level-generic-error* #f))
+        (begin
+          (print " in ")
+          (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))))
     (error "")))
 
 (define impc:compiler:print-if-type-conflict-error
@@ -1149,6 +1173,7 @@
                       (begin
                         ;; (println 'make-new-type: (string-append "%" name1 " = type " type))
                         (llvm:compile (string-append "%" name1 " = type " type))
+                        (callback (now) 'build-type-dataconstructor (string->symbol name1) type #f)
                         string-type)
                       (error))))
 	       ((regex:match? base "!") (string->symbol base))
