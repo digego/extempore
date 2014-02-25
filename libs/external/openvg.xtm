@@ -497,12 +497,6 @@
     (vgSeti VG_MATRIX_MODE VG_MATRIX_IMAGE_USER_TO_SURFACE)
     (vgLoadIdentity)))
 
-(bind-func xtm_create_vgpath
-  (lambda ()
-    (vgCreatePath VG_PATH_FORMAT_STANDARD VG_PATH_DATATYPE_F
-                  1.0 0.0 0 0
-                  VG_PATH_CAPABILITY_ALL)))
-
 ;; clear canvas
 
 (bind-alias xtm_colour |4,VGfloat|)
@@ -590,6 +584,12 @@
 
 ;; path
 
+(bind-func xtm_create_path
+  (lambda ()
+    (vgCreatePath VG_PATH_FORMAT_STANDARD VG_PATH_DATATYPE_F
+                  1.0 0.0 0 0
+                  VG_PATH_CAPABILITY_ALL)))
+
 (bind-func xtm_draw_path_keep
   (lambda (path)
     (vgDrawPath path (+ VG_STROKE_PATH VG_FILL_PATH))))
@@ -624,8 +624,6 @@
   (lambda (path)
     (vgDrawPath path VG_FILL_PATH)
     (vgDestroyPath path)))
-
-;; paths
 
 ;; convenience functions for adding shapes to path
 ;; from vgu.h
@@ -789,7 +787,7 @@
 
 (bind-func xtm_draw_linef
   (lambda (x1 y1 x2 y2)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (vguLine path x1 y1 x2 y2)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -797,7 +795,7 @@
 
 (bind-func xtm_draw_lined
   (lambda (x1 y1 x2 y2)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (xtm_add_lined path x1 y1 x2 y2)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -808,7 +806,7 @@
 
 (bind-func xtm_draw_polyf
   (lambda (points:VGfloat* npoints closed)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (vguPolygon path points npoints closed)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -816,7 +814,7 @@
 
 (bind-func xtm_draw_polyd
   (lambda (points:double* npoints closed)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (xtm_add_polyd path points npoints closed)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -827,7 +825,7 @@
 
 (bind-func xtm_draw_trif
   (lambda (x1 y1 x2 y2 x3 y3)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
 	  (vgu_err (xtm_add_trif path x1 y1 x2 y2 x3 y3)))
       (if (= vgu_err VGU_NO_ERROR)
 	  (xtm_draw_path path))
@@ -835,7 +833,7 @@
 
 (bind-func xtm_draw_trid
   (lambda (x1 y1 x2 y2 x3 y3)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (xtm_add_trid path x1 y1 x2 y2 x3 y3)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -846,7 +844,7 @@
 
 (bind-func xtm_draw_quadf
   (lambda (x1 y1 x2 y2 x3 y3 x4 y4)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
 	  (vgu_err (xtm_add_quadf path x1 y1 x2 y2 x3 y3 x4 y4)))
       (if (= vgu_err VGU_NO_ERROR)
 	  (xtm_draw_path path))
@@ -854,7 +852,7 @@
 
 (bind-func xtm_draw_quadd
   (lambda (x1 y1 x2 y2 x3 y3 x4 y4)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (xtm_add_quadd path x1 y1 x2 y2 x3 y3 x4 y4)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -865,7 +863,7 @@
 
 (bind-func xtm_draw_rectf
   (lambda (x y w h)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (vguRect path x y w h)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -873,7 +871,7 @@
 
 (bind-func xtm_draw_rectd
   (lambda (x y w h)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (xtm_add_rectd path x y w h)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -884,7 +882,7 @@
 
 (bind-func xtm_draw_round_rectf
   (lambda (x y w h arcw arch)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (vguRoundRect path x y w h arcw arch)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -892,7 +890,7 @@
 
 (bind-func xtm_draw_round_rectd
   (lambda (x y w h arcw arch)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (xtm_add_round_rectd path x y w h arcw arch)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -903,7 +901,7 @@
 
 (bind-func xtm_draw_ellipsef
   (lambda (cx cy w h)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (vguEllipse path cx cy w h)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -911,7 +909,7 @@
 
 (bind-func xtm_draw_ellipsed
   (lambda (cx cy w h)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (xtm_add_ellipsed path cx cy w h)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -922,7 +920,7 @@
 
 (bind-func xtm_draw_arcf
   (lambda (x y w h start_angle angle_extent arc_type)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (vguArc path x y w h start_angle angle_extent arc_type)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
@@ -930,7 +928,7 @@
 
 (bind-func xtm_draw_arcd
   (lambda (x y w h start_angle angle_extent arc_type)
-    (let ((path (xtm_create_vgpath))
+    (let ((path (xtm_create_path))
           (vgu_err (xtm_add_arcd path x y w h start_angle angle_extent arc_type)))
       (if (= vgu_err VGU_NO_ERROR)
           (xtm_draw_path path))
