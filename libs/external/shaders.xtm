@@ -3447,3 +3447,108 @@ void main( void ) {
         // gl_FragColor = texture2D(cBuf,TexCoord);
 }
 ")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; convenience functions for setting up a gl loop on another process
+
+(bind-func post:[void,i64,i32,float*,float*,float*,i8*]*
+  (lambda (frame shader m v p data)
+    void))
+
+(bind-func gl_render
+  (lambda ()
+    void))
+
+(define gl-loop
+  (lambda (time delta-t)
+    (gl_render)
+    (gl:swap-buffers *gl-ctx*)
+    (let* ((cb-lookahead 0.1)
+           (t (+ (now) (* cb-lookahead delta-t *second*)))
+           (missed-frames (quotient (real->integer (- t time))
+                                    (real->integer (* delta-t *second*))))
+           (newtime (+ time (* (* (+ missed-frames 2) delta-t) *second*))))
+      (if (> missed-frames 0)
+          (begin (print-with-colors 'red 'default #t
+                                    (print "Warning"))
+                 (print ": ")
+                 (print-with-colors 'green 'default #t
+                                    (print "gl-loop"))
+                 (print " couldn't handle the load, dropped ")
+                 (print-with-colors 'blue 'default #f
+                                    (print missed-frames))
+                 (print " frames\n")))
+      (callback (* newtime cb-lookahead) 'gl-loop newtime delta-t))))
+
+(define xtm-create-gl-context
+  (lambda (width height fullscreen)
+    (eval '(define *gl-ctx* #f) (interaction-environment))
+    (set! *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+    (if *gl-ctx* #t #f)))
+
+(define xtm-setup-and-start-gl-loop
+  (lambda (width height fps start-time)
+    (xtm_render_setup width height)
+    (if (<> (xtm-vg-create-context width height) 1)
+        (xtm_vg_print_error))
+    (bind-func gl_render
+      (lambda ()
+        ;;          pre  opaq trans post    data
+        (xtm_render null null null  post null)
+        void))
+    (gl-loop start-time (/ 1 fps))
+    ;; not sure about the best way to see if this function succeeds
+    #t))
+
+(define ipc:bind-xtmrender-vars
+  (lambda (proc)
+    (ipc:bind-func proc 'xtm_render_init_quad_shader)
+    (ipc:bind-func proc 'xtm_render_init_simple_shader)
+    (ipc:bind-func proc 'xtm_render_init_light_shaders xtm_render_init_light_shaders)
+    ;; frag shaders
+    (ipc:define proc 'simple-frag simple-frag)
+    (ipc:define proc 'quad-frag quad-frag)
+    (ipc:define proc 'xtmfrag0 xtmfrag0)
+    (ipc:define proc 'xtmfrag xtmfrag)
+    (ipc:define proc 'xtmfrag_nolight xtmfrag_nolight)
+    (ipc:define proc 'xtmfrag1 xtmfrag1)
+    (ipc:define proc 'xtmfrag2 xtmfrag2)
+    (ipc:define proc 'xtmfrag3 xtmfrag3)
+    (ipc:define proc 'xtmfrag4 xtmfrag4)
+    (ipc:define proc 'xtmfrag5 xtmfrag5)
+    ;; vert shaders
+    (ipc:define proc 'simple-vert-xtm simple-vert-xtm)
+    (ipc:define proc 'quad-vert quad-vert)
+    (ipc:define proc 'xtmvert-xtm xtmvert-xtm)
+    (ipc:define proc 'xtmvert0 xtmvert0)
+    (ipc:define proc 'xtmvert1 xtmvert1)
+    (ipc:define proc 'xtmvert2 xtmvert2)
+    (ipc:define proc 'xtmvert3 xtmvert3)
+    (ipc:define proc 'xtmvert4 xtmvert4)
+    (ipc:define proc 'xtmvert5 xtmvert5)
+    (ipc:bind-func proc 'xtm_render_setup_a xtm_render_setup_a)
+    (ipc:bind-func proc 'xtm_render_setup_b xtm_render_setup_b)
+    (ipc:bind-func proc 'xtm_render_setup_c xtm_render_setup_c)
+    (ipc:define proc 'xtm_render_setup xtm_render_setup)
+    (ipc:bind-func proc 'xtm_render xtm_render)
+    (ipc:bind-func proc 'xtm_vg_create_contexti32 xtm_vg_create_contexti32)
+    (ipc:define proc 'xtm-vg-create-context xtm-vg-create-context)
+    (ipc:bind-func proc 'gl_render gl_render)
+    (ipc:bind-func proc 'post post)))
+
+(define ipc:graphics-setup
+  (lambda (proc width height fullscreen fps start-time)
+    (ipc:define proc 'gl-loop gl-loop)
+    (ipc:define proc 'xtm-create-gl-context xtm-create-gl-context)
+    (ipc:define proc 'xtm-setup-and-start-gl-loop xtm-setup-and-start-gl-loop)
+    (if (not (ipc:call proc 'xtm-create-gl-context width height fullscreen))
+        (print-with-colors 'red 'default #t (print "Error creating gl context.")))
+    (begin
+      (sys:load "libs/xtm.xtm")
+      ;; shaders & openvg will only be loaded if loading xtm.xtm fails
+      (sys:load "libs/external/shaders.xtm")
+      (sys:load "libs/external/openvg.xtm")
+      (ipc:bind-xtmrender-vars proc)
+      (ipc:call proc 'xtm-setup-and-start-gl-loop width height fps start-time)
+      (begin (print "\nStarted xtm render loop on ")
+             (print-with-colors 'cyan 'default #t (print proc))
+             (print " process.\n\n")))))
