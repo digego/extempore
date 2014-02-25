@@ -3454,10 +3454,6 @@ void main( void ) {
   (lambda (frame shader m v p data)
     void))
 
-(bind-func gl_render
-  (lambda ()
-    void))
-
 (define gl-loop
   (lambda (time delta-t)
     (gl_render)
@@ -3492,7 +3488,7 @@ void main( void ) {
         (xtm_vg_print_error))
     (bind-func gl_render
       (lambda ()
-        ;;          pre  opaq trans post    data
+        ;;          pre  opaq trans post data
         (xtm_render null null null  post null)
         void))
     (gl-loop start-time (/ 1 fps))
@@ -3543,10 +3539,6 @@ void main( void ) {
     (if (not (ipc:call proc 'xtm-create-gl-context width height fullscreen))
         (print-with-colors 'red 'default #t (print "Error creating gl context.")))
     (begin
-      (sys:load "libs/xtm.xtm")
-      ;; shaders & openvg will only be loaded if loading xtm.xtm fails
-      (sys:load "libs/external/shaders.xtm")
-      (sys:load "libs/external/openvg.xtm")
       (ipc:bind-xtmrender-vars proc)
       (ipc:call proc 'xtm-setup-and-start-gl-loop width height fps start-time)
       (begin (print "\nStarted xtm render loop on ")
