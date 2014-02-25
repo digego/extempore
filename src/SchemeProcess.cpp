@@ -549,27 +549,44 @@ namespace extemp {
 		std::stringstream ss;
 		std::string load_path = scm->getLoadPath();
 
+                sleep(2); // give time for NSApp etc. to init                
+
+                while(!scm->getRunning()) {}
+
 		scm->loadFile("scheme.xtm", load_path.c_str());
-		//printf("Loaded... scheme.xtm\n");
 		scm->loadFile("llvmir.xtm", load_path.c_str()); 
-		//printf("Loaded... llvmir.xtm\n");
 		scm->loadFile("llvmti.xtm", load_path.c_str());		
-                // only load extempore.xtm for primary process
-                if(scm->getName().compare("primary") == 0)
-                  scm->loadFile("extempore.xtm", load_path.c_str());
-               
-                scm->setLoadedLibs(true);
- 
+
+                // only load extempore.xtm in primary process
+                char sstr[256];
+                if(scm->getName().compare("primary") == 0) {
+                  memset(sstr,0,256);
+                  snprintf(sstr,256,"(sys:load \"%s%s\")",load_path.c_str(),"extempore.xtm");
+                  std::string* s4 = new std::string(sstr);
+                  guard.lock();
+                  q.push(SchemeTask(extemp::UNIV::TIME, (60*5*44100), s4, "file_init", 5));
+                  guard.unlock();
+                  // scm->loadFile("extempore.xtm", load_path.c_str());
+                }
+
+                scm->setLoadedLibs(true);  
+
                 // load any init file provided
                 if(scm->getInitFile().compare("") != 0) {
                   sleep(2);
                   ascii_text_color(0,5,10);
                   printf("\n\nRunning File: %s ...\n\n",scm->getInitFile().c_str());
                   ascii_text_color(0,7,10);
-                  printf("");
-                  sleep(2); // sleep to make sure NSApp runloops etc. are initialized
-		  scm->loadFile(scm->getInitFile().c_str());
+                  memset(sstr,0,256);
+                  snprintf(sstr,256,"(sys:load \"%s\")",scm->getInitFile().c_str());
+                  std::string* s5 = new std::string(sstr);
+                  guard.lock();
+                  q.push(SchemeTask(extemp::UNIV::TIME+1000, (60*60*44100), s5, "file_init", 5));
+                  guard.unlock();
+                  // scm->loadFile(scm->getInitFile().c_str());
                 }
+                sleep(2);
+
 
 		// //////////////////////////////////////////////////
 		// // this added for dodgy continuations support
@@ -611,7 +628,8 @@ namespace extemp {
 							// this should be the expected result!!  - i.e. do nothing
 						}
 						uint64_t in_time = UNIV::TIME;
-						scheme_load_string(sc, (const char*) evalString->c_str(), in_time, in_time+sc->call_default_time);
+                                                uint64_t out_time = schemeTask.getMaxDuration();
+						scheme_load_string(sc, (const char*) evalString->c_str(), in_time, in_time+out_time); // sc->call_default_time);
 						if(SCHEME_EVAL_TIMING) {
 						}	
 						if(sc->retcode != 0) { //scheme error

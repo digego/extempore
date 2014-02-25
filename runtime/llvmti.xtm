@@ -2628,7 +2628,7 @@
       ;; we do this by grabbing the gpoly's lambda code and
       ;; sending it through type checking.
       ;;
-      (if (< *impc:ti:nativef-generics-recurse-test* 1)
+      (if (< *impc:ti:nativef-generics-recurse-test* 5)
           (begin
             (set! *impc:ti:nativef-generics-recurse-test*
                   (+ *impc:ti:nativef-generics-recurse-test* 1))
@@ -2795,10 +2795,10 @@
                  (resb (map (lambda (x) (impc:ti:type-normalize (impc:ti:type-unify x vars))) res))
                  (req? (impc:ti:type-unify gpoly-type vars))
                  ;; (llllll (println 'req? req? 'request? request?))
-                 (rtype (if (impc:ir:type? (cadr req?))
+                 (rtype (if (impc:ir:type? req?) ;; (cadr req?))
                             req?
                             (impc:ti:nativef-generics-check-return-type
-                             ast lambda-code gpoly-type gnum (cl:copy-list vars) resb)))
+                             ast lambda-code gpoly-type gnum (cl:tree-copy vars) resb)))
                  (grtype (impc:ti:type-unify rtype vars)))
 
             ;; check to see if for-each is possible (i.e. request and (cadr gpoly-type)) are same length
@@ -5508,7 +5508,10 @@
 
 (define build-type-dataconstructor
   (lambda (name type generic . args)
-    ;; (println 'build-data-construct name type generic)    
+    ;; (println 'build-data-construct name type generic)
+    (if (or (not (string? type)) ;; if not already a pretty type
+            (regex:match? type "^\\s*{"))
+        (set! type (impc:ir:pretty-print-type type)))
     (let* ((a (impc:ir:get-pretty-tuple-arg-strings type))
            (compiler-suppress-on (if (equal? *impc:compiler:message:level* 'low) #f #t))
            (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
