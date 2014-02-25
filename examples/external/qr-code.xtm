@@ -1,0 +1,94 @@
+;;; examples/qr-code.xtm -- a QR code genration example
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libqrencode
+
+;;; Commentary:
+
+;; For instructions on how to get libqrencode, see libs/external/qr-code.xtm
+
+;;; Code:
+
+(sys:load "libs/xtm.xtm")
+(sys:load "libs/external/shaders.xtm")
+(sys:load "libs/external/qr-code.xtm")
+
+;; create a function to generate a qr code and print it as ascii-art
+
+(bind-func qr_code_print
+  (lambda (input_string)
+    (let ((code (qr_create (Str input_string) 4))
+          (size (QRcode_size code))
+          (i 0)
+          (j 0))
+      (printf "\ninput_string: %s\n\n" input_string)
+      (dotimes (i size)
+        (dotimes (j size)
+          (if (QRcode_pixel code i j)
+              (printf "*")
+              (printf " ")))
+        (printf "\n"))
+      (QRcode_free code)
+      (printf "\n\n")
+      void)))
+
+;; test it out - use whatever string you like!
+(qr_code_print "http://benswift.me")
+
+;; now let's draw the qr code graphically
+
+;; change these whatever dimensions you want
+(define width 800.0)
+(define height width) ;; qr codes are square, so height == width
+(bind-val width float width)
+(bind-val height float height)
+(define fullscreen #f) ;; #t for fullscreen
+
+(bind-func gl_render
+  (lambda ()
+    ;;          pre  opaq trans post data
+    (xtm_render null null null  post null)
+    void))
+
+(ipc:graphics-setup "utility" width height fullscreen 10 (*metro* 'get-beat 4))
+
+;; re-evaluate this post function for new codes
+;; notice how the version (complexity) parameter in qr_create is
+;; random, so you'll get a different complexity code each time you
+;; re-evaluate
+(bind-func post:XTMRENDERCB
+  (let ((code (qr_create (Str "http://benswift.me") (random 20:i32)))
+        (size (QRcode_size code))
+        (dim (/ height (convert size)))
+        (i 0)
+        (j 0))
+    (lambda (frame shader m v p data)
+      (let ((fill (vgCreatePaint))
+            (stroke (vgCreatePaint))
+            (path (xtm_create_path)))
+        (xtm_vg_reset_matrices)
+        (xtm_vg_clear 0. 0. 0. 1. (convert width) (convert height))
+        ;; mess with the fill/stroke parameters to change colours
+        (xtm_paint_setup_fill fill 1. 1. 1. 1.)
+        (xtm_paint_setup_stroke stroke
+                                (random .1)
+                                (random .3 .5)
+                                (random .6 .7)
+                                1. 5.)
+        ;; loop over the QR code data, adding a rects to the path
+        (dotimes (i size)
+          (dotimes (j size)
+            (if (QRcode_pixel code i j)
+                (xtm_add_rect path
+                              (+ (/ (- width height) 2.)
+                                 (* (convert i) dim))
+                              (* (convert j) dim)
+                              dim dim))))
+        ;; draw the path
+        (xtm_draw_path path)
+        ;; clean up
+        (xtm_destroy_paint fill)
+        (xtm_destroy_paint stroke)
+        (xtm_vg_print_error))
+      void)))
