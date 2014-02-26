@@ -3450,10 +3450,6 @@ void main( void ) {
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; convenience functions for setting up a gl loop on another process
 
-(bind-func post:[void,i64,i32,float*,float*,float*,i8*]*
-  (lambda (frame shader m v p data)
-    void))
-
 (define gl-loop
   (lambda (time delta-t)
     (gl_render)
@@ -3464,13 +3460,13 @@ void main( void ) {
                                     (real->integer (* delta-t *second*))))
            (newtime (+ time (* (* (+ missed-frames 2) delta-t) *second*))))
       (if (> missed-frames 0)
-          (begin (print-with-colors 'red 'default #t
+          (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
                                     (print "Warning"))
                  (print ": ")
-                 (print-with-colors 'green 'default #t
+                 (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
                                     (print "gl-loop"))
                  (print " couldn't handle the load, dropped ")
-                 (print-with-colors 'blue 'default #f
+                 (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f
                                     (print missed-frames))
                  (print " frames\n")))
       (callback (* newtime cb-lookahead) 'gl-loop newtime delta-t))))
@@ -3482,15 +3478,11 @@ void main( void ) {
     (if *gl-ctx* #t #f)))
 
 (define xtm-setup-and-start-gl-loop
-  (lambda (width height fps start-time)
+  (lambda (width height fps start-time vg-setup?)
     (xtm_render_setup width height)
-    (if (<> (xtm-vg-create-context width height) 1)
-        (xtm_vg_print_error))
-    (bind-func gl_render
-      (lambda ()
-        ;;          pre  opaq trans post data
-        (xtm_render null null null  post null)
-        void))
+    (if vg-setup
+        (if (<> (xtm-vg-create-context width height) 1)
+            (xtm_vg_print_error)))
     (gl-loop start-time (/ 1 fps))
     ;; not sure about the best way to see if this function succeeds
     #t))
@@ -3532,15 +3524,26 @@ void main( void ) {
     (ipc:bind-func proc 'post post)))
 
 (define ipc:graphics-setup
-  (lambda (proc width height fullscreen fps start-time)
+  (lambda (proc width height fullscreen fps start-time . vg-setup)
+    (if (not (defined? 'gl_render))
+        (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
+                                    (print "Error"))
+                 (print ": ")
+                 (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
+                                    (print "gl_render"))
+                 (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t
+                                    (print ":[void]*"))
+                 (print " must be defined before you can start the graphics loop\n")
+                 (error "")))
     (ipc:define proc 'gl-loop gl-loop)
     (ipc:define proc 'xtm-create-gl-context xtm-create-gl-context)
     (ipc:define proc 'xtm-setup-and-start-gl-loop xtm-setup-and-start-gl-loop)
     (if (not (ipc:call proc 'xtm-create-gl-context width height fullscreen))
-        (print-with-colors 'red 'default #t (print "Error creating gl context.")))
+        (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
+                           (print "Error creating gl context.")))
     (begin
       (ipc:bind-xtmrender-vars proc)
-      (ipc:call proc 'xtm-setup-and-start-gl-loop width height fps start-time)
+      (ipc:call proc 'xtm-setup-and-start-gl-loop width height fps start-time (not (null? vg-setup)))
       (begin (print "\nStarted xtm render loop on ")
              (print-with-colors 'cyan 'default #t (print proc))
              (print " process.\n\n")))))
