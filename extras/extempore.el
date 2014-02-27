@@ -372,6 +372,9 @@ See `run-hooks'."
        ;; float and int literals
        '("\\_<[-+]?[/.[:digit:]]+?\\_>"
          (0 font-lock-constant-face))
+       ;; hex literals
+       '("\\_<#x[[:digit:]]+?\\_>"
+         (0 font-lock-constant-face))
        ;; hack to make sure / gets highlighted as a function
        '("\\_</\\_>"
          (0 font-lock-function-name-face t))
