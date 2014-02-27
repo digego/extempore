@@ -549,7 +549,7 @@ namespace extemp {
 		std::stringstream ss;
 		std::string load_path = scm->getLoadPath();
 
-                sleep(2); // give time for NSApp etc. to init                
+                //sleep(2); // give time for NSApp etc. to init                
 
                 while(!scm->getRunning()) {}
 
@@ -573,7 +573,6 @@ namespace extemp {
 
                 // load any init file provided
                 if(scm->getInitFile().compare("") != 0) {
-                  sleep(2);
                   ascii_text_color(0,5,10);
                   printf("\n\nRunning File: %s ...\n\n",scm->getInitFile().c_str());
                   ascii_text_color(0,7,10);
@@ -585,8 +584,6 @@ namespace extemp {
                   guard.unlock();
                   // scm->loadFile(scm->getInitFile().c_str());
                 }
-                sleep(2);
-
 
 		// //////////////////////////////////////////////////
 		// // this added for dodgy continuations support
