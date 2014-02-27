@@ -1242,15 +1242,15 @@ command to run."
       ;; bind-val
       (insert compiler-output)
       (goto-char (point-min))
-      (while (search-forward-regexp "^Bound \\(.*\\) >>> \\(.*\\)$" nil t)
+      (while (search-forward-regexp "^SetValue:  \\(.*\\) >>> \\(.*\\)$" nil t)
         (replace-match (concat "(bind-lib-val " libname " \\1 \\2)") t))
       ;; bind-func
       (goto-char (point-min))
-      (while (search-forward-regexp "^Compiled \\(.*\\) >>> \\(.*\\)$" nil t)
+      (while (search-forward-regexp "^Compiled:  \\(.*\\) >>> \\(.*\\)$" nil t)
         (replace-match (concat "(bind-lib-func " libname " \\1 \\2)") t))
       ;; bind-alias (and replace aliases in output)
       (goto-char (point-min))
-      (while (search-forward-regexp "^Aliased \\(.*\\) >>> \\(.*\\)$" nil t)
+      (while (search-forward-regexp "^SetAlias:  \\(.*\\) >>> \\(.*\\)$" nil t)
         (let ((alias (match-string 1))
               (value (match-string 2)))
           (replace-match (concat "(bind-alias \\1 \\2)") t)
