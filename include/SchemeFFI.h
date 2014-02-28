@@ -75,6 +75,7 @@ namespace extemp {
 
 	// misc scheme ties 
 	static pointer assocstrcmp(scheme* _sc, pointer args);
+	static pointer assocstrcmpall(scheme* _sc, pointer args);
 
 	// num stuff
 	static pointer randomReal(scheme* _sc, pointer args);

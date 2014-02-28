@@ -427,6 +427,7 @@ namespace extemp {
 
 	    // misc scheme ties
 	    { "assoc-strcmp",            &SchemeFFI::assocstrcmp },
+	    { "assoc-strcmp-all",            &SchemeFFI::assocstrcmpall },
 	    
 	    // number stuff
 	    { "random-real",		&SchemeFFI::randomReal },
@@ -1017,6 +1018,13 @@ namespace extemp {
       pointer key = pair_car(args);
       pointer alist = pair_cadr(args);
       return assoc_strcmp(_sc,key,alist);
+    }
+
+    pointer SchemeFFI::assocstrcmpall(scheme* _sc, pointer args)
+    {
+      pointer key = pair_car(args);
+      pointer alist = pair_cadr(args);
+      return assoc_strcmp_all(_sc,key,alist);
     }
 
     // number stuff	

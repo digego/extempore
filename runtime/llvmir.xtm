@@ -803,11 +803,8 @@
                              ags))))
           (else (set! type (make-list (+ 1 arity) "_"))))
     ;; (println 'type_b: type)
-    (let ((res (cl:remove-if (lambda (x)
-                                (or
-                                 (<> arity (cadr x))
-                                 (not (string=? name (symbol->string (car x))))))
-                             *impc:ir:gpolys*)))
+    (let* ((tmp (assoc-strcmp-all (string->symbol name) *impc:ir:gpolys*))           
+           (res (cl:remove-if (lambda (x) (<> arity (cadr x))) tmp)))
       (if (null? res)
           #f
           (let* ((weights (map (lambda (gp)
