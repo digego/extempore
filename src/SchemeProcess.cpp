@@ -549,13 +549,16 @@ namespace extemp {
 		std::stringstream ss;
 		std::string load_path = scm->getLoadPath();
 
-                //sleep(2); // give time for NSApp etc. to init                
+                sleep(1); // give time for NSApp etc. to init                
 
                 while(!scm->getRunning()) {}
 
 		scm->loadFile("scheme.xtm", load_path.c_str());
 		scm->loadFile("llvmir.xtm", load_path.c_str()); 
 		scm->loadFile("llvmti.xtm", load_path.c_str());		
+
+                scm->setLoadedLibs(true);  
+                sleep(1); // give time for NSApp etc. to init
 
                 // only load extempore.xtm in primary process
                 char sstr[256];
@@ -568,8 +571,6 @@ namespace extemp {
                   guard.unlock();
                   // scm->loadFile("extempore.xtm", load_path.c_str());
                 }
-
-                scm->setLoadedLibs(true);  
 
                 // load any init file provided
                 if(scm->getInitFile().compare("") != 0) {
