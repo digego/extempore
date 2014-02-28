@@ -32,33 +32,36 @@
 (if (<> (xtm-vg-create-context width height) 1) (xtm_vg_print_error))
 
 (bind-func post:XTMRENDERCB
-  (let ((image:VGImage (xtm_load_vgimage "assets/images/image.png")))
+  (let ((image:VGImage (xtm_load_vgimage "assets/images/image.png"))
+        (path (xtm_create_path))
+        (fill (vgCreatePaint))
+        (fill_color:xtm_color* (alloc))
+        (stroke (vgCreatePaint))
+        (stroke_color:xtm_color* (alloc)))
+    (afill! fill_color 1.0 0.0 0.0 0.5)
+    (afill! stroke_color 0.0 0.0 1.0 0.5)
     (lambda (frame shader m v p data)
-      (let ((path (xtm_create_path))
-            (stroke (vgCreatePaint))
-            (fill (vgCreatePaint))
-	    (i 0.0))
+      (let ((i:float 0.0))
         (xtm_vg_reset_matrices)
-	;; (xtm_vg_clear 0.0 0.0 0.0 1.0 (ftoi32 width) (ftoi32 height))
-        (xtm_paint_setup_fill fill 1.0 0.0 0.0 0.5)
-        (xtm_paint_setup_stroke stroke 0.0 0.0 1.0 0.5 10.0)
+        ;; (xtm_vg_clear 0.0 0.0 0.0 1.0 (ftoi32 width) (ftoi32 height))
+        (xtm_paint_set_fill fill fill_color)
+        (xtm_paint_set_stroke stroke stroke_color 10.)
         ;; create the path (using the add_circle closure)
-	(dotimes (i 200.0)
+        (dotimes (i 200.0)
           (xtm_add_ellipse
            path
-	   (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (i64tof frame)))))
-	   (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (i64tof frame)))))
+           (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (convert frame)))))
+           (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (convert frame)))))
            30.
            30.))
         ;; draw the image
         (if (null? image) void (vgDrawImage image))
         ;; draw the paths
-        (xtm_draw_path path)
+        (xtm_draw_path_keep path)
         ;; cleanup
-        (xtm_destroy_paint fill)
-        (xtm_destroy_paint stroke)
-	(xtm_vg_print_error)
-	void))))
+        (xtm_clear_path path)
+        (xtm_vg_print_error)
+        void))))
 
 (bind-func gl_render
   (lambda ()
