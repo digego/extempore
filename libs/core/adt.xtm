@@ -11,7 +11,14 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;; pairs
 
-(bind-type Pair <!x,!y>)
+(bind-type Pair <!a,!b>)
+
+(bind-func print:[void,Pair*]*
+  (lambda (p)
+    (if (null? p)
+        (begin (printout "<>") void)
+        (begin (printout "<" (tref p 0) "," (tref p 1) ">")
+               void))))
 
 (bind-func first:[!a,Pair:<!a,!b>*]* 
   (lambda (a)
@@ -20,12 +27,22 @@
 (bind-func second:[!b,Pair:<!a,!b>*]*	   
   (lambda (a)
     (tref a 1)))
-
-
+    
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; singly linked lists
 ;;
-(bind-type List <!x,List*>)
+(bind-type List <!a,List*>)
+  
+(bind-func print:[void,List*]*
+  (lambda (xs)
+    (if (null? xs)
+        (begin (printout "()") void)
+        (begin
+	  (printout "(" (car xs))
+	  (for-each (lambda (x) (printout " " x)) (cdr xs))
+	  (printout ")")
+          void))))
+
 
 (bind-func cons:[List:<!a,List*>*,!a,List:<!a,List*>*]*
   (lambda (x y)
@@ -257,14 +274,6 @@
       (tset! p 1 b)
       a)))
 
-(bind-func list_print:[void,List*]*
-  (lambda (xs)
-    (if (null? xs) void
-        (begin
-	  (printout "(" (car xs))
-	  (for-each (lambda (x) (printout " " x)) (cdr xs))
-	  (println ")")))))
-
 
 (bind-func swap:[List:<!a,List*>*,List:<!a,List*>*,i64,i64]*
   ;; swap ith and jth list elements inplace  
@@ -317,16 +326,7 @@
 
 (bind-type BTree <!_a,BTree*,BTree*>)
 
-(bind-func BLeaf:[BTree:<!a,BTree*,BTree*>*,!a]*
-  (lambda (x)
-    (let ((t (BTree x null null)))
-      t)))
-
-(bind-func btree_value:[!a,BTree*]*
-  (lambda (t)
-    (tref t 0)))
-
-(bind-func print_btree:[void,BTree*]*
+(bind-func print:[void,BTree*]*
   (lambda (t)
     (let ((f (lambda (t)
                (if (null? t) void
@@ -337,3 +337,13 @@
                      void)))))      
       (f t)
       (println))))
+
+(bind-func BLeaf:[BTree:<!a,BTree*,BTree*>*,!a]*
+  (lambda (x)
+    (let ((t (BTree x null null)))
+      t)))
+
+(bind-func btree_value:[!a,BTree*]*
+  (lambda (t)
+    (tref t 0)))
+

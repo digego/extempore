@@ -731,6 +731,10 @@
                                             (number->string pcnt)))
                            syms))
              (newtype (string->symbol (regex:replace-everything type syms newsyms)))
+             (newtypematch (map (lambda (k) (if (regex:match? k ":")
+                                           (car (regex:type-split k ":"))
+                                           "_"))
+                                (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))))
              (arity (- (length (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))) 1))
              (newcode (list 'bind-func
                             (string->symbol (string-append (symbol->string name)
@@ -739,13 +743,16 @@
                             (caddr code))))
         (let ((v (cl:remove-if (lambda (x)
                                  (or
-                                  (<> arity (cadr x))
+                                  (<> arity (cadr x))                                  
+                                  (not (string=?
+                                        (car (regex:type-split (symbol->string newtype) "(_|:)"))
+                                        (car (regex:type-split (symbol->string (caddr x)) "(_|:)"))))
                                   (not (string=? (symbol->string name) (symbol->string (car x))))))
                                *impc:ir:gpolys*)))
           ;; (let ((v (assoc-strcmp name *impc:ir:gpolys*)))
           (if (not (null? v))
-              (set-cdr! (car v) (list arity newtype newcode))
-              (set! *impc:ir:gpolys* (cons (list name arity newtype newcode) *impc:ir:gpolys*)))
+              (set-cdr! (car v) (list arity newtype newcode newtypematch))
+              (set! *impc:ir:gpolys* (cons (list name arity newtype newcode newtypematch) *impc:ir:gpolys*)))
           (set! *impc:ir:gpoly-needs-update* (cons (cons name arity) *impc:ir:gpoly-needs-update*))
           #t)))))
 
@@ -770,19 +777,55 @@
       (if res #t #f))))
 
 (define impc:ir:gpoly-types
-  (lambda (name arity)
+  (lambda (name arity type)
+    ;; (println 'poly: name 'a: arity 't: type)    
     (if (symbol? name) (set! name (symbol->string name)))
+    ;; (println 'type_a: type)
+    (cond ((and type (list? type))
+           (set! type (map (lambda (x)
+                             (if (string? x)
+                                 (cadr (regex:matched x "%([^-*]*)"))
+                                 "_"))
+                           (if (and (number? (car type))
+                                    (impc:ir:closure? type))
+                               (cddr type)
+                               type)))
+           ;; if lgth(type) = arity then we only have args
+           ;; and we should add a "_" return type
+           (if (= (length type) arity)
+               (set! type (cons "_" type))))
+          ((and type (string? type))
+           (let ((ags (impc:ir:get-pretty-closure-arg-strings type)))
+             (set! type (map (lambda (x)
+                               (if (regex:match? x ":")
+                                   (car (regex:type-split x ":"))
+                                   "_"))
+                             ags))))
+          (else (set! type (make-list (+ 1 arity) "_"))))
+    ;; (println 'type_b: type)
     (let ((res (cl:remove-if (lambda (x)
-                               (or
-                                (<> arity (cadr x))
-                                (not (string=? name (symbol->string (car x))))))
+                                (or
+                                 (<> arity (cadr x))
+                                 (not (string=? name (symbol->string (car x))))))
                              *impc:ir:gpolys*)))
-      (if (> (length res) 1)
-	  (impc:compiler:print-compiler-error (string-append "incorrect number of gpolys" (sexpr->string *impc:ir:gpolys*))))
-      (if (and res
-               (not (null? res)))
-          (cddr (car res))
-          #f))))
+      (if (null? res)
+          #f
+          (let* ((weights (map (lambda (gp)
+                                 (cons (apply + (map (lambda (x y)
+                                                       ;; (println x '=? y)
+                                                       (if (string=? x y)
+                                                           1
+                                                           (if (string=? x "_")
+                                                               0
+                                                               -100))) ;; you lose!
+                                                     (car (cddddr gp))
+                                                     type))
+                                       gp))
+                               res))
+                 (w (apply max (map (lambda (x) (car x)) weights))))
+            ;; (println 'best: w ': (length weights) '-> (assoc w weights))
+            (cdddr (assoc w weights)))))))
+
 
 ;; (define impc:ir:gpoly-types
 ;;   (lambda (name)

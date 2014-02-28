@@ -25,6 +25,15 @@
 ;; Generic Point {x,y}
 (bind-type Point <!a,!a>)
 
+(bind-func print:[void,Point*]*
+  (lambda (p)
+    (if (null? p)
+        (begin (printout "<>") void)
+        (begin (printout "<"
+                         (tref p 0) ","
+                         (tref p 1) ">")
+               void))))
+
 ;; make and return a Point
 (bind-func test_point_1
   "Test doc-string"
@@ -56,6 +65,43 @@
 ;; this allows *different* point and size primitives
 (bind-type RectangleB <Point:<!a,!a>*,Size:<!b,!b>*>)
 
+;; print routines for everything!
+(bind-func print:[void,Size*]*
+  (lambda (p)
+    (if (null? p)
+        (begin (printout "<>") void)
+        (begin (printout "<"
+                         (tref p 0) ","
+                         (tref p 1) ">")
+               void))))
+
+(bind-func print:[void,Rectangle*]*
+  (lambda (p)
+    (if (null? p)
+        (begin (printout "<>") void)
+        (begin (printout "<"
+                         (tref p 0) ","
+                         (tref p 1) ">")
+               void))))
+
+(bind-func print:[void,RectangleA*]*
+  (lambda (p)
+    (if (null? p)
+        (begin (printout "<>") void)
+        (begin (printout "<"
+                         (tref p 0) ","
+                         (tref p 1) ">")
+               void))))
+
+(bind-func print:[void,RectangleB*]*
+  (lambda (p)
+    (if (null? p)
+        (begin (printout "<>") void)
+        (begin (printout "<"
+                         (tref p 0) ","
+                         (tref p 1) ">")
+               void))))
+
 ;; make some rectangles
 (bind-func test_rectangle_1
   (lambda ()
@@ -82,6 +128,7 @@
 
 (bind-type Tree <!a,Tree*,Tree*>)
 
+
 (bind-func Leaf:[Tree:<!a,Tree*,Tree*>*,!a]*
   "Make A Leaf"
   (lambda (x)
@@ -92,7 +139,7 @@
   (lambda (t)
     (tref t 0)))
 
-(bind-func print_tree:[void,Tree*]*
+(bind-func print:[void,Tree*]*
   (lambda (t)
     (let ((f (lambda (t)
                (if (null? t) void
@@ -115,9 +162,9 @@
           (t6 (Tree (Point 1.0 2.0) t5 null)))
       (println)
       (printout "Integer Tree: ")
-      (print_tree t4)
+      (printout t4)
       (printout "Point Tree: ")
-      (print_tree t6)
+      (printout t6)
       (println))))
 
 (test-xtfunc (tree_test))
@@ -157,7 +204,7 @@
 (bind-func test_list_1
   (lambda ()
     (let ((l (list 1 2 3 4 5)))
-      (list_print l)
+      (println l)
       (car (cdr l)))))
 
 (test-xtfunc (test_list_1) 2)
@@ -166,7 +213,7 @@
   (lambda ()
     (let ((l (list 1 2 3 4 5))
           (l2 (map (lambda (x) (* x x)) l)))
-      (list_print l2))))
+      (println l2))))
 
 (test-xtfunc (test_list_2))
 
@@ -175,7 +222,7 @@
     (let ((l (list 1.0 2.0 3.0 4.0))
           (f (lambda (x) (* x x)))
           (l2 (map f l)))
-      (list_print l2))))
+      (println l2))))
 
 (test-xtfunc (test_list_3))
 
@@ -183,7 +230,7 @@
   (lambda ()
     (let ((lst (list 1 2 3)))
       (set_car (nth_tail lst 1) 5)
-      (list_print lst)
+      (println lst)
       (= (nth lst 1) 5))))
 
 (test-xtfunc (test_set_car) 1)
@@ -193,7 +240,7 @@
     (let ((lst1 (list 1 2 3))
 	  (lst2 (list 4 5 6)))
       (set_cdr (nth_tail lst1 2) lst2)
-      (list_print lst1)
+      (println lst1)
       (= (length lst1) 6))))
 
 (test-xtfunc (test_set_cdr) 1)
@@ -249,19 +296,19 @@
           (l3 (list l2 l2)))
       l3)))
 
-(bind-func test_list_8
-  (lambda ()
-    (let ((l1 (list (Point 1 2) (Point 3 4) (Point 5 6)))
-          (l2 (list l1 l1 l1)))
-      (for-each (lambda (x)                  
-                  (for-each (lambda (x)
-                              (printout x ","))
-                            x)
-                  (println))                
-                l2)
-      l2)))
+;; (bind-func test_list_8
+;;   (lambda ()
+;;     (let ((l1 (list (Point 1 2) (Point 3 4) (Point 5 6)))
+;;           (l2 (list l1 l1 l1)))
+;;       (for-each (lambda (x)                  
+;;                   (for-each (lambda (x)
+;;                               (printout x ","))
+;;                             x)
+;;                   (println))                
+;;                 l2)
+;;       l2)))
 
-(test-xtfunc (test_list_8))
+;; (test-xtfunc (test_list_8))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -274,7 +321,7 @@
           (v2 (list 5 6 7 8))
           (v3 (append v1 v2)))
       (insert v3 4 77)
-      (list_print v3)
+      (println v3)
       (println "length:" (length v3))
       (length v3))))
 
@@ -329,7 +376,7 @@
   (lambda ()
     (let ((lst (list 1 2 3 4 5)))
       (swap lst 1 3)
-      (list_print lst)
+      (println lst)
       (= (nth lst 1) 4))))
 
 (test-xtfunc (test_list_swap) 1)
@@ -366,8 +413,8 @@
   (lambda ()
     (let ((res1 (range 3 8))
           (res2 (range 1 10 3)))
-      (list_print res1)
-      (list_print res2)
+      (println res1)
+      (println res2)
       (= (nth res1 4)
          (nth res2 2)))))
 
@@ -380,8 +427,8 @@
           (res
            (filter (lambda (x) (not (null? (member x list1))))
                    list2)))
-      (list_print list1)
-      (list_print res)
+      (println list1)
+      (println res)
       (length res))))
 
 (test-xtfunc (test_list_range_2) 3)
@@ -422,7 +469,7 @@
     (let ((lst (range 10))
           (fn (lambda (a:i64 b) (cons a b)))
           (res (foldr fn null lst)))
-      (list_print res)
+      (println res)
       (and (= (nth lst 4)
               (nth res 4))
            (= (nth lst 6)
@@ -444,8 +491,7 @@
 (bind-func test_assoc_2
   (lambda ()
     (let ((dict (test_assoc_1)))
-      (list_print dict)
-      ;; (for-each (lambda (p) (println p)) dict)
+      (println dict)
       (println "Ben is" (dict_find dict (Str "Ben")) "years old")
       (println "Andrew is" (dict_find dict (Str "Andrew")) "years old")
       void)))
@@ -463,7 +509,7 @@
           (t2 (BLeaf 4))
           (t3 (BTree 2 t1 t2))
           (t4 (BTree 1 t3 null)))
-      (print_btree t4)
+      (println t4)
       t3)))
 
 (test-xtfunc (btree_test_1))
@@ -619,22 +665,33 @@
     (let ((lst (list gen_exp:$[i32]* gen_exp:$[i32]*)))
       lst)))
 
-   
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; specialize
+;; generic overloading
 ;;
-
-(bind-type TypeK <!a,!a>)
-
-(specialize-type TypeK $<i32> $<i64>)
-
-(bind-func spec_gen_f:[!a,!a]*
+(bind-func gen_sqr:[!a,!a]*
   (lambda (x)
     (* x x)))
 
-(specialize-generic spec_gen_f $[i32]* $[double]* $[float]*)
+(bind-func gen_sqr:[Pair*,Pair*]*
+  (lambda (x)
+    (Pair (* (first x) (first x))
+          (* (second x) (second x)))))
+
+(bind-func gen_sqr:[List*,List*]*
+  (lambda (lst)
+    (map (lambda (x) (gen_sqr x)) lst)))
+
+(bind-func gen_sqr_test
+  (lambda ()
+    (println (gen_sqr 2)
+             (gen_sqr 3.0)
+             (gen_sqr (Pair 4.0 5.0))
+             (gen_sqr (list 6 7 8)))))
+
+(test-xtfunc (gen_sqr_test))
+
 
 (print-test-results)
 
