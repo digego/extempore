@@ -873,7 +873,10 @@
 					 (cadr ast))
                                     (list (cons 'begin (impc:ti:first-transform (cddr ast) #t))))))
                        ((and (symbol? (car ast))
-                             (regex:match? (symbol->string (car ast)) ".*\\..*"))
+                             (regex:match? (symbol->string (car ast)) ".*\\..*")
+                             ;; this last case here to catch of '.' in
+                             ;; floating point numbers of type 1.000:float etc..
+                             (not (number? (string->atom (car (regex:type-split (symbol->string (car ast)) ":"))))))
                         (if (regex:match? (symbol->string (car ast)) ".*\\..*:.*")
                             (let* ((subs (regex:split (symbol->string (car ast)) "\\."))
                                    (a (string->symbol (car subs)))
@@ -945,12 +948,16 @@
                                 (_specialize-generic (car p) (cname-decode (cadr p)))
                                 t))))
                        ((and (symbol? ast)
-                             (regex:match? (symbol->string ast) ":(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
+                             (regex:match? (symbol->string ast) ":(f)|(i)|(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
                         (let ((p (regex:type-split (symbol->string ast) ":")))
                           (if (not (number? (string->atom (car p))))
-                              ast ;; if not a number then return ast as is                              
-                              ;; other do convert
-                              (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))
+                              ast
+                              ;; otherwise do a convert
+                              (if (string=? (cadr p) "f")
+                                  (list 'bitconvert (string->atom (car p)) 'float)
+                                  (if (string=? (cadr p) "i")
+                                      (list 'bitconvert (string->atom (car p)) 'i32)
+                                      (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))))
                        (else ast)))))))
 
 
@@ -2022,11 +2029,27 @@
     ;; cleanup request!
     (if (and (list? request?)
              (= 1 (length request?)))
-        (set! request? (car request?)))
+        (set! request? (car request?)))    
     ;; now start type checking    
-    (let* ((a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
-           (b (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars))
+    (let* ((n1 (cadr ast))
+           (n2 (caddr ast))
+           (a (impc:ti:type-unify (impc:ti:type-check n1 vars kts request?) vars))
+           (b (impc:ti:type-unify (impc:ti:type-check n2 vars kts request?) vars))
            (t (impc:ti:type-unify (list a b) vars)))
+      ;; if we can fully unify on 't'
+      ;; then we might need to retypecheck a or b      
+      (if (impc:ir:type? t)
+          (begin
+            (if (and (list? a)
+                     (list? n1)
+                     (assoc-strcmp (car n1) vars))
+                (begin (impc:ti:force-var (car n1) vars kts '())
+                       (impc:ti:type-check n1 vars kts t)))
+            (if (and (list? b)
+                     (list? n2)
+                     (assoc-strcmp (car n2) vars))
+                (begin (impc:ti:force-var (car n2) vars kts '())
+                       (impc:ti:type-check n2 vars kts t)))))      
       ;; (println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)      
       (if (and (impc:ir:type? b)
                (impc:ir:type? a)
@@ -2079,7 +2102,20 @@
 	     (a (impc:ti:type-unify (impc:ti:type-check n1 vars kts #f) vars)) ;; removed request?
              (b (impc:ti:type-unify (impc:ti:type-check n2 vars kts #f) vars)) ;; removed request?
 	     (t (impc:ti:type-unify (list a b) vars)))
-	 ;; (println 'a a 'b b 't t)
+        ;; if we can unify on 't'
+        ;; then we might need to retypecheck a or b
+        (if (impc:ir:type? t)
+            (begin
+              (if (and (list? a)
+                       (list? n1)
+                       (assoc-strcmp (car n1) vars))
+                  (begin (impc:ti:force-var (car n1) vars kts '())
+                         (impc:ti:type-check n1 vars kts t)))
+              (if (and (list? b)
+                       (list? n2)
+                       (assoc-strcmp (car n2) vars))
+                  (begin (impc:ti:force-var (car n2) vars kts '())
+                         (impc:ti:type-check n2 vars kts t)))))
          (if *impc:ti:print-sub-checks* (println 'compare:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
          (if (not (null? t))
              (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
@@ -2954,8 +2990,9 @@
            ;; (println 'va valid-args)
            ;; (println '-> ast 'valid-polys: valid-polys 'request: request?)
 
-           ;; (if (null? valid-polys)
-           ;;     (set! valid-polys (list (car ftypes))))
+           (if (null? valid-polys)
+               (set! valid-polys
+                     (cl:remove #f (map (lambda (a b) (if a b #f)) valid-lgth ftypes))))
            (if (null? valid-polys)
 	       (impc:compiler:print-compiler-error "no valid polymorphic options" ast))
            
