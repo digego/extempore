@@ -971,14 +971,18 @@
 ;; is 't' a complex type?
 (define impc:ti:complex-type?
   (lambda (t)
-    (if (atom? t) #f
-	(if (and (number? (car t))           ;; if list starts with a number (i.e. not a symbol)
-		 (<> (car t) *impc:ir:void*) ;; if not void
-                 ;; if proper complex type (tuple,array,closure)
-		 (member (modulo (car t) *impc:ir:pointer*)
-                         (list *impc:ir:tuple* *impc:ir:array* *impc:ir:vector* *impc:ir:closure*))) 
-	    #t
-	    #f))))
+    (if (and (atom? t)
+	     (not (string? t)))
+	#f
+	(if (string? t) #t
+	    (if (and (number? (car t))           ;; if list starts with a number (i.e. not a symbol)
+		     (<> (car t) *impc:ir:void*) ;; if not void
+		     ;; if proper complex type (tuple,array,closure)
+		     (member (modulo (car t) *impc:ir:pointer*)
+			     (list *impc:ir:tuple* *impc:ir:array* *impc:ir:vector* *impc:ir:closure*))) 
+		#t
+		#f)))))
+
 
 
 ;; newname mappings is an assoc list 
@@ -1463,8 +1467,11 @@
 				  (list? result)
 				  (or (impc:ir:closure? (car result))
 				      (impc:ir:tuple? (car result))))
-			     (begin (impc:ti:check-to-update-generic-vars (car result) t vars)
-				    (car result)) ;; result is a proper tuple or closure
+			     (begin
+			       (impc:ti:check-to-update-generic-vars (car result) t vars)
+			       (if (cl:find-if (lambda (k) (string? k)) result)
+				   (cl:find-if (lambda (k) (string? k)) result)
+				   (car result))) ;; result is a proper tuple or closure 
 			     (if (and (list? result)
 				      (not (null? result))
 				      (= (length result) 1))
