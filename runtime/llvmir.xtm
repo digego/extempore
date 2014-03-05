@@ -4705,6 +4705,28 @@
                       (cdr ftypes))))
       (if (<> (length args) (length (cdr ftypes)))
 	  (impc:compiler:print-bad-arity-error ast))
+
+      ;; this here for structural typing on function call
+      ;; can be commented out without effecting anything else!!
+      (if *impc:compiler:allow-structural-calls
+	  (set! args
+		(map (lambda (p ft)
+		       (let* ((atype (cadr (cdr p)))
+			      (aname (car (cdr p)))
+			      (abass (impc:ir:get-type-from-str (impc:ir:get-base-type atype)))
+			      (ftbass (impc:ir:get-type-from-str (impc:ir:get-base-type ft))))
+			 (if (string? abass) (set! abass (impc:ir:get-type-from-str (impc:ir:get-named-type abass))))
+			 (if (string? ftbass) (set! ftbass (impc:ir:get-type-from-str (impc:ir:get-named-type ftbass))))
+			 (if (and (not (equal? (impc:ir:get-type-from-str atype)
+					       (impc:ir:get-type-from-str ft)))
+				  (equal? abass ftbass))				   
+			     (cons (string-append
+				    (car p)
+				    (impc:ir:gname "val" ft)
+				    " = bitcast " atype " " aname " to " ft "\n")
+				   (impc:ir:gname))
+			     p)))
+		     args (cdr ftypes))))
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; new for impz stuff	 
       ;; (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
