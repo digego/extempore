@@ -518,6 +518,15 @@
     (vgSetParameteri paint VG_PAINT_TYPE VG_PAINT_TYPE_COLOR)
     (vgSetParameterfv paint VG_PAINT_COLOR 4 (cast paint_color VGfloat*))))
 
+(bind-func xtm_paint_set_pattern
+  (let ((tile_fill:|4,VGfloat|* (alloc)))
+    (afill! tile_fill 0. 0. 1. 1.)
+    (lambda (paint image:VGImage)
+      (vgSetParameteri paint VG_PAINT_TYPE VG_PAINT_TYPE_PATTERN)
+      (vgSetParameteri paint VG_PAINT_PATTERN_TILING_MODE VG_TILE_FILL)
+      (vgSetfv VG_TILE_FILL_COLOR 4 (cast tile_fill VGfloat*))
+      (vgPaintPattern paint image))))
+
 (bind-func xtm_paint_set_stroke
   (lambda (paint stroke_color:xtm_color* width)
     (xtm_paint_set_color paint stroke_color)
