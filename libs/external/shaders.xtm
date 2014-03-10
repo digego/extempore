@@ -3481,8 +3481,13 @@ void main( void ) {
   (lambda (width height fps start-time vg-setup?)
     (xtm_render_setup width height)
     (if vg-setup?
-        (if (<> (xtm-vg-create-context width height) 1)
-            (xtm_vg_print_error)))
+        (begin (print "Setting up ")
+               (print-with-colors
+                *impc:compiler:pretty-print-name-color* 'default #t
+                (print "OpenVG"))
+               (print " context.\n")
+               (if (<> (xtm-vg-create-context width height) 1)
+                   (xtm_vg_print_error))))
     (gl-loop start-time (/ 1 fps))
     ;; not sure about the best way to see if this function succeeds
     #t))
@@ -3523,30 +3528,29 @@ void main( void ) {
 
 (define ipc:graphics-setup
   (lambda (proc width height fullscreen fps start-time . vg-setup?)
-    (if (not (defined? 'gl_render))
-        (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
-                                  (print "Error: "))
-               (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
-                                  (print "gl_render"))
-               (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t
-                                  (print ":[void]*"))
-               (print " must be defined before you can start the graphics loop\n")
-               (error ""))
-        (begin (ipc:bind-func proc 'gl_render gl_render)
-               (if (defined? 'post)
-                   (ipc:bind-func proc 'post post))
-               (print "Binding ")
-               (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
-                                  (print "gl_render"))
-               (print " on ")
-               (print-with-colors 'cyan 'default #t (print proc))
-               (print " process\nMake sure you ")
-               (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
-                                  (print "ipc:bind-func"))
-               (print " any functions which ")
-               (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
-                                  (print "gl_render"))
-               (print " calls in that process as well\ne.g. (ipc:bind-func" proc "'fn_name fn_name)\n")))
+    (if (not (llvm:get-function "post"))
+        (bind-func post:XTMRENDERCB
+          (lambda (frame shader m v p data)
+            void)))
+    (if (not (llvm:get-function "gl_render"))
+        (bind-func gl_render
+          (lambda ()
+            (xtm_render null null null  post null)
+            void)))
+    (begin (ipc:bind-func proc 'gl_render gl_render)
+           (ipc:bind-func proc 'post post)
+           (print "Binding ")
+           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
+                              (print "gl_render"))
+           (print " on ")
+           (print-with-colors 'cyan 'default #t (print proc))
+           (print " process\nMake sure you ")
+           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
+                              (print "ipc:bind-func"))
+           (print " any functions which ")
+           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
+                              (print "gl_render"))
+           (print " calls in that process as well\ne.g. (ipc:bind-func" proc "'fn_name fn_name)\n"))
     (ipc:define proc 'gl-loop gl-loop)
     (ipc:define proc 'xtm-create-gl-context xtm-create-gl-context)
     (ipc:define proc 'xtm-setup-and-start-gl-loop xtm-setup-and-start-gl-loop)
