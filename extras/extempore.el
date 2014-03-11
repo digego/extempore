@@ -1566,26 +1566,18 @@ You shouldn't have to modify this list directly, use
 
 (defun exlog-start-logging ()
   (add-hook 'pre-command-hook 'exlog-pre-command-hook)
-  (unless exlog-logfile
-    (setq exlog-logfile
-          (exlog-new-logfile)))
   (call-interactively 'exlog-add-comment)
-  (exlog-advise-functions exlog-special-functions)
-  ;; (exlog-start-idle-write-timer)
-  )
+  (exlog-advise-functions exlog-special-functions))
 
 (defun exlog-stop-logging ()
   (remove-hook 'pre-command-hook 'exlog-pre-command-hook)
   (call-interactively 'exlog-add-comment)
-  (exlog-finish-logfile)
-  (setq exlog-logfile nil)
-  (exlog-unadvise-functions exlog-special-functions)
-  ;; (exlog-stop-idle-write-timer)
-  )
+  (exlog-write-log-buffer)
+  (exlog-unadvise-functions exlog-special-functions))
 
 (defun exlog-new-session ()
   (interactive)
-  (if exlog-logfile
+  (if (get-buffer "*exlog*")
       (call-interactively 'exlog-stop-logging))
   (exlog-start-logging))
 
@@ -1596,7 +1588,7 @@ You shouldn't have to modify this list directly, use
   (mapc (lambda (function)
           (ad-add-advice
            function
-	   '(exlog-advice nil t (advice . (lambda () (exlog-log-current-command real-this-command current-prefix-arg (ad-get-args 0)))))
+	   '(exlog-advice nil t (advice . (lambda () (exlog-log-command real-this-command current-prefix-arg (ad-get-args 0)))))
            'after 'first)
           (ad-activate function))
         func-list))
@@ -1613,92 +1605,65 @@ You shouldn't have to modify this list directly, use
     extempore-disconnect)
   "A list of extempore-mode functions to specifically instrument for logging")
 
-(defvar exlog-cache nil
-  "An in-memory cache of logged commands, which is flushed to
-  disk when the system is idle through
-  `exlog-flush'.")
-
 (defun exlog-yasnippet-hook ()
-  (exlog-log-current-command 'yas-expand
+  (exlog-log-command 'yas-expand
 					nil
 					(list yas-snippet-beg yas-snippet-end)))
 
 (add-hook 'yas-after-exit-snippet-hook
-	  'exlog-yasnippet-hook)
-
-(defun exlog-log-current-command (command event arg-list)
-  (if (and (equal major-mode 'extempore-mode)
-           (symbolp command))
-      (setq exlog-cache
-            (cons (concat (format-time-string "%Y-%m-%d %T.%3N")
-                          (format ",%s,%s,%s," 
-                                  (buffer-name)
-				  (symbol-name command)
-				  event)
-			  (prin1-to-string
-			   (if (member command '(yas-expand
-						 extempore-send-definition
-						 extempore-send-region
-						 extempore-send-buffer))
-			       (prin1-to-string
-				(read (concat "(" (remove ?\# (buffer-substring-no-properties (car arg-list) (cadr arg-list))) ")")))
-			     (prin1-to-string arg-list))))
-		  exlog-cache))))
+          'exlog-yasnippet-hook)
 
 (defun exlog-add-comment (comment)
   (interactive "sAny comments about this particular session? ")
-  (if (equal major-mode 'extempore-mode)
-      (setq exlog-cache
-            (cons (concat (format-time-string "%Y-%m-%d %T.%3N") ","
-                          (buffer-name) ","
-                          "comment,nil,"
-                          (replace-regexp-in-string
-                           "[\r\n]" " "
-                           (prin1-to-string comment)))
-                  exlog-cache))))
+  (format "(%s %s %s %s)"
+          (format-time-string "%Y-%m-%d %T.%3N")
+          (buffer-name)
+          "comment"
+          "nil"
+          (replace-regexp-in-string "[\r\n]" " " comment)))
+
+(defun exlog-write-log-entry (bname command event args)
+  (with-current-buffer (get-buffer-create "*exlog*")
+    (insert
+     (format "(%s %s %s %s %s)"
+             (format-time-string "%Y-%m-%d %T.%3N")
+             bname
+             command
+             event
+             args))))
+
+(defun exlog-log-command (command event args)
+  (if (and (equal major-mode 'extempore-mode)
+           (symbolp command))
+    (exlog-write-log-entry (buffer-name)
+                           (symbol-name command)
+                           event
+                           (if (and (member command '(yas-expand
+                                                      extempore-send-definition
+                                                      extempore-send-region
+                                                      extempore-send-buffer))
+                                    (every #'integer-or-marker-p args))
+                               (prin1-to-string (buffer-substring-no-properties (car args) (cadr args)))
+                             args))))
 
 (defun exlog-pre-command-hook ()
-  (exlog-log-current-command real-this-command last-input-event nil))
+  (exlog-log-command real-this-command last-input-event current-prefix-arg))
 
 ;; writing command list to file
 
-(defvar exlog-logfile nil)
-
-(defun exlog-new-logfile ()
-  (let* ((log-dir (concat (or user-extempore-directory user-emacs-directory) "keylogs/"))
-         (dir-created (unless (file-exists-p log-dir) (make-directory log-dir)))
-         (logfile-name (concat log-dir
-                               (format-time-string "%Y%m%dT%H%M%S-")
-                               user-login-name
-                               ".keylog")))
-    (if (file-exists-p logfile-name)
-        (progn (message "Extempore logfile %s already exists" logfile-name)
-               nil)
-      logfile-name)))
-
-(defun exlog-flush ()
-  (if exlog-logfile
-      (progn (append-to-file (concat (mapconcat 'identity (nreverse exlog-cache) "\n") "\n")
-                             nil
-                             exlog-logfile)
-             (setq exlog-cache nil))))
-
-(defun exlog-finish-logfile ()
-  (exlog-flush)
-  (async-shell-command (format "gzip %s" exlog-logfile)))
-
-(defvar exlog-write-timer nil)
-(defvar exlog-write-timer-interval 10.0)
-
-(defun exlog-start-idle-write-timer ()
-  (setq exlog-write-timer
-        (run-with-idle-timer exlog-write-timer-interval
-                             t
-                             'exlog-flush)))
-
-(defun exlog-stop-idle-write-timer ()
-  (cancel-timer exlog-write-timer)
-  (setq exlog-write-timer nil))
+(defun exlog-write-log-buffer ()
+  (let ((logfile-name (concat (or user-extempore-directory user-emacs-directory)
+                              "keylogs/"
+                              (format-time-string "%Y%m%dT%H%M%S-")
+                              user-login-name
+                              ".keylog"))
+        (log-buffer (get-buffer "*exlog*")))
+    (if log-buffer
+        (with-current-buffer log-buffer
+          (write-region nil nil logfile-name nil nil nil t)
+          (kill-buffer log-buffer)
+          (async-shell-command (format "gzip %s" logfile-name)))
+      (message "No log buffer found."))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; extempore slave buffer minor mode ;;
