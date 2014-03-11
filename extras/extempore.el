@@ -284,7 +284,7 @@ See `run-hooks'."
   (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
   (define-key keymap (kbd "C-x C-b") 'extempore-send-buffer)
   ;; (define-key keymap (kbd "C-x y")   'extempore-tr-animation-mode)
-  (define-key keymap (kbd "C-c C-l") 'extempore-logger-mode)
+  (define-key keymap (kbd "C-c C-l") 'exlog-mode)
   ;; slave buffer mode
   (define-key keymap (kbd "C-c c s") 'extempore-sb-mode)
   (define-key keymap (kbd "C-c c p") 'extempore-sb-toggle-current-buffer))
@@ -1551,85 +1551,85 @@ You shouldn't have to modify this list directly, use
 ;; extempore logger ;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-(define-minor-mode extempore-logger-mode
+(define-minor-mode exlog-mode
   "This minor mode automatically logs all keystrokes (and
   extempore code sent for evaluation) in all Extempore buffers."
   :global t
   :init-value nil
-  :lighter " ExLog"
+  :lighter " exlog"
   :keymap nil
   :group 'extempore
 
-  (if extempore-logger-mode
-      (extempore-logger-start-logging)
-    (extempore-logger-stop-logging)))
+  (if exlog-mode
+      (exlog-start-logging)
+    (exlog-stop-logging)))
 
-(defun extempore-logger-start-logging ()
-  (add-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
-  (unless extempore-logger-logfile
-    (setq extempore-logger-logfile
-          (extempore-logger-new-logfile)))
-  (call-interactively 'extempore-logger-add-comment)
-  (extempore-logger-advise-functions extempore-logger-special-functions)
-  ;; (extempore-logger-start-idle-write-timer)
+(defun exlog-start-logging ()
+  (add-hook 'pre-command-hook 'exlog-pre-command-hook)
+  (unless exlog-logfile
+    (setq exlog-logfile
+          (exlog-new-logfile)))
+  (call-interactively 'exlog-add-comment)
+  (exlog-advise-functions exlog-special-functions)
+  ;; (exlog-start-idle-write-timer)
   )
 
-(defun extempore-logger-stop-logging ()
-  (remove-hook 'pre-command-hook 'extempore-logger-pre-command-hook)
-  (call-interactively 'extempore-logger-add-comment)
-  (extempore-logger-finish-logfile)
-  (setq extempore-logger-logfile nil)
-  (extempore-logger-unadvise-functions extempore-logger-special-functions)
-  ;; (extempore-logger-stop-idle-write-timer)
+(defun exlog-stop-logging ()
+  (remove-hook 'pre-command-hook 'exlog-pre-command-hook)
+  (call-interactively 'exlog-add-comment)
+  (exlog-finish-logfile)
+  (setq exlog-logfile nil)
+  (exlog-unadvise-functions exlog-special-functions)
+  ;; (exlog-stop-idle-write-timer)
   )
 
-(defun extempore-logger-new-session ()
+(defun exlog-new-session ()
   (interactive)
-  (if extempore-logger-logfile
-      (call-interactively 'extempore-logger-stop-logging))
-  (extempore-logger-start-logging))
+  (if exlog-logfile
+      (call-interactively 'exlog-stop-logging))
+  (exlog-start-logging))
 
-;; advise funcitions for logging
+;; advise functions for logging
 
-(defun extempore-logger-advise-functions (func-list)
+(defun exlog-advise-functions (func-list)
   "Advise (via defadvice) the key extempore-mode functions"
   (mapc (lambda (function)
           (ad-add-advice
            function
-	   '(extempore-logger-advice nil t (advice . (lambda () (extempore-logger-log-current-command real-this-command current-prefix-arg (ad-get-args 0)))))
+	   '(exlog-advice nil t (advice . (lambda () (exlog-log-current-command real-this-command current-prefix-arg (ad-get-args 0)))))
            'after 'first)
           (ad-activate function))
         func-list))
 
-(defun extempore-logger-unadvise-functions (func-list)
+(defun exlog-unadvise-functions (func-list)
   "Remove advice from special extempore-mode functions"
   (mapc (lambda (function)
-          (ad-remove-advice function 'after 'extempore-logger-advice))
+          (ad-remove-advice function 'after 'exlog-advice))
         func-list))
 
-(defvar extempore-logger-special-functions
+(defvar exlog-special-functions
   '(extempore-send-region
     extempore-connect
     extempore-disconnect)
   "A list of extempore-mode functions to specifically instrument for logging")
 
-(defvar extempore-logger-cache nil
+(defvar exlog-cache nil
   "An in-memory cache of logged commands, which is flushed to
   disk when the system is idle through
-  `extempore-logger-flush'.")
+  `exlog-flush'.")
 
-(defun extempore-logger-yasnippet-hook ()
-  (extempore-logger-log-current-command 'yas-expand
+(defun exlog-yasnippet-hook ()
+  (exlog-log-current-command 'yas-expand
 					nil
 					(list yas-snippet-beg yas-snippet-end)))
 
 (add-hook 'yas-after-exit-snippet-hook
-	  'extempore-logger-yasnippet-hook)
+	  'exlog-yasnippet-hook)
 
-(defun extempore-logger-log-current-command (command event arg-list)
+(defun exlog-log-current-command (command event arg-list)
   (if (and (equal major-mode 'extempore-mode)
            (symbolp command))
-      (setq extempore-logger-cache
+      (setq exlog-cache
             (cons (concat (format-time-string "%Y-%m-%d %T.%3N")
                           (format ",%s,%s,%s," 
                                   (buffer-name)
@@ -1643,28 +1643,28 @@ You shouldn't have to modify this list directly, use
 			       (prin1-to-string
 				(read (concat "(" (remove ?\# (buffer-substring-no-properties (car arg-list) (cadr arg-list))) ")")))
 			     (prin1-to-string arg-list))))
-		  extempore-logger-cache))))
+		  exlog-cache))))
 
-(defun extempore-logger-add-comment (comment)
+(defun exlog-add-comment (comment)
   (interactive "sAny comments about this particular session? ")
   (if (equal major-mode 'extempore-mode)
-      (setq extempore-logger-cache
+      (setq exlog-cache
             (cons (concat (format-time-string "%Y-%m-%d %T.%3N") ","
                           (buffer-name) ","
                           "comment,nil,"
                           (replace-regexp-in-string
                            "[\r\n]" " "
                            (prin1-to-string comment)))
-                  extempore-logger-cache))))
+                  exlog-cache))))
 
-(defun extempore-logger-pre-command-hook ()
-  (extempore-logger-log-current-command real-this-command last-input-event nil))
+(defun exlog-pre-command-hook ()
+  (exlog-log-current-command real-this-command last-input-event nil))
 
 ;; writing command list to file
 
-(defvar extempore-logger-logfile nil)
+(defvar exlog-logfile nil)
 
-(defun extempore-logger-new-logfile ()
+(defun exlog-new-logfile ()
   (let* ((log-dir (concat (or user-extempore-directory user-emacs-directory) "keylogs/"))
          (dir-created (unless (file-exists-p log-dir) (make-directory log-dir)))
          (logfile-name (concat log-dir
@@ -1676,29 +1676,29 @@ You shouldn't have to modify this list directly, use
                nil)
       logfile-name)))
 
-(defun extempore-logger-flush ()
-  (if extempore-logger-logfile
-      (progn (append-to-file (concat (mapconcat 'identity (nreverse extempore-logger-cache) "\n") "\n")
+(defun exlog-flush ()
+  (if exlog-logfile
+      (progn (append-to-file (concat (mapconcat 'identity (nreverse exlog-cache) "\n") "\n")
                              nil
-                             extempore-logger-logfile)
-             (setq extempore-logger-cache nil))))
+                             exlog-logfile)
+             (setq exlog-cache nil))))
 
-(defun extempore-logger-finish-logfile ()
-  (extempore-logger-flush)
-  (async-shell-command (format "gzip %s" extempore-logger-logfile)))
+(defun exlog-finish-logfile ()
+  (exlog-flush)
+  (async-shell-command (format "gzip %s" exlog-logfile)))
 
-(defvar extempore-logger-write-timer nil)
-(defvar extempore-logger-write-timer-interval 10.0)
+(defvar exlog-write-timer nil)
+(defvar exlog-write-timer-interval 10.0)
 
-(defun extempore-logger-start-idle-write-timer ()
-  (setq extempore-logger-write-timer
-        (run-with-idle-timer extempore-logger-write-timer-interval
+(defun exlog-start-idle-write-timer ()
+  (setq exlog-write-timer
+        (run-with-idle-timer exlog-write-timer-interval
                              t
-                             'extempore-logger-flush)))
+                             'exlog-flush)))
 
-(defun extempore-logger-stop-idle-write-timer ()
-  (cancel-timer extempore-logger-write-timer)
-  (setq extempore-logger-write-timer nil))
+(defun exlog-stop-idle-write-timer ()
+  (cancel-timer exlog-write-timer)
+  (setq exlog-write-timer nil))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; extempore slave buffer minor mode ;;
