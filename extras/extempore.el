@@ -1608,7 +1608,7 @@ You shouldn't have to modify this list directly, use
 (defun exlog-yasnippet-hook ()
   (exlog-log-command 'yas-expand
 					nil
-					(list yas-snippet-beg yas-snippet-end)))
+					(prin1-to-string (buffer-substring-no-properties   yas-snippet-beg yas-snippet-end))))
 
 (add-hook 'yas-after-exit-snippet-hook
           'exlog-yasnippet-hook)
@@ -1636,11 +1636,9 @@ You shouldn't have to modify this list directly, use
     (exlog-write-log-entry (buffer-name)
                            (symbol-name command)
                            event
-                           (if (and (member command '(yas-expand
-                                                      extempore-send-definition
-                                                      extempore-send-region
-                                                      extempore-send-buffer))
-                                    (every #'integer-or-marker-p args))
+                           (if (member command '(extempore-send-definition
+                                                 extempore-send-region
+                                                 extempore-send-buffer))
                                (prin1-to-string (buffer-substring-no-properties (car args) (cadr args)))
                              args))))
 
