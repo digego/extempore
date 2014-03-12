@@ -187,6 +187,11 @@
 
 ;; set the path to your extempore-directory
 (setq user-extempore-directory "/path/to/extempore/")
+
+;; this one will be helpful for a default homebrew install of extempore on OSX
+;; (setq user-extempore-directory "/usr/local/Cellar/extempore/0.5/")
+
+;; load the emacs mode
 (autoload 'extempore-mode (concat user-extempore-directory "extras/extempore.el") "" t)
 (add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
 
