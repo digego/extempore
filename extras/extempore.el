@@ -1367,6 +1367,7 @@ command to run."
   (if bounds
       (let* ((tetris-lh-point (cdr bounds))
              (tetris-rh-point fill-column)
+             (defun-start (car bounds))
              (overlay (make-overlay defun-start
                                     (1+ defun-start)
                                     nil t nil)))
