@@ -186,10 +186,18 @@
 ;;;;;;;;;;;;;;;
 
 ;; set the path to your extempore-directory
-(setq user-extempore-directory "/path/to/extempore/")
+(setq user-extempore-directory "~/Code/extempore/")
 
 ;; this one will be helpful for a default homebrew install of extempore on OSX
 ;; (setq user-extempore-directory "/usr/local/Cellar/extempore/0.5/")
+
+;; you can delete this once you've setup your extempore path
+(if (string-equal user-extempore-directory "/path/to/extempore/")
+    (if user-init-file
+        (progn (find-file user-init-file)
+               (search-forward "/path/to/extempore/" nil t 2)
+               (error "You need to set your Extempore path!"))
+      (error "You need to set your Extempore path!")))
 
 ;; load the emacs mode
 (autoload 'extempore-mode (concat user-extempore-directory "extras/extempore.el") "" t)
@@ -200,10 +208,3 @@
 
 (add-to-list 'auto-mode-alist '("\\.ir$" . llvm-mode))
 (add-to-list 'auto-mode-alist '("\\.ll$" . llvm-mode))
-
-;; you can delete this once you've setup your extempore path
-(if (string-equal user-extempore-directory "/path/to/extempore/")
-    (if user-init-file
-        (progn (find-file user-init-file)
-               (search-forward "/path/to/extempore/" nil t 2)
-               (message "You need to set your Extempore path!"))))
