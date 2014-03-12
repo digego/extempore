@@ -246,12 +246,12 @@ See `run-hooks'."
   :group 'extempore)
 
 (defface extempore-blink-face
-  '((t (:foreground "#FF00FF" :weight bold :inherit nil)))
+  '((t (:foreground "#FF00FF" :background "#000000" :weight bold :inherit nil)))
   "Face used for 'blinking' code when it is evaluated."
   :group 'extempore)
 
 (defface extempore-sb-blink-face
-  '((t (:foreground "#00FFFF" :weight bold :inherit nil)))
+  '((t (:foreground "#00FFFF" :background "#000000" :weight bold :inherit nil)))
   "Face used for 'blinking' code in slave buffers."
   :group 'extempore)
 
