@@ -1566,12 +1566,12 @@ You shouldn't have to modify this list directly, use
 
 (defun exlog-start-logging ()
   (add-hook 'pre-command-hook 'exlog-pre-command-hook)
-  (call-interactively 'exlog-add-comment)
+  (call-interactively 'exlog-log-comment)
   (exlog-advise-functions exlog-special-functions))
 
 (defun exlog-stop-logging ()
   (remove-hook 'pre-command-hook 'exlog-pre-command-hook)
-  (call-interactively 'exlog-add-comment)
+  (call-interactively 'exlog-log-comment)
   (exlog-write-log-buffer)
   (exlog-unadvise-functions exlog-special-functions))
 
@@ -1613,14 +1613,12 @@ You shouldn't have to modify this list directly, use
 (add-hook 'yas-after-exit-snippet-hook
           'exlog-yasnippet-hook)
 
-(defun exlog-add-comment (comment)
+(defun exlog-log-comment (comment)
   (interactive "sAny comments about this particular session? ")
-  (format "(%s %s %s %s)"
-          (format-time-string "%Y-%m-%d %T.%3N")
-          (buffer-name)
-          "comment"
-          "nil"
-          (replace-regexp-in-string "[\r\n]" " " comment)))
+  (exlog-write-log-entry (buffer-name)
+                         'user-comment
+                         nil
+                         (prin1-to-string comment)))
 
 (defun exlog-write-log-entry (bname command event args)
   (with-current-buffer (get-buffer-create "*exlog*")
