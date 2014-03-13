@@ -207,7 +207,7 @@ namespace extemp {
     //-----------------------------------
     //  PORT AUDIO
     //-----------------------------------  
-#define NANO_SLEEP_DURATION 25000  
+#define NANO_SLEEP_DURATION 100000
     static volatile int32_t _atomic_thread_done_cnt = 0;
     static volatile int64_t _signal_cnt = 0;
 #ifndef TARGET_OS_WINDOWS
