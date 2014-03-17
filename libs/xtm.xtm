@@ -719,6 +719,17 @@
 		       (*metro* 'dur ,(car (cdr (cddddr args))))
 		       ,@(cddr (cddddr args)))))
 
+(define-macro (playob o b . args)
+  `(if (= 0 (modulo (+ ,o beat) ,b))
+       (play ,@args)
+       #f))
+
+(define-macro (playobs l b . args)
+  `(if (member (modulo beat ,b) ,l)
+       (play ,@args)
+       #f))
+
+
 ;; a macro for making extemore instruments
 ;; see http://benswift.me/2012-09-28-making-an-instrument.html
 
@@ -1138,7 +1149,17 @@
                                             ,@(cdr (cddddr args)))
                                 `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
                                             (*metro* 'dur ,(car (cdr (cddddr args))))
-                                            ,@(cddr (cddddr args)))))")
+                                            ,@(cddr (cddddr args)))))
+                     ;; play off beats macro
+                     (define-macro (playob o b . args)
+                       `(if (= 0 (modulo (+ ,o beat) ,b))
+                          (play ,@args)
+                          #f))
+                     ;; play off beat set macro
+                     (define-macro (playobs l b . args)
+                        `(if (member (modulo beat ,b) ,l)
+                           (play ,@args)
+                           #f))")
     (ipc:bind-func proc 'audio_64bit)
     (ipc:bind-func proc '_play_note)
     (ipc:bind-func proc 'midi2frq)))
@@ -1323,6 +1344,17 @@
 		       (real->integer ,(cadddr args))
 		       (real->integer ,(car (cddddr args)))
 		       (*metro* 'dur ,(cadr (cddddr args))) 0)))
+
+(define-macro (mplayob o b . args)
+  `(if (= 0 (modulo (+ ,o beat) ,b))
+       (mplay ,@args)
+       #f))
+
+(define-macro (mplayobs l b . args)
+  `(if (member (modulo beat ,b) ,l)
+       (mplay ,@args)
+       #f))
+
 
 (define *xtmlib-rtmidi-loaded* #t)
 (ascii-print-color 0 2 10)
