@@ -1658,6 +1658,7 @@ You shouldn't have to modify this list directly, use
     (if log-buffer
         (with-current-buffer log-buffer
           (write-region nil nil logfile-name nil nil nil t)
+          (message "Writing Extempore keylog file to %s" logfile-name)
           (kill-buffer log-buffer)
           (async-shell-command (format "gzip %s" logfile-name)))
       (message "No log buffer found."))))
