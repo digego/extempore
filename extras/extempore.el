@@ -184,14 +184,17 @@ All commands in `lisp-mode-shared-map' are inherited by this map.")
 
 ;;;###autoload
 (define-derived-mode extempore-mode prog-mode "Extempore"
-  "Major mode for editing Extempore code.
-This mode has been adapted from `scheme-mode'.
+  "Major mode for editing Extempore code. This mode has been
+adapted from `scheme-mode'. Entry to this mode calls the value of
+\\[extempore-mode-hook].
 
-In addition, if an Extempore process is running in a shell
-buffer, some additional commands will be defined, for evaluating
-expressions and controlling the extempore process.
+To switch to an inferior Extempore process (or start one if none
+present) use \\[switch-to-extempore], which is bound to C-c C-z
+by default.
 
-Entry to this mode calls the value of `extempore-mode-hook'."
+To send the current definition to a running Extempore process, use
+\\[extempore-send-definition].
+"
   (extempore-mode-variables))
 
 (defgroup extempore nil
