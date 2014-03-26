@@ -849,7 +849,6 @@ indentation."
 
 ;; for blinking evals in slave buffers (see `extempore-sb-mode')
 (make-variable-buffer-local 'extempore-sb-eval-markers)
-(setq extempore-sb-eval-markers nil)
 
 (defun extempore-blink-region (overlay start end &optional buf)
   (move-overlay overlay start end buf)
