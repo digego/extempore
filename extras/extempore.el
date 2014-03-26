@@ -854,10 +854,8 @@ indentation."
 (defun extempore-blink-region (overlay start end &optional buf)
   (move-overlay overlay start end buf)
   (redisplay)
-  (run-with-timer extempore-blink-duration
-                  nil
-                  (lambda (overlay) (delete-overlay overlay))
-                  overlay))
+  (sleep-for extempore-blink-duration)
+  (delete-overlay overlay))
 
 ;; sending definitions (code) from the Emacs buffer
 
