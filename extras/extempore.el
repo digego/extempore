@@ -1616,10 +1616,7 @@ You shouldn't have to modify this list directly, use
 
 (defun exlog-log-comment (comment)
   (interactive "sAny comments about this particular session? ")
-  (exlog-write-log-entry (buffer-name)
-                         'user-comment
-                         nil
-                         (prin1-to-string comment)))
+  (exlog-write-log-entry (buffer-name) 'user-comment nil comment))
 
 (defun exlog-write-log-entry (bname command event args)
   (with-current-buffer (get-buffer-create "*exlog*")
@@ -1629,7 +1626,7 @@ You shouldn't have to modify this list directly, use
              bname
              command
              event
-             args))))
+             (if (stringp args  (prin1-to-string args)) args)))))
 
 (defun exlog-log-command (command event args)
   (if (and (equal major-mode 'extempore-mode)
