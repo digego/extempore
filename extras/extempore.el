@@ -1608,8 +1608,8 @@ You shouldn't have to modify this list directly, use
 
 (defun exlog-yasnippet-hook ()
   (exlog-log-command 'yas-expand
-					nil
-					(prin1-to-string (buffer-substring-no-properties   yas-snippet-beg yas-snippet-end))))
+                     nil
+                     (buffer-substring-no-properties yas-snippet-beg yas-snippet-end)))
 
 (add-hook 'yas-after-exit-snippet-hook
           'exlog-yasnippet-hook)
@@ -1626,7 +1626,7 @@ You shouldn't have to modify this list directly, use
              bname
              command
              event
-             (if (stringp args  (prin1-to-string args)) args)))))
+             (if (stringp args) (prin1-to-string args) args)))))
 
 (defun exlog-log-command (command event args)
   (if (and (equal major-mode 'extempore-mode)
