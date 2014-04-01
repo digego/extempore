@@ -1622,7 +1622,7 @@ You shouldn't have to modify this list directly, use
   (with-current-buffer (get-buffer-create "*exlog*")
     (insert
      (format "(%s %s %s %s %s)\n"
-             (format-time-string "%Y-%m-%d %T.%3N")
+             (format-time-string "%Y-%m-%dT%T.%3N")
              bname
              command
              event
