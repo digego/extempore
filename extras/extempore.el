@@ -1122,7 +1122,7 @@ See variable `extempore-buffer'."
 Since this command is run implicitly, always ask the user for the
 command to run."
   (save-window-excursion
-    (extempore-run (read-string "Run Extempore: extempore " extempore-program-args))))
+    (extempore-run (read-string "Run command: " (concat "extempore " extempore-program-args)))))
 
 ;;;;;;;;;;;
 ;; eldoc ;;
