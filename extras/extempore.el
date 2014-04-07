@@ -833,7 +833,7 @@ indentation."
 
 ;; 'blinking' defuns as they are evaluated
 
-(defvar extempore-blink-duration 0.3)
+(defvar extempore-blink-duration 0.1)
 
 (defun extempore-make-blink-overlay (face-sym)
   (let ((overlay (make-overlay 0 0)))
