@@ -743,13 +743,20 @@
                             (caddr code))))
         (let ((v (cl:remove-if (lambda (x)
                                  (or
-                                  (<> arity (cadr x))                                  
-                                  (not (string=?
-                                        (car (regex:type-split (symbol->string newtype) "(_|:)"))
-                                        (car (regex:type-split (symbol->string (caddr x)) "(_|:)"))))
-                                  (not (string=? (symbol->string name) (symbol->string (car x))))))
+                                  (<> arity (cadr x))
+                                  (not (string=? (symbol->string name) (symbol->string (car x))))
+                                  (member #f
+				  	  (map (lambda (xx yy)
+				  		 (let ((res (string=?
+				  			     (car (regex:type-split yy "(_|:)"))
+				  			     (car (regex:type-split xx "(_|:)")))))
+				  		   res))
+				  	       (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
+				  	       (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
                                *impc:ir:gpolys*)))
-          ;; (let ((v (assoc-strcmp name *impc:ir:gpolys*)))
+	  ;; (if (not (null? v))
+	  ;;     (println 'updating: name 'with newtype)
+	  ;;     (println 'adding: name 'with newtype)) 
           (if (not (null? v))
               (set-cdr! (car v) (list arity newtype newcode newtypematch))
               (set! *impc:ir:gpolys* (cons (list name arity newtype newcode newtypematch) *impc:ir:gpolys*)))
@@ -821,8 +828,26 @@
                                res))
                  (w (apply max (map (lambda (x) (car x)) weights))))
             ;; (println 'best: w ': (length weights) '-> (assoc w weights))
-            (cdddr (assoc w weights)))))))
+	    (cdddr (assoc w weights)))))))
 
+(define impc:ir:gpoly-print-all
+  (lambda (name)
+    (if (string? name) (set! name (string->symbol name)))
+    (for-each (lambda (i)
+		(println '--: (car i) ': (caddr i)))
+	      (assoc-strcmp-all name *impc:ir:gpolys*))
+    #t))
+
+(define impc:ir:poly-print-all
+  (lambda (name)
+    (if (string? name) (set! name (string->symbol name)))
+    (for-each (lambda (i)
+		(let ((a (regex:split (symbol->string (car i)) "--")))
+		  (if (null? (cdr a))		  
+		      (println '++: (car i) ': (impc:ir:pretty-print-type (cadr i)))
+		      (println '++: (string->symbol (car a)) ': (string->symbol (cname-decode (cadr a)))))))
+	      (cdr (assoc name *impc:ir:polys*)))
+    #t))
 
 ;; (define impc:ir:gpoly-types
 ;;   (lambda (name)
