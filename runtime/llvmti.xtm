@@ -1085,7 +1085,8 @@
                            es2))                 
                  (tr (cl:remove-if (lambda (x)
                                      ;; (println 'x: x 'gpolyname: gpolyname)
-                                     (if (regex:match? x ":")
+                                     (if (and (not (regex:match? x "^(<|\\[)"))
+					      (regex:match? x ":"))
                                          (let ((p (regex:type-split x ":")))
                                            (or (regex:match? x gpolyname)
                                                (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
@@ -1755,12 +1756,19 @@
                (rettype '()))
           (if (not recursive?)
               (begin
-                (for-each (lambda (x y)
-                            ;; (println 'lambda 'x: x 'y: y)
-                            (impc:ti:update-var x vars kts y))
-                          args (cddr t))
+		(if (not (null? t))
+		    (for-each (lambda (x y)
+				;; (println 'lambda 'x: x 'y: y)
+				(impc:ti:update-var x vars kts y))
+			      args (cddr t)))
                 (set! rettype (impc:ti:type-check (caddr (cadr (assoc-strcmp sym *impc:ti:bound-lambdas*)))
                                                   vars kts #f))
+		(if (null? t)
+		    (let ((argtypes (map (lambda (x)
+					   (cadr (assoc-strcmp x vars)))
+					 args)))
+		      ;; (println 'update: sym 'with (cons 213 (cons (car rettype) argtypes)))
+		      (impc:ti:update-var sym vars kts (cons 213 (cons(car rettype) argtypes)))))
                 (if (impc:ir:type? rettype)
                     rettype
                     #f)))))))
@@ -4201,13 +4209,16 @@
              ;;;;;; a final check across all anonymous lambdas ;;;;;;
              ;; can safely just removed this ret2 code
              (ret2 (map (lambda (x)
+			  ;; (println 'x: x)
                           ;; only do redundant type check over anonymous lambdas
                           (if (and (assoc-strcmp (car x) fvars)
                                    (regex:match? (symbol->string (car x)) "_anon_lambda"))
-                              (begin ;; (println 'anon-lambda-check: x)
-                                     (impc:ti:type-check-bound-lambda
-                                      (car x) fvars kts
-                                      (cadr (assoc-strcmp (car x) fvars))))))
+                              (begin 
+				(impc:ti:type-check-bound-lambda
+				 (car x) fvars kts
+				 (if (> (length (assoc-strcmp (car x) fvars)) 1)
+				     (cadr (assoc-strcmp (car x) fvars))
+				     '())))))
                         *impc:ti:bound-lambdas*))
              ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
              (u (impc:ti:unify fvars))
