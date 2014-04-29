@@ -35,12 +35,11 @@
     (print-error 'You 'must 'set 'EXT_LLVM_DIR! 'before 'calling 'create-stlib.xtm))
 
 (begin
-  (ascii-print-color 0 2 10)
-  (print (string-append "\n\nCompiling xtlang stdlib"
-                        (if (string=? "1" (cptr->string (check_build_generic)))
-                            " for binary distribution" "")
-                        "...\n\n\n"))
-  (ascii-print-color 0 7 10))
+  (print-with-colors 'green 'default #t
+                     (print (string-append "\n\nCompiling xtlang stdlib"
+                                           (if (string=? "1" (cptr->string (check_build_generic)))
+                                               " for binary distribution" "")
+                                           "...\n\n\n"))))
 
 (define llvm-compile-xtlang-module
   (lambda args
@@ -83,17 +82,13 @@
       (print "compile command:\n " compilation-command "\n\n")
       (let ((res (command compilation-command)))
         (if (<> res 0)
-            (begin
-              (ascii-print-color 0 1 10)
-              (println)
-              (print "Failed to compile stdlib.")
-              (ascii-print-color 0 7 10)
-              (println))
-            (begin
-              (ascii-print-color 0 2 10)
-              (print "\nSuccessfully compiled stdlib: " shlib-path "\n")
-              (ascii-print-color 0 7 10)
-              (print "\nTo finish installation, move the shared lib into your extempore/libs directory\n\ne.g. mv" shlib-path "libs\n")))))))
+            (print-with-colors 'red 'default #t
+                               (print "Failed to compile stdlib.\n"))
+            (if (= (command (string-append "mv " shlib-path " libs")) 0)
+                (print-with-colors 'green 'default #t
+                                   (print "\nSuccessfully compiled stdlib\n\n"))
+                (print-with-colors 'red 'default #t
+                                   (print "Error moving " shlib-path " into place in libs/ directory."))))))))
 
 ;;; Code:
 (sys:load "libs/core/math.xtm")
