@@ -89,7 +89,6 @@
 
 /////////////////////// llvm includes
 #include "llvm/Assembly/Parser.h"
-#ifdef EXT_LLVM33
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Module.h"
@@ -97,15 +96,6 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/DataLayout.h"
-#else
-#include "llvm/LLVMContext.h"
-#include "llvm/CallingConv.h"
-#include "llvm/Module.h"
-#include "llvm/DataLayout.h"
-#include "llvm/Constants.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Instructions.h"
-#endif
 #include "llvm/Bitcode/ReaderWriter.h"
 //#include "llvm/ModuleProvider.h"
 #include "llvm/ExecutionEngine/JIT.h"

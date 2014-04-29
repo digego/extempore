@@ -72,7 +72,6 @@
 //#include "llvm/Analysis/DebugInfo.h"
 //#include "llvm/Analysis/Verifier.h"
 #include "llvm/Assembly/Parser.h"
-#ifdef EXT_LLVM33
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Module.h"
@@ -80,15 +79,6 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/DataLayout.h"
-#else
-#include "llvm/LLVMContext.h"
-#include "llvm/CallingConv.h"
-#include "llvm/Module.h"
-#include "llvm/Constants.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Instructions.h"
-#include "llvm/DataLayout.h"
-#endif
 
 #include "llvm/Support/TargetSelect.h"
 

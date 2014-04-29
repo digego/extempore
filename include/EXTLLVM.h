@@ -118,7 +118,10 @@ namespace llvm {
     class Module;
     class ModuleProvider;
     class ExecutionEngine;
+
+  namespace legacy {
     class PassManager;
+  }
 } // end llvm namespace
 
 namespace extemp {
@@ -138,7 +141,7 @@ namespace extemp {
 	llvm::Module* M;
 	llvm::ModuleProvider* MP;
 	llvm::ExecutionEngine* EE;
-	llvm::PassManager* PM;		
+  llvm::legacy::PassManager* PM;
 
     private:
 	static EXTLLVM SINGLETON;
