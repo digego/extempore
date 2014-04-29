@@ -1170,16 +1170,24 @@
                ((regex:match? base ":<")
                 (let* ((p (regex:type-split base ":"))
                        (ags (impc:ir:get-pretty-tuple-arg-strings (cadr p)))
+		       (ags2 (map (lambda (name) ;; check for aliases!
+				    (let ((res (assoc-strcmp name *impc:ir:type-aliases*)))
+				      (if res (cdr res) name)))
+				  ags))
                        (anypolys (cl:find-if                                  
                                   (lambda (x) (not (equal? x #f)))
                                   (map (lambda (k)
                                          (if (equal? (impc:ir:get-base-type k) (car p)) ;; strip recursives
                                              #f
                                              (impc:ir:gpolytype-types (impc:ir:get-base-type k))))
-                                      ags))))
+				       ags2))))
+		  ;; (println 'prealias-p: p)
+		  ;; set p in case we have aliased types in args that need unaliasing!
+		  (set! p (list (car p) (string-append "<" (string-join ags2 ",") ">")))
+		  ;; (println 'postalias-p: p)
                   ;; (println 'kit: base 'P: p)
                   ;; (println 't (cadr p))
-                  ;; (println 'ags: ags)
+                  ;; (println 'ags: ags2)
                   ;; (println 'anypolys anypolys)
                   (if (string=? (car p) "")
                       (error))
