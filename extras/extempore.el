@@ -474,8 +474,11 @@ See `run-hooks'."
                                        types))) t) "\\>")
         '(1 font-lock-type-face))))))
 
-(font-lock-add-keywords 'extempore-mode
-                        '(("(\\|)" . 'extempore-paren-face)))
+;; this conflicts with rainbow-delimiters. put it in your .emacs if
+;; you want it
+
+;; (font-lock-add-keywords 'extempore-mode
+;;                         '(("(\\|)" . 'extempore-paren-face)))
 
 (defvar extempore-font-lock-keywords
   (append extempore-font-lock-keywords-scheme
