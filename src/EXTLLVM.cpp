@@ -570,12 +570,46 @@ int llvm_printf(char* format, ...)
     return returnval;
 }
 
+int llvm_fprintf(FILE* stream, char* format, ...)
+{
+    va_list ap;
+    va_start(ap,format);
+    int returnval = vfprintf(stream, format, ap);
+    va_end(ap);
+    return returnval;
+}
+
 int llvm_sprintf(char* str, char* format, ...)
 {
     va_list ap;
     va_start(ap,format);
     int returnval = vsprintf(str, format, ap);
     //printf("in the wing: %s\n",str);
+    va_end(ap);
+    return returnval;
+}
+
+int llvm_sscanf(char* buffer, char* format, ...)
+{
+    va_list ap;
+    va_start(ap,format);
+#ifdef TARGET_OS_WINDOWS
+    char* ret = (char*) _alloca(2048);
+#else
+    char* ret = (char*) alloca(2048);
+#endif
+    int returnval = sscanf(buffer, format, ap);
+    printf("%s",ret);
+    fflush(stdout);	
+    va_end(ap);
+    return returnval;
+}
+
+int llvm_fscanf(FILE* stream, char* format, ...)
+{
+    va_list ap;
+    va_start(ap,format);
+    int returnval = vfscanf(stream, format, ap);
     va_end(ap);
     return returnval;
 }
@@ -1384,10 +1418,16 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_get_next_prime);			
 	    gv = M->getNamedValue(std::string("llvm_printf"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_printf);  
+	    gv = M->getNamedValue(std::string("llvm_fprintf"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_fprintf);	  
 	    gv = M->getNamedValue(std::string("llvm_sprintf"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_sprintf);	  
+	    gv = M->getNamedValue(std::string("llvm_sscanf"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_sscanf);	  
+	    gv = M->getNamedValue(std::string("llvm_fscanf"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_fscanf);	  
 	    gv = M->getNamedValue(std::string("llvm_zone_create"));
-	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);						
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);   
 	    gv = M->getNamedValue(std::string("llvm_zone_destroy"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);
 

@@ -79,7 +79,10 @@ unsigned long string_hash(unsigned char* str);
 
   void* llvm_memset(void* ptr, int32_t c, int64_t n);
   int llvm_printf(char* format, ...);
+  int llvm_fprintf(FILE* f, char* format, ...);
   int llvm_sprintf(char* str, char* format, ...);
+  int llvm_sscanf(char* buffer, char* format, ...);
+  int llvm_fscanf(FILE* f, char* format, ...);
   void llvm_send_udp(char* host, int port, void* message, int message_length);
   double imp_randd();
   float imp_randf();

@@ -206,18 +206,13 @@
       (tset! str 1 news)
       str)))
 
-;; create easy Data constructors from CStrings
-(bind-func Str
-  (lambda (s)
-    (let ((lgth (strlen s))
-          (str (String lgth s)))
-      str)))
+;; must be a Halloced string!
+(bind-func Delete_String
+  (lambda (str:String*)
+    (free (tref str 1))
+    (free str)
+    void))
 
-(bind-func Str_h
-  (lambda (s)
-    (let ((lgth (strlen s))
-          (str (String_h lgth s)))
-      str)))
 
 ;; String printing!
 (bind-func String_print:[void,String*]*
@@ -227,14 +222,61 @@
 
 (bind-poly print String_print)
 
-
+;; lenght of string is the current
+;; length of the cstr within string
 (bind-func string_length
   (lambda (str:String*)
+    (strlen (tref str 1))))
+
+;; size of string is the total allowable
+;; buffer size for string, which can be
+;; larger than (string_length)
+(bind-func string_size
+  (lambda (str:String*)
     (tref str 0)))
+
+(bind-func string_cstr
+  (lambda (str:String*)
+    (tref str 1)))
 
 (bind-func cstr_from_string
   (lambda (str:String*)
     (tref str 1)))
+
+(bind-func cstr_length
+  (lambda (str:String*)
+    (strlen (tref str 1))))
+
+;; create easy Data constructors from CStrings
+(bind-func Str_cptr
+  (lambda (s)
+    (let ((lgth (strlen s))
+          (str (String lgth s)))
+      str)))
+
+(bind-func Str_string
+  (lambda (s:String*)
+    (let ((lgth (string_length s))
+          (str (String lgth (string_cstr s))))
+      str)))
+
+(bind-poly Str Str_cptr)
+(bind-poly Str Str_string)
+
+(bind-func Str_h_cptr
+  (lambda (s)
+    (let ((lgth (strlen s))
+          (str (String_h lgth s)))
+      str)))
+
+(bind-func Str_h_string
+  (lambda (s:String*)
+    (let ((lgth (string_length s))
+          (str (String_h lgth (string_cstr s))))
+      str)))
+
+(bind-poly Str_h Str_h_cptr)
+(bind-poly Str_h Str_h_string)
 
 (bind-func string_cat
   (lambda (s1:String* s2:String*)
@@ -266,9 +308,9 @@
     (let ((i 0) (j 0)
 	  ;; column-major indexing closure
 	  (s_cstr (cstr_from_string s))
-	  (slen:i64 (string_length s))
+	  (slen:i64 (string_size s))
 	  (t_cstr (cstr_from_string t))
-	  (tlen:i64 (string_length t))
+	  (tlen:i64 (string_size t))
 	  (row:i64* (salloc (+ slen 1)))
 	  (prev_row:i64* (salloc (+ slen 1)))
 	  (min3 (lambda (a:i64 b c)

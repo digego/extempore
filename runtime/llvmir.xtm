@@ -3990,6 +3990,67 @@
        (impc:ir:strip-space os))))
 
 
+
+
+(define impc:ir:compiler:llvm_varargs
+  (lambda (ast types)
+    (let ((args (map (lambda (a)
+		       (cons (impc:ir:compiler a types)
+			     (impc:ir:gname)))
+		     (cdr ast)))
+	  (va (impc:ir:gname "val" "i32")))    
+      (cond ((equal? (car ast) 'llvm_printf)
+	     (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
+		     (impc:ir:pointer++ *impc:ir:si8*))
+		 (impc:compiler:print-bad-type-error-with-ast
+		  (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
+		  "first argument must be a format string" ast)))
+	    ((member (car ast) '(llvm_fprintf llvm_fscanf))
+	     (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
+		     (impc:ir:pointer++ *impc:ir:si8*))
+		 (impc:compiler:print-bad-type-error-with-ast
+		  (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
+		  "first argument must be stdc FILE*" ast))
+	     (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (cadr args)))))
+		     (impc:ir:pointer++ *impc:ir:si8*))
+		 (impc:compiler:print-bad-type-error-with-ast
+		  (impc:ir:get-type-from-str (car (cdr (cdr (cadr args)))))
+		  "second argument must be a format string" ast)))
+	    ((member (car ast) '(llvm_sprintf llvm_fprintf))
+	     (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
+		     (impc:ir:pointer++ *impc:ir:si8*))
+		 (impc:compiler:print-bad-type-error-with-ast
+		  (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
+		  "first argument must be allocated memory" ast))
+	     (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (cadr args)))))
+		     (impc:ir:pointer++ *impc:ir:si8*))
+		 (impc:compiler:print-bad-type-error-with-ast
+		  (impc:ir:get-type-from-str (car (cdr (cdr (cadr args)))))
+		  "second argument must be a format string" ast)))
+	    (else (impc:compiler:print-bad-type-error-with-ast "" "Bad VARARGS func!")))
+      (if (equal? (car ast) 'llvm_printf)
+	  (string-append (apply string-append (map (lambda (a) (car a)) args))
+			 "\n" va " = call i32 (i8*, ...)* @llvm_printf("
+			 (caddr (car args)) " " (cadr (car args))
+			 (apply string-append (map (lambda (a)
+						     (string-append ", " 
+								    (caddr a) 
+								    " " (cadr a)))
+						   (cdr args)))
+			 ")\n")
+	  (string-append (apply string-append (map (lambda (a) (car a)) args))
+			 "\n" va " = call i32 (i8*,i8*, ...)* @"
+                         (symbol->string (car ast)) "("
+			 (caddr (car args)) " " (cadr (car args)) ", "
+			 (caddr (cadr args)) " " (cadr (cadr args))
+			 (apply string-append (map (lambda (a)
+						     (string-append ", " 
+								    (caddr a) 
+								    " " (cadr a)))
+						   (cddr args)))
+			 ")\n")))))
+
+
 ;; (define impc:ir:compiler:cmp
 ;;    (let ((fcmps '("ugt" "ult" "une" "ueq"))
 ;;          (icmps '("sgt" "slt" "ne" "eq")))
@@ -5014,52 +5075,9 @@
                     (impc:ir:compiler:ifret ast types))					
                    ((and (symbol? (car ast))
                          (llvm:get-function (symbol->string (car ast))))
-                    (if (equal? (car ast) 'llvm_printf) ;; this guff all here for llvm_printf
-                        (let ((args (map (lambda (a)
-                                            (cons (impc:ir:compiler a types)
-                                                  (impc:ir:gname)))
-                                         (cdr ast)))
-                              (va (impc:ir:gname "val" "i32")))
-			  (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) (impc:ir:pointer++ *impc:ir:si8*))
-			      (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) "first argument must be a format string" ast))
-                           (string-append (apply string-append (map (lambda (a) (car a)) args))
-                                          "\n" va " = call i32 (i8*, ...)* @llvm_printf("
-                                          (caddr (car args)) " " (cadr (car args))
-                                          (apply string-append (map (lambda (a)
-                                                                       (string-append ", " 
-                                                                                      (caddr a) 
-                                                                                      " " (cadr a)))
-                                                                    (cdr args)))
-                                          ")\n"))
-			(if (equal? (car ast) 'llvm_sprintf) ;; this guff all here for llvm_sprintf
-			    (let ((args (map (lambda (a)
-					       (cons (impc:ir:compiler a types)
-						     (impc:ir:gname)))
-					     (cdr ast)))				  
-				  (va (impc:ir:gname "val" "i32")))
-			      (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) (impc:ir:pointer++ *impc:ir:si8*))
-				  (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-from-str (car (cdr (cdr (car args))))) "first argument must be allocated memory" ast))
-			      (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (cadr args))))) (impc:ir:pointer++ *impc:ir:si8*))
-				  (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-from-str (car (cdr (cdr (cadr args))))) "second argument must be a format string" ast))
-			      (string-append (apply string-append (map (lambda (a) (car a)) args))
-					     "\n" va " = call i32 (i8*,i8*, ...)* @llvm_sprintf("
-					     (caddr (car args)) " " (cadr (car args)) ", "
-					     (caddr (cadr args)) " " (cadr (cadr args))					     
-					     (apply string-append (map (lambda (a)
-									 (string-append ", " 
-											(caddr a) 
-											" " (cadr a)))
-								       (cddr args)))
-					     ")\n"))						    
-			    (impc:ir:compiler:native-call ast types))))
-                   ;; ((equal? (car ast) 'ret->) ;; return from function
-                   ;;  (let ((str (impc:ir:compiler (caddr ast) types)))
-                   ;;     (if (impc:ir:void? (cadr (impc:ir:gname)))
-                   ;;         (string-append str "ret void\n")
-                   ;;         (string-append str "ret " 
-                   ;;                        (cadr (impc:ir:gname)) " "
-                   ;;                        (car (impc:ir:gname))
-                   ;;                        "\n"))))
+		    (if (member (car ast) '(llvm_printf llvm_fprintf llvm_sprintf llvm_sscanf llvm_fscanf))
+			(impc:ir:compiler:llvm_varargs ast types)
+			(impc:ir:compiler:native-call ast types)))
                    ((equal? (car ast) 'ret->) ;; return from function
 		    (impc:ir:compiler:ret ast types hint?))
                    ((equal? (car ast) 'fptrcall)
