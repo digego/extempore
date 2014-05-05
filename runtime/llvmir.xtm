@@ -710,6 +710,7 @@
 (define impc:ir:add-gpoly
   (let ((pcnt 100))
     (lambda (code)
+      ;; (println 'adding: code)
       (set! pcnt (+ pcnt 1))      
       ;; (println 'code-pre-macro: code)
       ;; apply any macros to generic code!
@@ -732,8 +733,10 @@
                            syms))
              (newtype (string->symbol (regex:replace-everything type syms newsyms)))
              (newtypematch (map (lambda (k) (if (regex:match? k ":")
-                                           (car (regex:type-split k ":"))
-                                           "_"))
+						(car (regex:type-split k ":"))
+						(if (regex:match? k "^\\!g")
+						    "_"
+						    k)))
                                 (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))))
              (arity (- (length (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))) 1))
              (newcode (list 'bind-func
@@ -747,9 +750,15 @@
                                   (not (string=? (symbol->string name) (symbol->string (car x))))
                                   (member #f
 				  	  (map (lambda (xx yy)
-				  		 (let ((res (string=?
-				  			     (car (regex:type-split yy "(_|:)"))
-				  			     (car (regex:type-split xx "(_|:)")))))
+						 ;; (println 'xx: xx 'yy: yy)
+				  		 (let ((res (if (regex:match? xx "^\\!g")
+								(string=?
+								 (car (regex:type-split yy "_"))
+								 (car (regex:type-split xx "_")))
+								(string=?
+								 (car (regex:type-split yy ":"))
+								 (car (regex:type-split xx ":"))))))
+						   ;; (println 'res: res)
 				  		   res))
 				  	       (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
 				  	       (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
@@ -806,7 +815,9 @@
              (set! type (map (lambda (x)
                                (if (regex:match? x ":")
                                    (car (regex:type-split x ":"))
-                                   "_"))
+				   (if (regex:match? x "^\\!")
+				       "_"
+				       x)))
                              ags))))
           (else (set! type (make-list (+ 1 arity) "_"))))
     ;; (println 'type_b: type)
@@ -827,7 +838,13 @@
                                        gp))
                                res))
                  (w (apply max (map (lambda (x) (car x)) weights))))
+	    ;; (println '++++++++++++++ (length weights))
+	    ;; (println (for-each (lambda (k)
+	    ;; 			 (println k))
+	    ;; 		       weights))
             ;; (println 'best: w ': (length weights) '-> (assoc w weights))
+	    (if (> (length (assoc-strcmp-all w weights)) 1)
+		(print-error 'Compiler 'Error: 'ambiguous 'generic 'overload name '-> type))	    
 	    (cdddr (assoc w weights)))))))
 
 (define impc:ir:gpoly-print-all
