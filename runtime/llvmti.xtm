@@ -1791,8 +1791,9 @@
      ;; (println 'b1: t)
      (set! t (impc:ti:type-normalize t vars))
      ;; (println 'b2: t)
-
-     (if (string? t)
+     (if (and (string? t)
+	      #t 
+	      (assoc-strcmp sym vars))
          (let* ((p (assoc-strcmp sym vars))
                 (l (map (lambda (k) (string? k)) (cdr p))))
            (if (and (member #t l)
@@ -2019,24 +2020,24 @@
                                  (if (llvm:get-function (symbol->string ast))
                                      (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (llvm:get-function-args-withoutzone (symbol->string ast)))))
                                      (list (impc:ir:pointer-- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string ast))))))))))
-               ;; (println 'type: type)
-               (if (and request?
-                        (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
-                        (not (null? request?)))
-                   (if (null? type)
-                       (begin
-                         (impc:ti:update-var ast vars kts (list request?))
-                         request?)
-                       (let ((intersection (impc:ti:type-unify (list request? type) vars)))
-                         ;; (println 'intersection intersection 'request? request? 'type: type)
-                         (if (not (null? intersection))
-                             (begin 
-                               ;; andrew change
-                               (impc:ti:force-var ast vars kts (list intersection))
-                               ;;(impc:ti:update-var ast vars kts (list intersection))
-                               (list intersection))
-                             type)))
-                   type)))))))
+               ;; (println '---------- (member ast kts) 'type: type (impc:ir:type? type))
+	       (if (and request?
+			(not (member ast kts)) ;; if we're in KTS then we should ignore requests!
+			(not (null? request?)))
+		   (if (null? type)
+		       (begin
+			 (impc:ti:update-var ast vars kts (list request?))
+			 request?)
+		       (let ((intersection (impc:ti:type-unify (list request? type) vars)))
+			 ;; (println 'intersection intersection 'request? request? 'type: type)
+			 (if (not (null? intersection))
+			     (begin 
+			       ;; andrew change
+			       (impc:ti:force-var ast vars kts (list intersection))
+			       ;;(impc:ti:update-var ast vars kts (list intersection))
+			       (list intersection))
+			     type)))
+		   type)))))))
 
 
 
@@ -2222,7 +2223,7 @@
                   ;; is no choice about the type so we should
                   ;; force it to the type not update it
                                         ;(if (symbol? a) (impc:ti:force-var a vars kts t))
-                  (if (symbol? a) (impc:ti:update-var a vars kts t))
+                  (if (and t (symbol? a)) (impc:ti:update-var a vars kts t))
                   (impc:ti:type-check a vars kts t))
                 (cdr ast)
                 (cdr ftype))
@@ -3439,7 +3440,9 @@
        (if (and (null? a)
 		(not (null? c)))
 	   (begin ;; (println 'bingo c)
-		  (set! a (impc:ti:type-check (cadr ast) vars kts (map (lambda (k) (impc:ir:pointer++ k)) c)))))
+	     (set! a (impc:ti:type-check (cadr ast) vars kts
+					 (map (lambda (k) (impc:ir:pointer++ k))
+					      (cl:remove-if-not impc:ir:type? c))))))
        (if (not (null? a))
            (if (not (impc:ir:pointer? (if (impc:ir:type? a) a
                                           (if (list? a) (car a) a))))
@@ -3473,14 +3476,16 @@
 
 (define impc:ti:pointer-ref-check
    (lambda (ast vars kts request?)
-      ;(println 'pointer-ref-check: 'ast: ast 'request? request?) ;'vars: vars 'kts: kts)     
+      ;; (println 'pointer-ref-check: 'ast: ast 'request? request?) ;'vars: vars 'kts: kts)     
       (if (<> (length ast) 3)
 	  (impc:compiler:print-bad-arity-error ast))
-      (let ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
+      (if (or (impc:ir:type? request?) (atom? request?)) (set! request? (list request?)))
+      (let ((a (impc:ti:type-check (cadr ast) vars kts ;; '())) ;request?))
+				   (map (lambda (k) (impc:ir:pointer++ k))
+					(cl:remove-if-not impc:ir:type? request?))))
             ;; b should be fixed point
             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
 	(if (impc:ir:type? a) (set! a (list a)))
-	;(println 'a: a 'b: b)
 	(if (null? a) 
              a
              (if (impc:ir:array? (car a))
@@ -4893,8 +4898,10 @@
 						     (assoc-strcmp (caar types) (cdr types))
 						     (car types))
                                                     (loop (cdr types)))))))
-             ;(print 'checked checked-for-duplicates 'forced-types-udpated forced-types-updated 'forced: forced-types)
-             checked-for-duplicates))))
+	    ;; checked-for-duplicates))))	    	    
+	    ;; finally remove anything that isn't a fully qualified type!
+	    (cl:remove-if-not (lambda (t) (impc:ir:type? (cdr t))) checked-for-duplicates)))))
+
 			 
 			 
 
