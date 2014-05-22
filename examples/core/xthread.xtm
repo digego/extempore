@@ -4,25 +4,17 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(sys:load "libs/xcore/xthread.xtm")
+(sys:load "libs/core/xthread.xtm")
 
-;; dodgy precompile
-(bind-func divide-and-conquer (lambda (cnt:i32) void))
-
-;; recursive thread test
-;; each call spawns a new thread
 (bind-func divide-and-conquer  
   (lambda (cnt:i32)
-    (let ((a:i32* (alloc)))
-      (pset! a 0 cnt)
-      (spawn (lambda (args:i8*)
-               (let ((cnt (pref (cast args i32*) 0)))
-                 (printf "cnt:%d thread:%p\n" cnt (thread_self))
-                 (thread_sleep 1 0) ;; first arg seconds second nanoseconds 
-                 (if (> cnt 0)
-                     (begin (divide-and-conquer (- cnt 1))
-                            (divide-and-conquer (- cnt 1))))))
-             (cast a i8*)))
+    (spawn (lambda ()
+	     (printf "cnt:%d thread:%p\n" cnt (thread_self))
+	     (thread_sleep 1 0) ;; first arg seconds second nanoseconds 
+	     (if (> cnt 0)
+		 (begin (divide-and-conquer (- cnt 1))
+			(divide-and-conquer (- cnt 1))))
+	     void))
     void))
 
 (divide-and-conquer 3)
@@ -30,34 +22,17 @@
 ;; forka and join
 (bind-func fork-join
   (lambda ()
-    (let ((i 0) (a:i32* (alloc 4)))
-      (pfill! a 1 2 3 4)
-      (sync
-       (dotimes (i 4)
-         (spawn (lambda (args:i8*)
-                  (thread_sleep (dtoi64 (* 3. (random))) 0)
-                  (printf "Fork number %d\n" (pref (cast args i32*) 0)))
-                (cast (pref-ptr a i) i8*))))
-      (printf "Joined\n")
-      void)))
+    (memzone (* 1024 1024)
+      (let ((i 0))
+	(printout "Finish Order: ")
+	(sync
+	 (dotimes (i 4)
+	   (spawn (let ((jj i)) ;; each closure needs it's own i!
+		    (lambda ()
+		      (thread_sleep (dtoi64 (* 10. (random))) 0)
+		      (printout jj))))))
+	(println)
+	(println "Joined\n")
+	void))))
 
 (fork-join)
-
-;; sleep test
-(bind-func test2
-  (lambda ()
-    (let ((dat:double* (alloc)))
-      (pfill! dat 1.0 2.0 3.0 4.0 5.0)
-      (spawn (lambda (args)
-               (let ((i 0))
-                 (dotimes (i 5)
-                   (printf "HI: %p %f\n"
-                           (thread_self)
-                           (pref (cast args double*) i))
-                   (thread_sleep 1 0)))
-               (cast null i8*))
-             (cast dat i8*))
-      (printf "HELLO WORLD %p\n" (thread_self))
-      )))
-
-(test2)

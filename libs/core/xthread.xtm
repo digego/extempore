@@ -4,41 +4,35 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;
-;; where f must of type [i8*,i8*]*
-;; (although the final i8* is inserted automatically as (cast null
-;; i8*) so you don't need to explicity add this
-;;
-;; a is of type i8* and is the only argument passed to f
-;;
-(define-macro (spawn f a) 
-  (let* ((sym (symbol->string (gensym)))
-         (s (string-append "thread_" sym))
-         (s2 (string-append s ":[i8*,i8*]*"))
-         (n (string-append s "_native")))
-    (set! f (cons '(cast null i8*) (reverse f)))
-    (set! f (reverse f))
-    (eval `(bind-func ,(string->symbol s2) ,f))
-    `(thread_fork (llvm_get_function_ptr ,n) ,a)))
+(bind-func thread_native_call
+  (lambda (f:i8*)
+    (let ((f2:[void]* (cast f)))
+      (f2)
+      (cast null i8*))))
 
-(define-macro (syncspawn f a) 
+;;
+(define-macro (spawn f)
   (let* ((sym (symbol->string (gensym)))
-         (s (string-append "thread_" sym))
-         (s2 (string-append s ":[i8*,i8*]*"))
-         (n (string-append s "_native")))
-    (set! f (cons '(cast null i8*) (reverse f)))
-    (set! f (reverse f))
-    (eval `(bind-func ,(string->symbol s2) ,f))
-    `(begin (pset! spawnz numspawn (thread_fork (llvm_get_function_ptr ,n) ,a))
-            (set! numspawn (+ numspawn 1)))))
+	 (s (string-append sym ":[void]*")))
+    `(let ((,(string->symbol s) ,f))
+       (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ,(string->symbol sym) i8*)))))
+
+(define-macro (syncspawn f)
+  (let* ((sym (symbol->string (gensym)))
+	 (s (string-append sym ":[void]*")))
+    `(let ((,(string->symbol s) ,f))  
+       (pset! spawnz numspawn (thread_fork (llvm_get_function_ptr "thread_native_call_native")
+					   (cast ,(string->symbol sym) i8*)))
+       (set! numspawn (+ numspawn 1)))))
 
 (define-macro (sync . expr)
   (set! expr (cons 'begin expr))
   (set! expr (replace-all expr '((spawn . syncspawn))))
   (let ((ijk (gensym)))
-    `(let ((numspawn 0)
-           (,ijk 0)
-           (spawnz:i8** (alloc 10000)))
+    `(letz (* 1024 1024)
+       ((numspawn 0)
+	(,ijk 0)
+	(spawnz:i8** (alloc 10000)))
        ,expr
        (dotimes (,ijk numspawn)
          (thread_join (pref spawnz ,ijk)))
