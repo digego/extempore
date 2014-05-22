@@ -373,6 +373,12 @@ void llvm_zone_destroy(llvm_zone_t* zone)
     return;
 }
 
+void llvm_zone_print(llvm_zone_t* zone)
+{
+  printf("Zone(%p) Mem(%p) Offset(%lld) Size(%lld)\n",zone,zone->memory,zone->offset,zone->size);
+  return;
+}
+
 // void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 // {
 //     alloc_mutex.lock();
@@ -1430,6 +1436,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_create);   
 	    gv = M->getNamedValue(std::string("llvm_zone_destroy"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_destroy);
+	    gv = M->getNamedValue(std::string("llvm_zone_print"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_print);
 
 	    gv = M->getNamedValue(std::string("llvm_runtime_error"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_runtime_error);
@@ -1463,6 +1471,8 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&get_address_table);						
 	    gv = M->getNamedValue(std::string("check_address_type"));
 	    EE->updateGlobalMapping(gv,(void*)&check_address_type);						
+	    gv = M->getNamedValue(std::string("check_address_exists"));
+	    EE->updateGlobalMapping(gv,(void*)&check_address_exists);						
 	    gv = M->getNamedValue(std::string("get_address_offset"));
 	    EE->updateGlobalMapping(gv,(void*)&get_address_offset);  
 	    gv = M->getNamedValue(std::string("add_address_table"));
