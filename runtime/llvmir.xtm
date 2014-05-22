@@ -1046,7 +1046,7 @@
 
 (define impc:ir:pretty-print-type
    (lambda (t)
-      ;; (println 'type: t)
+      ;; (println 'typein: t)
       (if (null? t)
 	  (begin (println 'error 'trying 'to 'prettyprint 'null 'type: t) (error))
 	  ;(print-error 'Compiler 'Error: 'trying 'to 'print 'null 'type!)
@@ -1064,7 +1064,7 @@
                                        ))
                       (substring t 1 (string-length t)))
 		  (impc:ir:pretty-print-type (impc:ir:get-type-from-pretty-str t)))
-	      (if (null? t) '()
+	      (if (or (null? t) (not (impc:ir:type? t))) '()
 		  (cond ((atom? t)
 			 (impc:ir:get-type-str t t))
 			((impc:ir:tuple? t) 
@@ -1079,6 +1079,7 @@
 			((impc:ir:closure? t)
 			 (string-append "[" (string-join (map (lambda (k) (impc:ir:pretty-print-type k)) (cdr t)) ",")
 					"]" (apply string-append (make-list-with-proc (- (impc:ir:get-ptr-depth t) 1) (lambda (k) "*")))))))))))
+
 
 (define impc:ir:pptype impc:ir:pretty-print-type)
 
@@ -1511,7 +1512,7 @@
 
 (define impc:ir:str-list-check
    (lambda (type)
-      ;(println 'ir:str-list-check type)
+      ;; (println 'ir:str-list-check type)
       (cond ((string? type)
 	     (if (and (char=? (string-ref type 0) #\%)
 		      (not (null? (llvm:get-named-type (substring (impc:ir:get-base-type type) 1 (string-length (impc:ir:get-base-type type)))))))
@@ -2347,6 +2348,106 @@
       (impc:ir:strip-space os))))
 
 
+(define impc:ir:compile:make-env
+  (lambda (ast types)
+    ;; (println 'ast: ast 'types types)
+    (let* ((os (make-string 0))
+	   (lambda-envs '())
+	   (env-zone-tmp '())
+	   (res
+	    (map (lambda (p)
+		   (set! *impc:ir:sym-name-stack* (cons (caar p) *impc:ir:sym-name-stack*))
+		   ;; (println '__envin: *impc:ir:sym-name-stack*)                   
+		   ;; (println 'p2: (cadr p))
+		   (let* ((symstr (symbol->string (caar p)))
+			  (symtype (cdr (assoc-strcmp (caar p) types)))
+			  (value (impc:ir:compiler (cadr p) types symtype))
+			  (typestr (cadr (impc:ir:gname)))
+			  (e (impc:ir:gname)))	       
+		     ;; (println 'symstr: symstr 'symtype: symtype)
+		     ;; (println 'typestr: typestr)
+		     (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
+			      (impc:ir:number? (cdr (assoc-strcmp (caar p) types)))
+			      (impc:ir:number? (impc:ir:get-type-from-str typestr)))
+			 (set! typestr (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))))
+		     ;; type check
+		     ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc-strcmp (caar p) types)))
+		     (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
+				      (cdr (assoc-strcmp (caar p) types))))
+			 (impc:compiler:print-type-mismatch-error
+			  (impc:ir:pretty-print-type typestr)
+			  (impc:ir:pretty-print-type (cdr (assoc-strcmp (caar p) types)))
+			  (caar p)))
+					;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
+					;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+
+		     (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+			   (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+			   os)      	 		    
+		     (emit  "\n; let assign value to symbol " symstr "\n" os)
+		     (if (= (cadr ast) 3)
+			 (begin (emit "%dat_" symstr " = call i8* @llvm_zone_malloc(" 
+				      "%mzone* " (car (impc:ir:gname "zone")) ", i64 "
+				      (number->string (impc:ir:get-type-size (impc:ir:get-type-from-str (cadr e)))) ")\n" os)
+				(emit "%" symstr "Ptr = bitcast i8* %dat_" symstr " to " typestr "*\n" os))
+			 (emit "%" symstr "Ptr = alloca " typestr "\n" os))
+
+		     ;; (if (pair? value)
+		     ;; 	 (emit (car value) os)
+		     ;; 	 (emit value os))
+		     (list symstr typestr value e)))
+		 (caddr ast))))
+      ;; (println '____________A> ast)      
+      (map (lambda (p r)
+	     (let ((symstr (car r))
+		   (typestr (cadr r))
+		   (value (caddr r))
+		   (e (cadddr r)))
+	       (if (pair? value)
+		   (emit (car value) os)
+		   (emit value os))
+	       
+	       ;; this bitcast should be the same type on both sides                    
+	       (emit "\n; let value assignment\n" os)
+	       (emit (string-append "%" symstr " = select i1 true, " typestr " " 
+				    (if (and (number? (cadr p))
+					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
+					(llvm:convert-float (car e)) ;(impc:ir:gname)))
+					(car e)) ;(impc:ir:gname)))
+				    ", " typestr " "
+				    (if (and (number? (cadr p))
+					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
+					(llvm:convert-float (car e)) ; (impc:ir:gname)))
+					(car e)) ;(impc:ir:gname)))
+				    "\n") os)
+	       (emit (string-append "store " typestr " %" symstr ", " 
+				    typestr "* %" symstr "Ptr\n\n") os)
+	       (if (pair? value)
+		   (set! lambda-envs (cons (cdr value) lambda-envs)))))
+	   (caddr ast) res)
+      
+      ;; fill in and lambda environments now
+      (map (lambda (a)
+	     (emit a os))
+	   lambda-envs)
+      ;; (println '____________B> ast)            
+      ;; compile body
+      (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
+      (define envbody-str (impc:ir:compiler (cdddr ast) types))
+					;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
+      (if (not (null? (car *impc:ir:ls_var*)))
+	  (begin (emit "; promote local stack var allocations\n" os)
+		 (map (lambda (v)
+			(emit (car v) " = alloca " (cdr v) "\n" os))
+		      (car *impc:ir:ls_var*))))
+      (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
+      (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length (caddr ast))))
+      ;; (println '_envout: ast) ;;*impc:ir:sym-name-stack*)      
+      (emit envbody-str os)
+      ;;(emit (impc:ir:compiler (cdddr ast) types) os)
+      (impc:ir:strip-space os))))
+
+
 (define impc:ir:compiler:closure-from-getter
    (lambda (name)
       (if (not (llvm:get-function (string-append name "_getter")))
@@ -2458,7 +2559,7 @@
 
 
 (define impc:ir:compiler:closure-ref
-  (lambda (ast types . hint?)      
+  (lambda (ast types . hint?)
       ;; arg 1 must be a closure
       ;; arg 2 must be a string
       ;; arg 3 MAY be a type string or NULL
@@ -2481,7 +2582,7 @@
 	     (valtype (if (null? (cadddr ast)) (impc:ir:get-type-str (car hint?)) (cadddr ast)))
              (name-str (impc:ir:compiler (caddr ast) types))
              (name (impc:ir:gname)))
-         (emit "\n; closure set! \n" os)
+         (emit "\n; closure ref \n" os)
          (emit closure-str os)
          (emit name-str os)
          (emit type-str os)     
@@ -2630,6 +2731,39 @@
 	 ;      " [ " (car (impc:ir:gname "else_result")) ", %else" num " ]\n" os)
 
          (impc:ir:strip-space os))))
+
+(define impc:ir:compiler:closure-refcheck
+  (lambda (ast types . hint?)
+    (let* ((os (make-string 0))
+	   (num (number->string (llvm:count++)))
+	   (closure-str (if (and (symbol? (cadr ast))
+				 (llvm:get-function (symbol->string (cadr ast))))
+			    (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
+			    (impc:ir:compiler (cadr ast) types)))
+	   (closure (impc:ir:gname))	 
+	   (name-str (impc:ir:compiler (caddr ast) types))
+	   (name (impc:ir:gname)))
+      (emit "\n; closure ref check \n" os)
+      (emit closure-str os)
+      (emit name-str os)
+
+      ;; first deref closure
+      (emit (impc:ir:gname "closure" (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr closure)))))
+	    " = load " (cadr closure) " " (car closure) "\n" os)
+      (set! closure (impc:ir:gname "closure"))
+
+      ;; get address table    
+      (emit (string-append (impc:ir:gname "tablePtr" (cadr closure)) " = getelementptr "
+			   (cadr closure) " " (car closure) ", i32 0, i32 0\n") os)         
+      (emit (string-append (impc:ir:gname "tmp" "%clsvar**") " = bitcast i8** " 
+			   (car (impc:ir:gname 1)) " to %clsvar**\n") os)
+      (emit (string-append (impc:ir:gname "table" "%clsvar*")
+			   " = load %clsvar** " (car (impc:ir:gname 1)) "\n") os)
+      (emit (impc:ir:gname "val" "i1") " = call i1 @check_address_exists(i8* "
+	    (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
+
+      (impc:ir:strip-space os))))
+
 
 
 ;; returns a ptr's value
@@ -5061,7 +5195,11 @@
 			(impc:ir:compiler:closure-ref ast types)
 			(impc:ir:compiler:closure-ref ast types (car hint?))))
                    ((equal? (car ast) 'closure-set!)
-                    (impc:ir:compiler:closure-set ast types))                                      
+                    (impc:ir:compiler:closure-set ast types))
+		   ((equal? (car ast) 'closure-refcheck)
+		    (if (null? hint?)
+			(impc:ir:compiler:closure-refcheck ast types)
+			(impc:ir:compiler:closure-refcheck ast types (car hint?))))		    
                    ((equal? (car ast) 'coerce->)
                     (impc:ir:compiler:coerce (cdr ast) types))
 				   ((equal? (car ast) 'modulo)

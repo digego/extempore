@@ -35,6 +35,7 @@
 
 (define *impc:docstrings* '())
 (define *impc:closuretypes* '())
+(define *impc:closurebodies* '())
 
 (define *impc:ti:print-sub-checks* #f)
 (define *impc:ti:print-main-check* #f)
@@ -863,6 +864,10 @@
                               (symbol->string (caddr ast))
                               (if (not (null? (cdddr ast)))
 				  (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast))))))
+		       ((eq? (car ast) 'refcheck)
+			(list 'closure-refcheck
+			      (impc:ti:first-transform (cadr ast) inbody?)
+			      (symbol->string (caddr ast))))
                        ((eq? (car ast) 'doloop) (impc:ti:doloop ast inbody?))                       
                        ((eq? (car ast) 'dotimes) (impc:ti:dotimes ast inbody?))
 		       ((eq? (car ast) 'while) (impc:ti:while ast inbody?))
@@ -2751,7 +2756,6 @@
               (set! *impc:ti:nativef-generics-recurse-test* (- *impc:ti:nativef-generics-recurse-test* 1))
               (if (< *impc:ti:nativef-generics-recurse-test* 0)
                   (set! *impc:ti:nativef-generics-recurse-test* 0))
-              
               (if (and (not (null? ttype))
                        (impc:ir:closure? (car ttype)))
                        ;; (impc:ir:type? (cadar ttype)))
@@ -3425,7 +3429,8 @@
   (lambda (ast vars kts request?)
      (if (<> (length ast) 4)
 	 (impc:compiler:print-bad-arity-error ast))
-     (let* ((a (impc:ti:type-check (cadr ast) vars kts request?))
+     (let* ((aa (impc:ti:type-check (cadr ast) vars kts request?))
+	    (a (if (and (list? aa) (= (length aa) 1) (symbol? (car aa))) '() aa))
 	    ;; b should be fixed point types
 	    (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*)))
 	    ;; c should be of type a*
@@ -3789,6 +3794,21 @@
 		request?
 		'())
 	    (impc:ir:get-type-from-str (cadddr ast))))))
+
+;;(closure-ref closure a i32)
+(define impc:ti:closure-refcheck-check
+   (lambda (ast vars kts request?)
+     ;(println 'cls 'ref 'check: ast 'request? request?)
+      (if (<> (length ast) 3)
+	  (impc:compiler:print-bad-arity-error ast))
+      (let* (;; a should be a closure of some kind
+             (a (if (and (symbol? (cadr ast))
+                         (llvm:get-function (symbol->string (cadr ast))))
+                    #t ; // yes (cadr ast) is a globally defined closure
+                    (impc:ti:type-check (cadr ast) vars kts request?)))
+             ;; b should be a string (the var's name)
+             (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*))))
+	(list *impc:ir:i1*))))
 
 
 (define impc:ti:set-check
@@ -4190,6 +4210,7 @@
             ((and (list? ast) (member (car ast) '(tuple-ref-ptr))) (impc:ti:tuple-ref-ptr-check ast vars kts request?))	    
             ((and (list? ast) (member (car ast) '(closure-set!))) (impc:ti:closure-set-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(closure-ref))) (impc:ti:closure-ref-check ast vars kts request?))
+            ((and (list? ast) (member (car ast) '(closure-refcheck))) (impc:ti:closure-refcheck-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(pref))) (impc:ti:pref-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(pdref))) (impc:ti:pdref-check ast vars kts request?))
             ((and (list? ast) (member (car ast) '(null?))) (impc:ti:null?-check ast vars kts request?))
@@ -4371,9 +4392,14 @@
                                                           ;; ast (cons u (if (null? cnt) cnt (car cnt)))))
                                (cdr (car a)))))
                  ;; then see what versions might be OK?
-                 (let ((r (cl:find-if (lambda (x) 
-                                        (cl:every (lambda (x) x) (impc:ti:unity? x)))
-                                      res)))
+                 (let* ((rr (map (lambda (y)
+				   (cl:remove-if (lambda (x)
+						   (regex:match? (symbol->string (car x)) "^!" ))
+						 y))
+				 res))
+			(r (cl:find-if (lambda (x) 
+					 (cl:every (lambda (x) x) (impc:ti:unity? x)))
+				       rr)))
                    (if (not r)  ;; if no options are any good then :(
 		       (impc:compiler:print-could-not-resolve-type-error
 			(map (lambda (x) (symbol->string (car x)))
@@ -5485,12 +5511,15 @@
 
 (define-macro (xtm-closure-doc name)
   `(let ((res (assoc-strcmp (quote ,name) *impc:docstrings*))
-	 (res2 (assoc-strcmp (quote ,name) *impc:closuretypes*)))
+	 (res2 (assoc-strcmp (quote ,name) *impc:closuretypes*))
+	 (res3 (assoc-strcmp (quote ,name) *impc:closurebodies*)))
      (if res
-	 (cons (cdr res) (cdr res2))
+	 (list (cdr res) (cdr res2) (cdr res3))
 	 (if res2
-	     (cdr res2)
-	     #f))))
+	     (list '() (cdr res2) (cdr res3))
+	     (if res3
+		 (list '() '() (cdr res3))
+		 #f)))))
 
 
 (define-macro (definec symname . args)
@@ -5569,7 +5598,6 @@
 
 ;; alias for definec (should replace definec)
 (define-macro (bind-func . args)
-  ;; (println 'args: args)
   (if (list? (car args))
       (impc:compiler:print-compiler-error "bind-func requires a name!"))
   ;; if doc-string exists!
@@ -5580,6 +5608,14 @@
       (impc:compiler:print-already-bound-error (car args) "poly function"))
   (if (impc:ir:gpoly-exists? (car args))
       (impc:compiler:print-already-bound-error (car args) "generic closure"))
+  (if (regex:match? (symbol->string (car args)) ":")
+      (let ((p (regex:type-split (symbol->string (car args)) ":")))
+	(if (assoc-strcmp (car p) *impc:closurebodies*)
+	    (set-cdr! (assoc-strcmp (string->symbol (car p)) *impc:closurebodies*) (cdr args))
+	    (set! *impc:closurebodies* (cons (cons (string->symbol (car p)) (cdr args)) *impc:closurebodies*))))
+      (if (assoc-strcmp (car args) *impc:closurebodies*)
+	  (set-cdr! (assoc-strcmp (car args) *impc:closurebodies*) (cdr args))
+	  (set! *impc:closurebodies* (cons args *impc:closurebodies*))))
   (if (regex:match? (symbol->string (car args)) ":")
       (let* ((res (regex:type-split (symbol->string (car args)) ":"))
              (name (car res))
@@ -6087,8 +6123,6 @@
     (if (string? res)
         `(sexpr->string '(bind-lib-xtm mathlib ,name ,(string->symbol res)))
         `(sexpr->string '(bind-lib-xtm mathlib ,name ,(string->symbol (cdr res)))))))
-
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
