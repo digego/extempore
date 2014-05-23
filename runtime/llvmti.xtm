@@ -868,6 +868,27 @@
 			(list 'closure-refcheck
 			      (impc:ti:first-transform (cadr ast) inbody?)
 			      (symbol->string (caddr ast))))
+		       ((member (car ast) '(cast convert))
+		       	(if (= (length ast) 2)
+		       	    (impc:ti:first-transform (list (if (eq? (car ast) 'cast)
+							       'bitcast
+							       'bitconvert)
+							   (cadr ast)) inbody?)
+		       	    (let* ((p (regex:type-split (symbol->string (caddr ast)) ":"))
+		       		   (ptrdepth (impc:ir:get-ptr-depth (caddr ast)))
+		       		   (basetype (if (null? (cdr p)) #f (impc:ir:get-base-type (cadr p))))
+		       		   (etype (if (null? (cdr p)) #f (cname-encode basetype))))
+		       	      (impc:ti:first-transform 
+		       	       (list (if (eq? (car ast) 'cast)
+		       			 'bitcast
+		       			 'bitconvert)
+		       		     (cadr ast)
+		       		     (if etype
+		       			 (string->symbol
+		       			  (apply string-append "%" (car p) "--" etype
+		       				 (make-list ptrdepth "*")))
+		       			 (string->symbol (car p))))
+		       	       inbody?))))
                        ((eq? (car ast) 'doloop) (impc:ti:doloop ast inbody?))                       
                        ((eq? (car ast) 'dotimes) (impc:ti:dotimes ast inbody?))
 		       ((eq? (car ast) 'while) (impc:ti:while ast inbody?))
@@ -914,8 +935,6 @@
                  ;; (println 'atom: ast)
                  (cond ((eq? ast #f) '(impc_false))
                        ((eq? ast #t) '(impc_true))
-                       ((eq? ast 'cast) 'bitcast)                            
-                       ((eq? ast 'convert) 'bitconvert)                            
                        ((eq? ast '&) 'bitwise-and)
                        ((eq? ast 'bor) 'bitwise-or) ; can't use a pipe
                        ((eq? ast '^) 'bitwise-eor)
