@@ -693,7 +693,7 @@ indentation."
               (extempore-update-mode-line))))))
 
 (defun extempore-minibuffer-echo-filter (proc str)
-  (message (substring str 0 -1)))
+  (message (replace-regexp-in-string "[%\n]" "" (substring str 0 -1))))
 
 (defun extempore-repl-preoutput-filter (string)
   (concat "=> " (substring string 0 -1) "\nextempore> "))
