@@ -282,9 +282,13 @@
                (print ",")))
 
     (print " got " )
-    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print got))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (impc:ir:pretty-print-type got)))
     (print ", was expecting ")
-    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print expected "\n"))
+    (if (and (list? expected)
+	     (= 1 (length expected)))
+	(set! expected (car expected)))
+    
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (impc:ir:pretty-print-type expected) "\n")))
 
     (if *impc:compiler:top-level-generic-error*
         (set! *impc:compiler:top-level-generic-error* #f))
