@@ -30,6 +30,7 @@
 (sys:load "libs/core/audio_dsp.xtm")
 
 
+;; libsndfile enums
 (bind-val SF_LOOP_NONE i32 800)
 (bind-val SF_LOOP_FORWARD i32 801)
 (bind-val SF_LOOP_BACKWARD i32 802)
@@ -74,22 +75,45 @@
 (bind-val SF_FALSE i32 0)
 (bind-val SF_TRUE i32 1)
 
+;; libsndfile functions
+
+(bind-lib libsndfile sf_version_string [i8*]*)
 (bind-lib libsndfile sf_open [i8*,i8*,i32,sf_info*]*)
 (bind-lib libsndfile sf_open_fd [i8*,i32,i32,sf_info*,i32]*)
 (bind-lib libsndfile sf_close [i32,i8*]*)
 (bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
 (bind-lib libsndfile sf_write_sync [void,i8*]*)
-(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
-(bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
+;; read file by frame
+(bind-lib libsndfile sf_readf_float [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_writef_float [i64,i8*,float*,i64]*)
+(bind-lib libsndfile sf_readf_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_writef_double [i64,i8*,double*,i64]*)
+;; read file by item
 (bind-lib libsndfile sf_read_float [i64,i8*,float*,i64]*)
 (bind-lib libsndfile sf_write_float [i64,i8*,float*,i64]*)
+(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
+
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
 (bind-lib libsndfile sf_command [i32,i8*,i32,i8*,i32]*)
+(bind-lib libsndfile sf_format_check [i32,sf_info*]*)
 
-(bind-poly sf_read sf_read_double)
+(bind-poly sf_readf sf_readf_float)
+(bind-poly sf_writef sf_writef_float)
+(bind-poly sf_readf sf_readf_double)
+(bind-poly sf_writef sf_writef_double)
+
 (bind-poly sf_read sf_read_float)
-(bind-poly sf_write sf_write_double)
 (bind-poly sf_write sf_write_float)
+(bind-poly sf_read sf_read_double)
+(bind-poly sf_write sf_write_double)
+
+(bind-func sf_print_version_string
+  (lambda ()
+    (printf "%s\n" (sf_version_string))))
+
+(print "loaded ")
+(sf_print_version_string)
 
 ;; sf_info struct accessors
 
@@ -178,6 +202,11 @@
 (bind-func sample_data
   (lambda (abuf:AudioBuffer*)
     (tref abuf 5)))
+
+(bind-func num_samples
+  (lambda (abuf:AudioBuffer*)
+    (* (num_channels abuf)
+       (num_frames abuf))))
 
 ;; constructors/destructors
 
@@ -285,7 +314,7 @@
 
 (bind-func write_audio_buffer_to_file_with_format
   "write AudioBuffer tupe to audiofile file"
-  (lambda (fname abuf:AudioBuffer* format)
+  (lambda (abuf:AudioBuffer* fname format)
     (let ((frames (num_frames abuf))
           (chans (num_channels abuf))
           (offset (frame_offset abuf))
@@ -303,8 +332,8 @@
                                     (pref-ptr data offset))))))
 
 (bind-func write_audio_buffer_to_file
-  (lambda (fname abuf:AudioBuffer*)
-    (write_audio_buffer_to_file_with_format fname abuf (+ SF_FORMAT_AIF SF_FORMAT_PCM_16))))
+  (lambda (abuf:AudioBuffer* fname)
+    (write_audio_buffer_to_file_with_format abuf fname (+ SF_FORMAT_AIF SF_FORMAT_PCM_16))))
 
 ;; these write SAMPLE*
 (bind-poly write_audio_file write_audio_data_to_file)
@@ -323,7 +352,7 @@
 ;; if dat is set to null then
 ;; read_audio_data will return number of frames*channels
 (bind-func read_audio_file_into_data
-  (lambda (fname data:SAMPLE* offset num print_info:i32)
+  (lambda (fname offset num data:SAMPLE* print_info:i32)
     (let ((info:sf_info* (salloc))
           (audiofile (sf_open fname SFM_READ info))
           (channels (sf_channels info))
@@ -351,12 +380,11 @@
 (bind-func read_audio_file_into_data_with_offset
   "read the full audio file into memory starting at data"
   (lambda (fname data:SAMPLE* num)
-    (read_audio_file_into_data fname data 0 num 0)))
-
+    (read_audio_file_into_data fname 0 num data 0)))
 ;;
 ;; these return an AudioBuffer tuple
 ;;
-(bind-func audio_buffer_from_file_with_offset
+(bind-func read_audio_file_into_buffer_with_offset
   "create and return an AudioBuffer from an audio file"
   (lambda (fname num:i64 offset:i64)
     (let ((info:sf_info* (salloc))
@@ -380,15 +408,15 @@
             abuf)))))
 
 
-(bind-func audio_buffer_from_file
+(bind-func read_audio_file_into_buffer
   "create and return an AudioBuffer from an audio file"
   (lambda (fname num:i64)
-    (audio_buffer_from_file_with_offset fname num 0)))
+    (read_audio_file_into_buffer_with_offset fname num 0)))
 
 
 ;; these read into a (provided) buffer of type SAMPLE*
 (bind-poly read_audio_data read_audio_file_into_data)
 (bind-poly read_audio_data read_audio_file_into_data_with_offset)
 ;; these read into (and return) an AudioBuffer
-(bind-poly read_audio_data audio_buffer_from_file_with_offset)
-(bind-poly read_audio_data audio_buffer_from_file)
+(bind-poly read_audio_data read_audio_file_into_buffer_with_offset)
+(bind-poly read_audio_data read_audio_file_into_buffer)
