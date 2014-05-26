@@ -464,25 +464,6 @@
 (bind-lib-val stdlib SFC_GET_INSTRUMENT i32)
 (bind-lib-val stdlib SFC_GET_LOOP_INFO i32)
 
-(bind-lib-val stdlib SFM_READ i32)
-(bind-lib-val stdlib SFM_WRITE i32)
-(bind-lib-val stdlib SFM_RDWR i32)
-
-(bind-lib-val stdlib SF_FORMAT_WAV i32)
-(bind-lib-val stdlib SF_FORMAT_AIF i32)
-(bind-lib-val stdlib SF_FORMAT_AU i32)
-(bind-lib-val stdlib SF_FORMAT_RAW i32)
-(bind-lib-val stdlib SF_FORMAT_VOC i32)
-(bind-lib-val stdlib SF_FORMAT_FLAC i32)
-(bind-lib-val stdlib SF_FORMAT_CAF i32)
-(bind-lib-val stdlib SF_FORMAT_OGG i32)
-(bind-lib-val stdlib SF_FORMAT_PCM_16 i32)
-(bind-lib-val stdlib SF_FORMAT_PCM_24 i32)
-(bind-lib-val stdlib SF_FORMAT_PCM_32 i32)
-(bind-lib-val stdlib SF_FORMAT_FLOAT i32)
-(bind-lib-val stdlib SF_FORMAT_DOUBLE i32)
-(bind-lib-val stdlib SF_FORMAT_VORBIS i32)
-
 ;; (bind-type sf_info <i64,i32,i32,i32,i32,i32>)
 (bind-lib-type stdlib sf_info <i64,i32,i32,i32,i32,i32>)
 ;; (bind-type sf_format_info <i32,i8*,i8*>)
@@ -494,10 +475,9 @@
 ;;(bind-type SF_LOOP_INFO <|2,i8|,|2,i8|,i32,i32,float,i32,|6,i32|>)
 (bind-lib-type-no-scm stdlib SF_LOOP_INFO <|2,i8|,|2,i8|,i32,i32,float,i32,|6,i32|>)
 
+
 (bind-lib-val stdlib SF_FALSE i32)
 (bind-lib-val stdlib SF_TRUE i32)
-
-(bind-lib-type stdlib AudioBuffer <i64,i32,i64,i64,i32,SAMPLE*>)
 
 (bind-lib libsndfile sf_open [i8*,i8*,i32,sf_info*]*)
 (bind-lib libsndfile sf_open_fd [i8*,i32,i32,sf_info*,i32]*)
@@ -523,34 +503,10 @@
 (bind-lib-func stdlib sf_sections [i64,sf_info*]*)
 (bind-lib-func stdlib sf_seekable [i64,sf_info*]*)
 (bind-lib-func stdlib print_audio_file_info [void,i8*]*)
+(bind-lib-func stdlib read_audio_data [i64,i8*,float*,i64,i64,i32]*)
 (bind-lib-func stdlib audiofile_c [[float]*,i8*,i64,i64]*)
 (bind-lib-func stdlib audiofile_ptr_c [[float*]*,i8*,i64,i64]*)
-(bind-lib-func stdlib CreateAudioBuffer [AudioBuffer*,i64,i32]*)
-(bind-lib-func stdlib DeleteAudioBuffer [void,AudioBuffer*]*)
-(bind-lib-func stdlib AudioBufferPtr [float*,AudioBuffer*,i64,i64]*)
-
-(bind-lib-func stdlib write_audio_data_1 [i64,i8*,i32,i32,i64,i32,float*]*)
-(bind-lib-func stdlib write_audio_data_2 [i64,i8*,i32,i64,i32,float*]*)
-(bind-lib-func stdlib write_audio_data_3 [i64,i8*,i64,i32,float*]*)
-(bind-lib-func stdlib write_audio_data_4 [i64,i8*,i32,AudioBuffer*]*)
-(bind-lib-func stdlib write_audio_data_5 [i64,i8*,AudioBuffer*]*)
-
-(bind-poly write_audio_file write_audio_data_1)
-(bind-poly write_audio_file write_audio_data_2)
-(bind-poly write_audio_file write_audio_data_3)
-(bind-poly write_audio_file write_audio_data_4)
-(bind-poly write_audio_file write_audio_data_5)
-
-(bind-lib-func stdlib read_audio_data_1 [i64,i8*,float*,i64,i64,i32]*)
-(bind-lib-func stdlib read_audio_data_2 [i64,i8*,float*,i64]*)
-(bind-lib-func stdlib read_audio_data_3 [AudioBuffer*,i8*,i64,i64]*)
-(bind-lib-func stdlib read_audio_data_4 [AudioBuffer*,i8*,i64]*)
-
-(bind-poly read_audio_data read_audio_data_1)
-(bind-poly read_audio_data read_audio_data_2)
-(bind-poly read_audio_data read_audio_data_3)
-(bind-poly read_audio_data read_audio_data_4)
-
+(bind-lib-func stdlib write_audio_data [i64,i8*,i64,i32,float*]*)
 
 (define *xtmlib-sndfile-loaded* #t)
 
@@ -1378,27 +1334,16 @@
     (callback time 'midi_send device *midi-note-on* channel pitch velocity)
     (callback (+ time duration) 'midi_send device *midi-note-off* channel pitch velocity)))
 
-(define homo-play-midi-note
-  (let ((notes (make-vector 127 0)))
-    (lambda (time device pitch velocity duration channel)
-      (if (> time (vector-ref notes pitch))
-	  (let ((dur (- duration (* 2 *au:block-size*))))
-	    (vector-set! notes pitch (+ time dur))
-	    (callback time 'midi_send device *midi-note-on* channel pitch velocity)
-	    (callback (+ time dur) 'midi_send device *midi-note-off* channel pitch velocity))))))
-
-
-(define-macro (mplay . args)
-  (if (symbol? (car args))
-      `(play-midi-note (*metro* beat) ,(car args)
-		       (real->integer ,(cadr args))
+(define-macro (mplay args)
+  (if (symbol? (cadr args))
+      `(play-midi-note (*metro* beat) ,(cadr args)
 		       (real->integer ,(caddr args))
-		       (*metro* 'dur ,(car (cdddr args))) 0)
-      `(play-midi-note (*metro* (+ beat ,(car args))) ,(cadr args)
-		       (real->integer ,(caddr args))
-		       (real->integer ,(car (cdddr args)))
-		       (*metro* 'dur ,(cadr (cdddr args))) 0)))
-
+		       (real->integer ,(cadddr args))
+		       (*metro* 'dur ,(car (cddddr args))) 0)
+      `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args)
+		       (real->integer ,(cadddr args))
+		       (real->integer ,(car (cddddr args)))
+		       (*metro* 'dur ,(cadr (cddddr args))) 0)))
 
 (define-macro (mplayob o b . args)
   `(if (= 0 (modulo (+ ,o beat) ,b))
