@@ -1592,7 +1592,20 @@ You shouldn't have to modify this list directly, use
   (mapc (lambda (function)
           (ad-add-advice
            function
-	   '(exlog-advice nil t (advice . (lambda () (exlog-log-command real-this-command current-prefix-arg (ad-get-args 0)))))
+           '(exlog-advice
+             nil t
+             (advice . (lambda ()
+                         (let ((args (ad-get-args 0)))
+                           (exlog-log-command
+                            real-this-command
+                            current-prefix-arg
+                            (if (member real-this-command
+                                        '(extempore-send-definition
+                                          extempore-send-region
+                                          extempore-send-buffer))
+                                (buffer-substring-no-properties
+                                 (car args) (cadr args))
+                              args))))))
            'after 'first)
           (ad-activate function))
         func-list))
@@ -1637,11 +1650,7 @@ You shouldn't have to modify this list directly, use
     (exlog-write-log-entry (buffer-name)
                            (symbol-name command)
                            event
-                           (if (member command '(extempore-send-definition
-                                                 extempore-send-region
-                                                 extempore-send-buffer))
-                               (prin1-to-string (buffer-substring-no-properties (car args) (cadr args)))
-                             args))))
+                           args)))
 
 (defun exlog-pre-command-hook ()
   (exlog-log-command real-this-command last-input-event current-prefix-arg))
