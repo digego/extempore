@@ -1933,6 +1933,22 @@ If you don't want to be prompted for this name each time, set the
       (extempore-sb-stop-pushing-current-buffer)
     (call-interactively #'extempore-sb-push-current-buffer)))
 
+;; on OSX, say command can generate output files
+
+(defun extempore-write-voice-files (string voice)
+  (interactive
+   (list (read-from-minibuffer "String: ")
+         (ido-completing-read "Voice: "
+                              '("Agnes" "Albert" "Alex" "Bad News" "Bahh" "Bells" "Boing" "Bruce" "Bubbles" "Cellos" "Deranged" "Fred" "Good News" "Hysterical" "Junior" "Kathy" "Pipe Organ" "Princess" "Ralph" "Trinoids" "Vicki" "Victoria" "Whisper" "Zarvox")
+                              nil
+                              t)))
+  (mkdir (format "speech-samples/%s" voice) t)
+  (dolist (word (split-string string " "))
+    (shell-command (format "say --output-file=speech-samples/%s/%s-22kHz.aiff --voice %s %s" voice word voice word))
+    ;; upsample to 44.1kHz
+    (shell-command (format "sox speech-samples/%s/%s-22kHz.aiff speech-samples/%s/%s.aiff rate 44100" voice word voice word))
+    (shell-command (format "rm speech-samples/%s/%s-22kHz.aiff" voice word))))
+
 (provide 'extempore)
 
 ;;; extempore.el ends here
