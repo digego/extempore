@@ -1653,7 +1653,8 @@ You shouldn't have to modify this list directly, use
                            args)))
 
 (defun exlog-pre-command-hook ()
-  (exlog-log-command real-this-command last-input-event current-prefix-arg))
+  (let (deactivate-mark)
+    (exlog-log-command real-this-command last-input-event current-prefix-arg)))
 
 ;; writing command list to file
 
