@@ -1560,7 +1560,7 @@ You shouldn't have to modify this list directly, use
   extempore code sent for evaluation) in all Extempore buffers."
   :global t
   :init-value nil
-  :lighter " exlog"
+  :lighter " Log"
   :keymap nil
   :group 'extempore
 
