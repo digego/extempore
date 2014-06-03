@@ -1637,7 +1637,7 @@ You shouldn't have to modify this list directly, use
 (defun exlog-write-log-entry (bname command event args)
   (with-current-buffer (get-buffer-create "*exlog*")
     (insert
-     (format "(%s %s %s %s %s)\n"
+     (format "(#inst \"%s\" %s %s %s %s)\n"
              (format-time-string "%Y-%m-%dT%T.%3N")
              bname
              command
