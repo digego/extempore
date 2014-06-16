@@ -933,7 +933,8 @@
                                    (impc:ti:first-transform (cdr ast) #t)))))
                 (else
                  ;; (println 'atom: ast)
-                 (cond ((eq? ast #f) '(impc_false))
+                 (cond ((rational? ast) `(Rat ,(rational->n ast) ,(rational->d ast)))
+		       ((eq? ast #f) '(impc_false))
                        ((eq? ast #t) '(impc_true))
                        ((eq? ast '&) 'bitwise-and)
                        ((eq? ast 'bor) 'bitwise-or) ; can't use a pipe
@@ -4197,7 +4198,21 @@
 	    ((and (list? ast) (member (car ast)
                                       *impc:mathbinaryaritylist*))
                                       ;; '(* / + - % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right bitwise-not)))
-             (impc:ti:math-check ast vars kts request?))
+             (let ((r (impc:ti:math-check ast vars kts request?)))	       
+	       (if (impc:ir:tuple? r)
+		   (begin ;; this is very dodgy!
+		     (set! *unique-polynum* (+ 1 *unique-polynum*))
+		     (let ((m (string->symbol (string-append (cond ((eq? (car ast) '*) "xtm_multiplication##")
+								   ((eq? (car ast) '+) "xtm_addition##")
+								   ((eq? (car ast) '/) "xtm_division##")
+								   ((eq? (car ast) '-) "xtm_subtraction##")
+								   ((eq? (car ast) '%) "xtm_modulo##")
+								   (else (print-error "Error in math overloading")))
+							     (number->string *unique-polynum*)))))
+		       (insert-at-index 1 vars (list m))
+		       (set-car! ast m)
+		       (set! r (impc:ti:type-check ast vars kts request?)))))
+	       r))
             ((and (list? ast) (member (car ast) '(< > = <>))) (impc:ti:compare-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))
 	    ((and (list? ast) (member (car ast) '(while))) (impc:ti:while-check ast vars kts request?))
@@ -5076,8 +5091,8 @@
              (forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
              ;; (llllllllllll (println 'forced: forced-types))
 	     (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
-	     (t5 (impc:ti:coercion-run t3 forced-types)) ;; also there is doubling dipping here :(
              (typespre (impc:ti:run-type-check vars forced-types t4))
+	     (t5 (impc:ti:closure:convert t4 (list symname)))
 	     (types (impc:ti:type-normalize typespre))
              (newast '()))
         ;; (println 'forced: forced-types)

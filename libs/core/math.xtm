@@ -1029,6 +1029,165 @@
 (bind-poly rot_matrix_about_axis rot_matrix_about_axis_d)
 (bind-poly rot_matrix_about_axis rot_matrix_about_axis_f)
 
+
+;;;;;;;;;; RATIONAL NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; xtlang's rational number types and helper functions
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-type Rational <i64,i64>)
+
+(bind-func Rat
+  (lambda (a b)
+    (let ((r:<i64,i64>* (salloc)))
+      (tset! r 0 a)
+      (tset! r 1 b)
+      (pref (cast r Rational*) 0))))
+
+(bind-func print_rat
+  (lambda (x:Rational)
+    (printf "%lld/%lld" (tref x 0) (tref x 1)) void))
+
+(bind-poly print print_rat)
+
+(bind-func rat_mul_r_r
+  (lambda (a:Rational b:Rational)
+    (pref (Rational (* (tref a 0) (tref b 0))
+		    (* (tref a 1) (tref b 1)))
+	  0)))
+
+(bind-func rat_mul_r_i64
+  (lambda (a:Rational b:i64)
+    (pref (Rational (* (tref a 0) b) (* (tref a 1) 1)) 0)))
+
+(bind-func rat_mul_i64_r
+  (lambda (b:i64 a:Rational)
+    (pref (Rational (* (tref a 0) b) (* (tref a 1) 1)) 0)))
+
+(bind-func rat_mul_r_i32
+  (lambda (a:Rational b:i32)
+    (pref (Rational (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1)) 0)))
+
+(bind-func rat_mul_i32_r
+  (lambda (b:i32 a:Rational)
+    (pref (Rational (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1)) 0)))
+
+(bind-func rat_mul_r_i8
+  (lambda (a:Rational b:i8)
+    (pref (Rational (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1)) 0)))
+
+(bind-func rat_mul_i8_r
+  (lambda (b:i8 a:Rational)
+    (pref (Rational (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1)) 0)))
+
+(bind-func rat_mul_r_i1
+  (lambda (a:Rational b:i1)
+    (pref (Rational (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1)) 0)))
+
+(bind-func rat_mul_i1_r
+  (lambda (b:i1 a:Rational)
+    (pref (Rational (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1)) 0)))
+
+(bind-func rat_mul_r_d
+  (lambda (a:Rational b:double)
+    (* b (/ (convert (tref a 0) double) (convert (tref a 1) double)))))
+
+(bind-func rat_mul_d_r
+  (lambda (b:double a:Rational)
+    (* b (/ (convert (tref a 0) double) (convert (tref a 1) double)))))
+
+(bind-func rat_mul_r_f
+  (lambda (a:Rational b:float)
+    (* b (/ (convert (tref a 0) float) (convert (tref a 1) float)))))
+
+(bind-func rat_mul_f_r
+  (lambda (b:float a:Rational)
+    (* b (/ (convert (tref a 0) float) (convert (tref a 1) float)))))
+
+(bind-poly xtm_multiplication rat_mul_r_r)
+(bind-poly xtm_multiplication rat_mul_r_i64)
+(bind-poly xtm_multiplication rat_mul_i64_r)
+(bind-poly xtm_multiplication rat_mul_r_i32)
+(bind-poly xtm_multiplication rat_mul_i32_r)
+(bind-poly xtm_multiplication rat_mul_r_i8)
+(bind-poly xtm_multiplication rat_mul_i8_r)
+(bind-poly xtm_multiplication rat_mul_r_i1)
+(bind-poly xtm_multiplication rat_mul_i1_r)
+(bind-poly xtm_multiplication rat_mul_r_d)
+(bind-poly xtm_multiplication rat_mul_d_r)
+(bind-poly xtm_multiplication rat_mul_r_f)
+(bind-poly xtm_multiplication rat_mul_f_r)
+
+(bind-func rat_div_r_r
+  (lambda (a:Rational b:Rational)
+    (pref (Rational (* (tref a 0) (tref b 0))
+		    (* (tref b 1) (tref a 1)))
+	  0)))
+
+(bind-func rat_div_r_i64
+  (lambda (a:Rational b:i64)
+    (pref (Rational (* (tref a 0) 1) (* (tref a 1) b)) 0)))
+
+(bind-func rat_div_i64_r
+  (lambda (b:i64 a:Rational)
+    (pref (Rational (* (tref a 0) 1) (* (tref a 1) b)) 0)))
+
+(bind-func rat_div_r_i32
+  (lambda (a:Rational b:i32)
+    (pref (Rational (* (tref a 0) 1) (* (tref a 1) (i32toi64 b))) 0)))
+
+(bind-func rat_div_i32_r
+  (lambda (b:i32 a:Rational)
+    (pref (Rational (* (tref a 0) 1) (* (tref a 1) (i32toi64 b))) 0)))
+
+(bind-func rat_div_r_i8
+  (lambda (a:Rational b:i8)
+    (pref (Rational (* (tref a 0) 1) (* (tref a 1) (i8toi64 b))) 0)))
+
+(bind-func rat_div_i8_r
+  (lambda (b:i8 a:Rational)
+    (pref (Rational (* (tref a 0) 1) (* (tref a 1) (i8toi64 b))) 0)))
+
+(bind-func rat_div_r_i1
+  (lambda (a:Rational b:i1)
+    (pref (Rational (* (tref a 0) 1) (* (tref a 1) (i1toi64 b))) 0)))
+
+(bind-func rat_div_i1_r
+  (lambda (b:i1 a:Rational)
+    (pref (Rational (* (tref a 0) 1) (* (tref a 1) (i1toi64 b))) 0)))
+
+(bind-func rat_div_r_d
+  (lambda (a:Rational b:double)
+    (/ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func rat_div_d_r
+  (lambda (b:double a:Rational)
+    (/ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func rat_div_r_f
+  (lambda (a:Rational b:float)
+    (/ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-func rat_div_f_r
+  (lambda (b:float a:Rational)
+    (/ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-poly xtm_division rat_div_r_r)
+(bind-poly xtm_division rat_div_r_i64)
+(bind-poly xtm_division rat_div_i64_r)
+(bind-poly xtm_division rat_div_r_i32)
+(bind-poly xtm_division rat_div_i32_r)
+(bind-poly xtm_division rat_div_r_i8)
+(bind-poly xtm_division rat_div_i8_r)
+(bind-poly xtm_division rat_div_r_i1)
+(bind-poly xtm_division rat_div_i1_r)
+(bind-poly xtm_division rat_div_r_d)
+(bind-poly xtm_division rat_div_d_r)
+(bind-poly xtm_division rat_div_r_f)
+(bind-poly xtm_division rat_div_f_r)
+
+
 ;;;;;;;;;; COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; xtlang's complex number types and helper functions
