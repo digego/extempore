@@ -1804,3 +1804,15 @@
             ((string=? (sys:platform) "OSX")
              (print "/path/to/llvm/3.2/bin/llc -O3 -relocation-model=pic -tailcallopt" bitcode-file "&& clang -O3 -dynamiclib -undefined dynamic_lookup" asm-file "-o" shared-lib-file "\n"))
             (else (print "Sorry, cannot find the appropriate compilation command for your platform at this time."))))))
+
+
+(define range
+  (lambda args
+    (cond ((= (length args) 1)
+	   (make-list-with-proc (car args)  (lambda (i) i)))
+	  ((= (length args) 2)
+	   (make-list-with-proc (- (cadr args) (car args)) (lambda (i) (+ (car args) i))))
+	  ((= (length args) 3)
+	   (make-list-with-proc (/ (- (cadr args) (car args)) (caddr args))
+				(lambda (i) (+ (car args) (* i (caddr args))))))
+	  (else (println 'bad 'range!) '()))))
