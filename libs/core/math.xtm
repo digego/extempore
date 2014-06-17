@@ -1040,14 +1040,39 @@
 
 (bind-func Rat
   (lambda (a b)
+    (if (< b 0)
+        (begin (set! a (* -1 a))
+               (set! b (* -1 b))))
     (let ((r:<i64,i64>* (salloc)))
       (tset! r 0 a)
       (tset! r 1 b)
       (pref (cast r Rational*) 0))))
 
+(bind-func rat_greatest_common_divisor
+  (lambda (m:i64 n:i64)
+    (if (and (= m 0) (= n 0))
+        -1
+        (let ((r 0))
+          (if (< m 0) (set! m (* m -1)))
+          (if (< n 0) (set! n (* n -1)))
+          (while (not (= n 0))
+            (set! r (% m n))
+            (set! m n)
+            (set! n r))
+          m))))
+
+(bind-func rat_reduce
+  (lambda (a:Rational)
+    (let ((gcd (rat_greatest_common_divisor (tref a 0)
+                                            (tref a 1))))
+      (pref (Rational (/ (tref a 0) gcd)
+                      (/ (tref a 1) gcd))
+            0))))
+
 (bind-func print_rat
   (lambda (x:Rational)
-    (printf "%lld/%lld" (tref x 0) (tref x 1)) void))
+    (let ((reduced (rat_reduce x)))
+      (printf "%lld/%lld" (tref reduced 0) (tref reduced 1))) void))
 
 (bind-poly print print_rat)
 
@@ -1187,10 +1212,358 @@
 (bind-poly xtm_division rat_div_r_f)
 (bind-poly xtm_division rat_div_f_r)
 
+;; Rational addition
 
-;;;;;;;;;; COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(bind-func rat_add_r_r
+  (lambda (a:Rational b:Rational)
+    (let ((denom_a (tref a 1))
+          (denom_b (tref b 1)))
+      (pref (Rational (+ (* (tref a 0) denom_b) (* (tref b 0) denom_a))
+                      (* denom_a denom_b))
+            0))))
+
+(bind-func rat_add_r_i64
+  (lambda (a:Rational b:i64)
+    (pref (Rational (+ (tref a 0) (* (tref a 1) b)) (tref a 1)) 0)))
+
+(bind-func rat_add_i64_r
+  (lambda (b:i64 a:Rational)
+    (pref (Rational (+ (tref a 0) (* (tref a 1) b)) (tref a 1)) 0)))
+
+(bind-func rat_add_r_i32
+  (lambda (a:Rational b:i32)
+    (pref (Rational (+ (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_add_i32_r
+  (lambda (b:i32 a:Rational)
+    (pref (Rational (+ (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_add_r_i8
+  (lambda (a:Rational b:i8)
+    (pref (Rational (+ (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_add_i8_r
+  (lambda (b:i8 a:Rational)
+    (pref (Rational (+ (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_add_r_i1
+  (lambda (a:Rational b:i1)
+    (pref (Rational (+ (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_add_i1_r
+  (lambda (b:i1 a:Rational)
+    (pref (Rational (+ (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_add_r_d
+  (lambda (a:Rational b:double)
+    (+ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func rat_add_d_r
+  (lambda (b:double a:Rational)
+    (+ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func rat_add_r_f
+  (lambda (a:Rational b:float)
+    (+ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-func rat_add_f_r
+  (lambda (b:float a:Rational)
+    (+ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-poly xtm_addition rat_add_r_r)
+(bind-poly xtm_addition rat_add_r_i64)
+(bind-poly xtm_addition rat_add_i64_r)
+(bind-poly xtm_addition rat_add_r_i32)
+(bind-poly xtm_addition rat_add_i32_r)
+(bind-poly xtm_addition rat_add_r_i8)
+(bind-poly xtm_addition rat_add_i8_r)
+(bind-poly xtm_addition rat_add_r_i1)
+(bind-poly xtm_addition rat_add_i1_r)
+(bind-poly xtm_addition rat_add_r_d)
+(bind-poly xtm_addition rat_add_d_r)
+(bind-poly xtm_addition rat_add_r_f)
+(bind-poly xtm_addition rat_add_f_r)
+
+;; Rational subtraction
+
+(bind-func rat_subtract_r_r
+  (lambda (a:Rational b:Rational)
+    (let ((denom_a (tref a 1))
+          (denom_b (tref b 1)))
+      (pref (Rational (- (* (tref a 0) denom_b) (* (tref b 0) denom_a))
+                      (* denom_a denom_b))
+            0))))
+
+(bind-func rat_subtract_r_i64
+  (lambda (a:Rational b:i64)
+    (pref (Rational (- (tref a 0) (* (tref a 1) b)) (tref a 1)) 0)))
+
+(bind-func rat_subtract_i64_r
+  (lambda (b:i64 a:Rational)
+    (pref (Rational (- (tref a 0) (* (tref a 1) b)) (tref a 1)) 0)))
+
+(bind-func rat_subtract_r_i32
+  (lambda (a:Rational b:i32)
+    (pref (Rational (- (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_subtract_i32_r
+  (lambda (b:i32 a:Rational)
+    (pref (Rational (- (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_subtract_r_i8
+  (lambda (a:Rational b:i8)
+    (pref (Rational (- (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_subtract_i8_r
+  (lambda (b:i8 a:Rational)
+    (pref (Rational (- (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_subtract_r_i1
+  (lambda (a:Rational b:i1)
+    (pref (Rational (- (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_subtract_i1_r
+  (lambda (b:i1 a:Rational)
+    (pref (Rational (- (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1)) 0)))
+
+(bind-func rat_subtract_r_d
+  (lambda (a:Rational b:double)
+    (- (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func rat_subtract_d_r
+  (lambda (b:double a:Rational)
+    (- (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func rat_subtract_r_f
+  (lambda (a:Rational b:float)
+    (- (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-func rat_subtract_f_r
+  (lambda (b:float a:Rational)
+    (- (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-poly xtm_subtraction rat_subtract_r_r)
+(bind-poly xtm_subtraction rat_subtract_r_i64)
+(bind-poly xtm_subtraction rat_subtract_i64_r)
+(bind-poly xtm_subtraction rat_subtract_r_i32)
+(bind-poly xtm_subtraction rat_subtract_i32_r)
+(bind-poly xtm_subtraction rat_subtract_r_i8)
+(bind-poly xtm_subtraction rat_subtract_i8_r)
+(bind-poly xtm_subtraction rat_subtract_r_i1)
+(bind-poly xtm_subtraction rat_subtract_i1_r)
+(bind-poly xtm_subtraction rat_subtract_r_d)
+(bind-poly xtm_subtraction rat_subtract_d_r)
+(bind-poly xtm_subtraction rat_subtract_r_f)
+(bind-poly xtm_subtraction rat_subtract_f_r)
+
+;; Rational equality
+
+(bind-func rat_equal_r_r
+  (lambda (a:Rational b:Rational)
+    (let ((reduced_a (rat_reduce a))
+          (reduced_b (rat_reduce b)))
+      (and (= (tref reduced_a 0)
+              (tref reduced_b 0))
+           (= (tref reduced_a 1)
+              (tref reduced_b 1))))))
+
+(bind-func rat_equal_r_i64
+  (lambda (a:Rational b:i64)
+    (rat_equal_r_r a (Rat b 1))))
+
+(bind-func rat_equal_i64_r
+  (lambda (b:i64 a:Rational)
+    (rat_equal_r_r (Rat b 1) a)))
+
+(bind-func rat_equal_r_i32
+  (lambda (a:Rational b:i32)
+    (rat_equal_r_r a (Rat (i32toi64 b) 1))))
+
+(bind-func rat_equal_i32_r
+  (lambda (b:i32 a:Rational)
+    (rat_equal_r_r (Rat (i32toi64 b) 1) a)))
+
+(bind-func rat_equal_r_i8
+  (lambda (a:Rational b:i8)
+    (rat_equal_r_r a (Rat (i8toi64 b) 1))))
+
+(bind-func rat_equal_i8_r
+  (lambda (b:i8 a:Rational)
+    (rat_equal_r_r (Rat (i8toi64 b) 1) a)))
+
+(bind-func rat_equal_r_i1
+  (lambda (a:Rational b:i1)
+    (rat_equal_r_r a (Rat (i1toi64 b) 1))))
+
+(bind-func rat_equal_i1_r
+  (lambda (b:i1 a:Rational)
+    (rat_equal_r_r (Rat (i1toi64 b) 1) a)))
+
+(bind-poly xtm_equal rat_equal_r_r)
+(bind-poly xtm_equal rat_equal_r_i64)
+(bind-poly xtm_equal rat_equal_i64_r)
+(bind-poly xtm_equal rat_equal_r_i32)
+(bind-poly xtm_equal rat_equal_i32_r)
+(bind-poly xtm_equal rat_equal_r_i8)
+(bind-poly xtm_equal rat_equal_i8_r)
+(bind-poly xtm_equal rat_equal_r_i1)
+(bind-poly xtm_equal rat_equal_i1_r)
+
+;; Rational inequality
+
+(bind-func rat_notequal_r_r
+  (lambda (a:Rational b:Rational)
+    (let ((reduced_a (rat_reduce a))
+          (reduced_b (rat_reduce b)))
+      (or (<> (tref reduced_a 0)
+              (tref reduced_b 0))
+          (<> (tref reduced_a 1)
+              (tref reduced_b 1))))))
+
+(bind-func rat_notequal_r_i64
+  (lambda (a:Rational b:i64)
+    (rat_notequal_r_r a (Rat b 1))))
+
+(bind-func rat_notequal_i64_r
+  (lambda (b:i64 a:Rational)
+    (rat_notequal_r_r (Rat b 1) a)))
+
+(bind-func rat_notequal_r_i32
+  (lambda (a:Rational b:i32)
+    (rat_notequal_r_r a (Rat (i32toi64 b) 1))))
+
+(bind-func rat_notequal_i32_r
+  (lambda (b:i32 a:Rational)
+    (rat_notequal_r_r (Rat (i32toi64 b) 1) a)))
+
+(bind-func rat_notequal_r_i8
+  (lambda (a:Rational b:i8)
+    (rat_notequal_r_r a (Rat (i8toi64 b) 1))))
+
+(bind-func rat_notequal_i8_r
+  (lambda (b:i8 a:Rational)
+    (rat_notequal_r_r (Rat (i8toi64 b) 1) a)))
+
+(bind-func rat_notequal_r_i1
+  (lambda (a:Rational b:i1)
+    (rat_notequal_r_r a (Rat (i1toi64 b) 1))))
+
+(bind-func rat_notequal_i1_r
+  (lambda (b:i1 a:Rational)
+    (rat_notequal_r_r (Rat (i1toi64 b) 1) a)))
+
+(bind-poly xtm_notequal rat_notequal_r_r)
+(bind-poly xtm_notequal rat_notequal_r_i64)
+(bind-poly xtm_notequal rat_notequal_i64_r)
+(bind-poly xtm_notequal rat_notequal_r_i32)
+(bind-poly xtm_notequal rat_notequal_i32_r)
+(bind-poly xtm_notequal rat_notequal_r_i8)
+(bind-poly xtm_notequal rat_notequal_i8_r)
+(bind-poly xtm_notequal rat_notequal_r_i1)
+(bind-poly xtm_notequal rat_notequal_i1_r)
+
+;; Rational lessthan
+
+(bind-func rat_lessthan_r_r
+  (lambda (a:Rational b:Rational)
+    (< (* (tref a 0) (tref b 1))
+       (* (tref b 0) (tref a 1)))))
+
+(bind-func rat_lessthan_r_i64
+  (lambda (a:Rational b:i64)
+    (< (tref a 0) (* b (tref a 1)))))
+
+(bind-func rat_lessthan_i64_r
+  (lambda (b:i64 a:Rational)
+    (< (tref a 0) (* b (tref a 1)))))
+
+(bind-func rat_lessthan_r_i32
+  (lambda (a:Rational b:i32)
+    (< (tref a 0) (* (i32toi64 b) (tref a 1)))))
+
+(bind-func rat_lessthan_i32_r
+  (lambda (b:i32 a:Rational)
+    (< (tref a 0) (* (i32toi64 b) (tref a 1)))))
+
+(bind-func rat_lessthan_r_i8
+  (lambda (a:Rational b:i8)
+    (< (tref a 0) (* (i8toi64 b) (tref a 1)))))
+
+(bind-func rat_lessthan_i8_r
+  (lambda (b:i8 a:Rational)
+    (< (tref a 0) (* (i8toi64 b) (tref a 1)))))
+
+(bind-func rat_lessthan_r_i1
+  (lambda (a:Rational b:i1)
+    (< (tref a 0) (* (i1toi64 b) (tref a 1)))))
+
+(bind-func rat_lessthan_i1_r
+  (lambda (b:i1 a:Rational)
+    (< (tref a 0) (* (i1toi64 b) (tref a 1)))))
+
+(bind-poly xtm_lessthan rat_lessthan_r_r)
+(bind-poly xtm_lessthan rat_lessthan_r_i64)
+(bind-poly xtm_lessthan rat_lessthan_i64_r)
+(bind-poly xtm_lessthan rat_lessthan_r_i32)
+(bind-poly xtm_lessthan rat_lessthan_i32_r)
+(bind-poly xtm_lessthan rat_lessthan_r_i8)
+(bind-poly xtm_lessthan rat_lessthan_i8_r)
+(bind-poly xtm_lessthan rat_lessthan_r_i1)
+(bind-poly xtm_lessthan rat_lessthan_i1_r)
+
+;; Rational greaterthan
+
+(bind-func rat_greaterthan_r_r
+  (lambda (a:Rational b:Rational)
+    (> (* (tref a 0) (tref b 1))
+       (* (tref b 0) (tref a 1)))))
+
+(bind-func rat_greaterthan_r_i64
+  (lambda (a:Rational b:i64)
+    (> (tref a 0) (* b (tref a 1)))))
+
+(bind-func rat_greaterthan_i64_r
+  (lambda (b:i64 a:Rational)
+    (> (tref a 0) (* b (tref a 1)))))
+
+(bind-func rat_greaterthan_r_i32
+  (lambda (a:Rational b:i32)
+    (> (tref a 0) (* (i32toi64 b) (tref a 1)))))
+
+(bind-func rat_greaterthan_i32_r
+  (lambda (b:i32 a:Rational)
+    (> (tref a 0) (* (i32toi64 b) (tref a 1)))))
+
+(bind-func rat_greaterthan_r_i8
+  (lambda (a:Rational b:i8)
+    (> (tref a 0) (* (i8toi64 b) (tref a 1)))))
+
+(bind-func rat_greaterthan_i8_r
+  (lambda (b:i8 a:Rational)
+    (> (tref a 0) (* (i8toi64 b) (tref a 1)))))
+
+(bind-func rat_greaterthan_r_i1
+  (lambda (a:Rational b:i1)
+    (> (tref a 0) (* (i1toi64 b) (tref a 1)))))
+
+(bind-func rat_greaterthan_i1_r
+  (lambda (b:i1 a:Rational)
+    (> (tref a 0) (* (i1toi64 b) (tref a 1)))))
+
+(bind-poly xtm_greaterthan rat_greaterthan_r_r)
+(bind-poly xtm_greaterthan rat_greaterthan_r_i64)
+(bind-poly xtm_greaterthan rat_greaterthan_i64_r)
+(bind-poly xtm_greaterthan rat_greaterthan_r_i32)
+(bind-poly xtm_greaterthan rat_greaterthan_i32_r)
+(bind-poly xtm_greaterthan rat_greaterthan_r_i8)
+(bind-poly xtm_greaterthan rat_greaterthan_i8_r)
+(bind-poly xtm_greaterthan rat_greaterthan_r_i1)
+(bind-poly xtm_greaterthan rat_greaterthan_i1_r)
+
+;;;;;;; OLD COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; xtlang's complex number types and helper functions
+;; These are in here for compatibility, you should use the
+;; Complex type these days (see above).  It's much nicer.
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
