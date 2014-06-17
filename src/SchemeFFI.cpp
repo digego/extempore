@@ -2068,10 +2068,8 @@ namespace extemp {
 	const char* tmp_name = ss.str().c_str();
 
 	if(func->getReturnType()->isStructTy()) {
-          std::cout << "TMPNAMAA: " << tmp_name << std::endl;
 	  rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
 	  tmp_name = tmp_str_a;
-          std::cout << "TMPNAMAB: " << tmp_name << std::endl;	
 	}
 
 	pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
