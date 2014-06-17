@@ -1043,10 +1043,10 @@
     (if (< b 0)
         (begin (set! a (* -1 a))
                (set! b (* -1 b))))
-    (let ((r:<i64,i64>* (salloc)))
+    (let ((r:Rational* (salloc)))
       (tset! r 0 a)
       (tset! r 1 b)
-      (pref (cast r Rational*) 0))))
+      (pref r 0))))
 
 (bind-func rat_greatest_common_divisor
   (lambda (m:i64 n:i64)
@@ -1559,6 +1559,272 @@
 (bind-poly xtm_greaterthan rat_greaterthan_i8_r)
 (bind-poly xtm_greaterthan rat_greaterthan_r_i1)
 (bind-poly xtm_greaterthan rat_greaterthan_i1_r)
+
+;;;;;;;;;; COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; xtlang's complex number types and helper functions
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Complex (double versions)
+
+(bind-type Complex <double,double>)
+
+(bind-func print_Complex
+  (lambda (c:Complex)
+    (printf "%.2f+%.2fi"
+            (tref c 0)
+            (tref c 1))
+    void))
+
+(bind-poly print print_Complex)
+
+(bind-func Cpx
+  (lambda (re im)
+    (let ((c:Complex* (salloc)))
+      (tset! c 0 re)
+      (tset! c 1 im)
+      (pref c 0))))
+
+(bind-func Cpx_addition_c_c
+  (lambda (a:Complex b:Complex)
+    (pref (Complex (+ (tref a 0) (tref b 0))
+                   (+ (tref a 1) (tref b 1)))
+          0)))
+
+(bind-func Cpx_addition_c_d
+  (lambda (a:Complex b:double)
+    (pref (Complex (+ (tref a 0) b)
+                   (tref a 1))
+          0)))
+
+(bind-func Cpx_addition_d_c
+  (lambda (b:double a:Complex)
+    (pref (Complex (+ (tref a 0) b)
+                   (tref a 1))
+          0)))
+
+(bind-poly xtm_addition Cpx_addition_c_c)
+(bind-poly xtm_addition Cpx_addition_c_d)
+(bind-poly xtm_addition Cpx_addition_d_c)
+
+(bind-func Cpx_subtraction_c_c
+  (lambda (a:Complex b:Complex)
+    (pref (Complex (- (tref a 0) (tref b 0))
+                   (- (tref a 1) (tref b 1)))
+          0)))
+
+(bind-func Cpx_subtraction_c_d
+  (lambda (a:Complex b:double)
+    (pref (Complex (- (tref a 0) b)
+                   (tref a 1))
+          0)))
+
+(bind-func Cpx_subtraction_d_c
+  (lambda (b:double a:Complex)
+    (pref (Complex (- (tref a 0) b)
+                   (tref a 1))
+          0)))
+
+(bind-poly xtm_subtraction Cpx_subtraction_c_c)
+(bind-poly xtm_subtraction Cpx_subtraction_c_d)
+(bind-poly xtm_subtraction Cpx_subtraction_d_c)
+
+(bind-func Cpx_multiplication_c_c
+  (lambda (a:Complex b:Complex)
+    (pref (Complex (- (* (tref a 0) (tref b 0))
+                      (* (tref a 1) (tref b 1)))             
+                   (+ (* (tref a 0) (tref b 1))
+                      (* (tref a 1) (tref b 0))))
+          0)))
+
+(bind-func Cpx_multiplication_c_d
+  (lambda (a:Complex b:double)
+    (pref (Complex (- (* (tref a 0) b)
+                      (tref a 1))             
+                   (+ (tref a 0)
+                      (* (tref a 1) b)))
+          0)))
+
+(bind-func Cpx_multiplication_d_c
+  (lambda (b:double a:Complex)
+    (pref (Complex (- (* (tref a 0) b)
+                      (tref a 1))             
+                   (+ (tref a 0)
+                      (* (tref a 1) b)))
+          0)))
+
+(bind-poly xtm_multiplication Cpx_multiplication_c_c)
+(bind-poly xtm_multiplication Cpx_multiplication_c_d)
+(bind-poly xtm_multiplication Cpx_multiplication_d_c)
+
+(bind-func Cpx_division_c_c
+  (lambda (a:Complex b:Complex)
+    (let ((i (+ (* (tref a 0) (tref b 0))
+                (* (tref a 1) (tref b 1))))
+          (j (+ (* (tref b 0) (tref b 0))
+                (* (tref b 1) (tref b 1))))
+          (k (- (* (tref a 1) (tref b 0))
+                (* (tref a 0) (tref b 1)))))
+      (pref (Complex (/ i j)
+                     (/ k j))
+            0))))
+
+(bind-func Cpx_division_c_d
+  (lambda (a:Complex b:double)
+    (let ((i (+ (* (tref a 0) b)
+                (tref a 1)))
+          (j (* b b))
+          (k (- (* (tref a 1) b)
+                (tref a 0) )))
+      (pref (Complex (/ i j)
+                     (/ k j))
+            0))))
+
+(bind-func Cpx_division_d_c
+  (lambda (b:double a:Complex)
+    (let ((i (+ (* (tref a 0) b)
+                (tref a 1)))
+          (j (* b b))
+          (k (- (* (tref a 1) b)
+                (tref a 0) )))
+      (pref (Complex (/ i j)
+                     (/ k j))
+            0))))
+
+(bind-poly xtm_division Cpx_division_c_c)
+(bind-poly xtm_division Cpx_division_c_d)
+(bind-poly xtm_division Cpx_division_d_c)
+
+;; Complexf (float versions)
+
+(bind-type Complexf <float,float>)
+
+(bind-func Cpxf
+  (lambda (re im)
+    (let ((c:Complexf* (salloc)))
+      (tset! c 0 re)
+      (tset! c 1 im)
+      (pref c 0))))
+
+(bind-func print_Complexf
+  (lambda (c:Complexf)
+    (printf "%f+%fi\n"
+            (tref c 0)
+            (tref c 1))
+    void))
+
+(bind-poly print print_Complexf)
+
+(bind-func Cpxf_addition_c_c
+  (lambda (a:Complexf b:Complexf)
+    (pref (Complexf (+ (tref a 0) (tref b 0))
+                    (+ (tref a 1) (tref b 1)))
+          0)))
+
+(bind-func Cpxf_addition_c_d
+  (lambda (a:Complexf b:float)
+    (pref (Complexf (+ (tref a 0) b)
+                    (tref a 1))
+          0)))
+
+(bind-func Cpxf_addition_d_c
+  (lambda (b:float a:Complexf)
+    (pref (Complexf (+ (tref a 0) b)
+                    (tref a 1))
+          0)))
+
+(bind-poly xtm_addition Cpxf_addition_c_c)
+(bind-poly xtm_addition Cpxf_addition_c_d)
+(bind-poly xtm_addition Cpxf_addition_d_c)
+
+(bind-func Cpxf_subtraction_c_c
+  (lambda (a:Complexf b:Complexf)
+    (pref (Complexf (- (tref a 0) (tref b 0))
+                    (- (tref a 1) (tref b 1)))
+          0)))
+
+(bind-func Cpxf_subtraction_c_d
+  (lambda (a:Complexf b:float)
+    (pref (Complexf (- (tref a 0) b)
+                    (tref a 1))
+          0)))
+
+(bind-func Cpxf_subtraction_d_c
+  (lambda (b:float a:Complexf)
+    (pref (Complexf (- (tref a 0) b)
+                    (tref a 1))
+          0)))
+
+(bind-poly xtm_subtraction Cpxf_subtraction_c_c)
+(bind-poly xtm_subtraction Cpxf_subtraction_c_d)
+(bind-poly xtm_subtraction Cpxf_subtraction_d_c)
+
+(bind-func Cpxf_multiplication_c_c
+  (lambda (a:Complexf b:Complexf)
+    (pref (Complexf (- (* (tref a 0) (tref b 0))
+                       (* (tref a 1) (tref b 1)))             
+                    (+ (* (tref a 0) (tref b 1))
+                       (* (tref a 1) (tref b 0))))
+          0)))
+
+(bind-func Cpxf_multiplication_c_d
+  (lambda (a:Complexf b:float)
+    (pref (Complexf (- (* (tref a 0) b)
+                       (tref a 1))             
+                    (+ (tref a 0)
+                       (* (tref a 1) b)))
+          0)))
+
+(bind-func Cpxf_multiplication_d_c
+  (lambda (b:float a:Complexf)
+    (pref (Complexf (- (* (tref a 0) b)
+                       (tref a 1))             
+                    (+ (tref a 0)
+                       (* (tref a 1) b)))
+          0)))
+
+(bind-poly xtm_multiplication Cpxf_multiplication_c_c)
+(bind-poly xtm_multiplication Cpxf_multiplication_c_d)
+(bind-poly xtm_multiplication Cpxf_multiplication_d_c)
+
+(bind-func Cpxf_division_c_c
+  (lambda (a:Complexf b:Complexf)
+    (let ((i (+ (* (tref a 0) (tref b 0))
+                (* (tref a 1) (tref b 1))))
+          (j (+ (* (tref b 0) (tref b 0))
+                (* (tref b 1) (tref b 1))))
+          (k (- (* (tref a 1) (tref b 0))
+                (* (tref a 0) (tref b 1)))))
+      (pref (Complexf (/ i j)
+                      (/ k j))
+            0))))
+
+(bind-func Cpxf_division_c_d
+  (lambda (a:Complexf b:float)
+    (let ((i (+ (* (tref a 0) b)
+                (tref a 1)))
+          (j (* b b))
+          (k (- (* (tref a 1) b)
+                (tref a 0) )))
+      (pref (Complexf (/ i j)
+                      (/ k j))
+            0))))
+
+(bind-func Cpxf_division_d_c
+  (lambda (b:float a:Complexf)
+    (let ((i (+ (* (tref a 0) b)
+                (tref a 1)))
+          (j (* b b))
+          (k (- (* (tref a 1) b)
+                (tref a 0) )))
+      (pref (Complexf (/ i j)
+                      (/ k j))
+            0))))
+
+(bind-poly xtm_division Cpxf_division_c_c)
+(bind-poly xtm_division Cpxf_division_c_d)
+(bind-poly xtm_division Cpxf_division_d_c)
 
 ;;;;;;; OLD COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
