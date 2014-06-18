@@ -263,7 +263,6 @@
 
 (define impc:compiler:print-type-mismatch-error
   (lambda (got expected . name)
-    
     (if *impc:compiler:top-level-generic-error*
         (begin
           (set! name (list (car *impc:compiler:top-level-generic-error*)))))
@@ -280,16 +279,15 @@
                (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
                                   (print  (car name)))
                (print ",")))
-
     (print " got " )
-    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (impc:ir:pretty-print-type got)))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (impc:ir:pretty-print-type (if (impc:ir:type? got) (impc:ir:get-type-from-str got) got))))
     (print ", was expecting ")
     (if (and (list? expected)
-	     (= 1 (length expected)))
-	(set! expected (car expected)))
+             (= 1 (length expected)))
+        (set! expected (car expected)))
     
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f
-		       (print (impc:ir:pretty-print-type expected) "\n"))
+                       (print (impc:ir:pretty-print-type expected) "\n"))
 
     (if *impc:compiler:top-level-generic-error*
         (set! *impc:compiler:top-level-generic-error* #f))
