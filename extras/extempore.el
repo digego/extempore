@@ -1251,6 +1251,14 @@ command to run."
       (goto-char (point-min))
       (while (search-forward-regexp "^Compiled:  \\(.*\\) >>> \\(.*\\)$" nil t)
         (replace-match (concat "(bind-lib-func " libname " \\1 \\2)") t))
+      ;; bind-type
+      (goto-char (point-min))
+      (while (search-forward-regexp "^DataType:  \\(.*\\) >>> \\(.*\\)$" nil t)
+        (replace-match (concat "(bind-type \\1 \\2)") t))
+      ;; bind-poly
+      (goto-char (point-min))
+      (while (search-forward-regexp "^Overload:  \\(.*\\) \\(.*\\) >>> \\(.*\\)$" nil t)
+        (replace-match (concat "(bind-poly \\1 \\2)") t))
       ;; bind-alias (and replace aliases in output)
       (goto-char (point-min))
       (while (search-forward-regexp "^SetAlias:  \\(.*\\) >>> \\(.*\\)$" nil t)
@@ -1260,6 +1268,11 @@ command to run."
           (save-excursion
             (while (search-forward-regexp (format "\\<%s\\>" alias) nil t)
               (replace-match value t)))))
+      ;; remove scheme stub lines
+      (goto-char (point-min))
+      (while (search-forward-regexp "^There is no scheme stub available for.*\n" nil t)
+        (replace-match (concat "") t))
+      ;; finish up
       (kill-region (point-min)
                    (point-max))
       (message "Processed output copied to kill ring."))))
