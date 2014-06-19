@@ -838,7 +838,11 @@
                         (impc:ti:first-transform (impc:ti:tuple ast) inbody?))     
                        ((eq? (car ast) 'not)
                         (impc:ti:first-transform (impc:ti:not (cadr ast)) inbody?))
-		       ((and (member (car ast) *impc:mathbinaryaritylist*) ;; '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
+                       ((member (car ast) '(callback schedule))
+                        `(memzone (* 1024 8) (+ (- ,(impc:ti:first-transform (cadr ast) inbody?) (llvm_now)) (* ,*au:samplerate* 10))
+                                  (begin ,(cons 'callback (impc:ti:first-transform (cdr ast) inbody?)))))
+                       
+                       ((and (member (car ast) *impc:mathbinaryaritylist*) ;; '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
                              (<> (length ast) 3))
                         (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
 		       ((member (car ast) '(bitwise-not ~))
@@ -3105,29 +3109,62 @@
              returns)))))
 
 
+;; (define impc:ti:callback-check
+;;    (lambda (ast vars kts request?)
+;;       ;(println 'callback-check 'ast: ast 'vars: vars 'request: request?)
+;;       (let ((ftype (map impc:ir:get-type-from-str
+;;                         (let ((ags (llvm:get-function-args-withoutzone (symbol->string (caddr ast)))))
+;; 			  (if ags ags '())))))
+;; 	;(println 'ftype: ftype)
+;; 	(if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
+;; 	(if (null? ftype)
+;; 	    (begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
+;; 		   (impc:ti:type-check (cddr ast) vars kts '())
+;; 		   (list *impc:ir:void*))
+;; 	    (begin (if (<> (+ 2 (length ftype))
+;; 			   (length ast))
+;; 		       (impc:compiler:print-compiler-error "bad arity in call" ast))
+;; 		   ;; we don't care what we get back
+;; 		   (for-each (lambda (a t)
+;; 			       (if (symbol? a) (impc:ti:update-var a vars kts t))
+;; 			       (impc:ti:type-check a vars kts t))
+;; 			     (cdddr ast)
+;; 			     (cdr ftype))
+;; 		   ;; callback returns void	 
+;; 		   (list *impc:ir:void*))))))
+
 (define impc:ti:callback-check
-   (lambda (ast vars kts request?)
-      ;(println 'callback-check 'ast: ast 'vars: vars 'request: request?)
-      (let ((ftype (map impc:ir:get-type-from-str
-                        (let ((ags (llvm:get-function-args-withoutzone (symbol->string (caddr ast)))))
-			  (if ags ags '())))))
-	;(println 'ftype: ftype)
-	(if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
-	(if (null? ftype)
-	    (begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
-		   (impc:ti:type-check (cddr ast) vars kts '())
-		   (list *impc:ir:void*))
-	    (begin (if (<> (+ 2 (length ftype))
-			   (length ast))
-		       (impc:compiler:print-compiler-error "bad arity in call" ast))
-		   ;; we don't care what we get back
-		   (for-each (lambda (a t)
-			       (if (symbol? a) (impc:ti:update-var a vars kts t))
-			       (impc:ti:type-check a vars kts t))
-			     (cdddr ast)
-			     (cdr ftype))
-		   ;; callback returns void	 
-		   (list *impc:ir:void*))))))
+  (lambda (ast vars kts request?)
+    ;;(println 'callback-check 'ast: ast 'vars: vars 'request: request?)
+    (let ((ftype (map impc:ir:get-type-from-str
+                      (let ((ags (llvm:get-function-args-withoutzone (symbol->string (caddr ast)))))
+                        (if ags ags '())))))
+      (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
+      (if (null? ftype)
+          (begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
+                 (let ((fargs (cons 213
+                                    (cons -1
+                                          (map (lambda (a)                        
+                                                 (impc:ti:type-check a vars kts '()))
+                                               (cdddr ast))))))
+                   (if (and (assoc (caddr ast) vars)
+                            (null? (cdr (assoc (caddr ast) vars))))
+                       (impc:ti:update-var  (caddr ast) vars kts fargs)))
+                 (list *impc:ir:void*))
+          (begin (if (<> (+ 2 (length ftype))
+                         (length ast))
+                     (impc:compiler:print-compiler-error "bad arity in call" ast))
+                 (if (and (assoc (caddr ast) vars)
+                          (null? (cdr (assoc (caddr ast) vars))))
+                     (impc:ti:update-var (caddr ast) vars kts (cons 213 ftype)))
+                 ;; we don't care what we get back
+                 (for-each (lambda (a t)
+                             (if (symbol? a) (impc:ti:update-var a vars kts t))
+                             (impc:ti:type-check a vars kts t))
+                           (cdddr ast)
+                           (cdr ftype))
+                 ;; callback returns void	 
+                 (list *impc:ir:void*))))))
 
 
 (define impc:ti:push_zone-check
@@ -5265,7 +5302,10 @@
 								     (cdr stub-type)
 								     '("%ap" "%bp" "%cp" "%dp" "%ep" "%fp" "%gp" "%hp" "%ip" "%jp" "%kp" "%lp" "%mp" "%np" "%op" "%pp" "%qp" "%rp" "%sp" "%tp")
 								     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
-					   "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+					   ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+             "%_zone = call ccc %mzone* @llvm_threads_get_callback_zone()\n"
+             "call ccc void @llvm_push_zone_stack(%mzone* %_zone)\n"
+             "call ccc %mzone* @llvm_zone_reset(%mzone* %_zone)\n"
 					   "%_impz = bitcast %mzone* %_zone to i8*\n"
 					   "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
 					   "%ptrvar = load i8** %ptr\n"
@@ -5285,8 +5325,10 @@
 										      (impc:ir:get-type-str t) 
 										      " " n))
 								     (cdr stub-type)
-								     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
-					   ")\nret void\n" 
+								     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))             
+					   ")\n"
+             "call ccc %mzone* @llvm_pop_zone_stack()\n"             
+             "ret void\n" 
 					   "}\n")))
 		(fstub_scheme_valid #t) 
                 (fstub_scheme (string-append "define ccc i8* " ;(impc:ir:get-type-str (car stub-type))
@@ -5776,12 +5818,80 @@
                 (impc:ir:pretty-print-type ,(symbol->string symbol)) ; (llvm:get-named-type ,(symbol->string symbol))))
                 ))))
 
+;; (define build-type-dataconstructor
+;;   (lambda (name type generic . args)
+;;     ;; (println 'build-data-construct name type generic)
+;;     (if (or (not (string? type)) ;; if not already a pretty type
+;;             (regex:match? type "^\\s*{"))
+;;         (set! type (impc:ir:pretty-print-type type)))
+;;     (let* ((a (impc:ir:get-pretty-tuple-arg-strings type))
+;;            (compiler-suppress-on (if (equal? *impc:compiler:message:level* 'low) #f #t))
+;;            (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
+;;            (arglst2 *impc:alphabetidxlist*) ;; '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
+;;            (namestr (symbol->string name))
+;;            (ctype (string-append "["
+;;                                  (if generic
+;;                                      (apply string-append namestr ":" type "*"
+;;                                             (map (lambda (x)
+;;                                                    (string-append
+;;                                                     ","
+;;                                                     (regex:replace x
+;;                                                                    (string-append namestr "([*]*)")
+;;                                                                    (string-append namestr ":" type "$1"))))
+;;                                                  a))
+;;                                      (apply string-append (symbol->string name) "*"
+;;                                             (map (lambda (x) (string-append "," x)) a)))
+;;                                  "]*"))
+;;            (nameandtype (string->symbol (string-append namestr "" ":" ctype)))
+;;            (print_name (string->symbol (string-append namestr "_print" ":[void," (symbol->string name) "*]*")))
+;;            (h_nameandtype (string->symbol (string-append namestr "_h" ":" ctype)))
+;;            (argslist (map (lambda (a b) b) a arglst1)) 
+;;            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
+;;       ;; (println 'dataconstructor: 'name: name 'type: type)
+;;       (suppress-compiler-messages #t)
+;;       ;; (if (not generic)
+;;       ;;     (begin
+;;       ;;       (eval `(bind-func ,print_name
+;;       ;;                (lambda (x)
+;;       ;;                  (printout
+;;       ;;                   ,(if (regex:match? namestr "--")
+;;       ;;                        ;; (if *impc:ti:print-full-generic-types*
+;;       ;;                        ;; (impc:ir:pretty-print-type namestr)
+;;       ;;                        (string-append "!" "" (car (regex:type-split namestr "--")))
+;;       ;;                        namestr)
+;;       ;;                   ":<"
+;;       ;;                   ,(list 'tref 'x 0)
+;;       ;;                   ,@(impc:ti:flatten-1 (map (lambda (y z) (list "," (list 'tref 'x (+ 1 z)))) (cdr a) arglst2))
+;;       ;;                   ">")
+;;       ;;                  void))
+;;       ;;             (interaction-environment))
+;;       ;;       (eval `(bind-poly print ,(string->symbol (string-append namestr "_print")))
+;;       ;;             (interaction-environment))))
+;;       (eval `(bind-func ,nameandtype
+;;                (lambda ,argslist
+;;                  (let ((obj (zalloc)))
+;;                    ,@body
+;;                    obj)))
+;;             (interaction-environment))      
+;;       (eval `(bind-func ,h_nameandtype
+;;                (lambda ,argslist
+;;                  (let ((obj (halloc)))
+;;                    ,@body
+;;                    obj)))
+;;             (interaction-environment))
+;;       (if compiler-suppress-on
+;;           (suppress-compiler-messages #f)
+;;           'donothing))))
+
 (define build-type-dataconstructor
   (lambda (name type generic . args)
     ;; (println 'build-data-construct name type generic)
     (if (or (not (string? type)) ;; if not already a pretty type
             (regex:match? type "^\\s*{"))
         (set! type (impc:ir:pretty-print-type type)))
+    (let ((p (regex:type-split (symbol->string name) "--")))
+      (if (not (null? (cdr p)))
+          (set! type (regex:replace-all type (string-append (car p) "\\*") (string-append (symbol->string name) "*")))))
     (let* ((a (impc:ir:get-pretty-tuple-arg-strings type))
            (compiler-suppress-on (if (equal? *impc:compiler:message:level* 'low) #f #t))
            (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
@@ -5803,28 +5913,26 @@
            (nameandtype (string->symbol (string-append namestr "" ":" ctype)))
            (print_name (string->symbol (string-append namestr "_print" ":[void," (symbol->string name) "*]*")))
            (h_nameandtype (string->symbol (string-append namestr "_h" ":" ctype)))
-           (argslist (map (lambda (a b) b) a arglst1)) 
+           (argslist (map (lambda (a b) b) a arglst1))
+           (hcopy_body (map (lambda (a b c)
+                              (if (impc:ir:tuple? (impc:ir:get-type-from-pretty-str a))
+                                 `(if (not (null? (tref x ,c)))
+                                      (tset! obj ,b (,(string->symbol (string-append (impc:ir:get-base-type a) "_hcopy")) (tref x ,c))))
+                                 `(tset! obj ,b (tref x ,c))))
+                           a arglst2 (range (length a))))
+           (hfree_body (map (lambda (a c)
+                              (if (impc:ir:tuple? (impc:ir:get-type-from-pretty-str a))
+                                  `(if (not (null? (tref x ,c)))
+                                       (,(string->symbol (string-append (impc:ir:get-base-type a) "_hfree")) (tref x ,c)))))
+                            a (range (length a))))
+           (zcopy_body (map (lambda (a b c)
+                             (if (impc:ir:tuple? (impc:ir:get-type-from-pretty-str a))
+                                 `(if (not (null? (tref x ,c)))
+                                      (tset! obj ,b (,(string->symbol (string-append (impc:ir:get-base-type a) "_zcopy")) (tref x ,c))))
+                                 `(tset! obj ,b (tref x ,c))))
+                           a arglst2 (range (length a))))
            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
-      ;; (println 'dataconstructor: 'name: name 'type: type)
       (suppress-compiler-messages #t)
-      ;; (if (not generic)
-      ;;     (begin
-      ;;       (eval `(bind-func ,print_name
-      ;;                (lambda (x)
-      ;;                  (printout
-      ;;                   ,(if (regex:match? namestr "--")
-      ;;                        ;; (if *impc:ti:print-full-generic-types*
-      ;;                        ;; (impc:ir:pretty-print-type namestr)
-      ;;                        (string-append "!" "" (car (regex:type-split namestr "--")))
-      ;;                        namestr)
-      ;;                   ":<"
-      ;;                   ,(list 'tref 'x 0)
-      ;;                   ,@(impc:ti:flatten-1 (map (lambda (y z) (list "," (list 'tref 'x (+ 1 z)))) (cdr a) arglst2))
-      ;;                   ">")
-      ;;                  void))
-      ;;             (interaction-environment))
-      ;;       (eval `(bind-poly print ,(string->symbol (string-append namestr "_print")))
-      ;;             (interaction-environment))))
       (eval `(bind-func ,nameandtype
                (lambda ,argslist
                  (let ((obj (zalloc)))
@@ -5837,9 +5945,36 @@
                    ,@body
                    obj)))
             (interaction-environment))
+      (if (not generic)
+          (begin
+            (eval `(bind-func ,(string->symbol (string-append namestr "_hcopy:[" namestr "*," namestr "*]*"))
+                     (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                       (let ((obj (halloc)))
+                         ,@hcopy_body
+                         obj)))
+                  (interaction-environment))
+            (eval `(bind-poly hcopy ,(string->symbol (string-append namestr "_hcopy")))
+                  (interaction-environment))
+            (eval `(bind-func ,(string->symbol (string-append namestr "_hfree:[void," namestr "*]*"))
+                     (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                       ,@hfree_body
+                       (free x)
+                       void))
+                  (interaction-environment))
+            (eval `(bind-poly hfree ,(string->symbol (string-append namestr "_hfree")))
+                  (interaction-environment))
+            (eval `(bind-func ,(string->symbol (string-append namestr "_zcopy:[" namestr "*," namestr "*]*"))
+                     (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                       (let ((obj (zalloc)))
+                         ,@zcopy_body
+                         obj)))
+                  (interaction-environment))
+            (eval `(bind-poly zcopy ,(string->symbol (string-append namestr "_zcopy")))
+                  (interaction-environment))))
       (if compiler-suppress-on
           (suppress-compiler-messages #f)
           'donothing))))
+
 
 (define-macro (bind-type symbol type)
   (if *impc:compiler:precomp-llvm*

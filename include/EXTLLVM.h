@@ -53,6 +53,7 @@ typedef struct _llvm_callback_struct_ {
 
 extern "C"
 {
+llvm_zone_t* llvm_threads_get_callback_zone();
 const char*  llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
 void llvm_runtime_error(int error, void* arg);

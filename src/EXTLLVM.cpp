@@ -182,14 +182,44 @@ typedef struct llvm_zone_stack
 #ifdef EXT_BOOST
 std::map<boost::thread::id,llvm_zone_stack*> LLVM_ZONE_STACKS;
 std::map<boost::thread::id,uint64_t> LLVM_ZONE_STACKSIZES;
+std::map<boost::thread::id,llvm_zone_t*> LLVM_CALLBACK_ZONES;
 #else
 std::map<long,llvm_zone_stack*> LLVM_ZONE_STACKS;
 std::map<long,uint64_t> LLVM_ZONE_STACKSIZES;
+std::map<uint64_t,llvm_zone_t*> LLVM_CALLBACK_ZONES;
 #endif
 
 int LLVM_ZONE_ALIGN = 16;
 int LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN-1;
 
+// this is going to cause concurrency problems at some stage.
+// you really need to FIX IT!
+llvm_zone_t* llvm_threads_get_callback_zone()
+{
+  llvm_zone_t* zone = 0;
+#ifdef EXT_BOOST
+  zone = LLVM_CALLBACK_ZONES[boost::this_thread::get_id()];
+  if(!zone) {
+    zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
+    LLVM_CALLBACK_ZONES[boost::this_thread::get_id()] = zone;
+  }
+#elif TARGET_OS_MAC
+  mach_port_t tid = pthread_mach_thread_np(pthread_self());  
+  zone = LLVM_CALLBACK_ZONES[(long)tid];
+  if(!zone) {
+    zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
+    LLVM_CALLBACK_ZONES[(long)tid] = zone;
+  }  
+#else
+  pid_t tid = (pid_t) syscall (SYS_gettid);
+  zone = LLVM_CALLBACK_ZONES[(long)tid];
+  if(!zone) {
+    zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
+    LLVM_CALLBACK_ZONES[(long)tid] = zone;
+  }
+#endif
+  return zone;
+}
 
 // this is going to cause concurrency problems at some stage.
 // you really need to FIX IT!
@@ -352,7 +382,7 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone)
     zone->offset = 0;
     return zone;
 }
- 
+
 void llvm_zone_destroy(llvm_zone_t* zone)
 {
 #if DEBUG_ZONE_ALLOC  
@@ -1433,7 +1463,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_runtime_error);
 
 	    gv = M->getNamedValue(std::string("llvm_send_udp"));
-	    EE->updateGlobalMapping(gv,(void*)&llvm_send_udp);	  
+	    EE->updateGlobalMapping(gv,(void*)&llvm_send_udp);
+
+	    gv = M->getNamedValue(std::string("llvm_threads_get_callback_zone"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_threads_get_callback_zone); 	
 
 	    gv = M->getNamedValue(std::string("llvm_schedule_callback"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_schedule_callback); 	
