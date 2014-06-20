@@ -18,78 +18,6 @@
 
 (define *xtm_start_compile_time* (now))
 
-(bind-func command
-  (lambda (cmd:i8*)
-    (system cmd)))
-
-(bind-func get_llvm_path
-  (lambda ()
-    (getenv "EXT_LLVM_DIR")))
-
-(bind-func check_build_generic
-  (lambda ()
-    (getenv "EXT_BUILD_GENERIC")))
-
-;; check for EXT_LLVM_DIR
-(if (string=? "" (cptr->string (get_llvm_path)))
-    (print-error 'You 'must 'set 'EXT_LLVM_DIR! 'before 'calling 'create-stlib.xtm))
-
-(begin
-  (print-with-colors 'green 'default #t
-                     (print (string-append "\n\nCompiling xtlang stdlib"
-                                           (if (string=? "1" (cptr->string (check_build_generic)))
-                                               " for binary distribution" "")
-                                           "...\n\n\n"))))
-
-(define llvm-compile-xtlang-module
-  (lambda args
-    (let* ((platform (sys:platform))
-           (basename (if (null? args) "xtlang-module" (car args)))
-           (bitcode-path (string-append "/tmp/" basename ".bc"))
-           (asm-path (string-append "/tmp/" basename ".s"))
-           (shlib-path
-            (cond ((string=? platform "Linux")
-                   (string-append "/tmp/" basename ".so"))
-                  ((string=? platform "OSX")
-                   (string-append "/tmp/" basename ".dylib"))
-                  ((string=? platform "Windows")
-                   (string-append "./" basename ".dll"))
-                  (else "")))
-           (llvm-path (cptr->string (get_llvm_path)))
-           (build-generic
-            (string=? "1" (cptr->string (check_build_generic))))
-           (compilation-command
-            (string-append
-             (cptr->string (get_llvm_path))
-             "/bin/llc -O3 -relocation-model=pic -tailcallopt "
-             (if build-generic "-mcpu=generic " "")
-             bitcode-path " && "
-             (cond ((string=? platform "Linux")
-                    "gcc -O3 --shared -g ")
-                   ((string=? platform "OSX")
-                    (string-append "clang -O3 -dynamiclib -undefined dynamic_lookup "
-                                   (if build-generic  "-mmacosx-version-min=10.6 " ""))))
-             (if build-generic " -mtune=generic " "") asm-path
-             " -o " shlib-path "\n")))
-      (if (string=? platform "Windows")
-          (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
-      (if (string=? "" llvm-path)
-          (print-error 'You 'must 'set 'EXT_LLVM_DIR 'to 'compile 'the 'stdlib)
-          (println 'Looking 'for 'llc 'in (cptr->string (get_llvm_path))))
-      ;; print further instructions
-      (command (string-append "rm /tmp/" basename "*"))
-      (llvm:export-module bitcode-path)
-      (print "compile command:\n " compilation-command "\n\n")
-      (let ((res (command compilation-command)))
-        (if (<> res 0)
-            (print-with-colors 'red 'default #t
-                               (print "Failed to compile stdlib.\n"))
-            (if (= (command (string-append "mv " shlib-path " libs")) 0)
-                (print-with-colors 'green 'default #t
-                                   (print "\nSuccessfully compiled & moved stdlib into libs/ directory \n\n"))
-                (print-with-colors 'red 'default #t
-                                   (print "Error moving " shlib-path " into place in libs/ directory."))))))))
-
 ;;; Code:
 (sys:load "libs/core/math.xtm")
 (sys:load "libs/external/fft.xtm")
@@ -105,7 +33,7 @@
 (sys:load "libs/external/assimp.xtm")
 (sys:load "libs/external/openvg.xtm")
 ;; (println 'done 'loading!)
-(llvm-compile-xtlang-module "xtm")
+(sys:precomp:compile-current-module "xtm")
 
 (println)
 (println 'Total 'Compile 'Time: (* 1.0 (/ (- (now) *xtm_start_compile_time*) *minute*)) 'minutes)

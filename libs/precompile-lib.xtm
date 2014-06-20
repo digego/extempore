@@ -1,0 +1,185 @@
+;;; create-stdlib.xtm -- an Extempore 'script' file for creating the stdlib
+
+;; Author: Andrew Sorensen, Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; This file compiles (and exports) the xtlang code which forms the
+;; standard library. It can be run at Extempore startup through the
+;; --run command line argument, e.g.
+
+;; shell> ./extempore --run libs/create-stdlib.xtm
+
+;; To finish the stdlib compilation process, you'll need to compile
+;; the bitcode in the exported module with llc (the required arguments
+;; will be printed to the Extempore log once the module is exported.
+
+(define *sys:precomp:compile-start-time* (now))
+
+(bind-func command
+  (lambda (cmd:i8*)
+    (system cmd)))
+
+(bind-func get_llvm_path
+  (lambda ()
+    (getenv "EXT_LLVM_DIR")))
+
+(define sys:precomp:compile-current-module
+  (lambda (module-name move-into-place?)
+    (let ((ext-llvm-dir (cptr->string (get_llvm_path))))
+      (if (string=? "" ext-llvm-dir)
+          (print-error 'You 'must 'set 'EXT_LLVM_DIR! 'before 'calling 'create-stlib.xtm))
+      (let* ((platform (sys:platform))
+             (shlib-name (string-append "lib" module-name))
+             (bitcode-path (string-append "/tmp/" shlib-name ".bc"))
+             (asm-path (string-append "/tmp/" shlib-name ".s"))
+             (shlib-path
+              (cond ((string=? platform "Linux")
+                     (string-append "/tmp/" shlib-name ".so"))
+                    ((string=? platform "OSX")
+                     (string-append "/tmp/" shlib-name ".dylib"))
+                    ((string=? platform "Windows")
+                     (string-append "./" shlib-name ".dll"))
+                    (else "")))
+             (compilation-command
+              (string-append
+               ext-llvm-dir
+               "/bin/llc -O3 -relocation-model=pic -tailcallopt "
+               bitcode-path " && "
+               (cond ((string=? platform "Linux")
+                      "gcc -O3 --shared -g ")
+                     ((string=? platform "OSX")
+                      (string-append "clang -O3 -dynamiclib -undefined dynamic_lookup "
+                                     )))
+               asm-path
+               " -o " shlib-path "\n")))
+        (if (string=? platform "Windows")
+            (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
+        (begin (print "Looking for ")
+               (print-with-colors 'green 'default #t (print "llc"))
+               (print " in " ext-llvm-dir "\n"))
+        ;; print further instructions
+        (command (string-append "rm " bitcode-path asm-path shlib-path))
+        (llvm:export-module bitcode-path)
+        (print "compile command:\n " compilation-command "\n\n")
+        (let ((res (command compilation-command)))
+          (if (<> res 0)
+              (print-with-colors 'red 'default #t
+                                 (print "Failed to compile stdlib.\n"))
+              (begin (print "Succesfully compiled ")
+                     (print-with-colors 'green 'default #t (print shlib-path))
+                     (print "\n\n")
+                     (if move-into-place?
+                         (if (= (command (string-append "mv " shlib-path " libs")) 0)
+                             (begin (print "Moved ")
+                                    (print-with-colors 'green 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
+                             (print-with-colors 'red 'default #t
+                                                (print "Error moving " shlib-path " into libs/ directory.")))))))))))
+
+(define sys:precomp:insert-header
+  (lambda (libname)
+    (if (output-port? *sys:precomp:current-output-port*)
+        (begin
+          (display "(suppress-compiler-messages #t)\n(sys:load-preload-check '"
+                   *sys:precomp:current-output-port*)
+          (display libname *sys:precomp:current-output-port*)
+          (display ")\n(define *xtmlib-"
+                   *sys:precomp:current-output-port*)
+          (display libname *sys:precomp:current-output-port*)
+          (display "-loaded* #f)\n(define lib"
+                   *sys:precomp:current-output-port*)
+          (display libname *sys:precomp:current-output-port*)
+          (display " (sys:open-dylib \"libs/lib"
+                   *sys:precomp:current-output-port*)
+          (display libname *sys:precomp:current-output-port*)
+          (display (let ((platform (sys:platform)))
+                     (cond ((string=? platform "Linux") ".so\"))\n")
+                           ((string=? platform "Windows") ".dll\"))\n")
+                           ((string=? platform "OSX") ".dylib\"))\n")))
+                   *sys:precomp:current-output-port*)
+          (display "(print \"Loading \")\n(print-with-colors 'blue 'default #t (print \"" *sys:precomp:current-output-port*)
+          (display libname *sys:precomp:current-output-port*)
+          (display "\"))\n(print \" library...        \")\n"
+                   *sys:precomp:current-output-port*)))))
+
+(define sys:precomp:insert-footer
+  (lambda (libname)
+    (if (output-port? *sys:precomp:current-output-port*)
+        (begin
+          (display "(print-with-colors 'green 'default #t (print \"[DONE]\n\"))\n(define *xtmlib-"
+                   *sys:precomp:current-output-port*)
+          (display libname *sys:precomp:current-output-port*)
+          (display "-loaded* #t)\n(suppress-compiler-messages #f)\n"
+                   *sys:precomp:current-output-port*)
+))))
+
+(define sys:precomp:compile-xtm-file
+  (lambda (lib-path move-into-place? exit-when-done?)
+    ;; is there a better way to check if a file exists?
+    (let ((in-file-port (open-input-file lib-path)))
+      (if (not in-file-port)
+          (begin (print-with-colors 'red 'default #t
+                                    (print "Error:"))
+                 (print " no .xtm file at" lib-path "\n"))
+          (let* ((res (close-port in-file-port))
+                 (basename (car (reverse (regex:split lib-path "/"))))
+                 (libname (car (regex:split basename "[.]")))
+                 (precomp-file-path (string-append "libs/" basename)))
+            (if (not (sys:load-preload-check (string->symbol libname)))
+                (begin (print "Precomp file not written ")
+                       (close-port *sys:precomp:current-output-port*)
+                       (set! *sys:precomp:current-output-port* #f))
+                (begin
+                  ;; if the preload check passes
+                  (set! *sys:precomp:current-output-port* (open-output-file precomp-file-path))
+                  (if *sys:precomp:current-output-port*
+                      (begin
+                        ;; this is the 'success' branch
+                        (set! *sys:precomp:current-lib-name* libname)
+                        (sys:precomp:insert-header libname)
+                        (sys:load lib-path)
+                        (sys:precomp:compile-current-module libname move-into-place?)
+                        (sys:precomp:insert-footer libname)
+                        (close-port *sys:precomp:current-output-port*)
+                        (set! *sys:precomp:current-lib-name* "xtmshlib")
+                        (if  *sys:precomp:current-output-port*
+                             (begin (set! *sys:precomp:current-output-port* #f)
+                                    (print "Successfully wrote precomp file to ")
+                                    (print-with-colors 'green 'default #f (print precomp-file-path "\n")))
+                             (begin (print-with-colors 'red 'default #t (print "Error:"))
+                                    (print " something went wrong in writing the output file ")
+                                    (print-with-colors 'red 'default #t (print precomp-file-path "\n")))))
+                      (begin (print-with-colors 'red 'default #t
+                                                (print "Error:"))
+                             (print " cannot write precomp file at " precomp-file-path "\n"))))))))))
+
+;;; Code:
+(sys:load "libs/core/math.xtm")
+(sys:load "libs/external/fft.xtm")
+(sys:load "libs/core/audio_dsp.xtm")
+(sys:load "libs/core/instruments.xtm")
+(sys:load "libs/external/sndfile.xtm")
+(sys:load "libs/external/instruments_ext.xtm")
+(sys:load "libs/external/audio_dsp_ext.xtm")
+(sys:load "libs/external/rtmidi.xtm")
+(sys:load "libs/external/soil.xtm")
+(sys:load "libs/external/opengl.xtm")
+(sys:load "libs/external/shaders.xtm")
+(sys:load "libs/external/assimp.xtm")
+(sys:load "libs/external/openvg.xtm")
+;; (println 'done 'loading!)
+(sys:precomp:compile-current-module "xtm")
+
+(println)
+(println 'Total 'Compile 'Time: (* 1.0 (/ (- (now) *sys:precomp:compile-start-time*) *minute*)) 'minutes)
+(println)
+;; (println 'sym-name-stack-size: (length *impc:ir:sym-name-stack*))
+(println 'type-aliases: (length *impc:ir:type-aliases*))
+(println 'gpolytypes: (length *impc:ir:gpolytypes*))
+(println 'polytypes: (length *impc:ir:polytypes*))
+(println 'gpolys: (length *impc:ir:gpolys*))
+(println 'polys: (length *impc:ir:polys*))
+(println 'vtypes: (length *impc:ti:vtypes*))
+(println 'gtypemappings: (length *impc:ti:generic-type-mappings*))

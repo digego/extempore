@@ -617,7 +617,8 @@ namespace extemp {
     {
         // This is a seriously nasty HACK!!
         // PLEASE FIX ME!
-        exit(1);
+      int64_t retval = ivalue(pair_car(args));
+      exit(retval);
     }
 
     pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)

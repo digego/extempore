@@ -426,30 +426,87 @@
                        'default #t (print "Compiler Failed."))
     (error "")))
 
+(define *sys:precomp:current-output-port* #f)
+(define *sys:precomp:current-lib-name* "xtmshlib")
+
+(define impc:precomp:no-scm-suffix?
+  (lambda (symname)
+    (let ((tlist (llvm:get-function-args-withoutzone symname)))
+      (member #f
+              (map (lambda (type)
+                     (let ((type-str (impc:ir:get-type-from-pretty-str type)))
+                       (or (impc:ir:void? type-str)
+                           (impc:ir:floating-point? type-str)
+                           (impc:ir:fixed-point? type-str)
+                           (impc:ir:pointer? type-str))))
+                   (or tlist (list symname)))))))
+
+(define impc:precomp:write-binding-details-to-file
+  (lambda (lead-string symname type)
+    (if (output-port? *sys:precomp:current-output-port*)
+        (let* ((type-str (atom->string type))
+               (precomp-string
+                (cond ((string=? lead-string "SetValue:")
+                       (string-append "(bind-lib-val lib"
+                                      *sys:precomp:current-lib-name* " "
+                                      symname " " type-str ")\n"))
+                      ((string=? lead-string "Compiled:")
+                       (string-append "(bind-lib-func"
+                                      (if (impc:precomp:no-scm-suffix? symname) "-no-scm" "")
+                                      " lib"*sys:precomp:current-lib-name* " "
+                                      symname " " type-str ")\n"))
+                      ((string=? lead-string "DataType:")
+                       (string-append "(bind-lib-type-precomp lib"
+                                      *sys:precomp:current-lib-name* " " symname " " type-str ")\n"))
+                      ((string=? lead-string "Overload:")
+                       (string-append "(bind-poly " symname ")\n"))
+                      ((string=? lead-string "SetAlias:")
+                       (string-append "(bind-alias " symname " " type-str ")\n"))
+                      (else ""))))
+          (display precomp-string *sys:precomp:current-output-port*)))))
+
 (define impc:compiler:print-binding-details-to-log
   (lambda (lead-string symname type)
-    (print lead-string " ")
-    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
-    (print " >>> ")
-    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
-    (println)))
+    (impc:precomp:write-binding-details-to-file lead-string
+                                                (atom->string symname)
+                                                type)
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print lead-string " ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
+          (print " >>> ")
+          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
+          (println)))))
 
 (define impc:compiler:print-polying-details-to-log
   (lambda (lead-string poly-name native-name type)
-    (print lead-string " ")
-    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print poly-name))
-    (print " with ")
-    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print native-name))
-    (print " >>> ")
-    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
-    (println)))
+    (impc:precomp:write-binding-details-to-file
+     lead-string
+     (string-append (symbol->string poly-name)
+                    " "
+                    (symbol->string native-name))
+     "")
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print lead-string " ")
+          (print-with-colors *impc:compiler:pretty-print-name-color*
+                             'default #t (print poly-name))
+          (print " with ")
+          (print-with-colors *impc:compiler:pretty-print-name-color*
+                             'default #t (print native-name))
+          (print " >>> ")
+          (print-with-colors *impc:compiler:pretty-print-type-color*
+                             'default #f  (print type))
+          (println)))))
 
 (define impc:compiler:print-no-scheme-stub-notification
   (lambda (symname)
-    (print "There is no ")
-    (print-with-colors 'cyan 'default #t (print  "scheme stub"))
-    (print " available for ")
-    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname "\n"))))
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print "There is no ")
+          (print-with-colors 'cyan 'default #t (print  "scheme stub"))
+          (print " available for ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname "\n"))))))
 
 
 ;; ;; GCHANGE

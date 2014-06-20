@@ -351,8 +351,7 @@
 	  (if (member type v) #t
 	      (set-cdr! v (cons type (cdr v))))
 	  (set! *impc:ti:vtypes* (cons (list name type) *impc:ti:vtypes*)))
-      (if (equal? *impc:compiler:message:level* 'high)
-          (impc:compiler:print-binding-details-to-log "Appended type variable " name type))
+      (impc:compiler:print-binding-details-to-log "Appended type variable " name type)
       #t)))
 
 
@@ -5578,8 +5577,7 @@
 		  (set! *impc:closuretypes* (cons (cons symname (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))) *impc:closuretypes*))
                   (if (and (not *impc:compiler:print-raw-llvm*)
                            (or *impc:ti:print-code-specialization-compiles*
-                               (not (regex:match? (symbol->string symname) "--")))                                
-                           (equal? *impc:compiler:message:level* 'high))
+                               (not (regex:match? (symbol->string symname) "--"))))
                       (let* ((type1 (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype))))
                              (type2 (impc:ir:get-pretty-closure-arg-strings type1))
                              (simpletype
@@ -5659,11 +5657,10 @@
 			       ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
 			       (if (llvm:get-scheme-function ,(symbol->string symname))
 				   (let ((ftype (llvm:get-function-args-withoutzone ,(symbol->string symname))))
-                                     (if (equal? *impc:compiler:message:level* 'high)
-                                         (impc:compiler:print-binding-details-to-log
-                                          "Compiled:"
-                                          ',symname
-                                          (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))))
+             (impc:compiler:print-binding-details-to-log
+              "Compiled:"
+              ',symname
+              (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype))))
                                      (llvm:ffi-set-name
                                       (llvm:get-scheme-function ,(symbol->string symname))
                                       ,(symbol->string symname))
@@ -5734,8 +5731,7 @@
             (begin
               (impc:ir:add-gpoly (cons 'bind-func (cons newnametype (cdr args))))
               ;;(impc:ir:add-gpoly (cons 'bind-func args))
-              `(if (equal? *impc:compiler:message:level* 'high)
-                   (impc:compiler:print-binding-details-to-log "Generic: " ,(car res) ,(cadr res))))
+              `(impc:compiler:print-binding-details-to-log "Generic: " ,(car res) ,(cadr res)))
 	    `(impc:ti:parametric-poly-pass '(definec ,@args))))
       `(impc:ti:parametric-poly-pass '(definec ,@args))))
 
@@ -5810,13 +5806,12 @@
 	    "\n\n"
 	    *impc:compiler:precomp*))
   `(begin (impc:ir:add-type-alias ,(symbol->string symbol) ,(symbol->string type))
-          (if (equal? *impc:compiler:message:level* 'high)
-              (impc:compiler:print-binding-details-to-log
-               "SetAlias:"
-                ',symbol
-                ;;(print ',type)
-                (impc:ir:pretty-print-type ,(symbol->string symbol)) ; (llvm:get-named-type ,(symbol->string symbol))))
-                ))))
+          (impc:compiler:print-binding-details-to-log
+           "SetAlias:"
+           ',symbol
+           ;;(print ',type)
+           (impc:ir:pretty-print-type ,(symbol->string symbol)) ; (llvm:get-named-type ,(symbol->string symbol))))
+           )))
 
 ;; (define build-type-dataconstructor
 ;;   (lambda (name type generic . args)
@@ -6007,8 +6002,7 @@
                                                                         newtype
                                                                         ,(symbol->string symbol)))))))
 	      (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
-          (if (equal? *impc:compiler:message:level* 'high)
-	      (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
+          (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type)
           ;; now compile data constructor          
           (build-type-dataconstructor
            ',symbol
@@ -6024,16 +6018,14 @@
 	      (llvm:compile (string-append "%" ,(symbol->string symbol) " = type "
 					   ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type) (symbol->string symbol)))))
 	      (impc:compiler:print-bad-type-error ,type "only named tuple types are supported"))
-          (if (equal? *impc:compiler:message:level* 'high)
-	      (impc:compiler:print-type-details-to-log
-	       ,symbol
-	       (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol)))))))
+          (impc:compiler:print-type-details-to-log
+           ,symbol
+           (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))))
 
 ;; Ben's helper macros
 
 (define-macro (impc:print-bound-message symbol type)
-  `(if (equal? *impc:compiler:message:level* 'high)
-       (impc:compiler:print-binding-details-to-log "SetValue:" ',symbol ',type)))
+  `(impc:compiler:print-binding-details-to-log "SetValue:" ',symbol ',type))
 
 (define-macro (impc:pretty-print-vars . varlist)
   (map (lambda (var)
@@ -6120,8 +6112,7 @@
   (let ((type (impc:ir:get-function-type implementation_sym)))
     ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
     `(begin (impc:ir:add-poly ',poly_sym ',implementation_sym ',type)
-            (if (equal? *impc:compiler:message:level* 'high)
-                (impc:compiler:print-polying-details-to-log "Overload:" ',poly_sym ',implementation_sym ,(impc:ir:pretty-print-type type))))))
+            (impc:compiler:print-polying-details-to-log "Overload:" ',poly_sym ',implementation_sym ,(impc:ir:pretty-print-type type)))))
 
 ;; (define-macro (bind-scm symbol type value)
 ;;    (if (cptr? (eval value))
@@ -6132,8 +6123,7 @@
 ;; 						;,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str type)))))
 ;;                ;(ipc:call ,*impc:compiler:process* 'llvm:bind-global-var ,(symbol->string symbol) ,value)
 ;; 	       (llvm:bind-global-var ,(symbol->string symbol) ,value)
-;;                (if (equal? *impc:compiler:message:level* 'high)
-;; 		   (impc:compiler:print-binding-details-to-log "Foreign:" ',symbol ',type)))
+;;          (impc:compiler:print-binding-details-to-log "Foreign:" ',symbol ',type))
 ;;        (if (number? (eval value))
 ;; 	   `(bind-val ,symbol ,type ,value)
 ;; 	   (impc:compiler:print-compiler-error "bind-scm only accepts cptr or numeric values!"))))
@@ -6169,8 +6159,7 @@
                                    ") nounwind")))
       (if (and (llvm:compile ircode)
 	       (llvm:bind-symbol library (symbol->string symname)))
-          (if (equal? *impc:compiler:message:level* 'high)
-              (impc:compiler:print-binding-details-to-log "SetValue:" symname type))
+          (impc:compiler:print-binding-details-to-log "SetValue:" symname type)
 	  (impc:compiler:print-compiler-error (string-append "could not bind!" (symbol->string symname)))))))
 
 
@@ -6202,6 +6191,13 @@
        (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
        (bind-lib-func ,library ,name ,(string->symbol dctype))
        (bind-lib-func ,library ,(string->symbol (string-append namestr "_h")) ,(string->symbol dctype)))))
+
+(define-macro (bind-lib-type-precomp library name type . args)
+  (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
+         (namestr (symbol->string name))
+         (typestr (symbol->string type)))
+    `(begin
+       (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr)))))))
 
 ;;; this here for bindig to existing types
 ;;
