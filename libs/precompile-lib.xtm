@@ -16,8 +16,6 @@
 ;; the bitcode in the exported module with llc (the required arguments
 ;; will be printed to the Extempore log once the module is exported.
 
-(define *sys:precomp:compile-start-time* (now))
-
 (bind-func command
   (lambda (cmd:i8*)
     (system cmd)))
@@ -115,10 +113,26 @@
                    *sys:precomp:current-output-port*)
 ))))
 
+(define sys:precomp:print-compilation-details
+  (lambda (start-time)
+    (print-with-colors 'yellow 'default #t
+                       (print "Total compile time: "))
+    (print (* 1.0 (/ (- (now) start-time) *minute*)) "minutes\n\n")
+    
+    ;; (println 'sym-name-stack-size: (length *impc:ir:sym-name-stack*))
+    (println 'type-aliases: (length *impc:ir:type-aliases*))
+    (println 'gpolytypes: (length *impc:ir:gpolytypes*))
+    (println 'polytypes: (length *impc:ir:polytypes*))
+    (println 'gpolys: (length *impc:ir:gpolys*))
+    (println 'polys: (length *impc:ir:polys*))
+    (println 'vtypes: (length *impc:ti:vtypes*))
+    (println 'gtypemappings: (length *impc:ti:generic-type-mappings*))))
+
 (define sys:precomp:compile-xtm-file
   (lambda (lib-path move-into-place? exit-when-done?)
     ;; is there a better way to check if a file exists?
-    (let ((in-file-port (open-input-file lib-path)))
+    (let ((start-time (now))
+          (in-file-port (open-input-file lib-path)))
       (if (not in-file-port)
           (begin (print-with-colors 'red 'default #t
                                     (print "Error:"))
@@ -147,39 +161,14 @@
                         (if  *sys:precomp:current-output-port*
                              (begin (set! *sys:precomp:current-output-port* #f)
                                     (print "Successfully wrote precomp file to ")
-                                    (print-with-colors 'green 'default #f (print precomp-file-path "\n")))
+                                    (print-with-colors 'green 'default #f (print precomp-file-path "\n"))
+                                    (sys:precomp:print-compilation-details start-time)
+                                    (if exit-when-done? (quit 0)))
                              (begin (print-with-colors 'red 'default #t (print "Error:"))
                                     (print " something went wrong in writing the output file ")
-                                    (print-with-colors 'red 'default #t (print precomp-file-path "\n")))))
+                                    (print-with-colors 'red 'default #t (print precomp-file-path "\n"))
+                                    (if exit-when-done? (quit 1)))))
                       (begin (print-with-colors 'red 'default #t
                                                 (print "Error:"))
-                             (print " cannot write precomp file at " precomp-file-path "\n"))))))))))
-
-;;; Code:
-(sys:load "libs/core/math.xtm")
-(sys:load "libs/external/fft.xtm")
-(sys:load "libs/core/audio_dsp.xtm")
-(sys:load "libs/core/instruments.xtm")
-(sys:load "libs/external/sndfile.xtm")
-(sys:load "libs/external/instruments_ext.xtm")
-(sys:load "libs/external/audio_dsp_ext.xtm")
-(sys:load "libs/external/rtmidi.xtm")
-(sys:load "libs/external/soil.xtm")
-(sys:load "libs/external/opengl.xtm")
-(sys:load "libs/external/shaders.xtm")
-(sys:load "libs/external/assimp.xtm")
-(sys:load "libs/external/openvg.xtm")
-;; (println 'done 'loading!)
-(sys:precomp:compile-current-module "xtm")
-
-(println)
-(println 'Total 'Compile 'Time: (* 1.0 (/ (- (now) *sys:precomp:compile-start-time*) *minute*)) 'minutes)
-(println)
-;; (println 'sym-name-stack-size: (length *impc:ir:sym-name-stack*))
-(println 'type-aliases: (length *impc:ir:type-aliases*))
-(println 'gpolytypes: (length *impc:ir:gpolytypes*))
-(println 'polytypes: (length *impc:ir:polytypes*))
-(println 'gpolys: (length *impc:ir:gpolys*))
-(println 'polys: (length *impc:ir:polys*))
-(println 'vtypes: (length *impc:ti:vtypes*))
-(println 'gtypemappings: (length *impc:ti:generic-type-mappings*))
+                             (print " cannot write precomp file at " precomp-file-path "\n")
+                             (if exit-when-done? (quit 2)))))))))))
