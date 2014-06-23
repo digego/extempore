@@ -104,7 +104,6 @@
       ;; ntime = current time step
       ;; prepare FFT tables
       (cwfft2rinit mixup sct indx indy nxhy nxyh)
-      (memset (cast mixup i8*) 0 (convert (* nxhy 4)))
       ;; calculate form factors
       (set! isign 0)
       (cpois22 (cast qe cpxf*)
@@ -137,7 +136,6 @@
         (dtimer dtime itime -1)
         (set! isign -1)
         (cwfft2rx (cast qe cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
-        (memset (cast mixup i8*) 0 (convert (* nxhy 4)))
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tfft (+ tfft time))
@@ -157,7 +155,6 @@
         (dtimer dtime itime -1)
         (set! isign 1)
         (cwfft2rx (cast fxye cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
-        (memset (cast mixup i8*) 0 (convert (* nxhy 4)))
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tfft (+ tfft time))
@@ -182,8 +179,7 @@
             (if (= (% ntime sortime) 0)
                 (begin
                   (dtimer dtime itime -1)
-                  ;; (cdsortp2yl part part2 npicy idimp np ny1)
-                  ;; TODO try memsetting npicy
+                  (cdsortp2yl part part2 npicy idimp np ny1)
                   ;; exchange pointers
                   (set! tpart part)
                   (set! part part2)
@@ -191,7 +187,7 @@
                   (dtimer dtime itime 1)
                   (set! time (convert (pref dtime 0)))
                   (set! tsort (+ tsort time))
-                  ;; (println "tsort:" tsort)
+                  (println "tsort:" tsort)
                   )))
         (if (= ntime 0)
             (let ((field_energy (pref we 0))
@@ -231,6 +227,6 @@
       (println "Sort Time (nsec) =" (* tsort wt))
       (println "Total Particle Time (nsec) =" (* time wt))
       
-      void)))
+      void))
 
-(xtmain)
+  (xtmain))
