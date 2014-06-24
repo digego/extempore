@@ -38,7 +38,7 @@
   (lambda ()
     (main 0 null)))
 
-(run_main)
+;; (run_main)
 
 ;; some test functions
 
@@ -136,15 +136,6 @@
         (tsort:float 0.)
         (dtime:double* (zalloc))
         )
-    (println "\nxtlang allocation sizes (in elements, not bytes):\n")
-    (println "part alloc size =" (* idimp np) "\n")
-    (println "part2 alloc size =" (* idimp np))
-    (println "qe alloc size =" (* nxe nye))
-    (println "fxye alloc size =" (* ndim nxe nye))
-    (println "ffc alloc size =" (* nxh nyh))
-    (println "mixup alloc size =" nxhy)
-    (println "sct alloc size =" nxyh)
-    (println "npicy alloc size =" ny1)
     (lambda ()
       ;; nloop = number of time steps in simulation
       ;; ntime = current time step
@@ -158,20 +149,15 @@
       ;; initialize electrons
       (cdistr2 part vtx vty vx0 vy0 npx npy idimp np nx ny ipbc)
       ;; main iteration loop
-      ;; (println "Start iteration:" nloop "loops")
+      (println "\nStart iteration:" nloop "loops\n")
       (dotimes (ntime nloop)
         ;; check the mixup array
         ;; deposit charge with standard procedure: updates qe
-        (println "ntime" ntime)
+        (println "ntime:" ntime)
         (dtimer dtime itime -1)
         (dotimes (j (* nxe nye))
           (pset! qe j 0.))
-        (println "pre-cgpost2l, range is" (array_min part (* idimp np)) "to" (array_max part (* idimp np)))
         (cgpost2l part qe qme np idimp nxe nye)
-        (println "post-cgpost2l, range is" (array_min part (* idimp np)) "to" (array_max part (* idimp np)))
-        ;; (printf "&mixup[105] = %p mixup[105] = %d\n"
-        ;;         (pref-ptr mixup 105)
-        ;;         (pref mixup 105))
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tdpost (+ tdpost time))
@@ -280,8 +266,6 @@
       (println "Total Particle Time (nsec) =" (* time wt) "\n")
       
       void)))
-
-(println "\n\n\nExtempore 'harness' version output starts here.\n\n")
 
 (xtmain)
 
