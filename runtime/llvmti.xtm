@@ -5166,29 +5166,33 @@
         ;; 
         ;; also we make sure that any types of the form (sym "%list...") are converted to (sym . "%list...")
         ;; in other words change list ("%list...") into atom "%list..."
-	 (set! types (cl:remove #f (map (lambda (x) 
-					  (if (regex:match? (symbol->string (car x)) "^!") #f ;; remove !bang types
-					      (if (list? (cdr x))
-						  (if (= (length (cdr x)) 1)
-						      (cons (car x) (cadr x))
-						      x)
-						  x)))
-					types)))
 
+        (set! types (cl:remove #f (map (lambda (x) 
+                                         (if (or (regex:match? (symbol->string (car x)) "^!")
+                                                 (regex:match? (symbol->string (car x))
+                                                               "^[A-Za-z0-9_-]*:<.*##[0-9]*$"))
+                                                 #f
+                                             (if (list? (cdr x))
+                                                 (if (= (length (cdr x)) 1)
+                                                     (cons (car x) (cadr x))
+                                                     x)
+                                                 x)))
+                                       types)))
+        
          ;; just added by andrew (can be safely removed)
-         (if (null? types)
-	     (impc:compiler:print-could-not-resolve-type-error symname))
+        (if (null? types)
+            (impc:compiler:print-could-not-resolve-type-error symname))
          
          ;; (println 'final-types: types)
 
          ;; if we didn't unify print error and bomb out!	
          (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
-	     (begin 
-	       (println 'types_: types)
-	       (impc:compiler:print-could-not-resolve-type-error
-	  (cl:remove 'good (map (lambda (x y) (if y 'good (symbol->string (car x))))
-				types (impc:ti:unity? types)))
-	  "you could try forcing the type of one or more of these symbols")))
+             (begin 
+               ;; (println 'types_: types)
+               (impc:compiler:print-could-not-resolve-type-error
+                (cl:remove 'good (map (lambda (x y) (if y 'good (symbol->string (car x))))
+                                      types (impc:ti:unity? types)))
+                "you could try forcing the type of one or more of these symbols")))
 
 	 ;; if we have type checked ok then set addtypes to source and create new ast
 	 (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list)))
@@ -5813,80 +5817,12 @@
            (impc:ir:pretty-print-type ,(symbol->string symbol)) ; (llvm:get-named-type ,(symbol->string symbol))))
            )))
 
-;; (define build-type-dataconstructor
-;;   (lambda (name type generic . args)
-;;     ;; (println 'build-data-construct name type generic)
-;;     (if (or (not (string? type)) ;; if not already a pretty type
-;;             (regex:match? type "^\\s*{"))
-;;         (set! type (impc:ir:pretty-print-type type)))
-;;     (let* ((a (impc:ir:get-pretty-tuple-arg-strings type))
-;;            (compiler-suppress-on (if (equal? *impc:compiler:message:level* 'low) #f #t))
-;;            (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
-;;            (arglst2 *impc:alphabetidxlist*) ;; '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
-;;            (namestr (symbol->string name))
-;;            (ctype (string-append "["
-;;                                  (if generic
-;;                                      (apply string-append namestr ":" type "*"
-;;                                             (map (lambda (x)
-;;                                                    (string-append
-;;                                                     ","
-;;                                                     (regex:replace x
-;;                                                                    (string-append namestr "([*]*)")
-;;                                                                    (string-append namestr ":" type "$1"))))
-;;                                                  a))
-;;                                      (apply string-append (symbol->string name) "*"
-;;                                             (map (lambda (x) (string-append "," x)) a)))
-;;                                  "]*"))
-;;            (nameandtype (string->symbol (string-append namestr "" ":" ctype)))
-;;            (print_name (string->symbol (string-append namestr "_print" ":[void," (symbol->string name) "*]*")))
-;;            (h_nameandtype (string->symbol (string-append namestr "_h" ":" ctype)))
-;;            (argslist (map (lambda (a b) b) a arglst1)) 
-;;            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
-;;       ;; (println 'dataconstructor: 'name: name 'type: type)
-;;       (suppress-compiler-messages #t)
-;;       ;; (if (not generic)
-;;       ;;     (begin
-;;       ;;       (eval `(bind-func ,print_name
-;;       ;;                (lambda (x)
-;;       ;;                  (printout
-;;       ;;                   ,(if (regex:match? namestr "--")
-;;       ;;                        ;; (if *impc:ti:print-full-generic-types*
-;;       ;;                        ;; (impc:ir:pretty-print-type namestr)
-;;       ;;                        (string-append "!" "" (car (regex:type-split namestr "--")))
-;;       ;;                        namestr)
-;;       ;;                   ":<"
-;;       ;;                   ,(list 'tref 'x 0)
-;;       ;;                   ,@(impc:ti:flatten-1 (map (lambda (y z) (list "," (list 'tref 'x (+ 1 z)))) (cdr a) arglst2))
-;;       ;;                   ">")
-;;       ;;                  void))
-;;       ;;             (interaction-environment))
-;;       ;;       (eval `(bind-poly print ,(string->symbol (string-append namestr "_print")))
-;;       ;;             (interaction-environment))))
-;;       (eval `(bind-func ,nameandtype
-;;                (lambda ,argslist
-;;                  (let ((obj (zalloc)))
-;;                    ,@body
-;;                    obj)))
-;;             (interaction-environment))      
-;;       (eval `(bind-func ,h_nameandtype
-;;                (lambda ,argslist
-;;                  (let ((obj (halloc)))
-;;                    ,@body
-;;                    obj)))
-;;             (interaction-environment))
-;;       (if compiler-suppress-on
-;;           (suppress-compiler-messages #f)
-;;           'donothing))))
-
 (define build-type-dataconstructor
   (lambda (name type generic . args)
     ;; (println 'build-data-construct name type generic)
     (if (or (not (string? type)) ;; if not already a pretty type
             (regex:match? type "^\\s*{"))
         (set! type (impc:ir:pretty-print-type type)))
-    (let ((p (regex:type-split (symbol->string name) "--")))
-      (if (not (null? (cdr p)))
-          (set! type (regex:replace-all type (string-append (car p) "\\*") (string-append (symbol->string name) "*")))))
     (let* ((a (impc:ir:get-pretty-tuple-arg-strings type))
            (compiler-suppress-on (if (equal? *impc:compiler:message:level* 'low) #f #t))
            (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
@@ -5908,32 +5844,121 @@
            (nameandtype (string->symbol (string-append namestr "" ":" ctype)))
            (print_name (string->symbol (string-append namestr "_print" ":[void," (symbol->string name) "*]*")))
            (h_nameandtype (string->symbol (string-append namestr "_h" ":" ctype)))
-           (argslist (map (lambda (a b) b) a arglst1))
-           (hcopy_body (map (lambda (a b c)
-                              (if (impc:ir:tuple? (impc:ir:get-type-from-pretty-str a))
-                                 `(if (not (null? (tref x ,c)))
-                                      (tset! obj ,b (,(string->symbol (string-append (impc:ir:get-base-type a) "_hcopy")) (tref x ,c))))
-                                 `(tset! obj ,b (tref x ,c))))
-                           a arglst2 (range (length a))))
-           (hfree_body (map (lambda (a c)
-                              (if (impc:ir:tuple? (impc:ir:get-type-from-pretty-str a))
-                                  `(if (not (null? (tref x ,c)))
-                                       (,(string->symbol (string-append (impc:ir:get-base-type a) "_hfree")) (tref x ,c)))))
-                            a (range (length a))))
-           (zcopy_body (map (lambda (a b c)
-                             (if (impc:ir:tuple? (impc:ir:get-type-from-pretty-str a))
-                                 `(if (not (null? (tref x ,c)))
-                                      (tset! obj ,b (,(string->symbol (string-append (impc:ir:get-base-type a) "_zcopy")) (tref x ,c))))
-                                 `(tset! obj ,b (tref x ,c))))
-                           a arglst2 (range (length a))))
+           (argslist (map (lambda (a b) b) a arglst1)) 
            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
+      (println 'dataconstructor: 'name: name 'type: type)
       (suppress-compiler-messages #t)
+      ;; (if (not generic)
+      ;;     (begin
+      ;;       (eval `(bind-func ,print_name
+      ;;                (lambda (x)
+      ;;                  (printout
+      ;;                   ,(if (regex:match? namestr "--")
+      ;;                        ;; (if *impc:ti:print-full-generic-types*
+      ;;                        ;; (impc:ir:pretty-print-type namestr)
+      ;;                        (string-append "!" "" (car (regex:type-split namestr "--")))
+      ;;                        namestr)
+      ;;                   ":<"
+      ;;                   ,(list 'tref 'x 0)
+      ;;                   ,@(impc:ti:flatten-1 (map (lambda (y z) (list "," (list 'tref 'x (+ 1 z)))) (cdr a) arglst2))
+      ;;                   ">")
+      ;;                  void))
+      ;;             (interaction-environment))
+      ;;       (eval `(bind-poly print ,(string->symbol (string-append namestr "_print")))
+      ;;             (interaction-environment))))
       (eval `(bind-func ,nameandtype
                (lambda ,argslist
                  (let ((obj (zalloc)))
                    ,@body
                    obj)))
             (interaction-environment))      
+      (eval `(bind-func ,h_nameandtype
+               (lambda ,argslist
+                 (let ((obj (halloc)))
+                   ,@body
+                   obj)))
+            (interaction-environment))
+      (if compiler-suppress-on
+          (suppress-compiler-messages #f)
+          'donothing))))
+
+(define build-type-dataconstructor
+  (lambda (name type generic . args)
+    (if (or (not (string? type)) ;; if not already a pretty type
+            (regex:match? type "^\\s*{"))
+        (set! type (impc:ir:pretty-print-type type)))
+    
+    ;; (println 'build-data-construct name type generic)
+    
+    (let* ((tsplit (car (regex:type-split (symbol->string name) "--")))
+           (a (map (lambda (x)
+                     (if (and (string=? tsplit (impc:ir:get-base-type x))
+                              (= 1 (impc:ir:get-ptr-depth x)))
+                         (string-append (symbol->string name) "*")
+                         x))                   
+                   (impc:ir:get-pretty-tuple-arg-strings type)))
+           (compiler-suppress-on (if (equal? *impc:compiler:message:level* 'low) #f #t))
+           (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
+           (arglst2 *impc:alphabetidxlist*) ;; '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
+           (namestr (symbol->string name))
+           (ctype (string-append "["
+                                 (if generic
+                                     (apply string-append namestr ":" type "*"
+                                            (map (lambda (x)
+                                                   (string-append
+                                                    ","
+                                                    (regex:replace x
+                                                                   (string-append namestr "([*]*)")
+                                                                   (string-append namestr ":" type "$1"))))
+                                                 a))
+                                     (apply string-append (symbol->string name) "*"
+                                            (map (lambda (x) (string-append "," x)) a)))
+                                 "]*"))
+           (nameandtype (string->symbol (string-append namestr "" ":" ctype)))
+           (print_name (string->symbol (string-append namestr "_print" ":[void," (symbol->string name) "*]*")))
+           (h_nameandtype (string->symbol (string-append namestr "_h" ":" ctype)))
+           (argslist (map (lambda (a b) b) a arglst1))
+           (hcopy_body (if generic #f
+                           (map (lambda (a b c)                                  
+                                  (set! a (impc:ir:get-type-from-pretty-str a))
+                                    (if (and (impc:ir:tuple? a)
+                                             (= 1 (impc:ir:get-ptr-depth a)))
+                                        `(if (not (null? (tref x ,c)))
+                                             (tset! obj ,b (,(string->symbol
+                                                              (string-append (substring a 1 (- (string-length a) 1)) "_hcopy"))
+                                                             (tref x ,c))))
+                                        `(tset! obj ,b (tref x ,c))))
+                                a arglst2 (range (length a)))))
+           (hfree_body (if generic #f
+                           (map (lambda (a c)
+                                  (set! a (impc:ir:get-type-from-pretty-str a))
+                                    (if (and (impc:ir:tuple? a)
+                                             (= 1 (impc:ir:get-ptr-depth a)))
+                                        `(if (not (null? (tref x ,c)))
+                                             (,(string->symbol
+                                                (string-append (substring a 1 (- (string-length a) 1)) "_hfree"))
+                                               (tref x ,c)))))
+                                a (range (length a)))))
+           (zcopy_body (if generic #f
+                           (map (lambda (a b c)
+                                  (set! a (impc:ir:get-type-from-pretty-str a))
+                                    (if (and (impc:ir:tuple? a)
+                                             (= 1 (impc:ir:get-ptr-depth a)))
+                                        `(if (not (null? (tref x ,c)))
+                                             (tset! obj ,b (,(string->symbol
+                                                              (string-append (substring a 1 (- (string-length a) 1)) "_zcopy"))
+                                                             (tref x ,c))))
+                                        `(tset! obj ,b (tref x ,c))))
+                                a arglst2 (range (length a)))))
+           (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
+      ;;(println 'hcopy: hcopy_body)
+      (suppress-compiler-messages #t)
+      (eval `(bind-func ,nameandtype
+               (lambda ,argslist
+                 (let ((obj (zalloc)))
+                   ,@body
+                   obj)))
+            (interaction-environment))
       (eval `(bind-func ,h_nameandtype
                (lambda ,argslist
                  (let ((obj (halloc)))
@@ -5966,6 +5991,7 @@
                   (interaction-environment))
             (eval `(bind-poly zcopy ,(string->symbol (string-append namestr "_zcopy")))
                   (interaction-environment))))
+      ;; (println 'dc-out: name)
       (if compiler-suppress-on
           (suppress-compiler-messages #f)
           'donothing))))
