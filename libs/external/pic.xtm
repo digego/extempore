@@ -1,3 +1,6 @@
+;; to compile math lib:
+;; (sys:precomp:compile-xtm-file "libs/core/math.xtm" #t #t)
+
 (sys:load "libs/math.xtm")
 
 (define libcpic2 (sys:open-dylib "/Users/ben/Code/src/pic2/cpic2.dylib"))
@@ -35,7 +38,41 @@
   (lambda ()
     (main 0 null)))
 
-;; (run_main)
+(run_main)
+
+;; some test functions
+
+(bind-func bounds_check_int_array:[void,i32*,i32,i32,i32,String*]*
+  (lambda (arr len lower upper message)
+    (doloop (i len)
+      (if (or (< (pref arr i) lower)
+              (> (pref arr i) upper))
+          (println "Bounds check failed - lower:" lower "upper:" upper message)))))
+
+(bind-func bounds_check_float_array:[void,float*,i32,float,float,String*]*
+  (lambda (arr len lower upper message)
+    (doloop (i len)
+      (if (or (< (pref arr i) lower)
+              (> (pref arr i) upper))
+          (println "Bounds check failed - lower:" lower "upper:" upper message)))))
+
+(bind-func array_min
+  (lambda (arr:float* len:i32)
+    (let ((minval (pref arr 0))
+          (i:i32 0))
+      (dotimes (i len)
+        (if (< (pref arr i) minval)
+            (set! minval (pref arr i))))
+      minval)))
+
+(bind-func array_max
+  (lambda (arr:float* len:i32)
+    (let ((maxval (pref arr 0))
+          (i:i32 0))
+      (dotimes (i len)
+        (if (> (pref arr i) maxval)
+            (set! maxval (pref arr i))))
+      maxval)))
 
 (bind-func xtmain 500000000
   (let ( ;; parameters
@@ -45,7 +82,7 @@
         (npy:i32 3072)
         (ndim:i32 2)
         (tend:float 10.)
-        (dt:float 1.)
+        (dt:float .1)
         (qme:float -1.)
         (vtx:float 1.)
         (vty:float 1.)
@@ -62,8 +99,8 @@
         ;; scalars for standard code
         (j:i32 0)
         (np:i32 (* npx npy))
-        (nx:i32 (<< 1:i32 indx))
-        (ny:i32 (<< 1:i32 indy))
+        (nx:i32 (<< 1:i32 indx)) ;; only works for indx < 2^31
+        (ny:i32 (<< 1:i32 indy)) ;; only works for indx < 2^31
         (nxh:i32 (/ nx 2))
         (nyh:i32 (/ ny 2))
         (nxe:i32 (+ nx 2))
@@ -99,6 +136,15 @@
         (tsort:float 0.)
         (dtime:double* (zalloc))
         )
+    (println "\nxtlang allocation sizes (in elements, not bytes):\n")
+    (println "part alloc size =" (* idimp np) "\n")
+    (println "part2 alloc size =" (* idimp np))
+    (println "qe alloc size =" (* nxe nye))
+    (println "fxye alloc size =" (* ndim nxe nye))
+    (println "ffc alloc size =" (* nxh nyh))
+    (println "mixup alloc size =" nxhy)
+    (println "sct alloc size =" nxyh)
+    (println "npicy alloc size =" ny1)
     (lambda ()
       ;; nloop = number of time steps in simulation
       ;; ntime = current time step
@@ -112,25 +158,31 @@
       ;; initialize electrons
       (cdistr2 part vtx vty vx0 vy0 npx npy idimp np nx ny ipbc)
       ;; main iteration loop
-      (println "Start iteration:" nloop "loops")
+      ;; (println "Start iteration:" nloop "loops")
       (dotimes (ntime nloop)
+        ;; check the mixup array
         ;; deposit charge with standard procedure: updates qe
-        (println "ntime:" ntime)
+        (println "ntime" ntime)
         (dtimer dtime itime -1)
         (dotimes (j (* nxe nye))
           (pset! qe j 0.))
+        (println "pre-cgpost2l, range is" (array_min part (* idimp np)) "to" (array_max part (* idimp np)))
         (cgpost2l part qe qme np idimp nxe nye)
+        (println "post-cgpost2l, range is" (array_min part (* idimp np)) "to" (array_max part (* idimp np)))
+        ;; (printf "&mixup[105] = %p mixup[105] = %d\n"
+        ;;         (pref-ptr mixup 105)
+        ;;         (pref mixup 105))
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tdpost (+ tdpost time))
-        (println "tdpost:" tdpost)
+        ;; (println "tdpost:" tdpost)
         ;; add guard cells with standard procedure: updates qe
         (dtimer dtime itime -1)
         (caguard2l qe nx ny nxe nye)
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tguard (+ tguard time))
-        (println "tguard:" tguard)
+        ;; (println "tguard:" tguard)
         ;; transform charge to fourier space with standard procedure:
         ;; updates qe
         (dtimer dtime itime -1)
@@ -139,7 +191,7 @@
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tfft (+ tfft time))
-        (println "tfft:" tfft)
+        ;; (println "tfft:" tfft)
         ;; calculate force/charge in fourier space with standard
         ;; procedure: updates fxye
         (dtimer dtime itime -1)
@@ -150,7 +202,7 @@
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tfield (+ tfield time))
-        (println "tfield:" tfield)
+        ;; (println "tfield:" tfield)
         ;; transform force to real space with standard procedure: updates fxye 
         (dtimer dtime itime -1)
         (set! isign 1)
@@ -158,14 +210,14 @@
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tfft (+ tfft time))
-        (println "tfft:" tfft)
+        ;; (println "tfft:" tfft)
         ;; copy guard cells with standard procedure: updates fxye 
         (dtimer dtime itime -1)
         (ccguard2l fxye nx ny nxe nye)
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tguard (+ tguard time))
-        (println "tguard:" tguard)
+        ;; (println "tguard:" tguard)
         ;; push particles with standard procedure: updates part, wke 
         (pset! wke 0 0.)
         (dtimer dtime itime -1)
@@ -173,7 +225,7 @@
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tpush (+ tpush time))
-        (println "tpush:" tpush)
+        ;; (println "tpush:" tpush)
         ;; sort particles by cell for standard procedure 
         (if (> sortime 0)
             (if (= (% ntime sortime) 0)
@@ -187,7 +239,7 @@
                   (dtimer dtime itime 1)
                   (set! time (convert (pref dtime 0)))
                   (set! tsort (+ tsort time))
-                  (println "tsort:" tsort)
+                  ;; (println "tsort:" tsort)
                   )))
         (if (= ntime 0)
             (let ((field_energy (pref we 0))
@@ -225,8 +277,11 @@
       (println "Push Time (nsec) =" (* tpush wt))
       (println "Deposit Time (nsec) =" (* tdpost wt))
       (println "Sort Time (nsec) =" (* tsort wt))
-      (println "Total Particle Time (nsec) =" (* time wt))
+      (println "Total Particle Time (nsec) =" (* time wt) "\n")
       
-      void))
+      void)))
 
-  (xtmain))
+(println "\n\n\nExtempore 'harness' version output starts here.\n\n")
+
+(xtmain)
+
