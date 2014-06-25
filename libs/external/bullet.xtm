@@ -13,12 +13,22 @@
 
 ;;; Code:
 
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'bulletlib
+ (cond ((string=? (sys:platform) "Linux")
+        "libBulletDynamics.so")
+       ((string=? (sys:platform) "Windows")
+        "BulletDynamics.dll")
+       ((string=? (sys:platform) "OSX")
+        "libBulletDynamics.dylib")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unknown platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
 (define bulletlib
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "libBulletDynamics.so"))
-          ((string=? platform "Windows") (sys:load-dylib "BulletDynamics.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "libBulletDynamics.dylib"))
-          (else (sys:load-escape "Unknown platform")))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (or (eq? #f bulletlib)
 	(not bulletlib)) 

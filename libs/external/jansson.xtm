@@ -25,12 +25,23 @@
 
 (sys:load "libs/external/curl.xtm")
 
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libjansson
+ (cond ((string=? (sys:platform) "OSX")
+        "libjansson.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libjansson.so")
+       ((string=? (sys:platform) "Windows")
+        "libjansson.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
 (define libjansson
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "libjansson.so"))
-          ((string=? platform "Windows") (sys:load-dylib "libjansson.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "libjansson.dylib"))
-          (else (print "Unknown platform: " platform)))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (or (eq? #f libjansson)
         (null? libjansson))

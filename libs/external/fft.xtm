@@ -24,12 +24,23 @@
 (sys:load-preload-check 'fft)
 (define *xtmlib-fft-loaded* #f)
 
-(define kiss_fft
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "kiss_fft.so"))
-          ((string=? platform "Windows") (sys:load-dylib "kiss_fft.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "kiss_fft.dylib"))
-          (else (print "Unknown platform: " platform)))))
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libkissfft
+ (cond ((string=? (sys:platform) "OSX")
+        "kiss_fft.dylib")
+       ((string=? (sys:platform) "Linux")
+        "kiss_fft.so")
+       ((string=? (sys:platform) "Windows")
+        "kiss_fft.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
+(define libkissfft
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (not kiss_fft)
     (print-error "Could not load kiss_fft dynamic library"))
@@ -45,17 +56,17 @@
 
 (bind-alias kiss_fft_cfg i8*)
 
-(bind-lib kiss_fft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
-(bind-lib kiss_fft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
-(bind-lib kiss_fft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
-(bind-lib kiss_fft kiss_fft_cleanup [i8*,i8*]*)
-(bind-lib kiss_fft kiss_fft_next_fast_size [i32,i32]*)
+(bind-lib libkissfft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
+(bind-lib libkissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+(bind-lib libkissfft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
+(bind-lib libkissfft kiss_fft_cleanup [i8*,i8*]*)
+(bind-lib libkissfft kiss_fft_next_fast_size [i32,i32]*)
 
 ;; tools/kiss_fftr.h
 (bind-alias kiss_fftr_cfg i8*)
-(bind-lib kiss_fft kiss_fftr_alloc [kiss_fftr_cfg,i32,i32,i8*,i64*]*)
-(bind-lib kiss_fft kiss_fftr [i8*,kiss_fftr_cfg,kiss_fft_scalar*,kiss_fft_cpx*]*)
-(bind-lib kiss_fft kiss_fftri [i8*,kiss_fftr_cfg,kiss_fft_cpx*,kiss_fft_scalar*]*)
+(bind-lib libkissfft kiss_fftr_alloc [kiss_fftr_cfg,i32,i32,i8*,i64*]*)
+(bind-lib libkissfft kiss_fftr [i8*,kiss_fftr_cfg,kiss_fft_scalar*,kiss_fft_cpx*]*)
+(bind-lib libkissfft kiss_fftri [i8*,kiss_fftr_cfg,kiss_fft_cpx*,kiss_fft_scalar*]*)
 
 ;; complex input
 

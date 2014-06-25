@@ -14,12 +14,24 @@
 (sys:load-preload-check 'soil)
 
 ;; load soil library
+
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libsoil
+ (cond ((string=? (sys:platform) "OSX")
+        "libSOIL.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libSOIL.so")
+       ((string=? (sys:platform) "Windows")
+        "libSOIL.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
 (define libsoil
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "libSOIL.so"))
-	  ((string=? platform "Windows") (sys:load-dylib "libSOIL.dll"))
-	  ((string=? platform "OSX") (sys:load-dylib "libSOIL.dylib"))
-	  (else (sys:load-escape "Unknown platform for soil lib")))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (null? libsoil) 
     (sys:load-escape "Could not load libSOIL\n"))

@@ -15,23 +15,43 @@
 
 ;; set the path to the Horde3D directory
 
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'hordelib
+ (cond ((string=? (sys:platform) "OSX")
+        "/Library/Frameworks/Horde3D.framework/Horde3D")
+       ((string=? (sys:platform) "Linux")
+        "libHorde3D.so")
+       ((string=? (sys:platform) "Windows")
+        "Horde3D.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
 (define hordelib
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "libHorde3D.so"))
-          ((string=? platform "Windows") (sys:load-dylib "Horde3D.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "/Library/Frameworks/Horde3D.framework/Horde3D"))
-          (else (print "Unknown platform: " platform)))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (or (eq? #f hordelib)
 	(not hordelib)) 
     (sys:load-escape "Could not load 'Horde3D' dynamic library"))
 
+(sys:precomp:set-dylib-name-info
+ 'hordeutlib
+ (cond ((string=? (sys:platform) "OSX")
+        "/Library/Frameworks/Horde3DUtils.framework/Horde3DUtils")
+       ((string=? (sys:platform) "Linux")
+        "libHorde3DUtils.so")
+       ((string=? (sys:platform) "Windows")
+        "Horde3DUtils.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
 (define hordeutlib
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "libHorde3DUtils.so"))
-          ((string=? platform "Windows") (sys:load-dylib "Horde3DUtils.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "/Library/Frameworks/Horde3DUtils.framework/Horde3DUtils"))
-          (else (print "Unknown platform: " platform)))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (or (eq? #f hordeutlib)
 	(not hordeutlib)) 

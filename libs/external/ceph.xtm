@@ -11,15 +11,24 @@
 ;;; Code:
 
 ;; Ceph rados library
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'librados
+ (cond ((string=? (sys:platform) "OSX")
+        "librados.dylib")
+       ((string=? (sys:platform) "Linux")
+        "librados.so")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
 (define librados
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "librados.so"))
-          ((string=? platform "OSX") (sys:load-dylib "librados.dylib"))
-          (else (print-error "Unsupported platform: " platform)))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (null? librados)
     (print-error "Error loading librados"))
-
 
 ;; opaque
 (bind-alias rados_t i8*)

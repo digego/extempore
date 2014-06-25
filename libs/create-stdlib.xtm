@@ -16,33 +16,26 @@
 ;; the bitcode in the exported module with llc (the required arguments
 ;; will be printed to the Extempore log once the module is exported.
 
-(define *xtm_start_compile_time* (now))
-
 ;;; Code:
-(sys:load "libs/core/math.xtm")
-(sys:load "libs/external/fft.xtm")
-(sys:load "libs/core/audio_dsp.xtm")
-(sys:load "libs/core/instruments.xtm")
-(sys:load "libs/external/sndfile.xtm")
-(sys:load "libs/external/instruments_ext.xtm")
-(sys:load "libs/external/audio_dsp_ext.xtm")
-(sys:load "libs/external/rtmidi.xtm")
-(sys:load "libs/external/soil.xtm")
-(sys:load "libs/external/opengl.xtm")
-(sys:load "libs/external/shaders.xtm")
-(sys:load "libs/external/assimp.xtm")
-(sys:load "libs/external/openvg.xtm")
+
+;; load this lib first!
+(sys:load "libs/precompile-lib.xtm")
+
+;; take your pick of these ones. extempore will close after each one
+;; is done, though, so you'll need to start it up again if you want to
+;; do another one
+(sys:precomp:compile-xtlang-file "libs/core/math.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/fft.xtm")
+(sys:precomp:compile-xtlang-file "libs/core/audio_dsp.xtm")
+(sys:precomp:compile-xtlang-file "libs/core/instruments.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/sndfile.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/instruments_ext.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/audio_dsp_ext.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/rtmidi.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/soil.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/opengl.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/shaders.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/assimp.xtm")
+(sys:precomp:compile-xtlang-file "libs/external/openvg.xtm")
 ;; (println 'done 'loading!)
 (sys:precomp:compile-current-module "xtm")
-
-(println)
-(println 'Total 'Compile 'Time: (* 1.0 (/ (- (now) *xtm_start_compile_time*) *minute*)) 'minutes)
-(println)
-;; (println 'sym-name-stack-size: (length *impc:ir:sym-name-stack*))
-(println 'type-aliases: (length *impc:ir:type-aliases*))
-(println 'gpolytypes: (length *impc:ir:gpolytypes*))
-(println 'polytypes: (length *impc:ir:polytypes*))
-(println 'gpolys: (length *impc:ir:gpolys*))
-(println 'polys: (length *impc:ir:polys*))
-(println 'vtypes: (length *impc:ti:vtypes*))
-(println 'gtypemappings: (length *impc:ti:generic-type-mappings*))

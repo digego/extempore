@@ -11,13 +11,23 @@
 ;; lib-loading config
 (sys:load-preload-check 'assimp)
 
-;; lib assimp
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libassimp
+ (cond ((string=? (sys:platform) "OSX")
+        "libassimp.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libassimp.so.3")
+       ((string=? (sys:platform) "Windows")
+        "libassimp.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
 (define libassimp
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "libassimp.so.3"))
-          ((string=? platform "Windows") (sys:load-dylib "libassimp.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "libassimp.dylib"))
-          (else (print "Unknown platform: " platform)))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (or (eq? #f libassimp)
         (null? libassimp))

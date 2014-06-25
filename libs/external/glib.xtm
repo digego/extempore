@@ -13,12 +13,23 @@
 ;; lib-loading config
 (sys:load-preload-check 'glib)
 
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libglib
+ (cond ((string=? (sys:platform) "OSX")
+        "libglib-2.0.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libglib-2.0.so")
+       ((string=? (sys:platform) "Windows")
+        "libglib-2.0-0.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
 (define libglib
-  (sys:load-dylib (if (string=? "Linux" (sys:platform))
-		      "libglib-2.0.so"
-		      (if (string=? "Windows" (sys:platform))
-			  "libglib-2.0-0.dll"
-			  "libglib-2.0.dylib"))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (or (eq? #f libglib)
 	(not libglib)) 
@@ -36,16 +47,27 @@
 ;;     (print-error "Could not load 'gio' dynamic library"))
 
 
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libgobject
+ (cond ((string=? (sys:platform) "OSX")
+        "libgobject-2.0.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libgobject-2.0.so")
+       ((string=? (sys:platform) "Windows")
+        "libgobject-2.0-0.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
 (define libgobject
-  (sys:load-dylib (if (string=? "Linux" (sys:platform))
-		      "libgobject-2.0.so"
-		      (if (string=? "Windows" (sys:platform))
-			  "libgobject-2.0-0.dll"
-			  "libgobject-2.0.dylib"))))
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
 (if (or (eq? #f libgobject)
 	(not libgobject)) 
-    (sys:load-escape "Could not load 'gio' dynamic library"))
+    (sys:load-escape "Could not load 'gobject' dynamic library"))
 
 (define *xtmlib-glib-loaded* #t)
 
