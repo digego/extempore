@@ -16,7 +16,6 @@
 ;; try xtm first
 (sys:load "libs/xtm.xtm")
 ;; otherwise fall through
-(sys:load "libs/core/math.xtm")
 (sys:load "libs/external/opengl.xtm")
 
 (gl_set_view 900.0 600.0 100.0)
@@ -27,15 +26,15 @@
 (bind-func print-shader-info-log
   (lambda (obj:i32)
     (let ((infologLength:i32* (salloc))
-	  (charsWritten:i32* (salloc)))
+          (charsWritten:i32* (salloc)))
       (glGetShaderiv obj GL_INFO_LOG_LENGTH infologLength)
       (if (> (pref infologLength 0) 0)
-	  (let ((log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
-	    (glGetShaderInfoLog obj (pref infologLength 0) charsWritten log)
-	    (printf "printShaderInfoLog: %s\n" log)
-	    (free log)
-	    1)
-	  (begin (printf "Shader Info log: OK\n") 1)))))
+          (let ((shader_log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
+            (glGetShaderInfoLog obj (pref infologLength 0) charsWritten shader_log)
+            (printf "printShaderInfoLog: %s\n" shader_log)
+            (free shader_log)
+            1)
+          (begin (printf "Shader Info log: OK\n") 1)))))
 
 (bind-func print-program-info-log
   (lambda (obj:i32)
@@ -43,10 +42,10 @@
 	  (charsWritten:i32* (salloc)))
       (glGetProgramiv obj GL_INFO_LOG_LENGTH infologLength)
       (if (> (pref infologLength 0) 0)
-	  (let ((log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
-	    (glGetProgramInfoLog obj (pref infologLength 0) charsWritten log)
-	    (printf "printProgramInfoLog: %s\n" log)
-	    (free log)
+	  (let ((program_log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
+	    (glGetProgramInfoLog obj (pref infologLength 0) charsWritten program_log)
+	    (printf "printProgramInfoLog: %s\n" program_log)
+	    (free program_log)
 	    1)
 	  (begin (printf "Program Info log: OK\n") 1)))))
 
