@@ -36,13 +36,27 @@
     (no-compile)))
 
 (define-macro (change-test-result category func-sym)
-  `(for-each
-    (lambda (cat)
-      (if (equal? (car cat) ,category)
-	  (set-cdr! cat (if (not (member ,func-sym cat))
-			    (cons ,func-sym (cdr cat))))
-	  (set-cdr! cat (cl:remove ,func-sym (cdr cat)))))
-    *func-successes*))
+  `(begin
+     (if (equal? ,category 'compile)
+         (begin
+           (print "testing ")
+           (print-with-colors 'cyan 'default #f (print ,func-sym))
+           (print " result: ")))         
+          (for-each
+           (lambda (cat)
+             (if (equal? (car cat) ,category)
+                 (begin (set-cdr! cat (if (not (member ,func-sym cat))
+                                          (cons ,func-sym (cdr cat))))
+                        (if (not (equal? ,category 'no-compile))
+                            (begin (print-with-colors (case ,category
+                                                        ('correct 'green)
+                                                        ('incorrect 'magenta)
+                                                        ('compile 'yellow)
+                                                        ('no-compile ' red))
+                                                      'default #t (print ,category))
+                                   (print (if (equal? ,category 'correct) "\n" "... ")))))
+                 (set-cdr! cat (cl:remove ,func-sym (cdr cat)))))
+           *func-successes*)))
 
 (define-macro (test-xtfunc form . retval)
   `(let ((func-sym (quote ,(car form))))

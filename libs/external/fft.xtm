@@ -24,14 +24,14 @@
 (sys:load-preload-check 'fft)
 (define *xtmlib-fft-loaded* #f)
 
-(define kissfft
+(define kiss_fft
   (let ((platform (sys:platform)))
     (cond ((string=? platform "Linux") (sys:load-dylib "kiss_fft.so"))
           ((string=? platform "Windows") (sys:load-dylib "kiss_fft.dll"))
           ((string=? platform "OSX") (sys:load-dylib "kiss_fft.dylib"))
           (else (print "Unknown platform: " platform)))))
 
-(if (not kissfft)
+(if (not kiss_fft)
     (print-error "Could not load kiss_fft dynamic library"))
 
 ;; bind the required types and function signatures (see kiss_fft.h)
@@ -45,17 +45,17 @@
 
 (bind-alias kiss_fft_cfg i8*)
 
-(bind-lib kissfft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
-(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
-(bind-lib kissfft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
-(bind-lib kissfft kiss_fft_cleanup [i8*,i8*]*)
-(bind-lib kissfft kiss_fft_next_fast_size [i32,i32]*)
+(bind-lib kiss_fft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,i64*]*)
+(bind-lib kiss_fft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+(bind-lib kiss_fft kiss_fft_stride [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
+(bind-lib kiss_fft kiss_fft_cleanup [i8*,i8*]*)
+(bind-lib kiss_fft kiss_fft_next_fast_size [i32,i32]*)
 
 ;; tools/kiss_fftr.h
 (bind-alias kiss_fftr_cfg i8*)
-(bind-lib kissfft kiss_fftr_alloc [kiss_fftr_cfg,i32,i32,i8*,i64*]*)
-(bind-lib kissfft kiss_fftr [i8*,kiss_fftr_cfg,kiss_fft_scalar*,kiss_fft_cpx*]*)
-(bind-lib kissfft kiss_fftri [i8*,kiss_fftr_cfg,kiss_fft_cpx*,kiss_fft_scalar*]*)
+(bind-lib kiss_fft kiss_fftr_alloc [kiss_fftr_cfg,i32,i32,i8*,i64*]*)
+(bind-lib kiss_fft kiss_fftr [i8*,kiss_fftr_cfg,kiss_fft_scalar*,kiss_fft_cpx*]*)
+(bind-lib kiss_fft kiss_fftri [i8*,kiss_fftr_cfg,kiss_fft_cpx*,kiss_fft_scalar*]*)
 
 ;; complex input
 

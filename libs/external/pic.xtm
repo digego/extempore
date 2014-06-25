@@ -1,9 +1,10 @@
 ;; to compile math lib:
+;; (sys:load "libs/precompile-lib.xtm")
 ;; (sys:precomp:compile-xtm-file "libs/core/math.xtm" #t #t)
 
-(sys:load "libs/math.xtm")
+(sys:load "libs/core/math.xtm")
 
-(define libcpic2 (sys:open-dylib "/Users/ben/Code/src/pic2/cpic2.dylib"))
+(define libcpic2 (sys:load-dylib "/Users/ben/Code/src/pic2/libcpic2.dylib"))
 
 (bind-type timeval <i64,i64>) ;; <time_t,suseconds_t>
 
@@ -38,41 +39,9 @@
   (lambda ()
     (main 0 null)))
 
-(run_main)
+;; (run_main)
 
 ;; some test functions
-
-(bind-func bounds_check_int_array:[void,i32*,i32,i32,i32,String*]*
-  (lambda (arr len lower upper message)
-    (doloop (i len)
-      (if (or (< (pref arr i) lower)
-              (> (pref arr i) upper))
-          (println "Bounds check failed - lower:" lower "upper:" upper message)))))
-
-(bind-func bounds_check_float_array:[void,float*,i32,float,float,String*]*
-  (lambda (arr len lower upper message)
-    (doloop (i len)
-      (if (or (< (pref arr i) lower)
-              (> (pref arr i) upper))
-          (println "Bounds check failed - lower:" lower "upper:" upper message)))))
-
-(bind-func array_min
-  (lambda (arr:float* len:i32)
-    (let ((minval (pref arr 0))
-          (i:i32 0))
-      (dotimes (i len)
-        (if (< (pref arr i) minval)
-            (set! minval (pref arr i))))
-      minval)))
-
-(bind-func array_max
-  (lambda (arr:float* len:i32)
-    (let ((maxval (pref arr 0))
-          (i:i32 0))
-      (dotimes (i len)
-        (if (> (pref arr i) maxval)
-            (set! maxval (pref arr i))))
-      maxval)))
 
 (bind-func xtmain 500000000
   (let ( ;; parameters
@@ -136,15 +105,6 @@
         (tsort:float 0.)
         (dtime:double* (zalloc))
         )
-    (println "\nxtlang allocation sizes (in elements, not bytes):\n")
-    (println "part alloc size =" (* idimp np) "\n")
-    (println "part2 alloc size =" (* idimp np))
-    (println "qe alloc size =" (* nxe nye))
-    (println "fxye alloc size =" (* ndim nxe nye))
-    (println "ffc alloc size =" (* nxh nyh))
-    (println "mixup alloc size =" nxhy)
-    (println "sct alloc size =" nxyh)
-    (println "npicy alloc size =" ny1)
     (lambda ()
       ;; nloop = number of time steps in simulation
       ;; ntime = current time step
@@ -158,20 +118,16 @@
       ;; initialize electrons
       (cdistr2 part vtx vty vx0 vy0 npx npy idimp np nx ny ipbc)
       ;; main iteration loop
-      ;; (println "Start iteration:" nloop "loops")
+      (println "\nStart iteration:" nloop "loops\n")
       (dotimes (ntime nloop)
         ;; check the mixup array
         ;; deposit charge with standard procedure: updates qe
-        (println "ntime" ntime)
+        (if (= (% ntime 10) 0)
+            (println "ntime:" ntime))
         (dtimer dtime itime -1)
         (dotimes (j (* nxe nye))
           (pset! qe j 0.))
-        (println "pre-cgpost2l, range is" (array_min part (* idimp np)) "to" (array_max part (* idimp np)))
         (cgpost2l part qe qme np idimp nxe nye)
-        (println "post-cgpost2l, range is" (array_min part (* idimp np)) "to" (array_max part (* idimp np)))
-        ;; (printf "&mixup[105] = %p mixup[105] = %d\n"
-        ;;         (pref-ptr mixup 105)
-        ;;         (pref mixup 105))
         (dtimer dtime itime 1)
         (set! time (convert (pref dtime 0)))
         (set! tdpost (+ tdpost time))
@@ -246,19 +202,19 @@
                   (kinetic_energy (pref wke 0))
                   (total_energy (+ field_energy kinetic_energy)))
               (println "\nInitial Energies:\n")
-              (println "field_energy:" field_energy)
-              (println "kinetic_energy:" kinetic_energy)
-              (println "total_energy:" total_energy "\n"))))
+              (printf "field_energy:    %g\n" (convert field_energy double))
+              (printf "kinetic_energy:  %g\n" (convert kinetic_energy double))
+              (printf "total_energy:    %g\n" (convert total_energy double)))))
       ;; end main iteration loop
       ;; print results
       (println "ntime:" ntime)
       (let ((field_energy (pref we 0))
             (kinetic_energy (pref wke 0))
-            (total_energy (+ field_energy total_energy)))
+            (total_energy (+ field_energy kinetic_energy)))
         (println "\nFinal Energies:\n")
-        (println "field_energy:" field_energy)
-        (println "kinetic_energy:" kinetic_energy)
-        (println "total_energy:" total_energy "\n"))
+        (printf "field_energy:    %g\n" (convert field_energy double))
+        (printf "kinetic_energy:  %g\n" (convert kinetic_energy double))
+        (printf "total_energy:    %g\n\n" (convert total_energy double)))
       (println "deposit time =" tdpost)
       (println "guard time =" tguard)
       (println "solver time =" tfield)
@@ -272,7 +228,6 @@
       (set! wt (+ time tfield))
       (println "total time =" wt)
       (println)
-
       (set! wt (/ 1000000000. (convert (* nloop np))))
       (println "Push Time (nsec) =" (* tpush wt))
       (println "Deposit Time (nsec) =" (* tdpost wt))
@@ -281,7 +236,5 @@
       
       void)))
 
-(println "\n\n\nExtempore 'harness' version output starts here.\n\n")
-
-(xtmain)
+;; (xtmain)
 

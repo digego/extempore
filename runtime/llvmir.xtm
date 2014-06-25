@@ -427,7 +427,7 @@
     (error "")))
 
 (define *sys:precomp:current-output-port* #f)
-(define *sys:precomp:current-lib-name* "xtmshlib")
+(define *sys:precomp:current-lib-name* "xtmdylib")
 
 (define impc:precomp:no-scm-suffix?
   (lambda (symname)
@@ -442,26 +442,36 @@
                    (or tlist (list symname)))))))
 
 (define impc:precomp:write-binding-details-to-file
-  (lambda (lead-string symname type)
+  (lambda (lead-string symname type . args)
     (if (output-port? *sys:precomp:current-output-port*)
         (let* ((type-str (atom->string type))
                (precomp-string
                 (cond ((string=? lead-string "SetValue:")
-                       (string-append "(bind-lib-val lib"
+                       (string-append "(bind-lib-val "
                                       *sys:precomp:current-lib-name* " "
                                       symname " " type-str ")\n"))
+                      ((string=? lead-string "LibBound:")
+                       (string-append "(bind-lib "
+                                      symname  " "
+                                      type-str ")\n"))
                       ((string=? lead-string "Compiled:")
                        (string-append "(bind-lib-func"
                                       (if (impc:precomp:no-scm-suffix? symname) "-no-scm" "")
-                                      " lib"*sys:precomp:current-lib-name* " "
-                                      symname " " type-str ")\n"))
+                                      " " *sys:precomp:current-lib-name* " "
+                                      symname " " type-str
+                                      (if (null? args) ""
+                                          (string-append " " (number->string (car args))))
+                                      ")\n"))
                       ((string=? lead-string "DataType:")
-                       (string-append "(bind-lib-type-precomp lib"
+                       (string-append "(bind-lib-type-precomp "
                                       *sys:precomp:current-lib-name* " " symname " " type-str ")\n"))
                       ((string=? lead-string "Overload:")
                        (string-append "(bind-poly " symname ")\n"))
                       ((string=? lead-string "SetAlias:")
                        (string-append "(bind-alias " symname " " type-str ")\n"))
+                      ((string=? lead-string "Lib Load:")
+                       (string-append "(define " symname " (sys:load-dylib \"" type "\"))\n"
+                                      "(if (not " symname ")\n    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " symname " dynamic library\")(error \"\")))\n"))
                       (else ""))))
           (display precomp-string *sys:precomp:current-output-port*)))))
 
@@ -476,6 +486,38 @@
           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
           (print " >>> ")
           (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
+          (println)))))
+
+(define impc:compiler:print-bind-func-details-to-log
+  (lambda (symname type zone-size)
+    (println 'here)
+    (impc:precomp:write-binding-details-to-file "Compiled:"
+                                                (atom->string symname)
+                                                type
+                                                zone-size)
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print "Compiled: ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
+          (print " >>> ")
+          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
+          (println)))))
+
+(define impc:compiler:print-lib-binding-details-to-log
+  (lambda (libname symname type)
+    (impc:precomp:write-binding-details-to-file "LibBound:"
+                                                (string-append (atom->string libname)
+                                                               " "
+                                                               (atom->string symname))
+                                                (atom->string type))
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print "LibBound: ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
+          (print " >>> ")
+          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
+          (print  " from ")
+          (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f  (print libname))
           (println)))))
 
 (define impc:compiler:print-polying-details-to-log
@@ -498,6 +540,21 @@
           (print-with-colors *impc:compiler:pretty-print-type-color*
                              'default #f  (print type))
           (println)))))
+
+(define impc:compiler:print-dylib-loading-details-to-log
+  (lambda (dylib-path)
+    (let* ((basename (car (reverse (regex:split dylib-path "/"))))
+           (libname (car (regex:split basename "[.]"))))
+      (impc:precomp:write-binding-details-to-file "Lib Load:" libname dylib-path)
+      (if (equal? *impc:compiler:message:level* 'high)
+          (begin
+            (print "Lib Load:  ")
+            (print-with-colors *impc:compiler:pretty-print-name-color*
+                               'default #t (print libname))
+            (print " dynamic library from ")
+            (print-with-colors *impc:compiler:pretty-print-code-color*
+                               'default #t (print dylib-path))
+            (println))))))
 
 (define impc:compiler:print-no-scheme-stub-notification
   (lambda (symname)
@@ -599,7 +656,14 @@
 	    t)
 	  #f))))
 
-
+(define impc:ir:ground-type-aliases
+  (lambda (alias)
+    (let ((res (assoc-strcmp alias *impc:ir:type-aliases*)))
+      (if res
+          (let loop ((a (cdr res)))
+            (let ((r (assoc-strcmp a *impc:ir:type-aliases*)))
+              (if r (loop (cdr r)) a)))
+          #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; poly types

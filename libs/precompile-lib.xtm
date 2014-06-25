@@ -28,18 +28,21 @@
   (lambda (module-name move-into-place?)
     (let ((ext-llvm-dir (cptr->string (get_llvm_path))))
       (if (string=? "" ext-llvm-dir)
-          (print-error 'You 'must 'set 'EXT_LLVM_DIR! 'before 'calling 'create-stlib.xtm))
+          (begin (print-with-colors 'red 'default #t (print "Error"))
+                 (print ": you must set the environment variable ")
+                 (print-with-colors 'green 'default #f (print "EXT_LLVM_DIR"))
+                 (print " to point to your LLVM directory before you can precompile xtlang code.\n")
+                 (error "")))
       (let* ((platform (sys:platform))
-             (shlib-name (string-append "lib" module-name))
-             (bitcode-path (string-append "/tmp/" shlib-name ".bc"))
-             (asm-path (string-append "/tmp/" shlib-name ".s"))
+             (bitcode-path (string-append "/tmp/" module-name ".bc"))
+             (asm-path (string-append "/tmp/" module-name ".s"))
              (shlib-path
               (cond ((string=? platform "Linux")
-                     (string-append "/tmp/" shlib-name ".so"))
+                     (string-append "/tmp/" module-name ".so"))
                     ((string=? platform "OSX")
-                     (string-append "/tmp/" shlib-name ".dylib"))
+                     (string-append "/tmp/" module-name ".dylib"))
                     ((string=? platform "Windows")
-                     (string-append "./" shlib-name ".dll"))
+                     (string-append "./" module-name ".dll"))
                     (else "")))
              (compilation-command
               (string-append
@@ -82,14 +85,14 @@
         (begin
           (display "(suppress-compiler-messages #t)\n(sys:load-preload-check '"
                    *sys:precomp:current-output-port*)
-          (display libname *sys:precomp:current-output-port*)
+          (display (substring libname 3) *sys:precomp:current-output-port*)
           (display ")\n(define *xtmlib-"
                    *sys:precomp:current-output-port*)
-          (display libname *sys:precomp:current-output-port*)
-          (display "-loaded* #f)\n(define lib"
+          (display (substring libname 3) *sys:precomp:current-output-port*)
+          (display "-loaded* #f)\n(define "
                    *sys:precomp:current-output-port*)
           (display libname *sys:precomp:current-output-port*)
-          (display " (sys:open-dylib \"libs/lib"
+          (display " (sys:open-dylib \"libs/"
                    *sys:precomp:current-output-port*)
           (display libname *sys:precomp:current-output-port*)
           (display (let ((platform (sys:platform)))
@@ -106,9 +109,9 @@
   (lambda (libname)
     (if (output-port? *sys:precomp:current-output-port*)
         (begin
-          (display "(print-with-colors 'green 'default #t (print \"[DONE]\n\"))\n(define *xtmlib-"
+          (display "(print-with-colors 'green 'default #t (print \"[DONE]\\n\"))\n(define *xtmlib-"
                    *sys:precomp:current-output-port*)
-          (display libname *sys:precomp:current-output-port*)
+          (display (substring libname 3) *sys:precomp:current-output-port*)
           (display "-loaded* #t)\n(suppress-compiler-messages #f)\n"
                    *sys:precomp:current-output-port*)
 ))))
@@ -120,13 +123,20 @@
     (print (* 1.0 (/ (- (now) start-time) *minute*)) "minutes\n\n")
     
     ;; (println 'sym-name-stack-size: (length *impc:ir:sym-name-stack*))
-    (println 'type-aliases: (length *impc:ir:type-aliases*))
-    (println 'gpolytypes: (length *impc:ir:gpolytypes*))
-    (println 'polytypes: (length *impc:ir:polytypes*))
-    (println 'gpolys: (length *impc:ir:gpolys*))
-    (println 'polys: (length *impc:ir:polys*))
-    (println 'vtypes: (length *impc:ti:vtypes*))
-    (println 'gtypemappings: (length *impc:ti:generic-type-mappings*))))
+    (print-with-colors 'cyan 'default #f (print " type-aliases: "))
+    (println (length *impc:ir:type-aliases*))
+    (print-with-colors 'cyan 'default #f (print "   gpolytypes: "))
+    (println (length *impc:ir:gpolytypes*))
+    (print-with-colors 'cyan 'default #f (print "    polytypes: "))
+    (println (length *impc:ir:polytypes*))
+    (print-with-colors 'cyan 'default #f (print "       gpolys: "))
+    (println (length *impc:ir:gpolys*))
+    (print-with-colors 'cyan 'default #f (print "        polys: "))
+    (println (length *impc:ir:polys*))
+    (print-with-colors 'cyan 'default #f (print "       vtypes: "))
+    (println (length *impc:ti:vtypes*))
+    (print-with-colors 'cyan 'default #f (print "gtypemappings: "))
+    (println (length *impc:ti:generic-type-mappings*))))
 
 (define sys:precomp:compile-xtm-file
   (lambda (lib-path move-into-place? exit-when-done?)
@@ -139,7 +149,7 @@
                  (print " no .xtm file at" lib-path "\n"))
           (let* ((res (close-port in-file-port))
                  (basename (car (reverse (regex:split lib-path "/"))))
-                 (libname (car (regex:split basename "[.]")))
+                 (libname (string-append "xtm" (car (regex:split basename "[.]"))))
                  (precomp-file-path (string-append "libs/" basename)))
             (if (not (sys:load-preload-check (string->symbol libname)))
                 (begin (print "Precomp file not written ")
@@ -157,7 +167,7 @@
                         (sys:precomp:compile-current-module libname move-into-place?)
                         (sys:precomp:insert-footer libname)
                         (close-port *sys:precomp:current-output-port*)
-                        (set! *sys:precomp:current-lib-name* "xtmshlib")
+                        (set! *sys:precomp:current-lib-name* "xtmdylib")
                         (if  *sys:precomp:current-output-port*
                              (begin (set! *sys:precomp:current-output-port* #f)
                                     (print "Successfully wrote precomp file to ")
