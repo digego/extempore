@@ -1234,6 +1234,19 @@
       (and (not (null? base))
            (cdr base)))))
 
+;; needed for precomp.
+
+;; should be a cons pair e.g. '(libGLU .
+;; "/System/Library/Frameworks/OpenGL.framework/OpenGL")
+(define *sys:precomp:current-load-dylib-info* #f)
+
+(define sys:precomp:set-dylib-name-info
+  (lambda (symbol-name dylib-path)
+    ;; is there a better way to check if a file exists?
+    (set! *sys:precomp:current-load-dylib-info*
+          (cons symbol-name dylib-path))))
+
+
 ;; Check if (prebuilt) lib exists in runtime/lib first, otherwise
 ;; search LDPATH as usual
 (define sys:load-dylib

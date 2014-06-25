@@ -470,8 +470,14 @@
                       ((string=? lead-string "SetAlias:")
                        (string-append "(bind-alias " symname " " type-str ")\n"))
                       ((string=? lead-string "Lib Load:")
-                       (string-append "(define " symname " (sys:load-dylib \"" type "\"))\n"
-                                      "(if (not " symname ")\n    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " symname " dynamic library\")(error \"\")))\n"))
+                       (let ((dylib-sym-name (if *sys:precomp:current-load-dylib-info*
+                                                 (atom->string (car *sys:precomp:current-load-dylib-info*))
+                                                 "unknown-libname"))
+                             (dylib-path (if *sys:precomp:current-load-dylib-info*
+                                             (cdr *sys:precomp:current-load-dylib-info*)
+                                             "unknown-dylib-path")))
+                         (string-append "(define " dylib-sym-name " (sys:load-dylib \"" dylib-path "\"))\n"
+                                        "(if (not " dylib-sym-name ")\n    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " symname " dynamic library\")(error \"\")))\n")))
                       (else ""))))
           (display precomp-string *sys:precomp:current-output-port*)))))
 
