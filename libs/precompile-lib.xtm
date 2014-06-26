@@ -86,7 +86,7 @@
           (display "(sys:load-preload-check '"
                    *sys:precomp:current-output-port*)
           (display (substring libname 3) *sys:precomp:current-output-port*)
-          (display ")\n(suppress-compiler-messages #t)\n(define *xtmlib-"
+          (display ")\n(define *sys:precomp:loading-start-time* (now))\n(suppress-compiler-messages #t)\n(define *xtmlib-"
                    *sys:precomp:current-output-port*)
           (display (substring libname 3) *sys:precomp:current-output-port*)
           (display "-loaded* #f)\n(define "
@@ -102,14 +102,14 @@
                    *sys:precomp:current-output-port*)
           (display "(print \"Loading \")\n(print-with-colors 'blue 'default #t (print \"" *sys:precomp:current-output-port*)
           (display libname *sys:precomp:current-output-port*)
-          (display "\"))\n(print \" library...        \")\n"
+          (display "\"))\n(print \" library...     \")\n"
                    *sys:precomp:current-output-port*)))))
 
 (define sys:precomp:insert-footer
   (lambda (libname)
     (if (output-port? *sys:precomp:current-output-port*)
         (begin
-          (display "(print-with-colors 'green 'default #t (print \"[DONE]\\n\"))\n(define *xtmlib-"
+          (display "(print-with-colors 'green 'default #t (print \"[DONE]\"))\n (print \" in\" (* 1.0 (/ (- (now) *sys:precomp:loading-start-time*) *minute*)) \"minutes\\n\")\n(define *xtmlib-"
                    *sys:precomp:current-output-port*)
           (display (substring libname 3) *sys:precomp:current-output-port*)
           (display "-loaded* #t)\n(suppress-compiler-messages #f)\n"
