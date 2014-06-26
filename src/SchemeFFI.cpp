@@ -438,7 +438,9 @@ namespace extemp {
 	    { "sys:symbol-cptr",	&SchemeFFI::symbol_pointer },
 	    { "sys:make-cptr",		&SchemeFFI::makeCptr },
 	    { "sys:directory-list",     &SchemeFFI::dirlist },
-            { "sys:expand-path",           &SchemeFFI::pathExpansion },
+      { "sys:expand-path",           &SchemeFFI::pathExpansion },
+      { "sys:set-default-timeout",  &SchemeFFI::setDefaultTimeout },
+      { "sys:get-default-timeout",  &SchemeFFI::getDefaultTimeout },
 
 	    // DSP sys stuff
 	    { "sys:set-dsp-closure",	&SchemeFFI::setDSPClosure },
@@ -754,6 +756,17 @@ namespace extemp {
     return mk_string(_sc,exp_path);
   }
 
+  pointer SchemeFFI::setDefaultTimeout(scheme* _sc, pointer args)
+  {
+    long long timeout = ivalue(pair_car(args));
+    SchemeProcess::I(_sc)->setMaxDuration(timeout);
+    return _sc->T;
+  }
+
+  pointer SchemeFFI::getDefaultTimeout(scheme* _sc, pointer args)
+  {
+    return mk_integer(_sc,SchemeProcess::I(_sc)->getMaxDuration());
+  }
 
 #ifdef EXT_BOOST
 	pointer SchemeFFI::dirlist(scheme* _sc, pointer args)

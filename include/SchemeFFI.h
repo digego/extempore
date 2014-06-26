@@ -95,7 +95,10 @@ namespace extemp {
 	static pointer platform(scheme* _sc, pointer args);
 	static pointer makeCptr(scheme* _sc, pointer args);
 	static pointer dirlist(scheme* _sc, pointer args);
-        static pointer pathExpansion(scheme* _sc, pointer args);
+  static pointer pathExpansion(scheme* _sc, pointer args);
+  static pointer setDefaultTimeout(scheme* _sc, pointer args);
+  static pointer getDefaultTimeout(scheme* _sc, pointer args); 
+  
 	// dsp bits
 	static pointer setDSPClosure(scheme* _sc, pointer args);
 	static pointer setDSPMTClosure(scheme* _sc, pointer args);
