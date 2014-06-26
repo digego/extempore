@@ -22,19 +22,19 @@
 ;; epoch adjustments for NTP Jan 1st 1900
 (define *Epoch-1900-1970* 2208988800.0)
 ;; election value
-(define *election-val* (random))
+(define *topclock-election-val* (random))
 ;; master?
-(define *master* #f)
+(define *topclock-master* #f)
 ;; master ip (something valid to start with)
-(define *masterip* "127.0.0.1") ;; 
-(define *oldmasterip* "127.0.0.1") ;; something valid
+(define *topclock-master-ip* "127.0.0.1") ;;
+(define *topclock-old-master-ip* "127.0.0.1") ;; something valid
 ;; the time of the last stream message
 ;; from the current master
 ;; give ouselves 1 second breathing room
 ;; for startup
 (define *topclock-lastmsg* (+ 1. (clock:clock)))
 ;; did we win!
-(define *election-winner* #f)
+(define *topclock-election-winner* #f)
 (define *topclock-broadcast* (cons "255.255.255.255" *topclock-port*))
 (define *topclock-print-stream* #f)
 
@@ -62,7 +62,7 @@
       (cond ((string=? address "/clock/master/q")
              ;; if current master send reponse
              ;; srcport need not be same as *topclock-port*
-             (if *master* 
+             (if *topclock-master*
                  (io:osc:send (now) (cons srcip srcport) "/clock/master/r")))
             ((string=? address "/clock/master/r")
              ;; if we get a message it must be from master
@@ -73,8 +73,8 @@
              ;; if we have a higher election-val OR we are allready the master
              ;; then send a message back, otherwise don't!
              (let ((election-val (car args)))
-               (if (or *master*
-                       (> *election-val* election-val))
+               (if (or *topclock-master*
+                       (> *topclock-election-val* election-val))
                    (io:osc:send (now) (cons srcip srcport) "/clock/election/r"))))
             ((string=? address "/clock/election/r")
              ;; if we receive an election reply 
@@ -82,12 +82,12 @@
              ;; also don't try for re-election again
              ;; for AT LEAST 5 seconds!
              (set! *topclock-lastmsg* (+ 5. (clock:clock)))
-             (set! *election-winner* #f))
+             (set! *topclock-election-winner* #f))
             ((string=? address "/clock/sync/q")
              ;; if someone asks for a clocksync (from any IP and any PORT)
              ;; and we are the master then send a reply
              ;; first arg is t1 (from client) we add t2 to reply
-             (if *master*
+             (if *topclock-master*
                  (io:osc:send (now) (cons srcip srcport) "/clock/sync/r"
                               (car args) (1970->1900 (clock:clock)))))
             ((string=? address "/clock/sync/r")
@@ -103,7 +103,7 @@
              ;; bpm changes are sent to master only (i.e. not broadcast)
              ;; to ensure that we don't have the problem where some
              ;; clients GET the message but the master DOESN'T!
-             (if *master*
+             (if *topclock-master*
                  (let ((time (1900->1970 (car args)))
                        (bpm (cadr args))                   
                        (beat-n (caddr args))
@@ -125,7 +125,7 @@
                    (beat-n (caddr args))
                    (beat-d (cadddr args))
                    (cycle (car (cddddr args))))
-               (if (and (not *master*) (or (<> bpm oldbpm) (<> oldcycle cycle)))
+               (if (and (not *topclock-master*) (or (<> bpm oldbpm) (<> oldcycle cycle)))
                    (begin
                      (set! oldbpm bpm)
                      (set! oldcycle cycle)
@@ -152,19 +152,21 @@
                    (cycle (car (cddddr args))))
                (if *topclock-print-stream* (println 'clock 'stream: srcip time bpm (/ beat-n beat-d) cycle))
                ;; update masterip and lastmsg time
-               (set! *masterip* srcip)
-               (if (not (string=? *masterip* *oldmasterip*))
-                   (begin (ascii-print-color 0 5 10)
-                          (println)
-                          (println 'There 'is 'a 'new 'topclock 'in 'town! srcip)
-                          (println)
-                          (ascii-print-color 0 7 10)
-                          (set! *master* #f)
-                          (set! *oldmasterip* *masterip*)))
+               (set! *topclock-master-ip* srcip)
+               (if (not (string=? *topclock-master-ip* *topclock-old-master-ip*))
+                   (begin
+                     (print "There's a")
+                     (print-with-colors 'magenta 'default #f
+                                        (print "new topclock"))
+                     (print "in town at")
+                     (print-with-colors 'blue 'default #f
+                                        (print srcip "\n"))
+                     (set! *topclock-master* #f)
+                     (set! *topclock-old-master-ip* *topclock-master-ip*)))
                (set! *topclock-lastmsg* (clock:clock))
                ;; check for bpm updates (redundancy for missed bpm/update events)
-               (if (and (not *master*) (or (<> bpm oldbpm) (<> cycle oldcycle)))
-                   (io:osc:send (now) (cons *masterip* *topclock-port*) "/clock/bpm/q"))))
+               (if (and (not *topclock-master*) (or (<> bpm oldbpm) (<> cycle oldcycle)))
+                   (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*) "/clock/bpm/q"))))
             (else (println 'bad 'osc 'message: address))))))
 
 ;; start topclock osc receiver (both client and server)
@@ -181,7 +183,7 @@
 ;; 'beat' is the beat that this change fell on (should be synonymous with time)
 (define topclock-bpm
   (lambda (time bpm beat cycle) 
-    (io:osc:send (now) (cons *masterip* *topclock-port*) "/clock/bpm/set"
+    (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*) "/clock/bpm/set"
                  (1970->1900 (samples->clock time)) bpm
                  (rational->n beat) (rational->d beat) cycle)))
 
@@ -197,7 +199,7 @@
       (io:osc:send (*metro* beat) *topclock-broadcast* "/clock/stream"
                    (1970->1900 (samples->clock (*metro* beat)))
                    bpm (rational->n beat) (rational->d beat) cycle)
-      (if *master*
+      (if *topclock-master*
           (callback (*metro* (+ beat (* .5 dur))) 'topclock-streamer (+ beat dur) dur)))))
 
 ;; call a general election!
@@ -205,33 +207,29 @@
 ;; if there is an existing master
 ;; that master will continue in the rolw
 ;; if there is NO master then the peer
-;; with the highest *election-val* will
+;; with the highest *topclock-election-val* will
 ;; become the new master.
 (define topclock-election
   (lambda ()
     ;; assume we won :)
-    (set! *election-winner* #t)
-    (ascii-print-color 0 5 10)
-    (println 'Nominating 'myself 'in 'topclock 'election!)
-    (ascii-print-color 0 7 10)
+    (set! *topclock-election-winner* #t)
+    (print-with-colors 'yellow 'default #f
+                       (print "Nominating myself in topclock election...\n"))
     ;; send message to the world!
-    (io:osc:send (now) *topclock-broadcast* "/clock/election/q" *election-val*)
+    (io:osc:send (now) *topclock-broadcast* "/clock/election/q" *topclock-election-val*)
     ;; wait 4 seconds to find out if we really won!
     ;; if we didn't someone will have forced our
-    ;; *election-winner* to #f
+    ;; *topclock-election-winner* to #f
     (sys:sleep (* *au:samplerate* 4.0))
-    (if *election-winner*
+    (if *topclock-election-winner*
         (begin
-          (set! *master* #t)
-          (ascii-print-color 1 5 10)
-          (println 'Which 'I 'Won!)
-          (ascii-print-color 0 7 10)
+          (set! *topclock-master* #t)
+          (print-with-colors 'green 'default #t
+                             (print "which I won!\n"))
           (topclock-streamer (*metro* 'get-beat 1) 1/4))
-        (begin
-          (ascii-print-color 1 5 10)
-          (println 'Which 'I 'lost!)
-          (ascii-print-color 0 7 10)))
-    (set! *election-winner* #f)))
+        (print-with-colors 'red'default #t
+                           (print "which I lost!\n")))
+    (set! *topclock-election-winner* #f)))
 
 ;; a regular sync to the current master clock
 ;; this loop is run by all clients
@@ -244,21 +242,19 @@
 ;; must have died!
 (define topclock-sync
   (lambda ()
-    (io:osc:send (now) (cons *masterip* *topclock-port*) "/clock/sync/q"
+    (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*) "/clock/sync/q"
                  (1970->1900 (clock:clock)))
     ;; if not master and last streamed message
     ;; was more than 3 seconds ago
     ;; then call a general election!
-    (if (and (not *master*)
+    (if (and (not *topclock-master*)
              (> (- (clock:clock) *topclock-lastmsg*) 3.0))
         (topclock-election))
     (callback (+ (now) 10000) 'topclock-sync)))
 
-(ascii-print-color 0 5 10)
-(println)
-(println 'Starting 'TOPClock!)
-(ascii-print-color 0 7 10)
-(println)
+(print-with-colors 'magenta 'default #f
+                   (print "Starting TOPClock\n"))
+
 ;; start clock sync
 ;; all clients (including master)
 ;; will run this loop
