@@ -497,17 +497,19 @@
           (println)))))
 
 (define impc:compiler:print-bind-func-details-to-log
-  (lambda (symname type zone-size)
-    (impc:precomp:write-binding-details-to-file "Compiled:"
+  (lambda (lead-string symname type zone-size)
+    (impc:precomp:write-binding-details-to-file lead-string
                                                 (atom->string symname)
                                                 type
                                                 zone-size)
     (if (equal? *impc:compiler:message:level* 'high)
         (begin
-          (print "Compiled: ")
+          (print lead-string)
           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
           (print " >>> ")
           (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
+          (print " zone size: ")
+          (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f  (print zone-size))
           (println)))))
 
 (define impc:compiler:print-lib-binding-details-to-log
