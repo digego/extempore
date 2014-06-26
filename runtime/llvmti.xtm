@@ -4530,7 +4530,7 @@
                                  (code (caddr (cadr (impc:ir:gpoly-types (string->symbol (car p)) arity (cadr p)))))
                                  (pfunc (string->symbol (string-append (car p) "--" etype))))
                             (set! code `(let ((,pfunc ,code)) ,pfunc))
-                            (impc:ti:run pfunc code (cons pfunc (string->symbol (cadr p))))
+                            (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol (cadr p))))
                             (impc:ir:add-poly (string->symbol (car p)) pfunc (cadr p))
                             (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                               (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
@@ -4640,7 +4640,7 @@
 			 ;; (println 'pfunc: pfunc 'type: type 'code: code)
 			 ;; (println 'kts: (cons pfunc (string->symbol type)))
 			 ;(print)
-		   	 (impc:ti:run pfunc code (cons pfunc (string->symbol type)))
+			 (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol type)))
 			 (impc:ir:add-poly polyname pfunc type)			 
 			 (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                            (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
@@ -5112,7 +5112,7 @@
 
 
 (define impc:ti:run
-   (lambda (symname code . args)
+   (lambda (symname code zone-size . args)
       ;; (println '-----------> 'impc:ti:run: symname)
       ;; (println 'code: code)
       ;; (println 'args: args)
@@ -5596,15 +5596,21 @@
                                              "]*")))
                         ;; (println 'type2 type2)
                         ;; (println 'simpletype simpletype)                        
-                        (impc:compiler:print-binding-details-to-log 
-                         (if (regex:match? (symbol->string symname) "--") "Spec'zed:" "Compiled:")
-                         (if (regex:match? (symbol->string symname) "--")
-                             (let ((p (regex:split (symbol->string symname) "--")))
-                               (car p))
-                             symname)
-                         (if *impc:ti:print-full-generic-types*
-                             (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))
-                             simpletype))))))
+                        (if (regex:match? (symbol->string symname) "--")
+                            ;; note: can probably change this to the
+                            ;; bind-func specific one as well (as in
+                            ;; the 'else' branch)
+                            (impc:compiler:print-binding-details-to-log
+                             "Spec'zed:"
+                             symname
+                             (if *impc:ti:print-full-generic-types*
+                                 (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))
+                                 simpletype))
+                            (impc:compiler:print-bind-func-details-to-log
+                             "Compiled:"
+                             symname
+                             simpletype
+                             zone-size))))))
             (cadr (impc:ir:gname))))))
 
 (define-macro (xtm-closure-doc name)
@@ -5638,10 +5644,11 @@
       ;(print-full symname 'types: types 'e: expr 'args: args)
       `(define ,symname
 	 (let* ((res1 (impc:ti:run ',symname
-				   '(let ((,symname ,expr)) ,symname)
-				   ,@(if (null? types) 
-					 '()
-					 (map (lambda (k) (list 'quote k)) types))))
+                             '(let ((,symname ,expr)) ,symname)
+                             ,zone-size
+                             ,@(if (null? types)
+                                   '()
+                                   (map (lambda (k) (list 'quote k)) types))))
 		(setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
 		(func (llvm:get-function (symbol->string ',symname))))
 	   (if *impc:compiler:precomp-llvm*
@@ -6397,7 +6404,7 @@
                           (pfunc (string->symbol (string-append sym "--" etype))))
                      ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
-                     (impc:ti:run pfunc code (cons pfunc (string->symbol t)))
+                     (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol t)))
                      (impc:ir:add-poly (string->symbol sym) pfunc t)
                      (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                        (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
@@ -6479,7 +6486,7 @@
                      ;; (println 'makesym etype 't: t)
                      ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
-                     (impc:ti:run pfunc code (cons pfunc (string->symbol t)))
+                     (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol t)))
                      (impc:ir:add-poly (string->symbol sym) pfunc t)
                      (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                        (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
