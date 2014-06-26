@@ -19,5 +19,10 @@
 ;;; Code:
 
 (sys:load "libs/precompile-lib.xtm")
-(sys:precomp:compile-xtm-file "libs/external/stdlib.xtm" #t #t)
+
+(let ((old-timeout (sys:get-default-timeout)))
+  ;; set timeout to 1 hour
+  (sys:set-default-timeout (* *au:samplerate* 60 60))
+  (sys:precomp:compile-xtm-file "libs/external/stdlib.xtm" #t #t)
+  (sys:set-default-timeout old-timeout))
 
