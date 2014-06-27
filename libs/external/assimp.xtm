@@ -39,6 +39,7 @@
 (sys:load "libs/external/soil.xtm")
 ;; load shaders
 (sys:load "libs/external/shaders.xtm")
+(sys:load "libs/external/assimp-scm.xtm")
 
 ;; load texture and returns texture number
 ;; 16 is for verticle flip
@@ -107,33 +108,6 @@
 (bind-val aiProcess_FlipWindingOrder i32 16777216)
 (bind-val aiProcess_SplitByBoneCount i32 33554432)
 (bind-val aiProcess_Debone i32 67108864)
-
-(define  aiProcess_CalcTangentSpace  1)
-(define  aiProcess_JoinIdenticalVertices  2)
-(define  aiProcess_MakeLeftHanded  4)
-(define  aiProcess_Triangulate  8)
-(define  aiProcess_RemoveComponent  16)
-(define  aiProcess_GenNormals  32)
-(define  aiProcess_GenSmoothNormals  64)
-(define  aiProcess_SplitLargeMeshes  128)
-(define  aiProcess_PreTransformVertices  256)
-(define  aiProcess_LimitBoneWeights  512)
-(define  aiProcess_ValidateDataStructure  1024)
-(define  aiProcess_ImproveCacheLocality  2048)
-(define  aiProcess_RemoveRedundantMaterials  4096)
-(define  aiProcess_FixInfacingNormals  8192)
-(define  aiProcess_SortByPType  32768)
-(define  aiProcess_FindDegenerates  65536)
-(define  aiProcess_FindInvalidData  131072)
-(define  aiProcess_GenUVCoords  262144)
-(define  aiProcess_TransformUVCoords  524288)
-(define  aiProcess_FindInstances  1048576)
-(define  aiProcess_OptimizeMeshes  2097152)
-(define  aiProcess_OptimizeGraph  4194304)
-(define  aiProcess_FlipUVs  8388608)
-(define  aiProcess_FlipWindingOrder  16777216)
-(define  aiProcess_SplitByBoneCount  33554432)
-(define  aiProcess_Debone 67108864)
 
 (bind-type aiString <size_t,|1024,i8|>)
 ;(llvm:compile "%aiString = type {i64, |1024xi8|}
@@ -623,13 +597,6 @@
 
 (bind-poly assimp_load_model assimp_load_model_a)
 (bind-poly assimp_load_model assimp_load_model_b)
-
-;; poly has no binding for scheme
-(define assimp_load_model
-  (lambda (dir file . args)
-    (if (null? args)
-        (assimp_load_model_b dir file)
-        (assimp_load_model_a dir file (car args)))))
 
 (bind-func assimp_draw_node
   (lambda (node:xtm_node* shader:i32 model:float* view:float* projection:float* lights:i32 light:float*)
