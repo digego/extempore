@@ -905,6 +905,7 @@
                                     (list (cons 'begin (impc:ti:first-transform (cddr ast) #t))))))
                        ((and (symbol? (car ast))
                              (regex:match? (symbol->string (car ast)) ".*\\..*")
+                             (not (regex:match? (symbol->string (car ast)) "\\.[0-9]*i$"))
                              ;; this last case here to catch of '.' in
                              ;; floating point numbers of type 1.000:float etc..
                              (not (number? (string->atom (car (regex:type-split (symbol->string (car ast)) ":"))))))
@@ -972,6 +973,10 @@
                        ((eq? ast 'schedule) 'callback)
                        ((eq? ast 'randomf) 'imp_randf)
                        ((eq? ast 'void) '(void))
+                     ((and (symbol? ast)
+                           (regex:match? (symbol->string ast) "^[+-]?[0-9]*\\.?[0-9]*[+-][0-9]*\\.?[0-9]*i$"))
+                      (let ((p (regex:matched (symbol->string ast) "^([+-]?[0-9]*\\.?[0-9]*)([+-][0-9]*\\.?[0-9]*)i$")))
+                        `(Cpxd ,(* 1.0 (string->number (cadr p))) ,(* 1.0 (string->number (caddr p))))))
                        ((and (symbol? ast)
                              (regex:match? (symbol->string ast) ":\\$(\\[|<)"))
                         (let ((t (impc:ti:expand-generic-type ast)))
@@ -2099,12 +2104,14 @@
                      (assoc-strcmp (car n2) vars))
                 (begin (impc:ti:force-var (car n2) vars kts '())
                        (impc:ti:type-check n2 vars kts t)))))      
-      ;; (println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)      
-      (if (and (impc:ir:type? b)
+      ;;(println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)      
+      (if (and (not (equal? a b))
+               (impc:ir:type? b)
                (impc:ir:type? a)
+               (not (or (impc:ir:tuple? a)
+                        (impc:ir:tuple? b)))
                (not (and (impc:ir:vector? a)   ;; we are allowed to multiply
-                         (impc:ir:vector? b))) ;; a Vector by a Vector*
-               (not (equal? a b)))
+                         (impc:ir:vector? b)))) ;; a Vector by a Vector*
           (impc:compiler:print-type-conflict-error (impc:ir:pretty-print-type a)
                                                    (impc:ir:pretty-print-type b)
                                                    ast))
@@ -2114,8 +2121,8 @@
           (impc:compiler:print-type-mismatch-error (impc:ir:pretty-print-type t) "number" (symbol->string (car ast))))
       (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
       (if (not (null? t))
-          (begin (if (symbol? (cadr ast)) (impc:ti:force-var (cadr ast) vars kts t))
-                 (if (symbol? (caddr ast)) (impc:ti:force-var (caddr ast) vars kts t))
+          (begin (if (and (symbol? (cadr ast)) (not (impc:ir:tuple? t))) (impc:ti:force-var (cadr ast) vars kts t))
+                 (if (and (symbol? (caddr ast)) (not (impc:ir:tuple? t))) (impc:ti:force-var (caddr ast) vars kts t))
                  (if (and (not (null? t)) ;; this here because math functions always return non-pointer vectors
                           (impc:ir:vector? t) ;; we want to do this because these vectors are always stack allocated
                           (impc:ir:pointer? t)) ;; also these vectors are immutable (i.e. cannot use vector-set!)
