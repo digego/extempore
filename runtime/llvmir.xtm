@@ -450,11 +450,11 @@
                (precomp-string
                 (cond ((string=? lead-string "SetValue:")
                        (string-append
-                        (if (or (impc:ir:floating-point? type)
-                                (impc:ir:fixed-point? type))
-                            (string-append "(bind-lib-val " *sys:precomp:current-lib-name* " ")
-                            "(bind-val ") ;; bind-lib-val only works for floats and ints
-
+                        (if (impc:ir:array? (impc:ir:get-type-from-pretty-str type-str))
+                            "(bind-val "
+                            (string-append "(bind-lib-val "
+                                           *sys:precomp:current-lib-name*
+                                           " ")) ;; bind-lib-val only works for floats and ints
                         symname " " type-str ")\n"))
                       ((string=? lead-string "LibBound:")
                        (string-append "(bind-lib "
