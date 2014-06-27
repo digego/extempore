@@ -1817,30 +1817,6 @@
                   (close-input-port in)
                   #f)))))))
 
-;; llvm module export helper
-
-(define llvm-export-current-xtlang-module
-  (lambda args
-    (let* ((basename (if (null? args) "xtlang-module" (car args)))
-           (bitcode-file (string-append "/tmp/" basename ".bc"))
-           (asm-file (string-append "/tmp/" basename ".s"))
-           (shared-lib-file
-            (cond ((string=? (sys:platform) "Linux")
-             (string-append "./" basename ".so"))
-            ((string=? (sys:platform) "OSX")
-             (string-append "./" basename ".dylib"))
-            ((string=? (sys:platform) "Windows")
-             (string-append "./" basename ".dll"))
-            (else ""))))
-      (llvm:export-module bitcode-file)
-      ;; print further instructions
-      (print "\nLLVM bitcode for the current xtlang module exported to" bitcode-file "\nTo finish compiling, enter the following command in a terminal window (inserting the proper path to your LLVM install):\n\n")
-      (cond ((string=? (sys:platform) "Linux")
-             (print "/path/to/llvm/3.2/bin/llc -O3 -relocation-model=pic -tailcallopt" bitcode-file "&& gcc --shared -g" asm-file "-o" shared-lib-file "\n"))
-            ((string=? (sys:platform) "OSX")
-             (print "/path/to/llvm/3.2/bin/llc -O3 -relocation-model=pic -tailcallopt" bitcode-file "&& clang -O3 -dynamiclib -undefined dynamic_lookup" asm-file "-o" shared-lib-file "\n"))
-            (else (print "Sorry, cannot find the appropriate compilation command for your platform at this time."))))))
-
 
 (define range
   (lambda args
