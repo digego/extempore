@@ -148,10 +148,10 @@
                                     (print "Error:"))
                  (print " no .xtm file at" lib-path "\n"))
           (let* ((res (close-port in-file-port))
-                 (basename (car (reverse (regex:split lib-path "/"))))
-                 (libname (string-append "xtm" (car (regex:split basename "[.]"))))
-                 (precomp-file-path (string-append "libs/" basename)))
-            (if (not (sys:load-preload-check (string->symbol libname)))
+                 (libname (filename-from-path lib-path))
+                 (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
+                 (precomp-file-path (string-append "libs/" libname)))
+            (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "Precomp file not written ")
                        (close-port *sys:precomp:current-output-port*)
                        (set! *sys:precomp:current-output-port* #f))
@@ -161,11 +161,11 @@
                   (if *sys:precomp:current-output-port*
                       (begin
                         ;; this is the 'success' branch
-                        (set! *sys:precomp:current-lib-name* libname)
-                        (sys:precomp:insert-header libname)
+                        (set! *sys:precomp:current-lib-name* libname-no-extension)
+                        (sys:precomp:insert-header libname-no-extension)
                         (sys:load lib-path)
-                        (sys:precomp:compile-current-module libname move-into-place?)
-                        (sys:precomp:insert-footer libname)
+                        (sys:precomp:compile-current-module libname-no-extension move-into-place?)
+                        (sys:precomp:insert-footer libname-no-extension)
                         (close-port *sys:precomp:current-output-port*)
                         (set! *sys:precomp:current-lib-name* "xtmdylib")
                         (if  *sys:precomp:current-output-port*
