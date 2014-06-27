@@ -1,0 +1,383 @@
+
+;; passing a length of 0 will read the whole file
+(define-macro (set-sampler-index inst fname index offset lgth bank print?)
+  `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (and (cptr? native)
+              (> ,index 0)
+              (< ,index 128))
+         (set_sample_data_ native
+                           ,fname
+                           (real->integer ,index)
+                           (real->integer ,offset)
+                           (real->integer ,lgth)
+                           (real->integer ,bank)
+                           ,(if (> print? 0) 1 0)))))
+
+
+;; (set-sample-offset sampler 60 50000)
+;; this would offset the sample at index 60 by 50000 samples
+(define-macro (set-sample-offset inst index offset)
+  `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
+     (if (cptr? native)
+         (set_sample_offset_ native
+                             (real->integer ,index)
+                             (real->integer ,offset)))))
+
+
+
+;; make sampler instrument
+(define-macro (define-sampler name note_kernel effect_kernel)
+  `(bind-func ,name 100000
+     (let ((poly:i64 48)
+           (samples:|20,|128,SAMPLE*||* (zalloc)) ;; 128 samples * 20 'banks'
+           (samples_length:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
+           (samples_channels:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
+           (samples_offsets:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
+           (notes:[SAMPLE,SAMPLE,i64,i64]** (zalloc poly))
+           (attack:i64 200)
+           (decay:i64 200)
+           (release:i64 1000)
+           (sustain:SAMPLE 1.0) ;; amplitude of the sustain
+           (gain:SAMPLE 2.0)
+           (kk:i64 0) (ii:i64 0)
+           ;;(active:i64 0)
+           (note_starts:i64* (zalloc poly))
+           (new_note (lambda (start:i64 freq dur amp nargs:i64 dargs:SAMPLE*)
+                       (let ((free_note:i64 -1)
+                             (bank:i32 (if (< nargs 1) (i64toi32 0) (convert (pref dargs 0))))
+                             (idx:i64 (convert (floor (frq2midi freq))))
+                             (closest 1000000)
+                             (i:i64 0) (iii:i64 0) (idxi:i64 0)
+                             (new_idx idx))
+                         (dotimes (i poly) ;; check for free poly spot
+                           (if (> (pref note_starts i) 9999999999998)
+                               (set! free_note i)))
+                         (if (> free_note -1) ;; if we found a free poly spot assign a note
+                             (begin (dotimes (idxi 128)
+                                      (let ((v (llabs (- idx idxi))))
+                                        (if (and (<> (aref (aref-ptr samples_length bank) idxi) 0)
+                                                 (< v closest))
+                                            (begin (set! new_idx idxi)
+                                                   (set! closest v) 0))))
+                                    (let ((note_zone (push_zone (* 1024 10))))
+                                      (pset! notes free_note
+                                             (note_c start freq amp dur
+                                                     attack decay release sustain
+                                                     note_starts free_note
+                                                     (if (< nargs 2)
+                                                         (,note_kernel (aref-ptr samples bank) (aref-ptr samples_length bank) (aref-ptr samples_offsets bank)
+                                                                       (aref-ptr samples_channels bank) new_idx 0.5 0.0)
+                                                         (if (= nargs 2)
+                                                             (,note_kernel (aref-ptr samples bank) (aref-ptr samples_length bank) (aref-ptr samples_offsets bank)
+                                                                           (aref-ptr samples_channels bank) new_idx (pref dargs 1) 0.0)
+                                                             (,note_kernel (aref-ptr samples bank) (aref-ptr samples_length bank) (aref-ptr samples_offsets bank)
+                                                                           (aref-ptr samples_channels bank) new_idx (pref dargs 1) (pref dargs 2))))
+                                                     note_zone))
+                                      (pset! note_starts free_note start)
+                                      (pop_zone))
+                                    1)
+                             0)))))
+       (dotimes (kk 128)
+         (dotimes (ii 10) ;banks
+           (aset! (aref-ptr samples_offsets ii) kk 0)
+           (aset! (aref-ptr samples_length ii) kk 0)))
+       (dotimes (ii poly) ;; sets all notes to inactive
+         (pset! note_starts ii 9999999999999))
+       (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+         (let ((out:SAMPLE 0.0)
+               (k:i64 0))
+           (dotimes (k poly) ;; sum all active notesx
+             (if (< (pref note_starts k) time)
+                 (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
+           (* gain (,effect_kernel out time chan dat)))))))
+
+
+;; must be stereo samples of type wav aif or ogg
+(define-macro (load-sampler sampler path . args)
+  (let ((bank (if (> (length args) 0) (car args) 0))
+        (parser (if (> (length args) 1) (cadr args) 'parse-sample-names-1))
+        (midioffset (if (> (length args) 2) (caddr args) 0)))
+    `(let ((cnt 0)
+           (file-list (sys:directory-list ,(sys:expand-path path))))
+       (for-each (lambda (samp-data)
+                   (if samp-data
+                       (begin
+                         (set! cnt (+ cnt 1))
+                         (set-sampler-index ,sampler
+                                            (if (string=? (sys:platform) "Windows")
+                                                (car samp-data)
+                                                (string-append ,(sys:expand-path path) "/" (car samp-data)))
+                                            (+ ,midioffset (cadr samp-data))
+                                            (caddr samp-data)
+                                            (cadddr samp-data)
+                                            ,bank
+                                            0))))
+                 (,parser file-list))
+       (ascii-print-color 0 6 10)
+       (print 'Loaded cnt 'files 'into 'bank#: ,bank)
+       (ascii-print-color 0 7 10)
+       (println)
+       )))
+
+
+(define-macro (clear-sampler sampler . args)
+  (let ((bank (if (> (length args) 0) (car args) 0)))
+    `(let ((native (llvm:get-native-closure ,(symbol->string sampler)))
+           (cnt 0))
+       (dotimes (i 128)
+         (if (> (clear_sample_data_ native (real->integer i) (real->integer ,bank)) 0)
+             (set! cnt (+ cnt 1))))
+       (ascii-print-color 0 6 10)
+       (print 'Cleared cnt 'slots 'from 'bank#: ,bank)
+       (ascii-print-color 0 7 10)
+       (println)
+       #t)))
+
+
+
+;; as a start, here are a couple of parser functions which might be useful:
+
+(define note-name-to-midi-number
+  (lambda (name)
+    (let ((result (regex:matched name "([abcdefgABCDEFG])([#b])?(-?[0-9])")))
+        (if (null? result)
+            #f
+            (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                  (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                        ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+              (+ offset pc
+                 (cond ((string=? (caddr result) "#") 1)
+                       ((string=? (caddr result) "b") -1)
+                       (else 0))))))))
+
+;; this will match e.g. 60.aiff (where 60 is the midi note number)
+(define parse-sample-names-1
+  (lambda (file-list)
+    (map (lambda (fname)
+           (let ((result (regex:matched fname "([0-9]*)\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+             (if (null? result)
+                 (begin (if (not (regex:match? fname "^\\."))
+                            (println 'Error: 'cannot 'parse 'filename: fname))
+                        #f)
+                 (list fname                          ; filename
+                       (string->number (cadr result)) ; midi note number
+                       0                              ; offset
+                       0))))                          ; length (0 for whole sample)
+         file-list)))
+
+;; this will match e.g. Eb3.aiff (representing E flat 3)
+(define parse-sample-names-2
+  (lambda (file-list)
+    (map (lambda (fname)
+           (let ((result (regex:matched fname "^.*([abcdefgABCDEFG][#b]?[0-9]).*\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+             (if (null? result)
+                 (begin
+                   (if (not (regex:match? fname "^\\."))
+                       (begin
+                         (println 'Error: 'cannot 'parse 'filename: fname)
+                         (println 'Regex-result: result)))
+                   #f)
+                 (list fname                                    ; filename
+                       (note-name-to-midi-number (cadr result)) ; midi note number
+                       0                                        ; offset
+                       0))))                                    ; length (0 for whole sample)
+         file-list)))
+
+
+;; for the MIS piano samples (mf loudness only), avaliable from
+;; http://theremin.music.uiowa.edu/MISpiano.html
+(define parse-MIS-piano-mf
+  (lambda (file-list)
+    (map (lambda (samp-data)
+           (if (and samp-data
+                    (regex:match? (car samp-data) ".*\.mf\..*"))
+               samp-data
+               #f))
+         (parse-sample-names-2 file-list))))
+
+(define parse-MIS-piano-ff
+  (lambda (file-list)
+    (map (lambda (samp-data)
+           (if (and samp-data
+                    (regex:match? (car samp-data) ".*\.ff\..*"))
+               samp-data
+               #f))
+         (parse-sample-names-2 file-list))))
+
+;; for NI Akoustik piano samples
+;; Stein-R(A-1)-V(077)-dB(3129)-T(ML)-M(22)-P(1956-04-01).WAV
+(define parse-NI-piano-pp
+  (lambda (file-list)
+    (let loop ((unparsed-files file-list)
+               (samp-data-list '())
+               (loaded-notes '()))
+      (if (null? unparsed-files)
+          samp-data-list
+          (let ((result (regex:matched (car unparsed-files)
+                                       ".*-R\\(([ABCDEFG][#b]?-?[0-9])\\)-.*-M\\(([0-9]*)\\)-.*")))
+            (if (null? result)
+                (loop (cdr unparsed-files) samp-data-list loaded-notes)
+                (if (member (cadr result) loaded-notes)
+                    (loop (cdr unparsed-files) samp-data-list loaded-notes)
+                    (loop (cdr unparsed-files)
+                          (cons (list (car unparsed-files)
+                                      (+ 12 (note-name-to-midi-number (cadr result)))
+                                      0 0)
+                                samp-data-list)
+                          (cons (cadr result) loaded-notes)))))))))
+
+;; General MIDI drum note numbers
+
+(define *gm-kick* 35)
+(define *gm-kick-2* 36)
+(define *gm-side-stick* 37)
+(define *gm-snare* 38)
+(define *gm-hand-clap* 39)
+(define *gm-snare-2* 40)
+(define *gm-low-floor-tom* 41)
+(define *gm-closed-hi-hat* 42)
+(define *gm-hi-floor-tom* 43)
+(define *gm-pedal-hi-hat* 44)
+(define *gm-low-tom* 45)
+(define *gm-open-hi-hat* 46)
+(define *gm-low-mid-tom* 47)
+(define *gm-hi-mid-tom* 48)
+(define *gm-crash* 49)
+(define *gm-hi-tom* 50)
+(define *gm-ride* 51)
+(define *gm-chinese* 52)
+(define *gm-ride-bell* 53)
+(define *gm-tambourine* 54)
+(define *gm-splash* 55)
+(define *gm-cowbell* 56)
+(define *gm-crash-2* 57)
+(define *gm-vibraslap* 58)
+(define *gm-ride-2* 59)
+(define *gm-hi-bongo* 60)
+(define *gm-low-bongo* 61)
+(define *gm-mute-hi-conga* 62)
+(define *gm-hi-conga* 63)
+(define *gm-low-conga* 64)
+(define *gm-hi-timbale* 65)
+(define *gm-low-timbale* 66)
+(define *gm-hi-agogo* 67)
+(define *gm-low-agogo* 68)
+(define *gm-cabasa* 69)
+(define *gm-maracas* 70)
+(define *gm-short-whistle* 71)
+(define *gm-long-whistle* 72)
+(define *gm-short-guiro* 73)
+(define *gm-long-guiro* 74)
+(define *gm-claves* 75)
+(define *gm-hi-wood-block* 76)
+(define *gm-low-wood-block* 77)
+(define *gm-mute-cuica* 78)
+(define *gm-open-cuica* 79)
+(define *gm-mute-triangle* 80)
+(define *gm-open-triangle* 81)
+(define *gm-mute-surdo* 86)
+(define *gm-open-surdo* 87)
+
+(define *gm-drum-map-alist*
+  '(("kick" . 35)
+    ("kick-2" . 36)
+    ("side-stick" . 37)
+    ("snare" . 38)
+    ("hand-clap" . 39)
+    ("snare-2" . 40)
+    ("low-floor-tom" . 41)
+    ("closed-hi-hat" . 42)
+    ("hi-floor-tom" . 43)
+    ("pedal-hi-hat" . 44)
+    ("low-tom" . 45)
+    ("open-hi-hat" . 46)
+    ("low-mid-tom" . 47)
+    ("hi-mid-tom" . 48)
+    ("crash" . 49)
+    ("hi-tom" . 50)
+    ("ride" . 51)
+    ("chinese" . 52)
+    ("ride-bell" . 53)
+    ("tambourine" . 54)
+    ("splash" . 55)
+    ("cowbell" . 56)
+    ("crash-2" . 57)
+    ("vibraslap" . 58)
+    ("ride-2" . 59)
+    ("hi-bongo" . 60)
+    ("low-bongo" . 61)
+    ("mute-hi-conga" . 62)
+    ("hi-conga" . 63)
+    ("low-conga" . 64)
+    ("hi-timbale" . 65)
+    ("low-timbale" . 66)
+    ("hi-agogo" . 67)
+    ("low-agogo" . 68)
+    ("cabasa" . 69)
+    ("maracas" . 70)
+    ("short-whistle" . 71)
+    ("long-whistle" . 72)
+    ("short-guiro" . 73)
+    ("long-guiro" . 74)
+    ("claves" . 75)
+    ("hi-wood-block" . 76)
+    ("low-wood-block" . 77)
+    ("mute-cuica" . 78)
+    ("open-cuica" . 79)
+    ("mute-triangle" . 80)
+    ("open-triangle" . 81)
+    ("mute-surdo" . 86)
+    ("open-surdo" . 87)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; An ipc helper for audio
+;;
+(define ipc:audio-setup
+  (lambda (proc)
+    (ipc:eval-string proc
+                     ";; new playnote
+                     (define play-note
+                       (lambda (time inst pitch vol dur . args)
+                         (let* ((nargs (length args))
+                               (duration (* 1.0 dur))
+                               (dargs (sys:make-cptr (* 8 nargs))) ;; doubles
+                               (native (if (procedure? inst)
+                                           (llvm:get-native-closure (llvm:ffi-get-name inst))
+                                           (llvm:get-native-closure (if (symbol? inst)
+                                                                        (symbol->string inst)
+                                                                        inst)))))
+                           (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
+                           (if (cptr? native)
+                               (_play_note (integer->real time)
+                                           native
+                                           (midi2frq (* 1.0 pitch))
+                                           (/ (exp (/ vol 26.222)) 127.0)
+                                           duration
+                                           nargs
+                                           dargs)
+                               (print-error 'No 'inst 'named (symbol->string inst))))))
+                     ;; note name to midi num
+                     (define note-name-to-midi-number
+                       (lambda (name)
+                         (let ((result (regex:matched name \"([abcdefgABCDEFG])([#b])?(-?[0-9])\")))
+                           (if (null? result)
+                               #f
+                               (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                                     (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                                           ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+                                 (+ offset pc
+                                    (cond ((string=? (caddr result) \"#\") 1)
+                                          ((string=? (caddr result) \"b\") -1)
+                                          (else 0))))))))
+                     ;; the play macro
+                     (macro (play args)
+                            (if (symbol? (cadr args))
+                                `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+                                            ,@(cdr (cddddr args)))
+                                `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+                                            (*metro* 'dur ,(car (cdr (cddddr args))))
+                                            ,@(cddr (cddddr args)))))")
+    (ipc:bind-func proc '_play_note)
+    (ipc:bind-func proc 'midi2frq)))
