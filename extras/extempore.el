@@ -922,7 +922,8 @@ to continue it."
   (setq comint-preoutput-filter-functions (list (function extempore-repl-preoutput-filter)))
   ;; (extempore-mode-variables)
   (setq mode-line-process '(":%s"))
-  (setq comint-get-old-input (function extempore-get-old-input)))
+  ;; (setq comint-get-old-input (function extempore-get-old-input))
+  )
 
 (defun extempore-repl-send (proc string)
   (comint-simple-send proc (concat string "\r")))
