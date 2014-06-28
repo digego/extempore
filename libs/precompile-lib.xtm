@@ -6,15 +6,9 @@
 
 ;;; Commentary:
 
-;; This file compiles (and exports) the xtlang code which forms the
-;; standard library. It can be run at Extempore startup through the
-;; --run command line argument, e.g.
+;; 
 
-;; shell> ./extempore --run libs/create-stdlib.xtm
-
-;; To finish the stdlib compilation process, you'll need to compile
-;; the bitcode in the exported module with llc (the required arguments
-;; will be printed to the Extempore log once the module is exported.
+;;; Code:
 
 (bind-func command
   (lambda (cmd:i8*)
@@ -113,8 +107,15 @@
                    *sys:precomp:current-output-port*)
           (display (substring libname 3) *sys:precomp:current-output-port*)
           (display "-loaded* #t)\n(suppress-compiler-messages #f)\n"
-                   *sys:precomp:current-output-port*)
-))))
+                   *sys:precomp:current-output-port*)))))
+
+;; if precompiling, insert arbitrary sexp (remember to quote!) into
+;; the precomp .xtm file, otherwise do nothing
+(define sys:precomp:insert-sexp
+  (lambda (sexp)
+    (if (output-port? *sys:precomp:current-output-port*)
+        (display (string-append (sexpr->string sexp) "\n")
+                 *sys:precomp:current-output-port*))))
 
 (define sys:precomp:print-compilation-details
   (lambda (start-time)
