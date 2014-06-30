@@ -117,6 +117,21 @@
         (display (string-append (sexpr->string sexp) "\n")
                  *sys:precomp:current-output-port*))))
 
+(define sys:precomp:insert-xtmlib-loading-details
+  (lambda (libname)
+    (let ((ext (cond ((string=? (sys:platform) "OSX") ".dylib")
+                     ((string=? (sys:platform) "Linux") ".so")
+                     ((string=? (sys:platform) "Windows") ".dll")
+                     (else
+                      #f))))
+      (if ext
+          (sys:precomp:insert-sexp
+           `(define xtmmath (sys:load-dylib
+                             ,(string-append "libs/xtm" (atom->string libname) ext))))
+          (begin (print-with-colors 'red 'default #f (print "Error"))
+                 (print ": unsupported platform ")
+                 (print-with-colors 'yellow 'default #f (print (sys:platform))))))))
+
 (define sys:precomp:print-compilation-details
   (lambda (start-time)
     (print-with-colors 'yellow 'default #t
