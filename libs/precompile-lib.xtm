@@ -53,7 +53,7 @@
         (if (string=? platform "Windows")
             (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
         (begin (print "Looking for ")
-               (print-with-colors 'green 'default #t (print "llc"))
+               (print-with-colors 'magenta 'default #t (print "llc"))
                (print " in " ext-llvm-dir "\n"))
         ;; print further instructions
         (command (string-append "rm " bitcode-path asm-path shlib-path))
@@ -64,12 +64,12 @@
               (print-with-colors 'red 'default #t
                                  (print "Failed to compile stdlib.\n"))
               (begin (print "Succesfully compiled ")
-                     (print-with-colors 'green 'default #t (print shlib-path))
+                     (print-with-colors 'blue 'default #t (print shlib-path))
                      (print "\n\n")
                      (if move-into-place?
                          (if (= (command (string-append "mv " shlib-path " libs")) 0)
                              (begin (print "Moved ")
-                                    (print-with-colors 'green 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
+                                    (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
                              (print-with-colors 'red 'default #t
                                                 (print "Error moving " shlib-path " into libs/ directory.")))))))))))
 
@@ -77,36 +77,32 @@
   (lambda (libname)
     (if (output-port? *sys:precomp:current-output-port*)
         (begin
-          (display "(sys:load-preload-check '"
+          (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
                    *sys:precomp:current-output-port*)
-          (display (substring libname 3) *sys:precomp:current-output-port*)
-          (display ")\n(define *sys:precomp:loading-start-time* (now))\n(suppress-compiler-messages #t)\n(define *xtmlib-"
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
                    *sys:precomp:current-output-port*)
-          (display (substring libname 3) *sys:precomp:current-output-port*)
-          (display "-loaded* #f)\n(define "
+          (display "(set! *sys:precomp:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
                    *sys:precomp:current-output-port*)
-          (display libname *sys:precomp:current-output-port*)
-          (display " (sys:open-dylib \"libs/"
+          (display (string-append "(define " libname " (sys:open-dylib \"libs/" libname
+                                  (cond ((string=? (sys:platform) "Linux") ".so\"))\n")
+                                        ((string=? (sys:platform) "Windows") ".dll\"))\n")
+                                        ((string=? (sys:platform) "OSX") ".dylib\"))\n")))
                    *sys:precomp:current-output-port*)
-          (display libname *sys:precomp:current-output-port*)
-          (display (let ((platform (sys:platform)))
-                     (cond ((string=? platform "Linux") ".so\"))\n")
-                           ((string=? platform "Windows") ".dll\"))\n")
-                           ((string=? platform "OSX") ".dylib\"))\n")))
-                   *sys:precomp:current-output-port*)
-          (display "(print \"Loading \")\n(print-with-colors 'blue 'default #t (print \"" *sys:precomp:current-output-port*)
-          (display libname *sys:precomp:current-output-port*)
-          (display "\"))\n(print \" library...     \")\n"
+          (display (string-append "(print \"Loading \")\n(print-with-colors 'magenta 'default #t (print \""
+                                  libname "\"))\n(print \" library...\\n\")\n")
                    *sys:precomp:current-output-port*)))))
 
 (define sys:precomp:insert-footer
   (lambda (libname)
     (if (output-port? *sys:precomp:current-output-port*)
         (begin
-          (display "(print-with-colors 'green 'default #t (print \"[DONE]\"))\n (print \" in\" (* 1.0 (/ (- (now) *sys:precomp:loading-start-time*) *second*)) \"seconds\\n\")\n(define *xtmlib-"
+          (display (string-append "(print-with-colors 'green 'default #t (print \"Loaded \"))\n(print-with-colors 'blue 'default #t (print \"" libname "\"))\n")
                    *sys:precomp:current-output-port*)
-          (display (substring libname 3) *sys:precomp:current-output-port*)
-          (display "-loaded* #t)\n(suppress-compiler-messages #f)\n"
+          (display (string-append "(print \" library in\" (* 1.0 (/ (- (now) *xtmlib-" (substring libname 3) "-loaded*) *second*)) \"seconds\\n\")\n")
+                   *sys:precomp:current-output-port*)
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+                   *sys:precomp:current-output-port*)
+          (display "(set! *impc:compiler:message:level* *sys:precomp:prev-compiler-message-level*)\n"
                    *sys:precomp:current-output-port*)))))
 
 ;; if precompiling, insert arbitrary sexp (remember to quote!) into
@@ -116,6 +112,8 @@
     (if (output-port? *sys:precomp:current-output-port*)
         (display (string-append (sexpr->string sexp) "\n")
                  *sys:precomp:current-output-port*))))
+
+(define sys:precomp:loading-precomp-libs* #f)
 
 (define sys:precomp:insert-xtmlib-loading-details
   (lambda (libname)
@@ -178,10 +176,10 @@
                       (begin
                         ;; this is the 'success' branch
                         (set! *sys:precomp:current-lib-name* libname-no-extension)
-                        (sys:precomp:insert-header libname-no-extension)
+                        ;; (sys:precomp:insert-header libname-no-extension)
                         (sys:load lib-path)
                         (sys:precomp:compile-current-module libname-no-extension move-into-place?)
-                        (sys:precomp:insert-footer libname-no-extension)
+                        ;; (sys:precomp:insert-footer libname-no-extension)
                         (close-port *sys:precomp:current-output-port*)
                         (set! *sys:precomp:current-lib-name* "xtmdylib")
                         (if  *sys:precomp:current-output-port*

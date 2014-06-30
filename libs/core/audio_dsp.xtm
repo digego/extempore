@@ -30,11 +30,14 @@
 
 ;; try a precompiled one first
 
+(set! sys:precomp:loading-precomp-libs* #t)
 (sys:load "libs/math.xtm")
 (sys:precomp:insert-sexp '(sys:load "libs/math.xtm"))
-
 ;; else compile from scratch
 (sys:load "libs/core/math.xtm")
+(set! sys:precomp:loading-precomp-libs* #f)
+
+(sys:precomp:insert-header "xtmaudio_dsp")
 
 ;; do you want to compile multichannel extensions
 ;; usually NOT
@@ -1324,17 +1327,13 @@
 (if (not (llvm:get-globalvar "SVF_PEAK"))
     (bind-val SVF_PEAK i64 5))
 
-(bind-func min2
-  (lambda (a:SAMPLE b)
-    (if (< a b) a b)))
-
 (bind-func svf_c
   "Returns a (state variable) filter closure"
   (lambda (type)
     ;; old values
     (let ((zero:SAMPLE 0.0)
           (cutoff_ 0.0)
-          (resonance_ 0.0)
+          (resonance_:SAMPLE 0.0)
           (drive 0.0)
           (freq 0.0)
           (damp 0.0)
@@ -1351,9 +1350,9 @@
             (begin
               (set! cutoff_ cutoff)
               (set! resonance_ resonance)
-              (set! freq (* 2.0 (sin (* SPI (min2 0.25 (/ cutoff (* SAMPLERATE 2.0)))))))
-              (set! damp (min2 (* 2.0 (- 1.0 (pow resonance 0.25)))
-                               (min2 2.0 (- (/ 2.0 freq) (* freq 0.5)))))))
+              (set! freq (* 2.0 (sin (* SPI (min 0.25 (/ cutoff (* SAMPLERATE 2.0)))))))
+              (set! damp (min (* 2.0 (- 1.0 (pow resonance 0.25)))
+                               (min 2.0 (- (/ 2.0 freq) (* freq 0.5)))))))
         (set! notch (- in (* damp band)))
         (set! low (+ low (* freq band)))
         (set! high (- notch low))
@@ -1619,4 +1618,6 @@
   (lambda (freq:SAMPLE)            
     (+ (* 12.0 (log2 (/ freq 440.0))) 69.0)))
 
-(define *xtmlib-audio_dsp-loaded* #f)
+(define *xtmlib-audio_dsp-loaded* #t)
+
+(sys:precomp:insert-footer "xtmaudio_dsp")
