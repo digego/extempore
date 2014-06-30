@@ -522,11 +522,15 @@
 
 (define impc:compiler:print-lib-binding-details-to-log
   (lambda (libname symname type)
-    (impc:precomp:write-binding-details-to-file "LibBound:"
-                                                (string-append (atom->string libname)
-                                                               " "
-                                                               (atom->string symname))
-                                                (atom->string type))
+    ;; don't write the header stuff for other precompiled xtm libs -
+    ;; assume a header file already exists in that case
+    (if (not (and (>= (string-length (atom->string libname)) 3)
+                  (string=? "xtm" (substring (atom->string libname) 0 3))))
+        (impc:precomp:write-binding-details-to-file "LibBound:"
+                                                    (string-append (atom->string libname)
+                                                                   " "
+                                                                   (atom->string symname))
+                                                    (atom->string type)))
     (if (equal? *impc:compiler:message:level* 'high)
         (begin
           (print "LibBound:  ")
