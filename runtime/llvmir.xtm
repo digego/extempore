@@ -445,11 +445,14 @@
 
 (define impc:precomp:write-binding-details-to-file
   (lambda (lead-string symname type . args)
-    (if (and (output-port? *sys:precomp:current-output-port*)
-             (not (and (string? type) (string=? type ""))))
-        (let* ((type-str (impc:ir:pretty-print-type (atom->string type)))
+    (if (output-port? *sys:precomp:current-output-port*)
+        (let* ((type-str (if (string=? (atom->string type) "polying")
+                             "poly-string"
+                             (impc:ir:pretty-print-type (atom->string type))))
                (precomp-string
-                (cond ((string=? lead-string "SetValue:")
+                (cond ((string=? lead-string "Overload:")
+                       (string-append "(bind-poly " symname ")\n"))
+                      ((string=? lead-string "SetValue:")
                        (string-append
                         (if (impc:ir:array? (impc:ir:get-type-from-pretty-str type-str))
                             "(bind-val "
@@ -472,8 +475,6 @@
                       ((string=? lead-string "DataType:")
                        (string-append "(bind-lib-type-precomp "
                                       *sys:precomp:current-lib-name* " " symname " " type-str ")\n"))
-                      ((string=? lead-string "Overload:")
-                       (string-append "(bind-poly " symname ")\n"))
                       ((string=? lead-string "SetAlias:")
                        (string-append "(bind-alias " symname " " type-str ")\n"))
                       ((string=? lead-string "Lib Load:")
@@ -548,7 +549,7 @@
      (string-append (symbol->string poly-name)
                     " "
                     (symbol->string native-name))
-     "")
+     "polying")
     (if (equal? *impc:compiler:message:level* 'high)
         (begin
           (print lead-string " ")
