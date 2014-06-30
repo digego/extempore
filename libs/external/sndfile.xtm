@@ -12,6 +12,13 @@
 
 ;; lib-loading config
 (sys:load-preload-check 'sndfile)
+(define *xtmlib-sndfile-loaded* #f)
+
+(set! sys:precomp:loading-precomp-libs* #t)
+(sys:load "libs/audio_dsp.xtm")
+(sys:precomp:insert-sexp '(sys:load "libs/audio_dsp.xtm"))
+(sys:load "libs/core/audio_dsp.xtm")
+(set! sys:precomp:loading-precomp-libs* #f)
 
 ;; load the libsndfile dynamic library
 
@@ -37,9 +44,7 @@
         (null? libsndfile))
     (sys:load-escape "Error loading libsndfile dynamic library"))
 
-(define *xtmlib-sndfile-loaded* #t)
-
-(sys:load "libs/core/audio_dsp.xtm")
+(sys:precomp:insert-header "xtmsndfile")
 
 (bind-val SF_LOOP_NONE i32 800)
 (bind-val SF_LOOP_FORWARD i32 801)
@@ -246,3 +251,7 @@
 	(sf_write_sync audiofile)
 	(sf_close audiofile)
 	samples_written))))
+
+(define *xtmlib-sndfile-loaded* #t)
+
+(sys:precomp:insert-footer "xtmsndfile")

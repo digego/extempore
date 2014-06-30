@@ -447,8 +447,9 @@
   (lambda (lead-string symname type . args)
     (if (and (output-port? *sys:precomp:current-output-port*)
              (not sys:precomp:loading-precomp-libs*))
-        (let* ((type-str (if (string=? (atom->string type) "polying")
-                             "poly-string"
+        (let* ((type-str (if (or (string=? (atom->string type) "polying")
+                                 (string=? (atom->string lead-string) "Lib Load:"))
+                             "null"
                              (impc:ir:pretty-print-type (atom->string type))))
                (precomp-string
                 (cond ((string=? lead-string "Overload:")
