@@ -10,6 +10,21 @@
 
 ;; lib-loading config
 (sys:load-preload-check 'assimp)
+(define *xtmlib-assimp-loaded* #f)
+
+;; load SOIL
+(set! sys:precomp:loading-precomp-libs* #t)
+(sys:load "libs/shaders.xtm")
+(sys:precomp:insert-sexp '(sys:load "libs/shaders.xtm"))
+(sys:load "libs/external/shaders.xtm")
+;; load the scheme macros
+(sys:load "libs/external/assimp-scm.xtm")
+;; make sure we load them with precompiled code as well
+(sys:precomp:insert-sexp
+ '(sys:load "libs/external/assimp-scm.xtm"))
+(set! sys:precomp:loading-precomp-libs* #t)
+
+(sys:precomp:insert-header "xtmassimp")
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -32,17 +47,6 @@
 (if (or (eq? #f libassimp)
         (null? libassimp))
     (sys:load-escape "Error loading assimp library"))
-
-(define *xtmlib-assimp-loaded* #t)
-
-;; load SOIL
-(sys:load "libs/external/soil.xtm")
-;; load shaders
-(sys:load "libs/external/shaders.xtm")
-(sys:load "libs/external/assimp-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
- '(sys:load "libs/external/assimp-scm.xtm"))
 
 ;; load texture and returns texture number
 ;; 16 is for verticle flip
@@ -685,3 +689,6 @@
       (aiExportScene scene format fout aiprocess)
       (printf "\n Done exporting scene\n")
       void)))
+
+(sys:precomp:insert-footer "xtmassimp")
+(define *xtmlib-assimp-loaded* #t)

@@ -12,8 +12,11 @@
 
 ;; lib-loading config
 (sys:load-preload-check 'soil)
+(define *xtmlib-soil-loaded* #f)
 
 ;; load soil library
+
+(sys:precomp:insert-header "xtmsoil")
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -35,9 +38,6 @@
 
 (if (null? libsoil) 
     (sys:load-escape "Could not load libSOIL\n"))
-
-(define *xtmlib-soil-loaded* #f)
-
 
 (bind-lib libsoil SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
 (bind-lib libsoil SOIL_load_OGL_texture_from_memory [i32,i8*,i32,i32,i32,i32]*)
@@ -431,3 +431,5 @@
       void)))
 
 (define *xtmlib-soil-loaded* #t)
+
+(sys:precomp:insert-footer "xtmsoil")

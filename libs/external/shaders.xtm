@@ -12,14 +12,15 @@
 
 ;; lib-loading config
 (sys:load-preload-check 'shaders)
-(sys:load "libs/external/opengl.xtm")
+(define *xtmlib-shaders-loaded* #f)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; GLOBAL to let other libraries know that
-;; math.xtm has already been loaded
-;; 
-(define *xtmlib-shaders-loaded* #t)
+(set! sys:precomp:loading-precomp-libs* #t)
+(sys:load "libs/opengl.xtm")
+(sys:precomp:insert-sexp '(sys:load "libs/opengl.xtm"))
+(sys:load "libs/external/opengl.xtm")
+(set! sys:precomp:loading-precomp-libs* #f)
+
+(sys:precomp:insert-header "xtmshaders")
 
 ;; draw a quad
 ;; tw and th are framebuffer width and height
@@ -895,8 +896,7 @@
             (fill_identity_matrix model)
             (fill_identity_matrix view)         
             (fill_orthographic_matrix projection -0.5 0.5 -0.5 0.5 -0.5 0.5)          
-            (xtm_draw_tex xtm_render_quad_shader (tref render_fbo 1) model view projection)
-            )
+            (xtm_draw_tex xtm_render_quad_shader (tref render_fbo 1) model view projection))
           (begin
             ;; post is usually 2D? so no DEPTH test by default!
             (glDisable GL_DEPTH_TEST)                  
@@ -910,6 +910,7 @@
       (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
       ;; print errors?
       (gl_print_error)
-      (set! frame (+ frame 1))
-    )))
+      (set! frame (+ frame 1)))))
 
+(sys:precomp:insert-footer "xtmshaders")
+(define *xtmlib-shaders-loaded* #t)

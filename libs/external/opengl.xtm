@@ -10,13 +10,20 @@
 
 ;;; Code:
 
-;; first make sure that math.xtm is loaded
-(sys:load "libs/core/math.xtm")
-(sys:load "libs/external/soil.xtm")
-
-;; lib-loading config
 (sys:load-preload-check 'opengl)
-(define *xtmlib-opengl-loaded* #t)
+(define *xtmlib-opengl-loaded* #f)
+
+;; first make sure that math.xtm is loaded
+(set! sys:precomp:loading-precomp-libs* #t)
+(sys:load "libs/math.xtm")
+(sys:precomp:insert-sexp '(sys:load "libs/math.xtm"))
+(sys:load "libs/core/math.xtm")
+(sys:load "libs/soil.xtm")
+(sys:precomp:insert-sexp '(sys:load "libs/soil.xtm"))
+(sys:load "libs/external/soil.xtm")
+(set! sys:precomp:loading-precomp-libs* #f)
+
+(sys:precomp:insert-header "xtmopengl")
 
 ;; first check if we are windows we need to load some extensions!
 (if (string=? (sys:platform) "Windows")
@@ -898,3 +905,5 @@
       ;;       (printf "")))
       void)))
 
+(sys:precomp:insert-footer "xtmopengl")
+(define *xtmlib-opengl-loaded* #t)

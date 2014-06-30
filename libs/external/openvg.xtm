@@ -13,10 +13,16 @@
 
 ;;; Code:
 
-(sys:load "libs/external/soil.xtm")
-
 ;; lib-loading config
 (sys:load-preload-check 'openvg)
+
+(set! sys:precomp:loading-precomp-libs* #t)
+(sys:load "libs/soil.xtm")
+(sys:precomp:insert-sexp '(sys:load "libs/soil.xtm"))
+(sys:load "libs/external/soil.xtm")
+(set! sys:precomp:loading-precomp-libs* #f)
+
+(sys:precomp:insert-header "xtmopenvg")
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -1056,4 +1062,5 @@
                                          alpha))
                                  256.0)))))
 
+(sys:precomp:insert-header "xtmopenvg")
 (define *xtmlib-openvg-loaded* #t)
