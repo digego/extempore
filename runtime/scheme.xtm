@@ -1828,3 +1828,188 @@
 	   (make-list-with-proc (/ (- (cadr args) (car args)) (caddr args))
 				(lambda (i) (+ (car args) (* i (caddr args))))))
 	  (else (println 'bad 'range!) '()))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; PRECOMP STUFF ;;;;;;;;;;;;;;;;;;;;;;;
+
+;; this can be moved elsewhere, but should be loaded on startup
+
+
+(define sys:precomp:compile-current-module
+  (lambda (module-name move-into-place?)
+    (let ((ext-llvm-dir (cptr->string (get_llvm_path))))
+      (if (string=? "" ext-llvm-dir)
+          (begin (print-with-colors 'red 'default #t (print "Error"))
+                 (print ": you must set the environment variable ")
+                 (print-with-colors 'green 'default #f (print "EXT_LLVM_DIR"))
+                 (print " to point to your LLVM directory before you can precompile xtlang code.\n")
+                 (error "")))
+      (let* ((platform (sys:platform))
+             (bitcode-path (string-append "/tmp/" module-name ".bc"))
+             (asm-path (string-append "/tmp/" module-name ".s"))
+             (shlib-path
+              (cond ((string=? platform "Linux")
+                     (string-append "/tmp/" module-name ".so"))
+                    ((string=? platform "OSX")
+                     (string-append "/tmp/" module-name ".dylib"))
+                    ((string=? platform "Windows")
+                     (string-append "./" module-name ".dll"))
+                    (else "")))
+             (compilation-command
+              (string-append
+               ext-llvm-dir
+               "/bin/llc -O3 -relocation-model=pic -tailcallopt "
+               bitcode-path " && "
+               (cond ((string=? platform "Linux")
+                      "gcc -O3 --shared -g ")
+                     ((string=? platform "OSX")
+                      (string-append "clang -O3 -dynamiclib -undefined dynamic_lookup "
+                                     )))
+               asm-path
+               " -o " shlib-path "\n")))
+        (if (string=? platform "Windows")
+            (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
+        (begin (print "Looking for ")
+               (print-with-colors 'magenta 'default #t (print "llc"))
+               (print " in " ext-llvm-dir "\n"))
+        ;; print further instructions
+        (command (string-append "rm " bitcode-path asm-path shlib-path))
+        (llvm:export-module bitcode-path)
+        (print "compile command:\n " compilation-command "\n\n")
+        (let ((res (command compilation-command)))
+          (if (<> res 0)
+              (print-with-colors 'red 'default #t
+                                 (print "Failed to compile stdlib.\n"))
+              (begin (print "Succesfully compiled ")
+                     (print-with-colors 'blue 'default #t (print shlib-path))
+                     (print "\n\n")
+                     (if move-into-place?
+                         (if (= (command (string-append "mv " shlib-path " libs")) 0)
+                             (begin (print "Moved ")
+                                    (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
+                             (print-with-colors 'red 'default #t
+                                                (print "Error moving " shlib-path " into libs/ directory.")))))))))))
+
+(define sys:precomp:insert-header
+  (lambda (libname)
+    (if (output-port? *sys:precomp:current-output-port*)
+        (begin
+          (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
+                   *sys:precomp:current-output-port*)
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+                   *sys:precomp:current-output-port*)
+          (display "(set! *sys:precomp:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
+                   *sys:precomp:current-output-port*)
+          (display (string-append "(define " libname " (sys:open-dylib \"libs/" libname
+                                  (cond ((string=? (sys:platform) "Linux") ".so\"))\n")
+                                        ((string=? (sys:platform) "Windows") ".dll\"))\n")
+                                        ((string=? (sys:platform) "OSX") ".dylib\"))\n")))
+                   *sys:precomp:current-output-port*)
+          (display (string-append "(print \"Loading \")\n(print-with-colors 'magenta 'default #t (print \""
+                                  libname "\"))\n(print \" library...\\n\")\n")
+                   *sys:precomp:current-output-port*)))))
+
+(define sys:precomp:insert-footer
+  (lambda (libname)
+    (if (output-port? *sys:precomp:current-output-port*)
+        (begin
+          (display (string-append "(print-with-colors 'green 'default #t (print \"Loaded \"))\n(print-with-colors 'blue 'default #t (print \"" libname "\"))\n")
+                   *sys:precomp:current-output-port*)
+          (display (string-append "(print \" library in\" (* 1.0 (/ (- (now) *xtmlib-" (substring libname 3) "-loaded*) *second*)) \"seconds\\n\")\n")
+                   *sys:precomp:current-output-port*)
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+                   *sys:precomp:current-output-port*)
+          (display "(set! *impc:compiler:message:level* *sys:precomp:prev-compiler-message-level*)\n"
+                   *sys:precomp:current-output-port*)))))
+
+;; if precompiling, insert arbitrary sexp (remember to quote!) into
+;; the precomp .xtm file, otherwise do nothing
+(define sys:precomp:insert-sexp
+  (lambda (sexp)
+    (if (output-port? *sys:precomp:current-output-port*)
+        (display (string-append (sexpr->string sexp) "\n")
+                 *sys:precomp:current-output-port*))))
+
+(define sys:precomp:loading-precomp-libs* #f)
+
+(define sys:precomp:insert-xtmlib-loading-details
+  (lambda (libname)
+    (let ((ext (cond ((string=? (sys:platform) "OSX") ".dylib")
+                     ((string=? (sys:platform) "Linux") ".so")
+                     ((string=? (sys:platform) "Windows") ".dll")
+                     (else
+                      #f))))
+      (if ext
+          (sys:precomp:insert-sexp
+           `(define xtmmath (sys:load-dylib
+                             ,(string-append "libs/xtm" (atom->string libname) ext))))
+          (begin (print-with-colors 'red 'default #f (print "Error"))
+                 (print ": unsupported platform ")
+                 (print-with-colors 'yellow 'default #f (print (sys:platform))))))))
+
+(define sys:precomp:print-compilation-details
+  (lambda (start-time)
+    (print-with-colors 'yellow 'default #t
+                       (print "Total compile time: "))
+    (print (* 1.0 (/ (- (now) start-time) *minute*)) "minutes\n\n")
+    
+    ;; (println 'sym-name-stack-size: (length *impc:ir:sym-name-stack*))
+    (print-with-colors 'cyan 'default #f (print " type-aliases: "))
+    (println (length *impc:ir:type-aliases*))
+    (print-with-colors 'cyan 'default #f (print "   gpolytypes: "))
+    (println (length *impc:ir:gpolytypes*))
+    (print-with-colors 'cyan 'default #f (print "    polytypes: "))
+    (println (length *impc:ir:polytypes*))
+    (print-with-colors 'cyan 'default #f (print "       gpolys: "))
+    (println (length *impc:ir:gpolys*))
+    (print-with-colors 'cyan 'default #f (print "        polys: "))
+    (println (length *impc:ir:polys*))
+    (print-with-colors 'cyan 'default #f (print "       vtypes: "))
+    (println (length *impc:ti:vtypes*))
+    (print-with-colors 'cyan 'default #f (print "gtypemappings: "))
+    (println (length *impc:ti:generic-type-mappings*))))
+
+(define sys:precomp:compile-xtm-file
+  (lambda (lib-path move-into-place? exit-when-done?)
+    ;; is there a better way to check if a file exists?
+    (let ((start-time (now))
+          (in-file-port (open-input-file lib-path)))
+      (if (not in-file-port)
+          (begin (print-with-colors 'red 'default #t
+                                    (print "Error:"))
+                 (print " no .xtm file at" lib-path "\n"))
+          (let* ((res (close-port in-file-port))
+                 (libname (filename-from-path lib-path))
+                 (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
+                 (precomp-file-path (string-append "libs/" libname)))
+            (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
+                (begin (print "Precomp file not written ")
+                       (close-port *sys:precomp:current-output-port*)
+                       (set! *sys:precomp:current-output-port* #f))
+                (begin
+                  ;; if the preload check passes
+                  (set! *sys:precomp:current-output-port* (open-output-file precomp-file-path))
+                  (if *sys:precomp:current-output-port*
+                      (begin
+                        ;; this is the 'success' branch
+                        (set! *sys:precomp:current-lib-name* libname-no-extension)
+                        ;; (sys:precomp:insert-header libname-no-extension)
+                        (sys:load lib-path)
+                        (sys:precomp:compile-current-module libname-no-extension move-into-place?)
+                        ;; (sys:precomp:insert-footer libname-no-extension)
+                        (close-port *sys:precomp:current-output-port*)
+                        (set! *sys:precomp:current-lib-name* "xtmdylib")
+                        (if  *sys:precomp:current-output-port*
+                             (begin (set! *sys:precomp:current-output-port* #f)
+                                    (print "Successfully wrote precomp file to ")
+                                    (print-with-colors 'green 'default #f (print precomp-file-path "\n"))
+                                    (sys:precomp:print-compilation-details start-time)
+                                    (if exit-when-done? (quit 0)))
+                             (begin (print-with-colors 'red 'default #t (print "Error:"))
+                                    (print " something went wrong in writing the output file ")
+                                    (print-with-colors 'red 'default #t (print precomp-file-path "\n"))
+                                    (if exit-when-done? (quit 1)))))
+                      (begin (print-with-colors 'red 'default #t
+                                                (print "Error:"))
+                             (print " cannot write precomp file at " precomp-file-path "\n")
+                             (if exit-when-done? (quit 2)))))))))))
