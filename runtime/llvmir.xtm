@@ -445,8 +445,9 @@
 
 (define impc:precomp:write-binding-details-to-file
   (lambda (lead-string symname type . args)
-    (if (output-port? *sys:precomp:current-output-port*)
-        (let* ((type-str (atom->string type))
+    (if (and (output-port? *sys:precomp:current-output-port*)
+             (not (and (string? type) (string=? type ""))))
+        (let* ((type-str (impc:ir:pretty-print-type (atom->string type)))
                (precomp-string
                 (cond ((string=? lead-string "SetValue:")
                        (string-append
