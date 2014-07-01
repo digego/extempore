@@ -3,6 +3,7 @@
 ;; (sys:precomp:compile-xtm-file "libs/core/math.xtm" #t #t)
 
 (sys:load "libs/core/math.xtm")
+(sys:load "libs/external/shaders.xtm")
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -57,14 +58,122 @@
 
 ;; (run_main)
 
-;; some test functions
+;; gotta create the context before the vbo or it'll crash
 
-(bind-func xtmain 500000000
+(define width 1680.0)
+(define height 1050.0)
+(bind-val width float 1680.0)
+(bind-val height float 1050.0)
+(define fullscreen #t)
+
+(define *gl-ctx* (gl:make-ctx ":0" fullscreen 0. 0. width height))
+
+
+;; now for the xtlang version
+
+;; allocate arrays for standard code
+(bind-val part float*)
+(bind-val part2 float*)
+(bind-val tpart float*)
+(bind-val qe float*)
+(bind-val fxye float*)
+(bind-val ffc cpxf*)
+(bind-val mixup i32*)
+(bind-val sct cpxf*)
+(bind-val npicy i32*)
+;; and a vbo for the graphics code
+(bind-val vbo E_vbo*)
+
+(bind-func allocate_arrays
+  (lambda (np:i32 nx:i32 ny:i32)
+    (let ((part_ptr (halloc (* 4 np)))  ;; idimp = 4
+          (part2_ptr (halloc (* 4 np))) ;; idimp = 4
+          (qe_ptr (halloc (* (+ nx 2) (+ ny 1))))
+          (fxye_ptr (halloc (* 2 (+ nx 2) (+ ny 1)))) ;; ndim = 2
+          (ffc_ptr (halloc (* (/ nx 2) (/ ny 2))))
+          (mixup_ptr (halloc (max2i32 (/ nx 2) ny)))
+          (sct_ptr (halloc (/ (max2i32 nx ny) 2)))
+          (npicy_ptr (halloc (+ ny 1))))
+      (set! part part_ptr)
+      (set! vbo (create_vbo (* np 16)
+                            (cast part i8*)
+                            GL_STREAM_DRAW))
+      (set! part2 part2_ptr)
+      (set! qe qe_ptr)
+      (set! fxye fxye_ptr)
+      (set! ffc ffc_ptr)
+      (set! mixup mixup_ptr)
+      (set! sct sct_ptr)
+      (set! npicy npicy_ptr)
+      (println "Allocated memory for data arrays, np:" np "nx:" nx "ny:" ny)
+      void)))
+
+(bind-func free_arrays
+  (lambda ()
+    (free part)
+    (free part2)
+    (free qe)
+    (free fxye)
+    (free ffc)
+    (free mixup)
+    (free sct)
+    (free npicy)))
+
+(define *max-grid-size* (real->integer (expt 2 9)))
+(define *max-num-particles* (real->integer (* 3072 3072)))
+
+(allocate_arrays *max-num-particles* *max-grid-size* *max-grid-size*)
+
+(bind-func print_energies
+  (lambda (field_energy:float kinetic_energy:float header_string:i8*)
+    (printf "\n%s:\n\n" header_string)
+    (printf "field_energy:    %g\n" (convert field_energy double))
+    (printf "kinetic_energy:  %g\n" (convert kinetic_energy double))
+    (printf "total_energy:    %g\n" (convert (+ field_energy kinetic_energy) double))))
+
+;; (bind-func pic_step
+;;   (lambda (ntime:i32 np:i32 idimp:i32 nx:i32 ny:i32 nxe:i32 nye:i32 nxeh:i32 nxh:i32 nyh:i32 ny1:i32 nxhy:i32 nxyh:i32 qme:float qbme:float dt:float we:float* wke:float* ipbc:i32 isign:i32 indx:i32 indy:i32 ax:float ay:float affp:float)
+;;     void))
+
+(bind-func particle_range
+  (lambda (np)
+    (let ((minx:float 0.)
+          (miny:float 0.)
+          (maxx:float 0.)
+          (maxy:float 0.)
+          (minvx:float 0.)
+          (minvy:float 0.)
+          (maxvx:float 0.)
+          (maxvy:float 0.)
+          (x 0.)
+          (y 0.)
+          (vx 0.)
+          (vy 0.))
+      (doloop (i np)
+        (set! x (pref part (* 4 i)))
+        (set! y (pref part (+ (* 4 i) 1)))
+        (set! vx (pref part (+ (* 4 i) 2)))
+        (set! vy (pref part (+ (* 4 i) 3)))
+        (if (< x minx) (set! minx x))
+        (if (< y miny) (set! miny y))
+        (if (> x maxx) (set! maxx x))
+        (if (> y maxy) (set! maxy y))
+        (if (< vx minvx) (set! minvx vx))
+        (if (< vy minvy) (set! minvy vy))
+        (if (> vx maxvx) (set! maxvx vx))
+        (if (> vy maxvy) (set! maxvy vy))
+        )
+      (println "minx:" minx "miny:" miny)
+      (println "maxx:" maxx "maxy:" maxy)
+      (println "minvx:" minvx "minvy:" minvy)
+      (println "maxvx:" maxvx "maxvy:" maxvy))))
+
+(bind-func pic_step
   (let ( ;; parameters
-        (indx:i32 9)
-        (indy:i32 9)
-        (npx:i32 3072)
-        (npy:i32 3072)
+        (indx:i32 7)
+        (indy:i32 7)
+        (npx:i32 16) ;; 3072
+        (npy:i32 16) ;; 3072
         (ndim:i32 2)
         (tend:float 10.)
         (dt:float .1)
@@ -77,7 +186,6 @@
         (ay:float .912871)
         (idimp:i32 4)
         (ipbc:i32 1)
-        (sortime:i32 50)
         (wke:float* (zalloc))
         (we:float* (zalloc))
         (wt:float 0.)
@@ -100,17 +208,7 @@
         (qbme:float qme)
         (affp:float (/ (convert (* nx ny) float)
                        (convert np float)))
-        ;; allocate arrays for standard code
-        (part:float* (zalloc (* idimp np)))
-        (part2:float* (zalloc (* idimp np)))
-        (tpart:float* null)
-        (qe:float* (zalloc (* nxe nye)))
-        (fxye:float* (zalloc (* ndim nxe nye)))
-        (ffc:cpxf* (zalloc (* nxh nyh)))
-        (mixup:i32* (zalloc nxhy))
-        (sct:cpxf* (zalloc nxyh))
-        (npicy:i32* (zalloc ny1))
-        ;; timing data
+        ;; timing stuff
         (time:float 0.)
         (itime:timeval* (zalloc))
         (tdpost:float 0.)
@@ -120,142 +218,140 @@
         (tpush:float 0.)
         (tsort:float 0.)
         (dtime:double* (zalloc))
-        )
+        (sortime:i32 0)
+        ;; 16 bytes per particle: 4 floats (x,y,vx,vy)
+        (print_details (lambda ()
+                         (print_energies (pref we 0) (pref wke 0) "Energies")
+                         (println "deposit time =" tdpost)
+                         (println "guard time =" tguard)
+                         (println "solver time =" tfield)
+                         (println "fft time =" tfft)
+                         (println "push time =" tpush)
+                         (println "sort time =" tsort)
+                         (set! tfield (+ tfield tguard tfft))
+                         (println "total solver time =" tfield)
+                         (set! time (+ tdpost tpush tsort))
+                         (println "total particle time =" time)
+                         (set! wt (+ time tfield))
+                         (println "total time =" wt)
+                         (println)
+                         (set! wt (/ 1.0e9 (convert (* nloop np))))
+                         (println "Push Time (nsec) =" (* tpush wt))
+                         (println "Deposit Time (nsec) =" (* tdpost wt))
+                         (println "Sort Time (nsec) =" (* tsort wt))
+                         (println "Total Particle Time (nsec) =" (* time wt) "\n"))))
+    ;; initial setup
+    (cwfft2rinit mixup sct indx indy nxhy nxyh)
+    ;; calculate form factors
+    (set! isign 0)
+    (cpois22 (cast qe cpxf*)
+             (cast fxye cpxf*)
+             isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
+    ;; initialize electrons
+    (cdistr2 part vtx vty vx0 vy0 npx npy idimp np nx ny ipbc)
+    ;; (print_energies (pref we 0) (pref wke 0) "Initial energies")
     (lambda ()
-      ;; nloop = number of time steps in simulation
-      ;; ntime = current time step
-      ;; prepare FFT tables
-      (cwfft2rinit mixup sct indx indy nxhy nxyh)
-      ;; calculate form factors
-      (set! isign 0)
+      ;; (printf "part = %p part2 = %p vbo ref 2 = %p\n" part part2 (tref vbo 2))
+      ;; (if (= (% ntime 10) 0)
+      ;;     (println "ntime:" ntime))
+      (dtimer dtime itime -1)
+      (doloop (j (* nxe nye))
+        (pset! qe j 0.))
+      (cgpost2l part qe qme np idimp nxe nye)
+      (dtimer dtime itime 1)
+      (set! time (convert (pref dtime 0)))
+      (set! tdpost (+ tdpost time))
+      ;; (println "tdpost:" tdpost)
+      ;; add guard cells with standard procedure: updates qe
+      (dtimer dtime itime -1)
+      (caguard2l qe nx ny nxe nye)
+      (dtimer dtime itime 1)
+      (set! time (convert (pref dtime 0)))
+      (set! tguard (+ tguard time))
+      ;; (println "tguard:" tguard)
+      ;; transform charge to fourier space with standard procedure:
+      ;; updates qe
+      (dtimer dtime itime -1)
+      (set! isign -1)
+      (cwfft2rx (cast qe cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+      (dtimer dtime itime 1)
+      (set! time (convert (pref dtime 0)))
+      (set! tfft (+ tfft time))
+      ;; (println "tfft:" tfft)
+      ;; calculate force/charge in fourier space with standard
+      ;; procedure: updates fxye
+      (dtimer dtime itime -1)
+      (set! isign -1)
       (cpois22 (cast qe cpxf*)
                (cast fxye cpxf*)
                isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
-      ;; initialize electrons
-      (cdistr2 part vtx vty vx0 vy0 npx npy idimp np nx ny ipbc)
-      ;; main iteration loop
-      (println "\nStart iteration:" nloop "loops\n")
-      (dotimes (ntime nloop)
-        ;; check the mixup array
-        ;; deposit charge with standard procedure: updates qe
-        (if (= (% ntime 10) 0)
-            (println "ntime:" ntime))
-        (dtimer dtime itime -1)
-        (dotimes (j (* nxe nye))
-          (pset! qe j 0.))
-        (cgpost2l part qe qme np idimp nxe nye)
-        (dtimer dtime itime 1)
-        (set! time (convert (pref dtime 0)))
-        (set! tdpost (+ tdpost time))
-        ;; (println "tdpost:" tdpost)
-        ;; add guard cells with standard procedure: updates qe
-        (dtimer dtime itime -1)
-        (caguard2l qe nx ny nxe nye)
-        (dtimer dtime itime 1)
-        (set! time (convert (pref dtime 0)))
-        (set! tguard (+ tguard time))
-        ;; (println "tguard:" tguard)
-        ;; transform charge to fourier space with standard procedure:
-        ;; updates qe
-        (dtimer dtime itime -1)
-        (set! isign -1)
-        (cwfft2rx (cast qe cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
-        (dtimer dtime itime 1)
-        (set! time (convert (pref dtime 0)))
-        (set! tfft (+ tfft time))
-        ;; (println "tfft:" tfft)
-        ;; calculate force/charge in fourier space with standard
-        ;; procedure: updates fxye
-        (dtimer dtime itime -1)
-        (set! isign -1)
-        (cpois22 (cast qe cpxf*)
-                 (cast fxye cpxf*)
-                 isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
-        (dtimer dtime itime 1)
-        (set! time (convert (pref dtime 0)))
-        (set! tfield (+ tfield time))
-        ;; (println "tfield:" tfield)
-        ;; transform force to real space with standard procedure: updates fxye 
-        (dtimer dtime itime -1)
-        (set! isign 1)
-        (cwfft2r2 (cast fxye cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
-        (dtimer dtime itime 1)
-        (set! time (convert (pref dtime 0)))
-        (set! tfft (+ tfft time))
-        ;; (println "tfft:" tfft)
-        ;; copy guard cells with standard procedure: updates fxye 
-        (dtimer dtime itime -1)
-        (ccguard2l fxye nx ny nxe nye)
-        (dtimer dtime itime 1)
-        (set! time (convert (pref dtime 0)))
-        (set! tguard (+ tguard time))
-        ;; (println "tguard:" tguard)
-        ;; push particles with standard procedure: updates part, wke 
-        (pset! wke 0 0.)
-        (dtimer dtime itime -1)
-        (cgpush2l part fxye qbme dt wke idimp np nx ny nxe nye ipbc)
-        (dtimer dtime itime 1)
-        (set! time (convert (pref dtime 0)))
-        (set! tpush (+ tpush time))
-        ;; (println "tpush:" tpush)
-        ;; sort particles by cell for standard procedure 
-        (if (> sortime 0)
-            (if (= (% ntime sortime) 0)
-                (begin
-                  (dtimer dtime itime -1)
-                  (cdsortp2yl part part2 npicy idimp np ny1)
-                  ;; exchange pointers
-                  (set! tpart part)
-                  (set! part part2)
-                  (set! part2 tpart)
-                  (dtimer dtime itime 1)
-                  (set! time (convert (pref dtime 0)))
-                  (set! tsort (+ tsort time))
-                  ;; (println "tsort:" tsort)
-                  )))
-        (if (= ntime 0)
-            (let ((field_energy (pref we 0))
-                  (kinetic_energy (pref wke 0))
-                  (total_energy (+ field_energy kinetic_energy)))
-              (println "\nInitial Energies:\n")
-              (printf "field_energy:    %g\n" (convert field_energy double))
-              (printf "kinetic_energy:  %g\n" (convert kinetic_energy double))
-              (printf "total_energy:    %g\n" (convert total_energy double)))))
-      ;; end main iteration loop
-      ;; print results
-      (println "ntime:" ntime)
-      (let ((field_energy (pref we 0))
-            (kinetic_energy (pref wke 0))
-            (total_energy (+ field_energy kinetic_energy)))
-        (println "\nFinal Energies:\n")
-        (printf "field_energy:    %g\n" (convert field_energy double))
-        (printf "kinetic_energy:  %g\n" (convert kinetic_energy double))
-        (printf "total_energy:    %g\n\n" (convert total_energy double)))
-      (println "deposit time =" tdpost)
-      (println "guard time =" tguard)
-      (println "solver time =" tfield)
-      (println "fft time =" tfft)
-      (println "push time =" tpush)
-      (println "sort time =" tsort)
-      (set! tfield (+ tfield tguard tfft))
-      (println "total solver time =" tfield)
-      (set! time (+ tdpost tpush tsort))
-      (println "total particle time =" time)
-      (set! wt (+ time tfield))
-      (println "total time =" wt)
-      (println)
-      (set! wt (/ 1000000000. (convert (* nloop np))))
-      (println "Push Time (nsec) =" (* tpush wt))
-      (println "Deposit Time (nsec) =" (* tdpost wt))
-      (println "Sort Time (nsec) =" (* tsort wt))
-      (println "Total Particle Time (nsec) =" (* time wt) "\n")
-      
-      void)))
+      (dtimer dtime itime 1)
+      (set! time (convert (pref dtime 0)))
+      (set! tfield (+ tfield time))
+      ;; (println "tfield:" tfield)
+      ;; transform force to real space with standard procedure: updates fxye
+      (dtimer dtime itime -1)
+      (set! isign 1)
+      (cwfft2r2 (cast fxye cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+      (dtimer dtime itime 1)
+      (set! time (convert (pref dtime 0)))
+      (set! tfft (+ tfft time))
+      ;; (println "tfft:" tfft)
+      ;; copy guard cells with standard procedure: updates fxye
+      (dtimer dtime itime -1)
+      (ccguard2l fxye nx ny nxe nye)
+      (dtimer dtime itime 1)
+      (set! time (convert (pref dtime 0)))
+      (set! tguard (+ tguard time))
+      ;; (println "tguard:" tguard)
+      ;; push particles with standard procedure: updates part, wke
+      (pset! wke 0 0.)
+      (dtimer dtime itime -1)
+      (cgpush2l part fxye qbme dt wke idimp np nx ny nxe nye ipbc)
+      (dtimer dtime itime 1)
+      (set! time (convert (pref dtime 0)))
+      (set! tpush (+ tpush time))
+      ;; (println "tpush:" tpush)
+      ;; sort particles by cell for standard procedure
+      (if (and (> sortime 0) (= (% ntime sortime) 0))
+          (begin (dtimer dtime itime -1)
+                 (cdsortp2yl part part2 npicy idimp np ny1)
+                 ;; exchange pointers
+                 (set! tpart part)
+                 (set! part part2)
+                 (set! part2 tpart)
+                 (dtimer dtime itime 1)
+                 (set! time (convert (pref dtime 0)))
+                 (set! tsort (+ tsort time))
+                 void))
+      (set! ntime (+ ntime 1))
+      ntime)))
 
-;; (xtmain)
+;; 4 floats (4 bytes each) = 16 bytes
+(bind-func pic_set_vbo_data_size
+  (lambda (npx npy)
+    (tset! vbo 1 (* (* npx npy) 16))))
+
+(pic_set_vbo_data_size (pic_step.npx)
+                       (pic_step.npy))
+
+(particle_range (pic_step.np))
+
+(define run-simulation
+  (lambda ()
+    (let ((ntime (pic_step)))
+      (if (= (modulo ntime 1000) 0)
+          (println 'ntime: ntime))
+      ;; (if (= (modulo ntime 5) 0)
+      ;;     (particle_range (pic_step.np)))
+      (callback (+ (now) (/ *second* 2)) 'run-simulation))))
+
+(run-simulation)
+
+;; to reset
+(pic_step.ntime 0)
 
 ;; visualisation code
-
 
 ;; vert shader
 (define particles-vert
@@ -264,15 +360,16 @@
 
 //varying vec2 TexCoord;
 
-attribute vec2 particle_vertex;
+attribute vec2 pvert;
+uniform float nx;
+attribute vec2 pvel;
 // attribute vec4 myColour;
-attribute float particle_charge;
-attribute vec2 particle_velocity;
+// attribute float particle_charge;
 
 void main() {
-   gl_PointSize = 100.0;
+   gl_PointSize = 5.0*length(pvel);
    gl_FrontColor = vec4(1.0,1.0,1.0,1.0);
-   gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * vec4(particle_vertex.xy,0.0,1.0);
+   gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * (vec4(pvert.x/(nx/2.0),pvert.y/(nx/2.0),0.0,1.0) - vec4(1.,1.,0.,0.));
    //TexCoord = gl_MultiTexCoord0.st;
 }")
 
@@ -292,14 +389,6 @@ void main() {
    gl_FragColor = texture2D(tex1,gl_PointCoord)*gl_Color;
    //gl_FragColor = gl_Color;
 }")
-
-(define width 1440.0)
-(define height 900.0)
-(bind-val width float 1440.0)
-(bind-val height float 900.0)
-(define fullscreen #t)
-
-(define *gl-ctx* (gl:make-ctx ":0" fullscreen 0. 0. width height))
 
 (bind-val texture1 i32 0)
 
@@ -321,42 +410,35 @@ void main() {
 
 (update_shader_program particles-vert particles-frag)
 
-(bind-func update_particles
-  (lambda (particles:float* nparticles:i32)
-    (let ((dt 0.01))
-      (doloop (i nparticles)
-        ;; update x
-        (pset! particles (* i 4) (+ (pref particles (* i 4))
-                                    (* (pref particles (+ (* i 4) 2)) dt)))
-        (pset! particles (+ (* i 4) 1) (+ (pref particles (+ (* i 4) 1))
-                                          (* (pref particles (+ (* i 4) 3)) dt)))))))
+(bind-func fill_part_with_synthetic_data
+  (lambda (n min_val:float max_val:float)
+    (doloop (i n)
+      (pset! part i (random min_val max_val)))))
 
-;; draw system
-(bind-func draw_particles
-  (let ((nparticles 4)
-        (particles:float* (zalloc (* nparticles 4)))
-        (vertex_location:i32 -1)
-        (velocity_location:i32 -1)
-        (vbo (create_vbo (* nparticles (* nparticles 16))
-                           (cast particles i8*)
-                           GL_STREAM_DRAW)))
-    (pfill! particles
-            0. 0. .1 .1
-            0. .1 0. .1
-            0. .1 0. 0.
-            .1 0. 0. .1)
+(fill_part_with_synthetic_data (* 16 16) 0. 1.)
+
+(bind-func print_first_n_floats
+  (lambda (n)
+    (doloop (i n)
+      (printf "%g " (convert (pref part i) double)))
+    (println)))
+
+(print_first_n_floats (* 16 16))
+
+(bind-func gl_draw
+  (let ((vert_loc:i32 -1)
+        (vel_loc:i32 -1)
+        (nx_loc:i32 -1))
     (lambda ()
-      (let ((i 0)
-            ;; (size 1)
-            (texid texture1)
-            ;; (data (tref psys 2))
-            (cnt 0))
-        (if (= vertex_location -1)
-            (begin
-              (set! vertex_location (glGetAttribLocation particle_shader "particle_vertex"))
-              (set! velocity_location (glGetAttribLocation particle_shader "particle_velocity"))))
-        ;; update the positions
-        (update_particles particles nparticles)
+      (if (= vert_loc -1)
+          (begin
+            (set! vert_loc (glGetAttribLocation particle_shader "pvert"))
+            (set! vel_loc (glGetAttribLocation particle_shader "pvel"))
+            (set! nx_loc (glGetUniformLocation particle_shader "nx"))))
+      (let ((np (/ (tref vbo 1) 16)))
+        (glClearColor 0.0 0.0 0.0 1.0)
+        (glClear (+ GL_DEPTH_BUFFER_BIT GL_COLOR_BUFFER_BIT))
+        (glLoadIdentity)
         ;; gl setup
         (glEnable GL_BLEND)
         (glDisable GL_DEPTH_TEST)
@@ -366,24 +448,20 @@ void main() {
         (glEnable GL_VERTEX_PROGRAM_POINT_SIZE)
         ;; shader program
         (glUseProgram particle_shader)
-        ;; (printf "shader errors: %d\n" (glGetError))
+        ;; set uniform
+        (glUniform1f nx_loc 128.)
         ;; vbo stuff
         (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
         (glBufferSubData GL_ARRAY_BUFFER 0 (tref vbo 1) (tref vbo 2))
-        (glEnableVertexAttribArray vertex_location)
-        (glVertexAttribPointer vertex_location 2 GL_FLOAT GL_FALSE 16 null) ;(pref-ptr (cast null i8*) 0))
-        ;; (glEnableVertexAttribArray my_colour)
-        ;; (glVertexAttribPointer my_colour 4 GL_FLOAT GL_FALSE 16 (pref-ptr (cast null i8*) 8))
-        ;; (glEnableVertexAttribArray my_size)
-        ;; (glVertexAttribPointer my_size 1 GL_FLOAT GL_FALSE 16 (pref-ptr (cast null i8*) 24))
-        (glEnableVertexAttribArray velocity_location)
-        (glVertexAttribPointer velocity_location 2 GL_FLOAT GL_FALSE 16 (pref-ptr (cast null i8*) 8))
-        ;; (printf "vbo errors: %s\n" (gluErrorString (glGetError)))
+        (glEnableVertexAttribArray vert_loc)
+        (glVertexAttribPointer vert_loc 2 GL_FLOAT GL_FALSE 16 null) ;(pref-ptr (cast null i8*) 0))
+        (glEnableVertexAttribArray vel_loc)
+        (glVertexAttribPointer vel_loc 2 GL_FLOAT GL_FALSE 16 (pref-ptr (cast null i8*) 8))
         ;; texture setup
         (glActiveTexture GL_TEXTURE0)
         (glDisable GL_TEXTURE_RECTANGLE_ARB)
         (glEnable GL_TEXTURE_2D)
-        (glBindTexture GL_TEXTURE_2D texid)
+        (glBindTexture GL_TEXTURE_2D texture1)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
@@ -391,16 +469,16 @@ void main() {
         (glTexEnvi GL_POINT_SPRITE GL_COORD_REPLACE 1)
         (glUniform1i (glGetUniformLocation particle_shader "tex1") 0)
         ;; draw the points
-        (glDrawArrays GL_POINTS 0 nparticles)
+        (glDrawArrays GL_POINTS 0 np)
         ;; disable texture
         (glActiveTexture GL_TEXTURE0)
         (glBindTexture GL_TEXTURE_2D 0)
         (glDisable GL_TEXTURE_2D)
         ;; disable attribs
-        (glDisableVertexAttribArray vertex_location)
+        (glDisableVertexAttribArray vert_loc)
         ;; (glDisableVertexAttribArray my_colour)
         ;; (glDisableVertexAttribArray my_size)
-        (glDisableVertexAttribArray velocity_location)
+        ;; (glDisableVertexAttribArray vel_loc)
         ;; unbind the buffer
         (glBindBuffer GL_ARRAY_BUFFER 0)
         (glDisable GL_VERTEX_PROGRAM_POINT_SIZE)
@@ -412,25 +490,43 @@ void main() {
         ;; print errors (if there are any)
         (let ((glErr (glGetError)))
           (if (<>  glErr GL_NO_ERROR)
-              (printf "final errors: %s\n" (gluErrorString glErr))))
-        1))))
+              (printf "final errors: %s\n" (gluErrorString glErr)))))
+      1)))
 
-;; gl-code 	   
-(bind-func gl_draw_frame
-  (lambda (time:double)
-    (glClearColor 0.0 0.0 0.0 1.0)
-    (glClear (+ GL_DEPTH_BUFFER_BIT GL_COLOR_BUFFER_BIT))
-    (glLoadIdentity)
-    (draw_particles)
-    void))
+(begin
+  (pic_step)
+  (gl_draw)
+  (gl:swap-buffers *gl-ctx*))
 
-(define draw-loop
-  (lambda (time delta-t)
-    (gl_draw_frame time)
-    (gl:swap-buffers *gl-ctx*)
-    (callback (+ time (* *second* delta-t) 0.5)
-              'draw-loop
-              (+ time (* *second* delta-t)) 
-              delta-t)))
+(define run-simulation
+  (lambda ()
+    (let ((ntime (pic_step)))
+      (if (= (modulo ntime 1000) 0)
+          (println 'ntime: ntime))
+      (gl_draw)
+      (gl:swap-buffers *gl-ctx*)
+      (callback (+ (now) (/ *second* 30)) 'run-simulation))))
 
-(draw-loop (now) 1/30)
+(run-simulation)
+
+(bind-func print_part_stats
+  (lambda (np)
+    (println "mean:" (mean part (* np 4)))
+    (println "median:" (median part (* np 4)))))
+
+(print_part_stats (pic_step.np))
+
+;; to reset
+(pic_step)
+
+(bind-func test_particle_pointers
+  (lambda ()
+    (printf "(tref vbo 2) = %p part = %p diff = %d\n" (tref vbo 2) part
+            (- (convert (tref vbo 2) i64) (convert part i64)))))
+
+(test_particle_pointers)
+
+;; 4 floats (4 bytes each) = 16 bytes
+(bind-func pic_set_vbo_data_size
+  (lambda (npx npy)
+    (tset! vbo 1 (* (* npx npy) 16))))
