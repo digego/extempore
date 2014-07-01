@@ -131,10 +131,6 @@
     (printf "kinetic_energy:  %g\n" (convert kinetic_energy double))
     (printf "total_energy:    %g\n" (convert (+ field_energy kinetic_energy) double))))
 
-;; (bind-func pic_step
-;;   (lambda (ntime:i32 np:i32 idimp:i32 nx:i32 ny:i32 nxe:i32 nye:i32 nxeh:i32 nxh:i32 nyh:i32 ny1:i32 nxhy:i32 nxyh:i32 qme:float qbme:float dt:float we:float* wke:float* ipbc:i32 isign:i32 indx:i32 indy:i32 ax:float ay:float affp:float)
-;;     void))
-
 (bind-func particle_range
   (lambda (np)
     (let ((minx:float 0.)
@@ -337,58 +333,7 @@
 
 (particle_range (pic_step.np))
 
-(define run-simulation
-  (lambda ()
-    (let ((ntime (pic_step)))
-      (if (= (modulo ntime 1000) 0)
-          (println 'ntime: ntime))
-      ;; (if (= (modulo ntime 5) 0)
-      ;;     (particle_range (pic_step.np)))
-      (callback (+ (now) (/ *second* 2)) 'run-simulation))))
-
-;; (run-simulation)
-
-;; to reset
-(pic_step.ntime 0)
-
 ;; visualisation code
-
-;; vert shader
-(define particles-vert
-"// VERTEX SHADER
-// GLSL 1.2 compatible
-
-//varying vec2 TexCoord;
-
-attribute vec2 pvert;
-uniform float nx;
-attribute vec2 pvel;
-// attribute vec4 myColour;
-// attribute float particle_charge;
-
-void main() {
-   gl_PointSize = 4.*length(pvel);
-   gl_FrontColor = vec4(1.0,1.0,1.0,1.0);
-   gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * (vec4(pvert.x/(nx/2.0),pvert.y/(nx/2.0),0.0,1.0) - vec4(1.,1.,0.,0.));
-   //TexCoord = gl_MultiTexCoord0.st;
-}")
-
-(define particles-frag
-"//  FRAGMENT SHADER
-// #version 330
-
-#version 120
-
-#extension GL_ARB_texture_rectangle : disable
-
-uniform sampler2D tex1;
-
-//varying vec2 TexCoord;
-
-void main() {
-   gl_FragColor = texture2D(tex1,gl_PointCoord)*gl_Color;
-   //gl_FragColor = gl_Color;
-}")
 
 (bind-val texture1 i32 0)
 
@@ -408,7 +353,39 @@ void main() {
   (lambda (vert:i8* frag:i8*)
     (set! particle_shader (create_shader vert frag))))
 
-(update_shader_program particles-vert particles-frag)
+(update_shader_program
+ "// VERTEX SHADER
+// GLSL 1.2 compatible
+
+//varying vec2 TexCoord;
+
+attribute vec2 pvert;
+uniform float nx;
+attribute vec2 pvel;
+
+void main() {
+   gl_PointSize = 5.*length(pvel);
+   gl_FrontColor = vec4(pvel/2.,.5,1.0);
+   gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * (vec4(pvert.x/(nx/2.0),pvert.y/(nx/2.0),0.0,1.0) - vec4(1.,1.,0.,0.));
+   //TexCoord = gl_MultiTexCoord0.st;
+}"
+
+
+ "//  FRAGMENT SHADER
+// #version 330
+
+#version 120
+
+#extension GL_ARB_texture_rectangle : disable
+
+uniform sampler2D tex1;
+
+//varying vec2 TexCoord;
+
+void main() {
+   gl_FragColor = texture2D(tex1,gl_PointCoord)*gl_Color;
+   //gl_FragColor = gl_Color;
+}")
 
 (bind-func gl_draw
   (let ((vert_loc:i32 -1)
@@ -478,40 +455,48 @@ void main() {
               (printf "final errors: %s\n" (gluErrorString glErr)))))
       1)))
 
+;; frame-by-frame
 (begin
   (pic_step)
   (gl_draw (pic_step.nx))
   (gl:swap-buffers *gl-ctx*))
 
-(define run-simulation
-  (lambda ()
+(define gl-loop
+  (lambda (time delta-t)
     (let ((ntime (pic_step)))
       (if (= (modulo ntime 1000) 0)
-          (println 'ntime: ntime))
-      (gl_draw (pic_step.nx))
-      (gl:swap-buffers *gl-ctx*)
-      (callback (+ (now) (/ *second* 24)) 'run-simulation))))
+          (println 'ntime: ntime)))
+    (gl_draw (pic_step.nx))
+    (gl:swap-buffers *gl-ctx*)
+    (let* ((cb-lookahead 0.1)
+           (t (+ (now) (* cb-lookahead delta-t *second*)))
+           (missed-frames (quotient (real->integer (- t time))
+                                    (real->integer (* delta-t *second*))))
+           (newtime (+ time (* (* (+ missed-frames 2) delta-t) *second*))))
+      (if (> missed-frames 0)
+          (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
+                                    (print "Warning"))
+                 (print ": ")
+                 (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
+                                    (print "gl-loop"))
+                 (print " couldn't handle the load, dropped ")
+                 (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f
+                                    (print missed-frames))
+                 (print " frames\n")))
+      (callback (* newtime cb-lookahead) 'gl-loop newtime delta-t))))
 
-(run-simulation)
+(gl-loop (now) (/ 1 5))
 
-(bind-func print_part_stats
-  (lambda (np)
-    (println "mean:" (mean part (* np 4)))
-    (println "median:" (median part (* np 4)))))
+;; messing with things
 
-(print_part_stats (pic_step.np))
+;; ideas
 
-;; to reset
-(pic_step)
+;; use glTexBuffer (http://www.opengl.org/wiki/Buffer_Texture) to use
+;; charge density to set the colour
 
-(bind-func test_particle_pointers
-  (lambda ()
-    (printf "(tref vbo 2) = %p part = %p diff = %d\n" (tref vbo 2) part
-            (- (convert (tref vbo 2) i64) (convert part i64)))))
+(pic_step.np)
 
-(test_particle_pointers)
+(pic_step.qme .1)
+(pic_step.qme -1)
 
-;; 4 floats (4 bytes each) = 16 bytes
-(bind-func pic_set_vbo_data_size
-  (lambda (npx npy)
-    (tset! vbo 1 (* (* npx npy) 16))))
+(pic_step.dt .01)
