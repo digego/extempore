@@ -7,6 +7,11 @@ case $(uname) in
     *) echo Cannot precompile modules for OS:  $(uname) >&2 ; exit 1 ;;
 esac
 
+if [ -z "$EXT_LLVM_DIR" ]; then
+    echo "Need to set EXT_LLVM_DIR to point to your (Extempore) LLVM directory."
+    exit 2
+fi
+
 PRECOMP_LIBS="\
 core/math.xtm \
 core/audio_dsp.xtm \
