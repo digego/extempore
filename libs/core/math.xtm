@@ -1121,8 +1121,9 @@
 
 (bind-func rat_mul_r_r
   (lambda (a:Rational b:Rational)
-    (Rat (* (tref a 0) (tref b 0))
-         (* (tref a 1) (tref b 1)))))
+    (rat_reduce
+     (Rat (* (tref a 0) (tref b 0))
+          (* (tref a 1) (tref b 1))))))
 
 (bind-func rat_mul_r_i64
   (lambda (a:Rational b:i64)
@@ -1188,40 +1189,41 @@
 
 (bind-func rat_div_r_r
   (lambda (a:Rational b:Rational)
-    (Rat (* (tref a 0) (tref b 1))
-         (* (tref a 1) (tref b 0)))))
+    (rat_reduce
+     (Rat (* (tref a 0) (tref b 1))
+          (* (tref a 1) (tref b 0))))))
 
 (bind-func rat_div_r_i64
   (lambda (a:Rational b:i64)
-    (Rat (* (tref a 0) 1) (* (tref a 1) b))))
+    (Rat (* (tref a 0) b) (* (tref a 1) 1))))
 
 (bind-func rat_div_i64_r
-  (lambda (b:i64 a:Rational)
-    (Rat (* (tref a 0) 1) (* (tref a 1) b))))
+  (lambda (a:i64 b:Rational)
+    (Rat (* (tref b 1) a) (* (tref b 0) 1))))
 
 (bind-func rat_div_r_i32
   (lambda (a:Rational b:i32)
-    (Rat (* (tref a 0) 1) (* (tref a 1) (i32toi64 b)))))
+    (Rat (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1))))
 
 (bind-func rat_div_i32_r
-  (lambda (b:i32 a:Rational)
-    (Rat (* (tref a 0) 1) (* (tref a 1) (i32toi64 b)))))
+  (lambda (a:i32 b:Rational)
+    (Rat (* (tref b 1) (i32toi64 a)) (* (tref b 0) 1))))
 
 (bind-func rat_div_r_i8
   (lambda (a:Rational b:i8)
-    (Rat (* (tref a 0) 1) (* (tref a 1) (i8toi64 b)))))
+    (Rat (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1))))
 
 (bind-func rat_div_i8_r
-  (lambda (b:i8 a:Rational)
-    (Rat (* (tref a 0) 1) (* (tref a 1) (i8toi64 b)))))
+  (lambda (a:i8 b:Rational)
+    (Rat (* (tref b 1) (i8toi64 a)) (* (tref b 0) 1))))
 
 (bind-func rat_div_r_i1
   (lambda (a:Rational b:i1)
-    (Rat (* (tref a 0) 1) (* (tref a 1) (i1toi64 b)))))
+    (Rat (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1))))
 
 (bind-func rat_div_i1_r
-  (lambda (b:i1 a:Rational)
-    (Rat (* (tref a 0) 1) (* (tref a 1) (i1toi64 b)))))
+  (lambda (a:i1 b:Rational)
+    (Rat (* (tref b 1) (i1toi64 a)) (* (tref b 0) 1))))
 
 (bind-func rat_div_r_d
   (lambda (a:Rational b:double)
@@ -1259,8 +1261,9 @@
   (lambda (a:Rational b:Rational)
     (let ((denom_a (tref a 1))
           (denom_b (tref b 1)))
-      (Rat (+ (* (tref a 0) denom_b) (* (tref b 0) denom_a))
-           (* denom_a denom_b)))))
+      (rat_reduce
+       (Rat (+ (* (tref a 0) denom_b) (* (tref b 0) denom_a))
+            (* denom_a denom_b))))))
 
 (bind-func rat_add_r_i64
   (lambda (a:Rational b:i64)
@@ -1330,8 +1333,9 @@
   (lambda (a:Rational b:Rational)
     (let ((denom_a (tref a 1))
           (denom_b (tref b 1)))
-      (Rat (- (* (tref a 0) denom_b) (* (tref b 0) denom_a))
-           (* denom_a denom_b)))))
+      (rat_reduce
+       (Rat (- (* (tref a 0) denom_b) (* (tref b 0) denom_a))
+            (* denom_a denom_b))))))
 
 (bind-func rat_subtract_r_i64
   (lambda (a:Rational b:i64)
@@ -1598,6 +1602,44 @@
 (bind-poly xtm_greaterthan rat_greaterthan_i8_r)
 (bind-poly xtm_greaterthan rat_greaterthan_r_i1)
 (bind-poly xtm_greaterthan rat_greaterthan_i1_r)
+
+(bind-func rat_modulo_r_r
+  (lambda (a:Rational b:Rational)
+    (let ((c (/ a b))
+          (n (Rat (% (tref c 0) (tref c 1)) (tref c 1))))
+      (* b n))))
+
+(bind-func rat_modulo_r_i64
+  (lambda (a:Rational b:i64)
+    (rat_modulo_r_r a (Rat b 1))))
+
+(bind-func rat_modulo_i64_r
+  (lambda (a:i64 b:Rational)
+    (rat_modulo_r_r (Rat a 1) b)))
+
+(bind-func rat_modulo_r_i32
+  (lambda (a:Rational b:i32)
+    (rat_modulo_r_r a (Rat (i32toi64 b) 1))))
+
+(bind-func rat_modulo_i32_r
+  (lambda (a:i32 b:Rational)
+    (rat_modulo_r_r (Rat (i32toi64 a) 1) b)))
+
+(bind-func rat_modulo_r_i8
+  (lambda (a:Rational b:i8)
+    (rat_modulo_r_r a (Rat (i8toi64 b) 1))))
+
+(bind-func rat_modulo_i8_r
+  (lambda (a:i8 b:Rational)
+    (rat_modulo_r_r (Rat (i8toi64 a) 1) b)))
+
+(bind-poly xtm_modulo rat_modulo_r_r)
+(bind-poly xtm_modulo rat_modulo_r_i64)
+(bind-poly xtm_modulo rat_modulo_i64_r)
+(bind-poly xtm_modulo rat_modulo_r_i32)
+(bind-poly xtm_modulo rat_modulo_i32_r)
+(bind-poly xtm_modulo rat_modulo_r_i8)
+(bind-poly xtm_modulo rat_modulo_i8_r)
 
 ;;;;;;;;;; COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
