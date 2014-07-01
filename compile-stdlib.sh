@@ -37,10 +37,12 @@ do
     $PRECOMP_EXTEMPORE_RUN_COMMAND $PRECOMP_COMMAND_FILENAME
     rc=$?
     if [[ $rc != 0 ]] ; then
-        echo "\nError precompiling $f"
+        echo
+        echo Error precompiling $f
         exit $rc
     else
-        echo "\nSuccessfully precompiled $f"
+        echo
+        echo Successfully precompiled $f
     fi
 done
 
