@@ -110,8 +110,13 @@
   (lambda (tempo)
     (MakeMetro_3 tempo (now) (Rat 0 1))))
 
+(bind-func MakeMetro_4
+  (lambda (tempo offset beatn beatd)
+    (MakeMetro_3 tempo offset (Rat beatn beatd))))
+
 (bind-poly MakeMetro MakeMetro_3)
 (bind-poly MakeMetro MakeMetro_1)
+(bind-poly MakeMetro MakeMetro_4)
 
 (bind-func metro_get_time
   (lambda (m:Metronome* beat:Rational)
@@ -142,14 +147,6 @@
     (println "Metronome>> bpm:" (metro_get_tempo m) "beats:" (tref m 3))))
 
 (bind-poly print print_metronome)
-
-(bind-val Metro Metronome*)
-
-(bind-func metro_init
-  (lambda (tempo offset beatn beatd)
-    (set! Metro (MakeMetro tempo offset (Rat beatn beatd)))
-    (println "Initialized:" Metro)
-    void))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
