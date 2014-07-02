@@ -177,8 +177,9 @@ static const char *strlwr(char *s) {
 
 class ScmRuntimeError {
 public:
-    ScmRuntimeError(const char* _msg) {msg = _msg;};
-    const char* msg;
+  ScmRuntimeError(const char* _msg, pointer _p) {msg = _msg;p = _p;};
+  const char* msg;
+  pointer p;
 };
 
 static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int errnum=0);
@@ -445,7 +446,7 @@ int is_character(pointer p) { return (type(p)==T_CHARACTER); }
 char* string_value(pointer p) 
 { 
     if(!is_string(p)) {
-	throw ScmRuntimeError("Attempting to return a string from a non-string obj");
+      throw ScmRuntimeError("Attempting to return a string from a non-string obj",p);
 	//[NSException raise:@"IncorrectSchemeOBJ" format:@"Attempting to return a string from a non-string obj"];
     }
     return strvalue(p); 
@@ -547,7 +548,7 @@ int is_pair(pointer p)     { return (type(p)==T_PAIR); }
 
 pointer pair_car(pointer p) 
 {
-    if(!is_pair(p)) throw ScmRuntimeError("Attempting to access the car of a primitive");
+  if(!is_pair(p)) throw ScmRuntimeError("Attempting to access the car of a primitive",p);
     return car(p);
 }
 
@@ -561,7 +562,7 @@ pointer pair_cdr(pointer p)
 { 
     if(!is_pair(p)&&!is_continuation(p)) 
     {
-	throw ScmRuntimeError("Attempting to access the cdr of a primitive");
+      throw ScmRuntimeError("Attempting to access the cdr of a primitive",p);
     }
     return cdr(p);
 }
@@ -573,7 +574,7 @@ int is_symbol(pointer p)   { return (type(p)==T_SYMBOL); }
 char* symname(pointer p)   
 { 	
     if(!is_symbol(p)) {
-	throw ScmRuntimeError("Attempting to return a string from non-symbol obj");
+      throw ScmRuntimeError("Attempting to return a string from non-symbol obj",p);
 	//[NSException raise:@"IncorrectSchemeOBJ" format:@"Attempting to return a string from non-symbol obj"];
     }
     return strvalue(car(p)); 
@@ -603,7 +604,7 @@ void* cptr_value(pointer p)
 { 
   if(!is_cptr(p)) {
      if(is_string(p)) return (void*) strvalue(p);
-     else throw ScmRuntimeError("Attempting to return a cptr from a non-cptr obj");
+     else throw ScmRuntimeError("Attempting to return a cptr from a non-cptr obj",p);
 	//[NSException raise:@"IncorrectSchemeOBJ" format:@"Attempting to return a cptr from a non-cptr obj"];
     }
     return p->_object._cptr; 
@@ -3385,7 +3386,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
 	    sc->imp_env->erase(p2);									
 	    sc->code = cons(sc, p3, p2);		
 	    //sc->code = cons(sc, cons(sc, sc->QUOTE, cons(sc,(a), sc->NIL)), sc->NIL);
-	} else {
+    } else {
 	    //sc->code = sc->NIL;
 	    pointer p1 = mk_integer(sc, errnum);
 	    pointer p2 = cons(sc,p1,sc->NIL);
@@ -3393,45 +3394,45 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
 	    pointer p3 = cons(sc, sc->QUOTE, cons(sc, sc->F, sc->NIL));
 	    sc->imp_env->erase(p2);									
 	    sc->code = cons(sc, p3, p2);
-	}
-	sc->code = cons(sc, mk_string(sc, (s)), sc->code);
-	setimmutable(car(sc->code));
-	sc->code = cons(sc, slot_value_in_env(x), sc->code); 
-	sc->op = (int)OP_EVAL;
-		
-	sc->last_symbol_apply = sc->NIL;
-	sc->call_end_time = ULONG_LONG_MAX;
-	// empty applied_symbol_names stack is empty
-	while(!sc->applied_symbol_names->empty())
-	{
-	    sc->applied_symbol_names->pop();
-	}		
-	return sc->T;
     }
+    sc->code = cons(sc, mk_string(sc, (s)), sc->code);
+    setimmutable(car(sc->code));
+    sc->code = cons(sc, slot_value_in_env(x), sc->code); 
+    sc->op = (int)OP_EVAL;
+		
+    sc->last_symbol_apply = sc->NIL;
+    sc->call_end_time = ULONG_LONG_MAX;
+    // empty applied_symbol_names stack is empty
+    while(!sc->applied_symbol_names->empty())
+      {
+        sc->applied_symbol_names->pop();
+      }		
+    return sc->T;
+  }
 	
 	
 	
 #endif
 
-    if(a!=0) {
-	sc->args = cons(sc, (a), sc->NIL);
-    } else {
-	sc->args = sc->NIL;
-    }
-    //sc->args = cons(sc, mk_string(sc, (s)), sc->args);
-    sc->args = cons(sc, mk_string(sc, fname), sc->args);
-    setimmutable(car(sc->args));
-    sc->op = (int)OP_ERR0;
+  if(a!=0) {
+    sc->args = cons(sc, (a), sc->NIL);
+  } else {
+    sc->args = sc->NIL;
+  }
+  //sc->args = cons(sc, mk_string(sc, (s)), sc->args);
+  sc->args = cons(sc, mk_string(sc, fname), sc->args);
+  setimmutable(car(sc->args));
+  sc->op = (int)OP_ERR0;
 	
-    // empty applied_symbol_names stack is empty
-    while(!sc->applied_symbol_names->empty())
+  // empty applied_symbol_names stack is empty
+  while(!sc->applied_symbol_names->empty())
     {
-	sc->applied_symbol_names->pop();
+      sc->applied_symbol_names->pop();
     }
-    sc->last_symbol_apply = sc->NIL;
-    sc->call_end_time = ULONG_LONG_MAX;	
+  sc->last_symbol_apply = sc->NIL;
+  sc->call_end_time = ULONG_LONG_MAX;	
 	
-    return sc->T;
+  return sc->T;
 }
 #define Error_1(sc,s,a,l) return _Error_1(sc,s,a,l)
 #define Error_0(sc,s,l)    return _Error_1(sc,s,0,l)
@@ -6444,7 +6445,7 @@ void scheme_load_file(scheme *sc, FILE *fin) {
     try{
 	Eval_Cycle(sc, OP_T0LVL); 
     }catch(ScmRuntimeError err){
-	_Error_1(sc,err.msg,sc->NIL,0,0);
+	_Error_1(sc,err.msg,err.p,0,0);
     }
 	
     typeflag(sc->loadport)=T_ATOM;
@@ -6486,7 +6487,8 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
     try{
 		Eval_Cycle(sc, OP_T0LVL); 
     }catch(ScmRuntimeError err){
-		_Error_1(sc,err.msg,sc->NIL,0,0);
+      std::cout << "Error: evaluating expr: " << cmd << std::endl;
+		_Error_1(sc,err.msg,err.p,0,0);
     }catch(std::exception& e) {
 		_Error_1(sc,e.what(),sc->NIL,0,0);
 	}catch(std::string& e) {
@@ -6535,7 +6537,7 @@ void scheme_apply0(scheme *sc, const char *procname) {
     try{
 	Eval_Cycle(sc, OP_EVAL); 
     }catch(ScmRuntimeError err){
-	_Error_1(sc,err.msg,sc->NIL,0,0);
+	_Error_1(sc,err.msg,err.p,0,0);
     }
 }
 
@@ -6552,7 +6554,7 @@ void scheme_call_without_stack_reset(scheme *sc, pointer func, pointer args)
     try{
 	Eval_Cycle(sc, OP_APPLY); 
     }catch(ScmRuntimeError err){
-	_Error_1(sc,err.msg,sc->NIL,0,0);
+	_Error_1(sc,err.msg,err.p,0,0);
     }
 } 
 
@@ -6573,7 +6575,7 @@ void scheme_call(scheme *sc, pointer func, pointer args, uint64_t start_time, ui
     try{
 	Eval_Cycle(sc, OP_APPLY); 
     }catch(ScmRuntimeError err){
-	_Error_1(sc,err.msg,sc->NIL,0,0);
+	_Error_1(sc,err.msg,err.p,0,0);
     }
 	
     while(!sc->applied_symbol_names->empty())
