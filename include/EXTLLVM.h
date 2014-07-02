@@ -96,7 +96,7 @@ unsigned long string_hash(unsigned char* str);
   double imp_rand2_d(double a, double b);
   float imp_rand1_f(float a);
   float imp_rand2_f(float a, float b);
-
+  int64_t llvm_now();
 
   struct closure_address_table* new_address_table();
   struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table);
