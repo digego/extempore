@@ -3142,14 +3142,14 @@
 
 (define impc:ti:callback-check
   (lambda (ast vars kts request?)
-    ;;(println 'callback-check 'ast: ast 'vars: vars 'request: request?)
+    ;; (println 'callback-check 'ast: ast 'vars: vars 'request: request?)
     (let ((ftype (map impc:ir:get-type-from-str
                       (let ((ags (llvm:get-function-args-withoutzone (symbol->string (caddr ast)))))
                         (if ags ags '())))))
       (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
+      (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
       (if (null? ftype)
-          (begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
-                 (let ((fargs (cons 213
+          (begin (let ((fargs (cons 213
                                     (cons -1
                                           (map (lambda (a)                        
                                                  (impc:ti:type-check a vars kts '()))
@@ -6333,10 +6333,10 @@
 
 ;;; this here for binding to CLOSURE in dylib
 (define-macro (bind-lib-val library symname type)
-  `(let ((ground-type (impc:ir:ground-type-aliases ,(symbol->string type)))) 
+  `(let ((ground-type (impc:ir:ground-type-aliases ,(symbol->string type))))
      (llvm:compile 
       (string-append "@" ,(symbol->string symname) " = external global "
-                     (if ground-type ground-type ,(symbol->string type))))
+                     (if ground-type ground-type ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type))))))
      (llvm:bind-symbol ,library ,(symbol->string symname))))
 
 ;; THIS IS A HELPER FUNCTION
