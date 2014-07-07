@@ -65,21 +65,21 @@
 ;; for lights and cameras
 (bind-func prerender:XTMRENDERCB
   (lambda (frame shader m v p data)
-    (xtm_light_pos 1 0.0 5.0 15.0)
-    (xtm_light_tgt 1 0.0 3.0 0.0)
+    (xtm_light_pos 1 0.0 10.0 15.0)
+    (xtm_light_tgt 1 0.0 5.0 0.0)
     (xtm_light_up 1 0.0 1.0 0.0)        
     (xtm_light_diffuse 1 1.0 0.9 0.7 1.0)
     (xtm_light_power 1 (+ 70.0 (* 50.0 (cosf (+ 1.0 (* .1 (i64tof frame)))))))
     (xtm_light_angle 1 30.0)
 
-    (xtm_light_pos 2 10.0 6.0 7.0)
+    (xtm_light_pos 2 10.0 10.0 7.0)
     (xtm_light_tgt 2 0.0 0.0 -5.0)
     (xtm_light_up 2 0.0 1.0 0.0)        
     (xtm_light_diffuse 2 1.0 0.3 0.6 1.0)
     (xtm_light_power 2 (+ 70.0 (* 50.0 (cosf (+ 3.0 (* .1 (i64tof frame)))))))
     (xtm_light_angle 2 30.0)
 
-    (xtm_light_pos 3 -10.0 5.0 10.0)
+    (xtm_light_pos 3 -10.0 10.0 10.0)
     (xtm_light_tgt 3 0.0 0.0 0.0)
     (xtm_light_up 3 0.0 1.0 0.0)        
     (xtm_light_diffuse 3 0.3 1.0 0.6 1.0)
@@ -87,7 +87,7 @@
     (xtm_light_angle 3 30.0)
     
     (xtm_camera_pos 0.0 5.0 20.0)
-    (xtm_camera_tgt 1.0 0.0 0.0)
+    (xtm_camera_tgt 1.0 2.0 0.0)
     (xtm_camera_up 0.0 1.0 0.0)
     void
     ))
@@ -97,7 +97,7 @@
   (lambda (frame shader m v p data)
     (let ((nodes:xtm_node** (cast data xtm_node**)))
       (scale_matrix m 1.5 1.5 1.5)
-      (translate_matrix m 2.0 -1.9 0.0)            
+      (translate_matrix m 2.0 -0.1 0.0)            
       (rotate_matrix m (* .00005 (i64tof (now))) 0.0 1.0 0.0)
       (xtm_update_matrices shader m v p)
       (xtm_draw_model (pref nodes 0) shader m v p)
@@ -124,9 +124,9 @@
     (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur
               model1 model2 model3 (+ degree .5))))
 
-(define peppino (assimp_load_model path "peppino.blend"))
-(define scene (assimp_load_model path "scene.blend"))
-(define dome (assimp_load_model path "dome_cut.blend" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
+(define peppino (assimp_load_model path "peppino.dae"))
+(define scene (assimp_load_model path "scene.dae"))
+(define dome (assimp_load_model path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
 (xtm_render_setup (real->integer width) (real->integer height))
  
