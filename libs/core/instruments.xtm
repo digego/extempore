@@ -90,12 +90,6 @@
 ;;                        dargs)
 ;;            (print-error 'No 'inst 'named ,(symbol->string inst))))))
 
-;; load the scheme macros (e.g. define-instrument)
-(sys:load "libs/core/instruments-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
- '(sys:load "libs/core/instruments-scm.xtm"))
-
 ;; make synth defaults
 (bind-func default_note_c
   (lambda (nargs:i64 dargs:SAMPLE*)
@@ -110,7 +104,7 @@
   (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
     in))
 
-(define-instrument definst default_note_c default_fx)
+;; (define-instrument definst default_note_c default_fx)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -165,11 +159,6 @@
              (dlyr (* 2.0 (- 1.0 pan_old) in) wet fb))
             (else 0.0)))))
 
-(define-instrument synth synth_note_c synth_fx)
-(synth.attack 1000)
-(synth.decay 1000)
-(synth.sustain 0.9)
-(synth.release 7000)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -224,11 +213,6 @@
                    wet fb))
             (else 0.0)))))
 
-(define-instrument epad epad_note_c epad_fx)
-(epad.attack 1000)
-(epad.decay 1000)
-(epad.sustain 0.9)
-(epad.release 7000)
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; extempore organ ;;
@@ -280,11 +264,6 @@
                 (+ 1.0 (tremr trem_amp (* 1.1 trem_freq)))))
             (else 0.0)))))
 
-(define-instrument organ organ_note_c organ_fx)
-(organ.attack 200)
-(organ.decay 200)
-(organ.release 200)
-(organ.sustain 0.6)
 
 ;; fuzz bass
 
@@ -321,11 +300,6 @@
   (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
     in))
 
-(define-instrument fuzz_bass fuzz_bass_note_c fuzz_bass_fx)
-(fuzz_bass.attack 20)
-(fuzz_bass.decay 20)
-(fuzz_bass.release 100)
-(fuzz_bass.sustain 0.6)
 
 ;; shimmer pad
 
@@ -355,12 +329,6 @@
             ((= chan 1)
              (dr in wet fb))
             (else 0.0)))))
-
-(define-instrument shimmer_pad shimmer_pad_note_c shimmer_pad_fx)
-(shimmer_pad.attack 44100)
-(shimmer_pad.decay 500)
-(shimmer_pad.release 44100)
-(shimmer_pad.sustain 1.0)
 
 
 
@@ -417,11 +385,6 @@
                    fb))
             (else 0.0)))))
 
-(define-instrument fmsynth fmsynth_note_c fmsynth_fx)
-(fmsynth.attack 100)
-(fmsynth.decay 100)
-(fmsynth.release 5000)
-(fmsynth.sustain 0.8)
 
 ;; A simple FM pad
 ;; default is quite organy
@@ -472,13 +435,6 @@
                    wet fb))
             (else 0.0)))))
 
-(define-instrument fmpad fmpad_note_c fmpad_fx)
-(fmpad.attack 10000)
-(fmpad.decay 100)
-(fmpad.release 5000)
-(fmpad.sustain 1.0)
-
-
 
 ;; 
 ;; simple saw
@@ -504,12 +460,6 @@
                         0.75))
            time 0.8 0.5))))
 
-(define-instrument sawbass sawbass_note_c sawbass_fx)
-(sawbass.attack 100)
-(sawbass.decay 100)
-(sawbass.release 1000)
-(sawbass.sustain 1.0)
-
 ;; 
 ;; simple sine subbass
 ;;
@@ -522,12 +472,6 @@
 (bind-func subbass_fx
   (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
     in))
-
-(define-instrument subbass subbass_note_c subbass_fx)
-(subbass.attack 500)
-(subbass.decay 500)
-(subbass.release 500)
-(subbass.sustain 0.8)
 
 
 
@@ -569,10 +513,11 @@
                  rev 0.5))             
             (else 0.0)))))
 
-(define-instrument sawlead sawlead_note_c sawlead_fx)
-(sawlead.attack 40)
-(sawlead.decay 120)
-(sawlead.release 400)
-(sawlead.sustain 0.75)
+
+;; load the scheme macros (e.g. define-instrument)
+(sys:load "libs/core/instruments-scm.xtm")
+;; make sure we load them with precompiled code as well
+(sys:precomp:insert-sexp
+ '(sys:load "libs/core/instruments-scm.xtm"))
 
 (sys:precomp:insert-footer "xtminstruments")

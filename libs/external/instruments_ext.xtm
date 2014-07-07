@@ -90,12 +90,6 @@
       (if (null? olddat) 0
           (begin (free olddat)
                  1)))))
-    
-
-(sys:load "libs/external/instruments_ext-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
- '(sys:load "libs/external/instruments_ext-scm.xtm"))
 
 
 ;; helper functions for setting an individual samples offset
@@ -212,33 +206,11 @@
           (reverbl (* 1.5 (* pan_ in)) wet fb)
           (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
-(define-sampler sampler sampler_note_hermite_c sampler_fx)
-(define-sampler sampler1 sampler_note_hermite_c sampler1_fx)
-(define-sampler sampler2 sampler_note_hermite_c sampler2_fx)
-(define-sampler sampler3 sampler_note_hermite_c sampler3_fx)
 
-
-;; load-sampler now requires you to supply your own function for
-;; parsing the sample metadata from the sample names
-
-;; the supplied function (parser) takes one argument: a list of the
-;; files in the directory (the sample name) and
-;; return a list of four-element lists: filename, midi note number,
-;; sample offset and sample length (or 0 for the whole sample).
-
-;; As an example, if the directory contains the files:
-;; ("A1.wav" "B1.wav" "C2.wav" ...)
-
-;; the parser function should return the list
-;; (("A1.wav" 33 0 0)
-;;  ("B1.wav" 35 0 0)
-;;  ("C2.wav" 36 0 0))
-
-(sampler_fx.wet .025)
-(sampler1_fx.wet .025)
-(sampler2_fx.wet .025)
-(sampler3_fx.wet .025)
-
+(sys:load "libs/external/instruments_ext-scm.xtm")
+;; make sure we load them with precompiled code as well
+(sys:precomp:insert-sexp
+ '(sys:load "libs/external/instruments_ext-scm.xtm"))
 
 ;; (println 'Establish 'audio 'on 'utility 'process)
 ;; (ipc:audio-setup "utility")
