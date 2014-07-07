@@ -1745,29 +1745,6 @@
     (if (defined? (string->symbol (string-append "*xtmlib-" (atom->string libname) "-loaded*")))
         (sys:load-escape (string-append (atom->string libname) " already loaded")))))
 
-;; (define sys:load
-;;   (lambda (path)    
-;;     (let* ((in (open-input-file path))
-;;            (msg (call/cc
-;;                  (lambda (k)
-;;                    (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
-;;                    ""))))
-;;       (if (string=? msg "")
-;;           (let loop ((sexpr (read in)))
-;;             (if (eof-object? sexpr)
-;;                 (close-input-port in)                
-;;                 (begin
-;;                   (eval sexpr (interaction-environment))
-;;                   (loop (read in))))
-;;             #t)
-;;           (let ((words (regex:split msg " ")))
-;;             (ascii-print-color 0 5 10)
-;;             (for-each (lambda (w) (print w "")) words)
-;;             (ascii-print-color 0 7 10)
-;;             (println)
-;;             (close-input-port in)              
-;;             #f)))))
-
 (define file-exists?
   (lambda (path)
     (let ((in-port (open-input-file path)))
@@ -1932,21 +1909,6 @@
                  *sys:precomp:current-output-port*))))
 
 (define *sys:precomp:suppress-precomp* #f)
-
-(define sys:precomp:insert-xtmlib-loading-details
-  (lambda (libname)
-    (let ((ext (cond ((string=? (sys:platform) "OSX") ".dylib")
-                     ((string=? (sys:platform) "Linux") ".so")
-                     ((string=? (sys:platform) "Windows") ".dll")
-                     (else
-                      #f))))
-      (if ext
-          (sys:precomp:insert-sexp
-           `(define xtmmath (sys:load-dylib
-                             ,(string-append "libs/xtm" (atom->string libname) ext))))
-          (begin (print-with-colors 'red 'default #f (print "Error"))
-                 (print ": unsupported platform ")
-                 (print-with-colors 'yellow 'default #f (print (sys:platform))))))))
 
 (define sys:precomp:print-compilation-details
   (lambda (start-time)
