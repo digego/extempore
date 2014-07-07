@@ -463,12 +463,17 @@
 ;; returns a chord following basic diatonic harmony rules
 ;; based on root (0 for C etc.) maj/min ('- or '^) and degree (i-vii) 
 (define pc:diatonic
-   (lambda (root maj-min degree)   
-      (let ((val (assoc degree     
-                        (if (equal? '^ maj-min)
-                            *pc:diatonic-major*
-                            *pc:diatonic-minor*))))
-         (pc:chord (modulo (+ root (cadr val)) 12) (cddr val)))))
+  (lambda (root maj-min degree)
+    (if (number? degree)
+        (set! degree (cdr (assoc degree '((0 . i) (1 . ii) (2 . ii)
+                                          (3 . iii) (4 . iii) (5 . iv)
+                                          (6 . iv) (7 . v) (8 . vi) (9 . vi)
+                                          (10 . vii) (11 . vii))))))
+    (let ((val (assoc degree     
+                      (if (equal? '^ maj-min)
+                          *pc:diatonic-major*
+                          *pc:diatonic-minor*))))
+      (pc:chord (modulo (+ root (cadr val)) 12) (cddr val)))))
 
 
 
