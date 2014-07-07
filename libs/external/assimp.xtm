@@ -19,11 +19,7 @@
 (sys:precomp:insert-sexp '(sys:load "libs/shaders.xtm"))
 (sys:load "libs/external/shaders.xtm")
 ;; load the scheme macros
-(sys:load "libs/external/assimp-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
- '(sys:load "libs/external/assimp-scm.xtm"))
-(set! *sys:precomp:suppress-precomp* #t)
+(set! *sys:precomp:suppress-precomp* #f)
 
 (sys:precomp:insert-header "xtmassimp")
 
@@ -690,6 +686,11 @@
       (aiExportScene scene format fout aiprocess)
       (printf "\n Done exporting scene\n")
       void)))
+
+(sys:load "libs/external/assimp-scm.xtm")
+;; make sure we load them with precompiled code as well
+(sys:precomp:insert-sexp
+ '(sys:load "libs/external/assimp-scm.xtm"))
 
 (sys:precomp:insert-footer "xtmassimp")
 (define *xtmlib-assimp-loaded* #t)
