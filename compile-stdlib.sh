@@ -21,7 +21,7 @@ external/sndfile.xtm \
 external/audio_dsp_ext.xtm \
 external/instruments_ext.xtm \
 external/rtmidi.xtm \
-external/glib.xtm" \
+external/glib.xtm \
 external/soil.xtm \
 external/opengl.xtm \
 external/shaders.xtm \
