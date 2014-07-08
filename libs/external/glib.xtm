@@ -11,7 +11,11 @@
 ;;; Code:
 
 ;; lib-loading config
+(sys:load "libs/glib.xtm")
 (sys:load-preload-check 'glib)
+(define *xtmlib-glib-loaded* #f)
+
+(sys:precomp:insert-header "xtmglib")
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -35,17 +39,6 @@
 	(not libglib)) 
     (sys:load-escape "Could not load 'glib' dynamic library"))
 
-;; (define libgio
-;;   (sys:load-dylib (if (string=? "Linux" (sys:platform))
-;; 		      "libgio-2.0.so"
-;; 		      (if (string=? "Windows" (sys:platform))
-;; 			  "libgio-2.0-0.dll"
-;; 			  "libgio-2.0.dylib"))))
-
-;; (if (or (eq? #f libgio)
-;; 	(not libgio)) 
-;;     (print-error "Could not load 'gio' dynamic library"))
-
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -68,8 +61,6 @@
 (if (or (eq? #f libgobject)
 	(not libgobject)) 
     (sys:load-escape "Could not load 'gobject' dynamic library"))
-
-(define *xtmlib-glib-loaded* #t)
 
 ;; some GLib type aliases
 ;; note that some of these differ from GLib's actual implementation!
@@ -136,6 +127,7 @@
       (bind-lib libglib g_get_real_name_utf8 [gchar*]*)
       (bind-lib libglib g_get_host_name [gchar*]*)
       (bind-lib libglib g_get_home_dir_utf8 [gchar*]*)
+      (bind-lib libglib g_get_current_dir_utf8 [gchar*]*)            
       ;(bind-lib g gglib_get_environ [gchar**]*)
       (bind-lib libglib g_getenv_utf8 [gchar*,gchar*]*)
       (bind-lib libglib g_setenv_utf8 [gboolean,gchar*]*)
@@ -146,6 +138,7 @@
       (bind-lib libglib g_get_real_name [gchar*]*)
       (bind-lib libglib g_get_host_name [gchar*]*)
       (bind-lib libglib g_get_home_dir [gchar*]*)
+      (bind-lib libglib g_get_current_dir [gchar*]*)      
       (bind-lib libglib g_get_environ [gchar**]*)
       (bind-lib libglib g_getenv [gchar*,gchar*]*)
       (bind-lib libglib g_setenv [gboolean,gchar*]*)
@@ -163,6 +156,10 @@
 (if (string=? "Windows" (sys:platform))
     (begin 
       (bind-lib libglib g_file_test_utf8 [gboolean,gchar*,i32]*)
+      (bind-lib libglib g_rename_utf8 [i32,gchar*,gchar*]*)
+      (bind-lib libglib g_remove_utf8 [i32,gchar*]*)
+      (bind-lib libglib g_chdir_utf8 [i32,gchar*]*)
+      (bind-lib libglib g_mkdir_utf8 [i32,gchar*,int]*)            
       (bind-lib libglib g_dir_open_utf8 [GDir*,gchar*,guint,GError**]*)
       (bind-lib libglib g_dir_close [void,GDir*]*)
       (bind-lib libglib g_dir_read_name_utf8 [gchar*,GDir*]*)
@@ -170,6 +167,10 @@
       )
     (begin
       (bind-lib libglib g_file_test [gboolean,gchar*,i32]*)
+      (bind-lib libglib g_rename [i32,gchar*,gchar*]*)
+      (bind-lib libglib g_remove [i32,gchar*]*)
+      (bind-lib libglib g_chdir [i32,gchar*]*)
+      (bind-lib libglib g_mkdir [i32,gchar*,i32]*)      
       (bind-lib libglib g_dir_open [GDir*,gchar*,guint,GError**]*)
       (bind-lib libglib g_dir_close [void,GDir*]*)
       (bind-lib libglib g_dir_read_name [gchar*,GDir*]*)
@@ -668,5 +669,47 @@
       gv)))
 
 
+(bind-func sys_g_file_test
+  (lambda (path)
+    (g_file_test path G_FILE_TEST_EXISTS)))
+
+(bind-func sys_g_rename
+  (lambda (old new)
+    (g_rename old new)))  
+
+(bind-func sys_g_remove
+  (lambda (path)
+    (g_remove path)))
+
+(bind-func sys_g_chdir
+  (lambda (path)
+    (g_chdir path)))
+
+(bind-func sys_g_mkdir
+  (lambda (path)
+    (g_mkdir path #o0777)))
+
+(bind-func sys_g_get_user_name
+  (lambda ()
+    (g_get_user_name)))
+
+(bind-func sys_g_get_host_name
+  (lambda ()
+    (g_get_host_name)))
+
+(bind-func sys_g_get_home_dir
+  (lambda ()
+    (g_get_home_dir)))
+
+(bind-func sys_g_get_current_dir
+  (lambda ()
+    (g_get_current_dir)))
 
 
+(sys:load "libs/external/glib-scm.xtm")
+;; make sure we load them with precompiled code as well
+(sys:precomp:insert-sexp
+ '(sys:load "libs/external/glib-scm.xtm"))
+
+(sys:precomp:insert-footer "xtmglib")
+(define *xtmlib-glib-loaded* #t)
