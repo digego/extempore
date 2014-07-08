@@ -544,6 +544,9 @@ namespace extemp {
 	    { "gl:add-extension",           &SchemeFFI::addGLExtension },
 #endif
 	    { "gl:make-ctx",			    &SchemeFFI::makeGLContext },	    
+#if defined (TARGET_OS_MAC)
+	    { "gl:make-ctx-core",			    &SchemeFFI::makeGLCoreContext },
+#endif
 	    { "gl:set-context",             &SchemeFFI::glMakeContextCurrent },
 	    { "gl:swap-buffers",			&SchemeFFI::glSwapBuffers },
 
@@ -3911,7 +3914,120 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
       [window setHasShadow:NO];
       [window makeKeyAndOrderFront:nil];
     }else{	
-      [window setTitle:@"Extempore OpenGL Window"];
+      [window setTitle:@"Extempore OpenGL Compatibility Profile Window"];
+      [window makeKeyAndOrderFront:nil];
+    }
+
+    [window display];
+
+    GLint swapInt = 1;
+    [[view openGLContext] setValues:&swapInt forParameter:NSOpenGLCPSwapInterval];
+
+    CGLContextObj ctx = (CGLContextObj) [[view openGLContext] CGLContextObj];
+
+    CGLSetCurrentContext(ctx);
+    CGLLockContext(ctx);
+
+    // glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    // int glerrors = glGetError();
+    // printf("OpenGL Context Errors: %d\n",glerrors);
+    CGLEnable( ctx, kCGLCEMPEngine);
+
+    CGLUnlockContext(ctx);
+
+    // pointer list = _sc->NIL;
+    // _sc->imp_env->insert(list);
+    // pointer tlist = cons(_sc,mk_cptr(_sc,(void*)v),list);
+    // _sc->imp_env->erase(list);
+    // list = tlist;
+    // _sc->imp_env->insert(list);
+    // tlist = cons(_sc,mk_cptr(_sc,(void*)hdc),list);
+    // _sc->imp_env->erase(list);
+    // list = tlist;
+
+    //[pool release];
+
+    return mk_cptr(_sc, view); //list; //_cons(_sc, mk_cptr(_sc, (void*)dpy),mk_cptr(_sc,(void*)glxWin),1);
+  }
+
+
+  pointer SchemeFFI::makeGLCoreContext(scheme* _sc, pointer args)
+  {
+    //return objc_makeGLContext(_sc, args);
+
+    bool fullscrn = (pair_cadr(args) == _sc->T) ? 1 : 0;
+    int  posx = ivalue(pair_caddr(args));
+    int  posy = ivalue(pair_cadddr(args));
+    int  width = ivalue(pair_car(pair_cddddr(args)));
+    int  height = ivalue(pair_cadr(pair_cddddr(args)));
+
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+
+    NSRect frameRect = NSMakeRect(posx,posy,width,height);
+
+    // Get the screen rect of our main display
+    NSArray* screens = [NSScreen screens];
+    NSScreen* scrn = [NSScreen mainScreen]; // [screens objectAtIndex:0];
+
+    NSRect screenRect = frameRect;
+    if(fullscrn) screenRect = [scrn frame];
+
+    //NSSize size = screenRect.size;
+    NSPoint position = screenRect.origin;
+    NSSize size = screenRect.size;
+
+    if(fullscrn) {
+      position.x = 0;
+      position.y = 0;
+      screenRect.origin = position;
+    }
+
+    NSOpenGLPixelFormatAttribute array[] =
+      {
+      // Add these back for multsampling
+	// NSOpenGLPFAMultisample,
+	// NSOpenGLPFASampleBuffers, (NSOpenGLPixelFormatAttribute)1,
+	// NSOpenGLPFASamples, (NSOpenGLPixelFormatAttribute)4,
+
+      // if these are set, we don't get a Core profile GL canvas
+	// NSOpenGLPFAColorSize, (NSOpenGLPixelFormatAttribute)24,
+	// NSOpenGLPFADepthSize, (NSOpenGLPixelFormatAttribute)24,
+	// NSOpenGLPFAAccumSize, (NSOpenGLPixelFormatAttribute)24,
+	// NSOpenGLPFAAlphaSize, (NSOpenGLPixelFormatAttribute)8,
+	// NSOpenGLPFAStencilSize, (NSOpenGLPixelFormatAttribute)8,
+
+      // for Core Profile (OpenGL 3.2+)
+      NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
+
+      NSOpenGLPFADoubleBuffer,
+      NSOpenGLPFAAccelerated,
+      (NSOpenGLPixelFormatAttribute)0
+      };
+
+    NSOpenGLPixelFormat* fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes: (NSOpenGLPixelFormatAttribute*) array];
+    //NSOpenGLView* view = [[NSOpenGLView alloc] initWithFrame:screenRect pixelFormat:fmt];
+    BasicOpenGLView* view = [[BasicOpenGLView alloc] initWithFrame:screenRect pixelFormat:fmt];
+
+    int windowStyleMask;
+    if(fullscrn){
+      windowStyleMask = NSBorderlessWindowMask;
+    }else{
+      windowStyleMask = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask;
+    }
+    NSWindow* window = [[NSWindow alloc] initWithContentRect:screenRect
+	      styleMask:windowStyleMask
+	      backing:NSBackingStoreBuffered
+	      defer:YES screen:scrn];
+
+    [window setContentView:view];
+    [window useOptimizedDrawing:YES];
+    [window setOpaque:YES];
+    [window setBackgroundColor:[NSColor colorWithDeviceRed:0.0 green:0.0 blue:0.0 alpha:1.0]];
+    if(fullscrn) {
+      [window setHasShadow:NO];
+      [window makeKeyAndOrderFront:nil];
+    }else{
+      [window setTitle:@"Extempore OpenGL Core Profile Window"];
       [window makeKeyAndOrderFront:nil];				
     }	
     
