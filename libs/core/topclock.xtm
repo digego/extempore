@@ -111,7 +111,7 @@
                        (cycle (car (cddddr args))))
                    (set! oldbpm bpm)
                    (set! oldcycle cycle)
-                   (*metro* 'set-cycle cycle)
+                   (*metro* 'set-cycle cycle (/ beat-n beat-d))
                    (*metro* 'set-tempo bpm (clock->samples time) (/ beat-n beat-d))
                    ;; broadcast new bpm details as bpm/update
                    (io:osc:send (now) *topclock-broadcast* "/clock/bpm/update"
@@ -129,7 +129,7 @@
                    (begin
                      (set! oldbpm bpm)
                      (set! oldcycle cycle)
-                     (*metro* 'set-cycle cycle)
+                     (*metro* 'set-cycle cycle (/ beat-n beat-d))
                      (*metro* 'set-tempo bpm (clock->samples time) (/ beat-n beat-d))))))
             ((string=? address "/clock/bpm/q")
              ;; ask what the current bpm is
@@ -142,18 +142,13 @@
                     (total-beats (cdr mark)))
                (io:osc:send (now) (cons srcip srcport) "/clock/bpm/update"
                             time bpm (rational->n total-beats) (rational->d total-beats) cycle)))
-            ((string=? address "/clock/variable/update")
-             ;; bpm/update is same as bpm/set but is a broadcast
-             ;; call from the master
-             ;; (i.e. we don't care so much if this UDP packet gets lost
-             (let ((time (1900->1970 (car args)))
-                   (variable (cadr args))
-                   (beat-n (caddr args))
-                   (beat-d (cadddr args))
-                   (cycle (car (cddddr args)))
-                   (data (cdr (cddddr args))))
-               (if (and (not *topclock-master*) (or (<> bpm oldbpm) (<> oldcycle cycle)))
-
+            ((string=? address "/clock/variable/set")
+             (if *topclock-master*
+                 (let ((time (1900->1970 (car args)))
+                       (variable (cadr args))
+                       (beat-n (caddr args))
+                       (beat-d (cadddr args))
+                       (data (cddddr args)))
                    (callback (*metro* (/ beat-n beat-d))
                              (lambda ()
                                (eval `(define
@@ -162,17 +157,13 @@
                                              (car data)
                                              `(list ,@data)))
                                      (interaction-environment)))))))
-            ((string=? address "/clock/variable/set")
-             ;; bpm changes are sent to master only (i.e. not broadcast)
-             ;; to ensure that we don't have the problem where some
-             ;; clients GET the message but the master DOESN'T!
-             (if *topclock-master*
+            ((string=? address "/clock/variable/update")
+             (if (not *topclock-master*)
                  (let ((time (1900->1970 (car args)))
                        (variable (cadr args))
                        (beat-n (caddr args))
                        (beat-d (cadddr args))
-                       (cycle (car (cddddr args)))
-                       (data (cdr (cddddr args))))
+                       (data (cddddr args)))
                    (callback (*metro* (/ beat-n beat-d))
                              (lambda ()
                                (eval `(define
@@ -180,24 +171,17 @@
                                         ,(if (= (length data) 1)
                                              (car data)
                                              `(list ,@data)))
-                                     (interaction-environment))))
-                   ;; broadcast new bpm details as bpm/update
-                   (apply io:osc:send
-                          (now) *topclock-broadcast* "/clock/variable/update"
-                          (1970->1900 time) variable beat-n beat-d cycle
-                          data))))
+                                     (interaction-environment)))))))
             ((string=? address "/clock/variable/q")
              (let* ((mark (*metro* 'get-mark))
                     (time (1970->1900 (samples->clock (car mark))))
-                    (variable (if (defined? (string->symbol (car args)))
-                                  (eval (string->symbol (car args)))
-                                  #f))
-                    (cycle (*metro* 'get-cycle))
-                    (total-beats (cdr mark)))
-               (apply io:osc:send (now)
-                      (cons srcip srcport) "/clock/variable/update"
-                      time (car args) (rational->n total-beats) (rational->d total-beats) cycle
-                      variable)))
+                    (variable (string->symbol (car args)))
+                    (total-beats (cdr mark))
+                    (data (or (defined? variable)
+                              (eval variable))))
+               (apply io:osc:send (now) (cons srcip srcport) "/clock/variable/set"
+                      time variable (rational->n total-beats) (rational->d total-beats)
+                      data)))
             ((string=? address "/clock/stream")
              ;; stream sends out at a rate of 1/16 the current tempo
              ;; bpmt is the time that the bpm change occured
@@ -211,10 +195,10 @@
                (set! *topclock-master-ip* srcip)
                (if (not (string=? *topclock-master-ip* *topclock-old-master-ip*))
                    (begin
-                     (print "There's a")
+                     (print "There's a ")
                      (print-with-colors 'magenta 'default #f
                                         (print "new topclock"))
-                     (print "in town at")
+                     (print " in town at ")
                      (print-with-colors 'blue 'default #f
                                         (print srcip "\n"))
                      (set! *topclock-master* #f)
@@ -239,19 +223,20 @@
 ;; 'beat' is the beat that this change fell on (should be synonymous with time)
 (define topclock-bpm
   (lambda (time bpm beat cycle)
-    (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*) "/clock/bpm/set"
+    (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*)
+                 "/clock/bpm/set"
                  (1970->1900 (samples->clock time)) bpm
                  (rational->n beat) (rational->d beat) cycle)))
 
 (define topclock-variable
-  (lambda (time variable-name beat cycle . args)
-    (if (and (= (length args) 1)
-             (list? (car args)))
-        (set! args (car args)))
+  (lambda (time variable-name beat . data)
+    (if (and (= (length data) 1)
+             (list? (car data)))
+        (set! data (car data)))
     (apply io:osc:send
            (now) (cons *topclock-master-ip* *topclock-port*) "/clock/variable/set"
            (1970->1900 (samples->clock time)) (atom->string variable-name)
-           (rational->n beat) (rational->d beat) cycle args)))
+           (rational->n beat) (rational->d beat) data)))
 
 
 ;; topclock streamer
