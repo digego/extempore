@@ -197,8 +197,10 @@
                                   #f))
                     (cycle (*metro* 'get-cycle))
                     (total-beats (cdr mark)))
-               (io:osc:send (now) (cons srcip srcport) "/clock/variable/update"
-                            time (car args) (rational->n total-beats) (rational->d total-beats) cycle variable)))
+               (apply io:osc:send (now)
+                      (cons srcip srcport) "/clock/variable/update"
+                      time (car args) (rational->n total-beats) (rational->d total-beats) cycle
+                      variable)))
             ((string=? address "/clock/stream")
              ;; stream sends out at a rate of 1/16 the current tempo
              ;; bpmt is the time that the bpm change occured
