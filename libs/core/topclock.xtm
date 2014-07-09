@@ -245,6 +245,9 @@
 
 (define topclock-variable
   (lambda (time variable-name beat cycle . args)
+    (if (and (= (length args) 1)
+             (list? (car args)))
+        (set! args (car args)))
     (apply io:osc:send
            (now) (cons *topclock-master-ip* *topclock-port*) "/clock/variable/set"
            (1970->1900 (samples->clock time)) (atom->string variable-name)
