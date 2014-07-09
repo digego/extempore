@@ -77,7 +77,7 @@
                        (> *topclock-election-val* election-val))
                    (io:osc:send (now) (cons srcip srcport) "/clock/election/r"))))
             ((string=? address "/clock/election/r")
-             ;; if we receive an election reply 
+             ;; if we receive an election reply
              ;; then we are definitely NOT the master
              ;; also don't try for re-election again
              ;; for AT LEAST 5 seconds!
@@ -93,7 +93,7 @@
             ((string=? address "/clock/sync/r")
              ;; clock syncs come from current master
              (let* ((t1 (1900->1970 (car args)))
-                    (t2 (1900->1970 (cadr args))) ;; t2 
+                    (t2 (1900->1970 (cadr args))) ;; t2
                     (t3 (1900->1970 (cadr args))) ;; and t3 the same
                     (t4 (clock:clock))
                     (msg-delay (- t4 t1))
@@ -105,7 +105,7 @@
              ;; clients GET the message but the master DOESN'T!
              (if *topclock-master*
                  (let ((time (1900->1970 (car args)))
-                       (bpm (cadr args))                   
+                       (bpm (cadr args))
                        (beat-n (caddr args))
                        (beat-d (cadddr args))
                        (cycle (car (cddddr args))))
@@ -120,7 +120,7 @@
              ;; bpm/update is same as bpm/set but is a broadcast
              ;; call from the master
              ;; (i.e. we don't care so much if this UDP packet gets lost
-             (let ((time (1900->1970 (car args)))                   
+             (let ((time (1900->1970 (car args)))
                    (bpm (cadr args))
                    (beat-n (caddr args))
                    (beat-d (cadddr args))
@@ -153,12 +153,15 @@
                    (cycle (car (cddddr args)))
                    (data (cdr (cddddr args))))
                (if (and (not *topclock-master*) (or (<> bpm oldbpm) (<> oldcycle cycle)))
-                   (eval `(define
-                            ,(string->symbol variable)
-                            ,(if (= (length data) 1)
-                                 (car data)
-                                 `(list ,@data)))
-                         (interaction-environment)))))
+
+                   (callback (*metro* (/ beat-n beat-d))
+                             (lambda ()
+                               (eval `(define
+                                            ,(string->symbol variable)
+                                            ,(if (= (length data) 1)
+                                                 (car data)
+                                                 `(list ,@data)))
+                                         (interaction-environment)))))))
             ((string=? address "/clock/variable/set")
              ;; bpm changes are sent to master only (i.e. not broadcast)
              ;; to ensure that we don't have the problem where some
@@ -170,12 +173,14 @@
                         (beat-d (cadddr args))
                         (cycle (car (cddddr args)))
                         (data (cdr (cddddr args))))
-                   (eval `(define
-                            ,(string->symbol variable)
-                            ,(if (= (length data) 1)
-                                 (car data)
-                                 `(list ,@data)))
-                         (interaction-environment))
+                   (callback (*metro* (/ beat-n beat-d))
+                             (lambda ()
+                               (eval `(define
+                                            ,(string->symbol variable)
+                                            ,(if (= (length data) 1)
+                                                 (car data)
+                                                 `(list ,@data)))
+                                         (interaction-environment))))
                    ;; broadcast new bpm details as bpm/update
                    (apply io:osc:send
                           (now) *topclock-broadcast* "/clock/variable/update"
@@ -234,7 +239,7 @@
 ;; 'bpm' beats per minute
 ;; 'beat' is the beat that this change fell on (should be synonymous with time)
 (define topclock-bpm
-  (lambda (time bpm beat cycle) 
+  (lambda (time bpm beat cycle)
     (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*) "/clock/bpm/set"
                  (1970->1900 (samples->clock time)) bpm
                  (rational->n beat) (rational->d beat) cycle)))
