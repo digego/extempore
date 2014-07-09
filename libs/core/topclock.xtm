@@ -157,39 +157,36 @@
                    (callback (*metro* (/ beat-n beat-d))
                              (lambda ()
                                (eval `(define
-                                            ,(string->symbol variable)
-                                            ,(if (= (length data) 1)
-                                                 (car data)
-                                                 `(list ,@data)))
-                                         (interaction-environment)))))))
+                                        ,(string->symbol variable)
+                                        ,(if (= (length data) 1)
+                                             (car data)
+                                             `(list ,@data)))
+                                     (interaction-environment)))))))
             ((string=? address "/clock/variable/set")
              ;; bpm changes are sent to master only (i.e. not broadcast)
              ;; to ensure that we don't have the problem where some
              ;; clients GET the message but the master DOESN'T!
              (if *topclock-master*
-                 (let* ((time (1900->1970 (car args)))
-                        (variable (cadr args))
-                        (beat-n (caddr args))
-                        (beat-d (cadddr args))
-                        (cycle (car (cddddr args)))
-                        (data (cdr (cddddr args))))
+                 (let ((time (1900->1970 (car args)))
+                       (variable (cadr args))
+                       (beat-n (caddr args))
+                       (beat-d (cadddr args))
+                       (cycle (car (cddddr args)))
+                       (data (cdr (cddddr args))))
                    (callback (*metro* (/ beat-n beat-d))
                              (lambda ()
                                (eval `(define
-                                            ,(string->symbol variable)
-                                            ,(if (= (length data) 1)
-                                                 (car data)
-                                                 `(list ,@data)))
-                                         (interaction-environment))))
+                                        ,(string->symbol variable)
+                                        ,(if (= (length data) 1)
+                                             (car data)
+                                             `(list ,@data)))
+                                     (interaction-environment))))
                    ;; broadcast new bpm details as bpm/update
                    (apply io:osc:send
                           (now) *topclock-broadcast* "/clock/variable/update"
                           (1970->1900 time) variable beat-n beat-d cycle
                           data))))
             ((string=? address "/clock/variable/q")
-             ;; ask what the current bpm is
-             ;; when it was set
-             ;; and what the running beat total was when set
              (let* ((mark (*metro* 'get-mark))
                     (time (1970->1900 (samples->clock (car mark))))
                     (variable (if (defined? (string->symbol (car args)))
