@@ -3635,7 +3635,7 @@
 	 (if (> (impc:ir:get-ptr-depth ttype) 1.0)
 	     (impc:compiler:print-compiler-error "pointer depth too great for array-set!" ast))
          (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
-	     (impc:compiler:print-bad-type-error-with (cadr idx) "index must be an integer" ast))
+	     (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
         (if (and (integer? (caddr ast)) (> (+ 1 (caddr ast)) (cadr ttype)))
 	    (impc:compiler:print-index-oob-error 'array ast))
          (emit index-str os)
@@ -3857,7 +3857,7 @@
       (if (not (impc:ir:vector? ttype))
 	  (impc:compiler:print-bad-type-error-with-ast ttype "invalid vector type" ast))
       (if (> (impc:ir:get-ptr-depth ttype) 1.0)
-	  (impc:compiler:print-bad-type-error-with (cadr var) "pointer depth too great for vector-set!" ast))
+	  (impc:compiler:print-bad-type-error-with-ast (cadr var) "pointer depth too great for vector-set!" ast))
       ;; type tests done
       (emit index-str os)
       (emit var-str os)
@@ -3965,7 +3965,7 @@
 	     ;; 	     (impc:ir:pointer-- (impc:ir:convert-from-pretty-types (car hint?)))
 	     ;; 	     (impc:ir:convert-from-pretty-types (caddr ast)))))
 	(if (not (impc:ir:fixed-point? t))
-	    (impc:compiler:print-bad-type-error-with (impc:ir:get-type-str t) "alloc size must be an integer" ast))
+	    (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-str t) "alloc size must be an integer" ast))
 	(emit idx-str os)
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	(if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
