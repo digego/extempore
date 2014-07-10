@@ -855,6 +855,8 @@ indentation."
 
 (defun extempore-blink-region (overlay start end &optional buf)
   (move-overlay overlay start end buf)
+  (if extempore-sb-mode
+      (setq extempore-sb-eval-markers (cons start end)))
   (redisplay)
   (sleep-for extempore-blink-duration)
   (delete-overlay overlay))
