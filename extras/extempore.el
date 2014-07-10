@@ -1724,7 +1724,7 @@ If you don't want to be prompted for this name each time, set the
   :type 'string
   :group 'extempore)
 
-(defvar extempore-sb-refresh-interval 0.2
+(defvar extempore-sb-refresh-interval 0.1
   "The refresh interval (in seconds) for syncing the slave buffers")
 
 (defvar extempore-sb-server nil)
