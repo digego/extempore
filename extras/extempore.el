@@ -1715,7 +1715,7 @@ buffer."
   :type 'integer
   :group 'extempore)
 
-(defcustom extempore-sb-host-name nil
+(defcustom extempore-sb-host-name user-login-name
   "Host name to use sending slave buffers around.
 
 If you don't want to be prompted for this name each time, set the
