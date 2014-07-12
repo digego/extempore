@@ -422,7 +422,7 @@ namespace extemp {
 
         // print underflow/overflow
         if(statusFlags & 0x00000004) 
-          printf("Audio underflow: pushing extempore to hard?\n");
+          printf("Audio underflow: are you pushing extempore too hard?\n");
         if(statusFlags & 0x00000008) 
           printf("Audio output overflow\n");
 
