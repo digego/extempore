@@ -25,7 +25,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/audio_dsp.xtm")
+;; (sys:load "libs/audio_dsp.xtm")
 (sys:load-preload-check 'audio_dsp)
 (define *xtmlib-audio_dsp-loaded* #f)
 
@@ -964,6 +964,266 @@
           0.0))))
 
 
+;; http://www.cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf
+;; the 'using v1 to compute v2' version
+
+(bind-func svf_c
+  "a state variable filter (SVF)
+
+takes input pointer |6,SAMPLE|* and fills it:
+
+|in,low,band,high,notch,peak|
+"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res outarray:|6,SAMPLE|*)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! g (tan (* SPI (/ cutoff SR))))
+        (set! k (- 2.0 (* 2.0 res)))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+        (set! a2 (* g a1))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (aset! outarray 0 in) ;; input
+        (aset! outarray 1 v2) ;; low
+        (aset! outarray 2 v1) ;; band
+        (aset! outarray 3 (- in (- (* k v1) v2))) ;; high
+        (aset! outarray 4 (- in (* k v1))) ;; notch
+        (aset! outarray 5 (- in (- (* k v1) (* 2.0 v2)))) ;; peak
+        outarray))))
+
+(if *build-multi-chan*
+    (bind-func svf_mc_c
+      (lambda (nchan:i64)
+        (let ((svf_buf:[|6,float|*,float,float,float,|6,float|*]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! svf_buf i (svf_c)))
+          (lambda (chan in cutoff res outarray)
+            ((pref svf_buf chan) in cutoff res outarray))))))
+
+(bind-func lpf_c
+  "lowpass filter: returns lpf closure using a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! g (tan (* SPI (/ cutoff SR))))
+        (set! k (- 2.0 (* 2.0 res)))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+        (set! a2 (* g a1))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        v2))))
+
+(if *build-multi-chan*
+    (bind-func lpf_mc_c
+      (lambda (nchan:i64)
+        (let ((lpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! lpf_buf i (lpf_c)))
+          (lambda (chan in cutoff res)
+            ((pref lpf_buf chan) in cutoff res))))))
+
+(bind-func lpf2_c
+  "a state variable lowpass filter. slightly more flops than lpf_c,
+but v1 and v2 can be computed in parallel"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0) (a3 0.0)
+          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+	      (set! g (tan (* SPI (/ cutoff SR))))
+        (set! k (- 2.0 (* 2.0:float res)))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k )))))
+        (set! a2 (* g a1))
+        (set! a3 (* g a2))
+        (set! v3 (- in ic2eq))
+        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
+        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        v2))))
+
+(if *build-multi-chan*
+    (bind-func lpf2_mc_c
+      (lambda (nchan:i64)
+        (let ((lpf2_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! lpf2_buf i (lpf2_c)))
+          (lambda (chan in cutoff res)
+            ((pref lpf2_buf chan) in cutoff res))))))
+
+(bind-func bpf_c
+  "bandpass filter: returns bpf closure using a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! g (tan (* SPI (/ cutoff SR))))
+        (set! k (- 2.0 (* 2.0 res)))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+        (set! a2 (* g a1))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        v1))))
+
+(if *build-multi-chan*
+    (bind-func bpf_mc_c
+      (lambda (nchan:i64)
+        (let ((bpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! bpf_buf i (bpf_c)))
+          (lambda (chan in cutoff res)
+            ((pref bpf_buf chan) in cutoff res))))))
+
+(bind-func hpf_c
+  "highpass filter: returns hpf closure using a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! g (tan (* SPI (/ cutoff SR))))
+        (set! k (- 2.0 (* 2.0 res)))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+        (set! a2 (* g a1))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (- in (- (* k v1) v2))))))
+
+(if *build-multi-chan*
+    (bind-func hpf_mc_c
+      (lambda (nchan:i64)
+        (let ((hpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! hpf_buf i (hpf_c)))
+          (lambda (chan in cutoff res)
+            ((pref hpf_buf chan) in cutoff res))))))
+
+(bind-func notch_c
+  "notch filter: returns notch closure using a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! g (tan (* SPI (/ cutoff SR))))
+        (set! k (- 2.0 (* 2.0 res)))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+        (set! a2 (* g a1))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (- in (* k v1))))))
+
+(if *build-multi-chan*
+    (bind-func notch_mc_c
+      (lambda (nchan:i64)
+        (let ((notch_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! notch_buf i (notch_c)))
+          (lambda (chan in cutoff res)
+            ((pref notch_buf chan) in cutoff res))))))
+
+(bind-func peak_c
+  "peak filter: returns peak closure using a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! g (tan (* SPI (/ cutoff SR))))
+        (set! k (- 2.0 (* 2.0 res)))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+        (set! a2 (* g a1))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (- in (- (* k v1) (* 2.0 v2)))))))
+
+(if *build-multi-chan*
+    (bind-func peak_mc_c
+      (lambda (nchan:i64)
+        (let ((peak_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! peak_buf i (peak_c)))
+          (lambda (chan in cutoff res)
+            ((pref peak_buf chan) in cutoff res))))))
+
+;; Andy Simper's Sallen Key LPF
+;; TODO add link to pdf
+
+(bind-func skf_c
+  "lowpass filter: returns lpf closure using a Sallen Key lpf"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a0 0.0) (a1 0.0) (a2 0.0) (a3 0.0) (a4 0.0) (a5 0.0)
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! g (tan (* SPI (/ cutoff SR))))
+        (set! k (* 2.0 res))
+        (set! a0 (/ 1.0 (- (* (+ 1.0 g)
+                              (+ 1.0 g))
+                           (* g k))))
+        (set! a1 (* k a0))
+        (set! a2 (* (+ 1.0 g) a0))
+        (set! a3 (* g a2))
+        (set! a4 (/ 1.0 (+ 1.0 g)))
+        (set! a5 (* g a4))
+        (set! v1 (+ (* a1 ic2eq)
+                    (* a2 ic1eq)
+                    (* a3 in)))
+        (set! v2 (+ (* a4 ic2eq)
+                    (* a5 v1)))
+        (set! ic1eq (- (* 2.0 (- v1 (* k v2))) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        v2))))
+
+(if *build-multi-chan*
+    (bind-func skf_mc_c
+      (lambda (nchan:i64)
+        (let ((skf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! skf_buf i (skf_c)))
+          (lambda (chan in cutoff res)
+            ((pref skf_buf chan) in cutoff res))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -974,7 +1234,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; biquad low-pass filter
-(bind-func lpf_c
+(bind-func lpfbq_c
   (lambda ()
     (let* ((y1 0.0)
 	   (y2 0.0)
@@ -1017,18 +1277,18 @@
 	  y)))))
 
 (if *build-multi-chan*
-    (bind-func lpf_mc_c
+    (bind-func lpfbq_mc_c
       (lambda (channels:i64)
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
-	  (dotimes (i channels) (pset! lines i (lpf_c)))
+	  (dotimes (i channels) (pset! lines i (lpfbq_c)))
 	  (lambda (chan:i64 x freq res)
 	    (let ((f (pref lines chan)))
 	      (f x freq res)))))))
 
 
 ;; biquad high-pass filter
-(bind-func hpf_c
+(bind-func hpfbq_c
   (lambda ()
     (let* ((y1 0.0)
 	   (y2 0.0)
@@ -1071,18 +1331,18 @@
 	  y)))))
 
 (if *build-multi-chan*
-    (bind-func hpf_mc_c
+    (bind-func hpfbq_mc_c
       (lambda (channels:i64)
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
-	  (dotimes (i channels) (pset! lines i (hpf_c)))
+	  (dotimes (i channels) (pset! lines i (hpfbq_c)))
 	  (lambda (chan:i64 x freq res)
 	    (let ((f (pref lines chan)))
 	      (f x freq res)))))))
 
 
 ;; biquad band-pass filter
-(bind-func bpf_c
+(bind-func bpfbq_c
   (lambda () 
     (let* ((y1 0.0)
 	   (y2 0.0)
@@ -1130,18 +1390,18 @@
 
 
 (if *build-multi-chan*
-    (bind-func bpf_mc_c
+    (bind-func bpfbq_mc_c
       (lambda (channels:i64)
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
-	  (dotimes (i channels) (pset! lines i (bpf_c)))
+	  (dotimes (i channels) (pset! lines i (bpfbq_c)))
 	  (lambda (chan:i64 x freq bandwidth)
 	    (let ((f (pref lines chan)))
 	      (f x freq bandwidth)))))))
 
 
 ;; biquad notch filter
-(bind-func notch_c
+(bind-func notchbq_c
   (lambda () 
     (let* ((y1 0.0)
 	   (y2 0.0)
@@ -1188,11 +1448,11 @@
 	  y)))))
 
 (if *build-multi-chan*
-    (bind-func notch_mc_c
+    (bind-func notchbq_mc_c
       (lambda (channels:i64)
 	(let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
 	      (i:i64 0))
-	  (dotimes (i channels) (pset! lines i (notch_c)))
+	  (dotimes (i channels) (pset! lines i (notchbq_c)))
 	  (lambda (chan:i64 x freq bandwidth)
 	    (let ((f (pref lines chan)))
 	      (f x freq bandwidth)))))))
@@ -1377,85 +1637,6 @@
 	  (lambda (chan:i64 x freq res)
 	    (let ((f (pref lines chan)))
 	      (f x freq res)))))))
-
-;; State Variable Filter adapted from
-;; http://www.musicdsp.org/archive.php?classid=3#142 (it is possible
-;; to get all the hp, lp, bp and notch output values in one function,
-;; however they are currently provided in separate functions)
-
-(if (not (llvm:get-globalvar "SVF_LOWPASS"))
-    (bind-val SVF_LOWPASS i64 1))
-(if (not (llvm:get-globalvar "SVF_HIGHPASS"))
-    (bind-val SVF_HIGHPASS i64 2))
-(if (not (llvm:get-globalvar "SVF_BANDPASS"))
-    (bind-val SVF_BANDPASS i64 3))
-(if (not (llvm:get-globalvar "SVF_NOTCH"))
-    (bind-val SVF_NOTCH i64 4))
-(if (not (llvm:get-globalvar "SVF_PEAK"))
-    (bind-val SVF_PEAK i64 5))
-
-(bind-func svf_c
-  "Returns a (state variable) filter closure"
-  (lambda (type)
-    ;; old values
-    (let ((zero:SAMPLE 0.0)
-          (cutoff_ 0.0)
-          (resonance_:SAMPLE 0.0)
-          (drive 0.0)
-          (freq 0.0)
-          (damp 0.0)
-          (notch 0.0)
-          (low 0.0)
-          (high 0.0)
-          (band 0.0)
-          (peak 0.0)
-          (out 0.0))
-      (lambda (in cutoff resonance)
-        ;; recalculate some values if cutoff or resonance have changed
-        (if (or (<> cutoff cutoff_)
-                (<> resonance resonance_))
-            (begin
-              (set! cutoff_ cutoff)
-              (set! resonance_ resonance)
-              (set! freq (* 2.0 (sin (* SPI (min 0.25 (/ cutoff (* SAMPLERATE 2.0)))))))
-              (set! damp (min (* 2.0 (- 1.0 (pow resonance 0.25)))
-                               (min 2.0 (- (/ 2.0 freq) (* freq 0.5)))))))
-        (set! notch (- in (* damp band)))
-        (set! low (+ low (* freq band)))
-        (set! high (- notch low))
-        (set! band (- (+ (* freq high) band)
-                      (* drive band band band)))
-        ;; this is a bit filthy - needs a macro
-        (set! out (* 0.5 (if (= type SVF_LOWPASS)
-                             low
-                             (if (= type SVF_HIGHPASS)
-                                 high
-                                 (if (= type SVF_BANDPASS)
-                                     band
-                                     (if (= type SVF_NOTCH)
-                                         notch
-                                         (if (= type SVF_PEAK)
-                                             peak
-                                             zero)))))))
-        ;; now do it all again (because it's oversampled for
-        ;; stability)
-        (set! notch (- in (* damp band)))
-        (set! low (+ low (* freq band)))
-        (set! high (- notch low))
-        (set! band (- (+ (* freq high) band)
-                      (* drive band band band)))
-        ;; this is a bit filthy - needs a macro
-        (set! out (+ out (* 0.5 (if (= type SVF_LOWPASS)
-                                    low
-                                    (if (= type SVF_HIGHPASS)
-                                        high
-                                        (if (= type SVF_BANDPASS)
-                                            band
-                                            (if (= type SVF_NOTCH)
-                                                notch
-                                                (if (= type SVF_PEAK)
-                                                    peak
-                                                    zero))))))))))))
 
 ;; based on Steve Harris's foverdrive lv2 plugin
 ;; http://plugin.org.uk/
