@@ -1008,7 +1008,7 @@ takes input pointer |6,SAMPLE|* and fills it:
             ((pref svf_buf chan) in cutoff res outarray))))))
 
 (bind-func lpf_c
-  "lowpass filter: returns lpf closure using a state variable filter"
+  "lowpass filter: returns filtering closure which implements a state variable filter"
 	(lambda ()
 	  (let ((ic1eq 0.0) (ic2eq 0.0)
           (g 0.0)
@@ -1068,7 +1068,7 @@ but v1 and v2 can be computed in parallel"
             ((pref lpf2_buf chan) in cutoff res))))))
 
 (bind-func bpf_c
-  "bandpass filter: returns bpf closure using a state variable filter"
+  "bandpass filter: returns filtering closure which implements a state variable filter"
 	(lambda ()
 	  (let ((ic1eq 0.0) (ic2eq 0.0)
           (g 0.0)
@@ -1097,7 +1097,7 @@ but v1 and v2 can be computed in parallel"
             ((pref bpf_buf chan) in cutoff res))))))
 
 (bind-func hpf_c
-  "highpass filter: returns hpf closure using a state variable filter"
+  "highpass filter: returns filtering closure which implements a state variable filter"
 	(lambda ()
 	  (let ((ic1eq 0.0) (ic2eq 0.0)
           (g 0.0)
@@ -1126,7 +1126,7 @@ but v1 and v2 can be computed in parallel"
             ((pref hpf_buf chan) in cutoff res))))))
 
 (bind-func notch_c
-  "notch filter: returns notch closure using a state variable filter"
+  "notch filter: returns filtering closure which implements a state variable filter"
 	(lambda ()
 	  (let ((ic1eq 0.0) (ic2eq 0.0)
           (g 0.0)
@@ -1155,7 +1155,7 @@ but v1 and v2 can be computed in parallel"
             ((pref notch_buf chan) in cutoff res))))))
 
 (bind-func peak_c
-  "peak filter: returns peak closure using a state variable filter"
+  "peak filter: returns filtering closure which implements a state variable filter"
 	(lambda ()
 	  (let ((ic1eq 0.0) (ic2eq 0.0)
           (g 0.0)
@@ -1183,11 +1183,87 @@ but v1 and v2 can be computed in parallel"
           (lambda (chan in cutoff res)
             ((pref peak_buf chan) in cutoff res))))))
 
+(bind-func lshelf_c
+  "low shelf filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (A 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0) (a3 0.0)
+          (m0 1.0) (m1 1.0) (m2 1.0)
+          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
+	    (lambda (in cutoff gain Q)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! A (pow 10.0 (/ gain 40.0)))
+        (set! g (/ (tan (* SPI (/ cutoff SR)))
+                   (sqrt A)))
+        (set! k (/ 1.0 Q))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+        (set! a2 (* g a1))
+        (set! a3 (* g a2))
+        (set! m1 (* k (- A 1.0)))
+        (set! m2 (- (* A A) 1.0))
+        (set! v3 (- in ic2eq))
+        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
+        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (+ in (* m1 v1) (* m2 v2))))))
+
+(if *build-multi-chan*
+    (bind-func lshelf_mc_c
+      (lambda (nchan:i64)
+        (let ((lshelf_buf:[float,float,float,float,float]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! lshelf_buf i (lshelf_c)))
+          (lambda (chan in cutoff gain Q)
+            ((pref lshelf_buf chan) in cutoff gain Q))))))
+
+
+(bind-func hshelf_c
+  "low shelf filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (A 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0) (a3 0.0)
+          (m0 0.0) (m1 1.0) (m2 1.0)
+          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
+	    (lambda (in cutoff gain Q)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! A (pow 10.0 (/ gain 40.0)))
+        (set! g (/ (tan (* SPI (/ cutoff SR)))
+                   (sqrt A)))
+        (set! k (/ 1.0 Q))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+        (set! a2 (* g a1))
+        (set! a3 (* g a2))
+        (set! m0 (* A A))
+        (set! m1 (* k (- 1.0 A) A))
+        (set! m2 (- 1.0 (* A A)))
+        (set! v3 (- in ic2eq))
+        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
+        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (+ (* m0 in) (* m1 v1) (* m2 v2))))))
+
+(if *build-multi-chan*
+    (bind-func hshelf_mc_c
+      (lambda (nchan:i64)
+        (let ((hshelf_buf:[float,float,float,float,float]** (zalloc nchan))
+              (i:i64 0))
+          (dotimes (i nchan) (pset! hshelf_buf i (hshelf_c)))
+          (lambda (chan in cutoff gain Q)
+            ((pref hshelf_buf chan) in cutoff gain Q))))))
+
 ;; Andy Simper's Sallen Key LPF
 ;; TODO add link to pdf
 
 (bind-func skf_c
-  "lowpass filter: returns lpf closure using a Sallen Key lpf"
+  "lowpass filter: returns filtering closure using a Sallen Key lpf"
 	(lambda ()
 	  (let ((ic1eq 0.0) (ic2eq 0.0)
           (g 0.0)
