@@ -38,7 +38,6 @@
 
 (define *midi-in* (midi_new_indevice))
 (define *midi-out* (midi_new_outdevice))
-(define *midi-cc 11) ;; midi control change
 
 ;; query for valid midi output devices
 (midi_query_outports *midi-out*)
@@ -49,15 +48,16 @@
 ;; use control change messages to change
 ;; the pitch of an oscillator
 (bind-func midi_cc_receive
-  (let ((type:i8 0) (chan:i8 0) (a:i8 0) (b:float 0.)
+  (let ((type:i8 0) (chan:i8 0) (a:i8 0) (b:i8 0)
         (left:i8 1) (right:i8 2))
     (lambda (time:double len:i64 msg:i8*)
       (set! type (>> (pref msg 0) 4))
       (set! chan (& (pref msg 0) 15))
       (set! a (pref msg 1))
-      (set! b (i8tof (pref msg 2)))
-      (if (= a left) (dsp.freql (+ 110. (pow b 1.25))))
-      (if (= a right) (dsp.freqr (+ 110. (pow b 1.25))))
+      (set! b (pref msg 2))
+      (println type chan a b)
+      (if (= a left) (dsp.freql (+ 110. (pow (i8tof b) 1.25))))
+      (if (= a right) (dsp.freqr (+ 110. (pow (i8tof b) 1.25))))
       void)))
 
 ;; register an *midi-in* to "midi_callback"
