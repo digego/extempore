@@ -1,0 +1,425 @@
+;;; glfw3.xtm -- xtlang bindings for GLFW3
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libglfw, libGLEW
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
+
+;; (sys:load "libs/xtm.xtm")
+(sys:load "libs/external/opengl.xtm")
+
+(define libglfw3
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libglfw3.so"))
+          ((string=? platform "Windows") (sys:open-dylib "libglfw3.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "libglfw3.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+(define libGLEW
+  (let ((platform (sys:platform)))
+    (cond ((string=? platform "Linux") (sys:open-dylib "libGLEW.so"))
+          ((string=? platform "Windows") (sys:open-dylib "libGLEW.dll"))
+          ((string=? platform "OSX") (sys:open-dylib "libGLEW.dylib"))
+          (else (print "Unknown platform: " platform)))))
+
+;; glfw3
+
+;; some constants
+
+(bind-val GLFW_VERSION_MAJOR          i32 3)
+(bind-val GLFW_VERSION_MINOR          i32 0)
+(bind-val GLFW_VERSION_REVISION       i32 4)
+
+(bind-val GLFW_RELEASE                i32 0)
+(bind-val GLFW_PRESS                  i32 1)
+(bind-val GLFW_REPEAT                 i32 2)
+(bind-val GLFW_KEY_UNKNOWN            i32 -1)
+
+;; /* Printable keys */
+(bind-val GLFW_KEY_SPACE              i32 32)
+(bind-val GLFW_KEY_APOSTROPHE         i32 39)  ; '
+(bind-val GLFW_KEY_COMMA              i32 44)  ; ,
+(bind-val GLFW_KEY_MINUS              i32 45)  ; -
+(bind-val GLFW_KEY_PERIOD             i32 46)  ; .
+(bind-val GLFW_KEY_SLASH              i32 47)  ; /
+(bind-val GLFW_KEY_0                  i32 48)
+(bind-val GLFW_KEY_1                  i32 49)
+(bind-val GLFW_KEY_2                  i32 50)
+(bind-val GLFW_KEY_3                  i32 51)
+(bind-val GLFW_KEY_4                  i32 52)
+(bind-val GLFW_KEY_5                  i32 53)
+(bind-val GLFW_KEY_6                  i32 54)
+(bind-val GLFW_KEY_7                  i32 55)
+(bind-val GLFW_KEY_8                  i32 56)
+(bind-val GLFW_KEY_9                  i32 57)
+(bind-val GLFW_KEY_SEMICOLON          i32 59)  ; ;
+(bind-val GLFW_KEY_EQUAL              i32 61)  ; =
+(bind-val GLFW_KEY_A                  i32 65)
+(bind-val GLFW_KEY_B                  i32 66)
+(bind-val GLFW_KEY_C                  i32 67)
+(bind-val GLFW_KEY_D                  i32 68)
+(bind-val GLFW_KEY_E                  i32 69)
+(bind-val GLFW_KEY_F                  i32 70)
+(bind-val GLFW_KEY_G                  i32 71)
+(bind-val GLFW_KEY_H                  i32 72)
+(bind-val GLFW_KEY_I                  i32 73)
+(bind-val GLFW_KEY_J                  i32 74)
+(bind-val GLFW_KEY_K                  i32 75)
+(bind-val GLFW_KEY_L                  i32 76)
+(bind-val GLFW_KEY_M                  i32 77)
+(bind-val GLFW_KEY_N                  i32 78)
+(bind-val GLFW_KEY_O                  i32 79)
+(bind-val GLFW_KEY_P                  i32 80)
+(bind-val GLFW_KEY_Q                  i32 81)
+(bind-val GLFW_KEY_R                  i32 82)
+(bind-val GLFW_KEY_S                  i32 83)
+(bind-val GLFW_KEY_T                  i32 84)
+(bind-val GLFW_KEY_U                  i32 85)
+(bind-val GLFW_KEY_V                  i32 86)
+(bind-val GLFW_KEY_W                  i32 87)
+(bind-val GLFW_KEY_X                  i32 88)
+(bind-val GLFW_KEY_Y                  i32 89)
+(bind-val GLFW_KEY_Z                  i32 90)
+(bind-val GLFW_KEY_LEFT_BRACKET       i32 91)  ; [
+(bind-val GLFW_KEY_BACKSLASH          i32 92)  ; \
+(bind-val GLFW_KEY_RIGHT_BRACKET      i32 93)  ; ]
+(bind-val GLFW_KEY_GRAVE_ACCENT       i32 96)  ; `
+(bind-val GLFW_KEY_WORLD_1            i32 161) ; non-US #1
+(bind-val GLFW_KEY_WORLD_2            i32 162) ; non-US #2
+
+;; /* Function keys */
+(bind-val GLFW_KEY_ESCAPE             i32 256)
+(bind-val GLFW_KEY_ENTER              i32 257)
+(bind-val GLFW_KEY_TAB                i32 258)
+(bind-val GLFW_KEY_BACKSPACE          i32 259)
+(bind-val GLFW_KEY_INSERT             i32 260)
+(bind-val GLFW_KEY_DELETE             i32 261)
+(bind-val GLFW_KEY_RIGHT              i32 262)
+(bind-val GLFW_KEY_LEFT               i32 263)
+(bind-val GLFW_KEY_DOWN               i32 264)
+(bind-val GLFW_KEY_UP                 i32 265)
+(bind-val GLFW_KEY_PAGE_UP            i32 266)
+(bind-val GLFW_KEY_PAGE_DOWN          i32 267)
+(bind-val GLFW_KEY_HOME               i32 268)
+(bind-val GLFW_KEY_END                i32 269)
+(bind-val GLFW_KEY_CAPS_LOCK          i32 280)
+(bind-val GLFW_KEY_SCROLL_LOCK        i32 281)
+(bind-val GLFW_KEY_NUM_LOCK           i32 282)
+(bind-val GLFW_KEY_PRINT_SCREEN       i32 283)
+(bind-val GLFW_KEY_PAUSE              i32 284)
+(bind-val GLFW_KEY_F1                 i32 290)
+(bind-val GLFW_KEY_F2                 i32 291)
+(bind-val GLFW_KEY_F3                 i32 292)
+(bind-val GLFW_KEY_F4                 i32 293)
+(bind-val GLFW_KEY_F5                 i32 294)
+(bind-val GLFW_KEY_F6                 i32 295)
+(bind-val GLFW_KEY_F7                 i32 296)
+(bind-val GLFW_KEY_F8                 i32 297)
+(bind-val GLFW_KEY_F9                 i32 298)
+(bind-val GLFW_KEY_F10                i32 299)
+(bind-val GLFW_KEY_F11                i32 300)
+(bind-val GLFW_KEY_F12                i32 301)
+(bind-val GLFW_KEY_F13                i32 302)
+(bind-val GLFW_KEY_F14                i32 303)
+(bind-val GLFW_KEY_F15                i32 304)
+(bind-val GLFW_KEY_F16                i32 305)
+(bind-val GLFW_KEY_F17                i32 306)
+(bind-val GLFW_KEY_F18                i32 307)
+(bind-val GLFW_KEY_F19                i32 308)
+(bind-val GLFW_KEY_F20                i32 309)
+(bind-val GLFW_KEY_F21                i32 310)
+(bind-val GLFW_KEY_F22                i32 311)
+(bind-val GLFW_KEY_F23                i32 312)
+(bind-val GLFW_KEY_F24                i32 313)
+(bind-val GLFW_KEY_F25                i32 314)
+(bind-val GLFW_KEY_KP_0               i32 320)
+(bind-val GLFW_KEY_KP_1               i32 321)
+(bind-val GLFW_KEY_KP_2               i32 322)
+(bind-val GLFW_KEY_KP_3               i32 323)
+(bind-val GLFW_KEY_KP_4               i32 324)
+(bind-val GLFW_KEY_KP_5               i32 325)
+(bind-val GLFW_KEY_KP_6               i32 326)
+(bind-val GLFW_KEY_KP_7               i32 327)
+(bind-val GLFW_KEY_KP_8               i32 328)
+(bind-val GLFW_KEY_KP_9               i32 329)
+(bind-val GLFW_KEY_KP_DECIMAL         i32 330)
+(bind-val GLFW_KEY_KP_DIVIDE          i32 331)
+(bind-val GLFW_KEY_KP_MULTIPLY        i32 332)
+(bind-val GLFW_KEY_KP_SUBTRACT        i32 333)
+(bind-val GLFW_KEY_KP_ADD             i32 334)
+(bind-val GLFW_KEY_KP_ENTER           i32 335)
+(bind-val GLFW_KEY_KP_EQUAL           i32 336)
+(bind-val GLFW_KEY_LEFT_SHIFT         i32 340)
+(bind-val GLFW_KEY_LEFT_CONTROL       i32 341)
+(bind-val GLFW_KEY_LEFT_ALT           i32 342)
+(bind-val GLFW_KEY_LEFT_SUPER         i32 343)
+(bind-val GLFW_KEY_RIGHT_SHIFT        i32 344)
+(bind-val GLFW_KEY_RIGHT_CONTROL      i32 345)
+(bind-val GLFW_KEY_RIGHT_ALT          i32 346)
+(bind-val GLFW_KEY_RIGHT_SUPER        i32 347)
+(bind-val GLFW_KEY_MENU               i32 348)
+(bind-val GLFW_KEY_LAST               i32 348) ; GLFW_KEY_MENU
+
+;; Modifier key flags
+(bind-val GLFW_MOD_SHIFT           i32 1)
+(bind-val GLFW_MOD_CONTROL         i32 2)
+(bind-val GLFW_MOD_ALT             i32 4)
+(bind-val GLFW_MOD_SUPER           i32 8)
+
+(bind-val GLFW_MOUSE_BUTTON_1         i32 0)
+(bind-val GLFW_MOUSE_BUTTON_2         i32 1)
+(bind-val GLFW_MOUSE_BUTTON_3         i32 2)
+(bind-val GLFW_MOUSE_BUTTON_4         i32 3)
+(bind-val GLFW_MOUSE_BUTTON_5         i32 4)
+(bind-val GLFW_MOUSE_BUTTON_6         i32 5)
+(bind-val GLFW_MOUSE_BUTTON_7         i32 6)
+(bind-val GLFW_MOUSE_BUTTON_8         i32 7)
+(bind-val GLFW_MOUSE_BUTTON_LAST      i32 7) ; GLFW_MOUSE_BUTTON_8
+(bind-val GLFW_MOUSE_BUTTON_LEFT      i32 0) ; GLFW_MOUSE_BUTTON_1
+(bind-val GLFW_MOUSE_BUTTON_RIGHT     i32 1) ; GLFW_MOUSE_BUTTON_2
+(bind-val GLFW_MOUSE_BUTTON_MIDDLE    i32 2) ; GLFW_MOUSE_BUTTON_3
+
+(bind-val GLFW_JOYSTICK_1             i32 0)
+(bind-val GLFW_JOYSTICK_2             i32 1)
+(bind-val GLFW_JOYSTICK_3             i32 2)
+(bind-val GLFW_JOYSTICK_4             i32 3)
+(bind-val GLFW_JOYSTICK_5             i32 4)
+(bind-val GLFW_JOYSTICK_6             i32 5)
+(bind-val GLFW_JOYSTICK_7             i32 6)
+(bind-val GLFW_JOYSTICK_8             i32 7)
+(bind-val GLFW_JOYSTICK_9             i32 8)
+(bind-val GLFW_JOYSTICK_10            i32 9)
+(bind-val GLFW_JOYSTICK_11            i32 10)
+(bind-val GLFW_JOYSTICK_12            i32 11)
+(bind-val GLFW_JOYSTICK_13            i32 12)
+(bind-val GLFW_JOYSTICK_14            i32 13)
+(bind-val GLFW_JOYSTICK_15            i32 14)
+(bind-val GLFW_JOYSTICK_16            i32 15)
+(bind-val GLFW_JOYSTICK_LAST          i32 15) ; GLFW_JOYSTICK_16
+
+;; Error codes
+(bind-val GLFW_NOT_INITIALIZED        i32 65537)
+(bind-val GLFW_NO_CURRENT_CONTEXT     i32 65538)
+(bind-val GLFW_INVALID_ENUM           i32 65539)
+(bind-val GLFW_INVALID_VALUE          i32 65540)
+(bind-val GLFW_OUT_OF_MEMORY          i32 65541)
+(bind-val GLFW_API_UNAVAILABLE        i32 65542)
+(bind-val GLFW_VERSION_UNAVAILABLE    i32 65543)
+(bind-val GLFW_PLATFORM_ERROR         i32 65544)
+(bind-val GLFW_FORMAT_UNAVAILABLE     i32 65545)
+
+(bind-val GLFW_FOCUSED                i32 131073)
+(bind-val GLFW_ICONIFIED              i32 131074)
+(bind-val GLFW_RESIZABLE              i32 131075)
+(bind-val GLFW_VISIBLE                i32 131076)
+(bind-val GLFW_DECORATED              i32 131077)
+
+(bind-val GLFW_RED_BITS               i32 135169)
+(bind-val GLFW_GREEN_BITS             i32 135170)
+(bind-val GLFW_BLUE_BITS              i32 135171)
+(bind-val GLFW_ALPHA_BITS             i32 135172)
+(bind-val GLFW_DEPTH_BITS             i32 135173)
+(bind-val GLFW_STENCIL_BITS           i32 135174)
+(bind-val GLFW_ACCUM_RED_BITS         i32 135175)
+(bind-val GLFW_ACCUM_GREEN_BITS       i32 135176)
+(bind-val GLFW_ACCUM_BLUE_BITS        i32 135177)
+(bind-val GLFW_ACCUM_ALPHA_BITS       i32 135178)
+(bind-val GLFW_AUX_BUFFERS            i32 135179)
+(bind-val GLFW_STEREO                 i32 135180)
+(bind-val GLFW_SAMPLES                i32 135181)
+(bind-val GLFW_SRGB_CAPABLE           i32 135182)
+(bind-val GLFW_REFRESH_RATE           i32 135183)
+
+(bind-val GLFW_CLIENT_API             i32 139265)
+(bind-val GLFW_CONTEXT_VERSION_MAJOR  i32 139266)
+(bind-val GLFW_CONTEXT_VERSION_MINOR  i32 139267)
+(bind-val GLFW_CONTEXT_REVISION       i32 139268)
+(bind-val GLFW_CONTEXT_ROBUSTNESS     i32 139269)
+(bind-val GLFW_OPENGL_FORWARD_COMPAT  i32 139270)
+(bind-val GLFW_OPENGL_DEBUG_CONTEXT   i32 139271)
+(bind-val GLFW_OPENGL_PROFILE         i32 139272)
+
+(bind-val GLFW_OPENGL_API             i32 196609)
+(bind-val GLFW_OPENGL_ES_API          i32 196610)
+
+(bind-val GLFW_NO_ROBUSTNESS                   i32 0)
+(bind-val GLFW_NO_RESET_NOTIFICATION  i32 200705)
+(bind-val GLFW_LOSE_CONTEXT_ON_RESET  i32 200706)
+
+(bind-val GLFW_OPENGL_ANY_PROFILE              i32 0)
+(bind-val GLFW_OPENGL_CORE_PROFILE    i32 204801)
+(bind-val GLFW_OPENGL_COMPAT_PROFILE  i32 204802)
+
+(bind-val GLFW_CURSOR                 i32 208897)
+(bind-val GLFW_STICKY_KEYS            i32 208898)
+(bind-val GLFW_STICKY_MOUSE_BUTTONS   i32 208899)
+
+(bind-val GLFW_CURSOR_NORMAL          i32 212993)
+(bind-val GLFW_CURSOR_HIDDEN          i32 212994)
+(bind-val GLFW_CURSOR_DISABLED        i32 212995)
+
+(bind-val GLFW_CONNECTED              i32 262145)
+(bind-val GLFW_DISCONNECTED           i32 262146)
+
+
+;; to be used through pointers
+(bind-alias GLFWmonitor i8)
+(bind-alias GLFWwindow i8)
+
+;; width 0
+;; height 1
+;; redBits 2
+;; greenBits 3
+;; blueBits 4
+;; refreshRate 5
+(bind-alias GLFWvidmode <i32,i32,i32,i32,i32,i32>)
+
+(bind-alias GLFWerrorfun [void,i32,i8*]*)
+
+(bind-lib libglfw3 glfwInit [i32]*)
+(bind-lib libglfw3 glfwTerminate [void]*)
+(bind-lib libglfw3 glfwGetVersionString [i8*]*)
+
+(bind-lib libglfw3 glfwGetPrimaryMonitor [GLFWmonitor*]*)
+(bind-lib libglfw3 glfwGetVideoMode [GLFWvidmode*,GLFWmonitor*]*)
+
+
+
+(bind-lib libglfw3 glfwCreateWindow [GLFWwindow*,i32,i32,i8*,GLFWmonitor*,GLFWwindow*]*)
+(bind-lib libglfw3 glfwDestroyWindow [void,GLFWwindow*]*)
+
+(bind-lib libglfw3 glfwWindowShouldClose [i32,GLFWwindow*]*)
+
+(bind-lib libglfw3 glfwMakeContextCurrent [void,GLFWwindow*]*)
+(bind-lib libglfw3 glfwGetCurrentContext [GLFWwindow*]*)
+
+(bind-lib libglfw3 glfwSwapBuffers [void,GLFWwindow*]*)
+
+(bind-lib libglfw3 glfwGetWindowAttrib [i32,GLFWwindow*,i32]*)
+
+(bind-lib libglfw3 glfwGetWindowSize [void,GLFWwindow*,i32*,i32*]*)
+(bind-lib libglfw3 glfwSetWindowSize [void,GLFWwindow*,i32,i32]*)
+
+(bind-lib libglfw3 glfwDefaultWindowHints [void]*)
+(bind-lib libglfw3 glfwWindowHint [void,i32,i32]*)
+
+(bind-lib libglfw3 glfwPollEvents [void]*)
+
+;; GLEW
+
+(bind-val GLEW_OK i32 0)
+(bind-val GLEW_NO_ERROR i32 0)
+(bind-val GLEW_ERROR_NO_GL_VERSION i32 1)        ; /* missing GL version */
+(bind-val GLEW_ERROR_GL_VERSION_10_ONLY i32 2)   ; /* Need at least OpenGL 1.1 */
+(bind-val GLEW_ERROR_GLX_VERSION_11_ONLY i32 3)  ; /* Need at least GLX 1.2 */
+
+(bind-lib libGLEW glewInit [i32])
+;; glewExperimental is really a GLboolean (unsigned char)
+(bind-lib-val libGLEW glewExperimental i8)
+
+;; xtlang helper functions
+
+(bind-func glew_init
+  (lambda (experimental_p:i8)
+    (set! glewExperimental experimental_p)
+    (let ((res (glewInit)))
+      (if (= res GLEW_OK)
+          (printf "GLEW Initialised.\n")
+          (begin (printf "Error initialising GLEW: ")
+                 (cond ((= res GLEW_ERROR_NO_GL_VERSION)
+                        (printf "no GL version.\n"))
+                       ((= res GLEW_ERROR_GL_VERSION_10_ONLY)
+                        (printf "need at least OpenGL 1.1\n"))
+                       ((= res GLEW_ERROR_GLX_VERSION_11_ONLY)
+                        (printf "need at least GLX 1.2.\n"))
+                       (else
+                        (printf "unknown error.\n")))))
+      res)))
+
+(bind-func glfw_init
+  (lambda ()
+    (let ((res (glfwInit)))
+      (if (= res 1)
+          (printf "GLFW Initialised.\n")
+          (printf "Error initialising GLFW.\n"))
+      res)))
+
+(bind-func glfw_terminate
+  (lambda ()
+    (glfwTerminate)))
+
+(bind-func glfw_print_version_string
+  (lambda ()
+    (printf "%s\n" (glfwGetVersionString))))
+
+(bind-func glfw_create_fullscreen_window
+  (lambda ()
+    (let ((monitor (glfwGetPrimaryMonitor))
+          (vidmode (glfwGetVideoMode monitor))
+          (width (tref vidmode 0))
+          (height (tref vidmode 1)))
+      (glfwCreateWindow width height
+                        "Extempore OpenGL Window"
+                        monitor
+                        null))))
+
+(bind-func glfw_create_window
+  (lambda (width height)
+    (glfwCreateWindow width height
+                      "Extempore OpenGL Window"
+                      null
+                      null)))
+
+(bind-func glfw_window_should_close
+  (lambda (window)
+    (glfwWindowShouldClose window)))
+
+(bind-func glfw_make_context_current
+  (lambda (window)
+    (glfwMakeContextCurrent window)))
+
+(bind-func glfw_destroy_window
+  (lambda (window:GLFWwindow*)
+    (if (not (null? window))
+        (glfwDestroyWindow window)
+        (println "Error: Window pointer is NULL."))
+    void))
+
+(bind-func glfw_swap_buffers
+  (lambda (window:GLFWwindow*)
+    (glfwSwapBuffers window)))
+
+(bind-func glfw_poll_events
+  (lambda ()
+    (glfwPollEvents)))
+
+(bind-func glfw_print_video_mode_details
+  (lambda (vidmode:GLFWvidmode*)
+    (printf "      width: %i\n     height: %i\n    redBits: %i\n  greenBits: %i\n   blueBits: %i\nrefreshRate: %i\n"
+            (tref vidmode 0)
+            (tref vidmode 1)
+            (tref vidmode 2)
+            (tref vidmode 3)
+            (tref vidmode 4)
+            (tref vidmode 5))))
+
+(bind-func glfw_print_primary_monitor_details
+  (lambda ()
+    (let ((monitor (glfwGetPrimaryMonitor)))
+      (if (not (null? monitor))
+          (glfw_print_video_mode_details (glfwGetVideoMode monitor))
+          (printf "Error: Monitor pointer is NULL.\n")))))
+
+;; platform-specific stuff
+
+(bind-func glfw_set_osx_core_profile
+  (lambda ()
+    (glfwWindowHint GLFW_CONTEXT_VERSION_MAJOR 3)
+    (glfwWindowHint GLFW_CONTEXT_VERSION_MINOR 2)
+    (glfwWindowHint GLFW_OPENGL_FORWARD_COMPAT (convert GL_TRUE))
+    (glfwWindowHint GLFW_OPENGL_PROFILE GLFW_OPENGL_CORE_PROFILE)))
