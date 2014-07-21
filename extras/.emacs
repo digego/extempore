@@ -43,7 +43,6 @@
 (require 'package)
 (setq package-archives
       '(("gnu" . "http://elpa.gnu.org/packages/")
-        ("marmalade" . "http://marmalade-repo.org/packages/")
         ("melpa" . "http://melpa.milkbox.net/packages/")))
 
 (unless package--initialized
@@ -57,13 +56,32 @@
          '(ido-ubiquitous
            magit
            markdown-mode
-           org
            smex
            yasnippet))
   (if (not (package-installed-p package))
       (package-install package)))
 
 (global-set-key (kbd "C-c p") 'list-packages)
+
+;;;;;;;;;;;;;;;;
+;; fullscreen ;;
+;;;;;;;;;;;;;;;;
+
+(defcustom frame-maximization-mode 'maximized
+  "The maximization style of \\[toggle-frame-maximized]."
+  :type '(choice
+          (const :tab "Respect window manager screen decorations." maximized)
+          (const :tab "Ignore window manager screen decorations." fullscreen))
+  :group 'frames)
+
+(defun toggle-frame-maximized ()
+  "Maximize/un-maximize Emacs frame according to `frame-maximization-mode'."
+  (interactive)
+  (modify-frame-parameters
+   nil `((fullscreen . ,(if (frame-parameter nil 'fullscreen)
+                            nil frame-maximization-mode)))))
+
+(define-key global-map (kbd "C-s-f") 'toggle-frame-maximized)
 
 ;;;;;;;;;;
 ;; smex ;;
@@ -185,11 +203,9 @@
 ;; extempore ;;
 ;;;;;;;;;;;;;;;
 
-;; set the path to your extempore-directory
-(setq user-extempore-directory "~/Code/extempore/")
-
+(setq user-extempore-directory "/path/to/extempore/")
 ;; this one will be helpful for a default homebrew install of extempore on OSX
-;; (setq user-extempore-directory "/usr/local/Cellar/extempore/0.5/")
+;; (setq user-extempore-directory "/usr/local/Cellar/extempore/0.5.2/")
 
 ;; you can delete this once you've setup your extempore path
 (if (string-equal user-extempore-directory "/path/to/extempore/")
@@ -208,3 +224,5 @@
 
 (add-to-list 'auto-mode-alist '("\\.ir$" . llvm-mode))
 (add-to-list 'auto-mode-alist '("\\.ll$" . llvm-mode))
+
+;; start adding your own customizations here...
