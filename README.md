@@ -37,7 +37,8 @@ To see Extempore in action, check out these videos:
 
 ## OSX
 
-If you're a homebrew user, it's pretty straightforward:
+If you're a [homebrew](http://brew.sh/) user, it's pretty
+straightforward:
 
 ```shell
 brew tap benswift/extempore
