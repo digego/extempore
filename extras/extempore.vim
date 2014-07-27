@@ -29,6 +29,12 @@
 "   - add an indicator that a command was sent, maybe an underline or flash
 "   - clean up code a bit
 
+
+" Use Scheme syntax highlighting
+au BufNewFile,BufRead *.xtm set filetype=scheme
+
+
+
 " Define all of the Extempore commands
 command! -nargs=* ExtemporeOpenConnection :python open()
 command! -nargs=* ExtemporeCloseConnection :python close()
@@ -44,6 +50,7 @@ nnoremap <Leader>w :ExtemporeSendEnclosingBlock() <CR>
 nnoremap <Leader>a :ExtemporeSendEntireFile() <CR>
 nnoremap <Leader>s :ExtemporeSendSelection() <CR>
 
+
 python << EOF
 import vim
 import telnetlib
@@ -57,6 +64,7 @@ def open():
     """ Opens the connection """
     global telnet
     telnet = telnetlib.Telnet(HOST, PORT)
+    print telnet.read_some()
 
 def close():
     global telnet
@@ -70,7 +78,10 @@ def send_string(value):
         print "Not connected"
         return
     if value:
+    	# ignore any old state
+    	telnet.read_eager()
         telnet.write(value)
+        print telnet.read_some()
 
 def send_enclosing_block():
     """ Grab the enclosing function block and send it, ie if you
