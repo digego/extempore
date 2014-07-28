@@ -7,8 +7,8 @@ case $(uname) in
     *) echo Cannot precompile modules for OS:  $(uname) >&2 ; exit 1 ;;
 esac
 
-if [ -z "$EXT_LLVM_DIR" ]; then
-    echo "Need to set EXT_LLVM_DIR to point to your (Extempore) LLVM directory."
+if [ -z "$EXT_LLVM_DIR" ] && [ ! -d "/usr/local/Cellar/extempore-llvm/3.4.1" ] ; then
+    echo "You need to set the EXT_LLVM_DIR environment variable to point to your (Extempore) LLVM directory."
     exit 2
 fi
 
