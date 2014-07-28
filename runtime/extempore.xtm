@@ -351,7 +351,14 @@
 
 (bind-func get_llvm_path
   (lambda ()
-    (getenv "EXT_LLVM_DIR")))
+    (let ((path_from_env (getenv "EXT_LLVM_DIR")))
+      (if (not (null? path_from_env))
+          path_from_env
+          ;; check if homebrewed version (in default Cellar location)
+          ;; exisits - need to keep the version up-to-date by hand
+          (if (= (command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
+              "/usr/local/Cellar/extempore-llvm/3.4.1"
+              path_from_env)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
