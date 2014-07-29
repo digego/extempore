@@ -17,8 +17,13 @@
 
 ;;; Code:
 
-;; bind some global audio values 
-(bind-val SAMPLERATE SAMPLE (integer->real *au:samplerate*))
+;; first, we'll bind some global audio constants. these are already
+;; bound for you if you load libs/core/audio_dsp.xtm (or any library
+;; which loads that lib, which is any lib which does any audio stuff)
+(bind-val SPI SAMPLE 3.1415926535897932384626433832795028841971693993751058209749)
+(bind-val STWOPI SAMPLE 6.2831853071795864769252867665590057683943387987502116419498)
+(bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669)
+
 (bind-val SR SAMPLE (integer->real *au:samplerate*))
 (bind-val CHANNELS i64 *au:channels*)
 (bind-val IN_CHANNELS i64 *au:in-channels*)
@@ -29,15 +34,14 @@
     (printf "    FRAMES: %lld\n" FRAMES)
     (printf " OUT CHANS: %lld\n" CHANNELS)
     (printf "  IN CHANS: %lld\n" IN_CHANNELS)
-    (printf "SAMPLERATE: %f\n" SAMPLERATE)))
+    (printf "SAMPLERATE: %f\n" (ftod (convert SR)))))
 
 (print_audio_state)
 
 ;; compile sample by sample dsp code
-(bind-func dsp
+(bind-func dsp:DSP
   (lambda (in:SAMPLE time:i64 channel:i64	data:SAMPLE*)
-    (* .2 (dtof (random)))))
-
+    (random .2)))
 
 ;; set compiled function named "dsp" to be the dsp callback
 ;; once this is set any recompilation of the function
@@ -46,48 +50,52 @@
 (dsp:set! dsp)
 
 
-;; recompile dsp to produce two sine wave in left and right
+;; recompile dsp to produce two sine wave in left and right using the
+;; (input) time:i64 argument
 (bind-func dsp
   (lambda (in:SAMPLE time:i64 channel:i64	data:SAMPLE*)
-    (cond ((= channel 0.0)
-	   (* 0.5 (sin (* 3.141592 2.0 200.0 (/ (i64tof time) SR)))))
-          ((= channel 1.0)
-	   (* 0.5 (sin (* 3.141592 2.0 210.0 (/ (i64tof time) SR)))))
+    (cond ((= channel 0)
+           (* 0.5 (sin (* STWOPI 200.0 (/ (i64tof (modulo time (convert SR))) SR)))))
+          ((= channel 1)
+           (* 0.5 (sin (* STWOPI 210.0 (/ (i64tof (modulo time (convert SR))) SR)))))
           (else	0.0))))
 
 
-;; abstract out an oscillator function
+;; but it's clunky having to do all this modulo and pi-related stuff
+;; with the time, especially when we have closures to manage
+;; function-local state. So we abstract out an oscillator function
 (bind-func osc_c
-   (lambda (phase)
-      (lambda (amp freq)
-	 (let ((inc (* 3.141592 (* 2.0 (/ freq SR)))))
-            (set! phase (+ phase inc))
-            (* amp (sin phase))))))
+  (lambda (phase)
+    (lambda (amp freq)
+      (let ((inc (* STWOPI (/ freq SR))))
+        (set! phase (+ phase inc))
+        (if (> phase SPI) (set! phase (- phase STWOPI)))
+        (* amp (sin phase))))))
 
 
-;; same example as above but using oscillator abstraction
+;; same example as above but using the new osc_c oscillator abstraction
 (bind-func dsp
   (let ((osc1 (osc_c 0.0))
-	(osc2 (osc_c 0.0)))
+        (osc2 (osc_c 0.0)))
     (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
-      (cond ((= channel 1.0) (osc1 0.5 200.0))
-	    ((= channel 0.0) (osc2 0.5 210.0))
-	    (else 0.0)))))
+      (cond ((= channel 1) (osc1 0.5 200.0))
+            ((= channel 0) (osc2 0.5 210.0))
+            (else 0.0)))))
 
 
 ;; slightly more complex example
 (bind-func dsp
   (let ((oscs:|9,[SAMPLE,SAMPLE,SAMPLE]*|* (zalloc))
-	(i 0))
+        (i 0))
     (dotimes (i 9)
-       (aset! oscs i (osc_c 0.0)))
+      (aset! oscs i (osc_c 0.0)))
     (lambda (a:SAMPLE b:i64 c:i64 d:SAMPLE*)
-      (cond ((= c 0.0) ;; left channel
+      (cond ((= c 0) ;; left channel
              (+ ((aref oscs 0) (+ 0.3 ((aref oscs 2) 0.2 1.0)) 60.0)
-		((aref oscs 3) 0.2 220.0)
-		((aref oscs 4) 0.2 (+ 400. ((aref oscs 5) 200. .1)))
-		((aref oscs 6) 0.1 900.0)))
-            ((= c 1.0) ;; right channel                                                                       
+                ((aref oscs 3) 0.2 220.0)
+                ((aref oscs 4) 0.2 (+ 400. ((aref oscs 5) 200. .1)))
+                ((aref oscs 6) 0.1 900.0)))
+            ((= c 1) ;; right channel                                                                       
              ((aref oscs 7) 0.3 (+ 220.0 ((aref oscs 8) 110.0 20.0))))
             (else 0.0))))) ;; any remaining channels                                                          
 
@@ -103,13 +111,13 @@
 ;; adding freq1 and freq2 into closure environment
 (bind-func dsp
   (let ((osc1 (osc_c 0.0))
-	(osc2 (osc_c 0.0))
-	(freq1 220.0)
-	(freq2 220.0))
+        (osc2 (osc_c 0.0))
+        (freq1 220.0)
+        (freq2 220.0))
     (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
-      (cond ((= channel 1.0) (osc1 0.3 freq1))
-	    ((= channel 0.0) (osc2 0.3 freq2))
-	    (else 0.0)))))
+      (cond ((= channel 1) (osc1 0.3 freq1))
+            ((= channel 0) (osc2 0.3 freq2))
+            (else 0.0)))))
 
 ;; write accessor function for modification
 ;; of closure slots freq1 and freq2
@@ -127,10 +135,10 @@
      (* 1.0 (random 100 500))
      (* 1.0 freq))
     (callback time 'loop (+ time (* 20.0 freq))
-	      (dir freq 50.0)
-	      (cond ((> freq 600.0) -)
-		    ((< freq 300.0) +)
-		    (else dir)))))
+              (dir freq 50.0)
+              (cond ((> freq 600.0) -)
+                    ((< freq 300.0) +)
+                    (else dir)))))
 		  
 ;; start loop
 (loop (now) 220.0 +)
