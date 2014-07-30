@@ -269,7 +269,7 @@
     (if (and (not (null? name))
              (list? (car name))
              (symbol? (caar name)))        
-        (set! name (list (car (regex:type-split (symbol->string (caar name)) "--")))))
+        (set! name (list (car (regex:type-split (symbol->string (caar name)) "_poly_")))))
 
     (print-with-colors *impc:compiler:pretty-print-error-color*
                        'default #t (print "Type Error"))
@@ -1017,7 +1017,7 @@
   (lambda (name)
     (if (string? name) (set! name (string->symbol name)))
     (for-each (lambda (i)
-		(let ((a (regex:split (symbol->string (car i)) "--")))
+		(let ((a (regex:split (symbol->string (car i)) "_poly_")))
 		  (if (null? (cdr a))		  
 		      (println '++: (car i) ': (impc:ir:pretty-print-type (cadr i)))
 		      (println '++: (string->symbol (car a)) ': (string->symbol (cname-decode (cadr a)))))))
@@ -1211,10 +1211,10 @@
 	  (if (string? t)
 	      (if (and (char=? (string-ref t 0) #\%)
 		       (not (null? (llvm:get-named-type (substring (impc:ir:get-base-type t) 1 (string-length (impc:ir:get-base-type t)))))))
-                  (if (regex:match? t "--")
+                  (if (regex:match? t "_poly_")
                       (let* ((base (impc:ir:get-base-type t))
                              (ptrs (impc:ir:get-ptr-depth t))
-                             (p (regex:split base "--")))
+                             (p (regex:split base "_poly_")))
                         (string-append (substring (car p) 1 (string-length (car p)))
                                        ":"
                                        (cname-decode (cadr p))
@@ -1395,7 +1395,7 @@
                                                                                   (cons a b)))
                                                                               gtype-all type-all)))))
                       (impc:ir:get-type-from-pretty-str ;; otherwise fully typed
-                       (apply string-append "%" (car p) "--"
+                       (apply string-append "%" (car p) "_poly_"
                               (if (= (length p) 2)
                                   (cname-encode (cadr p))
                                   (cname-encode (apply string-append (cadr p) (map (lambda (x) (string-append ":" x)) (cddr p)))))
@@ -1405,7 +1405,7 @@
 	        string-type)               
 	       ((char=? (string-ref base 0) #\%)                
                 (let* ((name1 (substring base 1 (string-length base)))
-                       (p1 (regex:type-split name1 "--"))
+                       (p1 (regex:type-split name1 "_poly_"))
                        (name (car p1))
                        (encoding (cadr p1))
                        (t1 (cname-decode encoding))
