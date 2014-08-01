@@ -8,7 +8,7 @@ case $(uname) in
 esac
 
 if [ -z "$EXT_LLVM_DIR" ] && [ ! -d "/usr/local/Cellar/extempore-llvm/3.4.1" ] ; then
-    echo "You need to set the EXT_LLVM_DIR environment variable to point to your (Extempore) LLVM directory."
+    echo -e "\033[0;31mError\033[0;00m: You need to set the \033[0;32mEXT_LLVM_DIR\033[0;00m environment variable to point to your (Extempore) LLVM directory."
     exit 2
 fi
 
@@ -29,21 +29,26 @@ external/assimp.xtm \
 external/openvg.xtm"
 
 PRECOMP_COMMAND_FILENAME="xtmprecomp-command-file.xtm"
-PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --run "
+PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --term nocolor --run "
+
+# clear the log file (if present)
+rm -f compile-stdlib.log
 
 # check all the required shared libs are there
 for f in $PRECOMP_LIBS
 do
-    echo "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t)" > $PRECOMP_COMMAND_FILENAME
-    $PRECOMP_EXTEMPORE_RUN_COMMAND $PRECOMP_COMMAND_FILENAME
+    echo "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t #t)" > $PRECOMP_COMMAND_FILENAME
+    echo "Precompiling libs/$f"
+    # the sed command is for stripping the ANSI colour codes
+    $PRECOMP_EXTEMPORE_RUN_COMMAND $PRECOMP_COMMAND_FILENAME 2>&1 >>compile-stdlib.log | sed "s/\\^\\[(\\[[^@-~]+[@-~]|[0-9@-_]|%@)//g" | tee -a compile-stdlib.log
     rc=$?
     if [[ $rc != 0 ]] ; then
+        echo -e "\033[0;31mError precompiling libs/$f\033[0;00m"
         echo
-        echo Error precompiling $f
         exit $rc
     else
+        echo -e "\033[0;32mSuccessfully precompiled libs/$f\033[0;00m"
         echo
-        echo Successfully precompiled $f
     fi
 done
 

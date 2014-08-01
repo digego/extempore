@@ -1813,7 +1813,7 @@
 
 
 (define sys:precomp:compile-current-module
-  (lambda (module-name move-into-place?)
+  (lambda (module-name move-into-place? exit-on-error?)
     (let ((ext-llvm-dir (cptr->string (get_llvm_path))))
       (if (string=? "" ext-llvm-dir)
           (begin (print-with-colors 'red 'default #t (print "Error"))
@@ -1832,11 +1832,13 @@
                     ((string=? platform "Windows")
                      (string-append "./" module-name ".dll"))
                     (else "")))
-             (compilation-command
+             (compilation-command-a
               (string-append
                ext-llvm-dir
                "/bin/llc -O3 -relocation-model=pic -tailcallopt "
-               bitcode-path " && "
+               bitcode-path))              
+             (compilation-command-b
+              (string-append
                (cond ((string=? platform "Linux")
                       "gcc -O3 --shared -g ")
                      ((string=? platform "OSX")
@@ -1852,11 +1854,21 @@
         ;; print further instructions
         (command (string-append "rm " bitcode-path asm-path shlib-path))
         (llvm:export-module bitcode-path)
-        (print "compile command:\n " compilation-command "\n\n")
-        (let ((res (command compilation-command)))
-          (if (<> res 0)
-              (print-with-colors 'red 'default #t
-                                 (print "Failed to compile stdlib.\n"))
+
+        (let ((res1 0)
+              (res2 0))
+          (print "LLC command:\n " compilation-command-a "\n\n")
+          (set! res1 (command compilation-command-a))
+          (if (<> res1 0)
+              (begin (print-with-colors 'red 'default #t
+                                        (println "LLC Failed!. exit code" res1))
+                     (if exit-on-error? (quit 1))))
+          (print "CC command:\n " compilation-command-b "\n\n")          
+          (set! res2 (command compilation-command-b))
+          (if (<> res2 0)
+              (begin (print-with-colors 'red 'default #t
+                                        (println "CC Failed!. exit code" res2))
+                     (if exit-on-error? (quit 1)))                                        
               (begin (print "Succesfully compiled ")
                      (print-with-colors 'blue 'default #t (print shlib-path))
                      (print "\n\n")
@@ -1934,7 +1946,7 @@
     (println (length *impc:ti:generic-type-mappings*))))
 
 (define sys:precomp:compile-xtm-file
-  (lambda (lib-path move-into-place? exit-when-done?)
+  (lambda (lib-path move-into-place? exit-when-done? exit-on-error?)
     ;; is there a better way to check if a file exists?
     (let ((start-time (now))
           (in-file-port (open-input-file lib-path)))
@@ -1959,7 +1971,7 @@
                         (set! *sys:precomp:current-lib-name* libname-no-extension)
                         ;; (sys:precomp:insert-header libname-no-extension)
                         (sys:load lib-path)
-                        (sys:precomp:compile-current-module libname-no-extension move-into-place?)
+                        (sys:precomp:compile-current-module libname-no-extension move-into-place? exit-on-error?)
                         ;; (sys:precomp:insert-footer libname-no-extension)
                         (close-port *sys:precomp:current-output-port*)
                         (set! *sys:precomp:current-lib-name* "xtmdylib")

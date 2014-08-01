@@ -89,6 +89,10 @@ int WINDOWS_COLORS[16] = {Black,LightRed,LightGreen,Yellow,Blue,Purple,LightCyan
 
 void ascii_text_color(int attr, int fg, int bg)
 {
+  // for --term=nocolor, this function should do nothing
+  if (extemp::UNIV::EXT_TERM == 3) {
+    return;
+  }
 #ifdef TARGET_OS_WINDOWS
   if (extemp::UNIV::EXT_TERM == 1) {
     char command[13];
