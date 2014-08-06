@@ -553,37 +553,38 @@ namespace extemp {
 
                 while(!scm->getRunning()) {}
 
-		scm->loadFile("scheme.xtm", load_path.c_str());
-		scm->loadFile("llvmir.xtm", load_path.c_str()); 
-		scm->loadFile("llvmti.xtm", load_path.c_str());		
+                scm->loadFile("scheme.xtm", load_path.c_str());
+                scm->loadFile("llvmir.xtm", load_path.c_str()); 
+                scm->loadFile("llvmti.xtm", load_path.c_str());		
 
-                scm->setLoadedLibs(true);  
+                scm->setLoadedLibs(true);
                 sleep(1); // give time for NSApp etc. to init
 
                 // only load extempore.xtm in primary process
                 char sstr[256];
                 if(scm->getName().compare("primary") == 0) {
-                  memset(sstr,0,256);
-                  snprintf(sstr,256,"(sys:load \"%s%s\")",load_path.c_str(),"extempore.xtm");
-                  std::string* s4 = new std::string(sstr);
-                  guard.lock();
-                  q.push(SchemeTask(extemp::UNIV::TIME, (60*5*44100), s4, "file_init", 5));
-                  guard.unlock();
-                  // scm->loadFile("extempore.xtm", load_path.c_str());
-                }
+                  if (extemp::UNIV::EXT_LOADSTD == 1) {
+                    memset(sstr,0,256);
+                    snprintf(sstr,256,"(sys:load \"libs/core/std.xtm\")");
+                    std::string* s4 = new std::string(sstr);
+                    guard.lock();
+                    q.push(SchemeTask(extemp::UNIV::TIME, (60*5*44100), s4, "file_init", 5));
+                    guard.unlock();
+                  }
 
-                // load any init file provided
-                if(scm->getInitFile().compare("") != 0) {
-                  ascii_text_color(0,5,10);
-                  printf("\n\nRunning File: %s ...\n\n",scm->getInitFile().c_str());
-                  ascii_text_color(0,7,10);
-                  memset(sstr,0,256);
-                  snprintf(sstr,256,"(sys:load \"%s\")",scm->getInitFile().c_str());
-                  std::string* s5 = new std::string(sstr);
-                  guard.lock();
-                  q.push(SchemeTask(extemp::UNIV::TIME+1000, (60*60*44100), s5, "file_init", 5));
-                  guard.unlock();
-                  // scm->loadFile(scm->getInitFile().c_str());
+                  // load any init file provided
+                  if(scm->getInitFile().compare("") != 0) {
+                    ascii_text_color(0,5,10);
+                    printf("\n\nRunning File: %s ...\n\n",scm->getInitFile().c_str());
+                    ascii_text_color(0,7,10);
+                    memset(sstr,0,256);
+                    snprintf(sstr,256,"(sys:load \"%s\")",scm->getInitFile().c_str());
+                    std::string* s5 = new std::string(sstr);
+                    guard.lock();
+                    q.push(SchemeTask(extemp::UNIV::TIME+1000, (60*60*44100), s5, "file_init", 5));
+                    guard.unlock();
+                    // scm->loadFile(scm->getInitFile().c_str());
+                  }
                 }
 
 		// //////////////////////////////////////////////////

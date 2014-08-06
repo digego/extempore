@@ -1251,7 +1251,7 @@
 ;; search LDPATH as usual
 (define sys:load-dylib
   (lambda (dylib-path)
-    (let ((dylib (or (sys:open-dylib (string-append "runtime/lib/" dylib-path))
+    (let ((dylib (or ;; (sys:open-dylib (string-append "runtime/lib/" dylib-path))
                      (sys:open-dylib dylib-path))))
       (if dylib
           (begin (impc:compiler:print-dylib-loading-details-to-log dylib-path)
@@ -1840,7 +1840,7 @@
              (compilation-command-b
               (string-append
                (cond ((string=? platform "Linux")
-                      "gcc -O3 --shared -g ")
+                      "gcc -O3 --shared -fPIC -g ")
                      ((string=? platform "OSX")
                       (string-append "clang -O3 -dynamiclib -undefined dynamic_lookup "
                                      )))
@@ -1957,7 +1957,7 @@
           (let* ((res (close-port in-file-port))
                  (libname (filename-from-path lib-path))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
-                 (precomp-file-path (string-append "libs/" libname)))
+                 (precomp-file-path (string-append "" "libs/" libname)))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "Precomp file not written ")
                        (close-port *sys:precomp:current-output-port*)
@@ -1965,6 +1965,7 @@
                 (begin
                   ;; if the preload check passes
                   (set! *sys:precomp:current-output-port* (open-output-file precomp-file-path))
+                  (set! *sys:precomp:func-defs-in-mod* '())
                   (if *sys:precomp:current-output-port*
                       (begin
                         ;; this is the 'success' branch
@@ -1989,3 +1990,14 @@
                                                 (print "Error:"))
                              (print " cannot write precomp file at " precomp-file-path "\n")
                              (if exit-when-done? (quit 2)))))))))))
+
+
+(define-macro (xtmX expr)
+  (suppress-compiler-messages #t)
+  (eval `(bind-func xtm_expression
+           (lambda ()
+             ,expr
+             void))
+        (interaction-environment))
+  (suppress-compiler-messages #f)
+  (xtm_expression))                       

@@ -34,10 +34,19 @@
 ;; 
 
 
-;; extempore.xtm is loaded automatically by all processes on startup
-;; extempore.xtm is for xtlang as scheme.xtm is for scheme.
+;; std.xtm is loaded automatically by all processes on startup
+;; std.xtm is for xtlang as scheme.xtm is for scheme.
 
-(suppress-compiler-messages #t)
+;; lib-loading config
+
+(sys:load "libs/std.xtm")
+(sys:load-preload-check 'std)
+(define *xtmlib-std-loaded* #f)
+
+(sys:precomp:insert-header "xtmstd")
+
+
+;; (suppress-compiler-messages #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SETUP NAN's
@@ -87,52 +96,62 @@
 (bind-poly random imp_rand2_d)
 
 (bind-poly cos cosf)
-(bind-poly cos cosd)
+(bind-poly cos llvm_cos)
 (bind-poly tan tanf)
-(bind-poly tan tand)
+(bind-poly tan llvm_tan)
 (bind-poly sin sinf)
-(bind-poly sin sind)
+(bind-poly sin llvm_sin)
 (bind-poly cosh coshf)
-(bind-poly cosh coshd)
+(bind-poly cosh llvm_cosh)
 (bind-poly tanh tanhf)
-(bind-poly tanh tanhd)
+(bind-poly tanh llvm_tanh)
 (bind-poly sinh sinhf)
-(bind-poly sinh sinhd)
+(bind-poly sinh llvm_sinh)
 (bind-poly acos acosf)
-(bind-poly acos acosd)
+(bind-poly acos llvm_acos)
 (bind-poly asin asinf)
-(bind-poly asin asind)
+(bind-poly asin llvm_asin)
 (bind-poly atan atanf)
-(bind-poly atan atand)
+(bind-poly atan llvm_atan)
 (bind-poly atan2 atan2f)
-(bind-poly atan2 atan2d)
+(bind-poly atan2 llvm_atan2)
 (bind-poly ceil ceilf)
-(bind-poly ceil ceild)
+(bind-poly ceil llvm_ceil)
 (bind-poly floor floorf)
-(bind-poly floor floord)
+(bind-poly floor llvm_floor)
 (bind-poly exp expf)
-(bind-poly exp expd)
+(bind-poly exp llvm_exp)
 (bind-poly fmod fmodf)
-(bind-poly fmod fmodd)
+(bind-poly fmod llvm_fmod)
 (bind-poly pow powf)
-(bind-poly pow powd)
+(bind-poly pow llvm_pow)
 (bind-poly log logf)
-(bind-poly log logd)
+(bind-poly log llvm_log)
 (bind-poly log2 log2f) 
-(bind-poly log2 log2d) 
+(bind-poly log2 llvm_log2) 
 (bind-poly log10 log10f)
-(bind-poly log10 log10d)
+(bind-poly log10 llvm_log10)
 (bind-poly sqrt sqrtf)
-(bind-poly sqrt sqrtd)
+(bind-poly sqrt llvm_sqrt)
 (bind-poly fabs fabsf)
-(bind-poly fabs fabsd)
+(bind-poly fabs llvm_fabs)
 
 ;;;;;;;;;;;;;;;;
 ;; printing
 
 ;; prints a line break
 (bind-func print_return
-  (lambda () (printf "\n") void))
+  (lambda () (llvm_printf "\n") void))
+
+(bind-func testme1
+  (lambda (x:i64)
+    (* x x)))
+
+(bind-func freddy
+  (lambda (x:i64) (* x 5) void))
+
+(bind-func print_kk
+  (lambda () (llvm_printf "kk\n") void))
 
 ;; prints a space
 (bind-func print_space
@@ -360,21 +379,13 @@
               "/usr/local/Cellar/extempore-llvm/3.4.1"
               path_from_env)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (xtmX expr)
-  (suppress-compiler-messages #t)
-  (eval `(bind-func xtm_expression
-           (lambda ()
-             ,expr
-             void))
-        (interaction-environment))
-  (suppress-compiler-messages #f)
-  (xtm_expression))                       
-    
+;; (sys:load "libs/core/adt.xtm")
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; (suppress-compiler-messages #f)
 
-(sys:load "libs/core/adt.xtm")
 
-(suppress-compiler-messages #f)
+
+(define *xtmlib-std-loaded* #t)
+
+(sys:precomp:insert-footer "xtmstd")

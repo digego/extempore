@@ -18,7 +18,7 @@ else
 PLATFORM_LIBS += -lpcre -lGL -lX11
 endif
 
-PLATFORM_CXXFLAGS := -g -O3
+PLATFORM_CXXFLAGS := -g -fPIC -O3
 PLATFORM_LDFLAGS := -Wl,--export-dynamic
 
 PLATFORM_DEFINES := -DTARGET_OS_LINUX

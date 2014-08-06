@@ -13,6 +13,7 @@ if [ -z "$EXT_LLVM_DIR" ] && [ ! -d "/usr/local/Cellar/extempore-llvm/3.4.1" ] ;
 fi
 
 PRECOMP_LIBS="\
+core/std.xtm \
 core/math.xtm \
 core/audio_dsp.xtm \
 core/instruments.xtm \
@@ -29,7 +30,7 @@ external/assimp.xtm \
 external/openvg.xtm"
 
 PRECOMP_COMMAND_FILENAME="xtmprecomp-command-file.xtm"
-PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --run "
+PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd --run "
 
 # check all the required shared libs are there
 for f in $PRECOMP_LIBS

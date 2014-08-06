@@ -68,7 +68,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 #endif
 
 
-enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES, 
+enum { OPT_RUNTIME, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES, 
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITFILE, 
        OPT_PORT, OPT_TERM, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_HELP
@@ -77,6 +77,7 @@ enum { OPT_RUNTIME, OPT_SAMPLERATE, OPT_FRAMES,
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
     { OPT_RUNTIME,     "--runtime",       SO_REQ_SEP    },
+    { OPT_NOSTD,       "--nostd",         SO_NONE       },  
     { OPT_SAMPLERATE,  "--samplerate",    SO_REQ_SEP    },
     { OPT_FRAMES,      "--frames",        SO_REQ_SEP    },
     { OPT_CHANNELS,    "--channels",      SO_REQ_SEP    },
@@ -139,6 +140,9 @@ int main(int argc, char** argv)
 	  initfile = std::string(args.OptionArg());
 	  initfile_on = true;	  
 	  break;
+  case OPT_NOSTD:
+    extemp::UNIV::EXT_LOADSTD = 0;
+    break;
 	case OPT_PORT:
 	  primary_port = atoi(args.OptionArg());
 	  utility_port = primary_port-1;
@@ -176,7 +180,8 @@ int main(int argc, char** argv)
 	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	  std::cout << "            --port: port for primary process [7099]" << std::endl;	
 	  std::cout << "            --term: either ansi, cmd (windows), or basic (for simpler ansi terms)" << std::endl;	
-	  std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl; 	
+	  std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl;
+	  std::cout << "           --nostd: don't load std lib on startup" << std::endl; 	    
 	  std::cout << "      --samplerate: audio samplerate" << std::endl; 
 	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
 	  std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
