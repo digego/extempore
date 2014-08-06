@@ -428,6 +428,7 @@
 
 (define *sys:precomp:current-output-port* #f)
 (define *sys:precomp:current-lib-name* "xtmdylib")
+(define *sys:precomp:func-defs-in-mod* '())
 
 (define impc:precomp:no-scm-suffix?
   (lambda (symname)
@@ -467,13 +468,17 @@
                                       symname  " "
                                       type-str ")\n"))
                       ((string=? lead-string "Compiled:")
-                       (string-append "(bind-lib-func"
-                                      (if (impc:precomp:no-scm-suffix? symname) "-no-scm" "")
-                                      " " *sys:precomp:current-lib-name* " "
-                                      symname " " type-str
-                                      (if (null? args) ""
-                                          (string-append " " (number->string (car args))))
-                                      ")\n"))
+                       (if (assoc-strcmp symname *sys:precomp:func-defs-in-mod*)
+                           ""
+                           (begin
+                             (set! *sys:precomp:func-defs-in-mod* (cons (cons symname #t) *sys:precomp:func-defs-in-mod*))
+                             (string-append "(bind-lib-func"
+                                            (if (impc:precomp:no-scm-suffix? symname) "-no-scm" "")
+                                            " " *sys:precomp:current-lib-name* " "
+                                            symname " " type-str
+                                            (if (null? args) ""
+                                                (string-append " " (number->string (car args))))
+                                            ")\n"))))
                       ((string=? lead-string "DataType:")
                        (string-append "(bind-lib-type-precomp "
                                       *sys:precomp:current-lib-name* " " symname " " type-str ")\n"))
@@ -1999,30 +2004,22 @@
 (define impc:ir:make-const-string
   (lambda (ast)
     (let* ((os (make-string 0))
-	   (strtyp (string-append "[" (number->string (+ 1 (string-length ast))) " x i8]*"))
-	   (strsym '()))
+           (strtyp (string-append "[" (number->string (+ 1 (string-length ast))) " x i8]*"))
+           (strname (string-append "@gs" (if #f ;;(< (string-length ast) 1024)
+                                             (cname-encode ast)
+                                             (number->string *impc:ir:gstrcnt*))))
+           (strsym '()))
       (if (null? (llvm:get-llvm-alias ast))
-	  (let ((compile-str (string-append "@gs" (number->string *impc:ir:gstrcnt*)
-					    " = constant [" (number->string (+ 1 (string-length ast))) " x i8] c\""
-					    ast "\\00\"")))
-	    (llvm:compile compile-str)	    
-
-	    ;; this here for llvm precomp ;;;;;;;;;;
-	    ;; can be safely removed      ;;;;;;;;;;		      
-	    (if *impc:compiler:precomp-llvm*
-		(emit (sexpr->string
-		       `(let* ((ast ,ast)
-			       (compile-str (string-append "@gs" ,(number->string *impc:ir:gstrcnt*)
-							   " = constant [" (number->string (+ 1 (string-length ast))) " x i8] c\\\""
-							   ast "\\\\00\\\"")))
-			  (llvm:compile compile-str)))
-		       "\n\n"
-		       *impc:compiler:precomp*))
-	    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	    (set! strsym (string-append "@gs" (number->string *impc:ir:gstrcnt*)))
-	    (llvm:add-llvm-alias ast strsym)
-	    (set! *impc:ir:gstrcnt* (+ *impc:ir:gstrcnt* 1)))
-	  (set! strsym (llvm:get-llvm-alias ast)))
+          (let ((compile-str (string-append strname
+                                            " = private unnamed_addr constant [" (number->string (+ 1 (string-length ast))) " x i8] c\""
+                                            ;; " = constant [" (number->string (+ 1 (string-length ast))) " x i8] c\""                                            
+                                            ast "\\00\"")))
+            (llvm:compile compile-str)	    
+            (set! strsym strname)
+            (llvm:add-llvm-alias ast strsym)
+            (if #t ;; (>= (string-length ast) 1024)
+                (set! *impc:ir:gstrcnt* (+ *impc:ir:gstrcnt* 1))))
+          (set! strsym (llvm:get-llvm-alias ast)))
       (emit (string-append (impc:ir:gname "var" "i8*") " = bitcast " strtyp " " strsym " to i8*\n") os)
       (impc:ir:strip-space os))))
 
