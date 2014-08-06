@@ -126,6 +126,27 @@ double log2(double num) {
 }
 #endif
 
+// double (&cosd)(double) = cos;
+// double (&tand)(double) = tan;
+// double (&sind)(double) = sin;
+// double (&coshd)(double) = cosh;
+// double (&tanhd)(double) = tanh;
+// double (&sinhd)(double) = sinh; 
+// double (&acosd)(double) = acos;
+// double (&asind)(double) = asin; 
+// double (&atand)(double) = atan;
+// double (&atan2d)(double,double) = atan2;
+// double (&ceild)(double) = ceil;
+// double (&floord)(double) = floor;
+// double (&expd)(double) = exp;
+// double (&fmodd)(double,double) = fmod;
+// double (&powd)(double,double) = pow;
+// double (&logd)(double) = log;
+// double (&log2d)(double) = log2;
+// double (&log10d)(double) = log10;
+// double (&sqrtd)(double) = sqrt;
+// double (&fabsd)(double) = fabs;
+
 void* malloc16 (size_t s) {
   unsigned char *p;
   unsigned char *porig = (unsigned char*) malloc (s + 0x10);   // allocate extra
@@ -904,6 +925,28 @@ int64_t llvm_now()
     return extemp::UNIV::TIME;
 }
 
+double llvm_cos(double x) { return cos(x); }
+double llvm_tan(double x) { return tan(x); }
+double llvm_sin(double x) { return sin(x); }
+double llvm_cosh(double x) { return cosh(x); }
+double llvm_tanh(double x) { return tanh(x); }
+double llvm_sinh(double x) { return sinh(x); }
+double llvm_acos(double x) { return acos(x); }
+double llvm_asin(double x) { return asin(x); }
+double llvm_atan(double x) { return atan(x); }
+double llvm_atan2(double x,double y) { return atan2(x,y); }
+double llvm_ceil(double x) { return ceil(x); }
+double llvm_floor(double x) { return floor(x); }
+double llvm_exp(double x) { return exp(x); }
+double llvm_fmod(double x,double y) { return fmod(x,y); }
+double llvm_pow(double x,double y) { return pow(x,y); }
+double llvm_log(double x) { return log(x); }
+double llvm_log2(double x) { return log2(x); }
+double llvm_log10(double x) { return log10(x); }
+double llvm_sqrt(double x) { return sqrt(x); }
+double llvm_fabs(double x) { return fabs(x); }
+
+
 // double llvm_samplerate()
 // {
 //     return (double) extemp::UNIV::SAMPLERATE;
@@ -1035,7 +1078,7 @@ struct closure_address_table* get_address_table(const char* name, closure_addres
 	if(strcmp(table->name,name)) return table;
 	table = table->next;
     }
-    printf("Unable to locate %s in closure environment\n",name);
+    printf("Unable to locate %s in closure environment a\n",name);
     return 0;
 }
 
@@ -1050,7 +1093,7 @@ uint32_t get_address_offset(const char* name, closure_address_table* table)
 	}
 	table = table->next;
     }
-    printf("Unable to locate %s in closure environment\n",name);
+    printf("Unable to locate %s in closure environment b\n",name);
     return 0;
 }
 
@@ -1063,7 +1106,7 @@ char* get_address_type(const char* name, closure_address_table* table)
       }
       table = table->next;
     }
-    printf("Unable to locate %s in closure environment\n",name);
+    printf("Unable to locate %s in closure environment c\n",name);
     return 0;  
 }
 
@@ -1081,20 +1124,20 @@ bool check_address_exists(const char* name, closure_address_table* table)
 
 bool check_address_type(const char* name, closure_address_table* table, const char* type)
 {
-    while(table)
+  while(table)
     {
       if(strcmp(table->name,name) == 0) {
-	if(strcmp(table->type,type)!=0) {
-	  printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,name,table->type);
-	  return 0;
-	}else{
-	  return 1;
-	}	  
+        if(strcmp(table->type,type)!=0) {
+          printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,name,table->type);
+          return 0;
+        }else{
+          return 1;
+        }	  
       }
       table = table->next;
     }
-    printf("Unable to locate %s in closure environment\n",name);
-    return 0;
+  printf("Unable to locate %s in closure environment type: %s d\n",name,type);
+  return 0;
 }
 
 struct closure_address_table* new_address_table()
@@ -1680,46 +1723,88 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("mutex_trylock"));
 	    EE->updateGlobalMapping(gv,(void*)&mutex_trylock);
 
-            gv = M->getNamedValue(std::string("cosd"));
-            EE->updateGlobalMapping(gv,(void*)&cos);
-            gv = M->getNamedValue(std::string("tand"));
-            EE->updateGlobalMapping(gv,(void*)&tan);
-            gv = M->getNamedValue(std::string("sind"));
-            EE->updateGlobalMapping(gv,(void*)&sin);
-            gv = M->getNamedValue(std::string("coshd"));
-            EE->updateGlobalMapping(gv,(void*)&cosh);
-            gv = M->getNamedValue(std::string("tanhd"));
-            EE->updateGlobalMapping(gv,(void*)&tanh);
-            gv = M->getNamedValue(std::string("sinhd"));
-            EE->updateGlobalMapping(gv,(void*)&sinh);
-            gv = M->getNamedValue(std::string("acosd"));
-            EE->updateGlobalMapping(gv,(void*)&acos);
-            gv = M->getNamedValue(std::string("asind"));
-            EE->updateGlobalMapping(gv,(void*)&asin);
-            gv = M->getNamedValue(std::string("atand"));
-            EE->updateGlobalMapping(gv,(void*)&atan);
-            gv = M->getNamedValue(std::string("atan2d"));
-            EE->updateGlobalMapping(gv,(void*)&atan2);
-            gv = M->getNamedValue(std::string("ceild"));
-            EE->updateGlobalMapping(gv,(void*)&ceil);
-            gv = M->getNamedValue(std::string("floord"));
-            EE->updateGlobalMapping(gv,(void*)&floor);
-            gv = M->getNamedValue(std::string("expd"));
-            EE->updateGlobalMapping(gv,(void*)&exp);
-            gv = M->getNamedValue(std::string("fmodd"));
-            EE->updateGlobalMapping(gv,(void*)&fmod);
-            gv = M->getNamedValue(std::string("powd"));
-            EE->updateGlobalMapping(gv,(void*)&pow);
-            gv = M->getNamedValue(std::string("logd"));
-            EE->updateGlobalMapping(gv,(void*)&log);
-            gv = M->getNamedValue(std::string("log2d"));
-            EE->updateGlobalMapping(gv,(void*)&log2);
-            gv = M->getNamedValue(std::string("log10d"));
-            EE->updateGlobalMapping(gv,(void*)&log10);
-            gv = M->getNamedValue(std::string("sqrtd"));
-            EE->updateGlobalMapping(gv,(void*)&sqrt);
-            gv = M->getNamedValue(std::string("fabsd"));
-            EE->updateGlobalMapping(gv,(void*)&fabs);
+            // gv = M->getNamedValue(std::string("cosd"));
+            // EE->updateGlobalMapping(gv,(void*)&cos);
+            // gv = M->getNamedValue(std::string("tand"));
+            // EE->updateGlobalMapping(gv,(void*)&tan);
+            // gv = M->getNamedValue(std::string("sind"));
+            // EE->updateGlobalMapping(gv,(void*)&sin);
+            // gv = M->getNamedValue(std::string("coshd"));
+            // EE->updateGlobalMapping(gv,(void*)&cosh);
+            // gv = M->getNamedValue(std::string("tanhd"));
+            // EE->updateGlobalMapping(gv,(void*)&tanh);
+            // gv = M->getNamedValue(std::string("sinhd"));
+            // EE->updateGlobalMapping(gv,(void*)&sinh);
+            // gv = M->getNamedValue(std::string("acosd"));
+            // EE->updateGlobalMapping(gv,(void*)&acos);
+            // gv = M->getNamedValue(std::string("asind"));
+            // EE->updateGlobalMapping(gv,(void*)&asin);
+            // gv = M->getNamedValue(std::string("atand"));
+            // EE->updateGlobalMapping(gv,(void*)&atan);
+            // gv = M->getNamedValue(std::string("atan2d"));
+            // EE->updateGlobalMapping(gv,(void*)&atan2);
+            // gv = M->getNamedValue(std::string("ceild"));
+            // EE->updateGlobalMapping(gv,(void*)&ceil);
+            // gv = M->getNamedValue(std::string("floord"));
+            // EE->updateGlobalMapping(gv,(void*)&floor);
+            // gv = M->getNamedValue(std::string("expd"));
+            // EE->updateGlobalMapping(gv,(void*)&exp);
+            // gv = M->getNamedValue(std::string("fmodd"));
+            // EE->updateGlobalMapping(gv,(void*)&fmod);
+            // gv = M->getNamedValue(std::string("powd"));
+            // EE->updateGlobalMapping(gv,(void*)&pow);
+            // gv = M->getNamedValue(std::string("logd"));
+            // EE->updateGlobalMapping(gv,(void*)&log);
+            // gv = M->getNamedValue(std::string("log2d"));
+            // EE->updateGlobalMapping(gv,(void*)&log2);
+            // gv = M->getNamedValue(std::string("log10d"));
+            // EE->updateGlobalMapping(gv,(void*)&log10);
+            // gv = M->getNamedValue(std::string("sqrtd"));
+            // EE->updateGlobalMapping(gv,(void*)&sqrt);
+            // gv = M->getNamedValue(std::string("fabsd"));
+            // EE->updateGlobalMapping(gv,(void*)&fabs);
+
+      gv = M->getNamedValue(std::string("llvm_cos"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_cos);
+      gv = M->getNamedValue(std::string("llvm_tan"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_tan);
+      gv = M->getNamedValue(std::string("llvm_sin"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_sin);
+      gv = M->getNamedValue(std::string("llvm_cosh"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_cos);
+      gv = M->getNamedValue(std::string("llvm_tanh"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_tanh);
+      gv = M->getNamedValue(std::string("llvm_sinh"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_sinh);
+      gv = M->getNamedValue(std::string("llvm_acos"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_acos);
+      gv = M->getNamedValue(std::string("llvm_asin"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_asin);
+      gv = M->getNamedValue(std::string("llvm_atan"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_atan);
+      gv = M->getNamedValue(std::string("llvm_atan2"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_atan2);
+      gv = M->getNamedValue(std::string("llvm_ceil"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_ceil);
+      gv = M->getNamedValue(std::string("llvm_floor"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_floor);
+      gv = M->getNamedValue(std::string("llvm_exp"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_exp);
+      gv = M->getNamedValue(std::string("llvm_fmod"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_fmod);
+      gv = M->getNamedValue(std::string("llvm_pow"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_pow);
+      gv = M->getNamedValue(std::string("llvm_log"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_log);
+      gv = M->getNamedValue(std::string("llvm_log2"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_log2);
+      gv = M->getNamedValue(std::string("llvm_log10"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_log10);
+      gv = M->getNamedValue(std::string("llvm_sqrt"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_sqrt);
+      gv = M->getNamedValue(std::string("llvm_fabs"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_fabs);
+            
             
 	}	
 	return;

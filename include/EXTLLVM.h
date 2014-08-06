@@ -51,6 +51,29 @@ typedef struct _llvm_callback_struct_ {
     void* dat;
   } _llvm_callback_struct_;
 
+
+/* extern double (&cosd)(double); */
+/* extern double (&tand)(double); */
+/* extern double (&sind)(double); */
+/* extern double (&coshd)(double); */
+/* extern double (&tanhd)(double); */
+/* extern double (&sinhd)(double); */
+/* extern double (&acosd)(double); */
+/* extern double (&asind)(double); */
+/* extern double (&atand)(double); */
+/* extern double (&atan2d)(double,double); */
+/* extern double (&ceild)(double); */
+/* extern double (&floord)(double); */
+/* extern double (&expd)(double); */
+/* extern double (&fmodd)(double,double); */
+/* extern double (&powd)(double,double); */
+/* extern double (&logd)(double); */
+/* extern double (&log2d)(double); */
+/* extern double (&log10d)(double); */
+/* extern double (&sqrtd)(double); */
+/* extern double (&fabsd)(double); */
+
+
 extern "C"
 {
 llvm_zone_t* llvm_threads_get_callback_zone();
@@ -106,6 +129,26 @@ unsigned long string_hash(unsigned char* str);
   bool check_address_exists(const char* name, closure_address_table* table);
   bool check_address_type(const char* name, closure_address_table* table, const char* type);
 
+  double llvm_cos(double x);
+  double llvm_tan(double x);
+  double llvm_sin(double x);
+  double llvm_cosh(double x);
+  double llvm_tanh(double x);
+  double llvm_sinh(double x);
+  double llvm_acos(double x);
+  double llvm_asin(double x);
+  double llvm_atan(double x);
+  double llvm_atan2(double x,double y);
+  double llvm_ceil(double x);
+  double llvm_floor(double x);
+  double llvm_exp(double x);
+  double llvm_fmod(double x,double y);
+  double llvm_pow(double x,double y);
+  double llvm_log(double x);
+  double llvm_log2(double x);
+  double llvm_log10(double x);
+  double llvm_sqrt(double x);
+  double llvm_fabs(double x);  
 
 }
 
