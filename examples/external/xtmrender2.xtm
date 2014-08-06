@@ -52,6 +52,8 @@
 ;; setup opengl
 (define glctx (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
 
+(bind-val LINUX i1 (if (string=? (sys:platform) "Linux") 1 0))
+
 ;; first try to load from prebuilt stdlib
 ;; (sys:load "libs/xtm.xtm")
 ;; failing that compile on-the-fly
@@ -82,10 +84,12 @@
   (lambda (frame shader m v p data)
     (let ((nodes:xtm_node** (cast data xtm_node**)))
       (scale_matrix m 1.5 1.5 1.5)
-      (translate_matrix m 2.0 -0.1 0.0)                  
+      (translate_matrix m 2.0 -0.1 0.0)
+      (if LINUX (rotate_matrix m (dtof (/ PI 2.)) 1.0 0.0 0.0))      
       (xtm_update_matrices shader m v p)
       (xtm_draw_model (pref nodes 0) shader m v p)
       (fill_identity_matrix m)
+      (if LINUX (rotate_matrix m (dtof (/ PI 2.)) 1.0 0.0 0.0))      
       (xtm_update_matrices shader m v p)      
       (xtm_draw_model (pref nodes 1) shader m v p)
       (xtm_draw_model (pref nodes 2) shader m v p)
@@ -108,8 +112,8 @@
     (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur
               model1 model2 model3 (+ degree .5))))
 
-(define peppino (assimp_load_model path "peppino.dae"))
-(define scene (assimp_load_model path "scene.dae"))
+(define peppino (assimp_load_model path "peppino.dae" aiProcess_Triangulate))
+(define scene (assimp_load_model path "scene.dae" aiProcess_Triangulate))
 (define dome (assimp_load_model path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
 (xtm_render_setup (real->integer width) (real->integer height))
