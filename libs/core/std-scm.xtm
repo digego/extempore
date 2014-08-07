@@ -1,0 +1,43 @@
+;;; std-scm.xtm -- scheme code for libs/core/instruments.xtm library
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;;; Code:
+
+(set_float_nans_)
+
+;; generics here for catchall!
+(bind-func print:[void,!a]
+  (lambda (x) (printf "_") void))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; equality
+
+;; this is the catch-all for equality testing
+;; covers all numeric types
+;; will also catch all for all pointer types
+;; which compares against memory address
+;; otherwise expect poly override
+;;
+;; i.e. see string below
+(bind-func equal:[bool,!a,!b]*
+  "Basic equality check"
+  (lambda (a b)
+    (= a b)))
+
+
+(define-macro (xtmX expr)
+  (suppress-compiler-messages #t)
+  (eval `(bind-func xtm_expression
+           (lambda ()
+             ,expr
+             void))
+        (interaction-environment))
+  (suppress-compiler-messages #f)
+  (xtm_expression))                       
+

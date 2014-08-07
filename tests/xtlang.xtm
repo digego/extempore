@@ -513,6 +513,14 @@
 ;; you can do this using allocate
 (bind-type vec3 <double,double,double>)
 
+;; String printing!
+(bind-func vec3_print:[void,vec3*]*
+  (lambda (x)
+    (printf "<%d,%d,%d>" (tref x 0) (tref x 1) (tref x 2))
+    void))
+
+(bind-poly print vec3_print)
+
 ;; note that point is deallocated at the
 ;; end of the function call.  You can
 ;; stack allocate (stack-alloc)
@@ -864,15 +872,15 @@
 ;; closure types [double,double]* and [float,float]*
 ;; you would call the two lines below
 
-(bind-poly cos* cosd)
+(bind-poly cos* llvm_cos)
 (bind-poly cos* cosf)
 
 ;; the first argument is the polymorphic type name ('cos*')
-;; the second argument is an implementation name ('cos' or 'cosf')
+;; the second argument is an implementation name ('llvm_cos' or 'cosf')
 ;; the third argument is the type ([double,double]* or [float,float]*)
 
 ;; now you can let the compiler
-;; decide whether to use cosf or cos
+;; decide whether to use cosf or llvm_cos
 
 ;; here cos defaults to float
 ;; this is because in this instance

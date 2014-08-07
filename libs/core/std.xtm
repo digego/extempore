@@ -65,8 +65,6 @@
       (set! NaNd (pref (cast n64 double*) 0))
       void)))
 
-(set_float_nans_)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some global aliases
 
@@ -143,16 +141,6 @@
 (bind-func print_return
   (lambda () (llvm_printf "\n") void))
 
-(bind-func testme1
-  (lambda (x:i64)
-    (* x x)))
-
-(bind-func freddy
-  (lambda (x:i64) (* x 5) void))
-
-(bind-func print_kk
-  (lambda () (llvm_printf "kk\n") void))
-
 ;; prints a space
 (bind-func print_space
   (lambda () (printf " ") void))
@@ -182,25 +170,6 @@
 (bind-poly print print_f)
 (bind-poly print print_d)
 
-;; generics here for catchall!
-(bind-func print:[void,!a]
-  (lambda (x) (printf "_") void))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; equality
-
-;; this is the catch-all for equality testing
-;; covers all numeric types
-;; will also catch all for all pointer types
-;; which compares against memory address
-;; otherwise expect poly override
-;;
-;; i.e. see string below
-(bind-func equal:[bool,!a,!b]*
-  "Basic equality check"
-  (lambda (a b)
-    (= a b)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; XTLang strings
@@ -385,6 +354,11 @@
 ;; (suppress-compiler-messages #f)
 
 
+;; load the scheme macros (e.g. define-instrument)
+(sys:load "libs/core/std-scm.xtm")
+;; make sure we load them with precompiled code as well
+(sys:precomp:insert-sexp
+ '(sys:load "libs/core/std-scm.xtm"))
 
 (define *xtmlib-std-loaded* #t)
 
