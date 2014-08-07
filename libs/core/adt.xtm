@@ -104,18 +104,30 @@
 (bind-func length:[i64,List:<!a,List*>*]*
   (lambda (a)    
     (if (null? a)
-	0
-	(+ 1 (length (cdr a))))))
+        0
+        (+ 1 (length (cdr a))))))
 
-(bind-func nth_tail:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+(bind-func nth_tailr:[List:<!a,List*>*,List:<!a,List*>*,i64]*
   (lambda (lst idx)
     (let ((nt (lambda (l i cnt)
                 (if (or (= cnt i) (> cnt i))
                     l
                     (nt (cdr l)
-                               i
-                               (+ cnt 1))))))
+                        i
+                        (+ cnt 1))))))
       (nt lst idx 0))))
+
+
+(bind-func nth_tail:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+  (lambda (lst idx)
+    (if (= idx 0)
+        lst
+        (if (null? (cdr lst)) lst
+            (nth_tail (cdr lst) (- idx 1))))))
+
+(bind-func nthr:[!a,List:<!a,List*>*,i64]*
+  (lambda (lst idx)
+    (car (nth_tailr lst idx))))
 
 (bind-func nth:[!a,List:<!a,List*>*,i64]*
   (lambda (lst idx)
@@ -138,7 +150,16 @@
       (tset! pre_cell 1 post_cell)
       (car cell))))
 
+(bind-func reverse_inline:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (old new)
+    (if (null? old) new
+        (reverse_inline (cdr old) (cons (car old) new)))))
+
 (bind-func reverse:[List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (lst)
+    (reverse_inline lst (convert null))))
+
+(bind-func reverse_r:[List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (lst)
     (let ((rev (lambda (old new)
                  (if (null? old)
@@ -269,8 +290,8 @@
 (bind-func last:[List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a)
     (if (null? (cdr a))
-	a
-	(last (cdr a)))))
+        a
+        (last (cdr a)))))
 
 (bind-func range:[List:<!a,List*>*,!a]*
   (lambda (end)
@@ -304,10 +325,10 @@
 
 (bind-func append:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a b)
-    (let ((p (last a)))
-      (tset! p 1 b)
-      a)))
-
+    (if (null? a) b
+        (begin
+          (tset! (last a) 1 b)
+          a))))
 
 (bind-func swap:[List:<!a,List*>*,List:<!a,List*>*,i64,i64]*
   ;; swap ith and jth list elements inplace  
