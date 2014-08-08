@@ -29,7 +29,6 @@
 ;; setup opengl
 (define glctx (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
 
-(bind-val LINUX i1 (if (string=? (sys:platform) "Linux") 1 0))
 ;; first try to load from prebuilt stdlib
 ;; (sys:load "libs/xtm.xtm")
 ;; failing that compile on-the-fly
@@ -42,7 +41,6 @@
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
     (rotate_matrix m (* .1 (i64tof frame)) 0.0 1.0 0.0)
-    (if LINUX (rotate_matrix m (dtof (/ PI 2.)) 1.0 0.0 0.0))
     (xtm_draw_model (cast data xtm_node*) shader m v p)
     void))
 

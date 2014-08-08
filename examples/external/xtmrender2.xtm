@@ -52,8 +52,6 @@
 ;; setup opengl
 (define glctx (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
 
-(bind-val LINUX i1 (if (string=? (sys:platform) "Linux") 1 0))
-
 ;; first try to load from prebuilt stdlib
 ;; (sys:load "libs/xtm.xtm")
 ;; failing that compile on-the-fly
@@ -73,7 +71,7 @@
     (xtm_light_power 1 30.0)
     (xtm_light_angle 1 60.0)
     
-    (xtm_camera_pos (* 10.0 (cosf (* .02 (i64tof frame)))) 7.0 10.0)
+    (xtm_camera_pos (* 10.0 (cosf (* .02 (i64tof frame)))) 7.0 15.0)
     (xtm_camera_tgt 0.0 3.0 0.0)
     (xtm_camera_up 0.0 1.0 0.0)
     void
@@ -84,12 +82,10 @@
   (lambda (frame shader m v p data)
     (let ((nodes:xtm_node** (cast data xtm_node**)))
       (scale_matrix m 1.5 1.5 1.5)
-      (translate_matrix m 2.0 -0.1 0.0)
-      (if LINUX (rotate_matrix m (dtof (/ PI 2.)) 1.0 0.0 0.0))      
+      (translate_matrix m 2.0 -1.9 0.0)                  
       (xtm_update_matrices shader m v p)
       (xtm_draw_model (pref nodes 0) shader m v p)
       (fill_identity_matrix m)
-      (if LINUX (rotate_matrix m (dtof (/ PI 2.)) 1.0 0.0 0.0))      
       (xtm_update_matrices shader m v p)      
       (xtm_draw_model (pref nodes 1) shader m v p)
       (xtm_draw_model (pref nodes 2) shader m v p)
