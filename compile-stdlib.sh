@@ -35,13 +35,15 @@ PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd --term nocolor --run "
 # clear the log file (if present)
 rm -f compile-stdlib.log
 
+echo Precompiling the Extempore standard library.  This may take several minutes...
+echo
+
 # check all the required shared libs are there
 for f in $PRECOMP_LIBS
 do
     echo "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t #t)" > $PRECOMP_COMMAND_FILENAME
     echo "Precompiling libs/$f"
-    # the sed command is for stripping the ANSI colour codes
-    $PRECOMP_EXTEMPORE_RUN_COMMAND $PRECOMP_COMMAND_FILENAME 2>&1 >>compile-stdlib.log | sed "s/\\^\\[(\\[[^@-~]+[@-~]|[0-9@-_]|%@)//g" | tee -a compile-stdlib.log
+    $PRECOMP_EXTEMPORE_RUN_COMMAND $PRECOMP_COMMAND_FILENAME 2>&1 >>compile-stdlib.log | tee -a compile-stdlib.log
     rc=$?
     if [[ $rc != 0 ]] ; then
         echo -e "\033[0;31mError precompiling libs/$f\033[0;00m"
