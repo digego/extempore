@@ -343,10 +343,15 @@
       (if (not (null? path_from_env))
           path_from_env
           ;; check if homebrewed version (in default Cellar location)
-          ;; exisits - need to keep the version up-to-date by hand
+          ;; exists - need to keep the version up-to-date by hand
+          ;;
+          ;; OSX
           (if (= (command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
               "/usr/local/Cellar/extempore-llvm/3.4.1"
-              path_from_env)))))
+              ;; Linux
+              (if (= (command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
+                  "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
+                  path_from_env))))))
 
 
 ;; (sys:load "libs/core/adt.xtm")
