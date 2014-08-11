@@ -40,10 +40,11 @@
 //#include <ucontext.h>
 
 typedef struct _llvm_zone_t {
-    void* memory;
-    uint64_t offset;
-    uint64_t mark;
-    uint64_t size;
+  void* memory;
+  uint64_t offset;
+  uint64_t mark;
+  uint64_t size;
+  struct _llvm_zone_t* memories;
 } llvm_zone_t;
 
 typedef struct _llvm_callback_struct_ {
