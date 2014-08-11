@@ -789,26 +789,6 @@ indentation."
     (progn (message "Dropping malformed SLIP packet.")
            nil)))
 
-;; OSC (strings only at the moment)
-
-(defun extempore-make-osc-string (str)
-  (concat str (make-vector (- 4 (mod (length str) 4)) ?\0)))
-
-(defun extempore-extract-osc-string (str &optional start)
-  (and (string-match "[^\0]*" str start)
-       (match-string 0 str)))
-
-(defun extempore-extract-osc-address (str)
-  (extempore-extract-osc-string str 0))
-
-(defun extempore-extract-osc-type-tag (str)
-  (and (string-match ",[^\0]*" str)
-       (substring (match-string 0 str) 1)))
-
-(defun extempore-osc-args-index (str)
-  (and (string-match ",[^\0]*[\0]*" str)
-       (match-end 0)))
-
 ;; correct escaping of eval strings
 
 (defun extempore-make-crlf-evalstr (evalstr)
