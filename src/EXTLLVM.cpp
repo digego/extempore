@@ -106,6 +106,7 @@
 #define DEBUG_ZONE_STACK 0
 #define DEBUG_ZONE_ALLOC 0
 #define LEAKY_ZONES 1
+#define EXTENSIBLE_ZONES 1
 
 // llvm_scheme foreign function -> string name
 // also is not thread safe!
@@ -328,10 +329,11 @@ void llvm_push_zone_stack(llvm_zone_t* z)
 
 #if DEBUG_ZONE_STACK          
     llvm_threads_inc_zone_stacksize();
-    if(stack->tail) 
+    if(stack->tail) {
       printf("%p: push new zone %p:%lld onto old zone %p:%lld stacksize:%lld\n",stack,z,z->size,stack->tail->head,stack->tail->head->size,llvm_threads_get_zone_stacksize());
-    else
+    } else {
       printf("%p: push new zone %p:%lld onto empty stack\n",stack,z,z->size);
+    }
 #endif
     //printf("zones: %lld\n",llvm_threads_get_zone_stacksize());
     return;
@@ -355,7 +357,7 @@ llvm_zone_t* llvm_peek_zone_stack()
     }else{
       z = stack->head;
 #if DEBUG_ZONE_STACK      
-      //printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
+      printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
 #endif
       return z;
     }
@@ -374,7 +376,11 @@ llvm_zone_t* llvm_pop_zone_stack()
     llvm_zone_stack* tail = stack->tail;
 #if DEBUG_ZONE_STACK    
     llvm_threads_dec_zone_stacksize();
-    printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n",stack,head,head->size,tail->head,tail->head->size);
+    if(tail == NULL) {
+      printf("%p: popping zone %p:%lld from stack with no tail\n",stack,head,head->size);
+    }else{
+      printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n",stack,head,head->size,tail->head,tail->head->size);
+    }
 #endif
     free(stack);
     llvm_threads_set_zone_stack(tail);
@@ -392,6 +398,7 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     zone->mark = 0;
     zone->offset = 0;
     zone->size = size;
+    zone->memories = NULL;
 #if DEBUG_ZONE_ALLOC    
     printf("CreateZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
 #endif
@@ -409,7 +416,8 @@ void llvm_zone_destroy(llvm_zone_t* zone)
 #if DEBUG_ZONE_ALLOC  
     printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
 #endif
-    free(zone->memory);
+    if(zone->memories != NULL) llvm_zone_destroy(zone->memories);
+    free(zone->memory);    
     free(zone);
     return;
 }
@@ -459,11 +467,23 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 #endif
     if(zone->offset+size >= zone->size)
     {
-	// if LEAKY ZONE is TRUE then just print a warning and just leak the memory
-#if LEAKY_ZONES
-	printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
-        printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
-        fflush(NULL);
+
+#if EXTENSIBLE_ZONES // if extensible_zones is true then extend zone size by zone->size
+    ascii_text_color(0,3,10);      
+    printf("Warning ");
+    ascii_text_color(0,9,10);
+    printf("zone:%p size:%lld is full ... extending\n",zone,zone->size);        
+    llvm_zone_t* newzone = llvm_zone_create(zone->size);
+    void* tmp = newzone->memory;
+    newzone->memories = zone->memories;
+    newzone->memory = zone->memory;
+    zone->memory = tmp;
+    zone->memories = newzone;
+    llvm_zone_reset(zone);
+#elif LEAKY_ZONES       // if LEAKY ZONE is TRUE then just print a warning and just leak the memory
+        printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
+      printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
+      fflush(NULL);
 	return malloc((size_t)size);
 #else
 	printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
@@ -1276,7 +1296,8 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     ascii_text_color(1,7,10);
     printf(" %s.%s ",fname,vname);
     ascii_text_color(0,7,10);
-    printf("does not exist!\n"); 
+    printf("does not exist!\n");
+    ascii_text_color(0,9,10);    
     return _sc->F;
   }
   char* eptr = (char*) *(closure+1);
