@@ -1626,9 +1626,9 @@ backend in Extempore."
 
 (defun exvis-unadvise-functions ()
   "Remove exvis advice from functions"  
-  ;; (ad-remove-advice #'extempore-send-region 'before)
-  ;; (ad-remove-advice #'switch-to-buffer 'before)
-  )
+  (with-demoted-errors
+    (ad-remove-advice #'extempore-send-region 'before 'exvis-advice)
+    (ad-remove-advice #'switch-to-buffer 'before 'exvis-advice)))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; extempore logger ;;
