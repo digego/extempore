@@ -12,12 +12,11 @@ if [ -z "$EXT_LLVM_DIR" ] && [ ! -d "/usr/local/Cellar/extempore-llvm/3.4.1" ] ;
     exit 2
 fi
 
-PRECOMP_LIBS=(
-    core/std.xtm
-    core/math.xtm
-    core/audio_dsp.xtm
-    core/instruments.xtm
-)
+PRECOMP_LIBS="\
+core/std.xtm \
+core/math.xtm \
+core/audio_dsp.xtm \
+core/instruments.xtm"
 
 PRECOMP_COMMAND_FILENAME="xtmprecomp-command-file.xtm"
 PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd --run "
