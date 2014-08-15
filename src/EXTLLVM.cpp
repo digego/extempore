@@ -586,14 +586,15 @@ void* llvm_get_function_ptr(char* fname)
   llvm::Module* M = extemp::EXTLLVM::I()->M;
   llvm::Function* func = M->getFunction(std::string(fname));
   if(func == 0) {
-      throw std::runtime_error("Extempore runtime error: error retrieving function in llvm_get_function_ptr");
+    // throw std::runtime_error("Extempore runtime error: error retrieving function in llvm_get_function_ptr");
+    return NULL;
   }
 
   void* p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
 
-  if(p==NULL) {
-      throw std::runtime_error("Extempore runtime error: null ptr retrieving function ptr in llvm_get_function_ptr");
-  }
+  // if(p==NULL) {
+  //     throw std::runtime_error("Extempore runtime error: null ptr retrieving function ptr in llvm_get_function_ptr");
+  // }
   return p;
 }
 
