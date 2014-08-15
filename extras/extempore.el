@@ -1547,6 +1547,89 @@ You shouldn't have to modify this list directly, use
   (extempore-stop-tr-animation-timer)
   (extempore-stop-tr-anim-osc-server))
 
+;;;;;;;;;;;;;;;;
+;; exvis mode ;;
+;;;;;;;;;;;;;;;;
+
+(unless (require 'osc nil t)
+  (warn "OSC library not found.\nThis isn't a problem for normal use, but some advanced features will be disabled."))
+
+(defvar exvis-osc-client nil
+  "OSC client used for sending messages to `exvis-osc-host'")
+(defvar exvis-osc-host (cons "localhost" 9880)
+  "(HOST . PORT) pair")
+
+(define-minor-mode exvis-mode
+  "a minor mode for code visualisation. Requires a visualisation
+backend in Extempore."
+  :global t
+  :init-value nil
+  :lighter " ExVis"
+  :keymap nil
+  :group 'extempore
+
+  (if exvis-mode
+      (exvis-start)
+    (exvis-stop)))
+
+(defun exvis-start ()
+  (unless exvis-osc-client
+    (setq exvis-osc-client
+          (osc-make-client (car exvis-osc-host)
+                           (cdr exvis-osc-host)))
+    (exvis-advise-functions)))
+
+(defun exvis-stop ()
+  (exvis-unadvise-functions)
+  (delete-process exvis-osc-client)
+  (setq exvis-osc-client nil))
+
+;; here are the different OSC messages in the spec
+
+(defun exvis-send-selection-message (selections)
+  (apply #'osc-send-message exvis-osc-client
+         "/interface/selection"
+         (length selections)
+         selections))
+
+(defun exvis-send-code-message (code)
+  (osc-send-message exvis-osc-client
+                    "/interface/code"
+                    code))
+
+(defun exvis-send-evaluation-message (evaluated-code)
+  (osc-send-message exvis-osc-client
+                    "/interface/evaluate"
+                    evaluated-code))
+
+(defun exvis-send-error-message (error-message)
+  (osc-send-message exvis-osc-client
+                    "/interface/error"
+                    error-message))
+
+(defun exvis-send-focus-message (buffer-or-name)
+  (osc-send-message exvis-osc-client
+                    "/interface/focus"
+                    (if (bufferp buffer-or-name)
+                        (buffer-name buffer-or-name)
+                      buffer-or-name)))
+
+(defun exvis-advise-functions ()
+  "Advise (via defadvice) the relevant functions to send the OSC messages"
+  ;; evaluate
+  (defadvice extempore-send-region (before exvis-advice activate)
+    (exvis-send-evaluation-message
+     (apply #'buffer-substring-no-properties (ad-get-args 0))))
+  ;; focus
+  (defadvice switch-to-buffer (before exvis-advice activate)
+    (exvis-send-focus-message (ad-get-arg 0))))
+
+(defun exvis-unadvise-functions ()
+  "Remove exvis advice from functions"  
+  ;; (ad-remove-advice #'extempore-send-region 'before)
+  ;; (ad-remove-advice #'switch-to-buffer 'before)
+  )
+
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; extempore logger ;;
 ;;;;;;;;;;;;;;;;;;;;;;
