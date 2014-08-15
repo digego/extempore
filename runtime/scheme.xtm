@@ -1761,6 +1761,24 @@
   (lambda (path)
     (car (regex:split path "[.]"))))
 
+(define file->string
+  (lambda (path)
+    (let ((in (open-input-file path))
+          (out (make-string 0)))
+      (if in
+          (let loop ((char (read-char in)))
+            (if (not (eof-object? char))
+                (begin (emit (string char) out)
+                       (loop (read-char in)))
+                (begin (close-port in)
+                       out)))
+          (begin (print-with-colors 'red 'default #t
+                                    (print "Error opening file: "))
+                 (print path "\n")
+                 #f)))))
+
+;; sys:load and friends
+
 (define *global-sysload-evals* (make-list-with-proc 10 (lambda (i) #f)))
 
 (define sys:load
