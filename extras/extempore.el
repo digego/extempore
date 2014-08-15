@@ -376,7 +376,7 @@ See `run-hooks'."
        '("\\_<[-+]?[/.[:digit:]]+?\\_>"
          (0 font-lock-constant-face))
        ;; hex literals
-       '("\\_<#x[[:digit:]]+?\\_>"
+       '("\\_<#[xob][[:digit:]]+?\\_>"
          (0 font-lock-constant-face))
        ;; hack to make sure / gets highlighted as a function
        '("\\_</\\_>"
