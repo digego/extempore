@@ -472,7 +472,8 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
     ascii_text_color(0,3,10);      
     printf("Warning ");
     ascii_text_color(0,9,10);
-    printf("zone:%p size:%lld is full ... extending\n",zone,zone->size);        
+    if(size > zone->size) zone->size = size*3;
+    printf("zone:%p size:%lld is full ... extending\n",zone,zone->size);
     llvm_zone_t* newzone = llvm_zone_create(zone->size);
     void* tmp = newzone->memory;
     newzone->memories = zone->memories;
