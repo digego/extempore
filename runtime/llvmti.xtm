@@ -534,9 +534,9 @@
 (define impc:ti:list
   (lambda (ast)
     (if (null? ast) 'null
-	(list 'cons
-	      (car ast)
-	      (impc:ti:list (cdr ast))))))
+        (list 'cons
+              (car ast)
+              (impc:ti:list (cdr ast))))))
 
 
 (define impc:ti:println
@@ -575,6 +575,15 @@
                                     ;; (list 'print_space)
                                     (list 'print x))))
                              (cdr ast)))))))
+
+(define impc:ti:format
+  (lambda (ast)
+    (if (null? ast) 'null
+        (list 'string_cat
+              (if (string? (car ast))
+                  (list 'Str (car ast))
+                  (list 'str_format (car ast)))
+              (impc:ti:format (cdr ast))))))
 
 
 
@@ -815,6 +824,9 @@
                         (impc:ti:first-transform (impc:ti:quote (cadr ast)) inbody?))
                        ((eq? (car ast) 'list)
                         (impc:ti:first-transform (impc:ti:list (cdr ast)) inbody?))
+                       ((or (eq? (car ast) 'strln)
+                            (eq? (car ast) 'strj))
+                        (impc:ti:first-transform (impc:ti:format (cdr ast)) inbody?))
                        ((eq? (car ast) 'println)
                         (impc:ti:first-transform (impc:ti:println (cdr ast)) inbody?))
                        ((eq? (car ast) 'printout)
