@@ -389,7 +389,14 @@ llvm_zone_t* llvm_pop_zone_stack()
 
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
-    llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
+  llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
+  if (zone == NULL)
+    {
+      ascii_text_color(0,3,10);      
+      printf("Catastrophic memory failure!\n");
+      ascii_text_color(0,9,10);
+      exit(1);
+    }
 #ifdef TARGET_OS_WINDOWS
     zone->memory = malloc((size_t) size);
 #else
@@ -397,6 +404,12 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
 #endif
     zone->mark = 0;
     zone->offset = 0;
+    if(zone->memory == NULL) {
+      ascii_text_color(0,3,10);      
+      printf("Failed to allocate memory for Zone!\n");
+      ascii_text_color(0,9,10);    
+      size = 0;
+    }
     zone->size = size;
     zone->memories = NULL;
 #if DEBUG_ZONE_ALLOC    
