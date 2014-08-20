@@ -1397,7 +1397,7 @@ namespace extemp {
 	
     EXTLLVM EXTLLVM::SINGLETON;
     int64_t EXTLLVM::LLVM_COUNT = 0l;
-    bool EXTLLVM::OPTIMIZE_COMPILES = 0;
+    bool EXTLLVM::OPTIMIZE_COMPILES = 1;
     bool EXTLLVM::VERIFY_COMPILES = 1;
 	
     EXTLLVM::EXTLLVM()
@@ -1458,10 +1458,11 @@ namespace extemp {
 	    //EE = llvm::EngineBuilder(M).create();
 	    PM = new llvm::PassManager();
 	    //PM->add(new llvm::TargetData(*EE->getTargetData()));
-            PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
+      PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
 
-            // promote allocs to register
-            PM->add(llvm::createPromoteMemoryToRegisterPass());
+      PM->add(llvm::createBasicAliasAnalysisPass());   //new   
+      // promote allocs to register
+      PM->add(llvm::createPromoteMemoryToRegisterPass());
 	    // Do simple "peephole" optimizations and bit-twiddling optzns.
 	    PM->add(llvm::createInstructionCombiningPass());
 	    // Reassociate expressions.
@@ -1476,6 +1477,9 @@ namespace extemp {
 	    PM->add(llvm::createIndVarSimplifyPass());
 	    // Simplify the control flow graph (deleting unreachable blocks, etc).
 	    PM->add(llvm::createCFGSimplificationPass());
+      // 
+	    PM->add(llvm::createPromoteMemoryToRegisterPass());
+
 
 	    //llvm::PerformTailCallOpt = true;
 	    //llvm::GuaranteedTailCallOpt = true;
