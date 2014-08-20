@@ -95,6 +95,8 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
 llvm_zone_t* llvm_pop_zone_stack();
 llvm_zone_t* llvm_peek_zone_stack();
 void llvm_push_zone_stack(llvm_zone_t*);
+bool llvm_ptr_in_zone(llvm_zone_t*, void*);
+bool llvm_ptr_in_current_zone(void*);
 
 void* llvm_get_function_ptr(char* n);
 pointer llvm_scheme_env_set(scheme* _sc, char* sym);

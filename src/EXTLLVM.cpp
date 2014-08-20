@@ -565,6 +565,21 @@ bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
     return 0;		
 }
 
+bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
+{
+    if( (ptr >= zone->memory) && (ptr < ((char*)zone->memory)+zone->size) ) return true;
+    while(zone->memories != NULL) {
+      zone = zone->memories;
+      if( (ptr >= zone->memory) && (ptr < ((char*)zone->memory)+zone->size) ) return true;
+    }
+    return false;
+}
+
+bool llvm_ptr_in_current_zone(void* ptr)
+{
+  return llvm_ptr_in_zone(llvm_peek_zone_stack(),ptr);
+}
+
 
 extemp::CM* FreeWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,freeWithDelay);
 void free_after_delay(char* dat, double delay)
@@ -1612,6 +1627,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_set_size);
 	    gv = M->getNamedValue(std::string("llvm_zone_ptr_size"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_size);
+	    gv = M->getNamedValue(std::string("llvm_ptr_in_zone"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_ptr_in_zone);
+	    gv = M->getNamedValue(std::string("llvm_ptr_in_current_zone"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_ptr_in_current_zone);
 	    gv = M->getNamedValue(std::string("llvm_memset"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_memset);
 	    gv = M->getNamedValue(std::string("extitoa"));

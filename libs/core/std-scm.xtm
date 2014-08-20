@@ -14,6 +14,18 @@
 (bind-func print:[void,!a]
   (lambda (x) (printf "_") void))
 
+;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; catch all * zcopy
+;;
+(bind-func zcopy:[!a,!a,mzone*,mzone*]*
+  (lambda (x fromz toz)
+    (if (llvm_ptr_in_zone fromz (convert x))
+        (let ((size (llvm_zone_ptr_size (convert x)))
+              (newdat (convert (llvm_zone_malloc (llvm_peek_zone_stack) size))))
+          (memcpy (convert newdat) (convert x) size)
+          newdat)
+        x)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; equality
@@ -29,7 +41,6 @@
   "Basic equality check"
   (lambda (a b)
     (= a b)))
-
 
 (define-macro (xtmX expr)
   (suppress-compiler-messages #t)

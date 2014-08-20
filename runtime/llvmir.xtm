@@ -3071,30 +3071,54 @@
 ;;       (impc:ir:strip-space os))))
 
 
-(define impc:ir:compile:push_zone
+(define impc:ir:compile:push_new_zone
   (lambda (ast types)
     (let* ((os (make-string 0))
-	   (size-str (impc:ir:compiler (cadr ast) types))
-	   (size (impc:ir:gname)))
-	   
-      ;(println 'size: size)
-      
+           (size-str (impc:ir:compiler (cadr ast) types))
+           (size (impc:ir:gname)))      
+      ;;(println 'size: size)      
       (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
-	  (impc:compiler:print-needs-zone-size-error 'push_zone))
+          (impc:compiler:print-needs-zone-size-error 'push_new_zone))
       
       (emit size-str os) ;; write size str
       
       (emit (impc:ir:gname "zone" "%mzone*")
-	    " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
+            " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
       (emit "call void @llvm_push_zone_stack(%mzone* " (car (impc:ir:gname)) ")\n" os)
       (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
       (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
 
       (let ((zone (impc:ir:gname "zone")))
-	(impc:ir:gname "ret" (car zone) (cadr zone))) 	    
-      ;(impc:ir:gname "body" (car e) (cadr e))
+        (impc:ir:gname "ret" (car zone) (cadr zone))) 	    
+      ;; (impc:ir:gname "body" (car e) (cadr e))
       (impc:ir:strip-space os))))
 
+(define impc:ir:compile:push_zone
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+           (zone-str (impc:ir:compiler (cadr ast) types))
+           (zone (impc:ir:gname)))      
+      (emit zone-str os)  
+      (emit "call void @llvm_push_zone_stack(%mzone* " (car (impc:ir:gname)) ")\n" os)
+      (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
+      (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
+      (let ((zone (impc:ir:gname "zone")))
+        (impc:ir:gname "ret" (car zone) (cadr zone)))
+      ;; (impc:ir:gname "body" (car e) (cadr e))
+      (impc:ir:strip-space os))))
+
+(define impc:ir:compile:create_zone
+  (lambda (ast types)
+    (let* ((os (make-string 0))
+           (size-str (impc:ir:compiler (cadr ast) types))
+           (size (impc:ir:gname)))      
+      ;;(println 'size: size)      
+      (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
+          (impc:compiler:print-needs-zone-size-error 'create_zone))      
+      (emit size-str os) ;; write size str      
+      (emit (impc:ir:gname "zone" "%mzone*")
+            " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
+      (impc:ir:strip-space os))))
 
 (define impc:ir:compile:pop_zone
   (lambda (ast types)
@@ -3102,68 +3126,69 @@
       (emit (impc:ir:gname "oldzone" "%mzone*") " = call %mzone* @llvm_pop_zone_stack()\n" os)
       (emit (impc:ir:gname "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n" os)
       (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "newzone")) " to i8*\n" os)
-      (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)      
+      (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
+      (let ((zone (impc:ir:gname "oldzone")))
+        (impc:ir:gname "ret" (car zone) (cadr zone)))      
       (impc:ir:strip-space os))))
 
-
-(define impc:ir:compile:zone
-  (lambda (ast types)
-    (let* ((os (make-string 0))
-	   (size-str (impc:ir:compiler (cadr ast) types))
-	   (size (impc:ir:gname))
-	   (bodystr1 (impc:ir:compiler (caddr ast) types))
-	   (body1 (impc:ir:gname))
-	   (bodystr2 (if (= (length ast) 4)
-			 (impc:ir:compiler (cadddr ast) types)
-			 '()))
-	   (body2 (if (= (length ast) 4) (impc:ir:gname) '()))
-	   (e (if (null? bodystr2) body1 body2))
-	   (etype (impc:ir:get-type-from-str (cadr e))))
-      ;(println 'size: size 'body1: body1 'body2: body2)
+;; (define impc:ir:compile:zone
+;;   (lambda (ast types)
+;;     (let* ((os (make-string 0))
+;;            (size-str (impc:ir:compiler (cadr ast) types))
+;;            (size (impc:ir:gname))
+;;            (bodystr1 (impc:ir:compiler (caddr ast) types))
+;;            (body1 (impc:ir:gname))
+;;            (bodystr2 (if (= (length ast) 4)
+;;                          (impc:ir:compiler (cadddr ast) types)
+;;                          '()))
+;;            (body2 (if (= (length ast) 4) (impc:ir:gname) '()))
+;;            (e (if (null? bodystr2) body1 body2))
+;;            (etype (impc:ir:get-type-from-str (cadr e))))
+;;                                         ;(println 'size: size 'body1: body1 'body2: body2)
       
-      (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
-	  (impc:compiler:print-needs-zone-size-error 'memzone))
-      (if (and (= (length ast) 4)
-	       (<> (impc:ir:get-type-from-str (cadr body1)) *impc:ir:si64*))
-	  (impc:compiler:print-needs-zone-delay-error 'memzone))
-	       
-      (emit size-str os) ;; write size str
+;;       (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
+;;           (impc:compiler:print-needs-zone-size-error 'memzone))
+;;       (if (and (= (length ast) 4)
+;;                (<> (impc:ir:get-type-from-str (cadr body1)) *impc:ir:si64*))
+;;           (impc:compiler:print-needs-zone-delay-error 'memzone))
       
-      (emit (impc:ir:gname "zone" "%mzone*")
-	    " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
-      (emit "call void @llvm_push_zone_stack(%mzone* " (car (impc:ir:gname)) ")\n" os)
-      (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
-      (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
-
-      (emit bodystr1 os)
-      (if (not (null? bodystr2)) (emit bodystr2 os))
+;;       (emit size-str os) ;; write size str
       
-      (emit (impc:ir:gname "oldzone" "%mzone*") " = call %mzone* @llvm_pop_zone_stack()\n" os)
-      (emit (impc:ir:gname "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n" os)
-      (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "newzone")) " to i8*\n" os)
-      (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
+;;       (emit (impc:ir:gname "zone" "%mzone*")
+;;             " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
+;;       (emit "call void @llvm_push_zone_stack(%mzone* " (car (impc:ir:gname)) ")\n" os)
+;;       (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
+;;       (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
 
-      ;; now if the return value from the memzone is a pointer
-      ;; then we'll need to copy the value onto the new zone
-      ;; before destroying the existing zone
-      (if (impc:ir:closure? etype)
-	  (impc:compiler:print-compiler-error "you are not allowed to return a closure from a memzone")
-	  (if (impc:ir:pointer? etype)
-	      (begin (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr e) " " (car e) " to i8*\n"
-			   (impc:ir:gname "ptr_size" "i64") " = call i64 @llvm_zone_ptr_size(i8* " (car (impc:ir:gname "ptr_one")) ")\n"
-			   (impc:ir:gname "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n"
-			   (impc:ir:gname "new_mem" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "newzone")) ", i64 " (car (impc:ir:gname "ptr_size")) ")\n"
-			   "call i8* @memcpy(i8* " (car (impc:ir:gname "new_mem")) ", i8* " (car (impc:ir:gname "ptr_one")) ", i64 " (car (impc:ir:gname "ptr_size")) ")\n"
-			   (impc:ir:gname "ptr_two" (cadr e)) " = bitcast i8* " (car (impc:ir:gname "new_mem")) " to " (cadr e) "\n"
-			   os)
-		     (set! e (impc:ir:gname "ptr_two")))))
-      (if (null? body2)
-	  (emit "call void @llvm_zone_destroy(%mzone* " (car (impc:ir:gname "oldzone")) ")\n" os)
-	  (emit "call void @llvm_destroy_zone_after_delay(%mzone* " (car (impc:ir:gname "oldzone"))
-		                                          ", i64 " (car body1)
-		")\n" os))
-      (impc:ir:gname "body" (car e) (cadr e)) ;"voidmark" (impc:ir:get-type-str *impc:ir:void*))
-      (impc:ir:strip-space os))))
+;;       (emit bodystr1 os)
+;;       (if (not (null? bodystr2)) (emit bodystr2 os))
+      
+;;       (emit (impc:ir:gname "oldzone" "%mzone*") " = call %mzone* @llvm_pop_zone_stack()\n" os)
+;;       (emit (impc:ir:gname "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+;;       (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "newzone")) " to i8*\n" os)
+;;       (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
+
+;;       ;; now if the return value from the memzone is a pointer
+;;       ;; then we'll need to copy the value onto the new zone
+;;       ;; before destroying the existing zone
+;;       (if (impc:ir:closure? etype)
+;;           (impc:compiler:print-compiler-error "you are not allowed to return a closure from a memzone")
+;;           (if (impc:ir:pointer? etype)
+;;               (begin (emit (impc:ir:gname "ptr_one" "i8*") " = bitcast " (cadr e) " " (car e) " to i8*\n"
+;;                            (impc:ir:gname "ptr_size" "i64") " = call i64 @llvm_zone_ptr_size(i8* " (car (impc:ir:gname "ptr_one")) ")\n"
+;;                            (impc:ir:gname "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n"
+;;                            (impc:ir:gname "new_mem" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "newzone")) ", i64 " (car (impc:ir:gname "ptr_size")) ")\n"
+;;                            "call i8* @memcpy(i8* " (car (impc:ir:gname "new_mem")) ", i8* " (car (impc:ir:gname "ptr_one")) ", i64 " (car (impc:ir:gname "ptr_size")) ")\n"
+;;                            (impc:ir:gname "ptr_two" (cadr e)) " = bitcast i8* " (car (impc:ir:gname "new_mem")) " to " (cadr e) "\n"
+;;                            os)
+;;                      (set! e (impc:ir:gname "ptr_two")))))
+;;       (if (null? body2)
+;;           (emit "call void @llvm_zone_destroy(%mzone* " (car (impc:ir:gname "oldzone")) ")\n" os)
+;;           (emit "call void @llvm_destroy_zone_after_delay(%mzone* " (car (impc:ir:gname "oldzone"))
+;;                 ", i64 " (car body1)
+;;                 ")\n" os))
+;;       (impc:ir:gname "body" (car e) (cadr e)) ;"voidmark" (impc:ir:get-type-str *impc:ir:void*))
+;;       (impc:ir:strip-space os))))
 
 
 (define impc:ir:compile:apply-closure
@@ -5267,8 +5292,10 @@
             ((list? ast)
              (cond ((member (car ast) '(__make-env __make-env-zone))
                     (impc:ir:compile:make-env ast types))
-		   ((equal? (car ast) 'memzone) (impc:ir:compile:zone ast types))
+		   ;; ((equal? (car ast) 'memzone) (impc:ir:compile:zone ast types))
+		   ((equal? (car ast) 'push_new_zone) (impc:ir:compile:push_new_zone ast types))
 		   ((equal? (car ast) 'push_zone) (impc:ir:compile:push_zone ast types))
+		   ((equal? (car ast) 'create_zone) (impc:ir:compile:create_zone ast types))
 		   ((equal? (car ast) 'pop_zone) (impc:ir:compile:pop_zone ast types))
 		   ((member (car ast) '(impc_null))
 		    (string-append (impc:ir:gname "null" (if (null? hint?) "i8*" (impc:ir:get-type-str (car hint?))))
@@ -5355,7 +5382,7 @@
                     (impc:ir:compiler:tuple-set ast types))
                    ((equal? (car ast) 'void)
                     (impc:ir:compiler:void ast types))
-		   ((equal? (car ast) 'callback)
+		   ((equal? (car ast) 'llvm_callback)
 		    (impc:ir:compiler:callback ast types))
                    ((equal? (car ast) 'closure-ref)		
 		    (if (null? hint?)
