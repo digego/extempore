@@ -814,9 +814,9 @@
     
 (define *unique-polynum* 0)
 
+(define *impc:mathintrinsicslist* '(sin cos ceil floor exp fmod pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi))
 (define *impc:mathbinaryaritylist* '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
 (define *impc:lambdaslist* '(lambda lambdas lambdaz lambdah))
-
 
 (define impc:ti:first-transform
   (lambda (ast inbody?)
@@ -2193,7 +2193,29 @@
                 ((and (symbol? (caddr ast)) (not (null? a)))
                  (impc:ti:update-var (caddr ast) vars kts a) a) ;; return a
                 (else t))))))
-				   
+
+(define impc:ti:math-intrinsic-check
+  (lambda (ast vars kts request?)
+    (let* ((args (- (length ast) 1))
+           (a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
+           (b (if (> args 1)
+                  (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars)
+                  #f))
+           (c (if (> args 2)
+                  (impc:ti:type-unify (impc:ti:type-check (cadddr ast) vars kts request?) vars)
+                  #f)))
+      (if (and b
+               (not (equal? a b))
+               (not (number? (cadr ast)))
+               (not (number? (caddr ast))))
+          (impc:compiler:print-type-conflict-error (impc:ir:pretty-print-type a)
+                                                   (impc:ir:pretty-print-type b)
+                                                   ast)
+          (if (and b
+                   (not (equal? a b))
+                   (number? (cadr ast)))
+              (list b)
+              (list a))))))
 
 (define impc:ti:compare-check
   (lambda (ast vars kts request?)
@@ -4335,6 +4357,7 @@
                      (set-car! ast m)
                      (set! r (impc:ti:type-check ast vars kts request?)))))
              *impc:ir:i1*))
+          ((and (list? ast) (member (car ast) *impc:mathintrinsicslist*)) (impc:ti:math-intrinsic-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(while))) (impc:ti:while-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))

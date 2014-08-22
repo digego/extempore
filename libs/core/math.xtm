@@ -37,12 +37,12 @@
 ;;;;;;;;;;;;;;; simple funcs
 
 (bind-func lognf
-  (lambda (x n)
-    (/ (logf x) (logf n))))
+  (lambda (x:float n:float)
+    (/ (log x) (log n))))
 
 (bind-func lognd
-  (lambda (x n)
-    (/ (llvm_log x) (llvm_log n))))
+  (lambda (x:double n:double)
+    (/ (log x) (log n))))
 
 (bind-poly logn lognf)
 (bind-poly logn lognd)
@@ -442,7 +442,7 @@
 	  (i 0))
       (dotimes (i lgth)
 	(set! mag (+ mag (* (pref v i) (pref v i)))))
-      (set! mag (sqrtf mag))
+      (set! mag (sqrt mag))
       (dotimes (i lgth)
 	(pset! n i (/ (pref v i) mag)))
       void)))
@@ -599,7 +599,7 @@
 	  (i 0))
       (dotimes (i lgth)
 	(set! mag (+ mag (* (pref v i) (pref v i)))))
-      (sqrtf mag))))
+      (sqrt mag))))
 
 
 (bind-poly vmag vmagd)
@@ -631,10 +631,10 @@
 (bind-func vaquatf
   (lambda (angle:float v:float* quat:float*)
     (let ((m (vmagf v 3))
-	  (s (/ (sinf (* 0.5 angle)) m)))
+	  (s (/ (sin (* 0.5 angle)) m)))
       (pfill! quat
 	      (* (pref v 0) s) (* (pref v 1) s) (* (pref v 2) s)
-	      (cosf (* 0.5 angle)))
+	      (cos (* 0.5 angle)))
       void)))
 
 (bind-poly vaquat vaquatd)
@@ -953,29 +953,29 @@
 (bind-func minvf
   (lambda (ma:float* k:i64 inv:float*)
     (let ((mb:float* (salloc (* k k)))
-	  (fac:float* (salloc (* k k)))
-	  (d:float 0.0)
-	  (i 0) (j 0) (m 0) (n 0) (q:i64 0) (p:i64 0))
+          (fac:float* (salloc (* k k)))
+          (d:float 0.0)
+          (i 0) (j 0) (m 0) (n 0) (q:i64 0) (p:i64 0))
       (dotimes (q k)
-	(dotimes (p k)
-	  (set! m 0)
-	  (set! n 0)
-	  (dotimes (i k)
-	    (dotimes (j k)
-	      (pset! mb (+ (* i k) j) 0.0)
-	      (if (and (<> i q) (<> j p))
-		  (begin
-		    (pset! mb (+ (* m (- k 1)) n)
-			   (pref ma (+ (* i k) j)))
-		    (if (< n (- k 2))
-			(set! n (+ n 1))
-			(begin
-			  (set! n 0)
-			  (set! m (+ m 1)))))
-		  (begin 1))))
-	  (pset! fac (+ (* q k) p)
-		 (* (powf -1.0 (i64tof (+ q p)))
-		    (mdetrmf mb (- k 1))))))
+        (dotimes (p k)
+          (set! m 0)
+          (set! n 0)
+          (dotimes (i k)
+            (dotimes (j k)
+              (pset! mb (+ (* i k) j) 0.0)
+              (if (and (<> i q) (<> j p))
+                  (begin
+                    (pset! mb (+ (* m (- k 1)) n)
+                           (pref ma (+ (* i k) j)))
+                    (if (< n (- k 2))
+                        (set! n (+ n 1))
+                        (begin
+                          (set! n 0)
+                          (set! m (+ m 1)))))
+                  (begin 1))))
+          (pset! fac (+ (* q k) p)
+                 (* (pow (dtof -1.0) (i64tof (+ q p)))
+                    (mdetrmf mb (- k 1))))))
 
       (dotimes (i k)
 	(dotimes (j k)
@@ -1056,8 +1056,8 @@
     (let ((x (pref axis 0))
           (y (pref axis 1))
           (z (pref axis 2))
-          (cost (cosf theta))
-          (sint (sinf theta))
+          (cost (cos theta))
+          (sint (sin theta))
           (mcost (- 1.0 cost)))
       (pset! mat 0 (+ cost (* (* x x) mcost)))
       (pset! mat 1 (+ (* (* y x) mcost) (* z sint)))
@@ -2221,8 +2221,8 @@
 
 (bind-func magnitude_squared_cpxf
   (lambda (cpx_val:cpxf*)
-    (+ (powf (tref cpx_val 0) 2.0)
-       (powf (tref cpx_val 1) 2.0))))
+    (+ (pow (tref cpx_val 0) 2.0)
+       (pow (tref cpx_val 1) 2.0))))
 
 (bind-func magnitude_squared_cpxd
   (lambda (cpx_val:cpxd*)
@@ -2231,8 +2231,8 @@
 
 (bind-func magnitude_cpxf
   (lambda (cpx_val:cpxf*)
-    (sqrtf (+ (powf (tref cpx_val 0) 2.0)
-                        (powf (tref cpx_val 1) 2.0)))))
+    (sqrt (+ (pow (tref cpx_val 0) 2.0)
+                        (pow (tref cpx_val 1) 2.0)))))
 
 (bind-func magnitude_cpxd
   (lambda (cpx_val:cpxd*)
@@ -2260,8 +2260,8 @@
   (lambda (cart:cpxf*)
     (let ((pol:cpxf* (alloc 1)))
       (tfill! pol
-              (sqrtf (+ (powf (tref cart 0) 2.0)
-                        (powf (tref cart 1) 2.0)))
+              (sqrt (+ (pow (tref cart 0) 2.0)
+                        (pow (tref cart 1) 2.0)))
               (atan2f (tref cart 1)
                       (tref cart 0)))
       pol)))
@@ -2271,9 +2271,9 @@
     (let ((cart:cpxf* (alloc 1)))
       (tfill! cart
               (* (tref pol 0)
-                 (cosf (tref pol 1)))
+                 (cos (tref pol 1)))
               (* (tref pol 0)
-                 (sinf (tref pol 1))))
+                 (sin (tref pol 1))))
       cart)))
 
 (bind-func cart_to_pol_cpxd
@@ -2402,8 +2402,8 @@
       (dotimes (i len)
 	(tset! (pref-ptr pol i)
 	       0
-	       (sqrtf (+ (powf (tref (pref-ptr cart i) 0) 2.0)
-                         (powf (tref (pref-ptr cart i) 1) 2.0))))
+	       (sqrt (+ (pow (tref (pref-ptr cart i) 0) 2.0)
+                         (pow (tref (pref-ptr cart i) 1) 2.0))))
 	(tset! (pref-ptr pol i)
 	       1
 	       (atan2f (tref (pref-ptr cart i) 1)
@@ -2417,11 +2417,11 @@
 	(tset! (pref-ptr cart i)
 	       0
 	       (* (tref (pref-ptr pol i) 0)
-		  (cosf (tref (pref-ptr pol i) 1))))
+		  (cos (tref (pref-ptr pol i) 1))))
 	(tset! (pref-ptr cart i)
 	       1
 	       (* (tref (pref-ptr pol i) 0)
-		  (sinf (tref (pref-ptr pol i) 1))))))
+		  (sin (tref (pref-ptr pol i) 1))))))
     void))
 
 (bind-func buffer_cart_to_pol_cpxd
