@@ -12,7 +12,10 @@ if [ -z "$EXT_LLVM_DIR" ] && [ ! -d "/usr/local/Cellar/extempore-llvm/3.4.1" ] ;
     exit 2
 fi
 
-PRECOMP_LIBS="\
+# this is the 'standard' library
+# to override this list, call this script with:
+# PRECOMP_LIBS="core/foo.xtm external/bar.xtm" ./compile-stdlib.sh
+: ${PRECOMP_LIBS:="\
 core/std.xtm \
 core/math.xtm \
 core/audio_dsp.xtm \
@@ -23,11 +26,11 @@ external/audio_dsp_ext.xtm \
 external/instruments_ext.xtm \
 external/rtmidi.xtm \
 external/glib.xtm \
+external/gl2.xtm \
 external/soil.xtm \
-external/opengl.xtm \
 external/shaders.xtm \
 external/assimp.xtm \
-external/openvg.xtm"
+external/openvg.xtm"}
 
 PRECOMP_COMMAND_FILENAME="xtmprecomp-command-file.xtm"
 PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd --run "
