@@ -42,6 +42,13 @@
 #include <iosfwd>
 #include <iomanip>
 #include "pcre.h"
+#include "SchemeFFI.h"
+
+#ifdef TARGET_OS_MAC
+#include <CoreFoundation/CoreFoundation.h>
+#else
+#include <time.h>
+#endif
 
 #ifdef TARGET_OS_WINDOWS
 #include <malloc.h>
@@ -453,6 +460,20 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 	return result;
 }
 
+#ifdef TARGET_OS_MAC
+  double clock_clock()
+  {
+    return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + extemp::SchemeFFI::CLOCK_OFFSET;
+  } 
+#else
+  double clock_clock()
+  {
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    return time_to_double(t)+extemp::SchemeFFI::CLOCK_OFFSET;
+  }
+#endif
+
 
 
 namespace extemp {
@@ -481,6 +502,7 @@ namespace extemp {
 #else
     uint32_t UNIV::EXT_TERM = 0; 
 #endif
+    uint32_t UNIV::EXT_LOADSTD = 1;
 
     void UNIV::initRand() {
 #ifdef TARGET_OS_WINDOWS

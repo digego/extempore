@@ -61,20 +61,20 @@
 (bind-func second:[!b,Pair:<!a,!b>*]*	   
   (lambda (a)
     (tref a 1)))
-    
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; singly linked lists
 ;;
 (bind-type List <!a,List*>)
-  
+
 (bind-func print:[void,List*]*
   (lambda (xs)
     (if (null? xs)
         (begin (printout "()") void)
         (begin
-	  (printout "(" (car xs))
-	  (for-each (lambda (x) (printout " " x)) (cdr xs))
-	  (printout ")")
+          (printout "(" (car xs))
+          (for-each (lambda (x) (printout " " x)) (cdr xs))
+          (printout ")")
           void))))
 
 
@@ -104,18 +104,32 @@
 (bind-func length:[i64,List:<!a,List*>*]*
   (lambda (a)    
     (if (null? a)
-	0
-	(+ 1 (length (cdr a))))))
+        0
+        (+ 1 (length (cdr a))))))
+
+(bind-func nth_tailr:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+  (lambda (lst idx)
+    (let ((nt (lambdas (l i cnt)
+                       (if (or (= cnt i) (> cnt i))
+                           l
+                           (nt (cdr l)
+                               i
+                               (+ cnt 1))))))
+      (let ((r (nt lst idx 0)))
+        r))))
+
+
 
 (bind-func nth_tail:[List:<!a,List*>*,List:<!a,List*>*,i64]*
   (lambda (lst idx)
-    (let ((nt (lambda (l i cnt)
-                (if (or (= cnt i) (> cnt i))
-                    l
-                    (nt (cdr l)
-                               i
-                               (+ cnt 1))))))
-      (nt lst idx 0))))
+    (if (= idx 0)
+        lst
+        (if (null? (cdr lst)) lst
+            (nth_tail (cdr lst) (- idx 1))))))
+
+(bind-func nthr:[!a,List:<!a,List*>*,i64]*
+  (lambda (lst idx)
+    (car (nth_tailr lst idx))))
 
 (bind-func nth:[!a,List:<!a,List*>*,i64]*
   (lambda (lst idx)
@@ -138,7 +152,16 @@
       (tset! pre_cell 1 post_cell)
       (car cell))))
 
+(bind-func reverse_inline:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (old new)
+    (if (null? old) new
+        (reverse_inline (cdr old) (cons (car old) new)))))
+
 (bind-func reverse:[List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (lst)
+    (reverse_inline lst (convert null))))
+
+(bind-func reverse_r:[List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (lst)
     (let ((rev (lambda (old new)
                  (if (null? old)
@@ -185,21 +208,21 @@
 (bind-func member:[List:<!a,List*>*,!a,List:<!a,List*>*]*
   (lambda (element lst)
     (let ((f (lambda (l)
-	       (if (null? l)
-		   null
-		   (if (equal element (car l))
-		       l
-		       (f (cdr l)))))))
+               (if (null? l)
+                   null
+                   (if (equal element (car l))
+                       l
+                       (f (cdr l)))))))
       (f lst))))
 
 (bind-func member:[List:<!a,List*>*,!a,List:<!a,List*>*,[bool,!a,!a]*]*
   (lambda (element lst pred)
     (let ((f (lambda (l)
-	       (if (null? l)
-		   null
-		   (if (pred element (car l))
-		       l
-		       (f (cdr l)))))))
+               (if (null? l)
+                   null
+                   (if (pred element (car l))
+                       l
+                       (f (cdr l)))))))
       (f lst))))
 
 (bind-func any:[bool,[bool,!a]*,List:<!a,List*>*]*
@@ -253,24 +276,24 @@
 (bind-func for-each:[void,[!a,!b,!c]*,List:<!b,List*>*,List:<!c,List*>*]*
   (lambda (func xs1 xs2)
     (let ((f (lambda (l1 l2)
-	       (if (null? l1) void
-		   (begin (func (car l1) (car l2))
-			  (f (cdr l1) (cdr l2)))))))
+               (if (null? l1) void
+                   (begin (func (car l1) (car l2))
+                          (f (cdr l1) (cdr l2)))))))
       (f xs1 xs2))))
 
 (bind-func for-each:[void,[!a,!b,!c,!d]*,List:<!b,List*>*,List:<!c,List*>*,List:<!d,List*>*]*
   (lambda (func xs1 xs2 xs3)
     (let ((f (lambda (l1 l2 l3)
-	       (if (null? l1) void
-		   (begin (func (car l1) (car l2) (car l3))
-			  (f (cdr l1) (cdr l2) (cdr l3)))))))
+               (if (null? l1) void
+                   (begin (func (car l1) (car l2) (car l3))
+                          (f (cdr l1) (cdr l2) (cdr l3)))))))
       (f xs1 xs2 xs3))))
 
 (bind-func last:[List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a)
     (if (null? (cdr a))
-	a
-	(last (cdr a)))))
+        a
+        (last (cdr a)))))
 
 (bind-func range:[List:<!a,List*>*,!a]*
   (lambda (end)
@@ -304,10 +327,10 @@
 
 (bind-func append:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (a b)
-    (let ((p (last a)))
-      (tset! p 1 b)
-      a)))
-
+    (if (null? a) b
+        (begin
+          (tset! (last a) 1 b)
+          a))))
 
 (bind-func swap:[List:<!a,List*>*,List:<!a,List*>*,i64,i64]*
   ;; swap ith and jth list elements inplace  
@@ -402,28 +425,28 @@
 (bind-func regex_split_a
   (lambda (regex str)
     (let ((a:i8* (salloc 2048))
-	  (b:i8* (salloc 2048)))
+          (b:i8* (salloc 2048)))
       (sprintf a "")
       (sprintf b "")
       (rsplit regex (string_cstr str) a b)
       (append (list (if (> (strlen a) 0)
-			(Str a) (Str str)))
-	      (if (> (strlen b) 0)
-		  (regex_split_a regex (Str b))
-		  null)))))
+                        (Str a) (Str str)))
+              (if (> (strlen b) 0)
+                  (regex_split_a regex (Str b))
+                  null)))))
 
 (bind-func regex_split_b
   (lambda (regex str)
     (let ((a:i8* (salloc 2048))
-	  (b:i8* (salloc 2048)))
+          (b:i8* (salloc 2048)))
       (sprintf a "")
       (sprintf b "")
       (rsplit (string_cstr regex) (string_cstr str) a b)
       (append (list (if (> (strlen a) 0)
-			(Str a) (Str str)))
-	      (if (> (strlen b) 0)
-		  (regex_split_b regex (Str b))
-		  null)))))
+                        (Str a) (Str str)))
+              (if (> (strlen b) 0)
+                  (regex_split_b regex (Str b))
+                  null)))))
 
 (bind-poly regex_split regex_split_a)
 (bind-poly regex_split regex_split_b)
@@ -432,18 +455,18 @@
   (lambda (regex str:String* replace:String*)
     (let ((res:i8* (salloc 4096)))
       (rreplace regex
-		(string_cstr str)
-		(string_cstr replace)
-		res)
+                (string_cstr str)
+                (string_cstr replace)
+                res)
       (Str res))))
 
 (bind-func regex_replace_b
   (lambda (regex str:String* replace)
     (let ((res:i8* (salloc 4096)))
       (rreplace regex
-		(string_cstr str)
-		replace
-		res)
+                (string_cstr str)
+                replace
+                res)
       (Str res))))
 
 (bind-poly regex_replace regex_replace_a)

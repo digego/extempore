@@ -28,6 +28,12 @@
 (sys:load-preload-check 'rtmidi)
 (define *xtmlib-rtmidi-loaded* #f)
 
+(set! *sys:precomp:suppress-precomp* #t)
+(sys:load "libs/std.xtm")
+(sys:precomp:insert-sexp '(sys:load "libs/std.xtm"))
+(sys:load "libs/core/std.xtm")
+(set! *sys:precomp:suppress-precomp* #f)
+
 (sys:precomp:insert-header "xtmrtmidi")
 
 ;; set up the current dylib name and path (for precompilation)
@@ -222,11 +228,15 @@
   "Register a midi sink/source"
   (lambda (device:midi_in_device* callback_name:i8*)
     (let ((len (strlen callback_name))
-	  (callback_name_native:i8* (salloc (+ len 8))))
+          (callback_name_native:i8* (salloc (+ len 8))))
       (strncpy callback_name_native callback_name (+ 1 len))
       (strncpy (pref-ptr callback_name_native len) "_native" 8)
-      (printf "\nregistering %s as MIDI callback function\n\n" callback_name_native)
-      (setCallback device (llvm_get_function_ptr callback_name_native)))))
+      (let ((fptr (llvm_get_function_ptr callback_name_native)))
+        (if (null? fptr)
+            (printf "Error: cannot find xtlang function %s\n" callback_name)
+            (begin
+              (printf "\nregistering %s as MIDI callback function\n\n" callback_name)
+              (setCallback device fptr)))))))
 
 (bind-func midi_unregister_device
   "Register Extempore as a midi sink/source"

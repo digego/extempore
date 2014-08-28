@@ -106,6 +106,7 @@
 #define DEBUG_ZONE_STACK 0
 #define DEBUG_ZONE_ALLOC 0
 #define LEAKY_ZONES 1
+#define EXTENSIBLE_ZONES 1
 
 // llvm_scheme foreign function -> string name
 // also is not thread safe!
@@ -125,6 +126,27 @@ double log2(double num) {
 	return log(num)/log(2.0);
 }
 #endif
+
+// double (&cosd)(double) = cos;
+// double (&tand)(double) = tan;
+// double (&sind)(double) = sin;
+// double (&coshd)(double) = cosh;
+// double (&tanhd)(double) = tanh;
+// double (&sinhd)(double) = sinh; 
+// double (&acosd)(double) = acos;
+// double (&asind)(double) = asin; 
+// double (&atand)(double) = atan;
+// double (&atan2d)(double,double) = atan2;
+// double (&ceild)(double) = ceil;
+// double (&floord)(double) = floor;
+// double (&expd)(double) = exp;
+// double (&fmodd)(double,double) = fmod;
+// double (&powd)(double,double) = pow;
+// double (&logd)(double) = log;
+// double (&log2d)(double) = log2;
+// double (&log10d)(double) = log10;
+// double (&sqrtd)(double) = sqrt;
+// double (&fabsd)(double) = fabs;
 
 void* malloc16 (size_t s) {
   unsigned char *p;
@@ -307,10 +329,11 @@ void llvm_push_zone_stack(llvm_zone_t* z)
 
 #if DEBUG_ZONE_STACK          
     llvm_threads_inc_zone_stacksize();
-    if(stack->tail) 
+    if(stack->tail) {
       printf("%p: push new zone %p:%lld onto old zone %p:%lld stacksize:%lld\n",stack,z,z->size,stack->tail->head,stack->tail->head->size,llvm_threads_get_zone_stacksize());
-    else
+    } else {
       printf("%p: push new zone %p:%lld onto empty stack\n",stack,z,z->size);
+    }
 #endif
     //printf("zones: %lld\n",llvm_threads_get_zone_stacksize());
     return;
@@ -334,7 +357,7 @@ llvm_zone_t* llvm_peek_zone_stack()
     }else{
       z = stack->head;
 #if DEBUG_ZONE_STACK      
-      //printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
+      printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
 #endif
       return z;
     }
@@ -353,7 +376,11 @@ llvm_zone_t* llvm_pop_zone_stack()
     llvm_zone_stack* tail = stack->tail;
 #if DEBUG_ZONE_STACK    
     llvm_threads_dec_zone_stacksize();
-    printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n",stack,head,head->size,tail->head,tail->head->size);
+    if(tail == NULL) {
+      printf("%p: popping zone %p:%lld from stack with no tail\n",stack,head,head->size);
+    }else{
+      printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n",stack,head,head->size,tail->head,tail->head->size);
+    }
 #endif
     free(stack);
     llvm_threads_set_zone_stack(tail);
@@ -362,15 +389,30 @@ llvm_zone_t* llvm_pop_zone_stack()
 
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
-    llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
+  llvm_zone_t* zone = (llvm_zone_t*) malloc(sizeof(llvm_zone_t));
+  if (zone == NULL)
+    {
+      ascii_text_color(0,3,10);      
+      printf("Catastrophic memory failure!\n");
+      ascii_text_color(0,9,10);
+      exit(1);
+    }
 #ifdef TARGET_OS_WINDOWS
     zone->memory = malloc((size_t) size);
 #else
-    zone->memory = valloc((size_t) size);
+    // zone->memory = malloc((size_t) size);
+    posix_memalign(&zone->memory,LLVM_ZONE_ALIGN,(size_t)size);
 #endif
     zone->mark = 0;
     zone->offset = 0;
+    if(zone->memory == NULL) {
+      ascii_text_color(0,3,10);      
+      printf("Failed to allocate memory for Zone!\n");
+      ascii_text_color(0,9,10);    
+      size = 0;
+    }
     zone->size = size;
+    zone->memories = NULL;
 #if DEBUG_ZONE_ALLOC    
     printf("CreateZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
 #endif
@@ -388,7 +430,8 @@ void llvm_zone_destroy(llvm_zone_t* zone)
 #if DEBUG_ZONE_ALLOC  
     printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
 #endif
-    free(zone->memory);
+    if(zone->memories != NULL) llvm_zone_destroy(zone->memories);
+    free(zone->memory);    
     free(zone);
     return;
 }
@@ -438,11 +481,25 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 #endif
     if(zone->offset+size >= zone->size)
     {
-	// if LEAKY ZONE is TRUE then just print a warning and just leak the memory
-#if LEAKY_ZONES
-	printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
-        printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
-        fflush(NULL);
+
+#if EXTENSIBLE_ZONES // if extensible_zones is true then extend zone size by zone->size
+    if(size > zone->size) zone->size = size;
+    zone->size = zone->size * 2; // keep doubling zone size for each new allocation  
+    // ascii_text_color(0,3,10);      
+    // printf("Warning ");
+    // ascii_text_color(0,9,10);
+    // printf("zone:%p size:%lld is full ... extending\n",zone,zone->size);
+    llvm_zone_t* newzone = llvm_zone_create(zone->size);
+    void* tmp = newzone->memory;
+    newzone->memories = zone->memories;
+    newzone->memory = zone->memory;
+    zone->memory = tmp;
+    zone->memories = newzone;
+    llvm_zone_reset(zone);
+#elif LEAKY_ZONES       // if LEAKY ZONE is TRUE then just print a warning and just leak the memory
+        printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
+      printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
+      fflush(NULL);
 	return malloc((size_t)size);
 #else
 	printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
@@ -509,6 +566,21 @@ bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
     return 0;		
 }
 
+bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
+{
+    if( (ptr >= zone->memory) && (ptr < ((char*)zone->memory)+zone->size) ) return true;
+    while(zone->memories != NULL) {
+      zone = zone->memories;
+      if( (ptr >= zone->memory) && (ptr < ((char*)zone->memory)+zone->size) ) return true;
+    }
+    return false;
+}
+
+bool llvm_ptr_in_current_zone(void* ptr)
+{
+  return llvm_ptr_in_zone(llvm_peek_zone_stack(),ptr);
+}
+
 
 extemp::CM* FreeWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,freeWithDelay);
 void free_after_delay(char* dat, double delay)
@@ -545,14 +617,15 @@ void* llvm_get_function_ptr(char* fname)
   llvm::Module* M = extemp::EXTLLVM::I()->M;
   llvm::Function* func = M->getFunction(std::string(fname));
   if(func == 0) {
-      throw std::runtime_error("Extempore runtime error: error retrieving function in llvm_get_function_ptr");
+    // throw std::runtime_error("Extempore runtime error: error retrieving function in llvm_get_function_ptr");
+    return NULL;
   }
 
   void* p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
 
-  if(p==NULL) {
-      throw std::runtime_error("Extempore runtime error: null ptr retrieving function ptr in llvm_get_function_ptr");
-  }
+  // if(p==NULL) {
+  //     throw std::runtime_error("Extempore runtime error: null ptr retrieving function ptr in llvm_get_function_ptr");
+  // }
   return p;
 }
 
@@ -904,6 +977,28 @@ int64_t llvm_now()
     return extemp::UNIV::TIME;
 }
 
+// double llvm_cos(double x) { return cos(x); }
+// double llvm_sin(double x) { return sin(x); }
+double llvm_tan(double x) { return tan(x); }
+double llvm_cosh(double x) { return cosh(x); }
+double llvm_tanh(double x) { return tanh(x); }
+double llvm_sinh(double x) { return sinh(x); }
+double llvm_acos(double x) { return acos(x); }
+double llvm_asin(double x) { return asin(x); }
+double llvm_atan(double x) { return atan(x); }
+double llvm_atan2(double x,double y) { return atan2(x,y); }
+// double llvm_ceil(double x) { return ceil(x); }
+// double llvm_floor(double x) { return floor(x); }
+// double llvm_exp(double x) { return exp(x); }
+// double llvm_fmod(double x,double y) { return fmod(x,y); }
+// double llvm_pow(double x,double y) { return pow(x,y); }
+// double llvm_log(double x) { return log(x); }
+// double llvm_log2(double x) { return log2(x); }
+// double llvm_log10(double x) { return log10(x); }
+// double llvm_sqrt(double x) { return sqrt(x); }
+// double llvm_fabs(double x) { return fabs(x); }
+
+
 // double llvm_samplerate()
 // {
 //     return (double) extemp::UNIV::SAMPLERATE;
@@ -1035,7 +1130,7 @@ struct closure_address_table* get_address_table(const char* name, closure_addres
 	if(strcmp(table->name,name)) return table;
 	table = table->next;
     }
-    printf("Unable to locate %s in closure environment\n",name);
+    printf("Unable to locate %s in closure environment a\n",name);
     return 0;
 }
 
@@ -1050,7 +1145,7 @@ uint32_t get_address_offset(const char* name, closure_address_table* table)
 	}
 	table = table->next;
     }
-    printf("Unable to locate %s in closure environment\n",name);
+    printf("Unable to locate %s in closure environment b\n",name);
     return 0;
 }
 
@@ -1063,7 +1158,7 @@ char* get_address_type(const char* name, closure_address_table* table)
       }
       table = table->next;
     }
-    printf("Unable to locate %s in closure environment\n",name);
+    printf("Unable to locate %s in closure environment c\n",name);
     return 0;  
 }
 
@@ -1081,20 +1176,20 @@ bool check_address_exists(const char* name, closure_address_table* table)
 
 bool check_address_type(const char* name, closure_address_table* table, const char* type)
 {
-    while(table)
+  while(table)
     {
       if(strcmp(table->name,name) == 0) {
-	if(strcmp(table->type,type)!=0) {
-	  printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,name,table->type);
-	  return 0;
-	}else{
-	  return 1;
-	}	  
+        if(strcmp(table->type,type)!=0) {
+          printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,name,table->type);
+          return 0;
+        }else{
+          return 1;
+        }	  
       }
       table = table->next;
     }
-    printf("Unable to locate %s in closure environment\n",name);
-    return 0;
+  printf("Unable to locate %s in closure environment type: %s d\n",name,type);
+  return 0;
 }
 
 struct closure_address_table* new_address_table()
@@ -1233,7 +1328,8 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     ascii_text_color(1,7,10);
     printf(" %s.%s ",fname,vname);
     ascii_text_color(0,7,10);
-    printf("does not exist!\n"); 
+    printf("does not exist!\n");
+    ascii_text_color(0,9,10);    
     return _sc->F;
   }
   char* eptr = (char*) *(closure+1);
@@ -1363,10 +1459,11 @@ namespace extemp {
 	    //EE = llvm::EngineBuilder(M).create();
 	    PM = new llvm::PassManager();
 	    //PM->add(new llvm::TargetData(*EE->getTargetData()));
-            PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
+      PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
 
-            // promote allocs to register
-            PM->add(llvm::createPromoteMemoryToRegisterPass());
+      PM->add(llvm::createBasicAliasAnalysisPass());   //new   
+      // promote allocs to register
+      PM->add(llvm::createPromoteMemoryToRegisterPass());
 	    // Do simple "peephole" optimizations and bit-twiddling optzns.
 	    PM->add(llvm::createInstructionCombiningPass());
 	    // Reassociate expressions.
@@ -1381,6 +1478,9 @@ namespace extemp {
 	    PM->add(llvm::createIndVarSimplifyPass());
 	    // Simplify the control flow graph (deleting unreachable blocks, etc).
 	    PM->add(llvm::createCFGSimplificationPass());
+      // 
+	    PM->add(llvm::createPromoteMemoryToRegisterPass());
+
 
 	    //llvm::PerformTailCallOpt = true;
 	    //llvm::GuaranteedTailCallOpt = true;
@@ -1532,6 +1632,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_set_size);
 	    gv = M->getNamedValue(std::string("llvm_zone_ptr_size"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_zone_ptr_size);
+	    gv = M->getNamedValue(std::string("llvm_ptr_in_zone"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_ptr_in_zone);
+	    gv = M->getNamedValue(std::string("llvm_ptr_in_current_zone"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_ptr_in_current_zone);
 	    gv = M->getNamedValue(std::string("llvm_memset"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_memset);
 	    gv = M->getNamedValue(std::string("extitoa"));
@@ -1596,7 +1700,11 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("cname_encode"));
 	    EE->updateGlobalMapping(gv,(void*)&cname_encode);
 	    gv = M->getNamedValue(std::string("cname_decode"));
-	    EE->updateGlobalMapping(gv,(void*)&cname_decode);		
+	    EE->updateGlobalMapping(gv,(void*)&cname_decode);
+      
+      gv = M->getNamedValue(std::string("clock_clock"));
+      EE->updateGlobalMapping(gv,(void*)&clock_clock);
+      
 
 	    // add scheme bits
 	    gv = M->getNamedValue(std::string("r64value"));
@@ -1680,46 +1788,88 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("mutex_trylock"));
 	    EE->updateGlobalMapping(gv,(void*)&mutex_trylock);
 
-            gv = M->getNamedValue(std::string("cosd"));
-            EE->updateGlobalMapping(gv,(void*)&cos);
-            gv = M->getNamedValue(std::string("tand"));
-            EE->updateGlobalMapping(gv,(void*)&tan);
-            gv = M->getNamedValue(std::string("sind"));
-            EE->updateGlobalMapping(gv,(void*)&sin);
-            gv = M->getNamedValue(std::string("coshd"));
-            EE->updateGlobalMapping(gv,(void*)&cosh);
-            gv = M->getNamedValue(std::string("tanhd"));
-            EE->updateGlobalMapping(gv,(void*)&tanh);
-            gv = M->getNamedValue(std::string("sinhd"));
-            EE->updateGlobalMapping(gv,(void*)&sinh);
-            gv = M->getNamedValue(std::string("acosd"));
-            EE->updateGlobalMapping(gv,(void*)&acos);
-            gv = M->getNamedValue(std::string("asind"));
-            EE->updateGlobalMapping(gv,(void*)&asin);
-            gv = M->getNamedValue(std::string("atand"));
-            EE->updateGlobalMapping(gv,(void*)&atan);
-            gv = M->getNamedValue(std::string("atan2d"));
-            EE->updateGlobalMapping(gv,(void*)&atan2);
-            gv = M->getNamedValue(std::string("ceild"));
-            EE->updateGlobalMapping(gv,(void*)&ceil);
-            gv = M->getNamedValue(std::string("floord"));
-            EE->updateGlobalMapping(gv,(void*)&floor);
-            gv = M->getNamedValue(std::string("expd"));
-            EE->updateGlobalMapping(gv,(void*)&exp);
-            gv = M->getNamedValue(std::string("fmodd"));
-            EE->updateGlobalMapping(gv,(void*)&fmod);
-            gv = M->getNamedValue(std::string("powd"));
-            EE->updateGlobalMapping(gv,(void*)&pow);
-            gv = M->getNamedValue(std::string("logd"));
-            EE->updateGlobalMapping(gv,(void*)&log);
-            gv = M->getNamedValue(std::string("log2d"));
-            EE->updateGlobalMapping(gv,(void*)&log2);
-            gv = M->getNamedValue(std::string("log10d"));
-            EE->updateGlobalMapping(gv,(void*)&log10);
-            gv = M->getNamedValue(std::string("sqrtd"));
-            EE->updateGlobalMapping(gv,(void*)&sqrt);
-            gv = M->getNamedValue(std::string("fabsd"));
-            EE->updateGlobalMapping(gv,(void*)&fabs);
+            // gv = M->getNamedValue(std::string("cosd"));
+            // EE->updateGlobalMapping(gv,(void*)&cos);
+            // gv = M->getNamedValue(std::string("tand"));
+            // EE->updateGlobalMapping(gv,(void*)&tan);
+            // gv = M->getNamedValue(std::string("sind"));
+            // EE->updateGlobalMapping(gv,(void*)&sin);
+            // gv = M->getNamedValue(std::string("coshd"));
+            // EE->updateGlobalMapping(gv,(void*)&cosh);
+            // gv = M->getNamedValue(std::string("tanhd"));
+            // EE->updateGlobalMapping(gv,(void*)&tanh);
+            // gv = M->getNamedValue(std::string("sinhd"));
+            // EE->updateGlobalMapping(gv,(void*)&sinh);
+            // gv = M->getNamedValue(std::string("acosd"));
+            // EE->updateGlobalMapping(gv,(void*)&acos);
+            // gv = M->getNamedValue(std::string("asind"));
+            // EE->updateGlobalMapping(gv,(void*)&asin);
+            // gv = M->getNamedValue(std::string("atand"));
+            // EE->updateGlobalMapping(gv,(void*)&atan);
+            // gv = M->getNamedValue(std::string("atan2d"));
+            // EE->updateGlobalMapping(gv,(void*)&atan2);
+            // gv = M->getNamedValue(std::string("ceild"));
+            // EE->updateGlobalMapping(gv,(void*)&ceil);
+            // gv = M->getNamedValue(std::string("floord"));
+            // EE->updateGlobalMapping(gv,(void*)&floor);
+            // gv = M->getNamedValue(std::string("expd"));
+            // EE->updateGlobalMapping(gv,(void*)&exp);
+            // gv = M->getNamedValue(std::string("fmodd"));
+            // EE->updateGlobalMapping(gv,(void*)&fmod);
+            // gv = M->getNamedValue(std::string("powd"));
+            // EE->updateGlobalMapping(gv,(void*)&pow);
+            // gv = M->getNamedValue(std::string("logd"));
+            // EE->updateGlobalMapping(gv,(void*)&log);
+            // gv = M->getNamedValue(std::string("log2d"));
+            // EE->updateGlobalMapping(gv,(void*)&log2);
+            // gv = M->getNamedValue(std::string("log10d"));
+            // EE->updateGlobalMapping(gv,(void*)&log10);
+            // gv = M->getNamedValue(std::string("sqrtd"));
+            // EE->updateGlobalMapping(gv,(void*)&sqrt);
+            // gv = M->getNamedValue(std::string("fabsd"));
+            // EE->updateGlobalMapping(gv,(void*)&fabs);
+
+      // gv = M->getNamedValue(std::string("llvm_cos"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_cos);
+      // gv = M->getNamedValue(std::string("llvm_sin"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_sin);      
+      gv = M->getNamedValue(std::string("llvm_tan"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_tan);
+      gv = M->getNamedValue(std::string("llvm_cosh"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_cosh);
+      gv = M->getNamedValue(std::string("llvm_tanh"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_tanh);
+      gv = M->getNamedValue(std::string("llvm_sinh"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_sinh);
+      gv = M->getNamedValue(std::string("llvm_acos"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_acos);
+      gv = M->getNamedValue(std::string("llvm_asin"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_asin);
+      gv = M->getNamedValue(std::string("llvm_atan"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_atan);
+      gv = M->getNamedValue(std::string("llvm_atan2"));
+      EE->updateGlobalMapping(gv,(void*)&llvm_atan2);
+      // gv = M->getNamedValue(std::string("llvm_ceil"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_ceil);
+      // gv = M->getNamedValue(std::string("llvm_floor"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_floor);
+      // gv = M->getNamedValue(std::string("llvm_exp"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_exp);
+      // gv = M->getNamedValue(std::string("llvm_fmod"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_fmod);
+      // gv = M->getNamedValue(std::string("llvm_pow"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_pow);
+      // gv = M->getNamedValue(std::string("llvm_log"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_log);
+      // gv = M->getNamedValue(std::string("llvm_log2"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_log2);
+      // gv = M->getNamedValue(std::string("llvm_log10"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_log10);
+      // gv = M->getNamedValue(std::string("llvm_sqrt"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_sqrt);
+      // gv = M->getNamedValue(std::string("llvm_fabs"));
+      // EE->updateGlobalMapping(gv,(void*)&llvm_fabs);
+            
             
 	}	
 	return;

@@ -72,6 +72,8 @@
 #define D_MILLION 1000000.0
 
 
+extern "C" {
+
 bool rmatch(char* regex, char* str);
 bool rsplit(char* regex, char* str, char* a, char* b);
 char* rreplace(char* regex, char* str, char* replacement, char* result);
@@ -79,7 +81,11 @@ void ascii_text_color(int attr, int fg, int bg);
 char* base64_encode(const unsigned char *data,size_t input_length,size_t *output_length);
 unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
 char* cname_encode(char *data,size_t input_length,size_t *output_length);
-char* cname_decode(char *data,size_t input_length,size_t *output_length);
+  char* cname_decode(char *data,size_t input_length,size_t *output_length);
+ double clock_clock();
+
+
+}
 
 namespace extemp {
 
@@ -105,7 +111,8 @@ class UNIV {
 	static uint32_t SECOND;
 	static uint32_t FRAMES;
 	static const char* PWD;
-        static uint32_t EXT_TERM;
+  static uint32_t EXT_TERM;
+  static uint32_t EXT_LOADSTD;
         static uint32_t AUDIO_DEVICE;
         static uint32_t AUDIO_IN_DEVICE;
         static std::map<std::string,std::string> CMDPARAMS;

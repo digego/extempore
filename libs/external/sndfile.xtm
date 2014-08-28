@@ -1,15 +1,10 @@
 ;;; sndfile.xtm -- working with audio files
-
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
 ;; Required dylibs: libsndfile
-
 ;;; Commentary:
-
-;; 
-
+;;
 ;;; Code:
-
 ;; lib-loading config
 (sys:load "libs/sndfile.xtm")
 (sys:load-preload-check 'sndfile)
@@ -47,102 +42,467 @@
 
 (sys:precomp:insert-header "xtmsndfile")
 
+
+;; libsndfile enums
 (bind-val SF_LOOP_NONE i32 800)
 (bind-val SF_LOOP_FORWARD i32 801)
 (bind-val SF_LOOP_BACKWARD i32 802)
 (bind-val SF_LOOP_ALTERNATING i32 803)
-
 (bind-val SFC_GET_INSTRUMENT i32 4304) ;; 0x10D0
 (bind-val SFC_GET_LOOP_INFO i32 4320) ;; 0x10E0
-
+(bind-val SFM_READ i32 #x10)
+(bind-val SFM_WRITE i32 #x20)
+(bind-val SFM_RDWR i32 #x30)
+(bind-val SF_FORMAT_WAV i32 #x10000)
+(bind-val SF_FORMAT_AIF i32 #x20000)
+(bind-val SF_FORMAT_AU i32 #x30000)
+(bind-val SF_FORMAT_RAW i32 #x40000)
+(bind-val SF_FORMAT_VOC i32 #x80000)
+(bind-val SF_FORMAT_FLAC i32 #x170000)
+(bind-val SF_FORMAT_CAF i32 #x180000)
+(bind-val SF_FORMAT_OGG i32 #x200000)
+(bind-val SF_FORMAT_PCM_16 i32 #x2)
+(bind-val SF_FORMAT_PCM_24 i32 #x3)
+(bind-val SF_FORMAT_PCM_32 i32 #x4)
+(bind-val SF_FORMAT_FLOAT i32 #x6)
+(bind-val SF_FORMAT_DOUBLE i32 #x7)
+(bind-val SF_FORMAT_VORBIS i32 #x60)
 (bind-type sf_info <i64,i32,i32,i32,i32,i32>)
 (bind-type sf_format_info <i32,i8*,i8*>)
-;; mode,start,end,count
 
+;; mode,start,end,count
 (bind-type _sf_loop_ <i32,i32,i32,i32>)
+
 ;; 270 bytes
 ;; gain,basenote,detune,velocity_lo,velocity_hi,key_lo,key_hi,loop_count,loops
 (bind-type SF_INSTRUMENT <i32,i8,i8,i8,i8,i8,i8,i32,|16,_sf_loop_|>)
+
 ;; 44 bytes
 ;; time_sig_num time_sig_den loop_mode num_beats bpm root_key future[6]
 (bind-type SF_LOOP_INFO <|2,i8|,|2,i8|,i32,i32,float,i32,|6,i32|>)
 (bind-val SF_FALSE i32 0)
 (bind-val SF_TRUE i32 1)
 
+;; libsndfile functions
+(bind-lib libsndfile sf_version_string [i8*]*)
 (bind-lib libsndfile sf_open [i8*,i8*,i32,sf_info*]*)
 (bind-lib libsndfile sf_open_fd [i8*,i32,i32,sf_info*,i32]*)
 (bind-lib libsndfile sf_close [i32,i8*]*)
 (bind-lib libsndfile sf_seek [i64,i8*,i64,i32]*)
 (bind-lib libsndfile sf_write_sync [void,i8*]*)
-(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
-(bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
+
+;; read file by frame
+(bind-lib libsndfile sf_readf_float [i64,i8*,float*,i64]*)
+(bind-lib libsndfile sf_writef_float [i64,i8*,float*,i64]*)
+(bind-lib libsndfile sf_readf_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_writef_double [i64,i8*,double*,i64]*)
+
+;; read file by item
 (bind-lib libsndfile sf_read_float [i64,i8*,float*,i64]*)
 (bind-lib libsndfile sf_write_float [i64,i8*,float*,i64]*)
+(bind-lib libsndfile sf_read_double [i64,i8*,double*,i64]*)
+(bind-lib libsndfile sf_write_double [i64,i8*,double*,i64]*)
 (bind-lib libsndfile sf_strerror [i8*,i8*]*)
 (bind-lib libsndfile sf_command [i32,i8*,i32,i8*,i32]*)
+(bind-lib libsndfile sf_format_check [i32,sf_info*]*)
 
-(bind-poly sf_read sf_read_double)
+(bind-poly sf_readf sf_readf_float)
+(bind-poly sf_writef sf_writef_float)
+(bind-poly sf_readf sf_readf_double)
+(bind-poly sf_writef sf_writef_double)
 (bind-poly sf_read sf_read_float)
-(bind-poly sf_write sf_write_double)
 (bind-poly sf_write sf_write_float)
+(bind-poly sf_read sf_read_double)
+(bind-poly sf_write sf_write_double)
 
-;; struct accessors
+(bind-func sf_print_version_string
+  (lambda ()
+    (printf "%s\n" (sf_version_string))))
 
+(print "loaded ")
+(sf_print_version_string)
+
+;; sf_info struct accessors
 (bind-func sf_frames
   (lambda (info:sf_info*)
     (tref info 0)))
+
+(bind-func sf_set_frames
+  (lambda (info:sf_info* frames)
+    (tset! info 0 frames)))
 
 (bind-func sf_samplerate
   (lambda (info:sf_info*)
     (i32toi64 (tref info 1))))
 
+(bind-func sf_set_samplerate
+  (lambda (info:sf_info* samplerate)
+    (tset! info 1 (i64toi32 samplerate))))
+
 (bind-func sf_channels
   (lambda (info:sf_info*)
     (i32toi64 (tref info 2))))
 
+(bind-func sf_set_channels
+  (lambda (info:sf_info* channels)
+    (tset! info 2 (i64toi32 channels))))
+
 (bind-func sf_format
   (lambda (info:sf_info*)
-    (i32toi64 (tref info 3))))
+    (tref info 3)))
+
+(bind-func sf_set_format
+  (lambda (info:sf_info* format)
+    (tset! info 3 format)))
 
 (bind-func sf_sections
   (lambda (info:sf_info*)
     (i32toi64 (tref info 4))))
 
+(bind-func sf_set_sections
+  (lambda (info:sf_info* sections)
+    (tset! info 4 (i64toi32 sections))))
+
 (bind-func sf_seekable
   (lambda (info:sf_info*)
     (i32toi64 (tref info 5))))
 
+(bind-func sf_set_seekable
+  (lambda (info:sf_info* seekable)
+    (tset! info 5 (i64toi32 seekable))))
 
-;; size of audio data in file (in bytes)
-(bind-func print_audio_file_info
+;;;;;;;;;;;;;;;;;;;;;;
+;; AudioBuffer type ;;
+;;;;;;;;;;;;;;;;;;;;;;
+;; 0 frames (total)
+;; 1 samplerate
+;; 2 channels
+;; 3 loop_start
+;; 4 loop_frames
+;; 5 SAMPLE* (data)
+;; 6 filename
+
+(bind-type AudioBuffer <i64,i64,i64,i64,i64,SAMPLE*,String*>)
+
+(bind-func print_AudioBuffer:[void,AudioBuffer*]*
+  (lambda (x)
+    (println "\nFrames:" (tref x 0)
+             "\nSampleRate:" (tref x 1)
+             "\nChannels:" (tref x 2)
+             "\nLoopStart:" (tref x 3)
+             "\nLoopFrames:" (tref x 4)
+             "\nData:" (tref x 5)
+             "\nName:" (tref x 6))
+    void))
+
+(bind-poly print print_AudioBuffer)
+
+
+;; AudioBuffer accessor functions
+(bind-func num_frames
+  (lambda (abuf:AudioBuffer*)
+    (tref abuf 0)))
+
+(bind-func set_num_frames
+  (lambda (abuf:AudioBuffer* frames)
+    (tset! abuf 0 frames)))
+
+(bind-func file_samplerate
+  (lambda (abuf:AudioBuffer*)
+    (tref abuf 1)))
+
+(bind-func set_file_samplerate
+  (lambda (abuf:AudioBuffer* samplerate)
+    (tset! abuf 1 samplerate)))
+
+(bind-func num_channels
+  (lambda (abuf:AudioBuffer*)
+    (tref abuf 2)))
+
+(bind-func set_num_channels
+  (lambda (abuf:AudioBuffer* channels)
+    (tset! abuf 2 channels)))
+
+(bind-func loop_start
+  (lambda (abuf:AudioBuffer*)
+    (tref abuf 3)))
+
+(bind-func set_loop_start
+  (lambda (abuf:AudioBuffer* offset)
+    (tset! abuf 3 offset)))
+
+(bind-func num_loop_frames
+  (lambda (abuf:AudioBuffer*)
+    (tref abuf 4)))
+
+(bind-func set_num_loop_frames
+  (lambda (abuf:AudioBuffer* loop_frames)
+    (tset! abuf 4 loop_frames)))
+
+(bind-func audio_data_ptr
+  (lambda (abuf:AudioBuffer*)
+    (tref abuf 5)))
+
+(bind-func set_audio_data_ptr
+  (lambda (abuf:AudioBuffer* data_ptr)
+    (tset! abuf 5 data_ptr)))
+
+;; seek into audio data
+(bind-func audio_data_ptr_seek
+  (lambda (abuf:AudioBuffer* frame:i64 channel:i64)
+    (pref-ptr (audio_data_ptr abuf) (+ (* frame (num_channels abuf)) channel))))
+
+(bind-func audio_sample_seek
+  (lambda (abuf:AudioBuffer* frame:i64 channel:i64)
+    (let ((frames (num_frames abuf))
+          (channels (num_channels abuf)))
+      (if (< frame frames)
+          (pref (audio_data_ptr abuf) (+ (* frame channels) (min channel channels)))
+          0.))))
+
+(bind-poly audio_data audio_data_ptr)
+(bind-poly audio_data audio_data_ptr_seek)
+
+(bind-func source_filename
+  (lambda (abuf:AudioBuffer*)
+    (tref abuf 6)))
+
+(bind-func set_source_filename
+  (lambda (abuf:AudioBuffer* fname)
+    (tset! abuf 6 fname)))
+
+;; create/destroy AudioBuffers
+(bind-func create_audiobuffer_alloc
+  (lambda (frames:i64 channels:i64)
+    (let ((abuf:AudioBuffer* (zalloc))
+          (buf:SAMPLE* (zalloc (* channels frames))))
+      (tfill! abuf
+              frames
+              (convert SAMPLERATE)
+              channels
+              0
+              frames
+              buf
+              (Str "Empty AudioBuffer."))
+      abuf)))
+
+(bind-func create_audiobuffer_no_alloc
+  "create an AudioBuffer with existing audio data"
+  (lambda (frames:i64 channels:i64 name:String* data:SAMPLE*)
+    (let ((abuf:AudioBuffer* (zalloc)))
+      (tfill! abuf
+              frames
+              (convert SAMPLERATE)
+              channels
+              0
+              frames
+              data
+              name)
+      abuf)))
+
+(bind-func audiobuffer_total_samples
+  "get the total number of samples (* frames channels) from an Audiobuffer"
+  (lambda (abuf:AudioBuffer*)
+    (* (num_channels abuf)
+       (num_frames abuf))))
+
+(bind-func audio_file_total_samples
+  "get the total number of samples (* frames channels) from an audio file"
   (lambda (fname)
-    (let ((info:sf_info* (zalloc))
-	  (audiofile (sf_open fname 16 info))
-	  (channels (i32toi64 (tref info 2))))
+    (let ((info:sf_info* (salloc))
+          (audiofile (sf_open fname SFM_READ info)))
+      (if (null? audiofile)
+          0
+          (begin
+            (sf_close audiofile)
+            (* (sf_frames info)
+               (sf_channels info)))))))
+
+(bind-poly total_samples audiobuffer_total_samples)
+(bind-poly total_samples audio_file_total_samples)
+
+(bind-func pretty_print_audio_file_info
+  (lambda (abuf:AudioBuffer*)
+    (printf "\nfile name: %s\n" (cstr_from_string (source_filename abuf)))
+    (printf "samplerate: %d\n" (file_samplerate abuf))
+    (printf "frames: %d\n" (num_frames abuf))
+    (printf "channels: %d\n" (num_channels abuf))
+    ;; (printf "format: %#x\n" (format abuf))
+    (printf "data ptr: %p\n\n" (audio_data_ptr abuf))
+    void))
+
+(bind-func print_audio_file_info
+  "print info about an audio file"
+  (lambda (fname)
+    (let ((info:sf_info* (salloc))
+          (audiofile (sf_open fname SFM_READ info))
+          (channels (sf_channels info)))
       (if (null? audiofile)
           (begin (printf "Bad audio file!\n")
                  void)
-          (begin
+          (let ((nframes (sf_frames info))
+                (rate (sf_samplerate info))
+                (nseconds (/ nframes rate)))
             (printf "---------------\n")
-            (printf "filename:    %s\n" fname)
-            (printf "samplerate:  %d\n" (tref info 1))
-            (printf "channels:    %d\n" (tref info 2))
-            (printf "frames:      %lld\n" (tref info 0))
-            (printf "seconds:     %f\n"
-                    (/ (i64tod (/ (tref info 0) (i32toi64 (tref info 2))))
-                       (i32tod (tref info 1))))
+            (printf "filename: %s\n" fname)
+            (printf "samplerate: %d\n" rate)
+            (printf "channels: %d\n" (sf_channels info))
+            (printf "format: %#x\n" (sf_format info))
+            (printf "frames: %lld\n" nframes)
+            (if (< nframes (* 44100 60 1))
+                (printf "seconds: %f\n" nseconds)
+                (if (< nframes (* 44100 60 60))
+                    (printf "minutes: %f\n" (/ (convert nseconds double) 60.))
+                    (printf "hours: %f\n" (/ (convert nseconds double) (* 60. 60.)))))
             (let ((loops:SF_LOOP_INFO* (alloc))
                   (lp1 (sf_command audiofile SFC_GET_LOOP_INFO (cast loops i8*) 44)))
               (if (= lp1 SF_TRUE)
-                  (printf "loop-mode:   %d - bpm(%f)\n" (tref loops 2) (ftod (tref loops 4)))
+                  (printf "loop-mode: %d - bpm(%f)\n" (tref loops 2) (ftod (tref loops 4)))
                   (printf "loop-mode:\n")))
             (let ((inst:SF_INSTRUMENT* (alloc))
                   (lp2 (sf_command audiofile SFC_GET_INSTRUMENT (cast inst i8*) 270)))
               (if (= lp2 SF_TRUE)
-                  (printf "num loops:   %d\n" (tref inst 7))
-                  (printf "num loops:   0\n")))
+                  (printf "num loops: %d\n" (tref inst 7))
+                  (printf "num loops: 0\n")))
             (sf_close audiofile)
             void)))))
+
+;; create subbuffer from buffer
+;; where frame is the frame to start at
+;; and frames is the number of frames to copy
+(bind-func create_audiobuffer_from_region
+  (lambda (abuf:AudioBuffer* frame frames)
+    (if (or (null? abuf) (< frame 0)) null
+        (let ((fs (num_frames abuf)))
+          (if (>= (+ frame frames) fs) null
+              (let ((chans (num_channels abuf))
+                    (newbuf (create_audiobuffer_alloc frames chans))
+                    (fromptr (audio_data_ptr_seek abuf frame chans))
+                    (toptr (audio_data_ptr_seek newbuf 0 chans)))
+                (memcpy (convert toptr) (convert fromptr)
+                        (* frames chans (if (audio_64bit) 8 4)))
+                newbuf))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reading audio files ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+(bind-func create_audiobuffer_from_file_with_frames_and_offset
+  "read an audio file into an AudioBuffer
+Read `frames_to_read' frames (or full audio file if `frames_to_read' is 0),
+starting at frame `read_offset'"
+  (lambda (fname frames_to_read read_offset)
+    (let ((info:sf_info* (salloc))
+          (audiofile (sf_open fname SFM_READ info))
+          (abuf:AudioBuffer* null))
+      (if (null? audiofile)
+          (begin (println "soundfile error:" (sf_strerror audiofile))
+                 abuf)
+          ;; when sf_open has read the file without error
+          (let ((frames (sf_frames info))
+                (channels (sf_channels info))
+                (samplerate (sf_samplerate info))
+                (available_frames (- frames read_offset)))
+            (if (= frames_to_read 0)
+                (set! frames_to_read frames))
+            (if (<> samplerate (convert SR))
+                (println "Warning: file samplerate" samplerate "doesn't match the current audio samplerate" SR "- this could cause problems"))
+            (if (> frames_to_read available_frames)
+                (begin (println "Error: audio file too short - trying to read more frames than are available")
+                       (sf_close audiofile)
+                       abuf)
+                (let ((frames_read 0))
+                  ;; initialise and allocate memory for the AudioBuffer
+                  (set! abuf (create_audiobuffer_alloc frames_to_read channels))
+                  (set_source_filename abuf (Str fname))
+                  ;; read the audio data from the file
+                  (set! frames_read (sf_readf audiofile
+                                              (audio_data_ptr abuf)
+                                              (* frames_to_read channels)))
+                  (sf_close audiofile)
+                  ;; set the metadata into the new Audiobuffer object
+                  (set_num_frames abuf frames_read)
+                  (set_num_loop_frames abuf frames_read)
+                  (set_num_channels abuf channels)
+                  (set_file_samplerate abuf samplerate)
+                  (if (< frames_read frames_to_read)
+                      (begin (println "Error: tried to read" frames_to_read "frames, only read" frames_read "frames." (sf_strerror audiofile))
+                             abuf)
+                      abuf))))))))
+
+(bind-func create_audiobuffer_from_file
+  "read an audio file into an AudioBuffer"
+  (lambda (fname)
+    (create_audiobuffer_from_file_with_frames_and_offset fname 0 0)))
+
+(bind-func reload_audiobuffer_from_file_no_alloc
+  "read an audio file into an AudioBuffer, store audio data in `data'"
+  (lambda (abuf:AudioBuffer* fname data:SAMPLE*)
+    (create_audiobuffer_from_file_with_frames_and_offset fname 0 0)))
+
+;; poly'd constructors
+(bind-poly AudioBuffer create_audiobuffer_alloc)
+(bind-poly AudioBuffer create_audiobuffer_no_alloc)
+(bind-poly AudioBuffer create_audiobuffer_from_file_with_frames_and_offset)
+(bind-poly AudioBuffer create_audiobuffer_from_file)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; writing audio files ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+(bind-func write_audiobuffer_to_file_with_format_frames_and_offset
+  "write an audiobuffer to a file.
+Write `frames_to_write' frames (or full buffer if `frames_to_write' is 0),
+starting at frame `write_offset'.
+Format flag is from libsndfile."
+  (lambda (abuf fname format frames_to_write write_offset)
+    (let ((info:sf_info* (salloc)))
+      (if (= frames_to_write 0)
+          (set! frames_to_write (num_frames abuf)))
+      (sf_set_frames info frames_to_write)
+      (sf_set_samplerate info (file_samplerate abuf))
+      (sf_set_channels info (num_channels abuf))
+      (sf_set_format info format)
+      (let ((audiofile (sf_open fname SFM_WRITE info)))
+        (if (null? audiofile)
+            (begin (println "Error writing audio file:" (sf_strerror audiofile)) 0)
+            (let ((frames_written (sf_writef audiofile
+                                             (audio_data_ptr_seek abuf write_offset 0)
+                                             frames_to_write)))
+              ;; flush write to disk
+              (sf_write_sync audiofile)
+              (if (< frames_written frames_to_write)
+                  (println "Error writing audio file: tried to write" frames_to_write "frames, only wrote" frames_written "frames."
+                           (sf_strerror audiofile)))
+              (sf_close audiofile)
+              frames_written))))))
+
+(bind-func write_audiobuffer_to_file_with_format
+  "write an audiobuffer to a file.
+Format flag is from libsndfile."
+  (lambda (abuf fname format)
+    (write_audiobuffer_to_file_with_format_frames_and_offset abuf fname format 0 0)))
+
+;; uses systems samplerate
+;; format: 16bit PCM AIFF
+(bind-func write_audiobuffer_to_file
+  "write audiobuffer to file as 16bit PCM AIFF with default samplerate"
+  (lambda (abuf fname)
+    (write_audiobuffer_to_file_with_format abuf fname (+ SF_FORMAT_AIF SF_FORMAT_PCM_16))))
+
+;; questions for sorryballs
+;; - do we pretty much want to hide the SF interface away?
+;; - what's the point of the offset field? is it a playhead?
+;; (I can see the usefulness of an offset for reading the file in, but after that?)
+;; - what's with the loop_frames thing?
+;; - case/naming conventions for the accessors
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; LEGACY CRAP
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;; an audio buffer reader
@@ -173,7 +533,6 @@
       (if (null? dat)
           (* (tref info 0) channels) ;; frames * channels
           samples_read))))
-
 
 ;; an audio buffer reader (returns a value)
 (bind-func audiofile_c
@@ -235,6 +594,7 @@
                    (printf "Error: audio_closure wasn't initialised properly.")
                    audio_dat))))))
 
+
 ;; write out an audio buffer
 (bind-func write_audio_data
   (lambda (fname frames channels:i32 dat:SAMPLE*)
@@ -252,6 +612,8 @@
 	(sf_write_sync audiofile)
 	(sf_close audiofile)
 	samples_written))))
+
+
 
 (define *xtmlib-sndfile-loaded* #t)
 

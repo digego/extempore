@@ -71,7 +71,7 @@
     (xtm_light_power 1 30.0)
     (xtm_light_angle 1 60.0)
     
-    (xtm_camera_pos (* 10.0 (cosf (* .02 (i64tof frame)))) 7.0 10.0)
+    (xtm_camera_pos (* 10.0 (cosf (* .02 (i64tof frame)))) 7.0 15.0)
     (xtm_camera_tgt 0.0 3.0 0.0)
     (xtm_camera_up 0.0 1.0 0.0)
     void
@@ -82,7 +82,7 @@
   (lambda (frame shader m v p data)
     (let ((nodes:xtm_node** (cast data xtm_node**)))
       (scale_matrix m 1.5 1.5 1.5)
-      (translate_matrix m 2.0 -0.1 0.0)                  
+      (translate_matrix m 2.0 -1.9 0.0)                  
       (xtm_update_matrices shader m v p)
       (xtm_draw_model (pref nodes 0) shader m v p)
       (fill_identity_matrix m)
@@ -108,8 +108,8 @@
     (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur
               model1 model2 model3 (+ degree .5))))
 
-(define peppino (assimp_load_model path "peppino.dae"))
-(define scene (assimp_load_model path "scene.dae"))
+(define peppino (assimp_load_model path "peppino.dae" aiProcess_Triangulate))
+(define scene (assimp_load_model path "scene.dae" aiProcess_Triangulate))
 (define dome (assimp_load_model path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
 (xtm_render_setup (real->integer width) (real->integer height))

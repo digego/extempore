@@ -16,18 +16,7 @@ PRECOMP_LIBS="\
 core/std.xtm \
 core/math.xtm \
 core/audio_dsp.xtm \
-core/instruments.xtm \
-external/fft.xtm \
-external/sndfile.xtm \
-external/audio_dsp_ext.xtm \
-external/instruments_ext.xtm \
-external/rtmidi.xtm \
-external/glib.xtm \
-external/soil.xtm \
-external/opengl.xtm \
-external/shaders.xtm \
-external/assimp.xtm \
-external/openvg.xtm"
+core/instruments.xtm"
 
 PRECOMP_COMMAND_FILENAME="xtmprecomp-command-file.xtm"
 PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd --run "
@@ -35,7 +24,7 @@ PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd --run "
 # clear the log file (if present)
 rm -f compile-stdlib.log
 
-echo Precompiling the Extempore standard library.  This may take several minutes...
+echo "Precompiling the (core) Extempore standard library.  This may take a few minutes..."
 echo
 
 # check all the required shared libs are there

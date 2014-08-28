@@ -513,6 +513,14 @@
 ;; you can do this using allocate
 (bind-type vec3 <double,double,double>)
 
+;; String printing!
+(bind-func vec3_print:[void,vec3*]*
+  (lambda (x)
+    (printf "<%d,%d,%d>" (tref x 0) (tref x 1) (tref x 2))
+    void))
+
+(bind-poly print vec3_print)
+
 ;; note that point is deallocated at the
 ;; end of the function call.  You can
 ;; stack allocate (stack-alloc)
@@ -769,7 +777,7 @@
 ;;
 (bind-func callback-test
   (lambda (time:i64 count:i64)
-    void))
+    #t))
 
 (test-xtfunc (callback-test))
 
@@ -858,52 +866,6 @@
 ;; can be bound to multiple function
 ;; implementations each with a uniqute
 ;; type.
-
-;; for example to create the type variable
-;; named 'cos' that ranges over the two
-;; closure types [double,double]* and [float,float]*
-;; you would call the two lines below
-
-(bind-poly cos* cosd)
-(bind-poly cos* cosf)
-
-;; the first argument is the polymorphic type name ('cos*')
-;; the second argument is an implementation name ('cos' or 'cosf')
-;; the third argument is the type ([double,double]* or [float,float]*)
-
-;; now you can let the compiler
-;; decide whether to use cosf or cos
-
-;; here cos defaults to float
-;; this is because in this instance
-;; both [double,double]* and [float,float]*
-;; are acceptable.
-;;
-;; For this ambiguous ocurrence there is no resolution
-;; and we will get a compiler error
-;; (bind-func poly-test1
-;;   (lambda (a)
-;;     (cos* a)))
-
-;; so we could force the issue
-;; to [double,double]* by adding a type to a
-(bind-func poly-test2
-  (lambda (a:double)
-    (cos* a)))
-
-;; in a slightly more complex senario
-;; floorf requires a float
-(bind-func poly-test3
-  (lambda (a)
-    (floorf (cos* a))))
-
-;; note that forcing a to double in this case
-;; fails because there is no
-;; "cos" poly with signature [float,double]*
-
-;; (bind-func test43
-;;   (lambda (a:double)
-;;     (floorf (cos* a))))  ;; this fails although floor would work
 
 
 ;; poly variables can be for functions of
@@ -1015,10 +977,10 @@
     (dotimes (i 4) (vset! p i p_) (vset! b i b_) (vset! c i c_))
     (lambda (x:/4,float/)
       ;; no SIMD for abs yet!
-      (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
+      (dotimes (i 4) (vset! f1 i (fabs (vref x i))))
       (let ((y (+ (* b x) (* c x f1))))
 	;; no SIMD for abs yet!
-	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+	(dotimes (i 4) (vset! f2 i (fabs (vref y i))))
 	(+ (* p (- (* y f2) y)) y)))))
 
 (bind-func vcosf4
@@ -1039,10 +1001,10 @@
       ;; offset x for cos
       (set! x (+ x d))
       ;; no SIMD for abs yet!
-      (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
+      (dotimes (i 4) (vset! f1 i (fabs (vref x i))))
       (let ((y (+ (* b x) (* c x f1))))
 	;; no SIMD for abs yet!
-	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+	(dotimes (i 4) (vset! f2 i (fabs (vref y i))))
 	(+ (* p (- (* y f2) y)) y)))))
 
 
@@ -1054,20 +1016,20 @@
 	    (c (vcosf4 (pref a 0))))
 	(printf "precision inaccuracy is expected:\n")
 	(printf " sinf:\t%f,%f,%f,%f\n"
-		(ftod (sinf 0.1))
-		(ftod (sinf 0.2))
-		(ftod (sinf 0.3))
-		(ftod (sinf 0.4)))
+		(ftod (sin 0.1:f))
+		(ftod (sin 0.2:f))
+		(ftod (sin 0.3:f))
+		(ftod (sin 0.4:f)))
 	(printf "vsinf:\t%f,%f,%f,%f\n"
 		(ftod (vref b 0))
 		(ftod (vref b 1))
 		(ftod (vref b 2))
 		(ftod (vref b 3)))
 	(printf " cosf:\t%f,%f,%f,%f\n"
-		(ftod (cosf 0.1))
-		(ftod (cosf 0.2))
-		(ftod (cosf 0.3))
-		(ftod (cosf 0.4)))
+		(ftod (cos 0.1:f))
+		(ftod (cos 0.2:f))
+		(ftod (cos 0.3:f))
+		(ftod (cos 0.4:f)))
 	(printf "vcosf:\t%f,%f,%f,%f\n"
 		(ftod (vref c 0))
 		(ftod (vref c 1))

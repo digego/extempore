@@ -534,9 +534,9 @@
 (define impc:ti:list
   (lambda (ast)
     (if (null? ast) 'null
-	(list 'cons
-	      (car ast)
-	      (impc:ti:list (cdr ast))))))
+        (list 'cons
+              (car ast)
+              (impc:ti:list (cdr ast))))))
 
 
 (define impc:ti:println
@@ -575,6 +575,15 @@
                                     ;; (list 'print_space)
                                     (list 'print x))))
                              (cdr ast)))))))
+
+(define impc:ti:format
+  (lambda (ast)
+    (if (null? ast) 'null
+        (list 'string_cat
+              (if (string? (car ast))
+                  (list 'Str (car ast))
+                  (list 'str_format (car ast)))
+              (impc:ti:format (cdr ast))))))
 
 
 
@@ -732,13 +741,46 @@
              (make-list-with-proc (length args) (lambda (i) (real->integer i))))))
 
 
+(define impc:ti:memzone
+  (lambda (ast)
+    (if (or (> (length ast) 4)
+            (< (length ast) 3))
+        (impc:compiler:print-bad-arity-error ast))
+    `(begin (push_new_zone ,(cadr ast))
+            (let ((res ,(if (= (length ast) 3) (caddr ast) (cadddr ast)))
+                  (zone (pop_zone))
+                  (newz (llvm_peek_zone_stack))
+                  (rescopy (zcopy res zone newz)))
+              ,(if (= (length ast) 3)
+                   `(llvm_zone_destroy zone)
+                   `(llvm_destroy_zone_after_delay zone ,(caddr ast)))
+              rescopy))))
+
 (define impc:ti:letz
   (lambda (ast)
-    (if (not (number? (eval (cadr ast))))
-	(impc:compiler:print-needs-zone-size-error 'letz)
-        `(memzone ,(cadr ast)
-                  (let ,(caddr ast) ,@(cdddr ast))))))
+    ;; (if (not (number? (eval (cadr ast))))
+    ;;     (impc:compiler:print-needs-zone-size-error 'letz)
+    (if (list? (caadr ast))
+        (impc:ti:memzone `(memzone ,(* 1024 8)
+                                   (let ,(cadr ast) ,@(cddr ast))))
+        (impc:ti:memzone `(memzone ,(cadr ast)
+                                   (let ,(caddr ast) ,@(cdddr ast)))))))
 
+
+(define impc:ti:callback
+  (lambda (ast)    
+    `(let ((zold (llvm_peek_zone_stack))
+           (znew (push_new_zone (* 1024 8))))
+       (llvm_callback ,(car ast)
+                      ,(cadr ast)                           
+                      ,@(map (lambda (x)
+                               (impc:ti:first-transform `(zcopy ,x zold znew) #t))
+                             (cddr ast)))
+       (pop_zone)
+       (llvm_destroy_zone_after_delay znew
+                                      (+ (- ,(car ast) (llvm_now))
+                                         (* ,*au:samplerate* 10)))
+       #t)))
 
 (define impc:ti:gteq
   (lambda (ast)
@@ -775,9 +817,9 @@
     
 (define *unique-polynum* 0)
 
+(define *impc:mathintrinsicslist* '(sin cos ceil floor exp fmod pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi))
 (define *impc:mathbinaryaritylist* '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
 (define *impc:lambdaslist* '(lambda lambdas lambdaz lambdah))
-
 
 (define impc:ti:first-transform
   (lambda (ast inbody?)
@@ -803,6 +845,8 @@
                            (impc:ti:first-transform (cdr ast) inbody?))))                           
                        ((eq? (car ast) 'letz)
                         (impc:ti:first-transform (impc:ti:letz ast) inbody?))
+                       ((eq? (car ast) 'memzone)
+                        (impc:ti:first-transform (impc:ti:memzone ast) inbody?))
                        ((eq? (car ast) '>=)
                         (impc:ti:first-transform (impc:ti:gteq ast) inbody?))
                        ((eq? (car ast) '<=)
@@ -815,6 +859,9 @@
                         (impc:ti:first-transform (impc:ti:quote (cadr ast)) inbody?))
                        ((eq? (car ast) 'list)
                         (impc:ti:first-transform (impc:ti:list (cdr ast)) inbody?))
+                       ((or (eq? (car ast) 'strln)
+                            (eq? (car ast) 'strj))
+                        (impc:ti:first-transform (impc:ti:format (cdr ast)) inbody?))
                        ((eq? (car ast) 'println)
                         (impc:ti:first-transform (impc:ti:println (cdr ast)) inbody?))
                        ((eq? (car ast) 'printout)
@@ -839,9 +886,7 @@
                        ((eq? (car ast) 'not)
                         (impc:ti:first-transform (impc:ti:not (cadr ast)) inbody?))
                        ((member (car ast) '(callback schedule))
-                        `(memzone (* 1024 8) (+ (- ,(impc:ti:first-transform (cadr ast) inbody?) (llvm_now)) (* ,*au:samplerate* 10))
-                                  (begin ,(cons 'callback (impc:ti:first-transform (cdr ast) inbody?)))))
-                       
+                        (impc:ti:first-transform (impc:ti:callback (impc:ti:first-transform (cdr ast) inbody?)) inbody?))
                        ((and (member (car ast) *impc:mathbinaryaritylist*) ;; '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
                              (<> (length ast) 3))
                         (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
@@ -971,7 +1016,7 @@
                        ((eq? ast 'halloc) 'heap-alloc)
                        ((eq? ast 'zalloc) 'zone-alloc)
                        ((eq? ast 'alloc) 'zone-alloc)
-                       ((eq? ast 'schedule) 'callback)
+                       ;; ((eq? ast 'schedule) 'callback)
                        ((eq? ast 'randomf) 'imp_randf)
                        ((eq? ast 'void) '(void))
                      ((and (symbol? ast)
@@ -2028,7 +2073,8 @@
                     (impc:ir:gpoly-exists? (string->symbol (impc:ir:get-base-type (symbol->string ast)))))
                ;; (regex:match? (symbol->string ast) "##")
                ;; (not (regex:match? (symbol->string ast) "!")))
-	       (impc:compiler:print-compiler-error "trying to use generic function as value" ast))
+               (begin
+                 (impc:compiler:print-compiler-error "trying to use generic function as value" ast)))
            (if *impc:ti:print-sub-checks* (println 'sym:> 'ast: ast 'request? request?))
            ;; if a request is made - assume it's forced
            ;; find the intersection between the request
@@ -2150,7 +2196,29 @@
                 ((and (symbol? (caddr ast)) (not (null? a)))
                  (impc:ti:update-var (caddr ast) vars kts a) a) ;; return a
                 (else t))))))
-				   
+
+(define impc:ti:math-intrinsic-check
+  (lambda (ast vars kts request?)
+    (let* ((args (- (length ast) 1))
+           (a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
+           (b (if (> args 1)
+                  (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars)
+                  #f))
+           (c (if (> args 2)
+                  (impc:ti:type-unify (impc:ti:type-check (cadddr ast) vars kts request?) vars)
+                  #f)))
+      (if (and b
+               (not (equal? a b))
+               (not (number? (cadr ast)))
+               (not (number? (caddr ast))))
+          (impc:compiler:print-type-conflict-error (impc:ir:pretty-print-type a)
+                                                   (impc:ir:pretty-print-type b)
+                                                   ast)
+          (if (and b
+                   (not (equal? a b))
+                   (number? (cadr ast)))
+              (list b)
+              (list a))))))
 
 (define impc:ti:compare-check
   (lambda (ast vars kts request?)
@@ -3151,7 +3219,7 @@
       (if (null? ftype)
           (begin (let ((fargs (cons 213
                                     (cons -1
-                                          (map (lambda (a)                        
+                                          (map (lambda (a)
                                                  (impc:ti:type-check a vars kts '()))
                                                (cdddr ast))))))
                    (if (and (assoc (caddr ast) vars)
@@ -3174,32 +3242,46 @@
                  (list *impc:ir:void*))))))
 
 
-(define impc:ti:push_zone-check
+(define impc:ti:push_new_zone-check
   (lambda (ast vars kts request?)
     (if (<> (length ast) 2)
-	(impc:compiler:print-compiler-error "bad arity in call" ast))
+        (impc:compiler:print-compiler-error "bad arity in call" ast))
     (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
     (list "%mzone*")))
 
+(define impc:ti:push_zone-check
+  (lambda (ast vars kts request?)
+    (if (<> (length ast) 2)
+        (impc:compiler:print-compiler-error "bad arity in call" ast))
+    (impc:ti:type-check (cadr ast) vars kts "%mzone*")
+    (list "%mzone*")))
+
+(define impc:ti:create_zone-check
+  (lambda (ast vars kts request?)
+    (if (<> (length ast) 2)
+        (impc:compiler:print-compiler-error "bad arity in call" ast))
+    (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
+    (list "%mzone*")))
 
 (define impc:ti:pop_zone-check
   (lambda (ast vars kts request?)
+    (if (<> (length ast) 1)
+        (impc:compiler:print-compiler-error "bad arity in call" ast))    
     ;(println 'memzonecheck ast (list? (cadr ast)))
-    (list *impc:ir:void*)))
+    (list "%mzone*")))
 
-
-(define impc:ti:memzone-check
-  (lambda (ast vars kts request?)
-    (if (or (> (length ast) 4)
-	    (< (length ast) 3))
-	(impc:compiler:print-compiler-error  "memzone must be of the form (memzone size [delay] body) where \"delay\" is optional and \"body\" is a let, begin, lambda etc.."))
-    ;(println 'memzonecheck ast (list? (cadr ast)))
-    (if (= (length ast) 3)
-	(begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
-	       (impc:ti:type-check (caddr ast) vars kts request?))
-	(begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
-	       (impc:ti:type-check (caddr ast) vars kts *impc:ir:si64*)
-	       (impc:ti:type-check (cadddr ast) vars kts request?)))))
+;; (define impc:ti:memzone-check
+;;   (lambda (ast vars kts request?)
+;;     (if (or (> (length ast) 4)
+;;             (< (length ast) 3))
+;;         (impc:compiler:print-compiler-error  "memzone must be of the form (memzone size [delay] body) where \"delay\" is optional and \"body\" is a let, begin, lambda etc.."))
+;;                                         ;(println 'memzonecheck ast (list? (cadr ast)))
+;;     (if (= (length ast) 3)
+;;         (begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
+;;                (impc:ti:type-check (caddr ast) vars kts request?))
+;;         (begin (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
+;;                (impc:ti:type-check (caddr ast) vars kts *impc:ir:si64*)
+;;                (impc:ti:type-check (cadddr ast) vars kts request?)))))
 
 
 
@@ -4278,6 +4360,7 @@
                      (set-car! ast m)
                      (set! r (impc:ti:type-check ast vars kts request?)))))
              *impc:ir:i1*))
+          ((and (list? ast) (member (car ast) *impc:mathintrinsicslist*)) (impc:ti:math-intrinsic-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(dotimes))) (impc:ti:dotimes-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(while))) (impc:ti:while-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(llvm_printf))) (impc:ti:printf-check ast vars kts request?))
@@ -4287,8 +4370,10 @@
           ((and (list? ast) (member (car ast) '(llvm_fscanf))) (impc:ti:fscanf-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(push_zone))) (impc:ti:push_zone-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(pop_zone))) (impc:ti:pop_zone-check ast vars kts request?))	    
-          ((and (list? ast) (member (car ast) '(memzone))) (impc:ti:memzone-check ast vars kts request?))
-          ((and (list? ast) (member (car ast) '(callback))) (impc:ti:callback-check ast vars kts request?))	    
+          ((and (list? ast) (member (car ast) '(push_new_zone))) (impc:ti:push_new_zone-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(create_zone))) (impc:ti:create_zone-check ast vars kts request?))	    
+          ;;((and (list? ast) (member (car ast) '(memzone))) (impc:ti:memzone-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(llvm_callback))) (impc:ti:callback-check ast vars kts request?))	    
                                         ;((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(vector-set!))) (impc:ti:vector-set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(vector-ref))) (impc:ti:vector-ref-check ast vars kts request?))
@@ -4940,32 +5025,32 @@
 ;; adds make-closure and make-env tags
 (define impc:ti:closure:convert
   (lambda (ast esyms)
-      (cond ((pair? ast)
-             (if (member (car ast) *impc:lambdaslist*)
-                 (let (;(env (impc:ti:block:check-for-free-syms ast esyms))
-		       (allocate-mem-for-vars? (impc:ti:allocate-var? (cdr ast))))
-		   (list (cond ((eq? (car ast) 'lambdah) '__make-closure-h)
-                               ((eq? (car ast) 'lambdas) '__make-closure-s)
-                               (else '__make-closure-z))
-                         allocate-mem-for-vars?
-			 ;; name of compiled function is always last 
-			 ;; so we can remove it by dropping it off the end
-			 (cdr (reverse (cl:remove-duplicates esyms))) ;env 
-			 (cadr ast)
-			 (impc:ti:closure:convert (caddr ast) (append (cadr ast) esyms))))
-                 (if (member (car ast) *impc:letslist*)
-                     (let* ((allocate-mem-for-vars? (impc:ti:allocate-var? ast))
-                            (bindings (map (lambda (binding) 
-					     (car binding))
-					   (cadr ast))))
-		       ;(free-syms (impc:ti:block:check-for-free-syms (cddr ast) (append bindings esyms))))
-		       (cons '__make-env
-			     (cons allocate-mem-for-vars?
-				   (list (impc:ti:closure:convert (cadr ast) (append bindings esyms))
-					 (impc:ti:closure:convert (caddr ast) (append bindings esyms))))))
-                     (cons (impc:ti:closure:convert (car ast) esyms)
-                           (impc:ti:closure:convert (cdr ast) esyms)))))
-            ((atom? ast) ast))))
+    (cond ((pair? ast)
+           (if (member (car ast) *impc:lambdaslist*)
+               (let (;(env (impc:ti:block:check-for-free-syms ast esyms))
+                     (allocate-mem-for-vars? (impc:ti:allocate-var? (cdr ast))))
+                 (list (cond ((eq? (car ast) 'lambdah) '__make-closure-h)
+                             ((eq? (car ast) 'lambdas) '__make-closure-s)
+                             (else '__make-closure-z))
+                       allocate-mem-for-vars?
+                       ;; name of compiled function is always last 
+                       ;; so we can remove it by dropping it off the end
+                       (cdr (reverse (cl:remove-duplicates esyms))) ;env 
+                       (cadr ast)
+                       (impc:ti:closure:convert (caddr ast) (append (cadr ast) esyms))))
+               (if (member (car ast) *impc:letslist*)
+                   (let* ((allocate-mem-for-vars? (impc:ti:allocate-var? ast))
+                          (bindings (map (lambda (binding) 
+                                           (car binding))
+                                         (cadr ast))))
+                                        ;(free-syms (impc:ti:block:check-for-free-syms (cddr ast) (append bindings esyms))))
+                     (cons '__make-env
+                           (cons allocate-mem-for-vars?
+                                 (list (impc:ti:closure:convert (cadr ast) (append bindings esyms))
+                                       (impc:ti:closure:convert (caddr ast) (append bindings esyms))))))
+                   (cons (impc:ti:closure:convert (car ast) esyms)
+                         (impc:ti:closure:convert (cdr ast) esyms)))))
+          ((atom? ast) ast))))
 
 
 
@@ -5963,7 +6048,7 @@
                                         `(if (not (null? (tref x ,c)))
                                              (tset! obj ,b (,(string->symbol
                                                               (string-append (substring a 1 (- (string-length a) 1)) "_zcopy"))
-                                                             (tref x ,c))))
+                                                             (tref x ,c) fromz toz)))
                                         `(tset! obj ,b (tref x ,c))))
                                 a arglst2 (range (length a)))))
            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
@@ -5999,8 +6084,8 @@
                   (interaction-environment))
             (eval `(bind-poly hfree ,(string->symbol (string-append namestr "_hfree")))
                   (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append namestr "_zcopy:[" namestr "*," namestr "*]*"))
-                     (lambda (,(string->symbol (string-append "x:" namestr "*")))
+            (eval `(bind-func ,(string->symbol (string-append namestr "_zcopy:[" namestr "*," namestr "*,%mzone*,%mzone*]*"))
+                     (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
                        (let ((obj (zalloc)))
                          ,@zcopy_body
                          obj)))

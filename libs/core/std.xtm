@@ -34,10 +34,19 @@
 ;; 
 
 
-;; extempore.xtm is loaded automatically by all processes on startup
-;; extempore.xtm is for xtlang as scheme.xtm is for scheme.
+;; std.xtm is loaded automatically by all processes on startup
+;; std.xtm is for xtlang as scheme.xtm is for scheme.
 
-(suppress-compiler-messages #t)
+;; lib-loading config
+
+(sys:load "libs/std.xtm")
+(sys:load-preload-check 'std)
+(define *xtmlib-std-loaded* #f)
+
+(sys:precomp:insert-header "xtmstd")
+
+
+;; (suppress-compiler-messages #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SETUP NAN's
@@ -55,8 +64,6 @@
       (set! NaNf (pref (cast n32 float*) 0))
       (set! NaNd (pref (cast n64 double*) 0))
       void)))
-
-(set_float_nans_)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some global aliases
@@ -86,53 +93,53 @@
 (bind-poly random imp_rand1_d)
 (bind-poly random imp_rand2_d)
 
-(bind-poly cos cosf)
-(bind-poly cos cosd)
+;(bind-poly cos cosf)
+;(bind-poly cos llvm_cos)
+;(bind-poly sin sinf)
+;(bind-poly sin llvm_sin)
 (bind-poly tan tanf)
-(bind-poly tan tand)
-(bind-poly sin sinf)
-(bind-poly sin sind)
+(bind-poly tan llvm_tan)
 (bind-poly cosh coshf)
-(bind-poly cosh coshd)
+(bind-poly cosh llvm_cosh)
 (bind-poly tanh tanhf)
-(bind-poly tanh tanhd)
+(bind-poly tanh llvm_tanh)
 (bind-poly sinh sinhf)
-(bind-poly sinh sinhd)
+(bind-poly sinh llvm_sinh)
 (bind-poly acos acosf)
-(bind-poly acos acosd)
+(bind-poly acos llvm_acos)
 (bind-poly asin asinf)
-(bind-poly asin asind)
+(bind-poly asin llvm_asin)
 (bind-poly atan atanf)
-(bind-poly atan atand)
+(bind-poly atan llvm_atan)
 (bind-poly atan2 atan2f)
-(bind-poly atan2 atan2d)
-(bind-poly ceil ceilf)
-(bind-poly ceil ceild)
-(bind-poly floor floorf)
-(bind-poly floor floord)
-(bind-poly exp expf)
-(bind-poly exp expd)
-(bind-poly fmod fmodf)
-(bind-poly fmod fmodd)
-(bind-poly pow powf)
-(bind-poly pow powd)
-(bind-poly log logf)
-(bind-poly log logd)
-(bind-poly log2 log2f) 
-(bind-poly log2 log2d) 
-(bind-poly log10 log10f)
-(bind-poly log10 log10d)
-(bind-poly sqrt sqrtf)
-(bind-poly sqrt sqrtd)
-(bind-poly fabs fabsf)
-(bind-poly fabs fabsd)
+(bind-poly atan2 llvm_atan2)
+;; (bind-poly ceil ceilf)
+;; (bind-poly ceil llvm_ceil)
+;; (bind-poly floor floorf)
+;; (bind-poly floor llvm_floor)
+;; (bind-poly exp expf)
+;; (bind-poly exp llvm_exp)
+;; (bind-poly fmod fmodf)
+;; (bind-poly fmod llvm_fmod)
+;; (bind-poly pow powf)
+;; (bind-poly pow llvm_pow)
+;; (bind-poly log logf)
+;; (bind-poly log llvm_log)
+;; (bind-poly log2 log2f) 
+;; (bind-poly log2 llvm_log2) 
+;; (bind-poly log10 log10f)
+;; (bind-poly log10 llvm_log10)
+;; (bind-poly sqrt sqrtf)
+;; (bind-poly sqrt llvm_sqrt)
+;; (bind-poly fabs fabsf)
+;; (bind-poly fabs llvm_fabs)
 
 ;;;;;;;;;;;;;;;;
 ;; printing
 
 ;; prints a line break
 (bind-func print_return
-  (lambda () (printf "\n") void))
+  (lambda () (llvm_printf "\n") void))
 
 ;; prints a space
 (bind-func print_space
@@ -163,25 +170,35 @@
 (bind-poly print print_f)
 (bind-poly print print_d)
 
-;; generics here for catchall!
-(bind-func print:[void,!a]
-  (lambda (x) (printf "_") void))
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; equality
-
-;; this is the catch-all for equality testing
-;; covers all numeric types
-;; will also catch all for all pointer types
-;; which compares against memory address
-;; otherwise expect poly override
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; i.e. see string below
-(bind-func equal:[bool,!a,!b]*
-  "Basic equality check"
-  (lambda (a b)
-    (= a b)))
+;; support for zcopy
+
+(bind-func zcopy_i1
+  (lambda (x:i1 fromz:mzone* toz:mzone*) x))
+
+(bind-func zcopy_i8
+  (lambda (x:i8 fromz:mzone* toz:mzone*) x))
+
+(bind-func zcopy_i32
+  (lambda (x:i32 fromz:mzone* toz:mzone*) x))
+
+(bind-func zcopy_i64
+  (lambda (x:i64 fromz:mzone* toz:mzone*) x))
+
+(bind-func zcopy_f
+  (lambda (x:float fromz:mzone* toz:mzone*) x))
+
+(bind-func zcopy_d
+  (lambda (x:double fromz:mzone* toz:mzone*) x))
+
+(bind-poly zcopy zcopy_i1)
+(bind-poly zcopy zcopy_i8)
+(bind-poly zcopy zcopy_i32)
+(bind-poly zcopy zcopy_i64)
+(bind-poly zcopy zcopy_f)
+(bind-poly zcopy zcopy_d)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; XTLang strings
@@ -219,8 +236,11 @@
 ;; String printing!
 (bind-func String_print:[void,String*]*
   (lambda (x)
-    (printf "'%s'" (tref x 1))
-    void))
+    (if (null? x)
+        (begin (printf "")
+               void)
+        (begin (printf "'%s'" (tref x 1))
+               void))))
 
 (bind-poly print String_print)
 
@@ -282,19 +302,23 @@
 
 (bind-func string_cat
   (lambda (s1:String* s2:String*)
-    (let ((size (+ (tref s1 0) (tref s2 0)))
-          (news:i8* (zalloc size)))
-      (strcpy news (tref s1 1))
-      (strncat news (tref s2 1) size)
-      (Str news))))
+    (if (null? s2) (Str s1)
+        (if (null? s1) (Str s2)
+            (let ((size (+ (tref s1 0) (tref s2 0)))
+                  (news:i8* (zalloc size)))
+              (strcpy news (tref s1 1))
+              (strncat news (tref s2 1) size)
+              (Str news))))))
 
 (bind-func string_cat_h
   (lambda (s1:String* s2:String*)
-    (let ((size (+ (tref s1 0) (tref s2 0)))
-          (news:i8* (zalloc size)))
-      (strcpy news (tref s1 1))
-      (strncat news (tref s2 1) size)
-      (Str_h news))))
+    (if (null? s2) (Str s1)
+        (if (null? s1) (Str s2)
+            (let ((size (+ (tref s1 0) (tref s2 0)))
+                  (news:i8* (zalloc size)))
+              (strcpy news (tref s1 1))
+              (strncat news (tref s2 1) size)
+              (Str_h news))))))
 
 (bind-func string_cmp
   (lambda (s1:String* s2:String*)
@@ -343,6 +367,76 @@
   (lambda (s:String* t:String*)
     (/ 1.0 (i64tod (+ 1 (string_levenshtein s t))))))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; formatting!
+;;
+;; same as print but returns string
+;; should REPLACE PRINT!
+
+;; prints a line break
+(bind-func str_format_return
+  (lambda ()
+    (let ((str:i8* (salloc 256)))
+      (llvm_sprintf str "\n")
+      (Str str))))
+
+;; prints a space
+(bind-func str_format_space
+  (lambda ()
+    (Str " ")))
+
+(bind-func str_format_i1
+  (lambda (x:i1)
+    (let ((str:i8* (salloc 256)))
+      (llvm_sprintf str "%d" x)
+      (Str str))))
+
+(bind-func str_format_i8
+  (lambda (x:i8)
+    (let ((str:i8* (salloc 256)))
+      (llvm_sprintf str "%d" x)
+      (Str str))))
+
+(bind-func str_format_i32
+  (lambda (x:i32)
+    (let ((str:i8* (salloc 256)))    
+      (llvm_sprintf str "%d" x)
+      (Str str))))
+
+(bind-func str_format_i64
+  (lambda (x:i64)
+    (let ((str:i8* (salloc 256)))    
+      (llvm_sprintf str "%lld" x)
+      (Str str))))
+
+(bind-func str_format_f
+  (lambda (x:float)
+    (let ((str:i8* (salloc 256)))
+      (llvm_sprintf str "%f" (ftod x))
+      (Str str))))
+
+(bind-func str_format_d
+  (lambda (x:double)
+    (let ((str:i8* (salloc 256)))      
+      (llvm_sprintf str "%f" x)
+      (Str str))))
+
+(bind-poly str_format str_format_i1)
+(bind-poly str_format str_format_i8)
+(bind-poly str_format str_format_i32)
+(bind-poly str_format str_format_i64)
+(bind-poly str_format str_format_f)
+(bind-poly str_format str_format_d)
+
+;; String formatting!
+(bind-func String_format:[String*,String*]*
+  (lambda (x) x))
+
+(bind-poly str_format String_format)
+
 ;; some helpers for precomp stuff
 
 (bind-func command
@@ -355,26 +449,29 @@
       (if (not (null? path_from_env))
           path_from_env
           ;; check if homebrewed version (in default Cellar location)
-          ;; exisits - need to keep the version up-to-date by hand
+          ;; exists - need to keep the version up-to-date by hand
+          ;;
+          ;; OSX
           (if (= (command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
               "/usr/local/Cellar/extempore-llvm/3.4.1"
+              ;; Linux
+              (if (= (command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
+                  "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
+                  path_from_env)
               path_from_env)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (xtmX expr)
-  (suppress-compiler-messages #t)
-  (eval `(bind-func xtm_expression
-           (lambda ()
-             ,expr
-             void))
-        (interaction-environment))
-  (suppress-compiler-messages #f)
-  (xtm_expression))                       
-    
+;; (sys:load "libs/core/adt.xtm")
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; (suppress-compiler-messages #f)
 
-(sys:load "libs/core/adt.xtm")
 
-(suppress-compiler-messages #f)
+;; load the scheme macros (e.g. define-instrument)
+(sys:load "libs/core/std-scm.xtm")
+;; make sure we load them with precompiled code as well
+(sys:precomp:insert-sexp
+ '(sys:load "libs/core/std-scm.xtm"))
+
+(define *xtmlib-std-loaded* #t)
+
+(sys:precomp:insert-footer "xtmstd")

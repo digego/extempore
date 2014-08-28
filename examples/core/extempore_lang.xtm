@@ -20,8 +20,8 @@
 ;; 
 ;; integer literals default to 64 bit integers
 (bind-func my-test-1
-   (lambda (a)
-      (* a 5)))
+  (lambda (a)
+    (* a 5)))
 
 ;; notice that the log view displays the type
 ;; of the closure we just compiled
@@ -41,8 +41,8 @@
 
 ;; float literals default to doubles
 (bind-func my-test-1f
-   (lambda (a)
-      (* a 5.0)))
+  (lambda (a)
+    (* a 5.0)))
 
 ;; Again note the closures type in the logview
 ;; [double,double]*
@@ -60,8 +60,8 @@
 ;; you are free to recompile an existing closure
 ;; so we can change my-test-1 to
 (bind-func my-test-1
-   (lambda (a)
-      (/ a 5)))
+  (lambda (a)
+    (/ a 5)))
 
 (println (my-test-1 30)) ; 30 / 5 = 6
 
@@ -72,9 +72,9 @@
 ;; 
 ;; So we CANNOT do this
 
-;(bind-func my-test-1
-;   (lambda (a)
-;      (/ a 5.0)))
+                                        ;(bind-func my-test-1
+                                        ;   (lambda (a)
+                                        ;      (/ a 5.0)))
 
 ;; Just remember that you are not currently allowed to redefine an 
 ;; existing function to a new definition that requres a different type signature.  
@@ -90,17 +90,17 @@
 ;;
 ;; increment power each call
 (bind-func my-test-2
-   (let ((power 0))
-      (lambda (x)
-         (set! power (+ power 1)) ;; set! for closure mutation as per scheme
-         (* x power))))
+  (let ((power 0))
+    (lambda (x)
+      (set! power (+ power 1)) ;; set! for closure mutation as per scheme
+      (* x power))))
 
 ;; each modifies state
 (println (my-test-2 2)) ;; should = 2
 (println (my-test-2 2)) ;; should = 4
 (println (my-test-2 2)) ;; etc
 
-               
+
 ;; Closures can of course return closures.
 ;; notice the type signature of this closure
 ;; as printed in the logview "[[i64,i64]*]*"
@@ -121,11 +121,11 @@
 ;; to help in the validation process
 
 ;; THIS WOULD CAUSE AN ERROR!
-;(bind-func my-inc-maker
-;  (lambda (i)
-;    (lambda (inc)
-;      (set! i (+ i inc))
-;      i)))
+                                        ;(bind-func my-inc-maker
+                                        ;  (lambda (i)
+                                        ;    (lambda (inc)
+                                        ;      (set! i (+ i inc))
+                                        ;      i)))
 
 ;; This makes sense - should "+" operate
 ;; on doubles or integers - who knows?
@@ -151,10 +151,10 @@
 ;; With this information in mind we can
 ;; fix the incrementor by explicitly typing 'i'
 (bind-func my-inc-maker
-   (lambda (i:i64)
-      (lambda (inc)
-         (set! i (+ i inc))
-         i)))
+  (lambda (i:i64)
+    (lambda (inc)
+      (set! i (+ i inc))
+      i)))
 
 ;; this solves our problem as the compiler
 ;; can now use i's type to infer inc and
@@ -192,9 +192,9 @@
 ;; and x is our operand
 ;; THIS WILL CAUSE AN ERROR
 
-;(bind-func my-inc-maker-wrappert
-;   (lambda (f x) ; f and x are args
-;      (f x)))
+                                        ;(bind-func my-inc-maker-wrappert
+                                        ;   (lambda (f x) ; f and x are args
+                                        ;      (f x)))
 
 ;; oops can't resolve the type of "f"
 ;; fair enough really.
@@ -203,14 +203,14 @@
 ;; return type should be?
 ;; This also causes an error!
 
-;(bind-func my-inc-maker-wrappert
-;   (lambda (f x:i64) ; f and x are args
-;      (f x)))
+                                        ;(bind-func my-inc-maker-wrappert
+                                        ;   (lambda (f x:i64) ; f and x are args
+                                        ;      (f x)))
 
 ;; so we need to type f properly
 (bind-func my-inc-maker-wrapper
-   (lambda (f:[i64,i64]* x)      
-      (f x)))
+  (lambda (f:[i64,i64]* x)      
+    (f x)))
 
 ;; ok so now we can call my-inc-maker
 ;; which will return a closure
@@ -229,9 +229,9 @@
 
 ;; this avoids the wrapper completely
 (bind-func my-inc-test
-   (let ((f (my-inc-maker 0)))
-      (lambda ()
-         (f 1))))
+  (let ((f (my-inc-maker 0)))
+    (lambda ()
+      (f 1))))
 
 (println (my-inc-test)) ; 1
 (println (my-inc-test)) ; 2
@@ -251,10 +251,10 @@
 (bind-func my-test-4
   (lambda (a)
     (if (< a 1)
-	(printf "done\n")
-	(begin (printf "a: %lld\n" a)
-	       (my-test-4 (- a 1))))))
-    
+        (printf "done\n")
+        (begin (printf "a: %lld\n" a)
+               (my-test-4 (- a 1))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; a simple tuple example
@@ -272,7 +272,7 @@
 ;; logview shows [<i64,double,i32>*]*
 ;; i.e. a closure that takes no arguments
 ;; and returns the tuple <i64,double,i32>*
-      
+
 
 ;; here's another tuple example
 ;; note that my-test-7's return type is inferred
@@ -281,8 +281,8 @@
 (bind-func my-test-7 
   (lambda ()
     (let ((a:<i64,double>* (alloc)) ; returns pointer to type <i64,double>
-	  (b 37)
-	  (c 6.4))
+          (b 37)
+          (c 6.4))
       (tuple-set! a 0 b) ;; set i64 to 64
       (tset! a 1 c) ;; set double to 6.4 - tset! is an alias for tuple-set!
       (printf "tuple:1 %lld::%f\n" (tuple-ref a 0) (tref a 1))
@@ -300,23 +300,23 @@
 ;; some array code with *casting*
 ;; this function returns void
 (bind-func my-test-8
-   (lambda ()
-      (let ((v1:|5,float|* (alloc))
-	    (v2:|5,float|* (alloc))
-	    (i 0)
-	    (k 0))
-         (dotimes (i 5)
-            ;; random returns double so "truncate" to float
-            ;; which is what v expects
-            (array-set! v1 i (dtof (random))))
-	 ;; we can use the afill! function to fill an array
-	 (afill! v2 1.1 2.2 3.3 4.4 5.5)
-         (dotimes (k 5)
-            ;; unfortunately printf doesn't like floats
-            ;; so back to double for us :(
-            (printf "val: %lld::%f::%f\n" k
-		    (ftod (array-ref v1 k))
-		    (ftod (aref v2 k)))))))
+  (lambda ()
+    (let ((v1:|5,float|* (alloc))
+          (v2:|5,float|* (alloc))
+          (i 0)
+          (k 0))
+      (dotimes (i 5)
+        ;; random returns double so "truncate" to float
+        ;; which is what v expects
+        (array-set! v1 i (dtof (random))))
+      ;; we can use the afill! function to fill an array
+      (afill! v2 1.1 2.2 3.3 4.4 5.5)
+      (dotimes (k 5)
+        ;; unfortunately printf doesn't like floats
+        ;; so back to double for us :(
+        (printf "val: %lld::%f::%f\n" k
+                (ftod (array-ref v1 k))
+                (ftod (aref v2 k)))))))
 
 (my-test-8)
 
@@ -348,10 +348,10 @@
 ;; to work with either i64* or |5,i64|*
 
 (bind-func my-test-9
-   (lambda (v:|5,i64|*)
-      (let ((f (lambda (x)
-                  (* (array-ref v 2) x))))
-         f)))
+  (lambda (v:|5,i64|*)
+    (let ((f (lambda (x)
+               (* (array-ref v 2) x))))
+      f)))
 
 (bind-func my-test-10
   (lambda (v:|5,[i64,i64]*|*)
@@ -360,12 +360,12 @@
 
 
 (bind-func my-test-11
-   (lambda ()
-      (let ((v:|5,[i64,i64]*|* (alloc)) ;; make an array of closures!
-            (vv:|5,i64|* (alloc)))
-         (array-set! vv 2 3)
-         (aset! v 0 (my-test-9 vv)) ;; aset! alias for array-set!
-         (my-test-10 v))))
+  (lambda ()
+    (let ((v:|5,[i64,i64]*|* (alloc)) ;; make an array of closures!
+          (vv:|5,i64|* (alloc)))
+      (array-set! vv 2 3)
+      (aset! v 0 (my-test-9 vv)) ;; aset! alias for array-set!
+      (my-test-10 v))))
 
 ;; try to guess the answer before you call this!!
 (println (my-test-11))
@@ -374,24 +374,24 @@
 ;; some conditionals
 
 (bind-func my-test-12
-   (lambda (x:i64 y)
-      (if (> x y)
-          x
-          y)))
+  (lambda (x:i64 y)
+    (if (> x y)
+        x
+        y)))
 
 (println (my-test-12 12 13))
 (println (my-test-12 13 12))
 
 ;; returns boolean true
 (bind-func my-test-13
-   (lambda (x:i64)
-      (cond ((= x 1) (printf "A\n"))
-            ((= x 2) (printf "B\n"))
-            ((= x 3) (printf "C\n"))
-            ((= x 4) (printf "D\n"))
-            (else (printf "E\n")))
-      #t))
-            
+  (lambda (x:i64)
+    (cond ((= x 1) (printf "A\n"))
+          ((= x 2) (printf "B\n"))
+          ((= x 3) (printf "C\n"))
+          ((= x 4) (printf "D\n"))
+          (else (printf "E\n")))
+    #t))
+
 (my-test-13 1)
 (my-test-13 3)
 (my-test-13 100)
@@ -404,49 +404,49 @@
 (bind-func envelope-segments
   (lambda (points:double* num-of-points:i64)
     (let ((lines:[double,double]** (zone-alloc num-of-points))
-	  (k 0))
+          (k 0))
       (dotimes (k num-of-points)
-	(let* ((idx (* k 2))
-	       (x1 (pointer-ref points (+ idx 0)))
-	       (y1 (pointer-ref points (+ idx 1)))
-	       (x2 (pointer-ref points (+ idx 2)))
-	       (y2 (pointer-ref points (+ idx 3)))
-	       (m (if (= 0.0 (- x2 x1)) 0.0 (/ (- y2 y1) (- x2 x1))))
-	       (c (- y2 (* m x2)))
-	       (l (lambda (time) (+ (* m time) c))))
-	  (pointer-set! lines k l)))
+        (let* ((idx (* k 2))
+               (x1 (pointer-ref points (+ idx 0)))
+               (y1 (pointer-ref points (+ idx 1)))
+               (x2 (pointer-ref points (+ idx 2)))
+               (y2 (pointer-ref points (+ idx 3)))
+               (m (if (= 0.0 (- x2 x1)) 0.0 (/ (- y2 y1) (- x2 x1))))
+               (c (- y2 (* m x2)))
+               (l (lambda (time) (+ (* m time) c))))
+          (pointer-set! lines k l)))
       lines)))
 
 
 (bind-func envelope_c
-   (lambda (points:double* num-of-points)
-      (let ((klines:[double,double]** (envelope-segments points num-of-points))
-            (line-length num-of-points))
-         (lambda (time)
-            (let ((res -1.0)
-		  (k:i64 0))
-               (dotimes (k num-of-points)
-                  (let ((line (pointer-ref klines k))
-                        (time-point (pointer-ref points (* k 2))))
-                     (if (or (= time time-point)
-                             (< time-point time))
-                         (set! res (line time)))))
-               res)))))
+  (lambda (points:double* num-of-points)
+    (let ((klines:[double,double]** (envelope-segments points num-of-points))
+          (line-length num-of-points))
+      (lambda (time)
+        (let ((res -1.0)
+              (k:i64 0))
+          (dotimes (k num-of-points)
+            (let ((line (pointer-ref klines k))
+                  (time-point (pointer-ref points (* k 2))))
+              (if (or (= time time-point)
+                      (< time-point time))
+                  (set! res (line time)))))
+          res)))))
 
 
 ;; make a convenience wrapper 
 (bind-func env-wrap
-   (let* ((points 3)
-          (data (zone-alloc (* points 2))))
-      (pointer-set! data 0 0.0) ;; point data
-      (pset! data 1 0.0)      
-      (pset! data 2 2.0)
-      (pset! data 3 1.0)      
-      (pset! data 4 4.0)
-      (pset! data 5 0.0)
-      (let ((f (envelope_c data points)))
-         (lambda (time:double)
-            (f time)))))
+  (let ((points 3)
+        (data:double* (zalloc (* points 2))))
+    (pointer-set! data 0 0.0) ;; point data
+    (pset! data 1 0.0)      
+    (pset! data 2 2.0)
+    (pset! data 3 1.0)      
+    (pset! data 4 4.0)
+    (pset! data 5 0.0)
+    (let ((f (envelope_c data points)))
+      (lambda (time:double)
+        (f time)))))
 
 (println (env-wrap 0.0)) ;; time 0.0 should give us 0.0
 (println (env-wrap 1.0)) ;; time 1.0 should give us 0.5
@@ -517,7 +517,7 @@
 (bind-func my-test16
   (lambda (a:i32)
     (let ((f (lambda ()
-	       (* 3 a))))
+               (* 3 a))))
       f)))
 
 (bind-func my-test17
@@ -535,21 +535,21 @@
   (lambda ()
     (let ((f (lambda (x:i64) x)))
       (lambda (z)
-	(f z)))))
+        (f z)))))
 
 
 (bind-func my-test19
   (lambda ()
     (let ((t1 (my-test18))
-	  (t2 (my-test18)))
+          (t2 (my-test18)))
       ;; identity of 5
       (printf "%lld:%lld\n" (t1 5) (t2 5))
       (t1.f:[i64,i64]* (lambda (x:i64) (* x x)))
       ;; square of 5
-      (printf "%lld:%lld\n" (t1 5) (t2 5)))
+      (printf "%lld:%lld\n" (t1 5) (t2 5))
       ;; cube of 5 
       (t2.f:[i64,i64]* (lambda (y:i64) (* y y y)))
-      (printf "%lld:%lld\n" (t1 5) (t2 5))))
+      (printf "%lld:%lld\n" (t1 5) (t2 5)))))
 
 
 (my-test19) ;; 5:5 > 25:5 > 25:125
@@ -587,7 +587,7 @@
       (tset! pair 0 a)
       (tset! pair 1 b)
       pair)))
-          
+
 (bind-func car-i64
   (lambda (a:i64list*)
     (tref a 0)))
@@ -600,9 +600,9 @@
 (bind-func my-test25
   (lambda (a:i64list*)
     (if (null? a)
-	(begin (printf "done\n") 1)
-	(begin (printf "%lld\n" (car-i64 a))
-	       (my-test25 (cdr-i64 a))))))
+        (begin (printf "done\n") 1)
+        (begin (printf "%lld\n" (car-i64 a))
+               (my-test25 (cdr-i64 a))))))
 
 ;; build a list (using cons) and then call my-test25
 (bind-func my-test26
@@ -647,15 +647,15 @@
 (bind-func my-test28
   (lambda ()
     (let ((arr:|32,i64|* (alloc))
-	  (arroff (aref-ptr arr 16))
-	  (i 0)
-	  (k 0))
+          (arroff (aref-ptr arr 16))
+          (i 0)
+          (k 0))
       ;; load arr
       (dotimes (i 32) (aset! arr i i))
       (dotimes (k 16)
-	(printf "index: %lld\tarr: %lld\tarroff: %lld\n"
-		k (aref arr k) (pref arroff k))))))
-      
+        (printf "index: %lld\tarr: %lld\tarroff: %lld\n"
+                k (aref arr k) (pref arroff k))))))
+
 (my-test28) ;; print outs
 
 
@@ -675,15 +675,15 @@
 (bind-func my-test29
   (lambda ()
     (let ((tup:tuple-with-array* (stack-alloc))
-	  (t2:|32,i64|* (stack-alloc)))
+          (t2:|32,i64|* (stack-alloc)))
       (aset! t2 0 9)      
       (tset! tup 2 5.5)
       (aset! (aref-ptr (tref-ptr tup 1) 0) 0 0)
       (aset! (aref-ptr (tref-ptr tup 1) 0) 1 1)
       (aset! (aref-ptr (tref-ptr tup 1) 0) 2 2)
       (printf "val: %lld %lld %f\n"
-	      (aref (aref-ptr (tref-ptr tup 1) 0) 1)
-	      (aref t2 0) (ftod (tref tup 2)))
+              (aref (aref-ptr (tref-ptr tup 1) 0) 1)
+              (aref t2 0) (ftod (tref tup 2)))
       (aref (aref-ptr (tref-ptr tup 1) 0) 1))))
 
 (my-test29) ;; val: 1 9 5.5
@@ -799,9 +799,9 @@
   (lambda ()
     (let ((i 0))
       (dotimes (i 100000000)
-	(pset! g_array3 i i))
-      (= (pref g_array3 87654321)
-	 87654321))))
+        (aset! g_array3 i i))
+      (= (aref g_array3 87654321)
+         87654321))))
 
 (test_g_array3)
 
@@ -863,13 +863,13 @@
   (lambda ()
     (let ((b:|5,double|* (zalloc)))
       (aset! b 0
-	(memzone 1024
-	   (let ((a:|10,double|* (zalloc)))
-	     (aset! a 0 3.5)
-	     (aref a 0))))
+             (memzone 1024
+               (let ((a:|10,double|* (zalloc)))
+                 (aset! a 0 3.5)
+                 (aref a 0))))
       (let ((c:|9,i32|* (zalloc)))
-	(aset! c 0 99)
-	(aref b 0)))))
+        (aset! c 0 99)
+        (aref b 0)))))
 
 
 (println (test35)) ;; 3.5
@@ -879,19 +879,19 @@
   (lambda ()
     (memzone 1024
       (let ((k:|15,double|* (zalloc))
-	    (f (lambda (fa:|15,double|*)
-	         (memzone 1024
-		   (let ((a:|10,double|* (zalloc))
-			 (i 0))
-		     (dotimes (i 10)
-		       (aset! a i (* (aref fa i) (random))))
-		   a)))))
-	(f k)))))
+            (f (lambda (fa:|15,double|*)
+                 (memzone 1024
+                   (let ((a:|10,double|* (zalloc))
+                         (i 0))
+                     (dotimes (i 10)
+                       (aset! a i (* (aref fa i) (random))))
+                     a)))))
+        (f k)))))
 
 (bind-func test37
   (lambda ()
     (let ((v (test36))
-	  (i 0))
+          (i 0))
       (dotimes (i 10) (printf "%lld:%f\n" i (aref v i))))))
 
 ;; should print all 0.0's  
@@ -901,12 +901,12 @@
 (bind-func test38
   (lambda ()
     (memzone 1024 (* 44100 10)
-      (let ((a:|5,double|* (alloc)))
-	(aset! a 0 5.5)
-	(aref a 0)))))
+             (let ((a:|5,double|* (alloc)))
+               (aset! a 0 5.5)
+               (aref a 0)))))
 
 (println (test38)) ;; 5.50000
-	     
+
 
 ;;
 ;; Large allocation of memory on BUILD (i.e. when the closure is created)
@@ -944,19 +944,19 @@
   (lambda (queue:|2,list_t*|*)
     (let ((front (aref queue 0)))
       (if (null? front) -1
-	  (let ((val (tref front 0))
-		(back (aref queue 1)))
-	    (aset! queue 0 (tref front 1))
-	    (if (= back front) (aset! queue 1 null))
-	    (free front)
-	    val)))))
+          (let ((val (tref front 0))
+                (back (aref queue 1)))
+            (aset! queue 0 (tref front 1))
+            (if (= back front) (aset! queue 1 null))
+            (free front)
+            val)))))
 
 ;; add to the back of the list
 (bind-func enqueue
   (lambda (queue:|2,list_t*|* value:i64)
     (let ((tmp:list_t* (halloc))
-	  (front (aref queue 0))
-	  (back (aref queue 1)))
+          (front (aref queue 0))
+          (back (aref queue 1)))
       (tset! tmp 0 value)
       (tset! tmp 1 null)
       (if (null? back) 1 (begin (tset! back 1 tmp) 1))
@@ -967,8 +967,8 @@
 (bind-func queue_test
   (lambda ()
     (let ((myqueue:|2,list_t*|* (salloc))
-	  (stuff:|8,i64|* (salloc))
-	  (i 0))
+          (stuff:|8,i64|* (salloc))
+          (i 0))
       ;; first we must set queue front and back to null
       (afill! myqueue null null)
       ;; initialize stuff array
@@ -1008,7 +1008,7 @@
     (let ((i:i64 0))
       ;; 1 billion iterations
       (dotimes (i 1000000000)
-	(* 2 3 4 5 6)))
+        (* 2 3 4 5 6)))
     (printf "finished: %lld\n" a)
     ;; return a^2
     (* a a)))
@@ -1052,57 +1052,6 @@
 ;; implementations each with a uniqute
 ;; type.
 
-;; for example to create the type variable
-;; named 'cos' that ranges over the two
-;; closure types [double,double]* and [float,float]*
-;; you would call the two lines below
-
-(bind-poly cos* cos)
-(bind-poly cos* cosf)
-
-;; the first argument is the polymorphic type name ('cos*')
-;; the second argument is an implementation name ('cos' or 'cosf')
-;; the third argument is the type ([double,double]* or [float,float]*) 
-
-;; now you can let the compiler
-;; decide whether to use cosf or cos
-
-;; here cos defaults to float
-;; this is because in this instance
-;; both [double,double]* and [float,float]*
-;; are acceptable.
-;;
-;; For this ambiguous ocurrence the  this instance the compiler chooses
-;; the last poly bound -> [float,float]*
-(bind-func test40
-  (lambda (a)
-    (cos* a)))
-
-;; you could of course force the issue
-;; to [double,double]* by adding a type to a
-(bind-func test41
-  (lambda (a:double)
-    (cos* a)))
-
-;; in a slightly more complex senario
-;; floorf requires a float
-(bind-func test42
-  (lambda (a)
-    (floorf (cos* a)))) 
-
-;; note that forcing a to double in this case
-;; fails because there is no 
-;; "cos" poly with signature [float,double]*
-
-;; (bind-func test43
-;;   (lambda (a:double)
-;;     (floorf (cos* a))))  ;; this fails although floor would work
-
-
-;; poly variables can be for functions of
-;; mixed argument lengths
-;; 
-;; so for example:
 (bind-func my-func-1
   (lambda (a:i8*)
     (printf "%s\n" a)))
@@ -1116,15 +1065,15 @@
     (printf "%s %s %s\n" a b c)))
 
 ;; bind these three functions to poly 'print'
-(bind-poly print my-func-1)
-(bind-poly print my-func-2)
-(bind-poly print my-func-3)
+(bind-poly myprint my-func-1)
+(bind-poly myprint my-func-2)
+(bind-poly myprint my-func-3)
 
 (bind-func test44
   (lambda (a b c)
-    (print a)
-    (print a b)
-    (print a b c)))
+    (myprint a)
+    (myprint a b)
+    (myprint a b c)))
 
 (test44 "extempore's" "polymorphism" "rocks")
 
@@ -1134,7 +1083,7 @@
 (bind-func my-func-4
   (lambda (a:double)
     (* a a)))
-    
+
 (bind-func my-func-5
   (lambda (a:double)
     (dtoi64 (* a a))))
@@ -1157,216 +1106,6 @@
 (println '-> (test46 5.0))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Generics
-;;
-
-;; generic type
-(bind-type list <!a,list*>)
-
-(bind-func cons:[list*,!,list*]*
-  (lambda (a b)
-    (let ((pair (halloc)))
-      (tset! pair 0 a)
-      (tset! pair 1 b)
-      pair)))
-
-(bind-func head:[!a,list*]*
-  (lambda (a)
-    (tref a 0)))
-
-(bind-func tail:[list*,list*]*
-  (lambda (a)
-    (tref a 1)))
-
-(bind-func car:[!a,list*]*
-  (lambda (a)
-    (tref a 0)))
-
-(bind-func cdr:[list*,list*]*
-  (lambda (a)
-    (tref a 1)))
-
-(bind-func testlist1
-  (lambda (a:i32 b:i32 c:i32)
-    (cons a (cons b (cons c null)))))
-
-(bind-func testlist2
-  (lambda (a:double b:double c:double d:double)
-    (cons a (cons b (cons c (cons d null))))))
-
-(bind-func testlist3
-  (lambda (a:<i32,i64>*)
-    (head (cons a null))))
-
-(bind-func length:[i64,list*]*
-  (lambda (a)    
-    (if (null? a)
-	0
-	(+ 1 (length (cdr a))))))
-
-(bind-func gen_test
-  (lambda ()
-    (let ((l1 (testlist1 1 2 3))
-	  (l2 (testlist2 1.0 2.0 3.0 4.0)))
-      (printf "int:%d double:%f\n" (car (cdr l1)) (car (cdr (cdr l2))))
-      (car (cdr l1))
-      (car (cdr l2))
-      (% 2.0 3.0)
-      (printf "lengths: %lld:%lld\n" (length l1) (length l2))
-      void)))
-
-(gen_test)
-
-
-;; I need these two !heads to be independant
-(bind-func map:[list:<!b,list*>*,[!a,!b]*,list<!a,list*>*]
-  (lambda (func lst)
-    (let ((f (lambda (l)
-	       (if (null? l)
-		   null
-		   (cons (func (car l)) (f (cdr l)))))))
-      (f lst))))
-
-(bind-func map_test
-  (lambda ()
-    (let ((l1 (testlist1 1 2 3))
-	  (ff:[i64,i32]* (lambda (a) (i32toi64 (+ 10 a)))))
-      (let ((l2 (map ff l1)))
-	l2))))
-
-;; A simple specialisation might then be:
-
-(bind-func mymap
-  (lambda (a:i32)
-    (i32tod (+ 10 a))))
-
-(bind-func map_test2
-  (lambda (a:i32 b:i32 c:i32)
-    (let ((l1 (cons a (cons b (cons c null))))
-	  (l2 (map mymap l1)))
-      l2)))
-
-
-
-;; this works  ... yay!!
-(bind-func map_test_a
-  (lambda ()
-    (let ((l1 (testlist1 1 2 3))
-	  (ff:[i64,i32]* (lambda (a) (i32toi64 (+ 10 a)))))
-      (let ((l2 (map ff l1)))
-	(head (tail l2))))))
-
-(println (map_test_a)) ; -> 12
-
-
-(bind-func map_test_b
-  (lambda (a:i32 b:i32 c:i32)
-    (let ((l1 (cons a (cons b (cons c null))))
-	  (ff (lambda (d:i32) (+ 10.0 (i32tod d)))))
-      (let ((l2 (map ff l1)))
-	(head (tail l2))))))
-
-(println (map_test_b 1.0 2.0 3.0)) ; -> 12.0
-
-;; use l1 in l2 (i.e. poly as car of poly
-(bind-func map-test10
-  (lambda (a:i64)
-    (let ((l1 (cons a null))
-	  (l2 (cons l1 null)))
-      (head l2))))
-
-(bind-func map-test20
-  (lambda (l)
-    (map (lambda (s:i8*) (printf "%s " s)) l)))
-
-(bind-func map-test21
-  (lambda ()
-    (car (map-test20 (list "this" "is" "the" "end" "my" "friend")))))
-
-(map-test21)
-(print)
-
-
-(bind-func add-key-value-b
-  (lambda (key:i8* val:double dict:list*)
-    (let ((p:<i8*,double>* (zalloc)))
-      (tfill! p key val)
-      (cons p dict))))
-
-(bind-func value-for-key
-  (lambda (key:i8* dict:list* val:double*)
-    (let ((e:<i8*,double>* (car dict)))
-      (if (null? e)
-	  0
-	  (if (= (strcmp (tref e 0) key) 0)
-	      (begin (pset! val 0 (tref e 1)) 1)
-	      (value-for-key key (cdr dict) val))))))
-
-
-
-
-(bind-type colour <!red,!green,!blue>)
-(bind-type colour2 <!type,!type,!type>)
-
-(bind-func make-colour:[colour*,!red,!green,!blue]
-  (lambda (a b c)
-    (let ((col (alloc)))
-      (tfill! col a b c)
-      col)))
-
-(bind-func make-colour2:[colour2*,!type,!type,!type]
-  (lambda (a b c)
-    (let ((col (alloc)))
-      (tfill! col a b c)
-      col)))
-
-(bind-func drawsomething5
-  (lambda (a:float b:float c:double)
-    (let ((colour (make-colour a b c)))
-      colour)))
-
-(bind-func drawsomething7
-  (lambda (a:float b:float c:float)
-    (let ((colour (make-colour2 a b c)))
-      colour)))
-
-(bind-func drawsomething8
-  (lambda (a:double b:double c:double)
-    (let ((colour (make-colour2 a b c)))
-      colour)))
-    
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; the next two don't work because
-;; they use anoymous lambdas
-
-;; (bind-func map_testb
-;;   (lambda ()
-;;     (let ((l1 (testlist1 1 2 3))
-;; 	  (l2 (map (lambda (a) (+ 10 a)) l1)))
-;;       (head l2))))
-
-;; ;;;;;;; nor does this
-;; (bind-func map_testc
-;;   (lambda ()
-;;     (let ((l1 (testlist1 1 2 3))
-;; 	  (ff (lambda (a) (+ 10 a)))
-;; 	  (kk 5))
-;;       ;; adding anything to let AFTER a lambda creates an error
-;;       ;; my suspician is that the lambda opens something up that
-;;       ;; doesn't get propertly closed again ...
-;;       (let ((l2 (map ff l1)))
-;; 	(head l2)))))
-
-
-;; ALTHOUGH THESE ARE GENERAL PROBLEMS WITH
-;; LAMBDA ... NOT POLYMORPHISM OR GENERICS
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 
 ;;;;;;;;;;;;;;;;;;
 ;; vector types
@@ -1375,23 +1114,21 @@
 (bind-func vtest
   (lambda ()
     (let ((v1:/4,float/* (alloc)) 
-	  (v2:/4,float/* (alloc))
-	  (v3:/4,float/* (alloc)))
+          (v2:/4,float/* (alloc))
+          (v3:/4,float/* (alloc)))
       (vfill! v1 4.0 3.0 2.0 1.0)
       (vfill! v2 1.0 2.0 3.0 4.0)
       (vfill! v3 5.0 5.0 5.0 5.0)       
-      (let ((v4 (* v1 v2))
-	    (v5 (> v3 v4))) ;; unforunately vector conditionals don't work!
-	(printf "mul:%f:%f:%f:%f\n" (ftod (vref v4 0)) (ftod (vref v4 1)) (ftod (vref v4 2)) (ftod (vref v4 3)))	
-	(printf "cmp:%d:%d:%d:%d\n" (i1toi32 (vref v5 0)) (i1toi32 (vref v5 1)) (i1toi32 (vref v5 2)) (i1toi32 (vref v5 3)))
-	void))))
+      (let ((v4 (* v1 v2)))
+        (printf "mul:%f:%f:%f:%f\n" (ftod (vref v4 0)) (ftod (vref v4 1)) (ftod (vref v4 2)) (ftod (vref v4 3)))	
+        void))))
 
 (vtest)
 
 (bind-func vector_test_a
   (lambda ()
     (let ((v1:/4,float/* (alloc))
-	  (v2:/4,float/* (alloc)))
+          (v2:/4,float/* (alloc)))
       (vfill! v1 1.0 2.0 4.0 8.0)
       (vfill! v2 2.0 2.5 2.25 2.125)
       (* v1 v2))))
@@ -1400,47 +1137,47 @@
   (lambda ()
     (let ((a (vector_test_a)))
       (printf "%f:%f:%f:%f\n"
-	      (ftod (vref a 0))
-	      (ftod (vref a 1))
-	      (ftod (vref a 2))
-	      (ftod (vref a 3)))
+              (ftod (vref a 0))
+              (ftod (vref a 1))
+              (ftod (vref a 2))
+              (ftod (vref a 3)))
       void)))
-	   
+
 
 (vector_test)
 
 ;; vectorised sine func
 (bind-func vsinf4
   (let ((p:/4,float/* (alloc))
-	(b:/4,float/* (alloc))
-	(c:/4,float/* (alloc))
-	(f1:/4,float/* (alloc))
-	(f2:/4,float/* (alloc))
-	(i:i32 0)
-	(p_ 0.225)
-	(b_ (dtof (/ 4.0 PI)))
-	(c_ (dtof (/ -4.0 (* PI PI)))))
+        (b:/4,float/* (alloc))
+        (c:/4,float/* (alloc))
+        (f1:/4,float/* (alloc))
+        (f2:/4,float/* (alloc))
+        (i:i32 0)
+        (p_ 0.225)
+        (b_ (dtof (/ 4.0 PI)))
+        (c_ (dtof (/ -4.0 (* PI PI)))))
     (dotimes (i 4) (vset! p i p_) (vset! b i b_) (vset! c i c_))
     (lambda (x:/4,float/)
       ;; no SIMD for abs yet!
       (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
       (let ((y (+ (* b x) (* c x f1))))
-	;; no SIMD for abs yet!
-	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
-	(+ (* p (- (* y f2) y)) y)))))
+        ;; no SIMD for abs yet!
+        (dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+        (+ (* p (- (* y f2) y)) y)))))
 
 (bind-func vcosf4
   (let ((p:/4,float/* (alloc))
-	(b:/4,float/* (alloc))
-	(c:/4,float/* (alloc))
-	(d:/4,float/* (alloc))
-	(f1:/4,float/* (alloc))
-	(f2:/4,float/* (alloc))
-	(i:i32 0)
-	(p_ 0.225)
-	(d_ (dtof (/ PI 2.0)))
-	(b_ (dtof (/ 4.0 PI)))
-	(c_ (dtof (/ -4.0 (* PI PI)))))
+        (b:/4,float/* (alloc))
+        (c:/4,float/* (alloc))
+        (d:/4,float/* (alloc))
+        (f1:/4,float/* (alloc))
+        (f2:/4,float/* (alloc))
+        (i:i32 0)
+        (p_ 0.225)
+        (d_ (dtof (/ PI 2.0)))
+        (b_ (dtof (/ 4.0 PI)))
+        (c_ (dtof (/ -4.0 (* PI PI)))))
     (dotimes (i 4)
       (vset! p i p_) (vset! b i b_) (vset! c i c_) (vset! d i d_))
     (lambda (x:/4,float/)
@@ -1449,9 +1186,9 @@
       ;; no SIMD for abs yet!
       (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
       (let ((y (+ (* b x) (* c x f1))))
-	;; no SIMD for abs yet!
-	(dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
-	(+ (* p (- (* y f2) y)) y)))))
+        ;; no SIMD for abs yet!
+        (dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+        (+ (* p (- (* y f2) y)) y)))))
 
 
 (bind-func testvsinecos
@@ -1459,29 +1196,29 @@
     (let ((a:/4,float/* (alloc)))
       (vfill! a 0.1 0.2 0.3 0.4)
       (let ((b (vsinf4 (pref a 0)))
-	    (c (vcosf4 (pref a 0))))	       
-	(printf "precision inaccuracy is expected:\n")
-	(printf " sinf:\t%f,%f,%f,%f\n"
-		(ftod (sinf 0.1))
-		(ftod (sinf 0.2))
-		(ftod (sinf 0.3))
-		(ftod (sinf 0.4)))
-	(printf "vsinf:\t%f,%f,%f,%f\n"
-		(ftod (vref b 0))
-		(ftod (vref b 1))
-		(ftod (vref b 2))
-		(ftod (vref b 3)))
-	(printf " cosf:\t%f,%f,%f,%f\n"
-		(ftod (cosf 0.1))
-		(ftod (cosf 0.2))
-		(ftod (cosf 0.3))
-		(ftod (cosf 0.4)))
-	(printf "vcosf:\t%f,%f,%f,%f\n"
-		(ftod (vref c 0))
-		(ftod (vref c 1))
-		(ftod (vref c 2))
-		(ftod (vref c 3)))
-	void))))
+            (c (vcosf4 (pref a 0))))	       
+        (printf "precision inaccuracy is expected:\n")
+        (printf " sinf:\t%f,%f,%f,%f\n"
+                (ftod (sinf 0.1))
+                (ftod (sinf 0.2))
+                (ftod (sinf 0.3))
+                (ftod (sinf 0.4)))
+        (printf "vsinf:\t%f,%f,%f,%f\n"
+                (ftod (vref b 0))
+                (ftod (vref b 1))
+                (ftod (vref b 2))
+                (ftod (vref b 3)))
+        (printf " cosf:\t%f,%f,%f,%f\n"
+                (ftod (cosf 0.1))
+                (ftod (cosf 0.2))
+                (ftod (cosf 0.3))
+                (ftod (cosf 0.4)))
+        (printf "vcosf:\t%f,%f,%f,%f\n"
+                (ftod (vref c 0))
+                (ftod (vref c 1))
+                (ftod (vref c 2))
+                (ftod (vref c 3)))
+        void))))
 
 (testvsinecos)
 
@@ -1561,57 +1298,3 @@
   (vtest_c)
   (println 'Vec 'Test 'C '-> 'Seconds (list (- (clock:clock) t))))
 
-
-
-
-
-;; Memory Usage In Extempore Lang
-;; -------------------------------
-
-;; Extempore supports three types of memory allocation: stack allocation,
-;; heap alloation and zone allocation.  The first two of these memory
-;; allocation techniques should be familiar to anyone who has programmed
-;; in C/C++.  The third allocation type presents a type of middle ground
-;; between these two extremes.  Zone allocation in Extempore is in essence
-;; a form of stack allocation whose scope is defined by the user.
-
-;; Stack allocation in extempore is identical to stack allocation in C.
-;; Stack allocation is made using the stack-alloc call (or salloc for
-;; short).  Stack allocations, as in C, are available only for the
-;; duration of the function call.  They are deallocated when the function
-;; returns.
-
-;; (bind-func ex1
-;;   (lambda ()
-;;     (let ((a (stack-alloc double)))
-;;       (aset! a 0 5.5)
-;;       (aref a 0))))
-
-;; This example demonstrates a stack allocation of a single double (8
-;; bytes) bound to the symbol a. The type returned by stack-alloc is
-;; always a pointer to the memory allocated.  In ex1 the instance 'a'
-;; will be of type double* (a:double*).  An optional integer argument
-;; before the requested type results in a multiple allocation.
-
-;; (bind-type vec3 <float,float,float>)
-
-;; (bind-func ex2
-;;   (lambda ()
-     
-
-
-
-;; ;; calls that draw memory from the current zone
-
-;; make-string (literal strings are constant heap allocations)
-;; closures (i.e. lambda)
-;; make-array
-;; make-tuple
-;; zone-alloc
-
-;; ;; call that draw memory from the stack
-;; stack-alloc
-;; just about everything else
-
-;; ;; calls that draw memory from the heap
-;; heap-alloc

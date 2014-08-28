@@ -376,7 +376,7 @@ See `run-hooks'."
        '("\\_<[-+]?[/.[:digit:]]+?\\_>"
          (0 font-lock-constant-face))
        ;; hex literals
-       '("\\_<#x[[:digit:]]+?\\_>"
+       '("\\_<#[xob][[:digit:]]+?\\_>"
          (0 font-lock-constant-face))
        ;; hack to make sure / gets highlighted as a function
        '("\\_</\\_>"
@@ -788,26 +788,6 @@ indentation."
                                 (substring str 1 -1))
     (progn (message "Dropping malformed SLIP packet.")
            nil)))
-
-;; OSC (strings only at the moment)
-
-(defun extempore-make-osc-string (str)
-  (concat str (make-vector (- 4 (mod (length str) 4)) ?\0)))
-
-(defun extempore-extract-osc-string (str &optional start)
-  (and (string-match "[^\0]*" str start)
-       (match-string 0 str)))
-
-(defun extempore-extract-osc-address (str)
-  (extempore-extract-osc-string str 0))
-
-(defun extempore-extract-osc-type-tag (str)
-  (and (string-match ",[^\0]*" str)
-       (substring (match-string 0 str) 1)))
-
-(defun extempore-osc-args-index (str)
-  (and (string-match ",[^\0]*[\0]*" str)
-       (match-end 0)))
 
 ;; correct escaping of eval strings
 
@@ -1566,6 +1546,93 @@ You shouldn't have to modify this list directly, use
 (defun extempore-stop-tr-animation ()
   (extempore-stop-tr-animation-timer)
   (extempore-stop-tr-anim-osc-server))
+
+;;;;;;;;;;;;;;;;
+;; exvis mode ;;
+;;;;;;;;;;;;;;;;
+
+(unless (require 'osc nil t)
+  (warn "OSC library not found.\nThis isn't a problem for normal use, but some advanced features will be disabled."))
+
+(defvar exvis-osc-client nil
+  "OSC client used for sending messages to `exvis-osc-host'")
+(defvar exvis-osc-host (cons "localhost" 9880)
+  "(HOST . PORT) pair")
+
+(define-minor-mode exvis-mode
+  "a minor mode for code visualisation. Requires a visualisation
+backend in Extempore."
+  :global t
+  :init-value nil
+  :lighter " ExVis"
+  :keymap nil
+  :group 'extempore
+
+  (if exvis-mode
+      (exvis-start)
+    (exvis-stop)))
+
+(defun exvis-start ()
+  (unless exvis-osc-client
+    (setq exvis-osc-client
+          (osc-make-client (car exvis-osc-host)
+                           (cdr exvis-osc-host)))
+    (exvis-advise-functions)))
+
+(defun exvis-stop ()
+  (exvis-unadvise-functions)
+  (delete-process exvis-osc-client)
+  (setq exvis-osc-client nil))
+
+;; here are the different OSC messages in the spec
+
+(defun exvis-send-selection-message (selections)
+  (apply #'osc-send-message exvis-osc-client
+         "/interface/selection"
+         (length selections)
+         selections))
+
+(defun exvis-send-code-message (code)
+  (if (not (string= (buffer-name) "*temp*"))
+      (osc-send-message exvis-osc-client
+                        "/interface/code"
+                        code)))
+
+(defun exvis-send-evaluation-message (evaluated-code)
+  (if (not (string= (buffer-name) "*temp*"))
+      (osc-send-message exvis-osc-client
+                        "/interface/evaluate"
+                        evaluated-code)))
+
+(defun exvis-send-error-message (error-message)
+  (if (not (string= (buffer-name) "*temp*"))
+      (osc-send-message exvis-osc-client
+                        "/interface/error"
+                        error-message)))
+
+(defun exvis-send-focus-message (buffer-or-name)
+  (if (not (string= (buffer-name) "*temp*"))
+      (osc-send-message exvis-osc-client
+                        "/interface/focus"
+                        (if (bufferp buffer-or-name)
+                            (buffer-name buffer-or-name)
+                          buffer-or-name))))
+
+(defun exvis-advise-functions ()
+  "Advise (via defadvice) the relevant functions to send the OSC messages"
+  ;; evaluate
+  (defadvice extempore-send-region (before exvis-advice activate)
+    (exvis-send-evaluation-message
+     (apply #'buffer-substring-no-properties (ad-get-args 0))))
+  ;; focus
+  (defadvice switch-to-buffer (before exvis-advice activate)
+    (exvis-send-focus-message (ad-get-arg 0))))
+
+(defun exvis-unadvise-functions ()
+  "Remove exvis advice from functions"  
+  (with-demoted-errors
+    (ad-remove-advice #'extempore-send-region 'before 'exvis-advice)
+    (ad-remove-advice #'switch-to-buffer 'before 'exvis-advice)))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; extempore logger ;;
