@@ -466,7 +466,7 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
   {
     return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + extemp::SchemeFFI::CLOCK_OFFSET;
   } 
-#elseif TARGET_OS_LINUX
+#elif defined(TARGET_OS_LINUX)
   double clock_clock()
   {
     struct timespec t;
