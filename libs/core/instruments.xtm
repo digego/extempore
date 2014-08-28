@@ -114,7 +114,7 @@
 
 (bind-func synth_note_c
   (let ((res 1.0)
-        (fxamp 0.0))
+        (fxamp 0.002))
     (lambda (nargs:i64 dargs:SAMPLE*)
       (let ((oscl (osc_c 0.0))
             (oscl3 (osc_c 0.0))
@@ -127,17 +127,17 @@
             (oscr3 (osc_c 0.25))
             (oscr2 (osc_c 0.25)))
         (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
-          (if (< chan 1.0)
-              (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude
-                 (+ (oscl2 1.0 (+ freq (* 10.0 (random))))
-                    (lpf1 (saw1 fxamp freq) (* 5.0 freq) res)
-                    (oscl 0.8 (+ freq (oscl3 (* 2.01 freq)
-                                             (* freq 1.01))))))
-              (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude	       
-                 (+ (oscr2 1.0 (+ freq (* 5.0 (random))))
-                    (lpf2 (saw2 fxamp freq) (* 3.0 freq) res)
-                    (oscr 0.8 (+ freq (oscr3 (* 0.99 freq)
-                                             (* freq 0.99))))))))))))
+          (cond ((= chan 0)
+                 (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude
+                    (+ (oscl2 1.0 (+ freq (* 10.0 (random))))
+                       (lpf1 (saw1 fxamp freq) (* 5.0 freq) res)
+                       (oscl 0.8 freq))))
+                ((= chan 1)
+                 (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude	       
+                    (+ (oscr2 1.0 (+ freq (* 5.0 (random))))
+                       (lpf2 (saw2 fxamp freq) (* 3.0 freq) res)
+                       (oscr 0.8 freq))))
+                (else 0.0)))))))
 
 
 (bind-func synth_fx 262144
