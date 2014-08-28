@@ -82,6 +82,8 @@ char* base64_encode(const unsigned char *data,size_t input_length,size_t *output
 unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
 char* cname_encode(char *data,size_t input_length,size_t *output_length);
   char* cname_decode(char *data,size_t input_length,size_t *output_length);
+ double clock_clock();
+
 
 }
 

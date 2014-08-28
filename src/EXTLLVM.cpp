@@ -400,7 +400,8 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
 #ifdef TARGET_OS_WINDOWS
     zone->memory = malloc((size_t) size);
 #else
-    zone->memory = valloc((size_t) size);
+    // zone->memory = malloc((size_t) size);
+    posix_memalign(&zone->memory,LLVM_ZONE_ALIGN,(size_t)size);
 #endif
     zone->mark = 0;
     zone->offset = 0;
@@ -1397,7 +1398,7 @@ namespace extemp {
 	
     EXTLLVM EXTLLVM::SINGLETON;
     int64_t EXTLLVM::LLVM_COUNT = 0l;
-    bool EXTLLVM::OPTIMIZE_COMPILES = 1;
+    bool EXTLLVM::OPTIMIZE_COMPILES = 0;
     bool EXTLLVM::VERIFY_COMPILES = 1;
 	
     EXTLLVM::EXTLLVM()
@@ -1699,7 +1700,11 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("cname_encode"));
 	    EE->updateGlobalMapping(gv,(void*)&cname_encode);
 	    gv = M->getNamedValue(std::string("cname_decode"));
-	    EE->updateGlobalMapping(gv,(void*)&cname_decode);		
+	    EE->updateGlobalMapping(gv,(void*)&cname_decode);
+      
+      gv = M->getNamedValue(std::string("clock_clock"));
+      EE->updateGlobalMapping(gv,(void*)&clock_clock);
+      
 
 	    // add scheme bits
 	    gv = M->getNamedValue(std::string("r64value"));
