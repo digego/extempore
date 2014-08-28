@@ -460,17 +460,24 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 	return result;
 }
 
+
 #ifdef TARGET_OS_MAC
   double clock_clock()
   {
     return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + extemp::SchemeFFI::CLOCK_OFFSET;
   } 
-#else
+#elseif TARGET_OS_LINUX
   double clock_clock()
   {
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
-    return time_to_double(t)+extemp::SchemeFFI::CLOCK_OFFSET;
+    double t2 = (double)t.tv_sec + ((double)t.tv_nsec)/D_BILLION;    
+    return t2+extemp::SchemeFFI::CLOCK_OFFSET;
+  }
+#else
+   double clock_clock() {
+  // not implemented on windows!
+  return 0.0;
   }
 #endif
 
