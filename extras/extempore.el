@@ -1593,26 +1593,30 @@ backend in Extempore."
          selections))
 
 (defun exvis-send-code-message (code)
-  (osc-send-message exvis-osc-client
-                    "/interface/code"
-                    code))
+  (if (not (string= (buffer-name) "*temp*"))
+      (osc-send-message exvis-osc-client
+                        "/interface/code"
+                        code)))
 
 (defun exvis-send-evaluation-message (evaluated-code)
-  (osc-send-message exvis-osc-client
-                    "/interface/evaluate"
-                    evaluated-code))
+  (if (not (string= (buffer-name) "*temp*"))
+      (osc-send-message exvis-osc-client
+                        "/interface/evaluate"
+                        evaluated-code)))
 
 (defun exvis-send-error-message (error-message)
-  (osc-send-message exvis-osc-client
-                    "/interface/error"
-                    error-message))
+  (if (not (string= (buffer-name) "*temp*"))
+      (osc-send-message exvis-osc-client
+                        "/interface/error"
+                        error-message)))
 
 (defun exvis-send-focus-message (buffer-or-name)
-  (osc-send-message exvis-osc-client
-                    "/interface/focus"
-                    (if (bufferp buffer-or-name)
-                        (buffer-name buffer-or-name)
-                      buffer-or-name)))
+  (if (not (string= (buffer-name) "*temp*"))
+      (osc-send-message exvis-osc-client
+                        "/interface/focus"
+                        (if (bufferp buffer-or-name)
+                            (buffer-name buffer-or-name)
+                          buffer-or-name))))
 
 (defun exvis-advise-functions ()
   "Advise (via defadvice) the relevant functions to send the OSC messages"
