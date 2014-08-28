@@ -760,8 +760,11 @@
   (lambda (ast)
     ;; (if (not (number? (eval (cadr ast))))
     ;;     (impc:compiler:print-needs-zone-size-error 'letz)
-    (impc:ti:memzone `(memzone ,(cadr ast)
-                               (let ,(caddr ast) ,@(cdddr ast))))))
+    (if (list? (caadr ast))
+        (impc:ti:memzone `(memzone ,(* 1024 8)
+                                   (let ,(cadr ast) ,@(cddr ast))))
+        (impc:ti:memzone `(memzone ,(cadr ast)
+                                   (let ,(caddr ast) ,@(cdddr ast)))))))
 
 
 (define impc:ti:callback
