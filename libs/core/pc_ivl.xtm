@@ -299,11 +299,22 @@
       (if (null? pc) 
           -1
           (let loop ((val (random lower upper)) (count 0))
-             (if (> count 50) 
-                 -1                   
+             (if (> count 40) 
+                 (pc:exhaustive lower upper pc)             
                  (if (memv (modulo val 12) pc) 
                      val
                      (loop (random lower upper) (+ count 1))))))))
+
+(define pc:exhaustive
+  (lambda (lower upper pc)
+    (if (null? pc)
+      -1)
+    (let loop ((val lower))
+      (if (> val upper)
+        -1
+        (if (memv (modulo val 12) pc)
+          val
+          (loop (+ val 1)))))))
 
 ;; select pitch from pitch class relative to a given pitch
 ;; 
@@ -682,4 +693,5 @@
               (ivl:melody-by-ivl (+ starting-pitch (car ivls)) (cdr ivls) 
                                  (cons (+ starting-pitch (car ivls)) (car args)))))))
 
+(println "Loaded pc-ivl.xtm library\n")
                  
