@@ -292,18 +292,16 @@
 ;; arg 2: upper bound (exclusive)
 ;; arg 3: pitch class
 ;;
-;; returns -1 if no valid pitch was found 
+;; returns -1 if no valid pitch is possible
 ;;
 (define pc:random
-   (lambda (lower upper pc)
-      (if (null? pc) 
-          -1
-          (let loop ((val (random lower upper)) (count 0))
-             (if (> count 50) 
-                 -1                   
-                 (if (memv (modulo val 12) pc) 
-                     val
-                     (loop (random lower upper) (+ count 1))))))))
+  (lambda (lower upper pc)
+    (if (null? pc) -1
+        (let ((choices (filter (lambda (x) (pc:? x pc)) (range lower upper))))
+          (if (null? choices) -1
+              (random choices))))))
+
+
 
 ;; select pitch from pitch class relative to a given pitch
 ;; 
