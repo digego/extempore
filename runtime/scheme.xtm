@@ -201,15 +201,15 @@
 	     (loop (cdr lst) (+ count (caar lst)))))))
 
 (define (random . args)
-   (cond ((< (length args) 1)
-	  (random-real))
-	 ((list? (car args))
-	  (list-ref (car args) (random (length (car args)))))
-	 ((pair? (car args))
-	  (apply weighted-selection args))
-	 (else (let ((lower (if (> (length args) 1) (car args) 0))
-		     (upper (if (> (length args) 1) (cadr args) (car args))))
-		  (+ lower (random-int (- upper lower)))))))
+  (cond ((< (length args) 1)
+         (random-real))
+        ((list? (car args))
+         (list-ref (car args) (random (length (car args)))))
+        ((pair? (car args))
+         (apply weighted-selection args))
+        (else (let ((lower (if (> (length args) 1) (real->integer (car args)) 0))
+                    (upper (if (> (length args) 1) (cadr args) (car args))))
+                (+ lower (random-int (- upper lower)))))))
 
 ;;
 ;; EXTERNAL CPP STUFF AND CALLBACK FUNCTIONS
