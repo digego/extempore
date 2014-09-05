@@ -26,8 +26,8 @@ external/audio_dsp_ext.xtm \
 external/instruments_ext.xtm \
 external/rtmidi.xtm \
 external/glib.xtm \
-external/opengl.xtm \
 external/soil.xtm \
+external/opengl.xtm \
 external/shaders.xtm \
 external/assimp.xtm \
 external/openvg.xtm"}
