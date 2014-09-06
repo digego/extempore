@@ -2474,11 +2474,13 @@
                           #t))
 	     	 (begin ;; (println '----matched-polytype-1: gt '-> tt)
 	     	   (if (symbol? tt)
-	     	       (if (null? (cdr (assoc-strcmp tt vars)))
-	     		   (impc:ti:update-var gt vars kts (list tt))			   
-	        	   (begin
-	        	     (impc:ti:update-var gt vars kts (impc:ti:type-unify (cdr (assoc-strcmp tt vars)) vars))))
-	     	       (impc:ti:update-var gt vars kts (impc:ti:type-unify tt vars)))))
+               (if (not (assoc-strcmp tt vars))
+                   (print-error "Catastrophic compiler error: type missing from VARs")
+                   (if (null? (cdr (assoc-strcmp tt vars)))
+                       (impc:ti:update-var gt vars kts (list tt))			   
+                       (begin
+                         (impc:ti:update-var gt vars kts (impc:ti:type-unify (cdr (assoc-strcmp tt vars)) vars))))
+                   (impc:ti:update-var gt vars kts (impc:ti:type-unify tt vars))))))
              
 	     (if (atom? tt)
 		 (set! tt (list tt)))
@@ -6098,12 +6100,12 @@
           'donothing))))
 
 
-(define-macro (bind-type symbol type)
+(define-macro (bind-type symbol type . args)
   (if *impc:compiler:precomp-llvm*
       (emit (sexpr->string
-	     `(bind-type ,symbol ,type))
-	    "\n\n"
-	    *impc:compiler:precomp*))
+             `(bind-type ,symbol ,type))
+            "\n\n"
+            *impc:compiler:precomp*))
   (if (<> (impc:ir:get-ptr-depth type) 0)
       (impc:compiler:print-bad-type-error type "cannot be a pointer"))
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<)
@@ -6128,15 +6130,18 @@
                                                  (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str
                                                                         newtype
                                                                         ,(symbol->string symbol)))))))
-	      (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
+              (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
           (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type)
-          ;; now compile data constructor          
-          (build-type-dataconstructor
-           ',symbol
-           (if (impc:ir:gpolytype-types ',symbol)
-               (symbol->string (impc:ir:gpolytype-types ',symbol))
-               (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))
-           (if (impc:ir:gpolytype-types ',symbol) #t #f))))
+          ;; now compile data constructor
+          ,(if (or (null? args)
+                   (car args))
+               `(build-type-dataconstructor
+                 ',symbol
+                 (if (impc:ir:gpolytype-types ',symbol)
+                     (symbol->string (impc:ir:gpolytype-types ',symbol))
+                     (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))
+                 (if (impc:ir:gpolytype-types ',symbol) #t #f)))
+          ))
 
 
 
