@@ -359,8 +359,8 @@
         (o2 (osc_c (* 0.5 SPI))) 
         (cl (chorus_c 0.0))
         (cr (chorus_c 0.314))
-        (del1 (delay_c (convert (/ SR 2.0))))
-        (del2 (delay_c (convert (/ SR 3.0))))
+        (del1 (delay_c (convert (/ SRf 2.0))))
+        (del2 (delay_c (convert (/ SRf 3.0))))
         (lpfl (lpf_c))
         (lpfr (lpf_c))
         (res 0.4)        
@@ -452,13 +452,13 @@
   (let ((cl (chorus_mc_c 2 0.0))
         (lpf (lpf_mc_c 2))
         (del (delay_t_st_c
-              (convert (* SR (/ 1.0 2.1)))
-              (convert (* SR (/ 1.0 2.0))) 0))
+              (convert (* SRf (/ 1.0 2.1)))
+              (convert (* SRf (/ 1.0 2.0))) 0))
         (h (hann_t_mc_c 0)))
     (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (del chan (* 1.0
                    (lpf chan (cl chan in 1.0 0.6)
-                        (+ 350.0 (* 3000.0 (h chan time (convert (* SR 8.)))))
+                        (+ 350.0 (* 3000.0 (h chan time (convert (* SRf 8.)))))
                         0.75))
            time 0.8 0.5))))
 

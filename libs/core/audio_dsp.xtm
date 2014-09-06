@@ -51,7 +51,8 @@
 ;; bind some global audio values
 (if (not (llvm:get-globalvar "SAMPLERATE"))
     (begin (bind-val SAMPLERATE SAMPLE (integer->real *au:samplerate*))
-           (bind-val SR SAMPLE (integer->real *au:samplerate*))))
+           (bind-val SRf SAMPLE (integer->real *au:samplerate*))
+           (bind-val SR i64 *au:samplerate*)))
 (if (not (llvm:get-globalvar "CHANNELS"))
     (bind-val CHANNELS i64 *au:channels*))
 (if (not (llvm:get-globalvar "IN_CHANNELS"))
@@ -70,9 +71,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; silence
-(bind-func dsp:DSP
-  (lambda (in time chan dat)
-    0.0))
+;; (bind-func dsp:DSP
+;;   (lambda (in time chan dat)
+;;     0.0))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -97,11 +98,11 @@
                       (+ (* t m) c))))))
       (Metronome tempoR 0 offset beat (Rat 4 1)
                  (line (Rat offset 1) beat
-                       (+ offset (* tempoR (convert SR i64)))
+                       (+ offset (* tempoR SR))
                        (+ beat 1/1))
                  (line beat (Rat offset 1)
                        (+ beat 1/1)
-                       (+ offset (* tempoR (convert SR i64))))))))
+                       (+ offset (* tempoR SR)))))))
 
 (bind-func MakeMetro_1
   (lambda (tempo)
@@ -127,7 +128,7 @@
   (lambda (m:Metronome* q:Rational)
     (let ((val (+ (tref m 3) ;; total beats
                   (/ (- (now) (tref m 2)) ;; mark
-                     (* (convert SR i64) (tref m 0)))))
+                     (* SR (tref m 0)))))
           (q2 (- q (% val q))))
       (+ val (- q (% val q))))))
 
@@ -137,7 +138,7 @@
 
 (bind-func metro_get_duration
   (lambda (m:Metronome* dur:Rational)
-    (convert (* SR (* dur (tref m 0))) i64)))
+    (convert (* SRf (* dur (tref m 0))) i64)))
 
 (bind-func print_metronome:[void,Metronome*]*
   (lambda (m)
@@ -473,7 +474,7 @@
 (bind-func fade_c
   (lambda ()
     (let ((t 0.0)
-          (inc (/ 1.0 SR)))
+          (inc (/ 1.0 SRf)))
       (lambda (initial:SAMPLE final dur)
         (set! t (+ t inc))
         (if (> t dur)
@@ -982,7 +983,7 @@ takes input pointer |6,SAMPLE|* and fills it:
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res outarray:|6,SAMPLE|*)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SR))))
+	      (set! g (tan (* SPI (/ cutoff SRf))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1017,7 +1018,7 @@ takes input pointer |6,SAMPLE|* and fills it:
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SR))))
+	      (set! g (tan (* SPI (/ cutoff SRf))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1046,7 +1047,7 @@ but v1 and v2 can be computed in parallel"
           (a1 0.0) (a2 0.0) (a3 0.0)
           (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
 	    (lambda (in cutoff res)
-	      (set! g (tan (* SPI (/ cutoff SR))))
+	      (set! g (tan (* SPI (/ cutoff SRf))))
         (set! k (- 2.0 (* 2.0:float res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k )))))
         (set! a2 (* g a1))
@@ -1077,7 +1078,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SR))))
+	      (set! g (tan (* SPI (/ cutoff SRf))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1106,7 +1107,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SR))))
+	      (set! g (tan (* SPI (/ cutoff SRf))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1135,7 +1136,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SR))))
+	      (set! g (tan (* SPI (/ cutoff SRf))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1164,7 +1165,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SR))))
+	      (set! g (tan (* SPI (/ cutoff SRf))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1196,7 +1197,7 @@ but v1 and v2 can be computed in parallel"
 	    (lambda (in cutoff gain Q)
         ;; one option: do the check (= res oldres) trick here
 	      (set! A (pow 10.0 (/ gain 40.0)))
-        (set! g (/ (tan (* SPI (/ cutoff SR)))
+        (set! g (/ (tan (* SPI (/ cutoff SRf)))
                    (sqrt A)))
         (set! k (/ 1.0 Q))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
@@ -1234,7 +1235,7 @@ but v1 and v2 can be computed in parallel"
 	    (lambda (in cutoff gain Q)
         ;; one option: do the check (= res oldres) trick here
 	      (set! A (pow 10.0 (/ gain 40.0)))
-        (set! g (/ (tan (* SPI (/ cutoff SR)))
+        (set! g (/ (tan (* SPI (/ cutoff SRf)))
                    (sqrt A)))
         (set! k (/ 1.0 Q))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
@@ -1272,7 +1273,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SR))))
+	      (set! g (tan (* SPI (/ cutoff SRf))))
         (set! k (* 2.0 res))
         (set! a0 (/ 1.0 (- (* (+ 1.0 g)
                               (+ 1.0 g))
@@ -1570,7 +1571,7 @@ but v1 and v2 can be computed in parallel"
 (bind-func env_follow_c
   (lambda (ms:SAMPLE)
     (let ((y1 0.0)
-          (coeff (/ 1000. (* ms SR))))      
+          (coeff (/ 1000. (* ms SRf))))      
       (lambda (x:SAMPLE)
         (set! y1 (+ x (* coeff (- y1 x))))
         y1))))
@@ -1579,8 +1580,8 @@ but v1 and v2 can be computed in parallel"
 (bind-func atkrel_env_follow_c
   (lambda (atk:SAMPLE rel:SAMPLE)
     (let ((y1 0.0)
-          (atkcoeff (/ 1000. (* atk SR)))
-          (relcoeff (/ 1000. (* rel SR))))          
+          (atkcoeff (/ 1000. (* atk SRf)))
+          (relcoeff (/ 1000. (* rel SRf))))          
       (lambda (x)
         (set! y1 (+ x (* (if (> x y1) atkcoeff relcoeff) (- y1 x))))
         y1))))
