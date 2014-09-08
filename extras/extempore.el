@@ -1576,57 +1576,73 @@ backend in Extempore."
   (unless exvis-osc-client
     (setq exvis-osc-client
           (osc-make-client (car exvis-osc-host)
-                           (cdr exvis-osc-host)))
-    (exvis-advise-functions)))
+                           (cdr exvis-osc-host))))
+  (add-hook 'post-command-hook 'exvis-post-command-hook)
+  (exvis-advise-functions))
 
 (defun exvis-stop ()
+  (remove-hook 'post-command-hook 'exvis-post-command-hook)
   (exvis-unadvise-functions)
   (delete-process exvis-osc-client)
   (setq exvis-osc-client nil))
 
 ;; here are the different OSC messages in the spec
 
-(defun exvis-send-selection-message (selections)
-  (apply #'osc-send-message exvis-osc-client
-         "/interface/selection"
-         (length selections)
-         selections))
+;; (defun exvis-send-selection-message (selections)
+;;   (apply #'osc-send-message exvis-osc-client
+;;          "/interface/selection"
+;;          (length selections)
+;;          selections))
 
 (defun exvis-send-code-message (code)
-  (if (not (string= (buffer-name) "*temp*"))
+  (if exvis-osc-client
       (osc-send-message exvis-osc-client
                         "/interface/code"
                         code)))
 
 (defun exvis-send-evaluation-message (evaluated-code)
-  (if (not (string= (buffer-name) "*temp*"))
+  (if exvis-osc-client
       (osc-send-message exvis-osc-client
                         "/interface/evaluate"
                         evaluated-code)))
 
-(defun exvis-send-error-message (error-message)
-  (if (not (string= (buffer-name) "*temp*"))
-      (osc-send-message exvis-osc-client
-                        "/interface/error"
-                        error-message)))
+;; (defun exvis-send-error-message (error-message)
+;;   (osc-send-message exvis-osc-client
+;;                     "/interface/error"
+;;                     error-message))
 
 (defun exvis-send-focus-message (buffer-or-name)
-  (if (not (string= (buffer-name) "*temp*"))
+  (if (and exvis-osc-client
+           (equal (with-current-buffer buffer-or-name major-mode)
+                  'extempore-mode))
       (osc-send-message exvis-osc-client
                         "/interface/focus"
                         (if (bufferp buffer-or-name)
                             (buffer-name buffer-or-name)
                           buffer-or-name))))
 
+(defun exvis-post-command-hook ()
+  (let (deactivate-mark)
+    (if (and (equal major-mode 'extempore-mode)
+             (symbolp this-command)
+             (string-match (regexp-opt '("sp-" "-line" "-word" "-char" "insert"))
+                           (symbol-name this-command)))
+        (exvis-send-evaluation-message
+         (buffer-substring-no-properties (point-min) (point-max))))))
+
 (defun exvis-advise-functions ()
   "Advise (via defadvice) the relevant functions to send the OSC messages"
   ;; evaluate
   (defadvice extempore-send-region (before exvis-advice activate)
     (exvis-send-evaluation-message
-     (apply #'buffer-substring-no-properties (ad-get-args 0))))
+     (let ((args (ad-get-args 0)))
+       (if args
+           (apply #'buffer-substring-no-properties args)))))
   ;; focus
   (defadvice switch-to-buffer (before exvis-advice activate)
-    (exvis-send-focus-message (ad-get-arg 0))))
+    (let ((buffer-or-name (ad-get-arg 0)))
+      (if buffer-or-name
+          (exvis-send-focus-message buffer-or-name)))))
 
 (defun exvis-unadvise-functions ()
   "Remove exvis advice from functions"  
