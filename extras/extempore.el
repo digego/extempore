@@ -1552,7 +1552,7 @@ You shouldn't have to modify this list directly, use
 ;;;;;;;;;;;;;;;;
 
 (unless (require 'osc nil t)
-  (warn "OSC library not found.\nThis isn't a problem for normal use, but some advanced features will be disabled."))
+  (warn "OSC library not found.\nThis isn't a problem for normal use, but the ExVis minor mode will be disabled."))
 
 (defvar exvis-osc-client nil
   "OSC client used for sending messages to `exvis-osc-host'")
