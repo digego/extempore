@@ -45,6 +45,7 @@
 #endif
 
 #include <string>
+#include <vector>
 
 #ifdef TARGET_OS_WINDOWS
 #include <SDKDDKVer.h>
@@ -113,12 +114,15 @@ class UNIV {
 	static const char* PWD;
   static uint32_t EXT_TERM;
   static uint32_t EXT_LOADSTD;
-        static uint32_t AUDIO_DEVICE;
-        static uint32_t AUDIO_IN_DEVICE;
-        static std::map<std::string,std::string> CMDPARAMS;
+  static uint32_t AUDIO_DEVICE;
+  static uint32_t AUDIO_IN_DEVICE;
+  static std::map<std::string,std::string> CMDPARAMS;
+  static std::vector<std::string> ARCH;
+  static std::vector<std::string> ATTRS;
+  static std::vector<std::string> CPU;  
 #ifdef EXT_BOOST
-        static boost::mt19937 RNGGEN;
-        static boost::uniform_01<boost::mt19937> RNG;
+  static boost::mt19937 RNGGEN;
+  static boost::uniform_01<boost::mt19937> RNG;
         //static boost::random::uniform_01<boost::random::mt19937> RNG(RNGGEN);
 #endif
 

@@ -71,7 +71,8 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 enum { OPT_RUNTIME, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES, 
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITFILE, 
        OPT_PORT, OPT_TERM, OPT_DEVICE, OPT_IN_DEVICE,
-       OPT_PRT_DEVICES, OPT_REALTIME, OPT_HELP
+       OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
+       OPT_HELP
      };
 
 CSimpleOptA::SOption g_rgOptions[] = {
@@ -89,6 +90,9 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_IN_DEVICE,   "--indevice",      SO_REQ_SEP    },
     { OPT_PRT_DEVICES, "--print-devices", SO_NONE       },
     { OPT_REALTIME,    "--realtime",      SO_NONE       },
+    { OPT_ARCH,        "--arch",          SO_REQ_SEP    },
+    { OPT_CPU,         "--cpu",           SO_REQ_SEP    },
+    { OPT_ATTR,        "--attr",          SO_MULTI      },     
     { OPT_HELP,        "--help",          SO_NONE       },
     SO_END_OF_OPTIONS                       // END
 };
@@ -174,7 +178,16 @@ int main(int argc, char** argv)
 #else
 	  std::cout << "Realtime priority setting not available on your platform" << std::endl;
 #endif
-          break;
+    break;
+  case OPT_ARCH:
+    extemp::UNIV::ARCH.push_back(std::string(args.OptionArg()));
+    break;
+  case OPT_CPU:
+    extemp::UNIV::CPU.push_back(std::string(args.OptionArg()));
+    break;
+  case OPT_ATTR:
+    extemp::UNIV::ATTRS.push_back(std::string(args.OptionArg()));
+    break;
         case OPT_HELP:
 	default:    
 	  std::cout << "Extempore's command line options: " << std::endl;
@@ -189,7 +202,10 @@ int main(int argc, char** argv)
 	  std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
 	  std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
 	  std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
-	  std::cout << "        --indevice: the index of the audio input device to use" << std::endl;	
+	  std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
+    std::cout << "            --arch: the target architecture [current host]" << std::endl;
+    std::cout << "             --cpu: the target cpu [current host]" << std::endl;
+    std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;  
 	  std::cout << "   --print-devices: print the available audio devices to console" << std::endl;	
 	  return -1;
 	}
@@ -230,7 +246,7 @@ int main(int argc, char** argv)
 #endif
 
     extemp::AudioDevice* dev = extemp::AudioDevice::I();
-    dev->start();    
+    dev->start();
     ascii_text_color(0,7,10);	        
     std::cout << "---------------------------------------" << std::endl;
     ascii_text_color(0,9,10);	            

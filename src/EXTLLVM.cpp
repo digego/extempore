@@ -937,7 +937,7 @@ int mutex_trylock(void* mutex) {
 
 void* llvm_memset(void* ptr, int32_t c, int64_t n)
 {
-    return memset(ptr, c, n);
+    return memset(ptr, c, (size_t)n);
 }
 
 
@@ -1421,6 +1421,8 @@ namespace extemp {
           llvm::TargetOptions Opts;
           Opts.GuaranteedTailCallOpt = true;
           Opts.JITEmitDebugInfo = true;
+          Opts.UnsafeFPMath = false;
+          
   
           llvm::InitializeNativeTarget();
           llvm::InitializeNativeTargetAsmPrinter();
@@ -1436,10 +1438,13 @@ namespace extemp {
           factory.setAllocateGVsWithCode(false);
           factory.setTargetOptions(Opts);
           factory.setUseMCJIT(false);
+          if(!extemp::UNIV::ARCH.empty()) factory.setMArch(extemp::UNIV::ARCH.front());
+          if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
+          if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
           factory.setOptLevel(llvm::CodeGenOpt::Aggressive); // llvm::CodeGenOpt::None
+          llvm::TargetMachine* tm = factory.selectTarget();          
           //factory.setOptLevel(llvm::CodeGenOpt::None);
-
-          EE = factory.create();
+          EE = factory.create(tm);
           EE->DisableLazyCompilation(true);
 
 	    // //llvm::llvm_start_multithreaded();
@@ -1454,6 +1459,19 @@ namespace extemp {
 	    // }
 	    // EE->DisableLazyCompilation(true);
 	    // //std::cout << "Lazy Compilation: OFF" << std::endl;
+          ascii_text_color(0,7,10);
+          std::cout << "ARCH\t\t: " << std::flush;
+          ascii_text_color(1,6,10);	        
+          std::cout << std::string(tm->getTargetTriple()) << std::endl;
+          ascii_text_color(0,7,10);	        
+          std::cout << "CPU\t\t: " << std::flush;
+          ascii_text_color(1,6,10);	        
+          std::cout << std::string(tm->getTargetCPU()) << std::endl;
+          ascii_text_color(0,7,10);	                  
+          std::cout << "ATTRS\t\t: " << std::flush;
+          ascii_text_color(1,6,10);	        
+          std::cout << std::string(tm->getTargetFeatureString()) << std::endl;          
+          ascii_text_color(0,7,10);	            
 
 			
 	    //EE = llvm::EngineBuilder(M).create();
