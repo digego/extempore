@@ -6131,7 +6131,7 @@
                                                                         newtype
                                                                         ,(symbol->string symbol)))))))
               (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
-          (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type)
+          (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type args)
           ;; now compile data constructor
           ,(if (or (null? args)
                    (car args))
@@ -6308,44 +6308,12 @@
      (if (llvm:get-function ,(string-append (symbol->string symname) "_scheme"))         
          (llvm:erase-function ,(string-append (symbol->string symname) "_scheme")))))
 
-
-;;; this here for bindig to existing types
-;;
-;;
 (define-macro (bind-lib-type library name type . args)
-  (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
-         (namestr (symbol->string name))
-         (typestr (symbol->string type)) 
-         (dctype (string-append "[" namestr "*," (string-join a ",") "]*"))
-         (ptype (string-append "[void," namestr "*]*")))
-    `(begin
-       (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
-       (bind-lib-func ,library ,name ,(string->symbol dctype))
-       (bind-lib-func ,library ,(string->symbol (string-append namestr "_h")) ,(string->symbol dctype)))))
-
-(define-macro (bind-lib-type-precomp library name type . args)
   (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
     `(begin
        (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr)))))))
-
-;;; this here for bindig to existing types
-;;
-;; this is exactly the same as one above
-;; but DOESN't compile scheme wrappers
-;;
-(define-macro (bind-lib-type-no-scm library name type . args)
-  (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
-         (namestr (symbol->string name))
-         (typestr (symbol->string type))          
-         (dctype (string-append "[" namestr "*," (string-join a ",") "]*"))
-         (ptype (string-append "[void," namestr "*]*")))
-    `(begin
-       (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
-       (bind-lib-func-no-scm ,library ,name ,(string->symbol dctype))
-       (bind-lib-func-no-scm ,library ,(string->symbol (string-append namestr "_h")) ,(string->symbol dctype)))))
-
 
 ;;; this here for binding to CLOSURE in dylib
 ;;
