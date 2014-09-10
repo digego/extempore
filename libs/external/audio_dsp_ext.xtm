@@ -65,7 +65,7 @@
       (printf "IR:(%.1f seconds) Partitions(size:%lld num:%lld)\n" (ftod (/ (convert irlgth) (convert SR))) lgth parts)
       ;; partition and store IR spectra (circlar convolution so padded)
       (dotimes (i parts)
-        (memset (cast A i8*) 0 (* cpxSAMPLE_SIZE padlgth)) ;; zero pad
+        (memset (cast A i8*) 0 (convert (* cpxSAMPLE_SIZE padlgth))) ;; zero pad
         (read_audio_data path output (* i lgth) lgth 0)
         (fill_cpx_buffer output A lgth)
         (fft A (pref-ptr irs (* i padlgth)) padlgth))
@@ -87,7 +87,7 @@
               ;; forward FFT of incoming signal
               (fftr (if aorb drya dryb) B padlgth)
               ;; store FFT to use 'now' and also for 'delayed' use
-              (memcpy (cast _fft i8*) (cast B i8*) (* padlgth cpxSAMPLE_SIZE))
+              (memcpy (cast _fft i8*) (cast B i8*) (convert (* padlgth cpxSAMPLE_SIZE)))
               ;; run convolution over all partions
               (dotimes (i parts)
                 (set! j (% (+ parts (- po i)) parts))

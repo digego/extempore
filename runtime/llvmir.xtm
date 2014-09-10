@@ -93,6 +93,9 @@
 ;; NOT including global symbols
 (define *impc:ir:sym-name-stack* '())
 
+;; type of size_t on platform
+(define *impc:ir:size_t_str* (if (= 64 (sys:pointer-size)) "i64" "i32"))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Compiler error printing
 
@@ -963,7 +966,9 @@
     (cond ((and type (list? type))
            (set! type (map (lambda (x)
                              (if (string? x)
-                                 (cadr (regex:matched x "%([^-*]*)"))
+                                 (if (regex:match? x "_poly_")
+                                    (cadr (regex:matched x "%(.*)_poly_.*"))
+                                    (cadr (regex:matched x "%([^-*]*)")))
                                  "_"))
                            (if (and (number? (car type))
                                     (impc:ir:closure? type))
@@ -2053,17 +2058,24 @@
          (emit "; malloc closure structure\n" os2)
          (define cstruct closure-struct-str)
          (emit (impc:ir:gname "val" "i8*") " = getelementptr " cstruct "* null, i32 1\n" os2)
-         (emit (impc:ir:gname "size" "i64") " = ptrtoint " cstruct "* " (car (impc:ir:gname 1)) " to i64\n" os2)
+         (emit (impc:ir:gname "size" *impc:ir:size_t_str*) " = ptrtoint " cstruct "* "
+               (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os2)
          (cond ((eq? (car ast) '__make-closure-h)
                 (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @malloc("
-                      "i64 " (car (impc:ir:gname "size")) ")\n" os2))
+                      (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size")) ")\n" os2))
                ((eq? (car ast) '__make-closure-s)
                 (emit (impc:ir:gname "clsptr" "i8*") " = alloca i8"
                       ", " (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size"))
                       ", align 16\n" os2))
                (else
-                (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
-                      "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "size")) ")\n" os2)))
+                (if (string=? (cadr (impc:ir:gname "size")) "i32")
+                    (begin 
+                      (emit (impc:ir:gname "sizeb" "i64") " = zext i32 " (car (impc:ir:gname "size")) " to i64" os2)
+                      (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
+                            "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "sizeb")) ")\n" os2))
+                    (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
+                          "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "size")) ")\n" os2))))
+                    
          (emit (impc:ir:gname "closure" (string-append cstruct "*")) 
 	       " = bitcast i8* " (car (impc:ir:gname "clsptr")) 
 	       " to " cstruct "*\n" os2)
@@ -2071,17 +2083,23 @@
          (emit "\n; malloc environment structure\n" os2)
          (define estruct (impc:ir:make-struct-str-env env))
          (emit (impc:ir:gname "val" "i8*") " = getelementptr " estruct "* null, i32 1\n" os2)
-         (emit (impc:ir:gname "size" "i64") " = ptrtoint " estruct "* " (car (impc:ir:gname 1)) " to i64\n" os2)
+         (emit (impc:ir:gname "size" *impc:ir:size_t_str*) " = ptrtoint " estruct "* "
+               (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os2)
          (cond ((eq? (car ast) '__make-closure-h)
                 (emit (impc:ir:gname "envptr" "i8*") " = call i8* @malloc("
-                      "i64 " (car (impc:ir:gname 1)) ")\n" os2))
+                      (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1)) ")\n" os2))
                ((eq? (car ast) '__make-closure-s)
                 (emit (impc:ir:gname "envptr" "i8*") " = alloca i8"
                       ", " (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1))
                       ", align 16\n" os2))
                (else
-                (emit (impc:ir:gname "envptr" "i8*") " = call i8* @llvm_zone_malloc("
-                      "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname 1)) ")\n" os2)))
+                (if (string=? (cadr (impc:ir:gname "size")) "i32")
+                    (begin
+                      (emit (impc:ir:gname "sizeb" "i64") " = zext i32 " (car (impc:ir:gname "size")) " to i64" os2)
+                      (emit (impc:ir:gname "envptr" "i8*") " = call i8* @llvm_zone_malloc("
+                            "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "sizeb")) ")\n" os2))
+                    (emit (impc:ir:gname "envptr" "i8*") " = call i8* @llvm_zone_malloc("
+                          "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname 1)) ")\n" os2))))
          (emit (impc:ir:gname "environment" (string-append estruct "*")) 
 	       " = bitcast i8* " (car (impc:ir:gname "envptr")) 
 	       " to " estruct "*\n" os2)
@@ -2195,7 +2213,7 @@
 	 (impc:ir:gname "closure" (car (impc:ir:gname "closure")) (cadr (impc:ir:gname "closure")))
 	 ;; add an additional pointer wrapper for closure
          (cond ((eq? (car ast) '__make-closure-h)
-                (emit (impc:ir:gname "wrapper_ptr" "i8*") " = call i8* @malloc(i64 " 
+                (emit (impc:ir:gname "wrapper_ptr" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " "
                       (number->string (impc:ir:get-type-size (cadr (impc:ir:gname)))) ")\n" os2))
                ((eq? (car ast) '__make-closure-s)
                 (emit (impc:ir:gname "wrapper_ptr" "i8*") " = alloca i8"
@@ -2230,7 +2248,7 @@
          ;(println 'args: args)
          ;(println 'code: code)
          ;; first we make the function code
-         ;; define fastcc function with return type
+        ;; define fastcc function with return type
          (emit  "define fastcc " (impc:ir:get-type-str rettype) " @" name "(" os)
          ;(if (not (null? env)) (emit "i8* %_impenv" os))
          (emit "i8* %_impz," os)
@@ -2283,7 +2301,7 @@
 		  (begin ;; (println 'yes: allocate-mem? 'mem: ast)
                          (cond ((= allocate-mem? 1)
                                 (emit "%dat_" (symbol->string (car a)) " = call i8* @malloc("
-                                      "i64 " (number->string (impc:ir:get-type-size (cdr a))) ")\n" os))
+                                      *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size (cdr a))) ")\n" os))
                                ((= allocate-mem? 2)
                                 (emit "%dat_" (symbol->string (car a)) " = alloca i8"
                                       ", i64 " (number->string (impc:ir:get-type-size (cdr a)))
@@ -4025,7 +4043,7 @@
     (let* ((os (make-string 0)))
       (let* ;;((t (impc:ir:convert-from-pretty-types (cadr ast))))
 	    ((t (impc:ir:pointer-- (car hint?))))
-	(emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @malloc(i64 "
+	(emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " "
 			     (number->string (impc:ir:get-type-size t))
 			     ")\n") os)
 	(emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (number->string (impc:ir:get-type-size t)) ")\n" os)
@@ -4039,30 +4057,36 @@
   (lambda (ast types hint?)
     (let* ((os (make-string 0)))
       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
-	     (idx (impc:ir:gname))
-	     (t (impc:ir:get-type-from-str (cadr idx)))
-	     (tt (impc:ir:pointer-- (car hint?)))) ;(impc:ir:convert-from-pretty-types (car hint?)))))	     
-	     ;;(tt (impc:ir:convert-from-pretty-types (caddr ast))))
-	(if (not (impc:ir:fixed-point? t))
-	    (impc:compiler:print-bad-type-error-with (impc:ir:get-type-str t) "alloc size must be an integer"))
-	(emit idx-str os)
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	(if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
-	    (begin (emit (string-append (impc:ir:gname "tmp" "i64") " = zext " (impc:ir:get-type-str t) " "
-					(car idx) " to i64\n") os)
-		   (set! idx (impc:ir:gname))))
+             (idx (impc:ir:gname))
+             (t (impc:ir:get-type-from-str (cadr idx)))
+             (tt (impc:ir:pointer-- (car hint?)))) ;(impc:ir:convert-from-pretty-types (car hint?)))))	     
+        ;;(tt (impc:ir:convert-from-pretty-types (caddr ast))))
+        (if (not (impc:ir:fixed-point? t))
+            (impc:compiler:print-bad-type-error-with (impc:ir:get-type-str t) "alloc size must be an integer"))
+        (emit idx-str os)
+	      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        (if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
+            (begin (emit (string-append (impc:ir:gname "tmp" "i64") " = zext " (impc:ir:get-type-str t) " "
+                                        (car idx) " to i64\n") os)
+                   (set! idx (impc:ir:gname))))
         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	(emit (string-append (impc:ir:gname "size" "i64") " = mul i64 "
-			     (number->string (impc:ir:get-type-size tt)) ", " 
-			     (car idx) "\n") os)
-	(emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @malloc(i64 "
-			     (car (impc:ir:gname "size"))
-			     ")\n") os)
-	(emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "size")) ")\n" os)
-	(emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str tt) "*"))
-			     " = bitcast i8* " (car (impc:ir:gname "dat"))
-			     " to " (impc:ir:get-type-str tt) "*\n") os)
-	(impc:ir:strip-space os)))))
+        (emit (string-append (impc:ir:gname "size" "i64") " = mul i64 "
+                             (number->string (impc:ir:get-type-size tt)) ", " 
+                             (car idx) "\n") os)
+        (if (string=? *impc:ir:size_t_str* "i32")
+            (begin
+              (emit (impc:ir:gname "sizeb" "i32") " = trunc i64 " (car (impc:ir:gname "size")) " to i32\n" os)
+              (emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " "
+                                   (car (impc:ir:gname "sizeb"))
+                                   ")\n") os))
+            (emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " "
+                                 (car (impc:ir:gname "size"))
+                                 ")\n") os))
+        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "size")) ")\n" os)
+        (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str tt) "*"))
+                             " = bitcast i8* " (car (impc:ir:gname "dat"))
+                             " to " (impc:ir:get-type-str tt) "*\n") os)
+        (impc:ir:strip-space os)))))
 
 
 (define impc:ir:compiler:heap-alloc
@@ -5085,12 +5109,12 @@
 	    (impc:compiler:print-bad-arity-error ast))
 
 	(emit timestr os)
-	(emit (impc:ir:gname "dat1_" "i8*") " = call ccc i8* @malloc(i64 " (number->string total_size1) ")\n"
+	(emit (impc:ir:gname "dat1_" "i8*") " = call ccc i8* @malloc(" *impc:ir:size_t_str* " " (number->string total_size1) ")\n"
 	      (impc:ir:gname "struct1_" struct_type1) " = bitcast i8* " (car (impc:ir:gname "dat1_")) " to " struct_type1 "\n"
 	      os)
 	(if (null? args)
 	    (emit (impc:ir:gname "dat2_" "i8*") " = select i1 true, i8* null, i8* null\n" os)
-	    (emit (impc:ir:gname "dat2_" "i8*") " = call ccc i8* @malloc(i64 " (number->string total_size2) ")\n"
+	    (emit (impc:ir:gname "dat2_" "i8*") " = call ccc i8* @malloc(" *impc:ir:size_t_str* " " (number->string total_size2) ")\n"
 		  (impc:ir:gname "struct2_" struct_type2) " = bitcast i8* " (car (impc:ir:gname "dat2_")) " to " struct_type2 "\n"
 		  os))
 
