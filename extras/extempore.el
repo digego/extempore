@@ -109,6 +109,8 @@
      "(define\\(\\|-macro\\)\\s-+(?\\(\\S-+\\)\\_>" 2)
     ("instrument"
      "(define-\\(instrument\\|sampler\\)\\s-+\\(\\S-+\\)\\_>" 2)
+    ("lib" ;; bind-lib
+     "(bind-lib\\s-+\\S-+\\s-+\\(\\S-+\\)\\_>" 1)
     ("type"
      "(bind-\\(type\\|alias\\)\\s-+\\(\\S-+\\)\\_>" 2)
     ("type" ;; bind-lib-type
