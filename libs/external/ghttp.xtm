@@ -1,0 +1,323 @@
+;;; ghttp.xtm -- libghttp bindings for extempore
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libghttp.dylib
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
+
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libghttp
+ (cond ((string=? (sys:platform) "OSX")
+        "/Users/ben/Code/src/libghttp-1.0.9/libghttp.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libghttp.so")
+       ((string=? (sys:platform) "Windows")
+        "libghttp.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib               
+(define libghttp
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; ghttp_constants.h ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib-val libghttp http_hdr_Allow i8*)
+(bind-lib-val libghttp http_hdr_Content_Encoding i8*)
+(bind-lib-val libghttp http_hdr_Content_Language i8*)
+(bind-lib-val libghttp http_hdr_Content_Length i8*)
+(bind-lib-val libghttp http_hdr_Content_Location i8*)
+(bind-lib-val libghttp http_hdr_Content_MD5 i8*)
+(bind-lib-val libghttp http_hdr_Content_Range i8*)
+(bind-lib-val libghttp http_hdr_Content_Type i8*)
+(bind-lib-val libghttp http_hdr_Expires i8*)
+(bind-lib-val libghttp http_hdr_Last_Modified i8*)
+
+;; /* general headers */
+
+(bind-lib-val libghttp http_hdr_Cache_Control i8*)
+(bind-lib-val libghttp http_hdr_Connection i8*)
+(bind-lib-val libghttp http_hdr_Date i8*)
+(bind-lib-val libghttp http_hdr_Pragma i8*)
+(bind-lib-val libghttp http_hdr_Transfer_Encoding i8*)
+(bind-lib-val libghttp http_hdr_Update i8*)
+(bind-lib-val libghttp http_hdr_Trailer i8*)
+(bind-lib-val libghttp http_hdr_Via i8*)
+
+;; /* request headers */
+
+(bind-lib-val libghttp http_hdr_Accept i8*)
+(bind-lib-val libghttp http_hdr_Accept_Charset i8*)
+(bind-lib-val libghttp http_hdr_Accept_Encoding i8*)
+(bind-lib-val libghttp http_hdr_Accept_Language i8*)
+(bind-lib-val libghttp http_hdr_Authorization i8*)
+(bind-lib-val libghttp http_hdr_Expect i8*)
+(bind-lib-val libghttp http_hdr_From i8*)
+(bind-lib-val libghttp http_hdr_Host i8*)
+(bind-lib-val libghttp http_hdr_If_Modified_Since i8*)
+(bind-lib-val libghttp http_hdr_If_Match i8*)
+(bind-lib-val libghttp http_hdr_If_None_Match i8*)
+(bind-lib-val libghttp http_hdr_If_Range i8*)
+(bind-lib-val libghttp http_hdr_If_Unmodified_Since i8*)
+(bind-lib-val libghttp http_hdr_Max_Forwards i8*)
+(bind-lib-val libghttp http_hdr_Proxy_Authorization i8*)
+(bind-lib-val libghttp http_hdr_Range i8*)
+(bind-lib-val libghttp http_hdr_Referrer i8*)
+(bind-lib-val libghttp http_hdr_TE i8*)
+(bind-lib-val libghttp http_hdr_User_Agent i8*)
+
+;; /* response headers */
+
+(bind-lib-val libghttp http_hdr_Accept_Ranges i8*)
+(bind-lib-val libghttp http_hdr_Age i8*)
+(bind-lib-val libghttp http_hdr_ETag i8*)
+(bind-lib-val libghttp http_hdr_Location i8*)
+(bind-lib-val libghttp http_hdr_Retry_After i8*)
+(bind-lib-val libghttp http_hdr_Server i8*)
+(bind-lib-val libghttp http_hdr_Vary i8*)
+(bind-lib-val libghttp http_hdr_Warning i8*)
+(bind-lib-val libghttp http_hdr_WWW_Authenticate i8*)
+
+;; /* Other headers */
+
+(bind-lib-val libghttp http_hdr_Set_Cookie i8*)
+
+;; /* WebDAV headers */
+
+(bind-lib-val libghttp http_hdr_DAV i8*)
+(bind-lib-val libghttp http_hdr_Depth i8*)
+(bind-lib-val libghttp http_hdr_Destination i8*)
+(bind-lib-val libghttp http_hdr_If i8*)
+(bind-lib-val libghttp http_hdr_Lock_Token i8*)
+(bind-lib-val libghttp http_hdr_Overwrite i8*)
+(bind-lib-val libghttp http_hdr_Status_URI i8*)
+(bind-lib-val libghttp http_hdr_Timeout i8*)
+
+;;;;;;;;;;;;;
+;; ghttp.h ;;
+;;;;;;;;;;;;;
+
+(bind-alias ghttp_request i8*)
+
+(bind-alias ghttp_type enum)
+(bind-val ghttp_type_get ghttp_type 0)
+(bind-val ghttp_type_options ghttp_type 1)
+(bind-val ghttp_type_head ghttp_type 2)
+(bind-val ghttp_type_post ghttp_type 3)
+(bind-val ghttp_type_put ghttp_type 4)
+(bind-val ghttp_type_delete ghttp_type 5)
+(bind-val ghttp_type_trace ghttp_type 6)
+(bind-val ghttp_type_connect ghttp_type 7)
+(bind-val ghttp_type_propfind ghttp_type 8)
+(bind-val ghttp_type_proppatch ghttp_type 9)
+(bind-val ghttp_type_mkcol ghttp_type 10)
+(bind-val ghttp_type_copy ghttp_type 11)
+(bind-val ghttp_type_move ghttp_type 12)
+(bind-val ghttp_type_lock ghttp_type 13)
+(bind-val ghttp_type_unlock ghttp_type 14)
+
+(bind-alias ghttp_sync_mode enum)
+(bind-val  ghttp_sync ghttp_sync_mode 0)
+(bind-val  ghttp_async ghttp_sync_mode 1)
+
+(bind-alias ghttp_status enum)
+(bind-val ghttp_error ghttp_status -1)
+(bind-val ghttp_not_done ghttp_status 0)
+(bind-val ghttp_done ghttp_status 1)
+
+(bind-alias ghttp_proc enum)
+(bind-val ghttp_proc_none  ghttp_proc 0)
+(bind-val ghttp_proc_request  ghttp_proc 1)
+(bind-val ghttp_proc_response_hdrs  ghttp_proc 2)
+(bind-val ghttp_proc_response  ghttp_proc 3)
+
+;; typedef struct ghttp_current_status_tag
+;; {
+;;   ghttp_proc         proc;        ;; /* what's it doing? */
+;;   int                bytes_read;  ;; /* how many bytes have been read? */
+;;   int                bytes_total; ;; /* how many total */
+;; } ghttp_current_status;
+(bind-type ghttp_current_status <ghttp_proc,i32,i32>)
+
+;; /* create a new request object */
+(bind-lib libghttp ghttp_request_new [ghttp_request*]*)
+
+;; /* delete a current request object */
+(bind-lib libghttp ghttp_request_destroy [void,ghttp_request*]*)
+
+;; /* Validate a uri
+;;  * This will return -1 if a uri is invalid
+;;  */
+(bind-lib libghttp ghttp_uri_validate [i32,i8*]*)
+
+;; /* Set a uri in a request
+;;  * This will return -1 if the uri is invalid
+;;  */
+
+(bind-lib libghttp ghttp_set_uri [i32,ghttp_request*,i8*]*)
+
+;; /* Set a proxy for a request
+;;  * This will return -1 if the uri is invalid
+;;  */
+
+(bind-lib libghttp ghttp_set_proxy [i32,ghttp_request*,i8*]*)
+
+;; /* Set a request type
+;;  * This will return -1 if the request type is invalid or
+;;  * unsupported
+;;  */
+
+(bind-lib libghttp ghttp_set_type [i32,ghttp_request*,ghttp_type]*)
+
+;; /* Set the body.
+;;  * This will return -1 if the request type doesn't support it
+;;  */
+
+(bind-lib libghttp ghttp_set_body [i32,ghttp_request*,i8*,i32]*)
+
+;; /* Set whether or not you want to use sync or async mode.
+;;  */
+
+(bind-lib libghttp ghttp_set_sync [i32,ghttp_request*,ghttp_sync_mode]*)
+
+;; /* Prepare a request.
+;;  * Call this before trying to process a request or if you change the
+;;  * uri.
+;;  */
+
+(bind-lib libghttp ghttp_prepare [i32,ghttp_request*]*)
+
+;; /* Set the chunk size
+;;  * You might want to do this to optimize for different connection speeds.
+;;  */
+
+(bind-lib libghttp ghttp_set_chunksize [void,ghttp_request*,i32]*)
+
+;; /* Set a random request header
+;;  */
+
+;; ghttp_set_header(ghttp_request *a_request, const char *a_hdr, const char *a_val);
+(bind-lib libghttp ghttp_set_header [void,ghttp_request*,i8*,i8*]*)
+
+;; /* Process a request
+;;  */
+
+(bind-lib libghttp ghttp_process [ghttp_status,ghttp_request*]*)
+
+;; /* Get the status of a request
+;;  */
+
+(bind-lib libghttp ghttp_get_status [ghttp_current_status,ghttp_request*]*)
+
+;; /* Flush the received data (so far) into the response body.  This is
+;;  * useful for asynchronous requests with large responses: you can
+;;  * periodically flush the response buffer and parse the data that's
+;;  * arrived so far.
+;;  */
+
+(bind-lib libghttp ghttp_flush_response_buffer [void,ghttp_request*]*)
+
+;; /* Get the value of a random response header
+;;  */
+
+(bind-lib libghttp ghttp_get_header [i8*,ghttp_request*,i8*]*)
+
+;; /* Get the list of headers that were returned in the response.  You
+;;    must free the returned string values.  This function will return 0
+;;    on success, -1 on some kind of error. */
+(bind-lib libghttp ghttp_get_header_names [i32,ghttp_request*,i8***,i32*]*)
+
+;; /* Abort a currently running request.  */
+(bind-lib libghttp ghttp_close [i32,ghttp_request*]*)
+
+;; /* Clean a request
+;;  */
+(bind-lib libghttp ghttp_clean [void,ghttp_request*]*)
+
+;; /* Get the socket associated with a particular connection
+;;  */
+
+(bind-lib libghttp ghttp_get_socket [i32,ghttp_request*]*)
+
+;; /* get the return entity body
+;;  */
+
+(bind-lib libghttp ghttp_get_body [i8*,ghttp_request*]*)
+
+;; /* get the returned length
+;;  */
+
+(bind-lib libghttp ghttp_get_body_len [i32,ghttp_request*]*)
+
+;; /* Get an error message for a request that has failed.
+;;  */
+
+(bind-lib libghttp ghttp_get_error [i8*,ghttp_request*]*)
+
+;; /* Parse a date string that is one of the standard
+;;  * date formats
+;;  */
+
+(bind-alias time_t i64) ;; time_t is long on OSX-64
+(bind-lib libghttp ghttp_parse_date [time_t,i8*]*)
+
+;; /* Return the status code.
+;;  */
+
+(bind-lib libghttp ghttp_status_code [i32,ghttp_request*]*)
+
+;; /* Return the reason phrase.
+;;  */
+
+(bind-lib libghttp ghttp_reason_phrase [i8*,ghttp_request*]*)
+
+;; /* Set your username/password pair 
+;;  */
+
+(bind-lib libghttp ghttp_set_authinfo [i32,ghttp_request*,i8*,i8*]*)
+		   
+
+;; /* Set your username/password pair for proxy
+;;  */
+ 
+(bind-lib libghttp ghttp_set_proxy_authinfo [i32,ghttp_request*,i8*,i8*]*)
+
+;; some xtlang functions
+
+(bind-func ghttp_get_uri_body
+  (lambda (uri:i8* buf:i8* bufsize:i64)
+    (let ((request:ghttp_request* (ghttp_request_new))
+          (bytes_read:i32 0)
+          (status_code:i32 -1))
+      (if (or (= (ghttp_set_uri request uri) -1)
+              (= (ghttp_set_type request ghttp_type_get) -1))
+          (println "Error: invalid uri or type")
+          (let ((res (ghttp_prepare request))
+                (status (ghttp_process request)))
+            (set! status_code (ghttp_status_code request))
+            (if (= status ghttp_error)
+                (println "Error:" (ghttp_get_error request))
+                (begin ;;(println "HTTP status:" (ghttp_status_code request))
+                  (set! bytes_read (ghttp_get_body_len request))
+                  void))
+            (if (> bytes_read 0)
+                (if (<= bytes_read bufsize)
+                    (begin (memcpy buf (ghttp_get_body request) (convert bytes_read i64))
+                           void)
+                    (begin
+                      (memcpy buf (ghttp_get_body request) bufsize)
+                      (println "Warning: HTTP response body (" bytes_read " bytes) is too big for buffer (" bufsize " bytes).  Dropping the rest of the body."))))
+            (ghttp_request_destroy request))
+          status_code))))
+
