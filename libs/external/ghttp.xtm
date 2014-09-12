@@ -296,10 +296,15 @@
 
 ;; some xtlang functions
 
+(bind-func ghttp_set_extempore_user_agent
+  (lambda (request)
+    (ghttp_set_header request "User-Agent" "extempore-http/0.1")))
+
 ;; don't forget to destroy the request when you're done
 (bind-func ghttp_perform_get
   (lambda (uri:i8*)
     (let ((request:ghttp_request* (ghttp_request_new)))
+      (ghttp_set_extempore_user_agent request)
       (ghttp_set_type request ghttp_type_get)
       (if (= (ghttp_set_uri request uri) -1)
           (begin (println "Error: invalid uri")
@@ -348,12 +353,13 @@
 
 (bind-func ghttp_perform_post
   (lambda (uri:i8* body:i8* bodylen:i32)
-    (let ((request:ghttp_request* (ghttp_request_new)))
+    (let ((request:ghttp_request* (ghttp_request_new))) 
+      (ghttp_set_extempore_user_agent request)
       (ghttp_set_type request ghttp_type_post)
       (if (= (ghttp_set_uri request uri) -1)
           (begin (println "Error: invalid uri: " uri)
                  (ghttp_request_destroy request))
-          (begin (ghttp_set_header request http_hdr_Content_Type "application/json")
+          (begin (ghttp_set_header request "Content-Type" "application/json")
                  (ghttp_set_body request body bodylen)      
                  (ghttp_prepare request)
                  (if (= (ghttp_process request) ghttp_error)
