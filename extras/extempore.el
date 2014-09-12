@@ -2051,6 +2051,186 @@ If you don't want to be prompted for this name each time, set the
     (shell-command (format "sox speech-samples/%s/%s-22kHz.aiff speech-samples/%s/%s.aiff rate 44100" voice word voice word))
     (shell-command (format "rm speech-samples/%s/%s-22kHz.aiff" voice word))))
 
+;;;;;;;;;;;;;;;;;;;;;;
+;; extempore-parser ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+;; stuff for parsing C header files
+
+;; comments
+
+(defun extempore-parser-handle-c-comments ()
+  (interactive)
+  (while (re-search-forward "/\\*" nil t)
+    (if (not (looking-back ";;.*" (line-beginning-position)))
+        (let ((comment-begin (- (point) 2)))
+          (re-search-forward "\\*/" nil t)
+          (comment-region comment-begin (point))))))
+
+(defun extempore-parser-remove-ifdef-guards ()
+  (interactive)
+  (while (re-search-forward (regexp-opt (list "#if" "#ifdef" "#ifndef" "#else" "#elif" "#end" "#endif")) nil t)
+    (if (not (looking-back ";;.*" (line-beginning-position)))
+        (save-excursion
+          (beginning-of-line)
+          (insert ";; ")))))
+
+;; #define
+
+(defun extempore-parser-translate-define (define-line)
+  (let ((parsed-def (cl-remove-if (lambda (s) (string= s "#define"))
+                                  (split-string define-line " " t))))
+    (if (= (length parsed-def) 1)
+        (concat ";; " define-line)
+      (format "(bind-val %s i32 %s)"
+              (car parsed-def)
+              (let ((val-string (cadr parsed-def)))
+                (if (string-match "^0x" val-string)
+                    (concat "#" (substring val-string 1))
+                  val-string))))))
+
+(defun extempore-parser-process-defines ()
+  (interactive)
+  (while (re-search-forward "#define" nil t)
+    (if (not (looking-back ";;.*" (line-beginning-position)))
+        (progn
+          (beginning-of-line)
+          (kill-line)
+          (insert (extempore-parser-translate-define (current-kill 0)))))))
+
+;; function prototypes
+
+(defun extempore-parser-extract-pointer-string (type-str)
+  ;; TODO: should these numbers be multiplied, rather than added, in
+  ;; the case of e.g. **var[][]
+  (make-string (+ (length (and (string-match "*+" type-str)
+                               (match-string-no-properties 0 type-str)))
+                  (/ (length (and (string-match "\\(\\[\\]\\)+" type-str)
+                                  (match-string-no-properties 0 type-str)))
+                     2))
+               ?\*))
+
+(defun extempore-parser-map-c-type-to-xtlang-type (c-type)
+  "currently assumes x86_64 architecture - and maps unsigned type to signed types (since xtlang has no unsigned types)"
+  (let ((type-alist '(("char" . "i8")
+                      ("unsigned char" . "i8")
+                      ("short" . "i16")
+                      ("unsigned short" . "i16")
+                      ("int" . "i32")
+                      ("unsigned int" . "i32")
+                      ("long" . "i32")
+                      ("unsigned long" . "i32")
+                      ("long long" . "i64")
+                      ("unsigned long long" . "i64")
+                      ("int8_t" . "i8")
+                      ("uint8_t" . "i8")
+                      ("int16_t" . "i16")
+                      ("uint16_t" . "i16")
+                      ("int32_t" . "i32")
+                      ("uint32_t" . "i32")
+                      ("int64_t" . "i64")
+                      ("uint64_t" . "i64")
+                      ("float" . "float")
+                      ("double" . "double")))
+        (pointer-string (extempore-parser-extract-pointer-string c-type))
+        (base-type (replace-regexp-in-string
+                    "[[]]" "" (replace-regexp-in-string "[*]" "" c-type))))
+    (concat (or (cdr-safe (assoc base-type type-alist))
+                base-type)
+            pointer-string)))
+
+(defun extempore-parser-type-from-function-arg (arg-str)
+  (let ((elements (cl-remove-if (lambda (s) (member s (list "const" "struct")))
+                                (split-string arg-str " " t))))
+    (cond ((= (length elements) 1)
+           (extempore-parser-map-c-type-to-xtlang-type (car elements)))
+          ((= (length elements) 2)
+           (concat (extempore-parser-map-c-type-to-xtlang-type (car elements))
+                   (extempore-parser-extract-pointer-string (cadr elements))))
+          ((= (length elements) 3)
+           (concat (extempore-parser-map-c-type-to-xtlang-type
+                    (concat (car elements) " " (cadr elements)))
+                   (extempore-parser-extract-pointer-string (caddr elements))))
+          (t (message "cannot parse arg string: \"%s\"" arg-str)
+             ""))))
+
+(defun extempore-parser-parse-all-c-args (all-args)
+  (if (or (string= all-args "")
+          (string= all-args "void"))
+      ""
+    (concat ","
+            (mapconcat #'extempore-parser-type-from-function-arg
+                       (split-string all-args ",")
+                       ","))))
+
+;; ;; here are some examples of strings which should parse correctly
+;; (extempore-parser-parse-all-c-args "GLfloat size")
+;; (extempore-parser-parse-all-c-args "GLsizei length, const GLvoid *pointer")
+;; (extempore-parser-parse-all-c-args "void")
+;; (extempore-parser-parse-all-c-args "const GLint *")
+;; (extempore-parser-parse-all-c-args "GLenum, const GLint *")
+;; (extempore-parser-parse-all-c-args "GLenum, GLenum, GLenum, GLenum, GLenum, GLenum")
+;; (extempore-parser-parse-all-c-args "")
+;; (extempore-parser-parse-all-c-args "float part[], float q[], float qm, int nop, int idimp, int nxv, int nyv")
+;; (extempore-parser-parse-all-c-args "unsigned short GLhalfARB")
+;; (extempore-parser-parse-all-c-args "GLFWmonitor* monitor, int* count")
+
+(defun extempore-parser-process-function-prototypes (libname ignore-tokens)
+  (interactive
+   (list (read-from-minibuffer "libname: ")
+         (read-from-minibuffer "tokens to ignore: ")))
+  (while (re-search-forward (format "^%s[ ]?\\(?:const \\|unsigned \\|extern \\)*\\([\\*[:word:]_]*\\) \\([\\*[:word:]_]*\\)[ ]?(\\(\\(?:.\\|\n\\)*?\\))"
+                                    (if (string= ignore-tokens "")
+                                        ""
+                                      (concat (regexp-opt (split-string ignore-tokens " " t) "?"))))
+                            nil
+                            t)
+    (if (not (looking-back ";;.*" (line-beginning-position)))
+        (let* ((prototype-beginning (match-beginning 0))
+               (return-type (match-string-no-properties 1))
+               (function-name (match-string-no-properties 2))
+               (arg-string (extempore-parser-parse-all-c-args (replace-regexp-in-string "[\n]" "" (match-string-no-properties 3))))
+               (function-name-pointer-prefix (extempore-parser-extract-pointer-string function-name)))
+          (kill-region prototype-beginning (line-end-position))
+          (insert (format "(bind-lib %s %s [%s%s]*)"
+                          libname
+                          (substring function-name (length function-name-pointer-prefix))
+                          (extempore-parser-map-c-type-to-xtlang-type
+                           (concat return-type function-name-pointer-prefix))
+                          arg-string))))))
+
+;; typedef
+
+;; only single-line, for multi-line example see
+;; `extempore-parser-process-function-prototypes'
+(defun extempore-parser-process-function-pointer-typedefs ()
+  (interactive)
+  (while (re-search-forward "^typedef \\([\\*[:word:]]*\\) (\\(\\*[ ]?[[:word:]]*\\))[ ]?(\\(.*\\))"
+                            nil t)
+    (if (not (looking-back ";;.*" (line-beginning-position)))
+        (let ((typedef-beginning (match-beginning 0))
+              (return-type (match-string-no-properties 1))
+              (alias-name (replace-regexp-in-string "[* ]" "" (match-string-no-properties 2)))
+              (arg-string (extempore-parser-parse-all-c-args (replace-regexp-in-string "[\n]" "" (match-string-no-properties 3)))))
+          (kill-region typedef-beginning (line-end-position))
+          (insert (format "(bind-alias %s [%s%s]*)"
+                          alias-name
+                          return-type
+                          arg-string))))))
+
+;; this is just for simple ones
+(defun extempore-parser-process-typedefs ()
+  (interactive)
+  (while (re-search-forward "^typedef " nil t)
+    (if (not (looking-back ";;.*" (line-beginning-position)))
+        (progn (kill-region (match-beginning 0) (line-end-position))
+               (let* ((typedef-string (replace-regexp-in-string ";" "" (substring (current-kill 0) 8)))
+                      (newdef (car (reverse (split-string typedef-string " " t))))
+                      (ptr-string (extempore-parser-extract-pointer-string newdef)))
+                 (insert (format "(bind-alias %s %s)"
+                                 (substring newdef (length ptr-string))
+                                 (extempore-parser-type-from-function-arg typedef-string))))))))
+
 (provide 'extempore)
 
 ;;; extempore.el ends here
