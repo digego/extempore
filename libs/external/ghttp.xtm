@@ -108,7 +108,7 @@
 ;; ghttp.h ;;
 ;;;;;;;;;;;;;
 
-(bind-alias ghttp_request i8*)
+(bind-alias ghttp_request i8)
 
 (bind-alias ghttp_type enum)
 (bind-val ghttp_type_get ghttp_type 0)
@@ -231,6 +231,7 @@
 ;; /* Get the value of a random response header
 ;;  */
 
+;; const char * ghttp_get_header(ghttp_request *a_request, const char *a_hdr);
 (bind-lib libghttp ghttp_get_header [i8*,ghttp_request*,i8*]*)
 
 ;; /* Get the list of headers that were returned in the response.  You
@@ -295,29 +296,68 @@
 
 ;; some xtlang functions
 
-(bind-func ghttp_get_uri_body
-  (lambda (uri:i8* buf:i8* bufsize:i64)
-    (let ((request:ghttp_request* (ghttp_request_new))
-          (bytes_read:i32 0)
-          (status_code:i32 -1))
-      (if (or (= (ghttp_set_uri request uri) -1)
-              (= (ghttp_set_type request ghttp_type_get) -1))
-          (println "Error: invalid uri or type")
-          (let ((res (ghttp_prepare request))
-                (status (ghttp_process request)))
-            (set! status_code (ghttp_status_code request))
-            (if (= status ghttp_error)
-                (println "Error:" (ghttp_get_error request))
-                (begin ;;(println "HTTP status:" (ghttp_status_code request))
-                  (set! bytes_read (ghttp_get_body_len request))
-                  void))
-            (if (> bytes_read 0)
-                (if (<= bytes_read bufsize)
-                    (begin (memcpy buf (ghttp_get_body request) (convert bytes_read i64))
-                           void)
-                    (begin
-                      (memcpy buf (ghttp_get_body request) bufsize)
-                      (println "Warning: HTTP response body (" bytes_read " bytes) is too big for buffer (" bufsize " bytes).  Dropping the rest of the body."))))
-            (ghttp_request_destroy request))
-          status_code))))
+;; don't forget to destroy the request when you're done
+(bind-func ghttp_perform_get
+  (lambda (uri:i8*)
+    (let ((request:ghttp_request* (ghttp_request_new)))
+      (ghttp_set_type request ghttp_type_get)
+      (if (= (ghttp_set_uri request uri) -1)
+          (begin (println "Error: invalid uri")
+                 (ghttp_request_destroy request)
+                 null)
+          (begin
+            (ghttp_prepare request)
+            (if (= (ghttp_process request) ghttp_error)
+                (begin (println "ghttp Error:" (ghttp_get_error request))
+                       (ghttp_request_destroy request)
+                       null)
+                request))))))
+
+(bind-func ghttp_dump_request_body
+  (lambda (request:ghttp_request* buf:i8* bufsize:i64)
+    (if (null? request)
+        (println "Error: request is null.")
+        (let ((bytes_read (convert (ghttp_get_body_len request) i64)))
+          ;;(println "HTTP status:" (ghttp_status_code request))
+          (if (> bytes_read 0)
+              (if (<= bytes_read bufsize)
+                  (begin (memcpy buf (ghttp_get_body request) bytes_read)
+                         void)
+                  (begin
+                    (memcpy buf (ghttp_get_body request) bufsize)
+                    (println "Warning: HTTP response body (" bytes_read " bytes) is too big for buffer (" bufsize " bytes).  Dropping the rest of the body."))))))))
+
+(bind-func ghttp_print_headers
+  (lambda (request:ghttp_request*)
+    (if (null? request)
+        (println "Error: request is null.")
+        (let ((hdrptr:i8*** (salloc))
+              (hdrcount:i32* (salloc))
+              (i 0))
+          (ghttp_get_header_names request hdrptr hdrcount)
+          (dotimes (i (convert (pref hdrcount 0) i64))
+            (printf "header: %s\n" (pref (pref hdrptr 0) i))
+            (free (pref (pref hdrptr 0) i)))))))
+
+(bind-func ghttp_get_hdr
+  (lambda (request:ghttp_request* hdr:i8*)
+    (if (null? request)
+        (begin (println "Error: request is null.")
+               null)
+        (ghttp_get_header request hdr))))
+
+(bind-func ghttp_perform_post
+  (lambda (uri:i8* body:i8* bodylen:i32)
+    (let ((request:ghttp_request* (ghttp_request_new)))
+      (ghttp_set_type request ghttp_type_post)
+      (if (= (ghttp_set_uri request uri) -1)
+          (begin (println "Error: invalid uri: " uri)
+                 (ghttp_request_destroy request))
+          (begin (ghttp_set_header request http_hdr_Content_Type "application/json")
+                 (ghttp_set_body request body bodylen)      
+                 (ghttp_prepare request)
+                 (if (= (ghttp_process request) ghttp_error)
+                     (begin (println "ghttp Error:" (ghttp_get_error request))
+                            (ghttp_request_destroy request)))))
+      request)))
 
