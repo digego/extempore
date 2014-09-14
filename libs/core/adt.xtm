@@ -385,6 +385,7 @@
 
 (bind-func print:[void,BTree*]*
   (lambda (t)
+    (printout "<")    
     (let ((f (lambda (t)
                (if (null? t) void
                    (begin
@@ -393,7 +394,9 @@
                      (f (tref t 2))
                      void)))))      
       (f t)
-      (println))))
+      (printout ">")
+      void)))
+
 
 (bind-func BLeaf:[BTree:<!a,BTree*,BTree*>*,!a]*
   (lambda (x)
@@ -403,6 +406,28 @@
 (bind-func btree_value:[!a,BTree*]*
   (lambda (t)
     (tref t 0)))
+
+
+;; functor for Tree
+(bind-func fmap:[BTree:<!a,BTree*,BTree*>*,[!a,!b]*,BTree:<!b,BTree*,BTree*>*]*  
+  (lambda (func t)
+    (if (null? t) null
+        (BTree (func (tref t 0))
+               (fmap func (tref t 1))
+               (fmap func (tref t 2))))))
+
+;; (bind-func test_tree_as_functor
+;;   (lambda ()
+;;     (let ((t (BTree 4 (BTree 2 (BLeaf 1) (BLeaf 3)) (BLeaf 5)))
+;;           (t1 (fmap (lambda (x:i64) x) t)) ;; identity should return identity
+;;           (f1 (lambda (x) (i64tod x)))
+;;           (f2 (lambda (x:double) (* x x)))
+;;           (t2 (fmap f2 (fmap f1 t)))
+;;           (t3 (fmap (lambda (x) (f2 (f1 x))) t)))
+;;       (println "functor passes identity test" t "==" t1)
+;;       (println "functor passes composition test" t2 "==" t3)
+;;       void)))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -471,5 +496,4 @@
 
 (bind-poly regex_replace regex_replace_a)
 (bind-poly regex_replace regex_replace_b)
-
 
