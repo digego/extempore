@@ -42,6 +42,13 @@
   (lambda (a b)
     (= a b)))
 
+(define-macro (xtm-dump-ir fname)
+  (let ((n (llvm:get-closure-work-name (symbol->string fname))))
+    (if n
+        `(llvm:print-function ,n)
+        `(begin (println "No such XTM function") #f))))
+  
+
 (define-macro (xtmX expr)
   (suppress-compiler-messages #t)
   (eval `(bind-func xtm_expression
