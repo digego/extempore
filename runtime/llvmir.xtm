@@ -2009,15 +2009,16 @@
 (define impc:ir:make-const-string
   (lambda (ast)
     (let* ((os (make-string 0))
-           (strtyp (string-append "[" (number->string (+ 1 (string-length ast))) " x i8]*"))
+           (lgthstr (regex:replace-all ast "\\\\[0-9][0-9]" "x"))
+           (lgth (number->string (+ (string-length lgthstr) 1)))
+           (strtyp (string-append "[" lgth " x i8]*"))
            (strname (string-append "@gs" (if #f ;;(< (string-length ast) 1024)
                                              (cname-encode ast)
                                              (number->string *impc:ir:gstrcnt*))))
            (strsym '()))
       (if (null? (llvm:get-llvm-alias ast))
           (let ((compile-str (string-append strname
-                                            " = private unnamed_addr constant [" (number->string (+ 1 (string-length ast))) " x i8] c\""
-                                            ;; " = constant [" (number->string (+ 1 (string-length ast))) " x i8] c\""                                            
+                                            " = private unnamed_addr constant [" lgth " x i8] c\""
                                             ast "\\00\"")))
             (llvm:compile compile-str)	    
             (set! strsym strname)
