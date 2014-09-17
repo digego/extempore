@@ -1594,9 +1594,10 @@ backend in Extempore."
 (load (concat user-extempore-directory "extras/posn-on-screen.el") :noerror)
 
 (defun exvis-send-cursor-message (cursor-pos pos-screen-min pos-screen-max pos-x pos-y)
-  (osc-send-message exvis-osc-client
-                    "/interface/cursor"
-                    cursor-pos pos-screen-min pos-screen-max pos-x pos-y))
+  (if exvis-osc-client
+      (osc-send-message exvis-osc-client
+                        "/interface/cursor"
+                        cursor-pos pos-screen-min pos-screen-max pos-x pos-y)))
 
 (defun exvis-send-code-message (code)
   (if exvis-osc-client
@@ -1629,7 +1630,7 @@ backend in Extempore."
   (let (deactivate-mark)
     (if (and (equal major-mode 'extempore-mode)
              (symbolp this-command)
-             (string-match (regexp-opt '("sp-" "-line" "-word" "-char" "insert"))
+             (string-match (regexp-opt '("sp-" "-line" "-word" "-char" "end-of-" "beginning-of-" "insert"))
                            (symbol-name this-command)))
         (let ((posn (get-point-pixel-position)))
           (exvis-send-cursor-message (point)
