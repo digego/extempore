@@ -28,6 +28,12 @@
 
 ;; making and playing notes
 
+
+;; Structure for init values of each note
+;; start freq amp dur attack decay release sustain
+(bind-type NoteInitData <i64,SAMPLE,SAMPLE,i64,i64,i64,i64,SAMPLE>)
+
+
 ;; relative time USING adsr_accum + local mzone
 (bind-func note_c
   (lambda (start_time:i64
@@ -92,7 +98,7 @@
 
 ;; make synth defaults
 (bind-func default_note_c
-  (lambda (nargs:i64 dargs:SAMPLE*)
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
     (let ((sawl (saw_c 0.0))
           (sawr (saw_c 0.0)))
       (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
@@ -115,7 +121,7 @@
 (bind-func synth_note_c
   (let ((res 1.0)
         (fxamp 0.002))
-    (lambda (nargs:i64 dargs:SAMPLE*)
+    (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
       (let ((oscl (osc_c 0.0))
             (oscl3 (osc_c 0.0))
             (oscl2 (osc_c 0.0))
@@ -169,7 +175,7 @@
 ;;
 (bind-func epad_note_c
   (let ((res 0.1))
-    (lambda (nargs:i64 dargs:SAMPLE*)
+    (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
       (let ((oscl (square_c 0.0)) 
             (oscr (square_c 0.1))
             (o1 (osc_c 0.0))
@@ -228,7 +234,7 @@
         (drawbar_pos:SAMPLE* (zalloc num_drawbars)))
     (pfill! freq_ratio 0.5 1.5 1.0 2.0 3.0 4.0 5.0 6.0 8.0)
     (pfill! drawbar_pos 8. 8. 8. 0. 0. 0. 0. 0. 0.)
-    (lambda (nargs:i64 dargs:SAMPLE*)
+    (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
       (let ((tonewheel:[SAMPLE,SAMPLE,SAMPLE]** (zalloc (* 2 num_drawbars)))
             (freq_smudge:SAMPLE* (zalloc num_drawbars))
             (i:i64 0))
@@ -270,7 +276,7 @@
 ;; fuzz bass
 
 (bind-func fuzz_bass_note_c
-  (lambda (nargs:i64 dargs:SAMPLE*)
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
     (let ((sawl1 (saw_c 0.0))
           (sawr1 (saw_c 0.0))
           (sawl2 (saw_c 0.0))
@@ -306,7 +312,7 @@
 ;; shimmer pad
 
 (bind-func shimmer_pad_note_c
-  (lambda (nargs:i64 dargs:SAMPLE*)
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
     (let ((rectl (rect_c 0.0))
           (rectr (rect_c 0.0))
           (lfol (osc_c 0.0))
@@ -339,7 +345,7 @@
 ;; You can push I higher than 1.0
 ;; But only when H is low
 (bind-func fmsynth_note_c
-  (lambda (nargs:i64 dargs:SAMPLE*)
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
     (let ((o1 (osc_c 0.0))
           (o2 (osc_c 0.0))
           (I (if (> nargs 0) (pref dargs 0) 0.1)) ;; modulation index (generally 0.0-1.0)
@@ -394,7 +400,7 @@
 ;; You can push I higher than 1.0
 ;; But only when H is low
 (bind-func fmpad_note_c
-  (lambda (nargs:i64 dargs:SAMPLE*)
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
     (let ((o1 (osc_c 0.0))
           (o2 (osc_c 0.0))
           (o3 (osc_c 0.0))
@@ -442,7 +448,7 @@
 ;; simple saw
 ;;
 (bind-func sawbass_note_c
-  (lambda (nargs:i64 dargs:SAMPLE*)
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
     (let ((osc (saw_mc_c 0.0)))
       (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (* amp (osc chan amp freq))))))
@@ -466,7 +472,7 @@
 ;; simple sine subbass
 ;;
 (bind-func subbass_note_c
-  (lambda (nargs:i64 dargs:SAMPLE*)
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
     (let ((osc (osc_mc_c 0.0)))
       (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (* amp (osc chan amp freq))))))
@@ -478,7 +484,7 @@
 
 
 (bind-func sawlead_note_c
-  (lambda (nargs:i64 dargs:SAMPLE*)
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
     (let ((sawl1 (saw_c 0.0))
           (sawr1 (saw_c 0.2))
           (sawl2 (saw_c 0.0))
