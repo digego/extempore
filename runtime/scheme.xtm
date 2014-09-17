@@ -1832,6 +1832,12 @@
 
 ;; this can be moved elsewhere, but should be loaded on startup
 
+(define-macro (sys:precomp:suppress-precomp-do . forms)
+       `(let ((precomp-port *sys:precomp:current-output-port*))
+          (set! *sys:precomp:current-output-port* #t)
+          ,@forms
+          ;; whatever happens, set the port back to the original value
+          (set! *sys:precomp:current-output-port* precomp-port)))
 
 (define sys:precomp:compile-current-module
   (lambda (module-name move-into-place? exit-on-error?)
@@ -1902,7 +1908,7 @@
 
 (define sys:precomp:insert-header
   (lambda (libname)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (sys:precomp:currently-compiling?)
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
                    *sys:precomp:current-output-port*)
@@ -1923,7 +1929,7 @@
 
 (define sys:precomp:insert-footer
   (lambda (libname)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (sys:precomp:currently-compiling?)
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"Loaded \"))\n(print-with-colors 'blue 'default #t (print \"" libname "\"))\n")
                    *sys:precomp:current-output-port*)
@@ -1938,11 +1944,9 @@
 ;; the precomp .xtm file, otherwise do nothing
 (define sys:precomp:insert-sexp
   (lambda (sexp)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (sys:precomp:currently-compiling?)
         (display (string-append (sexpr->string sexp) "\n")
                  *sys:precomp:current-output-port*))))
-
-(define *sys:precomp:suppress-precomp* #f)
 
 (define sys:precomp:print-compilation-details
   (lambda (start-time)
@@ -1987,7 +1991,7 @@
                   ;; if the preload check passes
                   (set! *sys:precomp:current-output-port* (open-output-file precomp-file-path))
                   (set! *sys:precomp:func-defs-in-mod* '())
-                  (if *sys:precomp:current-output-port*
+                  (if (sys:precomp:currently-compiling?)
                       (begin
                         ;; this is the 'success' branch
                         (set! *sys:precomp:current-lib-name* libname-no-extension)
