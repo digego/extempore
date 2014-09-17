@@ -1558,7 +1558,7 @@ You shouldn't have to modify this list directly, use
 
 (defvar exvis-osc-client nil
   "OSC client used for sending messages to `exvis-osc-host'")
-(defvar exvis-osc-host (cons "localhost" 9880)
+(defvar exvis-osc-host (cons "127.0.0.1" 9880)
   "(HOST . PORT) pair")
 
 (define-minor-mode exvis-mode
