@@ -1316,6 +1316,7 @@
 ;; 				      (print-error 'Compiler 'Error: 'cannot 'find 'type 'for string-type)))))))))))
 
 (define impc:ir:get-type-expand-poly #f)
+(define *impc:ir:get-type-callback-off* #f)
 
 ;; now with pretty print support
 (define impc:ir:get-type-from-pretty-str
@@ -1432,7 +1433,9 @@
                       (begin
                         ;; (println 'make-new-type: (string-append "%" name1 " = type " type))
                         (llvm:compile (string-append "%" name1 " = type " type))
-                        (callback (now) 'build-type-dataconstructor (string->symbol name1) type #f)
+                        (if *impc:ir:get-type-callback-off*
+                            (build-type-dataconstructor (string->symbol name1) type #f)
+                            (callback (now) 'build-type-dataconstructor (string->symbol name1) type #f))
                         string-type)
                       (error))))
 	       ((regex:match? base "!") (string->symbol base))
