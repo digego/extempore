@@ -100,48 +100,112 @@
       (pset! offsets index offset)
       1)))
 
+
+;; linear sampler
+;;
+;; faster but noisy
+;; (bind-func sampler_note_linear_c
+;;   (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index pan:SAMPLE offset:i64)
+;;     (let ((idx_freq:SAMPLE (midi2frq (convert index)))
+;;           (phase:SAMPLE (convert (+ offset (pref samples_offsets index))))) ;; phase unit is audio frames
+;;       (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
+;;         (let ((rate (/ freq idx_freq))
+;;               (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
+;;                               (set! phase (+ phase rate))
+;;                               phase))
+;;               (posi:i64 (convert (floor pos))) 
+;;               (posx (+ (* posi 2) chan))
+;;               (lgth:i64 (convert (- (pref samples_length index) 10)))
+;;               (dat (pref samples index)))
+;;           (* amp (if (> posi lgth) 0.0 (pref dat posx))))))))
+
+
+;; hermite sampler  (multi-channels version)
+;;
+;; slower but less noisy (default)
+;; (bind-func sampler_note_hermite_c
+;;   (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index pan:SAMPLE offset:SAMPLE)
+;;     (let ((idx_freq (midi2frq (convert index)))
+;;           (channels:i64 (convert (pref samples_channels index)))
+;;           (phase (+ offset (convert (pref samples_offsets index))))) ;; phase unit is audio frames
+;;       (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
+;;         (let ((rate (/ freq idx_freq))              
+;;               (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
+;;                        (set! phase (+ phase rate))
+;;                        phase))
+;;               (posi:i64 (convert (floor pos)))
+;;               (posx (+ (* posi channels) (if (< chan channels) chan 0)))
+;;               (lgth:i64 (- (pref samples_length index) 10))
+;;               (dat (pref samples index)))
+;;           (if (< (fabs (- rate 1.0)) 0.01)
+;;               (if (> posi lgth) 0.0 (* amp (panner chan pan) (pref dat posx)))
+;;               (let ((y1 (if (or (> posi lgth) (< posi 1)) 0.0 (pref dat (- posx channels))))
+;;                     (x0 (if (> posi lgth) 0.0 (pref dat posx)))
+;;                     (x1 (if (> (+ posi 1) lgth) 0.0 (pref dat (+ posx channels))))
+;;                     (x2 (if (> (+ posi 2) lgth) 0.0 (pref dat (+ posx (* 2 channels))))))
+;;                 (* (panner chan pan)
+;;                    amp (hermite_interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
+
+
 ;; linear sampler
 ;;
 ;; faster but noisy
 (bind-func sampler_note_linear_c
-  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index pan:SAMPLE offset:i64)
+  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index pan:SAMPLE offset:i64 rev:i1)
     (let ((idx_freq:SAMPLE (midi2frq (convert index)))
           (phase:SAMPLE (convert (+ offset (pref samples_offsets index))))) ;; phase unit is audio frames
+      (if (and rev (< phase 0.01))
+          (set! phase (convert (- (pref samples_length index) 10))))      
       (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (let ((rate (/ freq idx_freq))
               (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
-                              (set! phase (+ phase rate))
+                              (if rev
+                                  (set! phase (- phase rate))
+                                  (set! phase (+ phase rate)))
                               phase))
               (posi:i64 (convert (floor pos))) 
               (posx (+ (* posi 2) chan))
               (lgth:i64 (convert (- (pref samples_length index) 10)))
               (dat (pref samples index)))
-          (* amp (if (> posi lgth) 0.0 (pref dat posx))))))))
+          (* amp (if (or (> posi lgth) (< posi 0)) 0.0 (pref dat posx))))))))
 
 
 ;; hermite sampler  (multi-channels version)
 ;;
 ;; slower but less noisy (default)
 (bind-func sampler_note_hermite_c
-  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index pan:SAMPLE offset:SAMPLE)
+  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index pan:SAMPLE offset:SAMPLE rev:i1)
     (let ((idx_freq (midi2frq (convert index)))
           (channels:i64 (convert (pref samples_channels index)))
           (phase (+ offset (convert (pref samples_offsets index))))) ;; phase unit is audio frames
+      (if (and rev (< phase 0.01))
+          (set! phase (convert (- (pref samples_length index) 10))))
       (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
         (let ((rate (/ freq idx_freq))              
               (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
-                       (set! phase (+ phase rate))
-                       phase))
+                              (if rev
+                                  (set! phase (- phase rate))
+                                  (set! phase (+ phase rate)))
+                              phase))
               (posi:i64 (convert (floor pos)))
               (posx (+ (* posi channels) (if (< chan channels) chan 0)))
               (lgth:i64 (- (pref samples_length index) 10))
               (dat (pref samples index)))
           (if (< (fabs (- rate 1.0)) 0.01)
-              (if (> posi lgth) 0.0 (* amp (panner chan pan) (pref dat posx)))
-              (let ((y1 (if (or (> posi lgth) (< posi 1)) 0.0 (pref dat (- posx channels))))
-                    (x0 (if (> posi lgth) 0.0 (pref dat posx)))
-                    (x1 (if (> (+ posi 1) lgth) 0.0 (pref dat (+ posx channels))))
-                    (x2 (if (> (+ posi 2) lgth) 0.0 (pref dat (+ posx (* 2 channels))))))
+              (if (or (> posi lgth) (< posi 0))  0.0 (* amp (panner chan pan) (pref dat posx)))
+              (let ((y1 (if (or (> posi lgth) (< posi 1)) 0.0
+                            (if rev
+                                (pref dat (+ posx channels))
+                                (pref dat (- posx channels)))))
+                    (x0 (if (or (> posi lgth) (< posi 0)) 0.0 (pref dat posx)))
+                    (x1 (if (or (> (+ posi 1) lgth) (< (- posi 1) 0)) 0.0
+                            (if rev
+                                (pref dat (- posx channels))
+                                (pref dat (+ posx channels)))))
+                    (x2 (if (or (> (+ posi 2) lgth) (< (- posi 2) 0)) 0.0
+                            (if rev
+                                (pref dat (- posx (* 2 channels)))
+                                (pref dat (+ posx (* 2 channels)))))))
                 (* (panner chan pan)
                    amp (hermite_interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
