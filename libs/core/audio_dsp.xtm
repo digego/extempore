@@ -406,7 +406,7 @@
           (leak 0.995)
           (saw 0.0))
       (lambda (amp freq)
-        (let* ((qmax (* 0.5 (/ SAMPLERATE freq)))
+        (let* ((qmax (/ SAMPLERATE freq))
                (dc (/ -0.498 qmax)))
           (set! phase (+ phase dp))
           (if (< phase 0.0) 
@@ -1907,10 +1907,10 @@ but v1 and v2 can be computed in parallel"
 (bind-func adsr_accum_c
   (lambda (start_time:i64 atk_dur:i64 dky_dur:i64 sus_dur:i64 rel_dur:i64 peak_amp:SAMPLE sus_amp:SAMPLE)
     (let ((val:SAMPLE (if (> (+ atk_dur dky_dur) 1) 0.0 peak_amp))
-          (t1 atk_dur)
-          (t2 (+ atk_dur dky_dur))
-          (t3 (+ atk_dur dky_dur sus_dur))
-          (t4 (+ atk_dur dky_dur sus_dur rel_dur))
+          (t1 (+ atk_dur start_time))
+          (t2 (+ atk_dur dky_dur start_time))
+          (t3 (+ atk_dur dky_dur sus_dur start_time))
+          (t4 (+ atk_dur dky_dur sus_dur rel_dur start_time))
           (inc1:SAMPLE (/ peak_amp (convert atk_dur)))
           (inc2 (* -1.0 (/ (- peak_amp sus_amp) (convert dky_dur))))
           (inc3 (* -1.0 (/ sus_amp (convert rel_dur)))))
@@ -1920,9 +1920,35 @@ but v1 and v2 can be computed in parallel"
                   ((> time t3) (set! val (+ val inc3)))
                   ((> time t2) val) ;; sustain (don't do anything with val)
                   ((> time t1) (set! val (+ val inc2)))
-                  ((> time 0) (set! val (+ val inc1)))
+                  ((> time start_time) (set! val (+ val inc1)))
                   (else (set! val 0.0))))
         val))))
+
+
+;; has both hold and sustain
+;; an accumulative ahdsr (random access not allowed! time must be linear).
+(bind-func ahdsr_accum_c
+  (lambda (start_time:i64 atk_dur:i64 hold_dur:i64 dky_dur:i64 sus_dur:i64 rel_dur:i64 peak_amp:SAMPLE sus_amp:SAMPLE)
+    (let ((val:SAMPLE (if (> atk_dur 1) 0.0 peak_amp))
+          (t1 (+ atk_dur start_time))
+          (t2 (+ atk_dur hold_dur start_time))          
+          (t3 (+ atk_dur hold_dur dky_dur start_time))
+          (t4 (+ atk_dur hold_dur dky_dur sus_dur start_time))
+          (t5 (+ atk_dur hold_dur dky_dur sus_dur rel_dur start_time))
+          (inc1:SAMPLE (/ peak_amp (convert atk_dur)))
+          (inc2 (* -1.0 (/ (- peak_amp sus_amp) (convert dky_dur))))
+          (inc3 (* -1.0 (/ sus_amp (convert rel_dur)))))
+      (lambda (time:i64 chan:i64)
+        (if (= chan 0)
+            (cond ((> time t5) (set! val 0.0))
+                  ((> time t4) (set! val (+ val inc3)))
+                  ((> time t3) val) ;; sustain (don't do anything with val)
+                  ((> time t2) (set! val (+ val inc2)))
+                  ((> time t1) val) ;; hold don't do anything with val
+                  ((> time start_time) (set! val (+ val inc1)))
+                  (else (set! val 0.0))))
+        val))))
+
 
 (bind-func hermite_interp
   (lambda (fractional y1:SAMPLE x0 x1 x2)
