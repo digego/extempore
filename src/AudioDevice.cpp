@@ -832,38 +832,39 @@ namespace extemp {
   }
 
   void AudioDevice::printDevices() {
-	Pa_Initialize();
-        ascii_text_color(0,2,10);
-        printf("\n-----Available Audio Drivers-----------------------------\n");
-        ascii_text_color(0,9,10);
-        PaError err;
+    Pa_Initialize();
+    PaError err;
 
-	int numDevices = Pa_GetDeviceCount();
-	if( numDevices < 0 ) {
-   	  printf("No audio devices found!\n");
-	  printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
-          exit(1);
-	}
-        
-        const   PaDeviceInfo *deviceInfo;
-        const   PaHostApiInfo* apiInfo;
-	for( int i=0; i<numDevices; i++ ) {
-	  deviceInfo = Pa_GetDeviceInfo( i );
-          apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-	  printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
-	}    
-        ascii_text_color(0,2,10);
-        printf("----------------------------------------------------------\n\n");
-        ascii_text_color(0,9,10);
+    int numDevices = Pa_GetDeviceCount();
+    if( numDevices <= 0 ) {
+   	  printf("ERROR: no audio devices found! Exiting...\n");
+      // printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
+      exit(1);
+    }        
+    ascii_text_color(0,2,10);
+    printf("\n-----Available Audio Devices-----------------------------\n");
+    ascii_text_color(0,9,10);
+
+    const   PaDeviceInfo *deviceInfo;
+    const   PaHostApiInfo* apiInfo;
+
+    for( int i=0; i<numDevices; i++ ) {
+      deviceInfo = Pa_GetDeviceInfo( i );
+      apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+      printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
+    }
+    ascii_text_color(0,2,10);
+    printf("----------------------------------------------------------\n\n");
+    ascii_text_color(0,9,10);
 #ifdef TARGET_OS_WINDOWS
-        Pa_Terminate();
+    Pa_Terminate();
 #else
-        fflush(stdout);
-        freopen("/dev/null","w",stdout); // throttle termination messages
-        Pa_Terminate();
-        fflush(stdout);
+    fflush(stdout);
+    freopen("/dev/null","w",stdout); // throttle termination messages
+    Pa_Terminate();
+    fflush(stdout);
 #endif
-        return;
+    return;
   }
 
 
