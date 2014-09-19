@@ -79,7 +79,7 @@ namespace extemp {
 	
 	void setDSPClosure(void* _dsp_func) 
 	{
-	    if(dsp_closure != 0) { printf("You can only set me once!\nBut you are allowed to re-definec me as often as you like!\n"); return; }
+	    if(dsp_closure != 0) { printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n"); return; }
 	    dsp_closure = _dsp_func; 
 	}
 	void* getDSPClosure() { return dsp_closure; }
@@ -89,7 +89,7 @@ namespace extemp {
 
 	void setDSPMTClosure(void* _dsp_func, int idx) 
 	{
-	    if(dsp_mt_closure[idx] != 0) { printf("You can only set me once!\nBut you are allowed to re-definec me as often as you like!\n"); return; }
+	    if(dsp_mt_closure[idx] != 0) { printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n"); return; }
 	    dsp_mt_closure[idx] = _dsp_func;
 	}
 	void* getDSPMTClosure(int idx) { return dsp_mt_closure[idx]; }
