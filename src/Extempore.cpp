@@ -164,6 +164,7 @@ int main(int argc, char** argv)
           break;
 	case OPT_NO_DEVICE:
     extemp::UNIV::AUDIO_NO_DEVICE = 1;
+    break;
 	case OPT_DEVICE:
 	  extemp::UNIV::AUDIO_DEVICE = atoi(args.OptionArg());
           break;

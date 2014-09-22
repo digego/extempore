@@ -495,6 +495,7 @@ namespace extemp {
     uint64_t UNIV::TIME = 0l;
     uint64_t UNIV::DEVICE_TIME = 0l;
     const char* UNIV::PWD = "";
+    uint32_t UNIV::AUDIO_NO_DEVICE = 0; // 0 for real device, 1 for dummy device
     uint32_t UNIV::AUDIO_DEVICE = -1;
     uint32_t UNIV::AUDIO_IN_DEVICE = -1;
   std::map<std::string,std::string> UNIV::CMDPARAMS;

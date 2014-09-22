@@ -143,8 +143,11 @@ namespace extemp {
     static double CLOCKOFFSET;
     int thread_idx[128];
 
-  private:
+  protected:
     bool started;
+    static AudioDevice SINGLETON;
+    
+  private:
     PaStream* stream;
     float* buffer;
     void* dsp_closure;
@@ -157,7 +160,6 @@ namespace extemp {
     SAMPLE* inbuf;
     float* outbuf_f;
     float* inbuf_f;
-    static AudioDevice SINGLETON;
     EXTThread** threads;
     int numthreads;
     bool zerolatency;
@@ -169,7 +171,7 @@ namespace extemp {
   public:
     NoAudioDevice();
     ~NoAudioDevice();
-    static NoAudioDevice* I() { return &SINGLETON; }
+    // static NoAudioDevice* I() { return &SINGLETON; }
 
     //////////////////////////////////////////////////////////////
     // from here on, these just copied from defn of AudioDevice //
@@ -183,8 +185,6 @@ namespace extemp {
     static double getCPULoad();
     static void printDevices();
   private:
-    bool started;
-    static NoAudioDevice SINGLETON;
     pthread_t* nodevice_tID; 
   };
 
