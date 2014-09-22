@@ -55,8 +55,6 @@
 #include <vector>
 #include "UNIV.h"
 
-#define BUFFERED_AUDIO
-
 #define SAMPLE float
 
 typedef void(*dsp_f_ptr_array)(void*,void*,float*,float*,long,void*);
