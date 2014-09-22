@@ -164,7 +164,7 @@ namespace extemp {
     bool toggle;
   };
 
-  class NoAudioDevice : AudioDevice
+  class NoAudioDevice : public AudioDevice
   {
   public:
     NoAudioDevice();

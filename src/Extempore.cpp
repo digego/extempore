@@ -70,7 +70,7 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 
 enum { OPT_RUNTIME, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES, 
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITFILE, 
-       OPT_PORT, OPT_TERM, OPT_DEVICE, OPT_IN_DEVICE,
+       OPT_PORT, OPT_TERM, OPT_NO_DEVICE, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
        OPT_HELP
      };
@@ -86,6 +86,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_INITFILE,    "--run",           SO_REQ_SEP    },
     { OPT_PORT,        "--port",          SO_REQ_SEP    },
     { OPT_TERM,        "--term",          SO_REQ_SEP    },
+    { OPT_NO_DEVICE,   "--nodevice",      SO_NONE       },
     { OPT_DEVICE,      "--device",        SO_REQ_SEP    },
     { OPT_IN_DEVICE,   "--indevice",      SO_REQ_SEP    },
     { OPT_PRT_DEVICES, "--print-devices", SO_NONE       },
@@ -161,6 +162,8 @@ int main(int argc, char** argv)
 	    extemp::UNIV::EXT_TERM = 0;
 	  }
           break;
+	case OPT_NO_DEVICE:
+    extemp::UNIV::AUDIO_NO_DEVICE = 1;
 	case OPT_DEVICE:
 	  extemp::UNIV::AUDIO_DEVICE = atoi(args.OptionArg());
           break;
@@ -201,6 +204,7 @@ int main(int argc, char** argv)
 	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
 	  std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
 	  std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
+	  std::cout << "          --nodevice: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
 	  std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
 	  std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
     std::cout << "            --arch: the target architecture [current host]" << std::endl;
@@ -245,7 +249,11 @@ int main(int argc, char** argv)
     [NSApplication sharedApplication];
 #endif
 
-    extemp::AudioDevice* dev = extemp::AudioDevice::I();
+    extemp::AudioDevice* dev;
+    if(extemp::UNIV::AUDIO_NO_DEVICE != 1)
+      dev = extemp::AudioDevice::I();
+    else
+      dev = extemp::NoAudioDevice::I();
     dev->start();
     ascii_text_color(0,7,10);	        
     std::cout << "---------------------------------------" << std::endl;
