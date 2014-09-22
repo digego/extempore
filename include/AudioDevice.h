@@ -166,7 +166,7 @@ namespace extemp {
     bool toggle;
   };
 
-  class NoAudioDevice : public AudioDevice
+  class NoAudioDevice : AudioDevice
   {
   public:
     NoAudioDevice();
@@ -187,6 +187,7 @@ namespace extemp {
   private:
     bool started;
     static NoAudioDevice SINGLETON;
+    pthread_t* nodevice_tID; 
   };
 
 } //End Namespace

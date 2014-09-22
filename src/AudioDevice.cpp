@@ -134,10 +134,9 @@ double getRealTime()
   return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970; 
 }
 
-int set_realtime(float period, float computation, float constraint) {
+int set_realtime(thread_port_t threadport, float period, float computation, float constraint) {
   struct thread_time_constraint_policy ttcpolicy;
   int ret;
-  thread_port_t threadport = pthread_mach_thread_np(pthread_self());
  
   ttcpolicy.period=period; // HZ/160
   ttcpolicy.computation=computation; // HZ/3300;
@@ -216,8 +215,8 @@ namespace extemp {
   void* audioCallbackMT(void* dat) {    
 #ifdef TARGET_OS_MAC
     Float64 clockFrequency = AudioGetHostClockFrequency();
-    //set_realtime(clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
-    set_realtime(clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
+    //set_realtime(pthread_mach_thread_np(pthread_self()), sclockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
+    set_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif TARGET_OS_LINUX
     pthread_t pt = pthread_self();
     int policy;
@@ -326,8 +325,8 @@ namespace extemp {
   void* audioCallbackMTBuf(void* dat) {
 #ifdef TARGET_OS_MAC
     Float64 clockFrequency = AudioGetHostClockFrequency();
-    //set_realtime(clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
-    set_realtime(clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
+    //set_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
+    set_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif TARGET_OS_LINUX
     pthread_t pt = pthread_self();
     int policy;
@@ -876,57 +875,100 @@ namespace extemp {
     // maybe kill the thread here?
   }
 
+  void* noAudioCallback(void* NOAUDIO_SLEEP_DURATION)
+  {
+    while(true){
+      UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
+      UNIV::TIME = UNIV::DEVICE_TIME;
+    
+      if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
+      AudioDevice::REALTIME = getRealTime();
+
+      device_time = UNIV::DEVICE_TIME;
+      if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
+
+      // trigger the scheduler
+      TaskScheduler::I()->getGuard()->signal();
+      // sleep
+      nanosleep((timespec*)NOAUDIO_SLEEP_DURATION, NULL);
+    }
+  }
+  
   void NoAudioDevice::start()
-  {        
-   	  printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
+  {
+#ifdef TARGET_OS_WINDOWS // fix for RT windows
+    printf("Extempore dummy audio device isn't yet supported on Windows.\n");
+    return;
+#else
+    printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
 
-      UNIV::CHANNELS = 1;
-      UNIV::SAMPLERATE = 44100;
+    UNIV::CHANNELS = 1; // only one channel for dummy device
+    // UNIV::SAMPLERATE = 44100;
 
-      if(started) return;
-      UNIV::initRand();        
+    if(started) return;
+    UNIV::initRand();        
 
-      RUNNING = true;
-      started = true;
+    // in original:
+    // err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
       
-      ascii_text_color(0,7,10);
-      std::cout << "Output Device  :" << std::flush;
-      ascii_text_color(1,6,10);	
-      std::cout << "Extempore dummy audio device" << std::endl;	
-      ascii_text_color(0,7,10);
-      std::cout << "Input Device   :" << std::endl;
-      std::cout << "SampleRate     :" << std::flush;
-      ascii_text_color(1,6,10);	
-      std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
-      ascii_text_color(0,7,10);	
-      std::cout << "Channels Out   :" << std::flush;
-      ascii_text_color(1,6,10);	
-      std::cout << UNIV::CHANNELS << std::endl << std::flush;
-      ascii_text_color(0,7,10);	
-      std::cout << "Channels In    :" << std::flush;
-      ascii_text_color(1,6,10);	
-      std::cout << UNIV::IN_CHANNELS << std::endl << std::flush;
-      ascii_text_color(0,7,10);	
-      std::cout << "Frames         :" << std::flush;
-      ascii_text_color(1,6,10);	
-      std::cout << UNIV::FRAMES << std::endl << std::flush;
-      ascii_text_color(0,7,10); 
-      std::cout << "Latency        :" << std::flush;
-      ascii_text_color(1,6,10);	
-      std::cout << UNIV::FRAMES / UNIV::SAMPLERATE << std::endl << std::flush;
-      // ascii_text_color(0,7,10); 
-      // std::cout << "Interleaved\t: " << std::flush;
-      // ascii_text_color(1,6,10);	
-      // std::cout << ((UNIV::INTERLEAVED==0) ? "TRUE" : "FALSE") << std::endl << std::flush;
-      // ascii_text_color(0,7,10);	
-      std::cout << std::flush;
-      //ascii_text_color(0,7,10);
+    started = true;
+      
+    ascii_text_color(0,7,10);
+    std::cout << "Output Device  :" << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << "Extempore dummy audio device" << std::endl;	
+    ascii_text_color(0,7,10);
+    std::cout << "Input Device   :" << std::endl;
+    std::cout << "SampleRate     :" << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
+    ascii_text_color(0,7,10);	
+    std::cout << "Channels Out   :" << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << UNIV::CHANNELS << std::endl << std::flush;
+    ascii_text_color(0,7,10);	
+    std::cout << "Channels In    :" << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << UNIV::IN_CHANNELS << std::endl << std::flush;
+    ascii_text_color(0,7,10);	
+    std::cout << "Frames         :" << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << UNIV::FRAMES << std::endl << std::flush;
+    ascii_text_color(0,7,10); 
+    std::cout << "Latency        :" << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << UNIV::FRAMES / UNIV::SAMPLERATE << std::endl << std::flush;
+    ascii_text_color(0,7,10); 
+    std::cout << std::flush;
 
+    // create the nodevice (dummy) audio thread
+    static struct timespec NOAUDIO_SLEEP_DURATION = {0,(long)UNIV::SAMPLERATE};
+    pthread_create(nodevice_tID, NULL, noAudioCallback, &NOAUDIO_SLEEP_DURATION);
+
+#endif    
+    // make the thread a high priority one
+#ifdef TARGET_OS_MAC
+    Float64 clockFrequency = (Float64)UNIV::SAMPLERATE;
+    set_realtime(pthread_mach_thread_np(*nodevice_tID), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
+#elif TARGET_OS_LINUX
+    int policy;
+    sched_param param;
+    pthread_getschedparam(nodevice_tID,&policy,&param);
+    param.sched_priority = 20;
+    policy = SCHED_RR; // SCHED_FIFO
+    int res = pthread_setschedparam(nodevice_tID,policy,&param);
+    if(res != 0) {
+      printf("Failed to set realtime priority for dummy audio thread\nERR:%s\n",strerror(res));
+    }
+#endif      
   }
 
   void NoAudioDevice::stop()
   {
     started = false;
+#ifndef TARGET_OS_WINDOWS // not yet implemented for windows
+    pthread_cancel(*nodevice_tID);
+#endif
   }
 
   void NoAudioDevice::initMTAudio(int num,bool _zerolatency)
@@ -957,6 +999,5 @@ namespace extemp {
     fflush(stdout);
     return;
   }
-  
 
 } //End Namespace
