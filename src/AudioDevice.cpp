@@ -192,6 +192,7 @@ float audio_sanity_f(float x)
 namespace extemp {
 	
   AudioDevice AudioDevice::SINGLETON;
+  NoAudioDevice NoAudioDevice::SINGLETON;
   double AudioDevice::REALTIME = 0.0;
   double AudioDevice::CLOCKBASE = 0.0;
   double AudioDevice::CLOCKOFFSET = 0.0;

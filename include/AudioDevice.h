@@ -145,9 +145,9 @@ namespace extemp {
 
   protected:
     bool started;
-    static AudioDevice SINGLETON;
     
   private:
+    static AudioDevice SINGLETON;
     PaStream* stream;
     float* buffer;
     void* dsp_closure;
@@ -171,13 +171,7 @@ namespace extemp {
   public:
     NoAudioDevice();
     ~NoAudioDevice();
-    // static NoAudioDevice* I() { return &SINGLETON; }
-
-    //////////////////////////////////////////////////////////////
-    // from here on, these just copied from defn of AudioDevice //
-    //////////////////////////////////////////////////////////////
-
-    // start and stop audio processing (which also stops time!!)	
+    static NoAudioDevice* I() { return &SINGLETON; }
     void start();
     void stop();
     void initMTAudio(int,bool);
@@ -185,6 +179,7 @@ namespace extemp {
     static double getCPULoad();
     static void printDevices();
   private:
+    static NoAudioDevice SINGLETON;
     pthread_t* nodevice_tID; 
   };
 
