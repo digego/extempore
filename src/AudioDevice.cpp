@@ -636,14 +636,14 @@ namespace extemp {
       exit(1);
     }
     
-    if((int)UNIV::AUDIO_DEVICE < 0 || (int)UNIV::AUDIO_DEVICE >= numDevices) {
+    if((int)UNIV::AUDIO_DEVICE < -1 || (int)UNIV::AUDIO_DEVICE >= numDevices) {
       ascii_text_color(0,1,10);
       printf("Output device not valid! %d\n",(int)UNIV::AUDIO_DEVICE);
       ascii_text_color(0,7,10);
       printf("\n");
       exit(1);
     }
-    if((int)UNIV::AUDIO_IN_DEVICE < 0 || (int)UNIV::AUDIO_IN_DEVICE >= numDevices) {
+    if((int)UNIV::AUDIO_IN_DEVICE < -1 || (int)UNIV::AUDIO_IN_DEVICE >= numDevices) {
       ascii_text_color(0,1,10);
       printf("Input device not valid! %d\n",(int)UNIV::AUDIO_IN_DEVICE);
       ascii_text_color(0,7,10);
