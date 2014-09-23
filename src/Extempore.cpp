@@ -250,12 +250,16 @@ int main(int argc, char** argv)
     [NSApplication sharedApplication];
 #endif
 
-    extemp::AudioDevice* dev;
     if(extemp::UNIV::AUDIO_NO_DEVICE != 1)
-      dev = extemp::AudioDevice::I();
+      {
+        extemp::AudioDevice* dev = extemp::AudioDevice::I();
+        dev->start();
+      }
     else
-      dev = extemp::NoAudioDevice::I();
-    dev->start();
+      {
+        extemp::NoAudioDevice* dev = extemp::NoAudioDevice::I();
+        dev->start();
+      }
     ascii_text_color(0,7,10);	        
     std::cout << "---------------------------------------" << std::endl;
     ascii_text_color(0,9,10);	            

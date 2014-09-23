@@ -876,8 +876,13 @@ namespace extemp {
     // maybe kill the thread here?
   }
 
-  void* noAudioCallback(void* NOAUDIO_SLEEP_DURATION)
+  void* noAudioCallback(void* sleepDuration)
   {
+    printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
+
+    long* dur = (long*)sleepDuration;
+    static struct timespec NOAUDIO_SLEEP_DURATION = {0, 1000000000 * *dur};
+
     while(true){
       UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
       UNIV::TIME = UNIV::DEVICE_TIME;
@@ -891,7 +896,7 @@ namespace extemp {
       // trigger the scheduler
       TaskScheduler::I()->getGuard()->signal();
       // sleep
-      nanosleep((timespec*)NOAUDIO_SLEEP_DURATION, NULL);
+      nanosleep(&NOAUDIO_SLEEP_DURATION, NULL);
     }
   }
   
@@ -901,7 +906,6 @@ namespace extemp {
     printf("Extempore dummy audio device isn't yet supported on Windows.\n");
     return;
 #else
-    printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
 
     UNIV::CHANNELS = 1; // only one channel for dummy device
     // UNIV::SAMPLERATE = 44100;
@@ -915,49 +919,54 @@ namespace extemp {
     started = true;
       
     ascii_text_color(0,7,10);
-    std::cout << "Output Device  :" << std::flush;
+    std::cout << "Output Device  : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << "Extempore dummy audio device" << std::endl;	
     ascii_text_color(0,7,10);
-    std::cout << "Input Device   :" << std::endl;
-    std::cout << "SampleRate     :" << std::flush;
+    std::cout << "Input Device   : " << std::endl;
+    std::cout << "SampleRate     : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
     ascii_text_color(0,7,10);	
-    std::cout << "Channels Out   :" << std::flush;
+    std::cout << "Channels Out   : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::CHANNELS << std::endl << std::flush;
     ascii_text_color(0,7,10);	
-    std::cout << "Channels In    :" << std::flush;
+    std::cout << "Channels In    : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::IN_CHANNELS << std::endl << std::flush;
     ascii_text_color(0,7,10);	
-    std::cout << "Frames         :" << std::flush;
+    std::cout << "Frames         : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::FRAMES << std::endl << std::flush;
     ascii_text_color(0,7,10); 
-    std::cout << "Latency        :" << std::flush;
+    std::cout << "Latency        : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::FRAMES / UNIV::SAMPLERATE << std::endl << std::flush;
     ascii_text_color(0,7,10); 
     std::cout << std::flush;
 
-    // create the nodevice (dummy) audio thread
-    static struct timespec NOAUDIO_SLEEP_DURATION = {0,(long)UNIV::SAMPLERATE};
-    pthread_create(nodevice_tID, NULL, noAudioCallback, &NOAUDIO_SLEEP_DURATION);
+    // create the "nodevice" audio thread
+    long sleepDuration = (long)(UNIV::FRAMES / UNIV::SAMPLERATE);
+    if(pthread_create(&nodevice_tID, NULL, noAudioCallback, &sleepDuration))
+      {
+        printf("Error: could not create the dummy audio thread.\n");
+        exit(1);
+      };
 
 #endif    
     // make the thread a high priority one
 #ifdef TARGET_OS_MAC
     Float64 clockFrequency = (Float64)UNIV::SAMPLERATE;
-    set_realtime(pthread_mach_thread_np(*nodevice_tID), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
+    set_realtime(pthread_mach_thread_np(nodevice_tID), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif TARGET_OS_LINUX
     int policy;
     sched_param param;
-    pthread_getschedparam(nodevice_tID,&policy,&param);
+    // todo check if these '&nodevice_tID's are ok
+    pthread_getschedparam(&nodevice_tID,&policy,&param);
     param.sched_priority = 20;
     policy = SCHED_RR; // SCHED_FIFO
-    int res = pthread_setschedparam(nodevice_tID,policy,&param);
+    int res = pthread_setschedparam(&nodevice_tID,policy,&param);
     if(res != 0) {
       printf("Failed to set realtime priority for dummy audio thread\nERR:%s\n",strerror(res));
     }
@@ -968,7 +977,7 @@ namespace extemp {
   {
     started = false;
 #ifndef TARGET_OS_WINDOWS // not yet implemented for windows
-    pthread_cancel(*nodevice_tID);
+    pthread_cancel(nodevice_tID);
 #endif
   }
 
