@@ -6,9 +6,17 @@
 
 ;;; Commentary:
 
-;; 
+;; libghttp (GNOME HTTP library) bindings for Extempore. This is more
+;; useful than the curl bindings (even though libcurl is a more
+;; featureful library) because it doesn't rely on varargs C calls,
+;; which we can't bind in xtlang
 
 ;;; Code:
+
+(sys:load-preload-check 'ghttp)
+(define *xtmlib-ghttp-loaded* #f)
+
+(sys:load "libs/external/jansson.xtm")
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -27,7 +35,6 @@
 ;; load the dylib               
 (define libghttp
   (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; ghttp_constants.h ;;
@@ -295,7 +302,7 @@
  
 (bind-lib libghttp ghttp_set_proxy_authinfo [i32,ghttp_request*,i8*,i8*]*)
 
-;; some xtlang functions
+;; some helpful xtlang functions
 
 (bind-func ghttp_set_extempore_user_agent
   (lambda (request)
@@ -319,7 +326,54 @@
                        null)
                 request))))))
 
-(bind-func ghttp_dump_request_body
+(bind-func ghttp_perform_put
+  (lambda (uri:i8* body:i8* bodylen:i32)
+    (let ((request:ghttp_request* (ghttp_request_new))) 
+      (ghttp_set_extempore_user_agent request)
+      (ghttp_set_type request ghttp_type_put)
+      (if (= (ghttp_set_uri request uri) -1)
+          (begin (println "Error: invalid uri: " uri)
+                 (ghttp_request_destroy request))
+          (begin (ghttp_set_body request body bodylen)
+                 (ghttp_prepare request)
+                 (if (= (ghttp_process request) ghttp_error)
+                     (begin (println "ghttp Error:" (ghttp_get_error request))
+                            (ghttp_request_destroy request)))))
+      request)))
+
+(bind-func ghttp_perform_post
+  (lambda (uri:i8* body:i8* bodylen:i32)
+    (let ((request:ghttp_request* (ghttp_request_new))) 
+      (ghttp_set_extempore_user_agent request)
+      (ghttp_set_type request ghttp_type_post)
+      (if (= (ghttp_set_uri request uri) -1)
+          (begin (println "Error: invalid uri: " uri)
+                 (ghttp_request_destroy request))
+          (begin (ghttp_set_body request body bodylen)
+                 (ghttp_prepare request)
+                 (if (= (ghttp_process request) ghttp_error)
+                     (begin (println "ghttp Error:" (ghttp_get_error request))
+                            (ghttp_request_destroy request)))))
+      request)))
+
+(bind-func ghttp_perform_delete
+  (lambda (uri:i8*)
+    (let ((request:ghttp_request* (ghttp_request_new)))
+      (ghttp_set_extempore_user_agent request)
+      (ghttp_set_type request ghttp_type_delete)
+      (if (= (ghttp_set_uri request uri) -1)
+          (begin (println "Error: invalid uri")
+                 (ghttp_request_destroy request)
+                 null)
+          (begin
+            (ghttp_prepare request)
+            (if (= (ghttp_process request) ghttp_error)
+                (begin (println "ghttp Error:" (ghttp_get_error request))
+                       (ghttp_request_destroy request)
+                       null)
+                request))))))
+
+(bind-func ghttp_request_body_copy
   (lambda (request:ghttp_request* buf:i8* bufsize:i64)
     (if (null? request)
         (println "Error: request is null.")
@@ -333,7 +387,14 @@
                     (memcpy buf (ghttp_get_body request) bufsize)
                     (println "Warning: HTTP response body (" bytes_read " bytes) is too big for buffer (" bufsize " bytes).  Dropping the rest of the body."))))))))
 
-(bind-func ghttp_print_headers
+;; (bind-func ghttp_get_hdr
+;;   (lambda (request:ghttp_request* hdr:i8*)
+;;     (if (null? request)
+;;         (begin (println "Error: request is null.")
+;;                null)
+;;         (ghttp_get_header request hdr))))
+
+(bind-func ghttp_request_print_headers
   (lambda (request:ghttp_request*)
     (if (null? request)
         (println "Error: request is null.")
@@ -341,56 +402,77 @@
               (hdrcount:i32* (salloc))
               (i 0))
           (ghttp_get_header_names request hdrptr hdrcount)
+          (println "HTTP headers:")
           (dotimes (i (convert (pref hdrcount 0) i64))
-            (printf "header: %s\n" (pref (pref hdrptr 0) i))
+            (printf "%s: %s\n"
+                    (pref (pref hdrptr 0) i)
+                    (ghttp_get_header request (pref (pref hdrptr 0) i)))
             (free (pref (pref hdrptr 0) i)))))))
 
-(bind-func ghttp_get_hdr
-  (lambda (request:ghttp_request* hdr:i8*)
-    (if (null? request)
-        (begin (println "Error: request is null.")
-               null)
-        (ghttp_get_header request hdr))))
-
-(bind-func ghttp_perform_post
-  (lambda (uri:i8* body:i8* bodylen:i32)
-    (let ((request:ghttp_request* (ghttp_request_new))) 
-      (ghttp_set_extempore_user_agent request)
-      (ghttp_set_type request ghttp_type_post)
-      (if (= (ghttp_set_uri request uri) -1)
-          (begin (println "Error: invalid uri: " uri)
-                 (ghttp_request_destroy request))
-          (begin (ghttp_set_header request "Content-Type" "application/json")
-                 (ghttp_set_body request body bodylen)
-                 (ghttp_prepare request)
-                 (if (= (ghttp_process request) ghttp_error)
-                     (begin (println "ghttp Error:" (ghttp_get_error request))
-                            (ghttp_request_destroy request)))))
-      request)))
+(bind-func ghttp_request_print_body
+  (lambda (request:ghttp_request*)
+    (if (not (null? request))
+          (begin (printf "Status code:\n %s\n" (ghttp_reason_phrase request))
+                 (printf "Response:\n %s\n" (ghttp_get_body request))))))
 
 ;; perform a request, dump response to log.  useful for testing
 
-(bind-func ghttp_get_dump_response
+(bind-func ghttp_print_get_response
   (lambda (host:i8*)
     (let ((request:ghttp_request* null)
           (status -1))
       (set! request (ghttp_perform_get host))
-      (if (not (null? request))
-          (begin (set! status (ghttp_status_code request))
-                 (printf "Status code: %s\n" (ghttp_reason_phrase request))
-                 (printf "Response: %s\n" (ghttp_get_body request))
-                 (ghttp_request_destroy request)))
+      (set! status (ghttp_status_code request))
+      (ghttp_request_print_headers request)
+      (ghttp_request_print_body request)
+      (ghttp_request_destroy request)
       status)))
 
-(bind-func ghttp_post_dump_response
+(bind-func ghttp_print_post_response
   (lambda (host:i8* body:i8*)
     (let ((bodylen (convert (strlen body) i32))
           (request:ghttp_request* null)
           (status -1))
       (set! request (ghttp_perform_post host body bodylen))
-      (if (not (null? request))
-          (begin (set! status (ghttp_status_code request))
-                 (printf "Status code: %s\n" (ghttp_reason_phrase request))
-                 (printf "Response: %s\n" (ghttp_get_body request))
-                 (ghttp_request_destroy request)))
+      (set! status (ghttp_status_code request))
+      (ghttp_request_print_headers request)
+      (ghttp_request_print_body request)
+      (ghttp_request_destroy request)
       status)))
+
+;; JSON versions
+
+(bind-func ghttp_get_response_json
+  (lambda (host:i8*)
+    (let ((request:ghttp_request* null)
+          (status -1)
+          (err:json_error_t* (zalloc)))
+      (set! request (ghttp_perform_get host))
+      (set! status (ghttp_status_code request))
+      (let ((json (json_loadb (ghttp_get_body request)
+                              (convert (ghttp_get_body_len request))
+                              0
+                              err)))
+        (if (null? json)
+            (printf "JSON error on line %d: %s\n" (tref err 0) (tref err 4)))
+        (ghttp_request_destroy request)
+        json))))
+
+(bind-func ghttp_post_response_json
+  (lambda (host:i8* body:i8*)
+    (let ((request:ghttp_request* null)
+          (status -1)
+          (bodylen (convert (strlen body) i32))
+          (err:json_error_t* (zalloc)))
+      (set! request (ghttp_perform_post host body bodylen))
+      (set! status (ghttp_status_code request))
+      (let ((json (json_loadb (ghttp_get_body request)
+                              (convert (ghttp_get_body_len request))
+                              0
+                              err)))
+        (if (null? json)
+            (printf "JSON error on line %d: %s\n" (tref err 0) (tref err 4)))
+        (ghttp_request_destroy request)
+        json))))
+
+(define *xtmlib-ghttp-loaded* #t)

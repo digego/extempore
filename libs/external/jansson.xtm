@@ -2,7 +2,7 @@
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: jansson (v2.4), curl
+;; Required dylibs: jansson, ghttp
 
 ;;; Commentary:
 
@@ -18,12 +18,8 @@
 
 ;;; Code:
 
-;; First, need to load the cURL library
-
-;; lib-loading config
 (sys:load-preload-check 'jansson)
-
-(sys:load "libs/external/curl.xtm")
+(define *xtmlib-jansson-loaded* #f)
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -39,15 +35,9 @@
                (print ": unsupported platform ")
                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
-;; load the dylib
+;; load the dylib               
 (define libjansson
   (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
-
-(if (or (eq? #f libjansson)
-        (null? libjansson))
-    (sys:load-escape "Error loading jansson library"))
-
-(define *xtmlib-jansson-loaded* #t)
  
 ;; the json_type enums
 (bind-val JSON_OBJECT enum 0)
@@ -126,6 +116,17 @@
 ;; print JSON data to string
 (bind-lib libjansson json_dumps [i8*,json_t*,size_t]*)
 
+
+;; overload print function
+
+(bind-func print_json_t
+  (lambda (json:json_t*)
+    (let ((s (json_dumps json 4)))
+      (printf "%s\n" s)
+      (free s))))
+
+(bind-poly print print_json_t)
+
 ;; type functions
 
 (bind-func json_typeof
@@ -193,19 +194,4 @@
         (begin (printf "Error: argument is not a JSON object.%\n") 0))
     0))
 
-;; pulling JSON data from the web
-(bind-func json_dump_url 101000
-  (let ((dat:i8* (zalloc 100000))
-        (err:json_error_t* (zalloc))
-        (i 0)) ;; necessary to get around compiler bug!
-    (lambda (url)
-      (let ((cdat (curl_request url dat))
-            (json (json_loads (tref cdat 0) 0 err)))
-        (if (null? json)
-            (printf "JSON error on line %d: %s\n" (tref err 0) (tref err 4))
-            (let ((dump_str (json_dumps json 2)))
-              (begin
-                (chunked_printf dump_str)
-                (free dump_str)
-                (printf "\n"))))
-        0))))
+(define *xtmlib-jansson-loaded* #t)
