@@ -14,7 +14,7 @@
 (sys:precomp:set-dylib-name-info
  'libghttp
  (cond ((string=? (sys:platform) "OSX")
-        "/Users/ben/Code/src/libghttp-1.0.9/libghttp.dylib")
+        "libghttp.dylib")
        ((string=? (sys:platform) "Linux")
         "libghttp.so")
        ((string=? (sys:platform) "Windows")
@@ -368,3 +368,29 @@
                             (ghttp_request_destroy request)))))
       request)))
 
+;; perform a request, dump response to log.  useful for testing
+
+(bind-func ghttp_get_dump_response
+  (lambda (host:i8*)
+    (let ((request:ghttp_request* null)
+          (status -1))
+      (set! request (ghttp_perform_get host))
+      (if (not (null? request))
+          (begin (set! status (ghttp_status_code request))
+                 (printf "Status code: %s\n" (ghttp_reason_phrase request))
+                 (printf "Response: %s\n" (ghttp_get_body request))
+                 (ghttp_request_destroy request)))
+      status)))
+
+(bind-func ghttp_post_dump_response
+  (lambda (host:i8* body:i8*)
+    (let ((bodylen (convert (strlen body) i32))
+          (request:ghttp_request* null)
+          (status -1))
+      (set! request (ghttp_perform_post host body bodylen))
+      (if (not (null? request))
+          (begin (set! status (ghttp_status_code request))
+                 (printf "Status code: %s\n" (ghttp_reason_phrase request))
+                 (printf "Response: %s\n" (ghttp_get_body request))
+                 (ghttp_request_destroy request)))
+      status)))
