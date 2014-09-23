@@ -876,12 +876,12 @@ namespace extemp {
     // maybe kill the thread here?
   }
 
-  void* noAudioCallback(void* sleepDuration)
+  void* noAudioCallback(void* sleepDurationNs)
   {
-    printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
+    // printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
 
-    long* dur = (long*)sleepDuration;
-    static struct timespec NOAUDIO_SLEEP_DURATION = {0, 1000000000 * *dur};
+    long* sleepDur = (long*)sleepDurationNs;
+    static struct timespec NOAUDIO_SLEEP_DURATION = {0, *sleepDur};
 
     while(true){
       UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
@@ -942,13 +942,13 @@ namespace extemp {
     ascii_text_color(0,7,10); 
     std::cout << "Latency        : " << std::flush;
     ascii_text_color(1,6,10);	
-    std::cout << UNIV::FRAMES / UNIV::SAMPLERATE << std::endl << std::flush;
+    std::cout << (double)UNIV::FRAMES / (double)UNIV::SAMPLERATE << std::endl << std::flush;
     ascii_text_color(0,7,10); 
     std::cout << std::flush;
 
     // create the "nodevice" audio thread
-    long sleepDuration = (long)(UNIV::FRAMES / UNIV::SAMPLERATE);
-    if(pthread_create(&nodevice_tID, NULL, noAudioCallback, &sleepDuration))
+    long sleepDurationNs = (1000000000 * (long)UNIV::FRAMES / (long)UNIV::SAMPLERATE);
+    if(pthread_create(&nodevice_tID, NULL, noAudioCallback, &sleepDurationNs))
       {
         printf("Error: could not create the dummy audio thread.\n");
         exit(1);
