@@ -252,12 +252,14 @@ int main(int argc, char** argv)
 
     if(extemp::UNIV::AUDIO_NO_DEVICE != 1)
       {
-        extemp::AudioDevice* dev = extemp::AudioDevice::I();
+        extemp::AudioDevice* dev = new extemp::AudioDevice;
+        extemp::AudioDevice::setI(dev);
         dev->start();
       }
     else
       {
-        extemp::NoAudioDevice* dev = extemp::NoAudioDevice::I();
+        extemp::NoAudioDevice* dev = new extemp::NoAudioDevice;
+        extemp::AudioDevice::setI(dev);
         dev->start();
       }
     ascii_text_color(0,7,10);	        

@@ -70,6 +70,7 @@ namespace extemp {
     AudioDevice();
     ~AudioDevice();
     static AudioDevice* I() { return &SINGLETON; }
+    static void setI(AudioDevice* dev) { SINGLETON = *dev; }
 	
     // start and stop audio processing (which also stops time!!)	
     void start();
@@ -145,9 +146,9 @@ namespace extemp {
 
   protected:
     bool started;
+    static AudioDevice SINGLETON;
     
   private:
-    static AudioDevice SINGLETON;
     PaStream* stream;
     float* buffer;
     void* dsp_closure;
@@ -171,14 +172,14 @@ namespace extemp {
   public:
     NoAudioDevice();
     ~NoAudioDevice();
-    static NoAudioDevice* I() { return &SINGLETON; }
+    static AudioDevice* I() { return AudioDevice::I(); }
+    static void setI(AudioDevice* dev) {AudioDevice::setI(dev);}
     void start();
     void stop();
     void setDSPClosure(void* _dsp_func);    
     static double getCPULoad();
     static void printDevices();
   private:
-    static NoAudioDevice SINGLETON;
     pthread_t nodevice_tID; 
   };
 
