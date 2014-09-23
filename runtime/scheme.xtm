@@ -1211,21 +1211,6 @@
                       names))))
     `(_dsp:set! ,zerolatency ,@lst)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; library-loading helpers ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-macro (define-lib libname)
-  `(define ,libname
-     (let ((platform (sys:platform)))
-       (cond ((string=? platform "Linux")
-	      (sys:load-dylib ,(string-append (symbol->string libname) ".so")))
-	     ((string=? platform "Windows")
-	      (sys:load-dylib ,(string-append (symbol->string libname) ".dll")))
-	     ((string=? platform "OSX")
-	      (sys:load-dylib ,(string-append (symbol->string libname) ".dylib")))
-	     (else (begin (println "Unknown platform: " platform) nil))))))
-
 ;; filename wrangling
 
 (define sys:file-path-components
@@ -1251,8 +1236,7 @@
 ;; search LDPATH as usual
 (define sys:load-dylib
   (lambda (dylib-path)
-    (let ((dylib (or ;; (sys:open-dylib (string-append "runtime/lib/" dylib-path))
-                     (sys:open-dylib dylib-path))))
+    (let ((dylib (sys:open-dylib dylib-path)))
       (if dylib
           (begin (impc:compiler:print-dylib-loading-details-to-log dylib-path)
                  dylib)
