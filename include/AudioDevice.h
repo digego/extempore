@@ -174,8 +174,7 @@ namespace extemp {
     static NoAudioDevice* I() { return &SINGLETON; }
     void start();
     void stop();
-    void initMTAudio(int,bool);
-    void initMTAudioBuf(int,bool);
+    void setDSPClosure(void* _dsp_func);    
     static double getCPULoad();
     static void printDevices();
   private:

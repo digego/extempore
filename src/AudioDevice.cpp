@@ -981,15 +981,12 @@ namespace extemp {
 #endif
   }
 
-  void NoAudioDevice::initMTAudio(int num,bool _zerolatency)
+  void setDSPClosure(void* _dsp_func)
   {
-    std::cout << "Error: Dummy audio device doesn't support multithreaded audio." << std::endl;
+    std::cout << "Error: Extempore is running in \"nodevice\" mode." << std::endl;
+    return;
   }
-
-  void NoAudioDevice::initMTAudioBuf(int num, bool _zerolatency)
-  {
-    std::cout << "Error: Dummy audio device doesn't support multithreaded audio." << std::endl;
-  }
+  
 
   double NoAudioDevice::getCPULoad() {    
     std::cout << "Error: Dummy audio device doesn't support CPU load monitoring" << std::endl;
