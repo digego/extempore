@@ -1460,15 +1460,15 @@ namespace extemp {
 	    // EE->DisableLazyCompilation(true);
 	    // //std::cout << "Lazy Compilation: OFF" << std::endl;
           ascii_text_color(0,7,10);
-          std::cout << "ARCH\t\t: " << std::flush;
+          std::cout << "ARCH           : " << std::flush;
           ascii_text_color(1,6,10);	        
           std::cout << std::string(tm->getTargetTriple()) << std::endl;
           ascii_text_color(0,7,10);	        
-          std::cout << "CPU\t\t: " << std::flush;
+          std::cout << "CPU            : " << std::flush;
           ascii_text_color(1,6,10);	        
           std::cout << std::string(tm->getTargetCPU()) << std::endl;
           ascii_text_color(0,7,10);	                  
-          std::cout << "ATTRS\t\t: " << std::flush;
+          std::cout << "ATTRS          : " << std::flush;
           ascii_text_color(1,6,10);	        
           std::cout << std::string(tm->getTargetFeatureString()) << std::endl;          
           ascii_text_color(0,7,10);	            
