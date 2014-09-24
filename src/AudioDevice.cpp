@@ -963,10 +963,10 @@ namespace extemp {
     int policy;
     sched_param param;
     // todo check if these '&nodevice_tID's are ok
-    pthread_getschedparam(&nodevice_tID,&policy,&param);
+    pthread_getschedparam(nodevice_tID,&policy,&param);
     param.sched_priority = 20;
     policy = SCHED_RR; // SCHED_FIFO
-    int res = pthread_setschedparam(&nodevice_tID,policy,&param);
+    int res = pthread_setschedparam(nodevice_tID,policy,&param);
     if(res != 0) {
       printf("Failed to set realtime priority for dummy audio thread\nERR:%s\n",strerror(res));
     }
