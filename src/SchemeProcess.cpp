@@ -565,7 +565,7 @@ namespace extemp {
                 if(scm->getName().compare("primary") == 0) {
                   if (extemp::UNIV::EXT_LOADSTD == 1) {
                     memset(sstr,0,256);
-                    snprintf(sstr,256,"(sys:load \"libs/core/std.xtm\")");
+                    snprintf(sstr,256,"(sys:load \"libs/core/std.xtm\" 'quiet)");
                     std::string* s4 = new std::string(sstr);
                     guard.lock();
                     q.push(SchemeTask(extemp::UNIV::TIME, (60*5*44100), s4, "file_init", 5));
