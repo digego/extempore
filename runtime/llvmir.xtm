@@ -433,6 +433,12 @@
 (define *sys:precomp:current-lib-name* "xtmdylib")
 (define *sys:precomp:func-defs-in-mod* '())
 
+(define sys:precomp:currently-compiling?
+  (lambda ()
+    (or (output-port? *sys:precomp:current-output-port*)
+        ;; this will be #t in a suppress-precomp-do form
+        *sys:precomp:current-output-port*)))
+
 (define impc:precomp:no-scm-suffix?
   (lambda (symname)
     (let ((tlist (llvm:get-function-args-withoutzone symname)))
@@ -449,8 +455,7 @@
 
 (define impc:precomp:write-binding-details-to-file
   (lambda (lead-string symname type . args)
-    (if (and (output-port? *sys:precomp:current-output-port*)
-             (not *sys:precomp:suppress-precomp*))
+    (if (output-port? *sys:precomp:current-output-port*)
         (let* ((type-str (if (or (string=? (atom->string type) "polying")
                                  (string=? (atom->string lead-string) "Lib Load:"))
                              "null"

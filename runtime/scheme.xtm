@@ -1696,17 +1696,33 @@
 
 ;; for eldoc integration
 
-(define-macro (get-eldoc-string sym) 
-  `(let ((scmdoc (and (symbol? (quote ,sym))
-                      (defined? (quote ,sym))
-                      (get-closure-code ,sym)))
-         (xtdoc (xtm-closure-doc ,sym)))
-     (cond (scmdoc
-            (cons (quote ,sym) (cadr scmdoc)))
-           (xtdoc
-            (list (quote ,sym) ': (if (pair? xtdoc) (cdr xtdoc) xtdoc)))
-           (else
-            #f))))
+(define get-eldoc-string
+  (lambda (name)
+    (let* ((sym (string->symbol name))
+           (docstring (assoc-strcmp sym *impc:docstrings*))
+           (types (assoc-strcmp sym *impc:closuretypes*))
+           (form (assoc-strcmp sym *impc:closurebodies*)))
+      ;; xtlang function
+      (if (or docstring types form)
+          (list 'docstring
+                '(lang . xtlang)
+                (cons 'name name)
+                (cons 'args (if form (sexpr->string (cadadr form)) '()))
+                (cons 'type (if types (cdr types) '()))
+                (cons 'docstring (if docstring (cdr docstring) '())))
+          (if (and (defined? sym)
+                   (not (macro? (eval sym))))
+              ;; scheme function
+              (let ((form (get-closure-code (eval sym))))
+                (list 'docstring
+                      '(lang . scheme)
+                      (cons 'name name)
+                      (cons 'args (if form (sexpr->string (cadr form)) '()))
+                      ;; no types for scheme
+                      (cons 'type '())
+                      ;; no docstrings for scheme at the moment
+                      (cons 'docstring '())))
+              (list 'docstring))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load which safely breaks on calling sys:load-escape
@@ -1766,14 +1782,16 @@
 (define *global-sysload-evals* (make-list-with-proc 10 (lambda (i) #f)))
 
 (define sys:load
-  (lambda (path)
+  (lambda (path . quiet?)
     (let ((in (open-input-file path))
           (cnt 0))
       (if (not in)
-          (begin (print-with-colors 'red 'default #t (print "File Error"))
-                 (print " couldn't find file ")
-                 (print-with-colors 'blue 'default #f (print path "\n"))
-                 #f)
+          (if (or (null? quiet?) (not (car quiet?)))
+              (begin (print-with-colors 'red 'default #t (print "File Error"))
+                     (print " couldn't find file ")
+                     (print-with-colors 'blue 'default #f (print path "\n"))
+                     #f)
+              #f)
           (let ((msg (call/cc
                       (lambda (k)
                         (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
@@ -1791,9 +1809,10 @@
                   (set! *sys:load-escape-stack* (cdr *sys:load-escape-stack*))
                   #t)
                 (let ((words (regex:split msg " ")))
-                  (print-with-colors 'yellow 'default #t (print "sys:load notification "))
-                  (for-each (lambda (w) (print w "")) words)
-                  (println)
+                  (if (or (null? quiet?) (not (car quiet?)))
+                      (begin (print-with-colors 'yellow 'default #t (print "sys:load notification "))
+                             (for-each (lambda (w) (print w "")) words)
+                             (println)))
                   (close-port in)
                   #f)))))))
 
@@ -1813,6 +1832,12 @@
 
 ;; this can be moved elsewhere, but should be loaded on startup
 
+(define-macro (sys:precomp:suppress-precomp-do . forms)
+       `(let ((precomp-port *sys:precomp:current-output-port*))
+          (set! *sys:precomp:current-output-port* #t)
+          ,@forms
+          ;; whatever happens, set the port back to the original value
+          (set! *sys:precomp:current-output-port* precomp-port)))
 
 (define sys:precomp:compile-current-module
   (lambda (module-name move-into-place? exit-on-error?)
@@ -1883,7 +1908,7 @@
 
 (define sys:precomp:insert-header
   (lambda (libname)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (sys:precomp:currently-compiling?)
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
                    *sys:precomp:current-output-port*)
@@ -1904,7 +1929,7 @@
 
 (define sys:precomp:insert-footer
   (lambda (libname)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (sys:precomp:currently-compiling?)
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"Loaded \"))\n(print-with-colors 'blue 'default #t (print \"" libname "\"))\n")
                    *sys:precomp:current-output-port*)
@@ -1919,11 +1944,9 @@
 ;; the precomp .xtm file, otherwise do nothing
 (define sys:precomp:insert-sexp
   (lambda (sexp)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (sys:precomp:currently-compiling?)
         (display (string-append (sexpr->string sexp) "\n")
                  *sys:precomp:current-output-port*))))
-
-(define *sys:precomp:suppress-precomp* #f)
 
 (define sys:precomp:print-compilation-details
   (lambda (start-time)
@@ -1968,7 +1991,7 @@
                   ;; if the preload check passes
                   (set! *sys:precomp:current-output-port* (open-output-file precomp-file-path))
                   (set! *sys:precomp:func-defs-in-mod* '())
-                  (if *sys:precomp:current-output-port*
+                  (if (sys:precomp:currently-compiling?)
                       (begin
                         ;; this is the 'success' branch
                         (set! *sys:precomp:current-lib-name* libname-no-extension)

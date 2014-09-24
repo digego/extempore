@@ -9,19 +9,15 @@
 ;; 
 
 ;;; Code:
-(sys:load "libs/opengl.xtm")
+(sys:load "libs/opengl.xtm" 'quiet)
 (sys:load-preload-check 'opengl)
 (define *xtmlib-opengl-loaded* #f)
 
-;; first make sure that math.xtm is loaded
-(set! *sys:precomp:suppress-precomp* #t)
-(sys:load "libs/math.xtm")
-(sys:precomp:insert-sexp '(sys:load "libs/math.xtm"))
-(sys:load "libs/core/math.xtm")
-(sys:load "libs/soil.xtm")
-(sys:precomp:insert-sexp '(sys:load "libs/soil.xtm"))
-(sys:load "libs/external/soil.xtm")
-(set! *sys:precomp:suppress-precomp* #f)
+(sys:precomp:suppress-precomp-do
+ (sys:load "libs/core/math.xtm")
+ (sys:load "libs/external/soil.xtm"))
+(sys:precomp:insert-sexp '(sys:load "libs/core/math.xtm"))
+(sys:precomp:insert-sexp '(sys:load "libs/external/soil.xtm"))
 
 (sys:precomp:insert-header "xtmopengl")
 
