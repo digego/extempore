@@ -1712,17 +1712,33 @@
 
 ;; for eldoc integration
 
-(define-macro (get-eldoc-string sym) 
-  `(let ((scmdoc (and (symbol? (quote ,sym))
-                      (defined? (quote ,sym))
-                      (get-closure-code ,sym)))
-         (xtdoc (xtm-closure-doc ,sym)))
-     (cond (scmdoc
-            (cons (quote ,sym) (cadr scmdoc)))
-           (xtdoc
-            (list (quote ,sym) ': (if (pair? xtdoc) (cdr xtdoc) xtdoc)))
-           (else
-            #f))))
+(define get-eldoc-string
+  (lambda (name)
+    (let* ((sym (string->symbol name))
+           (docstring (assoc-strcmp sym *impc:docstrings*))
+           (types (assoc-strcmp sym *impc:closuretypes*))
+           (form (assoc-strcmp sym *impc:closurebodies*)))
+      ;; xtlang function
+      (if (or docstring types form)
+          (list 'docstring
+                '(lang . xtlang)
+                (cons 'name name)
+                (cons 'args (if form (sexpr->string (cadadr form)) '()))
+                (cons 'type (if types (cdr types) '()))
+                (cons 'docstring (if docstring (cdr docstring) '())))
+          (if (and (defined? sym)
+                   (not (macro? (eval sym))))
+              ;; scheme function
+              (let ((form (get-closure-code (eval sym))))
+                (list 'docstring
+                      '(lang . scheme)
+                      (cons 'name name)
+                      (cons 'args (if form (sexpr->string (cadr form)) '()))
+                      ;; no types for scheme
+                      (cons 'type '())
+                      ;; no docstrings for scheme at the moment
+                      (cons 'docstring '())))
+              (list 'docstring))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load which safely breaks on calling sys:load-escape

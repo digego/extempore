@@ -694,9 +694,6 @@ indentation."
               (add-to-list 'extempore-connection-list proc t)
               (extempore-update-mode-line))))))
 
-(defun extempore-minibuffer-echo-filter (proc str)
-  (message (replace-regexp-in-string "[%\n]" "" (substring str 0 -1))))
-
 (defun extempore-repl-preoutput-filter (string)
   (concat "=> " (substring string 0 -1) "\nextempore> "))
 
@@ -1143,10 +1140,46 @@ command to run."
         ;; send the documentation request
         (if extempore-connection-list
             (process-send-string (car extempore-connection-list)
-                                 (format  "(get-eldoc-string %s)\r\n" fnsym)))
+                                 (format  "(get-eldoc-string \"%s\")\r\n" fnsym)))
         ;; always return nil; docstring comes back through the process
         ;; filter
         nil)))
+
+(defun extempore-propertize-xtlang-args (args)
+  (mapconcat (lambda (arg)
+               (let ((res (split-string arg ":" :omit-nulls)))
+                 (if (= (length res) 1)
+                     (car res)
+                   (concat (car res) (propertize (concat ":" (cadr res))
+                                                 'face 'font-lock-type-face)))))
+             (split-string args " " :omit-nulls)
+             " "))
+
+(defun extempore-process-docstring-form (form)
+  (if form
+      (message
+       "%s"
+       (concat (propertize (cdr (assoc 'name form))
+                           'face 'font-lock-function-name-face)
+               ""
+               (and (cdr (assoc 'type form))
+                    (concat ":" (propertize (cdr (assoc 'type form))
+                                            'face 'font-lock-type-face)))
+               " ("
+               (and (cdr (assoc 'args form))
+                    (extempore-propertize-xtlang-args (substring (cdr (assoc 'args form)) 1 -1)))
+               ")"
+               (and (cdr (assoc 'docstring form))
+                    (concat " - "
+                            (propertize (cdr (assoc 'docstring form))
+                                        'face 'font-lock-string-face)))))))
+
+(defun extempore-minibuffer-echo-filter (proc retstr)
+  (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
+    (if (and (> (length str) 9)
+             (string= "(docstring" (substring str 0 10)))
+        (extempore-process-docstring-form (cdr (read str)))
+      (message str))))
 
 (add-hook 'extempore-mode-hook
           '(lambda ()
