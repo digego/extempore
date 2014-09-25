@@ -450,12 +450,13 @@
   (lambda (var_name)
     (getenv var_name)))
 
-(define sys:get-env
-  (lambda (var-name)
-    (let ((res (cptr->string (sys_getenv var-name))))
-      (if (string=? res "")
-          #f
-          res))))
+(bind-func sys_setenv
+  (lambda (var_name value replace_p)
+    (setenv var_name value replace_p)))
+
+(bind-func sys_unsetenv
+  (lambda (var_name)
+    (unsetenv var_name)))
 
 (bind-func get_llvm_path
   (lambda ()
