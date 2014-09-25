@@ -445,6 +445,18 @@
   (lambda (cmd:i8*)
     (system cmd)))
 
+;; this just here to provide the scheme wrapper
+(bind-func sys_getenv
+  (lambda (var_name)
+    (getenv var_name)))
+
+(define sys:get-env
+  (lambda (var-name)
+    (let ((res (cptr->string (sys_getenv var-name))))
+      (if (string=? res "")
+          #f
+          res))))
+
 (bind-func get_llvm_path
   (lambda ()
     (let ((path_from_env (getenv "EXT_LLVM_DIR")))
