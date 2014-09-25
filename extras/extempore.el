@@ -1157,22 +1157,34 @@ command to run."
 
 (defun extempore-process-docstring-form (form)
   (if form
-      (message
-       "%s"
-       (concat (propertize (cdr (assoc 'name form))
-                           'face 'font-lock-function-name-face)
-               ""
-               (and (cdr (assoc 'type form))
-                    (concat ":" (propertize (cdr (assoc 'type form))
-                                            'face 'font-lock-type-face)))
-               " ("
-               (and (cdr (assoc 'args form))
-                    (extempore-propertize-xtlang-args (substring (cdr (assoc 'args form)) 1 -1)))
-               ")"
-               (and (cdr (assoc 'docstring form))
-                    (concat " - "
-                            (propertize (cdr (assoc 'docstring form))
-                                        'face 'font-lock-string-face)))))))
+      (let ((max-eldoc-string-length 120)
+            (eldoc-string
+             (concat (propertize (cdr (assoc 'name form))
+                                 'face 'font-lock-function-name-face)
+                     ""
+                     (and (cdr (assoc 'type form))
+                          (concat ":" (propertize (cdr (assoc 'type form))
+                                                  'face 'font-lock-type-face)))
+                     " ("
+                     (propertize "lambda" 'face 'font-lock-keyword-face)
+                     " ("
+                     (and (cdr (assoc 'args form))
+                          (extempore-propertize-xtlang-args (substring (cdr (assoc 'args form)) 1 -1)))
+                     ") ..."))
+            (docstring (cdr (assoc 'docstring form))))
+        (message
+         "%s"
+         (concat eldoc-string
+                 (if docstring
+                     (concat " - " (propertize (if (> (+ (length docstring)
+                                                         (length eldoc-string))
+                                                      (- max-eldoc-string-length 6))
+                                                   (concat (substring docstring 0 (- max-eldoc-string-length
+                                                                                     (length eldoc-string)
+                                                                                     6))
+                                                           "...")
+                                                 docstring)
+                                               'face 'font-lock-string-face))))))))
 
 (defun extempore-minibuffer-echo-filter (proc retstr)
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
