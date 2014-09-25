@@ -1226,6 +1226,20 @@ command to run."
 	(progn (kill-word 1)
 	       (insert (number-to-string (string-to-number hex-str 16)))))))
 
+(defun note-to-midi (str)
+  (if (string-match "\\([a-gA-G]\\)\\(#\\|b\\)?\\(-?[0-9]\\)" str)
+      (let ((pc (case (mod (- (mod (string-to-char (match-string 1 str))
+                                    16) 3) 7)
+                   ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11)))
+             (offset (+ 12 (* (string-to-number (match-string 3 str))
+                              12)))
+             (sharp-flat (match-string 2 str)))
+        (number-to-string
+         (+ offset pc
+            (if sharp-flat
+                (if (string= sharp-flat "#") 1 -1)
+              0))))))
+
 (defun note-to-midi-at-point ()
   (interactive)
   (let ((note-str (looking-at "\\([a-gA-G]\\)\\(#\\|b\\)?\\([0-9]\\)")))
