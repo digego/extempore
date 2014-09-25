@@ -402,7 +402,7 @@
               (hdrcount:i32* (salloc))
               (i 0))
           (ghttp_get_header_names request hdrptr hdrcount)
-          (println "HTTP headers:")
+          (println "HTTP headers:\n")
           (dotimes (i (convert (pref hdrcount 0) i64))
             (printf "%s: %s\n"
                     (pref (pref hdrptr 0) i)
@@ -412,8 +412,12 @@
 (bind-func ghttp_request_print_body
   (lambda (request:ghttp_request*)
     (if (not (null? request))
-          (begin (printf "Status code:\n %s\n" (ghttp_reason_phrase request))
-                 (printf "Response:\n %s\n" (ghttp_get_body request))))))
+        (begin (printf "\nStatus:\n %d: %s\n\n"
+                       (ghttp_status_code request)
+                       (ghttp_reason_phrase request))
+               (printf "Body:\n%.*s\n\n"
+                       (ghttp_get_body_len request)
+                       (ghttp_get_body request))))))
 
 ;; perform a request, dump response to log.  useful for testing
 
