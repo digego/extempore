@@ -1234,11 +1234,10 @@ command to run."
              (offset (+ 12 (* (string-to-number (match-string 3 str))
                               12)))
              (sharp-flat (match-string 2 str)))
-        (number-to-string
-         (+ offset pc
-            (if sharp-flat
-                (if (string= sharp-flat "#") 1 -1)
-              0))))))
+        (+ offset pc
+           (if sharp-flat
+               (if (string= sharp-flat "#") 1 -1)
+             0)))))
 
 (defun note-to-midi-at-point ()
   (interactive)
