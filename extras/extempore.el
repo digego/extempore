@@ -1145,15 +1145,20 @@ command to run."
         ;; filter
         nil)))
 
-(defun extempore-propertize-xtlang-args (args)
-  (mapconcat (lambda (arg)
-               (let ((res (split-string arg ":" :omit-nulls)))
-                 (if (= (length res) 1)
-                     (car res)
-                   (concat (car res) (propertize (concat ":" (cadr res))
-                                                 'face 'font-lock-type-face)))))
-             (split-string args " " :omit-nulls)
-             " "))
+(defun extempore-propertize-arg-string (arg-string)
+  (let ((single-vararg-p (not (string= (substring arg-string 0 1) "("))))
+    (if (not single-vararg-p)
+        (setq arg-string (substring arg-string 1 -1)))
+    (format
+     (if single-vararg-p "%s" "(%s)")
+     (mapconcat (lambda (arg)
+                  (let ((res (split-string arg ":" :omit-nulls)))
+                    (if (= (length res) 1)
+                        (car res)
+                      (concat (car res) (propertize (concat ":" (cadr res))
+                                                    'face 'font-lock-type-face)))))
+                (split-string arg-string " " :omit-nulls)
+                " "))))
 
 (defun extempore-process-docstring-form (form)
   (if form
@@ -1167,10 +1172,10 @@ command to run."
                                                   'face 'font-lock-type-face)))
                      " ("
                      (propertize "lambda" 'face 'font-lock-keyword-face)
-                     " ("
+                     " "
                      (and (cdr (assoc 'args form))
-                          (extempore-propertize-xtlang-args (substring (cdr (assoc 'args form)) 1 -1)))
-                     ") ..."))
+                          (extempore-propertize-arg-string (cdr (assoc 'args form))))
+                     " ..."))
             (docstring (cdr (assoc 'docstring form))))
         (message
          "%s"
