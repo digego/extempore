@@ -18,8 +18,12 @@
 
 ;;; Code:
 
+(sys:load "libs/jansson.xtm" 'quiet)
 (sys:load-preload-check 'jansson)
-(define *xtmlib-jansson-loaded* #f)
+
+(sys:precomp:suppress-precomp-do
+ (sys:load "libs/core/std.xtm"))
+(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -38,7 +42,11 @@
 ;; load the dylib               
 (define libjansson
   (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
- 
+
+(define *xtmlib-jansson-loaded* #f)
+
+(sys:precomp:insert-header "xtmjansson")
+
 ;; the json_type enums
 (bind-val JSON_OBJECT enum 0)
 (bind-val JSON_ARRAY enum 1)
@@ -196,3 +204,5 @@
     0))
 
 (define *xtmlib-jansson-loaded* #t)
+
+(sys:precomp:insert-footer "xtmjansson")
