@@ -11,7 +11,12 @@
 ;;; Code:
 
 ;; lib-loading config
+(sys:load "libs/cairo.xtm" 'quiet)
 (sys:load-preload-check 'cairo)
+
+(sys:precomp:suppress-precomp-do
+ (sys:load "libs/core/std.xtm"))
+(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -33,7 +38,9 @@
 
 (if (null? libcairo) (sys:load-escape "Error loading cairo library"))
 
-(define *xtmlib-cairo-loaded* #t)
+(sys:precomp:insert-header "xtmcairo")
+
+(define *xtmlib-cairo-loaded* #f)
 
 ;; complex structs with i8 name cheat (i.e. must be pointers)
 (bind-alias cairo_t i8)
@@ -576,3 +583,6 @@
 (bind-lib libcairo cairo_pdf_surface_create [cairo_surface_t*,i8*,double,double]*)
 (bind-lib libcairo cairo_pdf_surface_set_size [void,cairo_surface_t*,double,double]*)
 
+(define *xtmlib-cairo-loaded* #t)
+
+(sys:precomp:insert-footer "xtmcairo")
