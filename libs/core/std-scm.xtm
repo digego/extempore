@@ -59,3 +59,33 @@
   (suppress-compiler-messages #f)
   (xtm_expression))                       
 
+;; some scheme helpers for acessing the environment
+
+(define sys:get-env
+  (lambda (var-name)
+    (let ((res (cptr->string (sys_getenv var-name))))
+      (if (string=? res "")
+          #f
+          res))))
+
+(define sys:set-env
+  (lambda (var-name value replace?)
+    (if (and (string? var-name)
+             (string? value)
+             (boolean? replace?))
+        (let ((res (sys_setenv var-name value (if replace? 1 0))))
+          (if (<> res 0)
+              #f
+              #t))
+        (begin (print-with-colors 'red 'default #t (print "Error"))
+               (print ": var-name and value must be strings, replace must be boolean\n")
+               #f))))
+
+(define sys:unset-env
+  (lambda (var-name)
+    (if (string? var-name)
+        (let ((res (sys_unsetenv var-name)))
+          (if (<> res 0) #f #t))
+        (begin (print-with-colors 'red 'default #t (print "Error"))
+               (print ": var-name must be a string\n")
+               #f))))

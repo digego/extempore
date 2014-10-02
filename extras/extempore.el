@@ -1145,34 +1145,51 @@ command to run."
         ;; filter
         nil)))
 
-(defun extempore-propertize-xtlang-args (args)
-  (mapconcat (lambda (arg)
-               (let ((res (split-string arg ":" :omit-nulls)))
-                 (if (= (length res) 1)
-                     (car res)
-                   (concat (car res) (propertize (concat ":" (cadr res))
-                                                 'face 'font-lock-type-face)))))
-             (split-string args " " :omit-nulls)
-             " "))
+(defun extempore-propertize-arg-string (arg-string)
+  (let ((single-vararg-p (not (string= (substring arg-string 0 1) "("))))
+    (if (not single-vararg-p)
+        (setq arg-string (substring arg-string 1 -1)))
+    (format
+     (if single-vararg-p "%s" "(%s)")
+     (mapconcat (lambda (arg)
+                  (let ((res (split-string arg ":" :omit-nulls)))
+                    (if (= (length res) 1)
+                        (car res)
+                      (concat (car res) (propertize (concat ":" (cadr res))
+                                                    'face 'font-lock-type-face)))))
+                (split-string arg-string " " :omit-nulls)
+                " "))))
 
 (defun extempore-process-docstring-form (form)
   (if form
-      (message
-       "%s"
-       (concat (propertize (cdr (assoc 'name form))
-                           'face 'font-lock-function-name-face)
-               ""
-               (and (cdr (assoc 'type form))
-                    (concat ":" (propertize (cdr (assoc 'type form))
-                                            'face 'font-lock-type-face)))
-               " ("
-               (and (cdr (assoc 'args form))
-                    (extempore-propertize-xtlang-args (substring (cdr (assoc 'args form)) 1 -1)))
-               ")"
-               (and (cdr (assoc 'docstring form))
-                    (concat " - "
-                            (propertize (cdr (assoc 'docstring form))
-                                        'face 'font-lock-string-face)))))))
+      (let ((max-eldoc-string-length 120)
+            (eldoc-string
+             (concat (propertize (cdr (assoc 'name form))
+                                 'face 'font-lock-function-name-face)
+                     ""
+                     (and (cdr (assoc 'type form))
+                          (concat ":" (propertize (cdr (assoc 'type form))
+                                                  'face 'font-lock-type-face)))
+                     " ("
+                     (propertize "lambda" 'face 'font-lock-keyword-face)
+                     " "
+                     (and (cdr (assoc 'args form))
+                          (extempore-propertize-arg-string (cdr (assoc 'args form))))
+                     " ..."))
+            (docstring (cdr (assoc 'docstring form))))
+        (message
+         "%s"
+         (concat eldoc-string
+                 (if docstring
+                     (concat " - " (propertize (if (> (+ (length docstring)
+                                                         (length eldoc-string))
+                                                      (- max-eldoc-string-length 6))
+                                                   (concat (substring docstring 0 (- max-eldoc-string-length
+                                                                                     (length eldoc-string)
+                                                                                     6))
+                                                           "...")
+                                                 docstring)
+                                               'face 'font-lock-string-face))))))))
 
 (defun extempore-minibuffer-echo-filter (proc retstr)
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
@@ -1213,6 +1230,19 @@ command to run."
     (if hex-str
 	(progn (kill-word 1)
 	       (insert (number-to-string (string-to-number hex-str 16)))))))
+
+(defun note-to-midi (str)
+  (if (string-match "\\([a-gA-G]\\)\\(#\\|b\\)?\\(-?[0-9]\\)" str)
+      (let ((pc (case (mod (- (mod (string-to-char (match-string 1 str))
+                                    16) 3) 7)
+                   ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11)))
+             (offset (+ 12 (* (string-to-number (match-string 3 str))
+                              12)))
+             (sharp-flat (match-string 2 str)))
+        (+ offset pc
+           (if sharp-flat
+               (if (string= sharp-flat "#") 1 -1)
+             0)))))
 
 (defun note-to-midi-at-point ()
   (interactive)
