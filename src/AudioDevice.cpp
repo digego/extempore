@@ -894,8 +894,17 @@ namespace extemp {
 
       // trigger the scheduler
       TaskScheduler::I()->getGuard()->signal();
+
+      struct timespec REMAINING_SLEEP_DURATION;
+      int cnt = 0;
       // sleep
-      nanosleep(&NOAUDIO_SLEEP_DURATION, NULL);
+      nanosleep(&NOAUDIO_SLEEP_DURATION, &REMAINING_SLEEP_DURATION);
+      if(REMAINING_SLEEP_DURATION.tv_sec!=0 || REMAINING_SLEEP_DURATION.tv_nsec!=0)
+        {
+          cnt++;
+          if((cnt%10) == 0)
+            printf("Noaudio device thread woken prematurely by %lld nsec\n", REMAINING_SLEEP_DURATION.tv_nsec);
+        }
     }
   }
   
