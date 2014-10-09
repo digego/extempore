@@ -694,9 +694,6 @@ indentation."
               (add-to-list 'extempore-connection-list proc t)
               (extempore-update-mode-line))))))
 
-(defun extempore-repl-preoutput-filter (string)
-  (concat "=> " (substring string 0 -1) "\nextempore> "))
-
 (defun extempore-disconnect (host port)
   "Terminate a specific connection to an Extempore process"
   (interactive
@@ -853,8 +850,6 @@ indentation."
 
 (defvar extempore-buffer)
 
-(make-variable-buffer-local 'comint-preoutput-filter-functions)
-
 (define-derived-mode inferior-extempore-mode comint-mode "Inferior Extempore"
   "Major mode for running an inferior Extempore process.
 
@@ -886,41 +881,83 @@ C-M-q does Tab on each line starting within following expression.
 Paragraphs are separated only by blank lines.  Semicolons start comments.
 If you accidentally suspend your process, use \\[comint-continue-subjob]
 to continue it."
-  ;; Customize in inferior-extempore-mode-hook
-  (setq comint-preoutput-filter-functions nil)
   (setq mode-line-process '(":%s")))
 
 (defvar extempore-repl-mode-map
   (let ((m (make-sparse-keymap)))
     (define-key m (kbd "<return>") 'extempore-repl-return)
+    (define-key m (kbd "C-c C-c") 'extempore-repl-reset-prompt)
     m))
 
 (define-derived-mode extempore-repl-mode comint-mode "Extempore REPL"
   "Major mode for running a REPL connected to an existing Extempore process."
-  (setq comint-use-prompt-regexp t)
-  (setq comint-prompt-regexp "extempore> ")
-  (setq comint-input-sender (function extempore-repl-send))
-  (setq comint-preoutput-filter-functions (list (function extempore-repl-preoutput-filter)))
-  ;; (extempore-mode-variables)
-  (setq mode-line-process '(":%s"))
-  ;; (setq comint-get-old-input (function extempore-get-old-input))
+  (setq-local comint-use-prompt-regexp t)
+  (setq-local comint-prompt-regexp "xtm<.*>$ +")
+  (setq-local comint-input-sender (function extempore-repl-send))
+  (setq-local comint-preoutput-filter-functions (list (function extempore-repl-preoutput-filter)))
+  (setq-local comint-output-filter-functions (list (function ansi-color-process-output)
+                                                   (function comint-postoutput-scroll-to-bottom)))
+  (setq-local mode-line-process nil)
+  (setq-local comint-get-old-input (function extempore-get-old-input))
+  ;; this works, but there are lots of messages in the prompt
+  ;; (face-remap-add-relative 'comint-highlight-prompt '((:inherit nil) comint-highlight-prompt))
   )
 
 (defun extempore-repl-send (proc string)
   (comint-simple-send proc (concat string "\r")))
+
+(defun extempore-repl-propertized-prompt-string ()
+  (let ((proc (get-buffer-process (current-buffer))))
+    (format "\n%s<%s> "
+            (propertize "xtm" 'font-lock-face 'font-lock-type-face)
+            (let ((host (process-contact proc :host))
+                  (port (process-contact proc :service)))
+              (concat
+               (if (stringp host)
+                   (propertize host
+                               'font-lock-face
+                               'font-lock-function-name-face)
+                 "")
+               (if (or (stringp host) (numberp port)) ":" "")
+               (if (numberp port)
+                   (propertize (number-to-string port)
+                               'font-lock-face
+                               'font-lock-keyword-face)
+                 ""))))))
+
+(defun extempore-repl-preoutput-filter (string)
+  (format "%s %s %s"
+          (propertize "=>" 'font-lock-face 'font-lock-comment-face)
+          (propertize (substring string 0 -1)
+                      'font-lock-face
+                      'font-lock-string-face)
+          (extempore-repl-propertized-prompt-string)))
+
+(defun extempore-repl-reset-prompt ()
+  (interactive)
+  (insert (extempore-repl-propertized-prompt-string))
+  (comint-set-process-mark))
+
+(defun extempore-repl-is-whitespace-or-comment (string)
+  "Return non-nil if STRING is all whitespace or a comment."
+  (or (string= string "")
+      (string-match-p "\\`[ \t\n]*\\(?:;.*\\)*\\'" string)))
 
 (defun extempore-repl-return ()
   "Only send current input if it is a syntactically correct s-expression, otherwise newline-and-indent."
   (interactive)
   (let ((edit-pos (point)))
     (goto-char (process-mark (get-buffer-process (current-buffer))))
-    (let ((sexp-bounds (bounds-of-thing-at-point 'sexp)))
-      (if sexp-bounds
-          (progn (set-mark (car sexp-bounds))
-                 (goto-char (cdr sexp-bounds))
-                 (comint-send-input))
-        (progn (goto-char edit-pos)
-               (newline-and-indent))))))
+    (if (extempore-repl-is-whitespace-or-comment (buffer-substring edit-pos (point)))
+        
+        (extempore-repl-reset-prompt)
+      (let ((sexp-bounds (bounds-of-thing-at-point 'sexp)))
+        (if sexp-bounds
+            (progn (set-mark (car sexp-bounds))
+                   (goto-char (cdr sexp-bounds))
+                   (comint-send-input))
+          (progn (goto-char edit-pos)
+                 (newline-and-indent)))))))
 
 (defun extempore-get-old-input ()
   "Snarf the sexp ending at point."
@@ -928,6 +965,21 @@ to continue it."
     (let ((end (point)))
       (backward-sexp)
       (buffer-substring (point) end))))
+
+;;;###autoload
+(defun extempore-repl (host port)
+  (interactive
+   (list (ido-completing-read
+          "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host)
+         (string-to-number
+          (ido-completing-read
+           "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
+  "Start an Extempore REPL connected to HOST on PORT."
+  (if (comint-check-proc "*extempore*")
+      (progn (set-buffer (make-comint "extempore-repl" (cons host port)))
+             (extempore-repl-mode)
+             (pop-to-buffer "*extempore-repl*"))
+    (error "No *extempore* buffer detected, you can set one up with M-x extempore-run")))
 
 ;;;###autoload
 (defun extempore-run (program-args)
@@ -946,20 +998,6 @@ If there is a process already running in `*extempore*', switch to that buffer.
         (inferior-extempore-mode)))
   (setq extempore-buffer "*extempore*")
   (pop-to-buffer "*extempore*"))
-
-(defun extempore-start-repl (host port)
-  (interactive
-   (list (ido-completing-read
-          "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host)
-         (string-to-number
-          (ido-completing-read
-           "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
-  "Start an Extempore REPL connected to HOST on PORT."
-  (if (comint-check-proc "*extempore*")
-      (progn (set-buffer (make-comint "extempore-repl" (cons host port)))
-             (extempore-repl-mode)
-             (pop-to-buffer "*extempore-repl*"))
-    (message "No *extempore* buffer detected, you can set one up with M-x extempore-run")))
 
 (defun extempore-send-region (start end)
   "Send the current region to the inferior Extempore process."
