@@ -986,6 +986,9 @@ to continue it."
     (extempore-repl-mode)
     (pop-to-buffer (format "*%s*" repl-buffer-name))))
 
+;; for compatibility---this is what it used to be called
+(defalias 'extempore-start-repl 'extempore-repl)
+
 ;;;###autoload
 (defun extempore-run (program-args)
   "Run an inferior Extempore process, input and output via buffer `*extempore*'.
