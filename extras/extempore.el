@@ -975,11 +975,15 @@ to continue it."
           (ido-completing-read
            "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
   "Start an Extempore REPL connected to HOST on PORT."
-  (if (comint-check-proc "*extempore*")
-      (progn (set-buffer (make-comint "extempore-repl" (cons host port)))
-             (extempore-repl-mode)
-             (pop-to-buffer "*extempore-repl*"))
-    (error "No *extempore* buffer detected, you can set one up with M-x extempore-run")))
+  (unless (comint-check-proc "*extempore*")
+    (progn (call-interactively #'extempore-run)
+           (dotimes (i 5)
+             (message "starting Extempore%s" (make-string i ?\.))
+             (sit-for 1)))) ;; to give Extempore time to start listening for connections
+  (let ((repl-buffer-name (format "extempore REPL<%s:%d>" host port)))
+    (set-buffer (make-comint repl-buffer-name (cons host port)))
+    (extempore-repl-mode)
+    (pop-to-buffer (format "*%s*" repl-buffer-name))))
 
 ;;;###autoload
 (defun extempore-run (program-args)
