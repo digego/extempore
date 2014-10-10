@@ -887,6 +887,7 @@ to continue it."
   (let ((m (make-sparse-keymap)))
     (define-key m (kbd "<return>") 'extempore-repl-return)
     (define-key m (kbd "C-c C-c") 'extempore-repl-reset-prompt)
+    (define-key m (kbd "C-c C-z") 'switch-to-extempore)
     m))
 
 (define-derived-mode extempore-repl-mode comint-mode "Extempore REPL"
