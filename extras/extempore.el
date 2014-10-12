@@ -274,6 +274,7 @@ See `run-hooks'."
   ;; emacs conventions
   (define-key keymap (kbd "C-M-x") 'extempore-send-definition)   ;gnu convention
   (define-key keymap (kbd "C-x C-e") 'extempore-send-last-sexp)  ;gnu convention
+  (define-key keymap (kbd "C-c C-j") 'extempore-connect) ;'jack in'
   (define-key keymap (kbd "C-c C-e") 'extempore-send-definition)
   (define-key keymap (kbd "C-c M-e") 'extempore-send-definition-and-go)
   (define-key keymap (kbd "C-c C-r") 'extempore-send-region)
