@@ -277,18 +277,15 @@ See `run-hooks'."
   (define-key keymap (kbd "C-c C-j") 'extempore-connect) ;'jack in'
   (define-key keymap (kbd "C-c C-e") 'extempore-send-definition)
   (define-key keymap (kbd "C-c M-e") 'extempore-send-definition-and-go)
-  (define-key keymap (kbd "C-c C-r") 'extempore-send-region)
-  (define-key keymap (kbd "C-c M-r") 'extempore-send-region-and-go)
-  (define-key keymap (kbd "C-c C-b") 'extempore-send-buffer)
-  (define-key keymap (kbd "C-c M-b") 'extempore-send-buffer-and-go)
+  (define-key keymap (kbd "C-c C-r") 'extempore-send-buffer-or-region)
+  (define-key keymap (kbd "C-c M-r") 'extempore-send-buffer-or-region-and-go)
   (define-key keymap (kbd "C-c C-z") 'switch-to-extempore)
   ;; old Extempore defaults 
   (define-key keymap (kbd "C-x C-x") 'extempore-send-definition) ;extempore convention  
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-u C-x C-j") 'extempore-disconnect-all)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
-  (define-key keymap (kbd "C-x C-r") 'extempore-send-region)
-  (define-key keymap (kbd "C-x C-b") 'extempore-send-buffer)
+  (define-key keymap (kbd "C-x C-r") 'extempore-send-buffer-or-region)
   ;; (define-key keymap (kbd "C-x y")   'extempore-tr-animation-mode)
   (define-key keymap (kbd "C-c C-l") 'exlog-mode)
   ;; slave buffer mode
@@ -813,7 +810,7 @@ indentation."
 
 ;; 'blinking' defuns as they are evaluated
 
-(defvar extempore-blink-duration 0.1)
+(defvar extempore-blink-duration 0.15)
 
 (defun extempore-make-blink-overlay (face-sym)
   (let ((overlay (make-overlay 0 0)))
@@ -1030,14 +1027,15 @@ If there is a process already running in `*extempore*', switch to that buffer.
      (beginning-of-defun)
      (extempore-send-region (point) end))))
 
-(defun extempore-send-buffer ()
-  "Send the current buffer to the inferior Extempore process"
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (while (re-search-forward "^(" nil t)
-      (extempore-send-definition)
-      (redisplay))))
+(defun extempore-send-buffer-or-region (beg end)
+  "Send the current region (or buffer, if no region is active) to the inferior Extempore process"
+  (interactive "r")
+  (let ((extempore-blink-duration 0.01))
+    (save-excursion
+      (goto-char (if (use-region-p) beg (point-min)))
+      (while (re-search-forward "^(" (if (use-region-p) end (point-max)) t)
+        (extempore-send-definition)
+        (redisplay)))))
 
 (defun extempore-send-last-sexp ()
   "Send the previous sexp to the inferior Extempore process."
@@ -1056,13 +1054,6 @@ With argument, position cursor at end of buffer."
     (push-mark)
     (goto-char (point-max))))
 
-(defun extempore-send-region-and-go (start end)
-  "Send the current region to the inferior Extempore process.
-Then switch to the process buffer."
-  (interactive "r")
-  (extempore-send-region start end)
-  (switch-to-extempore t))
-
 (defun extempore-send-definition-and-go ()
   "Send the current definition to the inferior Extempore.
 Then switch to the process buffer."
@@ -1070,11 +1061,11 @@ Then switch to the process buffer."
   (extempore-send-definition)
   (switch-to-extempore t))
 
-(defun extempore-send-buffer-and-go ()
-  "Send the current buffer to the inferior Extempore.
+(defun extempore-send-buffer-or-region-and-go (start end)
+  "Send the current region to the inferior Extempore process.
 Then switch to the process buffer."
-  (interactive)
-  (extempore-send-buffer)
+  (interactive "r")
+  (extempore-send-bufer-or-region start end)
   (switch-to-extempore t))
 
 (defvar extempore-prev-l/c-dir/file nil
