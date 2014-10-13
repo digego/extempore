@@ -1002,8 +1002,7 @@ If there is a process already running in `*extempore*', switch to that buffer.
         (set-buffer (apply #'make-comint "extempore" (concat user-extempore-directory "extempore") nil
                            (split-string-and-unquote program-args)))
         (inferior-extempore-mode)))
-  (setq extempore-buffer "*extempore*")
-  (pop-to-buffer "*extempore*"))
+  (setq extempore-buffer "*extempore*"))
 
 (defun extempore-send-region (start end)
   "Send the current region to the inferior Extempore process."
@@ -1046,10 +1045,9 @@ If there is a process already running in `*extempore*', switch to that buffer.
   "Switch to the extempore process buffer.
 With argument, position cursor at end of buffer."
   (interactive "P")
-  (if (or (and extempore-buffer (comint-check-proc extempore-buffer))
-          (extempore-interactively-start-process))
+  (if (and extempore-buffer (comint-check-proc extempore-buffer))
       (pop-to-buffer extempore-buffer)
-    (error "No current process buffer.  See variable `extempore-buffer'"))
+    (extempore-interactively-start-process))
   (when eob-p
     (push-mark)
     (goto-char (point-max))))
@@ -1145,7 +1143,8 @@ See variable `extempore-buffer'."
 Since this command is run implicitly, always ask the user for the
 command to run."
   (save-window-excursion
-    (extempore-run (read-string "Run command: " (concat "extempore " extempore-program-args)))))
+    (extempore-run (read-string "Start Extempore as: " (concat "extempore " extempore-program-args))))
+  (display-buffer "*extempore*"))
 
 ;;;;;;;;;;;
 ;; eldoc ;;
