@@ -271,22 +271,24 @@ See `run-hooks'."
   :group 'extempore)
 
 (defun extempore-keybindings (keymap)
-  ;; emacs conventions
-  (define-key keymap (kbd "C-M-x") 'extempore-send-definition)   ;gnu convention
-  (define-key keymap (kbd "C-x C-e") 'extempore-send-last-sexp)  ;gnu convention
+  "tries to stick with Emacs conventions where possible.
+
+To restore the old C-x prefixed versions, add something like this to your .emacs
+
+  (add-hook 'extempore-mode-hook
+            (lambda ()
+              (define-key extempore-mode-map (kbd \"C-x C-x\") 'extempore-send-definition)
+              (define-key extempore-mode-map (kbd \"C-x C-r\") 'extempore-send-buffer-or-region)
+              (define-key extempore-mode-map (kbd \"C-x C-j\") 'extempore-connect)))
+"
   (define-key keymap (kbd "C-c C-j") 'extempore-connect) ;'jack in'
-  (define-key keymap (kbd "C-c C-e") 'extempore-send-definition)
+  (define-key keymap (kbd "C-M-x") 'extempore-send-definition)
+  (define-key keymap (kbd "C-c C-c") 'extempore-send-definition)
   (define-key keymap (kbd "C-c M-e") 'extempore-send-definition-and-go)
+  (define-key keymap (kbd "C-x C-e") 'extempore-send-last-sexp)
   (define-key keymap (kbd "C-c C-r") 'extempore-send-buffer-or-region)
   (define-key keymap (kbd "C-c M-r") 'extempore-send-buffer-or-region-and-go)
   (define-key keymap (kbd "C-c C-z") 'switch-to-extempore)
-  ;; old Extempore defaults 
-  (define-key keymap (kbd "C-x C-x") 'extempore-send-definition) ;extempore convention  
-  (define-key keymap (kbd "C-x C-j") 'extempore-connect)
-  ;; (define-key keymap (kbd "C-u C-x C-j") 'extempore-disconnect-all)
-  (define-key keymap (kbd "C-x C-j") 'extempore-connect)
-  (define-key keymap (kbd "C-x C-r") 'extempore-send-buffer-or-region)
-  ;; (define-key keymap (kbd "C-x y")   'extempore-tr-animation-mode)
   (define-key keymap (kbd "C-c C-l") 'exlog-mode)
   ;; slave buffer mode
   (define-key keymap (kbd "C-c c s") 'extempore-sb-mode)
