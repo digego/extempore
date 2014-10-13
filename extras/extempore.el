@@ -283,7 +283,7 @@ See `run-hooks'."
   ;; old Extempore defaults 
   (define-key keymap (kbd "C-x C-x") 'extempore-send-definition) ;extempore convention  
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
-  (define-key keymap (kbd "C-u C-x C-j") 'extempore-disconnect-all)
+  ;; (define-key keymap (kbd "C-u C-x C-j") 'extempore-disconnect-all)
   (define-key keymap (kbd "C-x C-j") 'extempore-connect)
   (define-key keymap (kbd "C-x C-r") 'extempore-send-buffer-or-region)
   ;; (define-key keymap (kbd "C-x y")   'extempore-tr-animation-mode)
