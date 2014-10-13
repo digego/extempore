@@ -1031,10 +1031,12 @@ If there is a process already running in `*extempore*', switch to that buffer.
 (defun extempore-send-buffer-or-region ()
   "Send the current region (or buffer, if no region is active) to the inferior Extempore process"
   (interactive)
-  (let ((extempore-blink-duration 0.01))
+  (let ((extempore-blink-duration 0.01)
+        (beg (if (region-active-p) (region-beginning) (point-min)))
+        (end (if (region-active-p) (region-end) (point-max))))
     (save-excursion
-      (goto-char (if (region-active-p) (region-beginning) (point-min)))
-      (while (re-search-forward "^(" (if (region-active-p) (region-end) (point-max)) t)
+      (goto-char beg)
+      (while (re-search-forward "^(" end t)
         (extempore-send-definition)
         (redisplay)))))
 
