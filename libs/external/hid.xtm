@@ -9,7 +9,12 @@
 ;;; Code:
 
 ;; lib-loading config
+(sys:load "libs/hid.xtm" 'quiet)
 (sys:load-preload-check 'libhid)
+
+(sys:precomp:suppress-precomp-do
+ (sys:load "libs/core/std.xtm"))
+(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 ;; lib assimp
 (define libhid
@@ -23,7 +28,9 @@
         (null? libhid))
     (sys:load-escape "Error loading HID library"))
 
-(define *xtmlib-hid-loaded* #t)
+(sys:precomp:insert-header "xtmhid")
+
+(define *xtmlib-hid-loaded* #f)
 
 (bind-type HIDNode <i16,i16>)
 (bind-type HIDPath <i8,|10,HIDNode|>)
@@ -160,3 +167,7 @@
 (bind-lib libhid hid_interrupt_read [hid_return,HIDInterface*,i32,i8*,i32,i32]*)
 (bind-lib libhid hid_interrupt_write [hid_return,HIDInterface*,i32,i8*,i32,i32]*)
 (bind-lib libhid hid_set_idle [hid_return,HIDInterface*,i32,i32]*)
+
+(define *xtmlib-hid-loaded* #t)
+
+(sys:precomp:insert-footer "xtmhid")
