@@ -9,7 +9,12 @@
 ;;
 
 ;; lib-loading config
+(sys:load "libs/bullet.xtm" 'quiet)
 (sys:load-preload-check 'bullet)
+
+(sys:precomp:suppress-precomp-do
+ (sys:load "libs/core/std.xtm"))
+(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 ;;; Code:
 
@@ -34,7 +39,9 @@
 	(not bulletlib)) 
     (sys:load-escape "Could not load 'bullet' dynamic library"))
 
-(define *xtmlib-bullet-loaded* #t)
+(sys:precomp:insert-header "xtmbullet")
+
+(define *xtmlib-bullet-loaded* #f)
 
 (define _extended_bullet #f)
 
@@ -107,3 +114,7 @@
       (bind-lib bulletlib plCreateHingeConstraint [plHingeConstraintHandle,plRigidBodyHandle,plVector3,plVector3,i1]*)
       (bind-lib bulletlib plSetHingeLimit [void,plHingeConstraintHandle,plReal,plReal]*)
       (bind-lib bulletlib plRayCast [plRigidBodyHandle,plDynamicsWorldHandle,plVector3,plVector3,plRigidBodyHandle*,i32]*)))
+
+(define *xtmlib-bullet-loaded* #t)
+
+(sys:precomp:insert-footer "xtmbullet")

@@ -11,7 +11,12 @@
 ;;; Code:
 
 ;; lib-loading config
+(sys:load "libs/horde3d.xtm" 'quiet)
 (sys:load-preload-check 'horde3d)
+
+(sys:precomp:suppress-precomp-do
+ (sys:load "libs/core/std.xtm"))
+(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 ;; set the path to the Horde3D directory
 
@@ -57,7 +62,9 @@
 	(not hordeutlib)) 
     (sys:load-escape "Could not load 'Horde3DUtils' dynamic library"))
 
-(define *xtmlib-horde3d-loaded* #t)
+(sys:precomp:insert-header "xtmhorde3d")
+
+(define *xtmlib-horde3d-loaded* #f)
 
 (define new-horde #t)
 
@@ -271,3 +278,7 @@
 			   (+ (pref dat 4) y)
 			   (+ (pref dat 5) z)
 			   (pref dat 6) (pref dat 7) (pref dat 8)))))    
+
+(define *xtmlib-horde3d-loaded* #t)
+
+(sys:precomp:insert-footer "xtmhorde3d")
