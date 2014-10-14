@@ -308,17 +308,34 @@
   (lambda (request)
     (ghttp_set_header request "User-Agent" "extempore-http/0.1")))
 
+(bind-func ghttp_set_content_type_plaintext
+  (lambda (request:ghttp_request*)
+    (ghttp_set_header request "Content-Type" "text/plain")))
+
+(bind-func ghttp_set_content_type_html
+  (lambda (request:ghttp_request*)
+    (ghttp_set_header request "Content-Type" "text/html")))
+
+(bind-func ghttp_set_content_type_json
+  (lambda (request:ghttp_request*)
+    (ghttp_set_header request "Content-Type" "application/json")))
+
+(bind-func ghttp_set_content_type_octet_stream
+  (lambda (request:ghttp_request*)
+    (ghttp_set_header request "Content-Type" "application/octet-stream")))
+
 ;; don't forget to destroy the request when you're done
-(bind-func ghttp_perform_get
-  (lambda (uri:i8*)
+
+(bind-func ghttp_perform_request_with_setup_fn
+  (lambda (uri:i8* setup_fn:[void,ghttp_request*]*)
     (let ((request:ghttp_request* (ghttp_request_new)))
       (ghttp_set_extempore_user_agent request)
-      (ghttp_set_type request ghttp_type_get)
       (if (= (ghttp_set_uri request uri) -1)
-          (begin (println "Error: invalid uri")
+          (begin (println "Error: invalid URI")
                  (ghttp_request_destroy request)
                  null)
           (begin
+            (setup_fn request)
             (ghttp_prepare request)
             (if (= (ghttp_process request) ghttp_error)
                 (begin (println "ghttp Error:" (ghttp_get_error request))
@@ -326,54 +343,99 @@
                        null)
                 request))))))
 
-(bind-func ghttp_perform_put
-  (lambda (uri:i8* body:i8* bodylen:i32)
-    (let ((request:ghttp_request* (ghttp_request_new))) 
-      (ghttp_set_extempore_user_agent request)
-      (ghttp_set_type request ghttp_type_put)
-      (if (= (ghttp_set_uri request uri) -1)
-          (begin (println "Error: invalid uri: " uri)
-                 (ghttp_request_destroy request))
-          (begin (ghttp_set_body request body bodylen)
-                 (ghttp_prepare request)
-                 (if (= (ghttp_process request) ghttp_error)
-                     (begin (println "ghttp Error:" (ghttp_get_error request))
-                            (ghttp_request_destroy request)))))
-      request)))
+;; GET
 
-(bind-func ghttp_perform_post
-  (lambda (uri:i8* body:i8* bodylen:i32)
-    (let ((request:ghttp_request* (ghttp_request_new))) 
-      (ghttp_set_extempore_user_agent request)
-      (ghttp_set_type request ghttp_type_post)
-      (if (= (ghttp_set_uri request uri) -1)
-          (begin (println "Error: invalid uri: " uri)
-                 (ghttp_request_destroy request))
-          (begin (ghttp_set_body request body bodylen)
-                 (ghttp_prepare request)
-                 (if (= (ghttp_process request) ghttp_error)
-                     (begin (println "ghttp Error:" (ghttp_get_error request))
-                            (ghttp_request_destroy request)))))
-      request)))
-
-(bind-func ghttp_perform_delete
+(bind-func ghttp_perform_GET
   (lambda (uri:i8*)
-    (let ((request:ghttp_request* (ghttp_request_new)))
-      (ghttp_set_extempore_user_agent request)
-      (ghttp_set_type request ghttp_type_delete)
-      (if (= (ghttp_set_uri request uri) -1)
-          (begin (println "Error: invalid uri")
-                 (ghttp_request_destroy request)
-                 null)
-          (begin
-            (ghttp_prepare request)
-            (if (= (ghttp_process request) ghttp_error)
-                (begin (println "ghttp Error:" (ghttp_get_error request))
-                       (ghttp_request_destroy request)
-                       null)
-                request))))))
+    (ghttp_perform_request_with_setup_fn
+     uri
+     (lambda (request:ghttp_request*)
+       (ghttp_set_type request ghttp_type_get)
+       void))))
 
-(bind-func ghttp_request_body_copy
+;; DELETE
+
+(bind-func ghttp_perform_DELETE
+  (lambda (uri:i8*)
+    (ghttp_perform_request_with_setup_fn
+     uri
+     (lambda (request:ghttp_request*)
+       (ghttp_set_type request ghttp_type_delete)
+       void))))
+
+;; PUT
+
+(bind-func ghttp_perform_PUT_default
+  (lambda (uri:i8* bodydata:i8* bodylen:i32)
+    (ghttp_perform_request_with_setup_fn uri
+                                (lambda (request:ghttp_request*)
+                                  (ghttp_set_type request ghttp_type_put)
+                                  (ghttp_set_body request bodydata bodylen)
+                                  void))))
+
+(bind-func ghttp_perform_PUT_string
+  (lambda (uri:i8* bodystr:i8*)
+    (ghttp_perform_request_with_setup_fn uri
+                                (lambda (request:ghttp_request*)
+                                  (ghttp_set_type request ghttp_type_put)
+                                  (ghttp_set_content_type_plaintext request)
+                                  (ghttp_set_body request bodystr (convert (strlen bodystr) i32))
+                                  void))))
+
+(bind-func ghttp_perform_PUT_json
+  (lambda (uri:i8* body:json_t*)
+    (let ((bodystr (json_dumps body 0)))
+      (if (null? bodystr)
+          (begin (println "Error dumping json to string: " body)
+                 null)
+          (ghttp_perform_request_with_setup_fn uri
+                                      (lambda (request:ghttp_request*)
+                                        (ghttp_set_type request ghttp_type_put)
+                                        (ghttp_set_content_type_json request)
+                                        (ghttp_set_body request bodystr (convert (strlen bodystr) i32))
+                                        void))))))
+
+(bind-poly ghttp_perform_PUT ghttp_perform_PUT_json)
+(bind-poly ghttp_perform_PUT ghttp_perform_PUT_string)
+(bind-poly ghttp_perform_PUT ghttp_perform_PUT_default)
+
+;; POST
+
+(bind-func ghttp_perform_POST_default
+  (lambda (uri:i8* bodydata:i8* bodylen:i32)
+    (ghttp_perform_request_with_setup_fn uri
+                                (lambda (request:ghttp_request*)
+                                  (ghttp_set_type request ghttp_type_post)
+                                  (ghttp_set_body request bodydata bodylen)
+                                  void))))
+
+(bind-func ghttp_perform_POST_string
+  (lambda (uri:i8* bodystr:i8*)
+    (ghttp_perform_request_with_setup_fn uri
+                                (lambda (request:ghttp_request*)
+                                  (ghttp_set_type request ghttp_type_post)
+                                  (ghttp_set_content_type_plaintext request)
+                                  (ghttp_set_body request bodystr (convert (strlen bodystr) i32))
+                                  void))))
+
+(bind-func ghttp_perform_POST_json
+  (lambda (uri:i8* body:json_t*)
+    (let ((bodystr (json_dumps body 0)))
+      (if (null? bodystr)
+          (begin (println "Error dumping json to string: " body)
+                 null)
+          (ghttp_perform_request_with_setup_fn uri
+                                      (lambda (request:ghttp_request*)
+                                        (ghttp_set_type request ghttp_type_post)
+                                        (ghttp_set_content_type_json request)
+                                        (ghttp_set_body request bodystr (convert (strlen bodystr) i32))
+                                        void))))))
+
+(bind-poly ghttp_perform_POST ghttp_perform_POST_json)
+(bind-poly ghttp_perform_POST ghttp_perform_POST_string)
+(bind-poly ghttp_perform_POST ghttp_perform_POST_default)
+
+(bind-func ghttp_copy_request_body_into_buffer
   (lambda (request:ghttp_request* buf:i8* bufsize:i64)
     (if (null? request)
         (println "Error: request is null.")
@@ -387,14 +449,7 @@
                     (memcpy buf (ghttp_get_body request) bufsize)
                     (println "Warning: HTTP response body (" bytes_read " bytes) is too big for buffer (" bufsize " bytes).  Dropping the rest of the body."))))))))
 
-;; (bind-func ghttp_get_hdr
-;;   (lambda (request:ghttp_request* hdr:i8*)
-;;     (if (null? request)
-;;         (begin (println "Error: request is null.")
-;;                null)
-;;         (ghttp_get_header request hdr))))
-
-(bind-func ghttp_request_print_headers
+(bind-func ghttp_print_request_headers
   (lambda (request:ghttp_request*)
     (if (null? request)
         (println "Error: request is null.")
@@ -409,67 +464,33 @@
                     (ghttp_get_header request (pref (pref hdrptr 0) i)))
             (free (pref (pref hdrptr 0) i)))))))
 
-(bind-func ghttp_request_print_body
+(bind-func ghttp_print_request_body
   (lambda (request:ghttp_request*)
-    (if (not (null? request))
+    (if (null? request)
+        (println "Error: request is null.")
         (begin (printf "\nStatus:\n %d: %s\n\n"
                        (ghttp_status_code request)
                        (ghttp_reason_phrase request))
                (printf "Body:\n%.*s\n\n"
                        (ghttp_get_body_len request)
-                       (ghttp_get_body request))))))
+                       (ghttp_get_body request))
+               void))))
 
-;; perform a request, dump response to log.  useful for testing
+(bind-func ghttp_print_request_full
+  (lambda (request:ghttp_request*)
+    (if (null? request)
+        (println "Error: request is null.")
+        (begin (ghttp_print_request_headers request)
+               (ghttp_print_request_body request)))))
 
-(bind-func ghttp_print_get_response
-  (lambda (host:i8*)
-    (let ((request:ghttp_request* null)
-          (status -1))
-      (set! request (ghttp_perform_get host))
-      (set! status (ghttp_status_code request))
-      (ghttp_request_print_headers request)
-      (ghttp_request_print_body request)
-      (ghttp_request_destroy request)
-      status)))
+(bind-poly print ghttp_print_request_full)
 
-(bind-func ghttp_print_post_response
-  (lambda (host:i8* body:i8*)
-    (let ((bodylen (convert (strlen body) i32))
-          (request:ghttp_request* null)
-          (status -1))
-      (set! request (ghttp_perform_post host body bodylen))
-      (set! status (ghttp_status_code request))
-      (ghttp_request_print_headers request)
-      (ghttp_request_print_body request)
-      (ghttp_request_destroy request)
-      status)))
+;; JSON conversion (destroys request)
 
-;; JSON versions
-
-(bind-func ghttp_get_response_json
-  (lambda (host:i8*)
-    (let ((request:ghttp_request* null)
-          (status -1)
-          (err:json_error_t* (zalloc)))
-      (set! request (ghttp_perform_get host))
-      (set! status (ghttp_status_code request))
-      (let ((json (json_loadb (ghttp_get_body request)
-                              (convert (ghttp_get_body_len request))
-                              0
-                              err)))
-        (if (null? json)
-            (printf "JSON error on line %d: %s\n" (tref err 0) (tref err 4)))
-        (ghttp_request_destroy request)
-        json))))
-
-(bind-func ghttp_post_response_json
-  (lambda (host:i8* body:i8*)
-    (let ((request:ghttp_request* null)
-          (status -1)
-          (bodylen (convert (strlen body) i32))
-          (err:json_error_t* (zalloc)))
-      (set! request (ghttp_perform_post host body bodylen))
-      (set! status (ghttp_status_code request))
+;; TODO should check for Content-Type
+(bind-func ghttp_request_body_as_json
+  (lambda (request:ghttp_request*)
+    (let ((err:json_error_t* (zalloc)))
       (let ((json (json_loadb (ghttp_get_body request)
                               (convert (ghttp_get_body_len request))
                               0
