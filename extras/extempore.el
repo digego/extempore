@@ -893,7 +893,7 @@ to continue it."
 (define-derived-mode extempore-repl-mode comint-mode "Extempore REPL"
   "Major mode for running a REPL connected to an existing Extempore process."
   (setq-local comint-use-prompt-regexp t)
-  (setq-local comint-prompt-regexp "xtm<.*>$ +")
+  (setq-local comint-prompt-regexp "^xtm<.*> +")
   (setq-local comint-input-sender (function extempore-repl-send))
   (setq-local comint-preoutput-filter-functions (list (function extempore-repl-preoutput-filter)))
   (setq-local comint-output-filter-functions (list (function ansi-color-process-output)
