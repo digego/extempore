@@ -42,7 +42,8 @@
               (let ((mchn (json_array_get machines i)))
                 (printf "[%lld] id: %s\n" i (json_string_value (json_object_get mchn "id")))
                 (printf "    IP: %s\n" (json_string_value (json_object_get mchn "primaryIP")))
-                (println))))
+                (println)))
+            (json_decref machines))
           (println "Fleet: no machines found.")))))
 
 (bind-func fleet_get_units
@@ -52,6 +53,13 @@
       (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url))
                        "units"))))
 
+(bind-func fleet_print_unit
+  (lambda (unit:json_t*)
+    (printf "             name: %s\n" (json_string_value (json_object_get unit "name")))
+    (printf "    current state: %s\n" (json_string_value (json_object_get unit "currentState")))
+    (printf "    desired state: %s\n" (json_string_value (json_object_get unit "desiredState")))
+    void))
+
 (bind-func fleet_list_units
   (lambda (host:i8* port:i32)
     (let ((units (fleet_get_units host port)))
@@ -60,34 +68,50 @@
             (println "Fleet units:\n")
             (doloop (i (json_array_size units))
               (let ((unit (json_array_get units i)))
-                (printf "[%lld]          name: %s\n" i (json_string_value (json_object_get unit "name")))
-                (printf "    current state: %s\n" (json_string_value (json_object_get unit "currentState")))
-                (printf "    desired state: %s\n" (json_string_value (json_object_get unit "desiredState")))
-                (println))))
+                (printf "[%lld]\n" i)
+                (fleet_print_unit unit)))
+            (json_decref units))
           (println "Fleet: no units found.")))))
 
-(bind-func fleet_get_states
+(bind-func fleet_get_state_for_unit
+  (let ((url:i8* (zalloc 256)))
+    (lambda (host:i8* port:i32 unit_name:i8*)
+      (sprintf url "http://%s:%d/%s/state?unitName=%s" host port FLEET_API_VERSION unit_name)
+      (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url))
+                       "states"))))
+
+(bind-func fleet_get_state_all_units
+  "get state of all units: see fleet_get_state_for_unit to get the state of a specific unit"
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32)
       (sprintf url "http://%s:%d/%s/state" host port FLEET_API_VERSION)
       (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url))
                        "states"))))
 
-(bind-func fleet_list_states
+(bind-poly fleet_get_state fleet_get_state_for_unit)
+(bind-poly fleet_get_state fleet_get_state_all_units)
+
+(bind-func fleet_print_unit_state
+  (lambda (state:json_t*)
+     (printf "                  name: %s\n\n" (json_string_value (json_object_get state "name")))
+     (printf "             machineID: %s\n" (json_string_value (json_object_get state "machineID")))
+     (printf "    systemdActiveState: %s\n" (json_string_value (json_object_get state "systemdActiveState")))
+     (printf "      systemdLoadState: %s\n" (json_string_value (json_object_get state "systemdLoadState")))
+     (printf "       systemdSubState: %s\n" (json_string_value (json_object_get state "systemdSubState")))
+     (println)))
+
+(bind-func fleet_list_state_all_units
   (lambda (host:i8* port:i32)
-    (let ((states (fleet_get_states host port)))
+    (let ((states (fleet_get_state_all_units host port)))
+      (if (or (null? states) (= (json_array_size states) 0))
+          (println "Fleet: no states available.")
+          (doloop (i (json_array_size states))
+            (let ((state (json_array_get states i)))
+              (printf "[%lld]\n" i)
+              (fleet_print_unit_state state))))
       (if (not (null? states))
-          (begin
-            (println "Fleet state:\n")
-            (doloop (i (json_array_size states))
-              (let ((state (json_array_get states i)))
-                (printf "[%lld]           name: %s\n\n" i (json_string_value (json_object_get state "name")))
-                (printf "         machineID: %s\n" (json_string_value (json_object_get state "machineID")))
-                (printf "systemdActiveState: %s\n" (json_string_value (json_object_get state "systemdActiveState")))
-                (printf "  systemdLoadState: %s\n" (json_string_value (json_object_get state "systemdLoadState")))
-                (printf "   systemdSubState: %s\n" (json_string_value (json_object_get state "systemdSubState")))
-                (println))))
-          (println "Fleet: no states available.")))))
+          (json_decref states))
+      void)))
 
 (bind-func fleet_delete_unit
   (let ((url:i8* (zalloc 256)))
@@ -97,13 +121,28 @@
         (if (null? (json_object_get json "error"))
             (println "Successfully deleted unit")
             (begin (printf "Fleet error: %s\n" (json_string_value (json_object_get (json_object_get json "error") "message")))
-                   void))))))
+                   void))
+        (json_decref json)))))
 
-(bind-func fleet_create_unit
+(bind-func fleet_modify_unit
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32 unit_name:i8* unit:json_t*)
       (sprintf url "http://%s:%d/%s/units/%s" host port FLEET_API_VERSION unit_name)
       (ghttp_request_body_as_json (ghttp_perform_PUT url unit)))))
+
+(bind-func fleet_set_unit_desiredstate
+  (let ((url:i8* (zalloc 256)))
+    (lambda (host:i8* port:i32 unit_name:i8* desired_state:i8*)
+      (sprintf url "http://%s:%d/%s/units/%s" host port FLEET_API_VERSION unit_name)
+      (let ((state_json (json_object))
+            (res (json_object_set_new state_json "desiredState" (json_string "inactive")))
+            (response (fleet_modify_unit host port "extempore.service" state_json)))
+        (println response)
+        (json_decref state_json)
+        (json_decref response)))))
+
+(bind-poly fleet_set_unit_state fleet_modify_unit)
+(bind-poly fleet_set_unit_state fleet_set_unit_desiredstate)
 
 (bind-func fleet_submit_extempore_service
   (let ((url:i8* (zalloc 256)))
@@ -131,6 +170,6 @@
             {\\22section\\22: \\22X-Fleet\\22, \\22name\\22: \\22Global\\22, \\22value\\22: \\22true\\22}]"
           0 ;;flags
           err))
-        (println (fleet_create_unit host port "extempore.service" body))))))
+        (println (fleet_modify_unit host port "extempore.service" body))))))
 
 (define *xtmlib-fleet-loaded* #t)
