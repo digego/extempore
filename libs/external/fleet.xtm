@@ -100,6 +100,19 @@
      (printf "       systemdSubState: %s\n" (json_string_value (json_object_get state "systemdSubState")))
      (println)))
 
+(bind-func fleet_list_state_for_unit
+  (lambda (host:i8* port:i32 unit_name:i8*)
+    (let ((states (fleet_get_state_for_unit host port unit_name)))
+      (if (or (null? states) (= (json_array_size states) 0))
+          (println "Fleet: no states available.")
+          (doloop (i (json_array_size states))
+            (let ((state (json_array_get states i)))
+              (printf "[%lld]\n" i)
+              (fleet_print_unit_state state))))
+      (if (not (null? states))
+          (json_decref states))
+      void)))
+
 (bind-func fleet_list_state_all_units
   (lambda (host:i8* port:i32)
     (let ((states (fleet_get_state_all_units host port)))
@@ -112,6 +125,9 @@
       (if (not (null? states))
           (json_decref states))
       void)))
+
+(bind-poly fleet_list_state fleet_list_state_for_unit)
+(bind-poly fleet_list_state fleet_list_state_all_units)
 
 (bind-func fleet_delete_unit
   (let ((url:i8* (zalloc 256)))
