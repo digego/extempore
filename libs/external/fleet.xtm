@@ -19,18 +19,33 @@
 
 ;; (ghttp_print_get_response "http://localhost:8080/v1-alpha/discovery.json")
 
+(bind-func fleet_response_error_p
+  (lambda (response:json_t* print_p:i1)
+    (let ((err (json_object_get response "error")))
+      (if (not (null? err))
+          (begin (printf "Fleet error code %lld: %s\n"
+                         (json_integer_value (json_object_get err "code"))
+                         (json_string_value (json_object_get err "error")))
+                 #t)
+          #f))))
+
 (bind-func fleet_get_api
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32)
       (sprintf url "http://%s:%d/%s/discovery.json" host port FLEET_API_VERSION)
-      (ghttp_request_body_as_json (ghttp_perform_GET url)))))
+      (let ((response (ghttp_request_body_as_json (ghttp_perform_GET url))))
+        (if (fleet_response_error_p response #t)
+            null
+            response)))))
 
 (bind-func fleet_get_machines
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32)
       (sprintf url "http://%s:%d/%s/machines" host port FLEET_API_VERSION)
-      (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url))
-                       "machines"))))
+      (let ((response (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url)) "machines")))
+        (if (fleet_response_error_p response #t)
+            null
+            response)))))
 
 (bind-func fleet_list_machines
   (lambda (host:i8* port:i32)
@@ -50,8 +65,10 @@
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32)
       (sprintf url "http://%s:%d/%s/units" host port FLEET_API_VERSION)
-      (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url))
-                       "units"))))
+      (let ((response (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url)) "units")))
+        (if (fleet_response_error_p response #t)
+            null
+            response)))))
 
 (bind-func fleet_print_unit
   (lambda (unit:json_t*)
@@ -85,8 +102,10 @@
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32)
       (sprintf url "http://%s:%d/%s/state" host port FLEET_API_VERSION)
-      (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url))
-                       "states"))))
+      (let ((response (json_object_get (ghttp_request_body_as_json (ghttp_perform_GET url)) "states")))
+        (if (fleet_response_error_p response #t)
+            null
+            response)))))
 
 (bind-poly fleet_get_state fleet_get_state_for_unit)
 (bind-poly fleet_get_state fleet_get_state_all_units)
@@ -133,29 +152,28 @@
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32 unit:i8*)
       (sprintf url "http://%s:%d/%s/units/%s" host port FLEET_API_VERSION unit)
-      (let ((json (ghttp_request_body_as_json (ghttp_perform_DELETE url))))
-        (if (null? (json_object_get json "error"))
-            (println "Successfully deleted unit")
-            (begin (printf "Fleet error: %s\n" (json_string_value (json_object_get (json_object_get json "error") "message")))
-                   void))
-        (json_decref json)))))
+      (let ((response (ghttp_request_body_as_json (ghttp_perform_DELETE url))))
+        (if (not (fleet_response_error_p response #t))
+            (println "Fleet: successfully deleted unit"))
+        (json_decref response)))))
 
 (bind-func fleet_modify_unit
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32 unit_name:i8* unit:json_t*)
       (sprintf url "http://%s:%d/%s/units/%s" host port FLEET_API_VERSION unit_name)
-      (ghttp_request_body_as_json (ghttp_perform_PUT url unit)))))
+      (let ((response (ghttp_request_body_as_json (ghttp_perform_PUT url unit))))
+        (if (not (fleet_response_error_p response #t))
+            (println "Fleet: successfully modified unit"))
+        (json_decref response)))))
 
 (bind-func fleet_set_unit_desiredstate
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32 unit_name:i8* desired_state:i8*)
       (sprintf url "http://%s:%d/%s/units/%s" host port FLEET_API_VERSION unit_name)
       (let ((state_json (json_object))
-            (res (json_object_set_new state_json "desiredState" (json_string "inactive")))
-            (response (fleet_modify_unit host port "extempore.service" state_json)))
-        (println response)
-        (json_decref state_json)
-        (json_decref response)))))
+            (res (json_object_set_new state_json "desiredState" (json_string desired_state))))
+        (fleet_modify_unit host port "extempore.service" state_json)
+        (json_decref state_json)))))
 
 (bind-poly fleet_set_unit_state fleet_modify_unit)
 (bind-poly fleet_set_unit_state fleet_set_unit_desiredstate)
@@ -186,6 +204,6 @@
             {\\22section\\22: \\22X-Fleet\\22, \\22name\\22: \\22Global\\22, \\22value\\22: \\22true\\22}]"
           0 ;;flags
           err))
-        (println (fleet_modify_unit host port "extempore.service" body))))))
+        (fleet_modify_unit host port "extempore.service" body)))))
 
 (define *xtmlib-fleet-loaded* #t)
