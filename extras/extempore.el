@@ -915,7 +915,10 @@ to continue it."
                   (port (process-contact proc :service)))
               (concat
                (if (stringp host)
-                   (propertize host
+                   (propertize (if (or (string= host "localhost")
+                                       (string= host "127.0.0.1"))
+                                   "lh"
+                                 host)
                                'font-lock-face
                                'font-lock-function-name-face)
                  "")
