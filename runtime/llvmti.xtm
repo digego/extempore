@@ -6196,7 +6196,13 @@
               *impc:compiler:precomp*))
     (let ((t (impc:ir:get-type-from-pretty-str (atom->string type))))
       (cond ((llvm:get-globalvar (symbol->string symbol))
-             `(print-notification 'Compiler 'Warning: 'symbol ',symbol 'is 'already 'bound, 'and 'has 'not 'been 're-bound))
+             `(begin
+                (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
+                (print " symbol ")
+                (print-with-colors 'green 'default #f (print ',symbol))
+                (print " is already bound, and has not been re-bound")
+                (println)
+                (error "")))
             ((and (equal? "i8*" (symbol->string type))
                   (string? value))
              `(begin
@@ -6226,7 +6232,7 @@
                                                                       (impc:ir:get-type-size t)
                                                                       (/ (sys:pointer-size) 8)))))
                          (impc:print-bound-message ,symbol ,type))
-		 `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate")))
+                 `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate")))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin
                 (llvm:compile
@@ -6235,7 +6241,7 @@
                   " = global "
                   ,(impc:ir:get-type-str t) " zeroinitializer"))
                 (impc:print-bound-message ,symbol ,type)))
-	    (else (impc:compiler:print-missing-type-error type))))))
+            (else (impc:compiler:print-missing-type-error type))))))
 
 (define impc:ir:get-function-type
   (lambda (name)

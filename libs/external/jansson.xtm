@@ -75,7 +75,7 @@
 (bind-lib libjansson json_false [json_t*]*)
 (bind-lib libjansson json_null [json_t*]*)
 
-(bind-lib libjansson json_delete [void,json_t]*)
+(bind-lib libjansson json_delete [void,json_t*]*)
 
 ;; JSON arrays
 (bind-lib libjansson json_array_size [size_t,json_t*]*)
@@ -124,6 +124,24 @@
 ;; print JSON data to string
 (bind-lib libjansson json_dumps [i8*,json_t*,size_t]*)
 
+;; incref/decref are defined here in xtlang - in jansson.h they're in the
+;; header and inlined (so they don't show up in the shared lib)
+
+(bind-func json_incref
+  (lambda (json:json_t*)
+    (if (and (not (null? json))
+             (<> (tref json 1) -1))
+        (tset! json 1 (+ (tref json 1) 1)))
+    json))
+
+(bind-func json_decref
+  (lambda (json:json_t*)
+    (if (and (not (null? json))
+             (<> (tref json 1) -1))
+        (tset! json 1 (- (tref json 1) 1)))
+    (if (= (tref json 1) 0)
+        (json_delete json))
+    void))
 
 ;; overload print function
 

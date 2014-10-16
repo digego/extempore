@@ -110,7 +110,9 @@
                        'default #t (print "Syntax Error"))
     (print " double colon error for ")
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print var "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-bad-type-error
   (lambda (type . message)
@@ -121,7 +123,9 @@
     (if (not (null? message))
 	(print " " (car message)))
     (println)
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-bad-numeric-value-error
   (lambda (value expected-type)
@@ -131,7 +135,9 @@
     (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print value))
     (print ", should be ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print expected-type "\n"))    
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-bad-type-error-with-ast
   (lambda (type message ast)
@@ -141,7 +147,9 @@
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type))
     (print " " message " ")
     (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-badly-formed-expression-error
   (lambda (expr-type ast)
@@ -151,7 +159,9 @@
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print expr-type))
     (print " expression:\n")
     (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-index-oob-error
   (lambda (type ast)
@@ -161,7 +171,9 @@
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print type))
     (print " index out of bounds: ")
     (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-cannot-expand-non-generic-error
   (lambda (name)
@@ -169,7 +181,9 @@
                        'default #t (print "Generics Error"))
     (print " cannot expand on non-generic ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print name "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-expansion-arity-error
   (lambda (before after)
@@ -179,7 +193,9 @@
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print before))
     (print " -> ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print after "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-no-valid-forms-for-generic-error
   (lambda (name)
@@ -187,7 +203,9 @@
                        'default #t (print "Generics Error"))
     (print " cannot find any valid forms for generic function ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print name "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-shadow-var-error
   (lambda (name)
@@ -196,7 +214,9 @@
     (print " cannot define ")
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
     (print " as a shadow variable\n")
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-already-bound-error
   (lambda (name type)
@@ -205,7 +225,9 @@
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
     (print " already bound as ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-no-redefinitions-error
   (lambda (name oldtype newtype)
@@ -215,7 +237,9 @@
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name)) (print " from ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print oldtype)) (print " to ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print newtype "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-bad-arity-error
   (lambda (ast)
@@ -223,7 +247,9 @@
                        'default #t (print "Syntax Error"))
     (print " bad arity in expression:\n")
     (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-no-retval-error
   (lambda (ast)
@@ -231,7 +257,9 @@
                        'default #t (print "Syntax Error"))
     (print " no return value for body: ")
     (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-needs-zone-size-error
   (lambda (expr-name)
@@ -240,7 +268,9 @@
     (print " ")
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print expr-name))
     (print " requires a zone size as its first argument\n")
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-needs-zone-delay-error
   (lambda (expr-name)
@@ -251,7 +281,9 @@
     (print " requires an ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print "i64"))
     (print " delay as its second argument\n")
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-variable-not-marked-as-free-error
   (lambda (vs)
@@ -260,7 +292,9 @@
     (print " variable " )
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print vs))
     (print " not marked as free - check the variable name in the polytype\n")
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define *impc:compiler:top-level-generic-error* #f)
 
@@ -294,7 +328,9 @@
 
     (if *impc:compiler:top-level-generic-error*
         (set! *impc:compiler:top-level-generic-error* #f))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 
 (define impc:compiler:print-type-conflict-error
@@ -315,7 +351,9 @@
         (begin
           (print " in ")
           (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-if-type-conflict-error
   (lambda (then else)
@@ -332,7 +370,9 @@
     (print ") branch of " )
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print  "if"))
     (print " statement\n")
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-unsupported-conversion-error
   (lambda (from to)
@@ -342,7 +382,9 @@
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print from))
     (print " to ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print to "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-missing-type-error
   (lambda (type)
@@ -350,7 +392,9 @@
                        'default #t (print "Type Error"))
     (print " cannot find type " )
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-could-not-resolve-type-error
   (lambda (types . message)
@@ -363,7 +407,9 @@
     (if (not (null? message))
 	(print " " (car message)))
     (println)
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-could-not-resolve-generic-type-error
   (lambda (types ast)
@@ -375,7 +421,9 @@
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print types))
     (print " ")
     (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-missing-identifier-error
   (lambda (name type)
@@ -383,7 +431,9 @@
                        'default #t (print "Compiler Error"))
     (print " cannot find " type " ")
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-missing-generic-type-error
   (lambda (type-name)
@@ -391,7 +441,9 @@
                        'default #t (print "Type Error"))
     (print " cannot find generic type ")
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type-name "\n"))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-missing-compiled-function-error
   (lambda (name)
@@ -400,7 +452,9 @@
     (print " no compiled function ")
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
     (print ", perhaps you need to turn on compilation?\n")
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-missing-compiled-function-setter-error
   (lambda (name)
@@ -409,7 +463,9 @@
     (print " no compiled function ")
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
     (print "setter, perhaps you need to turn on compilation?\n")
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-compiler-error
   (lambda (message . ast)
@@ -421,13 +477,17 @@
 	       (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f
                             (print (car ast)))))
     (println)
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define impc:compiler:print-compiler-failed-error
   (lambda ()
     (print-with-colors *impc:compiler:pretty-print-error-color*
                        'default #t (print "Compiler Failed."))
-    (error "")))
+    (if (sys:precomp:currently-compiling?)
+        (exit 2)
+        (error ""))))
 
 (define *sys:precomp:current-output-port* #f)
 (define *sys:precomp:current-lib-name* "xtmdylib")
