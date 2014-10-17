@@ -2,10 +2,11 @@
 
 [ -f TAGS ] && rm TAGS
 
-case $(uname) in
-  'Linux')  FIND_CMD='find . -regextype posix-extended';;
-  'Darwin') FIND_CMD='find -E .';;
-esac
+if find -version 2>/dev/null | grep GNU > /dev/null; then
+  FIND_CMD='find . -regextype posix-extended'
+else
+  FIND_CMD='find -E .'
+fi
 
 # make extempore/xtlang tags
 $FIND_CMD -regex '.*/.*\.(cpp|h)$' -print | etags -
