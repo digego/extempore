@@ -882,6 +882,16 @@ namespace extemp {
     long* sleepDur = (long*)sleepDurationNs;
     static struct timespec NOAUDIO_SLEEP_DURATION = {0, *sleepDur};
 
+    // check the timer resolution
+    struct timespec res;     
+    clock_getres(CLOCK_MONOTONIC,&res);
+    if(res.tv_sec > 0 || res.tv_nsec > 100)
+      printf("Warning: CLOCK_MONOTONIC resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
+
+    struct timespec ;     
+    clock_getres(CLOCK_MONOTONIC,&res);
+    
+    
     while(true){
       UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
       UNIV::TIME = UNIV::DEVICE_TIME;
@@ -955,20 +965,6 @@ namespace extemp {
 
 #endif    
     // make the thread a high priority one
-#ifdef TARGET_OS_MAC
-    Float64 clockFrequency = (Float64)UNIV::SAMPLERATE;
-    set_realtime(pthread_mach_thread_np(noaudio_tID), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
-#elif TARGET_OS_LINUX
-    int policy;
-    sched_param param;
-    pthread_getschedparam(noaudio_tID,&policy,&param);
-    param.sched_priority = 20;
-    policy = SCHED_RR; // SCHED_FIFO
-    int res = pthread_setschedparam(noaudio_tID,policy,&param);
-    if(res != 0) {
-      printf("Failed to set realtime priority for dummy audio thread\nERR:%s\n",strerror(res));
-    }
-#endif      
   }
 
   void NoAudioDevice::stop()

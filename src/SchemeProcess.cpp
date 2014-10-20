@@ -370,16 +370,16 @@ namespace extemp {
 		scheme_deinit(sc);
 	}
 
-        int SchemeProcess::setPriority(int priority)
+  int SchemeProcess::setPriority(int priority)
 	{
-	        threadScheme.setPriority(priority);
-		threadServer.setPriority(priority);
+    threadScheme.setPriority(priority, false);
+		threadServer.setPriority(priority, false);
 		return 0;
 	}
 
-        int SchemeProcess::getPriority()
+  int SchemeProcess::getPriority()
 	{
-	        int a = threadScheme.getPriority();
+    int a = threadScheme.getPriority();
 		int b = threadServer.getPriority();
 		if(a != b) {
 		  printf("process priority mismatch, scm[%d] svr[%d]\n",a,b);
