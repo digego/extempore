@@ -33,7 +33,7 @@
  *
  */
 
-#include <time.h>  //just included for checking execution time of function - can be removed at any time.
+#include <time.h>
 #include <iostream>
 #include <string.h>
 
@@ -135,7 +135,8 @@ double getRealTime()
   return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970; 
 }
 
-int set_realtime(thread_port_t threadport, float period, float computation, float constraint) {
+// this is duplicated in EXTThread::setPriority(), but kep here to not mess with the MT audio stuff
+int set_thread_realtime(thread_port_t threadport, float period, float computation, float constraint) {
   struct thread_time_constraint_policy ttcpolicy;
   int ret;
  
@@ -147,7 +148,7 @@ int set_realtime(thread_port_t threadport, float period, float computation, floa
   if ((ret=thread_policy_set(threadport,
                              THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&ttcpolicy,
                              THREAD_TIME_CONSTRAINT_POLICY_COUNT)) != KERN_SUCCESS) {
-    fprintf(stderr, "set_realtime() failed.\n");
+    fprintf(stderr, "set_thread_realtime() failed.\n");
     return 0;
   }
   return 1;
@@ -216,8 +217,8 @@ namespace extemp {
   void* audioCallbackMT(void* dat) {    
 #ifdef TARGET_OS_MAC
     Float64 clockFrequency = AudioGetHostClockFrequency();
-    //set_realtime(pthread_mach_thread_np(pthread_self()), sclockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
-    set_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
+    //set_thread_realtime(pthread_mach_thread_np(pthread_self()), sclockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
+    set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif TARGET_OS_LINUX
     pthread_t pt = pthread_self();
     int policy;
@@ -326,8 +327,8 @@ namespace extemp {
   void* audioCallbackMTBuf(void* dat) {
 #ifdef TARGET_OS_MAC
     Float64 clockFrequency = AudioGetHostClockFrequency();
-    //set_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
-    set_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
+    //set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
+    set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif TARGET_OS_LINUX
     pthread_t pt = pthread_self();
     int policy;
@@ -626,6 +627,16 @@ namespace extemp {
 
   void AudioDevice::start()
   {        
+    // if running in --noaudio mode, bail out
+
+    if(UNIV::AUDIO_NONE == 1)
+      {
+        ascii_text_color(0,1,10);
+        fprintf(stderr, "Error: cannot set the audio device in --noaudio mode\n");
+        ascii_text_color(0,7,10);
+        return;
+      }
+    
     Pa_Initialize();
     //printf("\n-----Available Audio Drivers-------\n");
     PaError err;
@@ -866,9 +877,13 @@ namespace extemp {
     return;
   }
 
+  // this is the callback function to run when in --noaudio mode
   void* noAudioCallback()
   {
-    printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
+    ascii_text_color(1,6,10);	
+    printf("Starting Extempore with dummy audio device:");
+    ascii_text_color(0,7,10);
+    printf(" Code will run fine, but there will be no audio output.\n");
 
     // check the timer resolution
     struct timespec res;     
@@ -876,14 +891,14 @@ namespace extemp {
     if(res.tv_sec > 0 || res.tv_nsec > 100)
       printf("Warning: CLOCK_REALTIME resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
 
-    const double startTime = getRealTime();
+    const double threadStartTime = getRealTime();
     const double frameDur = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
     double threadTime;
     double nextFrame;
     
     while(true){
 
-      threadTime = getRealTime() - startTime;
+      threadTime = getRealTime() - threadStartTime;
       // find the next time "modulo UNIV::FRAMES"      
       nextFrame = threadTime-fmod(threadTime, frameDur)+frameDur;
 
