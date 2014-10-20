@@ -744,11 +744,11 @@ namespace extemp {
     // ascii_text_color(1,7,10);
     // std::cout << "---PortAudio---" << std::endl;
     ascii_text_color(0,7,10);
-    std::cout << "Output Device\t: " << std::flush;
+    std::cout << "Output Device  : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << (Pa_GetDeviceInfo( outputDevice ))->name << std::endl;	
     ascii_text_color(0,7,10);
-    std::cout << "Input Device\t: " << std::flush;
+    std::cout << "Input Device   : " << std::flush;
     ascii_text_color(1,6,10);
     if(UNIV::AUDIO_IN_DEVICE != -1) {
       std::cout << (Pa_GetDeviceInfo( inputDevice ))->name << std::endl;	
@@ -756,31 +756,31 @@ namespace extemp {
       std::cout << std::endl;
     }
     ascii_text_color(0,7,10);
-    std::cout << "SampleRate\t: " << std::flush;
+    std::cout << "SampleRate     : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
     ascii_text_color(0,7,10);	
-    std::cout << "Channels Out\t: " << std::flush;
+    std::cout << "Channels Out   : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::CHANNELS << std::endl << std::flush;
     ascii_text_color(0,7,10);	
-    std::cout << "Channels In\t: " << std::flush;
+    std::cout << "Channels In    : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::IN_CHANNELS << std::endl << std::flush;
     ascii_text_color(0,7,10);	
-    std::cout << "Frames\t\t: " << std::flush;
+    std::cout << "Frames         : " << std::flush;
     ascii_text_color(1,6,10);	
     std::cout << UNIV::FRAMES << std::endl << std::flush;
     ascii_text_color(0,7,10); 
-    std::cout << "Latency\t\t: " << std::flush;
+    std::cout << "Latency        : " << std::flush;
     ascii_text_color(1,6,10);	
-    std::cout << info->outputLatency << std::endl << std::flush;
+    std::cout << info->outputLatency << std::flush;
+    std::cout << " sec" << std::endl << std::flush;
     // ascii_text_color(0,7,10); 
     // std::cout << "Interleaved\t: " << std::flush;
     // ascii_text_color(1,6,10);	
     // std::cout << ((UNIV::INTERLEAVED==0) ? "TRUE" : "FALSE") << std::endl << std::flush;
     // ascii_text_color(0,7,10);	
-    std::cout << std::flush;
     //ascii_text_color(0,7,10);
 
   }
@@ -902,7 +902,7 @@ namespace extemp {
   void NoAudioDevice::start()
   {
 #ifdef TARGET_OS_WINDOWS // fix for RT windows
-    printf("Extempore dummy audio device isn't yet supported on Windows.\n");
+    printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
     return;
 #else
 
@@ -941,9 +941,9 @@ namespace extemp {
     ascii_text_color(0,7,10); 
     std::cout << "Latency        : " << std::flush;
     ascii_text_color(1,6,10);	
-    std::cout << (double)UNIV::FRAMES / (double)UNIV::SAMPLERATE << std::endl << std::flush;
+    std::cout << (double)UNIV::FRAMES / (double)UNIV::SAMPLERATE << std::flush;
     ascii_text_color(0,7,10); 
-    std::cout << std::flush;
+    std::cout << " sec" << std::endl << std::flush;
 
     // create the "noaudio" audio thread
     long sleepDurationNs = (1000000000 * (long)UNIV::FRAMES / (long)UNIV::SAMPLERATE);
