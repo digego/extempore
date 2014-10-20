@@ -114,7 +114,7 @@ class UNIV {
 	static const char* PWD;
   static uint32_t EXT_TERM;
   static uint32_t EXT_LOADSTD;
-  static uint32_t AUDIO_NO_DEVICE;
+  static uint32_t AUDIO_NONE;
   static uint32_t AUDIO_DEVICE;
   static uint32_t AUDIO_IN_DEVICE;
   static std::map<std::string,std::string> CMDPARAMS;

@@ -945,9 +945,9 @@ namespace extemp {
     ascii_text_color(0,7,10); 
     std::cout << std::flush;
 
-    // create the "nodevice" audio thread
+    // create the "noaudio" audio thread
     long sleepDurationNs = (1000000000 * (long)UNIV::FRAMES / (long)UNIV::SAMPLERATE);
-    if(pthread_create(&nodevice_tID, NULL, noAudioCallback, &sleepDurationNs))
+    if(pthread_create(&noaudio_tID, NULL, noAudioCallback, &sleepDurationNs))
       {
         printf("Error: could not create the dummy audio thread.\n");
         exit(1);
@@ -957,14 +957,14 @@ namespace extemp {
     // make the thread a high priority one
 #ifdef TARGET_OS_MAC
     Float64 clockFrequency = (Float64)UNIV::SAMPLERATE;
-    set_realtime(pthread_mach_thread_np(nodevice_tID), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
+    set_realtime(pthread_mach_thread_np(noaudio_tID), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif TARGET_OS_LINUX
     int policy;
     sched_param param;
-    pthread_getschedparam(nodevice_tID,&policy,&param);
+    pthread_getschedparam(noaudio_tID,&policy,&param);
     param.sched_priority = 20;
     policy = SCHED_RR; // SCHED_FIFO
-    int res = pthread_setschedparam(nodevice_tID,policy,&param);
+    int res = pthread_setschedparam(noaudio_tID,policy,&param);
     if(res != 0) {
       printf("Failed to set realtime priority for dummy audio thread\nERR:%s\n",strerror(res));
     }
@@ -975,13 +975,13 @@ namespace extemp {
   {
     started = false;
 #ifndef TARGET_OS_WINDOWS // not yet implemented for windows
-    pthread_cancel(nodevice_tID);
+    pthread_cancel(noaudio_tID);
 #endif
   }
 
   void setDSPClosure(void* _dsp_func)
   {
-    std::cout << "Error: Extempore is running in \"nodevice\" mode." << std::endl;
+    std::cout << "Error: Extempore is running in \"noaudio\" mode." << std::endl;
     return;
   }
   

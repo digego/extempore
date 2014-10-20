@@ -180,7 +180,7 @@ namespace extemp {
     static double getCPULoad();
     static void printDevices();
   private:
-    pthread_t nodevice_tID; 
+    pthread_t noaudio_tID; 
   };
 
 } //End Namespace
