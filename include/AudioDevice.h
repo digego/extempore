@@ -167,21 +167,5 @@ namespace extemp {
     bool toggle;
   };
 
-  class NoAudioDevice : public AudioDevice
-  {
-  public:
-    NoAudioDevice();
-    ~NoAudioDevice();
-    static AudioDevice* I() { return AudioDevice::I(); }
-    static void setI(AudioDevice* dev) {AudioDevice::setI(dev);}
-    void start();
-    void stop();
-    void setDSPClosure(void* _dsp_func);    
-    static double getCPULoad();
-    static void printDevices();
-  private:
-    pthread_t noaudio_tID; 
-  };
-
 } //End Namespace
 #endif

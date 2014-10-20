@@ -123,6 +123,7 @@ double getRealTime()
   clock_gettime(CLOCK_REALTIME,&t);
   return time_to_double(t);
 }
+
 #endif //TARGET_OS_LINUX
 #endif //EXT_BOOST
 
@@ -835,7 +836,7 @@ namespace extemp {
 
     int numDevices = Pa_GetDeviceCount();
     if( numDevices <= 0 ) {
-   	  printf("ERROR: no audio devices found! Exiting...\n");
+   	  printf("Error: no audio devices found! Exiting...\n");
       // printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
       exit(1);
     }        
@@ -865,35 +866,29 @@ namespace extemp {
     return;
   }
 
-  NoAudioDevice::NoAudioDevice()
+  void* noAudioCallback()
   {
-    started = false;
-  }
-	
-  NoAudioDevice::~NoAudioDevice()
-  {
-    // maybe kill the thread here?
-  }
-
-  void* noAudioCallback(void* sleepDurationNs)
-  {
-    // printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
-
-    long* sleepDur = (long*)sleepDurationNs;
-    static struct timespec NOAUDIO_SLEEP_DURATION = {0, *sleepDur};
+    printf("Starting Extempore with dummy audio device. Code will run fine, but there will be no audio output.\n");
 
     // check the timer resolution
     struct timespec res;     
-    clock_getres(CLOCK_MONOTONIC,&res);
+    clock_getres(CLOCK_REALTIME,&res);
     if(res.tv_sec > 0 || res.tv_nsec > 100)
-      printf("Warning: CLOCK_MONOTONIC resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
+      printf("Warning: CLOCK_REALTIME resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
 
-    struct timespec ;     
-    clock_getres(CLOCK_MONOTONIC,&res);
-    
+    const double startTime = getRealTime();
+    const double frameDur = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
+    double threadTime;
+    double nextFrame;
     
     while(true){
-      UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
+
+      threadTime = getRealTime() - startTime;
+      // find the next time "modulo UNIV::FRAMES"      
+      nextFrame = threadTime-fmod(threadTime, frameDur)+frameDur;
+
+      // set device time to last frame time
+      UNIV::DEVICE_TIME = (utin64_t)(nextFrame-frameDur)
       UNIV::TIME = UNIV::DEVICE_TIME;
     
       if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
@@ -902,102 +897,18 @@ namespace extemp {
       device_time = UNIV::DEVICE_TIME;
       if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
 
+      struct timespec sleepDur = double_to_time(nextFrame-threadTime);
+      // sleep until the next time mod UNIV::FRAMES
+      nanosleep(&sleepDur, NULL);
+
       // trigger the scheduler
       TaskScheduler::I()->getGuard()->signal();
-      // sleep
-      nanosleep(&NOAUDIO_SLEEP_DURATION, NULL);
     }
-  }
-  
-  void NoAudioDevice::start()
-  {
-#ifdef TARGET_OS_WINDOWS // fix for RT windows
-    printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
-    return;
-#else
-
-    UNIV::CHANNELS = 1; // only one channel for dummy device
-    // UNIV::SAMPLERATE = 44100;
-
-    if(started) return;
-    UNIV::initRand();        
-
-    // in original:
-    // err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
-      
-    started = true;
-      
-    ascii_text_color(0,7,10);
-    std::cout << "Output Device  : " << std::flush;
-    ascii_text_color(1,6,10);	
-    std::cout << "Extempore dummy audio device" << std::endl;	
-    ascii_text_color(0,7,10);
-    std::cout << "Input Device   : " << std::endl;
-    std::cout << "SampleRate     : " << std::flush;
-    ascii_text_color(1,6,10);	
-    std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
-    std::cout << "Channels Out   : " << std::flush;
-    ascii_text_color(1,6,10);	
-    std::cout << UNIV::CHANNELS << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
-    std::cout << "Channels In    : " << std::flush;
-    ascii_text_color(1,6,10);	
-    std::cout << UNIV::IN_CHANNELS << std::endl << std::flush;
-    ascii_text_color(0,7,10);	
-    std::cout << "Frames         : " << std::flush;
-    ascii_text_color(1,6,10);	
-    std::cout << UNIV::FRAMES << std::endl << std::flush;
-    ascii_text_color(0,7,10); 
-    std::cout << "Latency        : " << std::flush;
-    ascii_text_color(1,6,10);	
-    std::cout << (double)UNIV::FRAMES / (double)UNIV::SAMPLERATE << std::flush;
-    ascii_text_color(0,7,10); 
-    std::cout << " sec" << std::endl << std::flush;
-
-    // create the "noaudio" audio thread
-    long sleepDurationNs = (1000000000 * (long)UNIV::FRAMES / (long)UNIV::SAMPLERATE);
-    if(pthread_create(&noaudio_tID, NULL, noAudioCallback, &sleepDurationNs))
-      {
-        printf("Error: could not create the dummy audio thread.\n");
-        exit(1);
-      };
-
-#endif    
-    // make the thread a high priority one
-  }
-
-  void NoAudioDevice::stop()
-  {
-    started = false;
-#ifndef TARGET_OS_WINDOWS // not yet implemented for windows
-    pthread_cancel(noaudio_tID);
-#endif
   }
 
   void setDSPClosure(void* _dsp_func)
   {
     std::cout << "Error: Extempore is running in \"noaudio\" mode." << std::endl;
-    return;
-  }
-  
-
-  double NoAudioDevice::getCPULoad() {    
-    std::cout << "Error: Dummy audio device doesn't support CPU load monitoring" << std::endl;
-    return 0.0;
-  }
-
-  void NoAudioDevice::printDevices() {
-    ascii_text_color(0,2,10);
-    printf("\n-----Available Audio Devices-----------------------------\n");
-    ascii_text_color(0,9,10);
-    printf("audio device[0]: Extempore dummy audio device\n");
-    ascii_text_color(0,2,10);
-    printf("----------------------------------------------------------\n\n");
-    ascii_text_color(0,9,10);
-    fflush(stdout);
-    freopen("/dev/null","w",stdout); // throttle termination messages
-    fflush(stdout);
     return;
   }
 
