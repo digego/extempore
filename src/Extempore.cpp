@@ -261,7 +261,7 @@ int main(int argc, char** argv)
 #ifdef TARGET_OS_WINDOWS
         printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
         exit(1);
-#else
+#endif
         // start the scheduler thread
         extemp::EXTThread* render_thread = new extemp::EXTThread();
         extemp::UNIV::CHANNELS = 1; // only one channel for dummy device
@@ -297,7 +297,7 @@ int main(int argc, char** argv)
         std::cout << " sec" << std::endl << std::flush;
 
         // create the render thread
-        render_thread->create(&extemp::AudioDevice::noAudioCallback,NULL);
+        render_thread->create(&extemp::noAudioCallback,NULL);
 
         // TODO - need to check if NOAUDIO flag is set for each call to an AudioDevice member function
         
