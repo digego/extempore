@@ -75,11 +75,16 @@ namespace extemp {
     // start and stop audio processing (which also stops time!!)	
     void start();
     void stop();
-	
+    static void startNoAudioThread(); // the --noaudio flag
+    
     void setDSPClosure(void* _dsp_func) 
     {
-	    if(dsp_closure != NULL) { printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n"); return; }
-	    dsp_closure = _dsp_func; 
+      if(extemp::UNIV::AUDIO_NONE == 1)
+        fprintf(stderr, "Error: Extempore is running in \"noaudio\" mode.\n"); 
+      else if(dsp_closure != NULL)
+        fprintf(stderr, "You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n");
+      else
+        dsp_closure = _dsp_func; 
     }
     void* getDSPClosure() { return dsp_closure; }
     bool getZeroLatency() { return zerolatency; }
@@ -88,8 +93,12 @@ namespace extemp {
 
     void setDSPMTClosure(void* _dsp_func, int idx) 
     {
-	    if(dsp_mt_closure[idx] != NULL) { printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n"); return; }
-	    dsp_mt_closure[idx] = _dsp_func;
+	    if(extemp::UNIV::AUDIO_NONE == 1)
+        fprintf(stderr, "Error: Extempore is running in \"noaudio\" mode.\n"); 
+      else if(dsp_mt_closure[idx] != NULL)
+        fprintf(stderr, "You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n");
+      else
+        dsp_mt_closure[idx] = _dsp_func;
     }
     void* getDSPMTClosure(int idx) { return dsp_mt_closure[idx]; }
 	

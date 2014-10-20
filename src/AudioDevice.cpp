@@ -876,14 +876,14 @@ namespace extemp {
 #endif
     return;
   }
-
+  
   // this is the callback function to run when in --noaudio mode
-  void* noAudioCallback()
+  void* noAudioCallback(void* args)
   {
-    ascii_text_color(1,6,10);	
-    printf("Starting Extempore with dummy audio device:");
+    ascii_text_color(1,3,10);	
+    printf("\nStarting Extempore with dummy audio device\n");
     ascii_text_color(0,7,10);
-    printf(" Code will run fine, but there will be no audio output.\n");
+    printf("Code will run fine, but there will be no audio output.\n");
 
     // check the timer resolution
     struct timespec res;     
@@ -895,7 +895,8 @@ namespace extemp {
     const double frameDur = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
     double threadTime;
     double nextFrame;
-    
+
+    // the worker loop
     while(true){
 
       threadTime = getRealTime() - threadStartTime;
@@ -921,10 +922,43 @@ namespace extemp {
     }
   }
 
-  void setDSPClosure(void* _dsp_func)
+  void AudioDevice::startNoAudioThread()
   {
-    std::cout << "Error: Extempore is running in \"noaudio\" mode." << std::endl;
-    return;
+    extemp::EXTThread* render_thread = new extemp::EXTThread();
+    extemp::UNIV::CHANNELS = 1; // only one channel for dummy device
+    extemp::UNIV::SAMPLERATE = 44100;
+    extemp::UNIV::initRand();        
+        
+    ascii_text_color(0,7,10);
+    std::cout << "Output Device  : " << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << "Extempore dummy audio device" << std::endl;	
+    ascii_text_color(0,7,10);
+    std::cout << "Input Device   : " << std::endl;
+    std::cout << "SampleRate     : " << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << extemp::UNIV::SAMPLERATE << std::endl << std::flush;
+    ascii_text_color(0,7,10);	
+    std::cout << "Channels Out   : " << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << extemp::UNIV::CHANNELS << std::endl << std::flush;
+    ascii_text_color(0,7,10);	
+    std::cout << "Channels In    : " << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << extemp::UNIV::IN_CHANNELS << std::endl << std::flush;
+    ascii_text_color(0,7,10);	
+    std::cout << "Frames         : " << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << extemp::UNIV::FRAMES << std::endl << std::flush;
+    ascii_text_color(0,7,10); 
+    std::cout << "Latency        : " << std::flush;
+    ascii_text_color(1,6,10);	
+    std::cout << (double)extemp::UNIV::FRAMES / (double)UNIV::SAMPLERATE << std::flush;
+    ascii_text_color(0,7,10); 
+    std::cout << " sec" << std::endl << std::flush;
+
+    // start the scheduler thread running
+    render_thread->create(&noAudioCallback,NULL);
   }
 
 } //End Namespace

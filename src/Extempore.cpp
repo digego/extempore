@@ -261,46 +261,9 @@ int main(int argc, char** argv)
 #ifdef TARGET_OS_WINDOWS
         printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
         exit(1);
+#else
+        extemp::AudioDevice::startNoAudioThread();
 #endif
-        // start the scheduler thread
-        extemp::EXTThread* render_thread = new extemp::EXTThread();
-        extemp::UNIV::CHANNELS = 1; // only one channel for dummy device
-        extemp::UNIV::SAMPLERATE = 44100;
-        extemp::UNIV::initRand();        
-        
-        ascii_text_color(0,7,10);
-        std::cout << "Output Device  : " << std::flush;
-        ascii_text_color(1,6,10);	
-        std::cout << "Extempore dummy audio device" << std::endl;	
-        ascii_text_color(0,7,10);
-        std::cout << "Input Device   : " << std::endl;
-        std::cout << "SampleRate     : " << std::flush;
-        ascii_text_color(1,6,10);	
-        std::cout << extemp::UNIV::SAMPLERATE << std::endl << std::flush;
-        ascii_text_color(0,7,10);	
-        std::cout << "Channels Out   : " << std::flush;
-        ascii_text_color(1,6,10);	
-        std::cout << extemp::UNIV::CHANNELS << std::endl << std::flush;
-        ascii_text_color(0,7,10);	
-        std::cout << "Channels In    : " << std::flush;
-        ascii_text_color(1,6,10);	
-        std::cout << extemp::UNIV::IN_CHANNELS << std::endl << std::flush;
-        ascii_text_color(0,7,10);	
-        std::cout << "Frames         : " << std::flush;
-        ascii_text_color(1,6,10);	
-        std::cout << extemp::UNIV::FRAMES << std::endl << std::flush;
-        ascii_text_color(0,7,10); 
-        std::cout << "Latency        : " << std::flush;
-        ascii_text_color(1,6,10);	
-        std::cout << (double)extemp::UNIV::FRAMES / (double)UNIV::SAMPLERATE << std::flush;
-        ascii_text_color(0,7,10); 
-        std::cout << " sec" << std::endl << std::flush;
-
-        // create the render thread
-        render_thread->create(&extemp::noAudioCallback,NULL);
-
-        // TODO - need to check if NOAUDIO flag is set for each call to an AudioDevice member function
-        
       }
     ascii_text_color(0,7,10);	        
     std::cout << "---------------------------------------" << std::endl;
