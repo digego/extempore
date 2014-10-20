@@ -903,7 +903,7 @@ namespace extemp {
       nextFrame = threadTime-fmod(threadTime, frameDur)+frameDur;
 
       // set device time to last frame time
-      UNIV::DEVICE_TIME = (uint64_t)(nextFrame-frameDur)
+      UNIV::DEVICE_TIME = (uint64_t)(nextFrame-frameDur);
       UNIV::TIME = UNIV::DEVICE_TIME;
     
       if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
