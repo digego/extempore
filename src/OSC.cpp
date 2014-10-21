@@ -539,7 +539,7 @@ namespace extemp {
           if(*buf==SLIP_ESC_ESC) data->push_back(SLIP_ESC);
           else if(*buf==SLIP_ESC_END) data->push_back(SLIP_END);
           else {
-            printf("Error in SLIP protocol: bad Escape type!!!");
+            fprintf(stderr, "Error in SLIP packet: bad escape type.\n");
             return -1; // bad packet
           }
           continue;
