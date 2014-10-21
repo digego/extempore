@@ -956,6 +956,7 @@ namespace extemp {
 
     // start the scheduler thread running
     render_thread->create(&noAudioCallback,NULL);
+    render_thread->setPriority(20, true);
   }
 
 } //End Namespace

@@ -168,11 +168,15 @@ namespace extemp
   int EXTThread::setPriority(int priority, bool realtime)
   {
 #ifdef TARGET_OS_LINUX
-    int policy;
     sched_param param;
+    int policy;
     pthread_getschedparam(pthread,&policy,&param);
+    param.sched_priority = priority;
+
+    // for realtime threads, use SCHED_RR policy
     if(realtime)
-      param.sched_priority = SCHED_RR;
+      policy = SCHED_RR;
+    
     int result = pthread_setschedparam(pthread,policy,&param);
     if(result != 0) {
       fprintf(stderr, "Error: failed to set thread priority: %s\n", strerror(result));
