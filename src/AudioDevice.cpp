@@ -98,24 +98,13 @@ double getRealTime()
 	boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
 	return time_to_double(pt); // + SchemeFFI::CLOCK_OFFSET);
 }
+#endif //EXT_BOOST
 
-#else
-#ifdef TARGET_OS_LINUX
+#ifndef TARGET_OS_WINDOWS //works on Linux && OSX
 double time_to_double(struct timespec t) {
   return t.tv_sec + t.tv_nsec/D_BILLION;
 }
  
-double getRealTime()
-{
-  struct timespec t;
-  clock_gettime(CLOCK_REALTIME,&t);
-  return time_to_double(t);
-}
-
-#endif //TARGET_OS_LINUX
-#endif //EXT_BOOST
-
-#ifdef TARGET_OS_MAC or TARGET_OS_LINUX
 struct timespec double_to_time(double tm) {
   struct timespec t;
  
@@ -129,7 +118,14 @@ struct timespec double_to_time(double tm) {
 }
 #endif
 
-#ifdef TARGET_OS_MAC
+#ifdef TARGET_OS_LINUX
+double getRealTime()
+{
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME,&t);
+  return time_to_double(t);
+}
+#elif TARGET_OS_MAC
 #include <CoreAudio/HostTime.h>
 
 double getRealTime()
