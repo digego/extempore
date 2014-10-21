@@ -891,20 +891,17 @@ namespace extemp {
     if(res.tv_sec > 0 || res.tv_nsec > 100)
       printf("Warning: CLOCK_REALTIME resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
 
-    const double threadStartTime = getRealTime();
-    const double frameDur = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
-    double threadTime;
+    const double thread_start_time = getRealTime();
+    const double sec_per_frame = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
+    double current_thread_time;
     double nextFrame;
 
     // the worker loop
     while(true){
 
-      threadTime = getRealTime() - threadStartTime;
-      // find the next time "modulo UNIV::FRAMES"      
-      nextFrame = threadTime-fmod(threadTime, frameDur)+frameDur;
-
-      // set device time to last frame time
-      UNIV::DEVICE_TIME = (uint64_t)(nextFrame-frameDur);
+      current_thread_time = getRealTime() - thread_start_time;
+      // set DEVICE_TIME to "time mod UNIV::FRAMES"      
+      UNIV::DEVICE_TIME = (uint64_t)(current_thread_time/sec_per_frame)*UNIV::FRAMES;
       UNIV::TIME = UNIV::DEVICE_TIME;
     
       if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
@@ -913,7 +910,7 @@ namespace extemp {
       device_time = UNIV::DEVICE_TIME;
       if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
 
-      struct timespec sleepDur = double_to_time(nextFrame-threadTime);
+      struct timespec sleepDur = double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
       // sleep until the next time mod UNIV::FRAMES
       nanosleep(&sleepDur, NULL);
 
