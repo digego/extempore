@@ -37,10 +37,14 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "UNIV.h"
 #include "EXTThread.h"
 
 #ifdef TARGET_OS_WINDOWS
 #include <Windows.h>
+#elif TARGET_OS_MAC
+#include <mach/thread_policy.h>
+#include <mach/thread_act.h>
 #endif
 
 #define _EXTTHREAD_DEBUG_
@@ -189,10 +193,9 @@ namespace extemp
     int result;
     
     // OSX magic numbers
-    Float64 threadFreq = (Float64)UNIV::SAMPLERATE;
-    ttcpolicy.period=threadFreq*.01; // HZ/160
-    ttcpolicy.computation=threadFreq*.007; // HZ/3300;
-    ttcpolicy.constraint=threadFreq*.007; // HZ/2200;
+    ttcpolicy.period=(uint32_t)(UNIV::SAMPLERATE/100); // HZ/160
+      ttcpolicy.computation=(uint32_t)(UNIV::SAMPLERATE/143); // HZ/3300;
+    ttcpolicy.constraint=(uint32_t)(UNIV::SAMPLERATE/143); // HZ/2200;
     ttcpolicy.preemptible=1; // 1 
 
     result = thread_policy_set(pthread_mach_thread_np(pthread),
@@ -201,7 +204,7 @@ namespace extemp
                                THREAD_TIME_CONSTRAINT_POLICY_COUNT);
     if (result != KERN_SUCCESS)
       {
-        fprintf(stderr, "Error: failed to set thread priority: %s\n" strerror(result));
+        fprintf(stderr, "Error: failed to set thread priority: %s\n", strerror(result));
         return 0;
       }else{
         return 1;

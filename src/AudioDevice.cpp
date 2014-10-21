@@ -105,6 +105,17 @@ double time_to_double(struct timespec t) {
   return t.tv_sec + t.tv_nsec/D_BILLION;
 }
  
+double getRealTime()
+{
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME,&t);
+  return time_to_double(t);
+}
+
+#endif //TARGET_OS_LINUX
+#endif //EXT_BOOST
+
+#ifdef TARGET_OS_MAC or TARGET_OS_LINUX
 struct timespec double_to_time(double tm) {
   struct timespec t;
  
@@ -116,16 +127,7 @@ struct timespec double_to_time(double tm) {
   }
   return t;
 }
-
-double getRealTime()
-{
-  struct timespec t;
-  clock_gettime(CLOCK_REALTIME,&t);
-  return time_to_double(t);
-}
-
-#endif //TARGET_OS_LINUX
-#endif //EXT_BOOST
+#endif
 
 #ifdef TARGET_OS_MAC
 #include <CoreAudio/HostTime.h>
@@ -885,11 +887,13 @@ namespace extemp {
     ascii_text_color(0,7,10);
     printf("Code will run fine, but there will be no audio output.\n");
 
+#ifdef TARGET_OS_LINUX
     // check the timer resolution
     struct timespec res;     
     clock_getres(CLOCK_REALTIME,&res);
     if(res.tv_sec > 0 || res.tv_nsec > 100)
       printf("Warning: CLOCK_REALTIME resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
+#endif
 
     const double thread_start_time = getRealTime();
     const double sec_per_frame = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
