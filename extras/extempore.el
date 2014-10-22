@@ -279,9 +279,9 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
             (lambda ()
               (define-key extempore-mode-map (kbd \"C-x C-x\") 'extempore-send-definition)
               (define-key extempore-mode-map (kbd \"C-x C-r\") 'extempore-send-buffer-or-region)
-              (define-key extempore-mode-map (kbd \"C-x C-j\") 'extempore-connect)))
+              (define-key extempore-mode-map (kbd \"C-x C-j\") 'extempore-connect-or-disconnect)))
 "
-  (define-key keymap (kbd "C-c C-j") 'extempore-connect) ;'jack in'
+  (define-key keymap (kbd "C-c C-j") 'extempore-connect-or-disconnect) ;'jack in'
   (define-key keymap (kbd "C-M-x") 'extempore-send-definition)
   (define-key keymap (kbd "C-c C-c") 'extempore-send-definition)
   (define-key keymap (kbd "C-c M-e") 'extempore-send-definition-and-go)
@@ -735,12 +735,18 @@ indentation."
   (interactive
    ;; get args interactively
    (list (ido-completing-read
-         "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host)
+          "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host)
          (string-to-number
           (ido-completing-read
            "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
   (extempore-sync-connections)
   (extempore-new-connection host port))
+
+(defun extempore-connect-or-disconnect (prefix)
+  (interactive "P")
+  (if prefix
+      (extempore-disconnect-all)
+    (call-interactively #'extempore-connect)))
 
 ;;; SLIP escape codes
 ;; END       ?\300    /* indicates end of packet */
