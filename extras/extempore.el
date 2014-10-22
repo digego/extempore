@@ -922,9 +922,11 @@ to continue it."
 
 (defun extempore-repl-send (proc string)
   (comint-simple-send proc
-                      (format (if (equalp extempore-repl-current-language 'xtlang)
-                                  ;; if in xtlang mode, wrap
-                                  ;; expression in a `call-as-xtlang' form
+                      ;; if in xtlang mode (and not bind-{func,val,
+                      ;; etc.} ing), wrap expression in a
+                      ;; `call-as-xtlang' form
+                      (format (if (and (equalp extempore-repl-current-language 'xtlang)
+                                       (not (string-match "^ *(bind-" string)))
                                   "(call-as-xtlang %s)\r"
                                 "%s\r")
                               string)))
