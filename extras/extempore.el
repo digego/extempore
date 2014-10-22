@@ -47,6 +47,7 @@
 ;; files, add the following lines to your .emacs
 
 ;; (autoload 'extempore-mode "/path/to/extempore/extras/extempore.el" "" t)
+;; (autoload 'extempore-repl "/path/to/extempore/extras/extempore.el" "" t)
 ;; (add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
 
 ;; Currently, extempore.el requires Emacs 24, because it inherits from
@@ -894,46 +895,59 @@ to continue it."
     (define-key m (kbd "<return>") 'extempore-repl-return)
     (define-key m (kbd "C-c C-c") 'extempore-repl-reset-prompt)
     (define-key m (kbd "C-c C-z") 'switch-to-extempore)
+    (define-key m (kbd "C-c C-l") 'extempore-repl-toggle-current-language)
     m))
+
+(defvar extempore-repl-current-language 'scheme)
 
 (define-derived-mode extempore-repl-mode comint-mode "Extempore REPL"
   "Major mode for running a REPL connected to an existing Extempore process."
   (setq-local comint-use-prompt-regexp t)
-  (setq-local comint-prompt-regexp "^xtm<.*> +")
+  (setq-local comint-prompt-regexp "^\\(scheme\\|xtlang\\)<[^>]*> +")
   (setq-local comint-input-sender (function extempore-repl-send))
   (setq-local comint-preoutput-filter-functions (list (function extempore-repl-preoutput-filter)))
   (setq-local comint-output-filter-functions (list (function ansi-color-process-output)
                                                    (function comint-postoutput-scroll-to-bottom)))
   (setq-local mode-line-process nil)
   (setq-local comint-get-old-input (function extempore-get-old-input))
-  ;; this works, but there are lots of messages in the prompt
-  ;; (face-remap-add-relative 'comint-highlight-prompt '((:inherit nil) comint-highlight-prompt))
-  )
+  (face-remap-set-base 'comint-highlight-prompt nil))
+
+(defun extempore-repl-toggle-current-language ()
+  "toggle between scheme and xtlang"
+  (interactive)
+  (if (equalp extempore-repl-current-language 'scheme)
+      (setq extempore-repl-current-language 'xtlang)
+    (setq extempore-repl-current-language 'scheme))
+  (extempore-repl-reset-prompt))
 
 (defun extempore-repl-send (proc string)
-  (comint-simple-send proc (concat string "\r")))
+  (comint-simple-send proc
+                      (format (if (equalp extempore-repl-current-language 'xtlang)
+                                  ;; if in xtlang mode, wrap
+                                  ;; expression in a `call-as-xtlang' form
+                                  "(call-as-xtlang %s)\r"
+                                "%s\r")
+                              string)))
 
 (defun extempore-repl-propertized-prompt-string ()
   (let ((proc (get-buffer-process (current-buffer))))
     (format "\n%s<%s> "
-            (propertize "xtm" 'font-lock-face 'font-lock-type-face)
+            (if (equalp extempore-repl-current-language 'xtlang)
+                (propertize "xtlang" 'font-lock-face 'font-lock-variable-name-face)
+              (propertize "scheme" 'font-lock-face 'font-lock-type-face))
             (let ((host (process-contact proc :host))
                   (port (process-contact proc :service)))
               (concat
-               (if (stringp host)
-                   (propertize (if (or (string= host "localhost")
-                                       (string= host "127.0.0.1"))
-                                   "lh"
-                                 host)
-                               'font-lock-face
-                               'font-lock-function-name-face)
-                 "")
-               (if (or (stringp host) (numberp port)) ":" "")
-               (if (numberp port)
-                   (propertize (number-to-string port)
-                               'font-lock-face
-                               'font-lock-keyword-face)
-                 ""))))))
+               (if (or (string= host "localhost")
+                       (string= host "127.0.0.1"))
+                   ""
+                 (concat (propertize host
+                                     'font-lock-face
+                                     'font-lock-keyword-face)
+                         ":"))
+               (propertize (number-to-string port)
+                           'font-lock-face
+                           'font-lock-function-name-face))))))
 
 (defun extempore-repl-preoutput-filter (string)
   (format "%s %s %s"
