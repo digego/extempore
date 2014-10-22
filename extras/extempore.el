@@ -109,7 +109,7 @@
   '(("scheme"
      "(\\(define\\|macro\\|define-macro\\)\\s-+(?\\(\\S-+\\)\\_>" 2)
     ("instrument"
-     "(define-\\(instrument\\|sampler\\)\\s-+\\(\\S-+\\)\\_>" 2)
+     "(bind-\\(instrument\\|sampler\\)\\s-+\\(\\S-+\\)\\_>" 2)
     ("lib" ;; bind-lib
      "(bind-lib\\s-+\\S-+\\s-+\\(\\S-+\\)\\_>" 1)
     ("type"
@@ -389,7 +389,7 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
          (0 font-lock-constant-face))
        ;; definitions
        (list (concat
-              "(\\(define\\|macro\\|define-macro\\|define-syntax\\|define-instrument\\|define-sampler\\)\\_>\\s-*(?\\(\\sw+\\)?")
+              "(\\(define\\|macro\\|define-macro\\|define-syntax\\|bind-instrument\\|bind-sampler\\)\\_>\\s-*(?\\(\\sw+\\)?")
              '(1 font-lock-keyword-face)
              '(2 font-lock-function-name-face))
        ;; scheme functions
@@ -1433,7 +1433,7 @@ command to run."
 
 (defun extempore-scheme-defun-name ()
   (save-excursion
-    (looking-at "(\\(define-\\(\\|macro\\|instrument\\|sampler\\)\\)\\s-+\\([^ \t\n:]+\\)")
+    (looking-at "(\\(define-\\(\\|macro\\)\\)\\s-+\\([^ \t\n:]+\\)")
     (match-string 3)))
 
 (defun extempore-inside-scheme-defun-p ()
@@ -1443,7 +1443,7 @@ command to run."
 
 (defun extempore-xtlang-defun-name ()
   (save-excursion
-    (looking-at "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\s-+\\([^ \t\n:]+\\)")
+    (looking-at "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\|instrument\\|sampler\\)\\)\\s-+\\([^ \t\n:]+\\)")
     (match-string 3)))
 
 (defun extempore-inside-xtlang-defun-p ()

@@ -54,7 +54,7 @@
   '(("definec" . font-lock-keyword-face)
     ("bind-func" . font-lock-keyword-face)
     ("definec:dsp" . font-lock-keyword-face)
-    ("define-instrument" . font-lock-keyword-face)
+    ("bind-instrument" . font-lock-keyword-face)
     ("bind-val" . font-lock-keyword-face)
     ("bind-typevar" . font-lock-keyword-face)
     ("bind-alias" . font-lock-keyword-face)

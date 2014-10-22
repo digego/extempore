@@ -31,7 +31,7 @@
 
 
 ;; make sampler instrument
-(define-macro (define-sampler name note_kernel effect_kernel)
+(define-macro (bind-sampler name note_kernel effect_kernel)
   `(bind-func ,name 100000
      (let ((poly:i64 48)
            (samples:|20,|128,SAMPLE*||* (zalloc)) ;; 128 samples * 20 'banks'
@@ -99,6 +99,8 @@
                  (set! out (+ out (* 0.3 ((pref notes k) in time chan))))))
            (* gain (,effect_kernel out time chan dat)))))))
 
+;; this is an alias for compatibility - but don't use it in new code
+(define define-sampler bind-sampler)
 
 ;; must be stereo samples of type wav aif or ogg
 (define-macro (load-sampler sampler path . args)
@@ -396,7 +398,7 @@
        (play ,@args)
        #f))
 
-(define-macro (define-instrument name note_kernel effect_kernel . args)
+(define-macro (bind-instrument name note_kernel effect_kernel . args)
   `(bind-func ,name
      (let* ((poly:i64 48)
             (notes:[SAMPLE,SAMPLE,i64,i64]** (zalloc poly))
@@ -660,33 +662,33 @@
 
 (if (not (sys:precomp:currently-compiling?))
     (begin
-      (eval `(define-sampler sampler sampler_note_hermite_c sampler_fx) (interaction-environment))
-      (eval `(define-instrument sawlead sawlead_note_c sawlead_fx) (interaction-environment))
+      (eval `(bind-sampler sampler sampler_note_hermite_c sampler_fx) (interaction-environment))
+      (eval `(bind-instrument sawlead sawlead_note_c sawlead_fx) (interaction-environment))
       (eval `(sawlead.attack 40) (interaction-environment))
       (eval `(sawlead.decay 120) (interaction-environment))
       (eval `(sawlead.release 400) (interaction-environment))
       (eval `(sawlead.sustain 0.75) (interaction-environment))
-      (eval `(define-instrument epad epad_note_c epad_fx) (interaction-environment))
+      (eval `(bind-instrument epad epad_note_c epad_fx) (interaction-environment))
       (eval `(epad.attack 1000) (interaction-environment))
       (eval `(epad.decay 1000) (interaction-environment))
       (eval `(epad.sustain 0.9) (interaction-environment))
       (eval `(epad.release 7000) (interaction-environment))
-      (eval `(define-instrument fmsynth fmsynth_note_c fmsynth_fx) (interaction-environment))
+      (eval `(bind-instrument fmsynth fmsynth_note_c fmsynth_fx) (interaction-environment))
       (eval `(fmsynth.attack 100) (interaction-environment))
       (eval `(fmsynth.decay 100) (interaction-environment))
       (eval `(fmsynth.release 5000) (interaction-environment))
       (eval `(fmsynth.sustain 0.8) (interaction-environment))
-      (eval `(define-instrument fuzz_bass fuzz_bass_note_c fuzz_bass_fx) (interaction-environment))
+      (eval `(bind-instrument fuzz_bass fuzz_bass_note_c fuzz_bass_fx) (interaction-environment))
       (eval `(fuzz_bass.attack 20) (interaction-environment))
       (eval `(fuzz_bass.decay 20) (interaction-environment))
       (eval `(fuzz_bass.release 100) (interaction-environment))
       (eval `(fuzz_bass.sustain 0.6) (interaction-environment))
-      (eval `(define-instrument shimmer_pad shimmer_pad_note_c shimmer_pad_fx) (interaction-environment))
+      (eval `(bind-instrument shimmer_pad shimmer_pad_note_c shimmer_pad_fx) (interaction-environment))
       (eval `(shimmer_pad.attack 44100) (interaction-environment))
       (eval `(shimmer_pad.decay 500) (interaction-environment))
       (eval `(shimmer_pad.release 44100) (interaction-environment))
       (eval `(shimmer_pad.sustain 1.0) (interaction-environment))
-      (eval `(define-instrument subbass subbass_note_c subbass_fx) (interaction-environment))
+      (eval `(bind-instrument subbass subbass_note_c subbass_fx) (interaction-environment))
       (eval `(subbass.attack 500) (interaction-environment))
       (eval `(subbass.decay 500) (interaction-environment))
       (eval `(subbass.release 500) (interaction-environment))
