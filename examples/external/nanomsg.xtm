@@ -1,0 +1,94 @@
+;;; nanomsg.xtm -- nanomsg examples
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libnanomsg
+
+;;; Commentary:
+
+;; http://nanomsg.org/
+
+;; These examples are translated from the C examples at
+;; https://github.com/dysinger/nanomsg-examples
+
+;;; Code:
+
+(sys:load "libs/external/nanomsg.xtm")
+
+;; Pipeline
+
+;; non-blocking (polling) version
+
+(bind-func listener
+  (let ((sock (nn_socket AF_SP NN_PULL))
+        (buflen:i64 1024)
+        (buf:i8* (zalloc buflen)))
+    (if (or (< sock 0)
+            (< (nn_bind sock "ipc:///tmp/pipeline.ipc") 0))
+        (nn_println_strerror))
+    (lambda ()
+      (let ((bytes (nn_recv sock buf buflen NN_DONTWAIT)))
+        (if (> bytes 0) buf "")))))
+
+(bind-func sender
+  (let ((sock (nn_socket AF_SP NN_PUSH)))
+    (if (or (< sock 0)
+            (< (nn_connect sock "ipc:///tmp/pipeline.ipc") 0))
+        (nn_println_strerror))
+    (lambda (msg:i8*)
+      (let ((sz_msg (+ (strlen msg) 1))
+            (bytes (nn_send sock msg sz_msg 0)))
+        (if (< bytes 0) ;; should also check (< bytes (convert sz_msg))
+            (nn_println_strerror)
+            void)))))
+
+(define listener-callback
+  (lambda (time delta-t)
+    (let ((res (cptr->string (listener))))
+      (if (not (string=? res ""))
+          (println 'listener 'received: res)))
+    (let ((next-time (max (+ time (* *second* delta-t)) (now))))
+      (callback next-time
+                'listener-callback
+                next-time 
+                delta-t))))
+
+;; start the listener callback
+(listener-callback (now) 1/10)
+
+;; try it out
+(sender "test string")
+
+;; ok, let's try a blocking version (don't foget to set the timeout!)
+
+(bind-func listener
+  (let ((sock (nn_socket AF_SP NN_PULL))
+        (buflen:i64 1024)
+        (buf:i8* (zalloc buflen)))
+    (if (or (< (nn_sock_set_timeout sock 1000) -1) ;; timeout is 1000ms (1 second)
+            (< sock 0)
+            (< (nn_bind sock "ipc:///tmp/pipeline.ipc") 0))
+        (nn_println_strerror))
+    (lambda ()
+      (let ((bytes (nn_recv sock buf buflen 0))) ;; now there's no NN_DONTWAIT flag
+        (if (> bytes 0) buf "")))))
+
+(bind-func sender
+  (let ((sock (nn_socket AF_SP NN_PUSH)))
+    (if (or (< sock 0)
+            (< (nn_connect sock "ipc:///tmp/pipeline.ipc") 0))
+        (nn_println_strerror))
+    (lambda (msg:i8*)
+      (let ((sz_msg (+ (strlen msg) 1))
+            (bytes (nn_send sock msg sz_msg 0)))
+        (if (< bytes 0) ;; should also check (< bytes (convert sz_msg))
+            (nn_println_strerror)
+            void)))))
+;; try it out
+(sender "non-blocking test string")
+
+;; when we call the listener, we'll get our response
+(println (cptr->string (listener)))
+
+;; Request/Reply
+
