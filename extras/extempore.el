@@ -988,7 +988,7 @@ to continue it."
   (unless (comint-check-proc "*extempore*")
     (progn (call-interactively #'extempore-run)
            (dotimes (i 5)
-             (message "starting Extempore%s" (make-string i ?\.))
+             (message "Starting Extempore%s" (make-string i ?\.))
              (sit-for 1)))) ;; to give Extempore time to start listening for connections
   (let ((repl-buffer-name (format "extempore REPL<%s:%d>" host port)))
     (set-buffer (make-comint repl-buffer-name (cons host port)))
@@ -1026,7 +1026,7 @@ If there is a process already running in `*extempore*', switch to that buffer.
            proc
            (concat (buffer-substring-no-properties start end) "\r\n")))
         (sleep-for extempore-blink-duration))
-    (message "%s is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)" (buffer-name))))
+    (error "Buffer %s is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)" (buffer-name))))
 
 (defun extempore-send-definition ()
   "Send the current definition to the inferior Extempore process."
