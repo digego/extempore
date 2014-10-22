@@ -1029,6 +1029,13 @@ If there is a process already running in `*extempore*', switch to that buffer.
         (inferior-extempore-mode)))
   (setq extempore-buffer "*extempore*"))
 
+(defun extempore-stop ()
+  (interactive)
+  (if (comint-check-proc "*extempore*")
+      (with-current-buffer "*extempore*"
+        (comint-interrupt-subjob))
+    (message "Extempore is not currently running in buffer *extempore*")))
+
 (defun extempore-send-region (start end)
   "Send the current region to the inferior Extempore process."
   (interactive "r")
