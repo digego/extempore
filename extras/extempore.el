@@ -961,8 +961,11 @@ to continue it."
 
 (defun extempore-repl-reset-prompt ()
   (interactive)
-  (insert (extempore-repl-propertized-prompt-string))
-  (comint-set-process-mark))
+  (if (get-buffer-process (current-buffer))
+      (progn
+        (insert (extempore-repl-propertized-prompt-string))
+        (comint-set-process-mark))
+    (message "This REPL is dead: the connection to Extempore has been closed.")))
 
 (defun extempore-repl-is-whitespace-or-comment (string)
   "Return non-nil if STRING is all whitespace or a comment."
@@ -972,18 +975,22 @@ to continue it."
 (defun extempore-repl-return ()
   "Only send current input if it is a syntactically correct s-expression, otherwise newline-and-indent."
   (interactive)
-  (let ((edit-pos (point)))
-    (goto-char (process-mark (get-buffer-process (current-buffer))))
-    (if (extempore-repl-is-whitespace-or-comment (buffer-substring edit-pos (point)))
-        
-        (extempore-repl-reset-prompt)
-      (let ((sexp-bounds (bounds-of-thing-at-point 'sexp)))
-        (if sexp-bounds
-            (progn (set-mark (car sexp-bounds))
-                   (goto-char (cdr sexp-bounds))
-                   (comint-send-input))
-          (progn (goto-char edit-pos)
-                 (newline-and-indent)))))))
+  (let ((edit-pos (point))
+        (proc (get-buffer-process (current-buffer))))
+    (if proc
+        (progn
+          (goto-char (process-mark proc))
+          (if (extempore-repl-is-whitespace-or-comment (buffer-substring edit-pos (point)))
+              
+              (extempore-repl-reset-prompt)
+            (let ((sexp-bounds (bounds-of-thing-at-point 'sexp)))
+              (if sexp-bounds
+                  (progn (set-mark (car sexp-bounds))
+                         (goto-char (cdr sexp-bounds))
+                         (comint-send-input))
+                (progn (goto-char edit-pos)
+                       (newline-and-indent))))))
+      (message "This REPL is dead: the connection to Extempore has been closed."))))
 
 (defun extempore-get-old-input ()
   "Snarf the sexp ending at point."
