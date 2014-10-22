@@ -193,8 +193,10 @@
                (error "You need to set your Extempore path!"))
       (error "You need to set your Extempore path!")))
 
-;; load the emacs mode
+;; (auto)load the key emacs mode functions
 (autoload 'extempore-mode (concat user-extempore-directory "extras/extempore.el") "" t)
+(autoload 'extempore-run (concat user-extempore-directory "extras/extempore.el") nil t)
+(autoload 'extempore-repl (concat user-extempore-directory "extras/extempore.el") nil t)
 (add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
 
 (autoload #'llvm-mode (concat user-extempore-directory "extras/llvm-mode.el")
