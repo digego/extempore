@@ -6,7 +6,7 @@
 ;; Adapted from: scheme.el by Bill Rozas and Dave Love
 ;; Also includes some work done by Hector Levesque and Andrew Sorensen
 
-;; Copyright (c) 2011-2013, Andrew Sorensen
+;; Copyright (c) 2011-2014, Andrew Sorensen
 
 ;; All rights reserved.
 

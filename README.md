@@ -103,7 +103,7 @@ You can also join the Extempore community:
 
 # Licence
 
-Copyright (c) 2011-2013, Andrew Sorensen
+Copyright (c) 2011-2014, Andrew Sorensen
 
 All rights reserved.
 
