@@ -576,6 +576,43 @@
                                     (list 'print x))))
                              (cdr ast)))))))
 
+(define impc:ti:sprintln
+  (lambda (ast)    
+    (if (null? ast)
+        (Str "")
+        `(memzone 1024
+           (string_cat
+            ,(if (string? (car ast))
+                 `(let ((x_t_mst:i8* (salloc 1024)))
+                    (llvm_sprintf x_t_mst "%s" ,(car ast))
+                    (Str x_t_mst))
+                 (list 'sprint (car ast)))
+            ,@(flatten-1 (map (lambda (x)
+                                (if (string? x)
+                                    (list `(let ((x_t_mst:i8* (salloc 1024)))
+                                             (llvm_sprintf x_t_mst " %s" ,x)
+                                             (Str x_t_mst)))
+                                    (list
+                                     (list 'sprint_space)
+                                     (list 'sprint x))))
+                              (cdr ast))))))))
+
+
+(define impc:ti:sprintln2
+  (lambda (ast)
+    (if (null? ast)
+        (Str "")
+        `(memzone 1024
+           (string_cat
+            ,@(map (lambda (x)
+                     (if (string? x)
+                         `(let ((xx_t_mst:i8* (salloc 1024)))
+                            (llvm_sprintf xx_t_mst "%s" ,x)
+                            (Str xx_t_mst))
+                         (list 'sprint x)))
+                   ast))))))
+
+
 (define impc:ti:format
   (lambda (ast)
     (if (null? ast) 'null
@@ -862,6 +899,10 @@
                        ((or (eq? (car ast) 'strln)
                             (eq? (car ast) 'strj))
                         (impc:ti:first-transform (impc:ti:format (cdr ast)) inbody?))
+                       ((eq? (car ast) 'sprintln)
+                        (impc:ti:first-transform (impc:ti:sprintln (cdr ast)) inbody?))
+                       ((eq? (car ast) 'sprintout)
+                        (impc:ti:first-transform (impc:ti:sprintln2 (cdr ast)) inbody?))
                        ((eq? (car ast) 'println)
                         (impc:ti:first-transform (impc:ti:println (cdr ast)) inbody?))
                        ((eq? (car ast) 'printout)
@@ -5206,6 +5247,29 @@
       (impc:ir:strip-space os))))
 
 
+(define impc:ti:get-expression-type
+  (lambda (ast)
+    (let* ((symname 'nosuchname)
+           (c `(let ((xtm_exp_result ,ast)) xtm_exp_result))
+           (shadows (impc:ti:rename-all-shadow-vars c '()))
+           (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
+           (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
+           (shadow-code (impc:ti:rename-all-shadow-vars ta '()))             
+           (c2 (impc:ti:get-var-types shadow-code)) 
+           (ccc (append (cdr c2) (cdr c1)))
+           (cc (impc:ti:expand-generic-types ccc))
+           (t1 (car c2))
+           (t2 (impc:ti:closure:convert t1 (list))) ;(list symname)))
+           (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t2 '())))           
+           (forced-types '()) ;(apply impc:ti:handle-forced-types t1 (append cc args)))
+           (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
+           (typespre (impc:ti:run-type-check vars forced-types t1))
+           (t5 (impc:ti:closure:convert t4 (list symname)))
+           (types (impc:ti:type-normalize typespre)))
+      (cdr (assoc 'xtm_exp_result types)))))
+
+
+
 (define impc:ti:run
    (lambda (symname code zone-size . args)
       ;; (println '-----------> 'impc:ti:run: symname)
@@ -6055,7 +6119,14 @@
                                              (tset! obj ,b (,(string->symbol
                                                               (string-append (substring a 1 (- (string-length a) 1)) "_zcopy"))
                                                              (tref x ,c) fromz toz)))
-                                        `(tset! obj ,b (tref x ,c))))
+                                        (if (and (impc:ir:pointer? a)
+                                                 (= 1 (impc:ir:get-ptr-depth a)))
+                                            `(if (llvm_ptr_in_zone fromz (cast (tref x ,c) i8*))
+                                                 (let ((newptr (zalloc (llvm_zone_ptr_size (cast (tref x ,c) i8*)))))
+                                                   (memcpy (cast newptr i8*) (cast (tref x ,c) i8*)
+                                                           (llvm_zone_ptr_size (cast (tref x ,c) i8*)))
+                                                   (tset! obj ,b newptr)))
+                                            `(tset! obj ,b (tref x ,c)))))
                                 a arglst2 (range (length a)))))
            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
       ;;(println 'hcopy: hcopy_body)
