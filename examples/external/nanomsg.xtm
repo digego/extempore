@@ -58,14 +58,17 @@
 
 ;; try it out
 (sender "test string")
+(sender "another string")
 
 ;; ok, let's try a blocking version (don't foget to set the timeout!)
+
+(sys:load "libs/external/nanomsg.xtm")
 
 (bind-func listener
   (let ((sock (nn_socket AF_SP NN_PULL))
         (buflen:i64 1024)
         (buf:i8* (zalloc buflen)))
-    (if (or (< (nn_sock_set_timeout sock 1000) -1) ;; timeout is 1000ms (1 second)
+    (if (or (< (nn_sock_set_timeout sock 100) -1) ;; timeout is 100ms (0.1 second)
             (< sock 0)
             (< (nn_bind sock "ipc:///tmp/pipeline.ipc") 0))
         (nn_println_strerror))
@@ -84,8 +87,9 @@
         (if (< bytes 0) ;; should also check (< bytes (convert sz_msg))
             (nn_println_strerror)
             void)))))
-;; try it out
-(sender "non-blocking test string")
+
+;; send a message
+(sender "blocking test string")
 
 ;; when we call the listener, we'll get our response
 (println (cptr->string (listener)))
