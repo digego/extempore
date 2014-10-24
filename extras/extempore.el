@@ -898,7 +898,7 @@ to continue it."
     (define-key m (kbd "C-c C-l") 'extempore-repl-toggle-current-language)
     m))
 
-(defvar extempore-repl-current-language 'scheme)
+(defvar-local extempore-repl-current-language 'scheme)
 
 (define-derived-mode extempore-repl-mode comint-mode "Extempore REPL"
   "Major mode for running a REPL connected to an existing Extempore process."
@@ -916,8 +916,8 @@ to continue it."
   "toggle between scheme and xtlang"
   (interactive)
   (if (equalp extempore-repl-current-language 'scheme)
-      (setq extempore-repl-current-language 'xtlang)
-    (setq extempore-repl-current-language 'scheme))
+      (setq-local extempore-repl-current-language 'xtlang)
+    (setq-local extempore-repl-current-language 'scheme))
   (extempore-repl-reset-prompt))
 
 (defun extempore-repl-send (proc string)
