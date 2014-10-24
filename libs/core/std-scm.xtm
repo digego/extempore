@@ -82,10 +82,14 @@
                     `(let ((s:i8* (halloc 2)))
                        ,expr
                        s)
-                    `(letz ((s (sprintln ,expr))
-                            (lgth (+ 1 (string_size s)))
-                            (oldcs (cstr_from_string s))
-                            (newcs:i8* (halloc lgth)))
+                    ;; this next form should be a `letz', but
+                    ;; currently there's a bug when we make that
+                    ;; change. so this version leaks, but it's the
+                    ;; best solution for the moment
+                    `(let ((s (sprintln ,expr))
+                           (lgth (+ 1 (string_size s)))
+                           (oldcs (cstr_from_string s))
+                           (newcs:i8* (halloc lgth)))
                        (strcpy newcs oldcs)
                        newcs))))                           
           (interaction-environment)))
