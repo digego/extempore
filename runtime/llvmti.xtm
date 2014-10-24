@@ -777,21 +777,27 @@
              args
              (make-list-with-proc (length args) (lambda (i) (real->integer i))))))
 
+(define *xtm_mz_num* 0)
 
 (define impc:ti:memzone
   (lambda (ast)
+    (define resname (string->symbol (string-append "res" (number->string (modulo *xtm_mz_num* 100)))))
+    (define zonename (string->symbol (string-append "zone" (number->string (modulo *xtm_mz_num* 100)))))
+    (define newzname (string->symbol (string-append "newz" (number->string (modulo *xtm_mz_num* 100)))))
+    (define rescopyname (string->symbol (string-append "rescopy" (number->string (modulo *xtm_mz_num* 100)))))
+    (set! *xtm_mz_num* (+ *xtm_mz_num* 1))
     (if (or (> (length ast) 4)
             (< (length ast) 3))
         (impc:compiler:print-bad-arity-error ast))
     `(begin (push_new_zone ,(cadr ast))
-            (let ((res ,(if (= (length ast) 3) (caddr ast) (cadddr ast)))
-                  (zone (pop_zone))
-                  (newz (llvm_peek_zone_stack))
-                  (rescopy (zcopy res zone newz)))
+            (let ((,resname ,(if (= (length ast) 3) (caddr ast) (cadddr ast)))
+                  (,zonename (pop_zone))
+                  (,newzname (llvm_peek_zone_stack))
+                  (,rescopyname (zcopy ,resname ,zonename ,newzname)))
               ,(if (= (length ast) 3)
-                   `(llvm_zone_destroy zone)
-                   `(llvm_destroy_zone_after_delay zone ,(caddr ast)))
-              rescopy))))
+                   `(llvm_zone_destroy ,zonename)
+                   `(llvm_destroy_zone_after_delay ,zonename ,(caddr ast)))
+              ,rescopyname))))
 
 (define impc:ti:letz
   (lambda (ast)
