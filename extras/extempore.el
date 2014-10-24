@@ -954,7 +954,10 @@ to continue it."
 (defun extempore-repl-preoutput-filter (string)
   (format "%s %s %s"
           (propertize "=>" 'font-lock-face 'font-lock-comment-face)
-          (propertize (substring string 0 -1)
+          (propertize (if (and (equalp extempore-repl-current-language 'xtlang)
+                               (> (length string) 2))
+                          (substring string 1 -2)
+                        (substring string 0 -1))
                       'font-lock-face
                       'font-lock-string-face)
           (extempore-repl-propertized-prompt-string)))
