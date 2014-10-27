@@ -1278,7 +1278,7 @@ command to run."
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
     (if (and (> (length str) 9)
              (string= "(docstring" (substring str 0 10)))
-        (extempore-process-docstring-form (cdr (read str)))
+        (extempore-process-docstring-form (cdr-safe (ignore-errors (read str))))
       (message str))))
 
 (add-hook 'extempore-mode-hook
