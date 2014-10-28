@@ -217,6 +217,8 @@ int main(int argc, char** argv)
       } else {
 	  char* key = (char*) args.OptionText();
 	  char* val = args.OptionArg();
+    if(!val)
+      val = "";
 	  char a[256];
 	  char b[256];
           if(!rmatch("--",key)) {

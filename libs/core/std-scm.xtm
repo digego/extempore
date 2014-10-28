@@ -14,6 +14,9 @@
 (bind-func print:[void,!a]
   (lambda (x) (printf "_") void))
 
+(bind-func tostring:[String*,!a]
+  (lambda (x) (Str "_")))
+
 ;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; catch all * zcopy
@@ -53,22 +56,43 @@
   (lambda (a b)
     (= a b)))
 
+(define-macro (string_cat . args)
+  (apply string_cat_macro args))
+
+(define (string_cat_macro . args)
+  `(string_cat_2 ,(car args)
+                 ,(if (null? (cdr args))
+                      'null
+                      (apply string_cat_macro (cdr args)))))
+
+
 (define-macro (xtm-dump-ir fname)
   (let ((n (llvm:get-closure-work-name (symbol->string fname))))
     (if n
         `(llvm:print-function ,n)
         `(begin (println "No such XTM function") #f))))
-  
 
-(define-macro (xtmX expr)
+  
+(define-macro (call-as-xtlang expr)
   (suppress-compiler-messages #t)
-  (eval `(bind-func xtm_expression
-           (lambda ()
-             ,expr
-             void))
-        (interaction-environment))
+  (let ((type (impc:ti:get-expression-type expr)))
+    (eval `(bind-func xtlang_expression
+             (lambda ()
+               ,(if (equal? type -1)
+                    `(let ((s:i8* (halloc 2)))
+                       ,expr
+                       s)
+                    `(letz ((s (sprintln ,expr))
+                            (lgth (+ 1 (string_size s)))
+                            (oldcs (cstr_from_string s))
+                            (newcs:i8* (halloc lgth)))
+                       (strcpy newcs oldcs)
+                       newcs))))                           
+          (interaction-environment)))
   (suppress-compiler-messages #f)
-  (xtm_expression))                       
+  (cptr->string (xtlang_expression)))
+
+(define xtmX call-as-xtlang)
 
 ;; some scheme helpers for acessing the environment
 

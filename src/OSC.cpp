@@ -76,6 +76,12 @@
 #define OSC_UDP_TYPE  1
 #define OSC_TCP_TYPE  2
 
+// for thread args (will be passed as void*)
+typedef struct scm_osc_pair {
+  extemp::SchemeProcess *scm_p;
+  extemp::OSC *osc_p;
+} scm_osc_pair;
+
 ///////////////////////////////////////////////
 //
 // THIS IS UGLY AND INEFFICIENT CHANGE ME!
@@ -539,7 +545,7 @@ namespace extemp {
           if(*buf==SLIP_ESC_ESC) data->push_back(SLIP_ESC);
           else if(*buf==SLIP_ESC_END) data->push_back(SLIP_END);
           else {
-            printf("Error in SLIP protocol: bad Escape type!!!");
+            fprintf(stderr, "Error in SLIP packet: bad escape type.\n");
             return -1; // bad packet
           }
           continue;
@@ -628,8 +634,8 @@ namespace extemp {
     // UNIV::initRand();
 
     scm_osc_pair *sop = (scm_osc_pair*) obj_p;
-    SchemeProcess* scm = (SchemeProcess*)sop->scm_p;
-    OSC* osc = (OSC*)sop->osc_p;
+    SchemeProcess* scm = sop->scm_p;
+    OSC* osc = sop->osc_p;
 
     //CAGuard& guard = scm->getGuard();
     EXTMonitor& guard = scm->getGuard();

@@ -61,28 +61,6 @@
   (if (not (package-installed-p package))
       (package-install package)))
 
-(global-set-key (kbd "C-c p") 'list-packages)
-
-;;;;;;;;;;;;;;;;
-;; fullscreen ;;
-;;;;;;;;;;;;;;;;
-
-(defcustom frame-maximization-mode 'maximized
-  "The maximization style of \\[toggle-frame-maximized]."
-  :type '(choice
-          (const :tab "Respect window manager screen decorations." maximized)
-          (const :tab "Ignore window manager screen decorations." fullscreen))
-  :group 'frames)
-
-(defun toggle-frame-maximized ()
-  "Maximize/un-maximize Emacs frame according to `frame-maximization-mode'."
-  (interactive)
-  (modify-frame-parameters
-   nil `((fullscreen . ,(if (frame-parameter nil 'fullscreen)
-                            nil frame-maximization-mode)))))
-
-(define-key global-map (kbd "C-s-f") 'toggle-frame-maximized)
-
 ;;;;;;;;;;
 ;; smex ;;
 ;;;;;;;;;;
@@ -215,8 +193,10 @@
                (error "You need to set your Extempore path!"))
       (error "You need to set your Extempore path!")))
 
-;; load the emacs mode
+;; (auto)load the key emacs mode functions
 (autoload 'extempore-mode (concat user-extempore-directory "extras/extempore.el") "" t)
+(autoload 'extempore-run (concat user-extempore-directory "extras/extempore.el") nil t)
+(autoload 'extempore-repl (concat user-extempore-directory "extras/extempore.el") nil t)
 (add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
 
 (autoload #'llvm-mode (concat user-extempore-directory "extras/llvm-mode.el")

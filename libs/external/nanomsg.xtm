@@ -1,0 +1,517 @@
+;;; nanomsg.xtm -- nanomsg bindings for Extempore
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libnanomsg
+
+;;; Commentary:
+
+;; http://nanomsg.org/
+
+;;; Code:
+
+(sys:load-preload-check 'nanomsg)
+(define *xtmlib-nanomsg-loaded* #f)
+
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libnanomsg
+ (cond ((string=? (sys:platform) "OSX")
+        "libnanomsg.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libnanomsg.so")
+       ((string=? (sys:platform) "Windows")
+        "libnanomsg.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
+(define libnanomsg
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+
+
+;; #include <errno.h>
+;; #include <stddef.h>
+
+;; /*  Handle DSO symbol visibility                                             */
+;; #if defined NN_NO_EXPORTS
+;; #   define NN_EXPORT
+;; #else
+;; #   if defined _WIN32
+;; #      if defined NN_EXPORTS
+;; #          define NN_EXPORT __declspec(dllexport)
+;; #      else
+;; #          define NN_EXPORT __declspec(dllimport)
+;; #      endif
+;; #   else
+;; #      if defined __SUNPRO_C
+;; #          define NN_EXPORT __global
+;; #      elif (defined __GNUC__ && __GNUC__ >= 4) || \
+;;              defined __INTEL_COMPILER || defined __clang__
+;; #          define NN_EXPORT __attribute__ ((visibility("default")))
+;; #      else
+;; #          define NN_EXPORT
+;; #      endif
+;; #   endif
+;; #endif
+
+;; /*  Inline functions are everywhere, but MSVC requires underscores           */
+;; #if defined _WIN32
+;; #  define NN_INLINE static __inline
+;; #else
+;; #  define NN_INLINE static inline
+;; #endif
+
+;; /******************************************************************************/
+;; /*  ABI versioning support.                                                   */
+;; /******************************************************************************/
+
+;; /*  Don't change this unless you know exactly what you're doing and have      */
+;; /*  read and understand the following documents:                              */
+;; /*  www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html     */
+;; /*  www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html  */
+
+;; /*  The current interface version. */
+(bind-val NN_VERSION_CURRENT i32 2)
+
+;; /*  The latest revision of the current interface. */
+(bind-val NN_VERSION_REVISION i32 0)
+
+;; /*  How many past interface versions are still supported. */
+(bind-val NN_VERSION_AGE i32 2)
+
+;; /******************************************************************************/
+;; /*  Errors.                                                                   */
+;; /******************************************************************************/
+
+;; /*  A number random enough not to collide with different errno ranges on      */
+;; /*  different OSes. The assumption is that error_t is at least 32-bit type.   */
+
+(define nn-hausnumero 156384712)
+(bind-val NN_HAUSNUMERO i32 nn-hausnumero)
+
+;; /*  On some platforms some standard POSIX errnos are not defined.    */
+;; #ifndef ENOTSUP
+(bind-val ENOTSUP i32 (+ nn-hausnumero 1))
+;; #endif
+;; #ifndef EPROTONOSUPPORT
+(bind-val EPROTONOSUPPORT i32 (+ nn-hausnumero 2))
+;; #endif
+;; #ifndef ENOBUFS
+(bind-val ENOBUFS i32 (+ nn-hausnumero 3))
+;; #endif
+;; #ifndef ENETDOWN
+(bind-val ENETDOWN i32 (+ nn-hausnumero 4))
+;; #endif
+;; #ifndef EADDRINUSE
+(bind-val EADDRINUSE i32 (+ nn-hausnumero 5))
+;; #endif
+;; #ifndef EADDRNOTAVAIL
+(bind-val EADDRNOTAVAIL i32 (+ nn-hausnumero 6))
+;; #endif
+;; #ifndef ECONNREFUSED
+(bind-val ECONNREFUSED i32 (+ nn-hausnumero 7))
+;; #endif
+;; #ifndef EINPROGRESS
+(bind-val EINPROGRESS i32 (+ nn-hausnumero 8))
+;; #endif
+;; #ifndef ENOTSOCK
+(bind-val ENOTSOCK i32 (+ nn-hausnumero 9))
+;; #endif
+;; #ifndef EAFNOSUPPORT
+(bind-val EAFNOSUPPORT i32 (+ nn-hausnumero 10))
+;; #endif
+;; #ifndef EPROTO
+(bind-val EPROTO i32 (+ nn-hausnumero 11))
+;; #endif
+;; #ifndef EAGAIN
+(bind-val EAGAIN i32 (+ nn-hausnumero 12))
+;; #endif
+;; #ifndef EBADF
+(bind-val EBADF i32 (+ nn-hausnumero 13))
+;; #endif
+;; #ifndef EINVAL
+(bind-val EINVAL i32 (+ nn-hausnumero 14))
+;; #endif
+;; #ifndef EMFILE
+(bind-val EMFILE i32 (+ nn-hausnumero 15))
+;; #endif
+;; #ifndef EFAULT
+(bind-val EFAULT i32 (+ nn-hausnumero 16))
+;; #endif
+;; #ifndef EACCESS
+(bind-val EACCESS i32 (+ nn-hausnumero 17))
+;; #endif
+;; #ifndef ENETRESET
+(bind-val ENETRESET i32 (+ nn-hausnumero 18))
+;; #endif
+;; #ifndef ENETUNREACH
+(bind-val ENETUNREACH i32 (+ nn-hausnumero 19))
+;; #endif
+;; #ifndef EHOSTUNREACH
+(bind-val EHOSTUNREACH i32 (+ nn-hausnumero 20))
+;; #endif
+;; #ifndef ENOTCONN
+(bind-val ENOTCONN i32 (+ nn-hausnumero 21))
+;; #endif
+;; #ifndef EMSGSIZE
+(bind-val EMSGSIZE i32 (+ nn-hausnumero 22))
+;; #endif
+;; #ifndef ETIMEDOUT
+(bind-val ETIMEDOUT i32 (+ nn-hausnumero 23))
+;; #endif
+;; #ifndef ECONNABORTED
+(bind-val ECONNABORTED i32 (+ nn-hausnumero 24))
+;; #endif
+;; #ifndef ECONNRESET
+(bind-val ECONNRESET i32 (+ nn-hausnumero 25))
+;; #endif
+;; #ifndef ENOPROTOOPT
+(bind-val ENOPROTOOPT i32 (+ nn-hausnumero 26))
+;; #endif
+;; #ifndef EISCONN
+(bind-val EISCONN i32 (+ nn-hausnumero 27))
+;; #define NN_EISCONN_DEFINED
+;; #endif
+;; #ifndef ESOCKTNOSUPPORT
+(bind-val ESOCKTNOSUPPORT i32 (+ nn-hausnumero 28))
+;; #endif
+
+;; /*  Native nanomsg error codes.                                               */
+;; #ifndef ETERM
+(bind-val ETERM i32 (+ nn-hausnumero 53))
+;; #endif
+;; #ifndef EFSM
+(bind-val EFSM i32 (+ nn-hausnumero 54))
+;; #endif
+
+;; /*  This function retrieves the errno as it is known to the library.          */
+;; /*  The goal of this function is to make the code 100% portable, including    */
+;; /*  where the library is compiled with certain CRT library (on Windows) and   */
+;; /*  linked to an application that uses different CRT library.                 */
+(bind-lib libnanomsg nn_errno [i32]*)
+
+;; /*  Resolves system errors and native errors to human-readable string.        */
+(bind-lib libnanomsg nn_strerror [i8*,i32]*)
+
+
+;; /*  Returns the symbol name (e.g. "NN_REQ") and value at a specified index.   */
+;; /*  If the index is out-of-range, returns NULL and sets errno to EINVAL       */
+;; /*  General usage is to start at i=0 and iterate until NULL is returned.      */
+(bind-lib libnanomsg nn_symbol [i8*,i32,i32*]*)
+
+;; /*  Constants that are returned in `ns` member of nn_symbol_properties        */
+(bind-val NN_NS_NAMESPACE i32 0)
+(bind-val NN_NS_VERSION i32 1)
+(bind-val NN_NS_DOMAIN i32 2)
+(bind-val NN_NS_TRANSPORT i32 3)
+(bind-val NN_NS_PROTOCOL i32 4)
+(bind-val NN_NS_OPTION_LEVEL i32 5)
+(bind-val NN_NS_SOCKET_OPTION i32 6)
+(bind-val NN_NS_TRANSPORT_OPTION i32 7)
+(bind-val NN_NS_OPTION_TYPE i32 8)
+(bind-val NN_NS_OPTION_UNIT i32 9)
+(bind-val NN_NS_FLAG i32 10)
+(bind-val NN_NS_ERROR i32 11)
+(bind-val NN_NS_LIMIT i32 12)
+
+;; /*  Constants that are returned in `type` member of nn_symbol_properties      */
+(bind-val NN_TYPE_NONE i32 0)
+(bind-val NN_TYPE_INT i32 1)
+(bind-val NN_TYPE_STR i32 2)
+
+;; /*  Constants that are returned in the `unit` member of nn_symbol_properties  */
+(bind-val NN_UNIT_NONE i32 0)
+(bind-val NN_UNIT_BYTES i32 1)
+(bind-val NN_UNIT_MILLISECONDS i32 2)
+(bind-val NN_UNIT_PRIORITY i32 3)
+(bind-val NN_UNIT_BOOLEAN i32 4)
+
+;; ;; /*  Structure that is returned from nn_symbol  */
+;; struct nn_symbol_properties {
+
+;;     ;; /*  The constant value  */
+;;     int value;
+
+;;     ;; /*  The contant name  */
+;;     const char* name;
+
+;;     ;; /*  The constant namespace, or zero for namespaces themselves */
+;;     int ns;
+
+;;     ;; /*  The option type for socket option constants  */
+;;     int type;
+
+;;     ;; /*  The unit for the option value for socket option constants  */
+;;     int unit;
+;; };
+(bind-type nn_symbol_properties <i32,i8*,i32,i32,i32>)
+
+;; /*  Fills in nn_symbol_properties structure and returns it's length           */
+;; /*  If the index is out-of-range, returns 0                                   */
+;; /*  General usage is to start at i=0 and iterate until zero is returned.      */
+(bind-lib libnanomsg nn_symbol_info [i32,i32,nn_symbol_properties*,i32]*)
+
+;; /******************************************************************************/
+;; /*  Helper function for shutting down multi-threaded applications.            */
+;; /******************************************************************************/
+
+(bind-lib libnanomsg nn_term [void]*)
+
+;; /******************************************************************************/
+;; /*  Zero-copy support.                                                        */
+;; /******************************************************************************/
+
+(bind-val NN_MSG size_t -1)
+
+(bind-lib libnanomsg nn_allocmsg [void*,size_t,i32]*)
+(bind-lib libnanomsg nn_reallocmsg [void*,i8*,size_t]*)
+(bind-lib libnanomsg nn_freemsg [i32,i8*]*)
+
+;; /******************************************************************************/
+;; /*  Socket definition.                                                        */
+;; /******************************************************************************/
+
+;; struct nn_iovec {
+;;     void *iov_base;
+;;     size_t iov_len;
+;; };
+(bind-type nn_iovec <i8*,size_t>)
+
+;; struct nn_msghdr {
+;;     struct nn_iovec *msg_iov;
+;;     int msg_iovlen;
+;;     void *msg_control;
+;;     size_t msg_controllen;
+;; };
+(bind-type nn_msghdr <*nn_iovec,i32,i8*,size_t>)
+
+;; struct nn_cmsghdr {
+;;     size_t cmsg_len;
+;;     int cmsg_level;
+;;     int cmsg_type;
+;; };
+(bind-type nn_cmsghdr <size_t,i32,i32>)
+
+;; /*  Internal function. Not to be used directly.                               */
+;; /*  Use NN_CMSG_NEXTHDR macro instead.                                        */
+;; NN_INLINE struct nn_cmsghdr *nn_cmsg_nexthdr_ (const struct nn_msghdr *mhdr,
+;;     const struct nn_cmsghdr *cmsg)
+;; {
+;;     size_t sz;
+
+;;     sz = sizeof (struct nn_cmsghdr) + cmsg->cmsg_len;
+;;     if (((char*) cmsg) - ((char*) mhdr->msg_control) + sz >=
+;;            mhdr->msg_controllen)
+;;         return NULL;
+;;     return (struct nn_cmsghdr*) (((char*) cmsg) + sz);
+;; }
+
+;; #define NN_CMSG_FIRSTHDR(mhdr) \
+;;     ((mhdr)->msg_controllen >= sizeof (struct nn_cmsghdr) \
+;;     ? (struct nn_cmsghdr*) (mhdr)->msg_control : (struct nn_cmsghdr*) NULL)
+
+;; #define NN_CMSG_NXTHDR(mhdr,cmsg) \
+;;     nn_cmsg_nexthdr_ ((struct nn_msghdr*) (mhdr), (struct nn_cmsghdr*) (cmsg))
+
+;; #define NN_CMSG_DATA(cmsg) \
+;;     ((unsigned char*) (((struct nn_cmsghdr*) (cmsg)) + 1))
+
+;; /*  Helper macro. Not to be used directly.                                    */
+;; #define NN_CMSG_ALIGN(len) \
+;;     (((len) + sizeof (size_t) - 1) & (size_t) ~(sizeof (size_t) - 1))
+
+;; /* Extensions to POSIX defined by RFC3542.                                    */
+
+;; #define NN_CMSG_SPACE(len) \
+;;     (NN_CMSG_ALIGN (len) + NN_CMSG_ALIGN (sizeof (struct nn_cmsghdr)))
+
+;; #define NN_CMSG_LEN(len) \
+;;     (NN_CMSG_ALIGN (sizeof (struct nn_cmsghdr)) + (len))
+
+;; /*  SP address families.                                                      */
+(bind-val AF_SP i32 1)
+(bind-val AF_SP_RAW i32 2)
+
+;; /*  Max size of an SP address.                                                */
+(bind-val NN_SOCKADDR_MAX i32 128)
+
+;; /*  Socket option levels: Negative numbers are reserved for transports,
+;;     positive for socket types. */
+(bind-val NN_SOL_SOCKET i32 0)
+
+;; /*  Generic socket options (NN_SOL_SOCKET level).                             */
+(bind-val NN_LINGER i32 1)
+(bind-val NN_SNDBUF i32 2)
+(bind-val NN_RCVBUF i32 3)
+(bind-val NN_SNDTIMEO i32 4)
+(bind-val NN_RCVTIMEO i32 5)
+(bind-val NN_RECONNECT_IVL i32 6)
+(bind-val NN_RECONNECT_IVL_MAX i32 7)
+(bind-val NN_SNDPRIO i32 8)
+(bind-val NN_RCVPRIO i32 9)
+(bind-val NN_SNDFD i32 10)
+(bind-val NN_RCVFD i32 11)
+(bind-val NN_DOMAIN i32 12)
+(bind-val NN_PROTOCOL i32 13)
+(bind-val NN_IPV4ONLY i32 14)
+(bind-val NN_SOCKET_NAME i32 15)
+
+;; /*  Send/recv options.                                                        */
+(bind-val NN_DONTWAIT i32 1)
+
+(bind-lib libnanomsg nn_socket [i32,i32,i32]*)
+(bind-lib libnanomsg nn_close [i32,i32]*)
+(bind-lib libnanomsg nn_setsockopt [i32,i32,i32,i32,i8*,size_t]*)
+(bind-lib libnanomsg nn_getsockopt [i32,i32,i32,i32,i8*,size_t*]*)
+(bind-lib libnanomsg nn_bind [i32,i32,i8*]*)
+(bind-lib libnanomsg nn_connect [i32,i32,i8*]*)
+(bind-lib libnanomsg nn_shutdown [i32,i32,i32]*)
+(bind-lib libnanomsg nn_send [i32,i32,i8*,size_t,i32]*)
+(bind-lib libnanomsg nn_recv [i32,i32,i8*,size_t,i32]*)
+(bind-lib libnanomsg nn_sendmsg [i32,i32,nn_msghdr*,i32]*)
+(bind-lib libnanomsg nn_recvmsg [i32,i32,nn_msghdr*,i32]*)
+
+;; /******************************************************************************/
+;; /*  Socket mutliplexing support.                                              */
+;; /******************************************************************************/
+
+(bind-val NN_POLLIN i32 1)
+(bind-val NN_POLLOUT i32 2)
+
+;; struct nn_pollfd {
+;;     int fd;
+;;     short events;
+;;     short revents;
+;; };
+(bind-type nn_pollfd <i32,i16,i16>)
+
+(bind-lib libnanomsg nn_poll [i32,nn_pollfd*,i32,i32]*)
+
+;; /******************************************************************************/
+;; /*  Built-in support for devices.                                             */
+;; /******************************************************************************/
+
+(bind-lib libnanomsg nn_device [i32,i32,i32]*)
+
+;; <nanomsg/pair.h>
+
+(bind-val NN_PROTO_PAIR i32 1)
+
+(bind-val NN_PAIR i32 (+ (* 1 16 0)))
+
+;; <nanomsg/pubsub.h>
+
+(bind-val NN_PROTO_PUBSUB i32 2)
+
+(bind-val NN_PUB i32 (+ (* 2 16) 0))
+(bind-val NN_SUB i32 (+ (* 2 16) 1))
+
+(bind-val NN_SUB_SUBSCRIBE i32 1)
+(bind-val NN_SUB_UNSUBSCRIBE i32 2)
+
+;; <nanomsg/reqrep.h>
+
+(bind-val NN_PROTO_REQREP i32 3)
+
+(bind-val NN_REQ i32 (+ (* 3 16) 0))
+(bind-val NN_REP i32 (+ (* 3 16) 1))
+
+(bind-val NN_REQ_RESEND_IVL i32 1)
+
+;; <nanomsg/pipeline.h>
+
+(bind-val NN_PROTO_PIPELINE i32 5)
+
+(bind-val NN_PUSH i32 (+ (* 5 16) 0))
+(bind-val NN_PULL i32 (+ (* 5 16) 1))
+
+;; <nanomsg/survey.h>
+
+(bind-val NN_PROTO_SURVEY i32 6)
+
+(bind-val NN_SURVEYOR i32 (+ (* 6 16) 0))
+(bind-val NN_RESPONDENT i32 (+ (* 6 16) 1))
+
+(bind-val NN_SURVEYOR_DEADLINE i32 1)
+
+;; <nanomsg/bus.h>
+
+(bind-val NN_PROTO_BUS i32 7)
+
+(bind-val NN_BUS i32 (+ (* 7 16) 0))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; xtlang wrapper functions ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func nn_println_strerror_with_msg
+  (lambda (msg:i8*)
+    (let ((en (nn_errno)))
+      (if (<> en 0)
+          (printf "%s: %s\n" msg (nn_strerror en)))
+      void)))
+
+(bind-func nn_println_strerror_no_msg
+  (lambda ()
+    (let ((en (nn_errno)))
+      (if (<> en 0)
+          (printf "nanomsg error: %s\n" (nn_strerror en)))
+      void)))
+
+(bind-poly nn_println_strerror nn_println_strerror_with_msg)
+(bind-poly nn_println_strerror nn_println_strerror_no_msg)
+
+(bind-func nn_sock_set_send_timeout
+  (lambda (sock:i32 timeout_ms:i32)
+    (let ((timeout_ptr:i32* (salloc)))
+      (pset! timeout_ptr 0 timeout_ms)
+      (nn_setsockopt sock NN_SOL_SOCKET NN_SNDTIMEO (cast timeout_ptr i8*) 4))))
+
+(bind-func nn_sock_set_recv_timeout
+  (lambda (sock:i32 timeout_ms:i32)
+    (let ((timeout_ptr:i32* (salloc)))
+      (pset! timeout_ptr 0 timeout_ms)
+      (nn_setsockopt sock NN_SOL_SOCKET NN_RCVTIMEO (cast timeout_ptr i8*) 4))))
+
+(bind-func nn_sock_set_timeout
+  "sets both send and recieve timeouts"
+  (lambda (sock:i32 timeout_ms:i32)
+    (nn_sock_set_send_timeout sock timeout_ms)
+    (nn_sock_set_recv_timeout sock timeout_ms)))
+
+(bind-func create_socket_with_timeout
+  "return socket id (i32)"
+  (lambda (protocol timeout)
+    (let  ((sock (nn_socket AF_SP protocol)))
+      (if (or (< sock 0)
+              (< (nn_sock_set_timeout sock timeout) 0))
+          (nn_println_strerror "error creating socket"))
+      sock)))
+
+(bind-func create_socket_default_timeout
+  "return socket id (i32)"
+  (lambda (protocol)
+    (let  ((sock (nn_socket AF_SP protocol)))
+      (if (< sock 0)
+          (nn_println_strerror "error creating socket"))
+      sock)))
+
+(bind-poly create_socket create_socket_with_timeout)
+(bind-poly create_socket create_socket_default_timeout)
+
+(bind-func bind_socket
+  (lambda (sock addr)
+    (if (< (nn_bind sock addr) 0)
+        (nn_println_strerror "error binding socket"))
+    sock))
+
+(bind-func connect_socket
+  (lambda (sock addr)
+    (if (< (nn_connect sock addr) 0)
+        (nn_println_strerror "error connecting socket"))
+    sock))
+
+(define *xtmlib-nanomsg-loaded* #t)

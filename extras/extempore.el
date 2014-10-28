@@ -6,7 +6,7 @@
 ;; Adapted from: scheme.el by Bill Rozas and Dave Love
 ;; Also includes some work done by Hector Levesque and Andrew Sorensen
 
-;; Copyright (c) 2011-2013, Andrew Sorensen
+;; Copyright (c) 2011-2014, Andrew Sorensen
 
 ;; All rights reserved.
 
@@ -47,6 +47,7 @@
 ;; files, add the following lines to your .emacs
 
 ;; (autoload 'extempore-mode "/path/to/extempore/extras/extempore.el" "" t)
+;; (autoload 'extempore-repl "/path/to/extempore/extras/extempore.el" "" t)
 ;; (add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
 
 ;; Currently, extempore.el requires Emacs 24, because it inherits from
@@ -108,7 +109,7 @@
   '(("scheme"
      "(\\(define\\|macro\\|define-macro\\)\\s-+(?\\(\\S-+\\)\\_>" 2)
     ("instrument"
-     "(define-\\(instrument\\|sampler\\)\\s-+\\(\\S-+\\)\\_>" 2)
+     "(bind-\\(instrument\\|sampler\\)\\s-+\\(\\S-+\\)\\_>" 2)
     ("lib" ;; bind-lib
      "(bind-lib\\s-+\\S-+\\s-+\\(\\S-+\\)\\_>" 1)
     ("type"
@@ -279,9 +280,9 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
             (lambda ()
               (define-key extempore-mode-map (kbd \"C-x C-x\") 'extempore-send-definition)
               (define-key extempore-mode-map (kbd \"C-x C-r\") 'extempore-send-buffer-or-region)
-              (define-key extempore-mode-map (kbd \"C-x C-j\") 'extempore-connect)))
+              (define-key extempore-mode-map (kbd \"C-x C-j\") 'extempore-connect-or-disconnect)))
 "
-  (define-key keymap (kbd "C-c C-j") 'extempore-connect) ;'jack in'
+  (define-key keymap (kbd "C-c C-j") 'extempore-connect-or-disconnect) ;'jack in'
   (define-key keymap (kbd "C-M-x") 'extempore-send-definition)
   (define-key keymap (kbd "C-c C-c") 'extempore-send-definition)
   (define-key keymap (kbd "C-c M-e") 'extempore-send-definition-and-go)
@@ -388,7 +389,7 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
          (0 font-lock-constant-face))
        ;; definitions
        (list (concat
-              "(\\(define\\|macro\\|define-macro\\|define-syntax\\|define-instrument\\|define-sampler\\)\\_>\\s-*(?\\(\\sw+\\)?")
+              "(\\(define\\|macro\\|define-macro\\|define-syntax\\|bind-instrument\\|bind-sampler\\)\\_>\\s-*(?\\(\\sw+\\)?")
              '(1 font-lock-keyword-face)
              '(2 font-lock-function-name-face))
        ;; scheme functions
@@ -735,12 +736,18 @@ indentation."
   (interactive
    ;; get args interactively
    (list (ido-completing-read
-         "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host)
+          "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host)
          (string-to-number
           (ido-completing-read
            "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
   (extempore-sync-connections)
   (extempore-new-connection host port))
+
+(defun extempore-connect-or-disconnect (prefix)
+  (interactive "P")
+  (if prefix
+      (extempore-disconnect-all)
+    (call-interactively #'extempore-connect)))
 
 ;;; SLIP escape codes
 ;; END       ?\300    /* indicates end of packet */
@@ -888,59 +895,80 @@ to continue it."
     (define-key m (kbd "<return>") 'extempore-repl-return)
     (define-key m (kbd "C-c C-c") 'extempore-repl-reset-prompt)
     (define-key m (kbd "C-c C-z") 'switch-to-extempore)
+    (define-key m (kbd "C-c C-l") 'extempore-repl-toggle-current-language)
     m))
+
+(defvar-local extempore-repl-current-language 'scheme)
 
 (define-derived-mode extempore-repl-mode comint-mode "Extempore REPL"
   "Major mode for running a REPL connected to an existing Extempore process."
   (setq-local comint-use-prompt-regexp t)
-  (setq-local comint-prompt-regexp "^xtm<.*> +")
+  (setq-local comint-prompt-regexp "^\\(scheme\\|xtlang\\)<[^>]*> +")
   (setq-local comint-input-sender (function extempore-repl-send))
   (setq-local comint-preoutput-filter-functions (list (function extempore-repl-preoutput-filter)))
   (setq-local comint-output-filter-functions (list (function ansi-color-process-output)
                                                    (function comint-postoutput-scroll-to-bottom)))
   (setq-local mode-line-process nil)
   (setq-local comint-get-old-input (function extempore-get-old-input))
-  ;; this works, but there are lots of messages in the prompt
-  ;; (face-remap-add-relative 'comint-highlight-prompt '((:inherit nil) comint-highlight-prompt))
-  )
+  (face-remap-set-base 'comint-highlight-prompt nil))
+
+(defun extempore-repl-toggle-current-language ()
+  "toggle between scheme and xtlang"
+  (interactive)
+  (if (equalp extempore-repl-current-language 'scheme)
+      (setq-local extempore-repl-current-language 'xtlang)
+    (setq-local extempore-repl-current-language 'scheme))
+  (extempore-repl-reset-prompt))
 
 (defun extempore-repl-send (proc string)
-  (comint-simple-send proc (concat string "\r")))
+  (comint-simple-send proc
+                      ;; if in xtlang mode (and not bind-{func,val,
+                      ;; etc.} ing), wrap expression in a
+                      ;; `call-as-xtlang' form
+                      (format (if (and (equalp extempore-repl-current-language 'xtlang)
+                                       (not (string-match "^ *(bind-" string)))
+                                  "(call-as-xtlang %s)\r"
+                                "%s\r")
+                              string)))
 
 (defun extempore-repl-propertized-prompt-string ()
   (let ((proc (get-buffer-process (current-buffer))))
     (format "\n%s<%s> "
-            (propertize "xtm" 'font-lock-face 'font-lock-type-face)
+            (if (equalp extempore-repl-current-language 'xtlang)
+                (propertize "xtlang" 'font-lock-face 'font-lock-variable-name-face)
+              (propertize "scheme" 'font-lock-face 'font-lock-type-face))
             (let ((host (process-contact proc :host))
                   (port (process-contact proc :service)))
               (concat
-               (if (stringp host)
-                   (propertize (if (or (string= host "localhost")
-                                       (string= host "127.0.0.1"))
-                                   "lh"
-                                 host)
-                               'font-lock-face
-                               'font-lock-function-name-face)
-                 "")
-               (if (or (stringp host) (numberp port)) ":" "")
-               (if (numberp port)
-                   (propertize (number-to-string port)
-                               'font-lock-face
-                               'font-lock-keyword-face)
-                 ""))))))
+               (if (or (string= host "localhost")
+                       (string= host "127.0.0.1"))
+                   ""
+                 (concat (propertize host
+                                     'font-lock-face
+                                     'font-lock-keyword-face)
+                         ":"))
+               (propertize (number-to-string port)
+                           'font-lock-face
+                           'font-lock-function-name-face))))))
 
 (defun extempore-repl-preoutput-filter (string)
   (format "%s %s %s"
           (propertize "=>" 'font-lock-face 'font-lock-comment-face)
-          (propertize (substring string 0 -1)
+          (propertize (if (and (equalp extempore-repl-current-language 'xtlang)
+                               (> (length string) 2))
+                          (substring string 1 -2)
+                        (substring string 0 -1))
                       'font-lock-face
                       'font-lock-string-face)
           (extempore-repl-propertized-prompt-string)))
 
 (defun extempore-repl-reset-prompt ()
   (interactive)
-  (insert (extempore-repl-propertized-prompt-string))
-  (comint-set-process-mark))
+  (if (get-buffer-process (current-buffer))
+      (progn
+        (insert (extempore-repl-propertized-prompt-string))
+        (comint-set-process-mark))
+    (message "This REPL is dead: the connection to Extempore has been closed.")))
 
 (defun extempore-repl-is-whitespace-or-comment (string)
   "Return non-nil if STRING is all whitespace or a comment."
@@ -950,18 +978,22 @@ to continue it."
 (defun extempore-repl-return ()
   "Only send current input if it is a syntactically correct s-expression, otherwise newline-and-indent."
   (interactive)
-  (let ((edit-pos (point)))
-    (goto-char (process-mark (get-buffer-process (current-buffer))))
-    (if (extempore-repl-is-whitespace-or-comment (buffer-substring edit-pos (point)))
-        
-        (extempore-repl-reset-prompt)
-      (let ((sexp-bounds (bounds-of-thing-at-point 'sexp)))
-        (if sexp-bounds
-            (progn (set-mark (car sexp-bounds))
-                   (goto-char (cdr sexp-bounds))
-                   (comint-send-input))
-          (progn (goto-char edit-pos)
-                 (newline-and-indent)))))))
+  (let ((edit-pos (point))
+        (proc (get-buffer-process (current-buffer))))
+    (if proc
+        (progn
+          (goto-char (process-mark proc))
+          (if (extempore-repl-is-whitespace-or-comment (buffer-substring edit-pos (point)))
+              
+              (extempore-repl-reset-prompt)
+            (let ((sexp-bounds (bounds-of-thing-at-point 'sexp)))
+              (if sexp-bounds
+                  (progn (set-mark (car sexp-bounds))
+                         (goto-char (cdr sexp-bounds))
+                         (comint-send-input))
+                (progn (goto-char edit-pos)
+                       (newline-and-indent))))))
+      (message "This REPL is dead: the connection to Extempore has been closed."))))
 
 (defun extempore-get-old-input ()
   "Snarf the sexp ending at point."
@@ -982,7 +1014,7 @@ to continue it."
   (unless (comint-check-proc "*extempore*")
     (progn (call-interactively #'extempore-run)
            (dotimes (i 5)
-             (message "starting Extempore%s" (make-string i ?\.))
+             (message "Starting Extempore%s" (make-string i ?\.))
              (sit-for 1)))) ;; to give Extempore time to start listening for connections
   (let ((repl-buffer-name (format "extempore REPL<%s:%d>" host port)))
     (set-buffer (make-comint repl-buffer-name (cons host port)))
@@ -1009,6 +1041,13 @@ If there is a process already running in `*extempore*', switch to that buffer.
         (inferior-extempore-mode)))
   (setq extempore-buffer "*extempore*"))
 
+(defun extempore-stop ()
+  (interactive)
+  (if (comint-check-proc "*extempore*")
+      (with-current-buffer "*extempore*"
+        (comint-interrupt-subjob))
+    (message "Extempore is not currently running in buffer *extempore*")))
+
 (defun extempore-send-region (start end)
   "Send the current region to the inferior Extempore process."
   (interactive "r")
@@ -1020,7 +1059,7 @@ If there is a process already running in `*extempore*', switch to that buffer.
            proc
            (concat (buffer-substring-no-properties start end) "\r\n")))
         (sleep-for extempore-blink-duration))
-    (message "%s is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)" (buffer-name))))
+    (error "Buffer %s is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)" (buffer-name))))
 
 (defun extempore-send-definition ()
   "Send the current definition to the inferior Extempore process."
@@ -1048,16 +1087,15 @@ If there is a process already running in `*extempore*', switch to that buffer.
   (interactive)
   (extempore-send-region (save-excursion (backward-sexp) (point)) (point)))
 
-(defun switch-to-extempore (eob-p)
-  "Switch to the extempore process buffer.
-With argument, position cursor at end of buffer."
+(defun switch-to-extempore (keep-point-p)
+  "Switch to the extempore process buffer and (unless prefix arg) position cursor at end of buffer."
   (interactive "P")
   (if (and extempore-buffer (comint-check-proc extempore-buffer))
-      (pop-to-buffer extempore-buffer)
-    (extempore-interactively-start-process))
-  (when eob-p
-    (push-mark)
-    (goto-char (point-max))))
+      (progn (pop-to-buffer extempore-buffer)
+             (when (not keep-point-p)
+               (push-mark)
+               (goto-char (point-max))))
+    (extempore-interactively-start-process)))
 
 (defun extempore-send-definition-and-go ()
   "Send the current definition to the inferior Extempore.
@@ -1239,7 +1277,7 @@ command to run."
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
     (if (and (> (length str) 9)
              (string= "(docstring" (substring str 0 10)))
-        (extempore-process-docstring-form (cdr (read str)))
+        (extempore-process-docstring-form (cdr-safe (ignore-errors (read str))))
       (message str))))
 
 (add-hook 'extempore-mode-hook
@@ -1397,7 +1435,7 @@ command to run."
 
 (defun extempore-scheme-defun-name ()
   (save-excursion
-    (looking-at "(\\(define-\\(\\|macro\\|instrument\\|sampler\\)\\)\\s-+\\([^ \t\n:]+\\)")
+    (looking-at "(\\(define-\\(\\|macro\\)\\)\\s-+\\([^ \t\n:]+\\)")
     (match-string 3)))
 
 (defun extempore-inside-scheme-defun-p ()
@@ -1407,7 +1445,7 @@ command to run."
 
 (defun extempore-xtlang-defun-name ()
   (save-excursion
-    (looking-at "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\)\\)\\s-+\\([^ \t\n:]+\\)")
+    (looking-at "(\\(bind-\\(func\\|val\\|type\\|alias\\|poly\\|lib\\|instrument\\|sampler\\)\\)\\s-+\\([^ \t\n:]+\\)")
     (match-string 3)))
 
 (defun extempore-inside-xtlang-defun-p ()

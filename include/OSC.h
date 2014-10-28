@@ -63,11 +63,6 @@ uint64_t unswap64i(uint64_t a);
 uint32_t swap32i(uint32_t f);
 uint32_t unswap32i(uint32_t a);
 
-typedef struct scm_osc_pair {
-  void* scm_p;
-  void* osc_p;
-} scm_osc_pair;
-
 //#define _OSC_DEBUG_
 
 namespace extemp {
