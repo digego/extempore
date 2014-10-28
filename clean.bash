@@ -4,4 +4,4 @@
 rm -rf extempore build/obj/{.deps,*}
 
 # remove precompiled extempore libs (e.g. from the stdlib)
-rm -rf extempore libs/*.{xtm,dylib,so}
+# rm -rf extempore libs/*.{xtm,dylib,so}
