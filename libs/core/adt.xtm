@@ -424,7 +424,7 @@
             (dict_get (cdr dict) key)))))
 
 (bind-func dict_set:[!v,List:<Pair:<String*,!v>*,List*>*,String*,!v]*
-  "update value for key in dict (returns previous value)"
+  "set (or overwrite) value for key in dict (returns the old value)"
   (lambda (dict key value)
     (if (null? dict)
         (convert null)
@@ -432,10 +432,13 @@
             (let ((oldval (second (car dict))))
               (tset! (car dict) 1 value)
               oldval)
-            (dict_set (cdr dict) key value)))))
+            (if (null? (cdr dict))
+                (begin (append dict (list (Pair key value)))
+                       (convert null))
+                (dict_set (cdr dict) key value))))))
 
 (bind-func dict_update:[!v,List:<Pair:<String*,!v>*,List*>*,String*,[!v,!v]*]*
-  "update value for key in dict according to update_fn (returns previous value)"
+  "set (or update) value for key in dict according to update_fn (returns the old value)"
   (lambda (dict key update_fn)
     (if (null? dict)
         (convert null)
@@ -446,7 +449,10 @@
               ;; update the value for key
               (tset! (car dict) 1 newval)
               oldval)
-            (dict_update (cdr dict) key update_fn)))))
+            (if (null? (cdr dict))
+                (begin (append dict (list (Pair key (update_fn (convert null)))))
+                       (convert null))
+                (dict_update (cdr dict) key update_fn))))))
 
 ;;;;;;;;;;;
 ;; TREES ;;

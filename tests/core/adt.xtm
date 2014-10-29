@@ -124,7 +124,7 @@
 
 (test-xtfunc (test_dict_get_2) 0)
 
-(bind-func test_dict_set
+(bind-func test_dict_set_1
   (lambda ()
     (let ((d (list (Pair (Str "one") 1)
                    (Pair (Str "two") 2)))
@@ -132,9 +132,20 @@
       (and (= oldval 2)
            (= (dict_get d (Str "two")) 3)))))
 
-(test-xtfunc (test_dict_set) 1)
+(test-xtfunc (test_dict_set_1) 1)
 
-(bind-func test_dict_update
+(bind-func test_dict_set_2
+  (lambda ()
+    (let ((d (list (Pair (Str "one") 1)
+                   (Pair (Str "two") 2))))
+      (dict_set d (Str "three") 3)
+      (println d)
+      (and (= (length d) 3)
+           (= (dict_get d (Str "three")) 3)))))
+
+(test-xtfunc (test_dict_set_2) 1)
+
+(bind-func test_dict_update_1
   (lambda ()
     (let ((d (list (Pair (Str "one") 1)
                    (Pair (Str "two") 2)))
@@ -144,5 +155,15 @@
       (and (= oldval 2)
            (= (dict_get d (Str "two")) 3)))))
 
-(test-xtfunc (test_dict_update) 1)
+(test-xtfunc (test_dict_update_1) 1)
 
+(bind-func test_dict_update_2
+  (lambda ()
+    (let ((d (list (Pair (Str "one") 1)
+                   (Pair (Str "two") 2))))
+      (dict_update d (Str "three") (lambda (v) (+ v 1)))
+      (println d)
+      (and (= (length d) 3)
+           (= (dict_get d (Str "three")) 1)))))
+
+(test-xtfunc (test_dict_update_2) 1)
