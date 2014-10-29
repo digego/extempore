@@ -117,14 +117,19 @@
         0
         (+ 1 (length (cdr a))))))
 
-(bind-func copy_list:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func copy:[List:<!a,List*>*,List:<!a,List*>*]*
   (lambda (lst)
     (let ((orig lst)
-          (copy null))
+          (cpy null))
       (while (not (null? orig))
-        (set! copy (cons (car orig) copy))
+        (set! cpy (cons (car orig) cpy))
         (set! orig (cdr orig)))
-      (reverse copy))))
+      (reverse cpy))))
+
+(bind-func equal:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+  "returns true if 'equal' returns true for all pairs of elements"
+  (lambda (list1 list2)
+    (every (lambda (a b) (equal a b)) list1 list2)))
 
 (bind-func nth_tailr:[List:<!a,List*>*,List:<!a,List*>*,i64]*
   (lambda (lst idx)
