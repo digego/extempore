@@ -105,3 +105,44 @@
       (length (drop lst 1000)))))
 
 (test-xtfunc (test_list_drop_2) 0)
+
+;; dict
+
+(bind-func test_dict_get_1
+  (lambda ()
+    (let ((d (list (Pair (Str "one") 1)
+                   (Pair (Str "two") 2))))
+      (dict_get d (Str "one")))))
+
+(test-xtfunc (test_dict_get_1) 1)
+
+(bind-func test_dict_get_2
+  (lambda ()
+    (let ((d (list (Pair (Str "one") 1)
+                   (Pair (Str "two") 2))))
+      (dict_get d (Str "three")))))
+
+(test-xtfunc (test_dict_get_2) 0)
+
+(bind-func test_dict_set
+  (lambda ()
+    (let ((d (list (Pair (Str "one") 1)
+                   (Pair (Str "two") 2)))
+          (oldval (dict_set d (Str "two") 3)))
+      (and (= oldval 2)
+           (= (dict_get d (Str "two")) 3)))))
+
+(test-xtfunc (test_dict_set) 1)
+
+(bind-func test_dict_update
+  (lambda ()
+    (let ((d (list (Pair (Str "one") 1)
+                   (Pair (Str "two") 2)))
+          (oldval (dict_update d
+                               (Str "two")
+                               (lambda (v) (+ v 1)))))
+      (and (= oldval 2)
+           (= (dict_get d (Str "two")) 3)))))
+
+(test-xtfunc (test_dict_update) 1)
+
