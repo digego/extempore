@@ -19,7 +19,7 @@ core/audio_dsp.xtm \
 core/instruments.xtm"
 
 PRECOMP_COMMAND_FILENAME="xtmprecomp-command-file.xtm"
-PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd --run "
+PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd --noaudio --run "
 
 # clear the log file (if present)
 rm -f compile-stdlib.log
