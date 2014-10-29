@@ -414,13 +414,39 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func dict_find:[!z,List:<Pair:<String*,!z>*,List*>*,String*]*
+(bind-func dict_get:[!v,List:<Pair:<String*,!v>*,List*>*,String*]*
+  "find value for key in dict (which must be a list of any <i8*,!v>)"
   (lambda (dict key)
-    (if (null? dict) (convert null)
+    (if (null? dict)
+        (convert null)
         (if (string_cmp (first (car dict)) key)
             (second (car dict))
-            (dict_find (cdr dict) key)))))
+            (dict_get (cdr dict) key)))))
 
+(bind-func dict_set:[!v,List:<Pair:<String*,!v>*,List*>*,String*,!v]*
+  "update value for key in dict (returns previous value)"
+  (lambda (dict key value)
+    (if (null? dict)
+        (convert null)
+        (if (string_cmp (first (car dict)) key)
+            (let ((oldval (second (car dict))))
+              (tset! (car dict) 1 value)
+              oldval)
+            (dict_set (cdr dict) key value)))))
+
+(bind-func dict_update:[!v,List:<Pair:<String*,!v>*,List*>*,String*,[!v,!v]*]*
+  "update value for key in dict according to update_fn (returns previous value)"
+  (lambda (dict key update_fn)
+    (if (null? dict)
+        (convert null)
+        (if (string_cmp (first (car dict)) key)
+            (let ((oldval (second (car dict)))
+                  (newval (update_fn oldval)))
+              ;; if update_fn returns null, do nothing. otherwise
+              ;; update the value for key
+              (tset! (car dict) 1 newval)
+              oldval)
+            (dict_update (cdr dict) key update_fn)))))
 
 ;;;;;;;;;;;
 ;; TREES ;;
