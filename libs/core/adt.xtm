@@ -379,6 +379,24 @@
                       (fold (cdr l) (fn (car l) r))))))
       (fold (reverse lst) end))))
 
+(bind-func take:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+  "returns a copy of the first n elements of lst"
+  (lambda (lst n)
+    (let ((newlst (list))
+          (oldlst lst)
+          (count 0))
+      (while (and (< count n)
+                  (not (null? oldlst)))
+        (set! newlst (cons (car oldlst) newlst))
+        (set! oldlst (cdr oldlst))
+        (set! count  (+ count 1)))
+      (reverse newlst))))
+
+(bind-func drop:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+  "returns a copy of lst sans the first n elements"
+  (lambda (lst n)
+    (copy (nth_tail lst n))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; a simple 'assoc' dictionary
