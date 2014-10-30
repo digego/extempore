@@ -840,12 +840,11 @@
 (define ipc:for-each
   (lambda (proc-list func . arg-lists)
     ;; poor man's destructuring(ish)
-    (if (null? arg-lists)
-        (set! arg-lists (make-list (length proc-list) '()))
-        (if (list? (caar arg-lists))
-            (set! arg-lists (car arg-lists))
-            (set! arg-lists (map list (car arg-lists)))))
-    (println 'arg-lists: arg-lists)
+    (set! arg-lists
+          (if (null? arg-lists)
+              (make-list (length proc-list) '())
+              (map (lambda (x) (if (list? x) x (list x)))
+                   (car arg-lists))))
     (for-each (lambda (proc args)
                 (apply ipc:call-async proc func args))
               proc-list
