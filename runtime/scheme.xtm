@@ -799,7 +799,7 @@
                                    (*sys:toplevel-continuation* 0)))))
         return-val))))
 
-(define ipc:mapcall
+(define ipc:map
   (lambda (func process-lst . args-lists)
     (let* ((callback-proc (ipc:get-process-name))
            (results '())
@@ -823,6 +823,33 @@
                     results)))
             (*sys:toplevel-continuation*))))))
 
+;; comptibility alias (deprecated)
+(define ipc:mapcall ipc:map)
+
+;; async map
+
+;; syntax:
+
+;; (ipc:map-async '("primary" "utility") 'fn-with-no-args)
+
+;; both of these ok:
+;; (ipc:map-async '("primary" "utility") 'fn-with-1-arg '(12 36))
+;; (ipc:map-async '("primary" "utility") 'fn-with-1-arg '((12) (36)))
+
+;; (ipc:map-async '("primary" "utility") 'fn-with-2-args '((12 436) (36 45)))
+(define ipc:map-async
+  (lambda (proc-list func . arg-lists)
+    ;; poor man's destructuring(ish)
+    (if (null? arg-lists)
+        (set! arg-lists (make-list (length proc-list) '()))
+        (if (list? (caar arg-lists))
+            (set! arg-lists (car arg-lists))
+            (set! arg-lists (map list (car arg-lists)))))
+    (println 'arg-lists: arg-lists)
+    (for-each (lambda (proc args)
+                (apply ipc:call-async proc func args))
+              proc-list
+              arg-lists)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
