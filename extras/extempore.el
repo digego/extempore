@@ -731,15 +731,18 @@ indentation."
   (setq extempore-connection-list nil)
   (extempore-update-mode-line))
 
+(defvar extempore-connect-host-history-list nil)
+(defvar extempore-connect-port-history-list nil)
+
 (defun extempore-connect (host port)
   "Connect to an Extempore process running on HOST and PORT."
   (interactive
    ;; get args interactively
    (list (ido-completing-read
-          "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host)
+          "Hostname: " (list extempore-default-host) nil nil nil 'extempore-connect-host-history-list extempore-default-host)
          (string-to-number
           (ido-completing-read
-           "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
+           "Port: " '("7099" "7098") nil nil nil 'extempore-connect-port-history-list (number-to-string extempore-default-port)))))
   (extempore-sync-connections)
   (extempore-new-connection host port))
 
@@ -1006,10 +1009,10 @@ to continue it."
 (defun extempore-repl (host port)
   (interactive
    (list (ido-completing-read
-          "Hostname: " (list extempore-default-host) nil nil nil nil extempore-default-host)
+          "Hostname: " (list extempore-default-host) nil nil nil 'extempore-connect-host-history-list extempore-default-host)
          (string-to-number
           (ido-completing-read
-           "Port: " '("7099" "7098") nil nil nil nil (number-to-string extempore-default-port)))))
+           "Port: " '("7099" "7098") nil nil nil 'extempore-connect-port-history-list (number-to-string extempore-default-port)))))
   "Start an Extempore REPL connected to HOST on PORT."
   (unless (comint-check-proc "*extempore*")
     (progn (call-interactively #'extempore-run)
