@@ -993,7 +993,7 @@ namespace extemp {
       return _sc->F;
     }
     std::string path(string_value(pair_cadr(args)));
-    std::string str = "(load \""+std::string(path)+"\")";
+    std::string str = "(sys:load \""+std::string(path)+"\")";
     SchemeREPL::I(process)->writeString(str);
     return _sc->T;
   }
