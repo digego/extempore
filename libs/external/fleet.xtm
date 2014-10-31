@@ -169,11 +169,16 @@
 (bind-func fleet_set_unit_desiredstate
   (let ((url:i8* (zalloc 256)))
     (lambda (host:i8* port:i32 unit_name:i8* desired_state:i8*)
-      (sprintf url "http://%s:%d/%s/units/%s" host port FLEET_API_VERSION unit_name)
-      (let ((state_json (json_object))
-            (res (json_object_set_new state_json "desiredState" (json_string desired_state))))
-        (fleet_modify_unit host port "extempore.service" state_json)
-        (json_decref state_json)))))
+      (if (or (= 0:i32 (strncmp "inactive" desired_state 9))
+              (= 0:i32 (strncmp "loaded" desired_state 7))
+              (= 0:i32 (strncmp "launched" desired_state 9)))
+          (begin
+            (sprintf url "http://%s:%d/%s/units/%s" host port FLEET_API_VERSION unit_name)
+            (let ((state_json (json_object))
+                  (res (json_object_set_new state_json "desiredState" (json_string desired_state))))
+              (fleet_modify_unit host port "extempore.service" state_json)
+              (json_decref state_json)))
+          (println "Error: desired state must be either inactive, loaded or launched")))))
 
 (bind-poly fleet_set_unit_state fleet_modify_unit)
 (bind-poly fleet_set_unit_state fleet_set_unit_desiredstate)
