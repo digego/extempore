@@ -43,6 +43,7 @@
 #include <string>
 #ifndef TARGET_OS_WINDOWS
 #include <unistd.h>
+#include <signal.h>
 #endif
 #ifdef TARGET_OS_MAC
 #include <Cocoa/Cocoa.h>
@@ -65,6 +66,20 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
       return FALSE; 
   } 
 } 
+#else
+
+void sig_handler(int signo)
+{
+  if (signo == SIGINT){
+    printf("Recieved interrupt signal (SIGINT), exiting Extempore...\n");
+    exit(0);
+  }
+  else if (signo == SIGTERM){
+    printf("Recieved termination signal (SIGTERM), exiting Extempore...\n");
+    exit(0);
+  }
+}
+
 #endif
 
 
@@ -116,10 +131,16 @@ int main(int argc, char** argv)
     freopen("/tmp/","w",stderr);
 #endif
 
-    // more evil windows termination code
-    #ifdef TARGET_OS_WINDOWS
-       SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
-    #endif
+// more evil windows termination code
+#ifdef TARGET_OS_WINDOWS
+    SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
+#else
+    // signal handlers for OSX/Linux
+    if (signal(SIGINT, sig_handler) == SIG_ERR)
+      printf("\nWarning: can't catch SIGINT.\n");
+    if (signal(SIGTERM, sig_handler) == SIG_ERR)
+      printf("\nWarning: can't catch SIGTERM.\n");
+#endif
 
 
     CSimpleOptA args(argc, argv, g_rgOptions);
