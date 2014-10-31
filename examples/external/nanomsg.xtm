@@ -144,20 +144,20 @@
 
 (bind-val REQUEST_SOCKET i32 -1)
 (bind-val REPLY_SOCKET i32 -1)
-;; (bind-val SOCKET_ADDRESS i8* "tcp://127.0.0.1:7250")
-(bind-val SOCKET_ADDRESS i8* "ipc:///tmp/pipeline.ipc")
 
 (bind-func set_up_reply_socket
   (lambda ()
-    (set! REPLY_SOCKET (create_socket NN_REP))
-    (bind_socket REPLY_SOCKET SOCKET_ADDRESS)
-    (println "REPLY_SOCKET:" REPLY_SOCKET)))
+    (if (or (< (set! REPLY_SOCKET (create_socket NN_REP)) 0)
+            (< (bind_socket REPLY_SOCKET "tcp://127.0.0.1:7199") 0))
+        (nn_println_strerror "reply socket")
+        (println "successfully bound REPLY_SOCKET:" REPLY_SOCKET))))
 
 (bind-func set_up_request_socket
   (lambda ()
-    (set! REQUEST_SOCKET (create_socket NN_REQ))
-    (connect_socket REQUEST_SOCKET SOCKET_ADDRESS)
-    (println "REQUEST_SOCKET:" REQUEST_SOCKET)))
+    (if (or (< (set! REQUEST_SOCKET (create_socket NN_REQ)) 0)
+            (< (connect_socket REQUEST_SOCKET "tcp://127.0.0.1:7199") 0))
+        (nn_println_strerror "request socket")
+        (println "successfully connected REQUEST_SOCKET:" REQUEST_SOCKET))))
 
 (set_up_request_socket)
 
