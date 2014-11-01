@@ -2,7 +2,7 @@
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: libnanomsg
+;; Required dylibs: libnanomsg, libghttp
 
 ;;; Commentary:
 
@@ -17,6 +17,7 @@
 (define *xtmlib-fleet-loaded* #f)
 
 (sys:load "libs/external/ghttp.xtm")
+(sys:load "libs/external/nanomsg.xtm")
 (sys:load "libs/core/adt.xtm")
 
 (bind-val FLEET_API_VERSION i8* "v1-alpha")
@@ -224,5 +225,54 @@
           0 ;;flags
           err))
         (fleet_modify_unit host port "extempore.service" body)))))
+
+(bind-val FLEET_NODE_SOCKET_LIST List:<i32,List*>*)
+;; max number of nodes you can connect to at once
+(bind-val FLEET_NODE_MAX i64 4)
+
+(bind-func fleet_connect_to_nodes
+  "creates new sockets each call - TODO: it should re-use existing ones"
+  (lambda (host port)
+    (set! FLEET_NODE_SOCKET_LIST
+          (map (lambda (ip)
+                 (let ((sock (create_socket NN_REQ)))
+                   (if (or (< sock 0)
+                           (< (connect_socket sock host) 0))
+                       (nn_println_strerror "error in fleet_connect_to_nodes"))
+                   sock))
+               (fleet_get_ip_list host port)))
+    FLEET_NODE_SOCKET_LIST))
+
+(bind-val FLEET_NANOMSG_CLIENT_BUFLEN size_t 10000)
+
+(bind-func fleet_message_node_sync
+  (let ((buf:i8* (zalloc FLEET_NANOMSG_CLIENT_BUFLEN)))
+    (lambda (msg:i8* sock:i32)
+      (let ((sz_msg (+ (strlen msg) 1))
+            (bytes (nn_send sock msg sz_msg 0)))
+        (if (= bytes (convert sz_msg)) ;; should also check (< bytes (convert sz_msg))
+            (let ((rbytes (nn_recv sock buf FLEET_NANOMSG_CLIENT_BUFLEN 0)))
+              (if (> rbytes 0)
+                  (begin (printf "reply received: %s\n" buf)
+                         void)))
+            (nn_println_strerror "error in request"))))))
+
+(bind-func fleet_message_all_nodes_sync 40000
+  (let ((buf:i8* (zalloc (* FLEET_NODE_MAX FLEET_NANOMSG_CLIENT_BUFLEN))))
+    (lambda (msg:i8*)
+      (let ((sz_msg (+ (strlen msg) 1)))
+        ;; send out the messages (scatter)
+        (for-each (lambda (sock)
+                    (nn_send sock msg sz_msg NN_DONTWAIT))
+                  FLEET_NODE_SOCKET_LIST)
+        ;; wait to recieve on all sockets (gather)
+        (for-each (lambda (sock)
+                    (let ((offset (* (index_of sock FLEET_NODE_SOCKET_LIST)
+                                     FLEET_NANOMSG_CLIENT_BUFLEN))
+                          (rbytes (nn_recv sock (pref-ptr buf offset) FLEET_NANOMSG_CLIENT_BUFLEN 0)))
+                      (if (> rbytes 0)
+                          (begin (printf "reply received from sock: %d: %s\n" sock (pref-ptr buf offset))
+                                 void))))
+                  FLEET_NODE_SOCKET_LIST)))))
 
 (define *xtmlib-fleet-loaded* #t)
