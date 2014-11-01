@@ -234,6 +234,28 @@
                        (f (cdr l)))))))
       (f xs))))
 
+(bind-func index_of:[size_t,!a,List:<!a,List*>*]*
+  "return index of first occurrence of element in lst, or -1 if not present"
+  (lambda (element lst)
+    (let ((f (lambda (l cnt)
+               (if (null? l)
+                   -1
+                   (if (equal element (car l))
+                       cnt
+                       (f (cdr l) (set! cnt (+ cnt 1))))))))
+      (f lst 0))))
+
+(bind-func index_of:[size_t,!a,List:<!a,List*>*,[bool,!a,!a]*]*
+  "return index of first occurrence of element in lst, or -1 if not present"
+  (lambda (element lst pred)
+    (let ((f (lambda (l cnt)
+               (if (null? l)
+                   -1
+                   (if (pred element (car l))
+                       cnt
+                       (f (cdr l) (set! cnt (+ cnt 1))))))))
+      (f lst 0))))
+
 (bind-func member:[List:<!a,List*>*,!a,List:<!a,List*>*]*
   (lambda (element lst)
     (let ((f (lambda (l)
