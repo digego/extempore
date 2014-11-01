@@ -30,21 +30,24 @@
 (bind-val FLEET_NANOMSG_SERVER_BUFLEN size_t 10000)
 
 (bind-func node_reply_function
-  (lambda (inbuf:i8* inbuflen:size_t outbuf:i8* outbuflen:size_t)
-    (sprintf outbuf "ping: response from node at time %lld" (now))))
+  "request message in inbuf (length inbuflen), shoudl store pointer to reply message in outbuf & return length of reply message"
+  (let ((reply_str:i8* (zalloc 256)))
+    (lambda (inbuf:i8* inbuflen:size_t outbuf:i8**)
+      (let ((bytes (sprintf reply_str "received message: %s\nping response from node at time %lld" inbuf (now))))
+        (pset! outbuf 0 reply_str)
+        bytes))))
 
 (bind-func node_reply_loop 30000
-  (let ((reqbuf:i8* (zalloc FLEET_NANOMSG_SERVER_BUFLEN))
-        (repbuf:i8* (zalloc FLEET_NANOMSG_SERVER_BUFLEN)))
+  (let ((buf:i8* (zalloc FLEET_NANOMSG_SERVER_BUFLEN))
+        (repbufptr:i8** (zalloc)))
     (lambda ()
       (println "starting reply_loop...")
       (while FLEET_NANOMSG_SERVER_RUNNING
-        (let ((reqbytes (nn_recv FLEET_NANOMSG_SERVER_SOCKET reqbuf FLEET_NANOMSG_SERVER_BUFLEN 0)))
+        (let ((reqbytes (nn_recv FLEET_NANOMSG_SERVER_SOCKET buf FLEET_NANOMSG_SERVER_BUFLEN 0)))
           (if (> reqbytes 0)
-              (let ((bytes (node_reply_function reqbuf FLEET_NANOMSG_SERVER_BUFLEN
-                                                repbuf FLEET_NANOMSG_SERVER_BUFLEN)))
+              (let ((bytes (node_reply_function buf FLEET_NANOMSG_SERVER_BUFLEN repbufptr)))
                 (if (> bytes 0)
-                    (if (< (nn_send FLEET_NANOMSG_SERVER_SOCKET repbuf (+ 1 (convert bytes)) 0) 0)
+                    (if (< (nn_send FLEET_NANOMSG_SERVER_SOCKET (pref repbufptr 0) (+ 1 (convert bytes)) 0) 0)
                         (nn_println_strerror "error in node_reply_loop")))))))
       (println "stopping node_reply_loop"))))
 
