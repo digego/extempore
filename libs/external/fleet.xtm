@@ -235,10 +235,12 @@
   (lambda (host port)
     (set! FLEET_NODE_SOCKET_LIST
           (map (lambda (ip)
+                 (printf "Connecting to node at %s ..." ip)
                  (let ((sock (create_socket NN_REQ)))
                    (if (or (< sock 0)
                            (< (connect_socket sock host) 0))
                        (nn_println_strerror "error in fleet_connect_to_nodes"))
+                   (printf "sock = %d\n" sock)
                    sock))
                (fleet_get_ip_list host port)))
     FLEET_NODE_SOCKET_LIST))
