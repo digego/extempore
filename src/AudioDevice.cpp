@@ -614,13 +614,16 @@ namespace extemp {
 	
   AudioDevice::~AudioDevice()
   {
-    PaError err;
-    err = Pa_StopStream(stream);
-    if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-    err = Pa_CloseStream(stream);
-    if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
-    err = Pa_Terminate();
-    if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+    if(UNIV::AUDIO_NONE != 1)
+      {
+        PaError err;
+        err = Pa_StopStream(stream);
+        if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+        err = Pa_CloseStream(stream);
+        if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+        err = Pa_Terminate();
+        if(err != paNoError) std::cout << Pa_GetErrorText(err) << std::endl;
+      }
   }
 
   void AudioDevice::start()
