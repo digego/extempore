@@ -234,16 +234,18 @@
   "creates new sockets each call - TODO: it should re-use existing ones"
   (lambda (host port)
     (set! FLEET_NODE_SOCKET_LIST
-          (map (lambda (ip)
-                 (printf "Connecting to node at %s ..." ip)
-                 (let ((sock (create_socket NN_REQ)))
-                   (if (or (< sock 0)
-                           (< (connect_socket sock host) 0))
-                       (nn_println_strerror "error in fleet_connect_to_nodes"))
-                   (printf "sock = %d\n" sock)
-                   sock))
-               (fleet_get_ip_list host port)))
-    FLEET_NODE_SOCKET_LIST))
+          (copy_h ;; copy the list to the heap - it's a global list
+           (map (lambda (ip)
+                  (printf "Connecting to node at %s ..." ip)
+                  (let ((sock (create_socket NN_REQ))
+                        (addr:i8* (salloc 32)))
+                    (sprintf addr "tcp://%s:7199" (cstr_from_string ip))
+                    (if (or (< sock 0)
+                            (< (connect_socket sock addr) 0))
+                        (nn_println_strerror "error in fleet_connect_to_nodes"))
+                    (printf "sock = %d\n" sock)
+                    sock))
+                (fleet_get_ip_list host port))))))
 
 (bind-val FLEET_NANOMSG_CLIENT_BUFLEN size_t 10000)
 
