@@ -103,6 +103,13 @@
       (tset! obj 1 y)
       obj)))
 
+(bind-func cons_h:[List:<!a,List*>*,!a,List:<!a,List*>*]*
+  (lambda (x y)
+    (let ((obj (halloc)))
+      (tset! obj 0 x)
+      (tset! obj 1 y)
+      obj)))
+
 (bind-func car:[!a,List:<!a,List*>*]*
   (lambda (a)
     (tref a 0)))
@@ -131,6 +138,15 @@
           (cpy null))
       (while (not (null? orig))
         (set! cpy (cons (car orig) cpy))
+        (set! orig (cdr orig)))
+      (reverse cpy))))
+
+(bind-func copy_h:[List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (lst)
+    (let ((orig lst)
+          (cpy null))
+      (while (not (null? orig))
+        (set! cpy (cons_h (car orig) cpy))
         (set! orig (cdr orig)))
       (reverse cpy))))
 
