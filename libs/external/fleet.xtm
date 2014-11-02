@@ -281,4 +281,39 @@
                                  void))))
                   FLEET_NODE_SOCKET_LIST)))))
 
+;; a high-level scheme api: requires *fleet-process-list* to be
+;; defined
+
+(define fleet-connect-processes
+  (lambda ()
+    (if (not (defined? '*fleet-process-list*))
+        (print "Error: *fleet-process-list* not defined\n")
+        (for-each (lambda (procinfo)
+                    (ipc:connect (cadr procinfo) (car procinfo) (caddr procinfo))
+                    (ipc:load (car procinfo) "libs/external/fleet-node.xtm"))
+                  *fleet-process-list*))))
+
+(define fleet-killemall
+  (lambda (exit-code)
+    (if (not (defined? '*fleet-process-list*))
+        (print "Error: *fleet-process-list* not defined\n")
+        (for-each (lambda (procinfo)
+                    (ipc:call-async (car procinfo) 'quit exit-code))
+                  *fleet-process-list*))))
+
+(define fleet-eval
+  (lambda (form)
+    (cond ((not (defined? '*fleet-process-list*))
+           (print "Error: *fleet-process-list* not defined\n"))
+          ((not (or (string? form)
+                    (list? form)))
+           (print "Error: form must be sexpr or string\n"))
+          (else
+           (for-each (lambda (procinfo)
+                       (ipc:eval-string (car procinfo)
+                                        (if (list? form)
+                                            (sexpr->string form)
+                                            form)))
+                     *fleet-process-list*)))))
+
 (define *xtmlib-fleet-loaded* #t)
