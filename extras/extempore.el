@@ -739,10 +739,10 @@ indentation."
   (interactive
    ;; get args interactively
    (list (ido-completing-read
-          "Hostname: " (list extempore-default-host) nil nil nil 'extempore-connect-host-history-list extempore-default-host)
+          "Hostname: " (cl-remove-duplicates (cons extempore-default-host extempore-connect-host-history-list) :test #'string=) nil nil nil 'extempore-connect-host-history-list extempore-default-host)
          (string-to-number
           (ido-completing-read
-           "Port: " '("7099" "7098") nil nil nil 'extempore-connect-port-history-list (number-to-string extempore-default-port)))))
+           "Port: " (cl-remove-duplicates (append '("7099" "7098") extempore-connect-port-history-list) :test #'string=) nil nil nil 'extempore-connect-port-history-list (number-to-string extempore-default-port)))))
   (extempore-sync-connections)
   (extempore-new-connection host port))
 
@@ -1009,10 +1009,10 @@ to continue it."
 (defun extempore-repl (host port)
   (interactive
    (list (ido-completing-read
-          "Hostname: " (list extempore-default-host) nil nil nil 'extempore-connect-host-history-list extempore-default-host)
+          "Hostname: " (cl-remove-duplicates (cons extempore-default-host extempore-connect-host-history-list) :test #'string=) nil nil nil 'extempore-connect-host-history-list extempore-default-host)
          (string-to-number
           (ido-completing-read
-           "Port: " '("7099" "7098") nil nil nil 'extempore-connect-port-history-list (number-to-string extempore-default-port)))))
+           "Port: " (cl-remove-duplicates (append '("7099" "7098") extempore-connect-port-history-list) :test #'string=) nil nil nil 'extempore-connect-port-history-list (number-to-string extempore-default-port)))))
   "Start an Extempore REPL connected to HOST on PORT."
   (unless (comint-check-proc "*extempore*")
     (progn (call-interactively #'extempore-run)
