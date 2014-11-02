@@ -11,6 +11,9 @@
 
 ;;; Code:
 
+(sys:load-preload-check 'fleet-node)
+(define *xtmlib-fleet-node-loaded* #f)
+
 (sys:load "libs/external/nanomsg.xtm")
 
 (bind-val FLEET_NANOMSG_SERVER_SOCKET i32 -1)
@@ -33,7 +36,7 @@
   "request message in inbuf (length inbuflen), shoudl store pointer to reply message in outbuf & return length of reply message"
   (let ((reply_str:i8* (zalloc 256)))
     (lambda (inbuf:i8* inbuflen:size_t outbuf:i8**)
-      (let ((bytes (sprintf reply_str "received message: %s\nping response from node at time %lld" inbuf (now))))
+      (let ((bytes (sprintf reply_str "pingback! received message \"%s\" at time %lld" inbuf (now))))
         (pset! outbuf 0 reply_str)
         bytes))))
 
@@ -58,3 +61,5 @@
 (bind-func node_reply_loop_stop
   (lambda ()
     (set! FLEET_NANOMSG_SERVER_RUNNING #f)))
+
+(define *xtmlib-fleet-node-loaded* #t)
