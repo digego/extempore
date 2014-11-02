@@ -307,15 +307,12 @@
   (lambda (form)
     (cond ((not (defined? '*fleet-process-list*))
            (print "Error: *fleet-process-list* not defined\n"))
-          ((not (or (string? form)
-                    (list? form)))
-           (print "Error: form must be sexpr or string\n"))
           (else
            (for-each (lambda (procinfo)
                        (ipc:eval-string (car procinfo)
-                                        (if (list? form)
-                                            (sexpr->string form)
-                                            form)))
+                                        (if (string? form)
+                                            form
+                                            (sexpr->string form))))
                      *fleet-process-list*)))))
 
 (define *xtmlib-fleet-loaded* #t)
