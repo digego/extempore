@@ -236,7 +236,7 @@
     (set! FLEET_NODE_SOCKET_LIST
           (copy_h ;; copy the list to the heap - it's a global list
            (map (lambda (ip)
-                  (printf "Connecting to node at %s ..." ip)
+                  (printf "Connecting to node at %s ..." (cstr_from_string ip))
                   (let ((sock (create_socket NN_REQ))
                         (addr:i8* (salloc 32)))
                     (sprintf addr "tcp://%s:7199" (cstr_from_string ip))
@@ -254,6 +254,7 @@
     (lambda (msg:i8* sock:i32)
       (let ((sz_msg (+ (strlen msg) 1))
             (bytes (nn_send sock msg sz_msg 0)))
+        (nn_sock_set_timeout sock 1000)
         (if (= bytes (convert sz_msg)) ;; should also check (< bytes (convert sz_msg))
             (let ((rbytes (nn_recv sock buf FLEET_NANOMSG_CLIENT_BUFLEN 0)))
               (if (> rbytes 0)
@@ -267,6 +268,7 @@
       (let ((sz_msg (+ (strlen msg) 1)))
         ;; send out the messages (scatter)
         (for-each (lambda (sock)
+                    (nn_sock_set_timeout sock 1000)
                     (nn_send sock msg sz_msg NN_DONTWAIT))
                   FLEET_NODE_SOCKET_LIST)
         ;; wait to recieve on all sockets (gather)
