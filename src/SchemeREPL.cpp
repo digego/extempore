@@ -90,14 +90,14 @@ namespace extemp {
 
     SchemeREPL* SchemeREPL::I(std::string &name)
     {
-	SchemeREPL* repl = REPL_MAP[name];
-	if(repl) return REPL_MAP[name];
-	else {
-	  ascii_text_color(1,1,10);
-	    printf("Could not find REPL named '%s'\n",name.c_str());
-	    ascii_text_color(0,9,10);
-	    return 0;
-	}
+      SchemeREPL* repl = REPL_MAP[name];
+      if(repl) return repl;
+      else {
+        // ascii_text_color(1,1,10);
+        // printf("Could not find REPL named '%s'\n",name.c_str());
+        // ascii_text_color(0,9,10);
+        return 0;
+      }
     }
 
     std::string& SchemeREPL::getTitle()

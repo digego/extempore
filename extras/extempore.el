@@ -1087,16 +1087,15 @@ If there is a process already running in `*extempore*', switch to that buffer.
   (interactive)
   (extempore-send-region (save-excursion (backward-sexp) (point)) (point)))
 
-(defun switch-to-extempore (eob-p)
-  "Switch to the extempore process buffer.
-With argument, position cursor at end of buffer."
+(defun switch-to-extempore (keep-point-p)
+  "Switch to the extempore process buffer and (unless prefix arg) position cursor at end of buffer."
   (interactive "P")
   (if (and extempore-buffer (comint-check-proc extempore-buffer))
-      (pop-to-buffer extempore-buffer)
-    (extempore-interactively-start-process))
-  (when eob-p
-    (push-mark)
-    (goto-char (point-max))))
+      (progn (pop-to-buffer extempore-buffer)
+             (when (not keep-point-p)
+               (push-mark)
+               (goto-char (point-max))))
+    (extempore-interactively-start-process)))
 
 (defun extempore-send-definition-and-go ()
   "Send the current definition to the inferior Extempore.
@@ -1278,7 +1277,7 @@ command to run."
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
     (if (and (> (length str) 9)
              (string= "(docstring" (substring str 0 10)))
-        (extempore-process-docstring-form (cdr (read str)))
+        (extempore-process-docstring-form (cdr-safe (ignore-errors (read str))))
       (message str))))
 
 (add-hook 'extempore-mode-hook

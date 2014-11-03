@@ -447,12 +447,22 @@
 ;; xtlang wrapper functions ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func nn_println_strerror
+(bind-func nn_println_strerror_with_msg
+  (lambda (msg:i8*)
+    (let ((en (nn_errno)))
+      (if (<> en 0)
+          (printf "%s: %s\n" msg (nn_strerror en)))
+      void)))
+
+(bind-func nn_println_strerror_no_msg
   (lambda ()
     (let ((en (nn_errno)))
       (if (<> en 0)
           (printf "nanomsg error: %s\n" (nn_strerror en)))
       void)))
+
+(bind-poly nn_println_strerror nn_println_strerror_with_msg)
+(bind-poly nn_println_strerror nn_println_strerror_no_msg)
 
 (bind-func nn_sock_set_send_timeout
   (lambda (sock:i32 timeout_ms:i32)
@@ -471,5 +481,37 @@
   (lambda (sock:i32 timeout_ms:i32)
     (nn_sock_set_send_timeout sock timeout_ms)
     (nn_sock_set_recv_timeout sock timeout_ms)))
+
+(bind-func create_socket_with_timeout
+  "return socket id (i32)"
+  (lambda (protocol timeout)
+    (let  ((sock (nn_socket AF_SP protocol)))
+      (if (or (< sock 0)
+              (< (nn_sock_set_timeout sock timeout) 0))
+          (nn_println_strerror "error creating socket"))
+      sock)))
+
+(bind-func create_socket_default_timeout
+  "return socket id (i32)"
+  (lambda (protocol)
+    (let  ((sock (nn_socket AF_SP protocol)))
+      (if (< sock 0)
+          (nn_println_strerror "error creating socket"))
+      sock)))
+
+(bind-poly create_socket create_socket_with_timeout)
+(bind-poly create_socket create_socket_default_timeout)
+
+(bind-func bind_socket
+  (lambda (sock addr)
+    (if (< (nn_bind sock addr) 0)
+        (nn_println_strerror "error binding socket"))
+    sock))
+
+(bind-func connect_socket
+  (lambda (sock addr)
+    (if (< (nn_connect sock addr) 0)
+        (nn_println_strerror "error connecting socket"))
+    sock))
 
 (define *xtmlib-nanomsg-loaded* #t)

@@ -888,126 +888,151 @@ namespace extemp {
 	}
     }
 
-    pointer SchemeFFI::ipcCall(scheme* _sc, pointer args)
-    {
-	std::string process(string_value(pair_car(args)));
-        SchemeREPL* repl = SchemeREPL::I(process);
-        if(!repl) {
-          std::cout << "BAD IPC: Process name '" << process << "' does not exist!" << std::endl;
-          return _sc->F;
-        }
- 	std::stringstream ss;
-	pointer sym = pair_cadr(args);
-	args = pair_cddr(args);
-	for(; is_pair(args); args = pair_cdr(args)) {
+  pointer SchemeFFI::ipcCall(scheme* _sc, pointer args)
+  {
+    std::string process(string_value(pair_car(args)));
+    SchemeREPL* repl = SchemeREPL::I(process);
+    if(!repl) {
+      std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
+      return _sc->F;
+    }
+    std::stringstream ss;
+    pointer sym = pair_cadr(args);
+    args = pair_cddr(args);
+    for(; is_pair(args); args = pair_cdr(args)) {
 	    ss << " ";
 	    if(is_pair(pair_car(args)) || is_vector(pair_car(args)) || is_symbol(pair_car(args))) {
-		ss << "'";
-		UNIV::printSchemeCell(_sc, ss, pair_car(args),true);
+        ss << "'";
+        UNIV::printSchemeCell(_sc, ss, pair_car(args),true);
 	    }
 	    else if(_sc->NIL == pair_car(args)) {
-		ss << "'()";
+        ss << "'()";
 	    }
 	    else if(pair_car(args) == _sc->F) {
-		ss << "#f";
+        ss << "#f";
 	    }
 	    else if(pair_car(args) == _sc->T) {
-		ss << "#t";
+        ss << "#t";
 	    }
-            else if(pair_car(args) == _sc->EOF_OBJ) {
-                // igore end of file
-            }
+      else if(pair_car(args) == _sc->EOF_OBJ) {
+        // igore end of file
+      }
 	    else if(is_closure(pair_car(args))) {
-		std::stringstream tmp;
-		UNIV::printSchemeCell(_sc, tmp, closure_code(pair_car(args)), true);
-		std::string sss = "(lambda "+tmp.str().substr(1);
-		ss << sss;
+        std::stringstream tmp;
+        UNIV::printSchemeCell(_sc, tmp, closure_code(pair_car(args)), true);
+        std::string sss = "(lambda "+tmp.str().substr(1);
+        ss << sss;
 	    }
 	    else if(is_string(pair_car(args)) || is_number(pair_car(args)) || is_symbol(pair_car(args))){
-		UNIV::printSchemeCell(_sc, ss, pair_car(args), true);
+        UNIV::printSchemeCell(_sc, ss, pair_car(args), true);
 	    }
 	    else {
-	        PRINT_ERROR("IPC does not support type.\nThis maybe related to the return type as well as the arguments if calling from ipc:call.\nIn particular remember that objc objects cannot be passed natively (you can turn them into strings though by calling objc:string-encode and then on the other end use objc:string-decode to reconstitute an object\n");
-		return _sc->F;
+        PRINT_ERROR("Extempore's IPC mechanism cannot serialise this type - this maybe related to the return type as well as the arguments.\n");
+        return _sc->F;
 	    }
-	}
-	std::string str = "("+std::string(symname(sym))+ss.str()+")";
-        repl->writeString(str);
-	return _sc->T;
     }
+    std::string str = "("+std::string(symname(sym))+ss.str()+")";
+    repl->writeString(str);
+    return _sc->T;
+  }
     
-    pointer SchemeFFI::ipcDefine(scheme* _sc, pointer args)
-    {
-	std::string process(string_value(pair_car(args)));
-	std::stringstream ss;
-	pointer sym = pair_cadr(args);
-	pointer value = pair_caddr(args);
-	ss << " ";
-	if(is_pair(value) || is_vector(value) || is_symbol(value)) {
+  pointer SchemeFFI::ipcDefine(scheme* _sc, pointer args)
+  {
+    std::string process(string_value(pair_car(args)));
+    SchemeREPL* repl = SchemeREPL::I(process);
+    if(!repl) {
+      std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
+      return _sc->F;
+    }
+    std::stringstream ss;
+    pointer sym = pair_cadr(args);
+    pointer value = pair_caddr(args);
+    ss << " ";
+    if(is_pair(value) || is_vector(value) || is_symbol(value)) {
 	    ss << "'";
 	    UNIV::printSchemeCell(_sc, ss, value,true);
-	}
-	else if(_sc->NIL == value) {
+    }
+    else if(_sc->NIL == value) {
 	    ss << "'()";
-	}
-	else if(value == _sc->F) {
+    }
+    else if(value == _sc->F) {
 	    ss << "#f";
-	}
-	else if(value == _sc->T) {
+    }
+    else if(value == _sc->T) {
 	    ss << "#t";
-	}
-	else if(value == _sc->EOF_OBJ) {
-          // ignore eof
-	}
-	else if(is_closure(value)) {
+    }
+    else if(value == _sc->EOF_OBJ) {
+      // ignore eof
+    }
+    else if(is_closure(value)) {
 	    std::stringstream tmp;
 	    UNIV::printSchemeCell(_sc, tmp, closure_code(value), true);
 	    std::string sss = "(lambda "+tmp.str().substr(1);
 	    ss << sss;
-	}
-	else if(is_string(value) || is_number(value)) {
-	    UNIV::printSchemeCell(_sc, ss,value, true);
-	}
-	else {
-	    PRINT_ERROR("IPC does not support type.\nThis maybe related to the return type as well as the arguments if calling from ipc:call.\nIn particular remember that objc objects cannot be passed natively (you can turn them into strings though by calling objc:string-encode and then on the other end use objc:string-decode to reconstitute an object\n");
-	    return _sc->F;
-	}
-	std::string str = "(define "+std::string(symname(sym))+ss.str()+")";
-	SchemeREPL::I(process)->writeString(str);
-	return _sc->T;
     }
+    else if(is_string(value) || is_number(value)) {
+	    UNIV::printSchemeCell(_sc, ss,value, true);
+    }
+    else {
+      PRINT_ERROR("Extempore's IPC mechanism cannot serialise this type - this maybe related to the return type as well as the arguments.\n");
+	    return _sc->F;
+    }
+    std::string str = "(define "+std::string(symname(sym))+ss.str()+")";
+    repl->writeString(str);
+    return _sc->T;
+  }
 
-    pointer SchemeFFI::ipcEval(scheme* _sc, pointer args)
-    {
-	std::string process(string_value(pair_car(args)));
-	std::string expr(string_value(pair_cadr(args)));
-	SchemeREPL::I(process)->writeString(expr);
-	return _sc->T;
+  pointer SchemeFFI::ipcEval(scheme* _sc, pointer args)
+  {
+    std::string process(string_value(pair_car(args)));
+    SchemeREPL* repl = SchemeREPL::I(process);
+    if(!repl) {
+      std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
+      return _sc->F;
+    }
+    std::string expr(string_value(pair_cadr(args)));
+    SchemeREPL::I(process)->writeString(expr);
+    return _sc->T;
     }
     
-    pointer SchemeFFI::ipcLoad(scheme* _sc, pointer args)
-    {
-	std::string process(string_value(pair_car(args)));
-	std::string path(string_value(pair_cadr(args)));
-	std::string str = "(load \""+std::string(path)+"\")";
-	SchemeREPL::I(process)->writeString(str);
-	return _sc->T;
+  pointer SchemeFFI::ipcLoad(scheme* _sc, pointer args)
+  {
+    std::string process(string_value(pair_car(args)));
+    SchemeREPL* repl = SchemeREPL::I(process);
+    if(!repl) {
+      std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
+      return _sc->F;
     }
+    std::string path(string_value(pair_cadr(args)));
+    std::string str = "(load \""+std::string(path)+"\")";
+    SchemeREPL::I(process)->writeString(str);
+    return _sc->T;
+  }
 
-    pointer SchemeFFI::ipcSetPriority(scheme* _sc, pointer args)
-    {
-	std::string process(string_value(pair_car(args)));
-	int priority = ivalue(pair_cadr(args));
-	SchemeProcess::I(process)->setPriority(priority);
-	return _sc->T;
+  pointer SchemeFFI::ipcSetPriority(scheme* _sc, pointer args)
+  {
+    std::string process(string_value(pair_car(args)));
+    SchemeREPL* repl = SchemeREPL::I(process);
+    if(!repl) {
+      std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
+      return _sc->F;
     }
+    int priority = ivalue(pair_cadr(args));
+    SchemeProcess::I(process)->setPriority(priority);
+    return _sc->T;
+  }
 
-    pointer SchemeFFI::ipcGetPriority(scheme* _sc, pointer args)
-    {
-	std::string process(string_value(pair_car(args)));
-	int priority = SchemeProcess::I(process)->getPriority();
-	return mk_integer(_sc, priority);
+  pointer SchemeFFI::ipcGetPriority(scheme* _sc, pointer args)
+  {
+    std::string process(string_value(pair_car(args)));
+    SchemeREPL* repl = SchemeREPL::I(process);
+    if(!repl) {
+      std::cout << "Error: unknown scheme process '" << process << "'" << std::endl;
+      return _sc->F;
     }
+    int priority = SchemeProcess::I(process)->getPriority();
+    return mk_integer(_sc, priority);
+  }
 
     pointer SchemeFFI::getNameOfCurrentProcess(scheme* _sc, pointer args)
     {
