@@ -262,7 +262,7 @@
                          void)))
             (nn_println_strerror "error in request"))))))
 
-(bind-func fleet_message_all_nodes_sync 40000
+(bind-func fleet_message_all_nodes_sync
   (let ((buf:i8* (zalloc (* FLEET_NODE_MAX FLEET_NANOMSG_CLIENT_BUFLEN))))
     (lambda (msg:i8*)
       (if (null? FLEET_NODE_SOCKET_LIST)
@@ -286,14 +286,15 @@
 ;; a high-level scheme api: requires *fleet-process-list* to be
 ;; defined
 
-(define fleet-connect-processes
+(define fleet-connect
   (lambda ()
     (if (not (defined? '*fleet-process-list*))
         (print "Error: *fleet-process-list* not defined\n")
-        (for-each (lambda (procinfo)
-                    (ipc:connect (cadr procinfo) (car procinfo) (caddr procinfo))
-                    (ipc:load (car procinfo) "libs/external/fleet-node.xtm"))
-                  *fleet-process-list*))))
+        (begin (for-each (lambda (procinfo)
+                           (ipc:connect (cadr procinfo) (car procinfo) (caddr procinfo))
+                           (ipc:load (car procinfo) "libs/external/fleet-node.xtm"))
+                         *fleet-process-list*)
+               (fleet_connect_to_nodes (cadar *fleet-process-list*) 8080)))))
 
 (define fleet-killemall
   (lambda (exit-code)
