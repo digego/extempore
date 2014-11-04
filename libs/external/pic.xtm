@@ -506,15 +506,13 @@ void main() {
       1)))
 
 (define run-pic
-  (lambda (time delta-t)
+  (lambda (delta-t)
     (let ((ntime (pic_step)))
       (if (= (modulo ntime 1000) 0)
           (println 'ntime: ntime)))
     ;; (draw_energy_hud)
     (gl_draw (pic_step.nx))
     (gl:swap-buffers *gl-ctx*)
-    (let ((next-time (max (+ time (* *second* delta-t)) (now))))
-      (callback next-time
-                'run-pic
-                next-time
-                delta-t))))
+    (callback (+ (now) (* *second* delta-t))
+              'run-pic
+              delta-t)))
