@@ -554,9 +554,24 @@
                               chord
                               (cdr lst)))
                     (if (eq? place 'bottom) 
-                        (reverse new-lst)
-                        new-lst)))))))
+                        (cl:sort (reverse new-lst) <)
+                        (cl:sort new-lst <))))))))
 
+
+(define pc:make-chord-fixed
+   (lambda (fix-point number pc . args)
+      (if (< number 1) 
+          '()
+          (let loop ((pitches (list (real->integer (pc:quantize fix-point pc))))
+                     (num (- number 1))
+                     (dir (if (null? args) + (if (equal? 'bottom (car args)) + -))))
+            (if (> num 0)
+                (loop (cons (real->integer (pc:relative (car pitches) (dir 1) pc))
+                            pitches)
+                      (- num 1)
+                      dir)
+                (reverse pitches))))))
+                        
 
 (define pc:distance-of-chord
    (lambda (chd pc)
