@@ -2037,3 +2037,25 @@
                                                 (print "Error:"))
                              (print " cannot write precomp file at " precomp-file-path "\n")
                              (if exit-when-done? (quit 2)))))))))))
+
+(define sys:run-tests
+  (lambda (test-files print? quit-on-exit?)
+    (sys:load "libs/core/test.xtm" 'quiet)
+    (xtmtest-reset-results)
+    (if (string? test-files)
+        (set! test-files (list test-files)))
+    (for-each (lambda (tf)
+                (sys:load tf))
+              test-files)
+    (if print? (xtmtest-print-results))
+    (if quit-on-exit?
+        (quit (if (cl:some (lambda (label-list)
+                             (and (not (equal? (car label-list) 'correct))
+                                  (> (length label-list) 1)))
+                           *xtmtest-results*)
+                  (begin (print-with-colors 'red 'default #t
+                                            (print "Some tests failed."))
+                         1)
+                  (begin (print-with-colors 'green 'default #t
+                                            (print "All tests passed."))
+                         0))))))

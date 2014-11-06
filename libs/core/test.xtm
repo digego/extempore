@@ -106,8 +106,7 @@
                                                'default #f (print (car reslist)))
                             (cond ((and (equal? (car label-list) 'correct)
                                         (cadr reslist))
-                                   (print "   result =" (caddr reslist))
-                                   (print ", was expecting" (cadr reslist)))
+                                   (print "   result =" (caddr reslist)))
                                   ((equal? (car label-list) 'incorrect)
                                    (print "   result =" (caddr reslist))
                                    (print ", was expecting" (cadr reslist))))
@@ -116,26 +115,8 @@
                 (println))
               *xtmtest-results*)))
 
-(define sys:run-tests
-  (lambda (test-files print? quit-on-exit?)
-    (xtmtest-reset-results)
-    (if (string? test-files)
-        (set! test-files (list test-files)))
-    (for-each (lambda (tf)
-                (load tf))
-              test-files)
-    (if print? (xtmtest-print-results))
-    (if quit-on-exit?
-        (quit (if (cl:some (lambda (label-list)
-                             (and (not (equal? (car label-list) 'correct))
-                                  (> (length label-list) 1)))
-                           *xtmtest-results*)
-                  (begin (print-with-colors 'red 'default #t
-                                            (print "Some tests failed."))
-                         1)
-                  (begin (print-with-colors 'green 'default #t
-                                            (print "All tests passed."))
-                         0))))))
-
 (define *xtmlib-test-loaded* #t)
-(print-with-colors 'green 'default #f (print "Test lib loaded.\n\n"))
+(print-with-colors 'green 'default #t (print "Loaded "))
+(print-with-colors 'blue 'default #t (print "test"))
+(print " library\n")
+
