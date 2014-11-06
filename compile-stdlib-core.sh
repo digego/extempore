@@ -12,27 +12,27 @@ if [ -z "$EXT_LLVM_DIR" ] && [ ! -d "/usr/local/Cellar/extempore-llvm/3.4.1" ] ;
     exit 2
 fi
 
-PRECOMP_LIBS="\
+# this is the 'standard' library
+# to override this list, call this script with:
+# PRECOMP_LIBS="core/foo.xtm external/bar.xtm" ./compile-stdlib.sh
+: ${PRECOMP_LIBS:="\
 core/std.xtm \
 core/math.xtm \
 core/audio_dsp.xtm \
-core/instruments.xtm"
+core/instruments.xtm"}
 
-PRECOMP_COMMAND_FILENAME="xtmprecomp-command-file.xtm"
-PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd $1 --run "
+PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd $1 --eval "
 
 # clear the log file (if present)
 rm -f compile-stdlib.log
 
-echo "Precompiling the (core) Extempore standard library.  This may take a few minutes..."
+echo Precompiling the (core) Extempore standard library.  This may take several minutes...
 echo
 
 # check all the required shared libs are there
 for f in $PRECOMP_LIBS
 do
-    echo "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t #t)" > $PRECOMP_COMMAND_FILENAME
-    echo "Precompiling libs/$f"
-    $PRECOMP_EXTEMPORE_RUN_COMMAND $PRECOMP_COMMAND_FILENAME | tee -a compile-stdlib.log
+    $PRECOMP_EXTEMPORE_RUN_COMMAND "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t #t)" | tee -a compile-stdlib.log
     rc=$?
     if [[ $rc != 0 ]] ; then
         echo -e "\033[0;31mError precompiling libs/$f\033[0;00m"
@@ -43,7 +43,5 @@ do
         echo
     fi
 done
-
-rm $PRECOMP_COMMAND_FILENAME
 
 exit 0
