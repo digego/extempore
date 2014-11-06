@@ -464,7 +464,7 @@
 			 (car dat)
 			 (cadr dat))))
 	  ;; restore print-error and print
-	  (set! print-error (lambda args (apply pprint-error args) (error "")))
+	  (set! print-error (lambda args (apply pprint-error args) (throw "")))
 	  (set! print storeprint)
 	  (print)
 	  (if (> (length (cl:remove '() (cl:remove #f res))) 0)
@@ -2087,7 +2087,7 @@
 	       (print " where you should be using a ")
 	       (print-with-colors 'blue 'default #t (print "tref"))
 	       (println)
-	       (error "")))
+	       (throw "")))
         (if (integer? ast)  ;; preference goes to start of list
             (if (or (= 1 ast) (= 0 ast))
                 (list *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8* *impc:ir:i1*)
@@ -6279,7 +6279,7 @@
                 (print-with-colors 'green 'default #f (print ',symbol))
                 (print " is already bound, and has not been re-bound")
                 (println)
-                (error "")))
+                (throw "")))
             ((and (equal? "i8*" (symbol->string type))
                   (string? value))
              `(begin
