@@ -50,7 +50,13 @@
     (compile)
     (no-compile)))
 
-(assoc 'correct *xtmtest-results*)
+(define xtmtest-reset-results
+  (lambda ()
+    (set! *xtmtest-results*
+          '((correct)
+            (incorrect)
+            (compile)
+            (no-compile)))))
 
 (define xtmtest-update-test-result
   (lambda (func-sym label expected got) 
@@ -110,9 +116,29 @@
                 (println))
               *xtmtest-results*)))
 
-(define xtmtest-run-tests
-  (lambda (test-file)
-    (sys:load test-file)))
+(define sys:run-tests
+  (lambda (test-files print? quit-on-exit?)
+    (xtmtest-reset-results)
+    (println 'a)
+    (if (string? test-files)
+        (set! test-files (list test-files)))
+    (println 'b)
+    (for-each (lambda (tf)
+                (println 'tf: tf)
+                (load tf))
+              test-files)
+    (if print? (xtmtest-print-results))
+    (if quit-on-exit?
+        (quit (if (cl:some (lambda (label-list)
+                             (and (not (equal? (car label-list) 'correct))
+                                  (> (length label-list) 1)))
+                           *xtmtest-results*)
+                  (begin (print-with-colors 'red 'default #t
+                                            (print "Some tests failed."))
+                         1)
+                  (begin (print-with-colors 'green 'default #t
+                                            (print "All tests passed."))
+                         0))))))
 
 (define *xtmlib-test-loaded* #t)
 (print-with-colors 'green 'default #f (print "Test lib loaded.\n\n"))
