@@ -2044,7 +2044,7 @@
     (xtmtest-reset-results)
     (if (string? test-files)
         (set! test-files (list test-files)))
-    (let ((t (now)))
+    (let ((start (now)))
       (for-each (lambda (tf)
                   (sys:load tf))
                 test-files)
@@ -2055,9 +2055,12 @@
                          (print (apply + (map (lambda (lab) (- (length lab) 1))
                                               *xtmtest-results*))))
       (print " tests in ")
-      (print-with-colors 'yellow 'default #t
-                         (print (/ (- (now) t) *au:samplerate* 1.0)))
-      (print " seconds.\n\n"))
+      (let ((dur-sec (/ (- (now) start) *au:samplerate* 1.0)))
+        (print-with-colors 'yellow 'default #t
+                           (print (if (> dur-sec 60) (/ dur-sec 60) dur-sec)))
+        (print (if (> dur-sec 60)
+                   " minutes.\n\n"
+                   " seconds.\n\n"))))
     (if quit-on-exit?
         (quit (if (cl:some (lambda (label-list)
                              (and (not (equal? (car label-list) 'correct))
