@@ -275,8 +275,7 @@ int main(int argc, char** argv)
 
     if(extemp::UNIV::AUDIO_NONE != 1)
       {
-        extemp::AudioDevice* dev = new extemp::AudioDevice;
-        extemp::AudioDevice::setI(dev);
+        extemp::AudioDevice* dev = extemp::AudioDevice::I();
         dev->start();
       }
     else

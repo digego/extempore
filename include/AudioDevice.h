@@ -70,58 +70,49 @@ namespace extemp {
     AudioDevice();
     ~AudioDevice();
     static AudioDevice* I() { return &SINGLETON; }
-    static void setI(AudioDevice* dev) { SINGLETON = *dev; }
-	
-    // start and stop audio processing (which also stops time!!)	
+
+    // start and stop audio processing (which also stops time!!)
     void start();
     void stop();
     static void startNoAudioThread(); // the --noaudio flag
-    
-    void setDSPClosure(void* _dsp_func) 
+  
+    void setDSPClosure(void* _dsp_func)
     {
-      if(extemp::UNIV::AUDIO_NONE == 1)
-        fprintf(stderr, "Error: Extempore is running in \"noaudio\" mode.\n"); 
-      else if(dsp_closure != NULL)
-        fprintf(stderr, "You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n");
-      else
-        dsp_closure = _dsp_func; 
+	    if(dsp_closure != NULL) { printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n"); return; }
+	    dsp_closure = _dsp_func;
     }
     void* getDSPClosure() { return dsp_closure; }
     bool getZeroLatency() { return zerolatency; }
     void setZeroLatency(bool z) { zerolatency = z; }
-    bool getToggle () { toggle = toggle ? false : true; return toggle; } 
+    bool getToggle () { toggle = toggle ? false : true; return toggle; }
 
-    void setDSPMTClosure(void* _dsp_func, int idx) 
+    void setDSPMTClosure(void* _dsp_func, int idx)
     {
-	    if(extemp::UNIV::AUDIO_NONE == 1)
-        fprintf(stderr, "Error: Extempore is running in \"noaudio\" mode.\n"); 
-      else if(dsp_mt_closure[idx] != NULL)
-        fprintf(stderr, "You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n");
-      else
-        dsp_mt_closure[idx] = _dsp_func;
+	    if(dsp_mt_closure[idx] != NULL) { printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n"); return; }
+	    dsp_mt_closure[idx] = _dsp_func;
     }
     void* getDSPMTClosure(int idx) { return dsp_mt_closure[idx]; }
 	
-    void setDSPWrapperArray( void(*_wrapper)(void*,void*,float*,float*,long,void*) ) 
-    { 
+    void setDSPWrapperArray( void(*_wrapper)(void*,void*,float*,float*,long,void*) )
+    {
 	    if(dsp_wrapper != NULL || dsp_wrapper_sum != NULL || dsp_wrapper_array != NULL || dsp_wrapper_sum_array != NULL) return;
 	    dsp_wrapper_array = _wrapper; 
     }
-    void setDSPWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE,long,long,SAMPLE*) ) 
-    { 
+    void setDSPWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE,long,long,SAMPLE*) )
+    {
 	    if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
 	    dsp_wrapper = _wrapper;
     }
     void setDSPMTWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE*,long,long,SAMPLE*),
-                          SAMPLE(*_wrappera)(void*,void*,SAMPLE,long,long,SAMPLE*)) 
-    { 
+                          SAMPLE(*_wrappera)(void*,void*,SAMPLE,long,long,SAMPLE*))
+    {
 	    if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
 	    dsp_wrapper_sum = _wrapper;
       dsp_wrapper = _wrappera;
     }
     void setDSPMTWrapperArray( void(*_wrapper)(void*,void*,float**,float*,long,void*),
                                void(*_wrappera)(void*,void*,float*,float*,long,void*))
-    { 
+    {
 	    if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
 	    dsp_wrapper_sum_array = _wrapper;
       dsp_wrapper_array = _wrappera;
@@ -130,8 +121,8 @@ namespace extemp {
     void initMTAudio(int,bool);
     void initMTAudioBuf(int,bool);
 
-    EXTThread** getMTThreads() { return threads; } 
-    int getNumThreads() { return numthreads; } 
+    EXTThread** getMTThreads() { return threads; }
+    int getNumThreads() { return numthreads; }
     dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
     dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
     dsp_f_ptr_sum getDSPSUMWrapper() { return dsp_wrapper_sum; }
@@ -146,18 +137,15 @@ namespace extemp {
 
     PaStream* getPaStream() { return stream; }
     static double getCPULoad();
-    static void printDevices();       
+    static void printDevices();
 
     static double CLOCKBASE;
     static double REALTIME;
     static double CLOCKOFFSET;
     int thread_idx[128];
 
-  protected:
-    bool started;
-    static AudioDevice SINGLETON;
-    
   private:
+    bool started;
     PaStream* stream;
     float* buffer;
     void* dsp_closure;
@@ -170,6 +158,7 @@ namespace extemp {
     SAMPLE* inbuf;
     float* outbuf_f;
     float* inbuf_f;
+    static AudioDevice SINGLETON;
     EXTThread** threads;
     int numthreads;
     bool zerolatency;
