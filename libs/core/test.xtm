@@ -1,6 +1,6 @@
 ;;; tests/test.xtm -- testing framework for Extempore
 
-;; Author: 
+;; Author: Ben Swift
 ;; Keywords: extempore
 ;; Required dylibs: 
 
@@ -10,18 +10,34 @@
 ;; Extempore - load before running any of the other .xtm files in
 ;; tests/
 
-;; To test an xtlang function, bind-func it, and then call it inside
-;; an xtmtest wrapper, e.g.
+;; To write a test, use the xtmtest macro. Usage examples:
 
-;; to only test if if compiles:
-;; (xtmtest (test_bit_twiddle_2))
+;; (xtmtest '(bind-func compile_fn ; this is the function definition
+;;             (lambda ()               ; this is the function definition
+;;               (* 3 8)))         ; this is the function definition
+;;          (compile_fn))          ; this is how to call it
 
-;; to test on an i64 return value (second argument)
-;; (xtmtest (test_bit_twiddle_2) 0)
+;; (xtmtest '(bind-func no_compile_fn ; this is the function definition
+;;             (lambda ()                  ; this is the function definition
+;;               (* 3 8.0)))          ; this is the function definition
+;;          (no_compile_fn))          ; this is how to call it
 
-;; To run the tests, M-x eval-buffer (in the buffer with the tests in
-;; it, not this one). Once you've run all the xtmtest tests,
-;; (xtmtest-print-results) does what it says on the tin.
+;; (xtmtest '(bind-func incorrect_fn ; this is the function definition
+;;             (lambda ()                 ; this is the function definition
+;;               (* 3 4)))           ; this is the function definition
+;;          (incorrect_fn)           ; this is how to call it
+;;          13)                      ; this is the expected return value
+
+;; (xtmtest '(bind-func correct_fn ; this is the function definition
+;;             (lambda ()               ; this is the function definition
+;;               (* 3 4)))         ; this is the function definition
+;;          (correct_fn)           ; this is how to call it
+;;          12)                    ; this is the expected return value
+
+;; ;; print the results
+;; (xtmtest-print-results)
+
+;; For more examples, see the test files in the tests/ subdirectory
 
 ;;; Code:
 
@@ -94,5 +110,9 @@
                 (println))
               *xtmtest-results*)))
 
+(define xtmtest-run-tests
+  (lambda (test-file)
+    (sys:load test-file)))
+
 (define *xtmlib-test-loaded* #t)
-(print-with-colors 'green 'default #f (print " done.\n\n"))
+(print-with-colors 'green 'default #f (print "Test lib loaded.\n\n"))
