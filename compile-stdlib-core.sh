@@ -23,18 +23,15 @@ core/instruments.xtm"}
 
 PRECOMP_EXTEMPORE_RUN_COMMAND="./extempore --nostd $1 --eval "
 
-# clear the log file (if present)
-rm -f compile-stdlib.log
-
-echo Precompiling the (core) Extempore standard library.  This may take several minutes...
+echo Precompiling the \(core\) Extempore standard library.  This may take several minutes...
 echo
 
 # check all the required shared libs are there
 for f in $PRECOMP_LIBS
 do
-    $PRECOMP_EXTEMPORE_RUN_COMMAND "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t #t)" | tee -a compile-stdlib.log
+    $PRECOMP_EXTEMPORE_RUN_COMMAND "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t #t)"
     rc=$?
-    if [[ $rc != 0 ]] ; then
+    if (($rc != 0))  ; then
         echo -e "\033[0;31mError precompiling libs/$f\033[0;00m"
         echo
         exit $rc
