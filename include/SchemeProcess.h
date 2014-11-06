@@ -112,7 +112,7 @@ namespace extemp {
 	void setMaxDuration(long long int);		
 	bool loadFile(const std::string file, const std::string path);
 	bool loadFile(const std::string file);
-	std::string getInitFile() { return init_file; }
+	std::string getInitExpr() { return init_expr; }
 	void addGlobal(char* symbol_name, pointer arg);		
 	void addForeignFunc(char* symbol_name, foreign_func func);
 	void addGlobalCptr(char* symbol_name, void* ptr);
@@ -205,7 +205,7 @@ namespace extemp {
 	llvm_zone_t* default_zone;
 	/* // this added for dodgy continuations support */
         /* ucontext_t _context;		 */
-	std::string init_file;
+	std::string init_expr;
     };
 	
     class SchemeObj{

@@ -84,7 +84,7 @@ void sig_handler(int signo)
 
 
 enum { OPT_RUNTIME, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES, 
-       OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITFILE, 
+       OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
        OPT_HELP
@@ -98,6 +98,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_FRAMES,      "--frames",        SO_REQ_SEP    },
     { OPT_CHANNELS,    "--channels",      SO_REQ_SEP    },
     { OPT_IN_CHANNELS, "--inchannels",    SO_REQ_SEP    },
+    { OPT_INITEXPR,    "--eval",          SO_REQ_SEP    },
     { OPT_INITFILE,    "--run",           SO_REQ_SEP    },
     { OPT_PORT,        "--port",          SO_REQ_SEP    },
     { OPT_TERM,        "--term",          SO_REQ_SEP    },
@@ -117,8 +118,8 @@ CSimpleOptA::SOption g_rgOptions[] = {
 int main(int argc, char** argv)
 {
     std::string runtimedir("runtime");
-    std::string initfile;    
-    bool initfile_on = false;
+    std::string initexpr;    
+    bool initexpr_on = false;
     
     std::string host("localhost");
     std::string primary_name("primary");
@@ -162,9 +163,13 @@ int main(int argc, char** argv)
         case OPT_IN_CHANNELS:
 	  extemp::UNIV::IN_CHANNELS = atoi(args.OptionArg());
 	  break;
+        case OPT_INITEXPR:
+          initexpr = std::string(args.OptionArg());
+          initexpr_on = true;
+    break;
         case OPT_INITFILE:
-	  initfile = std::string(args.OptionArg());
-	  initfile_on = true;	  
+          initexpr = std::string("(sys:load \"") + std::string(args.OptionArg()) + std::string("\")");
+          initexpr_on = true;	  
 	  break;
   case OPT_NOSTD:
     extemp::UNIV::EXT_LOADSTD = 0;
@@ -267,7 +272,7 @@ int main(int argc, char** argv)
 #ifdef TARGET_OS_MAC
     // we need to instantiate NSApp before potentially
     // calling something OSXy (like a window) inside
-    // an initfile.
+    // an initexpr.
     // We DONT want to start the run loop though as it
     // never exits - do that below
     [NSApplication sharedApplication];
@@ -297,8 +302,8 @@ int main(int argc, char** argv)
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
     utility_repl->connectToProcessAtHostname(host,utility_port);
 
-    if(initfile_on) { // if a file needs to be loaded from the command line
-       primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0, initfile);
+    if(initexpr_on) { // if an expression needs to be evaluated from the command line
+       primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0, initexpr);
     }else{
        primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0);
     }

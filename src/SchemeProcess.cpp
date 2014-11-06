@@ -66,6 +66,8 @@
 #endif
 */
 
+#define EXT_INITEXPR_BUFLEN 1024
+
 // FD_COPY IS BSD ONLY
 #ifndef FD_COPY
 #define        FD_COPY(f, t)   (void)(*(t) = *(f))
@@ -85,7 +87,7 @@ namespace extemp {
 	bool SchemeProcess::SCHEME_EVAL_TIMING = 0;	
 
 
-  SchemeProcess::SchemeProcess(std::string _load_path, std::string _name, int _server_port, bool _banner, std::string _init_file) :
+  SchemeProcess::SchemeProcess(std::string _load_path, std::string _name, int _server_port, bool _banner, std::string _init_expr) :
 	libs_loaded(false),
 		load_path(_load_path),
 		name(_name),
@@ -98,7 +100,7 @@ namespace extemp {
 		running(true),
 		server_port(_server_port),
           	with_banner(_banner),
-         	init_file(_init_file)
+  init_expr(_init_expr)
 	{
 		if(load_path[load_path.length()-1] != '/') load_path.append("/");
 		sc = scheme_init_new();
@@ -561,29 +563,30 @@ namespace extemp {
                 sleep(1); // give time for NSApp etc. to init
 
                 // only load extempore.xtm in primary process
-                char sstr[256];
+                char sstr[EXT_INITEXPR_BUFLEN];
                 if(scm->getName().compare("primary") == 0) {
                   if (extemp::UNIV::EXT_LOADSTD == 1) {
-                    memset(sstr,0,256);
-                    snprintf(sstr,256,"(sys:load \"libs/core/std.xtm\" 'quiet)");
+                    memset(sstr,0,EXT_INITEXPR_BUFLEN);
+                    snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/core/std.xtm\" 'quiet)");
                     std::string* s4 = new std::string(sstr);
                     guard.lock();
                     q.push(SchemeTask(extemp::UNIV::TIME, (60*5*44100), s4, "file_init", 5));
                     guard.unlock();
                   }
 
-                  // load any init file provided
-                  if(scm->getInitFile().compare("") != 0) {
+                  // eval any init expression (if provided)
+                  if(scm->getInitExpr().compare("") != 0) {
                     ascii_text_color(0,5,10);
-                    printf("\n\nRunning File: %s ...\n\n",scm->getInitFile().c_str());
+                    printf("\nEvaluating expression: ");
                     ascii_text_color(0,7,10);
-                    memset(sstr,0,256);
-                    snprintf(sstr,256,"(sys:load \"%s\")",scm->getInitFile().c_str());
+                    printf("%s\n\n", scm->getInitExpr().c_str());
+                    memset(sstr,0,EXT_INITEXPR_BUFLEN);
+                    snprintf(sstr,EXT_INITEXPR_BUFLEN,"%s",scm->getInitExpr().c_str());
                     std::string* s5 = new std::string(sstr);
                     guard.lock();
                     q.push(SchemeTask(extemp::UNIV::TIME+1000, (60*60*44100), s5, "file_init", 5));
                     guard.unlock();
-                    // scm->loadFile(scm->getInitFile().c_str());
+                    // scm->loadFile(scm->getInitExpr().c_str());
                   }
                 }
 
