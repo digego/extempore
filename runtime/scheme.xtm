@@ -2044,18 +2044,28 @@
     (xtmtest-reset-results)
     (if (string? test-files)
         (set! test-files (list test-files)))
-    (for-each (lambda (tf)
-                (sys:load tf))
-              test-files)
-    (if print? (xtmtest-print-results))
+    (let ((t (now)))
+      (for-each (lambda (tf)
+                  (sys:load tf))
+                test-files)
+      
+      (if print? (xtmtest-print-results))
+      (print "\nCompleted ")
+      (print-with-colors 'blue 'default #t
+                         (print (apply + (map (lambda (lab) (- (length lab) 1))
+                                              *xtmtest-results*))))
+      (print " tests in ")
+      (print-with-colors 'yellow 'default #t
+                         (print (/ (- (now) t) *au:samplerate* 1.0)))
+      (print " seconds.\n\n"))
     (if quit-on-exit?
         (quit (if (cl:some (lambda (label-list)
                              (and (not (equal? (car label-list) 'correct))
                                   (> (length label-list) 1)))
                            *xtmtest-results*)
                   (begin (print-with-colors 'red 'default #t
-                                            (print "Some tests failed."))
+                                            (print "Some tests failed.\n"))
                          1)
                   (begin (print-with-colors 'green 'default #t
-                                            (print "All tests passed."))
+                                            (print "All tests passed.\n"))
                          0))))))
