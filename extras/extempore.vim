@@ -146,7 +146,7 @@ def send_user_input():
     send_string(get_user_input()+"\r\n")
 
 def panic():
-    send_string("(bind-func dsp (lambda (in:double time:double channel:double  data:double*) 0.0))\r\n")
+    send_string("(bind-func dsp (lambda (in:SAMPLE time:i64 channel:SAMPLE data:SAMPLE*) 0.0))\r\n")
 
 def send_enclosing_block():
     """ Grab the enclosing function block and send it, ie if you
