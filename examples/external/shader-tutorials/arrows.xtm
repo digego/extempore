@@ -1,7 +1,7 @@
-(sys:load "libs/external/pic/shader-setup.xtm")
-(sys:load "libs/external/pic/pic.xtm")
+(sys:load "examples/external/shader-tutorials/shader-setup.xtm")
+;; (sys:load "examples/external/shader-tutorials/pic.xtm")
 
-(run-pic 1/30)
+;; (run-pic 1/30)
 
 (bind-func gl_set_depth_test
   (lambda ()
@@ -15,8 +15,8 @@
 (bind-val vertices float* (* narrows 4))
 
 (define arrows-program
-  (create_shader (file->string "libs/external/pic/arrows.vert")
-                 (file->string "libs/external/pic/arrows.frag")))
+  (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
+                 (file->string "examples/external/shader-tutorials/arrows.frag")))
 
 (call-as-xtlang (printf "vertices: %p\n" vertices))
 
@@ -99,29 +99,3 @@
       (println))))
 
 (mean_fxye (pic_step.np))
-
-(define run-pic
-  (lambda (delta-t)
-    (let ((ntime (pic_step)))
-      (if (= (modulo ntime 1000) 0)
-          (println 'ntime: ntime)))
-    ;; (draw_energy_hud)
-    (gl_draw_particles (pic_step.nx))
-    (gl:swap-buffers *gl-ctx*)
-    (callback (+ (now) (* *second* delta-t))
-              'run-pic
-              delta-t)))
-
-(bind-func kick_particles
-  (lambda (np percentage kickx kicky)
-    (doloop (i np)
-      )))
-
-(bind-func testloop
-  (lambda ()
-    (doloop (i 2)
-      (doloop (j 2)
-        (let ((iplusj (+ i j)))
-          (println "i:" i "j:" j "iplusj:" iplusj))))))
-
-(testloop)
