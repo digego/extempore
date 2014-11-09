@@ -1,0 +1,66 @@
+(sys:load "examples/external/shader-tutorials/shader-setup.xtm")
+
+(bind-val vertices float* 8)
+(bind-val texcoords float* 8)
+(bind-val texdata float* 12)
+
+(bind-func init_arrays
+  (lambda ()
+    (pfill! vertices
+            -1.0 -1.0
+            -1.0 1.0
+            1.0 -1.0
+            1.0 1.0)
+    (pfill! texcoords
+            0.0 0.0
+            1.0 0.0
+            1.0 1.0
+            0.0 1.0)
+    (pfill! texdata
+            1.0 0.0 0.0
+            0.0 1.0 0.0
+            0.0 0.0 1.0
+            1.0 1.0 1.0)))
+
+
+(init_arrays)
+
+(define particles-shader
+  (create_shader (file->string "examples/external/shader-tutorials/particles.vert")
+                 (file->string "examples/external/shader-tutorials/particles.frag")))
+
+(bind-func draw
+  (let ((vert_vbo (create_vbo vertices 8))
+        (texcoord_vbo (create_vbo texcoords 8))
+        (star_texture (create_rgb_texture texdata 2 2))
+        (vao (create_vao vert_vbo 2 texcoord_vbo 2)))
+    ;; (glDisable GL_TEXTURE_RECTANGLE_ARB)
+    ;; (glEnable GL_TEXTURE_2D)
+    (glEnable GL_PROGRAM_POINT_SIZE)
+    (lambda (program)
+      (glActiveTexture GL_TEXTURE0)
+      (glBindTexture GL_TEXTURE_2D star_texture)
+      (glUniform1i (glGetUniformLocation program "texStar") 0)
+      ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+      ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+      ;; (glTexEnvi GL_POINT_SPRITE GL_COORD_REPLACE 1)    
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
+      (glUseProgram program)
+      (glBindVertexArray vao)
+      (glDrawArrays GL_TRIANGLES_STRIP 0 4)
+      (gl_print_error)
+      void)))
+
+(define gl-loop
+  (lambda (time delta-t)
+    (draw particles-shader)
+    (gl:swap-buffers *gl-window*)
+    ;; (println 'time: time)
+    (callback (+ time (* *second* delta-t) 0.5)
+              'gl-loop
+              (+ time (* *second* delta-t)) 
+              delta-t)))
+
+(gl-loop (now) 1)
