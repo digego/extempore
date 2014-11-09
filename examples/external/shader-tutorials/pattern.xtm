@@ -1,4 +1,4 @@
-(sys:load "libs/external/pic/shader-setup.xtm")
+(sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
 (bind-func gl_set_depth_test
   (lambda ()
@@ -15,10 +15,8 @@
     (pfill! vertices
             -1.0 -1.0 0.0
             -1.0 1.0 0.0
-            1.0 1.0 0.0
-            1.0 1.0 0.0
             1.0 -1.0 0.0
-            -1.0 -1.0 0.0)
+            1.0 1.0 0.0)
     (pfill! colours
             1.0 0.0 0.0
             0.0 1.0 0.0
@@ -30,21 +28,21 @@
 (init_arrays)
 
 (define pattern-shader
-  (create_shader (file->string "libs/external/pic/pattern.vert")
-                 (file->string "libs/external/pic/pattern.frag")))
+  (create_shader (file->string "examples/external/shader-tutorials/pattern.vert")
+                 (file->string "examples/external/shader-tutorials/pattern.frag")))
 
 (bind-func draw
-  (let ((vert_vbo (create_vbo vertices 18))
+  (let ((vert_vbo (create_vbo vertices 12))
         (colour_vbo (create_vbo colours 18))
         (vao (create_vao vert_vbo 3 colour_vbo 3)))
     (lambda (program)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
       (glUseProgram program)
       (glBindVertexArray vao)
-      (glDrawArrays GL_TRIANGLES 0 6)
+      (glDrawArrays GL_TRIANGLES_STRIP 0 4)
       ;; the update call is only necessary if you're changing the
       ;; vert/colour data
-      ;; (update_vbo vert_vbo vertices 18)
+      (update_vbo vert_vbo vertices 12)
       void)))
 
 (define gl-loop
