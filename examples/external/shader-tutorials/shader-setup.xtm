@@ -1,0 +1,84 @@
+(sys:load "libs/external/opengl.xtm")
+
+(define width 1440.0)
+(define height 900.0)
+(bind-val width float 1440.0)
+(bind-val height float 900.0)
+(define fullscreen #t)
+
+(define *gl-window* (gl:make-ctx-core ":0.0" fullscreen 0.0 0.0 width height))
+
+;; how did it all go?
+
+(gl_print_driver_info)
+
+(bind-func create_vbo_float
+  (lambda (buf:float* bufsize)
+    (let ((vbo_ptr:i32* (salloc))
+          (vbo:i32 0))
+      (glGenBuffers 1 vbo_ptr)
+      (set! vbo (pref vbo_ptr 0))
+      (glBindBuffer GL_ARRAY_BUFFER vbo)
+      (glBufferData GL_ARRAY_BUFFER (* bufsize 4) (convert buf) GL_STREAM_DRAW)
+      vbo)))
+
+(bind-func update_vbo_float
+  (lambda (vbo buf:float* bufsize)
+    (glBindBuffer GL_ARRAY_BUFFER vbo)
+    (glBufferData GL_ARRAY_BUFFER (* bufsize 4) null GL_STREAM_DRAW)
+    (glBufferSubData GL_ARRAY_BUFFER 0 (* bufsize 4) (convert buf))
+    vbo))
+
+(bind-func create_vbo_int
+  (lambda (buf:i32* bufsize)
+    (let ((vbo_ptr:i32* (salloc))
+          (vbo:i32 0))
+      (glGenBuffers 1 vbo_ptr)
+      (set! vbo (pref vbo_ptr 0))
+      (glBindBuffer GL_ARRAY_BUFFER vbo)
+      (glBufferData GL_ARRAY_BUFFER (* bufsize 4) (convert buf) GL_STREAM_DRAW)
+      vbo)))
+
+(bind-func update_vbo_int
+  (lambda (vbo buf:i32* bufsize)
+    (glBindBuffer GL_ARRAY_BUFFER vbo)
+    (glBufferData GL_ARRAY_BUFFER (* bufsize 4) null GL_STREAM_DRAW)
+    (glBufferSubData GL_ARRAY_BUFFER 0 (* bufsize 4) (convert buf))
+    vbo))
+
+(bind-poly create_vbo create_vbo_float)
+(bind-poly create_vbo create_vbo_float)
+(bind-poly update_vbo update_vbo_float)
+(bind-poly update_vbo update_vbo_float)
+
+(bind-func create_vao_1
+  "size = number of components per attribute"
+  (lambda (vbo1 size1)
+    (let ((vao_ptr:i32* (salloc))
+          (vao:i32 0))
+      (glGenVertexArrays 1 vao_ptr)
+      (set! vao (pref vao_ptr 0))
+      (glBindVertexArray vao)
+      (glEnableVertexAttribArray 0)
+      (glBindBuffer GL_ARRAY_BUFFER vbo1)
+      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) 0 null)
+      vao)))
+
+(bind-func create_vao_2
+  "size = number of components per attribute"
+  (lambda (vbo1 size1 vbo2 size2)
+    (let ((vao_ptr:i32* (salloc))
+          (vao:i32 0))
+      (glGenVertexArrays 1 vao_ptr)
+      (set! vao (pref vao_ptr 0))
+      (glBindVertexArray vao)
+      (glEnableVertexAttribArray 0)
+      (glBindBuffer GL_ARRAY_BUFFER vbo1)
+      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) 0 null)
+      (glEnableVertexAttribArray 1)
+      (glBindBuffer GL_ARRAY_BUFFER vbo2)
+      (glVertexAttribPointer 1 size2 GL_FLOAT (convert GL_FALSE) 0 null)
+      vao)))
+
+(bind-poly create_vao create_vao_1)
+(bind-poly create_vao create_vao_2)

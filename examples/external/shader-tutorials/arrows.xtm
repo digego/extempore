@@ -1,0 +1,127 @@
+(sys:load "libs/external/pic/shader-setup.xtm")
+(sys:load "libs/external/pic/pic.xtm")
+
+(run-pic 1/30)
+
+(bind-func gl_set_depth_test
+  (lambda ()
+    (glEnable GL_DEPTH_TEST)
+    (glDepthFunc 257)
+    (glDisable GL_LINE_SMOOTH))) ;; GL_LESS
+
+(gl_set_depth_test)
+
+(define narrows (* 256 256))
+(bind-val vertices float* (* narrows 4))
+
+(define arrows-program
+  (create_shader (file->string "libs/external/pic/arrows.vert")
+                 (file->string "libs/external/pic/arrows.frag")))
+
+(call-as-xtlang (printf "vertices: %p\n" vertices))
+
+(bind-func munge_points
+  (lambda (nx:i64 ny:i64 ox:float oy:float)
+    (let ((i 0) (j 0) (idx 0)
+          (x 0.) (y 0.))
+      (dotimes (i nx)
+        (dotimes (j ny)
+          (set! idx (+ (* (+ (* nx i) j) 4) 0))
+          (set! x (- (* (/ (convert i float) (convert nx float)) 2.0) 1.0))
+          (set! y (- (* (/ (convert j float) (convert ny float)) 2.0) 1.0))
+          ;; (if (> idx (- (* nx ny 4) 10))
+          ;;     (println "i:" i "j:" j "idx:" idx))
+          (pset! vertices (+ idx 0) x)
+          (pset! vertices (+ idx 1) y)
+          (pset! vertices (+ idx 2) (+ x (* ox (random -1. 1.))))
+          (pset! vertices (+ idx 3) (+ y (* oy (random -1. 1.)))))))))
+
+(munge_points 256 256 0.01 0.01)
+
+(bind-func draw
+  (let ((narrows (* 256 256))
+        (vert_vbo (create_vbo vertices (* 4 narrows)))
+        (vao (create_vao vert_vbo 2)))
+    (lambda (program)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
+      (glUseProgram program)
+      (glBindVertexArray vao)
+      (glDrawArrays GL_LINES 0 (* 4 narrows))
+      (update_vbo vert_vbo vertices (* 4 narrows))
+      void)))
+
+(define gl-loop
+  (lambda (time delta-t)
+    (munge_points 256 256
+                  (+ .02 (* .02 (cos (* .1 2pi (/ time 44100.)))))
+                  (+ .02 (* .02 (cos (* .1 2pi .7 (/ time 44100.))))))
+    (draw arrows-program)
+    (gl:swap-buffers *gl-window*)
+    ;; (println 'time: time)
+    (callback (+ time (* *second* delta-t) 0.5)
+              'gl-loop
+              (+ time (* *second* delta-t)) 
+              delta-t)))
+
+(gl-loop (now) 1/30)
+
+(bind-func print_verts
+  (lambda (n)
+    (doloop (i n)
+      (printf "%.5f " (pref fxye i)))
+    (println)))
+
+(print_verts 64)
+
+(bind-func print_4floatvector
+  (lambda (v:/4,float/*)
+    (printf "/%f %f %f %f/"
+            (ftod (vref v 0))
+            (ftod (vref v 1))
+            (ftod (vref v 2))
+            (ftod (vref v 3)))))
+
+(bind-poly print print_4floatvector)
+
+(bind-func mean_fxye
+  (lambda (np)
+    (let ((sum:/4,float/* (salloc))
+          (norm:/4,float/* (salloc)))
+      (doloop (i (/ np 4))
+        (pset! sum 0 (+ (pref sum 0) (pref (cast fxye /4,float/*) i))))
+      (vfill! norm
+              (convert np)
+              (convert np)
+              (convert np)
+              (convert np))
+      (pset! sum 0 (/ (pref sum 0) norm))
+      (print_4floatvector sum)
+      (println))))
+
+(mean_fxye (pic_step.np))
+
+(define run-pic
+  (lambda (delta-t)
+    (let ((ntime (pic_step)))
+      (if (= (modulo ntime 1000) 0)
+          (println 'ntime: ntime)))
+    ;; (draw_energy_hud)
+    (gl_draw_particles (pic_step.nx))
+    (gl:swap-buffers *gl-ctx*)
+    (callback (+ (now) (* *second* delta-t))
+              'run-pic
+              delta-t)))
+
+(bind-func kick_particles
+  (lambda (np percentage kickx kicky)
+    (doloop (i np)
+      )))
+
+(bind-func testloop
+  (lambda ()
+    (doloop (i 2)
+      (doloop (j 2)
+        (let ((iplusj (+ i j)))
+          (println "i:" i "j:" j "iplusj:" iplusj))))))
+
+(testloop)

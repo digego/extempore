@@ -1,0 +1,80 @@
+(sys:load "libs/external/pic/shader-setup.xtm")
+
+(bind-func gl_set_depth_test
+  (lambda ()
+    (glEnable GL_DEPTH_TEST)
+    (glDepthFunc 257))) ;; GL_LESS
+
+(gl_set_depth_test)
+
+(bind-val vertices float* 9)
+(bind-val colours float* 9)
+
+(bind-func init_arrays
+  (lambda ()
+    (pfill! vertices
+            0.0  0.5 0.0
+            0.5 -0.5 0.0
+           -0.5 -0.5 0.0)
+    (pfill! colours
+            1.0 0.0 0.0
+            0.0 1.0 0.0
+            0.0 0.0 1.0)))
+
+(init_arrays)
+
+(define triangle-shader
+  (create_shader (file->string "libs/external/pic/triangle.vert")
+                 (file->string "libs/external/pic/triangle.frag")))
+
+(bind-func draw
+  (let ((vert_vbo (create_vbo vertices 9))
+        (colour_vbo (create_vbo colours 9))
+        (vao (create_vao vert_vbo 3 colour_vbo 3)))
+    (lambda (program)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
+      (glUseProgram program)
+      (glBindVertexArray vao)
+      (glDrawArrays GL_TRIANGLES 0 3)
+      void)))
+
+(define gl-loop
+  (lambda (time delta-t)
+    (draw triangle-shader)
+    (gl:swap-buffers *gl-window*)
+    ;; (println 'time: time)
+    (callback (+ time (* *second* delta-t) 0.5)
+              'gl-loop
+              (+ time (* *second* delta-t)) 
+              delta-t)))
+
+(gl-loop (now) 1/30)
+
+;; make sure you change (uncomment) the triangle.vert shader as well
+
+(define triangle-shader
+  (create_shader (file->string "libs/external/pic/triangle.vert")
+                 (file->string "libs/external/pic/triangle.frag")))
+
+(bind-func draw
+  (let ((vert_vbo (create_vbo vertices 9))
+        (colour_vbo (create_vbo colours 9))
+        (vao (create_vao vert_vbo 3 colour_vbo 3))
+        (model:float* (zalloc 16))
+        (view:float* (zalloc 16))
+        (proj:float* (zalloc 16)))
+    (fill_identity_matrix view)
+    (fill_identity_matrix proj)
+    (lambda (program)
+      (fill_identity_matrix model)
+      (let ((x (* 2. (cos (/ (convert (now)) 44100.))))
+            (y (* 1.4 (cos (* 1.1 (/ (convert (now)) 44100.))))))
+        (scale_matrix model x y 1.))
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
+      (glUseProgram program)
+      (glBindVertexArray vao)
+      (glUniformMatrix4fv (glGetUniformLocation program "model") 1 GL_FALSE model)
+      (glUniformMatrix4fv (glGetUniformLocation program "view") 1 GL_FALSE view)
+      (glUniformMatrix4fv (glGetUniformLocation program "proj") 1 GL_FALSE proj)
+      (glDrawArrays GL_TRIANGLES 0 3)
+      void)))
