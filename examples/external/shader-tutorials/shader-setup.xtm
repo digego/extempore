@@ -51,24 +51,12 @@
 (bind-poly update_vbo update_vbo_float)
 (bind-poly update_vbo update_vbo_float)
 
-(bind-func create_rgb_texture_float
-  (lambda (buf:float* width height)
+(bind-func create_texture
+  (lambda ()
     (let ((tex_ptr:i32* (salloc))
           (tex:i32 0))
       (glGenTextures 1 tex_ptr)
-      (set! tex (pref tex_ptr 0))
-      (glBindTexture GL_TEXTURE_2D tex)
-      (glTexImage2D GL_TEXTURE_2D 0 GL_RGB width height 0 GL_RGB GL_FLOAT (convert buf))
-      tex)))
-
-(bind-poly create_rgb_texture create_rgb_texture_float)
-;; doesn't work! still just a copy-paste from update_vbo_float
-;; (bind-func update_texture_float
-;;   (lambda (tex buf:float* bufsize)
-;;     (glBindBuffer GL_ARRAY_BUFFER tex)
-;;     (glBufferData GL_ARRAY_BUFFER (* bufsize 4) null GL_STREAM_DRAW)
-;;     (glBufferSubData GL_ARRAY_BUFFER 0 (* bufsize 4) (convert buf))
-;;     tex))
+      (pref tex_ptr 0))))
 
 (bind-func create_vao_1
   "size = number of components per attribute"
