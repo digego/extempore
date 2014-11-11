@@ -863,13 +863,9 @@
         (minvf mat 4 matrix)
         void))))
 
-;; gl print
 (bind-func gl_print_error_with_msg
   (lambda (msg:i8*)
-    (let ((err GL_NO_ERROR))
-      (set! err (glGetError))
-      ;; (if (<> err GL_NO_ERROR)
-      ;;     (ascii_text_color 0 1 10))
+    (let ((err (glGetError)))
       (cond
        ((= err GL_INVALID_ENUM)
         (printf "%s: Invalid Enum\n" msg))
@@ -888,17 +884,9 @@
        ((= err GL_TABLE_TOO_LARGE)
         (printf "%s: Table Too Large\n" msg))
        ((= err GL_NO_ERROR)
-        ;; do nothing
-        (i64toi32 1)
-        )                        
+        1:i32)
        (else
-        ;; do nothing
-        (printf "%s\n" msg)
-        ))
-      ;; (if (<> err GL_NO_ERROR)
-      ;;     (begin
-      ;;       (ascii_text_color 0 7 10)
-      ;;       (printf "")))
+        (printf "%s\n" msg)))
       void)))
 
 (bind-func gl_print_error_no_msg
