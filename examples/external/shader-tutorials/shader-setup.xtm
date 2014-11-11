@@ -12,148 +12,142 @@
 
 (gl_print_driver_info)
 
+;; id, nbytes, data
+(bind-type VBO <i32,i32,i8*>)
+
+(bind-func print_VBO
+  (lambda (vbo:VBO*)
+    (printf "VBO: <id=%d nbytes=%d data=%p>"
+            (tref vbo 0)
+            (tref vbo 1)
+            (tref vbo 2))))
+
+(bind-poly print print_VBO)
+
+(bind-func tostring_VBO
+  (lambda (vbo:VBO*)
+    (let ((s:i8* (salloc 256)))
+      (sprintf s "VBO: <id=%d nbytes=%d data=%p>"
+            (tref vbo 0)
+            (tref vbo 1)
+            (tref vbo 2))
+      (Str s))))
+
+(bind-poly tostring tostring_VBO)
+
 (bind-func create_vbo_float
-  (lambda (buf:float* bufsize)
-    (let ((vbo_ptr:i32* (salloc))
-          (vbo:i32 0))
-      (glGenBuffers 1 vbo_ptr)
-      (set! vbo (pref vbo_ptr 0))
-      (glBindBuffer GL_ARRAY_BUFFER vbo)
-      (glBufferData GL_ARRAY_BUFFER (* bufsize 4) (convert buf) GL_STREAM_DRAW)
+  (lambda (buf:float* buflen)
+    (let ((vbo:VBO* (halloc))
+          (id:i32* (salloc)))
+      (glGenBuffers 1 id)
+      (tfill! vbo (pref id 0) (* buflen 4) (cast buf i8*))
+      (gl_print_error "Error creating VBO")
       vbo)))
 
-(bind-func update_vbo_float
-  (lambda (vbo buf:float* bufsize)
-    (glBindBuffer GL_ARRAY_BUFFER vbo)
-    (glBufferData GL_ARRAY_BUFFER (* bufsize 4) null GL_STREAM_DRAW)
-    (glBufferSubData GL_ARRAY_BUFFER 0 (* bufsize 4) (convert buf))
-    vbo))
-
-(bind-func create_vbo_int
-  (lambda (buf:i32* bufsize)
-    (let ((vbo_ptr:i32* (salloc))
-          (vbo:i32 0))
-      (glGenBuffers 1 vbo_ptr)
-      (set! vbo (pref vbo_ptr 0))
-      (glBindBuffer GL_ARRAY_BUFFER vbo)
-      (glBufferData GL_ARRAY_BUFFER (* bufsize 4) (convert buf) GL_STREAM_DRAW)
+(bind-func create_vbo_i32
+  (lambda (buf:i32* buflen)
+    (let ((vbo:VBO* (halloc))
+          (id:i32* (salloc)))
+      (glGenBuffers 1 id)
+      (tfill! vbo (pref id 0) (* buflen 4) (cast buf i8*))
+      (gl_print_error "Error creating VBO")
       vbo)))
 
-(bind-func update_vbo_int
-  (lambda (vbo buf:i32* bufsize)
-    (glBindBuffer GL_ARRAY_BUFFER vbo)
-    (glBufferData GL_ARRAY_BUFFER (* bufsize 4) null GL_STREAM_DRAW)
-    (glBufferSubData GL_ARRAY_BUFFER 0 (* bufsize 4) (convert buf))
-    vbo))
-
 (bind-poly create_vbo create_vbo_float)
-(bind-poly create_vbo create_vbo_float)
-(bind-poly update_vbo update_vbo_float)
-(bind-poly update_vbo update_vbo_float)
+(bind-poly create_vbo create_vbo_i32)
 
+(bind-func bind_vbo
+  (lambda (vbo:VBO* type)
+    (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
+    (glBufferData GL_ARRAY_BUFFER (tref vbo 1) (tref vbo 2) type)
+    (glBindBuffer GL_ARRAY_BUFFER 0)
+    (gl_print_error "Error binding VBO")))
 
-(bind-func delete_vbo_1
-  (lambda (vbo)
-    (let ((vbo_ptr:i32* (salloc)))
-      (pset! vbo_ptr 0 vbo)
-      (glDeleteBuffers 1 vbo_ptr))))
+(bind-func update_vbo
+  (lambda (vbo:VBO* type)
+    (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
+    (glBufferData GL_ARRAY_BUFFER (tref vbo 1) null type)  ;; free the old memory
+    (glBufferSubData GL_ARRAY_BUFFER 0 (tref vbo 1) (tref vbo 2))
+    (glBindBuffer GL_ARRAY_BUFFER 0)
+    (gl_print_error "Error updating VBO")))
 
-(bind-poly delete_vbo delete_vbo_1)
+(bind-func delete_vbo
+  (lambda (vbo:VBO*)
+    (let ((id:i32* (salloc)))
+      (pset! id 0 (tref vbo 0))
+      (glDeleteBuffers 1 id)
+      (gl_print_error "Error deleting VBO")
+      (free vbo))))
+
+;; id
+(bind-type VAO <i32>)
+
+(bind-func print_VAO
+  (lambda (vao:VAO*)
+    (printf "VAO: id %d" (tref vao 0))))
+
+(bind-poly print print_VAO)
+
+(bind-func tostring_VAO
+  (lambda (vao:VAO*)
+    (let ((s:i8* (salloc 256)))
+      (sprintf s "VAO: id %d" (tref vao 0))
+      (Str s))))
+
+(bind-poly tostring tostring_VAO)
+
+(bind-func create_vao
+  (lambda ()
+    (let ((vao:VAO* (halloc))
+          (id:i32* (salloc)))
+      (glGenVertexArrays 1 id)
+      (gl_print_error "Error creating VAO")
+      (tset! vao 0 (pref id 0))
+      vao)))
+
+(bind-func bind_attribute_full
+  (lambda (vao:VAO* vbo:VBO* index size type stride offset)
+    (glBindVertexArray (tref vao 0))
+    (glEnableVertexAttribArray index)
+    (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
+    (glVertexAttribPointer index size type GL_FALSE stride (pref-ptr (cast null i8*) offset))
+    (glBindBuffer GL_ARRAY_BUFFER 0)
+    (glBindVertexArray 0)
+    (gl_print_error "Error binding VAO attribute")))
+
+(bind-func bind_attribute_float_packed
+  (lambda (vao vbo index size)
+    (bind_attribute_full vao vbo index size GL_FLOAT 0 0)))
+
+(bind-poly bind_attribute bind_attribute_full)
+(bind-poly bind_attribute bind_attribute_float_packed)
+
+(bind-func draw_vertex_array
+  (lambda (vao:VAO* draw_mode first count)
+    (glBindVertexArray (tref vao 0))
+    (glDrawArrays draw_mode first count)
+    (glBindVertexArray 0)
+    (gl_print_error "Error drawing vertex array")))
+
+(bind-func delete_vao
+  (lambda (vao:VBO*)
+    (let ((id:i32* (salloc)))
+      (pset! id 0 (tref vao 0))
+      (glDeleteVertexArrays 1 id)
+      (gl_print_error "Error deleting VAO")
+      (free vao))))
+
+;; texture
 
 (bind-func create_texture
   (lambda ()
-    (let ((tex_ptr:i32* (salloc))
-          (tex:i32 0))
-      (glGenTextures 1 tex_ptr)
-      (pref tex_ptr 0))))
+    (let ((id:i32* (salloc)))
+      (glGenTextures 1 id)
+      (pref id 0))))
 
-(bind-func create_vao_1
-  "size = number of components per attribute"
-  (lambda (vbo1 size1)
-    (let ((vao_ptr:i32* (salloc))
-          (vao:i32 0))
-      (glGenVertexArrays 1 vao_ptr)
-      (set! vao (pref vao_ptr 0))
-      (glBindVertexArray vao)
-      (glEnableVertexAttribArray 0)
-      (glBindBuffer GL_ARRAY_BUFFER vbo1)
-      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) 0 null)
-      vao)))
-
-(bind-func create_vao_with_stride_1
-  "size = number of components per attribute"
-  (lambda (vbo1 size1 stride1)
-    (let ((vao_ptr:i32* (salloc))
-          (vao:i32 0))
-      (glGenVertexArrays 1 vao_ptr)
-      (set! vao (pref vao_ptr 0))
-      (glBindVertexArray vao)
-      (glEnableVertexAttribArray 0)
-      (glBindBuffer GL_ARRAY_BUFFER vbo1)
-      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) stride1 null)
-      vao)))
-
-(bind-func create_vao_2
-  "size = number of components per attribute"
-  (lambda (vbo1 size1 vbo2 size2)
-    (let ((vao_ptr:i32* (salloc))
-          (vao:i32 0))
-      (glGenVertexArrays 1 vao_ptr)
-      (set! vao (pref vao_ptr 0))
-      (glBindVertexArray vao)
-      (glEnableVertexAttribArray 0)
-      (glBindBuffer GL_ARRAY_BUFFER vbo1)
-      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) 0 null)
-      (glEnableVertexAttribArray 1)
-      (glBindBuffer GL_ARRAY_BUFFER vbo2)
-      (glVertexAttribPointer 1 size2 GL_FLOAT (convert GL_FALSE) 0 null)
-      vao)))
-
-(bind-func create_vao_with_stride_2
-  "size = number of components per attribute"
-  (lambda (vbo1 size1 stride1 vbo2 size2 stride2)
-    (let ((vao_ptr:i32* (salloc))
-          (vao:i32 0))
-      (glGenVertexArrays 1 vao_ptr)
-      (set! vao (pref vao_ptr 0))
-      (glBindVertexArray vao)
-      (glEnableVertexAttribArray 0)
-      (glBindBuffer GL_ARRAY_BUFFER vbo1)
-      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) stride1 null)
-      (glEnableVertexAttribArray 1)
-      (glBindBuffer GL_ARRAY_BUFFER vbo2)
-      (glVertexAttribPointer 1 size2 GL_FLOAT (convert GL_FALSE) stride2 null)
-      vao)))
-
-(bind-func create_vao_3
-  "size = number of components per attribute"
-  (lambda (vbo1 size1 vbo2 size2 vbo3 size3)
-    (let ((vao_ptr:i32* (salloc))
-          (vao:i32 0))
-      (glGenVertexArrays 1 vao_ptr)
-      (set! vao (pref vao_ptr 0))
-      (glBindVertexArray vao)
-      (glEnableVertexAttribArray 0)
-      (glBindBuffer GL_ARRAY_BUFFER vbo1)
-      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) 0 null)
-      (glEnableVertexAttribArray 1)
-      (glBindBuffer GL_ARRAY_BUFFER vbo2)
-      (glVertexAttribPointer 1 size2 GL_FLOAT (convert GL_FALSE) 0 null)
-      (glEnableVertexAttribArray 2)
-      (glBindBuffer GL_ARRAY_BUFFER vbo3)
-      (glVertexAttribPointer 2 size3 GL_FLOAT (convert GL_FALSE) 0 null)
-      vao)))
-
-(bind-poly create_vao create_vao_1)
-(bind-poly create_vao create_vao_with_stride_1)
-(bind-poly create_vao create_vao_2)
-(bind-poly create_vao create_vao_with_stride_2)
-(bind-poly create_vao create_vao_3)
-
-(bind-func delete_vao_1
-  (lambda (vao)
-    (let ((vao_ptr:i32* (salloc)))
-      (pset! vao_ptr 0 vao)
-      (glDeleteVertexArrays 1 vao_ptr))))
-
-(bind-poly delete_vao delete_vao_1)
+(bind-func delete_texture
+  (lambda (tex)
+    (let ((id:i32* (salloc)))
+      (pset! id 0 tex)
+      (glDeleteTextures 1 id)
+      (gl_print_error "Error deleting texture"))))
