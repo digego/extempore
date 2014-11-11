@@ -38,6 +38,10 @@
 (bind-val particles_vao VAO*)
 (bind-val star_texture i32)
 
+;; (call-as-xtlang (println particles_vbo))
+;; (call-as-xtlang (print particles_vao))
+;; (call-as-xtlang (println "particles_vbo:" particles_vbo "particles_vao:" particles_vao))
+
 (bind-func init_gl_objects
   (lambda ()
     (glEnable GL_PROGRAM_POINT_SIZE)
@@ -49,19 +53,27 @@
 
 (init_gl_objects)
 
-(bind-func draw
-  (lambda (program:i32)
-    (glUseProgram program)
+(bind-func bind_texture0
+  (lambda (tex uniform_location)
     (glActiveTexture GL_TEXTURE0)
     (glBindTexture GL_TEXTURE_2D star_texture)
-    (glUniform1i (glGetUniformLocation program "texStar") star_texture)
+    (glUniform1i uniform_location tex)
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)))
+
+(bind-func draw
+  (lambda (program:i32)
+    (println "checkpoint" 0)
+    (glUseProgram program)
+    (println "checkpoint" 1)
+    (bind_texture0 star_texture (glGetUniformLocation program "texStar"))
+    (println "checkpoint" 2)
+    (glClear GL_COLOR_BUFFER_BIT)
+    (println "checkpoint" 9)
     (draw_vertex_array particles_vao GL_POINTS 0 np)
-    (glBindTexture GL_TEXTURE_2D 0)
+    (println "checkpoint" 10)
     void))
 
 (define gl-loop
