@@ -369,7 +369,7 @@
 (bind-func create_vbo
   (lambda (size:i32 data:i8* type:i32)
     (let ((vbo:E_vbo* (halloc))
-	  (vboid:i32* (salloc)))
+          (vboid:i32* (salloc)))
       (glGenBuffers 1 vboid)
       (glBindBuffer GL_ARRAY_BUFFER (pref vboid 0))
       (glBufferData GL_ARRAY_BUFFER size null type)
@@ -864,42 +864,49 @@
         void))))
 
 ;; gl print
-(bind-func gl_print_error
-  (lambda ()
+(bind-func gl_print_error_with_msg
+  (lambda (msg:i8*)
     (let ((err GL_NO_ERROR))
       (set! err (glGetError))
       ;; (if (<> err GL_NO_ERROR)
       ;;     (ascii_text_color 0 1 10))
       (cond
        ((= err GL_INVALID_ENUM)
-        (printf "GL ERR: Invalid ENUM: %d\n" err))
+        (printf "%s: Invalid Enum\n" msg))
        ((= err GL_INVALID_VALUE)
-        (printf "GL ERR: Invalid Value: %d\n" err))
+        (printf "%s: Invalid Value\n" msg))
        ((= err GL_INVALID_OPERATION)
-        (printf "GL ERR: Invalid Operation: %d\n" err))
+        (printf "%s: Invalid Operation\n" msg))
        ((= err GL_STACK_OVERFLOW)
-        (printf "GL ERR: Stack Underflow: %d\n" err))
+        (printf "%s: Stack Underflow\n" msg))
        ((= err GL_STACK_UNDERFLOW)
-        (printf "GL ERR: Stack Overflow: %d\n" err))
+        (printf "%s: Stack Overflow\n" msg))
        ((= err GL_OUT_OF_MEMORY)
-        (printf "GL ERR: Out Of Memory: %d\n" err))
+        (printf "%s: Out Of Memory\n" msg))
        ((= err GL_INVALID_FRAMEBUFFER_OPERATION)
-        (printf "GL ERR: Invalid Framebuffer Operation: %d\n" err))
+        (printf "%s: Invalid Framebuffer Operation\n" msg))
        ((= err GL_TABLE_TOO_LARGE)
-        (printf "GL ERR: Table Too Large: %d\n" err))
+        (printf "%s: Table Too Large\n" msg))
        ((= err GL_NO_ERROR)
         ;; do nothing
         (i64toi32 1)
         )                        
        (else
         ;; do nothing
-        (printf "GL ERR: %d\n" err)
+        (printf "%s\n" msg)
         ))
       ;; (if (<> err GL_NO_ERROR)
       ;;     (begin
       ;;       (ascii_text_color 0 7 10)
       ;;       (printf "")))
       void)))
+
+(bind-func gl_print_error_no_msg
+  (lambda ()
+    (gl_print_error_with_msg "OpenGL Error")))
+
+(bind-poly gl_print_error gl_print_error_with_msg)
+(bind-poly gl_print_error gl_print_error_no_msg)
 
 (sys:precomp:insert-footer "xtmopengl")
 (define *xtmlib-opengl-loaded* #t)
