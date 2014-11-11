@@ -53,8 +53,8 @@
 (define gl-loop
   (lambda (time delta-t)
     (munge_points 256 256
-                  (+ .02 (* .02 (cos (* .1 2pi (/ time 44100.)))))
-                  (+ .02 (* .02 (cos (* .1 2pi .7 (/ time 44100.))))))
+                  (+ .01 (* .01 (cos (* .1 2pi (/ time 44100.)))))
+                  (+ .01 (* .01 (cos (* .1 2pi .7 (/ time 44100.))))))
     (draw arrows-program)
     (gl:swap-buffers *gl-window*)
     ;; (println 'time: time)
@@ -99,3 +99,24 @@
       (println))))
 
 (mean_fxye (pic_step.np))
+
+(define implicit-arrows-program
+  (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
+                 (file->string "examples/external/shader-tutorials/arrows.frag")))
+
+(bind-func draw
+  (let ((narrows (* 256 256))
+        (vert_vbo (create_vbo vertices (* 4 narrows)))
+        (vao (create_vao vert_vbo 2 16)))
+    (lambda (program)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
+      (glUseProgram program)
+      (glBindVertexArray vao)
+      (glDrawArrays GL_LINES 0 (* 4 narrows))
+      (update_vbo vert_vbo vertices (* 4 narrows))
+      void)))
+
+  homepage 'https://github.com/DeVaukz/SOIL'
+  url 'https://codeload.github.com/DeVaukz/SOIL/zip/master'
+  version '1.07'
+  sha1 '7114eb45fd2c8da5177e1dad663d4e09ce403842'
