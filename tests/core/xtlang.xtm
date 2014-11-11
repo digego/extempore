@@ -5,21 +5,9 @@
 
 ;;; Commentary:
 
-;; a test suite for xtlang code. Currently, the tests cannot be run
-;; with (sys:load "libs/core/xtlang_test.xtm"), because the first failing
-;; compilation will stop the evaluation of the file.
-
-;; The way to run all the tests, then, is to use the evaluate-buffer
-;; functionality of your editor (in Emacs, bound to C-x C-b by
-;; default) to send the forms one at a time to the compiler. After all
-;; the tests are run, a summary of the results will be printed to the
-;; log.
+;;
 
 ;;; Code:
-
-;; (define start_time (now))
-
-(sys:load "libs/core/test.xtm")
 
 ;; bit twiddling
 
@@ -1037,6 +1025,11 @@
 
          (vector-test4))
 
+;; test the call-as-xtlang macro
+
+;; make sure it'll handle multiple body forms
+(xtmtest-result (call-as-xtlang (println 1) (println 2) 5)
+                5)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; syntax highlighting tests ;;
@@ -1067,12 +1060,3 @@
 ;; (bind-val hl_test4 double* 10)
 ;; (bind-type hl_test_type <i64>)
 ;; (bind-lib testlib testfn [i32,i32]*)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; FINISH!
-;;
-;; print out the results of all the tests!
-
-;; (xtmtest-print-results)
-
-;; (println 'total-time: (* 1.0 (/ (- (now) start_time) *samplerate*)) 'seconds)
