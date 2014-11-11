@@ -51,6 +51,15 @@
 (bind-poly update_vbo update_vbo_float)
 (bind-poly update_vbo update_vbo_float)
 
+
+(bind-func delete_vbo_1
+  (lambda (vbo)
+    (let ((vbo_ptr:i32* (salloc)))
+      (pset! vbo_ptr 0 vbo)
+      (glDeleteBuffers 1 vbo_ptr))))
+
+(bind-poly delete_vbo delete_vbo_1)
+
 (bind-func create_texture
   (lambda ()
     (let ((tex_ptr:i32* (salloc))
@@ -71,6 +80,19 @@
       (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) 0 null)
       vao)))
 
+(bind-func create_vao_with_stride_1
+  "size = number of components per attribute"
+  (lambda (vbo1 size1 stride1)
+    (let ((vao_ptr:i32* (salloc))
+          (vao:i32 0))
+      (glGenVertexArrays 1 vao_ptr)
+      (set! vao (pref vao_ptr 0))
+      (glBindVertexArray vao)
+      (glEnableVertexAttribArray 0)
+      (glBindBuffer GL_ARRAY_BUFFER vbo1)
+      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) stride1 null)
+      vao)))
+
 (bind-func create_vao_2
   "size = number of components per attribute"
   (lambda (vbo1 size1 vbo2 size2)
@@ -85,6 +107,22 @@
       (glEnableVertexAttribArray 1)
       (glBindBuffer GL_ARRAY_BUFFER vbo2)
       (glVertexAttribPointer 1 size2 GL_FLOAT (convert GL_FALSE) 0 null)
+      vao)))
+
+(bind-func create_vao_with_stride_2
+  "size = number of components per attribute"
+  (lambda (vbo1 size1 stride1 vbo2 size2 stride2)
+    (let ((vao_ptr:i32* (salloc))
+          (vao:i32 0))
+      (glGenVertexArrays 1 vao_ptr)
+      (set! vao (pref vao_ptr 0))
+      (glBindVertexArray vao)
+      (glEnableVertexAttribArray 0)
+      (glBindBuffer GL_ARRAY_BUFFER vbo1)
+      (glVertexAttribPointer 0 size1 GL_FLOAT (convert GL_FALSE) stride1 null)
+      (glEnableVertexAttribArray 1)
+      (glBindBuffer GL_ARRAY_BUFFER vbo2)
+      (glVertexAttribPointer 1 size2 GL_FLOAT (convert GL_FALSE) stride2 null)
       vao)))
 
 (bind-func create_vao_3
@@ -107,5 +145,15 @@
       vao)))
 
 (bind-poly create_vao create_vao_1)
+(bind-poly create_vao create_vao_with_stride_1)
 (bind-poly create_vao create_vao_2)
+(bind-poly create_vao create_vao_with_stride_2)
 (bind-poly create_vao create_vao_3)
+
+(bind-func delete_vao_1
+  (lambda (vao)
+    (let ((vao_ptr:i32* (salloc)))
+      (pset! vao_ptr 0 vao)
+      (glDeleteVertexArrays 1 vao_ptr))))
+
+(bind-poly delete_vao delete_vao_1)
