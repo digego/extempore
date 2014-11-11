@@ -73,24 +73,25 @@
         `(begin (println "No such XTM function") #f))))
 
   
-(define-macro (call-as-xtlang expr)
+(define-macro (call-as-xtlang . expr)
   (suppress-compiler-messages #t)
-  (let ((type (impc:ti:get-expression-type expr)))
-    (eval `(bind-func xtlang_expression
-             (lambda ()
-               ,(if (equal? type -1)
-                    `(let ((s:i8* (halloc 2)))
-                       ,expr
-                       s)
-                    `(letz ((s (sprintln ,expr))
-                            (lgth (+ 1 (string_size s)))
-                            (oldcs (cstr_from_string s))
-                            (newcs:i8* (halloc lgth)))
-                       (strcpy newcs oldcs)
-                       newcs))))                           
-          (interaction-environment)))
-  (suppress-compiler-messages #f)
-  (cptr->string (xtlang_expression)))
+  (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
+    (catch (suppress-compiler-messages #f)
+           (eval `(bind-func xtlang_expression
+                    (lambda ()
+                      ,(if (equal? type -1)
+                           `(let ((s:i8* (halloc 2)))
+                              ,@expr
+                              s)
+                           `(letz ((s (sprintln (begin ,@expr)))
+                                   (lgth (+ 1 (string_size s)))
+                                   (oldcs (cstr_from_string s))
+                                   (newcs:i8* (halloc lgth)))
+                              (strcpy newcs oldcs)
+                              newcs))))                           
+                 (interaction-environment))
+           (suppress-compiler-messages #f))
+    (cptr->string (xtlang_expression))))
 
 (define xtmX call-as-xtlang)
 
