@@ -1,13 +1,11 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
-(call-as-xtlang (glEnable GL_PROGRAM_POINT_SIZE))
-
-(define nx 10)
 (define np 100)
+(bind-val np i32 np) ;; be careful - these values won't necessarily
+                     ;; stay in sync
 
 (bind-val particles float* (* np 4)) ;; <x,y,vx,vy>
-(bind-val colours float* 12)
-;; (bind-val texdata float* 12)
+;; (bind-val colours float* (* np 3))
 
 (bind-func init_particles
   (lambda (np)
@@ -21,46 +19,50 @@
 
 (init_particles np)
 
+;; (bind-func init_colours
+;;   (lambda (np)
+;;     ;; GL_points version
+;;     (let ((i 0))
+;;       (dotimes (i (* np 3))
+;;         (pset! colours (+ (* i 3) 0) (random -1. 1.))
+;;         (pset! colours (+ (* i 3) 1) (random -1. 1.))
+;;         (pset! colours (+ (* i 3) 2) (random -1. 1.))))))
+
+;; (init_colours np)
+
 (define particles-shader
   (create_shader (file->string "examples/external/shader-tutorials/particles.vert")
                  (file->string "examples/external/shader-tutorials/particles.frag")))
 
-(bind-func create_particle_vao
-  "size = number of components per attribute"
-  (lambda (part_vbo:i32)
-    (let ((vao_ptr:i32* (salloc))
-          (vao:i32 0))
-      (glGenVertexArrays 1 vao_ptr)
-      (set! vao (pref vao_ptr 0))
-      (glBindVertexArray vao)
-      (glEnableVertexAttribArray 0)
-      (glBindBuffer GL_ARRAY_BUFFER part_vbo)
-      (glVertexAttribPointer 0 2 GL_FLOAT GL_FALSE 16 null)
-      (glEnableVertexAttribArray 1)
-      (glBindBuffer GL_ARRAY_BUFFER part_vbo)
-      (glVertexAttribPointer 1 2 GL_FLOAT GL_FALSE 16 (pref-ptr (cast null i8*) 8))
-      vao)))
+(bind-val particles_vbo VBO*)
+(bind-val particles_vao VAO*)
+(bind-val star_texture i32)
+
+(bind-func init_gl_objects
+  (lambda ()
+    (glEnable GL_PROGRAM_POINT_SIZE)
+    (set! particles_vao (create_vao) np)
+    (set! particles_vbo (create_vbo particles (* 4 np)))
+    (bind_attribute particles_vao particles_vbo 0 2 GL_FLOAT 16 0)
+    (bind_attribute particles_vao particles_vbo 1 2 GL_FLOAT 16 8)
+    (set! star_texture (gl_load_image "assets/images/star.png" 0))))
+
+(init_gl_objects)
 
 (bind-func draw
-  (let ((np 100)
-        (vert_vbo (create_vbo_float particles (* 4 np)))
-        (star_texture (gl_load_image "assets/images/star.png" star_texture))
-        (vao (create_particle_vao vert_vbo)))
-    (lambda (program:i32)
-      (glActiveTexture GL_TEXTURE0)
-      (glBindTexture GL_TEXTURE_2D star_texture)
-      ;; ;; (glTexImage2D GL_TEXTURE_2D 0 GL_RGB 2 2 0 GL_RGB GL_FLOAT (convert texdata))
-      (glUniform1i (glGetUniformLocation program "texStar") 0)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
-      (glUseProgram program)
-      (glBindVertexArray vao)
-      (glDrawArrays GL_POINTS 0 np)
-      (gl_print_error)
-      void)))
+  (lambda (program:i32)
+    (glUseProgram program)
+    (glActiveTexture GL_TEXTURE0)
+    (glBindTexture GL_TEXTURE_2D star_texture)
+    (glUniform1i (glGetUniformLocation program "texStar") star_texture)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
+    (draw_vertex_array particles_vao GL_POINTS 0 np)
+    (glBindTexture GL_TEXTURE_2D 0)
+    void))
 
 (define gl-loop
   (lambda (time delta-t)
