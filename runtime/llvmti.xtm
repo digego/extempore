@@ -75,7 +75,20 @@
     (if bool
         (set! *impc:compiler:message:level* 'low)
         (set! *impc:compiler:message:level* 'high))))
-              
+
+(define-macro (sys:with-quiet-compiler . form)
+  `(let ((msglvl *impc:compiler:message:level*))
+     (set! *impc:compiler:message:level* 'low)
+     (let ((res (catch #f ,@form)))
+       (set! *impc:compiler:message:level* msglvl)
+       res)))
+
+(define-macro (sys:with-noisy-compiler . form)
+  `(let ((msglvl *impc:compiler:message:level*))
+     (set! *impc:compiler:message:level* 'high)
+     (let ((res (catch #f ,@form)))
+       (set! *impc:compiler:message:level* msglvl)
+       res)))
 
 (define icr:new-zone
    (lambda args
