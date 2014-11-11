@@ -65,34 +65,29 @@
                       'null
                       (apply string_cat_macro (cdr args)))))
 
-
 (define-macro (xtm-dump-ir fname)
   (let ((n (llvm:get-closure-work-name (symbol->string fname))))
     (if n
         `(llvm:print-function ,n)
         `(begin (println "No such XTM function") #f))))
 
-  
 (define-macro (call-as-xtlang . expr)
-  (suppress-compiler-messages #t)
-  (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
-    (catch (suppress-compiler-messages #f)
-           (eval `(bind-func xtlang_expression
-                    (lambda ()
-                      ,(if (equal? type -1)
-                           `(let ((s:i8* (halloc 2)))
-                              ,@expr
-                              s)
-                           `(letz ((s (sprintln (begin ,@expr)))
-                                   (lgth (+ 1 (string_size s)))
-                                   (oldcs (cstr_from_string s))
-                                   (newcs:i8* (halloc lgth)))
-                              (strcpy newcs oldcs)
-                              newcs))))                           
-                 (interaction-environment))
-           (suppress-compiler-messages #f))
-    (quote (string->atom (cptr->string (xtlang_expression))))))
-
+  (sys:with-quiet-compiler
+   (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
+     (eval `(bind-func xtlang_expression
+              (lambda ()
+                ,(if (equal? type -1)
+                     `(let ((s:i8* (halloc 2)))
+                        ,@expr
+                        s)
+                     `(letz ((s (sprintln (begin ,@expr)))
+                             (lgth (+ 1 (string_size s)))
+                             (oldcs (cstr_from_string s))
+                             (newcs:i8* (halloc lgth)))
+                        (strcpy newcs oldcs)
+                        newcs))))                           
+           (interaction-environment))
+     (quote (string->atom (cptr->string (xtlang_expression)))))))
 
 (define xtmX call-as-xtlang)
 
