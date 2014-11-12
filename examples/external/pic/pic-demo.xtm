@@ -1,0 +1,51 @@
+(sys:load "libs/external/pic/pic.xtm")
+(run-pic 1/30)
+
+(pic_step.dt .1)
+
+(bind-func print_particle
+  (lambda (n)
+    (println "x"
+             (pref part (* 4 n)))))
+
+(print_particle 0)
+
+(bind-func particle_mean
+  (lambda (np)
+    (let ((maxcal:float 0.0))
+      (doloop (i np)
+        (if (> (pref part (* i 4)) maxcal )
+            (set! maxcal (pref part (* i 4)))))
+      (println "maxcal =" maxcal))))
+
+(particle_mean (pic_step.np))
+
+(bind-func particle_kick
+  (lambda (np x y)
+    (doloop (i np)
+      (let ((idx (random 0 np)))
+        (pset! part (+ 2 (* i 4))
+               (+ x (pref part (+ 2 (* i 4)))))
+        (pset! part (+ 3 (* i 4))
+               (+ y (pref part (+ 3 (* i 4)))))))))
+
+(particle_kick 1000 -3. 0.)
+
+(bind-func particle_drop
+  (lambda (np x y)
+    (doloop (i np)
+      (let ((idx (random 0 np)))
+        (pset! part (+ 0 (* i 4))
+               (+ x (random -100. 100.)))
+        (pset! part (+ 1 (* i 4))
+               (+ y (random -100. 100.)))))))
+
+(particle_drop 5000
+               (random 512)
+               (random 512))
+
+(pic_step.ipbc 0)
+
+(pic_step.qme 1)
+(pic_step.qme -1)
+
