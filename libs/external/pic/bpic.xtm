@@ -75,8 +75,8 @@
 (bind-val exyz cpxf*)
 (bind-val bxyz cpxf*)
 (bind-val ffc cpxf*)
-(bind-val mixup i32*)
 (bind-val sct cpxf*)
+(bind-val mixup i32*)
 (bind-val npicy i32*)
 ;; and a vbo for the graphics code
 (bind-val vbo E_vbo*)
@@ -116,6 +116,25 @@
       (set! npicy npicy_ptr)
       (println "Allocated data arrays for up to np:" np "nx:" nx "ny:" ny)
       void)))
+
+(bind-func zero_data_arrays
+  (lambda (np:i32 nx:i32 ny:i32)
+    (let ((idimp:i32 5)
+          (ndim:i32 3)
+          (nxe (+ nx 2))
+          (nye (+ ny 1)))
+      (memset (cast part i8*) 0 (convert (* (* idimp np) 4) i64))  ;; idimp = 5
+      (memset (cast part2 i8*) 0 (convert (* (* idimp np) 4) i64)) ;; idimp = 5
+      (memset (cast qe i8*) 0 (convert (* (* nxe nye) 4) i64))
+      (memset (cast fxyze i8*) 0 (convert (* (* ndim nxe nye) 4) i64))
+      (memset (cast cue i8*) 0 (convert (* (* ndim nxe nye) 4) i64))
+      (memset (cast bxyze i8*) 0 (convert (* (* ndim nxe nye) 4) i64))
+      (memset (cast exyz i8*) 0 (convert (* (* ndim (/ nxe 2) nye) 8) i64))
+      (memset (cast bxyz i8*) 0 (convert (* (* ndim (/ nxe 2) nye) 8) i64))
+      (memset (cast ffc i8*) 0 (convert (* (* (/ nx 2) (/ ny 2)) 8) i64))
+      (memset (cast sct i8*) 0 (convert (* (/ (max2i32 nx ny) 2) 8) i64))
+      (memset (cast mixup i8*) 0 (convert (* (max2i32 (/ nx 2) ny) 4) i64))
+      (memset (cast npicy i8*) 0 (convert (* (+ ny 1) 4) i64)))))
 
 (bind-func free_data_arrays
   (lambda ()
@@ -248,6 +267,7 @@
         (dth:float 0.)
         (sortime:i32 0))
 
+    (zero_data_arrays np nx ny)
     ;; prepare fft tables
     (cwfft2rinit mixup sct indx indy nxhy nxyh)
     ;; calculate form factors

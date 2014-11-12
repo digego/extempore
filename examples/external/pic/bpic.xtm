@@ -42,13 +42,27 @@
 ;; here, we're going to re-compile it to do something more interesting
 (bind-func munge_fields
   (lambda (n:i32)
-    (let ((comp 2) ;; comp: x = 0, y = 1, z = 2
-          (magnitude 1.))
+    (let ((field bxyz)  ;; can be fxyze, bxyze 
+          (comp 2)       ;; comp: x = 0, y = 1, z = 2
+          (magnitude 10.))
       (doloop (j (/ n 4))
-        (pset! (cast bxyz float*)
+        (pset! (cast field float*)
                (+ (* j 3) comp)
-               (+ (pref (cast bxyz float*) (+ (* j 3) comp)) magnitude))
+               (+ (pref (cast field float*) (+ (* j 3) comp)) magnitude))
         void))))
+
+;; to remove the external field, re-define munge_fields to be a no-op
+(bind-func munge_fields
+  (lambda (n:i32)
+    void))
+
+(particle_redistribute (bpic_step.np)
+                       (bpic_step.nx)
+                       (bpic_step.ny))
+
+(zero_data_arrays (bpic_step.np)
+                  (bpic_step.nx)
+                  (bpic_step.ny))
 
 ;; you can change the comp and magnitude variables (in the 'let') and
 ;; re-eval to see new results. also, you can go back up and
@@ -59,8 +73,8 @@
   (lambda (np x y)
     (doloop (i np)
       (let ((idx (random 0 np)))
-        (pset! part (+ 0 (* i 5)) x)
-        (pset! part (+ 1 (* i 5)) y)))))
+        (pset! part (+ 0 (* idx 5)) x)
+        (pset! part (+ 1 (* idx 5)) y)))))
 
 ;; drop 5000 particles at a random point
 (particle_drop 5000 (random (bpic_step.nx)) (random (bpic_step.nx)))
