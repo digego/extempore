@@ -60,3 +60,44 @@
 ;; too long.
 
 (bpic_step.ipbc 0)
+
+
+(bind-func init_field_xy
+  (lambda (nx:i32)
+    (let 
+      (dotimes (i (* xdim ny))
+        (pset! field (+ 0 (* 4 i)) (convert (/ i nxe) float))
+        (pset! field (+ 1 (* 4 i)) (convert (% i nxe) float))))))
+
+
+(bind-func order_test2
+  (lambda (r:i64 c)
+    (let ((i 0))
+      (doloop (x r)
+        (doloop (y c)
+          (printf "x = %lld y = %lld idx = %lld i = %lld\n" x y (+ (* x c) y) i))))
+    (println)))
+
+(order_test2 4 3)
+
+
+
+(+ x (* y xdim) (* z xdim ydim))
+
+
+(order_test_3 2 2 2)
+
+(bind-func field_add_ripple
+  (lambda (xdim xp yp zp)
+    (let ((ydim xdim)
+          (nxe (+ 2 xdim))
+          (ydime (+ 1 ydim))
+          (idx 0))
+      (doloop (x nxe)
+        (doloop (y ydime)
+          (set! idx (+ (* x nxe) y))
+          (pset! fxyze (+ 0 idx) )
+          (pset! fxyze (+ 1 idx) ))))))
+
+(bpic_step.relativity 0)
+(bpic_step.dt 0.1)
