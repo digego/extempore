@@ -1930,7 +1930,7 @@
 
 (define sys:precomp:insert-header
   (lambda (libname)
-    (if (sys:precomp:currently-compiling?)
+    (if (output-port? *sys:precomp:current-output-port*)
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
                    *sys:precomp:current-output-port*)
@@ -1951,7 +1951,7 @@
 
 (define sys:precomp:insert-footer
   (lambda (libname)
-    (if (sys:precomp:currently-compiling?)
+    (if (output-port? *sys:precomp:current-output-port*)
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"Loaded \"))\n(print-with-colors 'blue 'default #t (print \"" libname "\"))\n")
                    *sys:precomp:current-output-port*)
@@ -1966,7 +1966,7 @@
 ;; the precomp .xtm file, otherwise do nothing
 (define sys:precomp:insert-sexp
   (lambda (sexp)
-    (if (sys:precomp:currently-compiling?)
+    (if (output-port? *sys:precomp:current-output-port*)
         (display (string-append (sexpr->string sexp) "\n")
                  *sys:precomp:current-output-port*))))
 
