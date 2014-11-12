@@ -95,7 +95,6 @@
           (bxyze_ptr (halloc (* ndim nxe nye)))
           (exyz_ptr (halloc (* ndim (/ nxe 2) nye)))
           (bxyz_ptr (halloc (* ndim (/ nxe 2) nye)))
-          ;; twice the size of fxye
           (ffc_ptr (halloc (* (/ nx 2) (/ ny 2))))
           (mixup_ptr (halloc (max2i32 (/ nx 2) ny)))
           (sct_ptr (halloc (/ (max2i32 nx ny) 2)))
@@ -182,7 +181,7 @@
 (define height 768.0)
 (bind-val width float 1024.0)
 (bind-val height float 768.0)
-(define fullscreen #f)
+(define fullscreen #t)
 
 (define *gl-ctx* (gl:make-ctx ":0" fullscreen 0. 0. width height))
 
@@ -244,6 +243,7 @@
                        (convert np float)))
         (dth:float 0.)
         (sortime:i32 0))
+
     ;; prepare fft tables
     (cwfft2rinit mixup sct indx indy nxhy nxyh)
     ;; calculate form factors
@@ -251,19 +251,17 @@
     (cpois23 (cast qe cpxf*)
              (cast fxyze cpxf*)
              isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
+
     ;; initialize electrons
     (cdistr2h part vtx vty vtz vx0 vy0 vz0 npx npy idimp np nx ny ipbc)
     ;; initialize transverse electromagnetic fields
-    ;; for (j = 0; j < ndim*nxeh*nye; j++) {
-    ;;    exyz[j] = 0.0 + 0.0*_Complex_I;
-    ;;    bxyz[j] = 0.0 + 0.0*_Complex_I;
-    ;; }
 
-    (doloop (j (* ndim nxeh nye))
-      ;; set all imaginary components to 1.0 could have done this with
-      ;; cpxf, but this is easier
-      (pset! (cast exyz float*) (+ (* j 2) 1) 1.0)
-      (pset! (cast bxyz float*) (+ (* j 2) 1) 1.0))
+    ;; you can mess with the field here
+    ;; (doloop (j (* ndim nxeh nye))
+    ;;   ;; set all imaginary components to 1.0 could have done this with
+    ;;   ;; cpxf, but this is easier
+    ;;   (pset! (cast exyz float*) (+ (* j 2) 1) 1.0)
+    ;;   (pset! (cast bxyz float*) (+ (* j 2) 1) 1.0))
     (lambda ()
       (if (> dt (* 0.45 ci))
           (println "Warning: Courant condition may be exceeded!\n")
