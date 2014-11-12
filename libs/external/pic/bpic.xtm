@@ -1,29 +1,533 @@
-;; auto-processed by extempore-parser stuff in extempore.el
-(bind-lib libcbpic2 dtimer [void,double*,timeval*,i32]*)
-(bind-lib libcbpic2 ranorm [double]*)
-(bind-lib libcbpic2 randum [double]*)
-(bind-lib libcbpic2 cdistr2h [void,float*,float,float,float,float,float,float,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cgbpush23l [void,float*,float*,float*,float,float,float,float*,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cdgbpush23l [void,double*,double*,double*,double,double,double,double*,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cgrbpush23l [void,float*,float*,float*,float,float,float,float,float*,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cdgrbpush23l [void,double*,double*,double*,double,double,double,double,double*,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cgpost2l [void,float*,float*,float,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cgjpost2l [void,float*,float*,float,float,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cgrjpost2l [void,float*,float*,float,float,float,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cdsortp2yl [void,float*,float*,i32*,i32,i32,i32]*)
-(bind-lib libcbpic2 cbguard2l [void,float*,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cacguard2l [void,float*,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 caguard2l [void,float*,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cpois23 [void,float,float,i32,float,float,float,float,float*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 ccuperp2 [void,float,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cibpois23 [void,float,float,float,float,float*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cmaxwel2 [void,float,float,float,float,float,float,float*,float*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cemfield2 [void,float,float,float,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cwfft2rinit [void,i32*,float,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cfft2rxx [void,float,i32,i32*,float,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cfft2rxy [void,float,i32,i32*,float,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cfft2r3x [void,float,i32,i32*,float,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cfft2r3y [void,float,i32,i32*,float,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cwfft2rx [void,float,i32,i32*,float,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libcbpic2 cwfft2r3 [void,float,i32,i32*,float,i32,i32,i32,i32,i32,i32]*)
+;; bpic
 
+(sys:load "libs/external/shaders.xtm")
+
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libbpic2
+ (cond ((string=? (sys:platform) "OSX")
+        "libbpic2.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libbpic2.so")
+       ((string=? (sys:platform) "Windows")
+        "libbpic2.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
+(define libbpic2
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+
+;; from bpic2.h
+
+(bind-type timeval <i64,i64>)
+(bind-lib libbpic2 dtimer [void,double*,timeval*,i32]*)
+(bind-lib libbpic2 main [i32,i32,i8**]*)
+
+;; from bpush2.h
+
+(bind-lib libbpic2 dtimer [void,double*,timeval*,i32]*)
+(bind-lib libbpic2 ranorm [double]*)
+(bind-lib libbpic2 randum [double]*)
+(bind-lib libbpic2 cdistr2h [void,float*,float,float,float,float,float,float,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cgbpush23l [void,float*,float*,float*,float,float,float,float*,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cdgbpush23l [void,double*,double*,double*,double,double,double,double*,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cgrbpush23l [void,float*,float*,float*,float,float,float,float,float*,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cdgrbpush23l [void,double*,double*,double*,double,double,double,double,double*,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cgpost2l [void,float*,float*,float,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cgjpost2l [void,float*,float*,float,float,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cgrjpost2l [void,float*,float*,float,float,float,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cdsortp2yl [void,float*,float*,i32*,i32,i32,i32]*)
+(bind-lib libbpic2 cbguard2l [void,float*,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cacguard2l [void,float*,i32,i32,i32,i32]*)
+(bind-lib libbpic2 caguard2l [void,float*,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cpois23 [void,cpxf*,cpxf*,i32,cpxf*,float,float,float,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 ccuperp2 [void,cpxf*,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cibpois23 [void,cpxf*,cpxf*,cpxf*,float,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cmaxwel2 [void,cpxf*,cpxf*,cpxf*,cpxf*,float,float,float*,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cemfield2 [void,cpxf*,cpxf*,cpxf*,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cwfft2rinit [void,i32*,cpxf*,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cfft2rxx [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cfft2rxy [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cfft2r3x [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cfft2r3y [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cwfft2rx [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cwfft2r3 [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32]*)
+
+(bind-func run_main
+  (lambda ()
+    (main 0 null)))
+
+;; (run_main)
+
+
+;; now for the xtlang version
+
+;; allocate arrays for standard code
+(bind-val part float*) ;; <x,y,vx,vy,vz>
+(bind-val part2 float*)
+(bind-val tpart float*)
+(bind-val qe float*)
+(bind-val cue float*)
+(bind-val fxyze float*)
+(bind-val bxyze float*)
+(bind-val exyz cpxf*)
+(bind-val bxyz cpxf*)
+(bind-val ffc cpxf*)
+(bind-val mixup i32*)
+(bind-val sct cpxf*)
+(bind-val npicy i32*)
+;; and a vbo for the graphics code
+(bind-val vbo E_vbo*)
+
+(bind-func allocate_data_arrays
+  (lambda (np:i32 nx:i32 ny:i32)
+    (let ((idimp:i32 5)
+          (ndim:i32 3)
+          (nxe (+ nx 2))
+          (nye (+ ny 1))
+          (part_ptr (halloc (* idimp np)))  ;; idimp = 5
+          (part2_ptr (halloc (* idimp np))) ;; idimp = 5
+          (qe_ptr (halloc (* nxe nye)))
+          (fxyze_ptr (halloc (* ndim nxe nye)))
+          (cue_ptr (halloc (* ndim nxe nye)))
+          (bxyze_ptr (halloc (* ndim nxe nye)))
+          (exyz_ptr (halloc (* ndim (/ nxe 2) nye)))
+          (bxyz_ptr (halloc (* ndim (/ nxe 2) nye)))
+          ;; twice the size of fxye
+          (ffc_ptr (halloc (* (/ nx 2) (/ ny 2))))
+          (mixup_ptr (halloc (max2i32 (/ nx 2) ny)))
+          (sct_ptr (halloc (/ (max2i32 nx ny) 2)))
+          (npicy_ptr (halloc (+ ny 1))))
+      (set! part part_ptr)
+      (set! vbo (create_vbo (* np 20)
+                            (cast part i8*)
+                            GL_STREAM_DRAW))
+      (set! part2 part2_ptr)
+      (set! qe qe_ptr)
+      (set! fxyze fxyze_ptr)
+      (set! cue cue_ptr)
+      (set! bxyze bxyze_ptr)
+      (set! exyz exyz_ptr)
+      (set! bxyz bxyz_ptr)
+      (set! ffc ffc_ptr)
+      (set! mixup mixup_ptr)
+      (set! sct sct_ptr)
+      (set! npicy npicy_ptr))
+      (println "Allocated data arrays for up to np:" np "nx:" nx "ny:" ny)
+      void)))
+
+(bind-func free_data_arrays
+  (lambda ()
+    (free part)
+    (free vbo)
+    (free part2)
+    (free qe)
+    (free fxyze)
+    (free cue)
+    (free byxze)
+    (free exyz)
+    (free bxyz)
+    (free ffc)
+    (free mixup)
+    (free sct)
+    (free npicy))
+    (free part)
+    (free part2)
+    (free qe)
+    (free fxye)
+    (free field)
+    (free ffc)
+    (free mixup)
+    (free sct)
+    (free npicy)))
+
+(bind-func particle_range
+  (lambda (np)
+    (let ((minx:float 0.)
+          (miny:float 0.)
+          (maxx:float 0.)
+          (maxy:float 0.)
+          (minvx:float 0.)
+          (minvy:float 0.)
+          (maxvx:float 0.)
+          (maxvy:float 0.)
+          (x 0.)
+          (y 0.)
+          (vx 0.)
+          (vy 0.))
+      (doloop (i np)
+        (set! x (pref part (* 4 i)))
+        (set! y (pref part (+ (* 4 i) 1)))
+        (set! vx (pref part (+ (* 4 i) 2)))
+        (set! vy (pref part (+ (* 4 i) 3)))
+        (if (< x minx) (set! minx x))
+        (if (< y miny) (set! miny y))
+        (if (> x maxx) (set! maxx x))
+        (if (> y maxy) (set! maxy y))
+        (if (< vx minvx) (set! minvx vx))
+        (if (< vy minvy) (set! minvy vy))
+        (if (> vx maxvx) (set! maxvx vx))
+        (if (> vy maxvy) (set! maxvy vy)))
+      (println "minx:" minx "miny:" miny)
+      (println "maxx:" maxx "maxy:" maxy)
+      (println "minvx:" minvx "minvy:" minvy)
+      (println "maxvx:" maxvx "maxvy:" maxvy))))
+
+(bind-func init_particles
+  (lambda (np:i32 nx:i32 ny:i32)
+    (doloop (i np)
+      (pset! part (* i 4) (random (convert nx float)))
+      (pset! part (+ (* i 4) 1) (random (convert ny float)))
+      (pset! part (+ (* i 4) 2) (* 2. (random -1. 1.)))
+      (pset! part (+ (* i 4) 3) (* 2. (random -1. 1.))))))
+
+;; need to set up the graphics context before we create the VBO or
+;; it'll crash
+
+(define width 1024.0)
+(define height 768.0)
+(bind-val width float 1024.0)
+(bind-val height float 768.0)
+(define fullscreen #f)
+
+(define *gl-ctx* (gl:make-ctx ":0" fullscreen 0. 0. width height))
+
+(define *max-grid-size* (real->integer (expt 2 9)))
+(define *max-num-particles* (real->integer (* 3072 3072)))
+
+(allocate_data_arrays *max-num-particles* *max-grid-size* *max-grid-size*)
+
+;; 4 floats (4 bytes each) = 16 bytes
+(bind-func bpic_set_vbo_data_size
+  (lambda (npx npy)
+    (tset! vbo 1 (* (* npx npy) 20))))
+
+(bind-func bpic_step
+  (let (              ;; parameters
+        (indx:i32 8)  ;; originally 9
+        (indy:i32 8)  ;; originally 9
+        (npx:i32 500) ;; originally 3072
+        (npy:i32 500) ;; originally 3072
+        (ndim:i32 3)
+        (tend:float 10.)
+        (dt:float .04)
+        (qme:float -1.)
+        (vtx:float 1.)
+        (vty:float 1.)
+        (vtz:float 1.)
+        (vx0:float 0.)
+        (vy0:float 0.)
+        (vz0:float 0.)
+        (ax:float .912871)
+        (ay:float .912871)
+        (ci:float .1)
+        (idimp:i32 5)
+        (ipbc:i32 1)
+        (relativity:i32 1)
+        (wke:float* (zalloc))
+        (we:float* (zalloc))
+        (wf:float* (zalloc))
+        (wm:float* (zalloc))
+        (wt:float 0.)
+        ;; scalars for standard code
+        (j:i32 0)
+        (np:i32 (* npx npy))
+        (nx:i32 (<< 1:i32 indx)) ;; only works for indx < 2^31
+        (ny:i32 (<< 1:i32 indy)) ;; only works for indx < 2^31
+        (nxh:i32 (/ nx 2))
+        (nyh:i32 (/ ny 2))
+        (nxe:i32 (+ nx 2))
+        (nye:i32 (+ ny 1))
+        (nxeh:i32 (/ nxe 2))
+        (nxyh:i32 (/ (max nx ny) 2))
+        (nxhy:i32 (max nxh ny))
+        (ny1:i32 (+ ny 1))
+        (ntime:i32 0)
+        (nloop:i32 (convert (+ (/ tend dt) .0001)))
+        (isign:i32 0)
+        (qbme:float qme)
+        (affp:float (/ (convert (* nx ny) float)
+                       (convert np float)))
+        (dth:float 0.)
+        (sortime:i32 0))
+    ;; prepare fft tables
+    (cwfft2rinit mixup sct indx indy nxhy nxyh)
+    ;; calculate form factors
+    (set! isign 0)
+    (cpois23 (cast qe cpxf*)
+             (cast fxyze cpxf*)
+             isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
+    ;; initialize electrons
+    (cdistr2h part vtx vty vtz vx0 vy0 vz0 npx npy idimp np nx ny ipbc)
+    ;; initialize transverse electromagnetic fields
+    ;; for (j = 0; j < ndim*nxeh*nye; j++) {
+    ;;    exyz[j] = 0.0 + 0.0*_Complex_I;
+    ;;    bxyz[j] = 0.0 + 0.0*_Complex_I;
+    ;; }
+
+    (doloop (j (* ndim nxeh nye))
+      ;; set all imaginary components to 1.0 could have done this with
+      ;; cpxf, but this is easier
+      (pset! (cast exyz float*) (+ (* j 2) 1) 1.0)
+      (pset! (cast bxyz float*) (+ (* j 2) 1) 1.0))
+    (lambda ()
+      (if (> dt (* 0.45 ci))
+          (println "Warning: Courant condition may be exceeded!\n")
+          void)
+      ;; deposit current with standard procedure: updates part, cue
+      (doloop (j (* ndim nxe nye))
+        (pset! cue j 0.))
+      (if (= relativity 1)
+          (cgrjpost2l part cue qme dth ci np idimp nx ny nxe nye ipbc)
+          (cgjpost2l part cue qme dth np idimp nx ny nxe nye ipbc))
+
+      ;; deposit charge with standard procedure: updates qe
+      (doloop (j (* nxe nye))
+        (pset! qe j 0.))
+      (cgpost2l part qe qme np idimp nxe nye)
+
+      ;; add guard cells with standard procedure: updates cue, qe
+      (cacguard2l cue nx ny nxe nye)
+      (caguard2l qe nx ny nxe nye)
+
+      ;; transform charge to fourier space with standard procedure:
+      ;; updates qe
+      (set! isign -1)
+      (cwfft2rx (cast qe cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+
+      ;; transform current to fourier space with standard procedure:
+      ;; update cue
+      (set! isign -1)
+      (cwfft2r3 (cast cue cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+
+      ;; take transverse part of current with standard procedure:
+      ;; updates cue
+      (ccuperp2 (cast cue cpxf*) nx ny nxeh nye)
+
+      ;; calculate electromagnetic fields in fourier space with
+      ;; standard procedure: updates exyz, bxyz
+      (if (= ntime 0)
+          (begin (cibpois23 (cast cue cpxf*) bxyz ffc ci wm nx ny nxeh nye nxh nyh)
+                 (pset! wf 0 0.0)
+                 (set! dth (* 0.5 dt))
+                 void)
+          (cmaxwel2 exyz bxyz (cast cue cpxf*) ffc ci dt wf wm nx ny nxeh nye nxh nyh))
+
+      ;; calculate force/charge in fourier space with standard
+      ;; procedure: updates fxyze
+      (set! isign -1)
+      (cpois23 (cast qe cpxf*) (cast fxyze cpxf*) isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
+
+      ;; add longitudinal and transverse electric fields with standard
+      ;; procedure: updates fxyze
+      (set! isign 1)
+      (cemfield2 (cast fxyze cpxf*) exyz ffc isign nx ny nxeh nye nxh nyh)
+
+      ;; copy magnetic field with standard procedure: updates bxyze
+      (set! isign -1)
+      (cemfield2 (cast bxyze cpxf*) bxyz ffc isign nx ny nxeh nye nxh nyh)
+
+      ;; transform electric force to real space with standard
+      ;; procedure: updates fxyze
+      (set! isign 1)
+      (cwfft2r3 (cast fxyze cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+
+      ;; transform magnetic force to real space with standard procedure:
+      ;; updates bxyze                                                  
+      (set! isign 1)
+      (cwfft2r3 (cast bxyze cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+
+      ;; copy guard cells with standard procedure: updates fxyze, bxyze
+      (cbguard2l fxyze nx ny nxe nye)
+      (cbguard2l bxyze nx ny nxe nye)
+
+      ;; push particles with standard procedure: updates part, wke
+      (pset! wke 0 0.0)
+      (if (= relativity 1)
+          (cgrbpush23l part fxyze bxyze qbme dt dth ci wke idimp np nx ny nxe nye ipbc)
+          (cgbpush23l part fxyze bxyze qbme dt dth wke idimp np nx ny nxe nye ipbc))
+
+      ;; sort particles by cell for standard procedure
+      (if (and (> sortime 0)
+               (= (% ntime sortime) 0))
+          (begin
+            (cdsortp2yl part part2 npicy idimp np ny1)
+            ;; exchange pointers
+            (set! tpart part)
+            (set! part part2)
+            (set! part2 tpart)
+            void))
+      ;;       if (ntime==0) {
+      ;;          wt = we + wf + wm;
+      ;;          printf("Initial Total Field, Kinetic and Total Energies:\n");
+      ;;          printf("%e %e %e\n",wt,wke,wke+wt);
+      ;;          printf("Initial Electrostatic, Transverse Electric and Magnetic \
+      ;; Field Energies:\n");
+      ;;          printf("%e %e %e\n",we,wf,wm);
+      ;;       }
+      (set! ntime (+ ntime 1))
+      ntime)))
+
+(bpic_set_vbo_data_size (bpic_step.npx)
+                        (bpic_step.npy))
+
+(bind-func print_energies
+  (lambda (header_string:i8*)
+    (let ((field_energy
+           (pref (bpic_step.we:float*) 0))
+          (kinetic_energy
+           (pref (bpic_step.wke:float*) 0))
+          (transverse_electric_energy
+           (pref (bpic_step.wf:float*) 0))
+          (transverse_magnetic_energy
+           (pref (bpic_step.wm:float*) 0)))
+      (printf "\n%s:\n\n" header_string)
+      (printf "field_energy:    %g\n" (convert field_energy double))
+      (printf "kinetic_energy:  %g\n" (convert kinetic_energy double))
+      (printf "total_energy:    %g\n" (convert (+ field_energy kinetic_energy) double))
+      (printf "electric field:    %g\n" (convert transverse_electric_energy double))
+      (printf "magnetic field:    %g\n" (convert transverse_magnetic_energy double)))))
+
+;;
+
+;; visualisation code
+
+(bind-val star_texture i32 0)
+
+(bind-func load-tex
+  (lambda (tex_path id)
+    (let ((t (gl_load_image tex_path id)))
+      (set! star_texture t)
+      (printf "texture: %d\n" star_texture)
+      void)))
+
+;; 0 meaning load texture into new id
+(load-tex "assets/images/star.png" 0)
+
+(bind-val particle_shader i32 0)
+
+(bind-func update_shader_program
+  (lambda (vert:i8* frag:i8*)
+    (set! particle_shader (create_shader vert frag))))
+
+(update_shader_program
+ "// VERTEX SHADER
+// GLSL 1.2 compatible
+
+//varying vec2 TexCoord;
+
+attribute vec2 pvert;
+uniform float nx;
+attribute vec2 pvel;
+
+void main() {
+   gl_PointSize = min(20.0, 5.*sqrt(length(pvel)));
+   gl_FrontColor = vec4(.2,pvel/2.,1.0);
+   gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * (vec4(pvert.x/(nx/2.0),pvert.y/(nx/2.0),0.0,1.0) - vec4(1.,1.,0.,0.));
+   //TexCoord = gl_MultiTexCoord0.st;
+}"
+
+
+ "//  FRAGMENT SHADER
+// #version 330
+
+#version 120
+
+#extension GL_ARB_texture_rectangle : disable
+
+uniform sampler2D tex1;
+
+//varying vec2 TexCoord;void main {
+   gl_FragColor = texture2D(tex1,gl_PointCoord)*gl_Color;
+   //gl_FragColor = gl_Color;
+}")
+
+(bind-func gl_draw_particles
+  (let ((vert_loc:i32 -1)
+        (vel_loc:i32 -1)
+        (nx_loc:i32 -1))
+    (lambda (nx:i32)
+      (if (or (= vert_loc -1)
+              (= vel_loc -1)
+              (= nx_loc -1))
+          (begin
+            (set! vert_loc (glGetAttribLocation particle_shader "pvert"))
+            (set! vel_loc (glGetAttribLocation particle_shader "pvel"))
+            (set! nx_loc (glGetUniformLocation particle_shader "nx"))))
+      (let ((np (/ (tref vbo 1) 16)))
+        (glClearColor 0.0 0.0 0.0 1.0)
+        (glClear (+ GL_DEPTH_BUFFER_BIT GL_COLOR_BUFFER_BIT))
+        (glLoadIdentity)
+        ;; gl setup
+        (glEnable GL_BLEND)
+        (glDisable GL_DEPTH_TEST)
+        (glDepthMask GL_FALSE)
+        (glBlendFunc GL_SRC_ALPHA GL_ONE)
+        (glEnable GL_POINT_SPRITE)
+        (glEnable GL_VERTEX_PROGRAM_POINT_SIZE)
+        ;; shader program
+        (glUseProgram particle_shader)
+        ;; set uniform
+        (glUniform1f nx_loc (convert nx float))
+        ;; vbo stuff
+        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
+        (glBufferSubData GL_ARRAY_BUFFER 0 (tref vbo 1) (tref vbo 2))
+        (glEnableVertexAttribArray vert_loc)
+        (glVertexAttribPointer vert_loc 2 GL_FLOAT GL_FALSE 16 null) ;(pref-ptr (cast null i8*) 0))
+        (glEnableVertexAttribArray vel_loc)
+        (glVertexAttribPointer vel_loc 2 GL_FLOAT GL_FALSE 16 (pref-ptr (cast null i8*) 8))
+        ;; texture setup
+        (glActiveTexture GL_TEXTURE0)
+        (glDisable GL_TEXTURE_RECTANGLE_ARB)
+        (glEnable GL_TEXTURE_2D)
+        (glBindTexture GL_TEXTURE_2D star_texture)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+        (glTexEnvi GL_POINT_SPRITE GL_COORD_REPLACE 1)
+        (glUniform1i (glGetUniformLocation particle_shader "tex1") 0)
+        ;; draw the points
+        (glDrawArrays GL_POINTS 0 np)
+        ;; disable texture
+        (glActiveTexture GL_TEXTURE0)
+        (glBindTexture GL_TEXTURE_2D 0)
+        (glDisable GL_TEXTURE_2D)
+        ;; disable attribs
+        (glDisableVertexAttribArray vert_loc)
+        ;; (glDisableVertexAttribArray my_colour)
+        ;; (glDisableVertexAttribArray my_size)
+        ;; (glDisableVertexAttribArray vel_loc)
+        ;; unbind the buffer
+        (glBindBuffer GL_ARRAY_BUFFER 0)
+        (glDisable GL_VERTEX_PROGRAM_POINT_SIZE)
+        (glDisable GL_POINT_SPRITE)
+        ;; un-set the GL stuff
+        (glDisable GL_BLEND)
+        (glEnable GL_DEPTH_TEST)
+        (glDepthMask GL_TRUE)
+        ;; print errors (if there are any)
+        (let ((glErr (glGetError)))
+          (if (<>  glErr GL_NO_ERROR)
+              (printf "error in gl_draw_particles: %s\n"
+                      (gluErrorString glErr)))))
+      1)))
+
+(define run-bpic
+  (lambda (delta-t)
+    (let ((ntime (bpic_step)))
+      (if (= (modulo ntime 1000) 0)
+          (println 'ntime: ntime)))
+    ;; (draw_energy_hud)
+    ;; (gl_draw_particles (pic_step.nx))
+    ;; (gl:swap-buffers *gl-ctx*)
+    (callback (+ (now) (* *second* delta-t))
+              'run-bpic
+              delta-t)))
+
+(run-bpic 1)
+
+(print_energies "current energies")
