@@ -13,5 +13,5 @@ if [[ $REPLY =~ ^[Yy]$ ]]
 then
     # remove precompiled extempore libs (e.g. from the stdlib)
     echo removing precompiled libs...
-    rm -rf extempore libs/*.{xtm,dylib,so}
+    rm -rf libs/*.{xtm,dylib,so}
 fi
