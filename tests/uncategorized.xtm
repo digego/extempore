@@ -12,3 +12,23 @@
 
 ;;; Code:
 
+(sys:load "libs/core/test.xtm")
+
+;; why does it think th type of nx is double?
+(xtmtest
+ '(bind-func dotimes_type_quirk_1
+  (lambda (nx)
+    (doloop (x nx)
+      x)
+    nx))
+ (integer? (dotimes_type_quirk_1 2)) #t)
+
+(xtmtest
+ '(bind-func dotimes_type_quirk_2
+    (lambda (nx:i64)
+      (doloop (x nx)
+        x)
+      nx))
+ (integer? (dotimes_type_quirk_2 2)) #t)
+
+(xtmtest-print-results)
