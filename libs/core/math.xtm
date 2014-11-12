@@ -649,6 +649,33 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; helper functions for calculating row/column major indices - you
+;; probably don't want to use these in hot loops (it is a function
+;; call, after all) but if performance isn't an issue they can be
+;; handy to have around. and you can always turn them into macros
+
+(bind-func colmaj_idx_2
+  (lambda (x:i64 y ydim)
+    (+ (* x ydim) y)))
+
+(bind-func colmaj_idx_3
+  (lambda (x:i64 y z ydim zdim)
+    (+ (* x ydim zdim) (* y zdim) z)))
+
+(bind-poly colmaj_idx colmaj_idx_2)
+(bind-poly colmaj_idx colmaj_idx_3)
+
+(bind-func rowmaj_idx_2
+  (lambda (x:i64 y xdim)
+    (+ x (* y xdim))))
+
+(bind-func rowmaj_idx_3
+  (lambda (x:i64 y z xdim ydim)
+    (+ x (* y xdim) (* z xdim ydim))))
+
+(bind-poly rowmaj_idx rowmaj_idx_2)
+(bind-poly rowmaj_idx rowmaj_idx_3)
+
 ;; 'pretty' print matrix (doubles)
 (bind-func mprintd
   (lambda (m:double* r:i64 c:i64 col_major:i1)
