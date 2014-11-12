@@ -195,6 +195,10 @@
   (lambda (npx npy)
     (tset! vbo 1 (* (* npx npy) 20))))
 
+(bind-func munge_fields
+  (lambda (n:i32)
+    void))
+
 (bind-func bpic_step
   (let (              ;; parameters
         (indx:i32 8)  ;; originally 9
@@ -254,14 +258,6 @@
 
     ;; initialize electrons
     (cdistr2h part vtx vty vtz vx0 vy0 vz0 npx npy idimp np nx ny ipbc)
-    ;; initialize transverse electromagnetic fields
-
-    ;; you can mess with the field here
-    ;; (doloop (j (* ndim nxeh nye))
-    ;;   ;; set all imaginary components to 1.0 could have done this with
-    ;;   ;; cpxf, but this is easier
-    ;;   (pset! (cast exyz float*) (+ (* j 2) 1) 1.0)
-    ;;   (pset! (cast bxyz float*) (+ (* j 2) 1) 1.0))
     (lambda ()
       (if (> dt (* 0.45 ci))
           (println "Warning: Courant condition may be exceeded!\n")
@@ -328,6 +324,9 @@
       ;; updates bxyze                                                  
       (set! isign 1)
       (cwfft2r3 (cast bxyze cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+
+      ;; munge the fields while they're in real space
+      (munge_fields (* nxeh nye))
 
       ;; copy guard cells with standard procedure: updates fxyze, bxyze
       (cbguard2l fxyze nx ny nxe nye)
@@ -517,3 +516,21 @@ void main() {
     (callback (+ (now) (* *second* delta-t))
               'run-bpic
               delta-t)))
+
+
+;; gaussian random number X ~ N(0,1)
+;; algorithm by Marsaglia http://c-faq.com/lib/gaussian.html
+(bind-func randn
+  (let ((phase:i64 0))
+    (lambda ()
+      (let ((u1:SAMPLE (random))
+            (u2:SAMPLE (random))
+            (v1 (- (* 2.0 u1) 1.0))
+            (v2 (- (* 2.0 u2) 1.0))
+            (s (+ (* v1 v1) (* v2 v2))))
+        (if (= phase 0)
+            (if (or (> s 1.0) (= s 0.0) (= s 1.0))
+                (randn)
+                (* v1 (sqrt (/ (* -2.0 (log s)) s))))
+            (begin (set! phase (- 1 phase))
+                   (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))

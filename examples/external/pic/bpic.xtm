@@ -6,10 +6,11 @@
 
 ;;; Commentary:
 
-;; example file for running the PIC particle simulation
+;; example file for running an electromagnetic PIC particle
+;; simulation. See also the pic.xtm example in this same directory for
+;; electrostatic pic codes
 
 ;;; Code:
-
 
 (sys:load "libs/external/pic/bpic.xtm")
 
@@ -17,29 +18,41 @@
 ;; somewhere)
 (run-bpic 1/30)
 
-;; change the time step size (keep abs value below about 2 or it'll
-;; crash)
-(bpic_step.dt .04) ;; default
-(bpic_step.dt -.1)
-
-
-(bind-func particle_kick
-  "give np particles (selected at random) a kick"
-  (lambda (np x y z)
+;; this function redistributes particles, uniformly in space and with gaussia
+(bind-func particle_redistribute
+  (lambda (np:i32 nx:i32 ny:i32)
     (doloop (i np)
-      (let ((idx (random 0 np)))
-        (pset! part (+ 2 (* i 5))
-               (+ x (pref part (+ 2 (* i 5)))))
-        (pset! part (+ 3 (* i 5))
-               (+ y (pref part (+ 3 (* i 5)))))
-        (pset! part (+ 4 (* i 5))
-               (+ z (pref part (+ 4 (* i 5)))))))))
+      (pset! part (+ (* i 5) 0) (random 0. (convert nx)))
+      (pset! part (+ (* i 5) 1) (random 0. (convert ny)))
+      (pset! part (+ (* i 5) 2) (randn))
+      (pset! part (+ (* i 5) 3) (randn))
+      (pset! part (+ (* i 5) 4) (randn)))))
 
-;; give 1000 particles a kick in the direction {-3,0}
-(particle_kick 10000 -100. -100. -100.)
+;; call the reset function - see that the top-level local variables
+;; (which live in the bpic_step closure) are accessable through the
+;; 'dot' syntax
+(particle_redistribute (bpic_step.np)
+                       (bpic_step.nx)
+                       (bpic_step.ny))
 
-;; change the parameters and try again
-(particle_kick 1000 10. 0.)
+;; change the time step size (but don't exceed the Courant condition!)
+(bpic_step.dt .04) ;; default
+
+;; this function is already in the pic_step main loop, but is a no-op.
+;; here, we're going to re-compile it to do something more interesting
+(bind-func munge_fields
+  (lambda (n:i32)
+    (let ((comp 2) ;; comp: x = 0, y = 1, z = 2
+          (magnitude 1.))
+      (doloop (j (/ n 4))
+        (pset! (cast bxyz float*)
+               (+ (* j 3) comp)
+               (+ (pref (cast bxyz float*) (+ (* j 3) comp)) magnitude))
+        void))))
+
+;; you can change the comp and magnitude variables (in the 'let') and
+;; re-eval to see new results. also, you can go back up and
+;; redistribute the particles
 
 (bind-func particle_drop
   "drop np particles (selected at random) at the same location"
@@ -55,49 +68,10 @@
 ;; change our electrons...
 (bpic_step.qme -1.) ;; default
 ;; to positrons
-(bpic_step.qme 3.)
-;; be ready to change it back otherwise it'll blow up if you leave it
-;; too long.
+(bpic_step.qme 1.)
 
-(bpic_step.ipbc 0)
+;; change the boundary conditions (can be 0, 1, 2 or 3)
+(bpic_step.ipbc 2)
 
-
-(bind-func init_field_xy
-  (lambda (nx:i32)
-    (let 
-      (dotimes (i (* xdim ny))
-        (pset! field (+ 0 (* 4 i)) (convert (/ i nxe) float))
-        (pset! field (+ 1 (* 4 i)) (convert (% i nxe) float))))))
-
-
-(bind-func order_test2
-  (lambda (r:i64 c)
-    (let ((i 0))
-      (doloop (x r)
-        (doloop (y c)
-          (printf "x = %lld y = %lld idx = %lld i = %lld\n" x y (+ (* x c) y) i))))
-    (println)))
-
-(order_test2 4 3)
-
-
-
-(+ x (* y xdim) (* z xdim ydim))
-
-
-(order_test_3 2 2 2)
-
-(bind-func field_add_ripple
-  (lambda (xdim xp yp zp)
-    (let ((ydim xdim)
-          (nxe (+ 2 xdim))
-          (ydime (+ 1 ydim))
-          (idx 0))
-      (doloop (x nxe)
-        (doloop (y ydime)
-          (set! idx (+ (* x nxe) y))
-          (pset! fxyze (+ 0 idx) )
-          (pset! fxyze (+ 1 idx) ))))))
-
-(bpic_step.relativity 0)
-(bpic_step.dt 0.1)
+;; turn relativity on/off
+(bpic_step.relativity 1)
