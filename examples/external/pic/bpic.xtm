@@ -10,11 +10,12 @@
 
 ;;; Code:
 
+
 (sys:load "libs/external/pic/bpic.xtm")
 
 ;; to start the simulation (an OpenGL canvas window should pop up
 ;; somewhere)
-(run-bpic 1/5)
+(run-bpic 1/30)
 
 ;; change the time step size (keep abs value below about 2 or it'll
 ;; crash)
@@ -24,16 +25,18 @@
 
 (bind-func particle_kick
   "give np particles (selected at random) a kick"
-  (lambda (np x y)
+  (lambda (np x y z)
     (doloop (i np)
       (let ((idx (random 0 np)))
-        (pset! part (+ 2 (* i 4))
-               (+ x (pref part (+ 2 (* i 4)))))
-        (pset! part (+ 3 (* i 4))
-               (+ y (pref part (+ 3 (* i 4)))))))))
+        (pset! part (+ 2 (* i 5))
+               (+ x (pref part (+ 2 (* i 5)))))
+        (pset! part (+ 3 (* i 5))
+               (+ y (pref part (+ 3 (* i 5)))))
+        (pset! part (+ 4 (* i 5))
+               (+ z (pref part (+ 4 (* i 5)))))))))
 
 ;; give 1000 particles a kick in the direction {-3,0}
-(particle_kick 1000 10. 0.)
+(particle_kick 10000 -100. -100. -100.)
 
 ;; change the parameters and try again
 (particle_kick 1000 10. 0.)
@@ -43,15 +46,17 @@
   (lambda (np x y)
     (doloop (i np)
       (let ((idx (random 0 np)))
-        (pset! part (+ 0 (* i 4)) x)
-        (pset! part (+ 1 (* i 4)) y)))))
+        (pset! part (+ 0 (* i 5)) x)
+        (pset! part (+ 1 (* i 5)) y)))))
 
 ;; drop 5000 particles at a random point
-(particle_drop 2000 (random 512) (random 512)))
+(particle_drop 5000 (random (bpic_step.nx)) (random (bpic_step.nx)))
 
 ;; change our electrons...
-(pic_step.qme -1.) ;; default
+(bpic_step.qme -1.) ;; default
 ;; to positrons
-(pic_step.qme 1.)
+(bpic_step.qme 3.)
 ;; be ready to change it back otherwise it'll blow up if you leave it
 ;; too long.
+
+(bpic_step.ipbc 0)
