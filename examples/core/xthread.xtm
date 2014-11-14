@@ -9,12 +9,12 @@
 (bind-func divide-and-conquer  
   (lambda (cnt:i32)
     (spawn (lambda ()
-	     (printf "cnt:%d thread:%p\n" cnt (thread_self))
-	     (thread_sleep 1 0) ;; first arg seconds second nanoseconds 
-	     (if (> cnt 0)
-		 (begin (divide-and-conquer (- cnt 1))
-			(divide-and-conquer (- cnt 1))))
-	     void))
+             (printf "cnt:%d thread:%p\n" cnt (thread_self))
+             (thread_sleep 1 0) ;; first arg seconds second nanoseconds 
+             (if (> cnt 0)
+                 (begin (divide-and-conquer (- cnt 1))
+                        (divide-and-conquer (- cnt 1))))
+             void))
     void))
 
 (divide-and-conquer 3)
@@ -24,15 +24,16 @@
   (lambda ()
     (memzone (* 1024 1024)
       (let ((i 0))
-	(printout "Finish Order: ")
-	(sync
-	 (dotimes (i 4)
-	   (spawn (let ((jj i)) ;; each closure needs it's own i!
-		    (lambda ()
-		      (thread_sleep (dtoi64 (* 10. (random))) 0)
-		      (printout jj))))))
-	(println)
-	(println "Joined\n")
-	void))))
+        (printout "Finish Order: ")
+        (sync
+         (dotimes (i 4)
+           (spawn (let ((jj i)) ;; each closure needs it's own i!
+                    (lambda ()
+                      (thread_sleep (dtoi64 (* 10. (random))) 0)
+                      (printout jj)))))
+         1)
+        (println)
+        (println "Joined\n")
+        1))))
 
 (fork-join)
