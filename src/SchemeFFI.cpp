@@ -612,10 +612,8 @@ namespace extemp {
 
     pointer SchemeFFI::exit_extempore(scheme* _sc, pointer args)
     {
-        // This is a seriously nasty HACK!!
-        // PLEASE FIX ME!
-      int64_t retval = ivalue(pair_car(args));
-      exit(retval);
+      int rc = (int)ivalue(pair_car(args));
+      std::_Exit(rc);
     }
 
     pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)
