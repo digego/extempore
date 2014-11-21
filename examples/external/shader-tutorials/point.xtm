@@ -29,13 +29,14 @@
 (bind-func draw
   (let ((vert_vbo (create_vbo vertices 4))
         (colour_vbo (create_vbo colours 6))
-        (vao (create_vao vert_vbo 2 colour_vbo 3)))
+        (vao (create_vao)))
+    (bind_attribute vao vert_vbo 0 2)
+    (bind_attribute vao colour_vbo 1 2)
     (lambda (program)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
       (glUseProgram program)
-      (glBindVertexArray vao)
       (glDrawArrays GL_POINTS 0 2)
-      (update_vbo colour_vbo colours 6)
+      (update_vbo colour_vbo GL_STREAM_DRAW)
       (gl_print_error)
       void)))
 
