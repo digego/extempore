@@ -490,6 +490,16 @@
        `(+ ,(caddr args) (+ (* .5 ,(cadddr args)) (* .5 ,(cadddr args) (ramp (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args)))))))
        `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (ramp (* 2pi beat ,(cadddr args))))))))
 
+(define slide
+  (lambda (x)
+    (- 1.0 (ramp x))))
+
+(macro (slider args)
+       (if (> (length args) 4)
+           `(+ ,(caddr args) (+ (* .5 ,(cadddr args)) (* .5 ,(cadddr args) (slide (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args)))))))
+           `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (slide (* 2pi beat ,(cadddr args))))))))
+
+
 ;; square wave LFO with period 2pi
 
 (define rect
@@ -686,22 +696,28 @@
 (define *metro* (make-metro 120 '(0 . 0)))
 
 
-(define-macro (set-signal! variable value dur . rate)
-   (let ((r (if (null? rate) 1/16 (car rate))))
-      (if (closure? (eval value))
-	  `(let l1929 ((count (/ ,dur ,r)))
-	      (if (equal? ,variable 'stop-signal)
-		  'done
-		  (begin (set! ,variable (apply ,value (list ,variable)))
-			 (if (> count 1)
-			     (callback (+ (now) (* *samplerate* ,r)) l1929 (- count 1))))))
-	  `(let l1929 ((inc (/ (- ,value ,variable) (/ ,dur ,r)))
-		       (count (/ ,dur ,r)))
-	      (if (equal? ,variable 'stop-signal)
-		  'done
-		  (begin (set! ,variable (+ ,variable inc))
-			 (if (> count 1)
-			     (callback (+ (now) (* *samplerate* ,r)) l1929 inc (- count 1)))))))))
+;; define me first!
+(define-macro (set-signal! variable value seconds . rate)
+  (let ((r (if (null? rate) 1/30 (car rate))))
+    (if (and (or (list? value)
+                 (defined? value))
+             (closure? (eval value)))
+        `(let l1929 ((t (now))
+                     (count (/ ,seconds ,r)))
+           (if (equal? ,variable 'stop-signal)
+               'done
+               (begin (set! ,variable (apply ,value (list ,variable)))
+                      (if (> count 1)
+                          (callback (+ t (* *samplerate* ,r)) l1929 (+ t (* *samplerate* ,r)) (- count 1))))))
+        `(let l1929 ((t (now))
+                     (inc (/ (- ,value ,variable) (real->integer (/ ,seconds ,r))))
+                     (count (real->integer (/ ,seconds ,r))))
+           (if (equal? ,variable 'stop-signal)
+               'done
+               (begin (set! ,variable (+ ,variable inc))
+                      (if (> count 1)
+                          (callback (+ t (* *samplerate* ,r)) l1929 (+ t (* *samplerate* ,r)) inc (- count 1)))))))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
