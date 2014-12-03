@@ -10,7 +10,7 @@ export EXTEMPORE_OS
 
 if [ -z "$EXT_LLVM_DIR" ]; then 
 	if [ ! -f config/llvm.bash ]; then
-		echo Missing config/llvm.bash file.  See INSTALL. >&2
+		echo Missing config/llvm.bash file.  See README.md >&2
 		exit 1	
 	fi
 	. config/llvm.bash
