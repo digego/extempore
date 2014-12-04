@@ -2333,6 +2333,18 @@ If you don't want to be prompted for this name each time, set the
 ;; (extempore-parser-parse-all-c-args "unsigned short GLhalfARB")
 ;; (extempore-parser-parse-all-c-args "GLFWmonitor* monitor, int* count")
 
+;; doesn't yet handle nested function calls
+(defun extempore-parser-process-function-call ()
+  (interactive)
+  (if (re-search-forward "\s*\\([^(]+\\)(\\([^(]*?\\));?" nil :noerror)
+      (progn
+        (replace-match
+         (save-match-data
+           (format "(%s %s)"
+                   (match-string-no-properties 1)
+                   (mapconcat #'identity (split-string (match-string-no-properties 2) ",") " "))))
+        (indent-for-tab-command))))
+
 (defun extempore-parser-process-function-prototypes (libname ignore-tokens)
   (interactive
    (list (read-from-minibuffer "libname: ")
