@@ -31,21 +31,40 @@
 (define libmpi
   (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
-;; opaque structs
-(bind-alias MPI_Comm i8*)
-(bind-alias MPI_Datatype i8*)
-(bind-alias MPI_Status_ptr i8*)
-(bind-alias MPI_INT i32)
+;; opaque struct pointers
+
+(bind-alias MPI_Comm i8*) ;; ompi_communicator_t*
+(bind-alias MPI_Datatype i8*) ;; ompi_datatype_t*
+(bind-alias MPI_Errhandler i8*) ;; ompi_errhandler_t*
+;; #if OMPI_PROVIDE_MPI_FILE_INTERFACE
+;; (bind-alias MPI_File i8*) ;; ompi_file_t*
+;; #endif
+(bind-alias MPI_Group i8*) ;; ompi_group_t*
+(bind-alias MPI_Info i8*) ;; ompi_info_t*
+(bind-alias MPI_Op i8*) ;; ompi_op_t*
+(bind-alias MPI_Request i8*) ;; ompi_request_t*
+(bind-alias MPI_Message i8*) ;; ompi_message_t*
+(bind-alias MPI_Status i8*) ;; ompi_status_public_t
+(bind-alias MPI_Win i8*) ;; ompi_win_t*
+(bind-alias MPI_T_enum i8*) ;; mca_base_var_enum_t*
 
 (bind-lib libmpi MPI_Init [i32,i32*,i8***]*)
 (bind-lib libmpi MPI_Comm_size [i32,MPI_Comm,i32*]*)
 (bind-lib libmpi MPI_Comm_rank [i32,MPI_Comm,i32*]*)
+(bind-lib libmpi MPI_Get_processor_name [i32,i8*,i32*]*)
 (bind-lib libmpi MPI_Send [i32,i8*,i32,MPI_Datatype,i32,i32,MPI_Comm]*)
 (bind-lib libmpi MPI_Recv [i32,i8*,i32,MPI_Datatype,i32,i32,MPI_Comm]*)
 (bind-lib libmpi MPI_Finalize [i32]*)
 
-(bind-lib-val libmpi ompi_mpi_comm_world_addr i8*)
-(bind-lib-val libmpi ompi_mpi_comm_self_addr i8*)
-(bind-lib-val libmpi ompi_mpi_comm_null_addr i8*)
+(bind-lib-val libmpi ompi_mpi_comm_world_addr MPI_Comm)
+(bind-lib-val libmpi ompi_mpi_comm_self_addr MPI_Comm)
+(bind-lib-val libmpi ompi_mpi_comm_null_addr MPI_Comm)
+
+(bind-val MPI_COMM_WORLD MPI_Comm)
+(bind-val MPI_COMM_SELF MPI_Comm)
+(bind-val MPI_COMM_NULL MPI_Comm)
+(call-as-xtlang (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr))
+(call-as-xtlang (set! MPI_COMM_SELF ompi_mpi_comm_self_addr))
+(call-as-xtlang (set! MPI_COMM_NULL ompi_mpi_comm_null_addr))
 
 (define *xtmlib-mpi-loaded* #t)
