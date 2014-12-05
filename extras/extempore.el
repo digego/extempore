@@ -2342,7 +2342,8 @@ If you don't want to be prompted for this name each time, set the
          (save-match-data
            (format "(%s %s)"
                    (match-string-no-properties 1)
-                   (mapconcat #'identity (split-string (match-string-no-properties 2) ",") " "))))
+                   (mapconcat #'identity (split-string (match-string-no-properties 2) ",") " ")))
+         nil :literal)
         (indent-for-tab-command))))
 
 (defun extempore-parser-process-function-prototypes (libname ignore-tokens)
