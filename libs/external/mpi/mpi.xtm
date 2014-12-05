@@ -1,0 +1,51 @@
+;;; mpi.xtm -- OpenMPI bindings
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libopenmpi
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
+
+(sys:load-preload-check 'mpi)
+(define *xtmlib-mpi-loaded* #f)
+
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libmpi
+ (cond ((string=? (sys:platform) "OSX")
+        "libmpi.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libmpi.so")
+       ((string=? (sys:platform) "Windows")
+        "libmpi.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib               
+(define libmpi
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+
+;; opaque structs
+(bind-alias MPI_Comm i8*)
+(bind-alias MPI_Datatype i8*)
+(bind-alias MPI_Status_ptr i8*)
+(bind-alias MPI_INT i32)
+
+(bind-lib libmpi MPI_Init [i32,i32*,i8***]*)
+(bind-lib libmpi MPI_Comm_size [i32,MPI_Comm,i32*]*)
+(bind-lib libmpi MPI_Comm_rank [i32,MPI_Comm,i32*]*)
+(bind-lib libmpi MPI_Send [i32,i8*,i32,MPI_Datatype,i32,i32,MPI_Comm]*)
+(bind-lib libmpi MPI_Recv [i32,i8*,i32,MPI_Datatype,i32,i32,MPI_Comm]*)
+(bind-lib libmpi MPI_Finalize [i32]*)
+
+(bind-lib-val libmpi ompi_mpi_comm_world_addr i8*)
+(bind-lib-val libmpi ompi_mpi_comm_self_addr i8*)
+(bind-lib-val libmpi ompi_mpi_comm_null_addr i8*)
+
+(define *xtmlib-mpi-loaded* #t)
