@@ -5,14 +5,16 @@
 ;;
 
 (sys:load "libs/core/topclock.xtm")
-(sys:load "libs/external/instruments_ext.xtm")
+(sys:load "libs/core/instruments.xtm")
+
+(bind-instrument metrosynth fmsynth_note_c fmsynth_fx)
 
 (bind-func dsp:DSP 1000000
   (let ((t 0))
     (lambda (in time chan dat)
       (if (= t 0) (set! t time))
       (if (< chan 2)
-          (+ (fmsynth in time chan dat)
+          (+ (metrosynth in time chan dat)
              0.0)
           0.0))))
 
@@ -26,13 +28,12 @@
 (define test
   (lambda (beat dur)
     (if (and (= (modulo beat 4) 0)
-             (> (random) .8))
-        (topclock-bpm (*metro* beat) (random 80 280) beat (random '(6 5 4 3))))
-    ;; 'pos returns the metric position in the current cycle
-    (println 'beat: (*metro* 'pos beat))
+             (> (random) 0.8))
+        (topclock-bpm (*metro* beat) (random 20 280) beat (random '(6 5 4 3))))
+    (println 'beat: (rational->n beat) 'pos: (*metro* 'pos beat) 'clock: (clock:clock))
     (if (= (*metro* 'pos beat) 0)
-        (play fmsynth (random '(63 65 67 70 72)) 80 .1)
-        (play fmsynth 60 80 .1))
+        (play metrosynth (random '(63 65 67 70 72)) 80 .1)
+        (play metrosynth 60 80 .1))
     (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
 
 (define teststart

@@ -88,8 +88,9 @@
              ;; and we are the master then send a reply
              ;; first arg is t1 (from client) we add t2 to reply
              (if *topclock-master*
-                 (io:osc:send (now) (cons srcip srcport) "/clock/sync/r"
-                              (car args) (1970->1900 (clock:clock)))))
+                 (let ((t (now)))
+                   (io:osc:send t (cons srcip srcport) "/clock/sync/r"
+                                (car args) (1970->1900 (samples->clock t))))))
             ((string=? address "/clock/sync/r")
              ;; clock syncs come from current master
              (let* ((t1 (1900->1970 (car args)))
@@ -97,8 +98,9 @@
                     (t3 (1900->1970 (cadr args))) ;; and t3 the same
                     (t4 (clock:clock))
                     (msg-delay (- t4 t1))
-                    (offset (/ (+ (- t2 t1) (- t3 t4)) 2.0)))
-               (clock:adjust-offset offset)))
+                    (offset (/ (+ (- t2 t1) (- t3 t4)) 2.0)))               
+               (if (and (< msg-delay .02) (not *topclock-master*))
+                   (clock:adjust-offset offset))))
             ((string=? address "/clock/bpm/set")
              ;; bpm changes are sent to master only (i.e. not broadcast)
              ;; to ensure that we don't have the problem where some
@@ -292,16 +294,19 @@
 ;; a general election!  because the master
 ;; must have died!
 (define topclock-sync
-  (lambda ()
-    (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*) "/clock/sync/q"
-                 (1970->1900 (clock:clock)))
+  (lambda (cnt)
+    (if (= 0 (modulo cnt 25)) (println '[topclock] 'master: *topclock-master*))
+    (if (not *topclock-master*)
+        (let ((t (now)))
+           (io:osc:send t (cons *topclock-master-ip* *topclock-port*) "/clock/sync/q"
+                        (1970->1900 (samples->clock t)))))
     ;; if not master and last streamed message
     ;; was more than 3 seconds ago
     ;; then call a general election!
     (if (and (not *topclock-master*)
              (> (- (clock:clock) *topclock-lastmsg*) 3.0))
         (topclock-election))
-    (callback (+ (now) 10000) 'topclock-sync)))
+    (callback (+ (now) 10000) 'topclock-sync (+ cnt 1))))
 
 (print-with-colors 'magenta 'default #f
                    (print "Starting TOPClock\n"))
@@ -309,4 +314,4 @@
 ;; start clock sync
 ;; all clients (including master)
 ;; will run this loop
-(topclock-sync)
+(topclock-sync 0)
