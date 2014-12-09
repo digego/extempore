@@ -48,6 +48,41 @@
   (lambda (time)
     (+ time *Epoch-1900-1970*)))
 
+;; native osc
+(bind-func osc_send_one_double
+  (lambda (host ip address a:double)
+    (let ((types ",d")
+          (typesl 4)		               
+          (mod (modulo (+ (strlen address) 1) 4))
+          (addressl (+ (+ (strlen address) 1)
+                       (if (= 0 mod) 0 (- 4 mod))))
+
+          (lgth (+ addressl typesl 8))
+          (data (malloc lgth))
+          (args (bitcast (pref-ptr data (+ addressl typesl)) i64*)))
+      (strcpy (pref-ptr data 0) address)
+      (strcpy (pref-ptr data addressl) types)
+      (pset! args 0 (swap64f a))
+      (llvm_send_udp host ip data (i64toi32 lgth)))))
+
+(bind-func osc_send_two_double
+  (lambda (host ip address a:double b:double)
+    (let ((types ",dd")
+          (typesl 4)		               
+          (mod (modulo (+ (strlen address) 1) 4))
+          (addressl (+ (+ (strlen address) 1)
+                       (if (= 0 mod) 0 (- 4 mod))))
+
+          (lgth (+ addressl typesl 8 8))
+          (data (malloc lgth))
+          (args (bitcast (pref-ptr data (+ addressl typesl)) i64*)))
+      (strcpy (pref-ptr data 0) address)
+      (strcpy (pref-ptr data addressl) types)
+      (pset! args 0 (swap64f a))
+      (pset! args 1 (swap64f b))      
+      (llvm_send_udp host ip data (i64toi32 lgth)))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; q for query
@@ -88,9 +123,7 @@
              ;; and we are the master then send a reply
              ;; first arg is t1 (from client) we add t2 to reply
              (if *topclock-master*
-                 (let ((t (now)))
-                   (io:osc:send t (cons srcip srcport) "/clock/sync/r"
-                                (car args) (1970->1900 (samples->clock t))))))
+                 (osc_send_two_double srcip 5555 "/clock/sync/r" (car args) (1970->1900 (clock:clock)))))
             ((string=? address "/clock/sync/r")
              ;; clock syncs come from current master
              (let* ((t1 (1900->1970 (car args)))
@@ -99,7 +132,7 @@
                     (t4 (clock:clock))
                     (msg-delay (- t4 t1))
                     (offset (/ (+ (- t2 t1) (- t3 t4)) 2.0)))               
-               (if (and (< msg-delay .02) (not *topclock-master*))
+               (if (and (< (abs msg-delay) .01) (not *topclock-master*))
                    (clock:adjust-offset offset))))
             ((string=? address "/clock/bpm/set")
              ;; bpm changes are sent to master only (i.e. not broadcast)
@@ -280,9 +313,10 @@
           (print-with-colors 'green 'default #t
                              (print "which I won!\n"))
           (topclock-streamer (*metro* 'get-beat 1) 1/4))
-        (print-with-colors 'red'default #t
+        (print-with-colors 'red 'default #t
                            (print "which I lost!\n")))
-    (set! *topclock-election-winner* #f)))
+    (set! *topclock-election-winner* #f)
+    *topclock-election-winner*))
 
 ;; a regular sync to the current master clock
 ;; this loop is run by all clients
@@ -295,11 +329,11 @@
 ;; must have died!
 (define topclock-sync
   (lambda (cnt)
-    (if (= 0 (modulo cnt 25)) (println '[topclock] 'master: *topclock-master*))
+    ;; (if (= 0 (modulo cnt 25)) (println '[topclock] 'master: *topclock-master*))
     (if (not *topclock-master*)
-        (let ((t (now)))
-           (io:osc:send t (cons *topclock-master-ip* *topclock-port*) "/clock/sync/q"
-                        (1970->1900 (samples->clock t)))))
+        (osc_send_one_double *topclock-master-ip* *topclock-port*
+                             "/clock/sync/q"
+                             (1970->1900 (clock:clock))))
     ;; if not master and last streamed message
     ;; was more than 3 seconds ago
     ;; then call a general election!
