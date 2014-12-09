@@ -1193,7 +1193,7 @@ Since this command is run implicitly, always ask the user for the
 command to run."
   (save-window-excursion
     (extempore-run (read-string "Start Extempore as: " (concat "extempore " extempore-program-args))))
-  (display-buffer "*extempore*"))
+  (display-buffer "*extempore*" #'display-buffer-pop-up-window))
 
 ;;;;;;;;;;;
 ;; eldoc ;;

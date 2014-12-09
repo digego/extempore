@@ -80,7 +80,7 @@ The running extempore process acts as a server, and you send extempore
 code to the server for evaluation (by default on port `7099`).Once
 you've started extempore you can connect using either telnet,
 [Emacs](http://benswift.me/2012/10/10/extempore-emacs-cheat-sheet/),
-vim,
+[vim](http://benswift.me/2014/11/07/hacking-extempore-in-vim/),
 [Sublime Text](http://benswift.me/2012/10/23/extempore-st2-cheat-sheet/),
 or whatever you like. The Emacs support is probably the most mature at
 the moment, but patches are welcome for other editors.
