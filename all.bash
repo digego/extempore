@@ -23,15 +23,6 @@ EXT_LLVM_LDFLAGS=`$EXT_LLVM_CONFIG_SCRIPT --ldflags`
 EXT_LLVM_LIBS=`$EXT_LLVM_CONFIG_SCRIPT --libs`
 export EXT_LLVM_CXXFLAGS EXT_LLVM_LDFLAGS EXT_LLVM_LIBS
 
-# check for jack audio
-if [[ "$@" =~ "-DJACK_AUDIO" ]]
-then
-    JACK_AUDIO=1
-    export JACK_AUDIO
-else
-    unset JACK_AUDIO
-fi
-
 # check for boost
 if [[ "$@" =~ "-DEXT_BOOST" ]]
 then

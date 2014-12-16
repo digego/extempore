@@ -197,7 +197,7 @@ int main(int argc, char** argv)
 	case OPT_IN_DEVICE:
 	  extemp::UNIV::AUDIO_IN_DEVICE = atoi(args.OptionArg());
           break;
-#if !(defined (JACK_AUDIO) || defined (___ALSA_AUDIO___) || defined (COREAUDIO))
+#if !( defined (___ALSA_AUDIO___) || defined (COREAUDIO))
 	case OPT_PRT_DEVICES:          
           extemp::AudioDevice::printDevices();
 	  return 1;

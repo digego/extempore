@@ -42,8 +42,6 @@
 
 #if defined (COREAUDIO) //TARGET_OS_MAC)
 #include <CoreAudio/AudioHardware.h>
-#elif defined (JACK_AUDIO)
-#include <jack/jack.h>
 #elif defined (ALSA_AUDIO)
 #include <alsa/asoundlib.h>
 #else
