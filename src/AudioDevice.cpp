@@ -715,9 +715,12 @@ namespace extemp {
       paout.hostApiSpecificStreamInfo = NULL;
       PaStreamParameters* paoutptr = &paout;
       if(UNIV::CHANNELS<1) paoutptr=NULL;
+      UNIV::SAMPLERATE = deviceInfo->defaultSampleRate;
 
       err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback, (void*)TaskScheduler::I());
     }else{
+      deviceInfo = Pa_GetDeviceInfo( outputDevice );
+      UNIV::SAMPLERATE = deviceInfo->defaultSampleRate;
       err = Pa_OpenDefaultStream(&stream, 0, UNIV::CHANNELS, paFloat32, UNIV::SAMPLERATE, UNIV::FRAMES, audioCallback, (void*)TaskScheduler::I());
     }
     // std::cout << "Input Device: " << inputDevice << std::endl;
