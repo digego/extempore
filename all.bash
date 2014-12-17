@@ -8,12 +8,9 @@ case $(uname) in
 esac
 export EXTEMPORE_OS
 
-if [ -z "$EXT_LLVM_DIR" ]; then 
-	if [ ! -f config/llvm.bash ]; then
-		echo Missing config/llvm.bash file.  See INSTALL. >&2
-		exit 1	
-	fi
-	. config/llvm.bash
+if [ -z "$EXT_LLVM_DIRs" ]; then
+	  echo -e "You must set \033[0;32mEXT_LLVM_DIR\033[0;00m to point to your (patched) LLVM directory." >&2
+    exit 1
 fi
 
 # LLVM DEFS
