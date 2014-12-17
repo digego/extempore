@@ -35,6 +35,13 @@ To see Extempore in action, check out these videos:
 
 # Installation
 
+Note: Extempore can make use of various 3rd party libraries if they are
+available on your system (Soil, OpenVG, rtmidi, etc').
+Support is provided by xtlang wrappers living under libs/external. These
+components are optional and you can get up and running with extempore
+even if you haven't installed them. The examples which depend on these
+libraries will fail to compile and you may simply skip them.
+
 ## OSX
 
 If you're a [homebrew](http://brew.sh/) user, it's pretty
