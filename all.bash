@@ -8,7 +8,7 @@ case $(uname) in
 esac
 export EXTEMPORE_OS
 
-if [ -z "$EXT_LLVM_DIRs" ]; then
+if [ -z "$EXT_LLVM_DIR" ]; then
 	  echo -e "You must set \033[0;32mEXT_LLVM_DIR\033[0;00m to point to your (patched) LLVM directory." >&2
     exit 1
 fi
