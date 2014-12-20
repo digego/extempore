@@ -1015,15 +1015,26 @@ to continue it."
           (ido-completing-read
            "Port: " (cl-remove-duplicates (append '("7099" "7098") extempore-connect-port-history-list) :test #'string=) nil nil nil 'extempore-connect-port-history-list (number-to-string extempore-default-port)))))
   "Start an Extempore REPL connected to HOST on PORT."
-  (unless (comint-check-proc "*extempore*")
-    (progn (call-interactively #'extempore-run)
-           (dotimes (i 5)
-             (message "Starting Extempore%s" (make-string i ?\.))
-             (sit-for 1)))) ;; to give Extempore time to start listening for connections
-  (let ((repl-buffer-name (format "extempore REPL<%s:%d>" host port)))
-    (set-buffer (make-comint repl-buffer-name (cons host port)))
-    (extempore-repl-mode)
-    (pop-to-buffer (format "*%s*" repl-buffer-name))))
+  (let* ((repl-buffer-name (format "extempore REPL<%s:%d>" host port))
+         (repl-buffer-name* (format "*%s*" repl-buffer-name)))
+    (unless (comint-check-proc "*extempore*")
+      (call-interactively #'extempore-run))
+    (unless (and  (get-buffer repl-buffer-name*)
+                  (get-buffer-process repl-buffer-name*)))
+    (dotimes (i 25)
+      (condition-case err
+          (set-buffer (make-comint repl-buffer-name (cons host port)))
+        (error
+         (message (format  "Starting Extempore%s" (make-string i ?\.)))
+         (sit-for 0.2))))
+    (if (comint-check-proc "*extempore*")
+        (extempore-repl-mode))
+; Report to user and go to the repl buffer if it's there
+    (if  (and  (comint-check-proc "*extempore*"))
+         (progn
+           (pop-to-buffer (format "*%s*" repl-buffer-name))
+           (message "extempore REPL ready."))
+         (message "Could not Launch extempore REPL."))))
 
 ;; for compatibility---this is what it used to be called
 (defalias 'extempore-start-repl 'extempore-repl)
