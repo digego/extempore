@@ -1039,10 +1039,8 @@ If there is a process already running in `*extempore*', switch to that buffer.
   (unless user-extempore-directory
     (error "Error: `user-extempore-directory' not set!\n\nNote that this var used to be called `extempore-path', so you may need to update your .emacs"))
   (if (not (comint-check-proc "*extempore*"))
-      (let ((default-directory user-extempore-directory))
-        (set-buffer (apply #'make-comint "extempore" (concat user-extempore-directory "extempore") nil
-                           (split-string-and-unquote program-args)))
-        (inferior-extempore-mode)))
+      (let* ((default-directory (file-name-as-directory
+                                 (expand-file-name user-extempore-directory)))
   (setq extempore-buffer "*extempore*"))
 
 (defun extempore-stop ()
