@@ -1041,6 +1041,18 @@ If there is a process already running in `*extempore*', switch to that buffer.
   (if (not (comint-check-proc "*extempore*"))
       (let* ((default-directory (file-name-as-directory
                                  (expand-file-name user-extempore-directory)))
+            (runtime-directory (concat default-directory "runtime"))
+            (full-args (if (string-match "--runtime" program-args)
+                           program-args
+                           (concat  "--runtime=" runtime-directory " " program-args)
+                           ))
+            )
+        (message (concat "Running extempore with: " full-args))
+        (set-buffer (apply #'make-comint "extempore" (concat default-directory "extempore") nil
+                           (split-string-and-unquote full-args)))
+        (inferior-extempore-mode))
+      (message "extempore is already running in *extempore* buffer.")
+      )
   (setq extempore-buffer "*extempore*"))
 
 (defun extempore-stop ()
