@@ -1084,7 +1084,7 @@ If there is a process already running in `*extempore*', switch to that buffer.
            proc
            (concat (buffer-substring-no-properties start end) "\r\n")))
         (sleep-for extempore-blink-duration))
-    (error "Buffer %s is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)" (buffer-name))))
+    (error "Buffer %s is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-c C-j)" (buffer-name))))
 
 (defun extempore-send-definition ()
   "Send the current definition to the inferior Extempore process."
