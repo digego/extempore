@@ -73,6 +73,12 @@
 #define D_MILLION 1000000.0
 
 
+#ifdef TARGET_OS_WINDOWS
+#define OS_PATH_DELIM '\\'
+#else
+#define OS_PATH_DELIM '/'
+#endif
+
 extern "C" {
 
 bool rmatch(char* regex, char* str);

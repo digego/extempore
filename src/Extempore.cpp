@@ -117,8 +117,14 @@ CSimpleOptA::SOption g_rgOptions[] = {
 
 int main(int argc, char** argv)
 {
-    std::string runtimedir("runtime");
-    std::string initexpr;    
+    std::string ext_dir(argv[0]);
+    std::string runtimedir("");
+    if (ext_dir.find_last_of(OS_PATH_DELIM) != std::string::npos) {
+        runtimedir += ext_dir.substr(0,ext_dir.find_last_of(OS_PATH_DELIM)+1);
+    }
+    runtimedir += "runtime";
+
+    std::string initexpr;
     bool initexpr_on = false;
     
     std::string host("localhost");
