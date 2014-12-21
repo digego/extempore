@@ -302,8 +302,9 @@ int main(int argc, char** argv)
     std::cout << "---------------------------------------" << std::endl;
     ascii_text_color(0,9,10);	            
 
+    bool startup_ok = true;
     extemp::SchemeProcess* utility = new extemp::SchemeProcess(runtimedir, utility_name, utility_port, 0);
-    utility->start();
+    startup_ok &= utility->start();
 
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
     utility_repl->connectToProcessAtHostname(host,utility_port);
@@ -313,7 +314,16 @@ int main(int argc, char** argv)
     }else{
        primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0);
     }
-    primary->start();
+   startup_ok &= primary->start();
+
+   if (!startup_ok) {
+    ascii_text_color(1,1,10);
+    printf("Error");
+    ascii_text_color(0,9,10);
+    printf(": processes failed to start. Exiting...\n");
+    fflush(NULL);
+    exit(1);
+   }
 
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name);
     primary_repl->connectToProcessAtHostname(host,primary_port);
