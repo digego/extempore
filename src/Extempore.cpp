@@ -71,11 +71,11 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 void sig_handler(int signo)
 {
   if (signo == SIGINT){
-    printf("\nRecieved interrupt signal (SIGINT), exiting Extempore...\n");
+    printf("\nReceived interrupt signal (SIGINT), exiting Extempore...\n");
     exit(0);
   }
   else if (signo == SIGTERM){
-    printf("\nRecieved termination signal (SIGTERM), exiting Extempore...\n");
+    printf("\nReceived termination signal (SIGTERM), exiting Extempore...\n");
     exit(0);
   }
 }
