@@ -105,45 +105,45 @@ namespace extemp {
 	return title;
     }
 
-    void* SchemeREPL::readThread(void* obj)
-    {
-	SchemeREPL* repl = static_cast<SchemeREPL*>(obj);
-	while(repl->active) {
-	    //NSMutableString* str = [[NSMutableString alloc] init];
-	    std::stringstream ss; 
-	    if(repl->server_socket == 0) { 
-		ss << "No REPL Connection Established";
-		break;
-	    }else{
-		memset(repl->buf,0,BUFLENGTH+1);
-		int lgth = 0;
-#ifdef EXT_BOOST
-               	while((lgth = repl->server_socket->read_some(boost::asio::buffer(repl->buf, BUFLENGTH))) == BUFLENGTH) {
-#else
-		while((lgth = read(repl->server_socket, repl->buf, BUFLENGTH)) == BUFLENGTH) {		    
-#endif
+//     void* SchemeREPL::readThread(void* obj)
+//     {
+// 	SchemeREPL* repl = static_cast<SchemeREPL*>(obj);
+// 	while(repl->active) {
+// 	    //NSMutableString* str = [[NSMutableString alloc] init];
+// 	    std::stringstream ss;
+// 	    if(repl->server_socket == 0) {
+// 		ss << "No REPL Connection Established";
+// 		break;
+// 	    }else{
+// 		memset(repl->buf,0,BUFLENGTH+1);
+// 		int lgth = 0;
+// #ifdef EXT_BOOST
+//                	while((lgth = repl->server_socket->read_some(boost::asio::buffer(repl->buf, BUFLENGTH))) == BUFLENGTH) {
+// #else
+// 		while((lgth = read(repl->server_socket, repl->buf, BUFLENGTH)) == BUFLENGTH) {
+// #endif
 
-		    if(lgth < 0) {
-		      ascii_text_color(1,1,10);
-			printf("PROBLEM WITH REPL SOCKET: %s\n",repl->buf);
-		      ascii_text_color(0,9,10);
-			break;
-		    }
-		    ss << repl->buf;
-		    memset(repl->buf,0,BUFLENGTH+1);
-		}
-		if(lgth == 0) { // end of stream
-		  ascii_text_color(1,3,10);
-		    printf("CLOSE REPL READ STREAM %d",lgth);
-		  ascii_text_color(0,9,10);
-		    return 0;
-		}
-	    }
-	    //printf("repl-result: %s",ss.str().c_str());
-	    if(repl->server_socket == 0) break;
-	}
-	//printf("Exit REPL Thread\n");
-    }
+// 		    if(lgth < 0) {
+// 		      ascii_text_color(1,1,10);
+// 			printf("PROBLEM WITH REPL SOCKET: %s\n",repl->buf);
+// 		      ascii_text_color(0,9,10);
+// 			break;
+// 		    }
+// 		    ss << repl->buf;
+// 		    memset(repl->buf,0,BUFLENGTH+1);
+// 		}
+// 		if(lgth == 0) { // end of stream
+// 		  ascii_text_color(1,3,10);
+// 		    printf("CLOSE REPL READ STREAM %d",lgth);
+// 		  ascii_text_color(0,9,10);
+// 		    return 0;
+// 		}
+// 	    }
+// 	    //printf("repl-result: %s",ss.str().c_str());
+// 	    if(repl->server_socket == 0) break;
+// 	}
+// 	//printf("Exit REPL Thread\n");
+//     }
 
     void SchemeREPL::writeString(std::string& string)
     {
@@ -291,7 +291,7 @@ namespace extemp {
 	printf(" connected to remote process\n");
         fflush(NULL);
 	connected = true;
-	read_thread.create(&readThread,this);
+	// read_thread.create(&readThread,this);
 	return true;
     }
 
