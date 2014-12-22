@@ -71,11 +71,11 @@ BOOL CtrlHandler( DWORD fdwCtrlType )
 void sig_handler(int signo)
 {
   if (signo == SIGINT){
-    printf("\nRecieved interrupt signal (SIGINT), exiting Extempore...\n");
+    printf("\nReceived interrupt signal (SIGINT), exiting Extempore...\n");
     exit(0);
   }
   else if (signo == SIGTERM){
-    printf("\nRecieved termination signal (SIGTERM), exiting Extempore...\n");
+    printf("\nReceived termination signal (SIGTERM), exiting Extempore...\n");
     exit(0);
   }
 }
@@ -117,8 +117,14 @@ CSimpleOptA::SOption g_rgOptions[] = {
 
 int main(int argc, char** argv)
 {
-    std::string runtimedir("runtime");
-    std::string initexpr;    
+    std::string ext_dir(argv[0]);
+    std::string runtimedir("");
+    if (ext_dir.find_last_of(OS_PATH_DELIM) != std::string::npos) {
+        runtimedir += ext_dir.substr(0,ext_dir.find_last_of(OS_PATH_DELIM)+1);
+    }
+    runtimedir += "runtime";
+
+    std::string initexpr;
     bool initexpr_on = false;
     
     std::string host("localhost");
@@ -296,8 +302,9 @@ int main(int argc, char** argv)
     std::cout << "---------------------------------------" << std::endl;
     ascii_text_color(0,9,10);	            
 
+    bool startup_ok = true;
     extemp::SchemeProcess* utility = new extemp::SchemeProcess(runtimedir, utility_name, utility_port, 0);
-    utility->start();
+    startup_ok &= utility->start();
 
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
     utility_repl->connectToProcessAtHostname(host,utility_port);
@@ -307,7 +314,16 @@ int main(int argc, char** argv)
     }else{
        primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0);
     }
-    primary->start();
+   startup_ok &= primary->start();
+
+   if (!startup_ok) {
+    ascii_text_color(1,1,10);
+    printf("Error");
+    ascii_text_color(0,9,10);
+    printf(": processes failed to start. Exiting...\n");
+    fflush(NULL);
+    exit(1);
+   }
 
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name);
     primary_repl->connectToProcessAtHostname(host,primary_port);
