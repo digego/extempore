@@ -1,0 +1,35 @@
+;;; system.xtm -- tests for Extempore "system" functionality
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Any tests which excercise functionality from the CPP codebase (e.g.
+;; through SchemeFFI.cpp) should be placed in here.
+
+;; Also, tests of the scheme interpreter should go here as well.
+
+;;; Code:
+
+;; multi-process/IPC
+
+(define times-5
+  (lambda (a)
+    (* a 5)))
+
+(ipc:new "test-process" 7097)
+
+(ipc:define "test-process" 'times-5 times-5)
+
+(xtmtest-result
+ (ipc:call "test-process" 'times-5 2)
+ 10)
+
+;; async version - should return true, mostly in here just to check
+;; that it doesn't crash
+
+(xtmtest-result
+ (ipc:call-async "test-process" 'times-5 6)
+ #t)
