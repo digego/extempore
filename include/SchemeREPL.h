@@ -51,7 +51,7 @@ namespace extemp {
 	~SchemeREPL();
 	static SchemeREPL* I(std::string&);	
 	std::string& getTitle();
-	static void* readThread(void*);
+	// static void* readThread(void*);
 	void writeString(std::string&);
 	bool connectToProcessAtHostname(std::string&, int);
 	void closeREPL();
@@ -70,6 +70,6 @@ namespace extemp {
 	bool active;
 	std::string title;
 	EXTMutex* write_lock;
-	EXTThread read_thread;
+	// EXTThread read_thread;
     };
 }
