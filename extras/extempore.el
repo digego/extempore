@@ -1015,15 +1015,26 @@ to continue it."
           (ido-completing-read
            "Port: " (cl-remove-duplicates (append '("7099" "7098") extempore-connect-port-history-list) :test #'string=) nil nil nil 'extempore-connect-port-history-list (number-to-string extempore-default-port)))))
   "Start an Extempore REPL connected to HOST on PORT."
-  (unless (comint-check-proc "*extempore*")
-    (progn (call-interactively #'extempore-run)
-           (dotimes (i 5)
-             (message "Starting Extempore%s" (make-string i ?\.))
-             (sit-for 1)))) ;; to give Extempore time to start listening for connections
-  (let ((repl-buffer-name (format "extempore REPL<%s:%d>" host port)))
-    (set-buffer (make-comint repl-buffer-name (cons host port)))
-    (extempore-repl-mode)
-    (pop-to-buffer (format "*%s*" repl-buffer-name))))
+  (let* ((repl-buffer-name (format "extempore REPL<%s:%d>" host port))
+         (repl-buffer-name* (format "*%s*" repl-buffer-name)))
+    (unless (comint-check-proc "*extempore*")
+      (call-interactively #'extempore-run))
+    (unless (and  (get-buffer repl-buffer-name*)
+                  (get-buffer-process repl-buffer-name*)))
+    (dotimes (i 25)
+      (condition-case err
+          (set-buffer (make-comint repl-buffer-name (cons host port)))
+        (error
+         (message (format  "Starting Extempore%s" (make-string i ?\.)))
+         (sit-for 0.2))))
+    (if (comint-check-proc "*extempore*")
+        (extempore-repl-mode))
+; Report to user and go to the repl buffer if it's there
+    (if  (and  (comint-check-proc "*extempore*"))
+         (progn
+           (pop-to-buffer (format "*%s*" repl-buffer-name))
+           (message "extempore REPL ready."))
+         (message "Could not Launch extempore REPL."))))
 
 ;; for compatibility---this is what it used to be called
 (defalias 'extempore-start-repl 'extempore-repl)
@@ -1039,10 +1050,20 @@ If there is a process already running in `*extempore*', switch to that buffer.
   (unless user-extempore-directory
     (error "Error: `user-extempore-directory' not set!\n\nNote that this var used to be called `extempore-path', so you may need to update your .emacs"))
   (if (not (comint-check-proc "*extempore*"))
-      (let ((default-directory user-extempore-directory))
-        (set-buffer (apply #'make-comint "extempore" (concat user-extempore-directory "extempore") nil
-                           (split-string-and-unquote program-args)))
-        (inferior-extempore-mode)))
+      (let* ((default-directory (file-name-as-directory
+                                 (expand-file-name user-extempore-directory)))
+            (runtime-directory (concat default-directory "runtime"))
+            (full-args (if (string-match "--runtime" program-args)
+                           program-args
+                           (concat  "--runtime=" runtime-directory " " program-args)
+                           ))
+            )
+        (message (concat "Running extempore with: " full-args))
+        (set-buffer (apply #'make-comint "extempore" (concat default-directory "extempore") nil
+                           (split-string-and-unquote full-args)))
+        (inferior-extempore-mode))
+      (message "extempore is already running in *extempore* buffer.")
+      )
   (setq extempore-buffer "*extempore*"))
 
 (defun extempore-stop ()
@@ -1063,7 +1084,7 @@ If there is a process already running in `*extempore*', switch to that buffer.
            proc
            (concat (buffer-substring-no-properties start end) "\r\n")))
         (sleep-for extempore-blink-duration))
-    (error "Buffer %s is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-x C-j)" (buffer-name))))
+    (error "Buffer %s is not connected to an Extempore process.  You can connect with `M-x extempore-connect' (C-c C-j)" (buffer-name))))
 
 (defun extempore-send-definition ()
   "Send the current definition to the inferior Extempore process."
