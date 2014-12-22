@@ -44,12 +44,6 @@
 (sys:load-preload-check 'test)
 (define *xtmlib-test-loaded* #f)
 
-(define *xtmtest-results*
-  '((correct)
-    (incorrect)
-    (compile)
-    (no-compile)))
-
 (define xtmtest-reset-results
   (lambda ()
     (set! *xtmtest-results*
@@ -57,6 +51,10 @@
             (incorrect)
             (compile)
             (no-compile)))))
+
+(define *xtmtest-results* '())
+
+(xtmtest-reset-results)
 
 (define xtmtest-update-test-result
   (lambda (func-sym label call expected got) 
@@ -112,10 +110,11 @@
                       (print-with-colors 'blue 'default #t (print (car label-list) "\n\n"))
                       (for-each (lambda (reslist)
                                   (print "  name: ")
-                                  (print-with-colors (cdr (assoc (car label-list) '((correct . green)
-                                                                                    (incorrect . yellow)
-                                                                                    (compile . magenta)
-                                                                                    (no-compile . red))))
+                                  (print-with-colors (case (car label-list)
+                                                       ('correct 'green)
+                                                       ('incorrect 'magenta)
+                                                       ('compile 'yellow)
+                                                       ('no-compile ' red))
                                                      'default #f (print (car reslist)))
                                   (print " call: ")
                                   (print-with-colors 'blue 'default #f (print (cadr reslist)))
