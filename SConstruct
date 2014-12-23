@@ -274,8 +274,6 @@ def configure_environment_windows():
     env.Replace(CCFLAGS = '-g -fPIC -O3 -DEXT_BOOST -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS')
     env.Replace(LINKFLAGS = '-lpcre -lportaudio -lboost_thread -lboost_system -lboost_filesystem')
 
-    print('platform = ' + env['PLATFORM'])
-
 def configure_environment(platform):
     if platform == 'darwin':
         configure_environment_darwin()
