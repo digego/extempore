@@ -266,9 +266,9 @@ def configure_environment_linux():
 def configure_environment_darwin():
     env.Replace(CXX = 'clang++')
     env.Replace(LD = 'clang++')
-    env.Append(CCFLAGS = '-O3 -DUSE_GLUT')
+    # env.Append(CCFLAGS = '')
+    env.AppendUnique(FRAMEWORKS = Split('Cocoa CoreAudio AudioToolbox AudioUnit GLUT OpenGL')) # this doesn't work for some reason
     env.Append(LINKFLAGS = '-pthread -lpcre -lportaudio')
-    env.AppendUnique(FRAMEWORKS = Split('Cocoa CoreAudio AudioToolbox AudioUnit GLUT OpenGL'))
 
 def configure_environment_windows():
     env.Replace(CCFLAGS = '-g -fPIC -O3 -DEXT_BOOST -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS')
@@ -286,7 +286,7 @@ def configure_environment(platform):
 
 configure_environment(env['PLATFORM'])
 
-# additional LLVM env vars
+# LLVM env vars
 env.ParseConfig(os.environ['EXT_LLVM_CONFIG_SCRIPT'] + '  --cflags --ldflags --libs')
 
 # Prepare object files
