@@ -256,6 +256,9 @@ env = conf.Finish()
 ################################################
 # How to build the 'extempore' target
 ################################################
+
+# Linux
+
 PLATFORM_CXXFLAGS = '-g -fPIC -O3'
 PLATFORM_LDFLAGS = '-Wl,--export-dynamic'
 PLATFORM_DEFINES = ''
@@ -270,6 +273,10 @@ DEFINES = PLATFORM_DEFINES + \
     ' -D_GNU_SOURCE' + \
     ' -D__STDC_CONSTANT_MACROS' + \
     ' -D__STDC_LIMIT_MACROS'
+
+# OSX
+
+env.AppendUnique(FRAMEWORKS=Split('Cocoa CoreAudio AudioToolbox AudioUnit GLUT OpenGL'))
 
 # CXXFLAGS = '-w -O3 -MMD -fexceptions -frtti'
 CXXFLAGS = '-w -O3 -fexceptions -frtti'
