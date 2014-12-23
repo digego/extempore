@@ -157,9 +157,6 @@ int set_thread_realtime(thread_port_t threadport, float period, float computatio
 #ifdef _MSC_VER
 #define isnan(x) ((x) != (x))
 #define isinf(x) (isnan(x-x))
-#elif __APPLE__
-#define isnan(x) ((x) != (x))
-#define isinf(x) (isnan(x-x))
 #endif
 
 SAMPLE audio_sanity(SAMPLE x)

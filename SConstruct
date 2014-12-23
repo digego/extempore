@@ -277,13 +277,14 @@ def configure_environment_windows():
 def configure_environment(platform):
     if platform == 'darwin':
         configure_environment_darwin()
-    elif platform == linux:
+    elif platform == 'linux':
         configure_environment_linux()
-    elif platform == windows:
+    elif platform == 'windows':
         configure_environment_windows()
     else:
         print('Unsupported platform: ' + platform)
 
+configure_environment(env['PLATFORM'])
 
 # additional LLVM env vars
 env.ParseConfig(os.environ['EXT_LLVM_CONFIG_SCRIPT'] + '  --cflags --ldflags --libs')
