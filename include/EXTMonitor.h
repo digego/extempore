@@ -33,7 +33,7 @@
  *
  */
 
-#ifndef EXT_MONTIOR_H
+#ifndef EXT_MONITOR_H
 #define EXT_MONITOR_H
 
 #include <string>
