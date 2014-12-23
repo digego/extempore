@@ -264,6 +264,8 @@ def configure_environment_linux():
     env.Append(LINKFLAGS = '-Wl,--export-dynamic -ldl -lm -pthread -lpcre -lportaudio -lGL -lX11')
 
 def configure_environment_darwin():
+    env.Replace(CXX = 'clang++')
+    env.Replace(LD = 'clang++')
     env.Append(CCFLAGS = '-O3 -DUSE_GLUT')
     env.Append(LINKFLAGS = '-pthread -lpcre -lportaudio')
     env.AppendUnique(FRAMEWORKS = Split('Cocoa CoreAudio AudioToolbox AudioUnit GLUT OpenGL'))
