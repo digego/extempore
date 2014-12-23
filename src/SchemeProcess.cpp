@@ -54,14 +54,14 @@
 #include <sys/select.h>
 #endif
 
-#ifndef TARGET_OS_WINDOWS
+#ifndef _MSC_VER
 #include <unistd.h>
 #endif
 #include <stdlib.h>
 #include "UNIV.h"
 
 /*
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 #include <unistd.h>
 #endif
 */

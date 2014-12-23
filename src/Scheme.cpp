@@ -57,7 +57,7 @@
 
 #include <iostream>
 #include <sstream>
-#ifndef TARGET_OS_WINDOWS
+#ifndef _MSC_VER
 #include <execinfo.h>
 #endif
 
@@ -88,7 +88,7 @@
 
 //#if USE_STRCASECMP
 //#include <strings.h>
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 #define stricmp strcmp //stricmp _stricmp
 #define ULONG_LONG_MAX UINT64_MAX
 #else
@@ -144,7 +144,7 @@
 /* } */
 #endif 
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 #define atoll _atoi64
 #endif
 /*
@@ -217,7 +217,7 @@ inline void insert_treadmill(scheme* sc, pointer p)
     if(p->_list_colour == 0)
     {
 	std::cout << "ERROR: should not be inserting a free cell on the grey list!!!" << p << std::endl;
-#ifndef TARGET_OS_WINDOWS
+#ifndef _MSC_VER
         void* callstack[128];
         int i, frames = backtrace(callstack, 128);
         char** strs = backtrace_symbols(callstack, frames);

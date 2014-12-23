@@ -1,8 +1,8 @@
 OSX_FRAMEWORKS := \
 	-framework Cocoa \
 	-framework CoreAudio \
-        -framework AudioToolbox \
-        -framework AudioUnit \
+  -framework AudioToolbox \
+  -framework AudioUnit \
 	-framework GLUT \
 	-framework OpenGL \
 
@@ -21,6 +21,6 @@ PLATFORM_LIBS += $(OSX_FRAMEWORKS)
 PLATFORM_CXXFLAGS := -g -O3
 PLATFORM_LDFLAGS :=
 
-PLATFORM_DEFINES := -DTARGET_OS_MAC -DUSE_GLUT
+PLATFORM_DEFINES := -DUSE_GLUT
 PLATFORM_CXX := g++
 PLATFORM_LD := g++

@@ -258,7 +258,7 @@ env = conf.Finish()
 ################################################
 PLATFORM_CXXFLAGS = '-g -fPIC -O3'
 PLATFORM_LDFLAGS = '-Wl,--export-dynamic'
-PLATFORM_DEFINES = '-DTARGET_OS_LINUX'
+PLATFORM_DEFINES = ''
 PLATFORM_LIBS = '-ldl -lm -pthread -lportaudio'
 
 LIBS = ' -lpcre -lGL -lX11'

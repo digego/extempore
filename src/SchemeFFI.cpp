@@ -42,7 +42,7 @@
 #include "SchemeREPL.h"
 //#include "sys/mman.h"
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 #include <Windows.h>
 #include <Windowsx.h>
 #else
@@ -58,7 +58,7 @@
 #include <string.h>
 
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 #else
 #include <dirent.h>
 #endif
@@ -81,7 +81,7 @@
 #include <oniguruma.h>
 #endif
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
 #include <malloc/malloc.h>
 #else
 #include <time.h>
@@ -112,14 +112,14 @@
 #include "llvm/ADT/StringExtras.h"
 ///////////////////////////////////////
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 //#include <unistd.h>
 #include <malloc.h>
 #include <gl/GL.h>
-#elif TARGET_OS_LINUX
+#elif __linux__
 #include <GL/glx.h>
 #include <GL/gl.h>
-#elif TARGET_OS_MAC
+#elif __APPLE__
 #include <Cocoa/Cocoa.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <AppKit/AppKit.h>
@@ -127,7 +127,7 @@
 #include <OpenGL/gl.h>
 #endif
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 #define PRINT_ERROR(format, ...)		\
     ascii_text_color(1,1,10);			\
     printf(format , __VA_ARGS__);			\
@@ -140,7 +140,7 @@
 #endif
 
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
 
   // BasicOpenGLView
   @interface BasicOpenGLView : NSOpenGLView
@@ -533,11 +533,11 @@ namespace extemp {
 	    { "impc:ir:gettype",			      &SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			    &SchemeFFI::impcirAdd },
 	    { "gl:get-event",			          &SchemeFFI::getEvent },
-#if defined (TARGET_OS_WINDOWS)
+#if defined (_MSC_VER)
 	    { "gl:add-extension",           &SchemeFFI::addGLExtension },
 #endif
 	    { "gl:make-ctx",			          &SchemeFFI::makeGLContext },	    
-#if defined (TARGET_OS_MAC)
+#if defined (__APPLE__)
 	    { "gl:make-ctx-core",			      &SchemeFFI::makeGLCoreContext },
 #endif
 	    { "gl:set-context",             &SchemeFFI::glMakeContextCurrent },
@@ -1103,7 +1103,7 @@ namespace extemp {
     pointer SchemeFFI::openDynamicLib(scheme* _sc, pointer args)
     {
 	//void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 	  char* ccc = string_value(pair_car(args));
 	  size_t ccc_size = (strlen(ccc)+1) * 2; //2 for 16 bytes (wide_char)
 	  size_t converted_chars = 0;
@@ -1115,7 +1115,7 @@ namespace extemp {
 #endif
 	if (!lib_handle)
 	{
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 	  //std::cout << "Error loading library" << GetLastError() << std::endl;
 	  //printf("For Library Path: %ls\n",wstr);
 	  return _sc->F;
@@ -1129,7 +1129,7 @@ namespace extemp {
 
     pointer SchemeFFI::closeDynamicLib(scheme* _sc, pointer args)
     {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
       FreeLibrary((HMODULE)cptr_value(pair_car(args))) ;
 #else
 	dlclose(cptr_value(pair_car(args)));
@@ -1156,11 +1156,11 @@ namespace extemp {
 
     pointer SchemeFFI::platform(scheme* _sc, pointer args)
     {
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
       return mk_string(_sc, "OSX");
-#elif TARGET_OS_LINUX
+#elif __linux__
       return mk_string(_sc, "Linux");
-#elif TARGET_OS_WINDOWS
+#elif _MSC_VER
 	  return mk_string(_sc, "Windows");
 #else
 	  return mk_string(_sc, "");
@@ -2739,7 +2739,7 @@ namespace extemp {
 	char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
         if(floatin[1]=='x') return pair_car(args); 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
 	float f = (float) strtod(floatin, (char**) &floatout);
 #else        
 	float f = strtof(floatin, (char**) &floatout);
@@ -2797,7 +2797,7 @@ namespace extemp {
  	char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
         if(floatin[1]=='x') return pair_car(args); 
- #ifdef TARGET_OS_WINDOWS
+ #ifdef _MSC_VER
  	double f = strtod(floatin, (char**) &floatout);
  #else
  	double f = strtod(floatin, (char**) &floatout);
@@ -2904,7 +2904,7 @@ namespace extemp {
 	void* library = cptr_value(pair_car(args));
 	char* symname = string_value(pair_cadr(args));
 		
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
         void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
 #else
 	void* ptr = dlsym(library, symname);
@@ -2925,7 +2925,7 @@ namespace extemp {
 
 	EE->lock.acquire();
 		
-#ifdef TARGET_OS_WINDOWS
+#ifdef _MSC_VER
         void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
 #else
 	void* ptr = dlsym(library, symname);
@@ -3079,7 +3079,7 @@ namespace extemp {
   ////////////////////////////////////////////////////////////////
   //  SOME XWindows guff
   ////////////////////////////////////////////////////////////////
-#if defined (TARGET_OS_LINUX)
+#if defined (__linux__)
 
   int singleBufferAttributess[] = {
     GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
@@ -3503,7 +3503,7 @@ namespace extemp {
     return list; //_cons(_sc, mk_cptr(_sc, (void*)dpy),mk_cptr(_sc,(void*)glxWin),1);
   }
 
-#elif TARGET_OS_WINDOWS
+#elif _MSC_VER
 
   //int singleBufferAttributess[] = {
   //  GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
@@ -3848,7 +3848,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
   }
 
 
-#elif TARGET_OS_MAC
+#elif __APPLE__
 
   pointer SchemeFFI::getEvent(scheme* _sc, pointer args)
   {
@@ -4290,7 +4290,7 @@ struct timespec double_to_time(double tm) {
     return p3;
   }
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
   pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
   {
     return mk_real(_sc, CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + SchemeFFI::CLOCK_OFFSET);
@@ -4330,7 +4330,7 @@ struct timespec double_to_time(double tm) {
   pointer SchemeFFI::ad_setTime(scheme* _sc, pointer args)
   {
     if(pair_cdr(args) == _sc->NIL) {
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
       AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
 #else
       struct timespec t;
