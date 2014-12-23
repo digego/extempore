@@ -257,39 +257,36 @@ env = conf.Finish()
 # How to build the 'extempore' target
 ################################################
 
-# Linux
+def configure_environment_linux():
+    # CXXFLAGS = '-w -O3 -MMD -fexceptions -frtti'
+    # CXXFLAGS = '-w -O3 -fexceptions -frtti'
+    env.Append(CCFLAGS = '-fPIC -O3 -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS')
+    env.Append(LINKFLAGS = '-Wl,--export-dynamic -ldl -lm -pthread -lpcre -lportaudio -lGL -lX11')
 
-PLATFORM_CXXFLAGS = '-g -fPIC -O3'
-PLATFORM_LDFLAGS = '-Wl,--export-dynamic'
-PLATFORM_DEFINES = ''
-PLATFORM_LIBS = '-ldl -lm -pthread -lportaudio'
+def configure_environment_darwin():
+    env.Append(CCFLAGS = '-O3 -DUSE_GLUT')
+    env.Append(LINKFLAGS = '-pthread -lpcre -lportaudio')
+    env.AppendUnique(FRAMEWORKS = Split('Cocoa CoreAudio AudioToolbox AudioUnit GLUT OpenGL'))
 
-LIBS = ' -lpcre -lGL -lX11'
-if env.GetOption('EXT_BOOST'):
-    LIBS += ' -lboost_thread -lboost_system -lboost_filesystem'
+def configure_environment_windows():
+    env.Replace(CCFLAGS = '-g -fPIC -O3 -DEXT_BOOST -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS')
+    env.Replace(LINKFLAGS = '-lpcre -lportaudio -lboost_thread -lboost_system -lboost_filesystem')
 
-# Platform-independent
-DEFINES = PLATFORM_DEFINES + \
-    ' -D_GNU_SOURCE' + \
-    ' -D__STDC_CONSTANT_MACROS' + \
-    ' -D__STDC_LIMIT_MACROS'
+    print('platform = ' + env['PLATFORM'])
 
-# OSX
+def configure_environment(platform):
+    if platform == 'darwin':
+        configure_environment_darwin()
+    elif platform == linux:
+        configure_environment_linux()
+    elif platform == windows:
+        configure_environment_windows()
+    else:
+        print('Unsupported platform: ' + platform)
 
-env.AppendUnique(FRAMEWORKS=Split('Cocoa CoreAudio AudioToolbox AudioUnit GLUT OpenGL'))
 
-# CXXFLAGS = '-w -O3 -MMD -fexceptions -frtti'
-CXXFLAGS = '-w -O3 -fexceptions -frtti'
-CXXFLAGS += ' ' + DEFINES
-CXXFLAGS += ' ' + PLATFORM_CXXFLAGS
-LIBS     += ' ' + PLATFORM_LIBS
-LDFLAGS  = ' ' + PLATFORM_LDFLAGS
-
-env.ParseConfig(
-    os.environ['EXT_LLVM_CONFIG_SCRIPT'] + '  --cflags --ldflags --libs')
-env.Replace(CCFLAGS=CXXFLAGS)
-env.Replace(LINKFLAGS=LDFLAGS)
-env.Append(LINKFLAGS=LIBS)
+# additional LLVM env vars
+env.ParseConfig(os.environ['EXT_LLVM_CONFIG_SCRIPT'] + '  --cflags --ldflags --libs')
 
 # Prepare object files
 EXT_OBJ_FILES = []
