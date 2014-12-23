@@ -181,7 +181,7 @@ def check_llvm_version(context):
 
     return result
 
-def check_patches_applid(context):
+def check_patches_applied(context):
     context.Message('Checking that patches have been applied...')
     result = True
     for d in PATCH_DATA:
@@ -220,7 +220,7 @@ if not  COMMAND_LINE_TARGETS :
 
 conf = Configure(env, custom_tests={
     'check_llvm_dir_isset': check_llvm_dir_isset,
-    'check_patches_applid': check_patches_applid,
+    'check_patches_applied': check_patches_applied,
     'check_llvm_version': check_llvm_version
 })
 
@@ -243,7 +243,7 @@ if not conf.check_llvm_version():
                                     **color_dict))
     # Exit(1)
 
-if not conf.check_patches_applid():
+if not conf.check_patches_applied():
     err_msg = \
         """
 {orange}WARN{white}: Have you applied the provided patchs?
