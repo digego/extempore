@@ -260,18 +260,23 @@ env = conf.Finish()
 def configure_environment_linux():
     # CXXFLAGS = '-w -O3 -MMD -fexceptions -frtti'
     # CXXFLAGS = '-w -O3 -fexceptions -frtti'
-    env.Append(CCFLAGS = '-fPIC -O3 -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS')
+    env.Append(CXXFLAGS = '-fPIC -O3 -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS')
     env.Append(LINKFLAGS = '-Wl,--export-dynamic -ldl -lm -pthread -lpcre -lportaudio -lGL -lX11')
+
+# TODO: notes for future Ben:
+#
+# need to figure out why the FRAMEWORKS variable isn't getting put in
+# the right places. all.bash works fine.
 
 def configure_environment_darwin():
     env.Replace(CXX = 'clang++')
     env.Replace(LD = 'clang++')
-    # env.Append(CCFLAGS = '')
+    # env.Append(CXXFLAGS = '')
     env.AppendUnique(FRAMEWORKS = Split('Cocoa CoreAudio AudioToolbox AudioUnit GLUT OpenGL')) # this doesn't work for some reason
     env.Append(LINKFLAGS = '-pthread -lpcre -lportaudio')
 
 def configure_environment_windows():
-    env.Replace(CCFLAGS = '-g -fPIC -O3 -DEXT_BOOST -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS')
+    env.Replace(CXXFLAGS = '-g -fPIC -O3 -DEXT_BOOST -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS')
     env.Replace(LINKFLAGS = '-lpcre -lportaudio -lboost_thread -lboost_system -lboost_filesystem')
 
 def configure_environment(platform):
