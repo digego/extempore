@@ -28,6 +28,10 @@ import sys
 import subprocess
 from hashlib import md5
 
+import imp
+# Bring in the xtm dep discovery script as a module
+xtmdeps = imp.load_source('xtmdeps', 'build/xtmdeps.py')
+
 # pass --no-cache to disable this
 CacheDir('.scons_build_cache')
 
@@ -308,48 +312,6 @@ env.Program('extempore', EXT_OBJ_FILES)
 # How to build the 'stdlib-foo' targets
 ################################################
 
-def comp_artifacts(xtm_file):
-    "Returns compilation artifacts filenames for stdlib source file"
-    "e.g. (libs/xtmfoo.so,libs/foo.xtm)"
-
-    rootname = os.path.basename(xtm_file).split('.')[0]
-    target_f = 'libs/xtm' + rootname + env['SHLIBSUFFIX'] # libs/xtmfoo.so
-    xtm_header_f = 'libs/' + xtm_file.split('/')[-1]      # libs/foo.xtm
-    return target_f, xtm_header_f
-
-def get_stdlib_deps():
-    """Extract inter-dependencies from stdlib component. Hackish.
-
-    Returns:
-        {'core/std.xtm': [],
-         'core/math.xtm': ['libs/xtmstd.so', 'libs/std.xtm'],
-         <...>}
-    """
-    import re
-    import glob
-    from collections import defaultdict
-
-    d = defaultdict(lambda: [])
-
-    for fname in glob.glob('libs/*/*.xtm'):
-        if os.path.basename(fname).startswith("."):
-            continue
-        with open(fname) as f:
-            s=f.read()
-        deps = re.findall("^\s*\(sys:load \"(.+?)\"",s,flags=re.M)
-        fname = fname.split('libs/')[-1]
-        deps = [x for x in deps
-                if os.path.basename(fname) != os.path.basename(x)]
-
-        for dep in deps:
-
-            if '-scm' in dep:
-                d[fname] = d[fname]
-            else:
-                d[fname].extend(comp_artifacts(dep))
-
-    return dict(d)
-
 # Note: --noaudio for parallel builds
 EXT_COMPILE_CMD = './extempore --noaudio --port {port} --nostd  --eval "(sys:precomp:compile-xtm-file \\\"libs/{xtm_file}\\\" #t #t #t)"'
 EXT_STDLIB_OUTPUTS = []
@@ -371,7 +333,7 @@ def construct_stdlib_nodes(deps):
         cmd = EXT_COMPILE_CMD.format(xtm_file=xtm_file, port=port)
         port += port_step
         port = port_base + ((port-port_base) % 5000)
-        target_f, xtm_header_f = comp_artifacts(xtm_file)
+        target_f, xtm_header_f = xtmdeps.comp_artifacts(xtm_file,env['SHLIBSUFFIX'])
 
         full_deps = ['libs/' + xtm_file] + deps
         env.Command(target_f, full_deps, cmd)
@@ -390,13 +352,13 @@ def construct_stdlib_nodes(deps):
 if env.GetOption('stdlib_sources'): # user manually specified sources
     sources = [x for x in env.GetOption('stdlib_sources').split(' ') if x]
     for xtm_file in sources:
-        EXT_STDLIB_OUTPUTS.extend(comp_artifacts(xtm_file))
+        EXT_STDLIB_OUTPUTS.extend(xtmdeps.comp_artifacts(xtm_file,env['SHLIBSUFFIX']))
 else:
     if env.GetOption('no_dep_discovery'): # the less-moving-parts option
         deps = {xtm_file: [] for xtm_file in STDLIB_CORE_SRCS+STDLIB_EXTERNAL_SRCS}
     else:
         # Extract dependencies for source files, required for parallel builds with -j
-        deps = get_stdlib_deps()
+        deps = xtmdeps.get_stdlib_deps(env['SHLIBSUFFIX'])
 
         external_deps = {xtm_file:deps for xtm_file,deps in deps.items() if 'external/' in xtm_file}
         core_deps = {xtm_file:deps for xtm_file,deps in deps.items() if 'core/' in xtm_file}
