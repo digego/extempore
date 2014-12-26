@@ -360,11 +360,11 @@ else:
         # Extract dependencies for source files, required for parallel builds with -j
         deps = xtmdeps.get_stdlib_deps(env['SHLIBSUFFIX'])
 
-        external_deps = {xtm_file:deps for xtm_file,deps in deps.items() if 'external/' in xtm_file}
-        core_deps = {xtm_file:deps for xtm_file,deps in deps.items() if 'core/' in xtm_file}
-        EXT_STDLIB_EXTERNAL_OUTPUTS = construct_stdlib_nodes(external_deps)
-        EXT_STDLIB_CORE_OUTPUTS = construct_stdlib_nodes(core_deps)
-        EXT_STDLIB_OUTPUTS = EXT_STDLIB_CORE_OUTPUTS + EXT_STDLIB_EXTERNAL_OUTPUTS
+    external_deps = {xtm_file:deps for xtm_file,deps in deps.items() if 'external/' in xtm_file}
+    core_deps = {xtm_file:deps for xtm_file,deps in deps.items() if 'core/' in xtm_file}
+    EXT_STDLIB_EXTERNAL_OUTPUTS = construct_stdlib_nodes(external_deps)
+    EXT_STDLIB_CORE_OUTPUTS = construct_stdlib_nodes(core_deps)
+    EXT_STDLIB_OUTPUTS = EXT_STDLIB_CORE_OUTPUTS + EXT_STDLIB_EXTERNAL_OUTPUTS
 
 stdlib = env.Command('stdlib', EXT_STDLIB_OUTPUTS, '')
 stdlib_core = env.Command('stdlib-core', EXT_STDLIB_CORE_OUTPUTS, '')
