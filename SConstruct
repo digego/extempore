@@ -26,6 +26,7 @@ import os
 import glob
 import sys
 import subprocess
+import platform
 from hashlib import md5
 
 import imp
@@ -284,19 +285,19 @@ def configure_environment_windows():
     env.Replace(LINKFLAGS = '-lpcre -lportaudio -lboost_thread -lboost_system -lboost_filesystem')
 
 def configure_environment(platform):
-    if platform == 'darwin':
+    if platform == 'Darwin':
         configure_environment_darwin()
-    elif platform == 'linux':
+    elif platform == 'Linux':
         configure_environment_linux()
-    elif platform == 'windows':
+    elif platform == 'Windows':
         configure_environment_windows()
     else:
         print('Unsupported platform: ' + platform)
 
-configure_environment(env['PLATFORM'])
-
 # LLVM env vars
 env.ParseConfig(os.environ['EXT_LLVM_CONFIG_SCRIPT'] + '  --cflags --ldflags --libs')
+
+configure_environment(platform.system())
 
 # Prepare object files
 EXT_OBJ_FILES = []
