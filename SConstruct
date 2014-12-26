@@ -103,12 +103,6 @@ STDLIB_EXTERNAL_SRCS = [
     'external/rtmidi.xtm',
     'external/openvg.xtm']
 
-AddOption('--EXT_BOOST',
-          dest   = 'EXT_BOOST',
-          action = 'store_true',
-          help   = 'Whether Boost should be compiled in.'
-          )
-
 AddOption('--stdlib-sources',
           default = [],
           nargs  = 1,
@@ -135,9 +129,9 @@ if 'help' in  COMMAND_LINE_TARGETS :
 
 Add -c to the command to clean up the respective target.
 
-You can specify options (--help lists them):
+To list further options:
 
-    scons --EXT_BOOST
+    scons --help
 
 To Precompile only specific stdlib components (paths are relative to 'libs/'):
 
