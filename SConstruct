@@ -29,9 +29,14 @@ import subprocess
 import platform
 from hashlib import md5
 
-import imp
 # Bring in the xtm dep discovery script as a module
-xtmdeps = imp.load_source('xtmdeps', 'build/xtmdeps.py')
+if sys.version_info[:2] >= (3,4):
+    import importlib.machinery
+    x=importlib.machinery.SourceFileLoader('xtmdeps','build/xtmdeps.py').load_module()
+else:
+    import imp
+
+    xtmdeps = imp.load_source('xtmdeps', 'build/xtmdeps.py')
 
 # pass --no-cache to disable this
 CacheDir('.scons_build_cache')
