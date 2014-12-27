@@ -59,7 +59,8 @@ def get_stdlib_deps(shlibsuffix):
             if '-scm' in dep:
                 d[fname] = d[fname]
             else:
-                d[fname].extend(comp_artifacts(dep,shlibsuffix))
+                target_f, xtm_header_f = comp_artifacts(dep,shlibsuffix)
+                d[fname].append(target_f)
 
     return dict(d)
 
