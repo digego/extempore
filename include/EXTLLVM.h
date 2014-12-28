@@ -101,6 +101,7 @@ void llvm_push_zone_stack(llvm_zone_t*);
 bool llvm_ptr_in_zone(llvm_zone_t*, void*);
 bool llvm_ptr_in_current_zone(void*);
 
+void llvm_schedule_callback(long long, void*);  
 void* llvm_get_function_ptr(char* n);
 pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
