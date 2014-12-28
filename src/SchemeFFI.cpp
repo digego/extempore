@@ -1848,79 +1848,193 @@ namespace extemp {
         EXTLLVM::VERIFY_COMPILES = (pair_car(args) == _sc->T) ? 1 : 0; 
         return _sc->T;
     }
-	
-    pointer SchemeFFI::compile(scheme* _sc, pointer args)
-    {
-	// Create some module to put our function into it.
-	using namespace llvm;
-	Module* M = EXTLLVM::I()->M;
-	PassManager* PM = extemp::EXTLLVM::I()->PM;
 
-	char* assm = string_value(pair_car(args));
-	SMDiagnostic pa;
-	//ParseError pa;
-	long long num_of_funcs = M->getFunctionList().size();		
-	const Module* newM = ParseAssemblyString(assm, M, pa, getGlobalContext());
-	if(EXTLLVM::OPTIMIZE_COMPILES)
-	{
-	    PM->run(*M);
-	}
+#ifdef EXT_MCJIT
+  static long llvm_emitcounter = 0;
+#endif
+  pointer SchemeFFI::compile(scheme* _sc, pointer args)
+  {
+    // Create some module to put our function into it.
+    using namespace llvm;
+    Module* M = EXTLLVM::I()->M;
+    PassManager* PM = extemp::EXTLLVM::I()->PM;
 
-	//std::stringstream ss;
-	if(newM == 0)
-	{
-	    std::string errstr;
-	    llvm::raw_string_ostream ss(errstr);
-	    pa.print("Extempore",ss);
-	    printf("%s\n",ss.str().c_str());
-	    // if the number of functions in module has changed when calling runFunction 
-	    // then we assume a stub was made and appended to the end of the modules function list.
-	    // we remove this function now that we no longer need it!
-	    if(num_of_funcs != M->getFunctionList().size()) {
-		iplist<Function>::iterator iter = M->getFunctionList().end();
-		Function* func = dyn_cast<Function>(--iter);
-		//std::cout << "REMOVING ON FAIL: " << *func << std::endl;
-		func->dropAllReferences();
-		func->removeFromParent();
-	    }			
-	    return _sc->F;
-	}else{
-            if (extemp::EXTLLVM::VERIFY_COMPILES) {
-              std::string Err;
-              if (verifyModule(*M, ReturnStatusAction, &Err)) {
-	        printf("%s\n%s","Parsed, but not valid!\n",Err.c_str());
-	        if(num_of_funcs != M->getFunctionList().size()) {
-                  iplist<Function>::iterator iter = M->getFunctionList().end();
-                  Function* func = dyn_cast<Function>(--iter);
-                  //std::cout << "REMOVING ON FAIL: " << *func << std::endl;
-                  func->dropAllReferences();
-                  func->removeFromParent();
-	        }							
-	        return _sc->F;
-              } 
-            }
-	    return _sc->T;
-	}
+#ifdef EXT_MCJIT  
+    char modname[256];
+    sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
+    Module* m = NULL;
+    char tmpbuf1[1024];
+    char tmpbuf2[1024];
+    char tmpbuf3[1024];  
+#endif
+  
+    char* assm = string_value(pair_car(args));
+    SMDiagnostic pa;
+    //ParseError pa;
+    long long num_of_funcs = M->getFunctionList().size();
+
+    Module* newM = NULL;
+
+#ifndef EXT_MCJIT  
+    newM = ParseAssemblyString(assm, M, pa, getGlobalContext());
+
+    if(EXTLLVM::OPTIMIZE_COMPILES)
+      {
+        PM->run(*M);
+      }
+  
+#else
+    std::string asmcode(assm);
+    int cnt = 0;
+    do {
+      m = new Module(modname, getGlobalContext());
+      newM = ParseAssemblyString(asmcode.c_str(), m, pa, getGlobalContext());
+      if(newM != NULL) break;
+      std::string err = pa.getMessage().str();
+      if(cnt > 1000) {
+        std::cout << "Compiler Error: could not resolve all external dependencies" << std::endl;
+        break;
+      }
+      if(rmatch("use of undefined value",(char*)err.c_str())) {
+        char symname[1024];
+
+        rreplace("use of undefined value '@(.*)'",(char*)err.c_str(),"$1",symname);
+        GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(symname);
+        Function* func = extemp::EXTLLVM::I()->getFunction(symname);
+        const char* tmp_name = NULL;
+      
+        if(func != NULL) {
+          Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
+          int cntt = 0;
+          while(funcargs != func->getArgumentList().end())
+            {			
+              Argument* a = funcargs;
+              std::string typestr2;
+              llvm::raw_string_ostream ss2(typestr2);
+              llvm::Type* t = a->getType();
+              t->print(ss2);
+              tmp_name = ss2.str().c_str();
+              if(a->getType()->isStructTy()) {	      
+                rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+              }
+              funcargs++;
+              cntt++;
+            }          
+        }
+      
+        GlobalValue* vvv = gv;
+        std::string typestr;
+        llvm::raw_string_ostream ss(typestr);
+        vvv->getType()->print(ss);
+        std::string stype = ss.str();
+
+        stype.resize(stype.length()-1); // drop last '*'
+        std::string exprr("");
+        if(func) {
+          Type* rettype = func->getReturnType();
+          typestr.clear();
+          llvm::raw_string_ostream sts(typestr);
+          rettype->print(sts);
+          std::size_t pos = sts.str().find(" = type");
+          std::string rettypestr = sts.str();                    
+          if (pos > 0) {
+            rettypestr = sts.str().substr(0, pos);
+          }
+          std::string argstypestr = stype.substr(rettypestr.length()+1,stype.length());
+          sprintf(tmpbuf3,"declare %s @%s%s",rettypestr.c_str(),symname,argstypestr.c_str());
+          
+          exprr.append(tmpbuf3);
+        } else {
+          exprr.append("@");
+          exprr.append(symname);
+          exprr.append(" = external global ");
+          exprr.append(stype);          
+        }
+        exprr.append("\n\n");        
+        exprr.append(asmcode);        
+        asmcode.clear();
+        asmcode.append(exprr);        
+        delete m;
+        cnt++;
+      }else{
+        break;
+      }
+    }while (newM == 0);
+
+    if(EXTLLVM::OPTIMIZE_COMPILES)
+      {
+        PM->run(*m);
+      }
+  
+#endif
+  
+    //std::stringstream ss;
+    if(newM == 0)
+      {
+        std::string errstr;
+        llvm::raw_string_ostream ss(errstr);
+        pa.print("Extempore",ss);
+        printf("%s\n",ss.str().c_str());
+        // if the number of functions in module has changed when calling runFunction 
+        // then we assume a stub was made and appended to the end of the modules function list.
+        // we remove this function now that we no longer need it!
+#ifndef EXT_MCJIT    
+        if(num_of_funcs != M->getFunctionList().size()) {
+          iplist<Function>::iterator iter = M->getFunctionList().end();
+          Function* func = dyn_cast<Function>(--iter);
+          //std::cout << "REMOVING ON FAIL: " << *func << std::endl;
+          func->dropAllReferences();
+          func->removeFromParent();
+        }
+#endif
+        return _sc->F;
+      }else{
+      if (extemp::EXTLLVM::VERIFY_COMPILES) {
+        std::string Err;
+        if (verifyModule(*M, ReturnStatusAction, &Err)) {
+          printf("%s\n%s","Parsed, but not valid!\n",Err.c_str());
+#ifndef EXT_MCJIT        
+          if(num_of_funcs != M->getFunctionList().size()) {
+            iplist<Function>::iterator iter = M->getFunctionList().end();
+            Function* func = dyn_cast<Function>(--iter);
+            //std::cout << "REMOVING ON FAIL: " << *func << std::endl;
+            func->dropAllReferences();
+            func->removeFromParent();
+          }
+#endif        
+          return _sc->F;
+        } 
+      }
+#ifdef EXT_MCJIT    
+      extemp::EXTLLVM::I()->EE->addModule(m);
+      extemp::EXTLLVM::I()->addModule(m);
+      extemp::EXTLLVM::I()->EE->finalizeObject();
+#endif
+    
+      return _sc->T;
     }
+  }
 	
-    pointer SchemeFFI::bind_global_var(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::bind_global_var(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;		
-	llvm::GlobalValue* gv = M->getNamedValue(std::string(string_value(pair_car(args))));
-	if(gv == 0) {
+    //Module* M = EXTLLVM::I()->M;		
+    //llvm::GlobalValue* gv = M->getNamedValue(std::string(string_value(pair_car(args))));
+    llvm::GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(std::string(string_value(pair_car(args))));
+    
+    if(gv == 0) {
 	    printf("Attempting to bind to a non-existant global LLVM variable\n");
 	    return _sc->F;
-	}
-	void* ptr = cptr_value(pair_cadr(args));
-	void** ptrptr = (void**) malloc(sizeof(void*));
-	ptrptr[0] = ptr;
-        EXTLLVM::I()->EE->lock.acquire();
-	EXTLLVM::I()->EE->updateGlobalMapping(gv,ptrptr);
-	EXTLLVM::I()->EE->lock.release();
-	return _sc->T;
     }
+    void* ptr = cptr_value(pair_cadr(args));
+    void** ptrptr = (void**) malloc(sizeof(void*));
+    ptrptr[0] = ptr;
+    //EXTLLVM::I()->EE->lock.acquire();
+    EXTLLVM::I()->EE->updateGlobalMapping(gv,ptrptr);
+    //EXTLLVM::I()->EE->lock.release();
+    return _sc->T;
+  }
 
     pointer SchemeFFI::ff_set_name(scheme* _sc, pointer args)
     {
@@ -1939,59 +2053,63 @@ namespace extemp {
        return mk_string(_sc,name);
     }
 
-    pointer SchemeFFI::get_function(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-	if(func == 0)
-	{
-	    return _sc->F;
-	}
-	return mk_cptr(_sc, func); 				
-    }
+  pointer SchemeFFI::get_function(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
+    //Module* M = EXTLLVM::I()->M;
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    if(func == 0)
+      {
+        return _sc->F;
+      }
+    return mk_cptr(_sc, func); 				
+  }
 
-    pointer SchemeFFI::get_globalvar(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_globalvar(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-	llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args)))); 
-	if(var == 0)
-	{
-	    return _sc->F;
-	}				
-	return mk_cptr(_sc, var); 				
-    }
+    //Module* M = EXTLLVM::I()->M;
+    //llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(std::string(string_value(pair_car(args))));   
+    if(var == 0)
+      {
+        return _sc->F;
+      }				
+    return mk_cptr(_sc, var); 				
+  }
 
 
-    pointer SchemeFFI::get_function_calling_conv(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_function_calling_conv(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));		
-	if(func == 0)
-	{
-	    return _sc->F;
-	}			
+    //Module* M = EXTLLVM::I()->M;
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));    
+    if(func == 0)
+      {
+        return _sc->F;
+      }			
 
-	int cc = func->getCallingConv();
-	return mk_integer(_sc, cc);
-    }
+    int cc = func->getCallingConv();
+    return mk_integer(_sc, cc);
+  }
 
-    pointer SchemeFFI::get_function_varargs(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_function_varargs(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-	if(func == 0)
-	{
-	    return _sc->F;
-	}	
-        return func->isVarArg() ? _sc->T : _sc->F;
-    }
+    //Module* M = EXTLLVM::I()->M;
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));  
+    if(func == 0)
+      {
+        return _sc->F;
+      }	
+    return func->isVarArg() ? _sc->T : _sc->F;
+  }
 
   pointer SchemeFFI::llvm_print_closure(scheme* _sc, pointer args)
   {
@@ -2095,41 +2213,43 @@ namespace extemp {
         return mk_integer(_sc,size);       
     }
 
-    pointer SchemeFFI::get_named_struct_size(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_named_struct_size(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-        StructType* type = M->getTypeByName(std::string(string_value(pair_car(args))));
-	if(type == 0)
-	{
-	    return _sc->F;
-	}
-        DataLayout* layout = new DataLayout(M);
-        const StructLayout* sl = layout->getStructLayout(type);
-        long size = sl->getSizeInBytes();
-        delete layout;
-        return mk_integer(_sc,size);       
-    }
+    Module* M = EXTLLVM::I()->M;
+    //StructType* type = M->getTypeByName(std::string(string_value(pair_car(args))));
+    StructType* type = extemp::EXTLLVM::I()->getNamedType(std::string(string_value(pair_car(args))));
+    if(type == 0)
+      {
+        return _sc->F;
+      }
+    DataLayout* layout = new DataLayout(M);
+    const StructLayout* sl = layout->getStructLayout(type);
+    long size = sl->getSizeInBytes();
+    delete layout;
+    return mk_integer(_sc,size);       
+  }
 
-    pointer SchemeFFI::get_function_type(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_function_type(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-	if(func == 0)
-	{
-	    return _sc->F;
-	}			
+    //Module* M = EXTLLVM::I()->M;
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));  
+    if(func == 0)
+      {
+        return _sc->F;
+      }			
 
-        std::string typestr;
-	llvm::raw_string_ostream ss(typestr);
-        func->getFunctionType()->print(ss);
-	//printf("%s\n",ss.str().c_str());
-	pointer str = mk_string(_sc, ss.str().c_str()); //func->getFunctionType()->getDescription().c_str());
-	return str;
-    }
+    std::string typestr;
+    llvm::raw_string_ostream ss(typestr);
+    func->getFunctionType()->print(ss);
+    //printf("%s\n",ss.str().c_str());
+    pointer str = mk_string(_sc, ss.str().c_str()); //func->getFunctionType()->getDescription().c_str());
+    return str;
+  }
 
 
     pointer SchemeFFI::export_llvmmodule_bitcode(scheme* _sc, pointer args)
@@ -2153,63 +2273,65 @@ namespace extemp {
 	return _sc->T;
     }
 
-    pointer SchemeFFI::get_function_args(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_function_args(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-	if(func == 0)
-	{
-	    return _sc->F;
-	}
+    //Module* M = EXTLLVM::I()->M;
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));    
+    if(func == 0)
+      {
+        return _sc->F;
+      }
 
-        std::string typestr;
-	llvm::raw_string_ostream ss(typestr);
-        func->getReturnType()->print(ss);
+    std::string typestr;
+    llvm::raw_string_ostream ss(typestr);
+    func->getReturnType()->print(ss);
 
-	const char* tmp_name = ss.str().c_str();
+    const char* tmp_name = ss.str().c_str();
 
-	if(func->getReturnType()->isStructTy()) {
-	  rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
-	  tmp_name = tmp_str_a;
-	}
-
-	pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
-	pointer p = cons(_sc, str, _sc->NIL); 
-
-	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
-	while(funcargs != func->getArgumentList().end())
-	{			
-	    Argument* a = funcargs;
-	    _sc->imp_env->insert(p);					
-	    std::string typestr2;
-	    llvm::raw_string_ostream ss2(typestr2);
-	    a->getType()->print(ss2);
-
-	    tmp_name = ss2.str().c_str();
-
-	    if(a->getType()->isStructTy()) {	      
-	      rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
-	      //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
-	      tmp_name = tmp_str_a;
-	    }
-
-	    pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
-	    _sc->imp_env->erase(p);
-	    p = cons(_sc, str, p);			
-	    funcargs++;
-	}
-	return reverse(_sc, p);				
+    if(func->getReturnType()->isStructTy()) {
+      rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+      tmp_name = tmp_str_a;
     }
+
+    pointer str = mk_string(_sc, tmp_name); //_sc, ss.str().c_str()); //func->getReturnType()->getDescription().c_str());
+    pointer p = cons(_sc, str, _sc->NIL); 
+
+    Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();
+    while(funcargs != func->getArgumentList().end())
+      {			
+        Argument* a = funcargs;
+        _sc->imp_env->insert(p);					
+        std::string typestr2;
+        llvm::raw_string_ostream ss2(typestr2);
+        a->getType()->print(ss2);
+
+        tmp_name = ss2.str().c_str();
+
+        if(a->getType()->isStructTy()) {	      
+          rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+          //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
+          tmp_name = tmp_str_a;
+        }
+
+        pointer str = mk_string(_sc, tmp_name); //_sc, ss2.str().c_str()); //a->getType()->getDescription().c_str());
+        _sc->imp_env->erase(p);
+        p = cons(_sc, str, p);			
+        funcargs++;
+      }
+    return reverse(_sc, p);				
+  }
 
     pointer SchemeFFI::remove_global_var(scheme* _sc, pointer args)
     {
 	// Create some module to put our function into it.
 	using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;		
-	llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args)))); 
+	// Module* M = EXTLLVM::I()->M;  
+	// llvm::GlobalVariable* var = M->getGlobalVariable(std::string(string_value(pair_car(args))));
+	llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(std::string(string_value(pair_car(args))));  
 	if(var == 0)
 	{
 	    return _sc->F;
@@ -2219,45 +2341,49 @@ namespace extemp {
 	return _sc->T;
     }	
 
-    pointer SchemeFFI::remove_function(scheme* _sc, pointer args)
-    {
-	// Create some module to put our function into it.
-	using namespace llvm;
+  pointer SchemeFFI::remove_function(scheme* _sc, pointer args)
+  {
+    // Create some module to put our function into it.
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;		
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-	if(func == 0)
-	{
-	    return _sc->F;
-	}		
-	if(func->mayBeOverridden()) {
+    //Module* M = EXTLLVM::I()->M;		
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));    
+    if(func == 0)
+      {
+        return _sc->F;
+      }		
+    if(func->mayBeOverridden()) {
 	    func->dropAllReferences();		
 	    func->removeFromParent();
 	    return _sc->T;
-	}else{
+    }else{
 	    printf("Cannot remove function with dependencies\n");
 	    return _sc->F;
-	}
-    }		
-
-    pointer SchemeFFI::erase_function(scheme* _sc, pointer args)
-    {
-	// Create some module to put our function into it.
-	using namespace llvm;		
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-	if(func == 0)
-	{
-	    return _sc->F;
-	}		
-	extemp::EXTLLVM::I()->EE->lock.acquire();
-	extemp::EXTLLVM::I()->EE->freeMachineCodeForFunction(func);
-	extemp::EXTLLVM::I()->EE->lock.release();
-	func->deleteBody();
-	func->eraseFromParent();
-
-	return _sc->T;
     }
+  }		
+
+  pointer SchemeFFI::erase_function(scheme* _sc, pointer args)
+  {
+    // Create some module to put our function into it.
+    using namespace llvm;		
+    //Module* M = EXTLLVM::I()->M;
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));      
+    if(func == 0)
+      {
+        return _sc->F;
+      }
+#ifndef EXT_MCJIT    
+    extemp::EXTLLVM::I()->EE->lock.acquire();
+    extemp::EXTLLVM::I()->EE->freeMachineCodeForFunction(func);
+    extemp::EXTLLVM::I()->EE->lock.release();
+#endif    
+    func->deleteBody();
+    func->eraseFromParent();
+
+    return _sc->T;
+  }
 
     pointer SchemeFFI::callClosure(scheme* _sc, pointer args)
     {
@@ -2268,284 +2394,270 @@ namespace extemp {
 	return mk_integer(_sc, (*fptr)(eptr,ivalue(pair_cadr(args))));
     }
 	
-    pointer SchemeFFI::get_global_variable_type(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_global_variable_type(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-	Module::global_iterator i = M->global_begin();
-	GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(args))));
-	if(var == 0)
-	{
-	    return _sc->F;
-	}				
-        std::string typestr;
-	llvm::raw_string_ostream ss(typestr);
-        var->getType()->print(ss);
-	return mk_string(_sc, ss.str().c_str()); //var->getType()->getDescription().c_str());
-    }	
+    //Module* M = EXTLLVM::I()->M;
+    //Module::global_iterator i = M->global_begin();
+    //GlobalVariable* var = M->getNamedGlobal(std::string(string_value(pair_car(args))));
+    llvm::GlobalVariable* var = extemp::EXTLLVM::I()->getGlobalVariable(std::string(string_value(pair_car(args))));      
+    if(var == 0)
+      {
+        return _sc->F;
+      }				
+    std::string typestr;
+    llvm::raw_string_ostream ss(typestr);
+    var->getType()->print(ss);
+    return mk_string(_sc, ss.str().c_str()); //var->getType()->getDescription().c_str());
+  }	
 
-    pointer SchemeFFI::get_function_pointer(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_function_pointer(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-	//func->setCallingConv(CallingConv::C); //kCStackBased);
-	if(func == 0)
-	{
-	    return _sc->F;
-	}
-        // this should be safe without a lock
-	void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
+    //Module* M = EXTLLVM::I()->M;
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));        
+    //func->setCallingConv(CallingConv::C); //kCStackBased);
+    if(func == 0)
+      {
+        return _sc->F;
+      }
+    // this should be safe without a lock
+    void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
 
-	if(p==NULL) {
+    if(p==NULL) {
 	    //[[LogView sharedInstance] error:@"LLVM: Bad Function Ptr\n"];
 	    return _sc->F;
-	}
-
-	return mk_cptr(_sc, p);
-    }		
-
-    pointer SchemeFFI::llvm_call_void_native(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
-
-	Module* M = EXTLLVM::I()->M;
-        char name[1024];
-        sprintf(name,"%s_native",string_value(pair_car(args)));
-	llvm::Function* func = M->getFunction(std::string(name));
-	//llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-	//func->setCallingConv(CallingConv::C); //kCStackBased);
-	if(func == 0)
-	{
-	    return _sc->F;
-	}
-        // this should be safe without a lock
-	void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
-
-	if(p==NULL) {
-	    //[[LogView sharedInstance] error:@"LLVM: Bad Function Ptr\n"];
-	    return _sc->F;
-	}
-
-        void(*f)(void) = (void(*)(void)) p;
-        f();
-        
-        return _sc->T;
-    }		
-	
-    pointer SchemeFFI::recompile_and_link_function(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
-		
-	std::string fname(string_value(pair_car(args)));
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(fname); //std::string(string_value(pair_car(args))));
-	//func->setCallingConv(CallingConv::C); //kCStackBased);
-	if(func == 0)
-	{
-	    return _sc->F;
-	}
-	//std::cout << "fname: " << fname << std::endl;
-	//std::cout << "M: " << M << std::endl;
-	//std::cout << "FUNC: " << func << std::endl;
-	//std::cout << "EE: " << EXTLLVM::I()->EE << std::endl;
-	void* p = 0;
-	try{
-	  EXTLLVM* xll = EXTLLVM::I();
-	  ExecutionEngine* EE = xll->EE;
-	  EE->lock.acquire();
-	  void* p = EE->recompileAndRelinkFunction(func);
-	  EE->lock.release();
-	}catch(std::exception& e) {
-	  std::cout << "EXCEPT: " << e.what() << std::endl;
-	}
-		
-	if(p==NULL) {
-	    return _sc->F;
-	}
-		
-	//const llvm::GlobalValue* f2 = NativeScheme::I()->EE->getGlobalValueAtAddress(p);
-	//std::cout << "FUNC: " << func << "  fptr: " << p << "   f2: " << f2 << std::endl;
-		
-	return mk_cptr(_sc, p);
     }
+
+    return mk_cptr(_sc, p);
+  }		
+
+  pointer SchemeFFI::llvm_call_void_native(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
+
+    //Module* M = EXTLLVM::I()->M;
+    char name[1024];
+    sprintf(name,"%s_native",string_value(pair_car(args)));
+    //llvm::Function* func = M->getFunction(std::string(name));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(name));     
+    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+    //func->setCallingConv(CallingConv::C); //kCStackBased);
+    if(func == 0)
+      {
+        return _sc->F;
+      }
+    // this should be safe without a lock
+    void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
+
+    if(p==NULL) {
+	    //[[LogView sharedInstance] error:@"LLVM: Bad Function Ptr\n"];
+	    return _sc->F;
+    }
+
+    void(*f)(void) = (void(*)(void)) p;
+    f();
+        
+    return _sc->T;
+  }		
+	
+  pointer SchemeFFI::recompile_and_link_function(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
+		
+    std::string fname(string_value(pair_car(args)));
+    //Module* M = EXTLLVM::I()->M;
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(fname);    
+    //llvm::Function* func = M->getFunction(fname); //std::string(string_value(pair_car(args))));
+    //func->setCallingConv(CallingConv::C); //kCStackBased);
+    if(func == 0)
+      {
+        return _sc->F;
+      }
+    //std::cout << "fname: " << fname << std::endl;
+    //std::cout << "M: " << M << std::endl;
+    //std::cout << "FUNC: " << func << std::endl;
+    //std::cout << "EE: " << EXTLLVM::I()->EE << std::endl;
+    void* p = 0;
+    try{
+      EXTLLVM* xll = EXTLLVM::I();
+      ExecutionEngine* EE = xll->EE;
+      
+#ifdef EXT_MCJIT
+      void* p = NULL;
+#else      
+      EE->lock.acquire();
+      void* p = EE->recompileAndRelinkFunction(func);
+      EE->lock.release();
+#endif      
+    }catch(std::exception& e) {
+      std::cout << "EXCEPT: " << e.what() << std::endl;
+    }
+		
+    if(p==NULL) {
+	    return _sc->F;
+    }
+		
+    //const llvm::GlobalValue* f2 = NativeScheme::I()->EE->getGlobalValueAtAddress(p);
+    //std::cout << "FUNC: " << func << "  fptr: " << p << "   f2: " << f2 << std::endl;
+		
+    return mk_cptr(_sc, p);
+  }
 
 
     //
     // This will not be threadsafe whenever a definec is done!
     // 
-    pointer SchemeFFI::call_compiled_closure(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
-	uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
-	char* fname = (char*) *(closure+0);
-	void* eptr = (void*) *(closure+1);		
+  pointer SchemeFFI::call_compiled_closure(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
+    uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
+    char* fname = (char*) *(closure+0);
+    void* eptr = (void*) *(closure+1);		
 
-	//std::cout << "CALL COMPILED CLOSURE: " << fname << std::endl;
+    //std::cout << "CALL COMPILED CLOSURE: " << fname << std::endl;
 
-	ExecutionEngine* EE = EXTLLVM::I()->EE;	
+    ExecutionEngine* EE = EXTLLVM::I()->EE;	
 
 #ifdef LLVM_EE_LOCK
-        EE->lock.acquire();	
+    EE->lock.acquire();	
 #endif
 
-	Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(fname));
+    //Module* M = EXTLLVM::I()->M;
+    //llvm::Function* func = M->getFunction(std::string(fname));
+    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(fname));          
 	if(func == 0)
-	{
+    {
 	    printf("No such function\n");
 #ifdef LLVM_EE_LOCK
 	    EE->lock.release();	
 #endif
 	    return _sc->F;
-	}				
+    }				
 	//std::cout << "FUNC: " << *func << std::endl;
 
 	int lgth = list_length(_sc, args);
 	if(lgth != func->arg_size()) {
-	    printf("Wrong number of arguments supplied to native closure - should take: %d\n",(func->arg_size()-1));
+    printf("Wrong number of arguments supplied to native closure - should take: %d\n",(func->arg_size()-1));
 #ifdef LLVM_EE_LOCK
-	    EE->lock.release();	
+    EE->lock.release();	
 #endif
-	    return _sc->F;			
+    return _sc->F;			
 	}
 	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();		
 	std::vector<llvm::GenericValue> fargs(lgth);
 	// first add the environment
 	// which must always go first for a closure
 	if(((Argument*)funcargs)->getType()->getTypeID() != Type::PointerTyID)
-	{
+    {
 	    printf("Error: closure must have an environment!\n");
 #ifdef LLVM_EE_LOCK
 	    EE->lock.release();	
 #endif
 	    return _sc->F;			
-	}
+    }
 	fargs[0].PointerVal = eptr;	
 	++funcargs; // and increment funcargs past eptr
 
 	//std::cout << "ARGS: " << lgth << std::endl;
 	for(int i=1;i<lgth;i++,++funcargs)
-	{
+    {
 	    Argument* a = funcargs;
 	    pointer p = list_ref(_sc, i, args);
 	    if(is_integer(p)) {			
-		if(a->getType()->getTypeID() != Type::IntegerTyID)
-		{
-		    printf("Bad argument type %i\n",i);
+        if(a->getType()->getTypeID() != Type::IntegerTyID)
+          {
+            printf("Bad argument type %i\n",i);
 #ifdef LLVM_EE_LOCK
-		    EE->lock.release();	
+            EE->lock.release();	
 #endif
-		    return _sc->F;
-		}
-		int width = a->getType()->getPrimitiveSizeInBits();				
-		//std::cout << "IVALUE: " << ivalue(p) << std::endl; 				
-		fargs[i].IntVal = APInt(width,ivalue(p));				
+            return _sc->F;
+          }
+        int width = a->getType()->getPrimitiveSizeInBits();				
+        //std::cout << "IVALUE: " << ivalue(p) << std::endl; 				
+        fargs[i].IntVal = APInt(width,ivalue(p));				
 	    }			
 	    else if(is_real(p))
-	    {
+        {
 
-		if(a->getType()->getTypeID() == Type::FloatTyID)
-		{
-		    //std::cout << "RVALUE: " << rvalue(p) << std::endl; 					
-		    fargs[i].FloatVal = (float) rvalue(p);
-		}
-		else if(a->getType()->getTypeID() == Type::DoubleTyID)
-		{
-		    //std::cout << "RVALUE: " << rvalue(p) << std::endl; 
-		    fargs[i].DoubleVal = rvalue(p);
-		}
-		else
-		{
-		    printf("Bad argument type %i\n",i);
+          if(a->getType()->getTypeID() == Type::FloatTyID)
+            {
+              //std::cout << "RVALUE: " << rvalue(p) << std::endl; 					
+              fargs[i].FloatVal = (float) rvalue(p);
+            }
+          else if(a->getType()->getTypeID() == Type::DoubleTyID)
+            {
+              //std::cout << "RVALUE: " << rvalue(p) << std::endl; 
+              fargs[i].DoubleVal = rvalue(p);
+            }
+          else
+            {
+              printf("Bad argument type %i\n",i);
 #ifdef LLVM_EE_LOCK
-		    EE->lock.release();	
+              EE->lock.release();	
 #endif
-		    return _sc->F;
-		}
-	    }
+              return _sc->F;
+            }
+        }
 	    else if(is_string(p))
-	    {
-		if(a->getType()->getTypeID() != Type::PointerTyID)
-		{
-		    printf("Bad argument type %i\n",i);
+        {
+          if(a->getType()->getTypeID() != Type::PointerTyID)
+            {
+              printf("Bad argument type %i\n",i);
 #ifdef LLVM_EE_LOCK
-		    EE->lock.release();	
+              EE->lock.release();	
 #endif
-		    return _sc->F;					
-		}
-		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
-		fargs[i].PointerVal = string_value(p);
-	    }			
+              return _sc->F;					
+            }
+          //std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
+          fargs[i].PointerVal = string_value(p);
+        }			
 	    else if(is_cptr(p))
-	    {
-		if(a->getType()->getTypeID() != Type::PointerTyID)
-		{
-		    printf("Bad argument type %i\n",i);
+        {
+          if(a->getType()->getTypeID() != Type::PointerTyID)
+            {
+              printf("Bad argument type %i\n",i);
 #ifdef LLVM_EE_LOCK
-		    EE->lock.release();	
+              EE->lock.release();	
 #endif
-		    return _sc->F;					
-		}
-		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
-		fargs[i].PointerVal = cptr_value(p);
-	    }
+              return _sc->F;					
+            }
+          //std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
+          fargs[i].PointerVal = cptr_value(p);
+        }
 	    else 
-	    {
-		printf("Bad scheme argument\n");
+        {
+          printf("Bad scheme argument\n");
 #ifdef LLVM_EE_LOCK
-		EE->lock.release();	
+          EE->lock.release();	
 #endif
-		return _sc->F;
-	    }
-	}
+          return _sc->F;
+        }
+    }
 
-
-	//long long num_of_funcs = M->getFunctionList().size();
-	//EE->lock.release();	
-
-	/*
-#ifdef LLVM_EE_LOCK	
-	EE->lock.release();	
-#endif
-	*/
 	GenericValue gv = EE->runFunction(func,fargs);
 
 #ifdef LLVM_EE_LOCK	
 	EE->lock.release();	
 #endif
 
-	/*
-	if(num_of_funcs != M->getFunctionList().size()) {
-	  std::cout << "KICK(ccc): " << num_of_funcs << "  id:" << boost::this_thread::get_id() << std::endl;
-	    iplist<Function>::iterator iter = M->getFunctionList().end();
-	    Function* stub = dyn_cast<Function>(--iter);
-	    //			std::stringstream ss;
-	    //			ss << *stub << std::endl;
-	    EE->freeMachineCodeForFunction(stub);
-	    stub->deleteBody();
-	    stub->eraseFromParent();
-	}
-	*/
-
-	//EE->lock.release();	
-
 	switch(func->getReturnType()->getTypeID())
-	{
-	case Type::FloatTyID:
+    {
+    case Type::FloatTyID:
 	    return mk_real(_sc, gv.FloatVal);
-	case Type::DoubleTyID:
+    case Type::DoubleTyID:
 	    return mk_real(_sc, gv.DoubleVal);
-	case Type::IntegerTyID:
+    case Type::IntegerTyID:
 	    return mk_integer(_sc, gv.IntVal.getZExtValue()); //  getRawData());
-	case Type::PointerTyID:
+    case Type::PointerTyID:
 	    return mk_cptr(_sc, gv.PointerVal);
-	default:
+    default:
 	    return _sc->F;
-	}		
-    }
+    }		
+}
 
     //
     // This will not be threadsafe whenever a definec is done!
@@ -2873,7 +2985,8 @@ namespace extemp {
 	llvm::raw_string_ostream ss(str);
 		
 	if(list_length(_sc, args) > 0) {
-	    llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(args))));
+    llvm::GlobalValue* val = extemp::EXTLLVM::I()->getGlobalValue(std::string(string_value(pair_car(args))));    
+    //llvm::GlobalValue* val = M->getNamedValue(std::string(string_value(pair_car(args))));
 	    if(val == NULL) {
 		std::cerr << "No such value found in LLVM Module" << std::endl;
 		return _sc->F;
@@ -2888,16 +3001,17 @@ namespace extemp {
 	return _sc->T;
     }
 
-    pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
-    {
-	llvm::Module* M = EXTLLVM::I()->M;
-	llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
+{
+  //llvm::Module* M = EXTLLVM::I()->M;
+  //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));      
 	std::string str;
 	llvm::raw_string_ostream ss(str);
 	ss << *func;
 	printf("%s",str.c_str());
 	return _sc->T;		
-    }
+}
 
     pointer SchemeFFI::symbol_pointer(scheme* _sc, pointer args)
     {
@@ -2934,7 +3048,8 @@ namespace extemp {
 	    printf("Could not find symbol named %s!\n",symname);
 	    return _sc->F;
 	}
-	llvm::GlobalValue* gv = M->getNamedValue(std::string(symname));
+  llvm::GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(std::string(symname));  
+	//llvm::GlobalValue* gv = M->getNamedValue(std::string(symname));
 	EE->updateGlobalMapping(gv,ptr);
 
 	EE->lock.release();		
@@ -2962,8 +3077,8 @@ namespace extemp {
     }
 
 
-    pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
-    {
+pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
+{
 	char* n = string_value(pair_car(args));
 	char nk[256];
 	char* name = nk;
@@ -2973,12 +3088,12 @@ namespace extemp {
 	int ptrdepth = 0;
 	while(name[strlen(name)-1] == '*') {
 	  name[strlen(name)-1]=NULL;
-          ptrdepth++;
+    ptrdepth++;
 	}
 
-	llvm::Module* M = EXTLLVM::I()->M;
-	
-	const llvm::Type* tt = M->getTypeByName(name);
+	//llvm::Module* M = EXTLLVM::I()->M;	
+	//const llvm::Type* tt = M->getTypeByName(name);
+  const llvm::Type* tt = extemp::EXTLLVM::I()->getNamedType(name);  
 
 	if(tt) {
 	  //return mk_string(_sc,M->getTypeName(tt).c_str());
@@ -2997,7 +3112,7 @@ namespace extemp {
 	  if(ptrdepth>0) {
 	    char tmpstr[256];
 	    memset(tmpstr,0,256);
-            strcpy(tmpstr,tmp_name);
+      strcpy(tmpstr,tmp_name);
 	    for( ;ptrdepth>0;ptrdepth--) {
 	      tmpstr[strlen(tmpstr)]='*';
 	    }
@@ -3007,7 +3122,7 @@ namespace extemp {
 	} else {
 	  return _sc->NIL; 
 	}
-    }
+}
 	
     ////////////////////////////////////////////////////////////
     //
@@ -3532,8 +3647,9 @@ namespace extemp {
   {
     using namespace llvm;
     char* ext_name = string_value(pair_car(args));
-    Module* M = EXTLLVM::I()->M;		
-    llvm::GlobalValue* gv = M->getNamedValue(std::string(ext_name));
+    Module* M = EXTLLVM::I()->M;
+    llvm::GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(std::string(ext_name));    
+    //llvm::GlobalValue* gv = M->getNamedValue(std::string(ext_name));
     if( gv == 0 ) {
       printf("Attempting to bind to a non-existant global LLVM variable\n");
       return _sc->F;

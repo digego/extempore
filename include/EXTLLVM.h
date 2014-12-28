@@ -37,6 +37,9 @@
 #define _EXTLLVM_H
 
 #include "Scheme.h"
+#include <vector>
+#include <map>
+#include <string>
 //#include <ucontext.h>
 
 typedef struct _llvm_zone_t {
@@ -162,9 +165,16 @@ unsigned long string_hash(unsigned char* str);
 ///////////////////////////////////////////////////
 
 namespace llvm {
-    class Module;
-    class ModuleProvider;
-    class ExecutionEngine;
+  class Module;
+  class GlobalVariable;
+  class GlobalValue;
+  class Function;
+  class StructType;  
+  class ModuleProvider;
+#ifdef EXT_MCJIT
+  class SectionMemoryManager;
+#endif
+  class ExecutionEngine;  
 
   namespace legacy {
     class PassManager;
@@ -180,6 +190,16 @@ namespace extemp {
 	static EXTLLVM* I() { return &SINGLETON; }	
 	
 	void initLLVM();
+
+  llvm::Module* activeModule();
+  llvm::Function* getFunction(std::string);
+  llvm::GlobalVariable* getGlobalVariable(std::string);
+  llvm::StructType* getNamedType(std::string);
+  llvm::GlobalValue* getGlobalValue(std::string);
+#ifdef EXT_MCJIT  
+  uint64_t getSymbolAddress(std::string);
+#endif
+  void addModule(llvm::Module* m) { Ms.push_back(m); }  
 	
 	static int64_t LLVM_COUNT;
 	static bool OPTIMIZE_COMPILES;	
@@ -189,9 +209,13 @@ namespace extemp {
 	llvm::ModuleProvider* MP;
 	llvm::ExecutionEngine* EE;
   llvm::legacy::PassManager* PM;
+#ifdef EXT_MCJIT
+  llvm::SectionMemoryManager* MM;
+#endif  
 
     private:
 	static EXTLLVM SINGLETON;
+  std::vector<llvm::Module*> Ms;  
     };
 
 } // end extemp namespace

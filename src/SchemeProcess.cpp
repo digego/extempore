@@ -570,7 +570,7 @@ namespace extemp {
                     snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/core/std.xtm\" 'quiet)");
                     std::string* s4 = new std::string(sstr);
                     guard.lock();
-                    q.push(SchemeTask(extemp::UNIV::TIME, (60*5*44100), s4, "file_init", 5));
+                    q.push(SchemeTask(extemp::UNIV::TIME, scm->getMaxDuration(), s4, "file_init", 5));
                     guard.unlock();
                   }
 
@@ -630,7 +630,7 @@ namespace extemp {
 							// this should be the expected result!!  - i.e. do nothing
 						}
 						uint64_t in_time = UNIV::TIME;
-                                                uint64_t out_time = schemeTask.getMaxDuration();
+            uint64_t out_time = schemeTask.getMaxDuration();
 						scheme_load_string(sc, (const char*) evalString->c_str(), in_time, in_time+out_time); // sc->call_default_time);
 						if(SCHEME_EVAL_TIMING) {
 						}	
@@ -665,7 +665,8 @@ namespace extemp {
 							evalString->erase(--evalString->end());
 						}					
 						long long in_time = UNIV::TIME;
-						scheme_load_string(sc, (const char*) evalString->c_str(), in_time, in_time+sc->call_default_time);
+            uint64_t out_time = schemeTask.getMaxDuration();            
+						scheme_load_string(sc, (const char*) evalString->c_str(), in_time, in_time+out_time);
 						if(SCHEME_EVAL_TIMING) {
 						}												
 						if(sc->retcode != 0) { //scheme error

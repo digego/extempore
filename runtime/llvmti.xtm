@@ -5414,7 +5414,7 @@
          ;; compile to ir	 
          (define fstr (impc:ir:compiler newast types))
          ;; compile to x86 - i.e. call jit on any new ir functions to force jit compilation	
-         (for-each (lambda (fn) (llvm:jit-compile-function fn)) (impc:ti:get-closure-names newast))
+         ;; (for-each (lambda (fn) (llvm:jit-compile-function fn)) (impc:ti:get-closure-names newast))
 
          ;;
          ;; now compile ir to x86 and make stub code
@@ -6297,8 +6297,10 @@
                   (string? value))
              `(begin
                 (llvm:compile (string-append "@" ,(symbol->string symbol)
-                                             " = external global i8*"))
-                (llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
+                                             " = global i8* zeroinitializer"))
+                (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
+                                                               " \"" value "\")")))
+                ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
                 (impc:print-bound-message ,symbol ,type)))
             ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
                   (not (impc:ir:pointer? t)))
@@ -6313,16 +6315,38 @@
                 (impc:print-bound-message ,symbol ,type)))
             ((impc:ir:pointer? t)
              (if (integer? (eval value))
-                 `(begin (llvm:compile (string-append "@" ,(symbol->string symbol)
-                                                      " = external global "
-                                                      ,(impc:ir:get-type-str t)))
-                         (llvm:bind-global-var ,(symbol->string symbol)
-                                               ,(sys:make-cptr (* (eval value)
-                                                                  (if (impc:ir:number? t)
-                                                                      (impc:ir:get-type-size t)
-                                                                      (/ (sys:pointer-size) 8)))))
-                         (impc:print-bound-message ,symbol ,type))
-                 `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate")))
+                 `(begin
+                    (llvm:compile (string-append "@" ,(symbol->string symbol)
+                                                 " = global " "" ""
+                                                 ,(impc:ir:get-type-str t)
+                                                 " zeroinitializer"))
+                    (call-as-xtlang ,(string->sexpr
+                                      (string-append "(set! " (symbol->string symbol)
+                                                     " (cast (malloc "
+                                                     (atom->string (* (eval value)
+                                                                      (if (impc:ir:number? t)
+                                                                          (impc:ir:get-type-size t)
+                                                                          (/ (sys:pointer-size) 8))))
+                                                     ") "
+                                                     (atom->string type)
+                                                     "))")))
+                    ;; (llvm:bind-global-var ,(symbol->string symbol)
+                    ;;                       ,(sys:make-cptr (* (eval value)
+                    ;;                                          (if (impc:ir:number? t)
+                    ;;                                              (impc:ir:get-type-size t)
+                    ;;                                              (/ (sys:pointer-size) 8)))))
+                    (impc:print-bound-message ,symbol ,type))
+                 (if (list? (eval value))
+                     `(begin
+                        (llvm:compile (string-append "@" ,(symbol->string symbol)
+                                                     " = global "
+                                                     ,(impc:ir:get-type-str t)
+                                                     "zeroinitializer"))
+                        (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
+                                                                       " \"" (sexpr->string value) "\")")))
+                        ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
+                        (impc:print-bound-message ,symbol ,type))
+                     `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin
                 (llvm:compile
