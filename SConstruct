@@ -41,15 +41,48 @@ else:
 # pass --no-cache to disable this
 CacheDir('.scons_build_cache')
 
+################################################
+# Conveniences
+################################################
+
 color_dict = {
-    'red'       : "\033[0;31m",
-    'green'     : "\033[0;32m",
-    'blue'      : "\033[0;34m",
-    'purple'    : "\033[0;35m",
-    'turquoise' : "\033[0;36m",
-    'orange'    : "\033[0;33m",
-    'white'     : "\033[0;00m",
+    'red': "\033[0;31m",
+    'green': "\033[0;32m",
+    'blue': "\033[0;34m",
+    'purple': "\033[0;35m",
+    'turquoise': "\033[0;36m",
+    'orange': "\033[0;33m",
+    'white': "\033[0;00m",
 }
+
+
+class HelpMessage(object):
+
+    "Helper class for formatting a help message listing targets"
+    targets = {}
+    usage_header = """
+Available targets:
+
+"""
+    usage_footer = """"""
+
+    target_tmpl = "    {green}{name:30s}{white} {desc}.\n"
+
+    @staticmethod
+    def register_target(name, desc=None):
+        HelpMessage.targets[name] = dict(name=name, desc=desc)
+
+    @staticmethod
+    def to_string():
+        s = HelpMessage.usage_header
+
+        for k, d in sorted(HelpMessage.targets.items()):
+            d.update(color_dict)
+            s += HelpMessage.target_tmpl.format(**d)
+
+        s += HelpMessage.usage_footer
+        return s
+
 
 # The version we check for
 LLVM_VERSION = '3.4.1'
@@ -115,32 +148,6 @@ AddOption('--no-dep-discovery',
           action = 'store_true',
           help   = 'Skip dependency discovery when compiling stdlib (Do not use with -j)'
           )
-
-
-if 'help' in  COMMAND_LINE_TARGETS :
-    print("""
-{green} extempore             {white} Build the extempore binary.
-{green} stdlib                {white} Compile both core and external stdlib components.
-{green} stdlib-core           {white} Compile core stdlib components only.
-{green} stdlib-external       {white} Compile external stdlib components only.
-{green} test                  {white} Run all tests.
-{green} test-core             {white} Run tests tests/core/.
-{green} test-external         {white} Run tests test/external.
-
-Add -c to the command to clean up the respective target.
-
-To list further options:
-
-    scons --help
-
-To Precompile only specific stdlib components (paths are relative to 'libs/'):
-
-    scons --stdlib-source="external/sndfile.xtm core/std.xtm" stdlib
-
-Build artifacts are cached by default. Use the --no-cache option to disable it.
-""").format(**color_dict)
-
-    exit(1)
 
 
 def check_llvm_dir_isset(context):
@@ -307,6 +314,7 @@ for src_f in EXT_SRCFILES:
 # And make the binary using them
 
 env.Program('extempore', EXT_OBJ_FILES)
+HelpMessage.register_target('extempore', "Build the extempore binary.")
 
 ################################################
 # How to build the 'stdlib-foo' targets
@@ -373,10 +381,14 @@ else:
     EXT_STDLIB_OUTPUTS = EXT_STDLIB_CORE_OUTPUTS + EXT_STDLIB_EXTERNAL_OUTPUTS
 
 stdlib = env.Command('stdlib', EXT_STDLIB_OUTPUTS, '')
+HelpMessage.register_target('stdlib','Compile both core and external stdlib components.')
+
 stdlib_core = env.Command('stdlib-core', EXT_STDLIB_CORE_OUTPUTS, '')
+HelpMessage.register_target('stdlib-core','Compile core stdlib components only.')
+
 stdlib_external = env.Command(
     'stdlib-external', EXT_STDLIB_EXTERNAL_OUTPUTS, '')
-
+HelpMessage.register_target('stdlib-external', 'Compile external stdlib components only.')
 
 ################################################
 # How to build the 'test-foo' targets
@@ -401,5 +413,33 @@ EXT_CORE_TEST_NODES = construct_test_nodes('tests/core/*.xtm')
 EXT_EXTERNAL_TEST_NODES = construct_test_nodes('tests/external/*.xtm')
 
 test_tgt = env.Command('test', EXT_CORE_TEST_NODES +EXT_EXTERNAL_TEST_NODES ,'')
+HelpMessage.register_target('test', "Run tests all tests.")
+
 test_core_tgt = env.Command('test-core', EXT_CORE_TEST_NODES ,'')
+HelpMessage.register_target('test-core', "Run tests tests/core.")
+
 test_external_tgt = env.Command('test-external', EXT_EXTERNAL_TEST_NODES ,'')
+HelpMessage.register_target('test-external', "Run tests test/external.")
+
+
+################################################
+# Give the user a help message
+################################################
+
+if 'help' in COMMAND_LINE_TARGETS:
+    HelpMessage.usage_footer = """
+Add -c to the command to clean up the respective target.
+
+To list further options:
+
+    scons --help
+
+To Precompile only specific stdlib components (paths are relative to 'libs/'):
+
+    scons --stdlib-source="external/sndfile.xtm core/std.xtm" stdlib
+
+Build artifacts are cached by default. Use the --no-cache option to disable it.
+"""
+    print(HelpMessage.to_string())
+    exit(1)
+
