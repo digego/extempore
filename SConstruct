@@ -335,21 +335,18 @@ def construct_stdlib_nodes(deps):
         cmd = EXT_COMPILE_CMD.format(xtm_file=xtm_file, port=port)
         port += port_step
         port = port_base + ((port-port_base) % 5000)
-
-        # the source xtm file tells us the name of the output shlib
-        # and the xtm include file generated
         target_f, xtm_header_f = xtmdeps.comp_artifacts(xtm_file,env['SHLIBSUFFIX'])
 
-        # Each shlib becomes a target
-        shlib = env.Command(target_f, deps + ['libs/' + xtm_file], cmd)
-        # and its associated xtm include file should get cleaned when it is
-        Clean(shlib, xtm_header_f)
+        full_deps = ['libs/' + xtm_file] + deps
+        shlib_tgt = env.Command([target_f,xtm_header_f], full_deps, cmd)
 
-        # Only certain libs are precompiled as part of the "official" targets
-        # such as stdlib-core.
+        # we tell scons about the entire dep graph above, but we only include
+        # specific libraries in the actual targets. i.e. not all stdlib components
+        # we find is to be precompiled.
         if not(xtm_file in STDLIB_CORE_SRCS or xtm_file in STDLIB_EXTERNAL_SRCS):
             continue
         nodes.append(target_f)
+        nodes.append(xtm_header_f)
 
     return nodes
 
@@ -359,7 +356,7 @@ if env.GetOption('stdlib_sources'): # user manually specified sources
         EXT_STDLIB_OUTPUTS.extend(xtmdeps.comp_artifacts(xtm_file,env['SHLIBSUFFIX']))
 else:
     if env.GetOption('no_dep_discovery'): # the less-moving-parts option
-        deps = {xtm_file: [] for xtm_file in STDLIB_CORE_SRCS+STDLIB_EXTERNAL_SRCS}
+        deps = {xtm_file: {'local':[],'global':[]} for xtm_file in STDLIB_CORE_SRCS+STDLIB_EXTERNAL_SRCS}
     else:
         # Extract dependencies for source files, required for parallel builds with -j
         deps = xtmdeps.get_stdlib_deps(env['SHLIBSUFFIX'])
