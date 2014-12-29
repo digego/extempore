@@ -41,6 +41,9 @@ else:
 # pass --no-cache to disable this
 CacheDir('.scons_build_cache')
 
+# By default build nothing (but print out a helpful message below)
+Default(None)
+
 ################################################
 # Conveniences
 ################################################
@@ -83,6 +86,9 @@ Available targets:
         s += HelpMessage.usage_footer
         return s
 
+################################################
+# Package specifiec defines
+################################################
 
 # The version we check for
 LLVM_VERSION = '3.4.1'
@@ -149,6 +155,9 @@ AddOption('--no-dep-discovery',
           help   = 'Skip dependency discovery when compiling stdlib (Do not use with -j)'
           )
 
+#################################################
+# Environment construction, configuration, checks
+#################################################
 
 def check_llvm_dir_isset(context):
     context.Message('Searching for llvm build directory...')
@@ -210,64 +219,6 @@ def check_patches_applied(context):
         context.Result(result)
     return result
 
-#
-# The environments determines envars when invoking tools
-# and generally serves as the context for build steps.
-#
-# platform = ARGUMENTS.get('OS', Platform())
-
-env = Environment(CPPPATH=['#/include'])
-
-# By default build nothing (but we do run the checks)
-Default(None)
-
-#
-# Checks - tell the user if something isn't as it should be
-#
-
-if not  COMMAND_LINE_TARGETS :
-    msg = "{orange}INFO{white}: See 'scons help' for list of targets and 'scons --help' for options."
-    print(msg.format(**color_dict))
-
-conf = Configure(env, custom_tests={
-    'check_llvm_dir_isset': check_llvm_dir_isset,
-    'check_patches_applied': check_patches_applied,
-    'check_llvm_version': check_llvm_version
-})
-
-if not conf.check_llvm_dir_isset():
-    err_msg = \
-        """
-{red}ERROR{white}: You need to set {green}EXT_LLVM_DIR{white} to the path of your (Extempore) LLVM directory.
-""".lstrip()
-    sys.stderr.write(err_msg.format(**color_dict))
-    Exit(1)
-
-if not conf.check_llvm_version():
-    err_msg = \
-        """
-{orange}WARN{white}: Extempore should be compiled against llvm {req_version} not {llvm_version}
-""".lstrip()
-    sys.stderr.write(err_msg.format(req_version=LLVM_VERSION,
-                                    llvm_version=os.environ[
-                                        'EXT_LLVM_VERSION'],
-                                    **color_dict))
-    # Exit(1)
-
-if not conf.check_patches_applied():
-    err_msg = \
-        """
-{orange}WARN{white}: Have you applied the provided patchs?
-""".lstrip()
-    sys.stderr.write(err_msg.format(**color_dict))
-    # Exit(1)
-
-env = conf.Finish()
-
-################################################
-# How to build the 'extempore' target
-################################################
-
 def configure_environment_linux():
     # CXXFLAGS = '-w -O3 -MMD -fexceptions -frtti'
     # CXXFLAGS = '-w -O3 -fexceptions -frtti'
@@ -300,10 +251,53 @@ def configure_environment(platform):
     else:
         print('Unsupported platform: ' + platform)
 
-# LLVM env vars
-env.ParseConfig(os.environ['EXT_LLVM_CONFIG_SCRIPT'] + '  --cflags --ldflags --libs')
 
-configure_environment(platform.system())
+env = Environment(CPPPATH=['#/include'])
+
+conf = Configure(env, custom_tests={
+    'check_llvm_dir_isset': check_llvm_dir_isset,
+    'check_patches_applied': check_patches_applied,
+    'check_llvm_version': check_llvm_version
+})
+
+if COMMAND_LINE_TARGETS and 'help' not in COMMAND_LINE_TARGETS:
+    if not conf.check_llvm_dir_isset():
+        err_msg = \
+            """
+    {red}ERROR{white}: You need to set {green}EXT_LLVM_DIR{white} to the path of your (Extempore) LLVM directory.
+    """.lstrip()
+        sys.stderr.write(err_msg.format(**color_dict))
+        Exit(1)
+
+    if not conf.check_llvm_version():
+        err_msg = \
+            """
+    {orange}WARN{white}: Extempore should be compiled against llvm {req_version} not {llvm_version}
+    """.lstrip()
+        sys.stderr.write(err_msg.format(req_version=LLVM_VERSION,
+                                        llvm_version=os.environ[
+                                            'EXT_LLVM_VERSION'],
+                                        **color_dict))
+        # Exit(1)
+
+    if not conf.check_patches_applied():
+        err_msg = \
+            """
+    {orange}WARN{white}: Have you applied the provided patchs?
+    """.lstrip()
+        sys.stderr.write(err_msg.format(**color_dict))
+        # Exit(1)
+
+    # LLVM env vars
+    env.ParseConfig(os.environ['EXT_LLVM_CONFIG_SCRIPT'] + '  --cflags --ldflags --libs')
+
+    configure_environment(platform.system())
+
+env = conf.Finish()
+
+################################################
+# 'extempore' target
+################################################
 
 # Prepare object files
 EXT_OBJ_FILES = []
@@ -317,7 +311,7 @@ env.Program('extempore', EXT_OBJ_FILES)
 HelpMessage.register_target('extempore', "Build the extempore binary.")
 
 ################################################
-# How to build the 'stdlib-foo' targets
+# 'stdlib-foo' targets
 ################################################
 
 # Note: --noaudio for parallel builds
@@ -425,6 +419,11 @@ HelpMessage.register_target('test-external', "Run tests test/external.")
 ################################################
 # Give the user a help message
 ################################################
+
+if not COMMAND_LINE_TARGETS :
+    msg = "{orange}INFO{white}: See 'scons help' for list of targets and 'scons --help' for options."
+    print(msg.format(**color_dict))
+    # do not exit(1), '--help' might have been passed
 
 if 'help' in COMMAND_LINE_TARGETS:
     HelpMessage.usage_footer = """
