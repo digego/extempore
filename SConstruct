@@ -158,6 +158,9 @@ STDLIB_EXTERNAL_SRCS = [
     'external/rtmidi.xtm',
     'external/openvg.xtm']
 
+STDLIB_SOURCES = ARGUMENTS.get('STDLIB_SOURCES','').split(' ') or (STDLIB_CORE_SRCS + STDLIB_EXTERNAL_SRCS)
+STDLIB_SOURCES = [x for x in STDLIB_SOURCES if x]
+
 AddOption('--stdlib-sources',
           default = [],
           nargs  = 1,
@@ -359,33 +362,30 @@ def construct_stdlib_nodes(deps):
         # we tell scons about the entire dep graph above, but we only include
         # specific libraries in the actual targets. i.e. not all stdlib components
         # we find is to be precompiled.
-        if not(xtm_file in STDLIB_CORE_SRCS or xtm_file in STDLIB_EXTERNAL_SRCS):
+        if not(xtm_file in STDLIB_SOURCES):
             continue
         nodes.append(target_f)
         nodes.append(xtm_header_f)
 
     return nodes
 
-if env.GetOption('stdlib_sources'): # user manually specified sources
-    sources = [x for x in env.GetOption('stdlib_sources').split(' ') if x]
-    for xtm_file in sources:
-        EXT_STDLIB_OUTPUTS.extend(xtmdeps.comp_artifacts(xtm_file,env['SHLIBSUFFIX']))
-else:
-    if env.GetOption('no_dep_discovery'): # the less-moving-parts option
-        deps = {xtm_file: {'local':[],'global':[]} for xtm_file in STDLIB_CORE_SRCS+STDLIB_EXTERNAL_SRCS}
-    else:
-        # Extract dependencies for source files, required for parallel builds with -j
-        deps = xtmdeps.get_stdlib_deps(env['SHLIBSUFFIX'])
 
-    external_deps = {xtm_file:deps['local']
-                    for xtm_file,deps in deps.items()
-                    if 'external/' in xtm_file}
-    core_deps = {xtm_file:deps['local']
+if env.GetOption('no_dep_discovery'): # the less-moving-parts option
+    deps = {xtm_file: {'local':[],'global':[]} for xtm_file in STDLIB_CORE_SRCS+STDLIB_EXTERNAL_SRCS}
+else:
+    # Extract dependencies for source files, required for parallel builds with -j
+    deps = xtmdeps.get_stdlib_deps(env['SHLIBSUFFIX'])
+
+external_deps = {xtm_file:deps['local']
                 for xtm_file,deps in deps.items()
-                if 'core/' in xtm_file}
-    EXT_STDLIB_EXTERNAL_OUTPUTS = construct_stdlib_nodes(external_deps)
-    EXT_STDLIB_CORE_OUTPUTS = construct_stdlib_nodes(core_deps)
-    EXT_STDLIB_OUTPUTS = EXT_STDLIB_CORE_OUTPUTS + EXT_STDLIB_EXTERNAL_OUTPUTS
+                if 'external/' in xtm_file}
+core_deps = {xtm_file:deps['local']
+            for xtm_file,deps in deps.items()
+            if 'core/' in xtm_file}
+
+EXT_STDLIB_EXTERNAL_OUTPUTS = construct_stdlib_nodes(external_deps)
+EXT_STDLIB_CORE_OUTPUTS = construct_stdlib_nodes(core_deps)
+EXT_STDLIB_OUTPUTS = EXT_STDLIB_CORE_OUTPUTS + EXT_STDLIB_EXTERNAL_OUTPUTS
 
 stdlib = env.Command('stdlib', EXT_STDLIB_OUTPUTS, '')
 HelpMessage.register_target('stdlib','Compile both core and external stdlib components.')
@@ -436,20 +436,14 @@ HelpMessage.register_target('test-external', "Run tests test/external.")
 HelpMessage.usage_footer = """
 Add -c to the command to clean up the respective target.
 
-To list further options:
-
-    scons --help
-
 To Precompile only specific stdlib components (paths are relative to 'libs/'):
 
-    scons --stdlib-source="external/sndfile.xtm core/std.xtm" stdlib
+    scons stdlib STDLIB_SOURCES="external/sndfile.xtm core/std.xtm"
 
 Build artifacts are cached by default. Use the --no-cache option to disable it.
 """
 
 Help(HelpMessage.to_string())
-
-
 
 if not COMMAND_LINE_TARGETS and not GetOption('help'):
     msg = "{yellow}INFO{white}: See 'scons -h' for list of targets and 'scons -H' for options."
