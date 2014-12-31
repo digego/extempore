@@ -433,13 +433,7 @@ HelpMessage.register_target('test-external', "Run tests test/external.")
 # Give the user a help message
 ################################################
 
-if not COMMAND_LINE_TARGETS :
-    msg = "{orange}INFO{white}: See 'scons help' for list of targets and 'scons --help' for options."
-    print(msg.format(**color_dict))
-    # do not exit(1), '--help' might have been passed
-
-if 'help' in COMMAND_LINE_TARGETS:
-    HelpMessage.usage_footer = """
+HelpMessage.usage_footer = """
 Add -c to the command to clean up the respective target.
 
 To list further options:
@@ -452,6 +446,12 @@ To Precompile only specific stdlib components (paths are relative to 'libs/'):
 
 Build artifacts are cached by default. Use the --no-cache option to disable it.
 """
-    print(HelpMessage.to_string())
-    exit(1)
 
+Help(HelpMessage.to_string())
+
+
+
+if not COMMAND_LINE_TARGETS and not GetOption('help'):
+    msg = "{yellow}INFO{white}: See 'scons -h' for list of targets and 'scons -H' for options."
+    print(msg.format(**color_dict))
+    exit(1);
