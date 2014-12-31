@@ -49,14 +49,30 @@ Default(None)
 ################################################
 
 color_dict = {
-    'red': "\033[0;31m",
-    'green': "\033[0;32m",
-    'blue': "\033[0;34m",
-    'purple': "\033[0;35m",
-    'turquoise': "\033[0;36m",
-    'orange': "\033[0;33m",
-    'white': "\033[0;00m",
+    'black'      : "\033[0;30m",
+    'red'        : "\033[0;31m",
+    'green'      : "\033[0;32m",
+    'yellow'     : "\033[0;33m",
+    'blue'       : "\033[0;34m",
+    'magenta'    : "\033[0;35m",
+    'cyan'       : "\033[0;36m",
+    'white'      : "\033[0;37m",
+    'black_bg'   : "\033[0;40m",
+    'red_bg'     : "\033[0;41m",
+    'green_bg'   : "\033[0;42m",
+    'yellow_bg'  : "\033[0;43m",
+    'blue_bg'    : "\033[0;44m",
+    'magenta_bg' : "\033[0;45m",
+    'cyan_bg'    : "\033[0;46m",
+    'white_bg'   : "\033[0;47m",
+    # 256 codes
+    'ext_fg'   : "\033[38;5;{}m",
+    'ext_bg'   : "\033[48;5;{}m",
+    # rgb
+    'ext_fg'   : "\033[38;2;{};{};{}m",
+    'ext_bg'   : "\033[48;2;{};{};{}m",
 }
+
 
 
 class HelpMessage(object):
@@ -272,7 +288,7 @@ if COMMAND_LINE_TARGETS and 'help' not in COMMAND_LINE_TARGETS:
     if not conf.check_llvm_version():
         err_msg = \
             """
-    {orange}WARN{white}: Extempore should be compiled against llvm {req_version} not {llvm_version}
+    {yellow}WARN{white}: Extempore should be compiled against llvm {req_version} not {llvm_version}
     """.lstrip()
         sys.stderr.write(err_msg.format(req_version=LLVM_VERSION,
                                         llvm_version=os.environ[
@@ -283,7 +299,7 @@ if COMMAND_LINE_TARGETS and 'help' not in COMMAND_LINE_TARGETS:
     if not conf.check_patches_applied():
         err_msg = \
             """
-    {orange}WARN{white}: Have you applied the provided patchs?
+    {yellow}WARN{white}: Have you applied the provided patchs?
     """.lstrip()
         sys.stderr.write(err_msg.format(**color_dict))
         # Exit(1)
