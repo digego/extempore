@@ -1261,12 +1261,12 @@ static int alloc_cellseg(scheme *sc, int n) {
 	i = ++sc->last_cell_seg ;
 	sc->alloc_seg[i] = cp;
 	/* adjust in TYPE_BITS-bit boundary */
-	if((  *((unsigned*)cp) )%adj!=0) {
-	    cp=(char*)(adj*((long)cp/adj+1));
-	}
+	//if((  *((unsigned*)cp) )%adj!=0) {
+	//    cp=(char*)(adj*((long)cp/adj+1));
+	//}
         /* insert new segment in address order */
 	newp=(pointer)cp;
-		
+
         sc->cell_seg[i] = newp;
         while (i > 0 && sc->cell_seg[i - 1] > sc->cell_seg[i]) {
 	    p = sc->cell_seg[i];

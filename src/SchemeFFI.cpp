@@ -613,7 +613,11 @@ namespace extemp {
     pointer SchemeFFI::exit_extempore(scheme* _sc, pointer args)
     {
       int rc = (int)ivalue(pair_car(args));
+#ifdef TARGET_OS_WINDOWS
+	  std::exit(rc);
+#elif
       std::_Exit(rc);
+#endif
     }
 
     pointer SchemeFFI::dataGETi64(scheme* _sc, pointer args)
@@ -730,12 +734,12 @@ namespace extemp {
     }                                                     
 
   pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {    
-    char exp_path[8192];
-    memset(exp_path,0,8192);
-  #ifdef TARGET_OS_WIN
+  #ifdef TARGET_OS_WINDOWS
     char* path = string_value(pair_car(args));
     char* exp_path = path;
   #else
+	char exp_path[8192];
+	memset(exp_path,0,8192);
     char* path = string_value(pair_car(args));
     if(path[0] == '~') {
       char* h = getenv("HOME");      

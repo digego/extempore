@@ -96,6 +96,9 @@
 ;; type of size_t on platform
 (define *impc:ir:size_t_str* (if (= 64 (sys:pointer-size)) "i64" "i32"))
 
+;; A windows allocation bug that I can't track down yet!
+(define *WINDOWS_ALLOC_BUG* (if (string=? (sys:platform) "Windows") #t #f))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Compiler error printing
 
@@ -2103,309 +2106,287 @@
 ;; making and filling an environment structure
 ;; for a particular closure
 (define impc:ir:compile:make-closureenv
-   (lambda (ast types)
-      ;(println 'make-closure-env 'ast: ast 'types: types)
-      (let* ((os2 (make-string 0))
-             (os1 (make-string 0))
-             (name (list-ref ast 2)) 
-	     (allocate-mem? (list-ref ast 1))
-             (rettype (list-ref ast 3))
-             (env (list-ref ast 4))
-             (args (list-ref ast 5))
-             (code (list-ref ast 6)))
-         (define func-type-str (impc:ir:make-function-str (list* rettype (map (lambda (x) (cdr x)) args)) #t))
-         
-         (define closure-struct-str
-            (string-append "<{ i8*, i8*, " func-type-str "*}>"))
+  (lambda (ast types)
+    ;; (println 'make-closure-env 'ast: ast 'types: types)
+    (let* ((os2 (make-string 0))
+           (os1 (make-string 0))
+           (name (list-ref ast 2)) 
+           (allocate-mem? (list-ref ast 1))
+           (rettype (list-ref ast 3))
+           (env (list-ref ast 4))
+           (args (list-ref ast 5))
+           (code (list-ref ast 6)))
+      (define func-type-str (impc:ir:make-function-str (list* rettype (map (lambda (x) (cdr x)) args)) #t))
+      
+      (define closure-struct-str
+        (string-append "<{ i8*, i8*, " func-type-str "*}>"))
 
-	 (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
-	       (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-	       os2)      	 
-	 ; (emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os2)	 
-	 (emit "call void @llvm_zone_mark(%mzone* " (car (impc:ir:gname "zone")) ")\n" os2)
-         ;; malloc closure structure
-         (emit "; malloc closure structure\n" os2)
-         (define cstruct closure-struct-str)
-         (emit (impc:ir:gname "val" "i8*") " = getelementptr " cstruct "* null, i32 1\n" os2)
-         (emit (impc:ir:gname "size" *impc:ir:size_t_str*) " = ptrtoint " cstruct "* "
-               (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os2)
-         (cond ((eq? (car ast) '__make-closure-h)
-                (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @malloc("
-                      (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size")) ")\n" os2))
-               ((eq? (car ast) '__make-closure-s)
-                (emit (impc:ir:gname "clsptr" "i8*") " = alloca i8"
-                      ", " (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size"))
-                      ", align 16\n" os2))
-               (else
-                (if (string=? (cadr (impc:ir:gname "size")) "i32")
-                    (begin 
-                      (emit (impc:ir:gname "sizeb" "i64") " = zext i32 " (car (impc:ir:gname "size")) " to i64" os2)
-                      (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
-                            "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "sizeb")) ")\n" os2))
-                    (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
-                          "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "size")) ")\n" os2))))
-                    
-         (emit (impc:ir:gname "closure" (string-append cstruct "*")) 
-	       " = bitcast i8* " (car (impc:ir:gname "clsptr")) 
-	       " to " cstruct "*\n" os2)
-         ;; malloc evironment structure 
-         (emit "\n; malloc environment structure\n" os2)
-         (define estruct (impc:ir:make-struct-str-env env))
-         (emit (impc:ir:gname "val" "i8*") " = getelementptr " estruct "* null, i32 1\n" os2)
-         (emit (impc:ir:gname "size" *impc:ir:size_t_str*) " = ptrtoint " estruct "* "
-               (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os2)
-         (cond ((eq? (car ast) '__make-closure-h)
-                (emit (impc:ir:gname "envptr" "i8*") " = call i8* @malloc("
-                      (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1)) ")\n" os2))
-               ((eq? (car ast) '__make-closure-s)
-                (emit (impc:ir:gname "envptr" "i8*") " = alloca i8"
-                      ", " (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1))
-                      ", align 16\n" os2))
-               (else
-                (if (string=? (cadr (impc:ir:gname "size")) "i32")
-                    (begin
-                      (emit (impc:ir:gname "sizeb" "i64") " = zext i32 " (car (impc:ir:gname "size")) " to i64" os2)
-                      (emit (impc:ir:gname "envptr" "i8*") " = call i8* @llvm_zone_malloc("
-                            "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "sizeb")) ")\n" os2))
-                    (emit (impc:ir:gname "envptr" "i8*") " = call i8* @llvm_zone_malloc("
-                          "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname 1)) ")\n" os2))))
-         (emit (impc:ir:gname "environment" (string-append estruct "*")) 
-	       " = bitcast i8* " (car (impc:ir:gname "envptr")) 
-	       " to " estruct "*\n" os2)
-         ;; make new closure_address_table
-         (emit "\n; malloc closure address table\n" os2)
-         (emit (impc:ir:gname "addytable" "%clsvar*") " = call %clsvar* @new_address_table()\n" os2)
-         (define table (impc:ir:gname))
-         (define ptridx 0)
-         (dotimes (i (length env))		  		  
-            (let* ((e (list-ref env i))
-		   (varname (if (regex:match? (symbol->string (car e)) "__sub$")
-				(cadr (regex:matched (symbol->string (car e)) "(.*)__sub$"))
-				(symbol->string (car e))))
-                   ;(name-str (impc:ir:make-string varname))
-		   (name-str (impc:ir:make-const-string varname))
-                   (name (impc:ir:gname))
-                   ;(type-str (impc:ir:make-string (impc:ir:get-type-str (cdr e))))
-		   (type-str (impc:ir:make-const-string (impc:ir:get-type-str (cdr e))))
-                   (type (impc:ir:gname)))
-               (emit name-str os2)
-               (emit type-str os2)
-               (emit (impc:ir:gname "addytable" "%clsvar*") 
-		     " = call %clsvar* @add_address_table("
-		     "%mzone* " (car (impc:ir:gname "zone")) ", "
-		     (cadr name) " " (car name) ", "
-		     "i32 " (number->string ptridx) ", "
-		     (cadr type) " " (car type) ", "
-                     (cond ((eq? (car ast) '__make-closure-h) "i32 1, ")
-                           ((eq? (car ast) '__make-closure-s) "i32 2, ")
-                           (else "i32 3, "))
-		     "%clsvar* " (car table) ")\n"
-		     os2)
-               (set! table (impc:ir:gname))
-               (set! ptridx (+ ptridx (/ (sys:pointer-size) 8))))) ; need it as bytes
-         (emit (impc:ir:gname "address-table" "i8*") " = bitcast %clsvar* " (car table) " to i8*\n" os2)
-         ;; add data to environment structure
-         (emit "; add data to environment\n" os1)
-         (dotimes (i (length env))
-            (let* ((e (list-ref env i))
-                   (alloc? (not (regex:match? (symbol->string (car e)) "__sub$"))))
-               ;; first fixup mangled name if not allocing
-               (if (not alloc?) (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
-                                              (cdr e))))
-               (define t (begin (impc:ir:gname (string-append (symbol->string (car e)) "EnvPtr")
-                                               (string-append (impc:ir:get-type-str (cdr e)) "*"))
-                                (impc:ir:gname)))
-;               ;; if allocating then assign heap memory
-;               (if #f ;alloc?
-;                   (begin (emit ";need to alloc memory for this env var " (symbol->string (car e)) "\n"
-;				(impc:ir:gname "mem" "i8*") " = call i8* @llvm_zone_malloc("
-;				"%mzone* %_zone, i64 " 
-;				(number->string (impc:ir:get-type-size (cdr e)))
-;				")\n" os1)
-;                          (emit "; and store value in new memory\n"
-;				;(impc:ir:gname "memstore" (cadr t))
-;				(car t)
-;				" = bitcast i8* " (car (impc:ir:gname "mem")) " to " (cadr t) "\n" os1)
-;                          (emit (impc:ir:gname "val" (impc:ir:get-type-str (cdr e)))
-;				" = load " (impc:ir:get-type-str (cdr e)) "* %"
-;				(symbol->string (car e)) "Ptr\n" os1)
-;                          (emit "store " (impc:ir:get-type-str (cdr e)) " " (car (impc:ir:gname))
-;				", " ;(impc:ir:get-type-str (cdr e))
-;				(cadr t) " " (car t) "\n" os1)
-;                          (emit (impc:ir:gname "tmp_envptr" (string-append (cadr t) "*")) " = getelementptr "
-;				estruct "* " (car (impc:ir:gname "environment")) ", "
-;				"i32 0, i32 " (number->string i) "\n" os1)
-;                          (emit "store " (cadr t) " " (car t) " "
-;				", " (cadr t) "* " (car (impc:ir:gname "tmp_envptr")) "\n\n" os1))
-;                   (begin (emit "; don't need to alloc for env var " (symbol->string (car e)) "\n" os1)
-;                          (emit (impc:ir:gname "tmp_envptr" (string-append (cadr t) "*")) " = getelementptr "
-;				estruct "* " (car (impc:ir:gname "environment")) ", "
-;				"i32 0, i32 " (number->string i) "\n" os1)
-;                          (emit "store " (cadr t) " %" (symbol->string (car e)) "Ptr"
-;				", "
-;				(cadr t) "* " (car (impc:ir:gname "tmp_envptr")) "\n\n" os1)))))
+      (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+            (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+            os2)      	 
+                                        ; (emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os2)	 
+      (emit "call void @llvm_zone_mark(%mzone* " (car (impc:ir:gname "zone")) ")\n" os2)
+      ;; malloc closure structure
+      (emit "; malloc closure structure\n" os2)
+      (define cstruct closure-struct-str)
+      (emit (impc:ir:gname "val" "i8*") " = getelementptr " cstruct "* null, i32 1\n" os2)
+      (emit (impc:ir:gname "size" *impc:ir:size_t_str*) " = ptrtoint " cstruct "* "
+            (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os2)
+      (cond ((eq? (car ast) '__make-closure-h)
+             (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @malloc("
+                   (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size")) ")\n" os2))            
+            ((and (eq? (car ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+             (emit (impc:ir:gname "clsptr" "i8*") " = alloca i8"
+                   ", " (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size"))
+                   ", align 16\n" os2))
+            (else
+             (if (string=? (cadr (impc:ir:gname "size")) "i32")
+                 (begin 
+                   (emit (impc:ir:gname "sizeb" "i64") " = zext i32 " (car (impc:ir:gname "size")) " to i64" os2)
+                   (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
+                         "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "sizeb")) ")\n" os2))
+                 (emit (impc:ir:gname "clsptr" "i8*") " = call i8* @llvm_zone_malloc("
+                       "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "size")) ")\n" os2))))
+      
+      (emit (impc:ir:gname "closure" (string-append cstruct "*")) 
+            " = bitcast i8* " (car (impc:ir:gname "clsptr")) 
+            " to " cstruct "*\n" os2)
+      ;; malloc evironment structure 
+      (emit "\n; malloc environment structure\n" os2)
+      (define estruct (impc:ir:make-struct-str-env env))
+      (emit (impc:ir:gname "val" "i8*") " = getelementptr " estruct "* null, i32 1\n" os2)
+      (emit (impc:ir:gname "size" *impc:ir:size_t_str*) " = ptrtoint " estruct "* "
+            (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os2)
+      (cond ((eq? (car ast) '__make-closure-h)
+             (emit (impc:ir:gname "envptr" "i8*") " = call i8* @malloc("
+                   (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1)) ")\n" os2))
+            ((and (eq? (car ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+             (emit (impc:ir:gname "envptr" "i8*") " = alloca i8"
+                   ", " (cadr (impc:ir:gname 1)) " " (car (impc:ir:gname 1))
+                   ", align 16\n" os2))
+            (else
+             (if (string=? (cadr (impc:ir:gname "size")) "i32")
+                 (begin
+                   (emit (impc:ir:gname "sizeb" "i64") " = zext i32 " (car (impc:ir:gname "size")) " to i64" os2)
+                   (emit (impc:ir:gname "envptr" "i8*") " = call i8* @llvm_zone_malloc("
+                         "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname "sizeb")) ")\n" os2))
+                 (emit (impc:ir:gname "envptr" "i8*") " = call i8* @llvm_zone_malloc("
+                       "%mzone* " (car (impc:ir:gname "zone")) ", i64 " (car (impc:ir:gname 1)) ")\n" os2))))
+      (emit (impc:ir:gname "environment" (string-append estruct "*")) 
+            " = bitcast i8* " (car (impc:ir:gname "envptr")) 
+            " to " estruct "*\n" os2)
+      ;; make new closure_address_table
+      (emit "\n; malloc closure address table\n" os2)
+      (emit (impc:ir:gname "addytable" "%clsvar*") " = call %clsvar* @new_address_table()\n" os2)
+      (define table (impc:ir:gname))
+      (define ptridx 0)
+      (dotimes (i (length env))		  		  
+        (let* ((e (list-ref env i))
+               (varname (if (regex:match? (symbol->string (car e)) "__sub$")
+                            (cadr (regex:matched (symbol->string (car e)) "(.*)__sub$"))
+                            (symbol->string (car e))))
+                                        ;(name-str (impc:ir:make-string varname))
+               (name-str (impc:ir:make-const-string varname))
+               (name (impc:ir:gname))
+                                        ;(type-str (impc:ir:make-string (impc:ir:get-type-str (cdr e))))
+               (type-str (impc:ir:make-const-string (impc:ir:get-type-str (cdr e))))
+               (type (impc:ir:gname)))
+          (emit name-str os2)
+          (emit type-str os2)
+          (emit (impc:ir:gname "addytable" "%clsvar*") 
+                " = call %clsvar* @add_address_table("
+                "%mzone* " (car (impc:ir:gname "zone")) ", "
+                (cadr name) " " (car name) ", "
+                "i32 " (number->string ptridx) ", "
+                (cadr type) " " (car type) ", "
+                (cond ((eq? (car ast) '__make-closure-h) "i32 1, ")
+                      ((and (eq? (car ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*)) "i32 2, ")
+                      (else "i32 3, "))
+                "%clsvar* " (car table) ")\n"
+                os2)
+          (set! table (impc:ir:gname))
+          (set! ptridx (+ ptridx (/ (sys:pointer-size) 8))))) ; need it as bytes
+      (emit (impc:ir:gname "address-table" "i8*") " = bitcast %clsvar* " (car table) " to i8*\n" os2)
+      ;; add data to environment structure
+      (emit "; add data to environment\n" os1)
+      (dotimes (i (length env))
+        (let* ((e (list-ref env i))
+               (alloc? (not (regex:match? (symbol->string (car e)) "__sub$"))))
+          ;; first fixup mangled name if not allocing
+          (if (not alloc?) (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
+                                         (cdr e))))
+          (define t (begin (impc:ir:gname (string-append (symbol->string (car e)) "EnvPtr")
+                                          (string-append (impc:ir:get-type-str (cdr e)) "*"))
+                           (impc:ir:gname)))
 
-	       (emit "; don't need to alloc for env var " (symbol->string (car e)) "\n" os1)
-	       (emit (impc:ir:gname "tmp_envptr" (string-append (cadr t) "*")) " = getelementptr "
-		     estruct "* " (car (impc:ir:gname "environment")) ", "
-		     "i32 0, i32 " (number->string i) "\n" os1)
-	       (emit "store " (cadr t) " %" (symbol->string (car e)) "Ptr"
-		     ", "
-		     (cadr t) "* " (car (impc:ir:gname "tmp_envptr")) "\n\n" os1)))
+          (emit "; don't need to alloc for env var " (symbol->string (car e)) "\n" os1)
+          (emit (impc:ir:gname "tmp_envptr" (string-append (cadr t) "*")) " = getelementptr "
+                estruct "* " (car (impc:ir:gname "environment")) ", "
+                "i32 0, i32 " (number->string i) "\n" os1)
+          ;;(emit (impc:ir:gname "tmpttff" "i8*") " = bitcast " (cadr t) " %" (symbol->string (car e)) "Ptr to i8*\n" os1)
+          ;;(emit "call ccc void @llvm_print_i32(i32 " (number->string i) ")\n" os1) 
+          ;;(emit "call ccc void @llvm_print_pointer(i8* " (car (impc:ir:gname)) ")\n" os1)
+          (emit "store " (cadr t) " %" (symbol->string (car e)) "Ptr"
+                ", "
+                (cadr t) "* " (car (impc:ir:gname "tmp_envptr")) "\n\n" os1)))
 
-         (emit "\n" os1)
-         ;(emit (string-append "call void @testtest(i8* " (car (impc:ir:gname "envptr")) ")\n") os1)
-         
-         ;; add ftype string to provide type info to scheme world.
-         ;(emit (impc:ir:make-string name) os2)
-         
-         ;; insert stuff into closure
-         (emit "\n; insert table, function and environment into closure struct\n" os2)
-         (emit (impc:ir:gname "closure.table" "i8**") " = getelementptr " cstruct "* "
-	       (car (impc:ir:gname "closure")) ", i32 0, i32 0\n" os2)
-         (emit "store i8* " (car (impc:ir:gname "address-table")) ", i8** " 
-	       (car (impc:ir:gname)) "\n" os2)
-         (emit (impc:ir:gname "closure.env" "i8**") " = getelementptr " cstruct "* " 
-	       (car (impc:ir:gname "closure")) ", i32 0, i32 1\n" os2)
-         (emit "store i8* " (car (impc:ir:gname "envptr")) ", i8** " 
-	       (car (impc:ir:gname)) "\n" os2)
-         (emit (impc:ir:gname "closure.func" (string-append func-type-str "**")) 
-	       " = getelementptr " cstruct "* " (car (impc:ir:gname "closure")) 
-	       ", i32 0, i32 2\n" os2)
-         (emit "store " func-type-str "* @" name ", " func-type-str "** " (car (impc:ir:gname)) "\n" os2)
-         (impc:ir:gname "closure" (car (impc:ir:gname "closure")) (cadr (impc:ir:gname "closure")))
-	 ;; force set size of clsptr to the complete size of the closure!
-	 ;; this allows us to easily copy the entire closure
-	 (emit (impc:ir:gname "closure_size" "i64") " = call i64 @llvm_zone_mark_size(%mzone* " (car (impc:ir:gname "zone")) ")\n" os2)
-	 (emit "call void @llvm_zone_ptr_set_size(i8* " (car (impc:ir:gname "clsptr")) ", i64 " (car (impc:ir:gname)) ")\n" os2)
+      (emit "\n" os1)
+      
+      ;; insert stuff into closure
+      (emit "\n; insert table, function and environment into closure struct\n" os2)
+      (emit (impc:ir:gname "closure.table" "i8**") " = getelementptr " cstruct "* "
+            (car (impc:ir:gname "closure")) ", i32 0, i32 0\n" os2)
+      (emit "store i8* " (car (impc:ir:gname "address-table")) ", i8** " 
+            (car (impc:ir:gname)) "\n" os2)
+      (emit (impc:ir:gname "closure.env" "i8**") " = getelementptr " cstruct "* " 
+            (car (impc:ir:gname "closure")) ", i32 0, i32 1\n" os2)
+      (emit "store i8* " (car (impc:ir:gname "envptr")) ", i8** " 
+            (car (impc:ir:gname)) "\n" os2)
+      (emit (impc:ir:gname "closure.func" (string-append func-type-str "**")) 
+            " = getelementptr " cstruct "* " (car (impc:ir:gname "closure")) 
+            ", i32 0, i32 2\n" os2)
+      (emit "store " func-type-str "* @" name ", " func-type-str "** " (car (impc:ir:gname)) "\n" os2)
+      (impc:ir:gname "closure" (car (impc:ir:gname "closure")) (cadr (impc:ir:gname "closure")))
+      ;; force set size of clsptr to the complete size of the closure!
+      ;; this allows us to easily copy the entire closure
+      (emit (impc:ir:gname "closure_size" "i64") " = call i64 @llvm_zone_mark_size(%mzone* " (car (impc:ir:gname "zone")) ")\n" os2)
+      (emit "call void @llvm_zone_ptr_set_size(i8* " (car (impc:ir:gname "clsptr")) ", i64 " (car (impc:ir:gname)) ")\n" os2)
 
-	 (impc:ir:gname "closure" (car (impc:ir:gname "closure")) (cadr (impc:ir:gname "closure")))
-	 ;; add an additional pointer wrapper for closure
-         (cond ((eq? (car ast) '__make-closure-h)
-                (emit (impc:ir:gname "wrapper_ptr" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " "
-                      (number->string (impc:ir:get-type-size (cadr (impc:ir:gname)))) ")\n" os2))
-               ((eq? (car ast) '__make-closure-s)
-                (emit (impc:ir:gname "wrapper_ptr" "i8*") " = alloca i8"
-                      ", i32 " (number->string (impc:ir:get-type-size (cadr (impc:ir:gname))))
-                      ", align 16\n" os2))
-               (else 
-                (emit (impc:ir:gname "wrapper_ptr" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 " 
-                      (number->string (impc:ir:get-type-size (cadr (impc:ir:gname)))) ")\n" os2)))
-	 (emit (impc:ir:gname "closure_wrapper" (string-append (cadr (impc:ir:gname "closure")) "*"))
-	       " = bitcast i8* " (car (impc:ir:gname "wrapper_ptr")) " to " (cadr (impc:ir:gname "closure")) "*\n" os2)
-	 (emit "store " (cadr (impc:ir:gname "closure")) " " (car (impc:ir:gname "closure")) ", "
-	       (cadr (impc:ir:gname "closure")) "* " (car (impc:ir:gname "closure_wrapper")) "\n" os2)
-	 ;; last gname should be closure_wrapper (a pointer to a closure - i.e. [double,double]**)
-         (cons (impc:ir:strip-space os2)
-               (impc:ir:strip-space os1)))))			   
+      (impc:ir:gname "closure" (car (impc:ir:gname "closure")) (cadr (impc:ir:gname "closure")))
+      ;; add an additional pointer wrapper for closure
+      (cond ((eq? (car ast) '__make-closure-h)
+             (emit (impc:ir:gname "wrapper_ptr" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " "
+                   (number->string (impc:ir:get-type-size (cadr (impc:ir:gname)))) ")\n" os2))
+            ((and (eq? (car ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+             (emit (impc:ir:gname "wrapper_ptr" "i8*") " = alloca i8"
+                   ", i32 " (number->string (impc:ir:get-type-size (cadr (impc:ir:gname))))
+                   ", align 16\n" os2))
+            (else 
+             (emit (impc:ir:gname "wrapper_ptr" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 " 
+                   (number->string (impc:ir:get-type-size (cadr (impc:ir:gname)))) ")\n" os2)))
+      (emit (impc:ir:gname "closure_wrapper" (string-append (cadr (impc:ir:gname "closure")) "*"))
+            " = bitcast i8* " (car (impc:ir:gname "wrapper_ptr")) " to " (cadr (impc:ir:gname "closure")) "*\n" os2)
+      (emit "store " (cadr (impc:ir:gname "closure")) " " (car (impc:ir:gname "closure")) ", "
+            (cadr (impc:ir:gname "closure")) "* " (car (impc:ir:gname "closure_wrapper")) "\n" os2)
+      ;; last gname should be closure_wrapper (a pointer to a closure - i.e. [double,double]**)
+      (cons (impc:ir:strip-space os2)
+            (impc:ir:strip-space os1)))))			   
 
 (define impc:ir:compile:make-closure   
-   (lambda (ast types)
-      ;(println 'ast: ast)
-      (let* ((os (make-string 0))	     
-             (name (list-ref ast 2)) 
-	     (allocate-mem? (list-ref ast 1))
-             (rettype (list-ref ast 3))
-             (env (list-ref ast 4))
-             (args (list-ref ast 5))
-             (code (list-ref ast 6)))		
-         ;(println 'making-closure--------------------------------------> )
-         ;(println 'name: name)
-	 ;(println 'allocate: allocate-mem?)
-         ;(println 'rettype: rettype)
-         ;(println 'env: env)
-         ;(println 'args: args)
-         ;(println 'code: code)
-         ;; first we make the function code
-        ;; define fastcc function with return type
-         (emit  "define fastcc " (impc:ir:get-type-str rettype) " @" name "(" os)
-         ;(if (not (null? env)) (emit "i8* %_impenv" os))
-         (emit "i8* %_impz," os)
-         (emit "i8* %_impenv" os)         
-         (if (not (null? args)) (emit  ", " (impc:ir:make-arglist-str args #t) os))
-         ;; close off function opening         
-         (emit ") nounwind {\n" os)
-         (emit "entry:\n" os)
-         ;(emit "; setup zone\n" os)
-         ;(emit "%_zone = bitcast i8* %_impz to %mzone*\n" os)
+  (lambda (ast types)
+    ;;(println 'ast: ast)
+    (let* ((os (make-string 0))	     
+           (name (list-ref ast 2)) 
+           (allocate-mem? (list-ref ast 1))
+           (rettype (list-ref ast 3))
+           (result '())
+           (env (list-ref ast 4))
+           (args (list-ref ast 5))
+           (code (list-ref ast 6)))		
+      ;;(println 'making-closure--------------------------------------> )
+      ;;(println 'name: name)
+      ;;(println 'allocate: allocate-mem?)
+      ;;(println 'rettype: rettype)
+      ;;(println 'env: env)
+      ;;(println 'args: args)
+      ;;(println 'code: code)
+      ;; first we make the function code
+      ;; define fastcc function with return type
+      (emit  "define fastcc " (impc:ir:get-type-str rettype) " @" name "(" os)
+                                        ;(if (not (null? env)) (emit "i8* %_impenv" os))
+      (emit "i8* %_impz," os)
+      (emit "i8* %_impenv" os)         
+      (if (not (null? args)) (emit  ", " (impc:ir:make-arglist-str args #t) os))
+      ;; close off function opening         
+      (emit ") nounwind {\n" os)
+      (emit "entry:\n" os)
+      ;;(emit "; setup zone\n" os)
+      ;;(emit "%_zone = bitcast i8* %_impz to %mzone*\n" os)
 
-	 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	 ;; ;; new for impz stuff
-         (emit "%_impzPtr = alloca i8*\n" os)
-	 (emit "store i8* %_impz, i8** %_impzPtr\n" os)
-	 ;; (emit (impc:ir:gname "zone" "%mzone*") " = bitcast i8* %_impz to %mzone*\n" os)
-         ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ;; ;; new for impz stuff
+      (emit "%_impzPtr = alloca i8*\n" os)
+      (emit "store i8* %_impz, i8** %_impzPtr\n" os)
+      ;; (emit (impc:ir:gname "zone" "%mzone*") " = bitcast i8* %_impz to %mzone*\n" os)
+      ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	 ;; (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
-	 ;;       (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-	 ;;       os)      	 
-	 
-	 (emit (impc:ir:gname "zone" "%mzone*") " = bitcast i8* %_impz to %mzone*\n" os)
-	 ;; (emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+      ;; (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+      ;;       (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+      ;;       os)      	 
+      
+      (emit (impc:ir:gname "zone" "%mzone*") " = bitcast i8* %_impz to %mzone*\n" os)
+      ;; (emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
 
-         ;; first we need to pull evironment values
-         (if (not (null? env))
-             (begin (emit "; setup environment\n" os)
-                    (emit (string-append "%impenv = bitcast i8* %_impenv to "
-                                            (impc:ir:make-struct-str-env env) "*\n") os)
-                    (dotimes (i (length env))
-                       (let ((e (list-ref env i)))
-                          ;; need to strip __sub's
-                          (if (regex:match? (symbol->string (car e)) "__sub$")
-                              (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
-                                            (cdr e))))
-                          ;(print 'e: e)
-                          (emit (string-append "%" (symbol->string (car e)) "Ptr_ = getelementptr "
-                                                  (impc:ir:make-struct-str-env env) "* %impenv, "
-                                                  "i32 0, i32 " (number->string i) "\n") os)
-                          (emit (string-append "%" (symbol->string (car e)) "Ptr = load "
-                                                  (impc:ir:get-type-str (cdr e)) "** %"
-                                                  (symbol->string (car e)) "Ptr_\n") os)))))                       
-         ;; next we pull the function arguments
-         (emit "\n; setup arguments\n" os)          
-         (dotimes (i (length args))
-           (let* ((a (list-ref args i)))
-              (set! *impc:ir:sym-name-stack* (cons (car a) *impc:ir:sym-name-stack*))
-	      (if (> allocate-mem? 0)
-		  (begin ;; (println 'yes: allocate-mem? 'mem: ast)
-                         (cond ((= allocate-mem? 1)
-                                (emit "%dat_" (symbol->string (car a)) " = call i8* @malloc("
-                                      *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size (cdr a))) ")\n" os))
-                               ((= allocate-mem? 2)
-                                (emit "%dat_" (symbol->string (car a)) " = alloca i8"
-                                      ", i64 " (number->string (impc:ir:get-type-size (cdr a)))
-                                      ", align 16\n" os))
-                               (else 
-                                (emit "%dat_" (symbol->string (car a)) " = call i8* @llvm_zone_malloc(" 
-                                      "%mzone* " (car (impc:ir:gname "zone")) ", i64 " 
-                                      (number->string (impc:ir:get-type-size (cdr a))) ")\n" os)))
-			 (emit "%" (symbol->string (car a)) "Ptr = bitcast i8* %dat_" (symbol->string (car a)) " to " (impc:ir:get-type-str (cdr a)) "*\n" os))
-		  (emit  "%" (symbol->string (car a)) "Ptr = alloca " (impc:ir:get-type-str (cdr a)) "\n" os))
-	      (emit (string-append "store " (impc:ir:get-type-str (cdr a)) " %" (symbol->string (car a))
-				   ", " (impc:ir:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)))
-         (emit "\n" os)
-         ;; compile body
-         ;; (println '_compin: *impc:ir:sym-name-stack*)                  
-	 (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
-	 (define body-str (impc:ir:compiler code types))
-	 ;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
-	 (if (not (null? (car *impc:ir:ls_var*)))
-	     (begin (emit "; promote local stack var allocations\n" os)
-		    (map (lambda (v)
-			   (emit (car v) " = alloca " (cdr v) "\n" os))
-			 (car *impc:ir:ls_var*))))
-	 (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
-         (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length args)))
-         ;; (println 'compout: *impc:ir:sym-name-stack*)         
-	 (emit "\n" os)
-	 (emit body-str os)
-	 
-         ;(emit (impc:ir:compiler code types) os)
-
-	 
-         ;(emit  "ret " (impc:ir:get-type-str rettype) " " (car (impc:ir:gname)) "\n" os)
-         (emit "}" os) 
-         (impc:ir:strip-space os))))
+      ;; first we need to pull evironment values
+      (if (not (null? env))
+          (begin (emit "; setup environment\n" os)
+                 (emit (string-append "%impenv = bitcast i8* %_impenv to "
+                                      (impc:ir:make-struct-str-env env) "*\n") os)
+                 (dotimes (i (length env))
+                   (let ((e (list-ref env i)))
+                     ;; need to strip __sub's
+                     (if (regex:match? (symbol->string (car e)) "__sub$")
+                         (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
+                                       (cdr e))))
+                                        ;(print 'e: e)
+                     (emit (string-append "%" (symbol->string (car e)) "Ptr_ = getelementptr "
+                                          (impc:ir:make-struct-str-env env) "* %impenv, "
+                                          "i32 0, i32 " (number->string i) "\n") os)
+                     (emit (string-append "%" (symbol->string (car e)) "Ptr = load "
+                                          (impc:ir:get-type-str (cdr e)) "** %"
+                                          (symbol->string (car e)) "Ptr_\n") os)))))                       
+      ;; next we pull the function arguments
+      (emit "\n; setup arguments\n" os)          
+      (dotimes (i (length args))
+        (let* ((a (list-ref args i)))
+          (set! *impc:ir:sym-name-stack* (cons (car a) *impc:ir:sym-name-stack*))
+          (if (> allocate-mem? 0)
+              (begin ;; (println 'yes: allocate-mem? 'mem: ast)
+                (cond ((= allocate-mem? 1)
+                       (emit "%dat_" (symbol->string (car a)) " = call i8* @malloc("
+                             *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size (cdr a))) ")\n" os))
+                      ((and (= allocate-mem? 2) (not *WINDOWS_ALLOC_BUG*))
+                       (emit "%dat_" (symbol->string (car a)) " = alloca i8"
+                             ", i64 " (number->string (impc:ir:get-type-size (cdr a)))
+                             ", align 16\n" os))
+                      (else 
+                       (emit "%dat_" (symbol->string (car a)) " = call i8* @llvm_zone_malloc(" 
+                             "%mzone* " (car (impc:ir:gname "zone")) ", i64 " 
+                             (number->string (impc:ir:get-type-size (cdr a))) ")\n" os)))
+                (emit "%" (symbol->string (car a)) "Ptr = bitcast i8* %dat_" (symbol->string (car a)) " to " (impc:ir:get-type-str (cdr a)) "*\n" os))
+              (emit  "%" (symbol->string (car a)) "Ptr = alloca " (impc:ir:get-type-str (cdr a)) "\n" os))
+          (emit (string-append "store " (impc:ir:get-type-str (cdr a)) " %" (symbol->string (car a))
+                               ", " (impc:ir:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)))
+      (emit "\n" os)
+      ;; compile body
+      ;; (println '_compin: *impc:ir:sym-name-stack*)                  
+      (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
+      (define body-str (impc:ir:compiler code types))
+      (define result (impc:ir:gname))
+                                        ;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
+      (if (not (null? (car *impc:ir:ls_var*)))
+          (begin (emit "; promote local stack var allocations\n" os)
+            (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+                           (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+                           os)  
+                 (map (lambda (v)
+                         (if *WINDOWS_ALLOC_BUG*
+                            (begin (emit (impc:ir:gname "lspvar" "i8*") " = call i8* @llvm_zone_malloc("
+                                         "%mzone* " (car (impc:ir:gname "zone")) ", i64 " 
+                                         (number->string (impc:ir:get-type-size (cdr v))) ")\n" os)
+                                    (emit (car v) " = bitcast " (cadr (impc:ir:gname "lspvar")) " " (car (impc:ir:gname "lspvar")) " to " (impc:ir:get-type-str (cdr v)) "*\n" os))
+                            (begin (emit (car v) " = alloca " (cdr v) "\n" os))))
+                      (car *impc:ir:ls_var*))))
+      (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
+      (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length args)))
+      ;; (println 'compout: *impc:ir:sym-name-stack*)         
+      (emit "\n" os)
+      (emit body-str os)
+      (impc:ir:gname "result" (car result) (cadr result))
+      ;;(emit (impc:ir:compiler code types) os)
+      ;;(emit  "ret " (impc:ir:get-type-str rettype) " " (car (impc:ir:gname)) "\n" os)
+      (emit "}" os) 
+      (impc:ir:strip-space os))))
 
 
 ;; (define impc:ir:compile:make-env
@@ -2500,192 +2481,223 @@
 ;;          (impc:ir:strip-space os))))
 
 
-(define impc:ir:compile:make-env
-  (lambda (ast types)
-    (let* ((os (make-string 0))
-	   (lambda-envs '())
-	   (env-zone-tmp '()))
-      (map (lambda (p)
-             (set! *impc:ir:sym-name-stack* (cons (caar p) *impc:ir:sym-name-stack*))
-             ;; (println '__envin: *impc:ir:sym-name-stack*)                   
-             ;; (println 'p2: (cadr p))
-	     (let* ((symstr (symbol->string (caar p)))
-		    (symtype (cdr (assoc-strcmp (caar p) types)))
-		    (value (impc:ir:compiler (cadr p) types symtype)) ; os)
-		    (typestr (cadr (impc:ir:gname)))
-		    (e (impc:ir:gname)))	       
-	       ;; (println 'symstr: symstr 'symtype: symtype)
-	       ;; (println 'typestr: typestr)
-	       (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
-			(impc:ir:number? (cdr (assoc-strcmp (caar p) types)))
-			(impc:ir:number? (impc:ir:get-type-from-str typestr)))
-		   (set! typestr (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))))
-	       ;; type check
-               ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc-strcmp (caar p) types)))
-	       (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
-			  (cdr (assoc-strcmp (caar p) types))))
-	     (impc:compiler:print-type-mismatch-error
-	      (impc:ir:pretty-print-type typestr)
-	      (impc:ir:pretty-print-type (cdr (assoc-strcmp (caar p) types)))
-	      (caar p)))
-					;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
-					;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+;; (define impc:ir:compile:make-env
+;;   (lambda (ast types)
+;;     (let* ((os (make-string 0))
+;; 	   (lambda-envs '())
+;; 	   (env-zone-tmp '()))
+;;       (map (lambda (p)
+;;              (set! *impc:ir:sym-name-stack* (cons (caar p) *impc:ir:sym-name-stack*))
+;;              ;; (println '__envin: *impc:ir:sym-name-stack*)                   
+;;              ;; (println 'p2: (cadr p))
+;; 	     (let* ((symstr (symbol->string (caar p)))
+;; 		    (symtype (cdr (assoc-strcmp (caar p) types)))
+;; 		    (value (impc:ir:compiler (cadr p) types symtype)) ; os)
+;; 		    (typestr (cadr (impc:ir:gname)))
+;; 		    (e (impc:ir:gname)))	       
+;; 	       ;; (println 'symstr: symstr 'symtype: symtype)
+;; 	       ;; (println 'typestr: typestr)
+;; 	       (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
+;; 			(impc:ir:number? (cdr (assoc-strcmp (caar p) types)))
+;; 			(impc:ir:number? (impc:ir:get-type-from-str typestr)))
+;; 		   (set! typestr (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))))
+;; 	       ;; type check
+;;                ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc-strcmp (caar p) types)))
+;; 	       (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
+;; 			  (cdr (assoc-strcmp (caar p) types))))
+;; 	     (impc:compiler:print-type-mismatch-error
+;; 	      (impc:ir:pretty-print-type typestr)
+;; 	      (impc:ir:pretty-print-type (cdr (assoc-strcmp (caar p) types)))
+;; 	      (caar p)))
+;; 					;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
+;; 					;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
 
-	       (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
-	       	     (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-	       	     os)      	 		    
-	       (emit  "\n; let assign value to symbol " symstr "\n" os)
-	       (if (= (cadr ast) 3)
-	       	   (begin (emit "%dat_" symstr " = call i8* @llvm_zone_malloc(" 
-	       			"%mzone* " (car (impc:ir:gname "zone")) ", i64 "
-	       			(number->string (impc:ir:get-type-size (impc:ir:get-type-from-str (cadr e)))) ")\n" os)
-	       		  (emit "%" symstr "Ptr = bitcast i8* %dat_" symstr " to " typestr "*\n" os))
-	       	   (emit "%" symstr "Ptr = alloca " typestr "\n" os))
+;; 	       (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+;; 	       	     (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+;; 	       	     os)      	 		    
+;; 	       (emit  "\n; let assign value to symbol " symstr "\n" os)
+;; 	       (if (= (cadr ast) 3)
+;; 	       	   (begin (emit "%dat_" symstr " = call i8* @llvm_zone_malloc(" 
+;; 	       			"%mzone* " (car (impc:ir:gname "zone")) ", i64 "
+;; 	       			(number->string (impc:ir:get-type-size (impc:ir:get-type-from-str (cadr e)))) ")\n" os)
+;; 	       		  (emit "%" symstr "Ptr = bitcast i8* %dat_" symstr " to " typestr "*\n" os))
+;; 	       	   (emit "%" symstr "Ptr = alloca " typestr "\n" os))
 
-	       (if (pair? value)
-		   (emit (car value) os)
-		   (emit value os))
+;; 	       (if (pair? value)
+;; 		   (emit (car value) os)
+;; 		   (emit value os))
 	       
-	       ;; this bitcast should be the same type on both sides                    
-	       (emit "\n; let value assignment\n" os)
-	       (emit (string-append "%" symstr " = select i1 true, " typestr " " 
-				    (if (and (number? (cadr p))
-					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
-					(llvm:convert-float (car e)) ;(impc:ir:gname)))
-					(car e)) ;(impc:ir:gname)))
-				    ", " typestr " "
-				    (if (and (number? (cadr p))
-					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
-					(llvm:convert-float (car e)) ; (impc:ir:gname)))
-					(car e)) ;(impc:ir:gname)))
-				    "\n") os)
-	       (emit (string-append "store " typestr " %" symstr ", " 
-				    typestr "* %" symstr "Ptr\n\n") os)
-	       (if (pair? value)
-		   (set! lambda-envs (cons (cdr value) lambda-envs)))))
-;		   (emit (cdr value) os))))                 
-	   (caddr ast))
+;; 	       ;; this bitcast should be the same type on both sides                    
+;; 	       (emit "\n; let value assignment\n" os)
+;; 	       (emit (string-append "%" symstr " = select i1 true, " typestr " " 
+;; 				    (if (and (number? (cadr p))
+;; 					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
+;; 					(llvm:convert-float (car e)) ;(impc:ir:gname)))
+;; 					(car e)) ;(impc:ir:gname)))
+;; 				    ", " typestr " "
+;; 				    (if (and (number? (cadr p))
+;; 					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
+;; 					(llvm:convert-float (car e)) ; (impc:ir:gname)))
+;; 					(car e)) ;(impc:ir:gname)))
+;; 				    "\n") os)
+;; 	       (emit (string-append "store " typestr " %" symstr ", " 
+;; 				    typestr "* %" symstr "Ptr\n\n") os)
+;; 	       (if (pair? value)
+;; 		   (set! lambda-envs (cons (cdr value) lambda-envs)))))
+;; ;		   (emit (cdr value) os))))                 
+;; 	   (caddr ast))
 
-;      (set! *impc:ir:sym-name-stack* (cdr *impc:ir:sym-name-stack*))
+;; ;      (set! *impc:ir:sym-name-stack* (cdr *impc:ir:sym-name-stack*))
       
-      ;; fill in and lambda environments now
-      (map (lambda (a)
-	     (emit a os))
-	   lambda-envs)
+;;       ;; fill in and lambda environments now
+;;       (map (lambda (a)
+;; 	     (emit a os))
+;; 	   lambda-envs)
       
-      ;; compile body
-      (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
-      (define envbody-str (impc:ir:compiler (cdddr ast) types))
-					;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
-      (if (not (null? (car *impc:ir:ls_var*)))
-	  (begin (emit "; promote local stack var allocations\n" os)
-		 (map (lambda (v)
-			(emit (car v) " = alloca " (cdr v) "\n" os))
-		      (car *impc:ir:ls_var*))))
-      (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
-      (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length (caddr ast))))
-      ;; (println '_envout: *impc:ir:sym-name-stack*)      
-      (emit envbody-str os)
-      ;;(emit (impc:ir:compiler (cdddr ast) types) os)
-      (impc:ir:strip-space os))))
+;;       ;; compile body
+;;       (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
+;;       (define envbody-str (impc:ir:compiler (cdddr ast) types))
+;; 					;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
+;;       (if (not (null? (car *impc:ir:ls_var*)))
+;; 	  (begin (emit "; promote local stack var allocations\n" os)
+;; 		 (map (lambda (v)
+;; 			(emit (car v) " = alloca " (cdr v) "\n" os))
+;; 		      (car *impc:ir:ls_var*))))
+;;       (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
+;;       (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length (caddr ast))))
+;;       ;; (println '_envout: *impc:ir:sym-name-stack*)      
+;;       (emit envbody-str os)
+;;       ;;(emit (impc:ir:compiler (cdddr ast) types) os)
+;;       (impc:ir:strip-space os))))
 
 
 (define impc:ir:compile:make-env
   (lambda (ast types)
     ;; (println 'ast: ast 'types types)
     (let* ((os (make-string 0))
-	   (lambda-envs '())
-	   (env-zone-tmp '())
-	   (res
-	    (map (lambda (p)
-		   (set! *impc:ir:sym-name-stack* (cons (caar p) *impc:ir:sym-name-stack*))
-		   ;; (println '__envin: *impc:ir:sym-name-stack*)                   
-		   ;; (println 'p2: (cadr p))
-		   (let* ((symstr (symbol->string (caar p)))
-			  (symtype (cdr (assoc-strcmp (caar p) types)))
-			  (value (impc:ir:compiler (cadr p) types symtype))
-			  (typestr (cadr (impc:ir:gname)))
-			  (e (impc:ir:gname)))	       
-		     ;; (println 'symstr: symstr 'symtype: symtype)
-		     ;; (println 'typestr: typestr)
-		     (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
-			      (impc:ir:number? (cdr (assoc-strcmp (caar p) types)))
-			      (impc:ir:number? (impc:ir:get-type-from-str typestr)))
-			 (set! typestr (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))))
-		     ;; type check
-		     ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc-strcmp (caar p) types)))
-		     (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
-				      (cdr (assoc-strcmp (caar p) types))))
-			 (impc:compiler:print-type-mismatch-error
-			  (impc:ir:pretty-print-type typestr)
-			  (impc:ir:pretty-print-type (cdr (assoc-strcmp (caar p) types)))
-			  (caar p)))
-					;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
-					;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+           (lambda-envs '())
+           (result '())
+           (env-zone-tmp '())
+           (res
+            (map (lambda (p)
+                   (set! *impc:ir:sym-name-stack* (cons (caar p) *impc:ir:sym-name-stack*))
+                   ;; (println '__envin: *impc:ir:sym-name-stack*)                   
+                   ;; (println 'p2: (cadr p))
+                   (let* ((symstr (symbol->string (caar p)))
+                          (symtype (cdr (assoc-strcmp (caar p) types)))
+                          (value (impc:ir:compiler (cadr p) types symtype))
+                          (typestr (cadr (impc:ir:gname)))
+                          (e (impc:ir:gname)))	       
+                     ;; (println 'symstr: symstr 'symtype: symtype)
+                     ;; (println 'typestr: typestr)
+                     (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
+                              (impc:ir:number? (cdr (assoc-strcmp (caar p) types)))
+                              (impc:ir:number? (impc:ir:get-type-from-str typestr)))
+                         (set! typestr (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))))
+                     ;; type check
+                     ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc-strcmp (caar p) types)))
+                     (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
+                                      (cdr (assoc-strcmp (caar p) types))))
+                         (impc:compiler:print-type-mismatch-error
+                          (impc:ir:pretty-print-type typestr)
+                          (impc:ir:pretty-print-type (cdr (assoc-strcmp (caar p) types)))
+                          (caar p)))
+                                        ;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
+                                        ;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+                                        ;(emit "call ccc void @llvm_print_i32(i32 111)\n" os)
+                     (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+                           (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+                           os)      	 		    
+                     (emit  "\n; let assign value to symbol " symstr "\n" os)
+                                        ;; (emit "call ccc void @llvm_print_i32(i32 222)\n" os)
 
-		     (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
-			   (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-			   os)      	 		    
-		     (emit  "\n; let assign value to symbol " symstr "\n" os)
-		     (if (= (cadr ast) 3)
-			 (begin (emit "%dat_" symstr " = call i8* @llvm_zone_malloc(" 
-				      "%mzone* " (car (impc:ir:gname "zone")) ", i64 "
-				      (number->string (impc:ir:get-type-size (impc:ir:get-type-from-str (cadr e)))) ")\n" os)
-				(emit "%" symstr "Ptr = bitcast i8* %dat_" symstr " to " typestr "*\n" os))
-			 (emit "%" symstr "Ptr = alloca " typestr "\n" os))
+                     (if (or (= (cadr ast) 3)
+                             *WINDOWS_ALLOC_BUG*)
+                         (begin 
+                                        ;(emit "call ccc void @llvm_print_i32(i32 2222)\n" os)              
+                           (emit "%dat_" symstr " = call i8* @llvm_zone_malloc(" 
+                                 "%mzone* " (car (impc:ir:gname "zone")) ", i64 "
+                                 (number->string (impc:ir:get-type-size (impc:ir:get-type-from-str (cadr e)))) ")\n" os)
+                                        ;(emit "call ccc void @llvm_print_i32(i32 22222)\n" os)
 
-		     ;; (if (pair? value)
-		     ;; 	 (emit (car value) os)
-		     ;; 	 (emit value os))
-		     (list symstr typestr value e)))
-		 (caddr ast))))
+                           (emit "%" symstr "Ptr = bitcast i8* %dat_" symstr " to " typestr "*\n" os))
+                         (begin
+
+                                        ;(emit "%dat_" symstr " = call i8* @win_alloc(i64 "
+                                        ;      (number->string (impc:ir:get-type-size (impc:ir:get-type-from-str (cadr e)))) ")\n" os)
+                                        ;(emit "%" symstr "Ptr = bitcast i8* %dat_" symstr "Ptr to " typestr "*\n" os)
+                                        ; (println 'typestr: typestr)
+                           (emit "%" symstr "Ptr = alloca " typestr "\n" os)
+                           ))
+
+                                        ;(emit "call ccc void @llvm_print_i32(i32 333)\n" os)
+                     ;; (if (pair? value)
+                     ;; 	 (emit (car value) os)
+                     ;; 	 (emit value os))
+                     (list symstr typestr value e)))
+                 (caddr ast))))
+                                        ;(emit "call ccc void @llvm_print_i32(i32 444)\n" os)
       ;; (println '____________A> ast)      
       (map (lambda (p r)
-	     (let ((symstr (car r))
-		   (typestr (cadr r))
-		   (value (caddr r))
-		   (e (cadddr r)))
-	       (if (pair? value)
-		   (emit (car value) os)
-		   (emit value os))
-	       
-	       ;; this bitcast should be the same type on both sides                    
-	       (emit "\n; let value assignment\n" os)
-	       (emit (string-append "%" symstr " = select i1 true, " typestr " " 
-				    (if (and (number? (cadr p))
-					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
-					(llvm:convert-float (car e)) ;(impc:ir:gname)))
-					(car e)) ;(impc:ir:gname)))
-				    ", " typestr " "
-				    (if (and (number? (cadr p))
-					     (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
-					(llvm:convert-float (car e)) ; (impc:ir:gname)))
-					(car e)) ;(impc:ir:gname)))
-				    "\n") os)
-	       (emit (string-append "store " typestr " %" symstr ", " 
-				    typestr "* %" symstr "Ptr\n\n") os)
-	       (if (pair? value)
-		   (set! lambda-envs (cons (cdr value) lambda-envs)))))
-	   (caddr ast) res)
+             (let ((symstr (car r))
+                   (typestr (cadr r))
+                   (value (caddr r))
+                   (e (cadddr r)))
+               (if (pair? value)
+                   (emit (car value) os)
+                   (emit value os))
+               
+               ;; this bitcast should be the same type on both sides                    
+               (emit "\n; let value assignment\n" os)
+                                        ; (emit "call ccc void @llvm_print_i32(i32 555)\n" os)
+
+               (emit (string-append "%" symstr " = select i1 true, " typestr " " 
+                                    (if (and (number? (cadr p))
+                                             (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
+                                        (llvm:convert-float (car e)) ;(impc:ir:gname)))
+                                        (car e)) ;(impc:ir:gname)))
+                                    ", " typestr " "
+                                    (if (and (number? (cadr p))
+                                             (= *impc:ir:fp32* (impc:ir:get-type-from-str typestr)))
+                                        (llvm:convert-float (car e)) ; (impc:ir:gname)))
+                                        (car e)) ;(impc:ir:gname)))
+                                    "\n") os)
+               (emit (string-append "store " typestr " %" symstr ", " 
+                                    typestr "* %" symstr "Ptr\n\n") os)
+               (if (pair? value)
+                   (set! lambda-envs (cons (cdr value) lambda-envs)))))
+           (caddr ast) res)
       
       ;; fill in and lambda environments now
       (map (lambda (a)
-	     (emit a os))
-	   lambda-envs)
+             (emit a os))
+           lambda-envs)
+                                        ; (emit "call ccc void @llvm_print_i32(i32 999)\n" os)
       ;; (println '____________B> ast)            
       ;; compile body
       (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
       (define envbody-str (impc:ir:compiler (cdddr ast) types))
-					;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
+      (define result (impc:ir:gname))
+                                        ;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
       (if (not (null? (car *impc:ir:ls_var*)))
-	  (begin (emit "; promote local stack var allocations\n" os)
-		 (map (lambda (v)
-			(emit (car v) " = alloca " (cdr v) "\n" os))
-		      (car *impc:ir:ls_var*))))
+          (begin (emit "; promote local stack var allocations\n" os)
+            (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+                           (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+                           os)  
+                 (map (lambda (v)   
+                        (if *WINDOWS_ALLOC_BUG*
+                            (begin
+                               (emit (impc:ir:gname "lspvar" "i8*") " = call i8* @llvm_zone_malloc("
+                                    "%mzone* " (car (impc:ir:gname "zone")) ", i64 " 
+                                   (number->string (impc:ir:get-type-size (cdr v))) ")\n" os)
+                                (emit (car v) " = bitcast " (cadr (impc:ir:gname "lspvar")) " " (car (impc:ir:gname "lspvar")) " to " (impc:ir:get-type-str (cdr v)) "*\n" os))         
+                            (begin (emit (car v) " = alloca " (cdr v) "\n" os))))
+                      (car *impc:ir:ls_var*))))
       (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
       (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length (caddr ast))))
-      ;; (println '_envout: ast) ;;*impc:ir:sym-name-stack*)      
+      ;; (println '_envout: ast) ;;*impc:ir:sym-name-stack*)     
       (emit envbody-str os)
+      (impc:ir:gname "result" (car result) (cadr result))
       ;;(emit (impc:ir:compiler (cdddr ast) types) os)
       (impc:ir:strip-space os))))
 
@@ -2802,87 +2814,88 @@
 
 (define impc:ir:compiler:closure-ref
   (lambda (ast types . hint?)
-      ;; arg 1 must be a closure
-      ;; arg 2 must be a string
-      ;; arg 3 MAY be a type string or NULL
-      (let* ((os (make-string 0))
-	     (num (number->string (llvm:count++)))
-             (closure-str (if (and (symbol? (cadr ast))
-                                   (llvm:get-function (symbol->string (cadr ast))))
-                              (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
-                              (impc:ir:compiler (cadr ast) types)))
-             (closure (impc:ir:gname))	 
-	     (type-str (impc:ir:compiler (if (null? (cadddr ast))
-					     (if (null? hint?)
-						 (print-error 'Compiler 'Error: 'could 'not 'discern 'ref 'type 'for
-							      (string-append (symbol->string (cadr ast)) "." (caddr ast))
-							      'please 'provide 'explicit 'type 'i.e. '(f.name:<type>))
-						 (impc:ir:get-type-str (car hint?)))
-					     (cadddr ast))
-					 types))
-	     (type (impc:ir:gname))
-	     (valtype (if (null? (cadddr ast)) (impc:ir:get-type-str (car hint?)) (cadddr ast)))
-             (name-str (impc:ir:compiler (caddr ast) types))
-             (name (impc:ir:gname)))
-         (emit "\n; closure ref \n" os)
-         (emit closure-str os)
-         (emit name-str os)
-         (emit type-str os)     
+    ;; arg 1 must be a closure
+    ;; arg 2 must be a string
+    ;; arg 3 MAY be a type string or NULL
+    (let* ((os (make-string 0))
+           (num (number->string (llvm:count++)))
+           (closure-str (if (and (symbol? (cadr ast))
+                                 (llvm:get-function (symbol->string (cadr ast))))
+                            (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
+                            (impc:ir:compiler (cadr ast) types)))
+           (closure (impc:ir:gname))	 
+           (type-str (impc:ir:compiler (if (null? (cadddr ast))
+                                           (if (null? hint?)
+                                               (print-error 'Compiler 'Error: 'could 'not 'discern 'ref 'type 'for
+                                                            (string-append (symbol->string (cadr ast)) "." (caddr ast))
+                                                            'please 'provide 'explicit 'type 'i.e. '(f.name:<type>))
+                                               (impc:ir:get-type-str (car hint?)))
+                                           (cadddr ast))
+                                       types))
+           (type (impc:ir:gname))
+           (valtype (if (null? (cadddr ast)) (impc:ir:get-type-str (car hint?)) (cadddr ast)))
+           (name-str (impc:ir:compiler (caddr ast) types))
+           (name (impc:ir:gname)))
+      (emit "\n; closure ref \n" os)
+      ;; (emit "call ccc void @llvm_print_i32(i32 123)\n" os)
+      (emit closure-str os)
+      (emit name-str os)
+      (emit type-str os)
 
-	 ;; first deref closure
-	 (emit (impc:ir:gname "closure" (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr closure)))))
-	       " = load " (cadr closure) " " (car closure) "\n" os)
-	 (set! closure (impc:ir:gname "closure"))
+      ;; first deref closure
+      (emit (impc:ir:gname "closure" (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr closure)))))
+            " = load " (cadr closure) " " (car closure) "\n" os)
+      (set! closure (impc:ir:gname "closure"))
 
-	 ;; get address table    
-         (emit (string-append (impc:ir:gname "tablePtr" (cadr closure)) " = getelementptr "
-                                 (cadr closure) " " (car closure) ", i32 0, i32 0\n") os)         
-         (emit (string-append (impc:ir:gname "tmp" "%clsvar**") " = bitcast i8** " 
-                                 (car (impc:ir:gname 1)) " to %clsvar**\n") os)
-         (emit (string-append (impc:ir:gname "table" "%clsvar*")
-                                 " = load %clsvar** " (car (impc:ir:gname 1)) "\n") os)
-         (emit (string-append (impc:ir:gname "ePtr" "i8**") " = getelementptr "
-                                 (cadr closure) " " (car closure) ", i32 0, i32 1\n") os)
+      ;; get address table    
+      (emit (string-append (impc:ir:gname "tablePtr" (cadr closure)) " = getelementptr "
+                           (cadr closure) " " (car closure) ", i32 0, i32 0\n") os)         
+      (emit (string-append (impc:ir:gname "tmp" "%clsvar**") " = bitcast i8** " 
+                           (car (impc:ir:gname 1)) " to %clsvar**\n") os)
+      (emit (string-append (impc:ir:gname "table" "%clsvar*")
+                           " = load %clsvar** " (car (impc:ir:gname 1)) "\n") os)
+      (emit (string-append (impc:ir:gname "ePtr" "i8**") " = getelementptr "
+                           (cadr closure) " " (car closure) ", i32 0, i32 1\n") os)
 
-	 ;; get closure environment
-         (define ePtr (impc:ir:gname))         
-         (emit (impc:ir:gname "e" "i8*") " = load i8** " (car (impc:ir:gname "ePtr")) "\n" os)
-         (define e (impc:ir:gname))
-         (emit (impc:ir:gname "offset" "i32") " = call i32 @get_address_offset(i8* "
-	       (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
-         (define offset (impc:ir:gname))
+      ;; get closure environment
+      (define ePtr (impc:ir:gname))         
+      (emit (impc:ir:gname "e" "i8*") " = load i8** " (car (impc:ir:gname "ePtr")) "\n" os)
+      (define e (impc:ir:gname))
+      (emit (impc:ir:gname "offset" "i32") " = call i32 @get_address_offset(i8* "
+            (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
+      (define offset (impc:ir:gname))
+
+      (emit (impc:ir:gname "valPtr" "i8*") " = getelementptr " 
+            (cadr e) " " (car e) ", i32 " (car offset) "\n" os)
+      (emit  (impc:ir:gname "val" "i8**") " = bitcast i8* " (car (impc:ir:gname 1)) " to i8**\n" os)
+      (emit  (impc:ir:gname "val" "i8*") " = load i8** " (car (impc:ir:gname 1)) "\n" os)
+      ;; (emit "call ccc void @llvm_print_pointer(i8* " (car (impc:ir:gname)) ")\n" os)      
+      (emit (impc:ir:gname "val" (string-append valtype "*")) " = bitcast i8* " (car (impc:ir:gname 1)) " to "
+            (string-append valtype "*\n") os)
 
 
-         (emit (impc:ir:gname "valPtr" "i8*") " = getelementptr " 
-	       (cadr e) " " (car e) ", i32 " (car offset) "\n" os)
-         (emit  (impc:ir:gname "val" "i8**") " = bitcast i8* " (car (impc:ir:gname 1)) " to i8**\n" os)
-         (emit  (impc:ir:gname "val" "i8*") " = load i8** " (car (impc:ir:gname 1)) "\n" os)
-         (emit (impc:ir:gname "val" (string-append valtype "*")) " = bitcast i8* " (car (impc:ir:gname 1)) " to "
-	       (string-append valtype "*\n") os)
+      ;; type check
+      (emit (impc:ir:gname "check" "i1") " = call i1 @check_address_type(i8* " (car name) ", %clsvar* " (car (impc:ir:gname "table")) ", i8* " (car type) ")\n" os)
+      (emit  "br i1 " (car (impc:ir:gname "check")) ", label %then" num ", label %else" num "\n" os)        
 
-	 ;; type check
-	 (emit (impc:ir:gname "check" "i1") " = call i1 @check_address_type(i8* " (car name) ", %clsvar* " (car (impc:ir:gname "table")) ", i8* " (car type) ")\n" os)
-         (emit  "br i1 " (car (impc:ir:gname "check")) ", label %then" num ", label %else" num "\n" os)        
+      ;; do then
+      (emit "\nthen" num ":\n" os)
+      (emit  (impc:ir:gname "then_result" valtype) " = load " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)  
+      (emit  "br label %cont" num "\n" os)
+      
+      ;; do else
+      (emit "\nelse" num ":\n" os)
+      (emit  (impc:ir:gname "else_result" valtype) " = load " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)
+      (emit "br label %cont" num "\n" os)
 
-	 ;; do then
-	 (emit "\nthen" num ":\n" os)
-         (emit  (impc:ir:gname "then_result" valtype) " = load " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)  
-         (emit  "br label %cont" num "\n" os)
-	 
-	 ;; do else
-	 (emit "\nelse" num ":\n" os)
-         (emit  (impc:ir:gname "else_result" valtype) " = load " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) "\n" os)
-	 (emit "br label %cont" num "\n" os)
-
-	 ;; continue
-	 (emit "\ncont" num ":\n" os)
-	 ;(impc:ir:gname "val" (car val) (cadr val))
-
-	 (emit (impc:ir:gname "result" valtype) " = phi " valtype
-	       " [ " (car (impc:ir:gname "then_result")) ", %then" num " ], "
-	       " [ " (car (impc:ir:gname "else_result")) ", %else" num " ]\n" os)	       
-
-         (impc:ir:strip-space os))))
+      ;; continue
+      (emit "\ncont" num ":\n" os)
+                                        ;(impc:ir:gname "val" (car val) (cadr val))
+      (emit (impc:ir:gname "result" valtype) " = phi " valtype
+            " [ " (car (impc:ir:gname "then_result")) ", %then" num " ], "
+            " [ " (car (impc:ir:gname "else_result")) ", %else" num " ]\n" os)	       
+      ;;(emit "call ccc void @llvm_print_i32(i32 1234567)\n" os)
+      (impc:ir:strip-space os))))
 
 
 (define impc:ir:compiler:closure-set
@@ -3026,11 +3039,19 @@
 (define impc:ir:compiler:pref
   (lambda (ast types)
     (let* ((os (make-string 0))
-	   (val-str (impc:ir:compiler (cadr ast) types))
-	   (val (impc:ir:gname)))
+           (val-str (impc:ir:compiler (cadr ast) types))
+           (val (impc:ir:gname)))
       (emit val-str os)
-      (emit (impc:ir:gname "val" (string-append (cadr val) "*")) 
-	    " = alloca " (cadr val) "\n" os)
+      (if *WINDOWS_ALLOC_BUG*
+          (begin
+            (emit (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
+                 (number->string (impc:ir:get-type-size "i8*")) ")\n" os)
+            (emit (impc:ir:gname "val" (string-append (cadr val) "*"))
+                 " = bitcast i8* " (car (impc:ir:gname "dat"))
+                " to " (cadr val) "*\n" os))
+          (begin 
+             (emit (impc:ir:gname "val" (string-append (cadr val) "*")) 
+                 " = alloca " (cadr val) "\n" os)))
       (emit "store " (cadr val) " " (car val) ", " (cadr val) "* " (car (impc:ir:gname)))
       (impc:ir:strip-space os))))
 
@@ -3279,70 +3300,84 @@
 
 
 (define impc:ir:compile:apply-closure
-   (lambda (ast types ftype-provided?)
+  (lambda (ast types ftype-provided?)
     ;; (println 'apply-closure ast types ftype-provided? (car *impc:ir:sym-name-stack*))
-      (let* ((functiontype (if ftype-provided? 
-                               (cdr (impc:ir:get-type-from-str (cadar ast)))
-                               (if (and (assoc-strcmp (car ast) types)
-                                        (impc:ir:closure? (cdr (assoc-strcmp (car ast) types)))
-                                        (= 2 (impc:ir:get-ptr-depth (cdr (assoc-strcmp (car ast) types)))))
-                                   (cddr (assoc-strcmp (car ast) types))
-				   (if (impc:ir:closure? (cdr (assoc-strcmp (car ast) types)))
-				       (impc:compiler:print-bad-type-error (car ast) "remember that closures must be pointers")
-				       (impc:compiler:print-bad-type-error (car ast) "bad type for closure")))))
-             ;;(recursive-call (if (eq? (car ast) (car *impc:ir:sym-name-stack*)) #t #f))
-             (recursive-call (if (member (car ast) *impc:ir:sym-name-stack*) #t #f))             
-             (os (make-string 0))
-             (ftype (impc:ir:make-function-str functiontype #t))
-             (clstype (string-append "<{i8*, i8*, " ftype "*}>*"))
-             (vars (map (lambda (arg hint)
-                           (emit (impc:ir:compiler arg types hint) os)
-                           (impc:ir:gname))
-                        (cdr ast)
-                        (cdr functiontype))))
-        ;;(println 'recursive-call! recursive-call (car *impc:ir:sym-name-stack*) (car ast))
-	(emit "\n; apply closure \n" os)
-	(define v '())
-	(if ftype-provided?
-	    (begin (emit (impc:ir:gname "val" clstype)
-			 " = load " clstype "* " (caar ast) "\n" os)
-		   (set! v (car (impc:ir:gname "val")))) 
-	    (begin (emit (impc:ir:gname "val" (string-append clstype "*"))
-			 " = load " clstype "** %"
-			 (symbol->string (car ast)) "Ptr\n" os)
-		   (emit (impc:ir:gname "val" clstype)
-			 " = load " clstype "* " (car (impc:ir:gname 1)) "\n" os)
-		   (set! v (car (impc:ir:gname "val")))))
-         (emit (string-append (impc:ir:gname "fPtr" clstype)
-                                 " = getelementptr " clstype " " v ", i32 0, i32 2\n") os)
-         (emit (string-append (impc:ir:gname "ePtr" clstype) " = getelementptr "
-                                 clstype " " v ", i32 0, i32 1\n") os)
-         (emit (string-append (impc:ir:gname "f" (string-append ftype "*"))
-                                 " = load " ftype "** " (car (impc:ir:gname "fPtr")) "\n") os)
-         (emit (string-append (impc:ir:gname "e" "i8*")
-                                 " = load i8** " (car (impc:ir:gname "ePtr")) "\n") os)
+    (let* ((functiontype (if ftype-provided? 
+                             (cdr (impc:ir:get-type-from-str (cadar ast)))
+                             (if (and (assoc-strcmp (car ast) types)
+                                      (impc:ir:closure? (cdr (assoc-strcmp (car ast) types)))
+                                      (= 2 (impc:ir:get-ptr-depth (cdr (assoc-strcmp (car ast) types)))))
+                                 (cddr (assoc-strcmp (car ast) types))
+                                 (if (impc:ir:closure? (cdr (assoc-strcmp (car ast) types)))
+                                     (impc:compiler:print-bad-type-error (car ast) "remember that closures must be pointers")
+                                     (impc:compiler:print-bad-type-error (car ast) "bad type for closure")))))
+           ;;(recursive-call (if (eq? (car ast) (car *impc:ir:sym-name-stack*)) #t #f))
+           (recursive-call (if (member (car ast) *impc:ir:sym-name-stack*) #t #f))             
+           (os (make-string 0))
+           (ftype (impc:ir:make-function-str functiontype #t))
+           (clstype (string-append "<{i8*, i8*, " ftype "*}>*"))
+           (vars (map (lambda (arg hint)
+                        (emit (impc:ir:compiler arg types hint) os)
+                        (impc:ir:gname))
+                      (cdr ast)
+                      (cdr functiontype))))
+      ;;(println 'recursive-call! recursive-call (car *impc:ir:sym-name-stack*) (car ast))
+      (emit "\n; apply closure \n" os)
+      (define v '())
+      (if ftype-provided?
+          (begin (emit (impc:ir:gname "val" clstype)
+                       " = load " clstype "* " (caar ast) "\n" os)
+                 (set! v (car (impc:ir:gname "val")))) 
+          (begin (emit (impc:ir:gname "vval" (string-append clstype "*"))
+                       " = load " clstype "** %"
+                       (symbol->string (car ast)) "Ptr\n" os)
+                 (emit (impc:ir:gname "val" clstype)
+                       " = load " clstype "* " (car (impc:ir:gname 1)) "\n" os)
+                 (set! v (car (impc:ir:gname "val")))))
+      (emit (string-append (impc:ir:gname "fPtr" clstype)
+                           " = getelementptr " clstype " " v ", i32 0, i32 2\n") os)
+      (emit (string-append (impc:ir:gname "ePtr" clstype) " = getelementptr "
+                           clstype " " v ", i32 0, i32 1\n") os)
+      (emit (string-append (impc:ir:gname "f" (string-append ftype "*"))
+                           " = load " ftype "** " (car (impc:ir:gname "fPtr")) "\n") os)
 
-	 (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
-	       (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-	       os)      	 	 
-	 ;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)	 
-         (emit  (impc:ir:gname "z" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
-         (define zone (car (impc:ir:gname)))
-         (emit (string-append (if (impc:ir:void? (car functiontype))
-                                     (begin (impc:ir:gname "result" "void") "")
-                                     (string-append (impc:ir:gname "result" (impc:ir:get-type-str (car functiontype))) " = "))
-                                 (if recursive-call "tail " "")
-                                 ;;"tail call fastcc "
-                                 "call fastcc "                              
-                                 (impc:ir:get-type-str (car functiontype)) " "
-                                 (car (impc:ir:gname "f")) "(i8* " zone ", i8* "
-                                 (car (impc:ir:gname "e")) 
-                                 (apply string-append (map (lambda (var)
-                                                              (string-append ", " (cadr var) " " (car var)))
-                                                           vars))
-                                 ")\n") os)
-         ;;(println 'os: os)
-         (impc:ir:strip-space os))))
+      ;; (emit "call ccc void @llvm_print_i32(i32 88888888)\n" os)      
+      ;; (if (not ftype-provided?)
+      ;;     (begin
+      ;;       (emit (impc:ir:gname "kkkkk" "i8*") " = bitcast " clstype "** %" (symbol->string (car ast)) "Ptr to i8*\n" os)
+      ;;       (emit "call ccc void @llvm_print_pointer(i8* " (car (impc:ir:gname)) ")\n" os)         
+      ;;       (emit (impc:ir:gname "kkkk" "i8*") " = bitcast " (cadr (impc:ir:gname "vval")) " " (car (impc:ir:gname "vval")) " to i8*\n" os)
+      ;;       (emit "call ccc void @llvm_print_pointer(i8* " (car (impc:ir:gname)) ")\n" os))
+      ;;     (begin
+      ;;       (emit (impc:ir:gname "kkkkk" "i8*") " = bitcast " clstype "* " (caar ast) " to i8*\n" os)
+      ;;       (emit "call ccc void @llvm_print_pointer(i8* " (car (impc:ir:gname)) ")\n" os)))
+      ;;(emit (impc:ir:gname "kkk" "i8*") " = bitcast " (cadr (impc:ir:gname "val")) " " (car (impc:ir:gname "val")) " to i8*\n" os)
+      ;;(emit "call ccc void @llvm_print_pointer(i8* " (car (impc:ir:gname)) ")\n" os)
+      ;;(emit "call ccc void @llvm_print_i32(i32 99999999)\n" os)
+      (emit (string-append (impc:ir:gname "e" "i8*")
+                           " = load i8** " (car (impc:ir:gname "ePtr")) "\n") os)
+
+      (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+            (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+            os)      	 	 
+                                        ;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)	 
+      (emit  (impc:ir:gname "z" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
+      (define zone (car (impc:ir:gname)))
+      (emit (string-append (if (impc:ir:void? (car functiontype))
+                               (begin (impc:ir:gname "result" "void") "")
+                               (string-append (impc:ir:gname "result" (impc:ir:get-type-str (car functiontype))) " = "))
+                           (if recursive-call "tail " "")
+                           ;;"tail call fastcc "
+                           "call fastcc "                              
+                           (impc:ir:get-type-str (car functiontype)) " "
+                           (car (impc:ir:gname "f")) "(i8* " zone ", i8* "
+                           (car (impc:ir:gname "e")) 
+                           (apply string-append (map (lambda (var)
+                                                       (string-append ", " (cadr var) " " (car var)))
+                                                     vars))
+                           ")\n") os)
+      ;;(println 'os: os)
+      (impc:ir:strip-space os))))
 
 
 (define impc:ir:compiler:loop
@@ -3461,7 +3496,7 @@
 	 	   "fcmp ult ")
 	       (cadr num) " " (car num) ", "
 	       (if (impc:ir:fixed-point? (cadr num))
-	 	   "1"
+	 	   "1\n"
 	 	   "1.0\n") os)
 	 
          (emit  "br i1 " (car (impc:ir:gname)) ", label " after ", label " loop "\n" os)
@@ -4170,8 +4205,7 @@
     (let* ((os (make-string 0)))
       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
 	     (idx (impc:ir:gname))
-	     (t (impc:ir:get-type-str (impc:ir:pointer-- (car hint?))))) ;(impc:ir:convert-from-pretty-types (car hint?)))))	     	     
-	     ;(t (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (caddr ast)))))
+	     (t (impc:ir:get-type-str (impc:ir:pointer-- (car hint?))))) 	     	     
 	(emit idx-str os)
 	(emit (string-append (impc:ir:gname "dat" (string-append t "*")) " = alloca " t ", " (cadr idx) " " (car idx) ", align 16\n") os)
 	(impc:ir:strip-space os)))))
@@ -4187,26 +4221,30 @@
 
 (define impc:ir:compiler:stack-alloc
   (lambda (ast types hint?)
-    (if (= (length ast) 1)
-	(impc:ir:compiler:stack-alloc-without-size ast types hint?)
-	(impc:ir:compiler:stack-alloc-with-size ast types hint?))))
+    (if *WINDOWS_ALLOC_BUG*
+        (if (= (length ast) 1)   
+            (impc:ir:compiler:zone-alloc-without-size ast types hint?)
+            (impc:ir:compiler:zone-alloc-with-size ast types hint?))
+        (if (= (length ast) 1)
+          	(impc:ir:compiler:stack-alloc-without-size ast types hint?)
+      	     (impc:ir:compiler:stack-alloc-with-size ast types hint?)))))
 
 
 
 (define impc:ir:compiler:make-tuple
-   (lambda (ast types)
-      (let* ((os (make-string 0)))
-         (let* ((t (cons *impc:ir:tuple* (impc:ir:convert-from-pretty-types (cdr ast)))))
-	   (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
-		 (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-	       os)      	 	   
-	    ;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
-            (emit (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
-		  (number->string (impc:ir:get-type-size t)) ")\n" os)
-            (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
-		  " = bitcast i8* " (car (impc:ir:gname "dat")) 
-		  " to " (impc:ir:get-type-str t) "*\n" os)
-            (impc:ir:strip-space os)))))
+  (lambda (ast types)
+    (let* ((os (make-string 0)))
+      (let* ((t (cons *impc:ir:tuple* (impc:ir:convert-from-pretty-types (cdr ast)))))
+        (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
+              (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+              os)      	 	   
+        ;;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
+        (emit (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
+              (number->string (impc:ir:get-type-size t)) ")\n" os)
+        (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
+              " = bitcast i8* " (car (impc:ir:gname "dat")) 
+              " to " (impc:ir:get-type-str t) "*\n" os)
+        (impc:ir:strip-space os)))))
 
 
 (define impc:ir:compiler:tuple-ref
@@ -4978,6 +5016,7 @@
       (let* ((os (make-string 0))
              (elset (if (null? (cdddr ast)) #f #t))  
              (num (number->string (llvm:count++))))
+         ;(println 'ifretast: ast)
          ;; first do compare expression
          (emit (impc:ir:compiler (cadr ast) types) os)
          ;; then break on compare
@@ -4995,6 +5034,7 @@
                     (emit (impc:ir:compiler (cadddr ast) types) os)))
          ;; finally consolidate return type of if statement
          (define b (if elset (impc:ir:gname) #f))
+
          (if (and elset 
                   (not (equal? (impc:ir:get-type-from-str (cadr a)) 
                                (impc:ir:get-type-from-str (cadr b)))))                               
@@ -5010,6 +5050,7 @@
                             (null? (cadddr ast)))
                         #f #t))  
              (num (number->string (llvm:count++))))
+      ;;(println 'ifast: ast)
          ;; first do compare expression
          (emit (impc:ir:compiler (cadr ast) types) os)
          ;; then break on compare
@@ -5041,6 +5082,7 @@
          
          ;; finally consolidate return type of if statement
          (define b (if elset (impc:ir:gname) #f))
+                
          (if (and elset 
                   (not (equal? (impc:ir:get-type-from-str (cadr a)) 
                                (impc:ir:get-type-from-str (cadr b)))))                               

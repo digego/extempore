@@ -42,6 +42,10 @@
 //#include "EXTMonitor.h"
 #include "EXTLLVM.h"
 
+#ifdef TARGET_OS_WINDOWS
+#include <Windows.h>
+#endif
+
 #ifdef TARGET_OS_MAC
 #include <CoreAudio/HostTime.h>
 #include <mach/mach_init.h>
@@ -56,6 +60,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+// this is an aribrary maximum
+#define MAX_RT_AUDIO_THREADS 16
 ///////////////////////////////////////////////////////////////////////
 //
 //
@@ -265,7 +271,7 @@ namespace extemp {
       SAMPLE (*closure) (SAMPLE,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,long,long,SAMPLE*)) cache_closure);
       int cnt = 0;
 #ifdef TARGET_OS_WINDOWS
-      printf("MT Audio on Windows NOT Implemented!\n")
+	  printf("MT Audio on Windows NOT Implemented!\n");
         while(_signal_cnt <= lcount) { 
           //sleep??
           cnt++; 
@@ -364,7 +370,7 @@ namespace extemp {
       void (*closure) (float*,float*,long,void*) = *((void(**)(float*,float*,long,void*)) cache_closure);
       int cnt = 0;
 #ifdef TARGET_OS_WINDOWS
-      printf("MT Audio on Windows NOT Implemented!\n")
+	  printf("MT Audio on Windows NOT Implemented!\n");
         while(_signal_cnt <= lcount) { 
           //sleep??
           cnt++; 
@@ -477,7 +483,7 @@ namespace extemp {
       int numthreads = AudioDevice::I()->getNumThreads();
       bool zerolatency = AudioDevice::I()->getZeroLatency();
           
-      SAMPLE in[numthreads];
+      SAMPLE in[32];
       SAMPLE* inb = AudioDevice::I()->getDSPMTInBuffer();
       float* input = (float*) inputBuffer;
       for(int i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = (SAMPLE) input[i]; 
@@ -512,7 +518,7 @@ namespace extemp {
       SAMPLE (*closure) (SAMPLE*,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE*,long,long,SAMPLE*)) cache_closure);
       llvm_zone_t* zone = llvm_peek_zone_stack();
       bool toggle = AudioDevice::I()->getToggle();
-      SAMPLE* indats[numthreads];                    
+	  SAMPLE* indats[MAX_RT_AUDIO_THREADS];
       indats[0] = AudioDevice::I()->getDSPMTOutBuffer();          
       // if we are NOT running zerolatency
       // and toggle is FALSE then use alternate buffers
@@ -562,7 +568,7 @@ namespace extemp {
     }else if(AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then both MT and buffer based
       int numthreads = AudioDevice::I()->getNumThreads();
           
-      double in[numthreads];
+	  double in[MAX_RT_AUDIO_THREADS];
       float* inb = AudioDevice::I()->getDSPMTInBufferArray();
       float* input = (float*) inputBuffer;
       for(int i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = input[i];
@@ -591,7 +597,7 @@ namespace extemp {
       void (*closure) (float**,float*,long,void*) = * ((void(**)(float**,float*,long,void*)) cache_closure);
       llvm_zone_t* zone = llvm_peek_zone_stack();
       //float** indat = (float**) 
-      float* indats[numthreads];
+	  float* indats[MAX_RT_AUDIO_THREADS];
       float* outdat = (float*) outputBuffer;
       indats[0] = AudioDevice::I()->getDSPMTOutBufferArray();
       for(int jj=1;jj<numthreads;jj++) {
@@ -808,6 +814,10 @@ namespace extemp {
 
   void AudioDevice::initMTAudio(int num,bool _zerolatency)
   {
+	  if (num > MAX_RT_AUDIO_THREADS) {
+		  printf("HARD CEILING of %d RT AUDIO THREADS .. aborting!\n", MAX_RT_AUDIO_THREADS);
+		  exit(1);
+	  }
     numthreads = num;
     zerolatency = _zerolatency;
     toggle = true;
@@ -886,6 +896,11 @@ namespace extemp {
     ascii_text_color(0,7,10);
     printf("Code will run fine, but there will be no audio output.\n");
 
+#ifdef TARGET_OS_WINDOWS
+	printf("--noaudio option not supported on Windows OS ... aborting!\n");
+	exit(1);
+#endif
+
 #ifdef TARGET_OS_LINUX
     // check the timer resolution
     struct timespec res;     
@@ -913,10 +928,13 @@ namespace extemp {
       device_time = UNIV::DEVICE_TIME;
       if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
 
+#ifdef TARGET_OS_WINDOWS
+	  // double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
+#elif
       struct timespec sleepDur = double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
       // sleep until the next time mod UNIV::FRAMES
       nanosleep(&sleepDur, NULL);
-
+#endif
       // trigger the scheduler
       TaskScheduler::I()->getGuard()->signal();
     }

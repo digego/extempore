@@ -122,11 +122,11 @@ std::map<std::string,std::string> LLVM_STR_CONST_MAP;
 
 extemp::EXTMutex alloc_mutex("alloc mutex");
 
-#ifdef TARGET_OS_WINDOWS
-double log2(double num) {
-	return log(num)/log(2.0);
-}
-#endif
+//#ifdef TARGET_OS_WINDOWS
+//double log2(double num) {
+//	return log(num)/log(2.0);
+//}
+//#endif
 
 // double (&cosd)(double) = cos;
 // double (&tand)(double) = tan;
@@ -1201,26 +1201,24 @@ struct closure_address_table* new_address_table()
  
 struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table)
 {
-  
-    struct closure_address_table* t = NULL;
-    if(alloctype == 1) {
-      t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
-    } else if(alloctype == 2) {
+  struct closure_address_table* t = NULL;
+  if(alloctype == 1) {
+    t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
+  /* }  else if(alloctype == 2) {
 #ifdef TARGET_OS_WINDOWS
     t = (struct closure_address_table*) _alloca(sizeof(struct closure_address_table));
 #else
     t = (struct closure_address_table*) alloca(sizeof(struct closure_address_table));
-#endif
-    } else {
-      t = (struct closure_address_table*) llvm_zone_malloc(zone,sizeof(struct closure_address_table));
-    }
+#endif */
+  } else {
+    t = (struct closure_address_table*) llvm_zone_malloc(zone,sizeof(struct closure_address_table));
+  }
 
-    t->name = name;
-    t->offset = offset;
-    t->type = type;
-    t->next = table;
-    //printf("adding %s of type %s at %d\n",t->name,t->type,t->offset);
-    return t;
+  t->name = name;
+  t->offset = offset;
+  t->type = type;
+  t->next = table;
+  return t;
 }
 
 // bool rsplit(char* regex, char* str, char* a, char* b)
@@ -1753,7 +1751,7 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("unswap32f"));
 	    EE->updateGlobalMapping(gv,(void*)&unswap32f);	
 
-	    gv = M->getNamedValue(std::string("imp_rand"));
+	    gv = M->getNamedValue(std::string("imp_randd"));
 	    EE->updateGlobalMapping(gv,(void*)&imp_randd);	
 	    gv = M->getNamedValue(std::string("imp_randf"));
 	    EE->updateGlobalMapping(gv,(void*)&imp_randf);	
@@ -1775,10 +1773,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&imp_rand2_f);	
 
 
-#ifdef TARGET_OS_WINDOWS
-	    gv = M->getNamedValue(std::string("log2"));
-	    EE->updateGlobalMapping(gv,(void*)&log2);		
-#endif
+//#ifdef TARGET_OS_WINDOWS
+//	    gv = M->getNamedValue(std::string("log2"));
+//	    EE->updateGlobalMapping(gv,(void*)&log2);		
+//#endif
 	    gv = M->getNamedValue(std::string("rsplit"));
 	    EE->updateGlobalMapping(gv,(void*)&rsplit);		
 	    gv = M->getNamedValue(std::string("rmatch"));
