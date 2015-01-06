@@ -520,6 +520,7 @@ namespace extemp {
     // while(true){
     //   io_service->run();
     // }
+	  return NULL;
   }
 #else
 

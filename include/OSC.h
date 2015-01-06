@@ -110,6 +110,8 @@ namespace extemp {
 	boost::asio::ip::udp::endpoint* getClientAddress() { return osc_client_address; }
 	int* getClientAddressSize() { return &osc_client_address_size; }
 	void setClientAddressSize(int addr_size) { osc_client_address_size = addr_size; }
+	int getConnectionType() { return conn_type; }
+	void setConnectionType(int type) { conn_type = type; }
 	char* getMessageData() { return message_data; }
 	int getMessageLength() { return message_length; }
 	boost::asio::ip::udp::socket* getSendFD() { return send_socket; }
