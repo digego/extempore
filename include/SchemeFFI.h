@@ -214,11 +214,11 @@ namespace extemp {
 	static pointer ad_setTime(scheme* _sc, pointer args);
 
 	static pointer getEvent(scheme* _sc, pointer args);
-#if defined (TARGET_OS_WINDOWS)
+#if defined (_MSC_VER)
 	static pointer addGLExtension(scheme* _sc, pointer args);
 #endif
 	static pointer makeGLContext(scheme* _sc, pointer args);
-#if defined (TARGET_OS_MAC)
+#if defined (__APPLE__)
 	static pointer makeGLCoreContext(scheme* _sc, pointer args);
 #endif
 	static pointer glSwapBuffers(scheme* _sc, pointer args);

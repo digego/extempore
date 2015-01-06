@@ -36,11 +36,11 @@
 #ifndef _AUDIO_DEVICE_H
 #define _AUDIO_DEVICE_H
 
-#if defined (TARGET_OS_MAC)
+#if defined (__APPLE__)
 #include <CoreAudio/AudioHardware.h>
 #endif
 
-#if defined (COREAUDIO) //TARGET_OS_MAC)
+#if defined (COREAUDIO) //__APPLE__)
 #include <CoreAudio/AudioHardware.h>
 #elif defined (ALSA_AUDIO)
 #include <alsa/asoundlib.h>
