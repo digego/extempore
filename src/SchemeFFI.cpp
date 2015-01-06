@@ -615,7 +615,7 @@ namespace extemp {
       int rc = (int)ivalue(pair_car(args));
 #ifdef TARGET_OS_WINDOWS
 	  std::exit(rc);
-#elif
+#else
       std::_Exit(rc);
 #endif
     }

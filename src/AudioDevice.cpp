@@ -930,7 +930,7 @@ namespace extemp {
 
 #ifdef TARGET_OS_WINDOWS
 	  // double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
-#elif
+#else
       struct timespec sleepDur = double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
       // sleep until the next time mod UNIV::FRAMES
       nanosleep(&sleepDur, NULL);

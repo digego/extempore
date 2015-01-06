@@ -552,7 +552,7 @@ namespace extemp {
 		std::string load_path = scm->getLoadPath();
 #ifdef TARGET_OS_WINDOWS
 		Sleep(1000);
-#elif
+#else
                 sleep(1); // give time for NSApp etc. to init    
 #endif
 
@@ -565,7 +565,7 @@ namespace extemp {
                 scm->setLoadedLibs(true);
 #ifdef TARGET_OS_WINDOWS
 				Sleep(1000);
-#elif
+#else
 				sleep(1); // give time for NSApp etc. to init    
 #endif
 
@@ -594,7 +594,7 @@ namespace extemp {
                     memset(sstr,0,EXT_INITEXPR_BUFLEN);
 #ifdef TARGET_OS_WINDOWS
 					_snprintf(sstr, EXT_INITEXPR_BUFLEN, "%s", scm->getInitExpr().c_str());
-#elif
+#else
 					snprintf(sstr, EXT_INITEXPR_BUFLEN, "%s", scm->getInitExpr().c_str());
 #endif
 
