@@ -165,14 +165,18 @@
 ;; if there is no tail call optimiation
 ;; in place then this should blow the
 ;; stack and crash the test
-(xtmtest '(bind-func tail_opt_test
-            (lambda (n:i64)
-              (let ((a:float* (salloc 8000)))
-                (if (= n 0)
-                    (printf "tail opt test passed!\n")
-                    (tail_opt_test (- n 1))))))
 
-         (tail_opt_test 200))
+;; CANNOT RUN THIS TEST ON WINDOWS (i.e. no salloc)!
+(if (not (equal? (sys:platform) "Windows"))
+    (xtmtest '(bind-func tail_opt_test
+                (lambda (n:i64)
+                  (let ((a:float* (salloc 8000)))
+                    (if (= n 0)
+                        (printf "tail opt test passed!\n")
+                        (tail_opt_test (- n 1))))))
+
+             (tail_opt_test 200)))
+    
 (println 'A 'segfault 'here 'incidates 'that 'tail-call-optimizations 'are 'not 'working!)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
