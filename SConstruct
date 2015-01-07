@@ -158,7 +158,10 @@ STDLIB_EXTERNAL_SRCS = [
     'external/rtmidi.xtm',
     'external/openvg.xtm']
 
-STDLIB_SOURCES = ARGUMENTS.get('STDLIB_SOURCES','').split(' ') or (STDLIB_CORE_SRCS + STDLIB_EXTERNAL_SRCS)
+if ARGUMENTS.get('STDLIB_SOURCES'):
+    STDLIB_SOURCES = ARGUMENTS.get('STDLIB_SOURCES')
+else:
+    STDLIB_SOURCES = (STDLIB_CORE_SRCS + STDLIB_EXTERNAL_SRCS)
 STDLIB_SOURCES = [x for x in STDLIB_SOURCES if x]
 
 AddOption('--stdlib-sources',
