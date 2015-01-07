@@ -1887,32 +1887,45 @@
                  (print " to point to your LLVM directory before you can precompile xtlang code.\n")
                  (error "")))
       (let* ((platform (sys:platform))
-             (bitcode-path (string-append "/tmp/" module-name ".bc"))
-             (asm-path (string-append "/tmp/" module-name ".s"))
+             (bitcode-path (if (string=? platform "Windows")
+                               (string-append module-name ".bc")
+                               (string-append "/tmp/" module-name ".bc")))
+             (asm-path (if (string=? platform "Windows")
+                           (string-append module-name ".s")
+                           (string-append "/tmp/" module-name ".s")))
              (shlib-path
               (cond ((string=? platform "Linux")
                      (string-append "/tmp/" module-name ".so"))
                     ((string=? platform "OSX")
                      (string-append "/tmp/" module-name ".dylib"))
                     ((string=? platform "Windows")
-                     (string-append "./" module-name ".dll"))
+                     (string-append "" module-name ".dll"))
                     (else "")))
              (compilation-command-a
-              (string-append
-               ext-llvm-dir
-               "/bin/llc -O3 -relocation-model=pic -tailcallopt "
-               bitcode-path))              
+              (if (string=? platform "Windows")
+                  (string-append
+                   ext-llvm-dir
+                   "/bin/Release/llc -O3 -relocation-model=pic -tailcallopt "
+                   bitcode-path)
+                  (string-append
+                   ext-llvm-dir
+                   "/bin/llc -O3 -relocation-model=pic -tailcallopt "
+                   bitcode-path)))
              (compilation-command-b
-              (string-append
-               (cond ((string=? platform "Linux")
-                      "gcc -O3 --shared -fPIC -g ")
-                     ((string=? platform "OSX")
-                      (string-append "clang -O3 -dynamiclib -undefined dynamic_lookup "
-                                     )))
-               asm-path
-               " -o " shlib-path "\n")))
-        (if (string=? platform "Windows")
-            (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
+              (if (string=? platform "Windows")
+                  (string-append "cl.exe /D_USRDLL /D_WINDLL "
+                                 asm-path
+                                 " /link /DLL /OUT:"
+                                 shlib-path "\n")
+                  (string-append
+                   (cond ((string=? platform "Linux")
+                          "gcc -O3 --shared -fPIC -g ")
+                         ((string=? platform "OSX")
+                          (string-append "clang -O3 -dynamiclib -undefined dynamic_lookup ")))
+                   asm-path
+                   " -o " shlib-path "\n"))))
+        ;; (if (string=? platform "Windows")
+        ;;     (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
         (begin (print "Looking for ")
                (print-with-colors 'magenta 'default #t (print "llc"))
                (print " in " ext-llvm-dir "\n"))
