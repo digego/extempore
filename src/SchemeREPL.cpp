@@ -220,7 +220,7 @@ namespace extemp {
 	}
         // wait for main server to start up first time out of the gates.
 #ifdef TARGET_OS_WINDOWS
-        Sleep(1);
+        Sleep(1000);
 #else
         sleep(1);
 #endif

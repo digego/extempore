@@ -1111,7 +1111,8 @@ namespace extemp {
 	  char* ccc = string_value(pair_car(args));
 	  size_t ccc_size = (strlen(ccc)+1) * 2; //2 for 16 bytes (wide_char)
 	  size_t converted_chars = 0;
-	  wchar_t* wstr = (wchar_t*) _alloca(ccc_size);
+	  //wchar_t* wstr = (wchar_t*) _alloca(ccc_size);
+	  wchar_t wstr[2048];
 	  mbstowcs_s(&converted_chars,wstr,ccc_size, ccc, _TRUNCATE);
       void* lib_handle = LoadLibrary(wstr);
 #else
@@ -1120,8 +1121,8 @@ namespace extemp {
 	if (!lib_handle)
 	{
 #ifdef TARGET_OS_WINDOWS
-	  //std::cout << "Error loading library" << GetLastError() << std::endl;
-	  //printf("For Library Path: %ls\n",wstr);
+	  std::cout << "Error loading library: " << GetLastError() << std::endl;
+	  printf("For Library Path: %ls\n",wstr);
 	  return _sc->F;
 #else                       
 	  //fprintf(stderr, "%s\n", dlerror());
@@ -2256,26 +2257,46 @@ namespace extemp {
   }
 
 
-    pointer SchemeFFI::export_llvmmodule_bitcode(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::export_llvmmodule_bitcode(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	Module* M = EXTLLVM::I()->M;
-	if(M == 0)
-	{
-	    return _sc->F;
-	}			
+    Module* M = EXTLLVM::I()->M;
+    if(M == 0)
+      {
+        return _sc->F;
+      }			
         
-        char* filename = string_value(pair_car(args));
-        std::string errinfo;
-	llvm::raw_fd_ostream ss(filename,errinfo);
-        if(errinfo.length()>0) {
-          std::cout << errinfo << std::endl;
-          return _sc->F;
-        }
-        llvm::WriteBitcodeToFile(M,ss);
-	return _sc->T;
+    char* filename = string_value(pair_car(args));
+#ifdef TARGET_OS_WINDOWS
+    std::string str;
+    llvm::raw_string_ostream ss(str);
+    ss << *M;
+    std::ofstream fout(filename);
+    std::string irStr = ss.str();
+    std::string oldStr(" external global ");
+    std::string newStr(" dllimport global ");
+
+    size_t pos = 0;
+    while((pos = irStr.find(oldStr, pos)) != std::string::npos)
+      {
+        irStr.replace(pos, oldStr.length(), newStr);
+        pos += newStr.length();
+      }
+
+    fout << irStr; //ss.str();
+    fout.close();    
+#else    
+    std::string errinfo;
+    llvm::raw_fd_ostream ss(filename,errinfo);
+    if(errinfo.length()>0) {
+      std::cout << errinfo << std::endl;
+      return _sc->F;
     }
+    llvm::WriteBitcodeToFile(M,ss);
+#endif
+    return _sc->T;    
+  }
 
   pointer SchemeFFI::get_function_args(scheme* _sc, pointer args)
   {
