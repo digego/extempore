@@ -1888,24 +1888,33 @@
                  (error "")))
       (let* ((platform (sys:platform))
              (bitcode-path (if (string=? platform "Windows")
-                               (string-append module-name ".bc")
+                               (string-append ".\\msvc\\tmp\\" module-name ".ll")
                                (string-append "/tmp/" module-name ".bc")))
              (asm-path (if (string=? platform "Windows")
-                           (string-append module-name ".s")
+                           (string-append ".\\msvc\\tmp\\" module-name ".obj")
                            (string-append "/tmp/" module-name ".s")))
+             (win-libs (if (string=? platform "Windows")
+                           (let* ((dirlist (sys:directory-list "./msvc/tmp/"))
+                                  (liblist (cl:remove-if-not (lambda (s) (regex:match? s "\\.lib$")) dirlist))
+                                  (linklist (cl:remove-if (lambda (s)
+                                                            (regex:match? s (string-append module-name ".lib$")))
+                                                          liblist))
+                                  (strlist (string-append " " (string-join linklist " ") " ")))
+                             strlist)
+                           ""))
              (shlib-path
               (cond ((string=? platform "Linux")
                      (string-append "/tmp/" module-name ".so"))
                     ((string=? platform "OSX")
                      (string-append "/tmp/" module-name ".dylib"))
                     ((string=? platform "Windows")
-                     (string-append "" module-name ".dll"))
+                     (string-append ".\\msvc\\tmp\\" module-name ".dll"))
                     (else "")))
              (compilation-command-a
               (if (string=? platform "Windows")
                   (string-append
                    ext-llvm-dir
-                   "/bin/Release/llc -O3 -relocation-model=pic -tailcallopt "
+                   "/bin/Release/llc -O3 -tailcallopt -filetype obj "
                    bitcode-path)
                   (string-append
                    ext-llvm-dir
@@ -1913,10 +1922,16 @@
                    bitcode-path)))
              (compilation-command-b
               (if (string=? platform "Windows")
-                  (string-append "cl.exe /D_USRDLL /D_WINDLL "
-                                 asm-path
-                                 " /link /DLL /OUT:"
-                                 shlib-path "\n")
+                  (string-append "link "
+                                 ;; " /FORCE:UNRESOLVED "
+                                 " /MACHINE:x64 /DLL /OUT:"
+                                 shlib-path
+                                 win-libs
+                                 " opengl32.lib "
+                                 " Glu32.lib "
+                                 " .\\msvc\\x64\\Release\\extempore.lib"                                 
+                                 " .\\msvcrt.lib "                                 
+                                 asm-path "\n")
                   (string-append
                    (cond ((string=? platform "Linux")
                           "gcc -O3 --shared -fPIC -g ")
@@ -1930,7 +1945,7 @@
                (print-with-colors 'magenta 'default #t (print "llc"))
                (print " in " ext-llvm-dir "\n"))
         ;; print further instructions
-        (command (string-append "rm " bitcode-path asm-path shlib-path))
+        (command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
         (llvm:export-module bitcode-path)
 
         (let ((res1 0)
