@@ -691,7 +691,7 @@ indentation."
       (let ((proc (open-network-stream "extempore" nil host port)))
         (if proc
             (progn
-              (set-process-coding-system proc 'iso-latin-1 'iso-latin-1)
+              (set-process-coding-system proc 'iso-latin-1-unix 'iso-latin-1-unix)
               (set-process-filter proc #'extempore-minibuffer-echo-filter)
               (add-to-list 'extempore-connection-list proc t)
               (extempore-update-mode-line))))))
