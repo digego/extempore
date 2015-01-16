@@ -1631,7 +1631,7 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&llvm_destroy_zone_after_delay);			
 	    gv = M->getNamedValue(std::string("free_after_delay"));
 	    EE->updateGlobalMapping(gv,(void*)&free_after_delay);			
-	    gv = M->getNamedValue(std::string("next_prime"));
+	    gv = M->getNamedValue(std::string("llvm_get_next_prime"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_get_next_prime);			
 	    gv = M->getNamedValue(std::string("llvm_printf"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_printf);  
