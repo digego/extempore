@@ -2410,7 +2410,7 @@ static void* treadmill_scanner(void* obj)
 	    }
 	    sc->mutex->unlock(); // yeild here to let interpreter add greys to the treadmill!!
 #ifdef EXT_BOOST
-		boost::this_thread::sleep(boost::posix_time::microseconds(500));
+		boost::this_thread::sleep(boost::posix_time::microseconds(1000));
 #else
 	    usleep(500);
 #endif
