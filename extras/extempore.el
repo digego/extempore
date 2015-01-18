@@ -36,7 +36,7 @@
 ;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;; POSSIBILITY OF SUCH DAMAGE.
 
-;; Commentary:
+;;; Commentary:
 
 ;; A major mode for editing Extempore code. See the Extempore project
 ;; page at http://github.com/digego/extempore for more details.
