@@ -2089,7 +2089,9 @@
            (strsym '()))
       (if (null? (llvm:get-llvm-alias ast))
           (let ((compile-str (string-append strname
-                                            " = constant [" lgth " x i8] c\""
+                                            (if (sys:mcjit-enabled)
+                                                (string-append " = constant [" lgth " x i8] c\"")
+                                                (string-append " = private unnamed_addr constant [" lgth " x i8] c\""))
                                             ast "\\00\"")))
             (llvm:compile compile-str)	    
             (set! strsym strname)
@@ -2124,7 +2126,7 @@
       (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
             (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
             os2)      	 
-                                        ; (emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os2)	 
+      ;; (emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os2)	 
       (emit "call void @llvm_zone_mark(%mzone* " (car (impc:ir:gname "zone")) ")\n" os2)
       ;; malloc closure structure
       (emit "; malloc closure structure\n" os2)

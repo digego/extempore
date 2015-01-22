@@ -427,6 +427,7 @@ namespace extemp {
       { "rational->d",                &SchemeFFI::rationalToDenominator },
 	    // sys stuff
 	    { "sys:pointer-size",		        &SchemeFFI::pointerSize },
+      { "sys:mcjit-enabled",          &SchemeFFI::mcjitEnabled },
 	    { "sys:platform",	  	          &SchemeFFI::platform },
 	    { "sys:cmdarg",    		          &SchemeFFI::cmdarg },
 	    { "sys:open-dylib",		          &SchemeFFI::openDynamicLib },
@@ -1152,6 +1153,15 @@ namespace extemp {
 #endif
     }
 
+    pointer SchemeFFI::mcjitEnabled(scheme* _sc, pointer args)
+    {
+#ifdef EXT_MCJIT
+      return _sc->T;
+#else
+      return _sc->F;
+#endif
+    }  
+  
     pointer SchemeFFI::cmdarg(scheme* _sc, pointer args)
     {
       char* key = string_value(pair_car(args));
