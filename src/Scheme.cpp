@@ -199,6 +199,8 @@ inline void unlink(pointer p)
 //int missed_thread_insert = 0;
 //int hit_thread_insert = 0;
 
+static long long treadmill_inserts_per_cycle = 0;
+
 inline void insert_treadmill(scheme* sc, pointer p)
 {
     if(p->_colour == sc->dark)
@@ -340,6 +342,8 @@ inline void insert_treadmill(scheme* sc, pointer p)
 #ifdef TREADMILL_CHECKS
     p->_list_colour = 2; //set to grey
 #endif
+
+    treadmill_inserts_per_cycle++;
 	
     unlink(p);
     p->_colour = sc->dark;
@@ -1273,7 +1277,7 @@ static int alloc_cellseg(scheme *sc, int n) {
             sc->cell_seg[i] = sc->cell_seg[i - 1];
             sc->cell_seg[--i] = p;
         }
-	sc->fcells += CELL_SEGSIZE;
+        //	sc->fcells += CELL_SEGSIZE;
         last = newp + CELL_SEGSIZE - 1;
 
 	//sc->NIL = newp;
@@ -1302,14 +1306,14 @@ static int alloc_cellseg(scheme *sc, int n) {
     sc->treadmill_scan = sc->treadmill_top;
     //sc->treadmill_scan->_colour = sc->dark;
     pointer ttt = sc->treadmill_free;
-    sc->fcells = 0;
+    //    sc->fcells = 0;
     for(int i=0;i<(CELL_SEGSIZE/2);i++)
     {
 	ttt->_colour = !sc->dark;		
 #ifdef TREADMILL_CHECKS
 	ttt->_list_colour = 0;
 #endif
-	sc->fcells++;
+  //	sc->fcells++;
 	ttt = ttt->_cw;
     }
     sc->treadmill_bottom = ttt; //sc->treadmill_free + (CELL_SEGSIZE/2);//100000;
@@ -1367,7 +1371,8 @@ static int alloc_cellseg(scheme *sc, int n) {
 #endif
 		
     char str[256];
-    sprintf(str,"Allocated: %d cell segements for a total of %d.  Free cells = %lld",n,sc->last_cell_seg,sc->fcells);
+    //    sprintf(str,"Allocated: %d cell segements for a total of %d.  Free cells = %lld",n,sc->last_cell_seg,sc->fcells);
+    sprintf(str,"Allocated: %d cell segements for a total of %d.",n,sc->last_cell_seg);
 //	CPPBridge::notification(str);
 //    std::cout << "Allocated: " << n << " Cell Segements For A Total Of " << sc->last_cell_seg << ",  Free Cells = " << sc->fcells << std::endl;
     return n;
@@ -1377,54 +1382,47 @@ static int alloc_cellseg(scheme *sc, int n) {
 
 static inline pointer get_cell(scheme *sc, pointer a, pointer b) {
 		
-    //pointer free = sc->treadmill_free;
-    if(sc->treadmill_free == sc->treadmill_bottom)
+  //pointer free = sc->treadmill_free;
+  if(sc->treadmill_free == sc->treadmill_bottom)
     {
-	//std::cout << "START FLIP FROM GET_CELL " << sc << std::endl;
-	treadmill_flip(sc,a,b);
-	//std::cout << "FINISHED FLIP FROM GET_CELL " << sc << std::endl;		
+      //std::cout << "START FLIP FROM GET_CELL " << sc << std::endl;
+      treadmill_flip(sc,a,b);
+      //std::cout << "FINISHED FLIP FROM GET_CELL " << sc << std::endl;		
 		
-	if(sc->fcells<=0) { // if even after flip we have no free cells
-	    std::cout <<  "Out of memory!!.  Catastrophic error!!  free cells: " << sc->fcells << std::endl;
-	    exit(0);
-	}		
+      // if(sc->fcells<=0) { // if even after flip we have no free cells
+      //   std::cout <<  "Out of memory!!.  Catastrophic error!!  free cells: " << sc->fcells << std::endl;
+      //   exit(0);
+      // }		
     }
-
-#ifdef TREADMILL_CHECKS
-    if(sc->fcells<=0) { // if even after flip we have no free cells
-	std::cout <<  "Out of memory!!.  Catastrophic error!!  free cells: " << sc->fcells << std::endl;
-	exit(0);
-    }
-#endif
 	
-    pointer x = sc->treadmill_free; //sc->free_cell;
+  pointer x = sc->treadmill_free; //sc->free_cell;
 #ifdef TREADMILL_CHECKS	
-    if(x->_list_colour != 0)
+  if(x->_list_colour != 0)
     { 
-	_Error_1(sc,"Cell is not empty.  Catastrophic error in GC",sc->NIL,0);		
-	//printf("Error: cell is not empty");				
+      _Error_1(sc,"Cell is not empty.  Catastrophic error in GC",sc->NIL,0);		
+      //printf("Error: cell is not empty");				
     }
 #endif
 	
-    finalize_cell(sc, x);
-    typeflag(x) = 0;
+  finalize_cell(sc, x);
+  typeflag(x) = 0;
 	
 	
-    car(x) = sc->NIL;
-    cdr(x) = sc->NIL;
+  car(x) = sc->NIL;
+  cdr(x) = sc->NIL;
 	
-    ////////////////  these for debugger //////////////////
-    x->_debugger = sc->NIL; // might not need this?
-    x->_size = 0; // or this?
-    ///////////////////////////////////////////////////////
+  ////////////////  these for debugger //////////////////
+  x->_debugger = sc->NIL; // might not need this?
+  x->_size = 0; // or this?
+  ///////////////////////////////////////////////////////
 	
-    sc->treadmill_free = sc->treadmill_free->_cw;
-    x->_colour = sc->dark;
+  sc->treadmill_free = sc->treadmill_free->_cw;
+  x->_colour = sc->dark;
 #ifdef TREADMILL_CHECKS
-    x->_list_colour = 3; // black
+  x->_list_colour = 3; // black
 #endif
-    --sc->fcells;
-    return (x);
+  //    --sc->fcells;
+  return (x);
 }
 
 
@@ -2127,13 +2125,13 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
     //Sanity checks marking free cell colours
     long long free_cells = 0;
     pointer t = sc->treadmill_free;
-    for( ; t != sc->treadmill_bottom ; ++free_cells)
-    {
-#ifdef TREADMILL_CHECKS
-	t->_list_colour = 0; //set ecrus to frees
-#endif
-	t = t->_cw;
-    }
+//     for( ; t != sc->treadmill_bottom ; ++free_cells)
+//     {
+// #ifdef TREADMILL_CHECKS
+// 	t->_list_colour = 0; //set ecrus to frees
+// #endif
+// 	t = t->_cw;
+//     }
 #ifdef TREADMILL_CHECKS	
     if(free_cells != ecrus) 
     {
@@ -2147,8 +2145,9 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 #endif	
 		
     //std::cout << "CELLS IN FREE LIST: " << free_cells << std::endl;
-    sc->fcells = free_cells;
-    if(sc->fcells < 20000 || (sc->fcells < (sc->allocation_request+20000)))
+    //    sc->fcells = free_cells;
+    //if(sc->fcells < 20000 || (sc->fcells < (sc->allocation_request+20000)))
+    if(treadmill_inserts_per_cycle > ((sc->total_memory_allocated/2)-20000))
     {
 //		sc->mutex->Lock(); // lock and don't unlock because we're totally broken :(		
 //		std::cout << "TREADMILL: RUNNING OUT OF MEMORY!" << std::endl << std::flush;
@@ -2199,7 +2198,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 	    (p)->_cw = (p==last) ? sc->treadmill_bottom : p+1;
 	    (p)->_ccw = (p==first) ? sc->treadmill_bottom->_ccw : p-1;
 	}		
-	sc->fcells+=alloc_size;
+  //	sc->fcells+=alloc_size;
     }
     sc->allocation_request = -1;
 	
@@ -2207,7 +2206,6 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
     /////////////////////////////////////////////////////////////////
 	
     treadmill_mark_roots(sc,a,b);
-	
 		
 #ifdef TREADMILL_CHECKS
     ///////////////////////////////////////////////////////////////////////
@@ -2282,7 +2280,8 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
     ///////////////////////////////////////////////////////////////////////
     //std::cout << "FINISHED FLIP**********************************************************************************************************************************" << std::endl << std::flush;	
 #endif
-		
+
+    treadmill_inserts_per_cycle=0;
     sc->treadmill_flip_active = false;	
     //Treadmill_Guard.Unlock();
     while(sc->treadmill_scanner_finished == true)
