@@ -1,0 +1,138 @@
+;;; game-of-life.xtm -- Conway's Game of Life
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: 
+
+;;; Commentary:
+
+;; a simple Conway's game of life in Extempore. Uses ASCII-art (to
+;; stdout) for display.
+
+;;; Code:
+
+(sys:load-preload-check 'gameoflife)
+(define *xtmlib-gameoflife-loaded* #f)
+
+;;                w   h   data
+(bind-type World <i64,i64,i8*>)
+
+(bind-func world_create
+  (lambda (w h)
+    ;; make grid (w+2)*(h+2) for "guard" cells
+    (let ((data (zalloc (* (+ w 2) (+ h 2)))))
+      (World w h data))))
+
+(bind-func world_width
+  (lambda (w:World*)
+    (tref w 0)))
+
+(bind-func world_height
+  (lambda (w:World*)
+    (tref w 1)))
+
+
+(bind-func world_data_index
+  (lambda (w:World* x y)
+    (+ (* (+ x 1) (+ (world_width w) 2)) (+ y 1))))
+
+(bind-func cell_value
+  (lambda (w:World* x y)
+    (pref (tref w 2)
+          (world_data_index w x y))))
+
+(bind-func cell_set_value
+  (lambda (w:World* x y value)
+    (pset! (tref w 2)
+           (world_data_index w x y)
+           value)))
+
+(bind-func world_init
+  (lambda (w:World* density)
+    (doloop (i (world_height w))
+      (doloop (j (world_width w))
+        (if (< (random) density)
+            (cell_set_value w i j 1))))))
+
+(bind-func num_cell_neighbors
+  (lambda (w:World* x y)
+    (+ (cell_value w (- x 1) (- y 1))
+       (cell_value w (- x 1) y)
+       (cell_value w (- x 1) (+ y 1))
+       (cell_value w x (- y 1))
+       (cell_value w x (+ y 1))
+       (cell_value w (+ x 1) (- y 1))
+       (cell_value w (+ x 1) y)
+       (cell_value w (+ x 1) (+ y 1)))))
+
+(bind-func world_step
+  (lambda (w:World*)
+    (let ((c 0)
+          (n 0))
+      (doloop (i (world_height w))
+        (doloop (j (world_width w))
+          (set! c (cell_value w i j))
+          (set! n (num_cell_neighbors w i j))
+          ;; (println "i:" i "j:" j "c:" c "n:" n)
+          (if (<> c (convert 0))
+              ;; cell is live
+              (begin
+                (if (< n (convert 2))
+                    (cell_set_value w i j 0))
+                (if (> n (convert 3))
+                    (cell_set_value w i j 0)))
+              ;; cell is dead
+              (if (= n (convert 3))
+                  (cell_set_value w i j 1))))))))
+
+(bind-func world_basic_print
+  (lambda (w:World*)
+    (doloop (i (* (+ (world_width w) 2) (+ (world_height w) 2)))
+      (printf "%c " (if (<> (pref (tref w 2) i) 0)
+                        (pref "O" 0)
+                        (pref "." 0))))
+    (println)
+    (println)))
+
+(bind-func world_ascii_print
+  (lambda (w:World*)
+    (let ((width (world_width w))
+          (height (world_height w))
+          (world_string_length (* (+ width 1) height))
+          (world_string:i8* (zalloc world_string_length)))
+      (doloop (i height)
+        (doloop (j width)
+          (if (<> (cell_value w i j) 0)
+              (pset! world_string (+ (* i (+ width 1)) j) (pref "0" 0))
+              (pset! world_string (+ (* i (+ width 1)) j) (pref " " 0)))
+          (if (= j (- width 1))
+              (pset! world_string
+                     (- (* (+ 1 i) (+ width 1)) 1)
+                     (pref "\n" 0)))))
+      (printf "\n%.*s"
+              world_string_length
+              world_string))))
+
+(define *xtmlib-gameoflife-loaded* #t)
+
+;; actually do the things
+
+(define *world* (world_create 80 24))
+(world_init *world* .2)
+
+(define world-run
+  (lambda (time delta-t)
+    (world_step *world*)
+    (world_ascii_print *world*)
+    (let ((next-time (max (+ time (* *second* delta-t)) (now))))
+      (callback next-time
+                'world-run
+                next-time 
+                delta-t))))
+
+(world-run (now) .1)
+
+;; to stop the game...
+(define world-run
+  (lambda (time delta-t)
+    (println 'finished)))
