@@ -476,9 +476,19 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
   }
 #else
    double clock_clock() {
-  // not implemented on windows!
-  return 0.0;
-  }
+	   FILETIME tm;
+	   ULONGLONG t;
+	   double UNIX_1970_EPOCH = 11644473600.0;
+#if defined(NTDDI_WIN8) && NTDDI_VERSION >= NTDDI_WIN8
+	   /* Windows 8, Windows Server 2012 and later. ---------------- */
+	   GetSystemTimePreciseAsFileTime(&tm);
+#else
+	   /* Windows 7 */
+	   GetSystemTimeAsFileTime(&tm);
+#endif
+	   t = ((ULONGLONG)tm.dwHighDateTime << 32) | (ULONGLONG)tm.dwLowDateTime;
+	   return ((double)t / 10000000.0) - UNIX_1970_EPOCH;
+   }
 #endif
 
 
