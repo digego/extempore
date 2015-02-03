@@ -32,6 +32,15 @@
 
 (sys:precomp:insert-header "xtmmath")
 
+;;;;;;;;;;;;;;;; Constants ;;;;;;;;;;;;;;;;;;
+
+(bind-val PIf float 3.1415926535897932384626433832795028841971693993751058209749)
+(bind-val TWOPIf float 6.2831853071795864769252867665590057683943387987502116419498)
+(bind-val Ef float 2.7182818284590452353602874713526624977572470936999595749669)
+(bind-val PI double 3.1415926535897932384626433832795028841971693993751058209749)
+(bind-val TWOPI double 6.2831853071795864769252867665590057683943387987502116419498)
+(bind-val E double 2.7182818284590452353602874713526624977572470936999595749669)
+
 ;;;;;;;;;;;;;;; simple funcs
 
 (bind-func lognf
@@ -1797,6 +1806,61 @@
 (bind-poly xtm_division Cpxd_division_c_d)
 (bind-poly xtm_division Cpxd_division_d_c)
 
+(bind-func magnitude_complexd
+  (lambda (a:Complexd)
+    (sqrt (+ (* (tref a 0) (tref a 0))
+             (* (tref a 1) (tref a 1))))))         
+
+(bind-func phase_complexd
+  (lambda (a:Complexd)
+    (atan (/ (tref a 1) (tref a 0)))))
+
+(bind-func conj_complexd
+  (lambda (a:Complexd)
+    (Cpxd (tref a 0)
+          (* -1.0 (tref a 0)))))
+
+(bind-poly magC magnitude_complexd)
+(bind-poly phaseC phase_complexd)
+(bind-poly conjC conj_complexd)
+
+(bind-func rect_to_polar_d
+  (lambda (a:Complexd)
+    (Cpxd (sqrt (+ (* (tref a 0) (tref a 0))
+                   (* (tref a 1) (tref a 1))))
+          (atan (/ (tref a 1) (tref a 0))))))
+
+(bind-func rect_to_polar_dp
+  (lambda (a:Complexd* n:i64)
+    (doloop (i n)
+      (tset! (pref-ptr a i) 0
+             (sqrt (+ (* (tref a 0) (tref a 0))
+                      (* (tref a 1) (tref a 1)))))
+      (tset! (pref-ptr a i) 1
+             (atan (/ (tref a 1) (tref a 0)))))
+    void))
+
+(bind-poly rect_to_polar rect_to_polar_d)
+(bind-poly rect_to_polar rect_to_polar_dp)
+
+(bind-func polar_to_rect_d
+  (lambda (a:Complexd)
+    (Cpxd (* (tref a 0) (cos (tref a 1)))
+          (* (tref a 0) (sin (tref a 1))))))
+
+(bind-func polar_to_rect_dp
+  (lambda (a:Complexd* n:i64)
+    (doloop (i n)
+      (tset! (pref-ptr a i) 0
+             (* (tref a 0) (cos (tref a 1))))
+      (tset! (pref-ptr a i) 1
+             (* (tref a 0) (sin (tref a 1)))))
+    void))
+
+(bind-poly polar_to_rect polar_to_rect_d)
+(bind-poly polar_to_rect polar_to_rect_dp)
+
+
 ;; Complexf (float versions)
 
 (bind-type Complexf <float,float>)
@@ -1810,9 +1874,9 @@
 
 (bind-func print_Complexf
   (lambda (c:Complexf)
-    (printf "%f+%fi\n"
-            (tref c 0)
-            (tref c 1))
+    (printf "%.2f%+.2fi" ;; "%f+%fi\n"
+            (ftod (tref c 0))
+            (ftod (tref c 1)))
     void))
 
 (bind-poly print print_Complexf)
@@ -1914,6 +1978,64 @@
 (bind-poly xtm_division Cpxf_division_c_c)
 (bind-poly xtm_division Cpxf_division_c_d)
 (bind-poly xtm_division Cpxf_division_d_c)
+
+(bind-func magnitude_complexf
+  (lambda (a:Complexf)
+    (sqrt (+ (* (tref a 0) (tref a 0))
+             (* (tref a 1) (tref a 1))))))         
+
+(bind-func phase_complexf
+  (lambda (a:Complexf)
+    (atan (/ (tref a 1) (tref a 0)))))
+
+(bind-func conj_complexf
+  (lambda (a:Complexf)
+    (Cpxf (tref a 0)
+          (* -1.0 (tref a 0)))))
+
+(bind-poly magC magnitude_complexf)
+(bind-poly phaseC phase_complexf)
+(bind-poly conjC conj_complexf)
+
+(bind-func rect_to_polar_f
+  (lambda (a:Complexf)
+    (Cpxf (sqrt (+ (* (tref a 0) (tref a 0))
+                   (* (tref a 1) (tref a 1))))
+          (atan (/ (tref a 1) (tref a 0))))))
+
+;; in place transformation
+(bind-func rect_to_polar_fp
+  (lambda (a:Complexf* n:i64)
+    (doloop (i n)
+      (tset! (pref-ptr a i) 0
+             (sqrt (+ (* (tref a 0) (tref a 0))
+                      (* (tref a 1) (tref a 1)))))
+      (tset! (pref-ptr a i) 1
+             (atan (/ (tref a 1) (tref a 0)))))
+    void))
+
+(bind-poly rect_to_polar rect_to_polar_f)
+(bind-poly rect_to_polar rect_to_polar_fp)
+
+(bind-func polar_to_rect_f
+  (lambda (a:Complexf)
+    (Cpxf (* (tref a 0) (cos (tref a 1)))
+          (* (tref a 0) (sin (tref a 1))))))
+
+;; in place transformation
+(bind-func polar_to_rect_fp
+  (lambda (a:Complexf* n:i64)
+    (doloop (i n)
+      (tset! (pref-ptr a i) 0
+             (* (tref a 0) (cos (tref a 1))))
+      (tset! (pref-ptr a i) 1
+             (* (tref a 0) (sin (tref a 1)))))
+    void))
+
+(bind-poly polar_to_rect polar_to_rect_f)
+(bind-poly polar_to_rect polar_to_rect_fp)
+
+
 
 ;;;;;;; OLD COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -2257,7 +2379,7 @@
 (bind-func magnitude_cpxf
   (lambda (cpx_val:cpxf*)
     (sqrt (+ (pow (tref cpx_val 0) 2.0)
-                        (pow (tref cpx_val 1) 2.0)))))
+             (pow (tref cpx_val 1) 2.0)))))
 
 (bind-func magnitude_cpxd
   (lambda (cpx_val:cpxd*)
@@ -2601,7 +2723,7 @@
 
 ;;;;;;;;;; WINDOWING ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func window_hanning
+(bind-func window_hanning_d
   (let ((i:i64 0))
     (lambda (window_buffer:double* window_length)
       (dotimes (i window_length)
@@ -2611,13 +2733,26 @@
                                         (i64tod (- window_length 1)))))))))
       void)))
 
+(bind-func window_hanning_f
+  (let ((i:i64 0))
+    (lambda (window_buffer:float* window_length)
+      (dotimes (i window_length)
+        (pset! window_buffer i
+               (* (pref window_buffer i)
+                  (- 0.5 (* 0.5 (cos (/ (* TWOPIf (i64tof i))
+                                        (i64tof (- window_length 1)))))))))
+      void)))
+
+(bind-poly window_hanning window_hanning_d)
+(bind-poly window_hanning window_hanning_f)
+
 ;; where t is time between [0.0 - 1.0]
 (bind-func hanning
   (lambda (t)
     (- 0.5 (* 0.5
               (cos (* TWOPI t))))))
 
-(bind-func window_hamming
+(bind-func window_hamming_d
   (let ((i:i64 0))
     (lambda (window_buffer:double* window_length)
       (dotimes (i window_length)
@@ -2627,10 +2762,45 @@
                                           (i64tod (- window_length 1)))))))))
       void)))
 
+(bind-func window_hamming_f
+  (let ((i:i64 0))
+    (lambda (window_buffer:float* window_length)
+      (dotimes (i window_length)
+        (pset! window_buffer i
+               (* (pref window_buffer i)
+                  (- 0.54 (* 0.46 (cos (/ (* TWOPIf (i64tof i))
+                                          (i64tof (- window_length 1)))))))))
+      void)))
+
+(bind-poly window_hamming window_hamming_d)
+(bind-poly window_hamming window_hamming_f)
+
 ;; where to is [0.0 - 1.0]
 (bind-func hamming
   (lambda (t)
     (- 0.54 (* 0.46 (cos (* TWOPI t))))))
+
+;;;;;;; string hashing functions ;;;;;;;;;
+
+(bind-func djb2
+  (lambda (str:i8*)
+    (let ((hash:i64 5381)
+          (len (strlen str))
+          (i 0))
+      (dotimes (i len)
+        (set! hash (+ (<< hash 5) hash (convert (pref str i)))))
+      hash)))
+
+(bind-func sdbm
+  (lambda (str:i8*)
+    (let ((hash:i64 0)
+          (len (strlen str))
+          (i 0))
+      (dotimes (i len)
+        (set! hash (- (+ (convert (pref str i)) (<< hash 6) (<< hash 16)) hash)))
+      hash)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define *xtmlib-math-loaded* #t)
 
