@@ -1,0 +1,62 @@
+;;; nanovg.xtm:examples -- nanovg example
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libnanovg
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
+(sys:load "libs/external/opengl.xtm")
+(sys:load "libs/external/nanovg.xtm")
+
+(define width 640.)
+(define height 480.)
+(bind-val width float 640.)
+(bind-val height float 480.)
+(define fullscreen #f)
+
+(define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+
+
+(bind-func enable_stencil_buffer
+  (lambda ()
+    (glEnable GL_STENCIL_TEST)
+    (let ((bits:i32* (salloc)))
+      (glGetIntegerv GL_STENCIL_BITS bits)
+      (println "stencil buffer bit depth: " (pref bits 0)))))
+
+(enable_stencil_buffer)
+
+(bind-func nanovg_draw
+  (let ((vg:NVGcontext* (nvgCreateGL2 (+ NVG_ANTIALIAS NVG_STENCIL_STROKES NVG_DEBUG))))
+    (lambda ()
+      (if (null? vg)
+          (println "Error: vg is null.")
+          (begin
+            (nvgBeginFrame vg (convert width) (convert height) 1.0)
+            (nvgBeginPath vg)
+            (nvgRect vg 100. 100. 120. 30.)
+            (nvgFillColor vg (pref (NVGcolor 1. .7 0. 1.) 0))
+            (nvgFill vg)
+            (gl_print_error "draw:")
+            (nvgEndFrame vg))))))
+
+(define gl-loop
+  (lambda (time delta-t)
+    (let ((late-by (- (now) time))
+          (next-frame-time (+ time (* *second* delta-t))))
+      (if (> late-by 0)
+          (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
+          (begin
+            (nanovg_draw)
+            (gl:swap-buffers *gl-ctx*)))
+      (callback (* 0.9 next-frame-time)
+                'gl-loop
+                next-frame-time
+                delta-t))))
+
+(gl-loop (now) 1)
