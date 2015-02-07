@@ -8,7 +8,7 @@
 (gl_set_depth_test)
 
 (bind-val vertices float* 9)
-(bind-val colours float* 9)
+(bind-val colours float* 18)
 
 (bind-func init_arrays
   (lambda ()
@@ -34,15 +34,20 @@
 (bind-func draw
   (let ((vert_vbo (create_vbo vertices 12))
         (colour_vbo (create_vbo colours 18))
-        (vao (create_vao vert_vbo 3 colour_vbo 3)))
+        (vao (create_vao)))
+    (bind_vbo vert_vbo)
+    (bind_vbo colour_vbo)
+    (println (tref vert_vbo 0))
+    (bind_attribute vao vert_vbo 0)
+    (bind_attribute vao colour_vbo 1)
     (lambda (program)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
       (glUseProgram program)
-      (glBindVertexArray vao)
+      (glBindVertexArray (tref vao 0))
       (glDrawArrays GL_TRIANGLES_STRIP 0 4)
       ;; the update call is only necessary if you're changing the
       ;; vert/colour data
-      (update_vbo vert_vbo vertices 12)
+      (update_vbo vert_vbo)
       void)))
 
 (define gl-loop
