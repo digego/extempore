@@ -74,23 +74,27 @@
 
 ;; complex input
 
-(bind-func fft
+
+;; this config for FORWARD FFT ONLY!
+(bind-func fft_config
+  (lambda (len:i64)
+    (kiss_fft_alloc (i64toi32 len) 0 null null)))
+
+(bind-func fftc
   "calculate the FFT of an input signal"
   (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
     (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
                                     (i64toi32 len)
                                     0 null null)))
-      (kiss_fft fft_config in out))
-    void))
-
-(bind-func ifft
-  "calculate the inverse FFT of a signal"
-  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
-    (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
-                                    (i64toi32 len)
-                                    1 null null)))
       (kiss_fft fft_config in out)
+      (free fft_config)
       void)))
+
+(bind-func fftc_b
+  "calculate the FFT of an input signal"
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* config:kiss_fft_cfg)
+    (kiss_fft config in out)
+    void))
 
 ;; real-valued input
 
@@ -100,7 +104,40 @@
     (let ((fft_config:kiss_fftr_cfg (kiss_fftr_alloc
                                      (i64toi32 len)
                                      0 null null)))
-      (kiss_fftr fft_config in out))
+      (kiss_fftr fft_config in out)
+      (free fft_config)
+      void)))
+
+(bind-func fftr_b
+  "calculate the FFT of a real-valued input signal"
+  (lambda (in:kiss_fft_scalar* out:kiss_fft_cpx* config:kiss_fft_cfg)
+    (kiss_fftr config in out)
+    void))
+
+(bind-poly fft fftc)
+(bind-poly fft fftr)
+(bind-poly fft fftc_b)
+(bind-poly fft fftr_b)
+
+;; this config for INVERSE FFT ONLY!
+(bind-func ffti_config
+  (lambda (len:i64)
+    (kiss_fft_alloc (i64toi32 len) 1 null null)))
+
+(bind-func ifftc
+  "calculate the inverse FFT of a signal"
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
+    (let ((fft_config:kiss_fft_cfg (kiss_fft_alloc
+                                    (i64toi32 len)
+                                    1 null null)))
+      (kiss_fft fft_config in out)
+      (free fft_config)
+      void)))
+
+(bind-func ifftc_b
+  "calculate the inverse FFT of a signal"
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* config:kiss_fft_cfg)
+    (kiss_fft config in out)
     void))
 
 (bind-func ifftr
@@ -109,8 +146,20 @@
     (let ((fft_config:kiss_fftr_cfg (kiss_fftr_alloc
                                      (i64toi32 len)
                                      1 null null)))
-      (kiss_fftri fft_config in out))
+      (kiss_fftri fft_config in out)
+      (free fft_config)
+      void)))
+
+(bind-func ifftr_b
+  "calculate the FFT of a real-valued input signal"
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_scalar* config:kiss_fft_cfg)
+    (kiss_fftri config in out)
     void))
+
+(bind-poly ifft ifftc)
+(bind-poly ifft ifftr)
+(bind-poly ifft ifftc_b)
+(bind-poly ifft ifftr_b)
 
 (define *xtmlib-fft-loaded* #t)
 

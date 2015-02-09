@@ -17,7 +17,7 @@
 (bind-instrument fmsynth fmsynth_note_c fmsynth_fx)
 
 (bind-func dsp:DSP
-  (let ((F (stft_st_c 64 256 1024))
+  (let ((F (stft_st_c 64 512 512))
         (left:ComplexS* (F.left))
         (right:ComplexS* (F.right)))
     (lambda (in time chan dat)
@@ -52,33 +52,32 @@
 
 (bind-func post:XTMRENDERCB
   (let ((path (xtm_create_path))
-        ;(p2 (xtm_create_path))
-        (fill (vgCreatePaint))
-        (fill2 (vgCreatePaint))        
-        (fill_color:xtm_color* (alloc))
-        (fill_color2:xtm_color* (alloc))
-        (stroke (vgCreatePaint))
+        (paint (vgCreatePaint))
+        (colour:|4,float|* (alloc))
         (dl:Complexf* (dsp.left))
         (dr:Complexf* (dsp.left))
         (t 0)
-        (stroke_color:xtm_color* (alloc))
         (clear_color:xtm_color* (alloc)))
-    (afill! clear_color 0.0 0.0 0.0 1.0)
+    (vguRect path 0. 0. 3.0 1.0)
     (lambda (frame shader m v p data)
-      (let ((i:float 0.0))
-        (xtm_vg_clear_rect 0 0 (convert width) (convert height) clear_color)
+      (let ((i:float 0.0)
+            (inc (/ width 200.)))
+        (vgLoadIdentity)        
+        (afill! colour 0. 0. 0. 1.0)        
+        (xtm_vg_clear_rect 0 0 (convert width) (convert height) colour)
         (dotimes (i 200.0)
-          (afill! stroke_color 1.0 1.0 1.0 1.0)          
-          (xtm_paint_set_stroke stroke stroke_color 0.0)
-          (afill! fill_color 1. 0. 0. 0.5) 
-          (xtm_paint_set_fill fill fill_color)          
-          (xtm_draw_rect (convert (* 5. i)) 0.0 2. (* 30. (magC (pref dl (ftoi64 i)))))
-          (afill! fill_color2 0. 1. 0. 0.5) 
-          (xtm_paint_set_fill fill2 fill_color2)                    
-          (xtm_draw_rect (convert (* 5. i))
-                         (- height (* 30. (magC (pref dr (ftoi64 i)))))
-                         2.
-                         height))
+          (vgLoadIdentity)
+          (vgScale 1.0 (* 30. (magC (pref dl (ftoi64 i)))))
+          (vgTranslate (convert (* inc i)) 0.0)
+          (afill! colour 0. 1. 0. 0.5) 
+          (xtm_paint_set_fill paint colour)          
+          (vgDrawPath path VG_FILL_PATH)
+          (vgLoadIdentity)
+          (vgTranslate (convert (* inc i)) height) ;height) ;0.0)          
+          (vgScale 1.0 (* -30. (magC (pref dr (ftoi64 i)))))
+          (afill! colour 1. 0. 0. 0.5) 
+          (xtm_paint_set_fill paint colour)          
+          (vgDrawPath path VG_FILL_PATH))
         (xtm_vg_print_error)
         void))))
 
@@ -101,23 +100,20 @@
                 next-frame-time
                 delta-t))))
 
-;; now sound stuff
+;; start gl loop
+(gl-loop (now) 1/30)
 
+;; now sound stuff
 
 (define root 0)
 
-;; first let's play with synth
-(define l1
-  (lambda (beat dur cell)
-    (play fmsynth (pc:quantize (car cell) (pc:scale root 'aeolian))
-          (cosr 90 10 2) (* dur .2) (random) 10.0)
-    (callback (*metro* (+ beat (* dur .5))) 'l1
-              (+ beat dur)
-              dur
-              (rotate cell 1))))
+(define l2
+  (lambda (beat pitch dur)
+    (if (> pitch 100) (set! dur 4.))
+    (play fmsynth pitch 100 .2 .5 10.)
+    (callback (*metro* (+ beat (* .5 dur))) 'l2 (+ beat dur)
+              (if (> pitch 100) 60 (pc:relative pitch 1 (pc:scale root 'aeolian)))
+              1/6)))
 
-(l1 (*metro* 'get-beat 4) 1/4 '(60 63 62 67 72 65 84 77 65 67)) ;; start one playing quavers
-
-
-;; start gl loop
-(gl-loop (now) 1/30)
+;; start audio loop
+(l2 (*metro* 'get-beat 4) 60 1/6)

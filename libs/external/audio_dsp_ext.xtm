@@ -57,7 +57,7 @@
 ;;
 ;; r <= n
 ;; k >= n
-(bind-func stft_c
+(bind-func stft_c 10000000
   (lambda (r:i64 n:i64 k:i64)
     (if (< k n) (set! k n))
     (if (> r n) (set! r n))
@@ -67,6 +67,7 @@
           (segments (/ n r))
           (pad_offset (dtoi64 (- (* .5 (i64tod k)) (* .5 (i64tod n)))))
           (padbuf (cast (pref-ptr pad pad_offset) i8*))
+          (fftcfg (fft_config k))
           (n2 (* n 2)) (nhalf (/ n 2)) (i 0) (idx (- segments 1)) (t 0) (t2 0))
       (lambda (x)
         (if (= t2 0)
@@ -78,7 +79,7 @@
               ;; apply windowing function
               (window_hamming_f (cast padbuf SAMPLE*) n)
               ;; forward fft (pad is padbuf)
-              (fftr pad (cast spectrum) k)
+              (fft pad (convert spectrum) k)
               ;; inc index
               (set! idx (% (+ idx 1) segments))
               ))
@@ -215,5 +216,6 @@
 (bind-poly creverb_st_c creverb_st_c_a)
 (bind-poly creverb_st_c creverb_st_c_b)
 
-(sys:precomp:insert-header "xtmaudio_dsp_ext")
 (define *xtmlib-audio_dsp_ext-loaded* #t)
+
+(sys:precomp:insert-footer "xtmaudio_dsp_ext")
