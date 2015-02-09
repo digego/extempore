@@ -2,7 +2,7 @@
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: 
+;; Required dylibs:
 
 ;;; Commentary:
 
@@ -17,12 +17,6 @@
 ;;                w   h   data
 (bind-type World <i64,i64,i8*>)
 
-(bind-func world_create
-  (lambda (w h)
-    ;; make grid (w+2)*(h+2) for "guard" cells
-    (let ((data (zalloc (* (+ w 2) (+ h 2)))))
-      (World w h data))))
-
 (bind-func world_width
   (lambda (w:World*)
     (tref w 0)))
@@ -31,10 +25,35 @@
   (lambda (w:World*)
     (tref w 1)))
 
+(bind-func world_data
+  (lambda (w:World*)
+    (tref w 2)))
+
+(bind-func print_world
+  (lambda (w:World*)
+    (printf "World: %lld x %lld (data %p)\n"
+            (world_width w)
+            (world_height w)
+            (world_data w))))
+(bind-poly print print_world)
+
+(bind-func world_create
+  (lambda (w h)
+    ;; make grid (w+2)*(h+2) for "guard" cells
+    (let ((data (zalloc (* (+ w 2) (+ h 2))))
+          (res (World w h data)))
+      (printf "Created Game of Life ")
+      (print_world res)
+      res)))
 
 (bind-func world_data_index
   (lambda (w:World* x y)
     (+ (* (+ x 1) (+ (world_width w) 2)) (+ y 1))))
+
+(bind-func world_data_size
+  (lambda (w:World*)
+    (* (+ (world_width w) 2)
+       (+ (world_height w) 2))))
 
 (bind-func cell_value
   (lambda (w:World* x y)
@@ -51,8 +70,8 @@
   (lambda (w:World* density)
     (doloop (i (world_height w))
       (doloop (j (world_width w))
-        (if (< (random) density)
-            (cell_set_value w i j 1))))))
+        (cell_set_value w i j
+                        (if (< (random) density) 1 0))))))
 
 (bind-func num_cell_neighbors
   (lambda (w:World* x y)
@@ -114,25 +133,3 @@
               world_string))))
 
 (define *xtmlib-gameoflife-loaded* #t)
-
-;; actually do the things
-
-(define *world* (world_create 80 24))
-(world_init *world* .2)
-
-(define world-run
-  (lambda (time delta-t)
-    (world_step *world*)
-    (world_ascii_print *world*)
-    (let ((next-time (max (+ time (* *second* delta-t)) (now))))
-      (callback next-time
-                'world-run
-                next-time 
-                delta-t))))
-
-(world-run (now) .1)
-
-;; to stop the game...
-(define world-run
-  (lambda (time delta-t)
-    (println 'finished)))

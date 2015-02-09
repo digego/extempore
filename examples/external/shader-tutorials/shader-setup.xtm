@@ -16,14 +16,32 @@
 (bind-alias GLintptr i64)
 (bind-alias GLsizeiptr i64)
 
-;; id, type, type, size (bytes), data
+;; id, type, size (bytes), data
 (bind-type VBO <GLuint,GLenum,GLsizeiptr,GLvoid*>)
+
+;; accessors
+
+(bind-func VBO_id
+  (lambda (vbo:VBO*)
+    (tref vbo 0)))
+
+(bind-func VBO_type
+  (lambda (vbo:VBO*)
+    (tref vbo 1)))
+
+(bind-func VBO_size
+  (lambda (vbo:VBO*)
+    (tref vbo 2)))
+
+(bind-func VBO_data
+  (lambda (vbo:VBO*)
+    (tref vbo 3)))
 
 (bind-func print_VBO
   (lambda (vbo:VBO*)
     (printf "VBO: <id=%d type=%s nbytes=%d data=%p>"
             (tref vbo 0)
-            (let ((type (tref vbo 1)))
+            (let ((type (VBO_type vbo)))
               (cond ((= type GL_BYTE) "byte")
                     ((= type GL_SHORT) "short")
                     ((= type GL_INT) "int")
@@ -39,7 +57,7 @@
     (let ((s:i8* (salloc 256)))
       (sprintf s "VBO: <id=%d type=%s nbytes=%d data=%p>"
                (tref vbo 0)
-               (let ((type (tref vbo 1)))
+               (let ((type (VBO_type vbo)))
                  (cond ((= type GL_BYTE) "byte")
                     ((= type GL_SHORT) "short")
                     ((= type GL_INT) "int")
@@ -56,7 +74,14 @@
     (let ((vbo:VBO* (zalloc))
           (id:GLuint* (salloc)))
       (glGenBuffers 1 id)
-      (tfill! vbo (pref id 0) GL_FLOAT (* buflen 4) (cast buf GLvoid*))
+      (tfill! vbo
+              (pref id 0)
+              GL_FLOAT
+              (* buflen 4) ;; sizeof(float)
+              (cast buf GLvoid*))
+      (printf "Created ")
+      (print_VBO vbo)
+      (printf "\n")
       (gl_print_error "Error creating VBO")
       vbo)))
 
@@ -65,7 +90,14 @@
     (let ((vbo:VBO* (zalloc))
           (id:GLuint* (salloc)))
       (glGenBuffers 1 id)
-      (tfill! vbo (pref id 0) GL_INT (* buflen 4) (cast buf GLvoid*))
+      (tfill! vbo
+              (pref id 0)
+              GL_INT
+              (* buflen 4) ;; sizeof(float)
+              (cast buf GLvoid*))
+      (printf "Created ")
+      (print_VBO vbo)
+      (printf "\n")
       (gl_print_error "Error creating VBO")
       vbo)))
 
@@ -74,29 +106,32 @@
 
 (bind-func bind_vbo
   (lambda (vbo:VBO*)
-    (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
-    (glBufferData GL_ARRAY_BUFFER (tref vbo 2) (tref vbo 3) (tref vbo 1))
-    (glBindBuffer GL_ARRAY_BUFFER 0)
-    (gl_print_error "Error binding VBO")))
+    (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+    (gl_print_error "Error binding VBO")
+    (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
+    (gl_print_error "Error setting VBO data")))
 
 (bind-func update_vbo
+  "update the full buffer"
   (lambda (vbo:VBO*)
-    (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
-    (glBufferData GL_ARRAY_BUFFER (tref vbo 2) null (tref vbo 1))  ;; free the old memory
-    (glBufferSubData GL_ARRAY_BUFFER 0 (tref vbo 2) (tref vbo 3))
-    (glBindBuffer GL_ARRAY_BUFFER 0)
-    (gl_print_error "Error updating VBO")))
+    (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+    (gl_print_error "Error binding VBO")
+    (glBufferSubData GL_ARRAY_BUFFER 0 (VBO_size vbo) (VBO_data vbo))
+    (gl_print_error "Error updating VBO subdata")))
 
 (bind-func delete_vbo
   (lambda (vbo:VBO*)
     (let ((id:GLuint* (salloc)))
-      (pset! id 0 (tref vbo 0))
+      (pset! id 0 (VBO_id vbo))
       (glDeleteBuffers 1 id)
       (gl_print_error "Error deleting VBO")
       (free vbo))))
 
-;; id
-(bind-type VAO <i32>)
+(bind-type VAO <GLenum>)
+
+(bind-func VAO_id
+  (lambda (vao:VAO*)
+    (tref vao 0)))
 
 (bind-func print_VAO
   (lambda (vao:VAO*)
@@ -122,57 +157,87 @@
       vao)))
 
 (bind-func bind_attribute_full
-  (lambda (vao:VAO* vbo:VBO* index stride offset)
-    (println "checkpoint " 0)
-    (glBindVertexArray (tref vao 0))
-    (println "checkpoint " 1)
+  (lambda (vao:VAO* vbo:VBO* index size stride offset)
+    (glBindVertexArray (VAO_id vao))
+    (gl_print_error "Error binding VAO")
     (glEnableVertexAttribArray index)
-    (println "checkpoint " 2)
-    (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
-    (println "checkpoint " 3)
-    (glVertexAttribPointer index (convert (tref vbo 2)) (tref vbo 1) GL_FALSE stride (pref-ptr (cast null GLvoid*) offset))
-    (println "checkpoint " 4)
-    ;; (glBindBuffer GL_ARRAY_BUFFER 0)
-    (println "checkpoint " 5)
-    ;; (glBindVertexArray 0)
+    (gl_print_error "Error enabling VAO attribute")
+    (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+    (gl_print_error "Error binding VBO")
+    (glVertexAttribPointer index size (VBO_type vbo) GL_FALSE stride (pref-ptr (cast null GLvoid*) offset))
     (gl_print_error "Error binding VAO attribute")))
 
 (bind-func bind_attribute_packed
-  (lambda (vao vbo index)
-    (bind_attribute_full vao vbo index 0 0)))
+  (lambda (vao vbo index size)
+    (bind_attribute_full vao vbo index size 0 0)))
 
 (bind-poly bind_attribute bind_attribute_full)
 (bind-poly bind_attribute bind_attribute_packed)
 
 (bind-func draw_vertex_array
   (lambda (vao:VAO* draw_mode first count)
-    (glBindVertexArray (tref vao 0))
+    (glBindVertexArray (VAO_id vao))
+    (gl_print_error "Error binding vertex array")
     (glDrawArrays draw_mode first count)
-    (glBindVertexArray 0)
     (gl_print_error "Error drawing vertex array")))
 
 (bind-func delete_vao
   (lambda (vao:VAO*)
     (let ((id:GLuint* (salloc)))
-      (pset! id 0 (tref vao 0))
+      (pset! id 0 (VAO_id vao))
       (glDeleteVertexArrays 1 id)
       (gl_print_error "Error deleting VAO")
       (free vao))))
 
-;; texture
+(bind-type Texture <GLenum>)
+
+(bind-func Texture_id
+  (lambda (tex:Texture*)
+    (tref tex 0)))
+
+(bind-func print_Texture
+  (lambda (vao:Texture*)
+    (printf "Texture: id %d" (tref vao 0))))
+
+(bind-poly print print_Texture)
+
+(bind-func tostring_Texture
+  (lambda (vao:Texture*)
+    (let ((s:i8* (salloc 256)))
+      (sprintf s "Texture: id %d" (tref vao 0))
+      (Str s))))
+
+(bind-poly tostring tostring_Texture)
 
 (bind-func create_texture
   (lambda ()
-    (let ((id:GLuint* (salloc)))
+    (let ((tex:Texture* (zalloc))
+          (id:GLuint* (salloc)))
       (glGenTextures 1 id)
-      (pref id 0))))
+      (gl_print_error "Error creating Texture")
+      (tset! tex 0 (pref id 0))
+      (printf "Created ")
+      (print_Texture tex)
+      (printf "\n")
+      tex)))
+
+(bind-func bind_texture
+  (lambda (tex:Texture* data:GLvoid*)
+    (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+    (glTexImage2D GL_TEXTURE_2D 0 GL_RGB 2 2 0 GL_RGB GL_FLOAT data)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+    void))
 
 (bind-func delete_texture
-  (lambda (tex)
+  (lambda (tex:Texture*)
     (let ((id:GLuint* (salloc)))
-      (pset! id 0 tex)
+      (pset! id 0 (Texture_id tex))
       (glDeleteTextures 1 id)
-      (gl_print_error "Error deleting texture"))))
+      (gl_print_error "Error deleting Texture")
+      (free tex))))
 
 ;; actually do the things...
 
