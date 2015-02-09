@@ -1903,6 +1903,7 @@ namespace extemp {
     int cnt = 0;
     do {
       m = new Module(modname, getGlobalContext());
+	  if (!extemp::UNIV::ARCH.empty()) m->setTargetTriple(extemp::UNIV::ARCH.front());
       newM = ParseAssemblyString(asmcode.c_str(), m, pa, getGlobalContext());
       if(newM != NULL) break;
       std::string err = pa.getMessage().str();

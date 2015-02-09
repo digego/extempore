@@ -415,7 +415,7 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     zone->size = size;
     zone->memories = NULL;
 #if DEBUG_ZONE_ALLOC    
-    printf("CreateZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
+    printf("CreateZone: %x:%x:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
 #endif
     return zone;
 }
@@ -472,7 +472,6 @@ void llvm_zone_print(llvm_zone_t* zone)
 //     //extemp::SchemeProcess::I(pthread_self())->llvm_zone_ptr_set_size(newptr, size);
 //     return newptr;
 // }
-
 
 void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
@@ -1505,6 +1504,9 @@ namespace extemp {
   
           // Make the module, which holds all the code.
           M = new llvm::Module("xtmmodule_0", context);
+
+		  if (!extemp::UNIV::ARCH.empty()) M->setTargetTriple(extemp::UNIV::ARCH.front());
+
           Ms.push_back(M);
   
           // Build engine with JIT
@@ -1519,7 +1521,7 @@ namespace extemp {
 #else          
           factory.setUseMCJIT(false);
 #endif
-          if(!extemp::UNIV::ARCH.empty()) factory.setMArch(extemp::UNIV::ARCH.front());
+          //if(!extemp::UNIV::ARCH.empty()) factory.setMArch(extemp::UNIV::ARCH.front());
           if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
           if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
           factory.setOptLevel(llvm::CodeGenOpt::Aggressive); 
