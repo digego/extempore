@@ -57,23 +57,25 @@
 
 (bind-func cell_value
   (lambda (w:World* x y)
-    (pref (tref w 2)
+    (pref (world_data w)
           (world_data_index w x y))))
 
 (bind-func cell_set_value
   (lambda (w:World* x y value)
-    (pset! (tref w 2)
+    (pset! (world_data w)
            (world_data_index w x y)
            value)))
 
 (bind-func world_init
   (lambda (w:World* density)
+    (doloop (k (world_data_size w))
+      (pset! (world_data w) k 0))
     (doloop (i (world_height w))
       (doloop (j (world_width w))
         (cell_set_value w i j
                         (if (< (random) density) 1 0))))))
 
-(bind-func num_cell_neighbors
+(bind-func cell_count_neighbors
   (lambda (w:World* x y)
     (+ (cell_value w (- x 1) (- y 1))
        (cell_value w (- x 1) y)
@@ -86,28 +88,28 @@
 
 (bind-func world_step
   (lambda (w:World*)
-    (let ((c 0)
+    (let ((cv 0)
           (n 0))
       (doloop (i (world_height w))
         (doloop (j (world_width w))
-          (set! c (cell_value w i j))
-          (set! n (num_cell_neighbors w i j))
-          ;; (println "i:" i "j:" j "c:" c "n:" n)
-          (if (<> c (convert 0))
-              ;; cell is live
-              (begin
-                (if (< n (convert 2))
-                    (cell_set_value w i j 0))
-                (if (> n (convert 3))
-                    (cell_set_value w i j 0)))
+          (set! cv (cell_value w i j))
+          (set! n (cell_count_neighbors w i j))
+          (if (<> cv 0:i8)
+              (if (or (< n 2:i8)
+                      (> n 3:i8))
+                  (begin (printf "i = %lld j = %lld cv = %u n = %lld - cell dies!\n" i j cv n)
+                         (cell_set_value w i j 0))
+                  (begin (printf "i = %lld j = %lld cv = %u n = %lld\n" i j cv n) 0:i8))
               ;; cell is dead
-              (if (= n (convert 3))
-                  (cell_set_value w i j 1))))))))
+              (if (= n 3:i8)
+                  (begin (printf "i = %lld j = %lld cv = %u n = %lld - cell comes to life!\n" i j cv n)
+                         (cell_set_value w i j 1))
+                  (begin (printf "i = %lld j = %lld cv = %u n = %lld\n" i j cv n) 0:i8))))))))
 
 (bind-func world_basic_print
   (lambda (w:World*)
     (doloop (i (* (+ (world_width w) 2) (+ (world_height w) 2)))
-      (printf "%c " (if (<> (pref (tref w 2) i) 0)
+      (printf "%c " (if (<> (pref (world_data w) i) 0)
                         (pref "O" 0)
                         (pref "." 0))))
     (println)
