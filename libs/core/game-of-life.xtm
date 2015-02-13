@@ -52,8 +52,8 @@
           (height (world_height w))
           (xrem (% x width))
           (yrem (% y height)))
-      (+ (* (+ yrem (< yrem 0) height 0) width)
-         (+ xrem (< xrem 0) width 0)))))
+      (+ (* (+ yrem (if (< yrem 0) height 0)) width)
+         (+ xrem (if (< xrem 0) width 0))))))
 
 (bind-func world_data_size
   (lambda (w:World*)
@@ -80,6 +80,9 @@
         (cell_set_value w i j
                         (if (< (random) density) 1 0))))))
 
+;; NOTE: this is broken - since it updates the cells in-place,
+;; subsequent calls to this function get the new cells which have just
+;; come alive that timestep
 (bind-func cell_count_neighbors
   (lambda (w:World* x y)
     (+ (cell_value w (- x 1) (- y 1))
