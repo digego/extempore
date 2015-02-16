@@ -1908,7 +1908,7 @@ namespace extemp {
       if(newM != NULL) break;
       std::string err = pa.getMessage().str();
       if(cnt > 1000) {
-        std::cout << "Compiler Error: could not resolve all external dependencies" << std::endl;
+        std::cout << "MCJIT Compiler Error: could not resolve all external dependencies" << std::endl;
         break;
       }
       if(rmatch("use of undefined value",(char*)err.c_str())) {
@@ -1991,10 +1991,11 @@ namespace extemp {
         llvm::raw_string_ostream ss(errstr);
         pa.print("Extempore",ss);
         printf("%s\n",ss.str().c_str());
-        // if the number of functions in module has changed when calling runFunction 
-        // then we assume a stub was made and appended to the end of the modules function list.
-        // we remove this function now that we no longer need it!
 #ifndef EXT_MCJIT    
+        // if the number of functions in module has changed when
+        // calling runFunction then we assume a stub was made and
+        // appended to the end of the modules function list. we remove
+        // this function now that we no longer need it!
         if(num_of_funcs != M->getFunctionList().size()) {
           iplist<Function>::iterator iter = M->getFunctionList().end();
           Function* func = dyn_cast<Function>(--iter);
