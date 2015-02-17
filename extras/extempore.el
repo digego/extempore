@@ -2435,8 +2435,7 @@ If you don't want to be prompted for this name each time, set the
     (call-interactively parse-fn)))
 
 ;; help displaying LLVM IR
-
-(defun extempore-show-llvm-ir (beg end)
+(defun extempore-show-ir-in-temp-buffer (beg end)
   (interactive "r")
   (save-excursion
     (let ((ir-str (buffer-substring-no-properties beg end)))
