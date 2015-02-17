@@ -5918,35 +5918,6 @@
 	',args))
 
 
-;; Definec-precomp is for setting up precompiled ir functions only
-(define bind-func-precomp
-  (lambda (symname)
-    (let ((zone-size *impc:default-zone-size*))
-      (eval
-       `(define ,symname
-	  (let* ((setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
-		 (func (llvm:get-function (symbol->string ',symname))))
-	    (println 'setter: setter 'func: func)
-	    (if setter
-                (begin
-                  (sys:push-memzone (sys:create-mzone ,zone-size))
-                  (llvm:run setter (sys:peek-memzone))
-                  (sys:pop-memzone) ;; don't destroy here - should happend in _setter
-                  )
-		(impc:compiler:print-missing-compiled-function-setter-error ',symname))
-	    ;;(println 'scheme_func: (llvm:get-scheme-function ,(symbol->string symname)))
-	    (if func
-		;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
-		(if (llvm:get-scheme-function ,(symbol->string symname))
-                    (begin
-                      (llvm:ffi-set-name
-                       (llvm:get-scheme-function ,(symbol->string symname))
-                       ,(symbol->string symname))
-                      (mk-ff (llvm:get-scheme-function ,(symbol->string symname)))))
-		(impc:compiler:print-missing-compiled-function-error ',symname))))
-       (interaction-environment)))))
-
-
 ;; bind-func-ipc is for passing an already compiled (and setter'd)
 ;; native function across to a non-primary process
 (define bind-func-ipc
