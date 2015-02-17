@@ -2546,7 +2546,7 @@ namespace extemp {
 
 
     //
-    // This will not be threadsafe whenever a definec is done!
+    // This will not be threadsafe whenever a bind-func is done!
     // 
   pointer SchemeFFI::call_compiled_closure(scheme* _sc, pointer args)
   {
@@ -2697,7 +2697,7 @@ namespace extemp {
 }
 
     //
-    // This will not be threadsafe whenever a definec is done!
+    // This will not be threadsafe whenever a bind-func is done!
     // 
     pointer SchemeFFI::call_compiled(scheme* _sc, pointer args)
     {
