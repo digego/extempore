@@ -50,8 +50,6 @@
 (define *impc:compiler:verbose* #f)
 
 (define *impc:compiler:print-raw-llvm* #f)
-(define *impc:compiler:precomp* (make-string 0))
-(define *impc:compiler:precomp-llvm* #f)
 
 (define *impc:compiler:allow-structural-calls #f)
 
@@ -5724,7 +5722,6 @@
             (if *impc:compiler:print* (println '------------------------------compiling 'maker----------------------------------->))
             (if *impc:compiler:print* (println fs))
             (if *impc:compiler:print-raw-llvm* (print-full-nq fs))
-	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fs "\")\n\n" *impc:compiler:precomp*))
             (if *impc:compile*
                 (begin ;(llvm:remove-function (string-append (symbol->string symname) "_maker"))
                        (if (not (llvm:compile fs))
@@ -5733,7 +5730,6 @@
             (if *impc:compiler:print* (println '--------------------------------compiling 'setter----------------------------------->))            
             (if *impc:compiler:print* (println fssetter))
             (if *impc:compiler:print-raw-llvm* (print-full-nq fssetter))
-	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fssetter "\")\n\n" *impc:compiler:precomp*))
             (if *impc:compile*
                 (begin (if (not (llvm:compile fssetter))
 			   (impc:compiler:print-compiler-error "compiler failed"))
@@ -5741,7 +5737,6 @@
             (if *impc:compiler:print* (println '--------------------------------compiling 'getter----------------------------------->))            
             (if *impc:compiler:print* (println fsgetter))            
             (if *impc:compiler:print-raw-llvm* (print-full-nq fsgetter))
-	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fsgetter "\")\n\n" *impc:compiler:precomp*))
             (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
                 (begin (if (not (llvm:compile fsgetter))
 			   (impc:compiler:print-compiler-error "compiler failed"))
@@ -5753,9 +5748,6 @@
             (if *impc:compiler:print* (println))            
             (if *impc:compiler:print* (println fstub_scheme))            
             (if *impc:compiler:print-raw-llvm* (print-full-nq fstub))
-	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fstub "\")\n\n" *impc:compiler:precomp*))
-	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fstub_native "\")\n\n" *impc:compiler:precomp*))
-	    (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fstub_scheme "\")\n\n" *impc:compiler:precomp*))	    
             (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
                 (begin (if (or (not (llvm:compile fstub))
 			       (not (llvm:compile fstub_native))
@@ -5767,7 +5759,6 @@
 	   (if *impc:compiler:print* (println '----------------------------compiling 'callback----------------------------------->))
 	   (if *impc:compiler:print* (println fscallback))
 	   (if *impc:compiler:print-raw-llvm* (print-full-nq fscallback))
-	   (if *impc:compiler:precomp-llvm* (emit "(llvm:compile \"" fscallback "\")\n\n" *impc:compiler:precomp*))
 	   (if (and *impc:compile* compile-stub?) ;; only compile callback first time around!!!
 	       (begin 
 	   	 (if (not (llvm:compile fscallback))
@@ -5849,37 +5840,6 @@
                                    (map (lambda (k) (list 'quote k)) types))))
 		(setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
 		(func (llvm:get-function (symbol->string ',symname))))
-	   (if *impc:compiler:precomp-llvm*
-	       (emit (sexpr->string
-		      '(define ,symname
-			 (let* ((setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
-				(func (llvm:get-function (symbol->string ',symname))))
-
-			   (if setter
-			       (begin
-                                 (sys:push-memzone (sys:create-mzone ,zone-size))
-                                 (llvm:run setter (sys:peek-memzone))
-                                 (sys:pop-memzone) ;; don't destroy here should happen in _setter
-                                 )
-			       (impc:compiler:print-missing-compiled-function-setter-error ',symname))
-			   (if func
-			       ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
-			       (if (llvm:get-scheme-function ,(symbol->string symname))
-				   (let ((ftype (llvm:get-function-args-withoutzone ,(symbol->string symname))))
-             (impc:compiler:print-bind-func-details-to-log
-              "Compiled:"
-              ',symname
-              (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))
-              ,zone-size)
-                                     (llvm:ffi-set-name
-                                      (llvm:get-scheme-function ,(symbol->string symname))
-                                      ,(symbol->string symname))
-				     (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
-				   (impc:compiler:print-no-scheme-stub-notification ',symname))
-			       (impc:compiler:print-missing-compiled-function-error ',symname)))))
-		     
-		     *impc:compiler:precomp*))
-
 	   (if setter
 	       (begin
                  (sys:push-memzone (sys:create-mzone ,zone-size))
@@ -6010,11 +5970,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-macro (bind-alias symbol type)
-  (if *impc:compiler:precomp-llvm*
-      (emit (sexpr->string
-	     `(bind-alias ,symbol ,type))
-	    "\n\n"
-	    *impc:compiler:precomp*))
   `(begin (impc:ir:add-type-alias ,(symbol->string symbol) ,(symbol->string type))
           (impc:compiler:print-binding-details-to-log
            "SetAlias:"
@@ -6215,11 +6170,6 @@
 
 
 (define-macro (bind-type symbol type . args)
-  (if *impc:compiler:precomp-llvm*
-      (emit (sexpr->string
-             `(bind-type ,symbol ,type))
-            "\n\n"
-            *impc:compiler:precomp*))
   (if (<> (impc:ir:get-ptr-depth type) 0)
       (impc:compiler:print-bad-type-error type "cannot be a pointer"))
   `(begin
@@ -6296,11 +6246,6 @@
 ;;   (let ((value (if (null? optional-value)
 ;;                    0
 ;;                    (car optional-value))))
-;;     (if *impc:compiler:precomp-llvm*
-;;         (emit (sexpr->string
-;;                `(bind-val ,symbol ,type ,value))
-;;               "\n\n"
-;;               *impc:compiler:precomp*))
 ;;     (let ((t (impc:ir:get-type-from-pretty-str (atom->string type))))
 ;;       (cond ((llvm:get-globalvar (symbol->string symbol))
 ;;              `(begin
@@ -6361,11 +6306,6 @@
   (let ((value (if (null? optional-value)
                    1
                    (car optional-value))))
-    (if *impc:compiler:precomp-llvm*
-        (emit (sexpr->string
-               `(bind-val ,symbol ,type ,value))
-              "\n\n"
-              *impc:compiler:precomp*))
     (let ((t (impc:ir:get-type-from-pretty-str (atom->string type))))
       (cond ((llvm:get-globalvar (symbol->string symbol))
              `(begin
@@ -6476,11 +6416,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
-  (if *impc:compiler:precomp-llvm*
-      (emit (sexpr->string
-	     `(bind-lib ,library ,symname ,type ,@args))
-	    "\n\n"
-	    *impc:compiler:precomp*))
   `(__dynamic-bind ',library ',symname ',type ,@(map (lambda (k) `(quote ,k)) args)))
 
 (define __dynamic-bind
