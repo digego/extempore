@@ -2436,22 +2436,16 @@ If you don't want to be prompted for this name each time, set the
 
 ;; help displaying LLVM IR
 
-(defun extempore-show-last-llvm-ir ()
-  (interactive)
+(defun extempore-show-llvm-ir (beg end)
+  (interactive "r")
   (save-excursion
-    (if (re-search-backward "\"" nil :noerror)
-        (let* ((end (point))
-               (ir-str (buffer-substring-no-properties
-                        (progn 
-                          (re-search-backward "\"" nil :noerror)
-                          (+ (point) 1))
-                        (- end 1))))
-          (with-current-buffer (get-buffer-create "*extempore LLVM IR*")
-            (if (not (equalp major-mode 'llvm-mode))
-                (llvm-mode))
-            (delete-region (point-min) (point-max))
-            (insert (replace-regexp-in-string "\\\\n" "\n" ir-str))
-            (display-buffer "*extempore LLVM IR*" #'display-buffer-pop-up-window))))))
+    (let ((ir-str (buffer-substring-no-properties beg end)))
+      (with-current-buffer (get-buffer-create "*extempore LLVM IR*")
+        (if (not (equalp major-mode 'llvm-mode))
+            (llvm-mode))
+        (delete-region (point-min) (point-max))
+        (insert (replace-regexp-in-string "\\\\n" "\n" ir-str))
+        (display-buffer "*extempore LLVM IR*" #'display-buffer-pop-up-window)))))
 
 (provide 'extempore)
 
