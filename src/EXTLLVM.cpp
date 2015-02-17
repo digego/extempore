@@ -1579,7 +1579,7 @@ namespace extemp {
       // 
 	    PM->add(llvm::createPromoteMemoryToRegisterPass());
 
-	    char fname[] = "/code.ir";
+	    char fname[] = "/init.ll";
 	    char load_path[256];
 	    strcpy(load_path,extemp::UNIV::PWD);
 	    strcat(load_path,fname);
@@ -1600,15 +1600,15 @@ namespace extemp {
 #endif
 	    size_t res = fread(assm, 1, size, fp);
             if(res != size) {
-   	      printf("code.ir length(%lld) read(%lld) \n",size,res);
+   	      printf("init.ll length(%lld) read(%lld) \n",size,res);
               if(ferror(fp)) {
-    	        printf("Error reading code.ir %d\n",ferror(fp));
+    	        printf("Error reading init.ll %d\n",ferror(fp));
                 exit(1);
               }else if(feof(fp)){
-    	        printf("Error reading code.ir end-of-file error %d\n",feof(fp));
+    	        printf("Error reading init.ll end-of-file error %d\n",feof(fp));
                 exit(1);
               }else{
-                printf("Length mismatch reading code.ir lgth(%lld) read(%lld)\n",size,res);
+                printf("Length mismatch reading init.ll lgth(%lld) read(%lld)\n",size,res);
                 exit(1);
 	      }
 	    }
@@ -1621,7 +1621,7 @@ namespace extemp {
 			
 	    if(newM == 0)
 	    {
-     	        printf("Compiler Error: Error building code.ir\n");
+     	        printf("Compiler Error: Error building init.ll\n");
 		std::string errstr;
 		llvm::raw_string_ostream ss(errstr);
 		pa.print("Extempore",ss);
