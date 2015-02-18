@@ -1878,9 +1878,7 @@ namespace extemp {
     char modname[256];
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
     Module* m = NULL;
-    char tmpbuf1[1024];
-    char tmpbuf2[1024];
-    char tmpbuf3[1024];  
+    char tmpbuf[1024];
 #endif
   
     char* assm = string_value(pair_car(args));
@@ -1957,9 +1955,9 @@ namespace extemp {
             rettypestr = sts.str().substr(0, pos);
           }
           std::string argstypestr = stype.substr(rettypestr.length()+1,stype.length());
-          sprintf(tmpbuf3,"declare %s @%s%s",rettypestr.c_str(),symname,argstypestr.c_str());
+          sprintf(tmpbuf,"declare %s @%s%s",rettypestr.c_str(),symname,argstypestr.c_str());
           
-          exprr.append(tmpbuf3);
+          exprr.append(tmpbuf);
         } else {
           exprr.append("@");
           exprr.append(symname);
