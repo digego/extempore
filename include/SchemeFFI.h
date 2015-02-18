@@ -162,7 +162,7 @@ namespace extemp {
 	// llvm stuff
         static pointer optimizeCompiles(scheme* _sc, pointer args);
         static pointer verifyCompiles(scheme* _sc, pointer args);
-	static pointer compile(scheme* _sc, pointer args);
+	static pointer jitCompileIRString(scheme* _sc, pointer args);
 	static pointer bind_global_var(scheme* _sc, pointer args);		
         static pointer ff_set_name(scheme* _sc, pointer args);
         static pointer ff_get_name(scheme* _sc, pointer args);

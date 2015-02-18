@@ -493,7 +493,7 @@ namespace extemp {
 	    { "regex:replace",		          &SchemeFFI::regex_replace },
 	    // llvm stuff
 	    { "llvm:optimize",			        &SchemeFFI::optimizeCompiles },
-	    { "llvm:compile",			          &SchemeFFI::compile },
+	    { "llvm:jit-compile-ir-string", &SchemeFFI::jitCompileIRString},
 	    { "llvm:bind-global-var",	     	&SchemeFFI::bind_global_var },
       { "llvm:ffi-set-name",          &SchemeFFI::ff_set_name },
       { "llvm:ffi-get-name",          &SchemeFFI::ff_get_name },
@@ -1867,7 +1867,7 @@ namespace extemp {
 #ifdef EXT_MCJIT
   static long llvm_emitcounter = 0;
 #endif
-  pointer SchemeFFI::compile(scheme* _sc, pointer args)
+  pointer SchemeFFI::jitCompileIRString(scheme* _sc, pointer args)
   {
     // Create some module to put our function into it.
     using namespace llvm;

@@ -1278,7 +1278,7 @@
                 ;;(println 'newtype! newname 'totype: newtype3)
                 (if (null? (llvm:get-named-type newname))
                     (begin ;; if this is a new reification of a generic type then ...
-                           (llvm:compile (string-append "%" newname " = type " newtype3))
+                           (llvm:jit-compile-ir-string (string-append "%" newname " = type " newtype3))
                            ;; we should probably also build dataconstructors for the new
                            ;; concrete type?? (at least for printing reasons)
                            ;; because build-type-dataconstructor needs to be called from
@@ -5315,21 +5315,21 @@
     (if *impc:compile*
         (begin
           ;; (llvm:remove-function (string-append (symbol->string symname) "_maker"))
-          (if (not (llvm:compile fs))
+          (if (not (llvm:jit-compile-ir-string fs))
               (impc:compiler:print-compiler-error "compiler failed"))
           (if *impc:compiler:print* (print-notification "compiled maker"))))
     (if *impc:compiler:print* (println '--------------------------------compiling 'setter----------------------------------->))            
     (if *impc:compiler:print* (println fssetter))
     (if *impc:compiler:print-raw-llvm* (print-full-nq fssetter))
     (if *impc:compile*
-        (begin (if (not (llvm:compile fssetter))
+        (begin (if (not (llvm:jit-compile-ir-string fssetter))
                    (impc:compiler:print-compiler-error "compiler failed"))
                (if *impc:compiler:print* (print-notification "compiled setter"))))
     (if *impc:compiler:print* (println '--------------------------------compiling 'getter----------------------------------->))            
     (if *impc:compiler:print* (println fsgetter))            
     (if *impc:compiler:print-raw-llvm* (print-full-nq fsgetter))
     (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
-        (begin (if (not (llvm:compile fsgetter))
+        (begin (if (not (llvm:jit-compile-ir-string fsgetter))
                    (impc:compiler:print-compiler-error "compiler failed"))
                (if *impc:compiler:print* (print-notification "compiled stub"))))
     (if *impc:compiler:print* (println '--------------------------------compiling 'stubs----------------------------------->))            
@@ -5340,9 +5340,9 @@
     (if *impc:compiler:print* (println fstub_scheme))            
     (if *impc:compiler:print-raw-llvm* (print-full-nq fstub_scheme))
     (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
-        (begin (if (or (not (llvm:compile fstub))
-                       (not (llvm:compile fstub_native))
-                       (not (if fstub_scheme_valid (llvm:compile fstub_scheme) #t)))
+        (begin (if (or (not (llvm:jit-compile-ir-string fstub))
+                       (not (llvm:jit-compile-ir-string fstub_native))
+                       (not (if fstub_scheme_valid (llvm:jit-compile-ir-string fstub_scheme) #t)))
                    (impc:compiler:print-compiler-error "compiler failed building stubs!"))
                ;; bind fstub_scheme
                (if *impc:compiler:print*
@@ -5352,7 +5352,7 @@
     (if *impc:compiler:print-raw-llvm* (print-full-nq fscallback))
     (if (and *impc:compile* compile-stub?) ;; only compile callback first time around!!!
         (begin 
-          (if (not (llvm:compile fscallback))
+          (if (not (llvm:jit-compile-ir-string fscallback))
               (impc:compiler:print-compiler-error "compiler failed"))
           (if *impc:compiler:print* (print-notification "compiled callback"))))))
 
@@ -6168,7 +6168,7 @@
            ;; and on with the show!
            (if (regex:match? newtype "!") ;; then must be poly type
                (impc:ir:add-gpolytype ',symbol (string->symbol newtype))
-               (llvm:compile (string-append "%" ,(symbol->string symbol) " = type "
+               (llvm:jit-compile-ir-string (string-append "%" ,(symbol->string symbol) " = type "
                                             (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str
                                                                    newtype
                                                                    ,(symbol->string symbol)))))))
@@ -6193,7 +6193,7 @@
 
 (define-macro (bind-tvar symbol . types)
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<) ; (impc:ir:tuple? (impc:ir:get-type-from-pretty-str ,(symbol->string type)))
-	      (llvm:compile (string-append "%" ,(symbol->string symbol) " = type "
+	      (llvm:jit-compile-ir-string (string-append "%" ,(symbol->string symbol) " = type "
 					   ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type) (symbol->string symbol)))))
 	      (impc:compiler:print-bad-type-error ,type "only named tuple types are supported"))
           (impc:compiler:print-type-details-to-log
@@ -6211,10 +6211,10 @@
 		 (println ,var)))
        varlist))
 
-(define llvm:compile-and-print
+(define llvm:jit-compile-ir-string-and-print
   (lambda (str)
     (println str)
-    (llvm:compile str)))
+    (llvm:jit-compile-ir-string str)))
 
 
 
@@ -6234,14 +6234,14 @@
 ;;             ((and (equal? "i8*" (symbol->string type))
 ;;                   (string? value))
 ;;              `(begin
-;;                 (llvm:compile (string-append "@" ,(symbol->string symbol)
+;;                 (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
 ;;                                              " = external global i8*"))
 ;;                 (llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
 ;;                 (impc:print-bound-message ,symbol ,type)))
 ;;             ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
 ;;                   (not (impc:ir:pointer? t)))
 ;;              `(begin
-;;                 (llvm:compile
+;;                 (llvm:jit-compile-ir-string
 ;;                  (string-append "@" ,(symbol->string symbol)
 ;;                                 " = global "
 ;;                                 ,(impc:ir:get-type-str t) " "
@@ -6251,7 +6251,7 @@
 ;;                 (impc:print-bound-message ,symbol ,type)))
 ;;             ((impc:ir:pointer? t)
 ;;              (if (integer? (eval value))
-;;                  `(begin (llvm:compile (string-append "@" ,(symbol->string symbol)
+;;                  `(begin (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
 ;;                                                       " = external global "
 ;;                                                       ,(impc:ir:get-type-str t)))
 ;;                          (llvm:bind-global-var ,(symbol->string symbol)
@@ -6263,7 +6263,7 @@
 ;;                  `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate")))
 ;;             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
 ;;              `(begin
-;;                 (llvm:compile
+;;                 (llvm:jit-compile-ir-string
 ;;                  (string-append
 ;;                   "@" ,(symbol->string symbol)
 ;;                   " = global "
@@ -6294,7 +6294,7 @@
             ((and (equal? "i8*" (symbol->string type))
                   (string? value))
              `(begin
-                (llvm:compile (string-append "@" ,(symbol->string symbol)
+                (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
                                              " = dllexport global i8* zeroinitializer"))
                 (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
                                                                " \"" value "\")")))
@@ -6303,7 +6303,7 @@
             ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
                   (not (impc:ir:pointer? t)))
              `(begin
-                (llvm:compile
+                (llvm:jit-compile-ir-string
                  (string-append "@" ,(symbol->string symbol)
                                 " = dllexport global "
                                 ,(impc:ir:get-type-str t) " "
@@ -6314,7 +6314,7 @@
             ((impc:ir:pointer? t)
              (if (integer? (eval value))
                  `(begin
-                    (llvm:compile (string-append "@" ,(symbol->string symbol)
+                    (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
                                                  " = dllexport global "
                                                  ,(impc:ir:get-type-str t)
                                                  " zeroinitializer"))
@@ -6336,7 +6336,7 @@
                     (impc:print-bound-message ,symbol ,type))
                  (if (list? (eval value))
                      `(begin
-                        (llvm:compile (string-append "@" ,(symbol->string symbol)
+                        (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
                                                      " = dllexport global "
                                                      ,(impc:ir:get-type-str t)
                                                      "zeroinitializer"))
@@ -6347,7 +6347,7 @@
                      `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin
-                (llvm:compile
+                (llvm:jit-compile-ir-string
                  (string-append
                   "@" ,(symbol->string symbol)
                   " = dllexport global "
@@ -6378,7 +6378,7 @@
 ;; (define-macro (bind-scm symbol type value)
 ;;    (if (cptr? (eval value))
 ;;        `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
-;;                    (llvm:compile (string-append "@" ,(symbol->string symbol)
+;;                    (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
 ;;                                                 " = external global "
 ;;                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
 ;; 						;,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str type)))))
@@ -6413,7 +6413,7 @@
                                                      (string-append "," (impc:ir:get-type-str v)))
                                                    (cddr ctype))))
                                    ") nounwind")))
-      (if (and (llvm:compile ircode)
+      (if (and (llvm:jit-compile-ir-string ircode)
                (llvm:bind-symbol (eval library) (symbol->string symname)))
           (impc:compiler:print-lib-binding-details-to-log library symname type)
 	  (impc:compiler:print-compiler-error (string-append "could not bind!" (symbol->string symname)))))))
@@ -6437,7 +6437,7 @@
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
     `(begin
-       (llvm:compile ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr)))))))
+       (llvm:jit-compile-ir-string ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr)))))))
 
 ;;; this here for binding to CLOSURE in dylib
 ;;
@@ -6453,7 +6453,7 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
                ,(string->symbol (string-append "[" (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type)))
                                               ",i8*]*")))
-     (llvm:compile 
+     (llvm:jit-compile-ir-string 
       (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                      "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n"))
      (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
@@ -6490,7 +6490,7 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
                ,(string->symbol (string-append "[" (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type)))
                                               ",i8*]*")))
-     (llvm:compile 
+     (llvm:jit-compile-ir-string 
       (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                      "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n"))
      (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
@@ -6516,7 +6516,7 @@
 ;;; this here for binding to CLOSURE in dylib
 (define-macro (bind-lib-val library symname type)
   `(let ((ground-type (impc:ir:ground-type-aliases ,(symbol->string type))))
-     (llvm:compile 
+     (llvm:jit-compile-ir-string 
       (string-append "@" ,(symbol->string symname) " = external global "
                      (if ground-type ground-type ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type))))))
      (llvm:bind-symbol ,library ,(symbol->string symname))))
@@ -6635,8 +6635,8 @@
              (if (regex:match? t ":")
                  (set! t (cadr (regex:type-split t ":"))))
              (let ((newname (string-append sym "_poly_" (cname-encode t))))
-               ;; (println `(llvm:compile ,(string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t)))))
-               (llvm:compile (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
+               ;; (println `(llvm:jit-compile-ir-string ,(string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t)))))
+               (llvm:jit-compile-ir-string (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
                (build-type-dataconstructor (string->symbol newname) t #f)))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
