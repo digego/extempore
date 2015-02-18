@@ -5309,52 +5309,24 @@
 ;; compile the getter/setter/stub/callback functions
 (define impc:ti:compile-auxilliary-functions
   (lambda (fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
-    (if *impc:compiler:print* (println '------------------------------compiling 'maker----------------------------------->))
-    (if *impc:compiler:print* (println fs))
-    (if *impc:compiler:print-raw-llvm* (print-full-nq fs))
     (if *impc:compile*
-        (begin
-          ;; (llvm:remove-function (string-append (symbol->string symname) "_maker"))
-          (if (not (llvm:jit-compile-ir-string fs))
-              (impc:compiler:print-compiler-error "compiler failed"))
-          (if *impc:compiler:print* (print-notification "compiled maker"))))
-    (if *impc:compiler:print* (println '--------------------------------compiling 'setter----------------------------------->))            
-    (if *impc:compiler:print* (println fssetter))
-    (if *impc:compiler:print-raw-llvm* (print-full-nq fssetter))
-    (if *impc:compile*
-        (begin (if (not (llvm:jit-compile-ir-string fssetter))
-                   (impc:compiler:print-compiler-error "compiler failed"))
-               (if *impc:compiler:print* (print-notification "compiled setter"))))
-    (if *impc:compiler:print* (println '--------------------------------compiling 'getter----------------------------------->))            
-    (if *impc:compiler:print* (println fsgetter))            
-    (if *impc:compiler:print-raw-llvm* (print-full-nq fsgetter))
-    (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
-        (begin (if (not (llvm:jit-compile-ir-string fsgetter))
-                   (impc:compiler:print-compiler-error "compiler failed"))
-               (if *impc:compiler:print* (print-notification "compiled stub"))))
-    (if *impc:compiler:print* (println '--------------------------------compiling 'stubs----------------------------------->))            
-    (if *impc:compiler:print* (println fstub))
-    (if *impc:compiler:print-raw-llvm* (print-full-nq fstub))
-    (if *impc:compiler:print* (println fstub_native))
-    (if *impc:compiler:print-raw-llvm* (print-full-nq fstub_native))
-    (if *impc:compiler:print* (println fstub_scheme))            
-    (if *impc:compiler:print-raw-llvm* (print-full-nq fstub_scheme))
-    (if (and *impc:compile* compile-stub?) ;; only compile stub first time around!!!
-        (begin (if (or (not (llvm:jit-compile-ir-string fstub))
-                       (not (llvm:jit-compile-ir-string fstub_native))
-                       (not (if fstub_scheme_valid (llvm:jit-compile-ir-string fstub_scheme) #t)))
-                   (impc:compiler:print-compiler-error "compiler failed building stubs!"))
-               ;; bind fstub_scheme
-               (if *impc:compiler:print*
-                   (print-notification "compiled stubs"))))
-    (if *impc:compiler:print* (println '----------------------------compiling 'callback----------------------------------->))
-    (if *impc:compiler:print* (println fscallback))
-    (if *impc:compiler:print-raw-llvm* (print-full-nq fscallback))
-    (if (and *impc:compile* compile-stub?) ;; only compile callback first time around!!!
-        (begin 
-          (if (not (llvm:jit-compile-ir-string fscallback))
-              (impc:compiler:print-compiler-error "compiler failed"))
-          (if *impc:compiler:print* (print-notification "compiled callback"))))))
+        (begin (if (not (llvm:jit-compile-ir-string (string-append fs 
+                                                                   fssetter 
+                                                                   fsgetter 
+                                                                   (if compile-stub?
+                                                                       (string-append fstub fstub_native
+                                                                                      (if fstub_scheme_valid
+                                                                                          fstub_scheme ""))
+                                                                       "")
+                                                                   fscallback)))
+                   (impc:compiler:print-compiler-error "cannot compile auxilliary functions (closure getter/setter etc.)"))
+               (if *impc:compiler:print-raw-llvm*
+                   (begin (print-full-nq fs)    
+                          (print-full-nq fssetter)
+                          (print-full-nq fsgetter)
+                          (print-full-nq fstub)
+                          (print-full-nq fstub_native)
+                          (print-full-nq fstub_scheme)))))))
 
 (define impc:ti:run
    (lambda (symname code zone-size . args)
