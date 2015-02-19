@@ -666,6 +666,36 @@
           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname "\n"))))))
 
 
+;;;;;;;;;;;;;;;;;;;;;
+;; JIT-compilation ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; this is the "queue" where IR is cached as we go (NB: not actually a
+;; queue)
+(define *impc:compiler:queued-llvm-ir-string* "")
+
+(define impc:compiler:reset-jit-compilation-queue
+  (lambda ()
+    (set! *impc:compiler:queued-llvm-ir-string* "")))
+
+(define impc:compiler:queue-ir-for-compilation
+  (lambda (ir-string)
+    (set! *impc:compiler:queued-llvm-ir-string*
+          (string-append *impc:compiler:queued-llvm-ir-string* ir-string))))
+
+(define impc:compiler:flush-jit-compilation-queue
+  (lambda ()
+    (if (not (string=? *impc:compiler:queued-llvm-ir-string* ""))
+        (let ((res (llvm:jit-compile-ir-string *impc:compiler:queued-llvm-ir-string*)))
+          (impc:compiler:reset-jit-compilation-queue)
+          res))))
+
+(define llvm:compile-ir
+  (lambda (ir-string)
+    (if (sys:precomp:currently-compiling?)
+        (impc:compiler:queue-ir-for-compilation ir-string)
+        (llvm:jit-compile-ir-string ir-string))))
+
 ;; ;; GCHANGE
 ;; ;; removes %b when returning base types (i.e. !head%b returns !head)
 ;; (define impc:ir:get-base-type-g
