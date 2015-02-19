@@ -6191,58 +6191,6 @@
 
 
 ;; (define-macro (bind-val symbol type . optional-value)
-;;   (let ((value (if (null? optional-value)
-;;                    0
-;;                    (car optional-value))))
-;;     (let ((t (impc:ir:get-type-from-pretty-str (atom->string type))))
-;;       (cond ((llvm:get-globalvar (symbol->string symbol))
-;;              `(begin
-;;                 (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
-;;                 (print " symbol ")
-;;                 (print-with-colors 'green 'default #f (print ',symbol))
-;;                 (print " is already bound, and has not been re-bound")
-;;                 (println)
-;;                 (throw "")))
-;;             ((and (equal? "i8*" (symbol->string type))
-;;                   (string? value))
-;;              `(begin
-;;                 (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
-;;                                              " = external global i8*"))
-;;                 (llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-;;                 (impc:print-bound-message ,symbol ,type)))
-;;             ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
-;;                   (not (impc:ir:pointer? t)))
-;;              `(begin
-;;                 (llvm:jit-compile-ir-string
-;;                  (string-append "@" ,(symbol->string symbol)
-;;                                 " = global "
-;;                                 ,(impc:ir:get-type-str t) " "
-;;                                 ,(if (= t *impc:ir:fp32*)
-;;                                      (llvm:convert-float (atom->string (eval value)))
-;;                                      (atom->string (eval value)))))
-;;                 (impc:print-bound-message ,symbol ,type)))
-;;             ((impc:ir:pointer? t)
-;;              (if (integer? (eval value))
-;;                  `(begin (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
-;;                                                       " = external global "
-;;                                                       ,(impc:ir:get-type-str t)))
-;;                          (llvm:bind-global-var ,(symbol->string symbol)
-;;                                                ,(sys:make-cptr (* (eval value)
-;;                                                                   (if (impc:ir:number? t)
-;;                                                                       (impc:ir:get-type-size t)
-;;                                                                       (/ (sys:pointer-size) 8)))))
-;;                          (impc:print-bound-message ,symbol ,type))
-;;                  `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate")))
-;;             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
-;;              `(begin
-;;                 (llvm:jit-compile-ir-string
-;;                  (string-append
-;;                   "@" ,(symbol->string symbol)
-;;                   " = global "
-;;                   ,(impc:ir:get-type-str t) " zeroinitializer"))
-;;                 (impc:print-bound-message ,symbol ,type)))
-;;             (else (impc:compiler:print-missing-type-error type))))))
-
 
 
 ;; it needs to: work for
