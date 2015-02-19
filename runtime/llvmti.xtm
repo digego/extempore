@@ -33,9 +33,122 @@
 ;;
 ;;
 
-(define *impc:docstrings* '())
-(define *impc:closuretypes* '())
-(define *impc:closurebodies* '())
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; GLOBAL closures and variables ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; globals which cache the state (especially types) of all the things.
+
+;;;;;;;;;;;
+;; closures
+;; --------
+;;
+(define *impc:ti:closure-list* '())
+;;
+;; each element of the list is of the form
+;;
+;; (name . #(type docstring arg-pairlist body))
+;;
+;; where args is itself a pairlist:
+;; e.g. ((a . "i64") (b . "i64"))
+;;
+;; this list replaces *impc:closuretypes*, *impc:closurebodies* and *impc:docstrings*
+;;
+;; TODO:
+;;
+;; - if we keep this list sorted, then lookups become O(log2(N))
+;;   rather than O(N) (or we could even use a hash-map one day...)
+;; - add validation that closure type and arg types match up
+
+(define impc:ti:register-new-closure
+  (lambda (closure-name type docstring arg-pairlist body)
+    ;; check arg types
+    (if (not (and (or (string? closure-name) (begin (println 'closure-name: closure-name) #f))
+                  (or (string? type) (begin (println 'type: type) #f))
+                  (or (string? docstring) (begin (println )))
+                  (or (list? arg-pairlist) (begin (println 'arg-pairlist: arg-pairlist) #f))
+                  (or (list? body) (begin (println 'body: body) #f))))
+        (impc:compiler:print-compiler-error "couldn't register new closure")
+        (set! *impc:ti:closure-list*
+              (cons (cons closure-name (vector type docstring arg-pairlist body))
+                    *impc:ti:closure-list*)))))
+
+;; type is immutable, doesn't need a setter
+(define impc:ti:get-closure-type
+  (lambda (closure-name)
+    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+
+(define impc:ti:get-closure-docstring
+  (lambda (closure-name)
+    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 1) #f))))
+
+(define impc:ti:set-closure-docstring
+  (lambda (closure-name docstring)
+    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
+
+(define impc:ti:get-closure-arg-pairlist
+  (lambda (closure-name)
+    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 2) #f))))
+
+(define impc:ti:set-closure-arg-pairlist
+  (lambda (closure-name arg-pairlist)
+    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      (if cls-list (vector-set! (cdr cls-list) 2 arg-pairlist) #f))))
+
+(define impc:ti:get-closure-body
+  (lambda (closure-name)
+    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 3) #f))))
+
+(define impc:ti:set-closure-body
+  (lambda (closure-name body)
+    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      (if cls-list (vector-set! (cdr cls-list) 3 body) #f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; global variables (i.e. 'bind-val's)
+;; -----------------------------------
+;;
+(define *impc:ti:globalvar-list* '())
+;;
+;; each element of the list is of the form
+;;
+;; (name . #(type docstring))
+
+(define impc:ti:register-new-globalvar
+  (lambda (globalvar-name type docstring)
+    ;; check arg types
+    (if (not (and (or (symbol? globalvar-name) (begin (println 'globalvar-name: globalvar-name) #f))
+                  (or (string? type) (begin (println 'type: type) #f))
+                  (or (string? docstring) (begin (println docstring) #f))))
+        (impc:compiler:print-compiler-error "couldn't register new globalvar")
+        (set! *impc:ti:globalvar-list*
+              (cons (cons globalvar-name (vector type docstring))
+                    *impc:ti:globalvar-list*)))))
+
+;; type is immutable, doesn't need a setter
+(define impc:ti:get-globalvar-type
+  (lambda (globalvar-name)
+    (let ((cls-list (assoc globalvar-name *impc:ti:globalvar-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+
+(define impc:ti:get-globalvar-docstring
+  (lambda (globalvar-name)
+    (let ((cls-list (assoc *impc:ti:globalvar-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 1) #f))))
+
+(define impc:ti:set-globalvar-docstring
+  (lambda (globalvar-name docstring)
+    (let ((cls-list (assoc globalvar-name *impc:ti:globalvar-list*)))
+      (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; flags for printing debug info ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define *impc:ti:print-sub-checks* #f)
 (define *impc:ti:print-main-check* #f)
@@ -5781,15 +5894,15 @@
         (cadr (impc:ir:gname))))))
 
 (define-macro (xtm-closure-doc name)
-  `(let ((res (assoc-strcmp (quote ,name) *impc:docstrings*))
-         (res2 (assoc-strcmp (quote ,name) *impc:closuretypes*))
-         (res3 (assoc-strcmp (quote ,name) *impc:closurebodies*)))
-     (if res
-         (list (cdr res) (cdr res2) (cdr res3))
-         (if res2
-             (list '() (cdr res2) (cdr res3))
-             (if res3
-                 (list '() '() (cdr res3))
+  `(let ((docstring (impc:ti:get-closure-docstring ,name))
+         (types (impc:ti:get-closure-type ,name))
+         (form (impc:ti:get-closure-body ,name)))
+     (if docstring
+         (list (cdr docstring) (cdr types) (cdr form))
+         (if types
+             (list '() (cdr types) (cdr form))
+             (if form
+                 (list '() '() (cdr form))
                  #f)))))
 
 
