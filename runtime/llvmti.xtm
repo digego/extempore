@@ -1278,7 +1278,7 @@
                 ;;(println 'newtype! newname 'totype: newtype3)
                 (if (null? (llvm:get-named-type newname))
                     (begin ;; if this is a new reification of a generic type then ...
-                           (llvm:jit-compile-ir-string (string-append "%" newname " = type " newtype3))
+                           (llvm:compile-ir (string-append "%" newname " = type " newtype3))
                            ;; we should probably also build dataconstructors for the new
                            ;; concrete type?? (at least for printing reasons)
                            ;; because build-type-dataconstructor needs to be called from
@@ -2054,7 +2054,7 @@
                   (if (string? t)
                       (cons sym (impc:ir:pointer-- t))
                       (cons sym (- t *impc:ir:pointer*)))))
-	    (impc:compiler:print-missing-identifier-error sym 'variable))
+            (impc:compiler:print-missing-identifier-error sym 'variable))
         (assoc-strcmp sym vars))))
 
 
@@ -4027,7 +4027,7 @@
 		'())
 	    (impc:ir:get-type-from-str (cadddr ast))))))
 
-;;(closure-ref closure a i32)
+;; (closure-ref closure a i32)
 (define impc:ti:closure-refcheck-check
    (lambda (ast vars kts request?)
      ;(println 'cls 'ref 'check: ast 'request? request?)
@@ -4044,22 +4044,23 @@
 
 
 (define impc:ti:set-check
-   (lambda (ast vars kts request?)
-      (let* ((sym (impc:ti:get-var (cadr ast) vars))
-             (a (impc:ti:type-check (caddr ast) vars kts (cdr sym))))
-        (if *impc:ti:print-sub-checks* (println 'set!:> 'ast: ast 'a: a))
-        ;; (println 'a: a 'sym: sym)
-        (if (and (list? a)
-                 (= (length a) 1)
-                 (impc:ir:type? (car a)))
-            (set! a (car a)))
-        ;; if sym is not a global var then add return type to sym
-        (if (and (assoc-strcmp (car sym) vars)
-                 (member a (cdr (assoc-strcmp (car sym) vars))))
-            (impc:ti:force-var (car sym) vars '() a)
-            (if (assoc-strcmp (car sym) vars) 
-                (impc:ti:update-var (car sym) vars kts a)))
-        a)))
+  (lambda (ast vars kts request?)
+    ;; (println 'ast: ast 'vars: vars 'kts: kts 'request?: request?)
+    (let* ((sym (impc:ti:get-var (cadr ast) vars))
+           (a (impc:ti:type-check (caddr ast) vars kts (cdr sym))))
+      (if *impc:ti:print-sub-checks* (println 'set!:> 'ast: ast 'a: a))
+      ;; (println 'a: a 'sym: sym)
+      (if (and (list? a)
+               (= (length a) 1)
+               (impc:ir:type? (car a)))
+          (set! a (car a)))
+      ;; if sym is not a global var then add return type to sym
+      (if (and (assoc-strcmp (car sym) vars)
+               (member a (cdr (assoc-strcmp (car sym) vars))))
+          (impc:ti:force-var (car sym) vars '() a)
+          (if (assoc-strcmp (car sym) vars) 
+              (impc:ti:update-var (car sym) vars kts a)))
+      a)))
 
 (define impc:ti:pdref-check
    (lambda (ast vars kts request?)      
@@ -4575,101 +4576,101 @@
 ;; try some possible substitutions!
 (define impc:ti:run-type-check*
   (lambda (vars forced-types ast . cnt)
-      ;; (println '------------------------------------)
-      ;; (println 'forced-types forced-types)
-      ;; (println 'vars: vars)
-      ;; (println 'run-type-check 'ast: ast)
-      ;(if (null? cnt) (sys:clear-log-view))
-      (let* ((fvars (map (lambda (t) ;; add any forced-type values to vars
-                            (if (assoc-strcmp (car t) forced-types)
-                                (let ((tt (cdr (assoc-strcmp (car t) forced-types))))
-                                   (cons (car t) (list tt)))
-                                t))
-                         vars))
-	     ;;(lll (println 'vars1: vars))
-             (kts (map (lambda (x) (car x)) forced-types)) ;; just need symbols from forced-types
-	     ;; fvars gets modified 'in place' during this next
-             ;; operation
-             (ret (impc:ti:type-check ast fvars kts #f))
-	     ;; (llllllll (println 'pre-unified-vars: fvars))
-             ;;;;;; a final check across all anonymous lambdas ;;;;;;
-             ;; can safely just removed this ret2 code
-             (ret2 (map (lambda (x)
-			  ;; (println 'x: x)
-                          ;; only do redundant type check over anonymous lambdas
-                          (if (and (assoc-strcmp (car x) fvars)
-                                   (regex:match? (symbol->string (car x)) "_anon_lambda"))
-                              (begin 
-				(impc:ti:type-check-bound-lambda
-				 (car x) fvars kts
-				 (if (> (length (assoc-strcmp (car x) fvars)) 1)
-				     (cadr (assoc-strcmp (car x) fvars))
-				     '())))))
-                        *impc:ti:bound-lambdas*))
-             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-             (u (impc:ti:unify fvars))
-	     ;; (lllll (println 'post-unified-vars: u))
-             (t (impc:ti:unity? u))
-	     ;(lllllll (println (println 'cccccc)))
-             (tt (cl:every (lambda (x) x) t))
-             (a (if tt #t
-                    (impc:ti:find-unresolved-simple-types u))))
-	 ;(println 'fvars: fvars) 	
-	 ;(println 'types: u) 
-        (if *impc:ti:print-unifications* (println 'tirun:> a '-> u))
-         ;; if we have unified types then return them through continuation        
-        (if (or tt
-                (and (not (null? cnt))
-                     (list? (car cnt))
-                     (member u (car cnt))))
-            (*type-check-continuation* u))
-        (cond ((and (not (null? cnt))
-                    (eq? #f (car cnt)))
-               u)
-              ((not a) ;; this run is for generics
-               (impc:ti:clear-all-vars fvars)
-               (let* ((ret (impc:ti:run-type-check* fvars 
-                                                    ;; kts for all solved types
-                                                    (cl:remove #f (map (lambda (k)
-                                                                         (if (impc:ir:type? (cdr k)) k #f))
-                                                                       u))
-                                                    ast (cons u (if (null? cnt) cnt (car cnt))))))
-                 ret))
-              (else ;; (println 'bingo2: a)               
-               (let ((res (map (lambda (x)   ;; call run-type-check for each version of a simple type
-                                 ;; first clear vars
-                                 (impc:ti:clear-all-vars fvars)				    
-                                 (impc:ti:run-type-check* fvars 
-                                                          ;; as well as all simple types which have resolved fully
-                                                          (append (cl:remove-if-not (lambda (z) (and (not (list? z))
-                                                                                                (pair? z))) u)
-                                                                  ;; and any simple types that unify on x
-                                                                  (cl:remove 'failed 
-                                                                             (map (lambda (k)
-                                                                                    (if (null? (cl:intersection (list x) (cdr k)))
-                                                                                        'failed
-                                                                                        (cons (car k) x)))
-                                                                                  (impc:ti:find-unresolved-simple-types u)))
-                                                                  forced-types)
-                                                          ast #f))
-                                                          ;; ast (cons u (if (null? cnt) cnt (car cnt)))))
-                               (cdr (car a)))))
-                 ;; then see what versions might be OK?
-                 (let* ((rr (map (lambda (y)
-				   (cl:remove-if (lambda (x)
-						   (regex:match? (symbol->string (car x)) "^!" ))
-						 y))
-				 res))
-			(r (cl:find-if (lambda (x) 
-					 (cl:every (lambda (x) x) (impc:ti:unity? x)))
-				       rr)))
-                   (if (not r)  ;; if no options are any good then :(
-		       (impc:compiler:print-could-not-resolve-type-error
-			(map (lambda (x) (symbol->string (car x)))
-			     (cl:remove-if (lambda (x)
-					     (impc:ir:type? (cdr x)))
-					   (car res)))))
-                   r)))))))
+    ;; (println '------------------------------------)
+    ;; (println 'forced-types forced-types)
+    ;; (println 'vars: vars)
+    ;; (println 'run-type-check 'ast: ast)
+                                        ;(if (null? cnt) (sys:clear-log-view))
+    (let* ((fvars (map (lambda (t) ;; add any forced-type values to vars
+                         (if (assoc-strcmp (car t) forced-types)
+                             (let ((tt (cdr (assoc-strcmp (car t) forced-types))))
+                               (cons (car t) (list tt)))
+                             t))
+                       vars))
+           ;; (lll (println 'vars1: vars))
+           (kts (map (lambda (x) (car x)) forced-types)) ;; just need symbols from forced-types
+           ;; fvars gets modified 'in place' during this next
+           ;; operation
+           (ret (impc:ti:type-check ast fvars kts #f))
+           ;; (llllllll (println 'pre-unified-vars: fvars))
+;;;;;; a final check across all anonymous lambdas ;;;;;;
+           ;; can safely just removed this ret2 code
+           (ret2 (map (lambda (x)
+                        ;; (println 'x: x)
+                        ;; only do redundant type check over anonymous lambdas
+                        (if (and (assoc-strcmp (car x) fvars)
+                                 (regex:match? (symbol->string (car x)) "_anon_lambda"))
+                            (begin 
+                              (impc:ti:type-check-bound-lambda
+                               (car x) fvars kts
+                               (if (> (length (assoc-strcmp (car x) fvars)) 1)
+                                   (cadr (assoc-strcmp (car x) fvars))
+                                   '())))))
+                      *impc:ti:bound-lambdas*))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+           (u (impc:ti:unify fvars))
+           ;; (lllll (println 'post-unified-vars: u))
+           (t (impc:ti:unity? u))
+           ;; (lllllll (println (println 'cccccc)))
+           (tt (cl:every (lambda (x) x) t))
+           (a (if tt #t
+                  (impc:ti:find-unresolved-simple-types u))))
+                                        ;(println 'fvars: fvars) 	
+                                        ;(println 'types: u) 
+      (if *impc:ti:print-unifications* (println 'tirun:> a '-> u))
+      ;; if we have unified types then return them through continuation        
+      (if (or tt
+              (and (not (null? cnt))
+                   (list? (car cnt))
+                   (member u (car cnt))))
+          (*type-check-continuation* u))
+      (cond ((and (not (null? cnt))
+                  (eq? #f (car cnt)))
+             u)
+            ((not a) ;; this run is for generics
+             (impc:ti:clear-all-vars fvars)
+             (let* ((ret (impc:ti:run-type-check* fvars 
+                                                  ;; kts for all solved types
+                                                  (cl:remove #f (map (lambda (k)
+                                                                       (if (impc:ir:type? (cdr k)) k #f))
+                                                                     u))
+                                                  ast (cons u (if (null? cnt) cnt (car cnt))))))
+               ret))
+            (else ;; (println 'bingo2: a)               
+             (let ((res (map (lambda (x) ;; call run-type-check for each version of a simple type
+                               ;; first clear vars
+                               (impc:ti:clear-all-vars fvars)				    
+                               (impc:ti:run-type-check* fvars 
+                                                        ;; as well as all simple types which have resolved fully
+                                                        (append (cl:remove-if-not (lambda (z) (and (not (list? z))
+                                                                                              (pair? z))) u)
+                                                                ;; and any simple types that unify on x
+                                                                (cl:remove 'failed 
+                                                                           (map (lambda (k)
+                                                                                  (if (null? (cl:intersection (list x) (cdr k)))
+                                                                                      'failed
+                                                                                      (cons (car k) x)))
+                                                                                (impc:ti:find-unresolved-simple-types u)))
+                                                                forced-types)
+                                                        ast #f))
+                             ;; ast (cons u (if (null? cnt) cnt (car cnt)))))
+                             (cdr (car a)))))
+               ;; then see what versions might be OK?
+               (let* ((rr (map (lambda (y)
+                                 (cl:remove-if (lambda (x)
+                                                 (regex:match? (symbol->string (car x)) "^!" ))
+                                               y))
+                               res))
+                      (r (cl:find-if (lambda (x) 
+                                       (cl:every (lambda (x) x) (impc:ti:unity? x)))
+                                     rr)))
+                 (if (not r) ;; if no options are any good then :(
+                     (impc:compiler:print-could-not-resolve-type-error
+                      (map (lambda (x) (symbol->string (car x)))
+                           (cl:remove-if (lambda (x)
+                                           (impc:ir:type? (cdr x)))
+                                         (car res)))))
+                 r)))))))
 
             
 ;;
@@ -5310,7 +5311,7 @@
 (define impc:ti:compile-auxilliary-functions
   (lambda (fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
     (if *impc:compile*
-        (begin (if (not (llvm:jit-compile-ir-string (string-append fs 
+        (begin (if (not (llvm:compile-ir (string-append fs 
                                                                    fssetter 
                                                                    (if compile-stub?
                                                                        (string-append fsgetter fstub fstub_native
@@ -5329,455 +5330,455 @@
                           (print-full-nq fscallback)))))))
 
 (define impc:ti:run
-   (lambda (symname code zone-size . args)
-      ;; (println '-----------> 'impc:ti:run: symname)
-      ;; (println 'code: code)
-      ;; (println 'args: args)
-      (set! *impc:ir:sym-name-stack* '())
-      (set! *impc:ir:ls_var* '())
-      (set! *impc:ti:bound-lambdas* '())
-      (set! *impc:ti:generic-type-mappings* '())
-      (set! *impc:ti:nativef-generics-recurse-test* 0)
-      ;; don't want type checking to find existing native versions!
-      (if *impc:compile*
-          (begin ;(llvm:remove-globalvar (string-append (symbol->string symname) "_var"))
-                 ;(llvm:erase-function (symbol->string symname))
-                 (llvm:erase-function (string-append (symbol->string symname) "_setter"))
-                 (llvm:erase-function (string-append (symbol->string symname) "_maker"))))  
-      (let* ((c code)
-             (shadows (impc:ti:rename-all-shadow-vars c '()))
-             (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
-             (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
-             ;; (llllll (println 'ta: ta))
-             ;; might be over kill doing shadow vars twice!
-             (shadow-code (impc:ti:rename-all-shadow-vars ta '()))             
-             ;; (llll (println 'shadow-code shadow-code))
-             (c2 (impc:ti:get-var-types shadow-code)) ;; it is possible for macros in the first-transform to introduce new var-types
-             (ccc (append (cdr c2) (cdr c1)))
-             ;; (llllll (println 'ccc: ccc))
-             (cc (impc:ti:expand-generic-types ccc))
-             (t1 (car c2))
-             (t2 (impc:ti:mark-returns t1 symname #f #f #f))
-             (t3 (impc:ti:closure:convert t2 (list symname)))
-             (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
-             ;; (llllllllll (println 'vars: vars))
-             (forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
-             ;; (llllllllllll (println 'forced: forced-types))
-	     (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
-             (typespre (impc:ti:run-type-check vars forced-types t4))
-	     (t5 (impc:ti:closure:convert t4 (list symname)))
-	     (types (impc:ti:type-normalize typespre))
-             (newast '()))
-        ;; (println 'forced: forced-types)
-        ;; (println 'types-post: types)
-        ;; (println 'run: (impc:ti:unity? types))
-        ;; (println 'newast: newast)
-        ;; (println 'forced: forced-types)
-        ;; (println 'times: (- ct2 ct1) (- ct3 ct2) (- ct4 ct3) (- ct5 ct4) (- ct6 ct5) (- ct7 ct6) (- ct8 ct7) (- ct9 ct8) (- ct10 ct9) (- ct11 ct10))	 
+  (lambda (symname code zone-size . args)
+    ;; (println '-----------> 'impc:ti:run: symname)
+    ;; (println 'code: code)
+    ;; (println 'args: args)
+    (set! *impc:ir:sym-name-stack* '())
+    (set! *impc:ir:ls_var* '())
+    (set! *impc:ti:bound-lambdas* '())
+    (set! *impc:ti:generic-type-mappings* '())
+    (set! *impc:ti:nativef-generics-recurse-test* 0)
+    ;; don't want type checking to find existing native versions!
+    (if *impc:compile*
+        (begin ;(llvm:remove-globalvar (string-append (symbol->string symname) "_var"))
+                                        ;(llvm:erase-function (symbol->string symname))
+          (llvm:erase-function (string-append (symbol->string symname) "_setter"))
+          (llvm:erase-function (string-append (symbol->string symname) "_maker"))))
+    (let* ((c code)
+           (shadows (impc:ti:rename-all-shadow-vars c '()))
+           (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
+           (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
+           ;; (llllll (println 'ta: ta))
+           ;; might be over kill doing shadow vars twice!
+           (shadow-code (impc:ti:rename-all-shadow-vars ta '()))             
+           ;; (llll (println 'shadow-code shadow-code))
+           (c2 (impc:ti:get-var-types shadow-code)) ;; it is possible for macros in the first-transform to introduce new var-types
+           (ccc (append (cdr c2) (cdr c1)))
+           ;; (llllll (println 'ccc: ccc))
+           (cc (impc:ti:expand-generic-types ccc))
+           (t1 (car c2))
+           (t2 (impc:ti:mark-returns t1 symname #f #f #f))
+           (t3 (impc:ti:closure:convert t2 (list symname)))
+           (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
+           ;; (llllllllll (println 'vars: vars))
+           (forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
+           ;; (llllllllllll (println 'forced: forced-types))
+           (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
+           (typespre (impc:ti:run-type-check vars forced-types t4))
+           (t5 (impc:ti:closure:convert t4 (list symname)))
+           (types (impc:ti:type-normalize typespre))
+           (newast '()))
+      ;; (println 'forced: forced-types)
+      ;; (println 'types-post: types)
+      ;; (println 'run: (impc:ti:unity? types))
+      ;; (println 'newast: newast)
+      ;; (println 'forced: forced-types)
+      ;; (println 'times: (- ct2 ct1) (- ct3 ct2) (- ct4 ct3) (- ct5 ct4) (- ct6 ct5) (- ct7 ct6) (- ct8 ct7) (- ct9 ct8) (- ct10 ct9) (- ct11 ct10))	 
 	
-        ;; (println 'typesa types)
-        ;; A FINAL TYPE CLEANUP
-        ;; 
-        ;; finally we remove !bang types which ultimately don't need to be resolved fully
-        ;; don't need to be resolved because they are helpers to resolution not reified types in their own right
-        ;; 
-        ;; also we make sure that any types of the form (sym "%list...") are converted to (sym . "%list...")
-        ;; in other words change list ("%list...") into atom "%list..."
+      ;; (println 'typesa types)
+      ;; A FINAL TYPE CLEANUP
+      ;; 
+      ;; finally we remove !bang types which ultimately don't need to be resolved fully
+      ;; don't need to be resolved because they are helpers to resolution not reified types in their own right
+      ;; 
+      ;; also we make sure that any types of the form (sym "%list...") are converted to (sym . "%list...")
+      ;; in other words change list ("%list...") into atom "%list..."
 
-        (set! types (cl:remove #f (map (lambda (x) 
-                                         (if (or (regex:match? (symbol->string (car x)) "^!")
-                                                 (regex:match? (symbol->string (car x))
-                                                               "^[A-Za-z0-9_-]*:<.*##[0-9]*$"))
-                                                 #f
-                                             (if (list? (cdr x))
-                                                 (if (= (length (cdr x)) 1)
-                                                     (cons (car x) (cadr x))
-                                                     x)
-                                                 x)))
-                                       types)))
+      (set! types (cl:remove #f (map (lambda (x) 
+                                       (if (or (regex:match? (symbol->string (car x)) "^!")
+                                               (regex:match? (symbol->string (car x))
+                                                             "^[A-Za-z0-9_-]*:<.*##[0-9]*$"))
+                                           #f
+                                           (if (list? (cdr x))
+                                               (if (= (length (cdr x)) 1)
+                                                   (cons (car x) (cadr x))
+                                                   x)
+                                               x)))
+                                     types)))
         
-         ;; just added by andrew (can be safely removed)
-        (if (null? types)
-            (impc:compiler:print-could-not-resolve-type-error symname))
+      ;; just added by andrew (can be safely removed)
+      (if (null? types)
+          (impc:compiler:print-could-not-resolve-type-error symname))
          
-         ;; (println 'final-types: types)
+      ;; (println 'final-types: types)
 
-         ;; if we didn't unify print error and bomb out!	
-         (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
-             (begin 
-               ;; (println 'types_: types)
-               (impc:compiler:print-could-not-resolve-type-error
-                (cl:remove 'good (map (lambda (x y) (if y 'good (symbol->string (car x))))
-                                      types (impc:ti:unity? types)))
-                "you could try forcing the type of one or more of these symbols")))
+      ;; if we didn't unify print error and bomb out!	
+      (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
+          (begin 
+            ;; (println 'types_: types)
+            (impc:compiler:print-could-not-resolve-type-error
+             (cl:remove 'good (map (lambda (x y) (if y 'good (symbol->string (car x))))
+                                   types (impc:ti:unity? types)))
+             "you could try forcing the type of one or more of these symbols")))
 
-	 ;; if we have type checked ok then set addtypes to source and create new ast
-	 (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list)))
-         ;; (println 'ast:)
-         ;; (println newast)
-         ;; (println 'types:)
-         ;; (for-each (lambda (t) (println t)) types)
+      ;; if we have type checked ok then set addtypes to source and create new ast
+      (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list)))
+      ;; (println 'ast:)
+      (println newast)
+      (println 'types:)
+      ;; (for-each (lambda (t) (println t)) types)
          
-         ;; if this function has been defined before make sure we aren't changing its signature!!
-         (if (and (llvm:get-function (symbol->string symname))
-                  (or (<> (length (llvm:get-function-args-withoutzone (symbol->string symname)))
-                          (length (cddr (assoc-strcmp symname types)))) 
-                      (cl:position #f (map (lambda (a b)
-					     (equal? a b))
-                                           (cons (+ *impc:ir:closure*
-						    *impc:ir:pointer*
-                                                    *impc:ir:pointer*)
-                                                 (map (lambda (x) (impc:ir:get-type-from-str x))
-                                                      (llvm:get-function-args-withoutzone (symbol->string symname))))
-                                           (cdr (assoc-strcmp symname types))))))
-	     (impc:compiler:print-no-redefinitions-error
-	      symname
-	      (impc:ir:pptype (cons (+ *impc:ir:closure*
-				       *impc:ir:pointer*
-				       *impc:ir:pointer*)
-				    (map (lambda (x) (impc:ir:get-type-from-str x))
-					 (llvm:get-function-args-withoutzone (symbol->string symname)))))
-	      (impc:ir:pptype (cdr (assoc-strcmp symname types)))))
-	 ;(print-error "stop")
-         (if *impc:compiler:print-ast* (println '---------------------------------))
-         (if *impc:compiler:print-ast* (println 'types: types))
-         ;(println 'ctypes: converted-types)
-         (if *impc:compiler:print-ast* (println 'newast: newast))
+      ;; if this function has been defined before make sure we aren't changing its signature!!
+      (if (and (llvm:get-function (symbol->string symname))
+               (or (<> (length (llvm:get-function-args-withoutzone (symbol->string symname)))
+                       (length (cddr (assoc-strcmp symname types)))) 
+                   (cl:position #f (map (lambda (a b)
+                                          (equal? a b))
+                                        (cons (+ *impc:ir:closure*
+                                                 *impc:ir:pointer*
+                                                 *impc:ir:pointer*)
+                                              (map (lambda (x) (impc:ir:get-type-from-str x))
+                                                   (llvm:get-function-args-withoutzone (symbol->string symname))))
+                                        (cdr (assoc-strcmp symname types))))))
+          (impc:compiler:print-no-redefinitions-error
+           symname
+           (impc:ir:pptype (cons (+ *impc:ir:closure*
+                                    *impc:ir:pointer*
+                                    *impc:ir:pointer*)
+                                 (map (lambda (x) (impc:ir:get-type-from-str x))
+                                      (llvm:get-function-args-withoutzone (symbol->string symname)))))
+           (impc:ir:pptype (cdr (assoc-strcmp symname types)))))
+                                        ;(print-error "stop")
+      (if *impc:compiler:print-ast* (println '---------------------------------))
+      (if *impc:compiler:print-ast* (println 'types: types))
+                                        ;(println 'ctypes: converted-types)
+      (if *impc:compiler:print-ast* (println 'newast: newast))
 
-         ;; check for unfound types
-         (for-each (lambda (t)		     
-		     (if (not (impc:ir:type? (cdr t)))
-			 (impc:compiler:print-could-not-resolve-type-error (car t))))
-		   types)
+      ;; check for unfound types
+      (for-each (lambda (t)		     
+                  (if (not (impc:ir:type? (cdr t)))
+                      (impc:compiler:print-could-not-resolve-type-error (car t))))
+                types)
 	 
-         ;; compile to ir	 
-         (define fstr (impc:ir:compiler newast types))
-         ;; compile to x86 - i.e. call jit on any new ir functions to force jit compilation	
-         ;; (for-each (lambda (fn) (llvm:jit-compile-function fn)) (impc:ti:get-closure-names newast))
+      ;; compile to ir	 
+      (define fstr (impc:ir:compiler newast types))
+      ;; compile to x86 - i.e. call jit on any new ir functions to force jit compilation	
+      ;; (for-each (lambda (fn) (llvm:jit-compile-function fn)) (impc:ti:get-closure-names newast))
 
-         ;;
-         ;; now compile ir to x86 and make stub code
-         (let* ((closure-type (cadr (impc:ir:gname)))
-		(closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
-                (compile-stub? (if (llvm:get-function (string-append (symbol->string symname) "_getter")) #f #t))
-                (fs (string-append "define dllexport ccc " closure-type " @" (string-append (symbol->string symname) "_maker")
-                                   "(i8* %_impz) nounwind {\nentry:\n"				   
-                                   ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
-				   ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-				   ;; ;; new lines for impz
-				   "%_impzPtr = alloca i8*\n"
-				   "store i8* %_impz, i8** %_impzPtr\n"
-				   ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                                   fstr "}\n"))
-                (fssetter (string-append (if compile-stub? ;;(llvm:get-globalvar (string-append (symbol->string symname) "_var"))
-                                             (string-append "@" (symbol->string symname) "_var = dllexport global [1 x i8*] [ i8* null ]\n\n"
-                                                            "@" (symbol->string symname) "_var_zone = dllexport global [1 x i8*] [ i8* null ]\n\n")
-                                             "") ;; if global var alread exists do nothing
-                                         "define dllexport ccc void @" (string-append (symbol->string symname) "_setter")
-                                         "(i8* %_impz) nounwind {\nentry:\n" 
-                                         "%oldzone1 = getelementptr [1 x i8*]* @" (symbol->string symname) "_var_zone, i32 0, i32 0\n"
-                                         "%oldzone2 = load i8** %oldzone1\n"
-                                         "%oldzone3 = bitcast i8* %oldzone2 to %mzone*\n"
-                                         "store i8* %_impz, i8** %oldzone1\n"
-                                         ; existing code
-                                         "%closure = call ccc " (cadr (impc:ir:gname))
-                                         " @" (string-append (symbol->string symname) "_maker") "(i8* %_impz)\n"
-                                         "%ptr = bitcast " (cadr (impc:ir:gname)) " %closure to i8*\n"
-                                         "%varptr = bitcast [1 x i8*]* @" (symbol->string symname) "_var to i8**\n"
-                                         "store i8* %ptr, i8** %varptr\n"
-                                         ;; new code
-                                         "; destroy oldzone if not null\n"
-                                         "%test = icmp ne %mzone* %oldzone3, null\n"
-                                         "br i1 %test, label %then, label %cont\n"
-                                         ;"then:\ncall ccc void @llvm_zone_destroy(%mzone* %oldzone3)\nbr label %cont\n"
-					 "then:\ncall ccc void @llvm_destroy_zone_after_delay(%mzone* %oldzone3, i64 441000)\nbr label %cont\n"
-                                         "cont:\n"
-                                         "ret void\n}\n"))
-                (stub-type (impc:ir:get-closure-type-from-str closure-type))
-                (fsgetter (string-append "define dllexport ccc i8* @" (symbol->string symname) "_getter() nounwind {\n"
-                                         "entry:\n"
-                                         "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
-                                         "%func = load i8** %ptr\n"
-                                         "ret i8* %func\n}\n"))
-		(cb-struct-type (if (null? (cdr stub-type))
-				    '()
-				    (string-append ;"{void(i8*)*"
-				               "{"
-					       (impc:ir:get-type-str (cadr stub-type))
-					       (apply string-append
-						      (map (lambda (a)
-							     (string-append ", " (impc:ir:get-type-str a)))
-							   (cddr stub-type)))
-					       "}*")))
-		(fscallback (string-append "define dllexport ccc void @" (string-append (symbol->string symname) "_callback(i8* %dat) nounwind {\n"
-					   "entry:\n"
-					   (if (null? cb-struct-type)
-					       "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
-					       (string-append "%fstruct = bitcast i8* %dat to " cb-struct-type "\n"))
-					   ;;"%fPtr = getelementptr " cb-struct-type " %fstruct ,i32 0, i32 0\n"
-					   (apply string-append (map (lambda (n t ap a)
-								       (string-append ap " = getelementptr " cb-struct-type " %fstruct, i32 0, i32 " (number->string n) "\n"
-										      a " = load " (impc:ir:get-type-str t) "* " ap "\n"))
-								     (make-list-with-proc (- (length stub-type) 1) (lambda (i) i)) ;(+ i 1)))
-								     (cdr stub-type)
-								     '("%ap" "%bp" "%cp" "%dp" "%ep" "%fp" "%gp" "%hp" "%ip" "%jp" "%kp" "%lp" "%mp" "%np" "%op" "%pp" "%qp" "%rp" "%sp" "%tp")
-								     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
-					   ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-             "%_zone = call ccc %mzone* @llvm_threads_get_callback_zone()\n"
-             "call ccc void @llvm_push_zone_stack(%mzone* %_zone)\n"
-             "call ccc %mzone* @llvm_zone_reset(%mzone* %_zone)\n"
-					   "%_impz = bitcast %mzone* %_zone to i8*\n"
-					   "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
-					   "%ptrvar = load i8** %ptr\n"
-					   "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-					   "%closure = load " closure-type " %closure_tmp \n"
-					   "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
-					   "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
-					   "%ff = load "
-					   (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
-					   "* %fPtr\n"
-					   "%ee = load i8** %ePtr\n"
-					   (if (impc:ir:void? (car stub-type)) "" "%result = ")
-					   "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
-					   ;;"call ccc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"                                           
-					   (apply string-append (map (lambda (t n)
-								       (string-append ", " 
-										      (impc:ir:get-type-str t) 
-										      " " n))
-								     (cdr stub-type)
-								     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))             
-					   ")\n"
-             "call ccc %mzone* @llvm_pop_zone_stack()\n"             
-             "ret void\n" 
-					   "}\n")))
-		(fstub_scheme_valid #t) 
-                (fstub_scheme (string-append "define dllexport ccc i8* " ;(impc:ir:get-type-str (car stub-type))
-					     " @" (string-append (symbol->string symname) "_scheme(i8* %_sc, i8* %args) nounwind\n"
-					     "{\nentry:\n"
-					     "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-					     "%_impz = bitcast %mzone* %_zone to i8*\n"
+      ;;
+      ;; now compile ir to x86 and make stub code
+      (let* ((closure-type (cadr (impc:ir:gname)))
+             (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
+             (compile-stub? (if (llvm:get-function (string-append (symbol->string symname) "_getter")) #f #t))
+             (fs (string-append "define dllexport ccc " closure-type " @" (string-append (symbol->string symname) "_maker")
+                                "(i8* %_impz) nounwind {\nentry:\n"				   
+                                ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
+                                ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                ;; ;; new lines for impz
+                                "%_impzPtr = alloca i8*\n"
+                                "store i8* %_impz, i8** %_impzPtr\n"
+                                ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                fstr "}\n"))
+             (fssetter (string-append (if compile-stub? ;;(llvm:get-globalvar (string-append (symbol->string symname) "_var"))
+                                          (string-append "@" (symbol->string symname) "_var = dllexport global [1 x i8*] [ i8* null ]\n\n"
+                                                         "@" (symbol->string symname) "_var_zone = dllexport global [1 x i8*] [ i8* null ]\n\n")
+                                          "") ;; if global var alread exists do nothing
+                                      "define dllexport ccc void @" (string-append (symbol->string symname) "_setter")
+                                      "(i8* %_impz) nounwind {\nentry:\n" 
+                                      "%oldzone1 = getelementptr [1 x i8*]* @" (symbol->string symname) "_var_zone, i32 0, i32 0\n"
+                                      "%oldzone2 = load i8** %oldzone1\n"
+                                      "%oldzone3 = bitcast i8* %oldzone2 to %mzone*\n"
+                                      "store i8* %_impz, i8** %oldzone1\n"
+                                        ; existing code
+                                      "%closure = call ccc " (cadr (impc:ir:gname))
+                                      " @" (string-append (symbol->string symname) "_maker") "(i8* %_impz)\n"
+                                      "%ptr = bitcast " (cadr (impc:ir:gname)) " %closure to i8*\n"
+                                      "%varptr = bitcast [1 x i8*]* @" (symbol->string symname) "_var to i8**\n"
+                                      "store i8* %ptr, i8** %varptr\n"
+                                      ;; new code
+                                      "; destroy oldzone if not null\n"
+                                      "%test = icmp ne %mzone* %oldzone3, null\n"
+                                      "br i1 %test, label %then, label %cont\n"
+                                        ;"then:\ncall ccc void @llvm_zone_destroy(%mzone* %oldzone3)\nbr label %cont\n"
+                                      "then:\ncall ccc void @llvm_destroy_zone_after_delay(%mzone* %oldzone3, i64 441000)\nbr label %cont\n"
+                                      "cont:\n"
+                                      "ret void\n}\n"))
+             (stub-type (impc:ir:get-closure-type-from-str closure-type))
+             (fsgetter (string-append "define dllexport ccc i8* @" (symbol->string symname) "_getter() nounwind {\n"
+                                      "entry:\n"
+                                      "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
+                                      "%func = load i8** %ptr\n"
+                                      "ret i8* %func\n}\n"))
+             (cb-struct-type (if (null? (cdr stub-type))
+                                 '()
+                                 (string-append ;"{void(i8*)*"
+                                  "{"
+                                  (impc:ir:get-type-str (cadr stub-type))
+                                  (apply string-append
+                                         (map (lambda (a)
+                                                (string-append ", " (impc:ir:get-type-str a)))
+                                              (cddr stub-type)))
+                                  "}*")))
+             (fscallback (string-append "define dllexport ccc void @" (string-append (symbol->string symname) "_callback(i8* %dat) nounwind {\n"
+                                                                                     "entry:\n"
+                                                                                     (if (null? cb-struct-type)
+                                                                                         "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
+                                                                                         (string-append "%fstruct = bitcast i8* %dat to " cb-struct-type "\n"))
+                                                                                     ;;"%fPtr = getelementptr " cb-struct-type " %fstruct ,i32 0, i32 0\n"
+                                                                                     (apply string-append (map (lambda (n t ap a)
+                                                                                                                 (string-append ap " = getelementptr " cb-struct-type " %fstruct, i32 0, i32 " (number->string n) "\n"
+                                                                                                                                a " = load " (impc:ir:get-type-str t) "* " ap "\n"))
+                                                                                                               (make-list-with-proc (- (length stub-type) 1) (lambda (i) i)) ;(+ i 1)))
+                                                                                                               (cdr stub-type)
+                                                                                                               '("%ap" "%bp" "%cp" "%dp" "%ep" "%fp" "%gp" "%hp" "%ip" "%jp" "%kp" "%lp" "%mp" "%np" "%op" "%pp" "%qp" "%rp" "%sp" "%tp")
+                                                                                                               '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
+                                        ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                                                                     "%_zone = call ccc %mzone* @llvm_threads_get_callback_zone()\n"
+                                                                                     "call ccc void @llvm_push_zone_stack(%mzone* %_zone)\n"
+                                                                                     "call ccc %mzone* @llvm_zone_reset(%mzone* %_zone)\n"
+                                                                                     "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                                                     "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
+                                                                                     "%ptrvar = load i8** %ptr\n"
+                                                                                     "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                                                                                     "%closure = load " closure-type " %closure_tmp \n"
+                                                                                     "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
+                                                                                     "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+                                                                                     "%ff = load "
+                                                                                     (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
+                                                                                     "* %fPtr\n"
+                                                                                     "%ee = load i8** %ePtr\n"
+                                                                                     (if (impc:ir:void? (car stub-type)) "" "%result = ")
+                                                                                     "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                                                     ;;"call ccc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"                                           
+                                                                                     (apply string-append (map (lambda (t n)
+                                                                                                                 (string-append ", " 
+                                                                                                                                (impc:ir:get-type-str t) 
+                                                                                                                                " " n))
+                                                                                                               (cdr stub-type)
+                                                                                                               '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))             
+                                                                                     ")\n"
+                                                                                     "call ccc %mzone* @llvm_pop_zone_stack()\n"             
+                                                                                     "ret void\n" 
+                                                                                     "}\n")))
+             (fstub_scheme_valid #t) 
+             (fstub_scheme (string-append "define dllexport ccc i8* " ;(impc:ir:get-type-str (car stub-type))
+                                          " @" (string-append (symbol->string symname) "_scheme(i8* %_sc, i8* %args) nounwind\n"
+                                                              "{\nentry:\n"
+                                                              "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                                              "%_impz = bitcast %mzone* %_zone to i8*\n"
 
-					     ;(begin (println 'aaaaa) "")
+                                        ;(begin (println 'aaaaa) "")
 
-					     (apply string-append
-						    (map (lambda (t n idx)
-							   ;(println 't: t 'n: n 'idx: idx)
-							   (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
-                                                                            (cond ((and (not (number? t))
-											(not (impc:ir:pointer? t)))
-										   (set! fstub_scheme_valid #f)
-										   "")
-										  ((or (not (number? t))
-										       (not (or (impc:ir:number? t)
-                                                                                                (impc:ir:void? t)))) 
-                                                                                   (if (and (number? t)
-                                                                                            (= t (+ *impc:ir:pointer* *impc:ir:si8*)))
-                                                                                       (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
-                                                                                       (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
-                                                                                                      (impc:ti:scm_rt_check_string n)
-                                                                                                      "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
-                                                                                                      n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
-										  ((= t *impc:ir:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc double @r64value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc float  @r32value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i16  @i16value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i16  @i16value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i1  @i1value(i8* " n "_val)\n"))
-										  ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
-                                                                                                          (impc:ti:scm_rt_check_string n)
-                                                                                                          n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
-										  (else (error "Compiler Error: 'bad 'type 'in 'scheme 'stub")))))
-							 (cdr stub-type)
-							 '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
-							 (make-list-with-proc 20 (lambda (i) i))))
+                                                              (apply string-append
+                                                                     (map (lambda (t n idx)
+                                        ;(println 't: t 'n: n 'idx: idx)
+                                                                            (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                                                                           (cond ((and (not (number? t))
+                                                                                                       (not (impc:ir:pointer? t)))
+                                                                                                  (set! fstub_scheme_valid #f)
+                                                                                                  "")
+                                                                                                 ((or (not (number? t))
+                                                                                                      (not (or (impc:ir:number? t)
+                                                                                                               (impc:ir:void? t)))) 
+                                                                                                  (if (and (number? t)
+                                                                                                           (= t (+ *impc:ir:pointer* *impc:ir:si8*)))
+                                                                                                      (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
+                                                                                                                     (impc:ti:scm_rt_check_string n)
+                                                                                                                     n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
+                                                                                                      (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                                                                     (impc:ti:scm_rt_check_string n)
+                                                                                                                     "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
+                                                                                                                     n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
+                                                                                                 ((= t *impc:ir:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc double @r64value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc float  @r32value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                     (impc:ti:scm_rt_check_string n)
+                                                                                                                                     n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                     (impc:ti:scm_rt_check_string n)
+                                                                                                                                     n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                    (impc:ti:scm_rt_check_string n)
+                                                                                                                                    n " = call ccc i1  @i1value(i8* " n "_val)\n"))
+                                                                                                 ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+                                                                                                 (else (error "Compiler Error: 'bad 'type 'in 'scheme 'stub")))))
+                                                                          (cdr stub-type)
+                                                                          '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
+                                                                          (make-list-with-proc 20 (lambda (i) i))))
 
-					     ;(begin (println 'bbbbb) "")					     
+                                        ;(begin (println 'bbbbb) "")					     
 					     
-					     "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
-					     "%ptrvar = load i8** %ptr\n"
-					     "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-					     "%closure = load " closure-type " %closure_tmp \n"
-					     "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
-					     "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
-					     "%ff = load "
-					     (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
-					     "* %fPtr\n"
-					     "%ee = load i8** %ePtr\n"
-					     (if (impc:ir:void? (car stub-type)) "" "%result = ")
-					     "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                              "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
+                                                              "%ptrvar = load i8** %ptr\n"
+                                                              "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                                                              "%closure = load " closure-type " %closure_tmp \n"
+                                                              "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
+                                                              "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+                                                              "%ff = load "
+                                                              (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
+                                                              "* %fPtr\n"
+                                                              "%ee = load i8** %ePtr\n"
+                                                              (if (impc:ir:void? (car stub-type)) "" "%result = ")
+                                                              "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
 
-					     (apply string-append
-						    (map (lambda (t n)
-							   (string-append ", " (impc:ir:get-type-str t) " " n))
-							 (cdr stub-type)
-							 '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
-					     ")\n"
+                                                              (apply string-append
+                                                                     (map (lambda (t n)
+                                                                            (string-append ", " (impc:ir:get-type-str t) " " n))
+                                                                          (cdr stub-type)
+                                                                          '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
+                                                              ")\n"
 
-					     ;(begin (println 'ccccc) "")
+                                        ;(begin (println 'ccccc) "")
 
-					     (let* ((t (car stub-type)))
-					       (cond ((and (not (number? t))
-							   (not (impc:ir:pointer? t)))
-						      (set! fstub_scheme_valid #f)
-						      "")
-						     ((or (not (number? t))
-							  (not (or (impc:ir:number? t)
-                                                                   (impc:ir:void? t))))
-						      (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
-								     "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
-						     ((= t *impc:ir:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
-						     ((= t *impc:ir:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
-						     ((= t *impc:ir:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
-						     ((= t *impc:ir:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
-						     ((= t *impc:ir:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n") 
-						     ((= t *impc:ir:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
-						     ((= t *impc:ir:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")  
-						     ((= t *impc:ir:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
-						     ((= t *impc:ir:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")  
-						     ((= t *impc:ir:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
-						     ((= t *impc:ir:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")	 
-						     ((= t *impc:ir:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
-						     ((= t *impc:ir:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
-						     (else (error 'Compiler 'Error: 'return 'type 'error 'in 'scheme 'stub))))
+                                                              (let* ((t (car stub-type)))
+                                                                (cond ((and (not (number? t))
+                                                                            (not (impc:ir:pointer? t)))
+                                                                       (set! fstub_scheme_valid #f)
+                                                                       "")
+                                                                      ((or (not (number? t))
+                                                                           (not (or (impc:ir:number? t)
+                                                                                    (impc:ir:void? t))))
+                                                                       (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
+                                                                                      "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
+                                                                      ((= t *impc:ir:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
+                                                                      ((= t *impc:ir:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
+                                                                      ((= t *impc:ir:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
+                                                                      ((= t *impc:ir:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                                                                      ((= t *impc:ir:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n") 
+                                                                      ((= t *impc:ir:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                                                                      ((= t *impc:ir:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")  
+                                                                      ((= t *impc:ir:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                                                                      ((= t *impc:ir:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")  
+                                                                      ((= t *impc:ir:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                                                                      ((= t *impc:ir:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")	 
+                                                                      ((= t *impc:ir:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
+                                                                      ((= t *impc:ir:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+                                                                      (else (error 'Compiler 'Error: 'return 'type 'error 'in 'scheme 'stub))))
 					     
-					     "ret i8* %res\n"
-					     "}")))
-                (fstub (string-append "define dllexport fastcc " (impc:ir:get-type-str (car stub-type))
-                                      " @" (string-append (symbol->string symname) "("
-                                                          (apply string-append (map (lambda (t n c)
-                                                                                      (string-append c (impc:ir:get-type-str t) " "
-                                                                                                     n))
-                                                                                    (cdr stub-type)                                
-                                                                                    '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
-                                                                                    '("" "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
-                                                          ") nounwind \n"
-                                                          "{\nentry:\n"
-                                                          "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                          "%_impz = bitcast %mzone* %_zone to i8*\n"
-                                                          "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
-                                                          "%ptrvar = load i8** %ptr\n"
-                                                          "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                          "%closure = load " closure-type " %closure_tmp \n"
-                                                          "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
-                                                          "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
-                                                          "%ff = load "
-                                                          (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
-                                                          "* %fPtr\n"
-                                                          "%ee = load i8** %ePtr\n"
-                                                          (if (impc:ir:void? (car stub-type)) "" "%result = ")
-                                                          "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
-                                                          (apply string-append (map (lambda (t n)
-                                                                                      (string-append ", " 
-                                                                                                     (impc:ir:get-type-str t) 
-                                                                                                     " " n))
-                                                                                    (cdr stub-type)
-                                                                                    '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
-                                                          ")\nret " (impc:ir:get-type-str (car stub-type)) 
-                                                          (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-                                                          "}")))
-                (fstub_native (string-append "define dllexport ccc " (impc:ir:get-type-str (car stub-type))
-                                             " @" (string-append (symbol->string symname) "_native("
-                                                                 (apply string-append (map (lambda (t n c)
-                                                                                             (string-append c (impc:ir:get-type-str t) " "
-													    n))
-											   (cdr stub-type)                                
-											   '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
-											   '("" "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
-                                                                 ") nounwind \n"
-                                                                 "{\nentry:\n"
-                                                                 "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                                 "%_impz = bitcast %mzone* %_zone to i8*\n"
-                                                                 "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
-                                                                 "%ptrvar = load i8** %ptr\n"
-                                                                 "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                                 "%closure = load " closure-type " %closure_tmp \n"
-                                                                 "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
-                                                                 "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
-                                                                 "%ff = load "
-                                                                 (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
-                                                                 "* %fPtr\n"
-                                                                 "%ee = load i8** %ePtr\n"
-                                                                 (if (impc:ir:void? (car stub-type)) "" "%result = ")
-                                                                 "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
-                                                                 (apply string-append (map (lambda (t n)
-                                                                                             (string-append ", " 
-                                                                                                            (impc:ir:get-type-str t) 
-                                                                                                            " " n))
-                                                                                           (cdr stub-type)
-                                                                                           '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
-                                                                 ")\nret " (impc:ir:get-type-str (car stub-type)) 
-                                                                 (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-                                                                 "}"))))
+                                                              "ret i8* %res\n"
+                                                              "}")))
+             (fstub (string-append "define dllexport fastcc " (impc:ir:get-type-str (car stub-type))
+                                   " @" (string-append (symbol->string symname) "("
+                                                       (apply string-append (map (lambda (t n c)
+                                                                                   (string-append c (impc:ir:get-type-str t) " "
+                                                                                                  n))
+                                                                                 (cdr stub-type)                                
+                                                                                 '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
+                                                                                 '("" "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
+                                                       ") nounwind \n"
+                                                       "{\nentry:\n"
+                                                       "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                                       "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                       "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
+                                                       "%ptrvar = load i8** %ptr\n"
+                                                       "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                                                       "%closure = load " closure-type " %closure_tmp \n"
+                                                       "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
+                                                       "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+                                                       "%ff = load "
+                                                       (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
+                                                       "* %fPtr\n"
+                                                       "%ee = load i8** %ePtr\n"
+                                                       (if (impc:ir:void? (car stub-type)) "" "%result = ")
+                                                       "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                       (apply string-append (map (lambda (t n)
+                                                                                   (string-append ", " 
+                                                                                                  (impc:ir:get-type-str t) 
+                                                                                                  " " n))
+                                                                                 (cdr stub-type)
+                                                                                 '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
+                                                       ")\nret " (impc:ir:get-type-str (car stub-type)) 
+                                                       (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
+                                                       "}")))
+             (fstub_native (string-append "define dllexport ccc " (impc:ir:get-type-str (car stub-type))
+                                          " @" (string-append (symbol->string symname) "_native("
+                                                              (apply string-append (map (lambda (t n c)
+                                                                                          (string-append c (impc:ir:get-type-str t) " "
+                                                                                                         n))
+                                                                                        (cdr stub-type)                                
+                                                                                        '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
+                                                                                        '("" "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
+                                                              ") nounwind \n"
+                                                              "{\nentry:\n"
+                                                              "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                                              "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                              "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
+                                                              "%ptrvar = load i8** %ptr\n"
+                                                              "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                                                              "%closure = load " closure-type " %closure_tmp \n"
+                                                              "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
+                                                              "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+                                                              "%ff = load "
+                                                              (regex:replace closure-type-- "<\\{ ?i8\\*, ?i8\\*,(.*)\\}>\\*" "$1")
+                                                              "* %fPtr\n"
+                                                              "%ee = load i8** %ePtr\n"
+                                                              (if (impc:ir:void? (car stub-type)) "" "%result = ")
+                                                              "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                              (apply string-append (map (lambda (t n)
+                                                                                          (string-append ", " 
+                                                                                                         (impc:ir:get-type-str t) 
+                                                                                                         " " n))
+                                                                                        (cdr stub-type)
+                                                                                        '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
+                                                              ")\nret " (impc:ir:get-type-str (car stub-type)) 
+                                                              (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
+                                                              "}"))))
 
-	   ;;(println fsgetter)
-	   ;;(println fstub)
+        ;;(println fsgetter)
+        ;;(println fstub)
 
-           (impc:ti:compile-auxilliary-functions fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
-            (if *impc:compile*
-                (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname))))
-		  (set! *impc:closuretypes* (cons (cons symname (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))) *impc:closuretypes*))
-                  (if (and (not *impc:compiler:print-raw-llvm*)
-                           (or *impc:ti:print-code-specialization-compiles*
-                               (not (regex:match? (symbol->string symname) "_poly_"))))
-                      (let* ((type1 (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype))))
-                             (type2 (impc:ir:get-pretty-closure-arg-strings type1))
-                             (simpletype
-                              (string-append "["
-                                             (string-join (map (lambda (x)
-                                                                 (if (regex:match? x ":")
-                                                                     (apply string-append (car (regex:type-split x ":"))
-                                                                            (make-list (impc:ir:get-ptr-depth x) "*"))
-                                                                     x))
-                                                               type2)
-                                                          ",")
-                                             "]*")))
-                        ;; (println 'type2 type2)
-                        ;; (println 'simpletype simpletype)                        
-                        (if (regex:match? (symbol->string symname) "_poly_")
-                            ;; note: can probably change this to the
-                            ;; bind-func specific one as well (as in
-                            ;; the 'else' branch)
-                            (impc:compiler:print-binding-details-to-log
-                             "Spec'zed:"
-                             symname
-                             (if *impc:ti:print-full-generic-types*
-                                 (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))
-                                 simpletype))
-                            (impc:compiler:print-bind-func-details-to-log
-                             "Compiled:"
-                             symname
-                             simpletype
-                             zone-size))))))
-            (cadr (impc:ir:gname))))))
+        (impc:ti:compile-auxilliary-functions fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
+        (if *impc:compile*
+            (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname))))
+              (set! *impc:closuretypes* (cons (cons symname (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))) *impc:closuretypes*))
+              (if (and (not *impc:compiler:print-raw-llvm*)
+                       (or *impc:ti:print-code-specialization-compiles*
+                           (not (regex:match? (symbol->string symname) "_poly_"))))
+                  (let* ((type1 (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype))))
+                         (type2 (impc:ir:get-pretty-closure-arg-strings type1))
+                         (simpletype
+                          (string-append "["
+                                         (string-join (map (lambda (x)
+                                                             (if (regex:match? x ":")
+                                                                 (apply string-append (car (regex:type-split x ":"))
+                                                                        (make-list (impc:ir:get-ptr-depth x) "*"))
+                                                                 x))
+                                                           type2)
+                                                      ",")
+                                         "]*")))
+                    ;; (println 'type2 type2)
+                    ;; (println 'simpletype simpletype)                        
+                    (if (regex:match? (symbol->string symname) "_poly_")
+                        ;; note: can probably change this to the
+                        ;; bind-func specific one as well (as in
+                        ;; the 'else' branch)
+                        (impc:compiler:print-binding-details-to-log
+                         "Spec'zed:"
+                         symname
+                         (if *impc:ti:print-full-generic-types*
+                             (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))
+                             simpletype))
+                        (impc:compiler:print-bind-func-details-to-log
+                         "Compiled:"
+                         symname
+                         simpletype
+                         zone-size))))))
+        (cadr (impc:ir:gname))))))
 
 (define-macro (xtm-closure-doc name)
   `(let ((res (assoc-strcmp (quote ,name) *impc:docstrings*))
@@ -5795,45 +5796,45 @@
 (define-macro (definec symname . args)
   (let ((zone-size *impc:default-zone-size*))
     (if (number? (car args))
-	(begin (set! zone-size (car args))
-	       (set! args (cdr args))))
+        (begin (set! zone-size (car args))
+               (set! args (cdr args))))
     (if (string? (car args))
-	(begin (set! *impc:docstrings* (cons (cons symname (car args)) *impc:docstrings*))
-	       (set! args (cdr args))))
+        (begin (set! *impc:docstrings* (cons (cons symname (car args)) *impc:docstrings*))
+               (set! args (cdr args))))
     (let ((types (cdr (reverse args)))
-	  (expr (car (reverse args)))
-	  (precomp_sexpr '()))
+          (expr (car (reverse args)))
+          (precomp_sexpr '()))
       (if (regex:match? (symbol->string symname) ":")
-	  (let ((sres (regex:type-split (symbol->string symname) ":")))
-	    (set! symname (string->symbol (car sres)))
-	    (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
-      ;(print-full symname 'types: types 'e: expr 'args: args)
+          (let ((sres (regex:type-split (symbol->string symname) ":")))
+            (set! symname (string->symbol (car sres)))
+            (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
+      ;; (print-full symname 'types: types 'e: expr 'args: args)
       `(define ,symname
-	 (let* ((res1 (impc:ti:run ',symname
-                             '(let ((,symname ,expr)) ,symname)
-                             ,zone-size
-                             ,@(if (null? types)
-                                   '()
-                                   (map (lambda (k) (list 'quote k)) types))))
-		(setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
-		(func (llvm:get-function (symbol->string ',symname))))
-	   (if setter
-	       (begin
+         (let* ((res1 (impc:ti:run ',symname
+                                   '(let ((,symname ,expr)) ,symname)
+                                   ,zone-size
+                                   ,@(if (null? types)
+                                         '()
+                                         (map (lambda (k) (list 'quote k)) types))))
+                (setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
+                (func (llvm:get-function (symbol->string ',symname))))
+           (if setter
+               (begin
                  (sys:push-memzone (sys:create-mzone ,zone-size))
                  (llvm:run setter (sys:peek-memzone))
                  (sys:pop-memzone) ;; don't destroy here - should happen in _setter
                  )
-	       (impc:compiler:print-missing-compiled-function-setter-error ',symname))
-	   (if func
-	       ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
-	       (if (llvm:get-scheme-function ,(symbol->string symname))
-		   (begin
+               (impc:compiler:print-missing-compiled-function-setter-error ',symname))
+           (if func
+               ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
+               (if (llvm:get-scheme-function ,(symbol->string symname))
+                   (begin
                      (llvm:ffi-set-name
                       (llvm:get-scheme-function ,(symbol->string symname))
                       ,(symbol->string symname))                     
                      (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
-		   (impc:compiler:print-no-scheme-stub-notification ',symname))
-	       (impc:compiler:print-missing-compiled-function-error ',symname)))))))
+                   (impc:compiler:print-no-scheme-stub-notification ',symname))
+               (impc:compiler:print-missing-compiled-function-error ',symname)))))))
 	
 
 ;; alias for definec (should replace definec)
@@ -5850,12 +5851,12 @@
       (impc:compiler:print-already-bound-error (car args) "generic closure"))
   (if (regex:match? (symbol->string (car args)) ":")
       (let ((p (regex:type-split (symbol->string (car args)) ":")))
-	(if (assoc-strcmp (car p) *impc:closurebodies*)
-	    (set-cdr! (assoc-strcmp (string->symbol (car p)) *impc:closurebodies*) (cdr args))
-	    (set! *impc:closurebodies* (cons (cons (string->symbol (car p)) (cdr args)) *impc:closurebodies*))))
+        (if (assoc-strcmp (car p) *impc:closurebodies*)
+            (set-cdr! (assoc-strcmp (string->symbol (car p)) *impc:closurebodies*) (cdr args))
+            (set! *impc:closurebodies* (cons (cons (string->symbol (car p)) (cdr args)) *impc:closurebodies*))))
       (if (assoc-strcmp (car args) *impc:closurebodies*)
-	  (set-cdr! (assoc-strcmp (car args) *impc:closurebodies*) (cdr args))
-	  (set! *impc:closurebodies* (cons args *impc:closurebodies*))))
+          (set-cdr! (assoc-strcmp (car args) *impc:closurebodies*) (cdr args))
+          (set! *impc:closurebodies* (cons args *impc:closurebodies*))))
   (if (regex:match? (symbol->string (car args)) ":")
       (let* ((res (regex:type-split (symbol->string (car args)) ":"))
              (name (car res))
@@ -5874,12 +5875,12 @@
              (newnametype (string->symbol (string-append name ":" newtype))))
         ;; (println 'oldargs: args)
         ;; (println 'newargs: (cons newnametype (cdr args)))
-	(if (regex:match? newtype "!")
+        (if (regex:match? newtype "!")
             (begin
               (impc:ir:add-gpoly (cons 'bind-func (cons newnametype (cdr args))))
               ;;(impc:ir:add-gpoly (cons 'bind-func args))
               `(impc:compiler:print-binding-details-to-log "Generic: " ,(car res) ,(cadr res)))
-	    `(impc:ti:parametric-poly-pass '(definec ,@args))))
+            `(impc:ti:parametric-poly-pass '(definec ,@args))))
       `(impc:ti:parametric-poly-pass '(definec ,@args))))
 
 
@@ -6140,7 +6141,7 @@
            ;; and on with the show!
            (if (regex:match? newtype "!") ;; then must be poly type
                (impc:ir:add-gpolytype ',symbol (string->symbol newtype))
-               (llvm:jit-compile-ir-string (string-append "%" ,(symbol->string symbol) " = type "
+               (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
                                             (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str
                                                                    newtype
                                                                    ,(symbol->string symbol)))))))
@@ -6165,7 +6166,7 @@
 
 (define-macro (bind-tvar symbol . types)
   `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<) ; (impc:ir:tuple? (impc:ir:get-type-from-pretty-str ,(symbol->string type)))
-	      (llvm:jit-compile-ir-string (string-append "%" ,(symbol->string symbol) " = type "
+	      (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
 					   ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type) (symbol->string symbol)))))
 	      (impc:compiler:print-bad-type-error ,type "only named tuple types are supported"))
           (impc:compiler:print-type-details-to-log
@@ -6183,14 +6184,10 @@
 		 (println ,var)))
        varlist))
 
-(define llvm:jit-compile-ir-string-and-print
+(define llvm:compile-ir-and-print
   (lambda (str)
     (println str)
-    (llvm:jit-compile-ir-string str)))
-
-
-
-;; (define-macro (bind-val symbol type . optional-value)
+    (llvm:compile-ir str)))
 
 
 ;; it needs to: work for
@@ -6214,7 +6211,7 @@
             ((and (equal? "i8*" (symbol->string type))
                   (string? value))
              `(begin
-                (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
+                (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                              " = dllexport global i8* zeroinitializer"))
                 (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
                                                                " \"" value "\")")))
@@ -6223,7 +6220,7 @@
             ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
                   (not (impc:ir:pointer? t)))
              `(begin
-                (llvm:jit-compile-ir-string
+                (llvm:compile-ir
                  (string-append "@" ,(symbol->string symbol)
                                 " = dllexport global "
                                 ,(impc:ir:get-type-str t) " "
@@ -6234,7 +6231,7 @@
             ((impc:ir:pointer? t)
              (if (integer? (eval value))
                  `(begin
-                    (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
+                    (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                                  " = dllexport global "
                                                  ,(impc:ir:get-type-str t)
                                                  " zeroinitializer"))
@@ -6256,7 +6253,7 @@
                     (impc:print-bound-message ,symbol ,type))
                  (if (list? (eval value))
                      `(begin
-                        (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
+                        (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                                      " = dllexport global "
                                                      ,(impc:ir:get-type-str t)
                                                      "zeroinitializer"))
@@ -6267,7 +6264,7 @@
                      `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin
-                (llvm:jit-compile-ir-string
+                (llvm:compile-ir
                  (string-append
                   "@" ,(symbol->string symbol)
                   " = dllexport global "
@@ -6298,7 +6295,7 @@
 ;; (define-macro (bind-scm symbol type value)
 ;;    (if (cptr? (eval value))
 ;;        `(begin (if (not (llvm:get-globalvar ,(symbol->string symbol)))
-;;                    (llvm:jit-compile-ir-string (string-append "@" ,(symbol->string symbol)
+;;                    (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
 ;;                                                 " = external global "
 ;;                                                 ,(impc:ir:get-type-str (impc:ir:convert-from-pretty-types type)))))
 ;; 						;,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str type)))))
@@ -6333,7 +6330,7 @@
                                                      (string-append "," (impc:ir:get-type-str v)))
                                                    (cddr ctype))))
                                    ") nounwind")))
-      (if (and (llvm:jit-compile-ir-string ircode)
+      (if (and (llvm:compile-ir ircode)
                (llvm:bind-symbol (eval library) (symbol->string symname)))
           (impc:compiler:print-lib-binding-details-to-log library symname type)
 	  (impc:compiler:print-compiler-error (string-append "could not bind! " (symbol->string symname)))))))
@@ -6357,7 +6354,7 @@
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
     `(begin
-       (llvm:jit-compile-ir-string ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr)))))))
+       (llvm:compile-ir ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr)))))))
 
 ;;; this here for binding to CLOSURE in dylib
 ;;
@@ -6373,7 +6370,7 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
                ,(string->symbol (string-append "[" (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type)))
                                               ",i8*]*")))
-     (llvm:jit-compile-ir-string 
+     (llvm:compile-ir 
       (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                      "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n"))
      (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
@@ -6410,7 +6407,7 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
                ,(string->symbol (string-append "[" (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type)))
                                               ",i8*]*")))
-     (llvm:jit-compile-ir-string 
+     (llvm:compile-ir 
       (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                      "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n"))
      (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
@@ -6436,7 +6433,7 @@
 ;;; this here for binding to CLOSURE in dylib
 (define-macro (bind-lib-val library symname type)
   `(let ((ground-type (impc:ir:ground-type-aliases ,(symbol->string type))))
-     (llvm:jit-compile-ir-string 
+     (llvm:compile-ir 
       (string-append "@" ,(symbol->string symname) " = external global "
                      (if ground-type ground-type ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type))))))
      (llvm:bind-symbol ,library ,(symbol->string symname))))
@@ -6555,8 +6552,8 @@
              (if (regex:match? t ":")
                  (set! t (cadr (regex:type-split t ":"))))
              (let ((newname (string-append sym "_poly_" (cname-encode t))))
-               ;; (println `(llvm:jit-compile-ir-string ,(string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t)))))
-               (llvm:jit-compile-ir-string (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
+               ;; (println `(llvm:compile-ir ,(string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t)))))
+               (llvm:compile-ir (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
                (build-type-dataconstructor (string->symbol newname) t #f)))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
