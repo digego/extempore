@@ -1738,16 +1738,16 @@
   (lambda (name)
     (let* ((sym (string->symbol name))
            (docstring (impc:ti:get-closure-docstring name))
-           (types (impc:ti:get-closure-type name))
+           (type (impc:ti:get-closure-type name))
            (form (impc:ti:get-closure-body name)))
       ;; xtlang function
-      (if (or docstring types form)
+      (if (or docstring type form)
           (list 'docstring
                 '(lang . xtlang)
                 (cons 'name name)
-                (cons 'args (if form (sexpr->string (cadadr form)) '()))
-                (cons 'type (if types (cdr types) '()))
-                (cons 'docstring (if docstring (cdr docstring) '())))
+                (cons 'args (if form (sexpr->string (cadr form)) '()))
+                (cons 'type (or type '()))
+                (cons 'docstring (or docstring '())))
           (if (and (defined? sym)
                    (not (macro? (eval sym))))
               ;; scheme function
@@ -1756,7 +1756,7 @@
                       '(lang . scheme)
                       (cons 'name name)
                       (cons 'args (if form (sexpr->string (cadr form)) '()))
-                      ;; no types for scheme
+                      ;; no type for scheme
                       (cons 'type '())
                       ;; no docstrings for scheme at the moment
                       (cons 'docstring '())))
