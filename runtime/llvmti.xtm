@@ -60,24 +60,53 @@
 ;;   rather than O(N) (or we could even use a hash-map one day...)
 ;; - add validation that closure type and arg types match up
 
-(define impc:ti:register-new-closure
+(define impc:ti:print-closure-list
+  (lambda ()
+    (println '*impc:ti:closure-list*: *impc:ti:closure-list*)))
+
+(define impc:ti:reset-closure-list
+  (lambda ()
+    (set! *impc:ti:closure-list* '())))
+
+(define impc:ti:update-closure-list
   (lambda (closure-name type docstring arg-pairlist body)
     ;; check arg types
     (if (not (and (or (string? closure-name) (begin (println 'closure-name: closure-name) #f))
                   (or (string? type) (begin (println 'type: type) #f))
-                  (or (string? docstring) (begin (println )))
+                  (or (string? docstring) (begin (println docstring)))
                   (or (list? arg-pairlist) (begin (println 'arg-pairlist: arg-pairlist) #f))
                   (or (list? body) (begin (println 'body: body) #f))))
         (impc:compiler:print-compiler-error "couldn't register new closure")
-        (set! *impc:ti:closure-list*
-              (cons (cons closure-name (vector type docstring arg-pairlist body))
-                    *impc:ti:closure-list*)))))
+        (let ((existing (assoc-strcmp closure-name *impc:ti:closure-list*)))
+          (if existing
+              ;; update details if it already exists
+              (set-cdr! existing (vector type docstring arg-pairlist body))
+              ;; or create a new entry
+              (set! *impc:ti:closure-list*
+                    (cons (cons closure-name (vector type docstring arg-pairlist body))
+                          *impc:ti:closure-list*)))))))
 
-;; type is immutable, doesn't need a setter
 (define impc:ti:get-closure-type
   (lambda (closure-name)
     (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
       (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+
+;; this is a legacy name - should change it to impc:ti at some stage
+(define llvm:get-function-args-withoutzone
+  (lambda (name)
+    (let ((type (impc:ti:get-closure-type name)))
+      (if (string=? type "")
+          #f
+          (impc:ir:get-pretty-closure-arg-strings type)))))
+
+(define impc:ti:closure-exists?
+  (lambda (closure-name)
+    (if (llvm:get-function-args-withoutzone closure-name) #t #f)))
+
+(define impc:ti:set-closure-type
+  (lambda (closure-name type)
+    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      (if cls-list (vector-set! (cdr cls-list) 0 type) #f))))
 
 (define impc:ti:get-closure-docstring
   (lambda (closure-name)
@@ -108,6 +137,8 @@
   (lambda (closure-name body)
     (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
       (if cls-list (vector-set! (cdr cls-list) 3 body) #f))))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; global variables (i.e. 'bind-val's)
@@ -232,19 +263,6 @@
 (define icr:set-zone-default
   (lambda ()
     (set! *impc:zone* (sys:default-mzone))))
-
-(define llvm:get-function-args-withoutzone
-  (lambda (name)
-    (if (llvm:get-function (string-append name "_getter"))
-        (let ((ftype (llvm:get-function-args name)))
-          (list* (car ftype) (cddr ftype)))
-        (llvm:get-function-args name))))
-
-(define llvm:get-function-args-withoutzone
-  (lambda (name)
-    (llvm:get-function-args name)))
-
-
 
 ;; regex:type-split pair is like regex split
 ;; but only splits on 'first' occurence
@@ -5433,24 +5451,33 @@
 ;; compile the getter/setter/stub/callback functions
 (define impc:ti:compile-auxilliary-functions
   (lambda (fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
+    (println 'begin)
     (if *impc:compile*
-        (begin (if (not (llvm:compile-ir (string-append fs
-                                                        fssetter
-                                                        (if compile-stub?
-                                                            (string-append fsgetter fstub fstub_native
-                                                                           (if fstub_scheme_valid
-                                                                               fstub_scheme "")
-                                                                           fscallback)
-                                                            ""))))
-                   (impc:compiler:print-compiler-error "cannot compile auxilliary functions (closure getter/setter etc.)"))
-               (if *impc:compiler:print-raw-llvm*
-                   (begin (print-full-nq fs)
-                          (print-full-nq fssetter)
-                          (print-full-nq fsgetter)
-                          (print-full-nq fstub)
-                          (print-full-nq fstub_native)
-                          (print-full-nq fstub_scheme)
-                          (print-full-nq fscallback)))))))
+        (let ((ir-string (string-append fs
+                                        fssetter
+                                        (if compile-stub?
+                                            (string-append fsgetter fstub fstub_native
+                                                           (if fstub_scheme_valid
+                                                               fstub_scheme "")
+                                                           fscallback)
+                                            ""))))
+          (println)
+          (println)
+          (println)
+          (println)
+          (println)
+          (println 'ir-string: ir-string)
+          (if (not (llvm:compile-ir ir-string))
+              (impc:compiler:print-compiler-error "cannot compile auxilliary functions (closure getter/setter etc.)"))
+          (if *impc:compiler:print-raw-llvm*
+              (begin (print-full-nq fs)
+                     (print-full-nq fssetter)
+                     (print-full-nq fsgetter)
+                     (print-full-nq fstub)
+                     (print-full-nq fstub_native)
+                     (print-full-nq fstub_scheme)
+                     (print-full-nq fscallback)))))
+    (println 'end)))
 
 (define impc:ti:run
   (lambda (symname code zone-size . args)
@@ -5543,7 +5570,7 @@
       ;; (for-each (lambda (t) (println t)) types)
 
       ;; if this function has been defined before make sure we aren't changing its signature!!
-      (if (and (llvm:get-function (symbol->string symname))
+      (if (and (impc:ti:closure-exists? (symbol->string symname))
                (or (<> (length (llvm:get-function-args-withoutzone (symbol->string symname)))
                        (length (cddr (assoc-strcmp symname types))))
                    (cl:position #f (map (lambda (a b)
@@ -5567,23 +5594,20 @@
       (if *impc:compiler:print-ast* (println 'types: types))
                                         ;(println 'ctypes: converted-types)
       (if *impc:compiler:print-ast* (println 'newast: newast))
-
       ;; check for unfound types
       (for-each (lambda (t)
                   (if (not (impc:ir:type? (cdr t)))
                       (impc:compiler:print-could-not-resolve-type-error (car t))))
                 types)
-
       ;; compile to ir
       (define fstr (impc:ir:compiler newast types))
       ;; compile to x86 - i.e. call jit on any new ir functions to force jit compilation
       ;; (for-each (lambda (fn) (llvm:jit-compile-function fn)) (impc:ti:get-closure-names newast))
-
       ;;
       ;; now compile ir to x86 and make stub code
       (let* ((closure-type (cadr (impc:ir:gname)))
              (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
-             (compile-stub? (if (llvm:get-function (string-append (symbol->string symname) "_getter")) #f #t))
+             (compile-stub? (impc:ti:closure-exists? (symbol->string symname)))
              (fs (string-append "define dllexport ccc " closure-type " @" (string-append (symbol->string symname) "_maker")
                                 "(i8* %_impz) nounwind {\nentry:\n"
                                 ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
@@ -5862,13 +5886,12 @@
                                                               (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
                                                               "}"))))
 
-        ;;(println fsgetter)
+        ;; (println fsgetter)
         ;;(println fstub)
 
         (impc:ti:compile-auxilliary-functions fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
         (if *impc:compile*
             (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname))))
-              (set! *impc:closuretypes* (cons (cons symname (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))) *impc:closuretypes*))
               (if (and (not *impc:compiler:print-raw-llvm*)
                        (or *impc:ti:print-code-specialization-compiles*
                            (not (regex:match? (symbol->string symname) "_poly_"))))
@@ -5896,11 +5919,13 @@
                          (if *impc:ti:print-full-generic-types*
                              (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))
                              simpletype))
-                        (impc:compiler:print-bind-func-details-to-log
-                         "Compiled:"
-                         symname
-                         simpletype
-                         zone-size))))))
+                        (begin
+                          (impc:ti:set-closure-type (symbol->string symname) simpletype)
+                          (impc:compiler:print-bind-func-details-to-log
+                           "Compiled:"
+                           symname
+                           simpletype
+                           zone-size)))))))
         (cadr (impc:ir:gname))))))
 
 (define-macro (xtm-closure-doc name)
@@ -5964,21 +5989,20 @@
   (if (list? (car args))
       (impc:compiler:print-compiler-error "bind-func requires a name!"))
   ;; if doc-string exists!
-  (if (string? (cadr args))
-      (begin (set! *impc:docstrings* (cons (cons (car args) (cadr args)) *impc:docstrings*))
-             (set! args (append (list (car args)) (cddr args)))))
-  (if (impc:ir:poly-types (car args))
-      (impc:compiler:print-already-bound-error (car args) "poly function"))
-  (if (impc:ir:gpoly-exists? (car args))
-      (impc:compiler:print-already-bound-error (car args) "generic closure"))
-  (if (regex:match? (symbol->string (car args)) ":")
-      (let ((p (regex:type-split (symbol->string (car args)) ":")))
-        (if (assoc-strcmp (car p) *impc:closurebodies*)
-            (set-cdr! (assoc-strcmp (string->symbol (car p)) *impc:closurebodies*) (cdr args))
-            (set! *impc:closurebodies* (cons (cons (string->symbol (car p)) (cdr args)) *impc:closurebodies*))))
-      (if (assoc-strcmp (car args) *impc:closurebodies*)
-          (set-cdr! (assoc-strcmp (car args) *impc:closurebodies*) (cdr args))
-          (set! *impc:closurebodies* (cons args *impc:closurebodies*))))
+  (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
+        (docstring (if (string? (cadr args)) (cadr args) "")))
+    ;; remove docstring (if present)
+    (if (not (string=? docstring ""))
+        (set! args (append (list (car args)) (cddr args))))
+    (impc:ti:update-closure-list func-name
+                                 ""
+                                 docstring
+                                 '()
+                                 (cadr args))
+    (if (impc:ir:poly-types (car args))
+        (impc:compiler:print-already-bound-error (car args) "poly function"))
+    (if (impc:ir:gpoly-exists? (car args))
+        (impc:compiler:print-already-bound-error (car args) "generic closure")))
   (if (regex:match? (symbol->string (car args)) ":")
       (let* ((res (regex:type-split (symbol->string (car args)) ":"))
              (name (car res))
@@ -6321,79 +6345,63 @@
 (define-macro (bind-val symbol type . optional-value)
   (let ((value (if (null? optional-value)
                    1
-                   (car optional-value))))
-    (let ((t (impc:ir:get-type-from-pretty-str (atom->string type))))
-      (cond ((llvm:get-globalvar (symbol->string symbol))
-             `(begin
-                (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
-                (print " symbol ")
-                (print-with-colors 'green 'default #f (print ',symbol))
-                (print " is already bound, and has not been re-bound")
-                (println)
-                (throw "")))
-            ((and (equal? "i8*" (symbol->string type))
-                  (string? value))
-             `(begin
-                (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                                " = dllexport global i8* zeroinitializer"))
-                (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                               " \"" value "\")")))
-                ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-                (impc:print-bound-message ,symbol ,type)))
-            ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
-                  (not (impc:ir:pointer? t)))
-             `(begin
-                (llvm:compile-ir
-                 (string-append "@" ,(symbol->string symbol)
-                                " = dllexport global "
-                                ,(impc:ir:get-type-str t) " "
-                                ,(if (= t *impc:ir:fp32*)
-                                     (llvm:convert-float (atom->string (eval value)))
-                                     (atom->string (eval value)))))
-                (impc:print-bound-message ,symbol ,type)))
-            ((impc:ir:pointer? t)
-             (if (integer? (eval value))
-                 `(begin
-                    (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                                    " = dllexport global "
-                                                    ,(impc:ir:get-type-str t)
-                                                    " zeroinitializer"))
-                    (call-as-xtlang ,(string->sexpr
-                                      (string-append "(set! " (symbol->string symbol)
-                                                     " (cast (malloc "
-                                                     (atom->string (* (eval value)
-                                                                      (if (impc:ir:number? t)
-                                                                          (impc:ir:get-type-size t)
-                                                                          (/ (sys:pointer-size) 8))))
-                                                     ") "
-                                                     (atom->string type)
-                                                     "))")))
-                    ;; (llvm:bind-global-var ,(symbol->string symbol)
-                    ;;                       ,(sys:make-cptr (* (eval value)
-                    ;;                                          (if (impc:ir:number? t)
-                    ;;                                              (impc:ir:get-type-size t)
-                    ;;                                              (/ (sys:pointer-size) 8)))))
-                    (impc:print-bound-message ,symbol ,type))
-                 (if (list? (eval value))
-                     `(begin
-                        (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                                        " = dllexport global "
-                                                        ,(impc:ir:get-type-str t)
-                                                        "zeroinitializer"))
-                        (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                                       " \"" (sexpr->string value) "\")")))
-                        ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-                        (impc:print-bound-message ,symbol ,type))
-                     `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
-            ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
-             `(begin
-                (llvm:compile-ir
-                 (string-append
-                  "@" ,(symbol->string symbol)
-                  " = dllexport global "
-                  ,(impc:ir:get-type-str t) " zeroinitializer"))
-                (impc:print-bound-message ,symbol ,type)))
-            (else (impc:compiler:print-missing-type-error type))))))
+                   (car optional-value)))
+        (t (impc:ir:get-type-from-pretty-str (atom->string type))))
+    (cond ((llvm:get-globalvar (symbol->string symbol))
+           `(impc:compiler:print-compiler-error "symbol is already bound - use set! to change its value"))
+          ((and (equal? "i8*" (symbol->string type))
+                (string? value))
+           `(begin
+              (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                              " = dllexport global i8* zeroinitializer"))
+              (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
+                                                             " \"" value "\")")))))
+          ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
+                (not (impc:ir:pointer? t)))
+           `(llvm:compile-ir
+             (string-append "@" ,(symbol->string symbol)
+                            " = dllexport global "
+                            ,(impc:ir:get-type-str t) " "
+                            ,(if (= t *impc:ir:fp32*)
+                                 (llvm:convert-float (atom->string (eval value)))
+                                 (atom->string (eval value))))))
+          ((impc:ir:pointer? t)
+           (if (integer? (eval value))
+               `(begin
+                  (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                                  " = dllexport global "
+                                                  ,(impc:ir:get-type-str t)
+                                                  " zeroinitializer"))
+                  (call-as-xtlang ,(string->sexpr
+                                    (string-append "(set! " (symbol->string symbol)
+                                                   " (cast (malloc "
+                                                   (atom->string (* (eval value)
+                                                                    (if (impc:ir:number? t)
+                                                                        (impc:ir:get-type-size t)
+                                                                        (/ (sys:pointer-size) 8))))
+                                                   ") "
+                                                   (atom->string type)
+                                                   "))"))))
+               (if (list? (eval value))
+                   `(begin
+                      (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                                      " = dllexport global "
+                                                      ,(impc:ir:get-type-str t)
+                                                      "zeroinitializer"))
+                      (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
+                                                                     " \"" (sexpr->string value) "\")"))))
+                   `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
+          ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
+           `(begin
+              (llvm:compile-ir
+               (string-append
+                "@" ,(symbol->string symbol)
+                " = dllexport global "
+                ,(impc:ir:get-type-str t) " zeroinitializer"))))
+          (else (impc:compiler:print-missing-type-error type)))
+    `(begin
+       (impc:ti:update-globalvar-list ,(symbol->string symbol) ,(symbol->string type) "")
+       (impc:print-bound-message ,symbol ,type))))
 
 
 (define impc:ir:get-function-type
