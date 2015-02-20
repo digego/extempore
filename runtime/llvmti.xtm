@@ -119,31 +119,41 @@
 ;;
 ;; (name . #(type docstring))
 
-(define impc:ti:register-new-globalvar
+(define impc:ti:print-globalvar-list
+  (lambda ()
+    (println '*impc:ti:globalvar-list*: *impc:ti:globalvar-list*)))
+
+(define impc:ti:reset-globalvar-list
+  (lambda ()
+    (set! *impc:ti:globalvar-list* '())))
+
+(define impc:ti:update-globalvar-list
   (lambda (globalvar-name type docstring)
-    ;; check arg types
-    (if (not (and (or (symbol? globalvar-name) (begin (println 'globalvar-name: globalvar-name) #f))
-                  (or (string? type) (begin (println 'type: type) #f))
-                  (or (string? docstring) (begin (println docstring) #f))))
-        (impc:compiler:print-compiler-error "couldn't register new globalvar")
-        (set! *impc:ti:globalvar-list*
-              (cons (cons globalvar-name (vector type docstring))
-                    *impc:ti:globalvar-list*)))))
+    (if (impc:ti:get-globalvar-type globalvar-name)
+        (impc:compiler:print-already-bound-error globalvar-name type)
+        ;; check arg types
+        (if (not (and (or (string? globalvar-name) (begin (println 'globalvar-name: globalvar-name) #f))
+                      (or (string? type) (begin (println 'type: type) #f))
+                      (or (string? docstring) (begin (println docstring) #f))))
+            (impc:compiler:print-compiler-error "couldn't register new globalvar")
+            (set! *impc:ti:globalvar-list*
+                  (cons (cons globalvar-name (vector type docstring))
+                        *impc:ti:globalvar-list*))))))
 
 ;; type is immutable, doesn't need a setter
 (define impc:ti:get-globalvar-type
   (lambda (globalvar-name)
-    (let ((cls-list (assoc globalvar-name *impc:ti:globalvar-list*)))
+    (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
       (if cls-list (vector-ref (cdr cls-list) 0) #f))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
-    (let ((cls-list (assoc *impc:ti:globalvar-list*)))
+    (let ((cls-list (assoc-strcmp *impc:ti:globalvar-list*)))
       (if cls-list (vector-ref (cdr cls-list) 1) #f))))
 
 (define impc:ti:set-globalvar-docstring
   (lambda (globalvar-name docstring)
-    (let ((cls-list (assoc globalvar-name *impc:ti:globalvar-list*)))
+    (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
       (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
