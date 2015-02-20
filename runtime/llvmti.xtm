@@ -5451,7 +5451,6 @@
 ;; compile the getter/setter/stub/callback functions
 (define impc:ti:compile-auxilliary-functions
   (lambda (fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
-    (println 'begin)
     (if *impc:compile*
         (let ((ir-string (string-append fs
                                         fssetter
@@ -5461,12 +5460,6 @@
                                                                fstub_scheme "")
                                                            fscallback)
                                             ""))))
-          (println)
-          (println)
-          (println)
-          (println)
-          (println)
-          (println 'ir-string: ir-string)
           (if (not (llvm:compile-ir ir-string))
               (impc:compiler:print-compiler-error "cannot compile auxilliary functions (closure getter/setter etc.)"))
           (if *impc:compiler:print-raw-llvm*
@@ -5476,8 +5469,7 @@
                      (print-full-nq fstub)
                      (print-full-nq fstub_native)
                      (print-full-nq fstub_scheme)
-                     (print-full-nq fscallback)))))
-    (println 'end)))
+                     (print-full-nq fscallback)))))))
 
 (define impc:ti:run
   (lambda (symname code zone-size . args)
@@ -5891,7 +5883,9 @@
 
         (impc:ti:compile-auxilliary-functions fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
         (if *impc:compile*
-            (let ((ftype (llvm:get-function-args-withoutzone (symbol->string symname))))
+            (let ((ftype (impc:ir:get-pretty-closure-arg-strings
+                          (impc:ir:pretty-print-type
+                           (impc:ir:get-type-from-str closure-type)))))
               (if (and (not *impc:compiler:print-raw-llvm*)
                        (or *impc:ti:print-code-specialization-compiles*
                            (not (regex:match? (symbol->string symname) "_poly_"))))
