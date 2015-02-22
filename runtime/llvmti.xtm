@@ -139,6 +139,61 @@
       (if cls-list (vector-set! (cdr cls-list) 3 body) #f))))
 
 
+;;;;;;;;;;;;;;
+;; named types
+;; -----------
+;;
+;; each element of the list is of the form
+;;
+;; (name . #(type docstring))
+
+(define *impc:ti:namedtype-list* '())
+;;
+;; each element of the list is of the form
+;;
+;; (name . #(type docstring))
+
+(define impc:ti:print-namedtype-list
+  (lambda ()
+    (println '*impc:ti:namedtype-list*: *impc:ti:namedtype-list*)))
+
+(define impc:ti:reset-namedtype-list
+  (lambda ()
+    (set! *impc:ti:namedtype-list* '())))
+
+(define impc:ti:update-namedtype-list
+  (lambda (namedtype-name type docstring)
+    (if (impc:ti:get-namedtype-type namedtype-name)
+        (impc:compiler:print-already-bound-error namedtype-name type)
+        ;; check arg types
+        (if (not (and (or (string? namedtype-name) (begin (println 'namedtype-name: namedtype-name) #f))
+                      (or (string? type) (begin (println 'type: type) #f))
+                      (or (string? docstring) (begin (println docstring) #f))))
+            (impc:compiler:print-compiler-error "couldn't register new named type")
+            (set! *impc:ti:namedtype-list*
+                  (cons (cons namedtype-name (vector type docstring))
+                        *impc:ti:namedtype-list*))))))
+
+;; type is immutable, doesn't need a setter
+(define impc:ti:get-namedtype-type
+  (lambda (namedtype-name)
+    (let ((cls-list (assoc-strcmp namedtype-name *impc:ti:namedtype-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+
+(define impc:ti:namedtype-exists?
+  (lambda (namedtype-name)
+    (let ((cls-list (assoc-strcmp namedtype-name *impc:ti:namedtype-list*)))
+      (if (impc:ti:get-namedtype-type namedtype-name) #t #f))))
+
+(define impc:ti:get-namedtype-docstring
+  (lambda (namedtype-name)
+    (let ((cls-list (assoc-strcmp *impc:ti:namedtype-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 1) #f))))
+
+(define impc:ti:set-namedtype-docstring
+  (lambda (namedtype-name docstring)
+    (let ((cls-list (assoc-strcmp namedtype-name *impc:ti:namedtype-list*)))
+      (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; global variables (i.e. 'bind-val's)
