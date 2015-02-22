@@ -95,7 +95,7 @@
 (define llvm:get-function-args-withoutzone
   (lambda (name)
     (let ((type (impc:ti:get-closure-type name)))
-      (if (string=? type "")
+      (if (or (not type) (string=? type ""))
           #f
           (impc:ir:get-pretty-closure-arg-strings type)))))
 
@@ -231,6 +231,11 @@
   (lambda (globalvar-name)
     (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
       (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+
+(define impc:ti:globalvar-exists?
+  (lambda (globalvar-name)
+    (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
+      (if (impc:ti:get-globalvar-type globalvar-name) #t #f))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
@@ -483,7 +488,7 @@
                                                            (impc:ir:gpoly-exists? sym)
                                                            (and (not (equal? sym fname))
                                                                 (llvm:get-function (symbol->string sym)))
-                                                           (llvm:get-globalvar (symbol->string sym)))
+                                                           (impc:ti:globalvar-exists? (symbol->string sym)))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
@@ -513,7 +518,7 @@
                                                    (if (or (member sym syms)
                                                            (and (not (equal? sym fname))
                                                                 (llvm:get-function (symbol->string sym)))
-                                                           (llvm:get-globalvar (symbol->string sym)))
+                                                           (impc:ti:globalvar-exists? (symbol->string sym)))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
@@ -2167,8 +2172,8 @@
               '()
               (if (and (not (assoc-strcmp sym vars))
                        (not (regex:match? (symbol->string sym) ":\\["))
-                       (not (llvm:get-function (symbol->string sym)))
-                       (not (llvm:get-globalvar (symbol->string sym))))
+                       (not (impc:ti:closure-exists? (symbol->string sym)))
+                       (not (impc:ti:globalvar-exists? (symbol->string sym))))
                   (begin ;; (error)
                     (impc:compiler:print-missing-type-error sym))
                   (let ((pair (assoc-strcmp sym vars)))
@@ -2223,8 +2228,8 @@
                                         ;(if (equal? sym 'l) (println '-> 'forcing 'l t))
                                         ;(println 'force-var:> sym 'in: vars 'with: t 'kts: kts)
     (if (and (not (assoc-strcmp sym vars))
-             (not (llvm:get-function (symbol->string sym)))
-             (not (llvm:get-globalvar (symbol->string sym))))
+             (not (impc:ti:closure-exists? (symbol->string sym)))
+             (not (impc:ti:globalvar-exists? (symbol->string sym))))
         (impc:compiler:print-missing-identifier-error sym 'variable)
         (let ((pair (assoc-strcmp sym vars)))
           (if pair
@@ -2243,8 +2248,8 @@
 (define impc:ti:get-var
   (lambda (sym vars)
     (if (not (assoc-strcmp sym vars))
-        (if (llvm:get-global-variable-type (symbol->string sym))
-            (let ((t (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string sym)))))
+        (if (impc:ti:globalvar-exists? (symbol->string sym))
+            (let ((t (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string sym)))))
               (if (list? t)
                   (cons sym (cons (- (car t) *impc:ir:pointer*) (cdr t)))
                   (if (string? t)
@@ -2355,8 +2360,8 @@
           ;; and the current values and force that intersection
           (let ((polytype #f))
             (if (and (not (assoc-strcmp ast vars))
-                     (not (llvm:get-function (symbol->string ast)))
-                     (not (llvm:get-globalvar (symbol->string ast))))
+                     (not (impc:ti:closure-exists? (symbol->string ast)))
+                     (not (impc:ti:globalvar-exists? (symbol->string ast))))
                 (if (and (regex:match? (symbol->string ast) ":")
                          (impc:ir:gpoly-exists?
                           (string->symbol (car (regex:type-split (symbol->string ast) ":")))))
@@ -4348,7 +4353,7 @@
     ;; otherwise we need to try to find a type definition for the closure
     (let* ((ctype (if (assoc-strcmp (car ast) vars)
                       (cdr (assoc-strcmp (car ast) vars))
-                      (if (llvm:get-globalvar (symbol->string (car ast)))
+                      (if (impc:ti:closure-exists? (symbol->string (car ast)))
                           (list (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (car ast)))))
                           (impc:compiler:print-missing-identifier-error (car ast) 'closure))))
            ;; (llllllll (println 'ctype: ctype))
@@ -4704,7 +4709,7 @@
           ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))
           ((and (list? ast) ;; this is here to check against closures as global vars (i.e. not in local environment)
                 (symbol? (car ast))
-                (llvm:get-globalvar (symbol->string (car ast)))
+                (impc:ti:closure-exists? (symbol->string (car ast)))
                 (impc:ir:closure? (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (car ast))))))
            (impc:ti:closure-call-check ast vars kts request?))
           (else (impc:ti:join (impc:ti:type-check (car ast) vars kts request?)
@@ -5048,7 +5053,7 @@
                         (symbol? (car ast))
                         ;; (if (null? prev) #t
                         ;;     (not (member (car ast) (car prev))))
-                        (llvm:get-globalvar (symbol->string (car ast)))
+                        (impc:ti:closure-exists? (symbol->string (car ast)))
                         (impc:ir:closure? (llvm:get-global-variable-type (symbol->string (car ast))))))
                (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))
               ((list? ast)
@@ -5515,16 +5520,10 @@
                                                                fstub_scheme "")
                                                            fscallback)
                                             ""))))
-          (if (not (llvm:compile-ir ir-string))
-              (impc:compiler:print-compiler-error "cannot compile auxilliary functions (closure getter/setter etc.)"))
           (if *impc:compiler:print-raw-llvm*
-              (begin (print-full-nq fs)
-                     (print-full-nq fssetter)
-                     (print-full-nq fsgetter)
-                     (print-full-nq fstub)
-                     (print-full-nq fstub_native)
-                     (print-full-nq fstub_scheme)
-                     (print-full-nq fscallback)))))))
+              (print-full-nq ir-string))
+          (if (not (llvm:compile-ir ir-string))
+              (impc:compiler:print-compiler-error "cannot compile auxilliary functions (closure getter/setter etc.)"))))))
 
 (define impc:ti:run
   (lambda (symname code zone-size . args)
@@ -6400,7 +6399,7 @@
                    1
                    (car optional-value)))
         (t (impc:ir:get-type-from-pretty-str (atom->string type))))
-    (cond ((llvm:get-globalvar (symbol->string symbol))
+    (cond ((impc:ti:globalvar-exists? (symbol->string symbol))
            `(impc:compiler:print-compiler-error "symbol is already bound - use set! to change its value"))
           ((and (equal? "i8*" (symbol->string type))
                 (string? value))
