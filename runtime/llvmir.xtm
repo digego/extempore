@@ -3732,7 +3732,7 @@
            (type (impc:ir:get-type-from-str (cadr vv))))
       (emit "; do set!\n" os)
       (emit s2 os)
-      (if (llvm:get-globalvar (symbol->string (cadr ast))) ;; are we are setting a global variable?
+      (if (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
           (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
                                (symbol->string (cadr ast)) "\n") os)
           (if (member (cadr ast) *impc:ir:sym-name-stack*)
@@ -5502,7 +5502,7 @@
             ((atom? ast)
              (cond ((symbol? ast)
                     (if (or (assoc-strcmp ast types)
-                            (llvm:get-globalvar (symbol->string ast)))
+                            (impc:ti:globalvar-exists? (symbol->string ast)))
                         (if (assoc-strcmp ast types)
                             (begin
                               (if (not (member ast *impc:ir:sym-name-stack*))
