@@ -1477,7 +1477,7 @@
                 ;; ok now we have a type we need to add it to llvm and
                 ;; polytype
                 ;;(println 'newtype! newname 'totype: newtype3)
-                (if (null? (llvm:get-named-type newname))
+                (if (not (impc:ti:namedtype-exists? newname))
                     (begin ;; if this is a new reification of a generic type then ...
                       (llvm:compile-ir (string-append "%" newname " = type " newtype3))
                       ;; we should probably also build dataconstructors for the new
@@ -1576,21 +1576,6 @@
   (lambda (sym types vars)
     ;; (println 1 'sym: sym 'types: types)
 
-    ;; (set! types (map (lambda (x)
-    ;; 		       (if (string? x)
-    ;; 			   (let ((x2 (if (char=? (string-ref x 0) #\%)
-    ;; 					 (substring x 1 (string-length x))
-    ;; 					 x)))
-    ;; 			     (if (llvm:get-named-type (impc:ir:get-base-type x2))
-    ;; 				 (let ((t (llvm:get-named-type (impc:ir:get-base-type x2)))
-    ;; 				       (ptrdepth (impc:ir:get-ptr-depth x2)))
-    ;; 				   ;(set! named-type x)
-    ;; 				   (set! t (apply string-append t (make-list-with-proc ptrdepth (lambda (i) "*"))))
-    ;; 				   (impc:ir:get-type-from-str t))
-    ;; 				 x))
-    ;; 			   x))
-    ;; 		     types))
-
     (set! types (cl:remove-duplicates types))
 
     ;; (println 2 'sym: sym 'types: types)
@@ -1670,7 +1655,7 @@
                                                         (symbol->string (impc:ir:gpolytype-types (cadr split)))
                                                         ""))
                                           ;; (gen-type (symbol->string (impc:ir:gpolytype-types (cadr split))))
-                                          (named-type (impc:ir:get-type-from-str (llvm:get-named-type k)))
+                                          (named-type (impc:ir:get-type-from-str (impc:ti:get-namedtype-type k)))
                                           (domatch? (if (and (list? named-type)
                                                              (= (length named-type) (length t)))
                                                         #t #f))
@@ -1716,7 +1701,7 @@
   (lambda (atom lists vars)
     ;; (println 'checktoupdategenericvars: atom 'lists lists 'vars: vars)
     (let ((atom-type (if (string? atom)
-                         (impc:ir:get-type-from-str (llvm:get-named-type atom))
+                         (impc:ir:get-type-from-str (impc:ti:get-namedtype-type atom))
                          atom)))
       ;; (println 'atom: atom 'atom-type atom-type 'lists lists)
       (if (list? atom-type)
@@ -2275,7 +2260,7 @@
   (lambda (t vars)
     ;; check for named types
     (if (string? t)
-        (let ((t (impc:ir:get-type-from-str (llvm:get-named-type (impc:ir:clean-named-type t))))
+        (let ((t (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type t))))
               (ptr-level (impc:ir:get-ptr-depth t)))
           (dotimes (i ptr-level) (set! t (impc:ir:pointer++ t)))
           (list t))
@@ -2773,8 +2758,8 @@
              ;; if gt and tt still not equal tt maybe a named-type
              (if (<> (length gt) (length tt))
                  (if (and (string? (car tt)) ;; named type?
-                          (= (length gt) (length (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))))
-                     (set! tt (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))
+                          (= (length gt) (length (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (car tt))))))
+                     (set! tt (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (car tt))))
                      (set! subcheck #f)))
              ;;(print-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
 
@@ -3284,8 +3269,8 @@
                 ;; 	   (set! request? #f))
                 (if (list? (cadr gpoly-type))
                     (if (and (string? request?) ;; named type?
-                             (= (length (cadr gpoly-type)) (length (impc:ir:get-type-from-str (llvm:get-named-type request?)))))
-                        (set! request? (impc:ir:get-type-from-str (llvm:get-named-type request?)))
+                             (= (length (cadr gpoly-type)) (length (impc:ir:get-type-from-str (impc:ti:get-namedtype-type request?)))))
+                        (set! request? (impc:ir:get-type-from-str (impc:ti:get-namedtype-type request?)))
                         (set! request? #f))
                     (if (<> (length (list request?)) (length (list (cadr gpoly-type))))
                         (set! request? #f))))
@@ -4014,9 +3999,9 @@
 
 (define impc:ti:get-tuple-type-from-name
   (lambda (str)
-    (let ((t (llvm:get-named-type (substring (impc:ir:get-base-type (car res))
-                                             1
-                                             (string-length (impc:ir:get-base-type (car res)))))))
+    (let ((t (impc:ti:get-namedtype-type (substring (impc:ir:get-base-type (car res))
+                                                    1
+                                                    (string-length (impc:ir:get-base-type (car res)))))))
       (dotimes (i (impc:ir:get-ptr-depth str)) (set! t (impc:ir:pointer++ t)))
       t)))
 
@@ -4034,7 +4019,7 @@
                 (if (null? res) res
                     (if (and (string? (car res))
                              (char=? (string-ref (car res) 0) #\%))
-                        (let ((t (llvm:get-named-type (substring (impc:ir:get-base-type (car res))
+                        (let ((t (impc:ti:get-namedtype-type (substring (impc:ir:get-base-type (car res))
                                                                  1
                                                                  (string-length (impc:ir:get-base-type (car res)))))))
                           (dotimes (i (impc:ir:get-ptr-depth (car res))) (set! t (impc:ir:pointer++ t)))
@@ -4097,14 +4082,8 @@
       ;; check for named types
       (if (not (null? a)) (set! a (impc:ti:try-to-resolve-named-types (car a) vars)))
 
-      ;; (if (and (not (null? a)) (string? (car a)))
-      ;;     (let ((t (impc:ir:get-type-from-str (llvm:get-named-type (impc:ir:clean-named-type (car a)))))
-      ;; 	  (ptr-level (impc:ir:get-ptr-depth (car a))))
-      ;;       (dotimes (i ptr-level) (set! t (impc:ir:pointer++ t)))
-      ;;       (set! a (list t))))
 
-
-                                        ;(println 'tupref-check 'a: a 'ast: ast (list-ref (car a) (+ 1 (caddr ast))))
+      ;;(println 'tupref-check 'a: a 'ast: ast (list-ref (car a) (+ 1 (caddr ast))))
       (if (and (not (null? a))
                (list? a)
                (impc:ir:tuple? (car a)))
@@ -6124,7 +6103,7 @@
            ;;(print ',type)
            (begin
              (set! *impc:ir:get-type-callback-off* #t) ;; don't wait, do it immediately
-             (let ((r (impc:ir:pretty-print-type ,(symbol->string symbol)))) ; (llvm:get-named-type ,(symbol->string symbol))))
+             (let ((r (impc:ir:pretty-print-type ,(symbol->string symbol))))
                (set! *impc:ir:get-type-callback-off* #f)
                r))
            )))
@@ -6345,6 +6324,7 @@
                                                                       ,(symbol->string symbol)))))))
          (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
      (begin
+       (impc:ti:update-globalvar-list ,(symbol->string symbol) ,(symbol->string type) "")
        (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
      ;; the next line is to help specialize any element types that may not already be specialized!
      (map (lambda (a) (impc:ir:get-type-from-pretty-str a)) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
@@ -6357,7 +6337,7 @@
             ',symbol
             (if (impc:ir:gpolytype-types ',symbol)
                 (symbol->string (impc:ir:gpolytype-types ',symbol))
-                (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))
+                (impc:ir:pretty-print-type (impc:ti:get-namedtype-type ,(symbol->string symbol))))
             (if (impc:ir:gpolytype-types ',symbol) #t #f)))
      ))
 
@@ -6370,7 +6350,7 @@
               (impc:compiler:print-bad-type-error ,type "only named tuple types are supported"))
           (impc:compiler:print-type-details-to-log
            ,symbol
-           (impc:ir:pretty-print-type (llvm:get-named-type ,(symbol->string symbol))))))
+           (impc:ir:pretty-print-type (impc:ti:get-namedtype-type ,(symbol->string symbol))))))
 
 ;; Ben's helper macros
 
