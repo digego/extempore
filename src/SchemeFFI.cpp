@@ -1914,6 +1914,10 @@ namespace extemp {
 
         rreplace("use of undefined value '@(.*)'",(char*)err.c_str(),"$1",symname);
         GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(symname);
+        if(gv == NULL){
+          std::cout << "MCJIT compiler error: \"" << symname << "\" not defined in LLVM" << std::endl;
+          return _sc->F;
+        }
         Function* func = extemp::EXTLLVM::I()->getFunction(symname);
         const char* tmp_name = NULL;
       
