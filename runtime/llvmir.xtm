@@ -519,7 +519,7 @@
 
 (define impc:precomp:no-scm-suffix?
   (lambda (symname)
-    (let ((tlist (llvm:get-function-args-withoutzone symname)))
+    (let ((tlist (impc:ti:get-closure-arg-types symname)))
       (member #f
               (map (lambda (type)
                      (let ((type-str (if (impc:ir:array? type)
@@ -2690,7 +2690,7 @@
         (let* ((os (make-string 0))
                (type (cons (+ *impc:ir:pointer* *impc:ir:pointer* *impc:ir:closure*)
                            (map (lambda (x) (impc:ir:get-type-from-str x))
-                                (llvm:get-function-args-withoutzone name)))))
+                                (impc:ti:get-closure-arg-types name)))))
           (emit  (impc:ir:gname "closure" "i8*") " = call i8* @" name "_getter()\n" os)
           (emit (string-append (impc:ir:gname "closure" (impc:ir:get-type-str type)) " = bitcast i8* "
                                (car (impc:ir:gname 1)) " to " (impc:ir:get-type-str type) "\n") os)
@@ -5156,7 +5156,7 @@
                                    (impc:compiler:print-missing-identifier-error (caddr ast) 'closure)))))
            (ftypes (if (assoc-strcmp (caddr ast) types)
                        (map (lambda (a) (impc:ir:get-type-str a)) (cddr (assoc-strcmp (caddr ast) types)))
-                       (llvm:get-function-args-withoutzone fname)))
+                       (impc:ti:get-closure-arg-types fname)))
            (callback_func_name_str (impc:ir:compiler (string-append fname "_callback") types))
            (callback_func_name (impc:ir:gname))
            (closure_db_call (llvm:get-function (string-append fname "_callback")))
@@ -5245,7 +5245,7 @@
 ;;       (let* ((os (make-string 0))
 ;;              (fname (symbol->string (car ast)))
 ;;              (calling-conv (llvm:get-function-calling-conv fname))
-;;              (ftypes (llvm:get-function-args-withoutzone fname))
+;;              (ftypes (impc:ti:get-closure-arg-types fname))
 ;;              (closurecall (llvm:get-function (string-append fname "_getter")))
 ;;              (args (map (lambda (a hint)
 ;;                            (cons (impc:ir:compiler a types (impc:ir:get-type-from-str hint)) (impc:ir:gname)))
@@ -5304,7 +5304,7 @@
                       ;; (string-append (symbol->string (car ast)) "_native")
                       (symbol->string (car ast))))
            (calling-conv (llvm:get-function-calling-conv fname))
-           (ftypes (llvm:get-function-args-withoutzone fname))
+           (ftypes (impc:ti:get-closure-arg-types fname))
            (args (map (lambda (a hint)
                         (cons (impc:ir:compiler a types (impc:ir:get-type-from-str hint)) (impc:ir:gname)))
                       (cdr ast)

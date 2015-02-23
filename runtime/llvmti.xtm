@@ -92,7 +92,7 @@
       (if cls-list (vector-ref (cdr cls-list) 0) #f))))
 
 ;; this is a legacy name - should change it to impc:ti at some stage
-(define llvm:get-function-args-withoutzone
+(define impc:ti:get-closure-arg-types
   (lambda (name)
     (let ((type (impc:ti:get-closure-type name)))
       (if (or (not type) (string=? type ""))
@@ -101,7 +101,7 @@
 
 (define impc:ti:closure-exists?
   (lambda (closure-name)
-    (if (llvm:get-function-args-withoutzone closure-name) #t #f)))
+    (if (impc:ti:get-closure-arg-types closure-name) #t #f)))
 
 (define impc:ti:set-closure-type
   (lambda (closure-name type)
@@ -2362,7 +2362,7 @@
                             (if (assoc-strcmp ast vars)
                                 (cdr (assoc-strcmp ast vars))
                                 (if (llvm:get-function (symbol->string ast))
-                                    (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (llvm:get-function-args-withoutzone (symbol->string ast)))))
+                                    (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (impc:ti:get-closure-arg-types (symbol->string ast)))))
                                     (list (impc:ir:pointer-- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string ast))))))))))
               ;; (println '---------- (member ast kts) 'type: type (impc:ir:type? type))
               (if (and request?
@@ -2553,7 +2553,7 @@
     ;; (println 'type-checking: (car ast))
                                         ;(println 'native-check 'ast: ast 'vars: vars 'request: request?)
     (let ((ftype (map impc:ir:get-type-from-str
-                      (llvm:get-function-args-withoutzone (symbol->string (car ast))))))
+                      (impc:ti:get-closure-arg-types (symbol->string (car ast))))))
       (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
 
       (if (<> (length ftype)
@@ -2582,7 +2582,7 @@
     (let* ((isclosure (if (llvm:get-function (string-append (symbol->string (car ast)) "_getter")) #t #f))
            (name (symbol->string (car ast)))
            (ftype (map impc:ir:get-type-from-str
-                       (llvm:get-function-args-withoutzone name))))
+                       (impc:ti:get-closure-arg-types name))))
       ;;(println 'ftype:> 'ast: ast 'type: ftype)
       (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
 
@@ -3454,7 +3454,7 @@
 ;;    (lambda (ast vars kts request?)
 ;;       ;(println 'callback-check 'ast: ast 'vars: vars 'request: request?)
 ;;       (let ((ftype (map impc:ir:get-type-from-str
-;;                         (let ((ags (llvm:get-function-args-withoutzone (symbol->string (caddr ast)))))
+;;                         (let ((ags (impc:ti:get-closure-arg-types (symbol->string (caddr ast)))))
 ;; 			  (if ags ags '())))))
 ;; 	;(println 'ftype: ftype)
 ;; 	(if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
@@ -3478,7 +3478,7 @@
   (lambda (ast vars kts request?)
     ;; (println 'callback-check 'ast: ast 'vars: vars 'request: request?)
     (let ((ftype (map impc:ir:get-type-from-str
-                      (let ((ags (llvm:get-function-args-withoutzone (symbol->string (caddr ast)))))
+                      (let ((ags (impc:ti:get-closure-arg-types (symbol->string (caddr ast)))))
                         (if ags ags '())))))
       (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
       (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
@@ -5596,7 +5596,7 @@
 
       ;; if this function has been defined before make sure we aren't changing its signature!!
       (if (and (impc:ti:closure-exists? (symbol->string symname))
-               (or (<> (length (llvm:get-function-args-withoutzone (symbol->string symname)))
+               (or (<> (length (impc:ti:get-closure-arg-types (symbol->string symname)))
                        (length (cddr (assoc-strcmp symname types))))
                    (cl:position #f (map (lambda (a b)
                                           (equal? a b))
@@ -5604,7 +5604,7 @@
                                                  *impc:ir:pointer*
                                                  *impc:ir:pointer*)
                                               (map (lambda (x) (impc:ir:get-type-from-str x))
-                                                   (llvm:get-function-args-withoutzone (symbol->string symname))))
+                                                   (impc:ti:get-closure-arg-types (symbol->string symname))))
                                         (cdr (assoc-strcmp symname types))))))
           (impc:compiler:print-no-redefinitions-error
            symname
@@ -5612,7 +5612,7 @@
                                     *impc:ir:pointer*
                                     *impc:ir:pointer*)
                                  (map (lambda (x) (impc:ir:get-type-from-str x))
-                                      (llvm:get-function-args-withoutzone (symbol->string symname)))))
+                                      (impc:ti:get-closure-arg-types (symbol->string symname)))))
            (impc:ir:pptype (cdr (assoc-strcmp symname types)))))
                                         ;(print-error "stop")
       (if *impc:compiler:print-ast* (println '---------------------------------))
@@ -6440,11 +6440,11 @@
   (lambda (name)
     (if (symbol? name)
         (set! name (symbol->string name)))
-    (if (not (llvm:get-function-args-withoutzone name))
+    (if (not (impc:ti:get-closure-arg-types name))
         (impc:compiler:print-missing-identifier-error name 'closure))
     (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*)
           (map (lambda (x) (impc:ir:get-type-from-str x))
-               (llvm:get-function-args-withoutzone name)))))
+               (impc:ti:get-closure-arg-types name)))))
 
 
 (define-macro (bind-poly poly_sym implementation_sym)
