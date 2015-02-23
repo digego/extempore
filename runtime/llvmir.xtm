@@ -1731,7 +1731,6 @@
 
 (define impc:ir:str-list-check
   (lambda (type)
-    ;; (println 'ir:str-list-check type)
     (cond ((string? type)
            (if (and (char=? (string-ref type 0) #\%)
                     (impc:ti:namedtype-exists? (substring (impc:ir:get-base-type type) 1 (string-length (impc:ir:get-base-type type)))))
@@ -1762,12 +1761,13 @@
     (if (string? type)
         ;; if this is a named type string
         (if (char=? (string-ref type 0) #\%)
-            (begin (if (not (impc:ir:tuple? type)) (impc:compiler:print-bad-type-error type "bad named type"))
-                   (if (impc:ir:pointer? type)
-                       (/ (sys:pointer-size) 8) ;; in bytes not bits
-                       (let ((t2 (impc:ti:get-namedtype-type (substring type 1 (string-length type)))))
-                         (impc:ir:get-type-size (impc:ir:get-type-from-str t2)))))
-            (impc:ir:get-type-size (impc:ir:get-type-from-str type)))
+            (begin
+              (if (not (impc:ir:tuple? type)) (impc:compiler:print-bad-type-error type "bad named type"))
+              (if (impc:ir:pointer? type)
+                  (/ (sys:pointer-size) 8) ;; in bytes not bits
+                  (let ((t2 (impc:ti:get-namedtype-type (substring type 1 (string-length type)))))
+                    (impc:ir:get-type-size (impc:ir:get-type-from-pretty-str t2)))))
+            (impc:ir:get-type-size (impc:ir:get-type-from-pretty-str type)))
         (let ((t (impc:ir:str-list-check type)))
           (if (impc:ir:pointer? t) (/ (sys:pointer-size) 8) ;; in bytes not bits
               (cond ((member t (list *impc:ir:fp64* *impc:ir:si64* *impc:ir:ui64*)) 8) ; 8 byte stuff
@@ -1778,8 +1778,8 @@
                     ((= t *impc:ir:array*) (* (impc:ir:get-type-size (caddr type)) (cadr type)))
                     ((= t *impc:ir:vector*) (* (impc:ir:get-type-size (caddr type)) (cadr type)))
                     ((= t *impc:ir:tuple*)
-                     ;;(apply + (map (lambda (x) (impc:ir:get-type-size x)) (cdr type)))
-                     (llvm:get-struct-size (impc:ir:get-type-str type))
+                     (apply + (map (lambda (x) (impc:ir:get-type-size x)) (cdr type)))
+                     ;; (llvm:get-struct-size (impc:ir:get-type-str type))
                      )
                     (else (impc:compiler:print-bad-type-error t "bad type in get-size"))))))))
 
@@ -3101,7 +3101,7 @@
 (define impc:ir:compile:eval-gvar
   (lambda (var)
     (let* ((os (make-string 0))
-           (type (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string var))))
+           (type (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string var))))
            (type2 (impc:ir:pointer-- type))
            (typestr (impc:ir:get-type-str type2)))
       (if (and (or (impc:ir:array? type2)
@@ -4241,7 +4241,7 @@
                                         ;(atuple-type (impc:ir:get-type-from-str (cadr var)))
            (tuple-type (let ((r (impc:ir:get-type-from-str (cadr var))))
                          (if (string? r)
-                             (let* ((tt (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type r))))
+                             (let* ((tt (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type r))))
                                     (ptr-level (impc:ir:get-ptr-depth r)))
                                (dotimes (ki ptr-level) (set! tt (impc:ir:pointer++ tt)))
                                tt)
@@ -4299,7 +4299,7 @@
                                         ;(tuple-type (impc:ir:get-type-from-str (cadr var)))
            (tuple-type (let ((r (impc:ir:get-type-from-str (cadr var))))
                          (if (string? r)
-                             (let* ((tt (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type r))))
+                             (let* ((tt (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type r))))
                                     (ptr-level (impc:ir:get-ptr-depth r)))
                                (dotimes (ki ptr-level) (set! tt (impc:ir:pointer++ tt)))
                                tt)
@@ -4349,7 +4349,7 @@
                                         ;(tuple-type (impc:ir:get-type-from-str (cadr var)))
            (tuple-type (let ((r (impc:ir:get-type-from-str (cadr var))))
                          (if (string? r)
-                             (let* ((tt (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type r))))
+                             (let* ((tt (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type r))))
                                     (ptr-level (impc:ir:get-ptr-depth r)))
                                (dotimes (ki ptr-level) (set! tt (impc:ir:pointer++ tt)))
                                tt)

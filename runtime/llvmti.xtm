@@ -163,7 +163,7 @@
 
 (define impc:ti:update-namedtype-list
   (lambda (namedtype-name type docstring)
-    (if (impc:ti:get-namedtype-type namedtype-name)
+    (if (impc:ti:namedtype-exists? namedtype-name)
         (impc:compiler:print-already-bound-error namedtype-name type)
         ;; check arg types
         (if (not (and (or (string? namedtype-name) (begin (println 'namedtype-name: namedtype-name) #f))
@@ -178,6 +178,7 @@
 (define impc:ti:get-namedtype-type
   (lambda (namedtype-name)
     (let ((cls-list (assoc-strcmp namedtype-name *impc:ti:namedtype-list*)))
+      ;; (println 'namedtype-name: namedtype-name 'cls-list: cls-list)
       (if cls-list (vector-ref (cdr cls-list) 0) #f))))
 
 (define impc:ti:namedtype-exists?
@@ -1655,7 +1656,7 @@
                                                         (symbol->string (impc:ir:gpolytype-types (cadr split)))
                                                         ""))
                                           ;; (gen-type (symbol->string (impc:ir:gpolytype-types (cadr split))))
-                                          (named-type (impc:ir:get-type-from-str (impc:ti:get-namedtype-type k)))
+                                          (named-type (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type k)))
                                           (domatch? (if (and (list? named-type)
                                                              (= (length named-type) (length t)))
                                                         #t #f))
@@ -1701,7 +1702,7 @@
   (lambda (atom lists vars)
     ;; (println 'checktoupdategenericvars: atom 'lists lists 'vars: vars)
     (let ((atom-type (if (string? atom)
-                         (impc:ir:get-type-from-str (impc:ti:get-namedtype-type atom))
+                         (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type atom))
                          atom)))
       ;; (println 'atom: atom 'atom-type atom-type 'lists lists)
       (if (list? atom-type)
@@ -2260,7 +2261,7 @@
   (lambda (t vars)
     ;; check for named types
     (if (string? t)
-        (let ((t (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type t))))
+        (let ((t (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type t))))
               (ptr-level (impc:ir:get-ptr-depth t)))
           (dotimes (i ptr-level) (set! t (impc:ir:pointer++ t)))
           (list t))
@@ -2363,7 +2364,7 @@
                                 (cdr (assoc-strcmp ast vars))
                                 (if (llvm:get-function (symbol->string ast))
                                     (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (impc:ti:get-closure-arg-types (symbol->string ast)))))
-                                    (list (impc:ir:pointer-- (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string ast))))))))))
+                                    (list (impc:ir:pointer-- (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string ast))))))))))
               ;; (println '---------- (member ast kts) 'type: type (impc:ir:type? type))
               (if (and request?
                        (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
@@ -2758,8 +2759,8 @@
              ;; if gt and tt still not equal tt maybe a named-type
              (if (<> (length gt) (length tt))
                  (if (and (string? (car tt)) ;; named type?
-                          (= (length gt) (length (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (car tt))))))
-                     (set! tt (impc:ir:get-type-from-str (impc:ti:get-namedtype-type (car tt))))
+                          (= (length gt) (length (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type (car tt))))))
+                     (set! tt (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type (car tt))))
                      (set! subcheck #f)))
              ;;(print-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
 
@@ -3269,8 +3270,8 @@
                 ;; 	   (set! request? #f))
                 (if (list? (cadr gpoly-type))
                     (if (and (string? request?) ;; named type?
-                             (= (length (cadr gpoly-type)) (length (impc:ir:get-type-from-str (impc:ti:get-namedtype-type request?)))))
-                        (set! request? (impc:ir:get-type-from-str (impc:ti:get-namedtype-type request?)))
+                             (= (length (cadr gpoly-type)) (length (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type request?)))))
+                        (set! request? (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type request?)))
                         (set! request? #f))
                     (if (<> (length (list request?)) (length (list (cadr gpoly-type))))
                         (set! request? #f))))
@@ -4023,7 +4024,7 @@
                                                                  1
                                                                  (string-length (impc:ir:get-base-type (car res)))))))
                           (dotimes (i (impc:ir:get-ptr-depth (car res))) (set! t (impc:ir:pointer++ t)))
-                          (list (impc:ir:get-type-from-str t)))
+                          (list (impc:ir:get-type-from-pretty-str t)))
                         res))))
            ;; b should be 32bit fixed point type -- llvm structs only support 32bit indexes
            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*)))
@@ -4333,7 +4334,7 @@
     (let* ((ctype (if (assoc-strcmp (car ast) vars)
                       (cdr (assoc-strcmp (car ast) vars))
                       (if (impc:ti:closure-exists? (symbol->string (car ast)))
-                          (list (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (car ast)))))
+                          (list (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string (car ast)))))
                           (impc:compiler:print-missing-identifier-error (car ast) 'closure))))
            ;; (llllllll (println 'ctype: ctype))
            ;; get argument expression types
@@ -4689,7 +4690,7 @@
           ((and (list? ast) ;; this is here to check against closures as global vars (i.e. not in local environment)
                 (symbol? (car ast))
                 (impc:ti:closure-exists? (symbol->string (car ast)))
-                (impc:ir:closure? (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (car ast))))))
+                (impc:ir:closure? (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string (car ast))))))
            (impc:ti:closure-call-check ast vars kts request?))
           (else (impc:ti:join (impc:ti:type-check (car ast) vars kts request?)
                               (impc:ti:type-check (cdr ast) vars kts request?))))))
@@ -4934,7 +4935,7 @@
                                    a)))
                            (cddr ast)
                            (cdddr (if (not (assoc-strcmp (cadr ast) types)) ;; if not in local env then get types from global var
-                                      (cons (cadr ast) (impc:ir:get-type-from-str (llvm:get-global-variable-type (symbol->string (cadr ast)))))
+                                      (cons (cadr ast) (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string (cadr ast)))))
                                       (assoc-strcmp (cadr ast) types))))))
 
               ;; inject (and potential compile) generic functions
@@ -5033,7 +5034,7 @@
                         ;; (if (null? prev) #t
                         ;;     (not (member (car ast) (car prev))))
                         (impc:ti:closure-exists? (symbol->string (car ast)))
-                        (impc:ir:closure? (llvm:get-global-variable-type (symbol->string (car ast))))))
+                        (impc:ir:closure? (impc:ti:get-globalvar-type (symbol->string (car ast))))))
                (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))
               ((list? ast)
                (map (lambda (x)
@@ -6324,7 +6325,7 @@
                                                                       ,(symbol->string symbol)))))))
          (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
      (begin
-       (impc:ti:update-globalvar-list ,(symbol->string symbol) ,(symbol->string type) "")
+       (impc:ti:update-namedtype-list ,(symbol->string symbol) ,(symbol->string type) "")
        (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
      ;; the next line is to help specialize any element types that may not already be specialized!
      (map (lambda (a) (impc:ir:get-type-from-pretty-str a)) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
@@ -6337,7 +6338,7 @@
             ',symbol
             (if (impc:ir:gpolytype-types ',symbol)
                 (symbol->string (impc:ir:gpolytype-types ',symbol))
-                (impc:ir:pretty-print-type (impc:ti:get-namedtype-type ,(symbol->string symbol))))
+                (impc:ti:get-namedtype-type ,(symbol->string symbol)))
             (if (impc:ir:gpolytype-types ',symbol) #t #f)))
      ))
 
@@ -6350,7 +6351,7 @@
               (impc:compiler:print-bad-type-error ,type "only named tuple types are supported"))
           (impc:compiler:print-type-details-to-log
            ,symbol
-           (impc:ir:pretty-print-type (impc:ti:get-namedtype-type ,(symbol->string symbol))))))
+           (impc:ti:get-namedtype-type ,(symbol->string symbol)))))
 
 ;; Ben's helper macros
 
