@@ -47,10 +47,7 @@
 ;;
 ;; each element of the list is of the form
 ;;
-;; (name . #(type docstring arg-pairlist body))
-;;
-;; where args is itself a pairlist:
-;; e.g. ((a . "i64") (b . "i64"))
+;; (name . #(type docstring body))
 ;;
 ;; this list replaces *impc:closuretypes*, *impc:closurebodies* and *impc:docstrings*
 ;;
@@ -69,21 +66,20 @@
     (set! *impc:ti:closure-list* '())))
 
 (define impc:ti:update-closure-list
-  (lambda (closure-name type docstring arg-pairlist body)
+  (lambda (closure-name type docstring body)
     ;; check arg types
     (if (not (and (or (string? closure-name) (begin (println 'closure-name: closure-name) #f))
                   (or (string? type) (begin (println 'type: type) #f))
                   (or (string? docstring) (begin (println docstring)))
-                  (or (list? arg-pairlist) (begin (println 'arg-pairlist: arg-pairlist) #f))
                   (or (list? body) (begin (println 'body: body) #f))))
         (impc:compiler:print-compiler-error "couldn't register new closure")
         (let ((existing (assoc-strcmp closure-name *impc:ti:closure-list*)))
           (if existing
               ;; update details if it already exists
-              (set-cdr! existing (vector type docstring arg-pairlist body))
+              (set-cdr! existing (vector type docstring body))
               ;; or create a new entry
               (set! *impc:ti:closure-list*
-                    (cons (cons closure-name (vector type docstring arg-pairlist body))
+                    (cons (cons closure-name (vector type docstring body))
                           *impc:ti:closure-list*)))))))
 
 (define impc:ti:get-closure-type
@@ -118,25 +114,15 @@
     (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
       (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
 
-(define impc:ti:get-closure-arg-pairlist
+(define impc:ti:get-closure-body
   (lambda (closure-name)
     (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
       (if cls-list (vector-ref (cdr cls-list) 2) #f))))
 
-(define impc:ti:set-closure-arg-pairlist
-  (lambda (closure-name arg-pairlist)
-    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      (if cls-list (vector-set! (cdr cls-list) 2 arg-pairlist) #f))))
-
-(define impc:ti:get-closure-body
-  (lambda (closure-name)
-    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      (if cls-list (vector-ref (cdr cls-list) 3) #f))))
-
 (define impc:ti:set-closure-body
   (lambda (closure-name body)
     (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      (if cls-list (vector-set! (cdr cls-list) 3 body) #f))))
+      (if cls-list (vector-set! (cdr cls-list) 2 body) #f))))
 
 
 ;;;;;;;;;;;;;;
@@ -6029,7 +6015,6 @@
         (impc:ti:update-closure-list func-name
                                      ""
                                      docstring
-                                     '()
                                      (cadr args)))
     (if (impc:ir:poly-types (car args))
         (impc:compiler:print-already-bound-error (car args) "poly function"))
