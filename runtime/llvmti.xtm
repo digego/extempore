@@ -53,9 +53,8 @@
 ;;
 ;; TODO:
 ;;
-;; - if we keep this list sorted, then lookups become O(log2(N))
+;; - if we keep these lists sorted, then lookups become O(log2(N))
 ;;   rather than O(N) (or we could even use a hash-map one day...)
-;; - add validation that closure type and arg types match up
 
 (define impc:ti:print-closure-list
   (lambda ()
@@ -85,6 +84,7 @@
 (define impc:ti:get-closure-type
   (lambda (closure-name)
     (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
+      ;; (println 'cls-list: cls-list)
       (if cls-list (vector-ref (cdr cls-list) 0) #f))))
 
 ;; this is a legacy name - should change it to impc:ti at some stage
@@ -125,14 +125,89 @@
       (if cls-list (vector-set! (cdr cls-list) 2 body) #f))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;
+;; native (C) functions
+;; --------------------
+;;
+(define *impc:ti:nativefunc-list* '())
+;;
+;; each element of the list is of the form
+;;
+;; (name . #(type docstring body))
+;;
+(define impc:ti:print-nativefunc-list
+  (lambda ()
+    (println '*impc:ti:nativefunc-list*: *impc:ti:nativefunc-list*)))
+
+(define impc:ti:reset-nativefunc-list
+  (lambda ()
+    (set! *impc:ti:nativefunc-list* '())))
+
+(define impc:ti:update-nativefunc-list
+  (lambda (nativefunc-name type docstring body)
+    ;; check arg types
+    (if (not (and (or (string? nativefunc-name) (begin (println 'nativefunc-name: nativefunc-name) #f))
+                  (or (string? type) (begin (println 'type: type) #f))
+                  (or (string? docstring) (begin (println docstring)))
+                  (or (list? body) (begin (println 'body: body) #f))))
+        (impc:compiler:print-compiler-error "couldn't register new nativefunc")
+        (let ((existing (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
+          (if existing
+              ;; update details if it already exists
+              (set-cdr! existing (vector type docstring body))
+              ;; or create a new entry
+              (set! *impc:ti:nativefunc-list*
+                    (cons (cons nativefunc-name (vector type docstring body))
+                          *impc:ti:nativefunc-list*)))))))
+
+(define impc:ti:get-nativefunc-type
+  (lambda (nativefunc-name)
+    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
+      ;; (println 'nfunc-list: nfunc-list)
+      (if nfunc-list (vector-ref (cdr nfunc-list) 0) #f))))
+
+;; this is a legacy name - should change it to impc:ti at some stage
+(define impc:ti:get-nativefunc-arg-types
+  (lambda (name)
+    (let ((type (impc:ti:get-nativefunc-type name)))
+      (if (or (not type) (string=? type ""))
+          #f
+          (impc:ir:get-pretty-nativefunc-arg-strings type)))))
+
+(define impc:ti:nativefunc-exists?
+  (lambda (nativefunc-name)
+    (if (impc:ti:get-nativefunc-arg-types nativefunc-name) #t #f)))
+
+(define impc:ti:set-nativefunc-type
+  (lambda (nativefunc-name type)
+    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
+      (if nfunc-list (vector-set! (cdr nfunc-list) 0 type) #f))))
+
+(define impc:ti:get-nativefunc-docstring
+  (lambda (nativefunc-name)
+    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
+      (if nfunc-list (vector-ref (cdr nfunc-list) 1) #f))))
+
+(define impc:ti:set-nativefunc-docstring
+  (lambda (nativefunc-name docstring)
+    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
+      (if nfunc-list (vector-set! (cdr nfunc-list) 1 docstring) #f))))
+
+(define impc:ti:get-nativefunc-body
+  (lambda (nativefunc-name)
+    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
+      (if nfunc-list (vector-ref (cdr nfunc-list) 2) #f))))
+
+(define impc:ti:set-nativefunc-body
+  (lambda (nativefunc-name body)
+    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
+      (if nfunc-list (vector-set! (cdr nfunc-list) 2 body) #f))))
+
+
 ;;;;;;;;;;;;;;
 ;; named types
 ;; -----------
 ;;
-;; each element of the list is of the form
-;;
-;; (name . #(type docstring))
-
 (define *impc:ti:namedtype-list* '())
 ;;
 ;; each element of the list is of the form
@@ -2569,7 +2644,7 @@
   (lambda (ast vars kts request?)
     ;; (println 'type-checking: (car ast))
                                         ;(println 'native-check 'ast: ast 'vars: vars 'request: request?)
-    (let* ((isclosure (if (llvm:get-function (string-append (symbol->string (car ast)) "_getter")) #t #f))
+    (let* ((isclosure (impc:ti:closure-exists? (symbol->string (car ast))))
            (name (symbol->string (car ast)))
            (ftype (map impc:ir:get-type-from-str
                        (impc:ti:get-closure-arg-types name))))
@@ -4668,7 +4743,7 @@
              reses))
           ((and (list? ast) ;; native function
                 (symbol? (car ast))
-                (impc:ti:closure-exists? (symbol->string (car ast))))
+                (impc:ti:nativefunc-exists? (symbol->string (car ast))))
            (impc:ti:nativef-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(begin))) (impc:ti:begin-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(if ifret))) (impc:ti:if-check ast vars kts request?))
