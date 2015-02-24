@@ -277,7 +277,7 @@
 
 (define impc:ti:update-globalvar-list
   (lambda (globalvar-name type docstring)
-    (if (impc:ti:get-globalvar-type globalvar-name)
+    (if (impc:ti:globalvar-exists? globalvar-name)
         (impc:compiler:print-already-bound-error globalvar-name type)
         ;; check arg types
         (if (not (and (or (string? globalvar-name) (begin (println 'globalvar-name: globalvar-name) #f))
@@ -2299,7 +2299,7 @@
   (lambda (sym vars)
     (if (not (assoc-strcmp sym vars))
         (if (impc:ti:globalvar-exists? (symbol->string sym))
-            (let ((t (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string sym)))))
+            (let ((t (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string sym)))))
               (if (list? t)
                   (cons sym (cons (- (car t) *impc:ir:pointer*) (cdr t)))
                   (if (string? t)
@@ -2428,7 +2428,7 @@
                                 (cdr (assoc-strcmp ast vars))
                                 (if (impc:ti:closure-exists? (symbol->string ast))
                                     (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (impc:ti:get-closure-arg-types (symbol->string ast)))))
-                                    (list (impc:ir:pointer-- (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string ast))))))))))
+                                    (list (impc:ir:pointer-- (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string ast))))))))))
               ;; (println '---------- (member ast kts) 'type: type (impc:ir:type? type))
               (if (and request?
                        (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
@@ -4398,7 +4398,7 @@
     (let* ((ctype (if (assoc-strcmp (car ast) vars)
                       (cdr (assoc-strcmp (car ast) vars))
                       (if (impc:ti:closure-exists? (symbol->string (car ast)))
-                          (list (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string (car ast)))))
+                          (list (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string (car ast)))))
                           (impc:compiler:print-missing-identifier-error (car ast) 'closure))))
            ;; (llllllll (println 'ctype: ctype))
            ;; get argument expression types
@@ -4754,10 +4754,12 @@
           ((and (list? ast) ;; this is here to check against closures as global vars (i.e. not in local environment)
                 (symbol? (car ast))
                 (impc:ti:closure-exists? (symbol->string (car ast)))
-                (impc:ir:closure? (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string (car ast))))))
+                (impc:ir:closure? (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string (car ast))))))
            (impc:ti:closure-call-check ast vars kts request?))
-          (else (impc:ti:join (impc:ti:type-check (car ast) vars kts request?)
-                              (impc:ti:type-check (cdr ast) vars kts request?))))))
+          (else
+           (println 'here)
+           (impc:ti:join (impc:ti:type-check (car ast) vars kts request?)
+                         (impc:ti:type-check (cdr ast) vars kts request?))))))
 
 
 (define impc:ti:find-unresolved-simple-types
@@ -4999,7 +5001,7 @@
                                    a)))
                            (cddr ast)
                            (cdddr (if (not (assoc-strcmp (cadr ast) types)) ;; if not in local env then get types from global var
-                                      (cons (cadr ast) (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string (cadr ast)))))
+                                      (cons (cadr ast) (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string (cadr ast)))))
                                       (assoc-strcmp (cadr ast) types))))))
 
               ;; inject (and potential compile) generic functions
@@ -5097,8 +5099,7 @@
                         (symbol? (car ast))
                         ;; (if (null? prev) #t
                         ;;     (not (member (car ast) (car prev))))
-                        (impc:ti:closure-exists? (symbol->string (car ast)))
-                        (impc:ir:closure? (impc:ti:get-globalvar-type (symbol->string (car ast))))))
+                        (impc:ti:closure-exists? (symbol->string (car ast)))))
                (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))
               ((list? ast)
                (map (lambda (x)
