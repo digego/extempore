@@ -477,7 +477,7 @@
                                                    (if (or (member sym syms)
                                                            (impc:ir:gpoly-exists? sym)
                                                            (and (not (equal? sym fname))
-                                                                (llvm:get-function (symbol->string sym)))
+                                                                (impc:ti:closure-exists? (symbol->string sym)))
                                                            (impc:ti:globalvar-exists? (symbol->string sym)))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
@@ -507,7 +507,7 @@
                                                         (sym (string->symbol (car pair))))
                                                    (if (or (member sym syms)
                                                            (and (not (equal? sym fname))
-                                                                (llvm:get-function (symbol->string sym)))
+                                                                (impc:ti:closure-exists? (symbol->string sym)))
                                                            (impc:ti:globalvar-exists? (symbol->string sym)))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
@@ -1295,7 +1295,7 @@
                      ((and (symbol? ast)
                            (regex:match? (symbol->string ast) ":\\$(\\[|<)"))
                       (let ((t (impc:ti:expand-generic-type ast)))
-                        (if (llvm:get-function (symbol->string t))
+                        (if (impc:ti:closure-exists? (symbol->string t))
                             t
                             (let ((p (regex:type-split (symbol->string t) "_poly_")))
                               (_specialize-generic (car p) (cname-decode (cadr p)))
@@ -2351,7 +2351,7 @@
             (let ((type (if polytype polytype
                             (if (assoc-strcmp ast vars)
                                 (cdr (assoc-strcmp ast vars))
-                                (if (llvm:get-function (symbol->string ast))
+                                (if (impc:ti:closure-exists? (symbol->string ast))
                                     (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (impc:ti:get-closure-arg-types (symbol->string ast)))))
                                     (list (impc:ir:pointer-- (impc:ir:get-type-from-str (impc:ti:get-globalvar-type (symbol->string ast))))))))))
               ;; (println '---------- (member ast kts) 'type: type (impc:ir:type? type))
@@ -4166,7 +4166,7 @@
         (impc:compiler:print-bad-arity-error ast))
     (let* (;; a should be a closure of some kind
            (a (if (and (symbol? (cadr ast))
-                       (llvm:get-function (symbol->string (cadr ast))))
+                       (impc:ti:closure-exists? (symbol->string (cadr ast))))
                   #t ; // yes (cadr ast) is a globally defined closure
                   (impc:ti:type-check (cadr ast) vars kts request?)))
            ;; b should be a string (the var's name)
@@ -4186,7 +4186,7 @@
         (impc:compiler:print-bad-arity-error ast))
     (let* (;; a should be a closure of some kind
            (a (if (and (symbol? (cadr ast))
-                       (llvm:get-function (symbol->string (cadr ast))))
+                       (impc:ti:closure-exists? (symbol->string (cadr ast))))
                   #t ; // yes (cadr ast) is a globally defined closure
                   (impc:ti:type-check (cadr ast) vars kts request?)))
            ;; b should be a string (the var's name)
@@ -4205,7 +4205,7 @@
         (impc:compiler:print-bad-arity-error ast))
     (let* (;; a should be a closure of some kind
            (a (if (and (symbol? (cadr ast))
-                       (llvm:get-function (symbol->string (cadr ast))))
+                       (impc:ti:closure-exists? (symbol->string (cadr ast))))
                   #t ; // yes (cadr ast) is a globally defined closure
                   (impc:ti:type-check (cadr ast) vars kts request?)))
            ;; b should be a string (the var's name)
@@ -4668,7 +4668,7 @@
              reses))
           ((and (list? ast) ;; native function
                 (symbol? (car ast))
-                (llvm:get-function (symbol->string (car ast))))
+                (impc:ti:closure-exists? (symbol->string (car ast))))
            (impc:ti:nativef-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(begin))) (impc:ti:begin-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(if ifret))) (impc:ti:if-check ast vars kts request?))
@@ -5622,7 +5622,7 @@
       ;; now compile ir to x86 and make stub code
       (let* ((closure-type (cadr (impc:ir:gname)))
              (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
-             (compile-stub? (if (llvm:get-function (string-append (symbol->string symname) "_getter")) #f #t))
+             (compile-stub? (impc:ti:closure-exists? (symbol->string symname)))
              (fs (string-append "define dllexport ccc " closure-type " @" (string-append (symbol->string symname) "_maker")
                                 "(i8* %_impz) nounwind {\nentry:\n"
                                 ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
