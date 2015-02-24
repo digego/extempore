@@ -6559,7 +6559,7 @@
                                                   (cddr ctype))))
                                   ") nounwind")))
       (if (and (llvm:compile-ir ircode)
-               (llvm:bind-symbol (eval library) (symbol->string symname)))
+               (llvm:queue-bind-symbol (eval library) (symbol->string symname)))
           (impc:compiler:print-lib-binding-details-to-log library symname type)
           (impc:compiler:print-compiler-error (string-append "could not bind! " (symbol->string symname)))))))
 
@@ -6601,8 +6601,8 @@
      (llvm:compile-ir
       (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                      "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n"))
-     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
-     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
+     (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
+     (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
      ;;(println (llvm:get-scheme-function ,(symbol->string symname)))
      (if (llvm:get-scheme-function ,(symbol->string symname))
@@ -6638,8 +6638,8 @@
      (llvm:compile-ir
       (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                      "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n"))
-     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
-     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
+     (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
+     (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
      ;;(println (llvm:get-scheme-function ,(symbol->string symname)))
      (if (llvm:get-scheme-function ,(symbol->string symname))
@@ -6664,7 +6664,7 @@
      (llvm:compile-ir
       (string-append "@" ,(symbol->string symname) " = external global "
                      (if ground-type ground-type ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type))))))
-     (llvm:bind-symbol ,library ,(symbol->string symname))))
+     (llvm:queue-bind-symbol ,library ,(symbol->string symname))))
 
 ;; THIS IS A HELPER FUNCTION
 ;;

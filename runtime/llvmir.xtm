@@ -716,6 +716,13 @@
     (println ir-string)
     (llvm:compile-ir ir-string)))
 
+(define llvm:queue-bind-symbol
+  (lambda (library symname)
+    (if (sys:precomp:currently-compiling?)
+        (sys:precomp:insert-sexp
+         (list 'llvm:bind-symbol library symname))
+        (llvm:bind-symbol library symname))))
+
 ;; ;; GCHANGE
 ;; ;; removes %b when returning base types (i.e. !head%b returns !head)
 ;; (define impc:ir:get-base-type-g
