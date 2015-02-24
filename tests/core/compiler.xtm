@@ -1,0 +1,82 @@
+;;; compiler.xtm -- tests for compiler infrastructure
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Current test coverage: 0.00001% - but you've gotta start somewhere
+
+;;; Code:
+
+(sys:load "libs/core/test.xtm")
+
+(impc:ti:update-closure-list "benclosure"
+                              "[i64,i64]"
+                              "this is the docstring"
+                              '((a . "i64"))
+                              '(lambda (a) (+ a 42)))
+
+(xtmtest-result (impc:ti:get-closure-type "benclosure") "[i64,i64]")
+
+(impc:ti:update-closure-list "benclosure"
+                              "[i64,i64]"
+                              "this is the second docstring"
+                              '()
+                              '(lambda (a) 42))
+
+(xtmtest-result (impc:ti:get-closure-docstring "benclosure")
+                "this is the second docstring")
+
+(xtmtest
+ '(bind-func simplefunc
+    "simplefunc docstring"
+    (lambda ()
+      864))
+ (simplefunc)
+ 864)
+
+(xtmtest-result (impc:ti:closure-exists? "simplefunc") #t)
+(xtmtest-result (impc:ti:get-closure-type "simplefunc") "[i64]*")
+
+
+(xtmtest
+ '(bind-func twoargfunc
+    "simplefunc docstring"
+    (lambda (a:i64 b)
+      (* a b 2)))
+ (twoargfunc 2 6)
+ 24)
+
+(xtmtest-result (equal? (impc:ti:get-closure-arg-types "twoargfunc")
+                        (list "i64" "i64" "i64"))
+                #t)
+
+;; bind-val tests
+
+(xtmtest
+ '(bind-val benval i64)
+ (call-as-xtlang
+  (set! benval 42)
+  (println "benval:" benval)
+  benval)
+ 42)
+
+(xtmtest-result (not (llvm:get-globalvar "benval")) #f)
+
+(xtmtest-result (impc:ti:get-globalvar-type "benval") "i64")
+
+(xtmtest
+ '(bind-val bentuple <i64,i64,i8>)
+ (call-as-xtlang
+  (tfill! bentuple 1 2 3)
+  (println "benval:" benval)
+  (tref bentuple 1))
+ 2)
+
+(xtmtest-result (impc:ti:get-globalvar-type "bentuple")
+                "<i64,i64,i8>")
+
+
+(xtmtest-print-results)
