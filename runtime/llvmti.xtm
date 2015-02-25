@@ -294,7 +294,13 @@
 (define impc:ti:get-globalvar-type
   (lambda (globalvar-name)
     (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
-      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+      (if cls-list
+          ;; the old llvm:get-global-variable-type returned an extra
+          ;; level of pointerness from the bind-val declaration (e.g.
+          ;; (bind-val mytype i64) would return type "i64*"), so this
+          ;; getter adds a "*" on the end to be consistent with this
+          (string-append (vector-ref (cdr cls-list) 0) "*")
+          #f))))
 
 (define impc:ti:globalvar-exists?
   (lambda (globalvar-name)
@@ -2299,7 +2305,7 @@
   (lambda (sym vars)
     (if (not (assoc-strcmp sym vars))
         (if (impc:ti:globalvar-exists? (symbol->string sym))
-            (cons sym (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string sym))))
+            (cons sym (impc:ir:pointer-- (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string sym)))))
             (impc:compiler:print-missing-identifier-error sym 'variable))
         (assoc-strcmp sym vars))))
 
@@ -2423,7 +2429,7 @@
                                 (cdr (assoc-strcmp ast vars))
                                 (if (impc:ti:closure-exists? (symbol->string ast))
                                     (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (impc:ti:get-closure-arg-types (symbol->string ast)))))
-                                    (list (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string ast)))))))))
+                                    (list (impc:ir:pointer-- (impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type (symbol->string ast))))))))))
               ;; (println '---------- (member ast kts) 'type: type (impc:ir:type? type))
               (if (and request?
                        (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
