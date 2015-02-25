@@ -6669,23 +6669,28 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-closure
   (lambda (name)
-    (let ((f (llvm:get-function (string-append name "_getter"))))
-      (if f (llvm:run f)
-          '()))))
+    (if (sys:precomp:currently-compiling?)
+        (impc:compiler:print-not-during-precomp-error)
+        (let ((f (llvm:get-function (string-append name "_getter"))))
+          (if f (llvm:run f)
+              '())))))
 
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-function
   (lambda (name)
-    (llvm:get-function-pointer (string-append name "_native"))))
+    (if (sys:precomp:currently-compiling?)
+        (impc:compiler:print-not-during-precomp-error)
+        (llvm:get-function-pointer (string-append name "_native")))))
 
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-scheme-function
   (lambda (name)
-    (llvm:get-function-pointer (string-append name "_scheme"))))
+    (if (sys:precomp:currently-compiling?)
+        (impc:compiler:print-not-during-precomp-error)
+        (llvm:get-function-pointer (string-append name "_scheme")))))
 
 ;; Wrap a native, bound C function, allowing it to be called from scheme
 (define-macro (bind-wrapper local-sym native-sym)
