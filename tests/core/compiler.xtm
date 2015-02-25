@@ -63,9 +63,25 @@
   benval)
  42)
 
+(bind-val benval i64)
+
+
 (xtmtest-result (not (llvm:get-globalvar "benval")) #f)
 
 (xtmtest-result (impc:ti:get-globalvar-type "benval") "i64")
+
+(let ((types '("i32" "<i64>" "[i64,i8]" "|4,i1|")))
+  (for-each (lambda (t)
+              (println 't: t)
+              (let ((ugly (impc:ir:get-type-from-str t))
+                    (pretty (impc:ir:get-type-from-pretty-str t)))
+                (if (not (equal? ugly pretty))
+                    (println 'ugly: ugly 'pretty: pretty))))
+            types))
+
+(impc:ir:get-type-from-pretty-str (impc:ti:get-globalvar-type "benval"))
+(impc:ir:get-type-from-pretty-str "[i64]")
+
 
 (xtmtest
  '(bind-val bentuple <i64,i64,i8>)
@@ -77,6 +93,73 @@
 
 (xtmtest-result (impc:ti:get-globalvar-type "bentuple")
                 "<i64,i64,i8>")
+
+
+(set! *impc:ti:print-main-check* #t)
+(set! *impc:ti:print-main-check* #f)
+(set! *impc:ti:print-sub-checks* #t)
+(set! *impc:ti:print-sub-checks* #f)
+
+;; this currently fails
+(bind-func func_with_gv_ref
+  (lambda ()
+    benval))
+
+(impc:ti:print-closure-list)
+(impc:ti:print-globalvar-list)
+
+
+(impc:ir:pointer-- "i64")
+
+
+
+
+
+
+
+
+
+
+(bind-func testextref
+  (lambda ()
+    (set! benval 22)
+    void))
+
+(impc:ir:get-type-from-pretty-str "[i64,i64,i32]")
+(impc:ir:get-type-from-str "{ i64 }")
+(impc:ir:get-type-from-pretty-closure "[|16,i64|]")
+
+;; bind-type
+
+(bind-type bentype1 <i64>)
+
+(xtmtest-result (impc:ti:namedtype-exists? "bentype") #t)
+
+(xtmtest-result (impc:ir:get-base-type "<i64>**") "<i64>")
+(xtmtest-result (impc:ir:get-ptr-depth "<i64>**") 2)
+
+(xtmtest-result (equal? (impc:ir:get-type-from-str "{ i64 }")
+                        (impc:ir:get-type-from-pretty-str "<i64>"))
+                #t)
+
+;; some poly stuff
+
+(bind-poly simplefunc-poly simplefunc)
+
+;; TODO for tomorrow
+
+;; - make sure impc:ir:get-named-type returns the right "type" (pretty or ugly) for the regular, poly, and generic poly cases
+;; - perhaps make gpolys and polys into the same type of list with getters/setters etc.?
+
+(println '*impc:ir:polytypes*: *impc:ir:polytypes*)
+
+(xtmtest-result (impc:ir:pointer? "%bentype") #f)
+
+(impc:ti:print-namedtype-list)
+
+(impc:ir:get-pretty-tuple-arg-strings "<i64>")
+(impc:ir:get-base-type "<i64>***")
+
 
 
 (xtmtest-print-results)
