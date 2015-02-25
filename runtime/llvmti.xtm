@@ -133,7 +133,7 @@
 ;;
 ;; each element of the list is of the form
 ;;
-;; (name . #(type docstring body))
+;; (name . #(type docstring))
 ;;
 (define impc:ti:print-nativefunc-list
   (lambda ()
@@ -144,20 +144,19 @@
     (set! *impc:ti:nativefunc-list* '())))
 
 (define impc:ti:update-nativefunc-list
-  (lambda (nativefunc-name type docstring body)
+  (lambda (nativefunc-name type docstring)
     ;; check arg types
     (if (not (and (or (string? nativefunc-name) (begin (println 'nativefunc-name: nativefunc-name) #f))
                   (or (string? type) (begin (println 'type: type) #f))
-                  (or (string? docstring) (begin (println docstring)))
-                  (or (list? body) (begin (println 'body: body) #f))))
+                  (or (string? docstring) (begin (println docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new nativefunc")
         (let ((existing (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
           (if existing
               ;; update details if it already exists
-              (set-cdr! existing (vector type docstring body))
+              (set-cdr! existing (vector type docstring))
               ;; or create a new entry
               (set! *impc:ti:nativefunc-list*
-                    (cons (cons nativefunc-name (vector type docstring body))
+                    (cons (cons nativefunc-name (vector type docstring))
                           *impc:ti:nativefunc-list*)))))))
 
 (define impc:ti:get-nativefunc-type
@@ -192,16 +191,6 @@
   (lambda (nativefunc-name docstring)
     (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
       (if nfunc-list (vector-set! (cdr nfunc-list) 1 docstring) #f))))
-
-(define impc:ti:get-nativefunc-body
-  (lambda (nativefunc-name)
-    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
-      (if nfunc-list (vector-ref (cdr nfunc-list) 2) #f))))
-
-(define impc:ti:set-nativefunc-body
-  (lambda (nativefunc-name body)
-    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
-      (if nfunc-list (vector-set! (cdr nfunc-list) 2 body) #f))))
 
 
 ;;;;;;;;;;;;;;
@@ -6541,24 +6530,26 @@
   (lambda (library symname type . args)
     (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
            (calling_convention (if (null? args) "ccc" (symbol->string (car args))))
-           (ircode (string-append "declare "
-                                  calling_convention
-                                  " "
-                                  (impc:ir:get-type-str (car ctype))
-                                  " @"
-                                  (symbol->string symname)
-                                  "("
-                                  (if (null? (cdr ctype))
-                                      ""
-                                      (apply string-append
-                                             (impc:ir:get-type-str (cadr ctype))
-                                             (map (lambda (v)
-                                                    (string-append "," (impc:ir:get-type-str v)))
-                                                  (cddr ctype))))
-                                  ") nounwind")))
-      (if (and (llvm:compile-ir ircode)
+           (ir-string (string-append "declare "
+                                     calling_convention
+                                     " "
+                                     (impc:ir:get-type-str (car ctype))
+                                     " @"
+                                     (symbol->string symname)
+                                     "("
+                                     (if (null? (cdr ctype))
+                                         ""
+                                         (apply string-append
+                                                (impc:ir:get-type-str (cadr ctype))
+                                                (map (lambda (v)
+                                                       (string-append "," (impc:ir:get-type-str v)))
+                                                     (cddr ctype))))
+                                     ") nounwind")))
+      (if (and (llvm:compile-ir ir-string)
                (llvm:queue-bind-symbol (eval library) (symbol->string symname)))
-          (impc:compiler:print-lib-binding-details-to-log library symname type)
+          (begin
+            (impc:ti:update-nativefunc-list symname type "")
+            (impc:compiler:print-lib-binding-details-to-log library symname type))
           (impc:compiler:print-compiler-error (string-append "could not bind! " (symbol->string symname)))))))
 
 (define-macro (remove-func symname)
