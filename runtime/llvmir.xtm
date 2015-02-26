@@ -4989,11 +4989,6 @@
            (time (impc:ir:gname))
                                         ;(farg '())
            (fname (symbol->string (caddr ast)))
-           (calling-conv (let ((val (llvm:get-function-calling-conv fname)))
-                           (if val val
-                               (if (assoc-strcmp (caddr ast) types)
-                                   0
-                                   (impc:compiler:print-missing-identifier-error (caddr ast) 'closure)))))
            (ftypes (if (assoc-strcmp (caddr ast) types)
                        (map (lambda (a) (impc:ir:get-type-str a)) (cddr (assoc-strcmp (caddr ast) types)))
                        (impc:ti:get-closure-arg-types fname)))
@@ -5138,12 +5133,11 @@
 (define impc:ir:compiler:native-call
   (lambda (ast types)
     (let* ((os (make-string 0))
-           (closurecall (llvm:get-function (string-append (symbol->string (car ast)) "_getter")))
-           (fname (if closurecall
-                      (symbol->string (car ast))
-                      ;; (string-append (symbol->string (car ast)) "_native")
-                      (symbol->string (car ast))))
-           (calling-conv (llvm:get-function-calling-conv fname))
+           (fname (symbol->string (car ast)))
+           (calling-conv (if (or (impc:ti:closure-exists? fname)
+                                 (impc:ti:nativefunc-exists? fname))
+                             "ccc"      ;; bind-libs and toplevel closures
+                             "fastcc")) ;; everything else
            (ftypes (impc:ti:get-closure-arg-types fname))
            (args (map (lambda (a hint)
                         (cons (impc:ir:compiler a types (impc:ir:get-type-from-str hint)) (impc:ir:gname)))
@@ -5185,8 +5179,8 @@
       (emit (string-append (if (impc:ir:void? (car ftypes))
                                (begin (impc:ir:gname "res" "void") "")
                                (string-append (impc:ir:gname "res" (car ftypes)) " = "))
-                           ;;"tail call cc " (number->string calling-conv)
-                           "call cc " (number->string calling-conv)
+                           ;; "tail "
+                           "call " calling-conv
                            " " (car ftypes)
                            " @" fname "("
                            (apply string-append
@@ -5436,7 +5430,8 @@
                    ((equal? (car ast) 'ifret)
                     (impc:ir:compiler:ifret ast types))
                    ((and (symbol? (car ast))
-                         (impc:ti:closure-exists? (symbol->string (car ast))))
+                         (or (impc:ti:nativefunc-exists? (symbol->string (car ast)))
+                             (impc:ti:closure-exists? (symbol->string (car ast)))))
                     (if (member (car ast) '(llvm_printf llvm_fprintf llvm_sprintf llvm_sscanf llvm_fscanf))
                         (impc:ir:compiler:llvm_varargs ast types)
                         (impc:ir:compiler:native-call ast types)))
