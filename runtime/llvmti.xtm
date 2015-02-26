@@ -2676,39 +2676,12 @@
                 (else (list *impc:ir:i1*)))))))
 
 
-(define impc:ti:nativef-check
-  (lambda (ast vars kts request?)
-    ;; (println 'type-checking: (car ast))
-                                        ;(println 'native-check 'ast: ast 'vars: vars 'request: request?)
-    (let ((ftype (map impc:ir:get-type-from-str
-                      (impc:ti:get-closure-arg-types (symbol->string (car ast))))))
-      (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
-
-      (if (<> (length ftype)
-              (length ast))
-          (impc:compiler:print-compiler-error "bad arity in call" ast))
-
-      ;; we don't care what we get back because we already know the return type
-      (for-each (lambda (a t)
-                  ;; if a is a symbol then add type t to a
-                  ;; we also know that for native functions there
-                  ;; is no choice about the type so we should
-                  ;; force it to the type not update it
-                                        ;(if (symbol? a) (impc:ti:force-var a vars kts t))
-                  (if (symbol? a) (impc:ti:update-var a vars kts t))
-                  (impc:ti:type-check a vars kts t))
-                (cdr ast)
-                (cdr ftype))
-      (list (car ftype)))))
-
-
 ;; with _native functions
 (define impc:ti:nativef-check
   (lambda (ast vars kts request?)
     ;; (println 'type-checking: (car ast))
-                                        ;(println 'native-check 'ast: ast 'vars: vars 'request: request?)
-    (let* ((isclosure (impc:ti:closure-exists? (symbol->string (car ast))))
-           (name (symbol->string (car ast)))
+    ;; (println 'native-check 'ast: ast 'vars: vars 'request: request?)
+    (let* ((name (symbol->string (car ast)))
            (ftype (map impc:ir:get-type-from-str
                        (impc:ti:get-closure-arg-types name))))
       ;;(println 'ftype:> 'ast: ast 'type: ftype)
