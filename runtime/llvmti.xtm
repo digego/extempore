@@ -6724,6 +6724,14 @@
           (if f (llvm:run f)
               '())))))
 
+(define llvm:get-closure-setter
+  (lambda (name)
+    (if (sys:precomp:currently-compiling?)
+        (impc:compiler:print-not-during-precomp-error)
+        (let ((f (llvm:get-function (string-append name "_setter"))))
+          (if f (llvm:run f)
+              '())))))
+
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-function
   (lambda (name)
