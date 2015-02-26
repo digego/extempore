@@ -5075,60 +5075,6 @@
     ""))
 
 
-;; (define impc:ir:compiler:native-call
-;;    (lambda (ast types)
-;;       (let* ((os (make-string 0))
-;;              (fname (symbol->string (car ast)))
-;;              (calling-conv (llvm:get-function-calling-conv fname))
-;;              (ftypes (impc:ti:get-closure-arg-types fname))
-;;              (closurecall (llvm:get-function (string-append fname "_getter")))
-;;              (args (map (lambda (a hint)
-;;                            (cons (impc:ir:compiler a types (impc:ir:get-type-from-str hint)) (impc:ir:gname)))
-;;                         (cdr ast)
-;;                         (cdr ftypes))))
-;;          (if (<> (length args) (length (cdr ftypes)))
-;;              (print-error 'Compiler 'Error: ast 'Wrong 'number 'of 'arguments))
-;; 	 ;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 	 ;; new for impz stuff
-;; 	 ;(if closurecall (emit (impc:ir:gname "tmp_zone" "i8*") " = load i8** %_impzPtr\n" os))
-;; 	 ;(if closurecall (emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os))
-;; 	 (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
-;; 	       (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-;; 	       os)
-;; 	 (if closurecall (emit (impc:ir:gname "tmp_zone" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os))
-;; 	 ;;;;;;;;;;;;;;;;;;;;;;;;;
-;;          (emit (apply string-append (map (lambda (p) (car p)) args)) os)
-;;          (emit (string-append (if (impc:ir:void? (car ftypes))
-;;                                      (begin (impc:ir:gname "res" "void") "")
-;;                                      (string-append (impc:ir:gname "res" (car ftypes)) " = "))
-;;                                  ;;"tail call cc " (number->string calling-conv)
-;;                                  "call cc " (number->string calling-conv)
-;;                                  " " (car ftypes)
-;;                                  " @" fname "("
-;;                                  (if closurecall
-;; 				     ;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 				     ;; new for impz stuff
-;; 				     (string-append "i8* " (car (impc:ir:gname "tmp_zone")) (if (null? (cdr ftypes)) "" ","))
-;; 				     ;; this line replaced by above
-;;                                      ;(string-append "i8* %_impz" (if (null? (cdr ftypes)) "" ","))
-;; 				     ;;;;;;;;;;;;;;;;;;;;;;;;;
-;;                                      "")
-;;                                  (apply string-append
-;;                                         (map (lambda (p ft i)
-;;                                                 (let ((atype (cadr (cdr p)))
-;;                                                       (aname (car (cdr p))))
-;;                                                    ;(print p ft i)
-;;                                                    ;(if (not (string=? atype ft))
-;;                                                    (if (not (equal? (impc:ir:get-type-from-str atype)
-;;                                                                     (impc:ir:get-type-from-str ft)))
-;;                                                        (print-error 'Compiler 'Error: 'function 'argument 'does 'not 'match. 'Expected ft 'but 'got atype 'ast: ast))
-;;                                                    (string-append (if (> i 0) ", " "")
-;;                                                                   atype " " aname)))
-;;                                              args (cdr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
-;;                                  ")\n") os)
-;;          (impc:ir:strip-space os))))
-
-
 ;; THIS VERSION FOR _NATIVE CALL CLOSURES!
 (define impc:ir:compiler:native-call
   (lambda (ast types)
@@ -5168,14 +5114,14 @@
                              p)))
                      args (cdr ftypes))))
 
-	 ;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; new for impz stuff
       ;; (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
       ;;       (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
       ;;       os)
       ;; (if closurecall (emit (impc:ir:gname "tmp_zone" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os))
-	 ;;;;;;;;;;;;;;;;;;;;;;;;;
-      (emit (apply string-append (map (lambda (p) (car p)) args)) os)
+;;;;;;;;;;;;;;;;;;;;;;;;;
+      (emit (apply string-append (map car args)) os)
       (emit (string-append (if (impc:ir:void? (car ftypes))
                                (begin (impc:ir:gname "res" "void") "")
                                (string-append (impc:ir:gname "res" (car ftypes)) " = "))
