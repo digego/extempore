@@ -87,7 +87,6 @@
       ;; (println 'cls-list: cls-list)
       (if cls-list (vector-ref (cdr cls-list) 0) #f))))
 
-;; this is a legacy name - should change it to impc:ti at some stage
 (define impc:ti:get-closure-arg-types
   (lambda (name)
     (let ((type (impc:ti:get-closure-type name)))
@@ -129,7 +128,81 @@
 ;; native (C) functions
 ;; --------------------
 ;;
-(define *impc:ti:nativefunc-list* '())
+(define *impc:ti:nativefunc-list*
+  '(("impc_null" . #("[i8*]" ""))
+    ("impc_true" . #("[i1]" ""))
+    ("impc_false" . #("[i1]" ""))
+    ("i1toi64" . #("[i64,i1]*" ""))
+    ("i1toi32" . #("[i32,i1]*" ""))
+    ("i1toi16" . #("[i16,i1]*" ""))
+    ("i1toi8" . #("[i8,i1]*" ""))
+    ("i64toi1" . #("[i1,i64]*" ""))
+    ("i32toi1" . #("[i1,i32]*" ""))
+    ("i16toi1" . #("[i1,i16]*" ""))
+    ("i8toi1" . #("[i1,i8]*" ""))
+    ("i8toi64" . #("[i64,i8]*" ""))
+    ("i8toui64" . #("[i64,i8]*" ""))
+    ("i8toi32" . #("[i32,i8]*" ""))
+    ("i8toi16" . #("[i16,i8]*" ""))
+    ("i8toui32" . #("[i32,i8]*" ""))
+    ("i64toi8" . #("[i8,i64]*" ""))
+    ("i32toi8" . #("[i8,i32]*" ""))
+    ("i16toi8" . #("[i8,i16]*" ""))
+    ("i16toi64" . #("[i64,i16]*" ""))
+    ("i16toui64" . #("[i64,i16]*" ""))
+    ("i16toi32" . #("[i32,i16]*" ""))
+    ("i16toui32" . #("[i32,i16]*" ""))
+    ("i64toi16" . #("[i16,i64]*" ""))
+    ("i32toi16" . #("[i16,i32]*" ""))
+    ("i32toi64" . #("[i64,i32]*" ""))
+    ("i32toui64" . #("[i64,i32]*" ""))
+    ("i64toi32" . #("[i32,i64]*" ""))
+    ("ftod" . #("[double,float]*" ""))
+    ("dtof" . #("[float,double]*" ""))
+    ("ftoi64" . #("[i64,float]*" ""))
+    ("ftoi32" . #("[i32,float]*" ""))
+    ("ftoi16" . #("[i16,float]*" ""))
+    ("ftoi8" . #("[i8,float]*" ""))
+    ("ftoi1" . #("[i1,float]*" ""))
+    ("ftoui64" . #("[i64,float]*" ""))
+    ("ftoui32" . #("[i32,float]*" ""))
+    ("ftoui8" . #("[i8,float]*" ""))
+    ("ftoui1" . #("[i1,float]*" ""))
+    ("i64tof" . #("[float,i64]*" ""))
+    ("i32tof" . #("[float,i32]*" ""))
+    ("i16tof" . #("[float,i16]*" ""))
+    ("i8tof" . #("[float,i8]*" ""))
+    ("i1tof" . #("[float,i1]*" ""))
+    ("ui64tof" . #("[float,i64]*" ""))
+    ("ui32tof" . #("[float,i32]*" ""))
+    ("ui16tof" . #("[float,i16]*" ""))
+    ("ui8tof" . #("[float,i8]*" ""))
+    ("ui1tof" . #("[float,i1]*" ""))
+    ("dtoi64" . #("[i64,double]*" ""))
+    ("dtoi32" . #("[i32,double]*" ""))
+    ("dtoi16" . #("[i16,double]*" ""))
+    ("dtoi8" . #("[i8,double]*" ""))
+    ("dtoi1" . #("[i1,double]*" ""))
+    ("dtoui64" . #("[i64,double]*" ""))
+    ("dtoui32" . #("[i32,double]*" ""))
+    ("dtoui8" . #("[i8,double]*" ""))
+    ("dtoui1" . #("[i1,double]*" ""))
+    ("i64tod" . #("[double,i64]*" ""))
+    ("i32tod" . #("[double,i32]*" ""))
+    ("i16tod" . #("[double,i16]*" ""))
+    ("i8tod" . #("[double,i8]*" ""))
+    ("i1tod" . #("[double,i1]*" ""))
+    ("ui64tod" . #("[double,i64]*" ""))
+    ("ui32tod" . #("[double,i32]*" ""))
+    ("ui16tod" . #("[double,i16]*" ""))
+    ("ui8tod" . #("[double,i8]*" ""))
+    ("ui1tod" . #("[double,i1]*" ""))
+    ("ptrtoi64" . #("[i64,i8*]*" ""))
+    ("i64toptr" . #("[i8*,i64]*" ""))
+    ("ptrtoi32" . #("[i32,i8*]*" ""))
+    ("ptrtoi16" . #("[i16,i8*]*" ""))
+    ("i32toptr" . #("[i8*,i32]*" ""))
+    ("i16toptr" . #("[i8*,i16]*" ""))))
 ;;
 ;; each element of the list is of the form
 ;;
@@ -165,13 +238,12 @@
       ;; (println 'nfunc-list: nfunc-list)
       (if nfunc-list (vector-ref (cdr nfunc-list) 0) #f))))
 
-;; this is a legacy name - should change it to impc:ti at some stage
 (define impc:ti:get-nativefunc-arg-types
   (lambda (name)
     (let ((type (impc:ti:get-nativefunc-type name)))
       (if (or (not type) (string=? type ""))
           #f
-          (impc:ir:get-pretty-nativefunc-arg-strings type)))))
+          (impc:ir:get-pretty-closure-arg-strings type)))))
 
 (define impc:ti:nativefunc-exists?
   (lambda (nativefunc-name)
@@ -197,7 +269,8 @@
 ;; named types
 ;; -----------
 ;;
-(define *impc:ti:namedtype-list* '())
+(define *impc:ti:namedtype-list* '(("mzone" . #("<i8*,i64,i64,i64,mzone*>"))
+                                   ("clsvar" . #("<i8*,i32,i8*,i64,clsvar*>"))))
 ;;
 ;; each element of the list is of the form
 ;;
