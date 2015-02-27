@@ -2680,14 +2680,13 @@
                                         ;(println 'bingo: val 'fname: fname)
                              (if (equal? val #t)
                                  (let* ((rr (eval nast (interaction-environment)))
-                                        (type (impc:ir:get-function-type (symbol->string fname)))
-                                        (strtype (impc:ir:pretty-print-type type)))
-                                   (if (null? type)
-                                       #f
-                                       (begin
-                                         (eval `(bind-poly ,name ,fname ,(string->symbol strtype))
-                                               (interaction-environment))
-                                         type))))))
+                                        (strtype (impc:ti:get-closure-or-nativefunc-type (symbol->string fname)))
+                                        (type (impc:ir:get-type-from-pretty-str strtype)))
+                                   (and type
+                                        (begin
+                                          (eval `(bind-poly ,name ,fname ,(string->symbol strtype))
+                                                (interaction-environment))
+                                          type))))))
                          (car dat)
                          (cadr dat))))
           ;; restore print-error and print
@@ -8416,21 +8415,10 @@
             (else (impc:compiler:print-missing-type-error type))))))
 
 
-(define impc:ir:get-function-type
-  (lambda (name)
-    (if (symbol? name)
-        (set! name (symbol->string name)))
-    (if (not (impc:ti:get-closure-arg-types name))
-        (impc:compiler:print-missing-identifier-error name 'closure))
-    (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*)
-          (map (lambda (x) (impc:ir:get-type-from-str x))
-               (impc:ti:get-closure-arg-types name)))))
-
-
 (define-macro (bind-poly poly_sym implementation_sym)
   (if (impc:ir:gpoly-exists? implementation_sym)
       (impc:compiler:print-compiler-error (string-append "bind-poly only accepts monomorphic functions, not " (symbol->string implementation_sym))))
-  (let ((type (impc:ir:get-function-type implementation_sym)))
+  (let ((type (impc:ti:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
     ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
     `(begin (impc:ir:add-poly ',poly_sym ',implementation_sym ',type)
             (impc:compiler:print-polying-details-to-log "Overload:" ',poly_sym ',implementation_sym ,(impc:ir:pretty-print-type type)))))
