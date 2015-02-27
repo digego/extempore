@@ -1602,6 +1602,17 @@
   (lambda ()
     (set! *impc:ti:namedtype-list* '())))
 
+;; type is immutable, doesn't need a setter
+(define impc:ti:get-namedtype-type
+  (lambda (namedtype-name)
+    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
+      ;; (println 'namedtype-name: namedtype-name 'cls-list: cls-list)
+      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+
+(define impc:ti:namedtype-exists?
+  (lambda (namedtype-name)
+    (if (impc:ti:get-namedtype-type namedtype-name) #t #f)))
+
 (define impc:ti:update-namedtype-list
   (lambda (namedtype-name type docstring)
     (if (impc:ti:namedtype-exists? namedtype-name)
@@ -1615,26 +1626,14 @@
                   (cons (cons namedtype-name (vector type docstring))
                         *impc:ti:namedtype-list*))))))
 
-;; type is immutable, doesn't need a setter
-(define impc:ti:get-namedtype-type
-  (lambda (namedtype-name)
-    (let ((cls-list (assoc-strcmp namedtype-name *impc:ti:namedtype-list*)))
-      ;; (println 'namedtype-name: namedtype-name 'cls-list: cls-list)
-      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
-
-(define impc:ti:namedtype-exists?
-  (lambda (namedtype-name)
-    (let ((cls-list (assoc-strcmp namedtype-name *impc:ti:namedtype-list*)))
-      (if (impc:ti:get-namedtype-type namedtype-name) #t #f))))
-
 (define impc:ti:get-namedtype-docstring
   (lambda (namedtype-name)
-    (let ((cls-list (assoc-strcmp *impc:ti:namedtype-list*)))
+    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
       (if cls-list (vector-ref (cdr cls-list) 1) #f))))
 
 (define impc:ti:set-namedtype-docstring
   (lambda (namedtype-name docstring)
-    (let ((cls-list (assoc-strcmp namedtype-name *impc:ti:namedtype-list*)))
+    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
       (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2219,21 +2218,6 @@
   (lambda ()
     (set! *impc:ti:globalvar-list* '())))
 
-(define impc:ti:update-globalvar-list
-  (lambda (globalvar-name type docstring)
-    (if (impc:ti:globalvar-exists? globalvar-name)
-        (impc:compiler:print-already-bound-error globalvar-name type)
-        ;; check arg types
-        (if (not (and (or (string? globalvar-name) (begin (println 'globalvar-name: globalvar-name) #f))
-                      (or (string? type) (begin (println 'type: type) #f))
-                      (or (string? docstring) (begin (println docstring) #f))))
-            (impc:compiler:print-compiler-error "couldn't register new globalvar")
-            (begin
-              (set! *impc:ti:globalvar-list*
-                    (cons (cons globalvar-name (vector type docstring))
-                          *impc:ti:globalvar-list*))
-              (impc:compiler:print-binding-details-to-log "SetValue:" globalvar-name type))))))
-
 ;; type is immutable, doesn't need a setter
 (define impc:ti:get-globalvar-type
   (lambda (globalvar-name)
@@ -2248,9 +2232,22 @@
 
 (define impc:ti:globalvar-exists?
   (lambda (globalvar-name)
-    (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
-      ;; (println 'globalvar-exists 'globalvar-name: globalvar-name 'cls-list: cls-list)
-      (if (impc:ti:get-globalvar-type globalvar-name) #t #f))))
+    (if (impc:ti:get-globalvar-type globalvar-name) #t #f)))
+
+(define impc:ti:update-globalvar-list
+  (lambda (globalvar-name type docstring)
+    (if (impc:ti:globalvar-exists? globalvar-name)
+        (impc:compiler:print-already-bound-error globalvar-name type)
+        ;; check arg types
+        (if (not (and (or (string? globalvar-name) (begin (println 'globalvar-name: globalvar-name) #f))
+                      (or (string? type) (begin (println 'type: type) #f))
+                      (or (string? docstring) (begin (println docstring) #f))))
+            (impc:compiler:print-compiler-error "couldn't register new globalvar")
+            (begin
+              (set! *impc:ti:globalvar-list*
+                    (cons (cons globalvar-name (vector type docstring))
+                          *impc:ti:globalvar-list*))
+              (impc:compiler:print-binding-details-to-log "SetValue:" globalvar-name type))))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
@@ -4269,7 +4266,7 @@
   (lambda (t vars)
     ;; check for named types
     (if (string? t)
-        (let ((t (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type (impc:ir:clean-named-type t))))
+        (let ((t (impc:ir:get-type-from-pretty-str (impc:ti:get-namedtype-type t)))
               (ptr-level (impc:ir:get-ptr-depth t)))
           (dotimes (i ptr-level) (set! t (impc:ir:pointer++ t)))
           (list t))
@@ -5981,9 +5978,7 @@
 
 (define impc:ti:get-tuple-type-from-name
   (lambda (str)
-    (let ((t (impc:ti:get-namedtype-type (substring (impc:ir:get-base-type (car res))
-                                                    1
-                                                    (string-length (impc:ir:get-base-type (car res)))))))
+    (let ((t (impc:ti:get-namedtype-type (impc:ir:get-base-type (car res)))))
       (dotimes (i (impc:ir:get-ptr-depth str)) (set! t (impc:ir:pointer++ t)))
       t)))
 
@@ -6001,9 +5996,7 @@
                 (if (null? res) res
                     (if (and (string? (car res))
                              (char=? (string-ref (car res) 0) #\%))
-                        (let ((t (impc:ti:get-namedtype-type (substring (impc:ir:get-base-type (car res))
-                                                                 1
-                                                                 (string-length (impc:ir:get-base-type (car res)))))))
+                        (let ((t (impc:ti:get-namedtype-type (impc:ir:get-base-type (car res)))))
                           (dotimes (i (impc:ir:get-ptr-depth (car res))) (set! t (impc:ir:pointer++ t)))
                           (list (impc:ir:get-type-from-pretty-str t)))
                         res))))
