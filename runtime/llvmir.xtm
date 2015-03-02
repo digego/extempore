@@ -1354,8 +1354,7 @@
         (begin (println 'error 'trying 'to 'prettyprint 'null 'type: t) (error))
                                         ;(print-error 'Compiler 'Error: 'trying 'to 'print 'null 'type!)
         (if (string? t)
-            (if (and (char=? (string-ref t 0) #\%)
-                     (impc:ti:namedtype-exists? (substring (impc:ir:get-base-type t) 1 (string-length (impc:ir:get-base-type t)))))
+            (if (impc:ti:namedtype-exists? (impc:ir:get-base-type t))
                 (if (regex:match? t "_poly_")
                     (let* ((base (impc:ir:get-base-type t))
                            (ptrs (impc:ir:get-ptr-depth t))
@@ -1481,8 +1480,7 @@
                                (cname-encode (cadr p))
                                (cname-encode (apply string-append (cadr p) (map (lambda (x) (string-append ":" x)) (cddr p)))))
                            (make-list-with-proc ptr-depth (lambda (i) "*")))))))
-            ((and (char=? (string-ref base 0) #\%)
-                  (impc:ti:namedtype-exists? (substring base 1 (string-length base))))
+            ((impc:ti:namedtype-exists? base)
              string-type)
             ((char=? (string-ref base 0) #\%)
              (let* ((name1 (substring base 1 (string-length base)))
@@ -1753,15 +1751,14 @@
 
 (define impc:ir:str-list-check
   (lambda (type)
+    ;; (println 'str-list-check 'type: type)
     (cond ((string? type)
-           (if (and (char=? (string-ref type 0) #\%)
-                    (impc:ti:namedtype-exists? (substring (impc:ir:get-base-type type) 1 (string-length (impc:ir:get-base-type type)))))
+           (if (impc:ti:namedtype-exists? (impc:ir:get-base-type type))
                type
                (impc:ir:str-list-check (impc:ir:get-type-from-str type))))
           ((symbol? type)
            (set! type (symbol->string type))
-           (if (and (char=? (string-ref type 0) #\%)
-                    (impc:ti:namedtype-exists? (substring (impc:ir:get-base-type type) 1 (string-length (impc:ir:get-base-type type)))))
+           (if (impc:ti:namedtype-exists? (impc:ir:get-base-type type))
                type
                (if (and (char=? (string-ref type 0) #\!))
                    type
