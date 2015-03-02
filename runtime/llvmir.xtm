@@ -967,7 +967,13 @@
     (let ((clean-name (impc:ir:clean-named-type name)))
       (or (impc:ir:gpolytype-types clean-name)
           (impc:ir:polytype-types clean-name)
-          (impc:ti:get-namedtype-type clean-name)))))
+          (let ((from-cache (impc:ti:get-namedtype-type clean-name)))
+            (and from-cache
+                 ;; because the old (pre-mcjit) version used
+                 ;; llvm:get-named-type, which returned the type in
+                 ;; LLVM IR format, we convert the xtlang pretty type
+                 ;; to this format
+                 (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str from-cache))))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
