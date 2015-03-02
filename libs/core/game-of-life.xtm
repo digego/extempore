@@ -14,6 +14,8 @@
 (sys:load-preload-check 'gameoflife)
 (define *xtmlib-gameoflife-loaded* #f)
 
+(sys:load "libs/core/adt.xtm")
+
 ;;                w   h   data
 (bind-type World <i64,i64,i8*>)
 
@@ -94,10 +96,14 @@
        (cell_value w (+ x 1) y)
        (cell_value w (+ x 1) (+ y 1)))))
 
+;; each "update" element is <x,y,newvalue>
+(bind-type CellUpdate <i64,i64,i8>)
+
 (bind-func world_step
   (lambda (w:World*)
-    (let ((cv 0)
-          (n 0))
+    (letz ((cv 0)
+           (n 0)
+           (pending_updates:List:<CellUpdate*,List*>* null))
       (doloop (i (world_height w))
         (doloop (j (world_width w))
           (set! cv (cell_value w i j))
@@ -105,14 +111,19 @@
           (if (<> cv 0:i8)
               (if (or (< n 2:i8)
                       (> n 3:i8))
-                  (begin (printf "i = %lld j = %lld cv = %u n = %lld - cell dies!\n" i j cv n)
-                         (cell_set_value w i j 0))
-                  (begin (printf "i = %lld j = %lld cv = %u n = %lld\n" i j cv n) 0:i8))
+                  (begin (set! pending_updates (cons (CellUpdate i j 0) pending_updates))
+                         (printf "i = %lld j = %lld cv = %u n = %lld - cell dies!\n" i j cv n))
+                  (printf "i = %lld j = %lld cv = %u n = %lld\n" i j cv n))
               ;; cell is dead
               (if (= n 3:i8)
-                  (begin (printf "i = %lld j = %lld cv = %u n = %lld - cell comes to life!\n" i j cv n)
-                         (cell_set_value w i j 1))
-                  (begin (printf "i = %lld j = %lld cv = %u n = %lld\n" i j cv n) 0:i8))))))))
+                  (begin (set! pending_updates (cons (CellUpdate i j 1) pending_updates))
+                         (printf "i = %lld j = %lld cv = %u n = %lld - cell comes to life!\n" i j cv n))
+                  (printf "i = %lld j = %lld cv = %u n = %lld\n" i j cv n)))))
+      ;; do all the updates
+      (for-each (lambda (cu)
+                  (cell_set_value w (tref cu 0) (tref cu 1) (tref cu 2)))
+                pending_updates)
+      0)))
 
 (bind-func world_basic_print
   (lambda (w:World*)
