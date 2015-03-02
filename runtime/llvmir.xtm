@@ -1412,7 +1412,7 @@
             ((string=? base "vector") (+ *impc:ir:vector* offset))
             ((regex:match? base "^\\[.*\\]$")
              (cons (+ offset *impc:ir:pointer* *impc:ir:closure*) (apply impc:ir:get-type-from-pretty-closure string-type args)))
-            ((regex:match? base "^\\<\\{\\s?i8\\*,\\s?i8\\*.*")
+            ((regex:match? base "^\\{\\s?i8\\*,\\s?i8\\*.*")
              (cons (+ offset *impc:ir:closure*) (impc:ir:get-closure-type-from-str string-type)))
             ((regex:match? base "^\\<[^{].*[^}]\\>$")
              (cons (+ offset *impc:ir:tuple*) (apply impc:ir:get-type-from-pretty-tuple string-type args)))
@@ -1634,7 +1634,7 @@
 
 (define impc:ir:get-closure-type-from-str
   (lambda (string-type)
-    (impc:ir:get-function-type-from-str (regex:replace string-type "\\<\\{\\s?i8\\*,\\s?i8\\*,(.*)\\}\\>" "$1"))))
+    (impc:ir:get-function-type-from-str (regex:replace string-type "\\{\\s?i8\\*,\\s?i8\\*,(.*)\\}" "$1"))))
 
 
 (define impc:ir:get-function-type-from-str
@@ -1673,7 +1673,7 @@
             ((and (regex:match? base "^\\<.* x .*\\>\\**$")
                   (not (regex:match? base ",")))
              (cons (+ offset *impc:ir:vector*) (impc:ir:get-vector-type-from-str string-type)))
-            ((regex:match? base "^\\<\\{\\s?i8\\*,\\s?i8\\*.*$")
+            ((regex:match? base "^\\{\\s?i8\\*,\\s?i8\\*.*$")
              (cons (+ offset *impc:ir:closure*) (impc:ir:get-closure-type-from-str string-type)))
                                         ;((regex:match? base "\\<?\\{.*\\}\\>?\\**")
             ((regex:match? base "^\\<?\\{.*\\}\\>?\\**$")
@@ -1704,7 +1704,7 @@
         (if (symbol? type) (symbol->string type) type)
         (cond ((list? type) ;; must be a complex type
                (cond ((impc:ir:closure? (car type))
-                      (apply string-append "<{i8*, i8*, " (impc:ir:make-function-str (cdr type) #t) "*}>"
+                      (apply string-append "{i8*, i8*, "(impc:ir:make-function-str (cdr type) #t) "*}"
                              (make-list (impc:ir:get-ptr-depth (car type)) "*")))
                      ((impc:ir:tuple? (car type))
                       (apply string-append "{" (string-join (map (lambda (x) (apply impc:ir:get-type-str x args)) (cdr type)) ",") "}"
@@ -2020,11 +2020,11 @@
   (lambda (t)
     (let* ((os (make-string 0))
            (args t))
-      (emit "<{" os)
+      (emit "{"os)
       (dotimes (i (length args))
         (if (> i 0) (emit ", " os))
         (emit (impc:ir:get-type-str (cdr (list-ref args i))) os))
-      (emit "}>" os)
+      (emit "}" os)
       (impc:ir:strip-space os))))
 
 
@@ -2032,11 +2032,11 @@
   (lambda (t)
     (let* ((os (make-string 0))
            (args t))
-      (emit "<{" os)
+      (emit "{"os)
       (dotimes (i (length args))
         (if (> i 0) (emit ", " os))
         (emit  (impc:ir:get-type-str (cdr (list-ref args i))) "*" os))
-      (emit "}>" os)
+      (emit "}" os)
       (impc:ir:strip-space os))))
 
 
@@ -2119,7 +2119,7 @@
       (define func-type-str (impc:ir:make-function-str (list* rettype (map (lambda (x) (cdr x)) args)) #t))
 
       (define closure-struct-str
-        (string-append "<{ i8*, i8*, " func-type-str "*}>"))
+        (string-append "{ i8*, i8*, " func-type-str "*}"))
 
       (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
             (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
@@ -3133,7 +3133,7 @@
            (recursive-call (if (member (car ast) *impc:ir:sym-name-stack*) #t #f))
            (os (make-string 0))
            (ftype (impc:ir:make-function-str functiontype #t))
-           (clstype (string-append "<{i8*, i8*, " ftype "*}>*"))
+           (clstype (string-append "{i8*, i8*, "ftype "*}*"))
            (vars (map (lambda (arg hint)
                         (emit (impc:ir:compiler arg types hint) os)
                         (impc:ir:gname))
