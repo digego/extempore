@@ -29,6 +29,16 @@
 (xtmtest-result (impc:ti:get-closure-docstring "benclosure")
                 "this is the second docstring")
 
+(bind-func simplefunc
+  "simplefunc docstring"
+  (lambda ()
+    864))
+
+(println (simplefunc))
+
+(equal? (llvm:get-function "simplefunc")
+        (llvm:get-function-pointer "simplefunc"))
+
 (xtmtest
  '(bind-func simplefunc
     "simplefunc docstring"
@@ -91,25 +101,51 @@
   (tref bentuple 1))
  2)
 
+(bind-val bentuple <i64,i64,i8>)
+
+(bind-func dostuff_with_bentuple
+  (lambda ()
+    (tfill! bentuple 1 2 3)
+    (printf "benval: %lld\n" benval)
+    (tref bentuple 1)))
+
 (xtmtest-result (impc:ti:get-globalvar-type "bentuple")
                 "<i64,i64,i8>")
 
+(bind-alias envt i8*)
+
+(println *impc:ir:type-aliases*)
 
 (set! *impc:ti:print-main-check* #t)
-(set! *impc:ti:print-main-check* #f)
 (set! *impc:ti:print-sub-checks* #t)
+
+(set! *impc:ti:print-main-check* #f)
 (set! *impc:ti:print-sub-checks* #f)
 
+(bind-func audio_64bit (lambda () #f))
+
+(impc:ti:get-nativefunc-arg-types "impc_false")
+
 ;; this currently fails
+(bind-val benval i64)
 (bind-func func_with_gv_ref
   (lambda ()
+    (set! benval 64)
     benval))
+
+(func_with_gv_ref)
+
+(llvm:get-global-variable-type "benval")
+
+(impc:ir:type? "i64")
+
+(impc:ir:gname)
 
 (impc:ti:print-closure-list)
 (impc:ti:print-globalvar-list)
 
 
-(impc:ir:pointer-- "i64")
+;; places to check:
 
 
 
@@ -127,7 +163,7 @@
 
 (impc:ir:get-type-from-pretty-str "[i64,i64,i32]")
 (impc:ir:get-type-from-str "{ i64 }")
-(impc:ir:get-type-from-pretty-closure "[|16,i64|]")
+(impc:ir:get-type-from-pretty-str "|2,i64|")
 
 ;; bind-type
 
@@ -145,11 +181,11 @@
 ;; some poly stuff
 
 (bind-poly simplefunc-poly simplefunc)
+(bind-poly random imp_randf)
 
-;; TODO for tomorrow
+(bind-type bentype <i64>)
 
-;; - make sure impc:ir:get-named-type returns the right "type" (pretty or ugly) for the regular, poly, and generic poly cases
-;; - perhaps make gpolys and polys into the same type of list with getters/setters etc.?
+
 
 (println '*impc:ir:polytypes*: *impc:ir:polytypes*)
 
@@ -163,3 +199,42 @@
 
 
 (xtmtest-print-results)
+
+(bind-val benptr i64**)
+
+(sys:load "libs/core/std.xtm")
+
+(println (impc:ir:get-function-type "imp_randf"))
+(println (impc:ir:get-function-type "audio_64bit"))
+
+
+
+(println (impc:ti:get-closure-or-nativefunc-type "imp_randf"))
+(println (impc:ir:pretty-print-type (impc:ir:get-type-from-pretty-str (impc:ti:get-closure-or-nativefunc-type "audio_64bit"))))
+(println (impc:ti:get-closure-or-nativefunc-type "audio_64bit"))
+
+(let ((ast '(ret-> zcopy_i1 zcopy_i1)))
+  (symbol? (caddr ast)))
+
+;; this is broken.
+(bind-func zcopy_i1
+  (lambda (x:i1 fromz:mzone* toz:mzone*) x))
+
+(bind-func test_namedtype
+  (lambda (zone:mzone*)
+    zone))
+
+(impc:compiler:print-bad-type-error "mzone" "and this is the problem")
+
+
+(let ((base (impc:ir:get-base-type "%mzone*")))
+  (println base) 
+  (println (llvm:get-named-type base))
+  (println (impc:ir:get-pretty-tuple-arg-strings (impc:ir:get-named-type base))))
+
+
+
+
+;; TODO
+
+;; - need to go throuhg all the "bad type" errors one by one and see where it's bombing out.
