@@ -167,7 +167,7 @@
 
 ;; bind-type
 
-(bind-type bentype1 <i64>)
+(bind-type bentype <i64>)
 
 (xtmtest-result (impc:ti:namedtype-exists? "bentype") #t)
 
@@ -194,8 +194,8 @@
 (impc:ti:print-namedtype-list)
 
 (impc:ir:get-pretty-tuple-arg-strings "<i64>")
-(impc:ir:get-base-type "<i64>***")
 
+(impc:ir:get-base-type "bentype***")
 
 
 (xtmtest-print-results)
@@ -216,25 +216,69 @@
 (let ((ast '(ret-> zcopy_i1 zcopy_i1)))
   (symbol? (caddr ast)))
 
-;; this is broken.
-(bind-func zcopy_i1
-  (lambda (x:i1 fromz:mzone* toz:mzone*) x))
 
-(bind-func test_namedtype
-  (lambda (zone:mzone*)
-    zone))
+"(catch (quit 1) (bind-func test_namedtype (lambda (zone:mzone*) zone)))"
 
 (impc:compiler:print-bad-type-error "mzone" "and this is the problem")
 
+(bind-type benpoly <!a>)
 
-(let ((base (impc:ir:get-base-type "%mzone*")))
-  (println base) 
+(bind-func test_benpoly2
+  (lambda ()
+    (let ((bp (benpoly 35)))
+      (tref bp 0))))
+
+
+
+(println *impc:ir:gpolytypes*)
+(println *impc:ir:polytypes*)
+
+(println (impc:ir:gpolytype-types 'benpoly))
+(println (impc:ir:polytype-types 'benpoly))
+
+(impc:ir:types-equal? "%mzone" "i64**")
+
+(let ((base (impc:ir:get-base-type "mzone*")))
+  (println base)
   (println (llvm:get-named-type base))
-  (println (impc:ir:get-pretty-tuple-arg-strings (impc:ir:get-named-type base))))
+  (println (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (impc:ir:get-named-type base)))))
+
+
+
+(impc:ir:get-named-type "bentype")
+(impc:ir:get-named-type "benpoly")
+(llvm:get-named-type "bentype")
+
+
+(impc:ir:get-tuple-type-from-str "{ i64, i64 }")
+
+;; updated understanding of the problem:
+
+;; impc:ir:get-named-type used to return a LLVM IR (string)
+;; representation of the type, but now (under the new scheme cache
+;; regie) returns an xtlang pretty string type. (note that for generic
+;; types this is further messed up - returns a symbol and a list of
+;; list-types respectively).
+
+;; HOWEVER, mzone and clsvar (special types, declared in IR) are
+;; packed types (i.e. <{}> rather than just {} in LLVM IR) and the
+;; cache currently doesn't know how to return this (since xtlang's
+;; pretty types don't have a notation for packed types).
+
+;; the options are, to try and fix it:
+
+;; - special-case these two named types to return the right (packed) IR string
+
+;; - create a notation for packed types in xtlang
+
+;; - change make-tuple to make all xtlang types (tuples) packed
+
+;; - store LLVM IR (rather than xtlang pretty) type strings in the cache
+
+;; these options aren't mutually exclusive. some of them need to work
+;; together to fix it. I think I favour option 1 for the moment.
 
 
 
 
-;; TODO
-
-;; - need to go throuhg all the "bad type" errors one by one and see where it's bombing out.
+;; for git bisect - ./extempore --nostd --eval "(catch (quit 1) (bind-func test_namedtype (lambda (zone:mzone*) zone)))"
