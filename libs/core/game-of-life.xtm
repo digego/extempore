@@ -32,7 +32,7 @@
     (tref w 2)))
 
 (bind-func print_world
-  (lambda (w:World*)
+  (lambda (w)
     (printf "World: %lld x %lld (data %p)\n"
             (world_width w)
             (world_height w)
@@ -49,7 +49,7 @@
       res)))
 
 (bind-func world_data_index
-  (lambda (w:World* x y)
+  (lambda (w x y)
     (let ((width (world_width w))
           (height (world_height w))
           (xrem (% x width))
@@ -58,35 +58,37 @@
          (+ xrem (if (< xrem 0) width 0))))))
 
 (bind-func world_data_size
-  (lambda (w:World*)
+  (lambda (w)
     (* (world_width w)
        (world_height w))))
 
 (bind-func cell_value
-  (lambda (w:World* x y)
+  (lambda (w x y)
     (pref (world_data w)
           (world_data_index w x y))))
 
 (bind-func cell_set_value
-  (lambda (w:World* x y value)
+  (lambda (w x y value)
     (pset! (world_data w)
            (world_data_index w x y)
            value)))
 
 (bind-func world_init
-  (lambda (w:World* density)
-    (doloop (k (world_data_size w))
-      (pset! (world_data w) k 0))
-    (doloop (i (world_height w))
-      (doloop (j (world_width w))
-        (cell_set_value w i j
-                        (if (< (random) density) 1 0))))))
+  (lambda (w density)
+    (let ((data (world_data w)))
+      (doloop (k (world_data_size w))
+        (pset! data k 0))
+      (doloop (i (world_height w))
+        (doloop (j (world_width w))
+          (cell_set_value w i j
+                          (if (< (random) density) 1 0)))))))
 
-;; NOTE: this is broken - since it updates the cells in-place,
-;; subsequent calls to this function get the new cells which have just
-;; come alive that timestep
+(bind-func world_reset
+  (lambda (w)
+    (world_init w 0.0)))
+
 (bind-func cell_count_neighbors
-  (lambda (w:World* x y)
+  (lambda (w x y)
     (+ (cell_value w (- x 1) (- y 1))
        (cell_value w (- x 1) y)
        (cell_value w (- x 1) (+ y 1))
@@ -100,7 +102,7 @@
 (bind-type CellUpdate <i64,i64,i8>)
 
 (bind-func world_step
-  (lambda (w:World*)
+  (lambda (w)
     (letz ((cv 0)
            (n 0)
            (pending_updates:List:<CellUpdate*,List*>* null))
@@ -111,14 +113,10 @@
           (if (<> cv 0:i8)
               (if (or (< n 2:i8)
                       (> n 3:i8))
-                  (begin (set! pending_updates (cons (CellUpdate i j 0) pending_updates))
-                         (printf "i = %lld j = %lld cv = %u n = %lld - cell dies!\n" i j cv n))
-                  (printf "i = %lld j = %lld cv = %u n = %lld\n" i j cv n))
+                  (set! pending_updates (cons (CellUpdate i j 0) pending_updates)))
               ;; cell is dead
               (if (= n 3:i8)
-                  (begin (set! pending_updates (cons (CellUpdate i j 1) pending_updates))
-                         (printf "i = %lld j = %lld cv = %u n = %lld - cell comes to life!\n" i j cv n))
-                  (printf "i = %lld j = %lld cv = %u n = %lld\n" i j cv n)))))
+                  (set! pending_updates (cons (CellUpdate i j 1) pending_updates))))))
       ;; do all the updates
       (for-each (lambda (cu)
                   (cell_set_value w (tref cu 0) (tref cu 1) (tref cu 2)))
@@ -126,7 +124,7 @@
       0)))
 
 (bind-func world_basic_print
-  (lambda (w:World*)
+  (lambda (w)
     (doloop (i (world_data_size w))
       (printf "%c " (if (<> (pref (world_data w) i) 0)
                         (pref "O" 0)
@@ -135,7 +133,7 @@
     (println)))
 
 (bind-func world_ascii_print
-  (lambda (w:World*)
+  (lambda (w)
     (let ((width (world_width w))
           (height (world_height w))
           (world_string_length (* (+ width 1) height))
@@ -152,5 +150,13 @@
       (printf "\n%.*s"
               world_string_length
               world_string))))
+
+;; miscellaneous helpers
+
+(bind-func world_add_blinker
+  "add a (horizontal) blinker, centred at [x,y]"
+  (lambda (w x y)
+    (doloop (i 3)
+      (cell_set_value w (+ x i -1) y 1))))
 
 (define *xtmlib-gameoflife-loaded* #t)
