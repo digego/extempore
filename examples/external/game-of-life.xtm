@@ -24,7 +24,8 @@
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)))
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+    (gl_print_error "in world_texture_setup")))
 
 (define *gol-shader*
   (create_shader (file->string "examples/external/game-of-life.vert")
@@ -34,10 +35,10 @@
 (call-as-xtlang
  (pfill! fullscreen_quad_verts
          ;; pos       texcoord
-         -1.0  1.0 0.0 0.0
-         1.0  1.0 1.0 0.0
-         -1.0 -1.0 0.0 1.0
-         1.0 -1.0 1.0 1.0)
+         -1.0  1.0    0.0 0.0
+          1.0  1.0    1.0 0.0
+         -1.0 -1.0    0.0 1.0
+          1.0 -1.0    1.0 1.0)
  (set! world (world_create 256 128))
  ;; (world_set_to_checkerboard world)
  (world_init world .5)
@@ -82,5 +83,13 @@
                 next-frame-time
                 delta-t))))
 
+;; run once
+(begin
+  (gl_draw *gol-shader*)
+  (gl:swap-buffers *gl-window*))
+
 ;; start it running
-(gl-loop (now) 1/15)
+(gl-loop (now) 1/10)
+
+;; (randomly) reinitialise the world
+(call-as-xtlang (world_init world .1))
