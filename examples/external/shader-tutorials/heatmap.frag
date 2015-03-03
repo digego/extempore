@@ -16,5 +16,5 @@ vec3 HSLtoRGB(vec3 HSL){
 }
 
 void main () {
-  frag_colour = vec4(HUEtoRGB(gl_FragCoord.x/1680), 1.0);
+  frag_colour = vec4(HUEtoRGB(mod(cos(50.*gl_FragCoord.x/1680),1.0)), 1.0);
 }
