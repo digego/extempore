@@ -39,7 +39,8 @@
          -1.0 -1.0 0.0 1.0
          1.0 -1.0 1.0 1.0)
  (set! world (world_create 256 128))
- (world_init world .05)
+ ;; (world_set_to_checkerboard world)
+ (world_init world .5)
  (set! vbo (create_vbo fullscreen_quad_verts 16))
  (bind_vbo vbo)
  (set! vao (create_vao))
@@ -49,10 +50,9 @@
  (world_texture_setup)
  void)
 
-(call-as-xtlang (world_init world .04))
-
 (bind-func gl_draw
   (lambda (program)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
     ;; run the simulation
     (world_step world)
     ;; update texture
@@ -63,7 +63,6 @@
                      GL_BYTE
                      (world_data world))
     ;; draw the world
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
     (glUniform1i (glGetUniformLocation program "tex") 0)
     (glUseProgram program)
     (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
@@ -83,6 +82,5 @@
                 next-frame-time
                 delta-t))))
 
-(gl-loop (now) 1/20)
-
-;; actually run the simulation
+;; start it running
+(gl-loop (now) 1/15)
