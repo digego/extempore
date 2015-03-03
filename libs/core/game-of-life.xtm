@@ -41,7 +41,6 @@
 
 (bind-func world_create
   (lambda (w h)
-    ;; make grid (w+2)*(h+2) for "guard" cells
     (let ((data (zalloc (* w h)))
           (res (World w h data)))
       (printf "Created Game of Life ")
@@ -61,6 +60,34 @@
   (lambda (w)
     (* (world_width w)
        (world_height w))))
+
+(bind-func world_copy
+  (lambda (w)
+    (let ((new_world (world_create (world_width w)
+                                   (world_height w)))
+          (old_data (world_data w))
+          (new_data (world_data new_world)))
+      ;; copy the world data
+      (doloop (i (world_data_size w))
+        (pset! new_data i (pref old_data i)))
+      new_world)))
+
+(bind-func world_equal
+  (lambda (w1 w2)
+    (if (or (<> (world_width w1)
+                (world_width w2))
+            (<> (world_height w1)
+                (world_height w2)))
+        #f
+        (let ((data1 (world_data w1))
+              (data2 (world_data w2))
+              (size (world_data_size w1))
+              (count 0))
+          (while (and (< count size)
+                      (= (pref data1 count)
+                         (pref data2 count)))
+            (set! count (+ count 1)))
+          (= size count)))))
 
 (bind-func cell_value
   (lambda (w x y)
