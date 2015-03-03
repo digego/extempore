@@ -44,9 +44,7 @@
   (lambda ()
     (world_init world 0.0)
     ;; set up a "checkerboard" pattern
-    (doloop (i 5)
-      (doloop (j 5)
-        (cell_set_value world i j (convert (% (+ i j) 2)))))
+    (world_set_to_checkerboard world)
     (every cell_check_result
            (list (CellValue 0 0 0)
                  (CellValue 0 1 1)
@@ -192,3 +190,24 @@
                  (CellValue 4 4 0)))))
 
 (xtmtest-result (test_double_blink_blinker) 1)
+
+(bind-func test_world_periodic_bc
+  (lambda ()
+    (world_init world 0.0)
+    (world_add_blinker world (random 5) (random 5))
+    (let ((w2 (world_copy world)))
+      ;; 2 steps for a blinker should return to original state
+      (world_step world)
+      (world_step world)
+      (world_equal world w2))))
+
+(xtmtest-result (test_world_periodic_bc) 1)
+
+(bind-func test_world_foo
+  (lambda ()
+    (world_init world .3)
+    (doloop (i 6)
+      (world_ascii_print world)
+      (world_step world))))
+
+(xtmtest-result (test_world_foo) 1)
