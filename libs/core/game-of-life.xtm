@@ -16,8 +16,8 @@
 
 (sys:load "libs/core/adt.xtm")
 
-;;                w   h   data
-(bind-type World <i64,i64,i8*>)
+;;                w   h   dat generation
+(bind-type World <i64,i64,i8*,i64>)
 
 (bind-func world_width
   (lambda (w:World*)
@@ -31,18 +31,32 @@
   (lambda (w:World*)
     (tref w 2)))
 
+(bind-func world_generation
+  (lambda (w:World*)
+    (tref w 3)))
+
+(bind-func world_set_generation
+  (lambda (w:World* gen)
+    (tset! w 3 gen)))
+
+(bind-func world_increment_generation
+  (lambda (w:World*)
+    (tset! w 3 (+ 1 (tref w 3)))))
+
 (bind-func print_world
   (lambda (w)
-    (printf "World: %lld x %lld (data %p)\n"
+    (printf "World: %lld x %lld, generation %lld (data %p)\n"
             (world_width w)
             (world_height w)
+            (world_generation w)
             (world_data w))))
+
 (bind-poly print print_world)
 
 (bind-func world_create
   (lambda (w h)
     (let ((data (zalloc (* w h)))
-          (res (World w h data)))
+          (res (World w h data 0)))
       (printf "Created Game of Life ")
       (print_world res)
       res)))
@@ -112,7 +126,8 @@
 
 (bind-func world_reset
   (lambda (w)
-    (world_init w 0.0)))
+    (world_init w 0.0)
+    (world_set_generation w 0)))
 
 (bind-func cell_count_neighbors
   (lambda (w x y)
@@ -151,7 +166,7 @@
                   ;;          "newvalue =" (tref cu 2))
                   (cell_set_value w (tref cu 0) (tref cu 1) (tref cu 2)))
                 pending_updates)
-      0)))
+      (world_increment_generation w))))
 
 (bind-func world_basic_print
   (lambda (w)
