@@ -152,13 +152,14 @@
         (doloop (j (world_width w))
           (set! cv (cell_value w i j))
           (set! n (cell_count_neighbors w i j))
-          (if (<> cv 0:i8)
-              (if (or (< n 2:i8)
-                      (> n 3:i8))
-                  (set! pending_updates (cons (CellUpdate i j 0) pending_updates)))
-              ;; cell is dead
+          (if (= cv 0:i8)
+              ;; birth
               (if (= n 3:i8)
-                  (set! pending_updates (cons (CellUpdate i j 1) pending_updates))))))
+                  (set! pending_updates (cons (CellUpdate i j 1) pending_updates)))
+              ;; cell is dead
+              (if (not (or (= n 2:i8)
+                           (= n 3:i8)))
+                  (set! pending_updates (cons (CellUpdate i j 0) pending_updates))))))
       ;; do all the updates
       (for-each (lambda (cu)
                   ;; (println "performing update: x =" (tref cu 0)
