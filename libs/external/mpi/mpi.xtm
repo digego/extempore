@@ -44,9 +44,57 @@
 (bind-alias MPI_Op i8*) ;; ompi_op_t*
 (bind-alias MPI_Request i8*) ;; ompi_request_t*
 (bind-alias MPI_Message i8*) ;; ompi_message_t*
-(bind-alias MPI_Status i8*) ;; ompi_status_public_t
 (bind-alias MPI_Win i8*) ;; ompi_win_t*
 (bind-alias MPI_T_enum i8*) ;; mca_base_var_enum_t*
+
+(bind-type ompi_status_public_t <i32,i32,i32,i32,size_t>)
+(bind-alias MPI_Status ompi_status_public_t)
+
+;; /*
+;;  * MPI predefined handles
+;;  */
+;; these are a bit messy because MPI likes to have extra layers of
+;; indirection
+(bind-lib-val libmpi ompi_mpi_comm_world_addr MPI_Comm)
+(bind-val MPI_COMM_WORLD MPI_Comm)
+(bind-lib-val libmpi ompi_mpi_comm_self_addr MPI_Comm)
+(bind-val MPI_COMM_SELF MPI_Comm)
+(bind-lib-val libmpi ompi_mpi_comm_null_addr MPI_Comm)
+(bind-val MPI_COMM_NULL MPI_Comm)
+(bind-lib-val libmpi ompi_mpi_group_empty MPI_Group)
+(bind-val MPI_GROUP_EMPTY MPI_Group)
+(bind-lib-val libmpi ompi_message_no_proc MPI_Message)
+(bind-val MPI_MESSAGE_NO_PROC MPI_Message)
+(bind-lib-val libmpi ompi_mpi_op_max MPI_Op)
+(bind-val MPI_MAX MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_min MPI_Op)
+(bind-val MPI_MIN MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_sum MPI_Op)
+(bind-val MPI_SUM MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_prod MPI_Op)
+(bind-val MPI_PROD MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_land MPI_Op)
+(bind-val MPI_LAND MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_band MPI_Op)
+(bind-val MPI_BAND MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_lor MPI_Op)
+(bind-val MPI_LOR MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_bor MPI_Op)
+(bind-val MPI_BOR MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_lxor MPI_Op)
+(bind-val MPI_LXOR MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_bxor MPI_Op)
+(bind-val MPI_BXOR MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_maxloc MPI_Op)
+(bind-val MPI_MAXLOC MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_minloc MPI_Op)
+(bind-val MPI_MINLOC MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_replace MPI_Op)
+(bind-val MPI_REPLACE MPI_Op)
+(bind-lib-val libmpi ompi_mpi_op_no_op MPI_Op)
+(bind-val MPI_NO_OP MPI_Op)
+
+;; MPI API
 
 (bind-lib libmpi MPI_Init [i32,i32*,i8***]*)
 (bind-lib libmpi MPI_Comm_size [i32,MPI_Comm,i32*]*)
@@ -57,52 +105,115 @@
 (bind-lib libmpi MPI_Abort [i32,MPI_Comm,i32]*)
 (bind-lib libmpi MPI_Finalize [i32]*)
 
-(bind-lib-val libmpi ompi_mpi_comm_world_addr MPI_Comm)
-(bind-lib-val libmpi ompi_mpi_comm_self_addr MPI_Comm)
-(bind-lib-val libmpi ompi_mpi_comm_null_addr MPI_Comm)
+(call-as-xtlang
+ (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr)
+ (set! MPI_COMM_SELF ompi_mpi_comm_self_addr)
+ (set! MPI_COMM_NULL ompi_mpi_comm_null_addr)
+ (set! MPI_GROUP_EMPTY ompi_mpi_group_empty)
+ (set! MPI_MESSAGE_NO_PROC ompi_message_no_proc)
+ (set! MPI_MAX ompi_mpi_op_max)
+ (set! MPI_MIN ompi_mpi_op_min)
+ (set! MPI_SUM ompi_mpi_op_sum)
+ (set! MPI_PROD ompi_mpi_op_prod)
+ (set! MPI_LAND ompi_mpi_op_land)
+ (set! MPI_BAND ompi_mpi_op_band)
+ (set! MPI_LOR ompi_mpi_op_lor)
+ (set! MPI_BOR ompi_mpi_op_bor)
+ (set! MPI_LXOR ompi_mpi_op_lxor)
+ (set! MPI_BXOR ompi_mpi_op_bxor)
+ (set! MPI_MAXLOC ompi_mpi_op_maxloc)
+ (set! MPI_MINLOC ompi_mpi_op_minloc)
+ (set! MPI_REPLACE ompi_mpi_op_replace)
+ (set! MPI_NO_OP ompi_mpi_op_no_op))
 
-(bind-val MPI_COMM_WORLD MPI_Comm)
-(bind-val MPI_COMM_SELF MPI_Comm)
-(bind-val MPI_COMM_NULL MPI_Comm)
-(call-as-xtlang (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr))
-(call-as-xtlang (set! MPI_COMM_SELF ompi_mpi_comm_self_addr))
-(call-as-xtlang (set! MPI_COMM_NULL ompi_mpi_comm_null_addr))
+;; libmpiaddresses ;;
 
-;; opaque structs (but defining them as pointers)
+;; maybe there's a way to get by without these?
 
-(bind-alias ompi_predefined_datatype_t i8*)
-(bind-lib-val libmpi ompi_mpi_unavailable ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_lb ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_ub ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_char ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_signed_char ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_unsigned_char ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_byte ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_short ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_unsigned_short ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_int ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_unsigned ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_long ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_unsigned_long ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_long_long_int ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_unsigned_long_long ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_float ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_double ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_long_double ompi_predefined_datatype_t)
-;; /*
-;;  * C++ / C99 datatypes
-;;  */
-(bind-lib-val libmpi ompi_mpi_c_bool ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_cxx_bool ompi_predefined_datatype_t)
-;; /*
-;;  * Complex datatypes for C (base types), C++, and fortran
-;;  */
-(bind-lib-val libmpi ompi_mpi_c_float_complex ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_c_complex ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_c_double_complex ompi_predefined_datatype_t)
-(bind-lib-val libmpi ompi_mpi_c_long_double_complex ompi_predefined_datatype_t)
+(define libmpiaddresses (sys:load-dylib "/Users/ben/Code/extempore/examples/external/mpi/libmpiaddresses.dylib"))
 
-(bind-val  MPI_STATUS_IGNORE MPI_Status* 0)
-(bind-val  MPI_STATUSES_IGNORE MPI_Status* 0)
+;; /* C datatypes */
+(bind-lib-val libmpiaddresses ompi_mpi_datatype_null_addr MPI_Datatype)
+(bind-val MPI_DATATYPE_NULL MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_byte_addr MPI_Datatype)
+(bind-val MPI_BYTE MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_packed_addr MPI_Datatype)
+(bind-val MPI_PACKED MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_char_addr MPI_Datatype)
+(bind-val MPI_CHAR MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_short_addr MPI_Datatype)
+(bind-val MPI_SHORT MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_int_addr MPI_Datatype)
+(bind-val MPI_INT MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_long_addr MPI_Datatype)
+(bind-val MPI_LONG MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_float_addr MPI_Datatype)
+(bind-val MPI_FLOAT MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_double_addr MPI_Datatype)
+(bind-val MPI_DOUBLE MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_long_double_addr MPI_Datatype)
+(bind-val MPI_LONG_DOUBLE MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_unsigned_char_addr MPI_Datatype)
+(bind-val MPI_UNSIGNED_CHAR MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_signed_char_addr MPI_Datatype)
+(bind-val MPI_SIGNED_CHAR MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_unsigned_short_addr MPI_Datatype)
+(bind-val MPI_UNSIGNED_SHORT MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_unsigned_long_addr MPI_Datatype)
+(bind-val MPI_UNSIGNED_LONG MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_unsigned_addr MPI_Datatype)
+(bind-val MPI_UNSIGNED MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_wchar_addr MPI_Datatype)
+(bind-val MPI_WCHAR MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_long_long_int_addr MPI_Datatype)
+(bind-val MPI_LONG_LONG_INT MPI_Datatype)
+(bind-val MPI_LONG_LONG MPI_Datatype)
+(bind-lib-val libmpiaddresses ompi_mpi_unsigned_long_long_addr MPI_Datatype)
+(bind-val MPI_UNSIGNED_LONG_LONG MPI_Datatype)
+
+(call-as-xtlang
+ (set! MPI_DATATYPE_NULL ompi_mpi_datatype_null_addr)
+ (set! MPI_BYTE ompi_mpi_byte_addr)
+ (set! MPI_PACKED ompi_mpi_packed_addr)
+ (set! MPI_CHAR ompi_mpi_char_addr)
+ (set! MPI_SHORT ompi_mpi_short_addr)
+ (set! MPI_INT ompi_mpi_int_addr)
+ (set! MPI_LONG ompi_mpi_long_addr)
+ (set! MPI_FLOAT ompi_mpi_float_addr)
+ (set! MPI_DOUBLE ompi_mpi_double_addr)
+ (set! MPI_LONG_DOUBLE ompi_mpi_long_double_addr)
+ (set! MPI_UNSIGNED_CHAR ompi_mpi_unsigned_char_addr)
+ (set! MPI_SIGNED_CHAR ompi_mpi_signed_char_addr)
+ (set! MPI_UNSIGNED_SHORT ompi_mpi_unsigned_short_addr)
+ (set! MPI_UNSIGNED_LONG ompi_mpi_unsigned_long_addr)
+ (set! MPI_UNSIGNED ompi_mpi_unsigned_addr)
+ (set! MPI_WCHAR ompi_mpi_wchar_addr)
+ (set! MPI_LONG_LONG_INT ompi_mpi_long_long_int_addr)
+ (set! MPI_LONG_LONG ompi_mpi_long_long_int_addr)
+ (set! MPI_UNSIGNED_LONG_LONG ompi_mpi_unsigned_long_long_addr))
+
+;; constants
+
+(bind-val MPI_STATUS_IGNORE MPI_Status*)
+(bind-val MPI_STATUSES_IGNORE MPI_Status*)
+(call-as-xtlang
+ (set! MPI_STATUS_IGNORE (convert 0 MPI_Status*))
+ (set! MPI_STATUSES_IGNORE (convert 0 MPI_Status*))
+ void)
+
+;; /* Maximum length of datarep string (default is 128) */
+(bind-val OPAL_MAX_DATAREP_STRING i32 128)
+;; /* Maximum length of error strings (default is 256) */
+(bind-val OPAL_MAX_ERROR_STRING i32 256)
+;; /* Maximum length of info keys (default is 36) */
+(bind-val OPAL_MAX_INFO_KEY i32 36)
+;; /* Maximum length of info vals (default is 256) */
+(bind-val OPAL_MAX_INFO_VAL i32 256)
+;; /* Maximum length of object names (default is 64) */
+(bind-val OPAL_MAX_OBJECT_NAME i32 64)
+;; /* Maximum length of port names (default is 1024) */
+(bind-val OPAL_MAX_PORT_NAME i32 1024)
+;; /* Maximum length of processor names (default is 256) */
+(bind-val OPAL_MAX_PROCESSOR_NAME i32 256)
 
 (define *xtmlib-mpi-loaded* #t)
