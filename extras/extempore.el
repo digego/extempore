@@ -2362,7 +2362,7 @@ If you don't want to be prompted for this name each time, set the
         (replace-match
          (save-match-data
            (format "(%s %s)"
-                   (match-string-no-properties 1)
+                   (s-trim-left (match-string-no-properties 1))
                    (replace-regexp-in-string "[, ]+" " " (match-string-no-properties 2))))
          nil :literal)
         (indent-for-tab-command))))
