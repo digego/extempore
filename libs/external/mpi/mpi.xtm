@@ -31,6 +31,18 @@
 (define libmpi
   (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
+(bind-lib libmpi MPI_Get_library_version [i32,i8*,i32*]*)
+(bind-lib libmpi MPI_Get_version [i32,i32*,i32*]*)
+
+;; bail out if not using Open MPI
+(if (<> (call-as-xtlang
+         (letz ((ver:i8* (zalloc 1024))
+                (lenptr:i32* (zalloc)))
+           (MPI_Get_library_version ver lenptr)
+           (strncmp ver "Open MPI" 7)))
+        0)
+    (sys:load-escape "Sorry, Extempore's MPI bindings only work with OpenMPI at the moment."))
+
 ;; opaque struct pointers
 
 (bind-alias MPI_Comm i8*) ;; ompi_communicator_t*
