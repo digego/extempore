@@ -473,13 +473,16 @@ Field Energies:\n")
 
 ;; * * * end main iteration loop * * *
 
+(define *num-loops* (call-as-xtlang nloop))
+
 (define run-pbpic
   (lambda (delta-t)
     (let ((ntime (pbpic_step)))
-      (if (= (modulo ntime 250) 0)
-          (pbpic_print_energies ntime)))
-    ;; (gl_draw_particles (pbpic_step.nx))
-    ;; (gl:swap-buffers *gl-ctx*)
-    (callback (+ (now) (* *second* delta-t))
-              'run-pbpic
-              delta-t)))
+      ;; (gl_draw_particles (pbpic_step.nx))
+      ;; (gl:swap-buffers *gl-ctx*)
+      (if (< ntime *num-loops*)
+          (callback (now)
+                    'run-pbpic
+                    delta-t)
+          (pbpic_print_energies ntime)))))
+
