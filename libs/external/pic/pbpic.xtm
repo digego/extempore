@@ -1,0 +1,630 @@
+;;; pbpic.xtm:libs -- PIC plasma physics simulation library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libpbpic2.dylib
+
+;;; Commentary:
+
+;; This library uses Viktor Decyk's PIC simulation codes
+;; (https://idre.ucla.edu/hpc/parallel-plasma-pic-codes) to perform a
+;; particle-in-cell plasma physics simulation
+
+;; To use this library in Extempore, first get the (slightly modified)
+;; basic pic2 serial codes from
+
+;; https://github.com/benswift/pic2
+
+;; then build thd dylib with `make shared'
+
+;; then see examples/external/pbpic.xtm
+
+;;; Code:
+
+(sys:load "libs/external/shaders.xtm")
+(sys:load "libs/external/mpi.xtm")
+
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libpbpic2
+ (cond ((string=? (sys:platform) "OSX")
+        "/Users/ben/Code/src/skeleton-pic/pbpic2/libpbpic2.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libpbpic2.so")
+       ((string=? (sys:platform) "Windows")
+        "libpbpic2.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
+(define libpbpic2
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+
+(bind-type timeval <i64,i64>) ;; <time_t,suseconds_t>
+
+(bind-lib libpbpic2 dtimer [void,double*,timeval*,i32]*)
+(bind-lib libpbpic2 main [i32,i32,i8**]*)
+
+;; /* from pbpush2.h */
+(bind-lib libpbpic2 ranorm [double]*)
+(bind-lib libpbpic2 cpdicomp2l [void,float*,i32*,i32*,i32*,i32*,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cpdistr2h [void,float*,float*,i32*,i32,float,float,float,float,float,float,i32,i32,i32,i32,i32,i32,i32,i32,i32*]*)
+(bind-lib libpbpic2 cppgbpush23l [void,float*,float*,float*,float*,i32,i32,i32*,float,float,float,float*,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cdppgbpush23l [void,double*,double*,double*,double*,i32,i32,i32*,double,double,double,double*,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppgrbpush23l [void,float*,float*,float*,float*,i32,i32,i32*,float,float,float,float,float*,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cdppgrbpush23l [void,double*,double*,double*,double*,i32,i32,i32*,double,double,double,double,double*,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppgpost2l [void,float*,float*,i32,i32,float,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppgjpost2l [void,float*,float*,float*,i32,i32,i32*,float,float,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppgrjpost2l [void,float*,float*,float*,i32,i32,i32*,float,float,float,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppdsortp2yl [void,float*,float*,i32*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppcguard2xl [void,float*,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppaguard2xl [void,float*,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppacguard2xl [void,float*,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppois23 [void,cpxf*,cpxf*,i32,cpxf*,float,float,float,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppcuperp2 [void,cpxf*,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cippbpoisp23 [void,cpxf*,cpxf*,cpxf*,float,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppmaxwel2 [void,cpxf*,cpxf*,cpxf*,cpxf*,float,float,float,float*,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppemfield2 [void,cpxf*,cpxf*,cpxf*,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cwpfft2rinit [void,i32*,cpxf*,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppfft2rxx [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppfft2rxy [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppfft2r3xx [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppfft2r3xy [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cwppfft2r [void,cpxf*,cpxf*,cpxf*,cpxf*,i32,i32,i32*,cpxf*,float*,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cwppfft2r3 [void,cpxf*,cpxf*,cpxf*,cpxf*,i32,i32,i32*,cpxf*,float*,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+
+;; /* from pplib2.h */
+(bind-lib libpbpic2 cppinit2 [void,i32*,i32*,i32,i8**]*)
+(bind-lib libpbpic2 cppexit [void]*)
+(bind-lib libpbpic2 cppabort [void]*)
+(bind-lib libpbpic2 cpwtimera [void,i32,float*,double*]*)
+(bind-lib libpbpic2 cppsum [void,float*,float*,i32]*)
+(bind-lib libpbpic2 cppdsum [void,double*,double*,i32]*)
+(bind-lib libpbpic2 cppimax [void,i32*,i32*,i32]*)
+(bind-lib libpbpic2 cppncguard2l [void,float*,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppnaguard2l [void,float*,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppnacguard2l [void,float*,float*,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cpptpose [void,cpxf*,cpxf*,cpxf*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppntpose [void,cpxf*,cpxf*,cpxf*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpbpic2 cppmove2 [void,float*,float*,i32*,float*,float*,float*,float*,i32*,i32,i32,i32,i32,i32,i32,i32,i32,i32*]*)
+
+;; we don't use the timing stuff for now, but here it is:
+
+;; ;; /* declare and initialize timing data */
+;; float time
+;; struct timeval itime
+;; float tdpost = 0.0, tguard = 0.0, ttp = 0.0, tfield = 0.0
+;; float tdjpost = 0.0, tpush = 0.0, tsort = 0.0, tmov = 0.0
+;; float tfft[2] = {0.0,0.0}
+;; double dtime
+
+(bind-func pbpic2_step
+  (let ((indx:i32 9)
+        (indy:i32 9)
+        (npx:i32 3072)
+        (npy:i32 3072)
+        (ndim:i32 3)
+        (tend:float 10.0)
+        (dt:float 0.04)
+        (qme:float -1.0)
+        (vtx:float 1.0)
+        (vty:float 1.0)
+        (vtz:float 1.0)
+        (vx0:float 0.0)
+        (vy0:float 0.0)
+        (vz0:float 0.0)
+        (ax:float .912871)
+        (ay:float .912871)
+        (ci:float .1)
+        (idimp:i32 5)
+        (ipbc:i32 1)
+        (sortime:i32 0)
+        (relativity:i32 1)
+        (idps:i32 2)
+        (wke:float 0.0)
+        (we:float 0.0)
+        (wf:float 0.0)
+        (wm:float 0.0)
+        (wt:float 0.0)
+        ;; /* declare scalars for standard code */
+        (j:i32 0)
+        (nx:i32 (<< 1 indx))
+        (ny:i32 (<< 1 indy))
+        (nxh:i32 (/ nx 2))
+        (nyh:i32 (/ ny 2))
+        (nxe:i32 (+ nx 2))
+        (nye:i32 (+ ny 2))
+        (nxeh:i32 (/ nxe 2))
+        (nnxe:i32 (* ndim nxe))
+        (nxyh:i32 (/ (if (> nx ny) nx ny) 2))
+        (nxhy:i32 (/ (if (> nxh ny) nxh ny) 2))
+        (ny1:i32 (+ ny 1))
+        ;; /* nloop = number of time steps in simulation */
+;; /* ntime = current time step */
+        (ntime:i32 0)
+        (nloop:i32 (convert (+ (/ tend dt) .0001)))
+        (isign:i32 0)
+        (ierr:i32 0)
+        (qbme:float 0.0 qme)
+        (affp:float (/ (* (convert nx double)
+                          (convert ny double))
+                       np))
+        (dth:float 0.0)
+        (np:double np (* (convert npx double) (convert npy double)))
+        ;; /* declare scalars for MPI code */
+        (ntpose:i32 1)
+        (nvp:i32 0)
+        (idproc:i32 0)
+        (kstrt:i32 0)
+        (npmax:i32 0)
+        (kxp:i32 0)
+        (kyp:i32 0)
+        (nypmx:i32 0)
+        (nypmn:i32 0)
+        (nyp:i32 0)
+        (noff:i32 0)
+        (npp:i32 0)
+        (nps:i32 0)
+        (nbmax:i32 0)
+        (ntmax:i32 0)
+
+        ))
+  (lambda ()
+    ))
+
+
+
+
+
+;; /* declare arrays for standard code: */
+;; /* part, part2 = particle arrays */
+(bind-val part float*)
+(bind-val part2 float*)
+(bind-val tpart float*)
+;; /* qe = electron charge density with guard cells */
+(bind-val qe float*)
+;; /* cue = electron current density with guard cells */
+;; /* fxyze/g_bxyze = smoothed electric/magnetic field with guard cells */
+(bind-val cue float*)
+(bind-val fxyze float*)
+(bind-val bxyze float*)
+;; /* exyz/bxyz = transverse electric/magnetic field in fourier space */
+(bind-val exyz cpxf*)
+(bind-val bxyz float*)
+;; /* qt = scalar charge density field array in fourier space */
+(bind-val qt cpxf*)
+;; /* cut = vector current density field array in fourier space */
+;; /* fxyt/bxyt = vector electric/magnetic field in fourier space */
+(bind-val cut cpxf*)
+(bind-val fxyt float*)
+(bind-val bxyt float*)
+;; /* ffc = form factor array for poisson solver */
+(bind-val ffc cpxf*)
+;; /* mixup = bit reverse table for FFT */
+(bind-val mixup i32*)
+;; /* sct = sine/cosine table for FFT */
+(bind-val sct cpxf*)
+;; /* ihole = location of hole left in particle arrays */
+(bind-val ihole i32*)
+;; /* npic = scratch array for reordering particles */
+(bind-val npic i32*)
+
+(bind-val  wtot float*) ;; float[7] in original C code
+(bind-val  work float*) ;; float[7] in original C code
+(bind-val  info i32*)   ;; i32[7] in original C code
+
+;; /* declare arrays for MPI code: */
+;; /* bs/br = complex send/receive buffers for data transpose */
+(bind-val bs cpxf*)
+(bind-val br float*)
+;; /* sbufl/sbufr = particle buffers sent to nearby processors */
+;; /* rbufl/rbufr = particle buffers received from nearby processors */
+(bind-val sbufl float*)
+(bind-val sbufr float*)
+(bind-val rbufl float*)
+(bind-val rbufr float*)
+;; /* edges[0:1] = lower:upper y boundaries of particle partition */
+(bind-val edges float*)
+;; /* scr = guard cell buffer received from nearby processors */
+(bind-val scr float*)
+
+
+;; /* nvp = number of MPI ranks */
+;; /* initialize for distributed memory parallel processing */
+   cppinit2(&idproc,&nvp,argc,argv);
+   kstrt = idproc + 1;
+;; /* check if too many processors */
+   if (nvp > ny) {
+      if (kstrt==1) {
+         printf("Too many processors requested: ny, nvp=%d,%d\n",ny,nvp);
+      }
+      goto L3000;
+   }
+
+;; /* initialize data for MPI code */
+   edges = (float *) malloc(idps*sizeof(float));
+;; /* calculate partition variables: edges, nyp, noff, nypmx              */
+;; /* edges[0:1] = lower:upper boundary of particle partition             */
+;; /* nyp = number of primary (complete) gridpoints in particle partition */
+;; /* noff = lowermost global gridpoint in particle partition             */
+;; /* nypmx = maximum size of particle partition, including guard cells   */
+;; /* nypmn = minimum value of nyp                                        */
+   cpdicomp2l(edges,&nyp,&noff,&nypmx,&nypmn,ny,kstrt,nvp,idps);
+   if (nypmn < 1) {
+      if (kstrt==1) {
+         printf("combination not supported nvp, ny = %d,%d\n",nvp,ny);
+      }
+      goto L3000;
+   }
+;; /* initialize additional scalars for MPI code */
+;; /* kxp = number of complex grids in each field partition in x direction */
+   kxp = (nxh - 1)/nvp + 1;
+;; /* kyp = number of complex grids in each field partition in y direction */
+   kyp = (ny - 1)/nvp + 1;
+;; /* npmax = maximum number of electrons in each partition */
+   npmax = (np/nvp)*1.25;
+;; /* nbmax = size of buffer for passing particles between processors */
+   nbmax = 0.1*npmax;
+;; /* ntmax = size of ihole buffer for particles leaving processor */
+   ntmax = 2*nbmax;
+
+;; /* allocate data for standard code */
+   part = (float *) malloc(idimp*npmax*sizeof(float));
+   part2 = (float *) malloc(idimp*npmax*sizeof(float));
+   qe = (float *) malloc(nxe*nypmx*sizeof(float));
+   fxyze = (float *) malloc(ndim*nxe*nypmx*sizeof(float));
+   cue = (float *) malloc(ndim*nxe*nypmx*sizeof(float));
+   bxyze = (float *) malloc(ndim*nxe*nypmx*sizeof(float));
+   exyz = (cpxf *) malloc(ndim*nye*kxp*sizeof(cpxf));
+   bxyz = (cpxf *) malloc(ndim*nye*kxp*sizeof(cpxf));
+   qt = (cpxf *) malloc(nye*kxp*sizeof(cpxf));
+   fxyt = (cpxf *) malloc(ndim*nye*kxp*sizeof(cpxf));
+   cut = (cpxf *) malloc(ndim*nye*kxp*sizeof(cpxf));
+   bxyt = (cpxf *) malloc(ndim*nye*kxp*sizeof(cpxf));
+   ffc = (cpxf *) malloc(nyh*kxp*sizeof(cpxf));
+   mixup = (int *) malloc(nxhy*sizeof(int));
+   sct = (cpxf *) malloc(nxyh*sizeof(cpxf));
+   ihole = (int *) malloc((ntmax+1)*sizeof(int));
+   npic = (int *) malloc(nypmx*sizeof(int));
+
+;; /* allocate data for MPI code */
+   bs = (cpxf *) malloc(ndim*kxp*kyp*sizeof(cpxf));
+   br = (cpxf *) malloc(ndim*kxp*kyp*sizeof(cpxf));
+   sbufl = (float *) malloc(idimp*nbmax*sizeof(float));
+   sbufr = (float *) malloc(idimp*nbmax*sizeof(float));
+   rbufl = (float *) malloc(idimp*nbmax*sizeof(float));
+   rbufr = (float *) malloc(idimp*nbmax*sizeof(float));
+   scr = (float *) malloc(ndim*nxe*sizeof(float));
+
+;; /* prepare fft tables */
+   cwpfft2rinit(mixup,sct,indx,indy,nxhy,nxyh);
+;; /* calculate form factors */
+   isign = 0;
+   cppois23(qt,fxyt,isign,ffc,ax,ay,affp,&we,nx,ny,kstrt,nye,kxp,nyh);
+;; /* initialize electrons */
+   nps = 1;
+   npp = 0;
+   cpdistr2h(part,edges,&npp,nps,vtx,vty,vtz,vx0,vy0,vz0,npx,npy,nx,ny,
+             idimp,npmax,idps,ipbc,&ierr);
+;; /* check for particle initialization error */
+   if (ierr != 0) {
+      if (kstrt==1) {
+         printf("particle initialization error: ierr=%d\n",ierr);
+      }
+      goto L3000;
+   }
+
+;; /* initialize transverse electromagnetic fields */
+   for (j = 0; j < ndim*nye*kxp; j++) {
+      exyz[j] = 0.0 + 0.0*_Complex_I;
+      bxyz[j] = 0.0 + 0.0*_Complex_I;
+   }
+
+   if (dt > 0.45*ci) {
+      if (kstrt==1) {
+         printf("Warning: Courant condition may be exceeded!\n");
+      }
+   }
+
+;; /* * * * start main iteration loop * * * */
+
+L500: if (nloop <= ntime)
+         goto L2000;
+;; /*    if (kstrt==1) printf("ntime = %i\n",ntime); */
+
+;; /* deposit current with standard procedure: updates part, cue, ihole */
+      dtimer(&dtime,&itime,-1);
+      for (j = 0; j < ndim*nxe*nypmx; j++) {
+         cue[j] = 0.0;
+      }
+      if (relativity==1) {
+         cppgrjpost2l(part,cue,edges,npp,noff,ihole,qme,dth,ci,nx,ny,
+                      idimp,npmax,nxe,nypmx,idps,ntmax,ipbc);
+      }
+      else {
+         cppgjpost2l(part,cue,edges,npp,noff,ihole,qme,dth,nx,ny,idimp,
+                     npmax,nxe,nypmx,idps,ntmax,ipbc);
+      }
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tdjpost += time;
+;; /* check for ihole overflow error */
+      if (ihole[0] < 0) {
+         ierr = -ihole[0];
+         printf("ihole overflow error: ntmax,ih=%d,%d\n",ntmax,ierr);
+         cppabort();
+         goto L3000;
+      }
+
+;; /* move electrons into appropriate spatial regions: updates part, npp */
+      dtimer(&dtime,&itime,-1);
+      cppmove2(part,edges,&npp,sbufr,sbufl,rbufr,rbufl,ihole,ny,kstrt,nvp,
+               idimp,npmax,idps,nbmax,ntmax,info);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tmov += time;
+;; /* check for particle manager error */
+      if (info[0] != 0) {
+         ierr = info[0];
+         if (kstrt==1) {
+            printf("current particle manager error: ierr=%d\n",ierr);
+         }
+         goto L3000;
+      }
+
+;; /* deposit charge with standard procedure: updates qe */
+      dtimer(&dtime,&itime,-1);
+      for (j = 0; j < nxe*nypmx; j++) {
+         qe[j] = 0.0;
+      }
+      cppgpost2l(part,qe,npp,noff,qme,idimp,npmax,nxe,nypmx);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tdpost += time;
+
+;; /* add guard cells with standard procedure: updates cue, qe */
+      dtimer(&dtime,&itime,-1);
+      cppacguard2xl(cue,nyp,nx,ndim,nxe,nypmx);
+      cppnacguard2l(cue,scr,nyp,nx,ndim,kstrt,nvp,nxe,nypmx);
+      cppaguard2xl(qe,nyp,nx,nxe,nypmx);
+      cppnaguard2l(qe,scr,nyp,nx,kstrt,nvp,nxe,nypmx);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tguard += time;
+
+;; /* transform charge to fourier space with standard procedure: updates qt */
+;; /* modifies qe */
+      dtimer(&dtime,&itime,-1);
+      isign = -1;
+      cwppfft2r((cpxf *)qe,qt,bs,br,isign,ntpose,mixup,sct,&ttp,
+                indx,indy,kstrt,nvp,nxeh,nye,kxp,kyp,nypmx,nxhy,nxyh);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tfft[0] += time;
+      tfft[1] += ttp;
+
+;; /* transform current to fourier space with standard procedure: updates cut */
+;; /* modifies cue */
+      dtimer(&dtime,&itime,-1);
+      isign = -1;
+      cwppfft2r3((cpxf *)cue,cut,bs,br,isign,ntpose,mixup,sct,
+                 &ttp,indx,indy,kstrt,nvp,nxeh,nye,kxp,kyp,nypmx,nxhy,
+                 nxyh);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tfft[0] += time;
+      tfft[1] += ttp;
+
+;; /* take transverse part of current with standard procedure: updates cut */
+;; /* modifies cue */
+      dtimer(&dtime,&itime,-1);
+      cppcuperp2(cut,nx,ny,kstrt,nye,kxp);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tfield += time;
+
+;; /* calculate electromagnetic fields in fourier space with standard */
+;; /* procedure: updates exyz, bxyz, wf, wm */
+      dtimer(&dtime,&itime,-1);
+      if (ntime==0) {
+         cippbpoisp23(cut,bxyz,ffc,ci,&wm,nx,ny,kstrt,nye,kxp,nyh);
+         wf = 0.0;
+         dth = 0.5*dt;
+      }
+      else {
+         cppmaxwel2(exyz,bxyz,cut,ffc,affp,ci,dt,&wf,&wm,nx,ny,kstrt,
+                    nye,kxp,nyh);
+      }
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tfield += time;
+
+;; /* calculate force/charge in fourier space with standard procedure: */
+;; /* updates fxyt, we */
+      dtimer(&dtime,&itime,-1);
+      isign = -1;
+      cppois23(qt,fxyt,isign,ffc,ax,ay,affp,&we,nx,ny,kstrt,nye,kxp,
+               nyh);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tfield += time;
+
+;; /* add longitudinal and transverse electric fields with standard */
+;; /* procedure: updates fxyt */
+      dtimer(&dtime,&itime,-1);
+      isign = 1;
+      cppemfield2(fxyt,exyz,ffc,isign,nx,ny,kstrt,nye,kxp,nyh);
+;; /* copy magnetic field with standard procedure: updates bxyt */
+      isign = -1;
+      cppemfield2(bxyt,bxyz,ffc,isign,nx,ny,kstrt,nye,kxp,nyh);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tfield += time;
+
+;; /* transform force to real space with standard procedure: updates fxyze */
+;; /* modifies fxyt */
+      dtimer(&dtime,&itime,-1);
+      isign = 1;
+      cwppfft2r3((cpxf *)fxyze,fxyt,bs,br,isign,ntpose,mixup,
+                 sct,&ttp,indx,indy,kstrt,nvp,nxeh,nye,kxp,kyp,nypmx,
+                 nxhy,nxyh);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tfft[0] += time;
+      tfft[1] += ttp;
+
+;; /* transform magnetic field to real space with standard procedure: */
+;; /* updates bxyze, modifies bxyt */
+      dtimer(&dtime,&itime,-1);
+      isign = 1;
+      cwppfft2r3((cpxf *)bxyze,bxyt,bs,br,isign,ntpose,mixup,
+                 sct,&ttp,indx,indy,kstrt,nvp,nxeh,nye,kxp,kyp,nypmx,
+                 nxhy,nxyh);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tfft[0] += time;
+      tfft[1] += ttp;
+
+;; /* copy guard cells with standard procedure: updates fxyze, bxyze */
+      dtimer(&dtime,&itime,-1);
+      cppncguard2l(fxyze,nyp,kstrt,nvp,nnxe,nypmx);
+      cppcguard2xl(fxyze,nyp,nx,ndim,nxe,nypmx);
+      cppncguard2l(bxyze,nyp,kstrt,nvp,nnxe,nypmx);
+      cppcguard2xl(bxyze,nyp,nx,ndim,nxe,nypmx);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tguard += time;
+
+;; /* push particles: updates part, wke, and ihole */
+      dtimer(&dtime,&itime,-1);
+      wke = 0.0;
+      if (relativity==1) {
+         cppgrbpush23l(part,fxyze,bxyze,edges,npp,noff,ihole,qbme,dt,
+                       dth,ci,&wke,nx,ny,idimp,npmax,nxe,nypmx,idps,
+                       ntmax,ipbc);
+      }
+      else {
+         cppgbpush23l(part,fxyze,bxyze,edges,npp,noff,ihole,qbme,dt,dth,
+                      &wke,nx,ny,idimp,npmax,nxe,nypmx,idps,ntmax,ipbc);
+      }
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tpush += time;
+;; /* check for ihole overflow error */
+      if (ihole[0] < 0) {
+         ierr = -ihole[0];
+         printf("ihole overflow error: ntmax,ih=%d,%d\n",ntmax,ierr);
+         cppabort();
+         goto L3000;
+      }
+
+;; /* move electrons into appropriate spatial regions: updates part, npp */
+      dtimer(&dtime,&itime,-1);
+      cppmove2(part,edges,&npp,sbufr,sbufl,rbufr,rbufl,ihole,ny,kstrt,nvp,
+               idimp,npmax,idps,nbmax,ntmax,info);
+      dtimer(&dtime,&itime,1);
+      time = (float) dtime;
+      tmov += time;
+;; /* check for particle manager error */
+      if (info[0] != 0) {
+         ierr = info[0];
+         if (kstrt==1) {
+            printf("push particle manager error: ierr=%d\n",ierr);
+         }
+         goto L3000;
+      }
+
+;; /* sort particles for standard code: updates part */
+      if (sortime > 0) {
+         if (ntime%sortime==0) {
+            dtimer(&dtime,&itime,-1);
+            cppdsortp2yl(part,part2,npic,npp,noff,nyp,idimp,npmax,nypmx);
+;; /* exchange pointers */
+            tpart = part;
+            part = part2;
+            part2 = tpart;
+            dtimer(&dtime,&itime,1);
+            time = (float) dtime;
+            tsort += time;
+         }
+      }
+
+;; /* energy diagnostic */
+      wt = we + wf + wm;
+      wtot[0] = wt;
+      wtot[1] = wke;
+      wtot[2] = 0.0;
+      wtot[3] = wke + wt;
+      wtot[4] = we;
+      wtot[5] = wf;
+      wtot[6] = wm;
+      cppsum(wtot,work,7);
+      wke = wtot[1];
+      we = wtot[4];
+      wf = wtot[5];
+      wm = wtot[6];
+      if (ntime==0) {
+         if (kstrt==1) {
+            wt = we + wf + wm;
+            printf("Initial Total Field, Kinetic and Total Energies:\n");
+            printf("%e %e %e\n",wt,wke,wke+wt);
+            printf("Initial Electrostatic, Transverse Electric and \
+Magnetic Field Energies:\n");
+            printf("%e %e %e\n",we,wf,wm);
+         }
+      }
+      ntime += 1;
+      goto L500;
+L2000:
+
+;; /* * * * end main iteration loop * * * */
+
+   if (kstrt==1) {
+      printf("ntime, relativity = %i,%i\n",ntime,relativity);
+      printf("MPI nodes nvp = %i\n",nvp);
+      wt = we + wf + wm;
+      printf("Final Total Field, Kinetic and Total Energies:\n");
+      printf("%e %e %e\n",wt,wke,wke+wt);
+      printf("Final Electrostatic, Transverse Electric and Magnetic \
+Field Energies:\n");
+      printf("%e %e %e\n",we,wf,wm);
+
+      printf("\n");
+      printf("deposit time = %f\n",tdpost);
+      printf("current deposit time = %f\n",tdjpost);
+      tdpost += tdjpost;
+      printf("total deposit time = %f\n",tdpost);
+      printf("guard time = %f\n",tguard);
+      printf("solver time = %f\n",tfield);
+      printf("fft and transpose time = %f,%f\n",tfft[0],tfft[1]);
+      printf("push time = %f\n",tpush);
+      printf("particle move time = %f\n",tmov);
+      printf("sort time = %f\n",tsort);
+      tfield += tguard + tfft[0];
+      printf("total solver time = %f\n",tfield);
+      time = tdpost + tpush + tmov + tsort;
+      printf("total particle time = %f\n",time);
+      wt = time + tfield;
+      printf("total time = %f\n",wt);
+      printf("\n");
+
+      wt = 1.0e+09/(((float) nloop)*((float) np));
+      printf("Push Time (nsec) = %f\n",tpush*wt);
+      printf("Deposit Time (nsec) = %f\n",tdpost*wt);
+      printf("Sort Time (nsec) = %f\n",tsort*wt);
+      printf("Total Particle Time (nsec) = %f\n",time*wt);
+   }
+
+   
+(define run-pbpic
+  (lambda (delta-t)
+    (let ((ntime (pbpic_step)))
+      (if (= (modulo ntime 1000) 0)
+          (println 'ntime: ntime)))
+    (gl_draw_particles (pbpic_step.nx))
+    (gl:swap-buffers *gl-ctx*)
+    (callback (+ (now) (* *second* delta-t))
+              'run-pbpic
+              delta-t)))
