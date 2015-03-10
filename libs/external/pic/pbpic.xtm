@@ -21,8 +21,9 @@
 
 ;;; Code:
 
-(sys:load "libs/external/shaders.xtm")
-(sys:load "libs/external/mpi.xtm")
+(sys:load "libs/math.xtm")
+;; (sys:load "libs/external/shaders.xtm")
+;; (sys:load "libs/external/mpi/mpi.xtm")
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -92,14 +93,6 @@
 
 ;; we don't use the timing stuff for now, but here it is:
 
-;; ;; declare and initialize timing data
-;; float time
-;; struct timeval itime
-;; float tdpost = 0.0, tguard = 0.0, ttp = 0.0, tfield = 0.0
-;; float tdjpost = 0.0, tpush = 0.0, tsort = 0.0, tmov = 0.0
-;; float tfft[2] = {0.0,0.0}
-;; double dtime
-
 (bind-val indx i32 9)
 (bind-val indy i32 9)
 (bind-val npx i32 3072)
@@ -122,15 +115,15 @@
 (bind-val sortime i32 0)
 (bind-val relativity i32 1)
 (bind-val idps i32 2)
-(bind-val wke float 0.0)
-(bind-val we float 0.0)
-(bind-val wf float 0.0)
-(bind-val wm float 0.0)
+(bind-val wke_ptr float*)
+(bind-val we_ptr float*)
+(bind-val wf_ptr float*)
+(bind-val wm_ptr float*)
 (bind-val wt float 0.0)
 ;; declare scalars for standard code
 ;; (bind-val j i32 0)
-(bind-val nx i32 (call-as-xtlang (<< 1 indx)))
-(bind-val ny i32 (call-as-xtlang (<< 1 indy)))
+(bind-val nx i32 (call-as-xtlang (<< 1:i32 indx)))
+(bind-val ny i32 (call-as-xtlang (<< 1:i32 indy)))
 (bind-val nxh i32 (call-as-xtlang (/ nx 2)))
 (bind-val nyh i32 (call-as-xtlang (/ ny 2)))
 (bind-val nxe i32 (call-as-xtlang (+ nx 2)))
@@ -143,15 +136,15 @@
 ;; nloop = number of time steps in simulation
 ;; ntime = current time step
 (bind-val ntime i32 0)
-(bind-val nloop i32 (call-as-xtlang (convert (+ (/ tend dt) .0001))))
+(bind-val nloop i32 (call-as-xtlang (convert (+ (/ tend dt) .0001) i32)))
 (bind-val qbme float 0.0 (call-as-xtlang qme))
+(bind-val np double (call-as-xtlang
+                     (* (convert npx double) (convert npy double))))
 (bind-val affp float (call-as-xtlang
                       (/ (* (convert nx double)
                             (convert ny double))
                          np)))
 (bind-val dth float 0.0)
-(bind-val np double (call-as-xtlang
-                     (* (convert npx double) (convert npy double))))
 ;; declare scalars for MPI code
 (bind-val ntpose i32 1)
 (bind-val nvp_ptr i32*)
@@ -181,11 +174,11 @@
 ;; nypmn = minimum value of nyp                                       
 
 (call-as-xtlang 
- (cpdicomp2l edges nyp_ptr noff_ptr nypmx_ptr nypmn_ptr ny kstrt nvp idps)
- (if (< nypmn 1)
+ (cpdicomp2l edges nyp_ptr noff_ptr nypmx_ptr nypmn_ptr ny kstrt (pref nvp_ptr 0) idps)
+ (if (< (pref nypmn_ptr 0) 1)
      (begin
        (if (= kstrt 1)
-           (printf "combination not supported nvp ny = %d %d\n" nvp ny))
+           (printf "combination not supported nvp ny = %d %d\n" (pref nvp_ptr 0) ny))
        (cppexit))))
 
 ;; initialize additional scalars for MPI code
@@ -196,7 +189,7 @@
 ;; npmax = maximum number of electrons in each partition
 (bind-val npmax i32 (call-as-xtlang (convert (* (/ np (convert (pref nvp_ptr 0))) 1.25) i32)))
 ;; nbmax = size of buffer for passing particles between processors
-(bind-val nbmax i32 (call-as-xtlang (convert (* (convert npmax) 0.1) i32)))
+(bind-val nbmax i32 (call-as-xtlang (/ npmax 10)))
 ;; ntmax = size of ihole buffer for particles leaving processor
 (bind-val ntmax i32 (call-as-xtlang (* 2 nbmax)))
 
@@ -206,22 +199,22 @@
 (bind-val part2 float* (call-as-xtlang (* idimp npmax)))
 (bind-val tpart float*) ;; tmp ptr (for ptr swaps)
 ;; qe = electron charge density with guard cells
-(bind-val qe float* (call-as-xtlang (* nxe nypmx)))
+(bind-val qe float* (call-as-xtlang (* nxe (pref nypmx_ptr 0))))
 ;; cue = electron current density with guard cells
 ;; fxyze/g_bxyze = smoothed electric/magnetic field with guard cells
-(bind-val fxyze float* (call-as-xtlang (* ndim nxe nypmx)))
-(bind-val cue float* (call-as-xtlang (* ndim nxe nypmx)))
-(bind-val bxyze float* (call-as-xtlang (* ndim nxe nypmx)))
+(bind-val fxyze float* (call-as-xtlang (* ndim nxe (pref nypmx_ptr 0))))
+(bind-val cue float* (call-as-xtlang (* ndim nxe (pref nypmx_ptr 0))))
+(bind-val bxyze float* (call-as-xtlang (* ndim nxe (pref nypmx_ptr 0))))
 ;; exyz/bxyz = transverse electric/magnetic field in fourier space
 (bind-val exyz cpxf* (call-as-xtlang (* ndim nye kxp)))
-(bind-val bxyz float* (call-as-xtlang (* ndim nye kxp)))
+(bind-val bxyz cpxf* (call-as-xtlang (* ndim nye kxp)))
 ;; qt = scalar charge density field array in fourier space
 (bind-val qt cpxf* (call-as-xtlang (* nye kxp)))
 ;; cut = vector current density field array in fourier space
 ;; fxyt/bxyt = vector electric/magnetic field in fourier space
 (bind-val cut cpxf* (call-as-xtlang (* ndim nye kxp)))
-(bind-val fxyt float* (call-as-xtlang (* ndim nye kxp)))
-(bind-val bxyt float* (call-as-xtlang (* ndim nye kxp)))
+(bind-val fxyt cpxf* (call-as-xtlang (* ndim nye kxp)))
+(bind-val bxyt cpxf* (call-as-xtlang (* ndim nye kxp)))
 ;; ffc = form factor array for poisson solver
 (bind-val ffc cpxf* (call-as-xtlang (* nyh kxp)))
 ;; mixup = bit reverse table for FFT
@@ -231,7 +224,7 @@
 ;; ihole = location of hole left in particle arrays
 (bind-val ihole i32* (call-as-xtlang (+ ntmax 1)))
 ;; npic = scratch array for reordering particles
-(bind-val npic i32* (call-as-xtlang nypmx))
+(bind-val npic i32* (call-as-xtlang (pref nypmx_ptr 0)))
 
 (bind-val wtot float* 7) ;; float[7] in original C code
 (bind-val work float* 7) ;; float[7] in original C code
@@ -240,7 +233,7 @@
 ;; declare allocate arrays for MPI code:
 ;; bs/br = complex send/receive buffers for data transpose
 (bind-val bs cpxf* (call-as-xtlang (* ndim kxp kyp)))
-(bind-val br float* (call-as-xtlang (* ndim kxp kyp)))
+(bind-val br cpxf* (call-as-xtlang (* ndim kxp kyp)))
 ;; sbufl/sbufr = particle buffers sent to nearby processors
 ;; rbufl/rbufr = particle buffers received from nearby processors
 (bind-val sbufl float* (call-as-xtlang (* idimp nbmax)))
@@ -250,15 +243,24 @@
 ;; scr = guard cell buffer received from nearby processors
 (bind-val scr float* (call-as-xtlang (* ndim nxe)))
 
+;; ;; declare and initialize timing data
+;; float time
+;; struct timeval itime
+;; float tdpost = 0.0, tguard = 0.0, ttp = 0.0, tfield = 0.0
+;; float tdjpost = 0.0, tpush = 0.0, tsort = 0.0, tmov = 0.0
+;; float tfft[2] = {0.0,0.0}
+;; double dtime
+(bind-val ttp_ptr float*) ;; needed as argument to cwppfft2r
+
 ;; prepare fft tables
 (call-as-xtlang (cwpfft2rinit mixup sct indx indy nxhy nxyh))
 ;; calculate form factors
 (bind-val isign i32 0)
-(call-as-xtlang (cppois23 qt fxyt isign ffc ax ay affp &we nx ny kstrt nye kxp nyh))
+(call-as-xtlang (cppois23 qt fxyt isign ffc ax ay affp we_ptr nx ny kstrt nye kxp nyh))
 ;; initialize electrons
 (bind-val nps i32 1)
 (bind-val npp_ptr i32*)
-(bind-val ierr i32*)
+(bind-val ierr_ptr i32*)
 
 (call-as-xtlang
  (cpdistr2h part edges npp_ptr nps vtx vty vtz vx0 vy0 vz0 npx npy nx ny idimp npmax idps ipbc ierr_ptr)
@@ -266,318 +268,213 @@
  (if (<> (pref ierr_ptr 0) 0)
      (begin
        (if (= kstrt 1)
-           (printf "particle initialization error: ierr=%d\n" ierr))
+           (printf "particle initialization error: ierr=%d\n" (pref ierr_ptr 0)))
        (cppexit))))
 
 ;; initialize transverse electromagnetic fields
 (call-as-xtlang
  (doloop (j (* ndim nye kxp))
-   (tset! (pref exyz j) 0 0.0)
-   (tset! (pref exyz j) 1 0.0)
-   (tset! (pref bxyz j) 0 0.0)
-   (tset! (pref bxyz j) 1 0.0)))
+   (tset! (pref-ptr exyz j) 0 0.0)
+   (tset! (pref-ptr exyz j) 1 0.0)
+   (tset! (pref-ptr bxyz j) 0 0.0)
+   (tset! (pref-ptr bxyz j) 1 0.0)))
 
-(if (> dt (* 0.45 ci))
-    (if (= kstrt 1)
-        (printf "Warning: Courant condition may be exceeded!\n")))
+(call-as-xtlang
+ (if (> dt (* 0.45 ci))
+     (if (= kstrt 1)
+         (printf "Warning: Courant condition may be exceeded!\n"))))
 
 ;; * * * start main iteration loop * * *
 
-L500: if (nloop <= ntime)
-         goto L2000;
-;;    if (kstrt==1) printf("ntime = %i\n",ntime);
+(bind-func pbpic_step
+  (lambda ()
 
-;; deposit current with standard procedure: updates part, cue, ihole
-      dtimer(&dtime,&itime,-1);
-      for (j = 0; j < ndim*nxe*nypmx; j++) {
-         cue[j] = 0.0;
-      }
-      if (relativity==1) {
-         cppgrjpost2l(part,cue,edges,npp,noff,ihole,qme,dth,ci,nx,ny,
-                      idimp,npmax,nxe,nypmx,idps,ntmax,ipbc);
-      }
-      else {
-         cppgjpost2l(part,cue,edges,npp,noff,ihole,qme,dth,nx,ny,idimp,
-                     npmax,nxe,nypmx,idps,ntmax,ipbc);
-      }
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tdjpost += time;
-;; check for ihole overflow error
-      if (ihole[0] < 0) {
-         ierr = -ihole[0];
-         printf("ihole overflow error: ntmax,ih=%d,%d\n",ntmax,ierr);
-         cppabort();
-         goto L3000;
-      }
+    ;; L500: if (nloop <= ntime)
+    ;;          goto L2000;
+    ;;    if (kstrt==1) printf("ntime = %i\n",ntime);
 
-;; move electrons into appropriate spatial regions: updates part, npp
-      dtimer(&dtime,&itime,-1);
-      cppmove2(part,edges,&npp,sbufr,sbufl,rbufr,rbufl,ihole,ny,kstrt,nvp,
-               idimp,npmax,idps,nbmax,ntmax,info);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tmov += time;
-;; check for particle manager error
-      if (info[0] != 0) {
-         ierr = info[0];
-         if (kstrt==1) {
-            printf("current particle manager error: ierr=%d\n",ierr);
-         }
-         goto L3000;
-      }
+    ;; deposit current with standard procedure: updates part, cue, ihole
+    (doloop (j (* ndim nxe (pref nypmx_ptr 0)))
+      (pset! cue j 0.0))
+    
+    (if (= relativity 1)
+        (cppgrjpost2l part cue edges (pref npp_ptr 0) (pref noff_ptr 0) ihole qme dth ci nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc)
+        (cppgjpost2l part cue edges (pref npp_ptr 0) (pref noff_ptr 0) ihole qme dth nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc))
+    
+    ;; check for ihole overflow error
+    (if (< (pref ihole 0) 0)
+        (begin
+          (pset! ierr_ptr 0 (* -1 (pref ihole 0)))
+          (if (= kstrt 1)
+              (printf "ihole overflow error: ntmax ih=%d %d\n" ntmax (pref ierr_ptr 0)))
+          (cppabort)
+          (cppexit)))
 
-;; deposit charge with standard procedure: updates qe
-      dtimer(&dtime,&itime,-1);
-      for (j = 0; j < nxe*nypmx; j++) {
-         qe[j] = 0.0;
-      }
-      cppgpost2l(part,qe,npp,noff,qme,idimp,npmax,nxe,nypmx);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tdpost += time;
+    ;; move electrons into appropriate spatial regions: updates part, (pref npp_ptr 0)
+    (cppmove2 part edges npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt (pref nvp_ptr 0) idimp npmax idps nbmax ntmax info)
+    ;; check for particle manager error
+    (if (<> (pref info 0) 0)
+        (begin
+          (pset! ierr_ptr 0 (pref info 0))
+          (printf "current particle manager error: ierr=%d\n" (pref ierr_ptr 0))
+          (cppexit)))
 
-;; add guard cells with standard procedure: updates cue, qe
-      dtimer(&dtime,&itime,-1);
-      cppacguard2xl(cue,nyp,nx,ndim,nxe,nypmx);
-      cppnacguard2l(cue,scr,nyp,nx,ndim,kstrt,nvp,nxe,nypmx);
-      cppaguard2xl(qe,nyp,nx,nxe,nypmx);
-      cppnaguard2l(qe,scr,nyp,nx,kstrt,nvp,nxe,nypmx);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tguard += time;
+    ;; deposit charge with standard procedure: updates qe
+    (doloop (j (* nxe (pref nypmx_ptr 0)))
+      (pset! qe j 0.))
+    (cppgpost2l part qe (pref npp_ptr 0) (pref noff_ptr 0) qme idimp npmax nxe (pref nypmx_ptr 0))
 
-;; transform charge to fourier space with standard procedure: updates qt
-;; modifies qe
-      dtimer(&dtime,&itime,-1);
-      isign = -1;
-      cwppfft2r((cpxf *)qe,qt,bs,br,isign,ntpose,mixup,sct,&ttp,
-                indx,indy,kstrt,nvp,nxeh,nye,kxp,kyp,nypmx,nxhy,nxyh);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tfft[0] += time;
-      tfft[1] += ttp;
+    ;; add guard cells with standard procedure: updates cue, qe
+    (cppacguard2xl cue (pref nyp_ptr 0) nx ndim nxe (pref nypmx_ptr 0))
+    (cppnacguard2l cue scr (pref nyp_ptr 0) nx ndim kstrt (pref nvp_ptr 0) nxe (pref nypmx_ptr 0))
+    (cppaguard2xl qe (pref nyp_ptr 0) nx nxe (pref nypmx_ptr 0))
+    (cppnaguard2l qe scr (pref nyp_ptr 0) nx kstrt (pref nvp_ptr 0) nxe (pref nypmx_ptr 0))
 
-;; transform current to fourier space with standard procedure: updates cut
-;; modifies cue
-      dtimer(&dtime,&itime,-1);
-      isign = -1;
-      cwppfft2r3((cpxf *)cue,cut,bs,br,isign,ntpose,mixup,sct,
-                 &ttp,indx,indy,kstrt,nvp,nxeh,nye,kxp,kyp,nypmx,nxhy,
-                 nxyh);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tfft[0] += time;
-      tfft[1] += ttp;
+    ;; transform charge to fourier space with standard procedure: updates qt
+    ;; modifies qe
+    (set! isign -1:i32)
+    (cwppfft2r (convert qe) qt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt (pref nvp_ptr 0) nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
 
-;; take transverse part of current with standard procedure: updates cut
-;; modifies cue
-      dtimer(&dtime,&itime,-1);
-      cppcuperp2(cut,nx,ny,kstrt,nye,kxp);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tfield += time;
+    ;; transform current to fourier space with standard procedure: updates cut
+    ;; modifies cue
+    (set! isign -1:i32)
+    (cwppfft2r3 (convert cue) cut bs br isign ntpose mixup sct ttp_ptr indx indy kstrt (pref nvp_ptr 0) nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
 
-;; calculate electromagnetic fields in fourier space with standard
-;; procedure: updates exyz, bxyz, wf, wm
-      dtimer(&dtime,&itime,-1);
-      if (ntime==0) {
-         cippbpoisp23(cut,bxyz,ffc,ci,&wm,nx,ny,kstrt,nye,kxp,nyh);
-         wf = 0.0;
-         dth = 0.5*dt;
-      }
-      else {
-         cppmaxwel2(exyz,bxyz,cut,ffc,affp,ci,dt,&wf,&wm,nx,ny,kstrt,
-                    nye,kxp,nyh);
-      }
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tfield += time;
+    ;; take transverse part of current with standard procedure: updates cut
+    ;; modifies cue
+    (cppcuperp2 cut nx ny kstrt nye kxp)
 
-;; calculate force/charge in fourier space with standard procedure:
-;; updates fxyt, we
-      dtimer(&dtime,&itime,-1);
-      isign = -1;
-      cppois23(qt,fxyt,isign,ffc,ax,ay,affp,&we,nx,ny,kstrt,nye,kxp,
-               nyh);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tfield += time;
+    ;; calculate electromagnetic fields in fourier space with standard
+    ;; procedure: updates exyz, bxyz, wf, wm
+    (if (= ntime 0)
+        (begin
+          (cippbpoisp23 cut bxyz ffc ci wm_ptr nx ny kstrt nye kxp nyh)
+          (pset! wf_ptr 0 0.0)
+          (set! dth (* 0.5 dt))
+          void)
+        (cppmaxwel2 exyz bxyz cut ffc affp ci dt wf_ptr wm_ptr nx ny kstrt nye kxp nyh))
 
-;; add longitudinal and transverse electric fields with standard
-;; procedure: updates fxyt
-      dtimer(&dtime,&itime,-1);
-      isign = 1;
-      cppemfield2(fxyt,exyz,ffc,isign,nx,ny,kstrt,nye,kxp,nyh);
-;; copy magnetic field with standard procedure: updates bxyt
-      isign = -1;
-      cppemfield2(bxyt,bxyz,ffc,isign,nx,ny,kstrt,nye,kxp,nyh);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tfield += time;
+    ;; calculate force/charge in fourier space with standard procedure:
+    ;; updates fxyt, we
+    (set! isign -1:i32)
+    (cppois23 qt fxyt isign ffc ax ay affp we_ptr nx ny kstrt nye kxp nyh)
 
-;; transform force to real space with standard procedure: updates fxyze
-;; modifies fxyt
-      dtimer(&dtime,&itime,-1);
-      isign = 1;
-      cwppfft2r3((cpxf *)fxyze,fxyt,bs,br,isign,ntpose,mixup,
-                 sct,&ttp,indx,indy,kstrt,nvp,nxeh,nye,kxp,kyp,nypmx,
-                 nxhy,nxyh);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tfft[0] += time;
-      tfft[1] += ttp;
+    ;; add longitudinal and transverse electric fields with standard
+    ;; procedure: updates fxyt
+    (set! isign 1:i32)
+    (cppemfield2 fxyt exyz ffc isign nx ny kstrt nye kxp nyh)
+    ;; copy magnetic field with standard procedure: updates bxyt
+    (set! isign -1:i32)
+    (cppemfield2 bxyt bxyz ffc isign nx ny kstrt nye kxp nyh)
 
-;; transform magnetic field to real space with standard procedure:
-;; updates bxyze, modifies bxyt
-      dtimer(&dtime,&itime,-1);
-      isign = 1;
-      cwppfft2r3((cpxf *)bxyze,bxyt,bs,br,isign,ntpose,mixup,
-                 sct,&ttp,indx,indy,kstrt,nvp,nxeh,nye,kxp,kyp,nypmx,
-                 nxhy,nxyh);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tfft[0] += time;
-      tfft[1] += ttp;
+    ;; transform force to real space with standard procedure: updates fxyze
+    ;; modifies fxyt
+    (set! isign 1:i32)
+    (cwppfft2r3 (convert fxyze) fxyt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt (pref nvp_ptr 0) nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
 
-;; copy guard cells with standard procedure: updates fxyze, bxyze
-      dtimer(&dtime,&itime,-1);
-      cppncguard2l(fxyze,nyp,kstrt,nvp,nnxe,nypmx);
-      cppcguard2xl(fxyze,nyp,nx,ndim,nxe,nypmx);
-      cppncguard2l(bxyze,nyp,kstrt,nvp,nnxe,nypmx);
-      cppcguard2xl(bxyze,nyp,nx,ndim,nxe,nypmx);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tguard += time;
+    ;; transform magnetic field to real space with standard procedure:
+    ;; updates bxyze, modifies bxyt
+    (set! isign 1:i32)
+    (cwppfft2r3 (convert bxyze) bxyt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt (pref nvp_ptr 0) nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
 
-;; push particles: updates part, wke, and ihole
-      dtimer(&dtime,&itime,-1);
-      wke = 0.0;
-      if (relativity==1) {
-         cppgrbpush23l(part,fxyze,bxyze,edges,npp,noff,ihole,qbme,dt,
-                       dth,ci,&wke,nx,ny,idimp,npmax,nxe,nypmx,idps,
-                       ntmax,ipbc);
-      }
-      else {
-         cppgbpush23l(part,fxyze,bxyze,edges,npp,noff,ihole,qbme,dt,dth,
-                      &wke,nx,ny,idimp,npmax,nxe,nypmx,idps,ntmax,ipbc);
-      }
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tpush += time;
-;; check for ihole overflow error
-      if (ihole[0] < 0) {
-         ierr = -ihole[0];
-         printf("ihole overflow error: ntmax,ih=%d,%d\n",ntmax,ierr);
-         cppabort();
-         goto L3000;
-      }
+    ;; copy guard cells with standard procedure: updates fxyze, bxyze
+    (cppncguard2l fxyze (pref nyp_ptr 0) kstrt (pref nvp_ptr 0) nnxe (pref nypmx_ptr 0))
+    (cppcguard2xl fxyze (pref nyp_ptr 0) nx ndim nxe (pref nypmx_ptr 0))
+    (cppncguard2l bxyze (pref nyp_ptr 0) kstrt (pref nvp_ptr 0) nnxe (pref nypmx_ptr 0))
+    (cppcguard2xl bxyze (pref nyp_ptr 0) nx ndim nxe (pref nypmx_ptr 0))
 
-;; move electrons into appropriate spatial regions: updates part, npp
-      dtimer(&dtime,&itime,-1);
-      cppmove2(part,edges,&npp,sbufr,sbufl,rbufr,rbufl,ihole,ny,kstrt,nvp,
-               idimp,npmax,idps,nbmax,ntmax,info);
-      dtimer(&dtime,&itime,1);
-      time = (float) dtime;
-      tmov += time;
-;; check for particle manager error
-      if (info[0] != 0) {
-         ierr = info[0];
-         if (kstrt==1) {
-            printf("push particle manager error: ierr=%d\n",ierr);
-         }
-         goto L3000;
-      }
+    ;; push particles: updates part, wke, and ihole
+    (pset! wke_ptr 0 0.0)
+    (if (= relativity 1)
+        (cppgrbpush23l part fxyze bxyze edges (pref npp_ptr 0) (pref noff_ptr 0) ihole qbme dt dth ci wke_ptr nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc)
+        
+        (cppgbpush23l part fxyze bxyze edges (pref npp_ptr 0) (pref noff_ptr 0) ihole qbme dt dth wke_ptr nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc))
+    
+    ;; check for ihole overflow error
+    (if (< (pref ihole 0) 0)
+        (begin
+          (pset! ierr_ptr 0 (* -1 (pref ihole 0)))
+          (if (= kstrt 1)
+              (printf "ihole overflow error: ntmax ih=%d %d\n" ntmax (pref ierr_ptr 0)))
+          (cppabort)
+          (cppexit)))
 
-;; sort particles for standard code: updates part
-      if (sortime > 0) {
-         if (ntime%sortime==0) {
-            dtimer(&dtime,&itime,-1);
-            cppdsortp2yl(part,part2,npic,npp,noff,nyp,idimp,npmax,nypmx);
-;; exchange pointers
-            tpart = part;
-            part = part2;
-            part2 = tpart;
-            dtimer(&dtime,&itime,1);
-            time = (float) dtime;
-            tsort += time;
-         }
-      }
+    ;; move electrons into appropriate spatial regions: updates part, (pref npp_ptr 0)
+    (cppmove2 part edges npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt (pref nvp_ptr 0) idimp npmax idps nbmax ntmax info)
+    ;; check for particle manager error
+    (if (<> (pref info 0) 0)
+        (begin
+          (pset! ierr_ptr 0 (pref info 0))
+          (printf "push particle manager error: ierr=%d\n" (pref ierr_ptr 0))
+          (cppexit)))
 
-;; energy diagnostic
-      wt = we + wf + wm;
-      wtot[0] = wt;
-      wtot[1] = wke;
-      wtot[2] = 0.0;
-      wtot[3] = wke + wt;
-      wtot[4] = we;
-      wtot[5] = wf;
-      wtot[6] = wm;
-      cppsum(wtot,work,7);
-      wke = wtot[1];
-      we = wtot[4];
-      wf = wtot[5];
-      wm = wtot[6];
-      if (ntime==0) {
-         if (kstrt==1) {
-            wt = we + wf + wm;
-            printf("Initial Total Field, Kinetic and Total Energies:\n");
-            printf("%e %e %e\n",wt,wke,wke+wt);
-            printf("Initial Electrostatic, Transverse Electric and \
-Magnetic Field Energies:\n");
-            printf("%e %e %e\n",we,wf,wm);
-         }
-      }
-      ntime += 1;
-      goto L500;
-L2000:
+    ;; sort particles for standard code: updates part
+    (if (> sortime 0)
+        (if (= (% ntime sortime) 0)
+            (begin
+              (cppdsortp2yl part part2 npic (pref npp_ptr 0) (pref noff_ptr 0) (pref nyp_ptr 0) idimp npmax (pref nypmx_ptr 0))
+              ;; exchange pointers
+              (set! tpart part)
+              (set! part part2)
+              (set! part2 tpart))))
+    
+
+    ;; energy diagnostic
+    (set! wt (+ (pref we_ptr 0) (pref wf_ptr 0) (pref wm_ptr 0)))
+    (pfill! wtot
+            wt
+            (pref wke_ptr 0)
+            0.0
+            (+ (pref wke_ptr 0) wt)
+            (pref we_ptr 0)
+            (pref wf_ptr 0)
+            (pref wm_ptr 0))
+    (cppsum wtot work 7)
+    (pset! wke_ptr 0 (pref wtot 1))
+    (pset! we_ptr 0 (pref wtot 4))
+    (pset! wf_ptr 0 (pref wtot 5))
+    (pset! wm_ptr 0 (pref wtot 6))
+    (if (= ntime 0)
+        (if (= kstrt 1)
+            (begin
+              (set! wt (+ (pref we_ptr 0) (pref wf_ptr 0) (pref wm_ptr 0)))
+              (printf "Initial Total Field Kinetic and Total Energies:\n")
+              (printf "%e %e %e\n"
+                      wt (pref wke_ptr 0) (+ wt (pref wke_ptr 0)))
+              (printf "Initial Electrostatic Transverse Electric and Magnetic Field Energies:\n")
+              (printf "%e %e %e\n" (pref we_ptr 0) (pref wf_ptr 0) (pref wm_ptr 0)))))
+
+    ;; ntime is incremented in the scheme callback
+    (set! ntime (+ ntime 1))
+    ntime))
 
 ;; * * * end main iteration loop * * *
 
-   if (kstrt==1) {
-      printf("ntime, relativity = %i,%i\n",ntime,relativity);
-      printf("MPI nodes nvp = %i\n",nvp);
-      wt = we + wf + wm;
-      printf("Final Total Field, Kinetic and Total Energies:\n");
-      printf("%e %e %e\n",wt,wke,wke+wt);
-      printf("Final Electrostatic, Transverse Electric and Magnetic \
-Field Energies:\n");
-      printf("%e %e %e\n",we,wf,wm);
+(call-as-xtlang
+ (if (= kstrt 1)
+     (begin
+       (printf "ntime relativity = %i %i\n" ntime relativity)
+       (printf "MPI nodes nvp = %i\n" (pref nvp_ptr 0))
 
-      printf("\n");
-      printf("deposit time = %f\n",tdpost);
-      printf("current deposit time = %f\n",tdjpost);
-      tdpost += tdjpost;
-      printf("total deposit time = %f\n",tdpost);
-      printf("guard time = %f\n",tguard);
-      printf("solver time = %f\n",tfield);
-      printf("fft and transpose time = %f,%f\n",tfft[0],tfft[1]);
-      printf("push time = %f\n",tpush);
-      printf("particle move time = %f\n",tmov);
-      printf("sort time = %f\n",tsort);
-      tfield += tguard + tfft[0];
-      printf("total solver time = %f\n",tfield);
-      time = tdpost + tpush + tmov + tsort;
-      printf("total particle time = %f\n",time);
-      wt = time + tfield;
-      printf("total time = %f\n",wt);
-      printf("\n");
+       (set! wt (+ (pref we_ptr 0) (pref wf_ptr 0) (pref wm_ptr 0)))
+       (printf "Final Total Field Kinetic and Total Energies:\n")
+       (printf "%e %e %e\n"
+               wt (pref wke_ptr 0) (+ wt (pref wke_ptr 0)))
+       (printf "Final Electrostatic Transverse Electric and Magnetic \
+Field Energies:\n")
+       (printf "%e %e %e\n" (pref we_ptr 0) (pref wf_ptr 0) (pref wm_ptr 0))
 
-      wt = 1.0e+09/(((float) nloop)*((float) np));
-      printf("Push Time (nsec) = %f\n",tpush*wt);
-      printf("Deposit Time (nsec) = %f\n",tdpost*wt);
-      printf("Sort Time (nsec) = %f\n",tsort*wt);
-      printf("Total Particle Time (nsec) = %f\n",time*wt);
-   }
+       (printf "\n")
 
+       (set! wt (/ (convert 1.0e09 float) (* (convert nloop float) (convert np float)))))))
    
 (define run-pbpic
   (lambda (delta-t)
     (let ((ntime (pbpic_step)))
       (if (= (modulo ntime 1000) 0)
           (println 'ntime: ntime)))
-    (gl_draw_particles (pbpic_step.nx))
-    (gl:swap-buffers *gl-ctx*)
+    ;; (gl_draw_particles (pbpic_step.nx))
+    ;; (gl:swap-buffers *gl-ctx*)
     (callback (+ (now) (* *second* delta-t))
               'run-pbpic
               delta-t)))
