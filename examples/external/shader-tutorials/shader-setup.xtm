@@ -16,6 +16,20 @@
 (bind-alias GLintptr i64)
 (bind-alias GLsizeiptr i64)
 
+;; (bind-val GL_UNSIGNED_BYTE_3_3_2           GLenum #x8032)
+(bind-val GL_UNSIGNED_SHORT_4_4_4_4        GLenum #x8033)
+;; (bind-val GL_UNSIGNED_SHORT_5_5_5_1        GLenum #x8034)
+(bind-val GL_UNSIGNED_INT_8_8_8_8          GLenum #x8035)
+;; (bind-val GL_UNSIGNED_INT_10_10_10_2       GLenum #x8036)
+(bind-val GL_UNSIGNED_BYTE_2_3_3_REV       GLenum #x8362)
+;; (bind-val GL_UNSIGNED_SHORT_5_6_5          GLenum #x8363)
+(bind-val GL_UNSIGNED_SHORT_5_6_5_REV      GLenum #x8364)
+;; (bind-val GL_UNSIGNED_SHORT_4_4_4_4_REV    GLenum #x8365)
+(bind-val GL_UNSIGNED_SHORT_1_5_5_5_REV    GLenum #x8366)
+;; (bind-val GL_UNSIGNED_INT_8_8_8_8_REV      GLenum #x8367)
+(bind-val GL_UNSIGNED_INT_2_10_10_10_REV   GLenum #x8368)
+
+
 ;; id, type, size (bytes), data
 (bind-type VBO <GLuint,GLenum,GLsizeiptr,GLvoid*>)
 
@@ -221,15 +235,15 @@
       (printf "\n")
       tex)))
 
-(bind-func bind_texture
-  (lambda (tex:Texture* data:GLvoid*)
-    (glBindTexture GL_TEXTURE_2D (Texture_id tex))
-    (glTexImage2D GL_TEXTURE_2D 0 GL_RGB 2 2 0 GL_RGB GL_FLOAT data)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-    void))
+;; (bind-func bind_texture
+;;   (lambda (tex:Texture* data:GLvoid*)
+;;     (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+;;     (glTexImage2D GL_TEXTURE_2D 0 GL_RGB 2 2 0 GL_RGB GL_FLOAT data)
+;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+;;     void))
 
 (bind-func delete_texture
   (lambda (tex:Texture*)
@@ -239,15 +253,47 @@
       (gl_print_error "Error deleting Texture")
       (free tex))))
 
+;; stb_image is a helper library for loading image data
+
+(sys:load "libs/external/stb_image.xtm")
+
+(bind-func bind_image_texture
+  (lambda (tex filename)
+    (let ((width_ptr:i32* (salloc))
+          (height_ptr:i32* (salloc))
+          (comp_ptr:i32* (salloc))
+          (data (stbi_load filename width_ptr height_ptr comp_ptr 4)))
+      (if (null? data)
+          (begin (println (stbi_failure_reason))
+                 null)
+          (begin
+            (glActiveTexture GL_TEXTURE0)
+            (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+            (glTexImage2D GL_TEXTURE_2D 0
+                          GL_RGBA
+                          (pref width_ptr 0)
+                          (pref height_ptr 0)
+                          0
+                          GL_RGBA
+                          GL_UNSIGNED_INT_8_8_8_8
+                          data)
+            ;; set some parameters
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+            (gl_print_error "couldn't bind_image_texture")
+            tex)))))
+
 ;; actually do the things...
 
-(define width 1440.0)
-(define height 900.0)
 (bind-val width float 1440.0)
 (bind-val height float 900.0)
 (define fullscreen #t)
 
-(define *gl-window* (gl:make-ctx-core ":0.0" fullscreen 0.0 0.0 width height))
+(define *gl-window* (gl:make-ctx-core ":0.0" fullscreen 0.0 0.0 
+                                      (call-as-xtlang width) 
+                                      (call-as-xtlang height)))
 
 ;; how did it all go?
 
