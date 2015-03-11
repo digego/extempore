@@ -1,0 +1,100 @@
+(sys:load "examples/external/shader-tutorials/shader-setup.xtm")
+
+(bind-val fullscreen_quad_vert_data float* 16)
+(bind-val texture_data float* (* 4 2 4)) ;; 4x2 RGBA
+
+(bind-val tex Texture*)
+(bind-val vbo VBO*)
+(bind-val vao VAO*)
+
+(bind-func texture_setup
+  (lambda ()
+    (glActiveTexture GL_TEXTURE0)
+    (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+    (glTexImage2D GL_TEXTURE_2D
+                  0
+                  GL_RED
+                  4 2 ;; texture is 4x2 float
+                  0
+                  GL_RED
+                  GL_FLOAT
+                  (convert texture_data))
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+    (gl_print_error "in texture_setup")))
+
+(define *texture-shader*
+  (create_shader (file->string "examples/external/shader-tutorials/texture.vert")
+                 (file->string "examples/external/shader-tutorials/texture.frag")))
+
+;; simple grey(ish) blocky gradient
+(call-as-xtlang
+ (doloop (i 8)
+   (pset! texture_data i (/ (convert i) 8.))))
+
+;; init
+(call-as-xtlang
+ (pfill! fullscreen_quad_vert_data
+         ;; pos       texcoord
+         -0.5  0.5    0.0 0.0
+          0.5  0.5    1.0 0.0
+         -0.5 -0.5    0.0 1.0
+          0.5 -0.5    1.0 1.0)
+ (set! vbo (create_vbo fullscreen_quad_vert_data 16))
+ (bind_vbo vbo)
+ (set! vao (create_vao))
+ (bind_attribute vao vbo 0 2 16 0) ;; position
+ (bind_attribute vao vbo 1 2 16 8) ;; tex_coord
+ ;; (set! tex (create_texture))
+ ;; (texture_setup)
+ void)
+
+(bind-func gl_draw
+  (lambda (program)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    ;; update texture
+    ;; (glTexSubImage2D GL_TEXTURE_2D 0 0 0
+    ;;                  4 2
+    ;;                  GL_RED
+    ;;                  GL_FLOAT
+    ;;                  (convert texture_data))
+    ;; draw the world
+    (let ((texloc (glGetUniformLocation program "tex")))
+      (glUseProgram program)
+      (glUniform1i texloc 0))
+    (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
+    void))
+
+(define gl-loop
+  (lambda (time delta-t)
+    (let ((late-by (- (now) time))
+          (next-frame-time (+ time (* *second* delta-t))))
+      (if (> late-by 0)
+          (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
+          (begin
+            (gl_draw *texture-shader*)
+            (gl:swap-buffers *gl-window*)))
+      (callback (* 0.9 next-frame-time)
+                'gl-loop
+                next-frame-time
+                delta-t))))
+
+;; run once
+(begin
+  (gl_draw *texture-shader*)
+  (gl:swap-buffers *gl-window*))
+
+;; ok, let's use a more sophisticated (image) texture
+
+(call-as-xtlang
+ ;; (delete_texture tex)
+ (set! tex (bind_image_texture (create_texture) "assets/images/image.png"))
+ (if (null? tex)
+     (println "Whoops - tex is null")))
+
+;; run it again
+(begin
+  (gl_draw *texture-shader*)
+  (gl:swap-buffers *gl-window*))
