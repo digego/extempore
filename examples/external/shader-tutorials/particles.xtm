@@ -1,50 +1,66 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
-;; particle setop
-
-(bind-val np i64 10)
-
 ;; a basic 2D particle with position and velocity
 ;;                  <x     y     vx    vy   >
-(bind-type Particle <float,float,float,float>)
+;; (bind-type Particle <float,float,float,float>)
 
-(bind-val particles Particle* (call-as-xtlang np))
+(bind-val num_particles i64 10)
+(bind-val particles float* (* 4 (call-as-xtlang num_particles)))
+
+;; (bind-func distribute_particles
+;;   "randomly initialise the particles to "
+;;   (lambda (np)
+;;     (doloop (i np)
+;;       (tset! (pref-ptr particles i) 0 (random -1. 1.))
+;;       (tset! (pref-ptr particles i) 1 (random -1. 1.))
+;;       (tset! (pref-ptr particles i) 2 (random -1. 1.))
+;;       (tset! (pref-ptr particles i) 3 (random -1. 1.)))))
 
 (bind-func distribute_particles
   "randomly initialise the particles to "
   (lambda (np)
     (doloop (i np)
-      (tset! (pref-ptr particles i) 0 (random -1. 1.))
-      (tset! (pref-ptr particles i) 1 (random -1. 1.))
-      (tset! (pref-ptr particles i) 2 (random -1. 1.))
-      (tset! (pref-ptr particles i) 3 (random -1. 1.)))))
+      (pset! particles (+ (* i 4) 0) (random -1. 1.))
+      (pset! particles (+ (* i 4) 1) (random -1. 1.))
+      (pset! particles (+ (* i 4) 2) (random -1. 1.))
+      (pset! particles (+ (* i 4) 3) (random -1. 1.)))))
 
 (bind-func print_particle
-  (lambda (p:Particle*)
+  (lambda (p:float*)
     (printf "<%.2f %.2f %.2f %.2f>\n"
-            (convert (tref p 0) double)
-            (convert (tref p 1) double)
-            (convert (tref p 2) double)
-            (convert (tref p 3) double))))
+            (convert (pref p 0) double)
+            (convert (pref p 1) double)
+            (convert (pref p 2) double)
+            (convert (pref p 3) double))))
 
-(call-as-xtlang
- (distribute_particles np)
- (doloop (i np)
-   (print_particle (pref-ptr particles i))))
+;; (bind-func move_particles
+;;   "move the particles according to their velocities"
+;;   (lambda (np:i64 step:float)
+;;     (let ((p:Particle* null))
+;;       (doloop (i np)
+;;         (set! p (pref-ptr particles i))
+;;         ;; update x pos
+;;         (tset! p 0 (% (+ (tref p 0)
+;;                          (* (tref p 2) step))
+;;                       1.0))
+;;         ;; update y pos
+;;         (tset! p 1 (% (+ (tref p 1)
+;;                          (* (tref p 3) step))
+;;                       1.0))))))
 
 (bind-func move_particles
   "move the particles according to their velocities"
-  (lambda (np:i64 step)
-    (let ((p:Particle* null))
+  (lambda (np:i64 step:float)
+    (let ((p:float* null))
       (doloop (i np)
-        (set! p (pref-ptr particles i))
+        (set! p (pref-ptr particles (* i 4)))
         ;; update x pos
-        (tset! p 0 (% (+ (tref p 0)
-                         (* (tref p 2) step))
+        (pset! p 0 (% (+ (pref p 0)
+                         (* (pref p 2) step))
                       1.0))
         ;; update y pos
-        (tset! p 1 (% (+ (tref p 1)
-                         (* (tref p 3) step))
+        (pset! p 1 (% (+ (pref p 1)
+                         (* (pref p 3) step))
                       1.0))))))
 
 ;; OpenGL setup
@@ -56,68 +72,36 @@
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
 
-(bind-val texture_data float* (* 4 2 4))
-
-(bind-func texture_setup
-  (lambda ()
-    (glActiveTexture GL_TEXTURE0)
-    (glBindTexture GL_TEXTURE_2D (Texture_id tex))
-    (glTexImage2D GL_TEXTURE_2D
-                  0
-                  GL_RED
-                  4 2 ;; texture is 4x2 float
-                  0
-                  GL_RED
-                  GL_FLOAT
-                  (convert texture_data))
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
-    (gl_print_error "in texture_setup")))
-
 (define *particles-shader*
   (create_shader (file->string "examples/external/shader-tutorials/particles.vert")
                  (file->string "examples/external/shader-tutorials/particles.frag")))
 
-;; simple grey(ish) blocky gradient
-(call-as-xtlang
- (doloop (i 8)
-   (pset! texture_data i (/ (convert i) 8.)))
- (println "texture_data initialised."))
-
 ;; init
 (call-as-xtlang
- (distribute_particles np)
- (set! vbo (create_vbo (convert particles float*) (* np 4))) ;; np = 10
+ (distribute_particles num_particles)
+ (set! vbo (create_vbo particles (* num_particles 4))) ;; num_particles = 10
  (bind_vbo vbo)
  (set! vao (create_vao))
  (bind_attribute vao vbo 0 2 16 0)
  (bind_attribute vao vbo 1 2 16 8)
- ;; tex_coord
- (set! tex (create_texture))
- (texture_setup)
+ (set! tex (bind_image_texture (create_texture) "assets/images/star.png"))
+ (if (null? tex)
+     (println "Whoops - tex is null"))
  void)
 
 ;; draw all the things
 
 (bind-func gl_draw
-  (lambda (program)
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+  (lambda (program:GLuint)
+    (glClear GL_COLOR_BUFFER_BIT)
     ;; move particles, update VBO
-    (move_particles np .01)
-    (glBufferSubData GL_ARRAY_BUFFER 0 (* np 16) (convert particles))
-    ;; update texture
-    (glTexSubImage2D GL_TEXTURE_2D 0 0 0
-                     4 2
-                     GL_RED
-                     GL_FLOAT
-                     (convert texture_data))
+    (move_particles num_particles .01)
+    (glBufferSubData GL_ARRAY_BUFFER 0 (* num_particles 16) (VBO_data vbo))
     ;; draw the world
     (let ((texloc (glGetUniformLocation program "tex")))
       (glUseProgram program)
       (glUniform1i texloc 0))
-    (draw_vertex_array vao GL_POINTS 0 (convert np))
+    (draw_vertex_array vao GL_POINTS 0 (convert num_particles))
     void))
 
 (define gl-loop
@@ -133,11 +117,6 @@
                 'gl-loop
                 next-frame-time
                 delta-t))))
-
-;; run once
-(begin
-  (gl_draw *particles-shader*)
-  (gl:swap-buffers *gl-window*))
 
 ;; start it running
 (gl-loop (now) 1/10)
