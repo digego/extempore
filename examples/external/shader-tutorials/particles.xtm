@@ -1,89 +1,143 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
-(define np 100)
-(bind-val np i32 np) ;; be careful - these values won't necessarily
-                     ;; stay in sync
+;; particle setop
 
-(bind-val particles float* (* np 4)) ;; <x,y,vx,vy>
-;; (bind-val colours float* (* np 3))
+(bind-val np i64 10)
 
-(bind-func init_particles
+;; a basic 2D particle with position and velocity
+;;                  <x     y     vx    vy   >
+(bind-type Particle <float,float,float,float>)
+
+(bind-val particles Particle* (call-as-xtlang np))
+
+(bind-func distribute_particles
+  "randomly initialise the particles to "
   (lambda (np)
-    ;; GL_points version
-    (let ((i 0))
-      (dotimes (i (* np 4))
-        (pset! particles (+ (* i 4) 0) (random -1. 1.))
-        (pset! particles (+ (* i 4) 1) (random -1. 1.))
-        (pset! particles (+ (* i 4) 2) (random -1. 1.))
-        (pset! particles (+ (* i 4) 3) (random -1. 1.))))))
+    (doloop (i np)
+      (tset! (pref-ptr particles i) 0 (random -1. 1.))
+      (tset! (pref-ptr particles i) 1 (random -1. 1.))
+      (tset! (pref-ptr particles i) 2 (random -1. 1.))
+      (tset! (pref-ptr particles i) 3 (random -1. 1.)))))
 
-(init_particles np)
+(bind-func print_particle
+  (lambda (p:Particle*)
+    (printf "<%.2f %.2f %.2f %.2f>\n"
+            (convert (tref p 0) double)
+            (convert (tref p 1) double)
+            (convert (tref p 2) double)
+            (convert (tref p 3) double))))
 
-;; (bind-func init_colours
-;;   (lambda (np)
-;;     ;; GL_points version
-;;     (let ((i 0))
-;;       (dotimes (i (* np 3))
-;;         (pset! colours (+ (* i 3) 0) (random -1. 1.))
-;;         (pset! colours (+ (* i 3) 1) (random -1. 1.))
-;;         (pset! colours (+ (* i 3) 2) (random -1. 1.))))))
+(call-as-xtlang
+ (distribute_particles np)
+ (doloop (i np)
+   (print_particle (pref-ptr particles i))))
 
-;; (init_colours np)
+(bind-func move_particles
+  "move the particles according to their velocities"
+  (lambda (np:i64 step)
+    (let ((p:Particle* null))
+      (doloop (i np)
+        (set! p (pref-ptr particles i))
+        ;; update x pos
+        (tset! p 0 (% (+ (tref p 0)
+                         (* (tref p 2) step))
+                      1.0))
+        ;; update y pos
+        (tset! p 1 (% (+ (tref p 1)
+                         (* (tref p 3) step))
+                      1.0))))))
 
-(define particles-shader
+;; OpenGL setup
+
+(call-as-xtlang
+ (glEnable GL_PROGRAM_POINT_SIZE))
+
+(bind-val tex Texture*)
+(bind-val vbo VBO*)
+(bind-val vao VAO*)
+
+(bind-val texture_data float* (* 4 2 4))
+
+(bind-func texture_setup
+  (lambda ()
+    (glActiveTexture GL_TEXTURE0)
+    (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+    (glTexImage2D GL_TEXTURE_2D
+                  0
+                  GL_RED
+                  4 2 ;; texture is 4x2 float
+                  0
+                  GL_RED
+                  GL_FLOAT
+                  (convert texture_data))
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+    (gl_print_error "in texture_setup")))
+
+(define *particles-shader*
   (create_shader (file->string "examples/external/shader-tutorials/particles.vert")
                  (file->string "examples/external/shader-tutorials/particles.frag")))
 
-(bind-val particles_vbo VBO*)
-(bind-val particles_vao VAO*)
-(bind-val star_texture i32)
+;; simple grey(ish) blocky gradient
+(call-as-xtlang
+ (doloop (i 8)
+   (pset! texture_data i (/ (convert i) 8.)))
+ (println "texture_data initialised."))
 
-;; (call-as-xtlang (println particles_vbo))
-;; (call-as-xtlang (print particles_vao))
-;; (call-as-xtlang (println "particles_vbo:" particles_vbo "particles_vao:" particles_vao))
+;; init
+(call-as-xtlang
+ (distribute_particles np)
+ (set! vbo (create_vbo (convert particles float*) (* np 4))) ;; np = 10
+ (bind_vbo vbo)
+ (set! vao (create_vao))
+ (bind_attribute vao vbo 0 2 16 0)
+ (bind_attribute vao vbo 1 2 16 8)
+ ;; tex_coord
+ (set! tex (create_texture))
+ (texture_setup)
+ void)
 
-(bind-func init_gl_objects
-  (lambda ()
-    (glEnable GL_PROGRAM_POINT_SIZE)
-    (set! particles_vao (create_vao) np)
-    (set! particles_vbo (create_vbo particles (* 4 np)))
-    (bind_attribute particles_vao particles_vbo 0 2 GL_FLOAT 16 0)
-    (bind_attribute particles_vao particles_vbo 1 2 GL_FLOAT 16 8)
-    (set! star_texture (gl_load_image "assets/images/star.png" 0))))
+;; draw all the things
 
-(init_gl_objects)
-
-(bind-func bind_texture0
-  (lambda (tex uniform_location)
-    (glActiveTexture GL_TEXTURE0)
-    (glBindTexture GL_TEXTURE_2D star_texture)
-    (glUniform1i uniform_location tex)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)))
-
-(bind-func draw
-  (lambda (program:i32)
-    (println "checkpoint" 0)
-    (glUseProgram program)
-    (println "checkpoint" 1)
-    (bind_texture0 star_texture (glGetUniformLocation program "texStar"))
-    (println "checkpoint" 2)
-    (glClear GL_COLOR_BUFFER_BIT)
-    (println "checkpoint" 9)
-    (draw_vertex_array particles_vao GL_POINTS 0 np)
-    (println "checkpoint" 10)
+(bind-func gl_draw
+  (lambda (program)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    ;; move particles, update VBO
+    (move_particles np .01)
+    (glBufferSubData GL_ARRAY_BUFFER 0 (* np 16) (convert particles))
+    ;; update texture
+    (glTexSubImage2D GL_TEXTURE_2D 0 0 0
+                     4 2
+                     GL_RED
+                     GL_FLOAT
+                     (convert texture_data))
+    ;; draw the world
+    (let ((texloc (glGetUniformLocation program "tex")))
+      (glUseProgram program)
+      (glUniform1i texloc 0))
+    (draw_vertex_array vao GL_POINTS 0 (convert np))
     void))
 
 (define gl-loop
   (lambda (time delta-t)
-    (draw particles-shader)
-    (gl:swap-buffers *gl-window*)
-    (println 'time: time)
-    (callback (+ time (* *second* delta-t) 0.5)
-              'gl-loop
-              (+ time (* *second* delta-t)) 
-              delta-t)))
+    (let ((late-by (- (now) time))
+          (next-frame-time (+ time (* *second* delta-t))))
+      (if (> late-by 0)
+          (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
+          (begin
+            (gl_draw *particles-shader*)
+            (gl:swap-buffers *gl-window*)))
+      (callback (* 0.9 next-frame-time)
+                'gl-loop
+                next-frame-time
+                delta-t))))
 
-(gl-loop (now) 1)
+;; run once
+(begin
+  (gl_draw *particles-shader*)
+  (gl:swap-buffers *gl-window*))
+
+;; start it running
+(gl-loop (now) 1/10)
