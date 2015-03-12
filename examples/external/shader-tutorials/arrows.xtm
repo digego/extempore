@@ -1,27 +1,18 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
-;; (sys:load "examples/external/shader-tutorials/pic.xtm")
 
-;; (run-pic 1/30)
+(call-as-xtlang
+ (glEnable GL_DEPTH_TEST)
+ (glDepthFunc GL_LESS))
 
-(bind-func gl_set_depth_test
-  (lambda ()
-    (glEnable GL_DEPTH_TEST)
-    (glDepthFunc GL_LESS)
-    (glDisable GL_LINE_SMOOTH))) ;; GL_LESS
+(bind-val num_arrows i64 (* 64 64))
+(bind-val vertices float* (* (call-as-xtlang num_arrows) 4))
 
-(gl_set_depth_test)
-
-(define narrows (* 256 256))
-(bind-val vertices float* (* narrows 4))
-
-(define arrows-program
+(define *arrows-shader*
   (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
                  (file->string "examples/external/shader-tutorials/arrows.frag")))
 
-(call-as-xtlang (printf "vertices: %p\n" vertices))
-
 (bind-func munge_points
-  (lambda (nx:i64 ny:i64 ox:float oy:float)
+  (lambda (nx:i32 ny:i32 ox:float oy:float)
     (let ((i 0) (j 0) (idx 0)
           (x 0.) (y 0.))
       (dotimes (i nx)
@@ -36,26 +27,41 @@
           (pset! vertices (+ idx 2) (+ x (* ox (random -1. 1.))))
           (pset! vertices (+ idx 3) (+ y (* oy (random -1. 1.)))))))))
 
-(munge_points 256 256 0.01 0.01)
+(bind-val vbo VBO*)
+(bind-val vao VAO*)
 
-(bind-func draw
-  (let ((narrows (* 256 256))
-        (vert_vbo (create_vbo vertices (* 4 narrows)))
-        (vao (create_vao vert_vbo 2)))
-    (lambda (program)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
-      (glUseProgram program)
-      (glBindVertexArray vao)
-      (glDrawArrays GL_LINES 0 (* 4 narrows))
-      (update_vbo vert_vbo vertices (* 4 narrows))
-      void)))
+;; init
+(call-as-xtlang
+ (set! vbo (create_vbo vertices (convert (* 4 num_arrows))))
+ (bind_vbo vbo)
+ (set! vao (create_vao))
+ (bind_attribute vao vbo 0 2 0 0)
+ void)
+
+(define *arrows-shader*
+  (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
+                 (file->string "examples/external/shader-tutorials/arrows.frag")))
+
+(bind-func gl_draw
+  (lambda (program)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    (glBufferSubData GL_ARRAY_BUFFER 0 (VBO_size vbo) (VBO_data vbo))
+    (glUseProgram program)
+    (draw_vertex_array vao GL_LINES 0 (* 2 (convert num_arrows)))
+    void))
+
+;; draw once
+(begin
+  (gl_draw *arrows-shader*)
+  (gl:swap-buffers *gl-window*))
+
 
 (define gl-loop
   (lambda (time delta-t)
-    (munge_points 256 256
+    (munge_points 64 64
                   (+ .01 (* .01 (cos (* .1 2pi (/ time 44100.)))))
                   (+ .01 (* .01 (cos (* .1 2pi .7 (/ time 44100.))))))
-    (draw arrows-program)
+    (gl_draw *arrows-shader*)
     (gl:swap-buffers *gl-window*)
     ;; (println 'time: time)
     (callback (+ time (* *second* delta-t) 0.5)
@@ -64,59 +70,3 @@
               delta-t)))
 
 (gl-loop (now) 1/30)
-
-(bind-func print_verts
-  (lambda (n)
-    (doloop (i n)
-      (printf "%.5f " (pref fxye i)))
-    (println)))
-
-(print_verts 64)
-
-(bind-func print_4floatvector
-  (lambda (v:/4,float/*)
-    (printf "/%f %f %f %f/"
-            (ftod (vref v 0))
-            (ftod (vref v 1))
-            (ftod (vref v 2))
-            (ftod (vref v 3)))))
-
-(bind-poly print print_4floatvector)
-
-(bind-func mean_fxye
-  (lambda (np)
-    (let ((sum:/4,float/* (salloc))
-          (norm:/4,float/* (salloc)))
-      (doloop (i (/ np 4))
-        (pset! sum 0 (+ (pref sum 0) (pref (cast fxye /4,float/*) i))))
-      (vfill! norm
-              (convert np)
-              (convert np)
-              (convert np)
-              (convert np))
-      (pset! sum 0 (/ (pref sum 0) norm))
-      (print_4floatvector sum)
-      (println))))
-
-(mean_fxye (pic_step.np))
-
-(define implicit-arrows-program
-  (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
-                 (file->string "examples/external/shader-tutorials/arrows.frag")))
-
-(bind-func draw
-  (let ((narrows (* 256 256))
-        (vert_vbo (create_vbo vertices (* 4 narrows)))
-        (vao (create_vao vert_vbo 2 16)))
-    (lambda (program)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
-      (glUseProgram program)
-      (glBindVertexArray vao)
-      (glDrawArrays GL_LINES 0 (* 4 narrows))
-      (update_vbo vert_vbo vertices (* 4 narrows))
-      void)))
-
-  homepage 'https://github.com/DeVaukz/SOIL'
-  url 'https://codeload.github.com/DeVaukz/SOIL/zip/master'
-  version '1.07'
-  sha1 '7114eb45fd2c8da5177e1dad663d4e09ce403842'
