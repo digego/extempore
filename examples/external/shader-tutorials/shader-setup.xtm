@@ -285,6 +285,37 @@
             (gl_print_error "couldn't bind_image_texture")
             tex)))))
 
+;; this should be in opengl.xtm at some stage
+
+(bind-func create_geom_shader
+  (lambda (vsource:i8* gsource:i8* fsource:i8*)
+    (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
+          (gshader (glCreateShader GL_GEOMETRY_SHADER))
+          (vshader (glCreateShader GL_VERTEX_SHADER))
+          (fcode:|1,i8*|* (salloc 1))
+          (gcode:|1,i8*|* (salloc 1))
+          (vcode:|1,i8*|* (salloc 1))
+          (program (glCreateProgram))
+          (temp:i32* (salloc 1)))
+      (pset! fcode 0 fsource)
+      (pset! gcode 0 fsource)
+      (pset! vcode 0 vsource)
+      (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
+      (glShaderSource gshader 1 (cast gcode i8**) (bitcast null i32*))
+      (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
+      (glCompileShader fshader)
+      (glCompileShader gshader)
+      (glCompileShader vshader)
+      (glAttachShader program fshader)
+      (glAttachShader program gshader)
+      (glAttachShader program vshader)
+      (glLinkProgram program)
+      (print_shader_info_log fshader)
+      (print_shader_info_log gshader)
+      (print_shader_info_log vshader)
+      (print_program_info_log program)
+      program)))
+
 ;; actually do the things...
 
 (bind-val width float 1440.0)
