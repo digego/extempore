@@ -4,64 +4,85 @@
  (glEnable GL_DEPTH_TEST)
  (glDepthFunc GL_LESS))
 
-(bind-val num_arrows i64 (* 64 64))
-(bind-val vertices float* (* (call-as-xtlang num_arrows) 4))
+(bind-val grid_size i64 64)
+(bind-val num_arrows i64 (real->integer (expt (call-as-xtlang grid_size) 2)))
+
+;; this will be 'vec2's, in pairs - arrow base, arrow head. so the
+;; streaming update only needs to update the `head' vert (assuming the
+;; grid stays the same)
+(bind-val arrows_verts float* (* (call-as-xtlang num_arrows) 4))
 
 (define *arrows-shader*
   (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
                  (file->string "examples/external/shader-tutorials/arrows.frag")))
 
-(bind-func munge_points
-  (lambda (nx:i32 ny:i32 ox:float oy:float)
-    (let ((i 0) (j 0) (idx 0)
-          (x 0.) (y 0.))
-      (dotimes (i nx)
-        (dotimes (j ny)
-          (set! idx (+ (* (+ (* nx i) j) 4) 0))
-          (set! x (- (* (/ (convert i float) (convert nx float)) 2.0) 1.0))
-          (set! y (- (* (/ (convert j float) (convert ny float)) 2.0) 1.0))
-          ;; (if (> idx (- (* nx ny 4) 10))
-          ;;     (println "i:" i "j:" j "idx:" idx))
-          (pset! vertices (+ idx 0) x)
-          (pset! vertices (+ idx 1) y)
-          (pset! vertices (+ idx 2) (+ x (* ox (random -1. 1.))))
-          (pset! vertices (+ idx 3) (+ y (* oy (random -1. 1.)))))))))
+;; set base verts (i.e. every second vec2) to regular grid
+(call-as-xtlang
+ (let ((idx 0))
+   (doloop (i grid_size)
+     (doloop (j grid_size)     
+       (set! idx (* (+ (* i grid_size) j) 4))
+       (pset! arrows_verts
+              idx
+              (- (* (/ (convert i float) (convert grid_size float)) 2.0) 1.0))
+       (pset! arrows_verts
+              (+ idx 1)
+              (- (* (/ (convert j float) (convert grid_size float)) 2.0) 1.0))))))
 
-(bind-val vbo VBO*)
-(bind-val vao VAO*)
+;; (call-as-xtlang
+;;  (doloop (i 10)
+;;    (printf "%f %f %f %f\n"
+;;            (convert (pref arrows_verts (+ (* i 4) 0)) double)
+;;            (convert (pref arrows_verts (+ (* i 4) 1)) double)
+;;            (convert (pref arrows_verts (+ (* i 4) 2)) double)
+;;            (convert (pref arrows_verts (+ (* i 4) 3)) double)))
+;;  (println))
+
+(bind-func arrows_set_head_vert
+  (lambda (x y headxval headyval)
+    (let ((idx (* (+ (* x grid_size) y) 4)))
+      (pset! arrows_verts
+             (+ idx 2)
+             (+ (pref arrows_verts idx) headxval))
+      (pset! arrows_verts
+             (+ idx 3)
+             (+ (pref arrows_verts (+ idx 1)) headyval)))))
+
+(bind-func arrows_clockspin_heads
+  (lambda (mag off)
+    (doloop (i grid_size)
+      (doloop (j grid_size)
+        (arrows_set_head_vert i j
+                              (* mag (sin off))
+                              (* mag (cos off)))))))
+
+(bind-val arrows_vbo VBO*)
+(bind-val arrows_vao VAO*)
 
 ;; init
 (call-as-xtlang
- (set! vbo (create_vbo vertices (convert (* 4 num_arrows))))
- (bind_vbo vbo)
- (set! vao (create_vao))
- (bind_attribute vao vbo 0 2 0 0)
+ (set! arrows_vbo (create_vbo arrows_verts (convert (* 4 num_arrows))))
+ (set! arrows_vao (create_vao))
+ (bind_vbo arrows_vbo)
+ (bind_attribute arrows_vao arrows_vbo 0 2 0 0)
  void)
 
 (define *arrows-shader*
   (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
                  (file->string "examples/external/shader-tutorials/arrows.frag")))
 
-(bind-func gl_draw
+(bind-func gl_draw_arrows
   (lambda (program)
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-    (glBufferSubData GL_ARRAY_BUFFER 0 (VBO_size vbo) (VBO_data vbo))
+    (glClear GL_COLOR_BUFFER_BIT)
+    (glBufferSubData GL_ARRAY_BUFFER 0 (VBO_size arrows_vbo) (VBO_data arrows_vbo))
     (glUseProgram program)
-    (draw_vertex_array vao GL_LINES 0 (* 2 (convert num_arrows)))
+    (draw_vertex_array arrows_vao GL_LINES 0 (* 4 (convert num_arrows)))
     void))
-
-;; draw once
-(begin
-  (gl_draw *arrows-shader*)
-  (gl:swap-buffers *gl-window*))
-
 
 (define gl-loop
   (lambda (time delta-t)
-    (munge_points 64 64
-                  (+ .01 (* .01 (cos (* .1 2pi (/ time 44100.)))))
-                  (+ .01 (* .01 (cos (* .1 2pi .7 (/ time 44100.))))))
-    (gl_draw *arrows-shader*)
+    (arrows_clockspin_heads (* (cos (* .00001 time)) .02) (* time 0.0006))
+    (gl_draw_arrows *arrows-shader*)
     (gl:swap-buffers *gl-window*)
     ;; (println 'time: time)
     (callback (+ time (* *second* delta-t) 0.5)
@@ -69,4 +90,5 @@
               (+ time (* *second* delta-t)) 
               delta-t)))
 
+;; begin the draw loop
 (gl-loop (now) 1/30)
