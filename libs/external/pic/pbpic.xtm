@@ -475,14 +475,14 @@ Field Energies:\n")
 (define *num-loops* (call-as-xtlang nloop))
 
 (define run-pbpic
-  (lambda (delta-t)
+  (lambda ()
     (let ((ntime (pbpic_step)))
-      (println 'ntime: ntime)
+      ;; (println 'ntime: ntime)
       ;; (gl_draw_particles (pbpic_step.nx))
       ;; (gl:swap-buffers *gl-ctx*)
-      (if (< ntime *num-loops*)
-          (callback (now)
-                    'run-pbpic
-                    delta-t)
-          (pbpic_print_energies ntime)))))
+      (callback (now) 'run-pbpic))))
 
+;; graphics
+
+(if (and #t (= (call-as-xtlang kstrt) 1))
+    (sys:load "examples/external/shader-tutorials/pbpic-visuals.xtm"))
