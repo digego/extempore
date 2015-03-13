@@ -126,7 +126,8 @@
     (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
     (gl_print_error "Error binding VBO")
     (glBufferSubData GL_ARRAY_BUFFER 0 (VBO_size vbo) (VBO_data vbo))
-    (gl_print_error "Error updating VBO subdata")))
+    (gl_print_error "Error updating VBO subdata")
+    (glBindBuffer GL_ARRAY_BUFFER 0)))
 
 (bind-func delete_vbo
   (lambda (vbo:VBO*)
@@ -169,12 +170,13 @@
   (lambda (vao:VAO* vbo:VBO* index size stride offset)
     (glBindVertexArray (VAO_id vao))
     (gl_print_error "Error binding VAO")
-    (glEnableVertexAttribArray index)
-    (gl_print_error "Error enabling VAO attribute")
     (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
     (gl_print_error "Error binding VBO")
     (glVertexAttribPointer index size (VBO_type vbo) GL_FALSE stride (pref-ptr (cast null GLvoid*) offset))
-    (gl_print_error "Error binding VAO attribute")))
+    (gl_print_error "Error binding VAO attribute")
+    (glEnableVertexAttribArray index)
+    (gl_print_error "Error enabling VAO attribute")
+    (glBindVertexArray 0)))
 
 (bind-func bind_attribute_packed
   (lambda (vao vbo index size)
@@ -188,7 +190,8 @@
     (glBindVertexArray (VAO_id vao))
     (gl_print_error "Error binding vertex array")
     (glDrawArrays draw_mode first_element count)
-    (gl_print_error "Error drawing vertex array")))
+    (gl_print_error "Error drawing vertex array")
+    (glBindVertexArray 0)))
 
 (bind-func delete_vao
   (lambda (vao:VAO*)

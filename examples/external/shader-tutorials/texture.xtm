@@ -8,7 +8,7 @@
 (bind-val vao VAO*)
 
 (bind-func texture_setup
-  (lambda ()
+  (lambda (tex)
     (glActiveTexture GL_TEXTURE0)
     (glBindTexture GL_TEXTURE_2D (Texture_id tex))
     (glTexImage2D GL_TEXTURE_2D
@@ -43,43 +43,22 @@
          -0.5 -0.5    0.0 1.0
           0.5 -0.5    1.0 1.0)
  (set! vbo (create_vbo fullscreen_quad_vert_data 16))
- (bind_vbo vbo)
  (set! vao (create_vao))
  (bind_attribute vao vbo 0 2 16 0) ;; position
  (bind_attribute vao vbo 1 2 16 8) ;; tex_coord
  (set! tex (create_texture))
- (texture_setup)
+ (texture_setup tex)
  void)
 
 (bind-func gl_draw
   (lambda (program)
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-    ;; update texture
-    ;; (glTexSubImage2D GL_TEXTURE_2D 0 0 0
-    ;;                  4 2
-    ;;                  GL_RED
-    ;;                  GL_FLOAT
-    ;;                  (convert texture_data))
+    (glClear GL_COLOR_BUFFER_BIT)
     ;; draw the world
     (let ((texloc (glGetUniformLocation program "tex")))
       (glUseProgram program)
       (glUniform1i texloc 0))
     (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
     void))
-
-(define gl-loop
-  (lambda (time delta-t)
-    (let ((late-by (- (now) time))
-          (next-frame-time (+ time (* *second* delta-t))))
-      (if (> late-by 0)
-          (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
-          (begin
-            (gl_draw *texture-shader*)
-            (gl:swap-buffers *gl-window*)))
-      (callback (* 0.9 next-frame-time)
-                'gl-loop
-                next-frame-time
-                delta-t))))
 
 ;; run once
 (begin

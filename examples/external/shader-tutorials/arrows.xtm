@@ -1,9 +1,5 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
-(call-as-xtlang
- (glEnable GL_DEPTH_TEST)
- (glDepthFunc GL_LESS))
-
 (bind-val grid_size i64 64)
 (bind-val num_arrows i64 (real->integer (expt (call-as-xtlang grid_size) 2)))
 
@@ -63,8 +59,7 @@
 (call-as-xtlang
  (set! arrows_vbo (create_vbo arrows_verts (convert (* 4 num_arrows))))
  (set! arrows_vao (create_vao))
- (bind_vbo arrows_vbo)
- (bind_attribute arrows_vao arrows_vbo 0 2 0 0)
+ (bind_attribute arrows_vao arrows_vbo 0 2)
  void)
 
 (define *arrows-shader*
@@ -81,7 +76,7 @@
 
 (define gl-loop
   (lambda (time delta-t)
-    (arrows_clockspin_heads (* (cos (* .00001 time)) .02) (* time 0.0006))
+    (arrows_clockspin_heads (* (cos (* .00001 time)) .05) (* time 0.0002))
     (gl_draw_arrows *arrows-shader*)
     (gl:swap-buffers *gl-window*)
     ;; (println 'time: time)

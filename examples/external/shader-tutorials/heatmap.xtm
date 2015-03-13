@@ -1,12 +1,5 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
-(bind-func gl_set_depth_test
-  (lambda ()
-    (glEnable GL_DEPTH_TEST)
-    (glDepthFunc GL_LESS)))
-
-(gl_set_depth_test)
-
 (bind-val fullscreen_quad_vert_data float* 8)
 
 (bind-val vbo VBO*)
@@ -21,14 +14,13 @@
          -1.0 -1.0
           1.0 -1.0)
  (set! vbo (create_vbo fullscreen_quad_vert_data 16))
- (bind_vbo vbo)
  (set! vao (create_vao))
  (bind_attribute vao vbo 0 2 8 0)
  void)
 
 (bind-func gl_draw
   (lambda (program)
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    (glClear GL_COLOR_BUFFER_BIT)
     (glUseProgram program)
     (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
     void))
