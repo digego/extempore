@@ -158,11 +158,13 @@
 (call-as-xtlang
  (cppinit2 idproc_ptr nvp_ptr 0 null)
  (set! kstrt (+ (pref idproc_ptr 0) 1))
- (if (> (pref nvp_ptr 0) ny)
+ (if (> nvp ny)
      (begin
        (if (= kstrt 1)
-           (printf "Too many processors requested: ny nvp=%d %d\n" ny (pref nvp_ptr 0)))
+           (printf "Too many processors requested: ny nvp=%d %d\n" ny nvp))
        (cppexit))))
+
+(bind-val nvp i32 (call-as-xtlang (pref nvp_ptr 0)))
 
 ;; initialize data for MPI code
 (bind-val edges float* (call-as-xtlang idps))
@@ -174,20 +176,20 @@
 ;; nypmn = minimum value of nyp                                       
 
 (call-as-xtlang 
- (cpdicomp2l edges nyp_ptr noff_ptr nypmx_ptr nypmn_ptr ny kstrt (pref nvp_ptr 0) idps)
+ (cpdicomp2l edges nyp_ptr noff_ptr nypmx_ptr nypmn_ptr ny kstrt nvp idps)
  (if (< (pref nypmn_ptr 0) 1)
      (begin
        (if (= kstrt 1)
-           (printf "combination not supported nvp ny = %d %d\n" (pref nvp_ptr 0) ny))
+           (printf "combination not supported nvp ny = %d %d\n" nvp ny))
        (cppexit))))
 
 ;; initialize additional scalars for MPI code
 ;; kxp = number of complex grids in each field partition in x direction
-(bind-val kxp i32 (call-as-xtlang (+ (/ (- nxh 1) (pref nvp_ptr 0)) 1)))
+(bind-val kxp i32 (call-as-xtlang (+ (/ (- nxh 1) nvp) 1)))
 ;; kyp = number of complex grids in each field partition in y direction
-(bind-val kyp i32 (call-as-xtlang (+ (/ (- ny 1) (pref nvp_ptr 0)) 1)))
+(bind-val kyp i32 (call-as-xtlang (+ (/ (- ny 1) nvp) 1)))
 ;; npmax = maximum number of electrons in each partition
-(bind-val npmax i32 (call-as-xtlang (convert (* (/ np (convert (pref nvp_ptr 0))) 1.25) i32)))
+(bind-val npmax i32 (call-as-xtlang (convert (* (/ np (convert nvp)) 1.25) i32)))
 ;; nbmax = size of buffer for passing particles between processors
 (bind-val nbmax i32 (call-as-xtlang (/ npmax 10)))
 ;; ntmax = size of ihole buffer for particles leaving processor
@@ -289,7 +291,7 @@
     (if (= kstrt 1)
         (begin
           (printf "ntime: %d, relativity: %d\n" ntime relativity)
-          (printf "MPI nodes nvp = %i\n" (pref nvp_ptr 0))
+          (printf "MPI nodes nvp = %i\n" nvp)
           (set! wt (+ (pref we_ptr 0) (pref wf_ptr 0) (pref wm_ptr 0)))
           (printf "Total Field Kinetic and Total Energies:\n")
           (printf "%e %e %e\n"
@@ -326,7 +328,7 @@ Field Energies:\n")
           (cppexit)))
 
     ;; move electrons into appropriate spatial regions: updates part, (pref npp_ptr 0)
-    (cppmove2 part edges npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt (pref nvp_ptr 0) idimp npmax idps nbmax ntmax info)
+    (cppmove2 part edges npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt nvp idimp npmax idps nbmax ntmax info)
     ;; check for particle manager error
     (if (<> (pref info 0) 0)
         (begin
@@ -341,19 +343,19 @@ Field Energies:\n")
 
     ;; add guard cells with standard procedure: updates cue, qe
     (cppacguard2xl cue (pref nyp_ptr 0) nx ndim nxe (pref nypmx_ptr 0))
-    (cppnacguard2l cue scr (pref nyp_ptr 0) nx ndim kstrt (pref nvp_ptr 0) nxe (pref nypmx_ptr 0))
+    (cppnacguard2l cue scr (pref nyp_ptr 0) nx ndim kstrt nvp nxe (pref nypmx_ptr 0))
     (cppaguard2xl qe (pref nyp_ptr 0) nx nxe (pref nypmx_ptr 0))
-    (cppnaguard2l qe scr (pref nyp_ptr 0) nx kstrt (pref nvp_ptr 0) nxe (pref nypmx_ptr 0))
+    (cppnaguard2l qe scr (pref nyp_ptr 0) nx kstrt nvp nxe (pref nypmx_ptr 0))
 
     ;; transform charge to fourier space with standard procedure: updates qt
     ;; modifies qe
     (set! isign -1:i32)
-    (cwppfft2r (convert qe) qt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt (pref nvp_ptr 0) nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
+    (cwppfft2r (convert qe) qt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt nvp nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
 
     ;; transform current to fourier space with standard procedure: updates cut
     ;; modifies cue
     (set! isign -1:i32)
-    (cwppfft2r3 (convert cue) cut bs br isign ntpose mixup sct ttp_ptr indx indy kstrt (pref nvp_ptr 0) nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
+    (cwppfft2r3 (convert cue) cut bs br isign ntpose mixup sct ttp_ptr indx indy kstrt nvp nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
 
     ;; take transverse part of current with standard procedure: updates cut
     ;; modifies cue
@@ -385,17 +387,17 @@ Field Energies:\n")
     ;; transform force to real space with standard procedure: updates fxyze
     ;; modifies fxyt
     (set! isign 1:i32)
-    (cwppfft2r3 (convert fxyze) fxyt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt (pref nvp_ptr 0) nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
+    (cwppfft2r3 (convert fxyze) fxyt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt nvp nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
 
     ;; transform magnetic field to real space with standard procedure:
     ;; updates bxyze, modifies bxyt
     (set! isign 1:i32)
-    (cwppfft2r3 (convert bxyze) bxyt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt (pref nvp_ptr 0) nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
+    (cwppfft2r3 (convert bxyze) bxyt bs br isign ntpose mixup sct ttp_ptr indx indy kstrt nvp nxeh nye kxp kyp (pref nypmx_ptr 0) nxhy nxyh)
 
     ;; copy guard cells with standard procedure: updates fxyze, bxyze
-    (cppncguard2l fxyze (pref nyp_ptr 0) kstrt (pref nvp_ptr 0) nnxe (pref nypmx_ptr 0))
+    (cppncguard2l fxyze (pref nyp_ptr 0) kstrt nvp nnxe (pref nypmx_ptr 0))
     (cppcguard2xl fxyze (pref nyp_ptr 0) nx ndim nxe (pref nypmx_ptr 0))
-    (cppncguard2l bxyze (pref nyp_ptr 0) kstrt (pref nvp_ptr 0) nnxe (pref nypmx_ptr 0))
+    (cppncguard2l bxyze (pref nyp_ptr 0) kstrt nvp nnxe (pref nypmx_ptr 0))
     (cppcguard2xl bxyze (pref nyp_ptr 0) nx ndim nxe (pref nypmx_ptr 0))
 
     ;; push particles: updates part, wke, and ihole
@@ -415,7 +417,7 @@ Field Energies:\n")
           (cppexit)))
 
     ;; move electrons into appropriate spatial regions: updates part, (pref npp_ptr 0)
-    (cppmove2 part edges npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt (pref nvp_ptr 0) idimp npmax idps nbmax ntmax info)
+    (cppmove2 part edges npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt nvp idimp npmax idps nbmax ntmax info)
     ;; check for particle manager error
     (if (<> (pref info 0) 0)
         (begin
