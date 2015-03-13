@@ -1,7 +1,8 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
-(bind-val grid_size i64 64)
-(bind-val num_arrows i64 (real->integer (expt (call-as-xtlang grid_size) 2)))
+(bind-val grid_size_x i64 32)
+(bind-val grid_size_y i64 8)
+(bind-val num_arrows i64 (call-as-xtlang (* grid_size_x grid_size_y)))
 
 ;; this will be 'vec2's, in pairs - arrow base, arrow head. so the
 ;; streaming update only needs to update the `head' vert (assuming the
@@ -15,15 +16,15 @@
 ;; set base verts (i.e. every second vec2) to regular grid
 (call-as-xtlang
  (let ((idx 0))
-   (doloop (i grid_size)
-     (doloop (j grid_size)     
-       (set! idx (* (+ (* i grid_size) j) 4))
+   (doloop (i grid_size_x)
+     (doloop (j grid_size_y)     
+       (set! idx (* (+ (* i grid_size_y) j) 4))
        (pset! arrows_verts
               idx
-              (- (* (/ (convert i float) (convert grid_size float)) 2.0) 1.0))
+              (- (* (/ (convert i float) (convert grid_size_x float)) 2.0) 1.0))
        (pset! arrows_verts
               (+ idx 1)
-              (- (* (/ (convert j float) (convert grid_size float)) 2.0) 1.0))))))
+              (- (* (/ (convert j float) (convert grid_size_y float)) 2.0) 1.0))))))
 
 ;; (call-as-xtlang
 ;;  (doloop (i 10)
@@ -36,7 +37,7 @@
 
 (bind-func arrows_set_head_vert
   (lambda (x y headxval headyval)
-    (let ((idx (* (+ (* x grid_size) y) 4)))
+    (let ((idx (* (+ (* x grid_size_y) y) 4)))
       (pset! arrows_verts
              (+ idx 2)
              (+ (pref arrows_verts idx) headxval))
@@ -46,8 +47,8 @@
 
 (bind-func arrows_clockspin_heads
   (lambda (mag off)
-    (doloop (i grid_size)
-      (doloop (j grid_size)
+    (doloop (i grid_size_x)
+      (doloop (j grid_size_y)
         (arrows_set_head_vert i j
                               (* mag (sin off))
                               (* mag (cos off)))))))
