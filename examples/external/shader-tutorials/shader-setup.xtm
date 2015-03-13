@@ -176,7 +176,13 @@
     (gl_print_error "Error binding VAO")
     (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
     (gl_print_error "Error binding VBO")
-    (glVertexAttribPointer index size (VBO_type vbo) GL_FALSE stride (pref-ptr (cast null GLvoid*) offset))
+    (let ((component_size 4)) ;; for for GL_FLOAT and GL_INT
+      (glVertexAttribPointer index
+                             size
+                             (VBO_type vbo)
+                             GL_FALSE
+                             (* component_size stride)
+                             (pref-ptr (cast null GLvoid*) (* component_size offset))))
     (gl_print_error "Error binding VAO attribute")
     (glEnableVertexAttribArray index)
     (gl_print_error "Error enabling VAO attribute")
