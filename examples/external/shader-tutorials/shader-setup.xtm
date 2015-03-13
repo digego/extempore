@@ -94,9 +94,10 @@
               GL_FLOAT
               (* buflen 4) ;; sizeof(float)
               (cast buf GLvoid*))
-      (printf "Created ")
-      (print_VBO vbo)
-      (printf "\n")
+      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
+      (gl_print_error "Error setting VBO data")
+      (printf "Created ") (print_VBO vbo) (printf "\n")
       vbo)))
 
 (bind-func create_vbo_i32
@@ -110,20 +111,14 @@
               GL_INT
               (* buflen 4) ;; sizeof(float)
               (cast buf GLvoid*))
-      (printf "Created ")
-      (print_VBO vbo)
-      (printf "\n")
+      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
+      (gl_print_error "Error setting VBO data")
+      (printf "Created ") (print_VBO vbo) (printf "\n")
       vbo)))
 
 (bind-poly create_vbo create_vbo_float)
 (bind-poly create_vbo create_vbo_i32)
-
-(bind-func bind_vbo
-  (lambda (vbo:VBO*)
-    (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-    (gl_print_error "Error binding VBO")
-    (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
-    (gl_print_error "Error setting VBO data")))
 
 (bind-func update_vbo
   "update the full buffer"
