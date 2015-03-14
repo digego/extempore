@@ -21,9 +21,9 @@
 
 ;;; Code:
 
-(sys:load "libs/math.xtm")
+(sys:load "libs/core/math.xtm")
 ;; (sys:load "libs/external/shaders.xtm")
-;; (sys:load "libs/external/mpi/mpi.xtm")
+(sys:load "libs/external/mpi/mpi.xtm")
 
 ;; set up the current dylib name and path (for precompilation)
 (sys:precomp:set-dylib-name-info
@@ -233,6 +233,12 @@
 (bind-val part float* (* *idimp* *npmax*))
 (bind-val part2 float* (* *idimp* *npmax*))
 (bind-val tpart float*) ;; tmp ptr (for ptr swaps)
+;; allocate memory for *all* the particles (or at least a
+;; subset) for visualisation on head node
+(bind-val part_all float* (call-as-xtlang
+                           (if (= kstrt 1)
+                               (* nvp idimp npmax)
+                               0:i32)))
 ;; qe = electron charge density with guard cells
 (bind-val qe float* (* *nxe* *nypmx*))
 ;; cue = electron current density with guard cells
@@ -476,6 +482,20 @@ Field Energies:\n")
     (pset! we_ptr 0 (pref wtot 4))
     (pset! wf_ptr 0 (pref wtot 5))
     (pset! wm_ptr 0 (pref wtot 6))
+
+    ;; gather the particles (or a subset) to the head node for visualisation
+    (if (<>
+         (MPI_Gather (convert part i8*) ;; gather particle data
+                     (* npmax idimp) ;; num particles * floats-per-particle
+                     MPI_FLOAT
+                     (convert part_all i8*) ;; recv buffer on root node
+                     (* npmax idimp) ;; num particles * floats-per-particle
+                     MPI_FLOAT
+                     0 ;; root
+                     MPI_COMM_WORLD)
+         0)
+        (println "MPI_Gather error."))
+
     (if (= ntime 0)
         (if (= kstrt 1)
             ;; this could be replaced by a call to
@@ -510,7 +530,7 @@ Field Energies:\n")
       ;; (gl:swap-buffers *gl-ctx*)
       (callback (now) 'run-pbpic))))
 
-;; graphics
+;; visualisation (root node only)
 
 (if (and #t (= (call-as-xtlang kstrt) 1))
     (sys:load "examples/external/shader-tutorials/pbpic-visuals.xtm"))
