@@ -39,9 +39,19 @@
               (- (* (/ (convert j float) (convert ny float)) 2.0) 1.0))))))
 
 (bind-func copy_field_xy_to_arrows_buffer
-  (lambda (field:float* scale_factor)
+  (lambda (field:float* scale_factor:float)
     (let ((field_arrows_idx 0)
-          (field_idx 0))
+          (field_idx 0)
+          (max_length 0.0))
+      (doloop (k (* nxe ny))
+        (set! field_idx (* k ndim))
+        (if (> (pref field field_idx) max_length)
+            (set! max_length
+                  (pref field field_idx)))
+        (if (> (pref field (+ field_idx 1)) max_length)
+            (set! max_length
+                  (pref field (+ field_idx 1)))))
+      (set! scale_factor (* scale_factor (/ 1.0 max_length)))
       (doloop (i nx)
         (doloop (j ny)
           (set! field_arrows_idx (* (+ (* i nx) j) 4))
@@ -134,4 +144,4 @@
               delta-t)))
 
 ;; start it running
-(gl-loop 1/20)
+(gl-loop 1/30)
