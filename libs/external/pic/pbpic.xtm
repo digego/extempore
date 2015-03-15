@@ -523,12 +523,13 @@ Field Energies:\n")
 ;; (define *num-loops* (call-as-xtlang nloop))
 
 (define run-pbpic
-  (lambda ()
-    (let ((ntime (pbpic_step)))
-      ;; (println 'ntime: ntime)
-      ;; (gl_draw_particles (pbpic_step.nx))
-      ;; (gl:swap-buffers *gl-ctx*)
-      (callback (now) 'run-pbpic))))
+  (lambda (time delta-t)
+    (pbpic_step)
+    (let ((next-time (max (+ time (* *second* delta-t)) (now))))
+      (callback next-time
+                'run-pbpic
+                next-time
+                delta-t))))
 
 ;; visualisation (root node only)
 
