@@ -44,24 +44,26 @@
     (afill! clear_color 0.0 0.0 0.0 1.0)
     (xtm_paint_set_fill fill fill_color)
     (xtm_paint_set_stroke stroke stroke_color 10.)
+    (xtm_add_ellipse path 0.0 0.0 50. 50.)
     (lambda (frame shader m v p data)
       (let ((i:float 0.0))
         (xtm_vg_reset_matrices)
         (xtm_vg_clear (convert width) (convert height) clear_color)
-        ;; create the path (using the add_circle closure)
+        (vgLoadIdentity)        
+        (if (null? image) void (vgDrawImage image))        
+        (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)        
         (dotimes (i 200.0)
-          (xtm_add_ellipse
-           path
+          (vgLoadIdentity)
+          (vgTranslate
            (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (convert frame)))))
-           (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (convert frame)))))
-           30.
-           30.))
-        ;; draw the image
-        (if (null? image) void (vgDrawImage image))
-        ;; draw the paths
-        (xtm_draw_path_keep path)
-        ;; cleanup
-        (xtm_clear_path path)
+           (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (convert frame))))))
+          ;; (xtm_path_translate
+          ;;  (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (convert frame)))))
+          ;;  (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (convert frame))))))
+          (afill! fill_color (/ i 200.0) 0.0 (- 1.0 (/ i 200.0)) 0.5)
+          (xtm_paint_set_fill fill fill_color)
+          (vgDrawPath path VG_FILL_PATH))
+        ;; (xtm_clear_path path)
         (xtm_vg_print_error)
         void))))
 
