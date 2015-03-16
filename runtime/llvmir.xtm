@@ -1776,6 +1776,45 @@
                    (else *impc:ir:badtype*))) ;; (error) (print-error 'Compiler 'Error: 'Unknown 'complex 'type type))))
             (else type))))
 
+(define impc:ir:get-alignment
+  (lambda (t)
+    (cond ((impc:ir:pointer? t) (/ (sys:pointer-size) 8))
+          ((impc:ir:array? t) (impc:ir:get-type-size (caddr t))) ;; align to array element type
+          ((impc:ir:vector? t) (impc:ir:get-type-size t)) ;; align to full size of vector
+          ((or  ;; tuples align to their largest internal aligment
+            (impc:ir:closure? t)
+            (impc:ir:tuple? t))
+           (apply max (map (lambda (tt) (impc:ir:get-alignment tt)) (cdr t))))
+          (else ;; for scalars it's just their size in bytes
+           (impc:ir:get-type-size t)))))
+
+(define impc:ir:get-tuple-type-size
+  (lambda (type)
+    (let ((t (impc:ir:get-type-from-str (impc:ir:get-type-str type))))
+      ;; if tuple is pointer return pointer-size
+      (if (> (car t) *impc:ir:pointer*) (/ (sys:pointer-size) 8)
+          ;; otherwise
+          (let ((et '()) ;; element type
+                (size 0)
+                (largest 0)
+                (align 0)
+                (offset 0)
+                (this_size 0)                
+                (elmts (- (length t) 1)))
+            (dotimes (i elmts)
+              (set! et (list-ref t (+ i 1)))
+              (set! this_size (impc:ir:get-type-size et))
+              (set! align (impc:ir:get-alignment et))
+              (if (> align largest) (set! largest align))              
+              (set! offset (modulo size align))
+              (if (> offset 0) (- align offset))
+              (set! size (+ size this_size offset)))
+            ;; finally the whole struct should be aligned
+            ;; to the largest internal aligment
+            (if (> (modulo size largest) 0)
+                (set! size (+ size (- largest (modulo size largest)))))
+            size)))))
+
 
 (define impc:ir:get-type-size
    (lambda (type)
