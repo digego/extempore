@@ -33,6 +33,10 @@
 (define libstb_image
   (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
 
+;;;;;;;;;;;;;;;;;
+;; stb_image.h ;;
+;;;;;;;;;;;;;;;;;
+
 ;; typedef struct
 ;; {
 ;;    int      (*read)  (void *user,char *data,int size);   ;; fill 'data' with 'size' bytes.  return number of bytes actually read
@@ -119,5 +123,49 @@
 
 (bind-lib libstb_image stbi_zlib_decode_noheader_malloc [i8*,i8*,i32,i32*]*)
 (bind-lib libstb_image stbi_zlib_decode_noheader_buffer [i32,i8*,i32,i8*,i32]*)
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; stb_image_resize.h ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib libstb_image stbir_resize_uint8 [i32,i8*,i32,i32,i32,i8*,i32,i32,i32,i32]*)
+
+(bind-lib libstb_image stbir_resize_float [i32,float*,i32,i32,i32,float*,i32,i32,i32,i32]*)
+
+;; The following functions interpret image data as gamma-corrected sRGB. 
+;; Specify STBIR_ALPHA_CHANNEL_NONE if you have no alpha channel,
+;; or otherwise provide the index of the alpha channel. Flags value
+;; of 0 will probably do the right thing if you're not sure what
+;; the flags mean.
+
+(bind-val STBIR_ALPHA_CHANNEL_NONE i32 -1)
+
+;; Set this flag if your texture has premultiplied alpha. Otherwise, stbir will
+;; use alpha-weighted resampling (effectively premultiplying, resampling,
+;; then unpremultiplying).
+(bind-val STBIR_FLAG_ALPHA_PREMULTIPLIED i32 1)
+;; The specified alpha channel should be handled as gamma-corrected value even
+;; when doing sRGB operations.
+(bind-val STBIR_FLAG_ALPHA_USES_COLORSPACE i32 2)
+
+(bind-lib libstb_image stbir_resize_uint8_srgb [i32,i8*,i32,i32,i32,i8*,i32,i32,i32,i32,i32,i32]*)
+
+(bind-alias stbir_edge enum)
+(bind-val STBIR_EDGE_CLAMP   stbir_edge 1)
+(bind-val STBIR_EDGE_REFLECT stbir_edge 2)
+(bind-val STBIR_EDGE_WRAP    stbir_edge 3)
+(bind-val STBIR_EDGE_ZERO    stbir_edge 4)
+
+;; This function adds the ability to specify how requests to sample off the edge of the image are handled.
+(bind-lib libstb_image stbir_resize_uint8_srgb_edgemode [i32,i8*,i32,i32,i32,i8*,i32,i32,i32,i32,i32,i32,stbir_edge]*)
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; stb_image_write.h ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib libstb_image stbi_write_png [i32,i8*,i32,i32,i32,i8*,i32]*)
+(bind-lib libstb_image stbi_write_bmp [i32,i8*,i32,i32,i32,i8*]*)
+(bind-lib libstb_image stbi_write_tga [i32,i8*,i32,i32,i32,i8*]*)
+(bind-lib libstb_image stbi_write_hdr [i32,i8*,i32,i32,i32,float*]*)
 
 (define *xtmlib-stb_image-loaded* #t)
