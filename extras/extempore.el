@@ -2374,7 +2374,7 @@ If you don't want to be prompted for this name each time, set the
   (while (re-search-forward (format "^%s[ ]?\\(?:const \\|unsigned \\|extern \\)*\\([\\*[:word:]_]*\\) \\([\\*[:word:]_]*\\)[ ]?(\\(\\(?:.\\|\n\\)*?\\))"
                                     (if (string= ignore-tokens "")
                                         ""
-                                      (concat (regexp-opt (split-string ignore-tokens " " t) "?"))))
+                                      (concat (regexp-opt (split-string ignore-tokens " " t)) "?")))
                             nil
                             t)
     (if (not (looking-back ";;.*" (line-beginning-position)))
