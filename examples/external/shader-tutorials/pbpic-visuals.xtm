@@ -42,7 +42,7 @@
   (lambda (field:float* scale_factor:float)
     (let ((field_arrows_idx 0)
           (field_idx 0)
-          (max_length .25))
+          (max_length 0.))
       ;; (doloop (k (* nxe ny))
       ;;   (set! field_idx (* k ndim))
       ;;   (if (> (pref field field_idx) max_length)
@@ -51,7 +51,8 @@
       ;;   (if (> (pref field (+ field_idx 1)) max_length)
       ;;       (set! max_length
       ;;             (pref field (+ field_idx 1)))))
-      (set! scale_factor (* scale_factor (/ 1.0 max_length)))
+      ;; (if (> max_length 0.25)
+      ;;     (set! scale_factor (* 0.25 (/ 1.0 max_length))))
       (doloop (i nx)
         (doloop (j ny)
           (set! field_arrows_idx (* (+ (* i nx) j) 4))
@@ -59,15 +60,11 @@
           (pset! field_arrows ;; x component
                  (+ field_arrows_idx 2)
                  (+ (pref field_arrows field_arrows_idx)
-                    (if (< (* scale_factor (pref field field_idx)) max_length)
-                        (* scale_factor (pref field field_idx))
-                        max_length)))
+                    (* scale_factor (pref field field_idx))))
           (pset! field_arrows ;; x component
                  (+ field_arrows_idx 3)
                  (+ (pref field_arrows (+ field_arrows_idx 1))
-                    (if (< (* scale_factor (pref field (+ field_idx 1))) max_length)
-                        (* scale_factor (pref field (+ field_idx 1)))
-                        max_length))))))))
+                    (* scale_factor (pref field (+ field_idx 1))))))))))
 
 ;; not sure why fxyze tends to get massive (junk) numbers in it, but
 ;; this hack cleans them out.
@@ -113,7 +110,7 @@
 
 (bind-func gl_draw_field
   (lambda (program)
-    (copy_field_xy_to_arrows_buffer fxyze .02)
+    (copy_field_xy_to_arrows_buffer fxyze .1)
     ;; (remove_guff_from_arrows_buffer)
     (update_vbo_data field_vbo)
     (glUseProgram program)
