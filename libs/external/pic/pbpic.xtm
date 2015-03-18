@@ -244,10 +244,10 @@
 ;; cue = electron current density with guard cells
 ;; fxyze/g_bxyze = smoothed electric/magnetic field with guard cells
 (bind-val fxyze float* (* *ndim* *nxe* *nypmx*))
-(bind-val fxyze_all float* (call-as-xtlang
-                            (if (= kstrt 1)
-                                (* nvp ndim nxe (pref nypmx_ptr 0))
-                                0:i32)))
+;; (bind-val fxyze_all float* (call-as-xtlang
+;;                             (if (= kstrt 1)
+;;                                 (* nvp ndim nxe (pref nypmx_ptr 0))
+;;                                 0:i32)))
 (bind-val cue float* (* *ndim* (* *nxe* *nypmx*)))
 (bind-val bxyze float* (* *ndim* (* *nxe* *nypmx*)))
 ;; exyz/bxyz = transverse electric/magnetic field in fourier space
@@ -496,17 +496,17 @@ Field Energies:\n")
     ;; for visualisation
 
     ;; gather the fields (fxyze)
-    (if (<>
-         (MPI_Gather (convert fxyze i8*) ;; gather field data
-                     (* nxe ny ndim) ;; field size * floats-per-field-component
-                     MPI_FLOAT
-                     (convert fxyze_all i8*) ;; recv buffer on root node
-                     (* nxe ny ndim) ;; num particles * floats-per-particle
-                     MPI_FLOAT
-                     0 ;; root
-                     MPI_COMM_WORLD)
-         0)
-        (println "MPI_Gather fields error."))
+    ;; (if (<>
+    ;;      (MPI_Gather (convert fxyze i8*) ;; gather field data
+    ;;                  (* nxe ny ndim) ;; field size * floats-per-field-component
+    ;;                  MPI_FLOAT
+    ;;                  (convert fxyze_all i8*) ;; recv buffer on root node
+    ;;                  (* nxe ny ndim) ;; num particles * floats-per-particle
+    ;;                  MPI_FLOAT
+    ;;                  0 ;; root
+    ;;                  MPI_COMM_WORLD)
+    ;;      0)
+    ;;     (println "MPI_Gather fields error."))
 
     ;; gather the particles
     (if (<>
