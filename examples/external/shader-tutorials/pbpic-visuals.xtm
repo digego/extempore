@@ -134,15 +134,25 @@
   (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)))
 
+(define *draw-particles* #t)
+(define *draw-field* #t)
+
 (define gl-loop
   (lambda (delta-t)
     (gl_clear_colour_buffer)
-    (gl_draw_particles *particle-shader*)
-    (gl_draw_field *field-shader*)
+    (if *draw-particles* (gl_draw_particles *particle-shader*))
+    (if *draw-field* (gl_draw_field *field-shader*))
     (gl:swap-buffers *gl-window*)
     (callback (+ (now) (* *second* delta-t))
               'gl-loop
               delta-t)))
 
+;; (ipc:bind-func "utility" 'gl_clear_colour_buffer)
+;; (ipc:define "utility" '*particle-shader* *particle-shader*)
+;; (ipc:bind-func "utility" 'gl_draw_particles)
+;; (ipc:define "utility" '*field-shader* *field-shader*)
+;; (ipc:bind-func "utility" 'gl_draw_field)
+
 ;; start it running
 (gl-loop 1/30)
+
