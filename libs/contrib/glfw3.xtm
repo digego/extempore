@@ -3194,15 +3194,25 @@
     (printf "%s\n" (glfwGetVersionString))))
 
 (bind-func glfw_create_fullscreen_window
+  "creates a windowed fullscreen window (i.e. doesn't change video mode)"
   (lambda ()
     (let ((monitor (glfwGetPrimaryMonitor))
           (vidmode (glfwGetVideoMode monitor))
           (width (tref vidmode 0))
-          (height (tref vidmode 1)))
-      (glfwCreateWindow width height
-                        "Extempore OpenGL Window"
-                        monitor
-                        null))))
+          (height (tref vidmode 1))
+          (res:GLFWwindow* null))
+      (println "width:" width "height:" height)
+      ;; (glfwWindowHint GLFW_RED_BITS (tref vidmode 2))
+      ;; (glfwWindowHint GLFW_GREEN_BITS (tref vidmode 3))
+      ;; (glfwWindowHint GLFW_BLUE_BITS (tref vidmode 4))
+      ;; (glfwWindowHint GLFW_REFRESH_RATE (tref vidmode 5))
+      (glfwWindowHint GLFW_DECORATED 0)
+      (set! res (glfwCreateWindow width height
+                                  "Extempore OpenGL Window"
+                                  null
+                                  null))
+      (glfwSetWindowPos res 0 0)
+      res)))
 
 (bind-func glfw_create_window
   (lambda (width height)
