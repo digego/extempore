@@ -1,0 +1,59 @@
+(sys:load "examples/external/shader-tutorials/shader-setup.xtm")
+(sys:load "libs/contrib/glfw3.xtm")
+
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_osx_core_profile)
+ ;; (set! window (glfw_create_window 640 480)) 
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
+
+(bind-val fullscreen_quad_vert_data float* 8)
+
+(bind-val vbo VBO*)
+(bind-val vao VAO*)
+
+;; init
+(call-as-xtlang
+ (pfill! fullscreen_quad_vert_data
+         ;; pos (2D)
+         -1.0  1.0
+          1.0  1.0
+         -1.0 -1.0
+          1.0 -1.0)
+ (set! vbo (create_vbo fullscreen_quad_vert_data 16))
+ (set! vao (create_vao))
+ (bind_attribute vao vbo 0 2 2 0)
+ void)
+
+(bind-func gl_draw
+  (lambda (program)
+    (glClear GL_COLOR_BUFFER_BIT)
+    (let ((resloc (glGetUniformLocation program "iResolution"))
+          (timeloc (glGetUniformLocation program "iGlobalTime"))
+          (rateloc (glGetUniformLocation program "iSampleRate")))
+      (glUseProgram program)
+      (glUniform3f resloc 1920.0 1080.0 1.0)
+      (glUniform1f timeloc (convert (% (clock_clock) 441000.)))
+      (glUniform1f rateloc 44100.0))
+    (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
+    (glfwSwapBuffers window)
+    void))
+
+(define *shader*
+  (create_shader (file->string "examples/external/shader-tutorials/shadertoy.vert")
+                 (file->string "examples/external/shader-tutorials/shadertoy.frag")))
+
+(define shadertoy-loop
+  (lambda (time delta-t)
+    (gl_draw *shader*)
+    (let ((next-time (max (+ time (* *second* delta-t)) (now))))
+      (callback next-time
+                'shadertoy-loop
+                next-time 
+                delta-t))))
+
+(shadertoy-loop (now) 1/30)
