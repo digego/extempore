@@ -1,4 +1,16 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
+(sys:load "libs/contrib/glfw3.xtm")
+
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_osx_core_profile)
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
+
+;; shader stuff
 
 (bind-val triangle_vert_data float* 15)
 
@@ -27,9 +39,8 @@
     (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
     (glUseProgram program)
     (draw_vertex_array vao GL_TRIANGLES 0 3)
+    (glfwSwapBuffers window)
     void))
 
 ;; draw the triangle
-(begin
-  (gl_draw *triangle-shader*)
-  (gl:swap-buffers *gl-window*))
+(gl_draw *triangle-shader*)
