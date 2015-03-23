@@ -13,6 +13,7 @@
 
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
+(bind-val sp ShaderProgram*)
 
 ;; init
 (call-as-xtlang
@@ -28,16 +29,19 @@
  void)
 
 (bind-func gl_draw
-  (lambda (program)
+  (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
-    (glUseProgram program)
+    (glUseProgram (ShaderProgram_id sp))
     (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
     (glfwSwapBuffers window)
     void))
 
-(define *heatmap-shader*
-  (create_shader (file->string "examples/external/shader-tutorials/heatmap.vert")
-                 (file->string "examples/external/shader-tutorials/heatmap.frag")))
+(bind-func create_heatmap_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
+
+(create_heatmap_shader (file->string "examples/external/shader-tutorials/heatmap.vert")
+                       (file->string "examples/external/shader-tutorials/heatmap.frag"))
 
 ;; draw the map
-(gl_draw *heatmap-shader*)
+(gl_draw)

@@ -294,35 +294,136 @@
             (gl_print_error "couldn't bind_image_texture")
             tex)))))
 
-;; this should be in opengl.xtm at some stage
+;; shaders
 
-(bind-func create_geom_shader
+;;                <id    ,type  >
+(bind-type Shader <GLuint,GLenum>)
+(bind-type ShaderProgram <GLuint>)
+
+(bind-func Shader_id
+  (lambda (shader:Shader*)
+    (tref shader 0)))
+
+(bind-func Shader_type
+  (lambda (shader:Shader*)
+    (tref shader 1)))
+
+(bind-func ShaderProgram_id
+  (lambda (program:ShaderProgram*)
+    (tref program 0)))
+
+(bind-func Shader_print_info_log
+  (let ((max_log_length 4096)
+        (logbuf:i8* (zalloc max_log_length)))
+    (lambda (shader:Shader*)
+      (let ((len_ptr (salloc 1 i32)))
+        (glGetShaderInfoLog (Shader_id shader)
+                            max_log_length
+                            len_ptr
+                            logbuf)
+        (printf "%s shader info log: %s\n"
+                (cond ((= (Shader_type shader) GL_VERTEX_SHADER)
+                       "Vert")
+                      ((= (Shader_type shader) GL_FRAGMENT_SHADER)
+                       "Frag")
+                      ((= (Shader_type shader) GL_GEOMETRY_SHADER)
+                       "Geom")
+                      (else ""))
+                (if (= (pref len_ptr 0) 0)
+                    "OK"
+                    logbuf))
+        (if (= (pref len_ptr 0) 0) 0 1)))))
+
+(bind-func ShaderProgram_print_info_log
+  (let ((max_log_length 4096)
+        (logbuf:i8* (zalloc max_log_length)))
+    (lambda (program:ShaderProgram*)
+      (let ((len_ptr (salloc 1 i32)))
+        (glGetProgramInfoLog (ShaderProgram_id program)
+                             max_log_length
+                             len_ptr
+                             logbuf)
+        
+        (printf "Program info log: %s\n"
+                (if (= (pref len_ptr 0) 0)
+                    "OK"
+                    logbuf))
+        (if (= (pref len_ptr 0) 0) 0 1)))))
+
+(bind-func Shader_create
+  "create (and compile) an OpenGL shader"
+  (lambda (source:i8* type:GLenum)
+    (if (not (or (= type GL_VERTEX_SHADER)
+                 (= type GL_FRAGMENT_SHADER)
+                 (= type GL_GEOMETRY_SHADER)))
+        (begin (println "Error: shader type must be one of GL_VERTEX_SHADER, GL_FRAGMENT_SHADER or GL_GEOMETRY_SHADER")
+               null)
+        (let ((shader_id (glCreateShader type))
+              (source_ptr:i8** (salloc))
+              (shader (Shader shader_id type)))
+          (pset! source_ptr 0 source)
+          (glShaderSource shader_id 1 source_ptr (cast null i32*))
+          (glCompileShader shader_id)
+          (Shader_print_info_log shader)
+          shader))))
+
+(bind-func ShaderProgram_create_vf
+  "compile and link shader program (vert and frag shader)"
+  (lambda (vert:Shader* frag:Shader*)
+    (if (not (and (= (Shader_type vert) GL_VERTEX_SHADER)
+                  (= (Shader_type frag) GL_FRAGMENT_SHADER)))
+        (begin (println "Error: input shader types must be vert and frag respectively.")
+               null)
+        (let ((program_id (glCreateProgram))
+              (program (ShaderProgram program_id)))
+          (glAttachShader program_id (Shader_id vert))
+          (glAttachShader program_id (Shader_id frag))
+          (glLinkProgram program_id)
+          (ShaderProgram_print_info_log program)
+          program))))
+
+(bind-func ShaderProgram_create_vgf
+  "compile and link shader program (vert and frag shader)"
+  (lambda (vert:Shader* geom:Shader* frag:Shader*)
+    (if (not (and (= (Shader_type vert) GL_VERTEX_SHADER)
+                  (= (Shader_type geom) GL_GEOMETRY_SHADER)
+                  (= (Shader_type frag) GL_FRAGMENT_SHADER)))
+        (begin (println "Error: input shader types must be vert and frag respectively.")
+               null)
+        (let ((program_id (glCreateProgram))
+              (program (ShaderProgram program_id)))
+          (glAttachShader program_id (Shader_id vert))
+          (glAttachShader program_id (Shader_id geom))
+          (glAttachShader program_id (Shader_id frag))
+          (glLinkProgram program_id)
+          (ShaderProgram_print_info_log program)
+          program))))
+
+;; these ones are handy when you want to create a new shader program
+;; directly from the sources
+
+(bind-func ShaderProgram_create_vsfs
+  "compile and link shader program (vert and frag shader source)"
+  (lambda (vsource:i8* fsource:i8*)
+    (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
+          (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
+      (if (or (null? vert) (null? frag))
+          null
+          (ShaderProgram_create_vf vert frag)))))
+
+(bind-func ShaderProgram_create_vsgsfs
+  "compile and link shader program (vert and frag shader source)"
   (lambda (vsource:i8* gsource:i8* fsource:i8*)
-    (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
-          (gshader (glCreateShader GL_GEOMETRY_SHADER))
-          (vshader (glCreateShader GL_VERTEX_SHADER))
-          (fcode:|1,i8*|* (salloc 1))
-          (gcode:|1,i8*|* (salloc 1))
-          (vcode:|1,i8*|* (salloc 1))
-          (program (glCreateProgram))
-          (temp:i32* (salloc 1)))
-      (pset! fcode 0 fsource)
-      (pset! gcode 0 fsource)
-      (pset! vcode 0 vsource)
-      (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
-      (glShaderSource gshader 1 (cast gcode i8**) (bitcast null i32*))
-      (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
-      (glCompileShader vshader)
-      (glCompileShader gshader)
-      (glCompileShader fshader)
-      (glAttachShader program vshader)
-      (glAttachShader program gshader)
-      (glAttachShader program fshader)
-      (glLinkProgram program)
-      (printf "Vert ")(print_shader_info_log vshader)
-      (printf "Geom ")(print_shader_info_log gshader)
-      (printf "Frag ")(print_shader_info_log fshader)
-      (print_program_info_log program)
-      program)))
+    (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
+          (geom (Shader_create vsource GL_GEOMETRY_SHADER))
+          (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
+      (if (or (null? vert) (null? geom) (null? frag))
+          null
+          (ShaderProgram_create_vgf vert geom frag)))))
+
+(bind-poly ShaderProgram_create ShaderProgram_create_vf)
+(bind-poly ShaderProgram_create ShaderProgram_create_vgf)
+(bind-poly ShaderProgram_create ShaderProgram_create_vsfs)
+(bind-poly ShaderProgram_create ShaderProgram_create_vsgsfs)
 
 (define *xtmlib-shader-setup-loaded* #t)

@@ -15,6 +15,7 @@
 
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
+(bind-val sp ShaderProgram*)
 
 ;; init
 (call-as-xtlang
@@ -29,17 +30,20 @@
  (bind_attribute vao vbo 1 3 5 2) ;; tex_coord
  void)
 
-(define *triangle-shader*
-  (create_shader (file->string "examples/external/shader-tutorials/triangle.vert")
-                 (file->string "examples/external/shader-tutorials/triangle.frag")))
+(bind-func create_triangle_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
+
+(create_triangle_shader (file->string "examples/external/shader-tutorials/triangle.vert")
+                        (file->string "examples/external/shader-tutorials/triangle.frag"))
 
 (bind-func gl_draw
-  (lambda (program)
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-    (glUseProgram program)
+  (lambda ()
+    (glClear GL_COLOR_BUFFER_BIT)
+    (glUseProgram (ShaderProgram_id sp))
     (draw_vertex_array vao GL_TRIANGLES 0 3)
     (glfwSwapBuffers window)
     void))
 
 ;; draw the triangle
-(gl_draw *triangle-shader*)
+(gl_draw)

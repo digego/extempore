@@ -55,6 +55,7 @@
 
 (bind-val arrows_vbo VBO*)
 (bind-val arrows_vao VAO*)
+(bind-val sp ShaderProgram*)
 
 ;; init
 (call-as-xtlang
@@ -64,15 +65,18 @@
  (glEnable GL_LINE_SMOOTH)
  void)
 
-(define *arrows-shader*
-  (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
-                 (file->string "examples/external/shader-tutorials/arrows.frag")))
+(bind-func create_arrows_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
+
+(create_arrows_shader (file->string "examples/external/shader-tutorials/arrows.vert")
+                      (file->string "examples/external/shader-tutorials/arrows.frag"))
 
 (bind-func gl_draw_arrows
-  (lambda (program)
+  (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
     (update_vbo_data arrows_vbo)
-    (glUseProgram program)
+    (glUseProgram (ShaderProgram_id sp))
     (draw_vertex_array arrows_vao GL_LINES 0 (* 4 (convert num_arrows)))
     (glfwSwapBuffers window)
     void))
@@ -80,7 +84,7 @@
 (define gl-loop
   (lambda (time delta-t)
     (arrows_clockspin_heads (* (cos (* .0000053 time)) .3) (* time 0.0000074))
-    (gl_draw_arrows *arrows-shader*)
+    (gl_draw_arrows)
     ;; (println 'time: time)
     (callback (+ time (* *second* delta-t) 0.5)
               'gl-loop

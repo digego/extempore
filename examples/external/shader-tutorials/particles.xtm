@@ -58,10 +58,14 @@
 (bind-val particles_tex Texture*)
 (bind-val particles_vbo VBO*)
 (bind-val particles_vao VAO*)
+(bind-val sp ShaderProgram*)
 
-(define *particles-shader*
-  (create_shader (file->string "examples/external/shader-tutorials/particles.vert")
-                 (file->string "examples/external/shader-tutorials/particles.frag")))
+(bind-func create_particles_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
+
+(create_particles_shader (file->string "examples/external/shader-tutorials/particles.vert")
+                         (file->string "examples/external/shader-tutorials/particles.frag"))
 
 ;; init
 (call-as-xtlang
@@ -78,14 +82,14 @@
 ;; draw all the things
 
 (bind-func gl_draw_particles
-  (lambda (program:GLuint)
+  (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
     ;; move particles, update VBO
     (move_particles num_particles .01)    
     (update_vbo_data particles_vbo)
     ;; draw the world
-    (let ((texloc (glGetUniformLocation program "particles_tex")))
-      (glUseProgram program)
+    (let ((texloc (glGetUniformLocation (ShaderProgram_id sp) "particles_tex")))
+      (glUseProgram (ShaderProgram_id sp))
       (glUniform1i texloc 0))
     (draw_vertex_array particles_vao GL_POINTS 0 (convert num_particles))
     (glfwSwapBuffers window)
@@ -97,7 +101,7 @@
           (next-frame-time (+ time (* *second* delta-t))))
       (if (> late-by 0)
           (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
-          (gl_draw_particles *particles-shader*))
+          (gl_draw_particles))
       (callback (* 0.9 next-frame-time)
                 'gl-loop
                 next-frame-time

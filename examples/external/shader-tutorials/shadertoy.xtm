@@ -1,5 +1,4 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
-(sys:load "libs/contrib/glfw3.xtm")
 
 (bind-val window GLFWwindow*)
 
@@ -15,6 +14,7 @@
 
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
+(bind-val sp ShaderProgram*)
 
 ;; init
 (call-as-xtlang
@@ -30,12 +30,14 @@
  void)
 
 (bind-func gl_draw
-  (lambda (program)
+  (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
-    (let ((resloc (glGetUniformLocation program "iResolution"))
-          (timeloc (glGetUniformLocation program "iGlobalTime"))
-          (rateloc (glGetUniformLocation program "iSampleRate")))
-      (glUseProgram program)
+    (let ((program_id (ShaderProgram_id sp))
+          (resloc (glGetUniformLocation program_id "iResolution"))
+          (timeloc (glGetUniformLocation program_id "iGlobalTime"))
+          (rateloc (glGetUniformLocation program_id "iSampleRate")))
+
+      (glUseProgram program_id)
       (glUniform3f resloc 1920.0 1080.0 1.0)
       (glUniform1f timeloc (convert (% (clock_clock) 441000.)))
       (glUniform1f rateloc 44100.0))
@@ -43,13 +45,16 @@
     (glfwSwapBuffers window)
     void))
 
-(define *shader*
-  (create_shader (file->string "examples/external/shader-tutorials/shadertoy.vert")
-                 (file->string "examples/external/shader-tutorials/shadertoy.frag")))
+(bind-func create_shadertoy_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
+
+(create_shadertoy_shader (file->string "examples/external/shader-tutorials/shadertoy.vert")
+                         (file->string "examples/external/shader-tutorials/shadertoy.frag"))
 
 (define shadertoy-loop
   (lambda (time delta-t)
-    (gl_draw *shader*)
+    (gl_draw)
     (let ((next-time (max (+ time (* *second* delta-t)) (now))))
       (callback next-time
                 'shadertoy-loop

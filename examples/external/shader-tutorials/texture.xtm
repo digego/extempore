@@ -15,6 +15,7 @@
 (bind-val tex Texture*)
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
+(bind-val sp ShaderProgram*)
 
 (bind-func texture_setup
   (lambda (tex)
@@ -34,9 +35,12 @@
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
     (gl_print_error "in texture_setup")))
 
-(define *texture-shader*
-  (create_shader (file->string "examples/external/shader-tutorials/texture.vert")
-                 (file->string "examples/external/shader-tutorials/texture.frag")))
+(bind-func create_texture_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
+
+(create_texture_shader (file->string "examples/external/shader-tutorials/texture.vert")
+                       (file->string "examples/external/shader-tutorials/texture.frag"))
 
 ;; simple grey(ish) blocky gradient
 (call-as-xtlang
@@ -60,18 +64,19 @@
  void)
 
 (bind-func gl_draw
-  (lambda (program)
+  (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
     ;; draw the world
-    (let ((texloc (glGetUniformLocation program "tex")))
-      (glUseProgram program)
+    (let ((program_id (ShaderProgram_id sp))
+          (texloc (glGetUniformLocation program_id "tex")))
+      (glUseProgram program_id)
       (glUniform1i texloc 0))
     (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
     (glfwSwapBuffers window)
     void))
 
 ;; run once
-(gl_draw *texture-shader*)
+(gl_draw)
 
 ;; ok, let's use a more sophisticated (image) texture
 
@@ -82,4 +87,4 @@
      (println "Whoops - tex is null")))
 
 ;; run it again
-(gl_draw *texture-shader*)
+(gl_draw)
