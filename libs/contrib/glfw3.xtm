@@ -10,7 +10,10 @@
 
 ;;; Code:
 
-;; (sys:load "libs/xtm.xtm")
+(sys:load-preload-check 'glfw3)
+
+(define *xtmlib-glfw3-loaded* #f)
+
 (sys:load "libs/external/opengl.xtm")
 
 (define libglfw3
@@ -26,8 +29,6 @@
 ;;           ((string=? platform "Windows") (sys:open-dylib "libGLEW.dll"))
 ;;           ((string=? platform "OSX") (sys:open-dylib "libGLEW.dylib"))
 ;;           (else (print "Unknown platform: " platform)))))
-
-;; glfw3.h
 
 ;; /*************************************************************************
 ;;  * GLFW 3.1 - www.glfw.org
@@ -741,7 +742,7 @@
 ;;  *
 ;;  *  @ingroup window
 ;;  */
-(bind-alias GLFWframebuffersizefun [GLFWwindow*,i32,i32]*)
+(bind-alias GLFWframebuffersizefun [void,GLFWwindow*,i32,i32]*)
 
 ;; /*! @brief The function signature for mouse button callbacks.
 ;;  *
@@ -758,7 +759,7 @@
 ;;  *
 ;;  *  @ingroup input
 ;;  */
-(bind-alias GLFWmousebuttonfun [GLFWwindow*,i32,i32,i32]*)
+(bind-alias GLFWmousebuttonfun [void,GLFWwindow*,i32,i32,i32]*)
 
 ;; /*! @brief The function signature for cursor position callbacks.
 ;;  *
@@ -772,7 +773,7 @@
 ;;  *
 ;;  *  @ingroup input
 ;;  */
-(bind-alias GLFWcursorposfun [GLFWwindow*,double,double]*)
+(bind-alias GLFWcursorposfun [void,GLFWwindow*,double,double]*)
 
 ;; /*! @brief The function signature for cursor enter/leave callbacks.
 ;;  *
@@ -786,7 +787,7 @@
 ;;  *
 ;;  *  @ingroup input
 ;;  */
-(bind-alias GLFWcursorenterfun [GLFWwindow*,i32]*)
+(bind-alias GLFWcursorenterfun [void,GLFWwindow*,i32]*)
 
 ;; /*! @brief The function signature for scroll callbacks.
 ;;  *
@@ -800,7 +801,7 @@
 ;;  *
 ;;  *  @ingroup input
 ;;  */
-(bind-alias GLFWscrollfun [GLFWwindow*,double,double]*)
+(bind-alias GLFWscrollfun [void,GLFWwindow*,double,double]*)
 
 ;; /*! @brief The function signature for keyboard key callbacks.
 ;;  *
@@ -817,7 +818,7 @@
 ;;  *
 ;;  *  @ingroup input
 ;;  */
-(bind-alias GLFWkeyfun [GLFWwindow*,i32,i32,i32,i32]*)
+(bind-alias GLFWkeyfun [void,GLFWwindow*,i32,i32,i32,i32]*)
 
 ;; /*! @brief The function signature for Unicode character callbacks.
 ;;  *
@@ -830,7 +831,7 @@
 ;;  *
 ;;  *  @ingroup input
 ;;  */
-(bind-alias GLFWcharfun [GLFWwindow*,i32]*)
+(bind-alias GLFWcharfun [void,GLFWwindow*,i32]*)
 
 ;; /*! @brief The function signature for Unicode character with modifiers
 ;;  *  callbacks.
@@ -848,7 +849,7 @@
 ;;  *
 ;;  *  @ingroup input
 ;;  */
-(bind-alias GLFWcharmodsfun [GLFWwindow*,i32,i32]*)
+(bind-alias GLFWcharmodsfun [void,GLFWwindow*,i32,i32]*)
 
 ;; /*! @brief The function signature for file drop callbacks.
 ;;  *
@@ -862,7 +863,7 @@
 ;;  *
 ;;  *  @ingroup input
 ;;  */
-(bind-alias GLFWdropfun [GLFWwindow*,i32,i8**]*)
+(bind-alias GLFWdropfun [void,GLFWwindow*,i32,i8**]*)
 
 ;; /*! @brief The function signature for monitor configuration callbacks.
 ;;  *
@@ -875,7 +876,7 @@
 ;;  *
 ;;  *  @ingroup monitor
 ;;  */
-(bind-alias GLFWmonitorfun [GLFWmonitor*,i32]*)
+(bind-alias GLFWmonitorfun [void,GLFWmonitor*,i32]*)
 
 ;; width 0
 ;; height 1
@@ -3269,3 +3270,37 @@
     (glfwWindowHint GLFW_CONTEXT_VERSION_MINOR 2)
     (glfwWindowHint GLFW_OPENGL_FORWARD_COMPAT (convert GL_TRUE))
     (glfwWindowHint GLFW_OPENGL_PROFILE GLFW_OPENGL_CORE_PROFILE)))
+
+;; callbacks
+
+(bind-func glfw_error_callback:GLFWerrorfun
+  (lambda (err:i32 description:i8*)
+    (printf "GLFW error %d: %s\n" err description)
+    void))
+
+(bind-func glfw_set_error_callback
+  (lambda (cbfun:i8*)
+    (glfwSetErrorCallback (convert cbfun))))
+
+(bind-func glfw_key_callback:GLFWkeyfun
+  (lambda (window:GLFWwindow* key:i32 scancode:i32 action:i32 mods:i32)
+    (println "key:" key "scancode:" scancode "action:" action "mods:" mods)
+    (if (and (= key GLFW_KEY_ESCAPE)
+             (= action GLFW_PRESS))
+        (glfwSetWindowShouldClose window (convert GL_TRUE)))
+    void))
+
+(bind-func glfw_set_key_callback
+  (lambda (window:GLFWwindow* cbfun:i8*)
+    (glfwSetKeyCallback window (convert cbfun))))
+
+(bind-func glfw_window_position_callback:GLFWwindowposfun
+  (lambda (window:GLFWwindow* x:i32 y:i32)
+    (println "window:" window "x:" x "y:" y)
+    void))
+
+(bind-func glfw_set_window_position_callback
+  (lambda (window:GLFWwindow* cbfun:i8*)
+    (glfwSetWindowPosCallback window (convert cbfun))))
+
+(define *xtmlib-glfw3-loaded* #t)
