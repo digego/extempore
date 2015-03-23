@@ -5,8 +5,8 @@
 (call-as-xtlang
  (glfw_init)
  (glfw_set_core_profile)
- ;; (set! window (glfw_create_window 640 480)) 
- (set! window (glfw_create_fullscreen_window))
+ (set! window (glfw_create_window 640 480)) 
+ ;; (set! window (glfw_create_fullscreen_window))
  (glfwMakeContextCurrent window)
  (gl_print_driver_info))
 
@@ -47,7 +47,9 @@
 
 (bind-func create_shadertoy_shader
   (lambda (vsource:i8* fsource:i8*)
-    (set! sp (ShaderProgram_create vsource fsource))))
+    (let ((res (ShaderProgram_create vsource fsource)))
+      (if (not (null? res))
+          (set! sp res)))))
 
 (create_shadertoy_shader (file->string "examples/external/shader-tutorials/shadertoy.vert")
                          (file->string "examples/external/shader-tutorials/shadertoy.frag"))
@@ -62,3 +64,8 @@
                 delta-t))))
 
 (shadertoy-loop (now) 1/30)
+
+;; now we can swap in a different shader
+
+(create_shadertoy_shader (file->string "examples/external/shader-tutorials/shadertoy.vert")
+                         (file->string "examples/external/shader-tutorials/shadertoy-flame.frag"))
