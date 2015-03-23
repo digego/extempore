@@ -1,5 +1,14 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_core_profile)
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
+
 (call-as-xtlang
  (glEnable GL_PROGRAM_POINT_SIZE))
 
@@ -30,9 +39,8 @@
     (glClear GL_COLOR_BUFFER_BIT)
     (glUseProgram program)
     (draw_vertex_array vao GL_POINTS 0 3)
+    (glfwSwapBuffers window)
     void))
 
 ;; draw the points
-(begin
-  (gl_draw *points-shader*)
-  (gl:swap-buffers *gl-window*))
+(gl_draw *points-shader*)

@@ -1,5 +1,14 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_core_profile)
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
+
 (bind-val fullscreen_quad_vert_data float* 8)
 
 (bind-val vbo VBO*)
@@ -23,6 +32,7 @@
     (glClear GL_COLOR_BUFFER_BIT)
     (glUseProgram program)
     (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
+    (glfwSwapBuffers window)
     void))
 
 (define *heatmap-shader*
@@ -30,6 +40,4 @@
                  (file->string "examples/external/shader-tutorials/heatmap.frag")))
 
 ;; draw the map
-(begin
-  (gl_draw *heatmap-shader*)
-  (gl:swap-buffers *gl-window*))
+(gl_draw *heatmap-shader*)

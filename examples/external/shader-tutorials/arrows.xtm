@@ -1,7 +1,16 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
-(bind-val grid_size_x i64 160)
-(bind-val grid_size_y i64 90)
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_core_profile)
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
+
+(bind-val grid_size_x i64 32)
+(bind-val grid_size_y i64 16)
 (bind-val num_arrows i64 (call-as-xtlang (* grid_size_x grid_size_y)))
 
 ;; this will be 'vec2's, in pairs - arrow base, arrow head. so the
@@ -25,15 +34,6 @@
        (pset! arrows_verts
               (+ idx 1)
               (- (* (/ (convert j float) (convert grid_size_y float)) 2.0) 1.0))))))
-
-;; (call-as-xtlang
-;;  (doloop (i 10)
-;;    (printf "%f %f %f %f\n"
-;;            (convert (pref arrows_verts (+ (* i 4) 0)) double)
-;;            (convert (pref arrows_verts (+ (* i 4) 1)) double)
-;;            (convert (pref arrows_verts (+ (* i 4) 2)) double)
-;;            (convert (pref arrows_verts (+ (* i 4) 3)) double)))
-;;  (println))
 
 (bind-func arrows_set_head_vert
   (lambda (x y headxval headyval)
@@ -61,6 +61,7 @@
  (set! arrows_vbo (create_vbo arrows_verts (convert (* 4 num_arrows))))
  (set! arrows_vao (create_vao))
  (bind_attribute arrows_vao arrows_vbo 0 2)
+ (glEnable GL_LINE_SMOOTH)
  void)
 
 (define *arrows-shader*
@@ -73,13 +74,13 @@
     (update_vbo_data arrows_vbo)
     (glUseProgram program)
     (draw_vertex_array arrows_vao GL_LINES 0 (* 4 (convert num_arrows)))
+    (glfwSwapBuffers window)
     void))
 
 (define gl-loop
   (lambda (time delta-t)
-    (arrows_clockspin_heads (* (cos (* .000018 time)) .3) (* time 0.0002))
+    (arrows_clockspin_heads (* (cos (* .0000053 time)) .3) (* time 0.0000074))
     (gl_draw_arrows *arrows-shader*)
-    (gl:swap-buffers *gl-window*)
     ;; (println 'time: time)
     (callback (+ time (* *second* delta-t) 0.5)
               'gl-loop
