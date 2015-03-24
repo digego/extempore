@@ -39,6 +39,59 @@
 
 ;; globals which cache the state (especially types) of all the things.
 
+;;;;;;;;;;;;;;
+;; named types
+;; -----------
+;;
+(define *impc:ti:namedtype-list* '(("mzone" . #("<i8*,i64,i64,i64,mzone*>" "Extempore memory zone"))
+                                   ("clsvar" . #("<i8*,i32,i8*,i64,clsvar*>" "Extempore closure address table: <name,offset,type,TODO_whatisthis,next_table>"))))
+;;
+;; each element of the list is of the form
+;;
+;; (name . #(type docstring))
+
+(define impc:ti:print-namedtype-list
+  (lambda ()
+    (println '*impc:ti:namedtype-list*: *impc:ti:namedtype-list*)))
+
+(define impc:ti:reset-namedtype-list
+  (lambda ()
+    (set! *impc:ti:namedtype-list* '())))
+
+;; type is immutable, doesn't need a setter
+(define impc:ti:get-namedtype-type
+  (lambda (namedtype-name)
+    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
+      ;; (println 'namedtype-name: namedtype-name 'cls-list: cls-list)
+      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+
+(define impc:ti:namedtype-exists?
+  (lambda (namedtype-name)
+    (if (impc:ti:get-namedtype-type namedtype-name) #t #f)))
+
+(define impc:ti:update-namedtype-list
+  (lambda (namedtype-name type docstring)
+    (if (impc:ti:namedtype-exists? namedtype-name)
+        (impc:compiler:print-already-bound-error namedtype-name type)
+        ;; check arg types
+        (if (not (and (or (string? namedtype-name) (begin (println 'namedtype-name: namedtype-name) #f))
+                      (or (string? type) (begin (println 'type: type) #f))
+                      (or (string? docstring) (begin (println docstring) #f))))
+            (impc:compiler:print-compiler-error "couldn't register new named type")
+            (set! *impc:ti:namedtype-list*
+                  (cons (cons namedtype-name (vector type docstring))
+                        *impc:ti:namedtype-list*))))))
+
+(define impc:ti:get-namedtype-docstring
+  (lambda (namedtype-name)
+    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
+      (if cls-list (vector-ref (cdr cls-list) 1) #f))))
+
+(define impc:ti:set-namedtype-docstring
+  (lambda (namedtype-name docstring)
+    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
+      (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
+
 ;;;;;;;;;;;
 ;; closures
 ;; --------
@@ -1582,59 +1635,6 @@
   (lambda (closure-or-nativefunc-name)
     (or (impc:ti:get-closure-arg-types closure-or-nativefunc-name)
         (impc:ti:get-nativefunc-arg-types closure-or-nativefunc-name))))
-
-;;;;;;;;;;;;;;
-;; named types
-;; -----------
-;;
-(define *impc:ti:namedtype-list* '(("mzone" . #("<i8*,i64,i64,i64,mzone*>" "Extempore memory zone"))
-                                   ("clsvar" . #("<i8*,i32,i8*,i64,clsvar*>" "Extempore closure address table: <name,offset,type,TODO_whatisthis,next_table>"))))
-;;
-;; each element of the list is of the form
-;;
-;; (name . #(type docstring))
-
-(define impc:ti:print-namedtype-list
-  (lambda ()
-    (println '*impc:ti:namedtype-list*: *impc:ti:namedtype-list*)))
-
-(define impc:ti:reset-namedtype-list
-  (lambda ()
-    (set! *impc:ti:namedtype-list* '())))
-
-;; type is immutable, doesn't need a setter
-(define impc:ti:get-namedtype-type
-  (lambda (namedtype-name)
-    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
-      ;; (println 'namedtype-name: namedtype-name 'cls-list: cls-list)
-      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
-
-(define impc:ti:namedtype-exists?
-  (lambda (namedtype-name)
-    (if (impc:ti:get-namedtype-type namedtype-name) #t #f)))
-
-(define impc:ti:update-namedtype-list
-  (lambda (namedtype-name type docstring)
-    (if (impc:ti:namedtype-exists? namedtype-name)
-        (impc:compiler:print-already-bound-error namedtype-name type)
-        ;; check arg types
-        (if (not (and (or (string? namedtype-name) (begin (println 'namedtype-name: namedtype-name) #f))
-                      (or (string? type) (begin (println 'type: type) #f))
-                      (or (string? docstring) (begin (println docstring) #f))))
-            (impc:compiler:print-compiler-error "couldn't register new named type")
-            (set! *impc:ti:namedtype-list*
-                  (cons (cons namedtype-name (vector type docstring))
-                        *impc:ti:namedtype-list*))))))
-
-(define impc:ti:get-namedtype-docstring
-  (lambda (namedtype-name)
-    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
-      (if cls-list (vector-ref (cdr cls-list) 1) #f))))
-
-(define impc:ti:set-namedtype-docstring
-  (lambda (namedtype-name docstring)
-    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
-      (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; global variables (i.e. 'bind-val's)
