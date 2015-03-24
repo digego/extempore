@@ -71,26 +71,6 @@
         `(llvm:print-function ,n)
         `(begin (println "No such XTM function") #f))))
 
-(define-macro (call-as-xtlang . expr)
-  (sys:with-quiet-compiler
-   (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
-     (eval `(bind-func xtlang_expression
-              (lambda ()
-                ,(if (equal? type -1)
-                     `(let ((s:i8* (halloc 2)))
-                        ,@expr
-                        s)
-                     `(letz ((s (sprintln (begin ,@expr)))
-                             (lgth (+ 1 (string_size s)))
-                             (oldcs (cstr_from_string s))
-                             (newcs:i8* (halloc lgth)))
-                        (strcpy newcs oldcs)
-                        newcs))))                           
-           (interaction-environment))
-     (quote (string->atom (cptr->string (xtlang_expression)))))))
-
-(define xtmX call-as-xtlang)
-
 ;; some scheme helpers for acessing the environment
 
 (define sys:get-env
