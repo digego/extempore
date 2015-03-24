@@ -1,5 +1,14 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_core_profile)
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
+
 ;; OpenGL setup
 
 (call-as-xtlang
@@ -15,10 +24,14 @@
 
 (bind-val field_vbo VBO*)
 (bind-val field_vao VAO*)
+(bind-val field_sp ShaderProgram*)
 
-(define *field-shader*
-  (create_shader (file->string "examples/external/shader-tutorials/pbpic-field.vert")
-                 (file->string "examples/external/shader-tutorials/pbpic-field.frag")))
+(bind-func create_field_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! field_sp (ShaderProgram_create vsource fsource))))
+
+(create_field_shader (file->string "examples/external/shader-tutorials/pbpic-field.vert")
+               (file->string "examples/external/shader-tutorials/pbpic-field.frag"))
 
 ;; this data should have interleaved the `bases' of the field arrows
 ;; (i.e. the grid) in 2D with the ndim (i.e. 3D) field components
@@ -90,9 +103,14 @@
 (bind-val particle_vbo VBO*)
 (bind-val particle_vao VAO*)
 
-(define *particle-shader*
-  (create_shader (file->string "examples/external/shader-tutorials/pbpic-particle.vert")
-                 (file->string "examples/external/shader-tutorials/pbpic-particle.frag")))
+(bind-val particle_sp ShaderProgram*)
+
+(bind-func create_particle_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! particle_sp (ShaderProgram_create vsource fsource))))
+
+(create_particle_shader (file->string "examples/external/shader-tutorials/pbpic-particle.vert")
+               (file->string "examples/external/shader-tutorials/pbpic-particle.frag"))
 
 ;; init all the things
 (call-as-xtlang
@@ -109,22 +127,23 @@
 ;; draw all the things
 
 (bind-func gl_draw_field
-  (lambda (program)
+  (lambda ()
     (copy_field_xy_to_arrows_buffer fxyze .1)
     ;; (remove_guff_from_arrows_buffer)
     (update_vbo_data field_vbo)
-    (glUseProgram program)
+    (glUseProgram (ShaderProgram_id field_sp))
     (draw_vertex_array field_vao GL_LINES 0 (convert (* 4 nxe ny)))
     void))
 
 (bind-func gl_draw_particles
-  (lambda (program:GLuint)
+  (lambda ()
     ;; move particles, update VBO
     (update_vbo_data particle_vbo)
     ;; draw the world
-    (let ((texloc (glGetUniformLocation program "particle_tex"))
-          (nxnyloc (glGetUniformLocation program "nxny")))
-      (glUseProgram program)
+    (let ((sp_id (ShaderProgram_id particle_sp))
+          (texloc (glGetUniformLocation sp_id "particle_tex"))
+          (nxnyloc (glGetUniformLocation sp_id "nxny")))
+      (glUseProgram sp_id)
       (glUniform1i texloc 0)
       (glUniform2f nxnyloc (convert nxe) (convert ny)))
     (draw_vertex_array particle_vao GL_POINTS 0 (* nvp npmax))
@@ -134,25 +153,26 @@
   (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)))
 
+(bind-func gl_swap_buffers
+  (lambda ()
+    (glfwSwapBuffers window)))
+
 (define *draw-particles* #f)
 (define *draw-field* #f)
 
 (define gl-loop
   (lambda (delta-t)
     (gl_clear_colour_buffer)
-    (if *draw-particles* (gl_draw_particles *particle-shader*))
-    (if *draw-field* (gl_draw_field *field-shader*))
-    (gl:swap-buffers *gl-window*)
+    (if *draw-particles* (gl_draw_particles))
+    (if *draw-field* (gl_draw_field))
+    (gl_swap_buffers)
     (callback (+ (now) (* *second* delta-t))
               'gl-loop
               delta-t)))
 
 ;; (ipc:bind-func "utility" 'gl_clear_colour_buffer)
-;; (ipc:define "utility" '*particle-shader* *particle-shader*)
 ;; (ipc:bind-func "utility" 'gl_draw_particles)
-;; (ipc:define "utility" '*field-shader* *field-shader*)
 ;; (ipc:bind-func "utility" 'gl_draw_field)
 
 ;; start it running
 (gl-loop 1/30)
-
