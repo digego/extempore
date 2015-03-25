@@ -69,7 +69,7 @@
   (lambda (namedtype-name)
     (if (impc:ti:get-namedtype-type namedtype-name) #t #f)))
 
-(define impc:ti:update-namedtype-list
+(define impc:ti:register-new-namedtype
   (lambda (namedtype-name type docstring)
     (if (impc:ti:namedtype-exists? namedtype-name)
         (impc:compiler:print-already-bound-error namedtype-name type)
@@ -117,7 +117,7 @@
   (lambda ()
     (set! *impc:ti:closure-list* '())))
 
-(define impc:ti:update-closure-list
+(define impc:ti:register-new-closure
   (lambda (closure-name type docstring body)
     ;; check arg types
     (if (not (and (or (string? closure-name) (begin (println 'closure-name: closure-name) #f))
@@ -1570,7 +1570,7 @@
   (lambda ()
     (set! *impc:ti:nativefunc-list* '())))
 
-(define impc:ti:update-nativefunc-list
+(define impc:ti:register-new-nativefunc
   (lambda (nativefunc-name type docstring)
     ;; check arg types
     (if (not (and (or (string? nativefunc-name) (begin (println 'nativefunc-name: nativefunc-name) #f))
@@ -2234,7 +2234,7 @@
   (lambda (globalvar-name)
     (if (impc:ti:get-globalvar-type globalvar-name) #t #f)))
 
-(define impc:ti:update-globalvar-list
+(define impc:ti:register-new-globalvar
   (lambda (globalvar-name type docstring)
     (if (impc:ti:globalvar-exists? globalvar-name)
         (impc:compiler:print-already-bound-error globalvar-name type)
@@ -7998,7 +7998,7 @@
         (begin
           (impc:ti:set-closure-docstring func-name docstring)
           (impc:ti:set-closure-body func-name (cadr args)))
-        (impc:ti:update-closure-list func-name
+        (impc:ti:register-new-closure func-name
                                      ""
                                      docstring
                                      (cadr args)))
@@ -8296,7 +8296,7 @@
                                                                       ,(symbol->string symbol)))))))
          (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
      (begin
-       (impc:ti:update-namedtype-list ,(symbol->string symbol) ,(symbol->string type) "")
+       (impc:ti:register-new-namedtype ,(symbol->string symbol) ,(symbol->string type) "")
        (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
      ;; the next line is to help specialize any element types that may not already be specialized!
      (map (lambda (a) (impc:ir:get-type-from-pretty-str a)) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
@@ -8351,7 +8351,7 @@
                 (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
                                                                " \"" value "\")")))
                 ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-                (impc:ti:update-globalvar-list ,(symbol->string symbol) ,(symbol->string type) "")))
+                (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(symbol->string type) "")))
             ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
                   (not (impc:ir:pointer? t)))
              `(begin
@@ -8362,7 +8362,7 @@
                                 ,(if (= t *impc:ir:fp32*)
                                      (llvm:convert-float (atom->string (eval value)))
                                      (atom->string (eval value)))))
-                (impc:ti:update-globalvar-list ,(symbol->string symbol) ,(symbol->string type) "")))
+                (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(symbol->string type) "")))
             ((impc:ir:pointer? t)
              (if (integer? (eval value))
                  `(begin
@@ -8385,7 +8385,7 @@
                     ;;                                          (if (impc:ir:number? t)
                     ;;                                              (impc:ir:get-type-size t)
                     ;;                                              (/ (sys:pointer-size) 8)))))
-                    (impc:ti:update-globalvar-list ,(symbol->string symbol) ,(symbol->string type) ""))
+                    (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(symbol->string type) ""))
                  (if (list? (eval value))
                      `(begin
                         (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
@@ -8395,7 +8395,7 @@
                         (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
                                                                        " \"" (sexpr->string value) "\")")))
                         ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-                        (impc:ti:update-globalvar-list ,(symbol->string symbol) ,(symbol->string type) ""))
+                        (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(symbol->string type) ""))
                      `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin
@@ -8404,7 +8404,7 @@
                   "@" ,(symbol->string symbol)
                   " = dllexport global "
                   ,(impc:ir:get-type-str t) " zeroinitializer"))
-                (impc:ti:update-globalvar-list ,(symbol->string symbol) ,(symbol->string type) "")))
+                (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(symbol->string type) "")))
             (else (impc:compiler:print-missing-type-error type))))))
 
 
@@ -8457,7 +8457,7 @@
       (if (and (llvm:compile-ir ir-string)
                (llvm:queue-bind-symbol (eval library) (symbol->string symname)))
           (begin
-            (impc:ti:update-nativefunc-list symname type "")
+            (impc:ti:register-new-nativefunc symname type "")
             (impc:compiler:print-lib-binding-details-to-log library symname type))
           (impc:compiler:print-compiler-error (string-append "could not bind! " (symbol->string symname)))))))
 
