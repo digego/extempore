@@ -79,7 +79,7 @@
         (impc:compiler:print-already-bound-error namedtype-name type)
         ;; check arg types
         (if (not (and (or (string? namedtype-name) (begin (println 'namedtype-name: namedtype-name) #f))
-                      (or (string? type) (begin (println 'type: type) #f))
+                      (or (or (list? type) (integer? type)) (begin (println 'type: type) #f))
                       (or (string? docstring) (begin (println docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new named type")
             (set! *impc:ti:namedtype-list*
@@ -1561,7 +1561,7 @@
   (lambda (nativefunc-name type docstring)
     ;; check arg types
     (if (not (and (or (string? nativefunc-name) (begin (println 'nativefunc-name: nativefunc-name) #f))
-                  (or (string? type) (begin (println 'type: type) #f))
+                  (or (list? type) (begin (println 'type: type) #f))
                   (or (string? docstring) (begin (println docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new nativefunc")
         (let ((existing (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
@@ -2210,11 +2210,7 @@
   (lambda (globalvar-name)
     (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
       (if cls-list
-          ;; the old llvm:get-global-variable-type returned an extra
-          ;; level of pointerness from the bind-val declaration (e.g.
-          ;; (bind-val mytype i64) would return type "i64*"), so this
-          ;; getter adds a "*" on the end to be consistent with this
-          (string-append (vector-ref (cdr cls-list) 0) "*")
+          (vector-ref (cdr cls-list) 0)
           #f))))
 
 (define impc:ti:globalvar-exists?
@@ -2227,14 +2223,20 @@
         (impc:compiler:print-already-bound-error globalvar-name type)
         ;; check arg types
         (if (not (and (or (string? globalvar-name) (begin (println 'globalvar-name: globalvar-name) #f))
-                      (or (string? type) (begin (println 'type: type) #f))
+                      (or (or (list? type) (integer? type)) (begin (println 'type: type) #f))
                       (or (string? docstring) (begin (println docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new globalvar")
             (begin
               (set! *impc:ti:globalvar-list*
-                    (cons (cons globalvar-name (vector type docstring))
+                    ;; the old llvm:get-global-variable-type returned
+                    ;; an extra level of pointerness from the bind-val
+                    ;; declaration (e.g. (bind-val mytype i64) would
+                    ;; return type "i64*"), so we increment the
+                    ;; "pointerlyness" by one level here to mimic this
+                    ;; behaviour
+                    (cons (cons globalvar-name (vector (impc:ir:pointer++ type) docstring))
                           *impc:ti:globalvar-list*))
-              (impc:compiler:print-binding-details-to-log "SetValue:" globalvar-name type))))))
+              (impc:compiler:print-binding-details-to-log "SetValue:" globalvar-name (impc:ir:pretty-print-type type)))))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
@@ -8264,7 +8266,7 @@
                                 ,(if (= t *impc:ir:fp32*)
                                      (llvm:convert-float (atom->string (eval value)))
                                      (atom->string (eval value)))))
-                (impc:ti:register-new-globalvar ,(impc:ir:get-type-from-pretty-str (symbol->string symbol)) ,(symbol->string type) "")))
+                (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:get-type-from-pretty-str (symbol->string type)) "")))
             ((impc:ir:pointer? t)
              (if (integer? (eval value))
                  `(begin
@@ -8287,7 +8289,7 @@
                     ;;                                          (if (impc:ir:number? t)
                     ;;                                              (impc:ir:get-type-size t)
                     ;;                                              (/ (sys:pointer-size) 8)))))
-                    (impc:ti:register-new-globalvar ,(impc:ir:get-type-from-pretty-str (symbol->string symbol)) ,(symbol->string type) ""))
+                    (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) ""))
                  (if (list? (eval value))
                      `(begin
                         (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
@@ -8297,7 +8299,7 @@
                         (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
                                                                        " \"" (sexpr->string value) "\")")))
                         ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-                        (impc:ti:register-new-globalvar ,(impc:ir:get-type-from-pretty-str (symbol->string symbol)) ,(symbol->string type) ""))
+                        (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) ""))
                      `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin
@@ -8306,7 +8308,7 @@
                   "@" ,(symbol->string symbol)
                   " = dllexport global "
                   ,(impc:ir:get-type-str t) " zeroinitializer"))
-                (impc:ti:register-new-globalvar ,(impc:ir:get-type-from-pretty-str (symbol->string symbol)) ,(symbol->string type) "")))
+                (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) "")))
             (else (impc:compiler:print-missing-type-error type))))))
 
 
