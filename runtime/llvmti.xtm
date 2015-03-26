@@ -6729,21 +6729,6 @@
            ;; operation
            (ret (impc:ti:type-check ast fvars kts #f))
            ;; (llllllll (println 'pre-unified-vars: fvars))
-;;;;;; a final check across all anonymous lambdas ;;;;;;
-           ;; can safely just removed this ret2 code
-           (ret2 (map (lambda (x)
-                        ;; (println 'x: x)
-                        ;; only do redundant type check over anonymous lambdas
-                        (if (and (assoc-strcmp (car x) fvars)
-                                 (regex:match? (symbol->string (car x)) "_anon_lambda"))
-                            (begin
-                              (impc:ti:type-check-bound-lambda
-                               (car x) fvars kts
-                               (if (> (length (assoc-strcmp (car x) fvars)) 1)
-                                   (cadr (assoc-strcmp (car x) fvars))
-                                   '())))))
-                      *impc:ti:bound-lambdas*))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
            (u (impc:ti:unify fvars))
            ;; (lllll (println 'post-unified-vars: u))
            (t (impc:ti:unity? u))
