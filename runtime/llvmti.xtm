@@ -8199,7 +8199,7 @@
                                                                       ,(symbol->string symbol)))))))
          (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
      (begin
-       (impc:ti:register-new-namedtype ,(symbol->string symbol) ,(impc:ir:get-type-from-pretty-str (symbol->string type)) "")
+       (impc:ti:register-new-namedtype ,(symbol->string symbol) ',(impc:ir:get-type-from-pretty-str (symbol->string type)) "")
        (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
      ;; the next line is to help specialize any element types that may not already be specialized!
      (map (lambda (a) (impc:ir:get-type-from-pretty-str a)) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
@@ -8212,9 +8212,8 @@
             ',symbol
             (if (impc:ir:gpolytype-types ',symbol)
                 (symbol->string (impc:ir:gpolytype-types ',symbol))
-                (impc:ti:get-namedtype-type ,(symbol->string symbol)))
-            (if (impc:ir:gpolytype-types ',symbol) #t #f)))
-     ))
+                ,(symbol->string symbol))
+            (if (impc:ir:gpolytype-types ',symbol) #t #f)))))
 
 
 
