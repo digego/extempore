@@ -149,7 +149,7 @@
     (let ((type (impc:ti:get-closure-type name)))
       (if (or (not type) (null? type))
           #f
-          (map impc:ir:pretty-print-type (cdr type))))))
+          (map impc:ir:get-type-str (cdr type))))))
 
 (define impc:ti:closure-exists?
   (lambda (closure-name)
@@ -7854,11 +7854,8 @@
 
         (impc:ti:compile-auxilliary-functions fs fssetter fsgetter fstub fstub_native fstub_scheme fstub_scheme_valid fscallback compile-stub?)
         (if *impc:compile*
-            (let ((ftype (impc:ir:get-pretty-closure-arg-strings
-                          (impc:ir:pretty-print-type
-                           (impc:ir:get-type-from-str closure-type)))))
-              ;; (println 'closure-type: closure-type)
-              ;; (println 'ftype: ftype)
+            (let ((ftype (map impc:ir:get-type-str
+                              (cdr (impc:ir:get-type-from-str closure-type)))))
               (if (and (not *impc:compiler:print-raw-llvm*)
                        (or *impc:ti:print-code-specialization-compiles*
                            (not (regex:match? (symbol->string symname) "_poly_"))))
