@@ -153,7 +153,8 @@
 
 (define impc:ti:closure-exists?
   (lambda (closure-name)
-    (if (impc:ti:get-closure-type closure-name) #t #f)))
+    (let ((res (impc:ti:get-closure-type closure-name)))
+      (if (and res (not (null? res))) #t #f))))
 
 (define impc:ti:set-closure-type
   (lambda (closure-name type)
@@ -1581,13 +1582,13 @@
 (define impc:ti:get-nativefunc-arg-types
   (lambda (name)
     (let ((type (impc:ti:get-nativefunc-type name)))
-      (if (or (not type) (string=? type ""))
+      (if (or (not type) (null? type))
           #f
-          (impc:ir:get-pretty-closure-arg-strings type)))))
+          (map impc:ir:pretty-print-type (cdr type))))))
 
 (define impc:ti:nativefunc-exists?
   (lambda (nativefunc-name)
-    (if (impc:ti:get-nativefunc-arg-types nativefunc-name) #t #f)))
+    (if (impc:ti:get-nativefunc-type nativefunc-name) #t #f)))
 
 (define impc:ti:set-nativefunc-type
   (lambda (nativefunc-name type)
