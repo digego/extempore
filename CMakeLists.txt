@@ -7,7 +7,6 @@ set(EXTMPORE_VERSION_MINOR "60")
 set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
 
 option(EXTEMPORE_MCJIT "Use LLVM's MCJIT for codegen" OFF)
-option(EXTEMPORE_INSTALL "Generate installation target" OFF)
 
 # set up the extempore target
 
@@ -149,8 +148,8 @@ endif()
 # Linux
 if(UNIX AND NOT APPLE)
   target_compile_definitions(extempore PRIVATE -DTARGET_OS_LINUX)
-  target_compile_definitions(extempore PRIVATE -fPIC PRIVATE -O3)
-  target_link_libraries(extempore -Wl --export-dynamic)  
+  set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(extempore --export-dynamic)
   find_package(X11 REQUIRED)
   target_include_directories(extempore PRIVATE ${X11_INCLUDE_DIR})
   target_link_libraries(extempore ${X11_LIBRARIES})
@@ -180,6 +179,15 @@ endif()
 
 # copy libs into place
 
-file(COPY libs DESTINATION .)
-file(COPY examples DESTINATION .)
-file(COPY extras DESTINATION .)
+# install the executable
+install(TARGETS extempore
+  RUNTIME DESTINATION .)
+
+# runtime directory
+install(DIRECTORY runtime/ DESTINATION runtime)
+# libraries & examples
+install(DIRECTORY libs/core/ DESTINATION libs/core)
+install(DIRECTORY libs/external/ DESTINATION libs/external)
+install(DIRECTORY libs/contrib/ DESTINATION libs/contrib)
+install(DIRECTORY examples/ DESTINATION examples)
+install(DIRECTORY extras/ DESTINATION extras)
