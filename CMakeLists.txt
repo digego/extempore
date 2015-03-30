@@ -6,7 +6,7 @@ set(EXTMPORE_VERSION_MAJOR "0")
 set(EXTMPORE_VERSION_MINOR "60")
 set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
 
-option(EXTEMPORE_MCJIT "Use LLVM's MCJIT for codegen" OFF)
+option(MCJIT "Use LLVM's MCJIT for codegen" OFF)
 
 # set up the extempore target
 
@@ -32,8 +32,9 @@ target_include_directories(extempore PRIVATE include)
 # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake")
 
-if(EXTEMPORE_MCJIT)
-  target_compile_definitions(extempore PRIVATE -DEXT_USE_MCJIT)
+if(MCJIT)
+  target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
+  message("Extempore will use the \"MCJIT\" LLVM backend.")
 endif()
 
 # setup dependencies
