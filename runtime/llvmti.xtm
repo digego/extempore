@@ -4550,7 +4550,8 @@
     ;; (println 'native-check 'ast: ast 'vars: vars 'request: request?)
     (let* ((name (symbol->string (car ast)))
            (ftype (map impc:ir:get-type-from-str
-                       (impc:ti:get-nativefunc-arg-types name))))
+                       (or (impc:ti:get-nativefunc-arg-types name)
+                           (impc:ti:get-closure-arg-types name)))))
       (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
 
       (if (<> (length ftype)
@@ -6634,7 +6635,8 @@
              reses))
           ((and (list? ast) ;; native function
                 (symbol? (car ast))
-                (impc:ti:nativefunc-exists? (symbol->string (car ast))))
+                (or (impc:ti:nativefunc-exists? (symbol->string (car ast)))
+                    (impc:ti:closure-exists? (symbol->string (car ast)))))
            (impc:ti:nativef-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(begin))) (impc:ti:begin-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(if ifret))) (impc:ti:if-check ast vars kts request?))
@@ -6966,15 +6968,10 @@
                                   (impc:ti:add-types-to-source symname (cadr p) types envvars (car p))))
                           (caddr ast))
                      (impc:ti:add-types-to-source symname (cadddr ast) types envvars)))
-              ((or (and (assoc-strcmp (car ast) types)
-                        ;; (if (null? prev) #t
-                        ;;     (not (member (car ast) (car prev))))
-                        (impc:ir:closure? (cdr (assoc-strcmp (car ast) types))))
-                   (and (not (list? (car ast)))
-                        (symbol? (car ast))
-                        ;; (if (null? prev) #t
-                        ;;     (not (member (car ast) (car prev))))
-                        (impc:ti:closure-exists? (symbol->string (car ast)))))
+              ((and (assoc-strcmp (car ast) types)
+                    ;; (if (null? prev) #t
+                    ;;     (not (member (car ast) (car prev))))
+                    (impc:ir:closure? (cdr (assoc-strcmp (car ast) types))))
                (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))
               ((list? ast)
                (map (lambda (x)
