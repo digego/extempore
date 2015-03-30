@@ -163,9 +163,6 @@ int set_thread_realtime(thread_port_t threadport, float period, float computatio
 #ifdef TARGET_OS_WINDOWS
 #define isnan(x) ((x) != (x))
 #define isinf(x) (isnan(x-x))
-#elif TARGET_OS_MAC
-#define isnan(x) ((x) != (x))
-#define isinf(x) (isnan(x-x))
 #endif
 
 SAMPLE audio_sanity(SAMPLE x)
