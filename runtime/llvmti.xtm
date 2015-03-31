@@ -7439,7 +7439,9 @@
         (let ((ir-string (string-append fs
                                         fssetter
                                         (if compile-stub?
-                                            (string-append fsgetter fstub fstub_native
+                                            (string-append fsgetter
+                                                           fstub
+                                                           fstub_native
                                                            (if fstub_scheme_valid
                                                                fstub_scheme "")
                                                            fscallback)
@@ -7584,7 +7586,7 @@
                                 "%_impzPtr = alloca i8*\n"
                                 "store i8* %_impz, i8** %_impzPtr\n"
                                 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                                fstr "}\n"))
+                                fstr "}\n\n"))
              (fssetter (string-append (if compile-stub? ;;(llvm:get-globalvar (string-append (symbol->string symname) "_var"))
                                           (string-append "@" (symbol->string symname) "_var = dllexport global [1 x i8*] [ i8* null ]\n\n"
                                                          "@" (symbol->string symname) "_var_zone = dllexport global [1 x i8*] [ i8* null ]\n\n")
@@ -7608,13 +7610,13 @@
                                         ;"then:\ncall ccc void @llvm_zone_destroy(%mzone* %oldzone3)\nbr label %cont\n"
                                       "then:\ncall ccc void @llvm_destroy_zone_after_delay(%mzone* %oldzone3, i64 441000)\nbr label %cont\n"
                                       "cont:\n"
-                                      "ret void\n}\n"))
+                                      "ret void\n}\n\n"))
              (stub-type (impc:ir:get-closure-type-from-str closure-type))
              (fsgetter (string-append "define dllexport ccc i8* @" (symbol->string symname) "_getter() nounwind {\n"
                                       "entry:\n"
                                       "%ptr = getelementptr [1 x i8*]* @" (symbol->string symname) "_var, i32 0, i32 0\n"
                                       "%func = load i8** %ptr\n"
-                                      "ret i8* %func\n}\n"))
+                                      "ret i8* %func\n}\n\n"))
              (cb-struct-type (if (null? (cdr stub-type))
                                  '()
                                  (string-append ;"{void(i8*)*"
@@ -7665,7 +7667,7 @@
                                                                                      ")\n"
                                                                                      "call ccc %mzone* @llvm_pop_zone_stack()\n"
                                                                                      "ret void\n"
-                                                                                     "}\n")))
+                                                                                     "}\n\n")))
              (fstub_scheme_valid #t)
              (fstub_scheme (string-append "define dllexport ccc i8* " ;(impc:ir:get-type-str (car stub-type))
                                           " @" (string-append (symbol->string symname) "_scheme(i8* %_sc, i8* %args) nounwind\n"
@@ -7786,7 +7788,7 @@
                                                                       (else (error 'Compiler 'Error: 'return 'type 'error 'in 'scheme 'stub))))
 
                                                               "ret i8* %res\n"
-                                                              "}")))
+                                                              "}\n\n")))
              (fstub (string-append "define dllexport fastcc " (impc:ir:get-type-str (car stub-type))
                                    " @" (string-append (symbol->string symname) "("
                                                        (apply string-append (map (lambda (t n c)
@@ -7819,7 +7821,7 @@
                                                                                  '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
                                                        ")\nret " (impc:ir:get-type-str (car stub-type))
                                                        (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-                                                       "}")))
+                                                       "}\n\n")))
              (fstub_native (string-append "define dllexport ccc " (impc:ir:get-type-str (car stub-type))
                                           " @" (string-append (symbol->string symname) "_native("
                                                               (apply string-append (map (lambda (t n c)
@@ -7852,7 +7854,7 @@
                                                                                         '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")))
                                                               ")\nret " (impc:ir:get-type-str (car stub-type))
                                                               (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
-                                                              "}"))))
+                                                              "}\n\n"))))
 
         ;; (println fsgetter)
         ;; (println fstub)
