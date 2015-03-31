@@ -717,6 +717,7 @@
 
 (define llvm:compile-ir
   (lambda (ir-string)
+    (if *impc:compiler:print-raw-llvm* (print-full-nq ir-string))
     (if (sys:precomp:currently-compiling?)
         (impc:compiler:queue-ir-for-compilation ir-string)
         (llvm:jit-compile-ir-string ir-string))))
@@ -5301,7 +5302,6 @@
                       ;; compile function
                       (if *impc:compiler:print* (println '------------------------------compiling---------------------------->))
                       (if *impc:compiler:print* (println fstr))
-                      (if *impc:compiler:print-raw-llvm* (print-full-nq fstr))
                       (if *impc:compile*
                           (begin (llvm:remove-function (caddr ast))
                                  (if (not (llvm:jit-compile-ir-string fstr))
