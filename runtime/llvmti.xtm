@@ -8260,75 +8260,70 @@
 ;; - (null)  pointers to arrays/vectors
 
 (define-macro (bind-val symbol type . optional-value)
-  (let ((value (if (null? optional-value)
-                   1
-                   (car optional-value))))
-    (let ((t (impc:ir:get-type-from-pretty-str (atom->string type))))
-      (cond ((impc:ti:globalvar-exists? (symbol->string symbol))
-             `(impc:compiler:print-already-bound-error ',symbol ',type))
-            ((and (equal? "i8*" (symbol->string type))
-                  (string? value))
-             `(begin
-                (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                                " = dllexport global i8* zeroinitializer"))
-                (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                               " \"" value "\")")))
-                ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-                ,(impc:ti:register-new-globalvar (symbol->string symbol) ,(impc:ir:get-type-from-pretty-str (symbol->string type)) "")))
-            ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
-                  (not (impc:ir:pointer? t)))
-             `(begin
-                (llvm:compile-ir
-                 (string-append "@" ,(symbol->string symbol)
-                                " = dllexport global "
-                                ,(impc:ir:get-type-str t) " "
-                                ,(if (= t *impc:ir:fp32*)
-                                     (llvm:convert-float (atom->string (eval value)))
-                                     (atom->string (eval value)))))
-                (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:get-type-from-pretty-str (symbol->string type)) "")))
-            ((impc:ir:pointer? t)
-             (if (integer? (eval value))
-                 `(begin
-                    (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                                    " = dllexport global "
-                                                    ,(impc:ir:get-type-str t)
-                                                    " zeroinitializer"))
-                    (call-as-xtlang ,(string->sexpr
-                                      (string-append "(set! " (symbol->string symbol)
-                                                     " (cast (malloc "
-                                                     (atom->string (* (eval value)
-                                                                      (if (impc:ir:number? t)
-                                                                          (impc:ir:get-type-size t)
-                                                                          (/ (sys:pointer-size) 8))))
-                                                     ") "
-                                                     (atom->string type)
-                                                     "))")))
-                    ;; (llvm:bind-global-var ,(symbol->string symbol)
-                    ;;                       ,(sys:make-cptr (* (eval value)
-                    ;;                                          (if (impc:ir:number? t)
-                    ;;                                              (impc:ir:get-type-size t)
-                    ;;                                              (/ (sys:pointer-size) 8)))))
-                    (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) ""))
-                 (if (list? (eval value))
-                     `(begin
-                        (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                                        " = dllexport global "
-                                                        ,(impc:ir:get-type-str t)
-                                                        "zeroinitializer"))
-                        (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                                       " \"" (sexpr->string value) "\")")))
-                        ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-                        (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) ""))
-                     `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
-            ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
-             `(begin
-                (llvm:compile-ir
-                 (string-append
-                  "@" ,(symbol->string symbol)
-                  " = dllexport global "
-                  ,(impc:ir:get-type-str t) " zeroinitializer"))
-                (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) "")))
-            (else (impc:compiler:print-missing-type-error type))))))
+  (let ((value (if (null? optional-value) 1 (car optional-value)))
+        (t (impc:ir:get-type-from-pretty-str (atom->string type)))
+        (oldt (impc:ti:get-globalvar-type (symbol->string symbol))))
+    (cond (oldt
+           `(impc:compiler:print-already-bound-error ',symbol ,(impc:ir:pretty-print-type (impc:ir:pointer-- oldt))))
+          ;; string literal
+          ((and (equal? "i8*" (symbol->string type)) (string? value))
+           `(begin
+              (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                              " = dllexport global i8* zeroinitializer"))
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ,t "")
+              (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
+                                                             " \"" value "\")")))))
+          ;; float/int literal
+          ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
+                (not (impc:ir:pointer? t)))
+           `(begin
+              (llvm:compile-ir
+               (string-append "@" ,(symbol->string symbol)
+                              " = dllexport global "
+                              ,(impc:ir:get-type-str t) " "
+                              ,(if (= t *impc:ir:fp32*)
+                                   (llvm:convert-float (atom->string (eval value)))
+                                   (atom->string (eval value)))))
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ,t "")))
+          ;; pointer
+          ((impc:ir:pointer? t)
+           (if (integer? (eval value))
+               `(begin
+                  (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                                  " = dllexport global "
+                                                  ,(impc:ir:get-type-str t)
+                                                  " zeroinitializer"))
+                  (impc:ti:register-new-globalvar ,(symbol->string symbol) ,t "")
+                  (call-as-xtlang ,(string->sexpr
+                                    (string-append "(set! " (symbol->string symbol)
+                                                   " (cast (malloc "
+                                                   (atom->string (* (eval value)
+                                                                    (if (impc:ir:number? t)
+                                                                        (impc:ir:get-type-size t)
+                                                                        (/ (sys:pointer-size) 8))))
+                                                   ") "
+                                                   (atom->string type)
+                                                   "))"))))
+               (if (list? (eval value))
+                   `(begin
+                      (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                                      " = dllexport global "
+                                                      ,(impc:ir:get-type-str t)
+                                                      "zeroinitializer"))
+                      (impc:ti:register-new-globalvar ,(symbol->string symbol) ,t "")
+                      (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
+                                                                     " \"" (sexpr->string value) "\")"))))
+                   `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
+          ;; tuple/array/vector
+          ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
+           `(begin
+              (llvm:compile-ir
+               (string-append
+                "@" ,(symbol->string symbol)
+                " = dllexport global "
+                ,(impc:ir:get-type-str t) " zeroinitializer"))
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) "")))
+          (else (impc:compiler:print-missing-type-error type)))))
 
 
 (define-macro (bind-poly poly_sym implementation_sym)
