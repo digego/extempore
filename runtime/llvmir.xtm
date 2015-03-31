@@ -5122,10 +5122,11 @@
 ;; THIS VERSION FOR _NATIVE CALL CLOSURES!
 (define impc:ir:compiler:native-call
   (lambda (ast types)
+    ;; (println 'ast: ast 'types: types)
     (let* ((os (make-string 0))
            (fname (symbol->string (car ast)))
            (calling-conv (if (impc:ti:nativefunc-exists? fname)
-                             "ccc"      ;; bind-libs and toplevel closures
+                             "ccc" ;; bind-libs and toplevel closures
                              "fastcc")) ;; everything else
            (ftypes (or (impc:ti:get-closure-arg-types fname)
                        (impc:ti:get-nativefunc-arg-types fname)))
@@ -5241,8 +5242,7 @@
 (define impc:ir:compiler
   (let ((intrinsics '(sin cos ceil floor exp fmod pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi)))
     (lambda (ast types . hint?)
-      ;; (println 'compiler: ast 'hint?: hint?)
-      ;; (println 'types: types)
+      ;; (println 'compiler: ast 'hint?: hint? 'types: types)
       (cond ((null? ast) "")
             ((atom? ast)
              (cond ((symbol? ast)
