@@ -1089,6 +1089,11 @@
   (lambda (name fname ftype)
     (if (string? ftype)
         (set! ftype (impc:ir:get-type-from-pretty-str ftype)))
+    ;; ultimately, the polys and gpolys should have their own proper
+    ;; cache (i.e. in the top of llvmti.xtm), but for the moment this
+    ;; is here so that any reification of a generic type will go into
+    ;; the nativefunc cache
+    (impc:ti:register-new-nativefunc (symbol->string fname) ftype "")
     (let ((v (assoc-strcmp name *impc:ir:polys*)))
       (if v
           (let ((p (assoc-strcmp fname (cdr v))))
@@ -5130,7 +5135,10 @@
     ;; (println 'ast: ast 'types: types)
     (let* ((os (make-string 0))
            (fname (symbol->string (car ast)))
-           (calling-conv (if (impc:ti:nativefunc-exists? fname)
+           (calling-conv (if (and (impc:ti:nativefunc-exists? fname)
+                                  ;; this shouldn't be necessary when
+                                  ;; there's a proper polyfunc-cache
+                                  (not (regex:match? fname "_poly_")))
                              "ccc" ;; bind-libs and toplevel closures
                              "fastcc")) ;; everything else
            (ftypes (or (impc:ti:get-closure-arg-types fname)
