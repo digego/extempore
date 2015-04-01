@@ -2248,8 +2248,7 @@
                     ;; "pointerlyness" by one level here to mimic this
                     ;; behaviour
                     (cons (cons globalvar-name (vector (impc:ir:pointer++ type) docstring))
-                          *impc:ti:globalvar-list*))
-              (impc:compiler:print-binding-details-to-log "SetValue:" globalvar-name (impc:ir:pretty-print-type type)))))))
+                          *impc:ti:globalvar-list*)))))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
@@ -8272,7 +8271,12 @@
                                               " = dllexport global i8* zeroinitializer"))
               (impc:ti:register-new-globalvar ,(symbol->string symbol) ,t "")
               (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                             " \"" value "\")")))))
+                                                             " \"" value "\")")))
+              ;; we should really take the globalvar out of the cache
+              ;; if the previous steps failed
+              (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                          ,(symbol->string symbol)
+                                                          ,(impc:ir:pretty-print-type t))))
           ;; float/int literal
           ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
                 (not (impc:ir:pointer? t)))
@@ -8284,7 +8288,12 @@
                               ,(if (= t *impc:ir:fp32*)
                                    (llvm:convert-float (atom->string (eval value)))
                                    (atom->string (eval value)))))
-              (impc:ti:register-new-globalvar ,(symbol->string symbol) ,t "")))
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ,t "")
+              ;; we should really take the globalvar out of the cache
+              ;; if the previous steps failed
+              (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                          ,(symbol->string symbol)
+                                                          ,(impc:ir:pretty-print-type t))))
           ;; pointer
           ((impc:ir:pointer? t)
            (if (integer? (eval value))
@@ -8303,7 +8312,12 @@
                                                                         (/ (sys:pointer-size) 8))))
                                                    ") "
                                                    (atom->string type)
-                                                   "))"))))
+                                                   "))")))
+                  ;; we should really take the globalvar out of the cache
+                  ;; if the previous steps failed
+                  (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                          ,(symbol->string symbol)
+                                                          ,(impc:ir:pretty-print-type t)))
                (if (list? (eval value))
                    `(begin
                       (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
@@ -8312,7 +8326,12 @@
                                                       "zeroinitializer"))
                       (impc:ti:register-new-globalvar ,(symbol->string symbol) ,t "")
                       (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                                     " \"" (sexpr->string value) "\")"))))
+                                                                     " \"" (sexpr->string value) "\")")))
+                      ;; we should really take the globalvar out of the cache
+                      ;; if the previous steps failed
+                      (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                                  ,(symbol->string symbol)
+                                                                  ,(impc:ir:pretty-print-type t)))
                    `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
           ;; tuple/array/vector
           ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
@@ -8322,7 +8341,12 @@
                 "@" ,(symbol->string symbol)
                 " = dllexport global "
                 ,(impc:ir:get-type-str t) " zeroinitializer"))
-              (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) "")))
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ,(impc:ir:pretty-print-type (symbol->string type)) "")
+              ;; we should really take the globalvar out of the cache
+              ;; if the previous steps failed
+              (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                          ,(symbol->string symbol)
+                                                          ,(impc:ir:pretty-print-type t))))
           (else (impc:compiler:print-missing-type-error type)))))
 
 
