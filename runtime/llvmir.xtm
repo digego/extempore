@@ -5128,6 +5128,15 @@
     (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
     ""))
 
+;; this is currently broken for poly funcs
+(define impc:ir:function-calling-convention
+  (lambda (function-name)
+    (if (and (impc:ti:nativefunc-exists? function-name)
+             ;; this shouldn't be necessary when
+             ;; there's a proper polyfunc-cache
+             (not (regex:match? function-name "_poly_")))
+        "ccc" ;; bind-libs and toplevel closures
+        "fastcc")))
 
 ;; THIS VERSION FOR _NATIVE CALL CLOSURES!
 (define impc:ir:compiler:native-call
@@ -5135,12 +5144,6 @@
     ;; (println 'ast: ast 'types: types)
     (let* ((os (make-string 0))
            (fname (symbol->string (car ast)))
-           (calling-conv (if (and (impc:ti:nativefunc-exists? fname)
-                                  ;; this shouldn't be necessary when
-                                  ;; there's a proper polyfunc-cache
-                                  (not (regex:match? fname "_poly_")))
-                             "ccc" ;; bind-libs and toplevel closures
-                             "fastcc")) ;; everything else
            (ftypes (or (impc:ti:get-closure-arg-types fname)
                        (impc:ti:get-nativefunc-arg-types fname)))
            (args (map (lambda (a hint)
@@ -5184,7 +5187,7 @@
                                (begin (impc:ir:gname "res" "void") "")
                                (string-append (impc:ir:gname "res" (car ftypes)) " = "))
                            ;; "tail "
-                           "call " calling-conv
+                           "call " (impc:ir:function-calling-convention fname)
                            " " (car ftypes)
                            " @" fname "("
                            (apply string-append
