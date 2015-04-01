@@ -47,27 +47,26 @@
 ;; named types
 ;; -----------
 ;;
-(define *impc:ti:namedtype-list* '(("mzone" . #((14 108 2 2 2 "%mzone*") "Extempore memory zone"))
+(define *impc:ti:namedtype-cache* '(("mzone" . #((14 108 2 2 2 "%mzone*") "Extempore memory zone"))
                                    ("clsvar" . #((14 108 4 108 2 "%clsvar*") "Extempore closure address table: <name,offset,type,TODO_whatisthis,next_table>"))))
 ;;
 ;; each element of the list is of the form
 ;;
 ;; (name . #(type docstring))
 
-(define impc:ti:print-namedtype-list
+(define impc:ti:print-namedtype-cache
   (lambda ()
-    (println '*impc:ti:namedtype-list*: *impc:ti:namedtype-list*)))
+    (println '*impc:ti:namedtype-cache*: *impc:ti:namedtype-cache*)))
 
-(define impc:ti:reset-namedtype-list
+(define impc:ti:reset-namedtype-cache
   (lambda ()
-    (set! *impc:ti:namedtype-list* '())))
+    (set! *impc:ti:namedtype-cache* '())))
 
 ;; type is immutable, doesn't need a setter
 (define impc:ti:get-namedtype-type
   (lambda (namedtype-name)
-    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
-      ;; (println 'namedtype-name: namedtype-name 'cls-list: cls-list)
-      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+    (let ((closure-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
+      (if closure-data (vector-ref (cdr closure-data) 0) #f))))
 
 (define impc:ti:namedtype-exists?
   (lambda (namedtype-name)
@@ -82,25 +81,25 @@
                       (or (or (list? type) (integer? type)) (begin (println 'type: type) #f))
                       (or (string? docstring) (begin (println docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new named type")
-            (set! *impc:ti:namedtype-list*
+            (set! *impc:ti:namedtype-cache*
                   (cons (cons namedtype-name (vector type docstring))
-                        *impc:ti:namedtype-list*))))))
+                        *impc:ti:namedtype-cache*))))))
 
 (define impc:ti:get-namedtype-docstring
   (lambda (namedtype-name)
-    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
-      (if cls-list (vector-ref (cdr cls-list) 1) #f))))
+    (let ((closure-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
+      (if closure-data (vector-ref (cdr closure-data) 1) #f))))
 
 (define impc:ti:set-namedtype-docstring
   (lambda (namedtype-name docstring)
-    (let ((cls-list (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-list*)))
-      (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
+    (let ((closure-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
+      (if closure-data (vector-set! (cdr closure-data) 1 docstring) #f))))
 
 ;;;;;;;;;;;
 ;; closures
 ;; --------
 ;;
-(define *impc:ti:closure-list* '())
+(define *impc:ti:closure-cache* '())
 ;;
 ;; each element of the list is of the form
 ;;
@@ -113,13 +112,13 @@
 ;; - if we keep these lists sorted, then lookups become O(log2(N))
 ;;   rather than O(N) (or we could even use a hash-map one day...)
 
-(define impc:ti:print-closure-list
+(define impc:ti:print-closure-cache
   (lambda ()
-    (println '*impc:ti:closure-list*: *impc:ti:closure-list*)))
+    (println '*impc:ti:closure-cache*: *impc:ti:closure-cache*)))
 
-(define impc:ti:reset-closure-list
+(define impc:ti:reset-closure-cache
   (lambda ()
-    (set! *impc:ti:closure-list* '())))
+    (set! *impc:ti:closure-cache* '())))
 
 (define impc:ti:register-new-closure
   (lambda (closure-name type docstring body)
@@ -129,20 +128,20 @@
                   (or (string? docstring) (begin (println docstring)))
                   (or (list? body) (begin (println 'body: body) #f))))
         (impc:compiler:print-compiler-error "couldn't register new closure")
-        (let ((existing (assoc-strcmp closure-name *impc:ti:closure-list*)))
+        (let ((existing (assoc-strcmp closure-name *impc:ti:closure-cache*)))
           (if existing
               ;; update details if it already exists
               (set-cdr! existing (vector type docstring body))
               ;; or create a new entry
-              (set! *impc:ti:closure-list*
+              (set! *impc:ti:closure-cache*
                     (cons (cons closure-name (vector type docstring body))
-                          *impc:ti:closure-list*)))))))
+                          *impc:ti:closure-cache*)))))))
 
 (define impc:ti:get-closure-type
   (lambda (closure-name)
-    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      ;; (println 'cls-list: cls-list)
-      (if cls-list (vector-ref (cdr cls-list) 0) #f))))
+    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+      ;; (println 'cls-list: closure-data)
+      (if closure-data (vector-ref (cdr closure-data) 0) #f))))
 
 (define impc:ti:get-closure-arg-types
   (lambda (name)
@@ -165,28 +164,28 @@
 
 (define impc:ti:set-closure-type
   (lambda (closure-name type)
-    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      (if cls-list (vector-set! (cdr cls-list) 0 type) #f))))
+    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+      (if closure-data (vector-set! (cdr closure-data) 0 type) #f))))
 
 (define impc:ti:get-closure-docstring
   (lambda (closure-name)
-    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      (if cls-list (vector-ref (cdr cls-list) 1) #f))))
+    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+      (if closure-data (vector-ref (cdr closure-data) 1) #f))))
 
 (define impc:ti:set-closure-docstring
   (lambda (closure-name docstring)
-    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
+    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+      (if closure-data (vector-set! (cdr closure-data) 1 docstring) #f))))
 
 (define impc:ti:get-closure-body
   (lambda (closure-name)
-    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      (if cls-list (vector-ref (cdr cls-list) 2) #f))))
+    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+      (if closure-data (vector-ref (cdr closure-data) 2) #f))))
 
 (define impc:ti:set-closure-body
   (lambda (closure-name body)
-    (let ((cls-list (assoc-strcmp closure-name *impc:ti:closure-list*)))
-      (if cls-list (vector-set! (cdr cls-list) 2 body) #f))))
+    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+      (if closure-data (vector-set! (cdr closure-data) 2 body) #f))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -197,7 +196,7 @@
 ;;
 ;; (name . #(type docstring))
 ;;
-(define *impc:ti:nativefunc-list*
+(define *impc:ti:nativefunc-cache*
   '(;; functions in Extempore binary (defined in {EXTLLVM,SchemeFFI}.cpp)
     ("rmatch" . #((213 10 108 108) ""))
     ("rsplit" . #((213 10 108 108 108 108) ""))
@@ -1562,13 +1561,13 @@
     ("llvm_sscanf" . #(#t ""))
     ("llvm_fscanf" . #(#t ""))))
 
-(define impc:ti:print-nativefunc-list
+(define impc:ti:print-nativefunc-cache
   (lambda ()
-    (println '*impc:ti:nativefunc-list*: *impc:ti:nativefunc-list*)))
+    (println '*impc:ti:nativefunc-cache*: *impc:ti:nativefunc-cache*)))
 
-(define impc:ti:reset-nativefunc-list
+(define impc:ti:reset-nativefunc-cache
   (lambda ()
-    (set! *impc:ti:nativefunc-list* '())))
+    (set! *impc:ti:nativefunc-cache* '())))
 
 (define impc:ti:register-new-nativefunc
   (lambda (nativefunc-name type docstring)
@@ -1577,20 +1576,19 @@
                   (or (list? type) (begin (println 'type: type) #f))
                   (or (string? docstring) (begin (println docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new nativefunc")
-        (let ((existing (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
+        (let ((existing (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
           (if existing
               ;; update details if it already exists
               (set-cdr! existing (vector type docstring))
               ;; or create a new entry
-              (set! *impc:ti:nativefunc-list*
+              (set! *impc:ti:nativefunc-cache*
                     (cons (cons nativefunc-name (vector type docstring))
-                          *impc:ti:nativefunc-list*)))))))
+                          *impc:ti:nativefunc-cache*)))))))
 
 (define impc:ti:get-nativefunc-type
   (lambda (nativefunc-name)
-    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
-      ;; (println 'nfunc-list: nfunc-list)
-      (if nfunc-list (vector-ref (cdr nfunc-list) 0) #f))))
+    (let ((nfunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
+      (if nfunc-data (vector-ref (cdr nfunc-data) 0) #f))))
 
 (define impc:ti:get-nativefunc-arg-types
   (lambda (name)
@@ -1605,18 +1603,18 @@
 
 (define impc:ti:set-nativefunc-type
   (lambda (nativefunc-name type)
-    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
-      (if nfunc-list (vector-set! (cdr nfunc-list) 0 type) #f))))
+    (let ((nfunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
+      (if nfunc-data (vector-set! (cdr nfunc-data) 0 type) #f))))
 
 (define impc:ti:get-nativefunc-docstring
   (lambda (nativefunc-name)
-    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
-      (if nfunc-list (vector-ref (cdr nfunc-list) 1) #f))))
+    (let ((nfunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
+      (if nfunc-data (vector-ref (cdr nfunc-data) 1) #f))))
 
 (define impc:ti:set-nativefunc-docstring
   (lambda (nativefunc-name docstring)
-    (let ((nfunc-list (assoc-strcmp nativefunc-name *impc:ti:nativefunc-list*)))
-      (if nfunc-list (vector-set! (cdr nfunc-list) 1 docstring) #f))))
+    (let ((nfunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
+      (if nfunc-data (vector-set! (cdr nfunc-data) 1 docstring) #f))))
 
 
 ;; helpers for dealing with either closures or nativefuncs
@@ -1644,7 +1642,7 @@
 ;;
 ;; (name . #(type docstring))
 ;;
-(define *impc:ti:globalvar-list*
+(define *impc:ti:globalvar-cache*
   '(("GL_VERSION_1_1" . #("i32" ""))
     ("GL_VERSION_1_3" . #("i32" ""))
     ("GL_VERSION_1_5" . #("i32" ""))
@@ -2210,20 +2208,20 @@
     ("GL_LIGHT_MODEL_TWO_SIDE" . #("i32" ""))
     ("GL_SMOOTH" . #("i32" ""))))
 
-(define impc:ti:print-globalvar-list
+(define impc:ti:print-globalvar-cache
   (lambda ()
-    (println '*impc:ti:globalvar-list*: *impc:ti:globalvar-list*)))
+    (println '*impc:ti:globalvar-cache*: *impc:ti:globalvar-cache*)))
 
-(define impc:ti:reset-globalvar-list
+(define impc:ti:reset-globalvar-cache
   (lambda ()
-    (set! *impc:ti:globalvar-list* '())))
+    (set! *impc:ti:globalvar-cache* '())))
 
 ;; type is immutable, doesn't need a setter
 (define impc:ti:get-globalvar-type
   (lambda (globalvar-name)
-    (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
-      (if cls-list
-          (vector-ref (cdr cls-list) 0)
+    (let ((globalvar-data (assoc-strcmp globalvar-name *impc:ti:globalvar-cache*)))
+      (if globalvar-data
+          (vector-ref (cdr globalvar-data) 0)
           #f))))
 
 (define impc:ti:globalvar-exists?
@@ -2240,7 +2238,7 @@
                       (or (string? docstring) (begin (println docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new globalvar")
             (begin
-              (set! *impc:ti:globalvar-list*
+              (set! *impc:ti:globalvar-cache*
                     ;; the old llvm:get-global-variable-type returned
                     ;; an extra level of pointerness from the bind-val
                     ;; declaration (e.g. (bind-val mytype i64) would
@@ -2248,17 +2246,18 @@
                     ;; "pointerlyness" by one level here to mimic this
                     ;; behaviour
                     (cons (cons globalvar-name (vector (impc:ir:pointer++ type) docstring))
-                          *impc:ti:globalvar-list*)))))))
+                          *impc:ti:globalvar-cache*)))))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
-    (let ((cls-list (assoc-strcmp *impc:ti:globalvar-list*)))
-      (if cls-list (vector-ref (cdr cls-list) 1) #f))))
+    (let ((globalvar-data (assoc-strcmp *impc:ti:globalvar-cache*)))
+      (if globalvar-data (vector-ref (cdr globalvar-data) 1) #f))))
 
 (define impc:ti:set-globalvar-docstring
   (lambda (globalvar-name docstring)
-    (let ((cls-list (assoc-strcmp globalvar-name *impc:ti:globalvar-list*)))
-      (if cls-list (vector-set! (cdr cls-list) 1 docstring) #f))))
+    (let ((globalvar-data (assoc-strcmp globalvar-name *impc:ti:globalvar-cache*)))
+      (if globalvar-data (vector-set! (cdr globalvar-data) 1 docstring) #f))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; flags for printing debug info ;;
