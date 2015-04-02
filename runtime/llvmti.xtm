@@ -1671,23 +1671,23 @@
     ;; check arg types
     (if (not (and (or (string? polyfunc-name) (begin (println 'polyfunc-name: polyfunc-name) #f))
                   (or (string? func-name) (begin (println 'polyfunc-name: func-name) #f))
-                  (or (list? type) (begin (println 'type: type) #f))
+                  (or (list? func-type) (begin (println 'type: func-type) #f))
                   (or (string? docstring) (begin (println docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new polymorphic function")
-        (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+        (let ((candidates (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
           (if candidates
               (let ((res (cl:find-if (lambda (x) (string=? (vector-ref x 0) func-name))
-                                     myvec)))
+                                     (vector-ref (cdr candidates) 0))))
                 (if res
                     ;; if we're overriding an already poly'd function
                     (vector-set! res 1 func-type)
                     ;; if we're adding a new poly'd function
-                    (vector-set! candidates 0
+                    (vector-set! (cdr candidates) 0
                                  (cons (vector func-name func-type)
-                                       (vector-ref candidates 0)))))
+                                       (vector-ref (cdr candidates) 0)))))
               ;; or create a new entry
               (set! *impc:ti:polyfunc-cache*
-                    (cons (list polyfunc-name (vector (list (vector func-name func-type)) docstring))
+                    (cons (cons polyfunc-name (vector (list (vector func-name func-type)) docstring))
                           *impc:ti:polyfunc-cache*)))))))
 
 (define impc:ti:get-polyfunc-candidate-names
@@ -1714,14 +1714,14 @@
     (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
       (and candidates
            (begin
-             (print "Polymorphic options for")
+             (print "Polymorphic options for ")
              (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print polyfunc-name))
              (println)
              (for-each (lambda (func-vector)
                          ;; perhaps this should (regex:split (vector-ref func-vector 0) "_poly_") to clean the generic ones up a bit?
                          (print "  ")
                          (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print (vector-ref func-vector 0)))
-                         (print "-")
+                         (print ": ")
                          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (impc:ir:pretty-print-type (vector-ref func-vector 1))))
                          (println))
                        candidates))))))
