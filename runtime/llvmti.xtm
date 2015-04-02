@@ -1634,6 +1634,120 @@
     (or (impc:ti:get-closure-arg-types closure-or-nativefunc-name)
         (impc:ti:get-nativefunc-arg-types closure-or-nativefunc-name))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; polymorphic functions
+;; ---------------------
+;;
+;; for poly funcs, `type' is a list of vectors
+;;
+;; (poly-name . #((list #(func1 func1type) #(func2 func2type)) docstring))
+;;
+(define *impc:ti:polyfunc-cache*
+  '())
+
+(define impc:ti:print-polyfunc-cache
+  (lambda ()
+    (println '*impc:ti:polyfunc-cache*: *impc:ti:polyfunc-cache*)))
+
+(define impc:ti:reset-polyfunc-cache
+  (lambda ()
+    (set! *impc:ti:polyfunc-cache* '())))
+
+(define impc:ti:polyfunc-exists?
+  (lambda (polyfunc-name)
+    (if (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*) #t #f)))
+
+(define impc:ti:get-polyfunc-candidates
+  (lambda (polyfunc-name)
+    (let ((pfunc-data (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
+      (if pfunc-data
+          (vector-ref (cdr pfunc-data) 0)
+          #f))))
+
+;; only use the docstring first time around
+;; remap impc:ir:add-poly
+(define impc:ti:register-new-polyfunc
+  (lambda (polyfunc-name func-name func-type docstring)
+    ;; check arg types
+    (if (not (and (or (string? polyfunc-name) (begin (println 'polyfunc-name: polyfunc-name) #f))
+                  (or (string? func-name) (begin (println 'polyfunc-name: func-name) #f))
+                  (or (list? type) (begin (println 'type: type) #f))
+                  (or (string? docstring) (begin (println docstring)))))
+        (impc:compiler:print-compiler-error "couldn't register new polymorphic function")
+        (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+          (if candidates
+              (let ((res (cl:find-if (lambda (x) (string=? (vector-ref x 0) func-name))
+                                     myvec)))
+                (if res
+                    ;; if we're overriding an already poly'd function
+                    (vector-set! res 1 func-type)
+                    ;; if we're adding a new poly'd function
+                    (vector-set! candidates 0
+                                 (cons (vector func-name func-type)
+                                       (vector-ref candidates 0)))))
+              ;; or create a new entry
+              (set! *impc:ti:polyfunc-cache*
+                    (cons (list polyfunc-name (vector (list (vector func-name func-type)) docstring))
+                          *impc:ti:polyfunc-cache*)))))))
+
+(define impc:ti:get-polyfunc-candidate-names
+  (lambda (polyfunc-name)
+    (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+      (and candidates
+           (map (lambda (func-vector) (vector-ref func-vector 0)) candidates)))))
+
+;; remap impc:ir:poly-types - should return list types for all options
+(define impc:ti:get-polyfunc-candidate-types
+  (lambda (polyfunc-name)
+    (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+      (and candidates
+           (map (lambda (func-vector) (vector-ref func-vector 1)) candidates)))))
+
+(define impc:ti:get-polyfunc-candidate-pretty-types
+  (lambda (polyfunc-name)
+    (let ((types (impc:ti:get-polyfunc-candidate-types polyfunc-name)))
+      (and types (map impc:ir:pretty-print-type types)))))
+
+;; remap impc:ir:poly-print-all
+(define impc:ti:polyfunc-pretty-print
+  (lambda (polyfunc-name)
+    (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+      (and candidates
+           (begin
+             (print "Polymorphic options for")
+             (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print polyfunc-name))
+             (println)
+             (for-each (lambda (func-vector)
+                         ;; perhaps this should (regex:split (vector-ref func-vector 0) "_poly_") to clean the generic ones up a bit?
+                         (print "  ")
+                         (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print (vector-ref func-vector 0)))
+                         (print "-")
+                         (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (impc:ir:pretty-print-type (vector-ref func-vector 1))))
+                         (println))
+                       candidates))))))
+
+;; takes a polyname and a type, and returns the (first)
+;; poly'd over function with that type
+;; remap impc:ir:check-poly
+(define impc:ti:get-polyfunc-candidate
+  (lambda (polyfunc-name func-type)
+    (let loop ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+      (if (or (not candidates) (null? candidates))
+          #f
+          (if (equal? (vector-ref (car candidates) 1) func-type)
+              (vector-ref (car candidates) 0)
+              (loop (cdr candidates)))))))
+
+;; (define impc:ti:get-polyfunc-docstring
+;;   (lambda (polyfunc-name)
+;;     (let ((pfunc-data (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
+;;       (if pfunc-data (vector-ref (cdr pfunc-data) 1) #f))))
+
+;; (define impc:ti:set-polyfunc-docstring
+;;   (lambda (polyfunc-name docstring)
+;;     (let ((pfunc-data (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
+;;       (if pfunc-data (vector-set! (cdr pfunc-data) 1 docstring) #f))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; global variables (i.e. 'bind-val's)
 ;; -----------------------------------
