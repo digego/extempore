@@ -833,196 +833,6 @@
               (if r (loop (cdr r)) a)))
           #f))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; poly types
-;;
-
-(define *impc:ir:gpolytypes* (list))
-(define *impc:ir:polytypes* (list))
-
-;; where finds and replaces
-;; are equal length lists
-(define regex:replace-everything
-  (lambda (str finds replaces)
-    (if (<> (length finds) (length replaces))
-        (impc:compiler:print-compiler-error "regex:replace-everything expects an equal number of finds and replaces"))
-    (for-each (lambda (find replace)
-                (let ((s (regex:replace-all str find replace)))
-                  (set! str s)))
-              finds replaces)
-    str))
-
-(define impc:ir:add-gpolytype
-  (let ((pcnt 0))
-    (lambda (name type)
-      (set! pcnt (+ pcnt 1))
-      (if (symbol? type) (set! type (symbol->string type)))
-      (let* ((syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
-             (newsyms (map (lambda (s)
-                             (string-append "!g"
-                                            (substring s 1 (string-length s))
-                                            "_"
-                                            (number->string pcnt)))
-                           syms))
-             (newtype (string->symbol (regex:replace-everything type syms newsyms)))
-             (v (assoc-strcmp name *impc:ir:gpolytypes*)))
-        ;; (println 'gtype-name: name 'type: type 'newtype: newtype)
-        (if v
-            (set-cdr! v newtype)
-            (set! *impc:ir:gpolytypes* (cons (cons name newtype) *impc:ir:gpolytypes*)))
-        #t))))
-
-(define impc:ir:add-polytype
-  (lambda (name tname ttype)
-    (if (string? ttype) (set! ttype (string->symbol ttype)))
-    (let ((v (assoc-strcmp name *impc:ir:polytypes*)))
-      (if v
-          (let ((p (assoc-strcmp tname (cdr v))))
-            (if p
-                (begin (set-car! (cdr p) ttype) #t)
-                (begin (set-cdr! v (cons (list tname ttype) (cdr v))) #t)))
-          (begin (set! *impc:ir:polytypes* (cons (list name (list tname ttype)) *impc:ir:polytypes*))
-                 #t)))))
-
-(define impc:ir:gpolytype-types
-  (lambda (name)
-    (if (string? name) (set! name (string->symbol name)))
-    (let ((res (assoc-strcmp name *impc:ir:gpolytypes*)))
-      (if res
-          (cdr res)
-          #f))))
-
-;; (define impc:ir:gpolytype-types
-;;   (lambda (name)
-;;     ;; (println 'gpolytype-types name)
-;;     (if (string? name) (set! name (string->symbol name)))
-;;     (let ((res (assoc-strcmp name *impc:ir:gpolytypes*)))
-;;       (if res
-;;           (string->symbol
-;;            (impc:ir:pretty-print-type
-;;             (cons 14
-;;                   (map (lambda (x)
-;;                          (let ((basex (impc:ir:get-base-type x))
-;;                                (ptrsx (impc:ir:get-ptr-depth x)))
-;;                            (if (and (not (equal? (string->symbol basex) name))
-;;                                     (impc:ir:gpolytype-types basex))
-;;                                (string->symbol (apply string-append
-;;                                                       basex ":"
-;;                                                       (impc:ir:pretty-print-type (impc:ir:gpolytype-types basex))
-;;                                                       (make-list ptrsx "*")))
-;;                                (if (equal? (string->symbol basex) name)
-;;                                    (string->symbol x)
-;;                                    (impc:ir:get-type-from-pretty-str x)))))
-;;                        (impc:ir:get-pretty-tuple-arg-strings (symbol->string (cdr res)))))))
-;; 	  #f))))
-
-
-(define impc:ir:polytype-types
-  (lambda (name)
-    (if (string? name) (set! name (string->symbol name)))
-    (let ((res (assoc-strcmp name *impc:ir:polytypes*)))
-      (if res
-          (map (lambda (p)
-                 (cadr p))
-               (cdr res))
-          #f))))
-
-(define impc:ir:polytype-match?
-  (lambda (t1 t2)
-    (if (<> (length t1)
-            (length t2))
-        #f
-        (if (member #f (map (lambda (t1 t2)
-                              (if (atom? t1)
-                                  (set! t1 (list t1)))
-                              (if (atom? t2)
-                                  (set! t2 (list t2)))
-                              (if (null? (impc:ti:intersection* t1 t2))
-                                  #f
-                                  #t))
-                            t1
-                            t2))
-            #f
-            #t))))
-
-(define impc:ir:check-polytype
-  (lambda (name ttype)
-    (if (string? ttype)
-        (set! ftype (impc:ir:get-type-from-pretty-str ttype)))
-    (let ((res (assoc-strcmp name *impc:ir:polytypes*)))
-      (if res
-          (let* ((r2 (map (lambda (p)
-                                        ;(println 'ftype: ftype 'p: p)
-                            (if (impc:ir:polytype-match? (cadr p) ttype)
-                                (car p)
-                                '()))
-                          (cdr res)))
-                 (r3 (remove '() r2)))
-            (if (null? r3) #f (car r3)))
-          #f))))
-
-
-;; checks both named types and poly types
-(define impc:ir:get-named-type
-  (lambda (name)
-    (let ((clean-name (impc:ir:clean-named-type name)))
-      (or (impc:ir:gpolytype-types clean-name)
-          (impc:ir:polytype-types clean-name)
-          (let ((from-cache (impc:ti:get-namedtype-type clean-name)))
-            (and from-cache
-                 ;; because the old (pre-mcjit) version used
-                 ;; llvm:get-named-type, which returned the type in
-                 ;; LLVM IR format, we convert to this format
-                 (impc:ir:get-type-str from-cache)))))))
-
-
-
-;; (define impc:ir:gpoly-types
-;;   (lambda (name)
-;;     (let ((res (assoc-strcmp name *impc:ir:gpolys*)))
-;;       ;; (println 'name: name 'res: (if res (cadr res) #f))
-;;       (if res
-;;           (let ((ptrs (impc:ir:get-ptr-depth (cadr res))))
-;;             (cons
-;;              (string->symbol
-;;               (impc:ir:pretty-print-type
-;;                (cons (+ *impc:ir:closure* *impc:ir:pointer* (* *impc:ir:pointer* ptrs))
-;;                      (map (lambda (x)
-;;                             (let ((basex (car (regex:type-split (impc:ir:get-base-type x) ":")))
-;;                                   (ptrsx (impc:ir:get-ptr-depth x)))
-;;                               (if (impc:ir:gpolytype-types basex)
-;;                                   (string->symbol (apply string-append
-;;                                                          basex ":"
-;;                                                          (impc:ir:pretty-print-type (impc:ir:gpolytype-types basex))
-;;                                                          (make-list ptrsx "*")))
-;;                                   (impc:ir:get-type-from-pretty-str x))))
-;;                           (impc:ir:get-pretty-closure-arg-strings (symbol->string (cadr res)))))))
-;;              (cddr res)))
-;; 	  #f))))
-
-
-
-
-;; (define impc:ir:type-match?
-;;   (lambda (t1 t2)
-;;     (if (<> (length t1)
-;; 	    (length t2))
-;; 	#f
-;; 	(if (member #f (map (lambda (t1 t2)
-;; 			      (if (atom? t1)
-;; 				  (set! t1 (list t1)))
-;; 			      (if (atom? t2)
-;; 				  (set! t2 (list t2)))
-;; 			      (if (null? (impc:ti:intersection* t1 t2))
-;; 				  #f
-;; 				  #t))
-;; 			    t1
-;; 			    t2))
-;; 	    #f
-;; 	    #t))))
-
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  This stuff is all here just for pretty printing
@@ -1209,7 +1019,7 @@
                                (map (lambda (k)
                                       (if (equal? (impc:ir:get-base-type k) (car p)) ;; strip recursives
                                           #f
-                                          (impc:ir:gpolytype-types (impc:ir:get-base-type k))))
+                                          (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
                                     ags2))))
                ;; (println 'prealias-p: p)
                ;; set p in case we have aliased types in args that need unaliasing!
@@ -1221,10 +1031,10 @@
                ;; (println 'anypolys anypolys)
                (if (string=? (car p) "")
                    (error ""))
-               (if (and (impc:ir:gpolytype-types (car p)) ;; if still generic
+               (if (and (impc:ti:get-generictype-candidate-types (car p)) ;; if still generic
                         (or (regex:match? (cadr p) "!") ;; any gvars
                             anypolys))
-                   (let* ((gtype (impc:ir:gpolytype-types (car p)))
+                   (let* ((gtype (impc:ti:get-generictype-candidate-types (car p)))
                           ;; (gtype-all (regex:match-all (symbol->string gtype) "(![a-zA-Z0-9-_]*)"))
                           ;; (type-all (regex:match-all (cadr p) "(![a-zA-Z0-9-_]*)")))
                           (gtype-all (impc:ir:get-pretty-tuple-arg-strings (symbol->string gtype)))
@@ -1283,19 +1093,19 @@
                      string-type)
                    (error ""))))
             ((regex:match? base "!") (string->symbol base))
-            ((or (impc:ir:gpolytype-types base)
-                 (impc:ir:gpolytype-types (car (regex:split base "%"))))
+            ((or (impc:ti:get-generictype-candidate-types base)
+                 (impc:ti:get-generictype-candidate-types (car (regex:split base "%"))))
              (let* ((sb (regex:split base "%"))
                     (base2 (car sb))
                     (extended (if (> (length sb) 1) (cadr sb) #f)))
                ;; (println 'args: args 'base2: base2 'st: string-type)
-               ;; (println 'base2: (impc:ir:gpolytype-types base2))
+               ;; (println 'base2: (impc:ti:get-generictype-candidate-types base2))
                (if (and (not (null? args))
                         (atom? (car args))
                         (string=? (car args) base2))
                    (string->symbol string-type)
                    (let* ((type (impc:ir:get-type-from-pretty-str
-                                 (apply string-append (symbol->string (impc:ir:gpolytype-types base2))
+                                 (apply string-append (symbol->string (impc:ti:get-generictype-candidate-types base2))
                                         (make-string ptr-depth #\*))
                                  base2)))
                      ;; if we have come from a defined generic type
@@ -1676,15 +1486,15 @@
 (define impc:ir:types-equal?
   (lambda (a b)
     (if (string? a)
-        (if (impc:ir:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a)))
-            (let* ((nt (impc:ir:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a))))
+        (if (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a)))
+            (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a))))
                    (ptrdepth (impc:ir:get-ptr-depth a))
                    (strtype (apply string-append nt (make-string ptrdepth #\*))))
               (set! a (impc:ir:get-type-from-str strtype)))
             (set! a (impc:ir:get-type-from-str a))))
     (if (string? b)
-        (if (impc:ir:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type b)))
-            (let* ((nt (impc:ir:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type b))))
+        (if (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type b)))
+            (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type b))))
                    (ptrdepth (impc:ir:get-ptr-depth b))
                    (strtype (apply string-append nt (make-string ptrdepth #\*))))
               (set! b (impc:ir:get-type-from-str strtype)))
@@ -4920,8 +4730,8 @@
                               (aname (car (cdr p)))
                               (abass (impc:ir:get-type-from-str (impc:ir:get-base-type atype)))
                               (ftbass (impc:ir:get-type-from-str (impc:ir:get-base-type ft))))
-                         (if (string? abass) (set! abass (impc:ir:get-type-from-str (impc:ir:get-named-type abass))))
-                         (if (string? ftbass) (set! ftbass (impc:ir:get-type-from-str (impc:ir:get-named-type ftbass))))
+                         (if (string? abass) (set! abass (impc:ir:get-type-from-str (impc:ti:get-named-type abass))))
+                         (if (string? ftbass) (set! ftbass (impc:ir:get-type-from-str (impc:ti:get-named-type ftbass))))
                          (if (and (not (equal? (impc:ir:get-type-from-str atype)
                                                (impc:ir:get-type-from-str ft)))
                                   (equal? abass ftbass))
