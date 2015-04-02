@@ -1738,15 +1738,189 @@
               (vector-ref (car candidates) 0)
               (loop (cdr candidates)))))))
 
-;; (define impc:ti:get-polyfunc-docstring
-;;   (lambda (polyfunc-name)
-;;     (let ((pfunc-data (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
-;;       (if pfunc-data (vector-ref (cdr pfunc-data) 1) #f))))
+;;;;;;;;;;;;;;;;;;;;
+;; generic functions
+;; -----------------
+;;
+;; most of this is either copy-pasted from the polyfunc cache, or just
+;; copied from the old ad-hoc cache (with a few "API" functions
+;; renamed)
+;; 
 
-;; (define impc:ti:set-polyfunc-docstring
-;;   (lambda (polyfunc-name docstring)
-;;     (let ((pfunc-data (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
-;;       (if pfunc-data (vector-set! (cdr pfunc-data) 1 docstring) #f))))
+(define *impc:ti:genericfunc-cache* '())
+
+(define *impc:ti:genericfunc-needs-update* '())
+
+(define impc:ti:print-genericfunc-cache
+  (lambda ()
+    (println '*impc:ti:genericfunc-cache*: *impc:ti:genericfunc-cache*)))
+
+(define impc:ti:reset-genericfunc-cache
+  (lambda ()
+    (set! *impc:ti:genericfunc-cache* '())))
+
+(define impc:ti:genericfunc-src-changed
+  (lambda (name arity)
+    (if (string? name) (set! name (string->symbol name)))
+    (let ((res (member (cons name arity) *impc:ti:genericfunc-needs-update*)))
+      ;; (println 'name: name 'res: res)
+      (if res #t #f))))
+
+(define impc:ti:genericfunc-src-compiled
+  (lambda (name arity)
+    (if (string? name) (set! name (string->symbol name)))
+    (set! *impc:ti:genericfunc-needs-update*
+          (cl:remove-if (lambda (x) (equal? x (cons name arity))) *impc:ti:genericfunc-needs-update*))))
+
+(define impc:ti:genericfunc-apply-macros
+  (lambda (ast)
+    (cond ((atom? ast) ast)
+          ((and (list? ast)
+                (symbol? (car ast))
+                (not (eq? 'dotimes (car ast)))
+                (defined? (car ast))
+                (macro? (eval (car ast))))
+           (macro-expand ast))
+          ((pair? ast)
+           (cons (impc:ti:genericfunc-apply-macros (car ast))
+                 (impc:ti:genericfunc-apply-macros (cdr ast))))
+          (else ast))))
+
+(define impc:ri:register-new-genericfunc
+  (let ((pcnt 100))
+    (lambda (code)
+      ;; (println 'adding: code)
+      (set! pcnt (+ pcnt 1))
+      ;; (println 'code-pre-macro: code)
+      ;; apply any macros to generic code!
+      (set! code (cons (car code)
+                       (list (cadr code)
+                             (impc:ti:genericfunc-apply-macros (caddr code)))))
+      ;; (println 'code-post-macro: code)
+      (if (not (regex:match? (symbol->string (cadr code)) ":"))
+          (impc:compiler:print-compiler-error "generic functions must supply type"))
+      (let* ((res (regex:type-split (symbol->string (cadr code)) ":"))
+             (name (string->symbol (car res)))
+             ;; (ftype (string->symbol (cadr res))))
+             (type (cadr res))
+             (syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
+             (newsyms (map (lambda (s)
+                             (string-append "!g"
+                                            (substring s 1 (string-length s))
+                                            "_"
+                                            (number->string pcnt)))
+                           syms))
+             (newtype (string->symbol (regex:replace-everything type syms newsyms)))
+             (newtypematch (map (lambda (k) (if (regex:match? k ":")
+                                                (car (regex:type-split k ":"))
+                                                (if (regex:match? k "^\\!g")
+                                                    "_"
+                                                    k)))
+                                (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))))
+             (arity (- (length (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))) 1))
+             (newcode (list 'bind-func
+                            (string->symbol (string-append (symbol->string name)
+                                                           ":"
+                                                           (symbol->string newtype)))
+                            (caddr code))))
+        (let ((v (cl:remove-if (lambda (x)
+                                 (or
+                                  (<> arity (cadr x))
+                                  (not (string=? (symbol->string name) (symbol->string (car x))))
+                                  (member #f
+                                          (map (lambda (xx yy)
+                                                 ;; (println 'xx: xx 'yy: yy)
+                                                 (let ((res (if (regex:match? xx "^\\!g")
+                                                                (string=?
+                                                                 (car (regex:type-split yy "_"))
+                                                                 (car (regex:type-split xx "_")))
+                                                                (string=?
+                                                                 (car (regex:type-split yy ":"))
+                                                                 (car (regex:type-split xx ":"))))))
+                                                   ;; (println 'res: res)
+                                                   res))
+                                               (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
+                                               (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
+                               *impc:ti:genericfunc-cache*)))
+          ;; (if (not (null? v))
+          ;;     (println 'updating: name 'with newtype)
+          ;;     (println 'adding: name 'with newtype))
+          (if (not (null? v))
+              (set-cdr! (car v) (list arity newtype newcode newtypematch))
+              (set! *impc:ti:genericfunc-cache* (cons (list name arity newtype newcode newtypematch) *impc:ti:genericfunc-cache*)))
+          (set! *impc:ti:genericfunc-needs-update* (cons (cons name arity) *impc:ti:genericfunc-needs-update*))
+          #t)))))
+
+(define impc:ti:genericfunc-exists?
+  (lambda (name)
+    (if (string? name) (set! name (string->symbol name)))
+    (let ((res (assoc-strcmp name *impc:ti:genericfunc-cache*)))
+      (if res #t #f))))
+
+(define impc:ti:genericfunc-types
+  (lambda (name arity type)
+    ;; (println 'poly: name 'a: arity 't: type)
+    (if (symbol? name) (set! name (symbol->string name)))
+    ;; (println 'type_a: type)
+    (cond ((and type (list? type))
+           (set! type (map (lambda (x)
+                             (if (string? x)
+                                 (if (regex:match? x "_poly_")
+                                     (cadr (regex:matched x "%(.*)_poly_.*"))
+                                     (cadr (regex:matched x "%([^-*]*)")))
+                                 "_"))
+                           (if (and (number? (car type))
+                                    (impc:ir:closure? type))
+                               (cddr type)
+                               type)))
+           ;; if lgth(type) = arity then we only have args
+           ;; and we should add a "_" return type
+           (if (= (length type) arity)
+               (set! type (cons "_" type))))
+          ((and type (string? type))
+           (let ((ags (impc:ir:get-pretty-closure-arg-strings type)))
+             (set! type (map (lambda (x)
+                               (if (regex:match? x ":")
+                                   (car (regex:type-split x ":"))
+                                   (if (regex:match? x "^\\!")
+                                       "_"
+                                       x)))
+                             ags))))
+          (else (set! type (make-list (+ 1 arity) "_"))))
+    ;; (println 'type_b: type)
+    (let* ((tmp (assoc-strcmp-all (string->symbol name) *impc:ti:genericfunc-cache*))
+           (res (cl:remove-if (lambda (x) (<> arity (cadr x))) tmp)))
+      (if (null? res)
+          #f
+          (let* ((weights (map (lambda (gp)
+                                 (cons (apply + (map (lambda (x y)
+                                                       ;; (println x '=? y)
+                                                       (if (string=? x y)
+                                                           1
+                                                           (if (string=? x "_")
+                                                               0
+                                                               -100))) ;; you lose!
+                                                     (car (cddddr gp))
+                                                     type))
+                                       gp))
+                               res))
+                 (w (apply max (map (lambda (x) (car x)) weights))))
+            ;; (println '++++++++++++++ (length weights))
+            ;; (println (for-each (lambda (k)
+            ;; 			 (println k))
+            ;; 		       weights))
+            ;; (println 'best: w ': (length weights) '-> (assoc w weights))
+            (if (> (length (assoc-strcmp-all w weights)) 1)
+                (impc:compiler:print-compiler-error "ambiguous generic overload"))
+            (cdddr (assoc w weights)))))))
+
+(define impc:ir:genericfunc-print-all
+  (lambda (name)
+    (if (string? name) (set! name (string->symbol name)))
+    (for-each (lambda (i)
+                (println '--: (car i) ': (caddr i)))
+              (assoc-strcmp-all name *impc:ti:genericfunc-cache*))
+    #t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; global variables (i.e. 'bind-val's)
@@ -2526,7 +2700,7 @@
 
 (define impc:ti:expand-generic-type-func-gpoly-arity
   (lambda (name xvararity)
-    (let* ((all-gpolys (cl:remove-if-not (lambda (x) (equal? (car x) name)) *impc:ir:gpolys*))
+    (let* ((all-gpolys (cl:remove-if-not (lambda (x) (equal? (car x) name)) *impc:ti:genericfunc-cache*))
            (all-gtypes (map (lambda (x) (caddr x)) all-gpolys))
            (all-type-arity (map (lambda (x) (length
                                              (cl:remove-duplicates
@@ -2611,7 +2785,7 @@
                                                  (let* ((pair (regex:type-split (symbol->string (car x)) ":"))
                                                         (sym (string->symbol (car pair))))
                                                    (if (or (member sym syms)
-                                                           (impc:ir:gpoly-exists? sym)
+                                                           (impc:ti:genericfunc-exists? sym)
                                                            (and (not (equal? sym fname))
                                                                 (impc:ti:closure-exists? (symbol->string sym)))
                                                            (impc:ti:globalvar-exists? (symbol->string sym)))
@@ -3225,8 +3399,8 @@
   (lambda (ast inbody?)
     (if (null? ast) '()
         (cond ((list? ast)
-               (cond ((or (impc:ir:poly-types (car ast))
-                          (impc:ir:gpoly-exists? (car ast)))
+               (cond ((or (impc:ti:get-polyfunc-candidate-types (symbol->string (car ast)))
+                          (impc:ti:genericfunc-exists? (car ast)))
                       (set! *unique-polynum* (+ 1 *unique-polynum*))
                       (cons (string->symbol (string-append (symbol->string (car ast))
                                                            "##" ;"$$$"
@@ -3235,7 +3409,7 @@
                      ((and
                        (symbol? (car ast))
                        (regex:match? (symbol->string (car ast)) ":\\[")
-                       (impc:ir:gpoly-exists? (car (regex:type-split (symbol->string (car ast)) ":"))))
+                       (impc:ti:genericfunc-exists? (car (regex:type-split (symbol->string (car ast)) ":"))))
                       (let* ((p (regex:type-split (symbol->string (car ast)) ":"))
                              (ptrdepth (impc:ir:get-ptr-depth (cadr p)))
                              (base (impc:ir:get-base-type (cadr p))))
@@ -3619,9 +3793,10 @@
                   ;;                          "##" gnum)))
                   ;; (println 'updatevar: vs 'with rettype)
                   (impc:ti:update-var vs vars '() rettype)
-                  (impc:ir:add-polytype (string->symbol base)
-                                        (string->symbol newname)
-                                        (impc:ir:get-type-from-str newtype3))
+                  (impc:ti:register-new-polytype base
+                                                 newname
+                                                 (impc:ir:get-type-from-str newtype3)
+                                                 "")
                   rettype))
               vs))
         vs)))
@@ -4454,7 +4629,7 @@
           ;; if we get a generic function here it means that someone
           ;; is trying to pass it as a value (which is illegal!)
           (if (and (symbol? ast)
-                   (impc:ir:gpoly-exists? (string->symbol (impc:ir:get-base-type (symbol->string ast)))))
+                   (impc:ti:genericfunc-exists? (string->symbol (impc:ir:get-base-type (symbol->string ast)))))
               ;; (regex:match? (symbol->string ast) "##")
               ;; (not (regex:match? (symbol->string ast) "!")))
               (begin
@@ -4468,7 +4643,7 @@
                      (not (impc:ti:closure-exists? (symbol->string ast)))
                      (not (impc:ti:globalvar-exists? (symbol->string ast))))
                 (if (and (regex:match? (symbol->string ast) ":")
-                         (impc:ir:gpoly-exists?
+                         (impc:ti:genericfunc-exists?
                           (string->symbol (car (regex:type-split (symbol->string ast) ":")))))
                     (let* ((p (regex:type-split (symbol->string ast) ":"))
                            (etype (cname-encode (cadr p))))
@@ -5257,7 +5432,7 @@
                (gname (string->symbol (car (regex:split (symbol->string (car ast)) "##"))))
                (gnum (string->number (cadr (regex:split (symbol->string (car ast)) "##"))))
                (arity (- (length ast) 1))
-               (gpt (impc:ir:gpoly-types gname arity args))
+               (gpt (impc:ti:genericfunc-types gname arity args))
                ;; request? request? args)))
                (gpoly-code (cadr gpt))
                (lambda-code (caddr gpoly-code))
@@ -5309,14 +5484,14 @@
           ;;
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-          ;; (gpoly-type (impc:ir:get-type-from-pretty-str (symbol->string (car (impc:ir:gpoly-types gname))))))
+          ;; (gpoly-type (impc:ir:get-type-from-pretty-str (symbol->string (car (impc:ti:genericfunc-types gname))))))
 
 
           ;; (set! impc:ir:get-type-expand-poly #t)
           ;; (println 'gpoly-type: gpoly-type 'gtype: gtype gnum)
           ;; (println 'gpoly-code: gpoly-code)
           ;; (println 'generictype: (cadr gpoly-code))
-          ;;(println 'gpoly-typeb:> (car (impc:ir:gpoly-types gname)))
+          ;;(println 'gpoly-typeb:> (car (impc:ti:genericfunc-types gname)))
           (if (<> (length (cdr gpoly-type))
                   (length ast))
               (impc:compiler:print-compiler-error "bad arity in generics call" ast))
@@ -5451,7 +5626,7 @@
                     (cddr (impc:ti:type-unify (cdr (assoc-strcmp (car ast) vars)) vars)))
           (list (cadr (impc:ti:type-unify (cdr (assoc-strcmp (car ast) vars)) vars))))
         (let* ((polyf (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
-               (ftypes (impc:ir:poly-types polyf))
+               (ftypes (impc:ti:get-polyfunc-candidate-types (symbol->string polyf)))
                (valid-lgth (map (lambda (type)
                                   (if (<> (length (cdr type))
                                           (length ast)) #f #t))
@@ -6748,13 +6923,13 @@
           ((and (list? ast) ;; generic function
                 (symbol? (car ast))
                 (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-                (impc:ir:gpoly-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##"))))) ;"\\$\\$\\$")))))
+                (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##"))))) ;"\\$\\$\\$")))))
                                         ;(println 'generic (car ast))
            (impc:ti:nativef-generics ast vars kts request?))
           ((and (list? ast) ;; polymorphic function
                 (symbol? (car ast))
                 (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-                (impc:ir:poly-types (string->symbol (car (regex:split (symbol->string (car ast)) "##"))))) ;"\\$\\$\\$")))))
+                (impc:ti:get-polyfunc-candidate-types (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$")))))
            (let ((reses (impc:ti:nativef-poly-check ast vars kts request?)))
                                         ;(println 'ast: ast reses)
              reses))
@@ -6941,20 +7116,20 @@
                  (regex:match? (symbol->string ast) ":"))
             (let* ((p (regex:type-split (symbol->string ast) ":"))
                    (ptrs (impc:ir:get-ptr-depth ast))
-                   (poly? (impc:ir:gpoly-exists? (string->symbol (car p))))
+                   (poly? (impc:ti:genericfunc-exists? (string->symbol (car p))))
                    (etype (cname-encode (cadr p))))
               (if poly?
                   (begin
                     (if (not (llvm:get-function (string-append (car p) "_poly_" etype)))
                         (let* ((arity (- (length (impc:ir:get-pretty-closure-arg-strings (cadr p))) 1))
-                               (ptypes (impc:ir:gpoly-types (string->symbol (car p)) arity (cadr p)))
+                               (ptypes (impc:ti:genericfunc-types (string->symbol (car p)) arity (cadr p)))
                                (tmp (if (not ptypes)
                                         (impc:compiler:print-bad-arity-error ast)))
-                               (code (caddr (cadr (impc:ir:gpoly-types (string->symbol (car p)) arity (cadr p)))))
+                               (code (caddr (cadr (impc:ti:genericfunc-types (string->symbol (car p)) arity (cadr p)))))
                                (pfunc (string->symbol (string-append (car p) "_poly_" etype))))
                           (set! code `(let ((,pfunc ,code)) ,pfunc))
                           (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol (cadr p))))
-                          (impc:ir:add-poly (string->symbol (car p)) pfunc (cadr p))
+                          (impc:ti:register-new-polyfunc (car p) (symbol->string pfunc) (impc:ir:get-type-from-pretty-str (cadr p)))
                           (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                             (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
                             (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
@@ -7010,10 +7185,10 @@
               ;; do generic functions before polys
               ((and (symbol? (car ast))
                     (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-                    (impc:ir:gpoly-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
+                    (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
                ;; (println 'types types)
                ;; (println 'gpoly: (car ast))
-               ;; (println 'gpoly: (impc:ir:gpoly-types (string->symbol (car (regex:split (symbol->string (car ast)) "\\$\\$\\$")))))
+               ;; (println 'gpoly: (impc:ti:genericfunc-types (string->symbol (car (regex:split (symbol->string (car ast)) "\\$\\$\\$")))))
                ;; (println 'compile 'generic? ast)
                ;; (println 'types types)
                (if (null? (cdr (assoc-strcmp (car ast) types)))
@@ -7027,15 +7202,15 @@
                       (symp (regex:type-split (symbol->string symname) "_poly_"))
                       (symcname (if (null? (cdr symp)) "" (cadr symp)))
                       (arity (- (length (impc:ir:get-pretty-closure-arg-strings type)) 1))
-                      (code (caddr (cadr (impc:ir:gpoly-types polyname arity type))))
-                                        ;(lllll (println 'actual-code (caddr (cadr (impc:ir:gpoly-types polyname)))))
-                      (exists (if (string=? type "") #f (impc:ir:check-poly polyname type))))
-                 ;; (println 'polyname: polyname 'type: type 'exists: exists 'changed: (impc:ir:gpoly-src-changed polyname arity))
-                 ;; (impc:ir:gpoly-src-changed polyname arity))
-                 ;; (println 'p: (car ast) 'exists: exists 'changed: (impc:ir:gpoly-src-changed polyname arity))
+                      (code (caddr (cadr (impc:ti:genericfunc-types polyname arity type))))
+                                        ;(lllll (println 'actual-code (caddr (cadr (impc:ti:genericfunc-types polyname)))))
+                      (exists (if (string=? type "") #f (impc:ti:get-polyfunc-candidate (symbol->string polyname) (impc:ir:get-type-from-pretty-str type)))))
+                 ;; (println 'polyname: polyname 'type: type 'exists: exists 'changed: (impc:ti:genericfunc-src-changed polyname arity))
+                 ;; (impc:ti:genericfunc-src-changed polyname arity))
+                 ;; (println 'p: (car ast) 'exists: exists 'changed: (impc:ti:genericfunc-src-changed polyname arity))
                  (if (or (if exists
-                             (if (and (regex:match? (symbol->string exists) "_poly_")
-                                      (impc:ir:gpoly-src-changed polyname arity))
+                             (if (and (regex:match? exists "_poly_")
+                                      (impc:ti:genericfunc-src-changed polyname arity))
                                  #f
                                  #t)
                              #f)
@@ -7051,20 +7226,20 @@
                                                        (impc:ti:add-types-to-source symname jj types envvars ast))
                                                      (cdr ast)))))
                          (begin ;; (println 'polyexists)
-                           (cons exists
+                           (cons (string->symbol exists)
                                  (map (lambda (jj)
                                         (impc:ti:add-types-to-source symname jj types envvars ast))
                                       (cdr ast)))))
                      (let ((pfunc (string->symbol (string-append (car (regex:split (symbol->string (car ast)) "##")) "_poly_" (cname-encode type)))))
                        ;; (println 'pfund: pfunc)
-                       (impc:ir:gpoly-src-compiled polyname arity)
+                       (impc:ti:genericfunc-src-compiled polyname arity)
                        (set! code `(let ((,pfunc ,code)) ,pfunc))
                                         ;(print)
                        ;; (println 'pfunc: pfunc 'type: type 'code: code)
                        ;; (println 'kts: (cons pfunc (string->symbol type)))
                                         ;(print)
                        (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol type)))
-                       (impc:ir:add-poly polyname pfunc type)
+                       (impc:ti:register-new-polyfunc (symbol->string polyname) (symbol->string pfunc) (impc:ir:get-type-from-pretty-str))
                        (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                          (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
                          (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
@@ -7077,9 +7252,9 @@
               ;; inject polymorphic functions
               ((and (symbol? (car ast))
                     (regex:match? (symbol->string (car ast)) "##")) ;"\\$\\$\\$"))
-               (let* ((pname (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
+               (let* ((pname (car (regex:split (symbol->string (car ast)) "##"))) ;"\\$\\$\\$"))))
                       (type (cdr (assoc-strcmp (car ast) types)))
-                      (polyname (impc:ir:check-poly pname type)))
+                      (polyname (impc:ti:get-polyfunc-candidate pname type)))
                  (cons polyname
                        (map (lambda (jj)
                               (impc:ti:add-types-to-source symname jj types envvars ast))
@@ -7177,11 +7352,11 @@
 ;; 		   (cond ((pair? ast)
 ;; 			  (cond ((and (symbol? (car ast)) ;; this for generics
 ;; 				      (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-;; 				      (impc:ir:gpoly-types (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
+;; 				      (impc:ti:genericfunc-types (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
 ;; 				 ;; (println 'generics ast (regex:split (symbol->string (car ast)) "(\\$\\$\\$)|(_poly_)"))
 ;; 				 (let* ((gname (string->symbol (car (regex:split (symbol->string (car ast)) "(##)|(_poly_)"))))
 ;;                                         (gnum (string->number (cadr (regex:split (symbol->string (car ast)) "(##)|(_poly_)"))))
-;;                                         (typestrs (cl:remove-duplicates (impc:ir:get-pretty-closure-arg-strings (symbol->string (car (impc:ir:gpoly-types gname))))))
+;;                                         (typestrs (cl:remove-duplicates (impc:ir:get-pretty-closure-arg-strings (symbol->string (car (impc:ti:genericfunc-types gname))))))
 ;;                                         (types (map (lambda (x) (impc:ir:get-type-from-pretty-str x)) typestrs))
 ;;                                         (newsyms (cl:remove-duplicates
 ;;                                                   (map (lambda (a b)
@@ -7243,8 +7418,8 @@
                   (cond ((pair? ast)
                          (cond ((and (symbol? (car ast)) ;; this for generics
                                      (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-                                     (impc:ir:gpoly-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
-                                (if (not (impc:ir:gpoly-types (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
+                                     (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
+                                (if (not (impc:ti:genericfunc-types (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
                                                               (length (cdr ast)) #f))
                                     (impc:compiler:print-bad-arity-error (car (regex:split (symbol->string (car ast)) "##"))))
                                 ;; (println 'generics ast (regex:split (symbol->string (car ast)) "(\\$\\$\\$)|(_poly_)"))
@@ -7253,7 +7428,7 @@
                                        (arity (length (cdr ast)))
                                        (typestrs (cl:remove-duplicates
                                                   (impc:ir:get-pretty-closure-arg-strings
-                                                   (symbol->string (car (impc:ir:gpoly-types gname arity #f))))))
+                                                   (symbol->string (car (impc:ti:genericfunc-types gname arity #f))))))
                                        (types (map (lambda (x) (impc:ir:get-type-from-pretty-str x)) typestrs))
                                        (newsyms (cl:remove-duplicates
                                                  (map (lambda (a b)
@@ -7280,7 +7455,7 @@
                                   (f (cdr ast))))
                                ((and (symbol? (car ast)) ;; this for polys
                                      (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-                                     (impc:ir:poly-types (string->symbol (car (regex:split (symbol->string (car ast)) "##"))))) ;"\\$\\$\\$")))))
+                                     (impc:ti:get-polyfunc-candidate-types (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$")))))
                                 ;; (println 'poly!var (car ast))
                                 (set! syms (append (list (car ast)) syms))
                                 (f (cdr ast)))
@@ -8102,9 +8277,9 @@
                                       '()
                                       docstring
                                       (cadr args)))
-    (if (impc:ir:poly-types (car args))
-        (impc:compiler:print-already-bound-error (car args) "poly function"))
-    (if (impc:ir:gpoly-exists? (car args))
+    (if (impc:ti:polyfunc-exists? (car args))
+        (impc:compiler:print-already-bound-error (car args) "polymorphic closure"))
+    (if (impc:ti:genericfunc-exists? (car args))
         (impc:compiler:print-already-bound-error (car args) "generic closure")))
   (if (regex:match? (symbol->string (car args)) ":")
       (let* ((res (regex:type-split (symbol->string (car args)) ":"))
@@ -8126,8 +8301,8 @@
         ;; (println 'newargs: (cons newnametype (cdr args)))
         (if (regex:match? newtype "!")
             (begin
-              (impc:ir:add-gpoly (cons 'bind-func (cons newnametype (cdr args))))
-              ;;(impc:ir:add-gpoly (cons 'bind-func args))
+              (impc:ri:register-new-genericfunc (cons 'bind-func (cons newnametype (cdr args))))
+              ;;(impc:ri:register-new-genericfunc (cons 'bind-func args))
               `(impc:compiler:print-binding-details-to-log "Generic: " ,(car res) ,(cadr res)))
             `(impc:ti:parametric-poly-pass '(definec ,@args))))
       `(impc:ti:parametric-poly-pass '(definec ,@args))))
@@ -8464,11 +8639,11 @@
 
 
 (define-macro (bind-poly poly_sym implementation_sym)
-  (if (impc:ir:gpoly-exists? implementation_sym)
+  (if (impc:ti:genericfunc-exists? implementation_sym)
       (impc:compiler:print-compiler-error (string-append "bind-poly only accepts monomorphic functions, not " (symbol->string implementation_sym))))
   (let ((type (impc:ti:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
     ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
-    `(begin (impc:ir:add-poly ',poly_sym ',implementation_sym ',type)
+    `(begin (impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ,type)
             (impc:compiler:print-polying-details-to-log "Overload:" ',poly_sym ',implementation_sym ,(impc:ir:pretty-print-type type)))))
 
 ;; (define-macro (bind-scm symbol type value)
@@ -8688,7 +8863,7 @@
 ;;
 (define _constrain-generic
   (lambda (sym . types)
-    (if (not (impc:ir:gpoly-exists? (string->symbol sym)))
+    (if (not (impc:ti:genericfunc-exists? (string->symbol sym)))
         (impc:compiler:print-missing-identifier-error sym "generic function")
         (let ((printspec *impc:ti:print-code-specialization-compiles*))
           (set! *impc:ti:print-code-specialization-compiles* #t)
@@ -8699,12 +8874,12 @@
              (let ((etype (cname-encode t)))
                (if (not (llvm:get-function (string-append sym "_poly_" etype)))
                    (let* ((arity (- (length (impc:ir:get-pretty-closure-arg-strings t)) 1))
-                          (code (caddr (cadr (impc:ir:gpoly-types (string->symbol sym) arity t))))
+                          (code (caddr (cadr (impc:ti:genericfunc-types (string->symbol sym) arity t))))
                           (pfunc (string->symbol (string-append sym "_poly_" etype))))
                      ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
                      (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol t)))
-                     (impc:ir:add-poly (string->symbol sym) pfunc t)
+                     (impc:ti:register-new-polyfunc sym (symbol->string pfunc) (impc:ir:get-type-from-pretty-str t))
                      (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                        (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
                        (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
@@ -8712,11 +8887,11 @@
                      pfunc))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
-          (set! *impc:ir:gpolys*
+          (set! *impc:ti:genericfunc-cache*
                 (cl:remove-if (lambda (x)
                                 (if (string=? (symbol->string (car x)) sym)
                                     #t #f))
-                              *impc:ir:gpolys*))
+                              *impc:ti:genericfunc-cache*))
           #t))))
 
 (define-macro (constrain-generic sym . args)
@@ -8769,7 +8944,7 @@
 ;;
 (define _specialize-generic
   (lambda (sym . types)
-    (if (not (impc:ir:gpoly-exists? (string->symbol sym)))
+    (if (not (impc:ti:genericfunc-exists? (string->symbol sym)))
         (impc:compiler:print-missing-identifier-error sym "generic function")
         (let ((printspec *impc:ti:print-code-specialization-compiles*))
           (set! *impc:ti:print-code-specialization-compiles* #t)
@@ -8780,13 +8955,13 @@
              (let ((etype (cname-encode t)))
                (if (not (llvm:get-function (string-append sym "_poly_" etype)))
                    (let* ((arity (- (length (impc:ir:get-pretty-closure-arg-strings t)) 1))
-                          (code (caddr (cadr (impc:ir:gpoly-types (string->symbol sym) arity t))))
+                          (code (caddr (cadr (impc:ti:genericfunc-types (string->symbol sym) arity t))))
                           (pfunc (string->symbol (string-append sym "_poly_" etype))))
                      ;; (println 'makesym etype 't: t)
                      ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
                      (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol t)))
-                     (impc:ir:add-poly (string->symbol sym) pfunc t)
+                     (impc:ti:register-new-polyfunc sym (symbol->string pfunc) (impc:ir:get-type-from-pretty-str t))
                      (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                        (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
                        (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
