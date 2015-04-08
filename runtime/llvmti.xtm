@@ -1657,7 +1657,7 @@
   (lambda (polyfunc-name)
     (if (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*) #t #f)))
 
-(define impc:ti:get-polyfunc-candidates
+(define impc:ti:get-polyfunc-candidate-list
   (lambda (polyfunc-name)
     (let ((pfunc-data (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
       (if pfunc-data
@@ -1692,14 +1692,14 @@
 
 (define impc:ti:get-polyfunc-candidate-names
   (lambda (polyfunc-name)
-    (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+    (let ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name)))
       (and candidates
            (map (lambda (func-vector) (vector-ref func-vector 0)) candidates)))))
 
 ;; remap impc:ir:poly-types - should return list types for all options
 (define impc:ti:get-polyfunc-candidate-types
   (lambda (polyfunc-name)
-    (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+    (let ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name)))
       (and candidates
            (map (lambda (func-vector) (vector-ref func-vector 1)) candidates)))))
 
@@ -1711,7 +1711,7 @@
 ;; remap impc:ir:poly-print-all
 (define impc:ti:polyfunc-pretty-print
   (lambda (polyfunc-name)
-    (let ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+    (let ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name)))
       (and candidates
            (begin
              (print "Polymorphic options for ")
@@ -1731,11 +1731,11 @@
 ;; remap impc:ir:check-poly
 (define impc:ti:get-polyfunc-candidate
   (lambda (polyfunc-name func-type)
-    (let loop ((candidates (impc:ti:get-polyfunc-candidates polyfunc-name)))
+    (let loop ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name)))
       (if (or (not candidates) (null? candidates))
           #f
           (if (equal? (vector-ref (car candidates) 1) func-type)
-              (vector-ref (car candidates) 0)
+              (string->symbol (vector-ref (car candidates) 0))
               (loop (cdr candidates)))))))
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -1945,7 +1945,7 @@
   (lambda (polytype-name)
     (if (assoc-strcmp polytype-name *impc:ti:polytype-cache*) #t #f)))
 
-(define impc:ti:get-polytype-candidates
+(define impc:ti:get-polytype-candidate-list
   (lambda (polytype-name)
     (let ((pfunc-data (assoc-strcmp polytype-name *impc:ti:polytype-cache*)))
       (if pfunc-data
@@ -1980,7 +1980,7 @@
 
 (define impc:ti:get-polytype-candidate-names
   (lambda (polytype-name)
-    (let ((candidates (impc:ti:get-polytype-candidates polytype-name)))
+    (let ((candidates (impc:ti:get-polytype-candidate-list polytype-name)))
       (and candidates
            (map (lambda (func-vector) (vector-ref func-vector 0)) candidates)))))
 
@@ -1988,7 +1988,7 @@
 ;; options
 (define impc:ti:get-polytype-candidate-types
   (lambda (polytype-name)
-    (let ((candidates (impc:ti:get-polytype-candidates polytype-name)))
+    (let ((candidates (impc:ti:get-polytype-candidate-list polytype-name)))
       (and candidates
            (map (lambda (func-vector) (vector-ref func-vector 1)) candidates)))))
 
@@ -2000,7 +2000,7 @@
 ;; remap impc:ir:poly-print-all
 (define impc:ti:polytype-pretty-print
   (lambda (polytype-name)
-    (let ((candidates (impc:ti:get-polytype-candidates polytype-name)))
+    (let ((candidates (impc:ti:get-polytype-candidate-list polytype-name)))
       (and candidates
            (begin
              (print "Polymorphic types for ")
@@ -2020,11 +2020,11 @@
 ;; remap impc:ir:check-polytype
 (define impc:ti:get-polytype-candidate
   (lambda (polytype-name func-type)
-    (let loop ((candidates (impc:ti:get-polytype-candidates polytype-name)))
+    (let loop ((candidates (impc:ti:get-polytype-candidate-list polytype-name)))
       (if (or (not candidates) (null? candidates))
           #f
           (if (equal? (vector-ref (car candidates) 1) func-type)
-              (vector-ref (car candidates) 0)
+              (string->symbol (vector-ref (car candidates) 0))
               (loop (cdr candidates)))))))
 
 (define impc:ti:polytype-match?
