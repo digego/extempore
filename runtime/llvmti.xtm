@@ -4657,7 +4657,7 @@
                        (not (impc:ti:closure-exists? (symbol->string sym)))
                        (not (impc:ti:globalvar-exists? (symbol->string sym))))
                   (begin ;; (error)
-                    (impc:compiler:print-missing-type-error sym))
+                    (impc:compiler:print-missing-identifier-error sym 'type))
                   (let ((pair (assoc-strcmp sym vars)))
                     (if pair
                         (let ((pair-rest (cdr pair)))
@@ -5081,7 +5081,7 @@
              (regex:match? x "^%")
              (regex:match? x "_poly_")
              (if (null? (impc:ti:get-named-type x))
-                 (impc:compiler:print-missing-type-error x)
+                 (impc:compiler:print-missing-identifier-error x 'type)
                  #t))
         (let* ((gpolyname (regex:replace-all x "^%(.*)_poly_.*$" "$1"))
                (ptrdepth (impc:ir:get-ptr-depth x))
@@ -8836,7 +8836,7 @@
               (impc:compiler:print-binding-details-to-log "SetValue:"
                                                           ,(symbol->string symbol)
                                                           ,(impc:ir:pretty-print-type t))))
-          (else (impc:compiler:print-missing-type-error type)))))
+          (else (impc:compiler:print-missing-identifier-error type 'type)))))
 
 
 (define-macro (bind-poly poly_sym implementation_sym)
