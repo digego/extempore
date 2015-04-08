@@ -180,7 +180,7 @@
 (define parse-sample-names-2
   (lambda (file-list)
     (map (lambda (fname)
-           (let ((result (regex:matched fname "^.*([abcdefgABCDEFG][#b]?[0-9]).*\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+           (let ((result (regex:matched fname "^.*?([abcdefgABCDEFG][#b]?[0-9]).*\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
              (if (null? result)
                  (begin
                    (if (not (regex:match? fname "^\\."))
@@ -197,9 +197,9 @@
 (define parse-sample-names
   (lambda (file-list)
     (map (lambda (fname)
-           (if (regex:match? fname "([0-9][0-9][0-9]*)\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
+           (if (regex:match? fname "([0-9][0-9][0-9]*)\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
                (car (parse-sample-names-1 (list fname)))
-               (if (regex:match? fname "^.*([abcdefgABCDEFG][#b]?[0-9]).*\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
+               (if (regex:match? fname "^.*?([abcdefgABCDEFG][#b]?[0-9]).*\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
                    (car (parse-sample-names-2 (list fname)))
                    #f)))
          file-list)))
