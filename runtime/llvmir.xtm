@@ -1042,7 +1042,7 @@
                      ;; (println 'actuals gtype (cadr p))
                      (if (<> (length gtype-all) (length type-all))
                          (impc:compiler:print-type-mismatch-error (cadr p) gtype))
-                     (impc:ir:get-type-from-pretty-str (apply string-append (car p) (make-list ptr-depth "*"))
+                     (impc:ir:get-type-from-pretty-str (string-append (car p) (make-string ptr-depth #\*))
                                                        (list (car p) (cons
                                                                       (cons (car p) base)
                                                                       (map (lambda (a b)
@@ -1056,11 +1056,11 @@
                                                                                (cons a b)))
                                                                            gtype-all type-all)))))
                    (impc:ir:get-type-from-pretty-str ;; otherwise fully typed
-                    (apply string-append "%" (car p) "_poly_"
-                           (if (= (length p) 2)
-                               (cname-encode (cadr p))
-                               (cname-encode (apply string-append (cadr p) (map (lambda (x) (string-append ":" x)) (cddr p)))))
-                           (make-string ptr-depth #\*))))))
+                    (string-append "%" (car p) "_poly_"
+                                   (if (= (length p) 2)
+                                       (cname-encode (cadr p))
+                                       (cname-encode (apply string-append (cadr p) (map (lambda (x) (string-append ":" x)) (cddr p)))))
+                                   (make-string ptr-depth #\*))))))
             ((impc:ti:namedtype-exists? base)
              (if (char=? (string-ref base 0) #\%)
                  string-type
@@ -1074,8 +1074,8 @@
                     (t2 (impc:ir:get-pretty-tuple-arg-strings t1))
                     (t3 (map (lambda (k)
                                (if (string=? (impc:ir:get-base-type k) name)
-                                   (apply string-append "%" name1
-                                          (make-list (impc:ir:get-ptr-depth k) "*"))
+                                   (string-append "%" name1
+                                                  (make-string (impc:ir:get-ptr-depth k) #\*))
                                    (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str k))))
                              t2))
                     (t4 (string-append "{ " (string-join t3 ", ") " }"))
@@ -1102,8 +1102,8 @@
                         (string=? (car args) base2))
                    (string->symbol string-type)
                    (let* ((type (impc:ir:get-type-from-pretty-str
-                                 (apply string-append (symbol->string (impc:ti:get-generictype-candidate-types base2))
-                                        (make-string ptr-depth #\*))
+                                 (string-append (symbol->string (impc:ti:get-generictype-candidate-types base2))
+                                                (make-string ptr-depth #\*))
                                  base2)))
                      ;; if we have come from a defined generic type
                      ;; i.e. List:<!a,List*>
@@ -1132,8 +1132,8 @@
                                              ;; (println 'k: k 'p: p)
                                              (if (string? k)
                                                  (if (char=? (string-ref k 0) #\%)
-                                                     (apply string-append k (make-list p "*"))
-                                                     (string->symbol (apply string-append k (make-list p "*"))))
+                                                     (string-append k (make-string p #\*))
+                                                     (string->symbol (string-append k (make-string p #\*))))
                                                  k))
                                            type ptrs))))
                      ;; (println 'type: type 'extended: extended)
@@ -1288,26 +1288,25 @@
         (if (symbol? type) (symbol->string type) type)
         (cond ((list? type) ;; must be a complex type
                (cond ((impc:ir:closure? (car type))
-                      (apply string-append "{i8*, i8*, "(impc:ir:make-function-str (cdr type) #t) "*}"
-                             (make-list (impc:ir:get-ptr-depth (car type)) "*")))
+                      (string-append "{i8*, i8*, " (impc:ir:make-function-str (cdr type) #t) "*}"
+                                     (make-string (impc:ir:get-ptr-depth (car type)) #\*)))
                      ((impc:ir:tuple? (car type))
-                      (apply string-append "{" (string-join (map (lambda (x) (apply impc:ir:get-type-str x args)) (cdr type)) ",") "}"
-                             (make-list (impc:ir:get-ptr-depth (car type)) "*")))
+                      (string-append "{" (string-join (map (lambda (x) (apply impc:ir:get-type-str x args)) (cdr type)) ",") "}"
+                                     (make-string (impc:ir:get-ptr-depth (car type)) #\*)))
                      ((impc:ir:array? (car type))
-                      (apply string-append "[" (number->string (cadr type)) " x " (apply impc:ir:get-type-str (caddr type) args) "]"
-                             (make-list (impc:ir:get-ptr-depth (car type)) "*")))
+                      (string-append "[" (number->string (cadr type)) " x " (apply impc:ir:get-type-str (caddr type) args) "]"
+                                     (make-string (impc:ir:get-ptr-depth (car type)) #\*)))
                      ((impc:ir:vector? (car type))
-                      (apply string-append "<" (number->string (cadr type)) " x " (apply impc:ir:get-type-str (caddr type) args) ">"
-                             (make-list (impc:ir:get-ptr-depth (car type)) "*")))
+                      (string-append "<" (number->string (cadr type)) " x " (apply impc:ir:get-type-str (caddr type) args) ">"
+                                     (make-string (impc:ir:get-ptr-depth (car type)) #\*)))
                      (else (impc:compiler:print-bad-type-error type "bad complex type"))))
               ((= type *impc:ir:void*) "void")
               ((< type 0) ;; this here for recursive llvm ir type defs only!
                (let ((base (* -1 (modulo type (* -1 *impc:ir:pointer*))))
-                     (ptr-depth (floor (/ type (* -1 *impc:ir:pointer*)))))
-                                        ;(apply string-append "REC" (make-list ptr-depth "*"))))
-                 (apply string-append "\\" (number->string base) (make-list ptr-depth "*"))))
+                     (ptr-depth (real->integer (floor (/ type (* -1 *impc:ir:pointer*))))))
+                 (string-append "\\" (number->string base) (make-string ptr-depth #\*))))
               (else (let ((base (modulo type *impc:ir:pointer*))
-                          (ptr-depth (floor (/ type *impc:ir:pointer*))))
+                          (ptr-depth (real->integer (floor (/ type *impc:ir:pointer*)))))
                       (string-append (cond ((= base *impc:ir:fp64*) "double")
                                            ((= base *impc:ir:fp32*) "float")
                                            ((member base (list *impc:ir:si64* *impc:ir:ui64*)) "i64")
@@ -1318,7 +1317,7 @@
                                            ((string? (car args))
                                             (string-append "%" (car args)))
                                            (else (impc:compiler:print-bad-type-error (if (null? args) type (car args)))))
-                                     (apply string-append (make-list ptr-depth "*")))))))))
+                                     (make-string ptr-depth #\*))))))))
 
 
 (define impc:ir:convert-types
@@ -1486,14 +1485,14 @@
         (if (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a)))
             (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a))))
                    (ptrdepth (impc:ir:get-ptr-depth a))
-                   (strtype (apply string-append nt (make-string ptrdepth #\*))))
+                   (strtype (string-append nt (make-string ptrdepth #\*))))
               (set! a (impc:ir:get-type-from-str strtype)))
             (set! a (impc:ir:get-type-from-str a))))
     (if (string? b)
         (if (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type b)))
             (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type b))))
                    (ptrdepth (impc:ir:get-ptr-depth b))
-                   (strtype (apply string-append nt (make-string ptrdepth #\*))))
+                   (strtype (string-append nt (make-string ptrdepth #\*))))
               (set! b (impc:ir:get-type-from-str strtype)))
             (set! b (impc:ir:get-type-from-str b))))
     ;; (println 'equal? a b)

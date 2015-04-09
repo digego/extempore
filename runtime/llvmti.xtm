@@ -2933,8 +2933,8 @@
                         (set! gtype (regex:replace-all gtype x y)))
                       gvars xvars)
             (if func?
-                (string->symbol (apply string-append (car p) "_poly_" (cname-encode gtype) (make-list (- ptrdepth 1) "*")))
-                (string->symbol (apply string-append (car p) ":" gtype (make-list ptrdepth "*")))))))))
+                (string->symbol (string-append (car p) "_poly_" (cname-encode gtype) (make-string (- ptrdepth 1) #\*)))
+                (string->symbol (string-append (car p) ":" gtype (make-string ptrdepth #\*)))))))))
 
 
 (define impc:ti:expand-generic-types
@@ -3607,7 +3607,7 @@
                              (base (impc:ir:get-base-type (cadr p))))
                         (_specialize-generic (car p) (cadr p))
                         (cons
-                         (string->symbol (apply string-append (car p) "_poly_" (cname-encode (cadr p)) (make-list (- ptrdepth 1) "*")))
+                         (string->symbol (string-append (car p) "_poly_" (cname-encode (cadr p)) (make-string (- ptrdepth 1) #\*)))
                          (impc:ti:first-transform (cdr ast) inbody?))))
                      ((eq? (car ast) 'letz)
                       (impc:ti:first-transform (impc:ti:letz ast) inbody?))
@@ -3704,8 +3704,8 @@
                                    (cadr ast)
                                    (if etype
                                        (string->symbol
-                                        (apply string-append "%" (car p) "_poly_" etype
-                                               (make-list ptrdepth "*")))
+                                        (string-append "%" (car p) "_poly_" etype
+                                                       (make-string ptrdepth #\*)))
                                        (string->symbol (car p))))
                              inbody?))))
                      ((eq? (car ast) 'doloop) (impc:ti:doloop ast inbody?))
@@ -3971,7 +3971,7 @@
                                                (if (string? (impc:ir:get-type-from-pretty-str x))
                                                    (impc:ir:get-type-from-pretty-str x)
                                                    (if (regex:match? x gpolyname)
-                                                       (apply string-append "%" newname (make-list (impc:ir:get-ptr-depth x) "*"))
+                                                       (string-append "%" newname (make-string (impc:ir:get-ptr-depth x) #\*))
                                                        (impc:ir:get-type-from-pretty-str x))))
                                              elements)))
                      (newtype3 (impc:ir:get-type-str newtype2)))
@@ -3988,7 +3988,7 @@
                       ;; the top level, we should call use callback to add to queue
                       (callback (now) 'build-type-dataconstructor (string->symbol newname) newtype1 #f)
                       'done))
-                (let ((rettype (apply string-append "%" newname (make-list ptrdepth "*"))))
+                (let ((rettype (string-append "%" newname (make-string ptrdepth #\*))))
                   ;; (println 'oldvs: vs)
                   ;; (set! vs (string->symbol
                   ;;           (string-append base ":" gtype
@@ -5678,9 +5678,9 @@
                                                      (not (impc:ir:type? aa)))
                                                 aa
                                                 (if (string? aa)
-                                                    (apply string-append aa (make-list aptrdepth "*"))
+                                                    (string-append aa (make-string aptrdepth #\*))
                                                     (impc:ir:pretty-print-type aa)))
-                                            (apply string-append bb (make-list ptrdepth "*"))
+                                            (string-append bb (make-string ptrdepth #\*))
                                             (car (regex:type-split (symbol->string (car ast)) "##")))))))))
                     (cdr ast)
                     (cddr gpoly-type))
@@ -8382,8 +8382,8 @@
                           (string-append "["
                                          (string-join (map (lambda (x)
                                                              (if (regex:match? x ":")
-                                                                 (apply string-append (car (regex:type-split x ":"))
-                                                                        (make-list (impc:ir:get-ptr-depth x) "*"))
+                                                                 (string-append (car (regex:type-split x ":"))
+                                                                                (make-string (impc:ir:get-ptr-depth x) #\*))
                                                                  x))
                                                            type2)
                                                       ",")
@@ -8500,9 +8500,9 @@
              ;; i.e. expand list* into list:<!a,list*>*
              (expand-polys (map (lambda (k)
                                   (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
-                                      (apply string-append (impc:ir:get-base-type k) ":"
-                                             (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k)))
-                                             (make-list (impc:ir:get-ptr-depth k) "*"))
+                                      (string-append (impc:ir:get-base-type k) ":"
+                                                     (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k)))
+                                                     (make-string (impc:ir:get-ptr-depth k) #\*))
                                       k))
                                 ags))
              (newtype (string-append "[" (string-join expand-polys ",") "]*"))
@@ -8700,9 +8700,9 @@
                 (expand-polys (map (lambda (k)
                                      (if (and (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
                                               (not (equal? (impc:ir:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
-                                         (apply string-append (impc:ir:get-base-type k) ":"
-                                                (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k)))
-                                                (make-list (impc:ir:get-ptr-depth k) "*"))
+                                         (string-append (impc:ir:get-base-type k) ":"
+                                                        (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k)))
+                                                        (make-string (impc:ir:get-ptr-depth k) #\*))
                                          k))
                                    ags))
                 (newtype (string-append "<" (string-join expand-polys ",") ">")))
