@@ -1688,7 +1688,12 @@
               ;; or create a new entry
               (set! *impc:ti:polyfunc-cache*
                     (cons (cons polyfunc-name (vector (list (vector func-name func-type)) docstring))
-                          *impc:ti:polyfunc-cache*)))))))
+                          *impc:ti:polyfunc-cache*)))
+          ;; if the poly'd over func isn't a closure (e.g. if it's a
+          ;; generic specialization) then we add it to the nativefunc
+          ;; cache as well
+          (if (not (impc:ti:closure-exists? func-name))
+              (impc:ti:register-new-nativefunc func-name func-type docstring))))))
 
 (define impc:ti:get-polyfunc-candidate-names
   (lambda (polyfunc-name)
