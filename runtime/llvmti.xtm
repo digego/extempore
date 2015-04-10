@@ -4666,8 +4666,7 @@
                        (not (regex:match? (symbol->string sym) ":\\["))
                        (not (impc:ti:closure-exists? (symbol->string sym)))
                        (not (impc:ti:globalvar-exists? (symbol->string sym))))
-                  (begin ;; (error)
-                    (impc:compiler:print-missing-identifier-error sym 'type))
+                  (impc:compiler:print-missing-identifier-error sym 'type)
                   (let ((pair (assoc-strcmp sym vars)))
                     (if pair
                         (let ((pair-rest (cdr pair)))
@@ -8218,7 +8217,7 @@
                                                                                                  ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
                                                                                                                                       (impc:ti:scm_rt_check_string n)
                                                                                                                                       n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
-                                                                                                 (else (error "Compiler Error: 'bad 'type 'in 'scheme 'stub")))))
+                                                                                                 (else (impc:compiler:print-compiler-error "bad type in scheme stub")))))
                                                                           (cdr stub-type)
                                                                           '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t")
                                                                           (make-list-with-proc 20 (lambda (i) i))))
@@ -8270,7 +8269,7 @@
                                                                       ((= t *impc:ir:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
                                                                       ((= t *impc:ir:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
                                                                       ((= t *impc:ir:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
-                                                                      (else (error 'Compiler 'Error: 'return 'type 'error 'in 'scheme 'stub))))
+                                                                      (else (impc:compiler:print-compiler-error "return type error in scheme stub"))))
 
                                                               "ret i8* %res\n"
                                                               "}\n\n")))
