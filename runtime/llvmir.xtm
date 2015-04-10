@@ -1199,6 +1199,18 @@
            (t2 (map (lambda (x) (impc:ir:get-type-from-str x)) t1)))
       t2)))
 
+;; this is a hack - it's necessary for recursive generic types
+(define impc:ir:get-potentially-recursive-tuple-type-from-str
+  (lambda (type-name string-type)
+    (let* ((s1 (regex:replace string-type "\\<?\\{(.*)\\}\\>?.*" "$1"))
+           (t1 (cl:remove-if (lambda (x) (string=? x ""))
+                             (regex:match-all s1 impc:ir:regex-structs-or-atoms)))
+           (t2 (map (lambda (x)
+                      (if (string=? (impc:ir:clean-named-type x) type-name)
+                          x
+                          (impc:ir:get-type-from-str x))) t1)))
+      t2)))
+
 (define impc:ir:get-array-type-from-str
   (lambda (string-type)
     (let* ((s1 (regex:replace string-type "\\[(.*)\\].*" "$1"))

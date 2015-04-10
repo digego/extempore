@@ -3946,7 +3946,7 @@
                                      ;;  (regex:match? x gpolyname)))
                                      (regex:match-all s1 impc:ir:regex-tc-or-a))))
                  (es (map (lambda (x) (if (string? (impc:ir:get-type-from-pretty-str x))
-                                          (impc:ir:get-type-from-pretty-str x) x))
+                                     (impc:ir:get-type-from-pretty-str x) x))
                           es2))
                  (tr (cl:remove-if (lambda (x)
                                      ;; (println 'x: x 'gpolyname: gpolyname)
@@ -3983,17 +3983,19 @@
                 ;;(println 'newtype! newname 'totype: newtype3)
                 (if (not (impc:ti:namedtype-exists? newname))
                     (begin ;; if this is a new reification of a generic type then ...
-                      (llvm:compile-ir (string-append "%" newname " = type " newtype3))
-                      (impc:ti:register-new-polytype base
-                                                     newname
-                                                     (impc:ir:get-type-from-str newtype3)
-                                                     "")
-                      ;; we should probably also build dataconstructors for the new
-                      ;; concrete type?? (at least for printing reasons)
-                      ;; because build-type-dataconstructor needs to be called from
-                      ;; the top level, we should call use callback to add to queue
-                      (callback (now) 'build-type-dataconstructor (string->symbol newname) newtype1 #f)
-                      'done))
+                      (if (llvm:compile-ir (string-append "%" newname " = type " newtype3))
+                          (begin
+                            (impc:ti:register-new-polytype base
+                                                           newname
+                                                           (cons *impc:ir:tuple* (impc:ir:get-potentially-recursive-tuple-type-from-str (impc:ir:clean-named-type newname) newtype3))
+                                                           "")
+                            ;; we should probably also build dataconstructors for the new
+                            ;; concrete type?? (at least for printing reasons)
+                            ;; because build-type-dataconstructor needs to be called from
+                            ;; the top level, we should call use callback to add to queue
+                            (callback (now) 'build-type-dataconstructor (string->symbol newname) newtype1 #f)
+                            'done)
+                          (impc:compiler:print-compiler-failed-error))))
                 (let ((rettype (string-append "%" newname (make-string ptrdepth #\*))))
                   ;; (println 'oldvs: vs)
                   ;; (set! vs (string->symbol
