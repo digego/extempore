@@ -1028,7 +1028,7 @@
                (if (string=? (car p) "")
                    (impc:compiler:print-compiler-error "Cannot get type from pretty string" string-type))
                (if (and (impc:ti:get-generictype-candidate-types (car p)) ;; if still generic
-                        (or (regex:match? (cadr p) "!") ;; any gvars
+                        (or (impc:ti:bang-type? (cadr p)) ;; any gvars
                             anypolys))
                    (let* ((gtype (impc:ti:get-generictype-candidate-types (car p)))
                           ;; (gtype-all (regex:match-all (symbol->string gtype) "(![a-zA-Z0-9-_]*)"))
@@ -1087,7 +1087,7 @@
                          (callback (now) 'build-type-dataconstructor (string->symbol name1) type #f))
                      string-type)
                    (error ""))))
-            ((regex:match? base "!") (string->symbol base))
+            ((impc:ti:bang-type? base) (string->symbol base))
             ((or (impc:ti:get-generictype-candidate-types base)
                  (impc:ti:get-generictype-candidate-types (car (regex:split base "%"))))
              (let* ((sb (regex:split base "%"))
@@ -1138,7 +1138,7 @@
                      (if extended
                          (map (lambda (k)
                                 (if (and (symbol? k)
-                                         (regex:match? (symbol->string k) "!"))
+                                         (impc:ti:bang-type? k))
                                     (string->symbol (string-append (symbol->string k) "%" extended))
                                     (if (and (symbol? k)
                                              (string=? (impc:ir:get-base-type (symbol->string k)) base2))
