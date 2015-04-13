@@ -1794,7 +1794,7 @@
                  (impc:ti:genericfunc-apply-macros (cdr ast))))
           (else ast))))
 
-(define impc:ir:register-new-genericfunc
+(define impc:ti:register-new-genericfunc
   (let ((pcnt 100))
     (lambda (code)
       ;; (println 'adding: code)
@@ -8490,7 +8490,7 @@
         (impc:compiler:print-already-bound-error (car args) "polymorphic closure"))
     (if (impc:ti:genericfunc-exists? (car args))
         (impc:compiler:print-already-bound-error (car args) "generic closure"))
-    (if (impc:ti:bang-type? (car args))
+    (if (regex:match? (symbol->string (car args)) ":")
         (let* ((res (regex:type-split (symbol->string (car args)) ":"))
                (name (car res))
                (type (cadr res))
@@ -8508,9 +8508,18 @@
                (newnametype (string->symbol (string-append name ":" newtype))))
           ;; (println 'oldargs: args)
           ;; (println 'newargs: (cons newnametype (cdr args)))
-          (impc:ir:register-new-genericfunc (cons 'bind-func (cons newnametype (cdr args))))
-          ;;(impc:ir:register-new-genericfunc (cons 'bind-func args))
-          `(impc:compiler:print-binding-details-to-log "Generic: " ,(car res) ,(cadr res)))
+          (if (impc:ti:bang-type? newtype)
+              (begin
+                (impc:ti:register-new-genericfunc (cons 'bind-func (cons newnametype (cdr args))))
+                ;;(impc:ti:register-new-genericfunc (cons 'bind-func args))
+                `(impc:compiler:print-binding-details-to-log "Generic: " ,(car res) ,(cadr res)))
+              (begin
+                (if (impc:ti:closure-exists? func-name)
+                    (begin
+                      (impc:ti:set-closure-docstring func-name docstring)
+                      (impc:ti:set-closure-body func-name closure-body))
+                    (impc:ti:register-new-closure func-name '() docstring closure-body))
+                `(impc:ti:parametric-poly-pass '(definec ,@args)))))
         (begin
           (if (impc:ti:closure-exists? func-name)
               (begin
