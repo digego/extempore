@@ -8713,7 +8713,8 @@
        ;; (println 'transformed_type: newtype)
        ;; and on with the show!
        (if (impc:ti:bang-type? newtype) ;; then must be poly type
-           (impc:ti:register-new-generictype ',symbol (string->symbol newtype))
+           (begin (impc:ti:register-new-generictype ',symbol (string->symbol newtype))
+                  (impc:compiler:print-binding-details-to-log "GenType: " ',symbol ',type))
            (if
             (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
                                             (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str
