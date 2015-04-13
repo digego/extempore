@@ -1925,9 +1925,24 @@
 (define impc:ti:genericfunc-print-all
   (lambda (name)
     (if (string? name) (set! name (string->symbol name)))
-    (for-each (lambda (i)
-                (println '--: (car i) ': (caddr i)))
-              (assoc-strcmp-all name *impc:ti:genericfunc-cache*))
+    (let ((candidates (assoc-strcmp-all name *impc:ti:genericfunc-cache*)))
+      (if (null? candidates)
+          (begin
+            (print "No generic specialisations found for ")
+            (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
+            (println))
+          (begin
+            (print "Generic specialisations for ")
+            (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
+            (println)
+            (for-each (lambda (gf-list)
+                        ;; perhaps this should (regex:split (vector-ref gf-list 0) "_poly_") to clean the generic ones up a bit?
+                        (print "  ")
+                        (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print (car gf-list)))
+                        (print ":")
+                        (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (caddr gf-list)))
+                        (println))
+                      candidates))))
     #t))
 
 ;;;;;;;;;;;;;;;;;;;;
