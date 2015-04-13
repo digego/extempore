@@ -8692,36 +8692,38 @@
 (define-macro (bind-type symbol type . args)
   (if (<> (impc:ir:get-ptr-depth type) 0)
       (impc:compiler:print-bad-type-error type "cannot be a pointer"))
+  (if (not (char=? (string-ref (symbol->string type) 0) #\<))
+      (impc:compiler:print-bad-type-error type "must be a tuple type"))
   `(begin
      (set! *impc:ir:get-type-callback-off* #t)
-     (if (char=? (string-ref ,(symbol->string type) 0) #\<)
-         (let* ((ags (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
-                ;; expand all non-explict generic types
-                ;; i.e. expand list* into list:<!a,list*>*
-                (expand-polys (map (lambda (k)
-                                     (if (and (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
-                                              (not (equal? (impc:ir:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
-                                         (string-append (impc:ir:get-base-type k) ":"
-                                                        (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k)))
-                                                        (make-string (impc:ir:get-ptr-depth k) #\*))
-                                         k))
-                                   ags))
-                (newtype (string-append "<" (string-join expand-polys ",") ">")))
-           ;; (println 'authors_type: ,(symbol->string type))
-           ;; (println 'transformed_type: newtype)
-           ;; and on with the show!
-           (if (impc:ti:bang-type? newtype) ;; then must be poly type
-               (impc:ti:register-new-generictype ',symbol (string->symbol newtype))
-               (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
-                                               (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str
-                                                                      newtype
-                                                                      ,(symbol->string symbol)))))))
-         (impc:compiler:print-bad-type-error ',type "must be a tuple type"))
-     (begin
-       (impc:ti:register-new-namedtype ,(symbol->string symbol)
-                                       (impc:ir:get-type-from-pretty-str ,(symbol->string type))
-                                       "")
-       (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
+     (let* ((ags (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
+            ;; expand all non-explict generic types
+            ;; i.e. expand list* into list:<!a,list*>*
+            (expand-polys (map (lambda (k)
+                                 (if (and (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
+                                          (not (equal? (impc:ir:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
+                                     (string-append (impc:ir:get-base-type k) ":"
+                                                    (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k)))
+                                                    (make-string (impc:ir:get-ptr-depth k) #\*))
+                                     k))
+                               ags))
+            (newtype (string-append "<" (string-join expand-polys ",") ">")))
+       ;; (println 'authors_type: ,(symbol->string type))
+       ;; (println 'transformed_type: newtype)
+       ;; and on with the show!
+       (if (impc:ti:bang-type? newtype) ;; then must be poly type
+           (impc:ti:register-new-generictype ',symbol (string->symbol newtype))
+           (if
+            (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
+                                            (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str
+                                                                   newtype
+                                                                   ,(symbol->string symbol)))))
+            (begin
+              (impc:ti:register-new-namedtype ,(symbol->string symbol)
+                                              (impc:ir:get-type-from-pretty-str ,(symbol->string type))
+                                              "")
+              (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
+            (impc:compiler:print-compiler-error "could not compile IR for type" type))))
      ;; the next line is to help specialize any element types that may not already be specialized!
      (map (lambda (a) (impc:ir:get-type-from-pretty-str a)) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
      (set! *impc:ir:get-type-callback-off* #f)
