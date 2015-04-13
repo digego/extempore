@@ -8479,50 +8479,45 @@
       (impc:compiler:print-compiler-error "bind-func requires a name!"))
   ;; if doc-string exists!
   (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
-        (docstring (if (string? (cadr args)) (cadr args) "")))
+        (docstring (if (string? (cadr args)) (cadr args) ""))
+        ;; closure body is always in last position, preceeded by zone
+        ;; size and/or docstring
+        (closure-body (car (reverse args))))
     ;; remove docstring (if present)
     (if (not (string=? docstring ""))
         (set! args (append (list (car args)) (cddr args))))
-    (if (impc:ti:closure-exists? func-name)
-        (begin
-          (impc:ti:set-closure-docstring func-name docstring)
-          (impc:ti:set-closure-body func-name (cadr args)))
-        (impc:ti:register-new-closure func-name
-                                      '()
-                                      docstring
-                                      ;; closure body is always in
-                                      ;; last position, preceeded by
-                                      ;; zone size and/or docstring
-                                      (car (reverse args))))
     (if (impc:ti:polyfunc-exists? (car args))
         (impc:compiler:print-already-bound-error (car args) "polymorphic closure"))
     (if (impc:ti:genericfunc-exists? (car args))
-        (impc:compiler:print-already-bound-error (car args) "generic closure")))
-  (if (regex:match? (symbol->string (car args)) ":")
-      (let* ((res (regex:type-split (symbol->string (car args)) ":"))
-             (name (car res))
-             (type (cadr res))
-             (ags (impc:ir:get-pretty-closure-arg-strings type))
-             ;; expand all non-explict generic types
-             ;; i.e. expand list* into list:<!a,list*>*
-             (expand-polys (map (lambda (k)
-                                  (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
-                                      (string-append (impc:ir:get-base-type k) ":"
-                                                     (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k)))
-                                                     (make-string (impc:ir:get-ptr-depth k) #\*))
-                                      k))
-                                ags))
-             (newtype (string-append "[" (string-join expand-polys ",") "]*"))
-             (newnametype (string->symbol (string-append name ":" newtype))))
-        ;; (println 'oldargs: args)
-        ;; (println 'newargs: (cons newnametype (cdr args)))
-        (if (impc:ti:bang-type? newtype)
-            (begin
-              (impc:ir:register-new-genericfunc (cons 'bind-func (cons newnametype (cdr args))))
-              ;;(impc:ir:register-new-genericfunc (cons 'bind-func args))
-              `(impc:compiler:print-binding-details-to-log "Generic: " ,(car res) ,(cadr res)))
-            `(impc:ti:parametric-poly-pass '(definec ,@args))))
-      `(impc:ti:parametric-poly-pass '(definec ,@args))))
+        (impc:compiler:print-already-bound-error (car args) "generic closure"))
+    (if (impc:ti:bang-type? (car args))
+        (let* ((res (regex:type-split (symbol->string (car args)) ":"))
+               (name (car res))
+               (type (cadr res))
+               (ags (impc:ir:get-pretty-closure-arg-strings type))
+               ;; expand all non-explict generic types
+               ;; i.e. expand list* into list:<!a,list*>*
+               (expand-polys (map (lambda (k)
+                                    (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
+                                        (string-append (impc:ir:get-base-type k) ":"
+                                                       (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k)))
+                                                       (make-string (impc:ir:get-ptr-depth k) #\*))
+                                        k))
+                                  ags))
+               (newtype (string-append "[" (string-join expand-polys ",") "]*"))
+               (newnametype (string->symbol (string-append name ":" newtype))))
+          ;; (println 'oldargs: args)
+          ;; (println 'newargs: (cons newnametype (cdr args)))
+          (impc:ir:register-new-genericfunc (cons 'bind-func (cons newnametype (cdr args))))
+          ;;(impc:ir:register-new-genericfunc (cons 'bind-func args))
+          `(impc:compiler:print-binding-details-to-log "Generic: " ,(car res) ,(cadr res)))
+        (begin
+          (if (impc:ti:closure-exists? func-name)
+              (begin
+                (impc:ti:set-closure-docstring func-name docstring)
+                (impc:ti:set-closure-body func-name closure-body))
+              (impc:ti:register-new-closure func-name '() docstring closure-body))
+          `(impc:ti:parametric-poly-pass '(definec ,@args))))))
 
 
 (define-macro (bind-typevar name . args)
