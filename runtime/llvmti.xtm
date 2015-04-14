@@ -3624,7 +3624,7 @@
                        (impc:ti:genericfunc-exists? (car (regex:type-split (symbol->string (car ast)) ":"))))
                       (let* ((p (regex:type-split (symbol->string (car ast)) ":"))
                              (ptrdepth (impc:ir:get-ptr-depth (cadr p))))
-                        (_specialize-generic (car p) (cadr p))
+                        (impc:ti:specialize-generic (car p) (cadr p))
                         (cons
                          (string->symbol (impc:ir:pointer++ (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
                          (impc:ti:first-transform (cdr ast) inbody?))))
@@ -3818,7 +3818,7 @@
                         (if (impc:ti:closure-exists? (symbol->string t))
                             t
                             (let ((p (regex:type-split (symbol->string t) "_poly_")))
-                              (_specialize-generic (car p) (cname-decode (cadr p)))
+                              (impc:ti:specialize-generic (car p) (cname-decode (cadr p)))
                               t))))
                      ((and (symbol? ast)
                            (regex:match? (symbol->string ast) ":(f)|(i)|(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
@@ -9164,14 +9164,8 @@
                 (symbol->string (impc:ti:expand-generic-type x))) args)))
 
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
 ;; force specializations on a generic funtion
-;;
-;; i.e. (specialize-generic blah [i32,i32]* [i64,i64]*)
-;;
-(define _specialize-generic
+(define impc:ti:specialize-generic
   (lambda (sym . types)
     (if (not (impc:ti:genericfunc-exists? (string->symbol sym)))
         (impc:compiler:print-missing-identifier-error sym "generic function")
@@ -9203,8 +9197,11 @@
           (set! *impc:ti:print-code-specialization-compiles* printspec)
           #t))))
 
+;; helper macro for specializing generics
+;;
+;; i.e. (specialize-generic blah [i32,i32]* [i64,i64]*)
 (define-macro (specialize-generic sym . args)
-  (apply _specialize-generic
+  (apply impc:ti:specialize-generic
          (symbol->string sym)
          (map (lambda (x)
                 (if (regex:match? (symbol->string x) "^\\$")
