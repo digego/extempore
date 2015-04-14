@@ -8879,9 +8879,10 @@
 
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
-  `(__dynamic-bind ',library ',symname ',type ,@(map (lambda (k) `(quote ,k)) args)))
+  `(impc:ti:bind-lib ',library ',symname ',type ,@(map (lambda (k) `(quote ,k)) args)))
 
-(define __dynamic-bind
+;; this was previously called __dynamic-bind
+(define impc:ti:bind-lib
   (lambda (library symname type . args)
     (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
            (calling_convention (if (null? args) "ccc" (symbol->string (car args))))
@@ -8905,7 +8906,7 @@
           (begin
             (impc:ti:register-new-nativefunc symname (impc:ir:get-type-from-pretty-str type) "")
             (impc:compiler:print-lib-binding-details-to-log library symname type))
-          (impc:compiler:print-compiler-error (string-append "could not bind! " (symbol->string symname)))))))
+          (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname)))))))
 
 (define-macro (remove-func symname)
   `(begin
