@@ -2954,8 +2954,8 @@
                         (set! gtype (regex:replace-all gtype x y)))
                       gvars xvars)
             (if func?
-                (string->symbol (impc:ir:add-pointer-asterisks (string-append (car p) "_poly_" (cname-encode gtype)) (- ptrdepth 1)))
-                (string->symbol (impc:ir:add-pointer-asterisks (string-append (car p) ":" gtype) ptrdepth))))))))
+                (string->symbol (impc:ir:pointer++ (string-append (car p) "_poly_" (cname-encode gtype)) (- ptrdepth 1)))
+                (string->symbol (impc:ir:pointer++ (string-append (car p) ":" gtype) ptrdepth))))))))
 
 
 (define impc:ti:expand-generic-types
@@ -3627,7 +3627,7 @@
                              (ptrdepth (impc:ir:get-ptr-depth (cadr p))))
                         (_specialize-generic (car p) (cadr p))
                         (cons
-                         (string->symbol (impc:ir:add-pointer-asterisks (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
+                         (string->symbol (impc:ir:pointer++ (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
                          (impc:ti:first-transform (cdr ast) inbody?))))
                      ((eq? (car ast) 'letz)
                       (impc:ti:first-transform (impc:ti:letz ast) inbody?))
@@ -3724,7 +3724,7 @@
                                    (cadr ast)
                                    (if etype
                                        (string->symbol
-                                        (impc:ir:add-pointer-asterisks (string-append "%" (car p) "_poly_" etype)
+                                        (impc:ir:pointer++ (string-append "%" (car p) "_poly_" etype)
                                                                        ptrdepth))
                                        (string->symbol (car p))))
                              inbody?))))
@@ -3993,7 +3993,7 @@
                                                (if (string? (impc:ir:get-type-from-pretty-str x))
                                                    (impc:ir:get-type-from-pretty-str x)
                                                    (if (regex:match? x gpolyname)
-                                                       (impc:ir:add-pointer-asterisks (string-append "%" newname) (impc:ir:get-ptr-depth x))
+                                                       (impc:ir:pointer++ (string-append "%" newname) (impc:ir:get-ptr-depth x))
                                                        (impc:ir:get-type-from-pretty-str x))))
                                              elements)))
                      (newtype3 (impc:ir:get-type-str newtype2)))
@@ -4016,7 +4016,7 @@
                             (callback (now) 'build-type-dataconstructor (string->symbol newname) newtype1 #f)
                             'done)
                           (impc:compiler:print-compiler-failed-error))))
-                (let ((rettype (impc:ir:add-pointer-asterisks (string-append "%" newname) ptrdepth)))
+                (let ((rettype (impc:ir:pointer++ (string-append "%" newname) ptrdepth)))
                   ;; (println 'oldvs: vs)
                   ;; (set! vs (string->symbol
                   ;;           (string-append base ":" gtype
@@ -5701,9 +5701,9 @@
                                                      (not (impc:ir:type? aa)))
                                                 aa
                                                 (if (string? aa)
-                                                    (impc:ir:add-pointer-asterisks aa aptrdepth)
+                                                    (impc:ir:pointer++ aa aptrdepth)
                                                     (impc:ir:pretty-print-type aa)))
-                                            (impc:ir:add-pointer-asterisks bb ptrdepth)
+                                            (impc:ir:pointer++ bb ptrdepth)
                                             (car (regex:type-split (symbol->string (car ast)) "##")))))))))
                     (cdr ast)
                     (cddr gpoly-type))
@@ -6792,7 +6792,7 @@
       ;; return lambda type which is made up of
       ;; argument symbols plus return type from last body expression
       ;; (println 'vars: vars)
-      (let* ((ret (list (impc:ir:pointer++ (impc:ir:pointer++ (list* *impc:ir:closure* res (cadr ast))))))
+      (let* ((ret (list (impc:ir:pointer++ (list* *impc:ir:closure* res (cadr ast)) 2)))
              (uret (impc:ti:type-unify ret vars)))
         ;; (println 'ret: ret)
         ;; (println 'uret: uret)
@@ -6865,7 +6865,7 @@
       (if *impc:ti:print-sub-checks* (println 'closure:> 'ast: ast 'res: res 'ret: ret))
       (if (assoc-strcmp (car ast) vars)
           (impc:ti:update-var (car ast) vars kts
-                              (list (impc:ir:pointer++ (impc:ir:pointer++ (list* *impc:ir:closure* ret res))))))
+                              (list (impc:ir:pointer++ (list* *impc:ir:closure* ret res) 2))))
       (if (list? ret) ret
           (list ret)))))
 
@@ -8405,7 +8405,7 @@
                           (string-append "["
                                          (string-join (map (lambda (x)
                                                              (if (regex:match? x ":")
-                                                                 (impc:ir:add-pointer-asterisks (car (regex:type-split x ":"))
+                                                                 (impc:ir:pointer++ (car (regex:type-split x ":"))
                                                                                                 (impc:ir:get-ptr-depth x))
                                                                  x))
                                                            type2)
@@ -8514,7 +8514,7 @@
                ;; i.e. expand list* into list:<!a,list*>*
                (expand-polys (map (lambda (k)
                                     (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
-                                        (impc:ir:add-pointer-asterisks
+                                        (impc:ir:pointer++
                                          (string-append (impc:ir:get-base-type k) ":"
                                                         (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
                                          (impc:ir:get-ptr-depth k))
@@ -8728,7 +8728,7 @@
             (expand-polys (map (lambda (k)
                                  (if (and (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
                                           (not (equal? (impc:ir:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
-                                     (impc:ir:add-pointer-asterisks
+                                     (impc:ir:pointer++
                                       (string-append (impc:ir:get-base-type k) ":"
                                                      (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
                                       (impc:ir:get-ptr-depth k))

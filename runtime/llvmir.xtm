@@ -790,11 +790,6 @@
     (impc:ir:get-base-type str)))
 
 
-(define impc:ir:add-pointer-asterisks
-  (lambda (base ptr-depth)
-    (string-append base (make-string ptr-depth #\*))))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; type aliases
 ;;
@@ -1046,7 +1041,7 @@
                      ;; (println 'actuals gtype (cadr p))
                      (if (<> (length gtype-all) (length type-all))
                          (impc:compiler:print-type-mismatch-error (cadr p) gtype))
-                     (impc:ir:get-type-from-pretty-str (impc:ir:add-pointer-asterisks (car p) ptr-depth)
+                     (impc:ir:get-type-from-pretty-str (impc:ir:pointer++ (car p) ptr-depth)
                                                        (list (car p) (cons
                                                                       (cons (car p) base)
                                                                       (map (lambda (a b)
@@ -1105,7 +1100,7 @@
                         (string=? (car args) base2))
                    (string->symbol string-type)
                    (let* ((type (impc:ir:get-type-from-pretty-str
-                                 (impc:ir:add-pointer-asterisks (symbol->string (impc:ti:get-generictype-candidate-types base2))
+                                 (impc:ir:pointer++ (symbol->string (impc:ti:get-generictype-candidate-types base2))
                                                                 ptr-depth)
                                  base2)))
                      ;; if we have come from a defined generic type
@@ -1135,8 +1130,8 @@
                                              ;; (println 'k: k 'p: p)
                                              (if (string? k)
                                                  (if (char=? (string-ref k 0) #\%)
-                                                     (impc:ir:add-pointer-asterisks k p)
-                                                     (string->symbol (impc:ir:add-pointer-asterisks k p)))
+                                                     (impc:ir:pointer++ k p)
+                                                     (string->symbol (impc:ir:pointer++ k p)))
                                                  k))
                                            type ptrs))))
                      ;; (println 'type: type 'extended: extended)
@@ -1439,32 +1434,37 @@
 
 
 (define impc:ir:pointer--
-  (lambda (type)
-    (if (and (string? type)
-             (impc:ir:tuple? type))
-        (substring type 0 (- (string-length type) 1))
+  (lambda (type . ptr-depth)
+    (if (null? ptr-depth)
+        (set! ptr-depth 1)
+        (set! ptr-depth (car ptr-depth)))
+    (if (string? type) ;; this used to check for tuple? as well
+        (substring type 0 (- (string-length type) ptr-depth))
         (if (or (impc:ir:closure? type)
                 (impc:ir:array? type)
                 (impc:ir:vector? type)
                 (impc:ir:tuple? type))
             (let ((nl (cl:copy-list (if (string? type) (impc:ir:get-type-from-str type) type))))
-              (set-car! nl (- (impc:ir:str-list-check type) *impc:ir:pointer*))
+              (set-car! nl (- (impc:ir:str-list-check type) (* *impc:ir:pointer* ptr-depth)))
               nl)
-            (- (impc:ir:str-list-check type) *impc:ir:pointer*)))))
+            (- (impc:ir:str-list-check type) (* *impc:ir:pointer* ptr-depth))))))
+
 
 (define impc:ir:pointer++
-  (lambda (type)
-    (if (and (string? type)
-             (impc:ir:tuple? type))
-        (string-append type "*")
+  (lambda (type . ptr-depth)
+    (if (null? ptr-depth)
+        (set! ptr-depth 1)
+        (set! ptr-depth (car ptr-depth)))
+    (if (string? type) ;; this used to check for tuple? as well
+        (string-append type (make-string ptr-depth #\*))
         (if (or (impc:ir:closure? type)
                 (impc:ir:array? type)
                 (impc:ir:vector? type)
                 (impc:ir:tuple? type))
             (let ((nl (cl:copy-list (if (string? type) (impc:ir:get-type-from-str type) type))))
-              (set-car! nl (+ (impc:ir:str-list-check type) *impc:ir:pointer*))
+              (set-car! nl (+ (impc:ir:str-list-check type) (* *impc:ir:pointer* ptr-depth)))
               nl)
-            (+ (impc:ir:str-list-check type) *impc:ir:pointer*)))))
+            (+ (impc:ir:str-list-check type) (* *impc:ir:pointer* ptr-depth))))))
 
 
 (define impc:ir:type?
@@ -1500,14 +1500,14 @@
         (if (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a)))
             (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a))))
                    (ptrdepth (impc:ir:get-ptr-depth a))
-                   (strtype (impc:ir:add-pointer-asterisks nt ptrdepth)))
+                   (strtype (impc:ir:pointer++ nt ptrdepth)))
               (set! a (impc:ir:get-type-from-str strtype)))
             (set! a (impc:ir:get-type-from-str a))))
     (if (string? b)
         (if (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type b)))
             (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type b))))
                    (ptrdepth (impc:ir:get-ptr-depth b))
-                   (strtype (impc:ir:add-pointer-asterisks nt ptrdepth)))
+                   (strtype (impc:ir:pointer++ nt ptrdepth)))
               (set! b (impc:ir:get-type-from-str strtype)))
             (set! b (impc:ir:get-type-from-str b))))
     ;; (println 'equal? a b)
