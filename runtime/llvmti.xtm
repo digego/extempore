@@ -67,7 +67,7 @@
   (lambda (namedtype-name)
     (let ((ptr-depth (impc:ir:get-ptr-depth namedtype-name))
           (namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
-      (if namedtype-data (vector-ref (cdr namedtype-data) 0) #f))))
+      (if namedtype-data (impc:ir:pointer++ (vector-ref (cdr namedtype-data) 0) ptr-depth) #f))))
 
 (define impc:ti:namedtype-exists?
   (lambda (namedtype-name)
@@ -2123,15 +2123,14 @@
 ;; checks both named types and poly types
 (define impc:ti:get-named-type
   (lambda (name)
-    (let ((clean-name (impc:ir:clean-named-type name)))
-      (or (impc:ti:get-generictype-candidate-types clean-name)
-          (impc:ti:get-polytype-candidate-types clean-name)
-          (let ((from-cache (impc:ti:get-namedtype-type clean-name)))
-            (and from-cache
-                 ;; because the old (pre-mcjit) version used
-                 ;; llvm:get-named-type, which returned the type in
-                 ;; LLVM IR format, we convert to this format
-                 (impc:ir:get-type-str from-cache)))))))
+    (or (impc:ti:get-generictype-candidate-types name)
+        (impc:ti:get-polytype-candidate-types name)
+        (let ((from-cache (impc:ti:get-namedtype-type name)))
+          (and from-cache
+               ;; because the old (pre-mcjit) version used
+               ;; llvm:get-named-type, which returned the type in
+               ;; LLVM IR format, we convert to this format
+               (impc:ir:get-type-str from-cache))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
