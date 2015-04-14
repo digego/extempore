@@ -8884,29 +8884,32 @@
 ;; this was previously called __dynamic-bind
 (define impc:ti:bind-lib
   (lambda (library symname type . args)
-    (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
-           (calling_convention (if (null? args) "ccc" (symbol->string (car args))))
-           (ir-string (string-append "declare "
-                                     calling_convention
-                                     " "
-                                     (impc:ir:get-type-str (car ctype))
-                                     " @"
-                                     (symbol->string symname)
-                                     "("
-                                     (if (null? (cdr ctype))
-                                         ""
-                                         (apply string-append
-                                                (impc:ir:get-type-str (cadr ctype))
-                                                (map (lambda (v)
-                                                       (string-append "," (impc:ir:get-type-str v)))
-                                                     (cddr ctype))))
-                                     ") nounwind")))
-      (if (and (llvm:compile-ir ir-string)
-               (llvm:queue-bind-symbol (eval library) (symbol->string symname)))
-          (begin
-            (impc:ti:register-new-nativefunc symname (impc:ir:get-type-from-pretty-str type) "")
-            (impc:compiler:print-lib-binding-details-to-log library symname type))
-          (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname)))))))
+    (if (not (eval library))
+        (impc:compiler:print-compiler-error
+         (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
+        (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
+               (calling_convention (if (null? args) "ccc" (symbol->string (car args))))
+               (ir-string (string-append "declare "
+                                         calling_convention
+                                         " "
+                                         (impc:ir:get-type-str (car ctype))
+                                         " @"
+                                         (symbol->string symname)
+                                         "("
+                                         (if (null? (cdr ctype))
+                                             ""
+                                             (apply string-append
+                                                    (impc:ir:get-type-str (cadr ctype))
+                                                    (map (lambda (v)
+                                                           (string-append "," (impc:ir:get-type-str v)))
+                                                         (cddr ctype))))
+                                         ") nounwind")))
+          (if (and (llvm:compile-ir ir-string)
+                   (llvm:queue-bind-symbol (eval library) (symbol->string symname)))
+              (begin
+                (impc:ti:register-new-nativefunc symname (impc:ir:get-type-from-pretty-str type) "")
+                (impc:compiler:print-lib-binding-details-to-log library symname type))
+              (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
 
 (define-macro (remove-func symname)
   `(begin
