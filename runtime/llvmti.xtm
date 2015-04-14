@@ -7345,7 +7345,7 @@
                    (etype (cname-encode (cadr p))))
               (if poly?
                   (begin
-                    (if (not (llvm:get-function (string-append (car p) "_poly_" etype)))
+                    (if (not (impc:ti:closure-exists? (string-append sym "_poly_" etype)))
                         (let* ((arity (impc:ir:get-arity-from-pretty-closure (cadr p)))
                                (ptypes (impc:ti:genericfunc-types (string->symbol (car p)) arity (cadr p)))
                                (tmp (if (not ptypes)
@@ -9076,7 +9076,7 @@
              (if (regex:match? t "_poly_")
                  (set! t (cname-decode (cadr (regex:type-split t "_poly_")))))
              (let ((etype (cname-encode t)))
-               (if (not (llvm:get-function (string-append sym "_poly_" etype)))
+               (if (not (impc:ti:closure-exists? (string-append sym "_poly_" etype)))
                    (let* ((arity (impc:ir:get-arity-from-pretty-closure t))
                           (code (caddr (cadr (impc:ti:genericfunc-types (string->symbol sym) arity t))))
                           (pfunc (string->symbol (string-append sym "_poly_" etype))))
@@ -9154,7 +9154,7 @@
              (if (regex:match? t "_poly_")
                  (set! t (cname-decode (cadr (regex:type-split t "_poly_")))))
              (let ((etype (cname-encode t)))
-               (if (not (llvm:get-function (string-append sym "_poly_" etype)))
+               (if (not (impc:ti:closure-exists? (string-append sym "_poly_" etype)))
                    (let* ((arity (impc:ir:get-arity-from-pretty-closure t))
                           (code (caddr (cadr (impc:ti:genericfunc-types (string->symbol sym) arity t))))
                           (pfunc (string->symbol (string-append sym "_poly_" etype))))
