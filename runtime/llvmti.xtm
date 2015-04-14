@@ -4010,9 +4010,9 @@
                                                            "")
                             ;; we should probably also build dataconstructors for the new
                             ;; concrete type?? (at least for printing reasons)
-                            ;; because build-type-dataconstructor needs to be called from
+                            ;; because impc:ti:compile-type-dataconstructors needs to be called from
                             ;; the top level, we should call use callback to add to queue
-                            (callback (now) 'build-type-dataconstructor (string->symbol newname) newtype1 #f)
+                            (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol newname) newtype1 #f)
                             'done)
                           (impc:compiler:print-compiler-failed-error))))
                 (let ((rettype (impc:ir:pointer++ (string-append "%" newname) ptrdepth)))
@@ -8567,12 +8567,12 @@
            )))
 
 
-(define build-type-dataconstructor
+(define impc:ti:compile-type-dataconstructors
   (lambda (name type generic)
     (if (or (not (string? type)) ;; if not already a pretty type
             (regex:match? type "^\\s*{"))
         (set! type (impc:ir:pretty-print-type type)))
-    ;; (println 'build-type-dataconstructor name type generic)
+    ;; (println 'impc:ti:compile-type-dataconstructors name type generic)
     (let* ((tsplit (car (regex:type-split (symbol->string name) "_poly_")))
            (a (map (lambda (x)
                      (if (and (string=? tsplit (impc:ir:get-base-type x))
@@ -8731,7 +8731,7 @@
      ;; now compile data constructor
      ,(if (or (null? args)
               (car args))
-          `(build-type-dataconstructor
+          `(impc:ti:compile-type-dataconstructors
             ',symbol
             (if (impc:ti:get-generictype-candidate-types ',symbol)
                 (symbol->string (impc:ti:get-generictype-candidate-types ',symbol))
@@ -9127,7 +9127,7 @@
                  (set! t (cadr (regex:type-split t ":"))))
              (let ((newname (string-append sym "_poly_" (cname-encode t))))
                (if (llvm:compile-ir (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
-                   (build-type-dataconstructor (string->symbol newname) t #f)
+                   (impc:ti:compile-type-dataconstructors (string->symbol newname) t #f)
                    (impc:compiler:print-compiler-error "failed to compile IR in impc:ti:specialize-type" sym))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
