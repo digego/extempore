@@ -8927,7 +8927,11 @@
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
     `(begin
-       (llvm:compile-ir ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr)))))))
+       (if (llvm:compile-ir ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
+           (impc:ti:register-new-namedtype ,namestr
+                                           ,(impc:ir:get-type-from-pretty-str typestr namestr)
+                                           "")
+           (impc:compiler:print-compiler-error "bind-lib-type failed" ,name)))))
 
 ;;; this here for binding to CLOSURE in dylib
 ;;
