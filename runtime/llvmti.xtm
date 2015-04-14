@@ -8393,43 +8393,18 @@
             (if (not (llvm:compile-ir fscallback))
                 (impc:compiler:print-compiler-error "could not compile callback")))
         (if *impc:compile*
-            (let ((ftype (map impc:ir:get-type-str
-                              (cdr (impc:ir:get-type-from-str closure-type)))))
-              (if (and (not *impc:compiler:print-raw-llvm*)
-                       (or *impc:ti:print-code-specialization-compiles*
-                           (not (regex:match? (symbol->string symname) "_poly_"))))
-                  (let* ((type1 (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype))))
-                         (type2 (impc:ir:get-pretty-closure-arg-strings type1))
-                         (simpletype
-                          (string-append "["
-                                         (string-join (map (lambda (x)
-                                                             (if (regex:match? x ":")
-                                                                 (impc:ir:pointer++ (car (regex:type-split x ":"))
-                                                                                    (impc:ir:get-ptr-depth x))
-                                                                 x))
-                                                           type2)
-                                                      ",")
-                                         "]*")))
-                    ;; (println 'type2 type2)
-                    ;; (println 'simpletype simpletype)
-                    (if (regex:match? (symbol->string symname) "_poly_")
-                        ;; note: can probably change this to the
-                        ;; bind-func specific one as well (as in
-                        ;; the 'else' branch)
-                        (impc:compiler:print-binding-details-to-log
-                         "Spec'zed:"
-                         symname
-                         (if *impc:ti:print-full-generic-types*
-                             (impc:ir:pretty-print-type (impc:ir:get-type-str (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) ftype)))
-                             simpletype))
-                        (begin
-                          (impc:ti:set-closure-type (symbol->string symname)
-                                                    (cons (+ *impc:ir:closure* (* 2 *impc:ir:pointer*)) (map impc:ir:get-type-from-str ftype)))
-                          (impc:compiler:print-bind-func-details-to-log
-                           "Compiled:"
-                           symname
-                           simpletype
-                           zone-size)))))))
+            ;; make sure the (now resolved) function types hit the
+            ;; closure/nativefunc cache
+            (let* ((closure-type-list (impc:ir:get-type-from-str closure-type)))
+              (impc:ti:set-closure-type (symbol->string symname)
+                                        closure-type-list)
+              (impc:compiler:print-bind-func-details-to-log
+               (if (regex:match? (symbol->string symname) "_poly_")
+                   "Spec'zed:"
+                   "Compiled:")
+               symname
+               (impc:ir:pretty-print-type closure-type)
+               zone-size)))
         (cadr (impc:ir:gname))))))
 
 (define-macro (xtm-closure-doc name)
