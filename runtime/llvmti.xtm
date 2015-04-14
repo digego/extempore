@@ -8950,9 +8950,10 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
                ,(string->symbol (string-append "[" (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type)))
                                                ",i8*]*")))
-     (llvm:compile-ir
-      (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
-                     "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n"))
+     (if (not (llvm:compile-ir
+                (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
+                               "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
+         (impc:compiler:print-compiler-error "failed to compile IR in bind-lib-func" ,symname))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
@@ -8987,9 +8988,10 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
                ,(string->symbol (string-append "[" (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type)))
                                                ",i8*]*")))
-     (llvm:compile-ir
-      (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
-                     "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n"))
+     (if (not (llvm:compile-ir
+               (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
+                              "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
+         (impc:compiler:print-compiler-error "failed to compile IR in bind-lib-func-no-scm" ,symname))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
@@ -9010,13 +9012,16 @@
        )))
 
 
-;;; this here for binding to CLOSURE in dylib
 (define-macro (bind-lib-val library symname type)
   `(let ((ground-type (impc:ir:ground-type-aliases ,(symbol->string type))))
-     (llvm:compile-ir
-      (string-append "@" ,(symbol->string symname) " = external global "
-                     (if ground-type ground-type ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type))))))
-     (llvm:queue-bind-symbol ,library ,(symbol->string symname))))
+     (if (llvm:compile-ir
+          (string-append "@" ,(symbol->string symname) " = external global "
+                         (if ground-type ground-type ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type))))))
+         (begin (llvm:queue-bind-symbol ,library ,(symbol->string symname))
+                (impc:ti:register-new-globalvar ,(symbol->string name)
+                                                ,(impc:ir:get-type-from-pretty-str ,(symbol->string typestr))
+                                                ""))
+         (impc:compiler:print-compiler-error "failed to compile IR in bind-lib-val" ,name))))
 
 ;; THIS IS A HELPER FUNCTION
 ;;
@@ -9146,9 +9151,9 @@
              (if (regex:match? t ":")
                  (set! t (cadr (regex:type-split t ":"))))
              (let ((newname (string-append sym "_poly_" (cname-encode t))))
-               ;; (println `(llvm:compile-ir ,(string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t)))))
-               (llvm:compile-ir (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
-               (build-type-dataconstructor (string->symbol newname) t #f)))
+               (if (llvm:compile-ir (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
+                   (build-type-dataconstructor (string->symbol newname) t #f)
+                   (impc:compiler:print-compiler-error "failed to compile IR in impc:ti:specialize-type" sym))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
           #t))))
