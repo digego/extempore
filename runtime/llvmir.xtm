@@ -1081,7 +1081,7 @@
                (if (impc:ir:get-type-from-pretty-str t1)
                    (begin
                      ;; (println 'make-new-type: (string-append "%" name1 " = type " type))
-                     (llvm:jit-compile-ir-string (string-append "%" name1 " = type " type))
+                     (llvm:compile-ir (string-append "%" name1 " = type " type))
                      (if *impc:ir:get-type-callback-off*
                          (build-type-dataconstructor (string->symbol name1) type #f)
                          (callback (now) 'build-type-dataconstructor (string->symbol name1) type #f))
@@ -1727,7 +1727,7 @@
                                                 (string-append " = constant [" lgth " x i8] c\"")
                                                 (string-append " = private unnamed_addr constant [" lgth " x i8] c\""))
                                             ast "\\00\"")))
-            (llvm:jit-compile-ir-string compile-str)
+            (llvm:compile-ir compile-str)
             (set! strsym strname)
             (llvm:add-llvm-alias ast strsym)
             (if #t ;; (>= (string-length ast) 1024)
@@ -4883,7 +4883,7 @@
                       (if *impc:compiler:print* (println fstr))
                       (if *impc:compile*
                           (begin (llvm:remove-function (caddr ast))
-                                 (if (not (llvm:jit-compile-ir-string fstr))
+                                 (if (not (llvm:compile-ir fstr))
                                      (begin (if *impc:compiler:verbose*
                                                 (impc:compiler:print-compiler-error "compiler failed on " fstr)
                                                 (impc:compiler:print-compiler-error "compiler failed"))
