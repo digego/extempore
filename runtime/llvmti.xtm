@@ -8764,16 +8764,6 @@
             (if (impc:ti:get-generictype-candidate-types ',symbol) #t #f)))))
 
 
-
-(define-macro (bind-tvar symbol . types)
-  `(begin (if (char=? (string-ref ,(symbol->string type) 0) #\<) ; (impc:ir:tuple? (impc:ir:get-type-from-pretty-str ,(symbol->string type)))
-              (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
-                                              ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type) (symbol->string symbol)))))
-              (impc:compiler:print-bad-type-error ,type "only named tuple types are supported"))
-          (impc:compiler:print-type-details-to-log
-           ,symbol
-           (impc:ir:pretty-print-type (impc:ti:get-namedtype-type ,(symbol->string symbol))))))
-
 (define-macro (impc:pretty-print-vars . varlist)
   (map (lambda (var)
          `(begin (println '--- (quote ,var) '---)
