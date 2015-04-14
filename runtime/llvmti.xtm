@@ -65,8 +65,9 @@
 ;; type is immutable, doesn't need a setter
 (define impc:ti:get-namedtype-type
   (lambda (namedtype-name)
-    (let ((closure-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
-      (if closure-data (vector-ref (cdr closure-data) 0) #f))))
+    (let ((ptr-depth (impc:ir:get-ptr-depth namedtype-name))
+          (namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
+      (if namedtype-data (vector-ref (cdr namedtype-data) 0) #f))))
 
 (define impc:ti:namedtype-exists?
   (lambda (namedtype-name)
@@ -87,13 +88,13 @@
 
 (define impc:ti:get-namedtype-docstring
   (lambda (namedtype-name)
-    (let ((closure-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
-      (if closure-data (vector-ref (cdr closure-data) 1) #f))))
+    (let ((namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
+      (if namedtype-data (vector-ref (cdr namedtype-data) 1) #f))))
 
 (define impc:ti:set-namedtype-docstring
   (lambda (namedtype-name docstring)
-    (let ((closure-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
-      (if closure-data (vector-set! (cdr closure-data) 1 docstring) #f))))
+    (let ((namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
+      (if namedtype-data (vector-set! (cdr namedtype-data) 1 docstring) #f))))
 
 ;;;;;;;;;;;
 ;; closures
