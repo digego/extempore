@@ -7352,6 +7352,8 @@
                                         (impc:compiler:print-bad-arity-error ast)))
                                (code (caddr (cadr (impc:ti:genericfunc-types (string->symbol (car p)) arity (cadr p)))))
                                (pfunc (string->symbol (string-append (car p) "_poly_" etype))))
+                          ;; pre-populate the closure cache for the new specialised func
+                          (impc:ti:register-new-closure (symbol->string pfunc) '() "" code)
                           (set! code `(let ((,pfunc ,code)) ,pfunc))
                           (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol (cadr p))))
                           (impc:ti:register-new-polyfunc (car p)
@@ -7450,17 +7452,17 @@
                                         (impc:ti:add-types-to-source symname jj types envvars ast))
                                       (cdr ast)))))
                      (let ((pfunc (string->symbol (string-append (car (regex:split (symbol->string (car ast)) "##")) "_poly_" (cname-encode type)))))
-                       ;; (println 'pfund: pfunc)
+                       ;; (println 'pfunc: pfunc 'type: type 'code: code)
+                       ;; (println 'kts: (cons pfunc (string->symbol type)))
                        (impc:ti:genericfunc-src-compiled polyname arity)
+                       ;; pre-populate the closure cache for the new specialised func
                        (impc:ti:register-new-closure (symbol->string pfunc) '() "" code)
+                       (set! code `(let ((,pfunc ,code)) ,pfunc))
+                       (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol type)))
                        (impc:ti:register-new-polyfunc (symbol->string polyname)
                                                       (symbol->string pfunc)
                                                       (impc:ir:get-type-from-pretty-str type)
                                                       "")
-                       (set! code `(let ((,pfunc ,code)) ,pfunc))
-                       ;; (println 'pfunc: pfunc 'type: type 'code: code)
-                       ;; (println 'kts: (cons pfunc (string->symbol type)))
-                       (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol type)))
                        (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
                          (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
                          (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
@@ -9077,6 +9079,8 @@
                           (code (caddr (cadr (impc:ti:genericfunc-types (string->symbol sym) arity t))))
                           (pfunc (string->symbol (string-append sym "_poly_" etype))))
                      ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
+                     ;; pre-populate the closure cache for the new specialised func
+                     (impc:ti:register-new-closure (symbol->string pfunc) '() "" code)
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
                      (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol t)))
                      (impc:ti:register-new-polyfunc sym
@@ -9157,6 +9161,8 @@
                           (pfunc (string->symbol (string-append sym "_poly_" etype))))
                      ;; (println 'makesym etype 't: t)
                      ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
+                     ;; pre-populate the closure cache for the new specialised func
+                     (impc:ti:register-new-closure (symbol->string pfunc) '() "" code)
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
                      (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol t)))
                      (impc:ti:register-new-polyfunc sym
