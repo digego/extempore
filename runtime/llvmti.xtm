@@ -2962,6 +2962,19 @@
     (map (lambda (t)
            (cons (car t) (impc:ti:expand-generic-type (cdr t)))) types)))
 
+(define impc:ti:simplify-generic-pretty-type
+  (lambda (pretty-type)
+    (string-append
+     "["
+     (string-join
+      (map (lambda (x)
+             (if (regex:match? x ":")
+                 (impc:ir:pointer++ (car (regex:type-split x ":"))
+                                    (impc:ir:get-ptr-depth x))
+                 x))
+           (impc:ir:get-pretty-closure-arg-strings pretty-type))
+      ",")
+     "]*")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
