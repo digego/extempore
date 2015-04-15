@@ -8390,13 +8390,17 @@
             (let* ((closure-type-list (impc:ir:get-type-from-str closure-type)))
               (impc:ti:set-closure-type (symbol->string symname)
                                         closure-type-list)
-              (impc:compiler:print-bind-func-details-to-log
-               (if (regex:match? (symbol->string symname) "_poly_")
+              (if (regex:match? (symbol->string symname) "_poly_")
+                  (impc:compiler:print-bind-func-details-to-log
                    "Spec'zed:"
-                   "Compiled:")
-               symname
-               (impc:ir:pretty-print-type closure-type)
-               zone-size)))
+                   (string->symbol (car (regex:split (symbol->string symname) "_poly_")))
+                   (impc:ir:pretty-print-type closure-type)
+                   zone-size)
+                  (impc:compiler:print-bind-func-details-to-log
+                   "Compiled:"
+                   symname
+                   (impc:ir:pretty-print-type closure-type)
+                   zone-size))))
         (cadr (impc:ir:gname))))))
 
 (define-macro (xtm-closure-doc name)
