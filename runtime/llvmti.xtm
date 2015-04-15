@@ -3624,7 +3624,7 @@
                        (impc:ti:genericfunc-exists? (car (regex:type-split (symbol->string (car ast)) ":"))))
                       (let* ((p (regex:type-split (symbol->string (car ast)) ":"))
                              (ptrdepth (impc:ir:get-ptr-depth (cadr p))))
-                        (impc:ti:specialize-generic (car p) (cadr p))
+                        (impc:ti:specialize-genericfunc (car p) (cadr p))
                         (cons
                          (string->symbol (impc:ir:pointer++ (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
                          (impc:ti:first-transform (cdr ast) inbody?))))
@@ -3818,7 +3818,7 @@
                         (if (impc:ti:closure-exists? (symbol->string t))
                             t
                             (let ((p (regex:type-split (symbol->string t) "_poly_")))
-                              (impc:ti:specialize-generic (car p) (cname-decode (cadr p)))
+                              (impc:ti:specialize-genericfunc (car p) (cname-decode (cadr p)))
                               t))))
                      ((and (symbol? ast)
                            (regex:match? (symbol->string ast) ":(f)|(i)|(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
@@ -9059,9 +9059,9 @@
 ;; (bind-func test:[!a,!a]*
 ;;   (lambda (x) (* x x)))
 ;;
-;; (constrain-generic test [i32,i32]* [float,float]*)
+;; (constrain-genericfunc test [i32,i32]* [float,float]*)
 ;;
-(define impc:ti:constrain-generic
+(define impc:ti:constrain-genericfunc
   (lambda (sym . types)
     (if (not (impc:ti:genericfunc-exists? (string->symbol sym)))
         (impc:compiler:print-missing-identifier-error sym "generic function")
@@ -9097,8 +9097,8 @@
                               *impc:ti:genericfunc-cache*))
           #t))))
 
-(define-macro (constrain-generic sym . args)
-  (apply impc:ti:constrain-generic
+(define-macro (constrain-genericfunc sym . args)
+  (apply impc:ti:constrain-genericfunc
          (symbol->string sym)
          (map (lambda (x)
                 (if (regex:match? (symbol->string x) "^\\$")
@@ -9110,9 +9110,9 @@
 ;;
 ;; specialize generic type!
 ;;
-(define impc:ti:specialize-type
+(define impc:ti:specialize-generictype
   (lambda (sym . types)
-    ;; (println 'sym: sym types)
+    ;; (println 'impc:ti:specialize-generictype 'sym: sym types)
     (if (not (impc:ti:get-generictype-candidate-types (string->symbol sym)))
         (impc:compiler:print-missing-generic-type-error sym)
         (let ((printspec *impc:ti:print-code-specialization-compiles*))
@@ -9124,13 +9124,13 @@
              (let ((newname (string-append sym "_poly_" (cname-encode t))))
                (if (llvm:compile-ir (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
                    (impc:ti:compile-type-dataconstructors (string->symbol newname) t #f)
-                   (impc:compiler:print-compiler-error "failed to compile IR in impc:ti:specialize-type" sym))))
+                   (impc:compiler:print-compiler-error "failed to compile IR in impc:ti:specialize-generictype" sym))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
           #t))))
 
-(define-macro (specialize-type sym . args)
-  (apply impc:ti:specialize-type
+(define-macro (specialize-generictype sym . args)
+  (apply impc:ti:specialize-generictype
          (symbol->string sym)
          (map (lambda (x)
                 (if (regex:match? (symbol->string x) "^\\$")
@@ -9139,8 +9139,9 @@
 
 
 ;; force specializations on a generic funtion
-(define impc:ti:specialize-generic
+(define impc:ti:specialize-genericfunc
   (lambda (sym . types)
+    ;; (println 'impc:ti:specialize-genericfunc 'sym: sym types)
     (if (not (impc:ti:genericfunc-exists? (string->symbol sym)))
         (impc:compiler:print-missing-identifier-error sym "generic function")
         (let ((printspec *impc:ti:print-code-specialization-compiles*))
@@ -9173,9 +9174,9 @@
 
 ;; helper macro for specializing generics
 ;;
-;; i.e. (specialize-generic blah [i32,i32]* [i64,i64]*)
-(define-macro (specialize-generic sym . args)
-  (apply impc:ti:specialize-generic
+;; i.e. (specialize-genericfunc blah [i32,i32]* [i64,i64]*)
+(define-macro (specialize-genericfunc sym . args)
+  (apply impc:ti:specialize-genericfunc
          (symbol->string sym)
          (map (lambda (x)
                 (if (regex:match? (symbol->string x) "^\\$")

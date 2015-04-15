@@ -461,8 +461,7 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
        ;; convert
        '("(\\(convert\\)\\s-+\\S-+)"
          (1 font-lock-keyword-face))
-         ;; cast, constrain-generic, specialize-generic
-       '("(\\(constrain-generic\\|specialize-generic\\|specialize-type\\)\\s-+\\(\\S-+\\)\\s-+\\([^)]?+\\))"
+       '("(\\(constrain-genericfunc\\|specialize-genericfunc\\|specialize-generictype\\)\\s-+\\(\\S-+\\)\\s-+\\([^)]?+\\))"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
          (3 font-lock-type-face))
