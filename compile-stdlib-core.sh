@@ -29,7 +29,7 @@ echo
 # check all the required shared libs are there
 for f in $PRECOMP_LIBS
 do
-    $PRECOMP_EXTEMPORE_RUN_COMMAND "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t #t)"
+    $PRECOMP_EXTEMPORE_RUN_COMMAND "(sys:precomp:compile-xtm-file \"libs/$f\" #t #t)"
     rc=$?
     if (($rc != 0))  ; then
         echo -e "\033[0;31mError precompiling libs/$f\033[0;00m"

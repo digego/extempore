@@ -1939,7 +1939,7 @@
           (set! *sys:precomp:current-output-port* precomp-port)))
 
 (define sys:precomp:compile-current-module
-  (lambda (module-name move-into-place? exit-on-error?)
+  (lambda (module-name move-into-place? exit-afterwards?)
     (let ((ext-llvm-dir (cptr->string (get_llvm_path))))
       (if (string=? "" ext-llvm-dir)
           (begin (print-with-colors 'red 'default #t (print "Error"))
@@ -2016,13 +2016,13 @@
           (if (<> res1 0)
               (begin (print-with-colors 'red 'default #t
                                         (println "LLC Failed!. exit code" res1))
-                     (if exit-on-error? (quit 1))))
+                     (if exit-afterwards? (quit 1))))
           (print "CC command:\n " compilation-command-b "\n\n")          
           (set! res2 (command compilation-command-b))
           (if (<> res2 0)
               (begin (print-with-colors 'red 'default #t
                                         (println "CC Failed!. exit code" res2))
-                     (if exit-on-error? (quit 1)))                                        
+                     (if exit-afterwards? (quit 1)))
               (begin (print "Succesfully compiled ")
                      (print-with-colors 'blue 'default #t (print shlib-path))
                      (print "\n\n")
@@ -2098,7 +2098,7 @@
     (println (length *impc:ti:generic-type-mappings*))))
 
 (define sys:precomp:compile-xtm-file
-  (lambda (lib-path move-into-place? exit-when-done? exit-on-error?)
+  (lambda (lib-path move-into-place? exit-afterwards?)
     ;; is there a better way to check if a file exists?
     (let ((start-time (now))
           (in-file-port (open-input-file lib-path)))
@@ -2125,7 +2125,7 @@
                         ;; (sys:precomp:insert-header libname-no-extension)
                         (sys:load lib-path)
                         (impc:compiler:flush-jit-compilation-queue)
-                        (sys:precomp:compile-current-module libname-no-extension move-into-place? exit-on-error?)
+                        (sys:precomp:compile-current-module libname-no-extension move-into-place? exit-afterwards?)
                         ;; (sys:precomp:insert-footer libname-no-extension)
                         (close-port *sys:precomp:current-output-port*)
                         (set! *sys:precomp:current-lib-name* "xtmdylib")
@@ -2134,15 +2134,15 @@
                                     (print "Successfully wrote precomp file to ")
                                     (print-with-colors 'green 'default #f (print precomp-file-path "\n"))
                                     (sys:precomp:print-compilation-details start-time)
-                                    (if exit-when-done? (quit 0)))
+                                    (if exit-afterwards? (quit 0)))
                              (begin (print-with-colors 'red 'default #t (print "Error:"))
                                     (print " something went wrong in writing the output file ")
                                     (print-with-colors 'red 'default #t (print precomp-file-path "\n"))
-                                    (if exit-when-done? (quit 1)))))
+                                    (if exit-afterwards? (quit 1)))))
                       (begin (print-with-colors 'red 'default #t
                                                 (print "Error:"))
                              (print " cannot write precomp file at " precomp-file-path "\n")
-                             (if exit-when-done? (quit 2)))))))))))
+                             (if exit-afterwards? (quit 2)))))))))))
 
 (define sys:run-tests
   (lambda (test-files print? quit-on-exit?)
