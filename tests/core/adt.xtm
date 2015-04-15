@@ -17,33 +17,36 @@
 (define *impc:ti:print-code-specialization-compiles* #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 
+;;
 ;; generic types
 ;;
 
 ;; Generic Point {x,y}
-(bind-type Point <!a,!a>)
+(xtmtest-compile '(bind-type Point <!a,!a>))
 
-(bind-func print:[void,Point*]*
-  (lambda (p)
-    (if (null? p)
-        (begin (printout "<>") void)
-        (begin (printout "<"
-                         (tref p 0) ","
-                         (tref p 1) ">")
-               void))))
+(xtmtest-compile
+ '(bind-func print:[void,Point*]*
+    (lambda (p)
+      (if (null? p)
+          (begin (printout "<>") void)
+          (begin (printout "<"
+                           (tref p 0) ","
+                           (tref p 1) ">")
+                 void)))))
 
 ;; make and return a Point
-(bind-func test_generic_point_1
-  "Test doc-string"
-  (lambda ()
-    (let ((x (Point 1.0 2.0)))
-      x)))
+(xtmtest-compile
+ '(bind-func test_generic_point_1
+    "Test doc-string"
+    (lambda ()
+      (let ((x (Point 1.0 2.0)))
+        x))))
 
-(bind-func test_generic_point_2
-  (lambda ()
-    (let ((x (Point 1 2)))
-      x)))
+(xtmtest-compile
+ '(bind-func test_generic_point_2
+    (lambda ()
+      (let ((x (Point 1 2)))
+        x))))
 
 ;; print the point
 (xtmtest '(bind-func test_generic_point_3
@@ -56,58 +59,62 @@
 
 
 ;; Generic Size {width,height}
-(bind-type Size <!a,!a>)
+(xtmtest-compile '(bind-type Size <!a,!a>))
 ;; points and size must be the same primitive type!
-(bind-type Rectangle <Point*,Size*>)
+(xtmtest-compile '(bind-type Rectangle <Point*,Size*>))
 ;; this basically the same as Rectangle
-(bind-type RectangleA <Point:<!a,!a>*,Size:<!a,!a>*>)
+(xtmtest-compile '(bind-type RectangleA <Point:<!a,!a>*,Size:<!a,!a>*>))
 ;; this allows *different* point and size primitives
-(bind-type RectangleB <Point:<!a,!a>*,Size:<!b,!b>*>)
+(xtmtest-compile '(bind-type RectangleB <Point:<!a,!a>*,Size:<!b,!b>*>))
 
 ;; print routines for everything!
-(bind-func print:[void,Size*]*
-  (lambda (p)
-    (if (null? p)
-        (begin (printout "<>") void)
-        (begin (printout "<"
-                         (tref p 0) ","
-                         (tref p 1) ">")
-               void))))
+(xtmtest-compile '(bind-func print:[void,Size*]*
+                   (lambda (p)
+                     (if (null? p)
+                         (begin (printout "<>") void)
+                         (begin (printout "<"
+                                          (tref p 0) ","
+                                          (tref p 1) ">")
+                                void)))))
 
-(bind-func print:[void,Rectangle*]*
-  (lambda (p)
-    (if (null? p)
-        (begin (printout "<>") void)
-        (begin (printout "<"
-                         (tref p 0) ","
-                         (tref p 1) ">")
-               void))))
+(xtmtest-compile
+ '(bind-func print:[void,Rectangle*]*
+    (lambda (p)
+      (if (null? p)
+          (begin (printout "<>") void)
+          (begin (printout "<"
+                           (tref p 0) ","
+                           (tref p 1) ">")
+                 void)))))
 
-(bind-func print:[void,RectangleA*]*
-  (lambda (p)
-    (if (null? p)
-        (begin (printout "<>") void)
-        (begin (printout "<"
-                         (tref p 0) ","
-                         (tref p 1) ">")
-               void))))
+(xtmtest-compile
+ '(bind-func print:[void,RectangleA*]*
+    (lambda (p)
+      (if (null? p)
+          (begin (printout "<>") void)
+          (begin (printout "<"
+                           (tref p 0) ","
+                           (tref p 1) ">")
+                 void)))))
 
-(bind-func print:[void,RectangleB*]*
-  (lambda (p)
-    (if (null? p)
-        (begin (printout "<>") void)
-        (begin (printout "<"
-                         (tref p 0) ","
-                         (tref p 1) ">")
-               void))))
+(xtmtest-compile
+ '(bind-func print:[void,RectangleB*]*
+    (lambda (p)
+      (if (null? p)
+          (begin (printout "<>") void)
+          (begin (printout "<"
+                           (tref p 0) ","
+                           (tref p 1) ">")
+                 void)))))
 
 ;; make some rectangles
-(bind-func test_rectangle_1
-  (lambda ()
-    (let ((a (Rectangle (Point 1 2) (Size 3 4)))
-          (b (RectangleA (Point 5 6) (Size 7 8)))
-          (c (RectangleB (Point 9. 10.) (Size 11 12))))
-      c)))
+(xtmtest-compile
+ '(bind-func test_rectangle_1
+    (lambda ()
+      (let ((a (Rectangle (Point 1 2) (Size 3 4)))
+            (b (RectangleA (Point 5 6) (Size 7 8)))
+            (c (RectangleB (Point 9. 10.) (Size 11 12))))
+        c))))
 
 (xtmtest '(bind-func test_rectangle_2
             (lambda ()
@@ -125,29 +132,33 @@
 ;; recursive generic types
 ;;
 
-(bind-type Tree <!a,Tree*,Tree*>)
+(xtmtest-compile
+ '(bind-type Tree <!a,Tree*,Tree*>))
 
-(bind-func Leaf:[Tree:<!a,Tree*,Tree*>*,!a]*
-  "Make A Leaf"
-  (lambda (x)
-    (let ((t (Tree x null null)))
-      t)))
+(xtmtest-compile
+ '(bind-func Leaf:[Tree:<!a,Tree*,Tree*>*,!a]*
+    "Make A Leaf"
+    (lambda (x)
+      (let ((t (Tree x null null)))
+        t))))
 
-(bind-func tree_value:[!a,Tree*]*
-  (lambda (t)
-    (tref t 0)))
+(xtmtest-compile
+ '(bind-func tree_value:[!a,Tree*]*
+    (lambda (t)
+      (tref t 0))))
 
-(bind-func print:[void,Tree*]*
-  (lambda (t)
-    (let ((f (lambda (t)
-               (if (null? t) void
-                   (begin
-                     (printout (tree_value t) " ")
-                     (f (tref t 1))
-                     (f (tref t 2))
-                     void)))))      
-      (f t)
-      (println))))
+(xtmtest-compile
+ '(bind-func print:[void,Tree*]*
+    (lambda (t)
+      (let ((f (lambda (t)
+                 (if (null? t) void
+                     (begin
+                       (printout (tree_value t) " ")
+                       (f (tref t 1))
+                       (f (tref t 2))
+                       void)))))
+        (f t)
+        (println)))))
 
 
 (xtmtest '(bind-func tree_test
@@ -172,17 +183,20 @@
 ;; arity overload
 ;;
 
-(bind-func polygen:[!a,!a]*
-  (lambda (x)
-    (* 1 x)))
+(xtmtest-compile
+ '(bind-func polygen:[!a,!a]*
+    (lambda (x)
+      (* 1 x))))
 
-(bind-func polygen:[!a,!a,!a]*
-  (lambda (x y)
-    (* 1 x y)))
+(xtmtest-compile
+ '(bind-func polygen:[!a,!a,!a]*
+    (lambda (x y)
+      (* 1 x y))))
 
-(bind-func polygen:[!a,!a,!a,!a]*
-  (lambda (x y z)
-    (* 1 x y z)))
+(xtmtest-compile
+ '(bind-func polygen:[!a,!a,!a,!a]*
+    (lambda (x y z)
+      (* 1 x y z))))
 
 (xtmtest '(bind-func arity_test
             (lambda (x:i32 y:i32 z:i32)
@@ -304,11 +318,11 @@
 ;;   (lambda ()
 ;;     (let ((l1 (list (Point 1 2) (Point 3 4) (Point 5 6)))
 ;;           (l2 (list l1 l1 l1)))
-;;       (for-each (lambda (x)                  
+;;       (for-each (lambda (x)
 ;;                   (for-each (lambda (x)
 ;;                               (printout x ","))
 ;;                             x)
-;;                   (println))                
+;;                   (println))
 ;;                 l2)
 ;;       l2)))
 
@@ -531,25 +545,28 @@
 ;; a maybe monad test
 ;;
 
-(bind-type Maybe <i1,!a>)
+(xtmtest-compile
+ '(bind-type Maybe <i1,!a>))
 
 ;; Maybe's data constructor IS unit/return
 ;;
 ;; but really UNIT should take a single
 ;; arg, so it has type [Maybe*,!a]*
 ;; so we can override on arity as below
-(bind-func Maybe:[Maybe:<i1,!a>*,!a]*
-  (lambda (x)
-    (let ((m (alloc)))
-      (tset! m 0 #t)
-      (tset! m 1 x)
-      m)))
+(xtmtest-compile
+ '(bind-func Maybe:[Maybe:<i1,!a>*,!a]*
+    (lambda (x)
+      (let ((m (alloc)))
+        (tset! m 0 #t)
+        (tset! m 1 x)
+        m))))
 
-(bind-func bind:[Maybe:<i1,!b>*,Maybe:<i1,!a>*,[Maybe:<i1,!b>*,!a]*]*
-  (lambda (m f)
-    (if (tref m 0)
-        (f (tref m 1))           ;; true  Maybe
-        (Maybe #f (tref m 1))))) ;; false Maybe (nothing)
+(xtmtest-compile
+ '(bind-func bind:[Maybe:<i1,!b>*,Maybe:<i1,!a>*,[Maybe:<i1,!b>*,!a]*]*
+    (lambda (m f)
+      (if (tref m 0)
+          (f (tref m 1))                           ;; true  Maybe
+          (Maybe #f (tref m 1)))))) ;; false Maybe (nothing)
 
 ;; short-hand
 (constrain-genericfunc
@@ -563,23 +580,24 @@
 ;; (constrain-generic
 ;;  bind
 ;;  [Maybe:<i1,i64>*,Maybe:<i1,i64>*,[Maybe:<i1,i64>*,i64]*]*
-;;  [Maybe:<i1,i32>*,Maybe:<i1,i32>*,[Maybe:<i1,i32>*,i32]*]* 
+;;  [Maybe:<i1,i32>*,Maybe:<i1,i32>*,[Maybe:<i1,i32>*,i32]*]*
 ;;  [Maybe:<i1,float>*,Maybe:<i1,float>*,[Maybe:<i1,float>*,float]*]*
 ;;  [Maybe:<i1,double>*,Maybe:<i1,double>*,[Maybe:<i1,double>*,double]*]*)
 
 ;; maybe multiply
-(bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
-  (lambda (a b)
-    (bind
-     a (lambda (x)
-         (bind
-          b (lambda (y)
-              (let ((z (* x y)))
-                ;; stop computation if result
-                ;; is greater than 50
-                (if (> z (convert 50))
-                    (Maybe #f z)
-                    (Maybe #t z)))))))))
+(xtmtest-compile
+ '(bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
+    (lambda (a b)
+      (bind
+       a (lambda (x)
+           (bind
+            b (lambda (y)
+                (let ((z (* x y)))
+                  ;; stop computation if result
+                  ;; is greater than 50
+                  (if (> z (convert 50))
+                      (Maybe #f z)
+                      (Maybe #t z))))))))))
 
 ;; create a haskell style do syntax
 ;; but we'll use a let style form
@@ -593,23 +611,25 @@
          (f (cadr args) (caddr args))))
 
 ;; which makes maybe_mul considerably more readable
-(bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
-  (lambda (a b)
-    (mlet ((x a)
-           (y b))
-      (let ((z (* x y)))
-        ;; stop computation if result
-        ;; is greater than 50
-        (if (> z (convert 50)) 
-            (Maybe #f z)
-            (Maybe #t z))))))
-          
-(bind-func maybe_print_i64
-  (lambda (x:i64)
-    (let ((w (printf "%lld\n" x)))
-      (if (>= w 0)
-          (Maybe #t x)
-          (Maybe #f x)))))
+(xtmtest-compile
+ '(bind-func maybe_mul:[Maybe*,Maybe*,Maybe*]*
+    (lambda (a b)
+      (mlet ((x a)
+             (y b))
+            (let ((z (* x y)))
+              ;; stop computation if result
+              ;; is greater than 50
+              (if (> z (convert 50))
+                  (Maybe #f z)
+                  (Maybe #t z)))))))
+
+(xtmtest-compile
+ '(bind-func maybe_print_i64
+    (lambda (x:i64)
+      (let ((w (printf "%lld\n" x)))
+        (if (>= w 0)
+            (Maybe #t x)
+            (Maybe #f x))))))
 
 (xtmtest '(bind-func maybe_test
             (lambda (w:i64)
@@ -621,7 +641,7 @@
                 (bind (Maybe 5) (lambda (x) (Maybe (* x x))))
                 (bind (Maybe 6.0) (lambda (x) (Maybe (* x x))))
                 (bind (Maybe 5) (lambda (x) (Maybe (* x x))))
-                (bind result maybe_print_i64)      
+                (bind result maybe_print_i64)
                 void)))
 
          (maybe_test 3))
@@ -638,10 +658,10 @@
 ;; type expansion
 ;;
 
-(bind-type TypeA <!a,!a>)
-(bind-type TypeB <TypeA:<!a,!a>*,!a>)
-(bind-type TypeC <TypeA*,!a>)
-(bind-type TypeD <!a,[!b,!a]*,!b>)
+(xtmtest-compile '(bind-type TypeA <!a,!a>))
+(xtmtest-compile '(bind-type TypeB <TypeA:<!a,!a>*,!a>))
+(xtmtest-compile '(bind-type TypeC <TypeA*,!a>))
+(xtmtest-compile '(bind-type TypeD <!a,[!b,!a]*,!b>))
 
 (xtmtest '(bind-func test_exp2
             (lambda ()
@@ -653,23 +673,26 @@
 
          (test_exp2))
 
-(bind-func gen_exp:[!a,[!a,!b]*,!b]*
-  (lambda (f x)
-    (f x)))
+(xtmtest-compile
+ '(bind-func gen_exp:[!a,[!a,!b]*,!b]*
+    (lambda (f x)
+      (f x))))
 
-(bind-func test_gen_e
-  (lambda ()
-    (let ((f (lambda (x) (i64tod x))))
-      (gen_exp:$[double,i64]* f 2))))
+(xtmtest-compile
+ '(bind-func test_gen_e
+    (lambda ()
+      (let ((f (lambda (x) (i64tod x))))
+        (gen_exp:$[double,i64]* f 2)))))
 
 ;; (bind-func test_gen_list
 ;;   (lambda ()
 ;;     (let ((lst (list gen_exp:$[i32,i64]* gen_exp:$[i32,i64]*)))
 ;;       lst)))
 
-(bind-func gen_exp:[!a,!a,!a,!a]*
-  (lambda (x y z)
-    (* x y z)))
+(xtmtest-compile
+ '(bind-func gen_exp:[!a,!a,!a,!a]*
+    (lambda (x y z)
+      (* x y z))))
 
 ;; (bind-func test_gen_list2
 ;;   (lambda ()
@@ -681,18 +704,21 @@
 ;;
 ;; generic overloading
 ;;
-(bind-func gen_sqr:[!a,!a]*
-  (lambda (x)
-    (* x x)))
+(xtmtest-compile
+ '(bind-func gen_sqr:[!a,!a]*
+    (lambda (x)
+      (* x x))))
 
-(bind-func gen_sqr:[Pair*,Pair*]*
-  (lambda (x)
-    (Pair (* (first x) (first x))
-          (* (second x) (second x)))))
+(xtmtest-compile
+ '(bind-func gen_sqr:[Pair*,Pair*]*
+    (lambda (x)
+      (Pair (* (first x) (first x))
+            (* (second x) (second x))))))
 
-(bind-func gen_sqr:[List*,List*]*
-  (lambda (lst)
-    (map (lambda (x) (gen_sqr x)) lst)))
+(xtmtest-compile
+ '(bind-func gen_sqr:[List*,List*]*
+    (lambda (lst)
+      (map (lambda (x) (gen_sqr x)) lst))))
 
 (xtmtest '(bind-func gen_sqr_test
             (lambda ()
@@ -846,7 +872,7 @@
 
 ;; this next one currently causes an infinite loop in the compiler
 
-;; (xtmtest 
+;; (xtmtest
 
 ;; (test-xtfunc (test_dict_set_3) 1))
 

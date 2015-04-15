@@ -88,6 +88,15 @@
                          (xtmtest-update-test-result func-sym 'correct ',call exp-res result)
                          (xtmtest-update-test-result func-sym 'incorrect ',call exp-res result)))))))
 
+(define-macro (xtmtest-compile form)
+  `(let ((func-sym (quote ,(cadadr form))))
+     (print-with-colors 'cyan 'default #t (print "xtmtest "))
+     (print-with-colors 'black 'cyan #t (print "" func-sym ""))
+     (println)
+     (catch (xtmtest-update-test-result func-sym 'no-compile 'compile-only #f #f)
+            (eval ,form (interaction-environment))
+            (xtmtest-update-test-result func-sym 'correct 'compile-only #t #t))))
+
 (define-macro (xtmtest-result call expected-result)
   `(let ((func-sym (quote ,(car call))))
      (print-with-colors 'cyan 'default #t (print "xtmtest "))
