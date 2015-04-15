@@ -3112,7 +3112,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 	if (LLVM_ALIAS_TABLE.find(std::string(name)) != LLVM_ALIAS_TABLE.end())
 	  return mk_string(_sc,LLVM_ALIAS_TABLE[std::string(name)].c_str());
 	else
-	  return _sc->NIL;		    
+	  return _sc->F; 
     }
 
 
