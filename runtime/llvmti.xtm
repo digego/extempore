@@ -8413,9 +8413,13 @@
         (if *impc:compile*
             ;; make sure the (now resolved) function types hit the
             ;; closure/nativefunc cache
-            (let* ((closure-type-list (impc:ir:get-type-from-str closure-type)))
-              (impc:ti:set-closure-type (symbol->string symname)
-                                        closure-type-list)
+            (let* ((closure-type-list (impc:ir:get-type-from-str closure-type))
+                   (oldtype (impc:ti:get-closure-type (symbol->string symname))))
+              (if oldtype
+                  (if (not (equal? closure-type-list oldtype))
+                      (impc:compiler:print-already-bound-error symname oldtype))
+                  (impc:ti:set-closure-type (symbol->string symname)
+                                            closure-type-list))
               (if (regex:match? (symbol->string symname) "_poly_")
                   (impc:compiler:print-bind-func-details-to-log
                    "Spec'zed:"
