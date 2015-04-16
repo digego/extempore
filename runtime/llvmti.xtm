@@ -65,9 +65,11 @@
 ;; type is immutable, doesn't need a setter
 (define impc:ti:get-namedtype-type
   (lambda (namedtype-name)
-    (let ((ptr-depth (impc:ir:get-ptr-depth namedtype-name))
-          (namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
-      (if namedtype-data (impc:ir:pointer++ (vector-ref (cdr namedtype-data) 0) ptr-depth) #f))))
+    (if (string? namedtype-name)
+        (let ((ptr-depth (impc:ir:get-ptr-depth namedtype-name))
+              (namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
+          (if namedtype-data (impc:ir:pointer++ (vector-ref (cdr namedtype-data) 0) ptr-depth) #f))
+        #f)))
 
 (define impc:ti:namedtype-exists?
   (lambda (namedtype-name)
