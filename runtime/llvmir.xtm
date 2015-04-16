@@ -687,16 +687,16 @@
 
 ;; this is the "queue" where IR is cached as we go (NB: not actually a
 ;; queue)
-(define *impc:compiler:queued-llvm-ir-string* "")
+(define *impc:compiler:queued-llvm-ir-string* (make-string 0))
 
 (define impc:compiler:reset-jit-compilation-queue
   (lambda ()
-    (set! *impc:compiler:queued-llvm-ir-string* "")))
+    (set! *impc:compiler:queued-llvm-ir-string* (make-string 0))))
 
 (define impc:compiler:queue-ir-for-compilation
   (lambda (ir-string)
     (set! *impc:compiler:queued-llvm-ir-string*
-          (string-append *impc:compiler:queued-llvm-ir-string* ir-string))))
+          (emit ir-string *impc:compiler:queued-llvm-ir-string*))))
 
 (define impc:compiler:flush-jit-compilation-queue
   (lambda ()
