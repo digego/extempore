@@ -132,13 +132,12 @@
                   (or (string? docstring) (begin (println docstring)))
                   (or (list? body) (begin (println 'body: body) #f))))
         (impc:compiler:print-compiler-error "couldn't register new closure")
-        (let ((oldtype (impc:ti:get-closure-type closure-name)))
-          (if oldtype
-              (impc:compiler:print-already-bound-error closure-name oldtype)
-              ;; create a new entry
-              (set! *impc:ti:closure-cache*
-                    (cons (cons closure-name (vector type docstring body))
-                          *impc:ti:closure-cache*)))))))
+        (if (impc:ti:closure-exists? closure-name)
+            (impc:compiler:print-already-bound-error closure-name (impc:ti:get-closure-type closure-name))
+            ;; create a new entry
+            (set! *impc:ti:closure-cache*
+                  (cons (cons closure-name (vector type docstring body))
+                        *impc:ti:closure-cache*))))))
 
 (define impc:ti:get-closure-type
   (lambda (closure-name)
