@@ -1396,13 +1396,13 @@
                 (largest 0)
                 (align 0)
                 (offset 0)
-                (this_size 0)                
+                (this_size 0)
                 (elmts (- (length t) 1)))
             (dotimes (i elmts)
               (set! et (list-ref t (+ i 1)))
               (set! this_size (impc:ir:get-type-size et))
               (set! align (impc:ir:get-alignment et))
-              (if (> align largest) (set! largest align))              
+              (if (> align largest) (set! largest align))
               (set! offset (modulo size align))
               (if (> offset 0) (set! offset (- align offset)))
               (set! size (+ size this_size offset)))
@@ -1435,7 +1435,7 @@
                      (impc:ir:get-tuple-type-size type)
                      ;; (llvm:get-struct-size (impc:ir:get-type-str type))
                      )
-                    (else (impc:compiler:print-bad-type-error t "bad type in get-size"))))))))
+                    (else (impc:compiler:print-bad-type-error type "bad type in get-size"))))))))
 
 
 (define impc:ir:objectsize-intrinsic
@@ -3195,16 +3195,12 @@
         (emit (impc:ir:gname "val" "i8*") " = getelementptr " (impc:ir:get-type-str t) "* null, i32 1\n" os)
         (emit (impc:ir:gname "typesize" *impc:ir:size_t_str*) " = ptrtoint " (impc:ir:get-type-str t) "* "
               (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os)
-
         (emit (impc:ir:gname "zonesize" "i64") " = mul "
               (cadr (impc:ir:gname "typesize")) " " (car (impc:ir:gname "typesize")) ", "
               (car idx) "\n" os)
-
         (emit (impc:ir:gname "tzone" "i8*") " = load i8** %_impzPtr\n"
               (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
               os)
-
-                                        ;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
         (emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
                              (car (impc:ir:gname "zonesize"))
                              ")\n") os)
@@ -3575,7 +3571,6 @@
         (emit (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", "
               (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size")) ")\n" os)
         (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, "
-
               (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size")) ")\n" os)
         (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
               " = bitcast i8* " (car (impc:ir:gname "dat"))
@@ -3596,12 +3591,10 @@
         (if (not (impc:ir:fixed-point? t))
             (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-str t) "alloc size must be an integer" ast))
         (emit idx-str os)
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
             (begin (emit (string-append (impc:ir:gname "tmp" "i64") " = zext " (impc:ir:get-type-str t) " "
                                         (car idx) " to i64\n") os)
                    (set! idx (impc:ir:gname))))
-        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (emit (impc:ir:gname "val" "i8*") " = getelementptr " (impc:ir:get-type-str t) "* null, i32 1\n" os)
         (emit (impc:ir:gname "typesize" *impc:ir:size_t_str*) " = ptrtoint " (impc:ir:get-type-str t) "* "
               (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os)
@@ -4685,6 +4678,7 @@
                                                    (map (lambda (a) (string-append ", " (cadr (cdr a)))) (cdr args)))
                                             "}*")))
            (total_size1 (* (/ (sys:pointer-size) 8) 2))
+           ;; this is the last usage of impc:ir:get-type-size in llvmir.xtm - need to get rid of it as well
            (total_size2 (apply + (map (lambda (a) (impc:ir:get-type-size (cadr (cdr a)))) args))))
 
       (if (not (impc:ir:fixed-point? (cadr time)))
