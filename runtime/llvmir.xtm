@@ -95,6 +95,8 @@
 
 ;; type of size_t on platform
 (define *impc:ir:size_t_str* (if (= 64 (sys:pointer-size)) "i64" "i32"))
+;; pointer size in bytes (as a string)
+(define *impc:ir:pointer_size_bytes_str* (if (= 64 (sys:pointer-size)) "8" "4"))
 
 ;; A windows allocation bug that I can't track down yet!
 (define *WINDOWS_ALLOC_BUG* (if (string=? (sys:platform) "Windows") #t #f))
@@ -1434,6 +1436,11 @@
                      ;; (llvm:get-struct-size (impc:ir:get-type-str type))
                      )
                     (else (impc:compiler:print-bad-type-error t "bad type in get-size"))))))))
+
+
+(define impc:ir:objectsize-intrinsic
+  (lambda (object-name rettype)
+    (format "@llvm.objectsize.~a(i8* ~a, i1 true)" object-name rettype)))
 
 
 (define impc:ir:pointer--
