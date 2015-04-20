@@ -519,7 +519,7 @@
         ;; this will be #t in a suppress-precomp-do form
         *sys:precomp:current-output-port*)))
 
-(define impc:precomp:no-scm-suffix?
+(define impc:precomp:create-scm-wrapper?
   (lambda (symname)
     (let ((tlist (impc:ti:get-closure-arg-types symname)))
       (member #f
@@ -561,7 +561,7 @@
                            (begin
                              (set! *sys:precomp:func-defs-in-mod* (cons (cons symname #t) *sys:precomp:func-defs-in-mod*))
                              (string-append "(bind-lib-func"
-                                            (if (impc:precomp:no-scm-suffix? symname) "-no-scm" "")
+                                            (if (impc:precomp:create-scm-wrapper? symname) "-no-scm" "")
                                             " " *sys:precomp:current-lib-name* " "
                                             symname " " type-str
                                             (if (null? args) ""
