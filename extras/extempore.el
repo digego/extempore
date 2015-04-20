@@ -437,8 +437,8 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
          (4 font-lock-type-face t))
-       ;; bind-lib-func(-no-scm)
-       '("(\\(bind-lib-func\\|bind-lib-func-no-scm\\|bind-lib-type\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\)"
+       ;; bind-lib-func
+       '("(\\(bind-lib-func\\|bind-lib-type\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
