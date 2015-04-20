@@ -8462,19 +8462,10 @@
                                    ,zone-size
                                    ,@(if (null? types)
                                          '()
-                                         (map (lambda (k) (list 'quote k)) types))))
-                (func (llvm:get-function (symbol->string ',symname))))
+                                         (map (lambda (k) (list 'quote k)) types)))))
            (impc:ti:initialize-closure-with-new-zone (symbol->string ',symname)
                                                      *impc:default-zone-size*)
-           (if func
-               (if (llvm:get-scheme-function ,(symbol->string symname))
-                   (begin
-                     (llvm:ffi-set-name
-                      (llvm:get-scheme-function ,(symbol->string symname))
-                      ,(symbol->string symname))
-                     (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
-                   (impc:compiler:print-no-scheme-stub-notification ',symname))
-               (impc:compiler:print-missing-compiled-function-error ',symname)))))))
+           (impc:ti:create-scheme-wrapper (symbol->string ',symname)))))))
 
 
 (define-macro (bind-func . args)
@@ -8547,16 +8538,7 @@
     (let ((zone-size *impc:default-zone-size*))
       (eval
        `(define ,symname
-          (let* ((func (llvm:get-function (symbol->string ',symname))))
-            (if func
-                (if (llvm:get-scheme-function ,(symbol->string symname))
-                    (begin
-                      (llvm:ffi-set-name
-                       (llvm:get-scheme-function ,(symbol->string symname))
-                       ,(symbol->string symname))
-                      (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
-                    (impc:compiler:print-no-scheme-stub-notification ',symname))
-                (impc:compiler:print-missing-compiled-function-error ',symname))))
+          (impc:ti:create-scheme-wrapper (symbol->string ',symname)))
        (interaction-environment)))))
 
 (define ipc:bind-func
@@ -8944,15 +8926,10 @@
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
-     ;;(println (llvm:get-scheme-function ,(symbol->string symname)))
-     (if (llvm:get-scheme-function ,(symbol->string symname))
-         (begin
-           (llvm:ffi-set-name
-            (llvm:get-scheme-function ,(symbol->string symname))
-            ,(symbol->string symname))
-           (eval (define ,symname
-                   (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
-                 (interaction-environment))))
+     ,(if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings (symbol->string type)))
+          `(eval (define ,symname
+                   (impc:ti:create-scheme-wrapper (symbol->string ',symname)))
+                 (interaction-environment)))
      (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname)
                                                ,(if (null? args) *impc:default-zone-size* (car args)))))
 
@@ -8995,7 +8972,18 @@
                 (sys:pop-memzone))
               (impc:compiler:print-missing-compiled-function-error (string-append func-name "_setter")))))))
 
-;; a helper for returning a scheme closure native closure (if one exists!)
+(define impc:ti:create-scheme-wrapper
+  (lambda (func-name)
+    (if (sys:precomp:currently-compiling?)
+        (impc:compiler:print-not-during-precomp-error)
+        (let ((scheme-func (llvm:get-function-pointer (string-append func-name "_scheme"))))
+          (if scheme-func
+              (begin
+                (llvm:ffi-set-name scheme-func func-name)
+                (mk-ff func-name))
+              (impc:compiler:print-no-scheme-stub-notification (string->symbol func-name)))))))
+
+;; a helper for returning a native closure (if one exists!)
 (define llvm:get-native-closure
   (lambda (name)
     (if (sys:precomp:currently-compiling?)
@@ -9016,13 +9004,6 @@
     (if (sys:precomp:currently-compiling?)
         (impc:compiler:print-not-during-precomp-error)
         (llvm:get-function-pointer (string-append name "_native")))))
-
-;; a helper for returning a scheme closure native closure (if one exists!)
-(define llvm:get-scheme-function
-  (lambda (name)
-    (if (sys:precomp:currently-compiling?)
-        (impc:compiler:print-not-during-precomp-error)
-        (llvm:get-function-pointer (string-append name "_scheme")))))
 
 ;; Wrap a native, bound C function, allowing it to be called from scheme
 (define-macro (bind-wrapper local-sym native-sym)
