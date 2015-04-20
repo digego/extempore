@@ -8967,10 +8967,10 @@
           (if setter
               (begin
                 (sys:push-memzone (sys:create-mzone zone-size))
-                (llvm:run (sys:peek-memzone))
+                (llvm:run setter (sys:peek-memzone))
                 ;; don't destroy - this happens in _setter func
                 (sys:pop-memzone))
-              (impc:compiler:print-missing-compiled-function-error (string-append func-name "_setter")))))))
+              (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter))))))
 
 (define impc:ti:create-scheme-wrapper
   (lambda (func-name)
