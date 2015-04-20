@@ -7379,10 +7379,8 @@
                                                          (symbol->string pfunc)
                                                          (impc:ir:get-type-from-pretty-str (cadr p))
                                                          "")
-                          (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
-                            (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
-                            (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
-                            (sys:pop-memzone)) ;; don't destroy - this happens in _setter func
+                          (impc:ti:initialize-closure-with-new-zone (symbol-string pfunc)
+                                                                    *impc:default-zone-size*)
                           pfunc))
                     (begin ;; (println 'here!)
                       (string->symbol (string-append (car p) "_poly_" etype))))
@@ -7486,11 +7484,8 @@
                                                       (symbol->string pfunc)
                                                       (impc:ir:get-type-from-pretty-str type)
                                                       "")
-                       (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
-                         (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
-                         (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
-                         (sys:pop-memzone) ;; don't destroy - this happens in _setter func
-                         )
+                       (impc:ti:initialize-closure-with-new-zone (symbol-string pfunc)
+                                                                    *impc:default-zone-size*)
                        (cons pfunc
                              (map (lambda (jj)
                                     (impc:ti:add-types-to-source symname jj types envvars ast))
@@ -8468,17 +8463,10 @@
                                    ,@(if (null? types)
                                          '()
                                          (map (lambda (k) (list 'quote k)) types))))
-                (setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
                 (func (llvm:get-function (symbol->string ',symname))))
-           (if setter
-               (begin
-                 (sys:push-memzone (sys:create-mzone ,zone-size))
-                 (llvm:run setter (sys:peek-memzone))
-                 (sys:pop-memzone) ;; don't destroy here - should happen in _setter
-                 )
-               (impc:compiler:print-missing-compiled-function-setter-error ',symname))
+           (impc:ti:initialize-closure-with-new-zone (symbol->string ',symname)
+                                                     *impc:default-zone-size*)
            (if func
-               ;;(lambda args (apply llvm:run func (sys:peek-memzone) args))
                (if (llvm:get-scheme-function ,(symbol->string symname))
                    (begin
                      (llvm:ffi-set-name
@@ -8559,9 +8547,7 @@
     (let ((zone-size *impc:default-zone-size*))
       (eval
        `(define ,symname
-          (let* ((setter (llvm:get-function (string-append (symbol->string ',symname) "_setter")))
-                 (func (llvm:get-function (symbol->string ',symname))))
-                                        ;(println 'scmfunc: (llvm:get-scheme-function ,(symbol->string symname)))
+          (let* ((func (llvm:get-function (symbol->string ',symname))))
             (if func
                 (if (llvm:get-scheme-function ,(symbol->string symname))
                     (begin
@@ -8570,7 +8556,6 @@
                        ,(symbol->string symname))
                       (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
                     (impc:compiler:print-no-scheme-stub-notification ',symname))
-                                        ;(lambda args (apply llvm:run func (sys:peek-memzone) args))
                 (impc:compiler:print-missing-compiled-function-error ',symname))))
        (interaction-environment)))))
 
@@ -8953,8 +8938,8 @@
                ,(string->symbol (string-append "[" (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type)))
                                                ",i8*]*")))
      (if (not (llvm:compile-ir
-                (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
-                               "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
+               (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
+                              "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
          (impc:compiler:print-compiler-error "failed to compile IR in bind-lib-func" ,symname))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
@@ -8968,12 +8953,8 @@
            (eval (define ,symname
                    (mk-ff (llvm:get-scheme-function ,(symbol->string symname))))
                  (interaction-environment))))
-     ;; setup closure
-     (let ((setter (llvm:get-function ,(string-append (symbol->string symname) "_setter"))))
-       (sys:push-memzone (sys:create-mzone ,(if (null? args) *impc:default-zone-size* (car args))))
-       (llvm:run setter (sys:peek-memzone))
-       (sys:pop-memzone) ;; don't destroy zone here - should happen next timer around _setter
-       )))
+     (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname)
+                                               ,(if (null? args) *impc:default-zone-size* (car args)))))
 
 
 (define-macro (bind-lib-val library symname type)
@@ -9000,6 +8981,19 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define impc:ti:initialize-closure-with-new-zone
+  (lambda (func-name zone-size)
+    (if (sys:precomp:currently-compiling?)
+        (impc:compiler:print-not-during-precomp-error)
+        (let ((setter (llvm:get-function (string-append func-name "_setter"))))
+          (if setter
+              (begin
+                (sys:push-memzone (sys:create-mzone zone-size))
+                (llvm:run (sys:peek-memzone))
+                ;; don't destroy - this happens in _setter func
+                (sys:pop-memzone))
+              (impc:compiler:print-missing-compiled-function-error (string-append func-name "_setter")))))))
 
 ;; a helper for returning a scheme closure native closure (if one exists!)
 (define llvm:get-native-closure
@@ -9083,10 +9077,8 @@
                                                     (symbol->string pfunc)
                                                     (impc:ir:get-type-from-pretty-str t)
                                                     "")
-                     (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
-                       (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
-                       (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
-                       (sys:pop-memzone)) ;; don't destroy - this happens in _setter func
+                     (impc:ti:initialize-closure-with-new-zone (symbol-string pfunc)
+                                                               *impc:default-zone-size*)
                      pfunc))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
@@ -9171,10 +9163,8 @@
                                                     (symbol->string pfunc)
                                                     (impc:ir:get-type-from-pretty-str t)
                                                     "")
-                     (let ((setter (llvm:get-function (string-append (symbol->string pfunc) "_setter"))))
-                       (sys:push-memzone (sys:create-mzone *impc:default-zone-size*))
-                       (llvm:run setter (sys:peek-memzone)) ;; (sys:create-mzone *impc:default-zone-size*))
-                       (sys:pop-memzone)) ;; don't destroy - this happens in _setter func
+                     (impc:ti:initialize-closure-with-new-zone (symbol-string pfunc)
+                                                               *impc:default-zone-size*)
                      pfunc))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
