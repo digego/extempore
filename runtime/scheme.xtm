@@ -1932,11 +1932,13 @@
 ;; this can be moved elsewhere, but should be loaded on startup
 
 (define-macro (sys:precomp:suppress-precomp-do . forms)
-       `(let ((precomp-port *sys:precomp:current-output-port*))
-          (set! *sys:precomp:current-output-port* #t)
-          ,@forms
-          ;; whatever happens, set the port back to the original value
-          (set! *sys:precomp:current-output-port* precomp-port)))
+  `(if ,*sys:precomp:current-output-port*
+       (let ((precomp-port *sys:precomp:current-output-port*))
+         (set! *sys:precomp:current-output-port* #t)
+         ,@forms
+         ;; whatever happens, set the port back to the original value
+         (set! *sys:precomp:current-output-port* precomp-port))
+       ,@forms))
 
 (define sys:precomp:compile-current-module
   (lambda (module-name move-into-place? exit-afterwards?)
