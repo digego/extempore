@@ -520,18 +520,17 @@
         *sys:precomp:current-output-port*)))
 
 (define impc:precomp:create-scm-wrapper?
-  (lambda (symname)
-    (let ((tlist (impc:ti:get-closure-arg-types symname)))
-      (member #f
-              (map (lambda (type)
-                     (let ((type-str (if (impc:ir:array? type)
-                                         type
-                                         (impc:ir:get-type-from-pretty-str type))))
-                       (or (impc:ir:void? type-str)
-                           (impc:ir:floating-point? type-str)
-                           (impc:ir:fixed-point? type-str)
-                           (impc:ir:pointer? type-str))))
-                   (or tlist (list symname)))))))
+  (lambda (type-list)
+    (not (member #f
+                 (map (lambda (type)
+                        (let ((type-str (if (impc:ir:array? type)
+                                            type
+                                            (impc:ir:get-type-from-pretty-str type))))
+                          (or (impc:ir:void? type-str)
+                              (impc:ir:floating-point? type-str)
+                              (impc:ir:fixed-point? type-str)
+                              (impc:ir:pointer? type-str))))
+                      (or type-list (list symname)))))))
 
 (define impc:precomp:write-binding-details-to-file
   (lambda (lead-string symname type . args)
@@ -561,7 +560,7 @@
                            (begin
                              (set! *sys:precomp:func-defs-in-mod* (cons (cons symname #t) *sys:precomp:func-defs-in-mod*))
                              (string-append "(bind-lib-func"
-                                            (if (impc:precomp:create-scm-wrapper? symname) "-no-scm" "")
+                                            (if (impc:precomp:create-scm-wrapper? (impc:ti:get-closure-arg-types symname)) "-no-scm" "")
                                             " " *sys:precomp:current-lib-name* " "
                                             symname " " type-str
                                             (if (null? args) ""
