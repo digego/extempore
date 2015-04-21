@@ -680,16 +680,20 @@
   (lambda ()
     (if (not (string=? *impc:compiler:queued-llvm-ir-string* ""))
         (let ((res (llvm:jit-compile-ir-string *impc:compiler:queued-llvm-ir-string*)))
+          (if *impc:compiler:print-raw-llvm*
+              (print-full-nq *impc:compiler:queued-llvm-ir-string*))
           (impc:compiler:reset-jit-compilation-queue)
+          ;; (print "Flushed IR compilation queue with result: " res "\n")
           res))))
 
 ;; JIT-compile the IR string, or queue it for precomp
 (define llvm:compile-ir
   (lambda (ir-string)
-    (if *impc:compiler:print-raw-llvm* (print-full-nq ir-string))
     (if (sys:precomp:currently-compiling?)
         (impc:compiler:queue-ir-for-compilation ir-string)
-        (llvm:jit-compile-ir-string ir-string))))
+        (begin
+          (if *impc:compiler:print-raw-llvm* (print-full-nq ir-string))
+          (llvm:jit-compile-ir-string ir-string)))))
 
 (define llvm:compile-ir-and-print
   (lambda (ir-string)
