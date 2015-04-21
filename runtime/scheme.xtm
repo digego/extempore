@@ -1929,10 +1929,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; PRECOMP STUFF ;;;;;;;;;;;;;;;;;;;;;;;
 
-;; this can be moved elsewhere, but should be loaded on startup
+;; insert arbitrary sexp (remember to quote!) into the precomp .xtm
+;; file, otherwise do nothing
+(define sys:precomp:insert-sexp
+  (lambda (sexp)
+    (if (output-port? *sys:precomp:current-output-port*)
+        (display (string-append (sexpr->string sexp) "\n")
+                 *sys:precomp:current-output-port*))))
 
-(define-macro (sys:precomp:do-or-emit . forms)
-  (if (not *sys:precomp:current-output-port*)
+(define-macro (sys:precomp:do-or-add-to-precomp-header . forms)
+  (if (not (output-port? *sys:precomp:current-output-port*))
       `(begin ,@forms)
       `(begin ,@(map (lambda (f) `(sys:precomp:insert-sexp ',f)) forms))))
 
@@ -2073,14 +2079,6 @@
                    *sys:precomp:current-output-port*)
           (display "(set! *impc:compiler:message:level* *sys:precomp:prev-compiler-message-level*)\n"
                    *sys:precomp:current-output-port*)))))
-
-;; if precompiling, insert arbitrary sexp (remember to quote!) into
-;; the precomp .xtm file, otherwise do nothing
-(define sys:precomp:insert-sexp
-  (lambda (sexp)
-    (if (output-port? *sys:precomp:current-output-port*)
-        (display (string-append (sexpr->string sexp) "\n")
-                 *sys:precomp:current-output-port*))))
 
 (define sys:precomp:print-compilation-details
   (lambda (start-time)
