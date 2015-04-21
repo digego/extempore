@@ -8962,7 +8962,8 @@
 (define impc:ti:initialize-closure-with-new-zone
   (lambda (func-name zone-size)
     (if (sys:precomp:currently-compiling?)
-        (impc:compiler:print-not-during-precomp-error)
+        (sys:precomp:insert-sexp
+         `(impc:ti:initialize-closure-with-new-zone ,func-name ,zone-size))
         (let ((setter (llvm:get-function (string-append func-name "_setter"))))
           (if setter
               (begin
