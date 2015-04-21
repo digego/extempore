@@ -1931,6 +1931,11 @@
 
 ;; this can be moved elsewhere, but should be loaded on startup
 
+(define-macro (sys:precomp:do-or-emit . forms)
+  (if (not *sys:precomp:current-output-port*)
+      `(begin ,@forms)
+      `(begin ,@(map (lambda (f) `(sys:precomp:insert-sexp ',f)) forms))))
+
 (define-macro (sys:precomp:suppress-precomp-do . forms)
   `(if ,*sys:precomp:current-output-port*
        (let ((precomp-port *sys:precomp:current-output-port*))
