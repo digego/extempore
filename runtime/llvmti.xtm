@@ -7379,8 +7379,8 @@
                                                          (symbol->string pfunc)
                                                          (impc:ir:get-type-from-pretty-str (cadr p))
                                                          "")
-                          (impc:ti:initialize-closure-with-new-zone (symbol->string pfunc)
-                                                                    *impc:default-zone-size*)
+                          (impc:ti:initialize-closure-if-not-precompiling (symbol->string pfunc)
+                                                                          *impc:default-zone-size*)
                           pfunc))
                     (begin ;; (println 'here!)
                       (string->symbol (string-append (car p) "_poly_" etype))))
@@ -7484,8 +7484,8 @@
                                                       (symbol->string pfunc)
                                                       (impc:ir:get-type-from-pretty-str type)
                                                       "")
-                       (impc:ti:initialize-closure-with-new-zone (symbol->string pfunc)
-                                                                    *impc:default-zone-size*)
+                       (impc:ti:initialize-closure-if-not-precompiling (symbol->string pfunc)
+                                                                       *impc:default-zone-size*)
                        (cons pfunc
                              (map (lambda (jj)
                                     (impc:ti:add-types-to-source symname jj types envvars ast))
@@ -8463,9 +8463,9 @@
                                    ,@(if (null? types)
                                          '()
                                          (map (lambda (k) (list 'quote k)) types)))))
-           (impc:ti:initialize-closure-with-new-zone (symbol->string ',symname)
-                                                     *impc:default-zone-size*)
-           (impc:ti:create-scheme-wrapper (symbol->string ',symname)))))))
+           (impc:ti:initialize-closure-if-not-precompiling (symbol->string ',symname)
+                                                           *impc:default-zone-size*)
+           (impc:ti:create-scheme-wrapper-if-not-precompiling (symbol->string ',symname)))))))
 
 
 (define-macro (bind-func . args)
@@ -8538,7 +8538,7 @@
     (let ((zone-size *impc:default-zone-size*))
       (eval
        `(define ,symname
-          (impc:ti:create-scheme-wrapper (symbol->string ',symname)))
+          (impc:ti:create-scheme-wrapper-if-not-precompiling (symbol->string ',symname)))
        (interaction-environment)))))
 
 (define ipc:bind-func
@@ -8913,7 +8913,7 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_setter")) [void,i8*]*)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_getter")) [i8*]*)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_callback")) [void,i8*]*)
-     ,(if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings (symbol->string type)))
+     ,(if (impc:precomp:create-scm-wrapper? (impc:ti:get-closure-arg-types (symbol->string type)))
           `(bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_scheme")) [i8*,i8*,i8*]*))
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_native")) ,type)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
@@ -8926,12 +8926,12 @@
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
-     ,(if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings (symbol->string type)))
+     ,(if (impc:precomp:create-scm-wrapper? (impc:ti:get-closure-arg-types (symbol->string type)))
           `(eval (define ,symname
-                   (impc:ti:create-scheme-wrapper (symbol->string ',symname)))
+                   (impc:ti:create-scheme-wrapper-if-not-precompiling (symbol->string ',symname)))
                  (interaction-environment)))
-     (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname)
-                                               ,(if (null? args) *impc:default-zone-size* (car args)))))
+     (impc:ti:initialize-closure-if-not-precompiling ,(symbol->string symname)
+                                                     ,(if (null? args) *impc:default-zone-size* (car args)))))
 
 
 (define-macro (bind-lib-val library symname type)
@@ -8961,17 +8961,30 @@
 
 (define impc:ti:initialize-closure-with-new-zone
   (lambda (func-name zone-size)
+    (let ((setter (llvm:get-function (string-append func-name "_setter"))))
+      (if setter
+          (begin
+            (sys:push-memzone (sys:create-mzone zone-size))
+            (llvm:run setter (sys:peek-memzone))
+            ;; don't destroy - this happens in _setter func
+            (sys:pop-memzone))
+          (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter)))))
+
+(define impc:ti:initialize-closure-if-not-precompiling
+  (lambda (func-name zone-size)
     (if (not (sys:precomp:currently-compiling?))
-        (let ((setter (llvm:get-function (string-append func-name "_setter"))))
-          (if setter
-              (begin
-                (sys:push-memzone (sys:create-mzone zone-size))
-                (llvm:run setter (sys:peek-memzone))
-                ;; don't destroy - this happens in _setter func
-                (sys:pop-memzone))
-              (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter))))))
+        (impc:ti:initialize-closure-with-new-zone func-name zone-size))))
 
 (define impc:ti:create-scheme-wrapper
+  (lambda (func-name)
+    (let ((scheme-func (llvm:get-function-pointer (string-append func-name "_scheme"))))
+      (if scheme-func
+          (begin
+            (llvm:ffi-set-name scheme-func func-name)
+            (mk-ff scheme-func))
+          (impc:compiler:print-no-scheme-stub-notification (string->symbol func-name))))))
+
+(define impc:ti:create-scheme-wrapper-if-not-precompiling
   (lambda (func-name)
     (if (sys:precomp:currently-compiling?)
         (lambda ()
@@ -8979,12 +8992,7 @@
           (print " the scheme wrapper for ")
           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print (string->symbol func-name)))
           (print " doesn't actually exist here, this is just a no-op wrapper created during precompilation\n"))
-        (let ((scheme-func (llvm:get-function-pointer (string-append func-name "_scheme"))))
-          (if scheme-func
-              (begin
-                (llvm:ffi-set-name scheme-func func-name)
-                (mk-ff scheme-func))
-              (impc:compiler:print-no-scheme-stub-notification (string->symbol func-name)))))))
+        (impc:ti:create-scheme-wrapper func-name))))
 
 ;; a helper for returning a native closure (if one exists!)
 (define llvm:get-native-closure
@@ -9061,8 +9069,8 @@
                                                     (symbol->string pfunc)
                                                     (impc:ir:get-type-from-pretty-str t)
                                                     "")
-                     (impc:ti:initialize-closure-with-new-zone (symbol->string pfunc)
-                                                               *impc:default-zone-size*)
+                     (impc:ti:initialize-closure-if-not-precompiling (symbol->string pfunc)
+                                                                     *impc:default-zone-size*)
                      pfunc))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
@@ -9147,8 +9155,8 @@
                                                     (symbol->string pfunc)
                                                     (impc:ir:get-type-from-pretty-str t)
                                                     "")
-                     (impc:ti:initialize-closure-with-new-zone (symbol->string pfunc)
-                                                               *impc:default-zone-size*)
+                     (impc:ti:initialize-closure-if-not-precompiling (symbol->string pfunc)
+                                                                     *impc:default-zone-size*)
                      pfunc))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
