@@ -8961,9 +8961,7 @@
 
 (define impc:ti:initialize-closure-with-new-zone
   (lambda (func-name zone-size)
-    (if (sys:precomp:currently-compiling?)
-        (sys:precomp:insert-sexp
-         `(impc:ti:initialize-closure-with-new-zone ,func-name ,zone-size))
+    (if (not (sys:precomp:currently-compiling?))
         (let ((setter (llvm:get-function (string-append func-name "_setter"))))
           (if setter
               (begin
@@ -8976,13 +8974,11 @@
 (define impc:ti:create-scheme-wrapper
   (lambda (func-name)
     (if (sys:precomp:currently-compiling?)
-        (begin (sys:precomp:insert-sexp
-                `(impc:ti:create-scheme-wrapper ,func-name))
-               (lambda ()
-                 (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
-                 (print " the scheme wrapper for ")
-                 (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print (string->symbol func-name)))
-                 (print " doesn't actually exist here, this is just a no-op wrapper created during precompilation\n")))
+        (lambda ()
+          (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
+          (print " the scheme wrapper for ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print (string->symbol func-name)))
+          (print " doesn't actually exist here, this is just a no-op wrapper created during precompilation\n"))
         (let ((scheme-func (llvm:get-function-pointer (string-append func-name "_scheme"))))
           (if scheme-func
               (begin
