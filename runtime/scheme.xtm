@@ -2074,8 +2074,10 @@
 (define sys:precomp:insert-sexp
   (lambda (sexp)
     (if (output-port? *sys:precomp:current-output-port*)
-        (display (string-append (sexpr->string sexp) "\n")
-                 *sys:precomp:current-output-port*))))
+        (begin
+          (display sexp *sys:precomp:current-output-port*)
+          ;; add a newline to keep things nice
+          (display "\n" *sys:precomp:current-output-port*)))))
 
 (define sys:precomp:print-compilation-details
   (lambda (start-time)
