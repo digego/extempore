@@ -499,16 +499,16 @@
 
 (define impc:precomp:create-scm-wrapper?
   (lambda (type-list)
-    (not (member #f
-                 (map (lambda (type)
-                        (let ((type-str (if (impc:ir:array? type)
-                                            type
-                                            (impc:ir:get-type-from-pretty-str type))))
-                          (or (impc:ir:void? type-str)
-                              (impc:ir:floating-point? type-str)
-                              (impc:ir:fixed-point? type-str)
-                              (impc:ir:pointer? type-str))))
-                      (or type-list (list symname)))))))
+    (cl:every
+     (lambda (type)
+       (let ((type-str (if (impc:ir:array? type)
+                           type
+                           (impc:ir:get-type-from-pretty-str type))))
+         (or (impc:ir:void? type-str)
+             (impc:ir:floating-point? type-str)
+             (impc:ir:fixed-point? type-str)
+             (impc:ir:pointer? type-str))))
+     type-list)))
 
 (define impc:precomp:write-binding-details-to-file
   (lambda (lead-string symname type . args)
