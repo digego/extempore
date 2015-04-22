@@ -529,7 +529,8 @@ namespace extemp {
 	    { "llvm:add-llvm-alias",        &SchemeFFI::add_llvm_alias },
 	    { "llvm:get-llvm-alias",        &SchemeFFI::get_llvm_alias },
 	    { "llvm:get-named-type",        &SchemeFFI::get_named_type },
-	    { "llvm:export-module",         &SchemeFFI::export_llvmmodule_bitcode },
+	    { "llvm:get-global-module",     &SchemeFFI::get_global_module},
+      { "llvm:export-module",         &SchemeFFI::export_llvmmodule_bitcode },
 	    { "impc:ir:getname",			      &SchemeFFI::impcirGetName },
 	    { "impc:ir:gettype",			      &SchemeFFI::impcirGetType },		
 	    { "impc:ir:addtodict",			    &SchemeFFI::impcirAdd },
@@ -2028,9 +2029,14 @@ namespace extemp {
       extemp::EXTLLVM::I()->EE->addModule(m);
       extemp::EXTLLVM::I()->addModule(m);
       extemp::EXTLLVM::I()->EE->finalizeObject();
-#endif
-    
+
+      // when using MCJIT, return a pointer to the module with the new
+      // functions in it - which we'll use later to export the bitcode
+      // during precomp
+      return mk_cptr(_sc, m);      
+#else
       return _sc->T;
+#endif
     }
   }
 	
@@ -2271,21 +2277,34 @@ namespace extemp {
   }
 
 
-  pointer SchemeFFI::export_llvmmodule_bitcode(scheme* _sc, pointer args)
+  pointer SchemeFFI::get_global_module(scheme* _sc, pointer args)
   {
     using namespace llvm;
 
     Module* M = EXTLLVM::I()->M;
-    if(M == 0)
+    if(M == NULL)
+      {
+        return _sc->F;
+      }
+    return mk_cptr(_sc, M);
+  }
+
+
+  pointer SchemeFFI::export_llvmmodule_bitcode(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
+
+    Module* m = (Module *)cptr_value(pair_car(args));
+    if(m == 0)
       {
         return _sc->F;
       }			
         
-    char* filename = string_value(pair_car(args));
+    char* filename = string_value(pair_cadr(args));
 #ifdef TARGET_OS_WINDOWS
     std::string str;
     llvm::raw_string_ostream ss(str);
-    ss << *M;
+    ss << *m;
     std::ofstream fout(filename);
     std::string irStr = ss.str();
     std::string oldStr(" external global ");
@@ -2307,7 +2326,7 @@ namespace extemp {
       std::cout << errinfo << std::endl;
       return _sc->F;
     }
-    llvm::WriteBitcodeToFile(M,ss);
+    llvm::WriteBitcodeToFile(m,ss);
 #endif
     return _sc->T;    
   }

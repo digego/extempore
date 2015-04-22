@@ -1951,8 +1951,8 @@
          (set! *sys:precomp:current-output-port* precomp-port))
        ,@forms))
 
-(define sys:precomp:compile-current-module
-  (lambda (module-name move-into-place? exit-afterwards?)
+(define sys:precomp:compile-module
+  (lambda (module-name module move-into-place? exit-afterwards?)
     (let ((ext-llvm-dir (cptr->string (get_llvm_path))))
       (if (string=? "" ext-llvm-dir)
           (begin (print-with-colors 'red 'default #t (print "Error"))
@@ -2020,7 +2020,7 @@
                (print " in " ext-llvm-dir "\n"))
         ;; print further instructions
         (command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
-        (llvm:export-module bitcode-path)
+        (llvm:export-module module bitcode-path)
 
         (let ((res1 0)
               (res2 0))
@@ -2147,12 +2147,13 @@
                         (set! *sys:precomp:current-lib-name* libname-no-extension)
                         ;; (sys:precomp:insert-header libname-no-extension)
                         (sys:load lib-path)
-                        (if (not (impc:compiler:flush-jit-compilation-queue))
-                            (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
-                        ;; make sure the scheme wrappers for "command"
-                        ;; and "get_llvm_path" exist
-                        (sys:precomp:bootstrap-command-and-get-llvm-path)
-                        (sys:precomp:compile-current-module libname-no-extension move-into-place? exit-afterwards?)
+                        (let ((module (impc:compiler:flush-jit-compilation-queue)))
+                          (if (not module)
+                              (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
+                          ;; make sure the scheme wrappers for "command"
+                          ;; and "get_llvm_path" exist
+                          (sys:precomp:bootstrap-command-and-get-llvm-path)
+                          (sys:precomp:compile-module libname-no-extension module move-into-place? exit-afterwards?))
                         ;; (sys:precomp:insert-footer libname-no-extension)
                         (close-port *sys:precomp:current-output-port*)
                         (set! *sys:precomp:current-lib-name* "xtmdylib")

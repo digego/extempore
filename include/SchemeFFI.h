@@ -197,7 +197,9 @@ namespace extemp {
 	static pointer symbol_pointer(scheme* _sc, pointer args);
 	static pointer bind_symbol(scheme* _sc, pointer args);
 	static pointer get_named_type(scheme* _sc, pointer args);
-        static pointer export_llvmmodule_bitcode(scheme* _sc, pointer args);
+  static pointer get_global_module(scheme* _sc, pointer args);
+
+  static pointer export_llvmmodule_bitcode(scheme* _sc, pointer args);
         static pointer add_llvm_alias(scheme* _sc, pointer args);
         static pointer get_llvm_alias(scheme* _sc, pointer args);
 	static pointer impcirGetName(scheme* _sc, pointer args);	
