@@ -84,9 +84,11 @@
                       (or (or (list? type) (integer? type)) (begin (println 'type: type) #f))
                       (or (string? docstring) (begin (println docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new named type")
-            (set! *impc:ti:namedtype-cache*
-                  (cons (cons namedtype-name (vector type docstring))
-                        *impc:ti:namedtype-cache*))))))
+            (begin
+              (set! *impc:ti:namedtype-cache*
+                    (cons (cons namedtype-name (vector type docstring))
+                          *impc:ti:namedtype-cache*))
+              (car *impc:ti:namedtype-cache*))))))
 
 (define impc:ti:get-namedtype-docstring
   (lambda (namedtype-name)
@@ -135,9 +137,11 @@
         (if (impc:ti:closure-exists? closure-name)
             (impc:compiler:print-already-bound-error closure-name (impc:ti:get-closure-type closure-name))
             ;; create a new entry
-            (set! *impc:ti:closure-cache*
-                  (cons (cons closure-name (vector type docstring body))
-                        *impc:ti:closure-cache*))))))
+            (begin
+              (set! *impc:ti:closure-cache*
+                    (cons (cons closure-name (vector type docstring body))
+                          *impc:ti:closure-cache*))
+              (car *impc:ti:closure-cache*))))))
 
 (define impc:ti:get-closure-type
   (lambda (closure-name)
@@ -1588,9 +1592,11 @@
               ;; update details if it already exists
               (set-cdr! existing (vector type docstring))
               ;; or create a new entry
-              (set! *impc:ti:nativefunc-cache*
-                    (cons (cons nativefunc-name (vector type docstring))
-                          *impc:ti:nativefunc-cache*)))))))
+              (begin
+                (set! *impc:ti:nativefunc-cache*
+                      (cons (cons nativefunc-name (vector type docstring))
+                            *impc:ti:nativefunc-cache*))
+                (car *impc:ti:nativefunc-cache*)))))))
 
 (define impc:ti:get-nativefunc-type
   (lambda (nativefunc-name)
@@ -2747,7 +2753,8 @@
                     ;; "pointerlyness" by one level here to mimic this
                     ;; behaviour
                     (cons (cons globalvar-name (vector (impc:ir:pointer++ type) docstring))
-                          *impc:ti:globalvar-cache*)))))))
+                          *impc:ti:globalvar-cache*))
+              (car *impc:ti:globalvar-cache*))))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
