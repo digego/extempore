@@ -8920,8 +8920,8 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_setter")) [void,i8*]*)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_getter")) [i8*]*)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_callback")) [void,i8*]*)
-     ,(if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings (symbol->string type)))
-          `(bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_scheme")) [i8*,i8*,i8*]*))
+     (if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings ,(symbol->string type)))
+         (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_scheme")) [i8*,i8*,i8*]*))
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_native")) ,type)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
                ,(string->symbol (string-append "[" (symbol->string type) ",i8*]*")))
@@ -8932,10 +8932,10 @@
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
-     ,(if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings (symbol->string type)))
-          `(eval (define ,symname
-                   (impc:ti:create-scheme-wrapper-if-not-precompiling (symbol->string ',symname)))
-                 (interaction-environment)))
+     (if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings ,(symbol->string type)))
+         (eval (define ,symname
+                 (impc:ti:create-scheme-wrapper-if-not-precompiling (symbol->string ',symname)))
+               (interaction-environment)))
      (impc:ti:initialize-closure-if-not-precompiling ,(symbol->string symname)
                                                      ,(if (null? args) *impc:default-zone-size* (car args)))))
 
