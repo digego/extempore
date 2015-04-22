@@ -2102,6 +2102,22 @@
     (print-with-colors 'cyan 'default #f (print "gtypemappings: "))
     (println (length *impc:ti:generic-type-mappings*))))
 
+;; this is a hack - it's necessary because the precomp scheme function
+;; needs the xtlang functions "command" (must have) and
+;; "get_llvm_path" (nice to have). So if they haven't been loaded
+;; ahead of time (i.e. if you're precompiling std.xtm) then we have to
+;; initialise them and create the scheme wrappers here.
+(define sys:precomp:bootstrap-command-and-get-llvm-path
+  (lambda ()
+    ;; command
+    (impc:ti:initialize-closure-with-new-zone "command" *impc:default-zone-size*)
+    (eval `(define command ,(impc:ti:create-scheme-wrapper "command"))
+          (interaction-environment))
+    ;; get_llvm_path
+    (impc:ti:initialize-closure-with-new-zone "get_llvm_path" *impc:default-zone-size*)
+    (eval `(define get_llvm_path ,(impc:ti:create-scheme-wrapper "get_llvm_path"))
+          (interaction-environment))))
+
 (define sys:precomp:compile-xtm-file
   (lambda (lib-path move-into-place? exit-afterwards?)
     ;; is there a better way to check if a file exists?
@@ -2129,7 +2145,11 @@
                         (set! *sys:precomp:current-lib-name* libname-no-extension)
                         ;; (sys:precomp:insert-header libname-no-extension)
                         (sys:load lib-path)
-                        (impc:compiler:flush-jit-compilation-queue)
+                        (if (not (impc:compiler:flush-jit-compilation-queue))
+                            (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
+                        ;; make sure the scheme wrappers for "command"
+                        ;; and "get_llvm_path" exist
+                        (sys:precomp:bootstrap-command-and-get-llvm-path)
                         (sys:precomp:compile-current-module libname-no-extension move-into-place? exit-afterwards?)
                         ;; (sys:precomp:insert-footer libname-no-extension)
                         (close-port *sys:precomp:current-output-port*)
