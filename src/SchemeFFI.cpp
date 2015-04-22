@@ -3084,7 +3084,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 	void* ptr = dlsym(library, symname);
 #endif
 	if(!ptr) {
-	    printf("Could not find symbol named %s!\n",symname);
+	    // printf("Could not find symbol named %s\n",symname);
 	    return _sc->F;
 	}
   llvm::GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(std::string(symname));  
