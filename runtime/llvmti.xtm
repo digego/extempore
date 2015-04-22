@@ -8875,7 +8875,7 @@
           (if (and (llvm:compile-ir ir-string)
                    (llvm:queue-bind-symbol (eval library) (symbol->string symname)))
               (begin
-                (impc:ti:register-new-nativefunc symname (impc:ir:get-type-from-pretty-str type) "")
+                (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "")
                 (impc:compiler:print-lib-binding-details-to-log library symname type))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
 
@@ -8913,12 +8913,11 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_setter")) [void,i8*]*)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_getter")) [i8*]*)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_callback")) [void,i8*]*)
-     ,(if (impc:precomp:create-scm-wrapper? (impc:ti:get-closure-arg-types (symbol->string type)))
+     ,(if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings (symbol->string type)))
           `(bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_scheme")) [i8*,i8*,i8*]*))
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_native")) ,type)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
-               ,(string->symbol (string-append "[" (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type)))
-                                               ",i8*]*")))
+               ,(string->symbol (string-append "[" (symbol->string type) ",i8*]*")))
      (if (not (llvm:compile-ir
                (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                               "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
@@ -8926,7 +8925,7 @@
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
-     ,(if (impc:precomp:create-scm-wrapper? (impc:ti:get-closure-arg-types (symbol->string type)))
+     ,(if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings (symbol->string type)))
           `(eval (define ,symname
                    (impc:ti:create-scheme-wrapper-if-not-precompiling (symbol->string ',symname)))
                  (interaction-environment)))
@@ -8935,13 +8934,15 @@
 
 
 (define-macro (bind-lib-val library symname type)
-  `(let ((ground-type (impc:ir:ground-type-aliases ,(symbol->string type))))
+  `(let* ((type-str ,(or (impc:ir:ground-type-aliases (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str)))
      (if (llvm:compile-ir
           (string-append "@" ,(symbol->string symname) " = external global "
-                         (if ground-type ground-type ,(impc:ir:get-type-str (impc:ir:get-type-from-pretty-str (symbol->string type))))))
+                         (impc:ir:get-type-str type-list)))
          (begin (llvm:queue-bind-symbol ,library ,(symbol->string symname))
                 (impc:ti:register-new-globalvar ,(symbol->string symname)
-                                                (impc:ir:get-type-from-pretty-str ground-type)
+                                                type-list
                                                 ""))
          (impc:compiler:print-compiler-error "failed to compile IR in bind-lib-val" ,symname))))
 
