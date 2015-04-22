@@ -8880,7 +8880,8 @@
                                                          (cddr ctype))))
                                          ") nounwind")))
           (if (and (llvm:compile-ir ir-string)
-                   (llvm:queue-bind-symbol (eval library) (symbol->string symname)))
+                   (sys:precomp:do-or-add-to-precomp-header
+                    (llvm:bind-symbol (eval library) (symbol->string symname))))
               (begin
                 (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "")
                 (impc:compiler:print-lib-binding-details-to-log library symname type))
@@ -8929,8 +8930,8 @@
                (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                               "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
          (impc:compiler:print-compiler-error "failed to compile IR in bind-lib-func" ,symname))
-     (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
-     (llvm:queue-bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
+     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
+     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
      (if (impc:precomp:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings ,(symbol->string type)))
          (eval (define ,symname
@@ -8947,7 +8948,7 @@
      (if (llvm:compile-ir
           (string-append "@" ,(symbol->string symname) " = external global "
                          (impc:ir:get-type-str type-list)))
-         (begin (llvm:queue-bind-symbol ,library ,(symbol->string symname))
+         (begin (llvm:bind-symbol ,library ,(symbol->string symname))
                 (impc:ti:register-new-globalvar ,(symbol->string symname)
                                                 type-list
                                                 ""))
