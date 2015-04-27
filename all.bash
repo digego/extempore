@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 case $(uname) in
         *NT*) EXTEMPORE_OS=windows ;;
