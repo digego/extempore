@@ -72,6 +72,8 @@
         `(begin (println "No such XTM function") #f))))
 
 (define-macro (call-as-xtlang . expr)
+  (sys:precomp:insert-sexp
+   `(call-as-xtlang ,@expr))
   (sys:with-quiet-compiler
    (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
      (eval `(bind-func call_as_xtlang_expression
