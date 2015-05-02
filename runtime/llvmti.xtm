@@ -8381,36 +8381,33 @@
             (println '------------------------------compiling 'maker----------------------------------->))
         (if *impc:compiler:print* (print-full-nq fsmaker))
         (if *impc:compile*
-            (if (not (llvm:compile-ir fsmaker))
-                (impc:compiler:print-compiler-error "could not compile maker")))
+            (impc:compiler:queue-ir-for-compilation fsmaker))
         (if *impc:compiler:print* 
             (println '--------------------------------compiling 'setter----------------------------------->))
         (if *impc:compiler:print* (print-full-nq fssetter))
         (if *impc:compile*
-            (if (not (llvm:compile-ir fssetter))
-                (impc:compiler:print-compiler-error "could not compile setter")))
+            (impc:compiler:queue-ir-for-compilation fssetter))
         (if *impc:compiler:print* 
             (println '--------------------------------compiling 'getter----------------------------------->))
         (if *impc:compiler:print* (print-full-nq fsgetter))
         (if (and *impc:compile* compile-stub?)
-            (if (not (llvm:compile-ir fsgetter))
-                (impc:compiler:print-compiler-error "could not compile getter")))
+            (impc:compiler:queue-ir-for-compilation fsgetter))
         (if *impc:compiler:print* 
             (println '--------------------------------compiling 'stubs----------------------------------->))
         (if *impc:compiler:print* (print-full-nq fstub))
         (if *impc:compiler:print* (print-full-nq fstub_native))
         (if *impc:compiler:print* (print-full-nq fstub_scheme))
         (if (and *impc:compile* compile-stub?)
-            (if (not (and (llvm:compile-ir fstub)
-                          (llvm:compile-ir fstub_native)
-                          (if fstub_scheme_valid (llvm:compile-ir fstub_scheme) #t)))
-                (impc:compiler:print-compiler-error "could not compile stubs")))
+            (begin (impc:compiler:queue-ir-for-compilation fstub)
+                   (impc:compiler:queue-ir-for-compilation fstub_native)
+                   (if fstub_scheme_valid (impc:compiler:queue-ir-for-compilation fstub_scheme) #t)))
         (if *impc:compiler:print*
             (println '----------------------------compiling 'callback----------------------------------->))
         (if *impc:compiler:print* (print-full-nq fscallback))
         (if (and *impc:compile* compile-stub?)
-            (if (not (llvm:compile-ir fscallback))
-                (impc:compiler:print-compiler-error "could not compile callback")))
+            (impc:compiler:queue-ir-for-compilation fscallback))
+        (if (not (impc:compiler:flush-jit-compilation-queue))
+            (impc:compiler:print-compiler-error "could not compile helper functions" symname))
         (if *impc:compile*
             ;; make sure the (now resolved) function types hit the
             ;; closure/nativefunc cache
