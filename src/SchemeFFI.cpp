@@ -65,9 +65,8 @@
 #endif
 
 
-// setting this define should make call_compiled_closure
-// and call_compiled thread safe 
-// BUT ... also extremely SLOW !
+// setting this define should make call_compiled thread safe BUT ...
+// also extremely SLOW !
 
 #define LLVM_EE_LOCK
 
@@ -514,7 +513,6 @@ namespace extemp {
 	    { "llvm:erase-function",		    &SchemeFFI::erase_function },
 	    { "llvm:call-void-func",        &SchemeFFI::llvm_call_void_native },
 	    { "llvm:run",				            &SchemeFFI::call_compiled },
-	    { "llvm:run-closure",			      &SchemeFFI::call_compiled_closure },
 	    { "llvm:convert-float",			    &SchemeFFI::llvm_convert_float_constant },
  	    { "llvm:convert-double",			  &SchemeFFI::llvm_convert_double_constant },
 	    { "llvm:count",				          &SchemeFFI::llvm_count },
@@ -2566,162 +2564,6 @@ namespace extemp {
 		
     return mk_cptr(_sc, p);
   }
-
-
-    //
-    // This will not be threadsafe whenever a bind-func is done!
-    // 
-  pointer SchemeFFI::call_compiled_closure(scheme* _sc, pointer args)
-  {
-    using namespace llvm;
-    uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
-    char* fname = (char*) *(closure+0);
-    void* eptr = (void*) *(closure+1);		
-
-    //std::cout << "CALL COMPILED CLOSURE: " << fname << std::endl;
-
-    ExecutionEngine* EE = EXTLLVM::I()->EE;	
-
-#ifdef LLVM_EE_LOCK
-    EE->lock.acquire();	
-#endif
-
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(fname));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(fname));          
-	if(func == 0)
-    {
-	    printf("No such function\n");
-#ifdef LLVM_EE_LOCK
-	    EE->lock.release();	
-#endif
-	    return _sc->F;
-    }				
-	//std::cout << "FUNC: " << *func << std::endl;
-
-	int lgth = list_length(_sc, args);
-	if(lgth != func->arg_size()) {
-    printf("Wrong number of arguments supplied to native closure - should take: %d\n",(func->arg_size()-1));
-#ifdef LLVM_EE_LOCK
-    EE->lock.release();	
-#endif
-    return _sc->F;			
-	}
-	Function::ArgumentListType::iterator funcargs = func->getArgumentList().begin();		
-	std::vector<llvm::GenericValue> fargs(lgth);
-	// first add the environment
-	// which must always go first for a closure
-	if(((Argument*)funcargs)->getType()->getTypeID() != Type::PointerTyID)
-    {
-	    printf("Error: closure must have an environment!\n");
-#ifdef LLVM_EE_LOCK
-	    EE->lock.release();	
-#endif
-	    return _sc->F;			
-    }
-	fargs[0].PointerVal = eptr;	
-	++funcargs; // and increment funcargs past eptr
-
-	//std::cout << "ARGS: " << lgth << std::endl;
-	for(int i=1;i<lgth;i++,++funcargs)
-    {
-	    Argument* a = funcargs;
-	    pointer p = list_ref(_sc, i, args);
-	    if(is_integer(p)) {			
-        if(a->getType()->getTypeID() != Type::IntegerTyID)
-          {
-            printf("Bad argument type %i\n",i);
-#ifdef LLVM_EE_LOCK
-            EE->lock.release();	
-#endif
-            return _sc->F;
-          }
-        int width = a->getType()->getPrimitiveSizeInBits();				
-        //std::cout << "IVALUE: " << ivalue(p) << std::endl; 				
-        fargs[i].IntVal = APInt(width,ivalue(p));				
-	    }			
-	    else if(is_real(p))
-        {
-
-          if(a->getType()->getTypeID() == Type::FloatTyID)
-            {
-              //std::cout << "RVALUE: " << rvalue(p) << std::endl; 					
-              fargs[i].FloatVal = (float) rvalue(p);
-            }
-          else if(a->getType()->getTypeID() == Type::DoubleTyID)
-            {
-              //std::cout << "RVALUE: " << rvalue(p) << std::endl; 
-              fargs[i].DoubleVal = rvalue(p);
-            }
-          else
-            {
-              printf("Bad argument type %i\n",i);
-#ifdef LLVM_EE_LOCK
-              EE->lock.release();	
-#endif
-              return _sc->F;
-            }
-        }
-	    else if(is_string(p))
-        {
-          if(a->getType()->getTypeID() != Type::PointerTyID)
-            {
-              printf("Bad argument type %i\n",i);
-#ifdef LLVM_EE_LOCK
-              EE->lock.release();	
-#endif
-              return _sc->F;					
-            }
-          //std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
-          fargs[i].PointerVal = string_value(p);
-        }			
-	    else if(is_cptr(p))
-        {
-          if(a->getType()->getTypeID() != Type::PointerTyID)
-            {
-              printf("Bad argument type %i\n",i);
-#ifdef LLVM_EE_LOCK
-              EE->lock.release();	
-#endif
-              return _sc->F;					
-            }
-          //std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
-          fargs[i].PointerVal = cptr_value(p);
-        }
-	    else 
-        {
-          printf("Bad scheme argument\n");
-#ifdef LLVM_EE_LOCK
-          EE->lock.release();	
-#endif
-          return _sc->F;
-        }
-    }
-
-#ifdef EXT_MCJIT
-  // need to remove the mapping here, otherwise runFunction will bomb out under MCJIT
-  EXTLLVM::I()->EE->updateGlobalMapping(func,nullptr);
-#endif
-	GenericValue gv = EE->runFunction(func,fargs);
-
-#ifdef LLVM_EE_LOCK	
-	EE->lock.release();	
-#endif
-
-	switch(func->getReturnType()->getTypeID())
-    {
-    case Type::FloatTyID:
-	    return mk_real(_sc, gv.FloatVal);
-    case Type::DoubleTyID:
-	    return mk_real(_sc, gv.DoubleVal);
-    case Type::IntegerTyID:
-	    return mk_integer(_sc, gv.IntVal.getZExtValue()); //  getRawData());
-    case Type::PointerTyID:
-	    return mk_cptr(_sc, gv.PointerVal);
-    default:
-	    return _sc->F;
-    }		
-}
 
     //
     // This will not be threadsafe whenever a bind-func is done!
