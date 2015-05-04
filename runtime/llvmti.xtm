@@ -8406,8 +8406,9 @@
         (if *impc:compiler:print* (print-full-nq fscallback))
         (if (and *impc:compile* compile-stub?)
             (impc:compiler:queue-ir-for-compilation fscallback))
-        (if (not (impc:compiler:flush-jit-compilation-queue))
-            (impc:compiler:print-compiler-error "could not compile helper functions" symname))
+        (if (not (sys:precomp:currently-compiling?))
+            (if (not (impc:compiler:flush-jit-compilation-queue))
+                (impc:compiler:print-compiler-error "could not compile helper functions" symname)))
         (if *impc:compile*
             ;; make sure the (now resolved) function types hit the
             ;; closure/nativefunc cache
