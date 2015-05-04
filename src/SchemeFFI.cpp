@@ -57,6 +57,7 @@
 #include <sstream>
 #include <string.h>
 
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
 
 #ifdef TARGET_OS_WINDOWS
 #else
@@ -2474,20 +2475,21 @@ namespace extemp {
   {
     using namespace llvm;
 
-    //Module* M = EXTLLVM::I()->M;
-    //llvm::Function* func = M->getFunction(std::string(string_value(pair_car(args))));
-    llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));        
-    //func->setCallingConv(CallingConv::C); //kCStackBased);
+    llvm::Function* func = EXTLLVM::I()->getFunction(std::string(string_value(pair_car(args))));        
     if(func == 0)
       {
         return _sc->F;
       }
-    // this should be safe without a lock
-    void* p = EXTLLVM::I()->EE->getPointerToFunction(func);
 
+    void* p;
+
+    // has the function been updateGlobalMapping'd somewhere else,
+    // e.g. bind_symbol
+      p = EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
+    if(p==NULL) // look for it as a JIT-compiled function
+      p = EXTLLVM::I()->EE->getPointerToFunction(func);
     if(p==NULL) {
-	    //[[LogView sharedInstance] error:@"LLVM: Bad Function Ptr\n"];
-	    return _sc->F;
+      return _sc->F;
     }
 
     return mk_cptr(_sc, p);
