@@ -73,6 +73,23 @@
 
 ;; some scheme helpers for acessing the environment
 
+(define get-llvm-path
+  (lambda ()
+    (let ((path_from_env (sys:command-output "echo $EXT_LLVM_DIR")))
+      (if (not (string=? path_from_env ""))
+          path_from_env
+          ;; check if homebrewed version (in default Cellar location)
+          ;; exists - need to keep the version up-to-date by hand
+          ;;
+          ;; OSX
+          (if (= (sys:command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
+              "/usr/local/Cellar/extempore-llvm/3.4.1"
+              ;; Linux
+              (if (= (sys:command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
+                  "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
+                  path_from_env)
+              path_from_env)))))
+
 (define sys:get-env
   (lambda (var-name)
     (let ((res (cptr->string (sys_getenv var-name))))
@@ -101,9 +118,4 @@
         (begin (print-with-colors 'red 'default #t (print "Error"))
                (print ": var-name must be a string\n")
                #f))))
-
-;; add a sys: version of command for consistency
-(define sys:command
-  (lambda (cmd)
-    (command cmd)))
 

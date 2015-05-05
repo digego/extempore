@@ -1953,8 +1953,8 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module move-into-place? exit-afterwards?)
-    (let ((ext-llvm-dir (cptr->string (get_llvm_path))))
-      (if (string=? "" ext-llvm-dir)
+    (let* ((llvm-path (get-llvm-path)))
+      (if (string=? "" llvm-path)
           (begin (print-with-colors 'red 'default #t (print "Error"))
                  (print ": you must set the environment variable ")
                  (print-with-colors 'green 'default #f (print "EXT_LLVM_DIR"))
@@ -1987,11 +1987,11 @@
              (compilation-command-a
               (if (string=? platform "Windows")
                   (string-append
-                   ext-llvm-dir
+                   llvm-path
                    "/bin/Release/llc -O3 -tailcallopt -filetype obj "
                    bitcode-path)
                   (string-append
-                   ext-llvm-dir
+                   llvm-path
                    "/bin/llc -O3 -relocation-model=pic -tailcallopt "
                    bitcode-path)))
              (compilation-command-b
@@ -2017,7 +2017,7 @@
         ;;     (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
         (begin (print "Looking for ")
                (print-with-colors 'magenta 'default #t (print "llc"))
-               (print " in " ext-llvm-dir "\n"))
+               (print " in " llvm-path "\n"))
         ;; print further instructions
         (command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
         (llvm:export-module module bitcode-path)

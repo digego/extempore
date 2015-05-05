@@ -504,10 +504,6 @@
 
 ;; some helpers for AOT-compilation stuff
 
-(bind-func command
-  (lambda (cmd:i8*)
-    (system cmd)))
-
 (bind-func sys_getenv
   (lambda (var_name)
     (getenv var_name)))
@@ -526,24 +522,6 @@
         (lambda (var_name)
           (unsetenv var_name)))
      (interaction-environment)))
-
-(bind-func get_llvm_path
-  (lambda ()
-    (let ((path_from_env (getenv "EXT_LLVM_DIR")))
-      (if (not (null? path_from_env))
-          path_from_env
-          ;; check if homebrewed version (in default Cellar location)
-          ;; exists - need to keep the version up-to-date by hand
-          ;;
-          ;; OSX
-          (if (= (command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
-              "/usr/local/Cellar/extempore-llvm/3.4.1"
-              ;; Linux
-              (if (= (command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
-                  "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
-                  path_from_env)
-              path_from_env)))))
-
 
 ;; (sys:load "libs/core/adt.xtm")
 
