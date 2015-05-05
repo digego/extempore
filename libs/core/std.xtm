@@ -171,28 +171,6 @@
 
 (bind-type String <size_t,i8*>)
 
-
-;; override default constructors
-(impc:aot:do-or-emit
- (bind-func String
-  (lambda (lgth s)
-    (let ((news:i8* (zalloc (+ 1 lgth)))
-          (str:String* (zalloc)))
-      (strcpy news s)
-      (tset! str 0 lgth)
-      (tset! str 1 news)
-      str))))
-
-(impc:aot:do-or-emit
- (bind-func String_h
-   (lambda (lgth s)
-     (let ((news:i8* (halloc (+ 1 lgth)))
-           (str:String* (halloc)))
-       (strcpy news s)
-       (tset! str 0 lgth)
-       (tset! str 1 news)
-       str))))
-
 ;; must be a Halloced string!
 (bind-func Delete_String
   (lambda (str:String*)
@@ -527,12 +505,38 @@
 
 ;; (suppress-compiler-messages #f)
 
-
 ;; load the scheme macros (e.g. bind-instrument)
 (sys:load "libs/core/std-scm.xtm")
 ;; make sure we load them with AOT-compiled code as well
 (impc:aot:insert-sexp
  '(sys:load "libs/core/std-scm.xtm"))
+
+;; this stuff needs to go at the end, since redefinitions have to go
+;; in a new module
+
+;; override default constructors
+
+(impc:aot:insert-sexp
+ '(impc:compiler:flush-jit-compilation-queue))
+
+(impc:aot:do-or-emit
+ (bind-func String
+   (lambda (lgth s)
+     (let ((news:i8* (zalloc (+ 1 lgth)))
+           (str:String* (zalloc)))
+       (strcpy news s)
+       (tset! str 0 lgth)
+       (tset! str 1 news)
+       str)))
+ (bind-func String_h
+   (lambda (lgth s)
+     (let ((news:i8* (halloc (+ 1 lgth)))
+           (str:String* (halloc)))
+       (strcpy news s)
+       (tset! str 0 lgth)
+       (tset! str 1 news)
+       str))))
+
 
 (define *xtmlib-std-loaded* #t)
 
