@@ -8880,9 +8880,10 @@
                                                          (cddr ctype))))
                                          ") nounwind")))
           (if (and (llvm:compile-ir ir-string)
-                   (impc:aot:do-or-emit
-                    (llvm:bind-symbol (eval library) (symbol->string symname))))
+                   (llvm:bind-symbol (eval library) (symbol->string symname)))
               (begin
+                (impc:aot:insert-sexp
+                 `(llvm:bind-symbol ,library ,(symbol->string symname)))
                 (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "")
                 (impc:compiler:print-lib-binding-details-to-log library symname type))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
