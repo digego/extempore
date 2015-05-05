@@ -8921,7 +8921,7 @@
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_setter")) [void]*)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_getter")) [i8*]*)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_callback")) [void,i8*]*)
-     (if (impc:ti:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings ,(symbol->string type)))
+     (if (impc:ti:create-scm-wrapper? ,(symbol->string symname))
          (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_scheme")) [i8*,i8*,i8*]*))
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_native")) ,type)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
@@ -8933,10 +8933,11 @@
      (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
      (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
      ;; bind scheme function
-     (if (impc:ti:create-scm-wrapper? (impc:ir:get-pretty-closure-arg-strings ,(symbol->string type)))
+     (if (impc:ti:create-scm-wrapper? ,(symbol->string symname))
          (eval (define ,symname
                  (impc:ti:create-scheme-wrapper (symbol->string ',symname)))
-               (interaction-environment)))
+               (interaction-environment))
+         (impc:compiler:print-no-scheme-stub-notification (symbol->string ',symname)))
      (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname)
                                                      ,(if (null? args) *impc:default-zone-size* (car args)))))
 

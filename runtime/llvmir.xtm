@@ -498,17 +498,16 @@
         *impc:aot:current-output-port*)))
 
 (define impc:ti:create-scm-wrapper?
-  (lambda (type-list)
+  (lambda (func-name)
     (cl:every
      (lambda (type)
-       (let ((type-str (if (impc:ir:array? type)
-                           type
-                           (impc:ir:get-type-from-pretty-str type))))
-         (or (impc:ir:void? type-str)
-             (impc:ir:floating-point? type-str)
-             (impc:ir:fixed-point? type-str)
-             (impc:ir:pointer? type-str))))
-     type-list)))
+       (println 'type: type)
+       (or (impc:ir:void? type)
+           (impc:ir:floating-point? type)
+           (impc:ir:fixed-point? type)
+           (impc:ir:pointer? type)))
+     (map impc:ir:get-type-from-pretty-str
+          (impc:ti:get-closure-or-nativefunc-arg-types func-name)))))
 
 (define impc:aot:write-binding-details-to-file
   (lambda (lead-string symname type . args)
