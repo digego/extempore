@@ -2015,36 +2015,42 @@
                    " -o " shlib-path "\n"))))
         ;; (if (string=? platform "Windows")
         ;;     (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
-        (begin (print "Looking for ")
-               (print-with-colors 'magenta 'default #t (print "llc"))
-               (print " in " llvm-path "\n"))
+        (print "Looking for llc in " llvm-path "...\n\n")
+        (begin
+          (print-with-colors 'black 'yellow #t (print " Exporting module "))
+          (print "\n  " bitcode-path "\n\n"))
         ;; print further instructions
         (sys:command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
+        
         (llvm:export-module module bitcode-path)
 
         (let ((res1 0)
               (res2 0))
-          (print "LLC command:\n " compilation-command-a "\n\n")
+          (begin
+            (print-with-colors 'black 'yellow #t (print " Generating assembly from LLVM bitcode "))
+            (print "\n  " compilation-command-a "\n\n"))
           (set! res1 (sys:command compilation-command-a))
           (if (<> res1 0)
               (begin (print-with-colors 'red 'default #t
-                                        (println "LLC Failed!. exit code" res1))
+                                        (println "llc failed with exit code " res1))
                      (if exit-afterwards? (quit 1))))
-          (print "CC command:\n " compilation-command-b "\n\n")          
+          (begin
+            (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
+            (print "\n  " compilation-command-b "\n\n"))          
           (set! res2 (sys:command compilation-command-b))
           (if (<> res2 0)
               (begin (print-with-colors 'red 'default #t
-                                        (println "CC Failed!. exit code" res2))
+                                        (println "cc failed with exit code " res2))
                      (if exit-afterwards? (quit 1)))
-              (begin (print "Succesfully compiled ")
-                     (print-with-colors 'blue 'default #t (print shlib-path))
-                     (print "\n\n")
-                     (if move-into-place?
-                         (if (= (sys:command (string-append "mv " shlib-path " libs")) 0)
-                             (begin (print "Moved ")
-                                    (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
-                             (print-with-colors 'red 'default #t
-                                                (print "Error moving " shlib-path " into libs/ directory.")))))))))))
+              (begin 
+                (print-with-colors 'black 'green #t (print " Succesfully compiled "))
+                (print "\n  " shlib-path "\n\n")
+                (if move-into-place?
+                    (if (= (sys:command (string-append "mv " shlib-path " libs")) 0)
+                        (begin (print "Moved ")
+                               (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
+                        (print-with-colors 'red 'default #t
+                                           (print "Error moving " shlib-path " into libs/ directory.")))))))))))
 
 (define impc:aot:insert-header
   (lambda (libname)
@@ -2114,7 +2120,7 @@
     (let ((start-time (now))
           (in-file-port (open-input-file lib-path)))
       (if (not in-file-port)
-          (begin (print-with-colors 'red 'default #t
+          (begin (print-with-colors 'black 'red #t
                                     (print "Error:"))
                  (print " no .xtm file at" lib-path "\n"))
           (let* ((res (close-port in-file-port))
@@ -2135,6 +2141,10 @@
                         (set! *impc:aot:current-lib-name* libname-no-extension)
                         ;; (impc:aot:insert-header libname-no-extension)
                         (sys:load lib-path)
+                        (begin
+                          (println)
+                          (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
+                          (print "\n"))
                         (let ((module (impc:compiler:flush-jit-compilation-queue)))
                           (if (not module)
                               (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
@@ -2145,16 +2155,16 @@
                         (if  *impc:aot:current-output-port*
                              (begin (set! *impc:aot:current-output-port* #f)
                                     (print "Successfully wrote AOT-compilation file to ")
-                                    (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n"))
+                                    (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
                                     (impc:aot:print-compilation-details start-time)
                                     (if exit-afterwards? (quit 0)))
-                             (begin (print-with-colors 'red 'default #t (print "Error:"))
-                                    (print " something went wrong in writing the output file ")
-                                    (print-with-colors 'red 'default #t (print aot-compilation-file-path "\n"))
+                             (begin (print-with-colors 'black 'red #t (print " Error "))
+                                    (print "\n\nsomething went wrong in writing the output file ")
+                                    (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
                                     (if exit-afterwards? (quit 1)))))
-                      (begin (print-with-colors 'red 'default #t
-                                                (print "Error:"))
-                             (print " cannot write AOT-compilation file at " aot-compilation-file-path "\n")
+                      (begin (print-with-colors 'black 'red #t
+                                                (print " Error "))
+                             (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
                              (if exit-afterwards? (quit 2)))))))))))
 
 (define sys:run-tests
