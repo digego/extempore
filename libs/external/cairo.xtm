@@ -14,12 +14,12 @@
 (sys:load "libs/cairo.xtm" 'quiet)
 (sys:load-preload-check 'cairo)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libcairo
  (cond ((string=? (sys:platform) "OSX")
         "libcairo.dylib")
@@ -34,11 +34,11 @@
 
 ;; load the dylib
 (define libcairo
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (null? libcairo) (sys:load-escape "Error loading cairo library"))
 
-(sys:precomp:insert-header "xtmcairo")
+(impc:aot:insert-header "xtmcairo")
 
 (define *xtmlib-cairo-loaded* #f)
 
@@ -585,4 +585,4 @@
 
 (define *xtmlib-cairo-loaded* #t)
 
-(sys:precomp:insert-footer "xtmcairo")
+(impc:aot:insert-footer "xtmcairo")

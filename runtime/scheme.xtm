@@ -1318,16 +1318,16 @@
       (and (not (null? base))
            (cdr base)))))
 
-;; needed for precomp.
+;; needed for AOT-compilation.
 
 ;; should be a cons pair e.g. '(libGLU .
 ;; "/System/Library/Frameworks/OpenGL.framework/OpenGL")
-(define *sys:precomp:current-load-dylib-info* #f)
+(define *impc:aot:current-load-dylib-info* #f)
 
-(define sys:precomp:set-dylib-name-info
+(define impc:aot:set-dylib-name-info
   (lambda (symbol-name dylib-path)
     ;; is there a better way to check if a file exists?
-    (set! *sys:precomp:current-load-dylib-info*
+    (set! *impc:aot:current-load-dylib-info*
           (cons symbol-name dylib-path))))
 
 
@@ -1927,38 +1927,38 @@
 	  (else (println 'bad 'range!) '()))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; PRECOMP STUFF ;;;;;;;;;;;;;;;;;;;;;;;
+;; ahead-of-time compilation stuff ;;;;;;;;;;;;;;;;;;;;;;;
 
-;; insert arbitrary sexp (remember to quote!) into the precomp .xtm
+;; insert arbitrary sexp (remember to quote!) into the AOT-compilation file
 ;; file, otherwise do nothing
-(define sys:precomp:insert-sexp
+(define impc:aot:insert-sexp
   (lambda (sexp)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (output-port? *impc:aot:current-output-port*)
         (display (string-append (sexpr->string sexp) "\n")
-                 *sys:precomp:current-output-port*))))
+                 *impc:aot:current-output-port*))))
 
-(define-macro (sys:precomp:do-or-add-to-precomp-header . forms)
-  (if (not (output-port? *sys:precomp:current-output-port*))
+(define-macro (impc:aot:do-or-emit . forms)
+  (if (not (output-port? *impc:aot:current-output-port*))
       `(begin ,@forms)
-      `(begin ,@(map (lambda (f) `(sys:precomp:insert-sexp ',f)) forms))))
+      `(begin ,@(map (lambda (f) `(impc:aot:insert-sexp ',f)) forms))))
 
-(define-macro (sys:precomp:suppress-precomp-do . forms)
-  `(if ,*sys:precomp:current-output-port*
-       (let ((precomp-port *sys:precomp:current-output-port*))
-         (set! *sys:precomp:current-output-port* #t)
+(define-macro (impc:aot:suppress-aot-do . forms)
+  `(if ,*impc:aot:current-output-port*
+       (let ((aot-compilation-port *impc:aot:current-output-port*))
+         (set! *impc:aot:current-output-port* #t)
          ,@forms
          ;; whatever happens, set the port back to the original value
-         (set! *sys:precomp:current-output-port* precomp-port))
+         (set! *impc:aot:current-output-port* aot-compilation-port))
        ,@forms))
 
-(define sys:precomp:compile-module
+(define impc:aot:compile-module
   (lambda (module-name module move-into-place? exit-afterwards?)
     (let ((ext-llvm-dir (cptr->string (get_llvm_path))))
       (if (string=? "" ext-llvm-dir)
           (begin (print-with-colors 'red 'default #t (print "Error"))
                  (print ": you must set the environment variable ")
                  (print-with-colors 'green 'default #f (print "EXT_LLVM_DIR"))
-                 (print " to point to your LLVM directory before you can precompile xtlang code.\n")
+                 (print " to point to your LLVM directory before you can ahead-of-time compile xtlang code.\n")
                  (error "")))
       (let* ((platform (sys:platform))
              (bitcode-path (if (string=? platform "Windows")
@@ -2046,41 +2046,41 @@
                              (print-with-colors 'red 'default #t
                                                 (print "Error moving " shlib-path " into libs/ directory.")))))))))))
 
-(define sys:precomp:insert-header
+(define impc:aot:insert-header
   (lambda (libname)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (output-port? *impc:aot:current-output-port*)
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
-                   *sys:precomp:current-output-port*)
+                   *impc:aot:current-output-port*)
           (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
-                   *sys:precomp:current-output-port*)
-          (display "(set! *sys:precomp:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
-                   *sys:precomp:current-output-port*)
+                   *impc:aot:current-output-port*)
+          (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
+                   *impc:aot:current-output-port*)
           (display (string-append "(define " libname " (sys:open-dylib \"libs/" libname
                                   (cond ((string=? (sys:platform) "Linux") ".so\"))\n")
                                         ((string=? (sys:platform) "Windows") ".dll\"))\n")
                                         ((string=? (sys:platform) "OSX") ".dylib\"))\n")))
-                   *sys:precomp:current-output-port*)
+                   *impc:aot:current-output-port*)
           (display (string-append "(if (not " libname ") (begin (print-with-colors 'red 'default #t (print \"Error\")) (print \": could not load " libname " dynamic library\\n\") (error \"\")))\n")
-                   *sys:precomp:current-output-port*)
+                   *impc:aot:current-output-port*)
           (display (string-append "(print \"Loading \")\n(print-with-colors 'magenta 'default #t (print \""
                                   libname "\"))\n(print \" library...\\n\")\n")
-                   *sys:precomp:current-output-port*)))))
+                   *impc:aot:current-output-port*)))))
 
-(define sys:precomp:insert-footer
+(define impc:aot:insert-footer
   (lambda (libname)
-    (if (output-port? *sys:precomp:current-output-port*)
+    (if (output-port? *impc:aot:current-output-port*)
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"Loaded \"))\n(print-with-colors 'blue 'default #t (print \"" libname "\"))\n")
-                   *sys:precomp:current-output-port*)
+                   *impc:aot:current-output-port*)
           (display (string-append "(print \" library in\" (* 1.0 (/ (- (now) *xtmlib-" (substring libname 3) "-loaded*) *second*)) \"seconds\\n\")\n")
-                   *sys:precomp:current-output-port*)
+                   *impc:aot:current-output-port*)
           (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
-                   *sys:precomp:current-output-port*)
-          (display "(set! *impc:compiler:message:level* *sys:precomp:prev-compiler-message-level*)\n"
-                   *sys:precomp:current-output-port*)))))
+                   *impc:aot:current-output-port*)
+          (display "(set! *impc:compiler:message:level* *impc:aot:prev-compiler-message-level*)\n"
+                   *impc:aot:current-output-port*)))))
 
-(define sys:precomp:print-compilation-details
+(define impc:aot:print-compilation-details
   (lambda (start-time)
     (print-with-colors 'yellow 'default #t
                        (print "Total compile time: "))
@@ -2104,12 +2104,12 @@
     (print "  " (length *impc:ti:polyfunc-cache*))
     (print-with-colors 'cyan 'default #f (print " specializations\n\n"))))
 
-;; this is a hack - it's necessary because the precomp scheme function
+;; this is a hack - it's necessary because the AOT-compilation scheme function
 ;; needs the xtlang functions "command" (must have) and
 ;; "get_llvm_path" (nice to have). So if they haven't been loaded
-;; ahead of time (i.e. if you're precompiling std.xtm) then we have to
+;; ahead of time (i.e. if you're AOT-compiling std.xtm) then we have to
 ;; initialise them and create the scheme wrappers here.
-(define sys:precomp:bootstrap-command-and-get-llvm-path
+(define impc:aot:bootstrap-command-and-get-llvm-path
   (lambda ()
     ;; command
     (impc:ti:initialize-closure-with-new-zone "command" *impc:default-zone-size*)
@@ -2120,7 +2120,7 @@
     (eval `(define get_llvm_path ,(impc:ti:create-scheme-wrapper "get_llvm_path"))
           (interaction-environment))))
 
-(define sys:precomp:compile-xtm-file
+(define impc:aot:compile-xtm-file
   (lambda (lib-path move-into-place? exit-afterwards?)
     ;; is there a better way to check if a file exists?
     (let ((start-time (now))
@@ -2132,44 +2132,44 @@
           (let* ((res (close-port in-file-port))
                  (libname (filename-from-path lib-path))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
-                 (precomp-file-path (string-append "" "libs/" libname)))
+                 (aot-compilation-file-path (string-append "" "libs/" libname)))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
-                (begin (print "Precomp file not written ")
-                       (close-port *sys:precomp:current-output-port*)
-                       (set! *sys:precomp:current-output-port* #f))
+                (begin (print "AOT-compilation file not written ")
+                       (close-port *impc:aot:current-output-port*)
+                       (set! *impc:aot:current-output-port* #f))
                 (begin
                   ;; if the preload check passes
-                  (set! *sys:precomp:current-output-port* (open-output-file precomp-file-path))
-                  (set! *sys:precomp:func-defs-in-mod* '())
-                  (if (sys:precomp:currently-compiling?)
+                  (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
+                  (set! *impc:aot:func-defs-in-mod* '())
+                  (if (impc:aot:currently-compiling?)
                       (begin
                         ;; this is the 'success' branch
-                        (set! *sys:precomp:current-lib-name* libname-no-extension)
-                        ;; (sys:precomp:insert-header libname-no-extension)
+                        (set! *impc:aot:current-lib-name* libname-no-extension)
+                        ;; (impc:aot:insert-header libname-no-extension)
                         (sys:load lib-path)
                         (let ((module (impc:compiler:flush-jit-compilation-queue)))
                           (if (not module)
                               (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
                           ;; make sure the scheme wrappers for "command"
                           ;; and "get_llvm_path" exist
-                          (sys:precomp:bootstrap-command-and-get-llvm-path)
-                          (sys:precomp:compile-module libname-no-extension module move-into-place? exit-afterwards?))
-                        ;; (sys:precomp:insert-footer libname-no-extension)
-                        (close-port *sys:precomp:current-output-port*)
-                        (set! *sys:precomp:current-lib-name* "xtmdylib")
-                        (if  *sys:precomp:current-output-port*
-                             (begin (set! *sys:precomp:current-output-port* #f)
-                                    (print "Successfully wrote precomp file to ")
-                                    (print-with-colors 'green 'default #f (print precomp-file-path "\n"))
-                                    (sys:precomp:print-compilation-details start-time)
+                          (impc:aot:bootstrap-command-and-get-llvm-path)
+                          (impc:aot:compile-module libname-no-extension module move-into-place? exit-afterwards?))
+                        ;; (impc:aot:insert-footer libname-no-extension)
+                        (close-port *impc:aot:current-output-port*)
+                        (set! *impc:aot:current-lib-name* "xtmdylib")
+                        (if  *impc:aot:current-output-port*
+                             (begin (set! *impc:aot:current-output-port* #f)
+                                    (print "Successfully wrote AOT-compilation file to ")
+                                    (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n"))
+                                    (impc:aot:print-compilation-details start-time)
                                     (if exit-afterwards? (quit 0)))
                              (begin (print-with-colors 'red 'default #t (print "Error:"))
                                     (print " something went wrong in writing the output file ")
-                                    (print-with-colors 'red 'default #t (print precomp-file-path "\n"))
+                                    (print-with-colors 'red 'default #t (print aot-compilation-file-path "\n"))
                                     (if exit-afterwards? (quit 1)))))
                       (begin (print-with-colors 'red 'default #t
                                                 (print "Error:"))
-                             (print " cannot write precomp file at " precomp-file-path "\n")
+                             (print " cannot write AOT-compilation file at " aot-compilation-file-path "\n")
                              (if exit-afterwards? (quit 2)))))))))))
 
 (define sys:run-tests

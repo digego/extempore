@@ -13,27 +13,27 @@
 (sys:load-preload-check 'opengl)
 (define *xtmlib-opengl-loaded* #f)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/math.xtm")
  (sys:load "libs/external/soil.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/math.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/external/soil.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/math.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/external/soil.xtm"))
 
 ;(if (string=? (sys:platform) "Windows")
 (begin
-  (sys:precomp:suppress-precomp-do
+  (impc:aot:suppress-aot-do
    (sys:load "libs/external/glext.xtm"))
-  (sys:precomp:insert-sexp '(sys:load "libs/external/glext.xtm")))
+  (impc:aot:insert-sexp '(sys:load "libs/external/glext.xtm")))
 
 
-(sys:precomp:insert-header "xtmopengl")
+(impc:aot:insert-header "xtmopengl")
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GL
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libgl
  (cond ((string=? (sys:platform) "Linux")
         "libGL.so")
@@ -47,7 +47,7 @@
                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (define libgl
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 ;; if on windows also check for Gl32.dll			  
 (if (or (eq? #f libgl)
@@ -105,7 +105,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GLU
 
-(sys:precomp:set-dylib-name-info
+(impc:aot:set-dylib-name-info
  'libglu
  (cond ((string=? (sys:platform) "Linux")
         "libGLU.so")
@@ -119,7 +119,7 @@
                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (define libglu
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (or (eq? #f libglu)
 	(not libglu)) 
@@ -823,5 +823,5 @@
 (bind-poly gl_print_error gl_print_error_with_msg)
 (bind-poly gl_print_error gl_print_error_no_msg)
 
-(sys:precomp:insert-footer "xtmopengl")
+(impc:aot:insert-footer "xtmopengl")
 (define *xtmlib-opengl-loaded* #t)

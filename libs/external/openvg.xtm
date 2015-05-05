@@ -17,14 +17,14 @@
 (sys:load "libs/openvg.xtm" 'quiet)
 (sys:load-preload-check 'openvg)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/external/soil.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/external/soil.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/external/soil.xtm"))
 
-(sys:precomp:insert-header "xtmopenvg")
+(impc:aot:insert-header "xtmopenvg")
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libopenvg
  (cond ((string=? (sys:platform) "OSX")
         "libOpenVG.dylib")
@@ -39,7 +39,7 @@
 
 ;; load the dylib
 (define libopenvg
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (null? libopenvg)
     (sys:load-escape "Could not load OpenVG\n"))
@@ -504,7 +504,7 @@
     (xtm_vg_create_contexti32 (real->integer w)
                               (real->integer h))))
 
-(sys:precomp:insert-sexp
+(impc:aot:insert-sexp
  '(define xtm-vg-create-context
     (lambda (w h)
       (xtm_vg_create_contexti32 (real->integer w)
@@ -1068,5 +1068,5 @@
 
 (define *xtmlib-openvg-loaded* #t)
 
-(sys:precomp:insert-footer "xtmopenvg")
+(impc:aot:insert-footer "xtmopenvg")
 

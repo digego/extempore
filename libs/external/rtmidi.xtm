@@ -28,14 +28,14 @@
 (sys:load-preload-check 'rtmidi)
 (define *xtmlib-rtmidi-loaded* #f)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
 
-(sys:precomp:insert-header "xtmrtmidi")
+(impc:aot:insert-header "xtmrtmidi")
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'librtmidi
  (cond ((string=? (sys:platform) "OSX")
         "librtmidic.dylib")
@@ -50,7 +50,7 @@
 
 ;; load the dylib
 (define librtmidi
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (not librtmidi)
     (print-error "Could not load librtmidi dynamic library"))
@@ -59,8 +59,8 @@
 (bind-val RTMIDI_ERROR i32 1)
 
 (sys:load "libs/external/rtmidi-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
+;; make sure we load them with AOT-compiled code as well
+(impc:aot:insert-sexp
  '(sys:load "libs/external/rtmidi-scm.xtm"))
 
 (bind-val MIDI_NOTE_OFF i8 *midi-note-off*)
@@ -262,5 +262,5 @@
       (pfill! msg (+ (<< type 4) chan) a b)
       (sendMessage device 3 msg))))
 
-(sys:precomp:insert-footer "xtmrtmidi")
+(impc:aot:insert-footer "xtmrtmidi")
 (define *xtmlib-rtmidi-loaded* #t)

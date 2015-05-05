@@ -21,12 +21,12 @@
 (sys:load "libs/jansson.xtm" 'quiet)
 (sys:load-preload-check 'jansson)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libjansson
  (cond ((string=? (sys:platform) "OSX")
         "libjansson.dylib")
@@ -41,11 +41,11 @@
 
 ;; load the dylib               
 (define libjansson
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (define *xtmlib-jansson-loaded* #f)
 
-(sys:precomp:insert-header "xtmjansson")
+(impc:aot:insert-header "xtmjansson")
 
 ;; the json_type enums
 (bind-val JSON_OBJECT enum 0)
@@ -223,4 +223,4 @@
 
 (define *xtmlib-jansson-loaded* #t)
 
-(sys:precomp:insert-footer "xtmjansson")
+(impc:aot:insert-footer "xtmjansson")

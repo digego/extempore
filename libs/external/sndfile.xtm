@@ -10,14 +10,14 @@
 (sys:load-preload-check 'sndfile)
 (define *xtmlib-sndfile-loaded* #f)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/audio_dsp.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/audio_dsp.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/audio_dsp.xtm"))
 
 ;; load the libsndfile dynamic library
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libsndfile
  (cond ((string=? (sys:platform) "OSX")
         "libsndfile.dylib")
@@ -32,13 +32,13 @@
 
 ;; load the dylib
 (define libsndfile
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (or (eq? #f libsndfile)
         (null? libsndfile))
     (sys:load-escape "Error loading libsndfile dynamic library"))
 
-(sys:precomp:insert-header "xtmsndfile")
+(impc:aot:insert-header "xtmsndfile")
 
 
 ;; libsndfile enums
@@ -615,4 +615,4 @@ Format flag is from libsndfile."
 
 (define *xtmlib-sndfile-loaded* #t)
 
-(sys:precomp:insert-footer "xtmsndfile")
+(impc:aot:insert-footer "xtmsndfile")

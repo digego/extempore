@@ -14,15 +14,15 @@
 (sys:load "libs/gstreamer.xtm" 'quiet)
 (sys:load-preload-check 'gstreamer)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 ;; make sure that glib is loaded
 (sys:load "libs/external/glib.xtm")
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'gstlib
  (cond ((string=? (sys:platform) "OSX")
         "libgstreamer-1.0.dylib")
@@ -35,13 +35,13 @@
 
 ;; load the dylib
 (define gstlib
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (not gstlib)
     (sys:load-escape "Could not load 'gstreamer' dynamic library"))
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'gstapplib
  (cond ((string=? (sys:platform) "OSX")
         "libgstapp-1.0.dylib")
@@ -54,12 +54,12 @@
 
 ;; load the dylib
 (define gstapplib
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (not gstapplib)
     (sys:load-escape "Could not load 'gstreamer' app library\nMake sure you have install at least the core plugins!"))
 
-(sys:precomp:insert-header "xtmgstreamer")
+(impc:aot:insert-header "xtmgstreamer")
 
 (define *xtmlib-gstreamer-loaded* #f)
 
@@ -296,4 +296,4 @@
 
 (define *xtmlib-gstreamer-loaded* #t)
 
-(sys:precomp:insert-footer "xtmgstreamer")
+(impc:aot:insert-footer "xtmgstreamer")

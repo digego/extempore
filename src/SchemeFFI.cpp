@@ -2031,7 +2031,7 @@ namespace extemp {
 
       // when using MCJIT, return a pointer to the module with the new
       // functions in it - which we'll use later to export the bitcode
-      // during precomp
+      // during AOT-compilation
       return mk_cptr(_sc, m);      
 #else
       return _sc->T;

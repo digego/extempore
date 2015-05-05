@@ -17,14 +17,14 @@
 (sys:load "libs/ghttp.xtm" 'quiet)
 (sys:load-preload-check 'ghttp)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 (sys:load "libs/external/jansson.xtm")
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libghttp
  (cond ((string=? (sys:platform) "OSX")
         "libghttp.dylib")
@@ -39,9 +39,9 @@
 
 ;; load the dylib               
 (define libghttp
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
-(sys:precomp:insert-header "xtmghttp")
+(impc:aot:insert-header "xtmghttp")
 
 (define *xtmlib-ghttp-loaded* #f)
 
@@ -511,4 +511,4 @@
 
 (define *xtmlib-ghttp-loaded* #t)
 
-(sys:precomp:insert-footer "xtmghttp")
+(impc:aot:insert-footer "xtmghttp")

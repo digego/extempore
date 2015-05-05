@@ -13,14 +13,14 @@
 (sys:load-preload-check 'assimp)
 (define *xtmlib-assimp-loaded* #f)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/external/shaders.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/external/shaders.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/external/shaders.xtm"))
 
-(sys:precomp:insert-header "xtmassimp")
+(impc:aot:insert-header "xtmassimp")
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libassimp
  (cond ((string=? (sys:platform) "OSX")
         "libassimp.dylib")
@@ -35,7 +35,7 @@
 
 ;; load the dylib
 (define libassimp
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (or (eq? #f libassimp)
         (null? libassimp))
@@ -684,9 +684,9 @@
       void)))
 
 (sys:load "libs/external/assimp-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
+;; make sure we load them with AOT-compiled code as well
+(impc:aot:insert-sexp
  '(sys:load "libs/external/assimp-scm.xtm"))
 
-(sys:precomp:insert-footer "xtmassimp")
+(impc:aot:insert-footer "xtmassimp")
 (define *xtmlib-assimp-loaded* #t)

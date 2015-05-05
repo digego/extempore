@@ -13,10 +13,10 @@
 (sys:load-preload-check 'udis86)
 (define *xtmlib-udis86-loaded* #f)
 
-(sys:precomp:insert-header "xtmudis86")
+(impc:aot:insert-header "xtmudis86")
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libudis86
  (cond ((string=? (sys:platform) "OSX")
         "libudis86.dylib")
@@ -31,7 +31,7 @@
 
 ;; load the dylib
 (define libudis86
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 
 (bind-type ud_operand <i32,i8,i32,i32,i8,i8,i64,i64,i8> #f)

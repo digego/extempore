@@ -43,7 +43,7 @@
 (sys:load-preload-check 'std)
 (define *xtmlib-std-loaded* #f)
 
-(sys:precomp:insert-header "xtmstd")
+(impc:aot:insert-header "xtmstd")
 
 ;; (suppress-compiler-messages #f)
 
@@ -173,7 +173,7 @@
 
 
 ;; override default constructors
-(sys:precomp:do-or-add-to-precomp-header
+(impc:aot:do-or-emit
  (bind-func String
   (lambda (lgth s)
     (let ((news:i8* (zalloc (+ 1 lgth)))
@@ -183,7 +183,7 @@
       (tset! str 1 news)
       str))))
 
-(sys:precomp:do-or-add-to-precomp-header
+(impc:aot:do-or-emit
  (bind-func String_h
    (lambda (lgth s)
      (let ((news:i8* (halloc (+ 1 lgth)))
@@ -502,7 +502,7 @@
 (bind-poly tostring tostring_f)
 (bind-poly tostring tostring_d)
 
-;; some helpers for precomp stuff
+;; some helpers for AOT-compilation stuff
 
 (bind-func command
   (lambda (cmd:i8*)
@@ -552,10 +552,10 @@
 
 ;; load the scheme macros (e.g. bind-instrument)
 (sys:load "libs/core/std-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
+;; make sure we load them with AOT-compiled code as well
+(impc:aot:insert-sexp
  '(sys:load "libs/core/std-scm.xtm"))
 
 (define *xtmlib-std-loaded* #t)
 
-(sys:precomp:insert-footer "xtmstd")
+(impc:aot:insert-footer "xtmstd")

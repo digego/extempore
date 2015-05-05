@@ -14,14 +14,14 @@
 (sys:load "libs/horde3d.xtm" 'quiet)
 (sys:load-preload-check 'horde3d)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 ;; set the path to the Horde3D directory
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'hordelib
  (cond ((string=? (sys:platform) "OSX")
         "/Library/Frameworks/Horde3D.framework/Horde3D")
@@ -36,13 +36,13 @@
 
 ;; load the dylib
 (define hordelib
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (or (eq? #f hordelib)
 	(not hordelib)) 
     (sys:load-escape "Could not load 'Horde3D' dynamic library"))
 
-(sys:precomp:set-dylib-name-info
+(impc:aot:set-dylib-name-info
  'hordeutlib
  (cond ((string=? (sys:platform) "OSX")
         "/Library/Frameworks/Horde3DUtils.framework/Horde3DUtils")
@@ -56,13 +56,13 @@
                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (define hordeutlib
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (or (eq? #f hordeutlib)
 	(not hordeutlib)) 
     (sys:load-escape "Could not load 'Horde3DUtils' dynamic library"))
 
-(sys:precomp:insert-header "xtmhorde3d")
+(impc:aot:insert-header "xtmhorde3d")
 
 (define *xtmlib-horde3d-loaded* #f)
 
@@ -281,4 +281,4 @@
 
 (define *xtmlib-horde3d-loaded* #t)
 
-(sys:precomp:insert-footer "xtmhorde3d")
+(impc:aot:insert-footer "xtmhorde3d")

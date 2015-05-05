@@ -13,8 +13,8 @@
 (sys:load-preload-check 'gmp)
 (define *xtmlib-gmp-loaded* #f)
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libgmp
  (cond ((string=? (sys:platform) "OSX")
         "libgmp.dylib")
@@ -29,7 +29,7 @@
 
 ;; load the dylib
 (define libgmp
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (bind-type __mpz_struct <i32,i32,i32*>)
 (bind-alias mpz_t __mpz_struct*)

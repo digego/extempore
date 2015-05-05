@@ -22,14 +22,14 @@
 (sys:load-preload-check 'fft)
 (define *xtmlib-fft-loaded* #f)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/math.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/math.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/math.xtm"))
 
-(sys:precomp:insert-header "xtmfft")
+(impc:aot:insert-header "xtmfft")
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libkissfft
  (cond ((string=? (sys:platform) "OSX")
         "kiss_fft.dylib")
@@ -44,7 +44,7 @@
 
 ;; load the dylib
 (define libkissfft
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (not libkissfft)
     (print-error "Could not load kiss_fft dynamic library"))
@@ -163,4 +163,4 @@
 
 (define *xtmlib-fft-loaded* #t)
 
-(sys:precomp:insert-footer "xtmfft")
+(impc:aot:insert-footer "xtmfft")

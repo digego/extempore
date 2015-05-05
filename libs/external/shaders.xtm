@@ -15,11 +15,11 @@
 (sys:load-preload-check 'shaders)
 (define *xtmlib-shaders-loaded* #f)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/external/opengl.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/external/opengl.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/external/opengl.xtm"))
 
-(sys:precomp:insert-header "xtmshaders")
+(impc:aot:insert-header "xtmshaders")
 
 ;; draw a quad
 ;; tw and th are framebuffer width and height
@@ -784,8 +784,8 @@
 (bind-poly xtm_render_setup xtm_render_setup_c)
 
 (sys:load "libs/external/shaders-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
+;; make sure we load them with AOT-compiled code as well
+(impc:aot:insert-sexp
  '(sys:load "libs/external/shaders-scm.xtm"))
 
 (bind-alias XTMRENDERCB [void,i64,i32,float*,float*,float*,i8*]*)
@@ -911,5 +911,5 @@
       (gl_print_error)
       (set! frame (+ frame 1)))))
 
-(sys:precomp:insert-footer "xtmshaders")
+(impc:aot:insert-footer "xtmshaders")
 (define *xtmlib-shaders-loaded* #t)

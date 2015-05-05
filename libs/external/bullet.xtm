@@ -12,14 +12,14 @@
 (sys:load "libs/bullet.xtm" 'quiet)
 (sys:load-preload-check 'bullet)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
 
 ;;; Code:
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'bulletlib
  (cond ((string=? (sys:platform) "Linux")
         "libBulletDynamics.so")
@@ -33,13 +33,13 @@
                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (define bulletlib
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (or (eq? #f bulletlib)
 	(not bulletlib)) 
     (sys:load-escape "Could not load 'bullet' dynamic library"))
 
-(sys:precomp:insert-header "xtmbullet")
+(impc:aot:insert-header "xtmbullet")
 
 (define *xtmlib-bullet-loaded* #f)
 
@@ -117,4 +117,4 @@
 
 (define *xtmlib-bullet-loaded* #t)
 
-(sys:precomp:insert-footer "xtmbullet")
+(impc:aot:insert-footer "xtmbullet")

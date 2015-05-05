@@ -15,14 +15,14 @@
 (sys:load-preload-check 'glib)
 (define *xtmlib-glib-loaded* #f)
 
-(sys:precomp:suppress-precomp-do
+(impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
-(sys:precomp:insert-sexp '(sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
 
-(sys:precomp:insert-header "xtmglib")
+(impc:aot:insert-header "xtmglib")
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libglib
  (cond ((string=? (sys:platform) "OSX")
         "libglib-2.0.dylib")
@@ -37,15 +37,15 @@
 
 ;; load the dylib
 (define libglib
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (or (eq? #f libglib)
 	(not libglib)) 
     (sys:load-escape "Could not load 'glib' dynamic library"))
 
 
-;; set up the current dylib name and path (for precompilation)
-(sys:precomp:set-dylib-name-info
+;; set up the current dylib name and path (for AOT compilation)
+(impc:aot:set-dylib-name-info
  'libgobject
  (cond ((string=? (sys:platform) "OSX")
         "libgobject-2.0.dylib")
@@ -60,7 +60,7 @@
 
 ;; load the dylib
 (define libgobject
-  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 (if (or (eq? #f libgobject)
 	(not libgobject)) 
@@ -711,9 +711,9 @@
 
 
 (sys:load "libs/external/glib-scm.xtm")
-;; make sure we load them with precompiled code as well
-(sys:precomp:insert-sexp
+;; make sure we load them with AOT-compiled code as well
+(impc:aot:insert-sexp
  '(sys:load "libs/external/glib-scm.xtm"))
 
-(sys:precomp:insert-footer "xtmglib")
+(impc:aot:insert-footer "xtmglib")
 (define *xtmlib-glib-loaded* #t)
