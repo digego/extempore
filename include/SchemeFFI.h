@@ -182,7 +182,6 @@ namespace extemp {
 	static pointer erase_function(scheme* _sc, pointer args);
         static pointer llvm_call_void_native(scheme* _sc, pointer args);
 	static pointer call_compiled(scheme* _sc, pointer args);
-	static pointer call_compiled_closure(scheme* _sc, pointer args);
 	static pointer llvm_convert_float_constant(scheme* _sc, pointer args);
 	static pointer llvm_convert_double_constant(scheme* _sc, pointer args);
 	static pointer llvm_count(scheme* _sc, pointer args);
