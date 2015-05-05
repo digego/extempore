@@ -2019,19 +2019,19 @@
                (print-with-colors 'magenta 'default #t (print "llc"))
                (print " in " llvm-path "\n"))
         ;; print further instructions
-        (command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
+        (sys:command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
         (llvm:export-module module bitcode-path)
 
         (let ((res1 0)
               (res2 0))
           (print "LLC command:\n " compilation-command-a "\n\n")
-          (set! res1 (command compilation-command-a))
+          (set! res1 (sys:command compilation-command-a))
           (if (<> res1 0)
               (begin (print-with-colors 'red 'default #t
                                         (println "LLC Failed!. exit code" res1))
                      (if exit-afterwards? (quit 1))))
           (print "CC command:\n " compilation-command-b "\n\n")          
-          (set! res2 (command compilation-command-b))
+          (set! res2 (sys:command compilation-command-b))
           (if (<> res2 0)
               (begin (print-with-colors 'red 'default #t
                                         (println "CC Failed!. exit code" res2))
@@ -2040,7 +2040,7 @@
                      (print-with-colors 'blue 'default #t (print shlib-path))
                      (print "\n\n")
                      (if move-into-place?
-                         (if (= (command (string-append "mv " shlib-path " libs")) 0)
+                         (if (= (sys:command (string-append "mv " shlib-path " libs")) 0)
                              (begin (print "Moved ")
                                     (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
                              (print-with-colors 'red 'default #t
@@ -2107,21 +2107,6 @@
     (print "  " (length *impc:ti:polyfunc-cache*))
     (print-with-colors 'cyan 'default #f (print " specializations\n\n"))))
 
-;; this is a hack - it's necessary because the AOT-compilation scheme function
-;; needs the xtlang functions "command" (must have) and
-;; "get_llvm_path" (nice to have). So if they haven't been loaded
-;; ahead of time (i.e. if you're AOT-compiling std.xtm) then we have to
-;; initialise them and create the scheme wrappers here.
-(define impc:aot:bootstrap-command-and-get-llvm-path
-  (lambda ()
-    ;; command
-    (impc:ti:initialize-closure-with-new-zone "command" *impc:default-zone-size*)
-    (eval `(define command ,(impc:ti:create-scheme-wrapper "command"))
-          (interaction-environment))
-    ;; get_llvm_path
-    (impc:ti:initialize-closure-with-new-zone "get_llvm_path" *impc:default-zone-size*)
-    (eval `(define get_llvm_path ,(impc:ti:create-scheme-wrapper "get_llvm_path"))
-          (interaction-environment))))
 
 (define impc:aot:compile-xtm-file
   (lambda (lib-path move-into-place? exit-afterwards?)
@@ -2153,9 +2138,6 @@
                         (let ((module (impc:compiler:flush-jit-compilation-queue)))
                           (if (not module)
                               (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
-                          ;; make sure the scheme wrappers for "command"
-                          ;; and "get_llvm_path" exist
-                          (impc:aot:bootstrap-command-and-get-llvm-path)
                           (impc:aot:compile-module libname-no-extension module move-into-place? exit-afterwards?))
                         ;; (impc:aot:insert-footer libname-no-extension)
                         (close-port *impc:aot:current-output-port*)
