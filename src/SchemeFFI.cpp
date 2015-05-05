@@ -436,6 +436,8 @@ namespace extemp {
 	    { "sys:make-cptr",		          &SchemeFFI::makeCptr },
 	    { "sys:directory-list",         &SchemeFFI::dirlist },
       { "sys:expand-path",            &SchemeFFI::pathExpansion },
+      { "sys:command",                &SchemeFFI::command },
+      { "sys:command-output",         &SchemeFFI::commandOutput },
       { "sys:set-default-timeout",    &SchemeFFI::setDefaultTimeout },
       { "sys:get-default-timeout",    &SchemeFFI::getDefaultTimeout },
 	    // DSP sys stuff
@@ -752,6 +754,30 @@ namespace extemp {
     
   #endif  
     return mk_string(_sc,exp_path);
+  }
+  
+  pointer SchemeFFI::command(scheme* _sc, pointer args) {    
+    // NOTE: doesn't work for Windows yet
+    int res = system(string_value(pair_car(args)));
+    return mk_integer(_sc,res);
+  }
+
+  pointer SchemeFFI::commandOutput(scheme* _sc, pointer args) {    
+    // NOTE: doesn't work for Windows yet
+    char outbuf[8192];
+    memset(outbuf,0,8192);
+    FILE *stream = popen(string_value(pair_car(args)), "r");
+    if (stream && fgets(outbuf, 8192, stream))
+      {
+        pclose(stream);
+        // get rid of the final newline
+        size_t len = strnlen(outbuf, 8192);
+        if(len < 8192)
+          outbuf[len-1] = '\0';
+        return mk_string(_sc,outbuf);
+      }
+    else
+      return _sc->F;     
   }
 
   pointer SchemeFFI::setDefaultTimeout(scheme* _sc, pointer args)
