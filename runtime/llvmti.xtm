@@ -80,9 +80,9 @@
     (if (impc:ti:namedtype-exists? namedtype-name)
         (impc:compiler:print-already-bound-error namedtype-name (impc:ir:pretty-print-type type))
         ;; check arg types
-        (if (not (and (or (string? namedtype-name) (begin (println 'namedtype-name: namedtype-name) #f))
-                      (or (or (list? type) (integer? type)) (begin (println 'type: type) #f))
-                      (or (string? docstring) (begin (println docstring) #f))))
+        (if (not (and (or (string? namedtype-name) (begin (println 'bad 'namedtype-name: namedtype-name) #f))
+                      (or (or (list? type) (integer? type)) (begin (println 'bad 'type: type) #f))
+                      (or (string? docstring) (begin (println 'bad 'doctstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new named type")
             (begin
               (set! *impc:ti:namedtype-cache*
@@ -129,10 +129,10 @@
   (lambda (closure-name type docstring body)
     ;; (println 'closure-name: closure-name 'type: type 'docstring: docstring 'body: body)
     ;; check arg types
-    (if (not (and (or (string? closure-name) (begin (println 'closure-name: closure-name) #f))
-                  (or (list? type) (begin (println 'type: type) #f))
-                  (or (string? docstring) (begin (println docstring)))
-                  (or (list? body) (begin (println 'body: body) #f))))
+    (if (not (and (or (string? closure-name) (begin (println 'bad 'closure-name: closure-name) #f))
+                  (or (list? type) (begin (println 'bad 'type: type) #f))
+                  (or (string? docstring) (begin (println 'bad 'docstring: docstring)))
+                  (or (list? body) (begin (println 'bad 'body: body) #f))))
         (impc:compiler:print-compiler-error "couldn't register new closure")
         (if (impc:ti:closure-exists? closure-name)
             (impc:compiler:print-already-bound-error closure-name (impc:ti:get-closure-type closure-name))
@@ -1583,9 +1583,9 @@
 (define impc:ti:register-new-nativefunc
   (lambda (nativefunc-name type docstring)
     ;; check arg types
-    (if (not (and (or (string? nativefunc-name) (begin (println 'nativefunc-name: nativefunc-name) #f))
-                  (or (list? type) (begin (println 'type: type) #f))
-                  (or (string? docstring) (begin (println docstring)))))
+    (if (not (and (or (string? nativefunc-name) (begin (println 'bad 'nativefunc-name: nativefunc-name) #f))
+                  (or (list? type) (begin (println 'bad 'type: type) #f))
+                  (or (string? docstring) (begin (println 'bad 'docstring: docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new nativefunc")
         (let ((existing (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
           (if existing
@@ -1682,10 +1682,10 @@
 (define impc:ti:register-new-polyfunc
   (lambda (polyfunc-name func-name func-type docstring)
     ;; check arg types
-    (if (not (and (or (string? polyfunc-name) (begin (println 'polyfunc-name: polyfunc-name) #f))
-                  (or (string? func-name) (begin (println 'polyfunc-name: func-name) #f))
-                  (or (list? func-type) (begin (println 'type: func-type) #f))
-                  (or (string? docstring) (begin (println docstring)))))
+    (if (not (and (or (string? polyfunc-name) (begin (println 'bad 'polyfunc-name: polyfunc-name) #f))
+                  (or (string? func-name) (begin (println 'bad 'polyfunc-name: func-name) #f))
+                  (or (list? func-type) (begin (println 'bad 'type: func-type) #f))
+                  (or (string? docstring) (begin (println 'bad 'docstring: docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new polymorphic function")
         (let ((candidates (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
           (if candidates
@@ -1990,10 +1990,10 @@
 (define impc:ti:register-new-polytype
   (lambda (polytype-name type-name type docstring)
     ;; check arg types
-    (if (not (and (or (string? polytype-name) (begin (println 'polytype-name: polytype-name) #f))
-                  (or (string? type-name) (begin (println 'polytype-name: type-name) #f))
-                  (or (list? type) (begin (println 'type: type) #f))
-                  (or (string? docstring) (begin (println docstring)))))
+    (if (not (and (or (string? polytype-name) (begin (println 'bad 'polytype-name: polytype-name) #f))
+                  (or (string? type-name) (begin (println 'bad 'polytype-name: type-name) #f))
+                  (or (list? type) (begin (println 'bad 'type: type) #f))
+                  (or (string? docstring) (begin (println 'bad 'docstring: docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new polymorphic type")
         (let ((candidates (assoc-strcmp polytype-name *impc:ti:polytype-cache*)))
           (if candidates
@@ -2740,9 +2740,9 @@
     (if (impc:ti:globalvar-exists? globalvar-name)
         (impc:compiler:print-already-bound-error (string->symbol globalvar-name) (impc:ir:pretty-print-type type))
         ;; check arg types
-        (if (not (and (or (string? globalvar-name) (begin (println 'globalvar-name: globalvar-name) #f))
-                      (or (or (list? type) (integer? type)) (begin (println 'type: type) #f))
-                      (or (string? docstring) (begin (println docstring) #f))))
+        (if (not (and (or (string? globalvar-name) (begin (println 'bad 'globalvar-name: globalvar-name) #f))
+                      (or (or (list? type) (integer? type)) (begin (println 'bad 'type: type) #f))
+                      (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new globalvar")
             (begin
               (set! *impc:ti:globalvar-cache*
