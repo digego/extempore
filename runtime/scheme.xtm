@@ -1976,6 +1976,7 @@
                                   (strlist (string-append " " (string-join linklist " ") " ")))
                              strlist)
                            ""))
+             (optimize-compiles? #f)
              (shlib-path
               (cond ((string=? platform "Linux")
                      (string-append "/tmp/" module-name ".so"))
@@ -1988,11 +1989,15 @@
               (if (string=? platform "Windows")
                   (string-append
                    llvm-path
-                   "/bin/Release/llc -O3 -tailcallopt -filetype obj "
+                   "/bin/Release/llc " 
+                   (if optimize-compiles? "-O3" "-O0")
+                   " -tailcallopt -filetype obj "
                    bitcode-path)
                   (string-append
                    llvm-path
-                   "/bin/llc -O3 -relocation-model=pic -tailcallopt "
+                   "/bin/llc " 
+                   (if optimize-compiles? "-O3" "-O0")
+                   " -relocation-model=pic -tailcallopt "
                    bitcode-path)))
              (compilation-command-b
               (if (string=? platform "Windows")
@@ -2008,9 +2013,13 @@
                                  asm-path "\n")
                   (string-append
                    (cond ((string=? platform "Linux")
-                          "gcc -O3 --shared -fPIC -g ")
+                          (string-append "gcc " 
+                                         (if optimize-compiles? "-O3" "-g -O0")
+                                         " --shared -fPIC -g "))
                          ((string=? platform "OSX")
-                          (string-append "clang -O3 -dynamiclib -undefined dynamic_lookup ")))
+                          (string-append "clang "
+                                         (if optimize-compiles? "-O3" "-g -O0")   
+                                         " -dynamiclib -undefined dynamic_lookup ")))
                    asm-path
                    " -o " shlib-path "\n"))))
         ;; (if (string=? platform "Windows")
@@ -2032,7 +2041,7 @@
           (set! res1 (sys:command compilation-command-a))
           (if (<> res1 0)
               (begin (print-with-colors 'red 'default #t
-                                        (println "llc failed with exit code " res1))
+                                        (print "llc failed with exit code " res1 "\n"))
                      (if exit-afterwards? (quit 1))))
           (begin
             (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
@@ -2040,7 +2049,7 @@
           (set! res2 (sys:command compilation-command-b))
           (if (<> res2 0)
               (begin (print-with-colors 'red 'default #t
-                                        (println "cc failed with exit code " res2))
+                                        (print "cc failed with exit code " res2 "\n"))
                      (if exit-afterwards? (quit 1)))
               (begin 
                 (print-with-colors 'black 'green #t (print " Succesfully compiled "))
