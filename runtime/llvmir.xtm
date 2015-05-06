@@ -4705,13 +4705,11 @@
     (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
     ""))
 
-;; this is currently broken for poly funcs
+;; this is (possibly?) broken for poly funcs
 (define impc:ir:function-calling-convention
   (lambda (function-name)
     (if (and (impc:ti:nativefunc-exists? function-name)
-             ;; this shouldn't be necessary when
-             ;; there's a proper polyfunc-cache
-             (not (regex:match? function-name "_poly_")))
+             (not (impc:ti:closure-exists? function-name)))
         "ccc" ;; bind-libs and toplevel closures
         "fastcc")))
 
