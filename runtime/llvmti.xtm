@@ -81,7 +81,7 @@
         (impc:compiler:print-already-bound-error namedtype-name (impc:ir:pretty-print-type type))
         ;; check arg types
         (if (not (and (or (string? namedtype-name) (begin (println 'bad 'namedtype-name: namedtype-name) #f))
-                      (or (or (list? type) (integer? type)) (begin (println 'bad 'type: type) #f))
+                      (or (list? type) (integer? type) (begin (println 'bad 'type: type) #f))
                       (or (string? docstring) (begin (println 'bad 'doctstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new named type")
             (begin
@@ -2741,7 +2741,10 @@
         (impc:compiler:print-already-bound-error (string->symbol globalvar-name) (impc:ir:pretty-print-type type))
         ;; check arg types
         (if (not (and (or (string? globalvar-name) (begin (println 'bad 'globalvar-name: globalvar-name) #f))
-                      (or (or (list? type) (integer? type)) (begin (println 'bad 'type: type) #f))
+                      (or (list? type)
+                          (integer? type)
+                          (impc:ti:namedtype-exists? type)
+                          (begin (println 'bad 'type: type) #f))
                       (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new globalvar")
             (begin
