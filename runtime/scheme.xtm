@@ -1318,6 +1318,23 @@
       (and (not (null? base))
            (cdr base)))))
 
+(define get-llvm-path
+  (lambda ()
+    (let ((path_from_env (sys:command-output "echo $EXT_LLVM_DIR")))
+      (if (not (string=? path_from_env ""))
+          path_from_env
+          ;; check if homebrewed version (in default Cellar location)
+          ;; exists - need to keep the version up-to-date by hand
+          ;;
+          ;; OSX
+          (if (= (sys:command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
+              "/usr/local/Cellar/extempore-llvm/3.4.1"
+              ;; Linux
+              (if (= (sys:command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
+                  "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
+                  path_from_env)
+              path_from_env)))))
+
 ;; needed for AOT-compilation.
 
 ;; should be a cons pair e.g. '(libGLU .
