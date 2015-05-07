@@ -4708,10 +4708,11 @@
 ;; this is (possibly?) broken for poly funcs
 (define impc:ir:function-calling-convention
   (lambda (function-name)
-    (if (and (impc:ti:nativefunc-exists? function-name)
-             (not (impc:ti:closure-exists? function-name)))
-        "ccc" ;; bind-libs and toplevel closures
-        "fastcc")))
+    (if (not (impc:ti:closure-or-nativefunc-exists? function-name))
+        #f
+        (if (impc:ti:closure-exists? function-name)
+            "fastcc"
+            "ccc"))))
 
 ;; THIS VERSION FOR _NATIVE CALL CLOSURES!
 (define impc:ir:compiler:native-call
