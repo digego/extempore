@@ -2072,7 +2072,10 @@
                 (print-with-colors 'black 'green #t (print " Succesfully compiled "))
                 (print "\n  " shlib-path "\n\n")
                 (if move-into-place?
-                    (if (= (sys:command (string-append "mv " shlib-path " libs")) 0)
+                    (if (and (= (sys:command (string-append "mv " shlib-path " libs")) 0)
+                             (if (not optimize-compiles?)
+                                 (= (sys:command (string-append "mv " shlib-path ".dSYM libs")) 0)
+                                 #t))
                         (begin (print "Moved ")
                                (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
                         (print-with-colors 'red 'default #t
