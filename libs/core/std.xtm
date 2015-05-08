@@ -39,6 +39,22 @@
 
 ;; lib-loading config
 
+(if (string=? (ipc:get-process-name)
+              *impc:compiler:process*)
+    (begin
+      (print "\nCompiling ")
+      (print-with-colors 'cyan 'default #t (print "init.ll"))
+      (print "... ")
+      (let ((init-ll-string (file->string "runtime/init.ll")))
+        (if (llvm:compile-ir init-ll-string)
+            (begin
+              (print-with-colors 'green 'default #t (print "done"))
+              (print "\n\n"))
+            (begin
+              (print-with-colors 'red 'default #t (print "\n\nError compiling init.ll IR\n\n"))
+              (print "This is pretty bad.  Exiting...\n")
+              (quit 1))))))
+
 (sys:load "libs/std.xtm" 'quiet)
 (sys:load-preload-check 'std)
 (define *xtmlib-std-loaded* #f)

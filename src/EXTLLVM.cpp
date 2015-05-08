@@ -1579,56 +1579,7 @@ namespace extemp {
       // 
 	    PM->add(llvm::createPromoteMemoryToRegisterPass());
 
-	    char fname[] = "/init.ll";
-	    char load_path[256];
-	    strcpy(load_path,extemp::UNIV::PWD);
-	    strcat(load_path,fname);
-	    FILE* fp;
-	    if((fp = fopen(load_path,"rb")) == NULL)
-	    {
-		printf("Could not open %s\n",load_path);
-		exit(1);
-	    }
-			
-	    fseek(fp,0,SEEK_END);
-	    long long size = ftell(fp);
-	    fseek(fp,0,SEEK_SET);
-#ifdef TARGET_OS_WINDOWS
-	    char* assm = (char*) _alloca(size+1);
-#else
-	    char* assm = (char*) alloca(size+1);
-#endif
-	    size_t res = fread(assm, 1, size, fp);
-            if(res != size) {
-   	      printf("init.ll length(%lld) read(%lld) \n",size,res);
-              if(ferror(fp)) {
-    	        printf("Error reading init.ll %d\n",ferror(fp));
-                exit(1);
-              }else if(feof(fp)){
-    	        printf("Error reading init.ll end-of-file error %d\n",feof(fp));
-                exit(1);
-              }else{
-                printf("Length mismatch reading init.ll lgth(%lld) read(%lld)\n",size,res);
-                exit(1);
-	      }
-	    }
-	    //std::cout << "assm: " << size << " :: " << res << " ... " << std::endl << assm << std::endl;
-
-            assm[size]=0;
-	    fclose(fp);
-	    llvm::SMDiagnostic pa;
-	    llvm::Module* newM = ParseAssemblyString(assm, M, pa, llvm::getGlobalContext());
-			
-	    if(newM == 0)
-	    {
-     	        printf("Compiler Error: Error building init.ll\n");
-		std::string errstr;
-		llvm::raw_string_ostream ss(errstr);
-		pa.print("Extempore",ss);
-		printf(ss.str().c_str());
-                exit(1);
-	    }
-
+      // tell LLVM about some built-in functions
 	    llvm::GlobalValue* gv = M->getNamedValue(std::string("llvm_destroy_zone_after_delay"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_destroy_zone_after_delay);			
 	    gv = M->getNamedValue(std::string("free_after_delay"));
