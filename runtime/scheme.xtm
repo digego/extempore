@@ -2047,7 +2047,7 @@
           (print "\n  " bitcode-path "\n\n"))
         ;; print further instructions
         (sys:command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
-        
+
         (llvm:export-module module bitcode-path)
 
         (let ((res1 0)
@@ -2074,12 +2074,12 @@
                 (if move-into-place?
                     (if (and (= (sys:command (string-append "mv " shlib-path " libs")) 0)
                              (if (not optimize-compiles?)
-                                 (= (sys:command (string-append "mv " shlib-path ".dSYM libs")) 0)
+                                 (= (sys:command (string-append "rm -rf libs/" module-name ".dylib.dSYM & mv " shlib-path ".dSYM libs")) 0)
                                  #t))
                         (begin (print "Moved ")
                                (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
                         (print-with-colors 'red 'default #t
-                                           (print "Error moving " shlib-path " into libs/ directory.")))))))))))
+                                           (print "Error moving " shlib-path " into libs/ directory.\n\n")))))))))))
 
 (define impc:aot:insert-header
   (lambda (libname)
