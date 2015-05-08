@@ -1150,9 +1150,8 @@ namespace extemp {
 #ifdef TARGET_OS_WINDOWS
 	  std::cout << "Error loading library: " << GetLastError() << std::endl;
 	  printf("For Library Path: %ls\n",wstr);
-	  return _sc->F;
-#else                       
-	  //fprintf(stderr, "%s\n", dlerror());
+#else
+	  fprintf(stderr, "Error in %s\n", dlerror());
 #endif
 	  return _sc->F;
 	}
