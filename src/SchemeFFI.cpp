@@ -1151,7 +1151,7 @@ namespace extemp {
 	  std::cout << "Error loading library: " << GetLastError() << std::endl;
 	  printf("For Library Path: %ls\n",wstr);
 #else
-	  fprintf(stderr, "Error in %s\n", dlerror());
+	  printf("Error in %s\n", dlerror());
 #endif
 	  return _sc->F;
 	}
