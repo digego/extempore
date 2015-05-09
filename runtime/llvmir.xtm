@@ -916,9 +916,10 @@
                       (string-append (substring (car p) 1 (string-length (car p)))
                                      ":"
                                      (cname-decode (cadr p))
-                                     (make-string ptrs #\*)
-                                     ))
-                    (substring t 1 (string-length t)))
+                                     (make-string ptrs #\*)))
+                    (if (char=? (string-ref t 0) #\%)
+                        (substring t 1 (string-length t))
+                        t))
                 (impc:ir:pretty-print-type (impc:ir:get-type-from-pretty-str t)))
             (if (or (null? t) (not (impc:ir:type? t))) '()
                 (cond ((atom? t)
