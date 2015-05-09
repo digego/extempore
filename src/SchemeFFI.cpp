@@ -434,6 +434,7 @@ namespace extemp {
 	    { "sys:close-dylib",	          &SchemeFFI::closeDynamicLib },
 	    { "sys:symbol-cptr",	          &SchemeFFI::symbol_pointer },
 	    { "sys:make-cptr",		          &SchemeFFI::makeCptr },
+	    { "sys:slurp-file",             &SchemeFFI::slurpFile },
 	    { "sys:directory-list",         &SchemeFFI::dirlist },
       { "sys:expand-path",            &SchemeFFI::pathExpansion },
       { "sys:command",                &SchemeFFI::command },
@@ -844,6 +845,23 @@ namespace extemp {
     return reverse(_sc,list);
   }
 #endif
+
+  pointer SchemeFFI::slurpFile(scheme* _sc, pointer args)
+  {
+    std::FILE *fp = std::fopen(string_value(pair_car(args)), "rb");
+
+    if(fp){
+      std::string contents;
+      std::fseek(fp, 0, SEEK_END);
+      contents.resize(std::ftell(fp));
+      std::rewind(fp);
+      std::fread(&contents[0], 1, contents.size(), fp);
+      std::fclose(fp);
+
+      return mk_string(_sc,contents.c_str());
+    }
+    return _sc->F;
+  }
 
     pointer SchemeFFI::impcirGetType(scheme* _sc, pointer args)
     {

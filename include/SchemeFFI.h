@@ -95,6 +95,7 @@ namespace extemp {
 	static pointer cmdarg(scheme* _sc, pointer args);
 	static pointer platform(scheme* _sc, pointer args);
 	static pointer makeCptr(scheme* _sc, pointer args);
+	static pointer slurpFile(scheme* _sc, pointer args);
 	static pointer dirlist(scheme* _sc, pointer args);
   static pointer pathExpansion(scheme* _sc, pointer args);
   static pointer command(scheme* _sc, pointer args);
