@@ -8712,17 +8712,13 @@
        (if (impc:ti:bang-type? newtype) ;; then must be poly type
            (begin (impc:ti:register-new-generictype ',symbol (string->symbol newtype))
                   (impc:compiler:print-binding-details-to-log "GenrType:" ',symbol ',type))
-           (if
-            (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
-                                            (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str
-                                                                   newtype
-                                                                   ,(symbol->string symbol)))))
-            (begin
-              (impc:ti:register-new-namedtype ,(symbol->string symbol)
-                                              (impc:ir:get-type-from-pretty-str ,(symbol->string type))
-                                              "")
-              (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
-            (impc:compiler:print-compiler-error "could not compile IR for type" type))))
+           (let ((typelist (cons *impc:ir:tuple* (impc:ir:get-type-from-pretty-tuple ,(symbol->string type)
+                                                                                     ,(symbol->string symbol)))))
+             (if (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
+                                                 (impc:ir:get-type-str typelist)))
+                 (begin (impc:ti:register-new-namedtype ,(symbol->string symbol) typelist "")
+                        (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
+                 (impc:compiler:print-compiler-error "could not compile IR for type" type)))))
      ;; the next line is to help specialize any element types that may not already be specialized!
      (map (lambda (a) (impc:ir:get-type-from-pretty-str a)) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
      (set! *impc:ir:get-type-callback-off* #f)
