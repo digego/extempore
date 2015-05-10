@@ -8985,10 +8985,12 @@
   (lambda (func-name)
     (if (impc:aot:currently-compiling?)
         (lambda ()
-          (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
-          (print " the scheme wrapper for ")
-          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print (string->symbol func-name)))
-          (print " doesn't actually exist here, this is just a no-op wrapper created during AOT compilation\n"))
+          (if (not (impc:aot:currently-compiling?))
+              (begin
+                (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
+                (print " the scheme wrapper for ")
+                (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print (string->symbol func-name)))
+                (print " was called, but it doesn't exist (yet)\n"))))
         (let ((scheme-func (llvm:get-function-pointer (string-append func-name "_scheme"))))
           (if scheme-func
               (begin
