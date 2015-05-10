@@ -1309,9 +1309,10 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     return _sc->F; 
   }
   
-  void*(*p)() = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
-  
-  if(p==NULL) {
+  void*(*p)() = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
+  if(p==nullptr){
+     p = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
+  }else if(p==nullptr) {
     printf("Error attempting to set environment variable in closure %s.%s\n",fname,vname);
     return _sc->F;
   }
