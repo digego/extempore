@@ -2336,7 +2336,11 @@ namespace extemp {
   {
     using namespace llvm;
 
+#ifdef EXT_MCJIT
     Module* m = (Module *)cptr_value(pair_car(args));
+#else
+    Module* m = EXTLLVM::I()->M;
+#endif // EXT_MCJIT
     if(m == 0)
       {
         return _sc->F;
