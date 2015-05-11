@@ -28,6 +28,7 @@ external/rtmidi.xtm \
 external/glib.xtm \
 external/soil.xtm \
 external/opengl.xtm \
+external/glext.xtm \
 external/shaders.xtm \
 external/assimp.xtm \
 external/openvg.xtm"}
