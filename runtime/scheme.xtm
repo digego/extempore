@@ -1950,17 +1950,18 @@
 
 (define sys:compile-init-ll
   (lambda ()
-    (if (string=? (ipc:get-process-name)
-                  *impc:compiler:process*)
-        (begin
-          (print "\nCompiling ")
-          (print-with-colors 'blue 'default #t (print "init.ll"))
-          (print "... ")
+    (let ((print? #f))
+      (if (string=? (ipc:get-process-name) *impc:compiler:process*)
           (let ((init-ll-string (sys:slurp-file "runtime/init.ll")))
             (if (and init-ll-string (llvm:compile-ir init-ll-string))
-                (begin
-                  (print-with-colors 'green 'default #t (print "done"))
-                  (print "\n\n"))
+                (if print?
+                    (begin
+                      (print "\nCompiling ")
+                      (print-with-colors 'blue 'default #t (print "init.ll"))
+                      (print "... ")
+                      (print-with-colors 'green 'default #t (print "done"))
+                      (print "\n\n"))
+                    #t)
                 (begin
                   (print-with-colors 'red 'default #t (print "\n\nError compiling init.ll IR\n\n"))
                   (print "This is pretty bad.  Exiting...\n")
