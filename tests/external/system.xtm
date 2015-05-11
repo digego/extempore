@@ -1,0 +1,27 @@
+;;; system.xtm -- tests for various system commands
+
+;; Author: 
+;; Keywords: extempore
+;; Required dylibs: 
+
+;;; Commentary:
+
+;; These tests excercise various things in the environment in which
+;; xtlang is running, e.g. compilers and whatnot
+
+;;; Code:
+
+(sys:load "libs/core/test.xtm")
+
+(xtmtest
+ '(define test_system_compiler
+    (lambda ()
+      (sys:command "echo \'#include <stdio.h>\nvoid printarg(int arg){ printf(\"printing arg: %d\\\\n\", arg); }\' | clang -dynamiclib -x c -o xtmtestlib.dylib -")))
+ (test_system_compiler)
+ 0)
+
+(define xtmtestlib (sys:load-dylib "xtmtestlib.dylib"))
+
+(xtmtest
+ '(bind-lib xtmtestlib printarg [void,i32]*)
+ (call-as-xtlang (printarg 4)))
