@@ -1334,13 +1334,17 @@
 
 (define impc:ir:get-alignment
   (lambda (t)
+    (let  ((nt (impc:ti:get-namedtype-type t)))
+      (if nt (set! t nt)))
     (cond ((impc:ir:pointer? t) (/ (sys:pointer-size) 8))
           ((impc:ir:array? t) (impc:ir:get-type-size (caddr t))) ;; align to array element type
           ((impc:ir:vector? t) (impc:ir:get-type-size t)) ;; align to full size of vector
           ((or  ;; tuples align to their largest internal aligment
             (impc:ir:closure? t)
             (impc:ir:tuple? t))
-           (apply max (map (lambda (tt) (impc:ir:get-alignment tt)) (cdr t))))
+           (apply max (map (lambda (tt)
+                             (impc:ir:get-alignment tt))
+                           (cdr t))))
           (else ;; for scalars it's just their size in bytes
            (impc:ir:get-type-size t)))))
 
