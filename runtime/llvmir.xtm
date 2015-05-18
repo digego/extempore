@@ -1345,8 +1345,9 @@
            (apply max (map (lambda (tt)
                              (impc:ir:get-alignment tt))
                            (cdr t))))
-          (else ;; for scalars it's just their size in bytes
-           (impc:ir:get-type-size t)))))
+          (else ;; under MCJIT i64 appears to be 4-byte aligned, not
+                ;; 8-byte aligned. WTF?
+           (if (= t 2) 4 (impc:ir:get-type-size t))))))
 
 
 (define impc:ir:get-tuple-type-size
