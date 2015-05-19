@@ -23,8 +23,8 @@ cd llvm-3.4.2.src/lib/AsmParser && \
 
 # build extempore
 cd $ROOTDIR/extempore && \
-    ./compile-stdlib.sh && \
-    EXT_LLVM_DIR=llvm-build ./all.bash
+    EXT_LLVM_DIR=llvm-build ./all.bash && \
+    ./compile-stdlib.sh
 
 cd $ROOTDIR
 # clean up after ourselves
