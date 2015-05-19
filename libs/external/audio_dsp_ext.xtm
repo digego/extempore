@@ -30,10 +30,9 @@
 
 (impc:aot:insert-header "xtmaudio_dsp_ext")
 
-(bind-alias cpxSAMPLE cpxf)
-(bind-val cpxSAMPLE_SIZE i64 8)
-(bind-val SAMPLE_SIZE i64 4)
-(bind-alias ComplexS Complexf)       
+;; are we using float or double precision complex numbers for our
+;; samples?
+(bind-alias SComplex Complexf)
 
 ;; STFT
 ;; 
@@ -50,7 +49,8 @@
     (if (< k n) (set! k n))
     (if (> r n) (set! r n))
     (let ((buf:SAMPLE* (alloc n))
-          (spectrum:ComplexS* (alloc k))          
+          (sample_size_in_bytes 4) ;; assuming float SAMPLE
+          (spectrum:SComplex* (alloc k))          
           (pad:SAMPLE* (alloc k))
           (segments (/ n r))
           (pad_offset (dtoi64 (- (* .5 (i64tod k)) (* .5 (i64tod n)))))
@@ -62,8 +62,8 @@
             (let ((start (* idx r))
                   (samps (- n start)))
               ;; copy 'n' samples to padded buffer 
-              (memcpy padbuf (convert (pref-ptr buf start)) (* SAMPLE_SIZE samps))
-              (memcpy padbuf (convert (pref-ptr buf 0)) (* SAMPLE_SIZE start))
+              (memcpy padbuf (convert (pref-ptr buf start)) (* sample_size_in_bytes samps))
+              (memcpy padbuf (convert (pref-ptr buf 0)) (* sample_size_in_bytes start))
               ;; apply windowing function
               (window_hamming_f (cast padbuf SAMPLE*) n)
               ;; forward fft (pad is padbuf)
@@ -82,8 +82,8 @@
   (lambda (r n k)
     (let ((L (stft_c r n k))
           (R (stft_c r n k))
-          (left:ComplexS* (L.spectrum))
-          (right:ComplexS* (R.spectrum))
+          (left:SComplex* (L.spectrum))
+          (right:SComplex* (R.spectrum))
           (i 0))
       (lambda (chan:i64 x)
         (if (= chan 0) (L x) (R x))))))
@@ -92,7 +92,7 @@
 (bind-func stft_mc_c
   (lambda (channels:i64 r n k)
     (let ((fftchans:[float,float]** (alloc channels))
-          (spectrums:ComplexS** (alloc channels)) 
+          (spectrums:SComplex** (alloc channels)) 
           (i 0))
       (dotimes (i channels)
         (let ((F (stft_c r n k)))
@@ -100,9 +100,6 @@
           (pset! spectrums i (F.spectrum))))
       (lambda (chan:i64 x)
         ((pref fftchans chan) x)))))
-
-
-
 
 ;; uniform partitioned convolution in frq domain
 ;; expects mono aif/wav audio file at samplerate
@@ -112,8 +109,8 @@
           (irlgth (+ _irlgth (- lgth (% _irlgth lgth)))) ;; pad to whole multiple of lgth
           (parts (/ irlgth lgth)) ;; how many partitions
           (po 0) ;; partition offset
-          (irs:cpxSAMPLE* (zalloc (* 2 irlgth))) ;; storage for all IR FFT 'partitions'
-          (ffts:cpxSAMPLE* (zalloc (* 2 irlgth))) ;; storage for all total forward ffts
+          (irs:SComplex* (zalloc (* 2 irlgth))) ;; storage for all IR FFT 'partitions'
+          (ffts:SComplex* (zalloc (* 2 irlgth))) ;; storage for all total forward ffts
           (padlgth (* lgth 2)) ;; padlgth is for convolution buffers                    
           (aorb:i1 #t) ;; #t for a #f for b          
           (irtaila:SAMPLE* (zalloc lgth)) ;; buffer ir tail
@@ -121,17 +118,17 @@
           (drya:SAMPLE* (zalloc padlgth)) ;; buffer input signal
           (dryb:SAMPLE* (zalloc padlgth))
           (t1:i64 0) (i:i64 0) (out:SAMPLE 0.0) (j:i64 0)
-          (A:cpxSAMPLE* (zalloc padlgth)) 
-          (B:cpxSAMPLE* (zalloc padlgth))
+          (A:SComplex* (zalloc padlgth)) 
+          (B:SComplex* (zalloc padlgth))
           (a:SAMPLE* (zalloc padlgth))
           (t2:double 0.0)
           (output:SAMPLE* (zalloc lgth))) ;; buffer output
       (printf "IR:(%.1f seconds) Partitions(size:%lld num:%lld)\n" (ftod (/ (convert irlgth) (convert SR))) lgth parts)
       ;; partition and store IR spectra (circlar convolution so padded)
       (dotimes (i parts)
-        (memset (cast A i8*) 0 (convert (* cpxSAMPLE_SIZE padlgth))) ;; zero pad
+        (memset (cast A i8*) 0 (convert (* 8 padlgth))) ;; zero pad, assumes Complexf (8 bytes per struct)
         (read_audio_data path output (* i lgth) lgth 0)
-        (fill_cpx_buffer output A lgth)
+        (Complex_bufferize output A lgth)
         (fft A (pref-ptr irs (* i padlgth)) padlgth))
       (lambda (in:SAMPLE dry:SAMPLE wet:SAMPLE)
         (set! t2 (clock_clock))
@@ -147,19 +144,20 @@
         (set! t1 (+ t1 1))
         ;; if we have buffered lgth samples then run convolution
         (if (= t1 lgth)
-            (let ((_fft:cpxSAMPLE* (pref-ptr ffts (* po padlgth)))
-                  (_ir:cpxSAMPLE* null))
+            (let ((_fft:SComplex* (pref-ptr ffts (* po padlgth)))
+                  (_ir:SComplex* null))
               ;; forward FFT of incoming signal
               (fftr (if aorb drya dryb) B padlgth)
               ;; store FFT to use 'now' and also for 'delayed' use
-              (memcpy (cast _fft i8*) (cast B i8*) (convert (* padlgth cpxSAMPLE_SIZE)))
+              (memcpy (cast _fft i8*) (cast B i8*) (convert (* padlgth 8)))
               ;; run convolution over all partions
               (dotimes (i parts)
                 (set! j (% (+ parts (- po i)) parts))
                 (set! _fft (pref-ptr ffts (* j padlgth)))                
                 (set! _ir (pref-ptr irs (* i padlgth)))
-                (cpxmul _fft _ir A padlgth)
-                (cpxadd A B B padlgth))
+                ;; '*' and '+' are overloaded for buffers of Complex{f,d}
+                (Complexf_multiplication_bybuf _fft _ir A padlgth)
+                (Complexf_addition_bybuf A B B padlgth))
               ;; after convolution is complete back to time domain!
               (ifftr B a padlgth)
               (let ((scale:SAMPLE (/ 1.0 (convert (* lgth parts))))

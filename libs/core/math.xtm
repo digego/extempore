@@ -55,15 +55,15 @@
 (bind-poly logn lognd)
 
 (bind-func clampf
-  (lambda (x:float _min _max)
-    (if (> x _max) _max
-        (if (< x _min) _min
+  (lambda (x:float minval maxval)
+    (if (> x maxval) maxval
+        (if (< x minval) minval
             x))))
 
 (bind-func clampd
-  (lambda (x:double _min _max)
-    (if (> x _max) _max
-        (if (< x _min) _min
+  (lambda (x:double minval maxval)
+    (if (> x maxval) maxval
+        (if (< x minval) minval
             x))))
 
 (bind-poly clamp clampd)
@@ -71,26 +71,26 @@
 
 ;;;;;;;;;;;;;;; some simple predicates trailing p for predicate ;;;;
 
-(bind-func eveni64
+(bind-func evenp_i64
   (lambda (x)
-    (if (= (bitwise-and x 1) 0) #t #f)))
+    (if (= (bitwise-and x 1) 0) 1:i1 0:i1)))
 
-(bind-func eveni32
+(bind-func evenp_i32
   (lambda (x:i32)
-    (if (= (bitwise-and x 1) 0) #t #f)))
+    (if (= (bitwise-and x 1) 0) 1:i1 0:i1)))
 
-(bind-func oddi64
+(bind-func oddp_i64
   (lambda (x)
-    (if (= (bitwise-and x 1) 0) #f #t)))
+    (if (= (bitwise-and x 1) 0) 0:i1 1:i1)))
 
-(bind-func oddi32
+(bind-func oddp_i32
   (lambda (x:i32)
-    (if (= (bitwise-and x 1) 0) #f #t)))
+    (if (= (bitwise-and x 1) 0) 0:i1 1:i1)))
 
-(bind-poly evenp eveni64)
-(bind-poly evenp eveni32)
-(bind-poly oddp oddi64)
-(bind-poly oddp oddi32)
+(bind-poly evenp evenp_i64)
+(bind-poly evenp evenp_i32)
+(bind-poly oddp oddp_i64)
+(bind-poly oddp oddp_i32)
 
 ;;;;;;;;;;;;;;;;;;;; radians and degrees
 
@@ -118,32 +118,32 @@
 
 ;;;;;;;;;;;;;;;; default sort!
 
-(bind-func _qsortd
+(bind-func quicksortd
   (lambda (dat:double* left right)
     (if (< left right)
         (let ((tmp 0.0)
-              (_swap (lambdas (x y)
-                      (set! tmp (pref dat x))
-                      (pset! dat x (pref dat y))
-                      (pset! dat y tmp)))
+              (swap_fn (lambdas (x y)
+                                (set! tmp (pref dat x))
+                                (pset! dat x (pref dat y))
+                                (pset! dat y tmp)))
               (pivot (pref dat right))
               (index left)
               (i 0))
           (dotimes (i left (- right left))
             (if (or (< (pref dat i) pivot)
                     (= (pref dat i) pivot))
-                (begin (_swap i index)
+                (begin (swap_fn i index)
                        (set! index (+ index 1)))))
-          (_swap right index)
-          (_qsortd dat left (- index 1))
-          (_qsortd dat (+ index 1) right))
+          (swap_fn right index)
+          (quicksortd dat left (- index 1))
+          (quicksortd dat (+ index 1) right))
         void)))
 
-(bind-func _qsortf
+(bind-func quicksortf
   (lambda (dat:float* left right)
     (if (< left right)
         (let ((tmp 0.0)
-              (_swap (lambdas (x y)
+              (swap_fn (lambdas (x y)
                       (set! tmp (pref dat x))
                       (pset! dat x (pref dat y))
                       (pset! dat y tmp)))
@@ -153,21 +153,21 @@
           (dotimes (i left (- right left))
             (if (or (< (pref dat i) pivot)
                     (= (pref dat i) pivot))
-                (begin (_swap i index)
+                (begin (swap_fn i index)
                        (set! index (+ index 1)))))
-          (_swap right index)
-          (_qsortf dat left (- index 1))
-          (_qsortf dat (+ index 1) right))
+          (swap_fn right index)
+          (quicksortf dat left (- index 1))
+          (quicksortf dat (+ index 1) right))
         void)))
 
 (bind-func sortd
   (lambda (arr:double* lgth)
-    (_qsortd arr 0 (- lgth 1))
+    (quicksortd arr 0 (- lgth 1))
     arr))
 
 (bind-func sortf
   (lambda (arr:float* lgth)
-    (_qsortf arr 0 (- lgth 1))
+    (quicksortf arr 0 (- lgth 1))
     arr))
 
 (bind-poly sort sortd)
@@ -400,8 +400,8 @@
             (begin (set! phase (- 1 phase))
                    (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))
 
-(bind-poly guassr randnd)
-(bind-poly guassr randnf)
+(bind-poly gaussr randnd)
+(bind-poly gaussr randnf)
 
 ;;;;;;;;;; VECTOR ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -1133,7 +1133,7 @@
       (tset! r 1 b)
       (pref r 0))))
 
-(bind-func rat_greatest_common_divisor
+(bind-func Rational_greatest_common_divisor
   (lambda (m:i64 n:i64)
     (if (and (= m 0) (= n 0))
         -1
@@ -1146,541 +1146,541 @@
             (set! n r))
           m))))
 
-(bind-func rat_reduce
+(bind-func Rational_reduce
   (lambda (a:Rational)
-    (let ((gcd (rat_greatest_common_divisor (tref a 0)
+    (let ((gcd (Rational_greatest_common_divisor (tref a 0)
                                             (tref a 1))))
       (Rat (/ (tref a 0) gcd)
            (/ (tref a 1) gcd)))))
 
-(bind-func print_rat
+(bind-func Rational_print
   (lambda (x:Rational)
-    (let ((reduced (rat_reduce x)))
+    (let ((reduced (Rational_reduce x)))
       (printf "%lld/%lld" (tref reduced 0) (tref reduced 1))) void))
 
-(bind-poly print print_rat)
+(bind-poly print Rational_print)
 
-(bind-func rat_mul_r_r
+(bind-func Rational_mul_rat_rat
   (lambda (a:Rational b:Rational)
-    (rat_reduce
+    (Rational_reduce
      (Rat (* (tref a 0) (tref b 0))
           (* (tref a 1) (tref b 1))))))
 
-(bind-func rat_mul_r_i64
+(bind-func Rational_mul_rat_i64
   (lambda (a:Rational b:i64)
     (Rat (* (tref a 0) b) (* (tref a 1) 1))))
 
-(bind-func rat_mul_i64_r
+(bind-func Rational_mul_i64_rat
   (lambda (b:i64 a:Rational)
     (Rat (* (tref a 0) b) (* (tref a 1) 1))))
 
-(bind-func rat_mul_r_i32
+(bind-func Rational_mul_rat_i32
   (lambda (a:Rational b:i32)
     (Rat (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_mul_i32_r
+(bind-func Rational_mul_i32_rat
   (lambda (b:i32 a:Rational)
     (Rat (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_mul_r_i8
+(bind-func Rational_mul_rat_i8
   (lambda (a:Rational b:i8)
     (Rat (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_mul_i8_r
+(bind-func Rational_mul_i8_rat
   (lambda (b:i8 a:Rational)
     (Rat (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_mul_r_i1
+(bind-func Rational_mul_rat_i1
   (lambda (a:Rational b:i1)
     (Rat (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_mul_i1_r
+(bind-func Rational_mul_i1_rat
   (lambda (b:i1 a:Rational)
     (Rat (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_mul_r_d
+(bind-func Rational_mul_rat_d
   (lambda (a:Rational b:double)
     (* b (/ (convert (tref a 0) double) (convert (tref a 1) double)))))
 
-(bind-func rat_mul_d_r
+(bind-func Rational_mul_d_rat
   (lambda (b:double a:Rational)
     (* b (/ (convert (tref a 0) double) (convert (tref a 1) double)))))
 
-(bind-func rat_mul_r_f
+(bind-func Rational_mul_rat_f
   (lambda (a:Rational b:float)
     (* b (/ (convert (tref a 0) float) (convert (tref a 1) float)))))
 
-(bind-func rat_mul_f_r
+(bind-func Rational_mul_f_rat
   (lambda (b:float a:Rational)
     (* b (/ (convert (tref a 0) float) (convert (tref a 1) float)))))
 
-(bind-poly xtm_multiplication rat_mul_r_r)
-(bind-poly xtm_multiplication rat_mul_r_i64)
-(bind-poly xtm_multiplication rat_mul_i64_r)
-(bind-poly xtm_multiplication rat_mul_r_i32)
-(bind-poly xtm_multiplication rat_mul_i32_r)
-(bind-poly xtm_multiplication rat_mul_r_i8)
-(bind-poly xtm_multiplication rat_mul_i8_r)
-(bind-poly xtm_multiplication rat_mul_r_i1)
-(bind-poly xtm_multiplication rat_mul_i1_r)
-(bind-poly xtm_multiplication rat_mul_r_d)
-(bind-poly xtm_multiplication rat_mul_d_r)
-(bind-poly xtm_multiplication rat_mul_r_f)
-(bind-poly xtm_multiplication rat_mul_f_r)
+(bind-poly xtm_multiplication Rational_mul_rat_rat)
+(bind-poly xtm_multiplication Rational_mul_rat_i64)
+(bind-poly xtm_multiplication Rational_mul_i64_rat)
+(bind-poly xtm_multiplication Rational_mul_rat_i32)
+(bind-poly xtm_multiplication Rational_mul_i32_rat)
+(bind-poly xtm_multiplication Rational_mul_rat_i8)
+(bind-poly xtm_multiplication Rational_mul_i8_rat)
+(bind-poly xtm_multiplication Rational_mul_rat_i1)
+(bind-poly xtm_multiplication Rational_mul_i1_rat)
+(bind-poly xtm_multiplication Rational_mul_rat_d)
+(bind-poly xtm_multiplication Rational_mul_d_rat)
+(bind-poly xtm_multiplication Rational_mul_rat_f)
+(bind-poly xtm_multiplication Rational_mul_f_rat)
 
-(bind-func rat_div_r_r
+(bind-func Rational_div_rat_rat
   (lambda (a:Rational b:Rational)
-    (rat_reduce
+    (Rational_reduce
      (Rat (* (tref a 0) (tref b 1))
           (* (tref a 1) (tref b 0))))))
 
-(bind-func rat_div_r_i64
+(bind-func Rational_div_rat_i64
   (lambda (a:Rational b:i64)
     (Rat (* (tref a 0) b) (* (tref a 1) 1))))
 
-(bind-func rat_div_i64_r
+(bind-func Rational_div_i64_rat
   (lambda (a:i64 b:Rational)
     (Rat (* (tref b 1) a) (* (tref b 0) 1))))
 
-(bind-func rat_div_r_i32
+(bind-func Rational_div_rat_i32
   (lambda (a:Rational b:i32)
     (Rat (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_div_i32_r
+(bind-func Rational_div_i32_rat
   (lambda (a:i32 b:Rational)
     (Rat (* (tref b 1) (i32toi64 a)) (* (tref b 0) 1))))
 
-(bind-func rat_div_r_i8
+(bind-func Rational_div_rat_i8
   (lambda (a:Rational b:i8)
     (Rat (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_div_i8_r
+(bind-func Rational_div_i8_rat
   (lambda (a:i8 b:Rational)
     (Rat (* (tref b 1) (i8toi64 a)) (* (tref b 0) 1))))
 
-(bind-func rat_div_r_i1
+(bind-func Rational_div_rat_i1
   (lambda (a:Rational b:i1)
     (Rat (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1))))
 
-(bind-func rat_div_i1_r
+(bind-func Rational_div_i1_rat
   (lambda (a:i1 b:Rational)
     (Rat (* (tref b 1) (i1toi64 a)) (* (tref b 0) 1))))
 
-(bind-func rat_div_r_d
+(bind-func Rational_div_rat_d
   (lambda (a:Rational b:double)
     (/ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
 
-(bind-func rat_div_d_r
+(bind-func Rational_div_d_rat
   (lambda (b:double a:Rational)
     (/ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
 
-(bind-func rat_div_r_f
+(bind-func Rational_div_rat_f
   (lambda (a:Rational b:float)
     (/ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
 
-(bind-func rat_div_f_r
+(bind-func Rational_div_f_rat
   (lambda (b:float a:Rational)
     (/ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
 
-(bind-poly xtm_division rat_div_r_r)
-(bind-poly xtm_division rat_div_r_i64)
-(bind-poly xtm_division rat_div_i64_r)
-(bind-poly xtm_division rat_div_r_i32)
-(bind-poly xtm_division rat_div_i32_r)
-(bind-poly xtm_division rat_div_r_i8)
-(bind-poly xtm_division rat_div_i8_r)
-(bind-poly xtm_division rat_div_r_i1)
-(bind-poly xtm_division rat_div_i1_r)
-(bind-poly xtm_division rat_div_r_d)
-(bind-poly xtm_division rat_div_d_r)
-(bind-poly xtm_division rat_div_r_f)
-(bind-poly xtm_division rat_div_f_r)
+(bind-poly xtm_division Rational_div_rat_rat)
+(bind-poly xtm_division Rational_div_rat_i64)
+(bind-poly xtm_division Rational_div_i64_rat)
+(bind-poly xtm_division Rational_div_rat_i32)
+(bind-poly xtm_division Rational_div_i32_rat)
+(bind-poly xtm_division Rational_div_rat_i8)
+(bind-poly xtm_division Rational_div_i8_rat)
+(bind-poly xtm_division Rational_div_rat_i1)
+(bind-poly xtm_division Rational_div_i1_rat)
+(bind-poly xtm_division Rational_div_rat_d)
+(bind-poly xtm_division Rational_div_d_rat)
+(bind-poly xtm_division Rational_div_rat_f)
+(bind-poly xtm_division Rational_div_f_rat)
 
 ;; Rational addition
 
-(bind-func rat_add_r_r
+(bind-func Rational_add_rat_rat
   (lambda (a:Rational b:Rational)
     (let ((denom_a (tref a 1))
           (denom_b (tref b 1)))
-      (rat_reduce
+      (Rational_reduce
        (Rat (+ (* (tref a 0) denom_b) (* (tref b 0) denom_a))
             (* denom_a denom_b))))))
 
-(bind-func rat_add_r_i64
+(bind-func Rational_add_rat_i64
   (lambda (a:Rational b:i64)
     (Rat (+ (tref a 0) (* (tref a 1) b)) (tref a 1))))
 
-(bind-func rat_add_i64_r
+(bind-func Rational_add_i64_rat
   (lambda (b:i64 a:Rational)
     (Rat (+ (tref a 0) (* (tref a 1) b)) (tref a 1))))
 
-(bind-func rat_add_r_i32
+(bind-func Rational_add_rat_i32
   (lambda (a:Rational b:i32)
     (Rat (+ (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1))))
 
-(bind-func rat_add_i32_r
+(bind-func Rational_add_i32_rat
   (lambda (b:i32 a:Rational)
     (Rat (+ (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1))))
 
-(bind-func rat_add_r_i8
+(bind-func Rational_add_rat_i8
   (lambda (a:Rational b:i8)
     (Rat (+ (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1))))
 
-(bind-func rat_add_i8_r
+(bind-func Rational_add_i8_rat
   (lambda (b:i8 a:Rational)
     (Rat (+ (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1))))
 
-(bind-func rat_add_r_i1
+(bind-func Rational_add_rat_i1
   (lambda (a:Rational b:i1)
     (Rat (+ (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1))))
 
-(bind-func rat_add_i1_r
+(bind-func Rational_add_i1_rat
   (lambda (b:i1 a:Rational)
     (Rat (+ (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1))))
 
-(bind-func rat_add_r_d
+(bind-func Rational_add_rat_d
   (lambda (a:Rational b:double)
     (+ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
 
-(bind-func rat_add_d_r
+(bind-func Rational_add_d_rat
   (lambda (b:double a:Rational)
     (+ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
 
-(bind-func rat_add_r_f
+(bind-func Rational_add_rat_f
   (lambda (a:Rational b:float)
     (+ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
 
-(bind-func rat_add_f_r
+(bind-func Rational_add_f_rat
   (lambda (b:float a:Rational)
     (+ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
 
-(bind-poly xtm_addition rat_add_r_r)
-(bind-poly xtm_addition rat_add_r_i64)
-(bind-poly xtm_addition rat_add_i64_r)
-(bind-poly xtm_addition rat_add_r_i32)
-(bind-poly xtm_addition rat_add_i32_r)
-(bind-poly xtm_addition rat_add_r_i8)
-(bind-poly xtm_addition rat_add_i8_r)
-(bind-poly xtm_addition rat_add_r_i1)
-(bind-poly xtm_addition rat_add_i1_r)
-(bind-poly xtm_addition rat_add_r_d)
-(bind-poly xtm_addition rat_add_d_r)
-(bind-poly xtm_addition rat_add_r_f)
-(bind-poly xtm_addition rat_add_f_r)
+(bind-poly xtm_addition Rational_add_rat_rat)
+(bind-poly xtm_addition Rational_add_rat_i64)
+(bind-poly xtm_addition Rational_add_i64_rat)
+(bind-poly xtm_addition Rational_add_rat_i32)
+(bind-poly xtm_addition Rational_add_i32_rat)
+(bind-poly xtm_addition Rational_add_rat_i8)
+(bind-poly xtm_addition Rational_add_i8_rat)
+(bind-poly xtm_addition Rational_add_rat_i1)
+(bind-poly xtm_addition Rational_add_i1_rat)
+(bind-poly xtm_addition Rational_add_rat_d)
+(bind-poly xtm_addition Rational_add_d_rat)
+(bind-poly xtm_addition Rational_add_rat_f)
+(bind-poly xtm_addition Rational_add_f_rat)
 
 ;; Rational subtraction
 
-(bind-func rat_subtract_r_r
+(bind-func Rational_subtract_rat_rat
   (lambda (a:Rational b:Rational)
     (let ((denom_a (tref a 1))
           (denom_b (tref b 1)))
-      (rat_reduce
+      (Rational_reduce
        (Rat (- (* (tref a 0) denom_b) (* (tref b 0) denom_a))
             (* denom_a denom_b))))))
 
-(bind-func rat_subtract_r_i64
+(bind-func Rational_subtract_rat_i64
   (lambda (a:Rational b:i64)
     (Rat (- (tref a 0) (* (tref a 1) b)) (tref a 1))))
 
-(bind-func rat_subtract_i64_r
+(bind-func Rational_subtract_i64_rat
   (lambda (b:i64 a:Rational)
     (Rat (- (tref a 0) (* (tref a 1) b)) (tref a 1))))
 
-(bind-func rat_subtract_r_i32
+(bind-func Rational_subtract_rat_i32
   (lambda (a:Rational b:i32)
     (Rat (- (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1))))
 
-(bind-func rat_subtract_i32_r
+(bind-func Rational_subtract_i32_rat
   (lambda (b:i32 a:Rational)
     (Rat (- (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1))))
 
-(bind-func rat_subtract_r_i8
+(bind-func Rational_subtract_rat_i8
   (lambda (a:Rational b:i8)
     (Rat (- (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1))))
 
-(bind-func rat_subtract_i8_r
+(bind-func Rational_subtract_i8_rat
   (lambda (b:i8 a:Rational)
     (Rat (- (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1))))
 
-(bind-func rat_subtract_r_i1
+(bind-func Rational_subtract_rat_i1
   (lambda (a:Rational b:i1)
     (Rat (- (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1))))
 
-(bind-func rat_subtract_i1_r
+(bind-func Rational_subtract_i1_rat
   (lambda (b:i1 a:Rational)
     (Rat (- (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1))))
 
-(bind-func rat_subtract_r_d
+(bind-func Rational_subtract_rat_d
   (lambda (a:Rational b:double)
     (- (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
 
-(bind-func rat_subtract_d_r
+(bind-func Rational_subtract_d_rat
   (lambda (b:double a:Rational)
     (- (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
 
-(bind-func rat_subtract_r_f
+(bind-func Rational_subtract_rat_f
   (lambda (a:Rational b:float)
     (- (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
 
-(bind-func rat_subtract_f_r
+(bind-func Rational_subtract_f_rat
   (lambda (b:float a:Rational)
     (- (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
 
-(bind-poly xtm_subtraction rat_subtract_r_r)
-(bind-poly xtm_subtraction rat_subtract_r_i64)
-(bind-poly xtm_subtraction rat_subtract_i64_r)
-(bind-poly xtm_subtraction rat_subtract_r_i32)
-(bind-poly xtm_subtraction rat_subtract_i32_r)
-(bind-poly xtm_subtraction rat_subtract_r_i8)
-(bind-poly xtm_subtraction rat_subtract_i8_r)
-(bind-poly xtm_subtraction rat_subtract_r_i1)
-(bind-poly xtm_subtraction rat_subtract_i1_r)
-(bind-poly xtm_subtraction rat_subtract_r_d)
-(bind-poly xtm_subtraction rat_subtract_d_r)
-(bind-poly xtm_subtraction rat_subtract_r_f)
-(bind-poly xtm_subtraction rat_subtract_f_r)
+(bind-poly xtm_subtraction Rational_subtract_rat_rat)
+(bind-poly xtm_subtraction Rational_subtract_rat_i64)
+(bind-poly xtm_subtraction Rational_subtract_i64_rat)
+(bind-poly xtm_subtraction Rational_subtract_rat_i32)
+(bind-poly xtm_subtraction Rational_subtract_i32_rat)
+(bind-poly xtm_subtraction Rational_subtract_rat_i8)
+(bind-poly xtm_subtraction Rational_subtract_i8_rat)
+(bind-poly xtm_subtraction Rational_subtract_rat_i1)
+(bind-poly xtm_subtraction Rational_subtract_i1_rat)
+(bind-poly xtm_subtraction Rational_subtract_rat_d)
+(bind-poly xtm_subtraction Rational_subtract_d_rat)
+(bind-poly xtm_subtraction Rational_subtract_rat_f)
+(bind-poly xtm_subtraction Rational_subtract_f_rat)
 
 ;; Rational equality
 
-(bind-func rat_equal_r_r
+(bind-func Rational_equal_rat_rat
   (lambda (a:Rational b:Rational)
-    (let ((reduced_a (rat_reduce a))
-          (reduced_b (rat_reduce b)))
+    (let ((reduced_a (Rational_reduce a))
+          (reduced_b (Rational_reduce b)))
       (and (= (tref reduced_a 0)
               (tref reduced_b 0))
            (= (tref reduced_a 1)
               (tref reduced_b 1))))))
 
-(bind-func rat_equal_r_i64
+(bind-func Rational_equal_rat_i64
   (lambda (a:Rational b:i64)
-    (rat_equal_r_r a (Rat b 1))))
+    (Rational_equal_rat_rat a (Rat b 1))))
 
-(bind-func rat_equal_i64_r
+(bind-func Rational_equal_i64_rat
   (lambda (b:i64 a:Rational)
-    (rat_equal_r_r (Rat b 1) a)))
+    (Rational_equal_rat_rat (Rat b 1) a)))
 
-(bind-func rat_equal_r_i32
+(bind-func Rational_equal_rat_i32
   (lambda (a:Rational b:i32)
-    (rat_equal_r_r a (Rat (i32toi64 b) 1))))
+    (Rational_equal_rat_rat a (Rat (i32toi64 b) 1))))
 
-(bind-func rat_equal_i32_r
+(bind-func Rational_equal_i32_rat
   (lambda (b:i32 a:Rational)
-    (rat_equal_r_r (Rat (i32toi64 b) 1) a)))
+    (Rational_equal_rat_rat (Rat (i32toi64 b) 1) a)))
 
-(bind-func rat_equal_r_i8
+(bind-func Rational_equal_rat_i8
   (lambda (a:Rational b:i8)
-    (rat_equal_r_r a (Rat (i8toi64 b) 1))))
+    (Rational_equal_rat_rat a (Rat (i8toi64 b) 1))))
 
-(bind-func rat_equal_i8_r
+(bind-func Rational_equal_i8_rat
   (lambda (b:i8 a:Rational)
-    (rat_equal_r_r (Rat (i8toi64 b) 1) a)))
+    (Rational_equal_rat_rat (Rat (i8toi64 b) 1) a)))
 
-(bind-func rat_equal_r_i1
+(bind-func Rational_equal_rat_i1
   (lambda (a:Rational b:i1)
-    (rat_equal_r_r a (Rat (i1toi64 b) 1))))
+    (Rational_equal_rat_rat a (Rat (i1toi64 b) 1))))
 
-(bind-func rat_equal_i1_r
+(bind-func Rational_equal_i1_rat
   (lambda (b:i1 a:Rational)
-    (rat_equal_r_r (Rat (i1toi64 b) 1) a)))
+    (Rational_equal_rat_rat (Rat (i1toi64 b) 1) a)))
 
-(bind-poly xtm_equal rat_equal_r_r)
-(bind-poly xtm_equal rat_equal_r_i64)
-(bind-poly xtm_equal rat_equal_i64_r)
-(bind-poly xtm_equal rat_equal_r_i32)
-(bind-poly xtm_equal rat_equal_i32_r)
-(bind-poly xtm_equal rat_equal_r_i8)
-(bind-poly xtm_equal rat_equal_i8_r)
-(bind-poly xtm_equal rat_equal_r_i1)
-(bind-poly xtm_equal rat_equal_i1_r)
+(bind-poly xtm_equal Rational_equal_rat_rat)
+(bind-poly xtm_equal Rational_equal_rat_i64)
+(bind-poly xtm_equal Rational_equal_i64_rat)
+(bind-poly xtm_equal Rational_equal_rat_i32)
+(bind-poly xtm_equal Rational_equal_i32_rat)
+(bind-poly xtm_equal Rational_equal_rat_i8)
+(bind-poly xtm_equal Rational_equal_i8_rat)
+(bind-poly xtm_equal Rational_equal_rat_i1)
+(bind-poly xtm_equal Rational_equal_i1_rat)
 
 ;; Rational inequality
 
-(bind-func rat_notequal_r_r
+(bind-func Rational_notequal_rat_rat
   (lambda (a:Rational b:Rational)
-    (let ((reduced_a (rat_reduce a))
-          (reduced_b (rat_reduce b)))
+    (let ((reduced_a (Rational_reduce a))
+          (reduced_b (Rational_reduce b)))
       (or (<> (tref reduced_a 0)
               (tref reduced_b 0))
           (<> (tref reduced_a 1)
               (tref reduced_b 1))))))
 
-(bind-func rat_notequal_r_i64
+(bind-func Rational_notequal_rat_i64
   (lambda (a:Rational b:i64)
-    (rat_notequal_r_r a (Rat b 1))))
+    (Rational_notequal_rat_rat a (Rat b 1))))
 
-(bind-func rat_notequal_i64_r
+(bind-func Rational_notequal_i64_rat
   (lambda (b:i64 a:Rational)
-    (rat_notequal_r_r (Rat b 1) a)))
+    (Rational_notequal_rat_rat (Rat b 1) a)))
 
-(bind-func rat_notequal_r_i32
+(bind-func Rational_notequal_rat_i32
   (lambda (a:Rational b:i32)
-    (rat_notequal_r_r a (Rat (i32toi64 b) 1))))
+    (Rational_notequal_rat_rat a (Rat (i32toi64 b) 1))))
 
-(bind-func rat_notequal_i32_r
+(bind-func Rational_notequal_i32_rat
   (lambda (b:i32 a:Rational)
-    (rat_notequal_r_r (Rat (i32toi64 b) 1) a)))
+    (Rational_notequal_rat_rat (Rat (i32toi64 b) 1) a)))
 
-(bind-func rat_notequal_r_i8
+(bind-func Rational_notequal_rat_i8
   (lambda (a:Rational b:i8)
-    (rat_notequal_r_r a (Rat (i8toi64 b) 1))))
+    (Rational_notequal_rat_rat a (Rat (i8toi64 b) 1))))
 
-(bind-func rat_notequal_i8_r
+(bind-func Rational_notequal_i8_rat
   (lambda (b:i8 a:Rational)
-    (rat_notequal_r_r (Rat (i8toi64 b) 1) a)))
+    (Rational_notequal_rat_rat (Rat (i8toi64 b) 1) a)))
 
-(bind-func rat_notequal_r_i1
+(bind-func Rational_notequal_rat_i1
   (lambda (a:Rational b:i1)
-    (rat_notequal_r_r a (Rat (i1toi64 b) 1))))
+    (Rational_notequal_rat_rat a (Rat (i1toi64 b) 1))))
 
-(bind-func rat_notequal_i1_r
+(bind-func Rational_notequal_i1_rat
   (lambda (b:i1 a:Rational)
-    (rat_notequal_r_r (Rat (i1toi64 b) 1) a)))
+    (Rational_notequal_rat_rat (Rat (i1toi64 b) 1) a)))
 
-(bind-poly xtm_notequal rat_notequal_r_r)
-(bind-poly xtm_notequal rat_notequal_r_i64)
-(bind-poly xtm_notequal rat_notequal_i64_r)
-(bind-poly xtm_notequal rat_notequal_r_i32)
-(bind-poly xtm_notequal rat_notequal_i32_r)
-(bind-poly xtm_notequal rat_notequal_r_i8)
-(bind-poly xtm_notequal rat_notequal_i8_r)
-(bind-poly xtm_notequal rat_notequal_r_i1)
-(bind-poly xtm_notequal rat_notequal_i1_r)
+(bind-poly xtm_notequal Rational_notequal_rat_rat)
+(bind-poly xtm_notequal Rational_notequal_rat_i64)
+(bind-poly xtm_notequal Rational_notequal_i64_rat)
+(bind-poly xtm_notequal Rational_notequal_rat_i32)
+(bind-poly xtm_notequal Rational_notequal_i32_rat)
+(bind-poly xtm_notequal Rational_notequal_rat_i8)
+(bind-poly xtm_notequal Rational_notequal_i8_rat)
+(bind-poly xtm_notequal Rational_notequal_rat_i1)
+(bind-poly xtm_notequal Rational_notequal_i1_rat)
 
 ;; Rational lessthan
 
-(bind-func rat_lessthan_r_r
+(bind-func Rational_lessthan_rat_rat
   (lambda (a:Rational b:Rational)
     (< (* (tref a 0) (tref b 1))
        (* (tref b 0) (tref a 1)))))
 
-(bind-func rat_lessthan_r_i64
+(bind-func Rational_lessthan_rat_i64
   (lambda (a:Rational b:i64)
     (< (tref a 0) (* b (tref a 1)))))
 
-(bind-func rat_lessthan_i64_r
+(bind-func Rational_lessthan_i64_rat
   (lambda (b:i64 a:Rational)
     (< (tref a 0) (* b (tref a 1)))))
 
-(bind-func rat_lessthan_r_i32
+(bind-func Rational_lessthan_rat_i32
   (lambda (a:Rational b:i32)
     (< (tref a 0) (* (i32toi64 b) (tref a 1)))))
 
-(bind-func rat_lessthan_i32_r
+(bind-func Rational_lessthan_i32_rat
   (lambda (b:i32 a:Rational)
     (< (tref a 0) (* (i32toi64 b) (tref a 1)))))
 
-(bind-func rat_lessthan_r_i8
+(bind-func Rational_lessthan_rat_i8
   (lambda (a:Rational b:i8)
     (< (tref a 0) (* (i8toi64 b) (tref a 1)))))
 
-(bind-func rat_lessthan_i8_r
+(bind-func Rational_lessthan_i8_rat
   (lambda (b:i8 a:Rational)
     (< (tref a 0) (* (i8toi64 b) (tref a 1)))))
 
-(bind-func rat_lessthan_r_i1
+(bind-func Rational_lessthan_rat_i1
   (lambda (a:Rational b:i1)
     (< (tref a 0) (* (i1toi64 b) (tref a 1)))))
 
-(bind-func rat_lessthan_i1_r
+(bind-func Rational_lessthan_i1_rat
   (lambda (b:i1 a:Rational)
     (< (tref a 0) (* (i1toi64 b) (tref a 1)))))
 
-(bind-poly xtm_lessthan rat_lessthan_r_r)
-(bind-poly xtm_lessthan rat_lessthan_r_i64)
-(bind-poly xtm_lessthan rat_lessthan_i64_r)
-(bind-poly xtm_lessthan rat_lessthan_r_i32)
-(bind-poly xtm_lessthan rat_lessthan_i32_r)
-(bind-poly xtm_lessthan rat_lessthan_r_i8)
-(bind-poly xtm_lessthan rat_lessthan_i8_r)
-(bind-poly xtm_lessthan rat_lessthan_r_i1)
-(bind-poly xtm_lessthan rat_lessthan_i1_r)
+(bind-poly xtm_lessthan Rational_lessthan_rat_rat)
+(bind-poly xtm_lessthan Rational_lessthan_rat_i64)
+(bind-poly xtm_lessthan Rational_lessthan_i64_rat)
+(bind-poly xtm_lessthan Rational_lessthan_rat_i32)
+(bind-poly xtm_lessthan Rational_lessthan_i32_rat)
+(bind-poly xtm_lessthan Rational_lessthan_rat_i8)
+(bind-poly xtm_lessthan Rational_lessthan_i8_rat)
+(bind-poly xtm_lessthan Rational_lessthan_rat_i1)
+(bind-poly xtm_lessthan Rational_lessthan_i1_rat)
 
 ;; Rational greaterthan
 
-(bind-func rat_greaterthan_r_r
+(bind-func Rational_greaterthan_rat_rat
   (lambda (a:Rational b:Rational)
     (> (* (tref a 0) (tref b 1))
        (* (tref b 0) (tref a 1)))))
 
-(bind-func rat_greaterthan_r_i64
+(bind-func Rational_greaterthan_rat_i64
   (lambda (a:Rational b:i64)
     (> (tref a 0) (* b (tref a 1)))))
 
-(bind-func rat_greaterthan_i64_r
+(bind-func Rational_greaterthan_i64_rat
   (lambda (b:i64 a:Rational)
     (> (tref a 0) (* b (tref a 1)))))
 
-(bind-func rat_greaterthan_r_i32
+(bind-func Rational_greaterthan_rat_i32
   (lambda (a:Rational b:i32)
     (> (tref a 0) (* (i32toi64 b) (tref a 1)))))
 
-(bind-func rat_greaterthan_i32_r
+(bind-func Rational_greaterthan_i32_rat
   (lambda (b:i32 a:Rational)
     (> (tref a 0) (* (i32toi64 b) (tref a 1)))))
 
-(bind-func rat_greaterthan_r_i8
+(bind-func Rational_greaterthan_rat_i8
   (lambda (a:Rational b:i8)
     (> (tref a 0) (* (i8toi64 b) (tref a 1)))))
 
-(bind-func rat_greaterthan_i8_r
+(bind-func Rational_greaterthan_i8_rat
   (lambda (b:i8 a:Rational)
     (> (tref a 0) (* (i8toi64 b) (tref a 1)))))
 
-(bind-func rat_greaterthan_r_i1
+(bind-func Rational_greaterthan_rat_i1
   (lambda (a:Rational b:i1)
     (> (tref a 0) (* (i1toi64 b) (tref a 1)))))
 
-(bind-func rat_greaterthan_i1_r
+(bind-func Rational_greaterthan_i1_rat
   (lambda (b:i1 a:Rational)
     (> (tref a 0) (* (i1toi64 b) (tref a 1)))))
 
-(bind-poly xtm_greaterthan rat_greaterthan_r_r)
-(bind-poly xtm_greaterthan rat_greaterthan_r_i64)
-(bind-poly xtm_greaterthan rat_greaterthan_i64_r)
-(bind-poly xtm_greaterthan rat_greaterthan_r_i32)
-(bind-poly xtm_greaterthan rat_greaterthan_i32_r)
-(bind-poly xtm_greaterthan rat_greaterthan_r_i8)
-(bind-poly xtm_greaterthan rat_greaterthan_i8_r)
-(bind-poly xtm_greaterthan rat_greaterthan_r_i1)
-(bind-poly xtm_greaterthan rat_greaterthan_i1_r)
+(bind-poly xtm_greaterthan Rational_greaterthan_rat_rat)
+(bind-poly xtm_greaterthan Rational_greaterthan_rat_i64)
+(bind-poly xtm_greaterthan Rational_greaterthan_i64_rat)
+(bind-poly xtm_greaterthan Rational_greaterthan_rat_i32)
+(bind-poly xtm_greaterthan Rational_greaterthan_i32_rat)
+(bind-poly xtm_greaterthan Rational_greaterthan_rat_i8)
+(bind-poly xtm_greaterthan Rational_greaterthan_i8_rat)
+(bind-poly xtm_greaterthan Rational_greaterthan_rat_i1)
+(bind-poly xtm_greaterthan Rational_greaterthan_i1_rat)
 
-(bind-func rat_modulo_r_r
+(bind-func Rational_modulo_rat_rat
   (lambda (a:Rational b:Rational)
     (let ((c (/ a b))
           (n (Rat (% (tref c 0) (tref c 1)) (tref c 1))))
       (* b n))))
 
-(bind-func rat_modulo_r_i64
+(bind-func Rational_modulo_rat_i64
   (lambda (a:Rational b:i64)
-    (rat_modulo_r_r a (Rat b 1))))
+    (Rational_modulo_rat_rat a (Rat b 1))))
 
-(bind-func rat_modulo_i64_r
+(bind-func Rational_modulo_i64_rat
   (lambda (a:i64 b:Rational)
-    (rat_modulo_r_r (Rat a 1) b)))
+    (Rational_modulo_rat_rat (Rat a 1) b)))
 
-(bind-func rat_modulo_r_i32
+(bind-func Rational_modulo_rat_i32
   (lambda (a:Rational b:i32)
-    (rat_modulo_r_r a (Rat (i32toi64 b) 1))))
+    (Rational_modulo_rat_rat a (Rat (i32toi64 b) 1))))
 
-(bind-func rat_modulo_i32_r
+(bind-func Rational_modulo_i32_rat
   (lambda (a:i32 b:Rational)
-    (rat_modulo_r_r (Rat (i32toi64 a) 1) b)))
+    (Rational_modulo_rat_rat (Rat (i32toi64 a) 1) b)))
 
-(bind-func rat_modulo_r_i8
+(bind-func Rational_modulo_rat_i8
   (lambda (a:Rational b:i8)
-    (rat_modulo_r_r a (Rat (i8toi64 b) 1))))
+    (Rational_modulo_rat_rat a (Rat (i8toi64 b) 1))))
 
-(bind-func rat_modulo_i8_r
+(bind-func Rational_modulo_i8_rat
   (lambda (a:i8 b:Rational)
-    (rat_modulo_r_r (Rat (i8toi64 a) 1) b)))
+    (Rational_modulo_rat_rat (Rat (i8toi64 a) 1) b)))
 
-(bind-poly xtm_modulo rat_modulo_r_r)
-(bind-poly xtm_modulo rat_modulo_r_i64)
-(bind-poly xtm_modulo rat_modulo_i64_r)
-(bind-poly xtm_modulo rat_modulo_r_i32)
-(bind-poly xtm_modulo rat_modulo_i32_r)
-(bind-poly xtm_modulo rat_modulo_r_i8)
-(bind-poly xtm_modulo rat_modulo_i8_r)
+(bind-poly xtm_modulo Rational_modulo_rat_rat)
+(bind-poly xtm_modulo Rational_modulo_rat_i64)
+(bind-poly xtm_modulo Rational_modulo_i64_rat)
+(bind-poly xtm_modulo Rational_modulo_rat_i32)
+(bind-poly xtm_modulo Rational_modulo_i32_rat)
+(bind-poly xtm_modulo Rational_modulo_rat_i8)
+(bind-poly xtm_modulo Rational_modulo_i8_rat)
 
 ;;;;;;;;;; COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -1692,14 +1692,14 @@
 
 (bind-type Complexd <double,double>)
 
-(bind-func print_Complexd
+(bind-func Complexd_print
   (lambda (c:Complexd)
     (printf "%.2f%+.2fi"
             (tref c 0)
             (tref c 1))
     void))
 
-(bind-poly print print_Complexd)
+(bind-poly print Complexd_print)
 
 (bind-func Cpxd
   (lambda (re im)
@@ -1708,445 +1708,23 @@
       (tset! c 1 im)
       (pref c 0))))
 
-(bind-func Cpxd_addition_c_c
+(bind-func Complexd_addition_cpx_cpx
   (lambda (a:Complexd b:Complexd)
     (Cpxd (+ (tref a 0) (tref b 0))
          (+ (tref a 1) (tref b 1)))))
 
-(bind-func Cpxd_addition_c_d
+(bind-func Complexd_addition_cpx_re
   (lambda (a:Complexd b:double)
     (Cpxd (+ (tref a 0) b)
          (tref a 1))))
 
-(bind-func Cpxd_addition_d_c
+(bind-func Complexd_addition_re_cpx
   (lambda (b:double a:Complexd)
     (Cpxd (+ (tref a 0) b)
          (tref a 1))))
 
-(bind-poly xtm_addition Cpxd_addition_c_c)
-(bind-poly xtm_addition Cpxd_addition_c_d)
-(bind-poly xtm_addition Cpxd_addition_d_c)
-
-(bind-func Cpxd_subtraction_c_c
-  (lambda (a:Complexd b:Complexd)
-    (Cpxd (- (tref a 0) (tref b 0))
-         (- (tref a 1) (tref b 1)))))
-
-(bind-func Cpxd_subtraction_c_d
-  (lambda (a:Complexd b:double)
-    (Cpxd (- (tref a 0) b)
-         (tref a 1))))
-
-(bind-func Cpxd_subtraction_d_c
-  (lambda (b:double a:Complexd)
-    (Cpxd (- (tref a 0) b)
-         (tref a 1))))
-
-(bind-poly xtm_subtraction Cpxd_subtraction_c_c)
-(bind-poly xtm_subtraction Cpxd_subtraction_c_d)
-(bind-poly xtm_subtraction Cpxd_subtraction_d_c)
-
-(bind-func Cpxd_multiplication_c_c
-  (lambda (a:Complexd b:Complexd)
-    (Cpxd (- (* (tref a 0) (tref b 0))
-            (* (tref a 1) (tref b 1)))             
-         (+ (* (tref a 0) (tref b 1))
-            (* (tref a 1) (tref b 0))))))
-
-(bind-func Cpxd_multiplication_c_d
-  (lambda (a:Complexd b:double)
-    (Cpxd (- (* (tref a 0) b)
-            (tref a 1))             
-         (+ (tref a 0)
-            (* (tref a 1) b)))))
-
-(bind-func Cpxd_multiplication_d_c
-  (lambda (b:double a:Complexd)
-    (Cpxd (- (* (tref a 0) b)
-            (tref a 1))             
-         (+ (tref a 0)
-            (* (tref a 1) b)))))
-
-(bind-poly xtm_multiplication Cpxd_multiplication_c_c)
-(bind-poly xtm_multiplication Cpxd_multiplication_c_d)
-(bind-poly xtm_multiplication Cpxd_multiplication_d_c)
-
-(bind-func Cpxd_division_c_c
-  (lambda (a:Complexd b:Complexd)
-    (let ((i (+ (* (tref a 0) (tref b 0))
-                (* (tref a 1) (tref b 1))))
-          (j (+ (* (tref b 0) (tref b 0))
-                (* (tref b 1) (tref b 1))))
-          (k (- (* (tref a 1) (tref b 0))
-                (* (tref a 0) (tref b 1)))))
-      (Cpxd (/ i j)
-           (/ k j)))))
-
-(bind-func Cpxd_division_c_d
-  (lambda (a:Complexd b:double)
-    (let ((i (+ (* (tref a 0) b)
-                (tref a 1)))
-          (j (* b b))
-          (k (- (* (tref a 1) b)
-                (tref a 0) )))
-      (Cpxd (/ i j)
-           (/ k j)))))
-
-(bind-func Cpxd_division_d_c
-  (lambda (b:double a:Complexd)
-    (let ((i (+ (* (tref a 0) b)
-                (tref a 1)))
-          (j (* b b))
-          (k (- (* (tref a 1) b)
-                (tref a 0) )))
-      (Cpxd (/ i j)
-           (/ k j)))))
-
-(bind-poly xtm_division Cpxd_division_c_c)
-(bind-poly xtm_division Cpxd_division_c_d)
-(bind-poly xtm_division Cpxd_division_d_c)
-
-(bind-func magnitude_complexd
-  (lambda (a:Complexd)
-    (sqrt (+ (* (tref a 0) (tref a 0))
-             (* (tref a 1) (tref a 1))))))         
-
-(bind-func phase_complexd
-  (lambda (a:Complexd)
-    (atan (/ (tref a 1) (tref a 0)))))
-
-(bind-func conj_complexd
-  (lambda (a:Complexd)
-    (Cpxd (tref a 0)
-          (* -1.0 (tref a 0)))))
-
-(bind-poly magC magnitude_complexd)
-(bind-poly phaseC phase_complexd)
-(bind-poly conjC conj_complexd)
-
-(bind-func rect_to_polar_d
-  (lambda (a:Complexd)
-    (Cpxd (sqrt (+ (* (tref a 0) (tref a 0))
-                   (* (tref a 1) (tref a 1))))
-          (atan (/ (tref a 1) (tref a 0))))))
-
-(bind-func rect_to_polar_dp
-  (lambda (a:Complexd* n:i64)
-    (doloop (i n)
-      (tset! (pref-ptr a i) 0
-             (sqrt (+ (* (tref a 0) (tref a 0))
-                      (* (tref a 1) (tref a 1)))))
-      (tset! (pref-ptr a i) 1
-             (atan (/ (tref a 1) (tref a 0)))))
-    void))
-
-(bind-poly rect_to_polar rect_to_polar_d)
-(bind-poly rect_to_polar rect_to_polar_dp)
-
-(bind-func polar_to_rect_d
-  (lambda (a:Complexd)
-    (Cpxd (* (tref a 0) (cos (tref a 1)))
-          (* (tref a 0) (sin (tref a 1))))))
-
-(bind-func polar_to_rect_dp
-  (lambda (a:Complexd* n:i64)
-    (doloop (i n)
-      (tset! (pref-ptr a i) 0
-             (* (tref a 0) (cos (tref a 1))))
-      (tset! (pref-ptr a i) 1
-             (* (tref a 0) (sin (tref a 1)))))
-    void))
-
-(bind-poly polar_to_rect polar_to_rect_d)
-(bind-poly polar_to_rect polar_to_rect_dp)
-
-
-;; Complexf (float versions)
-
-(bind-type Complexf <float,float>)
-
-(bind-func Cpxf
-  (lambda (re im)
-    (let ((c:Complexf* (salloc)))
-      (tset! c 0 re)
-      (tset! c 1 im)
-      (pref c 0))))
-
-(bind-func print_Complexf
-  (lambda (c:Complexf)
-    (printf "%.2f%+.2fi" ;; "%f+%fi\n"
-            (ftod (tref c 0))
-            (ftod (tref c 1)))
-    void))
-
-(bind-poly print print_Complexf)
-
-(bind-func Cpxf_addition_c_c
-  (lambda (a:Complexf b:Complexf)
-    (Cpxf (+ (tref a 0) (tref b 0))
-          (+ (tref a 1) (tref b 1)))))
-
-(bind-func Cpxf_addition_c_d
-  (lambda (a:Complexf b:float)
-    (Cpxf (+ (tref a 0) b)
-          (tref a 1))))
-
-(bind-func Cpxf_addition_d_c
-  (lambda (b:float a:Complexf)
-    (Cpxf (+ (tref a 0) b)
-          (tref a 1))))
-
-(bind-poly xtm_addition Cpxf_addition_c_c)
-(bind-poly xtm_addition Cpxf_addition_c_d)
-(bind-poly xtm_addition Cpxf_addition_d_c)
-
-(bind-func Cpxf_subtraction_c_c
-  (lambda (a:Complexf b:Complexf)
-    (Cpxf (- (tref a 0) (tref b 0))
-          (- (tref a 1) (tref b 1)))))
-
-(bind-func Cpxf_subtraction_c_d
-  (lambda (a:Complexf b:float)
-    (Cpxf (- (tref a 0) b)
-          (tref a 1))))
-
-(bind-func Cpxf_subtraction_d_c
-  (lambda (b:float a:Complexf)
-    (Cpxf (- (tref a 0) b)
-          (tref a 1))))
-
-(bind-poly xtm_subtraction Cpxf_subtraction_c_c)
-(bind-poly xtm_subtraction Cpxf_subtraction_c_d)
-(bind-poly xtm_subtraction Cpxf_subtraction_d_c)
-
-(bind-func Cpxf_multiplication_c_c
-  (lambda (a:Complexf b:Complexf)
-    (Cpxf (- (* (tref a 0) (tref b 0))
-             (* (tref a 1) (tref b 1)))             
-          (+ (* (tref a 0) (tref b 1))
-             (* (tref a 1) (tref b 0))))))
-
-(bind-func Cpxf_multiplication_c_d
-  (lambda (a:Complexf b:float)
-    (Cpxf (- (* (tref a 0) b)
-             (tref a 1))             
-          (+ (tref a 0)
-             (* (tref a 1) b)))))
-
-(bind-func Cpxf_multiplication_d_c
-  (lambda (b:float a:Complexf)
-    (Cpxf (- (* (tref a 0) b)
-             (tref a 1))             
-          (+ (tref a 0)
-             (* (tref a 1) b)))))
-
-(bind-poly xtm_multiplication Cpxf_multiplication_c_c)
-(bind-poly xtm_multiplication Cpxf_multiplication_c_d)
-(bind-poly xtm_multiplication Cpxf_multiplication_d_c)
-
-(bind-func Cpxf_division_c_c
-  (lambda (a:Complexf b:Complexf)
-    (let ((i (+ (* (tref a 0) (tref b 0))
-                (* (tref a 1) (tref b 1))))
-          (j (+ (* (tref b 0) (tref b 0))
-                (* (tref b 1) (tref b 1))))
-          (k (- (* (tref a 1) (tref b 0))
-                (* (tref a 0) (tref b 1)))))
-      (Cpxf (/ i j)
-            (/ k j)))))
-
-(bind-func Cpxf_division_c_d
-  (lambda (a:Complexf b:float)
-    (let ((i (+ (* (tref a 0) b)
-                (tref a 1)))
-          (j (* b b))
-          (k (- (* (tref a 1) b)
-                (tref a 0) )))
-      (Cpxf (/ i j)
-            (/ k j)))))
-
-(bind-func Cpxf_division_d_c
-  (lambda (b:float a:Complexf)
-    (let ((i (+ (* (tref a 0) b)
-                (tref a 1)))
-          (j (* b b))
-          (k (- (* (tref a 1) b)
-                (tref a 0) )))
-      (Cpxf (/ i j)
-            (/ k j)))))
-
-(bind-poly xtm_division Cpxf_division_c_c)
-(bind-poly xtm_division Cpxf_division_c_d)
-(bind-poly xtm_division Cpxf_division_d_c)
-
-(bind-func magnitude_complexf
-  (lambda (a:Complexf)
-    (sqrt (+ (* (tref a 0) (tref a 0))
-             (* (tref a 1) (tref a 1))))))         
-
-(bind-func phase_complexf
-  (lambda (a:Complexf)
-    (atan (/ (tref a 1) (tref a 0)))))
-
-(bind-func conj_complexf
-  (lambda (a:Complexf)
-    (Cpxf (tref a 0)
-          (* -1.0 (tref a 0)))))
-
-(bind-poly magC magnitude_complexf)
-(bind-poly phaseC phase_complexf)
-(bind-poly conjC conj_complexf)
-
-(bind-func rect_to_polar_f
-  (lambda (a:Complexf)
-    (Cpxf (sqrt (+ (* (tref a 0) (tref a 0))
-                   (* (tref a 1) (tref a 1))))
-          (atan (/ (tref a 1) (tref a 0))))))
-
-;; in place transformation
-(bind-func rect_to_polar_fp
-  (lambda (a:Complexf* n:i64)
-    (doloop (i n)
-      (tset! (pref-ptr a i) 0
-             (sqrt (+ (* (tref a 0) (tref a 0))
-                      (* (tref a 1) (tref a 1)))))
-      (tset! (pref-ptr a i) 1
-             (atan (/ (tref a 1) (tref a 0)))))
-    void))
-
-(bind-poly rect_to_polar rect_to_polar_f)
-(bind-poly rect_to_polar rect_to_polar_fp)
-
-(bind-func polar_to_rect_f
-  (lambda (a:Complexf)
-    (Cpxf (* (tref a 0) (cos (tref a 1)))
-          (* (tref a 0) (sin (tref a 1))))))
-
-;; in place transformation
-(bind-func polar_to_rect_fp
-  (lambda (a:Complexf* n:i64)
-    (doloop (i n)
-      (tset! (pref-ptr a i) 0
-             (* (tref a 0) (cos (tref a 1))))
-      (tset! (pref-ptr a i) 1
-             (* (tref a 0) (sin (tref a 1)))))
-    void))
-
-(bind-poly polar_to_rect polar_to_rect_f)
-(bind-poly polar_to_rect polar_to_rect_fp)
-
-
-
-;;;;;;; OLD COMPLEX NUMBERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; These are in here for compatibility, you should use the
-;; Complexd type these days (see above).  It's much nicer.
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(bind-type cpxd <double,double>)
-(bind-type cpxf <float,float>)
-
-;; complex addition (in zone!)
-(bind-func cpxd_add
-  (lambda (a:cpxd* b:cpxd*)
-    (let ((c:cpxd* (zalloc 1)))
-      (tset! c 0 (+ (tref a 0) (tref b 0)))
-      (tset! c 1 (+ (tref a 1) (tref b 1)))
-      c)))
-
-;; complex subtraction (in zone!)
-(bind-func cpxd_sub
-  (lambda (a:cpxd* b:cpxd*)
-    (let ((c:cpxd* (zalloc 1)))
-      (tset! c 0 (- (tref a 0) (tref b 0)))
-      (tset! c 1 (- (tref a 1) (tref b 1)))
-      c)))
-
-;; complex multiplication (in zone!)
-(bind-func cpxd_mul
-  (lambda (a:cpxd* b:cpxd*)
-    (let ((c:cpxd* (zalloc 1)))
-      (tset! c 0 (- (* (tref a 0) (tref b 0))
-                    (* (tref a 1) (tref b 1))))             
-      (tset! c 1 (+ (* (tref a 0) (tref b 1))
-                    (* (tref a 1) (tref b 0))))
-      c)))
-
-;; complex division (in zone!)
-(bind-func cpxd_div
-  (lambda (a:cpxd* b:cpxd*)
-    (let ((c:cpxd* (zalloc 1))
-          (i (+ (* (tref a 0) (tref b 0))
-                (* (tref a 1) (tref b 1))))
-          (j (+ (* (tref b 0) (tref b 0))
-                (* (tref b 1) (tref b 1))))
-          (k (- (* (tref a 1) (tref b 0))
-                (* (tref a 0) (tref b 1)))))
-      (tset! c 0 (/ i j))
-      (tset! c 1 (/ k j))
-      c)))
-
-;; (bind-func cpxd_print
-;;   (lambda (val:cpxd*)
-;;     (if (or (= (tref val 1) 0.0)
-;;             (> (tref val 1) 0.0)) 
-;;         (printf "%.2f+%.2fi" (tref val 0) (tref val 1))
-;;         (printf "%.2f%.2fi" (tref val 0) (tref val 1))
-;;         void)))
-
-;; complex addition (in zone!)
-(bind-func cpxf_add
-  (lambda (a:cpxf* b:cpxf*)
-    (let ((c:cpxf* (zalloc 1)))
-      (tset! c 0 (+ (tref a 0) (tref b 0)))
-      (tset! c 1 (+ (tref a 1) (tref b 1)))
-      c)))
-
-;; complex subtraction (in zone!)
-(bind-func cpxf_sub
-  (lambda (a:cpxf* b:cpxf*)
-    (let ((c:cpxf* (zalloc 1)))
-      (tset! c 0 (- (tref a 0) (tref b 0)))
-      (tset! c 1 (- (tref a 1) (tref b 1)))
-      c)))
-
-;; complex multiplication (in zone!)
-(bind-func cpxf_mul
-  (lambda (a:cpxf* b:cpxf*)
-    (let ((c:cpxf* (zalloc 1)))
-      (tset! c 0 (- (* (tref a 0) (tref b 0))
-                    (* (tref a 1) (tref b 1))))             
-      (tset! c 1 (+ (* (tref a 0) (tref b 1))
-                    (* (tref a 1) (tref b 0))))
-      c)))
-
-;; complex division (in zone!)
-(bind-func cpxf_div
-  (lambda (a:cpxf* b:cpxf*)
-    (let ((c:cpxf* (zalloc 1))
-          (i (+ (* (tref a 0) (tref b 0))
-                (* (tref a 1) (tref b 1))))
-          (j (+ (* (tref b 0) (tref b 0))
-                (* (tref b 1) (tref b 1))))
-          (k (- (* (tref a 1) (tref b 0))
-                (* (tref a 0) (tref b 1)))))
-      (tset! c 0 (/ i j))
-      (tset! c 1 (/ k j))
-      c)))
-
-;; (bind-func cpxf_print
-;;   (lambda (val:cpxf*)
-;;     (if (or (= (tref val 1) 0.0)
-;;             (> (tref val 1) 0.0)) 
-;;         (printf "%.2f+%.2fi" (tref val 0) (tref val 1))
-;;         (printf "%.2f%.2fi" (tref val 0) (tref val 1))
-;;         void)))
-
-
-;; complex addition
-(bind-func cpxd_add_buf
-  (lambda (a:cpxd* b:cpxd* c:cpxd* lgth)
+(bind-func Complexd_addition_bybuf
+  (lambda (a:Complexd* b:Complexd* c:Complexd* lgth)
     (let ((i 0))
       (dotimes (i lgth)
         (tset! (pref-ptr c i) 0
@@ -2157,9 +1735,28 @@
                   (tref (pref-ptr b i) 1))))
       void)))
 
-;; complex subtraction (in zone!)
-(bind-func cpxd_sub_buf
-  (lambda (a:cpxd* b:cpxd* c:cpxd* lgth)
+(bind-poly xtm_addition Complexd_addition_cpx_cpx)
+(bind-poly xtm_addition Complexd_addition_cpx_re)
+(bind-poly xtm_addition Complexd_addition_re_cpx)
+(bind-poly xtm_addition Complexd_addition_bybuf)
+
+(bind-func Complexd_subtraction_cpx_cpx
+  (lambda (a:Complexd b:Complexd)
+    (Cpxd (- (tref a 0) (tref b 0))
+         (- (tref a 1) (tref b 1)))))
+
+(bind-func Complexd_subtraction_cpx_re
+  (lambda (a:Complexd b:double)
+    (Cpxd (- (tref a 0) b)
+         (tref a 1))))
+
+(bind-func Complexd_subtraction_re_cpx
+  (lambda (b:double a:Complexd)
+    (Cpxd (- (tref a 0) b)
+         (tref a 1))))
+
+(bind-func Complexd_subtraction_bybuf
+  (lambda (a:Complexd* b:Complexd* c:Complexd* lgth)
     (let ((i 0))
       (dotimes (i lgth)
         (tset! (pref-ptr c i) 0
@@ -2170,9 +1767,34 @@
                   (tref (pref-ptr b i) 1))))
       void)))
 
-;; complex multiplication (in zone!)
-(bind-func cpxd_mul_buf
-  (lambda (a:cpxd* b:cpxd* c:cpxd* lgth)
+(bind-poly xtm_subtraction Complexd_subtraction_cpx_cpx)
+(bind-poly xtm_subtraction Complexd_subtraction_cpx_re)
+(bind-poly xtm_subtraction Complexd_subtraction_re_cpx)
+(bind-poly xtm_subtraction Complexd_subtraction_bybuf)
+
+(bind-func Complexd_multiplication_cpx_cpx
+  (lambda (a:Complexd b:Complexd)
+    (Cpxd (- (* (tref a 0) (tref b 0))
+            (* (tref a 1) (tref b 1)))             
+         (+ (* (tref a 0) (tref b 1))
+            (* (tref a 1) (tref b 0))))))
+
+(bind-func Complexd_multiplication_cpx_re
+  (lambda (a:Complexd b:double)
+    (Cpxd (- (* (tref a 0) b)
+            (tref a 1))             
+         (+ (tref a 0)
+            (* (tref a 1) b)))))
+
+(bind-func Complexd_multiplication_re_cpx
+  (lambda (b:double a:Complexd)
+    (Cpxd (- (* (tref a 0) b)
+            (tref a 1))             
+         (+ (tref a 0)
+            (* (tref a 1) b)))))
+
+(bind-func Complexd_multiplication_bybuf
+  (lambda (a:Complexd* b:Complexd* c:Complexd* lgth)
     (let ((i 0))
       (dotimes (i lgth)
         (tset! (pref-ptr c i) 0
@@ -2187,10 +1809,45 @@
                      (tref (pref-ptr b i) 0)))))
       void)))
 
-;; complex division (in zone!)
-(bind-func cpxd_div_buf
-  (lambda (a:cpxd* b:cpxd* c:cpxd* lgth)
-    (let ((i 0) (j 0.0) (k 0.0) (l 0.0))          
+(bind-poly xtm_multiplication Complexd_multiplication_cpx_cpx)
+(bind-poly xtm_multiplication Complexd_multiplication_cpx_re)
+(bind-poly xtm_multiplication Complexd_multiplication_re_cpx)
+(bind-poly xtm_multiplication Complexd_multiplication_bybuf)
+
+(bind-func Complexd_division_cpx_cpx
+  (lambda (a:Complexd b:Complexd)
+    (let ((i (+ (* (tref a 0) (tref b 0))
+                (* (tref a 1) (tref b 1))))
+          (j (+ (* (tref b 0) (tref b 0))
+                (* (tref b 1) (tref b 1))))
+          (k (- (* (tref a 1) (tref b 0))
+                (* (tref a 0) (tref b 1)))))
+      (Cpxd (/ i j)
+           (/ k j)))))
+
+(bind-func Complexd_division_cpx_re
+  (lambda (a:Complexd b:double)
+    (let ((i (+ (* (tref a 0) b)
+                (tref a 1)))
+          (j (* b b))
+          (k (- (* (tref a 1) b)
+                (tref a 0) )))
+      (Cpxd (/ i j)
+           (/ k j)))))
+
+(bind-func Complexd_division_re_cpx
+  (lambda (b:double a:Complexd)
+    (let ((i (+ (* (tref a 0) b)
+                (tref a 1)))
+          (j (* b b))
+          (k (- (* (tref a 1) b)
+                (tref a 0) )))
+      (Cpxd (/ i j)
+           (/ k j)))))
+
+(bind-func Complexd_division_bybuf
+  (lambda (a:Complexd* b:Complexd* c:Complexd* lgth)
+    (let ((i 0) (j 0.0) (k 0.0) (l 0.0))
       (dotimes (i lgth)
         (set! j (+ (* (tref (pref-ptr a i) 0)
                       (tref (pref-ptr b i) 0))
@@ -2208,10 +1865,104 @@
         (tset! (pref-ptr c i) 1 (/ l k)))
       void)))
 
+(bind-poly xtm_division Complexd_division_cpx_cpx)
+(bind-poly xtm_division Complexd_division_cpx_re)
+(bind-poly xtm_division Complexd_division_re_cpx)
+(bind-poly xtm_division Complexd_division_bybuf)
 
-;; complex addition
-(bind-func cpxf_add_buf
-  (lambda (a:cpxf* b:cpxf* c:cpxf* lgth:i64)
+(bind-func Complexd_magnitude
+  (lambda (a:Complexd)
+    (sqrt (+ (* (tref a 0) (tref a 0))
+             (* (tref a 1) (tref a 1))))))         
+
+(bind-func Complexd_phase
+  (lambda (a:Complexd)
+    (atan (/ (tref a 1) (tref a 0)))))
+
+(bind-func Complexd_conj
+  (lambda (a:Complexd)
+    (Cpxd (tref a 0)
+          (* -1.0 (tref a 0)))))
+
+(bind-poly Complex_mag Complexd_magnitude)
+(bind-poly Complex_phase Complexd_phase)
+(bind-poly Complex_conj Complexd_conj)
+
+(bind-func Complexd_cart_to_pol
+  (lambda (a:Complexd)
+    (Cpxd (sqrt (+ (* (tref a 0) (tref a 0))
+                   (* (tref a 1) (tref a 1))))
+          (atan (/ (tref a 1) (tref a 0))))))
+
+(bind-func Complexd_cart_to_pol_bybuf
+  "transform a whole buffer cart->pol in-place"
+  (lambda (a:Complexd* n:i64)
+    (doloop (i n)
+      (tset! (pref-ptr a i) 0
+             (sqrt (+ (* (tref a 0) (tref a 0))
+                      (* (tref a 1) (tref a 1)))))
+      (tset! (pref-ptr a i) 1
+             (atan (/ (tref a 1) (tref a 0)))))
+    void))
+
+(bind-poly Complex_cart_to_pol Complexd_cart_to_pol)
+(bind-poly Complex_cart_to_pol Complexd_cart_to_pol_bybuf)
+
+(bind-func Complexd_pol_to_cart
+  (lambda (a:Complexd)
+    (Cpxd (* (tref a 0) (cos (tref a 1)))
+          (* (tref a 0) (sin (tref a 1))))))
+
+(bind-func Complexd_pol_to_cart_bybuf
+  "transform a whole buffer pol->cart in-place"
+  (lambda (a:Complexd* n:i64)
+    (doloop (i n)
+      (tset! (pref-ptr a i) 0
+             (* (tref a 0) (cos (tref a 1))))
+      (tset! (pref-ptr a i) 1
+             (* (tref a 0) (sin (tref a 1)))))
+    void))
+
+(bind-poly pol_to_cart Complexd_pol_to_cart)
+(bind-poly pol_to_cart Complexd_pol_to_cart_bybuf)
+
+;; Complexf (float versions)
+
+(bind-type Complexf <float,float>)
+
+(bind-func Cpxf
+  (lambda (re im)
+    (let ((c:Complexf* (salloc)))
+      (tset! c 0 re)
+      (tset! c 1 im)
+      (pref c 0))))
+
+(bind-func Complexf_print
+  (lambda (c:Complexf)
+    (printf "%.2f%+.2fi" ;; "%f+%fi\n"
+            (ftod (tref c 0))
+            (ftod (tref c 1)))
+    void))
+
+(bind-poly print Complexf_print)
+
+(bind-func Complexf_addition_cpx_cpx
+  (lambda (a:Complexf b:Complexf)
+    (Cpxf (+ (tref a 0) (tref b 0))
+          (+ (tref a 1) (tref b 1)))))
+
+(bind-func Complexf_addition_cpx_re
+  (lambda (a:Complexf b:float)
+    (Cpxf (+ (tref a 0) b)
+          (tref a 1))))
+
+(bind-func Complexf_addition_re_cpx
+  (lambda (b:float a:Complexf)
+    (Cpxf (+ (tref a 0) b)
+          (tref a 1))))
+
+(bind-func Complexf_addition_bybuf
+  (lambda (a:Complexf* b:Complexf* c:Complexf* lgth:i64)
     (if (evenp lgth)
         (let ((aa:/4,float/* (cast a))
               (bb:/4,float/* (cast b))
@@ -2219,7 +1970,7 @@
               (k 0))
           (dotimes (k (/ lgth 2))
             (pset! cc k (+ (pref-ptr aa k) (pref-ptr bb k)))
-            void))    
+            void))
         (let ((i 0))
           (dotimes (i lgth)
             (tset! (pref-ptr c i) 0
@@ -2230,9 +1981,28 @@
                       (tref (pref-ptr b i) 1))))
           void))))
 
-;; complex subtraction (in zone!)
-(bind-func cpxf_sub_buf
-  (lambda (a:cpxf* b:cpxf* c:cpxf* lgth:i64)
+(bind-poly xtm_addition Complexf_addition_cpx_cpx)
+(bind-poly xtm_addition Complexf_addition_cpx_re)
+(bind-poly xtm_addition Complexf_addition_re_cpx)
+(bind-poly xtm_addition Complexf_addition_bybuf)
+
+(bind-func Complexf_subtraction_cpx_cpx
+  (lambda (a:Complexf b:Complexf)
+    (Cpxf (- (tref a 0) (tref b 0))
+          (- (tref a 1) (tref b 1)))))
+
+(bind-func Complexf_subtraction_cpx_re
+  (lambda (a:Complexf b:float)
+    (Cpxf (- (tref a 0) b)
+          (tref a 1))))
+
+(bind-func Complexf_subtraction_re_cpx
+  (lambda (b:float a:Complexf)
+    (Cpxf (- (tref a 0) b)
+          (tref a 1))))
+
+(bind-func Complexf_subtraction_bybuf
+  (lambda (a:Complexf* b:Complexf* c:Complexf* lgth:i64)
     (if (evenp lgth)
         (let ((aa:/4,float/* (cast a))
               (bb:/4,float/* (cast b))
@@ -2240,7 +2010,7 @@
               (k 0))
           (dotimes (k (/ lgth 2))
             (pset! cc k (- (pref-ptr aa k) (pref-ptr bb k)))
-            void))    
+            void))
         (let ((i 0))
           (dotimes (i lgth)
             (tset! (pref-ptr c i) 0
@@ -2251,11 +2021,36 @@
                       (tref (pref-ptr b i) 1))))
           void))))
 
-;; complex multiplication (in zone!)
-(bind-func cpxf_mul_buf
+(bind-poly xtm_subtraction Complexf_subtraction_cpx_cpx)
+(bind-poly xtm_subtraction Complexf_subtraction_cpx_re)
+(bind-poly xtm_subtraction Complexf_subtraction_re_cpx)
+(bind-poly xtm_subtraction Complexf_subtraction_bybuf)
+
+(bind-func Complexf_multiplication_cpx_cpx
+  (lambda (a:Complexf b:Complexf)
+    (Cpxf (- (* (tref a 0) (tref b 0))
+             (* (tref a 1) (tref b 1)))             
+          (+ (* (tref a 0) (tref b 1))
+             (* (tref a 1) (tref b 0))))))
+
+(bind-func Complexf_multiplication_cpx_re
+  (lambda (a:Complexf b:float)
+    (Cpxf (- (* (tref a 0) b)
+             (tref a 1))             
+          (+ (tref a 0)
+             (* (tref a 1) b)))))
+
+(bind-func Complexf_multiplication_re_cpx
+  (lambda (b:float a:Complexf)
+    (Cpxf (- (* (tref a 0) b)
+             (tref a 1))             
+          (+ (tref a 0)
+             (* (tref a 1) b)))))
+
+(bind-func Complexf_multiplication_bybuf
   (let ((dd:/4,float/* (alloc)))
-    (vfill! dd -1.0 1.0 -1.0 1.0)  
-    (lambda (a:cpxf* b:cpxf* c:cpxf* lgth:i64)
+    (vfill! dd -1.0 1.0 -1.0 1.0)
+    (lambda (a:Complexf* b:Complexf* c:Complexf* lgth:i64)
       (if (evenp lgth)
           (let ((j 0)
                 (aa:/4,float/* (cast a))
@@ -2283,11 +2078,45 @@
                            (tref (pref-ptr b i) 0)))))
             void)))))
 
+(bind-poly xtm_multiplication Complexf_multiplication_cpx_cpx)
+(bind-poly xtm_multiplication Complexf_multiplication_cpx_re)
+(bind-poly xtm_multiplication Complexf_multiplication_re_cpx)
+(bind-poly xtm_multiplication Complexf_multiplication_bybuf)
 
-;; complex division (in zone!)
-(bind-func cpxf_div_buf
-  (lambda (a:cpxf* b:cpxf* c:cpxf* lgth)
-    (let ((i 0) (j 0.0) (k 0.0) (l 0.0))          
+(bind-func Complexf_division_cpx_cpx
+  (lambda (a:Complexf b:Complexf)
+    (let ((i (+ (* (tref a 0) (tref b 0))
+                (* (tref a 1) (tref b 1))))
+          (j (+ (* (tref b 0) (tref b 0))
+                (* (tref b 1) (tref b 1))))
+          (k (- (* (tref a 1) (tref b 0))
+                (* (tref a 0) (tref b 1)))))
+      (Cpxf (/ i j)
+            (/ k j)))))
+
+(bind-func Complexf_division_cpx_re
+  (lambda (a:Complexf b:float)
+    (let ((i (+ (* (tref a 0) b)
+                (tref a 1)))
+          (j (* b b))
+          (k (- (* (tref a 1) b)
+                (tref a 0) )))
+      (Cpxf (/ i j)
+            (/ k j)))))
+
+(bind-func Complexf_division_re_cpx
+  (lambda (b:float a:Complexf)
+    (let ((i (+ (* (tref a 0) b)
+                (tref a 1)))
+          (j (* b b))
+          (k (- (* (tref a 1) b)
+                (tref a 0) )))
+      (Cpxf (/ i j)
+            (/ k j)))))
+
+(bind-func Complexf_division_bybuf
+  (lambda (a:Complexf* b:Complexf* c:Complexf* lgth)
+    (let ((i 0) (j 0.0) (k 0.0) (l 0.0))
       (dotimes (i lgth)
         (set! j (+ (* (tref (pref-ptr a i) 0)
                       (tref (pref-ptr b i) 0))
@@ -2305,392 +2134,152 @@
         (tset! (pref-ptr c i) 1 (/ l k)))
       void)))
 
-;; scalar * complex buffer in-place!
-(bind-func scpxd_mul
-  (lambda (s:double cpx:cpxd* lgth)
-    (let ((i 0) (a:cpxd* cpx))
-      (dotimes (i lgth)
-        (set! a (pref-ptr cpx i))
-        (tset! a 0 (* (tref a 0) s))
-        (tset! a 1 (* (tref a 1) s)))
-      void)))
+(bind-poly xtm_division Complexf_division_cpx_cpx)
+(bind-poly xtm_division Complexf_division_cpx_re)
+(bind-poly xtm_division Complexf_division_re_cpx)
+(bind-poly xtm_division Complexf_division_bybuf)
 
-;; scalar * complex buffer in-place!
-(bind-func scpxf_mul
-  (lambda (s:float cpx:cpxf* lgth)
-    (let ((i 0) (a:cpxf* cpx))
-      (dotimes (i lgth)
-        (set! a (pref-ptr cpx i))
-        (tset! a 0 (* (tref a 0) s))
-        (tset! a 1 (* (tref a 1) s)))
-      void)))
+(bind-func Complexf_magnitude
+  (lambda (a:Complexf)
+    (sqrt (+ (* (tref a 0) (tref a 0))
+             (* (tref a 1) (tref a 1))))))         
 
-(bind-poly cpxadd cpxf_add)
-(bind-poly cpxadd cpxd_add)
-(bind-poly cpxadd cpxf_add_buf)
-(bind-poly cpxadd cpxd_add_buf)
-(bind-poly cpxsub cpxf_sub)
-(bind-poly cpxsub cpxd_sub)
-(bind-poly cpxsub cpxf_sub_buf)
-(bind-poly cpxsub cpxd_sub_buf)
-(bind-poly cpxmul cpxf_mul)
-(bind-poly cpxmul cpxd_mul)
-(bind-poly cpxmul cpxf_mul_buf)
-(bind-poly cpxmul cpxd_mul_buf)
-(bind-poly cpxdiv cpxf_div)
-(bind-poly cpxdiv cpxd_div)
-(bind-poly cpxdiv cpxf_div_buf)
-(bind-poly cpxdiv cpxd_div_buf)
-;; (bind-poly cpxprint cpxf_print)
-;; (bind-poly cpxprint cpxd_print)
-(bind-poly scpxmul scpxd_mul)
-(bind-poly scpxmul scpxf_mul)
+(bind-func Complexf_phase
+  (lambda (a:Complexf)
+    (atan (/ (tref a 1) (tref a 0)))))
 
-;; conversion functions
-(bind-func conjugate_cpxf
-  (lambda (cpx_val:cpxf*)
-    (let ((cpx_cnj:cpxf* (alloc 1)))
-      (tfill! cpx_cnj
-              (tref cpx_val 0)
-              (* -1.0 (tref cpx_val 1)))
-      cpx_cnj)))
+(bind-func Complexf_conj
+  (lambda (a:Complexf)
+    (Cpxf (tref a 0)
+          (* -1.0 (tref a 0)))))
 
-(bind-func conjugate_cpxd
-  (lambda (cpx_val:cpxd*)
-    (let ((cpx_cnj:cpxd* (alloc 1)))
-      (tfill! cpx_cnj
-              (tref cpx_val 0)
-              (* -1.0 (tref cpx_val 1)))
-      cpx_cnj)))
+(bind-poly Complex_mag Complexf_magnitude)
+(bind-poly Complex_phase Complexf_phase)
+(bind-poly Complex_conj Complexf_conj)
 
-(bind-poly conjugate_cpx conjugate_cpxf)
-(bind-poly conjugate_cpx conjugate_cpxd)
+(bind-func Complexf_cart_to_pol
+  (lambda (a:Complexf)
+    (Cpxf (sqrt (+ (* (tref a 0) (tref a 0))
+                   (* (tref a 1) (tref a 1))))
+          (atan (/ (tref a 1) (tref a 0))))))
 
-(bind-func magnitude_squared_cpxf
-  (lambda (cpx_val:cpxf*)
-    (+ (pow (tref cpx_val 0) 2.0)
-       (pow (tref cpx_val 1) 2.0))))
-
-(bind-func magnitude_squared_cpxd
-  (lambda (cpx_val:cpxd*)
-    (+ (pow (tref cpx_val 0) 2.0)
-       (pow (tref cpx_val 1) 2.0))))
-
-(bind-func magnitude_cpxf
-  (lambda (cpx_val:cpxf*)
-    (sqrt (+ (pow (tref cpx_val 0) 2.0)
-             (pow (tref cpx_val 1) 2.0)))))
-
-(bind-func magnitude_cpxd
-  (lambda (cpx_val:cpxd*)
-    (sqrt (+ (pow (tref cpx_val 0) 2.0)
-             (pow (tref cpx_val 1) 2.0)))))
-
-(bind-func phase_cpxf
-  (lambda (cpx_val:cpxf*)
-    (atan2f (tref cpx_val 1)
-            (tref cpx_val 0))))
-
-(bind-func phase_cpxd
-  (lambda (cpx_val:cpxd*)
-    (atan2 (tref cpx_val 1)
-           (tref cpx_val 0))))
-
-(bind-poly magnitude_squared_cpx magnitude_squared_cpxf)
-(bind-poly magnitude_squared_cpx magnitude_squared_cpxd)
-(bind-poly magnitude_cpx magnitude_cpxf)
-(bind-poly magnitude_cpx magnitude_cpxd)
-(bind-poly phase_cpx phase_cpxf)
-(bind-poly phase_cpx phase_cpxd)
-
-(bind-func cart_to_pol_cpxf
-  (lambda (cart:cpxf*)
-    (let ((pol:cpxf* (alloc 1)))
-      (tfill! pol
-              (sqrt (+ (pow (tref cart 0) 2.0)
-                        (pow (tref cart 1) 2.0)))
-              (atan2f (tref cart 1)
-                      (tref cart 0)))
-      pol)))
-
-(bind-func pol_to_cart_cpxf
-  (lambda (pol:cpxf*)
-    (let ((cart:cpxf* (alloc 1)))
-      (tfill! cart
-              (* (tref pol 0)
-                 (cos (tref pol 1)))
-              (* (tref pol 0)
-                 (sin (tref pol 1))))
-      cart)))
-
-(bind-func cart_to_pol_cpxd
-  (lambda (cart:cpxd*)
-    (let ((pol:cpxd* (alloc 1)))
-      (tfill! pol
-              (sqrt (+ (pow (tref cart 0) 2.0)
-                       (pow (tref cart 1) 2.0)))
-              (atan2 (tref cart 1)
-                     (tref cart 0)))
-      pol)))
-
-(bind-func pol_to_cart_cpxd
-  (lambda (pol:cpxd*)
-    (let ((cart:cpxd* (alloc 1)))
-      (tfill! cart
-              (* (tref pol 0)
-                 (cos (tref pol 1)))
-              (* (tref pol 0)
-                 (sin (tref pol 1))))
-      cart)))
-
-(bind-poly cart_to_pol cart_to_pol_cpxf)
-(bind-poly cart_to_pol cart_to_pol_cpxd)
-(bind-poly pol_to_cart pol_to_cart_cpxf)
-(bind-poly pol_to_cart pol_to_cart_cpxd)
-
-;; some helpers for working with buffers of cpxf/cpxd types
-
-(bind-func fill_cpx_buffer_cpxf
-  (lambda (re:float* im:float* com:cpxf* len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(tset! (pref-ptr com i) 0 (pref re i))
-	(tset! (pref-ptr com i) 1 (pref im i))))
+(bind-func Complexf_cart_to_pol_bybuf
+  "transform a whole buffer cart->pol in-place"
+  (lambda (a:Complexf* n:i64)
+    (doloop (i n)
+      (tset! (pref-ptr a i) 0
+             (sqrt (+ (* (tref a 0) (tref a 0))
+                      (* (tref a 1) (tref a 1)))))
+      (tset! (pref-ptr a i) 1
+             (atan (/ (tref a 1) (tref a 0)))))
     void))
 
-(bind-func fill_cpx_buffer_cpxf_reonly
-  (lambda (re:float* com:cpxf* len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(tset! (pref-ptr com i) 0 (pref re i))
-	(tset! (pref-ptr com i) 1 0.0)))
+(bind-poly Complexf_cart_to_pol Complexf_cart_to_pol)
+(bind-poly Complexf_cart_to_pol Complexf_cart_to_pol_bybuf)
+
+(bind-func Complexf_pol_to_cart
+  (lambda (a:Complexf)
+    (Cpxf (* (tref a 0) (cos (tref a 1)))
+          (* (tref a 0) (sin (tref a 1))))))
+
+(bind-func Complexf_pol_to_cart_bybuf
+  "transform a whole buffer pol->cart in-place"
+  (lambda (a:Complexf* n:i64)
+    (doloop (i n)
+      (tset! (pref-ptr a i) 0
+             (* (tref a 0) (cos (tref a 1))))
+      (tset! (pref-ptr a i) 1
+             (* (tref a 0) (sin (tref a 1)))))
     void))
 
-(bind-func fill_cpx_buffer_cpxd
-  (lambda (re:double* im:double* com:cpxd* len:i64)
+(bind-poly Complexf_pol_to_cart Complexf_pol_to_cart)
+(bind-poly Complexf_pol_to_cart Complexf_pol_to_cart_bybuf)
+
+;; "bufferize" whole buffers of real & complex values (take two real
+;; buffers with real & imaginary components, fill buffer of Complex
+;; values)
+
+(bind-func Complexf_bufferize
+  (lambda (re:float* im:float* com:Complexf* len:i64)
     (let ((i 0))
       (dotimes (i len)
-	(tset! (pref-ptr com i) 0 (pref re i))
-	(tset! (pref-ptr com i) 1 (pref im i))))
+        (tset! (pref-ptr com i) 0 (pref re i))
+        (tset! (pref-ptr com i) 1 (pref im i))))
     void))
 
-(bind-func fill_cpx_buffer_cpxd_reonly
-  (lambda (re:double* com:cpxd* len:i64)
+(bind-func Complexf_bufferize_reonly
+  (lambda (re:float* com:Complexf* len:i64)
     (let ((i 0))
       (dotimes (i len)
-	(tset! (pref-ptr com i) 0 (pref re i))
-	(tset! (pref-ptr com i) 1 0.0)))
+        (tset! (pref-ptr com i) 0 (pref re i))
+        (tset! (pref-ptr com i) 1 0.0)))
     void))
 
-(bind-poly fill_cpx_buffer fill_cpx_buffer_cpxf)
-(bind-poly fill_cpx_buffer fill_cpx_buffer_cpxd)
-(bind-poly fill_cpx_buffer fill_cpx_buffer_cpxf_reonly)
-(bind-poly fill_cpx_buffer fill_cpx_buffer_cpxd_reonly)
-
-(bind-func pour_cpx_buffer_cpxf
-  (lambda (com:cpxf* re:float* im:float* len:i64)
+(bind-func Complexd_bufferize
+  (lambda (re:double* im:double* com:Complexd* len:i64)
     (let ((i 0))
       (dotimes (i len)
-	(pset! re i (tref (pref-ptr com i) 0)) 
-	(pset! im i (tref (pref-ptr com i) 1))))
+        (tset! (pref-ptr com i) 0 (pref re i))
+        (tset! (pref-ptr com i) 1 (pref im i))))
     void))
 
-(bind-func pour_cpx_buffer_cpxd
-  (lambda (com:cpxd* re:double* im:double* len:i64)
+(bind-func Complexd_bufferize_reonly
+  (lambda (re:double* com:Complexd* len:i64)
     (let ((i 0))
       (dotimes (i len)
-	(pset! re i (tref (pref-ptr com i) 0))
-	(pset! im i (tref (pref-ptr com i) 1))))
+        (tset! (pref-ptr com i) 0 (pref re i))
+        (tset! (pref-ptr com i) 1 0.0)))
     void))
 
-(bind-func pour_cpx_buffer_cpxf_reonly
-  (lambda (com:cpxf* re:float* len:i64)
+(bind-poly Complex_bufferize Complexf_bufferize)
+(bind-poly Complex_bufferize Complexd_bufferize)
+(bind-poly Complex_bufferize Complexf_bufferize_reonly)
+(bind-poly Complex_bufferize Complexd_bufferize_reonly)
+
+;; do the opposite (take buffer of Complex, fill two real buffers with
+;; real & imaginary components)
+
+(bind-func Complexf_unbufferize
+  (lambda (com:Complexf* re:float* im:float* len:i64)
     (let ((i 0))
       (dotimes (i len)
-	(pset! re i (tref (pref-ptr com i) 0)) ))
+        (pset! re i (tref (pref-ptr com i) 0)) 
+        (pset! im i (tref (pref-ptr com i) 1))))
     void))
 
-(bind-func pour_cpx_buffer_cpxd_reonly
-  (lambda (com:cpxd* re:double* len:i64)
+(bind-func Complexd_unbufferize
+  (lambda (com:Complexd* re:double* im:double* len:i64)
     (let ((i 0))
       (dotimes (i len)
-	(pset! re i (tref (pref-ptr com i) 0))))
+        (pset! re i (tref (pref-ptr com i) 0))
+        (pset! im i (tref (pref-ptr com i) 1))))
     void))
 
-(bind-poly pour_cpx_buffer pour_cpx_buffer_cpxf)
-(bind-poly pour_cpx_buffer pour_cpx_buffer_cpxd)
-(bind-poly pour_cpx_buffer pour_cpx_buffer_cpxf_reonly)
-(bind-poly pour_cpx_buffer pour_cpx_buffer_cpxd_reonly)
-
-(bind-func conjugate_buffer_cpxf
-  (lambda (signal:cpxf* conj:cpxf* len:i64)
+(bind-func Complexf_unbufferize_reonly
+  (lambda (com:Complexf* re:float* len:i64)
     (let ((i 0))
       (dotimes (i len)
-	(tset! (pref-ptr conj i)
-	       1
-	       (* -1.0 (tref (pref-ptr signal i) 1))))
-      void)))
-
-(bind-func conjugate_buffer_cpxd
-  (lambda (signal:cpxd* conj:cpxd* len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(tset! (pref-ptr conj i)
-	       1
-	       (* -1.0 (tref (pref-ptr signal i) 1))))
-      void)))
-
-(bind-poly conjugate_buffer_cpx conjugate_buffer_cpxf)
-(bind-poly conjugate_buffer_cpx conjugate_buffer_cpxd)
-
-(bind-func buffer_cart_to_pol_cpxf
-  (lambda (cart:cpxf* pol:cpxf* len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(tset! (pref-ptr pol i)
-	       0
-	       (sqrt (+ (pow (tref (pref-ptr cart i) 0) 2.0)
-                         (pow (tref (pref-ptr cart i) 1) 2.0))))
-	(tset! (pref-ptr pol i)
-	       1
-	       (atan2f (tref (pref-ptr cart i) 1)
-                       (tref (pref-ptr cart i) 0)))))
+        (pset! re i (tref (pref-ptr com i) 0)) ))
     void))
 
-(bind-func buffer_pol_to_cart_cpxf
-  (lambda (pol:cpxf* cart:cpxf* len:i64)
+(bind-func Complexd_unbufferize_reonly
+  (lambda (com:Complexd* re:double* len:i64)
     (let ((i 0))
       (dotimes (i len)
-	(tset! (pref-ptr cart i)
-	       0
-	       (* (tref (pref-ptr pol i) 0)
-		  (cos (tref (pref-ptr pol i) 1))))
-	(tset! (pref-ptr cart i)
-	       1
-	       (* (tref (pref-ptr pol i) 0)
-		  (sin (tref (pref-ptr pol i) 1))))))
+        (pset! re i (tref (pref-ptr com i) 0)) ))
     void))
 
-(bind-func buffer_cart_to_pol_cpxd
-  (lambda (cart:cpxd* pol:cpxd* len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(tset! (pref-ptr pol i)
-	       0
-	       (sqrt (+ (pow (tref (pref-ptr cart i) 0) 2.0)
-			(pow (tref (pref-ptr cart i) 1) 2.0))))
-	(tset! (pref-ptr pol i)
-	       1
-	       (atan2 (tref (pref-ptr cart i) 1)
-		      (tref (pref-ptr cart i) 0)))))
-    void))
-
-(bind-func buffer_pol_to_cart_cpxd
-  (lambda (pol:cpxd* cart:cpxd* len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(tset! (pref-ptr cart i)
-	       0
-	       (* (tref (pref-ptr pol i) 0)
-		  (cos (tref (pref-ptr pol i) 1))))
-	(tset! (pref-ptr cart i)
-	       1
-	       (* (tref (pref-ptr pol i) 0)
-		  (sin (tref (pref-ptr pol i) 1))))))
-    void))
-
-(bind-poly buffer_cart_to_pol buffer_cart_to_pol_cpxf)
-(bind-poly buffer_cart_to_pol buffer_cart_to_pol_cpxd)
-(bind-poly buffer_pol_to_cart buffer_pol_to_cart_cpxf)
-(bind-poly buffer_pol_to_cart buffer_pol_to_cart_cpxd)
-
-(bind-func buffer_re_only_cpxf
-  "get the (float) real components of the complex buffer"
-  (lambda (in_cpxf:cpxf*
-      out_float:float*
-      len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(pset! out_float
-	       i
-	       (tref (pref-ptr in_cpxf i) 0))))
-    void))
-
-(bind-func buffer_im_only_cpxf
-  "get the (float) imaginary components of the complex buffer"
-  (lambda (in_cpxf:cpxf*
-      out_float:float*
-      len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(pset! out_float
-	       i
-	       (tref (pref-ptr in_cpxf i) 1))))
-    void))
-
-(bind-func buffer_re_only_cpxd
-  "get the (double) real components of the complex buffer"
-  (lambda (in_cpxd:cpxd*
-      out_double:double*
-      len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(pset! out_double
-	       i
-	       (tref (pref-ptr in_cpxd i) 0))))
-    void))
-
-(bind-func buffer_im_only_cpxd
-  "get the (double) imaginary components of the complex buffer"
-  (lambda (in_cpxd:cpxd*
-      out_double:double*
-      len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-	(pset! out_double
-	       i
-	       (tref (pref-ptr in_cpxd i) 1))))
-    void))
-
-(bind-poly buffer_re_only buffer_re_only_cpxf)
-(bind-poly buffer_im_only buffer_re_only_cpxf)
-(bind-poly buffer_re_only buffer_re_only_cpxd)
-(bind-poly buffer_im_only buffer_re_only_cpxd)
-
-(bind-func buffer_cpxd_to_cpxf
-  (lambda (in_cpxd:cpxd*
-      out_cpxf:cpxf*
-      len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-        (tset! (pref-ptr out_cpxf i)
-               0
-               (dtof (tref (pref-ptr in_cpxd i) 0)))
-        (tset! (pref-ptr out_cpxf i)
-               1
-               (dtof (tref (pref-ptr in_cpxd i) 1)))))
-    void))
-
-(bind-func buffer_cpxf_to_cpxd
-  (lambda (in_cpxf:cpxf*
-      out_cpxd:cpxd*
-      len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-        (tset! (pref-ptr out_cpxd i)
-               0
-               (ftod (tref (pref-ptr in_cpxf i) 0)))
-        (tset! (pref-ptr out_cpxd i)
-               1
-               (ftod (tref (pref-ptr in_cpxf i) 1)))))
-    void))
+(bind-poly Complex_unbufferize Complexf_unbufferize)
+(bind-poly Complex_unbufferize Complexd_unbufferize)
+(bind-poly Complex_unbufferize Complexf_unbufferize_reonly)
+(bind-poly Complex_unbufferize Complexd_unbufferize_reonly)
 
 ;;;;;;;;;; DFT/IDFT for teaching purposes ;;;;;;;;;;;;;;;;
 
 ;; real in -> complex out
 (bind-func dft
-  (lambda (in:double* out:cpxd* lgth)
-    (let ((n:i64 0) (k:i64 0) (tmp 0.0) (cpx:cpxd* null) (N (i64tod lgth)))
+  (lambda (in:double* out:Complexd* lgth)
+    (let ((n:i64 0) (k:i64 0) (tmp 0.0) (cpx:Complexd* null) (N (i64tod lgth)))
       (memset (cast out i8*) 0 (convert (* lgth 16)))
       (dotimes (k lgth)
         (set! cpx (pref-ptr out k))
@@ -2706,8 +2295,8 @@
 
 ;; complex in -> real out
 (bind-func idft
-  (lambda (in:cpxd* out:double* lgth)
-    (let ((n:i64 0) (k:i64 0) (tmp 0.0) (cpx:cpxd* null) (N (i64tod lgth)))
+  (lambda (in:Complexd* out:double* lgth)
+    (let ((n:i64 0) (k:i64 0) (tmp 0.0) (cpx:Complexd* null) (N (i64tod lgth)))
       (dotimes (n lgth)
         (pset! out n 0.0)
         (dotimes (k lgth)
