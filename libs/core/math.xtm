@@ -2199,7 +2199,7 @@
 ;; buffers with real & imaginary components, fill buffer of Complex
 ;; values)
 
-(bind-func Complexf_bufferize
+(bind-func Complexf_bufferize_re_im
   (lambda (re:float* im:float* com:Complexf* len:i64)
     (let ((i 0))
       (dotimes (i len)
@@ -2215,7 +2215,7 @@
         (tset! (pref-ptr com i) 1 0.0)))
     void))
 
-(bind-func Complexd_bufferize
+(bind-func Complexd_bufferize_re_im
   (lambda (re:double* im:double* com:Complexd* len:i64)
     (let ((i 0))
       (dotimes (i len)
@@ -2231,27 +2231,19 @@
         (tset! (pref-ptr com i) 1 0.0)))
     void))
 
-(bind-poly Complex_bufferize Complexf_bufferize)
-(bind-poly Complex_bufferize Complexd_bufferize)
+(bind-poly Complex_bufferize Complexf_bufferize_re_im)
+(bind-poly Complex_bufferize Complexd_bufferize_re_im)
 (bind-poly Complex_bufferize Complexf_bufferize_reonly)
 (bind-poly Complex_bufferize Complexd_bufferize_reonly)
 
 ;; do the opposite (take buffer of Complex, fill two real buffers with
 ;; real & imaginary components)
 
-(bind-func Complexf_unbufferize
+(bind-func Complexf_unbufferize_re_im
   (lambda (com:Complexf* re:float* im:float* len:i64)
     (let ((i 0))
       (dotimes (i len)
         (pset! re i (tref (pref-ptr com i) 0)) 
-        (pset! im i (tref (pref-ptr com i) 1))))
-    void))
-
-(bind-func Complexd_unbufferize
-  (lambda (com:Complexd* re:double* im:double* len:i64)
-    (let ((i 0))
-      (dotimes (i len)
-        (pset! re i (tref (pref-ptr com i) 0))
         (pset! im i (tref (pref-ptr com i) 1))))
     void))
 
@@ -2262,6 +2254,14 @@
         (pset! re i (tref (pref-ptr com i) 0)) ))
     void))
 
+(bind-func Complexd_unbufferize_re_im
+  (lambda (com:Complexd* re:double* im:double* len:i64)
+    (let ((i 0))
+      (dotimes (i len)
+        (pset! re i (tref (pref-ptr com i) 0))
+        (pset! im i (tref (pref-ptr com i) 1))))
+    void))
+
 (bind-func Complexd_unbufferize_reonly
   (lambda (com:Complexd* re:double* len:i64)
     (let ((i 0))
@@ -2269,8 +2269,8 @@
         (pset! re i (tref (pref-ptr com i) 0)) ))
     void))
 
-(bind-poly Complex_unbufferize Complexf_unbufferize)
-(bind-poly Complex_unbufferize Complexd_unbufferize)
+(bind-poly Complex_unbufferize Complexf_unbufferize_re_im)
+(bind-poly Complex_unbufferize Complexd_unbufferize_re_im)
 (bind-poly Complex_unbufferize Complexf_unbufferize_reonly)
 (bind-poly Complex_unbufferize Complexd_unbufferize_reonly)
 
