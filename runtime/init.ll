@@ -1105,9 +1105,13 @@ declare i32 @setjmp(i8*)
 @GL_RETURN = global i32 258
 @GL_ADD = global i32 260
 @GL_NEVER = global i32 512
+@GL_LESS = global i32 513
 @GL_EQUAL = global i32 514
+@GL_LEQUAL = global i32 515
 @GL_GREATER = global i32 516
+@GL_NOTEQUAL = global i32 517
 @GL_GEQUAL = global i32 518
+@GL_ALWAYS = global i32 519
 @GL_CURRENT_BIT = global i32 1
 @GL_LINE_BIT = global i32 4
 @GL_POLYGON_STIPPLE_BIT = global i32 16

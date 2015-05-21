@@ -1,122 +1,95 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
-;; (sys:load "examples/external/shader-tutorials/pic.xtm")
 
-;; (run-pic 1/30)
+(bind-val window GLFWwindow*)
 
-(bind-func gl_set_depth_test
-  (lambda ()
-    (glEnable GL_DEPTH_TEST)
-    (glDepthFunc 257)
-    (glDisable GL_LINE_SMOOTH))) ;; GL_LESS
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_core_profile)
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
 
-(gl_set_depth_test)
+(bind-val grid_size_x i64 32)
+(bind-val grid_size_y i64 16)
+(bind-val num_arrows i64 (call-as-xtlang (* grid_size_x grid_size_y)))
 
-(define narrows (* 256 256))
-(bind-val vertices float* (* narrows 4))
+;; this will be 'vec2's, in pairs - arrow base, arrow head. so the
+;; streaming update only needs to update the `head' vert (assuming the
+;; grid stays the same)
+(bind-val arrows_verts float* (* (call-as-xtlang num_arrows) 4))
 
-(define arrows-program
+(define *arrows-shader*
   (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
                  (file->string "examples/external/shader-tutorials/arrows.frag")))
 
-(call-as-xtlang (printf "vertices: %p\n" vertices))
+;; set base verts (i.e. every second vec2) to regular grid
+(call-as-xtlang
+ (let ((idx 0))
+   (doloop (i grid_size_x)
+     (doloop (j grid_size_y)     
+       (set! idx (* (+ (* i grid_size_y) j) 4))
+       (pset! arrows_verts
+              idx
+              (- (* (/ (convert i float) (convert grid_size_x float)) 2.0) 1.0))
+       (pset! arrows_verts
+              (+ idx 1)
+              (- (* (/ (convert j float) (convert grid_size_y float)) 2.0) 1.0))))))
 
-(bind-func munge_points
-  (lambda (nx:i64 ny:i64 ox:float oy:float)
-    (let ((i 0) (j 0) (idx 0)
-          (x 0.) (y 0.))
-      (dotimes (i nx)
-        (dotimes (j ny)
-          (set! idx (+ (* (+ (* nx i) j) 4) 0))
-          (set! x (- (* (/ (convert i float) (convert nx float)) 2.0) 1.0))
-          (set! y (- (* (/ (convert j float) (convert ny float)) 2.0) 1.0))
-          ;; (if (> idx (- (* nx ny 4) 10))
-          ;;     (println "i:" i "j:" j "idx:" idx))
-          (pset! vertices (+ idx 0) x)
-          (pset! vertices (+ idx 1) y)
-          (pset! vertices (+ idx 2) (+ x (* ox (random -1. 1.))))
-          (pset! vertices (+ idx 3) (+ y (* oy (random -1. 1.)))))))))
+(bind-func arrows_set_head_vert
+  (lambda (x y headxval headyval)
+    (let ((idx (* (+ (* x grid_size_y) y) 4)))
+      (pset! arrows_verts
+             (+ idx 2)
+             (+ (pref arrows_verts idx) headxval))
+      (pset! arrows_verts
+             (+ idx 3)
+             (+ (pref arrows_verts (+ idx 1)) headyval)))))
 
-(munge_points 256 256 0.01 0.01)
+(bind-func arrows_clockspin_heads
+  (lambda (mag off)
+    (doloop (i grid_size_x)
+      (doloop (j grid_size_y)
+        (arrows_set_head_vert i j
+                              (* mag (sin off))
+                              (* mag (cos off)))))))
 
-(bind-func draw
-  (let ((narrows (* 256 256))
-        (vert_vbo (create_vbo vertices (* 4 narrows)))
-        (vao (create_vao vert_vbo 2)))
-    (lambda (program)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
-      (glUseProgram program)
-      (glBindVertexArray vao)
-      (glDrawArrays GL_LINES 0 (* 4 narrows))
-      (update_vbo vert_vbo vertices (* 4 narrows))
-      void)))
+(bind-val arrows_vbo VBO*)
+(bind-val arrows_vao VAO*)
+(bind-val sp ShaderProgram*)
+
+;; init
+(call-as-xtlang
+ (set! arrows_vbo (create_vbo arrows_verts (convert (* 4 num_arrows))))
+ (set! arrows_vao (create_vao))
+ (bind_attribute arrows_vao arrows_vbo 0 2)
+ (glEnable GL_LINE_SMOOTH)
+ void)
+
+(bind-func create_arrows_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
+
+(create_arrows_shader (file->string "examples/external/shader-tutorials/arrows.vert")
+                      (file->string "examples/external/shader-tutorials/arrows.frag"))
+
+(bind-func gl_draw_arrows
+  (lambda ()
+    (glClear GL_COLOR_BUFFER_BIT)
+    (update_vbo_data arrows_vbo)
+    (glUseProgram (ShaderProgram_id sp))
+    (draw_vertex_array arrows_vao GL_LINES 0 (* 4 (convert num_arrows)))
+    (glfwSwapBuffers window)
+    void))
 
 (define gl-loop
   (lambda (time delta-t)
-    (munge_points 256 256
-                  (+ .01 (* .01 (cos (* .1 2pi (/ time 44100.)))))
-                  (+ .01 (* .01 (cos (* .1 2pi .7 (/ time 44100.))))))
-    (draw arrows-program)
-    (gl:swap-buffers *gl-window*)
+    (arrows_clockspin_heads (* (cos (* .0000053 time)) .3) (* time 0.0000074))
+    (gl_draw_arrows)
     ;; (println 'time: time)
     (callback (+ time (* *second* delta-t) 0.5)
               'gl-loop
               (+ time (* *second* delta-t)) 
               delta-t)))
 
+;; begin the draw loop
 (gl-loop (now) 1/30)
-
-(bind-func print_verts
-  (lambda (n)
-    (doloop (i n)
-      (printf "%.5f " (pref fxye i)))
-    (println)))
-
-(print_verts 64)
-
-(bind-func print_4floatvector
-  (lambda (v:/4,float/*)
-    (printf "/%f %f %f %f/"
-            (ftod (vref v 0))
-            (ftod (vref v 1))
-            (ftod (vref v 2))
-            (ftod (vref v 3)))))
-
-(bind-poly print print_4floatvector)
-
-(bind-func mean_fxye
-  (lambda (np)
-    (let ((sum:/4,float/* (salloc))
-          (norm:/4,float/* (salloc)))
-      (doloop (i (/ np 4))
-        (pset! sum 0 (+ (pref sum 0) (pref (cast fxye /4,float/*) i))))
-      (vfill! norm
-              (convert np)
-              (convert np)
-              (convert np)
-              (convert np))
-      (pset! sum 0 (/ (pref sum 0) norm))
-      (print_4floatvector sum)
-      (println))))
-
-(mean_fxye (pic_step.np))
-
-(define implicit-arrows-program
-  (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
-                 (file->string "examples/external/shader-tutorials/arrows.frag")))
-
-(bind-func draw
-  (let ((narrows (* 256 256))
-        (vert_vbo (create_vbo vertices (* 4 narrows)))
-        (vao (create_vao vert_vbo 2 16)))
-    (lambda (program)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
-      (glUseProgram program)
-      (glBindVertexArray vao)
-      (glDrawArrays GL_LINES 0 (* 4 narrows))
-      (update_vbo vert_vbo vertices (* 4 narrows))
-      void)))
-
-  homepage 'https://github.com/DeVaukz/SOIL'
-  url 'https://codeload.github.com/DeVaukz/SOIL/zip/master'
-  version '1.07'
-  sha1 '7114eb45fd2c8da5177e1dad663d4e09ce403842'

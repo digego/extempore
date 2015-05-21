@@ -1,0 +1,171 @@
+;;; stb_image.xtm -- Sean Barret's simple image library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: stb_image
+
+;;; Commentary:
+
+;; grab the source from github, then
+;; - rename stb_image*.h to stb_image*.c
+;; - clang -dynamiclib -o libstb_image.dylib stb_image.c stb_image_resize.c stb_image_write.c
+
+;;; Code:
+
+(sys:load-preload-check 'stb_image)
+(define *xtmlib-stb_image-loaded* #f)
+
+;; set up the current dylib name and path (for precompilation)
+(sys:precomp:set-dylib-name-info
+ 'libstb_image
+ (cond ((string=? (sys:platform) "OSX")
+        "libstb_image.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libstb_image.so")
+       ((string=? (sys:platform) "Windows")
+        "libstb_image.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib
+(define libstb_image
+  (sys:load-dylib (cdr *sys:precomp:current-load-dylib-info*)))
+
+;;;;;;;;;;;;;;;;;
+;; stb_image.h ;;
+;;;;;;;;;;;;;;;;;
+
+;; typedef struct
+;; {
+;;    int      (*read)  (void *user,char *data,int size);   ;; fill 'data' with 'size' bytes.  return number of bytes actually read
+;;    void     (*skip)  (void *user,int n);                 ;; skip the next 'n' bytes, or 'unget' the last -n bytes if negative
+;;    int      (*eof)   (void *user);                       ;; returns nonzero if we are at end of file/data
+;; } stbi_io_callbacks;
+
+;; this is just an opaque pointer now
+(bind-alias stbi_io_callbacks i8)
+
+(bind-alias stbi_uc i8)
+
+(bind-lib libstb_image stbi_load [stbi_uc*,i8*,i32*,i32*,i32*,i32]*)
+(bind-lib libstb_image stbi_load_from_memory [stbi_uc*,stbi_uc*,i32,i32*,i32*,i32*,i32]*)
+(bind-lib libstb_image stbi_load_from_callbacks [stbi_uc*,stbi_io_callbacks*,i8*,i32*,i32*,i32*,i32]*)
+
+;; #ifndef STBI_NO_STDIO
+;; (bind-lib libstb_image stbi_load_from_file [stbi_uc*,FILE*,i32*,i32*,i32*,i32]*)
+;; for stbi_load_from_file, file pointer is left pointing immediately after image
+;; #endif
+
+;; #ifndef STBI_NO_LINEAR
+(bind-lib libstb_image stbi_loadf [float*,i8*,i32*,i32*,i32*,i32]*)
+(bind-lib libstb_image stbi_loadf_from_memory [float*,stbi_uc*,i32,i32*,i32*,i32*,i32]*)
+(bind-lib libstb_image stbi_loadf_from_callbacks [float*,stbi_io_callbacks*,i8*,i32*,i32*,i32*,i32]*)
+
+   ;; #ifndef STBI_NO_STDIO
+;; (bind-lib libstb_image stbi_loadf_from_file [float*,FILE*,i32*,i32*,i32*,i32]*)
+   ;; #endif
+;; #endif
+
+;; #ifndef STBI_NO_HDR
+(bind-lib libstb_image stbi_hdr_to_ldr_gamma [void,float]*)
+(bind-lib libstb_image stbi_hdr_to_ldr_scale [void,float]*)
+;; #endif
+
+;; #ifndef STBI_NO_LINEAR
+(bind-lib libstb_image stbi_ldr_to_hdr_gamma [void,float]*)
+(bind-lib libstb_image stbi_ldr_to_hdr_scale [void,float]*)
+;; #endif ;; STBI_NO_HDR
+
+;; stbi_is_hdr is always defined, but always returns false if STBI_NO_HDR
+(bind-lib libstb_image stbi_is_hdr_from_callbacks [i32,stbi_io_callbacks*,i8*]*)
+(bind-lib libstb_image stbi_is_hdr_from_memory [i32,stbi_uc*,i32]*)
+;; #ifndef STBI_NO_STDIO
+(bind-lib libstb_image stbi_is_hdr [i32,i8*]*)
+;; (bind-lib libstb_image stbi_is_hdr_from_file [i32,FILE*]*)
+;; #endif ;; STBI_NO_STDIO
+
+
+;; get a VERY brief reason for failure
+;; NOT THREADSAFE
+(bind-lib libstb_image stbi_failure_reason [i8*]*)
+
+;; free the loaded image -- this is just free()
+(bind-lib libstb_image stbi_image_free [void,i8*]*)
+
+;; get image dimensions & components without fully decoding
+(bind-lib libstb_image stbi_info_from_memory [i32,stbi_uc*,i32,i32*,i32*,i32*]*)
+(bind-lib libstb_image stbi_info_from_callbacks [i32,stbi_io_callbacks*,i8*,i32*,i32*,i32*]*)
+
+;; #ifndef STBI_NO_STDIO
+(bind-lib libstb_image stbi_info [i32,i8*,i32*,i32*,i32*]*)
+;; (bind-lib libstb_image stbi_info_from_file [i32,FILE*,i32*,i32*,i32*]*)
+;; #endif
+
+
+
+;; for image formats that explicitly notate that they have premultiplied alpha,
+;; we just return the colors as stored in the file. set this flag to force
+;; unpremultiplication. results are undefined if the unpremultiply overflow.
+(bind-lib libstb_image stbi_set_unpremultiply_on_load [void,i32]*)
+
+;; indicate whether we should process iphone images back to canonical format,
+;; or just pass them through "as-is"
+(bind-lib libstb_image stbi_convert_iphone_png_to_rgb [void,i32]*)
+
+;; ZLIB client - used by PNG, available for other purposes
+
+(bind-lib libstb_image stbi_zlib_decode_malloc_guesssize [i8*,i8*,i32,i32,i32*]*)
+(bind-lib libstb_image stbi_zlib_decode_malloc_guesssize_headerflag [i8*,i8*,i32,i32,i32*,i32]*)
+(bind-lib libstb_image stbi_zlib_decode_malloc [i8*,i8*,i32,i32*]*)
+(bind-lib libstb_image stbi_zlib_decode_buffer [i32,i8*,i32,i8*,i32]*)
+
+(bind-lib libstb_image stbi_zlib_decode_noheader_malloc [i8*,i8*,i32,i32*]*)
+(bind-lib libstb_image stbi_zlib_decode_noheader_buffer [i32,i8*,i32,i8*,i32]*)
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; stb_image_resize.h ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib libstb_image stbir_resize_uint8 [i32,i8*,i32,i32,i32,i8*,i32,i32,i32,i32]*)
+
+(bind-lib libstb_image stbir_resize_float [i32,float*,i32,i32,i32,float*,i32,i32,i32,i32]*)
+
+;; The following functions interpret image data as gamma-corrected sRGB. 
+;; Specify STBIR_ALPHA_CHANNEL_NONE if you have no alpha channel,
+;; or otherwise provide the index of the alpha channel. Flags value
+;; of 0 will probably do the right thing if you're not sure what
+;; the flags mean.
+
+(bind-val STBIR_ALPHA_CHANNEL_NONE i32 -1)
+
+;; Set this flag if your texture has premultiplied alpha. Otherwise, stbir will
+;; use alpha-weighted resampling (effectively premultiplying, resampling,
+;; then unpremultiplying).
+(bind-val STBIR_FLAG_ALPHA_PREMULTIPLIED i32 1)
+;; The specified alpha channel should be handled as gamma-corrected value even
+;; when doing sRGB operations.
+(bind-val STBIR_FLAG_ALPHA_USES_COLORSPACE i32 2)
+
+(bind-lib libstb_image stbir_resize_uint8_srgb [i32,i8*,i32,i32,i32,i8*,i32,i32,i32,i32,i32,i32]*)
+
+(bind-alias stbir_edge enum)
+(bind-val STBIR_EDGE_CLAMP   stbir_edge 1)
+(bind-val STBIR_EDGE_REFLECT stbir_edge 2)
+(bind-val STBIR_EDGE_WRAP    stbir_edge 3)
+(bind-val STBIR_EDGE_ZERO    stbir_edge 4)
+
+;; This function adds the ability to specify how requests to sample off the edge of the image are handled.
+(bind-lib libstb_image stbir_resize_uint8_srgb_edgemode [i32,i8*,i32,i32,i32,i8*,i32,i32,i32,i32,i32,i32,stbir_edge]*)
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; stb_image_write.h ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib libstb_image stbi_write_png [i32,i8*,i32,i32,i32,i8*,i32]*)
+(bind-lib libstb_image stbi_write_bmp [i32,i8*,i32,i32,i32,i8*]*)
+(bind-lib libstb_image stbi_write_tga [i32,i8*,i32,i32,i32,i8*]*)
+(bind-lib libstb_image stbi_write_hdr [i32,i8*,i32,i32,i32,float*]*)
+
+(define *xtmlib-stb_image-loaded* #t)

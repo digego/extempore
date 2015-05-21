@@ -957,10 +957,7 @@ to continue it."
 (defun extempore-repl-preoutput-filter (string)
   (format "%s %s %s"
           (propertize "=>" 'font-lock-face 'font-lock-comment-face)
-          (propertize (if (and (equalp extempore-repl-current-language 'xtlang)
-                               (> (length string) 2))
-                          (substring string 1 -2)
-                        (substring string 0 -1))
+          (propertize (substring string 0 -1)
                       'font-lock-face
                       'font-lock-string-face)
           (extempore-repl-propertized-prompt-string)))
@@ -2361,7 +2358,7 @@ If you don't want to be prompted for this name each time, set the
         (replace-match
          (save-match-data
            (format "(%s %s)"
-                   (match-string-no-properties 1)
+                   (s-trim-left (match-string-no-properties 1))
                    (replace-regexp-in-string "[, ]+" " " (match-string-no-properties 2))))
          nil :literal)
         (indent-for-tab-command))))
@@ -2373,7 +2370,7 @@ If you don't want to be prompted for this name each time, set the
   (while (re-search-forward (format "^%s[ ]?\\(?:const \\|unsigned \\|extern \\)*\\([\\*[:word:]_]*\\) \\([\\*[:word:]_]*\\)[ ]?(\\(\\(?:.\\|\n\\)*?\\))"
                                     (if (string= ignore-tokens "")
                                         ""
-                                      (concat (regexp-opt (split-string ignore-tokens " " t) "?"))))
+                                      (concat (regexp-opt (split-string ignore-tokens " " t)) "?")))
                             nil
                             t)
     (if (not (looking-back ";;.*" (line-beginning-position)))

@@ -1,4 +1,9 @@
+(sys:load-preload-check 'shader-setup)
+
+(define *xtmlib-shader-setup-loaded* #f)
+
 (sys:load "libs/external/opengl.xtm")
+(sys:load "libs/contrib/glfw3.xtm")
 
 (bind-alias GLbitfield i32)
 (bind-alias GLboolean i8)
@@ -15,6 +20,20 @@
 (bind-alias GLvoid i8)
 (bind-alias GLintptr i64)
 (bind-alias GLsizeiptr i64)
+
+;; (bind-val GL_UNSIGNED_BYTE_3_3_2           GLenum #x8032)
+;; (bind-val GL_UNSIGNED_SHORT_4_4_4_4        GLenum #x8033)
+;; (bind-val GL_UNSIGNED_SHORT_5_5_5_1        GLenum #x8034)
+;; (bind-val GL_UNSIGNED_INT_8_8_8_8          GLenum #x8035)
+;; (bind-val GL_UNSIGNED_INT_10_10_10_2       GLenum #x8036)
+;; (bind-val GL_UNSIGNED_BYTE_2_3_3_REV       GLenum #x8362)
+;; (bind-val GL_UNSIGNED_SHORT_5_6_5          GLenum #x8363)
+;; (bind-val GL_UNSIGNED_SHORT_5_6_5_REV      GLenum #x8364)
+;; (bind-val GL_UNSIGNED_SHORT_4_4_4_4_REV    GLenum #x8365)
+;; (bind-val GL_UNSIGNED_SHORT_1_5_5_5_REV    GLenum #x8366)
+;; (bind-val GL_UNSIGNED_INT_8_8_8_8_REV      GLenum #x8367)
+;; (bind-val GL_UNSIGNED_INT_2_10_10_10_REV   GLenum #x8368)
+
 
 ;; id, type, size (bytes), data
 (bind-type VBO <GLuint,GLenum,GLsizeiptr,GLvoid*>)
@@ -74,15 +93,16 @@
     (let ((vbo:VBO* (zalloc))
           (id:GLuint* (salloc)))
       (glGenBuffers 1 id)
+      (gl_print_error "Error creating VBO")
       (tfill! vbo
               (pref id 0)
               GL_FLOAT
               (* buflen 4) ;; sizeof(float)
               (cast buf GLvoid*))
-      (printf "Created ")
-      (print_VBO vbo)
-      (printf "\n")
-      (gl_print_error "Error creating VBO")
+      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
+      (gl_print_error "Error setting VBO data")
+      (printf "Created ") (print_VBO vbo) (printf "\n")
       vbo)))
 
 (bind-func create_vbo_i32
@@ -90,34 +110,29 @@
     (let ((vbo:VBO* (zalloc))
           (id:GLuint* (salloc)))
       (glGenBuffers 1 id)
+      (gl_print_error "Error creating VBO")
       (tfill! vbo
               (pref id 0)
               GL_INT
               (* buflen 4) ;; sizeof(float)
               (cast buf GLvoid*))
-      (printf "Created ")
-      (print_VBO vbo)
-      (printf "\n")
-      (gl_print_error "Error creating VBO")
+      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
+      (gl_print_error "Error setting VBO data")
+      (printf "Created ") (print_VBO vbo) (printf "\n")
       vbo)))
 
 (bind-poly create_vbo create_vbo_float)
 (bind-poly create_vbo create_vbo_i32)
 
-(bind-func bind_vbo
-  (lambda (vbo:VBO*)
-    (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-    (gl_print_error "Error binding VBO")
-    (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
-    (gl_print_error "Error setting VBO data")))
-
-(bind-func update_vbo
+(bind-func update_vbo_data
   "update the full buffer"
   (lambda (vbo:VBO*)
     (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
     (gl_print_error "Error binding VBO")
     (glBufferSubData GL_ARRAY_BUFFER 0 (VBO_size vbo) (VBO_data vbo))
-    (gl_print_error "Error updating VBO subdata")))
+    (gl_print_error "Error updating VBO subdata")
+    (glBindBuffer GL_ARRAY_BUFFER 0)))
 
 (bind-func delete_vbo
   (lambda (vbo:VBO*)
@@ -127,7 +142,7 @@
       (gl_print_error "Error deleting VBO")
       (free vbo))))
 
-(bind-type VAO <GLenum>)
+(bind-type VAO <GLuint>)
 
 (bind-func VAO_id
   (lambda (vao:VAO*)
@@ -160,12 +175,19 @@
   (lambda (vao:VAO* vbo:VBO* index size stride offset)
     (glBindVertexArray (VAO_id vao))
     (gl_print_error "Error binding VAO")
-    (glEnableVertexAttribArray index)
-    (gl_print_error "Error enabling VAO attribute")
     (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
     (gl_print_error "Error binding VBO")
-    (glVertexAttribPointer index size (VBO_type vbo) GL_FALSE stride (pref-ptr (cast null GLvoid*) offset))
-    (gl_print_error "Error binding VAO attribute")))
+    (let ((component_size 4)) ;; for for GL_FLOAT and GL_INT
+      (glVertexAttribPointer index
+                             size
+                             (VBO_type vbo)
+                             GL_FALSE
+                             (* component_size stride)
+                             (pref-ptr (cast null GLvoid*) (* component_size offset))))
+    (gl_print_error "Error binding VAO attribute")
+    (glEnableVertexAttribArray index)
+    (gl_print_error "Error enabling VAO attribute")
+    (glBindVertexArray 0)))
 
 (bind-func bind_attribute_packed
   (lambda (vao vbo index size)
@@ -175,11 +197,12 @@
 (bind-poly bind_attribute bind_attribute_packed)
 
 (bind-func draw_vertex_array
-  (lambda (vao:VAO* draw_mode first count)
+  (lambda (vao:VAO* draw_mode first_element count)
     (glBindVertexArray (VAO_id vao))
     (gl_print_error "Error binding vertex array")
-    (glDrawArrays draw_mode first count)
-    (gl_print_error "Error drawing vertex array")))
+    (glDrawArrays draw_mode first_element count)
+    (gl_print_error "Error drawing vertex array")
+    (glBindVertexArray 0)))
 
 (bind-func delete_vao
   (lambda (vao:VAO*)
@@ -189,7 +212,7 @@
       (gl_print_error "Error deleting VAO")
       (free vao))))
 
-(bind-type Texture <GLenum>)
+(bind-type Texture <GLuint>)
 
 (bind-func Texture_id
   (lambda (tex:Texture*)
@@ -221,15 +244,15 @@
       (printf "\n")
       tex)))
 
-(bind-func bind_texture
-  (lambda (tex:Texture* data:GLvoid*)
-    (glBindTexture GL_TEXTURE_2D (Texture_id tex))
-    (glTexImage2D GL_TEXTURE_2D 0 GL_RGB 2 2 0 GL_RGB GL_FLOAT data)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-    void))
+;; (bind-func bind_texture
+;;   (lambda (tex:Texture* data:GLvoid*)
+;;     (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+;;     (glTexImage2D GL_TEXTURE_2D 0 GL_RGB 2 2 0 GL_RGB GL_FLOAT data)
+;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+;;     void))
 
 (bind-func delete_texture
   (lambda (tex:Texture*)
@@ -239,16 +262,168 @@
       (gl_print_error "Error deleting Texture")
       (free tex))))
 
-;; actually do the things...
+;; stb_image is a helper library for loading image data
 
-(define width 1440.0)
-(define height 900.0)
-(bind-val width float 1440.0)
-(bind-val height float 900.0)
-(define fullscreen #t)
+(sys:load "libs/external/stb_image.xtm")
 
-(define *gl-window* (gl:make-ctx-core ":0.0" fullscreen 0.0 0.0 width height))
+(bind-func bind_image_texture
+  (lambda (tex filename)
+    (let ((width_ptr:i32* (salloc))
+          (height_ptr:i32* (salloc))
+          (comp_ptr:i32* (salloc))
+          (data (stbi_load filename width_ptr height_ptr comp_ptr 4)))
+      (if (null? data)
+          (begin (println (stbi_failure_reason))
+                 null)
+          (begin
+            (glActiveTexture GL_TEXTURE0)
+            (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+            (glTexImage2D GL_TEXTURE_2D 0
+                          GL_RGBA
+                          (pref width_ptr 0)
+                          (pref height_ptr 0)
+                          0
+                          GL_RGBA
+                          GL_UNSIGNED_BYTE
+                          data)
+            ;; set some parameters
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+            (gl_print_error "couldn't bind_image_texture")
+            tex)))))
 
-;; how did it all go?
+;; shaders
 
-(gl_print_driver_info)
+;;                <id    ,type  >
+(bind-type Shader <GLuint,GLenum>)
+(bind-type ShaderProgram <GLuint>)
+
+(bind-func Shader_id
+  (lambda (shader:Shader*)
+    (tref shader 0)))
+
+(bind-func Shader_type
+  (lambda (shader:Shader*)
+    (tref shader 1)))
+
+(bind-func ShaderProgram_id
+  (lambda (program:ShaderProgram*)
+    (tref program 0)))
+
+(bind-func Shader_print_info_log
+  (let ((max_log_length 4096)
+        (logbuf:i8* (zalloc max_log_length)))
+    (lambda (shader:Shader*)
+      (let ((len_ptr (salloc 1 i32)))
+        (glGetShaderInfoLog (Shader_id shader)
+                            max_log_length
+                            len_ptr
+                            logbuf)
+        (printf "%s shader info log: %s\n"
+                (cond ((= (Shader_type shader) GL_VERTEX_SHADER)
+                       "Vert")
+                      ((= (Shader_type shader) GL_FRAGMENT_SHADER)
+                       "Frag")
+                      ((= (Shader_type shader) GL_GEOMETRY_SHADER)
+                       "Geom")
+                      (else ""))
+                (if (= (pref len_ptr 0) 0)
+                    "OK"
+                    logbuf))
+        (if (= (pref len_ptr 0) 0) 0 1)))))
+
+(bind-func ShaderProgram_print_info_log
+  (let ((max_log_length 4096)
+        (logbuf:i8* (zalloc max_log_length)))
+    (lambda (program:ShaderProgram*)
+      (let ((len_ptr (salloc 1 i32)))
+        (glGetProgramInfoLog (ShaderProgram_id program)
+                             max_log_length
+                             len_ptr
+                             logbuf)
+        
+        (printf "Program info log: %s\n"
+                (if (= (pref len_ptr 0) 0)
+                    "OK"
+                    logbuf))
+        (if (= (pref len_ptr 0) 0) 0 1)))))
+
+(bind-func Shader_create
+  "create (and compile) an OpenGL shader"
+  (lambda (source:i8* type:GLenum)
+    (if (not (or (= type GL_VERTEX_SHADER)
+                 (= type GL_FRAGMENT_SHADER)
+                 (= type GL_GEOMETRY_SHADER)))
+        (begin (println "Error: shader type must be one of GL_VERTEX_SHADER, GL_FRAGMENT_SHADER or GL_GEOMETRY_SHADER")
+               null)
+        (let ((shader_id (glCreateShader type))
+              (source_ptr:i8** (salloc))
+              (shader (Shader shader_id type)))
+          (pset! source_ptr 0 source)
+          (glShaderSource shader_id 1 source_ptr (cast null i32*))
+          (glCompileShader shader_id)
+          (Shader_print_info_log shader)
+          shader))))
+
+(bind-func ShaderProgram_create_vf
+  "compile and link shader program (vert and frag shader)"
+  (lambda (vert:Shader* frag:Shader*)
+    (if (not (and (= (Shader_type vert) GL_VERTEX_SHADER)
+                  (= (Shader_type frag) GL_FRAGMENT_SHADER)))
+        (begin (println "Error: input shader types must be vert and frag respectively.")
+               null)
+        (let ((program_id (glCreateProgram))
+              (program (ShaderProgram program_id)))
+          (glAttachShader program_id (Shader_id vert))
+          (glAttachShader program_id (Shader_id frag))
+          (glLinkProgram program_id)
+          (ShaderProgram_print_info_log program)
+          program))))
+
+(bind-func ShaderProgram_create_vgf
+  "compile and link shader program (vert and frag shader)"
+  (lambda (vert:Shader* geom:Shader* frag:Shader*)
+    (if (not (and (= (Shader_type vert) GL_VERTEX_SHADER)
+                  (= (Shader_type geom) GL_GEOMETRY_SHADER)
+                  (= (Shader_type frag) GL_FRAGMENT_SHADER)))
+        (begin (println "Error: input shader types must be vert and frag respectively.")
+               null)
+        (let ((program_id (glCreateProgram))
+              (program (ShaderProgram program_id)))
+          (glAttachShader program_id (Shader_id vert))
+          (glAttachShader program_id (Shader_id geom))
+          (glAttachShader program_id (Shader_id frag))
+          (glLinkProgram program_id)
+          (ShaderProgram_print_info_log program)
+          program))))
+
+;; these ones are handy when you want to create a new shader program
+;; directly from the sources
+
+(bind-func ShaderProgram_create_vsfs
+  "compile and link shader program (vert and frag shader source)"
+  (lambda (vsource:i8* fsource:i8*)
+    (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
+          (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
+      (if (or (null? vert) (null? frag))
+          null
+          (ShaderProgram_create_vf vert frag)))))
+
+(bind-func ShaderProgram_create_vsgsfs
+  "compile and link shader program (vert and frag shader source)"
+  (lambda (vsource:i8* gsource:i8* fsource:i8*)
+    (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
+          (geom (Shader_create vsource GL_GEOMETRY_SHADER))
+          (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
+      (if (or (null? vert) (null? geom) (null? frag))
+          null
+          (ShaderProgram_create_vgf vert geom frag)))))
+
+(bind-poly ShaderProgram_create ShaderProgram_create_vf)
+(bind-poly ShaderProgram_create ShaderProgram_create_vgf)
+(bind-poly ShaderProgram_create ShaderProgram_create_vsfs)
+(bind-poly ShaderProgram_create ShaderProgram_create_vsgsfs)
+
+(define *xtmlib-shader-setup-loaded* #t)

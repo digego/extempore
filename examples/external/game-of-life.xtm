@@ -15,8 +15,8 @@
     (glTexImage2D GL_TEXTURE_2D
                   0
                   GL_RGB
-                  (+ 2 (convert (world_width world)))
-                  (+ 2 (convert (world_height world)))
+                  (convert (world_width world))
+                  (convert (world_height world))
                   0
                   GL_RED
                   GL_BYTE
@@ -24,7 +24,8 @@
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
-    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)))
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+    (gl_print_error "in world_texture_setup")))
 
 (define *gol-shader*
   (create_shader (file->string "examples/external/game-of-life.vert")
@@ -34,12 +35,13 @@
 (call-as-xtlang
  (pfill! fullscreen_quad_verts
          ;; pos       texcoord
-         -1.0  1.0 0.0 0.0
-         1.0  1.0 1.0 0.0
-         -1.0 -1.0 0.0 1.0
-         1.0 -1.0 1.0 1.0)
- (set! world (world_create 256 128))
- (world_init world .05)
+         -1.0  1.0    0.0 0.0
+          1.0  1.0    1.0 0.0
+         -1.0 -1.0    0.0 1.0
+          1.0 -1.0    1.0 1.0)
+ (set! world (world_create 512 512))
+ ;; (world_set_to_checkerboard world)
+ (world_init world .5)
  (set! vbo (create_vbo fullscreen_quad_verts 16))
  (bind_vbo vbo)
  (set! vao (create_vao))
@@ -49,23 +51,22 @@
  (world_texture_setup)
  void)
 
-(call-as-xtlang (world_init world .04))
-
 (bind-func gl_draw
   (lambda (program)
+    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
     ;; run the simulation
     (world_step world)
     ;; update texture
     (glTexSubImage2D GL_TEXTURE_2D 0 0 0
-                     (+ 2 (convert (world_width world)))
-                     (+ 2 (convert (world_height world)))
+                     (convert (world_width world))
+                     (convert (world_height world))
                      GL_RED
                      GL_BYTE
                      (world_data world))
     ;; draw the world
-    (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-    (glUniform1i (glGetUniformLocation program "tex") 0)
-    (glUseProgram program)
+    (let ((texloc (glGetUniformLocation program "tex")))
+      (glUseProgram program)
+      (glUniform1i texloc 0))
     (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
     void))
 
@@ -83,6 +84,13 @@
                 next-frame-time
                 delta-t))))
 
-(gl-loop (now) 1/20)
+;; run once
+(begin
+  (gl_draw *gol-shader*)
+  (gl:swap-buffers *gl-window*))
 
-;; actually run the simulation
+;; start it running
+(gl-loop (now) 1/2)
+
+;; (randomly) reinitialise the world
+(call-as-xtlang (world_init world .1))

@@ -1,140 +1,47 @@
 (sys:load "examples/external/shader-tutorials/shader-setup.xtm")
 
-(bind-func gl_set_modes
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_core_profile)
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
+
+(bind-val fullscreen_quad_vert_data float* 8)
+
+(bind-val vbo VBO*)
+(bind-val vao VAO*)
+(bind-val sp ShaderProgram*)
+
+;; init
+(call-as-xtlang
+ (pfill! fullscreen_quad_vert_data
+         ;; pos (2D)
+         -1.0  1.0
+          1.0  1.0
+         -1.0 -1.0
+          1.0 -1.0)
+ (set! vbo (create_vbo fullscreen_quad_vert_data 16))
+ (set! vao (create_vao))
+ (bind_attribute vao vbo 0 2 2 0)
+ void)
+
+(bind-func gl_draw
   (lambda ()
-    ;; (glPolygonMode GL_FRONT_AND_BACK GL_POINT)
-    (glEnable GL_PROGRAM_POINT_SIZE)
-    void)) ;; GL_LESS
+    (glClear GL_COLOR_BUFFER_BIT)
+    (glUseProgram (ShaderProgram_id sp))
+    (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
+    (glfwSwapBuffers window)
+    void))
 
-(gl_set_modes)
+(bind-func create_heatmap_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
 
-(define gridsize 256) ;; total cells = gridsize^2
-(bind-val grid float* (* 2 gridsize gridsize))
-(bind-val values float* (* 2 gridsize gridsize))
+(create_heatmap_shader (file->string "examples/external/shader-tutorials/heatmap.vert")
+                       (file->string "examples/external/shader-tutorials/heatmap.frag"))
 
-(bind-func init_grid
-  (lambda (gridsize)
-    (let ((i 0) (j 0))
-      (dotimes (i gridsize)
-        (dotimes (j gridsize)
-          (pset! grid
-                 (* (+ (* gridsize i) j) 2)
-                 (convert i float))
-          (pset! grid
-                 (+ (* (+ (* gridsize i) j) 2) 1)
-                 (convert j float)))))))
-
-(init_grid gridsize)
-
-(bind-func munge_values
-  (lambda (gridsize)
-    (let ((i 0))
-      (dotimes (i gridsize)
-        (pset! values i (random))))))
-
-(munge_values gridsize)
-
-(define heatmap-program
-  (create_shader (file->string "examples/external/shader-tutorials/heatmap.vert")
-                 (file->string "examples/external/shader-tutorials/heatmap.frag")))
-
-(bind-func draw
-  (let ((gridsize:i32 256)
-        (gridsize2 (* gridsize gridsize))
-        (grid_vbo (create_vbo grid (* 2 gridsize2)))
-        (value_vbo (create_vbo values (* 2 gridsize2)))
-        (vao (create_vao grid_vbo 2 value_vbo 2))
-        (model:float* (zalloc 16)))
-    (fill_identity_matrix model)
-    (translate_matrix model -1. -1. 0.)
-    (scale_matrix model
-                  (/ 2. (convert gridsize))
-                  (/ 2. (convert gridsize))
-                  1.)
-    (lambda (program)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))        
-      (glUseProgram program)
-      (glBindVertexArray vao)
-      (glUniform1f (glGetUniformLocation program "size")
-                   (+ 4. (* 4. (cos (/ (* .1 6.28 (convert (now))) 44100.)))))
-      (glUniformMatrix4fv (glGetUniformLocation program "model") 1 GL_FALSE model)
-      (glDrawArrays GL_POINTS 0 gridsize2)
-      (update_vbo grid_vbo grid (* 2 gridsize2))
-      (update_vbo value_vbo values (* 2 gridsize2))
-      void)))
-
-;; TODO- the scaling is off, and so is the color (value isn't getting passed through)
-
-(define gl-loop
-  (lambda (time delta-t)
-    (munge_values gridsize)    
-    (draw heatmap-program)
-    (gl:swap-buffers *gl-window*)
-    ;; (println 'time: time)
-    (callback (+ time (* *second* delta-t) 0.5)
-              'gl-loop
-              (+ time (* *second* delta-t)) 
-              delta-t)))
-
-(gl-loop (now) 1/2)
-
-(bind-func print_verts
-  (lambda (n)
-    (doloop (i n)
-      (printf "%.2f " (ftod (pref values i))))
-    (println)))
-
-(print_verts 16)
-
-(bind-func print_4floatvector
-  (lambda (v:/4,float/*)
-    (printf "/%f %f %f %f/"
-            (ftod (vref v 0))
-            (ftod (vref v 1))
-            (ftod (vref v 2))
-            (ftod (vref v 3)))))
-
-(bind-poly print print_4floatvector)
-
-(bind-func mean_fxye
-  (lambda (np)
-    (let ((sum:/4,float/* (salloc))
-          (norm:/4,float/* (salloc)))
-      (doloop (i (/ np 4))
-        (pset! sum 0 (+ (pref sum 0) (pref (cast fxye /4,float/*) i))))
-      (vfill! norm
-              (convert np)
-              (convert np)
-              (convert np)
-              (convert np))
-      (pset! sum 0 (/ (pref sum 0) norm))
-      (print_4floatvector sum)
-      (println))))
-
-(mean_fxye (pic_step.np))
-
-(define run-pic
-  (lambda (delta-t)
-    (let ((ntime (pic_step)))
-      (if (= (modulo ntime 1000) 0)
-          (println 'ntime: ntime)))
-    ;; (draw_energy_hud)
-    (gl_draw_particles (pic_step.nx))
-    (gl:swap-buffers *gl-ctx*)
-    (callback (+ (now) (* *second* delta-t))
-              'run-pic
-              delta-t)))
-
-(bind-func kick_particles
-  (lambda (np percentage kickx kicky)
-    (doloop (i np)
-      )))
-
-(bind-func testloop
-  (lambda ()
-    (doloop (i 2)
-      (doloop (j 2)
-        (let ((iplusj (+ i j)))
-          (println "i:" i "j:" j "iplusj:" iplusj))))))
-
-(testloop)
+;; draw the map
+(gl_draw)
