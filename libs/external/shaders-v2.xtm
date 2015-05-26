@@ -1,9 +1,16 @@
-(sys:load-preload-check 'shader-setup)
+(sys:load "libs/shaders-v2.xtm" 'quiet)
+(sys:load-preload-check 'shaders-v2)
+(define *xtmlib-shaders-v2-loaded* #f)
 
-(define *xtmlib-shader-setup-loaded* #f)
+(impc:aot:suppress-aot-do
+ (sys:load "libs/external/opengl.xtm")
+ (sys:load "libs/contrib/glfw3.xtm")
+ (sys:load "libs/external/stb_image.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/external/opengl.xtm" 'quiet))
+(impc:aot:insert-sexp '(sys:load "libs/contrib/glfw3.xtm" 'quiet))
+(impc:aot:insert-sexp '(sys:load "libs/external/stb_image.xtm" 'quiet))
 
-(sys:load "libs/external/opengl.xtm")
-(sys:load "libs/contrib/glfw3.xtm")
+(impc:aot:insert-header "xtmshaders-v2")
 
 (bind-alias GLbitfield i32)
 (bind-alias GLboolean i8)
@@ -264,10 +271,8 @@
 
 ;; stb_image is a helper library for loading image data
 
-(sys:load "libs/external/stb_image.xtm")
-
 (bind-func bind_image_texture
-  (lambda (tex filename)
+  (lambda (tex:Texture* filename)
     (let ((width_ptr:i32* (salloc))
           (height_ptr:i32* (salloc))
           (comp_ptr:i32* (salloc))
@@ -426,4 +431,5 @@
 (bind-poly ShaderProgram_create ShaderProgram_create_vsfs)
 (bind-poly ShaderProgram_create ShaderProgram_create_vsgsfs)
 
-(define *xtmlib-shader-setup-loaded* #t)
+(impc:aot:insert-footer "xtmshaders-v2")
+(define *xtmlib-shaders-v2-loaded* #t)
