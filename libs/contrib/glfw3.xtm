@@ -10,18 +10,32 @@
 
 ;;; Code:
 
+(sys:load "libs/glfw3.xtm" 'quiet)
 (sys:load-preload-check 'glfw3)
-
 (define *xtmlib-glfw3-loaded* #f)
 
-(sys:load "libs/external/opengl.xtm")
+(impc:aot:suppress-aot-do
+ (sys:load "libs/external/opengl.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/external/opengl.xtm" 'quiet))
 
+(impc:aot:insert-header "xtmglfw3")
+
+(impc:aot:set-dylib-name-info
+ 'libglfw3
+ (cond ((string=? (sys:platform) "OSX")
+        "libglfw3.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libglfw3.so")
+       ((string=? (sys:platform) "Windows")
+        "libglfw3.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib               
 (define libglfw3
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:open-dylib "libglfw3.so"))
-          ((string=? platform "Windows") (sys:open-dylib "libglfw3.dll"))
-          ((string=? platform "OSX") (sys:open-dylib "libglfw3.dylib"))
-          (else (print "Unknown platform: " platform)))))
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
 ;; (define libGLEW
 ;;   (let ((platform (sys:platform)))
@@ -296,7 +310,7 @@
 (bind-val GLFW_KEY_RIGHT_ALT i32 346)
 (bind-val GLFW_KEY_RIGHT_SUPER i32 347)
 (bind-val GLFW_KEY_MENU i32 348)
-(bind-val GLFW_KEY_LAST i32 (call-as-xtlang GLFW_KEY_MENU))
+(bind-val GLFW_KEY_LAST i32 348) ;; (call-as-xtlang GLFW_KEY_MENU)
 
 ;; /*! @} */
 
@@ -336,10 +350,10 @@
 (bind-val GLFW_MOUSE_BUTTON_6 i32 5)
 (bind-val GLFW_MOUSE_BUTTON_7 i32 6)
 (bind-val GLFW_MOUSE_BUTTON_8 i32 7)
-(bind-val GLFW_MOUSE_BUTTON_LAST i32 (call-as-xtlang GLFW_MOUSE_BUTTON_8))
-(bind-val GLFW_MOUSE_BUTTON_LEFT i32 (call-as-xtlang GLFW_MOUSE_BUTTON_1))
-(bind-val GLFW_MOUSE_BUTTON_RIGHT i32 (call-as-xtlang GLFW_MOUSE_BUTTON_2))
-(bind-val GLFW_MOUSE_BUTTON_MIDDLE i32 (call-as-xtlang GLFW_MOUSE_BUTTON_3))
+(bind-val GLFW_MOUSE_BUTTON_LAST i32 7) ;; (call-as-xtlang GLFW_MOUSE_BUTTON_8)
+(bind-val GLFW_MOUSE_BUTTON_LEFT i32 0) ;; (call-as-xtlang GLFW_MOUSE_BUTTON_1)
+(bind-val GLFW_MOUSE_BUTTON_RIGHT i32 1) ;; (call-as-xtlang GLFW_MOUSE_BUTTON_2)
+(bind-val GLFW_MOUSE_BUTTON_MIDDLE i32 2) ;; (call-as-xtlang GLFW_MOUSE_BUTTON_3)
 ;; /*! @} */
 
 ;; /*! @defgroup joysticks Joysticks
@@ -364,7 +378,7 @@
 (bind-val GLFW_JOYSTICK_14 i32 13)
 (bind-val GLFW_JOYSTICK_15 i32 14)
 (bind-val GLFW_JOYSTICK_16 i32 15)
-(bind-val GLFW_JOYSTICK_LAST i32 (call-as-xtlang GLFW_JOYSTICK_16))
+(bind-val GLFW_JOYSTICK_LAST i32 15) ;; (call-as-xtlang GLFW_JOYSTICK_16)
 ;; /*! @} */
 
 ;; /*! @defgroup errors Error codes
@@ -3300,4 +3314,5 @@
   (lambda (window:GLFWwindow* cbfun:i8*)
     (glfwSetWindowPosCallback window (convert cbfun))))
 
+(impc:aot:insert-footer "xtmglfw3")
 (define *xtmlib-glfw3-loaded* #t)
