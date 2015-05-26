@@ -59,14 +59,14 @@
 (bind-lib libpic2 cdsortp2yl [void,float*,float*,i32*,i32,i32,i32]*)
 (bind-lib libpic2 ccguard2l [void,float*,i32,i32,i32,i32]*)
 (bind-lib libpic2 caguard2l [void,float*,i32,i32,i32,i32]*)
-(bind-lib libpic2 cpois22 [void,cpxf*,cpxf*,i32,cpxf*,float,float,float,float*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libpic2 cwfft2rinit [void,i32*,cpxf*,i32,i32,i32,i32]*)
-(bind-lib libpic2 cfft2rxx [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libpic2 cfft2rxy [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libpic2 cfft2r2x [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libpic2 cfft2r2y [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libpic2 cwfft2rx [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libpic2 cwfft2r2 [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpic2 cpois22 [void,Complexf*,Complexf*,i32,Complexf*,float,float,float,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpic2 cwfft2rinit [void,i32*,Complexf*,i32,i32,i32,i32]*)
+(bind-lib libpic2 cfft2rxx [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpic2 cfft2rxy [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpic2 cfft2r2x [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpic2 cfft2r2y [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpic2 cwfft2rx [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libpic2 cwfft2r2 [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32]*)
 
 ;; main
 
@@ -85,9 +85,9 @@
 (bind-val qe float*)
 (bind-val fxye float*)
 (bind-val field float*)
-(bind-val ffc cpxf*)
+(bind-val ffc Complexf*)
 (bind-val mixup i32*)
-(bind-val sct cpxf*)
+(bind-val sct Complexf*)
 (bind-val npicy i32*)
 ;; and a vbo for the graphics code
 (bind-val vbo E_vbo*)
@@ -283,8 +283,8 @@
     (cwfft2rinit mixup sct indx indy nxhy nxyh)
     ;; calculate form factors
     (set! isign 0)
-    (cpois22 (cast qe cpxf*)
-             (cast fxye cpxf*)
+    (cpois22 (cast qe Complexf*)
+             (cast fxye Complexf*)
              isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
     ;; initialize electrons
     (cdistr2 part vtx vty vx0 vy0 npx npy idimp np nx ny ipbc)
@@ -312,7 +312,7 @@
       ;; updates qe
       (dtimer dtime itime -1)
       (set! isign -1)
-      (cwfft2rx (cast qe cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+      (cwfft2rx (cast qe Complexf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
       (dtimer dtime itime 1)
       (set! time (convert (pref dtime 0)))
       (set! tfft (+ tfft time))
@@ -321,8 +321,8 @@
       ;; procedure: updates fxye
       (dtimer dtime itime -1)
       (set! isign -1)
-      (cpois22 (cast qe cpxf*)
-               (cast fxye cpxf*)
+      (cpois22 (cast qe Complexf*)
+               (cast fxye Complexf*)
                isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
       (dtimer dtime itime 1)
       (set! time (convert (pref dtime 0)))
@@ -331,7 +331,7 @@
       ;; transform force to real space with standard procedure: updates fxye
       (dtimer dtime itime -1)
       (set! isign 1)
-      (cwfft2r2 (cast fxye cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+      (cwfft2r2 (cast fxye Complexf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
       (dtimer dtime itime 1)
       (set! time (convert (pref dtime 0)))
       (set! tfft (+ tfft time))

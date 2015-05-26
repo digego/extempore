@@ -42,18 +42,18 @@
 (bind-lib libbpic2 cbguard2l [void,float*,i32,i32,i32,i32]*)
 (bind-lib libbpic2 cacguard2l [void,float*,i32,i32,i32,i32]*)
 (bind-lib libbpic2 caguard2l [void,float*,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cpois23 [void,cpxf*,cpxf*,i32,cpxf*,float,float,float,float*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 ccuperp2 [void,cpxf*,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cibpois23 [void,cpxf*,cpxf*,cpxf*,float,float*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cmaxwel2 [void,cpxf*,cpxf*,cpxf*,cpxf*,float,float,float*,float*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cemfield2 [void,cpxf*,cpxf*,cpxf*,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cwfft2rinit [void,i32*,cpxf*,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cfft2rxx [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cfft2rxy [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cfft2r3x [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cfft2r3y [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cwfft2rx [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32]*)
-(bind-lib libbpic2 cwfft2r3 [void,cpxf*,i32,i32*,cpxf*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cpois23 [void,Complexf*,Complexf*,i32,Complexf*,float,float,float,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 ccuperp2 [void,Complexf*,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cibpois23 [void,Complexf*,Complexf*,Complexf*,float,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cmaxwel2 [void,Complexf*,Complexf*,Complexf*,Complexf*,float,float,float*,float*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cemfield2 [void,Complexf*,Complexf*,Complexf*,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cwfft2rinit [void,i32*,Complexf*,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cfft2rxx [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cfft2rxy [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cfft2r3x [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cfft2r3y [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cwfft2rx [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32]*)
+(bind-lib libbpic2 cwfft2r3 [void,Complexf*,i32,i32*,Complexf*,i32,i32,i32,i32,i32,i32]*)
 
 (bind-func run_main
   (lambda ()
@@ -72,10 +72,10 @@
 (bind-val cue float*)
 (bind-val fxyze float*)
 (bind-val bxyze float*)
-(bind-val exyz cpxf*)
-(bind-val bxyz cpxf*)
-(bind-val ffc cpxf*)
-(bind-val sct cpxf*)
+(bind-val exyz Complexf*)
+(bind-val bxyz Complexf*)
+(bind-val ffc Complexf*)
+(bind-val sct Complexf*)
 (bind-val mixup i32*)
 (bind-val npicy i32*)
 ;; and a vbo for the graphics code
@@ -272,8 +272,8 @@
     (cwfft2rinit mixup sct indx indy nxhy nxyh)
     ;; calculate form factors
     (set! isign 0)
-    (cpois23 (cast qe cpxf*)
-             (cast fxyze cpxf*)
+    (cpois23 (cast qe Complexf*)
+             (cast fxyze Complexf*)
              isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
 
     ;; initialize electrons
@@ -301,49 +301,49 @@
       ;; transform charge to fourier space with standard procedure:
       ;; updates qe
       (set! isign -1)
-      (cwfft2rx (cast qe cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+      (cwfft2rx (cast qe Complexf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
 
       ;; transform current to fourier space with standard procedure:
       ;; update cue
       (set! isign -1)
-      (cwfft2r3 (cast cue cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+      (cwfft2r3 (cast cue Complexf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
 
       ;; take transverse part of current with standard procedure:
       ;; updates cue
-      (ccuperp2 (cast cue cpxf*) nx ny nxeh nye)
+      (ccuperp2 (cast cue Complexf*) nx ny nxeh nye)
 
       ;; calculate electromagnetic fields in fourier space with
       ;; standard procedure: updates exyz, bxyz
       (if (= ntime 0)
-          (begin (cibpois23 (cast cue cpxf*) bxyz ffc ci wm nx ny nxeh nye nxh nyh)
+          (begin (cibpois23 (cast cue Complexf*) bxyz ffc ci wm nx ny nxeh nye nxh nyh)
                  (pset! wf 0 0.0)
                  (set! dth (* 0.5 dt))
                  void)
-          (cmaxwel2 exyz bxyz (cast cue cpxf*) ffc ci dt wf wm nx ny nxeh nye nxh nyh))
+          (cmaxwel2 exyz bxyz (cast cue Complexf*) ffc ci dt wf wm nx ny nxeh nye nxh nyh))
 
       ;; calculate force/charge in fourier space with standard
       ;; procedure: updates fxyze
       (set! isign -1)
-      (cpois23 (cast qe cpxf*) (cast fxyze cpxf*) isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
+      (cpois23 (cast qe Complexf*) (cast fxyze Complexf*) isign ffc ax ay affp we nx ny nxeh nye nxh nyh)
 
       ;; add longitudinal and transverse electric fields with standard
       ;; procedure: updates fxyze
       (set! isign 1)
-      (cemfield2 (cast fxyze cpxf*) exyz ffc isign nx ny nxeh nye nxh nyh)
+      (cemfield2 (cast fxyze Complexf*) exyz ffc isign nx ny nxeh nye nxh nyh)
 
       ;; copy magnetic field with standard procedure: updates bxyze
       (set! isign -1)
-      (cemfield2 (cast bxyze cpxf*) bxyz ffc isign nx ny nxeh nye nxh nyh)
+      (cemfield2 (cast bxyze Complexf*) bxyz ffc isign nx ny nxeh nye nxh nyh)
 
       ;; transform electric force to real space with standard
       ;; procedure: updates fxyze
       (set! isign 1)
-      (cwfft2r3 (cast fxyze cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+      (cwfft2r3 (cast fxyze Complexf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
 
       ;; transform magnetic force to real space with standard procedure:
       ;; updates bxyze                                                  
       (set! isign 1)
-      (cwfft2r3 (cast bxyze cpxf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
+      (cwfft2r3 (cast bxyze Complexf*) isign mixup sct indx indy nxeh nye nxhy nxyh)
 
       ;; munge the fields while they're in real space
       (munge_fields (* nxeh nye))
