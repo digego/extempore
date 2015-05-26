@@ -23,7 +23,62 @@
 
 (sys:load "libs/core/math.xtm")
 ;; (sys:load "libs/external/shaders.xtm")
-(sys:load "libs/external/mpi.xtm")
+
+;; (sys:load "libs/external/mpi.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; begin inserted mpi.xtm code ;;
+
+;; set up the current dylib name and path (for precompilation)
+(impc:aot:set-dylib-name-info
+ 'libmpi
+ (cond ((string=? (sys:platform) "OSX")
+        "libmpi.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libmpi.so")
+       ((string=? (sys:platform) "Windows")
+        "libmpi.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+;; load the dylib               
+(define libmpi
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+
+(bind-alias MPI_Comm i8*) ;; ompi_communicator_t*
+(bind-alias MPI_Datatype i8*) ;; ompi_datatype_t*
+
+(bind-lib libmpi MPI_Gather [i32,i8*,i32,MPI_Datatype,i8*,i32,MPI_Datatype,i32,MPI_Comm]*)
+(bind-lib-val libmpi ompi_mpi_comm_world_addr MPI_Comm)
+(bind-val MPI_COMM_WORLD MPI_Comm)
+
+(call-as-xtlang (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr))
+
+(impc:aot:set-dylib-name-info
+ 'libmpiaddresses
+ (cond ((string=? (sys:platform) "OSX")
+        "/Users/ben/Code/extempore/examples/external/mpi/libmpiaddresses.dylib")
+       ((string=? (sys:platform) "Linux")
+        "libmpiaddresses.so")
+       ((string=? (sys:platform) "Windows")
+        "libmpiaddresses.dll")
+       (else
+        (begin (print-with-colors 'red 'default #f (print "Error"))
+               (print ": unsupported platform ")
+               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+(define libmpiaddresses
+  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+
+(bind-lib-val libmpiaddresses ompi_mpi_float_addr MPI_Datatype)
+(bind-val MPI_FLOAT MPI_Datatype)
+
+(call-as-xtlang (set! MPI_FLOAT ompi_mpi_float_addr))
+
+;; end inserted mpi.xtm code ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; set up the current dylib name and path (for precompilation)
 (impc:aot:set-dylib-name-info
