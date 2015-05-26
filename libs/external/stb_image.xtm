@@ -12,8 +12,15 @@
 
 ;;; Code:
 
+(sys:load "libs/stb_image.xtm" 'quiet)
 (sys:load-preload-check 'stb_image)
 (define *xtmlib-stb_image-loaded* #f)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmstb_image")
 
 ;; set up the current dylib name and path (for precompilation)
 (impc:aot:set-dylib-name-info
@@ -168,4 +175,5 @@
 (bind-lib libstb_image stbi_write_tga [i32,i8*,i32,i32,i32,i8*]*)
 (bind-lib libstb_image stbi_write_hdr [i32,i8*,i32,i32,i32,float*]*)
 
+(impc:aot:insert-footer "xtmstb_image")
 (define *xtmlib-stb_image-loaded* #t)
