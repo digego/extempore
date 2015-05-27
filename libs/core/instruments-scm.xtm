@@ -54,6 +54,30 @@
        (play ,@args)
        #f))
 
+;; play pattern
+;;
+;; (playp "x x " 2 sampler 120 dur)
+;; (playp ". -x . x" 2 sampler 120 dur)
+;; 
+(define-macro (playp str l . args)
+  `(let ((res (cl:member-if (lambda (x)
+                              (equal? (car x) (modulo beat ,l)))
+                            ',(map (lambda (c r)
+                                     (list (if (equal? c #\ ) #f r)
+                                           (cdr (assoc c '((#\ . 0)
+                                                           (#\x . 60)
+                                                           (#\o . 67)
+                                                           (#\- . 66)
+                                                           (#\. . 69))))))
+                                   (string->list str)
+                                   (range 0 l (/ l (string-length str)))))))
+     (if res 
+         (play ,(car args)
+               (cadar res)
+               ,@(cdr args))
+         #f)))
+
+
 ;; a macro for making extemore instruments
 ;; see http://benswift.me/2012-09-28-making-an-instrument.html
 
