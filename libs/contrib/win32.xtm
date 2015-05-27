@@ -14,12 +14,19 @@
 (define kernel32 (sys:load-dylib "Kernel32.dll"))
 
 (if (or (eq? #f kernel32)
-	(null? kernel32))
+        (null? kernel32))
     (print-error "Error loading kernel32 lib"))
+
+(define user32 (sys:load-dylib "User32.dll"))
+
+(if (or (eq? #f user32)
+        (null? user32))
+    (print-error "Error loading user32 lib"))
 
 (bind-alias HANDLE i8*)
 (bind-alias DWORD i32)
 (bind-alias DWORD_PTR i64)
+(bind-alias BOOL i1)
 (bind-alias PDWORD_PTR i64*) ;; pointer to DWORD_PTR
 
 (bind-val REALTIME_PRIORITY_CLASS i32 256)
@@ -39,3 +46,10 @@
 (bind-lib kernel32 GetMaximumProcessorCount [DWORD,DWORD]*)
 (bind-lib kernel32 GetActiveProcessorCount [DWORD,DWORD]*)
 (bind-lib kernel32 SetProcessPriorityBoost [i1,HANDLE,i1]*)
+
+(bind-alias HWND i8*)
+(bind-alias HDC i8*)
+
+(bind-lib user32 WindowFromDC [HWND,HDC]*)
+(bind-lib user32 BringWindowToTop [BOOL,HWND]*)
+(bind-lib user32 SetFocus [HWND,HWND]*)
