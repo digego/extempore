@@ -160,6 +160,112 @@
           (_qsortf dat (+ index 1) right))
         void)))
 
+(bind-func _qsorti64
+  (lambda (dat:i64* left right)
+    (if (< left right)
+        (let ((tmp 0)
+              (_swap (lambdas (x y)
+                      (set! tmp (pref dat x))
+                      (pset! dat x (pref dat y))
+                      (pset! dat y tmp)))
+              (pivot (pref dat right))
+              (index left)
+              (i 0))
+          (dotimes (i left (- right left))
+            (if (or (< (pref dat i) pivot)
+                    (= (pref dat i) pivot))
+                (begin (_swap i index)
+                       (set! index (+ index 1)))))
+          (_swap right index)
+          (_qsorti64 dat left (- index 1))
+          (_qsorti64 dat (+ index 1) right))
+        void)))
+
+(bind-func _qsorti32
+  (lambda (dat:i32* left right)
+    (if (< left right)
+        (let ((tmp 0)
+              (_swap (lambdas (x y)
+                      (set! tmp (pref dat x))
+                      (pset! dat x (pref dat y))
+                      (pset! dat y tmp)))
+              (pivot (pref dat right))
+              (index left)
+              (i 0))
+          (dotimes (i left (- right left))
+            (if (or (< (pref dat i) pivot)
+                    (= (pref dat i) pivot))
+                (begin (_swap i index)
+                       (set! index (+ index 1)))))
+          (_swap right index)
+          (_qsorti32 dat left (- index 1))
+          (_qsorti32 dat (+ index 1) right))
+        void)))
+
+(bind-func _qsorti16
+  (lambda (dat:i16* left right)
+    (if (< left right)
+        (let ((tmp 0)
+              (_swap (lambdas (x y)
+                      (set! tmp (pref dat x))
+                      (pset! dat x (pref dat y))
+                      (pset! dat y tmp)))
+              (pivot (pref dat right))
+              (index left)
+              (i 0))
+          (dotimes (i left (- right left))
+            (if (or (< (pref dat i) pivot)
+                    (= (pref dat i) pivot))
+                (begin (_swap i index)
+                       (set! index (+ index 1)))))
+          (_swap right index)
+          (_qsorti16 dat left (- index 1))
+          (_qsorti16 dat (+ index 1) right))
+        void)))
+
+(bind-func _qsorti8
+  (lambda (dat:i8* left right)
+    (if (< left right)
+        (let ((tmp 0)
+              (_swap (lambdas (x y)
+                      (set! tmp (pref dat x))
+                      (pset! dat x (pref dat y))
+                      (pset! dat y tmp)))
+              (pivot (pref dat right))
+              (index left)
+              (i 0))
+          (dotimes (i left (- right left))
+            (if (or (< (pref dat i) pivot)
+                    (= (pref dat i) pivot))
+                (begin (_swap i index)
+                       (set! index (+ index 1)))))
+          (_swap right index)
+          (_qsorti8 dat left (- index 1))
+          (_qsorti8 dat (+ index 1) right))
+        void)))
+
+;; this generic _qsort works but is SUPER slow!
+(bind-func _qsort:[void,!a,i64,i64]*
+  (lambda (dat left right)
+    (if (< left right)
+        (let ((tmp (convert 0))
+              (_swap (lambdas (x y)
+                      (set! tmp (pref dat x))
+                      (pset! dat x (pref dat y))
+                      (pset! dat y tmp)))
+              (pivot (pref dat right))
+              (index left)
+              (i 0))
+          (dotimes (i left (- right left))
+            (if (or (< (pref dat i) pivot)
+                    (= (pref dat i) pivot))
+                (begin (_swap i index)
+                       (set! index (+ index 1)))))
+          (_swap right index)
+          (_qsort dat left (- index 1))
+          (_qsort dat (+ index 1) right))
+        void)))
+
 (bind-func sortd
   (lambda (arr:double* lgth)
     (_qsortd arr 0 (- lgth 1))
@@ -170,8 +276,32 @@
     (_qsortf arr 0 (- lgth 1))
     arr))
 
+(bind-func sorti64
+  (lambda (arr:i64* lgth)
+    (_qsorti64 arr 0 (- lgth 1))
+    arr))
+
+(bind-func sorti32
+  (lambda (arr:i32* lgth)
+    (_qsorti32 arr 0 (- lgth 1))
+    arr))
+
+(bind-func sorti16
+  (lambda (arr:i16* lgth)
+    (_qsorti16 arr 0 (- lgth 1))
+    arr))
+
+(bind-func sorti8
+  (lambda (arr:i8* lgth)
+    (_qsorti8 arr 0 (- lgth 1))
+    arr))
+
 (bind-poly sort sortd)
 (bind-poly sort sortf)
+(bind-poly sort sorti64)
+(bind-poly sort sorti32)
+(bind-poly sort sorti16)
+(bind-poly sort sorti8)
 
 ;;;;;;;;;;;;;;;; mean, median, mode
 ;; need to extend these to ints
@@ -1159,6 +1289,35 @@
       (printf "%lld/%lld" (tref reduced 0) (tref reduced 1))) void))
 
 (bind-poly print print_rat)
+
+(bind-func rtod
+  (lambda (a:Rational)
+    (/ (i64tod (tref a 0)) (i64tod (tref a 1)))))
+
+(bind-func rtof
+  (lambda (a:Rational)
+    (/ (i64tof (tref a 0)) (i64tof (tref a 1)))))
+
+(bind-func rtoi64
+  (lambda (a:Rational)
+    (dtoi64 (rtod a))))
+
+(bind-func rtoi32
+  (lambda (a:Rational)
+    (dtoi32 (rtod a))))
+
+(bind-func rtoi16
+  (lambda (a:Rational)
+    (dtoi16 (rtod a))))
+
+(bind-func rtoi8
+  (lambda (a:Rational)
+    (dtoi8 (rtod a))))
+
+(bind-func rtoi1
+  (lambda (a:Rational)
+    (dtoi1 (rtod a))))
+
 
 (bind-func rat_mul_r_r
   (lambda (a:Rational b:Rational)
