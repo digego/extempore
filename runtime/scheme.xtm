@@ -530,6 +530,10 @@
        `(+ ,(cadr args) (* ,(caddr args) (tri-wave (* 2pi beat ,(cadddr args)))))))
 
 
+(define (clamp num low high)
+  (if (< num low) low
+      (if (> num high) high
+          num)))
 
 ; creates a rhythm of a given length
 ; a tactus is provided and a percentage of synconization (from 0 - 1)
@@ -927,6 +931,11 @@
   (if (null? lst)
       accum
       (foldl func (func accum (car lst)) (cdr lst))))
+
+(define (scan proc val lst)
+    (if (null? lst)
+        '()
+        (cons (proc val (car lst)) (scan proc (proc val (car lst)) (cdr lst)))))
 
 ;; jumble returns a randomized version of lst
 (define jumble
