@@ -218,17 +218,6 @@ namespace extemp {
 	static pointer ad_getClockTime(scheme* _sc, pointer args);
 	static pointer ad_setTime(scheme* _sc, pointer args);
 
-	static pointer getEvent(scheme* _sc, pointer args);
-#if defined (TARGET_OS_WINDOWS)
-	static pointer addGLExtension(scheme* _sc, pointer args);
-#endif
-	static pointer makeGLContext(scheme* _sc, pointer args);
-#if defined (TARGET_OS_MAC)
-	static pointer makeGLCoreContext(scheme* _sc, pointer args);
-#endif
-	static pointer glSwapBuffers(scheme* _sc, pointer args);
-	static pointer glMakeContextCurrent(scheme* _sc, pointer args);
-
 	static double CLOCK_OFFSET;
     private:
 	static SchemeFFI SINGLETON;		

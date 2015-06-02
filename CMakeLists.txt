@@ -131,7 +131,6 @@ endif()
 if(APPLE)
   target_compile_definitions(extempore
     PRIVATE -DTARGET_OS_MAC
-    PRIVATE -DUSE_GLUT
     )
   # tell the compiler that we're using ObjC++
   target_compile_options(extempore PRIVATE -x objective-c++)

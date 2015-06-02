@@ -6,7 +6,7 @@ else
 PLATFORM_LIBS += -pthread
 endif
 
-PLATFORM_LIBS += -lportaudio -lpcre -lGL -lX11
+PLATFORM_LIBS += -lportaudio -lpcre
 
 PLATFORM_CXXFLAGS := -g -fPIC -O3
 PLATFORM_LDFLAGS := -Wl,--export-dynamic
