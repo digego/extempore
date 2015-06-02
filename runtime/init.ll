@@ -506,7 +506,7 @@ declare i64 @strxfrm(i8*, i8*, i64)
 ;; misc C lib stuff
 declare void @longjmp(i8*,i32)
 declare i32 @setjmp(i8*)
-
+declare i8* @dlsym(i8*, i8*)
 
 ;; opengl
  declare void @glAccum(i32, float)
