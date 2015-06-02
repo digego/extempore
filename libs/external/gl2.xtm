@@ -1799,38 +1799,38 @@
 ;; load platform-specific OpenGL stuff
 
 (let ((platform (sys:platform)))
-  ((string=? platform "OSX")
-   (eval `(bind-func gl_get_proc_address
-            (let ((libGL_ptr:i8* null))
-              (lambda (name:i8*)
-                (if (not (null? libGL_ptr))
-                    (dlsym libGL_ptr name)
-                    null))))
-         (interaction-environment))
-   ;; set the OpenGL.framework pointer in gl_get_proc_address
-   (gl_get_proc_address.libGL_ptr libGL))
+  (cond ((string=? platform "OSX")
+         (eval '(bind-func gl_get_proc_address
+                  (let ((libGL_ptr:i8* null))
+                    (lambda (name:i8*)
+                      (if (not (null? libGL_ptr))
+                          (dlsym libGL_ptr name)
+                          null))))
+               (interaction-environment))
+         ;; set the OpenGL.framework pointer in gl_get_proc_address
+         (gl_get_proc_address.libGL_ptr libGL))
 
-  ((string=? platform "Linux")
-   (eval `(bind-lib libGL glXGetProcAddressARB [i8*,i8*]*)
-         (interaction-environment))
-   (eval `(bind-func gl_get_proc_address
-            (lambda (name:i8*)
-              (glXGetProcAddressARB name)))
-         (interaction-environment)))
+        ((string=? platform "Linux")
+         (eval '(bind-lib libGL glXGetProcAddressARB [i8*,i8*]*)
+               (interaction-environment))
+         (eval '(bind-func gl_get_proc_address
+                  (lambda (name:i8*)
+                    (glXGetProcAddressARB name)))
+               (interaction-environment)))
 
-  ((string=? platform "Windows")
-   (eval `(bind-lib libGL wglGetProcAddress [i8*,i8*]*)
-         (interaction-environment))
-   (eval `(bind-func gl_get_proc_address
-            (lambda (name:i8*)
-              (wglGetProcAddressARB name)))
-         (interaction-environment)))
+        ((string=? platform "Windows")
+         (eval '(bind-lib libGL wglGetProcAddress [i8*,i8*]*)
+               (interaction-environment))
+         (eval '(bind-func gl_get_proc_address
+                  (lambda (name:i8*)
+                    (wglGetProcAddressARB name)))
+               (interaction-environment)))
 
-  (else (begin (print-with-colors 'red 'default #t
-                                  (print "Error"))
-               (print ": unknown platform, cannot load platform-specific ")
-               (print-with-colors 'blue 'default #f (print "OpenGL"))
-               (print " code.\n"))))
+        (else (begin (print-with-colors 'red 'default #t
+                                        (print "Error"))
+                     (print ": unknown platform, cannot load platform-specific ")
+                     (print-with-colors 'blue 'default #f (print "OpenGL"))
+                     (print " code.\n")))))
 
 (bind-gl-lib glAccum [void,GLenum,GLfloat]*)
 (bind-gl-lib glAlphaFunc [void,GLenum,GLfloat,GLclampf]*)
@@ -2421,7 +2421,7 @@
 ;; gl print
 (bind-func gl_print_error
   (lambda ()
-    (let ((err) (glGetError))
+    (let ((err (glGetError)))
       ;; (if (<> err GL_NO_ERROR)
       ;;     (ascii_text_color 0 1 10))
       (cond
