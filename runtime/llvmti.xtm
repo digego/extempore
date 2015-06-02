@@ -8502,6 +8502,51 @@
                 (impc:compiler:print-lib-binding-details-to-log library symname type))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
 
+;; this is like bind-lib, but specifically for OpenGL procedures. It's
+;; necessary because you have to get the function pointer at runtime
+;; from the GL driver
+
+(define-macro (bind-gl-lib proc-name type . args)
+  `(impc:ti:bind-gl-lib ',proc-name ',type ,@(map (lambda (k) `(quote ,k)) args)))
+
+
+(define impc:ti:bind-gl-lib
+  (lambda (proc-name type . args)
+    (if (or (not (defined? 'libGL))
+            (not libGL))
+        (impc:compiler:print-compiler-error
+         (string-append "the OpenGL dynamic library appears to have not been loaded correctly"))
+        (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
+               (calling_convention "ccc")
+               (ir-string (string-append "declare "
+                                         calling_convention
+                                         " "
+                                         (impc:ir:get-type-str (car ctype))
+                                         " @"
+                                         (symbol->string proc-name)
+                                         "("
+                                         (if (null? (cdr ctype))
+                                             ""
+                                             (apply string-append
+                                                    (impc:ir:get-type-str (cadr ctype))
+                                                    (map (lambda (v)
+                                                           (string-append "," (impc:ir:get-type-str v)))
+                                                         (cddr ctype))))
+                                         ") nounwind")))
+          (if (and (llvm:compile-ir ir-string)
+                   (llvm:bind-global-var libGL
+                                         (symbol->string proc-name)
+                                         (gl_get_proc_address (symbol->string proc-name))))
+              (begin
+                (impc:aot:insert-sexp
+                 `(llvm:bind-global-var libGL
+                                         ,(symbol->string proc-name)
+                                         (gl_get_proc_address ,(symbol->string proc-name))))
+                (impc:ti:register-new-nativefunc (symbol->string proc-name) (impc:ir:get-type-from-pretty-str (symbol->string type)) "")
+                (impc:compiler:print-lib-binding-details-to-log 'libGL proc-name type))
+              (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string proc-name))))))))
+
+
 (define-macro (remove-func symname)
   `(begin
      (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var"))
