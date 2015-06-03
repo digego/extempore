@@ -380,7 +380,7 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
        '("\\_<[-+]?[/.[:digit:]]+?\\_>"
          (0 font-lock-constant-face))
        ;; hex literals
-       '("\\_<#[xob][[:digit:]]+?\\_>"
+       '("\\_<#[xob][0-9a-fA-F]+?\\_>"
          (0 font-lock-constant-face))
        ;; hack to make sure / gets highlighted as a function
        '("\\_</\\_>"
