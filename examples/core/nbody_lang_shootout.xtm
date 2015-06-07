@@ -278,10 +278,17 @@
       (tset! bodies 4 (/ (- 0.0 py) solar_mass))
       (tset! bodies 5 (/ (- 0.0 pz) solar_mass))
       void)))
+
+(bind-val bodies planet*)
+
+(bind-func init_bodies
+  (lambda ()
+    (set! bodies (make_bodies))
+    void))
                                                
 (bind-func main
   (lambda (n:i64)
-    (let ((bodies:planet* (make_bodies))
+    (let (;; (bodies:planet* (make_bodies))
           (i:i64 0))
       (offset_momentum 5 bodies)
       (printf "%.9f\n" (energy 5 bodies))
@@ -290,6 +297,10 @@
       (printf "%.9f\n" (energy 5 bodies))
       void)))
 
+(init_bodies)
+
 (let ((t1 (clock:clock)))
   (main 50000000)
   (println 'time: (- (clock:clock) t1)))
+
+(quit 1)
