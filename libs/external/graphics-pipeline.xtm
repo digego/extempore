@@ -21,32 +21,6 @@
 
 (impc:aot:insert-header "xtmgraphics-pipeline")
 
-;; draw a quad
-;; tw and th are framebuffer width and height
-(bind-func gl_draw_shader_quad
-  (lambda (x y w h r tw th)
-    (let ((hx (* -0.5 w))
-	  (hy (* -0.5 h))
-	  (xx (+ x (* .5 w)))
-	  (yy (+ y (* .5 h))))
-      (glPushMatrix)
-      (glTranslated xx yy 0.0)
-      (glRotated r 0.0 0.0 1.0)
-      (glBegin GL_QUADS)
-      (glTexCoord2d 0.0 0.0)
-      (glVertex2d hx hy)
-      (glTexCoord2d 0.0 th)
-      (glVertex2d hx (+ hy h))
-      (glTexCoord2d tw th)
-      (glVertex2d (+ hx w) (+ hy h))
-      (glTexCoord2d tw 0.0)
-      (glVertex2d (+ hx w) hy)
-      (glTexCoord2d 0.0 0.0)
-      (glEnd)
-      (glPopMatrix)
-      void)))
-
-
 ;; matrix should be float* 5x5
 (bind-func shader_set_grid_offsets
   (lambda (matrix:float* width:float height:float factor:float)
