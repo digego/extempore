@@ -1,4 +1,4 @@
-(sys:load "libs/external/shaders-v2.xtm")
+(sys:load "libs/external/glfw3.xtm")
 
 (bind-val window GLFWwindow*)
 
@@ -15,7 +15,7 @@
 
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
-(bind-val sp ShaderProgram*)
+(bind-val sp ShaderProgram)
 
 ;; init
 (call-as-xtlang
@@ -24,8 +24,8 @@
           0.0  0.5   1.0 0.0 0.0
           0.5 -0.5   0.0 1.0 0.0
          -0.5 -0.5   0.0 0.0 1.0)
- (set! vbo (create_vbo triangle_vert_data 15))
- (set! vao (create_vao))
+ (set! vbo (VBO_create triangle_vert_data 15))
+ (set! vao (VAO_create))
  (bind_attribute vao vbo 0 2 5 0) ;; position
  (bind_attribute vao vbo 1 3 5 2) ;; tex_coord
  void)
@@ -40,7 +40,7 @@
 (bind-func gl_draw
   (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
-    (glUseProgram (ShaderProgram_id sp))
+    (glUseProgram sp)
     (draw_vertex_array vao GL_TRIANGLES 0 3)
     (glfwSwapBuffers window)
     void))
