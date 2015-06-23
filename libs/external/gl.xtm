@@ -2862,6 +2862,46 @@
 (bind-alias PFNGLDEPTHRANGEINDEXEDPROC [void,GLuint,GLclampd,GLclampd]*)
 (bind-alias PFNGLGETFLOATI_VPROC [void,GLenum,GLuint,GLfloat*]*)
 (bind-alias PFNGLGETDOUBLEI_VPROC [void,GLenum,GLuint,GLdouble*]*)
+;; some helper functions
+
+;; gl print
+(bind-func gl_print_error_with_msg
+  (lambda (msg:i8*)
+    (let ((err (glGetError)))
+      (cond
+       ((= err GL_INVALID_ENUM)
+        (printf "%s: Invalid Enum\n" msg))
+       ((= err GL_INVALID_VALUE)
+        (printf "%s: Invalid Value\n" msg))
+       ((= err GL_INVALID_OPERATION)
+        (printf "%s: Invalid Operation\n" msg))
+       ((= err GL_OUT_OF_MEMORY)
+        (printf "%s: Out Of Memory\n" msg))
+       ((= err GL_INVALID_FRAMEBUFFER_OPERATION)
+        (printf "%s: Invalid Framebuffer Operation\n" msg))
+       ((= err GL_NO_ERROR)
+        1:i32)
+       (else
+        (printf "%s\n" msg)))
+      void)))
+
+(bind-func gl_print_error_no_msg
+  (lambda ()
+    (gl_print_error_with_msg "OpenGL Error")))
+
+(bind-poly gl_print_error gl_print_error_with_msg)
+(bind-poly gl_print_error gl_print_error_no_msg)
+
+(bind-func gl_print_driver_info
+  (lambda ()
+    (println "--------------------------------------------------")
+    (println "Extempore OpenGL driver info")
+    (println "--------------------------------------------------")
+    (printf "  Vendor:  %s\n" (glGetString GL_VENDOR))
+    (printf "Renderer:  %s\n" (glGetString GL_RENDERER))
+    (printf " Version:  %s\n" (glGetString GL_VERSION))
+    (println "--------------------------------------------------")
+    void))
 
 (impc:aot:insert-footer "xtmgl")
 (define *xtmlib-gl-loaded* #t)
