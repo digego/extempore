@@ -1796,42 +1796,6 @@
 (bind-val GL_COMPRESSED_SLUMINANCE          i32 #x8C4A)
 (bind-val GL_COMPRESSED_SLUMINANCE_ALPHA    i32 #x8C4B)
 
-;; load platform-specific OpenGL stuff
-
-(let ((platform (sys:platform)))
-  (cond ((string=? platform "OSX")
-         (eval '(bind-func gl_get_proc_address
-                  (let ((libGL_ptr:i8* null))
-                    (lambda (name:i8*)
-                      (if (not (null? libGL_ptr))
-                          (dlsym libGL_ptr name)
-                          null))))
-               (interaction-environment))
-         ;; set the OpenGL.framework pointer in gl_get_proc_address
-         (gl_get_proc_address.libGL_ptr libGL))
-
-        ((string=? platform "Linux")
-         (eval '(bind-lib libGL glXGetProcAddressARB [i8*,i8*]*)
-               (interaction-environment))
-         (eval '(bind-func gl_get_proc_address
-                  (lambda (name:i8*)
-                    (glXGetProcAddressARB name)))
-               (interaction-environment)))
-
-        ((string=? platform "Windows")
-         (eval '(bind-lib libGL wglGetProcAddress [i8*,i8*]*)
-               (interaction-environment))
-         (eval '(bind-func gl_get_proc_address
-                  (lambda (name:i8*)
-                    (wglGetProcAddressARB name)))
-               (interaction-environment)))
-
-        (else (begin (print-with-colors 'red 'default #t
-                                        (print "Error"))
-                     (print ": unknown platform, cannot load platform-specific ")
-                     (print-with-colors 'blue 'default #f (print "OpenGL"))
-                     (print " code.\n")))))
-
 (bind-lib libGL glAccum [void,GLenum,GLfloat]*)
 (bind-lib libGL glAlphaFunc [void,GLenum,GLfloat,GLclampf]*)
 (bind-lib libGL glAreTexturesResident [GLboolean,GLsizei,GLuint*,GLboolean*]*)
@@ -2418,36 +2382,36 @@
 
 ;; some helper functions
 
-;; gl print
-(bind-func gl_print_error
-  (lambda ()
+(bind-func gl_print_error_with_msg
+  (lambda (msg:i8*)
     (let ((err (glGetError)))
-      ;; (if (<> err GL_NO_ERROR)
-      ;;     (ascii_text_color 0 1 10))
       (cond
        ((= err GL_INVALID_ENUM)
-        (printf "OpenGL Error: invalid ENUM: %d\n" err))
+        (printf "%s: Invalid Enum\n" msg))
        ((= err GL_INVALID_VALUE)
-        (printf "OpenGL Error: Invalid Value: %d\n" err))
+        (printf "%s: Invalid Value\n" msg))
        ((= err GL_INVALID_OPERATION)
-        (printf "OpenGL Error: Invalid Operation: %d\n" err))
+        (printf "%s: Invalid Operation\n" msg))
        ((= err GL_STACK_OVERFLOW)
-        (printf "OpenGL Error: Stack Underflow: %d\n" err))
+        (printf "%s: Stack Underflow\n" msg))
        ((= err GL_STACK_UNDERFLOW)
-        (printf "OpenGL Error: Stack Overflow: %d\n" err))
+        (printf "%s: Stack Overflow\n" msg))
        ((= err GL_OUT_OF_MEMORY)
-        (printf "OpenGL Error: Out Of Memory: %d\n" err))
-       ;; this enum requires an OpenGL extension (see glext.xtm)
-       ;; ((= err GL_INVALID_FRAMEBUFFER_OPERATION)
-       ;;  (printf "OpenGL Error: Invalid Framebuffer Operation: %d\n" err))
+        (printf "%s: Out Of Memory\n" msg))
        ((= err GL_TABLE_TOO_LARGE)
-        (printf "OpenGL Error: Table Too Large: %d\n" err))
+        (printf "%s: Table Too Large\n" msg))
        ((= err GL_NO_ERROR)
-        ;; do nothing
-        (i64toi32 1))
+        1:i32)
        (else
-        (printf "OpenGL Error: %d\n" err))))
-    void))
+        (printf "%s\n" msg)))
+      void)))
+
+(bind-func gl_print_error_no_msg
+  (lambda ()
+    (gl_print_error_with_msg "OpenGL Error")))
+
+(bind-poly gl_print_error gl_print_error_with_msg)
+(bind-poly gl_print_error gl_print_error_no_msg)
 
 (bind-func gl_print_driver_info
   (lambda ()
