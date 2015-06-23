@@ -5,35 +5,48 @@
 
 ;;; Commentary:
 
-;;
+;; This example uses the (now very old) "fixed function" graphics
+;; pipeline. Unless there's a reason you have to use this
+;; functionality, then you probably want to look at the
+;; "hello-triangle.xtm" example instead
 
 ;;; Code:
-(define glctx (gl:make-ctx ":0.0" #f 0.0 0.0 1024.0 768.0))
 
-;; a trivial opengl draw loop
-(bind-func my-gl-loop
+(sys:load "libs/external/gl-compatibility.xtm")
+(sys:load "libs/external/glfw3.xtm")
+
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (set! window (glfw_create_window 1024 768))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
+
+(bind-func gl_draw
   (let ((size 0.01))
     (lambda (degree)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (glLoadIdentity)
       (glTranslated 0.0 -1.0 0.0)
       (let ((i:double 0.0))
-	(dotimes (i 1000.0)
-	  (glTranslated (/ i 2000.0) 0.0 0.0)
-	  (glColor3d (/ i 1500.0) 0.0 1.0)
-	  (glRotated degree (/ i 200000.0) 0.5 0.0)
-	  (glBegin GL_QUADS)
-	  (glVertex2d 0.0 0.0)
-	  (glVertex2d size 0.0)
-	  (glVertex2d size size)
-	  (glVertex2d 0.0 size)       
-	  (glEnd))))))
+        (dotimes (i 1000.0)
+          (glTranslated (/ i 2000.0) 0.0 0.0)
+          (glColor3d (/ i 1500.0) 0.0 1.0)
+          (glRotated degree (/ i 200000.0) 0.5 0.0)
+          (glBegin GL_QUADS)
+          (glVertex2d 0.0 0.0)
+          (glVertex2d size 0.0)
+          (glVertex2d size size)
+          (glVertex2d 0.0 size)       
+          (glEnd)))
+      (glfwSwapBuffers window))))
 
-;; standard impromptu callback                                                
-(define opengl-test
+;; standard Extempore callback
+
+(define gl-loop
   (lambda (degree)
-    (my-gl-loop degree)
-    (gl:swap-buffers glctx)
-    (callback (+ (now) 500) 'opengl-test (+ degree .005))))
+    (gl_draw degree)
+    (callback (+ (now) 500) 'gl-loop (+ degree .005))))
 
-(opengl-test 70.0)
+(gl-loop 70.0)
