@@ -28,20 +28,6 @@
 (bind-alias GLintptr i64)
 (bind-alias GLsizeiptr i64)
 
-;; (bind-val GL_UNSIGNED_BYTE_3_3_2           GLenum #x8032)
-;; (bind-val GL_UNSIGNED_SHORT_4_4_4_4        GLenum #x8033)
-;; (bind-val GL_UNSIGNED_SHORT_5_5_5_1        GLenum #x8034)
-;; (bind-val GL_UNSIGNED_INT_8_8_8_8          GLenum #x8035)
-;; (bind-val GL_UNSIGNED_INT_10_10_10_2       GLenum #x8036)
-;; (bind-val GL_UNSIGNED_BYTE_2_3_3_REV       GLenum #x8362)
-;; (bind-val GL_UNSIGNED_SHORT_5_6_5          GLenum #x8363)
-;; (bind-val GL_UNSIGNED_SHORT_5_6_5_REV      GLenum #x8364)
-;; (bind-val GL_UNSIGNED_SHORT_4_4_4_4_REV    GLenum #x8365)
-;; (bind-val GL_UNSIGNED_SHORT_1_5_5_5_REV    GLenum #x8366)
-;; (bind-val GL_UNSIGNED_INT_8_8_8_8_REV      GLenum #x8367)
-;; (bind-val GL_UNSIGNED_INT_2_10_10_10_REV   GLenum #x8368)
-
-
 ;; id, type, size (bytes), data
 (bind-type VBO <GLuint,GLenum,GLsizeiptr,GLvoid*>)
 
@@ -221,41 +207,17 @@
       (gl_print_error "Error deleting VAO")
       (free vao))))
 
-(bind-type Texture <GLuint>)
-
-(bind-func Texture_id
-  (lambda (tex:Texture*)
-    (tref tex 0)))
-
-(bind-func Texture_print
-  (lambda (tex:Texture*)
-    (printf "Texture: id %d" (tref tex 0))
-    void))
-
-(bind-poly print Texture_print)
-
-(bind-func Texture_tostring
-  (lambda (tex:Texture*)
-    (let ((s:i8* (salloc 256)))
-      (sprintf s "Texture: id %d" (tref tex 0))
-      (Str s))))
-
-(bind-poly tostring Texture_tostring)
+(bind-alias Texture GLuint)
 
 (bind-func Texture_create
   (lambda ()
-    (let ((tex:Texture* (zalloc))
-          (id:GLuint* (salloc)))
+    (let ((id:GLuint* (salloc)))
       (glGenTextures 1 id)
       (gl_print_error "Error creating Texture")
-      (tset! tex 0 (pref id 0))
-      (printf "Created ")
-      (Texture_print tex)
-      (printf "\n")
-      tex)))
+      (pref id 0))))
 
-;; (bind-func bind_texture
-;;   (lambda (tex:Texture* data:GLvoid*)
+;; (bind-func Texture_bind
+;;   (lambda (tex:Texture data:GLvoid*)
 ;;     (glBindTexture GL_TEXTURE_2D (Texture_id tex))
 ;;     (glTexImage2D GL_TEXTURE_2D 0 GL_RGB 2 2 0 GL_RGB GL_FLOAT data)
 ;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
@@ -265,27 +227,24 @@
 ;;     void))
 
 (bind-func Texture_delete
-  (lambda (tex:Texture*)
+  (lambda (tex:Texture)
     (let ((id:GLuint* (salloc)))
-      (pset! id 0 (Texture_id tex))
+      (pset! id 0 tex)
       (glDeleteTextures 1 id)
-      (gl_print_error "Error deleting Texture")
-      (free tex))))
-
-;; stb_image is a helper library for loading image data
+      (gl_print_error "Error deleting Texture"))))
 
 (bind-func bind_image_texture
-  (lambda (tex:Texture* filename)
+  (lambda (tex:Texture filename)
     (let ((width_ptr:i32* (salloc))
           (height_ptr:i32* (salloc))
           (comp_ptr:i32* (salloc))
           (data (stbi_load filename width_ptr height_ptr comp_ptr 4)))
       (if (null? data)
           (begin (println (stbi_failure_reason))
-                 null)
+                 -1)
           (begin
             (glActiveTexture GL_TEXTURE0)
-            (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+            (glBindTexture GL_TEXTURE_2D tex)
             (glTexImage2D GL_TEXTURE_2D 0
                           GL_RGBA
                           (pref width_ptr 0)
@@ -306,7 +265,7 @@
 
 ;;                <id    ,type  >
 (bind-type Shader <GLuint,GLenum>)
-(bind-type ShaderProgram <GLuint>)
+(bind-alias ShaderProgram GLuint)
 
 (bind-func Shader_id
   (lambda (shader:Shader*)
@@ -315,10 +274,6 @@
 (bind-func Shader_type
   (lambda (shader:Shader*)
     (tref shader 1)))
-
-(bind-func ShaderProgram_id
-  (lambda (program:ShaderProgram*)
-    (tref program 0)))
 
 (bind-func Shader_print_info_log
   (let ((max_log_length 4096)
@@ -345,13 +300,12 @@
 (bind-func ShaderProgram_print_info_log
   (let ((max_log_length 4096)
         (logbuf:i8* (zalloc max_log_length)))
-    (lambda (program:ShaderProgram*)
+    (lambda (program:ShaderProgram)
       (let ((len_ptr (salloc 1 i32)))
-        (glGetProgramInfoLog (ShaderProgram_id program)
+        (glGetProgramInfoLog program
                              max_log_length
                              len_ptr
                              logbuf)
-        
         (printf "Program info log: %s\n"
                 (if (= (pref len_ptr 0) 0)
                     "OK"
@@ -381,12 +335,11 @@
     (if (not (and (= (Shader_type vert) GL_VERTEX_SHADER)
                   (= (Shader_type frag) GL_FRAGMENT_SHADER)))
         (begin (println "Error: input shader types must be vert and frag respectively.")
-               null)
-        (let ((program_id (glCreateProgram))
-              (program (ShaderProgram program_id)))
-          (glAttachShader program_id (Shader_id vert))
-          (glAttachShader program_id (Shader_id frag))
-          (glLinkProgram program_id)
+               -1)
+        (let ((program (glCreateProgram)))
+          (glAttachShader program (Shader_id vert))
+          (glAttachShader program (Shader_id frag))
+          (glLinkProgram program)
           (ShaderProgram_print_info_log program)
           program))))
 
@@ -397,13 +350,12 @@
                   (= (Shader_type geom) GL_GEOMETRY_SHADER)
                   (= (Shader_type frag) GL_FRAGMENT_SHADER)))
         (begin (println "Error: input shader types must be vert and frag respectively.")
-               null)
-        (let ((program_id (glCreateProgram))
-              (program (ShaderProgram program_id)))
-          (glAttachShader program_id (Shader_id vert))
-          (glAttachShader program_id (Shader_id geom))
-          (glAttachShader program_id (Shader_id frag))
-          (glLinkProgram program_id)
+               -1)
+        (let ((program (glCreateProgram)))
+          (glAttachShader program (Shader_id vert))
+          (glAttachShader program (Shader_id geom))
+          (glAttachShader program (Shader_id frag))
+          (glLinkProgram program)
           (ShaderProgram_print_info_log program)
           program))))
 
@@ -416,7 +368,7 @@
     (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
           (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
       (if (or (null? vert) (null? frag))
-          null
+          -1
           (ShaderProgram_create_vf vert frag)))))
 
 (bind-func ShaderProgram_create_vsgsfs
@@ -426,7 +378,7 @@
           (geom (Shader_create vsource GL_GEOMETRY_SHADER))
           (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
       (if (or (null? vert) (null? geom) (null? frag))
-          null
+          -1
           (ShaderProgram_create_vgf vert geom frag)))))
 
 (bind-poly ShaderProgram_create ShaderProgram_create_vf)
