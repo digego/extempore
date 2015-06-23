@@ -1,4 +1,4 @@
-(sys:load "libs/external/shaders-v2.xtm")
+(sys:load "libs/external/glfw3.xtm")
 
 (bind-val window GLFWwindow*)
 
@@ -14,7 +14,7 @@
 
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
-(bind-val sp ShaderProgram*)
+(bind-val sp ShaderProgram)
 
 ;; init
 (call-as-xtlang
@@ -24,20 +24,18 @@
           1.0  1.0
          -1.0 -1.0
           1.0 -1.0)
- (set! vbo (create_vbo fullscreen_quad_vert_data 16))
- (set! vao (create_vao))
+ (set! vbo (VBO_create fullscreen_quad_vert_data 16))
+ (set! vao (VAO_create))
  (bind_attribute vao vbo 0 2 2 0)
  void)
 
 (bind-func gl_draw
   (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
-    (let ((program_id (ShaderProgram_id sp))
-          (resloc (glGetUniformLocation program_id "iResolution"))
-          (timeloc (glGetUniformLocation program_id "iGlobalTime"))
-          (rateloc (glGetUniformLocation program_id "iSampleRate")))
-
-      (glUseProgram program_id)
+    (let ((resloc (glGetUniformLocation sp "iResolution"))
+          (timeloc (glGetUniformLocation sp "iGlobalTime"))
+          (rateloc (glGetUniformLocation sp "iSampleRate")))
+      (glUseProgram sp)
       (glUniform3f resloc 1920.0 1080.0 1.0)
       (glUniform1f timeloc (convert (% (clock_clock) 441000.)))
       (glUniform1f rateloc 44100.0))
@@ -48,7 +46,7 @@
 (bind-func create_shadertoy_shader
   (lambda (vsource:i8* fsource:i8*)
     (let ((res (ShaderProgram_create vsource fsource)))
-      (if (not (null? res))
+      (if (not (< res 0))
           (set! sp res)))))
 
 (create_shadertoy_shader (file->string "examples/external/shader-tutorials/shadertoy.vert")

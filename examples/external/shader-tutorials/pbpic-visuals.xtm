@@ -1,4 +1,4 @@
-(sys:load "libs/external/shaders-v2.xtm")
+(sys:load "libs/external/glfw3.xtm")
 
 (bind-val window GLFWwindow*)
 
@@ -24,7 +24,7 @@
 
 (bind-val field_vbo VBO*)
 (bind-val field_vao VAO*)
-(bind-val field_sp ShaderProgram*)
+(bind-val field_sp ShaderProgram)
 
 (bind-func create_field_shader
   (lambda (vsource:i8* fsource:i8*)
@@ -99,11 +99,11 @@
 
 ;; particles
 
-(bind-val particle_tex Texture*)
+(bind-val particle_tex Texture)
 (bind-val particle_vbo VBO*)
 (bind-val particle_vao VAO*)
 
-(bind-val particle_sp ShaderProgram*)
+(bind-val particle_sp ShaderProgram)
 
 (bind-func create_particle_shader
   (lambda (vsource:i8* fsource:i8*)
@@ -114,13 +114,13 @@
 
 ;; init all the things
 (call-as-xtlang
- (set! particle_vbo (create_vbo part_all (convert (* nvp idimp npmax))))
- (set! particle_vao (create_vao))
+ (set! particle_vbo (VBO_create part_all (convert (* nvp idimp npmax))))
+ (set! particle_vao (VAO_create))
  (bind_attribute particle_vao particle_vbo 0 2 5 0)
  (bind_attribute particle_vao particle_vbo 1 3 5 2)
  (set! particle_tex (bind_image_texture (create_texture) "assets/images/star.png"))
- (set! field_vbo (create_vbo field_arrows (convert (* 4 nx ny))))
- (set! field_vao (create_vao))
+ (set! field_vbo (VBO_create field_arrows (convert (* 4 nx ny))))
+ (set! field_vao (VAO_create))
  (bind_attribute field_vao field_vbo 0 2)
  void)
 
@@ -131,7 +131,7 @@
     (copy_field_xy_to_arrows_buffer fxyze .1)
     ;; (remove_guff_from_arrows_buffer)
     (update_vbo_data field_vbo)
-    (glUseProgram (ShaderProgram_id field_sp))
+    (glUseProgram field_sp)
     (draw_vertex_array field_vao GL_LINES 0 (convert (* 4 nxe ny)))
     void))
 
@@ -140,10 +140,9 @@
     ;; move particles, update VBO
     (update_vbo_data particle_vbo)
     ;; draw the world
-    (let ((sp_id (ShaderProgram_id particle_sp))
-          (texloc (glGetUniformLocation sp_id "particle_tex"))
-          (nxnyloc (glGetUniformLocation sp_id "nxny")))
-      (glUseProgram sp_id)
+    (let ((texloc (glGetUniformLocation particle_sp "particle_tex"))
+          (nxnyloc (glGetUniformLocation particle_sp "nxny")))
+      (glUseProgram particle_sp)
       (glUniform1i texloc 0)
       (glUniform2f nxnyloc (convert nxe) (convert ny)))
     (draw_vertex_array particle_vao GL_POINTS 0 (* nvp npmax))

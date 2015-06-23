@@ -1,4 +1,4 @@
-(sys:load "libs/external/shaders-v2.xtm")
+(sys:load "libs/external/glfw3.xtm")
 
 (bind-val window GLFWwindow*)
 
@@ -17,10 +17,6 @@
 ;; streaming update only needs to update the `head' vert (assuming the
 ;; grid stays the same)
 (bind-val arrows_verts float* (* (call-as-xtlang num_arrows) 4))
-
-(define *arrows-shader*
-  (create_shader (file->string "examples/external/shader-tutorials/arrows.vert")
-                 (file->string "examples/external/shader-tutorials/arrows.frag")))
 
 ;; set base verts (i.e. every second vec2) to regular grid
 (call-as-xtlang
@@ -55,12 +51,12 @@
 
 (bind-val arrows_vbo VBO*)
 (bind-val arrows_vao VAO*)
-(bind-val sp ShaderProgram*)
+(bind-val sp ShaderProgram)
 
 ;; init
 (call-as-xtlang
- (set! arrows_vbo (create_vbo arrows_verts (convert (* 4 num_arrows))))
- (set! arrows_vao (create_vao))
+ (set! arrows_vbo (VBO_create arrows_verts (convert (* 4 num_arrows))))
+ (set! arrows_vao (VAO_create))
  (bind_attribute arrows_vao arrows_vbo 0 2)
  (glEnable GL_LINE_SMOOTH)
  void)
@@ -75,8 +71,8 @@
 (bind-func gl_draw_arrows
   (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
-    (update_vbo_data arrows_vbo)
-    (glUseProgram (ShaderProgram_id sp))
+    (VBO_update_data arrows_vbo)
+    (glUseProgram sp)
     (draw_vertex_array arrows_vao GL_LINES 0 (* 4 (convert num_arrows)))
     (glfwSwapBuffers window)
     void))

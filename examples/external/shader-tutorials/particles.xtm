@@ -1,4 +1,4 @@
-(sys:load "libs/external/shaders-v2.xtm")
+(sys:load "libs/external/glfw3.xtm")
 
 (bind-val window GLFWwindow*)
 
@@ -55,10 +55,10 @@
  (glEnable GL_BLEND)
  (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA))
 
-(bind-val particles_tex Texture*)
+(bind-val particles_tex Texture)
 (bind-val particles_vbo VBO*)
 (bind-val particles_vao VAO*)
-(bind-val sp ShaderProgram*)
+(bind-val sp ShaderProgram)
 
 (bind-func create_particles_shader
   (lambda (vsource:i8* fsource:i8*)
@@ -70,12 +70,12 @@
 ;; init
 (call-as-xtlang
  (distribute_particles num_particles)
- (set! particles_vbo (create_vbo particles_verts (* num_particles 4))) ;; num_particles = 10
- (set! particles_vao (create_vao))
+ (set! particles_vbo (VBO_create particles_verts (* num_particles 4))) ;; num_particles = 10
+ (set! particles_vao (VAO_create))
  (bind_attribute particles_vao particles_vbo 0 2 4 0)
  (bind_attribute particles_vao particles_vbo 1 2 4 2)
- (set! particles_tex (bind_image_texture (create_texture) "assets/images/star2.png"))
- (if (null? particles_tex)
+ (set! particles_tex (bind_image_texture (Texture_create) "assets/images/star2.png"))
+ (if (< particles_tex 0)
      (println "Whoops - particles_tex is null"))
  void)
 
@@ -86,10 +86,10 @@
     (glClear GL_COLOR_BUFFER_BIT)
     ;; move particles, update VBO
     (move_particles num_particles .01)    
-    (update_vbo_data particles_vbo)
+    (VBO_update_data particles_vbo)
     ;; draw the world
-    (let ((texloc (glGetUniformLocation (ShaderProgram_id sp) "particles_tex")))
-      (glUseProgram (ShaderProgram_id sp))
+    (let ((texloc (glGetUniformLocation sp "particles_tex")))
+      (glUseProgram sp)
       (glUniform1i texloc 0))
     (draw_vertex_array particles_vao GL_POINTS 0 (convert num_particles))
     (glfwSwapBuffers window)

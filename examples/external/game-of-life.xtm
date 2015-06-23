@@ -1,17 +1,27 @@
 (sys:load "libs/core/game-of-life.xtm")
-(sys:load "libs/external/shaders-v2.xtm")
+(sys:load "libs/external/glfw3.xtm")
+
+(bind-val window GLFWwindow*)
+
+(call-as-xtlang
+ (glfw_init)
+ (glfw_set_core_profile)
+ (set! window (glfw_create_fullscreen_window))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
 
 (bind-val fullscreen_quad_verts float* 16)
 
 (bind-val world World*)
-(bind-val tex Texture*)
+(bind-val tex Texture)
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
+(bind-val sp ShaderProgram)
 
 (bind-func world_texture_setup
   (lambda ()
     (glActiveTexture GL_TEXTURE0)
-    (glBindTexture GL_TEXTURE_2D (Texture_id tex))
+    (glBindTexture GL_TEXTURE_2D tex)
     (glTexImage2D GL_TEXTURE_2D
                   0
                   GL_RGB
@@ -27,9 +37,12 @@
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
     (gl_print_error "in world_texture_setup")))
 
-(define *gol-shader*
-  (create_shader (file->string "examples/external/game-of-life.vert")
-                 (file->string "examples/external/game-of-life.frag")))
+(bind-func create_gol_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
+
+(create_gol_shader (file->string "examples/external/game-of-life.vert")
+                   (file->string "examples/external/game-of-life.frag"))
 
 ;; init
 (call-as-xtlang
@@ -39,20 +52,19 @@
           1.0  1.0    1.0 0.0
          -1.0 -1.0    0.0 1.0
           1.0 -1.0    1.0 1.0)
- (set! world (world_create 512 512))
+ (set! world (world_create 64 64))
  ;; (world_set_to_checkerboard world)
  (world_init world .5)
- (set! vbo (create_vbo fullscreen_quad_verts 16))
- (bind_vbo vbo)
- (set! vao (create_vao))
- (bind_attribute vao vbo 0 2 16 0) ;; position
- (bind_attribute vao vbo 1 2 16 8) ;; tex_coord
- (set! tex (create_texture))
+ (set! vbo (VBO_create fullscreen_quad_verts 16))
+ (set! vao (VAO_create))
+ (bind_attribute vao vbo 0 2 4 0) ;; position
+ (bind_attribute vao vbo 1 2 4 2) ;; tex_coord
+ (set! tex (Texture_create))
  (world_texture_setup)
  void)
 
 (bind-func gl_draw
-  (lambda (program)
+  (lambda ()
     (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
     ;; run the simulation
     (world_step world)
@@ -64,10 +76,11 @@
                      GL_BYTE
                      (world_data world))
     ;; draw the world
-    (let ((texloc (glGetUniformLocation program "tex")))
-      (glUseProgram program)
+    (let ((texloc (glGetUniformLocation sp "tex")))
+      (glUseProgram sp)
       (glUniform1i texloc 0))
     (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
+    (glfwSwapBuffers window)
     void))
 
 (define gl-loop
@@ -76,21 +89,17 @@
           (next-frame-time (+ time (* *second* delta-t))))
       (if (> late-by 0)
           (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
-          (begin
-            (gl_draw *gol-shader*)
-            (gl:swap-buffers *gl-window*)))
+          (gl_draw))
       (callback (* 0.9 next-frame-time)
                 'gl-loop
                 next-frame-time
                 delta-t))))
 
 ;; run once
-(begin
-  (gl_draw *gol-shader*)
-  (gl:swap-buffers *gl-window*))
+(gl_draw)
 
 ;; start it running
-(gl-loop (now) 1/2)
+(gl-loop (now) 1/5)
 
 ;; (randomly) reinitialise the world
 (call-as-xtlang (world_init world .1))
