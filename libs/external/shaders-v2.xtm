@@ -63,7 +63,7 @@
   (lambda (vbo:VBO*)
     (tref vbo 3)))
 
-(bind-func print_VBO
+(bind-func VBO_print
   (lambda (vbo:VBO*)
     (printf "VBO: <id=%d type=%s nbytes=%d data=%p>"
             (tref vbo 0)
@@ -74,11 +74,12 @@
                     ((= type GL_FLOAT) "float")
                     (else "unknown")))
             (tref vbo 2)
-            (tref vbo 3))))
+            (tref vbo 3))
+    void))
 
-(bind-poly print print_VBO)
+(bind-poly print VBO_print)
 
-(bind-func tostring_VBO
+(bind-func VBO_tostring
   (lambda (vbo:VBO*)
     (let ((s:i8* (salloc 256)))
       (sprintf s "VBO: <id=%d type=%s nbytes=%d data=%p>"
@@ -93,9 +94,9 @@
                (tref vbo 3))
       (Str s))))
 
-(bind-poly tostring tostring_VBO)
+(bind-poly tostring VBO_tostring)
 
-(bind-func create_vbo_float
+(bind-func VBO_create_float
   (lambda (buf:float* buflen)
     (let ((vbo:VBO* (zalloc))
           (id:GLuint* (salloc)))
@@ -109,10 +110,10 @@
       (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
       (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
       (gl_print_error "Error setting VBO data")
-      (printf "Created ") (print_VBO vbo) (printf "\n")
+      (printf "Created ") (VBO_print vbo) (printf "\n")
       vbo)))
 
-(bind-func create_vbo_i32
+(bind-func VBO_create_i32
   (lambda (buf:i32* buflen)
     (let ((vbo:VBO* (zalloc))
           (id:GLuint* (salloc)))
@@ -126,13 +127,13 @@
       (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
       (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
       (gl_print_error "Error setting VBO data")
-      (printf "Created ") (print_VBO vbo) (printf "\n")
+      (printf "Created ") (VBO_print vbo) (printf "\n")
       vbo)))
 
-(bind-poly create_vbo create_vbo_float)
-(bind-poly create_vbo create_vbo_i32)
+(bind-poly VBO_create VBO_create_float)
+(bind-poly VBO_create VBO_create_i32)
 
-(bind-func update_vbo_data
+(bind-func VBO_update_data
   "update the full buffer"
   (lambda (vbo:VBO*)
     (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
@@ -141,7 +142,7 @@
     (gl_print_error "Error updating VBO subdata")
     (glBindBuffer GL_ARRAY_BUFFER 0)))
 
-(bind-func delete_vbo
+(bind-func VBO_delete
   (lambda (vbo:VBO*)
     (let ((id:GLuint* (salloc)))
       (pset! id 0 (VBO_id vbo))
@@ -155,21 +156,22 @@
   (lambda (vao:VAO*)
     (tref vao 0)))
 
-(bind-func print_VAO
+(bind-func VAO_print
   (lambda (vao:VAO*)
-    (printf "VAO: id %d" (tref vao 0))))
+    (printf "VAO: id %d" (tref vao 0))
+    void))
 
-(bind-poly print print_VAO)
+(bind-poly print VAO_print)
 
-(bind-func tostring_VAO
+(bind-func VAO_tostring
   (lambda (vao:VAO*)
     (let ((s:i8* (salloc 256)))
       (sprintf s "VAO: id %d" (tref vao 0))
       (Str s))))
 
-(bind-poly tostring tostring_VAO)
+(bind-poly tostring VAO_tostring)
 
-(bind-func create_vao
+(bind-func VAO_create
   (lambda ()
     (let ((vao:VAO* (zalloc))
           (id:GLuint* (salloc)))
@@ -211,7 +213,7 @@
     (gl_print_error "Error drawing vertex array")
     (glBindVertexArray 0)))
 
-(bind-func delete_vao
+(bind-func VAO_delete
   (lambda (vao:VAO*)
     (let ((id:GLuint* (salloc)))
       (pset! id 0 (VAO_id vao))
@@ -225,21 +227,22 @@
   (lambda (tex:Texture*)
     (tref tex 0)))
 
-(bind-func print_Texture
-  (lambda (vao:Texture*)
-    (printf "Texture: id %d" (tref vao 0))))
+(bind-func Texture_print
+  (lambda (tex:Texture*)
+    (printf "Texture: id %d" (tref tex 0))
+    void))
 
-(bind-poly print print_Texture)
+(bind-poly print Texture_print)
 
-(bind-func tostring_Texture
-  (lambda (vao:Texture*)
+(bind-func Texture_tostring
+  (lambda (tex:Texture*)
     (let ((s:i8* (salloc 256)))
-      (sprintf s "Texture: id %d" (tref vao 0))
+      (sprintf s "Texture: id %d" (tref tex 0))
       (Str s))))
 
-(bind-poly tostring tostring_Texture)
+(bind-poly tostring Texture_tostring)
 
-(bind-func create_texture
+(bind-func Texture_create
   (lambda ()
     (let ((tex:Texture* (zalloc))
           (id:GLuint* (salloc)))
@@ -247,7 +250,7 @@
       (gl_print_error "Error creating Texture")
       (tset! tex 0 (pref id 0))
       (printf "Created ")
-      (print_Texture tex)
+      (Texture_print tex)
       (printf "\n")
       tex)))
 
@@ -261,7 +264,7 @@
 ;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
 ;;     void))
 
-(bind-func delete_texture
+(bind-func Texture_delete
   (lambda (tex:Texture*)
     (let ((id:GLuint* (salloc)))
       (pset! id 0 (Texture_id tex))
