@@ -21,6 +21,10 @@
 (sys:load-preload-check 'gl-compatibility)
 (define *xtmlib-gl-compatibility-loaded* #f)
 
+;; also need to check that the core profile OpenGL lib hasn't been
+;; loaded, as it's incompatible with this one
+(sys:load-preload-check 'gl)
+
 (impc:aot:suppress-aot-do
  (sys:load "libs/std.xtm"))
 (impc:aot:insert-sexp '(sys:load "libs/core/std.xtm"))
@@ -2426,3 +2430,7 @@
 
 (impc:aot:insert-footer "xtmgl-compatibility")
 (define *xtmlib-gl-compatibility-loaded* #t)
+
+;; so that preload checks for 'gl return true
+(define *xtmlib-gl-loaded* #t)
+(impc:aot:insert-sexp '(define *xtmlib-gl-loaded* #t))
