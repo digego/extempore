@@ -27,6 +27,7 @@ external/instruments_ext.xtm \
 external/rtmidi.xtm \
 external/glib.xtm \
 external/stb_image.xtm \
+external/soil.xtm \
 external/gl.xtm \
 external/glext.xtm \
 external/graphics-pipeline.xtm \
