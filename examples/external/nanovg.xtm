@@ -10,40 +10,43 @@
 
 ;;; Code:
 
-(sys:load "libs/external/gl.xtm")
+(sys:load "libs/external/glfw3.xtm")
 (sys:load "libs/external/nanovg.xtm")
 
-(define width 640.)
-(define height 480.)
-(bind-val width float 640.)
-(bind-val height float 480.)
-(define fullscreen #f)
+(bind-val window GLFWwindow*)
 
-(define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+(call-as-xtlang
+ (set! window (glfw_init_and_create_fullscreen_window)))
 
+(bind-val vg NVGcontext*)
 
-(bind-func enable_stencil_buffer
-  (lambda ()
-    (glEnable GL_STENCIL_TEST)
-    (let ((bits:i32* (salloc)))
-      (glGetIntegerv GL_STENCIL_BITS bits)
-      (println "stencil buffer bit depth: " (pref bits 0)))))
+(call-as-xtlang
+ (set! vg (nvgCreateGL3 (+ NVG_ANTIALIAS NVG_STENCIL_STROKES NVG_DEBUG))))
 
-(enable_stencil_buffer)
+(call-as-xtlang
+ (glEnable GL_STENCIL_TEST))
+
+(call-as-xtlang
+ (let ((bits:i32* (salloc)))
+   (glGetIntegerv GL_MAX_DEPTH_TEXTURE_SAMPLES bits)
+   (println "stencil buffer bit depth: " (pref bits 0))))
+
+(bind-val width float 1920.0)
+(bind-val height float 1080.0)
 
 (bind-func nanovg_draw
-  (let ((vg:NVGcontext* (nvgCreateGL2 (+ NVG_ANTIALIAS NVG_STENCIL_STROKES NVG_DEBUG))))
-    (lambda ()
-      (if (null? vg)
-          (println "Error: vg is null.")
-          (begin
-            (nvgBeginFrame vg (convert width) (convert height) 1.0)
-            (nvgBeginPath vg)
-            (nvgRect vg 100. 100. 120. 30.)
-            (nvgFillColor vg (pref (NVGcolor 1. .7 0. 1.) 0))
-            (nvgFill vg)
-            (gl_print_error "draw:")
-            (nvgEndFrame vg))))))
+  (lambda ()
+    (if (null? vg)
+        (println "Error: vg is null.")
+        (begin
+          ;; (nvgBeginFrame vg (convert width) (convert height) 1.0)
+          (nvgBeginPath vg)
+          (nvgRect vg 100. 100. 520. 430.)
+          (nvgFillColor vg (pref (NVGcolor 1. .7 0. 1.) 0))
+          (nvgFill vg)
+          (gl_print_error "draw:")
+          (nvgEndFrame vg)
+          (glfwSwapBuffers window)))))
 
 (define gl-loop
   (lambda (time delta-t)
@@ -51,9 +54,7 @@
           (next-frame-time (+ time (* *second* delta-t))))
       (if (> late-by 0)
           (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
-          (begin
-            (nanovg_draw)
-            (gl:swap-buffers *gl-ctx*)))
+          (nanovg_draw))
       (callback (* 0.9 next-frame-time)
                 'gl-loop
                 next-frame-time
