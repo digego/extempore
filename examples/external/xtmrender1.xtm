@@ -17,17 +17,16 @@
 ;; make sure you include / on the end
 (define path "assets/models/")
 
-(define fullscreen #f)
-;; (define width 1920.0)
-;; (define height 1200.0)
-(define width 1024.0)
-(define height 768.0)
+(sys:load "libs/external/glfw3.xtm")
 
-(bind-val width float width)
-(bind-val height float height)
+(bind-val window GLFWwindow*)
 
-;; setup opengl
-(define glctx (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+(call-as-xtlang
+ (glfw_init)
+ ;; (glfw_set_core_profile)
+ (set! window (glfw_create_window 1024 768))
+ (glfwMakeContextCurrent window)
+ (gl_print_driver_info))
 
 (sys:load "libs/external/assimp.xtm")
 
@@ -41,21 +40,18 @@
 (bind-func gl_render
   (lambda (model:xtm_node*)
     (xtm_render null render null null (cast model i8*))
+    (glfwSwapBuffers window)
     void))
 
 ;; standard impromptu callback
 (define opengl-loop
   (lambda (time dur model degree)
     (let ((v (now)))
-      (gl_render model)
-      (gl:swap-buffers glctx)
-      )
+      (gl_render model))
     (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur model (+ degree .5))))
 
 (define peppino (assimp_load_model path "/peppino.dae" aiProcess_Triangulate))
 
-(xtm_render_setup (real->integer width) (real->integer height))
+(xtm_render_setup 1024 768)
  
 (opengl-loop (now) 2000 peppino 70.0)
-
-                            
