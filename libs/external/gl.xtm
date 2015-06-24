@@ -2951,10 +2951,10 @@
                (tref vbo 0)
                (let ((type (VBO_type vbo)))
                  (cond ((= type GL_BYTE) "byte")
-                    ((= type GL_SHORT) "short")
-                    ((= type GL_INT) "int")
-                    ((= type GL_FLOAT) "float")
-                    (else "unknown")))
+                       ((= type GL_SHORT) "short")
+                       ((= type GL_INT) "int")
+                       ((= type GL_FLOAT) "float")
+                       (else "unknown")))
                (tref vbo 2)
                (tref vbo 3))
       (Str s))))
@@ -3315,7 +3315,7 @@
 (bind-func FBO_create_texture_rect
   (lambda (width height)
     (let ((id:i32* (salloc))
-	  (tex:i32* (salloc)))
+          (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
       ;;(glRenderbufferStorage GL_RENDERBUFFER GL_RGBA16F width height)
@@ -3337,7 +3337,7 @@
 (bind-func FBO_create_depth_buffer_rect
   (lambda (width height)
     (let ((id:i32* (salloc))
-	  (tex:i32* (salloc)))
+          (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
       ;; (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
@@ -3360,7 +3360,7 @@
 (bind-func FBO_create_texture
   (lambda (width height)
     (let ((id:i32* (salloc))
-	  (tex:i32* (salloc)))
+          (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
       (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA8 width height)
@@ -3380,7 +3380,7 @@
 (bind-func FBO_create_depth_buffer
   (lambda (width height)
     (let ((id:i32* (salloc))
-	  (tex:i32* (salloc)))
+          (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
       (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
@@ -3410,9 +3410,9 @@
 (bind-func FBO_create_rect
   (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
     (let ((texid:i32 0)
-	  (depthid:i32 0)
-	  (fboid:i32* (salloc))
-	  (fbo:FBO* (halloc))) ;; heap alloc
+          (depthid:i32 0)
+          (fboid:i32* (salloc))
+          (fbo:FBO* (halloc))) ;; heap alloc
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
@@ -3426,8 +3426,8 @@
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_RECTANGLE_ARB depthid 0)
       (tfill! fbo (pref fboid 0) texid depthid width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
-	(if (<> status GL_FRAMEBUFFER_COMPLETE)
-	    (set! fbo (cast null FBO*))))
+        (if (<> status GL_FRAMEBUFFER_COMPLETE)
+            (set! fbo (cast null FBO*))))
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       ;; unbind the frame buffer
@@ -3440,19 +3440,19 @@
 (bind-func FBO_create_no_depth_rect
   (lambda (width:i32 height:i32 _texid:i32)
     (let ((texid:i32 0)
-	  (fboid:i32* (salloc))
-	  (fbo:FBO* (halloc))) ;; heap alloc
+          (fboid:i32* (salloc))
+          (fbo:FBO* (halloc))) ;; heap alloc
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
       (if (> _texid 0) (set! texid _texid))
-      (set! texid (FBO_create_texture_rect width height))
+      (set! texid (FBO_create_texture_rect width height))      
       ;; Attach the texture texid to the color buffer of our fbo
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_RECTANGLE_ARB texid 0)
       (tfill! fbo (pref fboid 0) texid -1 width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
-	(if (<> status GL_FRAMEBUFFER_COMPLETE)
-	    (set! fbo (cast null FBO*))))
+        (if (<> status GL_FRAMEBUFFER_COMPLETE)
+            (set! fbo (cast null FBO*))))
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear GL_COLOR_BUFFER_BIT)
       ;; unbind the frame buffer
@@ -3465,10 +3465,10 @@
 ;; if _texid is greater than 0 then use existing _texid
 (bind-func FBO_create
   (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
-    (let ((texid:i32 0)
-	  (depthid:i32 0)
-	  (fboid:i32* (salloc))
-	  (fbo:FBO* (halloc))) ;; heap alloc
+    (let ((texid:i32 0) 
+          (depthid:i32 0) 
+          (fboid:i32* (salloc))
+          (fbo:FBO* (halloc))) ;; heap alloc
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
@@ -3483,7 +3483,7 @@
       (tfill! fbo (pref fboid 0) texid depthid width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER))
             (err:i32 (glGetError)))
-	(if (<> status GL_FRAMEBUFFER_COMPLETE)
+        (if (<> status GL_FRAMEBUFFER_COMPLETE)
             (if (<> err GL_NO_ERROR)
                 (begin (printf "GL ERR: FRAMEBUFFER err: %d\n" err)
                        (set! fbo (cast null FBO*))
@@ -3503,8 +3503,8 @@
 (bind-func FBO_create_no_depth
   (lambda (width:i32 height:i32 _texid:i32)
     (let ((texid:i32 0)
-	  (fboid:i32* (salloc))
-	  (fbo:FBO* (halloc))) ;; heap alloc
+          (fboid:i32* (salloc))
+          (fbo:FBO* (halloc))) ;; heap alloc
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
@@ -3514,9 +3514,9 @@
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D texid 0)
       (tfill! fbo (pref fboid 0) texid -1 width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
-	(printf "fb status %d\n" status)
-	(if (<> status GL_FRAMEBUFFER_COMPLETE)
-	    (set! fbo (cast null FBO*))))
+        (printf "fb status %d\n" status)
+        (if (<> status GL_FRAMEBUFFER_COMPLETE)
+            (set! fbo (cast null FBO*))))
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear GL_COLOR_BUFFER_BIT)
       ;; unbind the frame buffer
