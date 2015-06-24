@@ -460,6 +460,16 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 	return result;
 }
 
+double audio_clock_base()
+  {
+    return extemp::UNIV::AUDIO_CLOCK_BASE;
+  }
+
+double audio_clock_now()
+  {
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
+  }
+
 
 #ifdef TARGET_OS_MAC
   double clock_clock()
@@ -492,7 +502,6 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 #endif
 
 
-
 namespace extemp {
 
     uint32_t UNIV::FRAMES = 128;
@@ -503,7 +512,9 @@ namespace extemp {
     uint32_t UNIV::MINUTE = SECOND * 60;
     uint32_t UNIV::HOUR = MINUTE * 60;
     uint64_t UNIV::TIME = 0l;
-    uint64_t UNIV::DEVICE_TIME = 0l;
+  uint64_t UNIV::DEVICE_TIME = 0l;
+  double UNIV::AUDIO_CLOCK_NOW = 0.0;
+    double UNIV::AUDIO_CLOCK_BASE = 0.0;  
     const char* UNIV::PWD = "";
     uint32_t UNIV::AUDIO_NONE = 0; // 0 for real device, 1 for dummy device
     uint32_t UNIV::AUDIO_DEVICE = -1;
@@ -551,7 +562,7 @@ namespace extemp {
 	return (double)rand() / (double)RAND_MAX;
 #endif
     }
-
+  
     double UNIV::midi2frq(double pitch)
     {
 	return 220.0 * pow(2.0,(pitch - 57.0)/12);

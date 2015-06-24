@@ -89,8 +89,9 @@ char* base64_encode(const unsigned char *data,size_t input_length,size_t *output
 unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
 char* cname_encode(char *data,size_t input_length,size_t *output_length);
   char* cname_decode(char *data,size_t input_length,size_t *output_length);
- double clock_clock();
-
+  double clock_clock();
+  double audio_clock_base();
+  double audio_clock_now();
 
 }
 
@@ -113,6 +114,8 @@ class UNIV {
 	static uint32_t SAMPLERATE;
 	static uint64_t TIME;
 	static uint64_t DEVICE_TIME;
+  static double AUDIO_CLOCK_BASE;
+  static double AUDIO_CLOCK_NOW;  
 	static uint32_t HOUR;
 	static uint32_t MINUTE;
 	static uint32_t SECOND;
@@ -132,7 +135,7 @@ class UNIV {
   static boost::uniform_01<boost::mt19937> RNG;
         //static boost::random::uniform_01<boost::random::mt19937> RNG(RNGGEN);
 #endif
-
+  
 	static double midi2frq(double pitch);
 	static double frqRatio(double semitones);
 	static void initRand();
