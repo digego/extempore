@@ -23,6 +23,180 @@
 
 (impc:aot:insert-header "xtmgraphics-pipeline")
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; OpenGL related Matrix Operations
+;;
+
+(bind-func mat4_to_mat3
+  (lambda (mat4:float* mat3:float*)
+    (pfill! mat3
+            (pref mat4 0) (pref mat4 1) (pref mat4 2)
+            (pref mat4 4) (pref mat4 5) (pref mat4 6)
+            (pref mat4 8) (pref mat4 9) (pref mat4 10))
+    void))
+
+
+(bind-func translate_matrix
+  (lambda (mat:float* x y z)
+    (let ((mat2:float* (salloc 32))
+          (mat3 (pref-ptr mat2 16)))
+      (pfill! mat2
+              1.0 0.0 0.0 0.0
+              0.0 1.0 0.0 0.0
+              0.0 0.0 1.0 0.0
+              x   y   z   1.0)
+      ;;(mmulf mat2 4 4 mat 4 4 mat3)
+      (mmul4 mat2 mat mat3)
+      (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
+      void)))
+
+(bind-func scale_matrix
+  (lambda (mat:float* x:float y:float z:float)
+    (let ((mat2:float* (salloc 32))
+          (mat3:float* (pref-ptr mat2 16)))
+      (pfill! mat2
+              x     0.0   0.0   0.0
+              0.0   y     0.0   0.0
+              0.0   0.0   z     0.0
+              0.0   0.0   0.0   1.0)
+      ;;(mmulf mat2 4 4 mat 4 4 mat3)
+      (mmul4 mat2 mat mat3)
+      (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
+      void)))
+
+(bind-func rotate_matrix
+  (lambda (mat:float* alpha:float x:float y:float z:float)
+    (let ((c (cos alpha))
+          (c-1 (- 1.0 c))
+          (s (sin alpha))
+          (mat2:float* (salloc 16))
+          (mat3:float* (salloc 16))
+          (vec1:float* (salloc 3)) ;; axis to rotate around (normalized)
+          (vec2:float* (salloc 3))) ;; axis to rotate around (normalized)
+      (pfill! vec1 x y z)
+      (vnormf vec1 3 vec2)
+      (set! x (pref vec2 0))
+      (set! y (pref vec2 1))
+      (set! z (pref vec2 2))
+      (pfill! mat2
+              (+ (* x x c-1) c) (- (* x y c-1) (* z s)) (+ (* x z c-1) (* y s)) 0.0
+              (+ (* y x c-1) (* z s)) (+ (* y y c-1) c) (- (* y z c-1) (* x s)) 0.0
+              (- (* x z c-1) (* y s)) (+ (* y z c-1) (* x s)) (+ (* z z c-1) c) 0.0
+              0.0               0.0                     0.0                     1.0)
+      ;;(mmulf mat2 4 4 mat 4 4 mat3)
+      (mmul4 mat2 mat mat3)
+      (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
+      void)))
+
+;; this is similar to gluPerspective
+;; but fills a suitable PROJECTION matrix
+(bind-func fill_identity_matrix
+  (lambda (mat:float*)
+    (pfill! mat
+            1.0 0.0 0.0 0.0
+            0.0 1.0 0.0 0.0
+            0.0 0.0 1.0 0.0
+            0.0 0.0 0.0 1.0)
+    void))
+
+;; this is similar to gluPerspective
+;; but fills a suitable PROJECTION matrix
+(bind-func fill_projection_matrix
+  (lambda (mat:float* fovy aspect near far)
+    (let ((top (* near (tanf fovy)))
+          (right (* top aspect))
+          (left (* -1.0 right))
+          (bottom (* -1.0 top)))
+      (pfill! mat
+              (/ near right) 0.0 0.0 0.0
+              0.0 (/ near top) 0.0 0.0
+              0.0 0.0 (/ (+ (* -1.0 far) near) (- far near)) -1.0
+              0.0 0.0 (/ (* -2.0 far near) (- far near)) 0.0)
+      void)))
+
+;; this is similar to gluPerspective
+;; but fills a suitable PROJECTION matrix
+(bind-func fill_orthographic_matrix
+  (lambda (mat:float* left right bottom top near far)
+    (pfill! mat
+            (/ 2.0 (- right left)) 0.0 0.0 0.0
+            0.0 (/ 2.0 (- top bottom)) 0.0 0.0
+            0.0 0.0 (* -1.0 (/ 2.0 (- far near))) 0.0
+            (* -1.0 (/ (+ left right) (- right left)))
+            (* -1.0 (/ (+ top bottom) (- top bottom)))
+            (* -1.0 (/ (+ far near) (- far near)))
+            1.0)
+    void))
+
+;; where v1 and v2 can be v3 or v4
+;; but v3 MUST be v4
+(bind-func fill_direction_vector
+  (lambda (v1:float* v2:float* v3:float*)
+    (let ((tmp:float* (salloc 4)))
+      (vsub v1 v2 3 tmp)
+      (vnorm tmp 3 v3)
+      (pset! v3 3 0.0) ;; direction vectors get w = 0.0
+      void)))
+
+;; this is similar to gl_look_at
+;; but returns a suitable VIEW matrix
+(bind-func fill_view_matrix
+  (let ((mattt:float* (alloc 16)))
+    (lambda (matrix:float* vEye vTarget vUp)
+      (let ((vz:float* (salloc 3))
+            (vy:float* (salloc 3))
+            (vx:float* (salloc 3))
+            (i 0)
+            (mat:float* (salloc 16))
+            (mtmp1:float* (salloc 16))
+            (vtmp1:float* (salloc 3))
+            (vtmp2:float* (salloc 3)))
+        (vsub vEye vTarget 3 vtmp1)
+        (vnorm vtmp1 3 vz)
+        (vnorm vUp 3 vtmp2)
+        (vcross vtmp2 vz vtmp1)
+        (vnorm vtmp1 3 vx)
+        (vcross vz vx vy)
+        (pfill! mat
+                (pref vx 0) (pref vx 1) (pref vx 2) 0.0
+                (pref vy 0) (pref vy 1) (pref vy 2) 0.0
+                (pref vz 0) (pref vz 1) (pref vz 2) 0.0
+                (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
+        (minvf mat 4 matrix)
+        void))))
+
+
+;; this is similar to gl_look_at
+;; but returns a suitable VIEW matrix
+;;
+;; same as fill_view_matrix but
+;; instead of a target:position
+;; we provide a    dir:vector
+(bind-func fill_view_matrix_dir
+  (let ((mattt:float* (alloc 16)))
+    (lambda (matrix:float* vEye:float* vDir vUp)
+      (let ((vz:float* (salloc 3))
+            (vy:float* (salloc 3))
+            (vx:float* (salloc 3))
+            (i 0)
+            (mat:float* (salloc 16))
+            (mtmp1:float* (salloc 16))
+            (vtmp1:float* (salloc 3))
+            (vtmp2:float* (salloc 3)))
+        (vnorm vDir 3 vz)
+        (vnorm vUp 3 vtmp2)
+        (vcross vtmp2 vz vtmp1)
+        (vnorm vtmp1 3 vx)
+        (vcross vz vx vy)
+        (pfill! mat
+                (pref vx 0) (pref vx 1) (pref vx 2) 0.0
+                (pref vy 0) (pref vy 1) (pref vy 2) 0.0
+                (pref vz 0) (pref vz 1) (pref vz 2) 0.0
+                (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
+        (minvf mat 4 matrix)
+        void))))
+
 ;; matrix should be float* 5x5
 (bind-func shader_set_grid_offsets
   (lambda (matrix:float* width:float height:float factor:float)
