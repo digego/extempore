@@ -305,11 +305,6 @@
 ;;       (ai_get_bounding_box_for_node scene (tref scene 1) min max trafo))))
 
 
-(bind-func aiColor4f
-  (lambda (colour:aiColor4D*)
-    (glColor4f (tref colour 1) (tref colour 2) (tref colour 3) (tref colour 0))))
-
-
 (bind-func ai_color4_to_float4
   (lambda (colour:aiColor4D* dat:float*)
     (pset! dat 0 (tref colour 0))
@@ -317,6 +312,15 @@
     (pset! dat 2 (tref colour 2))
     (pset! dat 3 (tref colour 3))
     1))
+
+;; need to move this file fully to the OpenGL 3.2+ , after which we
+;; won't need this fixed-function pipeline stuff
+
+(bind-val GL_EMISSION i32 #x1600)
+(bind-val GL_AMBIENT i32 #x1200)
+(bind-val GL_DIFFUSE i32 #x1201)
+(bind-val GL_SPECULAR i32 #x1202)
+(bind-lib libGL glMaterialfv [void,GLenum,GLenum,GLfloat*])
 
 (bind-func ai_apply_material
   (lambda (mtl:aiMaterial* idx:i32)
@@ -461,9 +465,7 @@
           (printf "Error: positions:%d <> position_cnt:%d" positions (+ position_cnt 1)))
       (pset! modes 0 GL_TRIANGLES) ;;  face_mode)
       ;; return vbo
-      (let ((vbo (create_vbo (* positions vbostride 4) (cast vbodata i8*) GL_STATIC_DRAW)))
-        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))        
-        (glBufferData GL_ARRAY_BUFFER (convert (tref vbo 1)) (tref vbo 2) GL_STATIC_DRAW)
+      (let ((vbo (VBO_create vbodata (convert (* positions vbostride) i64) GL_STATIC_DRAW)))
         (glBindBuffer GL_ARRAY_BUFFER 0)
         vbo))))
  
@@ -472,7 +474,7 @@
   (lambda (scene:aiScene* mesh:aiMesh* aimesh:xtm_mesh* dir:i8*)
     ;; (printf "\tBuild Mesh\n")
     (let ((facemode:i32* (salloc)) 
-          (vbo:E_vbo* null)
+          (vbo:VBO* null)
           (color:aiColor4D* (salloc))
           (val:float* (salloc))
           (diffuse:float* (halloc 4))
@@ -483,7 +485,7 @@
           (material (pref (tref scene 5) material_index))
           (texid 0)
           (texfile:aiString* (salloc))          
-	  (name:aiString* (tref-ptr mesh 14)))
+          (name:aiString* (tref-ptr mesh 14)))
       (set! vbo (ai_build_mesh_vbo mesh facemode))
       (tset! aimesh 0 vbo)
       (if (= (aiGetMaterialTexture material 1 0 texfile null null null null null null) 0)
