@@ -418,7 +418,7 @@
 
 
 ;; vbo(0),texid(1),diffuse(2),ambient(3),specular(4),emissive(5),shininess(6),opacity(7),facemode(8) (GL_TRIANGLE,GL_QUAD etc..)
-(bind-type xtm_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
+(bind-type xtm_mesh <VBO*,i32,float*,float*,float*,float*,float,float,i32>)
 ;; name(0),transmat(1),parent(2),num_children(3),chidren(4),num_of_meshes(5),meshes(6)
 (bind-type xtm_node <i8*,float*,xtm_node*,i32,xtm_node*,i32,xtm_mesh*>)
 
@@ -459,13 +459,11 @@
             0.0)
         ;; color is green
         (pfill! (pref-ptr vbodata (+ 10 (* i vbostride))) 0.2 1.0 0.2 1.0))
-      (let ((vbo (create_vbo (* num_verts vbostride 4) (cast vbodata i8*) GL_STATIC_DRAW)))
-        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))        
-        (glBufferData GL_ARRAY_BUFFER (convert (tref vbo 1)) (tref vbo 2) GL_STATIC_DRAW)
+      (let ((vbo (VBO_create vbodata (convert (* num_verts vbostride)) GL_STATIC_DRAW)))
         (glBindBuffer GL_ARRAY_BUFFER 0)
         vbo))))
 
-;;(bind-type xtm_mesh <E_vbo*,i32,float*,float*,float*,float*,float,float,i32>)
+;;(bind-type xtm_mesh <VBO*,i32,float*,float*,float*,float*,float,float,i32>)
 
 (bind-func xtm_make_node_a
   (lambda (name:i8* verts:float* num_verts:i32 r g b)
@@ -480,7 +478,7 @@
           (ambient:float* (halloc 4))
           (specular:float* (halloc 4))
           (emissive:float* (halloc 4))
-          (vbo:E_vbo* (xtm_build_mesh_vbo verts num_verts)))
+          (vbo:VBO* (xtm_build_mesh_vbo verts num_verts)))
       (pfill! ambient 0.0 0.0 0.0 1.0)
       (pfill! diffuse r   g   b   1.0)
       (pfill! specular 1.0 1.0 1.0 1.0)
@@ -725,7 +723,7 @@
             (begin
               (glUniform1f (glGetUniformLocation shader "IsTextured") 0.0)))
         ;; vbo stuff
-        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
+        (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
         (glEnableVertexAttribArray vert) ;; 56
         (glVertexAttribPointer vert 4 GL_FLOAT GL_FALSE 56 null)
         (glEnableVertexAttribArray norm) 
@@ -734,7 +732,7 @@
         (glVertexAttribPointer uvw 3 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 28))
         (glEnableVertexAttribArray color) 
         (glVertexAttribPointer color 4 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 40))
-        (glDrawArrays facemode 0 (/ (tref vbo 1) 56))
+        (glDrawArrays facemode 0 (convert (/ (VBO_size vbo) 14)))
         (glDisableVertexAttribArray vert)
         (glDisableVertexAttribArray norm)
         (glDisableVertexAttribArray uvw)
@@ -796,29 +794,55 @@
 (bind-val xtm_render_near float 0.1)
 (bind-val xtm_render_far float 100.0)
 
+
+;; with default attributes for
+;; 0 vertex 4d
+;; 1 normals 3d
+;; 2 coords (uvw) 3d
+;; 3 color 4d
+(bind-func ShaderProgram_create_xtm
+  "compile and link shader program (vert and frag shader source)"
+  (lambda (vsource:i8* fsource:i8*)
+    (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
+          (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
+      (if (or (null? vert) (null? frag))
+          -1
+          (begin
+            (let ((program (glCreateProgram)))
+              (glAttachShader program (Shader_id vert))
+              (glAttachShader program (Shader_id frag))
+              (glBindAttribLocation program 0 "xtmVertex")
+              (glBindAttribLocation program 1 "xtmNormal")
+              (glBindAttribLocation program 2 "xtmUVW")
+              (glBindAttribLocation program 3 "xtmColor")
+              (glLinkProgram program)
+              (ShaderProgram_print_info_log program)
+              program))))))
+
+
 (bind-func xtm_render_init_light_shaders
   (lambda (a1 a2 b1 b2 c1 c2 d1 d2 e1 e2 f1 f2)
-    (aset! xtm_render_light_shaders 0 (create_shader_xtm a1 a2))
-    (aset! xtm_render_light_shaders 1 (create_shader_xtm b1 b2))
-    (aset! xtm_render_light_shaders 2 (create_shader_xtm c1 c2))
-    (aset! xtm_render_light_shaders 3 (create_shader_xtm d1 d2))
-    (aset! xtm_render_light_shaders 4 (create_shader_xtm e1 e2))
-    (aset! xtm_render_light_shaders 5 (create_shader_xtm f1 f2))
+    (aset! xtm_render_light_shaders 0 (ShaderProgram_create_xtm a1 a2))
+    (aset! xtm_render_light_shaders 1 (ShaderProgram_create_xtm b1 b2))
+    (aset! xtm_render_light_shaders 2 (ShaderProgram_create_xtm c1 c2))
+    (aset! xtm_render_light_shaders 3 (ShaderProgram_create_xtm d1 d2))
+    (aset! xtm_render_light_shaders 4 (ShaderProgram_create_xtm e1 e2))
+    (aset! xtm_render_light_shaders 5 (ShaderProgram_create_xtm f1 f2))
     void))
 
 (bind-func xtm_render_init_simple_shader
   (lambda (v f)
-    (set! xtm_render_simple_shader (create_shader_xtm v f))
+    (set! xtm_render_simple_shader (ShaderProgram_create_xtm v f))
     void))
 
 (bind-func xtm_render_init_quad_shader
   (lambda (v f)
-    (set! xtm_render_quad_shader (create_shader_xtm v f))
+    (set! xtm_render_quad_shader (ShaderProgram_create_xtm v f))
     void))
 
 (bind-func xtm_render_init_dof_shader
   (lambda (v f)
-    (set! xtm_render_dof_shader (create_shader_xtm v f))
+    (set! xtm_render_dof_shader (ShaderProgram_create_xtm v f))
     void))
 
 (bind-func xtm_draw_tex
@@ -847,7 +871,7 @@
         (far 0.0)
         (dof 1.4)
         (blur 2.0))
-    (lambda (fbo:E_fbo* fp model view projection)
+    (lambda (fbo:FBO* fp model view projection)
       (let ((shader (xtm_render_dof_shader))
             (framebufsize:float* (alloc 2)))
         (glDisable GL_DEPTH_TEST)                        
@@ -890,15 +914,15 @@
       
 
 (bind-func xtm_render_fbo
-  (let ((fbo:E_fbo* null))
+  (let ((fbo:FBO* null))
     (lambda ()
-      (if (null? fbo) (set! fbo (create_fbo xtm_render_w xtm_render_h 0 0)))
+      (if (null? fbo) (set! fbo (FBO_create xtm_render_w xtm_render_h 0 0)))
       fbo)))
 
 (bind-func xtm_shader_fbo
-  (let ((fbo:E_fbo* null))
+  (let ((fbo:FBO* null))
     (lambda ()
-      (if (null? fbo) (set! fbo (create_fbo (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
+      (if (null? fbo) (set! fbo (FBO_create (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
       fbo)))
 
 (bind-func xtm_render_setup_a
@@ -907,10 +931,10 @@
     (set! xtm_render_h h)
     (xtm_shader_fbo)        
     (xtm_render_fbo)        
-    ;; (set! xtm_render_s1 (create_shader_xtm s1v s1f))
-    ;; (set! xtm_render_s2 (create_shader_xtm s2v s2f))
-    ;; (set! xtm_render_s3 (create_shader_xtm s2v s2f_nl))
-    ;; (set! xtm_render_s4 (create_shader_xtm s4v s4f))
+    ;; (set! xtm_render_s1 (ShaderProgram_create_xtm s1v s1f))
+    ;; (set! xtm_render_s2 (ShaderProgram_create_xtm s2v s2f))
+    ;; (set! xtm_render_s3 (ShaderProgram_create_xtm s2v s2f_nl))
+    ;; (set! xtm_render_s4 (ShaderProgram_create_xtm s4v s4f))
     (printf "XTM Render Setup Complete\n")
     void))
 
@@ -957,8 +981,8 @@
         (model:float* (alloc 16))
         (view:float* (alloc 16))
         (projection:float* (alloc 16))
-        (shadow_fbo:E_fbo* null)
-        (render_fbo:E_fbo* null))
+        (shadow_fbo:FBO* null)
+        (render_fbo:FBO* null))
     (lambda (pre:XTMRENDERCB opaque:XTMRENDERCB transparent:XTMRENDERCB post:XTMRENDERCB data:i8*)
       (set! shadow_fbo (xtm_shader_fbo))
       (set! render_fbo (xtm_render_fbo))      
