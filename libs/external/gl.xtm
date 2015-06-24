@@ -2995,8 +2995,8 @@
       (printf "Created ") (VBO_print vbo) (printf "\n")
       vbo)))
 
-(bind-func VBO_create_float_withtype
-  (lambda (buf:float* buflen type)
+(bind-func VBO_create_float_usage
+  (lambda (buf:float* buflen usage)
     (let ((vbo:VBO* (zalloc))
           (id:GLuint* (salloc)))
       (glGenBuffers 1 id)
@@ -3007,13 +3007,13 @@
               (* buflen 4) ;; sizeof(float)
               (cast buf GLvoid*))
       (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) type)
+      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) usage)
       (gl_print_error "Error setting VBO data")
       (printf "Created ") (VBO_print vbo) (printf "\n")
       vbo)))
 
-(bind-func VBO_create_i32_withtype
-  (lambda (buf:i32* buflen type)
+(bind-func VBO_create_i32_usage
+  (lambda (buf:i32* buflen usage)
     (let ((vbo:VBO* (zalloc))
           (id:GLuint* (salloc)))
       (glGenBuffers 1 id)
@@ -3024,15 +3024,15 @@
               (* buflen 4) ;; sizeof(float)
               (cast buf GLvoid*))
       (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) type)
+      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) usage)
       (gl_print_error "Error setting VBO data")
       (printf "Created ") (VBO_print vbo) (printf "\n")
       vbo)))
 
 (bind-poly VBO_create VBO_create_float)
 (bind-poly VBO_create VBO_create_i32)
-(bind-poly VBO_create VBO_create_float_withtype)
-(bind-poly VBO_create VBO_create_i32_withtype)
+(bind-poly VBO_create VBO_create_float_usage)
+(bind-poly VBO_create VBO_create_i32_usage)
 
 (bind-func VBO_update_data
   "update the full buffer"
