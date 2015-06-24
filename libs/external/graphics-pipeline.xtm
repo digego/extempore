@@ -71,7 +71,7 @@
           (c-1 (- 1.0 c))
           (s (sin alpha))
           (mat2:float* (salloc 16))
-          (mat3:float* (salloc 16))
+          (mat3:float* (salloc 16))          
           (vec1:float* (salloc 3)) ;; axis to rotate around (normalized)
           (vec2:float* (salloc 3))) ;; axis to rotate around (normalized)
       (pfill! vec1 x y z)
@@ -149,7 +149,7 @@
             (vx:float* (salloc 3))
             (i 0)
             (mat:float* (salloc 16))
-            (mtmp1:float* (salloc 16))
+            (mtmp1:float* (salloc 16))          
             (vtmp1:float* (salloc 3))
             (vtmp2:float* (salloc 3)))
         (vsub vEye vTarget 3 vtmp1)
@@ -181,7 +181,7 @@
             (vx:float* (salloc 3))
             (i 0)
             (mat:float* (salloc 16))
-            (mtmp1:float* (salloc 16))
+            (mtmp1:float* (salloc 16))          
             (vtmp1:float* (salloc 3))
             (vtmp2:float* (salloc 3)))
         (vnorm vDir 3 vz)
@@ -845,8 +845,46 @@
     (set! xtm_render_dof_shader (ShaderProgram_create_xtm v f))
     void))
 
+(pfill! fullscreen_quad_verts
+        ;; pos       texcoord
+        -1.0  1.0    0.0 0.0
+        1.0  1.0    1.0 0.0
+        -1.0 -1.0    0.0 1.0
+        1.0 -1.0    1.0 1.0)
+(set! vbo (VBO_create fullscreen_quad_verts 16))
+(set! vao (VAO_create))
+(bind_attribute vao vbo 0 2 4 0) ;; position
+(bind_attribute vao vbo 1 2 4 2) ;; tex_coord
+(set! tex (Texture_create))
+(draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
+
+;; draw a quad
+;; tw and th are framebuffer width and height
+(bind-func gl_draw_shader_quad
+  (lambda (x y w h r tw th)
+    (let ((hx (* -0.5 w))
+	  (hy (* -0.5 h))
+	  (xx (+ x (* .5 w)))
+	  (yy (+ y (* .5 h))))
+      (glPushMatrix)
+      (glTranslated xx yy 0.0)
+      (glRotated r 0.0 0.0 1.0)
+      (glBegin GL_QUADS)
+      (glTexCoord2d 0.0 0.0)
+      (glVertex2d hx hy)
+      (glTexCoord2d 0.0 th)
+      (glVertex2d hx (+ hy h))
+      (glTexCoord2d tw th)
+      (glVertex2d (+ hx w) (+ hy h))
+      (glTexCoord2d tw 0.0)
+      (glVertex2d (+ hx w) hy)
+      (glTexCoord2d 0.0 0.0)
+      (glEnd)
+      (glPopMatrix)
+      void)))
+
 (bind-func xtm_draw_tex
-  (lambda (shader:i32 tex:i32 m v p)
+  (lambda (shader:ShaderProgram tex:Texture m v p)
     (glUseProgram shader)
     (shader_update_matrices shader m v p)
     ;; setup shadowmap texture from FBO
@@ -957,10 +995,10 @@
 (bind-poly xtm_render_setup xtm_render_setup_b)
 (bind-poly xtm_render_setup xtm_render_setup_c)
 
-(sys:load "libs/external/shaders-scm.xtm")
+(sys:load "libs/external/graphics-pipeline-scm.xtm")
 ;; make sure we load them with AOT-compiled code as well
 (impc:aot:insert-sexp
- '(sys:load "libs/external/shaders-scm.xtm"))
+ '(sys:load "libs/external/graphics-pipeline-scm.xtm"))
 
 (bind-alias XTMRENDERCB [void,i64,i32,float*,float*,float*,i8*]*)
 
@@ -993,7 +1031,6 @@
       (fill_projection_matrix projection xtm_render_angle
                               (i32tof (/ xtm_render_w xtm_render_h))
                               xtm_render_near xtm_render_far)
-
       (if (not (null? pre))
           (begin
             ;; each cycle set lights back to 0
@@ -1001,7 +1038,6 @@
             (xtm_camera_view view)       ;; set view
             (fill_identity_matrix model) ;; set model
             (pre frame 0 model view projection data)))
-
       (glBindFramebuffer GL_FRAMEBUFFER (tref shadow_fbo 0))
       ;;(set! sh1 xtm_render_s1)
       (set! sh1 xtm_render_simple_shader)
@@ -1062,7 +1098,6 @@
       ;;
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
-
       (if (null? post)
           (begin ;; if no post then just render fbo            
             (glDisable GL_DEPTH_TEST)
