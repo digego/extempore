@@ -845,43 +845,24 @@
     (set! xtm_render_dof_shader (ShaderProgram_create_xtm v f))
     void))
 
-(pfill! fullscreen_quad_verts
-        ;; pos       texcoord
-        -1.0  1.0    0.0 0.0
-        1.0  1.0    1.0 0.0
-        -1.0 -1.0    0.0 1.0
-        1.0 -1.0    1.0 1.0)
-(set! vbo (VBO_create fullscreen_quad_verts 16))
-(set! vao (VAO_create))
-(bind_attribute vao vbo 0 2 4 0) ;; position
-(bind_attribute vao vbo 1 2 4 2) ;; tex_coord
-(set! tex (Texture_create))
-(draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
-
-;; draw a quad
-;; tw and th are framebuffer width and height
-(bind-func gl_draw_shader_quad
-  (lambda (x y w h r tw th)
-    (let ((hx (* -0.5 w))
-	  (hy (* -0.5 h))
-	  (xx (+ x (* .5 w)))
-	  (yy (+ y (* .5 h))))
-      (glPushMatrix)
-      (glTranslated xx yy 0.0)
-      (glRotated r 0.0 0.0 1.0)
-      (glBegin GL_QUADS)
-      (glTexCoord2d 0.0 0.0)
-      (glVertex2d hx hy)
-      (glTexCoord2d 0.0 th)
-      (glVertex2d hx (+ hy h))
-      (glTexCoord2d tw th)
-      (glVertex2d (+ hx w) (+ hy h))
-      (glTexCoord2d tw 0.0)
-      (glVertex2d (+ hx w) hy)
-      (glTexCoord2d 0.0 0.0)
-      (glEnd)
-      (glPopMatrix)
-      void)))
+(bind-func xtm_draw_shader_unit_quad
+  (let ((fullscreen_quad_verts:|16,float|* (zalloc))
+        (vbo:VBO* null)
+        (vao:VAO* null))
+    (afill! fullscreen_quad_verts
+            ;; pos       texcoord
+            -1.0  1.0    0.0 0.0
+             1.0  1.0    1.0 0.0
+            -1.0 -1.0    0.0 1.0
+             1.0 -1.0    1.0 1.0)
+    (lambda ()
+      (set! vbo (VBO_create (convert fullscreen_quad_verts float*) 16))
+      (set! vao (VAO_create))
+      (bind_attribute vao vbo 0 2 4 0) ;; position
+      (bind_attribute vao vbo 1 2 4 2) ;; tex_coord
+      (draw_vertex_array vao GL_TRIANGLE_STRIP 0 4)
+      (VBO_delete vbo)
+      (VAO_delete vao))))
 
 (bind-func xtm_draw_tex
   (lambda (shader:ShaderProgram tex:Texture m v p)
@@ -892,7 +873,7 @@
     (glBindTexture GL_TEXTURE_2D tex)
     (glUniform1i (glGetUniformLocation shader "tex1") 0)
     ;; (glViewport x y w h)
-    (gl_draw_shader_quad 0.0 0.0 1.0 1.0 0.0 1.0 1.0)
+    (xtm_draw_shader_unit_quad)
     (glBindTexture GL_TEXTURE_2D 0)
     (glUseProgram 0)
     void))
@@ -942,7 +923,7 @@
         (pfill! framebufsize (i32tof xtm_render_w) (i32tof xtm_render_h))
         (glUniform2fv (glGetUniformLocation xtm_render_dof_shader "frameBufSize") 1 framebufsize)
         (glUniform1i (glGetUniformLocation xtm_render_dof_shader "show_depth") show_depth)        
-        (gl_draw_shader_quad 0.0 0.0 1.0 1.0 0.0 1.0 1.0)        
+        (xtm_draw_shader_unit_quad)        
         (glActiveTexture GL_TEXTURE0) 
         (glBindTexture GL_TEXTURE_2D 0)
         (glActiveTexture GL_TEXTURE2) 
@@ -1024,7 +1005,7 @@
     (lambda (pre:XTMRENDERCB opaque:XTMRENDERCB transparent:XTMRENDERCB post:XTMRENDERCB data:i8*)
       (set! shadow_fbo (xtm_shader_fbo))
       (set! render_fbo (xtm_render_fbo))      
-      (glShadeModel GL_SMOOTH)
+      ;; (glShadeModel GL_SMOOTH)
       (glEnable GL_DEPTH_TEST)
       (glEnable GL_TEXTURE_2D)
       ;; seutp projection matrix            
