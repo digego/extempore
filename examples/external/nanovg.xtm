@@ -159,7 +159,7 @@ static char* cpToUTF8(int cp, char* str)
 
       ;; /*	nvgBeginPath(vg)
       ;; 	nvgRoundedRect(vg, x+0.5,y+0.5, w-1,h-1, cornerRadius-0.5)
-      ;; 	nvgStrokeColor(vg, nvgRGBA(0,0,0,48))
+      ;; 	nvgStrokeColor(vg, nvgRGBA 0,0,0,48)
       ;; 	nvgStroke(vg);*/
 
       (nvgFontSize vg h*1.3)
@@ -519,151 +519,151 @@ static char* cpToUTF8(int cp, char* str)
       (nvgStrokeWidth vg 1.0))))
 
 
-void drawSpinner(NVGcontext* vg, float cx, float cy, float r, float t)
-{
-	float a0 = 0.0 + t*6
-	float a1 = NVG_PI + t*6
-	float r0 = r
-	float r1 = r * 0.75
-	float ax,ay, bx,by
-	NVGpaint paint
+(bind-func drawSpinner
+  (lambda (vg cx cy r t)
+    (let ((a0 (+ 0.0 (* t 6)))
+          (a1 (+ NVG_PI (* t 6)))
+          (r0 r)
+          (r1 (* r 0.75))
+          (ax (+ cx (* (cos a0) (+ r0 r1) 0.5)))
+          (ay (+ cy (* (sin a0) (+ r0 r1) 0.5)))
+          (bx (+ cx (* (cos a1) (+ r0 r1) 0.5)))
+          (by (+ cy (* (sin a1) (+ r0 r1) 0.5)))
+          (paint:NVGpaint (nvgLinearGradient vg ax ay bx by (nvgRGBA 0 0 0 0) (nvgRGBA 0 0 0 128))))
+      (nvgSave vg)
 
-	nvgSave(vg)
+      (nvgBeginPath vg)
+      (nvgArc vg cx cy r0 a0 a1 NVG_CW)
+      (nvgArc vg cx cy r1 a1 a0 NVG_CCW)
+      (nvgClosePath vg)
+      (nvgFillPaint vg paint)
+      (nvgFill vg)
 
-	nvgBeginPath(vg)
-	nvgArc(vg, cx,cy, r0, a0, a1, NVG_CW)
-	nvgArc(vg, cx,cy, r1, a1, a0, NVG_CCW)
-	nvgClosePath(vg)
-	ax = cx + cosf(a0) * (r0+r1)*0.5
-	ay = cy + sinf(a0) * (r0+r1)*0.5
-	bx = cx + cosf(a1) * (r0+r1)*0.5
-	by = cy + sinf(a1) * (r0+r1)*0.5
-	paint = nvgLinearGradient(vg, ax,ay, bx,by, nvgRGBA(0,0,0,0), nvgRGBA(0,0,0,128))
-	nvgFillPaint(vg, paint)
-	nvgFill(vg)
+      (nvgRestore vg))))
 
-	nvgRestore(vg)
-}
 
-void drawThumbnails(NVGcontext* vg, float x, float y, float w, float h, const int* images, int nimages, float t)
-{
-	float cornerRadius = 3.0
-	NVGpaint shadowPaint, imgPaint, fadePaint
-	float ix,iy,iw,ih
-	float thumb = 60.0
-	float arry = 30.5
-	int imgw, imgh
-	float stackh = (nimages/2) * (thumb+10) + 10
-	int i
-	float u = (1+cosf(t*0.5))*0.5
-	float u2 = (1-cosf(t*0.2f))*0.5
-	float scrollh, dv
+(bind-func drawThumbnails
+  (lambda (NVGcontext* vg, float x, float y, float w, float h, const int* images, int nimages, float t)
+    (let ((cornerRadius 3.0)
+          (shadowPaint:NVGpaint (salloc))
+          (imgPaint:NVGpaint (salloc))
+          (fadePaint:NVGpaint (salloc))
+          (ix)
+          (iy)
+          (iw)
+          (ih)
+          (thumb 60.0)
+          (arry 30.5)
+          (imgw_ptr:i32* (salloc))
+          (imgh_ptr:i32* (salloc))
+          (stackh (+ (* (/ nimages 2) (+ thumb 10)) 10))
+          (i 0)
+          (u (* (+ 1.0 (cos (* t 0.5))) 0.5))
+          (u2 (* (- 1.0 (cos (* t 0.2))) 0.5))
+          (scrollh (* (/ h stackh) (- h 8)))
+          (dv (/ 1.0 (convert (- nimages 1)))))
+      (nvgSave vg)
+      ;; (nvgClearState vg)
 
-	nvgSave(vg)
-;;	nvgClearState(vg)
+      ;; Drop shadow
+      (set! shadowPaint (nvgBoxGradient vg x (+ y 4) w h (* cornerRadius 2) 20 nvgRGBA 0 0 0 128 nvgRGBA 0 0 0 0))
+      (nvgBeginPath vg)
+      (nvgRect vg (- x 10) (- y 10) (+ w 20) (+ h 30))
+      (nvgRoundedRect vg x y w h cornerRadius)
+      (nvgPathWinding vg NVG_HOLE)
+      (nvgFillPaint vg shadowPaint)
+      (nvgFill vg)
 
-	;; Drop shadow
-	shadowPaint = nvgBoxGradient(vg, x,y+4, w,h, cornerRadius*2, 20, nvgRGBA(0,0,0,128), nvgRGBA(0,0,0,0))
-	nvgBeginPath(vg)
-	nvgRect(vg, x-10,y-10, w+20,h+30)
-	nvgRoundedRect(vg, x,y, w,h, cornerRadius)
-	nvgPathWinding(vg, NVG_HOLE)
-	nvgFillPaint(vg, shadowPaint)
-	nvgFill(vg)
+      ;; Window
+      (nvgBeginPath vg)
+      (nvgRoundedRect vg x y w h cornerRadius)
+      (nvgMoveTo vg (- x 10) (+ y arry))
+      (nvgLineTo vg (+ x 1) (+ y (- arry 11)))
+      (nvgLineTo vg (+ x 1) (+ y arry 11))
+      (nvgFillColor vg nvgRGBA 200 200 200 255)
+      (nvgFill vg)
 
-	;; Window
-	nvgBeginPath(vg)
-	nvgRoundedRect(vg, x,y, w,h, cornerRadius)
-	nvgMoveTo(vg, x-10,y+arry)
-	nvgLineTo(vg, x+1,y+arry-11)
-	nvgLineTo(vg, x+1,y+arry+11)
-	nvgFillColor(vg, nvgRGBA(200,200,200,255))
-	nvgFill(vg)
+      (nvgSave vg)
+      (nvgScissor vg x y w h)
+      (nvgTranslate vg 0 (* -1.0 (- stackh h) u))
 
-	nvgSave(vg)
-	nvgScissor(vg, x,y,w,h)
-	nvgTranslate(vg, 0, -(stackh - h)*u)
+      (dotimes (i nimages)
+        (let  ((tx (+ x 10))
+               (ty (+ y 10))
+               (v 0)
+               (a)))
+        (set! tx (+ tx (* (% i 2) (+ thumb 10))))
+        (set! ty (+ ty (* (/ i 2) (+ thumb 10))))
+        (nvgImageSize vg (pref images i) imgw_ptr imgh_ptr)
+        (if (< (pref imgw_ptr 0) (pref imgh_ptr 0))
+            (begin
+              (set! iw thumb)
+              (set! ih (/ (* iw (convert (pref imgh_ptr 0) float)) (convert (pref imgw_ptr 0) float)))
+              (set! ix 0)
+              (set! iy (* -1.0 (- ih thumb) 0.5)))
+            (begin
+              (set! ih thumb)
+              (set! iw (/ (* ih (convert (pref imgw_ptr 0) float)) (convert (pref imgh_ptr 0) float)))
+              (set! ix (* -1.0 (- iw thumb) 0.5))
+              (set! iy 0)))
 
-	dv = 1.0 / (float)(nimages-1)
+        (set! v (* (convert i) dv))
+        (set! a (clampf (/ (- u2 v) dv) 0 1))
 
-	for (i = 0; i < nimages; i++) {
-		float tx, ty, v, a
-		tx = x+10
-		ty = y+10
-		tx += (i%2) * (thumb+10)
-		ty += (i/2) * (thumb+10)
-		nvgImageSize(vg, images[i], &imgw, &imgh)
-		if (imgw < imgh) {
-			iw = thumb
-			ih = iw * (float)imgh/(float)imgw
-			ix = 0
-			iy = -(ih-thumb)*0.5
-		} else {
-			ih = thumb
-			iw = ih * (float)imgw/(float)imgh
-			ix = -(iw-thumb)*0.5
-			iy = 0
-		}
+        (if (< a 1.0)
+            (drawSpinner vg (+ tx (/ thumb 2)) (+ ty (/ thumb 2)) (* thumb 0.25) t))
 
-		v = i * dv
-		a = clampf((u2-v) / dv, 0, 1)
+        (set! imgPaint (nvgImagePattern vg (+ tx ix) (+ ty iy) iw ih (/ 0.0 (* 180. NVG_PI)) (pref images i) a))
+        (nvgBeginPath vg)
+        (nvgRoundedRect vg tx ty thumb thumb 5)
+        (nvgFillPaint vg imgPaint)
+        (nvgFill vg)
 
-		if (a < 1.0)
-			drawSpinner(vg, tx+thumb/2,ty+thumb/2, thumb*0.25, t)
+        (set! shadowPaint (nvgBoxGradient vg (- tx 1) ty (+ thumb 2) (+ thumb 2) 5 3 nvgRGBA 0 0 0 128 nvgRGBA 0 0 0 0))
+        (nvgBeginPath vg)
+        (nvgRect vg (- tx 5) (- ty 5) (+ thumb 10) (+ thumb 10))
+        (nvgRoundedRect vg tx ty thumb thumb 6)
+        (nvgPathWinding vg NVG_HOLE)
+        (nvgFillPaint vg shadowPaint)
+        (nvgFill vg)
 
-		imgPaint = nvgImagePattern(vg, tx+ix, ty+iy, iw,ih, 0.0/180.0*NVG_PI, images[i], a)
-		nvgBeginPath(vg)
-		nvgRoundedRect(vg, tx,ty, thumb,thumb, 5)
-		nvgFillPaint(vg, imgPaint)
-		nvgFill(vg)
+        (nvgBeginPath vg)
+        (nvgRoundedRect vg (+ tx 0.5) (+ ty 0.5) (- thumb 1) (- thumb 1) (- 4.0 0.5))
+        (nvgStrokeWidth vg 1.0)
+        (nvgStrokeColor vg nvgRGBA 255 255 255 192)
+        (nvgStroke vg))
+      (nvgRestore vg)
 
-		shadowPaint = nvgBoxGradient(vg, tx-1,ty, thumb+2,thumb+2, 5, 3, nvgRGBA(0,0,0,128), nvgRGBA(0,0,0,0))
-		nvgBeginPath(vg)
-		nvgRect(vg, tx-5,ty-5, thumb+10,thumb+10)
-		nvgRoundedRect(vg, tx,ty, thumb,thumb, 6)
-		nvgPathWinding(vg, NVG_HOLE)
-		nvgFillPaint(vg, shadowPaint)
-		nvgFill(vg)
+      ;; Hide fades
+      (set! fadePaint (nvgLinearGradient vg x y x (+ y 6) nvgRGBA 200 200 200 255 nvgRGBA 200 200 200 0))
+      (nvgBeginPath vg)
+      (nvgRect vg (+ x 4) y (- w 8) 6)
+      (nvgFillPaint vg fadePaint)
+      (nvgFill vg)
 
-		nvgBeginPath(vg)
-		nvgRoundedRect(vg, tx+0.5,ty+0.5, thumb-1,thumb-1, 4-0.5)
-		nvgStrokeWidth(vg,1.0)
-		nvgStrokeColor(vg, nvgRGBA(255,255,255,192))
-		nvgStroke(vg)
-	}
-	nvgRestore(vg)
+      (set! fadePaint (nvgLinearGradient vg x (+ y h) x (+ y (- h 6)) nvgRGBA 200 200 200 255 nvgRGBA 200 200 200 0))
+      (nvgBeginPath vg)
+      (nvgRect vg (+ x 4) (+ y (- h 6)) (- w 8) 6)
+      (nvgFillPaint vg fadePaint)
+      (nvgFill vg)
 
-	;; Hide fades
-	fadePaint = nvgLinearGradient(vg, x,y,x,y+6, nvgRGBA(200,200,200,255), nvgRGBA(200,200,200,0))
-	nvgBeginPath(vg)
-	nvgRect(vg, x+4,y,w-8,6)
-	nvgFillPaint(vg, fadePaint)
-	nvgFill(vg)
+      ;; Scroll bar
+      (set! shadowPaint (nvgBoxGradient vg (+ x (- w 11)) (+ y 5) 8 (- h 8) 3 4 nvgRGBA 0 0 0 32 nvgRGBA 0 0 0 92))
+      (nvgBeginPath vg)
+      (nvgRoundedRect vg (+ x (- w 12)) (+ y 4) 8 (- h 8) 3)
+      (nvgFillPaint vg shadowPaint)
+      ;; (nvgFillColor vg nvgRGBA 255 0 0 128)
+      (nvgFill vg)
 
-	fadePaint = nvgLinearGradient(vg, x,y+h,x,y+h-6, nvgRGBA(200,200,200,255), nvgRGBA(200,200,200,0))
-	nvgBeginPath(vg)
-	nvgRect(vg, x+4,y+h-6,w-8,6)
-	nvgFillPaint(vg, fadePaint)
-	nvgFill(vg)
+      (set! shadowPaint (nvgBoxGradient vg (+ x (- w 11)) (+ y 3 (* (- h 8 scrollh) u)) 8 scrollh 3 4 nvgRGBA 220 220 220 255 nvgRGBA 128 128 128 255))
+      nvgBeginPath(vg)
+      nvgRoundedRect(vg (+ x (- w 11)) (+ y 5 (* (- h 8 scrollh) u)) 6 (- scrollh 2) 2)
+      (nvgFillPaint vg shadowPaint)
+      ;; (nvgFillColor vg nvgRGBA 0 0 0 128)
+      (nvgFill vg)
 
-	;; Scroll bar
-	shadowPaint = nvgBoxGradient(vg, x+w-12+1,y+4+1, 8,h-8, 3,4, nvgRGBA(0,0,0,32), nvgRGBA(0,0,0,92))
-	nvgBeginPath(vg)
-	nvgRoundedRect(vg, x+w-12,y+4, 8,h-8, 3)
-	nvgFillPaint(vg, shadowPaint)
-;;	nvgFillColor(vg, nvgRGBA(255,0,0,128))
-	nvgFill(vg)
+      (nvgRestore vg))))
 
-	scrollh = (h/stackh) * (h-8)
-	shadowPaint = nvgBoxGradient(vg, x+w-12-1,y+4+(h-8-scrollh)*u-1, 8,scrollh, 3,4, nvgRGBA(220,220,220,255), nvgRGBA(128,128,128,255))
-	nvgBeginPath(vg)
-	nvgRoundedRect(vg, x+w-12+1,y+4+1 + (h-8-scrollh)*u, 8-2,scrollh-2, 2)
-	nvgFillPaint(vg, shadowPaint)
-;;	nvgFillColor(vg, nvgRGBA(0,0,0,128))
-	nvgFill(vg)
-
-	nvgRestore(vg)
-}
 
 void drawColorwheel(NVGcontext* vg, float x, float y, float w, float h, float t)
 {
@@ -676,7 +676,7 @@ void drawColorwheel(NVGcontext* vg, float x, float y, float w, float h, float t)
 
 /*	nvgBeginPath(vg)
 	nvgRect(vg, x,y,w,h)
-	nvgFillColor(vg, nvgRGBA(255,0,0,128))
+	nvgFillColor(vg, nvgRGBA 255,0,0,128)
 	nvgFill(vg);*/
 
 	cx = x + w*0.5
@@ -704,7 +704,7 @@ void drawColorwheel(NVGcontext* vg, float x, float y, float w, float h, float t)
 	nvgBeginPath(vg)
 	nvgCircle(vg, cx,cy, r0-0.5)
 	nvgCircle(vg, cx,cy, r1+0.5)
-	nvgStrokeColor(vg, nvgRGBA(0,0,0,64))
+	nvgStrokeColor(vg, nvgRGBA 0,0,0,64)
 	nvgStrokeWidth(vg, 1.0)
 	nvgStroke(vg)
 
@@ -717,10 +717,10 @@ void drawColorwheel(NVGcontext* vg, float x, float y, float w, float h, float t)
 	nvgStrokeWidth(vg, 2.0)
 	nvgBeginPath(vg)
 	nvgRect(vg, r0-1,-3,r1-r0+2,6)
-	nvgStrokeColor(vg, nvgRGBA(255,255,255,192))
+	nvgStrokeColor(vg, nvgRGBA 255,255,255,192)
 	nvgStroke(vg)
 
-	paint = nvgBoxGradient(vg, r0-3,-5,r1-r0+6,10, 2,4, nvgRGBA(0,0,0,128), nvgRGBA(0,0,0,0))
+	paint = nvgBoxGradient(vg, r0-3,-5,r1-r0+6,10, 2,4, nvgRGBA 0,0,0,128, nvgRGBA 0,0,0,0)
 	nvgBeginPath(vg)
 	nvgRect(vg, r0-2-10,-4-10,r1-r0+4+20,8+20)
 	nvgRect(vg, r0-2,-4,r1-r0+4,8)
@@ -739,13 +739,13 @@ void drawColorwheel(NVGcontext* vg, float x, float y, float w, float h, float t)
 	nvgLineTo(vg, ax,ay)
 	nvgLineTo(vg, bx,by)
 	nvgClosePath(vg)
-	paint = nvgLinearGradient(vg, r,0, ax,ay, nvgHSLA(hue,1.0,0.5,255), nvgRGBA(255,255,255,255))
+	paint = nvgLinearGradient(vg, r,0, ax,ay, nvgHSLA(hue,1.0,0.5,255), nvgRGBA 255,255,255,255)
 	nvgFillPaint(vg, paint)
 	nvgFill(vg)
-	paint = nvgLinearGradient(vg, (r+ax)*0.5,(0+ay)*0.5, bx,by, nvgRGBA(0,0,0,0), nvgRGBA(0,0,0,255))
+	paint = nvgLinearGradient(vg, (r+ax)*0.5,(0+ay)*0.5, bx,by, nvgRGBA 0,0,0,0, nvgRGBA 0,0,0,255)
 	nvgFillPaint(vg, paint)
 	nvgFill(vg)
-	nvgStrokeColor(vg, nvgRGBA(0,0,0,64))
+	nvgStrokeColor(vg, nvgRGBA 0,0,0,64)
 	nvgStroke(vg)
 
 	;; Select circle on triangle
@@ -754,10 +754,10 @@ void drawColorwheel(NVGcontext* vg, float x, float y, float w, float h, float t)
 	nvgStrokeWidth(vg, 2.0)
 	nvgBeginPath(vg)
 	nvgCircle(vg, ax,ay,5)
-	nvgStrokeColor(vg, nvgRGBA(255,255,255,192))
+	nvgStrokeColor(vg, nvgRGBA 255,255,255,192)
 	nvgStroke(vg)
 
-	paint = nvgRadialGradient(vg, ax,ay, 7,9, nvgRGBA(0,0,0,64), nvgRGBA(0,0,0,0))
+	paint = nvgRadialGradient(vg, ax,ay, 7,9, nvgRGBA 0,0,0,64, nvgRGBA 0,0,0,0)
 	nvgBeginPath(vg)
 	nvgRect(vg, ax-20,ay-20,40,40)
 	nvgCircle(vg, ax,ay,7)
@@ -798,7 +798,7 @@ void drawLines(NVGcontext* vg, float x, float y, float w, float h, float t)
 			nvgLineJoin(vg, joins[j])
 
 			nvgStrokeWidth(vg, s*0.3)
-			nvgStrokeColor(vg, nvgRGBA(0,0,0,160))
+			nvgStrokeColor(vg, nvgRGBA 0,0,0,160)
 			nvgBeginPath(vg)
 			nvgMoveTo(vg, fx+pts[0], fy+pts[1])
 			nvgLineTo(vg, fx+pts[2], fy+pts[3])
@@ -810,7 +810,7 @@ void drawLines(NVGcontext* vg, float x, float y, float w, float h, float t)
 			nvgLineJoin(vg, NVG_BEVEL)
 
 			nvgStrokeWidth(vg, 1.0)
-			nvgStrokeColor(vg, nvgRGBA(0,192,255,255))
+			nvgStrokeColor(vg, nvgRGBA 0,192,255,255)
 			nvgBeginPath(vg)
 			nvgMoveTo(vg, fx+pts[0], fy+pts[1])
 			nvgLineTo(vg, fx+pts[2], fy+pts[3])
@@ -905,11 +905,11 @@ void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, 
 			int hit = mx > x && mx < (x+width) && my >= y && my < (y+lineh)
 
 			nvgBeginPath(vg)
-			nvgFillColor(vg, nvgRGBA(255,255,255,hit?64:16))
+			nvgFillColor(vg, nvgRGBA 255,255,255,hit?64:16)
 			nvgRect(vg, x, y, row->width, lineh)
 			nvgFill(vg)
 
-			nvgFillColor(vg, nvgRGBA(255,255,255,255))
+			nvgFillColor(vg, nvgRGBA 255,255,255,255)
 			nvgText(vg, x, y, row->start, row->end)
 
 			if (hit) {
@@ -925,7 +925,7 @@ void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, 
 					px = gx
 				}
 				nvgBeginPath(vg)
-				nvgFillColor(vg, nvgRGBA(255,192,0,255))
+				nvgFillColor(vg, nvgRGBA 255,192,0,255)
 				nvgRect(vg, caretx, y, 1, lineh)
 				nvgFill(vg)
 
@@ -949,11 +949,11 @@ void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, 
 		nvgTextBounds(vg, gx,gy, txt, NULL, bounds)
 
 		nvgBeginPath(vg)
-		nvgFillColor(vg, nvgRGBA(255,192,0,255))
+		nvgFillColor(vg, nvgRGBA 255,192,0,255)
 		nvgRoundedRect(vg, (int)bounds[0]-4,(int)bounds[1]-2, (int)(bounds[2]-bounds[0])+8, (int)(bounds[3]-bounds[1])+4, ((int)(bounds[3]-bounds[1])+4)/2-1)
 		nvgFill(vg)
 
-		nvgFillColor(vg, nvgRGBA(32,32,32,255))
+		nvgFillColor(vg, nvgRGBA 32,32,32,255)
 		nvgText(vg, gx,gy, txt, null)
 	}
 
@@ -973,7 +973,7 @@ void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, 
 	nvgGlobalAlpha(vg, a)
 
 	nvgBeginPath(vg)
-	nvgFillColor(vg, nvgRGBA(220,220,220,255))
+	nvgFillColor(vg, nvgRGBA 220,220,220,255)
 	nvgRoundedRect(vg, bounds[0]-2,bounds[1]-2, (int)(bounds[2]-bounds[0])+4, (int)(bounds[3]-bounds[1])+4, 3)
 	px = (int)((bounds[2]+bounds[0])/2)
 	nvgMoveTo(vg, px,bounds[1] - 10)
@@ -981,7 +981,7 @@ void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, 
 	nvgLineTo(vg, px-7,bounds[1]+1)
 	nvgFill(vg)
 
-	nvgFillColor(vg, nvgRGBA(0,0,0,220))
+	nvgFillColor(vg, nvgRGBA 0,0,0,220)
 	nvgTextBox(vg, x,y, 150, "Hover your mouse over the text to see calculated caret position.", null)
 
 	nvgRestore(vg)
@@ -993,7 +993,7 @@ void drawWidths(NVGcontext* vg, float x, float y, float width)
 
 	nvgSave(vg)
 
-	nvgStrokeColor(vg, nvgRGBA(0,0,0,255))
+	nvgStrokeColor(vg, nvgRGBA 0,0,0,255)
 
 	for (i = 0; i < 20; i++) {
 		float w = (i+0.5)*0.1f
@@ -1018,18 +1018,18 @@ void drawCaps(NVGcontext* vg, float x, float y, float width)
 
 	nvgBeginPath(vg)
 	nvgRect(vg, x-lineWidth/2, y, width+lineWidth, 40)
-	nvgFillColor(vg, nvgRGBA(255,255,255,32))
+	nvgFillColor(vg, nvgRGBA 255,255,255,32)
 	nvgFill(vg)
 
 	nvgBeginPath(vg)
 	nvgRect(vg, x, y, width, 40)
-	nvgFillColor(vg, nvgRGBA(255,255,255,32))
+	nvgFillColor(vg, nvgRGBA 255,255,255,32)
 	nvgFill(vg)
 
 	nvgStrokeWidth(vg, lineWidth)
 	for (i = 0; i < 3; i++) {
 		nvgLineCap(vg, caps[i])
-		nvgStrokeColor(vg, nvgRGBA(0,0,0,255))
+		nvgStrokeColor(vg, nvgRGBA 0,0,0,255)
 		nvgBeginPath(vg)
 		nvgMoveTo(vg, x, y + i*10 + 5)
 		nvgLineTo(vg, x+width, y + i*10 + 5)
@@ -1048,7 +1048,7 @@ void drawScissor(NVGcontext* vg, float x, float y, float t)
 	nvgRotate(vg, nvgDegToRad(5))
 	nvgBeginPath(vg)
 	nvgRect(vg, -20,-20,60,40)
-	nvgFillColor(vg, nvgRGBA(255,0,0,255))
+	nvgFillColor(vg, nvgRGBA 255,0,0,255)
 	nvgFill(vg)
 	nvgScissor(vg, -20,-20,60,40)
 
@@ -1061,7 +1061,7 @@ void drawScissor(NVGcontext* vg, float x, float y, float t)
 	nvgResetScissor(vg)
 	nvgBeginPath(vg)
 	nvgRect(vg, -20,-10,60,30)
-	nvgFillColor(vg, nvgRGBA(255,128,0,64))
+	nvgFillColor(vg, nvgRGBA 255,128,0,64)
 	nvgFill(vg)
 	nvgRestore(vg)
 
@@ -1069,7 +1069,7 @@ void drawScissor(NVGcontext* vg, float x, float y, float t)
 	nvgIntersectScissor(vg, -20,-10,60,30)
 	nvgBeginPath(vg)
 	nvgRect(vg, -20,-10,60,30)
-	nvgFillColor(vg, nvgRGBA(255,128,0,255))
+	nvgFillColor(vg, nvgRGBA 255,128,0,255)
 	nvgFill(vg)
 
 	nvgRestore(vg)
@@ -1119,7 +1119,7 @@ void renderDemo(NVGcontext* vg, float mx, float my, float width, float height,
 	drawEditBox(vg, "Password", x,y, 280,28)
 	y += 38
 	drawCheckBox(vg, "Remember me", x,y, 140,28)
-	drawButton(vg, ICON_LOGIN, "Sign in", x+138, y, 140, 28, nvgRGBA(0,96,128,255))
+	drawButton(vg, ICON_LOGIN, "Sign in", x+138, y, 140, 28, nvgRGBA 0,96,128,255)
 	y += 45
 
 	;; Slider
@@ -1129,8 +1129,8 @@ void renderDemo(NVGcontext* vg, float mx, float my, float width, float height,
 	drawSlider(vg, 0.4f, x,y, 170,28)
 	y += 55
 
-	drawButton(vg, ICON_TRASH, "Delete", x, y, 160, 28, nvgRGBA(128,16,8,255))
-	drawButton(vg, 0, "Cancel", x+170, y, 110, 28, nvgRGBA(0,0,0,0))
+	drawButton(vg, ICON_TRASH, "Delete", x, y, 160, 28, nvgRGBA 128,16,8,255)
+	drawButton(vg, 0, "Cancel", x+170, y, 110, 28, nvgRGBA 0,0,0,0)
 
 	;; Thumbnails box
 	drawThumbnails(vg, 365, popy-30, 160, 300, data->images, 12, t)
