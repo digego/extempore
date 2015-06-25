@@ -31,22 +31,42 @@
    (glGetIntegerv GL_MAX_DEPTH_TEXTURE_SAMPLES bits)
    (println "stencil buffer bit depth: " (pref bits 0))))
 
-(bind-val width float 1920.0)
-(bind-val height float 1080.0)
+(bind-val winWidth i32)
+(bind-val winHeight i32)
+(bind-val fbWidth i32)
+(bind-val fbHeight i32)
+
+(call-as-xtlang
+ (let ((w:i32* (alloc))
+       (h:i32* (alloc)))
+   (glfwGetWindowSize window w h)
+   (set! winWidth (pref w 0))
+   (set! winHeight (pref h 0))
+   (glfwGetFramebufferSize window w h)
+   (set! fbWidth (pref w 0))
+   (set! fbHeight (pref h 0))
+   0))
+
+(bind-func draw_test_rect
+  (lambda (x y)
+    (nvgBeginPath vg)
+    (nvgRect vg x y 520. 430.)
+    (nvgFillColor vg (nvgRGBA 128 0 128 128))
+    (nvgFill vg)))
 
 (bind-func nanovg_draw
   (lambda ()
-    (if (null? vg)
-        (println "Error: vg is null.")
-        (begin
-          ;; (nvgBeginFrame vg (convert width) (convert height) 1.0)
-          (nvgBeginPath vg)
-          (nvgRect vg 100. 100. 520. 430.)
-          (nvgFillColor vg (pref (NVGcolor 1. .7 0. 1.) 0))
-          (nvgFill vg)
-          (gl_print_error "draw:")
-          (nvgEndFrame vg)
-          (glfwSwapBuffers window)))))
+    (glViewport 0 0 fbWidth fbHeight)
+    (glClear (+ GL_COLOR_BUFFER_BIT
+                GL_DEPTH_BUFFER_BIT
+                GL_STENCIL_BUFFER_BIT))
+    (nvgBeginFrame vg
+                   (convert fbWidth) (convert fbHeight)
+                   (/ (convert fbWidth float)
+                      (convert winWidth float)))
+    (draw_test_rect 300. 300.)
+    (nvgEndFrame vg)
+    (glfwSwapBuffers window)))
 
 (define gl-loop
   (lambda (time delta-t)
