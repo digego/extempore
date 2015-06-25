@@ -15,8 +15,15 @@
 
 ;;; Code:
 
+(sys:load "libs/nanovg.xtm" 'quiet)
 (sys:load-preload-check 'nanovg)
 (define *xtmlib-nanovg-loaded* #f)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmnanovg")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (impc:aot:set-dylib-name-info
@@ -639,4 +646,5 @@
 ;; (bind-lib libnanovg nvgCreateGLES3 [NVGcontext*,i32]*)
 ;; (bind-lib libnanovg nvgDeleteGLES3 [void,NVGcontext*]*)
 
+(impc:aot:insert-footer "xtmnanovg")
 (define *xtmlib-nanovg-loaded* #t)
