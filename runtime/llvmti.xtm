@@ -1112,16 +1112,21 @@
                                 (_specialize-generic (car p) (cname-decode (cadr p)))
                                 t))))
                        ((and (symbol? ast)
-                             (regex:match? (symbol->string ast) ":(f)|(i)|(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
+                             (regex:match? (symbol->string ast) ":(f)|(i)|(f32)|(f64)|(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
                         (let ((p (regex:type-split (symbol->string ast) ":")))
                           (if (not (number? (string->atom (car p))))
                               ast
                               ;; otherwise do a convert
-                              (if (string=? (cadr p) "f")
-                                  (list 'bitconvert (string->atom (car p)) 'float)
-                                  (if (string=? (cadr p) "i")
-                                      (list 'bitconvert (string->atom (car p)) 'i32)
-                                      (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))))
+                              (cond ((string=? (cadr p) "f")
+                                     (list 'bitconvert (string->atom (car p)) 'float))
+                                    ((string=? (cadr p) "i")
+                                     (list 'bitconvert (string->atom (car p)) 'i32))
+                                    ((string=? (cadr p) "f32")
+                                     (list 'bitconvert (string->atom (car p)) 'float))                                     
+                                    ((string=? (cadr p) "f64")
+                                     (list 'bitconvert (string->atom (car p)) 'double))  
+                                    (else
+                                     (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))))
                        (else ast)))))))
 
 
@@ -2554,13 +2559,14 @@
                           #t))
 	     	 (begin ;; (println '----matched-polytype-1: gt '-> tt)
 	     	   (if (symbol? tt)
-               (if (not (assoc-strcmp tt vars))
-                   (print-error "Catastrophic compiler error: type missing from VARs")
-                   (if (null? (cdr (assoc-strcmp tt vars)))
-                       (impc:ti:update-var gt vars kts (list tt))			   
-                       (begin
-                         (impc:ti:update-var gt vars kts (impc:ti:type-unify (cdr (assoc-strcmp tt vars)) vars))))
-                   (impc:ti:update-var gt vars kts (impc:ti:type-unify tt vars))))))
+               (begin
+                 (if (not (assoc-strcmp tt vars))
+                     (set! vars (cons (list tt) vars)))
+                 (if (null? (cdr (assoc-strcmp tt vars)))
+                     (impc:ti:update-var gt vars kts (list tt))			   
+                     (begin
+                       (impc:ti:update-var gt vars kts (impc:ti:type-unify (cdr (assoc-strcmp tt vars)) vars))))
+                 (impc:ti:update-var gt vars kts (impc:ti:type-unify tt vars))))))
              
 	     (if (atom? tt)
 		 (set! tt (list tt)))

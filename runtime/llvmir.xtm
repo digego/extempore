@@ -1037,9 +1037,12 @@
                                  (if (regex:match? x "_poly_")
                                     (cadr (regex:matched x "%(.*)_poly_.*"))
                                     (cadr (regex:matched x "%([^-*]*)")))
-                                 (if (impc:ir:type? x)
-                                     (impc:ir:pretty-print-type x)
-                                     "_")))
+                                 (if (and (symbol? x)
+                                          (regex:match? (symbol->string x) ":"))
+                                     (car (regex:split (symbol->string x) ":"))
+                                     (if (impc:ir:type? x)
+                                         (impc:ir:pretty-print-type x)
+                                         "_"))))
                            (if (and (number? (car type))
                                     (impc:ir:closure? type))
                                (cddr type)
@@ -1061,27 +1064,35 @@
     ;; (println 'type_b: type)
     (let* ((tmp (assoc-strcmp-all (string->symbol name) *impc:ir:gpolys*))           
            (res (cl:remove-if (lambda (x) (<> arity (cadr x))) tmp)))
+      ;; (println 'res: (map (lambda (gp) (car (cddddr gp))) res))
       (if (null? res)
           #f
           (let* ((weights (map (lambda (gp)
                                  (cons (apply + (map (lambda (x y)
                                                        ;; (println x '=? y)
-                                                       (if (string=? x y)
-                                                           1
-                                                           (if (string=? x "_")
-                                                               0
-                                                               -100))) ;; you lose!
+                                                       (if (string=? x "_")
+                                                           0
+                                                           (if (string=? x y)
+                                                               1
+                                                               (if (string=? y "_")
+                                                                   0
+                                                                   -1))))
+                                                       ;; (if (string=? x y)
+                                                       ;;     1
+                                                       ;;     (if (string=? x "_")
+                                                       ;;         0
+                                                       ;;         -100))) ;; you lose!
                                                      (car (cddddr gp))
                                                      type))
                                        gp))
                                res))
                  (w (apply max (map (lambda (x) (car x)) weights))))
-	    ;; (println '++++++++++++++ (length weights))
-	    ;; (println (for-each (lambda (k)
-	    ;; 			 (println k))
-	    ;; 		       weights))
+            ;; (println '++++++++++++++ (length weights))
+            ;; (println (for-each (lambda (k)
+            ;;                      (println k))
+            ;;                    weights))
             ;; (println 'best: w ': (length weights) '-> (assoc w weights))
-	    (if (> (length (assoc-strcmp-all w weights)) 1)
+            (if (> (length (assoc-strcmp-all w weights)) 1)
 		(print-error 'Compiler 'Error: 'ambiguous 'generic 'overload name '-> type))	    
 	    (cdddr (assoc w weights)))))))
 
