@@ -159,8 +159,8 @@ static char* cpToUTF8(int cp, char* str)
 
       ;; /*	nvgBeginPath(vg)
       ;; 	nvgRoundedRect(vg, x+0.5,y+0.5, w-1,h-1, cornerRadius-0.5)
-      ;; 	nvgStrokeColor(vg, nvgRGBA 0,0,0,48)
-      ;; 	nvgStroke(vg);*/
+      ;; 	nvgStrokeColor(vg, (nvgRGBA 0,0,0,48
+      ;; 	nvgStroke))(vg);*/
 
       (nvgFontSize vg h*1.3)
       (nvgFontFace vg "icons")
@@ -284,7 +284,7 @@ static char* cpToUTF8(int cp, char* str)
           (cornerRadius 4.0)
           (tw 0.0)
           (iw 0.0)
-          (tw (nvgTextBounds vg 0 0 text NULL null)))
+          (tw (nvgTextBounds vg 0 0 text null null)))
 
       (nvgLinearGradient vg x y x (+ y h) (nvgRGBA 255 255 255 (if (isBlack col) 16 32)) (nvgRGBA 0 0 0 (if (isBlack col) 16 32)))
       (nvgBeginPath vg)
@@ -566,7 +566,7 @@ static char* cpToUTF8(int cp, char* str)
       ;; (nvgClearState vg)
 
       ;; Drop shadow
-      (set! shadowPaint (nvgBoxGradient vg x (+ y 4) w h (* cornerRadius 2) 20 nvgRGBA 0 0 0 128 nvgRGBA 0 0 0 0))
+      (set! shadowPaint (nvgBoxGradient vg x (+ y 4) w h (* cornerRadius 2) 20 (nvgRGBA 0 0 0 128) (nvgRGBA 0 0 0 0)))
       (nvgBeginPath vg)
       (nvgRect vg (- x 10) (- y 10) (+ w 20) (+ h 30))
       (nvgRoundedRect vg x y w h cornerRadius)
@@ -580,7 +580,7 @@ static char* cpToUTF8(int cp, char* str)
       (nvgMoveTo vg (- x 10) (+ y arry))
       (nvgLineTo vg (+ x 1) (+ y (- arry 11)))
       (nvgLineTo vg (+ x 1) (+ y arry 11))
-      (nvgFillColor vg nvgRGBA 200 200 200 255)
+      (nvgFillColor vg (nvgRGBA 200 200 200 255))
       (nvgFill vg)
 
       (nvgSave vg)
@@ -619,7 +619,7 @@ static char* cpToUTF8(int cp, char* str)
         (nvgFillPaint vg imgPaint)
         (nvgFill vg)
 
-        (set! shadowPaint (nvgBoxGradient vg (- tx 1) ty (+ thumb 2) (+ thumb 2) 5 3 nvgRGBA 0 0 0 128 nvgRGBA 0 0 0 0))
+        (set! shadowPaint (nvgBoxGradient vg (- tx 1) ty (+ thumb 2) (+ thumb 2) 5 3 (nvgRGBA 0 0 0 128) (nvgRGBA 0 0 0 0)))
         (nvgBeginPath vg)
         (nvgRect vg (- tx 5) (- ty 5) (+ thumb 10) (+ thumb 10))
         (nvgRoundedRect vg tx ty thumb thumb 6)
@@ -630,621 +630,651 @@ static char* cpToUTF8(int cp, char* str)
         (nvgBeginPath vg)
         (nvgRoundedRect vg (+ tx 0.5) (+ ty 0.5) (- thumb 1) (- thumb 1) (- 4.0 0.5))
         (nvgStrokeWidth vg 1.0)
-        (nvgStrokeColor vg nvgRGBA 255 255 255 192)
+        (nvgStrokeColor vg (nvgRGBA 255 255 255 192))
         (nvgStroke vg))
       (nvgRestore vg)
 
       ;; Hide fades
-      (set! fadePaint (nvgLinearGradient vg x y x (+ y 6) nvgRGBA 200 200 200 255 nvgRGBA 200 200 200 0))
+      (set! fadePaint (nvgLinearGradient vg x y x (+ y 6) (nvgRGBA 200 200 200 255) (nvgRGBA 200 200 200 0)))
       (nvgBeginPath vg)
       (nvgRect vg (+ x 4) y (- w 8) 6)
       (nvgFillPaint vg fadePaint)
       (nvgFill vg)
 
-      (set! fadePaint (nvgLinearGradient vg x (+ y h) x (+ y (- h 6)) nvgRGBA 200 200 200 255 nvgRGBA 200 200 200 0))
+      (set! fadePaint (nvgLinearGradient vg x (+ y h) x (+ y (- h 6)) (nvgRGBA 200 200 200 255) (nvgRGBA 200 200 200 0)))
       (nvgBeginPath vg)
       (nvgRect vg (+ x 4) (+ y (- h 6)) (- w 8) 6)
       (nvgFillPaint vg fadePaint)
       (nvgFill vg)
 
       ;; Scroll bar
-      (set! shadowPaint (nvgBoxGradient vg (+ x (- w 11)) (+ y 5) 8 (- h 8) 3 4 nvgRGBA 0 0 0 32 nvgRGBA 0 0 0 92))
+      (set! shadowPaint (nvgBoxGradient vg (+ x (- w 11)) (+ y 5) 8 (- h 8) 3 4 (nvgRGBA 0 0 0 32) (nvgRGBA 0 0 0 92)))
       (nvgBeginPath vg)
       (nvgRoundedRect vg (+ x (- w 12)) (+ y 4) 8 (- h 8) 3)
       (nvgFillPaint vg shadowPaint)
-      ;; (nvgFillColor vg nvgRGBA 255 0 0 128)
+      ;; (nvgFillColor vg (nvgRGBA 255 0 0 128))
       (nvgFill vg)
 
-      (set! shadowPaint (nvgBoxGradient vg (+ x (- w 11)) (+ y 3 (* (- h 8 scrollh) u)) 8 scrollh 3 4 nvgRGBA 220 220 220 255 nvgRGBA 128 128 128 255))
+      (set! shadowPaint (nvgBoxGradient vg (+ x (- w 11)) (+ y 3 (* (- h 8 scrollh) u)) 8 scrollh 3 4 (nvgRGBA 220 220 220 255) (nvgRGBA 128 128 128 255)))
       nvgBeginPath(vg)
       nvgRoundedRect(vg (+ x (- w 11)) (+ y 5 (* (- h 8 scrollh) u)) 6 (- scrollh 2) 2)
       (nvgFillPaint vg shadowPaint)
-      ;; (nvgFillColor vg nvgRGBA 0 0 0 128)
+      ;; (nvgFillColor vg (nvgRGBA 0 0 0 128))
       (nvgFill vg)
 
       (nvgRestore vg))))
 
 
-void drawColorwheel(NVGcontext* vg, float x, float y, float w, float h, float t)
-{
-	int i
-	float r0, r1, ax,ay, bx,by, cx,cy, aeps, r
-	float hue = sinf(t * 0.12f)
-	NVGpaint paint
-
-	nvgSave(vg)
-
-/*	nvgBeginPath(vg)
-	nvgRect(vg, x,y,w,h)
-	nvgFillColor(vg, nvgRGBA 255,0,0,128)
-	nvgFill(vg);*/
-
-	cx = x + w*0.5
-	cy = y + h*0.5
-	r1 = (w < h ? w : h) * 0.5 - 5.0
-	r0 = r1 - 20.0
-	aeps = 0.5 / r1;	;; half a pixel arc length in radians (2pi cancels out).
-
-	for (i = 0; i < 6; i++) {
-		float a0 = (float)i / 6.0 * NVG_PI * 2.0 - aeps
-		float a1 = (float)(i+1.0) / 6.0 * NVG_PI * 2.0 + aeps
-		nvgBeginPath(vg)
-		nvgArc(vg, cx,cy, r0, a0, a1, NVG_CW)
-		nvgArc(vg, cx,cy, r1, a1, a0, NVG_CCW)
-		nvgClosePath(vg)
-		ax = cx + cosf(a0) * (r0+r1)*0.5
-		ay = cy + sinf(a0) * (r0+r1)*0.5
-		bx = cx + cosf(a1) * (r0+r1)*0.5
-		by = cy + sinf(a1) * (r0+r1)*0.5
-		paint = nvgLinearGradient(vg, ax,ay, bx,by, nvgHSLA(a0/(NVG_PI*2),1.0,0.55f,255), nvgHSLA(a1/(NVG_PI*2),1.0,0.55f,255))
-		nvgFillPaint(vg, paint)
-		nvgFill(vg)
-	}
-
-	nvgBeginPath(vg)
-	nvgCircle(vg, cx,cy, r0-0.5)
-	nvgCircle(vg, cx,cy, r1+0.5)
-	nvgStrokeColor(vg, nvgRGBA 0,0,0,64)
-	nvgStrokeWidth(vg, 1.0)
-	nvgStroke(vg)
-
-	;; Selector
-	nvgSave(vg)
-	nvgTranslate(vg, cx,cy)
-	nvgRotate(vg, hue*NVG_PI*2)
-
-	;; Marker on
-	nvgStrokeWidth(vg, 2.0)
-	nvgBeginPath(vg)
-	nvgRect(vg, r0-1,-3,r1-r0+2,6)
-	nvgStrokeColor(vg, nvgRGBA 255,255,255,192)
-	nvgStroke(vg)
-
-	paint = nvgBoxGradient(vg, r0-3,-5,r1-r0+6,10, 2,4, nvgRGBA 0,0,0,128, nvgRGBA 0,0,0,0)
-	nvgBeginPath(vg)
-	nvgRect(vg, r0-2-10,-4-10,r1-r0+4+20,8+20)
-	nvgRect(vg, r0-2,-4,r1-r0+4,8)
-	nvgPathWinding(vg, NVG_HOLE)
-	nvgFillPaint(vg, paint)
-	nvgFill(vg)
-
-	;; Center triangle
-	r = r0 - 6
-	ax = cosf(120.0/180.0*NVG_PI) * r
-	ay = sinf(120.0/180.0*NVG_PI) * r
-	bx = cosf(-120.0/180.0*NVG_PI) * r
-	by = sinf(-120.0/180.0*NVG_PI) * r
-	nvgBeginPath(vg)
-	nvgMoveTo(vg, r,0)
-	nvgLineTo(vg, ax,ay)
-	nvgLineTo(vg, bx,by)
-	nvgClosePath(vg)
-	paint = nvgLinearGradient(vg, r,0, ax,ay, nvgHSLA(hue,1.0,0.5,255), nvgRGBA 255,255,255,255)
-	nvgFillPaint(vg, paint)
-	nvgFill(vg)
-	paint = nvgLinearGradient(vg, (r+ax)*0.5,(0+ay)*0.5, bx,by, nvgRGBA 0,0,0,0, nvgRGBA 0,0,0,255)
-	nvgFillPaint(vg, paint)
-	nvgFill(vg)
-	nvgStrokeColor(vg, nvgRGBA 0,0,0,64)
-	nvgStroke(vg)
-
-	;; Select circle on triangle
-	ax = cosf(120.0/180.0*NVG_PI) * r*0.3
-	ay = sinf(120.0/180.0*NVG_PI) * r*0.4f
-	nvgStrokeWidth(vg, 2.0)
-	nvgBeginPath(vg)
-	nvgCircle(vg, ax,ay,5)
-	nvgStrokeColor(vg, nvgRGBA 255,255,255,192)
-	nvgStroke(vg)
-
-	paint = nvgRadialGradient(vg, ax,ay, 7,9, nvgRGBA 0,0,0,64, nvgRGBA 0,0,0,0)
-	nvgBeginPath(vg)
-	nvgRect(vg, ax-20,ay-20,40,40)
-	nvgCircle(vg, ax,ay,7)
-	nvgPathWinding(vg, NVG_HOLE)
-	nvgFillPaint(vg, paint)
-	nvgFill(vg)
-
-	nvgRestore(vg)
-
-	nvgRestore(vg)
-}
-
-void drawLines(NVGcontext* vg, float x, float y, float w, float h, float t)
-{
-	int i, j
-	float pad = 5.0, s = w/9.0 - pad*2
-	float pts[4*2], fx, fy
-	int joins[3] = {NVG_MITER, NVG_ROUND, NVG_BEVEL}
-	int caps[3] = {NVG_BUTT, NVG_ROUND, NVG_SQUARE}
-	NVG_NOTUSED(h)
-
-	nvgSave(vg)
-	pts[0] = -s*0.25 + cosf(t*0.3) * s*0.5
-	pts[1] = sinf(t*0.3) * s*0.5
-	pts[2] = -s*0.25
-	pts[3] = 0
-	pts[4] = s*0.25
-	pts[5] = 0
-	pts[6] = s*0.25 + cosf(-t*0.3) * s*0.5
-	pts[7] = sinf(-t*0.3) * s*0.5
-
-	for (i = 0; i < 3; i++) {
-		for (j = 0; j < 3; j++) {
-			fx = x + s*0.5 + (i*3+j)/9.0*w + pad
-			fy = y - s*0.5 + pad
-
-			nvgLineCap(vg, caps[i])
-			nvgLineJoin(vg, joins[j])
-
-			nvgStrokeWidth(vg, s*0.3)
-			nvgStrokeColor(vg, nvgRGBA 0,0,0,160)
-			nvgBeginPath(vg)
-			nvgMoveTo(vg, fx+pts[0], fy+pts[1])
-			nvgLineTo(vg, fx+pts[2], fy+pts[3])
-			nvgLineTo(vg, fx+pts[4], fy+pts[5])
-			nvgLineTo(vg, fx+pts[6], fy+pts[7])
-			nvgStroke(vg)
-
-			nvgLineCap(vg, NVG_BUTT)
-			nvgLineJoin(vg, NVG_BEVEL)
-
-			nvgStrokeWidth(vg, 1.0)
-			nvgStrokeColor(vg, nvgRGBA 0,192,255,255)
-			nvgBeginPath(vg)
-			nvgMoveTo(vg, fx+pts[0], fy+pts[1])
-			nvgLineTo(vg, fx+pts[2], fy+pts[3])
-			nvgLineTo(vg, fx+pts[4], fy+pts[5])
-			nvgLineTo(vg, fx+pts[6], fy+pts[7])
-			nvgStroke(vg)
-		}
-	}
-
-
-	nvgRestore(vg)
-}
-
-int loadDemoData(NVGcontext* vg, DemoData* data)
-{
-	int i
-
-	if (vg == null)
-		return -1
-
-	for (i = 0; i < 12; i++) {
-		char file[128]
-		snprintf(file, 128, "../example/images/image%d.jpg", i+1)
-		data->images[i] = nvgCreateImage(vg, file, 0)
-		if (data->images[i] == 0) {
-			printf("Could not load %s.\n", file)
-			return -1
-		}
-	}
-
-	data->fontIcons = nvgCreateFont(vg, "icons", "../example/entypo.ttf")
-	if (data->fontIcons == -1) {
-		printf("Could not add font icons.\n")
-		return -1
-	}
-	data->fontNormal = nvgCreateFont(vg, "sans", "../example/Roboto-Regular.ttf")
-	if (data->fontNormal == -1) {
-		printf("Could not add font italic.\n")
-		return -1
-	}
-	data->fontBold = nvgCreateFont(vg, "sans-bold", "../example/Roboto-Bold.ttf")
-	if (data->fontBold == -1) {
-		printf("Could not add font bold.\n")
-		return -1
-	}
-
-	return 0
-}
-
-void freeDemoData(NVGcontext* vg, DemoData* data)
-{
-	int i
-
-	if (vg == null)
-		return
-
-	for (i = 0; i < 12; i++)
-		nvgDeleteImage(vg, data->images[i])
-}
-
-void drawParagraph(NVGcontext* vg, float x, float y, float width, float height, float mx, float my)
-{
-	NVGtextRow rows[3]
-	NVGglyphPosition glyphs[100]
-	const char* text = "This is longer chunk of text.\n  \n  Would have used lorem ipsum but she    was busy jumping over the lazy dog with the fox and all the men who came to the aid of the party."
-	const char* start
-	const char* end
-	int nrows, i, nglyphs, j, lnum = 0
-	float lineh
-	float caretx, px
-	float bounds[4]
-	float a
-	float gx,gy
-	int gutter = 0
-	NVG_NOTUSED(height)
-
-	nvgSave(vg)
-
-	nvgFontSize(vg, 18.0)
-	nvgFontFace(vg, "sans")
-	nvgTextAlign(vg, NVG_ALIGN_LEFT|NVG_ALIGN_TOP)
-	nvgTextMetrics(vg, NULL, NULL, &lineh)
-
-	;; The text break API can be used to fill a large buffer of rows,
-	;; or to iterate over the text just few lines (or just one) at a time.
-	;; The "next" variable of the last returned item tells where to continue.
-	start = text
-	end = text + strlen(text)
-	while ((nrows = nvgTextBreakLines(vg, start, end, width, rows, 3))) {
-		for (i = 0; i < nrows; i++) {
-			NVGtextRow* row = &rows[i]
-			int hit = mx > x && mx < (x+width) && my >= y && my < (y+lineh)
-
-			nvgBeginPath(vg)
-			nvgFillColor(vg, nvgRGBA 255,255,255,hit?64:16)
-			nvgRect(vg, x, y, row->width, lineh)
-			nvgFill(vg)
-
-			nvgFillColor(vg, nvgRGBA 255,255,255,255)
-			nvgText(vg, x, y, row->start, row->end)
-
-			if (hit) {
-				caretx = (mx < x+row->width/2) ? x : x+row->width
-				px = x
-				nglyphs = nvgTextGlyphPositions(vg, x, y, row->start, row->end, glyphs, 100)
-				for (j = 0; j < nglyphs; j++) {
-					float x0 = glyphs[j].x
-					float x1 = (j+1 < nglyphs) ? glyphs[j+1].x : x+row->width
-					float gx = x0 * 0.3 + x1 * 0.7f
-					if (mx >= px && mx < gx)
-						caretx = glyphs[j].x
-					px = gx
-				}
-				nvgBeginPath(vg)
-				nvgFillColor(vg, nvgRGBA 255,192,0,255)
-				nvgRect(vg, caretx, y, 1, lineh)
-				nvgFill(vg)
-
-				gutter = lnum+1
-				gx = x - 10
-				gy = y + lineh/2
-			}
-			lnum++
-			y += lineh
-		}
-		;; Keep going...
-		start = rows[nrows-1].next
-	}
-
-	if (gutter) {
-		char txt[16]
-		snprintf(txt, sizeof(txt), "%d", gutter)
-		nvgFontSize(vg, 13.0)
-		nvgTextAlign(vg, (bitwise-or NVG_ALIGN_RIGHT NVG_ALIGN_MIDDLE))
-
-		nvgTextBounds(vg, gx,gy, txt, NULL, bounds)
-
-		nvgBeginPath(vg)
-		nvgFillColor(vg, nvgRGBA 255,192,0,255)
-		nvgRoundedRect(vg, (int)bounds[0]-4,(int)bounds[1]-2, (int)(bounds[2]-bounds[0])+8, (int)(bounds[3]-bounds[1])+4, ((int)(bounds[3]-bounds[1])+4)/2-1)
-		nvgFill(vg)
-
-		nvgFillColor(vg, nvgRGBA 32,32,32,255)
-		nvgText(vg, gx,gy, txt, null)
-	}
-
-	y += 20.0
-
-	nvgFontSize(vg, 13.0)
-	nvgTextAlign(vg, NVG_ALIGN_LEFT|NVG_ALIGN_TOP)
-	nvgTextLineHeight(vg, 1.2f)
-
-	nvgTextBoxBounds(vg, x,y, 150, "Hover your mouse over the text to see calculated caret position.", NULL, bounds)
-
-	;; Fade the tooltip out when close to it.
-	gx = fabsf((mx - (bounds[0]+bounds[2])*0.5) / (bounds[0] - bounds[2]))
-	gy = fabsf((my - (bounds[1]+bounds[3])*0.5) / (bounds[1] - bounds[3]))
-	a = maxf(gx, gy) - 0.5
-	a = clampf(a, 0, 1)
-	nvgGlobalAlpha(vg, a)
-
-	nvgBeginPath(vg)
-	nvgFillColor(vg, nvgRGBA 220,220,220,255)
-	nvgRoundedRect(vg, bounds[0]-2,bounds[1]-2, (int)(bounds[2]-bounds[0])+4, (int)(bounds[3]-bounds[1])+4, 3)
-	px = (int)((bounds[2]+bounds[0])/2)
-	nvgMoveTo(vg, px,bounds[1] - 10)
-	nvgLineTo(vg, px+7,bounds[1]+1)
-	nvgLineTo(vg, px-7,bounds[1]+1)
-	nvgFill(vg)
-
-	nvgFillColor(vg, nvgRGBA 0,0,0,220)
-	nvgTextBox(vg, x,y, 150, "Hover your mouse over the text to see calculated caret position.", null)
-
-	nvgRestore(vg)
-}
-
-void drawWidths(NVGcontext* vg, float x, float y, float width)
-{
-	int i
-
-	nvgSave(vg)
-
-	nvgStrokeColor(vg, nvgRGBA 0,0,0,255)
-
-	for (i = 0; i < 20; i++) {
-		float w = (i+0.5)*0.1f
-		nvgStrokeWidth(vg, w)
-		nvgBeginPath(vg)
-		nvgMoveTo(vg, x,y)
-		nvgLineTo(vg, x+width,y+width*0.3)
-		nvgStroke(vg)
-		y += 10
-	}
-
-	nvgRestore(vg)
-}
-
-void drawCaps(NVGcontext* vg, float x, float y, float width)
-{
-	int i
-	int caps[3] = {NVG_BUTT, NVG_ROUND, NVG_SQUARE}
-	float lineWidth = 8.0
-
-	nvgSave(vg)
-
-	nvgBeginPath(vg)
-	nvgRect(vg, x-lineWidth/2, y, width+lineWidth, 40)
-	nvgFillColor(vg, nvgRGBA 255,255,255,32)
-	nvgFill(vg)
-
-	nvgBeginPath(vg)
-	nvgRect(vg, x, y, width, 40)
-	nvgFillColor(vg, nvgRGBA 255,255,255,32)
-	nvgFill(vg)
-
-	nvgStrokeWidth(vg, lineWidth)
-	for (i = 0; i < 3; i++) {
-		nvgLineCap(vg, caps[i])
-		nvgStrokeColor(vg, nvgRGBA 0,0,0,255)
-		nvgBeginPath(vg)
-		nvgMoveTo(vg, x, y + i*10 + 5)
-		nvgLineTo(vg, x+width, y + i*10 + 5)
-		nvgStroke(vg)
-	}
-
-	nvgRestore(vg)
-}
-
-void drawScissor(NVGcontext* vg, float x, float y, float t)
-{
-	nvgSave(vg)
-
-	;; Draw first rect and set scissor to it's area.
-	nvgTranslate(vg, x, y)
-	nvgRotate(vg, nvgDegToRad(5))
-	nvgBeginPath(vg)
-	nvgRect(vg, -20,-20,60,40)
-	nvgFillColor(vg, nvgRGBA 255,0,0,255)
-	nvgFill(vg)
-	nvgScissor(vg, -20,-20,60,40)
-
-	;; Draw second rectangle with offset and rotation.
-	nvgTranslate(vg, 40,0)
-	nvgRotate(vg, t)
-
-	;; Draw the intended second rectangle without any scissoring.
-	nvgSave(vg)
-	nvgResetScissor(vg)
-	nvgBeginPath(vg)
-	nvgRect(vg, -20,-10,60,30)
-	nvgFillColor(vg, nvgRGBA 255,128,0,64)
-	nvgFill(vg)
-	nvgRestore(vg)
-
-	;; Draw second rectangle with combined scissoring.
-	nvgIntersectScissor(vg, -20,-10,60,30)
-	nvgBeginPath(vg)
-	nvgRect(vg, -20,-10,60,30)
-	nvgFillColor(vg, nvgRGBA 255,128,0,255)
-	nvgFill(vg)
-
-	nvgRestore(vg)
-}
-
-void renderDemo(NVGcontext* vg, float mx, float my, float width, float height,
-				float t, int blowup, DemoData* data)
-{
-	float x,y,popy
-
-	drawEyes(vg, width - 250, 50, 150, 100, mx, my, t)
-	drawParagraph(vg, width - 450, 50, 150, 100, mx, my)
-	drawGraph(vg, 0, height/2, width, height/2, t)
-	drawColorwheel(vg, width - 300, height - 300, 250.0, 250.0, t)
-
-	;; Line joints
-	drawLines(vg, 120, height-50, 600, 50, t)
-
-	;; Line caps
-	drawWidths(vg, 10, 50, 30)
-
-	;; Line caps
-	drawCaps(vg, 10, 300, 30)
-
-	drawScissor(vg, 50, height-80, t)
-
-	nvgSave(vg)
-	if (blowup) {
-		nvgRotate(vg, sinf(t*0.3)*5.0/180.0*NVG_PI)
-		nvgScale(vg, 2.0, 2.0)
-	}
-
-	;; Widgets
-	drawWindow(vg, "Widgets `n Stuff", 50, 50, 300, 400)
-	x = 60; y = 95
-	drawSearchBox(vg, "Search", x,y,280,25)
-	y += 40
-	drawDropDown(vg, "Effects", x,y,280,28)
-	popy = y + 14
-	y += 45
-
-	;; Form
-	drawLabel(vg, "Login", x,y, 280,20)
-	y += 25
-	drawEditBox(vg, "Email",  x,y, 280,28)
-	y += 35
-	drawEditBox(vg, "Password", x,y, 280,28)
-	y += 38
-	drawCheckBox(vg, "Remember me", x,y, 140,28)
-	drawButton(vg, ICON_LOGIN, "Sign in", x+138, y, 140, 28, nvgRGBA 0,96,128,255)
-	y += 45
-
-	;; Slider
-	drawLabel(vg, "Diameter", x,y, 280,20)
-	y += 25
-	drawEditBoxNum(vg, "123.00", "px", x+180,y, 100,28)
-	drawSlider(vg, 0.4f, x,y, 170,28)
-	y += 55
-
-	drawButton(vg, ICON_TRASH, "Delete", x, y, 160, 28, nvgRGBA 128,16,8,255)
-	drawButton(vg, 0, "Cancel", x+170, y, 110, 28, nvgRGBA 0,0,0,0)
-
-	;; Thumbnails box
-	drawThumbnails(vg, 365, popy-30, 160, 300, data->images, 12, t)
-
-	nvgRestore(vg)
-}
-
-static void unpremultiplyAlpha(unsigned char* image, int w, int h, int stride)
-{
-	int x,y
-
-	;; Unpremultiply
-	for (y = 0; y < h; y++) {
-		unsigned char *row = &image[y*stride]
-		for (x = 0; x < w; x++) {
-			int r = row[0], g = row[1], b = row[2], a = row[3]
-			if (a != 0) {
-				row[0] = (int)mini(r*255/a, 255)
-				row[1] = (int)mini(g*255/a, 255)
-				row[2] = (int)mini(b*255/a, 255)
-			}
-			row += 4
-		}
-	}
-
-	;; Defringe
-	for (y = 0; y < h; y++) {
-		unsigned char *row = &image[y*stride]
-		for (x = 0; x < w; x++) {
-			int r = 0, g = 0, b = 0, a = row[3], n = 0
-			if (a == 0) {
-				if (x-1 > 0 && row[-1] != 0) {
-					r += row[-4]
-					g += row[-3]
-					b += row[-2]
-					n++
-				}
-				if (x+1 < w && row[7] != 0) {
-					r += row[4]
-					g += row[5]
-					b += row[6]
-					n++
-				}
-				if (y-1 > 0 && row[-stride+3] != 0) {
-					r += row[-stride]
-					g += row[-stride+1]
-					b += row[-stride+2]
-					n++
-				}
-				if (y+1 < h && row[stride+3] != 0) {
-					r += row[stride]
-					g += row[stride+1]
-					b += row[stride+2]
-					n++
-				}
-				if (n > 0) {
-					row[0] = r/n
-					row[1] = g/n
-					row[2] = b/n
-				}
-			}
-			row += 4
-		}
-	}
-}
-
-static void setAlpha(unsigned char* image, int w, int h, int stride, unsigned char a)
-{
-	int x, y
-	for (y = 0; y < h; y++) {
-		unsigned char* row = &image[y*stride]
-		for (x = 0; x < w; x++)
-			row[x*4+3] = a
-	}
-}
-
-static void flipHorizontal(unsigned char* image, int w, int h, int stride)
-{
-	int i = 0, j = h-1, k
-	while (i < j) {
-		unsigned char* ri = &image[i * stride];		
-		unsigned char* rj = &image[j * stride];		
-		for (k = 0; k < w*4; k++) {
-			unsigned char t = ri[k]
-			ri[k] = rj[k]
-			rj[k] = t
-		}
-		i++
-		j--
-	}
-}
-
-void saveScreenShot(int w, int h, int premult, const char* name)
-{
-	unsigned char* image = (unsigned char*)malloc(w*h*4)
-	if (image == null)
-		return
-	glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, image)
-	if (premult)
-		unpremultiplyAlpha(image, w, h, w*4)
-	else
-		setAlpha(image, w, h, w*4, 255)
-	flipHorizontal(image, w, h, w*4)
- 	stbi_write_png(name, w, h, 4, image, w*4)
- 	free(image)
-}
-
-
-
-
-
-
-
-
+(bind-func drawColorwheel
+  (lambda (NVGcontext* vg, float x, float y, float w, float h, float t)
+    (let ((i 0)
+          (r1 (- (* (minf w h) 0.5) 5.0))
+          (r0 (- r1 20.0))
+          (ax 0.0)
+          (ay 0.0)
+          (bx 0.0)
+          (by 0.0)
+          (cx (+ x (* w 0.5)))
+          (cy (+ y (* h 0.5)))
+          (aeps (/ 0.5 r1)) ;; half a pixel arc length in radians (2pi cancels out)
+          (r (- r0 6))
+          (hue (sin (* t 0.12)))
+          (paint:NVGpaint (salloc)))
+      (nvgSave vg)
+
+      ;; /*	nvgBeginPath(vg)
+      ;; 	nvgRect(vg, x,y,w,h)
+      ;; 	nvgFillColor(vg, (nvgRGBA 255,0,0,128
+      ;; 	nvgFill))(vg);*/
+
+      (dotimes (i 6)
+        (let ((a0 (- (* (/ (convert i) 6.0) NVG_PI 2.0) aeps))
+              (a1 (+ (* (/ (+ (convert i) 1.0) 6.0) NVG_PI 2.0) aeps)))
+          (nvgBeginPath vg)
+          (nvgArc vg cx cy r0 a0 a1 NVG_CW)
+          (nvgArc vg cx cy r1 a1 a0 NVG_CCW)
+          (nvgClosePath vg)
+          (set! ax (+ cx (* (cos a0) (+ r0 r1) 0.5)))
+          (set! ay (+ cy (* (sin a0) (+ r0 r1) 0.5)))
+          (set! bx (+ cx (* (cos a1) (+ r0 r1) 0.5)))
+          (set! by (+ cy (* (sin a1) (+ r0 r1) 0.5)))
+          (set! paint (nvgLinearGradient vg ax ay bx by (nvgHSLA (/ a0 (* NVG_PI 2)) 1.0 0.55 255)  (nvgHSLA (/ a1 (* NVG_PI 2)) 1.0 0.55 255)))
+          (nvgFillPaint vg paint)
+          (nvgFill vg)))
+
+      (nvgBeginPath vg)
+      (nvgCircle vg cx cy (- r0 0.5))
+      (nvgCircle vg cx cy (+ r1 0.5))
+      (nvgStrokeColor vg (nvgRGBA 0 0 0 64))
+      (nvgStrokeWidth vg 1.0)
+      (nvgStroke vg)
+
+      ;; Selector
+      (nvgSave vg)
+      (nvgTranslate vg cx cy)
+      (nvgRotate vg (* hue NVG_PI 2))
+
+      ;; Marker on
+      (nvgStrokeWidth vg 2.0)
+      (nvgBeginPath vg)
+      (nvgRect vg (- r0 1) -3 (- r1 (+ r0 2)) 6)
+      (nvgStrokeColor vg (nvgRGBA 255 255 255 192))
+      (nvgStroke vg)
+
+      (set! paint (nvgBoxGradient vg (- r0 3) -5 (- r1 (+ r0 6)) 10 2 4 (nvgRGBA 0 0 0 128) (nvgRGBA 0 0 0 0)))
+      (nvgBeginPath vg)
+      (nvgRect vg (- r0 12) -14 (- r1 (+ r0 24)) 28)
+      (nvgRect vg (- r0 2) -4 (- r1 (+ r0 4)) 8)
+      (nvgPathWinding vg NVG_HOLE)
+      (nvgFillPaint vg paint)
+      (nvgFill vg)
+
+      ;; Center triangle
+      (set! ax (* (cos (* (/ 120.0 180.0) NVG_PI)) r))
+      (set! ay (* (sin (* (/ 120.0 180.0) NVG_PI)) r))
+      (set! bx (* (cos (* (/ -120.0 180.0) NVG_PI)) r))
+      (set! by (* (sin (* (/ -120.0 180.0) NVG_PI)) r))
+      (nvgBeginPath vg)
+      (nvgMoveTo vg r 0)
+      (nvgLineTo vg ax ay)
+      (nvgLineTo vg bx by)
+      (nvgClosePath vg)
+      (set! paint (nvgLinearGradient vg r 0 ax ay (nvgHSLA hue 1.0 0.5 255) (nvgRGBA 255 255 255 255)))
+      (nvgFillPaint vg paint)
+      (nvgFill vg)
+      (set! paint) (nvgLinearGradient vg (* (+ r ax) 0.5) (* (+ 0 ay) 0.5) bx by (nvgRGBA 0 0 0 0) (nvgRGBA 0 0 0 255))
+      (nvgFillPaint vg paint)
+      (nvgFill vg)
+      (nvgStrokeColor vg (nvgRGBA 0 0 0 64))
+      (nvgStroke vg)
+
+      ;; Select circle on triangle
+      (set! ax (* (cos (* (/ 120.0 180.0) NVG_PI)) r 0.3))
+      (set! ay (* (sin (* (/ 120.0 180.0) NVG_PI)) r 0.4))
+      (nvgStrokeWidth vg 2.0)
+      (nvgBeginPath vg)
+      (nvgCircle vg ax ay 5)
+      (nvgStrokeColor vg (nvgRGBA 255 255 255 192))
+      (nvgStroke vg)
+
+      (set! paint (nvgRadialGradient vg ax ay 7 9 (nvgRGBA 0 0 0 64) (nvgRGBA 0 0 0 0)))
+      (nvgBeginPath vg)
+      (nvgRect vg (- ax 20) (- ay 20) 40 40)
+      (nvgCircle vg ax ay 7)
+      (nvgPathWinding vg NVG_HOLE)
+      (nvgFillPaint vg paint)
+      (nvgFill vg)
+
+      (nvgRestore vg)
+      (nvgRestore vg))))
+
+
+(bind-func drawLines
+  (lambda (vg x y w h t)
+    (let ((i 0)
+          (j 0)
+          (pad 5.0)
+          (s (- (/ w 9.0) (* pad 2)))
+          (pts:float* (salloc 8))
+          (fx 0.)
+          (fy 0.)
+          (joins:i32* (salloc 3))
+          (caps:i32* (salloc 3)))
+      (pfill! joins NVG_MITER NVG_ROUND NVG_BEVEL)
+      (pfill! caps NVG_BUTT NVG_ROUND NVG_SQUARE)
+      (nvgSave vg)
+      (pfill! pts
+              (+ (* -1.0 s 0.25) (* (cosf (* t 0.3)) s 0.5))
+              (* (sinf (* t 0.3)) s 0.5)
+              (* -1.0 s 0.25)
+              0.0
+              (* s 0.25)
+              0.0
+              (+ (* s 0.25) (* (cos (* t -0.3)) (* s 0.5)))
+              (* (sin (* t -0.3)) (* s 0.5)))
+
+      (dotimes (i 3)
+        (dotimes (j 3)
+          (set! fx (+ x (* s 0.5) (* (/ (+ (* i 3) j) 9.0) w) pad))
+          (set! fy (+ (- y (* s 0.5)) pad))
+
+          (nvgLineCap vg (pref caps i))
+          (nvgLineJoin vg (pref joins j))
+
+          (nvgStrokeWidth vg (* s 0.3))
+          (nvgStrokeColor vg (nvgRGBA 0 0 0 160))
+          (nvgBeginPath vg)
+          (nvgMoveTo vg (+ fx (pref pts 0)) (+ fy (pref pts 1)))
+          (nvgLineTo vg (+ fx (pref pts 2)) (+ fy (pref pts 3)))
+          (nvgLineTo vg (+ fx (pref pts 4)) (+ fy (pref pts 5)))
+          (nvgLineTo vg (+ fx (pref pts 6)) (+ fy (pref pts 7)))
+          (nvgStroke vg)
+
+          (nvgLineCap vg NVG_BUTT)
+          (nvgLineJoin vg NVG_BEVEL)
+
+          (nvgStrokeWidth vg 1.0)
+          (nvgStrokeColor vg (nvgRGBA 0 192 255 255))
+          (nvgBeginPath vg)
+          (nvgMoveTo vg (+ fx (pref pts 0)) (+ fy (pref pts 1)))
+          (nvgLineTo vg (+ fx (pref pts 2)) (+ fy (pref pts 3)))
+          (nvgLineTo vg (+ fx (pref pts 4)) (+ fy (pref pts 5)))
+          (nvgLineTo vg (+ fx (pref pts 6)) (+ fy (pref pts 7)))
+          (nvgStroke vg)))
+
+      (nvgRestore vg))))
+
+;; need to fix up paths
+
+;; struct DemoData {
+;; 	int fontNormal, fontBold, fontIcons; 
+;; 	int images[12];
+;; };
+
+(bind-type DemoData <i32,i32,i32,|12,i32|>)
+
+(bind-func loadDemoData
+  (lambda (vg data:DemoData*)
+    (let ((i 0)
+          (file:i8* (salloc 128))
+          (ret 0))
+      (if (null? vg)
+          (set! ret -1))
+      (dotimes (i 12)
+        (snprintf file 128 "../example/images/image%d.jpg" (+ i 1))
+        (aset! (tref-ptr data 3) i (nvgCreateImage vg file 0))
+        (if (= (aref (tref-ptr data 3) i) 0)
+            (begin (printf "Could not load %s.\n" file)
+                   (set! ret -1))))
+      (tset! data 0 (nvgCreateFont vg "sans" "../example/Roboto-Regular.ttf"))
+      (if (= (tref data 0) -1)
+          (begin (printf "Could not add font italic.\n")
+                 (set! ret -1)))
+      (tset! data 1 (nvgCreateFont vg "sans-bold" "../example/Roboto-Bold.ttf"))
+      (if (= (tref data 1) -1)
+          (begin (printf "Could not add font bold.\n")
+                 (set! ret -1)))
+      (tset! data 2 (nvgCreateFont vg "icons" "../example/entypo.ttf"))
+      (if (= (tref data 2) -1)
+          (begin (printf "Could not add font icons.\n")
+                 (set! ret -1)))
+      ret)))
+
+
+(bind-func freeDemoData
+  (lambda (vg data)
+    (if (not (null? vg))
+        (doloop (i 12)
+          (nvgDeleteImage vg (aref (tref-ptr data 3) i))))))
+
+
+(bind-func drawParagraph
+  (lambda (vg x y width height mx my)
+    (let ((rows:NVGtextrow* (salloc 3))
+          (row:NVGtextrow* null)
+          (glyphs:NVGglyphposition* (salloc 100))
+          (text "This is longer chunk of text.\n  \n  Would have used lorem ipsum but she    was busy jumping over the lazy dog with the fox and all the men who came to the aid of the party.")
+          (start:i8* null)
+          (end:i8* null)
+          (nrows 0)
+          (hit 0)
+          (i 0)
+          (nglyphs 0)
+          (j 0)
+          (lnum 0)
+          (lineh_ptr:float* (salloc))
+          (caretx 0.0)
+          (px 0.0)
+          (bounds:float (salloc 4))
+          (a 0.0)
+          (gx 0.0)
+          (gy 0.0)
+          (gutter 0))
+
+      (nvgSave vg)
+
+      (nvgFontSize vg 18.0)
+      (nvgFontFace vg "sans")
+      (nvgTextAlign vg (bitwise-or NVG_ALIGN_LEFT NVG_ALIGN_TOP))
+      (nvgTextMetrics vg null null lineh_ptr)
+
+      ;; The text break API can be used to fill a large buffer of rows,
+      ;; or to iterate over the text just few lines (or just one) at a time.
+      ;; The "next" variable of the last returned item tells where to continue.
+      (set! start text)
+      (set! end (pref-ptr text (strlen text)))
+      (set! nrows (nvgTextBreakLines vg start end width rows 3))
+      (while (nrows)
+        (dotimes (i nrows)
+          (set! row (pref-ptr rows i))
+          (set! hit
+                (and (> mx x) (< mx (+ x width)) (>= my y) (< my (+ y lineh))))
+
+          (nvgBeginPath vg)
+          (nvgFillColor vg (nvgRGBA 255 255 255 (if hit 64 16)))
+          (nvgRect vg x y (tref row 3) lineh)
+          (nvgFill vg)
+
+          (nvgFillColor vg (nvgRGBA 255 255 255 255))
+          (nvgText vg x y (tref row 0) (tref row 1))
+
+          (if hit
+              (begin
+                (set! caretx
+                      (if (< mx (+ x (/ (tref row 3) 2)))
+                          x
+                          (+ x (tref row 3))))
+                (set! px x)
+                (set! nglyphs (nvgTextGlyphPositions vg x y (tref row 0) (tref row 1) glyphs 100))
+                (dotimes (j nglyphs)
+                  (set! x0 (tref (pref-ptr glyphs j) 1))
+                  (set! x1 (if (< (+ j 1) nglyphs)
+                               (tref (pref-ptr glyphs (+ j 1)) 1)
+                               (+ x (tref row 3))))
+                  (set! gx (+ (* x0 0.3) (* x1 0.7)))
+                  (if (and (>= mx px) (< mx gx))
+                      (set! caretx (tref (pref-ptr glyphs j) 1)))
+                  (set! px gx))
+                (nvgBeginPath vg)
+                (nvgFillColor vg (nvgRGBA 255 192 0 255))
+                (nvgRect vg caretx y 1 lineh)
+                (nvgFill vg)
+
+                (set! gutter (+ lnum 1))
+                (set! gx (- x 10))
+                (set! gy (+ y (/ lineh 2)))))
+          (set! lnum (+ lnum 1))
+          (set! lineh (+ lineh y)))
+        ;; Keep going...
+        (set! start (tref (pref-ptr rows (- nrows 1)) 2)))
+
+      (if (= gutter 1)
+          (begin
+            (let ((txt:|16,i8| (salloc)))
+              
+              (snprintf txt 16 "%d" gutter)
+              (nvgFontSize vg 13.0)
+              (nvgTextAlign vg (bitwise-or NVG_ALIGN_RIGHT NVG_ALIGN_MIDDLE))
+
+              (nvgTextBounds vg gx gy txt null bounds)
+              (nvgBeginPath vg)
+              (nvgFillColor vg (nvgRGBA 255 192 0 255))
+              (nvgRoundedRect vg
+                              (- (convert (pref bounds 0) i32) 4)
+                              (- (convert (pref bounds 1) i32) 2)
+                              (+ (- (convert (pref bounds 2) i32)
+                                    (convert (pref bounds 1) i32))
+                                 8)
+                              (+ (- (convert (pref bounds 3) i32)
+                                    (convert (pref bounds 1) i32))
+                                 4)
+                              (- (/ (+ (- (convert (pref bounds 3) i32)
+                                          (convert (pref bounds 1) i32))
+                                       4)
+                                    2)
+                                 1))
+              (nvgFill vg)
+
+              (nvgFillColor vg (nvgRGBA 32 32 32 255))
+              (nvgText vg gx gy txt null))))
+      (set! y (+ y 20.0))
+
+      (nvgFontSize vg 13.0)
+      (nvgTextAlign vg (bitwise-or NVG_ALIGN_LEFT NVG_ALIGN_TOP))
+      (nvgTextLineHeight vg 1.2)
+
+      (nvgTextBoxBounds vg x y 150 "Hover your mouse over the text to see calculated caret position." null bounds)
+
+      ;; Fade the tooltip out when close to it.
+      (set! gx (fabs (- mx (/ (+ (* (pref bounds 0) (pref bounds 2) 0.5))) (- (pref bounds 0) (pref bounds 2)))))
+      (set! gy (fabs (- my (/ (+ (* (pref bounds 1) (pref bounds 3) 0.5))) (- (pref bounds 1) (pref bounds 3)))))
+      (set! a (- (maxf gx gy) 0.5))
+      (set! a (clampf a 0.0 1.0))
+      (nvgGlobalAlpha vg a)
+
+      (nvgBeginPath vg)
+      (nvgFillColor vg (nvgRGBA 220 220 220 255))
+      nvgRoundedRect(vg, bounds[0]-2,bounds[1]-2, (int)(bounds[2]-bounds[0])+4, (int)(bounds[3]-bounds[1])+4, 3)
+      (nvgRoundedRect vg
+                      (- (pref bounds 0) 2.0)
+                      (- (pref bounds 1) 2.0)
+                      (+ (- (convert (pref bounds 2) i32)
+                            (convert (pref bounds 0) i32))
+                         4)
+                      (+ (- (convert (pref bounds 3) i32)
+                            (convert (pref bounds 1) i32))
+                         4)
+                      3)
+      (set! px (/ (+ (pref bounds 2)
+                     (pref bounds 0))
+                  2.0))
+      (nvgMoveTo vg px (- (pref bounds 1) 10))
+      (nvgLineTo vg (+ px 7) (+ (pref bounds 1) 1))
+      (nvgLineTo vg (- px 7) (+ (pref bounds 1) 1))
+      (nvgFill vg)
+
+      (nvgFillColor vg (nvgRGBA 0 0 0 220))
+      (nvgTextBox vg x y 150 "Hover your mouse over the text to see calculated caret position." null)
+
+      (nvgRestore vg))))
+
+
+(bind-func drawWidths
+  (lambda (vg x y width)
+    (nvgSave vg)
+
+    (nvgStrokeColor vg (nvgRGBA 0 0 0 255))
+
+    (doloop (i 20)
+      (let ((w (* (+ (convert i) 0.5) 0.1)))
+        (nvgStrokeWidth vg w)
+        (nvgBeginPath vg)
+        (nvgMoveTo vg x y)
+        (nvgLineTo vg (+ x width) (+ y (* width 0.3)))
+        (nvgStroke vg)
+        (set! y (+ y 10.0))))
+    (nvgRestore vg)))
+
+
+(bind-func drawCaps
+  (lambda (NVGcontext* vg, float x, float y, float width)
+    (let ((caps:i32* (salloc 3))
+          (lineWidth 8.0))
+      (pfill! caps NVG_BUTT NVG_ROUND NVG_SQUARE)
+
+      (nvgSave vg)
+
+      (nvgBeginPath vg)
+      (nvgRect vg (- x (/ lineWidth 2)) y (+ width lineWidth) 40)
+      (nvgFillColor vg (nvgRGBA 255 255 255 32))
+      (nvgFill vg)
+
+      (nvgBeginPath vg)
+      (nvgRect vg x y width 40)
+      (nvgFillColor vg (nvgRGBA 255 255 255 32))
+      (nvgFill vg)
+
+      (nvgStrokeWidth vg lineWidth)
+      (doloop (i 3)
+        )
+      (nvgLineCap vg (pref caps i))
+      (nvgStrokeColor vg (nvgRGBA 0 0 0 255))
+      (nvgBeginPath vg)
+      (nvgMoveTo vg x (+ y (* i 10) 5))
+      (nvgLineTo vg x+width (+ y (* i 10) 5))
+      (nvgStroke vg)
+
+      (nvgRestore vg))))
+
+
+(bind-func drawScissor
+  (lambda (vg x y t)
+    (nvgSave vg)
+
+    ;; Draw first rect and set scissor to it's area.
+    (nvgTranslate vg x y)
+    (nvgRotate vg (nvgDegToRad 5.0))
+    (nvgBeginPath vg)
+    (nvgRect vg -20 -20 60 40)
+    (nvgFillColor vg (nvgRGBA 255 0 0 255))
+    (nvgFill vg)
+    (nvgScissor vg -20 -20 60 40)
+
+    ;; Draw second rectangle with offset and rotation.
+    (nvgTranslate vg 40 0)
+    (nvgRotate vg t)
+
+    ;; Draw the intended second rectangle without any scissoring.
+    (nvgSave vg)
+    (nvgResetScissor vg)
+    (nvgBeginPath vg)
+    (nvgRect vg -20 -10 60 30)
+    (nvgFillColor vg (nvgRGBA 255 128 0 64))
+    (nvgFill vg)
+    (nvgRestore vg)
+
+    ;; Draw second rectangle with combined scissoring.
+    (nvgIntersectScissor vg -20 -10 60 30)
+    (nvgBeginPath vg)
+    (nvgRect vg -20 -10 60 30)
+    (nvgFillColor vg (nvgRGBA 255 128 0 255))
+    (nvgFill vg)
+
+    (nvgRestore vg)))
+
+(bind-func renderDemo
+  (lambda (vg mx my width height t blowup data:DemoData*) 
+    (let ((x)
+          (y)
+          (popy)))
+
+    (drawEyes vg (- width) 250 50 150 100 mx my t)
+    (drawParagraph vg (- width) 450 50 150 100 mx my)
+    (drawGraph vg 0 (/ height 2) width (/ height 2) t)
+    (drawColorwheel vg (- width) 300 (- height 300) 250.0 250.0 t)
+
+    ;; Line joints
+    (drawLines vg 120 (- height 50) 600 50 t)
+
+    ;; Line caps
+    (drawWidths vg 10 50 30)
+
+    ;; Line caps
+    (drawCaps vg 10 300 30)
+
+    (drawScissor vg 50 (- height 80) t)
+
+    (nvgSave vg)
+    (if (= blowup 1)
+        (begin
+          (nvgRotate vg (* (/ (* (sin (* t 0.3)) 5.0) 180.0) NVG_PI))
+          (nvgScale vg 2.0 2.0)))
+
+    ;; Widgets
+    (drawWindow vg "Widgets n Stuff" 50 50 300 400)
+    (set! x 60)
+    (set! y 95)
+    (drawSearchBox vg "Search" x y 280 25)
+    (set! y (+ y 40))
+    (drawDropDown vg "Effects" x y 280 28)
+    (set! popy (+ y 14))
+    (set! y (+ y 45))
+
+    ;; Form
+    (drawLabel vg "Login" x y 280 20)
+    (set! y (+ y 25))
+    (drawEditBox vg "Email" x y 280 28)
+    (set! y (+ y 35))
+    (drawEditBox vg "Password" x y 280 28)
+    (set! y (+ y 38))
+    (drawCheckBox vg "Remember me" x y 140 28)
+    (drawButton vg ICON_LOGIN "Sign in" (+ x 138) y 140 28 (nvgRGBA 0 96 128 255))
+    (set! y (+ y 45))
+
+    ;; Slider
+    (drawLabel vg "Diameter" x y 280 20)
+    (set! y (+ y 25))
+    (drawEditBoxNum vg "123.00" "px" (+ x 180) y 100 28)
+    (drawSlider vg 0.4 x y 170 28)
+    (set! y (+ y 55))
+
+    (drawButton vg ICON_TRASH "Delete" x y 160 28 (nvgRGBA 128 16 8 255))
+    (drawButton vg 0 "Cancel" (+ x 170) y 110 28 (nvgRGBA 0 0 0 0))
+
+    ;; Thumbnails box
+    (drawThumbnails vg 365 (- popy 30) 160 300 (tref data 3) 12 t)
+
+    (nvgRestore vg)))
+
+(bind-func unpremultiplyAlpha
+  (lambda (image w h stride)
+    (let ((x:i32 0)
+          (y:i32 0)
+          (row:i8* null)
+          (r:i32 0)
+          (g:i32 0)
+          (b:i32 0)
+          (a:i32 0)
+          (n:i32 0))
+      ;; Unpremultiply
+      (dotimes (y h)
+        (set! row (pref-ptr image (* y stride)))
+        (dotimes (x w)
+          (set! r (convert (pref row 0))) 
+          (set! g (convert (pref row 1))) 
+          (set! b (convert (pref row 2))) 
+          (set! a (convert (pref row 3)))
+          (if (<> a 0)
+              (begin
+                (pset! row 0 (convert (mini (/ (* r 255) a) 255)))
+                (pset! row 1 (convert (mini (/ (* g 255) a) 255)))
+                (pset! row 2 (convert (mini (/ (* b 255) a) 255)))))
+          (set! row (+ row 4))))
+
+      ;; Defringe
+      (dotimes (y h)
+        (set! row (pref-ptr image (* y stride)))
+        (dotimes (x w)
+          (set! r 0) 
+          (set! g 0) 
+          (set! b 0) 
+          (set! a (pref row 3))
+          (if (= a 0)
+              (begin
+                (if (and (> (- x 1) 0) (<> (pref row -1) 0))
+                    (begin
+                      (set! r (+ r (pref row -4)))
+                      (set! g (+ g (pref row -3)))
+                      (set! b (+ b (pref row -2)))
+                      (set! n (+ n 1))))
+                (if (and (< (+ x 1) w) (<> (pref row 7) 0))
+                    (begin
+                      (set! r (+ r (pref row 4)))
+                      (set! g (+ g (pref row 5)))
+                      (set! b (+ b (pref row 6)))
+                      (set! n (+ n 1))))
+                (if (and (> (- y 1) 0) (<> (pref row (+ (* -1 stride) 3)) 0))
+                    (begin
+                      (set! r (+ r (pref row (* -1 stride))))
+                      (set! g (+ g (pref row (+ (* -1 stride) 1))))
+                      (set! b (+ b (pref row (+ (* -1 stride) 2))))
+                      (set! var (+ var ))))
+                (if (and (< (+ y 1) h) (<> (pref row (+ stride 3)) 0))
+                    ()
+                    (set! r (+ r (pref row stride)))
+                    (set! g (+ g (pref row (+ stride 1))))
+                    (set! b (+ b (pref row (+ stride 2))))
+                    (set! n (+ n 1)))
+                (if (> n 0)
+                    (begin
+                      (pset! row 0 (/ r n))
+                      (pset! row 1 (/ g n))
+                      (pset! row 2 (/ b n))))))
+          (set! row (+ row 4)))))))
+
+
+(bind-func setAlpha
+  (lambda (image w h stride a)
+    (let ((x:i32 0)
+          (y:i32 0)
+          (row:i8* null))
+      (dotimes (y h)
+        (set! row (pref-ptr image (* y stride)))
+        (dotimes (x w)
+          (pset! row (+ (* x 4) 3) a))))))
+
+
+(bind-func flipHorizontal
+  (lambda (image w h stride)
+    (let ((i 0)
+          (j (- h 1))
+          (k 0)
+          (ri:i8* null)
+          (rj:i8* null)
+          (t:i8 0)))
+    (while (< i j)
+      (set! ri (pref-ptr image (* i stride)))
+      (set! rj (pref-ptr image (* j stride)))
+      (dotimes (k (* w 4))
+        (set! t (pref ri k))
+        (pset! ri k (pref rj k))
+        (pset! rj k t))
+      (set! i (+ i 1))
+      (set! j (+ j 1)))))
+
+
+(bind-func saveScreenShot
+  (lambda (w h premult name)
+    (let ((image:i8* (halloc (* w h 4))))
+      (if (not (null? image))
+          (begin
+            (glReadPixels 0 0 w h GL_RGBA GL_UNSIGNED_BYTE image))))
+    (if (= premult 1)
+        (unpremultiplyAlpha image w h (* w 4))
+        (setAlpha image w h (* w 4) 255))
+    (flipHorizontal image w h (* w 4))
+    (stbi_write_png name w h 4 image (* w 4))
+    (free image)))
 
 (bind-val winWidth i32)
 (bind-val winHeight i32)
