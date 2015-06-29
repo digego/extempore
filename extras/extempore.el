@@ -1262,8 +1262,8 @@ command to run."
                           (concat ":" (propertize (cdr (assoc 'type form))
                                                   'face 'font-lock-type-face)))
                      " "
-                     (or (format "%s" (cadr (assoc 'args form)))
-                         "()")))
+                     (and (cadr (assoc 'args form))
+                          (format "%s" (cadr (assoc 'args form))))))
             (docstring (cdr (assoc 'docstring form))))
         (message
          "%s"
