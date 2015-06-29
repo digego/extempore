@@ -6392,7 +6392,8 @@
                 ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
                 (impc:print-bound-message ,symbol ,type)))
             ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
-                  (not (impc:ir:pointer? t)))
+                  (not (impc:ir:pointer? t))
+                  (not (list? value)))
              `(begin
                 (llvm:compile
                  (string-append "@" ,(symbol->string symbol)
@@ -6402,8 +6403,9 @@
                                      (llvm:convert-float (atom->string (eval value)))
                                      (atom->string (eval value)))))
                 (impc:print-bound-message ,symbol ,type)))
-            ((impc:ir:pointer? t)
-             (if (integer? (eval value))
+            ((or (impc:ir:pointer? t)
+                 (list? value))
+             (if (integer? value)
                  `(begin
                     (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                  " = dllexport global "
@@ -6412,28 +6414,22 @@
                     (call-as-xtlang ,(string->sexpr
                                       (string-append "(set! " (symbol->string symbol)
                                                      " (cast (malloc "
-                                                     (atom->string (* (eval value)
+                                                     (atom->string (* value
                                                                       (if (impc:ir:number? t)
                                                                           (impc:ir:get-type-size t)
                                                                           (/ (sys:pointer-size) 8))))
                                                      ") "
                                                      (atom->string type)
                                                      "))")))
-                    ;; (llvm:bind-global-var ,(symbol->string symbol)
-                    ;;                       ,(sys:make-cptr (* (eval value)
-                    ;;                                          (if (impc:ir:number? t)
-                    ;;                                              (impc:ir:get-type-size t)
-                    ;;                                              (/ (sys:pointer-size) 8)))))
                     (impc:print-bound-message ,symbol ,type))
-                 (if (list? (eval value))
+                 (if (list? value)                     
                      `(begin
                         (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                      " = dllexport global "
                                                      ,(impc:ir:get-type-str t)
                                                      "zeroinitializer"))
-                        (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                                       " \"" (sexpr->string value) "\")")))
-                        ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
+                        (call-as-xtlang ,(string->sexpr (string-append "(begin (set! " (symbol->string symbol)
+                                                                       " " (sexpr->string value) ") void)")))
                         (impc:print-bound-message ,symbol ,type))
                      `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
