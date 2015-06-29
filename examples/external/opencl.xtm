@@ -1,0 +1,54 @@
+;;; opencl.xtm -- a "Hello World" for OpenCL 1.2
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
+(sys:load "libs/external/opencl.xtm")
+
+(define kernel-source
+  "__kernel void square(
+   __global float* input,
+   __global float* output,
+   const unsigned int count)
+{
+   int i = get_global_id(0);
+   if(i < count)
+       output[i] = input[i] * input[i];
+}")
+
+(bind-func main
+  (lambda (argc:i32 argv:i8**)
+    (letz ((DATA_SIZE 1024)
+           (err:i32* (alloc))
+           (data:float* (alloc DATA_SIZE))
+           (results:float* (alloc DATA_SIZE))
+           (correct 0)
+           (global 0)
+           (local 0)
+           (device_id:cl_device_id* (alloc))
+           (device_context:cl_context* (alloc))
+           (commands:cl_command_queue* (alloc))
+           (kernel:cl_kernel* (alloc))
+           (input:cl_mem* (alloc))
+           (output:cl_mem* (alloc)))
+      ;; fill data set with random values
+      (doloop (i DATA_SIZE)
+        (pset! data i (random)))
+      ;; connect to a compute device
+      (let ((gpu 1))
+        (pset! err 0 (clGetDeviceIDs null
+                                     (if gpu
+                                         CL_DEVICE_TYPE_GPU
+                                         CL_DEVICE_TYPE_CPU)
+                                     1
+                                     device_id
+                                     null))
+        (if (<> (pref err 0) CL_SUCCESS)))
+      )))
