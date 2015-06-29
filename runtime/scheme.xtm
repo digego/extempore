@@ -1810,36 +1810,6 @@
 	 (list->string (cl:sort! (string->list seq) less?)))
 	(else (cl:sort! (append seq '()) less?))))
 
-;; for eldoc integration
-
-(define get-eldoc-string
-  (lambda (name)
-    (let* ((sym (string->symbol name))
-           (docstring (impc:ti:get-closure-docstring name))
-           (type (impc:ir:pretty-print-type (impc:ti:get-closure-type name)))
-           (form (impc:ti:get-closure-body name)))
-      ;; xtlang function
-      (if (or docstring type form)
-          (list 'docstring
-                '(lang . xtlang)
-                (cons 'name name)
-                (cons 'args (if form (sexpr->string (cadr form)) '()))
-                (cons 'type (or type '()))
-                (cons 'docstring (or docstring '())))
-          (if (and (defined? sym)
-                   (not (macro? (eval sym))))
-              ;; scheme function
-              (let ((form (get-closure-code (eval sym))))
-                (list 'docstring
-                      '(lang . scheme)
-                      (cons 'name name)
-                      (cons 'args (if form (sexpr->string (cadr form)) '()))
-                      ;; no type for scheme
-                      (cons 'type '())
-                      ;; no docstrings for scheme at the moment
-                      (cons 'docstring '())))
-              (list 'docstring))))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load which safely breaks on calling sys:load-escape
 ;;
@@ -2252,3 +2222,183 @@
                   (begin (print-with-colors 'green 'default #t
                                             (print "All tests passed :)\n"))
                          0))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; (Emacs) eldoc support ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; this functionality could (and should!) be provided for other
+;; editors - just need to integrate it into the right editor-specific
+;; hooks for inline documentation
+
+;; the documentation function should return information on the following, in order:
+
+;; 1. xtlang generic function
+;; 2. xtlang generic type
+;; 3. xtlang poly function
+;; 4. xtlang poly type
+;; 5. xtlang closure
+;; 6. xtlang nativefunc (e.g. bind-lib)
+;; 7. xtlang type
+;; 8. scheme function
+;; 9. scheme macro
+
+;; the documentation function should return an associative list with
+;; the following keys:
+
+;; ((name . function-name)
+;;  (category . "xtlang closure")
+;;  (type . type-string)
+;;  (args . arg-sexp)
+;;  (docstring . documentation-string))
+
+;; the keys must be present, but the cdr of each element may be
+;; missing where appropriate (e.g. scheme functions have no type field)
+
+(define eldoc-strip-arg-type-annotations
+  (lambda (form)
+    (if (symbol? form)
+        form
+        (map (lambda (arg)
+               (string->symbol (car (regex:split (symbol->string arg) ":"))))
+             form))))
+
+(define eldoc-get-args-from-form
+  (lambda (form)
+    ;; (println 'form: form)
+    (if (null? form)
+        #f
+        (if (equal? (car form) 'let)
+            (eldoc-get-args-from-form (caddr form))
+            (if (equal? (car form) 'lambda)
+                (eldoc-strip-arg-type-annotations (cadr form))
+                #f)))))
+
+;; currently only returns the result for the first arity
+(define eldoc-get-xtlang-genericfunc-args
+  (lambda (fn-sym)
+    (eldoc-get-args-from-form
+     (caddar (cdddar (assoc-strcmp-all fn-sym *impc:ti:genericfunc-cache*))))))
+
+(define eldoc-genericfunc-handler
+  (lambda (name-sym)
+    ;; once we have a way to handle multipe aritys, we should update
+    ;; this function
+    (list 
+     '(category . "generic closure")
+     (cons 'name (symbol->string name-sym))
+     (list 'args (sexpr->string (eldoc-get-xtlang-genericfunc-args name-sym)))
+     (cons 'type (symbol->string (caddar (assoc-strcmp-all name-sym *impc:ti:genericfunc-cache*))))
+     (list 'docstring))))
+
+(define eldoc-generictype-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "generic type")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (symbol->string (impc:ti:get-generictype-candidate-types name-sym)))
+     (list 'docstring))))
+
+(define eldoc-polyfunc-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "polymorphic closure")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (string-join (map (lambda (pf) (impc:ir:pretty-print-type pf))
+                                   (impc:ti:get-polyfunc-candidate-types (symbol->string name-sym)))
+                              " "))
+     (cons 'docstring 
+           (string-join (cons "poly'd closures:"
+                              (impc:ti:get-polyfunc-candidate-names (symbol->string name-sym)))
+                        " ")))))
+
+(define eldoc-polytype-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "polymorphic type")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (string-join (map (lambda (pf) (impc:ir:pretty-print-type pf))
+                                   (impc:ti:get-polytype-candidate-types (symbol->string name-sym)))
+                              " "))
+     (list 'docstring))))
+
+(define eldoc-closure-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "xtlang closure")
+     (cons 'name (symbol->string name-sym))
+     (list 'args (eldoc-get-args-from-form (impc:ti:get-closure-body (symbol->string name-sym))))
+     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-closure-type (symbol->string name-sym))))
+     (cons 'docstring 
+           (let ((docstring (impc:ti:get-closure-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
+
+(define eldoc-nativefunc-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "native C function")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-nativefunc-type (symbol->string name-sym))))
+     (list 'docstring))))
+
+(define eldoc-namedtype-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "named type")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-namedtype-type (symbol->string name-sym))))
+     (list 'docstring))))
+
+(define eldoc-scheme-function-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "scheme closure")
+     (cons 'name (symbol->string name-sym))
+     (list 'args (eldoc-get-args-from-form (get-closure-code (eval name-sym))))
+     (list 'type)
+     (list 'docstring))))
+
+(define eldoc-scheme-macro-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "scheme macro")
+     (cons 'name (symbol->string name-sym))
+     (list 'args (eldoc-get-args-from-form (car (cdaddr (get-closure-code (eval name-sym))))))
+     (list 'type)
+     (list 'docstring))))
+
+(define eldoc-documentation-function
+  (lambda (name)
+    (let ((sym (string->symbol name)))
+            ;; 1. xtlang generic function
+      (cond ((impc:ti:genericfunc-exists? name)
+             (cons 'eldoc-docstring (eldoc-genericfunc-handler sym)))
+            ;; 2. xtlang generic type
+            ((impc:ti:generictype-exists? name)
+             (cons 'eldoc-docstring (eldoc-generictype-handler sym)))
+            ;; 3. xtlang poly function
+            ((impc:ti:polyfunc-exists? name)
+             (cons 'eldoc-docstring (eldoc-polyfunc-handler sym)))
+            ;; 4. xtlang poly type
+            ((impc:ti:polytype-exists? name)
+             (cons 'eldoc-docstring (eldoc-polytype-handler sym)))
+            ;; 5. xtlang closure
+            ((impc:ti:closure-exists? name)
+             (cons 'eldoc-docstring (eldoc-closure-handler sym)))
+            ;; 6. xtlang nativefunc (e.g. bind-lib)
+            ((impc:ti:nativefunc-exists? name)
+             (cons 'eldoc-docstring (eldoc-nativefunc-handler sym)))
+            ;; 7. xtlang type
+            ((impc:ti:namedtype-exists? name)
+             (cons 'eldoc-docstring (eldoc-namedtype-handler sym)))
+            ;; 8. scheme function
+            ((and (defined? sym) (closure? (eval sym)))
+             (cons 'eldoc-docstring (eldoc-scheme-function-handler sym)))
+            ;; 9. scheme macro
+            ((and (defined? sym) (macro? (eval sym)))
+             (cons 'eldoc-docstring (eldoc-scheme-macro-handler sym)))))))

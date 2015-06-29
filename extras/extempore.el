@@ -1243,42 +1243,27 @@ command to run."
         ;; send the documentation request
         (if extempore-connection-list
             (process-send-string (car extempore-connection-list)
-                                 (format  "(get-eldoc-string \"%s\")\r\n" fnsym)))
+                                 (format  "(eldoc-documentation-function \"%s\")\r\n" fnsym)))
         ;; always return nil; docstring comes back through the process
         ;; filter
         nil)))
-
-(defun extempore-propertize-arg-string (arg-string)
-  (let ((single-vararg-p (not (string= (substring arg-string 0 1) "("))))
-    (if (not single-vararg-p)
-        (setq arg-string (substring arg-string 1 -1)))
-    (format
-     (if single-vararg-p "%s" "(%s)")
-     (mapconcat (lambda (arg)
-                  (let ((res (split-string arg ":" :omit-nulls)))
-                    (if (= (length res) 1)
-                        (car res)
-                      (concat (car res) (propertize (concat ":" (cadr res))
-                                                    'face 'font-lock-type-face)))))
-                (split-string arg-string " " :omit-nulls)
-                " "))))
 
 (defun extempore-process-docstring-form (form)
   (if form
       (let ((max-eldoc-string-length 120)
             (eldoc-string
-             (concat (propertize (cdr (assoc 'name form))
+             (concat (propertize (cdr (assoc 'category form))
+                                 'face 'font-lock-keyword-face)
+                     " "
+                     (propertize (cdr (assoc 'name form))
                                  'face 'font-lock-function-name-face)
                      ""
                      (and (cdr (assoc 'type form))
                           (concat ":" (propertize (cdr (assoc 'type form))
                                                   'face 'font-lock-type-face)))
-                     " ("
-                     (propertize "lambda" 'face 'font-lock-keyword-face)
                      " "
-                     (and (cdr (assoc 'args form))
-                          (extempore-propertize-arg-string (cdr (assoc 'args form))))
-                     " ..."))
+                     (or (format "%s" (cadr (assoc 'args form)))
+                         "()")))
             (docstring (cdr (assoc 'docstring form))))
         (message
          "%s"
@@ -1296,8 +1281,8 @@ command to run."
 
 (defun extempore-minibuffer-echo-filter (proc retstr)
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
-    (if (and (> (length str) 9)
-             (string= "(docstring" (substring str 0 10)))
+    (if (and (> (length str) 15)
+             (string= "(eldoc-docstring" (substring str 0 16)))
         (extempore-process-docstring-form (cdr-safe (ignore-errors (read str))))
       (message str))))
 
