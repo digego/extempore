@@ -38,6 +38,109 @@
 (define libCL
   (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
 
+;;;;;;;;;;;;;;;;;;;
+;; cl_platform.h ;;
+;;;;;;;;;;;;;;;;;;;
+
+;; TODO check that these alignment requirements are satisfied in xtlang
+
+(bind-alias cl_char i8)
+(bind-alias cl_uchar i8)
+(bind-alias cl_short i16)    ;; __attribute__((aligned(2)));
+(bind-alias cl_ushort i16)  ;; __attribute__((aligned(2)));
+(bind-alias cl_int i32)      ;; __attribute__((aligned(4)));
+(bind-alias cl_uint i32)    ;; __attribute__((aligned(4)));
+(bind-alias cl_long i64)     ;; __attribute__((aligned(8)));
+(bind-alias cl_ulong i64)   ;; __attribute__((aligned(8)));
+(bind-alias cl_half i16)    ;; __attribute__((aligned(2)));
+(bind-alias cl_float float)      ;; __attribute__((aligned(4)));
+(bind-alias cl_double double)    ;; __attribute__((aligned(8)));
+
+;; all this stuff is platform dependent! check it makes sense for your
+;; platform.
+(bind-val CL_CHAR_BIT i32         8)
+(bind-val CL_SCHAR_MAX i32        127)
+(bind-val CL_SCHAR_MIN i32        -128)
+(bind-val CL_CHAR_MAX i32         127) ;; CL_SCHAR_MAX
+(bind-val CL_CHAR_MIN i32         -128) ;; CL_SCHAR_MIN
+(bind-val CL_UCHAR_MAX i32        255)
+(bind-val CL_SHRT_MAX i32         32767)
+(bind-val CL_SHRT_MIN i32         -32768)
+(bind-val CL_USHRT_MAX i32        65535)
+(bind-val CL_INT_MAX i32          2147483647)
+(bind-val CL_INT_MIN i32          -2147483648)
+(bind-val CL_UINT_MAX i32         #xffffffff)
+;; (bind-val CL_LONG_MAX i64         #x7FFFFFFFFFFFFFFFLL)
+;; (bind-val CL_LONG_MIN i64         (- #x7FFFFFFFFFFFFFFFLL 1LL))
+;; (bind-val CL_ULONG_MAX i64        #xFFFFFFFFFFFFFFFFULL)
+
+(bind-val CL_FLT_DIG i32          6)
+(bind-val CL_FLT_MANT_DIG i32     24)
+(bind-val CL_FLT_MAX_10_EXP i32   +38)
+(bind-val CL_FLT_MAX_EXP i32      +128)
+(bind-val CL_FLT_MIN_10_EXP i32   -37)
+(bind-val CL_FLT_MIN_EXP i32      -125)
+(bind-val CL_FLT_RADIX i32        2)
+;; (bind-val CL_FLT_MAX i32          #x1.fffffep127f)
+;; (bind-val CL_FLT_MIN i32          #x1.0p-126f)
+;; (bind-val CL_FLT_EPSILON i32      #x1.0p-23f)
+
+(bind-val CL_DBL_DIG i32          15)
+(bind-val CL_DBL_MANT_DIG i32     53)
+(bind-val CL_DBL_MAX_10_EXP i32   +308)
+(bind-val CL_DBL_MAX_EXP i32      +1024)
+(bind-val CL_DBL_MIN_10_EXP i32   -307)
+(bind-val CL_DBL_MIN_EXP i32      -1021)
+(bind-val CL_DBL_RADIX i32        2)
+;; (bind-val CL_DBL_MAX i32          #x1.fffffffffffffp1023)
+;; (bind-val CL_DBL_MIN i32          #x1.0p-1022)
+;; (bind-val CL_DBL_EPSILON i32      #x1.0p-52)
+
+(bind-val CL_M_E double            2.718281828459045090796)
+(bind-val CL_M_LOG2E double        1.442695040888963387005)
+(bind-val CL_M_LOG10E double       0.434294481903251816668)
+(bind-val CL_M_LN2 double          0.693147180559945286227)
+(bind-val CL_M_LN10 double         2.302585092994045901094)
+(bind-val CL_M_PI double           3.141592653589793115998)
+(bind-val CL_M_PI_2 double         1.570796326794896557999)
+(bind-val CL_M_PI_4 double         0.785398163397448278999)
+(bind-val CL_M_1_PI double         0.318309886183790691216)
+(bind-val CL_M_2_PI double         0.636619772367581382433)
+(bind-val CL_M_2_SQRTPI double     1.128379167095512558561)
+(bind-val CL_M_SQRT2 double        1.414213562373095145475)
+(bind-val CL_M_SQRT1_2 double      0.707106781186547572737)
+
+(bind-val CL_M_E_F float           2.71828174591064)
+(bind-val CL_M_LOG2E_F float       1.44269502162933)
+(bind-val CL_M_LOG10E_F float      0.43429449200630)
+(bind-val CL_M_LN2_F float         0.69314718246460)
+(bind-val CL_M_LN10_F float        2.30258512496948)
+(bind-val CL_M_PI_F float          3.14159274101257)
+(bind-val CL_M_PI_2_F float        1.57079637050629)
+(bind-val CL_M_PI_4_F float        0.78539818525314)
+(bind-val CL_M_1_PI_F float        0.31830987334251)
+(bind-val CL_M_2_PI_F float        0.63661974668503)
+(bind-val CL_M_2_SQRTPI_F float    1.12837922573090)
+(bind-val CL_M_SQRT2_F float       1.41421353816986)
+(bind-val CL_M_SQRT1_2_F float     0.70710676908493)
+
+;; #if defined( __GNUC__ )
+;;    #define CL_HUGE_VALF     __builtin_huge_valf()
+;;    #define CL_HUGE_VAL      __builtin_huge_val()
+;;    #define CL_NAN           __builtin_nanf( "" )
+;; #else
+;;    #define CL_HUGE_VALF     ((cl_float) 1e50)
+;;    #define CL_HUGE_VAL      ((cl_double) 1e500)
+;;    float nanf( const char * );
+;;    #define CL_NAN           nanf( "" )  
+;; #endif
+;; #define CL_MAXFLOAT         CL_FLT_MAX
+;; #define CL_INFINITY         CL_HUGE_VALF
+
+;;;;;;;;;;
+;; cl.h ;;
+;;;;;;;;;;
+
 (bind-alias _cl_platform_id i8)
 (bind-alias _cl_device_id i8)
 (bind-alias _cl_context i8)
@@ -57,6 +160,8 @@
 (bind-alias cl_kernel _cl_kernel*)
 (bind-alias cl_event _cl_event*)
 (bind-alias cl_sampler _cl_sampler*)
+
+(bind-alias intptr_t size_t) ;; technically not guaranteed, but probably true
 
 (bind-alias cl_bool cl_uint)
 (bind-alias cl_bitfield cl_ulong)
@@ -198,8 +303,8 @@
 ;; /* cl_bool */
 (bind-val CL_FALSE i32 0)
 (bind-val CL_TRUE i32 1)
-(bind-val CL_BLOCKING i32 CL_TRUE)
-(bind-val CL_NON_BLOCKING i32 CL_FALSE)
+(bind-val CL_BLOCKING i32 1) ;; CL_TRUE
+(bind-val CL_NON_BLOCKING i32 0) ;; CL_FALSE
 
 ;; /* cl_platform_info */
 (bind-val CL_PLATFORM_PROFILE i32 #x0900)
@@ -209,11 +314,11 @@
 (bind-val CL_PLATFORM_EXTENSIONS i32 #x0904)
 
 ;; /* cl_device_type - bitfield */
-(bind-val CL_DEVICE_TYPE_DEFAULT i32 (<< 1 0))
-(bind-val CL_DEVICE_TYPE_CPU i32 (<< 1 1))
-(bind-val CL_DEVICE_TYPE_GPU i32 (<< 1 2))
-(bind-val CL_DEVICE_TYPE_ACCELERATOR i32 (<< 1 3))
-(bind-val CL_DEVICE_TYPE_CUSTOM i32 (<< 1 4))
+(bind-val CL_DEVICE_TYPE_DEFAULT i32 (real->integer (expt 2 0)))
+(bind-val CL_DEVICE_TYPE_CPU i32 (real->integer (expt 2 1)))
+(bind-val CL_DEVICE_TYPE_GPU i32 (real->integer (expt 2 2)))
+(bind-val CL_DEVICE_TYPE_ACCELERATOR i32 (real->integer (expt 2 3)))
+(bind-val CL_DEVICE_TYPE_CUSTOM i32 (real->integer (expt 2 4)))
 (bind-val CL_DEVICE_TYPE_ALL i32 #xFFFFFFFF)
 
 ;; /* cl_device_info */
@@ -295,14 +400,14 @@
 (bind-val CL_DEVICE_IMAGE_BASE_ADDRESS_ALIGNMENT i32 #x104B)
 
 ;; /* cl_device_fp_config - bitfield */
-(bind-val CL_FP_DENORM i32 (<< 1 0))
-(bind-val CL_FP_INF_NAN i32 (<< 1 1))
-(bind-val CL_FP_ROUND_TO_NEAREST i32 (<< 1 2))
-(bind-val CL_FP_ROUND_TO_ZERO i32 (<< 1 3))
-(bind-val CL_FP_ROUND_TO_INF i32 (<< 1 4))
-(bind-val CL_FP_FMA i32 (<< 1 5))
-(bind-val CL_FP_SOFT_FLOAT i32 (<< 1 6))
-(bind-val CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT i32 (<< 1 7))
+(bind-val CL_FP_DENORM i32 (real->integer (expt 2 0)))
+(bind-val CL_FP_INF_NAN i32 (real->integer (expt 2 1)))
+(bind-val CL_FP_ROUND_TO_NEAREST i32 (real->integer (expt 2 2)))
+(bind-val CL_FP_ROUND_TO_ZERO i32 (real->integer (expt 2 3)))
+(bind-val CL_FP_ROUND_TO_INF i32 (real->integer (expt 2 4)))
+(bind-val CL_FP_FMA i32 (real->integer (expt 2 5)))
+(bind-val CL_FP_SOFT_FLOAT i32 (real->integer (expt 2 6)))
+(bind-val CL_FP_CORRECTLY_ROUNDED_DIVIDE_SQRT i32 (real->integer (expt 2 7)))
 
 ;; /* cl_device_mem_cache_type */
 (bind-val CL_NONE i32 #x0)
@@ -314,12 +419,12 @@
 (bind-val CL_GLOBAL i32 #x2)
 
 ;; /* cl_device_exec_capabilities - bitfield */
-(bind-val CL_EXEC_KERNEL i32 (<< 1 0))
-(bind-val CL_EXEC_NATIVE_KERNEL i32 (<< 1 1))
+(bind-val CL_EXEC_KERNEL i32 (real->integer (expt 2 0)))
+(bind-val CL_EXEC_NATIVE_KERNEL i32 (real->integer (expt 2 1)))
 
 ;; /* cl_command_queue_properties - bitfield */
-(bind-val CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE i32 (<< 1 0))
-(bind-val CL_QUEUE_PROFILING_ENABLE i32 (<< 1 1))
+(bind-val CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE i32 (real->integer (expt 2 0)))
+(bind-val CL_QUEUE_PROFILING_ENABLE i32 (real->integer (expt 2 1)))
 
 ;; /* cl_context_info  */
 (bind-val CL_CONTEXT_REFERENCE_COUNT i32 #x1080)
@@ -338,12 +443,12 @@
 (bind-val CL_DEVICE_PARTITION_BY_AFFINITY_DOMAIN i32 #x1088)
     
 ;; /* cl_device_affinity_domain */
-(bind-val CL_DEVICE_AFFINITY_DOMAIN_NUMA i32 (<< 1 0))
-(bind-val CL_DEVICE_AFFINITY_DOMAIN_L4_CACHE i32 (<< 1 1))
-(bind-val CL_DEVICE_AFFINITY_DOMAIN_L3_CACHE i32 (<< 1 2))
-(bind-val CL_DEVICE_AFFINITY_DOMAIN_L2_CACHE i32 (<< 1 3))
-(bind-val CL_DEVICE_AFFINITY_DOMAIN_L1_CACHE i32 (<< 1 4))
-(bind-val CL_DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE i32 (<< 1 5))
+(bind-val CL_DEVICE_AFFINITY_DOMAIN_NUMA i32 (real->integer (expt 2 0)))
+(bind-val CL_DEVICE_AFFINITY_DOMAIN_L4_CACHE i32 (real->integer (expt 2 1)))
+(bind-val CL_DEVICE_AFFINITY_DOMAIN_L3_CACHE i32 (real->integer (expt 2 2)))
+(bind-val CL_DEVICE_AFFINITY_DOMAIN_L2_CACHE i32 (real->integer (expt 2 3)))
+(bind-val CL_DEVICE_AFFINITY_DOMAIN_L1_CACHE i32 (real->integer (expt 2 4)))
+(bind-val CL_DEVICE_AFFINITY_DOMAIN_NEXT_PARTITIONABLE i32 (real->integer (expt 2 5)))
 
 ;; /* cl_command_queue_info */
 (bind-val CL_QUEUE_CONTEXT i32 #x1090)
@@ -352,20 +457,20 @@
 (bind-val CL_QUEUE_PROPERTIES i32 #x1093)
 
 ;; /* cl_mem_flags - bitfield */
-(bind-val CL_MEM_READ_WRITE i32 (<< 1 0))
-(bind-val CL_MEM_WRITE_ONLY i32 (<< 1 1))
-(bind-val CL_MEM_READ_ONLY i32 (<< 1 2))
-(bind-val CL_MEM_USE_HOST_PTR i32 (<< 1 3))
-(bind-val CL_MEM_ALLOC_HOST_PTR i32 (<< 1 4))
-(bind-val CL_MEM_COPY_HOST_PTR i32 (<< 1 5))
-;; reserved                        (<< 1 6)    
-(bind-val CL_MEM_HOST_WRITE_ONLY i32 (<< 1 7))
-(bind-val CL_MEM_HOST_READ_ONLY i32 (<< 1 8))
-(bind-val CL_MEM_HOST_NO_ACCESS i32 (<< 1 9))
+(bind-val CL_MEM_READ_WRITE i32 (real->integer (expt 2 0)))
+(bind-val CL_MEM_WRITE_ONLY i32 (real->integer (expt 2 1)))
+(bind-val CL_MEM_READ_ONLY i32 (real->integer (expt 2 2)))
+(bind-val CL_MEM_USE_HOST_PTR i32 (real->integer (expt 2 3)))
+(bind-val CL_MEM_ALLOC_HOST_PTR i32 (real->integer (expt 2 4)))
+(bind-val CL_MEM_COPY_HOST_PTR i32 (real->integer (expt 2 5)))
+;; reserved                        (real->integer (expt 2 6))    
+(bind-val CL_MEM_HOST_WRITE_ONLY i32 (real->integer (expt 2 7)))
+(bind-val CL_MEM_HOST_READ_ONLY i32 (real->integer (expt 2 8)))
+(bind-val CL_MEM_HOST_NO_ACCESS i32 (real->integer (expt 2 9)))
 
 ;; /* cl_mem_migration_flags - bitfield */
-(bind-val CL_MIGRATE_MEM_OBJECT_HOST i32 (<< 1 0))
-(bind-val CL_MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED i32 (<< 1 1))
+(bind-val CL_MIGRATE_MEM_OBJECT_HOST i32 (real->integer (expt 2 0)))
+(bind-val CL_MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED i32 (real->integer (expt 2 1)))
 
 ;; /* cl_channel_order */
 (bind-val CL_R i32 #x10B0)
@@ -454,9 +559,9 @@
 (bind-val CL_SAMPLER_FILTER_MODE i32 #x1154)
   
 ;; /* cl_map_flags - bitfield */
-(bind-val CL_MAP_READ i32 (<< 1 0))
-(bind-val CL_MAP_WRITE i32 (<< 1 1))
-(bind-val CL_MAP_WRITE_INVALIDATE_REGION i32 (<< 1 2))
+(bind-val CL_MAP_READ i32 (real->integer (expt 2 0)))
+(bind-val CL_MAP_WRITE i32 (real->integer (expt 2 1)))
+(bind-val CL_MAP_WRITE_INVALIDATE_REGION i32 (real->integer (expt 2 2)))
 
 ;; /* cl_program_info */
 (bind-val CL_PROGRAM_REFERENCE_COUNT i32 #x1160)
@@ -516,9 +621,9 @@
     
 ;; /* cl_kernel_arg_type_qualifer */
 (bind-val CL_KERNEL_ARG_TYPE_NONE i32 0)
-(bind-val CL_KERNEL_ARG_TYPE_CONST i32 (<< 1 0))
-(bind-val CL_KERNEL_ARG_TYPE_RESTRICT i32 (<< 1 1))
-(bind-val CL_KERNEL_ARG_TYPE_VOLATILE i32 (<< 1 2))
+(bind-val CL_KERNEL_ARG_TYPE_CONST i32 (real->integer (expt 2 0)))
+(bind-val CL_KERNEL_ARG_TYPE_RESTRICT i32 (real->integer (expt 2 1)))
+(bind-val CL_KERNEL_ARG_TYPE_VOLATILE i32 (real->integer (expt 2 2)))
 
 ;; /* cl_kernel_work_group_info */
 (bind-val CL_KERNEL_WORK_GROUP_SIZE i32 #x11B0)
