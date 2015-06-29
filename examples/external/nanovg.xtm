@@ -1,4 +1,4 @@
-;;; nanovg.xtm:examples -- nanovg example
+;;; nanovg.xtm -- nanovg 2D graphics example
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
@@ -18,6 +18,26 @@
 
 (call-as-xtlang
  (set! window (glfw_init_and_create_window 800 600)))
+
+;; GLFW testing
+
+(call-as-xtlang
+ (let ((w:double* (salloc))
+       (h:double* (salloc)))
+   (glfwGetCursorPos window w h)
+   (println (pref w 0)
+            (pref h 0))))
+
+(bind-func get_window_ptr
+  (lambda ()
+    window))
+
+(println (get_window_ptr))
+
+(glfw_set_key_callback (get_window_ptr)
+                       (llvm:get-function-pointer "glfw_key_callback_native"))
+
+;; more setup
 
 (call-as-xtlang
  (set! vg (nvgCreateGL3 (+ NVG_ANTIALIAS NVG_STENCIL_STROKES NVG_DEBUG)))
@@ -1277,6 +1297,8 @@
    (set! fbHeight (pref h 0))
    0))
 
+
+
 (bind-func draw_test_rect
   (lambda (x y)
     (nvgBeginPath vg)
@@ -1299,6 +1321,8 @@
              "This is a test string." null)
     0.:float))
 
+;; TODO fix eldoc! what a pain in the arse.
+
 (bind-func nanovg_draw
   (lambda ()
     (glViewport 0 0 fbWidth fbHeight)
@@ -1309,8 +1333,11 @@
                    (convert fbWidth) (convert fbHeight)
                    (/ (convert fbWidth float)
                       (convert winWidth float)))
-    (draw_test_rect 300. 300.)
-    (draw_test_text)
+		(nvgBeginFrame vg winWidth winHeight 2.0)
+
+		(renderDemo vg 100.:float 20.:float (convert winWidth float) (convert winHeight float) (convert (glfwGetTime)) 0 null)
+    ;; (draw_test_rect 300. 300.)
+    ;; (draw_test_text)
     (nvgEndFrame vg)
     (glfwSwapBuffers window)))
 
@@ -1326,4 +1353,4 @@
                 next-frame-time
                 delta-t))))
 
-(gl-loop (now) 1/40)
+(gl-loop (now) 1/4)
