@@ -3247,7 +3247,8 @@
   (lambda (window:GLFWwindow*)
     (if (not (null? window))
         (glfwDestroyWindow window)
-        (println "Error: Window pointer is NULL."))
+        (begin (printf "Error: Window pointer is NULL.\n")
+               void))
     void))
 
 (bind-func glfw_swap_buffers
@@ -3295,7 +3296,8 @@
 
 (bind-func glfw_key_callback:GLFWkeyfun
   (lambda (window:GLFWwindow* key:i32 scancode:i32 action:i32 mods:i32)
-    (println "key:" key "scancode:" scancode "action:" action "mods:" mods)
+    (printf "key: %d scancode: %d action: %d mods: %d\n"
+            key scancode action mods)
     (if (and (= key GLFW_KEY_ESCAPE)
              (= action GLFW_PRESS))
         (glfwSetWindowShouldClose window (convert GL_TRUE)))
@@ -3307,7 +3309,7 @@
 
 (bind-func glfw_window_position_callback:GLFWwindowposfun
   (lambda (window:GLFWwindow* x:i32 y:i32)
-    (println "window:" window "x:" x "y:" y)
+    (printf "window moved to x: %d y: %d\n" x y)
     void))
 
 (bind-func glfw_set_window_position_callback
