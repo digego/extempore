@@ -613,20 +613,21 @@ void llvm_schedule_callback(long long time, void* dat)
 
 void* llvm_get_function_ptr(char* fname)
 {
-  //using namespace llvm;
-  // llvm::Module* M = extemp::EXTLLVM::I()->M;
-  // llvm::Function* func = M->getFunction(std::string(fname));
-  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(fname));
-  if(func == 0) {
-    // throw std::runtime_error("Extempore runtime error: error retrieving function in llvm_get_function_ptr");
-    return NULL;
+  using namespace llvm;
+  
+  llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(fname));        
+  if(func == nullptr)
+    {
+      return nullptr;
+    }
+  // has the function been updateGlobalMapping'd somewhere else,
+  // e.g. bind_symbol
+  void* p = extemp::EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
+  if(p==nullptr) // look for it as a JIT-compiled function
+    p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
+  if(p==nullptr) {
+    return nullptr;
   }
-
-  void* p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
-
-  // if(p==NULL) {
-  //     throw std::runtime_error("Extempore runtime error: null ptr retrieving function ptr in llvm_get_function_ptr");
-  // }
   return p;
 }
 
