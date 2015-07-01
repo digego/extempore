@@ -7265,6 +7265,10 @@
         (impc:compiler:print-not-during-aot-error)
         (llvm:get-function-pointer (string-append name "_native")))))
 
+;; the same functionality, but for use in xtlang code
+(define-macro (get_native_fptr closure-name)
+  `(llvm_get_function_ptr ,(string-append (symbol->string closure-name) "_native")))
+
 ;; Wrap a native, bound C function, allowing it to be called from scheme
 (define-macro (bind-wrapper local-sym native-sym)
   (let* ((types (cdr (impc:ti:get-closure-arg-types (symbol->string native-sym))))
