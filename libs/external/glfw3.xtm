@@ -3235,6 +3235,15 @@
                       null
                       null)))
 
+(bind-func glfw_create_interaction_window
+  (lambda (width height)
+    (register_for_window_events)
+    (glfwWindowHint GLFW_FOCUSED 1)
+    (glfwCreateWindow width height
+                      "Extempore OpenGL Window"
+                      null
+                      null)))
+
 (bind-func glfw_window_should_close
   (lambda (window)
     (glfwWindowShouldClose window)))
@@ -3296,11 +3305,8 @@
 
 (bind-func glfw_key_callback:GLFWkeyfun
   (lambda (window:GLFWwindow* key:i32 scancode:i32 action:i32 mods:i32)
-    (printf "key: %d scancode: %d action: %d mods: %d\n"
-            key scancode action mods)
-    (if (and (= key GLFW_KEY_ESCAPE)
-             (= action GLFW_PRESS))
-        (glfwSetWindowShouldClose window (convert GL_TRUE)))
+    (printf "window: %p key: %d scancode: %d action: %d mods: %d\n"
+            window key scancode action mods)
     void))
 
 (bind-func glfw_set_key_callback
@@ -3316,11 +3322,26 @@
   (lambda (window:GLFWwindow* cbfun:i8*)
     (glfwSetWindowPosCallback window (convert cbfun))))
 
+(bind-func glfw_mouse_button_callback:GLFWmousebuttonfun
+  (lambda (window button action mods)
+    (printf "window: %p button %d action %d mods %d\n" window button action mods)
+    void))
+
 (bind-func glfw_init_and_create_window
   (lambda (width height)
     (glfw_init)
     (glfw_set_core_profile)
     (let ((window (glfw_create_window width height)))
+      (glfwMakeContextCurrent window)
+      (glfwSwapInterval 1)
+      (gl_print_driver_info)
+      window)))
+
+(bind-func glfw_init_and_create_interaction_window
+  (lambda (width height)
+    (glfw_init)
+    (glfw_set_core_profile)
+    (let ((window (glfw_create_interaction_window width height)))
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
       (gl_print_driver_info)
