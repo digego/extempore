@@ -46,6 +46,7 @@
 
 #ifdef TARGET_OS_MAC
 #include <CoreFoundation/CoreFoundation.h>
+#include <AppKit/AppKit.h>
 #else
 #include <time.h>
 #endif
@@ -491,8 +492,17 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
    }
 #endif
 
-
-
+#ifdef TARGET_OS_MAC
+int register_for_window_events()
+{
+  // to give Extempore it's own dock icon, etc
+  return (int)[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+#else
+  // implement the required "recieve events" functionality for Linux
+  // or Windows if necessary
+  return 1;
+#endif
+}
 namespace extemp {
 
     uint32_t UNIV::FRAMES = 128;

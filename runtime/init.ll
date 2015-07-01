@@ -45,6 +45,7 @@ declare i8* @cname_encode(i8*,i64,i64)
 declare i8* @cname_decode(i8*,i64,i64)
 
 declare double @clock_clock()
+declare i32 @register_for_window_events()
 
 ;; swap stuff
 declare i64 @swap64f(double)
