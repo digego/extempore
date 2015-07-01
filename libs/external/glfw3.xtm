@@ -726,7 +726,7 @@
 ;;  *
 ;;  *  @ingroup window
 ;;  */
-(bind-alias GLFWwindowfocusfun [void,GLFWwindow*]*)
+(bind-alias GLFWwindowfocusfun [void,GLFWwindow*,i32]*)
 
 ;; /*! @brief The function signature for window iconify/restore callbacks.
 ;;  *
@@ -3295,32 +3295,37 @@
 ;; callbacks
 
 (bind-func glfw_error_callback:GLFWerrorfun
-  (lambda (err:i32 description:i8*)
+  (lambda (err description)
     (printf "GLFW error %d: %s\n" err description)
     void))
 
-(bind-func glfw_set_error_callback
-  (lambda (cbfun:i8*)
-    (glfwSetErrorCallback (convert cbfun))))
-
 (bind-func glfw_key_callback:GLFWkeyfun
-  (lambda (window:GLFWwindow* key:i32 scancode:i32 action:i32 mods:i32)
+  (lambda (window key scancode action mods)
     (printf "window: %p key: %d scancode: %d action: %d mods: %d\n"
             window key scancode action mods)
     void))
 
-(bind-func glfw_set_key_callback
-  (lambda (window:GLFWwindow* cbfun:i8*)
-    (glfwSetKeyCallback window (convert cbfun))))
-
-(bind-func glfw_window_position_callback:GLFWwindowposfun
-  (lambda (window:GLFWwindow* x:i32 y:i32)
-    (printf "window moved to x: %d y: %d\n" x y)
+(bind-func glfw_char_callback:GLFWcharfun
+  (lambda (window codepoint)
+    (printf "window: %p codepoint: %c\n" window codepoint)
     void))
 
-(bind-func glfw_set_window_position_callback
-  (lambda (window:GLFWwindow* cbfun:i8*)
-    (glfwSetWindowPosCallback window (convert cbfun))))
+(bind-func glfw_window_position_callback:GLFWwindowposfun
+  (lambda (window xpos ypos)
+    (printf "window position x: %d y: %d\n" xpos ypos)
+    void))
+
+(bind-func glfw_window_focus_callback:GLFWwindowfocusfun
+  (lambda (window focused)
+    (if (= focused (convert GL_TRUE))
+        (printf "window %p gained focus\n" window)
+        (printf "window %p lost focus\n" window))
+    void))
+
+(bind-func glfw_cursor_position_callback:GLFWcursorposfun
+  (lambda (window xpos ypos)
+    (printf "cursor position x: %f y: %f\n" xpos ypos)
+    void))
 
 (bind-func glfw_mouse_button_callback:GLFWmousebuttonfun
   (lambda (window button action mods)
