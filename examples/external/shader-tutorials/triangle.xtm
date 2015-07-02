@@ -1,26 +1,61 @@
+;;; triangle.xtm -- basic OpenGL drawing and window management
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libGL, libglfw3
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
+
 (sys:load "libs/external/glfw3.xtm")
 
 (bind-val window GLFWwindow*)
 
+(bind-val width i32 800)
+(bind-val height i32 600)
+
+;; create a window
 (call-as-xtlang
- (set! window (glfw_init_and_create_fullscreen_window)))
+ (set! window (glfw_init_and_create_interaction_window width height)))
+
+(call-as-xtlang
+ ;; errors
+ (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+ ;; ;; mouse
+ ;; (glfwSetMouseButtonCallback window (convert (get_native_fptr glfw_mouse_button_callback)))
+ ;; (glfwSetCursorPosCallback window (convert (get_native_fptr glfw_cursor_position_callback)))
+ ;; keyboard
+ (glfwSetKeyCallback window (convert (get_native_fptr glfw_key_callback))))
 
 ;; shader stuff
 
-(bind-val triangle_vert_data float* 15)
+(bind-val triangle_vert_data |15,float|)
+(bind-val view_mat |16,float|) ;; view matrix
 
 (bind-val vbo VBO*)
 (bind-val vao VAO*)
 (bind-val sp ShaderProgram)
 
-;; init
+(bind-func reset_view_matrix
+  (lambda ()
+    (afill! view_mat
+         1.0 0.0 0.0 0.0
+         0.0 1.0 0.0 0.0
+         0.0 0.0 1.0 0.0
+         0.0 0.0 0.0 1.0)))
+
+;; init data
 (call-as-xtlang
- (pfill! triangle_vert_data
+ (afill! triangle_vert_data
          ;; pos      colour
           0.0  0.5   1.0 0.0 0.0
           0.5 -0.5   0.0 1.0 0.0
-         -0.5 -0.5   0.0 0.0 1.0)
- (set! vbo (VBO_create triangle_vert_data 15))
+          -0.5 -0.5   0.0 0.0 1.0)
+ (reset_view_matrix)
+ (set! vbo (VBO_create (aref-ptr triangle_vert_data 0) 15))
  (set! vao (VAO_create))
  (bind_attribute vao vbo 0 2 5 0) ;; position
  (bind_attribute vao vbo 1 3 5 2) ;; tex_coord
@@ -30,16 +65,47 @@
   (lambda (vsource:i8* fsource:i8*)
     (set! sp (ShaderProgram_create vsource fsource))))
 
-(create_triangle_shader (file->string "examples/external/shader-tutorials/triangle.vert")
-                        (file->string "examples/external/shader-tutorials/triangle.frag"))
+(create_triangle_shader (sys:slurp-file "examples/external/shader-tutorials/triangle.vert")
+                        (sys:slurp-file "examples/external/shader-tutorials/triangle.frag"))
 
-(bind-func gl_draw
-  (lambda ()
+(bind-func gl_draw_loop
+  (lambda (time:i64 delta_t:double)
     (glClear GL_COLOR_BUFFER_BIT)
     (glUseProgram sp)
-    (draw_vertex_array vao GL_TRIANGLES 0 3)
+    (let ((loc (glGetUniformLocation sp "view_mat")))
+      (glUniformMatrix4fv loc 1 GL_FALSE (aref-ptr view_mat 0))
+      (draw_vertex_array vao GL_TRIANGLES 0 3))
+    (glfwPollEvents)
     (glfwSwapBuffers window)
-    void))
+    (if (= (glfwWindowShouldClose window) 1)
+        (begin (glfwDestroyWindow window)
+               (println "Window closed, stopping draw loop.")
+               #t)
+        (let ((next_time (+ time (convert (* 44100. delta_t)))))
+          (callback next_time gl_draw_loop next_time delta_t)))))
 
-;; draw the triangle
-(gl_draw)
+(gl_draw_loop (now) (/ 1.0 3.0)) ;; 30fps
+
+;; now, let's update our key callback to move the triangle around
+;; using the arrow keys
+(bind-func glfw_key_callback:GLFWkeyfun
+  (let ((speed 0.01))
+    (lambda (window key scancode action mods)
+      (if (and (= action GLFW_PRESS)
+               (= key GLFW_KEY_LEFT))
+          (aset! view_mat 3 (- (aref view_mat 3) speed)))
+      (if (and (= action GLFW_PRESS)
+               (= key GLFW_KEY_RIGHT))
+          (aset! view_mat 3 (+ (aref view_mat 3) speed)))
+      (if (and (= action GLFW_PRESS)
+               (= key GLFW_KEY_DOWN))
+          (aset! view_mat 7 (- (aref view_mat 7) speed)))
+      (if (and (= action GLFW_PRESS)
+               (= key GLFW_KEY_UP))
+          (aset! view_mat 7 (+ (aref view_mat 7) speed)))
+      void)))
+
+(call-as-xtlang
+ (doloop (i 16)
+   (printf "%f " (convert (aref view_mat i) double))
+   (println)))
