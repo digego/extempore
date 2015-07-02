@@ -19,16 +19,8 @@
 
 ;; create a window
 (call-as-xtlang
- (set! window (glfw_init_and_create_interaction_window width height)))
-
-(call-as-xtlang
- ;; errors
  (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
- ;; ;; mouse
- ;; (glfwSetMouseButtonCallback window (convert (get_native_fptr glfw_mouse_button_callback)))
- ;; (glfwSetCursorPosCallback window (convert (get_native_fptr glfw_cursor_position_callback)))
- ;; keyboard
- (glfwSetKeyCallback window (convert (get_native_fptr glfw_key_callback))))
+ (set! window (glfw_init_and_create_interaction_window width height)))
 
 ;; shader stuff
 
@@ -68,6 +60,11 @@
 (create_triangle_shader (sys:slurp-file "examples/external/shader-tutorials/triangle.vert")
                         (sys:slurp-file "examples/external/shader-tutorials/triangle.frag"))
 
+;; doesn't do anything (yet!)
+(bind-func move_triangle
+  (lambda (window:GLFWwindow*)
+    void))
+
 (bind-func gl_draw_loop
   (lambda (time:i64 delta_t:double)
     (glClear GL_COLOR_BUFFER_BIT)
@@ -76,6 +73,7 @@
       (glUniformMatrix4fv loc 1 GL_FALSE (aref-ptr view_mat 0))
       (draw_vertex_array vao GL_TRIANGLES 0 3))
     (glfwPollEvents)
+    (move_triangle window)
     (glfwSwapBuffers window)
     (if (= (glfwWindowShouldClose window) 1)
         (begin (glfwDestroyWindow window)
@@ -84,28 +82,33 @@
         (let ((next_time (+ time (convert (* 44100. delta_t)))))
           (callback next_time gl_draw_loop next_time delta_t)))))
 
-(gl_draw_loop (now) (/ 1.0 3.0)) ;; 30fps
+(gl_draw_loop (now) (/ 1.0 30.0)) ;; 30fps
 
-;; now, let's update our key callback to move the triangle around
-;; using the arrow keys
-(bind-func glfw_key_callback:GLFWkeyfun
-  (let ((speed 0.01))
-    (lambda (window key scancode action mods)
-      (if (and (= action GLFW_PRESS)
-               (= key GLFW_KEY_LEFT))
-          (aset! view_mat 3 (- (aref view_mat 3) speed)))
-      (if (and (= action GLFW_PRESS)
-               (= key GLFW_KEY_RIGHT))
-          (aset! view_mat 3 (+ (aref view_mat 3) speed)))
-      (if (and (= action GLFW_PRESS)
-               (= key GLFW_KEY_DOWN))
-          (aset! view_mat 7 (- (aref view_mat 7) speed)))
-      (if (and (= action GLFW_PRESS)
-               (= key GLFW_KEY_UP))
-          (aset! view_mat 7 (+ (aref view_mat 7) speed)))
+;; now, let's update our key callback to translate and scale the triangle
+;; using the arrow keys (hold shift to scale)
+(bind-func move_triangle
+  (let ((speed 0.05))
+    (lambda (window)
+      (if (or (= GLFW_PRESS (glfwGetKey window GLFW_KEY_LEFT_SHIFT))
+              (= GLFW_PRESS (glfwGetKey window GLFW_KEY_RIGHT_SHIFT)))
+          ;; scale
+          (begin
+            (if (= GLFW_PRESS (glfwGetKey window GLFW_KEY_LEFT))
+                (aset! view_mat 0 (- (aref view_mat 0) speed)))
+            (if (= GLFW_PRESS (glfwGetKey window GLFW_KEY_RIGHT))
+                (aset! view_mat 0 (+ (aref view_mat 0) speed)))
+            (if (= GLFW_PRESS (glfwGetKey window GLFW_KEY_DOWN))
+                (aset! view_mat 5 (- (aref view_mat 5) speed)))
+            (if (= GLFW_PRESS (glfwGetKey window GLFW_KEY_UP))
+                (aset! view_mat 5 (+ (aref view_mat 5) speed))))
+          ;; translate
+          (begin
+            (if (= GLFW_PRESS (glfwGetKey window GLFW_KEY_LEFT))
+                (aset! view_mat 12 (- (aref view_mat 12) speed)))
+            (if (= GLFW_PRESS (glfwGetKey window GLFW_KEY_RIGHT))
+                (aset! view_mat 12 (+ (aref view_mat 12) speed)))
+            (if (= GLFW_PRESS (glfwGetKey window GLFW_KEY_DOWN))
+                (aset! view_mat 13 (- (aref view_mat 13) speed)))
+            (if (= GLFW_PRESS (glfwGetKey window GLFW_KEY_UP))
+                (aset! view_mat 13 (+ (aref view_mat 13) speed)))))
       void)))
-
-(call-as-xtlang
- (doloop (i 16)
-   (printf "%f " (convert (aref view_mat i) double))
-   (println)))
