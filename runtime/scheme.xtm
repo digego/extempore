@@ -2240,8 +2240,9 @@
 ;; 5. xtlang closure
 ;; 6. xtlang nativefunc (e.g. bind-lib)
 ;; 7. xtlang type
-;; 8. scheme function
-;; 9. scheme macro
+;; 8. xtlang global variable
+;; 9. scheme function
+;; 10. scheme macro
 
 ;; the documentation function should return an associative list with
 ;; the following keys:
@@ -2355,6 +2356,15 @@
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-namedtype-type (symbol->string name-sym))))
      (list 'docstring))))
 
+(define eldoc-globalvar-handler
+  (lambda (name-sym)
+    (list 
+     '(category . "global var")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-globalvar-type (symbol->string name-sym))))
+     (list 'docstring))))
+
 (define eldoc-scheme-function-handler
   (lambda (name-sym)
     (list 
@@ -2376,30 +2386,23 @@
 (define eldoc-documentation-function
   (lambda (name)
     (let ((sym (string->symbol name)))
-            ;; 1. xtlang generic function
       (cond ((impc:ti:genericfunc-exists? name)
              (cons 'eldoc-docstring (eldoc-genericfunc-handler sym)))
-            ;; 2. xtlang generic type
             ((impc:ti:generictype-exists? name)
              (cons 'eldoc-docstring (eldoc-generictype-handler sym)))
-            ;; 3. xtlang poly function
             ((impc:ti:polyfunc-exists? name)
              (cons 'eldoc-docstring (eldoc-polyfunc-handler sym)))
-            ;; 4. xtlang poly type
             ((impc:ti:polytype-exists? name)
              (cons 'eldoc-docstring (eldoc-polytype-handler sym)))
-            ;; 5. xtlang closure
             ((impc:ti:closure-exists? name)
              (cons 'eldoc-docstring (eldoc-closure-handler sym)))
-            ;; 6. xtlang nativefunc (e.g. bind-lib)
             ((impc:ti:nativefunc-exists? name)
              (cons 'eldoc-docstring (eldoc-nativefunc-handler sym)))
-            ;; 7. xtlang type
             ((impc:ti:namedtype-exists? name)
              (cons 'eldoc-docstring (eldoc-namedtype-handler sym)))
-            ;; 8. scheme function
+            ((impc:ti:globalvar-exists? name)
+             (cons 'eldoc-docstring (eldoc-globalvar-handler sym)))
             ((and (defined? sym) (closure? (eval sym)))
              (cons 'eldoc-docstring (eldoc-scheme-function-handler sym)))
-            ;; 9. scheme macro
             ((and (defined? sym) (macro? (eval sym)))
              (cons 'eldoc-docstring (eldoc-scheme-macro-handler sym)))))))
