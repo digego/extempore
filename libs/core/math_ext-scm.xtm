@@ -1,0 +1,40 @@
+;;; math_ext-scm.xtm -- scheme code for libs/core/math_ext.xtm library
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;;; Code:
+
+(define-macro (Vec . args)
+  (let ((l (length args))
+        (int? (if (integer? (car args)) #t #f))
+        (ary 'impgenvec9217928))
+    `(let ((,(string->symbol
+              (string-append (symbol->string ary)
+                             (if int? ":i64*" ":double*")))
+             (alloc ,l)))
+       (pfill! ,ary ,@args)
+       (Vector ,ary ,l))))
+
+
+(define-macro (Mat . args)
+  (let ((rows (length args))
+        (a2 (reverse args))
+        (cols (length (car args)))
+        (int? (if (integer? (caar args)) #t #f))
+        (ary 'impgenmat9217928)
+        (biglst '()))
+    (dotimes (i rows)
+      (set! biglst (append (list-ref a2 i) biglst))
+      (if (<> (length (list-ref args i)) cols)
+          (print-error "Bad Matrix - column length mismatch")))
+    `(let ((,(string->symbol
+              (string-append (symbol->string ary)
+                             (if int? ":i64*" ":double*")))
+             (alloc ,(* rows cols))))
+       (pfill! ,ary ,@biglst)
+       (Matrix ,ary ,rows ,cols #f))))
+
