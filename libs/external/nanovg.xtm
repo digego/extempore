@@ -21,9 +21,9 @@
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm")
- (sys:load "libs/external/gl.xtm"))
+ (sys:load "libs/external/glfw3.xtm"))
 (impc:aot:insert-sexp '(sys:load "libs/core/std.xtm" 'quiet))
-(impc:aot:insert-sexp '(sys:load "libs/external/gl.xtm" 'quiet))
+(impc:aot:insert-sexp '(sys:load "libs/external/glfw3.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmnanovg")
 
@@ -647,6 +647,21 @@
 ;; ;; if built with NANOVG_GLES3
 ;; (bind-lib libnanovg nvgCreateGLES3 [NVGcontext*,i32]*)
 ;; (bind-lib libnanovg nvgDeleteGLES3 [void,NVGcontext*]*)
+
+(bind-func nvg_create_context
+  (lambda ()
+    (glEnable GL_STENCIL_TEST)
+    (nvgCreateGL3 (+ NVG_ANTIALIAS NVG_STENCIL_STROKES NVG_DEBUG))))
+
+(bind-func nvg_get_pixel_ratio
+  (lambda (window)
+    (let ((ww:i32* (alloc))
+          (wh:i32* (alloc))
+          (fbw:i32* (alloc))
+          (fbh:i32* (alloc)))
+      (glfwGetWindowSize window ww wh)
+      (glfwGetFramebufferSize window fbw fbh)
+      (/ (convert fbw float) (convert ww float)))))
 
 (impc:aot:insert-footer "xtmnanovg")
 (define *xtmlib-nanovg-loaded* #t)
