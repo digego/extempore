@@ -1824,7 +1824,7 @@ namespace extemp {
       {
         std::string errstr;
         llvm::raw_string_ostream ss(errstr);
-        pa.print("Extempore",ss);
+        pa.print("LLVM IR",ss);
         printf("%s\n",ss.str().c_str());
 #ifndef EXT_MCJIT    
         // if the number of functions in module has changed when
