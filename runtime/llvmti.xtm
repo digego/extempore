@@ -2235,8 +2235,7 @@
                      (list? n2)
                      (assoc-strcmp (car n2) vars))
                 (begin (impc:ti:force-var (car n2) vars kts '())
-                       (impc:ti:type-check n2 vars kts t)))))      
-      ;;(println 'math: a b 't: t 'request? request? 'ast: ast 'vars: vars)      
+                       (impc:ti:type-check n2 vars kts t)))))            
       (if (and (not (equal? a b))
                (impc:ir:type? b)
                (impc:ir:type? a)
@@ -2249,6 +2248,7 @@
                                                    ast))
       (if (and (impc:ir:type? t)
                (impc:ir:pointer? t)
+               (not (impc:ir:tuple? t))
                (not (impc:ir:vector? t)))
           (impc:compiler:print-type-mismatch-error (impc:ir:pretty-print-type t) "number" (symbol->string (car ast))))
       (if *impc:ti:print-sub-checks* (println 'math:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
@@ -2335,8 +2335,9 @@
                      (if (impc:ir:pointer? t)
                          (list (- (car t) *impc:ir:pointer*) (cadr t) *impc:ir:i1*)
                          (list (car t) (cadr t) *impc:ir:i1*))
-                     (if (and (impc:ir:tuple? t)
-                              (not (impc:ir:pointer? t)))
+                     ;; (if (and (impc:ir:tuple? t)
+                     ;;          (not (impc:ir:pointer? t)))
+                     (if (impc:ir:tuple? t)
                          t
                          (list *impc:ir:i1*))))
           (cond ((impc:ir:vector? a)
@@ -2347,8 +2348,11 @@
                  (if (symbol? (caddr ast)) (impc:ti:update-var (cadr ast) vars kts b))
                  (let ((retvec (if (impc:ir:pointer? b) (impc:ir:pointer-- b) b)))
                    (list (car retvec) (cadr retvec) *impc:ir:i1*)))
-                ((or (and (impc:ir:tuple? a) (not (impc:ir:pointer? a)))
-                     (and (impc:ir:tuple? b) (not (impc:ir:pointer? b))))
+                ;; ((or (and (impc:ir:tuple? a) (not (impc:ir:pointer? a)))
+                ;;      (and (impc:ir:tuple? b) (not (impc:ir:pointer? b))))
+                ;;  (list (if (impc:ir:tuple? a) a b)))
+                ((or (impc:ir:tuple? a)
+                     (impc:ir:tuple? b))
                  (list (if (impc:ir:tuple? a) a b)))
                 ((not (cl:find-if symbol? (cdr ast))) (list *impc:ir:i1*)) ;; return t
                 ((and (symbol? n1) 
@@ -2998,13 +3002,41 @@
                                             (impc:ir:get-type-from-pretty-str k)))
                                       (impc:ir:get-pretty-closure-arg-strings
                                        (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":")))))))
-          ;; (println 'gpolycode: gpoly-code)
-
+          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+          ;; it is possible for some generic types to be missed from 'vars'
+          ;; due to the fact that a different gpoly (overridden generic) choice
+          ;; was made when initially seeding 'vars'
+          ;; so ... at this point we check and inject missing arg types into vars
+          ;;
+          (for-each (lambda (a)
+                      ;;(println 'a: a ': gnum)
+                      (if (regex:match? a "^([a-zA-Z]|!)")
+                          (if (and (not (assoc-strcmp (string->symbol (string-append a "##" (number->string gnum))) vars))
+                                   (regex:match? a "(:|!)"))
+                              (let ((newsymm (string->symbol (string-append a "##" (number->string gnum))))
+                                    (all-syms (cl:remove-duplicates (map (lambda (aa)
+                                                                           (string->symbol (string-append aa "##" (number->string gnum))))
+                                                                         (regex:match-all a "![^,>\\]]*")))))
+                                ;; (println 'all all-syms 'new newsymm)
+                                (set! all-syms (remove (symbol->string newsymm) all-syms))
+                                ;;(println 'adding_p newsymm 'gnum gnum) ;newsym newsymm)
+                                ;; add newsym
+                                (set-cdr! vars (cons (list newsymm) (cdr vars)))
+                                ;; add all-syms
+                                (for-each (lambda (x)
+                                            (if (and (not (assoc-strcmp x vars))
+                                                     (regex:match? (symbol->string x) "^([a-zA-Z]|!)"))
+                                                (begin ;; (println 'adding_sub x 'gnum gnum)
+                                                       (set-cdr! vars (cons (list x) (cdr vars)))
+                                                       ;;(set! vars (cons (list (string->symbol x)) vars))
+                                                       )))
+                                          all-syms)))))
+                    (impc:ir:get-pretty-closure-arg-strings (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":"))))
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
           ;; this is all here purely for generating nicer compiler errors!
           ;; and can be removed safely without effecting any functionality
           (for-each (lambda (a b)
-                      ;; (println 'a: a 'b: b)
+                      ;;(println 'a: a 'b: b)
                       (if (symbol? a)
                           (begin (set! a (assoc-strcmp a vars))
                                  (if (and (symbol? b)
@@ -6786,3 +6818,8 @@
                 (if (regex:match? (symbol->string x) "^\\$")
                     (set! x (string->symbol (string-append (symbol->string sym) ":" (symbol->string x)))))
                 (symbol->string (impc:ti:expand-generic-type x))) args)))
+
+(define s-p-a-c-e-s___
+  (lambda ()
+    (string-append "           ")))
+    
