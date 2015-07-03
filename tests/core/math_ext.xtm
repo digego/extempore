@@ -1,0 +1,65 @@
+;;; math.xtm:tests -- test for the math library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: 
+
+;;; Commentary:
+
+;; Tests for libs/core/math.xtm
+
+;;; Code:
+
+;; (sys:load "libs/core/test.xtm")
+(sys:load "libs/core/math_ext.xtm")
+
+(xtmtest '(bind-func test_lineara_one
+            (lambda ()
+              (let ((m1 (Mat (1.0 2.0 0.0)
+                             (0.0 1.0 0.0)
+                             (0.0 2.0 1.0)))
+                    (v1 (Vec 1.0 2.0 3.0))
+                    (v2 (Vec 1.0 -1.0 1.0)))
+                (println m1 "inv:" (invert m1) "det:" (determinant m1) "trans:" (transposition m1))
+                (println v2 "norm:" (normal v1) "mag:" (magnitude v1) "cross:"
+                         (cross_product v1 v2) "dot:" (dot_product v1 v2))
+                void)))
+              
+         (test_lineara_one))
+
+(xtmtest '(bind-func test_lineara_two
+            (lambda ()
+              (let ((m1 (Mat (1.0 2.0 3.0)
+                             (3.0 2.0 1.0)))
+                    (m2 (Mat (1.0 1.0)
+                             (2.0 2.0)
+                             (3.0 3.0)))
+                    (v1 (Vec 1.0 2.0 3.0)))
+                (println (* m2 (* m1 (* 2.0:f64 (* v1 v1)))))
+                void)))
+
+         (test_lineara_two))
+
+(xtmtest '(bind-func test_lineara_three
+            (lambda (scale:double a:double b:i32 c:i32)
+              (let ((m1 (Mat (1.0 0.0 1.0)
+                             (0.0 1.0 0.0)))
+                    (m2 (Mat (1.0 2.0)
+                             (3.0 2.0)
+                             (1.0 2.0)))
+                    (m3 (* m1 m2))
+                    (v1 (Vec 1.0 2.0))
+                    (m4 (* v1 m3))
+                    (m5 (* m3 v1))
+                    (m6 (* scale m5))
+                    (v2 (Vec 2.0 2.0))
+                    (v3 (* scale v1))
+                    (v4 (* v3 scale)))
+                (println "m1:" m1 "\nm2:" m2 "\nm3:" m3 "\nm4:" m4 "\nm5:" m5 "\nm6:" m6)
+                (println "v1:" v1 "\nv2:" v2 "\nv3:" v3 "\nv4:" v4)
+                (println "n1:" (* scale a) "\nn2:" (* b c) "\nn3:" (* b (dtoi32 scale)))
+                void)))
+
+         (test_lineara_three 2.0 3.0 2 3))
+
+(xtmtest-print-results)
