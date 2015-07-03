@@ -447,6 +447,32 @@
   (lambda (lst n)
     (copy (nth_tail lst n))))
 
+(bind-func duplicates:[List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (lst)
+    (let ((dupes (list)))
+      (while (not (null? lst))
+        (if (not (null? (member (car lst) (cdr lst))))
+            (set! dupes (cons (car lst) dupes)))
+        (set! lst (cdr lst)))
+      (reverse dupes))))
+
+(bind-func unique:[List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (lst)
+    (let ((unq (list)))
+      (while (not (null? lst))
+        (if (null? (member (car lst) (cdr lst)))
+            (set! unq (cons (car lst) unq)))
+        (set! lst (cdr lst)))
+      (reverse unq))))
+
+(bind-func intersection:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (l1 l2)
+    (duplicates (append (unique l1) (unique l2)))))
+
+(bind-func union:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+  (lambda (l1 l2)
+    (unique (append l1 l2))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; a simple 'assoc' dictionary
