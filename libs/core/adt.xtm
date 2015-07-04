@@ -13,7 +13,7 @@
 (impc:aot:insert-sexp '(sys:load "libs/core/std.xtm" 'quiet))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 
+;;
 ;; fully generalised first and second
 
 (bind-func first:[!a,!b]*
@@ -58,11 +58,11 @@
         (begin (printout "<" (tref p 0) "," (tref p 1) ">")
                void))))
 
-(bind-func first:[!a,Pair:<!a,!b>*]* 
+(bind-func first:[!a,Pair:<!a,!b>*]*
   (lambda (a)
     (tref a 0)))
 
-(bind-func second:[!b,Pair:<!a,!b>*]*	   
+(bind-func second:[!b,Pair:<!a,!b>*]*
   (lambda (a)
     (tref a 1)))
 
@@ -131,7 +131,7 @@
     (tset! a 1 val)))
 
 (bind-func length:[i64,List:<!a,List*>*]*
-  (lambda (a)    
+  (lambda (a)
     (if (null? a)
         0
         (+ 1 (length (cdr a))))))
@@ -245,7 +245,7 @@
       (f xs1 xs2 xs3))))
 
 (bind-func filter:[List:<!a,List*>*,[bool,!a]*,List:<!a,List*>*]*
-  (lambda (pred xs)    
+  (lambda (pred xs)
     (let ((f (lambda (l)
                (if (null? l)
                    null
@@ -404,7 +404,7 @@
           a))))
 
 (bind-func swap:[List:<!a,List*>*,List:<!a,List*>*,i64,i64]*
-  ;; swap ith and jth list elements inplace  
+  ;; swap ith and jth list elements inplace
   (lambda (lst i j)
     (let ((ith_val (nth lst i)))
       (set_car (nth_tail lst i) (nth lst j))
@@ -473,6 +473,25 @@
   (lambda (l1 l2)
     (unique (append l1 l2))))
 
+;; push can't really work without changing the cells around, and can
+;; never work for the (push 42 (list)) case, so it's best to not use
+;; it for the moment
+
+;; (bind-func push:[void,!a,List:<!a,List*>*]*
+;;   "add element to head of list (modifies list in-place)"
+;;   (lambda (element lst)
+;;     (set! lst (cons element lst))
+;;     void))
+
+(bind-func pop:[!a,List:<!a,List*>*]*
+  "pop first element from list (modifies list in-place)"
+  (lambda (lst)
+    (if (null? lst)
+        (convert null)
+        (let ((element (car lst)))
+          (set! lst (cdr lst))
+          element))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; a simple 'assoc' dictionary
@@ -526,54 +545,131 @@
 ;; TREES ;;
 ;;;;;;;;;;;
 
-;; start of binary tree ...
+;; Binary Tree
 
-(bind-type BTree <!_a,BTree*,BTree*>)
+(bind-type BTree <!v,BTree*,BTree*>)
 
 (bind-func print:[void,BTree*]*
-  (lambda (t)
-    (printout "<")    
-    (let ((f (lambda (t)
-               (if (null? t) void
+  (lambda (tree)
+    (printout "<")
+    (let ((f (lambda (tree)
+               (if (null? tree) void
                    (begin
-                     (printout (btree_value t) " ")
-                     (f (tref t 1))
-                     (f (tref t 2))
-                     void)))))      
-      (f t)
+                     (printout (BTree_value tree) " ")
+                     (f (tref tree 1))
+                     (f (BTree_right tree))
+                     void)))))
+      (f tree)
       (printout ">")
       void)))
 
+(bind-func BTree_leaf:[BTree:<!a,BTree*,BTree*>*,!a]*
+  (lambda (value)
+    (let ((tree (BTree value null null)))
+      tree)))
 
-(bind-func BLeaf:[BTree:<!a,BTree*,BTree*>*,!a]*
-  (lambda (x)
-    (let ((t (BTree x null null)))
-      t)))
+(bind-func BTree_value:[!a,BTree*]*
+  (lambda (tree)
+    (tref tree 0)))
 
-(bind-func btree_value:[!a,BTree*]*
-  (lambda (t)
-    (tref t 0)))
+(bind-func BTree_left:[BTree*,BTree*]*
+  (lambda (tree)
+    (tref tree 1)))
+
+(bind-func BTree_right:[BTree*,BTree*]*
+  (lambda (tree)
+    (tref tree 2)))
+
+(bind-func BTree_map:[BTree:<!v,BTree*,BTree*>*,BTree:<!b,BTree*,BTree*>*,[!v,!r]*]*
+  (lambda (tree fn)
+    (if (null? tree) null
+        (BTree (fn (tref tree 0))
+               (BTree_map fn (tref tree 1))
+               (BTree_map fn (BTree_right tree))))))
+
+(bind-func BTree_walk_preorder:[void,BTree:<!v,BTree*,BTree*>*,[void,!v]*]
+  (lambda (tree fn)
+    (if (null? tree) null
+        (begin
+          (fn (tref tree 0))
+          (BTree_walk_preorder fn (BTree_left tree))
+          (BTree_walk_preorder fn (BTree_right tree))))))
+
+(bind-func BTree_walk_inorder:[void,BTree:<!v,BTree*,BTree*>*,[void,!v]*]
+  (lambda (tree fn)
+    (if (null? tree) null
+        (begin
+          (BTree_walk_inorder fn (BTree_left tree))
+          (fn (tref tree 0))
+          (BTree_walk_inorder fn (BTree_right tree))))))
+
+(bind-func BTree_walk_postorder:[void,BTree:<!v,BTree*,BTree*>*,[void,!v]*]
+  (lambda (tree fn)
+    (if (null? tree) null
+        (begin
+          (BTree_walk_postorder fn (BTree_left tree))
+          (BTree_walk_postorder fn (BTree_right tree))
+          (fn (tref tree 0))))))
+
+;; ;; imperative version
+;; (bind-func BTree_walk_preorder:[void,BTree:<!v,BTree*,BTree*>*,[void,!v]*]
+;;   (lambda (tree fn)
+;;     (let ((to_visit (list)))
+;;       (while (not (or (null? to_visit)
+;;                       (null? tree)))
+;;         (if (not (null? tree))
+;;             (begin
+;;               ;; call the render callback
+;;               (fn (tref tree 0))
+;;               ;; set the other children to walk later
+;;               (if (not (null? (cdr (tref tree 5))))
+;;                   (set! to_visit
+;;                         (append (cdr (tref tree 5))
+;;                                 to_visit)))
+;;               ;; keep walking deeper
+;;               (set! tree (car (tref tree 5))))
+;;             (begin
+;;               ;; go back up and walk a different branch
+;;               (set! tree (car to_visit))
+;;               (set! to_visit (cdr to_visit))))))))
 
 
-;; functor for Tree
-(bind-func fmap:[BTree:<!a,BTree*,BTree*>*,[!a,!b]*,BTree:<!b,BTree*,BTree*>*]*  
-  (lambda (func t)
-    (if (null? t) null
-        (BTree (func (tref t 0))
-               (fmap func (tref t 1))
-               (fmap func (tref t 2))))))
+;; a generic tree
 
-;; (bind-func test_tree_as_functor
-;;   (lambda ()
-;;     (let ((t (BTree 4 (BTree 2 (BLeaf 1) (BLeaf 3)) (BLeaf 5)))
-;;           (t1 (fmap (lambda (x:i64) x) t)) ;; identity should return identity
-;;           (f1 (lambda (x) (i64tod x)))
-;;           (f2 (lambda (x:double) (* x x)))
-;;           (t2 (fmap f2 (fmap f1 t)))
-;;           (t3 (fmap (lambda (x) (f2 (f1 x))) t)))
-;;       (println "functor passes identity test" t "==" t1)
-;;       (println "functor passes composition test" t2 "==" t3)
-;;       void)))
+;; (bind-type Tree <!nt,List:<Tree*,List*>*>)
+
+;; (bind-func Tree_walk_preorder:[void,Tree:<!nt,List:<Tree*,List*>*>,[void,!nt]*]
+;;   (lambda (tree fn)
+;;     (let ((to_visit (list)))
+;;       (while (not (or (null? to_visit)
+;;                       (null? tree)))
+;;         (if (not (null? tree))
+;;             (begin
+;;               ;; call the render callback
+;;               (fn (tref tree 0))
+;;               ;; set the other children to walk later
+;;               (if (not (null? (cdr (tref tree 5))))
+;;                   (set! to_visit
+;;                         (append (cdr (tref tree 5))
+;;                                 to_visit)))
+;;               ;; keep walking deeper
+;;               (set! tree (car (tref tree 5))))
+;;             (begin
+;;               ;; go back up and walk a different branch
+;;               (set! tree (car to_visit))
+;;               (set! to_visit (cdr to_visit))))))))
+
+;; (bind-func Tree_find:[]
+;;   (lambda (tree visit)
+;;     ))
+
+;; (bind-func Tree_map:[]
+;;   (lambda (tree visit)
+;;     ))
+
+;; (bind-func Tree_reduce:[]
+;;   (lambda (tree visit)
+;;     ))
 
 
 
