@@ -483,6 +483,21 @@
 (bind-poly tostring tostring_f)
 (bind-poly tostring tostring_d)
 
+;; we print i8* as pointers, not C strings - if you want to print them
+;; as C strings use printf with %s
+
+(bind-func print_voidptr
+  (lambda (x:i8*) (printf "%p" x) void))
+
+(bind-func tostring_voidptr
+  (lambda (x:i8*)
+    (let ((s:i8* (salloc 256)))
+      (sprintf s "%p" x)
+      (Str s))))
+
+(bind-poly print print_voidptr)
+(bind-poly tostring tostring_voidptr)
+
 ;; some helpers for AOT-compilation stuff
 
 (bind-func sys_getenv
