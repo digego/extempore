@@ -214,37 +214,41 @@
 
 ;; walks the tree in pre-order
 (bind-func gui_render_subtree
-  (lambda (gui:GUI* widget:Widget* x y w h)
+  (lambda (gui:GUI* widget:Widget* x:float y:float w:float h:float)
+    ;; (println "x:" x "y:" y "w:" w "h:" h)
     (if (null? widget)
-        void
+        widget
         (if (and (null? (Widget_left_child widget))
                  (null? (Widget_right_child widget)))
             ;; if a leaf node, set the nanovg transform matrix and
             ;; call the render callback
             (let ((winWidth (GUI_width gui))
                   (winHeight (GUI_height gui))
-                  (vg (GUI_context gui))
-                  (render_fn:WidgetCB (convert (Widget_cb widget))))
+                  (vg (GUI_context gui)))
               (nvgResetTransform vg)
-              (nvgScale vg (/ w winWidth) (/ h winHeight))
+              (nvgScale vg (/ 1. winWidth) (/ 1. winHeight))
               (nvgTranslate vg (/ x winWidth) (/ y winHeight))
-              (println "doing things to" widget)
-              ;; (render_fn)
-              (println "done."))
+              (println "rendering.")
+              ((Widget_cb widget) widget)
+              null)
             ;; otherwise recurse into the child widgets
             (begin
+              (println "check1")
               (gui_render_subtree gui
                                   (Widget_left_child widget)
                                   x
                                   y
                                   w
                                   (* (Widget_size (Widget_left_child widget)) h))
+              (println "check2")
               (gui_render_subtree gui
                                   (Widget_right_child widget)
                                   x
                                   (+ y (* (Widget_size (Widget_left_child widget)) h))
                                   w
-                                  (* (Widget_size (Widget_right_child widget)) h)))))))
+                                  (* (Widget_size (Widget_right_child widget)) h))
+              (println "check3")
+              (convert null))))))
 
 (bind-func gui_render
   (lambda (gui:GUI*)
@@ -274,13 +278,13 @@
 ;; returns the first widget for which pred returns true
 (bind-func Widget_find_preorder
   (lambda (widget:Widget* pred:[i1,Widget*]*)
-    (println "find_preorder" widget)
-    (if (or (null? widget) (pred widget))
+    (if (and (not (null? widget)) (pred widget))
         widget
-        (begin
-          (Widget_find_preorder (Widget_left_child widget) pred)
-          (Widget_find_preorder (Widget_right_child widget) pred)
-          null))))
+        (if (not (null? widget))
+            (begin
+              (Widget_find_preorder (Widget_left_child widget) pred)
+              (Widget_find_preorder (Widget_right_child widget) pred))
+            null))))
 
 ;; some useful helper search functions
 
@@ -332,15 +336,13 @@
                                       old_leaf
                                       null
                                       null)))            
+            ;; (println "old_leaf:" old_leaf "new_lchild:" new_lchild "new_rchild:" new_rchild)
             ;; normalise new widget size
             (Widget_set_size new_lchild (/ new_size total_size))
-            (println "old_widget:" old_leaf)
-            (println "new_lchild:" new_lchild)
-            (println "new_rchild:" new_rchild)
             ;; set up left child pointer (widget to add)
-            (println "check3")(Widget_set_left_child old_leaf new_lchild)
+            (Widget_set_left_child old_leaf new_lchild)
             ;; set up right child pointer (old leaf widget)
-            (println "check0")(Widget_set_right_child old_leaf new_rchild)
+            (Widget_set_right_child old_leaf new_rchild)
             ;; return the new_lchild
             new_lchild)))))
 
@@ -372,23 +374,20 @@
 
 ;; button
 
-;; TODO check if functions (callbacks) with no args work ok. ones that
-;; do nothing. in fact, put a println after the cb call to see if it
-;; gets past that
-
-(bind-func gui_render_button_c
-  (lambda (label:i8* r:float g:float b:float)
-    (lambda (gui:GUI* widget:Widget*)
-      (printf "Ben's thing!\n")
-      (nvgSave (GUI_context gui))
-      (nvgBeginPath (GUI_context gui))
-      ;; assume matrix transform -> [0,1]^2 has been applied
-      (nvgFillColor (GUI_context gui)
-                    (nvgRGBf r g b))
-      (nvgRect (GUI_context gui) 0. 0. 1. 1.)
-      (nvgFill (GUI_context gui))
-      (nvgRestore (GUI_context gui))
-      void)))
+(bind-func gui_button_create
+  (lambda (gui:GUI* label:i8* r:float g:float b:float)
+    (let ((cb (lambda (widget:Widget*)
+                (println "callback" gui widget)
+                ;; (nvgSave (GUI_context gui))
+                ;; (nvgBeginPath (GUI_context gui))
+                ;; ;; assume matrix transform -> [0,1]^2 has been applied
+                ;; (nvgFillColor (GUI_context gui)
+                ;;               (nvgRGBf r g b))
+                ;; (nvgRect (GUI_context gui) 0. 0. 1. 1.)
+                ;; (nvgFill (GUI_context gui))
+                ;; (nvgRestore (GUI_context gui))
+                void)))
+      (Widget_h 1 1.0 Widget_button cb null null null))))
 
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
