@@ -43,6 +43,101 @@
 ;; types should be stored in the list format, although they can be
 ;; printed prettily, obviously
 
+;;;;;;;;;;;;;;;;;;;;
+;; language builtins
+;; -----------------
+;;
+(define *impc:ti:builtin-cache* '(("pref" . #("[!v,!v*,i32|i64]*" "pointer-(de)reference" (ptr idx)))
+                                  ("pref-ptr" . #("[!v*,!v*,i32|i64]*" "pointer-(de)reference" (ptr idx)))
+                                  ("pset!" . #("[!v,!v*,i32|i64,!v]*" "pointer-set" (ptr idx val)))
+                                  ("tref" . #("[!v,!v*,i32|i64]*" "tuple-(de)reference" (tuple idx)))
+                                  ("tref-ptr" . #("[!v*,!v*,i32|i64]*" "tuple-(de)reference" (tuple idx)))
+                                  ("tset!" . #("[!v,!v*,i32|i64,!v]*" "tuple-set" (tuple idx val)))
+                                  ("aref" . #("[!v,!v*,i32|i64]*" "array-(de)reference" (array idx)))
+                                  ("aref-ptr" . #("[!v*,!v*,i32|i64]*" "array-(de)reference" (array idx)))
+                                  ("aset!" . #("[!v,!v*,i32|i64,!v]*" "array-set" (array idx val)))
+                                  ("vref" . #("[!v,!v*,i32|i64]*" "vector-(de)reference" (vector idx)))
+                                  ("vref-ptr" . #("[!v*,!v*,i32|i64]*" "vector-(de)reference" (vector idx)))
+                                  ("vset!" . #("[!v,!v*,i32|i64,!v]*" "vector-set" (vector idx val)))))
+;;
+;; language builtins - the cache is just used for documentation at
+;; this stage, the actual builtins are handled in the compiler (mostly
+;; in first-transform). In the future, however, we could integrate
+;; that stuff into the builtin-cache
+;;
+;; (name . #(type-str docstring args))
+;;
+;; The other differences between this and the closure-list are that
+;; the type is stored as a string rather than a list (so that we can
+;; handle weird/overloaded/varargs things nicely for documentation
+;; purposes) and also that "body" is replaced by "args"
+;;
+(define impc:ti:print-builtin-cache
+  (lambda ()
+    (println '*impc:ti:builtin-cache*: *impc:ti:builtin-cache*)))
+
+(define impc:ti:reset-builtin-cache
+  (lambda ()
+    (set! *impc:ti:builtin-cache* '())))
+
+(define impc:ti:register-new-builtin
+  (lambda (builtin-name type-str docstring args)
+    ;; (println 'builtin-name: builtin-name 'type: type-str 'docstring: docstring 'args: args)
+    ;; check arg types
+    (if (not (and (or (string? builtin-name) (begin (println 'bad 'builtin-name: builtin-name) #f))
+                  (or (string? type-str) (begin (println 'bad 'type: type-str) #f))
+                  (or (string? docstring) (begin (println 'bad 'docstring: docstring)))
+                  (or (list? args) (begin (println 'bad 'args: args) #f))))
+        (impc:compiler:print-compiler-error "couldn't register new builtin")
+        (if (impc:ti:builtin-exists? builtin-name)
+            (impc:compiler:print-already-bound-error builtin-name (impc:ti:get-builtin-type builtin-name))
+            ;; create a new entry
+            (begin
+              (set! *impc:ti:builtin-cache*
+                    (cons (cons builtin-name (vector type-str docstring args))
+                          *impc:ti:builtin-cache*))
+              (car *impc:ti:builtin-cache*))))))
+
+(define impc:ti:get-builtin-type-str
+  (lambda (builtin-name)
+    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
+      ;; (println 'cls-list: builtin-data)
+      (if builtin-data (vector-ref (cdr builtin-data) 0) #f))))
+
+(define impc:ti:builtin-exists?
+  (lambda (builtin-name)
+    (let ((res (impc:ti:get-builtin-type-str builtin-name)))
+      (if (and res (not (null? res))) #t #f))))
+
+(define impc:ti:set-builtin-type-str
+  (lambda (builtin-name type-str)
+    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
+      (if builtin-data
+          (if (not (null? (vector-ref (cdr builtin-data) 0)))
+              (print "Warning: attempting to re-type already typed builtin" builtin-name "to" (impc:ir:pretty-print-type-str type-str) "\n")
+              (vector-set! (cdr builtin-data) 0 type-str))
+          (impc:compiler:print-compiler-error "tried to set type of unknown builtin" builtin-name)))))
+
+(define impc:ti:get-builtin-docstring
+  (lambda (builtin-name)
+    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
+      (if builtin-data (vector-ref (cdr builtin-data) 1) #f))))
+
+(define impc:ti:set-builtin-docstring
+  (lambda (builtin-name docstring)
+    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
+      (if builtin-data (vector-set! (cdr builtin-data) 1 docstring) #f))))
+
+(define impc:ti:get-builtin-args
+  (lambda (builtin-name)
+    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
+      (if builtin-data (vector-ref (cdr builtin-data) 2) #f))))
+
+(define impc:ti:set-builtin-args
+  (lambda (builtin-name args)
+    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
+      (if builtin-data (vector-set! (cdr builtin-data) 2 args) #f))))
+
 ;;;;;;;;;;;;;;
 ;; named types
 ;; -----------

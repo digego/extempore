@@ -2282,6 +2282,17 @@
     (eldoc-get-args-from-form
      (caddar (cdddar (assoc-strcmp-all fn-sym *impc:ti:genericfunc-cache*))))))
 
+(define eldoc-builtin-handler
+  (lambda (name-sym)
+    (list
+     '(category . "xtlang builtin")
+     (cons 'name (symbol->string name-sym))
+     (list 'args (impc:ti:get-builtin-args (symbol->string name-sym)))
+     (cons 'type (impc:ti:get-builtin-type-str (symbol->string name-sym)))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-builtin-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
+
 (define eldoc-genericfunc-handler
   (lambda (name-sym)
     ;; once we have a way to handle multipe aritys, we should update
@@ -2386,7 +2397,9 @@
 (define eldoc-documentation-function
   (lambda (name)
     (let ((sym (string->symbol name)))
-      (cond ((impc:ti:genericfunc-exists? name)
+      (cond ((impc:ti:builtin-exists? name)
+             (cons 'eldoc-docstring (eldoc-builtin-handler sym)))
+            ((impc:ti:genericfunc-exists? name)
              (cons 'eldoc-docstring (eldoc-genericfunc-handler sym)))
             ((impc:ti:generictype-exists? name)
              (cons 'eldoc-docstring (eldoc-generictype-handler sym)))
