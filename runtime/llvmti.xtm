@@ -3834,39 +3834,40 @@
                       (if (regex:match? (symbol->string gt) ":")
                           (impc:ti:generic-types-matchup? gt tt vars)
                           #t))
-                 (begin ;; (println '----matched-polytype-1: gt '-> tt)
-                   (if (symbol? tt)
-                       (if (not (assoc-strcmp tt vars))
-                           (print-error "Catastrophic compiler error: type missing from VARs")
-                           (if (null? (cdr (assoc-strcmp tt vars)))
-                               (impc:ti:update-var gt vars kts (list tt))
-                               (begin
-                                 (impc:ti:update-var gt vars kts (impc:ti:type-unify (cdr (assoc-strcmp tt vars)) vars))))
-                           (impc:ti:update-var gt vars kts (impc:ti:type-unify tt vars))))))
-
-             (if (atom? tt)
-                 (set! tt (list tt)))
-             (if (and (list? tt)
-                      (list? (car tt))
-                      (not (atom? gt)))
-                 (set! tt (car tt)))
-             (if (atom? gt)
-                 (set! gt (list gt)))
-                                        ;(println 2 'a: a 'tt: tt 'gt: gt)
-             ;; if gt and tt still not equal tt maybe a named-type
-             (if (<> (length gt) (length tt))
-                 (if (and (string? (car tt)) ;; named type?
-                          (= (length gt) (length (impc:ti:get-namedtype-type (car tt)))))
-                     (set! tt (impc:ti:get-namedtype-type (car tt)))
-                     (set! subcheck #f)))
-             ;;(print-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
-
-             ;; GCHANGE
-             ;; we might be able to update-vars based by matching our request 'gt vs our result 'tt
-             (if subcheck
-                 (for-each
-                  (lambda (aa bb)
-                    ;; (println 'matched-polytype-2: aa '-> bb)
+	     	 (begin ;; (println '----matched-polytype-1: gt '-> tt)
+	     	   (if (symbol? tt)
+               (begin
+                 (if (not (assoc-strcmp tt vars))
+                     (set! vars (cons (list tt) vars)))
+                 (if (null? (cdr (assoc-strcmp tt vars)))
+                     (impc:ti:update-var gt vars kts (list tt))			   
+                     (begin
+                       (impc:ti:update-var gt vars kts (impc:ti:type-unify (cdr (assoc-strcmp tt vars)) vars))))
+                 (impc:ti:update-var gt vars kts (impc:ti:type-unify tt vars))))))
+             
+	     (if (atom? tt)
+		 (set! tt (list tt)))
+	     (if (and (list? tt)
+		      (list? (car tt))
+		      (not (atom? gt)))
+		 (set! tt (car tt)))
+	     (if (atom? gt)
+		 (set! gt (list gt)))
+	     ;(println 2 'a: a 'tt: tt 'gt: gt)
+	     ;; if gt and tt still not equal tt maybe a named-type
+	     (if (<> (length gt) (length tt))
+		 (if (and (string? (car tt)) ;; named type?
+			  (= (length gt) (length (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))))
+		     (set! tt (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))
+		     (set! subcheck #f)))
+		     ;;(print-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
+	     
+	     ;; GCHANGE
+	     ;; we might be able to update-vars based by matching our request 'gt vs our result 'tt
+	     (if subcheck
+		 (for-each
+		  (lambda (aa bb)
+		    ;; (println 'matched-polytype-2: aa '-> bb)
                     ;; (println 'vars: vars)
                     (if (and (atom? aa)
                              (symbol? aa)
