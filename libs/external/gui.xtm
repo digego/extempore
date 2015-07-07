@@ -24,10 +24,6 @@
 
 (impc:aot:insert-header "xtmgui")
 
-;; can't have GUI* in here without causing a recursive definition
-;; (bind-alias WidgetCallback [void,GUI*,Widget*]*)
-(bind-alias WidgetCallback [void]*)
-
 ;; 0. id
 ;; 1. size
 ;; 2. type (flags)
@@ -35,7 +31,8 @@
 ;; 4. parent widget
 ;; 5. left child widget
 ;; 6. right child widget
-(bind-type Widget <i32,float,i64,WidgetCallback,Widget*,Widget*,Widget*>)
+(bind-type Widget <i32,float,i64,[void,Widget*]*,Widget*,Widget*,Widget*>)
+(bind-alias WidgetCB [void,Widget*]*)
 
 ;; accessors
 (bind-func Widget_id
@@ -46,11 +43,15 @@
   (lambda (widget:Widget*)
     (tref widget 1)))
 
+(bind-func Widget_set_size
+  (lambda (widget:Widget* size)
+    (tset! widget 1 size)))
+
 (bind-func Widget_type
   (lambda (widget:Widget*)
     (tref widget 2)))
 
-(bind-func Widget_callback
+(bind-func Widget_cb
   (lambda (widget:Widget*)
     (tref widget 3)))
 
@@ -58,23 +59,36 @@
   (lambda (widget:Widget*)
     (tref widget 4)))
 
+(bind-func Widget_set_parent
+  (lambda (child:Widget* parent)
+    (tset! child 4 parent)))
+
 (bind-func Widget_left_child
   (lambda (widget:Widget*)
     (tref widget 5)))
+
+(bind-func Widget_set_left_child
+  (lambda (parent:Widget* child)
+    (tset! parent 5 child)))
 
 (bind-func Widget_right_child
   (lambda (widget:Widget*)
     (tref widget 6)))
 
+(bind-func Widget_set_right_child
+  (lambda (parent:Widget* child)
+    (tset! parent 6 child)))
+
 (bind-func Widget_print
   (lambda (widget:Widget*)
     (if (null? widget)
-        (printf "<Widget: 0x0>")
-        (printf "<Widget: id=%d size=%.3f type=%lld parent=%p Lchild=%p Rchild=%p>"
+        (printf "<Widget 0x0>")
+        (printf "<Widget %p: id=%d size=%.3f type=%lld parent=%p Lchild=%p Rchild=%p>"
+                widget
                 (Widget_id widget)
                 (convert (Widget_size widget) double)
                 (Widget_type widget)
-                ;; (tref widget 3) ;; callback
+                ;; (Widget_cb widget) ;; callback
                 (Widget_parent widget)
                 (Widget_left_child widget)
                 (Widget_right_child widget)))
@@ -84,13 +98,14 @@
   (lambda (widget:Widget*)
     (let ((s:i8* (salloc 1024)))
       (if (null? widget)
-          (sprintf s "<Widget: 0x0>")
+          (sprintf s "<Widget 0x0>")
           (sprintf s
-                   "<Widget: id=%d size=%.3f type=%lld parent=%p Lchild=%p Rchild=%p>"
+                   "<Widget %p: id=%d size=%.3f type=%lld parent=%p Lchild=%p Rchild=%p>"
+                   widget
                    (Widget_id widget)
                    (convert (Widget_size widget) double)
                    (Widget_type widget)
-                   ;; (tref widget 3) ;; callback
+                   ;; (Widget_cb widget) ;; callback
                    (Widget_parent widget)
                    (Widget_left_child widget)
                    (Widget_right_child widget)))
@@ -114,6 +129,10 @@
   (lambda (gui:GUI*)
     (tref gui 2)))
 
+(bind-func GUI_set_root
+  (lambda (gui:GUI* widget)
+    (tset! gui 2 widget)))
+
 (bind-func GUI_width
   (lambda (gui:GUI*)
     (tref gui 3)))
@@ -129,8 +148,9 @@
 (bind-func GUI_print
   (lambda (gui:GUI*)
     (if (null? gui)
-        (printf "<GUI: 0x0>")
-        (printf "<GUI: window=%p context=%p root=%p width=%.1f height=%.1f pixelRatio=%.1f>"
+        (printf "<GUI 0x0>")
+        (printf "<GUI %p: window=%p context=%p root=%p width=%.1f height=%.1f pixelRatio=%.1f>"
+                gui
                 (GUI_window gui)
                 (GUI_context gui)
                 (GUI_root gui)
@@ -143,9 +163,10 @@
   (lambda (gui:GUI*)
     (let ((s:i8* (salloc 1024)))
       (if (null? gui)
-          (sprintf s "<GUI: 0x0>")
+          (sprintf s "<GUI 0x0>")
           (sprintf s
-                   "<GUI: window=%p context=%p root=%p width=%.1f height=%.1f pixelRatio=%.1f>"
+                   "<GUI %p: window=%p context=%p root=%p width=%.1f height=%.1f pixelRatio=%.1f>"
+                   gui
                    (GUI_window gui)
                    (GUI_context gui)
                    (GUI_root gui)
@@ -196,7 +217,7 @@
             (let ((winWidth (GUI_width gui))
                   (winHeight (GUI_height gui))
                   (vg (GUI_context gui))
-                  (render_fn:WidgetCallback (convert (tref widget 3))))
+                  (render_fn:WidgetCB (convert (Widget_cb widget))))
               (nvgResetTransform vg)
               (nvgScale vg (/ w winWidth) (/ h winHeight))
               (nvgTranslate vg (/ x winWidth) (/ y winHeight))
@@ -241,49 +262,20 @@
           (visit_fn widget)
           (Widget_walk_preorder (Widget_left_child widget) visit_fn)
           (Widget_walk_preorder (Widget_right_child widget) visit_fn)
-          widget))))
+          null))))
 
 ;; returns the first widget for which pred returns true
 (bind-func Widget_find_preorder
-  (lambda (widget pred:[i1,Widget*]*)
+  (lambda (widget:Widget* pred:[i1,Widget*]*)
+    (println "find_preorder" widget)
     (if (or (null? widget) (pred widget))
         widget
         (begin
           (Widget_find_preorder (Widget_left_child widget) pred)
           (Widget_find_preorder (Widget_right_child widget) pred)
-          widget))))
+          null))))
 
-(bind-func gui_add_widget_left
-  (lambda (gui:GUI* widget:Widget*)
-    (let ((leaf (Widget_find_preorder
-                 (GUI_root gui)
-                 (lambda (w)
-                   (and (null? (Widget_left_child w))
-                        (null? (Widget_right_child w)))))))
-      (if (null? leaf)
-          (tset! gui 2 widget)
-          (let ((existing_size (Widget_size leaf))
-                (new_size (Widget_size widget))
-                (total_size (+ existing_size new_size))
-                (new_parent:Widget* (halloc)))
-            ;; set up the new leaf nodes
-            (tset! leaf 4 new_parent)
-            (tset! leaf 1 (/ existing_size total_size))
-            (tset! widget 1 (/ new_size total_size))
-            ;; fill the newly-created parent widget
-            (tfill! new_parent
-                    (Widget_id leaf)
-                    existing_size
-                    (Widget_type leaf)
-                    (tref leaf 3)
-                    (Widget_parent leaf)
-                    widget
-                    leaf))))))
-
-;; add widgets to left by default
-(bind-poly gui_add_widget gui_add_widget_left)
-
-;; stubs
+;; some useful helper search functions
 
 (bind-func gui_find_parent
   (lambda (gui:GUI* widget:Widget*)
@@ -292,6 +284,14 @@
      (lambda (w)
        (or (= (Widget_left_child w) widget)
            (= (Widget_right_child w) widget))))))
+
+(bind-func gui_find_leaf
+  (lambda (gui:GUI*)
+    (Widget_find_preorder
+     (GUI_root gui)
+     (lambda (w)
+       (and (null? (Widget_left_child w))
+            (null? (Widget_right_child w)))))))
 
 (bind-func gui_find_widget_with_id
   (lambda (gui:GUI* id:i32)
@@ -304,9 +304,54 @@
 ;; (bind-poly gui_find gui_find_parent) ;; this is perhaps too confusing
 (bind-poly gui_find gui_find_widget_with_id)
 
+;; modify the GUI tree
+
+(bind-func gui_add_widget_left
+  (lambda (gui:GUI* new_widget:Widget*)
+    (let ((old_leaf (gui_find_leaf gui)))
+      (if (null? old_leaf)
+          (GUI_set_root gui new_widget)
+          (let ((old_size (Widget_size old_leaf))
+                (new_size (Widget_size new_widget))
+                (total_size (+ old_size new_size))
+                (new_lchild new_widget)
+                ;; copy old leaf node to be new right child (should
+                ;; increment the ID here, but not sure how best to do
+                ;; that)
+                (new_rchild (Widget_h (Widget_id old_leaf)
+                                      (/ old_size total_size)
+                                      (Widget_type old_leaf)
+                                      (tref old_leaf 3)
+                                      old_leaf
+                                      null
+                                      null)))            
+            ;; normalise new widget size
+            (Widget_set_size new_lchild (/ new_size total_size))
+            (println "old_widget:" old_leaf)
+            (println "new_lchild:" new_lchild)
+            (println "new_rchild:" new_rchild)
+            ;; set up left child pointer (widget to add)
+            (println "check3")(Widget_set_left_child old_leaf new_lchild)
+            ;; set up right child pointer (old leaf widget)
+            (println "check0")(Widget_set_right_child old_leaf new_rchild)
+            ;; return the new_lchild
+            new_lchild)))))
+
+;; add widgets to left by default
+(bind-poly gui_add_widget gui_add_widget_left)
+
 (bind-func gui_validate
   (lambda (gui:GUI*)
-    void))
+    ;; check that all nodes are either full, or leaves
+    (null?
+     (Widget_find_preorder
+      (GUI_root gui)
+      (lambda (w)
+        ;; need an exclusive or...
+        (not (or (and (null? (Widget_left_child w))
+                      (null? (Widget_right_child w)))
+                 (and (not (null? (Widget_left_child w)))
+                      (not (null? (Widget_right_child w)))))))))))
 
 ;;;;;;;;;;;;;
 ;; widgets ;;
