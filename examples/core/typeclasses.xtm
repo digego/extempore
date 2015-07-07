@@ -1,0 +1,163 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Messing around with some preiminary ideas for type classes
+;;
+;; obviously the idea would be to hide all of this behind syntax!
+;;
+
+
+;; DEFINE a type class NUM
+;; with FOUR functions (i.e. 4 elements)
+;; note that although this class NUM has four functions of the same type
+;; there is no need for them all to have the same type, the tuple can
+;; include functions of different types.
+(bind-type NUM <[!a,!a,!a]*,[!a,!a,!a]*,[!a,!a,!a]*,[!a,!a,!a]*>)
+
+;; first function
+(bind-func plus:[!a,NUM*,!a,!a]*
+  (lambda (dict a b)
+    (let ((f (tref dict 0)))
+      (f a b))))
+
+;; second function
+(bind-func minus:[!a,NUM*,!a,!a]*
+  (lambda (dict a b)
+    (let ((f (tref dict 1)))
+      (f a b))))
+
+;; third function
+(bind-func mul:[!a,NUM*,!a,!a]*
+  (lambda (dict a b)
+    (let ((f (tref dict 2)))
+      (f a b))))
+
+;; fourth function
+(bind-func div:[!a,NUM*,!a,!a]*
+  (lambda (dict a b)
+    (let ((f (tref dict 3)))
+      (f a b))))
+
+;;;;
+;; Now provide instances f64,f32,i64 and i32 of class NUM
+;;;;
+
+;; double INSTANCE of NUM
+(bind-func num_f64_plus
+  (lambda (a:double b:double)
+    (+ a b)))
+
+(bind-func num_f64_minus
+  (lambda (a:double b:double)
+    (- a b)))
+
+(bind-func num_f64_mul
+  (lambda (a:double b:double)
+    (* a b)))
+
+(bind-func num_f64_div
+  (lambda (a:double b:double)
+    (/ a b)))
+
+(bind-val NUM_f64 NUM:<[double,double,double]*,[double,double,double]*,[double,double,double]*,[double,double,double]*>*)
+
+(bind-func init_num_f64_dict
+  (lambda ()
+    ;; obvously must add instances of NUM in correct order (i.e. tuple element order)
+    (set! NUM_f64 (NUM_h num_f64_plus num_f64_minus num_f64_mul num_f64_div))))
+
+(init_num_f64_dict)
+;; finished instance of NUM_double
+
+
+;; i64 INSTANCE of NUM
+(bind-func num_i64_plus
+  (lambda (a:i64 b:i64)
+    (+ a b)))
+
+(bind-func num_i64_minus
+  (lambda (a:i64 b:i64)
+    (- a b)))
+
+(bind-func num_i64_mul
+  (lambda (a:i64 b:i64)
+    (* a b)))
+
+(bind-func num_i64_div
+  (lambda (a:i64 b:i64)
+    (/ a b)))
+
+(bind-val NUM_i64 NUM:<[i64,i64,i64]*,[i64,i64,i64]*,[i64,i64,i64]*,[i64,i64,i64]*>*)
+
+(bind-func init_num_i64_dict
+  (lambda ()   
+    (set! NUM_i64 (NUM_h num_i64_plus num_i64_minus num_i64_mul num_i64_div))))
+
+(init_num_i64_dict)
+;; finished instance of NUM_i64
+
+;; i32 INSTANCE of NUM
+(bind-func num_i32_plus
+  (lambda (a:i32 b:i32)
+    (+ a b)))
+
+(bind-func num_i32_minus
+  (lambda (a:i32 b:i32)
+    (- a b)))
+
+(bind-func num_i32_mul
+  (lambda (a:i32 b:i32)
+    (* a b)))
+
+(bind-func num_i32_div
+  (lambda (a:i32 b:i32)
+    (/ a b)))
+
+(bind-val NUM_i32 NUM:<[i32,i32,i32]*,[i32,i32,i32]*,[i32,i32,i32]*,[i32,i32,i32]*>*)
+
+(bind-func init_num_i32_dict
+  (lambda ()   
+    (set! NUM_i32 (NUM_h num_i32_plus num_i32_minus num_i32_mul num_i32_div))))
+
+(init_num_i32_dict)
+;; finished instance of NUM_i32
+
+;; f32 INSTANCE of NUM
+(bind-func num_f32_plus
+  (lambda (a:float b:float)
+    (+ a b)))
+
+(bind-func num_f32_minus
+  (lambda (a:float b:float)
+    (- a b)))
+
+(bind-func num_f32_mul
+  (lambda (a:float b:float)
+    (* a b)))
+
+(bind-func num_f32_div
+  (lambda (a:float b:float)
+    (/ a b)))
+
+(bind-val NUM_f32 NUM:<[float,float,float]*,[float,float,float]*,[float,float,float]*,[float,float,float]*>*)
+
+(bind-func init_num_f32_dict
+  (lambda ()   
+    (set! NUM_f32 (NUM_h num_f32_plus num_f32_minus num_f32_mul num_f32_div))))
+
+(init_num_f32_dict)
+;; finished instance of f32 NUM
+
+
+;;;;
+;; now test the two instances
+;;;;
+
+(bind-func type_class_test
+  (lambda ()
+    (println (plus NUM_f32 3.0:f 2.0:f)
+             (minus NUM_f32 3.0:f 2.0:f)
+             (mul NUM_f64 3.0 2.0)
+             (div NUM_i64 12 3))
+    (plus NUM_i32 3 2)))
+
+(type_class_test)
