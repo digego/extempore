@@ -74,6 +74,35 @@
   (lambda (widget:Widget*)
     (tref widget 6)))
 
+(bind-func Widget_print
+  (lambda (widget:Widget*)
+    (printf "<Widget: id=%d size=%f type=%lld parent=%p Lchild=%p Rchild=%p>"
+            (Widget_id widget)
+            (convert (Widget_size widget) double)
+            (Widget_type widget)
+            ;; (tref widget 3) ;; callback
+            (Widget_parent widget)
+            (Widget_left_child widget)
+            (Widget_right_child widget))
+    void))
+
+(bind-func Widget_tostring
+  (lambda (widget:Widget*)
+    (let ((s:i8* (salloc 1024)))
+      (sprintf s
+               "<Widget: id=%d size=%f type=%lld parent=%p Lchild=%p Rchild=%p>"
+               (Widget_id widget)
+               (convert (Widget_size widget) double)
+               (Widget_type widget)
+               ;; (tref widget 3) ;; callback
+               (Widget_parent widget)
+               (Widget_left_child widget)
+               (Widget_right_child widget))
+      (Str s))))
+
+(bind-poly print Widget_print)
+(bind-poly tostring Widget_tostring)
+
 (bind-type GUI <GLFWwindow*,NVGcontext*,Widget*,float,float,float>)
 
 ;; accessors
