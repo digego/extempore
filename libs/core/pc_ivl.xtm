@@ -12,6 +12,7 @@
 
 ;;; Code:
 
+
 ; Define basic diatonic major
 (define *pc:diatonic-major*
    '((i . (0 . ^))
@@ -123,6 +124,7 @@
      (messiaen5 . (1 4 1 1 4))
      (messiaen6 . (2 2 1 1 2 2 1))
      (messiaen7 . (1 1 1 2 1 1 1 1 2))
+     (harmonic . (2 1 2 2 1 3))
      (ionian . (2 2 1 2 2 2))
      (dorian . (2 1 2 2 2 1))
      (phrygian . (1 2 2 2 1 2))
@@ -229,6 +231,7 @@
      (vi7 . (9 . aeolian))
      (vii . (11 . locrian))
      (vii7 . (11 . locrian))))
+
 
 ;; return the pitch class of pitch
 
@@ -367,6 +370,7 @@
                              (cl:remove (modulo (car chord) 12) p)
                              pc))))))))
 
+
 ;; Returns a scale degree of a given value (pitch) based on a pc
 (define pc:degree
    (lambda (value pc)
@@ -424,6 +428,7 @@
                                newlst)))))))
 
 
+
 ;; invert the values of lst quantizing to pc
 (define pc:invert
    (lambda (lst pc . args)
@@ -474,7 +479,6 @@
                           *pc:diatonic-major*
                           *pc:diatonic-minor*))))
       (pc:chord (modulo (+ root (cadr val)) 12) (cddr val)))))
-
 
 
 
@@ -571,7 +575,7 @@
                       (- num 1)
                       dir)
                 (reverse pitches))))))
-                        
+
 
 (define pc:distance-of-chord
    (lambda (chd pc)
@@ -581,12 +585,25 @@
 
 ;; distance between pitch and a pc
 (define pc:distance
-   (lambda (pitch pc)
-      (let ((p (modulo pitch 12)))
-         (car (cl:sort (map (lambda (class)
-                               (let ((val (abs (- p class))))
-                                  (abs (if (< val (- 12 val)) val (- 12 val)))))
-                            pc) <)))))
+  (lambda (pitch pc)
+    (if (atom? pc) (set! pc (list pc)))
+    (let ((p (modulo pitch 12)))
+      (car (cl:sort (map (lambda (class)
+                           (let ((val (abs (- p class))))
+                             (abs (if (< val (- 12 val)) val (- 12 val)))))
+                         pc) <)))))
+
+;; find the pc that is closest to given pitch
+;; useful for finding next step for pitch given a chord
+(define pc:closest-pc
+  (lambda (pitch pc)
+    (cdar (cl:sort (map (lambda (class) (cons (pc:distance pitch class) class)) pc)
+                   (lambda (a b) (< (car a) (car b)))))))
+
+(define pc:closest-pitch
+  (lambda (pc pitches)
+    (cdar (cl:sort (map (lambda (p) (cons (pc:distance p pc) p)) pitches)
+                   (lambda (a b) (< (car a) (car b)))))))
 
 ;; returns the pitch in plst that is closest to the pc set
 ;; if multiple pitches in plst are the closest return the first
