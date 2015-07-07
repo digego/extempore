@@ -193,7 +193,7 @@
               (nvgScale vg (/ w winWidth) (/ h winHeight))
               (nvgTranslate vg (/ x winWidth) (/ y winHeight))
               (println "doing things to" widget)
-              (render_fn)
+              ;; (render_fn)
               (println "done."))
             ;; otherwise recurse into the child widgets
             (begin
@@ -224,6 +224,17 @@
     (glfwPollEvents)
     (glfwSwapBuffers (GUI_window gui))))
 
+;; walk the widget tree (preorder), applying fn to each widget
+(bind-func Widget_walk_preorder
+  (lambda (widget:Widget* visit_fn:[void,Widget*]*)
+    (if (null? widget)
+        widget
+        (begin
+          (visit_fn widget)
+          (Widget_walk_preorder (Widget_left_child widget) visit_fn)
+          (Widget_walk_preorder (Widget_right_child widget) visit_fn)
+          widget))))
+
 ;; returns the first widget for which pred returns true
 (bind-func Widget_find_preorder
   (lambda (widget pred:[i1,Widget*]*)
@@ -231,7 +242,8 @@
         widget
         (begin
           (Widget_find_preorder (Widget_left_child widget) pred)
-          (Widget_find_preorder (Widget_right_child widget) pred)))))
+          (Widget_find_preorder (Widget_right_child widget) pred)
+          widget))))
 
 (bind-func gui_add_widget_left
   (lambda (gui:GUI* widget:Widget*)
