@@ -24,6 +24,10 @@
 
 (impc:aot:insert-header "xtmgui")
 
+;; can't have GUI* in here without causing a recursive definition
+;; (bind-alias WidgetCallback [void,GUI*,Widget*]*)
+(bind-alias WidgetCallback [void]*)
+
 ;; 0. id
 ;; 1. size
 ;; 2. type (flags)
@@ -31,19 +35,7 @@
 ;; 4. parent widget
 ;; 5. left child widget
 ;; 6. right child widget
-(bind-type Widget <i32,float,i64,[void,Widget*]*,Widget*,Widget*,Widget*>)
-
-(bind-func Widget_print
-  (lambda (widget:Widget*)
-    (printf "<Widget: id=%d size=%f type=%lld parent=%p l child=%p r child=%p>\n"
-            (Widget_id widget)
-            (convert (Widget_size widget) double)
-            (Widget_type widget)
-            ;; (tref widget 3) ;; callback
-            (Widget_parent widget)
-            (Widget_left_child widget)
-            (Widget_right_child widget))
-    void))
+(bind-type Widget <i32,float,i64,WidgetCallback,Widget*,Widget*,Widget*>)
 
 ;; accessors
 (bind-func Widget_id
@@ -130,14 +122,36 @@
   (lambda (gui:GUI*)
     (tref gui 5)))
 
-;; can't have GUI* in here without causing a recursive definition
-;; (bind-alias WidgetCallback [void,GUI*,Widget*]*)
-;; so we just pass the widget arg
-(bind-alias WidgetCallback [void,Widget*]*)
+(bind-func GUI_print
+  (lambda (gui:GUI*)
+    (printf "<GUI: window=%p context=%p root=%p width=%f height=%f pixelRatio=%f>"
+            (GUI_window gui)
+            (GUI_context gui)
+            (GUI_root gui)
+            (convert (GUI_width gui) double)
+            (convert (GUI_height gui) double)
+            (convert (GUI_pixel_ratio gui) double))
+    void))
+
+(bind-func GUI_tostring
+  (lambda (gui:GUI*)
+    (let ((s:i8* (salloc 1024)))
+      (sprintf s
+               "<GUI: window=%p context=%p root=%p width=%f height=%f pixelRatio=%f>"
+            (GUI_window gui)
+            (GUI_context gui)
+            (GUI_root gui)
+            (convert (GUI_width gui) double)
+            (convert (GUI_height gui) double)
+            (convert (GUI_pixel_ratio gui) double))
+      (Str s))))
+
+(bind-poly print GUI_print)
+(bind-poly tostring GUI_tostring)
 
 ;; currently doesn't check for double-initialisation, but probably
 ;; should
-(bind-func gui_create
+(bind-func gui_init
   (lambda (width height)
     (let ((ww:i32* (alloc))
           (wh:i32* (alloc))
@@ -151,38 +165,16 @@
       (set! window (glfw_init_and_create_interaction_window width height))
       ;; set up nanovg
       (set! vg (nvg_create_context))
-      (glfwGetWindowSize (GUI_window gui) ww wh)
-      (glfwGetFramebufferSize (GUI_window gui) fbw fbh)
+      (glfwGetWindowSize window ww wh)
+      (glfwGetFramebufferSize window fbw fbh)
       (tfill! gui
               window
               vg
               null
               (convert (pref ww 0) float)
               (convert (pref wh 0) float)
-              (/ (convert fbw float) (convert ww float)))
+              (/ (convert (pref fbw 0) float) (convert (pref ww 0) float)))
       gui)))
-
-;; preorder(node)
-;;   if node == null then return
-;;   visit(node)
-;;   preorder(node.left) 
-;;   preorder(node.right)
-
-;; iterativePreorder(node)
-;;   parentStack = empty stack
-;;   while (not parentStack.isEmpty() or node ≠ null)
-;;     if (node ≠ null) 
-;;       visit(node)
-;;       if (node.right ≠ null) parentStack.push(node.right) 
-;;       node = node.left   
-;;     else     
-;;       node = parentStack.pop()
-
-;;  r
-;; | \ \
-;; a  b  c
-;; |\
-;; d e
 
 ;; walks the tree in pre-order
 (bind-func gui_render_subtree
@@ -195,11 +187,14 @@
             ;; call the render callback
             (let ((winWidth (GUI_width gui))
                   (winHeight (GUI_height gui))
-                  (vg (GUI_context gui)))
+                  (vg (GUI_context gui))
+                  (render_fn:WidgetCallback (convert (tref widget 3))))
               (nvgResetTransform vg)
               (nvgScale vg (/ w winWidth) (/ h winHeight))
               (nvgTranslate vg (/ x winWidth) (/ y winHeight))
-              ((tref widget 3) widget))
+              (println "doing things to" widget)
+              (render_fn)
+              (println "done."))
             ;; otherwise recurse into the child widgets
             (begin
               (gui_render_subtree gui
@@ -217,12 +212,17 @@
 
 (bind-func gui_render
   (lambda (gui:GUI*)
-    (gui_render_subtree gui
-                        (GUI_root gui)
-                        0.
-                        0.
-                        (GUI_width gui)
-                        (GUI_height gui))))
+    (glClear (bitwise-or GL_COLOR_BUFFER_BIT
+                         GL_DEPTH_BUFFER_BIT
+                         GL_STENCIL_BUFFER_BIT))
+    (nvgBeginFrame (GUI_context gui)
+                   (convert (GUI_width gui))
+                   (convert (GUI_height gui))
+                   (GUI_pixel_ratio gui))
+    (gui_render_subtree gui (GUI_root gui) 0. 0. (GUI_width gui) (GUI_height gui))
+    (nvgEndFrame (GUI_context gui))
+    (glfwPollEvents)
+    (glfwSwapBuffers (GUI_window gui))))
 
 ;; returns the first widget for which pred returns true
 (bind-func Widget_find_preorder
@@ -244,9 +244,21 @@
           (tset! gui 2 widget)
           (let ((existing_size (Widget_size leaf))
                 (new_size (Widget_size widget))
-                (total_size (+ existing_size new_size)))
-            ;; probably need to catch the parent here
-            )))))
+                (total_size (+ existing_size new_size))
+                (new_parent:Widget* (halloc)))
+            ;; set up the new leaf nodes
+            (tset! leaf 4 new_parent)
+            (tset! leaf 1 (/ existing_size total_size))
+            (tset! widget 1 (/ new_size total_size))
+            ;; fill the newly-created parent widget
+            (tfill! new_parent
+                    (Widget_id leaf)
+                    existing_size
+                    (Widget_type leaf)
+                    (tref leaf 3)
+                    (Widget_parent leaf)
+                    widget
+                    leaf))))))
 
 ;; add widgets to left by default
 (bind-poly gui_add_widget gui_add_widget_left)
@@ -255,16 +267,18 @@
 
 (bind-func gui_find_parent
   (lambda (gui:GUI* widget:Widget*)
-    (Widget_find_preorder (GUI_root gui)
-                          (lambda (w)
-                            (or (= (Widget_left_child w) widget)
-                                (= (Widget_right_child w) widget))))))
+    (Widget_find_preorder
+     (GUI_root gui)
+     (lambda (w)
+       (or (= (Widget_left_child w) widget)
+           (= (Widget_right_child w) widget))))))
 
 (bind-func gui_find_widget_with_id
   (lambda (gui:GUI* id:i32)
-    (Widget_find_preorder (GUI_root gui)
-                          (lambda (w)
-                            (= (Widget_id w) id)))))
+    (Widget_find_preorder
+     (GUI_root gui)
+     (lambda (w)
+       (= (Widget_id w) id)))))
 
 (bind-poly gui_find Widget_find_preorder)
 ;; (bind-poly gui_find gui_find_parent) ;; this is perhaps too confusing
@@ -286,21 +300,23 @@
 
 ;; button
 
-(bind-func gui_render_button_c
-  (lambda (label r g b)
-    (let ((paint (nvgFillColor (tref gui 1) (nvgRGBf r g b))))
-      (lambda (gui:GUI* widget:Widget*)
-        (println "label:" label)
-        (nvgSave (tref gui 1))
-        (nvgBeginPath (tref gui 1))
-        ;; assume matrix transform -> [0,1]^2 has been applied
-        (nvgRect (tref gui 1) 0. 0. 1. 1.)
-        (nvgFill (tref gui 1))
-        (nvgRestore (tref gui 1))))))
+;; TODO check if functions (callbacks) with no args work ok. ones that
+;; do nothing. in fact, put a println after the cb call to see if it
+;; gets past that
 
-(bind-func gui_add_button
-  (lambda (gui:GUI* size cb)
-    (Widget -1 size 0 cb null null)))
+(bind-func gui_render_button_c
+  (lambda (label:i8* r:float g:float b:float)
+    (lambda (gui:GUI* widget:Widget*)
+      (printf "Ben's thing!\n")
+      (nvgSave (GUI_context gui))
+      (nvgBeginPath (GUI_context gui))
+      ;; assume matrix transform -> [0,1]^2 has been applied
+      (nvgFillColor (GUI_context gui)
+                    (nvgRGBf r g b))
+      (nvgRect (GUI_context gui) 0. 0. 1. 1.)
+      (nvgFill (GUI_context gui))
+      (nvgRestore (GUI_context gui))
+      void)))
 
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
