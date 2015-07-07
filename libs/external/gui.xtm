@@ -68,28 +68,32 @@
 
 (bind-func Widget_print
   (lambda (widget:Widget*)
-    (printf "<Widget: id=%d size=%f type=%lld parent=%p Lchild=%p Rchild=%p>"
-            (Widget_id widget)
-            (convert (Widget_size widget) double)
-            (Widget_type widget)
-            ;; (tref widget 3) ;; callback
-            (Widget_parent widget)
-            (Widget_left_child widget)
-            (Widget_right_child widget))
+    (if (null? widget)
+        (printf "<Widget: 0x0>")
+        (printf "<Widget: id=%d size=%.3f type=%lld parent=%p Lchild=%p Rchild=%p>"
+                (Widget_id widget)
+                (convert (Widget_size widget) double)
+                (Widget_type widget)
+                ;; (tref widget 3) ;; callback
+                (Widget_parent widget)
+                (Widget_left_child widget)
+                (Widget_right_child widget)))
     void))
 
 (bind-func Widget_tostring
   (lambda (widget:Widget*)
     (let ((s:i8* (salloc 1024)))
-      (sprintf s
-               "<Widget: id=%d size=%f type=%lld parent=%p Lchild=%p Rchild=%p>"
-               (Widget_id widget)
-               (convert (Widget_size widget) double)
-               (Widget_type widget)
-               ;; (tref widget 3) ;; callback
-               (Widget_parent widget)
-               (Widget_left_child widget)
-               (Widget_right_child widget))
+      (if (null? widget)
+          (sprintf s "<Widget: 0x0>")
+          (sprintf s
+                   "<Widget: id=%d size=%.3f type=%lld parent=%p Lchild=%p Rchild=%p>"
+                   (Widget_id widget)
+                   (convert (Widget_size widget) double)
+                   (Widget_type widget)
+                   ;; (tref widget 3) ;; callback
+                   (Widget_parent widget)
+                   (Widget_left_child widget)
+                   (Widget_right_child widget)))
       (Str s))))
 
 (bind-poly print Widget_print)
@@ -124,26 +128,30 @@
 
 (bind-func GUI_print
   (lambda (gui:GUI*)
-    (printf "<GUI: window=%p context=%p root=%p width=%f height=%f pixelRatio=%f>"
-            (GUI_window gui)
-            (GUI_context gui)
-            (GUI_root gui)
-            (convert (GUI_width gui) double)
-            (convert (GUI_height gui) double)
-            (convert (GUI_pixel_ratio gui) double))
+    (if (null? gui)
+        (printf "<GUI: 0x0>")
+        (printf "<GUI: window=%p context=%p root=%p width=%.1f height=%.1f pixelRatio=%.1f>"
+                (GUI_window gui)
+                (GUI_context gui)
+                (GUI_root gui)
+                (convert (GUI_width gui) double)
+                (convert (GUI_height gui) double)
+                (convert (GUI_pixel_ratio gui) double)))
     void))
 
 (bind-func GUI_tostring
   (lambda (gui:GUI*)
     (let ((s:i8* (salloc 1024)))
-      (sprintf s
-               "<GUI: window=%p context=%p root=%p width=%f height=%f pixelRatio=%f>"
-            (GUI_window gui)
-            (GUI_context gui)
-            (GUI_root gui)
-            (convert (GUI_width gui) double)
-            (convert (GUI_height gui) double)
-            (convert (GUI_pixel_ratio gui) double))
+      (if (null? gui)
+          (sprintf s "<GUI: 0x0>")
+          (sprintf s
+                   "<GUI: window=%p context=%p root=%p width=%.1f height=%.1f pixelRatio=%.1f>"
+                   (GUI_window gui)
+                   (GUI_context gui)
+                   (GUI_root gui)
+                   (convert (GUI_width gui) double)
+                   (convert (GUI_height gui) double)
+                   (convert (GUI_pixel_ratio gui) double)))
       (Str s))))
 
 (bind-poly print GUI_print)
