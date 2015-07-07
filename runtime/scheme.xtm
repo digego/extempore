@@ -2240,27 +2240,14 @@
 ;; editors - just need to integrate it into the right editor-specific
 ;; hooks for inline documentation
 
-;; the documentation function should return information on the following, in order:
-
-;; 1. xtlang generic function
-;; 2. xtlang generic type
-;; 3. xtlang poly function
-;; 4. xtlang poly type
-;; 5. xtlang closure
-;; 6. xtlang nativefunc (e.g. bind-lib)
-;; 7. xtlang type
-;; 8. xtlang global variable
-;; 9. scheme function
-;; 10. scheme macro
-
 ;; the documentation function should return an associative list with
 ;; the following keys:
 
-;; ((name . function-name)
+;; ((name . awesome_closure)
 ;;  (category . "xtlang closure")
-;;  (type . type-string)
-;;  (args . arg-sexp)
-;;  (docstring . documentation-string))
+;;  (type . "[i64]")
+;;  (args . (arg1 arg2))
+;;  (docstring . "the docstring))
 
 ;; the keys must be present, but the cdr of each element may be
 ;; missing where appropriate (e.g. scheme functions have no type field)
@@ -2408,20 +2395,20 @@
     (let ((sym (string->symbol name)))
       (cond ((impc:ti:builtin-exists? name)
              (cons 'eldoc-docstring (eldoc-builtin-handler sym)))
-            ((impc:ti:genericfunc-exists? name)
-             (cons 'eldoc-docstring (eldoc-genericfunc-handler sym)))
+            ((impc:ti:polytype-exists? name)
+             (cons 'eldoc-docstring (eldoc-polytype-handler sym)))
+            ((impc:ti:namedtype-exists? name)
+             (cons 'eldoc-docstring (eldoc-namedtype-handler sym)))
             ((impc:ti:generictype-exists? name)
              (cons 'eldoc-docstring (eldoc-generictype-handler sym)))
             ((impc:ti:polyfunc-exists? name)
              (cons 'eldoc-docstring (eldoc-polyfunc-handler sym)))
-            ((impc:ti:polytype-exists? name)
-             (cons 'eldoc-docstring (eldoc-polytype-handler sym)))
             ((impc:ti:closure-exists? name)
              (cons 'eldoc-docstring (eldoc-closure-handler sym)))
             ((impc:ti:nativefunc-exists? name)
              (cons 'eldoc-docstring (eldoc-nativefunc-handler sym)))
-            ((impc:ti:namedtype-exists? name)
-             (cons 'eldoc-docstring (eldoc-namedtype-handler sym)))
+            ((impc:ti:genericfunc-exists? name)
+             (cons 'eldoc-docstring (eldoc-genericfunc-handler sym)))
             ((impc:ti:globalvar-exists? name)
              (cons 'eldoc-docstring (eldoc-globalvar-handler sym)))
             ((and (defined? sym) (closure? (eval sym)))
