@@ -1130,7 +1130,12 @@
                                  (if (regex:match? x "_poly_")
                                      (cadr (regex:matched x "%(.*)_poly_.*"))
                                      (cadr (regex:matched x "%([^-*]*)")))
-                                 "_"))
+                                 (if (and (symbol? x)
+                                          (regex:match? (symbol->string x) ":"))
+                                     (car (regex:split (symbol->string x) ":"))
+                                     (if (impc:ir:type? x)
+                                         (impc:ir:pretty-print-type x)
+                                         "_"))))
                            (if (and (number? (car type))
                                     (impc:ir:closure? type))
                                (cddr type)
@@ -1152,16 +1157,24 @@
     ;; (println 'type_b: type)
     (let* ((tmp (assoc-strcmp-all (string->symbol name) *impc:ti:genericfunc-cache*))
            (res (cl:remove-if (lambda (x) (<> arity (cadr x))) tmp)))
+      ;; (println 'res: (map (lambda (gp) (car (cddddr gp))) res))
       (if (null? res)
           #f
           (let* ((weights (map (lambda (gp)
                                  (cons (apply + (map (lambda (x y)
                                                        ;; (println x '=? y)
-                                                       (if (string=? x y)
-                                                           1
-                                                           (if (string=? x "_")
-                                                               0
-                                                               -100))) ;; you lose!
+                                                       (if (string=? x "_")
+                                                           0
+                                                           (if (string=? x y)
+                                                               1
+                                                               (if (string=? y "_")
+                                                                   0
+                                                                   -1))))
+                                                     ;; (if (string=? x y)
+                                                     ;;     1
+                                                     ;;     (if (string=? x "_")
+                                                     ;;         0
+                                                     ;;         -100))) ;; you lose!
                                                      (car (cddddr gp))
                                                      type))
                                        gp))
@@ -1169,11 +1182,11 @@
                  (w (apply max (map (lambda (x) (car x)) weights))))
             ;; (println '++++++++++++++ (length weights))
             ;; (println (for-each (lambda (k)
-            ;; 			 (println k))
-            ;; 		       weights))
+            ;;                      (println k))
+            ;;                    weights))
             ;; (println 'best: w ': (length weights) '-> (assoc w weights))
             (if (> (length (assoc-strcmp-all w weights)) 1)
-                (impc:compiler:print-compiler-error "ambiguous generic overload"))
+                (impc:compiler:print-compiler-error "ambiguous generic overload"))	    
             (cdddr (assoc w weights)))))))
 
 (define impc:ti:genericfunc-pretty-print
@@ -2398,7 +2411,7 @@
                                    (if etype
                                        (string->symbol
                                         (impc:ir:pointer++ (string-append "%" (car p) "_poly_" etype)
-                                                                       ptrdepth))
+                                                           ptrdepth))
                                        (string->symbol (car p))))
                              inbody?))))
                      ((eq? (car ast) 'doloop) (impc:ti:doloop ast inbody?))
@@ -2495,16 +2508,21 @@
                               (impc:ti:specialize-genericfunc (car p) (cname-decode (cadr p)))
                               t))))
                      ((and (symbol? ast)
-                           (regex:match? (symbol->string ast) ":(f)|(i)|(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
+                           (regex:match? (symbol->string ast) ":(f)|(i)|(f32)|(f64)|(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
                       (let ((p (regex:type-split (symbol->string ast) ":")))
                         (if (not (number? (string->atom (car p))))
                             ast
                             ;; otherwise do a convert
-                            (if (string=? (cadr p) "f")
-                                (list 'bitconvert (string->atom (car p)) 'float)
-                                (if (string=? (cadr p) "i")
-                                    (list 'bitconvert (string->atom (car p)) 'i32)
-                                    (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))))
+                            (cond ((string=? (cadr p) "f")
+                                   (list 'bitconvert (string->atom (car p)) 'float))
+                                  ((string=? (cadr p) "i")
+                                   (list 'bitconvert (string->atom (car p)) 'i32))
+                                  ((string=? (cadr p) "f32")
+                                   (list 'bitconvert (string->atom (car p)) 'float))
+                                  ((string=? (cadr p) "f64")
+                                   (list 'bitconvert (string->atom (car p)) 'double))
+                                  (else
+                                   (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))))
                      (else ast)))))))
 
 
@@ -3840,7 +3858,7 @@
                  (if (not (assoc-strcmp tt vars))
                      (set! vars (cons (list tt) vars)))
                  (if (null? (cdr (assoc-strcmp tt vars)))
-                     (impc:ti:update-var gt vars kts (list tt))			   
+                     (impc:ti:update-var gt vars kts (list tt))
                      (begin
                        (impc:ti:update-var gt vars kts (impc:ti:type-unify (cdr (assoc-strcmp tt vars)) vars))))
                  (impc:ti:update-var gt vars kts (impc:ti:type-unify tt vars))))))
