@@ -1,4 +1,6 @@
 
+
+
 ;; passing a length of 0 will read the whole file
 (define-macro (set-sampler-index inst fname index offset lgth bank print?)
   `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
@@ -102,6 +104,7 @@
 ;; this is an alias for compatibility - but don't use it in new code
 (define define-sampler bind-sampler)
 
+
 ;; must be stereo samples of type wav aif or ogg
 (define-macro (load-sampler sampler path . args)
   (let ((bank (if (> (length args) 0) (car args) 0))
@@ -180,7 +183,8 @@
 (define parse-sample-names-2
   (lambda (file-list)
     (map (lambda (fname)
-           (let ((result (regex:matched fname "^.*?([abcdefgABCDEFG][#b]?[0-9]).*\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+           (let ((result (regex:matched fname "^.*?[-_[:space:]]([abcdefgABCDEFG][#b]?[0-9])[^0-9A-Za-z].*(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+             ;; (println fname ":" result)
              (if (null? result)
                  (begin
                    (if (not (regex:match? fname "^\\."))
@@ -199,10 +203,11 @@
     (map (lambda (fname)
            (if (regex:match? fname "([0-9][0-9][0-9]*)\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
                (car (parse-sample-names-1 (list fname)))
-               (if (regex:match? fname "^.*?([abcdefgABCDEFG][#b]?[0-9]).*\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
+               (if (regex:match? fname "^.*?[-_[:space:]]([abcdefgABCDEFG][#b]?[0-9])[^0-9A-Za-z].*(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
                    (car (parse-sample-names-2 (list fname)))
                    #f)))
          file-list)))
+
 
 
 ;; for the MIS piano samples (mf loudness only), avaliable from
@@ -225,6 +230,7 @@
                #f))
          (parse-sample-names-2 file-list))))
 
+
 ;; for NI Akoustik piano samples
 ;; Stein-R(A-1)-V(077)-dB(3129)-T(ML)-M(22)-P(1956-04-01).WAV
 (define parse-NI-piano-pp
@@ -246,6 +252,7 @@
                                       0 0)
                                 samp-data-list)
                           (cons (cadr result) loaded-notes)))))))))
+
 
 ;; General MIDI drum note numbers
 
