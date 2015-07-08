@@ -1243,7 +1243,7 @@ command to run."
         ;; send the documentation request
         (if extempore-connection-list
             (process-send-string (car extempore-connection-list)
-                                 (format  "(eldoc-documentation-function \"%s\")\r\n" fnsym)))
+                                 (format  "(if (defined? 'eldoc-documentation-function) (eldoc-documentation-function \"%s\"))\r\n" fnsym)))
         ;; always return nil; docstring comes back through the process
         ;; filter
         nil)))
