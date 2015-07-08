@@ -5237,7 +5237,11 @@
                       (cdr (assoc-strcmp (car ast) vars))
                       (if (impc:ti:closure-exists? (symbol->string (car ast)))
                           (list (impc:ti:get-closure-type (symbol->string (car ast))))
-                          (impc:compiler:print-missing-identifier-error (car ast) 'closure))))
+                          ;; check for globalvar closures
+                          (if (and (impc:ti:globalvar-exists? (symbol->string (car ast)))
+                                   (impc:ir:closure? (impc:ti:get-globalvar-type (symbol->string (car ast)))))
+                              (list (impc:ti:get-globalvar-type (symbol->string (car ast))))
+                              (impc:compiler:print-missing-identifier-error (car ast) 'closure)))))
            ;; (llllllll (println 'ctype: ctype))
            ;; get argument expression types
            (res (map (lambda (e t)
@@ -5592,7 +5596,9 @@
           ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))
           ((and (list? ast) ;; this is here to check against closures as global vars (i.e. not in local environment)
                 (symbol? (car ast))
-                (impc:ti:closure-exists? (symbol->string (car ast))))
+                (or (impc:ti:closure-exists? (symbol->string (car ast)))
+                    (let ((gvar-type (impc:ti:get-globalvar-type (symbol->string (car ast)))))
+                         (and gvar-type (impc:ir:closure? gvar-type)))))
            (impc:ti:closure-call-check ast vars kts request?))
           (else
            (impc:ti:join (impc:ti:type-check (car ast) vars kts request?)
