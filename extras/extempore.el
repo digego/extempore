@@ -1283,7 +1283,8 @@ command to run."
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
     (if (and (> (length str) 15)
              (string= "(eldoc-docstring" (substring str 0 16)))
-        (extempore-process-docstring-form (cdr-safe (ignore-errors (read str))))
+        (if (not (string= "(eldoc-docstring-nodocstring)" str))
+            (extempore-process-docstring-form (cdr-safe (ignore-errors (read str)))))
       (message str))))
 
 (add-hook 'extempore-mode-hook
