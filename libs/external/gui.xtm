@@ -226,7 +226,6 @@
 ;; walks the tree in pre-order
 (bind-func gui_render_subtree
   (lambda (widget:Widget* x:float y:float w:float h:float)
-    ;; (println "x:" x "y:" y "w:" w "h:" h)
     (if (null? widget)
         widget
         (if (and (null? (widget_left_child widget))
@@ -348,8 +347,11 @@
               (let ((old_size (widget_size old_leaf))
                     (new_size (widget_size new_widget))
                     (total_size (+ old_size new_size))
+                    ;; reverse these two assignments to add the new
+                    ;; widget as the left child
                     (new_lchild new_widget)
                     (new_rchild old_leaf)
+                    (old_parent (widget_parent old_leaf))
                     (new_parent (Widget_h -1
                                           old_size
                                           (widget_type old_leaf)
@@ -363,6 +365,16 @@
                 ;; set up new parent pointers
                 (widget_set_parent new_lchild new_parent)
                 (widget_set_parent new_rchild new_parent)
+                ;; if necessary, reconnect the widget tree
+                (if (null? old_parent)
+                    ;; if old leaf node was the root node
+                    (GUI_set_root EXTEMPORE_GUI new_parent)
+                    ;; otherwise set child pointers in old parent
+                    (if (= (widget_left_child old_parent) old_leaf)
+                        (widget_set_left_child old_parent new_parent)
+                        (if (= (widget_right_child old_parent) old_leaf)
+                            (widget_set_right_child old_parent new_parent))
+                        (println "could not reconnect widget tree")))
                 ;; return the new_lchild
                 new_lchild))))))
 
