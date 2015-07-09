@@ -266,6 +266,24 @@
     (glfwPollEvents)
     (glfwSwapBuffers (GUI_window gui))))
 
+(bind-func Widget_leaf_p
+  (lambda (widget:Widget*)
+    (and (null? (Widget_left_child widget))
+         (null? (Widget_right_child widget)))))
+
+(bind-func Widget_inner_p
+  (lambda (widget:Widget*)
+    (not (Widget_leaf_p widget))))
+
+(bind-func Widget_parent_p
+  (lambda (child:Widget* parent:Widget*)
+    (= (Widget_parent child) parent)))
+
+(bind-func Widget_child_p
+  (lambda (parent:Widget* child:Widget*)
+    (or (= (Widget_left_child parent) child)
+        (= (Widget_right_child parent) child))))
+
 ;; walk the widget tree (preorder), applying fn to each widget
 (bind-func Widget_walk_preorder
   (lambda (widget:Widget* visit_fn:[void,Widget*]*)
@@ -295,16 +313,13 @@
     (Widget_find_preorder
      (GUI_root gui)
      (lambda (w)
-       (or (= (Widget_left_child w) widget)
-           (= (Widget_right_child w) widget))))))
+       (Widget_parent_p widget w)))))
 
 (bind-func gui_find_leaf
   (lambda (gui:GUI*)
     (Widget_find_preorder
      (GUI_root gui)
-     (lambda (w)
-       (and (null? (Widget_left_child w))
-            (null? (Widget_right_child w)))))))
+     Widget_leaf_p)))
 
 (bind-func gui_find_widget_with_id
   (lambda (gui:GUI* id:i32)
@@ -328,23 +343,20 @@
                 (new_size (Widget_size new_widget))
                 (total_size (+ old_size new_size))
                 (new_lchild new_widget)
-                ;; copy old leaf node to be new right child (should
-                ;; increment the ID here, but not sure how best to do
-                ;; that)
-                (new_rchild (Widget_h (Widget_id old_leaf)
-                                      (/ old_size total_size)
+                (new_rchild old_leaf)
+                (new_parent (Widget_h -1
+                                      old_size
                                       (Widget_type old_leaf)
-                                      (tref old_leaf 3)
-                                      old_leaf
                                       null
-                                      null)))            
-            ;; (println "old_leaf:" old_leaf "new_lchild:" new_lchild "new_rchild:" new_rchild)
+                                      (Widget_parent old_leaf)
+                                      new_lchild
+                                      new_rchild)))
             ;; normalise new widget size
             (Widget_set_size new_lchild (/ new_size total_size))
-            ;; set up left child pointer (widget to add)
-            (Widget_set_left_child old_leaf new_lchild)
-            ;; set up right child pointer (old leaf widget)
-            (Widget_set_right_child old_leaf new_rchild)
+            (Widget_set_size new_rchild (/ old_size total_size))
+            ;; set up new parent pointers
+            (Widget_set_parent new_lchild new_parent)
+            (Widget_set_parent new_rchild new_parent)
             ;; return the new_lchild
             new_lchild)))))
 
