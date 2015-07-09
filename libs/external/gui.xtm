@@ -228,28 +228,24 @@
                   (winHeight (GUI_height gui))
                   (vg (GUI_context gui)))
               (nvgResetTransform vg)
-              (nvgScale vg (/ 1. winWidth) (/ 1. winHeight))
+              (nvgScale vg winWidth winHeight)
               (nvgTranslate vg (/ x winWidth) (/ y winHeight))
-              (println "rendering.")
               ((Widget_cb widget) widget)
               null)
             ;; otherwise recurse into the child widgets
             (begin
-              (println "check1")
               (gui_render_subtree gui
                                   (Widget_left_child widget)
                                   x
                                   y
                                   w
                                   (* (Widget_size (Widget_left_child widget)) h))
-              (println "check2")
               (gui_render_subtree gui
                                   (Widget_right_child widget)
                                   x
                                   (+ y (* (Widget_size (Widget_left_child widget)) h))
                                   w
                                   (* (Widget_size (Widget_right_child widget)) h))
-              (println "check3")
               (convert null))))))
 
 (bind-func gui_render
@@ -336,29 +332,32 @@
 
 (bind-func gui_add_widget_left
   (lambda (gui:GUI* new_widget:Widget*)
-    (let ((old_leaf (gui_find_leaf gui)))
-      (if (null? old_leaf)
-          (GUI_set_root gui new_widget)
-          (let ((old_size (Widget_size old_leaf))
-                (new_size (Widget_size new_widget))
-                (total_size (+ old_size new_size))
-                (new_lchild new_widget)
-                (new_rchild old_leaf)
-                (new_parent (Widget_h -1
-                                      old_size
-                                      (Widget_type old_leaf)
-                                      null
-                                      (Widget_parent old_leaf)
-                                      new_lchild
-                                      new_rchild)))
-            ;; normalise new widget size
-            (Widget_set_size new_lchild (/ new_size total_size))
-            (Widget_set_size new_rchild (/ old_size total_size))
-            ;; set up new parent pointers
-            (Widget_set_parent new_lchild new_parent)
-            (Widget_set_parent new_rchild new_parent)
-            ;; return the new_lchild
-            new_lchild)))))
+    (if (not (Widget_leaf_p  new_widget))
+        (begin (println "Cannot add non-leaf widget")
+               new_widget)
+        (let ((old_leaf (gui_find_leaf gui)))
+          (if (null? old_leaf)
+              (GUI_set_root gui new_widget)
+              (let ((old_size (Widget_size old_leaf))
+                    (new_size (Widget_size new_widget))
+                    (total_size (+ old_size new_size))
+                    (new_lchild new_widget)
+                    (new_rchild old_leaf)
+                    (new_parent (Widget_h -1
+                                          old_size
+                                          (Widget_type old_leaf)
+                                          null
+                                          (Widget_parent old_leaf)
+                                          new_lchild
+                                          new_rchild)))
+                ;; normalise new widget size
+                (Widget_set_size new_lchild (/ new_size total_size))
+                (Widget_set_size new_rchild (/ old_size total_size))
+                ;; set up new parent pointers
+                (Widget_set_parent new_lchild new_parent)
+                (Widget_set_parent new_rchild new_parent)
+                ;; return the new_lchild
+                new_lchild))))))
 
 ;; add widgets to left by default
 (bind-poly gui_add_widget gui_add_widget_left)
@@ -391,15 +390,14 @@
 (bind-func gui_button_create
   (lambda (gui:GUI* label:i8* r:float g:float b:float)
     (let ((cb (lambda (widget:Widget*)
-                (println "callback" gui widget)
-                ;; (nvgSave (GUI_context gui))
-                ;; (nvgBeginPath (GUI_context gui))
-                ;; ;; assume matrix transform -> [0,1]^2 has been applied
-                ;; (nvgFillColor (GUI_context gui)
-                ;;               (nvgRGBf r g b))
-                ;; (nvgRect (GUI_context gui) 0. 0. 1. 1.)
-                ;; (nvgFill (GUI_context gui))
-                ;; (nvgRestore (GUI_context gui))
+                (println "inwidget" (Str label) gui widget)
+                (nvgSave (GUI_context gui))
+                (nvgBeginPath (GUI_context gui))
+                ;; assume matrix transform -> [0,1]^2 has been applied
+                (nvgFillColor (GUI_context gui) (nvgRGBf r g b))
+                (nvgRect (GUI_context gui) 0. 0. 1. 1.)
+                (nvgFill (GUI_context gui))
+                (nvgRestore (GUI_context gui))
                 void)))
       (Widget_h 1 1.0 Widget_button cb null null null))))
 
