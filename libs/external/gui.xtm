@@ -36,70 +36,70 @@
 (bind-alias WidgetCB [void,Widget*]*)
 
 ;; accessors
-(bind-func Widget_id
+(bind-func widget_id
   (lambda (widget:Widget*)
     (tref widget 0)))
 
-(bind-func Widget_size
+(bind-func widget_size
   (lambda (widget:Widget*)
     (tref widget 1)))
 
-(bind-func Widget_set_size
+(bind-func widget_set_size
   (lambda (widget:Widget* size)
     (tset! widget 1 size)))
 
-(bind-func Widget_type
+(bind-func widget_type
   (lambda (widget:Widget*)
     (tref widget 2)))
 
-(bind-func Widget_cb
+(bind-func widget_cb
   (lambda (widget:Widget*)
     (tref widget 3)))
 
-(bind-func Widget_set_cb
+(bind-func widget_set_cb
   (lambda (widget:Widget* cb:WidgetCB)
     (tset! widget 3 cb)))
 
-(bind-func Widget_parent
+(bind-func widget_parent
   (lambda (widget:Widget*)
     (tref widget 4)))
 
-(bind-func Widget_set_parent
+(bind-func widget_set_parent
   (lambda (child:Widget* parent)
     (tset! child 4 parent)))
 
-(bind-func Widget_left_child
+(bind-func widget_left_child
   (lambda (widget:Widget*)
     (tref widget 5)))
 
-(bind-func Widget_set_left_child
+(bind-func widget_set_left_child
   (lambda (parent:Widget* child)
     (tset! parent 5 child)))
 
-(bind-func Widget_right_child
+(bind-func widget_right_child
   (lambda (widget:Widget*)
     (tref widget 6)))
 
-(bind-func Widget_set_right_child
+(bind-func widget_set_right_child
   (lambda (parent:Widget* child)
     (tset! parent 6 child)))
 
-(bind-func Widget_print
+(bind-func widget_print
   (lambda (widget:Widget*)
     (if (null? widget)
         (printf "<Widget 0x0>")
         (printf "<Widget %p: id=%d size=%.3f type=%lld parent=%p Lchild=%p Rchild=%p>"
                 widget
-                (Widget_id widget)
-                (convert (Widget_size widget) double)
-                (Widget_type widget)
-                ;; (Widget_cb widget) ;; callback
-                (Widget_parent widget)
-                (Widget_left_child widget)
-                (Widget_right_child widget)))
+                (widget_id widget)
+                (convert (widget_size widget) double)
+                (widget_type widget)
+                ;; (widget_cb widget) ;; callback
+                (widget_parent widget)
+                (widget_left_child widget)
+                (widget_right_child widget)))
     void))
 
-(bind-func Widget_tostring
+(bind-func widget_tostring
   (lambda (widget:Widget*)
     (let ((s:i8* (salloc 1024)))
       (if (null? widget)
@@ -107,17 +107,17 @@
           (sprintf s
                    "<Widget %p: id=%d size=%.3f type=%lld parent=%p Lchild=%p Rchild=%p>"
                    widget
-                   (Widget_id widget)
-                   (convert (Widget_size widget) double)
-                   (Widget_type widget)
-                   ;; (Widget_cb widget) ;; callback
-                   (Widget_parent widget)
-                   (Widget_left_child widget)
-                   (Widget_right_child widget)))
+                   (widget_id widget)
+                   (convert (widget_size widget) double)
+                   (widget_type widget)
+                   ;; (widget_cb widget) ;; callback
+                   (widget_parent widget)
+                   (widget_left_child widget)
+                   (widget_right_child widget)))
       (Str s))))
 
-(bind-poly print Widget_print)
-(bind-poly tostring Widget_tostring)
+(bind-poly print widget_print)
+(bind-poly tostring widget_tostring)
 
 ;; 0. GLFW window
 ;; 1. nanovg context
@@ -189,10 +189,17 @@
 (bind-poly print GUI_print)
 (bind-poly tostring GUI_tostring)
 
-;; currently doesn't check for double-initialisation, but probably
-;; should
+;; this is the global gui structure - there can only be one in each
+;; Extempore process
+
+(bind-val EXTEMPORE_GUI GUI*)
+
 (bind-func gui_init
   (lambda (width height)
+    ;; (if (not (null? EXTEMPORE_GUI))
+    ;;     (begin
+    ;;       (println "Extempore GUI is already initialised, and cannot be re-initialised.")
+    ;;       EXTEMPORE_GUI))
     (let ((ww:i32* (alloc))
           (wh:i32* (alloc))
           (fbw:i32* (alloc))
@@ -206,200 +213,200 @@
       (set! vg (nvg_create_context))
       (glfwGetWindowSize window ww wh)
       (glfwGetFramebufferSize window fbw fbh)
-      (GUI_h
-              window
-              vg
-              null
-              (convert (pref ww 0) float)
-              (convert (pref wh 0) float)
-              (/ (convert (pref fbw 0) float) (convert (pref ww 0) float))))))
+      ;; create the new GUI data type
+      (set! EXTEMPORE_GUI
+            (GUI_h
+             window
+             vg
+             null
+             (convert (pref ww 0) float)
+             (convert (pref wh 0) float)
+             (/ (convert (pref fbw 0) float) (convert (pref ww 0) float)))))))
 
 ;; walks the tree in pre-order
 (bind-func gui_render_subtree
-  (lambda (gui:GUI* widget:Widget* x:float y:float w:float h:float)
+  (lambda (widget:Widget* x:float y:float w:float h:float)
     ;; (println "x:" x "y:" y "w:" w "h:" h)
     (if (null? widget)
         widget
-        (if (and (null? (Widget_left_child widget))
-                 (null? (Widget_right_child widget)))
+        (if (and (null? (widget_left_child widget))
+                 (null? (widget_right_child widget)))
             ;; if a leaf node, set the nanovg transform matrix and
             ;; call the render callback
-            (let ((winWidth (GUI_width gui))
-                  (winHeight (GUI_height gui))
-                  (vg (GUI_context gui)))
+            (let ((winWidth (GUI_width EXTEMPORE_GUI))
+                  (winHeight (GUI_height EXTEMPORE_GUI))
+                  (vg (GUI_context EXTEMPORE_GUI)))
               (nvgResetTransform vg)
               (nvgScale vg winWidth winHeight)
               (nvgTranslate vg (/ x winWidth) (/ y winHeight))
-              ((Widget_cb widget) widget)
+              ((widget_cb widget) widget)
               null)
             ;; otherwise recurse into the child widgets
             (begin
-              (gui_render_subtree gui
-                                  (Widget_left_child widget)
+              (gui_render_subtree (widget_left_child widget)
                                   x
                                   y
                                   w
-                                  (* (Widget_size (Widget_left_child widget)) h))
-              (gui_render_subtree gui
-                                  (Widget_right_child widget)
+                                  (* (widget_size (widget_left_child widget)) h))
+              (gui_render_subtree (widget_right_child widget)
                                   x
-                                  (+ y (* (Widget_size (Widget_left_child widget)) h))
+                                  (+ y (* (widget_size (widget_left_child widget)) h))
                                   w
-                                  (* (Widget_size (Widget_right_child widget)) h))
+                                  (* (widget_size (widget_right_child widget)) h))
               (convert null))))))
 
 (bind-func gui_render
-  (lambda (gui:GUI*)
+  (lambda ()
     (glClear (bitwise-or GL_COLOR_BUFFER_BIT
                          GL_DEPTH_BUFFER_BIT
                          GL_STENCIL_BUFFER_BIT))
-    (nvgBeginFrame (GUI_context gui)
-                   (convert (GUI_width gui))
-                   (convert (GUI_height gui))
-                   (GUI_pixel_ratio gui))
-    (gui_render_subtree gui (GUI_root gui) 0. 0. (GUI_width gui) (GUI_height gui))
-    (nvgEndFrame (GUI_context gui))
+    (nvgBeginFrame (GUI_context EXTEMPORE_GUI)
+                   (convert (GUI_width EXTEMPORE_GUI))
+                   (convert (GUI_height EXTEMPORE_GUI))
+                   (GUI_pixel_ratio EXTEMPORE_GUI))
+    (gui_render_subtree (GUI_root EXTEMPORE_GUI) 0. 0. (GUI_width EXTEMPORE_GUI) (GUI_height EXTEMPORE_GUI))
+    (nvgEndFrame (GUI_context EXTEMPORE_GUI))
     (glfwPollEvents)
-    (glfwSwapBuffers (GUI_window gui))))
+    (glfwSwapBuffers (GUI_window EXTEMPORE_GUI))))
 
-(bind-func Widget_leaf_p
+(bind-func widget_leaf_p
   (lambda (widget:Widget*)
-    (and (null? (Widget_left_child widget))
-         (null? (Widget_right_child widget)))))
+    (and (null? (widget_left_child widget))
+         (null? (widget_right_child widget)))))
 
-(bind-func Widget_inner_p
+(bind-func widget_inner_p
   (lambda (widget:Widget*)
-    (not (Widget_leaf_p widget))))
+    (not (widget_leaf_p widget))))
 
-(bind-func Widget_parent_p
+(bind-func widget_parent_p
   (lambda (child:Widget* parent:Widget*)
-    (= (Widget_parent child) parent)))
+    (= (widget_parent child) parent)))
 
-(bind-func Widget_child_p
+(bind-func widget_child_p
   (lambda (parent:Widget* child:Widget*)
-    (or (= (Widget_left_child parent) child)
-        (= (Widget_right_child parent) child))))
+    (or (= (widget_left_child parent) child)
+        (= (widget_right_child parent) child))))
 
 ;; walk the widget tree (preorder), applying fn to each widget
-(bind-func Widget_walk_preorder
+(bind-func widget_walk_preorder
   (lambda (widget:Widget* visit_fn:[void,Widget*]*)
     (if (null? widget)
         widget
         (begin
           (visit_fn widget)
-          (Widget_walk_preorder (Widget_left_child widget) visit_fn)
-          (Widget_walk_preorder (Widget_right_child widget) visit_fn)
+          (widget_walk_preorder (widget_left_child widget) visit_fn)
+          (widget_walk_preorder (widget_right_child widget) visit_fn)
           null))))
 
 ;; returns the first widget for which pred returns true
-(bind-func Widget_find_preorder
+(bind-func widget_find_preorder
   (lambda (widget:Widget* pred:[i1,Widget*]*)
     (if (and (not (null? widget)) (pred widget))
         widget
         (if (not (null? widget))
             (begin
-              (Widget_find_preorder (Widget_left_child widget) pred)
-              (Widget_find_preorder (Widget_right_child widget) pred))
+              (widget_find_preorder (widget_left_child widget) pred)
+              (widget_find_preorder (widget_right_child widget) pred))
             null))))
 
 ;; some useful helper search functions
 
-(bind-func gui_find_parent
-  (lambda (gui:GUI* widget:Widget*)
-    (Widget_find_preorder
-     (GUI_root gui)
+(bind-func widget_find_parent
+  (lambda (widget:Widget*)
+    (widget_find_preorder
+     (GUI_root EXTEMPORE_GUI)
      (lambda (w)
-       (Widget_parent_p widget w)))))
+       (widget_parent_p widget w)))))
 
-(bind-func gui_find_leaf
-  (lambda (gui:GUI*)
-    (Widget_find_preorder
-     (GUI_root gui)
-     Widget_leaf_p)))
+(bind-func widget_find_leaf
+  (lambda ()
+    (widget_find_preorder
+     (GUI_root EXTEMPORE_GUI)
+     widget_leaf_p)))
 
-(bind-func gui_find_widget_with_id
-  (lambda (gui:GUI* id:i32)
-    (Widget_find_preorder
-     (GUI_root gui)
+(bind-func widget_find_with_id
+  (lambda (id)
+    (widget_find_preorder
+     (GUI_root EXTEMPORE_GUI)
      (lambda (w)
-       (= (Widget_id w) id)))))
+       (= (widget_id w) id)))))
 
-(bind-poly gui_find Widget_find_preorder)
-;; (bind-poly gui_find gui_find_parent) ;; this is perhaps too confusing
-(bind-poly gui_find gui_find_widget_with_id)
+(bind-poly widget_find widget_find_preorder)
+;; (bind-poly widget_find widget_find_parent) ;; this is perhaps too confusing
+(bind-poly widget_find widget_find_with_id)
 
 ;; modify the GUI tree
 
-(bind-func gui_add_widget_left
-  (lambda (gui:GUI* new_widget:Widget*)
-    (if (not (Widget_leaf_p  new_widget))
+(bind-func widget_add_left
+  (lambda (new_widget:Widget*)
+    (if (not (widget_leaf_p new_widget))
         (begin (println "Cannot add non-leaf widget")
                new_widget)
-        (let ((old_leaf (gui_find_leaf gui)))
+        (let ((old_leaf (widget_find_leaf)))
           (if (null? old_leaf)
-              (GUI_set_root gui new_widget)
-              (let ((old_size (Widget_size old_leaf))
-                    (new_size (Widget_size new_widget))
+              (GUI_set_root EXTEMPORE_GUI new_widget)
+              (let ((old_size (widget_size old_leaf))
+                    (new_size (widget_size new_widget))
                     (total_size (+ old_size new_size))
                     (new_lchild new_widget)
                     (new_rchild old_leaf)
                     (new_parent (Widget_h -1
                                           old_size
-                                          (Widget_type old_leaf)
+                                          (widget_type old_leaf)
                                           null
-                                          (Widget_parent old_leaf)
+                                          (widget_parent old_leaf)
                                           new_lchild
                                           new_rchild)))
                 ;; normalise new widget size
-                (Widget_set_size new_lchild (/ new_size total_size))
-                (Widget_set_size new_rchild (/ old_size total_size))
+                (widget_set_size new_lchild (/ new_size total_size))
+                (widget_set_size new_rchild (/ old_size total_size))
                 ;; set up new parent pointers
-                (Widget_set_parent new_lchild new_parent)
-                (Widget_set_parent new_rchild new_parent)
+                (widget_set_parent new_lchild new_parent)
+                (widget_set_parent new_rchild new_parent)
                 ;; return the new_lchild
                 new_lchild))))))
 
 ;; add widgets to left by default
-(bind-poly gui_add_widget gui_add_widget_left)
+(bind-poly widget_add widget_add_left)
 
 (bind-func gui_validate
-  (lambda (gui:GUI*)
+  (lambda ()
     ;; check that all nodes are either full, or leaves
     (null?
-     (Widget_find_preorder
-      (GUI_root gui)
+     (widget_find_preorder
+      (GUI_root EXTEMPORE_GUI)
       (lambda (w)
         ;; need an exclusive or...
-        (not (or (and (null? (Widget_left_child w))
-                      (null? (Widget_right_child w)))
-                 (and (not (null? (Widget_left_child w)))
-                      (not (null? (Widget_right_child w)))))))))))
+        (not (or (and (null? (widget_left_child w))
+                      (null? (widget_right_child w)))
+                 (and (not (null? (widget_left_child w)))
+                      (not (null? (widget_right_child w)))))))))))
 
 ;;;;;;;;;;;;;
 ;; widgets ;;
 ;;;;;;;;;;;;;
 
 ;; not sure if I'll use these, but...
-(bind-val Widget_button i64 (real->integer (expt 2 0)))
-(bind-val Widget_label i64 (real->integer (expt 2 1)))
-(bind-val Widget_image i64 (real->integer (expt 2 2)))
-(bind-val Widget_fbo i64 (real->integer (expt 2 3)))
+(bind-val widget_button i64 (real->integer (expt 2 0)))
+(bind-val widget_label i64 (real->integer (expt 2 1)))
+(bind-val widget_image i64 (real->integer (expt 2 2)))
+(bind-val widget_fbo i64 (real->integer (expt 2 3)))
 
 ;; button
 
-(bind-func gui_button_create
-  (lambda (gui:GUI* label:i8* r:float g:float b:float)
+(bind-func widget_button_create
+  (lambda (label:i8* r:float g:float b:float)
     (let ((cb (lambda (widget:Widget*)
-                (println "inwidget" (Str label) gui widget)
-                (nvgSave (GUI_context gui))
-                (nvgBeginPath (GUI_context gui))
+                (println "inwidget" (Str label) EXTEMPORE_GUI widget)
+                (nvgSave (GUI_context EXTEMPORE_GUI))
+                (nvgBeginPath (GUI_context EXTEMPORE_GUI))
                 ;; assume matrix transform -> [0,1]^2 has been applied
-                (nvgFillColor (GUI_context gui) (nvgRGBf r g b))
-                (nvgRect (GUI_context gui) 0. 0. 1. 1.)
-                (nvgFill (GUI_context gui))
-                (nvgRestore (GUI_context gui))
+                (nvgFillColor (GUI_context EXTEMPORE_GUI) (nvgRGBf r g b))
+                (nvgRect (GUI_context EXTEMPORE_GUI) 0. 0. 1. 1.)
+                (nvgFill (GUI_context EXTEMPORE_GUI))
+                (nvgRestore (GUI_context EXTEMPORE_GUI))
                 void)))
-      (Widget_h 1 1.0 Widget_button cb null null null))))
+      (Widget_h 1 1.0 widget_button cb null null null))))
 
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
