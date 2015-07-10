@@ -236,23 +236,37 @@
                   (winHeight (GUI_height EXTEMPORE_GUI))
                   (vg (GUI_context EXTEMPORE_GUI)))
               (nvgResetTransform vg)
-              (nvgScale vg winWidth winHeight)
-              (nvgTranslate vg (/ x winWidth) (/ y winHeight))
+              (nvgTranslate vg x y)
+              (nvgScale vg w h)
               ((Widget_cb widget) widget)
               null)
-            ;; otherwise recurse into the child widgets
-            (begin
+            ;; otherwise recurse into the child widgets - horizontal
+            ;; splits only at this point
+            (let ((lchild (Widget_left_child widget))
+                  (rchild (Widget_right_child widget))
+                  (lsize (Widget_size lchild))
+                  (rsize (Widget_size rchild))
+                  (totalsize (+ lsize rsize)))
+              ;; normalise sizes
+              (set! lsize (/ lsize totalsize))
+              (set! rsize (/ rsize totalsize))
+              ;; recurse into children
               (gui_render_subtree (Widget_left_child widget)
                                   x
                                   y
                                   w
-                                  (* (Widget_size (Widget_left_child widget)) h))
+                                  (* lsize h))
               (gui_render_subtree (Widget_right_child widget)
                                   x
-                                  (+ y (* (Widget_size (Widget_left_child widget)) h))
+                                  (+ y (* rsize h))
                                   w
-                                  (* (Widget_size (Widget_right_child widget)) h))
+                                  (* rsize h))
               (convert null))))))
+
+;; for debugging
+(bind-func draw_rect
+  (lambda ()
+    void))
 
 (bind-func gui_render
   (lambda ()
@@ -344,24 +358,18 @@
         (let ((old_leaf (Widget_find_leaf)))
           (if (null? old_leaf)
               (GUI_set_root EXTEMPORE_GUI new_widget)
-              (let ((old_size (Widget_size old_leaf))
-                    (new_size (Widget_size new_widget))
-                    (total_size (+ old_size new_size))
-                    ;; reverse these two assignments to add the new
+              (let (;; reverse these two assignments to add the new
                     ;; widget as the left child
                     (new_lchild new_widget)
                     (new_rchild old_leaf)
                     (old_parent (Widget_parent old_leaf))
                     (new_parent (Widget_h -1
-                                          old_size
+                                          (Widget_size old_leaf)
                                           (Widget_type old_leaf)
                                           null
                                           (Widget_parent old_leaf)
                                           new_lchild
                                           new_rchild)))
-                ;; normalise new widget size
-                (Widget_set_size new_lchild (/ new_size total_size))
-                (Widget_set_size new_rchild (/ old_size total_size))
                 ;; set up new parent pointers
                 (Widget_set_parent new_lchild new_parent)
                 (Widget_set_parent new_rchild new_parent)
