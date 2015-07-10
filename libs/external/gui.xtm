@@ -404,20 +404,6 @@
                  (and (not (null? (Widget_left_child w)))
                       (not (null? (Widget_right_child w)))))))))))
 
-;;;;;;;;;;;;;
-;; widgets ;;
-;;;;;;;;;;;;;
-
-(bind-val WIDGET_BUTTON i64 (real->integer (expt 2 0)))
-(bind-val WIDGET_LABEL i64 (real->integer (expt 2 1)))
-(bind-val WIDGET_IMAGE i64 (real->integer (expt 2 2)))
-(bind-val WIDGET_FBO i64 (real->integer (expt 2 3)))
-
-;; split types
-
-(bind-val WIDGET_SPLIT_VERTICAL i64 (real->integer (expt 2 4)))
-(bind-val WIDGET_SPLIT_HORIZONTAL i64 (real->integer (expt 2 5)))
-
 ;; create
 
 (bind-func Widget_create_with_cb
@@ -438,24 +424,123 @@
 ;; mouse/keyboard input ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; this stuff is heavily glfw-based
+;; these functions are heavily glfw-based, and they must be called
+;; from inside a widget callback, since they use the current nanovg
+;; transform to do hit-detection
 
+(bind-func gui_mouse_x
+  (lambda ()
+    (let ((x_ptr:double* (salloc))
+          (y_ptr:double* (salloc)))
+      (glfwGetCursorPos (GUI_window EXTEMPORE_GUI) x_ptr y_ptr)
+      (convert (pref x_ptr 0) float))))
+
+(bind-func gui_mouse_y
+  (lambda ()
+    (let ((x_ptr:double* (salloc))
+          (y_ptr:double* (salloc)))
+      (glfwGetCursorPos (GUI_window EXTEMPORE_GUI) x_ptr y_ptr)
+      (convert (pref y_ptr 0) float))))
+
+(bind-func gui_hover_p
+  (let ((transform:float* (alloc 6)))
+    (lambda (widget:Widget*)
+      ;; get current matrix transform from nanovg
+      (nvgCurrentTransform (GUI_context EXTEMPORE_GUI) transform)
+      (let ((x (gui_mouse_x))
+            (y (gui_mouse_y))
+            (xmin (pref transform 2))
+            (xmax (+ xmin (pref transform 0)))
+            (ymin (pref transform 5))
+            (ymax (+ ymin (pref transform 3))))
+        ;; (println "xmin:" xmin "x:" x "xmax:" xmax)
+        ;; (println "ymin:" ymin "y:" y "ymax:" ymax)
+        ;; a simple hit-test
+        (and (< xmin x) (> xmax x)
+             (< ymin y) (> ymax y))))))
+
+(bind-func gui_click_p
+  (lambda (widget:Widget* button)
+    (and (gui_hover_p widget)
+         (= (glfwGetMouseButton (GUI_window EXTEMPORE_GUI)
+                                button)
+            GLFW_PRESS))))
+
+(bind-func gui_left_click_p
+  (lambda (widget:Widget*)
+    (gui_click_p widget GLFW_MOUSE_BUTTON_1)))
+
+(bind-func gui_right_click_p
+  (lambda (widget:Widget*)
+    (gui_click_p widget GLFW_MOUSE_BUTTON_2)))
+
+(bind-func gui_enter_p
+  (let ((prev 0)
+        (curr 0))
+    (lambda (widget:Widget*)
+      (set! curr (gui_hover_p widget))
+      (if (and (not prev) curr)
+          (begin (set! prev curr) 1)
+          (begin (set! prev curr) 0)))))
+
+(bind-func gui_leave_p
+  (let ((prev 0)
+        (curr 0))
+    (lambda (widget:Widget*)
+      (set! curr (gui_hover_p widget))
+      (if (and prev (not curr))
+          (begin (set! prev curr) 1)
+          (begin (set! prev curr) 0)))))
+
+(bind-func gui_keypress_p
+  (lambda (widget:Widget* key)
+    (= (glfwGetKey (GUI_window EXTEMPORE_GUI) key)
+       GLFW_PRESS)))
+
+(bind-func gui_keyrelease_p
+  (lambda (widget:Widget* key)
+    (= (glfwGetKey (GUI_window EXTEMPORE_GUI) key)
+       GLFW_RELEASE)))
+
+;;;;;;;;;;;;;
+;; widgets ;;
+;;;;;;;;;;;;;
+
+(bind-val WIDGET_BUTTON i64 (real->integer (expt 2 0)))
+(bind-val WIDGET_LABEL i64 (real->integer (expt 2 1)))
+(bind-val WIDGET_IMAGE i64 (real->integer (expt 2 2)))
+(bind-val WIDGET_FBO i64 (real->integer (expt 2 3)))
+
+;; split types
+
+(bind-val WIDGET_SPLIT_VERTICAL i64 (real->integer (expt 2 4)))
+(bind-val WIDGET_SPLIT_HORIZONTAL i64 (real->integer (expt 2 5)))
 
 
 ;; button
 
-(bind-func Widget_button_create
-  (lambda (label:i8* r:float g:float b:float)
 (bind-func Widget_create_button
   (lambda (id size label:i8* r g b)
     (let ((lab (Str label))
           (cb (lambda (widget:Widget*)
-                (println lab)
+                (let ((trans:float* (salloc 6))
+                      (i 0))
+                  (nvgCurrentTransform (GUI_context EXTEMPORE_GUI)
+                                       trans)
+                  (printf "current transform: ")
+                  (dotimes (i 6)
+                    (printf "%f " (convert (pref trans i) double)))
+                  (println))
                 (nvgSave (GUI_context EXTEMPORE_GUI))
                 (nvgBeginPath (GUI_context EXTEMPORE_GUI))
                 ;; assume matrix transform -> [0,1]^2 has been applied
-                (nvgFillColor (GUI_context EXTEMPORE_GUI) (nvgRGBf r g b))
-                (nvgRect (GUI_context EXTEMPORE_GUI) .1 .1 .8 .8)
+                (if (= (glfwGetMouseButton (GUI_window EXTEMPORE_GUI) GLFW_MOUSE_BUTTON_1)
+                       GLFW_PRESS)
+                    (nvgFillColor (GUI_context EXTEMPORE_GUI)
+                                  (nvgRGBf (- 1. r) (- 1. g) (- 1. b)))
+                    (nvgFillColor (GUI_context EXTEMPORE_GUI)
+                                  (nvgRGBf r g b)))
+                (nvgRect (GUI_context EXTEMPORE_GUI) 0. 0. 1. 1.)
                 (nvgFill (GUI_context EXTEMPORE_GUI))
                 (nvgRestore (GUI_context EXTEMPORE_GUI))
                 void)))
