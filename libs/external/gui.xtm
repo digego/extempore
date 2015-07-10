@@ -119,6 +119,86 @@
 (bind-poly print Widget_print)
 (bind-poly tostring Widget_tostring)
 
+;; create
+
+(bind-func Widget_create_with_cb
+  (lambda (id size type cb:WidgetCB)
+    (Widget_h id size type cb null null null)))
+
+(bind-poly Widget_create Widget_create_with_cb)
+
+;; destroy (free)
+
+;; this should really fix up the widget tree as well, but that makes
+;; it a fair bit more complicated. left as an excercise to the reader :)
+(bind-func Widget_destroy
+  (lambda (widget:Widget*)
+    (free widget)))
+
+(bind-func Widget_leaf_p
+  (lambda (widget:Widget*)
+    (and (null? (Widget_left_child widget))
+         (null? (Widget_right_child widget)))))
+
+(bind-func Widget_inner_p
+  (lambda (widget:Widget*)
+    (not (Widget_leaf_p widget))))
+
+(bind-func Widget_parent_p
+  (lambda (child:Widget* parent:Widget*)
+    (= (Widget_parent child) parent)))
+
+(bind-func Widget_child_p
+  (lambda (parent:Widget* child:Widget*)
+    (or (= (Widget_left_child parent) child)
+        (= (Widget_right_child parent) child))))
+
+;; walk the widget tree (preorder), applying fn to each widget
+(bind-func Widget_walk_preorder
+  (lambda (widget:Widget* visit_fn:[void,Widget*]*)
+    (if (null? widget)
+        widget
+        (begin
+          (visit_fn widget)
+          (Widget_walk_preorder (Widget_left_child widget) visit_fn)
+          (Widget_walk_preorder (Widget_right_child widget) visit_fn)
+          null))))
+
+;; returns the first widget for which pred returns true
+(bind-func Widget_find_preorder
+  (lambda (widget:Widget* pred:[i1,Widget*]*)
+    (if (and (not (null? widget)) (pred widget))
+        widget
+        (if (not (null? widget))
+            (begin
+              (Widget_find_preorder (Widget_left_child widget) pred)
+              (Widget_find_preorder (Widget_right_child widget) pred))
+            null))))
+
+;; this is untested
+(bind-func Widget_find_inorder
+  (lambda (widget:Widget* pred:[i1,Widget*]*)
+    (if (not (null? widget))
+        (begin
+          (Widget_find_inorder (Widget_left_child widget) pred)
+          (if (and (not (null? widget)) (pred widget))
+              widget
+              
+              (Widget_find_inorder (Widget_right_child widget) pred)))
+        null)))
+
+;; this is untested
+(bind-func Widget_find_postorder
+  (lambda (widget:Widget* pred:[i1,Widget*]*)
+    (if (not (null? widget))
+        (begin
+          (Widget_find_postorder (Widget_left_child widget) pred)
+          (Widget_find_postorder (Widget_right_child widget) pred)
+          (if (and (not (null? widget)) (pred widget)) widget
+              null)))))
+
+;; the GUI type
+
 ;; 0. GLFW window
 ;; 1. nanovg context
 ;; 2. root widget
@@ -265,11 +345,6 @@
                                   (* rsize h))
               (convert null))))))
 
-;; for debugging
-(bind-func draw_rect
-  (lambda ()
-    void))
-
 (bind-func gui_render
   (lambda ()
     (glClear (bitwise-or GL_COLOR_BUFFER_BIT
@@ -284,80 +359,51 @@
     (glfwPollEvents)
     (glfwSwapBuffers (GUI_window EXTEMPORE_GUI))))
 
-(bind-func Widget_leaf_p
-  (lambda (widget:Widget*)
-    (and (null? (Widget_left_child widget))
-         (null? (Widget_right_child widget)))))
-
-(bind-func Widget_inner_p
-  (lambda (widget:Widget*)
-    (not (Widget_leaf_p widget))))
-
-(bind-func Widget_parent_p
-  (lambda (child:Widget* parent:Widget*)
-    (= (Widget_parent child) parent)))
-
-(bind-func Widget_child_p
-  (lambda (parent:Widget* child:Widget*)
-    (or (= (Widget_left_child parent) child)
-        (= (Widget_right_child parent) child))))
-
-;; walk the widget tree (preorder), applying fn to each widget
-(bind-func Widget_walk_preorder
-  (lambda (widget:Widget* visit_fn:[void,Widget*]*)
-    (if (null? widget)
-        widget
-        (begin
-          (visit_fn widget)
-          (Widget_walk_preorder (Widget_left_child widget) visit_fn)
-          (Widget_walk_preorder (Widget_right_child widget) visit_fn)
-          null))))
-
-;; returns the first widget for which pred returns true
-(bind-func Widget_find_preorder
-  (lambda (widget:Widget* pred:[i1,Widget*]*)
-    (if (and (not (null? widget)) (pred widget))
-        widget
-        (if (not (null? widget))
-            (begin
-              (Widget_find_preorder (Widget_left_child widget) pred)
-              (Widget_find_preorder (Widget_right_child widget) pred))
-            null))))
-
 ;; some useful helper search functions
 
-(bind-func Widget_find_parent
+(bind-func gui_find_parent
   (lambda (widget:Widget*)
     (Widget_find_preorder
      (GUI_root EXTEMPORE_GUI)
      (lambda (w)
        (Widget_parent_p widget w)))))
 
-(bind-func Widget_find_leaf
+(bind-func gui_find_leaf_preorder
   (lambda ()
     (Widget_find_preorder
      (GUI_root EXTEMPORE_GUI)
      Widget_leaf_p)))
 
-(bind-func Widget_find_with_id
+(bind-func gui_find_leaf_inorder
+  (lambda ()
+    (Widget_find_inorder
+     (GUI_root EXTEMPORE_GUI)
+     Widget_leaf_p)))
+
+(bind-func gui_find_leaf_postorder
+  (lambda ()
+    (Widget_find_postorder
+     (GUI_root EXTEMPORE_GUI)
+     Widget_leaf_p)))
+
+(bind-func gui_find_widget_with_id
   (lambda (id)
     (Widget_find_preorder
      (GUI_root EXTEMPORE_GUI)
      (lambda (w)
        (= (Widget_id w) id)))))
 
-(bind-poly Widget_find Widget_find_preorder)
-;; (bind-poly Widget_find Widget_find_parent) ;; this is perhaps too confusing
-(bind-poly Widget_find Widget_find_with_id)
-
 ;; modify the GUI tree
 
-(bind-func Widget_add_left
-  (lambda (new_widget:Widget*)
+(bind-val WIDGET_SPLIT_VERTICAL i64 (real->integer (expt 2 0)))
+(bind-val WIDGET_SPLIT_HORIZONTAL i64 (real->integer (expt 2 1)))
+
+(bind-func gui_add_widget
+  (lambda (new_widget:Widget* horizontal_p:i1)
     (if (not (Widget_leaf_p new_widget))
         (begin (println "Cannot add non-leaf widget")
                new_widget)
-        (let ((old_leaf (Widget_find_leaf)))
+        (let ((old_leaf (gui_find_leaf_preorder)))
           (if (null? old_leaf)
               (GUI_set_root EXTEMPORE_GUI new_widget)
               (let (;; reverse these two assignments to add the new
@@ -367,7 +413,9 @@
                     (old_parent (Widget_parent old_leaf))
                     (new_parent (Widget_h -1
                                           (Widget_size old_leaf)
-                                          (Widget_type old_leaf)
+                                          (if horizontal_p
+                                              WIDGET_SPLIT_HORIZONTAL
+                                              WIDGET_SPLIT_VERTICAL)
                                           null
                                           (Widget_parent old_leaf)
                                           new_lchild
@@ -388,9 +436,6 @@
                 ;; return the new_lchild
                 new_lchild))))))
 
-;; add widgets to left by default
-(bind-poly Widget_add Widget_add_left)
-
 (bind-func gui_validate
   (lambda ()
     ;; check that all nodes are either full, or leaves
@@ -403,22 +448,6 @@
                       (null? (Widget_right_child w)))
                  (and (not (null? (Widget_left_child w)))
                       (not (null? (Widget_right_child w)))))))))))
-
-;; create
-
-(bind-func Widget_create_with_cb
-  (lambda (id size type cb:WidgetCB)
-    (Widget_h id size type cb null null null)))
-
-(bind-poly Widget_create Widget_create_with_cb)
-
-;; destroy (free)
-
-;; this should really fix up the widget tree as well, but that makes
-;; it a fair bit more complicated. left as an excercise to the reader :)
-(bind-func Widget_destroy
-  (lambda (widget:Widget*)
-    (free widget)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; mouse/keyboard input ;;
@@ -506,16 +535,10 @@
 ;; widgets ;;
 ;;;;;;;;;;;;;
 
-(bind-val WIDGET_BUTTON i64 (real->integer (expt 2 0)))
-(bind-val WIDGET_LABEL i64 (real->integer (expt 2 1)))
-(bind-val WIDGET_IMAGE i64 (real->integer (expt 2 2)))
-(bind-val WIDGET_FBO i64 (real->integer (expt 2 3)))
-
-;; split types
-
-(bind-val WIDGET_SPLIT_VERTICAL i64 (real->integer (expt 2 4)))
-(bind-val WIDGET_SPLIT_HORIZONTAL i64 (real->integer (expt 2 5)))
-
+(bind-val WIDGET_BUTTON i64 (real->integer (expt 2 2)))
+(bind-val WIDGET_LABEL i64 (real->integer (expt 2 3)))
+(bind-val WIDGET_IMAGE i64 (real->integer (expt 2 4)))
+(bind-val WIDGET_FBO i64 (real->integer (expt 2 5)))
 
 ;; button
 
@@ -523,23 +546,13 @@
   (lambda (id size label:i8* r g b)
     (let ((lab (Str label))
           (cb (lambda (widget:Widget*)
-                (let ((trans:float* (salloc 6))
-                      (i 0))
-                  (nvgCurrentTransform (GUI_context EXTEMPORE_GUI)
-                                       trans)
-                  (printf "current transform: ")
-                  (dotimes (i 6)
-                    (printf "%f " (convert (pref trans i) double)))
-                  (println))
                 (nvgSave (GUI_context EXTEMPORE_GUI))
                 (nvgBeginPath (GUI_context EXTEMPORE_GUI))
                 ;; assume matrix transform -> [0,1]^2 has been applied
-                (if (= (glfwGetMouseButton (GUI_window EXTEMPORE_GUI) GLFW_MOUSE_BUTTON_1)
-                       GLFW_PRESS)
-                    (nvgFillColor (GUI_context EXTEMPORE_GUI)
-                                  (nvgRGBf (- 1. r) (- 1. g) (- 1. b)))
-                    (nvgFillColor (GUI_context EXTEMPORE_GUI)
-                                  (nvgRGBf r g b)))
+                ;; (nvgFillColor (GUI_context EXTEMPORE_GUI)
+                ;;               (nvgRGBf (- 1. r) (- 1. g) (- 1. b)))
+                (nvgFillColor (GUI_context EXTEMPORE_GUI)
+                              (nvgRGBf r g b))
                 (nvgRect (GUI_context EXTEMPORE_GUI) 0. 0. 1. 1.)
                 (nvgFill (GUI_context EXTEMPORE_GUI))
                 (nvgRestore (GUI_context EXTEMPORE_GUI))
