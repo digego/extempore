@@ -24,6 +24,9 @@
 
 (impc:aot:insert-header "xtmgui")
 
+;; <x,y,w,h>
+(bind-type Rect <float,float,float,float>)
+
 ;; 0. id
 ;; 1. size
 ;; 2. type (flags)
@@ -31,9 +34,9 @@
 ;; 4. parent widget
 ;; 5. left child widget
 ;; 6. right child widget
-(bind-type Widget <i32,float,i64,[void,Widget*]*,Widget*,Widget*,Widget*>)
+(bind-type Widget <i32,float,i64,[void,Widget*,Rect*]*,Widget*,Widget*,Widget*>)
 
-(bind-alias WidgetCB [void,Widget*]*)
+(bind-alias WidgetCB [void,Widget*,Rect*]*)
 
 ;; accessors
 (bind-func Widget_id
@@ -310,7 +313,7 @@
 
 ;; walks the tree in pre-order
 (bind-func gui_render_subtree
-  (lambda (widget:Widget* x:float y:float w:float h:float)
+  (lambda (widget:Widget* bounds:Rect*)
     (if (null? widget)
         widget
         (if (and (null? (Widget_left_child widget))
@@ -320,10 +323,10 @@
             (let ((winWidth (GUI_width EXTEMPORE_GUI))
                   (winHeight (GUI_height EXTEMPORE_GUI))
                   (vg (GUI_context EXTEMPORE_GUI)))
-              (nvgResetTransform vg)
-              (nvgTranslate vg x y)
-              (nvgScale vg w h)
-              ((Widget_cb widget) widget)
+              ;; (nvgResetTransform vg)
+              ;; (nvgTranslate vg x y)
+              ;; (nvgScale vg w h)
+              ((Widget_cb widget) widget bounds)
               null)
             ;; otherwise recurse into the child widgets - horizontal
             ;; splits only at this point
@@ -341,27 +344,29 @@
                   ;; split horizontally (default)
                   (begin
                     (gui_render_subtree (Widget_left_child widget)
-                                        x
-                                        y
-                                        w
-                                        (* lsize h))
+                                        (Rect (tref bounds 0)
+                                              (tref bounds 1)
+                                              (tref bounds 2)
+                                              (* lsize (tref bounds 3))))
                     (gui_render_subtree (Widget_right_child widget)
-                                        x
-                                        (+ y (* lsize h))
-                                        w
-                                        (* rsize h)))
+                                        (Rect (tref bounds 0)
+                                              (+ (tref bounds 1)
+                                                 (* lsize (tref bounds 3)))
+                                              (tref bounds 2)
+                                              (* rsize (tref bounds 3)))))
                   ;; split vertically
                   (begin
                     (gui_render_subtree (Widget_left_child widget)
-                                        x
-                                        y
-                                        (* lsize w)
-                                        h)
+                                        (Rect (tref bounds 0)
+                                              (tref bounds 1)
+                                              (* lsize (tref bounds 2))
+                                              (tref bounds 3)))
                     (gui_render_subtree (Widget_right_child widget)
-                                        (+ x (* lsize w))
-                                        y
-                                        (* rsize w)
-                                        h)))
+                                        (Rect (+ (tref bounds 0)
+                                                 (* lsize (tref bounds 2)))
+                                              (tref bounds 1)
+                                              (* rsize (tref bounds 2))
+                                              (tref bounds 3)))))
               (convert null))))))
 
 (bind-func gui_render
@@ -373,7 +378,7 @@
                    (convert (GUI_width EXTEMPORE_GUI))
                    (convert (GUI_height EXTEMPORE_GUI))
                    (GUI_pixel_ratio EXTEMPORE_GUI))
-    (gui_render_subtree (GUI_root EXTEMPORE_GUI) 0. 0. (GUI_width EXTEMPORE_GUI) (GUI_height EXTEMPORE_GUI))
+    (gui_render_subtree (GUI_root EXTEMPORE_GUI) (Rect 0. 0. (GUI_width EXTEMPORE_GUI) (GUI_height EXTEMPORE_GUI)))
     (nvgEndFrame (GUI_context EXTEMPORE_GUI))
     (glfwPollEvents)
     (glfwSwapBuffers (GUI_window EXTEMPORE_GUI))))
@@ -485,41 +490,38 @@
       (glfwGetCursorPos (GUI_window EXTEMPORE_GUI) x_ptr y_ptr)
       (convert (pref y_ptr 0) float))))
 
-(bind-func gui_hover_p
-  (let ((transform:float* (alloc 6)))
-    (lambda (widget:Widget*)
-      ;; get current matrix transform from nanovg
-      (nvgCurrentTransform (GUI_context EXTEMPORE_GUI) transform)
-      (let ((x (gui_mouse_x))
-            (y (gui_mouse_y))
-            (xmin (pref transform 4))
-            (xmax (+ xmin (pref transform 0)))
-            (ymin (pref transform 5))
-            (ymax (+ ymin (pref transform 3))))
-        ;; a simple hit-test
-        (and (< xmin x) (> xmax x)
-             (< ymin y) (> ymax y))))))
+(bind-func gui_inbounds_p
+  (lambda (bounds:Rect*)
+    (let ((x (gui_mouse_x))
+          (y (gui_mouse_y))
+          (xmin (tref bounds 0))
+          (xmax (+ xmin (tref bounds 2)))
+          (ymin (tref bounds 1))
+          (ymax (+ ymin (tref bounds 3))))
+      ;; a simple hit-test
+      (and (< xmin x) (> xmax x)
+           (< ymin y) (> ymax y)))))
 
 (bind-func gui_click_p
-  (lambda (widget:Widget* button)
-    (and (gui_hover_p widget)
+  (lambda (bounds:Rect* button)
+    (and (gui_inbounds_p bounds)
          (= (glfwGetMouseButton (GUI_window EXTEMPORE_GUI)
                                 button)
             GLFW_PRESS))))
 
 (bind-func gui_left_click_p
-  (lambda (widget:Widget*)
-    (gui_click_p widget GLFW_MOUSE_BUTTON_1)))
+  (lambda (bounds:Rect*)
+    (gui_click_p bounds GLFW_MOUSE_BUTTON_1)))
 
 (bind-func gui_right_click_p
-  (lambda (widget:Widget*)
-    (gui_click_p widget GLFW_MOUSE_BUTTON_2)))
+  (lambda (bounds:Rect*)
+    (gui_click_p bounds GLFW_MOUSE_BUTTON_2)))
 
 (bind-func gui_enter_p
   (let ((prev 0)
         (curr 0))
-    (lambda (widget:Widget*)
-      (set! curr (gui_hover_p widget))
+    (lambda (bounds:Rect*)
+      (set! curr (gui_inbounds_p bounds))
       (if (and (not prev) curr)
           (begin (set! prev curr) 1)
           (begin (set! prev curr) 0)))))
@@ -527,19 +529,19 @@
 (bind-func gui_leave_p
   (let ((prev 0)
         (curr 0))
-    (lambda (widget:Widget*)
-      (set! curr (gui_hover_p widget))
+    (lambda (bounds:Rect*)
+      (set! curr (gui_inbounds_p bounds))
       (if (and prev (not curr))
           (begin (set! prev curr) 1)
           (begin (set! prev curr) 0)))))
 
 (bind-func gui_keypress_p
-  (lambda (widget:Widget* key)
+  (lambda (key)
     (= (glfwGetKey (GUI_window EXTEMPORE_GUI) key)
        GLFW_PRESS)))
 
 (bind-func gui_keyrelease_p
-  (lambda (widget:Widget* key)
+  (lambda (key)
     (= (glfwGetKey (GUI_window EXTEMPORE_GUI) key)
        GLFW_RELEASE)))
 
@@ -557,15 +559,20 @@
 (bind-func Widget_create_button
   (lambda (id size label:i8* r g b)
     (let ((lab (Str label))
-          (cb (lambda (widget:Widget*)
-                (nvgSave (GUI_context EXTEMPORE_GUI))
-                (nvgBeginPath (GUI_context EXTEMPORE_GUI))
-                ;; assume matrix transform -> [0,1]^2 has been applied
-                (nvgFillColor (GUI_context EXTEMPORE_GUI)
-                              (nvgRGBf r g b))
-                (nvgRect (GUI_context EXTEMPORE_GUI) 0. 0. 1. 1.)
-                (nvgFill (GUI_context EXTEMPORE_GUI))
-                (nvgRestore (GUI_context EXTEMPORE_GUI))
+          (cb (lambda (widget:Widget* bounds:Rect*)
+                (let ((vg (GUI_context EXTEMPORE_GUI)))
+                  (nvgSave vg)
+                  (nvgBeginPath vg)
+                  ;; assume matrix transform -> [0,1]^2 has been applied
+                  (nvgFillColor vg
+                                (nvgRGBf r g b))
+                  (nvgRect vg
+                           (tref bounds 0)
+                           (tref bounds 1)
+                           (tref bounds 2)
+                           (tref bounds 3))
+                  (nvgFill vg)
+                  (nvgRestore vg))
                 void)))
       (Widget_create id size WIDGET_BUTTON cb))))
 
