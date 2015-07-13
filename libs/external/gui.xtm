@@ -556,37 +556,6 @@
     (= (glfwGetKey (GUI_window EXTEMPORE_GUI) key)
        GLFW_RELEASE)))
 
-;;;;;;;;;;;;;
-;; widgets ;;
-;;;;;;;;;;;;;
-
-(bind-val WIDGET_BUTTON i64 (real->integer (expt 2 2)))
-(bind-val WIDGET_LABEL i64 (real->integer (expt 2 3)))
-(bind-val WIDGET_IMAGE i64 (real->integer (expt 2 4)))
-(bind-val WIDGET_FBO i64 (real->integer (expt 2 5)))
-
-;; button
-
-(bind-func Widget_create_button
-  (lambda (id size label:i8* r g b)
-    (let ((lab (Str label))
-          (cb (lambda (widget:Widget* bounds:Rect*)
-                (let ((vg (GUI_context EXTEMPORE_GUI)))
-                  (nvgSave vg)
-                  (nvgBeginPath vg)
-                  ;; assume matrix transform -> [0,1]^2 has been applied
-                  (nvgFillColor vg
-                                (nvgRGBf r g b))
-                  (nvgRect vg
-                           (tref bounds 0)
-                           (tref bounds 1)
-                           (tref bounds 2)
-                           (tref bounds 3))
-                  (nvgFill vg)
-                  (nvgRestore vg))
-                void)))
-      (Widget_create id size WIDGET_BUTTON cb))))
-
 ;; fonts
 
 (bind-func gui_load_opensans_fonts
@@ -618,10 +587,55 @@ If you don't have OpenSans on your system, you can download it for free from www
 
 ;; default colours
 
-(bind-val GUI_COLOR_DEFAULT_BG NVGcolor)
-(bind-val GUI_COLOR_HOVER_BG NVGcolor)
+(bind-val GUI_COLOR_BG NVGcolor)
+(bind-val GUI_COLOR_BORDER NVGcolor)
+(bind-val GUI_COLOR_HOVER NVGcolor)
 (bind-val GUI_COLOR_CLICK NVGcolor)
 (bind-val GUI_COLOR_TEXT NVGcolor)
+
+(bind-func gui_set_default_color_theme
+  (lambda ()
+    (tfill! GUI_COLOR_BG .11 .11 .2 1.)
+    (tfill! GUI_COLOR_BORDER .3 .27 .4 1.)
+    (tfill! GUI_COLOR_HOVER .19 .21 .25 1.)
+    (tfill! GUI_COLOR_CLICK .4 .42 .51 1.)
+    (tfill! GUI_COLOR_TEXT .67 .7 .73 1.)))
+
+;;;;;;;;;;;;;
+;; widgets ;;
+;;;;;;;;;;;;;
+
+(bind-val WIDGET_BUTTON i64 (real->integer (expt 2 2)))
+(bind-val WIDGET_LABEL i64 (real->integer (expt 2 3)))
+(bind-val WIDGET_IMAGE i64 (real->integer (expt 2 4)))
+(bind-val WIDGET_FBO i64 (real->integer (expt 2 5)))
+
+;; button
+
+(bind-func Widget_create_button
+  (lambda (id size label:i8*)
+    (let ((lab (Str label))
+          (cb (lambda (widget:Widget* bounds:Rect*)
+                (let ((vg (GUI_context EXTEMPORE_GUI)))
+                  (nvgSave vg)
+                  (nvgBeginPath vg)
+                  ;; assume matrix transform -> [0,1]^2 has been applied
+                  (cond ((gui_left_click_p bounds)
+                         (nvgFillColor vg (nvgRGBf 1. 0. 0.)))
+                        ((gui_inbounds_p bounds)
+                         (nvgFillColor vg (nvgRGBf 0. 1. 0.)))
+                        (else
+                         (nvgFillColor vg (nvgRGBf 0. 0. 1.))))
+                  (nvgRect vg
+                           (tref bounds 0)
+                           (tref bounds 1)
+                           (tref bounds 2)
+                           (tref bounds 3))
+                  (nvgFill vg)
+                  (nvgRestore vg))
+                void)))
+      (Widget_create id size WIDGET_BUTTON cb))))
+
 
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
