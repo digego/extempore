@@ -61,6 +61,29 @@
 ;; };
 (bind-type NVGcolor <float,float,float,float>)
 
+;; we need this one because NVGcolor often gets passed around by value
+;; (i.e. on the stack)
+(bind-func NVGcolor_print
+  (lambda (color:NVGcolor)
+    (printf "<NVGcolor: r=%.3f, g=%.3f, b=%.3f, a=%.3f>"
+            (convert (tref color 0) double)
+            (convert (tref color 1) double)
+            (convert (tref color 2) double)
+            (convert (tref color 3) double))
+    void))
+
+(bind-func NVGcolor_ptr_print
+  (lambda (color:NVGcolor*)
+    (printf "<NVGcolor: r=%.3f, g=%.3f, b=%.3f, a=%.3f>"
+            (convert (tref color 0) double)
+            (convert (tref color 1) double)
+            (convert (tref color 2) double)
+            (convert (tref color 3) double))
+    void))
+
+(bind-poly print NVGcolor_print)
+(bind-poly print NVGcolor_ptr_print)
+
 ;; struct NVGpaint {
 ;;  float xform[6];
 ;;  float extent[2];
@@ -72,6 +95,35 @@
 ;; };
 (bind-type NVGpaint <|6,float|,|2,float|,float,float,NVGcolor,NVGcolor,i32>)
 
+(bind-func NVGpaint_print
+  (lambda (paint:NVGpaint)
+    (printf "<NVGpaint:\n    xform=|")
+    (printf "%.3f " (convert (pref (tref paint 0) 0) double))
+    (printf "%.3f " (convert (pref (tref paint 0) 1) double))
+    (printf "%.3f " (convert (pref (tref paint 0) 2) double))
+    (printf "%.3f " (convert (pref (tref paint 0) 3) double))
+    (printf "%.3f " (convert (pref (tref paint 0) 4) double))
+    (printf "%.3f|" (convert (pref (tref paint 0) 5) double))
+    (printf "\n    extent=|%.3f %.3f|\n"
+            (convert (pref (tref paint 1) 0) double)
+            (convert (pref (tref paint 1) 1) double))
+    (printf "    radius=%.3f\n    feather=%.3f\n"
+            (convert (tref paint 2) double)
+            (convert (tref paint 3) double))
+    (printf "    innerColor=<NVGcolor: r=%.3f, g=%.3f, b=%.3f, a=%.3f>\n"
+            (convert (tref (tref paint 4) 0) double)
+            (convert (tref (tref paint 4) 1) double)
+            (convert (tref (tref paint 4) 2) double)
+            (convert (tref (tref paint 4) 3) double))
+    (printf "    outerColor=<NVGcolor: r=%.3f, g=%.3f, b=%.3f, a=%.3f>\n"
+            (convert (tref (tref paint 5) 0) double)
+            (convert (tref (tref paint 5) 1) double)
+            (convert (tref (tref paint 5) 2) double)
+            (convert (tref (tref paint 5) 3) double))
+    (printf "    image=%d>" (tref paint 6))
+    void))
+
+(bind-poly print NVGpaint_print)
 
 (bind-alias NVGwinding enum)
 (bind-val NVG_CCW NVGwinding 1) ;; Winding for solid shapes
