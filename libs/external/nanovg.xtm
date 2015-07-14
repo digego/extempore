@@ -72,6 +72,21 @@
 
 (bind-poly print NVGcolor_print)
 
+(bind-func NVGcolor_hex
+  "takes a 8-digit hex string (e.g. #x12ab3eff) and returns an NVGcolor
+
+Hex string should be RGBA, with two digits per channel.
+
+Examples:
+ (set! red   (NVGcolor_hex #xFF0000FF))
+ (set! green (NVGcolor_hex #x00FF00FF))
+ (set! blue  (NVGcolor_hex #x0000FFFF))"
+  (lambda (hex_value:i64)
+    (NVGcolor (/ (convert (>> (& hex_value #xFF000000) (* 4 6)) float) (convert #xFF float))
+              (/ (convert (>> (& hex_value #x00FF0000) (* 4 4)) float) (convert #xFF float))
+              (/ (convert (>> (& hex_value #x0000FF00) (* 4 2)) float) (convert #xFF float))
+              (/ (convert (& hex_value #x000000FF) float) (convert #xFF float)))))
+
 ;; struct NVGpaint {
 ;;  float xform[6];
 ;;  float extent[2];
