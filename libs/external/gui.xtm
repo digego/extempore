@@ -585,21 +585,88 @@ If you don't have OpenSans on your system, you can download it for free from www
       (sprintf path "%s/OpenSans-SemiboldItalic.ttf" opensans_dir)
       (nvgCreateFont (GUI_context EXTEMPORE_GUI) "SemiboldItalic" path))))
 
-;; default colours
 
+;; Color themes
+
+;; Primary colors
+(bind-val GUI_COLOR_YELLOW NVGcolor*)
+(bind-val GUI_COLOR_ORANGE NVGcolor*)
+(bind-val GUI_COLOR_RED NVGcolor*)
+(bind-val GUI_COLOR_MAGENTA NVGcolor*)
+(bind-val GUI_COLOR_VIOLET NVGcolor*)
+(bind-val GUI_COLOR_BLUE NVGcolor*)
+(bind-val GUI_COLOR_CYAN NVGcolor*)
+(bind-val GUI_COLOR_GREEN NVGcolor*)
+(bind-val GUI_COLOR_GRAY NVGcolor*)
+;; Darker and lighter accented colors
+(bind-val GUI_COLOR_YELLOW_D NVGcolor*)
+(bind-val GUI_COLOR_YELLOW_L NVGcolor*)
+(bind-val GUI_COLOR_ORANGE_D NVGcolor*)
+(bind-val GUI_COLOR_ORANGE_L NVGcolor*)
+(bind-val GUI_COLOR_RED_D NVGcolor*)
+(bind-val GUI_COLOR_RED_L NVGcolor*)
+(bind-val GUI_COLOR_MAGENTA_D NVGcolor*)
+(bind-val GUI_COLOR_MAGENTA_L NVGcolor*)
+(bind-val GUI_COLOR_VIOLET_D NVGcolor*)
+(bind-val GUI_COLOR_VIOLET_L NVGcolor*)
+(bind-val GUI_COLOR_BLUE_D NVGcolor*)
+(bind-val GUI_COLOR_BLUE_L NVGcolor*)
+(bind-val GUI_COLOR_CYAN_D NVGcolor*)
+(bind-val GUI_COLOR_CYAN_L NVGcolor*)
+(bind-val GUI_COLOR_GREEN_D NVGcolor*)
+(bind-val GUI_COLOR_GREEN_L NVGcolor*)
+(bind-val GUI_COLOR_GRAY_D NVGcolor*)
+(bind-val GUI_COLOR_GRAY_L NVGcolor*)
+;; Adaptive colors
+(bind-val GUI_COLOR_FG NVGcolor*)
 (bind-val GUI_COLOR_BG NVGcolor*)
-(bind-val GUI_COLOR_BORDER NVGcolor*)
-(bind-val GUI_COLOR_HOVER NVGcolor*)
-(bind-val GUI_COLOR_CLICK NVGcolor*)
-(bind-val GUI_COLOR_TEXT NVGcolor*)
+(bind-val GUI_COLOR_HL_LINE NVGcolor*)
+(bind-val GUI_COLOR_HL NVGcolor*)
+(bind-val GUI_COLOR_EMPH NVGcolor*)
+(bind-val GUI_COLOR_COMMENTS NVGcolor*)
 
-(bind-func gui_set_default_color_theme
+(bind-func gui_set_monokai_color_theme
+  "set GUI_COLOR_* variables to Monokai color theme
+
+Monokai was originally from Textmate, but has since been ported to
+several different editors."
   (lambda ()
-    (set! GUI_COLOR_BG (NVGcolor .11 .11 .2 1.))
-    (set! GUI_COLOR_BORDER (NVGcolor .3 .27 .4 1.))
-    (set! GUI_COLOR_HOVER (NVGcolor .19 .21 .25 1.))
-    (set! GUI_COLOR_CLICK (NVGcolor .4 .42 .51 1.))
-    (set! GUI_COLOR_TEXT (NVGcolor .67 .7 .73 1.))
+    ;; Primary colors
+    (set! GUI_COLOR_YELLOW           (NVGcolor_hex #xE6DB74FF))
+    (set! GUI_COLOR_ORANGE           (NVGcolor_hex #xFD971FFF))
+    (set! GUI_COLOR_RED              (NVGcolor_hex #xF92672FF))
+    (set! GUI_COLOR_MAGENTA          (NVGcolor_hex #xFD5FF0FF))
+    (set! GUI_COLOR_VIOLET           (NVGcolor_hex #xAE81FFFF))
+    (set! GUI_COLOR_BLUE             (NVGcolor_hex #x66D9EFFF))
+    (set! GUI_COLOR_CYAN             (NVGcolor_hex #xA1EFE4FF))
+    (set! GUI_COLOR_GREEN            (NVGcolor_hex #xA6E22EFF))
+    (set! GUI_COLOR_GRAY             (NVGcolor_hex #x474747FF))
+    ;; Darker and lighter accented colors
+    (set! GUI_COLOR_YELLOW_D         (NVGcolor_hex #x968B26FF))
+    (set! GUI_COLOR_YELLOW_L         (NVGcolor_hex #xF3EA98FF))
+    (set! GUI_COLOR_ORANGE_D         (NVGcolor_hex #xA45E0AFF))
+    (set! GUI_COLOR_ORANGE_L         (NVGcolor_hex #xFEB257FF))
+    (set! GUI_COLOR_RED_D            (NVGcolor_hex #xA20C41FF))
+    (set! GUI_COLOR_RED_L            (NVGcolor_hex #xFC5C94FF))
+    (set! GUI_COLOR_MAGENTA_D        (NVGcolor_hex #xA41F99FF))
+    (set! GUI_COLOR_MAGENTA_L        (NVGcolor_hex #xFE87F4FF))
+    (set! GUI_COLOR_VIOLET_D         (NVGcolor_hex #x562AA6FF))
+    (set! GUI_COLOR_VIOLET_L         (NVGcolor_hex #xC2A1FFFF))
+    (set! GUI_COLOR_BLUE_D           (NVGcolor_hex #x21889BFF))
+    (set! GUI_COLOR_BLUE_L           (NVGcolor_hex #x8DE6F7FF))
+    (set! GUI_COLOR_CYAN_D           (NVGcolor_hex #x349B8DFF))
+    (set! GUI_COLOR_CYAN_L           (NVGcolor_hex #xBBF7EFFF))
+    (set! GUI_COLOR_GREEN_D          (NVGcolor_hex #x67930FFF))
+    (set! GUI_COLOR_GREEN_L          (NVGcolor_hex #xC1F161FF))
+    (set! GUI_COLOR_GRAY_D           (NVGcolor_hex #x333333FF))
+    (set! GUI_COLOR_GRAY_L           (NVGcolor_hex #x6b6b6bFF))
+    ;; Adaptive colors
+    (set! GUI_COLOR_FG               (NVGcolor_hex #xF8F8F2FF))
+    (set! GUI_COLOR_BG               (NVGcolor_hex #x272822FF))
+    (set! GUI_COLOR_HL_LINE          (NVGcolor_hex #x3E3D31FF))
+    (set! GUI_COLOR_HL               (NVGcolor_hex #x49483EFF))
+    (set! GUI_COLOR_EMPH             (NVGcolor_hex #xF8F8F0FF))
+    (set! GUI_COLOR_COMMENTS         (NVGcolor_hex #x75715EFF))
     void))
 
 ;;;;;;;;;;;;;
@@ -622,9 +689,9 @@ If you don't have OpenSans on your system, you can download it for free from www
                   (nvgBeginPath vg)
                   ;; assume matrix transform -> [0,1]^2 has been applied
                   (cond ((gui_left_click_p bounds)
-                         (_nvgFillColor vg GUI_COLOR_CLICK))
+                         (_nvgFillColor vg GUI_COLOR_FG))
                         ((gui_inbounds_p bounds)
-                         (_nvgFillColor vg GUI_COLOR_HOVER))
+                         (_nvgFillColor vg GUI_COLOR_HL))
                         (else
                          (_nvgFillColor vg GUI_COLOR_BG)))
                   (nvgRect vg
