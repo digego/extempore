@@ -587,19 +587,20 @@ If you don't have OpenSans on your system, you can download it for free from www
 
 ;; default colours
 
-(bind-val GUI_COLOR_BG NVGcolor)
-(bind-val GUI_COLOR_BORDER NVGcolor)
-(bind-val GUI_COLOR_HOVER NVGcolor)
-(bind-val GUI_COLOR_CLICK NVGcolor)
-(bind-val GUI_COLOR_TEXT NVGcolor)
+(bind-val GUI_COLOR_BG NVGcolor*)
+(bind-val GUI_COLOR_BORDER NVGcolor*)
+(bind-val GUI_COLOR_HOVER NVGcolor*)
+(bind-val GUI_COLOR_CLICK NVGcolor*)
+(bind-val GUI_COLOR_TEXT NVGcolor*)
 
 (bind-func gui_set_default_color_theme
   (lambda ()
-    (tfill! GUI_COLOR_BG .11 .11 .2 1.)
-    (tfill! GUI_COLOR_BORDER .3 .27 .4 1.)
-    (tfill! GUI_COLOR_HOVER .19 .21 .25 1.)
-    (tfill! GUI_COLOR_CLICK .4 .42 .51 1.)
-    (tfill! GUI_COLOR_TEXT .67 .7 .73 1.)))
+    (set! GUI_COLOR_BG (NVGcolor .11 .11 .2 1.))
+    (set! GUI_COLOR_BORDER (NVGcolor .3 .27 .4 1.))
+    (set! GUI_COLOR_HOVER (NVGcolor .19 .21 .25 1.))
+    (set! GUI_COLOR_CLICK (NVGcolor .4 .42 .51 1.))
+    (set! GUI_COLOR_TEXT (NVGcolor .67 .7 .73 1.))
+    void))
 
 ;;;;;;;;;;;;;
 ;; widgets ;;
@@ -621,11 +622,11 @@ If you don't have OpenSans on your system, you can download it for free from www
                   (nvgBeginPath vg)
                   ;; assume matrix transform -> [0,1]^2 has been applied
                   (cond ((gui_left_click_p bounds)
-                         (nvgFillColor vg (nvgRGBf 1. 0. 0.)))
+                         (_nvgFillColor vg GUI_COLOR_CLICK))
                         ((gui_inbounds_p bounds)
-                         (nvgFillColor vg (nvgRGBf 0. 1. 0.)))
+                         (_nvgFillColor vg GUI_COLOR_HOVER))
                         (else
-                         (nvgFillColor vg (nvgRGBf 0. 0. 1.))))
+                         (_nvgFillColor vg GUI_COLOR_BG)))
                   (nvgRect vg
                            (tref bounds 0)
                            (tref bounds 1)
