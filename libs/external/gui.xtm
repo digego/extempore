@@ -740,21 +740,13 @@ several different editors."
           (println "Set GUI theme: default")))
     void))
 
-;;;;;;;;;;;;;
-;; widgets ;;
-;;;;;;;;;;;;;
-
-(bind-val GUI_BUTTON i64 (real->integer (expt 2 2)))
-(bind-val GUI_LABEL i64 (real->integer (expt 2 3)))
-(bind-val GUI_IMAGE i64 (real->integer (expt 2 4)))
-(bind-val GUI_FBO i64 (real->integer (expt 2 5)))
-
-;; button
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; nanovg draw helpers ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func gui_draw_text_in_bounds
-  (let ((count 0))
-    (lambda (vg text:i8* bounds:Rect*)
-      (nvgBeginPath vg)
+  (lambda (bounds:Rect* text:i8*)
+    (let ((vg (GUI_context EXTEMPORE_GUI)))
       ;; find bounds
       (let ((font_size 30.)
             (h (tref bounds 3))
@@ -776,8 +768,31 @@ several different editors."
                     (tref bounds 2)
                     text null)))))
 
+(bind-func gui_draw_rect
+  (lambda (bounds:Rect*)
+    (let ((vg (GUI_context EXTEMPORE_GUI)))
+      (nvgRect vg (tref bounds 0) (tref bounds 1) (tref bounds 2) (tref bounds 3)))))
+
+;;;;;;;;;;;;;
+;; widgets ;;
+;;;;;;;;;;;;;
+
+;; these are the standard widgets, but feel free to implement your own
+;; custom ones - it's basically just an xtlang closure callback
+
+(bind-val GUI_BUTTON i64 (real->integer (expt 2 2)))
+(bind-val GUI_BUTTON_CHECKBOX i64 (real->integer (expt 2 3)))
+(bind-val GUI_BUTTON_RADIO i64 (real->integer (expt 2 4)))
+(bind-val GUI_TEXT i64 (real->integer (expt 2 5)))
+(bind-val GUI_SLIDER i64 (real->integer (expt 2 6)))
+(bind-val GUI_SLIDER2D i64 (real->integer (expt 2 7)))
+(bind-val GUI_IMAGE i64 (real->integer (expt 2 8)))
+(bind-val GUI_FBO i64 (real->integer (expt 2 9)))
+
+;; button
+
 (bind-func gui_draw_button
-  (lambda (label:i8* bounds)
+  (lambda (bounds label:i8*)
     (let ((vg (GUI_context EXTEMPORE_GUI)))
       ;; draw background
       (nvgBeginPath vg)
@@ -787,18 +802,14 @@ several different editors."
              (_nvgFillColor vg GUI_COLOR_HL))
             (else
              (_nvgFillColor vg GUI_COLOR_BG)))
-      (nvgRect vg
-               (tref bounds 0)
-               (tref bounds 1)
-               (tref bounds 2)
-               (tref bounds 3))
+      (gui_draw_rect bounds)
       (nvgFill vg)
       ;; draw text
       (nvgBeginPath vg)
       (if (gui_left_click_p bounds)
           (_nvgFillColor vg GUI_COLOR_BG)
           (_nvgFillColor vg GUI_COLOR_FG))
-      (gui_draw_text_in_bounds vg label bounds)
+      (gui_draw_text_in_bounds bounds label)
       (nvgFill vg))))
 
 (bind-func Widget_button
@@ -807,10 +818,35 @@ several different editors."
     (let ((lab (Str label)))
       (Widget_with_cb id .5 GUI_BUTTON
                       (lambda (widget:Widget* bounds:Rect*)
-                        (let ((vg (GUI_context EXTEMPORE_GUI)))
-                          (gui_draw_button (string_cstr lab) bounds))
+                        (gui_draw_button bounds (string_cstr lab))
                         void)))))
 
+;; checkbox
+
+(bind-func gui_draw_checkbox
+  (lambda (bounds label:i8* on_p:i1)
+    (let ((vg (GUI_context EXTEMPORE_GUI)))
+      ;; draw background
+      (nvgBeginPath vg)
+      (if on_p
+          (_nvgFillColor vg GUI_COLOR_GREEN_L)
+          (_nvgFillColor vg GUI_COLOR_GREEN_D))
+      (gui_draw_rect bounds)
+      (nvgFill vg)
+      (_nvgFillColor vg GUI_COLOR_BG)
+      (nvgBeginPath vg)
+      (gui_draw_text_in_bounds bounds label)
+      (nvgFill vg))))
+
+(bind-func Widget_checkbox
+  "create a button widget with id and label"
+  (lambda (id label:i8*)
+    (let ((lab (Str label)))
+      (Widget_with_cb id .5 GUI_BUTTON
+                      (lambda (widget:Widget* bounds:Rect*)
+                        (let ((vg (GUI_context EXTEMPORE_GUI)))
+                          (gui_draw_checkbox bounds (string_cstr lab) #t))
+                        void)))))
 
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
