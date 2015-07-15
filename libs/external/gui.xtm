@@ -732,6 +732,31 @@ several different editors."
 
 ;; button
 
+(bind-func gui_draw_text_in_bounds
+  (let ((count 0))
+    (lambda (vg text:i8* bounds:Rect*)
+      (nvgBeginPath vg)
+      ;; find bounds
+      (let ((font_size 30.)
+            (h (tref bounds 3))
+            (textbox_height font_size)
+            (b_ptr:float* (salloc 4)))
+        (nvgTextAlign vg (bor NVG_ALIGN_BOTTOM NVG_ALIGN_CENTER))
+        (nvgFontSize vg font_size)
+        (nvgTextBoxBounds vg
+                          (tref bounds 0)
+                          (tref bounds 1)
+                          (tref bounds 2)
+                          text null
+                          b_ptr)
+        (set! textbox_height (- (pref b_ptr 3) (pref b_ptr 1)))
+        ;; draw text
+        (nvgTextBox vg
+                    (tref bounds 0)
+                    (+ (tref bounds 1) (/ (+ (tref bounds 3) textbox_height) 2.0))
+                    (tref bounds 2)
+                    text null)))))
+
 (bind-func gui_draw_button
   (lambda (label:i8* bounds)
     (let ((vg (GUI_context EXTEMPORE_GUI)))
@@ -751,16 +776,11 @@ several different editors."
       (nvgFill vg)
       ;; draw text
       (nvgBeginPath vg)
-      (_nvgFillColor vg GUI_COLOR_FG)
-      (nvgTextAlign vg NVG_ALIGN_CENTER)
-      ;; draw text
-      (nvgTextBox vg
-                  (tref bounds 0)
-                  (+ (tref bounds 1) 50.)
-                  (tref bounds 2)
-                  label null)
+      (if (gui_left_click_p bounds)
+          (_nvgFillColor vg GUI_COLOR_BG)
+          (_nvgFillColor vg GUI_COLOR_FG))
+      (gui_draw_text_in_bounds vg label bounds)
       (nvgFill vg))))
-
 
 (bind-func Widget_create_button
   (lambda (id label:i8*)
