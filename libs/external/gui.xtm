@@ -919,13 +919,25 @@ several different editors."
                            (tref bounds 2))
                         (/ (- (gui_mouse_y) (tref bounds 1))
                            (tref bounds 3)))))
-          ;; draw widget
+          ;; draw background
           (nvgBeginPath vg)
-          ;; need to draw a slider "marker at the right place"
-          (if (gui_left_click_p bounds)
-              (_nvgFillColor vg GUI_COLOR_BLUE_L)
-              (_nvgFillColor vg GUI_COLOR_BLUE_D))
+          (_nvgFillColor vg GUI_COLOR_BLUE_D)
           (gui_draw_rect bounds)
+          (nvgFill vg)
+          ;; draw "marker"
+          (nvgBeginPath vg)
+          (_nvgFillColor vg GUI_COLOR_BLUE_L)
+          (if (Widget_split_vertical_p widget)
+              (gui_draw_rect (Rect
+                              (+ (* (tref bounds 2) slider_pos) (tref bounds 0) -10.)
+                              (tref bounds 1)
+                              20.
+                              (tref bounds 3)))
+              (gui_draw_rect (Rect
+                              (tref bounds 0)
+                              (+ (* (tref bounds 3) slider_pos) (tref bounds 1) -10.)
+                              (tref bounds 2)
+                              20.)))
           (nvgFill vg)
           (_nvgFillColor vg GUI_COLOR_BG)
           (nvgBeginPath vg)
