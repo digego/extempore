@@ -451,9 +451,10 @@
 
 ;; modify the GUI tree
 
-;; this is the all-singing, all-dancing "widget add" function. see
-;; below for helper functions which use sensible default parameters
-(bind-func gui_add_widget
+;; this is the all-singing, all-dancing "base" widget add function.
+;; see below for helper functions which use sensible default
+;; parameters
+(bind-func gui_add_widget_base
   "add a new widget to the GUI
 
 new_widget: widget to add
@@ -508,7 +509,20 @@ If parent_widget is null, new_widget becomes the new GUI root node.
 
 (bind-func gui_add_widget_preorder
   (lambda (new_widget split_size split_orientation addleft_p)
-    (gui_add_widget new_widget (gui_find_leaf_preorder) split_size split_orientation addleft_p)))
+    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size split_orientation addleft_p)))
+
+(bind-func gui_add_widget_preorder_horizontal
+  (lambda (new_widget split_size)
+    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size GUI_SPLIT_HORIZONTAL 0)))
+
+(bind-func gui_add_widget_preorder_vertical
+  (lambda (new_widget split_size)
+    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size GUI_SPLIT_VERTICAL 0)))
+
+(bind-poly gui_add_widget gui_add_widget_base)
+(bind-poly gui_add_widget gui_add_widget_preorder)
+(bind-poly gui_add_widget gui_add_widget_preorder_horizontal)
+(bind-poly gui_add_widget gui_add_widget_preorder_vertical)
 
 (bind-func gui_validate
   (lambda ()
