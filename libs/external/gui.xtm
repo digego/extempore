@@ -319,8 +319,8 @@
              (convert (pref wh 0) float)
              (/ (convert (pref fbw 0) float) (convert (pref ww 0) float)))))))
 
-(bind-val WIDGET_SPLIT_VERTICAL i64 (real->integer (expt 2 0)))
-(bind-val WIDGET_SPLIT_HORIZONTAL i64 (real->integer (expt 2 1)))
+(bind-val GUI_SPLIT_VERTICAL i64 (real->integer (expt 2 0)))
+(bind-val GUI_SPLIT_HORIZONTAL i64 (real->integer (expt 2 1)))
 
 ;; walks the tree in pre-order
 (bind-func gui_render_subtree
@@ -345,8 +345,8 @@
                   (rchild (Widget_right_child widget))
                   (split (Widget_split widget)))
               ;; recurse into children
-              (if (= (& WIDGET_SPLIT_VERTICAL (Widget_type widget))
-                     WIDGET_SPLIT_VERTICAL)
+              (if (= (& GUI_SPLIT_VERTICAL (Widget_type widget))
+                     GUI_SPLIT_VERTICAL)
                   ;; split horizontally (default)
                   (begin
                     (gui_render_subtree (Widget_left_child widget)
@@ -432,7 +432,7 @@
 new_widget: widget to add
 parent_widget: widget to split
 split_size: relative size of the two new widgets, in (0,1)
-split_orientation: either WIDGET_SPLIT_HORIZONTAL or WIDGET_SPLIT_VERTICAL
+split_orientation: either GUI_SPLIT_HORIZONTAL or GUI_SPLIT_VERTICAL
 addleft_p: #t to add new widget as *left* child of parent, otherwise *right* child
 
 If parent_widget is null, new_widget becomes the new GUI root node.
@@ -445,9 +445,9 @@ If parent_widget is null, new_widget becomes the new GUI root node.
                      (< split_size 1.)))
            (println "gui_add_widget: split_size must be between 0. and 1.")
            0:i1)
-          ((not (or (= split_orientation WIDGET_SPLIT_HORIZONTAL)
-                    (= split_orientation WIDGET_SPLIT_VERTICAL)))
-           (println "gui_add_widget: split_orientation must be either WIDGET_SPLIT_HORIZONTAL or WIDGET_SPLIT_VERTICAL")
+          ((not (or (= split_orientation GUI_SPLIT_HORIZONTAL)
+                    (= split_orientation GUI_SPLIT_VERTICAL)))
+           (println "gui_add_widget: split_orientation must be either GUI_SPLIT_HORIZONTAL or GUI_SPLIT_VERTICAL")
            0:i1)
           ((null? parent_widget)
            (Widget_set_split new_widget split_size)
@@ -711,10 +711,10 @@ several different editors."
 ;; widgets ;;
 ;;;;;;;;;;;;;
 
-(bind-val WIDGET_BUTTON i64 (real->integer (expt 2 2)))
-(bind-val WIDGET_LABEL i64 (real->integer (expt 2 3)))
-(bind-val WIDGET_IMAGE i64 (real->integer (expt 2 4)))
-(bind-val WIDGET_FBO i64 (real->integer (expt 2 5)))
+(bind-val GUI_BUTTON i64 (real->integer (expt 2 2)))
+(bind-val GUI_LABEL i64 (real->integer (expt 2 3)))
+(bind-val GUI_IMAGE i64 (real->integer (expt 2 4)))
+(bind-val GUI_FBO i64 (real->integer (expt 2 5)))
 
 ;; button
 
