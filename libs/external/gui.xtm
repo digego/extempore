@@ -903,5 +903,47 @@ several different editors."
 (bind-poly Widget_checkbox Widget_checkbox_with_id)
 (bind-poly Widget_checkbox Widget_checkbox_next_id)
 
+;; slider
+
+(bind-func Widget_slider_c
+  (lambda (label:i8*)
+    (let ((lab (Str label))
+          (slider_pos 0.))
+      (lambda (widget:Widget* bounds:Rect*)
+        (let ((vg (GUI_context EXTEMPORE_GUI)))
+          ;; toggle state
+          (if (gui_left_click_p bounds)
+              (set! slider_pos
+                    (if (Widget_split_vertical_p widget)
+                        (/ (- (gui_mouse_x) (tref bounds 0))
+                           (tref bounds 2))
+                        (/ (- (gui_mouse_y) (tref bounds 1))
+                           (tref bounds 3)))))
+          ;; draw widget
+          (nvgBeginPath vg)
+          ;; need to draw a slider "marker at the right place"
+          (if (gui_left_click_p bounds)
+              (_nvgFillColor vg GUI_COLOR_BLUE_L)
+              (_nvgFillColor vg GUI_COLOR_BLUE_D))
+          (gui_draw_rect bounds)
+          (nvgFill vg)
+          (_nvgFillColor vg GUI_COLOR_BG)
+          (nvgBeginPath vg)
+          (gui_draw_text_in_bounds bounds lab)
+          (nvgFill vg))))))
+
+(bind-func Widget_slider_with_id
+  "create a slider widget"
+  (lambda (id label:i8*)
+    (Widget_with_cb id .5 GUI_SLIDER (Widget_slider_c label))))
+
+(bind-func Widget_slider_next_id
+  "create a slider widget"
+  (lambda (label:i8*)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER (Widget_slider_c label))))
+
+(bind-poly Widget_slider Widget_slider_with_id)
+(bind-poly Widget_slider Widget_slider_next_id)
+
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
