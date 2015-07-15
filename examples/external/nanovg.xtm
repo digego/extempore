@@ -13,8 +13,8 @@
 (sys:load "libs/external/glfw3.xtm")
 (sys:load "libs/external/nanovg.xtm")
 
-(bind-val winWidth i32 800 600)
-(bind-val winHeight i32 800 600)
+(bind-val width i32 1920)
+(bind-val height i32 1080)
 (bind-val fbWidth i32)
 (bind-val fbHeight i32)
 (bind-val pxRatio float)
@@ -25,36 +25,58 @@
 ;; create a window
 (call-as-xtlang
  (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
- (set! window (glfw_init_and_create_interaction_window winWidth winHeight))
+ (set! window (glfw_init_and_create_fullscreen_window))
  (set! vg (nvg_create_context)))
 
 (call-as-xtlang
  (let ((w:i32* (alloc))
        (h:i32* (alloc)))
    (glfwGetWindowSize window w h)
-   (set! winWidth (pref w 0))
-   (set! winHeight (pref h 0))
+   (set! width (pref w 0))
+   (set! height (pref h 0))
    (glfwGetFramebufferSize window w h)
    (set! fbWidth (pref w 0))
    (set! fbHeight (pref h 0))
-   (set! pxRatio (/ (convert fbWidth float) (convert winWidth float)))
-   0))
+   (set! pxRatio (/ (convert fbWidth float) (convert width float)))
+   (nvgCreateFont vg "bold" "/Users/ben/Library/Fonts/OpenSans-Bold.ttf")))
 
 (bind-func draw_frame
   (lambda ()
-    (nvgBeginFrame vg winWidth winHeight pxRatio)
+    (nvgBeginFrame vg width height pxRatio)
     ;; stuff goes here
     (nvgBeginPath vg)
-    (nvgFillPaint vg
-                  (nvgRadialGradient vg
-                                     0. 0. 0. 0.
-                                     (nvgRGBf 0. 0. 1.)
-                                     (nvgRGBf 0. 1. 0.)))
-    (nvgFillColor vg
-                  (nvgRGBf 1. (random) 0.))
-    (nvgRoundedRect vg 0. 0. (convert winWidth) (convert winHeight) (random 100. 500.))
+    (_nvgFillPaint vg
+                   (_nvgLinearGradient vg
+                                       0. 0.
+                                       (convert width)
+                                       (convert height)
+                                       (NVGcolor 1. 0. 1. 1.)
+                                       (NVGcolor 0. 1. 1. 1.)))
+    (nvgRect vg 100. 100. (+ (convert width) -200.) (+ (convert height) -200.))
     (nvgPathWinding vg NVG_CW)
-    (nvgRoundedRect vg 100. 100. 300. (random 200. 1500.) 10.)
+    (nvgCircle vg 410. 410. 100.)
+    (nvgFill vg)
+    (nvgEndFrame vg)))
+
+
+
+(bind-func draw_frame
+  (lambda ()
+    (nvgBeginFrame vg width height pxRatio)
+    ;; stuff goes here
+    (nvgBeginPath vg)
+    (_nvgFillColor vg (NVGcolor 0. 1. 1. 1.))
+    (nvgRect vg 100. 100. (+ (convert width) -200.) (+ (convert height) -200.))
+    (nvgPathWinding vg NVG_CW)
+    (nvgCircle vg 410. 410. 100.)
+    (nvgFill vg)
+    (nvgBeginPath vg)
+    (_nvgFillColor vg (NVGcolor 0. 0. 0. 1.))
+    (nvgFontSize vg 100.)
+    (nvgTextAlign vg NVG_ALIGN_CENTER)
+    ;; (nvgTextAlign vg NVG_ALIGN_TOP)
+    (nvgTextBox vg 100. 200. (+ (convert width) -200.)
+                "Ben's button" null)
     (nvgFill vg)
     (nvgEndFrame vg)))
 
@@ -74,10 +96,10 @@
         (let ((next_time (+ time (convert (* 44100. delta_t)))))
           (callback next_time gl_draw_loop next_time delta_t)))))
 
+(gl_draw_loop (now) (/ 1.0 3.0))
+
 (bind-func gl_draw_loop
   (lambda (time:i64 delta_t:double)
-    #f))
-
-(gl_draw_loop (now) (/ 1.0 10.0)) ;; 30fps
+    #f)) ;; 30fps
 
 ;; what might a simple 2d GUI library look like?
