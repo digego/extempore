@@ -745,7 +745,7 @@ several different editors."
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func gui_draw_text_in_bounds
-  (lambda (bounds:Rect* text:i8*)
+  (lambda (bounds:Rect* text:String*)
     (let ((vg (GUI_context EXTEMPORE_GUI)))
       ;; find bounds
       (let ((font_size 30.)
@@ -758,7 +758,7 @@ several different editors."
                           (tref bounds 0)
                           (tref bounds 1)
                           (tref bounds 2)
-                          text null
+                          (string_cstr text) null
                           b_ptr)
         (set! textbox_height (- (pref b_ptr 3) (pref b_ptr 1)))
         ;; draw text
@@ -766,7 +766,7 @@ several different editors."
                     (tref bounds 0)
                     (+ (tref bounds 1) (/ (+ (tref bounds 3) textbox_height) 2.0))
                     (tref bounds 2)
-                    text null)))))
+                    (string_cstr text) null)))))
 
 (bind-func gui_draw_rect
   (lambda (bounds:Rect*)
@@ -791,62 +791,61 @@ several different editors."
 
 ;; button
 
-(bind-func gui_draw_button
-  (lambda (bounds label:i8*)
-    (let ((vg (GUI_context EXTEMPORE_GUI)))
-      ;; draw background
-      (nvgBeginPath vg)
-      (cond ((gui_left_click_p bounds)
-             (_nvgFillColor vg GUI_COLOR_EMPH))
-            ((gui_inbounds_p bounds)
-             (_nvgFillColor vg GUI_COLOR_HL))
-            (else
-             (_nvgFillColor vg GUI_COLOR_BG)))
-      (gui_draw_rect bounds)
-      (nvgFill vg)
-      ;; draw text
-      (nvgBeginPath vg)
-      (if (gui_left_click_p bounds)
-          (_nvgFillColor vg GUI_COLOR_BG)
-          (_nvgFillColor vg GUI_COLOR_FG))
-      (gui_draw_text_in_bounds bounds label)
-      (nvgFill vg))))
+(bind-func Widget_button_c
+  (lambda (label:i8*)
+    (let ((lab (Str label)))
+      (lambda (widget:Widget* bounds:Rect*)
+        (let ((vg (GUI_context EXTEMPORE_GUI)))
+          ;; draw background
+          (nvgBeginPath vg)
+          (cond ((gui_left_click_p bounds)
+                 (_nvgFillColor vg GUI_COLOR_EMPH))
+                ((gui_inbounds_p bounds)
+                 (_nvgFillColor vg GUI_COLOR_HL))
+                (else
+                 (_nvgFillColor vg GUI_COLOR_BG)))
+          (gui_draw_rect bounds)
+          (nvgFill vg)
+          ;; draw text
+          (nvgBeginPath vg)
+          (if (gui_left_click_p bounds)
+              (_nvgFillColor vg GUI_COLOR_BG)
+              (_nvgFillColor vg GUI_COLOR_FG))
+          (gui_draw_text_in_bounds bounds lab)
+          (nvgFill vg))))))
 
 (bind-func Widget_button
-  "create a button widget with id and label"
+  "create a button widget"
   (lambda (id label:i8*)
-    (let ((lab (Str label)))
-      (Widget_with_cb id .5 GUI_BUTTON
-                      (lambda (widget:Widget* bounds:Rect*)
-                        (gui_draw_button bounds (string_cstr lab))
-                        void)))))
+    (Widget_with_cb id .5 GUI_BUTTON (Widget_button_c label))))
 
 ;; checkbox
 
-(bind-func gui_draw_checkbox
-  (lambda (bounds label:i8* on_p:i1)
-    (let ((vg (GUI_context EXTEMPORE_GUI)))
-      ;; draw background
-      (nvgBeginPath vg)
-      (if on_p
-          (_nvgFillColor vg GUI_COLOR_GREEN_L)
-          (_nvgFillColor vg GUI_COLOR_GREEN_D))
-      (gui_draw_rect bounds)
-      (nvgFill vg)
-      (_nvgFillColor vg GUI_COLOR_BG)
-      (nvgBeginPath vg)
-      (gui_draw_text_in_bounds bounds label)
-      (nvgFill vg))))
+(bind-func Widget_checkbox_c
+  (lambda (label:i8*)
+    (let ((lab (Str label))
+          (state:i1 0))
+      (lambda (widget:Widget* bounds:Rect*)
+        (let ((vg (GUI_context EXTEMPORE_GUI)))
+          ;; toggle state
+          (if (gui_left_click_p bounds)
+              (set! state (not state)))
+          ;; draw widget
+          (nvgBeginPath vg)
+          (if state
+              (_nvgFillColor vg GUI_COLOR_GREEN_L)
+              (_nvgFillColor vg GUI_COLOR_GREEN_D))
+          (gui_draw_rect bounds)
+          (nvgFill vg)
+          (_nvgFillColor vg GUI_COLOR_BG)
+          (nvgBeginPath vg)
+          (gui_draw_text_in_bounds bounds lab)
+          (nvgFill vg))))))
 
 (bind-func Widget_checkbox
-  "create a button widget with id and label"
+  "create a checkbox widget"
   (lambda (id label:i8*)
-    (let ((lab (Str label)))
-      (Widget_with_cb id .5 GUI_BUTTON
-                      (lambda (widget:Widget* bounds:Rect*)
-                        (let ((vg (GUI_context EXTEMPORE_GUI)))
-                          (gui_draw_checkbox bounds (string_cstr lab) #t))
-                        void)))))
+    (Widget_with_cb id .5 GUI_BUTTON_CHECKBOX (Widget_checkbox_c label))))
 
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
