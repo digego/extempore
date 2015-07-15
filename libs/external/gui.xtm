@@ -804,14 +804,12 @@ several different editors."
 (bind-func Widget_button
   "create a button widget with id and label"
   (lambda (id label:i8*)
-    (let ((lab (Str label))
-          (cb (lambda (widget:Widget* bounds:Rect*)
-                (let ((vg (GUI_context EXTEMPORE_GUI)))
-                  (nvgSave vg)
-                  (gui_draw_button (string_cstr lab) bounds)
-                  (nvgRestore vg))
-                void)))
-      (Widget_with_cb id .5 GUI_BUTTON cb))))
+    (let ((lab (Str label)))
+      (Widget_with_cb id .5 GUI_BUTTON
+                      (lambda (widget:Widget* bounds:Rect*)
+                        (let ((vg (GUI_context EXTEMPORE_GUI)))
+                          (gui_draw_button (string_cstr lab) bounds))
+                        void)))))
 
 
 (impc:aot:insert-footer "xtmgui")
