@@ -39,7 +39,7 @@
 (bind-poly print Rect_print)
 
 ;; 0. id
-;; 1. size
+;; 1. split
 ;; 2. type (flags)
 ;; 3. callback (to draw widget, handle events)
 ;; 4. parent widget
@@ -54,13 +54,13 @@
   (lambda (widget:Widget*)
     (tref widget 0)))
 
-(bind-func Widget_size
+(bind-func Widget_split
   (lambda (widget:Widget*)
     (tref widget 1)))
 
-(bind-func Widget_set_size
-  (lambda (widget:Widget* size)
-    (tset! widget 1 size)))
+(bind-func Widget_set_split
+  (lambda (widget:Widget* split)
+    (tset! widget 1 split)))
 
 (bind-func Widget_type
   (lambda (widget:Widget*)
@@ -102,10 +102,10 @@
   (lambda (widget:Widget*)
     (if (null? widget)
         (printf "<Widget 0x0>")
-        (printf "<Widget %p\n        id=%d\n        size=%.3f\n        type=%lld\n        parent=%p\n        Lchild=%p\n        Rchild=%p\n>"
+        (printf "<Widget %p\n        id=%d\n        split=%.3f\n        type=%lld\n        parent=%p\n        Lchild=%p\n        Rchild=%p\n>"
                 widget
                 (Widget_id widget)
-                (convert (Widget_size widget) double)
+                (convert (Widget_split widget) double)
                 (Widget_type widget)
                 ;; (Widget_cb widget) ;; callback
                 (Widget_parent widget)
@@ -119,10 +119,10 @@
       (if (null? widget)
           (sprintf s "<Widget 0x0>")
           (sprintf s
-                   "<Widget %p\n        id=%d\n        size=%.3f\n        type=%lld\n        parent=%p\n        Lchild=%p\n        Rchild=%p\n>"
+                   "<Widget %p\n        id=%d\n        split=%.3f\n        type=%lld\n        parent=%p\n        Lchild=%p\n        Rchild=%p\n>"
                    widget
                    (Widget_id widget)
-                   (convert (Widget_size widget) double)
+                   (convert (Widget_split widget) double)
                    (Widget_type widget)
                    ;; (Widget_cb widget) ;; callback
                    (Widget_parent widget)
@@ -136,8 +136,8 @@
 ;; create
 
 (bind-func Widget_create_with_cb
-  (lambda (id size type cb:WidgetCB)
-    (Widget_h id size type cb null null null)))
+  (lambda (id split type cb:WidgetCB)
+    (Widget_h id split type cb null null null)))
 
 (bind-poly Widget_create Widget_create_with_cb)
 
@@ -343,12 +343,7 @@
             ;; splits only at this point
             (let ((lchild (Widget_left_child widget))
                   (rchild (Widget_right_child widget))
-                  (lsize (Widget_size lchild))
-                  (rsize (Widget_size rchild))
-                  (totalsize (+ lsize rsize)))
-              ;; normalise sizes
-              (set! lsize (/ lsize totalsize))
-              (set! rsize (/ rsize totalsize))
+                  (split (Widget_split widget)))
               ;; recurse into children
               (if (= (& WIDGET_SPLIT_VERTICAL (Widget_type widget))
                      WIDGET_SPLIT_VERTICAL)
@@ -358,27 +353,26 @@
                                         (Rect (tref bounds 0)
                                               (tref bounds 1)
                                               (tref bounds 2)
-                                              (* lsize (tref bounds 3))))
+                                              (* split (tref bounds 3))))
                     (gui_render_subtree (Widget_right_child widget)
                                         (Rect (tref bounds 0)
                                               (+ (tref bounds 1)
-                                                 (* lsize (tref bounds 3)))
+                                                 (* split (tref bounds 3)))
                                               (tref bounds 2)
-                                              (* rsize (tref bounds 3)))))
+                                              (* (- 1. split) (tref bounds 3)))))
                   ;; split vertically
                   (begin
                     (gui_render_subtree (Widget_left_child widget)
                                         (Rect (tref bounds 0)
                                               (tref bounds 1)
-                                              (* lsize (tref bounds 2))
+                                              (* split (tref bounds 2))
                                               (tref bounds 3)))
                     (gui_render_subtree (Widget_right_child widget)
                                         (Rect (+ (tref bounds 0)
-                                                 (* lsize (tref bounds 2)))
+                                                 (* split (tref bounds 2)))
                                               (tref bounds 1)
-                                              (* rsize (tref bounds 2))
-                                              (tref bounds 3)))))
-              (convert null))))))
+                                              (* (- 1. split) (tref bounds 2))
+                                              (tref bounds 3))))))))))
 
 (bind-func gui_render
   (lambda ()
@@ -430,41 +424,61 @@
 
 ;; modify the GUI tree
 
+;; this is the all-singing, all-dancing "widget add" function. see
+;; below for helper functions which use sensible default parameters
 (bind-func gui_add_widget
-  (lambda (new_widget:Widget* split)
-    (if (not (Widget_leaf_p new_widget))
-        (begin (println "Cannot add non-leaf widget")
-               new_widget)
-        (let ((old_leaf (gui_find_leaf_preorder)))
-          (if (null? old_leaf)
-              (GUI_set_root EXTEMPORE_GUI new_widget)
-              (let (;; reverse these two assignments to add the new
-                    ;; widget as the left child
-                    (new_lchild old_leaf)
-                    (new_rchild new_widget)
-                    (old_parent (Widget_parent old_leaf))
-                    (new_parent (Widget_h -1 ;; internal nodes have id -1
-                                          (Widget_size old_leaf)
-                                          split
-                                          null
-                                          (Widget_parent old_leaf)
-                                          new_lchild
-                                          new_rchild)))
-                ;; set up new parent pointers
-                (Widget_set_parent new_lchild new_parent)
-                (Widget_set_parent new_rchild new_parent)
-                ;; if necessary, reconnect the widget tree
-                (if (null? old_parent)
-                    ;; if old leaf node was the root node
-                    (GUI_set_root EXTEMPORE_GUI new_parent)
-                    ;; otherwise set child pointers in old parent
-                    (if (= (Widget_left_child old_parent) old_leaf)
-                        (Widget_set_left_child old_parent new_parent)
-                        (if (= (Widget_right_child old_parent) old_leaf)
-                            (Widget_set_right_child old_parent new_parent))
-                        (println "Error in gui_add_widget: could not reconnect the widget tree")))
-                ;; return the new_lchild
-                new_lchild))))))
+  "add a new widget to the GUI
+
+new_widget: widget to add
+parent_widget: widget to split
+split_size: relative size of the two new widgets (float in [0,1])
+split_orientation: either WIDGET_SPLIT_HORIZONTAL or WIDGET_SPLIT_VERTICAL
+addleft_p: #t to add new widget as *left* child of parent, otherwise *right* child
+
+If parent_widget is null, new_widget becomes the new GUI root node.
+"
+  (lambda (new_widget:Widget* parent_widget:Widget* split_size split_orientation addleft_p:i1)
+    (cond ((not (Widget_leaf_p new_widget))
+           (println "gui_add_widget: cannot add non-leaf widget")
+           0:i1)
+          ((not (and (>= split_size 0.)
+                     (<= split_size 1.)))
+           (println "gui_add_widget: split_size must be between 0. and 1.")
+           0:i1)
+          ((not (or (= split_orientation WIDGET_SPLIT_HORIZONTAL)
+                    (= split_orientation WIDGET_SPLIT_VERTICAL)))
+           (println "gui_add_widget: split_orientation must be either WIDGET_SPLIT_HORIZONTAL or WIDGET_SPLIT_VERTICAL")
+           0:i1)
+          ((null? parent_widget)
+           (Widget_set_split new_widget split_size)
+           (GUI_set_root EXTEMPORE_GUI new_widget)
+           1:i1)
+          (else
+           (let ((grandparent_widget (Widget_parent parent_widget))
+                 (new_lchild (if addleft_p new_widget parent_widget))
+                 (new_rchild (if addleft_p parent_widget new_widget))
+                 (new_parent (Widget_h -1 ;; internal nodes have id -1
+                                       split_size
+                                       (bor (Widget_type parent_widget) split_orientation)
+                                       null
+                                       grandparent_widget
+                                       new_lchild
+                                       new_rchild)))
+             ;; reconnect the widget tree
+             (Widget_set_parent new_lchild new_parent)
+             (Widget_set_parent new_rchild new_parent)
+             (if (null? grandparent_widget)
+                 (GUI_set_root EXTEMPORE_GUI new_parent)
+                 (if (= (Widget_left_child grandparent_widget) parent_widget)
+                     (Widget_set_left_child grandparent_widget new_parent)
+                     (if (= (Widget_right_child grandparent_widget) parent_widget)
+                         (Widget_set_right_child grandparent_widget new_parent))
+                     (println "gui_add_widget: could not reconnect the widget tree")))
+             1:i1)))))
+
+(bind-func gui_add_widget_preorder
+  (lambda (new_widget split_size split_orientation addleft_p)
+    (gui_add_widget new_widget (gui_find_leaf_preorder) split_size split_orientation addleft_p)))
 
 (bind-func gui_validate
   (lambda ()
@@ -478,6 +492,14 @@
                       (null? (Widget_right_child w)))
                  (and (not (null? (Widget_left_child w)))
                       (not (null? (Widget_right_child w)))))))))))
+
+(bind-func gui_reset
+  (lambda ()
+    ;; free all the Widget memory, reset GUI_root
+    (Widget_walk_preorder
+     (GUI_root EXTEMPORE_GUI)
+     (lambda (w) (free w)))
+    (GUI_set_root EXTEMPORE_GUI null)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; mouse/keyboard input ;;
@@ -681,7 +703,7 @@ several different editors."
 ;; button
 
 (bind-func Widget_create_button
-  (lambda (id size label:i8*)
+  (lambda (id label:i8*)
     (let ((lab (Str label))
           (cb (lambda (widget:Widget* bounds:Rect*)
                 (let ((vg (GUI_context EXTEMPORE_GUI)))
@@ -713,7 +735,7 @@ several different editors."
                   (nvgFill vg)
                   (nvgRestore vg))
                 void)))
-      (Widget_create id size WIDGET_BUTTON cb))))
+      (Widget_create id .5 WIDGET_BUTTON cb))))
 
 
 (impc:aot:insert-footer "xtmgui")
