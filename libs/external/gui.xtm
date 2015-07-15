@@ -578,12 +578,16 @@ If parent_widget is null, new_widget becomes the new GUI root node.
     (= (glfwGetKey (GUI_window EXTEMPORE_GUI) key)
        GLFW_RELEASE)))
 
+;;;;;;;;;;;;;;;;;;;;
+;; GUI appearance ;;
+;;;;;;;;;;;;;;;;;;;;
+
 ;; fonts
 
 (bind-func gui_load_opensans_fonts
-  "load OpenSans .ttf fonts
+  "Load OpenSans .ttf fonts in opensans_dir
 
-If you don't have OpenSans on your system, you can download it for free from www.fontsquirrel.com"
+If you don't have OpenSans on your system, you can download it for free from http://www.fontsquirrel.com/fonts/open-sans"
   (lambda (opensans_dir:i8*)
     (let ((path:i8* (zalloc 256))
           (create_font (lambda (name:i8*)
@@ -622,7 +626,6 @@ If you don't have OpenSans on your system, you can download it for free from www
             (else
              (println "OpenSans fonts successfully loaded")
              1:i1)))))
-
 
 ;; Color themes
 
@@ -705,10 +708,18 @@ several different editors."
     (set! GUI_COLOR_HL               (NVGcolor_hex #x49483EFF))
     (set! GUI_COLOR_EMPH             (NVGcolor_hex #xF8F8F0FF))
     (set! GUI_COLOR_COMMENTS         (NVGcolor_hex #x75715EFF))
-    (println "Set GUI color theme: monokai")
     void))
 
-(impc:aot:do-or-emit (gui_set_monokai_color_theme))
+(bind-func gui_set_default_theme
+  (lambda (font_path)
+    ;; colors
+    (gui_set_monokai_color_theme)
+    ;; fonts
+    (if (gui_load_opensans_fonts font_path)
+        (let ((vg (GUI_context EXTEMPORE_GUI)))
+          (nvgFontFace vg "Bold")
+          (println "Set GUI theme: default")))
+    void))
 
 ;;;;;;;;;;;;;
 ;; widgets ;;
@@ -718,10 +729,6 @@ several different editors."
 (bind-val GUI_LABEL i64 (real->integer (expt 2 3)))
 (bind-val GUI_IMAGE i64 (real->integer (expt 2 4)))
 (bind-val GUI_FBO i64 (real->integer (expt 2 5)))
-
-(bind-func gui_set_font_size
-  (lambda (size)
-    (nvgFontSize (GUI_context EXTEMPORE_GUI) size)))
 
 ;; button
 
