@@ -824,14 +824,19 @@ several different editors."
 (bind-func Widget_checkbox_c
   (lambda (label:i8*)
     (let ((lab (Str label))
-          (state:i1 0))
+          (state:i1 0)
+          (click:i1 0)
+          (prev_click:i1 0))
       (lambda (widget:Widget* bounds:Rect*)
         (let ((vg (GUI_context EXTEMPORE_GUI)))
           ;; toggle state
-          (if (gui_left_click_p bounds)
+          (set! click (gui_left_click_p bounds))
+          (if (and click (not prev_click))
               (set! state (not state)))
+          (set! prev_click click)
           ;; draw widget
           (nvgBeginPath vg)
+          ;; checkboxes are edge-triggered on state change
           (if state
               (_nvgFillColor vg GUI_COLOR_GREEN_L)
               (_nvgFillColor vg GUI_COLOR_GREEN_D))
