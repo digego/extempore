@@ -705,7 +705,10 @@ several different editors."
     (set! GUI_COLOR_HL               (NVGcolor_hex #x49483EFF))
     (set! GUI_COLOR_EMPH             (NVGcolor_hex #xF8F8F0FF))
     (set! GUI_COLOR_COMMENTS         (NVGcolor_hex #x75715EFF))
+    (println "Set GUI color theme: monokai")
     void))
+
+(impc:aot:do-or-emit (gui_set_monokai_color_theme))
 
 ;;;;;;;;;;;;;
 ;; widgets ;;
@@ -716,7 +719,41 @@ several different editors."
 (bind-val GUI_IMAGE i64 (real->integer (expt 2 4)))
 (bind-val GUI_FBO i64 (real->integer (expt 2 5)))
 
+(bind-func gui_set_font_size
+  (lambda (size)
+    (nvgFontSize (GUI_context EXTEMPORE_GUI) size)))
+
 ;; button
+
+(bind-func gui_draw_button
+  (lambda (label:i8* bounds)
+    (let ((vg (GUI_context EXTEMPORE_GUI)))
+      ;; draw background
+      (nvgBeginPath vg)
+      (cond ((gui_left_click_p bounds)
+             (_nvgFillColor vg GUI_COLOR_EMPH))
+            ((gui_inbounds_p bounds)
+             (_nvgFillColor vg GUI_COLOR_HL))
+            (else
+             (_nvgFillColor vg GUI_COLOR_BG)))
+      (nvgRect vg
+               (tref bounds 0)
+               (tref bounds 1)
+               (tref bounds 2)
+               (tref bounds 3))
+      (nvgFill vg)
+      ;; draw text
+      (nvgBeginPath vg)
+      (_nvgFillColor vg GUI_COLOR_FG)
+      (nvgTextAlign vg NVG_ALIGN_CENTER)
+      ;; draw text
+      (nvgTextBox vg
+                  (tref bounds 0)
+                  (+ (tref bounds 1) 50.)
+                  (tref bounds 2)
+                  label null)
+      (nvgFill vg))))
+
 
 (bind-func Widget_create_button
   (lambda (id label:i8*)
@@ -724,34 +761,10 @@ several different editors."
           (cb (lambda (widget:Widget* bounds:Rect*)
                 (let ((vg (GUI_context EXTEMPORE_GUI)))
                   (nvgSave vg)
-                  ;; draw background
-                  (nvgBeginPath vg)
-                  (cond ((gui_left_click_p bounds)
-                         (_nvgFillColor vg GUI_COLOR_EMPH))
-                        ((gui_inbounds_p bounds)
-                         (_nvgFillColor vg GUI_COLOR_HL))
-                        (else
-                         (_nvgFillColor vg GUI_COLOR_BG)))
-                  (nvgRect vg
-                           (tref bounds 0)
-                           (tref bounds 1)
-                           (tref bounds 2)
-                           (tref bounds 3))
-                  (nvgFill vg)
-                  ;; draw text
-                  (nvgBeginPath vg)
-                  (_nvgFillColor vg GUI_COLOR_FG)
-                  (nvgFontSize vg 64.)
-                  (nvgTextAlign vg NVG_ALIGN_CENTER)
-                  (nvgTextBox vg
-                              (tref bounds 0)
-                              (tref bounds 1)
-                              (tref bounds 2)
-                              "test" null)
-                  (nvgFill vg)
+                  (gui_draw_button (string_cstr lab) bounds)
                   (nvgRestore vg))
                 void)))
-      (Widget_create id .5 WIDGET_BUTTON cb))))
+      (Widget_create id .5 GUI_BUTTON cb))))
 
 
 (impc:aot:insert-footer "xtmgui")
