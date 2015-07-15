@@ -338,6 +338,16 @@
 (bind-val GUI_SPLIT_VERTICAL i64 (real->integer (expt 2 0)))
 (bind-val GUI_SPLIT_HORIZONTAL i64 (real->integer (expt 2 1)))
 
+(bind-func Widget_split_horizontal_p
+  (lambda (widget)
+    (= (& GUI_SPLIT_HORIZONTAL (Widget_type widget))
+       GUI_SPLIT_HORIZONTAL)))
+
+(bind-func Widget_split_vertical_p
+  (lambda (widget)
+    (= (& GUI_SPLIT_VERTICAL (Widget_type widget))
+       GUI_SPLIT_VERTICAL)))
+
 ;; walks the tree in pre-order
 (bind-func gui_render_subtree
   (lambda (widget:Widget* bounds:Rect*)
@@ -361,8 +371,7 @@
                   (rchild (Widget_right_child widget))
                   (split (Widget_split widget)))
               ;; recurse into children
-              (if (= (& GUI_SPLIT_VERTICAL (Widget_type widget))
-                     GUI_SPLIT_VERTICAL)
+              (if (Widget_split_vertical_p widget)
                   ;; split horizontally (default)
                   (begin
                     (gui_render_subtree (Widget_left_child widget)
