@@ -135,17 +135,15 @@
 
 ;; create
 
-(bind-func Widget_create_with_cb
+(bind-func Widget_with_cb
   (lambda (id split type cb:WidgetCB)
     (Widget_h id split type cb null null null)))
-
-(bind-poly Widget_create Widget_create_with_cb)
 
 ;; destroy (free)
 
 ;; this should really fix up the widget tree as well, but that makes
 ;; it a fair bit more complicated. left as an excercise to the reader :)
-(bind-func Widget_destroy
+(bind-func Widget_free
   (lambda (widget:Widget*)
     (free widget)))
 
@@ -167,15 +165,33 @@
     (or (= (Widget_left_child parent) child)
         (= (Widget_right_child parent) child))))
 
-;; walk the widget tree (preorder), applying fn to each widget
+;; walk the widget tree, applying fn to each widget
 (bind-func Widget_walk_preorder
-  (lambda (widget:Widget* visit_fn:[void,Widget*]*)
+  (lambda (widget:Widget* visit_fn:[Widget*,Widget*]*)
     (if (null? widget)
         widget
         (begin
           (visit_fn widget)
           (Widget_walk_preorder (Widget_left_child widget) visit_fn)
-          (Widget_walk_preorder (Widget_right_child widget) visit_fn)
+          (Widget_walk_preorder (Widget_right_child widget) visit_fn)))))
+
+(bind-func Widget_walk_inorder
+  (lambda (widget:Widget* visit_fn:[Widget*,Widget*]*)
+    (if (null? widget)
+        widget
+        (begin
+          (Widget_walk_inorder (Widget_left_child widget) visit_fn)
+          (visit_fn widget)
+          (Widget_walk_inorder (Widget_right_child widget) visit_fn)))))
+
+(bind-func Widget_walk_postorder
+  (lambda (widget:Widget* visit_fn:[Widget*,Widget*]*)
+    (if (null? widget)
+        widget
+        (begin
+          (Widget_walk_postorder (Widget_left_child widget) visit_fn)
+          (Widget_walk_postorder (Widget_right_child widget) visit_fn)
+          (visit_fn widget)
           null))))
 
 ;; returns the first widget for which pred returns true
@@ -496,9 +512,9 @@ If parent_widget is null, new_widget becomes the new GUI root node.
 (bind-func gui_reset
   (lambda ()
     ;; free all the Widget memory, reset GUI_root
-    (Widget_walk_preorder
+    (Widget_walk_postorder
      (GUI_root EXTEMPORE_GUI)
-     (lambda (w) (free w)))
+     (lambda (w) (Widget_free w) w))
     (GUI_set_root EXTEMPORE_GUI null)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -782,7 +798,8 @@ several different editors."
       (gui_draw_text_in_bounds vg label bounds)
       (nvgFill vg))))
 
-(bind-func Widget_create_button
+(bind-func Widget_button
+  "create a button widget with id and label"
   (lambda (id label:i8*)
     (let ((lab (Str label))
           (cb (lambda (widget:Widget* bounds:Rect*)
@@ -791,7 +808,7 @@ several different editors."
                   (gui_draw_button (string_cstr lab) bounds)
                   (nvgRestore vg))
                 void)))
-      (Widget_create id .5 GUI_BUTTON cb))))
+      (Widget_with_cb id .5 GUI_BUTTON cb))))
 
 
 (impc:aot:insert-footer "xtmgui")
