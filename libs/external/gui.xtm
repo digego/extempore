@@ -66,6 +66,18 @@
   (lambda (widget:Widget*)
     (tref widget 2)))
 
+(bind-func Widget_set_type
+  (lambda (widget:Widget* type)
+    (tset! widget 2 type)))
+
+(bind-func Widget_type_add_flags
+  (lambda (widget:Widget* flags)
+    (tset! widget 2 (bor flags (tref widget 2)))))
+
+(bind-func Widget_type_remove_flags
+  (lambda (widget:Widget* flags)
+    (tset! widget 2 (& (~ flags) (tref widget 2)))))
+
 (bind-func Widget_cb
   (lambda (widget:Widget*)
     (tref widget 3)))
@@ -336,17 +348,16 @@
              (/ (convert (pref fbw 0) float) (convert (pref ww 0) float)))))))
 
 (bind-val GUI_SPLIT_VERTICAL i64 (real->integer (expt 2 0)))
-(bind-val GUI_SPLIT_HORIZONTAL i64 (real->integer (expt 2 1)))
-
-(bind-func Widget_split_horizontal_p
-  (lambda (widget)
-    (= (& GUI_SPLIT_HORIZONTAL (Widget_type widget))
-       GUI_SPLIT_HORIZONTAL)))
+;; (bind-val GUI_SPLIT_HORIZONTAL i64 (real->integer (expt 2 1)))
 
 (bind-func Widget_split_vertical_p
   (lambda (widget)
     (= (& GUI_SPLIT_VERTICAL (Widget_type widget))
        GUI_SPLIT_VERTICAL)))
+
+(bind-func Widget_split_horizontal_p
+  (lambda (widget)
+    (not (Widget_split_vertical_p widget))))
 
 ;; walks the tree in pre-order
 (bind-func gui_render_subtree
@@ -467,11 +478,11 @@
 @param new_widget - widget to add
 @param parent_widget - widget to split
 @param split_size - relative size of the two new widgets, in (0,1)
-@param split_orientation - either GUI_SPLIT_HORIZONTAL or GUI_SPLIT_VERTICAL
+@param vertical_p - split windows vertically? {0,1} otherwise split horizontally
 
 If parent_widget is null, new_widget becomes the new GUI root node.
 "
-  (lambda (new_widget:Widget* parent_widget:Widget* split_size split_orientation)
+  (lambda (new_widget:Widget* parent_widget:Widget* split_size vertical_p:i32)
     (cond ((not (Widget_leaf_p new_widget))
            (println "gui_add_widget: cannot add non-leaf widget")
            0:i1)
@@ -481,10 +492,6 @@ If parent_widget is null, new_widget becomes the new GUI root node.
           ((not (and (> split_size 0.)
                      (< split_size 1.)))
            (println "gui_add_widget: split_size must be between 0. and 1.")
-           0:i1)
-          ((not (or (= split_orientation GUI_SPLIT_HORIZONTAL)
-                    (= split_orientation GUI_SPLIT_VERTICAL)))
-           (println "gui_add_widget: split_orientation must be either GUI_SPLIT_HORIZONTAL or GUI_SPLIT_VERTICAL")
            0:i1)
           ((null? parent_widget)
            (Widget_set_split new_widget split_size)
@@ -496,11 +503,13 @@ If parent_widget is null, new_widget becomes the new GUI root node.
                  (new_rchild new_widget)
                  (new_parent (Widget_h -1 ;; internal nodes have id -1
                                        split_size
-                                       (bor (Widget_type parent_widget) split_orientation)
+                                       (Widget_type parent_widget)
                                        null
                                        grandparent_widget
                                        new_lchild
                                        new_rchild)))
+             (if (<> vertical_p 0)
+                 (Widget_type_add_flags new_parent GUI_SPLIT_VERTICAL))
              ;; reconnect the widget tree
              (Widget_set_parent new_lchild new_parent)
              (Widget_set_parent new_rchild new_parent)
@@ -517,23 +526,12 @@ If parent_widget is null, new_widget becomes the new GUI root node.
   (lambda (new_widget split_size split_orientation)
     (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size split_orientation)))
 
-(bind-func gui_add_widget_preorder_horizontal
-  (lambda (new_widget split_size)
-    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size GUI_SPLIT_HORIZONTAL)))
-
-(bind-func gui_add_widget_preorder_vertical
-  (lambda (new_widget split_size)
-    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size GUI_SPLIT_VERTICAL)))
-
 (bind-poly gui_add_widget gui_add_widget_base)
 (bind-poly gui_add_widget gui_add_widget_preorder)
-(bind-poly gui_add_widget gui_add_widget_preorder_horizontal) ;; split horizontally by default
-(bind-poly gui_add_widget_horizontal gui_add_widget_preorder_horizontal)
-(bind-poly gui_add_widget_vertical gui_add_widget_preorder_vertical)
 
 ;; flip l and r child widgets of internal node
 
-(bind-func gui_flip_widgets
+(bind-func Widget_swap_children
   (lambda (widget)
     (if (Widget_leaf_p widget)
         (println "gui_flip_widgets: cannot flip leaf widgets")
@@ -541,6 +539,14 @@ If parent_widget is null, new_widget becomes the new GUI root node.
           ;; swap the child widgets
           (Widget_set_left_child widget (Widget_right_child widget))
           (Widget_set_right_child widget old_left)
+          void))))
+
+(bind-func Widget_swap_split_orientation
+  (lambda (widget)
+    (if (Widget_leaf_p widget)
+        (println "gui_flip_widgets: cannot flip leaf widgets")
+        (begin
+          (Widget_set_type widget (^ (Widget_type widget) GUI_SPLIT_VERTICAL))
           void))))
 
 (bind-func gui_validate
@@ -919,11 +925,14 @@ several different editors."
     (let ((lab (Str label))
           (slider_pos 0.))
       (lambda (widget:Widget* bounds:Rect*)
-        (let ((vg (GUI_context EXTEMPORE_GUI)))
+        (let ((vg (GUI_context EXTEMPORE_GUI))
+              (parent (Widget_parent widget))
+              (vertical_p (or (null? parent)
+                              (Widget_split_vertical_p parent))))
           ;; toggle state
           (if (gui_left_click_p bounds)
               (set! slider_pos
-                    (if (Widget_split_vertical_p widget)
+                    (if vertical_p
                         (/ (- (gui_mouse_x) (tref bounds 0))
                            (tref bounds 2))
                         (/ (- (gui_mouse_y) (tref bounds 1))
@@ -936,7 +945,7 @@ several different editors."
           ;; draw "marker"
           (nvgBeginPath vg)
           (_nvgFillColor vg GUI_COLOR_BLUE_L)
-          (if (Widget_split_vertical_p widget)
+          (if vertical_p
               (gui_draw_rect (Rect
                               (+ (* (tref bounds 2) slider_pos) (tref bounds 0) -10.)
                               (tref bounds 1)
