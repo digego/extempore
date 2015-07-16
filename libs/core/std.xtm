@@ -174,17 +174,18 @@
 
 ;; 
 (bind-type String <size_t,i8*>
-           "xtlang's string type
+  "xtlang's string type
+
 Tuple contains <string_length,characters>
 
 Should be created, modified and destroyed with the String_* library functions.
 
-Second item in tuple is a char* c-style string
-")
+Second item in tuple is a char* c-style string ")
 
 ;; must be a Halloced string!
-(bind-func Delete_String
-  "Delete a string object
+(bind-func String_free
+  "Free an xtlang String
+
 Frees both the underlying character array and the tuple container.
 @param str - String to be deleted 
 "
@@ -196,6 +197,7 @@ Frees both the underlying character array and the tuple container.
 ;; String printing!
 (bind-func String_print:[void,String*]*
   "Prints all characters in a given string object.
+
 Overloads and should be used via the `println` function
 If the string is empty will print a zero length string
 
@@ -210,54 +212,50 @@ If the string is empty will print a zero length string
 
 (bind-poly print String_print)
 
-(bind-func tostring_String:[String*,String*]*
-  "Suggestions welcome"
+(bind-func String_tostring:[String*,String*]*
+  "convert String to String*
+
+This is just the identity function, since a string is already a string."
   (lambda (x)
     x))
 
-(bind-poly tostring tostring_String)
+(bind-poly tostring String_tostring)
 
-(bind-func string_length
-  "Takes a String and returns the number of characters it holds
-@param str - The String
-@return length - length of string
-"
+(bind-func String_length
+  "Takes a (null-terminated) String* and returns the string length
+
+@param str - the String*
+@return length - length (via strlen)"
   (lambda (str:String*)
     (strlen (tref str 1))))
 
-(bind-func string_size
-  "Takes a String and returns the number of characters it holds
-@param str - The String
-@return length - length of string
-"
+(bind-func String_size
+  "Takes a String* and returns the size of allocated memory
+
+Not necessarily the same as String_length - 
+@param str - the String
+@return size - size of alloc'ed memory"
   (lambda (str:String*)
     (tref str 0)))
 
-(bind-func string_cstr
-  "@param str 
+(bind-func String_cstr
+  "Return an i8* pointer to the underlying char array
+
+@param str
 @return c_str - the underlying i8 'char' array"
   (lambda (str:String*)
     (tref str 1)))
 
-(bind-func cstr_from_string
-  "@param str 
-@return c_str - the underlying i8 'char' array"
-  (lambda (str:String*)
-    (tref str 1)))
+;; easy String dataconstructors from c strings
 
-(bind-func cstr_length
-  "Takes a String and returns the number of characters it holds
-@param str - The String
-@return length - length of string
-"
-  (lambda (str:String*)
-    (strlen (tref str 1))))
+;; zone alloc'ed versions
 
-;; create easy Data constructors from CStrings
-(bind-func Str_cptr
-  "Generate a String object from a character array
-Use via the polymorphic Str symbol
-@param str - character array from which to generate a String object
+(bind-func String_from_cptr
+  "Create an xtlang String type from a c string (char array)
+
+Use via the polymorphic Str function
+
+@param str - character array from which to generate a new String
 @return - the new String*
 "
   (lambda (s)
@@ -265,24 +263,30 @@ Use via the polymorphic Str symbol
           (str (String lgth s)))
       str)))
 
-(bind-func Str_string
-  "Generate a String object from a String object
-Use via the polymorphic Str symbol
-@param s - the input String object
+(bind-func String_copy
+  "Create a new xtlang String type from an existing String
+
+Use via the polymorphic Str function
+
+@param str - pointer to the String to copy
 @return - the new String*
 "
-  (lambda (s:String*)
-    (let ((lgth (string_length s))
-          (str (String lgth (string_cstr s))))
-      str)))
+  (lambda (str:String*)
+    (let ((lgth (String_length str))
+          (new_str (String lgth (String_cstr str))))
+      new_str)))
 
-(bind-poly Str Str_cptr)
-(bind-poly Str Str_string)
+(bind-poly Str String_from_cptr)
+(bind-poly Str String_copy)
 
-(bind-func Str_h_cptr
-  "Generate a String object from a character array
-Use via the polymorphic Str_h symbol
-@param str - character array from which to generate a String object
+;; heap alloc'ed versions
+
+(bind-func String_from_cptr_h
+  "Create an (heap-allocated) xtlang String type from a c string (char array)
+
+Use via the polymorphic Str function
+
+@param str - character array from which to generate a new String
 @return - the new String*
 "
   (lambda (s)
@@ -290,22 +294,26 @@ Use via the polymorphic Str_h symbol
           (str (String_h lgth s)))
       str)))
 
-(bind-func Str_h_string
-  "Generate a String object from a String object
-Use via the polymorphic Str_h symbol
-@param s - the input String 
-@return - the new String 
+(bind-func String_copy_h
+  "Create a new (heap-allocated) xtlang String type from an existing String
+
+Use via the polymorphic Str function
+
+@param str - pointer to the String to copy
+@return - the new String*
 "
-  (lambda (s:String*)
-    (let ((lgth (string_length s))
-          (str (String_h lgth (string_cstr s))))
-      str)))
+  (lambda (str:String*)
+    (let ((lgth (String_length str))
+          (new_str (String_h lgth (String_cstr str))))
+      new_str)))
 
-(bind-poly Str_h Str_h_cptr)
-(bind-poly Str_h Str_h_string)
+(bind-poly Str_h String_from_cptr_h)
+(bind-poly Str_h String_copy_h)
 
-(bind-func string_cat_2
+
+(bind-func String_cat2
   "Concatenate 2 Strings
+
 If one string is null, the alternate String will be returned.
 If both strings are null an empty String will be returned 
 
@@ -322,7 +330,7 @@ If both strings are null an empty String will be returned
               (strncat news (tref s2 1) size)
               (Str news))))))
 
-(bind-func string_cat_h
+(bind-func String_cat2_h
   (lambda (s1:String* s2:String*)
     (if (null? s2) (Str s1)
         (if (null? s1) (Str s2)
@@ -332,33 +340,35 @@ If both strings are null an empty String will be returned
               (strncat news (tref s2 1) size)
               (Str_h news))))))
 
-(bind-func string_cmp
-  "Compare two strings
+(bind-func String_equal
+  "Equality test for String
+
 @param s1 - first string
 @param s2 - second string
-@return - boolean value representing string 
+@return - true/false
 "
   (lambda (s1:String* s2:String*)
     (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
         1:i1 0:i1)))
 
 ;; bind to eq
-(bind-poly equal string_cmp)
+(bind-poly equal String_equal)
 
 ;; levenshtein edit distance
-(bind-func string_levenshtein
+(bind-func String_levenshtein
   "Returns the levenshtein distance between two strings
+
 @param s - string 1
 @param t - string 2
-@return - The levenshetein distance
+@return - levenshetein distance
 "
   (lambda (s:String* t:String*)
     (let ((i 0) (j 0)
           ;; column-major indexing closure
-          (s_cstr (cstr_from_string s))
-          (slen:size_t (string_size s))
-          (t_cstr (cstr_from_string t))
-          (tlen:size_t (string_size t))
+          (s_cstr (String_cstr s))
+          (slen:size_t (String_length s))
+          (t_cstr (String_cstr t))
+          (tlen:size_t (String_length t))
           (row:i64* (salloc (+ slen 1)))
           (prev_row:i64* (salloc (+ slen 1)))
           (min3 (lambda (a:i64 b c)
@@ -385,9 +395,9 @@ If both strings are null an empty String will be returned
           (set! row tmp_row)))
       (pref prev_row tlen))))
 
-(bind-func string_similarity
+(bind-func String_similarity
   (lambda (s:String* t:String*)
-    (/ 1.0 (i64tod (+ 1 (string_levenshtein s t))))))
+    (/ 1.0 (i64tod (+ 1 (String_levenshtein s t))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -397,66 +407,65 @@ If both strings are null an empty String will be returned
 ;; same as print but returns string
 ;; should REPLACE PRINT!
 
-;; prints a line break
-(bind-func str_format_return
+(bind-func String_format_return
   (lambda ()
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "\n")
       (Str str))))
 
 ;; prints a space
-(bind-func str_format_space
+(bind-func String_format_space
   (lambda ()
     (Str " ")))
 
-(bind-func str_format_i1
+(bind-func String_format_i1
   (lambda (x:i1)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (Str str))))
 
-(bind-func str_format_i8
+(bind-func String_format_i8
   (lambda (x:i8)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (Str str))))
 
-(bind-func str_format_i32
+(bind-func String_format_i32
   (lambda (x:i32)
     (let ((str:i8* (salloc 256)))    
       (llvm_sprintf str "%d" x)
       (Str str))))
 
-(bind-func str_format_i64
+(bind-func String_format_i64
   (lambda (x:i64)
     (let ((str:i8* (salloc 256)))    
       (llvm_sprintf str "%lld" x)
       (Str str))))
 
-(bind-func str_format_f
+(bind-func String_format_f
   (lambda (x:float)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%f" (ftod x))
       (Str str))))
 
-(bind-func str_format_d
+(bind-func String_format_d
   (lambda (x:double)
     (let ((str:i8* (salloc 256)))      
       (llvm_sprintf str "%f" x)
       (Str str))))
 
-(bind-poly str_format str_format_i1)
-(bind-poly str_format str_format_i8)
-(bind-poly str_format str_format_i32)
-(bind-poly str_format str_format_i64)
-(bind-poly str_format str_format_f)
-(bind-poly str_format str_format_d)
+(bind-poly String_format String_format_i1)
+(bind-poly String_format String_format_i8)
+(bind-poly String_format String_format_i32)
+(bind-poly String_format String_format_i64)
+(bind-poly String_format String_format_f)
+(bind-poly String_format String_format_d)
 
 ;; String formatting!
-(bind-func String_format:[String*,String*]*
+(bind-func String_format_String:[String*,String*]*
   (lambda (x) x))
 
-(bind-poly str_format String_format)
+(bind-poly String_format String_format_String)
 
 
 
