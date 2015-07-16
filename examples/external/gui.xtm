@@ -1,0 +1,103 @@
+;;; gui.xtm:examples -- Extempore 2d GUI example
+
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; an example of how to use the Extempore GUI
+
+;;; Code:
+
+(sys:load "libs/external/gui.xtm")
+
+;; create a 800x600 gui window
+(gui_init 800 600)
+
+;; load the default theme - make sure you pass the path to where the
+;; OpenSans fonts are located on your system
+(gui_set_default_theme "/Users/ben/Library/Fonts")
+
+;; first, create a button callback (must be of type [void]*)
+(bind-func my_button_cb
+  (lambda ()
+    (println "click!")
+    void))
+
+;; now, let's add our button to the GUI
+
+(bind-func add_the_button
+  (lambda ()
+    (gui_add_widget_preorder (Widget_button_next_id "my button" my_button_cb) .5 0)))
+
+(add_the_button)
+
+;; nothing happened, because we haven't provided a temporal recursion
+;; to draw the GUI frame
+(bind-func gui_render_loop
+  (lambda (time:i64 delta_t:double)
+    (gui_render)
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time gui_render_loop next_time delta_t))))
+
+;; start the render loop - now you should see the button appear
+(gui_render_loop (now) (/ 1. 30.))
+
+;; let's add a slider along the bottom
+
+;; again, we need to create a slider callback (must be of type [void,float]*)
+(bind-func my_slider_cb
+  (lambda (x:float)
+    (println "slider pos:" x)
+    void))
+
+;; and re-define add_the_button to add our new button
+(bind-func add_the_button
+  (lambda ()
+    (gui_add_widget (Widget_slider "my slider" my_slider_cb) .2 1)))
+
+(add_the_button)
+
+;; Hmm, it would probably be better if these two were flipped around
+
+(call-as-xtlang
+ (Widget_swap_children (GUI_root EXTEMPORE_GUI)))
+
+;; let's add a checkbox (toggle) button
+
+;; for a checkbox, we need an action callback of type [void,i1]*
+
+(bind-func my_checkbox_cb
+  (lambda (onoff:i1)
+    (if onoff
+        (println "checkbox on")
+        (println "checkbox off"))
+    void))
+
+(bind-func add_the_button
+  (lambda ()
+    (gui_add_widget (Widget_checkbox "my checkbox" my_checkbox_cb) .5 0)))
+
+(add_the_button)
+
+;; finally, let's try a 2D (x-y) slider
+
+(bind-func my_slider2D_cb
+  (lambda (x:float y:float)
+    (println "slider2D x:" x "y:" y)
+    void))
+
+(bind-func add_the_button
+  (lambda ()
+    (gui_add_widget (Widget_slider2D "my 2D slider" my_slider2D_cb) .5 1)))
+
+(add_the_button)
+
+;; to stop the gui render callback, re-define the gui_render_loop
+;; closure
+(bind-func gui_render_loop
+  (lambda (time:i64 delta_t:double)
+    (println "gui_render_loop callback stopped")
+    #f))
