@@ -980,5 +980,55 @@ several different editors."
 (bind-poly Widget_slider Widget_slider_with_id)
 (bind-poly Widget_slider Widget_slider_next_id)
 
+;; slider 2D
+
+(bind-func Widget_slider2D_c
+  (lambda (label:i8*)
+    (let ((lab (Str label))
+          (slider_xpos 0.)
+          (slider_ypos 0.))
+      (lambda (widget:Widget* bounds:Rect*)
+        (let ((vg (GUI_context EXTEMPORE_GUI)))
+          ;; toggle state
+          (if (gui_left_click_p bounds)
+              (begin (set! slider_xpos
+                           (/ (- (gui_mouse_x) (tref bounds 0))
+                              (tref bounds 2)))
+                     (set! slider_ypos
+                           (/ (- (gui_mouse_y) (tref bounds 1))
+                              (tref bounds 3)))))
+          ;; draw background
+          (nvgBeginPath vg)
+          (_nvgFillColor vg GUI_COLOR_ORANGE_D)
+          (gui_draw_rect bounds)
+          (nvgFill vg)
+          ;; draw "marker"
+          (nvgBeginPath vg)
+          (_nvgFillColor vg GUI_COLOR_ORANGE_L)
+          (gui_draw_circle (+ (* (tref bounds 2) slider_xpos)
+                              (tref bounds 0))
+                           (+ (* (tref bounds 3) slider_ypos)
+                              (tref bounds 1))
+                           10.)
+          (nvgFill vg)
+          (_nvgFillColor vg GUI_COLOR_BG)
+          (nvgBeginPath vg)
+          (gui_draw_text_in_bounds bounds lab)
+          (nvgFill vg))))))
+
+(bind-func Widget_slider2D_with_id
+  "create a slider2D widget"
+  (lambda (id label:i8*)
+    (Widget_with_cb id .5 GUI_SLIDER2D (Widget_slider2D_c label))))
+
+(bind-func Widget_slider2D_next_id
+  "create a slider2D widget"
+  (lambda (label:i8*)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER2D (Widget_slider2D_c label))))
+
+(bind-poly Widget_slider2D Widget_slider2D_with_id)
+(bind-poly Widget_slider2D Widget_slider2D_next_id)
+
+
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
