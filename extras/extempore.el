@@ -426,9 +426,16 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
        (list
         (regexp-opt extempore-xtlang-names 'symbols)
         '(1 font-lock-function-name-face))
-       ;; bind-type/alias
-       '("(\\(bind-\\(type\\|alias\\)\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+       
+       ;; bind-alias
+       '("(\\(bind-alias\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
          (1 font-lock-keyword-face)
+         (3 font-lock-function-name-face)
+         (4 font-lock-type-face t))
+       ;; bind-type
+       '("(\\(bind-type\\)\\s-+\\([^ \t:]+\\)\\s-+\\([^ \t:]+\\)\\(:[^ \t)]?+\\)?"
+         (1 font-lock-keyword-face)
+         (2 font-lock-function-name-face)
          (3 font-lock-function-name-face)
          (4 font-lock-type-face t))
        ;; bind-lib
@@ -1393,7 +1400,7 @@ command to run."
       ;; bind-type
       (goto-char (point-min))
       (while (search-forward-regexp "^DataType:  \\(.*\\) >>> \\(.*\\)$" nil t)
-        (replace-match (concat "(bind-type \\1 \\2)") t))
+        (replace-match (concat "(bind-type \\1 \\2 \\3)") t))
       ;; bind-poly
       (goto-char (point-min))
       (while (search-forward-regexp "^Overload:  \\(.*\\) \\(.*\\) >>> \\(.*\\)$" nil t)
