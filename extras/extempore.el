@@ -1400,7 +1400,7 @@ command to run."
       ;; bind-type
       (goto-char (point-min))
       (while (search-forward-regexp "^DataType:  \\(.*\\) >>> \\(.*\\)$" nil t)
-        (replace-match (concat "(bind-type \\1 \\2 \\3)") t))
+        (replace-match (concat "(bind-type \\1 \\2)") t))
       ;; bind-poly
       (goto-char (point-min))
       (while (search-forward-regexp "^Overload:  \\(.*\\) \\(.*\\) >>> \\(.*\\)$" nil t)
