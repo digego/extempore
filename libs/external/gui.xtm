@@ -994,10 +994,11 @@ The widget will be assigned the next available id based on the current state of 
       (lambda (widget:Widget* bounds:Rect*)
         (let ((vg (GUI_context EXTEMPORE_GUI))
               (parent (Widget_parent widget))
+              (click_p (gui_left_click_p bounds))
               (vertical_p (or (null? parent)
                               (Widget_split_vertical_p parent))))
           ;; toggle state
-          (if (gui_left_click_p bounds)
+          (if click_p
               (begin
                 (set! slider_pos
                       (if vertical_p
@@ -1013,7 +1014,9 @@ The widget will be assigned the next available id based on the current state of 
           (nvgFill vg)
           ;; draw "marker"
           (nvgBeginPath vg)
-          (_nvgFillColor vg GUI_COLOR_BLUE_L)
+          (if click_p
+              (_nvgFillColor vg GUI_COLOR_BLUE_L)
+              (_nvgFillColor vg GUI_COLOR_BLUE))
           (let ((slider_rect:Rect* (salloc)))
             (if vertical_p
                 (tfill! slider_rect
@@ -1077,12 +1080,13 @@ The widget will be assigned the next available id based on the current state of 
 (bind-func Widget_slider2D_c
   (lambda (label:i8* cb:[void,float,float]*)
     (let ((lab (Str label))
-          (slider_xpos 0.)
-          (slider_ypos 0.))
+          (slider_xpos .5)
+          (slider_ypos .5))
       (lambda (widget:Widget* bounds:Rect*)
-        (let ((vg (GUI_context EXTEMPORE_GUI)))
+        (let ((vg (GUI_context EXTEMPORE_GUI))
+              (click_p (gui_left_click_p bounds)))
           ;; toggle state
-          (if (gui_left_click_p bounds)
+          (if click_p
               (begin (set! slider_xpos
                            (/ (- (gui_mouse_x) (tref bounds 0))
                               (tref bounds 2)))
@@ -1097,7 +1101,9 @@ The widget will be assigned the next available id based on the current state of 
           (nvgFill vg)
           ;; draw "marker"
           (nvgBeginPath vg)
-          (_nvgFillColor vg GUI_COLOR_ORANGE_L)
+          (if click_p
+              (_nvgFillColor vg GUI_COLOR_ORANGE_L)
+              (_nvgFillColor vg GUI_COLOR_ORANGE))
           (gui_draw_circle (+ (* (tref bounds 2) slider_xpos)
                               (tref bounds 0))
                            (+ (* (tref bounds 3) slider_ypos)
