@@ -433,11 +433,11 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
          (3 font-lock-function-name-face)
          (4 font-lock-type-face t))
        ;; bind-type
-       '("(\\(bind-type\\)\\s-+\\([^ \t:]+\\)\\s-+\\([^ \t:]+\\)\\(:[^ \t)]?+\\)?"
+       '("(\\(bind-type\\)\\s-+\\([^ \t]+\\)\\s-+\\([^ \t]+\\)[ \t\n]*?\\(\"[^)]*\"\\)?)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
-         (3 font-lock-function-name-face)
-         (4 font-lock-type-face t))
+         (3 font-lock-type-face t)
+         (4 font-lock-string-face))
        ;; bind-lib
        '("(\\(bind-lib\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
          (1 font-lock-keyword-face)
@@ -621,6 +621,7 @@ indentation."
 (put 'lambda 'extempore-indent-function 1)
 (put 'memzone 'extempore-indent-function 1)
 (put 'bind-func 'extempore-indent-function 'defun)
+(put 'bind-type 'extempore-indent-function 'defun)
 (put 'let 'extempore-indent-function 'extempore-let-indent)
 (put 'letz 'extempore-indent-function 'extempore-let-indent)
 (put 'let* 'extempore-indent-function 'extempore-let-indent)
