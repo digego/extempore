@@ -13,93 +13,16 @@
 (sys:load "libs/external/glfw3.xtm")
 (sys:load "libs/external/nanovg.xtm")
 
-(bind-val width i32 1920)
-(bind-val height i32 1080)
-(bind-val fbWidth i32)
-(bind-val fbHeight i32)
-(bind-val pxRatio float)
+(bind-val width float 1024.)
+(bind-val height float 768.)
+(bind-val pixel_ratio float)
 
 (bind-val window GLFWwindow*)
 (bind-val vg NVGcontext*)
 
-;; create a window
 (call-as-xtlang
  (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
- (set! window (glfw_init_and_create_fullscreen_window))
- (set! vg (nvg_create_context)))
+ (set! window (glfw_init_and_create_window (convert width) (convert height)))
+ (set! vg (nvg_create_context))
+ (set! pixel_ratio (nvg_get_pixel_ratio window)))
 
-(call-as-xtlang
- (let ((w:i32* (alloc))
-       (h:i32* (alloc)))
-   (glfwGetWindowSize window w h)
-   (set! width (pref w 0))
-   (set! height (pref h 0))
-   (glfwGetFramebufferSize window w h)
-   (set! fbWidth (pref w 0))
-   (set! fbHeight (pref h 0))
-   (set! pxRatio (/ (convert fbWidth float) (convert width float)))
-   (nvgCreateFont vg "bold" "/Users/ben/Library/Fonts/OpenSans-Bold.ttf")))
-
-(bind-func draw_frame
-  (lambda ()
-    (nvgBeginFrame vg width height pxRatio)
-    ;; stuff goes here
-    (nvgBeginPath vg)
-    (_nvgFillPaint vg
-                   (_nvgLinearGradient vg
-                                       0. 0.
-                                       (convert width)
-                                       (convert height)
-                                       (NVGcolor 1. 0. 1. 1.)
-                                       (NVGcolor 0. 1. 1. 1.)))
-    (nvgRect vg 100. 100. (+ (convert width) -200.) (+ (convert height) -200.))
-    (nvgPathWinding vg NVG_CW)
-    (nvgCircle vg 410. 410. 100.)
-    (nvgFill vg)
-    (nvgEndFrame vg)))
-
-
-
-(bind-func draw_frame
-  (lambda ()
-    (nvgBeginFrame vg width height pxRatio)
-    ;; stuff goes here
-    (nvgBeginPath vg)
-    (_nvgFillColor vg (NVGcolor 0. 1. 1. 1.))
-    (nvgRect vg 100. 100. (+ (convert width) -200.) (+ (convert height) -200.))
-    (nvgPathWinding vg NVG_CW)
-    (nvgCircle vg 410. 410. 100.)
-    (nvgFill vg)
-    (nvgBeginPath vg)
-    (_nvgFillColor vg (NVGcolor 0. 0. 0. 1.))
-    (nvgFontSize vg 100.)
-    (nvgTextAlign vg NVG_ALIGN_CENTER)
-    ;; (nvgTextAlign vg NVG_ALIGN_TOP)
-    (nvgTextBox vg 100. 200. (+ (convert width) -200.)
-                "Ben's button" null)
-    (nvgFill vg)
-    (nvgEndFrame vg)))
-
-(bind-func gl_draw_loop
-  (lambda (time:i64 delta_t:double)
-    (glClear (bitwise-or GL_COLOR_BUFFER_BIT
-                         GL_DEPTH_BUFFER_BIT
-                         GL_STENCIL_BUFFER_BIT))
-    (draw_frame)
-    (glfwPollEvents)
-    (glfwSwapBuffers window)
-    (if (= (glfwWindowShouldClose window) 1)
-        (begin
-          (nvgDeleteGL3 vg)
-          (glfwTerminate)
-          #t)
-        (let ((next_time (+ time (convert (* 44100. delta_t)))))
-          (callback next_time gl_draw_loop next_time delta_t)))))
-
-(gl_draw_loop (now) (/ 1.0 3.0))
-
-(bind-func gl_draw_loop
-  (lambda (time:i64 delta_t:double)
-    #f)) ;; 30fps
-
-;; what might a simple 2d GUI library look like?
