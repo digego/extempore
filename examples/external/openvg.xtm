@@ -1,89 +1,96 @@
-;;; openvg.xtm -- OpenVG drawing example
+;;; openvg.xtm -- OpenVG-ish drawing example
 
 ;; Author: Andrew Sorensen, Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: libOpenVG
+;; Required dylibs: libglfw3, libnanovg
 
 ;;; Commentary:
 
-;;
+;; This example used to be powered by ShivaVG, an OpenVG
+;; implementation which has now been unmaintained for several years.
+
+;; Recently, it has been updated to use the nanovg
+;; (https://github.com/memononen/nanovg) 2D hardware-accelerated
+;; drawing library. nanovg is *not* conformant with the OpenVG spec,
+;; but it's pretty close, and it's actively maintained, so is probably
+;; a good option going forward unless you need strict OpenVG
+;; compatibility.
 
 ;;; Code:
 
-(define fullscreen #f)
-;; (define width 1920.0)
-;; (define height 1200.0)
-(define width 1024.0)
-(define height 768.0)
-(bind-val width float width)
-(bind-val height float height)
+(sys:load "libs/external/glfw3.xtm")
+(sys:load "libs/external/nanovg.xtm")
 
-;; setup opengl
-(define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+(bind-val width float 1024.)
+(bind-val height float 768.)
+(bind-val pixel_ratio float)
 
-;; first try to load from prebuilt stdlib
-;; (sys:load "libs/xtm.xtm")
-;; failing that compile on-the-fly
-(sys:load "libs/external/graphics-pipeline.xtm")
-(sys:load "libs/external/openvg.xtm")
+(bind-val window GLFWwindow*)
+(bind-val vg NVGcontext*)
 
-;; init xtm render pipeline
-(xtm_render_setup width height)
-(if (<> (xtm-vg-create-context width height) 1) (xtm_vg_print_error))
+;; create a window
+(call-as-xtlang
+ (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+ (set! window (glfw_init_and_create_window (convert width) (convert height)))
+ (set! vg (nvg_create_context))
+ (set! pixel_ratio (nvg_get_pixel_ratio window)))
 
-(bind-func post:XTMRENDERCB
-  (let ((image:VGImage (xtm_load_vgimage "assets/images/image.png"))
-        (path (xtm_create_path))
-        (fill (vgCreatePaint))
-        (fill_color:xtm_color* (alloc))
-        (stroke (vgCreatePaint))
-        (stroke_color:xtm_color* (alloc))
-        (clear_color:xtm_color* (alloc)))
-    (afill! fill_color 1.0 0.0 0.0 0.5)
-    (afill! stroke_color 0.0 0.0 1.0 0.5)
-    (afill! clear_color 0.0 0.0 0.0 1.0)
-    (xtm_paint_set_fill fill fill_color)
-    (xtm_paint_set_stroke stroke stroke_color 10.)
-    (xtm_add_ellipse path 0.0 0.0 50. 50.)
-    (lambda (frame shader m v p data)
-      (let ((i:float 0.0))
-        (xtm_vg_reset_matrices)
-        (xtm_vg_clear (convert width) (convert height) clear_color)
-        (vgLoadIdentity)        
-        (if (null? image) void (vgDrawImage image))        
-        (vgSeti VG_MATRIX_MODE VG_MATRIX_PATH_USER_TO_SURFACE)        
-        (dotimes (i 200.0)
-          (vgLoadIdentity)
-          (vgTranslate
-           (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (convert frame)))))
-           (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (convert frame))))))
-          ;; (xtm_path_translate
-          ;;  (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (convert frame)))))
-          ;;  (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (convert frame))))))
-          (afill! fill_color (/ i 200.0) 0.0 (- 1.0 (/ i 200.0)) 0.5)
-          (xtm_paint_set_fill fill fill_color)
-          (vgDrawPath path VG_FILL_PATH))
-        ;; (xtm_clear_path path)
-        (xtm_vg_print_error)
-        void))))
+;; background image
+(bind-val bg_paint NVGpaint*)
 
-(bind-func gl_render
-  (lambda ()
-    (xtm_render null null null post null)
-    void))
+(call-as-xtlang
+ (set! bg_paint (_nvgImagePattern vg
+                                  0. 0.
+                                  width height
+                                  0.
+                                  (nvgCreateImage vg "assets/images/image.png"  0)
+                                  1.)))
 
-(define gl-loop
-  (lambda (time delta-t)
-    (let ((late-by (- (now) time))
-          (next-frame-time (+ time (* *second* delta-t))))
-      (if (> late-by 0)
-          (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
+(bind-func draw_frame
+  (let ((fill (NVGcolor 1.0 0.0 0.0 0.5))
+        (stroke (NVGcolor 0.0 0.0 1.0 0.5))
+        (i 0.:f)
+        (frame 0))
+    (lambda ()
+      (nvgBeginFrame vg (convert width) (convert height) pixel_ratio)
+      (nvgResetTransform vg)
+      (if (not (null? bg_paint))
+          ;; draw background image
           (begin
-            (gl_render)
-            (gl:swap-buffers *gl-ctx*)))
-      (callback (* 0.9 next-frame-time)
-                'gl-loop
-                next-frame-time
-                delta-t))))
+            (_nvgFillPaint vg bg_paint)
+            (nvgBeginPath vg)
+            (nvgRect vg 0. 0. width height)
+            (nvgFill vg)))        
+      ;; loop and draw the circles
+      (dotimes (i 200.0)
+        (nvgResetTransform vg)
+        (nvgTranslate vg
+                      (+ (/ width 2.0) (* 200. (cos (* i 0.00025 (convert frame)))))
+                      (+ (/ height 2.0) (* 100. (tan (* 0.0001 i (convert frame))))))
+        (nvgBeginPath vg)
+        (nvgCircle vg 0. 0. 50.)
+        (tfill! fill (/ i 200.0) 0.0 (- 1.0 (/ i 200.0)) 0.5)
+        (_nvgFillColor vg fill)
+        (nvgFill vg)
+        (nvgStrokeWidth vg 10.)
+        (_nvgStrokeColor vg stroke)
+        (nvgStroke vg))
+      (set! frame (+ frame 1))
+      (nvgEndFrame vg))))
 
-(gl-loop (now) 1/20)
+(bind-func nvg_draw_loop
+  (lambda (time:i64 delta_t:double)
+    (nvg_clear)
+    (draw_frame)
+    (glfwPollEvents)
+    (glfwSwapBuffers window)    
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time nvg_draw_loop next_time delta_t))))
+
+(nvg_draw_loop (now) (/ 1. 30.))
+
+;; to stop the draw loop, eval this version of nvg_draw_loop
+(bind-func nvg_draw_loop
+  (lambda (time:i64 delta_t:double)
+    (println "nvg_draw_loop callback stopped")
+    #f))
