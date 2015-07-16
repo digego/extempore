@@ -184,14 +184,23 @@ Second item in tuple is a char* c-style string
 
 ;; must be a Halloced string!
 (bind-func Delete_String
+  "Delete a string object
+Frees both the underlying character array and the tuple container.
+@param str - String to be deleted 
+"
   (lambda (str:String*)
     (free (tref str 1))
     (free str)
     void))
 
-
 ;; String printing!
 (bind-func String_print:[void,String*]*
+  "Prints all characters in a given string object.
+Overloads and should be used via the `println` function
+If the string is empty will print a zero length string
+
+@param str - String to be printed
+"
   (lambda (x)
     (if (null? x)
         (begin (printf "")
@@ -202,44 +211,66 @@ Second item in tuple is a char* c-style string
 (bind-poly print String_print)
 
 (bind-func tostring_String:[String*,String*]*
+  "Suggestions welcome"
   (lambda (x)
     x))
 
 (bind-poly tostring tostring_String)
 
-;; lenght of string is the current
-;; length of the cstr within string
 (bind-func string_length
+  "Takes a String and returns the number of characters it holds
+@param str - The String
+@return length - length of string
+"
   (lambda (str:String*)
     (strlen (tref str 1))))
 
-;; size of string is the total allowable
-;; buffer size for string, which can be
-;; larger than (string_length)
 (bind-func string_size
+  "Takes a String and returns the number of characters it holds
+@param str - The String
+@return length - length of string
+"
   (lambda (str:String*)
     (tref str 0)))
 
 (bind-func string_cstr
+  "@param str 
+@return c_str - the underlying i8 'char' array"
   (lambda (str:String*)
     (tref str 1)))
 
 (bind-func cstr_from_string
+  "@param str 
+@return c_str - the underlying i8 'char' array"
   (lambda (str:String*)
     (tref str 1)))
 
 (bind-func cstr_length
+  "Takes a String and returns the number of characters it holds
+@param str - The String
+@return length - length of string
+"
   (lambda (str:String*)
     (strlen (tref str 1))))
 
 ;; create easy Data constructors from CStrings
 (bind-func Str_cptr
+  "Generate a String object from a character array
+Use via the polymorphic Str symbol
+@param str - character array from which to generate a String object
+@return - the new String*
+"
   (lambda (s)
     (let ((lgth (strlen s))
           (str (String lgth s)))
       str)))
 
 (bind-func Str_string
+  "Generate a String object from a String object
+Use via the polymorphic Str symbol
+@param s - the input String object
+@return - the new String*
+"
   (lambda (s:String*)
     (let ((lgth (string_length s))
           (str (String lgth (string_cstr s))))
@@ -249,12 +280,22 @@ Second item in tuple is a char* c-style string
 (bind-poly Str Str_string)
 
 (bind-func Str_h_cptr
+  "Generate a String object from a character array
+Use via the polymorphic Str_h symbol
+@param str - character array from which to generate a String object
+@return - the new String*
+"
   (lambda (s)
     (let ((lgth (strlen s))
           (str (String_h lgth s)))
       str)))
 
 (bind-func Str_h_string
+  "Generate a String object from a String object
+Use via the polymorphic Str_h symbol
+@param s - the input String 
+@return - the new String 
+"
   (lambda (s:String*)
     (let ((lgth (string_length s))
           (str (String_h lgth (string_cstr s))))
@@ -264,7 +305,14 @@ Second item in tuple is a char* c-style string
 (bind-poly Str_h Str_h_string)
 
 (bind-func string_cat_2
-  "concatenate 2 Strings - use string_cat for varargs version"
+  "Concatenate 2 Strings
+If one string is null, the alternate String will be returned.
+If both strings are null an empty String will be returned 
+
+@param s1 - first string to be concatenated
+@param s2 - second string to be concatenated
+@return - pointer to new String 
+"
   (lambda (s1:String* s2:String*)
     (if (null? s2) (Str s1)
         (if (null? s1) (Str s2)
@@ -273,7 +321,6 @@ Second item in tuple is a char* c-style string
               (strcpy news (tref s1 1))
               (strncat news (tref s2 1) size)
               (Str news))))))
-
 
 (bind-func string_cat_h
   (lambda (s1:String* s2:String*)
@@ -286,6 +333,11 @@ Second item in tuple is a char* c-style string
               (Str_h news))))))
 
 (bind-func string_cmp
+  "Compare two strings
+@param s1 - first string
+@param s2 - second string
+@return - boolean value representing string 
+"
   (lambda (s1:String* s2:String*)
     (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
         1:i1 0:i1)))
@@ -295,6 +347,11 @@ Second item in tuple is a char* c-style string
 
 ;; levenshtein edit distance
 (bind-func string_levenshtein
+  "Returns the levenshtein distance between two strings
+@param s - string 1
+@param t - string 2
+@return - The levenshetein distance
+"
   (lambda (s:String* t:String*)
     (let ((i 0) (j 0)
           ;; column-major indexing closure
@@ -331,7 +388,6 @@ Second item in tuple is a char* c-style string
 (bind-func string_similarity
   (lambda (s:String* t:String*)
     (/ 1.0 (i64tod (+ 1 (string_levenshtein s t))))))
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;
