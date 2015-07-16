@@ -152,7 +152,7 @@
     (and (null? (Widget_left_child widget))
          (null? (Widget_right_child widget)))))
 
-(bind-func Widget_inner_p
+(bind-func Widget_internal_p
   (lambda (widget:Widget*)
     (not (Widget_leaf_p widget))))
 
@@ -530,6 +530,18 @@ If parent_widget is null, new_widget becomes the new GUI root node.
 (bind-poly gui_add_widget gui_add_widget_preorder_horizontal) ;; split horizontally by default
 (bind-poly gui_add_widget_horizontal gui_add_widget_preorder_horizontal)
 (bind-poly gui_add_widget_vertical gui_add_widget_preorder_vertical)
+
+;; flip l and r child widgets of internal node
+
+(bind-func gui_flip_widgets
+  (lambda (widget)
+    (if (Widget_leaf_p widget)
+        (println "gui_flip_widgets: cannot flip leaf widgets")
+        (let ((old_left (Widget_left_child widget)))
+          ;; swap the child widgets
+          (Widget_set_left_child widget (Widget_right_child widget))
+          (Widget_set_right_child widget old_left)
+          void))))
 
 (bind-func gui_validate
   (lambda ()
