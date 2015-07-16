@@ -458,23 +458,20 @@
          null))
       top_id)))
 
-;; modify the GUI tree
-
 ;; this is the all-singing, all-dancing "base" widget add function.
 ;; see below for helper functions which use sensible default
 ;; parameters
 (bind-func gui_add_widget_base
   "add a new widget to the GUI
 
-new_widget: widget to add
-parent_widget: widget to split
-split_size: relative size of the two new widgets, in (0,1)
-split_orientation: either GUI_SPLIT_HORIZONTAL or GUI_SPLIT_VERTICAL
-addleft_p: #t to add new widget as *left* child of parent, otherwise *right* child
+@param new_widget - widget to add
+@param parent_widget - widget to split
+@param split_size - relative size of the two new widgets, in (0,1)
+@param split_orientation - either GUI_SPLIT_HORIZONTAL or GUI_SPLIT_VERTICAL
 
 If parent_widget is null, new_widget becomes the new GUI root node.
 "
-  (lambda (new_widget:Widget* parent_widget:Widget* split_size split_orientation addleft_p:i1)
+  (lambda (new_widget:Widget* parent_widget:Widget* split_size split_orientation)
     (cond ((not (Widget_leaf_p new_widget))
            (println "gui_add_widget: cannot add non-leaf widget")
            0:i1)
@@ -495,8 +492,8 @@ If parent_widget is null, new_widget becomes the new GUI root node.
            1:i1)
           (else
            (let ((grandparent_widget (Widget_parent parent_widget))
-                 (new_lchild (if addleft_p new_widget parent_widget))
-                 (new_rchild (if addleft_p parent_widget new_widget))
+                 (new_lchild parent_widget)
+                 (new_rchild new_widget)
                  (new_parent (Widget_h -1 ;; internal nodes have id -1
                                        split_size
                                        (bor (Widget_type parent_widget) split_orientation)
@@ -517,16 +514,16 @@ If parent_widget is null, new_widget becomes the new GUI root node.
              1:i1)))))
 
 (bind-func gui_add_widget_preorder
-  (lambda (new_widget split_size split_orientation addleft_p)
-    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size split_orientation addleft_p)))
+  (lambda (new_widget split_size split_orientation)
+    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size split_orientation)))
 
 (bind-func gui_add_widget_preorder_horizontal
   (lambda (new_widget split_size)
-    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size GUI_SPLIT_HORIZONTAL 0)))
+    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size GUI_SPLIT_HORIZONTAL)))
 
 (bind-func gui_add_widget_preorder_vertical
   (lambda (new_widget split_size)
-    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size GUI_SPLIT_VERTICAL 0)))
+    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size GUI_SPLIT_VERTICAL)))
 
 (bind-poly gui_add_widget gui_add_widget_base)
 (bind-poly gui_add_widget gui_add_widget_preorder)
