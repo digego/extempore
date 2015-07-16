@@ -948,17 +948,19 @@ several different editors."
           ;; draw "marker"
           (nvgBeginPath vg)
           (_nvgFillColor vg GUI_COLOR_BLUE_L)
-          (if vertical_p
-              (gui_draw_rect (Rect
-                              (+ (* (tref bounds 2) slider_pos) (tref bounds 0) -10.)
-                              (tref bounds 1)
-                              20.
-                              (tref bounds 3)))
-              (gui_draw_rect (Rect
-                              (tref bounds 0)
-                              (+ (* (tref bounds 3) slider_pos) (tref bounds 1) -10.)
-                              (tref bounds 2)
-                              20.)))
+          (let ((slider_rect:Rect* (salloc)))
+            (if vertical_p
+                (tfill! slider_rect
+                        (+ (* (tref bounds 2) slider_pos) (tref bounds 0) -10.)
+                        (tref bounds 1)
+                        20.
+                        (tref bounds 3))
+                (tfill! slider_rect
+                        (tref bounds 0)
+                        (+ (* (tref bounds 3) slider_pos) (tref bounds 1) -10.)
+                        (tref bounds 2)
+                        20.))
+            (gui_draw_rect slider_rect))
           (nvgFill vg)
           (_nvgFillColor vg GUI_COLOR_BG)
           (nvgBeginPath vg)
