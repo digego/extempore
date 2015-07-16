@@ -845,13 +845,22 @@ several different editors."
 ;; button
 
 (bind-func Widget_button_c
-  (lambda (label:i8*)
-    (let ((lab (Str label)))
+  (lambda (label:i8* cb:[void,i1]*)
+    (let ((lab (Str label))
+          (click_p:i1 0)
+          (prev_click_p:i1 0))
       (lambda (widget:Widget* bounds:Rect*)
         (let ((vg (GUI_context EXTEMPORE_GUI)))
+          ;; toggle state
+          (set! click_p (gui_left_click_p bounds))
+          (if (and click_p (not prev_click_p))
+              ;; fire callbacks
+              (cb click_p))
+          (set! prev_click_p click_p)
+          ;; call the callback
           ;; draw background
           (nvgBeginPath vg)
-          (cond ((gui_left_click_p bounds)
+          (cond (click_p
                  (_nvgFillColor vg GUI_COLOR_EMPH))
                 ((gui_inbounds_p bounds)
                  (_nvgFillColor vg GUI_COLOR_HL))
@@ -861,40 +870,69 @@ several different editors."
           (nvgFill vg)
           ;; draw text
           (nvgBeginPath vg)
-          (if (gui_left_click_p bounds)
+          (if click_p
               (_nvgFillColor vg GUI_COLOR_BG)
               (_nvgFillColor vg GUI_COLOR_FG))
           (gui_draw_text_in_bounds bounds lab)
           (nvgFill vg))))))
 
-(bind-func Widget_button_with_id
-  "create a button widget"
-  (lambda (id label:i8*)
-    (Widget_with_cb id .5 GUI_BUTTON (Widget_button_c label))))
+(bind-func Widget_button_nocb
+  "create a button widget
+
+@param label - a text label for the button
+
+The widget will be assigned the next available id based on the current
+state of the GUI
+
+This button doesn't do anything when clicked - to register a click
+callback, @see Widget_button_next_id
+"
+  (lambda (label:i8*)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON (Widget_button_c label null))))
 
 (bind-func Widget_button_next_id
-  "create a button widget"
-  (lambda (label:i8*)
-    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON (Widget_button_c label))))
+  "create a button widget
 
-(bind-poly Widget_button Widget_button_with_id)
+@param label - a text label for the button
+@param cb - button callback (called when button is clicked)
+
+The widget will be assigned the next available id based on the current state of the GUI
+"
+  (lambda (label:i8* cb)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON (Widget_button_c label cb))))
+
+(bind-func Widget_button_with_id
+  "create a button widget with a specified id
+
+@param label - a text label for the button
+@param cb - button callback (called when button is clicked)
+@param id - an id handle for the widget
+"
+  (lambda (label:i8* cb id)
+    (Widget_with_cb id .5 GUI_BUTTON (Widget_button_c label cb))))
+
+(bind-poly Widget_button Widget_button_nocb)
 (bind-poly Widget_button Widget_button_next_id)
+(bind-poly Widget_button Widget_button_with_id)
 
 ;; checkbox
 
 (bind-func Widget_checkbox_c
-  (lambda (label:i8*)
+  (lambda (label:i8* cb:[void,i1]*)
     (let ((lab (Str label))
           (state:i1 0)
-          (click:i1 0)
-          (prev_click:i1 0))
+          (click_p:i1 0)
+          (prev_click_p:i1 0))
       (lambda (widget:Widget* bounds:Rect*)
         (let ((vg (GUI_context EXTEMPORE_GUI)))
           ;; toggle state
-          (set! click (gui_left_click_p bounds))
-          (if (and click (not prev_click))
-              (set! state (not state)))
-          (set! prev_click click)
+          (set! click_p (gui_left_click_p bounds))
+          (if (and click_p (not prev_click_p))
+              (begin
+                (set! state (not state))
+                ;; fire callbacks
+                (cb state)))
+          (set! prev_click_p click_p)
           ;; draw widget
           (nvgBeginPath vg)
           ;; checkboxes are edge-triggered on state change
@@ -908,23 +946,49 @@ several different editors."
           (gui_draw_text_in_bounds bounds lab)
           (nvgFill vg))))))
 
-(bind-func Widget_checkbox_with_id
-  "create a checkbox widget"
-  (lambda (id label:i8*)
-    (Widget_with_cb id .5 GUI_BUTTON_CHECKBOX (Widget_checkbox_c label))))
+(bind-func Widget_checkbox_nocb
+  "create a checkbox widget
+
+@param label - a text label for the checkbox
+@param cb - checkbox callback (called when checkbox is toggled)
+
+This checkbox doesn't do anything when toggled - to register a click
+callback, @see Widget_checkbox_next_id
+
+The widget will be assigned the next available id based on the current state of the GUI
+"
+  (lambda (label:i8*)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON_CHECKBOX (Widget_checkbox_c label null))))
 
 (bind-func Widget_checkbox_next_id
-  "create a checkbox widget"
-  (lambda (label:i8*)
-    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON_CHECKBOX (Widget_checkbox_c label))))
+  "create a checkbox widget
 
+@param label - a text label for the checkbox
+@param cb - checkbox callback (called when checkbox is toggled)
+
+The widget will be assigned the next available id based on the current state of the GUI
+"
+  (lambda (label:i8* cb)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON_CHECKBOX (Widget_checkbox_c label cb))))
+
+(bind-func Widget_checkbox_with_id
+  "create a checkbox widget with a specified id
+
+@param label - a text label for the checkbox
+@param cb - checkbox callback (called when checkbox is toggled)
+@param id - an id handle for the widget
+"
+  (lambda (label:i8* cb id)
+    (Widget_with_cb id .5 GUI_BUTTON_CHECKBOX (Widget_checkbox_c label cb))))
+
+(bind-poly Widget_checkbox Widget_checkbox_nocb)
 (bind-poly Widget_checkbox Widget_checkbox_with_id)
 (bind-poly Widget_checkbox Widget_checkbox_next_id)
 
 ;; slider
 
 (bind-func Widget_slider_c
-  (lambda (label:i8*)
+  (lambda (label:i8* cb:[void,float]*)
     (let ((lab (Str label))
           (slider_pos 0.))
       (lambda (widget:Widget* bounds:Rect*)
@@ -934,12 +998,14 @@ several different editors."
                               (Widget_split_vertical_p parent))))
           ;; toggle state
           (if (gui_left_click_p bounds)
-              (set! slider_pos
-                    (if vertical_p
-                        (/ (- (gui_mouse_x) (tref bounds 0))
-                           (tref bounds 2))
-                        (/ (- (gui_mouse_y) (tref bounds 1))
-                           (tref bounds 3)))))
+              (begin
+                (set! slider_pos
+                      (if vertical_p
+                          (/ (- (gui_mouse_x) (tref bounds 0))
+                             (tref bounds 2))
+                          (/ (- (gui_mouse_y) (tref bounds 1))
+                             (tref bounds 3))))
+                (cb slider_pos)))
           ;; draw background
           (nvgBeginPath vg)
           (_nvgFillColor vg GUI_COLOR_BLUE_D)
@@ -967,23 +1033,49 @@ several different editors."
           (gui_draw_text_in_bounds bounds lab)
           (nvgFill vg))))))
 
-(bind-func Widget_slider_with_id
-  "create a slider widget"
-  (lambda (id label:i8*)
-    (Widget_with_cb id .5 GUI_SLIDER (Widget_slider_c label))))
+(bind-func Widget_slider_nocb
+  "create a slider widget
+
+@param label - a text label for the slider
+@param cb - slider callback (called when slider is moved)
+
+This slider doesn't do anything when moved - to register a callback,
+@see Widget_slider_next_id
+
+The widget will be assigned the next available id based on the current state of the GUI
+"
+  (lambda (label:i8*)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER (Widget_slider_c label null))))
 
 (bind-func Widget_slider_next_id
-  "create a slider widget"
-  (lambda (label:i8*)
-    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER (Widget_slider_c label))))
+  "create a slider widget
 
-(bind-poly Widget_slider Widget_slider_with_id)
+@param label - a text label for the slider
+@param cb - slider callback (called when slider is moved)
+
+The widget will be assigned the next available id based on the current state of the GUI
+"
+  (lambda (label:i8* cb)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER (Widget_slider_c label cb))))
+
+(bind-func Widget_slider_with_id
+  "create a slider widget with a specified id
+
+@param label - a text label for the slider
+@param cb - slider callback (called when slider is moved)
+@param id - an id handle for the widget
+"
+  (lambda (label:i8* cb id)
+    (Widget_with_cb id .5 GUI_SLIDER (Widget_slider_c label cb))))
+
+(bind-poly Widget_slider Widget_slider_nocb)
 (bind-poly Widget_slider Widget_slider_next_id)
+(bind-poly Widget_slider Widget_slider_with_id)
 
 ;; slider 2D
 
 (bind-func Widget_slider2D_c
-  (lambda (label:i8*)
+  (lambda (label:i8* cb:[void,float,float]*)
     (let ((lab (Str label))
           (slider_xpos 0.)
           (slider_ypos 0.))
@@ -996,7 +1088,8 @@ several different editors."
                               (tref bounds 2)))
                      (set! slider_ypos
                            (/ (- (gui_mouse_y) (tref bounds 1))
-                              (tref bounds 3)))))
+                              (tref bounds 3)))
+                     (cb slider_xpos slider_ypos)))
           ;; draw background
           (nvgBeginPath vg)
           (_nvgFillColor vg GUI_COLOR_ORANGE_D)
@@ -1016,18 +1109,44 @@ several different editors."
           (gui_draw_text_in_bounds bounds lab)
           (nvgFill vg))))))
 
-(bind-func Widget_slider2D_with_id
-  "create a slider2D widget"
-  (lambda (id label:i8*)
-    (Widget_with_cb id .5 GUI_SLIDER2D (Widget_slider2D_c label))))
+(bind-func Widget_slider2D_nocb
+  "create a 2D slider widget
+
+@param label - a text label for the slider
+@param cb - slider callback (called when slider is moved)
+
+This 2D slider doesn't do anything when moved - to register a callback,
+@see Widget_slider2D_next_id
+
+The widget will be assigned the next available id based on the current state of the GUI
+"
+  (lambda (label:i8*)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER2D (Widget_slider2D_c label null))))
 
 (bind-func Widget_slider2D_next_id
-  "create a slider2D widget"
-  (lambda (label:i8*)
-    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER2D (Widget_slider2D_c label))))
+  "create a 2D slider widget
 
-(bind-poly Widget_slider2D Widget_slider2D_with_id)
+@param label - a text label for the slider
+@param cb - slider callback (called when slider is moved)
+
+The widget will be assigned the next available id based on the current state of the GUI
+"
+  (lambda (label:i8* cb)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER2D (Widget_slider2D_c label cb))))
+
+(bind-func Widget_slider2D_with_id
+  "create a 2D slider widget with a specified id
+
+@param label - a text label for the slider
+@param cb - slider callback (called when slider is moved)
+@param id - an id handle for the widget
+"
+  (lambda (label:i8* cb id)
+    (Widget_with_cb id .5 GUI_SLIDER2D (Widget_slider2D_c label cb))))
+
+(bind-poly Widget_slider2D Widget_slider2D_nocb)
 (bind-poly Widget_slider2D Widget_slider2D_next_id)
+(bind-poly Widget_slider2D Widget_slider2D_with_id)
 
 
 (impc:aot:insert-footer "xtmgui")
