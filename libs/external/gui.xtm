@@ -955,6 +955,86 @@ The widget will be assigned the next available id based on the current state of 
 (bind-poly Widget_checkbox Widget_checkbox_with_id)
 (bind-poly Widget_checkbox Widget_checkbox_next_id)
 
+;; radio
+
+(bind-func Widget_radio_c
+  (lambda (label:i8* cb:[void,i64]* nstates)
+    (let ((lab (Str label))
+          (state:i64 0)
+          (click_p:i1 0)
+          (prev_click_p:i1 0))
+      (lambda (widget:Widget* bounds:Rect*)
+        (let ((vg (GUI_context EXTEMPORE_GUI))
+              (parent (Widget_parent widget))
+              (vertical_p (or (null? parent)
+                              (Widget_split_vertical_p parent)))
+              (pos (if vertical_p
+                       (/ (- (gui_mouse_x) (tref bounds 0))
+                          (tref bounds 2))
+                       (/ (- (gui_mouse_y) (tref bounds 1))
+                          (tref bounds 3))))
+              (button_bounds:Rect* (salloc)))
+          ;; toggle state
+          (set! click_p (gui_left_click_p bounds))
+          (if (and click_p (not prev_click_p))
+              (begin
+                (set! state (convert (* (convert state float) pos)))
+                ;; fire callback
+                (cb state)))
+          (set! prev_click_p click_p)
+          ;; draw widgets
+          (doloop (i nstates)
+            (if vertical_p
+                (tfill! button_bounds
+                        (+ (tref bounds 0)
+                           (* (/ (tref bounds 2) (convert nstates)) (convert i)))
+                        (tref bounds 1)
+                        (/ (tref bounds 2) (convert nstates))
+                        (tref bounds 3))
+                (tfill! button_bounds
+                        (tref bounds 0)
+                        (+ (tref bounds 1)
+                           (* (/ (tref bounds 3) (convert nstates)) (convert i)))
+                        (tref bounds 2)
+                        (/ (tref bounds 3) (convert nstates))))
+            (nvgBeginPath vg)
+            (if (= i state)
+                (_nvgFillColor vg GUI_COLOR_MAGENTA_L)
+                (_nvgFillColor vg GUI_COLOR_MAGENTA_D))
+            (gui_draw_rect button_bounds)
+            (nvgFill vg))
+          ;; (_nvgFillColor vg GUI_COLOR_BG)
+          ;; (nvgBeginPath vg)
+          ;; (gui_draw_text_in_bounds bounds lab)
+          ;; (nvgFill vg)
+          void)))))
+
+(bind-func Widget_radio_next_id
+  "create a radio button widget
+
+@param label - a text label for the radio button
+@param cb - radio button callback (called when radio button is toggled)
+@param nstates - number of states for the radio button
+
+The widget will be assigned the next available id based on the current state of the GUI
+"
+  (lambda (label:i8* cb nstates)
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON_CHECKBOX (Widget_radio_c label cb))))
+
+(bind-func Widget_radio_with_id
+  "create a radio button widget with a specified id
+
+@param label - a text label for the radio button
+@param cb - radio button callback (called when radio button is toggled)
+@param nstates - number of states for the radio button
+@param id - an id handle for the widget
+"
+  (lambda (label:i8* cb nstates id)
+    (Widget_with_cb id .5 GUI_BUTTON_CHECKBOX (Widget_radio_c label cb))))
+
+(bind-poly Widget_radio Widget_radio_with_id)
+(bind-poly Widget_radio Widget_radio_next_id)
+
 ;; slider
 
 (bind-func Widget_slider_c
