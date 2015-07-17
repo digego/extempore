@@ -3326,8 +3326,90 @@
 
 ;; Framebuffer Object
 
+;; fbo id          0
+;; texture id      1
+;; depth buffer id 2
+;; width           3
+;; height          4
+(bind-type FBO <GLuint,GLuint,GLuint,GLsizei,GLsizei>)
+
+;; accessor functions
+
+(bind-func FBO_id
+  (lambda (fbo:FBO*)
+    (tref fbo 0)))
+
+(bind-func FBO_texture
+  (lambda (fbo:FBO*)
+    (tref fbo 1)))
+
+(bind-func FBO_depth_buffer
+  (lambda (fbo:FBO*)
+    (tref fbo 2)))
+
+(bind-func FBO_width
+  (lambda (fbo:FBO*)
+    (tref fbo 3)))
+
+(bind-func FBO_height
+  (lambda (fbo:FBO*)
+    (tref fbo 4)))
+
+;; create FBOs
+
+(bind-func FBO_create
+  (lambda ()
+    (let ((fbo:FBO* (zalloc))
+          (id:GLuint* (salloc)))
+      (glGenFramebuffers 1 id)
+      (gl_print_error "Error creating FBO")
+      (tset! fbo 0 (pref id 0))
+      fbo)))
+
+(bind-func FBO_create_depth_texture
+  (lambda (width height)
+    (let ((depth_tex (Texture_create)))
+      (glActiveTexture GL_TEXTURE0)
+      (glBindTexture GL_TEXTURE_2D depth_tex)
+      (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT width height 0 GL_DEPTH_COMPONENT GL_UNSIGNED_BYTE null)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      ;; attach depth texture to framebuffer
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_2D depth_tex 0)
+      depth_tex)))
+
+(bind-func FBO_create_with_texture
+  (lambda (width height depth_p:i1)
+    (let ((fbo (FBO_create))
+          (fb_tex (Texture_create))
+          (depth_tex -1))
+      (glBindTexture GL_TEXTURE_2D fb_tex)
+      (glTexImage2D GL_TEXTURE_2D 0 GL_RGBA width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_REPEAT)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_REPEAT)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+      (glBindFramebuffer GL_FRAMEBUFFER (FBO_id fbo))
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D fb_tex 0)
+      (if depth_p
+          (set! depth_tex (FBO_create_depth_texture width height)))
+      (if (<> (glCheckFramebufferStatus GL_FRAMEBUFFER) GL_FRAMEBUFFER_COMPLETE)
+          (println "Error creating framebuffer"))
+      ;; fill the FBO tuple with metadata
+      (tfill! fbo
+              (FBO_id fbo)
+              fb_tex
+              depth_tex
+              width
+              height)
+      fbo)))
+
 ;; from glext.h
 (bind-val GL_TEXTURE_RECTANGLE_ARB i32 #x84F5)
+
+;; The following functionality was in the old shaders.xtm
 
 ;; creates an empty texture
 ;; suitable to back an FBO
@@ -3416,14 +3498,6 @@
       (glBindTexture GL_TEXTURE_2D 0)
       (pref tex 0))))
 
-;; structure to hold fbo data
-;; fbo id          0
-;; texture id      1
-;; depth buffer id 2
-;; width           3
-;; height          4
-(bind-type FBO <GLuint,GLuint,GLuint,GLsizei,GLsizei>)
-
 ;; create and return a frame buffer struct (FBO)
 ;; if _texid is greater than 0 then use existing _texid
 (bind-func FBO_create_rect
@@ -3482,7 +3556,7 @@
 
 ;; create and return a frame buffer struct (FBO)
 ;; if _texid is greater than 0 then use existing _texid
-(bind-func FBO_create
+(bind-func FBO_create_1
   (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
     (let ((texid:i32 0) 
           (depthid:i32 0) 
