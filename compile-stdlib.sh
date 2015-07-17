@@ -27,12 +27,12 @@ external/instruments_ext.xtm \
 external/rtmidi.xtm \
 external/glib.xtm \
 external/stb_image.xtm \
-external/soil.xtm \
 external/gl.xtm \
 external/glext.xtm \
 external/graphics-pipeline.xtm \
-external/assimp.xtm \
-external/openvg.xtm"}
+external/nanovg.xtm \
+external/soil.xtm \
+external/assimp.xtm"}
 
 EXTEMPORE_AOT_COMPILATION_COMMAND="./extempore --nostd $1 --eval "
 
