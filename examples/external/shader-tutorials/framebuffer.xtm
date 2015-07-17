@@ -26,14 +26,8 @@
 ;; set up the FBO & backing textures
 
 (bind-val fbo FBO*)
-(bind-val draw_bufs GLenum* 1)
+(bind-val draw_bufs GLenum*)
 (bind-val ss_quad_vao VAO*)
-
-(call-as-xtlang
- (set! fbo (FBO_create_with_texture width height #t))
- (pset! draw_bufs 0 GL_COLOR_ATTACHMENT0)
- (glDrawBuffers 1 draw_bufs)
- (set! ss_quad_vao (VAO_create_ss_quad)))
 
 ;; and here's the triangle we eventually want to draw (taken from triangle.xtm)
 
@@ -61,8 +55,8 @@
   (lambda (vsource:i8* fsource:i8*)
     (set! sp (ShaderProgram_create vsource fsource))))
 
-(create_triangle_shader (sys:slurp-file "examples/external/shader-tutorials/triangle.vert")
-                        (sys:slurp-file "examples/external/shader-tutorials/triangle.frag"))
+(create_triangle_shader (sys:slurp-file "examples/external/shader-tutorials/framebuffer-triangle.vert")
+                        (sys:slurp-file "examples/external/shader-tutorials/framebuffer-triangle.frag"))
 
 ;; here's our post-processing shader
 
@@ -70,7 +64,7 @@
 
 (bind-func create_post_process_shader
   (lambda (vsource:i8* fsource:i8*)
-    (set! sp (ShaderProgram_create vsource fsource))))
+    (set! post_process_sp (ShaderProgram_create vsource fsource))))
 
 (create_post_process_shader
  (sys:slurp-file "examples/external/shader-tutorials/framebuffer-post-process.vert")
@@ -78,18 +72,22 @@
 
 ;; now, to put it all together
 
-(bind-func gl_draw_loop
-  (lambda (time:i64 delta_t:double)
-    (glViewport 0 0 width height)
+(call-as-xtlang
+ (println (set! fbo (FBO_create_with_textures width height #t)))
+ (pset! draw_bufs 0 GL_COLOR_ATTACHMENT0)
+ (glDrawBuffers 1 draw_bufs)
+ (set! ss_quad_vao (VAO_create_ss_quad)))
+
+(bind-func gl_draw
+  (lambda ()
     ;; bind the second (render-to-texture) framebuffer
     (glBindFramebuffer GL_FRAMEBUFFER (FBO_id fbo))
     ;; clear the framebuffer's colour and depth buffers
     (glClear (bor GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
     ;; render the triangle as normal
     (glUseProgram sp)
-    (let ((loc (glGetUniformLocation sp "view_mat")))
-      (glUniformMatrix4fv loc 1 GL_FALSE (aref-ptr view_mat 0))
-      (draw_vertex_array vao GL_TRIANGLES 0 3))
+    (glBindVertexArray (VAO_id vao))
+    (glDrawArrays GL_TRIANGLES 0 3)
     ;; bind default framebuffer
     (glBindFramebuffer GL_FRAMEBUFFER 0)
     ;; clear the framebuffer's colour and depth buffers
@@ -100,9 +98,14 @@
     (glBindVertexArray (VAO_id ss_quad_vao))
     ;; activate the first texture slot and put texture from previous pass in it
     (glActiveTexture GL_TEXTURE0)
-    (glBindTexture GL_TEXTURE_2D (FBO_texture fbo))
+    (glBindTexture GL_TEXTURE_2D (FBO_color_texture fbo))
     ;; draw the quad
-    (glDrawArrays GL_TRIANGLE_STRIP 0 4)
+    (glDrawArrays GL_TRIANGLE_STRIP 0 4)))
+
+(bind-func gl_draw_loop
+  (lambda (time:i64 delta_t:double)
+    (glViewport 0 0 width height)
+    (gl_draw)
     ;; swap buffers
     (glfwPollEvents)
     (glfwSwapBuffers window)
