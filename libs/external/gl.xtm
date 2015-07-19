@@ -3083,7 +3083,7 @@
       (tset! vao 0 (pref id 0))
       vao)))
 
-(bind-func bind_attribute_full
+(bind-func VAO_bind_attribute_base
   (lambda (vao:VAO* vbo:VBO* index size stride offset)
     (glBindVertexArray (VAO_id vao))
     (gl_print_error "Error binding VAO")
@@ -3101,14 +3101,14 @@
     (gl_print_error "Error enabling VAO attribute")
     (glBindVertexArray 0)))
 
-(bind-func bind_attribute_packed
+(bind-func VAO_bind_attribute_packed
   (lambda (vao vbo index size)
-    (bind_attribute_full vao vbo index size 0 0)))
+    (VAO_bind_attribute_base vao vbo index size 0 0)))
 
-(bind-poly bind_attribute bind_attribute_full)
-(bind-poly bind_attribute bind_attribute_packed)
+(bind-poly VAO_bind_attribute VAO_bind_attribute_base)
+(bind-poly VAO_bind_attribute VAO_bind_attribute_packed)
 
-(bind-func draw_vertex_array
+(bind-func VAO_bind_and_draw_arrays
   (lambda (vao:VAO* draw_mode first_element count)
     (glBindVertexArray (VAO_id vao))
     (gl_print_error "Error binding vertex array")
@@ -3139,8 +3139,8 @@
     (lambda ()
       (set! vbo (VBO_create ss_quad_pos_st 16))
       (set! vao (VAO_create))
-      (bind_attribute vao vbo 0 2 4 0) ;; position
-      (bind_attribute vao vbo 1 2 4 2) ;; tex_coord
+      (VAO_bind_attribute vao vbo 0 2 4 0) ;; position
+      (VAO_bind_attribute vao vbo 1 2 4 2) ;; tex_coord
       vao)))
 
 ;; GL Texture
@@ -3171,7 +3171,7 @@
       (glDeleteTextures 1 id)
       (gl_print_error "Error deleting Texture"))))
 
-(bind-func bind_image_texture
+(bind-func Texture_bind_image
   (lambda (tex:Texture filename)
     (let ((width_ptr:i32* (salloc))
           (height_ptr:i32* (salloc))
@@ -3196,7 +3196,7 @@
             (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
             (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
             (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-            (gl_print_error "couldn't bind_image_texture")
+            (gl_print_error "couldn't Texture_bind_image")
             tex)))))
 
 ;; OpenGL shaders
@@ -3222,7 +3222,7 @@
                             max_log_length
                             len_ptr
                             logbuf)
-        (printf "%s shader info log: %s\n"
+        (printf "%sShader: %s\n"
                 (cond ((= (Shader_type shader) GL_VERTEX_SHADER)
                        "Vert")
                       ((= (Shader_type shader) GL_FRAGMENT_SHADER)
@@ -3244,7 +3244,7 @@
                              max_log_length
                              len_ptr
                              logbuf)
-        (printf "Program info log: %s\n"
+        (printf "   Program: %s\n"
                 (if (= (pref len_ptr 0) 0)
                     "OK"
                     logbuf))
