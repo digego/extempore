@@ -428,10 +428,11 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
         '(1 font-lock-function-name-face))
        
        ;; bind-alias
-       '("(\\(bind-alias\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+       '("(\\(bind-alias\\)\\s-+\\([^ \t]+\\)\\s-+\\([^ \t]+\\)[ \t\n]*?\\(\"[^)]*\"\\)?)"
          (1 font-lock-keyword-face)
-         (3 font-lock-function-name-face)
-         (4 font-lock-type-face t))
+         (2 font-lock-function-name-face)
+         (3 font-lock-type-face t)
+         (4 font-lock-string-face))
        ;; bind-type
        '("(\\(bind-type\\)\\s-+\\([^ \t]+\\)\\s-+\\([^ \t]+\\)[ \t\n]*?\\(\"[^)]*\"\\)?)"
          (1 font-lock-keyword-face)

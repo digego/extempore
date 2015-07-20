@@ -2045,8 +2045,8 @@
      '(category . "xtlang alias")
      (cons 'name (symbol->string alias-sym))
      (list 'args)
-     (cons 'type (impc:ir:ground-type-aliases (symbol->string alias-sym)))
-     (list 'docstring))))
+     (cons 'type (impc:ti:get-typealias-ground-type (symbol->string alias-sym)))
+     (list 'docstring (impc:ti:get-typealias-docstring (symbol->string alias-sym))))))
 
 (define eldoc-namedtype-handler
   (lambda (name-sym)
@@ -2089,7 +2089,7 @@
     (let ((sym (string->symbol name)))
       (cond ((impc:ti:builtin-exists? name)
              (cons 'eldoc-docstring (eldoc-builtin-handler sym)))
-            ((impc:ir:ground-type-aliases name)
+            ((impc:ti:typealias-exists? name)
              (cons 'eldoc-docstring (eldoc-alias-handler sym)))
             ((impc:ti:polytype-exists? name)
              (cons 'eldoc-docstring (eldoc-polytype-handler sym)))

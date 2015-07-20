@@ -195,6 +195,7 @@
 
 (define impc:ti:register-new-namedtype
   (lambda (namedtype-name type docstring)
+    ;; (println 'namedtype-name: namedtype-name 'type: type 'docstring: docstring)
     (if (impc:ti:namedtype-exists? namedtype-name)
         (impc:compiler:print-already-bound-error namedtype-name (impc:ir:pretty-print-type type))
         ;; check arg types
@@ -203,10 +204,12 @@
                       (or (string? docstring) (begin (println 'bad 'doctstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new named type")
             (begin
+              ;; add to the AOT-header if we're precompiling
               (set! *impc:ti:namedtype-cache*
                     (cons (cons namedtype-name (vector type docstring))
                           *impc:ti:namedtype-cache*))
-              (car *impc:ti:namedtype-cache*))))))
+              (car *impc:ti:namedtype-cache*)
+              (impc:aot:insert-namedtype-binding-details namedtype-name type docstring))))))
 
 (define impc:ti:get-namedtype-docstring
   (lambda (namedtype-name)
@@ -218,6 +221,78 @@
     (let ((namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
       (if namedtype-data (vector-set! (cdr namedtype-data) 1 docstring) #f))))
 
+;;;;;;;;;;;;;;;
+;; type aliases
+;; ------------
+;;
+(define *impc:ti:typealias-cache* '())
+;;
+;; each element of the list is of the form
+;;
+;; (name . #(type-alias docstring))
+
+(define impc:ti:print-typealias-cache
+  (lambda ()
+    (println '*impc:ti:typealias-cache*: *impc:ti:typealias-cache*)))
+
+(define impc:ti:reset-typealias-cache
+  (lambda ()
+    (set! *impc:ti:typealias-cache* '())))
+
+(define impc:ti:get-typealias-type
+  (lambda (typealias-name)
+    (if (string? typealias-name)
+        (let ((ptr-depth (impc:ir:get-ptr-depth typealias-name))
+              (typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
+          (if typealias-data (impc:ir:pointer++ (vector-ref (cdr typealias-data) 0) ptr-depth) #f))
+        #f)))
+
+(define impc:ti:typealias-exists?
+  (lambda (typealias-name)
+    (let ((res (impc:ti:get-typealias-type typealias-name)))
+      (if (and res (not (null? res))) #t #f))))
+
+;; this one will recursively keep following aliases until it reaches
+;; the "ground" type
+(define impc:ti:get-typealias-ground-type
+  (lambda (typealias-name)
+    (let loop ((lowered-alias (impc:ti:get-typealias-type typealias-name)))
+      (if (and lowered-alias (string? lowered-alias))
+          (loop (impc:ti:get-typealias-type lowered-alias))
+          lowered-alias))))
+
+(define impc:ti:register-new-typealias
+  (lambda (typealias-name type docstring)
+    ;; (println 'typealias-name: typealias-name 'type: type 'docstring: docstring)
+    (if (impc:ti:typealias-exists? typealias-name)
+        (impc:compiler:print-already-bound-error typealias-name (impc:ir:pretty-print-type type))
+        ;; check arg types
+        (if (not (and (or (string? typealias-name) (begin (println 'bad 'typealias-name: typealias-name) #f))
+                      (or (list? type)
+                          (integer? type)
+                          (and (string? type)
+                               (impc:ti:namedtype-exists? type))
+                          (begin (println 'bad 'type: type) #f))
+                      (or (string? docstring) (begin (println 'bad 'doctstring: docstring) #f))))
+            (impc:compiler:print-compiler-error "couldn't register new type alias")
+            (begin
+              ;; add to the AOT-header if we're precompiling
+              (set! *impc:ti:typealias-cache*
+                    (cons (cons typealias-name (vector type docstring))
+                          *impc:ti:typealias-cache*))
+              (car *impc:ti:typealias-cache*)
+              (impc:aot:insert-typealias-binding-details typealias-name type docstring))))))
+
+(define impc:ti:get-typealias-docstring
+  (lambda (typealias-name)
+    (let ((typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
+      (if typealias-data (vector-ref (cdr typealias-data) 1) #f))))
+
+(define impc:ti:set-typealias-docstring
+  (lambda (typealias-name docstring)
+    (let ((typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
+      (if typealias-data (vector-set! (cdr typealias-data) 1 docstring) #f))))
+
 ;;;;;;;;;;;
 ;; closures
 ;; --------
@@ -226,7 +301,7 @@
 ;;
 ;; each element of the list is of the form
 ;;
-;; (name . #(type docstring body))
+;; (name . #(type docstring zone-size body))
 ;;
 ;; this list replaces *impc:closuretypes*, *impc:closurebodies* and *impc:docstrings*
 ;;
@@ -244,11 +319,12 @@
     (set! *impc:ti:closure-cache* '())))
 
 (define impc:ti:register-new-closure
-  (lambda (closure-name type docstring body)
-    ;; (println 'closure-name: closure-name 'type: type 'docstring: docstring 'body: body)
+  (lambda (closure-name type zone-size docstring body)
+    ;; (println 'closure-name: closure-name 'type: type 'docstring: docstring 'zone-size: zone-size 'body: body)
     ;; check arg types
     (if (not (and (or (string? closure-name) (begin (println 'bad 'closure-name: closure-name) #f))
                   (or (list? type) (begin (println 'bad 'type: type) #f))
+                  (or (number? zone-size) (begin (println 'bad 'zone-size: zone-size) #f))
                   (or (string? docstring) (begin (println 'bad 'docstring: docstring)))
                   (or (list? body) (begin (println 'bad 'body: body) #f))))
         (impc:compiler:print-compiler-error "couldn't register new closure")
@@ -257,7 +333,7 @@
             ;; create a new entry
             (begin
               (set! *impc:ti:closure-cache*
-                    (cons (cons closure-name (vector type docstring body))
+                    (cons (cons closure-name (vector type docstring zone-size body))
                           *impc:ti:closure-cache*))
               (car *impc:ti:closure-cache*))))))
 
@@ -305,15 +381,25 @@
     (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
       (if closure-data (vector-set! (cdr closure-data) 1 docstring) #f))))
 
-(define impc:ti:get-closure-body
+(define impc:ti:get-closure-zone-size
   (lambda (closure-name)
     (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
       (if closure-data (vector-ref (cdr closure-data) 2) #f))))
 
-(define impc:ti:set-closure-body
+(define impc:ti:set-closure-zone-size
   (lambda (closure-name body)
     (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
       (if closure-data (vector-set! (cdr closure-data) 2 body) #f))))
+
+(define impc:ti:get-closure-body
+  (lambda (closure-name)
+    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+      (if closure-data (vector-ref (cdr closure-data) 3) #f))))
+
+(define impc:ti:set-closure-body
+  (lambda (closure-name body)
+    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+      (if closure-data (vector-set! (cdr closure-data) 3 body) #f))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -945,6 +1031,7 @@
                   (or (string? docstring) (begin (println 'bad 'docstring: docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new polymorphic function")
         (let ((candidates (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
+          ;; add the bind-poly form to the AOT-header if we're precompiling
           (if candidates
               (let ((res (cl:find-if (lambda (x) (string=? (vector-ref x 0) func-name))
                                      (vector-ref (cdr candidates) 0))))
@@ -966,7 +1053,8 @@
               ;; or create a new entry
               (set! *impc:ti:polyfunc-cache*
                     (cons (cons polyfunc-name (vector (list (vector func-name func-type)) docstring))
-                          *impc:ti:polyfunc-cache*)))))))
+                          *impc:ti:polyfunc-cache*)))
+          (impc:aot:insert-polyfunc-binding-details polyfunc-name func-name docstring)))))
 
 (define impc:ti:get-polyfunc-docstring
   (lambda (polyfunc-name)
@@ -1469,6 +1557,7 @@
                       (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new globalvar")
             (begin
+              ;; add the bind-poly form to the AOT-header if we're precompiling
               (set! *impc:ti:globalvar-cache*
                     ;; the old llvm:get-global-variable-type returned
                     ;; an extra level of pointerness from the bind-val
@@ -1478,7 +1567,8 @@
                     ;; behaviour
                     (cons (cons globalvar-name (vector (impc:ir:pointer++ type) docstring))
                           *impc:ti:globalvar-cache*))
-              (car *impc:ti:globalvar-cache*))))))
+          (car *impc:ti:globalvar-cache*)
+              (impc:aot:insert-globalvar-binding-details globalvar-name type docstring))))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
@@ -1513,58 +1603,116 @@
         ;; this will be #t in a suppress-aot-do form
         *impc:aot:current-output-port*)))
 
-;; TODO: this should probably be refactored into different handlers
-;; for e.g. closures, types, polyfuncs, etc. But it works fine at the
-;; moment, so there are more pressing things to do.
-(define impc:aot:write-binding-details-to-file
-  (lambda (lead-string symname type . args)
+;; helpers for putting the correct info into the aot-header file
+
+(define impc:aot:insert-typealias-binding-details
+  (lambda (name type docstring)
     (if (output-port? *impc:aot:current-output-port*)
-        (let* ((type-str (if (or (string=? (atom->string type) "polying")
-                                 (string=? (atom->string lead-string) "Lib Load:"))
-                             "null"
-                             (impc:ir:pretty-print-type (atom->string type))))
-               (aot-compilation-string
-                (cond ((string=? lead-string "Overload:")
-                       (string-append "" "(bind-poly " symname ")\n"))
-                      ((string=? lead-string "SetValue:")
-                       (string-append
-                        (if (impc:ir:array? (impc:ir:get-type-from-pretty-str type-str))
-                            "(bind-val "
-                            (string-append "(bind-lib-val "
-                                           *impc:aot:current-lib-name*
-                                           " ")) ;; bind-lib-val only works for floats and ints
-                        symname " " type-str ")\n"))
-                      ((string=? lead-string "LibBound:")
-                       (string-append "(bind-lib "
-                                      symname  " "
-                                      type-str ")\n"))
-                      ((string=? lead-string "Compiled:")
-                       (if (assoc-strcmp symname *impc:aot:func-defs-in-mod*)
-                           ""
-                           (begin
-                             (set! *impc:aot:func-defs-in-mod* (cons (cons symname #t) *impc:aot:func-defs-in-mod*))
-                             (string-append "(bind-lib-func "
-                                            *impc:aot:current-lib-name* " "
-                                            symname " " type-str
-                                            (if (null? args) ""
-                                                (string-append " " (number->string (car args))))
-                                            ")\n"))))
-                      ((string=? lead-string "DataType:")
-                       (string-append "(bind-lib-type "
-                                      *impc:aot:current-lib-name* " " symname " " type-str ")\n"))
-                      ((string=? lead-string "SetAlias:")
-                       (string-append "(bind-alias " symname " " type-str ")\n"))
-                      ((string=? lead-string "Lib Load:")
-                       (let ((dylib-sym-name (if *impc:aot:current-load-dylib-info*
-                                                 (atom->string (car *impc:aot:current-load-dylib-info*))
-                                                 "unknown-libname"))
-                             (dylib-path (if *impc:aot:current-load-dylib-info*
-                                             (cdr *impc:aot:current-load-dylib-info*)
-                                             "unknown-dylib-path")))
-                         (string-append "(define " dylib-sym-name " (sys:load-dylib \"" dylib-path "\"))\n"
-                                        "(if (not " dylib-sym-name ")\n    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " symname " dynamic library\")(error \"\")))\n")))
-                      (else ""))))
-          (display aot-compilation-string *impc:aot:current-output-port*)))))
+        (begin
+          (write
+           (list
+            'bind-alias
+            (string->symbol name) 
+            (string->symbol (impc:ir:pretty-print-type type))
+            docstring)
+           *impc:aot:current-output-port*)
+          (display "\n" *impc:aot:current-output-port*)))))
+
+(define impc:aot:insert-namedtype-binding-details
+  (lambda (name type docstring)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          (write
+           (list
+            'bind-lib-type
+            (string->symbol *impc:aot:current-lib-name*)
+            (string->symbol name) 
+            (string->symbol (impc:ir:pretty-print-type type))
+            docstring)
+           *impc:aot:current-output-port*)
+          (display "\n" *impc:aot:current-output-port*)))))
+
+(define impc:aot:insert-closure-binding-details
+  (lambda (name type zone-size docstring body)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          (write
+           (list
+            'bind-lib-func
+            (string->symbol *impc:aot:current-lib-name*)
+            (string->symbol name)
+            (string->symbol (impc:ir:pretty-print-type type))
+            zone-size
+            docstring
+            (list 'quote body))
+           *impc:aot:current-output-port*)
+          (display "\n" *impc:aot:current-output-port*)))))
+
+(define impc:aot:insert-nativefunc-binding-details
+  (lambda (lib-name func-name type docstring)
+    (if (and (output-port? *impc:aot:current-output-port*)
+             ;; ignore the binding if we're just binding something
+             ;; from an Extempore AOT-compiled library
+             (not (and (>= (string-length (atom->string lib-name)) 3)
+                       (string=? "xtm" (substring (atom->string lib-name) 0 3)))))
+        (begin
+          (write
+           (list 'bind-lib lib-name func-name type)
+           *impc:aot:current-output-port*)
+          (display "\n" *impc:aot:current-output-port*)))))
+
+(define impc:aot:insert-polyfunc-binding-details
+  (lambda (poly-name func-name docstring)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          (write
+           (list
+            'bind-poly
+            (string->symbol poly-name)
+            (string->symbol func-name)
+            docstring)
+           *impc:aot:current-output-port*)
+          (display "\n" *impc:aot:current-output-port*)))))
+
+(define impc:aot:insert-globalvar-binding-details
+  (lambda (name type docstring)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          (write
+           (append
+            ;; bind-lib-val only works for floats and ints
+            (if (impc:ir:array? type)
+                (list 'bind-val)
+                (list 'bind-lib-val (string->symbol *impc:aot:current-lib-name*)))
+            (list
+             (string->symbol name)
+             (string->symbol (impc:ir:pretty-print-type type))
+             docstring))
+           *impc:aot:current-output-port*)
+          (display "\n" *impc:aot:current-output-port*)))))
+
+;; this is stateful!
+(define impc:aot:insert-load-dylib-details
+  (lambda ()
+    (if (output-port? *impc:aot:current-output-port*)
+        (let ((dylib-sym-name (if *impc:aot:current-load-dylib-info*
+                                  (atom->string (car *impc:aot:current-load-dylib-info*))
+                                  "unknown-libname"))
+              (dylib-path (if *impc:aot:current-load-dylib-info*
+                              (cdr *impc:aot:current-load-dylib-info*)
+                              "unknown-dylib-path")))
+          (display (string-append
+                    "(define " dylib-sym-name " (sys:load-dylib \"" dylib-path "\"))\n"
+                    "(if (not " dylib-sym-name ")\n"
+                    "    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " dylib-sym-name " dynamic library\")(error \"\")))\n")
+                   *impc:aot:current-output-port*)))))
+
+;; don't need specialised ones for these:
+
+;; genericfunc
+;; polytype
+;; generictype
+
 (define get-llvm-path
   (lambda ()
     (let ((path_from_env (sys:command-output "echo $EXT_LLVM_DIR")))
@@ -1758,8 +1906,8 @@
                        (print "Total compile time: "))
     (print (* 1.0 (/ (- (now) start-time) *minute*)) "minutes\n\n")
     (print-with-colors 'black 'blue #t (print " Types "))
-    (print "\n  " (length *impc:ir:type-aliases*))
-    (print-with-colors 'cyan 'default #f (print " aliases\n"))
+    (print "\n  " (length *impc:ti:typealias-cache*))
+    (print-with-colors 'cyan 'default #f (print " type aliases\n"))
     (print "  " (length *impc:ti:generictype-cache*))
     (print-with-colors 'cyan 'default #f (print " named types\n"))
     (print "  " (length *impc:ti:namedtype-cache*))
@@ -6139,6 +6287,7 @@
                           (if (not (impc:ti:closure-exists? (symbol->string pfunc)))
                               (impc:ti:register-new-closure (symbol->string pfunc)
                                                             '()
+                                                            *impc:default-zone-size*
                                                             ""
                                                             code))
                           (set! code `(let ((,pfunc ,code)) ,pfunc))
@@ -6244,6 +6393,7 @@
                        (if (not (impc:ti:closure-exists? (symbol->string pfunc)))
                            (impc:ti:register-new-closure (symbol->string pfunc)
                                                          '()
+                                                         *impc:default-zone-size*
                                                          ""
                                                          code))
                        (set! code `(let ((,pfunc ,code)) ,pfunc))
@@ -7114,8 +7264,15 @@
                       (impc:compiler:print-no-redefinitions-error symname
                                                                   (impc:ti:get-closure-type symname-string)
                                                                   closure-type-list))
-                  (impc:ti:set-closure-type symname-string
-                                            closure-type-list))
+                  (begin
+                    (impc:ti:set-closure-type symname-string
+                                              closure-type-list)
+                    ;; add to the AOT-header if we're precompiling
+                    (impc:aot:insert-closure-binding-details symname-string
+                                                             closure-type-list
+                                                             (impc:ti:get-closure-zone-size symname-string)
+                                                             (impc:ti:get-closure-docstring symname-string)
+                                                             (impc:ti:get-closure-body symname-string))))
               (if (regex:match? symname-string "_poly_")
                   (impc:compiler:print-bind-func-details-to-log
                    "Spec'zed:"
@@ -7147,8 +7304,6 @@
     (if (number? (car args))
         (begin (set! zone-size (car args))
                (set! args (cdr args))))
-    (if (string? (car args))
-        (set! args (cdr args)))
     (let ((types (cdr (reverse args)))
           (expr (car (reverse args)))
           (aot_sexpr '()))
@@ -7165,7 +7320,7 @@
                                          '()
                                          (map (lambda (k) (list 'quote k)) types)))))
            (impc:ti:initialize-closure-with-new-zone (symbol->string ',symname)
-                                                           *impc:default-zone-size*)
+                                                     *impc:default-zone-size*)
            (impc:ti:create-scheme-wrapper (symbol->string ',symname)))))))
 
 
@@ -7174,13 +7329,17 @@
       (impc:compiler:print-compiler-error "bind-func requires a name!"))
   ;; if doc-string exists!
   (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
-        (docstring (if (string? (cadr args)) (cadr args) ""))
+        (zone-size (if (number? (cadr args)) (cadr args) *impc:default-zone-size*))
+        (docstring (if (string? (cadr args))
+                       (cadr args)
+                       (if (and (not (null? (cddr args))) (string? (caddr args)))
+                           (caddr args)
+                           "")))
         ;; closure body is always in last position, preceeded by zone
         ;; size and/or docstring
         (closure-body (car (reverse args))))
-    ;; remove docstring (if present)
-    (if (not (string=? docstring ""))
-        (set! args (append (list (car args)) (cddr args))))
+    ;; strip docstring
+    (set! args (cl:remove-if string? args))
     (if (impc:ti:polyfunc-exists? (car args))
         (impc:compiler:print-already-bound-error (car args) "polymorphic closure"))
     (if (impc:ti:genericfunc-exists? (car args))
@@ -7214,14 +7373,14 @@
                     (begin
                       (impc:ti:set-closure-docstring func-name docstring)
                       (impc:ti:set-closure-body func-name closure-body))
-                    (impc:ti:register-new-closure func-name '() docstring closure-body))
+                    (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
                 `(impc:ti:parametric-poly-pass '(definec ,@args)))))
         (begin
           (if (impc:ti:closure-exists? func-name)
               (begin
                 (impc:ti:set-closure-docstring func-name docstring)
                 (impc:ti:set-closure-body func-name closure-body))
-              (impc:ti:register-new-closure func-name '() docstring closure-body))
+              (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
           `(impc:ti:parametric-poly-pass '(definec ,@args))))))
 
 
@@ -7247,8 +7406,11 @@
     (ipc:call procname 'bind-func-ipc symname)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define-macro (bind-alias symbol type)
-  `(begin (impc:ir:add-type-alias ,(symbol->string symbol) ,(symbol->string type))
+(define-macro (bind-alias symbol type . docstring)
+  `(begin (impc:ti:register-new-typealias
+           ,(symbol->string symbol)
+           ',(impc:ir:get-type-from-pretty-str (symbol->string type))
+           ,(if (null? docstring) "" (car docstring)))
           (impc:compiler:print-binding-details-to-log
            "SetAlias:"
            ',symbol
@@ -7542,15 +7704,16 @@
   (let ((type (impc:ti:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
     ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
     (if type
-        `(begin (impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
-                (impc:compiler:print-polying-details-to-log "Overload:" ',poly_sym ',implementation_sym ,(impc:ir:pretty-print-type type)))
+        `(impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
         `(impc:compiler:print-missing-identifier-error ',implementation_sym 'closure))))
 
 (define sys:load-dylib
   (lambda (dylib-path)
     (let ((dylib (sys:open-dylib dylib-path)))
       (if dylib
-          (begin (impc:compiler:print-dylib-loading-details-to-log dylib-path)
+          (begin
+            (impc:aot:insert-load-dylib-details)
+            (impc:compiler:print-dylib-loading-details-to-log dylib-path)
                  dylib)
           (begin (print-with-colors 'red 'default #t
                                     (print "Error"))
@@ -7559,18 +7722,25 @@
 
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
-  `(impc:ti:bind-lib ',library ',symname ',type ,@(map (lambda (k) `(quote ,k)) args)))
+  `(impc:ti:bind-lib ',library ',symname ',type
+                     ;; calling convention
+                     ,(if (and (not (null? args)) (number? (car args)))
+                          (car args)
+                          0) ;; 0=ccc                     
+                     ;; docstring
+                     ,(if (and (not (null? args)) (string? (car (reverse args))))
+                          (car (reverse args))
+                          "")))
 
 ;; this was previously called __dynamic-bind
 (define impc:ti:bind-lib
-  (lambda (library symname type . args)
+  (lambda (library symname type calling-convention docstring)
     (if (not (eval library))
         (impc:compiler:print-compiler-error
          (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
         (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
-               (calling_convention (if (null? args) "ccc" (symbol->string (car args))))
                (ir-string (string-append "declare "
-                                         calling_convention
+                                         "cc " (atom->string calling-convention)
                                          " "
                                          (impc:ir:get-type-str (car ctype))
                                          " @"
@@ -7590,7 +7760,7 @@
                 (impc:aot:insert-sexp
                  `(llvm:bind-symbol ,library ,(symbol->string symname)))
                 (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "")
-                (impc:compiler:print-lib-binding-details-to-log library symname type))
+                (impc:aot:insert-nativefunc-binding-details library symname type docstring))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
 
 ;; this is like bind-lib, but specifically for OpenGL procedures. It's
@@ -7598,20 +7768,22 @@
 ;; from the GL driver
 
 (define-macro (bind-gl-lib proc-name type . args)
-  `(impc:ti:bind-gl-lib ',proc-name ',type ,@(map (lambda (k) `(quote ,k)) args)))
+  `(impc:ti:bind-gl-lib ',proc-name ',type
+                        ;; docstring
+                        ,(if (not (null? args)) (car args) "")))
 
 
 (define impc:ti:bind-gl-lib
-  (lambda (proc-name type . args)
+  (lambda (proc-name type docstring)
     ;; (println 'proc-name: proc-name 'type: type)
     (if (or (not (defined? 'libGL))
             (not libGL))
         (impc:compiler:print-compiler-error
          (string-append "the OpenGL dynamic library appears to have not been loaded correctly"))
         (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
-               (calling_convention "ccc")
+               (calling-convention "ccc")
                (ir-string (string-append "declare "
-                                         calling_convention
+                                         calling-convention
                                          " "
                                          (impc:ir:get-type-str (car ctype))
                                          " @"
@@ -7633,7 +7805,7 @@
                  `(llvm:bind-global-var ,(symbol->string proc-name)
                                         (gl_get_proc_address ,(symbol->string proc-name))))
                 (impc:ti:register-new-nativefunc (symbol->string proc-name) (impc:ir:get-type-from-pretty-str (symbol->string type)) "")
-                (impc:compiler:print-lib-binding-details-to-log 'libGL proc-name type))
+                (impc:aot:insert-nativefunc-binding-details 'libGL proc-name type ""))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string proc-name))))))))
 
 
@@ -7651,7 +7823,7 @@
      (if (llvm:get-function ,(string-append (symbol->string symname) "_scheme"))
          (llvm:erase-function ,(string-append (symbol->string symname) "_scheme")))))
 
-(define-macro (bind-lib-type library name type . args)
+(define-macro (bind-lib-type library name type docstring)
   (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
@@ -7659,13 +7831,13 @@
        (if (llvm:compile-ir ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
            (impc:ti:register-new-namedtype ,namestr
                                            ',(impc:ir:get-type-from-pretty-str typestr namestr)
-                                           "")
+                                           ,docstring)
            (impc:compiler:print-compiler-error "bind-lib-type failed" ,name)))))
 
 ;;; this here for binding to CLOSURE in dylib
 ;;
 ;; arg is for *optional* zone size arg
-(define-macro (bind-lib-func library symname type . args)
+(define-macro (bind-lib-func library symname type zone-size docstring body)
   `(begin
      (bind-lib ,library ,symname ,type fastcc)
      (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_setter")) [void]*)
@@ -7690,14 +7862,15 @@
          (impc:compiler:print-no-scheme-stub-notification (symbol->string ',symname)))
      (impc:ti:register-new-closure ,(symbol->string symname)
                                    (impc:ir:get-type-from-pretty-str ,(symbol->string type))
-                                   "AOT-compiled function"
-                                   '(AOT-compiled))
+                                   ,zone-size
+                                   ,docstring
+                                   ,body)
      (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname)
-                                               ,(if (null? args) *impc:default-zone-size* (car args)))))
+                                               ,zone-size)))
 
 
 (define-macro (bind-lib-val library symname type)
-  `(let* ((type-str ,(or (impc:ir:ground-type-aliases (symbol->string type))
+  `(let* ((type-str ,(or (impc:ti:get-typealias-ground-type (symbol->string type))
                          (symbol->string type)))
           (type-list (impc:ir:get-type-from-pretty-str type-str)))
      (if (llvm:compile-ir
@@ -7834,6 +8007,7 @@
                      (if (not (impc:ti:closure-exists? (symbol->string pfunc)))
                          (impc:ti:register-new-closure (symbol->string pfunc)
                                                        '()
+                                                       *impc:default-zone-size*
                                                        ""
                                                        code))
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
@@ -7920,6 +8094,7 @@
                      (if (not (impc:ti:closure-exists? (symbol->string pfunc)))
                          (impc:ti:register-new-closure (symbol->string pfunc)
                                                        '()
+                                                       *impc:default-zone-size*
                                                        ""
                                                        code))
                      (set! code `(let ((,pfunc ,code)) ,pfunc))

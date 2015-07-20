@@ -121,6 +121,7 @@
 
 (define impc:compiler:print-bad-type-error
   (lambda (type . message)
+    err
     (print-with-colors *impc:compiler:pretty-print-error-color*
                        'default #t (print "Type Error"))
     (print " bad type ")
@@ -490,9 +491,6 @@
 
 (define impc:compiler:print-binding-details-to-log
   (lambda (lead-string symname type)
-    (impc:aot:write-binding-details-to-file lead-string
-                                                (atom->string symname)
-                                                type)
     (if (equal? *impc:compiler:message:level* 'high)
         (begin
           (print lead-string " ")
@@ -503,10 +501,6 @@
 
 (define impc:compiler:print-bind-func-details-to-log
   (lambda (lead-string symname type zone-size)
-    (impc:aot:write-binding-details-to-file lead-string
-                                                (atom->string symname)
-                                                type
-                                                zone-size)
     (if (equal? *impc:compiler:message:level* 'high)
         (begin
           (print lead-string " ")
@@ -524,13 +518,6 @@
   (lambda (libname symname type)
     ;; don't write the header stuff for other AOT-compiled xtm libs -
     ;; assume a header file already exists in that case
-    (if (not (and (>= (string-length (atom->string libname)) 3)
-                  (string=? "xtm" (substring (atom->string libname) 0 3))))
-        (impc:aot:write-binding-details-to-file "LibBound:"
-                                                    (string-append (atom->string libname)
-                                                                   " "
-                                                                   (atom->string symname))
-                                                    (atom->string type)))
     (if (equal? *impc:compiler:message:level* 'high)
         (begin
           (print "LibBound:  ")
@@ -543,12 +530,6 @@
 
 (define impc:compiler:print-polying-details-to-log
   (lambda (lead-string poly-name native-name type)
-    (impc:aot:write-binding-details-to-file
-     lead-string
-     (string-append (symbol->string poly-name)
-                    " "
-                    (symbol->string native-name))
-     "polying")
     (if (equal? *impc:compiler:message:level* 'high)
         (begin
           (print lead-string " ")
@@ -566,7 +547,6 @@
   (lambda (dylib-path)
     (let* ((basename (car (reverse (regex:split dylib-path "/"))))
            (libname (car (regex:split basename "[.]"))))
-      (impc:aot:write-binding-details-to-file "Lib Load:" libname dylib-path)
       (if (equal? *impc:compiler:message:level* 'high)
           (begin
             (print "Lib Load:  ")
@@ -687,41 +667,6 @@
     (if (and (char=? (string-ref str 0) #\%))
         (set! str (substring str 1 (string-length str))))
     (impc:ir:get-base-type str)))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; type aliases
-;;
-
-(define *impc:ir:type-aliases* '())
-
-(define impc:ir:add-type-alias
-  (lambda (name type)
-    (let ((v (assoc-strcmp name *impc:ir:type-aliases*)))
-      (if v
-          (begin (set-cdr! v type)
-                 #t)
-          (begin (set! *impc:ir:type-aliases* (cons (cons name type) *impc:ir:type-aliases*))
-                 #t)))))
-
-(define impc:ir:check-type-aliases
-  (lambda (base ptr-depth)
-    (let ((res (assoc-strcmp base *impc:ir:type-aliases*)))
-      (if res
-          (let ((t (impc:ir:get-type-from-pretty-str (cdr res))))
-            (dotimes (i ptr-depth) (set! t (impc:ir:pointer++ t)))
-            t)
-          #f))))
-
-(define impc:ir:ground-type-aliases
-  (lambda (alias)
-    (let ((res (assoc-strcmp alias *impc:ir:type-aliases*)))
-      (if res
-          (let loop ((a (cdr res)))
-            (let ((r (assoc-strcmp a *impc:ir:type-aliases*)))
-              (if r (loop (cdr r)) a)))
-          #f))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  This stuff is all here just for pretty printing
@@ -907,8 +852,8 @@
              (let* ((p (regex:type-split base ":"))
                     (ags (impc:ir:get-pretty-tuple-arg-strings (cadr p)))
                     (ags2 (map (lambda (name) ;; check for aliases!
-                                 (let ((res (assoc-strcmp name *impc:ir:type-aliases*)))
-                                   (if res (cdr res) name)))
+                                 (let ((res (impc:ti:get-typealias-type name)))
+                                   (or res name)))
                                ags))
                     (anypolys (cl:find-if
                                (lambda (x) (not (equal? x #f)))
@@ -1003,7 +948,7 @@
                    (string->symbol string-type)
                    (let* ((type (impc:ir:get-type-from-pretty-str
                                  (impc:ir:pointer++ (symbol->string (impc:ti:get-generictype-candidate-types base2))
-                                                                ptr-depth)
+                                                    ptr-depth)
                                  base2)))
                      ;; if we have come from a defined generic type
                      ;; i.e. List:<!a,List*>
@@ -1064,8 +1009,9 @@
                         (if (< i *impc:ir:lowest-base-type*)
                             (loop (+ i 1))
                             ;; if everything else fails try type aliases
-                            (let ((res (impc:ir:check-type-aliases base ptr-depth)))
-                              (if res res
+                            (let ((res (impc:ti:get-typealias-type base)))
+                              (if res
+                                  (impc:ir:pointer++ res ptr-depth)
                                   (impc:compiler:print-could-not-resolve-type-error string-type)))))))))))
 
 
