@@ -487,76 +487,6 @@
         (quit 2)
         (throw ""))))
 
-(define *impc:aot:current-output-port* #f)
-(define *impc:aot:current-lib-name* "xtmdylib")
-(define *impc:aot:func-defs-in-mod* '())
-
-(define impc:aot:currently-compiling?
-  (lambda ()
-    (or (output-port? *impc:aot:current-output-port*)
-        ;; this will be #t in a suppress-aot-do form
-        *impc:aot:current-output-port*)))
-
-(define impc:ti:create-scm-wrapper?
-  (lambda (func-name)
-    (cl:every
-     (lambda (type)
-       (or (impc:ir:void? type)
-           (impc:ir:floating-point? type)
-           (impc:ir:fixed-point? type)
-           (impc:ir:pointer? type)))
-     (map impc:ir:get-type-from-str
-          (impc:ti:get-closure-or-nativefunc-arg-types func-name)))))
-
-(define impc:aot:write-binding-details-to-file
-  (lambda (lead-string symname type . args)
-    (if (output-port? *impc:aot:current-output-port*)
-        (let* ((type-str (if (or (string=? (atom->string type) "polying")
-                                 (string=? (atom->string lead-string) "Lib Load:"))
-                             "null"
-                             (impc:ir:pretty-print-type (atom->string type))))
-               (aot-compilation-string
-                (cond ((string=? lead-string "Overload:")
-                       (string-append "" "(bind-poly " symname ")\n"))
-                      ((string=? lead-string "SetValue:")
-                       (string-append
-                        (if (impc:ir:array? (impc:ir:get-type-from-pretty-str type-str))
-                            "(bind-val "
-                            (string-append "(bind-lib-val "
-                                           *impc:aot:current-lib-name*
-                                           " ")) ;; bind-lib-val only works for floats and ints
-                        symname " " type-str ")\n"))
-                      ((string=? lead-string "LibBound:")
-                       (string-append "(bind-lib "
-                                      symname  " "
-                                      type-str ")\n"))
-                      ((string=? lead-string "Compiled:")
-                       (if (assoc-strcmp symname *impc:aot:func-defs-in-mod*)
-                           ""
-                           (begin
-                             (set! *impc:aot:func-defs-in-mod* (cons (cons symname #t) *impc:aot:func-defs-in-mod*))
-                             (string-append "(bind-lib-func "
-                                            *impc:aot:current-lib-name* " "
-                                            symname " " type-str
-                                            (if (null? args) ""
-                                                (string-append " " (number->string (car args))))
-                                            ")\n"))))
-                      ((string=? lead-string "DataType:")
-                       (string-append "(bind-lib-type "
-                                      *impc:aot:current-lib-name* " " symname " " type-str ")\n"))
-                      ((string=? lead-string "SetAlias:")
-                       (string-append "(bind-alias " symname " " type-str ")\n"))
-                      ((string=? lead-string "Lib Load:")
-                       (let ((dylib-sym-name (if *impc:aot:current-load-dylib-info*
-                                                 (atom->string (car *impc:aot:current-load-dylib-info*))
-                                                 "unknown-libname"))
-                             (dylib-path (if *impc:aot:current-load-dylib-info*
-                                             (cdr *impc:aot:current-load-dylib-info*)
-                                             "unknown-dylib-path")))
-                         (string-append "(define " dylib-sym-name " (sys:load-dylib \"" dylib-path "\"))\n"
-                                        "(if (not " dylib-sym-name ")\n    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " symname " dynamic library\")(error \"\")))\n")))
-                      (else ""))))
-          (display aot-compilation-string *impc:aot:current-output-port*)))))
 
 (define impc:compiler:print-binding-details-to-log
   (lambda (lead-string symname type)
@@ -697,6 +627,27 @@
   (lambda (ir-string)
     (print-full-nq ir-string)
     (llvm:compile-ir ir-string)))
+
+;; to compile the special init.ll file (which needs to be done on most
+;; startups)
+(define sys:compile-init-ll
+  (lambda ()
+    (let ((print? #f))
+      (if (string=? (ipc:get-process-name) *impc:compiler:process*)
+          (let ((init-ll-string (sys:slurp-file "runtime/init.ll")))
+            (if (and init-ll-string (llvm:compile-ir init-ll-string))
+                (if print?
+                    (begin
+                      (print "\nCompiling ")
+                      (print-with-colors 'blue 'default #t (print "init.ll"))
+                      (print "... ")
+                      (print-with-colors 'green 'default #t (print "done"))
+                      (print "\n\n"))
+                    #t)
+                (begin
+                  (print-with-colors 'red 'default #t (print "\n\nError compiling init.ll IR\n\n"))
+                  (print "This is pretty bad.  Exiting...\n")
+                  (quit 1))))))))
 
 
 ;; GCHANGE

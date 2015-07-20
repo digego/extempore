@@ -1490,6 +1490,344 @@
     (let ((globalvar-data (assoc-strcmp globalvar-name *impc:ti:globalvar-cache*)))
       (if globalvar-data (vector-set! (cdr globalvar-data) 1 docstring) #f))))
 
+;;;;;;;;;;;;;;;;;;;;;
+;; AOT-compilation ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+(define *impc:aot:current-output-port* #f)
+(define *impc:aot:current-lib-name* "xtmdylib")
+(define *impc:aot:func-defs-in-mod* '())
+;; should be a cons pair e.g. '(libGLU .
+;; "/System/Library/Frameworks/OpenGL.framework/OpenGL")
+(define *impc:aot:current-load-dylib-info* #f)
+
+(define impc:aot:set-dylib-name-info
+  (lambda (symbol-name dylib-path)
+    ;; is there a better way to check if a file exists?
+    (set! *impc:aot:current-load-dylib-info*
+          (cons symbol-name dylib-path))))
+
+(define impc:aot:currently-compiling?
+  (lambda ()
+    (or (output-port? *impc:aot:current-output-port*)
+        ;; this will be #t in a suppress-aot-do form
+        *impc:aot:current-output-port*)))
+
+;; TODO: this should probably be refactored into different handlers
+;; for e.g. closures, types, polyfuncs, etc. But it works fine at the
+;; moment, so there are more pressing things to do.
+(define impc:aot:write-binding-details-to-file
+  (lambda (lead-string symname type . args)
+    (if (output-port? *impc:aot:current-output-port*)
+        (let* ((type-str (if (or (string=? (atom->string type) "polying")
+                                 (string=? (atom->string lead-string) "Lib Load:"))
+                             "null"
+                             (impc:ir:pretty-print-type (atom->string type))))
+               (aot-compilation-string
+                (cond ((string=? lead-string "Overload:")
+                       (string-append "" "(bind-poly " symname ")\n"))
+                      ((string=? lead-string "SetValue:")
+                       (string-append
+                        (if (impc:ir:array? (impc:ir:get-type-from-pretty-str type-str))
+                            "(bind-val "
+                            (string-append "(bind-lib-val "
+                                           *impc:aot:current-lib-name*
+                                           " ")) ;; bind-lib-val only works for floats and ints
+                        symname " " type-str ")\n"))
+                      ((string=? lead-string "LibBound:")
+                       (string-append "(bind-lib "
+                                      symname  " "
+                                      type-str ")\n"))
+                      ((string=? lead-string "Compiled:")
+                       (if (assoc-strcmp symname *impc:aot:func-defs-in-mod*)
+                           ""
+                           (begin
+                             (set! *impc:aot:func-defs-in-mod* (cons (cons symname #t) *impc:aot:func-defs-in-mod*))
+                             (string-append "(bind-lib-func "
+                                            *impc:aot:current-lib-name* " "
+                                            symname " " type-str
+                                            (if (null? args) ""
+                                                (string-append " " (number->string (car args))))
+                                            ")\n"))))
+                      ((string=? lead-string "DataType:")
+                       (string-append "(bind-lib-type "
+                                      *impc:aot:current-lib-name* " " symname " " type-str ")\n"))
+                      ((string=? lead-string "SetAlias:")
+                       (string-append "(bind-alias " symname " " type-str ")\n"))
+                      ((string=? lead-string "Lib Load:")
+                       (let ((dylib-sym-name (if *impc:aot:current-load-dylib-info*
+                                                 (atom->string (car *impc:aot:current-load-dylib-info*))
+                                                 "unknown-libname"))
+                             (dylib-path (if *impc:aot:current-load-dylib-info*
+                                             (cdr *impc:aot:current-load-dylib-info*)
+                                             "unknown-dylib-path")))
+                         (string-append "(define " dylib-sym-name " (sys:load-dylib \"" dylib-path "\"))\n"
+                                        "(if (not " dylib-sym-name ")\n    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " symname " dynamic library\")(error \"\")))\n")))
+                      (else ""))))
+          (display aot-compilation-string *impc:aot:current-output-port*)))))
+(define get-llvm-path
+  (lambda ()
+    (let ((path_from_env (sys:command-output "echo $EXT_LLVM_DIR")))
+      (if (not (string=? path_from_env ""))
+          path_from_env
+          ;; check if homebrewed version (in default Cellar location)
+          ;; exists - need to keep the version up-to-date by hand
+          ;;
+          ;; OSX
+          (if (= (sys:command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
+              "/usr/local/Cellar/extempore-llvm/3.4.1"
+              ;; Linux
+              (if (= (sys:command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
+                  "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
+                  path_from_env)
+              path_from_env)))))
+
+;; insert arbitrary sexp (remember to quote!) into the AOT-compilation
+;; file, otherwise do nothing
+(define impc:aot:insert-sexp
+  (lambda (sexp)
+    (if (output-port? *impc:aot:current-output-port*)
+        (display (string-append (sexpr->string sexp) "\n")
+                 *impc:aot:current-output-port*))))
+
+(define-macro (impc:aot:do-or-emit . forms)
+  (if (not (output-port? *impc:aot:current-output-port*))
+      `(begin ,@forms)
+      `(begin ,@(map (lambda (f) `(impc:aot:insert-sexp ',f)) forms))))
+
+(define-macro (impc:aot:suppress-aot-do . forms)
+  `(if ,*impc:aot:current-output-port*
+       (let ((aot-compilation-port *impc:aot:current-output-port*))
+         (set! *impc:aot:current-output-port* #t)
+         (begin ,@forms)
+         ;; whatever happens, set the port back to the original value
+         (set! *impc:aot:current-output-port* aot-compilation-port))
+       (begin ,@forms)))
+
+(define impc:aot:compile-module
+  (lambda (module-name module move-into-place? exit-afterwards?)
+    (let* ((llvm-path (get-llvm-path)))
+      (if (string=? "" llvm-path)
+          (begin (print-with-colors 'red 'default #t (print "Error"))
+                 (print ": you must set the environment variable ")
+                 (print-with-colors 'green 'default #f (print "EXT_LLVM_DIR"))
+                 (print " to point to your LLVM directory before you can ahead-of-time compile xtlang code.\n")
+                 (error "")))
+      (let* ((platform (sys:platform))
+             (bitcode-path (if (string=? platform "Windows")
+                               (string-append ".\\msvc\\tmp\\" module-name ".ll")
+                               (string-append "/tmp/" module-name ".bc")))
+             (asm-path (if (string=? platform "Windows")
+                           (string-append ".\\msvc\\tmp\\" module-name ".obj")
+                           (string-append "/tmp/" module-name ".s")))
+             (win-libs (if (string=? platform "Windows")
+                           (let* ((dirlist (sys:directory-list "./msvc/tmp/"))
+                                  (liblist (cl:remove-if-not (lambda (s) (regex:match? s "\\.lib$")) dirlist))
+                                  (linklist (cl:remove-if (lambda (s)
+                                                            (regex:match? s (string-append module-name ".lib$")))
+                                                          liblist))
+                                  (strlist (string-append " " (string-join linklist " ") " ")))
+                             strlist)
+                           ""))
+             (optimize-compiles? #t)
+             (shlib-path
+              (cond ((string=? platform "Linux")
+                     (string-append "/tmp/" module-name ".so"))
+                    ((string=? platform "OSX")
+                     (string-append "/tmp/" module-name ".dylib"))
+                    ((string=? platform "Windows")
+                     (string-append ".\\msvc\\tmp\\" module-name ".dll"))
+                    (else "")))
+             (compilation-command-a
+              (if (string=? platform "Windows")
+                  (string-append
+                   llvm-path
+                   "/bin/Release/llc " 
+                   (if optimize-compiles? "-O3" "-O0")
+                   " -tailcallopt -filetype obj "
+                   bitcode-path)
+                  (string-append
+                   llvm-path
+                   "/bin/llc " 
+                   (if optimize-compiles? "-O3" "-O0")
+                   " -relocation-model=pic -tailcallopt "
+                   bitcode-path)))
+             (compilation-command-b
+              (if (string=? platform "Windows")
+                  (string-append "link "
+                                 ;; " /FORCE:UNRESOLVED "
+                                 " /MACHINE:x64 /DLL /OUT:"
+                                 shlib-path
+                                 win-libs
+                                 " opengl32.lib "
+                                 " Glu32.lib "
+                                 " .\\msvc\\x64\\Release\\extempore.lib"                                 
+                                 " .\\msvcrt.lib "                                 
+                                 asm-path)
+                  (string-append
+                   (cond ((string=? platform "Linux")
+                          (string-append "gcc " 
+                                         (if optimize-compiles? "-O3" "-g -O0")
+                                         " --shared -fPIC "))
+                         ((string=? platform "OSX")
+                          (string-append "clang "
+                                         (if optimize-compiles? "-O3" "-g -O0")   
+                                         " -dynamiclib -undefined dynamic_lookup ")))
+                   asm-path
+                   " -o " shlib-path))))
+        ;; (if (string=? platform "Windows")
+        ;;     (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
+        (print "Looking for llc in " llvm-path "...\n\n")
+        (begin
+          (print-with-colors 'black 'yellow #t (print " Exporting module "))
+          (print "\n  " bitcode-path "\n\n"))
+        ;; print further instructions
+        (sys:command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
+        (llvm:export-module module bitcode-path)
+        (let ((res1 0)
+              (res2 0))
+          (begin
+            (print-with-colors 'black 'yellow #t (print " Generating assembly from LLVM bitcode "))
+            (print "\n  " compilation-command-a "\n\n"))
+          (set! res1 (sys:command compilation-command-a))
+          (if (<> res1 0)
+              (begin (print-with-colors 'red 'default #t
+                                        (print "llc failed with exit code " res1 "\n"))
+                     (if exit-afterwards? (quit 1))))
+          (begin
+            (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
+            (print "\n  " compilation-command-b "\n\n"))          
+          (set! res2 (sys:command compilation-command-b))
+          (if (<> res2 0)
+              (begin (print-with-colors 'red 'default #t
+                                        (print "cc failed with exit code " res2 "\n"))
+                     (if exit-afterwards? (quit 1)))
+              (begin 
+                (print-with-colors 'black 'green #t (print " Succesfully compiled "))
+                (print "\n  " shlib-path "\n\n")
+                (if move-into-place?
+                    (if (and (= (sys:command (string-append "mv " shlib-path " libs")) 0)
+                             (if (not optimize-compiles?)
+                                 (= (sys:command (string-append "rm -rf libs/" module-name ".dylib.dSYM; mv " shlib-path ".dSYM libs")) 0)
+                                 #t))
+                        (begin (print "Moved ")
+                               (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
+                        (print-with-colors 'red 'default #t
+                                           (print "Error moving " shlib-path " into libs/ directory.\n\n")))))))))))
+
+(define impc:aot:insert-header
+  (lambda (libname)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
+                   *impc:aot:current-output-port*)
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+                   *impc:aot:current-output-port*)
+          (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
+                   *impc:aot:current-output-port*)
+          (display (string-append "(define " libname " (sys:open-dylib \"libs/" libname
+                                  (cond ((string=? (sys:platform) "Linux") ".so\"))\n")
+                                        ((string=? (sys:platform) "Windows") ".dll\"))\n")
+                                        ((string=? (sys:platform) "OSX") ".dylib\"))\n")))
+                   *impc:aot:current-output-port*)
+          (display (string-append "(if (not " libname ") (begin (print-with-colors 'red 'default #t (print \"Error\")) (print \": could not load " libname " dynamic library\\n\") (error \"\")))\n")
+                   *impc:aot:current-output-port*)
+          (display (string-append "(print \"Loading \")\n(print-with-colors 'blue 'default #t (print '"
+                                  libname "))\n(print \" library... \")\n")
+                   *impc:aot:current-output-port*)
+          (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
+                                  "(impc:compiler:flush-jit-compilation-queue)\n")
+                   *impc:aot:current-output-port*)))))
+
+(define impc:aot:insert-footer
+  (lambda (libname)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          (display (string-append "(print-with-colors 'green 'default #t (print \"done\"))")
+                   *impc:aot:current-output-port*)
+          (display (string-append "(print \" in\" (* 1.0 (/ (- (now) *xtmlib-" (substring libname 3) "-loaded*) *second*)) \"seconds\\n\")\n")
+                   *impc:aot:current-output-port*)
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+                   *impc:aot:current-output-port*)
+          (display "(set! *impc:compiler:message:level* *impc:aot:prev-compiler-message-level*)\n"
+                   *impc:aot:current-output-port*)))))
+
+(define impc:aot:print-compilation-details
+  (lambda (start-time)
+    (print-with-colors 'yellow 'default #t
+                       (print "Total compile time: "))
+    (print (* 1.0 (/ (- (now) start-time) *minute*)) "minutes\n\n")
+    (print-with-colors 'black 'blue #t (print " Types "))
+    (print "\n  " (length *impc:ir:type-aliases*))
+    (print-with-colors 'cyan 'default #f (print " aliases\n"))
+    (print "  " (length *impc:ti:generictype-cache*))
+    (print-with-colors 'cyan 'default #f (print " named types\n"))
+    (print "  " (length *impc:ti:namedtype-cache*))
+    (print-with-colors 'cyan 'default #f (print " generic\n"))
+    (print "  " (length *impc:ti:polytype-cache*))
+    (print-with-colors 'cyan 'default #f (print " specializations\n\n"))
+    
+    (print-with-colors 'black 'blue #t (print " Closures "))
+    (print "\n  " (length *impc:ti:closure-cache*))
+    (print-with-colors 'cyan 'default #f (print " top-level closures\n"))
+    (print "  " (length *impc:ti:genericfunc-cache*))
+    (print-with-colors 'cyan 'default #f (print " generics\n"))
+    (print "  " (length *impc:ti:polyfunc-cache*))
+    (print-with-colors 'cyan 'default #f (print " specializations\n\n"))))
+
+(define impc:aot:compile-xtm-file
+  (lambda (lib-path move-into-place? exit-afterwards?)
+    ;; is there a better way to check if a file exists?
+    (let ((start-time (now))
+          (in-file-port (open-input-file lib-path)))
+      (if (not in-file-port)
+          (begin (print-with-colors 'black 'red #t
+                                    (print "Error:"))
+                 (print " no .xtm file at" lib-path "\n"))
+          (let* ((res (close-port in-file-port))
+                 (libname (filename-from-path lib-path))
+                 (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
+                 (aot-compilation-file-path (string-append "" "libs/" libname)))
+            (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
+                (begin (print "AOT-compilation file not written ")
+                       (close-port *impc:aot:current-output-port*)
+                       (set! *impc:aot:current-output-port* #f))
+                (begin
+                  ;; if the preload check passes
+                  (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
+                  (set! *impc:aot:func-defs-in-mod* '())
+                  (if (impc:aot:currently-compiling?)
+                      (begin
+                        ;; this is the 'success' branch
+                        (set! *impc:aot:current-lib-name* libname-no-extension)
+                        ;; (impc:aot:insert-header libname-no-extension)
+                        (sys:load lib-path)
+                        (begin
+                          (println)
+                          (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
+                          (print "\n"))
+                        (let ((module (impc:compiler:flush-jit-compilation-queue)))
+                          (if (not module)
+                              (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
+                          (impc:aot:compile-module libname-no-extension module move-into-place? exit-afterwards?))
+                        ;; (impc:aot:insert-footer libname-no-extension)
+                        (close-port *impc:aot:current-output-port*)
+                        (set! *impc:aot:current-lib-name* "xtmdylib")
+                        (if  *impc:aot:current-output-port*
+                             (begin (set! *impc:aot:current-output-port* #f)
+                                    (print "Successfully wrote AOT-compilation file to ")
+                                    (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
+                                    (impc:aot:print-compilation-details start-time)
+                                    (if exit-afterwards? (quit 0)))
+                             (begin (print-with-colors 'black 'red #t (print " Error "))
+                                    (print "\n\nsomething went wrong in writing the output file ")
+                                    (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
+                                    (if exit-afterwards? (quit 1)))))
+                      (begin (print-with-colors 'black 'red #t
+                                                (print " Error "))
+                             (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
+                             (if exit-afterwards? (quit 2)))))))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; flags for printing debug info ;;
@@ -7208,6 +7546,16 @@
                 (impc:compiler:print-polying-details-to-log "Overload:" ',poly_sym ',implementation_sym ,(impc:ir:pretty-print-type type)))
         `(impc:compiler:print-missing-identifier-error ',implementation_sym 'closure))))
 
+(define sys:load-dylib
+  (lambda (dylib-path)
+    (let ((dylib (sys:open-dylib dylib-path)))
+      (if dylib
+          (begin (impc:compiler:print-dylib-loading-details-to-log dylib-path)
+                 dylib)
+          (begin (print-with-colors 'red 'default #t
+                                    (print "Error"))
+                 (print ": could not load " dylib-path " dynamic library\n")
+                 #f)))))
 
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
@@ -7386,6 +7734,17 @@
                 ;; don't destroy - this happens in _setter func
                 (sys:pop-memzone))
               (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter))))))
+
+(define impc:ti:create-scm-wrapper?
+  (lambda (func-name)
+    (cl:every
+     (lambda (type)
+       (or (impc:ir:void? type)
+           (impc:ir:floating-point? type)
+           (impc:ir:fixed-point? type)
+           (impc:ir:pointer? type)))
+     (map impc:ir:get-type-from-str
+          (impc:ti:get-closure-or-nativefunc-arg-types func-name)))))
 
 (define impc:ti:create-scheme-wrapper
   (lambda (func-name)
