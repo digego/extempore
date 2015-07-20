@@ -7190,8 +7190,10 @@
       (impc:compiler:print-compiler-error (string-append "bind-poly only accepts monomorphic functions, not " (symbol->string implementation_sym))))
   (let ((type (impc:ti:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
     ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
-    `(begin (impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type "")
-            (impc:compiler:print-polying-details-to-log "Overload:" ',poly_sym ',implementation_sym ,(impc:ir:pretty-print-type type)))))
+    (if type
+        `(begin (impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type "")
+                (impc:compiler:print-polying-details-to-log "Overload:" ',poly_sym ',implementation_sym ,(impc:ir:pretty-print-type type)))
+        `(impc:compiler:print-missing-identifier-error ',implementation_sym 'closure))))
 
 
 ;; this here for wrapping llvm dynamic binds
