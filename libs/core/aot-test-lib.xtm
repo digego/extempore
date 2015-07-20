@@ -1,0 +1,59 @@
+;;; aot-test-lib.xtm -- 
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: 
+
+;;; Commentary:
+
+;; this is mostly for testing that the metadata (docstrings, zone
+;; sizes etc.) is preserved through AOT-compilation
+
+;;; Code:
+
+(sys:load "libs/aot-test.xtm" 'quiet)
+(sys:load-preload-check 'aot-test)
+(define *xtmlib-aot-test-loaded* #f)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/std.xtm"))
+(impc:aot:insert-sexp '(sys:load "libs/core/std.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmaot-test")
+
+;; bind-func
+
+(bind-func bindfunc
+  (lambda (a)
+    (+ a 32)))
+
+(bind-func bindfunc_with_docstring
+  "bf+ds"
+  (lambda (a)
+    (+ a 32.)))
+
+(bind-func bindfunc_with_zone_size 1024
+  (lambda (a)
+    (+ a 32)))
+
+(bind-func bindfunc_with_zone_size_and_docstring 1024
+  "bf+zs+ds"
+  (lambda (a)
+    (+ a 32.0)))
+
+;; bind-poly
+
+(bind-poly bindfuncpoly bindfunc)
+(bind-poly bindfuncpoly bindfunc_with_docstring)
+
+(bind-poly bindfuncpoly_with_docstring bindfunc "polydoc")
+(bind-poly bindfuncpoly_with_docstring bindfunc_with_docstring)
+
+;; bind-type
+
+(bind-type BT <i32,i32>)
+
+(bind-type BTWithDocstring <i32,i32> "bt+ds")
+
+(impc:aot:insert-footer "xtmaot-test")
+(define *xtmlib-aot-test-loaded* #t)

@@ -1,0 +1,66 @@
+;;; aot-compilation.xtm -- tests for ahead-of-time compilation
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: 
+
+;;; Commentary:
+
+;; to run these tests, first precompile the test library. In a shell
+;; in the Extempore directory,
+
+;; ./extempore --eval "(impc:aot:compile-xtm-file \"libs/core/aot-test-lib.xtm\" #t #t)"
+
+;;; Code:
+
+(sys:load "libs/core/test.xtm")
+
+(sys:load "libs/aot-test-lib.xtm")
+
+;; bind-func
+
+(xtmtest-result
+ (string=? (impc:ti:get-closure-docstring "bindfunc")
+           "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-closure-docstring "bindfunc_with_docstring")
+           "bf+ds")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-closure-docstring "bindfunc_with_zone_size")
+           "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-closure-docstring "bindfunc_with_zone_size_and_docstring")
+           "bf+zs+ds")
+ #t)
+
+;; bind-poly
+
+(xtmtest-result
+ (string=? (impc:ti:get-polyfunc-docstring "bindfuncpoly")
+           "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-polyfunc-docstring "bindfuncpoly_with_docstring")
+           "polydoc")
+ #t)
+
+;; bind-type
+
+(xtmtest-result
+ (string=? (impc:ti:get-namedtype-docstring "BT")
+           "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-namedtype-docstring "BTWithDocstring")
+           "bt+ds")
+ #t)
+
+(impc:ti:print-polyfunc-cache)
