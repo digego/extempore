@@ -14,25 +14,25 @@ fi
 
 # this is the 'standard' library
 # to override this list, call this script with:
-# AOT_LIBS="core/foo.xtm external/bar.xtm" ./compile-stdlib.sh
+# AOT_LIBS="libs/core/foo.xtm libs/external/bar.xtm" ./compile-stdlib.sh
 : ${AOT_LIBS:="\
-core/std.xtm \
-core/math.xtm \
-core/audio_dsp.xtm \
-core/instruments.xtm \
-external/fft.xtm \
-external/sndfile.xtm \
-external/audio_dsp_ext.xtm \
-external/instruments_ext.xtm \
-external/rtmidi.xtm \
-external/glib.xtm \
-external/stb_image.xtm \
-external/gl.xtm \
-external/glext.xtm \
-external/graphics-pipeline.xtm \
-external/nanovg.xtm \
-external/soil.xtm \
-external/assimp.xtm"}
+libs/core/std.xtm \
+libs/core/math.xtm \
+libs/core/audio_dsp.xtm \
+libs/core/instruments.xtm \
+libs/external/fft.xtm \
+libs/external/sndfile.xtm \
+libs/external/audio_dsp_ext.xtm \
+libs/external/instruments_ext.xtm \
+libs/external/rtmidi.xtm \
+libs/external/glib.xtm \
+libs/external/stb_image.xtm \
+libs/external/gl.xtm \
+libs/external/glext.xtm \
+libs/external/graphics-pipeline.xtm \
+libs/external/nanovg.xtm \
+libs/external/soil.xtm \
+libs/external/assimp.xtm"}
 
 EXTEMPORE_AOT_COMPILATION_COMMAND="./extempore --nostd $1 --eval "
 
@@ -42,14 +42,14 @@ echo
 # check all the required shared libs are there
 for f in $AOT_LIBS
 do
-    $EXTEMPORE_AOT_COMPILATION_COMMAND "(impc:aot:compile-xtm-file \"libs/$f\" #t #t)"
+    $EXTEMPORE_AOT_COMPILATION_COMMAND "(impc:aot:compile-xtm-file \"$f\" #t #t)"
     rc=$?
     if (($rc != 0))  ; then
-        echo -e "\033[0;31mError AOT-compiling libs/$f\033[0;00m"
+        echo -e "\033[0;31mError AOT-compiling $f\033[0;00m"
         echo
         exit $rc
     else
-        echo -e "\033[0;32mSuccessfully AOT-compiled libs/$f\033[0;00m"
+        echo -e "\033[0;32mSuccessfully AOT-compiled $f\033[0;00m"
         echo
     fi
 done
