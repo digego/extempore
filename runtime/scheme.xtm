@@ -2114,7 +2114,8 @@
             (else
              '(xtmdoc-docstring-nodocstring))))))
 
-(define xtmdoc-export-all-the-things
+;; xtlang stuff only
+(define xtmdoc-all-doc-alists
   (lambda ()
     (append
      (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) *impc:ti:builtin-cache*)
@@ -2127,3 +2128,35 @@
      (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
      (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) *impc:ti:polytype-cache*)
      (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*))))
+
+(define xtmdoc-write-alist-as-json
+  (lambda (xtmdoc-alist file-port)
+    (display "{\n  \"category\": " file-port)
+    (write (cdr (assoc 'category xtmdoc-alist)) file-port)
+    (display ",\n  \"name\": " file-port)
+    (write (cdr (assoc 'name xtmdoc-alist)) file-port)
+    (display ",\n  \"args\": " file-port)
+    (write (sexpr->string (cdr (assoc 'args xtmdoc-alist))) file-port)
+    (display ",\n  \"type\": " file-port)
+    (write (cdr (assoc 'type xtmdoc-alist)) file-port)
+    (display ",\n  \"docstring\": " file-port)
+    (let ((docstring (cdr (assoc 'docstring xtmdoc-alist))))
+      (write (if (null? docstring) 'null docstring) file-port))
+    (display "\n}" file-port)))
+
+(define xtmdoc-export-caches-to-json
+  (lambda (file-path)
+    (let ((outfile-port (open-output-file file-path)))
+      (display "[\n" outfile-port)
+      (let loop ((doc-alists (xtmdoc-all-doc-alists)))
+        (if (null? doc-alists)
+            (begin
+              (display "\n]" outfile-port)
+              (close-port outfile-port)
+              (print "Succesfully exported docs as json to " file-path "\n")
+              #t)
+            (begin
+              (xtmdoc-write-alist-as-json (car doc-alists) outfile-port)
+              (if (not (null? (cdr doc-alists)))
+                  (display ",\n" outfile-port))
+              (loop (cdr doc-alists))))))))
