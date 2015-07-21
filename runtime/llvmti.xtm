@@ -1616,7 +1616,7 @@
             (string->symbol (impc:ir:pretty-print-type type))
             docstring)
            *impc:aot:current-output-port*)
-          (display "\n" *impc:aot:current-output-port*)))))
+          (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-namedtype-binding-details
   (lambda (name type docstring)
@@ -1630,7 +1630,7 @@
             (string->symbol (impc:ir:pretty-print-type type))
             docstring)
            *impc:aot:current-output-port*)
-          (display "\n" *impc:aot:current-output-port*)))))
+          (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-closure-binding-details
   (lambda (name type zone-size docstring body)
@@ -1646,7 +1646,7 @@
             docstring
             (list 'quote body))
            *impc:aot:current-output-port*)
-          (display "\n" *impc:aot:current-output-port*)))))
+          (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-nativefunc-binding-details
   (lambda (lib-name func-name type docstring)
@@ -1659,7 +1659,7 @@
           (write
            (list 'bind-lib lib-name func-name type)
            *impc:aot:current-output-port*)
-          (display "\n" *impc:aot:current-output-port*)))))
+          (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-polyfunc-binding-details
   (lambda (poly-name func-name docstring)
@@ -1672,7 +1672,7 @@
             (string->symbol func-name)
             docstring)
            *impc:aot:current-output-port*)
-          (display "\n" *impc:aot:current-output-port*)))))
+          (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-globalvar-binding-details
   (lambda (name type docstring)
@@ -1689,23 +1689,38 @@
              (string->symbol (impc:ir:pretty-print-type type))
              docstring))
            *impc:aot:current-output-port*)
-          (display "\n" *impc:aot:current-output-port*)))))
+          (newline *impc:aot:current-output-port*)))))
 
-;; this is stateful!
 (define impc:aot:insert-load-dylib-details
-  (lambda ()
+  (lambda (dylib-info-pair)
     (if (output-port? *impc:aot:current-output-port*)
-        (let ((dylib-sym-name (if *impc:aot:current-load-dylib-info*
-                                  (atom->string (car *impc:aot:current-load-dylib-info*))
-                                  "unknown-libname"))
-              (dylib-path (if *impc:aot:current-load-dylib-info*
-                              (cdr *impc:aot:current-load-dylib-info*)
-                              "unknown-dylib-path")))
-          (display (string-append
-                    "(define " dylib-sym-name " (sys:load-dylib \"" dylib-path "\"))\n"
-                    "(if (not " dylib-sym-name ")\n"
-                    "    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " dylib-sym-name " dynamic library\")(error \"\")))\n")
-                   *impc:aot:current-output-port*)))))
+        (begin
+          (write
+           (list 'define (car dylib-info-pair) (list 'sys:load-dylib (cdr dylib-info-pair)))
+           *impc:aot:current-output-port*)
+          (write
+           `(if (not ,(car dylib-info-pair))
+                (begin
+                  (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
+                  (print ": could not load the " ,(cdr dylib-info-pair)
+                         " dynamic library - perhaps you can install it through your package manager?\n")
+                  (error "")))
+           *impc:aot:current-output-port*)
+          (newline *impc:aot:current-output-port*))
+        (if *impc:aot:current-load-dylib-info*
+
+            
+            (let ((dylib-sym-name (if *impc:aot:current-load-dylib-info*
+                                      (car *impc:aot:current-load-dylib-info*)
+                                      'unknown-libname))
+                  (dylib-path (if 
+                               (cdr *impc:aot:current-load-dylib-info*)
+                               "unknown-dylib-path")))
+              (display (string-append
+                        "(define " dylib-sym-name " (sys:load-dylib \"" dylib-path "\"))\n"
+                        "(if (not " dylib-sym-name ")\n"
+                        "    (begin (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t (print \"\\nError\"))(print \": could not load " dylib-sym-name " dynamic library\")(error \"\")))\n")
+                       *impc:aot:current-output-port*))))))
 
 ;; don't need specialised ones for these:
 
@@ -1878,8 +1893,14 @@
                                         ((string=? (sys:platform) "Windows") ".dll\"))\n")
                                         ((string=? (sys:platform) "OSX") ".dylib\"))\n")))
                    *impc:aot:current-output-port*)
-          (display (string-append "(if (not " libname ") (begin (print-with-colors 'red 'default #t (print \"Error\")) (print \": could not load " libname " dynamic library\\n\") (error \"\")))\n")
-                   *impc:aot:current-output-port*)
+          (write
+           `(if (not ,(string->symbol libname))
+                (begin
+                  (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
+                  (print ": could not load the AOT-compilied " ,libname
+                         " dynamic library\n")
+                  (error "")))
+           *impc:aot:current-output-port*)
           (display (string-append "(print \"Loading \")\n(print-with-colors 'blue 'default #t (print '"
                                   libname "))\n(print \" library... \")\n")
                    *impc:aot:current-output-port*)
@@ -7712,7 +7733,7 @@
     (let ((dylib (sys:open-dylib dylib-path)))
       (if dylib
           (begin
-            (impc:aot:insert-load-dylib-details)
+            (impc:aot:insert-load-dylib-details *impc:aot:current-load-dylib-info*)
             (impc:compiler:print-dylib-loading-details-to-log dylib-path)
                  dylib)
           (begin (print-with-colors 'red 'default #t
