@@ -506,7 +506,7 @@
   (lambda (dict key)
     (if (null? dict)
         (convert null)
-        (if (string_cmp (first (car dict)) key)
+        (if (equal (first (car dict)) key)
             (second (car dict))
             (dict_get (cdr dict) key)))))
 
@@ -515,7 +515,7 @@
   (lambda (dict key value)
     (if (null? dict)
         (convert null)
-        (if (string_cmp (first (car dict)) key)
+        (if (equal (first (car dict)) key)
             (let ((oldval (second (car dict))))
               (tset! (car dict) 1 value)
               oldval)
@@ -529,7 +529,7 @@
   (lambda (dict key update_fn)
     (if (null? dict)
         (convert null)
-        (if (string_cmp (first (car dict)) key)
+        (if (equal (first (car dict)) key)
             (let ((oldval (second (car dict)))
                   (newval (update_fn oldval)))
               ;; if update_fn returns null, do nothing. otherwise
@@ -680,11 +680,11 @@
 
 (bind-func regex_match_a
   (lambda (regex str)
-    (rmatch regex (string_cstr str))))
+    (rmatch regex (String_cstr str))))
 
 (bind-func regex_match_b
   (lambda (regex str)
-    (rmatch (string_cstr regex) (string_cstr str))))
+    (rmatch (String_cstr regex) (String_cstr str))))
 
 (bind-poly regex_match regex_match_a)
 (bind-poly regex_match regex_match_b)
@@ -695,7 +695,7 @@
           (b:i8* (salloc 2048)))
       (sprintf a "")
       (sprintf b "")
-      (rsplit regex (string_cstr str) a b)
+      (rsplit regex (String_cstr str) a b)
       (append (list (if (> (strlen a) 0)
                         (Str a) (Str str)))
               (if (> (strlen b) 0)
@@ -708,7 +708,7 @@
           (b:i8* (salloc 2048)))
       (sprintf a "")
       (sprintf b "")
-      (rsplit (string_cstr regex) (string_cstr str) a b)
+      (rsplit (String_cstr regex) (String_cstr str) a b)
       (append (list (if (> (strlen a) 0)
                         (Str a) (Str str)))
               (if (> (strlen b) 0)
@@ -722,8 +722,8 @@
   (lambda (regex str:String* replace:String*)
     (let ((res:i8* (salloc 4096)))
       (rreplace regex
-                (string_cstr str)
-                (string_cstr replace)
+                (String_cstr str)
+                (String_cstr replace)
                 res)
       (Str res))))
 
@@ -731,7 +731,7 @@
   (lambda (regex str:String* replace)
     (let ((res:i8* (salloc 4096)))
       (rreplace regex
-                (string_cstr str)
+                (String_cstr str)
                 replace
                 res)
       (Str res))))
