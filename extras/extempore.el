@@ -1252,7 +1252,7 @@ command to run."
         ;; send the documentation request
         (if extempore-connection-list
             (process-send-string (car extempore-connection-list)
-                                 (format  "(if (defined? 'eldoc-documentation-function) (eldoc-documentation-function \"%s\"))\r\n" fnsym)))
+                                 (format  "(if (defined? 'xtmdoc-documentation-function) (xtmdoc-documentation-function \"%s\"))\r\n" fnsym)))
         ;; always return nil; docstring comes back through the process
         ;; filter
         nil)))
@@ -1293,8 +1293,8 @@ command to run."
 (defun extempore-minibuffer-echo-filter (proc retstr)
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
     (if (and (> (length str) 15)
-             (string= "(eldoc-docstring" (substring str 0 16)))
-        (if (not (string= "(eldoc-docstring-nodocstring)" str))
+             (string= "(xtmdoc-docstring" (substring str 0 16)))
+        (if (not (string= "(xtmdoc-docstring-nodocstring)" str))
             (extempore-process-docstring-form (cdr-safe (ignore-errors (read str)))))
       (message str))))
 

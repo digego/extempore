@@ -1937,7 +1937,7 @@
 ;; the keys must be present, but the cdr of each element may be
 ;; missing where appropriate (e.g. scheme functions have no type field)
 
-(define eldoc-strip-arg-type-annotations
+(define xtmdoc-strip-arg-type-annotations
   (lambda (form)
     (if (or (symbol? form)
             (not (list? form)))
@@ -1946,24 +1946,24 @@
                (string->symbol (car (regex:split (symbol->string arg) ":"))))
              form))))
 
-(define eldoc-get-args-from-form
+(define xtmdoc-get-args-from-form
   (lambda (form)
     ;; (println 'form: form)
     (if (null? form)
         #f
         (if (equal? (car form) 'let)
-            (eldoc-get-args-from-form (caddr form))
+            (xtmdoc-get-args-from-form (caddr form))
             (if (equal? (car form) 'lambda)
-                (eldoc-strip-arg-type-annotations (cadr form))
+                (xtmdoc-strip-arg-type-annotations (cadr form))
                 #f)))))
 
 ;; currently only returns the result for the first arity
-(define eldoc-get-xtlang-genericfunc-args
+(define xtmdoc-get-xtlang-genericfunc-args
   (lambda (fn-sym)
-    (eldoc-get-args-from-form
+    (xtmdoc-get-args-from-form
      (caddar (cdddar (assoc-strcmp-all fn-sym *impc:ti:genericfunc-cache*))))))
 
-(define eldoc-builtin-handler
+(define xtmdoc-builtin-handler
   (lambda (name-sym)
     (list
      '(category . "xtlang builtin")
@@ -1974,18 +1974,18 @@
            (let ((docstring (impc:ti:get-builtin-docstring (symbol->string name-sym))))
              (if (string=? docstring "") '() docstring))))))
 
-(define eldoc-genericfunc-handler
+(define xtmdoc-genericfunc-handler
   (lambda (name-sym)
     ;; once we have a way to handle multipe aritys, we should update
     ;; this function
     (list 
      '(category . "generic closure")
      (cons 'name (symbol->string name-sym))
-     (list 'args (sexpr->string (eldoc-get-xtlang-genericfunc-args name-sym)))
+     (list 'args (sexpr->string (xtmdoc-get-xtlang-genericfunc-args name-sym)))
      (cons 'type (symbol->string (caddar (assoc-strcmp-all name-sym *impc:ti:genericfunc-cache*))))
      (list 'docstring))))
 
-(define eldoc-generictype-handler
+(define xtmdoc-generictype-handler
   (lambda (name-sym)
     (list 
      '(category . "generic type")
@@ -1994,7 +1994,7 @@
      (cons 'type (symbol->string (impc:ti:get-generictype-candidate-types name-sym)))
      (list 'docstring))))
 
-(define eldoc-polyfunc-handler
+(define xtmdoc-polyfunc-handler
   (lambda (name-sym)
     (list 
      '(category . "polymorphic closure")
@@ -2008,7 +2008,7 @@
                               (impc:ti:get-polyfunc-candidate-names (symbol->string name-sym)))
                         " ")))))
 
-(define eldoc-polytype-handler
+(define xtmdoc-polytype-handler
   (lambda (name-sym)
     (list 
      '(category . "polymorphic type")
@@ -2019,18 +2019,18 @@
                               " "))
      (list 'docstring))))
 
-(define eldoc-closure-handler
+(define xtmdoc-closure-handler
   (lambda (name-sym)
     (list 
      '(category . "xtlang closure")
      (cons 'name (symbol->string name-sym))
-     (list 'args (eldoc-get-args-from-form (impc:ti:get-closure-body (symbol->string name-sym))))
+     (list 'args (xtmdoc-get-args-from-form (impc:ti:get-closure-body (symbol->string name-sym))))
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-closure-type (symbol->string name-sym))))
      (cons 'docstring 
            (let ((docstring (impc:ti:get-closure-docstring (symbol->string name-sym))))
              (if (string=? docstring "") '() docstring))))))
 
-(define eldoc-nativefunc-handler
+(define xtmdoc-nativefunc-handler
   (lambda (name-sym)
     (list 
      '(category . "C function")
@@ -2039,7 +2039,7 @@
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-nativefunc-type (symbol->string name-sym))))
      (list 'docstring))))
 
-(define eldoc-typealias-handler
+(define xtmdoc-typealias-handler
   (lambda (alias-sym)
     (list
      '(category . "xtlang alias")
@@ -2048,7 +2048,7 @@
      (cons 'type (impc:ti:get-typealias-ground-type (symbol->string alias-sym)))
      (list 'docstring (impc:ti:get-typealias-docstring (symbol->string alias-sym))))))
 
-(define eldoc-namedtype-handler
+(define xtmdoc-namedtype-handler
   (lambda (name-sym)
     (list 
      '(category . "named type")
@@ -2057,7 +2057,7 @@
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-namedtype-type (symbol->string name-sym))))
      (list 'docstring))))
 
-(define eldoc-globalvar-handler
+(define xtmdoc-globalvar-handler
   (lambda (name-sym)
     (list 
      '(category . "global var")
@@ -2066,16 +2066,16 @@
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-globalvar-type (symbol->string name-sym))))
      (list 'docstring))))
 
-(define eldoc-scheme-function-handler
+(define xtmdoc-scheme-function-handler
   (lambda (name-sym)
     (list 
      '(category . "scheme closure")
      (cons 'name (symbol->string name-sym))
-     (list 'args (eldoc-get-args-from-form (get-closure-code (eval name-sym))))
+     (list 'args (xtmdoc-get-args-from-form (get-closure-code (eval name-sym))))
      (list 'type)
      (list 'docstring))))
 
-(define eldoc-scheme-macro-handler
+(define xtmdoc-scheme-macro-handler
   (lambda (name-sym)
     (list 
      '(category . "scheme macro")
@@ -2084,32 +2084,46 @@
      (list 'type)
      (list 'docstring))))
 
-(define eldoc-documentation-function
+(define xtmdoc-documentation-function
   (lambda (name)
     (let ((sym (string->symbol name)))
       (cond ((impc:ti:builtin-exists? name)
-             (cons 'eldoc-docstring (eldoc-builtin-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-builtin-handler sym)))
             ((impc:ti:typealias-exists? name)
-             (cons 'eldoc-docstring (eldoc-typealias-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-typealias-handler sym)))
             ((impc:ti:polytype-exists? name)
-             (cons 'eldoc-docstring (eldoc-polytype-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-polytype-handler sym)))
             ((impc:ti:namedtype-exists? name)
-             (cons 'eldoc-docstring (eldoc-namedtype-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-namedtype-handler sym)))
             ((impc:ti:generictype-exists? name)
-             (cons 'eldoc-docstring (eldoc-generictype-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-generictype-handler sym)))
             ((impc:ti:polyfunc-exists? name)
-             (cons 'eldoc-docstring (eldoc-polyfunc-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-polyfunc-handler sym)))
             ((impc:ti:closure-exists? name)
-             (cons 'eldoc-docstring (eldoc-closure-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-closure-handler sym)))
             ((impc:ti:nativefunc-exists? name)
-             (cons 'eldoc-docstring (eldoc-nativefunc-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-nativefunc-handler sym)))
             ((impc:ti:genericfunc-exists? name)
-             (cons 'eldoc-docstring (eldoc-genericfunc-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-genericfunc-handler sym)))
             ((impc:ti:globalvar-exists? name)
-             (cons 'eldoc-docstring (eldoc-globalvar-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-globalvar-handler sym)))
             ((and (defined? sym) (closure? (eval sym)))
-             (cons 'eldoc-docstring (eldoc-scheme-function-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-scheme-function-handler sym)))
             ((and (defined? sym) (macro? (eval sym)))
-             (cons 'eldoc-docstring (eldoc-scheme-macro-handler sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-scheme-macro-handler sym)))
             (else
-             '(eldoc-docstring-nodocstring))))))
+             '(xtmdoc-docstring-nodocstring))))))
+
+(define xtmdoc-export-all-the-things
+  (lambda ()
+    (append
+     (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) *impc:ti:builtin-cache*)
+     (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) *impc:ti:namedtype-cache*)
+     (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) *impc:ti:typealias-cache*)
+     (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data)))) *impc:ti:closure-cache*)
+     (map (lambda (data) (xtmdoc-nativefunc-handler (string->symbol (car data)))) *impc:ti:nativefunc-cache*)
+     (map (lambda (data) (xtmdoc-genericfunc-handler (car data))) *impc:ti:genericfunc-cache*)
+     (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) *impc:ti:polyfunc-cache*)
+     (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
+     (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) *impc:ti:polytype-cache*)
+     (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*))))
