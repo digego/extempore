@@ -408,56 +408,48 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
   (eval-when-compile
     (let ((extempore-xtlang-names '("random" "afill!" "pfill!" "tfill!" "vfill!" "array-fill!" "pointer-fill!" "tuple-fill!" "vector-fill!" "free" "array" "tuple" "list" "~" "cset!" "cref" "&" "bor" "ang-names" "<<" ">>" "nil" "printf" "sprintf" "null" "now" "pset!" "pref-ptr" "vset!" "vref" "aset!" "aref" "aref-ptr" "tset!" "tref" "tref-ptr" "salloc" "halloc" "zalloc" "alloc" "schedule" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "llvm_printf" "push_zone" "pop_zone" "memzone" "callback" "llvm_sprintf" "make-array" "array-set!" "array-ref" "array-ref-ptr" "pointer-set!" "pointer-ref" "pointer-ref-ptr" "stack-alloc" "heap-alloc" "zone-alloc" "make-tuple" "tuple-set!" "tuple-ref" "tuple-ref-ptr" "closure-set!" "closure-ref" "pref" "pdref" "impc_null" "bitcast" "void" "ifret" "ret->" "clrun->" "make-env-zone" "make-env" "<>")))
       (list
-       ;; definitions
-       ;; closure type annotations (i.e. specified with a colon)
-       '("(\\(bind-\\(func\\|poly\\)\\)\\s-+\\([^ \t:]+\\)\\(:[^ \t)]?+\\)?"
-         (1 font-lock-keyword-face)
-         (3 font-lock-function-name-face)
-         (4 font-lock-type-face prepend t))
-       ;; (list
-       ;;  (concat
-       ;;   "(\\(bind-\\(func\\|poly\\)\\)\\_>"
-       ;;   ;; Any whitespace and declared object.
-       ;;   "\s-*"
-       ;;   "\\(\\sw+\\)?")
-       ;;  '(1 font-lock-keyword-face)
-       ;;  '(3 font-lock-function-name-face))
-       ;; important xtlang functions
+       ;; xtlang "keywords"
        (list
         (regexp-opt extempore-xtlang-names 'symbols)
         '(1 font-lock-function-name-face))
+       ;; bind-func
+       '("(\\(bind-func\\)\\s-+\\([[:alnum:]_-]+\\)"
+         (1 font-lock-keyword-face)
+         (2 font-lock-function-name-face))
+       '("(\\(bind-poly\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)"
+         (1 font-lock-keyword-face)
+         (2 font-lock-function-name-face))
        
        ;; bind-alias
-       '("(\\(bind-alias\\)\\s-+\\([^ \t]+\\)\\s-+\\([^ \t]+\\)[ \t\n]*?\\(\"[^)]*\"\\)?)"
+       '("(\\(bind-alias\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
-         (3 font-lock-type-face t)
-         (4 font-lock-string-face))
+         (3 font-lock-type-face))
        ;; bind-type
-       '("(\\(bind-type\\)\\s-+\\([^ \t]+\\)\\s-+\\([^ \t]+\\)[ \t\n]*?\\(\"[^)]*\"\\)?)"
+       '("(\\(bind-type\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
          (3 font-lock-type-face t)
          (4 font-lock-string-face))
        ;; bind-lib
-       '("(\\(bind-lib\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+       '("(\\(bind-lib\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
          (4 font-lock-type-face t))
        ;; bind-lib-func
-       '("(\\(bind-lib-func\\|bind-lib-type\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\)"
+       '("(\\(bind-lib-func\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
          (4 font-lock-type-face t))
        ;; bind-val
-       '("(\\(bind-val\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]?+\\)"
+       '("(\\(bind-val\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
          (3 font-lock-type-face t))
        ;; bind-lib-val
-       '("(\\(bind-lib-val\\)\\s-+\\(\\S-+\\)\\s-+\\(\\S-+\\)\\s-+\\([^ \t)]+\\))"
+       '("(\\(bind-lib-val\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
