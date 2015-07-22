@@ -616,9 +616,9 @@ void* llvm_get_function_ptr(char* fname)
   using namespace llvm;
   
   llvm::Function* func = extemp::EXTLLVM::I()->getFunction(std::string(fname));        
-  if(func == nullptr)
+  if(func == NULL)
     {
-      return nullptr;
+      return NULL;
     }
   // has the function been updateGlobalMapping'd somewhere else,
   // e.g. bind_symbol
@@ -626,7 +626,7 @@ void* llvm_get_function_ptr(char* fname)
   if(p==nullptr) // look for it as a JIT-compiled function
     p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
   if(p==nullptr) {
-    return nullptr;
+    return NULL;
   }
   return p;
 }

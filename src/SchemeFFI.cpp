@@ -2546,7 +2546,7 @@ namespace extemp {
 
 #ifdef EXT_MCJIT
   // need to remove the mapping here, otherwise runFunction will bomb out under MCJIT
-  EXTLLVM::I()->EE->updateGlobalMapping(func,nullptr);
+  EXTLLVM::I()->EE->updateGlobalMapping(func,NULL);
 #endif
   GenericValue gv = EE->runFunction(func,fargs);
 #ifdef LLVM_EE_LOCK		
