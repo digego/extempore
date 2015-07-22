@@ -429,31 +429,30 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
        '("(\\(bind-type\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
-         (3 font-lock-type-face t)
-         (4 font-lock-string-face))
+         (3 font-lock-type-face))
        ;; bind-lib
        '("(\\(bind-lib\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
-         (4 font-lock-type-face t))
+         (4 font-lock-type-face))
        ;; bind-lib-func
        '("(\\(bind-lib-func\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
-         (4 font-lock-type-face t))
+         (4 font-lock-type-face))
        ;; bind-val
        '("(\\(bind-val\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
-         (3 font-lock-type-face t))
+         (3 font-lock-type-face))
        ;; bind-lib-val
        '("(\\(bind-lib-val\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
-         (4 font-lock-type-face t))
+         (4 font-lock-type-face))
        ;; cast
        '("(\\(cast\\|convert\\)\\s-+\\S-+\\s-+\\([^ \t)]?+\\))"
          (1 font-lock-keyword-face)
