@@ -2126,24 +2126,25 @@
              '(xtmdoc-docstring-nodocstring))))))
 
 ;; sort the alists (as returned by the various handler functions) into
-;; a reasonably meaningful order (most to least important)
-(define xtmdoc-sort-alists
+;; a reasonably meaningful order (least to most important)
+(define xtmdoc-alist-lessthan
   (lambda (left right)
-    (let ((categories '("builtin"
-                        "type alias"
-                        "generic type"
-                        "generic closure"
-                        "named type"
-                        "closure"
-                        "polymorphic type"
-                        "polymorphic closure"
+    (let ((categories '("C function"
                         "global var"
-                        "C function"))))
-    (if (< (cl:position (assoc 'category left) categories)
-           (cl:position (assoc 'category right) categories))
-        #t
-        (string<? (assoc 'name left)
-                  (assoc 'name right)))))
+                        "polymorphic closure"
+                        "polymorphic type"
+                        "closure"
+                        "named type"
+                        "generic closure"
+                        "generic type"
+                        "type alias"
+                        "builtin")))
+      (let ((lpos (cl:position (cdr (assoc 'category left)) categories))
+            (rpos (cl:position (cdr (assoc 'category right)) categories)))
+        (if (<> lpos rpos)
+            (< lpos rpos)
+            (string<? (cdr (assoc 'name left))
+                      (cdr (assoc 'name right))))))))
 
 (define xtmdoc-alist-union
   (lambda (doc-alists-master doc-alists-slave)
@@ -2197,7 +2198,8 @@
   (lambda (file-path)
     (let ((outfile-port (open-output-file file-path)))
       (display "[\n" outfile-port)
-      (let loop ((doc-alists (xtmdoc-all-doc-alists)))
+      (let loop ((doc-alists (cl:sort (xtmdoc-all-doc-alists)
+                                      (lambda (a b) (not (xtmdoc-alist-lessthan a b))))))
         (if (null? doc-alists)
             (begin
               (display "\n]" outfile-port)
