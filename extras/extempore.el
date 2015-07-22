@@ -1292,8 +1292,8 @@ command to run."
 
 (defun extempore-minibuffer-echo-filter (proc retstr)
   (let ((str (replace-regexp-in-string "[%\n]" "" (substring retstr 0 -1))))
-    (if (and (> (length str) 15)
-             (string= "(xtmdoc-docstring" (substring str 0 16)))
+    (if (and (> (length str) 16)
+             (string= "(xtmdoc-docstring" (substring str 0 17)))
         (if (not (string= "(xtmdoc-docstring-nodocstring)" str))
             (extempore-process-docstring-form (cdr-safe (ignore-errors (read str)))))
       (message str))))
