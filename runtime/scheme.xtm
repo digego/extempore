@@ -1929,7 +1929,7 @@
 ;; the following keys:
 
 ;; ((name . awesome_closure)
-;;  (category . "xtlang closure")
+;;  (category . "closure")
 ;;  (type . "[i64]")
 ;;  (args . (arg1 arg2))
 ;;  (docstring . "the docstring))
@@ -1966,7 +1966,7 @@
 (define xtmdoc-builtin-handler
   (lambda (name-sym)
     (list
-     '(category . "xtlang builtin")
+     '(category . "builtin")
      (cons 'name (symbol->string name-sym))
      (list 'args (impc:ti:get-builtin-args (symbol->string name-sym)))
      (cons 'type (impc:ti:get-builtin-type-str (symbol->string name-sym)))
@@ -2021,7 +2021,7 @@
 (define xtmdoc-closure-handler
   (lambda (name-sym)
     (list 
-     '(category . "xtlang closure")
+     '(category . "closure")
      (cons 'name (symbol->string name-sym))
      (list 'args (xtmdoc-get-args-from-form (impc:ti:get-closure-body (symbol->string name-sym))))
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-closure-type (symbol->string name-sym))))
@@ -2047,7 +2047,7 @@
 (define xtmdoc-typealias-handler
   (lambda (name-sym)
     (list
-     '(category . "xtlang alias")
+     '(category . "type alias")
      (cons 'name (symbol->string name-sym))
      (list 'args)
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-typealias-ground-type (symbol->string name-sym))))
@@ -2125,20 +2125,57 @@
             (else
              '(xtmdoc-docstring-nodocstring))))))
 
-;; xtlang stuff only
+;; sort the alists (as returned by the various handler functions) into
+;; a reasonably meaningful order (most to least important)
+(define xtmdoc-sort-alists
+  (lambda (left right)
+    (let ((categories '("builtin"
+                        "type alias"
+                        "generic type"
+                        "generic closure"
+                        "named type"
+                        "closure"
+                        "polymorphic type"
+                        "polymorphic closure"
+                        "global var"
+                        "C function"))))
+    (if (< (cl:position (assoc 'category left) categories)
+           (cl:position (assoc 'category right) categories))
+        #t
+        (string<? (assoc 'name left)
+                  (assoc 'name right)))))
+
+(define xtmdoc-alist-union
+  (lambda (doc-alists-master doc-alists-slave)
+    (cl:remove-if
+     (lambda (data)
+       (cl:find-if (lambda (x)
+                     (string=? (cdr (assoc 'name x))
+                               (cdr (assoc 'name data))))
+                   doc-alists-master))
+     doc-alists-slave)))
+
 (define xtmdoc-all-doc-alists
   (lambda ()
-    (append
-     (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) *impc:ti:builtin-cache*)
-     (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) *impc:ti:namedtype-cache*)
-     (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) *impc:ti:typealias-cache*)
-     (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data)))) *impc:ti:closure-cache*)
-     (map (lambda (data) (xtmdoc-nativefunc-handler (string->symbol (car data)))) *impc:ti:nativefunc-cache*)
-     (map (lambda (data) (xtmdoc-genericfunc-handler (car data))) *impc:ti:genericfunc-cache*)
-     (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) *impc:ti:polyfunc-cache*)
-     (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
-     (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) *impc:ti:polytype-cache*)
-     (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*))))
+    (let ((closure-alists
+           (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data)))) *impc:ti:closure-cache*)))
+      (append
+       (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) *impc:ti:builtin-cache*)
+       (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) *impc:ti:typealias-cache*)
+       (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
+       (map (lambda (data) (xtmdoc-genericfunc-handler (car data))) *impc:ti:genericfunc-cache*)
+       
+       (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) *impc:ti:namedtype-cache*)
+       closure-alists
+       (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) *impc:ti:polytype-cache*)
+       (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) *impc:ti:polyfunc-cache*)
+       (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*)
+       ;; make sure the "_native" versions of each closure don't get in
+       ;; there (since the closure is already there)
+       (xtmdoc-alist-union closure-alists
+                           (map (lambda (x)
+                                  (xtmdoc-nativefunc-handler (string->symbol (car x))))
+                                *impc:ti:nativefunc-cache*))))))
 
 (define xtmdoc-write-alist-as-json
   (lambda (xtmdoc-alist file-port)
@@ -2148,7 +2185,7 @@
     (write (cdr (assoc 'name xtmdoc-alist)) file-port)
     (display ",\n  \"args\": " file-port)
     (let ((args (cdr (assoc 'args xtmdoc-alist))))
-      (write (if (null? args) 'null (sexpr->string args)) file-port))
+      (write (if (null? args) 'null (sexpr->string (car args))) file-port))
     (display ",\n  \"type\": " file-port)
     (write (cdr (assoc 'type xtmdoc-alist)) file-port)
     (display ",\n  \"docstring\": " file-port)
