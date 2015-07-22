@@ -2004,9 +2004,8 @@
                                    (impc:ti:get-polyfunc-candidate-types (symbol->string name-sym)))
                               " "))
      (cons 'docstring 
-           (string-join (cons "poly'd closures:"
-                              (impc:ti:get-polyfunc-candidate-names (symbol->string name-sym)))
-                        " ")))))
+           (let ((docstring (impc:ti:get-polyfunc-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-polytype-handler
   (lambda (name-sym)
@@ -2036,17 +2035,25 @@
      '(category . "C function")
      (cons 'name (symbol->string name-sym))
      (list 'args)
-     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-nativefunc-type (symbol->string name-sym))))
-     (list 'docstring))))
+     (cons 'type
+           (let ((type (impc:ti:get-nativefunc-type (symbol->string name-sym))))
+             (if (equal? type 'varargs)
+                 "varargs"
+                 (impc:ir:pretty-print-type type))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-nativefunc-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-typealias-handler
-  (lambda (alias-sym)
+  (lambda (name-sym)
     (list
      '(category . "xtlang alias")
-     (cons 'name (symbol->string alias-sym))
+     (cons 'name (symbol->string name-sym))
      (list 'args)
-     (cons 'type (impc:ti:get-typealias-ground-type (symbol->string alias-sym)))
-     (list 'docstring (impc:ti:get-typealias-docstring (symbol->string alias-sym))))))
+     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-typealias-ground-type (symbol->string name-sym))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-typealias-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-namedtype-handler
   (lambda (name-sym)
@@ -2055,7 +2062,9 @@
      (cons 'name (symbol->string name-sym))
      (list 'args)
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-namedtype-type (symbol->string name-sym))))
-     (list 'docstring))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-namedtype-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-globalvar-handler
   (lambda (name-sym)
@@ -2064,7 +2073,9 @@
      (cons 'name (symbol->string name-sym))
      (list 'args)
      (cons 'type (impc:ir:pretty-print-type (impc:ti:get-globalvar-type (symbol->string name-sym))))
-     (list 'docstring))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-globalvar-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-scheme-function-handler
   (lambda (name-sym)
@@ -2136,7 +2147,8 @@
     (display ",\n  \"name\": " file-port)
     (write (cdr (assoc 'name xtmdoc-alist)) file-port)
     (display ",\n  \"args\": " file-port)
-    (write (sexpr->string (cdr (assoc 'args xtmdoc-alist))) file-port)
+    (let ((args (cdr (assoc 'args xtmdoc-alist))))
+      (write (if (null? args) 'null (sexpr->string args)) file-port))
     (display ",\n  \"type\": " file-port)
     (write (cdr (assoc 'type xtmdoc-alist)) file-port)
     (display ",\n  \"docstring\": " file-port)
