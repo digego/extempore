@@ -623,9 +623,9 @@ void* llvm_get_function_ptr(char* fname)
   // has the function been updateGlobalMapping'd somewhere else,
   // e.g. bind_symbol
   void* p = extemp::EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
-  if(p==nullptr) // look for it as a JIT-compiled function
+  if(p==NULL) // look for it as a JIT-compiled function
     p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
-  if(p==nullptr) {
+  if(p==NULL) {
     return NULL;
   }
   return p;
@@ -1311,9 +1311,9 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   }
   
   void*(*p)() = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
-  if(p==nullptr){
+  if(p==NULL){
      p = (void*(*)()) extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
-  }else if(p==nullptr) {
+  }else if(p==NULL) {
     printf("Error attempting to set environment variable in closure %s.%s\n",fname,vname);
     return _sc->F;
   }
