@@ -1698,16 +1698,16 @@
 ;; file, otherwise do nothing
 (define-macro (impc:aot:insert-forms . forms)
   (if (output-port? *impc:aot:current-output-port*)
-      (for-each
-       (lambda (sexp)
-         (write sexp *impc:aot:current-output-port*)
-         (newline *impc:aot:current-output-port*))
-       forms)))
+      `(begin
+         ,@(map (lambda (sexp)
+                  `(begin (write ',sexp *impc:aot:current-output-port*)
+                          (newline *impc:aot:current-output-port*)))
+                forms))))
 
 (define-macro (impc:aot:do-or-emit . forms)
   (if (not (output-port? *impc:aot:current-output-port*))
       `(begin ,@forms)
-      `(begin ,@(map (lambda (f) `(impc:aot:insert-forms ,f)) forms))))
+      `(impc:aot:insert-forms ,@forms)))
 
 (define-macro (impc:aot:suppress-aot-do . forms)
   `(if ,*impc:aot:current-output-port*
