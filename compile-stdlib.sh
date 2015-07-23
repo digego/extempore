@@ -29,6 +29,7 @@ libs/external/glib.xtm \
 libs/external/stb_image.xtm \
 libs/external/gl.xtm \
 libs/external/glext.xtm \
+libs/external/glfw3.xtm \
 libs/external/graphics-pipeline.xtm \
 libs/external/nanovg.xtm \
 libs/external/soil.xtm \
