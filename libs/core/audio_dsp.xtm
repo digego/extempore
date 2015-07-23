@@ -25,7 +25,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/audio_dsp.xtm" 'quiet)
+(sys:load "libs/aot-cache/audio_dsp.xtm" 'quiet)
 (sys:load-preload-check 'audio_dsp)
 (define *xtmlib-audio_dsp-loaded* #f)
 
@@ -942,12 +942,17 @@
 ;; http://www.cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf
 ;; the 'using v1 to compute v2' version
 
+
+;; the @param tags in the docstring are actually for the returned
+;; closure (hence being below the @return tag in the docstring)
 (bind-func svf_c
   "a state variable filter (SVF)
 
-takes input pointer |6,SAMPLE|* and fills it:
-
-|in,low,band,high,notch,peak|
+@return - a closure which takes 4 arguments:
+@param in - input pointer |6,SAMPLE|* (|in,low,band,high,notch,peak|)
+@param cutoff - filter cutoff (Hz)
+@param res - filter resonance
+@param outarray - place to store the output 
 "
 	(lambda ()
 	  (let ((ic1eq 0.0) (ic2eq 0.0)
@@ -1009,6 +1014,10 @@ takes input pointer |6,SAMPLE|* and fills it:
       (lambda (chan in cutoff res)
         ((pref lpf_buf chan) in cutoff res)))))
 
+;; this is just here to test a theory...
+
+(println 'here)
+
 (bind-func lpf2_c
   "a state variable lowpass filter. slightly more flops than lpf_c,
 but v1 and v2 can be computed in parallel"
@@ -1035,7 +1044,8 @@ but v1 and v2 can be computed in parallel"
   (lambda (nchan:i64)
     (let ((lpf2_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
           (i:i64 0))
-      (dotimes (i nchan) (pset! lpf2_buf i (lpf2_c)))
+      (dotimes (i nchan)
+        (pset! lpf2_buf i (lpf2_c)))
       (lambda (chan in cutoff res)
         ((pref lpf2_buf chan) in cutoff res)))))
 

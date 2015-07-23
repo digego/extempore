@@ -1818,14 +1818,14 @@
                 (print-with-colors 'black 'green #t (print " Succesfully compiled "))
                 (print "\n  " shlib-path "\n\n")
                 (if move-into-place?
-                    (if (and (= (sys:command (string-append "mv " shlib-path " libs")) 0)
+                    (if (and (= (sys:command (string-append "mv " shlib-path " libs/aot-cache")) 0)
                              (if (not optimize-compiles?)
-                                 (= (sys:command (string-append "rm -rf libs/" module-name ".dylib.dSYM; mv " shlib-path ".dSYM libs")) 0)
+                                 (= (sys:command (string-append "rm -rf libs/aot-cache/" module-name ".dylib.dSYM; mv " shlib-path ".dSYM libs")) 0)
                                  #t))
                         (begin (print "Moved ")
-                               (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/ directory.\n\n"))
+                               (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/aot-cache directory.\n\n"))
                         (print-with-colors 'red 'default #t
-                                           (print "Error moving " shlib-path " into libs/ directory.\n\n")))))))))))
+                                           (print "Error moving " shlib-path " into libs/aot-cache directory.\n\n")))))))))))
 
 (define impc:aot:insert-header
   (lambda (libname)
@@ -1837,7 +1837,7 @@
                    *impc:aot:current-output-port*)
           (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
                    *impc:aot:current-output-port*)
-          (display (string-append "(define " libname " (sys:open-dylib \"libs/" libname
+          (display (string-append "(define " libname " (sys:open-dylib \"libs/aot-cache/" libname
                                   (cond ((string=? (sys:platform) "Linux") ".so\"))\n")
                                         ((string=? (sys:platform) "Windows") ".dll\"))\n")
                                         ((string=? (sys:platform) "OSX") ".dylib\"))\n")))
@@ -1905,7 +1905,7 @@
           (let* ((res (close-port in-file-port))
                  (libname (filename-from-path lib-path))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
-                 (aot-compilation-file-path (string-append "" "libs/" libname)))
+                 (aot-compilation-file-path (string-append "" "libs/aot-cache/" libname)))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "AOT-compilation file not written ")
                        (close-port *impc:aot:current-output-port*)
