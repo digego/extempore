@@ -46,7 +46,7 @@
 (impc:aot:insert-header "xtmstd")
 
 (sys:compile-init-ll)
-(impc:aot:insert-sexp '(sys:compile-init-ll))
+(impc:aot:insert-forms (sys:compile-init-ll))
 
 ;; (suppress-compiler-messages #f)
 
@@ -598,16 +598,16 @@ If both strings are null an empty String will be returned
 ;; load the scheme macros (e.g. bind-instrument)
 (sys:load "libs/core/std-scm.xtm")
 ;; make sure we load them with AOT-compiled code as well
-(impc:aot:insert-sexp
- '(sys:load "libs/core/std-scm.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/core/std-scm.xtm"))
 
 ;; this stuff needs to go at the end, since redefinitions have to go
 ;; in a new module
 
 ;; override default constructors
 
-(impc:aot:insert-sexp
- '(impc:compiler:flush-jit-compilation-queue))
+(impc:aot:insert-forms
+ (impc:compiler:flush-jit-compilation-queue))
 
 (impc:aot:do-or-emit
  (bind-func String

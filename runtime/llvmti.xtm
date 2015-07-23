@@ -1696,16 +1696,18 @@
 
 ;; insert arbitrary sexp (remember to quote!) into the AOT-compilation
 ;; file, otherwise do nothing
-(define impc:aot:insert-sexp
-  (lambda (sexp)
-    (if (output-port? *impc:aot:current-output-port*)
-        (display (string-append (sexpr->string sexp) "\n")
-                 *impc:aot:current-output-port*))))
+(define-macro (impc:aot:insert-forms . forms)
+  (if (output-port? *impc:aot:current-output-port*)
+      (for-each
+       (lambda (sexp)
+         (write sexp *impc:aot:current-output-port*)
+         (newline *impc:aot:current-output-port*))
+       forms)))
 
 (define-macro (impc:aot:do-or-emit . forms)
   (if (not (output-port? *impc:aot:current-output-port*))
       `(begin ,@forms)
-      `(begin ,@(map (lambda (f) `(impc:aot:insert-sexp ',f)) forms))))
+      `(begin ,@(map (lambda (f) `(impc:aot:insert-forms ,f)) forms))))
 
 (define-macro (impc:aot:suppress-aot-do . forms)
   `(if ,*impc:aot:current-output-port*
@@ -7726,7 +7728,7 @@
           (if (and (llvm:compile-ir ir-string)
                    (llvm:bind-symbol (eval library) (symbol->string symname)))
               (begin
-                (impc:aot:insert-sexp
+                (impc:aot:insert-forms
                  `(llvm:bind-symbol ,library ,(symbol->string symname)))
                 (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
                 (impc:aot:insert-nativefunc-binding-details library symname type docstring))
@@ -7770,7 +7772,7 @@
                    (llvm:bind-global-var (symbol->string proc-name)
                                          (gl_get_proc_address (symbol->string proc-name))))
               (begin
-                (impc:aot:insert-sexp
+                (impc:aot:insert-forms
                  `(llvm:bind-global-var ,(symbol->string proc-name)
                                         (gl_get_proc_address ,(symbol->string proc-name))))
                 (impc:ti:register-new-nativefunc (symbol->string proc-name) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
