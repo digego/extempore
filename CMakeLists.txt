@@ -181,13 +181,13 @@ endif()
 
 # install the executable
 install(TARGETS extempore
-  RUNTIME DESTINATION .)
+  RUNTIME DESTINATION bin)
 
 # runtime directory
 install(DIRECTORY runtime/ DESTINATION runtime)
 # libraries & examples
-install(DIRECTORY libs/core/ DESTINATION libs/core)
-install(DIRECTORY libs/external/ DESTINATION libs/external)
-install(DIRECTORY libs/contrib/ DESTINATION libs/contrib)
-install(DIRECTORY examples/ DESTINATION examples)
-install(DIRECTORY extras/ DESTINATION extras)
+install(DIRECTORY libs/core/ DESTINATION share/extempore/libs/core)
+install(DIRECTORY libs/external/ DESTINATION share/extempore/libs/external)
+install(DIRECTORY libs/contrib/ DESTINATION share/extempore/libs/contrib)
+install(DIRECTORY examples/ DESTINATION share/extempore/examples)
+install(DIRECTORY extras/ DESTINATION share/extempore/extras)
