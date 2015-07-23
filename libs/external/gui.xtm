@@ -807,7 +807,7 @@ several different editors."
                           (tref bounds 0)
                           (tref bounds 1)
                           (tref bounds 2)
-                          (string_cstr text) null
+                          (String_cstr text) null
                           b_ptr)
         (set! textbox_height (- (pref b_ptr 3) (pref b_ptr 1)))
         ;; draw text
@@ -815,7 +815,7 @@ several different editors."
                     (tref bounds 0)
                     (+ (tref bounds 1) (/ (+ (tref bounds 3) textbox_height) 2.0))
                     (tref bounds 2)
-                    (string_cstr text) null)))))
+                    (String_cstr text) null)))))
 
 (bind-func gui_draw_rect
   (lambda (bounds:Rect*)
@@ -957,9 +957,10 @@ The widget will be assigned the next available id based on the current state of 
 ;; radio
 
 (bind-func Widget_radio_c
-  (lambda (label:i8* cb:[void,i64]* nstates)
+  (lambda (label:i8* cb:[void,i32]* nstates:i32)
     (let ((lab (Str label))
-          (state:i64 0)
+          (state:i32 0)
+          (old_state:i32 -1)
           (click_p:i1 0)
           (prev_click_p:i1 0))
       (lambda (widget:Widget* bounds:Rect*)
@@ -977,9 +978,11 @@ The widget will be assigned the next available id based on the current state of 
           (set! click_p (gui_left_click_p bounds))
           (if (and click_p (not prev_click_p))
               (begin
-                (set! state (convert (* (convert state float) pos)))
-                ;; fire callback
-                (cb state)))
+                (set! state (convert (* (convert nstates float) pos)))
+                ;; fire callback if state has changed
+                (if (<> state old_state)
+                    (cb state))
+                (set! old_state state)))
           (set! prev_click_p click_p)
           ;; draw widgets
           (doloop (i nstates)
@@ -997,11 +1000,13 @@ The widget will be assigned the next available id based on the current state of 
                         (tref bounds 2)
                         (/ (tref bounds 3) (convert nstates))))
             (nvgBeginPath vg)
+            (_nvgStrokeColor vg GUI_COLOR_BG)
             (if (= i state)
                 (_nvgFillColor vg GUI_COLOR_MAGENTA_L)
                 (_nvgFillColor vg GUI_COLOR_MAGENTA_D))
             (gui_draw_rect button_bounds)
-            (nvgFill vg))
+            (nvgFill vg)
+            (nvgStroke vg))
           ;; (_nvgFillColor vg GUI_COLOR_BG)
           ;; (nvgBeginPath vg)
           ;; (gui_draw_text_in_bounds bounds lab 30.)
@@ -1018,7 +1023,7 @@ The widget will be assigned the next available id based on the current state of 
 The widget will be assigned the next available id based on the current state of the GUI
 "
   (lambda (label:i8* cb nstates)
-    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON_CHECKBOX (Widget_radio_c label cb))))
+    (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON_CHECKBOX (Widget_radio_c label cb nstates))))
 
 (bind-func Widget_radio_with_id
   "create a radio button widget with a specified id
@@ -1029,7 +1034,7 @@ The widget will be assigned the next available id based on the current state of 
 @param id - an id handle for the widget
 "
   (lambda (label:i8* cb nstates id)
-    (Widget_with_cb id .5 GUI_BUTTON_CHECKBOX (Widget_radio_c label cb))))
+    (Widget_with_cb id .5 GUI_BUTTON_CHECKBOX (Widget_radio_c label cb nstates))))
 
 (bind-poly Widget_radio Widget_radio_with_id)
 (bind-poly Widget_radio Widget_radio_next_id)
