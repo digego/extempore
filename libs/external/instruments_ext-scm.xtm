@@ -461,12 +461,14 @@
 
 ;; (set-sample-offset sampler 60 50000)
 ;; this would offset the sample at index 60 by 50000 samples
-(define-macro (set-sample-offset inst index offset)
+(define-macro (set-sample-offset inst index bank offset)
   `(let ((native (llvm:get-native-closure ,(symbol->string inst))))
      (if (cptr? native)
          (set_sample_offset_ native
                              (real->integer ,index)
+                             (real->integer ,bank)
                              (real->integer ,offset)))))
+
 
 
 (define-macro (load-sampler sampler path . args)
