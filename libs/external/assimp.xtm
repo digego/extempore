@@ -17,8 +17,7 @@
  (sys:load "libs/external/graphics-pipeline.xtm")
  (sys:load "libs/external/soil.xtm"))
 (impc:aot:insert-forms
- (sys:load "libs/external/graphics-pipeline.xtm" 'quiet))
-(impc:aot:insert-forms
+ (sys:load "libs/external/graphics-pipeline.xtm" 'quiet)
  (sys:load "libs/external/soil.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmassimp")
@@ -54,9 +53,9 @@
   (lambda (path idx:i32)
     (let ((res (SOIL_load_OGL_texture path 4 idx (+ 4 8 16)))) ; (+ 512 16))))
       (if (= res 0)
-	  (begin (printf "failed (%lld) to load %s\n" res path)
+          (begin (printf "failed (%lld) to load %s\n" res path)
                  0)
-	  (begin (printf "...tex:> id(%d) loaded path:%s\n" res path)
+          (begin (printf "...tex:> id(%d) loaded path:%s\n" res path)
                  res)))))
 
 ;; load texture and returns texture number
@@ -70,9 +69,9 @@
     (let ((res (SOIL_load_OGL_texture_from_memory data datalgth 4 idx (+ 4 8 16)))) ; (+ 512 16))))
       (printf "loaded ogl texture %d\n" res)
       (if (= res 0)
-	  (begin (printf "failed (%d) to load embedded texture\n" res)
+          (begin (printf "failed (%d) to load embedded texture\n" res)
                  0)
-	  (begin (printf "...tex:> id(%d) loaded embedded texture\n" res)
+          (begin (printf "...tex:> id(%d) loaded embedded texture\n" res)
                  res)))))
 
 
@@ -114,7 +113,7 @@
 (bind-val aiProcess_Debone i32 67108864)
 
 (bind-type aiString <size_t,|1024,i8|>)
-;(llvm:compile "%aiString = type {i64, |1024xi8|}
+                                        ;(llvm:compile "%aiString = type {i64, |1024xi8|}
 (bind-type aiMatrix4x4 <float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float>)
 (bind-type aiMatrix3x3 <float,float,float,float,float,float,float,float,float>)
 (bind-type aiVector4D <float,float,float,float>)
@@ -196,7 +195,6 @@
   (lambda (mat pkey type index pout)
     (aiGetMaterialFloatArray mat pkey type index pout null)))
 
-
 (bind-func ai_copy_matrix4
   (lambda (src:aiMatrix4x4* dest:aiMatrix4x4*)
     (tset! dest 0 (tref src 0))
@@ -237,74 +235,11 @@
     (pset! mat2 15 (tref mat1 15))
     void))
 
-
-(bind-func aisgl_min
-  (lambda (a:float b:float)
-    (if (< a b) a b)))
-
-
-(bind-func aisgl_max
-  (lambda (a:float b:float)
-    (if (> a b) a b)))
-
-
 (bind-func ai_print_string
   (lambda (str:aiString*)
     (let ((size (tref str 0))
-	  (dat (bitcast (tref-ptr str 1) i8*)))
+          (dat (bitcast (tref-ptr str 1) i8*)))
       (printf "%.*s\n" size dat))))
-
-
-;; (bind-func ai_get_bounding_box_for_node
-;;   (lambda (scene:aiScene* nd:aiNode* min:aiVector3D* max:aiVector3D* trafo:aiMatrix4x4*)
-;;     (let ((prev:aiMatrix4x4* (stack-alloc))
-;; 	  (prevarr (bitcast prev float*))
-;;           (n:i32 0)
-;;           (nn:i32 0)
-;;           (t:i32 0)
-;; 	  (minarr (bitcast min float*))
-;; 	  (maxarr (bitcast max float*))
-;; 	  (trafoarr (bitcast trafo float*)))
-;;       (ai_copy_matrix4 trafo prev)
-;;       (aiMultiplyMatrix4 trafo (tref-ptr nd 1))
-;;       ;(printf "meshes: %lld\n" (tref nd 5))
-;;       (dotimes (n (tref nd 5))
-;; 	;(printf "n: %lld\n" n)
-;; 	(let ((mesh (pref (tref scene 3) (pref (tref nd 6) n)))
-;; 	      (verts (tref mesh 3)))
-;; 	  ;(printf "verts: %lld\n" (tref mesh 1))
-;; 	  (dotimes (t (tref mesh 1))	   
-;; 	    (let ((tmp (pref-ptr verts t))
-;; 		  (tmparr (bitcast tmp float*)))
-;; 	      (aiTransformVecByMatrix4 tmp trafo)
-;; 	      (tset! min 0 (aisgl_min (tref min 0) (tref tmp 0)))
-;; 	      (tset! min 1 (aisgl_min (tref min 1) (tref tmp 1)))
-;; 	      (tset! min 2 (aisgl_min (tref min 2) (tref tmp 2)))
-;; 	      (tset! max 0 (aisgl_max (tref max 0) (tref tmp 0)))
-;; 	      (tset! max 1 (aisgl_max (tref max 1) (tref tmp 1)))
-;; 	      (tset! max 2 (aisgl_max (tref max 2) (tref tmp 2)))))))
-      
-;;       (dotimes (nn (tref nd 3))
-;; 	(let ((mynodes (tref nd 4))
-;; 	      (next-node (pref mynodes nn)))
-;; 	  ;(printf "node %d:%d\n" nn (tref nd 3))
-;; 	  (ai_get_bounding_box_for_node scene next-node min max trafo)))
-;;       (ai_copy_matrix4 prev trafo))))
-
-
-;; (bind-func ai_get_bounding_box
-;;   (lambda (scene:aiScene* min:aiVector3D* max:aiVector3D*)
-;;     (let ((trafo:aiMatrix4x4* (stack-alloc))
-;;           (i 0)
-;; 	  (minarr:float* (cast min))
-;; 	  (maxarr:float* (cast max)))
-;;       (aiIdentityMatrix4 trafo)
-;;       (dotimes (i 3)
-;; 	(pset! minarr i 123151.0)
-;; 	(pset! maxarr i -123151.0))
-;;       ;(printf "number of node meshes %d\n" (tref (tref scene 1) 5))
-;;       (ai_get_bounding_box_for_node scene (tref scene 1) min max trafo))))
-
 
 (bind-func ai_color4_to_float4
   (lambda (colour:aiColor4D* dat:float*)
@@ -313,69 +248,6 @@
     (pset! dat 2 (tref colour 2))
     (pset! dat 3 (tref colour 3))
     1))
-
-;; need to move this file fully to the OpenGL 3.2+ , after which we
-;; won't need this fixed-function pipeline stuff
-
-(bind-val GL_EMISSION i32 #x1600)
-(bind-val GL_AMBIENT i32 #x1200)
-(bind-val GL_DIFFUSE i32 #x1201)
-(bind-val GL_SPECULAR i32 #x1202)
-(bind-lib libGL glMaterialfv [void,GLenum,GLenum,GLfloat*])
-
-(bind-func ai_apply_material
-  (lambda (mtl:aiMaterial* idx:i32)
-    (let ((c1:|4,float|* (salloc))
-          (c:float* (cast c1))
-	  (diffuse:aiColor4D* (salloc))
-	  (specular:aiColor4D* (salloc))
-	  (ambient:aiColor4D* (salloc))
-	  (emission:aiColor4D* (salloc))
-	  (max_:i32* (salloc))
-	  (wireframe:i32* (salloc))
-	  (two_sided:i32* (salloc))
-	  (shininess:float* (salloc))
-	  (strength:float* (salloc))
-	  (name:aiString* (salloc))
-	  (texfile:aiString* (salloc)))
-
-      ;; PRINT MATERIAL PARAMS
-      ;; mKey(0),mSemantic(1),mIndex(2),mDataLength(3),mType(4),mData(5)
-      (aiGetMaterialString mtl "?mat.name" 0 0 name)      
-      (printf "material %d name: " (+ idx 1))
-      (ai_print_string name)
-
-      ;; (printf "textures: diffuse:%d ambient:%d specular:%d normals:%d unknown:%d\n"
-      ;; 	      (aiGetMaterialTextureCount mtl 1)
-      ;; 	      (aiGetMaterialTextureCount mtl 3)
-      ;; 	      (aiGetMaterialTextureCount mtl 2)
-      ;; 	      (aiGetMaterialTextureCount mtl 6)
-      ;; 	      (aiGetMaterialTextureCount mtl 12))
-
-      
-      (if (= (aiGetMaterialTexture mtl 1 0 texfile null null null null null null) 0)
-	  (begin (printf "bind to index:%d texture name: " (+ 1 idx))
-		 (ai_print_string texfile)
-		 (glBindTexture GL_TEXTURE_2D (+ 1 idx))))
-
-      (pfill! c 0.8 0.8 0.8 1.0)      
-      (glMaterialfv GL_FRONT_AND_BACK GL_DIFFUSE c)
-      
-      (pfill! c 0.0 0.0 0.0 1.0)      
-      (glMaterialfv GL_FRONT_AND_BACK GL_SPECULAR c)
-
-      (pfill! c 0.0 0.0 0.0 1.0)      
-      (glMaterialfv GL_FRONT_AND_BACK GL_AMBIENT c)
-
-      (pfill! c 0.0 0.0 0.0 1.0)      
-      (glMaterialfv GL_FRONT_AND_BACK GL_EMISSION c)
-
-      (if (and (= (begin (pset! max_ 0 1)
-                         (aiGetMaterialIntegerArray mtl "$mat.twosided" 0 0 two_sided max_)) 0)
-      	       (= (pref two_sided 0) 1))
-      	  (glEnable GL_CULL_FACE)
-      	  (glDisable GL_CULL_FACE)))))
-
 
 ;; mode is a bit of a dodge
 ;; it basically returns whatever the
@@ -469,7 +341,6 @@
       (let ((vbo (VBO_create vbodata (convert (* positions vbostride) i64) GL_STATIC_DRAW)))
         (glBindBuffer GL_ARRAY_BUFFER 0)
         vbo))))
- 
 
 (bind-func ai_build_mesh
   (lambda (scene:aiScene* mesh:aiMesh* aimesh:xtm_mesh* dir:i8*)
@@ -530,8 +401,6 @@
       (tset! aimesh 8 (pref facemode 0))
       void)))
 
-
-
 ;; returns the scenes top level node as xtm_node*
 (bind-func ai_build_node
   (lambda (scene:aiScene* node:aiNode* _node:xtm_node* parent:xtm_node* dir:i8*)
@@ -563,7 +432,6 @@
         (ai_build_mesh scene (pref meshes (pref (tref node 6) i)) (pref-ptr _meshes i) dir))
       (tset! _node 6 _meshes)
       void)))
-
 
 ;; returns the scenes top level node as xtm_node*
 (bind-func ai_build_scene  
@@ -598,7 +466,7 @@
                  (ai_build_scene scene dir))))
         (if (not (null? scene))
             (begin ;; (printf "delete scene: %p\n" scene)
-                   (aiReleaseImport scene)))
+              (aiReleaseImport scene)))
         root))))
 
 (bind-func assimp_load_model_b
@@ -634,43 +502,40 @@
         (assimp_draw_node (pref-ptr children i) shader model view projection lights light))
       void)))
 
-
 (bind-func assimp_draw_model
   (lambda (scene:xtm_node* shader:i32 model view projection lights light)
     (assimp_draw_node scene shader model view projection lights light)
     void))
 
-
 (bind-func ai_load_textures
   (lambda (scene:aiScene*)
     (let ((materials (tref scene 5))
-	  (num-of-mats (tref scene 4))
+          (num-of-mats (tref scene 4))
           (i:i32 0))
       (dotimes (i num-of-mats) 
-	(let ((mtl (pref materials i))
-	      (name:aiString* (salloc))
-	      (texfile:aiString* (salloc)))
-	  (if (= (aiGetMaterialTexture mtl 1 0 texfile null null null null null null) 0)
-	      (begin (aiGetMaterialString mtl "?mat.name" 0 0 name)      
-		     (printf "load texture for material %d name: " (+ 1 i))
-		     (ai_print_string name)
-		     (printf "textures: diffuse:%d specular:%d ambient:%d emissive:%d hight:%d normals:%d shininess:%d opacity:%d displacement:%d lightmap:%d reflect:%d unknown:%d\n"
-			     (aiGetMaterialTextureCount mtl 1)
-			     (aiGetMaterialTextureCount mtl 2)			     
-			     (aiGetMaterialTextureCount mtl 3)
-			     (aiGetMaterialTextureCount mtl 4)
-			     (aiGetMaterialTextureCount mtl 5)			     
-			     (aiGetMaterialTextureCount mtl 6)
-			     (aiGetMaterialTextureCount mtl 7)
-			     (aiGetMaterialTextureCount mtl 8)
-			     (aiGetMaterialTextureCount mtl 9)			     
-			     (aiGetMaterialTextureCount mtl 10)
-			     (aiGetMaterialTextureCount mtl 11)			     
-			     (aiGetMaterialTextureCount mtl 12))		     
-		     (printf "texture name: ")
-		     (ai_print_string texfile)
-		     (ai_load_ogl_texture (bitcast (tref-ptr texfile 1) i8*) (+ 1 i)))))))))
-
+        (let ((mtl (pref materials i))
+              (name:aiString* (salloc))
+              (texfile:aiString* (salloc)))
+          (if (= (aiGetMaterialTexture mtl 1 0 texfile null null null null null null) 0)
+              (begin (aiGetMaterialString mtl "?mat.name" 0 0 name)      
+                     (printf "load texture for material %d name: " (+ 1 i))
+                     (ai_print_string name)
+                     (printf "textures: diffuse:%d specular:%d ambient:%d emissive:%d hight:%d normals:%d shininess:%d opacity:%d displacement:%d lightmap:%d reflect:%d unknown:%d\n"
+                             (aiGetMaterialTextureCount mtl 1)
+                             (aiGetMaterialTextureCount mtl 2)			     
+                             (aiGetMaterialTextureCount mtl 3)
+                             (aiGetMaterialTextureCount mtl 4)
+                             (aiGetMaterialTextureCount mtl 5)			     
+                             (aiGetMaterialTextureCount mtl 6)
+                             (aiGetMaterialTextureCount mtl 7)
+                             (aiGetMaterialTextureCount mtl 8)
+                             (aiGetMaterialTextureCount mtl 9)			     
+                             (aiGetMaterialTextureCount mtl 10)
+                             (aiGetMaterialTextureCount mtl 11)			     
+                             (aiGetMaterialTextureCount mtl 12))		     
+                     (printf "texture name: ")
+                     (ai_print_string texfile)
+                     (ai_load_ogl_texture (bitcast (tref-ptr texfile 1) i8*) (+ 1 i)))))))))
 
 (bind-func ai_print_export_formats
   (lambda ()
