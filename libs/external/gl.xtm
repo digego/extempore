@@ -2930,16 +2930,18 @@
 
 (bind-func VBO_print
   (lambda (vbo:VBO*)
-    (printf "VBO: <id=%d type=%s nbytes=%d data=%p>"
-            (tref vbo 0)
-            (let ((type (VBO_type vbo)))
-              (cond ((= type GL_BYTE) "byte")
-                    ((= type GL_SHORT) "short")
-                    ((= type GL_INT) "int")
-                    ((= type GL_FLOAT) "float")
-                    (else "unknown")))
-            (tref vbo 2)
-            (tref vbo 3))
+    (if (null? vbo)
+        (printf "<VBO: 0x0>")
+        (printf "<VBO: id=%d type=%s nbytes=%d data=%p>"
+                (tref vbo 0)
+                (let ((type (VBO_type vbo)))
+                  (cond ((= type GL_BYTE) "byte")
+                        ((= type GL_SHORT) "short")
+                        ((= type GL_INT) "int")
+                        ((= type GL_FLOAT) "float")
+                        (else "unknown")))
+                (tref vbo 2)
+                (tref vbo 3)))
     void))
 
 (bind-poly print VBO_print)
@@ -2947,16 +2949,18 @@
 (bind-func VBO_toString
   (lambda (vbo:VBO*)
     (let ((s:i8* (salloc 256)))
-      (sprintf s "VBO: <id=%d type=%s nbytes=%d data=%p>"
-               (tref vbo 0)
-               (let ((type (VBO_type vbo)))
-                 (cond ((= type GL_BYTE) "byte")
-                       ((= type GL_SHORT) "short")
-                       ((= type GL_INT) "int")
-                       ((= type GL_FLOAT) "float")
-                       (else "unknown")))
-               (tref vbo 2)
-               (tref vbo 3))
+      (if (null? vbo)
+          (sprintf s "<VBO: 0x0>")
+          (sprintf s "<VBO: id=%d type=%s nbytes=%d data=%p>"
+                   (tref vbo 0)
+                   (let ((type (VBO_type vbo)))
+                     (cond ((= type GL_BYTE) "byte")
+                           ((= type GL_SHORT) "short")
+                           ((= type GL_INT) "int")
+                           ((= type GL_FLOAT) "float")
+                           (else "unknown")))
+                   (tref vbo 2)
+                   (tref vbo 3)))
       (Str s))))
 
 (bind-poly toString VBO_toString)
@@ -3061,7 +3065,9 @@
 
 (bind-func VAO_print
   (lambda (vao:VAO*)
-    (printf "<VAO: id %d>" (tref vao 0))
+    (if (null? vao)
+        (printf "<VAO: 0x0>")
+        (printf "<VAO: id %d>" (tref vao 0)))
     void))
 
 (bind-poly print VAO_print)
@@ -3069,7 +3075,9 @@
 (bind-func VAO_toString
   (lambda (vao:VAO*)
     (let ((s:i8* (salloc 256)))
-      (sprintf s "<VAO: id %d>" (tref vao 0))
+      (if (null? vao)
+          (sprintf s "<VAO: 0x0>")
+          (sprintf s "<VAO: id %d>" (tref vao 0)))
       (Str s))))
 
 (bind-poly toString VAO_toString)
@@ -3358,15 +3366,31 @@
 
 (bind-func FBO_print
   (lambda (fbo:FBO*)
-    (printf "<FBO: id=%d color_tex=%d depth_tex=%d width=%d height=%d>"
-            (FBO_id fbo)
-            (FBO_color_texture fbo)
-            (FBO_depth_texture fbo)
-            (FBO_width fbo)
-            (FBO_height fbo))
+    (if (null? fbo)
+        (printf "<FBO: 0x0>")
+        (printf "<FBO: id=%d color_tex=%d depth_tex=%d width=%d height=%d>"
+                (FBO_id fbo)
+                (FBO_color_texture fbo)
+                (FBO_depth_texture fbo)
+                (FBO_width fbo)
+                (FBO_height fbo)))
     void))
 
+(bind-func FBO_toString
+  (lambda (fbo:FBO*)
+    (let ((str:i8* (zalloc 256)))
+      (if (null? fbo)
+          (sprintf str "<FBO: 0x0>")
+          (sprintf str "<FBO: id=%d color_tex=%d depth_tex=%d width=%d height=%d>"
+                   (FBO_id fbo)
+                   (FBO_color_texture fbo)
+                   (FBO_depth_texture fbo)
+                   (FBO_width fbo)
+                   (FBO_height fbo)))
+      (Str str))))
+
 (bind-poly print FBO_print)
+(bind-poly toString FBO_toString)
 
 ;; create FBOs
 
@@ -3410,16 +3434,20 @@
       (if depth_p
           (set! depth_tex (Texture_create_FBO_depth_texture width height)))
       (if (<> (glCheckFramebufferStatus GL_FRAMEBUFFER) GL_FRAMEBUFFER_COMPLETE)
-          (println "Error creating framebuffer"))
-      (gl_print_error "Error creating FBO & backing textures")
-      ;; fill the FBO tuple with metadata
-      (tfill! fbo
-              (FBO_id fbo)
-              color_tex
-              depth_tex
-              width
-              height)
-      fbo)))
+          (begin
+            (println "Error creating framebuffer")
+            (gl_print_error "Error creating FBO & backing textures")
+            ;; return null pointer for fbo
+            null)
+          ;; fill the FBO tuple with metadata
+          (begin
+            (tfill! fbo
+                    (FBO_id fbo)
+                    color_tex
+                    depth_tex
+                    width
+                    height)
+            fbo)))))
 
 ;; from glext.h
 (bind-val GL_TEXTURE_RECTANGLE_ARB i32 #x84F5)
