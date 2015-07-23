@@ -897,13 +897,13 @@
         (glUseProgram xtm_render_dof_shader)
         (shader_update_matrices xtm_render_dof_shader model view projection)
         (glActiveTexture GL_TEXTURE0)            
-        (glBindTexture GL_TEXTURE_2D (tref fbo 2))
+        (glBindTexture GL_TEXTURE_2D (FBO_depth_texture fbo))
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
         (glActiveTexture GL_TEXTURE2)
-        (glBindTexture GL_TEXTURE_2D (tref fbo 1))
+        (glBindTexture GL_TEXTURE_2D (FBO_color_texture fbo))
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
@@ -1019,7 +1019,7 @@
             (xtm_camera_view view)       ;; set view
             (fill_identity_matrix model) ;; set model
             (pre frame 0 model view projection data)))
-      (glBindFramebuffer GL_FRAMEBUFFER (tref shadow_fbo 0))
+      (glBindFramebuffer GL_FRAMEBUFFER (FBO_id shadow_fbo))
       ;;(set! sh1 xtm_render_s1)
       (set! sh1 xtm_render_simple_shader)
       (glUseProgram sh1)
@@ -1049,13 +1049,13 @@
       ;; make sure we are not writing to a framebuffer!
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       ;; actually we want to render to the render fbo
-      (glBindFramebuffer GL_FRAMEBUFFER (tref render_fbo 0))
+      (glBindFramebuffer GL_FRAMEBUFFER (FBO_id render_fbo))
       (set! sh2 (aref xtm_render_light_shaders activelights))
       ;;(set! sh2 (if (> activelights 0) xtm_render_s2 xtm_render_s3))
       (glUseProgram sh2)
       ;; setup shadowmap texture from FBO
       (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
-      (glBindTexture GL_TEXTURE_2D (tref shadow_fbo 2))      
+      (glBindTexture GL_TEXTURE_2D (FBO_depth_texture shadow_fbo))
       (glUniform1i (glGetUniformLocation sh2 "shadowMap") 0)      
       ;;(shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
       ;; draw scene
@@ -1085,7 +1085,7 @@
             (fill_identity_matrix model)
             (fill_identity_matrix view)         
             (fill_orthographic_matrix projection -0.5 0.5 -0.5 0.5 -0.5 0.5)          
-            (xtm_draw_tex xtm_render_quad_shader (tref render_fbo 1) model view projection))
+            (xtm_draw_tex xtm_render_quad_shader (FBO_color_texture render_fbo) model view projection))
           (begin
             ;; post is usually 2D? so no DEPTH test by default!
             (glDisable GL_DEPTH_TEST)                  
