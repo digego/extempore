@@ -848,11 +848,11 @@
 ;; compiling this will stop the callbacks
 ;;
 ;; of course we need to keep the type
-;; signature the same [void,i64,i64]*
+;; signature the same [i1,i64,i64]*
 ;;
 (bind-func test34
   (lambda (time:i64 count:i64)
-    void))
+    #t))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -938,6 +938,13 @@
 ;;
 ;; i8* is value  --- list_t* is next
 (bind-type list_t <i64,list_t*>)
+
+;; check for pointer address equality
+(bind-func list_t_equal
+  (lambda (list1:list_t* list2:list_t*)
+    (= (cast list1 i8*) (cast list2 i8*))))
+
+(bind-poly xtm_equal list_t_equal)
 
 ;; remove value from front of list
 (bind-func dequeue
@@ -1155,15 +1162,15 @@
         (f2:/4,float/* (alloc))
         (i:i32 0)
         (p_ 0.225)
-        (b_ (dtof (/ 4.0 PI)))
-        (c_ (dtof (/ -4.0 (* PI PI)))))
+        (b_ (dtof (/ 4.0 3.141592)))
+        (c_ (dtof (/ -4.0 (* 3.141592 3.141592)))))
     (dotimes (i 4) (vset! p i p_) (vset! b i b_) (vset! c i c_))
     (lambda (x:/4,float/)
       ;; no SIMD for abs yet!
-      (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
+      (dotimes (i 4) (vset! f1 i (fabs (vref x i))))
       (let ((y (+ (* b x) (* c x f1))))
         ;; no SIMD for abs yet!
-        (dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+        (dotimes (i 4) (vset! f2 i (fabs (vref y i))))
         (+ (* p (- (* y f2) y)) y)))))
 
 (bind-func vcosf4
@@ -1175,19 +1182,19 @@
         (f2:/4,float/* (alloc))
         (i:i32 0)
         (p_ 0.225)
-        (d_ (dtof (/ PI 2.0)))
-        (b_ (dtof (/ 4.0 PI)))
-        (c_ (dtof (/ -4.0 (* PI PI)))))
+        (d_ (dtof (/ 3.141592 2.0)))
+        (b_ (dtof (/ 4.0 3.141592)))
+        (c_ (dtof (/ -4.0 (* 3.141592 3.141592)))))
     (dotimes (i 4)
       (vset! p i p_) (vset! b i b_) (vset! c i c_) (vset! d i d_))
     (lambda (x:/4,float/)
       ;; offset x for cos
       (set! x (+ x d))
       ;; no SIMD for abs yet!
-      (dotimes (i 4) (vset! f1 i (fabsf (vref x i))))
+      (dotimes (i 4) (vset! f1 i (fabs (vref x i))))
       (let ((y (+ (* b x) (* c x f1))))
         ;; no SIMD for abs yet!
-        (dotimes (i 4) (vset! f2 i (fabsf (vref y i))))
+        (dotimes (i 4) (vset! f2 i (fabs (vref y i))))
         (+ (* p (- (* y f2) y)) y)))))
 
 

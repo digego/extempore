@@ -2292,6 +2292,10 @@
            (c (if (> args 2)
                   (impc:ti:type-unify (impc:ti:type-check (cadddr ast) vars kts request?) vars)
                   #f)))
+      (if (impc:ir:fixed-point? a)
+          (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type a)
+                                              (string-append "Only real numbers are supported for math intrinsics: "
+                                                             (symbol->string (car ast)))))
       (if (and b
                (not (equal? a b))
                (not (number? (cadr ast)))
@@ -6389,8 +6393,6 @@
 ;;                 (impc:print-bound-message ,symbol ,type)))
 ;;             (else (impc:compiler:print-missing-type-error type))))))
 
-
-
 ;; it needs to: work for
 ;; - primitives
 ;; - pointers to primitives
@@ -6421,8 +6423,12 @@
                                              " = dllexport global i8* zeroinitializer"))
                 (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
                                                                " \"" value "\")")))
-                ;;(llvm:bind-global-var ,(symbol->string symbol) ,(string->cptr value))
-                (impc:print-bound-message ,symbol ,type)))
+                (impc:compiler:print-binding-details-to-log "SetValue:" ',symbol ',type)
+                (sys:precomp:insert-sexp '(call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
+                                                                                         " \"" value "\")"))))
+
+                ))
+                ;; (impc:print-bound-message ,symbol ,type)))
             ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
                   (not (impc:ir:pointer? t))
                   (not (list? value)))
@@ -6453,16 +6459,32 @@
                                                      ") "
                                                      (atom->string type)
                                                      "))")))
-                    (impc:print-bound-message ,symbol ,type))
+                    ;; (sys:precomp:insert-sexp '(bind-val ,symbol ,type ,value))
+                    (impc:compiler:print-binding-details-to-log "SetValue:" ',symbol ',type)
+                    (sys:precomp:insert-sexp '(call-as-xtlang ,(string->sexpr
+                                                                (string-append "(set! " (symbol->string symbol)
+                                                                               " (cast (malloc "
+                                                                               (atom->string (* value
+                                                                                                (if (impc:ir:number? t)
+                                                                                                    (impc:ir:get-type-size t)
+                                                                                                    (/ (sys:pointer-size) 8))))
+                                                                               ") "
+                                                                               (atom->string type)
+                                                                               "))"))))
+                    )
+                    ;; (impc:print-bound-message ,symbol ,type))
                  (if (list? value)                     
                      `(begin
                         (llvm:compile (string-append "@" ,(symbol->string symbol)
                                                      " = dllexport global "
                                                      ,(impc:ir:get-type-str t)
-                                                     "zeroinitializer"))
+                                                     " zeroinitializer"))
                         (call-as-xtlang ,(string->sexpr (string-append "(begin (set! " (symbol->string symbol)
                                                                        " " (sexpr->string value) ") void)")))
-                        (impc:print-bound-message ,symbol ,type))
+                        (impc:compiler:print-binding-details-to-log "SetValue:" ',symbol ',type)
+                        (sys:precomp:insert-sexp '(call-as-xtlang ,(string->sexpr (string-append "(begin (set! " (symbol->string symbol) " " (sexpr->string value) ") void)"))))
+                        )
+                        ;;(impc:print-bound-message ,symbol ,type))
                      `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
             ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
              `(begin

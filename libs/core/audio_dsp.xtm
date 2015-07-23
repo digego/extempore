@@ -44,19 +44,35 @@
 (bind-val STWOPI SAMPLE 6.2831853071795864769252867665590057683943387987502116419498)
 (bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669)
 
-;; bind some global audio values
 (if (not (llvm:get-globalvar "SAMPLERATE"))
-    (begin (bind-val SAMPLERATE SAMPLE (integer->real *au:samplerate*))
-           (bind-val SRs SAMPLE (integer->real *au:samplerate*))
-           (bind-val SRf float (integer->real *au:samplerate*))
-           (bind-val SRd double (integer->real *au:samplerate*))           
-           (bind-val SR i64 *au:samplerate*)))
+    (begin (bind-val SAMPLERATE SAMPLE 44100.0)
+           (bind-val SRs SAMPLE 44100.0)
+           (bind-val SRf float 44100.0)
+           (bind-val SRd double 44100.0)
+           (bind-val SR i64 44100)))
 (if (not (llvm:get-globalvar "CHANNELS"))
-    (bind-val CHANNELS i64 *au:channels*))
+    (bind-val CHANNELS i64 2))
 (if (not (llvm:get-globalvar "IN_CHANNELS"))
-    (bind-val IN_CHANNELS i64 *au:in-channels*))
+    (bind-val IN_CHANNELS i64 0))
 (if (not (llvm:get-globalvar "FRAMES"))
-    (bind-val FRAMES i64 *au:block-size*))
+    (bind-val FRAMES i64 128))
+                  
+                  
+(bind-func init_audio_state
+  (lambda (srate:i64 channels:i64 frames:i64)
+    (set! SAMPLERATE (convert srate SAMPLE))
+    (set! SRs (convert srate SAMPLE))
+    (set! SRf (convert srate float))
+    (set! SRd (convert srate double))
+    (set! SR srate)    
+    (set! CHANNELS channels)
+    (set! FRAMES frames)
+    void))
+
+(init_audio_state *au:samplerate*
+                  *au:channels*
+                  *au:in-channels*
+                  *au:block-size*)
 
 (bind-func print_audio_state
   (lambda ()
