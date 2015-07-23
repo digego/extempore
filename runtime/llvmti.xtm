@@ -7728,8 +7728,9 @@
           (if (and (llvm:compile-ir ir-string)
                    (llvm:bind-symbol (eval library) (symbol->string symname)))
               (begin
-                (impc:aot:insert-forms
-                 `(llvm:bind-symbol ,library ,(symbol->string symname)))
+                (if (output-port? *impc:aot:current-output-port*)
+                    (begin (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
+                           (newline *impc:aot:current-output-port*)))
                 (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
                 (impc:aot:insert-nativefunc-binding-details library symname type docstring))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
@@ -7772,9 +7773,10 @@
                    (llvm:bind-global-var (symbol->string proc-name)
                                          (gl_get_proc_address (symbol->string proc-name))))
               (begin
-                (impc:aot:insert-forms
-                 `(llvm:bind-global-var ,(symbol->string proc-name)
-                                        (gl_get_proc_address ,(symbol->string proc-name))))
+                (if (output-port? *impc:aot:current-output-port*)
+                    (begin (write `(llvm:bind-global-var ,(symbol->string proc-name)
+                                                         (gl_get_proc_address ,(symbol->string proc-name))))
+                           (newline *impc:aot:current-output-port*)))
                 (impc:ti:register-new-nativefunc (symbol->string proc-name) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
                 (impc:aot:insert-nativefunc-binding-details 'libGL proc-name type ""))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string proc-name))))))))
