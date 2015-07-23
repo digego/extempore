@@ -1913,7 +1913,9 @@
                        (close-port *impc:aot:current-output-port*)
                        (set! *impc:aot:current-output-port* #f))
                 (begin
-                  ;; if the preload check passes
+                  ;; if the preload check passes, create aot-cache dir
+                  ;; if it doesn't exist
+                  (sys:command "[ ! -d libs/aot-cache ] && mkdir libs/aot-cache")
                   (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
