@@ -850,19 +850,19 @@
         (vbo:VBO* null)
         (vao:VAO* null))
     (afill! fullscreen_quad_verts
-            ;; pos       texcoord
-            -1.0  1.0    0.0 0.0
-             1.0  1.0    1.0 0.0
-            -1.0 -1.0    0.0 1.0
-             1.0 -1.0    1.0 1.0)
+            ;; pos     tex_coord
+            -1. -1.    0. 0.
+            -1.  1.    0. 1.
+             1. -1.    1. 0.
+             1.  1.    1. 1.)
     (lambda ()
-      (set! vbo (VBO_create (convert fullscreen_quad_verts float*) 16))
-      (set! vao (VAO_create))
+      (if (null? vbo)
+          (set! vbo (VBO_create (convert fullscreen_quad_verts float*) 16)))
+      (if (null? vao)
+          (set! vao (VAO_create)))
       (VAO_bind_attribute vao vbo 0 2 4 0) ;; position
       (VAO_bind_attribute vao vbo 1 2 4 2) ;; tex_coord
-      (VAO_bind_and_draw_arrays vao GL_TRIANGLE_STRIP 0 4)
-      (VBO_delete vbo)
-      (VAO_delete vao))))
+      (VAO_bind_and_draw_arrays vao GL_TRIANGLE_STRIP 0 4))))
 
 (bind-func xtm_draw_tex
   (lambda (shader:ShaderProgram tex:Texture m v p)
@@ -1003,29 +1003,29 @@
         (shadow_fbo:FBO* null)
         (render_fbo:FBO* null))
     (lambda (pre:XTMRENDERCB opaque:XTMRENDERCB transparent:XTMRENDERCB post:XTMRENDERCB data:i8*)
-      (set! shadow_fbo (xtm_shader_fbo))
+      (gl_print_error "check-0")(set! shadow_fbo (xtm_shader_fbo))
       (set! render_fbo (xtm_render_fbo))      
       ;; (glShadeModel GL_SMOOTH)
-      (glEnable GL_DEPTH_TEST)
-      (glEnable GL_TEXTURE_2D)
+      (gl_print_error "check-1")(glEnable GL_DEPTH_TEST)
+      (gl_print_error "check-2")(glEnable GL_TEXTURE_2D)
       ;; seutp projection matrix            
-      (fill_projection_matrix projection xtm_render_angle
+      (gl_print_error "check-3")(fill_projection_matrix projection xtm_render_angle
                               (i32tof (/ xtm_render_w xtm_render_h))
                               xtm_render_near xtm_render_far)
       (if (not (null? pre))
           (begin
             ;; each cycle set lights back to 0
-            (tset! (xtm_get_lights) 9 0)            
-            (xtm_camera_view view)       ;; set view
-            (fill_identity_matrix model) ;; set model
-            (pre frame 0 model view projection data)))
-      (glBindFramebuffer GL_FRAMEBUFFER (FBO_id shadow_fbo))
+            (gl_print_error "check-4")(tset! (xtm_get_lights) 9 0)            
+            (gl_print_error "check-5")(xtm_camera_view view)       ;; set view
+            (gl_print_error "check-6")(fill_identity_matrix model) ;; set model
+            (gl_print_error "check-7")(pre frame 0 model view projection data)))
+      (gl_print_error "check-8")(glBindFramebuffer GL_FRAMEBUFFER (FBO_id shadow_fbo))
       ;;(set! sh1 xtm_render_s1)
-      (set! sh1 xtm_render_simple_shader)
-      (glUseProgram sh1)
+      (gl_print_error "check-9")(set! sh1 xtm_render_simple_shader)
+      (gl_print_error "check-:")(glUseProgram sh1)
       ;; clear shadow buffer
-      (glClearColor 0.0 0.0 0.0 1.0)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      (gl_print_error "check-;")(glClearColor 0.0 0.0 0.0 1.0)
+      (gl_print_error "check-<")(glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (if (not (null? opaque))
           (dotimes (i (tref lights 9))
             ;; 4 x 4 shadow texture texture
@@ -1037,8 +1037,8 @@
             (xtm_update_matrices sh1 model view projection)
             (opaque frame sh1 model view projection data)))
       ;; turn off shadow FBO
-      (glBindFramebuffer GL_FRAMEBUFFER 0)
-      (glUseProgram 0)
+      (gl_print_error "check-=")(glBindFramebuffer GL_FRAMEBUFFER 0)
+      (gl_print_error "check->")(glUseProgram 0)
       ;;
       (set! activelights (tref lights 9))
       (if (> activelights 5) (set! activelights (i64toi32 5)))
@@ -1047,38 +1047,38 @@
       ;; using the shadow FBO's depth buffer as a shadow map
       ;;      
       ;; make sure we are not writing to a framebuffer!
-      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      (gl_print_error "check-?")(glBindFramebuffer GL_FRAMEBUFFER 0)
       ;; actually we want to render to the render fbo
-      (glBindFramebuffer GL_FRAMEBUFFER (FBO_id render_fbo))
-      (set! sh2 (aref xtm_render_light_shaders activelights))
+      (gl_print_error "check-@")(glBindFramebuffer GL_FRAMEBUFFER (FBO_id render_fbo))
+      (gl_print_error "check-A")(set! sh2 (aref xtm_render_light_shaders activelights))
       ;;(set! sh2 (if (> activelights 0) xtm_render_s2 xtm_render_s3))
-      (glUseProgram sh2)
+      (gl_print_error "check-B")(glUseProgram sh2)
       ;; setup shadowmap texture from FBO
-      (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
-      (glBindTexture GL_TEXTURE_2D (FBO_depth_texture shadow_fbo))
-      (glUniform1i (glGetUniformLocation sh2 "shadowMap") 0)      
+      (gl_print_error "check-C")(glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
+      (gl_print_error "check-D")(glBindTexture GL_TEXTURE_2D (FBO_depth_texture shadow_fbo))
+      (gl_print_error "check-E")(glUniform1i (glGetUniformLocation sh2 "shadowMap") 0)      
       ;;(shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
       ;; draw scene
-      (glViewport xtm_render_x xtm_render_y xtm_render_w xtm_render_h)
-      (glDisable GL_CULL_FACE) ;; turn face culling off
+      (gl_print_error "check-F")(glViewport xtm_render_x xtm_render_y xtm_render_w xtm_render_h)
+      (gl_print_error "check-G")(glDisable GL_CULL_FACE) ;; turn face culling off
       ;; clear main framebuffer
-      (glClearColor 0.0 0.0 0.0 1.0)
+      (gl_print_error "check-H")(glClearColor 0.0 0.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (if (not (null? opaque))
           (begin
             ;; setup matrices
-            (xtm_camera_view view)       ;; setup view
-            (fill_identity_matrix model) ;; setup model
-            (xtm_update_lights sh2) ;; update lights on shader
-            (xtm_update_camera sh2) ;; update camera on shader
-            (xtm_update_matrices sh2 model view projection) ;; update mats on shader
-            (opaque frame sh2 model view projection data)))
+            (gl_print_error "check-in0")(xtm_camera_view view)       ;; setup view
+            (gl_print_error "check-in1")(fill_identity_matrix model) ;; setup model
+            (gl_print_error "check-in2")(xtm_update_lights sh2) ;; update lights on shader
+            (gl_print_error "check-in3")(xtm_update_camera sh2) ;; update camera on shader
+            (gl_print_error "check-in4")(xtm_update_matrices sh2 model view projection) ;; update mats on shader
+            (gl_print_error "check-in5")(opaque frame sh2 model view projection data)))
       ;; turn everything off again.
-      (glActiveTexture GL_TEXTURE0)
-      (glBindTexture GL_TEXTURE_2D 0)
+      (gl_print_error "check-I")(glActiveTexture GL_TEXTURE0)
+      (gl_print_error "check-J")(glBindTexture GL_TEXTURE_2D 0)
       ;;
-      (glBindFramebuffer GL_FRAMEBUFFER 0)
-      (glUseProgram 0)
+      (gl_print_error "check-K")(glBindFramebuffer GL_FRAMEBUFFER 0)
+      (gl_print_error "check-L")(glUseProgram 0)
       (if (null? post)
           (begin ;; if no post then just render fbo            
             (glDisable GL_DEPTH_TEST)
@@ -1096,7 +1096,7 @@
             ;; the post processing stage.
             (post frame xtm_render_quad_shader model view projection data)))
       ;;
-      (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
+      (gl_print_error "check-M")(glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
       ;; print errors?
       (gl_print_error)
       (set! frame (+ frame 1)))))
