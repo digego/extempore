@@ -41,19 +41,22 @@
 ;; make sure you include / on the end
 (define path "assets/models/")
 
-(define fullscreen #f)
-;; (define width 1920.0)
-;; (define height 1200.0)
-(define width 1024.0)
-(define height 768.0)
-
-(bind-val width float width)
-(bind-val height float height)
-
-;; setup opengl
-(define glctx (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
-
+(sys:load "libs/external/glfw3.xtm")
 (sys:load "libs/external/assimp.xtm")
+
+(bind-val window GLFWwindow*)
+
+(define width 1024)
+(define height 768)
+(bind-val width i32 width)
+(bind-val height i32 height)
+
+;; create a window
+(call-as-xtlang
+ (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+ ;; some of the shaders in the graphics pipeline use older glsl
+ ;; versions, so we need a "compatibility" graphics context
+ (set! window (glfw_init_and_create_compatibility_window width height)))
 
 (bind-func build_pyramid_node
   (lambda (size:float)
