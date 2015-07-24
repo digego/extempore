@@ -17,9 +17,9 @@
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/math.xtm")
- (sys:load "libs/external/gl.xtm"))
-(impc:aot:insert-forms (sys:load "libs/core/math.xtm" 'quiet))
-(impc:aot:insert-forms (sys:load "libs/external/gl.xtm" 'quiet))
+ (sys:load "libs/external/gl-compatibility.xtm"))
+(impc:aot:insert-forms (sys:load "libs/core/math.xtm" 'quiet)
+                       (sys:load "libs/external/gl-compatibility.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmgraphics-pipeline")
 
@@ -416,6 +416,110 @@
     (glUniform1f (glGetUniformLocation id "MaterialShininess") shininess)
     void))
 
+;; Vertex Buffer Object
+
+;; id, type, size (bytes), data
+(bind-type VBO <GLuint,GLenum,GLsizeiptr,GLvoid*>)
+
+;; accessors
+
+(bind-func VBO_id
+  (lambda (vbo:VBO*)
+    (tref vbo 0)))
+
+(bind-func VBO_type
+  (lambda (vbo:VBO*)
+    (tref vbo 1)))
+
+(bind-func VBO_size
+  (lambda (vbo:VBO*)
+    (tref vbo 2)))
+
+(bind-func VBO_data
+  (lambda (vbo:VBO*)
+    (tref vbo 3)))
+
+(bind-func VBO_print
+  (lambda (vbo:VBO*)
+    (if (null? vbo)
+        (printf "<VBO: 0x0>")
+        (printf "<VBO: id=%d type=%s nbytes=%d data=%p>"
+                (tref vbo 0)
+                (let ((type (VBO_type vbo)))
+                  (cond ((= type GL_BYTE) "byte")
+                        ((= type GL_SHORT) "short")
+                        ((= type GL_INT) "int")
+                        ((= type GL_FLOAT) "float")
+                        (else "unknown")))
+                (tref vbo 2)
+                (tref vbo 3)))
+    void))
+
+(bind-poly print VBO_print)
+
+(bind-func VBO_toString
+  (lambda (vbo:VBO*)
+    (let ((s:i8* (salloc 256)))
+      (if (null? vbo)
+          (sprintf s "<VBO: 0x0>")
+          (sprintf s "<VBO: id=%d type=%s nbytes=%d data=%p>"
+                   (tref vbo 0)
+                   (let ((type (VBO_type vbo)))
+                     (cond ((= type GL_BYTE) "byte")
+                           ((= type GL_SHORT) "short")
+                           ((= type GL_INT) "int")
+                           ((= type GL_FLOAT) "float")
+                           (else "unknown")))
+                   (tref vbo 2)
+                   (tref vbo 3)))
+      (Str s))))
+
+(bind-poly toString VBO_toString)
+
+(bind-func VBO_create_float
+  (lambda (buf:float* buflen)
+    (let ((vbo:VBO* (halloc))
+          (id:GLuint* (salloc)))
+      (glGenBuffers 1 id)
+      (gl_print_error "Error creating VBO")
+      (tfill! vbo
+              (pref id 0)
+              GL_FLOAT
+              (* buflen 4) ;; sizeof(float)
+              (cast buf GLvoid*))
+      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
+      (gl_print_error "Error setting VBO data")
+      (printf "Created ") (VBO_print vbo) (printf "\n")
+      vbo)))
+
+(bind-func VBO_create_float_usage
+  (lambda (buf:float* buflen usage)
+    (let ((vbo:VBO* (halloc))
+          (id:GLuint* (salloc)))
+      (glGenBuffers 1 id)
+      (gl_print_error "Error creating VBO")
+      (tfill! vbo
+              (pref id 0)
+              GL_FLOAT
+              (* buflen 4) ;; sizeof(float)
+              (cast buf GLvoid*))
+      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
+      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) usage)
+      (gl_print_error "Error setting VBO data")
+      (printf "Created ") (VBO_print vbo) (printf "\n")
+      vbo)))
+
+(bind-poly VBO_create VBO_create_float)
+(bind-poly VBO_create VBO_create_float_usage)
+
+(bind-func VBO_delete
+  (lambda (vbo:VBO*)
+    (let ((id:GLuint* (salloc)))
+      (pset! id 0 (VBO_id vbo))
+      (glDeleteBuffers 1 id)
+      (gl_print_error "Error deleting VBO")
+      (free vbo))))
 
 ;; vbo(0),texid(1),diffuse(2),ambient(3),specular(4),emissive(5),shininess(6),opacity(7),facemode(8) (GL_TRIANGLE,GL_QUAD etc..)
 (bind-type xtm_mesh <VBO*,i32,float*,float*,float*,float*,float,float,i32>)
@@ -794,80 +898,147 @@
 (bind-val xtm_render_near float 0.1)
 (bind-val xtm_render_far float 100.0)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Shader helpers
+;; 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a couple of shader helper functions
+(bind-func print_shader_info_log
+  (lambda (obj:i32)
+    (let ((infologLength (salloc 1 i32))
+          (charsWritten (salloc 1 i32)))
+      (glGetShaderiv obj GL_INFO_LOG_LENGTH infologLength)
+      (if (> (pref infologLength 0) 1)
+          (let ((l (bitcast (malloc (convert (pref infologLength 0))) i8*)))
+            (glGetShaderInfoLog obj (pref infologLength 0) charsWritten l)
+            (printf "printShaderInfoLog: %s\n" l)
+            (free l)
+            1)
+          (begin (printf "Shader Info log: OK\n") 1)))))
+
+(bind-func print_program_info_log
+  (lambda (obj:i32)
+    (let ((infologLength (salloc 1 i32))
+          (charsWritten (salloc 1 i32)))
+      (glGetProgramiv obj GL_INFO_LOG_LENGTH infologLength)
+      (if (> (pref infologLength 0) 1)
+          (let ((l (bitcast (malloc (convert (pref infologLength 0))) i8*)))
+            (glGetProgramInfoLog obj (pref infologLength 0) charsWritten l)
+            (printf "Program Info Log:\n %s\n" l)
+            (free l)
+            1)
+          (begin (printf "Program Info log: OK\n") 1)))))
+
+;; load shader (vert and frag shader)
+(bind-func create_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
+          (vshader (glCreateShader GL_VERTEX_SHADER))
+          (fcode:|1,i8*|* (salloc 1))
+          (vcode:|1,i8*|* (salloc 1))
+          (program (glCreateProgram))
+          (temp:i32* (salloc 1)))
+      (pset! fcode 0 fsource)
+      (pset! vcode 0 vsource)
+      (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
+      (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
+      (glCompileShader fshader)
+      (glCompileShader vshader)
+      (glAttachShader program fshader)
+      (glAttachShader program vshader)
+      (glLinkProgram program)
+      (print_shader_info_log fshader)
+      (print_shader_info_log vshader)
+      (print_program_info_log program)
+      program)))
+
 
 ;; with default attributes for
 ;; 0 vertex 4d
 ;; 1 normals 3d
 ;; 2 coords (uvw) 3d
 ;; 3 color 4d
-(bind-func ShaderProgram_create_xtm
-  "compile and link shader program (vert and frag shader source)"
+(bind-func create_shader_xtm
   (lambda (vsource:i8* fsource:i8*)
-    (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
-          (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
-      (if (or (null? vert) (null? frag))
-          -1
-          (begin
-            (let ((program (glCreateProgram)))
-              (glAttachShader program (Shader_id vert))
-              (glAttachShader program (Shader_id frag))
-              (glBindAttribLocation program 0 "xtmVertex")
-              (glBindAttribLocation program 1 "xtmNormal")
-              (glBindAttribLocation program 2 "xtmUVW")
-              (glBindAttribLocation program 3 "xtmColor")
-              (glLinkProgram program)
-              (ShaderProgram_print_info_log program)
-              program))))))
+    (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
+	  (vshader (glCreateShader GL_VERTEX_SHADER))
+	  (fcode:|1,i8*|* (salloc 1))
+	  (vcode:|1,i8*|* (salloc 1))
+	  (program (glCreateProgram))
+	  (temp:i32* (salloc 1)))
+      (pset! fcode 0 fsource)
+      (pset! vcode 0 vsource)      
+      (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
+      (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
+      (glCompileShader fshader)
+      (glCompileShader vshader)   
+      (glAttachShader program fshader)
+      (glAttachShader program vshader)
+      (glBindAttribLocation program 0 "xtmVertex")
+      (glBindAttribLocation program 1 "xtmNormal")
+      (glBindAttribLocation program 2 "xtmUVW")
+      (glBindAttribLocation program 3 "xtmColor")
+      (glLinkProgram program)
+      (print_shader_info_log fshader)
+      (print_shader_info_log vshader)
+      (print_program_info_log program)
+      program)))
 
 
 (bind-func xtm_render_init_light_shaders
   (lambda (a1 a2 b1 b2 c1 c2 d1 d2 e1 e2 f1 f2)
-    (aset! xtm_render_light_shaders 0 (ShaderProgram_create_xtm a1 a2))
-    (aset! xtm_render_light_shaders 1 (ShaderProgram_create_xtm b1 b2))
-    (aset! xtm_render_light_shaders 2 (ShaderProgram_create_xtm c1 c2))
-    (aset! xtm_render_light_shaders 3 (ShaderProgram_create_xtm d1 d2))
-    (aset! xtm_render_light_shaders 4 (ShaderProgram_create_xtm e1 e2))
-    (aset! xtm_render_light_shaders 5 (ShaderProgram_create_xtm f1 f2))
+    (aset! xtm_render_light_shaders 0 (create_shader_xtm a1 a2))
+    (aset! xtm_render_light_shaders 1 (create_shader_xtm b1 b2))
+    (aset! xtm_render_light_shaders 2 (create_shader_xtm c1 c2))
+    (aset! xtm_render_light_shaders 3 (create_shader_xtm d1 d2))
+    (aset! xtm_render_light_shaders 4 (create_shader_xtm e1 e2))
+    (aset! xtm_render_light_shaders 5 (create_shader_xtm f1 f2))
     void))
 
 (bind-func xtm_render_init_simple_shader
   (lambda (v f)
-    (set! xtm_render_simple_shader (ShaderProgram_create_xtm v f))
+    (set! xtm_render_simple_shader (create_shader_xtm v f))
     void))
 
 (bind-func xtm_render_init_quad_shader
   (lambda (v f)
-    (set! xtm_render_quad_shader (ShaderProgram_create_xtm v f))
+    (set! xtm_render_quad_shader (create_shader_xtm v f))
     void))
 
 (bind-func xtm_render_init_dof_shader
   (lambda (v f)
-    (set! xtm_render_dof_shader (ShaderProgram_create_xtm v f))
+    (set! xtm_render_dof_shader (create_shader_xtm v f))
     void))
 
-(bind-func xtm_draw_shader_unit_quad
-  (let ((fullscreen_quad_verts:|16,float|* (zalloc))
-        (vbo:VBO* null)
-        (vao:VAO* null))
-    (afill! fullscreen_quad_verts
-            ;; pos     tex_coord
-            -1. -1.    0. 0.
-            -1.  1.    0. 1.
-             1. -1.    1. 0.
-             1.  1.    1. 1.)
-    (lambda ()
-      
-      (set! vbo (VBO_create (convert fullscreen_quad_verts float*) 16))
-      (set! vao (VAO_create))
-      ;; TODO what are the locations
-      (VAO_bind_attribute vao vbo 0 2 4 0) ;; position
-      (VAO_bind_attribute vao vbo 1 2 4 2) ;; tex_coord
-      (VAO_bind_and_draw_arrays vao GL_TRIANGLE_STRIP 0 4)
-      (VBO_delete vbo)
-      (VAO_delete vao))))
+;; draw a quad
+;; tw and th are framebuffer width and height
+(bind-func gl_draw_shader_quad
+  (lambda (x y w h r tw th)
+    (let ((hx (* -0.5 w))
+	  (hy (* -0.5 h))
+	  (xx (+ x (* .5 w)))
+	  (yy (+ y (* .5 h))))
+      (glPushMatrix)
+      (glTranslated xx yy 0.0)
+      (glRotated r 0.0 0.0 1.0)
+      (glBegin GL_QUADS)
+      (glTexCoord2d 0.0 0.0)
+      (glVertex2d hx hy)
+      (glTexCoord2d 0.0 th)
+      (glVertex2d hx (+ hy h))
+      (glTexCoord2d tw th)
+      (glVertex2d (+ hx w) (+ hy h))
+      (glTexCoord2d tw 0.0)
+      (glVertex2d (+ hx w) hy)
+      (glTexCoord2d 0.0 0.0)
+      (glEnd)
+      (glPopMatrix)
+      void)))
 
 (bind-func xtm_draw_tex
-  (lambda (shader:ShaderProgram tex:Texture m v p)
+  (lambda (shader tex m v p)
     (glUseProgram shader)
     (shader_update_matrices shader m v p)
     ;; setup shadowmap texture from FBO
@@ -875,10 +1046,291 @@
     (glBindTexture GL_TEXTURE_2D tex)
     (glUniform1i (glGetUniformLocation shader "tex1") 0)
     ;; (glViewport x y w h)
-    (xtm_draw_shader_unit_quad)
+    (gl_draw_shader_quad 0.0 0.0 1.0 1.0 0.0 1.0 1.0)
     (glBindTexture GL_TEXTURE_2D 0)
     (glUseProgram 0)
     void))
+
+;; Framebuffer Objects
+;;
+;; these are currently copied from libs/external/gl.xtm (which can't
+;; be loaded at the same time as this lib for gl-compatibility.xtm
+;; reasons)
+
+(bind-type FBO <GLuint,GLuint,GLuint,GLsizei,GLsizei>)
+
+;; accessor functions
+
+(bind-func FBO_id
+  (lambda (fbo:FBO*)
+    (tref fbo 0)))
+
+(bind-func FBO_color_texture
+  (lambda (fbo:FBO*)
+    (tref fbo 1)))
+
+(bind-func FBO_depth_texture
+  (lambda (fbo:FBO*)
+    (tref fbo 2)))
+
+(bind-func FBO_width
+  (lambda (fbo:FBO*)
+    (tref fbo 3)))
+
+(bind-func FBO_height
+  (lambda (fbo:FBO*)
+    (tref fbo 4)))
+
+(bind-func FBO_print
+  (lambda (fbo:FBO*)
+    (if (null? fbo)
+        (printf "<FBO: 0x0>")
+        (printf "<FBO: id=%d color_tex=%d depth_tex=%d width=%d height=%d>"
+                (FBO_id fbo)
+                (FBO_color_texture fbo)
+                (FBO_depth_texture fbo)
+                (FBO_width fbo)
+                (FBO_height fbo)))
+    void))
+
+(bind-func FBO_toString
+  (lambda (fbo:FBO*)
+    (let ((str:i8* (zalloc 256)))
+      (if (null? fbo)
+          (sprintf str "<FBO: 0x0>")
+          (sprintf str "<FBO: id=%d color_tex=%d depth_tex=%d width=%d height=%d>"
+                   (FBO_id fbo)
+                   (FBO_color_texture fbo)
+                   (FBO_depth_texture fbo)
+                   (FBO_width fbo)
+                   (FBO_height fbo)))
+      (Str str))))
+
+(bind-poly print FBO_print)
+(bind-poly toString FBO_toString)
+
+;; a few necessary constants
+
+(bind-val GL_TEXTURE_RECTANGLE_ARB i32 #x84F5)
+(bind-val GL_FRAMEBUFFER i32 #x8D40)
+(bind-val GL_RENDERBUFFER i32 #x8D41)
+(bind-val GL_COLOR_ATTACHMENT0 i32 #x8CE0)
+(bind-val GL_DEPTH_ATTACHMENT i32 #x8D00)
+(bind-val GL_FRAMEBUFFER_COMPLETE i32 #x8CD5)
+
+(bind-lib libGL glGenRenderbuffers [void,GLsizei,GLuint*]*)
+(bind-lib libGL glBindRenderbuffer [void,GLenum,GLuint]*)
+(bind-lib libGL glRenderbufferStorage [void,GLenum,GLenum,GLsizei,GLsizei]*)
+(bind-lib libGL glFramebufferRenderbuffer [void,GLenum,GLenum,GLenum,GLuint]*)
+(bind-lib libGL glBindFramebuffer [void,GLenum,GLuint]*)
+(bind-lib libGL glGenFramebuffers [void,GLsizei,GLuint*]*)
+(bind-lib libGL glCheckFramebufferStatus [GLenum,GLenum]*)
+(bind-lib libGL glFramebufferTexture2D [void,GLenum,GLenum,GLenum,GLuint,GLint]*)
+
+;; creates an empty texture
+;; suitable to back an FBO
+(bind-func FBO_create_texture_rect
+  (lambda (width height)
+    (let ((id:i32* (salloc))
+          (tex:i32* (salloc)))
+      (glGenRenderbuffers 1 id)
+      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+      ;;(glRenderbufferStorage GL_RENDERBUFFER GL_RGBA16F width height)
+      (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA8 width height)
+      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER (pref id 0))
+
+      (glGenTextures 1 tex)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
+      ;;(glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_RGBA16F width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_RGBA8 width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_LINEAR)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_LINEAR)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
+      (pref tex 0))))
+
+;; create fbo depth buffer
+(bind-func FBO_create_depth_buffer_rect
+  (lambda (width height)
+    (let ((id:i32* (salloc))
+          (tex:i32* (salloc)))
+      (glGenRenderbuffers 1 id)
+      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+      ;; (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT24 width height)
+      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER (pref id 0))
+      (glGenTextures 1 tex)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB (pref tex 0))
+      ;;(glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 GL_DEPTH_COMPONENT24 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_LINEAR)
+      (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_LINEAR)
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
+      (pref tex 0))))
+
+;; creates an empty texture
+;; suitable to back an FBO
+(bind-func FBO_create_texture
+  (lambda (width height)
+    (let ((id:i32* (salloc))
+          (tex:i32* (salloc)))
+      (glGenRenderbuffers 1 id)
+      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+      (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA8 width height)
+      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER (pref id 0))
+      (glGenTextures 1 tex)
+      (glBindTexture GL_TEXTURE_2D (pref tex 0))
+      (glTexImage2D GL_TEXTURE_2D 0 GL_RGBA8 width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+      (glBindTexture GL_TEXTURE_2D 0)
+      (pref tex 0))))
+
+
+;; create fbo depth buffer
+(bind-func FBO_create_depth_buffer
+  (lambda (width height)
+    (let ((id:i32* (salloc))
+          (tex:i32* (salloc)))
+      (glGenRenderbuffers 1 id)
+      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+      ;; (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT24 width height)
+      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER (pref id 0))
+      (glGenTextures 1 tex)
+      (glBindTexture GL_TEXTURE_2D (pref tex 0))
+      (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      ;; (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT24 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+      (glBindTexture GL_TEXTURE_2D 0)
+      (pref tex 0))))
+
+
+;; create and return a frame buffer struct (FBO)
+;; if _texid is greater than 0 then use existing _texid
+(bind-func FBO_create
+  (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
+    (let ((texid:i32 0) 
+          (depthid:i32 0) 
+          (fboid:i32* (salloc))
+          (fbo:FBO* (halloc))) ;; heap alloc
+      (glGenFramebuffers 1 fboid)
+      ;; bind the fbo
+      (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+      (if (> _texid 0) (set! texid _texid))
+      (if (> _depthid 0) (set! texid _depthid))
+      (set! texid (FBO_create_texture width height))
+      (set! depthid (FBO_create_depth_buffer width height))
+      ;; Attach the texture texid to the color buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D texid 0)
+      ;; Attach the texture depthid to the depth buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_2D depthid 0)
+      (tfill! fbo (pref fboid 0) texid depthid width height)
+      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER))
+            (err:i32 (glGetError)))
+        (if (<> status GL_FRAMEBUFFER_COMPLETE)
+            (if (<> err GL_NO_ERROR)
+                (begin (printf "GL ERR: FRAMEBUFFER err: %d\n" err)
+                       (set! fbo (cast null FBO*))
+                       1)
+                (begin
+                  (printf "Possible framebuf error?: %d\n" err)
+                  1))))
+      (glClearColor 0.0 1.0 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      ;; unbind the frame buffer
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      ;; return the extfbo struct
+      fbo)))
+
+;; create and return a frame buffer struct (FBO)
+;; if _texid is greater than 0 then use existing _texid
+(bind-func FBO_create_rect
+  (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
+    (let ((texid:i32 0)
+          (depthid:i32 0)
+          (fboid:i32* (salloc))
+          (fbo:FBO* (halloc))) ;; heap alloc
+      (glGenFramebuffers 1 fboid)
+      ;; bind the fbo
+      (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+      (if (> _texid 0) (set! texid _texid))
+      (if (> _depthid 0) (set! depthid _depthid))
+      (set! texid (FBO_create_texture_rect width height))
+      (set! depthid (FBO_create_depth_buffer_rect width height))
+      ;; Attach the texture texid to the color buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_RECTANGLE_ARB texid 0)
+      ;; Attach the texture depthid to the depth buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_RECTANGLE_ARB depthid 0)
+      (tfill! fbo (pref fboid 0) texid depthid width height)
+      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
+        (if (<> status GL_FRAMEBUFFER_COMPLETE)
+            (set! fbo (cast null FBO*))))
+      (glClearColor 0.0 1.0 0.0 1.0)
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      ;; unbind the frame buffer
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      ;; return the extfbo struct
+      fbo)))
+
+;; create and return a frame buffer struct (FBO)
+;; if _texid is greater than 0 then use existing _texid
+(bind-func FBO_create_no_depth_rect
+  (lambda (width:i32 height:i32 _texid:i32)
+    (let ((texid:i32 0)
+          (fboid:i32* (salloc))
+          (fbo:FBO* (halloc))) ;; heap alloc
+      (glGenFramebuffers 1 fboid)
+      ;; bind the fbo
+      (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+      (if (> _texid 0) (set! texid _texid))
+      (set! texid (FBO_create_texture_rect width height))      
+      ;; Attach the texture texid to the color buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_RECTANGLE_ARB texid 0)
+      (tfill! fbo (pref fboid 0) texid -1 width height)
+      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
+        (if (<> status GL_FRAMEBUFFER_COMPLETE)
+            (set! fbo (cast null FBO*))))
+      (glClearColor 0.0 1.0 0.0 1.0)
+      (glClear GL_COLOR_BUFFER_BIT)
+      ;; unbind the frame buffer
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      ;; return the extfbo struct
+      fbo)))
+
+;; create and return a frame buffer struct (FBO)
+;; if _texid is greater than 0 then use existing _texid
+(bind-func FBO_create_no_depth
+  (lambda (width:i32 height:i32 _texid:i32)
+    (let ((texid:i32 0)
+          (fboid:i32* (salloc))
+          (fbo:FBO* (halloc))) ;; heap alloc
+      (glGenFramebuffers 1 fboid)
+      ;; bind the fbo
+      (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+      (if (> _texid 0) (set! texid _texid))
+      (set! texid (FBO_create_texture width height))
+      ;; Attach the texture texid to the color buffer of our fbo
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D texid 0)
+      (tfill! fbo (pref fboid 0) texid -1 width height)
+      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
+        (printf "fb status %d\n" status)
+        (if (<> status GL_FRAMEBUFFER_COMPLETE)
+            (set! fbo (cast null FBO*))))
+      (glClearColor 0.0 1.0 0.0 1.0)
+      (glClear GL_COLOR_BUFFER_BIT)
+      ;; unbind the frame buffer
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      ;; return the extfbo struct
+      fbo)))
 
 
 ;; fp represents the focal point
@@ -925,7 +1377,7 @@
         (pfill! framebufsize (i32tof xtm_render_w) (i32tof xtm_render_h))
         (glUniform2fv (glGetUniformLocation xtm_render_dof_shader "frameBufSize") 1 framebufsize)
         (glUniform1i (glGetUniformLocation xtm_render_dof_shader "show_depth") show_depth)        
-        (xtm_draw_shader_unit_quad)        
+        (gl_draw_shader_quad 0.0 0.0 1.0 1.0 0.0 1.0 1.0)
         (glActiveTexture GL_TEXTURE0) 
         (glBindTexture GL_TEXTURE_2D 0)
         (glActiveTexture GL_TEXTURE2) 
@@ -937,13 +1389,13 @@
 (bind-func xtm_render_fbo
   (let ((fbo:FBO* null))
     (lambda ()
-      (if (null? fbo) (set! fbo (FBO_create_1 xtm_render_w xtm_render_h 0 0)))
+      (if (null? fbo) (set! fbo (FBO_create xtm_render_w xtm_render_h 0 0)))
       fbo)))
 
 (bind-func xtm_shader_fbo
   (let ((fbo:FBO* null))
     (lambda ()
-      (if (null? fbo) (set! fbo (FBO_create_1 (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
+      (if (null? fbo) (set! fbo (FBO_create (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
       fbo)))
 
 (bind-func xtm_render_setup_a
@@ -952,10 +1404,10 @@
     (set! xtm_render_h h)
     (xtm_shader_fbo)        
     (xtm_render_fbo)        
-    ;; (set! xtm_render_s1 (ShaderProgram_create_xtm s1v s1f))
-    ;; (set! xtm_render_s2 (ShaderProgram_create_xtm s2v s2f))
-    ;; (set! xtm_render_s3 (ShaderProgram_create_xtm s2v s2f_nl))
-    ;; (set! xtm_render_s4 (ShaderProgram_create_xtm s4v s4f))
+    ;; (set! xtm_render_s1 (create_shader_xtm s1v s1f))
+    ;; (set! xtm_render_s2 (create_shader_xtm s2v s2f))
+    ;; (set! xtm_render_s3 (create_shader_xtm s2v s2f_nl))
+    ;; (set! xtm_render_s4 (create_shader_xtm s4v s4f))
     (printf "XTM Render Setup Complete\n")
     void))
 
