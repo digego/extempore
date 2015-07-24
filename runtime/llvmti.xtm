@@ -7677,7 +7677,9 @@
   (let ((type (impc:ti:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
     ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
     (if type
-        `(impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
+        `(begin
+           (impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
+           (impc:compiler:print-polying-details-to-log "PolyFunc:" ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ,(impc:ir:pretty-print-type type)))
         `(impc:compiler:print-missing-identifier-error ',implementation_sym 'closure))))
 
 (define sys:load-dylib
@@ -7738,6 +7740,7 @@
                     (begin (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
                            (newline *impc:aot:current-output-port*)))
                 (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+                (impc:compiler:print-lib-binding-details-to-log library symname type)
                 (impc:aot:insert-nativefunc-binding-details library symname type docstring))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
 
@@ -7784,6 +7787,7 @@
                                                          (gl_get_proc_address ,(symbol->string proc-name))))
                            (newline *impc:aot:current-output-port*)))
                 (impc:ti:register-new-nativefunc (symbol->string proc-name) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+                (impc:compiler:print-lib-binding-details-to-log 'libGL proc-name type)
                 (impc:aot:insert-nativefunc-binding-details 'libGL proc-name type ""))
               (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string proc-name))))))))
 
