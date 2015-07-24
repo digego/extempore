@@ -146,7 +146,7 @@ struct scheme {
     bool treadmill_scanner_finished;
 	
 	
-#define CELL_SEGSIZE   500000  /* # of cells in one segment */
+#define CELL_SEGSIZE   1500000  /* # of cells in one segment */
 #define CELL_NSEGMENT   1    /* # of segments for cells */
     char *alloc_seg[CELL_NSEGMENT];
     pointer cell_seg[CELL_NSEGMENT];
