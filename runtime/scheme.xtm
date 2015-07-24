@@ -2146,20 +2146,26 @@
             (string<? (cdr (assoc 'name left))
                       (cdr (assoc 'name right))))))))
 
-(define xtmdoc-alist-union
-  (lambda (doc-alists-master doc-alists-slave)
+(define xtmdoc-clean-nativefunc-alist
+  (lambda (closure-alists nativefunc-alists)
     (cl:remove-if
-     (lambda (data)
-       (cl:find-if (lambda (x)
-                     (string=? (cdr (assoc 'name x))
-                               (cdr (assoc 'name data))))
-                   doc-alists-master))
-     doc-alists-slave)))
+     (lambda (nativefunc-data)
+       (let ((nativefunc-name (cdr (assoc 'name nativefunc-data))))
+         (cl:find-if (lambda (closure-data)
+                       (or
+                        ;; is it a getter/setter/etc.?
+                        (regex:match? nativefunc-name
+                                      "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$)")
+                        ;; is it a closure?
+                        (string=? (cdr (assoc 'name closure-data)) nativefunc-name)))
+                     closure-alists)))
+     nativefunc-alists)))
 
 (define xtmdoc-all-doc-alists
   (lambda ()
     (let ((closure-alists
-           (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data)))) *impc:ti:closure-cache*)))
+           (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data))))
+                *impc:ti:closure-cache*)))
       (append
        (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) *impc:ti:builtin-cache*)
        (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) *impc:ti:typealias-cache*)
@@ -2173,10 +2179,11 @@
        (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*)
        ;; make sure the "_native" versions of each closure don't get in
        ;; there (since the closure is already there)
-       (xtmdoc-alist-union closure-alists
-                           (map (lambda (x)
-                                  (xtmdoc-nativefunc-handler (string->symbol (car x))))
-                                *impc:ti:nativefunc-cache*))))))
+       (xtmdoc-clean-nativefunc-alist
+        closure-alists
+        (map (lambda (x)
+               (xtmdoc-nativefunc-handler (string->symbol (car x))))
+             *impc:ti:nativefunc-cache*))))))
 
 (define xtmdoc-write-alist-as-json
   (lambda (xtmdoc-alist file-port)
