@@ -7687,11 +7687,15 @@
           (begin
             (impc:aot:insert-load-dylib-details *impc:aot:current-load-dylib-info*)
             (impc:compiler:print-dylib-loading-details-to-log dylib-path)
-                 dylib)
-          (begin (print-with-colors 'red 'default #t
-                                    (print "Error"))
-                 (print ": could not load " dylib-path " dynamic library\n")
-                 #f)))))
+            dylib)
+          (begin
+            (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
+                               (print "Error"))
+            (print ": could not find ")
+            (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print dylib-path))
+            (print " dynamic library\n")
+            (sys:load-escape (string-append "could not find " dylib-path " dynamic library"))
+            #f)))))
 
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
