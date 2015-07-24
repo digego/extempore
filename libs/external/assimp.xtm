@@ -195,59 +195,26 @@
   (lambda (mat pkey type index pout)
     (aiGetMaterialFloatArray mat pkey type index pout null)))
 
-(bind-func ai_copy_matrix4
-  (lambda (src:aiMatrix4x4* dest:aiMatrix4x4*)
-    (tset! dest 0 (tref src 0))
-    (tset! dest 1 (tref src 1))
-    (tset! dest 2 (tref src 2))
-    (tset! dest 3 (tref src 3))
-    (tset! dest 4 (tref src 4))
-    (tset! dest 5 (tref src 5))
-    (tset! dest 6 (tref src 6))
-    (tset! dest 7 (tref src 7))
-    (tset! dest 8 (tref src 8))
-    (tset! dest 9 (tref src 9))
-    (tset! dest 10 (tref src 10))
-    (tset! dest 11 (tref src 11))
-    (tset! dest 12 (tref src 12))
-    (tset! dest 13 (tref src 13))
-    (tset! dest 14 (tref src 14))
-    (tset! dest 15 (tref src 15))
-    1))
-
 (bind-func ai_matrix4_to_float
   (lambda (mat1:aiMatrix4x4* mat2:float*)
-    (pset! mat2 0 (tref mat1 0))
-    (pset! mat2 1 (tref mat1 1))
-    (pset! mat2 2 (tref mat1 2))
-    (pset! mat2 3 (tref mat1 3))
-    (pset! mat2 4 (tref mat1 4))
-    (pset! mat2 5 (tref mat1 5))
-    (pset! mat2 6 (tref mat1 6))
-    (pset! mat2 7 (tref mat1 7))
-    (pset! mat2 8 (tref mat1 8))
-    (pset! mat2 9 (tref mat1 9))
-    (pset! mat2 10 (tref mat1 10))
-    (pset! mat2 11 (tref mat1 11))
-    (pset! mat2 12 (tref mat1 12))
-    (pset! mat2 13 (tref mat1 13))
-    (pset! mat2 14 (tref mat1 14))
-    (pset! mat2 15 (tref mat1 15))
-    void))
+    (doloop (i 16)
+      (pset! mat2 i (aref (convert mat1 |16,float|*) i)))))
 
-(bind-func ai_print_string
+(bind-func Print_aiString
   (lambda (str:aiString*)
     (let ((size (tref str 0))
-          (dat (bitcast (tref-ptr str 1) i8*)))
-      (printf "%.*s\n" size dat))))
+          (dat (convert (tref-ptr str 1) i8*)))
+      (printf "%.*s\n" size dat)
+      void)))
+
+(bind-poly print Print_aiString)
 
 (bind-func ai_color4_to_float4
   (lambda (colour:aiColor4D* dat:float*)
     (pset! dat 0 (tref colour 0))
     (pset! dat 1 (tref colour 1))
     (pset! dat 2 (tref colour 2))
-    (pset! dat 3 (tref colour 3))
-    1))
+    (pset! dat 3 (tref colour 3))))
 
 ;; mode is a bit of a dodge
 ;; it basically returns whatever the
@@ -475,67 +442,6 @@
 
 (bind-poly assimp_load_model assimp_load_model_a)
 (bind-poly assimp_load_model assimp_load_model_b)
-
-(bind-func assimp_draw_node
-  (lambda (node:xtm_node* shader:i32 model:float* view:float* projection:float* lights:i32 light:float*)
-    (let ((i:i32 0)
-          (children (tref node 4))
-          (meshes (tref node 6))
-          (transmat:float* (tref node 1))
-          (m2:float* (salloc 16))
-          (m:float* (salloc 16)))
-      ;; (printf "draw node: %s\n" (tref node 0))
-      ;;(mprint transmat 4 4 1)      
-      ;;(mprintf model 4 4 1)
-      (if (null? transmat)
-          (begin (memcpy (cast m i8*) (cast model i8*) (* 4 16)) 1)
-          (begin
-            (mtrans transmat 4 4 m2)
-            (mmul m2 4 4 model 4 4 m)
-            1))
-      (shader_update_matrices_lvs shader m view projection lights light)
-      ;; first draw meshes
-      (dotimes (i (tref node 5))
-        (xtm_draw_mesh (pref-ptr meshes i) shader))
-      ;; then draw other children recursively
-      (dotimes (i (tref node 3))
-        (assimp_draw_node (pref-ptr children i) shader model view projection lights light))
-      void)))
-
-(bind-func assimp_draw_model
-  (lambda (scene:xtm_node* shader:i32 model view projection lights light)
-    (assimp_draw_node scene shader model view projection lights light)
-    void))
-
-(bind-func ai_load_textures
-  (lambda (scene:aiScene*)
-    (let ((materials (tref scene 5))
-          (num-of-mats (tref scene 4))
-          (i:i32 0))
-      (dotimes (i num-of-mats) 
-        (let ((mtl (pref materials i))
-              (name:aiString* (salloc))
-              (texfile:aiString* (salloc)))
-          (if (= (aiGetMaterialTexture mtl 1 0 texfile null null null null null null) 0)
-              (begin (aiGetMaterialString mtl "?mat.name" 0 0 name)      
-                     (printf "load texture for material %d name: " (+ 1 i))
-                     (ai_print_string name)
-                     (printf "textures: diffuse:%d specular:%d ambient:%d emissive:%d hight:%d normals:%d shininess:%d opacity:%d displacement:%d lightmap:%d reflect:%d unknown:%d\n"
-                             (aiGetMaterialTextureCount mtl 1)
-                             (aiGetMaterialTextureCount mtl 2)			     
-                             (aiGetMaterialTextureCount mtl 3)
-                             (aiGetMaterialTextureCount mtl 4)
-                             (aiGetMaterialTextureCount mtl 5)			     
-                             (aiGetMaterialTextureCount mtl 6)
-                             (aiGetMaterialTextureCount mtl 7)
-                             (aiGetMaterialTextureCount mtl 8)
-                             (aiGetMaterialTextureCount mtl 9)			     
-                             (aiGetMaterialTextureCount mtl 10)
-                             (aiGetMaterialTextureCount mtl 11)			     
-                             (aiGetMaterialTextureCount mtl 12))		     
-                     (printf "texture name: ")
-                     (ai_print_string texfile)
-                     (ai_load_ogl_texture (bitcast (tref-ptr texfile 1) i8*) (+ 1 i)))))))))
 
 (bind-func ai_print_export_formats
   (lambda ()
