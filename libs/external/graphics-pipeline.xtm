@@ -856,13 +856,15 @@
              1. -1.    1. 0.
              1.  1.    1. 1.)
     (lambda ()
-      (if (null? vbo)
-          (set! vbo (VBO_create (convert fullscreen_quad_verts float*) 16)))
-      (if (null? vao)
-          (set! vao (VAO_create)))
+      
+      (set! vbo (VBO_create (convert fullscreen_quad_verts float*) 16))
+      (set! vao (VAO_create))
+      ;; TODO what are the locations
       (VAO_bind_attribute vao vbo 0 2 4 0) ;; position
       (VAO_bind_attribute vao vbo 1 2 4 2) ;; tex_coord
-      (VAO_bind_and_draw_arrays vao GL_TRIANGLE_STRIP 0 4))))
+      (VAO_bind_and_draw_arrays vao GL_TRIANGLE_STRIP 0 4)
+      (VBO_delete vbo)
+      (VAO_delete vao))))
 
 (bind-func xtm_draw_tex
   (lambda (shader:ShaderProgram tex:Texture m v p)
@@ -978,7 +980,7 @@
 
 (sys:load "libs/external/graphics-pipeline-scm.xtm")
 ;; make sure we load them with AOT-compiled code as well
-(impc:aot:insert-forms
+(impc:aot:do-or-emit
  (sys:load "libs/external/graphics-pipeline-scm.xtm"))
 
 (bind-alias XTMRENDERCB [void,i64,i32,float*,float*,float*,i8*]*)
