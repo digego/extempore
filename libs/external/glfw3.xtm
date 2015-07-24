@@ -3288,6 +3288,13 @@
     (glfwWindowHint GLFW_OPENGL_FORWARD_COMPAT (convert GL_TRUE))
     (glfwWindowHint GLFW_OPENGL_PROFILE GLFW_OPENGL_CORE_PROFILE)))
 
+(bind-func glfw_set_compatibility_profile
+  (lambda ()
+    (glfwWindowHint GLFW_CONTEXT_VERSION_MAJOR 3)
+    (glfwWindowHint GLFW_CONTEXT_VERSION_MINOR 1)
+    (glfwWindowHint GLFW_OPENGL_FORWARD_COMPAT (convert GL_FALSE))
+    (glfwWindowHint GLFW_OPENGL_PROFILE GLFW_OPENGL_COMPAT_PROFILE)))
+
 ;; callbacks
 
 (bind-func glfw_error_callback:GLFWerrorfun
@@ -3338,6 +3345,16 @@
       (gl_print_driver_info)
       window)))
 
+(bind-func glfw_init_and_create_compatibility_window
+  (lambda (width height)
+    (glfw_init)
+    (glfw_set_compatibility_profile)
+    (let ((window (glfw_create_window width height)))
+      (glfwMakeContextCurrent window)
+      (glfwSwapInterval 1)
+      (gl_print_driver_info)
+      window)))
+
 (bind-func glfw_init_and_create_interaction_window
   (lambda (width height)
     (glfw_init)
@@ -3348,10 +3365,30 @@
       (gl_print_driver_info)
       window)))
 
+(bind-func glfw_init_and_create_interaction_compatibility_window
+  (lambda (width height)
+    (glfw_init)
+    (glfw_set_compatibility_profile)
+    (let ((window (glfw_create_interaction_window width height)))
+      (glfwMakeContextCurrent window)
+      (glfwSwapInterval 1)
+      (gl_print_driver_info)
+      window)))
+
 (bind-func glfw_init_and_create_fullscreen_window
   (lambda ()
     (glfw_init)
     (glfw_set_core_profile)
+    (let ((window (glfw_create_fullscreen_window)))
+      (glfwMakeContextCurrent window)
+      (glfwSwapInterval 1)
+      (gl_print_driver_info)
+      window)))
+
+(bind-func glfw_init_and_create_fullscreen_compatibility_window
+  (lambda ()
+    (glfw_init)
+    (glfw_set_compatibility_profile)
     (let ((window (glfw_create_fullscreen_window)))
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
