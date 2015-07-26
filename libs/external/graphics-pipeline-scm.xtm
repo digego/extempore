@@ -2567,16 +2567,8 @@ void main( void ) {
     (if *gl-ctx* #t #f)))
 
 (define xtm-setup-and-start-gl-loop
-  (lambda (width height fps start-time vg-setup?)
+  (lambda (width height fps start-time)
     (xtm_render_setup width height)
-    (if vg-setup?
-        (begin (print "Setting up ")
-               (print-with-colors
-                *impc:compiler:pretty-print-name-color* 'default #t
-                (print "OpenVG"))
-               (print " context.\n")
-               (if (<> (xtm-vg-create-context width height) 1)
-                   (xtm_vg_print_error))))
     (gl-loop start-time (/ 1 fps))
     ;; not sure about the best way to see if this function succeeds
     #t))
@@ -2611,12 +2603,10 @@ void main( void ) {
     (ipc:bind-func proc 'xtm_render_setup_b xtm_render_setup_b)
     (ipc:bind-func proc 'xtm_render_setup_c xtm_render_setup_c)
     (ipc:define proc 'xtm_render_setup xtm_render_setup)
-    (ipc:bind-func proc 'xtm_render xtm_render)
-    (ipc:bind-func proc 'xtm_vg_create_contexti32 xtm_vg_create_contexti32)
-    (ipc:define proc 'xtm-vg-create-context xtm-vg-create-context)))
+    (ipc:bind-func proc 'xtm_render xtm_render)))
 
 (define ipc:graphics-setup
-  (lambda (proc width height fullscreen fps start-time . vg-setup?)
+  (lambda (proc width height fullscreen fps start-time)
     (if (not (impc:ti:closure-exists? "post"))
         (bind-func post:XTMRENDERCB
           (lambda (frame shader m v p data)
@@ -2648,7 +2638,7 @@ void main( void ) {
                            (print "Error creating gl context.")))
     (begin
       (ipc:bind-xtmrender-vars proc)
-      (ipc:call proc 'xtm-setup-and-start-gl-loop width height fps start-time (not (null? vg-setup?)))
+      (ipc:call proc 'xtm-setup-and-start-gl-loop width height fps start-time)
       (begin (print "\nStarted xtm render loop on ")
              (print-with-colors 'cyan 'default #t (print proc))
              (print " process.\n\n")))))
