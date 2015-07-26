@@ -2542,7 +2542,8 @@ void main( void ) {
 (define gl-loop
   (lambda (time delta-t)
     (gl_render)
-    (gl:swap-buffers *gl-ctx*)
+    ;; this won't work in Scheme
+    ;; (glfw_swap_buffers window)
     (let* ((cb-lookahead 0.1)
            (t (+ (now) (* cb-lookahead delta-t *second*)))
            (missed-frames (quotient (real->integer (- t time))
@@ -2559,12 +2560,6 @@ void main( void ) {
                                     (print missed-frames))
                  (print " frames\n")))
       (callback (* newtime cb-lookahead) 'gl-loop newtime delta-t))))
-
-(define xtm-create-gl-context
-  (lambda (width height fullscreen)
-    (eval '(define *gl-ctx* #f) (interaction-environment))
-    (set! *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
-    (if *gl-ctx* #t #f)))
 
 (define xtm-setup-and-start-gl-loop
   (lambda (width height fps start-time)
@@ -2631,11 +2626,11 @@ void main( void ) {
                               (print "gl_render"))
            (print " calls in that process as well\ne.g. (ipc:bind-func" proc "'fn_name fn_name)\n"))
     (ipc:define proc 'gl-loop gl-loop)
-    (ipc:define proc 'xtm-create-gl-context xtm-create-gl-context)
+    ;; (ipc:define proc 'xtm-create-gl-context xtm-create-gl-context)
     (ipc:define proc 'xtm-setup-and-start-gl-loop xtm-setup-and-start-gl-loop)
-    (if (not (ipc:call proc 'xtm-create-gl-context width height fullscreen))
-        (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
-                           (print "Error creating gl context.")))
+    ;; (if (not (ipc:call proc 'xtm-create-gl-context width height fullscreen))
+    ;;     (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
+    ;;                        (print "Error creating gl context.")))
     (begin
       (ipc:bind-xtmrender-vars proc)
       (ipc:call proc 'xtm-setup-and-start-gl-loop width height fps start-time)
