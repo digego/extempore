@@ -1,31 +1,27 @@
+;;; xtmrender1.xtm -- using the Extempore 3D rendering pipeline
 
-;; xtmrender1.xtm
-;;
-;; using the default xtm OpenGL pipeline
-;;
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
-;;
-;;
-;; you can download the molecule obj model from:
-;;
-;; http://extempore.moso.com.au/extras/molecule.obj
-;;
+;; Required dylibs: libGL, libglfw3, libassimp, libsoil
+
+;;; Commentary:
+
+;; the peppino model (and other Extempore "assets") are available from
+;; http://extempore.moso.com.au/extras/assets.tgz
 
 ;;; Code:
 
-;; make sure you include / on the end
+;; path to the model files: if you've put assets in the top-level
+;; Extempore folder then this will work, otherwise change it to suit
+;; (make sure you include / on the end)
 (bind-val model_path i8* "assets/models/")
 
 (sys:load "libs/external/assimp.xtm")
 (sys:load "libs/external/glfw3.xtm")
 
 (bind-val window GLFWwindow*)
-
-(define width 1024)
-(define height 768)
-(bind-val width i32 width)
-(bind-val height i32 height)
+(bind-val width i32 1024)
+(bind-val height i32 768)
 
 ;; create a window
 (call-as-xtlang
@@ -44,15 +40,19 @@
 (bind-func gl_render
   (lambda (model:xtm_node*)
     (xtm_render null render null null (convert model i8*))
-    (glfwSwapBuffers window)
     void))
 
 (bind-val peppino xtm_node*)
 
-(call-as-xtlang
- (set! peppino (assimp_load_model model_path "/peppino.dae" aiProcess_Triangulate)))
+(bind-func set_peppino
+  (lambda ()
+    (set! peppino (assimp_load_model model_path "/peppino.dae" aiProcess_Triangulate))))
 
-(xtm_render_setup width height)
+(set_peppino)
+
+(xtm_render_setup 
+ (call-as-xtlang (glfw_get_framebuffer_width window))
+ (call-as-xtlang (glfw_get_framebuffer_height window)))
 
 (bind-func gl_draw_loop
   (lambda (time:i64 delta_t:double)
