@@ -492,9 +492,9 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
    }
 #endif
 
-#ifdef TARGET_OS_MAC
 int register_for_window_events()
 {
+#ifdef TARGET_OS_MAC
   // to give Extempore it's own dock icon, etc
   return (int)[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 #else
