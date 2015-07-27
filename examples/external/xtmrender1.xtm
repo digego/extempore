@@ -32,7 +32,7 @@
  (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
  ;; some of the shaders in the graphics pipeline use older glsl
  ;; versions, so we need a "compatibility" graphics context
- (set! window (glfw_init_and_create_fullscreen_compatibility_window)))
+ (set! window (glfw_init_and_create_compatibility_window width height)))
 
 ;; for models
 (bind-func render:XTMRENDERCB
@@ -47,12 +47,6 @@
     (glfwSwapBuffers window)
     void))
 
-;; standard impromptu callback
-(define opengl-loop
-  (lambda (time dur model degree)
-    (gl_render model)
-    (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur model (+ degree .5))))
-
 (bind-val peppino xtm_node*)
 
 (call-as-xtlang
@@ -62,7 +56,6 @@
 
 (bind-func gl_draw_loop
   (lambda (time:i64 delta_t:double)
-    (gl_draw)
     (gl_render peppino)
     ;; swap buffers
     (glfwPollEvents)
