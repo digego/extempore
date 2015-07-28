@@ -11,15 +11,14 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/aot-test.xtm" 'quiet)
-(sys:load-preload-check 'aot-test)
-(define *xtmlib-aot-test-loaded* #f)
+(sys:load-preload-check 'aot-compilation)
+(define *xtmlib-aot-compilation-loaded* #f)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
 (impc:aot:insert-forms (sys:load "libs/core/std.xtm" 'quiet))
 
-(impc:aot:insert-header "xtmaot-test")
+(impc:aot:insert-header "xtmaot-compilation")
 
 ;; bind-func
 
@@ -60,5 +59,26 @@
 (bind-alias BTalias BT)
 (bind-alias BTaliasWithDocstring BTWithDocstring "ba+ds")
 
-(impc:aot:insert-footer "xtmaot-test")
-(define *xtmlib-aot-test-loaded* #t)
+;; bind-val
+
+(bind-val string_gv_with_docstring i8* "sgv" "sgv+ds")
+;; if there's only one string in the bind-val form and the type is
+;; i8*, the string literal is the value (not the docstring)
+(bind-val string_gv_no_docstring i8* "sgv")
+(bind-val string_gv_no_initval i8*)
+
+(bind-val array_gv_with_docstring i32* 100 "agv+ds")
+(bind-val array_gv_no_docstring i32* 100)
+
+(bind-val i8_array_gv_with_docstring i8* 100 "i8agv+ds")
+(bind-val i8_array_gv_no_docstring i8* 100)
+(bind-val i8_array_gv_no_initval i8*)
+
+(bind-val ptr_gv_with_docstring BT* (BT 42 -4) "pgv+ds")
+(bind-val ptr_gv_no_docstring BT* (BT 42 -4))
+
+(bind-val noinit_gv_with_docstring BT* "nigv+ds")
+(bind-val noinit_gv_no_docstring BT*)
+
+(impc:aot:insert-footer "xtmaot-compilation")
+(define *xtmlib-aot-compilation-loaded* #t)

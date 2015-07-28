@@ -9,13 +9,14 @@
 ;; to run these tests, first precompile the test library. In a shell
 ;; in the Extempore directory,
 
-;; ./extempore --eval "(impc:aot:compile-xtm-file \"libs/core/aot-test-lib.xtm\" #t #t)"
+;; ./extempore --eval "(impc:aot:compile-xtm-file \"libs/core/aot-test.xtm\" #t #t)"
 
 ;;; Code:
 
 (sys:load "libs/core/test.xtm")
 
-(sys:load "libs/aot-test-lib.xtm")
+(if (not (sys:load "libs/aot-cache/aot-test.xtm"))
+    (sys:load-escape "Error in aot-compilation test: you haven't precompiled aot-test.xtm"))
 
 ;; bind-func
 
@@ -74,3 +75,94 @@
  (string=? (impc:ti:get-typealias-docstring "BTaliasWithDocstring")
            "ba+ds")
  #t)
+
+;; bind-val
+
+(xtmtest
+ '(bind-func return_string_gv_with_docstring
+    (lambda ()
+      string_gv_with_docstring))
+ (string=? (cptr->string (return_string_gv_with_docstring)) "sgv")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "string_gv_with_docstring") "sgv+ds")
+ #t)
+;; if there's only one string in the bind-val form and the type is
+;; i8*, the string literal is the value (not the docstring)
+
+(xtmtest
+ '(bind-func return_string_gv_no_docstring
+    (lambda ()
+      string_gv_no_docstring))
+ (string=? (cptr->string (return_string_gv_no_docstring)) "sgv")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "string_gv_no_docstring") "")
+ #t)
+
+(xtmtest
+ '(bind-func return_string_gv_no_initval
+    (lambda ()
+      string_gv_no_initval))
+ (string=? (cptr->string (return_string_gv_no_initval)) "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "string_gv_no_initval") "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "array_gv_with_docstring") "agv+ds")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "array_gv_no_docstring") "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "i8_array_gv_with_docstring") "i8agv+ds")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "i8_array_gv_no_docstring") "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "i8_array_gv_no_initval") "")
+ #t)
+
+(bind-func return_ptr_gv_first_with_docstring
+  (lambda ()
+    (tref ptr_gv_with_docstring 0)))
+
+(bind-func return_ptr_gv_second_with_docstring
+  (lambda ()
+    (tref ptr_gv_with_docstring 1)))
+
+(xtmtest-result
+ (return_ptr_gv_first_with_docstring)
+ 42)
+
+(xtmtest-result
+ (return_ptr_gv_second_with_docstring)
+ -4)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "ptr_gv_with_docstring") "pgv+ds")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "ptr_gv_no_docstring") "")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "noinit_gv_with_docstring") "nigv+ds")
+ #t)
+
+(xtmtest-result
+ (string=? (impc:ti:get-globalvar-docstring "noinit_gv_no_docstring") "")
+ #t)
+
+(xtmtest-print-results)

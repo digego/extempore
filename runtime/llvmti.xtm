@@ -1621,7 +1621,7 @@
                     ;; behaviour
                     (cons (cons globalvar-name (vector (impc:ir:pointer++ type) docstring))
                           *impc:ti:globalvar-cache*))
-          (car *impc:ti:globalvar-cache*)
+              (car *impc:ti:globalvar-cache*)
               (impc:aot:insert-globalvar-binding-details globalvar-name type docstring))))))
 
 (define impc:ti:get-globalvar-docstring
@@ -7700,26 +7700,36 @@
                  (println ,var)))
        varlist))
 
+;; bind-val takes an optional argument, the meaning of which depends
+;; on the type of the val, and also an optional docstring
 
-;; it needs to: work for
-;; - primitives
-;; - pointers to primitives
-;; - (null)  pointers to arrays/vectors
-
-(define-macro (bind-val symbol type . optional-value)
-  (let ((value (if (null? optional-value) 1 (car optional-value)))
-        (t (impc:ir:get-type-from-pretty-str (atom->string type)))
-        (oldt (impc:ti:get-globalvar-type (symbol->string symbol))))
+(define-macro (bind-val symbol type . args)
+  (let* ((string-literal? (and (equal? 'i8* type)
+                               (not (null? args))
+                               (string? (car args))))
+         (value (if string-literal?
+                    (car args)
+                    (if (not (or (null? args) (string? (car args))))
+                        (car args)
+                        1 ;; default value/alloc size
+                        )))
+         (docstring (if (or (null? args)
+                            (not (string? (car (reverse args))))
+                            (and string-literal? (= (length args) 1)))
+                        ""
+                        (car (reverse args))))
+         (t (impc:ir:get-type-from-pretty-str (atom->string type)))
+         (oldt (impc:ti:get-globalvar-type (symbol->string symbol))))
     (cond (oldt
            `(impc:compiler:print-already-bound-error ',symbol ,(impc:ir:pretty-print-type (impc:ir:pointer-- oldt))))
           ;; string literal
-          ((and (equal? 'i8* type) (string? value))
+          (string-literal?
            `(begin
               (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                               " = dllexport global i8* zeroinitializer"))
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
-              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
               (impc:aot:do-or-emit
                (call-as-xtlang (set! ,symbol ,value)))
               (impc:compiler:print-binding-details-to-log "SetValue:"
@@ -7737,7 +7747,7 @@
                               ,(if (= t *impc:ir:fp32*)
                                    (llvm:convert-float (atom->string (eval value)))
                                    (atom->string (eval value)))))
-              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
               (impc:compiler:print-binding-details-to-log "SetValue:"
@@ -7751,7 +7761,7 @@
                                                   " = dllexport global "
                                                   ,(impc:ir:get-type-str t)
                                                   " zeroinitializer"))
-                  (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
+                  (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
                   (impc:aot:do-or-emit
                    (call-as-xtlang (set! ,symbol (cast (malloc ,(* (eval value)
                                                                    (if (impc:ir:number? t)
@@ -7769,7 +7779,7 @@
                                                       " = dllexport global "
                                                       ,(impc:ir:get-type-str t)
                                                       "zeroinitializer"))
-                      (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
+                      (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
                       (impc:aot:do-or-emit
                        (call-as-xtlang (set! ,symbol ,value) void))
                       ;; we should really take the globalvar out of the cache
@@ -7786,7 +7796,7 @@
                 "@" ,(symbol->string symbol)
                 " = dllexport global "
                 ,(impc:ir:get-type-str t) " zeroinitializer"))
-              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
               (impc:compiler:print-binding-details-to-log "SetValue:"
@@ -7976,7 +7986,7 @@
                                                ,zone-size)))
 
 
-(define-macro (bind-lib-val library symname type)
+(define-macro (bind-lib-val library symname type docstring)
   `(let* ((type-str ,(or (impc:ti:get-typealias-ground-type (symbol->string type))
                          (symbol->string type)))
           (type-list (impc:ir:get-type-from-pretty-str type-str)))
@@ -7986,7 +7996,7 @@
          (begin (llvm:bind-symbol ,library ,(symbol->string symname))
                 (impc:ti:register-new-globalvar ,(symbol->string symname)
                                                 type-list
-                                                ""))
+                                                ,docstring))
          (impc:compiler:print-compiler-error "failed to compile IR in bind-lib-val" ,symname))))
 
 ;; THIS IS A HELPER FUNCTION
