@@ -427,7 +427,7 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
          (2 font-lock-function-name-face)
          (3 font-lock-type-face))
        ;; bind-type
-       '("(\\(bind-type\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
+       '("(\\(bind-type\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|!-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
          (3 font-lock-type-face))
