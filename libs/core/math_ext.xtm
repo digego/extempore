@@ -1,0 +1,209 @@
+;;
+;; Copyright (c) 2011, Andrew Sorensen
+;;
+;; All rights reserved.
+;;
+;;
+;; Redistribution and use in source and binary forms, with or without
+;; modification, are permitted provided that the following conditions are met:
+;;
+;; 1. Redistributions of source code must retain the above copyright notice,
+;;    this list of conditions and the following disclaimer.
+;;
+;; 2. Redistributions in binary form must reproduce the above copyright notice,
+;;    this list of conditions and the following disclaimer in the documentation
+;;    and/or other materials provided with the distribution.
+;;
+;; Neither the name of the authors nor other contributors may be used to endorse
+;; or promote products derived from this software without specific prior written
+;; permission.
+;;
+;;
+;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+;; ARE DISCLEXTD. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+;; POSSIBILITY OF SUCH DAMAGE.
+;;
+;;
+
+;; lib-loading config
+
+(sys:load "libs/aot-cache/math_ext.xtm" 'quiet)
+(sys:load-preload-check 'math_ext)
+(define *xtmlib-math_ext-loaded* #f)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/math.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/core/math.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmmath_ext")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Vector multiplication
+;;
+(bind-type Vector <!a,i64>)
+
+(bind-func print:[void,Vector*]*
+  (lambda (v)
+    (vprint (tref v 0) (tref v 1))
+    void))
+
+(bind-func normal:[Vector:<!a,i64>*,Vector:<!a,i64>*]*
+  (lambda (v1)
+    (let ((vdat (alloc (tref v1 1))))
+      (vnorm (tref v1 0) (tref v1 1) vdat)
+      (Vector vdat (tref v1 1)))))
+
+(bind-func magnitude:[!b,Vector:<!a,i64>*]*
+  (lambda (v1)
+    (vmag (tref v1 0) (tref v1 1))))
+
+(bind-func dot_product:[!b,Vector:<!a,i64>*,Vector:<!a,i64>*]*
+  (lambda (v1 v2)
+    (vdot (tref v1 0) (tref v2 0) (tref v1 1))))
+
+;; vcross is for 3d vec only
+(bind-func cross_product:[Vector:<!a,i64>*,Vector:<!a,i64>*,Vector:<!a,i64>*]*
+  (lambda (v1 v2)
+    (let ((vdat (alloc 3)))
+      (vcross (tref v1 0) (tref v2 0) vdat)
+      (Vector vdat 3))))
+
+;; VECTOR ARITHMETIC
+
+(bind-func xtm_multiplication:[Vector:<!a,i64>*,Vector:<!a,i64>*,Vector:<!a,i64>*]*
+  (lambda (v1 v2)
+    (let ((vdat (alloc (tref v1 1))))
+      (vmul (tref v1 0) (tref v2 0) (tref v1 1) vdat)
+      (Vector vdat (tref v1 1)))))
+
+(bind-func xtm_division:[Vector:<!a,i64>*,Vector:<!a,i64>*,Vector:<!a,i64>*]*
+  (lambda (v1 v2)
+    (let ((vdat (alloc (tref v1 1))))
+      (vdiv (tref v1 0) (tref v2 0) (tref v1 1) vdat)
+      (Vector vdat (tref v1 1)))))
+
+(bind-func xtm_addition:[Vector:<!a,i64>*,Vector:<!a,i64>*,Vector:<!a,i64>*]*
+  (lambda (v1 v2)
+    (let ((vdat (alloc (tref v1 1))))
+      (vsum (tref v1 0) (tref v2 0) (tref v1 1) vdat)
+      (Vector vdat (tref v1 1)))))
+
+(bind-func xtm_subtration:[Vector:<!a,i64>*,Vector:<!a,i64>*,Vector:<!a,i64>*]*
+  (lambda (v1 v2)
+    (let ((vdat (alloc (tref v1 1))))
+      (vsub (tref v1 0) (tref v2 0) (tref v1 1) vdat)
+      (Vector vdat (tref v1 1)))))
+
+(bind-func xtm_multiplication:[Vector:<!a,i64>*,!b,Vector:<!a,i64>*]*
+  (lambda (s v1)
+    (let ((vdat (alloc (tref v1 1))))
+      (vsmul s (tref v1 0) (tref v1 1) vdat)
+      (Vector vdat (tref v1 1)))))
+
+(bind-func xtm_multiplication:[Vector:<!a,i64>*,Vector:<!a,i64>*,!b]*
+  (lambda (v1 s)
+    (let ((vdat (alloc (tref v1 1))))
+      (vsmul s (tref v1 0) (tref v1 1) vdat)
+      (Vector vdat (tref v1 1)))))
+
+(bind-func xtm_division:[Vector:<!a,i64>*,Vector:<!a,i64>*,!b]*
+  (lambda (v1 s)
+    (let ((vdat (alloc (tref v1 1))))
+      (vsdiv s (tref v1 0) (tref v1 1) vdat)
+      (Vector vdat (tref v1 1)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; MATRIX multiplication
+;;
+(bind-type Matrix <!a,i64,i64,i1>)
+
+(bind-func print:[void,Matrix*]*
+  (lambda (m)
+    (mprint (tref m 0) (tref m 1) (tref m 2) (tref m 3))
+    void))
+
+(bind-func transposition:[Matrix:<!a,i64,i64,i1>*,Matrix:<!a,i64,i64,i1>*]*
+  (lambda (m1)
+    (let ((mdat (alloc (* (tref m1 1) (tref m1 2)))))
+      (mtrans (tref m1 0) (tref m1 1) (tref m1 2) mdat)
+      (Matrix mdat (tref m1 1) (tref m1 2) (tref m1 3)))))
+
+(bind-func determinant:[!b,Matrix:<!a,i64,i64,i1>*]*
+  (lambda (m1)
+    (if (<> (tref m1 1) (tref m1 2))
+        (begin
+          (println "Error: Determinant for square matrix's only")
+          (convert 0))
+        (mdetrm (tref m1 0) (tref m1 1)))))
+
+(bind-func invert:[Matrix:<!a,i64,i64,i1>*,Matrix:<!a,i64,i64,i1>*]*
+  (lambda (m1)
+    (let ((mdat (alloc (* (tref m1 1) (tref m1 2)))))
+      (minv (tref m1 0) (tref m1 1) mdat)
+      (Matrix mdat (tref m1 1) (tref m1 2) (tref m1 3)))))
+
+;; MATRIX ARITHMETIC
+
+(bind-func xtm_multiplication:[Matrix:<!a,i64,i64,i1>*,Matrix:<!a,i64,i64,i1>*,Matrix:<!a,i64,i64,i1>*]*
+  (lambda (m1 m2)
+    (let ((mdat (alloc (* (tref m1 1) (tref m2 2)))))
+      (mmul (tref m1 0) (tref m1 1) (tref m1 2)
+            (tref m2 0) (tref m2 1) (tref m2 2)
+            mdat)
+      (Matrix mdat (tref m1 1) (tref m2 2) (tref m1 3)))))
+
+;; treat as row vector
+(bind-func xtm_multiplication:[Matrix:<!a,i64,i64,i1>*,Vector:<!a,i64>*,Matrix:<!a,i64,i64,i1>*]*
+  (lambda (v1 m2)
+    (let ((mdat (alloc (* 1 (tref m2 2)))))
+      (mmul (tref v1 0) 1 (tref v1 1)
+            (tref m2 0) (tref m2 1) (tref m2 2)
+            mdat)
+      (Matrix mdat 1 (tref m2 2) (tref m2 3)))))
+
+;; treat as column vector
+(bind-func xtm_multiplication:[Matrix:<!a,i64,i64,i1>*,Matrix:<!a,i64,i64,i1>*,Vector:<!a,i64>*]*
+  (lambda (m1 v2)
+    (let ((mdat (alloc (* (tref m1 1) 1))))
+      (mmul (tref m1 0) (tref m1 1) (tref m1 2)
+            (tref v2 0) (tref v2 1) 1
+            mdat)
+      (Matrix mdat (tref m1 1) 1 (tref m1 3)))))
+
+(bind-func xtm_multiplication:[Matrix:<!a,i64,i64,i1>*,!b,Matrix:<!a,i64,i64,i1>*]*
+  (lambda (s m1)
+    (let ((size (* (tref m1 1) (tref m1 2)))
+          (mdat1 (tref m1 0))
+          (mdat2 (alloc size))
+          (i:i64 0))
+      (dotimes (i size)
+        (pset! mdat2 i (* s (pref mdat1 i))))
+      (Matrix mdat2 (tref m1 1) (tref m1 2) (tref m1 3)))))
+
+(bind-func xtm_multiplication:[Matrix:<!a,i64,i64,i1>*,Matrix:<!a,i64,i64,i1>*,!b]*
+  (lambda (m1 s)
+    (let ((size (* (tref m1 1) (tref m1 2)))
+          (mdat1 (tref m1 0))
+          (mdat2 (alloc size))
+          (i:i64 0))
+      (dotimes (i size)
+        (pset! mdat2 i (* s (pref mdat1 i))))
+      (Matrix mdat2 (tref m1 1) (tref m1 2) (tref m1 3)))))
+
+(impc:aot:do-or-emit
+ (sys:load "libs/core/math_ext-scm.xtm"))
+
+(define *xtmlib-math_ext-loaded* #t)
+
+(impc:aot:insert-footer "xtmmath_ext")
