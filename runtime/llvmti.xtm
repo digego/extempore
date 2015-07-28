@@ -1122,85 +1122,86 @@
 (define *impc:ti:genericfunc-num-list* '())
 
 (define impc:ti:register-new-genericfunc
-  ;; (println 'adding: code)
-  (set! *pcnt* (+ *pcnt* 1))
-  ;; (println 'addgpoly: code 'at: *pcnt*)
-  ;; (println 'code-pre-macro: code)
-  ;; apply any macros to generic code!
-  (set! code (cons (car code)
-                   (list (cadr code)
-                         (impc:ir:generics-apply-macros (caddr code)))))
-  ;; (println 'code-post-macro: code)
-  (if (not (regex:match? (symbol->string (cadr code)) ":"))
-      (impc:compiler:print-compiler-error "generic functions must supply type"))
-  (let* ((res (regex:type-split (symbol->string (cadr code)) ":"))
-         (name (string->symbol (car res)))
-         (numl (assoc-strcmp (car res) *impc:ti:genericfunc-num-list*))
-         ;; (num (if numl (cdr numl) *pcnt*))
-         (num *pcnt*)
-         ;; (ftype (string->symbol (cadr res))))
-         (type (cadr res))
-         (syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
-         (newsyms (map (lambda (s)
-                         ;; (println 's: s)
-                         (if (regex:match? s "^!g")
-                             (let ((r (regex:split s "_")))
-                               (string-append (car r) "___" (number->string num)))
-                             (let ((r (string-append "!g" 
-                                                     (substring s 1 (string-length s))
-                                                     "_"
-                                                     (number->string num))))
-                               r)))
-                       ;; (string-append "!g" 
-                       ;;                (substring s 1 (string-length s))
-                       ;;                "_"
-                       ;;                (number->string num)))
-                       syms))
-         (newtype1 (regex:replace-everything type syms newsyms))
-         (newtype (string->symbol (regex:replace-all newtype1 "___" "_")))
-         (newtypematch (map (lambda (k) (if (regex:match? k ":")
-                                            (car (regex:type-split k ":"))
-                                            (if (regex:match? k "^\\!g")
-                                                "_"
-                                                (regex:replace-all k "\\!g[^,\\]\\>]*" "_"))))
-                            (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))))
-         (arity (- (length (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))) 1))
-         (newcode (list 'bind-func
-                        (string->symbol (string-append (symbol->string name)
-                                                       ":"
-                                                       (symbol->string newtype)))
-                        (caddr code))))
-    ;; (println 'newtype newtype 'newsyms newsyms)
-    (let ((v (cl:remove-if (lambda (x)
-                             (or
-                              (<> arity (cadr x))
-                              (not (string=? (symbol->string name) (symbol->string (car x))))
-                              (member #f
-                                      (map (lambda (xx yy)
-                                             ;; (println 'xx: xx 'yy: yy)
-                                             (let ((res (if (regex:match? xx "^\\!g")
-                                                            (string=?
-                                                             (car (regex:type-split yy "_"))
-                                                             (car (regex:type-split xx "_")))
-                                                            (string=?
-                                                             (car (regex:type-split yy ":"))
-                                                             (car (regex:type-split xx ":"))))))
-                                               ;; (println 'res: res)
-                                               res))
-                                           (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
-                                           (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
-                           *impc:ti:genericfunc-cache*)))
-      (if (= num *pcnt*)
-          (set! *impc:ti:genericfunc-num-list* (cons (cons (symbol->string name) *pcnt*) *impc:ti:genericfunc-num-list*)))
-                                        ;            (set! *pcnt* (- *pcnt* 1)))
-      ;; (if (not (null? v))
-      ;;     (println 'updating: name 'with newtype)
-      ;;     (println 'adding: name 'with newtype)) 
-      (if (not (null? v))
-          (set-cdr! (car v) (list arity newtype newcode newtypematch))
-          (set! *impc:ti:genericfunc-cache* (cons (list name arity newtype newcode newtypematch) *impc:ti:genericfunc-cache*)))
-      (set! *impc:ir:genericfunc-needs-update* (cons (cons name arity) *impc:ir:genericfunc-needs-update*))
-      #t)))
+  (lambda (code)
+    ;; (println 'adding: code)
+    (set! *impc:ti:generic-count* (+ *impc:ti:generic-count* 1))
+    ;; (println 'addgpoly: code 'at: *impc:ti:generic-count*)
+    ;; (println 'code-pre-macro: code)
+    ;; apply any macros to generic code!
+    (set! code (cons (car code)
+                     (list (cadr code)
+                           (impc:ti:genericfunc-apply-macros (caddr code)))))
+    ;; (println 'code-post-macro: code)
+    (if (not (regex:match? (symbol->string (cadr code)) ":"))
+        (impc:compiler:print-compiler-error "generic functions must supply type"))
+    (let* ((res (regex:type-split (symbol->string (cadr code)) ":"))
+           (name (string->symbol (car res)))
+           (numl (assoc-strcmp (car res) *impc:ti:genericfunc-num-list*))
+           ;; (num (if numl (cdr numl) *impc:ti:generic-count*))
+           (num *impc:ti:generic-count*)
+           ;; (ftype (string->symbol (cadr res))))
+           (type (cadr res))
+           (syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
+           (newsyms (map (lambda (s)
+                           ;; (println 's: s)
+                           (if (regex:match? s "^!g")
+                               (let ((r (regex:split s "_")))
+                                 (string-append (car r) "___" (number->string num)))
+                               (let ((r (string-append "!g" 
+                                                       (substring s 1 (string-length s))
+                                                       "_"
+                                                       (number->string num))))
+                                 r)))
+                         ;; (string-append "!g" 
+                         ;;                (substring s 1 (string-length s))
+                         ;;                "_"
+                         ;;                (number->string num)))
+                         syms))
+           (newtype1 (regex:replace-everything type syms newsyms))
+           (newtype (string->symbol (regex:replace-all newtype1 "___" "_")))
+           (newtypematch (map (lambda (k) (if (regex:match? k ":")
+                                         (car (regex:type-split k ":"))
+                                         (if (regex:match? k "^\\!g")
+                                             "_"
+                                             (regex:replace-all k "\\!g[^,\\]\\>]*" "_"))))
+                              (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))))
+           (arity (- (length (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))) 1))
+           (newcode (list 'bind-func
+                          (string->symbol (string-append (symbol->string name)
+                                                         ":"
+                                                         (symbol->string newtype)))
+                          (caddr code))))
+      ;; (println 'newtype newtype 'newsyms newsyms)
+      (let ((v (cl:remove-if (lambda (x)
+                               (or
+                                (<> arity (cadr x))
+                                (not (string=? (symbol->string name) (symbol->string (car x))))
+                                (member #f
+                                        (map (lambda (xx yy)
+                                               ;; (println 'xx: xx 'yy: yy)
+                                               (let ((res (if (regex:match? xx "^\\!g")
+                                                              (string=?
+                                                               (car (regex:type-split yy "_"))
+                                                               (car (regex:type-split xx "_")))
+                                                              (string=?
+                                                               (car (regex:type-split yy ":"))
+                                                               (car (regex:type-split xx ":"))))))
+                                                 ;; (println 'res: res)
+                                                 res))
+                                             (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
+                                             (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
+                             *impc:ti:genericfunc-cache*)))
+        (if (= num *impc:ti:generic-count*)
+            (set! *impc:ti:genericfunc-num-list* (cons (cons (symbol->string name) *impc:ti:generic-count*) *impc:ti:genericfunc-num-list*)))
+                                        ;            (set! *impc:ti:generic-count* (- *impc:ti:generic-count* 1)))
+        ;; (if (not (null? v))
+        ;;     (println 'updating: name 'with newtype)
+        ;;     (println 'adding: name 'with newtype)) 
+        (if (not (null? v))
+            (set-cdr! (car v) (list arity newtype newcode newtypematch))
+            (set! *impc:ti:genericfunc-cache* (cons (list name arity newtype newcode newtypematch) *impc:ti:genericfunc-cache*)))
+        (set! *impc:ti:genericfunc-needs-update* (cons (cons name arity) *impc:ti:genericfunc-needs-update*))
+        #t))))
 
 (define impc:ti:genericfunc-exists?
   (lambda (name)
@@ -1516,33 +1517,33 @@
     (let ((res (assoc-strcmp name *impc:ti:generictype-cache*)))
       (if res #t #f))))
 
-(define *impc:ti:generictype-count* 0)
+(define *impc:ti:generic-count* 0)
 
 (define impc:ti:register-new-generictype
   (let ((cnt 0))
     (lambda (name type)
       (set! cnt 0)
-      (set! *impc:ti:generictype-count* (+ *impc:ti:generictype-count* 1))
-      ;; (println 'add-gpolytype: name 'at: *impc:ti:generictype-count*)
+      (set! *impc:ti:generic-count* (+ *impc:ti:generic-count* 1))
+      ;; (println 'add-gpolytype: name 'at: *impc:ti:generic-count*)
       (if (symbol? type) (set! type (symbol->string type)))
       (let* ((syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
              (newsyms (map (lambda (s)
                              (if (regex:match? s "^!g")
                                  (let ((r (regex:split s "_")))
                                    (set! cnt (+ cnt 1))
-                                   (string-append (car r) "x" (number->string cnt) "_" (number->string *impc:ti:generictype-count*)))
+                                   (string-append (car r) "x" (number->string cnt) "_" (number->string *impc:ti:generic-count*)))
                                  (let ((r (string-append "!g"
                                                          (substring s 1 (string-length s))
                                                          "_"
-                                                         (number->string *impc:ti:generictype-count*))))
+                                                         (number->string *impc:ti:generic-count*))))
                                    r)))
                            syms))
              (newtype (string->symbol (regex:replace-everything type syms newsyms)))
-             (v (assoc-strcmp name *impc:ir:genericfunctypes*)))
+             (v (assoc-strcmp name *impc:ti:generictype-cache*)))
         ;; (println 'gtype-name: name 'type: type 'newtype: newtype)
         (if v
             (set-cdr! v newtype)
-            (set! *impc:ir:genericfunctypes* (cons (cons name newtype) *impc:ir:genericfunctypes*)))
+            (set! *impc:ti:generictype-cache* (cons (cons name newtype) *impc:ti:generictype-cache*)))
         #t))))
 
 (define impc:ti:get-generictype-candidate-types
@@ -7712,21 +7713,22 @@
     (cond (oldt
            `(impc:compiler:print-already-bound-error ',symbol ,(impc:ir:pretty-print-type (impc:ir:pointer-- oldt))))
           ;; string literal
-          ((and (equal? "i8*" (symbol->string type)) (string? value))
+          ((and (equal? 'i8* type) (string? value))
            `(begin
               (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                               " = dllexport global i8* zeroinitializer"))
-              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
-              (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                             " \"" value "\")")))
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
+              (impc:aot:do-or-emit
+               (call-as-xtlang (set! ,symbol ,value)))
               (impc:compiler:print-binding-details-to-log "SetValue:"
                                                           ,(symbol->string symbol)
                                                           ,(impc:ir:pretty-print-type t))))
           ;; float/int literal
           ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
-                (not (impc:ir:pointer? t)))
+                (not (impc:ir:pointer? t))
+                (not (list? (eval value))))
            `(begin
               (llvm:compile-ir
                (string-append "@" ,(symbol->string symbol)
@@ -7750,30 +7752,26 @@
                                                   ,(impc:ir:get-type-str t)
                                                   " zeroinitializer"))
                   (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
-                  (call-as-xtlang ,(string->sexpr
-                                    (string-append "(set! " (symbol->string symbol)
-                                                   " (cast (malloc "
-                                                   (atom->string (* (eval value)
-                                                                    (if (impc:ir:number? t)
-                                                                        (impc:ir:get-type-size t)
-                                                                        (/ (sys:pointer-size) 8))))
-                                                   ") "
-                                                   (atom->string type)
-                                                   "))")))
+                  (impc:aot:do-or-emit
+                   (call-as-xtlang (set! ,symbol (cast (malloc ,(* (eval value)
+                                                                   (if (impc:ir:number? t)
+                                                                       (impc:ir:get-type-size t)
+                                                                       (/ (sys:pointer-size) 8))))
+                                                       ,type))))
                   ;; we should really take the globalvar out of the cache
                   ;; if the previous steps failed
                   (impc:compiler:print-binding-details-to-log "SetValue:"
                                                               ,(symbol->string symbol)
                                                               ,(impc:ir:pretty-print-type t)))
-               (if (list? (eval value))
+               (if (list? value)
                    `(begin
                       (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                                       " = dllexport global "
                                                       ,(impc:ir:get-type-str t)
                                                       "zeroinitializer"))
                       (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t "")
-                      (call-as-xtlang ,(string->sexpr (string-append "(set! " (symbol->string symbol)
-                                                                     " \"" (sexpr->string value) "\")")))
+                      (impc:aot:do-or-emit
+                       (call-as-xtlang (set! ,symbol ,value) void))
                       ;; we should really take the globalvar out of the cache
                       ;; if the previous steps failed
                       (impc:compiler:print-binding-details-to-log "SetValue:"
