@@ -36,23 +36,27 @@
 
 (impc:aot:insert-header "xtmaudio_dsp")
 
-(bind-val SPI SAMPLE 3.1415926535897932384626433832795028841971693993751058209749)
-(bind-val STWOPI SAMPLE 6.2831853071795864769252867665590057683943387987502116419498)
-(bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669)
+(bind-val SPI SAMPLE 3.1415926535897932384626433832795028841971693993751058209749
+          "pi of type SAMPLE")
+(bind-val STWOPI SAMPLE 6.2831853071795864769252867665590057683943387987502116419498
+          "2pi of type SAMPLE")
+(bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669
+          "e (base of natural log) of type SAMPLE")
 
 ;; bind some global audio values
 (if (not (impc:ti:globalvar-exists? "SAMPLERATE"))
-    (begin (bind-val SAMPLERATE SAMPLE (integer->real *au:samplerate*))
-           (bind-val SRs SAMPLE (integer->real *au:samplerate*))
-           (bind-val SRf float (integer->real *au:samplerate*))
-           (bind-val SRd double (integer->real *au:samplerate*))           
-           (bind-val SR i64 *au:samplerate*)))
+    (begin (bind-val SAMPLERATE SAMPLE (integer->real *au:samplerate*)
+                     "audio sample rate")
+           (bind-val SRs SAMPLE (integer->real *au:samplerate*) "audio sample rate")
+           (bind-val SRf float (integer->real *au:samplerate*) "audio sample rate (float)")
+           (bind-val SRd double (integer->real *au:samplerate*) "audio sample rate (double)")
+           (bind-val SR i64 *au:samplerate*) "audio sample rate (i64)"))
 (if (not (impc:ti:globalvar-exists? "CHANNELS"))
-    (bind-val CHANNELS i64 *au:channels*))
+    (bind-val CHANNELS i64 *au:channels*) "number of audio output channels")
 (if (not (impc:ti:globalvar-exists? "IN_CHANNELS"))
-    (bind-val IN_CHANNELS i64 *au:in-channels*))
+    (bind-val IN_CHANNELS i64 *au:in-channels*) "number of audio input channels")
 (if (not (impc:ti:globalvar-exists? "FRAMES"))
-    (bind-val FRAMES i64 *au:block-size*))
+    (bind-val FRAMES i64 *au:block-size*) "audio signal chain block size")
 
 (bind-func print_audio_state
   (lambda ()
