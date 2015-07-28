@@ -4184,6 +4184,10 @@
            (c (if (> args 2)
                   (impc:ti:type-unify (impc:ti:type-check (cadddr ast) vars kts request?) vars)
                   #f)))
+      (if (impc:ir:fixed-point? a)
+          (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type a)
+                                              (string-append "Only real numbers are supported for math intrinsics: "
+                                                             (symbol->string (car ast)))))
       (if (and b
                (not (equal? a b))
                (not (number? (cadr ast)))
