@@ -55,6 +55,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
+#include <inttypes.h>
+
 #include <iostream>
 #include <sstream>
 #ifndef TARGET_OS_WINDOWS
@@ -85,6 +87,7 @@
 #include <ctype.h>
 
 #include "UNIV.h"
+#include "SchemeProcess.h"
 
 //#if USE_STRCASECMP
 //#include <strings.h>
@@ -200,25 +203,42 @@ inline void unlink(pointer p)
 //int hit_thread_insert = 0;
 
 static long long treadmill_inserts_per_cycle = 0;
+static int last_call_to_insert_treadmill = 0;
 
 inline void insert_treadmill(scheme* sc, pointer p)
 {
     if(p->_colour == sc->dark)
     {
 	return;
-    }	
+    }
 
 #ifdef TREADMILL_CHECKS		
     if(sc->treadmill_scanner_finished == true && sc->treadmill_flip_active == false)
     {
 	std::cout << "ERROR: shouldn't be inserting a free cell now!!!" << p << std::endl;		
     }
-#endif	
+#endif
+
+
+#ifdef TREADMILL_CHECKS	    
+    uintptr_t lowptr =  (uintptr_t)((char*)sc->cell_seg[0]);
+    uintptr_t highptr = (uintptr_t)((char*)sc->cell_seg[0]+(CELL_SEGSIZE * sizeof(struct cell)));
+    uintptr_t actualptr = (uintptr_t)((char*)p);
+    if ((actualptr > highptr) || (actualptr < lowptr)) {
+      printf("Pointer not in Cell range!! %" PRIuPTR " != %" PRIuPTR ":%" PRIuPTR "\n",actualptr,lowptr,highptr);
+    }
+#endif    
 			
 #ifdef TREADMILL_CHECKS	
     if(p->_list_colour == 0)
-    {
-	std::cout << "ERROR: should not be inserting a free cell on the grey list!!!" << p << std::endl;
+      {  
+  std::cout << "ERROR[" << extemp::SchemeProcess::I(sc)->getName() <<"] should not be inserting a free cell on the grey list!!!" << p << std::endl;
+  printf("last_call_to_insert_treadmill: %d\n",last_call_to_insert_treadmill);
+    last_call_to_insert_treadmill = 0;
+      printf("CELL: inserted is 0x%" PRIXPTR " base of memory is 0x%" PRIXPTR ":0x%" PRIXPTR "\n",(uintptr_t)p,(uintptr_t)sc->cell_seg[0],(uintptr_t)((char*)sc->cell_seg[0]+(CELL_SEGSIZE * sizeof(struct cell))));
+      printf("CELL: inserted is %" PRIuPTR " base of memory is %" PRIuPTR ":%" PRIuPTR "\n",(uintptr_t)p,(uintptr_t)&(sc->cell_seg[0]),(uintptr_t)((char*)sc->cell_seg[0]+(CELL_SEGSIZE * sizeof(struct cell))));
+      printf("CELL: %" PRIuPTR " of %" PRIuPTR "\n",(actualptr-lowptr),(highptr-lowptr));
+      printf("left: %d  right: %d\n",p->_ccw->_list_colour,p->_cw->_list_colour);
 #ifndef TARGET_OS_WINDOWS
         void* callstack[128];
         int i, frames = backtrace(callstack, 128);
@@ -1252,7 +1272,7 @@ static int alloc_cellseg(scheme *sc, int n) {
 	adj=sizeof(struct cell);
     }
 	
-    //std::cout << "ALLOCATE MEMORY" << std::endl;
+    //std::cout << "ALLOCATE MEMORY: " << sc->last_cell_seg << std::endl;
 	
     //std::cout << "FCELLS: " << sc->fcells << std::endl;
 	
@@ -1270,15 +1290,18 @@ static int alloc_cellseg(scheme *sc, int n) {
 	//}
         /* insert new segment in address order */
 	newp=(pointer)cp;
+  //  std::cout << "ALLOCATING MEM IN PROCESS: " << extemp::SchemeProcess::I(sc)->getName() << std::endl;
+  //printf("Alloced Memory[%d]:  0x%" PRIXPTR ":0x%" PRIXPTR " 0x%" PRIXPTR ":0x%" PRIXPTR "\n",i,(uintptr_t)&newp[0],(uintptr_t)&newp[CELL_SEGSIZE],(uintptr_t)cp,(uintptr_t)(cp+(CELL_SEGSIZE * sizeof(struct cell))));
+  //printf("Alloced Memory[%d]: %" PRIuPTR ":%" PRIuPTR " %" PRIuPTR ":%" PRIuPTR "\n",i,(uintptr_t)&newp[0],(uintptr_t)&newp[CELL_SEGSIZE],(uintptr_t)cp,(uintptr_t)(cp+(CELL_SEGSIZE * sizeof(struct cell))));  
 
         sc->cell_seg[i] = newp;
         while (i > 0 && sc->cell_seg[i - 1] > sc->cell_seg[i]) {
-	    p = sc->cell_seg[i];
+	          p = sc->cell_seg[i];
             sc->cell_seg[i] = sc->cell_seg[i - 1];
             sc->cell_seg[--i] = p;
         }
         //	sc->fcells += CELL_SEGSIZE;
-        last = newp + CELL_SEGSIZE - 1;
+        last = newp + CELL_SEGSIZE - 1;        
 
 	//sc->NIL = newp;
 	int k=0;
@@ -1373,8 +1396,8 @@ static int alloc_cellseg(scheme *sc, int n) {
     char str[256];
     //    sprintf(str,"Allocated: %d cell segements for a total of %d.  Free cells = %lld",n,sc->last_cell_seg,sc->fcells);
     sprintf(str,"Allocated: %d cell segements for a total of %d.",n,sc->last_cell_seg);
-//	CPPBridge::notification(str);
-//    std::cout << "Allocated: " << n << " Cell Segements For A Total Of " << sc->last_cell_seg << ",  Free Cells = " << sc->fcells << std::endl;
+    //CPPBridge::notification(str);
+    std::cout << "Allocated: " << n << " Cell Segements For A Total Of " << sc->last_cell_seg << ",  Free Cells = " << sc->fcells << std::endl;
     return n;
 }
 
@@ -1394,7 +1417,7 @@ static inline pointer get_cell(scheme *sc, pointer a, pointer b) {
       //   exit(0);
       // }		
     }
-	
+
   pointer x = sc->treadmill_free; //sc->free_cell;
 #ifdef TREADMILL_CHECKS	
   if(x->_list_colour != 0)
@@ -1438,11 +1461,17 @@ pointer _cons(scheme *sc, pointer a, pointer b, int immutable) {
     ////////////// write barrier for treadmill
     if(a->_colour != sc->dark)
     {
-	//std::cout << "INSERT FROM CONS: " << a << " " << (int)a->_colour << " != " << sc->dark << std::endl << std::flush; 
-	insert_treadmill(sc,a);		
+      //std::cout << "INSERT FROM CONS: " << a << " " << (int)a->_colour << " != " << sc->dark << std::endl << std::flush;
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 1;
+#endif
+	    insert_treadmill(sc,a);		
     }	
     if(b->_colour != sc->dark)
-    {
+      {
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 2;
+#endif
 	insert_treadmill(sc,b);	
     }
     //////////////////////////////////////////
@@ -1714,6 +1743,9 @@ pointer mk_vector(scheme *sc, int len) {
     pointer* cptr = (pointer*) vec->_object._cptr;
 	
     ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 3;
+#endif
     insert_treadmill(sc,obj);
     //////////////////////////////////////////
 		
@@ -1732,6 +1764,9 @@ pointer mk_vector(scheme *sc, int len) {
     pointer* p = (pointer*)vec->_object._cptr;
 	
     ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 4;
+#endif
     insert_treadmill(sc,a);
     //////////////////////////////////////////
 	
@@ -1934,7 +1969,11 @@ static void treadmill_mark_roots(scheme* sc, pointer a, pointer b) {
 #endif
 	
     sc->mutex->lock();
-		
+
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 5;
+#endif
+    
     insert_treadmill(sc, sc->oblist);		
     insert_treadmill(sc, sc->global_env);
     insert_treadmill(sc, sc->args);
@@ -2125,14 +2164,15 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
     //Sanity checks marking free cell colours
     long long free_cells = 0;
     pointer t = sc->treadmill_free;
-//     for( ; t != sc->treadmill_bottom ; ++free_cells)
-//     {
-// #ifdef TREADMILL_CHECKS
-// 	t->_list_colour = 0; //set ecrus to frees
-// #endif
-// 	t = t->_cw;
-//     }
-#ifdef TREADMILL_CHECKS	
+#ifdef TREADMILL_CHECKS    
+    for( ; t != sc->treadmill_bottom ; ++free_cells)
+    {
+	     t->_list_colour = 0; //set ecrus to frees
+	     t = t->_cw;
+    }
+#endif
+    
+#ifdef TREADMILL_CHECKS    
     if(free_cells != ecrus) 
     {
 	printf("FREE CELLS: %lld   OLD ECRUS: %lld\n",free_cells,ecrus);
@@ -2306,143 +2346,166 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
     return;
 }
 
+
+ 
 static void* treadmill_scanner(void* obj)
 {
-    scheme* sc = (scheme*) obj;
-    int total_previous_scan = 0;	
+   scheme* sc = (scheme*) obj;
+   int total_previous_scan = 0;	
 	
-    sc->mutex->lock();
-    while(true)
-    {	
-	sc->treadmill_scanner_finished = false;		
+   sc->mutex->lock();
+   while(true)
+     {	
+       sc->treadmill_scanner_finished = false;		
 #ifdef TREADMILL_DEBUG		
-	std::cout << "TREADMILL: START SCAN " << std::endl << std::flush;
+       std::cout << "TREADMILL: START SCAN " << std::endl << std::flush;
 #endif
 		
-	//treadmill_mark_roots(sc);
+       //treadmill_mark_roots(sc);
 
-	total_previous_scan = 0;
-	//mutex.Lock();
+       total_previous_scan = 0;
+       //mutex.Lock();
 		
-	while(!sc->treadmill_flip_active || sc->treadmill_scan != sc->treadmill_top) { // untill the flip is activated we need to keep checking for new objects that may be added to the grey list
-	    int count = 0;
-	    unsigned int dark = sc->dark;
-	    while(sc->treadmill_scan != sc->treadmill_top) //scanned_cell != sc->treadmill_top)
-	    {				
+       while(!sc->treadmill_flip_active || sc->treadmill_scan != sc->treadmill_top) { // untill the flip is activated we need to keep checking for new objects that may be added to the grey list
+         int count = 0;
+         unsigned int dark = sc->dark;
+         while(sc->treadmill_scan != sc->treadmill_top) //scanned_cell != sc->treadmill_top)
+           {				
 #ifdef TREADMILL_CHECKS				
-		if(sc->treadmill_scan->_colour != dark) std::cout << "TREADMILL: SCAN OBJ NOT DARKENED!!!" << std::endl << std::flush;				
+             if(sc->treadmill_scan->_colour != dark) std::cout << "TREADMILL: SCAN OBJ NOT DARKENED!!!" << std::endl << std::flush;				
 #endif				
-		pointer scan = sc->treadmill_scan;				
+             pointer scan = sc->treadmill_scan;				
 				
-		if(is_vector(scan)) {
-		    int length = scan->_size;
+             if(is_vector(scan)) {
+               int length = scan->_size;
 					
-		    pointer* cptr = (pointer*) scan->_object._cptr;
-		    for(int i=0; i<length; i++) {
-			pointer p = cptr[i];
-			if(p->_colour != dark)
-			{
-			    insert_treadmill(sc,p);
-			}
-		    }
-		}
+               pointer* cptr = (pointer*) scan->_object._cptr;
+               for(int i=0; i<length; i++) {
+                 pointer p = cptr[i];
+                 if(p->_colour != dark)
+                   {
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 6;
+#endif
+                     insert_treadmill(sc,p);
+                   }
+               }
+             }
 				
-		if(is_continuation(scan))
-		{
-		    pointer d = cont_dump(scan);
-		    unsigned int* dump = (unsigned int*) cptr_value_sc(sc,d);
-		    int nframes = dump[0];
-		    dump_stack_frame* frames = (dump_stack_frame*)&dump[1];
+             if(is_continuation(scan))
+               {
+                 //#ifdef TREADMILL_CHECKS
+                 //std::cout << "Insert Continuation into Treadmill" << std::endl;
+                 //#endif
+                 pointer d = cont_dump(scan);
+                 unsigned int* dump = (unsigned int*) cptr_value_sc(sc,d);
+                 int nframes = dump[0];
+                 dump_stack_frame* frames = (dump_stack_frame*)&dump[1];
 					
-		    // for each frame check the args and code lists
-		    for(int j=0;j<nframes;j++)
-		    {
-			// envir
-			pointer env = frames[j].envir;
-			if(env->_colour != dark)
-			{
-			    insert_treadmill(sc, env);
-			}
+                 // for each frame check the args and code lists
+                 for(int j=0;j<nframes;j++)
+                   {
+                     // envir
+                     pointer env = frames[j].envir;
+                     if(env->_colour != dark)
+                       {
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 7;
+#endif
+                         insert_treadmill(sc, env);
+                       }
 						
-			// args
-			pointer args = frames[j].args;
-			if(args->_colour != dark)
-			{
-			    insert_treadmill(sc, args);
-			}
+                     // args
+                     pointer args = frames[j].args;
+                     if(args->_colour != dark)
+                       {
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 8;
+#endif
+                         insert_treadmill(sc, args);
+                       }
 						
-			// copy code
-			pointer code = frames[j].code;
-			if(code->_colour != dark)
-			{
-			    insert_treadmill(sc, code);
-			}
-		    }
-		}
-			    
-		if(!is_atom(scan))
-		{
-		    pointer a = scan->_object._cons._car;
-		    pointer b = scan->_object._cons._cdr;
-		    if(a->_colour != dark)
-		    {					
-			insert_treadmill(sc, a);
-		    }
-		    if(b->_colour != dark)
-		    {										
-			insert_treadmill(sc, b);
-		    }
-		}
+                     // copy code
+                     pointer code = frames[j].code;
+                     if(code->_colour != dark)
+                       {
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 9;
+#endif
+                         insert_treadmill(sc, code);
+                       }
+                   }
+               }
+    
+             if(!is_atom(scan))
+               {
+                 pointer a = scan->_object._cons._car;
+                 pointer b = scan->_object._cons._cdr;
+                 if(a->_colour != dark)
+                   {
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 10;
+#endif
+                     insert_treadmill(sc, a);
+                   }
+                 if(b->_colour != dark)
+                   {
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 11;
+#endif
+                     insert_treadmill(sc, b);
+                   }
+               }
 				
 #ifdef TREADMILL_CHECKS				
-		sc->treadmill_scan->_list_colour = 3;
+             sc->treadmill_scan->_list_colour = 3;
 #endif
-		sc->treadmill_scan = sc->treadmill_scan->_ccw;				
-		total_previous_scan++;
+             sc->treadmill_scan = sc->treadmill_scan->_ccw;				
+             total_previous_scan++;
 
-		if(!(count%100)) {		// force a yield every now and then?		
-		    sc->mutex->unlock(); 
-		    sc->mutex->lock();
-		}
-		count++;
+             if(!(count%100)) {		// force a yield every now and then?		
+               sc->mutex->unlock(); 
+               sc->mutex->lock();
+             }
+             count++;
 				
-	    }
-	    sc->mutex->unlock(); // yeild here to let interpreter add greys to the treadmill!!
+           }
+         sc->mutex->unlock(); // yeild here to let interpreter add greys to the treadmill!!
 #ifdef EXT_BOOST
-		boost::this_thread::sleep(boost::posix_time::microseconds(1000));
+         boost::this_thread::sleep(boost::posix_time::microseconds(1000));
 #else
-	    usleep(500);
+         usleep(500);
 #endif
-	    sc->mutex->lock(); // But lock again after sleep!
-	}
+         sc->mutex->lock(); // But lock again after sleep!
+       }
 #ifdef EXT_BOOST
 #else
-	sc->Treadmill_Guard->lock();
+       sc->Treadmill_Guard->lock();
 #endif
 #ifdef TREADMILL_DEBUG		
-	std::cout << "TREADMILL: FINISHED SCAN: " << sc->treadmill_flip_active << std::endl << std::flush;
+       std::cout << "TREADMILL: FINISHED SCAN: " << sc->treadmill_flip_active << std::endl << std::flush;
 #endif
 		
-	if(sc->treadmill_scan != sc->treadmill_top) 
-	{
-	    std::cout << "HUGE ERROR:  SHOULD NOT FINISH SCANNER UNTIL SCAN == TOP" << std::endl << std::flush;
-	}
+       if(sc->treadmill_scan != sc->treadmill_top) 
+         {
+           std::cout << "HUGE ERROR:  SHOULD NOT FINISH SCANNER UNTIL SCAN == TOP" << std::endl << std::flush;
+         }
 		
-	sc->mutex->unlock();				
-	sc->treadmill_scanner_finished = true;		
-	sc->Treadmill_Guard->wait();
+       sc->mutex->unlock();				
+       sc->treadmill_scanner_finished = true;		
+       sc->Treadmill_Guard->wait();
 #ifdef TREADMILL_DEBUG
-	std::cout << "WAKING UP SCANNER" << std::endl << std::flush;		
+       std::cout << "WAKING UP SCANNER" << std::endl << std::flush;		
 #endif
-	sc->mutex->lock();				
+       sc->mutex->lock();				
 #ifdef EXT_BOOST
 #else
-	sc->Treadmill_Guard->unlock();
+       sc->Treadmill_Guard->unlock();
 #endif
-	if(sc->treadmill_stop) break; // exit treadmill thread 
-    }
+       if(sc->treadmill_stop) break; // exit treadmill thread 
+     }
 		
-    return sc;
+   return sc;
 }
 
 int released = 0;
@@ -3052,7 +3115,13 @@ pointer mk_closure(scheme *sc, pointer c, pointer e) {
 	
     typeflag(x) = T_CLOSURE;
     ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 12;
+#endif
     insert_treadmill(sc,c);
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 13;
+#endif
     insert_treadmill(sc,e);	
     //////////////////////////////////////////
 	
@@ -3085,7 +3154,13 @@ static pointer list_star(scheme *sc, pointer d) {
     }
     // NOT SURE ABOUT THIS ONE? DOING Q for good measure
     ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 14;
+#endif
     insert_treadmill(sc,car(cdr(p)));
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 15;
+#endif
     insert_treadmill(sc,q);	
     //////////////////////////////////////////
 	
@@ -3117,6 +3192,9 @@ static pointer list_star(scheme *sc, pointer d) {
 	p = q;
     }
     ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 16;
+#endif
     insert_treadmill(sc,result);
     ////////////////////////////////////////////
     return (result);
@@ -3136,6 +3214,9 @@ static pointer list_star(scheme *sc, pointer d) {
 	}
     }
     ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 17;
+#endif
     insert_treadmill(sc,p);
     //////////////////////////////////////////
 
@@ -3262,20 +3343,23 @@ static void new_frame_in_env(scheme *sc, pointer old_env)
 static inline void new_slot_spec_in_env(scheme *sc, pointer env, 
                                         pointer variable, pointer value) 
 { 
-    pointer slot = immutable_cons(sc, variable, value); 
+  pointer slot = immutable_cons(sc, variable, value); 
 	
-    if (is_vector(car(env))) { 
-	int location = hash_fn(symname_sc(sc,variable), (car(env))->_size); 
+  if (is_vector(car(env))) { 
+    int location = hash_fn(symname_sc(sc,variable), (car(env))->_size); 
 		
-	set_vector_elem(sc, car(env), location, 
-			immutable_cons(sc, slot, vector_elem(car(env), location))); 
-    } else {
-	pointer tmp = immutable_cons(sc, slot, car(env)); 
-	////////////// write barrier for treadmill
-	insert_treadmill(sc,tmp);
-	//////////////////////////////////////////		
-	car(env) = tmp;
-    } 
+    set_vector_elem(sc, car(env), location, 
+                    immutable_cons(sc, slot, vector_elem(car(env), location))); 
+  } else {
+    pointer tmp = immutable_cons(sc, slot, car(env)); 
+    ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+    last_call_to_insert_treadmill = 18;
+#endif
+    insert_treadmill(sc,tmp);
+    //////////////////////////////////////////		
+    car(env) = tmp;
+  } 
 } 
 
 pointer find_slot_in_env(scheme *sc, pointer env, pointer hdl, int all) 
@@ -3311,13 +3395,16 @@ pointer find_slot_in_env(scheme *sc, pointer env, pointer hdl, int all)
 
 
 inline void new_slot_in_env(scheme *sc, pointer variable, pointer value) 
-{ 	
+{
     new_slot_spec_in_env(sc, sc->envir, variable, value); 
 } 
 
 inline void set_slot_in_env(scheme *sc, pointer slot, pointer value) 
 { 
     ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 19;
+#endif
     insert_treadmill(sc,value);
     //////////////////////////////////////////
 
@@ -4709,13 +4796,19 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     case OP_CONS:       /* cons */
 	cdr(sc->args) = cadr(sc->args);
 	////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 20;
+#endif  
 	insert_treadmill(sc,cdr(sc->args));
 	//////////////////////////////////////////			
 	s_return(sc,sc->args);
 				
     case OP_SETCAR:     /* set-car! */
 	if(!is_immutable(car(sc->args))) {
-	    ////////////// write barrier for treadmill
+    ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 21;
+#endif    
 	    insert_treadmill(sc,cadr(sc->args));
 	    //////////////////////////////////////////
 
@@ -4727,7 +4820,10 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
 			
     case OP_SETCDR:     /* set-cdr! */
 	if(!is_immutable(car(sc->args))) {
-	    ////////////// write barrier for treadmill
+    ////////////// write barrier for treadmill
+#ifdef TREADMILL_CHECKS
+      last_call_to_insert_treadmill = 22;
+#endif    
 	    insert_treadmill(sc,cadr(sc->args));
 	    //////////////////////////////////////////
 
@@ -5590,12 +5686,19 @@ static pointer opexe_5(scheme *sc, enum scheme_opcodes op) {
 	}
 	case TOK_SHARP_CONST:
 	    if ((x = mk_sharp_const(sc, readstr_upto(sc, (char*)"();\t\n\r "))) == sc->NIL) {
-		Error_0(sc,"undefined sharp expression",sc->args->_size);
+        Error_0(sc,"undefined sharp expression",sc->args->_size);
 	    } else {
 		s_return(sc,x);
 	    }
 	default:
-	    Error_0(sc,"syntax error: illegal token",sc->args->_size);
+    if(sc->tok == 1) {
+      std::cout << "ILLEGAL RIGHT BRACKET!!!" << std::endl;
+      std::cout << "Check for unbalanced expression" << std::endl;
+      Error_0(sc,"Illegal right bracket: unbalanced expr?",sc->args->_size);      
+    }else{
+      std::cout << "ILLEGAL TOKEN: " << sc->tok << std::endl;
+      Error_0(sc,"syntax error: illegal token",sc->args->_size);    
+    }
 	}
 	break;
 			
@@ -6187,13 +6290,15 @@ static int syntaxnum(pointer p) {
     }
 }
 
-scheme* extempore_scheme_init_new() {	
-    scheme *sc=(scheme*)malloc(sizeof(scheme));	
+scheme* extempore_scheme_init_new() {
+  scheme *sc=(scheme*)malloc(sizeof(scheme));
+  printf("Scheme (xtm) init new %p \n",sc);
     return sc;
 }
 
 scheme *scheme_init_new() {
-    scheme *sc=(scheme*)malloc(sizeof(scheme));
+  scheme *sc=(scheme*)malloc(sizeof(scheme));
+  //printf("Scheme init new %p \n",sc);  
     if(!scheme_init(sc)) {
 	free(sc);
 	return 0;
@@ -6203,7 +6308,9 @@ scheme *scheme_init_new() {
 }
 
 scheme *scheme_init_new_custom_alloc(func_alloc malloc, func_dealloc free) {
-    scheme *sc=(scheme*)malloc(sizeof(scheme));
+  
+  scheme *sc=(scheme*)malloc(sizeof(scheme));
+  //printf("Scheme init new custom %p \n",sc);    
     if(!scheme_init_custom_alloc(sc,malloc,free)) {
 	free(sc);
 	return 0;
@@ -6219,6 +6326,7 @@ int scheme_init(scheme *sc) {
 int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     int i, n=sizeof(dispatch_table)/sizeof(dispatch_table[0]);
     pointer x;
+    //printf("Scheme init custom alloc %p\n",sc);
 	
     num_zero.num_type=0; //is_fixnum=1;
     num_zero.value.ivalue=0;
@@ -6602,14 +6710,14 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
 
 void scheme_define(scheme *sc, pointer envir, pointer symbol, pointer value) {
     pointer x;
-	
+
     sc->defined_keywords->insert(symname_sc(sc,symbol));
     sc->reverse_symbol_lookup->insert(std::make_pair(value,symbol));
 	
     x=find_slot_in_env(sc,envir,symbol,0);
     if (x != sc->NIL) { 
 	set_slot_in_env(sc, x, value); 
-    } else { 
+    } else {
 	new_slot_spec_in_env(sc, envir, symbol, value); 
     } 
 }
