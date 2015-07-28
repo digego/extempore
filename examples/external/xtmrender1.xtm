@@ -30,7 +30,6 @@
  ;; versions, so we need a "compatibility" graphics context
  (set! window (glfw_init_and_create_compatibility_window width height)))
 
-;; for models
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
     (rotate_matrix m (* .1 (i64tof frame)) 0.0 1.0 0.0)
@@ -44,11 +43,8 @@
 
 (bind-val peppino xtm_node*)
 
-(bind-func set_peppino
-  (lambda ()
-    (set! peppino (assimp_load_model model_path "/peppino.dae" aiProcess_Triangulate))))
-
-(set_peppino)
+(call-as-xtlang
+ (set! peppino (assimp_load_model model_path "/peppino.dae" aiProcess_Triangulate)))
 
 (xtm_render_setup 
  (call-as-xtlang (glfw_get_framebuffer_width window))
