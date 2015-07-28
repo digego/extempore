@@ -119,19 +119,19 @@
 
 
 (define replace-all
-   (lambda (lst alst)
-      (if (pair? lst)
-	  (let loop ((lsta lst) (lstb '()))
-	     (if (null? lsta)
-		 (reverse lstb)
-		 (let* ((v (car lsta))
-			(lstb2 (cond ((pair? v)
-				     (cons (loop v '()) lstb))
-				    ((assoc v alst)
-				     (cons (cdr (assoc v alst)) lstb))
-				    (#t (cons v lstb)))))
-		    (loop (cdr lsta) lstb2))))
-	  lst)))
+  (lambda (lst alst)
+    (if (pair? lst)
+        (let loop ((lsta lst) (lstb '()))
+          (if (null? lsta)
+              (reverse lstb)
+              (let* ((v (car lsta))
+                     (lstb2 (cond ((assoc v alst)
+                                   (cons (cdr (assoc v alst)) lstb))
+                                  ((pair? v)
+                                   (cons (loop v '()) lstb))
+                                  (#t (cons v lstb)))))
+                (loop (cdr lsta) lstb2))))
+        lst)))
 
 (define replace-first
    (lambda (obj-a obj-b  lst)
