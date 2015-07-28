@@ -92,9 +92,35 @@
 ;; helper functions for setting an individual samples offset
 ;; i.e. set sample index 60 to start at 40000 samples into the audio buffer
 (bind-func set_sample_offset_
-  (lambda (sampler:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* index:i64 offset:i64)
-    (let ((offsets:|128,i64|* (sampler.samples_offsets)))
-      (pset! offsets index offset)
+  (lambda (inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* index:i64 bank:i64 offset:i64)
+    (let ((offsets:|20,|128,i64||* (inst.samples_offsets)))
+      (aset! (aref-ptr offsets bank) index offset)
+      1)))
+
+
+;; helper function for adding sample data to sampler
+;; were tha sample data is an AudioBuffer!
+;;
+;; for example:
+;; ;; this reads the whole file into index 60
+;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 0 0)
+;; ;; this reads 5000 frames starting 1000 frames into the file
+;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000)
+;; 
+(bind-func set_sample_audiobuffer
+  (lambda (inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* buf:AudioBuffer* index:i64 bank:i32)
+    (let ((channels:i64 (num_channels buf))
+          (num (num_frames buf))
+          (adat:SAMPLE* (audio_data_ptr buf))
+          (offsets:|20,|128,i64||* (inst.samples_offsets))
+          (samples:|20,|128,SAMPLE*||* (inst.samples))
+          (samples_channels:|20,|128,i64||* (inst.samples_channels))
+          (samples_length:|20,|128,i64||* (inst.samples_length)))
+            ;;(printf "%lld samples read into: %lld\n" samples_read index)
+      (aset! (aref-ptr samples_channels bank) index (convert channels))
+      (aset! (aref-ptr samples bank) index adat)
+      (aset! (aref-ptr offsets bank) index (loop_start buf))
+      (aset! (aref-ptr samples_length bank) index num)          
       1)))
 
 
