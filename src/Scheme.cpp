@@ -59,7 +59,7 @@
 
 #include <iostream>
 #include <sstream>
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
 #include <execinfo.h>
 #endif
 
@@ -91,7 +91,7 @@
 
 //#if USE_STRCASECMP
 //#include <strings.h>
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #define stricmp strcmp //stricmp _stricmp
 #define ULONG_LONG_MAX UINT64_MAX
 #else
@@ -147,7 +147,7 @@
 /* } */
 #endif 
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #define atoll _atoi64
 #endif
 /*
@@ -239,7 +239,7 @@ inline void insert_treadmill(scheme* sc, pointer p)
       printf("CELL: inserted is %" PRIuPTR " base of memory is %" PRIuPTR ":%" PRIuPTR "\n",(uintptr_t)p,(uintptr_t)&(sc->cell_seg[0]),(uintptr_t)((char*)sc->cell_seg[0]+(CELL_SEGSIZE * sizeof(struct cell))));
       printf("CELL: %" PRIuPTR " of %" PRIuPTR "\n",(actualptr-lowptr),(highptr-lowptr));
       printf("left: %d  right: %d\n",p->_ccw->_list_colour,p->_cw->_list_colour);
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
         void* callstack[128];
         int i, frames = backtrace(callstack, 128);
         char** strs = backtrace_symbols(callstack, frames);

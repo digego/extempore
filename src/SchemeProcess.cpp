@@ -54,14 +54,14 @@
 #include <sys/select.h>
 #endif
 
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <stdlib.h>
 #include "UNIV.h"
 
 /*
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #include <unistd.h>
 #endif
 */
@@ -550,7 +550,7 @@ namespace extemp {
 
 		std::stringstream ss;
 		std::string load_path = scm->getLoadPath();
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 		Sleep(1000);
 #else
                 sleep(1); // give time for NSApp etc. to init    
@@ -563,7 +563,7 @@ namespace extemp {
                 scm->loadFile("llvmti.xtm", load_path.c_str());		
 
                 scm->setLoadedLibs(true);
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 				Sleep(1000);
 #else
 				sleep(1); // give time for NSApp etc. to init    
@@ -574,7 +574,7 @@ namespace extemp {
                 if(scm->getName().compare("primary") == 0) {
                   if (extemp::UNIV::EXT_LOADSTD == 1) {
                     memset(sstr,0,EXT_INITEXPR_BUFLEN);
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 					_snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/core/std.xtm\" 'quiet)");
 #else
                     snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/core/std.xtm\" 'quiet)");
@@ -592,7 +592,7 @@ namespace extemp {
                     ascii_text_color(0,7,10);
                     printf("%s\n\n", scm->getInitExpr().c_str());
                     memset(sstr,0,EXT_INITEXPR_BUFLEN);
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 					_snprintf(sstr, EXT_INITEXPR_BUFLEN, "%s", scm->getInitExpr().c_str());
 #else
 					snprintf(sstr, EXT_INITEXPR_BUFLEN, "%s", scm->getInitExpr().c_str());

@@ -44,14 +44,14 @@
 #include "pcre.h"
 #include "SchemeFFI.h"
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
 #include <AppKit/AppKit.h>
 #else
 #include <time.h>
 #endif
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #include <malloc.h>
 //#include <unistd.h>
 #include <Windows.h>
@@ -101,7 +101,7 @@ void ascii_text_color(int attr, int fg, int bg)
   if (extemp::UNIV::EXT_TERM == 3) {
     return;
   }
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   if (extemp::UNIV::EXT_TERM == 1) {
     char command[13];
     if(fg>8) fg = 8;
@@ -462,12 +462,12 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 }
 
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
   double clock_clock()
   {
     return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + extemp::SchemeFFI::CLOCK_OFFSET;
   } 
-#elif defined(TARGET_OS_LINUX)
+#elif defined(__linux__)
   double clock_clock()
   {
     struct timespec t;
@@ -494,7 +494,7 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 
 int register_for_window_events()
 {
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
   // to give Extempore it's own dock icon, etc
   return (int)[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 #else
@@ -529,7 +529,7 @@ namespace extemp {
 #endif
 
     // 0 is for ansi, 1 is for MSDos CMD shell
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     uint32_t UNIV::EXT_TERM = 1;
 #else
     uint32_t UNIV::EXT_TERM = 0; 
@@ -537,9 +537,9 @@ namespace extemp {
     uint32_t UNIV::EXT_LOADSTD = 1;
 
     void UNIV::initRand() {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
       srand((int)UNIV::DEVICE_TIME); ///UNIV::SECOND));
-#elif TARGET_OS_LINUX
+#elif __linux__
       srand((int)(UNIV::DEVICE_TIME/UNIV::SECOND));
 #else
       sranddev();

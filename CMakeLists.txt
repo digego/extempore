@@ -118,7 +118,6 @@ target_compile_options(extempore
 
 # Windows
 if(WIN32)
-  target_compile_definitions(extempore PRIVATE -DTARGET_OS_WINDOWS)
   # need Boost on Windows (for the moment, at least)
   find_package(Boost 1.47.0 REQUIRED)
   if(Boost_FOUND)
@@ -129,9 +128,6 @@ endif()
 
 # OSX
 if(APPLE)
-  target_compile_definitions(extempore
-    PRIVATE -DTARGET_OS_MAC
-    )
   # tell the compiler that we're using ObjC++
   target_compile_options(extempore PRIVATE -x objective-c++)
   
@@ -147,7 +143,6 @@ endif()
 
 # Linux
 if(UNIX AND NOT APPLE)
-  target_compile_definitions(extempore PRIVATE -DTARGET_OS_LINUX)
   set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
   target_link_libraries(extempore --export-dynamic)
   find_package(X11 REQUIRED)

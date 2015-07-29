@@ -47,7 +47,7 @@
 #include <string>
 #include <vector>
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #include <SDKDDKVer.h>
 //void uSleep(int waitTime);
 #endif
@@ -73,7 +73,7 @@
 #define D_MILLION 1000000.0
 
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #define OS_PATH_DELIM '\\'
 #else
 #define OS_PATH_DELIM '/'

@@ -40,7 +40,7 @@
 #include <sstream>
 #include <math.h>
 
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <stdlib.h>
@@ -947,7 +947,7 @@ namespace extemp {
 
   int OSC::setOSCTimestamp(char* data, double d)
   {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     uint32_t seconds = (uint32_t) d;
 #else
     uint32_t seconds = trunc(d);

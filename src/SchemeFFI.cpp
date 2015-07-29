@@ -42,7 +42,7 @@
 #include "SchemeREPL.h"
 //#include "sys/mman.h"
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #include <Windows.h>
 #include <Windowsx.h>
 #else
@@ -59,7 +59,7 @@
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #else
 #include <dirent.h>
 #endif
@@ -81,7 +81,7 @@
 #include <oniguruma.h>
 #endif
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
 #include <malloc/malloc.h>
 #else
 #include <time.h>
@@ -112,16 +112,16 @@
 #include "llvm/ADT/StringExtras.h"
 ///////////////////////////////////////
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 //#include <unistd.h>
 #include <malloc.h>
-#elif TARGET_OS_MAC
+#elif __APPLE__
 #include <Cocoa/Cocoa.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <AppKit/AppKit.h>
 #endif
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #define PRINT_ERROR(format, ...)		\
     ascii_text_color(1,1,10);			\
     printf(format , __VA_ARGS__);			\
@@ -407,7 +407,7 @@ namespace extemp {
     pointer SchemeFFI::exit_extempore(scheme* _sc, pointer args)
     {
       int rc = (int)ivalue(pair_car(args));
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 	  std::exit(rc);
 #else
       std::_Exit(rc);
@@ -528,7 +528,7 @@ namespace extemp {
     }                                                     
 
   pointer SchemeFFI::pathExpansion(scheme* _sc, pointer args) {    
-  #ifdef TARGET_OS_WINDOWS
+  #ifdef _WIN32
     char* path = string_value(pair_car(args));
     char* exp_path = path;
   #else
@@ -942,7 +942,7 @@ namespace extemp {
     pointer SchemeFFI::openDynamicLib(scheme* _sc, pointer args)
     {
 	//void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 	  char* ccc = string_value(pair_car(args));
 	  size_t ccc_size = (strlen(ccc)+1) * 2; //2 for 16 bytes (wide_char)
 	  size_t converted_chars = 0;
@@ -955,7 +955,7 @@ namespace extemp {
 #endif
 	if (!lib_handle)
 	{
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 	  std::cout << "Error loading library: " << GetLastError() << std::endl;
 	  printf("For Library Path: %ls\n",wstr);
 #else
@@ -968,7 +968,7 @@ namespace extemp {
 
     pointer SchemeFFI::closeDynamicLib(scheme* _sc, pointer args)
     {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
       FreeLibrary((HMODULE)cptr_value(pair_car(args))) ;
 #else
 	dlclose(cptr_value(pair_car(args)));
@@ -1004,11 +1004,11 @@ namespace extemp {
 
     pointer SchemeFFI::platform(scheme* _sc, pointer args)
     {
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
       return mk_string(_sc, "OSX");
-#elif TARGET_OS_LINUX
+#elif __linux__
       return mk_string(_sc, "Linux");
-#elif TARGET_OS_WINDOWS
+#elif _WIN32
 	  return mk_string(_sc, "Windows");
 #else
 	  return mk_string(_sc, "");
@@ -2137,7 +2137,7 @@ namespace extemp {
       }			
         
     char* filename = string_value(pair_cadr(args));
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     std::string str;
     llvm::raw_string_ostream ss(str);
     ss << *m;
@@ -2598,7 +2598,7 @@ namespace extemp {
 	char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
         if(floatin[1]=='x') return pair_car(args); 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 	float f = (float) strtod(floatin, (char**) &floatout);
 #else        
 	float f = strtof(floatin, (char**) &floatout);
@@ -2656,7 +2656,7 @@ namespace extemp {
  	char floatout[256];
         // if already converted to hex value just return Hex String Unchanged
         if(floatin[1]=='x') return pair_car(args); 
- #ifdef TARGET_OS_WINDOWS
+ #ifdef _WIN32
  	double f = strtod(floatin, (char**) &floatout);
  #else
  	double f = strtod(floatin, (char**) &floatout);
@@ -2765,7 +2765,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 	void* library = cptr_value(pair_car(args));
 	char* symname = string_value(pair_cadr(args));
 		
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
         void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
 #else
 	void* ptr = dlsym(library, symname);
@@ -2786,7 +2786,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 
 	EE->lock.acquire();
 		
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
         void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
 #else
 	void* ptr = dlsym(library, symname);
@@ -3074,7 +3074,7 @@ struct timespec double_to_time(double tm) {
     return p3;
   }
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
   pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
   {
     return mk_real(_sc, CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + SchemeFFI::CLOCK_OFFSET);
@@ -3114,7 +3114,7 @@ struct timespec double_to_time(double tm) {
   pointer SchemeFFI::ad_setTime(scheme* _sc, pointer args)
   {
     if(pair_cdr(args) == _sc->NIL) {
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
       AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
 #else
       struct timespec t;

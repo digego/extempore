@@ -41,18 +41,18 @@
 #include "SchemeREPL.h"
 #include "EXTLLVM.h"
 #include <string>
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
 #include <unistd.h>
 #include <signal.h>
 #endif
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
 #include <Cocoa/Cocoa.h>
 #include <AppKit/AppKit.h>
 #endif
 
 
 // WARNING EVIL WINDOWS TERMINATION CODE!
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 BOOL CtrlHandler( DWORD fdwCtrlType ) 
 { 
   switch( fdwCtrlType ) 
@@ -133,13 +133,13 @@ int main(int argc, char** argv)
     int primary_port = 7099;
     int utility_port = 7098;
 
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
     // redirect stderr to NULL
     freopen("/tmp/","w",stderr);
 #endif
 
 // more evil windows termination code
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
 #else
     // signal handlers for OSX/Linux
@@ -209,7 +209,7 @@ int main(int argc, char** argv)
 	  return 1;
 #endif
         case OPT_REALTIME:
-#ifdef TARGET_OS_WINDOWS          
+#ifdef _WIN32          
           SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
 #else
 	  std::cout << "Realtime priority setting not available on your platform" << std::endl;
@@ -275,7 +275,7 @@ int main(int argc, char** argv)
     extemp::EXTLLVM::I()->initLLVM();
     extemp::SchemeProcess* primary = 0;
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
     // we need to instantiate NSApp before potentially
     // calling something OSXy (like a window) inside
     // an initexpr.
@@ -291,7 +291,7 @@ int main(int argc, char** argv)
       }
     else
       {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
         printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
         exit(1);
 #else
@@ -329,11 +329,11 @@ int main(int argc, char** argv)
     primary_repl->connectToProcessAtHostname(host,primary_port);
 
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
     [[NSApplication sharedApplication] run];
 #else
     while(1) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
       Sleep(5000);
 #else
       sleep(5000);

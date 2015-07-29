@@ -40,9 +40,9 @@
 #include "UNIV.h"
 #include "EXTThread.h"
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #include <Windows.h>
-#elif TARGET_OS_MAC
+#elif __APPLE__
 #include <mach/thread_policy.h>
 #include <mach/thread_act.h>
 #endif
@@ -171,7 +171,7 @@ namespace extemp
 
   int EXTThread::setPriority(int priority, bool realtime)
   {
-#ifdef TARGET_OS_LINUX
+#ifdef __linux__
     sched_param param;
     int policy;
     pthread_getschedparam(pthread,&policy,&param);
@@ -188,7 +188,7 @@ namespace extemp
     }else{
       return 1;
     }
-#elif TARGET_OS_MAC    
+#elif __APPLE__    
     struct thread_time_constraint_policy ttcpolicy;
     int result;
     
@@ -217,7 +217,7 @@ namespace extemp
 
   int EXTThread::getPriority()
   {
-#ifdef TARGET_OS_LINUX 
+#ifdef __linux__ 
     int policy;
     sched_param param;
     pthread_getschedparam(pthread,&policy,&param);

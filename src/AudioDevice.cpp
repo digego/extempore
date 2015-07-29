@@ -42,11 +42,11 @@
 //#include "EXTMonitor.h"
 #include "EXTLLVM.h"
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #include <Windows.h>
 #endif
 
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
 #include <CoreAudio/HostTime.h>
 #include <mach/mach_init.h>
 #include <mach/task_policy.h>
@@ -106,7 +106,7 @@ double getRealTime()
 }
 #endif //EXT_BOOST
 
-#ifndef TARGET_OS_WINDOWS //works on Linux && OSX
+#ifndef _WIN32 //works on Linux && OSX
 double time_to_double(struct timespec t) {
   return t.tv_sec + t.tv_nsec/D_BILLION;
 }
@@ -124,14 +124,14 @@ struct timespec double_to_time(double tm) {
 }
 #endif
 
-#ifdef TARGET_OS_LINUX
+#ifdef __linux__
 double getRealTime()
 {
   struct timespec t;
   clock_gettime(CLOCK_REALTIME,&t);
   return time_to_double(t);
 }
-#elif TARGET_OS_MAC
+#elif __APPLE__
 #include <CoreAudio/HostTime.h>
 
 double getRealTime()
@@ -160,7 +160,7 @@ int set_thread_realtime(thread_port_t threadport, float period, float computatio
 
 #endif
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #define isnan(x) ((x) != (x))
 #define isinf(x) (isnan(x-x))
 #endif
@@ -212,15 +212,15 @@ namespace extemp {
 #define NANO_SLEEP_DURATION 100000
   static volatile int32_t _atomic_thread_done_cnt = 0;
   static volatile int64_t _signal_cnt = 0;
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
   static struct timespec MT_SLEEP_DURATION = {0,NANO_SLEEP_DURATION};
 #endif
   void* audioCallbackMT(void* dat) {    
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
     Float64 clockFrequency = AudioGetHostClockFrequency();
     //set_thread_realtime(pthread_mach_thread_np(pthread_self()), sclockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
-#elif TARGET_OS_LINUX
+#elif __linux__
     pthread_t pt = pthread_self();
     int policy;
     sched_param param;
@@ -231,7 +231,7 @@ namespace extemp {
     if(res != 0) {
       printf("Failed to set realtime priority for Audio thread\nERR:%s\n",strerror(res));
     }
-#elif TARGET_OS_WINDOWS // fix for RT windows
+#elif _WIN32 // fix for RT windows
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     printf("Starting RT Audio Process\n");
@@ -267,7 +267,7 @@ namespace extemp {
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
       SAMPLE (*closure) (SAMPLE,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,long,long,SAMPLE*)) cache_closure);
       int cnt = 0;
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 	  printf("MT Audio on Windows NOT Implemented!\n");
         while(_signal_cnt <= lcount) { 
           //sleep??
@@ -310,9 +310,9 @@ namespace extemp {
         }
       }
 
-#ifdef TARGET_OS_LINUX
+#ifdef __linux__
       __sync_fetch_and_add(&_atomic_thread_done_cnt,1);
-#elif TARGET_OS_MAC
+#elif __APPLE__
       OSAtomicAdd32(1,&_atomic_thread_done_cnt);
 #else
       printf("NO MT Audio Support on Windows Yet!!\n");
@@ -326,11 +326,11 @@ namespace extemp {
 
   // buffered version of MT audio callback
   void* audioCallbackMTBuf(void* dat) {
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
     Float64 clockFrequency = AudioGetHostClockFrequency();
     //set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
-#elif TARGET_OS_LINUX
+#elif __linux__
     pthread_t pt = pthread_self();
     int policy;
     sched_param param;
@@ -341,7 +341,7 @@ namespace extemp {
     if(res != 0) {
       printf("Failed to set realtime priority for Audio thread\nERR:%s\n",strerror(res));
     }
-#elif TARGET_OS_WINDOWS // fix for RT windows
+#elif _WIN32 // fix for RT windows
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     printf("Starting RT Buffered Audio Process\n");
@@ -366,7 +366,7 @@ namespace extemp {
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
       void (*closure) (float*,float*,long,void*) = *((void(**)(float*,float*,long,void*)) cache_closure);
       int cnt = 0;
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 	  printf("MT Audio on Windows NOT Implemented!\n");
         while(_signal_cnt <= lcount) { 
           //sleep??
@@ -385,9 +385,9 @@ namespace extemp {
       cache_wrapper(zone, (void*)closure, inbuf, outbuf, (float)UNIV::DEVICE_TIME, NULL);
       llvm_zone_reset(zone);
 
-#ifdef TARGET_OS_LINUX
+#ifdef __linux__
       __sync_fetch_and_add(&_atomic_thread_done_cnt,1);
-#elif TARGET_OS_MAC
+#elif __APPLE__
       OSAtomicAdd32(1,&_atomic_thread_done_cnt);
 #else
       // NO ATOMIC SUPPORT ON WINDOWS YET!!!!
@@ -487,7 +487,7 @@ namespace extemp {
       // start computing in all audio threads
       _atomic_thread_done_cnt = 0;
       int cnt=0;          
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
       if(zerolatency) {
         _signal_cnt++;
         while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
@@ -496,7 +496,7 @@ namespace extemp {
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
-#elif TARGET_OS_LINUX
+#elif __linux__
       if(zerolatency) {
         _signal_cnt++;
         while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
@@ -539,7 +539,7 @@ namespace extemp {
             llvm_zone_reset(zone);
           }
       }
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
       if(!zerolatency) {
         _signal_cnt++;
         while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
@@ -548,7 +548,7 @@ namespace extemp {
           nanosleep(&MT_SLEEP_DURATION ,NULL);
         }
       }
-#elif TARGET_OS_LINUX
+#elif __linux__
       if(!zerolatency) {
         _signal_cnt++;
         while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
@@ -573,13 +573,13 @@ namespace extemp {
       _atomic_thread_done_cnt = 0;
       _signal_cnt++;
       int cnt=0;          
-#ifdef TARGET_OS_MAC
+#ifdef __APPLE__
       while(!OSAtomicCompareAndSwap32(numthreads,0,&_atomic_thread_done_cnt)) { 
         cnt++;
         if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
         nanosleep(&MT_SLEEP_DURATION ,NULL);
       }
-#elif TARGET_OS_LINUX
+#elif __linux__
       while(!__sync_bool_compare_and_swap(&_atomic_thread_done_cnt,numthreads,0)) { 
         cnt++;
         if (0 == (cnt % 100000)) printf("Locked with threads:%d of %d cnt(%lld)\n!",_atomic_thread_done_cnt,numthreads,_signal_cnt);
@@ -874,7 +874,7 @@ namespace extemp {
     ascii_text_color(0,2,10);
     printf("----------------------------------------------------------\n\n");
     ascii_text_color(0,9,10);
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     Pa_Terminate();
 #else
     fflush(stdout);
@@ -893,12 +893,12 @@ namespace extemp {
     ascii_text_color(0,7,10);
     printf("Code will run fine, but there will be no audio output.\n");
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 	printf("--noaudio option not supported on Windows OS ... aborting!\n");
 	exit(1);
 #endif
 
-#ifdef TARGET_OS_LINUX
+#ifdef __linux__
     // check the timer resolution
     struct timespec res;     
     clock_getres(CLOCK_REALTIME,&res);
@@ -925,7 +925,7 @@ namespace extemp {
       device_time = UNIV::DEVICE_TIME;
       if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 	  // double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
 #else
       struct timespec sleepDur = double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));

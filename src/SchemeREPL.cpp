@@ -49,7 +49,7 @@
 #include <netdb.h>         /* host to IP resolution       */
 #endif
 
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <iostream>
@@ -219,7 +219,7 @@ namespace extemp {
 	    return false;
 	}
         // wait for main server to start up first time out of the gates.
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
         Sleep(1000);
 #else
         sleep(1);

@@ -43,13 +43,13 @@
 #include "OSC.h"
 #include "math.h"
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
 #include <malloc.h>
 #else
 #include <sys/types.h>
 #endif
 
-#ifdef TARGET_OS_LINUX
+#ifdef __linux__
 #include <sys/syscall.h>
 #endif
 
@@ -65,7 +65,7 @@
 #include <arpa/inet.h>
 #endif
 
-#ifndef TARGET_OS_WINDOWS
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 
@@ -122,7 +122,7 @@ std::map<std::string,std::string> LLVM_STR_CONST_MAP;
 
 extemp::EXTMutex alloc_mutex("alloc mutex");
 
-//#ifdef TARGET_OS_WINDOWS
+//#ifdef _WIN32
 //double log2(double num) {
 //	return log(num)/log(2.0);
 //}
@@ -226,7 +226,7 @@ llvm_zone_t* llvm_threads_get_callback_zone()
     zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
     LLVM_CALLBACK_ZONES[boost::this_thread::get_id()] = zone;
   }
-#elif TARGET_OS_MAC
+#elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());  
   zone = LLVM_CALLBACK_ZONES[(long)tid];
   if(!zone) {
@@ -251,7 +251,7 @@ llvm_zone_stack* llvm_threads_get_zone_stack()
   llvm_zone_stack* stack = 0;
 #ifdef EXT_BOOST
   stack = LLVM_ZONE_STACKS[boost::this_thread::get_id()];
-#elif TARGET_OS_MAC
+#elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   stack = LLVM_ZONE_STACKS[(long)tid];
 #else
@@ -268,7 +268,7 @@ void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
 {
 #ifdef EXT_BOOST
   LLVM_ZONE_STACKS[boost::this_thread::get_id()] = llvm_zone_stack;
-#elif TARGET_OS_MAC
+#elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   LLVM_ZONE_STACKS[(long)tid] = llvm_zone_stack;
 #else
@@ -282,7 +282,7 @@ void llvm_threads_inc_zone_stacksize()
 {
 #ifdef EXT_BOOST
   LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()] += 1;
-#elif TARGET_OS_MAC
+#elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   LLVM_ZONE_STACKSIZES[(long)tid] += 1;
 #else
@@ -296,7 +296,7 @@ void llvm_threads_dec_zone_stacksize()
 {
 #ifdef EXT_BOOST
   LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()] -= 1;
-#elif TARGET_OS_MAC
+#elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   LLVM_ZONE_STACKSIZES[(long)tid] -= 1;
 #else
@@ -311,7 +311,7 @@ uint64_t llvm_threads_get_zone_stacksize()
   uint64_t size = 0;
 #ifdef EXT_BOOST
   size = LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()];
-#elif TARGET_OS_MAC
+#elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   size = LLVM_ZONE_STACKSIZES[(long)tid];
 #else
@@ -398,7 +398,7 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
       ascii_text_color(0,9,10);
       exit(1);
     }
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     zone->memory = malloc((size_t) size);
 #else
     // zone->memory = malloc((size_t) size);
@@ -659,7 +659,7 @@ int llvm_printf(char* format, ...)
 {
     va_list ap;
     va_start(ap,format);
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     char* ret = (char*) _alloca(2048);
 #else
     char* ret = (char*) alloca(2048);
@@ -694,7 +694,7 @@ int llvm_sscanf(char* buffer, char* format, ...)
 {
     va_list ap;
     va_start(ap,format);
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     char* ret = (char*) _alloca(2048);
 #else
     char* ret = (char*) alloca(2048);
@@ -820,7 +820,7 @@ long long llvm_get_next_prime(long long start)
 /////////////////////////////////////////////
 
 void* thread_fork(void*(*start_routine)(void*),void* args) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return NULL;
 #else
   pthread_t* t = (pthread_t*) malloc(sizeof(pthread_t));
@@ -831,7 +831,7 @@ void* thread_fork(void*(*start_routine)(void*),void* args) {
 }
 
 int thread_join(void* thread) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return NULL;
 #else
   pthread_t* t = (pthread_t*) thread;
@@ -840,7 +840,7 @@ int thread_join(void* thread) {
 }
 
 int thread_kill(void* thread) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return NULL;
 #else
   pthread_t* t = (pthread_t*) thread;
@@ -849,7 +849,7 @@ int thread_kill(void* thread) {
 }
 
 void* thread_self() {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return NULL;
 #else
   pthread_t t = pthread_self();
@@ -859,7 +859,7 @@ void* thread_self() {
 
 // return value is number of nanosecs sleep missed by
 int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return NULL;
 #else
   struct timespec a, b;
@@ -871,7 +871,7 @@ int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
 }
 
 void* mutex_create() {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return NULL;
 #else
   pthread_mutex_t* mutex = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
@@ -882,7 +882,7 @@ void* mutex_create() {
 }
 
 int mutex_destroy(void* mutex) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return NULL;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
@@ -891,7 +891,7 @@ int mutex_destroy(void* mutex) {
 }
 
 int mutex_lock(void* mutex) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return -1;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
@@ -900,7 +900,7 @@ int mutex_lock(void* mutex) {
 }
 
 int mutex_unlock(void* mutex) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return -1;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
@@ -909,7 +909,7 @@ int mutex_unlock(void* mutex) {
 }
 
 int mutex_trylock(void* mutex) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
   return -1;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
@@ -1205,7 +1205,7 @@ struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, u
   if(alloctype == 1) {
     t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
   /* }  else if(alloctype == 2) {
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     t = (struct closure_address_table*) _alloca(sizeof(struct closure_address_table));
 #else
     t = (struct closure_address_table*) alloca(sizeof(struct closure_address_table));
@@ -1728,7 +1728,7 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&imp_rand2_f);	
 
 
-//#ifdef TARGET_OS_WINDOWS
+//#ifdef _WIN32
 //	    gv = M->getNamedValue(std::string("log2"));
 //	    EE->updateGlobalMapping(gv,(void*)&log2);		
 //#endif
