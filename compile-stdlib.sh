@@ -28,6 +28,7 @@ libs/external/rtmidi.xtm \
 libs/external/glib.xtm \
 libs/external/stb_image.xtm \
 libs/external/gl.xtm \
+libs/external/gl-compatibility.xtm \
 libs/external/glext.xtm \
 libs/external/glfw3.xtm \
 libs/external/graphics-pipeline.xtm \
