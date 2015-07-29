@@ -2443,7 +2443,7 @@ If you don't want to be prompted for this name each time, set the
 (defun extmpore-AOT-compile-lib (lib-path)
   (interactive "sLibrary: ")
   (let ((default-directory user-extempore-directory))
-    (async-shell-command (format "AOT_LIBS=%s ./compile-stdlib.sh --port=17099" lib-path))))
+    (async-shell-command (format "AOT_LIBS=\"%s\" ./compile-stdlib.sh --port=17099" lib-path))))
 
 (provide 'extempore)
 
