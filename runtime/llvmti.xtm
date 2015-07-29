@@ -102,9 +102,11 @@
   (lambda ()
     (set! *impc:ti:builtin-cache* '())))
 
+;; this is never called in regular compilation! the builtin cache is
+;; populated by hand (see above) and is mostly here for documentation
+;; (especially for language builtins)
 (define impc:ti:register-new-builtin
   (lambda (builtin-name type-str docstring args)
-    ;; (println 'builtin-name: builtin-name 'type: type-str 'docstring: docstring 'args: args)
     ;; check arg types
     (if (not (and (or (string? builtin-name) (begin (println 'bad 'builtin-name: builtin-name) #f))
                   (or (string? type-str) (begin (println 'bad 'type: type-str) #f))
@@ -7484,6 +7486,11 @@
               (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
           `(impc:ti:parametric-poly-pass '(definec ,@args))))))
 
+(impc:ti:register-new-builtin
+ "bind-func"
+ ""
+ "compile an xtlang closure"
+ '(closure-name[:closure-type] [zone-size] [docstring] closure-body))
 
 (define-macro (bind-typevar name . args)
   (if (string? name) (set! name (string->symbol name)))
@@ -7523,6 +7530,11 @@
                r))
            )))
 
+(impc:ti:register-new-builtin
+ "bind-alias"
+ ""
+ "bind an xtlang type alias"
+ '(alias-name alias-target [docstring]))
 
 (define impc:ti:compile-type-dataconstructors
   (lambda (name type generic)
@@ -7693,6 +7705,11 @@
             (impc:ir:pretty-print-type (impc:ti:get-namedtype-type ,(symbol->string symbol))))
         (if (impc:ti:get-generictype-candidate-types ',symbol) #t #f)))))
 
+(impc:ti:register-new-builtin
+ "bind-type"
+ ""
+ "bind an xtlang named type"
+ '(name type [docstring]))
 
 (define-macro (impc:pretty-print-vars . varlist)
   (map (lambda (var)
@@ -7804,6 +7821,11 @@
                                                           ,(impc:ir:pretty-print-type t))))
           (else (impc:compiler:print-missing-identifier-error type 'type)))))
 
+(impc:ti:register-new-builtin
+ "bind-val"
+ ""
+ "bind a global variable"
+ '(variable-name type [value] [docstring]))
 
 (define-macro (bind-poly poly_sym implementation_sym . docstring)
   (if (impc:ti:genericfunc-exists? implementation_sym)
@@ -7815,6 +7837,12 @@
            (impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
            (impc:compiler:print-polying-details-to-log "PolyFunc:" ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ,(impc:ir:pretty-print-type type)))
         `(impc:compiler:print-missing-identifier-error ',implementation_sym 'closure))))
+
+(impc:ti:register-new-builtin
+ "bind-poly"
+ ""
+ "bind a polymorphic symbol"
+ '(poly-name closure-name [docstring]))
 
 (define sys:load-dylib
   (lambda (dylib-path)
@@ -7844,6 +7872,12 @@
                      ,(if (and (not (null? args)) (string? (car (reverse args))))
                           (car (reverse args))
                           "")))
+
+(impc:ti:register-new-builtin
+ "bind-lib"
+ ""
+ "bind a C function from a shared library"
+ '(libname function-name [docstring]))
 
 ;; this was previously called __dynamic-bind
 (define impc:ti:bind-lib

@@ -1969,7 +1969,9 @@
      '(category . "builtin")
      (cons 'name (symbol->string name-sym))
      (cons 'args (impc:ti:get-builtin-args (symbol->string name-sym)))
-     (cons 'type (impc:ti:get-builtin-type-str (symbol->string name-sym)))
+     (cons 'type
+           (let ((type (impc:ti:get-builtin-type-str (symbol->string name-sym))))
+             (if (string=? type "") '() type)))
      (cons 'docstring
            (let ((docstring (impc:ti:get-builtin-docstring (symbol->string name-sym))))
              (if (string=? docstring "") '() docstring))))))
@@ -2200,7 +2202,8 @@
                  (sexpr->string args))
              file-port))
     (display ",\n  \"type\": " file-port)
-    (write (cdr (assoc 'type xtmdoc-alist)) file-port)
+    (let ((type (cdr (assoc 'type xtmdoc-alist))))
+      (write (if (null? type) 'null type) file-port))
     (display ",\n  \"docstring\": " file-port)
     (let ((docstring (cdr (assoc 'docstring xtmdoc-alist))))
       (write (if (null? docstring) 'null docstring) file-port))
