@@ -1281,10 +1281,10 @@ command to run."
                  (if docstring
                      (concat " - " (propertize (if (> (+ (length docstring)
                                                          (length eldoc-string))
-                                                      (- max-eldoc-string-length 6))
+                                                      (- max-eldoc-string-length 17))
                                                    (concat (substring docstring 0 (- max-eldoc-string-length
                                                                                      (length eldoc-string)
-                                                                                     6))
+                                                                                     -17))
                                                            "...")
                                                  docstring)
                                                'face 'font-lock-string-face))))))))
