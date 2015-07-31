@@ -7748,23 +7748,22 @@
               ;; if the previous steps failed
               (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
               (impc:aot:do-or-emit
-               (call-as-xtlang (set! ,symbol ,value)))
+               (call-as-xtlang (set! ,symbol ,value) void))
               (impc:compiler:print-binding-details-to-log "SetValue:"
                                                           ,(symbol->string symbol)
                                                           ,(impc:ir:pretty-print-type t))))
-          ;; float/int literal
-          ((and (or (impc:ir:number? t) (impc:ir:boolean? t))
-                (not (impc:ir:pointer? t))
-                (not (list? (eval value))))
+          ;; 
+          ((and (or (impc:ir:number? t)
+                    (impc:ir:boolean? t)
+                    (not (impc:ir:pointer? t))))
            `(begin
-              (llvm:compile-ir
-               (string-append "@" ,(symbol->string symbol)
-                              " = dllexport global "
-                              ,(impc:ir:get-type-str t) " "
-                              ,(if (= t *impc:ir:fp32*)
-                                   (llvm:convert-float (atom->string (eval value)))
-                                   (atom->string (eval value)))))
+              (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                              " = dllexport global "
+                                              ,(impc:ir:get-type-str t)
+                                              " zeroinitializer"))
               (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+              (impc:aot:do-or-emit
+               (call-as-xtlang (set! ,symbol (convert ,value ,type)) void))
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
               (impc:compiler:print-binding-details-to-log "SetValue:"
@@ -7784,7 +7783,8 @@
                                                                    (if (impc:ir:number? t)
                                                                        (impc:ir:get-type-size t)
                                                                        (/ (sys:pointer-size) 8))))
-                                                       ,type))))
+                                                       ,type))
+                                   void))
                   ;; we should really take the globalvar out of the cache
                   ;; if the previous steps failed
                   (impc:compiler:print-binding-details-to-log "SetValue:"
