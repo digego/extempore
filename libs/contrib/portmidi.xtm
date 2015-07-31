@@ -547,6 +547,35 @@
 ;;     PmTimestamp    timestamp;
 ;; } PmEvent;
 (bind-type PmEvent <PmMessage,PmTimestamp>)
+
+(bind-func PmEvent_message
+  (lambda (event:PmEvent*)
+    (tref event 0)))
+
+(bind-func PmEvent_timestamp
+  (lambda (event:PmEvent*)
+    (tref event 2)))
+
+(bind-func PmEvent_print
+  "specialised print function for PmEvent*"
+  (lambda (pmevent:PmEvent*)
+    (printf "<PmEvent: message=%d timestamp=%d>"
+            (tref pmevent 0))
+    void))
+
+(bind-poly print PmEvent_print)
+
+(bind-func PmEvent_toString
+  "specialised toString function for PmEvent*"
+  (lambda (pmevent:PmEvent*)
+    (let ((str:i8* (salloc 256)))
+      (sprintf str "<PmEvent: message=%d timestamp=%d>"
+               (tref pmevent 0))
+      (Str str))))
+
+(bind-poly toString PmEvent_toString)
+
+
 ;; /** 
 ;;     @}
 ;; */
