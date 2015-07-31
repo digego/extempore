@@ -1278,13 +1278,13 @@ command to run."
         (message
          "%s"
          (concat eldoc-string
-                 (if docstring
+                 (if (and docstring (< (length eldoc-string) max-eldoc-string-length))
                      (concat " - " (propertize (if (> (+ (length docstring)
                                                          (length eldoc-string))
                                                       (- max-eldoc-string-length 17))
                                                    (concat (substring docstring 0 (- max-eldoc-string-length
                                                                                      (length eldoc-string)
-                                                                                     -17))
+                                                                                     17))
                                                            "...")
                                                  docstring)
                                                'face 'font-lock-string-face))))))))
