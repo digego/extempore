@@ -554,13 +554,16 @@
 
 (bind-func PmEvent_timestamp
   (lambda (event:PmEvent*)
-    (tref event 2)))
+    (tref event 1)))
 
 (bind-func PmEvent_print
   "specialised print function for PmEvent*"
   (lambda (pmevent:PmEvent*)
-    (printf "<PmEvent: message=%d timestamp=%d>"
-            (tref pmevent 0))
+    (printf "<PmEvent: status=%d data1=%d data2=%d timestamp=%d>"
+            (Pm_MessageStatus (tref pmevent 0))
+            (Pm_MessageData1 (tref pmevent 0))
+            (Pm_MessageData2 (tref pmevent 0))
+            (tref pmevent 1))
     void))
 
 (bind-poly print PmEvent_print)
@@ -569,8 +572,11 @@
   "specialised toString function for PmEvent*"
   (lambda (pmevent:PmEvent*)
     (let ((str:i8* (salloc 256)))
-      (sprintf str "<PmEvent: message=%d timestamp=%d>"
-               (tref pmevent 0))
+      (sprintf str "<PmEvent: status=%d data1=%d data2=%d timestamp=%d>"
+               (Pm_MessageStatus (tref pmevent 0))
+               (Pm_MessageData1 (tref pmevent 0))
+               (Pm_MessageData2 (tref pmevent 0))
+               (tref pmevent 1))
       (Str str))))
 
 (bind-poly toString PmEvent_toString)
