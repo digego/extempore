@@ -145,6 +145,15 @@
 (bind-poly print Widget_print)
 (bind-poly toString Widget_toString)
 
+;; not sure why the conversion to i64 is necessary - this was a result
+;; of the most recent SB generics update
+(bind-func Widget_equal
+  "naive pointer equality check for Widgets"
+  (lambda (w1:Widget* w2:Widget*)
+    (= (convert w1 i64) (convert w2 i64))))
+
+(bind-poly equal Widget_equal)
+
 ;; create
 
 (bind-func Widget_with_cb
@@ -169,13 +178,13 @@
     (not (Widget_leaf_p widget))))
 
 (bind-func Widget_parent_p
-  (lambda (child:Widget* parent:Widget*)
-    (= (Widget_parent child) parent)))
+  (lambda (child parent)
+    (equal (Widget_parent child) parent)))
 
 (bind-func Widget_child_p
   (lambda (parent:Widget* child:Widget*)
-    (or (= (Widget_left_child parent) child)
-        (= (Widget_right_child parent) child))))
+    (or (equal (Widget_left_child parent) child)
+        (equal (Widget_right_child parent) child))))
 
 ;; walk the widget tree, applying fn to each widget
 (bind-func Widget_walk_preorder
@@ -487,7 +496,7 @@ If parent_widget is null, new_widget becomes the new GUI root node.
            (println "gui_add_widget: cannot add non-leaf widget")
            0:i1)
           ((not (null? (gui_find_widget_with_id (Widget_id new_widget))))
-           (println "gui_add_widget: cannot add widget, a widget with id =" (Widget_id new_widget) "is already in the tree")
+           (println "gui_add_widget: cannot add widget, a widget with id equal" (Widget_id new_widget) "is already in the tree")
            0:i1)
           ((not (and (> split_size 0.)
                      (< split_size 1.)))
@@ -515,9 +524,9 @@ If parent_widget is null, new_widget becomes the new GUI root node.
              (Widget_set_parent new_rchild new_parent)
              (if (null? grandparent_widget)
                  (GUI_set_root EXTEMPORE_GUI new_parent)
-                 (if (= (Widget_left_child grandparent_widget) parent_widget)
+                 (if (equal (Widget_left_child grandparent_widget) parent_widget)
                      (Widget_set_left_child grandparent_widget new_parent)
-                     (if (= (Widget_right_child grandparent_widget) parent_widget)
+                     (if (equal (Widget_right_child grandparent_widget) parent_widget)
                          (Widget_set_right_child grandparent_widget new_parent))
                      (println "gui_add_widget: could not reconnect the widget tree")))
              1:i1)))))
