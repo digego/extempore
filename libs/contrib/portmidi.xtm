@@ -153,6 +153,30 @@
 ;; } PmDeviceInfo;
 
 (bind-type PmDeviceInfo <i32,i8*,i8*,i32,i32,i32>)
+
+(bind-func PmDeviceInfo_print
+  (lambda (pmdi:PmDeviceInfo*)
+    (printf "<PmDeviceInfo: interface=%s name=%s input? %d output? %d"
+            (tref pmdi 1)
+            (tref pmdi 2)
+            (tref pmdi 3)
+            (tref pmdi 4))
+    void))
+
+(bind-poly print PmDeviceInfo_print)
+
+(bind-func PmDeviceInfo_toString
+  (lambda (pmdi:PmDeviceInfo*)
+    (let ((str:i8* (zalloc 256)))
+      (sprintf str "<PmDeviceInfo: interface=%s name=%s input? %d output? %d"
+               (tref pmdi 1)
+               (tref pmdi 2)
+               (tref pmdi 3)
+               (tref pmdi 4))
+      (Str str))))
+
+(bind-poly toString PmDeviceInfo_toString)
+
 ;; /**  Get devices count, ids range from 0 to Pm_CountDevices()-1. */
 (bind-lib libportmidi Pm_CountDevices [i32]*)
 ;; /**
