@@ -7752,20 +7752,30 @@
               (impc:compiler:print-binding-details-to-log "SetValue:"
                                                           ,(symbol->string symbol)
                                                           ,(impc:ir:pretty-print-type t))))
-          ;; 
+          ;; non-pointer values
           ((and (or (impc:ir:number? t)
                     (impc:ir:boolean? t)
                     (not (impc:ir:pointer? t))))
            `(begin
               (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                               " = dllexport global "
-                                              ,(impc:ir:get-type-str t)
-                                              " zeroinitializer"))
+                                              ,(impc:ir:get-type-str t) " "
+                                              ,(if (number? value)
+                                                   ;; can we serialise the value straight into the
+                                                   ;;  IR? (e.g. i32/i64/float/double)
+                                                   (if (= t *impc:ir:fp32*)
+                                                       (llvm:convert-float (atom->string value))
+                                                       (atom->string value))
+                                                   ;; otherwise use zeroinitializer and we'll just use a
+                                                   ;; set! inside a call-as-xtlang a bit further down
+                                                   "zeroinitializer")))
               (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
-              (impc:aot:do-or-emit
-               (call-as-xtlang (set! ,symbol (convert ,value ,type)) void))
-              ;; we should really take the globalvar out of the cache
-              ;; if the previous steps failed
+              ;; set value for non int/float literals
+              ,(if (not (number? value))
+                   `(impc:aot:do-or-emit
+                     (call-as-xtlang (set! ,symbol (convert ,value ,type)) void)))
+              ;; we should really take the globalvar out of the
+              ;; cache if any of the previous steps failed
               (impc:compiler:print-binding-details-to-log "SetValue:"
                                                           ,(symbol->string symbol)
                                                           ,(impc:ir:pretty-print-type t))))
