@@ -18,7 +18,6 @@
   (sys:load \"libs/external/glfw3.xtm\")
   (sys:load \"libs/external/instruments_ext.xtm\")
   (sys:load \"libs/external/nanovg.xtm\")
-  (sys:load \"libs/external/rtmidi.xtm\")
   (sys:load \"libs/external/sndfile.xtm\")
   (sys:load \"libs/external/stb_image.xtm\")
   (xtmdoc-export-caches-to-json \"$1\")
