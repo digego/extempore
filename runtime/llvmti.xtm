@@ -7784,7 +7784,7 @@
                                                           ,(impc:ir:pretty-print-type t))))
           ;; pointer
           ((impc:ir:pointer? t)
-           (if (integer? (eval value))
+           (if (or (not value) (integer? value))
                `(begin
                   (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                                   " = dllexport global "
@@ -7792,7 +7792,7 @@
                                                   " zeroinitializer"))
                   (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
                   (impc:aot:do-or-emit
-                   (call-as-xtlang (set! ,symbol (cast (malloc ,(* (eval value)
+                   (call-as-xtlang (set! ,symbol (cast (malloc ,(* (or value 1)
                                                                    (if (impc:ir:number? t)
                                                                        (impc:ir:get-type-size t)
                                                                        (/ (sys:pointer-size) 8))))
