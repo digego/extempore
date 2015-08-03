@@ -620,9 +620,12 @@ entry:
 ret i8* %e
 }
 
-declare i64 @llvm_now()
-declare double @llvm_samplerate()
+declare i32 @llvm_samplerate()
+declare i32 @llvm_frames()
+declare i32 @llvm_channels()
+declare i32 @llvm_in_channels()
 
+declare i64 @llvm_now()
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SCHEME STUFF

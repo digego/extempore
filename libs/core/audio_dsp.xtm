@@ -45,18 +45,18 @@
 
 ;; bind some global audio values
 (if (not (impc:ti:globalvar-exists? "SAMPLERATE"))
-    (begin (bind-val SAMPLERATE SAMPLE (integer->real *au:samplerate*)
+    (begin (bind-val SAMPLERATE SAMPLE (llvm_samplerate)
                      "audio sample rate")
-           (bind-val SRs SAMPLE (integer->real *au:samplerate*) "audio sample rate")
-           (bind-val SRf float (integer->real *au:samplerate*) "audio sample rate (float)")
-           (bind-val SRd double (integer->real *au:samplerate*) "audio sample rate (double)")
-           (bind-val SR i64 *au:samplerate*) "audio sample rate (i64)"))
+           (bind-val SRs SAMPLE SAMPLERATE "audio sample rate")
+           (bind-val SRf float SAMPLERATE "audio sample rate (float)")
+           (bind-val SRd double SAMPLERATE "audio sample rate (double)")
+           (bind-val SR i64 SAMPLERATE) "audio sample rate (i64)"))
 (if (not (impc:ti:globalvar-exists? "CHANNELS"))
-    (bind-val CHANNELS i64 *au:channels*) "number of audio output channels")
+    (bind-val CHANNELS i64 (llvm_channels)) "number of audio output channels")
 (if (not (impc:ti:globalvar-exists? "IN_CHANNELS"))
-    (bind-val IN_CHANNELS i64 *au:in-channels*) "number of audio input channels")
+    (bind-val IN_CHANNELS i64 (llvm_in_channels)) "number of audio input channels")
 (if (not (impc:ti:globalvar-exists? "FRAMES"))
-    (bind-val FRAMES i64 *au:block-size*) "audio signal chain block size")
+    (bind-val FRAMES i64 (llvm_frames)) "audio signal chain block size")
 
 (bind-func print_audio_state
   (lambda ()

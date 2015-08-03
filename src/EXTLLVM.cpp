@@ -1000,26 +1000,13 @@ double llvm_atan2(double x,double y) { return atan2(x,y); }
 // double llvm_sqrt(double x) { return sqrt(x); }
 // double llvm_fabs(double x) { return fabs(x); }
 
-
-// double llvm_samplerate()
-// {
-//     return (double) extemp::UNIV::SAMPLERATE;
-// }
-
-// double llvm_frames()
-// {
-//   return (double) extemp::UNIV::FRAMES;
-// }
-
-// double llvm_channels_in()
-// {
-//     return (double) extemp::UNIV::CHANNELS;
-// }
-
-// double llvm_channels_out()
-// {
-//     return (double) extemp::UNIV::IN_CHANNELS;
-// }
+// these shouldn't ever be large, so it should be ok to cast to signed
+// int for returning into xtlang (which prefers signed ints). I hope
+// this doesn't come back to bite me one day.
+int32_t llvm_samplerate() { return (int32_t)extemp::UNIV::SAMPLERATE; }
+int32_t llvm_frames() { return (int32_t)extemp::UNIV::FRAMES; }
+int32_t llvm_channels() { return (int32_t)extemp::UNIV::CHANNELS; }
+int32_t llvm_in_channels() { return (int32_t)extemp::UNIV::IN_CHANNELS; }
 
 double imp_randd()
 {
@@ -1662,8 +1649,15 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("ascii_text_color"));
 	    EE->updateGlobalMapping(gv,(void*)&ascii_text_color);
 	    
-	    // gv = M->getNamedValue(std::string("llvm_samplerate"));
-	    // EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
+	    gv = M->getNamedValue(std::string("llvm_samplerate"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_samplerate);
+	    gv = M->getNamedValue(std::string("llvm_frames"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_frames);
+	    gv = M->getNamedValue(std::string("llvm_channels"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_channels);
+	    gv = M->getNamedValue(std::string("llvm_in_channels"));
+	    EE->updateGlobalMapping(gv,(void*)&llvm_in_channels);
+
 	    gv = M->getNamedValue(std::string("llvm_now"));
 	    EE->updateGlobalMapping(gv,(void*)&llvm_now);
 	    gv = M->getNamedValue(std::string("llvm_zone_reset"));
