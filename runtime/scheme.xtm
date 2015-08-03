@@ -2142,70 +2142,73 @@
                         "generic type"
                         "type alias"
                         "builtin")))
-      (let ((lpos (cl:position (cdr (assoc 'category left)) categories))
-            (rpos (cl:position (cdr (assoc 'category right)) categories)))
+      (let ((lpos (cl:position (cdr (assoc-strcmp 'category left)) categories))
+            (rpos (cl:position (cdr (assoc-strcmp 'category right)) categories)))
         (if (<> lpos rpos)
             (< lpos rpos)
-            (string<? (cdr (assoc 'name left))
-                      (cdr (assoc 'name right))))))))
+            (string<? (cdr (assoc-strcmp 'name left))
+                      (cdr (assoc-strcmp 'name right))))))))
 
 (define xtmdoc-clean-nativefunc-alist
   (lambda (closure-alists nativefunc-alists)
     (cl:remove-if
      (lambda (nativefunc-data)
-       (let ((nativefunc-name (cdr (assoc 'name nativefunc-data))))
+       (let ((nativefunc-name (cdr (assoc-strcmp 'name nativefunc-data))))
          (cl:find-if (lambda (closure-data)
-                       (or
-                        ;; is it a getter/setter/etc.?
-                        (regex:match? nativefunc-name
-                                      "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$)")
-                        ;; is it a closure?
-                        (string=? (cdr (assoc 'name closure-data)) nativefunc-name)))
+                       ;; is it a closure?
+                       (string=? (cdr (assoc-strcmp 'name closure-data)) nativefunc-name))
                      closure-alists)))
      nativefunc-alists)))
 
 (define xtmdoc-all-doc-alists
   (lambda ()
-    (let ((closure-alists
-           (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data))))
-                *impc:ti:closure-cache*)))
-      (append
-       (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) *impc:ti:builtin-cache*)
-       (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) *impc:ti:typealias-cache*)
-       (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
-       (map (lambda (data) (xtmdoc-genericfunc-handler (car data))) *impc:ti:genericfunc-cache*)
-       
-       (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) *impc:ti:namedtype-cache*)
-       closure-alists
-       (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) *impc:ti:polytype-cache*)
-       (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) *impc:ti:polyfunc-cache*)
-       (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*)
-       ;; make sure the "_native" versions of each closure don't get in
-       ;; there (since the closure is already there)
-       (xtmdoc-clean-nativefunc-alist
-        closure-alists
-        (map (lambda (x)
-               (xtmdoc-nativefunc-handler (string->symbol (car x))))
-             *impc:ti:nativefunc-cache*))))))
+    (let* ((closure-alists
+            (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data))))
+                 *impc:ti:closure-cache*))
+           (all-doc-alists
+            (append
+             (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) *impc:ti:builtin-cache*)
+             (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) *impc:ti:typealias-cache*)
+             (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
+             (map (lambda (data) (xtmdoc-genericfunc-handler (car data))) *impc:ti:genericfunc-cache*)
+             
+             (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) *impc:ti:namedtype-cache*)
+             closure-alists
+             (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) *impc:ti:polytype-cache*)
+             (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) *impc:ti:polyfunc-cache*)
+             (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*)
+             ;; make sure the "_native" versions of each closure don't get in
+             ;; there (since the closure is already there)
+             (xtmdoc-clean-nativefunc-alist
+              closure-alists
+              (map (lambda (x)
+                     (xtmdoc-nativefunc-handler (string->symbol (car x))))
+                   *impc:ti:nativefunc-cache*)))))      
+      ;; filter out the things which shouldn't make it to the exported docs
+      (cl:remove-if
+       (lambda (doc-alist)
+         (regex:match? (cdr (assoc-strcmp 'name doc-alist))
+                       "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$|_poly_)"))
+       all-doc-alists))))
 
 (define xtmdoc-write-alist-as-json
   (lambda (xtmdoc-alist file-port)
     (display "{\n  \"category\": " file-port)
-    (write (cdr (assoc 'category xtmdoc-alist)) file-port)
+    (write (cdr (assoc-strcmp 'category xtmdoc-alist)) file-port)
     (display ",\n  \"name\": " file-port)
-    (write (cdr (assoc 'name xtmdoc-alist)) file-port)
+    (write (cdr (assoc-strcmp 'name xtmdoc-alist)) file-port)
     (display ",\n  \"args\": " file-port)
-    (let ((args (cdr (assoc 'args xtmdoc-alist))))
+    (let ((args (cdr (assoc-strcmp 'args xtmdoc-alist))))
       (write (if (or (null? args)
                      (and (string? args) (string=? args "")))
                  'null
                  (sexpr->string args))
              file-port))
     (display ",\n  \"type\": " file-port)
-    (let ((type (cdr (assoc 'type xtmdoc-alist))))
+    (let ((type (cdr (assoc-strcmp 'type xtmdoc-alist))))
       (write (if (null? type) 'null type) file-port))
     (display ",\n  \"docstring\": " file-port)
-    (let ((docstring (cdr (assoc 'docstring xtmdoc-alist))))
+    (let ((docstring (cdr (assoc-strcmp 'docstring xtmdoc-alist))))
       (write (if (null? docstring) 'null docstring) file-port))
     (display "\n}" file-port)))
 
