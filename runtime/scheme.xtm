@@ -2004,12 +2004,21 @@
      '(category . "polymorphic closure")
      (cons 'name (symbol->string name-sym))
      (cons 'args "")
-     (cons 'type (string-join (map (lambda (pf) (impc:ir:pretty-print-type pf))
-                                   (impc:ti:get-polyfunc-candidate-types (symbol->string name-sym)))
-                              " "))
+     (list 'type)
      (cons 'docstring 
-           (let ((docstring (impc:ti:get-polyfunc-docstring (symbol->string name-sym))))
-             (if (string=? docstring "") '() docstring))))))
+           (let ((docstring (impc:ti:get-polyfunc-docstring (symbol->string name-sym)))
+                 (poly-options-docstring
+                  (string-join (map (lambda (pf)
+                                      (let* ((option-name (vector-ref pf 0))
+                                             (option-docstring (impc:ti:get-closure-docstring option-name)))
+                                        (string-append "@poly " option-name ":"
+                                                       (impc:ir:pretty-print-type (vector-ref pf 1))
+                                                       (if (string=? option-docstring "")
+                                                           ""
+                                                           (string-append " - " (car (regex:split option-docstring "\n")))))))
+                                    (impc:ti:get-polyfunc-candidate-list (symbol->string name-sym)))
+                               "\n")))
+             (string-append docstring poly-options-docstring))))))
 
 (define xtmdoc-polytype-handler
   (lambda (name-sym)
