@@ -73,10 +73,10 @@
                                   ;; printing
                                   ("println" . #("[void,!v...]*" "generic print function - to add support for NewType, overload print:[void,NewType]*" (val1...)))
                                   ;; memory allocation
-                                  ("alloc" . #("[!v*,i64]*" "allocate memory from current zone for [size] elements (default 1)" ([size])))
-                                  ("zalloc" . #("[!v*,i64]*" "allocate memory from current zone for [size] elements (default 1)" ([size])))
-                                  ("halloc" . #("[!v*,i64]*" "allocate memory from the heap for [size] elements (default 1)" ([size])))
-                                  ("salloc" . #("[!v*,i64]*" "allocate memory from the stack zone for [size] elements (default 1)" ([size])))
+                                  ("alloc" . #("[!v*,i64]*" "allocate memory from current zone with size (optional, default = 1)" (optional-size)))
+                                  ("zalloc" . #("[!v*,i64]*" "allocate memory from current zone with size (optional, default = 1)" (optional-size)))
+                                  ("halloc" . #("[!v*,i64]*" "allocate memory from the heap with size (optional, default = 1)" (optional-size)))
+                                  ("salloc" . #("[!v*,i64]*" "allocate memory from the stack zone with size (optional, default = 1)" (optional-size)))
                                   ;; Extempore runtime stuff
                                   ("callback" . #("[i1,i64,sym,args...]*" "set callback for closure at time with args" (time closure args...)))
                                   ;; special scheme macros
@@ -7494,7 +7494,7 @@
  "bind-func"
  ""
  "compile an xtlang closure"
- '(closure-name[:closure-type] [zone-size] [docstring] closure-body))
+ '(closure-name optional-zone-size optional-docstring closure-body))
 
 (define-macro (bind-typevar name . args)
   (if (string? name) (set! name (string->symbol name)))
@@ -7538,7 +7538,7 @@
  "bind-alias"
  ""
  "bind an xtlang type alias"
- '(alias-name alias-target [docstring]))
+ '(alias-name alias-target optional-docstring))
 
 (define impc:ti:compile-type-dataconstructors
   (lambda (name type generic)
@@ -7713,7 +7713,7 @@
  "bind-type"
  ""
  "bind an xtlang named type"
- '(name type [docstring]))
+ '(name type optional-docstring))
 
 (define-macro (impc:pretty-print-vars . varlist)
   (map (lambda (var)
@@ -7838,7 +7838,7 @@
  "bind-val"
  ""
  "bind a global variable"
- '(variable-name type [value] [docstring]))
+ '(variable-name type optional-value optional-docstring))
 
 (define-macro (bind-poly poly_sym implementation_sym . docstring)
   (if (impc:ti:genericfunc-exists? implementation_sym)
@@ -7855,7 +7855,7 @@
  "bind-poly"
  ""
  "bind a polymorphic symbol"
- '(poly-name closure-name [docstring]))
+ '(poly-name closure-name optional-docstring))
 
 (define sys:load-dylib
   (lambda (dylib-path)
@@ -7890,7 +7890,7 @@
  "bind-lib"
  ""
  "bind a C function from a shared library"
- '(libname function-name [docstring]))
+ '(libname function-name optional-docstring))
 
 ;; this was previously called __dynamic-bind
 (define impc:ti:bind-lib
