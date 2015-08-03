@@ -2193,19 +2193,78 @@
                        "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$|_poly_)"))
        all-doc-alists))))
 
+;; we handle the args field separately, since there are a few special
+;; cases to handle
+(define xtmdoc-write-alist-args-as-json
+  (lambda (xtmdoc-alist file-port)
+    ;; (println (cdr (assoc-strcmp 'name xtmdoc-alist)))
+    (display ",\n  \"args\": " file-port)
+    (let ((category (cdr (assoc-strcmp 'category xtmdoc-alist)))
+          (args (cdr (assoc-strcmp 'args xtmdoc-alist)))
+          (type (cdr (assoc-strcmp 'type xtmdoc-alist))))
+      ;; arg names and types
+      (cond
+       ((member category '("closure" "generic closure"))
+        (display
+         (string-append
+          "["
+          (string-join (map (lambda (name type)
+                              (string-append "[\"" (symbol->string name) "\", \"" type "\"]"))
+                            args
+                            (cdr (impc:ir:get-pretty-closure-arg-strings type)))
+                       ", ")
+          "]")
+         file-port))
+       ((string=? category "builtin")
+        (if (or (not (string? type))
+                (string=? type "")
+                (<> (length (cdr (impc:ir:get-pretty-closure-arg-strings type)))
+                    (length args)))
+            ;; allow builtins have malformed arg/type relationships
+            (display
+             (string-append
+              "["
+              (string-join (map (lambda (name)
+                                  (string-append "[\"" (symbol->string name) "\", null]"))
+                                args)
+                           ", ")
+              "]")
+             file-port)
+            (display
+             (string-append
+              "["
+              (string-join (map (lambda (name type)
+                                  (string-append "[\"" (symbol->string name) "\", \"" type "\"]"))
+                                args
+                                (cdr (impc:ir:get-pretty-closure-arg-strings type)))
+                           ", ")
+              "]")
+             file-port)))
+       ((member category '("named type" "generic type" "C function"))
+        (display
+         (string-append
+          "["
+          ;; at the moment, there's no way of telling the xtlang
+          ;; compiler about the names of the arguments to a C function
+          (string-join (map (lambda (type)
+                              (string-append "[null, \"" type "\"]"))
+                            (cdr (impc:ir:get-pretty-closure-arg-strings type)))
+                       ", ")
+          "]")
+         file-port))
+       ;; "polymorphic closure"
+       ;; "global var"
+       ;; "polymorphic type"
+       ;; "type alias"
+       (else (write 'null file-port))))))
+
 (define xtmdoc-write-alist-as-json
   (lambda (xtmdoc-alist file-port)
     (display "{\n  \"category\": " file-port)
     (write (cdr (assoc-strcmp 'category xtmdoc-alist)) file-port)
     (display ",\n  \"name\": " file-port)
     (write (cdr (assoc-strcmp 'name xtmdoc-alist)) file-port)
-    (display ",\n  \"args\": " file-port)
-    (let ((args (cdr (assoc-strcmp 'args xtmdoc-alist))))
-      (write (if (or (null? args)
-                     (and (string? args) (string=? args "")))
-                 'null
-                 (sexpr->string args))
-             file-port))
+    (xtmdoc-write-alist-args-as-json xtmdoc-alist file-port)
     (display ",\n  \"type\": " file-port)
     (let ((type (cdr (assoc-strcmp 'type xtmdoc-alist))))
       (write (if (null? type) 'null type) file-port))
