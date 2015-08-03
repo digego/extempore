@@ -23,28 +23,24 @@
 
 (bind-val width float 1024.)
 (bind-val height float 768.)
-(bind-val pixel_ratio float)
 
-(bind-val window GLFWwindow*)
-(bind-val vg NVGcontext*)
+(bind-val window GLFWwindow*
+  (glfw_init_and_create_window (convert width) (convert height)))
+(bind-val vg NVGcontext* (nvg_create_context))
 
-;; create a window
+(bind-val pixel_ratio float (nvg_get_pixel_ratio window))
+
 (call-as-xtlang
- (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
- (set! window (glfw_init_and_create_window (convert width) (convert height)))
- (set! vg (nvg_create_context))
- (set! pixel_ratio (nvg_get_pixel_ratio window)))
+ (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback))))
 
 ;; background image
-(bind-val bg_paint NVGpaint*)
-
-(call-as-xtlang
- (set! bg_paint (nvgImagePattern vg
-                                  0. 0.
-                                  width height
-                                  0.
-                                  (nvgCreateImage vg "assets/images/image.png"  0)
-                                  1.)))
+(bind-val bg_paint NVGpaint*
+  (nvgImagePattern vg
+                   0. 0.
+                   width height
+                   0.
+                   (nvgCreateImage vg "assets/images/image.png"  0)
+                   1.))
 
 (bind-func draw_frame
   (let ((fill (NVGcolor 1.0 0.0 0.0 0.5))
