@@ -7732,8 +7732,7 @@
                     (car args)
                     (if (not (or (null? args) (string? (car args))))
                         (car args)
-                        1 ;; default value/alloc size
-                        )))
+                        #f)))
          (docstring (if (or (null? args)
                             (not (string? (car (reverse args))))
                             (and string-literal? (= (length args) 1)))
@@ -7767,7 +7766,7 @@
                                               ,(if (number? value)
                                                    ;; can we serialise the value straight into the
                                                    ;;  IR? (e.g. i32/i64/float/double)
-                                                   (if (= t *impc:ir:fp32*)
+                                                   (if (equal? t *impc:ir:fp32*)
                                                        (llvm:convert-float (atom->string value))
                                                        (atom->string value))
                                                    ;; otherwise use zeroinitializer and we'll just use a
@@ -7775,7 +7774,7 @@
                                                    "zeroinitializer")))
               (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
               ;; set value for non int/float literals
-              ,(if (not (number? value))
+              ,(if (and value (not (number? value)))
                    `(impc:aot:do-or-emit
                      (call-as-xtlang (set! ,symbol (convert ,value ,type)) void)))
               ;; we should really take the globalvar out of the
