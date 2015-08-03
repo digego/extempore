@@ -1948,14 +1948,16 @@
 
 (define xtmdoc-get-args-from-form
   (lambda (form)
-    ;; (println 'form: form)
     (if (null? form)
         #f
-        (if (equal? (car form) 'let)
-            (xtmdoc-get-args-from-form (caddr form))
-            (if (equal? (car form) 'lambda)
-                (xtmdoc-strip-arg-type-annotations (cadr form))
-                #f)))))
+        (if (equal? (car form) 'lambda)
+            (xtmdoc-strip-arg-type-annotations (cadr form))
+            (if (and (list? (car form)) (equal? (caar form) 'lambda))
+                (xtmdoc-strip-arg-type-annotations (cadar form))
+                ;; recurse!
+                (xtmdoc-get-args-from-form (if (member (car form) '(let let* letz))
+                                               (cddr form)
+                                               (cdr form))))))))
 
 ;; currently only returns the result for the first arity
 (define xtmdoc-get-xtlang-genericfunc-args
