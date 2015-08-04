@@ -1285,6 +1285,19 @@
                      )
                     (else (impc:compiler:print-bad-type-error type "bad type in get-size"))))))))
 
+;; handy for checking that the type size calculations are getting done
+;; correctly.  typename-list should be a list of typenames (as strings)
+(define impc:ir:check-type-size-calculations
+  (lambda (typename-list)
+    (for-each (lambda (type)
+                (if (<> (impc:ir:get-type-size type)
+                        (llvm:get-named-struct-size type))
+                    (println
+                     'type: type
+                     'impc: (impc:ir:get-type-size type)
+                     'llvm: (llvm:get-named-struct-size type))))
+              typename-list)
+    #t))
 
 (define impc:ir:objectsize-intrinsic
   (lambda (object-name rettype)
