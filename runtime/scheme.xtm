@@ -1986,7 +1986,8 @@
      '(category . "generic closure")
      (cons 'name (symbol->string name-sym))
      (cons 'args (xtmdoc-get-xtlang-genericfunc-args name-sym))
-     (cons 'type (symbol->string (caddar (assoc-strcmp-all name-sym *impc:ti:genericfunc-cache*))))
+     (cons 'type (impc:ti:simplify-generic-pretty-type
+                  (symbol->string (caddar (assoc-strcmp-all name-sym *impc:ti:genericfunc-cache*)))))
      (list 'docstring))))
 
 (define xtmdoc-generictype-handler
@@ -1995,7 +1996,8 @@
      '(category . "generic type")
      (cons 'name (symbol->string name-sym))
      (list 'args)
-     (cons 'type (symbol->string (impc:ti:get-generictype-candidate-types name-sym)))
+     (cons 'type (impc:ti:simplify-generic-pretty-type
+                  (symbol->string (impc:ti:get-generictype-candidate-types name-sym))))
      (list 'docstring))))
 
 (define xtmdoc-polyfunc-handler
@@ -2010,7 +2012,7 @@
                  (poly-options-docstring
                   (string-join (map (lambda (pf)
                                       (let* ((option-name (vector-ref pf 0))
-                                             (option-docstring (impc:ti:get-closure-docstring option-name)))
+                                             (option-docstring (impc:ti:get-closure-or-nativefunc-docstring option-name)))
                                         (string-append "@poly " option-name ":"
                                                        (impc:ir:pretty-print-type (vector-ref pf 1))
                                                        (if (string=? option-docstring "")
@@ -2249,7 +2251,7 @@
                            ", ")
               "]")
              file-port)))
-       ((member category '("generic type" "C function"))
+       ((string=? category "C function")
         (display
          (string-append
           "["
@@ -2263,6 +2265,7 @@
          file-port))
        ;; these are the ones for which "args" doesn't make sense
        ;; "named type"
+       ;; "generic type"
        ;; "polymorphic closure"
        ;; "global var"
        ;; "polymorphic type"
