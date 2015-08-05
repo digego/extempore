@@ -2457,8 +2457,8 @@
                                                                (map (lambda (t)
                                                                       (symbol->string t))
                                                                     r))))
-                                   (nameandtype (string-append name "_poly_" ctype)))
-                              (cons (string->symbol name) (string->symbol nameandtype))))
+                                   (name:type (string-append name "_poly_" ctype)))
+                              (cons (string->symbol name) (string->symbol name:type))))
                           combinations)))
       (list (map (lambda (n) (cdr n)) newnames)
             (map (lambda (n r r2)
@@ -7580,8 +7580,6 @@
                                      (apply string-append (symbol->string name) "*"
                                             (map (lambda (x) (string-append "," x)) a)))
                                  "]*"))
-           (nameandtype (string->symbol (string-append namestr "" ":" ctype)))
-           (h_nameandtype (string->symbol (string-append namestr "_h" ":" ctype)))
            (argslist (map (lambda (a b) b) a arglst1))
            (hcopy_body (if generic #f
                            (map (lambda (a b c)
@@ -7625,13 +7623,13 @@
            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
       ;;(println 'hcopy: hcopy_body)
       (suppress-compiler-messages #t)
-      (eval `(bind-func ,nameandtype
+      (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype))
                (lambda ,argslist
                  (let ((obj (zalloc)))
                    ,@body
                    obj)))
             (interaction-environment))
-      (eval `(bind-func ,h_nameandtype
+      (eval `(bind-func ,(string->symbol (string-append namestr "_h:" ctype))
                (lambda ,argslist
                  (let ((obj (halloc)))
                    ,@body
@@ -7639,6 +7637,8 @@
             (interaction-environment))
       (if (not generic)
           (begin
+            (eval `(bind-poly ,(string->symbol namestr) ,(string->symbol (string-append namestr "_z")))
+                  (interaction-environment))
             (eval `(bind-func ,(string->symbol (string-append namestr "_hcopy:[" namestr "*," namestr "*]*"))
                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
                        (let ((obj (halloc)))
