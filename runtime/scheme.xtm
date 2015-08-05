@@ -2011,16 +2011,12 @@
            (let ((docstring (impc:ti:get-polyfunc-docstring (symbol->string name-sym)))
                  (poly-options-docstring
                   (string-join (map (lambda (pf)
-                                      (let* ((option-name (vector-ref pf 0))
-                                             (option-docstring (impc:ti:get-closure-or-nativefunc-docstring option-name)))
+                                      (let* ((option-name (vector-ref pf 0)))
                                         (string-append "@poly " option-name ":"
-                                                       (impc:ir:pretty-print-type (vector-ref pf 1))
-                                                       (if (string=? option-docstring "")
-                                                           ""
-                                                           (string-append " - " (car (regex:split option-docstring "\n")))))))
+                                                       (impc:ir:pretty-print-type (vector-ref pf 1)))))
                                     (impc:ti:get-polyfunc-candidate-list (symbol->string name-sym)))
                                "\n")))
-             (string-append docstring poly-options-docstring))))))
+             (string-append docstring "\n\n" poly-options-docstring))))))
 
 (define xtmdoc-polytype-handler
   (lambda (name-sym)
