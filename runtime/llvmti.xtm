@@ -2614,19 +2614,19 @@
 (define impc:ti:sprintln
   (lambda (ast)
     (if (null? ast)
-        (Str "")
+        (String "")
         `(memzone 1024
            (String_cat
             ,(if (string? (car ast))
                  `(let ((x_t_mst:i8* (salloc 1024)))
                     (llvm_sprintf x_t_mst "%s" ,(car ast))
-                    (Str x_t_mst))
+                    (String x_t_mst))
                  (list 'toString (car ast)))
             ,@(flatten-1 (map (lambda (x)
                                 (if (string? x)
                                     (list `(let ((x_t_mst:i8* (salloc 1024)))
                                              (llvm_sprintf x_t_mst " %s" ,x)
-                                             (Str x_t_mst)))
+                                             (String x_t_mst)))
                                     (list
                                      (list 'toString_space)
                                      (list 'toString x))))
@@ -2636,14 +2636,14 @@
 (define impc:ti:sprintln2
   (lambda (ast)
     (if (null? ast)
-        (Str "")
+        (String "")
         `(memzone 1024
            (String_cat
             ,@(map (lambda (x)
                      (if (string? x)
                          `(let ((xx_t_mst:i8* (salloc 1024)))
                             (llvm_sprintf xx_t_mst "%s" ,x)
-                            (Str xx_t_mst))
+                            (String xx_t_mst))
                          (list 'toString x)))
                    ast))))))
 
