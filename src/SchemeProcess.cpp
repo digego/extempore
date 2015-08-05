@@ -520,7 +520,7 @@ namespace extemp {
 		*ss << "##                                      ##" << std::endl;        		    		
 		*ss << "##           andrew@moso.com.au         ##" << std::endl;            
 		*ss << "##                                      ##" << std::endl;
-		*ss << "##            (c) 2005-2014             ##" << std::endl;
+		*ss << "##            (c) 2005-2015             ##" << std::endl;
 		*ss << "##                                      ##" << std::endl;        
 		*ss << "##########################################" << std::endl;
 		*ss << "     ################################" << std::endl;
