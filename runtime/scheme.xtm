@@ -2014,7 +2014,9 @@
                                       (let* ((option-name (vector-ref pf 0)))
                                         (string-append "@poly " option-name ":"
                                                        (impc:ir:pretty-print-type (vector-ref pf 1)))))
-                                    (impc:ti:get-polyfunc-candidate-list (symbol->string name-sym)))
+                                    (cl:remove-if
+                                     (lambda (pf) (regex:match? (vector-ref pf 0) "_poly_"))
+                                     (impc:ti:get-polyfunc-candidate-list (symbol->string name-sym))))
                                "\n")))
              (string-append docstring "\n\n" poly-options-docstring))))))
 
