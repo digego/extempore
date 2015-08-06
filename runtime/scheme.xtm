@@ -2172,7 +2172,7 @@
      nativefunc-alists)))
 
 (define xtmdoc-all-doc-alists
-  (lambda ()
+  (lambda (include-nativefuncs?)
     (let* ((closure-alists
             (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data))))
                  *impc:ti:closure-cache*))
@@ -2190,11 +2190,13 @@
              (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*)
              ;; make sure the "_native" versions of each closure don't get in
              ;; there (since the closure is already there)
-             (xtmdoc-clean-nativefunc-alist
-              closure-alists
-              (map (lambda (x)
-                     (xtmdoc-nativefunc-handler (string->symbol (car x))))
-                   *impc:ti:nativefunc-cache*)))))      
+             (if include-nativefuncs?
+                 (xtmdoc-clean-nativefunc-alist
+                  closure-alists
+                  (map (lambda (x)
+                         (xtmdoc-nativefunc-handler (string->symbol (car x))))
+                       *impc:ti:nativefunc-cache*))
+                 '()))))      
       ;; filter out the things which shouldn't make it to the exported docs
       (cl:remove-if
        (lambda (doc-alist)
@@ -2286,10 +2288,10 @@
     (display "\n}" file-port)))
 
 (define xtmdoc-export-caches-to-json
-  (lambda (file-path)
+  (lambda (file-path include-nativefuncs?)
     (let ((outfile-port (open-output-file file-path)))
       (display "[\n" outfile-port)
-      (let loop ((doc-alists (cl:sort (xtmdoc-all-doc-alists)
+      (let loop ((doc-alists (cl:sort (xtmdoc-all-doc-alists include-nativefuncs?)
                                       (lambda (a b) (not (xtmdoc-alist-lessthan a b))))))
         (if (null? doc-alists)
             (begin

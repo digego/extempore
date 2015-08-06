@@ -20,7 +20,7 @@
   (sys:load \"libs/external/nanovg.xtm\")
   (sys:load \"libs/external/sndfile.xtm\")
   (sys:load \"libs/external/stb_image.xtm\")
-  (xtmdoc-export-caches-to-json \"$1\")
+  (xtmdoc-export-caches-to-json \"$1\" #f)
   (quit 0))"
 
 if (($? != 0))  ; then
