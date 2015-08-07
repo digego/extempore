@@ -8,6 +8,10 @@ set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
 
 option(MCJIT "Use LLVM's MCJIT for codegen" ON)
 
+# set path to Extempore's shared runtime files
+set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore")
+configure_file(src/UNIV.cpp ${CMAKE_SOURCE_DIR}/src/UNIV.cpp @ONLY)
+
 # set up the extempore target
 
 add_executable(extempore src/Extempore.cpp)
@@ -28,10 +32,6 @@ target_sources(extempore
   PRIVATE src/UNIV.cpp
   )
 target_include_directories(extempore PRIVATE include)
-
-# path to Extempore's shared runtime files
-set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore")
-configure_file(src/UNIV.cpp src/UNIV.cpp @ONLY)
 
 # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake")
