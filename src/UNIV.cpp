@@ -504,7 +504,10 @@ int register_for_window_events()
 }
 namespace extemp {
 
-  std::string UNIV::SHARE_DIR = std::string("/Users/ben/Code/extempore");  
+    // this template should be filled by cmake during the build
+    // process - or you can do it yourself (by hand) if you're into
+    // that sort of thing
+    std::string UNIV::SHARE_DIR = std::string("@EXT_SHARE_DIR@");
     uint32_t UNIV::FRAMES = 128;
     uint32_t UNIV::CHANNELS = 2;
     uint32_t UNIV::IN_CHANNELS = 0;

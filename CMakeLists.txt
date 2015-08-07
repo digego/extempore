@@ -6,7 +6,7 @@ set(EXTMPORE_VERSION_MAJOR "0")
 set(EXTMPORE_VERSION_MINOR "60")
 set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
 
-option(MCJIT "Use LLVM's MCJIT for codegen" OFF)
+option(MCJIT "Use LLVM's MCJIT for codegen" ON)
 
 # set up the extempore target
 
@@ -29,12 +29,18 @@ target_sources(extempore
   )
 target_include_directories(extempore PRIVATE include)
 
+# path to Extempore's shared runtime files
+set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore")
+configure_file(src/UNIV.cpp src/UNIV.cpp @ONLY)
+
 # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake")
 
 if(MCJIT)
   target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-  message("Extempore will use the \"MCJIT\" LLVM backend.")
+  message("Extempore will use the new LLVM MCJIT backend.")
+else()
+  message("Extempore will use old LLVM JIT backend.")  
 endif()
 
 # setup dependencies
@@ -172,17 +178,17 @@ endif()
 #   endif()
 # endif()
 
-# copy libs into place
-
 # install the executable
 install(TARGETS extempore
   RUNTIME DESTINATION bin)
 
-# runtime directory
-install(DIRECTORY runtime/ DESTINATION runtime)
-# libraries & examples
-install(DIRECTORY libs/core/ DESTINATION share/extempore/libs/core)
-install(DIRECTORY libs/external/ DESTINATION share/extempore/libs/external)
-install(DIRECTORY libs/contrib/ DESTINATION share/extempore/libs/contrib)
-install(DIRECTORY examples/ DESTINATION share/extempore/examples)
-install(DIRECTORY extras/ DESTINATION share/extempore/extras)
+# install the rest of the necessary files into the "share" directory
+install(DIRECTORY runtime examples assets extras
+  DESTINATION ${EXT_SHARE_DIR}
+  PATTERN ".DS_Store" EXCLUDE)
+# need to filter out precomp guff from libs
+install(DIRECTORY libs
+  DESTINATION ${EXT_SHARE_DIR}
+  PATTERN "*.xtm"
+  PATTERN "aot-cache" EXCLUDE
+  PATTERN ".DS_Store" EXCLUDE)
