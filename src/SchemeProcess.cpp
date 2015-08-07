@@ -110,7 +110,7 @@ namespace extemp {
 		//scheme_set_output_port_file(sc, stdout);
 		memset(scheme_outport_string,0,SCHEME_OUTPORT_STRING_LENGTH);
 		scheme_set_output_port_string(sc,scheme_outport_string,&scheme_outport_string[SCHEME_OUTPORT_STRING_LENGTH-1]);
-		FILE *initscm = fopen(std::string(load_path).append("init.xtm").c_str(),"r");
+		FILE *initscm = fopen(std::string(load_path).append("runtime/init.xtm").c_str(),"r");
 		if(!initscm) {
 			std::cout << "ERROR: Could not locate file: init.xtm" << std::endl << "Exiting system!!" << std::endl;
 			exit(1);
@@ -549,24 +549,22 @@ namespace extemp {
 		OSC::schemeInit(scm);
 
 		std::stringstream ss;
-		std::string load_path = scm->getLoadPath();
 #ifdef _WIN32
 		Sleep(1000);
 #else
-                sleep(1); // give time for NSApp etc. to init    
+    sleep(1); // give time for NSApp etc. to init
 #endif
+    while(!scm->getRunning()) {}
 
-                while(!scm->getRunning()) {}
+    scm->loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
+    scm->loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
+    scm->loadFile("runtime/llvmti.xtm", UNIV::SHARE_DIR);
 
-                scm->loadFile("scheme.xtm", load_path.c_str());
-                scm->loadFile("llvmir.xtm", load_path.c_str()); 
-                scm->loadFile("llvmti.xtm", load_path.c_str());		
-
-                scm->setLoadedLibs(true);
+    scm->setLoadedLibs(true);
 #ifdef _WIN32
-				Sleep(1000);
+    Sleep(1000);
 #else
-				sleep(1); // give time for NSApp etc. to init    
+    sleep(1); // give time for NSApp etc. to init
 #endif
 
                 // only load extempore.xtm in primary process

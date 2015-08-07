@@ -1351,7 +1351,7 @@ namespace extemp {
       SchemeProcess* scm = extemp::SchemeProcess::I(_sc);
       scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
-      // SchemeProcess* scm = new extemp::SchemeProcess(std::string(UNIV::PWD), std::string("tcp-osc-server"), port, 0);
+      // SchemeProcess* scm = new extemp::SchemeProcess(UNIV::SHARE_DIR, std::string("tcp-osc-server"), port, 0);
       // scm->start();
       // scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 

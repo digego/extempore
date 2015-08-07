@@ -109,6 +109,7 @@ class UNIV {
 #define THIRTY_TWO_BIT 214748647
     
     public:
+  static std::string SHARE_DIR;
 	static uint32_t CHANNELS;
 	static uint32_t IN_CHANNELS;
 	static uint32_t SAMPLERATE;
@@ -118,7 +119,6 @@ class UNIV {
 	static uint32_t MINUTE;
 	static uint32_t SECOND;
 	static uint32_t FRAMES;
-	static const char* PWD;
   static uint32_t EXT_TERM;
   static uint32_t EXT_LOADSTD;
   static uint32_t AUDIO_NONE;

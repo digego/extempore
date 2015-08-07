@@ -69,7 +69,6 @@ void uSleep(int waitTime){
 }
 */
 
-
 enum Windows_Color_Convert
 {
         Black       = 0,
@@ -505,6 +504,7 @@ int register_for_window_events()
 }
 namespace extemp {
 
+  std::string UNIV::SHARE_DIR = std::string("/Users/ben/Code/extempore");  
     uint32_t UNIV::FRAMES = 128;
     uint32_t UNIV::CHANNELS = 2;
     uint32_t UNIV::IN_CHANNELS = 0;
@@ -514,7 +514,6 @@ namespace extemp {
     uint32_t UNIV::HOUR = MINUTE * 60;
     uint64_t UNIV::TIME = 0l;
     uint64_t UNIV::DEVICE_TIME = 0l;
-    const char* UNIV::PWD = "";
     uint32_t UNIV::AUDIO_NONE = 0; // 0 for real device, 1 for dummy device
     uint32_t UNIV::AUDIO_DEVICE = -1;
     uint32_t UNIV::AUDIO_IN_DEVICE = -1;

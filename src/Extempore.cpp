@@ -83,7 +83,7 @@ void sig_handler(int signo)
 #endif
 
 
-enum { OPT_RUNTIME, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES, 
+enum { OPT_SHAREDIR, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
@@ -92,7 +92,8 @@ enum { OPT_RUNTIME, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES,
 
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
-    { OPT_RUNTIME,     "--runtime",       SO_REQ_SEP    },
+    { OPT_SHAREDIR,    "--runtime",       SO_REQ_SEP    },
+    { OPT_SHAREDIR,    "--sharedir",      SO_REQ_SEP    },
     { OPT_NOSTD,       "--nostd",         SO_NONE       },  
     { OPT_SAMPLERATE,  "--samplerate",    SO_REQ_SEP    },
     { OPT_FRAMES,      "--frames",        SO_REQ_SEP    },
@@ -117,13 +118,6 @@ CSimpleOptA::SOption g_rgOptions[] = {
 
 int main(int argc, char** argv)
 {
-    std::string ext_dir(argv[0]);
-    std::string runtimedir("");
-    if (ext_dir.find_last_of(OS_PATH_DELIM) != std::string::npos) {
-        runtimedir += ext_dir.substr(0,ext_dir.find_last_of(OS_PATH_DELIM)+1);
-    }
-    runtimedir += "runtime";
-
     std::string initexpr;
     bool initexpr_on = false;
     
@@ -149,13 +143,12 @@ int main(int argc, char** argv)
       printf("\nWarning: can't catch SIGTERM.\n");
 #endif
 
-
     CSimpleOptA args(argc, argv, g_rgOptions);
     while (args.Next()) {
       if (args.LastError() == SO_SUCCESS) {
 	switch(args.OptionId()) {
-	case OPT_RUNTIME:
-	  runtimedir = std::string(args.OptionArg());
+	case OPT_SHAREDIR:
+    extemp::UNIV::SHARE_DIR = std::string(args.OptionArg());
 	  break;
         case OPT_SAMPLERATE:
 	  extemp::UNIV::SAMPLERATE = atoi(args.OptionArg());
@@ -271,7 +264,6 @@ int main(int argc, char** argv)
     std::cout << std::endl;
     ascii_text_color(0,9,10);
 		
-    extemp::UNIV::PWD = runtimedir.c_str();
     extemp::EXTLLVM::I()->initLLVM();
     extemp::SchemeProcess* primary = 0;
 
@@ -303,16 +295,16 @@ int main(int argc, char** argv)
     ascii_text_color(0,9,10);	            
 
     bool startup_ok = true;
-    extemp::SchemeProcess* utility = new extemp::SchemeProcess(runtimedir, utility_name, utility_port, 0);
+    extemp::SchemeProcess* utility = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
     startup_ok &= utility->start();
 
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name);
     utility_repl->connectToProcessAtHostname(host,utility_port);
 
     if(initexpr_on) { // if an expression needs to be evaluated from the command line
-       primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0, initexpr);
+       primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
     }else{
-       primary = new extemp::SchemeProcess(runtimedir, primary_name, primary_port, 0);
+       primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0);
     }
    startup_ok &= primary->start();
 

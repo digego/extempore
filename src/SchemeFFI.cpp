@@ -229,6 +229,7 @@ namespace extemp {
 	    { "sys:pointer-size",		        &SchemeFFI::pointerSize },
       { "sys:mcjit-enabled",          &SchemeFFI::mcjitEnabled },
 	    { "sys:platform",	  	          &SchemeFFI::platform },
+	    { "sys:share-dir",	       	    &SchemeFFI::getShareDir },
 	    { "sys:cmdarg",    		          &SchemeFFI::cmdarg },
 	    { "sys:open-dylib",		          &SchemeFFI::openDynamicLib },
 	    { "sys:close-dylib",	          &SchemeFFI::closeDynamicLib },
@@ -686,7 +687,7 @@ namespace extemp {
 	std::string host_name("localhost");
 	std::string proc_name(string_value(pair_car(args)));
 	int port = ivalue(pair_cadr(args));
-	SchemeProcess* sp = new SchemeProcess(std::string(UNIV::PWD),proc_name, port, 0);
+	SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
 	sp->start();
 	SchemeREPL* repl = new SchemeREPL(proc_name);
 
@@ -1014,6 +1015,11 @@ namespace extemp {
 	  return mk_string(_sc, "");
 #endif
     }
+
+  pointer SchemeFFI::getShareDir(scheme* _sc, pointer args)
+  {
+		return mk_string(_sc,UNIV::SHARE_DIR.c_str());
+  }
 
     // positions base64[62] = '+' and base64[63] == '/'
     pointer SchemeFFI::Base64Encode(scheme* _sc, pointer args)
