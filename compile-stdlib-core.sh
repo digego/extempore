@@ -21,7 +21,7 @@ core/math.xtm \
 core/audio_dsp.xtm \
 core/instruments.xtm"}
 
-EXTEMPORE_AOT_COMPILATION_COMMAND="./extempore --nostd $1 --eval "
+EXTEMPORE_AOT_COMPILATION_COMMAND="extempore --nostd $1 --eval "
 
 echo Ahead-of-time \(AOT\) compiling the \(core\) Extempore standard library.  This may take several minutes...
 echo

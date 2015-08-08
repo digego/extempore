@@ -21,7 +21,7 @@
 
 for f in $EXAMPLES
 do
-    ./extempore --eval "(sys:run-tests \"$f\" #t #t)"
+    extempore --eval "(sys:run-tests \"$f\" #t #t)"
     rc=$?
     if (($rc != 0)); then
         echo -e "\033[0;31mError in example $f\033[0;00m"

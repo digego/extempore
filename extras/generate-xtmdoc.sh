@@ -6,7 +6,7 @@
 # shell> cd ~/path/to/extempore
 # shell> ./extras/generate-xtmdoc.sh xtmdoc.json
 
-./extempore --eval "(begin
+extempore --eval "(begin
   (sys:load \"libs/core/adt.xtm\")
   (sys:load \"libs/core/audio_dsp.xtm\")
   (sys:load \"libs/core/instruments.xtm\")

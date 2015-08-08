@@ -73,7 +73,7 @@ You don't need to do anything special to run extempore, it'll just run
 in any terminal (or command prompt on Windows).
 
 ```shell
-$ ./extempore
+$ extempore
 ```
 
 The running extempore process acts as a server, and you send extempore
@@ -86,7 +86,7 @@ or whatever you like. The Emacs support is probably the most mature at
 the moment, but patches are welcome for other editors.
 
 There are some optional command line options that you may want to use
-you can get a list by running `./extempore --help`
+you can get a list by running `extempore --help`
 
 For more detail, see this post on
 [interacting with the Exempore compiler](http://benswift.me/2012-09-26-interacting-with-the-extempore-compiler.html).
