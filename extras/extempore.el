@@ -1,6 +1,6 @@
 ;;; extempore.el --- Emacs major mode for Extempore source files
 
-;; Author: Ben Swift <benjamin.j.swift@gmail.com>
+;; Author: Ben Swift <ben@benswift.me>
 ;; Keywords: Extempore
 
 ;; Adapted from: scheme.el by Bill Rozas and Dave Love
