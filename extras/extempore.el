@@ -241,10 +241,15 @@ See `run-hooks'."
   :type 'boolean
   :group 'extempore)
 
-(defcustom user-extempore-directory nil
-  "Location of the extempore directory."
+(defcustom extempore-share-directory nil
+  "Location of the extempore directory.
+
+Used to be called `user-extempore-directory'"
   :type 'string
   :group 'extempore)
+
+(defalias 'user-extempore-directory 'extempore-share-directory
+  "Deprecated: use extempore-share-directory instead")
 
 (defcustom extempore-program-args nil
   "Arguments to pass to the extempore process started by `extempore-run'."
@@ -1053,23 +1058,17 @@ If there is a process already running in `*extempore*', switch to that buffer.
 \(Type \\[describe-mode] in the process buffer for a list of commands.)"
 
   (interactive (list (read-string "Run Extempore: extempore " extempore-program-args)))
-  (unless user-extempore-directory
-    (error "Error: `user-extempore-directory' not set!\n\nNote that this var used to be called `extempore-path', so you may need to update your .emacs"))
+  (unless extempore-share-directory
+    (error "Error: `extempore-share-directory' not set!\n\nNote that this var used to be called `extempore-path', so you may need to update your .emacs"))
   (if (not (comint-check-proc "*extempore*"))
       (let* ((default-directory (file-name-as-directory
-                                 (expand-file-name user-extempore-directory)))
-            (runtime-directory (concat default-directory "runtime"))
-            (full-args (if (string-match "--runtime" program-args)
-                           program-args
-                           (concat  "--runtime=" runtime-directory " " program-args)
-                           ))
-            )
-        (message (concat "Running extempore with: " full-args))
-        (set-buffer (apply #'make-comint "extempore" (concat default-directory "extempore") nil
-                           (split-string-and-unquote full-args)))
+                                 (expand-file-name extempore-share-directory)))
+             (runtime-directory (concat default-directory "runtime")))
+        (message (concat "Running extempore with: " program-args))
+        (set-buffer (apply #'make-comint "extempore" "extempore" nil
+                           (split-string-and-unquote program-args)))
         (inferior-extempore-mode))
-      (message "extempore is already running in *extempore* buffer.")
-      )
+    (message "extempore is already running in *extempore* buffer."))
   (setq extempore-buffer "*extempore*"))
 
 (defun extempore-stop ()
@@ -1753,7 +1752,7 @@ backend in Extempore."
 ;; here are the different OSC messages in the spec
 
 ;; get this file from https://github.com/Sarcasm/posn-on-screen/blob/master/posn-on-screen.el
-(load (concat user-extempore-directory "extras/posn-on-screen.el") :noerror)
+(load (concat extempore-share-directory "extras/posn-on-screen.el") :noerror)
 
 (defun exvis-send-cursor-message (cursor-pos pos-screen-min pos-screen-max pos-x pos-y)
   (if exvis-osc-client
@@ -1931,7 +1930,7 @@ backend in Extempore."
 ;; writing command list to file
 
 (defun exlog-write-log-buffer ()
-  (let ((logfile-name (concat (or user-extempore-directory user-emacs-directory)
+  (let ((logfile-name (concat (or extempore-share-directory user-emacs-directory)
                               "keylogs/"
                               (format-time-string "%Y%m%dT%H%M%S-")
                               user-login-name
@@ -2442,7 +2441,7 @@ If you don't want to be prompted for this name each time, set the
 
 (defun extmpore-AOT-compile-lib (lib-path)
   (interactive "sLibrary: ")
-  (let ((default-directory user-extempore-directory))
+  (let ((default-directory extempore-share-directory))
     (async-shell-command (format "AOT_LIBS=\"%s\" ./compile-stdlib.sh --port=17099" lib-path))))
 
 (provide 'extempore)

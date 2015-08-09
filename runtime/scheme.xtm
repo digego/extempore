@@ -1836,7 +1836,9 @@
 
 (define sys:load
   (lambda (path . quiet?)
-    (let ((in (open-input-file path))
+    (let ((in (or
+               (open-input-file (string-append (sys:share-dir) "/" path))
+               (open-input-file path)))
           (cnt 0))
       (if (not in)
           (if (or (null? quiet?) (not (car quiet?)))

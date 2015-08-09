@@ -1836,6 +1836,7 @@
              (asm-path (if (string=? platform "Windows")
                            (string-append ".\\msvc\\tmp\\" module-name ".obj")
                            (string-append "/tmp/" module-name ".s")))
+             (aot-cache-path (string-append (sys:share-dir) "/libs/aot-cache"))
              (win-libs (if (string=? platform "Windows")
                            (let* ((dirlist (sys:directory-list "./msvc/tmp/"))
                                   (liblist (cl:remove-if-not (lambda (s) (regex:match? s "\\.lib$")) dirlist))
@@ -1922,14 +1923,14 @@
                 (print-with-colors 'black 'green #t (print " Succesfully compiled "))
                 (print "\n  " shlib-path "\n\n")
                 (if move-into-place?
-                    (if (and (= (sys:command (string-append "mv " shlib-path " libs/aot-cache")) 0)
+                    (if (and (= (sys:command (string-append "mv " shlib-path " " aot-cache-path)) 0)
                              (if (not optimize-compiles?)
-                                 (= (sys:command (string-append "rm -rf libs/aot-cache/" module-name ".dylib.dSYM; mv " shlib-path ".dSYM libs/aot-cache")) 0)
+                                 (= (sys:command (string-append "rm -rf " aot-cache-path "/" module-name ".dylib.dSYM; mv " shlib-path ".dSYM " aot-cache-path)) 0)
                                  #t))
                         (begin (print "Moved ")
-                               (print-with-colors 'blue 'default #t (print shlib-path)) (print " into libs/aot-cache directory.\n\n"))
+                               (print-with-colors 'blue 'default #t (print shlib-path)) (print " into " aot-cache-path "\n\n"))
                         (print-with-colors 'red 'default #t
-                                           (print "Error moving " shlib-path " into libs/aot-cache directory.\n\n")))))))))))
+                                           (print "Error moving " shlib-path " into " aot-cache-path "\n\n")))))))))))
 
 (define impc:aot:insert-header
   (lambda (libname)
@@ -1999,9 +2000,10 @@
 
 (define impc:aot:compile-xtm-file
   (lambda (lib-path move-into-place? exit-afterwards?)
-    ;; is there a better way to check if a file exists?
     (let ((start-time (now))
-          (in-file-port (open-input-file lib-path)))
+          (in-file-port (or
+                         (open-input-file (string-append (sys:share-dir) "/" lib-path))
+                         (open-input-file lib-path))))
       (if (not in-file-port)
           (begin (print-with-colors 'black 'red #t
                                     (print "Error:"))
@@ -2009,7 +2011,8 @@
           (let* ((res (close-port in-file-port))
                  (libname (filename-from-path lib-path))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
-                 (aot-compilation-file-path (string-append "" "libs/aot-cache/" libname)))
+                 (aot-cache-path (string-append (sys:share-dir) "/libs/aot-cache"))
+                 (aot-compilation-file-path (string-append aot-cache-path libname)))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "AOT-compilation file not written ")
                        (close-port *impc:aot:current-output-port*)
@@ -2017,7 +2020,7 @@
                 (begin
                   ;; if the preload check passes, create aot-cache dir
                   ;; if it doesn't exist
-                  (sys:command "[ ! -d libs/aot-cache ] && mkdir libs/aot-cache")
+                  (sys:command (string-append "mkdir " aot-cache-path))
                   (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
@@ -7869,7 +7872,9 @@
 
 (define sys:load-dylib
   (lambda (dylib-path)
-    (let ((dylib (sys:open-dylib dylib-path)))
+    (let ((dylib (or
+                  (sys:open-dylib (string-append (sys:share-dir) "/" dylib-path))
+                  (sys:open-dylib dylib-path))))
       (if dylib
           (begin
             (impc:aot:insert-load-dylib-details *impc:aot:current-load-dylib-info*)
