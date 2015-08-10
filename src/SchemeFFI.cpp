@@ -956,12 +956,12 @@ namespace extemp {
 #endif
 	if (!lib_handle)
 	{
-#ifdef _WIN32
-	  std::cout << "Error loading library: " << GetLastError() << std::endl;
-	  printf("For Library Path: %ls\n",wstr);
-#else
-	  printf("Error in %s\n", dlerror());
-#endif
+// #ifdef _WIN32
+// 	  std::cout << "Error loading library: " << GetLastError() << std::endl;
+// 	  printf("For Library Path: %ls\n",wstr);
+// #else
+// 	  printf("Error in %s\n", dlerror());
+// #endif
 	  return _sc->F;
 	}
 	return mk_cptr(_sc,lib_handle);
