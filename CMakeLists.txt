@@ -6,10 +6,10 @@ set(EXTMPORE_VERSION_MAJOR "0")
 set(EXTMPORE_VERSION_MINOR "60")
 set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
 
-option(MCJIT "Use LLVM's MCJIT for codegen" ON)
+option(MCJIT "use LLVM's MCJIT for codegen" ON)
 
-# set path to Extempore's shared runtime files
-set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore")
+set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
+  "path to Extempore's shared runtime files")
 configure_file(src/UNIV.cpp ${CMAKE_SOURCE_DIR}/src/UNIV.cpp @ONLY)
 
 # set up the extempore target
@@ -34,19 +34,21 @@ target_sources(extempore
 target_include_directories(extempore PRIVATE include)
 
 # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake" CACHE PATH
+  "path to Extempore's cmake modules")
 
 if(MCJIT)
   target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-  message("Extempore will use the new LLVM MCJIT backend.")
+  message("using the new LLVM MCJIT backend...")
 else()
-  message("Extempore will use old LLVM JIT backend.")  
+  message("using the old LLVM JIT backend...")  
 endif()
 
 # setup dependencies
 
 if(EXISTS "$ENV{EXT_LLVM_DIR}")
-  set(LLVM_ROOT_DIR $ENV{EXT_LLVM_DIR})
+  set(LLVM_ROOT_DIR $ENV{EXT_LLVM_DIR} CACHE PATH
+    "path to the (patched) LLVM build")
   find_package(LLVM 3.4 REQUIRED)
   target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
   target_link_libraries(extempore
