@@ -216,7 +216,7 @@ struct scheme {
     pointer free_cell;       /* pointer to top of free cells */
     uint64_t    fcells;          /* # of free cells */
     uint64_t    total_memory_allocated;          /* total number of allocated cells */
-    uint64_t  allocation_request;
+    int64_t  allocation_request;
 	
     pointer inport;
     pointer outport;

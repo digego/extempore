@@ -198,7 +198,6 @@ namespace extemp {
 #ifdef _DEBUG_QUEUE_
 			std::cout << "Removing " << pos->second << " from the queue. REAPED" << std::endl;
 #endif						
-			pos->second->deleteArg();
 			delete pos->second;
 			//////////////////////////////////////
 			queue.erase(pos++);

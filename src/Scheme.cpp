@@ -96,7 +96,6 @@
 #define ULONG_LONG_MAX UINT64_MAX
 #else
 #define stricmp strcmp //strcasecmp
-#define ULONG_LONG_MAX UINT64_MAX
 #endif
 //#endif
 
@@ -3685,7 +3684,7 @@ static inline void dump_stack_mark(scheme *sc)
 static void dump_stack_continuation_set(scheme* sc, pointer p)
 {
     unsigned int* olddump = (unsigned int*) cptr_value_sc(sc,p);
-    int nframes = olddump[0];
+    ptrdiff_t nframes = olddump[0];
     memcpy(sc->dump_base, &olddump[1], nframes*sizeof(struct dump_stack_frame));
     sc->dump = (pointer)nframes;
 	
@@ -5506,7 +5505,7 @@ static pointer opexe_4(scheme *sc, enum scheme_opcodes op) {
         char *str;
 
         size=p->rep.string.curr-p->rep.string.start+1;
-        if(str=(char*)sc->malloc(size)) {
+        if((str=(char*)sc->malloc(size))) {
           pointer s;
 
           memcpy(str,p->rep.string.start,size-1);

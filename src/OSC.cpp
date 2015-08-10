@@ -1419,7 +1419,7 @@ namespace extemp {
         osc->setStarted(true);
       }
       osc->sc = _sc;
-      return _sc->NIL;
     }
+    return _sc->NIL;
   }
 } //End Namespace

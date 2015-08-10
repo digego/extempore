@@ -620,7 +620,7 @@ namespace extemp {
     pointer list = _sc->NIL;
     if (dp != NULL)
       {
-	while (ep = readdir (dp)) {
+    while ((ep = readdir (dp))) {
 	  _sc->imp_env->insert(list);
 	  pointer tlist = cons(_sc,mk_string(_sc,ep->d_name),list);
 	  _sc->imp_env->erase(list);
@@ -1063,7 +1063,7 @@ namespace extemp {
       unsigned long hash = 0;
       int c;
   
-      while (c = *str++)
+      while ((c = *str++))
 	hash = c + (hash << 6) + (hash << 16) - hash;
   
       return mk_integer(_sc,hash);
@@ -1704,7 +1704,7 @@ namespace extemp {
     }
 
 #ifdef EXT_MCJIT
-  static long llvm_emitcounter = 0;
+  static long long llvm_emitcounter = 0;
 #endif
   pointer SchemeFFI::jitCompileIRString(scheme* _sc, pointer args)
   {
@@ -1748,7 +1748,7 @@ namespace extemp {
         std::cout << "MCJIT Compiler Error: could not resolve all external dependencies" << std::endl;
         break;
       }
-      if(rmatch("use of undefined value",(char*)err.c_str())) {
+      if(err.find("use of undefined value") != std::string::npos) {
         char symname[1024];
 
         rreplace("use of undefined value '@(.*)'",(char*)err.c_str(),"$1",symname);
@@ -2051,7 +2051,7 @@ namespace extemp {
 
 	PassManager* PM = extemp::EXTLLVM::I()->PM;
 	char* struct_type_str = string_value(pair_car(args));
-        unsigned long hash = string_hash((unsigned char*)struct_type_str);
+        unsigned long long hash = string_hash((unsigned char*)struct_type_str);
         char name[128];
         sprintf(name,"_xtmT%lld",hash);
         char assm[1024];
@@ -2840,7 +2840,7 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
 
 	int ptrdepth = 0;
 	while(name[strlen(name)-1] == '*') {
-	  name[strlen(name)-1]=NULL;
+	  name[strlen(name)-1]='\0';
     ptrdepth++;
 	}
 

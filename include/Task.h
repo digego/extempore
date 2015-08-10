@@ -53,7 +53,6 @@ namespace extemp {
 	bool isCallback() { return this->is_callback; }
 	void isCallback(bool _callback) { this->is_callback = _callback; } 
 	virtual void execute() { classMember->execute(this); }
-	virtual void deleteArg() = 0;
 	bool equal(TaskI* t)
 	{
 	    if(t->getStartTime() != startTime) { std::cout << "Failed Time Equality Test" << std::endl; return false; }
@@ -83,8 +82,7 @@ namespace extemp {
 	    arg(_arg)            		
 	{}
 
-	void deleteArg() { delete arg; }
-	T getArg() { return this->arg; }
+    T getArg() { return this->arg; }
 
     private:
 	T arg; //responsibility for cleanup of arg is outside task

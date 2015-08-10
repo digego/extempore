@@ -240,19 +240,14 @@ int main(int argc, char** argv)
 	  return -1;
 	}
       } else {
-	  char* key = (char*) args.OptionText();
-	  char* val = args.OptionArg();
-    if(!val)
-      val = "";
-	  char a[256];
-	  char b[256];
-          if(!rmatch("--",key)) {
-            std::cout << "Poorly formed arg: " << key << std::endl;
+        std::string key((char*)args.OptionText());
+        std::string val(args.OptionArg());
+
+        if(key.substr(0,2) == std::string("--")) {
+            std::cout << "Poorly formed argument: " << key << std::endl;
             return 1;
-          }
-	  rsplit("--",key,a,b);
-	  //std::cout << "ADD-ARG: " << b << " " << val << std::endl;
-	  extemp::UNIV::CMDPARAMS[std::string(b)] = std::string(val);
+        }
+        extemp::UNIV::CMDPARAMS[key.substr(2)] = val;
       }
     }
     ascii_text_color(0,7,10);	    
