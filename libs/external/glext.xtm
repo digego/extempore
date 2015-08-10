@@ -10,22 +10,17 @@
 (impc:aot:insert-header "xtmglext")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libglext
- (cond ((string=? (sys:platform) "Linux")
-        "libGL.so")
-       ((string=? (sys:platform) "OSX")
-        "/System/Library/Frameworks/OpenGL.framework/OpenGL")
-       ((string=? (sys:platform) "Windows")
-        "glext.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libglext
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libglext
+  (cond ((string=? (sys:platform) "Linux")
+         "libGL.so")
+        ((string=? (sys:platform) "OSX")
+         "/System/Library/Frameworks/OpenGL.framework/OpenGL")
+        ((string=? (sys:platform) "Windows")
+         "glext.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 
 (bind-lib libglext glActiveTexture [void,i32]*)

@@ -12,23 +12,15 @@
 
 ;; Ceph rados library
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'librados
- (cond ((string=? (sys:platform) "OSX")
-        "librados.dylib")
-       ((string=? (sys:platform) "Linux")
-        "librados.so")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define librados
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (null? librados)
-    (print-error "Error loading librados"))
+(bind-dylib librados
+  (cond ((string=? (sys:platform) "OSX")
+         "librados.dylib")
+        ((string=? (sys:platform) "Linux")
+         "librados.so")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;; opaque
 (bind-alias rados_t i8*)

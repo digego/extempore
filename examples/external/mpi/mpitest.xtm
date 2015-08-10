@@ -13,23 +13,18 @@
 (sys:load "libs/external/mpi.xtm")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libmpimain
- (cond ((string=? (sys:platform) "OSX")
-        ;; "/Users/ben/Code/src/skeleton-pic/tutorials/smdemo_mpi/libmpimain.dylib"
-        "libmpimain.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libmpimain.so")
-       ((string=? (sys:platform) "Windows")
-        "libmpimain.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libmpimain
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libmpimain
+  (cond ((string=? (sys:platform) "OSX")
+         ;; "/Users/ben/Code/src/skeleton-pic/tutorials/smdemo_mpi/libmpimain.dylib"
+         "libmpimain.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libmpimain.so")
+        ((string=? (sys:platform) "Windows")
+         "libmpimain.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-lib libmpimain mpadd [void,float*,float*,float*,i32]*)
 (bind-lib libmpimain init_mpi [void,i32*,i32*,i32*,i32,i8**]*)

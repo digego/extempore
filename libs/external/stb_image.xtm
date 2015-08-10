@@ -23,22 +23,17 @@
 (impc:aot:insert-header "xtmstb_image")
 
 ;; set up the current dylib name and path (for precompilation)
-(impc:aot:set-dylib-name-info
- 'libstb_image
- (cond ((string=? (sys:platform) "OSX")
-        "libstb_image.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libstb_image.so")
-       ((string=? (sys:platform) "Windows")
-        "libstb_image.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libstb_image
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libstb_image
+  (cond ((string=? (sys:platform) "OSX")
+         "libstb_image.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libstb_image.so")
+        ((string=? (sys:platform) "Windows")
+         "libstb_image.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;;;;;;;;;;;;;;;;;
 ;; stb_image.h ;;

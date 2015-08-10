@@ -21,22 +21,17 @@
 (impc:aot:insert-header "xtmmpi")
 
 ;; set up the current dylib name and path (for precompilation)
-(impc:aot:set-dylib-name-info
- 'libmpi
- (cond ((string=? (sys:platform) "OSX")
-        "libmpi.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libmpi.so")
-       ((string=? (sys:platform) "Windows")
-        "libmpi.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib               
-(define libmpi
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libmpi
+  (cond ((string=? (sys:platform) "OSX")
+         "libmpi.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libmpi.so")
+        ((string=? (sys:platform) "Windows")
+         "libmpi.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-lib libmpi MPI_Get_library_version [i32,i8*,i32*]*)
 (bind-lib libmpi MPI_Get_version [i32,i32*,i32*]*)
@@ -585,21 +580,17 @@
 
 ;; maybe there's a way to get by without these?
 
-(impc:aot:set-dylib-name-info
- 'libmpiaddresses
- (cond ((string=? (sys:platform) "OSX")
-        "/Users/ben/Code/extempore/examples/external/mpi/libmpiaddresses.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libmpiaddresses.so")
-       ((string=? (sys:platform) "Windows")
-        "libmpiaddresses.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-(define libmpiaddresses
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libmpiaddresses
+  (cond ((string=? (sys:platform) "OSX")
+         "/Users/ben/Code/extempore/examples/external/mpi/libmpiaddresses.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libmpiaddresses.so")
+        ((string=? (sys:platform) "Windows")
+         "libmpiaddresses.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;; /* C datatypes */
 (bind-lib-val libmpiaddresses ompi_mpi_datatype_null_addr MPI_Datatype)

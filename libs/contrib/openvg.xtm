@@ -27,25 +27,17 @@
 (impc:aot:insert-header "xtmopenvg")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libopenvg
- (cond ((string=? (sys:platform) "OSX")
-        "libOpenVG.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libOpenVG.so")
-       ((string=? (sys:platform) "Windows")
-        "libOpenVG.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libopenvg
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (null? libopenvg)
-    (sys:load-escape "Could not load OpenVG\n"))
+(bind-dylib libopenvg
+  (cond ((string=? (sys:platform) "OSX")
+         "libOpenVG.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libOpenVG.so")
+        ((string=? (sys:platform) "Windows")
+         "libOpenVG.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (define *xtmlib-openvg-loaded* #f)
 

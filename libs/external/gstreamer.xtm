@@ -22,42 +22,15 @@
 (sys:load "libs/external/glib.xtm")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'gstlib
- (cond ((string=? (sys:platform) "OSX")
-        "libgstreamer-1.0.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libgstreamer-1.0.so")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define gstlib
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (not gstlib)
-    (sys:load-escape "Could not load 'gstreamer' dynamic library"))
-
-;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'gstapplib
- (cond ((string=? (sys:platform) "OSX")
-        "libgstapp-1.0.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libgstapp-1.0.so")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define gstapplib
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (not gstapplib)
-    (sys:load-escape "Could not load 'gstreamer' app library\nMake sure you have install at least the core plugins!"))
+(bind-dylib gstlib
+  (cond ((string=? (sys:platform) "OSX")
+         "libgstreamer-1.0.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libgstreamer-1.0.so")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (impc:aot:insert-header "xtmgstreamer")
 
@@ -281,6 +254,17 @@
 (bind-val GST_FLOW_NOT_NEGOTIATED i32 -4)
 (bind-val GST_FLOW_ERROR i32 -5)
 (bind-val GST_FLOW_NOT_SUPPORTED i32 -6)
+
+;; set up the current dylib name and path (for AOT compilation)
+(bind-dylib gstapplib
+  (cond ((string=? (sys:platform) "OSX")
+         "libgstapp-1.0.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libgstapp-1.0.so")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;; (bind-type GstAppSinkCallbacks <[void,GstAppSink*,gpointer]*,[GstFlowReturn,GstAppSink*,gpointer]*,[GstFlowReturn,GstAppSink*,gpointer]*>)
 (bind-type GstAppSinkCallbacks <i8*,i8*,i8*>) ;;[void,GstAppSink*,gpointer]*,[GstFlowReturn,GstAppSink*,gpointer]*,[GstFlowReturn,GstAppSink*,gpointer]*>)

@@ -22,49 +22,17 @@
 (impc:aot:insert-header "xtmglib")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libglib
- (cond ((string=? (sys:platform) "OSX")
-        "libglib-2.0.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libglib-2.0.so")
-       ((string=? (sys:platform) "Windows")
-        "libglib-2.0-0.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libglib
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (or (eq? #f libglib)
-	(not libglib)) 
-    (sys:load-escape "Could not load 'glib' dynamic library"))
-
-
-;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libgobject
- (cond ((string=? (sys:platform) "OSX")
-        "libgobject-2.0.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libgobject-2.0.so")
-       ((string=? (sys:platform) "Windows")
-        "libgobject-2.0-0.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libgobject
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (or (eq? #f libgobject)
-	(not libgobject)) 
-    (sys:load-escape "Could not load 'gobject' dynamic library"))
+(bind-dylib libglib
+  (cond ((string=? (sys:platform) "OSX")
+         "libglib-2.0.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libglib-2.0.so")
+        ((string=? (sys:platform) "Windows")
+         "libglib-2.0-0.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-alias GRegex i8*) ;; GRegex in GLib is actually an opaque struct (not pointer to struct)
 (bind-alias GMatchInfo i8*) ;; GMatchInfo in GLib is actually an opaque struct (not pointer to struct)
@@ -91,22 +59,23 @@
 (bind-alias gboolean i32) ;; WARNING GLib defines this as i32
 (bind-alias GQuark i32)
 (bind-alias GRegexMatchFlags i32)
+(bind-alias gsize size_t)
 ;(bind-alias GObject i8) ;; opaque struct
 (bind-alias GObjectClass i8) ;; opaque struct
 (bind-alias GObjectConstructParam i8) ;; opaque struct
 (bind-alias GType i64)
-(bind-type GArray <gchar*,guint>)
-(bind-type GByteArray <i8*,guint>)
-(bind-type GPtrArray <gpointer*,guint>)
-(bind-type GMutex <gpointer>)
-(bind-type GCond <gpointer>)
-(bind-alias gsize size_t)
 ;(bind-alias GValue i8) ;; opaque struct
 (bind-alias GMainLoop i8) ;; opaque struct
 (bind-alias GCallback [void]*) ;; callback
 (bind-alias GFreeFunc [void,gpointer]*)
 (bind-alias GData i8) ;; opaque
-;; some types
+
+;; types
+(bind-type GArray <gchar*,guint>)
+(bind-type GByteArray <i8*,guint>)
+(bind-type GPtrArray <gpointer*,guint>)
+(bind-type GMutex <gpointer>)
+(bind-type GCond <gpointer>)
 (bind-type GTypeClass <GType>)
 (bind-type GTypeInstance <GTypeClass*>)
 (bind-type GTypeInterface <GType,GType>)
@@ -204,7 +173,58 @@
 (bind-lib libglib g_free [void,gpointer]*)
 (bind-lib libglib g_malloc [gpointer,gsize]*)
 
-;; GObject stuff
+;; Main loop
+(bind-lib libglib g_main_loop_new [GMainLoop*,i8*,gboolean]*)
+(bind-lib libglib g_main_loop_run [void,GMainLoop*]*)
+(bind-lib libglib g_main_loop_quit [void,GMainLoop*]*)
+(bind-lib libglib g_main_loop_is_running [gboolean,GMainLoop*]*)
+(bind-lib libglib g_main_loop_unref [void,GMainLoop*]*)
+(bind-lib libglib g_main_context_iteration [gboolean,i8*,gboolean]*)
+
+;; type string stuff
+(bind-lib libglib g_string_new [GString*,gchar*]*)
+
+;; hash tables
+(bind-alias GHashTable i8)
+(bind-alias GHashFunc [guint,gconstpointer]*)
+(bind-alias GEqualFunc [gboolean,gconstpointer,gconstpointer]*)
+
+;; hash and equal functions for g_hash_table_new
+(bind-lib libglib g_direct_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib libglib g_direct_hash [guint,gconstpointer]*)
+(bind-lib libglib g_str_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib libglib g_str_hash [guint,gconstpointer]*)
+(bind-lib libglib g_int_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib libglib g_int_hash [guint,gconstpointer]*)
+(bind-lib libglib g_int64_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib libglib g_int64_hash [guint,gconstpointer]*)
+(bind-lib libglib g_double_equal [gboolean,gconstpointer,gconstpointer]*)
+(bind-lib libglib g_double_hash [guint,gconstpointer]*)
+
+(bind-lib libglib g_hash_table_new [GHashTable*,GHashFunc,GEqualFunc]*)
+(bind-lib libglib g_hash_table_insert [void,GHashTable*,gpointer,gpointer]*)
+(bind-lib libglib g_hash_table_replace [void,GHashTable*,gpointer,gpointer]*)
+;; (bind-lib g gglib_hash_table_add [void,GHashTable*,gpointer]*)
+;; (bind-lib g gglib_hash_table_contains [gboolean,GHashTable*,gconstpointer]*)
+(bind-lib libglib g_hash_table_size [guint,GHashTable*]*)
+(bind-lib libglib g_hash_table_lookup [gpointer,GHashTable*,gconstpointer]*)
+(bind-lib libglib g_hash_table_remove [gboolean,GHashTable*,gconstpointer]*)
+(bind-lib libglib g_hash_table_remove_all [void,GHashTable*]*)
+
+;; GObject library
+
+;; set up the current dylib name and path (for AOT compilation)
+(bind-dylib libgobject
+  (cond ((string=? (sys:platform) "OSX")
+         "libgobject-2.0.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libgobject-2.0.so")
+        ((string=? (sys:platform) "Windows")
+         "libgobject-2.0-0.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 (bind-lib libgobject g_object_ref [gpointer,gpointer]*)
 (bind-lib libgobject g_object_unref [void,gpointer]*)
 (bind-lib libgobject g_object_set_data [void,GObject*,gchar*,gpointer]*)
@@ -220,16 +240,6 @@
 (bind-lib libgobject g_signal_connect_object [gulong,gpointer,gchar*,GCallback,gpointer,i32]*)
 (bind-lib libgobject g_signal_emitv [void,GValue*,guint,GQuark,GValue*]*)
 (bind-lib libgobject g_signal_lookup [guint,gchar*,GType]*)
-
-
-;; Main loop
-(bind-lib libglib g_main_loop_new [GMainLoop*,i8*,gboolean]*)
-(bind-lib libglib g_main_loop_run [void,GMainLoop*]*)
-(bind-lib libglib g_main_loop_quit [void,GMainLoop*]*)
-(bind-lib libglib g_main_loop_is_running [gboolean,GMainLoop*]*)
-(bind-lib libglib g_main_loop_unref [void,GMainLoop*]*)
-(bind-lib libglib g_main_context_iteration [gboolean,i8*,gboolean]*)
-
 
 ;; value and TYPE STUFF
 (bind-lib libgobject g_value_init [GValue*,GValue*,GType]*)
@@ -275,36 +285,6 @@
 (bind-lib libgobject g_type_from_name [GType,gchar*]*)
 (bind-lib libgobject g_type_init [void]*)
 (bind-lib libgobject g_type_name [gchar*,GType]*)
-
-;; type string stuff
-(bind-lib libglib g_string_new [GString*,gchar*]*)
-
-;; hash tables
-(bind-alias GHashTable i8)
-(bind-alias GHashFunc [guint,gconstpointer]*)
-(bind-alias GEqualFunc [gboolean,gconstpointer,gconstpointer]*)
-
-;; hash and equal functions for g_hash_table_new
-(bind-lib libglib g_direct_equal [gboolean,gconstpointer,gconstpointer]*)
-(bind-lib libglib g_direct_hash [guint,gconstpointer]*)
-(bind-lib libglib g_str_equal [gboolean,gconstpointer,gconstpointer]*)
-(bind-lib libglib g_str_hash [guint,gconstpointer]*)
-(bind-lib libglib g_int_equal [gboolean,gconstpointer,gconstpointer]*)
-(bind-lib libglib g_int_hash [guint,gconstpointer]*)
-(bind-lib libglib g_int64_equal [gboolean,gconstpointer,gconstpointer]*)
-(bind-lib libglib g_int64_hash [guint,gconstpointer]*)
-(bind-lib libglib g_double_equal [gboolean,gconstpointer,gconstpointer]*)
-(bind-lib libglib g_double_hash [guint,gconstpointer]*)
-
-(bind-lib libglib g_hash_table_new [GHashTable*,GHashFunc,GEqualFunc]*)
-(bind-lib libglib g_hash_table_insert [void,GHashTable*,gpointer,gpointer]*)
-(bind-lib libglib g_hash_table_replace [void,GHashTable*,gpointer,gpointer]*)
-;; (bind-lib g gglib_hash_table_add [void,GHashTable*,gpointer]*)
-;; (bind-lib g gglib_hash_table_contains [gboolean,GHashTable*,gconstpointer]*)
-(bind-lib libglib g_hash_table_size [guint,GHashTable*]*)
-(bind-lib libglib g_hash_table_lookup [gpointer,GHashTable*,gconstpointer]*)
-(bind-lib libglib g_hash_table_remove [gboolean,GHashTable*,gconstpointer]*)
-(bind-lib libglib g_hash_table_remove_all [void,GHashTable*]*)
 
 
 ;; ;; GSocket stuff
@@ -703,11 +683,41 @@
   (lambda ()
     (g_get_current_dir)))
 
-
-(sys:load "libs/external/glib-scm.xtm")
-;; make sure we load them with AOT-compiled code as well
-(impc:aot:insert-forms
- (sys:load "libs/external/glib-scm.xtm"))
+(impc:aot:do-or-emit
+ (define-macro (sys:mkdir path) `(sys_g_mkdir ,(symbol->string path))))
+(impc:aot:do-or-emit
+ (define sys:username (lambda () (cptr->string (sys_g_get_user_name)))))
+(impc:aot:do-or-emit
+ (define sys:hostname (lambda () (cptr->string (sys_g_get_host_name)))))
+(impc:aot:do-or-emit
+ (define sys:home-directory (lambda () (cptr->string (sys_g_get_home_dir)))))
+(impc:aot:do-or-emit
+ (define sys:getcwd (lambda () (cptr->string (sys_g_get_current_dir)))))
+(impc:aot:do-or-emit
+ (define sys:pwd (lambda () (cptr->string (sys_g_get_current_dir)))))
+(impc:aot:do-or-emit
+ (define sys:cwd (lambda () (cptr->string (sys_g_get_current_dir)))))
+(impc:aot:do-or-emit
+ (define sys:rename sys_g_rename))
+(impc:aot:do-or-emit
+ (define sys:remove sys_g_remove))
+(impc:aot:do-or-emit
+ (define-macro (sys:rm path) `(sys_g_remove ,(symbol->string path))))
+(impc:aot:do-or-emit
+ (define-macro (sys:mv path) `(sys_g_rename ,(symbol->string path))))
+(impc:aot:do-or-emit
+ (define sys:file-exists? sys_g_file_test))
+(impc:aot:do-or-emit
+ (define sys:chdir sys_g_chdir))
+(impc:aot:do-or-emit
+ (define-macro (sys:cd . path)
+                       (if (null? path)
+                           `(sys_g_chdir (sys:home-directory))
+                           `(sys_g_chdir ,(symbol->string (car path))))))
+(impc:aot:do-or-emit
+ (define-macro (sys:mkdir path) `(sys_g_mkdir ,(symbol->string path))))
+(impc:aot:do-or-emit
+ (define sys:ls (lambda () (sys:directory-list "."))))
 
 (impc:aot:insert-footer "xtmglib")
 (define *xtmlib-glib-loaded* #t)

@@ -20,29 +20,17 @@
 
 (impc:aot:insert-header "xtmglfw3")
 
-(impc:aot:set-dylib-name-info
- 'libglfw3
- (cond ((string=? (sys:platform) "OSX")
-        "libglfw3.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libglfw3.so")
-       ((string=? (sys:platform) "Windows")
-        "libglfw3.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib               
-(define libglfw3
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-;; (define libGLEW
-;;   (let ((platform (sys:platform)))
-;;     (cond ((string=? platform "Linux") (sys:open-dylib "libGLEW.so"))
-;;           ((string=? platform "Windows") (sys:open-dylib "libGLEW.dll"))
-;;           ((string=? platform "OSX") (sys:open-dylib "libGLEW.dylib"))
-;;           (else (print "Unknown platform: " platform)))))
+(bind-dylib libglfw3
+  (cond ((string=? (sys:platform) "OSX")
+         "libglfw3.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libglfw3.so")
+        ((string=? (sys:platform) "Windows")
+         "libglfw3.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;; /*************************************************************************
 ;;  * GLFW 3.1 - www.glfw.org

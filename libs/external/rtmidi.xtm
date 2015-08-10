@@ -35,25 +35,17 @@
 (impc:aot:insert-header "xtmrtmidi")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'librtmidi
- (cond ((string=? (sys:platform) "OSX")
-        "librtmidic.dylib")
-       ((string=? (sys:platform) "Linux")
-        "librtmidic.so")
-       ((string=? (sys:platform) "Windows")
-        "rtmidilib.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define librtmidi
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (not librtmidi)
-    (print-error "Could not load librtmidi dynamic library"))
+(bind-dylib librtmidi
+  (cond ((string=? (sys:platform) "OSX")
+         "librtmidic.dylib")
+        ((string=? (sys:platform) "Linux")
+         "librtmidic.so")
+        ((string=? (sys:platform) "Windows")
+         "rtmidilib.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-val RTMIDI_NOERROR i32 0)
 (bind-val RTMIDI_ERROR i32 1)

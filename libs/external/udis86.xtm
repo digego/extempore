@@ -16,23 +16,17 @@
 (impc:aot:insert-header "xtmudis86")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libudis86
- (cond ((string=? (sys:platform) "OSX")
-        "libudis86.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libudis86.so")
-       ((string=? (sys:platform) "Windows")
-        "libudis86.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libudis86
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
+(bind-dylib libudis86
+  (cond ((string=? (sys:platform) "OSX")
+         "libudis86.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libudis86.so")
+        ((string=? (sys:platform) "Windows")
+         "libudis86.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-type ud_operand <i32,i8,i32,i32,i8,i8,i64,i64,i8> #f)
 (bind-type ud <[i32,ud*],i8*,size_t,size_t,i8,size_t,|64,i8|,i32,[void,ud*],i64,|64,i8|,i8*,size_t,size_t,|128,i8|,[i8*,ud*,i64,i64*]*,i8,i64,i8,i32,|3,ud_operand|,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8*,i8*,i8*> #f)

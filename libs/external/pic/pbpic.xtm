@@ -30,22 +30,17 @@
 ;; begin inserted mpi.xtm code ;;
 
 ;; set up the current dylib name and path (for precompilation)
-(impc:aot:set-dylib-name-info
- 'libmpi
- (cond ((string=? (sys:platform) "OSX")
-        "libmpi.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libmpi.so")
-       ((string=? (sys:platform) "Windows")
-        "libmpi.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib               
-(define libmpi
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libmpi
+  (cond ((string=? (sys:platform) "OSX")
+         "libmpi.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libmpi.so")
+        ((string=? (sys:platform) "Windows")
+         "libmpi.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-alias MPI_Comm i8*) ;; ompi_communicator_t*
 (bind-alias MPI_Datatype i8*) ;; ompi_datatype_t*
@@ -56,21 +51,17 @@
 
 (call-as-xtlang (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr))
 
-(impc:aot:set-dylib-name-info
- 'libmpiaddresses
- (cond ((string=? (sys:platform) "OSX")
-        "/Users/ben/Code/extempore/examples/external/mpi/libmpiaddresses.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libmpiaddresses.so")
-       ((string=? (sys:platform) "Windows")
-        "libmpiaddresses.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-(define libmpiaddresses
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libmpiaddresses
+  (cond ((string=? (sys:platform) "OSX")
+         "/Users/ben/Code/extempore/examples/external/mpi/libmpiaddresses.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libmpiaddresses.so")
+        ((string=? (sys:platform) "Windows")
+         "libmpiaddresses.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-lib-val libmpiaddresses ompi_mpi_float_addr MPI_Datatype)
 (bind-val MPI_FLOAT MPI_Datatype)
@@ -81,22 +72,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; set up the current dylib name and path (for precompilation)
-(impc:aot:set-dylib-name-info
- 'libpbpic2
- (cond ((string=? (sys:platform) "OSX")
-        "/Users/ben/Code/src/skeleton-pic/pbpic2/libpbpic2.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libpbpic2.so")
-       ((string=? (sys:platform) "Windows")
-        "libpbpic2.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libpbpic2
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libpbpic2
+  (cond ((string=? (sys:platform) "OSX")
+         "/Users/ben/Code/src/skeleton-pic/pbpic2/libpbpic2.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libpbpic2.so")
+        ((string=? (sys:platform) "Windows")
+         "libpbpic2.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-type timeval <i64,i64>) ;; <time_t,suseconds_t>
 

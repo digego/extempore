@@ -11,20 +11,15 @@
 ;;; Code:
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libgsl
- (cond ((string=? (sys:platform) "OSX")
-        "libgsl.0.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libgsl.so.0")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libgsl
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libgsl
+  (cond ((string=? (sys:platform) "OSX")
+         "libgsl.0.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libgsl.so.0")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 
 ;; SOME TYPES FOR GSL

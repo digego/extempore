@@ -6,18 +6,13 @@
 (impc:aot:insert-header "xtmkinect2")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libkinect2
- (cond ((string=? (sys:platform) "Windows")
-        "xtmkinect.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libkinect2
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libkinect2
+  (cond ((string=? (sys:platform) "Windows")
+         "xtmkinect.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-alias TrackingState i32)
 (bind-alias JointType i32)

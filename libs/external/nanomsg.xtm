@@ -14,22 +14,17 @@
 (define *xtmlib-nanomsg-loaded* #f)
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libnanomsg
- (cond ((string=? (sys:platform) "OSX")
-        "libnanomsg.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libnanomsg.so")
-       ((string=? (sys:platform) "Windows")
-        "libnanomsg.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libnanomsg
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libnanomsg
+  (cond ((string=? (sys:platform) "OSX")
+         "libnanomsg.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libnanomsg.so")
+        ((string=? (sys:platform) "Windows")
+         "libnanomsg.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 
 ;; #include <errno.h>

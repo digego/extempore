@@ -18,25 +18,17 @@
 ;; lilv lib
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'liblilv
- (cond ((string=? (sys:platform) "OSX")
-        "liblilv-0.dylib")
-       ((string=? (sys:platform) "Linux")
-        "liblilv-0.so")
-       ((string=? (sys:platform) "Windows")
-        "liblilv.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define liblilv
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-
-(if (null? liblilv) (print-error "Error loading lilv library"))
+(bind-dylib liblilv
+  (cond ((string=? (sys:platform) "OSX")
+         "liblilv-0.dylib")
+        ((string=? (sys:platform) "Linux")
+         "liblilv-0.so")
+        ((string=? (sys:platform) "Windows")
+         "liblilv.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-alias LV2_Handle i8*)
 (bind-type LV2_Feature <i8*,i8*>)

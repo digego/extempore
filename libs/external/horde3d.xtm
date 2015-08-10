@@ -21,46 +21,17 @@
 ;; set the path to the Horde3D directory
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'hordelib
- (cond ((string=? (sys:platform) "OSX")
-        "/Library/Frameworks/Horde3D.framework/Horde3D")
-       ((string=? (sys:platform) "Linux")
-        "libHorde3D.so")
-       ((string=? (sys:platform) "Windows")
-        "Horde3D.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define hordelib
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (or (eq? #f hordelib)
-	(not hordelib)) 
-    (sys:load-escape "Could not load 'Horde3D' dynamic library"))
-
-(impc:aot:set-dylib-name-info
- 'hordeutlib
- (cond ((string=? (sys:platform) "OSX")
-        "/Library/Frameworks/Horde3DUtils.framework/Horde3DUtils")
-       ((string=? (sys:platform) "Linux")
-        "libHorde3DUtils.so")
-       ((string=? (sys:platform) "Windows")
-        "Horde3DUtils.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-(define hordeutlib
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (or (eq? #f hordeutlib)
-	(not hordeutlib)) 
-    (sys:load-escape "Could not load 'Horde3DUtils' dynamic library"))
+(bind-dylib hordelib
+  (cond ((string=? (sys:platform) "OSX")
+         "/Library/Frameworks/Horde3D.framework/Horde3D")
+        ((string=? (sys:platform) "Linux")
+         "libHorde3D.so")
+        ((string=? (sys:platform) "Windows")
+         "Horde3D.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (impc:aot:insert-header "xtmhorde3d")
 
@@ -126,6 +97,18 @@
 (bind-lib hordelib h3dGetCameraProjMat [void,i32,float*]*)
 (bind-lib hordelib h3dCastRay [i32,i32,float,float,float,float,float,float,i32]*)
 (bind-lib hordelib h3dGetCastRayResult [i1,i32,i32*,float*,float*]*)
+
+(bind-dylib hordeutlib
+  (cond ((string=? (sys:platform) "OSX")
+         "/Library/Frameworks/Horde3DUtils.framework/Horde3DUtils")
+        ((string=? (sys:platform) "Linux")
+         "libHorde3DUtils.so")
+        ((string=? (sys:platform) "Windows")
+         "Horde3DUtils.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;; horde utils
 (bind-lib hordeutlib h3dutDumpMessages [i1]*)

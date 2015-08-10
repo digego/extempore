@@ -22,6 +22,8 @@
 (sys:load-preload-check 'fft)
 (define *xtmlib-fft-loaded* #f)
 
+(set! *impc:compiler:message:level* 'high)
+
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm")
  (sys:load "libs/core/math.xtm"))
@@ -31,25 +33,17 @@
 (impc:aot:insert-header "xtmfft")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libkissfft
- (cond ((string=? (sys:platform) "OSX")
-        "kiss_fft.dylib")
-       ((string=? (sys:platform) "Linux")
-        "kiss_fft.so")
-       ((string=? (sys:platform) "Windows")
-        "KissFFT.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libkissfft
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (not libkissfft)
-    (print-error "Could not load kiss_fft dynamic library"))
+(bind-dylib libkissfft
+  (cond ((string=? (sys:platform) "OSX")
+         "kiss_fft.dylib")
+        ((string=? (sys:platform) "Linux")
+         "kiss_fft.so")
+        ((string=? (sys:platform) "Windows")
+         "KissFFT.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;; bind the required types and function signatures (see kiss_fft.h)
 

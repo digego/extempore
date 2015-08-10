@@ -23,22 +23,17 @@
 (impc:aot:insert-header "xtmassimp")
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libassimp
- (cond ((string=? (sys:platform) "OSX")
-        "libassimp.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libassimp.so.3")
-       ((string=? (sys:platform) "Windows")
-        "assimp.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; load the dylib
-(define libassimp
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libassimp
+  (cond ((string=? (sys:platform) "OSX")
+         "libassimp.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libassimp.so.3")
+        ((string=? (sys:platform) "Windows")
+         "assimp.dll")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unsupported platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;; load texture and returns texture number
 ;; 16 is for verticle flip
@@ -460,10 +455,66 @@
       (printf "\n Done exporting scene\n")
       void)))
 
-(sys:load "libs/external/assimp-scm.xtm")
-;; make sure we load them with AOT-compiled code as well
-(impc:aot:insert-forms
- (sys:load "libs/external/assimp-scm.xtm"))
+;; define the constants in Scheme as well
+(impc:aot:do-or-emit
+ (define aiProcess_CalcTangentSpace #x1))
+(impc:aot:do-or-emit
+ (define aiProcess_JoinIdenticalVertices #x2))
+(impc:aot:do-or-emit
+ (define aiProcess_MakeLeftHanded #x4))
+(impc:aot:do-or-emit
+ (define aiProcess_Triangulate #x8))
+(impc:aot:do-or-emit
+ (define aiProcess_RemoveComponent #x10))
+(impc:aot:do-or-emit
+ (define aiProcess_GenNormals #x20))
+(impc:aot:do-or-emit
+ (define aiProcess_GenSmoothNormals #x40))
+(impc:aot:do-or-emit
+ (define aiProcess_SplitLargeMeshes #x80))
+(impc:aot:do-or-emit
+ (define aiProcess_PreTransformVertices #x100))
+(impc:aot:do-or-emit
+ (define aiProcess_LimitBoneWeights #x200))
+(impc:aot:do-or-emit
+ (define aiProcess_ValidateDataStructure #x400))
+(impc:aot:do-or-emit
+ (define aiProcess_ImproveCacheLocality #x800))
+(impc:aot:do-or-emit
+ (define aiProcess_RemoveRedundantMaterials #x1000))
+(impc:aot:do-or-emit
+ (define aiProcess_FixInfacingNormals #x2000))
+(impc:aot:do-or-emit
+ (define aiProcess_SortByPType #x8000))
+(impc:aot:do-or-emit
+ (define aiProcess_FindDegenerates #x10000))
+(impc:aot:do-or-emit
+ (define aiProcess_FindInvalidData #x20000))
+(impc:aot:do-or-emit
+ (define aiProcess_GenUVCoords #x40000))
+(impc:aot:do-or-emit
+ (define aiProcess_TransformUVCoords #x80000))
+(impc:aot:do-or-emit
+ (define aiProcess_FindInstances #x100000))
+(impc:aot:do-or-emit
+ (define aiProcess_OptimizeMeshes #x200000))
+(impc:aot:do-or-emit
+ (define aiProcess_OptimizeGraph #x400000))
+(impc:aot:do-or-emit
+ (define aiProcess_FlipUVs #x800000))
+(impc:aot:do-or-emit
+ (define aiProcess_FlipWindingOrder #x1000000))
+(impc:aot:do-or-emit
+ (define aiProcess_SplitByBoneCount #x2000000))
+(impc:aot:do-or-emit
+ (define aiProcess_Debone #x4000000))
+;; poor man's Scheme polying
+(impc:aot:do-or-emit
+ (define assimp_load_model
+                       (lambda (dir file . args)
+                         (if (null? args)
+                             (assimp_load_model_b dir file)
+                             (assimp_load_model_a dir file (car args))))))
 
 (impc:aot:insert-footer "xtmassimp")
 (define *xtmlib-assimp-loaded* #t)

@@ -19,25 +19,17 @@
 ;;; Code:
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'bulletlib
- (cond ((string=? (sys:platform) "Linux")
-        "libBulletDynamics.so")
-       ((string=? (sys:platform) "Windows")
-        "BulletDynamics.dll")
-       ((string=? (sys:platform) "OSX")
-        "libBulletDynamics.dylib")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unknown platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-(define bulletlib
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (or (eq? #f bulletlib)
-	(not bulletlib)) 
-    (sys:load-escape "Could not load 'bullet' dynamic library"))
+(bind-dylib bulletlib
+  (cond ((string=? (sys:platform) "Linux")
+         "libBulletDynamics.so")
+        ((string=? (sys:platform) "Windows")
+         "BulletDynamics.dll")
+        ((string=? (sys:platform) "OSX")
+         "libBulletDynamics.dylib")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unknown platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (impc:aot:insert-header "xtmbullet")
 

@@ -31,31 +31,26 @@
 ;; Load GL
 
 ;; set up the current dylib name and path (for AOT compilation)
-(impc:aot:set-dylib-name-info
- 'libgl
- (cond ((string=? (sys:platform) "Linux")
-        "libGL.so")
-       ((string=? (sys:platform) "Windows")
-        "opengl32.dll")
-       ((string=? (sys:platform) "OSX")
-        "/System/Library/Frameworks/OpenGL.framework/OpenGL")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unknown platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-(define libgl
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
+(bind-dylib libgl
+  (cond ((string=? (sys:platform) "Linux")
+         "libGL.so")
+        ((string=? (sys:platform) "Windows")
+         "opengl32.dll")
+        ((string=? (sys:platform) "OSX")
+         "/System/Library/Frameworks/OpenGL.framework/OpenGL")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unknown platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 ;; if on windows also check for Gl32.dll			  
-(if (or (eq? #f libgl)
-	    (null? libgl)) 
-	(if (string=? "Windows" (sys:platform))
-	    (begin (set! libgl (sys:load-dylib "Gl32.dll"))
-		       (if (or (null? libgl)
-				       (eq? #f libgl))
-			       (print-error "Error loading opengl library")))	   
-		(sys:load-escape "Error loading opengl library")))
+(if (not libgl) 
+    (if (string=? "Windows" (sys:platform))
+        (begin (set! libgl (sys:load-dylib "Gl32.dll"))
+               (if (or (null? libgl)
+                       (eq? #f libgl))
+                   (print-error "Error loading opengl library")))	   
+        (sys:load-escape "Error loading opengl library")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; missing opengl constants
@@ -103,25 +98,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GLU
 
-(impc:aot:set-dylib-name-info
- 'libglu
- (cond ((string=? (sys:platform) "Linux")
-        "libGLU.so")
-       ((string=? (sys:platform) "Windows")
-        "Glu32.dll")
-       ((string=? (sys:platform) "OSX")
-        "/System/Library/Frameworks/OpenGL.framework/OpenGL")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unknown platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-(define libglu
-  (sys:load-dylib (cdr *impc:aot:current-load-dylib-info*)))
-
-(if (or (eq? #f libglu)
-	(not libglu)) 
-    (sys:load-escape "Could not load 'glu' dynamic library"))
+(bind-dylib libglu
+  (cond ((string=? (sys:platform) "Linux")
+         "libGLU.so")
+        ((string=? (sys:platform) "Windows")
+         "Glu32.dll")
+        ((string=? (sys:platform) "OSX")
+         "/System/Library/Frameworks/OpenGL.framework/OpenGL")
+        (else
+         (begin (print-with-colors 'red 'default #f (print "Error"))
+                (print ": unknown platform ")
+                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
 (bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
 (bind-lib libglu gluOrtho2D [void,double,double,double,double]*)
