@@ -183,7 +183,7 @@ install(TARGETS extempore
   RUNTIME DESTINATION bin)
 
 # install the rest of the necessary files into the "share" directory
-install(DIRECTORY runtime examples assets extras
+install(DIRECTORY runtime examples tests assets extras
   DESTINATION ${EXT_SHARE_DIR}
   PATTERN ".DS_Store" EXCLUDE)
 # need to filter out precomp guff from libs
