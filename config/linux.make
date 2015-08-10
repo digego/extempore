@@ -11,6 +11,5 @@ PLATFORM_LIBS += -lportaudio -lpcre
 PLATFORM_CXXFLAGS := -g -fPIC -O3
 PLATFORM_LDFLAGS := -Wl,--export-dynamic
 
-PLATFORM_DEFINES := -DEXT_MCJIT
 PLATFORM_CXX := g++
 PLATFORM_LD := g++

@@ -10,7 +10,6 @@ option(MCJIT "use LLVM's MCJIT for codegen" ON)
 
 set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
   "path to Extempore's shared runtime files")
-configure_file(src/UNIV.cpp ${CMAKE_SOURCE_DIR}/src/UNIV.cpp @ONLY)
 
 # set up the extempore target
 
@@ -110,6 +109,9 @@ target_include_directories(extempore PRIVATE ${OPENGL_INCLUDE_DIR})
 target_link_libraries(extempore ${OPENGL_LIBRARIES})
 
 # all platforms
+
+target_compile_definitions(extempore
+  PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
 
 target_compile_definitions(extempore
   PRIVATE -D_GNU_SOURCE

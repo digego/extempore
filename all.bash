@@ -29,6 +29,10 @@ else
     unset EXT_BOOST
 fi
 
+# build with mcjit by default
+PLATFORM_DEFINES="-DEXT_MCJIT -DEXT_SHARE_DIR=\\\"${PWD}\\\""
+export PLATFORM_DEFINES
+
 EXT_USER_ARGS=$@
 export EXT_USER_ARGS
 
