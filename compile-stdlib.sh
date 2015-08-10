@@ -36,7 +36,7 @@ libs/external/nanovg.xtm \
 libs/external/soil.xtm \
 libs/external/assimp.xtm"}
 
-EXTEMPORE_AOT_COMPILATION_COMMAND="extempore --nostd $1 --eval "
+: ${AOT_COMPILATION_COMMAND:="extempore --nostd $1 --eval "}
 
 echo Ahead-of-time \(AOT\) compiling the Extempore standard library.  This may take several minutes...
 echo
@@ -44,7 +44,7 @@ echo
 # check all the required shared libs are there
 for f in $AOT_LIBS
 do
-    $EXTEMPORE_AOT_COMPILATION_COMMAND "(impc:aot:compile-xtm-file \"$f\" #t #t)"
+    $AOT_COMPILATION_COMMAND "(impc:aot:compile-xtm-file \"$f\" #t #t)"
     rc=$?
     if (($rc != 0))  ; then
         echo -e "\033[0;31mError AOT-compiling $f\033[0;00m"
