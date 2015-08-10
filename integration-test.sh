@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ROOT_DIR=$(shell pwd)
+ROOT_DIR=$PWD
 
 # without MCJIT
 
