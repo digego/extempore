@@ -1656,12 +1656,6 @@
 ;; "/System/Library/Frameworks/OpenGL.framework/OpenGL")
 (define *impc:aot:current-load-dylib-info* #f)
 
-(define impc:aot:set-dylib-name-info
-  (lambda (symbol-name dylib-path)
-    ;; is there a better way to check if a file exists?
-    (set! *impc:aot:current-load-dylib-info*
-          (cons symbol-name dylib-path))))
-
 (define impc:aot:currently-compiling?
   (lambda ()
     (or (output-port? *impc:aot:current-output-port*)
@@ -7877,17 +7871,26 @@
                   (sys:open-dylib dylib-path))))
       (if dylib
           (begin
-            (impc:aot:insert-load-dylib-details *impc:aot:current-load-dylib-info*)
             (impc:compiler:print-dylib-loading-details-to-log dylib-path)
             dylib)
           (begin
             (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
                                (print "Error"))
             (print ": could not find ")
-            (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print dylib-path))
+            (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (print dylib-path))
             (print " dynamic library\n")
             (sys:load-escape (string-append "could not find " dylib-path " dynamic library"))
             #f)))))
+
+(define-macro (bind-dylib lib-symbol lib-path)
+  `(let ((dylib (sys:load-dylib ,(eval lib-path))))
+     (if dylib
+         (begin
+           (eval (list 'define ',lib-symbol dylib)
+                 (interaction-environment))
+           (set! *impc:aot:current-load-dylib-info*
+                 (cons ',lib-symbol ,(eval lib-path)))
+           (impc:aot:insert-load-dylib-details *impc:aot:current-load-dylib-info*)))))
 
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
