@@ -7,6 +7,7 @@ set(EXTMPORE_VERSION_MINOR "60")
 set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
 
 option(MCJIT "use LLVM's MCJIT for codegen" ON)
+option(BOOST "use boost library" OFF)
 
 set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
   "path to Extempore's shared runtime files")
@@ -125,12 +126,16 @@ target_compile_options(extempore
   PRIVATE  -frtti
   )
 
-
-# Windows
+# need Boost on Windows (for the moment, at least)
 if(WIN32)
-  # need Boost on Windows (for the moment, at least)
+  set(BOOST ON)
+endif()
+
+if(BOOST)
   find_package(Boost 1.47.0 REQUIRED)
   if(Boost_FOUND)
+    message("using boost library...")
+    target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
     target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
     target_link_libraries(extempore ${Boost_LIBRARIES})
   endif()
