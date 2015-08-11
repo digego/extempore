@@ -65,6 +65,11 @@
 #include <arpa/inet.h>
 #endif
 
+#ifdef _WIN32
+#include <chrono>
+#include <thread>
+#endif
+
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -861,7 +866,8 @@ void* thread_self() {
 // return value is number of nanosecs sleep missed by
 int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
 #ifdef _WIN32
-  return NULL;
+  std::this_thread::sleep_for(std::chrono::seconds(s) +
+                              std::chrono::nanoseconds(ns));
 #else
   struct timespec a, b;
   a.tv_sec = secs;
