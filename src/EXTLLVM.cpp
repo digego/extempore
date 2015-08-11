@@ -1209,41 +1209,6 @@ struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, u
   return t;
 }
 
-// bool rsplit(char* regex, char* str, char* a, char* b)
-// {
-//   char* data = str;
-//   int length = strlen(data);
-//   char* pattern = regex;		
-//   pcre *re; 
-//   const char *error; 
-//   int erroffset; 
-//   //printf("dat: data\n");
-//   // should probably move this regex compile to global
-//   re = pcre_compile(	pattern, /* the pattern */ 
-// 			0, /* default options */ 
-// 			&error, /* for error message */ 
-// 			&erroffset, /* for error offset */ 
-// 			NULL); /* use default character tables */		
-//   int rc; 
-//   int ovector[60];					
-//   rc = pcre_exec(	re, /* result of pcre_compile() */ 
-// 			NULL, /* we didn’t study the pattern */ 
-// 			data, /* the subject string */ 
-// 			strlen(data), /* the length of the subject string */ 
-// 			0, /* start at offset 0 in the subject */ 
-// 			0, /* default options */ 
-// 			ovector, /* vector of integers for substring information */ 
-// 			60); /* number of elements (NOT size in bytes) */
-  
-//   if(rc<1 || rc>1) return false; // then we failed
-//   int range = ovector[0];
-//   memset(a,0,range+1);
-//   memcpy(a,data,range);
-//   memset(b,0,(length-(range+1))+1);
-//   memcpy(b,data+range+1,(length-(range+1)));
-//   return true;
-// }
-
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
   char a[256];
   char b[256];
