@@ -1750,8 +1750,10 @@ namespace extemp {
       }
       if(err.find("use of undefined value") != std::string::npos) {
         char symname[1024];
-
-        rreplace("use of undefined value '@(.*)'",(char*)err.c_str(),"$1",symname);
+        const char* undef_value_string = "use of undefined value '@(.*)'";
+        const char* match1_string = "$1";
+        const char* eq_type_string = " = type ";
+        rreplace((char*)undef_value_string,(char*)err.c_str(),(char*)match1_string,symname);
         GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(symname);
         if(gv == NULL){
           std::cout << "MCJIT compiler error: \"" << symname << "\" not defined in LLVM" << std::endl;
@@ -1772,7 +1774,7 @@ namespace extemp {
               t->print(ss2);
               tmp_name = ss2.str().c_str();
               if(a->getType()->isStructTy()) {	      
-                rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+                rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
               }
               funcargs++;
               cntt++;
@@ -2190,9 +2192,10 @@ namespace extemp {
     func->getReturnType()->print(ss);
 
     const char* tmp_name = ss.str().c_str();
+    const char* eq_type_string = " = type ";
 
     if(func->getReturnType()->isStructTy()) {
-      rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+      rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
       tmp_name = tmp_str_a;
     }
 
@@ -2211,7 +2214,7 @@ namespace extemp {
         tmp_name = ss2.str().c_str();
 
         if(a->getType()->isStructTy()) {	      
-          rsplit(" = type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+          rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
           //printf("tmp:%s  a:%s  b:%s\n",(char*)tmp_name,tmp_str_a,tmp_str_b);
           tmp_name = tmp_str_a;
         }
@@ -2857,7 +2860,8 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
 
 	  const char* tmp_name = ss.str().c_str();
 	  if(tt->isStructTy()) {
-	    rsplit("= type ",(char*)tmp_name,tmp_str_a,tmp_str_b);
+      const char* eq_type_string = " = type ";
+	    rsplit((char*)eq_type_string,(char*)tmp_name,tmp_str_a,tmp_str_b);
 	    tmp_name = tmp_str_b;
 	  }
 	  
