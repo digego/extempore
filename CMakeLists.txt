@@ -132,7 +132,8 @@ if(WIN32)
 endif()
 
 if(BOOST)
-  find_package(Boost 1.47.0 REQUIRED)
+  find_package(Boost 1.47.0 REQUIRED
+    COMPONENTS filesystem system thread date_time regex serialization)
   if(Boost_FOUND)
     target_compile_options(extempore PRIVATE -std=c++11)
     target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
