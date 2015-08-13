@@ -39,9 +39,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake" CA
 
 if(MCJIT)
   target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-  message("-- Using the new LLVM MCJIT backend...")
+  message(STATUS "-- Using the new LLVM MCJIT backend...")
 else()
-  message("-- Using the old LLVM JIT backend...")
+  message(STATUS "-- Using the old LLVM JIT backend...")
 endif()
 
 # setup dependencies
