@@ -143,6 +143,9 @@ endif()
 
 # OSX
 if(APPLE)
+  # use clang++ by default
+  set(CMAKE_C_COMPILIER clang)
+  set(CMAKE_CXX_COMPILIER clang++)
   # tell the compiler that we're using ObjC++
   target_compile_options(extempore PRIVATE -x objective-c++)
   
