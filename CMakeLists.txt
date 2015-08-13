@@ -39,9 +39,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake" CA
 
 if(MCJIT)
   target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-  message("using the new LLVM MCJIT backend...")
+  message("-- Using the new LLVM MCJIT backend...")
 else()
-  message("using the old LLVM JIT backend...")  
+  message("-- Using the old LLVM JIT backend...")
 endif()
 
 # setup dependencies
@@ -134,7 +134,6 @@ endif()
 if(BOOST)
   find_package(Boost 1.47.0 REQUIRED)
   if(Boost_FOUND)
-    message("using boost library...")
     target_compile_options(extempore PRIVATE -std=c++11)
     target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
     target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
