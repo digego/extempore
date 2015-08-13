@@ -42,11 +42,18 @@
 #include <string>
 //#include <ucontext.h>
 
+typedef struct _zone_hooks_t {
+  uint64_t space; // here just so we don't get <i8*,i8*>
+  void* hook; // xtlang closure of type [void]*
+  struct _zone_hooks_t* hooks;
+} zone_hooks_t;
+
 typedef struct _llvm_zone_t {
   void* memory;
   uint64_t offset;
   uint64_t mark;
   uint64_t size;
+  zone_hooks_t* cleanup_hooks;
   struct _llvm_zone_t* memories;
 } llvm_zone_t;
 

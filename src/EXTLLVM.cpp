@@ -413,6 +413,7 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
       size = 0;
     }
     zone->size = size;
+    zone->cleanup_hooks = NULL;
     zone->memories = NULL;
 #if DEBUG_ZONE_ALLOC    
     printf("CreateZone: %x:%x:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);

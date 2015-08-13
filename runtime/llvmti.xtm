@@ -166,7 +166,7 @@
 ;; named types
 ;; -----------
 ;;
-(define *impc:ti:namedtype-cache* '(("mzone" . #((14 108 2 2 2 "%mzone*") "Extempore memory zone"))
+(define *impc:ti:namedtype-cache* '(("mzone" . #((14 108 2 2 2 108 "%mzone*") "Extempore memory zone"))
                                    ("clsvar" . #((14 108 4 108 2 "%clsvar*") "Extempore closure address table: <name,offset,type,TODO_whatisthis,next_table>"))))
 ;;
 ;; each element of the list is of the form
@@ -2812,6 +2812,57 @@
                            `(llvm_destroy_zone_after_delay ,zonename ,(caddr ast)))
                       ,rescopyname)))))))
 
+(define impc:ti:memzone
+  (lambda (ast)
+    (define zone_returns_void? (impc:ti:check-memzone-void? ast))
+    (if zone_returns_void?
+        `(begin (push_new_zone ,(cadr ast))
+                ,(if (= (length ast) 3) (caddr ast) (cadddr ast))
+                (let ((zonename (pop_zone))
+                      (hook:<i64,i8*,i8*>* (cast (tref zonename 4)))
+                      (f:[void]* null))
+                  (while (not (null? hook))
+                    (set! f (cast (tref hook 1) [void]*))
+                    (f)
+                    (set! hook (cast (tref hook 2) <i64,i8*,i8*>*)))
+                  (llvm_zone_destroy zonename)
+                  )
+                void)
+        (begin
+          (define resname (string->symbol (string-append "res" (number->string (modulo *xtm_mz_num* 100)))))
+          (define zonename (string->symbol (string-append "zone" (number->string (modulo *xtm_mz_num* 100)))))
+          (define newzname (string->symbol (string-append "newz" (number->string (modulo *xtm_mz_num* 100)))))
+          (define rescopyname (string->symbol (string-append "rescopy" (number->string (modulo *xtm_mz_num* 100)))))
+          (set! *xtm_mz_num* (+ *xtm_mz_num* 1))
+          (if (or (> (length ast) 4)
+                  (< (length ast) 3))
+              (impc:compiler:print-bad-arity-error ast))
+          `(begin (push_new_zone ,(cadr ast))
+                  (let ((,resname ,(if (= (length ast) 3) (caddr ast) (cadddr ast)))
+                        (,zonename (pop_zone))
+                        (,newzname (llvm_peek_zone_stack)))
+                    ;; this extra let seems reduentant! BUT is needed
+                    ;; because rescopyname should go in newzone not zonename
+                    ;; i.e. needs to go into a *new* let after pop_zone is called
+                    (let ((,rescopyname (zcopy ,resname ,zonename ,newzname))
+                          (hook:<i64,i8*,i8*>* (cast (tref ,zonename 4)))
+                          (f:[void]* null))
+                      ,(if (= (length ast) 3)
+                           `(begin
+                              (while (not (null? hook))
+                                (set! f (cast (tref hook 1) [void]*))
+                                (f)
+                                (set! hook (cast (tref hook 2) <i64,i8*,i8*>*))
+                                1)
+                              (llvm_zone_destroy ,zonename)
+                              )
+                           `(llvm_destroy_zone_after_delay ,zonename ,(caddr ast)))
+                      ,rescopyname)))))))
+
+(define impc:ti:beginz
+  (lambda (ast)
+    (impc:ti:memzone `(memzone ,(* 1024 1) (begin ,@(cdr ast))))))
+
 (define impc:ti:letz
   (lambda (ast)
     ;; (if (not (number? (eval (cadr ast))))
@@ -2822,6 +2873,15 @@
         (impc:ti:memzone `(memzone ,(cadr ast)
                                    (let ,(caddr ast) ,@(cdddr ast)))))))
 
+(define impc:ti:cleanup
+  (lambda (ast)
+    `(let ((zone (llvm_peek_zone_stack))
+           (hooks:<i64,i8*,i8*>* (cast (tref zone 4)))         
+           (hook:<i64,i8*,i8*>* (alloc))
+           (f (lambda () ,@(cdr ast) void)))
+       (tfill! hook 0 (cast f i8*) (cast hooks i8*))
+       (tset! zone 4 (cast hook i8*))
+       void)))
 
 (define impc:ti:callback
   (lambda (ast)
@@ -2903,6 +2963,10 @@
                       (impc:ti:first-transform (impc:ti:letz ast) inbody?))
                      ((eq? (car ast) 'memzone)
                       (impc:ti:first-transform (impc:ti:memzone ast) inbody?))
+                     ((eq? (car ast) 'beginz)
+                      (impc:ti:first-transform (impc:ti:beginz ast) inbody?))
+                     ((eq? (car ast) 'cleanup)
+                      (impc:ti:first-transform (impc:ti:cleanup ast) inbody?))
                      ((eq? (car ast) '>=)
                       (impc:ti:first-transform (impc:ti:gteq ast) inbody?))
                      ((eq? (car ast) '<=)

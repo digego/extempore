@@ -910,6 +910,29 @@
 
          (poly-test11 5.0))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; a little test for zone cleanup
+;;
+(bind-func MyLittleCleanupTest
+  (lambda ()
+    (let ((tmp2:i8* (alloc 8)))
+      (cleanup (println "Clean up before leaving zone!"))
+      tmp2)))
+
+(xtmtest '(bind-func cleanup-test
+            (lambda ()
+              (letz ((tmp:i8* (alloc 8))
+                     (t2 (MyLittleCleanupTest)))
+                (begin
+                  (println "In Zone ...")
+                  1))
+              (println "Out of zone ...")
+              void))
+
+         (cleanup-test))
+
 ;;;;;;;;;;;;;;;;;;
 ;; vector types
 
