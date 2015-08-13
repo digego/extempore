@@ -51,7 +51,6 @@
 
 #ifdef EXT_BOOST
 #include <boost/filesystem.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #endif
 
 #include <sstream>
@@ -345,11 +344,6 @@ namespace extemp {
       { "clock:adjust-offset",        &SchemeFFI::adjustClockOffset},
 	    { "clock:clock",                &SchemeFFI::getClockTime},
       { "clock:ad:clock",             &SchemeFFI::lastSampleBlockClock},    
-	    { "ad:clock:set-offset",        &SchemeFFI::ad_setClockOffset},
-      { "ad:clock:get-offset",        &SchemeFFI::ad_getClockOffset},
-	    { "ad:clock:adjust-offset",     &SchemeFFI::ad_adjustClockOffset},
-	    { "ad:clock:clock",             &SchemeFFI::ad_getClockTime},
-      { "ad:clock",                   &SchemeFFI::ad_getClockTime},
 	    //#endif
            
 
@@ -2536,23 +2530,6 @@ namespace extemp {
 	    }
 		    
 	}
-
-	//		double(*fp)(double	,double) = (double(*)(double,double)) EE->getPointerToFunction(func);
-	//		double v = fp(rvalue(pair_car(args)),rvalue(pair_cadr(args)));
-
-
-	//long long num_of_funcs = M->getFunctionList().size();
-	//std::cout << "llvm funcs: " << num_of_funcs << "  id:" << boost::this_thread::get_id() << std::endl;
-	
-	//        EE->lock.release();	
-
-
-/*
-	#ifdef LLVM_EE_LOCK
-	EE->lock.release();
-	#endif
-*/
-
 #ifdef EXT_MCJIT
   // need to remove the mapping here, otherwise runFunction will bomb out under MCJIT
   EXTLLVM::I()->EE->updateGlobalMapping(func,NULL);
@@ -2561,26 +2538,6 @@ namespace extemp {
 #ifdef LLVM_EE_LOCK		
 	EE->lock.release();
 #endif
-
-        //EE->lock.acquire();	
-	//long long num_of_funcs = M->getFunctionList().size();
-
-	// if the number of functions in module has changed when calling runFunction 
-	// then we assume a stub was made and appended to the end of the modules function list.
-	// we remove this function now that we no longer need it!
-
-	/*
-	if(num_of_funcs != M->getFunctionList().size()) {
-	    std::cout << "KICK(cc): " << num_of_funcs << "  id:" << boost::this_thread::get_id() << std::endl;
-	    iplist<Function>::iterator iter = M->getFunctionList().end();
-	    Function* stub = dyn_cast<Function>(--iter);
-	    EE->freeMachineCodeForFunction(stub);
-	    stub->deleteBody();
-	    stub->eraseFromParent();
-	}
-*/
-	//	EE->lock.release();	
-
 
 	//std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
 	switch(func->getReturnType()->getTypeID())
@@ -2947,197 +2904,88 @@ pointer SchemeFFI::get_named_type(scheme* _sc, pointer args)
       return mk_real(_sc,load);
     }
 
-  //////////////////////////////////////////////////////////////////
-  //  CLOCK STUFF
-
+//////////////////////////////////////////////////////////////////
+//  CLOCK STUFF
 #ifdef EXT_BOOST
- boost::posix_time::ptime EXT_BOOST_JAN1970(boost::gregorian::date(1970,boost::gregorian::Jan,1));
-
-  double time_to_double(boost::posix_time::ptime& time) {
-	 boost::posix_time::time_period period(EXT_BOOST_JAN1970,time);
-	 return period.length().total_microseconds()/D_MILLION;
-  }
- 
-  struct boost::posix_time::ptime& double_to_time(double tm) {
-     using namespace boost::posix_time;
-     ptime p;
-     int64_t seconds = (int64_t)tm;
-     int64_t fractional = (tm-seconds)*time_duration::ticks_per_second();
-     p = EXT_BOOST_JAN1970+time_duration(0,0,seconds,fractional);
-
-     return p;
-  }
-  pointer SchemeFFI::adjustClockOffset(scheme* _sc, pointer args)
+  double getRealTime()
   {
-    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args)) + SchemeFFI::CLOCK_OFFSET;
-    return mk_real(_sc,SchemeFFI::CLOCK_OFFSET);
+    auto time_in_sec = std::chrono::high_resolution_clock::now().time_since_epoch();
+    return time_in_sec.count();
   }
-
-  pointer SchemeFFI::setClockOffset(scheme* _sc, pointer args)
-  {
-    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args));
-    return pair_car(args);
-  }
-
-  pointer SchemeFFI::getClockOffset(scheme* _sc, pointer args)
-  {
-    return mk_real(_sc, SchemeFFI::CLOCK_OFFSET);
-  }
-
-  pointer SchemeFFI::lastSampleBlockClock(scheme* _sc, pointer args)
-  {
-    pointer p1 = mk_integer(_sc,UNIV::TIME);
-    _sc->imp_env->insert(p1);
-    pointer p2 = mk_real(_sc,AudioDevice::REALTIME + SchemeFFI::CLOCK_OFFSET);
-    _sc->imp_env->insert(p2);
-    pointer p3 = cons(_sc, p1, p2);
-    _sc->imp_env->erase(p1);
-    _sc->imp_env->erase(p2);
-    return p3;
-  }
-
-  pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
-  {
-	boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
-	return mk_real(_sc, time_to_double(pt) + SchemeFFI::CLOCK_OFFSET);
-    //return mk_real(_sc, CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + SchemeFFI::CLOCK_OFFSET);
-  }
-
-  //audiodevice clock stuff
-  pointer SchemeFFI::ad_adjustClockOffset(scheme* _sc, pointer args)
-  {
-    AudioDevice::CLOCKOFFSET = rvalue(pair_car(args)) + AudioDevice::CLOCKOFFSET;
-    return mk_real(_sc,AudioDevice::CLOCKOFFSET);
-  }
-
-  pointer SchemeFFI::ad_setClockOffset(scheme* _sc, pointer args)
-  {
-    AudioDevice::CLOCKOFFSET = rvalue(pair_car(args));
-    return pair_car(args);
-  }
-
-  pointer SchemeFFI::ad_getClockOffset(scheme* _sc, pointer args)
-  {
-    return mk_real(_sc, AudioDevice::CLOCKOFFSET);
-  }
-
-  pointer SchemeFFI::ad_getClockTime(scheme* _sc, pointer args)
-  {
-    return mk_real(_sc,AudioDevice::CLOCKBASE + AudioDevice::CLOCKOFFSET + ((double)UNIV::TIME/(double)UNIV::SAMPLERATE));
-  }
-
-  pointer SchemeFFI::ad_setTime(scheme* _sc, pointer args)
-  {
-    if(pair_cdr(args) == _sc->NIL) {
-		//AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
-		boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
-		AudioDevice::CLOCKBASE = time_to_double(pt); /* + SchemeFFI::CLOCK_OFFSET) */
-    }else{
-      AudioDevice::CLOCKBASE = rvalue(pair_cadr(args));
-    }
-    UNIV::TIME = ivalue(pair_car(args));
-    return _sc->T;
-  } 
-#else
-double time_to_double(struct timespec t) {
+#elif (__linux__ | __APPLE__)
+  //works on Linux && OSX
+  double time_to_double(struct timespec t) {
     return t.tv_sec + t.tv_nsec/D_BILLION;
-}
- 
-struct timespec double_to_time(double tm) {
-  struct timespec t;
- 
-  t.tv_sec = (long)tm;
-  t.tv_nsec = (tm - t.tv_sec)*BILLION;
-  if (t.tv_nsec == BILLION) {
-    t.tv_sec++;
-    t.tv_nsec = 0;
-  }
-  return t;
-}
-
-  pointer SchemeFFI::adjustClockOffset(scheme* _sc, pointer args)
-  {
-    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args)) + SchemeFFI::CLOCK_OFFSET;
-    return mk_real(_sc,SchemeFFI::CLOCK_OFFSET);
   }
 
-  pointer SchemeFFI::setClockOffset(scheme* _sc, pointer args)
-  {
-    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args));
-    return pair_car(args);
+  struct timespec double_to_time(double tm) {
+    struct timespec t;
+
+    t.tv_sec = (long)tm;
+    t.tv_nsec = (tm - t.tv_sec)*BILLION;
+    if (t.tv_nsec == BILLION) {
+      t.tv_sec++;
+      t.tv_nsec = 0;
+    }
+    return t;
   }
 
-  pointer SchemeFFI::getClockOffset(scheme* _sc, pointer args)
+#ifdef __linux__
+  double getRealTime()
   {
-    return mk_real(_sc, SchemeFFI::CLOCK_OFFSET);
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME,&t);
+    return time_to_double(t);
   }
 
-  pointer SchemeFFI::lastSampleBlockClock(scheme* _sc, pointer args)
-  {
-    pointer p1 = mk_integer(_sc,UNIV::TIME);
-    _sc->imp_env->insert(p1);
-    pointer p2 = mk_real(_sc,AudioDevice::REALTIME + SchemeFFI::CLOCK_OFFSET);
-    _sc->imp_env->insert(p2);
-    pointer p3 = cons(_sc, p1, p2);
-    _sc->imp_env->erase(p1);
-    _sc->imp_env->erase(p2);
-    return p3;
-  }
-
-#ifdef __APPLE__
-  pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
-  {
-    return mk_real(_sc, CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + SchemeFFI::CLOCK_OFFSET);
-  } 
-#else
   pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
   {
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
     return mk_real(_sc, time_to_double(t)+SchemeFFI::CLOCK_OFFSET);
   }
-#endif
-
-  //audiodevice clock stuff
-  pointer SchemeFFI::ad_adjustClockOffset(scheme* _sc, pointer args)
+#elif __APPLE__
+#include <CoreAudio/HostTime.h>
+  double getRealTime()
   {
-    AudioDevice::CLOCKOFFSET = rvalue(pair_car(args)) + AudioDevice::CLOCKOFFSET;
-    return mk_real(_sc,AudioDevice::CLOCKOFFSET);
+    return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
   }
 
-  pointer SchemeFFI::ad_setClockOffset(scheme* _sc, pointer args)
+  pointer SchemeFFI::getClockTime(scheme* _sc, pointer args)
   {
-    AudioDevice::CLOCKOFFSET = rvalue(pair_car(args));
+    return mk_real(_sc, CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + SchemeFFI::CLOCK_OFFSET);
+  } 
+#endif
+#endif // EXT_BOOST
+
+  pointer SchemeFFI::adjustClockOffset(scheme* _sc, pointer args)
+  {
+    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args)) + SchemeFFI::CLOCK_OFFSET;
+    return mk_real(_sc,SchemeFFI::CLOCK_OFFSET);
+  }
+
+  pointer SchemeFFI::setClockOffset(scheme* _sc, pointer args)
+  {
+    SchemeFFI::CLOCK_OFFSET = rvalue(pair_car(args));
     return pair_car(args);
   }
 
-  pointer SchemeFFI::ad_getClockOffset(scheme* _sc, pointer args)
+  pointer SchemeFFI::getClockOffset(scheme* _sc, pointer args)
   {
-    return mk_real(_sc, AudioDevice::CLOCKOFFSET);
+    return mk_real(_sc, SchemeFFI::CLOCK_OFFSET);
   }
 
-  pointer SchemeFFI::ad_getClockTime(scheme* _sc, pointer args)
+  pointer SchemeFFI::lastSampleBlockClock(scheme* _sc, pointer args)
   {
-    return mk_real(_sc,AudioDevice::CLOCKBASE + AudioDevice::CLOCKOFFSET + ((double)UNIV::TIME/(double)UNIV::SAMPLERATE));
+    pointer p1 = mk_integer(_sc,UNIV::TIME);
+    _sc->imp_env->insert(p1);
+    pointer p2 = mk_real(_sc,AudioDevice::REALTIME + SchemeFFI::CLOCK_OFFSET);
+    _sc->imp_env->insert(p2);
+    pointer p3 = cons(_sc, p1, p2);
+    _sc->imp_env->erase(p1);
+    _sc->imp_env->erase(p2);
+    return p3;
   }
-
-  pointer SchemeFFI::ad_setTime(scheme* _sc, pointer args)
-  {
-    if(pair_cdr(args) == _sc->NIL) {
-#ifdef __APPLE__
-      AudioDevice::CLOCKBASE = CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
-#else
-      struct timespec t;
-      clock_gettime(CLOCK_REALTIME, &t);
-      AudioDevice::CLOCKBASE = time_to_double(t);
-#endif
-    }else{
-      AudioDevice::CLOCKBASE = rvalue(pair_cadr(args));
-    }
-    UNIV::TIME = ivalue(pair_car(args));
-    return _sc->T;
-  } 
-#endif
 
 } // end namespace
 

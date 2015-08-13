@@ -73,8 +73,10 @@ namespace extemp
 	if (! initialised)
 	{
 #ifdef EXT_BOOST
-            bthread = boost::thread(start_routine, arg);
-            result = 0;
+    // std::function<void*(void*)> fn = static_cast<std::function<void*(void*)> >(start_routine);
+    std::function<void*()> fn = [start_routine,arg]()->void* { return start_routine(arg); };
+    bthread = std::thread(fn);
+    result = 0;
 #else
 	    result = pthread_create(&pthread, NULL, start_routine, arg);
 #endif
@@ -141,47 +143,26 @@ namespace extemp
 
 	return result;
     }
-	
-    //BE AWARE THAT THIS WILL ONLY TERMINATE THE THREAD AT CERTAIN PREDETEMINED POINTS (LIKE WAIT POINTS)
-    //READ pthread_cancel BEFORE MAKING ASSUMPTIONS.  (usually need a pthread_testcancel or pthread_cond_(timed)wait
-    int EXTThread::cancel()
-    {
-	int result = 22; //EINVAL
-		
-	if(initialised)
-	{
-#ifdef EXT_BOOST
-	    bthread.interrupt();
-            result = 0;
-#else
-	    result = pthread_cancel(pthread);
-#endif
-	    cancelled = ! result;
-	}
-		
-#ifdef _EXTTHREAD_DEBUG_
-	if (result)
-	{
-	    std::cerr << "Error joining thread: " << result << std::endl;
-	}
-#endif
-	return result;
-		
-    }
 
   int EXTThread::setPriority(int priority, bool realtime)
   {
+    pthread_t thread;
+#ifdef EXT_BOOST
+    thread = bthread.native_handle();
+#else
+    thread = pthread;
+#endif
 #ifdef __linux__
     sched_param param;
     int policy;
-    pthread_getschedparam(pthread,&policy,&param);
+    pthread_getschedparam(thread,&policy,&param);
     param.sched_priority = priority;
 
     // for realtime threads, use SCHED_RR policy
     if(realtime)
       policy = SCHED_RR;
     
-    int result = pthread_setschedparam(pthread,policy,&param);
+    int result = pthread_setschedparam(thread,policy,&param);
     if(result != 0) {
       fprintf(stderr, "Error: failed to set thread priority: %s\n", strerror(result));
       return 0;
@@ -198,7 +179,7 @@ namespace extemp
     ttcpolicy.constraint=(uint32_t)(UNIV::SAMPLERATE/143); // HZ/2200;
     ttcpolicy.preemptible=1; // 1 
 
-    result = thread_policy_set(pthread_mach_thread_np(pthread),
+    result = thread_policy_set(pthread_mach_thread_np(thread),
                                THREAD_TIME_CONSTRAINT_POLICY,
                                (thread_policy_t)&ttcpolicy,
                                THREAD_TIME_CONSTRAINT_POLICY_COUNT);
@@ -239,14 +220,14 @@ namespace extemp
     bool EXTThread::isCurrentThread()
     {
 #ifdef EXT_BOOST
-        return (bthread.get_id() == boost::this_thread::get_id());
+      return (bthread.get_id() == std::this_thread::get_id());
 #else
 	return pthread_equal(pthread_self(), pthread);
 #endif
     }
 	
 #ifdef EXT_BOOST
-  boost::thread& EXTThread::getBthread()
+  std::thread& EXTThread::getBthread()
     {
 	return bthread;
     }

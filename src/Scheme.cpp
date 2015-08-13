@@ -89,16 +89,6 @@
 #include "UNIV.h"
 #include "SchemeProcess.h"
 
-//#if USE_STRCASECMP
-//#include <strings.h>
-#ifdef _WIN32
-#define stricmp strcmp //stricmp _stricmp
-#define ULONG_LONG_MAX UINT64_MAX
-#else
-#define stricmp strcmp //strcasecmp
-#endif
-//#endif
-
 /* Used for documentation purposes, to signal functions in 'interface' */
 #define INTERFACE
 
@@ -130,7 +120,7 @@
 #ifndef macintosh
 # include <malloc.h>
 #else
-/* static int stricmp(const char *s1, const char *s2) */
+/* static int strcmp(const char *s1, const char *s2) */
 /* { */
 /*   unsigned char c1, c2; */
 /*   do { */
@@ -732,12 +722,12 @@ static const char *charnames[32]={
 static int is_ascii_name(const char *name, int *pc) {
     int i;
     for(i=0; i<32; i++) {
-	if(stricmp(name,charnames[i])==0) {
+	if(strcmp(name,charnames[i])==0) {
 	    *pc=i;
 	    return 1;
 	}
     }
-    if(stricmp(name,"del")==0) {
+    if(strcmp(name,"del")==0) {
 	*pc=127;
 	return 1;
     }
@@ -1516,7 +1506,7 @@ static inline pointer oblist_find_by_name(scheme *sc, const char *name)
     for (x = vector_elem(sc->oblist, location); x != sc->NIL; x = cdr(x)) { 
 	s = symname_sc(sc,car(x)); 
 	/* case-insensitive, per R5RS section 2. */ 
-	if(stricmp(name, s) == 0) { 
+	if(strcmp(name, s) == 0) {
 	    return car(x); 
 	}
     } 
@@ -1924,13 +1914,13 @@ static pointer mk_sharp_const(scheme *sc, char *name) {
 	return (mk_integer(sc, x));
     } else if (*name == '\\') { /* #\w (character) */
 	int c=0;
-	if(stricmp(name+1,"space")==0) {
+	if(strcmp(name+1,"space")==0) {
 	    c=' ';
-	} else if(stricmp(name+1,"newline")==0) {
+	} else if(strcmp(name+1,"newline")==0) {
 	    c='\n';
-	} else if(stricmp(name+1,"return")==0) {
+	} else if(strcmp(name+1,"return")==0) {
 	    c='\r';
-	} else if(stricmp(name+1,"tab")==0) {
+	} else if(strcmp(name+1,"tab")==0) {
 	    c='\t';
 	} else if(name[1]=='x' && name[2]!=0) {
 	    int c1=0;
@@ -2037,7 +2027,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 #endif
 
 #ifdef EXT_BOOST
-	boost::this_thread::sleep(boost::posix_time::microseconds(50));
+	std::this_thread::sleep_for(std::chrono::microseconds(50));
 #else
 	usleep(50);
 #endif
@@ -2331,7 +2321,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 	    std::cout << "ERROR: SENDING NOTIFICATION TO SCANNER THREAD" << std::endl << std::flush;					
 	}
 #ifdef EXT_BOOST
-	boost::this_thread::sleep(boost::posix_time::microseconds(50));
+	std::this_thread::sleep_for(std::chrono::microseconds(50));
 #else
 	usleep(50);
 #endif
@@ -2471,7 +2461,7 @@ static void* treadmill_scanner(void* obj)
            }
          sc->mutex->unlock(); // yeild here to let interpreter add greys to the treadmill!!
 #ifdef EXT_BOOST
-         boost::this_thread::sleep(boost::posix_time::microseconds(1000));
+         std::this_thread::sleep_for(std::chrono::microseconds(500));
 #else
          usleep(500);
 #endif
@@ -3507,7 +3497,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
 	sc->op = (int)OP_EVAL;
 		
 	sc->last_symbol_apply = sc->NIL;
-	sc->call_end_time = ULONG_LONG_MAX;
+	sc->call_end_time = std::numeric_limits<long long>::max();
 	// empty applied_symbol_names stack is empty
 	while(!sc->applied_symbol_names->empty())
 	{
@@ -3542,7 +3532,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     sc->op = (int)OP_EVAL;
 		
     sc->last_symbol_apply = sc->NIL;
-    sc->call_end_time = ULONG_LONG_MAX;
+    sc->call_end_time = std::numeric_limits<long long>::max();
     // empty applied_symbol_names stack is empty
     while(!sc->applied_symbol_names->empty())
       {
@@ -3571,7 +3561,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
       sc->applied_symbol_names->pop();
     }
   sc->last_symbol_apply = sc->NIL;
-  sc->call_end_time = ULONG_LONG_MAX;	
+  sc->call_end_time = std::numeric_limits<long long>::max();
 	
   return sc->T;
 }
@@ -6136,7 +6126,7 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
 	    }else{
 		sprintf(msg,"Exceeded maximum rumtime. If you need a higher default process execution time use sys:set-default-timeout\n");
 	    }
-	    sc->call_end_time = ULONG_LONG_MAX;			
+	    sc->call_end_time = std::numeric_limits<long long>::max();
 	    _Error_1(sc, msg, sc->NIL, sc->code->_debugger->_size);
 	    return;
 	}
@@ -6560,7 +6550,7 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     sc->treadmill_scan_thread = new extemp::EXTThread();
     sc->treadmill_scan_thread->create(&treadmill_scanner, sc); //, CAPThread::kDefaultThreadPriority);
 	
-    sc->call_end_time = ULONG_LONG_MAX;
+    sc->call_end_time = std::numeric_limits<long long>::max();
     //sc->call_default_time = 158760000ll;  // 1 hour
     sc->call_default_time = extemp::UNIV::SAMPLERATE*60*5; // 5 minutes
 	
@@ -6657,7 +6647,7 @@ void scheme_load_file(scheme *sc, FILE *fin) {
     sc->last_symbol_apply = sc->NIL;
     sc->error_position = -1;
 	
-    sc->call_end_time = ULONG_LONG_MAX;		
+    sc->call_end_time = std::numeric_limits<long long>::max();
 }
 
 void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_time, unsigned long long end_time) {
@@ -6704,7 +6694,7 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
     sc->last_symbol_apply = sc->NIL;	
     sc->error_position = -1;
 	
-    sc->call_end_time = ULONG_LONG_MAX;
+    sc->call_end_time = std::numeric_limits<long long>::max();
 }
 
 void scheme_define(scheme *sc, pointer envir, pointer symbol, pointer value) {
@@ -6782,6 +6772,6 @@ void scheme_call(scheme *sc, pointer func, pointer args, uint64_t start_time, ui
     sc->last_symbol_apply = sc->NIL;	
     sc->error_position = -1;
 	
-    sc->call_end_time = ULONG_LONG_MAX;
+    sc->call_end_time = std::numeric_limits<long long>::max();
 }
 //#endif

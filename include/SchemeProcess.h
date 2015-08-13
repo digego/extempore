@@ -47,6 +47,7 @@
 
 #ifdef EXT_BOOST
 #include <boost/asio.hpp>
+#include <boost/bind.hpp>
 #endif
 
 #define pair_caar(p) pair_car(pair_car(p))

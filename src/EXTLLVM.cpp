@@ -68,6 +68,8 @@
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
+#elseif EXT_BOOST
+#include <thread>
 #endif
 
 #ifndef _WIN32
@@ -208,9 +210,9 @@ typedef struct llvm_zone_stack
 
 
 #ifdef EXT_BOOST
-std::map<boost::thread::id,llvm_zone_stack*> LLVM_ZONE_STACKS;
-std::map<boost::thread::id,uint64_t> LLVM_ZONE_STACKSIZES;
-std::map<boost::thread::id,llvm_zone_t*> LLVM_CALLBACK_ZONES;
+std::map<std::thread::id,llvm_zone_stack*> LLVM_ZONE_STACKS;
+std::map<std::thread::id,uint64_t> LLVM_ZONE_STACKSIZES;
+std::map<std::thread::id,llvm_zone_t*> LLVM_CALLBACK_ZONES;
 #else
 std::map<long,llvm_zone_stack*> LLVM_ZONE_STACKS;
 std::map<long,uint64_t> LLVM_ZONE_STACKSIZES;
@@ -226,10 +228,10 @@ llvm_zone_t* llvm_threads_get_callback_zone()
 {
   llvm_zone_t* zone = 0;
 #ifdef EXT_BOOST
-  zone = LLVM_CALLBACK_ZONES[boost::this_thread::get_id()];
+  zone = LLVM_CALLBACK_ZONES[std::this_thread::get_id()];
   if(!zone) {
     zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
-    LLVM_CALLBACK_ZONES[boost::this_thread::get_id()] = zone;
+    LLVM_CALLBACK_ZONES[std::this_thread::get_id()] = zone;
   }
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());  
@@ -255,7 +257,7 @@ llvm_zone_stack* llvm_threads_get_zone_stack()
 {
   llvm_zone_stack* stack = 0;
 #ifdef EXT_BOOST
-  stack = LLVM_ZONE_STACKS[boost::this_thread::get_id()];
+  stack = LLVM_ZONE_STACKS[std::this_thread::get_id()];
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   stack = LLVM_ZONE_STACKS[(long)tid];
@@ -272,7 +274,7 @@ llvm_zone_stack* llvm_threads_get_zone_stack()
 void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
 {
 #ifdef EXT_BOOST
-  LLVM_ZONE_STACKS[boost::this_thread::get_id()] = llvm_zone_stack;
+  LLVM_ZONE_STACKS[std::this_thread::get_id()] = llvm_zone_stack;
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   LLVM_ZONE_STACKS[(long)tid] = llvm_zone_stack;
@@ -286,7 +288,7 @@ void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
 void llvm_threads_inc_zone_stacksize()
 {
 #ifdef EXT_BOOST
-  LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()] += 1;
+  LLVM_ZONE_STACKSIZES[std::this_thread::get_id()] += 1;
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   LLVM_ZONE_STACKSIZES[(long)tid] += 1;
@@ -300,7 +302,7 @@ void llvm_threads_inc_zone_stacksize()
 void llvm_threads_dec_zone_stacksize()
 {
 #ifdef EXT_BOOST
-  LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()] -= 1;
+  LLVM_ZONE_STACKSIZES[std::this_thread::get_id()] -= 1;
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   LLVM_ZONE_STACKSIZES[(long)tid] -= 1;
@@ -315,7 +317,7 @@ uint64_t llvm_threads_get_zone_stacksize()
 {
   uint64_t size = 0;
 #ifdef EXT_BOOST
-  size = LLVM_ZONE_STACKSIZES[boost::this_thread::get_id()];
+  size = LLVM_ZONE_STACKSIZES[std::this_thread::get_id()];
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
   size = LLVM_ZONE_STACKSIZES[(long)tid];

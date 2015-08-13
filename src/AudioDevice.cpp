@@ -41,6 +41,7 @@
 #include "TaskScheduler.h"
 //#include "EXTMonitor.h"
 #include "EXTLLVM.h"
+#include "SchemeFFI.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -62,82 +63,6 @@
 
 // this is an aribrary maximum
 #define MAX_RT_AUDIO_THREADS 16
-///////////////////////////////////////////////////////////////////////
-//
-//
-// NOTE  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-//
-// The contents of this file are a complete HACK!
-// I have written some placeholder code to get the project
-// started, but all of this code needs to be replaced.
-//
-// Nothing here is implemented properly AT ANY LEVEL!
-// There is A LOT to do to make this stuff work properly.
-// So please don't complain about how dodgy this code is
-// Jump in and start to replace it !!!
-//
-///////////////////////////////////////////////////////////////////////
-
-#ifdef EXT_BOOST
-#include <boost/filesystem.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-
-boost::posix_time::ptime EXT_BOOST_JAN1970(boost::gregorian::date(1970,boost::gregorian::Jan,1));
-
-double time_to_double(boost::posix_time::ptime& time) {
-  boost::posix_time::time_period period(EXT_BOOST_JAN1970,time);
-  return period.length().total_microseconds()/D_MILLION;
-}
- 
-struct boost::posix_time::ptime& double_to_time(double tm) {
-  using namespace boost::posix_time;
-  ptime p;
-  int64_t seconds = (int64_t)tm;
-  int64_t fractional = (tm-seconds)*time_duration::ticks_per_second();
-  p = EXT_BOOST_JAN1970+time_duration(0,0,seconds,fractional);
-
-  return p;
-}
-
-double getRealTime()
-{
-	boost::posix_time::ptime pt = boost::posix_time::microsec_clock::local_time();
-	return time_to_double(pt); // + SchemeFFI::CLOCK_OFFSET);
-}
-#endif //EXT_BOOST
-
-#ifndef _WIN32 //works on Linux && OSX
-double time_to_double(struct timespec t) {
-  return t.tv_sec + t.tv_nsec/D_BILLION;
-}
- 
-struct timespec double_to_time(double tm) {
-  struct timespec t;
- 
-  t.tv_sec = (long)tm;
-  t.tv_nsec = (tm - t.tv_sec)*BILLION;
-  if (t.tv_nsec == BILLION) {
-    t.tv_sec++;
-    t.tv_nsec = 0;
-  }
-  return t;
-}
-#endif
-
-#ifdef __linux__
-double getRealTime()
-{
-  struct timespec t;
-  clock_gettime(CLOCK_REALTIME,&t);
-  return time_to_double(t);
-}
-#elif __APPLE__
-#include <CoreAudio/HostTime.h>
-
-double getRealTime()
-{
-  return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970; 
-}
 
 // this is duplicated in EXTThread::setPriority(), but kep here to not mess with the MT audio stuff
 int set_thread_realtime(thread_port_t threadport, float period, float computation, float constraint) {
@@ -157,8 +82,6 @@ int set_thread_realtime(thread_port_t threadport, float period, float computatio
   }
   return 1;
 }
-
-#endif
 
 #ifdef _WIN32
 #define isnan(x) ((x) != (x))
@@ -406,8 +329,8 @@ namespace extemp {
     UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
     UNIV::TIME = UNIV::DEVICE_TIME;
 
-    if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
-    AudioDevice::REALTIME = getRealTime();
+    if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = SchemeFFI::getRealTime();
+    AudioDevice::REALTIME = SchemeFFI::getRealTime();
 
     device_time = UNIV::DEVICE_TIME;
     if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
@@ -906,7 +829,7 @@ namespace extemp {
       printf("Warning: CLOCK_REALTIME resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
 #endif
 
-    const double thread_start_time = getRealTime();
+    const double thread_start_time = SchemeFFI::getRealTime();
     const double sec_per_frame = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
     double current_thread_time;
     double nextFrame;
@@ -914,21 +837,19 @@ namespace extemp {
     // the worker loop
     while(true){
 
-      current_thread_time = getRealTime() - thread_start_time;
+      current_thread_time = SchemeFFI::getRealTime() - thread_start_time;
       // set DEVICE_TIME to "time mod UNIV::FRAMES"      
       UNIV::DEVICE_TIME = (uint64_t)(current_thread_time/sec_per_frame)*UNIV::FRAMES;
       UNIV::TIME = UNIV::DEVICE_TIME;
     
-      if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime(); 
-      AudioDevice::REALTIME = getRealTime();
+      if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = SchemeFFI::getRealTime();
+      AudioDevice::REALTIME = SchemeFFI::getRealTime();
 
       device_time = UNIV::DEVICE_TIME;
       if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
 
-#ifdef _WIN32
-	  // double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
-#else
-      struct timespec sleepDur = double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
+#ifndef EXT_BOOST
+      struct timespec sleepDur = SchemeFFI::double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
       // sleep until the next time mod UNIV::FRAMES
       nanosleep(&sleepDur, NULL);
 #endif

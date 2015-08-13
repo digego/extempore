@@ -40,8 +40,7 @@
 #include "SchemePrivate.h"
 
 #ifdef EXT_BOOST
-#include <boost/random.hpp>
-#include <boost/random/mersenne_twister.hpp>
+#include <random>
 #endif
 
 #include <string>
@@ -129,9 +128,9 @@ class UNIV {
   static std::vector<std::string> ATTRS;
   static std::vector<std::string> CPU;  
 #ifdef EXT_BOOST
-  static boost::mt19937 RNGGEN;
-  static boost::uniform_01<boost::mt19937> RNG;
-        //static boost::random::uniform_01<boost::random::mt19937> RNG(RNGGEN);
+  static std::random_device RNGDEV;
+  static std::mt19937_64 RNGGEN;
+  static std::uniform_real_distribution<> uniform_01;
 #endif
 
 	static double midi2frq(double pitch);

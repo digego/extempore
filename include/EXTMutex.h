@@ -37,7 +37,7 @@
 #define EXT_MUTEX
 
 #ifdef EXT_BOOST
-#include <boost/thread/recursive_mutex.hpp>
+#include <mutex>
 #else
 #include "pthread.h"
 #endif
@@ -64,7 +64,7 @@ namespace extemp
 	bool initialised;
 	std::string name;
 #ifdef EXT_BOOST
-	boost::recursive_mutex bmutex;
+	std::recursive_mutex bmutex;
 #else
 	pthread_mutex_t pthread_mutex;
 	pthread_t owner;

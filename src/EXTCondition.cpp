@@ -64,8 +64,7 @@ namespace extemp
     int EXTCondition::init()
     {  
 #ifdef EXT_BOOST
-      //boost_cond = boost::condition_variable;
-	int result = 0;
+      int result = 0;
 #else
         int result = pthread_cond_init(&pthread_cond, NULL);
 #endif
@@ -110,9 +109,9 @@ namespace extemp
     {
 
 #ifdef EXT_BOOST
-        boost::recursive_mutex::scoped_lock lock(aimeMutex->bmutex);
-        boost_cond.wait(lock); //aimeMutex->block); // bmutex.scoped_lock); //lock);
-        int result = 0;
+      std::unique_lock<std::recursive_mutex> lock(aimeMutex->bmutex);
+      boost_cond.wait(lock);
+      int result = 0;
 #else
         int result = pthread_cond_wait(&pthread_cond, &aimeMutex->pthread_mutex);
 #endif

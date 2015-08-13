@@ -37,8 +37,7 @@
 #define EXT_CONDITION
 
 #ifdef EXT_BOOST
-#include <boost/thread/condition_variable.hpp>
-#include <boost/thread/locks.hpp>
+#include <condition_variable>
 #else
 #include "pthread.h"
 #endif
@@ -63,7 +62,7 @@ namespace extemp
     protected:
 	bool initialised;
 #ifdef EXT_BOOST
-	boost::condition_variable_any boost_cond;
+	std::condition_variable_any boost_cond;
 #else
 	pthread_cond_t pthread_cond;
 #endif

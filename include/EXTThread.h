@@ -37,7 +37,8 @@
 #define EXT_THREAD
 
 #ifdef EXT_BOOST
-#include <boost/thread/thread.hpp>
+#include <thread>
+#include <functional>
 #else
 #include "pthread.h"
 #endif
@@ -54,13 +55,12 @@ namespace extemp
 	int create(void *(*start_routine)(void *), void *arg);
 	int detach();
 	int join();
-	int cancel();
 	bool isRunning();
 	bool isCurrentThread();
 	int setPriority(int, bool);
 	int getPriority(); //doesn't say if it's realtime or not
 #ifdef EXT_BOOST
-	boost::thread& getBthread();
+	std::thread& getBthread();
 #else
 	pthread_t getPthread();
 #endif
@@ -71,7 +71,7 @@ namespace extemp
 	bool joined;
 	bool cancelled;			
 #ifdef EXT_BOOST
-	boost::thread bthread;
+	std::thread bthread;
 #else
 	pthread_t pthread;
 #endif

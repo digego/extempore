@@ -787,7 +787,7 @@ namespace extemp {
 
 				// 1000 microseconds = 1 millisecond
 #ifdef EXT_BOOST
-				boost::this_thread::sleep(boost::posix_time::microseconds(1000));
+				std::this_thread::sleep_for(std::chrono::microseconds(1000));
 #else
 				usleep(1000);
 #endif

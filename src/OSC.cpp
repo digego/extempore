@@ -46,7 +46,8 @@
 #include <stdlib.h>
 
 #ifdef EXT_BOOST
-// header boost/asio.h from OSC.h
+#include <thread>
+#include <chrono>
 #else
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -499,7 +500,7 @@ namespace extemp {
         //if(reply_length > 0) sendto(osc->getSocketFD(), reply, reply_length, 0, (struct sockaddr*)osc->getClientAddress(), osc->sizeOfClientAddress());
       }else{
 #ifdef EXT_BOOST
-        boost::this_thread::sleep(boost::posix_time::microseconds(1000));
+        std::this_thread::sleep_for(std::chrono::microseconds(1000));
 #else
         usleep(1000);
 #endif
