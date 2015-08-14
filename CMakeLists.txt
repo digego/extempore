@@ -54,6 +54,7 @@ endif()
 if(EXISTS "$ENV{EXT_LLVM_DIR}")
   set(LLVM_ROOT_DIR $ENV{EXT_LLVM_DIR} CACHE PATH
     "path to the (patched) LLVM build")
+  list(APPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIRECTORY}/llvm-build/")
   find_package(LLVM 3.4 REQUIRED)
   target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
   target_link_libraries(extempore
@@ -103,6 +104,8 @@ else()
 endif()
 
 if(WIN32)
+  set(MSVC_TOOLCHAIN vc140)
+  set(NUGET_PACKAGE_DIR "${CMAKE_BINARY_DIR}/packages")
   # on Windows, we'll use NuGet to pull down the build-time
   # dependencies - requires NuGet command line interface (choco install nuget.commandline)
   # boost components needed: system filesystem thread date_time regex serialization
@@ -114,12 +117,18 @@ if(WIN32)
   # Install-Package boost_regex-vc140 -Pre
   # Install-Package boost_serialization-vc140 -Pre
   # Install-Package boost-vc140 -Pre
-  # assume they've come from NuGet 
-  target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/packages/portaudio.0.19.1/build/native/include)
-  target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/packages/pcre.8.33.0.1/build/native/include)
-  target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/boost.1.58.0.0/lib/native/include)
-  # assume LLVM install dir is extempore/llvm-build
-  target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/llvm-build/include)
+  # assume they've come from NuGet
+  target_include_directories(extempore PRIVATE "${NUGET_PACKAGE_DIR}/portaudio.0.19.1/build/native/include")
+  target_include_directories(extempore PRIVATE "${NUGET_PACKAGE_DIR}/pcre.8.33.0.1/build/native/include")
+  # link_directories(
+  #   # boost
+  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_system-${MSVC_TOOLCHAIN}-mt-1_59.lib"
+  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_filesystem-${MSVC_TOOLCHAIN}-mt-1_59.lib"
+  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_thread-${MSVC_TOOLCHAIN}-mt-1_59.lib"
+  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_date-${MSVC_TOOLCHAIN}-mt-1_59.lib"
+  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_regex-${MSVC_TOOLCHAIN}-mt-1_59.lib"
+  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_serialization-${MSVC_TOOLCHAIN}-mt-1_59.lib"
+  #   )
 else()
   # on OSX & Linux, assume you've got them through your package manager
   find_package(Portaudio REQUIRED)
@@ -160,8 +169,9 @@ endif()
 if(BOOST)
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
     target_compile_options(extempore PRIVATE -std=c++11)
-  find_package(Boost 1.58.0
-    COMPONENTS system filesystem thread date_time regex serialization)
+    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIRECTORY}/packages/boost-vc140.1.59.0-b1/")
+    find_package(Boost 1.58.0
+      COMPONENTS system filesystem thread date_time regex serialization)
   if(Boost_FOUND)
     target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
     target_link_libraries(extempore ${Boost_LIBRARIES})
