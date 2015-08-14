@@ -115,23 +115,9 @@ namespace extemp {
   static pointer initMTAudioBuf(scheme* _sc, pointer args);
   static pointer getAudioLoad(scheme* _sc, pointer args);
 
-  // clock
-#ifdef EXT_BOOST
-#include <chrono>
-#else
-  static double time_to_double(struct timespec t);
-  static struct timespec double_to_time(double tm);
-#endif
-  static double getRealTime();
-	static pointer adjustClockOffset(scheme* _sc, pointer args);
-	static pointer setClockOffset(scheme* _sc, pointer args);
-	static pointer getClockOffset(scheme* _sc, pointer args);
-	static pointer getClockTime(scheme* _sc, pointer args);
-	static pointer lastSampleBlockClock(scheme* _sc, pointer args);
-
 	// misc stuff
 	static pointer dataGETi64(scheme* _sc, pointer args);
-	static pointer dataGETdouble(scheme* _sc, pointer args);	
+	static pointer dataGETdouble(scheme* _sc, pointer args);
 	static pointer dataGETfloat(scheme* _sc, pointer args);	
 	static pointer dataSETi64(scheme* _sc, pointer args);
 	static pointer dataSETdouble(scheme* _sc, pointer args);
@@ -223,7 +209,13 @@ namespace extemp {
 	static pointer impcirGetType(scheme* _sc, pointer args);	
 	static pointer impcirAdd(scheme* _sc, pointer args);
 
-	static double CLOCK_OFFSET;
+  // clock
+  static pointer getClockTime(scheme* _sc, pointer args);
+	static pointer adjustClockOffset(scheme* _sc, pointer args);
+	static pointer setClockOffset(scheme* _sc, pointer args);
+	static pointer getClockOffset(scheme* _sc, pointer args);
+	static pointer lastSampleBlockClock(scheme* _sc, pointer args);
+
     private:
 	static SchemeFFI SINGLETON;		
 	static std::map<std::string,std::pair<std::string,std::string> > IMPCIR_DICT;

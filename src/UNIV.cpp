@@ -460,36 +460,72 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 	return result;
 }
 
+//////////////////////////////////////////////////////////////////
+//  CLOCK/TIME
+#ifdef EXT_BOOST
+double getRealTime()
+{
+  auto time_in_sec = std::chrono::high_resolution_clock::now().time_since_epoch();
+  return time_in_sec.count();
+}
 
-#ifdef __APPLE__
-  double clock_clock()
-  {
-    return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 + extemp::SchemeFFI::CLOCK_OFFSET;
-  } 
-#elif defined(__linux__)
-  double clock_clock()
-  {
-    struct timespec t;
-    clock_gettime(CLOCK_REALTIME, &t);
-    double t2 = (double)t.tv_sec + ((double)t.tv_nsec)/D_BILLION;    
-    return t2+extemp::SchemeFFI::CLOCK_OFFSET;
+#elif __linux__
+
+double time_to_double(struct timespec t) {
+  return t.tv_sec + t.tv_nsec/D_BILLION;
+}
+
+struct timespec double_to_time(double tm) {
+  struct timespec t;
+
+  t.tv_sec = (long)tm;
+  t.tv_nsec = (tm - t.tv_sec)*BILLION;
+  if (t.tv_nsec == BILLION) {
+    t.tv_sec++;
+    t.tv_nsec = 0;
   }
-#else
-   double clock_clock() {
-	   FILETIME tm;
-	   ULONGLONG t;
-	   double UNIX_1970_EPOCH = 11644473600.0;
-#if defined(NTDDI_WIN8) && NTDDI_VERSION >= NTDDI_WIN8
-	   /* Windows 8, Windows Server 2012 and later. ---------------- */
-	   GetSystemTimePreciseAsFileTime(&tm);
-#else
-	   /* Windows 7 */
-	   GetSystemTimeAsFileTime(&tm);
+  return t;
+}
+
+double getRealTime()
+{
+  struct timespec t;
+  clock_gettime(CLOCK_REALTIME,&t);
+  return time_to_double(t);
+}
+
+#elif __APPLE__
+
+#include <CoreAudio/HostTime.h>
+
+// same as linux version
+double time_to_double(struct timespec t) {
+  return t.tv_sec + t.tv_nsec/D_BILLION;
+}
+
+// same as linux version
+struct timespec double_to_time(double tm) {
+  struct timespec t;
+
+  t.tv_sec = (long)tm;
+  t.tv_nsec = (tm - t.tv_sec)*BILLION;
+  if (t.tv_nsec == BILLION) {
+    t.tv_sec++;
+    t.tv_nsec = 0;
+  }
+  return t;
+}
+
+double getRealTime()
+{
+  return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
+}
 #endif
-	   t = ((ULONGLONG)tm.dwHighDateTime << 32) | (ULONGLONG)tm.dwLowDateTime;
-	   return ((double)t / 10000000.0) - UNIX_1970_EPOCH;
-   }
-#endif
+
+double clock_clock()
+{
+  return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
+}
 
 int register_for_window_events()
 {
@@ -502,24 +538,26 @@ int register_for_window_events()
   return 1;
 #endif
 }
+
 namespace extemp {
 
-    // this template should be filled by cmake during the build
-    // process - or you can do it yourself (by hand) if you're into
-    // that sort of thing
-    std::string UNIV::SHARE_DIR = std::string(EXT_SHARE_DIR);
-    uint32_t UNIV::FRAMES = 128;
-    uint32_t UNIV::CHANNELS = 2;
-    uint32_t UNIV::IN_CHANNELS = 0;
-    uint32_t UNIV::SAMPLERATE = 44100;
-    uint32_t UNIV::SECOND = SAMPLERATE;
-    uint32_t UNIV::MINUTE = SECOND * 60;
-    uint32_t UNIV::HOUR = MINUTE * 60;
-    uint64_t UNIV::TIME = 0l;
-    uint64_t UNIV::DEVICE_TIME = 0l;
-    uint32_t UNIV::AUDIO_NONE = 0; // 0 for real device, 1 for dummy device
-    uint32_t UNIV::AUDIO_DEVICE = -1;
-    uint32_t UNIV::AUDIO_IN_DEVICE = -1;
+  // this template should be filled by cmake during the build
+  // process - or you can do it yourself (by hand) if you're into
+  // that sort of thing
+  std::string UNIV::SHARE_DIR = std::string(EXT_SHARE_DIR);
+  uint32_t UNIV::FRAMES = 128;
+  uint32_t UNIV::CHANNELS = 2;
+  uint32_t UNIV::IN_CHANNELS = 0;
+  uint32_t UNIV::SAMPLERATE = 44100;
+  uint32_t UNIV::SECOND = SAMPLERATE;
+  uint32_t UNIV::MINUTE = SECOND * 60;
+  uint32_t UNIV::HOUR = MINUTE * 60;
+  uint64_t UNIV::TIME = 0l;
+  uint64_t UNIV::DEVICE_TIME = 0l;
+  uint32_t UNIV::AUDIO_NONE = 0; // 0 for real device, 1 for dummy device
+  uint32_t UNIV::AUDIO_DEVICE = -1;
+  uint32_t UNIV::AUDIO_IN_DEVICE = -1;
+  double UNIV::CLOCK_OFFSET = 0.0;
   std::map<std::string,std::string> UNIV::CMDPARAMS;
   std::vector<std::string> UNIV::ARCH;
   std::vector<std::string> UNIV::ATTRS;
@@ -528,7 +566,7 @@ namespace extemp {
 #ifdef EXT_BOOST
   std::random_device UNIV::RNGDEV;
   std::mt19937_64 UNIV::RNGGEN(UNIV::RNGDEV());
-  std::uniform_real_distribution<> uniform_01(0, 1);
+  std::uniform_real_distribution<double> uniform_01(0.0, 1.0);
 #endif
 
     // 0 is for ansi, 1 is for MSDos CMD shell

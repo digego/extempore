@@ -88,10 +88,14 @@ char* base64_encode(const unsigned char *data,size_t input_length,size_t *output
 unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
 char* cname_encode(char *data,size_t input_length,size_t *output_length);
   char* cname_decode(char *data,size_t input_length,size_t *output_length);
- double clock_clock();
-int register_for_window_events();
 
-
+  // clock/time
+#ifdef EXT_BOOST
+#include <chrono>
+#endif
+  double getRealTime();
+  double clock_clock();
+  int register_for_window_events();
 }
 
 namespace extemp {
@@ -123,6 +127,7 @@ class UNIV {
   static uint32_t AUDIO_NONE;
   static uint32_t AUDIO_DEVICE;
   static uint32_t AUDIO_IN_DEVICE;
+  static double CLOCK_OFFSET;
   static std::map<std::string,std::string> CMDPARAMS;
   static std::vector<std::string> ARCH;
   static std::vector<std::string> ATTRS;

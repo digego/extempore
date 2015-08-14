@@ -58,6 +58,9 @@
 #include <libkern/OSAtomic.h>
 #endif
 
+#ifdef EXT_BOOST
+#include <thread>
+#endif
 #include <stdlib.h>
 #include <math.h>
 
@@ -329,11 +332,11 @@ namespace extemp {
     UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
     UNIV::TIME = UNIV::DEVICE_TIME;
 
-    if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = SchemeFFI::getRealTime();
-    AudioDevice::REALTIME = SchemeFFI::getRealTime();
+    if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime();
+    AudioDevice::REALTIME = getRealTime();
 
     device_time = UNIV::DEVICE_TIME;
-    if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
+    if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl;
 
     int channels = 2;
     uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
@@ -829,7 +832,7 @@ namespace extemp {
       printf("Warning: CLOCK_REALTIME resolution is %lus %luns, this may cause problems.\n",res.tv_sec);
 #endif
 
-    const double thread_start_time = SchemeFFI::getRealTime();
+    const double thread_start_time = getRealTime();
     const double sec_per_frame = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
     double current_thread_time;
     double nextFrame;
@@ -837,20 +840,30 @@ namespace extemp {
     // the worker loop
     while(true){
 
-      current_thread_time = SchemeFFI::getRealTime() - thread_start_time;
-      // set DEVICE_TIME to "time mod UNIV::FRAMES"      
+      current_thread_time = getRealTime() - thread_start_time;
+      // set DEVICE_TIME to "time mod UNIV::FRAMES"
       UNIV::DEVICE_TIME = (uint64_t)(current_thread_time/sec_per_frame)*UNIV::FRAMES;
       UNIV::TIME = UNIV::DEVICE_TIME;
-    
-      if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = SchemeFFI::getRealTime();
-      AudioDevice::REALTIME = SchemeFFI::getRealTime();
+
+      if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime();
+      AudioDevice::REALTIME = getRealTime();
 
       device_time = UNIV::DEVICE_TIME;
-      if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl; 
+      if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl;
 
-#ifndef EXT_BOOST
-      struct timespec sleepDur = SchemeFFI::double_to_time(sec_per_frame - fmod(current_thread_time, sec_per_frame));
       // sleep until the next time mod UNIV::FRAMES
+      double dur = sec_per_frame - fmod(current_thread_time, sec_per_frame);
+#ifdef EXT_BOOST
+      std::this_thread::sleep_for(std::chrono::nanoseconds(int64_t(dur*1e9)));
+#else
+      struct timespec sleepDur;
+
+      sleepDur.tv_sec = (long)dur;
+      sleepDur.tv_nsec = (dur - sleepDur.tv_sec)*BILLION;
+      if (sleepDur.tv_nsec == BILLION) {
+        sleepDur.tv_sec++;
+        sleepDur.tv_nsec = 0;
+      }
       nanosleep(&sleepDur, NULL);
 #endif
       // trigger the scheduler
