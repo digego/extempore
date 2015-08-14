@@ -34,7 +34,9 @@ target_sources(extempore
 target_include_directories(extempore PRIVATE include)
 
 # suppress the warning about the opcode switch statement
-set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
+if(NOT WIN32)
+  set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
+endif()
 
 # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake" CACHE PATH
@@ -105,10 +107,13 @@ if(WIN32)
   # dependencies - requires NuGet command line interface (choco install nuget.commandline)
   add_custom_command(TARGET extempore
     PRE_BUILD
-    COMMAND nuget install portaudio -Version 0.19.1
-    COMMAND nuget install pcre -Version 8.33.0.1
-    COMMAND nuget install boost -Version 1.58.0
-    )
+    COMMAND nuget install portaudio -Version 0.19.1)
+  add_custom_command(TARGET extempore
+    PRE_BUILD
+    COMMAND nuget install pcre -Version 8.33.0.1)
+  add_custom_command(TARGET extempore
+    PRE_BUILD
+    COMMAND nuget install boost -Version 1.58.0)
   # assume they've come from NuGet 
   target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/packages/portaudio.0.19.1/build/native/include)
   target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/packages/pcre.8.33.0.1/build/native/include)
@@ -154,10 +159,10 @@ endif()
 
 if(BOOST)
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
+    target_compile_options(extempore PRIVATE -std=c++11)
   find_package(Boost 1.58.0
     COMPONENTS filesystem system thread date_time regex serialization)
   if(Boost_FOUND)
-    target_compile_options(extempore PRIVATE -std=c++11)
     target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
     target_link_libraries(extempore ${Boost_LIBRARIES})
   endif()
