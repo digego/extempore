@@ -102,53 +102,51 @@ namespace extemp {
 
 //#define mk_cb(instance,class,func) (dynamic_cast<CM*>(new CMI<class>(instance,&class::func)))
     
-typedef float AUDIOSAMPLE;
-    
-class UNIV {
+  class UNIV {
 
 #define EIGHT_BIT 127
 #define SIXTEEN_BIT 32767
 #define TWENTY_FOUR_BIT 8388608
 #define THIRTY_TWO_BIT 214748647
     
-    public:
-  static std::string SHARE_DIR;
-	static uint32_t CHANNELS;
-	static uint32_t IN_CHANNELS;
-	static uint32_t SAMPLERATE;
-	static uint64_t TIME;
-	static uint64_t DEVICE_TIME;
-	static uint32_t HOUR;
-	static uint32_t MINUTE;
-	static uint32_t SECOND;
-	static uint32_t FRAMES;
-  static uint32_t EXT_TERM;
-  static uint32_t EXT_LOADSTD;
-  static uint32_t AUDIO_NONE;
-  static uint32_t AUDIO_DEVICE;
-  static uint32_t AUDIO_IN_DEVICE;
-  static double CLOCK_OFFSET;
-  static std::map<std::string,std::string> CMDPARAMS;
-  static std::vector<std::string> ARCH;
-  static std::vector<std::string> ATTRS;
-  static std::vector<std::string> CPU;  
+  public:
+    static std::string SHARE_DIR;
+    static uint32_t CHANNELS;
+    static uint32_t IN_CHANNELS;
+    static uint32_t SAMPLERATE;
+    static uint64_t TIME;
+    static uint64_t DEVICE_TIME;
+    static uint32_t HOUR;
+    static uint32_t MINUTE;
+    static uint32_t SECOND;
+    static uint32_t FRAMES;
+    static uint32_t EXT_TERM;
+    static uint32_t EXT_LOADSTD;
+    static uint32_t AUDIO_NONE;
+    static uint32_t AUDIO_DEVICE;
+    static uint32_t AUDIO_IN_DEVICE;
+    static double CLOCK_OFFSET;
+    static std::map<std::string,std::string> CMDPARAMS;
+    static std::vector<std::string> ARCH;
+    static std::vector<std::string> ATTRS;
+    static std::vector<std::string> CPU;
 #ifdef EXT_BOOST
-  static std::random_device RNGDEV;
-  static std::mt19937_64 RNGGEN;
-  static std::uniform_real_distribution<> uniform_01;
+    static std::random_device RNGDEV;
+    static std::mt19937_64 RNGGEN;
+    static std::uniform_real_distribution<double> uniform_01;
 #endif
 
-	static double midi2frq(double pitch);
-	static double frqRatio(double semitones);
-	static void initRand();
-	static int random(int range);
-	static double random();
-	static bool file_check(const std::string& filename);	
-	static void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
+    static double midi2frq(double pitch);
+    static double frqRatio(double semitones);
+    static void initRand();
+    static int random(int range);
+    static double random();
+    static bool file_check(const std::string& filename);
+    static void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
      
- private:
+  private:
 	
-    };
+  };
 
 } //End Namespace
 #endif
