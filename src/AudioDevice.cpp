@@ -58,15 +58,15 @@
 #include <libkern/OSAtomic.h>
 #endif
 
-#ifdef EXT_BOOST
-#include <thread>
-#endif
 #include <stdlib.h>
 #include <math.h>
 
 // this is an aribrary maximum
 #define MAX_RT_AUDIO_THREADS 16
 
+#ifdef EXT_BOOST
+#include <thread>
+#elif
 // this is duplicated in EXTThread::setPriority(), but kep here to not mess with the MT audio stuff
 int set_thread_realtime(thread_port_t threadport, float period, float computation, float constraint) {
   struct thread_time_constraint_policy ttcpolicy;
@@ -85,6 +85,7 @@ int set_thread_realtime(thread_port_t threadport, float period, float computatio
   }
   return 1;
 }
+#endif
 
 #ifdef _WIN32
 #define isnan(x) ((x) != (x))

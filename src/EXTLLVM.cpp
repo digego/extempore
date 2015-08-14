@@ -68,7 +68,7 @@
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
-#elseif EXT_BOOST
+#elif EXT_BOOST
 #include <thread>
 #endif
 
