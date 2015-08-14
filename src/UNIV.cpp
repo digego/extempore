@@ -566,7 +566,7 @@ namespace extemp {
 #ifdef EXT_BOOST
   std::random_device UNIV::RNGDEV;
   std::mt19937_64 UNIV::RNGGEN(UNIV::RNGDEV());
-  std::uniform_real_distribution<double> uniform_01(0.0, 1.0);
+  std::uniform_real_distribution<double> UNIV::uniform_01(0.0, 1.0);
 #endif
 
     // 0 is for ansi, 1 is for MSDos CMD shell
@@ -586,10 +586,10 @@ namespace extemp {
       sranddev();
 #endif
     }
-    
+
     int UNIV::random(int range) {
 #ifdef EXT_BOOST
-      return (int)(uniform_01(RNGGEN)*(double)range);
+      return (int)(UNIV::uniform_01(UNIV::RNGGEN)*(double)range);
 #else
         return (int)((double)rand() / (double)RAND_MAX * (double) range);
 #endif
@@ -597,7 +597,7 @@ namespace extemp {
 
     double UNIV::random() {
 #ifdef EXT_BOOST
-      return uniform_01(RNGGEN);
+      return UNIV::uniform_01(UNIV::RNGGEN);
 #else      
 	return (double)rand() / (double)RAND_MAX;
 #endif
