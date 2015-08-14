@@ -1836,31 +1836,31 @@
 
 (define sys:load
   (lambda (path . quiet?)
-    (let ((in (or
-               (open-input-file (string-append (sys:share-dir) "/" path))
-               (open-input-file path)))
+    (let ((file-string (or (sys:slurp-file (string-append (sys:share-dir) "/" path))
+                           (sys:slurp-file path)))
           (cnt 0))
-      (if (not in)
+      (if (not file-string)
           (if (or (null? quiet?) (not (car quiet?)))
               (begin (print-with-colors 'red 'default #t (print "File Error"))
                      (print " couldn't find file ")
                      (print-with-colors 'blue 'default #f (print path "\n"))
                      #f)
               #f)
-          (let ((msg (call/cc
+          (let ((input (open-input-string file-string))
+                (msg (call/cc
                       (lambda (k)
                         (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
                         ""))))
             (if (string=? msg "")
                 (begin                  
-                  (let loop ((sexpr (read in)))
+                  (let loop ((sexpr (read input)))
                     (if (not (eof-object? sexpr))
                         (begin
                           (set! *global-sysload-evals* (cons sexpr *global-sysload-evals*))
                           (set! *global-sysload-evals* (list-head *global-sysload-evals* 10))
                           (eval (car *global-sysload-evals*) (interaction-environment))
-                          (loop (read in)))))
-                  (close-input-port in)
+                          (loop (read input)))))
+                  (close-input-port input)
                   (set! *sys:load-escape-stack* (cdr *sys:load-escape-stack*))
                   #t)
                 (let ((words (regex:split msg " ")))
@@ -1868,7 +1868,7 @@
                       (begin (print-with-colors 'yellow 'default #t (print "sys:load notification "))
                              (for-each (lambda (w) (print w "")) words)
                              (println)))
-                  (close-port in)
+                  (close-port input)
                   #f)))))))
 
 (define range
