@@ -856,6 +856,8 @@ int thread_kill(void* thread) {
 #endif
 }
 
+// this returns a pointer to a stack variable - I don't think that's
+// what you want.
 void* thread_self() {
 #ifdef _WIN32
   return NULL;
