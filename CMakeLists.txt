@@ -105,15 +105,15 @@ endif()
 if(WIN32)
   # on Windows, we'll use NuGet to pull down the build-time
   # dependencies - requires NuGet command line interface (choco install nuget.commandline)
-  add_custom_command(TARGET extempore
-    PRE_BUILD
-    COMMAND nuget install portaudio -Version 0.19.1)
-  add_custom_command(TARGET extempore
-    PRE_BUILD
-    COMMAND nuget install pcre -Version 8.33.0.1)
-  add_custom_command(TARGET extempore
-    PRE_BUILD
-    COMMAND nuget install boost -Version 1.58.0)
+  # boost components needed: system filesystem thread date_time regex serialization
+  # at the NuGet install prompt
+  # Install-Package boost_system-vc140 -Pre
+  # Install-Package boost_filesystem-vc140 -Pre
+  # Install-Package boost_thread-vc140 -Pre
+  # Install-Package boost_date_time-vc140 -Pre
+  # Install-Package boost_regex-vc140 -Pre
+  # Install-Package boost_serialization-vc140 -Pre
+  # Install-Package boost-vc140 -Pre
   # assume they've come from NuGet 
   target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/packages/portaudio.0.19.1/build/native/include)
   target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/packages/pcre.8.33.0.1/build/native/include)
@@ -161,7 +161,7 @@ if(BOOST)
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
     target_compile_options(extempore PRIVATE -std=c++11)
   find_package(Boost 1.58.0
-    COMPONENTS filesystem system thread date_time regex serialization)
+    COMPONENTS system filesystem thread date_time regex serialization)
   if(Boost_FOUND)
     target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
     target_link_libraries(extempore ${Boost_LIBRARIES})
