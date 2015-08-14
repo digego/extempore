@@ -870,8 +870,9 @@ void* thread_self() {
 // return value is number of nanosecs sleep missed by
 int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
 #ifdef _WIN32
-  std::this_thread::sleep_for(std::chrono::seconds(s) +
-                              std::chrono::nanoseconds(ns));
+  std::this_thread::sleep_for(std::chrono::seconds(secs) +
+                              std::chrono::nanoseconds(nanosecs));
+  return 0;
 #else
   struct timespec a, b;
   a.tv_sec = secs;

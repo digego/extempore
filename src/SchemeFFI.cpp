@@ -548,7 +548,8 @@ namespace extemp {
   }
 
   pointer SchemeFFI::commandOutput(scheme* _sc, pointer args) {    
-    // NOTE: doesn't work for Windows yet
+#ifndef _WIN32
+	  // NOTE: doesn't work for Windows yet
     char outbuf[8192];
     memset(outbuf,0,8192);
     FILE *stream = popen(string_value(pair_car(args)), "r");
@@ -562,6 +563,7 @@ namespace extemp {
         return mk_string(_sc,outbuf);
       }
     else
+#endif
       return _sc->F;     
   }
 
@@ -937,13 +939,7 @@ namespace extemp {
     {
 	//void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
 #ifdef _WIN32
-	  char* ccc = string_value(pair_car(args));
-	  size_t ccc_size = (strlen(ccc)+1) * 2; //2 for 16 bytes (wide_char)
-	  size_t converted_chars = 0;
-	  //wchar_t* wstr = (wchar_t*) _alloca(ccc_size);
-	  wchar_t wstr[2048];
-	  mbstowcs_s(&converted_chars,wstr,ccc_size, ccc, _TRUNCATE);
-      void* lib_handle = LoadLibrary(wstr);
+      void* lib_handle = LoadLibraryA(string_value(pair_car(args)));
 #else
       void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY|RTLD_GLOBAL);
 #endif

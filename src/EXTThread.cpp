@@ -146,11 +146,10 @@ namespace extemp
 
   int EXTThread::setPriority(int priority, bool realtime)
   {
-    pthread_t thread;
 #ifdef EXT_BOOST
-    thread = bthread.native_handle();
+    auto thread = bthread.native_handle();
 #else
-    thread = pthread;
+	pthread_t thread = pthread;
 #endif
 #ifdef __linux__
     sched_param param;
