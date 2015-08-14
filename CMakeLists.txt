@@ -33,6 +33,9 @@ target_sources(extempore
   )
 target_include_directories(extempore PRIVATE include)
 
+# suppress the warning about the opcode switch statement
+set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
+
 # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake" CACHE PATH
   "path to Extempore's cmake modules")
