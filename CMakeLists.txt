@@ -100,17 +100,30 @@ else()
   message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable to point to your (patched for Extempore) LLVM build")
 endif()
 
-find_package(Portaudio REQUIRED)
-target_include_directories(extempore PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
-target_link_libraries(extempore ${PORTAUDIO_LIBRARIES})
+if(WIN32)
+  # on Windows, we'll use NuGet to pull down the build-time
+  # dependencies - requires NuGet command line interface (choco install nuget.commandline)
 
-find_package(PCRE REQUIRED)
-target_include_directories(extempore PRIVATE ${PCRE_INCLUDE_DIR})
-target_link_libraries(extempore ${PCRE_LIBRARY})
+  # add_custom_command(TARGET extempore
+  #   PRE_BUILD
+  #   COMMAND nuget install portaudio
+  #   COMMAND nuget install pcre
+  #   COMMAND nuget install boost -Version 1.58.0
+  #   )
+else()
+  # on OSX & Linux, assume you've got them through your package manager
+  find_package(Portaudio REQUIRED)
+  target_include_directories(extempore PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
+  target_link_libraries(extempore ${PORTAUDIO_LIBRARIES})
 
-find_package(OpenGL REQUIRED)
-target_include_directories(extempore PRIVATE ${OPENGL_INCLUDE_DIR})
-target_link_libraries(extempore ${OPENGL_LIBRARIES})
+  find_package(PCRE REQUIRED)
+  target_include_directories(extempore PRIVATE ${PCRE_INCLUDE_DIR})
+  target_link_libraries(extempore ${PCRE_LIBRARY})
+
+  find_package(OpenGL REQUIRED)
+  target_include_directories(extempore PRIVATE ${OPENGL_INCLUDE_DIR})
+  target_link_libraries(extempore ${OPENGL_LIBRARIES})
+endif()
 
 # all platforms
 
@@ -135,7 +148,7 @@ if(WIN32)
 endif()
 
 if(BOOST)
-  find_package(Boost 1.47.0 REQUIRED
+  find_package(Boost 1.58.0 REQUIRED
     COMPONENTS filesystem system thread date_time regex serialization)
   if(Boost_FOUND)
     target_compile_options(extempore PRIVATE -std=c++11)
