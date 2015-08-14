@@ -103,13 +103,18 @@ endif()
 if(WIN32)
   # on Windows, we'll use NuGet to pull down the build-time
   # dependencies - requires NuGet command line interface (choco install nuget.commandline)
-
-  # add_custom_command(TARGET extempore
-  #   PRE_BUILD
-  #   COMMAND nuget install portaudio
-  #   COMMAND nuget install pcre
-  #   COMMAND nuget install boost -Version 1.58.0
-  #   )
+  add_custom_command(TARGET extempore
+    PRE_BUILD
+    COMMAND nuget install portaudio -Version 0.19.1
+    COMMAND nuget install pcre -Version 8.33.0.1
+    COMMAND nuget install boost -Version 1.58.0
+    )
+  # assume they've come from NuGet 
+  target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/packages/portaudio.0.19.1/build/native/include)
+  target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/packages/pcre.8.33.0.1/build/native/include)
+  target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/boost.1.58.0.0/lib/native/include)
+  # assume LLVM install dir is extempore/llvm-build
+  target_include_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/llvm-build/include)
 else()
   # on OSX & Linux, assume you've got them through your package manager
   find_package(Portaudio REQUIRED)
@@ -148,11 +153,11 @@ if(WIN32)
 endif()
 
 if(BOOST)
-  find_package(Boost 1.58.0 REQUIRED
+  target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
+  find_package(Boost 1.58.0
     COMPONENTS filesystem system thread date_time regex serialization)
   if(Boost_FOUND)
     target_compile_options(extempore PRIVATE -std=c++11)
-    target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
     target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
     target_link_libraries(extempore ${Boost_LIBRARIES})
   endif()
