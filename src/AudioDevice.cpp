@@ -66,7 +66,7 @@
 
 #ifdef EXT_BOOST
 #include <thread>
-#elif
+#else
 // this is duplicated in EXTThread::setPriority(), but kep here to not mess with the MT audio stuff
 int set_thread_realtime(thread_port_t threadport, float period, float computation, float constraint) {
   struct thread_time_constraint_policy ttcpolicy;
