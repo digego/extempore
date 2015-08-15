@@ -12,7 +12,9 @@ option(BOOST "use boost library" OFF)
 set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
   "path to Extempore's shared runtime files")
 
-# set up the extempore target
+########################
+# extempore executable #
+########################
 
 add_executable(extempore src/Extempore.cpp)
 target_sources(extempore
@@ -38,134 +40,146 @@ if(NOT WIN32)
   set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
 endif()
 
-# set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/extras/cmake" CACHE PATH
-  "path to Extempore's cmake modules")
-
-if(MCJIT)
-  target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-  message(STATUS "-- Using the new LLVM MCJIT backend...")
-else()
-  message(STATUS "-- Using the old LLVM JIT backend...")
-endif()
-
-# setup dependencies
-
-if(EXISTS "$ENV{EXT_LLVM_DIR}")
-  set(LLVM_ROOT_DIR $ENV{EXT_LLVM_DIR} CACHE PATH
-    "path to the (patched) LLVM build")
-  list(APPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIRECTORY}/llvm-build/")
-  find_package(LLVM 3.4 REQUIRED)
-  target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
-  target_link_libraries(extempore
-    -L${LLVM_LIBRARY_DIRS}
-    -lLLVMLTO
-    -lLLVMLinker 
-    -lLLVMipo 
-    -lLLVMVectorize 
-    -lLLVMBitWriter 
-    -lLLVMTableGen 
-    -lLLVMDebugInfo 
-    -lLLVMOption 
-    -lLLVMX86Disassembler 
-    -lLLVMX86AsmParser 
-    -lLLVMX86CodeGen 
-    -lLLVMSelectionDAG 
-    -lLLVMAsmPrinter 
-    -lLLVMX86Desc 
-    -lLLVMX86Info 
-    -lLLVMX86AsmPrinter 
-    -lLLVMX86Utils 
-    -lLLVMIRReader 
-    -lLLVMBitReader 
-    -lLLVMAsmParser 
-    -lLLVMMCDisassembler 
-    -lLLVMMCParser 
-    -lLLVMInstrumentation 
-    -lLLVMInterpreter 
-    -lLLVMMCJIT 
-    -lLLVMJIT 
-    -lLLVMCodeGen 
-    -lLLVMObjCARCOpts 
-    -lLLVMScalarOpts 
-    -lLLVMInstCombine 
-    -lLLVMTransformUtils 
-    -lLLVMipa 
-    -lLLVMAnalysis 
-    -lLLVMRuntimeDyld 
-    -lLLVMExecutionEngine 
-    -lLLVMTarget 
-    -lLLVMMC 
-    -lLLVMObject 
-    -lLLVMCore 
-    -lLLVMSupport)
-else()
-  message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable to point to your (patched for Extempore) LLVM build")
-endif()
-
-if(WIN32)
-  set(MSVC_TOOLCHAIN vc140)
-  set(NUGET_PACKAGE_DIR "${CMAKE_BINARY_DIR}/packages")
-  # on Windows, we'll use NuGet to pull down the build-time
-  # dependencies - requires NuGet command line interface (choco install nuget.commandline)
-  # boost components needed: system filesystem thread date_time regex serialization
-  # at the NuGet install prompt
-  # Install-Package boost_system-vc140 -Pre
-  # Install-Package boost_filesystem-vc140 -Pre
-  # Install-Package boost_thread-vc140 -Pre
-  # Install-Package boost_date_time-vc140 -Pre
-  # Install-Package boost_regex-vc140 -Pre
-  # Install-Package boost_serialization-vc140 -Pre
-  # Install-Package boost-vc140 -Pre
-  # assume they've come from NuGet
-  target_include_directories(extempore PRIVATE "${NUGET_PACKAGE_DIR}/portaudio.0.19.1/build/native/include")
-  target_include_directories(extempore PRIVATE "${NUGET_PACKAGE_DIR}/pcre.8.33.0.1/build/native/include")
-  # link_directories(
-  #   # boost
-  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_system-${MSVC_TOOLCHAIN}-mt-1_59.lib"
-  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_filesystem-${MSVC_TOOLCHAIN}-mt-1_59.lib"
-  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_thread-${MSVC_TOOLCHAIN}-mt-1_59.lib"
-  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_date-${MSVC_TOOLCHAIN}-mt-1_59.lib"
-  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_regex-${MSVC_TOOLCHAIN}-mt-1_59.lib"
-  #   "${NUGET_PACKAGE_DIR}/boost_system-vc140.1.59.0-b1/lib/native/address-model-64/lib/libboost_serialization-${MSVC_TOOLCHAIN}-mt-1_59.lib"
-  #   )
-else()
-  # on OSX & Linux, assume you've got them through your package manager
-  find_package(Portaudio REQUIRED)
-  target_include_directories(extempore PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
-  target_link_libraries(extempore ${PORTAUDIO_LIBRARIES})
-
-  find_package(PCRE REQUIRED)
-  target_include_directories(extempore PRIVATE ${PCRE_INCLUDE_DIR})
-  target_link_libraries(extempore ${PCRE_LIBRARY})
-
-  find_package(OpenGL REQUIRED)
-  target_include_directories(extempore PRIVATE ${OPENGL_INCLUDE_DIR})
-  target_link_libraries(extempore ${OPENGL_LIBRARIES})
-endif()
-
-# all platforms
-
 target_compile_definitions(extempore
-  PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
-
-target_compile_definitions(extempore
+  PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}"
   PRIVATE -D_GNU_SOURCE
 	PRIVATE -D__STDC_CONSTANT_MACROS
 	PRIVATE -D__STDC_LIMIT_MACROS
   )
 
-# need Boost on Windows (for the moment, at least)
+# set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
+  "path to Extempore's cmake modules")
+
+if(MCJIT)
+  target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
+  message(STATUS "Using the new LLVM MCJIT backend...")
+else()
+  message(STATUS "Using the old LLVM JIT backend...")
+endif()
+
+###########################
+# build-time dependencies #
+###########################
+
+# Extempore's build-time deps are:
+# 
+# - portaudio
+# - PCRE
+# - LLVM 3.4.2 (patched for Extempore)
+# - Boost (optional)
+
+# cmake will try and find these deps in the usual places.
+
+# On *OSX/Linux*, this assumes you've got them through your package
+# manager
+
+# On *Windows*, it assumes the dependencies have been obtained through
+# NuGet, either through Visual Studio or the NuGet command line
+# interface (choco install nuget.commandline). As an example (assuming
+# VS2015), something like this might get you what you need:
+
+# nuget-install boost_system-vc140 -Pre
+# nuget-install boost_filesystem-vc140 -Pre
+# nuget-install boost_thread-vc140 -Pre
+# nuget-install boost_date_time-vc140 -Pre
+# nuget-install boost_regex-vc140 -Pre
+# nuget-install boost_serialization-vc140 -Pre
+# nuget-install boost-vc140 -Pre
+
+# but check the docs - these might change.
+
+# set some hint variables on Windows so that our find_package commands
+# can find what they're looking for
+if(WIN32)
+  set(NUGET_PACKAGE_DIR ${CMAKE_BINARY_DIR}/packages)
+  set(BOOST_ROOT ${NUGET_PACKAGE_DIR})
+  set(PCRE_ROOT ${NUGET_PACKAGE_DIR}/pcre.8.33.0.1/build/native)
+  set(PORTAUDIO_ROOT ${NUGET_PACKAGE_DIR}/portaudio.0.19.1/build/native)
+endif()
+
+# LLVM
+
+if(EXISTS $ENV{EXT_LLVM_DIR})
+  set(LLVM_ROOT_DIR $ENV{EXT_LLVM_DIR} CACHE PATH
+    "path to the (patched) LLVM build")
+elseif(EXISTS ${LLVM_ROOT_DIR})
+  # if we specify LLVM_ROOT_DIR through cmake, then we set the
+  # EXT_LLVM_DIR environment variable as well
+  set($ENV{EXT_LLVM_DIR} ${LLVM_ROOT_DIR})  
+else()
+  message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")  
+endif()
+
+find_package(LLVM 3.4 REQUIRED)
+target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
+target_link_libraries(extempore
+  -L${LLVM_LIBRARY_DIRS}
+  -lLLVMLTO
+  -lLLVMLinker 
+  -lLLVMipo 
+  -lLLVMVectorize 
+  -lLLVMBitWriter 
+  -lLLVMTableGen 
+  -lLLVMDebugInfo 
+  -lLLVMOption 
+  -lLLVMX86Disassembler 
+  -lLLVMX86AsmParser 
+  -lLLVMX86CodeGen 
+  -lLLVMSelectionDAG 
+  -lLLVMAsmPrinter 
+  -lLLVMX86Desc 
+  -lLLVMX86Info 
+  -lLLVMX86AsmPrinter 
+  -lLLVMX86Utils 
+  -lLLVMIRReader 
+  -lLLVMBitReader 
+  -lLLVMAsmParser 
+  -lLLVMMCDisassembler 
+  -lLLVMMCParser 
+  -lLLVMInstrumentation 
+  -lLLVMInterpreter 
+  -lLLVMMCJIT 
+  -lLLVMJIT 
+  -lLLVMCodeGen 
+  -lLLVMObjCARCOpts 
+  -lLLVMScalarOpts 
+  -lLLVMInstCombine 
+  -lLLVMTransformUtils 
+  -lLLVMipa 
+  -lLLVMAnalysis 
+  -lLLVMRuntimeDyld 
+  -lLLVMExecutionEngine 
+  -lLLVMTarget 
+  -lLLVMMC 
+  -lLLVMObject 
+  -lLLVMCore 
+  -lLLVMSupport)
+
+# portaudio
+
+find_package(Portaudio REQUIRED)
+target_include_directories(extempore PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
+target_link_libraries(extempore ${PORTAUDIO_LIBRARIES})
+
+# PCRE
+
+find_package(PCRE REQUIRED)
+target_include_directories(extempore PRIVATE ${PCRE_INCLUDE_DIR})
+target_link_libraries(extempore ${PCRE_LIBRARY})
+
+# Boost
+
+# *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
 endif()
 
 if(BOOST)
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
-    target_compile_options(extempore PRIVATE -std=c++11)
-    list(APPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIRECTORY}/packages/boost-vc140.1.59.0-b1/")
-    find_package(Boost 1.58.0
-      COMPONENTS system filesystem thread date_time regex serialization)
+  target_compile_options(extempore PRIVATE -std=c++11)
+  find_package(Boost 1.58.0 REQUIRED
+    COMPONENTS system filesystem thread date_time regex serialization)
   if(Boost_FOUND)
     target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
     target_link_libraries(extempore ${Boost_LIBRARIES})
@@ -199,27 +213,6 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(extempore ${X11_LIBRARIES})
   target_link_libraries(extempore pthread ncurses)
 endif()
-
-# if(MSVC)
-#   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-
-#   if (NOT USE_MSVC_RUNTIME_LIBRARY_DLL)
-#     foreach (flag CMAKE_C_FLAGS
-#         CMAKE_C_FLAGS_DEBUG
-#         CMAKE_C_FLAGS_RELEASE
-#         CMAKE_C_FLAGS_MINSIZEREL
-#         CMAKE_C_FLAGS_RELWITHDEBINFO)
-
-#       if (${flag} MATCHES "/MD")
-#         string(REGEX REPLACE "/MD" "/MT" ${flag} "${${flag}}")
-#       endif()
-#       if (${flag} MATCHES "/MDd")
-#         string(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
-#       endif()
-
-#     endforeach()
-#   endif()
-# endif()
 
 # install the executable
 install(TARGETS extempore

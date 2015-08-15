@@ -15,23 +15,29 @@
 # PCRE_LIBRARIES	- List of libraries when using pcre.
 # PCRE_FOUND	- True if pcre found.
 
+# to provide a hint for where to look, set the PCRE_ROOT variable
+
 # Look for the header file.
-FIND_PATH(PCRE_INCLUDE_DIR NAMES pcre.h)
+find_path(PCRE_INCLUDE_DIR
+  NAMES pcre.h
+  HINTS ${PCRE_ROOT}/include)
 
 # Look for the library.
-FIND_LIBRARY(PCRE_LIBRARY NAMES pcre)
+find_library(PCRE_LIBRARY
+  NAMES pcre
+  HINTS ${PCRE_ROOT}/lib)
 
 # Handle the QUIETLY and REQUIRED arguments and set PCRE_FOUND to TRUE if all listed variables are TRUE.
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(PCRE DEFAULT_MSG PCRE_LIBRARY PCRE_INCLUDE_DIR)
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(PCRE DEFAULT_MSG PCRE_LIBRARY PCRE_INCLUDE_DIR)
 
 # Copy the results to the output variables.
-IF(PCRE_FOUND)
-	SET(PCRE_LIBRARIES ${PCRE_LIBRARY})
-	SET(PCRE_INCLUDE_DIRS ${PCRE_INCLUDE_DIR})
-ELSE(PCRE_FOUND)
-	SET(PCRE_LIBRARIES)
-	SET(PCRE_INCLUDE_DIRS)
-ENDIF(PCRE_FOUND)
+if(PCRE_FOUND)
+	set(PCRE_LIBRARIES ${PCRE_LIBRARY})
+	set(PCRE_INCLUDE_DIRS ${PCRE_INCLUDE_DIR})
+else(PCRE_FOUND)
+	set(PCRE_LIBRARIES)
+	set(PCRE_INCLUDE_DIRS)
+endif(PCRE_FOUND)
 
-MARK_AS_ADVANCED(PCRE_INCLUDE_DIRS PCRE_LIBRARIES)
+mark_as_advanced(PCRE_INCLUDE_DIRS PCRE_LIBRARIES)
