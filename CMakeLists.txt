@@ -155,12 +155,6 @@ target_compile_definitions(extempore
 	PRIVATE -D__STDC_LIMIT_MACROS
   )
 
-target_compile_options(extempore
-  # PRIVATE  -w -O3 -MMD
-  PRIVATE  -fexceptions
-  PRIVATE  -frtti
-  )
-
 # need Boost on Windows (for the moment, at least)
 if(WIN32)
   set(BOOST ON)
