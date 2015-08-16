@@ -62,7 +62,7 @@ endif()
 # build-time dependencies #
 ###########################
 
-# Extempore's build-time deps are:
+# Extempore's build-time dependencies are:
 # 
 # - portaudio
 # - PCRE
@@ -232,11 +232,27 @@ install(DIRECTORY libs
   PATTERN "aot-cache" EXCLUDE
   PATTERN ".DS_Store" EXCLUDE)
 
-# uninstall
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-    IMMEDIATE @ONLY)
-
 add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+  COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
+  COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}
+  COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore and ${EXT_SHARE_DIR}")
+
+###################
+# AOT compilation #
+###################
+
+configure_file(
+  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake.in
+  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake
+  @ONLY)
+
+add_custom_target(aot_stdlib
+  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake
+  COMMENT "Ahead-of-time compiling the standard library...")
+
+add_dependencies(aot_stdlib extempore)
+
+# uninstall only AOT-compiled libs
+add_custom_target(uninstall_aot_stdlib
+  COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
+  COMMENT "Removing AOT-compiled libs")
