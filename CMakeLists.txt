@@ -214,7 +214,10 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(extempore pthread ncurses)
 endif()
 
-# install the executable
+###########
+# install #
+###########
+
 install(TARGETS extempore
   RUNTIME DESTINATION bin)
 
@@ -228,3 +231,12 @@ install(DIRECTORY libs
   PATTERN "*.xtm"
   PATTERN "aot-cache" EXCLUDE
   PATTERN ".DS_Store" EXCLUDE)
+
+# uninstall
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    IMMEDIATE @ONLY)
+
+add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
