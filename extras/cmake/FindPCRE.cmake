@@ -15,17 +15,13 @@
 # PCRE_LIBRARIES	- List of libraries when using pcre.
 # PCRE_FOUND	- True if pcre found.
 
-# to provide a hint for where to look, set the PCRE_ROOT variable
-
 # Look for the header file.
 find_path(PCRE_INCLUDE_DIR
-  NAMES pcre.h
-  HINTS ${PCRE_ROOT}/include)
+  NAMES pcre.h)
 
 # Look for the library.
 find_library(PCRE_LIBRARY
-  NAMES pcre
-  HINTS ${PCRE_ROOT}/lib)
+  NAMES pcre)
 
 # Handle the QUIETLY and REQUIRED arguments and set PCRE_FOUND to TRUE if all listed variables are TRUE.
 include(FindPackageHandleStandardArgs)

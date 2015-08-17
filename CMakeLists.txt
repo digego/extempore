@@ -94,8 +94,6 @@ endif()
 if(WIN32)
   set(NUGET_PACKAGE_DIR ${CMAKE_BINARY_DIR}/packages)
   set(BOOST_ROOT ${NUGET_PACKAGE_DIR})
-  set(PCRE_ROOT ${NUGET_PACKAGE_DIR}/pcre.8.33.0.1/build/native)
-  set(PORTAUDIO_ROOT ${NUGET_PACKAGE_DIR}/portaudio.0.19.1/build/native)
 endif()
 
 # LLVM
