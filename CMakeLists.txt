@@ -79,21 +79,19 @@ endif()
 # interface (choco install nuget.commandline). As an example (assuming
 # VS2015), something like this might get you what you need:
 
-# nuget-install boost_system-vc140 -Pre
-# nuget-install boost_filesystem-vc140 -Pre
-# nuget-install boost_thread-vc140 -Pre
-# nuget-install boost_date_time-vc140 -Pre
-# nuget-install boost_regex-vc140 -Pre
-# nuget-install boost_serialization-vc140 -Pre
-# nuget-install boost-vc140 -Pre
-
-# but check the docs - these might change.
-
-# set some hint variables on Windows so that our find_package commands
-# can find what they're looking for
 if(WIN32)
   set(NUGET_PACKAGE_DIR ${CMAKE_BINARY_DIR}/packages)
-  set(BOOST_ROOT ${NUGET_PACKAGE_DIR})
+  execute_process(
+    COMMAND nuget install portaudio & nuget install pcre & nuget install boost-vc140 & nuget install boost_system-vc140 & nuget install boost_filesystem-vc140 & nuget install boost_thread-vc140 & nuget install boost_date_time-vc140 & nuget install boost_regex-vc140 & nuget install boost_serialization-vc140
+    RESULT_VARIABLE nuget_retval
+    WORKING_DIRECTORY ${NUGET_PACKAGE_DIR}
+    QUIET_OUTPUT)
+  if(NOT "${nuget_retval}" STREQUAL 0)
+    message(FATAL_ERROR "Problem installing dependencies through NuGet - do you have the NuGet command line tool installed?")
+  endif()
+  # set some hint variables on Windows so that our find_package commands
+  # can find what they're looking for
+  set(BOOST_INCLUDEDIR ${NUGET_PACKAGE_DIR}/boost.1.59.0-b1/lib/native/include)
 endif()
 
 # LLVM
