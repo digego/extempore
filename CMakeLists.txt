@@ -82,7 +82,7 @@ endif()
 if(WIN32)
   set(NUGET_PACKAGE_DIR ${CMAKE_BINARY_DIR}/packages)
   execute_process(
-    COMMAND nuget install portaudio & nuget install pcre & nuget install boost-vc140 & nuget install boost_system-vc140 & nuget install boost_filesystem-vc140 & nuget install boost_thread-vc140 & nuget install boost_date_time-vc140 & nuget install boost_regex-vc140 & nuget install boost_serialization-vc140
+    COMMAND nuget install portaudio & nuget install pcre & nuget install boost-vc140 # or just asio?
     RESULT_VARIABLE nuget_retval
     WORKING_DIRECTORY ${NUGET_PACKAGE_DIR}
     QUIET_OUTPUT)
@@ -91,7 +91,7 @@ if(WIN32)
   endif()
   # set some hint variables on Windows so that our find_package commands
   # can find what they're looking for
-  set(BOOST_INCLUDEDIR ${NUGET_PACKAGE_DIR}/boost.1.59.0-b1/lib/native/include)
+  set(BOOST_INCLUDEDIR ${NUGET_PACKAGE_DIR}/boost.1.59.0/lib/native/include)
 endif()
 
 # LLVM
@@ -174,8 +174,7 @@ endif()
 if(BOOST)
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
   target_compile_options(extempore PRIVATE -std=c++11)
-  find_package(Boost 1.58.0 REQUIRED
-    COMPONENTS system filesystem thread date_time regex serialization)
+  find_package(Boost 1.58.0 REQUIRED)
   if(Boost_FOUND)
     target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
     target_link_libraries(extempore ${Boost_LIBRARIES})

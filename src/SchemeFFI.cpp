@@ -45,24 +45,16 @@
 #ifdef _WIN32
 #include <Windows.h>
 #include <Windowsx.h>
+#include <filesystem>
 #else
 #include <dlfcn.h>
-#endif
-
-#ifdef EXT_BOOST
-#include <boost/filesystem.hpp>
+#include <dirent.h>
 #endif
 
 #include <sstream>
 #include <string.h>
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-
-#ifdef _WIN32
-#else
-#include <dirent.h>
-#endif
-
 
 // setting this define should make call_compiled thread safe BUT ...
 // also extremely SLOW !
@@ -579,22 +571,22 @@ namespace extemp {
     return mk_integer(_sc,SchemeProcess::I(_sc)->getMaxDuration());
   }
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 	pointer SchemeFFI::dirlist(scheme* _sc, pointer args)
 	{
 	  char* path = string_value(pair_car(args));
-	  boost::filesystem::path bpath(path);
-	  if(!boost::filesystem::exists(bpath)) {
+	  std::tr2::sys::path bpath(path);
+	  if(!std::tr2::sys::exists(bpath)) {
 		  return _sc->NIL;
 	  }
-	  if(!boost::filesystem::is_directory(bpath)) {
+	  if(!std::tr2::sys::is_directory(bpath)) {
 		  return _sc->NIL;
 	  }
 
-	  boost::filesystem::directory_iterator end_it;
+	  std::tr2::sys::directory_iterator end_it;
 
 	  pointer list = _sc->NIL;
-	  for(boost::filesystem::directory_iterator it(bpath); it != end_it; ++it) {
+	  for(std::tr2::sys::directory_iterator it(bpath); it != end_it; ++it) {
 	    _sc->imp_env->insert(list);
 		pointer tlist = 0;
 		//tlist = cons(_sc,mk_string(_sc,it->path().leaf().string().c_str()),list);
