@@ -13,6 +13,8 @@
 # For details see the accompanying COPYING-CMAKE-SCRIPTS file.
 #
 
+# to provide a hint for where to look, set the PORTAUDIO_ROOT variable
+
 if(NOT WIN32)
   include(FindPkgConfig)
   pkg_check_modules(PORTAUDIO portaudio-2.0)
@@ -22,14 +24,22 @@ if(NOT ${PORTAUDIO_FOUND})
 
   find_path(PORTAUDIO_INCLUDE_DIR
     NAMES portaudio.h
-    PATHS /usr/include /usr/local/include /opt/local/include /sw/include)
+    HINTS ${PORTAUDIO_ROOT}/include
+    PATHS /usr/include /usr/local/include /opt/local/include /sw/include
+    )
   
   find_library(PORTAUDIO_LIBRARY
     NAMES portaudio
-    PATHS /usr/lib /usr/local/lib /opt/local/lib /sw/lib)
+    HINTS ${PORTAUDIO_ROOT}/lib
+    PATHS /usr/lib /usr/local/lib /opt/local/lib /sw/lib
+    )
   
-  set(PORTAUDIO_INCLUDE_DIRS ${PORTAUDIO_INCLUDE_DIR})
-  set(PORTAUDIO_LIBRARIES ${PORTAUDIO_LIBRARY})
+  set(PORTAUDIO_INCLUDE_DIRS
+    ${PORTAUDIO_INCLUDE_DIR}
+    )
+  set(PORTAUDIO_LIBRARIES
+    ${PORTAUDIO_LIBRARY}
+    )
   
   if(PORTAUDIO_INCLUDE_DIRS AND PORTAUDIO_LIBRARIES)
     set(PORTAUDIO_FOUND TRUE)
