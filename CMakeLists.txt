@@ -251,3 +251,14 @@ add_dependencies(aot_stdlib extempore)
 add_custom_target(uninstall_aot_stdlib
   COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
   COMMENT "Removing AOT-compiled libs")
+
+##########
+# xtmdoc #
+##########
+
+add_custom_target(xtmdoc
+  COMMAND ${CMAKE_INSTALL_PREFIX}/bin/extempore --runtime ${EXT_SHARE_DIR} --port 17095 --eval "(begin (sys:load \"libs/core/adt.xtm\") (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/core/math_ext.xtm\") (sys:load \"libs/core/std.xtm\") (sys:load \"libs/external/fft.xtm\") (sys:load \"libs/external/gl.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/nanovg.xtm\") (sys:load \"libs/external/sndfile.xtm\") (sys:load \"libs/external/stb_image.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
+  COMMENT "Generating xtmdoc output in /tmp/xtmdoc.json"
+  VERBATIM)
+
+add_dependencies(xtmdoc extempore)
