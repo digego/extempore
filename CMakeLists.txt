@@ -63,7 +63,7 @@ endif()
 ###########################
 
 # Extempore's build-time dependencies are:
-# 
+#
 # - portaudio
 # - PCRE
 # - LLVM 3.4.2 (patched for Extempore)
@@ -102,9 +102,9 @@ if(EXISTS $ENV{EXT_LLVM_DIR})
 elseif(EXISTS ${LLVM_ROOT_DIR})
   # if we specify LLVM_ROOT_DIR through cmake, then we set the
   # EXT_LLVM_DIR environment variable as well
-  set($ENV{EXT_LLVM_DIR} ${LLVM_ROOT_DIR})  
+  set($ENV{EXT_LLVM_DIR} ${LLVM_ROOT_DIR})
 else()
-  message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")  
+  message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")
 endif()
 
 find_package(LLVM 3.4 REQUIRED)
@@ -112,44 +112,44 @@ target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_libraries(extempore
   -L${LLVM_LIBRARY_DIRS}
   -lLLVMLTO
-  -lLLVMLinker 
-  -lLLVMipo 
-  -lLLVMVectorize 
-  -lLLVMBitWriter 
-  -lLLVMTableGen 
-  -lLLVMDebugInfo 
-  -lLLVMOption 
-  -lLLVMX86Disassembler 
-  -lLLVMX86AsmParser 
-  -lLLVMX86CodeGen 
-  -lLLVMSelectionDAG 
-  -lLLVMAsmPrinter 
-  -lLLVMX86Desc 
-  -lLLVMX86Info 
-  -lLLVMX86AsmPrinter 
-  -lLLVMX86Utils 
-  -lLLVMIRReader 
-  -lLLVMBitReader 
-  -lLLVMAsmParser 
-  -lLLVMMCDisassembler 
-  -lLLVMMCParser 
-  -lLLVMInstrumentation 
-  -lLLVMInterpreter 
-  -lLLVMMCJIT 
-  -lLLVMJIT 
-  -lLLVMCodeGen 
-  -lLLVMObjCARCOpts 
-  -lLLVMScalarOpts 
-  -lLLVMInstCombine 
-  -lLLVMTransformUtils 
-  -lLLVMipa 
-  -lLLVMAnalysis 
-  -lLLVMRuntimeDyld 
-  -lLLVMExecutionEngine 
-  -lLLVMTarget 
-  -lLLVMMC 
-  -lLLVMObject 
-  -lLLVMCore 
+  -lLLVMLinker
+  -lLLVMipo
+  -lLLVMVectorize
+  -lLLVMBitWriter
+  -lLLVMTableGen
+  -lLLVMDebugInfo
+  -lLLVMOption
+  -lLLVMX86Disassembler
+  -lLLVMX86AsmParser
+  -lLLVMX86CodeGen
+  -lLLVMSelectionDAG
+  -lLLVMAsmPrinter
+  -lLLVMX86Desc
+  -lLLVMX86Info
+  -lLLVMX86AsmPrinter
+  -lLLVMX86Utils
+  -lLLVMIRReader
+  -lLLVMBitReader
+  -lLLVMAsmParser
+  -lLLVMMCDisassembler
+  -lLLVMMCParser
+  -lLLVMInstrumentation
+  -lLLVMInterpreter
+  -lLLVMMCJIT
+  -lLLVMJIT
+  -lLLVMCodeGen
+  -lLLVMObjCARCOpts
+  -lLLVMScalarOpts
+  -lLLVMInstCombine
+  -lLLVMTransformUtils
+  -lLLVMipa
+  -lLLVMAnalysis
+  -lLLVMRuntimeDyld
+  -lLLVMExecutionEngine
+  -lLLVMTarget
+  -lLLVMMC
+  -lLLVMObject
+  -lLLVMCore
   -lLLVMSupport)
 
 # portaudio
@@ -188,7 +188,7 @@ if(APPLE)
   set(CMAKE_CXX_COMPILIER clang++)
   # tell the compiler that we're using ObjC++
   target_compile_options(extempore PRIVATE -x objective-c++)
-  
+
   target_link_libraries(extempore pthread ncurses)
 
   # frameworks
