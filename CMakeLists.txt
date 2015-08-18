@@ -91,7 +91,6 @@ if(WIN32)
   # endif()
   # set some hint variables on Windows so that our find_package commands
   # can find what they're looking for
-  set(BOOST_INCLUDEDIR ${NUGET_PACKAGE_DIR}/boost.1.59.0/lib/native/include)
 endif()
 
 # LLVM
@@ -175,6 +174,7 @@ target_link_libraries(extempore ${PCRE_LIBRARY})
 # *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
+  set(BOOST_INCLUDEDIR ${NUGET_PACKAGE_DIR}/boost.1.59.0.0/lib/native/include)
 endif()
 
 if(BOOST)
