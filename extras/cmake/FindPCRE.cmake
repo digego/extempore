@@ -20,12 +20,12 @@
 # Look for the header file.
 find_path(PCRE_INCLUDE_DIR
   NAMES pcre.h
-  HINTS ${PCRE_ROOT}/include)
+  PATHS ${PCRE_ROOT}/include)
 
 # Look for the library.
 find_library(PCRE_LIBRARY
   NAMES pcre
-  HINTS ${PCRE_ROOT}/lib)
+  PATHS ${PCRE_ROOT}/lib)
 
 # Handle the QUIETLY and REQUIRED arguments and set PCRE_FOUND to TRUE if all listed variables are TRUE.
 include(FindPackageHandleStandardArgs)

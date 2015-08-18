@@ -81,14 +81,14 @@ endif()
 
 if(WIN32)
   set(NUGET_PACKAGE_DIR ${CMAKE_BINARY_DIR}/packages)
-  execute_process(
-    COMMAND nuget install portaudio & nuget install pcre & nuget install boost-vc140 # or just asio?
-    RESULT_VARIABLE nuget_retval
-    WORKING_DIRECTORY ${NUGET_PACKAGE_DIR}
-    QUIET_OUTPUT)
-  if(NOT "${nuget_retval}" STREQUAL 0)
-    message(FATAL_ERROR "Problem installing dependencies through NuGet - do you have the NuGet command line tool installed?")
-  endif()
+  # execute_process(
+  #   COMMAND nuget install portaudio & nuget install pcre & nuget install boost-vc140 # or just asio?
+  #   RESULT_VARIABLE nuget_retval
+  #   WORKING_DIRECTORY ${NUGET_PACKAGE_DIR}
+  #   OUTPUT_QUIET)
+  # if(NOT "${nuget_retval}" STREQUAL 0)
+  #   message(FATAL_ERROR "Problem installing dependencies through NuGet - do you have the NuGet command line tool installed?")
+  # endif()
   # set some hint variables on Windows so that our find_package commands
   # can find what they're looking for
   set(BOOST_INCLUDEDIR ${NUGET_PACKAGE_DIR}/boost.1.59.0/lib/native/include)

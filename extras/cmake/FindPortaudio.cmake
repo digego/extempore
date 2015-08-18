@@ -24,14 +24,12 @@ if(NOT ${PORTAUDIO_FOUND})
 
   find_path(PORTAUDIO_INCLUDE_DIR
     NAMES portaudio.h
-    HINTS ${PORTAUDIO_ROOT}/include
-    PATHS /usr/include /usr/local/include /opt/local/include /sw/include
+    PATHS /usr/include /usr/local/include /opt/local/include /sw/include ${PORTAUDIO_ROOT}/include
     )
   
   find_library(PORTAUDIO_LIBRARY
     NAMES portaudio
-    HINTS ${PORTAUDIO_ROOT}/lib
-    PATHS /usr/lib /usr/local/lib /opt/local/lib /sw/lib
+    PATHS /usr/lib /usr/local/lib /opt/local/lib /sw/lib ${PORTAUDIO_ROOT}/lib
     )
   
   set(PORTAUDIO_INCLUDE_DIRS
