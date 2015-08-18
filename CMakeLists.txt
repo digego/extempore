@@ -280,3 +280,39 @@ add_custom_target(xtmdoc
   VERBATIM)
 
 add_dependencies(xtmdoc extempore)
+
+#########
+# cpack #
+#########
+
+# cpack is cmake's tool for providing distributable
+# binaries/installers on various platforms.
+
+set(CPACK_PACKAGE_NAME "Extempore")
+set(CPACK_PACKAGE_VENDOR "Andrew Sorensen")
+set(CPACK_PACKAGE_CONTACT "Ben Swift")
+
+# CPACK_PACKAGE_DIRECTORY
+
+set(CPACK_PACKAGE_VERSION_MAJOR EXTEMPORE_VERSION_MAJOR)
+set(CPACK_PACKAGE_VERSION_MINOR EXTEMPORE_VERSION_MINOR)
+set(CPACK_PACKAGE_VERSION_PATCH "0")
+
+# CPACK_PACKAGE_DESCRIPTION_FILE
+
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")
+
+# CPACK_PACKAGE_FILE_NAME
+
+# CPACK_PACKAGE_INSTALL_DIRECTORY
+
+if(APPLE)
+  set(CPACK_GENERATOR DragNDrop)
+  include(CPackDMG)
+elseif(UNIX AND NOT APPLE) # Linux
+  set(CPACK_GENERATOR DEB)
+  include(CPackDeb)
+elseif(WIN32)
+  set(CPACK_GENERATOR NSIS64)
+  include(CPackNSIS)
+endif()
