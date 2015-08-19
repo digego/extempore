@@ -152,6 +152,7 @@ target_link_libraries(extempore
 
 if(WIN32)
   set(NUGET_PACKAGE_DIR ${CMAKE_SOURCE_DIR}/packages)
+  # give find_package a hint about where to find portaudio
   set(Portaudio_ROOT ${NUGET_PACKAGE_DIR}/portaudio.0.19.1/build/native)
 endif()
 find_package(Portaudio REQUIRED)
@@ -161,11 +162,12 @@ target_link_libraries(extempore ${PORTAUDIO_LIBRARIES})
 # PCRE
 
 if(WIN32)
+  # give find_package a hint about where to find PCRE
   set(PCRE_ROOT ${NUGET_PACKAGE_DIR}/pcre.8.33.0.1/build/native)
 endif()
 find_package(PCRE REQUIRED)
-target_include_directories(extempore PRIVATE ${PCRE_INCLUDE_DIR})
-target_link_libraries(extempore ${PCRE_LIBRARY})
+target_include_directories(extempore PRIVATE ${PCRE_INCLUDE_DIRS})
+target_link_libraries(extempore ${PCRE_LIBRARIES})
 
 # Boost
 
