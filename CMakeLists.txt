@@ -244,6 +244,18 @@ add_custom_target(uninstall
   COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}
   COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore and ${EXT_SHARE_DIR}")
 
+##########
+# assets #
+##########
+
+add_custom_target(assets
+  WORKING_DIR ${EXT_SHARE_DIR}
+  COMMAND curl -O http://extempore.moso.com.au/extras/assets.tgz
+  COMMAND ${CMAKE_COMMAND} -E tar xf assets.tgz
+  COMMAND ${CMAKE_COMMAND} -E assets.tgz
+  COMMAND ${CMAKE_COMMAND} -E remove assets.tgz
+  COMMENT "Downloading assets from http://extempore.moso.com.au/extras/assets.tgz")
+
 ###################
 # AOT compilation #
 ###################
