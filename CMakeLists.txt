@@ -226,6 +226,12 @@ install(TARGETS extempore
 install(DIRECTORY runtime examples tests assets extras
   DESTINATION ${EXT_SHARE_DIR}
   PATTERN ".DS_Store" EXCLUDE)
+# only install assets if it exists
+if(EXISTS ${CMAKE_SOURCE_DIR}/assets)
+  install(DIRECTORY assets
+    DESTINATION ${EXT_SHARE_DIR}
+    PATTERN ".DS_Store" EXCLUDE)
+endif()
 # need to filter out precomp guff from libs
 install(DIRECTORY libs
   DESTINATION ${EXT_SHARE_DIR}
