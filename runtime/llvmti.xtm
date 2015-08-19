@@ -8115,10 +8115,11 @@
                                                ,zone-size)))
 
 
-(define-macro (bind-lib-val library symname type docstring)
+(define-macro (bind-lib-val library symname type . docstring)
   `(let* ((type-str ,(or (impc:ti:get-typealias-ground-type (symbol->string type))
                          (symbol->string type)))
-          (type-list (impc:ir:get-type-from-pretty-str type-str)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (docstring ,(if (null? docstring) "" (car docstring))))
      (if (llvm:compile-ir
           (string-append "@" ,(symbol->string symname) " = external global "
                          (impc:ir:get-type-str type-list)))
