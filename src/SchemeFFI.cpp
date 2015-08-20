@@ -46,6 +46,7 @@
 #include <Windows.h>
 #include <Windowsx.h>
 #include <filesystem>
+#include <fstream>
 #else
 #include <dlfcn.h>
 #include <dirent.h>
@@ -2128,9 +2129,9 @@ namespace extemp {
     char* filename = string_value(pair_cadr(args));
 #ifdef _WIN32
     std::string str;
+    std::ofstream fout(filename);
     llvm::raw_string_ostream ss(str);
     ss << *m;
-    std::ofstream fout(filename);
     std::string irStr = ss.str();
     std::string oldStr(" external global ");
     std::string newStr(" dllimport global ");
