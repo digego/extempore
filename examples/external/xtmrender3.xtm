@@ -41,22 +41,21 @@
 ;; make sure you include / on the end
 (define path "assets/models/")
 
-(sys:load "libs/external/glfw3.xtm")
 (sys:load "libs/external/assimp.xtm")
-
-(bind-val window GLFWwindow*)
+(sys:load "libs/external/glfw3.xtm")
 
 (define width 1024)
 (define height 768)
-(bind-val width i32 width)
-(bind-val height i32 height)
+(bind-val width i32 1024)
+(bind-val height i32 768)
 
-;; create a window
-(call-as-xtlang
- (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
- ;; some of the shaders in the graphics pipeline use older glsl
- ;; versions, so we need a "compatibility" graphics context
- (set! window (glfw_init_and_create_compatibility_window width height)))
+(bind-val window  GLFWwindow*
+  ;; create a window
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    ;; some of the shaders in the graphics pipeline use older glsl
+    ;; versions, so we need a "compatibility" graphics context
+    (glfw_init_and_create_compatibility_window width height)))
 
 ;; for lights and cameras
 (bind-func prerender:XTMRENDERCB
@@ -115,7 +114,8 @@
   (lambda (time dur model1 model2 model3 degree)
     (let ((v (now)))
       (gl_render model1 model2 model3)
-      (gl:swap-buffers glctx)
+      (glfwPollEvents)
+      (glfwSwapBuffers window)
       )
     (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur
               model1 model2 model3 (+ degree .5))))

@@ -10,6 +10,9 @@
 
 ;;; Code:
 
+;; (sys:load "libs/external/graphics-pipeline.xtm")
+(sys:load "libs/external/glfw3.xtm")
+(sys:load "libs/external/nanovg.xtm")
 (sys:load "libs/core/instruments.xtm")
 (sys:load "libs/core/pc_ivl.xtm")
 (sys:load "libs/external/audio_dsp_ext.xtm")
@@ -18,8 +21,8 @@
 
 (bind-func dsp:DSP
   (let ((F (stft_st_c 64 512 512))
-        (left:ComplexS* (F.left))
-        (right:ComplexS* (F.right)))
+        (left:SComplex* (F.left))
+        (right:SComplex* (F.right)))
     (lambda (in time chan dat)
       (cond ((< chan 2)
              (F chan
@@ -34,53 +37,72 @@
 ;; (define height 1200.0)
 (define width 1024.0)
 (define height 768.0)
-(bind-val width float width)
-(bind-val height float height)
+(bind-val width float 1024.0)
+(bind-val height float 768.0)
+
+(bind-val window GLFWwindow*
+  ;; create a window
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    ;; some of the shaders in the graphics pipeline use older glsl
+    ;; versions, so we need a "compatibility" graphics context
+    ;;(glfw_init_and_create_compatibility_window (convert width) (convert height))))    
+    (glfw_init_and_create_window (convert width) (convert height))))
+
+(bind-val vg NVGcontext* (nvg_create_context))
+
+(bind-val pixel_ratio float (nvg_get_pixel_ratio window))
 
 ;; setup opengl
-(define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+;; (define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
 
-(sys:load "libs/external/graphics-pipeline.xtm")
-(sys:load "libs/contrib/openvg.xtm")
+;; (sys:load "libs/external/graphics-pipeline.xtm")
+;; (sys:load "libs/contrib/openvg.xtm")
 
 ;; init xtm render pipeline
-(xtm_render_setup width height)
-(if (<> (xtm-vg-create-context width height) 1) (xtm_vg_print_error))
+;; (xtm_render_setup width height)
 
-(bind-func post:XTMRENDERCB
-  (let ((path (xtm_create_path))
-        (paint (vgCreatePaint))
+
+(bind-func post ;;:XTMRENDERCB
+  (let ((redfill (NVGcolor 1.0 0.0 0.0 0.5))
+        (greenfill (NVGcolor 0.0 1.0 0.0 0.5))
+        (bgfill (NVGcolor 0.0 0.0 0.0 1.0))
+        (stroke (NVGcolor 0.0 0.0 1.0 0.5))
         (colour:|4,float|* (alloc))
         (dl:Complexf* (dsp.left))
         (dr:Complexf* (dsp.left))
-        (t 0)
-        (clear_color:xtm_color* (alloc)))
-    (vguRect path 0. 0. 3.0 1.0)
-    (lambda (frame shader m v p data)
+        (t 0))
+;        (clear_color:xtm_color* (alloc)))
+;    (vguRect path 0. 0. 3.0 1.0)
+    (lambda () ;;frame shader m v p data)
       (let ((i:float 0.0)
             (inc (/ width 200.)))
-        (vgLoadIdentity)        
-        (afill! colour 0. 0. 0. 1.0)        
-        (xtm_vg_clear_rect 0 0 (convert width) (convert height) colour)
+        (nvgBeginFrame vg (convert width) (convert height) pixel_ratio)
+        (nvgResetTransform vg)
+        (_nvgFillColor vg bgfill)
+        (nvgBeginPath vg)
+        (nvgRect vg 0. 0. width height)
+        (nvgFill vg)
         (dotimes (i 200.0)
-          (vgLoadIdentity)
-          (vgScale 1.0 (* 30. (magC (pref dl (ftoi64 i)))))
-          (vgTranslate (convert (* inc i)) 0.0)
-          (afill! colour 0. 1. 0. 0.5) 
-          (xtm_paint_set_fill paint colour)          
-          (vgDrawPath path VG_FILL_PATH)
-          (vgLoadIdentity)
-          (vgTranslate (convert (* inc i)) height) ;height) ;0.0)          
-          (vgScale 1.0 (* -30. (magC (pref dr (ftoi64 i)))))
-          (afill! colour 1. 0. 0. 0.5) 
-          (xtm_paint_set_fill paint colour)          
-          (vgDrawPath path VG_FILL_PATH))
-        (xtm_vg_print_error)
+          (nvgResetTransform vg)
+          (nvgBeginPath vg)
+          (_nvgFillColor vg redfill)
+          (nvgRect vg (convert (* inc i)) 0.0 3.0 (* 30. (Complex_mag (pref dl (ftoi64 i)))))
+          (nvgFill vg)
+          (nvgBeginPath vg)
+          (_nvgFillColor vg greenfill)          
+          (nvgRect vg (convert (* inc i)) height 3.0 (* -30. (Complex_mag (pref dr (ftoi64 i)))))
+          (nvgFill vg))
+        (nvgEndFrame vg)
+        ;; (xtm_vg_print_error)
         void))))
 
 (bind-func gl_render
   (lambda ()
-    (xtm_render null null null post null)
+    (post)
+    (glfwPollEvents)
+    (glfwSwapBuffers window)
+    ;; (xtm_render null null null post null)
     void))
 
 (define gl-loop
@@ -90,8 +112,7 @@
       (if (> late-by 0)
           (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
           (begin
-            (gl_render)
-            (gl:swap-buffers *gl-ctx*)))
+            (gl_render)))
       (callback (* 0.9 next-frame-time)
                 'gl-loop
                 next-frame-time
