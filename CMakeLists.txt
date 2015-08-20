@@ -58,6 +58,15 @@ else()
   message(STATUS "Using the old LLVM JIT backend...")
 endif()
 
+# Set a default build type if none was specified
+
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "Building 'Release' configuration")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 ###########################
 # build-time dependencies #
 ###########################
