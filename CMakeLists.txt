@@ -98,16 +98,11 @@ endif()
 # interface (choco install nuget.commandline). As an example (assuming
 # VS2015), something like this might get you what you need:
 
-# if(WIN32)
-#   execute_process(
-#     COMMAND nuget install portaudio & nuget install pcre & nuget install boost-vc140
-#     RESULT_VARIABLE nuget_retval
-#     WORKING_DIRECTORY ${NUGET_PACKAGE_DIR}
-#     OUTPUT_QUIET)
-#   if(NOT "${nuget_retval}" STREQUAL 0)
-#     message(FATAL_ERROR "Problem installing dependencies through NuGet - do you have the NuGet command line tool installed?")
-#   endif()
-# endif()
+# nuget install portaudio & nuget install pcre & nuget install boost-vc140
+
+# after that, you'll probably still have to move the relevant headers
+# and libs into packages/{lib,include} - which is messy I know, but
+# should be pretty straightforward
 
 # LLVM
 
