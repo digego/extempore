@@ -856,14 +856,33 @@ int thread_kill(void* thread) {
 #endif
 }
 
-// this returns a pointer to a stack variable - I don't think that's
-// what you want.
+int thread_equal(void* thread1, void* thread2) {
+#ifdef _WIN32
+  return 0;
+#else
+  pthread_t* t1 = (pthread_t*) thread1;
+  pthread_t* t2 = (pthread_t*) thread2;  
+  return pthread_equal(*t1,*t2);
+#endif  
+}
+
+int thread_equal_self(void* thread1) {
+#ifdef _WIN32
+  return 0;
+#else
+  pthread_t* t1 = (pthread_t*) thread1;
+  return pthread_equal(*t1,pthread_self());
+#endif  
+}
+
 void* thread_self() {
 #ifdef _WIN32
   return NULL;
 #else
-  pthread_t t = pthread_self();
-  return &t;
+  pthread_t* t1 = (pthread_t*) malloc(sizeof(pthread_t));  
+  pthread_t t2 = pthread_self();
+  memcpy(t1,&t2,sizeof(pthread_t));
+  return t1;
 #endif  
 }
 
@@ -1791,6 +1810,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&thread_kill);
 	    gv = M->getNamedValue(std::string("thread_self"));
 	    EE->updateGlobalMapping(gv,(void*)&thread_self);
+	    gv = M->getNamedValue(std::string("thread_equal"));
+	    EE->updateGlobalMapping(gv,(void*)&thread_equal);
+	    gv = M->getNamedValue(std::string("thread_equal_self"));
+	    EE->updateGlobalMapping(gv,(void*)&thread_equal_self);      
 	    gv = M->getNamedValue(std::string("thread_sleep"));
 	    EE->updateGlobalMapping(gv,(void*)&thread_sleep);
 

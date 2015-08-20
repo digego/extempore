@@ -87,6 +87,8 @@ typedef struct _llvm_callback_struct_ {
 
 extern "C"
 {
+  void* malloc16 (size_t s);
+  void free16(void* p);
 llvm_zone_t* llvm_threads_get_callback_zone();
 const char*  llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
@@ -138,6 +140,19 @@ unsigned long string_hash(unsigned char* str);
   float imp_rand1_f(float a);
   float imp_rand2_f(float a, float b);
   int64_t llvm_now();
+
+  void* thread_fork(void*(*start_routine)(void*),void* args);
+  int thread_join(void* thread);
+  int thread_kill(void* thread);
+  int thread_equal(void* thread1, void* thread2);
+  int thread_equal_self(void* thread1);
+  void* thread_self();
+  int64_t thread_sleep(int64_t secs, int64_t nanosecs);
+  void* mutex_create();
+  int mutex_destroy(void* mutex);
+  int mutex_lock(void* mutex);
+  int mutex_unlock(void* mutex);
+  int mutex_trylock(void* mutex);
 
   struct closure_address_table* new_address_table();
   struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table);
