@@ -16,6 +16,11 @@ set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
 # extempore executable #
 ########################
 
+if(WIN32)
+  set(NUGET_PACKAGE_DIR ${CMAKE_SOURCE_DIR}/packages)
+  link_directories(${NUGET_PACKAGE_DIR}/lib)
+endif()
+
 add_executable(extempore src/Extempore.cpp)
 target_sources(extempore
   PRIVATE src/AudioDevice.cpp
@@ -33,6 +38,11 @@ target_sources(extempore
   PRIVATE src/TaskScheduler.cpp
   PRIVATE src/UNIV.cpp
   )
+
+if(WIN32)
+  target_sources(extempore PRIVATE msvc/extempore.def)
+endif()
+
 target_include_directories(extempore PRIVATE include)
 
 # suppress the warning about the opcode switch statement
@@ -160,9 +170,8 @@ target_link_libraries(extempore
 # portaudio
 
 if(WIN32)
-  set(NUGET_PACKAGE_DIR ${CMAKE_SOURCE_DIR}/packages)
   # give find_package a hint about where to find portaudio
-  set(Portaudio_ROOT ${NUGET_PACKAGE_DIR}/portaudio.0.19.1/build/native)
+  set(Portaudio_ROOT ${NUGET_PACKAGE_DIR})
 endif()
 find_package(Portaudio REQUIRED)
 target_include_directories(extempore PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
@@ -172,7 +181,8 @@ target_link_libraries(extempore ${PORTAUDIO_LIBRARIES})
 
 if(WIN32)
   # give find_package a hint about where to find PCRE
-  set(PCRE_ROOT ${NUGET_PACKAGE_DIR}/pcre.8.33.0.1/build/native)
+  set(PCRE_ROOT ${NUGET_PACKAGE_DIR})
+  target_compile_definitions(extempore PRIVATE -DPCRE_STATIC)
 endif()
 find_package(PCRE REQUIRED)
 target_include_directories(extempore PRIVATE ${PCRE_INCLUDE_DIRS})
@@ -183,16 +193,18 @@ target_link_libraries(extempore ${PCRE_LIBRARIES})
 # *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
-  set(BOOST_INCLUDEDIR ${NUGET_PACKAGE_DIR}/boost.1.59.0.0/lib/native/include)
 endif()
 
 if(BOOST)
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
-  target_compile_options(extempore PRIVATE -std=c++11)
-  find_package(Boost 1.58.0 REQUIRED)
-  if(Boost_FOUND)
-    target_include_directories(extempore PRIVATE ${Boost_INCLUDE_DIRS})
-    target_link_libraries(extempore ${Boost_LIBRARIES})
+  # target_compile_options(extempore PRIVATE -std=c++11)
+  find_path(BOOST_ASIO_INCLUDE_DIR
+    NAMES boost/asio.hpp
+    PATHS ${NUGET_PACKAGE_DIR}/include)
+  if(BOOST_ASIO_INCLUDE_DIR)
+    target_include_directories(extempore PRIVATE ${BOOST_ASIO_INCLUDE_DIR})
+  else()
+    message(FATAL_ERROR "Cannot find boost/asio.hpp header")
   endif()
 endif()
 
