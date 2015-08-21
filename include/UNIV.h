@@ -95,6 +95,8 @@ char* cname_encode(char *data,size_t input_length,size_t *output_length);
 #endif
   double getRealTime();
   double clock_clock();
+  double audio_clock_base();
+  double audio_clock_now();  
   int register_for_window_events();
 }
 
@@ -116,6 +118,8 @@ namespace extemp {
     static uint32_t SAMPLERATE;
     static uint64_t TIME;
     static uint64_t DEVICE_TIME;
+    static double AUDIO_CLOCK_BASE;
+    static double AUDIO_CLOCK_NOW;
     static uint32_t HOUR;
     static uint32_t MINUTE;
     static uint32_t SECOND;

@@ -333,9 +333,13 @@ namespace extemp {
     UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
     UNIV::TIME = UNIV::DEVICE_TIME;
 
-    if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime();
+    if(AudioDevice::CLOCKBASE < 1.0) {
+      AudioDevice::CLOCKBASE = getRealTime();
+      UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
+    }
     AudioDevice::REALTIME = getRealTime();
-
+    UNIV::AUDIO_CLOCK_NOW = AudioDevice::REALTIME;
+    
     device_time = UNIV::DEVICE_TIME;
     if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl;
 

@@ -1740,6 +1740,10 @@ namespace extemp {
       
       gv = M->getNamedValue(std::string("clock_clock"));
       EE->updateGlobalMapping(gv,(void*)&clock_clock);
+      gv = M->getNamedValue(std::string("audio_clock_base"));
+      EE->updateGlobalMapping(gv,(void*)&audio_clock_base);
+      gv = M->getNamedValue(std::string("audio_clock_now"));
+      EE->updateGlobalMapping(gv,(void*)&audio_clock_now);      
       
 
 	    // add scheme bits

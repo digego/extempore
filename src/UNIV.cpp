@@ -522,6 +522,17 @@ double getRealTime()
 }
 #endif
 
+double audio_clock_base()
+  {
+    return extemp::UNIV::AUDIO_CLOCK_BASE;
+  }
+
+double audio_clock_now()
+  {
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
+  }
+
+
 double clock_clock()
 {
   return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
@@ -554,6 +565,8 @@ namespace extemp {
   uint32_t UNIV::HOUR = MINUTE * 60;
   uint64_t UNIV::TIME = 0l;
   uint64_t UNIV::DEVICE_TIME = 0l;
+  double UNIV::AUDIO_CLOCK_NOW = 0.0;
+  double UNIV::AUDIO_CLOCK_BASE = 0.0;    
   uint32_t UNIV::AUDIO_NONE = 0; // 0 for real device, 1 for dummy device
   uint32_t UNIV::AUDIO_DEVICE = -1;
   uint32_t UNIV::AUDIO_IN_DEVICE = -1;
