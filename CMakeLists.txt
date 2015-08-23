@@ -119,48 +119,7 @@ endif()
 
 find_package(LLVM 3.4 REQUIRED)
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
-target_link_libraries(extempore
-  -L${LLVM_LIBRARY_DIRS}
-  -lLLVMLTO
-  -lLLVMLinker
-  -lLLVMipo
-  -lLLVMVectorize
-  -lLLVMBitWriter
-  -lLLVMTableGen
-  -lLLVMDebugInfo
-  -lLLVMOption
-  -lLLVMX86Disassembler
-  -lLLVMX86AsmParser
-  -lLLVMX86CodeGen
-  -lLLVMSelectionDAG
-  -lLLVMAsmPrinter
-  -lLLVMX86Desc
-  -lLLVMX86Info
-  -lLLVMX86AsmPrinter
-  -lLLVMX86Utils
-  -lLLVMIRReader
-  -lLLVMBitReader
-  -lLLVMAsmParser
-  -lLLVMMCDisassembler
-  -lLLVMMCParser
-  -lLLVMInstrumentation
-  -lLLVMInterpreter
-  -lLLVMMCJIT
-  -lLLVMJIT
-  -lLLVMCodeGen
-  -lLLVMObjCARCOpts
-  -lLLVMScalarOpts
-  -lLLVMInstCombine
-  -lLLVMTransformUtils
-  -lLLVMipa
-  -lLLVMAnalysis
-  -lLLVMRuntimeDyld
-  -lLLVMExecutionEngine
-  -lLLVMTarget
-  -lLLVMMC
-  -lLLVMObject
-  -lLLVMCore
-  -lLLVMSupport)
+target_link_libraries(extempore ${LLVM_LIBRARIES})
 
 # portaudio
 
