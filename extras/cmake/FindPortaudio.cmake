@@ -24,19 +24,19 @@ find_path(PORTAUDIO_INCLUDE_DIR
   NAMES portaudio.h
   PATHS /usr/include /usr/local/include /opt/local/include /sw/include ${Portaudio_ROOT}/include
   )
-  
+
 find_library(PORTAUDIO_LIBRARY
-  NAMES portaudio
+  NAMES ${CMAKE_STATIC_LIBRARY_PREFIX}portaudio${CMAKE_STATIC_LIBRARY_SUFFIX}
   PATHS /usr/lib /usr/local/lib /opt/local/lib /sw/lib ${Portaudio_ROOT}/lib
   )
-  
+
 set(PORTAUDIO_INCLUDE_DIRS
   ${PORTAUDIO_INCLUDE_DIR}
   )
 set(PORTAUDIO_LIBRARIES
   ${PORTAUDIO_LIBRARY}
   )
-  
+
 if(PORTAUDIO_INCLUDE_DIRS AND PORTAUDIO_LIBRARIES)
   set(PORTAUDIO_FOUND TRUE)
 endif(PORTAUDIO_INCLUDE_DIRS AND PORTAUDIO_LIBRARIES)

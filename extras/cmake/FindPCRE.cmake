@@ -24,7 +24,7 @@ find_path(PCRE_INCLUDE_DIR
 
 # Look for the library.
 find_library(PCRE_LIBRARY
-  NAMES pcre
+  NAMES ${CMAKE_STATIC_LIBRARY_PREFIX}pcre${CMAKE_STATIC_LIBRARY_SUFFIX}
   PATHS ${PCRE_ROOT}/lib)
 
 # Handle the QUIETLY and REQUIRED arguments and set PCRE_FOUND to TRUE if all listed variables are TRUE.
