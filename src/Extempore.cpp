@@ -224,7 +224,8 @@ int main(int argc, char** argv)
 	  std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
 	  std::cout << "            --port: port for primary process [7099]" << std::endl;	
 	  std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
-	  std::cout << "         --runtime: path to runtime directory [runtime]" << std::endl;
+	  std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
+	  std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
 	  std::cout << "           --nostd: don't load std lib on startup" << std::endl;
 	  std::cout << "      --samplerate: audio samplerate" << std::endl; 
 	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
