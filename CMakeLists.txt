@@ -198,7 +198,7 @@ install(TARGETS extempore
   RUNTIME DESTINATION bin)
 
 # install the rest of the necessary files into the "share" directory
-install(DIRECTORY runtime examples tests assets extras
+install(DIRECTORY runtime examples tests extras
   DESTINATION ${EXT_SHARE_DIR}
   PATTERN ".DS_Store" EXCLUDE)
 # only install assets if it exists
