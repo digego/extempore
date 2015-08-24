@@ -61,15 +61,29 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 execute_process(
-  COMMAND ${LLVM_CONFIG} --libfiles
-  OUTPUT_VARIABLE LLVM_LIBRARIES
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-string(REPLACE " " ";" LLVM_LIBRARIES ${LLVM_LIBRARIES})
-
-execute_process(
   COMMAND ${LLVM_CONFIG} --libdir
   OUTPUT_VARIABLE LLVM_LIBRARY_DIRS
   OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+# LLVM_LIBRARIES is a bit tricker on Windows
+if(WIN32)
+  execute_process(
+    COMMAND ${LLVM_CONFIG} --libnames
+    OUTPUT_VARIABLE LLVM_LIBRARIES_STRING
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  string(REPLACE " " ";" LLVM_LIBRARIES_STRING ${LLVM_LIBRARIES_STRING})
+  foreach(llvm_lib ${LLVM_LIBRARIES_STRING})
+    get_filename_component(basename ${llvm_lib} NAME_WE)
+    string(SUBSTRING ${basename} 3 -1 stripped_basename)
+    list(APPEND LLVM_LIBRARIES "${LLVM_LIBRARY_DIRS}/${stripped_basename}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  endforeach()
+else()
+  execute_process(
+    COMMAND ${LLVM_CONFIG} --libfiles
+    OUTPUT_VARIABLE LLVM_LIBRARIES
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  string(REPLACE " " ";" LLVM_LIBRARIES ${LLVM_LIBRARIES})
+endif()
 
 execute_process(
   COMMAND ${LLVM_CONFIG} --version
