@@ -54,8 +54,17 @@ target_compile_definitions(extempore
   PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}"
   PRIVATE -D_GNU_SOURCE
 	PRIVATE -D__STDC_CONSTANT_MACROS
+	PRIVATE -D__STDC_FORMAT_MACROS
 	PRIVATE -D__STDC_LIMIT_MACROS
   )
+
+target_compile_options(extempore
+  PRIVATE -fvisibility-inlines-hidden
+  # PRIVATE -fno-exceptions
+  PRIVATE -fno-rtti
+  PRIVATE -fno-common
+  PRIVATE -Woverloaded-virtual
+  PRIVATE -Wcast-qual)
 
 # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
