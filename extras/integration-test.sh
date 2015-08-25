@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# this script should be run from inside the extras/ subdirectory
+
 cd .. # move up one level into top-level extempore directory
 SRC_DIR=$PWD
 
@@ -12,11 +14,11 @@ TEST_DIR=/tmp/extempore-integration-test
 # port to run the Extempore primary process on
 TEST_PORT=17097
 
-if [ ! -d $TEST_DIR ]; then
-    mkdir $TEST_DIR
+if [ -d $TEST_DIR ]; then
+    rm -r $TEST_DIR
 fi
 
-cd $TEST_DIR
+mkdir $TEST_DIR && cd $TEST_DIR
 
 echo "Running tests in ${TEST_DIR}..."
 
