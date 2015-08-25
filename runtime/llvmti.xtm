@@ -2861,14 +2861,14 @@
 
 (define impc:ti:beginz
   (lambda (ast)
-    (impc:ti:memzone `(memzone ,(* 1024 1) (begin ,@(cdr ast))))))
+    (impc:ti:memzone `(memzone ,(* 1024 4) (begin ,@(cdr ast))))))
 
 (define impc:ti:letz
   (lambda (ast)
     ;; (if (not (number? (eval (cadr ast))))
     ;;     (impc:compiler:print-needs-zone-size-error 'letz)
     (if (list? (caadr ast))
-        (impc:ti:memzone `(memzone ,(* 1024 8)
+        (impc:ti:memzone `(memzone ,(* 1024 4)
                                    (let ,(cadr ast) ,@(cddr ast))))
         (impc:ti:memzone `(memzone ,(cadr ast)
                                    (let ,(caddr ast) ,@(cdddr ast)))))))
@@ -2886,7 +2886,7 @@
 (define impc:ti:callback
   (lambda (ast)
     `(let ((zold (llvm_peek_zone_stack))
-           (znew (push_new_zone (* 1024 8))))
+           (znew (push_new_zone (* 1024 4))))
        (llvm_callback ,(car ast)
                       ,(cadr ast)
                       ,@(map (lambda (x)
