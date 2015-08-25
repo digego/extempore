@@ -37,3 +37,34 @@
         1))))
 
 (fork-join)
+
+;; futures using async
+
+;;
+;; async returns a 'future' which will
+;; block until a result is ready.
+;; 
+(bind-func await_futures
+  (lambda (num:i64)
+    (let ((future1 (async (lambda () ;; aysnc accepts zero arguments
+                            (println "start async 1")
+                            (let ((res 0))
+                              (thread_sleep 2 0)
+                              (doloop (i num) (set! res (+ res (* i i i))))
+                              (println "done with async 1")
+                              5))))
+          (future2 (async (lambda (x) ;; async also optionally accepts one argument
+                            (println "start async 2")
+                            (thread_sleep 3 0)
+                            (println "done with async 2")
+                            x)
+                          10)) ;; must give async the argument to be applied!
+          (res 0))
+      (thread_sleep 0 50000) 
+      (println "Do some other work while we WAIT!")
+      ;; add two futures!
+      (set! res (+ (future1) (future2)))
+      (println "(future1) + (future2) =" res)
+      res)))
+
+(await_futures 100000)

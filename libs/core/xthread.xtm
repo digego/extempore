@@ -10,6 +10,51 @@
       (f2)
       (cast null i8*))))
 
+;; async returns a 'future'
+;;
+;; see examples/core/xthread.xtm for usage
+;;
+;; async -> 0 args
+;;
+(bind-func async:[[!a]*,[!a]*]*
+  (lambda (f)
+    (let ((res (convert null))
+          (z1 (create_zone 4096))
+          (ff (lambda ()
+                (push_zone z1)
+                (set! res (f))
+                (pop_zone)
+                void))
+          (thread (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ff i8*))))
+      (lambda ()
+        (thread_join thread)
+        (let ((r2 (zcopy res z1 (llvm_peek_zone_stack))))
+          (llvm_zone_destroy z1)
+          r2)))))
+
+;; async returns a 'future'
+;;
+;; see examples/core/xthread.xtm for usage
+;;
+;; async -> 1 arg
+;;
+(bind-func async:[[!a]*,[!a,!b]*,!b]*
+  (lambda (f arg)
+    (let ((res (convert null))
+          (z1 (create_zone 4096))
+          (ff (lambda ()
+                (push_zone z1)
+                (set! res (f arg))
+                (pop_zone)
+                void))
+          (thread (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ff i8*))))
+      (lambda ()
+        (thread_join thread)
+        (let ((r2 (zcopy res z1 (llvm_peek_zone_stack))))
+          (llvm_zone_destroy z1)
+          r2)))))
+
+
 ;;
 (define-macro (spawn f)
   (let* ((sym (symbol->string (gensym)))
