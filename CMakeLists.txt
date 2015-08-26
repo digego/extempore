@@ -113,7 +113,7 @@ endif()
 
 # after that, you'll probably still have to move the relevant headers
 # and libs into packages/{lib,include} - which is messy I know, but
-# should be pretty straightforward
+# should be pretty straightforwards
 
 # LLVM
 
@@ -199,6 +199,11 @@ if(UNIX AND NOT APPLE)
   target_include_directories(extempore PRIVATE ${X11_INCLUDE_DIR})
   target_link_libraries(extempore ${X11_LIBRARIES})
   target_link_libraries(extempore pthread ncurses)
+endif()
+
+# on Windows, put the created extempore.exe into the source directory
+if(WIN32)
+  set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
 
 ###########
