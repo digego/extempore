@@ -1996,21 +1996,36 @@
     (print "  " (length *impc:ti:polyfunc-cache*))
     (print-with-colors 'cyan 'default #f (print " specializations\n\n"))))
 
+(define unix-or-Windows
+  (lambda (unix-val win-val)
+    (if (string=? (sys:platform) "Windows")
+        win-val unix-val)))
+
+(define Windows-convert-unix-path
+  (lambda (unix-path)
+    (regex:replace-all unix-path  "/" "\\")))
+
+(define sanitize-platform-path
+  (lambda (path)
+    (if (string=? (sys:platform) "Windows")
+        (Windows-convert-unix-path path)
+        path)))
+
 (define impc:aot:compile-xtm-file
   (lambda (lib-path move-into-place? exit-afterwards?)
     (let ((start-time (now))
           (in-file-port (or
-                         (open-input-file lib-path)
-                         (open-input-file (string-append (sys:share-dir) "/" lib-path)))))
+                         (open-input-file (sanitize-platform-path lib-path))
+                         (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
       (if (not in-file-port)
           (begin (print-with-colors 'black 'red #t
                                     (print "Error:"))
-                 (print " no .xtm file at" lib-path "\n"))
+                 (print " no .xtm file at" (sanitize-platform-path lib-path) "\n"))
           (let* ((res (close-port in-file-port))
-                 (libname (filename-from-path lib-path))
+                 (libname (sanitize-platform-path (filename-from-path lib-path)))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
-                 (aot-cache-path (string-append (sys:share-dir) "/libs/aot-cache"))
-                 (aot-compilation-file-path (string-append aot-cache-path "/" libname)))
+                 (aot-cache-path (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
+                 (aot-compilation-file-path (sanitize-platform-path (string-append aot-cache-path "/" libname))))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "AOT-compilation file not written ")
                        (close-port *impc:aot:current-output-port*)
