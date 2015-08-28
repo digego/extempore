@@ -1828,36 +1828,32 @@
                  (print " to point to your LLVM directory before you can ahead-of-time compile xtlang code.\n")
                  (error "")))
       (let* ((platform (sys:platform))
-             (bitcode-path (if (string=? platform "Windows")
-                               (string-append ".\\msvc\\tmp\\" module-name ".ll")
-                               (string-append "/tmp/" module-name ".bc")))
-             (asm-path (if (string=? platform "Windows")
-                           (string-append ".\\msvc\\tmp\\" module-name ".obj")
-                           (string-append "/tmp/" module-name ".s")))
-             (aot-cache-path (string-append (sys:share-dir) "/libs/aot-cache"))
+             (tmp-dir (sanitize-platform-path (unix-or-Windows "/tmp/" (string-append (sys:share-dir) "\\msvc\\tmp\\")))) ;; (cptr->string (sys_getenv "TEMP"))
+             (bitcode-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
+             (asm-path (string-append tmp-dir module-name (unix-or-Windows ".s" ".obj")))
+             (aot-cache-path (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
              (win-libs (if (string=? platform "Windows")
-                           (let* ((dirlist (sys:directory-list "./msvc/tmp/"))
-                                  (liblist (cl:remove-if-not (lambda (s) (regex:match? s "\\.lib$")) dirlist))
+                           (let* ((dirlist (sys:directory-list tmp-dir))
                                   (linklist (cl:remove-if (lambda (s)
                                                             (regex:match? s (string-append module-name ".lib$")))
-                                                          liblist))
-                                  (strlist (string-append " " (string-join linklist " ") " ")))
-                             strlist)
+                                                          (cl:remove-if-not (lambda (s) (regex:match? s "\\.lib$")) dirlist))))
+                             (string-append " " (string-join linklist " ") " "))
                            ""))
              (optimize-compiles? #t)
+             (res (println 'temp-dir: tmp-dir 'win-libs: win-libs 'asm-path: asm-path))
              (shlib-path
               (cond ((string=? platform "Linux")
-                     (string-append "/tmp/" module-name ".so"))
+                     (string-append tmp-dir module-name ".so"))
                     ((string=? platform "OSX")
-                     (string-append "/tmp/" module-name ".dylib"))
+                     (string-append tmp-dir module-name ".dylib"))
                     ((string=? platform "Windows")
-                     (string-append ".\\msvc\\tmp\\" module-name ".dll"))
+                     (string-append (sys:share-dir) "\\libs\\aot-cache\\" module-name ".dll"))
                     (else "")))
-             (compilation-command-a
+             (llc-command
               (if (string=? platform "Windows")
                   (string-append
                    llvm-path
-                   "/bin/Release/llc " 
+                   "\\bin\\llc "
                    (if optimize-compiles? "-O3" "-O0")
                    " -tailcallopt -filetype obj "
                    bitcode-path)
@@ -1867,17 +1863,19 @@
                    (if optimize-compiles? "-O3" "-O0")
                    " -relocation-model=pic -tailcallopt "
                    bitcode-path)))
-             (compilation-command-b
+             (compilation-command
               (if (string=? platform "Windows")
                   (string-append "link "
                                  ;; " /FORCE:UNRESOLVED "
                                  " /MACHINE:x64 /DLL /OUT:"
                                  shlib-path
                                  win-libs
-                                 " opengl32.lib "
-                                 " Glu32.lib "
-                                 " .\\msvc\\x64\\Release\\extempore.lib"                                 
-                                 " .\\msvcrt.lib "                                 
+                                 ;; " opengl32.lib "
+                                 ;; " Glu32.lib "
+                                 " "
+                                 ;; (string-append tmp-dir module-name ".lib ")
+                                 "extempore.lib "
+                                 "msvcrt.lib "
                                  asm-path)
                   (string-append
                    (cond ((string=? platform "Linux")
@@ -1903,16 +1901,16 @@
               (res2 0))
           (begin
             (print-with-colors 'black 'yellow #t (print " Generating assembly from LLVM bitcode "))
-            (print "\n  " compilation-command-a "\n\n"))
-          (set! res1 (sys:command compilation-command-a))
+            (print "\n  " llc-command "\n\n"))
+          (set! res1 (sys:command llc-command))
           (if (<> res1 0)
               (begin (print-with-colors 'red 'default #t
                                         (print "llc failed with exit code " res1 "\n"))
                      (if exit-afterwards? (quit 1))))
           (begin
             (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
-            (print "\n  " compilation-command-b "\n\n"))          
-          (set! res2 (sys:command compilation-command-b))
+            (print "\n  " compilation-command "\n\n"))
+          (set! res2 (sys:command compilation-command))
           (if (<> res2 0)
               (begin (print-with-colors 'red 'default #t
                                         (print "cc failed with exit code " res2 "\n"))
@@ -2033,7 +2031,7 @@
                 (begin
                   ;; if the preload check passes, create aot-cache dir
                   ;; if it doesn't exist
-                  (sys:command (string-append "mkdir " aot-cache-path))
+                  (sys:command (string-append (unix-or-Windows "mkdir " "md ") aot-cache-path))
                   (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
