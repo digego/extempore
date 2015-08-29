@@ -541,14 +541,21 @@ namespace extemp {
   }
 
   pointer SchemeFFI::commandOutput(scheme* _sc, pointer args) {    
-#ifndef _WIN32
-	  // NOTE: doesn't work for Windows yet
+
     char outbuf[8192];
     memset(outbuf,0,8192);
+#ifdef _WIN32
+    FILE *stream = _popen(string_value(pair_car(args)), "r");
+#else
     FILE *stream = popen(string_value(pair_car(args)), "r");
+#endif
     if (stream && fgets(outbuf, 8192, stream))
       {
+#ifdef _WIN32
+        _pclose(stream);
+#else
         pclose(stream);
+#endif
         // get rid of the final newline
         size_t len = strnlen(outbuf, 8192);
         if(len < 8192)
@@ -556,7 +563,6 @@ namespace extemp {
         return mk_string(_sc,outbuf);
       }
     else
-#endif
       return _sc->F;     
   }
 
