@@ -1776,23 +1776,24 @@
 (define get-llvm-path
   (lambda ()
     (sanitize-platform-path
-     (if (not (string=? (sys:platform) "Windows"))
-         `(let ((path_from_env (sys:command-output "echo $EXT_LLVM_DIR")))
-            (if (not (string=? path_from_env ""))
-                path_from_env
-                ;; check if homebrewed version (in default Cellar location)
-                ;; exists - need to keep the version up-to-date by hand
-                ;;
-                ;; OSX
-                (if (= (sys:command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
-                    "/usr/local/Cellar/extempore-llvm/3.4.1"
-                    ;; Linux
-                    (if (= (sys:command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
-                        "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
-                        path_from_env)
-                    path_from_env)))
-         ;; on Windows, assume it's in SHAREDIR/llvm-build
-         (string-append (sys:share-dir) "\\llvm-build")))))
+     (unix-or-Windows
+      ;; otherwise have a gewd look
+      (let ((path_from_env (sys:command-output "echo $EXT_LLVM_DIR")))
+        (if (not (string=? path_from_env ""))
+            path_from_env
+            ;; check if homebrewed version (in default Cellar location)
+            ;; exists - need to keep the version up-to-date by hand
+            ;;
+            ;; OSX
+            (if (= (sys:command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
+                "/usr/local/Cellar/extempore-llvm/3.4.1"
+                ;; Linux
+                (if (= (sys:command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
+                    "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
+                    path_from_env)
+                path_from_env)))
+      ;; on Windows, assume it's in SHAREDIR/llvm-build
+      (string-append (sys:share-dir) "\\llvm-build")))))
 
 ;; insert arbitrary sexp (remember to quote!) into the AOT-compilation
 ;; file, otherwise do nothing
@@ -1993,10 +1994,9 @@
     (print "  " (length *impc:ti:polyfunc-cache*))
     (print-with-colors 'cyan 'default #f (print " specializations\n\n"))))
 
-(define unix-or-Windows
-  (lambda (unix-val win-val)
-    (if (string=? (sys:platform) "Windows")
-        win-val unix-val)))
+(define-macro (unix-or-Windows unix-expr win-expr)
+  (if (string=? (sys:platform) "Windows")
+      win-expr unix-expr))
 
 (define Windows-convert-unix-path
   (lambda (unix-path)
