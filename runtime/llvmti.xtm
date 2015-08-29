@@ -1820,7 +1820,7 @@
        (begin ,@forms)))
 
 (define impc:aot:compile-module
-  (lambda (module-name module move-into-place? exit-afterwards?)
+  (lambda (module-name module exit-afterwards?)
     (let* ((llvm-path (get-llvm-path)))
       (if (string=? "" llvm-path)
           (begin (print-with-colors 'red 'default #t (print "Error"))
@@ -1829,104 +1829,87 @@
                  (print " to point to your LLVM directory before you can ahead-of-time compile xtlang code.\n")
                  (error "")))
       (let* ((platform (sys:platform))
-             (tmp-dir (sanitize-platform-path (unix-or-Windows "/tmp/" (string-append (sys:share-dir) "\\msvc\\tmp\\")))) ;; (cptr->string (sys_getenv "TEMP"))
-             (bitcode-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
+             (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
+             (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
              (asm-path (string-append tmp-dir module-name (unix-or-Windows ".s" ".obj")))
-             (aot-cache-path (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
-             (win-libs (if (string=? platform "Windows")
-                           (let* ((dirlist (sys:directory-list tmp-dir))
-                                  (linklist (cl:remove-if (lambda (s)
-                                                            (regex:match? s (string-append module-name ".lib$")))
-                                                          (cl:remove-if-not (lambda (s) (regex:match? s "\\.lib$")) dirlist))))
-                             (string-append " " (string-join linklist " ") " "))
-                           ""))
+             (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/")))
+             (output-shlib-path (string-append output-dir module.name
+                                               (cond ((string=? platform "Linux") ".so")
+                                                     ((string=? platform "OSX") ".dylib")
+                                                     ((string=? platform "Windows") ".dll"))))
+             (link-libs (if (string=? platform "Windows")
+                            (let* ((dirlist (sys:directory-list (string-append (sys:share-dir) "\\libs\\win64")))
+                                   (linklist (cl:remove-if (lambda (s)
+                                                             (regex:match? s (string-append module-name ".lib$")))
+                                                           (cl:remove-if-not (lambda (s) (regex:match? s "\\.lib$")) dirlist))))
+                              (string-append " " (string-join linklist " ") " "))
+                            ""))
              (optimize-compiles? #t)
-             (shlib-path
-              (cond ((string=? platform "Linux")
-                     (string-append tmp-dir module-name ".so"))
-                    ((string=? platform "OSX")
-                     (string-append tmp-dir module-name ".dylib"))
-                    ((string=? platform "Windows")
-                     (string-append (sys:share-dir) "\\libs\\aot-cache\\" module-name ".dll"))
-                    (else "")))
              (llc-command
-              (if (string=? platform "Windows")
-                  (string-append
-                   llvm-path
-                   "\\bin\\llc "
-                   (if optimize-compiles? "-O3" "-O0")
-                   " -tailcallopt -filetype obj "
-                   bitcode-path)
-                  (string-append
-                   llvm-path
-                   "/bin/llc " 
-                   (if optimize-compiles? "-O3" "-O0")
-                   " -relocation-model=pic -tailcallopt "
-                   bitcode-path)))
-             (compilation-command
-              (if (string=? platform "Windows")
-                  (string-append "link "
-                                 ;; " /FORCE:UNRESOLVED "
-                                 " /MACHINE:x64 /DLL /OUT:"
-                                 shlib-path
-                                 win-libs
-                                 ;; " opengl32.lib "
-                                 ;; " Glu32.lib "
-                                 " "
-                                 ;; (string-append tmp-dir module-name ".lib ")
-                                 "extempore.lib "
-                                 "msvcrt.lib "
-                                 asm-path)
-                  (string-append
-                   (cond ((string=? platform "Linux")
-                          (string-append "gcc " 
-                                         (if optimize-compiles? "-O3" "-g -O0")
-                                         " --shared -fPIC "))
-                         ((string=? platform "OSX")
-                          (string-append "clang "
-                                         (if optimize-compiles? "-O3" "-g -O0")   
-                                         " -dynamiclib -undefined dynamic_lookup ")))
-                   asm-path
-                   " -o " shlib-path))))
-        ;; (if (string=? platform "Windows")
-        ;;     (print-error 'Sorry, 'this 'function 'is 'not 'available 'on 'your 'platform))
+              (unix-or-Windows (string-append
+                                llvm-path
+                                "/bin/llc " 
+                                (if optimize-compiles? "-O3" "-O0")
+                                " -relocation-model=pic -tailcallopt "
+                                bc-path)
+                               (string-append
+                                llvm-path
+                                "\\bin\\llc "
+                                (if optimize-compiles? "-O3" "-O0")
+                                " -tailcallopt -filetype obj "
+                                bc-path)))
+             (link-command
+              (unix-or-Windows (string-append
+                                (cond ((string=? platform "Linux")
+                                       (string-append "gcc " 
+                                                      (if optimize-compiles? "-O3" "-g -O0")
+                                                      " --shared -fPIC "))
+                                      ((string=? platform "OSX")
+                                       (string-append "clang "
+                                                      (if optimize-compiles? "-O3" "-g -O0")   
+                                                      " -dynamiclib -undefined dynamic_lookup ")))
+                                asm-path
+                                " -o " shlib-path)
+                               (string-append "link "
+                                              ;; " /FORCE:UNRESOLVED "
+                                              " /MACHINE:x64 /DLL /OUT:"
+                                              shlib-path
+                                              link-libs
+                                              ;; " opengl32.lib "
+                                              ;; " Glu32.lib "
+                                              " "
+                                              ;; (string-append tmp-dir module-name ".lib ")
+                                              "extempore.lib "
+                                              "msvcrt.lib "
+                                              asm-path))))
         (print "Looking for llc in " llvm-path "...\n\n")
         (begin
           (print-with-colors 'black 'yellow #t (print " Exporting module "))
-          (print "\n  " bitcode-path "\n\n"))
+          (print "\n  " bc-path "\n\n"))
         ;; print further instructions
-        (sys:command (string-append "rm " bitcode-path " " asm-path " " shlib-path))
-        (llvm:export-module module bitcode-path)
-        (let ((res1 0)
-              (res2 0))
+        ;; (sys:command (string-append "rm " bc-path " " asm-path " " shlib-path))
+        (llvm:export-module module bc-path)
+        (let ((llc-res 0)
+              (linker-res 0))
           (begin
             (print-with-colors 'black 'yellow #t (print " Generating assembly from LLVM bitcode "))
             (print "\n  " llc-command "\n\n"))
-          (set! res1 (sys:command llc-command))
-          (if (<> res1 0)
+          (set! llc-res (sys:command llc-command))
+          (if (<> llc-res 0)
               (begin (print-with-colors 'red 'default #t
-                                        (print "llc failed with exit code " res1 "\n"))
+                                        (print "llc command failed with exit code " llc-res "\n"))
                      (if exit-afterwards? (quit 1))))
           (begin
             (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
-            (print "\n  " compilation-command "\n\n"))
-          (set! res2 (sys:command compilation-command))
-          (if (<> res2 0)
+            (print "\n  " link-command "\n\n"))
+          (set! linker-res (sys:command link-command))
+          (if (<> linker-res 0)
               (begin (print-with-colors 'red 'default #t
-                                        (print "cc failed with exit code " res2 "\n"))
+                                        (print "linking failed with exit code " linker-res "\n"))
                      (if exit-afterwards? (quit 1)))
               (begin 
                 (print-with-colors 'black 'green #t (print " Succesfully compiled "))
-                (print "\n  " shlib-path "\n\n")
-                (if move-into-place?
-                    (if (and (= (sys:command (string-append "mv " shlib-path " " aot-cache-path)) 0)
-                             (if (not optimize-compiles?)
-                                 (= (sys:command (string-append "rm -rf " aot-cache-path "/" module-name ".dylib.dSYM; mv " shlib-path ".dSYM " aot-cache-path)) 0)
-                                 #t))
-                        (begin (print "Moved ")
-                               (print-with-colors 'blue 'default #t (print shlib-path)) (print " into " aot-cache-path "\n\n"))
-                        (print-with-colors 'red 'default #t
-                                           (print "Error moving " shlib-path " into " aot-cache-path "\n\n")))))))))))
+                (print "\n  " shlib-path "\n\n"))))))))
 
 (define impc:aot:insert-header
   (lambda (libname)
@@ -2009,7 +1992,7 @@
         path)))
 
 (define impc:aot:compile-xtm-file
-  (lambda (lib-path move-into-place? exit-afterwards?)
+  (lambda (lib-path exit-afterwards?)
     (let ((start-time (now))
           (in-file-port (or
                          (open-input-file (sanitize-platform-path lib-path))
@@ -2021,8 +2004,8 @@
           (let* ((res (close-port in-file-port))
                  (libname (sanitize-platform-path (filename-from-path lib-path)))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
-                 (aot-cache-path (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
-                 (aot-compilation-file-path (sanitize-platform-path (string-append aot-cache-path "/" libname))))
+                 (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
+                 (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname))))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "AOT-compilation file not written ")
                        (close-port *impc:aot:current-output-port*)
@@ -2030,7 +2013,7 @@
                 (begin
                   ;; if the preload check passes, create aot-cache dir
                   ;; if it doesn't exist
-                  (sys:command (string-append (unix-or-Windows "mkdir " "md ") aot-cache-path))
+                  (sys:command (string-append (unix-or-Windows "mkdir " "md ") output-dir))
                   (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
@@ -2046,7 +2029,7 @@
                         (let ((module (impc:compiler:flush-jit-compilation-queue)))
                           (if (not module)
                               (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
-                          (impc:aot:compile-module libname-no-extension module move-into-place? exit-afterwards?))
+                          (impc:aot:compile-module libname-no-extension module exit-afterwards?))
                         ;; (impc:aot:insert-footer libname-no-extension)
                         (close-port *impc:aot:current-output-port*)
                         (set! *impc:aot:current-lib-name* "xtmdylib")
@@ -7946,6 +7929,7 @@
 
 (define sys:load-dylib
   (lambda (dylib-path)
+    ;; TODO: check libs\\win64 on Windows
     (let ((dylib (or
                   (sys:open-dylib dylib-path)
                   (sys:open-dylib (string-append (sys:share-dir) "/" dylib-path)))))
