@@ -64,12 +64,7 @@
 
 ////////////////////////////////
 
-
-#define PCRE_REGEX
-
-#ifdef PCRE_REGEX
 #include <pcre.h>
-#endif
 
 #ifdef __APPLE__
 #include <malloc/malloc.h>
@@ -1230,7 +1225,6 @@ namespace extemp {
     //
     //////////////////////////////////////////////////////
 	
-#ifdef PCRE_REGEX
     pointer SchemeFFI::regex_match(scheme* _sc, pointer args)	
     {
 	char* data = string_value(pair_car(args));
@@ -1479,7 +1473,6 @@ namespace extemp {
 		
 	return mk_string(_sc,result);
     }
-#endif
 
     ///////////////////////////////////////////////////////
     //
