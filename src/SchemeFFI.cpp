@@ -69,8 +69,6 @@
 
 #ifdef PCRE_REGEX
 #include <pcre.h>
-#else
-#include <oniguruma.h>
 #endif
 
 #ifdef __APPLE__
@@ -1481,122 +1479,6 @@ namespace extemp {
 		
 	return mk_string(_sc,result);
     }
-	
-	
-#else // ONIGURUMA NOT COMPLETE!!
-    pointer SchemeFFI::regex_match(scheme* _sc, pointer args)	
-    {
-	int r;
-	unsigned char *start, *range, *end;
-	regex_t* reg;
-	OnigErrorInfo einfo;
-	OnigRegion *region;
-	
-	UChar* pattern = (UChar*) string_value(pair_cadr(args)); 
-	UChar* str     = (UChar*) string_value(pair_car(args));
-	
-	r = onig_new(&reg, pattern, pattern + strlen((char* )pattern), ONIG_OPTION_DEFAULT, ONIG_ENCODING_ASCII, ONIG_SYNTAX_DEFAULT, &einfo);
-	if (r != ONIG_NORMAL) {
-	    UChar s[ONIG_MAX_ERROR_MESSAGE_LEN];
-	    onig_error_code_to_str(s, r, &einfo);
-	    fprintf(stderr, "ERROR: %s\n", s);
-	    return _sc->F;
-	}
-	
-	region = onig_region_new();
-	
-	bool matched = false;
-	end   = str + strlen((char* )str);
-	start = str;
-	range = end;
-	r = onig_search(reg, str, end, start, range, region, ONIG_OPTION_NONE);
-	if (r >= 0) {
-	    int i;
-	    matched = true;
-	    fprintf(stderr, "match at %d\n", r);
-	    for (i = 0; i < region->num_regs; i++) {
-		fprintf(stderr, "%d: (%d-%d)\n", i, region->beg[i], region->end[i]);
-	    }
-	}
-	else if (r == ONIG_MISMATCH) {
-	    fprintf(stderr, "search fail\n");
-	}
-	else { /* error */
-	    UChar s[ONIG_MAX_ERROR_MESSAGE_LEN];
-	    onig_error_code_to_str(s, r);
-	    fprintf(stderr, "ERROR: %s\n", s);
-	    return _sc->F;
-	}
-	
-	onig_region_free(region, 1 /* 1:free self, 0:free contents only */);
-	onig_free(reg);
-	onig_end();
-	return (matched) ? _sc->T : _sc->F;		
-    }
-	
-    pointer SchemeFFI::regex_match_all(scheme* _sc, pointer args)	
-    {
-	int r;
-	unsigned char *start, *range, *end;
-	regex_t* reg;
-	OnigErrorInfo einfo;
-	OnigRegion *region;
-	
-	UChar* pattern = (UChar*) string_value(pair_cadr(args)); 
-	UChar* str     = (UChar*) string_value(pair_car(args));
-	
-	r = onig_new(&reg, pattern, pattern + strlen((char* )pattern), ONIG_OPTION_DEFAULT, ONIG_ENCODING_ASCII, ONIG_SYNTAX_DEFAULT, &einfo);
-	if (r != ONIG_NORMAL) {
-	    UChar s[ONIG_MAX_ERROR_MESSAGE_LEN];
-	    onig_error_code_to_str(s, r, &einfo);
-	    fprintf(stderr, "ERROR: %s\n", s);
-	    return _sc->F;
-	}
-	
-	region = onig_region_new();
-	pointer list = _sc->NIL;
-	  
-	while(true) {
-	    bool matched = false;
-	    end   = str + strlen((char* )str);
-	    start = str;
-	    range = end;
-	    r = onig_search(reg, str, end, start, range, region, ONIG_OPTION_NONE);
-	    if (r >= 0) {
-		int i;
-		matched = true;
-		fprintf(stderr, "match at %d\n", r);
-		for (i = 0; i < region->num_regs; i++) {
-		    if(region->beg[i] == -1) continue;
-		    int range = region->end[i] - region->beg[i];
-		    char* substr = (char*) alloca(range+1);
-		    memset(substr,0,range+1);
-		    strncpy(substr, ((char*)str)+region->beg[i], range);
-		    _sc->imp_env->insert(list); 			
-		    pointer tlist = cons(_sc,mk_string(_sc,substr),list);
-		    _sc->imp_env->erase(list);
-		    list = tlist;
-		    //set_vector_elem(_sc,v,vpos++,mk_string(_sc,substr));
-		    fprintf(stderr, "%d: (%d-%d)\n", i, region->beg[i], region->end[i]);
-		    str = str+region->end[i];		
-		}
-	    }
-	    else if (r == ONIG_MISMATCH) {
-		break;
-	    }
-	    else { /* error */
-		UChar s[ONIG_MAX_ERROR_MESSAGE_LEN];
-		onig_error_code_to_str(s, r);
-		fprintf(stderr, "ERROR: %s\n", s);
-		return _sc->F;
-	    }
-	}
-	
-	onig_region_free(region, 1 /* 1:free self, 0:free contents only */);
-	onig_free(reg);
-	onig_end();
-	return reverse(_sc, list);
-    }	
 #endif
 
     ///////////////////////////////////////////////////////
