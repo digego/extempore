@@ -1833,17 +1833,17 @@
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
              (asm-path (string-append tmp-dir module-name (unix-or-Windows ".s" ".obj")))
              (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/")))
-             (output-shlib-path (string-append output-dir module.name
+             (output-shlib-path (string-append output-dir module-name
                                                (cond ((string=? platform "Linux") ".so")
                                                      ((string=? platform "OSX") ".dylib")
                                                      ((string=? platform "Windows") ".dll"))))
              (link-libs (if (string=? platform "Windows")
-                            (let* ((dirlist (sys:directory-list (string-append (sys:share-dir) "\\libs\\win64")))
-                                   (linklist (cl:remove-if (lambda (s)
-                                                             (regex:match? s (string-append module-name ".lib$")))
-                                                           (cl:remove-if-not (lambda (s) (regex:match? s "\\.lib$")) dirlist))))
-                              (string-append " " (string-join linklist " ") " "))
-                            ""))
+                            (cl:remove-if (lambda (s)
+                                            (or (not (regex:match? s "\\.lib$"))
+                                                (regex:match? s (string-append module-name ".lib$"))))
+                                          (append (sys:directory-list output-dir)
+                                                  (sys:directory-list (string-append (sys:share-dir) "\\libs\\win64"))))
+                            '()))
              (optimize-compiles? #t)
              (llc-command
               (unix-or-Windows (string-append
@@ -1869,12 +1869,12 @@
                                                       (if optimize-compiles? "-O3" "-g -O0")   
                                                       " -dynamiclib -undefined dynamic_lookup ")))
                                 asm-path
-                                " -o " shlib-path)
+                                " -o " output-shlib-path)
                                (string-append "link "
                                               ;; " /FORCE:UNRESOLVED "
                                               " /MACHINE:x64 /DLL /OUT:"
-                                              shlib-path
-                                              link-libs
+                                              output-shlib-path
+                                              (string-join link-libs " ") " "
                                               ;; " opengl32.lib "
                                               ;; " Glu32.lib "
                                               " "
@@ -1886,8 +1886,9 @@
         (begin
           (print-with-colors 'black 'yellow #t (print " Exporting module "))
           (print "\n  " bc-path "\n\n"))
-        ;; print further instructions
-        ;; (sys:command (string-append "rm " bc-path " " asm-path " " shlib-path))
+        ;; make sure tmp-dir exists
+        (sys:command (string-append (unix-or-Windows "mkdir " "md ") tmp-dir))
+        ;; (sys:command (string-append "rm " bc-path " " asm-path " " output-shlib-path))
         (llvm:export-module module bc-path)
         (let ((llc-res 0)
               (linker-res 0))
@@ -1909,7 +1910,7 @@
                      (if exit-afterwards? (quit 1)))
               (begin 
                 (print-with-colors 'black 'green #t (print " Succesfully compiled "))
-                (print "\n  " shlib-path "\n\n"))))))))
+                (print "\n  " output-shlib-path "\n\n"))))))))
 
 (define impc:aot:insert-header
   (lambda (libname)
