@@ -180,6 +180,141 @@
          x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Boxed type
+
+(bind-type Box <!a>
+  "A generic 'Box' type")
+
+(bind-func unbox:[!a,Box*]*
+  (lambda (b)
+    "unboxes any Box into a value"
+    (tref b 0)))
+
+(bind-func print:[void,Box*]*
+  (lambda (b)
+    (printout "<Box '" (tref b 0) "'>")
+    void))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; XTLang symbols
+
+;; 
+(bind-type Symbol <size_t,i8*>
+  "xtlang's symbol type
+
+Tuple contains <symbol_length,characters>
+
+Should be created, modified and desymoyed with the Symbol_* library functions.
+
+Second item in tuple is a char* c-style symbol ")
+
+;; must be a Halloced symbol!
+(bind-func Symbol_free
+  "Free an xtlang Symbol
+
+Frees both the underlying character array and the tuple container.
+@param sym - Symbol to be deleted 
+"
+  (lambda (sym:Symbol*)
+    (free (tref sym 1))
+    (free sym)
+    void))
+
+;; Symbol printing!
+(bind-func Symbol_print:[void,Symbol*]*
+  "Prints all characters in a given symbol object.
+
+Overloads and should be used via the `println` function
+If the symbol is empty will print a zero length symbol
+
+@param sym - Symbol to be printed
+"
+  (lambda (x)
+    (if (null? x)
+        (begin (printf "")
+               void)
+        (begin (printf "%s" (tref x 1))
+               void))))
+
+(bind-poly print Symbol_print)
+
+(bind-func Symbol_toString:[String*,Symbol*]*
+  "convert Symbol to String"
+  (lambda (x)
+    (String (tref x 0) (tref x 1))))
+
+(bind-poly toString Symbol_toString)
+
+(bind-func Symbol_length
+  "Takes a (null-terminated) Symbol* and returns the symbol length
+
+@param sym - the Symbol*
+@return length - length (via symlen)"
+  (lambda (sym:Symbol*)
+    (strlen (tref sym 1))))
+
+(bind-func Symbol_size
+  "Takes a Symbol* and returns the size of allocated memory
+
+Not necessarily the same as Symbol_length - 
+@param sym - the Symbol
+@return size - size of alloc'ed memory"
+  (lambda (sym:Symbol*)
+    (tref sym 0)))
+
+(bind-func Symbol_cstr
+  "Return an i8* pointer to the underlying char array
+
+@param sym
+@return c_sym - the underlying i8 'char' array"
+  (lambda (sym:Symbol*)
+    (tref sym 1)))
+
+(bind-func Symbol_from_cptr
+  "Create an xtlang Symbol type from a c string (char array)
+
+Use via the polymorphic Str function
+
+@param str - character array from which to generate a new Symbol
+@return - the new Symbol*
+"
+  (lambda (s)
+    (let ((lgth (strlen s))
+          (str (Symbol_z lgth s)))
+      str)))
+
+(bind-func Symbol_copy
+  "Create a new xtlang Symbol type from an existing Symbol
+
+Use via the polymorphic Str function
+
+@param str - pointer to the Symbol to copy
+@return - the new Symbol*
+"
+  (lambda (str:Symbol*)
+    (let ((lgth (Symbol_length str))
+          (new_str (Symbol_z lgth (Symbol_cstr str))))
+      new_str)))
+
+(bind-poly Symbol Symbol_from_cptr)
+(bind-poly Symbol Symbol_copy)
+
+(bind-func Symbol_equal
+  "Equality test for Symbol
+
+@param s1 - first symbol
+@param s2 - second symbol
+@return - true/false
+"
+  (lambda (s1:Symbol* s2:Symbol*)
+    (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
+        1:i1 0:i1)))
+
+(bind-poly equal Symbol_equal)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; XTLang strings
 
 ;; 

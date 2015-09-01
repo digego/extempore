@@ -1214,11 +1214,16 @@
         (set! *impc:ti:genericfunc-needs-update* (cons (cons name arity) *impc:ti:genericfunc-needs-update*))
         #t))))
 
+;; with an optional arity check
 (define impc:ti:genericfunc-exists?
-  (lambda (name)
+  (lambda (name . arity)
     (if (string? name) (set! name (string->symbol name)))
-    (let ((res (assoc-strcmp name *impc:ti:genericfunc-cache*)))
-      (if res #t #f))))
+    (if (null? arity)
+        (let ((res (assoc-strcmp name *impc:ti:genericfunc-cache*)))
+          (if res #t #f))
+        (let* ((res (assoc-strcmp-all name *impc:ti:genericfunc-cache*))
+               (results (map (lambda (r) (cadr r)) res)))
+          (if (and (not (null? results)) (member (car arity) results)) #t #f)))))
 
 (define impc:ir:genericfunc-stringify-generic-arg-strings
   (lambda (args)
@@ -2663,7 +2668,7 @@
 (define impc:ti:quote
   (lambda (ast)
     (cond ((null? ast) '(impc_null)) ;(list))
-          ((symbol? ast) `(llvm_make_symbol ,(symbol->string ast)))
+          ((symbol? ast) `(Symbol ,(symbol->string ast))) ;;`(llvm_make_symbol ,(symbol->string ast)))
           ((list? ast)
            (cons 'list (map (lambda (a)
                               (if (or (eq? 'NIL a)
@@ -4530,7 +4535,9 @@
 	     ;(println 2 'a: a 'tt: tt 'gt: gt)
 	     ;; if gt and tt still not equal tt maybe a named-type
 	     (if (<> (length gt) (length tt))
-		 (if (and (string? (car tt)) ;; named type?
+           (if (and
+                (not (null? tt))
+                (string? (car tt)) ;; named type?
 			  (= (length gt) (length (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))))
 		     (set! tt (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))
 		     (set! subcheck #f)))
@@ -6255,8 +6262,8 @@
           ((and (list? ast) ;; generic function
                 (symbol? (car ast))
                 (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-                (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##"))))) ;"\\$\\$\\$")))))
-                                        ;(println 'generic (car ast))
+                (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
+                                             (length (cdr ast))))
            (impc:ti:nativef-generics ast vars kts request?))
           ((and (list? ast) ;; polymorphic function
                 (symbol? (car ast))
@@ -6520,7 +6527,8 @@
               ;; do generic functions before polys
               ((and (symbol? (car ast))
                     (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-                    (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
+                    (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
+                                                 (length (cdr ast))))
                ;; (println 'types types)
                ;; (println 'gpoly: (car ast))
                ;; (println 'gpoly: (impc:ti:genericfunc-types (string->symbol (car (regex:split (symbol->string (car ast)) "\\$\\$\\$")))))
@@ -6684,14 +6692,14 @@
 (define impc:ti:find-all-vars
   (lambda (full-ast syms)
     (letrec ((f (lambda (ast)
-                  ;; (println 'ast: ast)
                   (cond ((pair? ast)
                          (cond ((and (symbol? (car ast)) ;; this for generics
                                      (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
-                                     (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))))
-                                (if (not (impc:ti:genericfunc-types (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
-                                                              (length (cdr ast)) #f))
-                                    (impc:compiler:print-bad-arity-error (car (regex:split (symbol->string (car ast)) "##"))))
+                                     (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
+                                                                  (length (cdr ast))))
+                                ;; (if (not (impc:ti:genericfunc-types (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
+                                ;;                                     (length (cdr ast)) #f))
+                                ;;     (impc:compiler:print-bad-arity-error (car (regex:split (symbol->string (car ast)) "##"))))
                                 ;; (println 'generics ast (regex:split (symbol->string (car ast)) "(\\$\\$\\$)|(_poly_)"))
                                 (let* ((gname (string->symbol (car (regex:split (symbol->string (car ast)) "(##)|(_poly_)"))))
                                        (gnum (string->number (cadr (regex:split (symbol->string (car ast)) "(##)|(_poly_)"))))
@@ -7646,6 +7654,7 @@
                            (map (lambda (a b c)
                                   (set! a (impc:ir:get-type-from-pretty-str a))
                                   (if (and (impc:ir:tuple? a)
+                                           (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
                                            (= 1 (impc:ir:get-ptr-depth a)))
                                       `(if (not (null? (tref x ,c)))
                                            (tset! obj ,b (,(string->symbol
@@ -7657,6 +7666,7 @@
                            (map (lambda (a c)
                                   (set! a (impc:ir:get-type-from-pretty-str a))
                                   (if (and (impc:ir:tuple? a)
+                                           (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
                                            (= 1 (impc:ir:get-ptr-depth a)))
                                       `(if (not (null? (tref x ,c)))
                                            (,(string->symbol
@@ -7667,6 +7677,7 @@
                            (map (lambda (a b c)
                                   (set! a (impc:ir:get-type-from-pretty-str a))
                                   (if (and (impc:ir:tuple? a)
+                                           (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
                                            (= 1 (impc:ir:get-ptr-depth a)))
                                       `(if (not (null? (tref x ,c)))
                                            (tset! obj ,b (,(string->symbol
