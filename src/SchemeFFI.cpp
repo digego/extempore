@@ -73,7 +73,7 @@
 #endif
 
 /////////////////////// llvm includes
-#include "llvm/Assembly/Parser.h"
+#include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Module.h"
@@ -83,17 +83,25 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 //#include "llvm/ModuleProvider.h"
+#ifndef EXT_MCJIT
 #include "llvm/ExecutionEngine/JIT.h"
+#endif
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/MutexGuard.h"
+#ifdef EXT_MCJIT
+#include "llvm/IR/Verifier.h"
+#include "llvm/IR/LegacyPassManager.h"
+#else
 #include "llvm/Analysis/Verifier.h"
+#include "llvm/PassManager.h"
+#endif
 //#include "llvm/Target/TargetData.h"
 #include "llvm/LinkAllPasses.h"
-#include "llvm/PassManager.h"
 #include "llvm/ADT/StringExtras.h"
 ///////////////////////////////////////
 
@@ -1574,12 +1582,11 @@ namespace extemp {
     // Create some module to put our function into it.
     using namespace llvm;
     Module* M = EXTLLVM::I()->M;
-    PassManager* PM = extemp::EXTLLVM::I()->PM;
+    legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
 
 #ifdef EXT_MCJIT  
     char modname[256];
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
-    Module* m = NULL;
     char tmpbuf[1024];
 #endif
   
@@ -1588,10 +1595,8 @@ namespace extemp {
     //ParseError pa;
     long long num_of_funcs = M->getFunctionList().size();
 
-    Module* newM = NULL;
-
 #ifndef EXT_MCJIT  
-    newM = ParseAssemblyString(assm, M, pa, getGlobalContext());
+    std::unique_ptr<llvm::Module> newModule = ParseAssemblyString(assm, M, pa, getGlobalContext());
 
     if(EXTLLVM::OPTIMIZE_COMPILES)
       {
@@ -1601,11 +1606,13 @@ namespace extemp {
 #else
     std::string asmcode(assm);
     int cnt = 0;
+
+    std::unique_ptr<llvm::Module> newModule;
     do {
-      m = new Module(modname, getGlobalContext());
-	  if (!extemp::UNIV::ARCH.empty()) m->setTargetTriple(extemp::UNIV::ARCH.front());
-      newM = ParseAssemblyString(asmcode.c_str(), m, pa, getGlobalContext());
-      if(newM != NULL) break;
+      newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
+      if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH.front());
+
+      if(newModule != NULL) break;
       std::string err = pa.getMessage().str();
       if(cnt > 1000) {
         std::cout << "MCJIT Compiler Error: could not resolve all external dependencies" << std::endl;
@@ -1676,22 +1683,21 @@ namespace extemp {
         exprr.append(asmcode);        
         asmcode.clear();
         asmcode.append(exprr);        
-        delete m;
         cnt++;
       }else{
         break;
       }
-    }while (newM == 0);
+    }while (newModule == 0);
 
     if(EXTLLVM::OPTIMIZE_COMPILES)
       {
-        PM->run(*m);
+        PM->run(*newModule);
       }
   
 #endif
   
     //std::stringstream ss;
-    if(newM == 0)
+    if(newModule == 0)
       {
         std::string errstr;
         llvm::raw_string_ostream ss(errstr);
@@ -1713,9 +1719,9 @@ namespace extemp {
         return _sc->F;
       }else{
       if (extemp::EXTLLVM::VERIFY_COMPILES) {
-        std::string Err;
-        if (verifyModule(*M, ReturnStatusAction, &Err)) {
-          printf("%s\n%s","Parsed, but not valid!\n",Err.c_str());
+        llvm::raw_ostream *err;
+        if (verifyModule(*M, err)) {
+          std::cout << err << "\nInvalid LLVM IR\n";
 #ifndef EXT_MCJIT        
           if(num_of_funcs != M->getFunctionList().size()) {
             iplist<Function>::iterator iter = M->getFunctionList().end();
@@ -1728,15 +1734,16 @@ namespace extemp {
           return _sc->F;
         } 
       }
-#ifdef EXT_MCJIT    
-      extemp::EXTLLVM::I()->EE->addModule(m);
-      extemp::EXTLLVM::I()->addModule(m);
+#ifdef EXT_MCJIT
+      llvm::Module *modulePtr = newModule.get();
+      extemp::EXTLLVM::I()->EE->addModule(std::move(newModule));
+      extemp::EXTLLVM::I()->addModule(modulePtr);
       extemp::EXTLLVM::I()->EE->finalizeObject();
 
       // when using MCJIT, return a pointer to the module with the new
       // functions in it - which we'll use later to export the bitcode
       // during AOT-compilation
-      return mk_cptr(_sc, m);      
+      return mk_cptr(_sc, modulePtr);
 #else
       return _sc->T;
 #endif
@@ -1910,36 +1917,44 @@ namespace extemp {
     else return _sc->F;
   }
   
-    pointer SchemeFFI::get_struct_size(scheme* _sc, pointer args)
-    {
-	using namespace llvm;
+  pointer SchemeFFI::get_struct_size(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
 
-	PassManager* PM = extemp::EXTLLVM::I()->PM;
-	char* struct_type_str = string_value(pair_car(args));
-        unsigned long long hash = string_hash((unsigned char*)struct_type_str);
-        char name[128];
-        sprintf(name,"_xtmT%lld",hash);
-        char assm[1024];
-        sprintf(assm,"%%%s = type %s",name,struct_type_str);
-        //printf("parse this! %s\n",assm);
-	SMDiagnostic pa;
-        // Don't!! write this into the default module!
-	const Module* newM = ParseAssemblyString(assm, NULL, pa, getGlobalContext());        
-        if(newM == 0)
-        {
-          return _sc->F;
-        }
-        StructType* type = newM->getTypeByName(std::string(name));
-	if(type == 0)
-	{
-	    return _sc->F;
-	}
-        DataLayout* layout = new DataLayout(newM);
-        const StructLayout* sl = layout->getStructLayout(type);
-        long size = sl->getSizeInBytes();
-        delete layout;
-        return mk_integer(_sc,size);       
-    }
+#ifdef EXT_MCJIT
+    legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
+#else
+    PassManager* PM = extemp::EXTLLVM::I()->PM;
+#endif
+    char* struct_type_str = string_value(pair_car(args));
+    unsigned long long hash = string_hash((unsigned char*)struct_type_str);
+    char name[128];
+    sprintf(name,"_xtmT%lld",hash);
+    char assm[1024];
+    sprintf(assm,"%%%s = type %s",name,struct_type_str);
+    //printf("parse this! %s\n",assm);
+    SMDiagnostic pa;
+    // Don't!! write this into the default module!
+#ifdef EXT_MCJIT
+    std::unique_ptr<llvm::Module> newM = parseAssemblyString(assm, pa, getGlobalContext());
+#else
+    const Module* newM = ParseAssemblyString(assm, NULL, pa, getGlobalContext());
+#endif
+    if(newM == 0)
+      {
+        return _sc->F;
+      }
+    StructType* type = newM->getTypeByName(std::string(name));
+    if(type == 0)
+      {
+        return _sc->F;
+      }
+    DataLayout* layout = new DataLayout(newM.get());
+    const StructLayout* sl = layout->getStructLayout(type);
+    long size = sl->getSizeInBytes();
+    delete layout;
+    return mk_integer(_sc,size);
+  }
 
   pointer SchemeFFI::get_named_struct_size(scheme* _sc, pointer args)
   {
@@ -2027,10 +2042,10 @@ namespace extemp {
     fout << irStr; //ss.str();
     fout.close();    
 #else    
-    std::string errinfo;
-    llvm::raw_fd_ostream ss(filename,errinfo);
-    if(errinfo.length()>0) {
-      std::cout << errinfo << std::endl;
+    std::error_code errcode;
+    llvm::raw_fd_ostream ss(filename, errcode, llvm::sys::fs::F_RW);
+    if(errcode) {
+      std::cout << errcode.message() << std::endl;
       return _sc->F;
     }
     llvm::WriteBitcodeToFile(m,ss);
@@ -2284,7 +2299,7 @@ namespace extemp {
 	ExecutionEngine* EE = EXTLLVM::I()->EE;
 
 #ifdef LLVM_EE_LOCK	
-	EE->lock.acquire();
+  llvm::MutexGuard locked(EE->lock);
 #endif
 	
         Module* M = EXTLLVM::I()->M;
@@ -2293,9 +2308,6 @@ namespace extemp {
 	{
 	    //std::cout << "no such function\n" << std::endl;
 	    printf("No such function\n");
-#ifdef LLVM_EE_LOCK
-	    EE->lock.release();	
-#endif
 	    return _sc->F;
 	}				
 	func->getArgumentList();
@@ -2308,9 +2320,6 @@ namespace extemp {
 	if(lgth != func->getArgumentList().size())
 	{
 	    printf("Wrong number of arguments for function!\n");
-#ifdef LLVM_EE_LOCK
-	    EE->lock.release();	
-#endif
 	    return _sc->F;			
 	}
 	std::vector<llvm::GenericValue> fargs(lgth);
@@ -2323,9 +2332,6 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::IntegerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
-#ifdef LLVM_EE_LOCK
-		    EE->lock.release();	
-#endif
 		    return _sc->F;
 		}
 		int width = a->getType()->getPrimitiveSizeInBits();
@@ -2346,9 +2352,6 @@ namespace extemp {
 		else
 		{
 		    printf("Bad argument type %i\n",i);
-#ifdef LLVM_EE_LOCK
-		    EE->lock.release();	
-#endif
 		    return _sc->F;
 		}
 	    }
@@ -2357,9 +2360,6 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::PointerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
-#ifdef LLVM_EE_LOCK
-		    EE->lock.release();	
-#endif
 		    return _sc->F;					
 		}
 		//std::cout << "PTRVALUE: " << cptr_value(p) << std::endl; 				
@@ -2370,9 +2370,6 @@ namespace extemp {
 		if(a->getType()->getTypeID() != Type::PointerTyID)
 		{
 		    printf("Bad argument type %i\n",i);
-#ifdef LLVM_EE_LOCK
-		    EE->lock.release();	
-#endif
 		    return _sc->F;
 		}
 		fargs[i].PointerVal = cptr_value(p);
@@ -2383,18 +2380,12 @@ namespace extemp {
 		//ascii_print_color(1,1,10); // error color
 		printf("Bad argument at index %i you can't pass in a scheme closure.\n",i);
 		//ascii_print_color(0,9,10);
-#ifdef LLVM_EE_LOCK
-		EE->lock.release();	
-#endif
 		return _sc->F;
 	    }
 	    else {
 		//ascii_print_color(1,1,10); // error color
 		printf("Bad argument at index %i\n",i);
 		//ascii_print_color(0,9,10); // default
-#ifdef LLVM_EE_LOCK
-		EE->lock.release();	
-#endif
 		return _sc->F;
 	    }
 		    
@@ -2404,9 +2395,6 @@ namespace extemp {
   EXTLLVM::I()->EE->updateGlobalMapping(func,NULL);
 #endif
   GenericValue gv = EE->runFunction(func,fargs);
-#ifdef LLVM_EE_LOCK		
-	EE->lock.release();
-#endif
 
 	//std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
 	switch(func->getReturnType()->getTypeID())
@@ -2619,7 +2607,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 	llvm::Module* M = EXTLLVM::I()->M;
 	llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;	
 
-	EE->lock.acquire();
+  llvm::MutexGuard locked(EE->lock);
 		
 #ifdef _WIN32
         void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
@@ -2633,8 +2621,6 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
   llvm::GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(std::string(symname));  
 	//llvm::GlobalValue* gv = M->getNamedValue(std::string(symname));
 	EE->updateGlobalMapping(gv,ptr);
-
-	EE->lock.release();		
 
 	return _sc->T;
     }	

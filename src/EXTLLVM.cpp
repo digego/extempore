@@ -78,7 +78,7 @@
 
 //#include "llvm/Analysis/DebugInfo.h"
 //#include "llvm/Analysis/Verifier.h"
-#include "llvm/Assembly/Parser.h"
+#include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Module.h"
@@ -86,6 +86,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/LegacyPassManager.h"
 
 #include "llvm/Support/TargetSelect.h"
 
@@ -101,9 +102,7 @@
 // #include "llvm/Analysis/Verifier.h"
 // #include "llvm/Target/TargetData.h"
 #include "llvm/LinkAllPasses.h"
-#include "llvm/PassManager.h"
 
-#include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
@@ -1470,79 +1469,78 @@ namespace extemp {
 
 
 	
-    void EXTLLVM::initLLVM()
-    {
-	if(M == 0) { // Initalize Once Only (not per scheme process)
-                     // 
+  void EXTLLVM::initLLVM()
+  {
+    if(M == 0) { // Initalize Once Only (not per scheme process)
+      //
 
-    llvm::TargetOptions Opts;
-	    //llvm::PerformTailCallOpt = true;    
-          Opts.GuaranteedTailCallOpt = true;
-          Opts.JITEmitDebugInfo = true;
-          Opts.UnsafeFPMath = false;
-          
-  
-          llvm::InitializeNativeTarget();
-          llvm::InitializeNativeTargetAsmPrinter();
-          llvm::LLVMContext &context = llvm::getGlobalContext();
-          //llvm::IRBuilder<> theBuilder(context);
-  
-          // Make the module, which holds all the code.
-          M = new llvm::Module("xtmmodule_0", context);
+      llvm::TargetOptions Opts;
+	    //llvm::PerformTailCallOpt = true;
+      Opts.GuaranteedTailCallOpt = true;
+      Opts.UnsafeFPMath = false;
 
-		  if (!extemp::UNIV::ARCH.empty()) M->setTargetTriple(extemp::UNIV::ARCH.front());
 
-          Ms.push_back(M);
-  
-          // Build engine with JIT
-          llvm::EngineBuilder factory(M);
-          factory.setEngineKind(llvm::EngineKind::JIT);
-          factory.setAllocateGVsWithCode(false);
-          factory.setTargetOptions(Opts);
+      llvm::InitializeNativeTarget();
+      llvm::InitializeNativeTargetAsmPrinter();
+      llvm::LLVMContext &context = llvm::getGlobalContext();
+      //llvm::IRBuilder<> theBuilder(context);
+
+      // Make the module, which holds all the code.
+      std::unique_ptr<llvm::Module> module = llvm::make_unique<llvm::Module>("xtmmodule_0", context);
+
+      M = module.get();
+      addModule(M);
+
+      if (!extemp::UNIV::ARCH.empty()) M->setTargetTriple(extemp::UNIV::ARCH.front());
+
+      // Build engine with JIT
+      llvm::EngineBuilder factory(std::move(module));
+      factory.setEngineKind(llvm::EngineKind::JIT);
+      // factory.setAllocateGVsWithCode(false);
+      factory.setTargetOptions(Opts);
 #ifdef EXT_MCJIT
-          factory.setUseMCJIT(true);
-          MM = new llvm::SectionMemoryManager();          
-          factory.setMCJITMemoryManager(MM);
+      std::unique_ptr<llvm::SectionMemoryManager> MM = llvm::make_unique<llvm::SectionMemoryManager>();
+      factory.setMCJITMemoryManager(std::move(MM));
 #else          
-          factory.setUseMCJIT(false);
+      factory.setUseMCJIT(false);
 #endif
-          //if(!extemp::UNIV::ARCH.empty()) factory.setMArch(extemp::UNIV::ARCH.front());
-          if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
-          if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
-          factory.setOptLevel(llvm::CodeGenOpt::Aggressive); 
-          //factory.setOptLevel(llvm::CodeGenOpt::None);
-          llvm::TargetMachine* tm = factory.selectTarget();          
-          EE = factory.create(tm);
-          EE->DisableLazyCompilation(true);
+      //if(!extemp::UNIV::ARCH.empty()) factory.setMArch(extemp::UNIV::ARCH.front());
+      if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
+      if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
+      factory.setOptLevel(llvm::CodeGenOpt::Aggressive);
+      //factory.setOptLevel(llvm::CodeGenOpt::None);
+      llvm::TargetMachine* tm = factory.selectTarget();
+      EE = factory.create(tm);
+      EE->DisableLazyCompilation(true);
 
-          ascii_text_color(0,7,10);
-          std::cout << "ARCH           : " << std::flush;
-          ascii_text_color(1,6,10);	        
-          std::cout << std::string(tm->getTargetTriple()) << std::endl;
-          ascii_text_color(0,7,10);	        
-          std::cout << "CPU            : " << std::flush;
-          ascii_text_color(1,6,10);	        
-          std::cout << std::string(tm->getTargetCPU()) << std::endl;
-          ascii_text_color(0,7,10);	                  
-          std::cout << "ATTRS          : " << std::flush;
-          ascii_text_color(1,6,10);	        
-          std::cout << std::string(tm->getTargetFeatureString()) << std::endl;          
-          ascii_text_color(0,7,10);
-          std::cout << "MCJIT          : " << std::flush;
-          ascii_text_color(1,6,10);
+      ascii_text_color(0,7,10);
+      std::cout << "ARCH           : " << std::flush;
+      ascii_text_color(1,6,10);
+      std::cout << std::string(tm->getTargetTriple().normalize()) << std::endl;
+      ascii_text_color(0,7,10);
+      std::cout << "CPU            : " << std::flush;
+      ascii_text_color(1,6,10);
+      std::cout << std::string(tm->getTargetCPU()) << std::endl;
+      ascii_text_color(0,7,10);
+      std::cout << "ATTRS          : " << std::flush;
+      ascii_text_color(1,6,10);
+      std::cout << std::string(tm->getTargetFeatureString()) << std::endl;
+      ascii_text_color(0,7,10);
+      std::cout << "MCJIT          : " << std::flush;
+      ascii_text_color(1,6,10);
 #ifdef EXT_MCJIT
-          std::cout << "YES" << std::endl;
+      std::cout << "YES" << std::endl;
 #else
-          std::cout << "NO" << std::endl;
+      std::cout << "NO" << std::endl;
 #endif          
-          ascii_text_color(0,7,10);          
+      ascii_text_color(0,7,10);
           
 
 			
 	    //EE = llvm::EngineBuilder(M).create();
-	    PM = new llvm::PassManager();
+	    PM = new llvm::legacy::PassManager();
 	    //PM->add(new llvm::TargetData(*EE->getTargetData()));
-      PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
+      // PM->add(new llvm::DataLayout(*(EE->getDataLayout())));
 
       PM->add(llvm::createBasicAliasAnalysisPass());   //new   
       // promote allocs to register
@@ -1565,7 +1563,7 @@ namespace extemp {
 	    PM->add(llvm::createPromoteMemoryToRegisterPass());
 
       // tell LLVM about some built-in functions
-	    llvm::GlobalValue* gv = M->getNamedValue(std::string("llvm_destroy_zone_after_delay"));
+	    llvm::GlobalValue* gv = M->getNamedValue("llvm_destroy_zone_after_delay");
 	    EE->updateGlobalMapping(gv,(void*)&llvm_destroy_zone_after_delay);			
 	    gv = M->getNamedValue(std::string("free_after_delay"));
 	    EE->updateGlobalMapping(gv,(void*)&free_after_delay);			
@@ -1718,10 +1716,10 @@ namespace extemp {
 	    EE->updateGlobalMapping(gv,(void*)&imp_rand2_f);	
 
 
-//#ifdef _WIN32
-//	    gv = M->getNamedValue(std::string("log2"));
-//	    EE->updateGlobalMapping(gv,(void*)&log2);		
-//#endif
+      //#ifdef _WIN32
+      //	    gv = M->getNamedValue(std::string("log2"));
+      //	    EE->updateGlobalMapping(gv,(void*)&log2);
+      //#endif
 	    gv = M->getNamedValue(std::string("rsplit"));
 	    EE->updateGlobalMapping(gv,(void*)&rsplit);		
 	    gv = M->getNamedValue(std::string("rmatch"));
@@ -1832,46 +1830,46 @@ namespace extemp {
 	    gv = M->getNamedValue(std::string("mutex_trylock"));
 	    EE->updateGlobalMapping(gv,(void*)&mutex_trylock);
 
-            // gv = M->getNamedValue(std::string("cosd"));
-            // EE->updateGlobalMapping(gv,(void*)&cos);
-            // gv = M->getNamedValue(std::string("tand"));
-            // EE->updateGlobalMapping(gv,(void*)&tan);
-            // gv = M->getNamedValue(std::string("sind"));
-            // EE->updateGlobalMapping(gv,(void*)&sin);
-            // gv = M->getNamedValue(std::string("coshd"));
-            // EE->updateGlobalMapping(gv,(void*)&cosh);
-            // gv = M->getNamedValue(std::string("tanhd"));
-            // EE->updateGlobalMapping(gv,(void*)&tanh);
-            // gv = M->getNamedValue(std::string("sinhd"));
-            // EE->updateGlobalMapping(gv,(void*)&sinh);
-            // gv = M->getNamedValue(std::string("acosd"));
-            // EE->updateGlobalMapping(gv,(void*)&acos);
-            // gv = M->getNamedValue(std::string("asind"));
-            // EE->updateGlobalMapping(gv,(void*)&asin);
-            // gv = M->getNamedValue(std::string("atand"));
-            // EE->updateGlobalMapping(gv,(void*)&atan);
-            // gv = M->getNamedValue(std::string("atan2d"));
-            // EE->updateGlobalMapping(gv,(void*)&atan2);
-            // gv = M->getNamedValue(std::string("ceild"));
-            // EE->updateGlobalMapping(gv,(void*)&ceil);
-            // gv = M->getNamedValue(std::string("floord"));
-            // EE->updateGlobalMapping(gv,(void*)&floor);
-            // gv = M->getNamedValue(std::string("expd"));
-            // EE->updateGlobalMapping(gv,(void*)&exp);
-            // gv = M->getNamedValue(std::string("fmodd"));
-            // EE->updateGlobalMapping(gv,(void*)&fmod);
-            // gv = M->getNamedValue(std::string("powd"));
-            // EE->updateGlobalMapping(gv,(void*)&pow);
-            // gv = M->getNamedValue(std::string("logd"));
-            // EE->updateGlobalMapping(gv,(void*)&log);
-            // gv = M->getNamedValue(std::string("log2d"));
-            // EE->updateGlobalMapping(gv,(void*)&log2);
-            // gv = M->getNamedValue(std::string("log10d"));
-            // EE->updateGlobalMapping(gv,(void*)&log10);
-            // gv = M->getNamedValue(std::string("sqrtd"));
-            // EE->updateGlobalMapping(gv,(void*)&sqrt);
-            // gv = M->getNamedValue(std::string("fabsd"));
-            // EE->updateGlobalMapping(gv,(void*)&fabs);
+      // gv = M->getNamedValue(std::string("cosd"));
+      // EE->updateGlobalMapping(gv,(void*)&cos);
+      // gv = M->getNamedValue(std::string("tand"));
+      // EE->updateGlobalMapping(gv,(void*)&tan);
+      // gv = M->getNamedValue(std::string("sind"));
+      // EE->updateGlobalMapping(gv,(void*)&sin);
+      // gv = M->getNamedValue(std::string("coshd"));
+      // EE->updateGlobalMapping(gv,(void*)&cosh);
+      // gv = M->getNamedValue(std::string("tanhd"));
+      // EE->updateGlobalMapping(gv,(void*)&tanh);
+      // gv = M->getNamedValue(std::string("sinhd"));
+      // EE->updateGlobalMapping(gv,(void*)&sinh);
+      // gv = M->getNamedValue(std::string("acosd"));
+      // EE->updateGlobalMapping(gv,(void*)&acos);
+      // gv = M->getNamedValue(std::string("asind"));
+      // EE->updateGlobalMapping(gv,(void*)&asin);
+      // gv = M->getNamedValue(std::string("atand"));
+      // EE->updateGlobalMapping(gv,(void*)&atan);
+      // gv = M->getNamedValue(std::string("atan2d"));
+      // EE->updateGlobalMapping(gv,(void*)&atan2);
+      // gv = M->getNamedValue(std::string("ceild"));
+      // EE->updateGlobalMapping(gv,(void*)&ceil);
+      // gv = M->getNamedValue(std::string("floord"));
+      // EE->updateGlobalMapping(gv,(void*)&floor);
+      // gv = M->getNamedValue(std::string("expd"));
+      // EE->updateGlobalMapping(gv,(void*)&exp);
+      // gv = M->getNamedValue(std::string("fmodd"));
+      // EE->updateGlobalMapping(gv,(void*)&fmod);
+      // gv = M->getNamedValue(std::string("powd"));
+      // EE->updateGlobalMapping(gv,(void*)&pow);
+      // gv = M->getNamedValue(std::string("logd"));
+      // EE->updateGlobalMapping(gv,(void*)&log);
+      // gv = M->getNamedValue(std::string("log2d"));
+      // EE->updateGlobalMapping(gv,(void*)&log2);
+      // gv = M->getNamedValue(std::string("log10d"));
+      // EE->updateGlobalMapping(gv,(void*)&log10);
+      // gv = M->getNamedValue(std::string("sqrtd"));
+      // EE->updateGlobalMapping(gv,(void*)&sqrt);
+      // gv = M->getNamedValue(std::string("fabsd"));
+      // EE->updateGlobalMapping(gv,(void*)&fabs);
 
       // gv = M->getNamedValue(std::string("llvm_cos"));
       // EE->updateGlobalMapping(gv,(void*)&llvm_cos);
@@ -1893,32 +1891,10 @@ namespace extemp {
       EE->updateGlobalMapping(gv,(void*)&llvm_atan);
       gv = M->getNamedValue(std::string("llvm_atan2"));
       EE->updateGlobalMapping(gv,(void*)&llvm_atan2);
-      // gv = M->getNamedValue(std::string("llvm_ceil"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_ceil);
-      // gv = M->getNamedValue(std::string("llvm_floor"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_floor);
-      // gv = M->getNamedValue(std::string("llvm_exp"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_exp);
-      // gv = M->getNamedValue(std::string("llvm_fmod"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_fmod);
-      // gv = M->getNamedValue(std::string("llvm_pow"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_pow);
-      // gv = M->getNamedValue(std::string("llvm_log"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_log);
-      // gv = M->getNamedValue(std::string("llvm_log2"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_log2);
-      // gv = M->getNamedValue(std::string("llvm_log10"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_log10);
-      // gv = M->getNamedValue(std::string("llvm_sqrt"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_sqrt);
-      // gv = M->getNamedValue(std::string("llvm_fabs"));
-      // EE->updateGlobalMapping(gv,(void*)&llvm_fabs);
-            
-            
-	}
 #ifdef EXT_MCJIT
-  extemp::EXTLLVM::I()->EE->finalizeObject();
+      extemp::EXTLLVM::I()->EE->finalizeObject();
 #endif
-	return;
+      return;
     }
+  }
 }

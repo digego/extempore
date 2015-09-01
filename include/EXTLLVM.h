@@ -237,7 +237,7 @@ namespace extemp {
 	llvm::ExecutionEngine* EE;
   llvm::legacy::PassManager* PM;
 #ifdef EXT_MCJIT
-  llvm::SectionMemoryManager* MM;
+  std::unique_ptr<llvm::SectionMemoryManager> MM;
 #endif  
 
     private:

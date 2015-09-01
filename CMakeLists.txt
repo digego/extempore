@@ -60,12 +60,14 @@ target_compile_definitions(extempore
 
 if(NOT MSVC)
   target_compile_options(extempore
+    PRIVATE -std=c++11
     PRIVATE -fvisibility-inlines-hidden
     # PRIVATE -fno-exceptions
     PRIVATE -fno-rtti
     PRIVATE -fno-common
     PRIVATE -Woverloaded-virtual
-    PRIVATE -Wcast-qual)
+    PRIVATE -Wcast-qual
+    )
 endif()
 
 # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
