@@ -40,7 +40,10 @@
 #include <vector>
 #include <map>
 #include <string>
-//#include <ucontext.h>
+#ifdef _WIN32
+#include <memory>
+#endif
+ //#include <ucontext.h>
 
 typedef struct _zone_hooks_t {
   uint64_t space; // here just so we don't get <i8*,i8*>
