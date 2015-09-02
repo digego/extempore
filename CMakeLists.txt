@@ -132,9 +132,13 @@ endif()
 
 find_package(LLVM 3.4 REQUIRED)
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
-string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
-target_compile_options(extempore PRIVATE ${LLVM_COMPILE_OPTIONS})
 target_link_libraries(extempore ${LLVM_LIBRARIES})
+
+# the llvm-config --cxxflags output seems to just mess things up at
+# the moment - but maybe it's needed on Windows?
+
+# string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
+# target_compile_options(extempore PRIVATE ${LLVM_COMPILE_OPTIONS})
 
 # portaudio
 
