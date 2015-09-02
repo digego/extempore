@@ -40,7 +40,7 @@ target_sources(extempore
   )
 
 if(WIN32)
-  target_sources(extempore PRIVATE msvc/extempore.def)
+  target_sources(extempore PRIVATE src/extempore.def)
 endif()
 
 target_include_directories(extempore PRIVATE include)
