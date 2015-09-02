@@ -7147,8 +7147,8 @@
                                        "() nounwind {\nentry:\n"
                                        "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
                                        "%_impz = bitcast %mzone* %_zone to i8*\n"
-                                       "%oldzone1 = getelementptr [1 x i8*]* @" symname-string "_var_zone, i32 0, i32 0\n"
-                                       "%oldzone2 = load i8** %oldzone1\n"
+                                       "%oldzone1 = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var_zone, i32 0, i32 0\n"
+                                       "%oldzone2 = load i8*, i8** %oldzone1\n"
                                        "%oldzone3 = bitcast i8* %oldzone2 to %mzone*\n"
                                        "store i8* %_impz, i8** %oldzone1\n"
                                         ; existing code
@@ -7168,8 +7168,8 @@
              (stub-type (impc:ir:get-closure-type-from-str closure-type))
              (getter-ir (string-append "define dllexport ccc i8* @" symname-string "_getter() nounwind {\n"
                                        "entry:\n"
-                                       "%ptr = getelementptr [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                       "%func = load i8** %ptr\n"
+                                       "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                       "%func = load i8*, i8** %ptr\n"
                                        "ret i8* %func\n}\n\n"))
              (cb-struct-type (if (null? (cdr stub-type))
                                  '()
@@ -7186,10 +7186,9 @@
                                                                                       (if (null? cb-struct-type)
                                                                                           "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
                                                                                           (string-append "%fstruct = bitcast i8* %dat to " cb-struct-type "\n"))
-                                                                                      ;;"%fPtr = getelementptr " cb-struct-type " %fstruct ,i32 0, i32 0\n"
                                                                                       (apply string-append (map (lambda (n t ap a)
-                                                                                                                  (string-append ap " = getelementptr " cb-struct-type " %fstruct, i32 0, i32 " (number->string n) "\n"
-                                                                                                                                 a " = load " (impc:ir:get-type-str t) "* " ap "\n"))
+                                                                                                                  (string-append ap " = getelementptr " (impc:ir:pointer-- cb-struct-type) ", " cb-struct-type " %fstruct, i32 0, i32 " (number->string n) "\n"
+                                                                                                                                 a " = load " (impc:ir:get-type-str t) ", " (impc:ir:get-type-str t) "* " ap "\n"))
                                                                                                                 (make-list-with-proc (- (length stub-type) 1) (lambda (i) i)) ;(+ i 1)))
                                                                                                                 (cdr stub-type)
                                                                                                                 '("%ap" "%bp" "%cp" "%dp" "%ep" "%fp" "%gp" "%hp" "%ip" "%jp" "%kp" "%lp" "%mp" "%np" "%op" "%pp" "%qp" "%rp" "%sp" "%tp")
@@ -7199,16 +7198,17 @@
                                                                                       "call ccc void @llvm_push_zone_stack(%mzone* %_zone)\n"
                                                                                       "call ccc %mzone* @llvm_zone_reset(%mzone* %_zone)\n"
                                                                                       "%_impz = bitcast %mzone* %_zone to i8*\n"
-                                                                                      "%ptr = getelementptr [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                                                                      "%ptrvar = load i8** %ptr\n"
+                                                                                      "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                                                                      "%ptrvar = load i8*, i8** %ptr\n"
                                                                                       "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                                                      "%closure = load " closure-type " %closure_tmp \n"
-                                                                                      "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
-                                                                                      "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+                                                                                      "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                                                                                      "%fPtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                                                      "%ePtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
                                                                                       "%ff = load "
+                                                                                      (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
                                                                                       (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
                                                                                       "* %fPtr\n"
-                                                                                      "%ee = load i8** %ePtr\n"
+                                                                                      "%ee = load i8*, i8** %ePtr\n"
                                                                                       (if (impc:ir:void? (car stub-type)) "" "%result = ")
                                                                                       "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
                                                                                       ;;"call ccc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
@@ -7294,16 +7294,17 @@
 
                                         ;(begin (println 'bbbbb) "")
 
-                                                                "%ptr = getelementptr [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                                                "%ptrvar = load i8** %ptr\n"
+                                                                "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                                                "%ptrvar = load i8*, i8** %ptr\n"
                                                                 "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                                "%closure = load " closure-type " %closure_tmp \n"
-                                                                "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
-                                                                "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+                                                                "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                                                                "%fPtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                                "%ePtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
                                                                 "%ff = load "
+                                                                (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
                                                                 (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
                                                                 "* %fPtr\n"
-                                                                "%ee = load i8** %ePtr\n"
+                                                                "%ee = load i8*, i8** %ePtr\n"
                                                                 (if (impc:ir:void? (car stub-type)) "" "%result = ")
                                                                 "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
 
@@ -7355,16 +7356,17 @@
                                                          "{\nentry:\n"
                                                          "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
                                                          "%_impz = bitcast %mzone* %_zone to i8*\n"
-                                                         "%ptr = getelementptr [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                                         "%ptrvar = load i8** %ptr\n"
+                                                         "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                                         "%ptrvar = load i8*, i8** %ptr\n"
                                                          "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                         "%closure = load " closure-type " %closure_tmp \n"
-                                                         "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
-                                                         "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+                                                         "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                                                         "%fPtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                         "%ePtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
                                                          "%ff = load "
+                                                         (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
                                                          (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
                                                          "* %fPtr\n"
-                                                         "%ee = load i8** %ePtr\n"
+                                                         "%ee = load i8*, i8** %ePtr\n"
                                                          (if (impc:ir:void? (car stub-type)) "" "%result = ")
                                                          "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
                                                          (apply string-append (map (lambda (t n)
@@ -7388,16 +7390,17 @@
                                                            "{\nentry:\n"
                                                            "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
                                                            "%_impz = bitcast %mzone* %_zone to i8*\n"
-                                                           "%ptr = getelementptr [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                                           "%ptrvar = load i8** %ptr\n"
+                                                           "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                                           "%ptrvar = load i8*, i8** %ptr\n"
                                                            "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                           "%closure = load " closure-type " %closure_tmp \n"
-                                                           "%fPtr = getelementptr " closure-type-- " %closure, i32 0, i32 2\n"
-                                                           "%ePtr = getelementptr " closure-type-- " %closure, i32 0, i32 1\n"
+                                                           "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                                                           "%fPtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                           "%ePtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
                                                            "%ff = load "
+                                                           (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
                                                            (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
                                                            "* %fPtr\n"
-                                                           "%ee = load i8** %ePtr\n"
+                                                           "%ee = load i8*, i8** %ePtr\n"
                                                            (if (impc:ir:void? (car stub-type)) "" "%result = ")
                                                            "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
                                                            (apply string-append (map (lambda (t n)
