@@ -17,8 +17,8 @@ set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
 ########################
 
 if(WIN32)
-  set(NUGET_PACKAGE_DIR ${CMAKE_SOURCE_DIR}/packages)
-  link_directories(${NUGET_PACKAGE_DIR}/lib)
+  set(WIN64_PACKAGE_DIR ${CMAKE_SOURCE_DIR}/libs/win64)
+  link_directories(${WIN64_PACKAGE_DIR}/lib)
 endif()
 
 add_executable(extempore src/Extempore.cpp)
@@ -132,13 +132,15 @@ endif()
 
 find_package(LLVM 3.4 REQUIRED)
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
+string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
+target_compile_options(extempore PRIVATE ${LLVM_COMPILE_OPTIONS})
 target_link_libraries(extempore ${LLVM_LIBRARIES})
 
 # portaudio
 
 if(WIN32)
   # give find_package a hint about where to find portaudio
-  set(Portaudio_ROOT ${NUGET_PACKAGE_DIR})
+  set(Portaudio_ROOT ${WIN64_PACKAGE_DIR})
 endif()
 find_package(Portaudio REQUIRED)
 target_include_directories(extempore PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
@@ -148,7 +150,7 @@ target_link_libraries(extempore ${PORTAUDIO_LIBRARIES})
 
 if(WIN32)
   # give find_package a hint about where to find PCRE
-  set(PCRE_ROOT ${NUGET_PACKAGE_DIR})
+  set(PCRE_ROOT ${WIN64_PACKAGE_DIR})
   target_compile_definitions(extempore PRIVATE -DPCRE_STATIC)
 endif()
 find_package(PCRE REQUIRED)
@@ -167,7 +169,7 @@ if(BOOST)
   # target_compile_options(extempore PRIVATE -std=c++11)
   find_path(BOOST_ASIO_INCLUDE_DIR
     NAMES boost/asio.hpp
-    PATHS ${NUGET_PACKAGE_DIR}/include)
+    PATHS ${WIN64_PACKAGE_DIR}/include)
   if(BOOST_ASIO_INCLUDE_DIR)
     target_include_directories(extempore PRIVATE ${BOOST_ASIO_INCLUDE_DIR})
   else()
@@ -203,9 +205,14 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(extempore pthread ncurses)
 endif()
 
-# on Windows, put the created extempore.exe into the source directory
+# on Windows, put the created extempore.exe straight into the source directory
 if(WIN32)
-  set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
+  set_target_properties(extempore
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
+    LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
+    LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR})
 endif()
 
 ###########
