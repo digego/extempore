@@ -35,6 +35,9 @@ To see Extempore in action, check out these videos:
 
 # Installation
 
+These are the quick-start options---See `INSTALL.md` for details in
+how to build from source.
+
 ## OSX
 
 If you're a [homebrew](http://brew.sh/) user, it's pretty
