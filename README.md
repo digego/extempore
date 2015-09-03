@@ -35,8 +35,8 @@ To see Extempore in action, check out these videos:
 
 # Installation
 
-These are the quick-start options---See `INSTALL.md` for details in
-how to build from source.
+*These are the quick-start options---see* [INSTALL.md](./INSTALL.md)
+*for details in how to build from source.*
 
 ## OSX
 
