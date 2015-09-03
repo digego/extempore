@@ -137,8 +137,12 @@ target_link_libraries(extempore ${LLVM_LIBRARIES})
 # the llvm-config --cxxflags output seems to just mess things up at
 # the moment - but maybe it's needed on Windows?
 
-# string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
-# target_compile_options(extempore PRIVATE ${LLVM_COMPILE_OPTIONS})
+if(WIN32)
+  string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
+  foreach(opt ${LLVM_COMPILE_OPTIONS})
+    target_compile_options(extempore PRIVATE ${opt})
+  endforeach()
+endif()
 
 # portaudio
 
