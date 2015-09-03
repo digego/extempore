@@ -114,18 +114,17 @@ endif()
 # nuget install portaudio & nuget install pcre & nuget install boost-vc140
 
 # after that, you'll probably still have to move the relevant headers
-# and libs into packages/{lib,include} - which is messy I know, but
+# and libs into libs/win64/{lib,include} - which is messy I know, but
 # should be pretty straightforwards
 
 # LLVM
 
-if(EXISTS $ENV{EXT_LLVM_DIR})
-  set(LLVM_ROOT_DIR $ENV{EXT_LLVM_DIR} CACHE PATH
-    "path to the (patched) LLVM build")
-elseif(EXISTS ${LLVM_ROOT_DIR})
-  # if we specify LLVM_ROOT_DIR through cmake, then we set the
-  # EXT_LLVM_DIR environment variable as well
-  set($ENV{EXT_LLVM_DIR} ${LLVM_ROOT_DIR})
+if(DEFINED ENV{EXT_LLVM_DIR})
+  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR}
+    CACHE PATH "path to the (patched) LLVM build")
+  set(LLVM_ROOT_DIR ${EXT_LLVM_DIR})
+elseif(EXT_LLVM_DIR)
+  set(LLVM_ROOT_DIR ${EXT_LLVM_DIR})
 else()
   message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")
 endif()
@@ -133,9 +132,6 @@ endif()
 find_package(LLVM 3.4 REQUIRED)
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_libraries(extempore ${LLVM_LIBRARIES})
-
-# the llvm-config --cxxflags output seems to just mess things up at
-# the moment - but maybe it's needed on Windows?
 
 if(WIN32)
   string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
