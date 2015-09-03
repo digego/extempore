@@ -53,7 +53,9 @@ painful, but it's a one-time process.
 ### LLVM 3.7
 
 LLVM now uses CMake as well. Grab the
-[3.7.0 source tarball](http://llvm.org/releases/download.html#3.7.0) and
+[3.7.0 source tarball](http://llvm.org/releases/download.html#3.7.0),
+apply both patches (`llparser.patch` and `mcjit.patch` in `extras/`),
+and
 
 ```
 mkdir cmake-build && cd cmake-build
