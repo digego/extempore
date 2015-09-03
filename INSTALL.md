@@ -30,20 +30,25 @@ brew install pcre portaudio
 
 ### Windows
 
-In addition to PCRE and Portaudio, we still need a small amount of the
-Boost libs on Windows (specifically the ASIO component for TCP/UDP
-handling). If you've got the NuGet command line client installed, you
-can probably do
+The version of **PCRE** available through NuGet is pretty old (8.33 as of
+writing this) so it's probably worth building it from source.
+
+The NuGet version of **Portaudio** should be fine, but building it
+from source is fine too.
+
+We still need one component of the **Boost** libs on Windows
+(specifically the ASIO component for TCP/UDP handling). If you've got
+the NuGet command line client installed, you can probably do
 
 ```
 nuget install boost-vc140 & nuget install boost_system-vc140 & nuget install boost_regex-vc140 & nuget install boost_date_time-vc140
 ```
 
-It doesn't matter how you get the deps, but the CMake build process
-expects to find them in `libs/win64/lib` (for the library files) and
-`libs/win64/include` (for the headers). So you'll need to (probably
-manually) move them in there, which is a bit painful, but it's a
-one-time process.
+It doesn't matter how you get these deps, but the Extempore CMake
+build process expects to find them in `libs/win64/lib` (for the
+library files) and `libs/win64/include` (for the headers). So you'll
+need to (probably manually) move them in there, which is a bit
+painful, but it's a one-time process.
 
 ### LLVM 3.7
 
@@ -70,14 +75,16 @@ cmake -DEXT_LLVM_DIR=/path/to/llvm-build-files ..
 If you've set the `EXT_LLVM_DIR` environment variable you don't have
 to provide it again to CMake.
 
-If you're a developer, and want to work "in-tree", then you can set
+If you want to work "in-tree" (handy for Extempore developers) then
+you can set
 
 ```
-cmake -DEXT_SHARE_DIR=/path/to/extempore ..
+cmake -DIN_TREE=ON ..
 ```
-this will make the `make install` just install `extempore` into
-`/usr/local/bin`, and Extempore will keep using the cloned Extempore
-repo for it's `runtime/`, `libs/`, etc.
+
+This will make the `make install` just install `extempore` into
+`/usr/local/bin`, and Extempore will keep using the Extempore source
+directory (i.e. the cloned repo) for it's `runtime/`, `libs/`, etc.
 
 ### Windows
 

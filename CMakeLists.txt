@@ -8,9 +8,17 @@ set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
 
 option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
+option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" OFF)
 
-set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
-  "path to Extempore's shared runtime files")
+# if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
+# line it will override these values
+if(IN_TREE)
+  set(EXT_SHARE_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH
+    "path to Extempore's shared runtime files")
+else()
+  set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
+    "path to Extempore's shared runtime files")
+endif()
 
 ########################
 # extempore executable #
