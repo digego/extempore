@@ -1,0 +1,13 @@
+#!/bin/sh
+
+TMP_EXT_SOURCE_DIR=`pwd`
+CMAKE_BUILD_DIR=cmake-build
+
+mkdir -p $CMAKE_BUILD_DIR && cd $CMAKE_BUILD_DIR
+cmake -DEXT_SHARE_DIR=$TMP_EXT_SOURCE_DIR ..
+
+# generate pseudo makefile that point to cmake makefile
+printf 'all: ;$(MAKE) -C %s all 
+install: ;$(MAKE) -C %s install
+clean: ;$(MAKE) -C %s clean
+' "$CMAKE_BUILD_DIR" "$CMAKE_BUILD_DIR" "$CMAKE_BUILD_DIR" > $TMP_EXT_SOURCE_DIR/Makefile
