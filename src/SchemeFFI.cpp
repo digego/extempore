@@ -2205,8 +2205,7 @@ namespace extemp {
 
     void* p;
 
-    // has the function been updateGlobalMapping'd somewhere else,
-    // e.g. bind_symbol
+    // has the function been loaded somewhere else, e.g. dlsym
       p = EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
     if(p==NULL) // look for it as a JIT-compiled function
       p = EXTLLVM::I()->EE->getPointerToFunction(func);
@@ -2599,31 +2598,28 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
 	return mk_cptr(_sc,ptr);
     }
 	
-    pointer SchemeFFI::bind_symbol(scheme* _sc, pointer args)
-    {
-	void* library = cptr_value(pair_car(args));
-	char* symname = string_value(pair_cadr(args));
+  pointer SchemeFFI::bind_symbol(scheme* _sc, pointer args)
+  {
+    void* library = cptr_value(pair_car(args));
+    char* symname = string_value(pair_cadr(args));
 
-	llvm::Module* M = EXTLLVM::I()->M;
-	llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;	
+    llvm::Module* M = EXTLLVM::I()->M;
+    llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
 
-  llvm::MutexGuard locked(EE->lock);
+    llvm::MutexGuard locked(EE->lock);
 		
 #ifdef _WIN32
-        void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
+    void* ptr = (void*) GetProcAddress((HMODULE)library, symname);
 #else
-	void* ptr = dlsym(library, symname);
+    void* ptr = dlsym(library, symname);
 #endif
-	if(!ptr) {
-	    // printf("Could not find symbol named %s\n",symname);
-	    return _sc->F;
-	}
-  llvm::GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(std::string(symname));  
-	//llvm::GlobalValue* gv = M->getNamedValue(std::string(symname));
-	EE->updateGlobalMapping(gv,ptr);
-
-	return _sc->T;
-    }	
+    if(ptr) {
+      return _sc->T;
+    }else{
+      // printf("Could not find symbol named %s\n",symname);
+      return _sc->F;
+    }
+  }
 
 
     // For simple preprocessor alias's
