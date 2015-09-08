@@ -1,7 +1,12 @@
 (sys:load "libs/external/glfw3.xtm")
 
+(bind-val width i32 800)
+(bind-val height i32 600)
+
 (bind-val window GLFWwindow*
-  (glfw_init_and_create_window 640 480))
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_interaction_window width height)))
 
 (bind-val fullscreen_quad_vert_data float* 8)
 
@@ -29,7 +34,7 @@
           (timeloc (glGetUniformLocation sp "iGlobalTime"))
           (rateloc (glGetUniformLocation sp "iSampleRate")))
       (glUseProgram sp)
-      (glUniform3f resloc 1920.0 1080.0 1.0)
+      (glUniform3f resloc (convert width) (convert height) 1.0)
       (glUniform1f timeloc (convert (% (clock_clock) 441000.)))
       (glUniform1f rateloc 44100.0))
     (VAO_bind_and_draw_arrays vao GL_TRIANGLE_STRIP 0 4)
