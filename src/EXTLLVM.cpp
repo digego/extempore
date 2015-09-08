@@ -78,6 +78,7 @@
 
 //#include "llvm/Analysis/DebugInfo.h"
 //#include "llvm/Analysis/Verifier.h"
+#include "llvm/Config/llvm-config.h" // for LLVM_VERSION_STRING
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/CallingConv.h"
@@ -627,8 +628,7 @@ void* llvm_get_function_ptr(char* fname)
     {
       return NULL;
     }
-  // has the function been updateGlobalMapping'd somewhere else,
-  // e.g. bind_symbol
+  // has the function been loaded somewhere else, e.g. dlsym
   void* p = extemp::EXTLLVM::I()->EE->getPointerToGlobalIfAvailable(func);
   if(p==NULL) // look for it as a JIT-compiled function
     p = extemp::EXTLLVM::I()->EE->getPointerToFunction(func);
@@ -1526,12 +1526,13 @@ namespace extemp {
       ascii_text_color(1,6,10);
       std::cout << std::string(tm->getTargetFeatureString()) << std::endl;
       ascii_text_color(0,7,10);
-      std::cout << "MCJIT          : " << std::flush;
+      std::cout << "LLVM           : " << std::flush;
       ascii_text_color(1,6,10);
+      std::cout << LLVM_VERSION_STRING;
 #ifdef EXT_MCJIT
-      std::cout << "YES" << std::endl;
+      std::cout << " MCJIT" << std::endl;
 #else
-      std::cout << "NO" << std::endl;
+      std::cout << " JIT" << std::endl;
 #endif          
       ascii_text_color(0,7,10);
           
