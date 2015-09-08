@@ -290,7 +290,6 @@ namespace extemp {
 	    // llvm stuff
 	    { "llvm:optimize",			        &SchemeFFI::optimizeCompiles },
 	    { "llvm:jit-compile-ir-string", &SchemeFFI::jitCompileIRString},
-	    { "llvm:bind-global-var",	     	&SchemeFFI::bind_global_var },
       { "llvm:ffi-set-name",          &SchemeFFI::ff_set_name },
       { "llvm:ffi-get-name",          &SchemeFFI::ff_get_name },
 	    { "llvm:get-function",		     	&SchemeFFI::get_function },
@@ -1750,27 +1749,6 @@ namespace extemp {
     }
   }
 	
-  pointer SchemeFFI::bind_global_var(scheme* _sc, pointer args)
-  {
-    using namespace llvm;
-
-    //Module* M = EXTLLVM::I()->M;		
-    //llvm::GlobalValue* gv = M->getNamedValue(std::string(string_value(pair_car(args))));
-    llvm::GlobalValue* gv = extemp::EXTLLVM::I()->getGlobalValue(std::string(string_value(pair_car(args))));
-    
-    if(gv == 0) {
-	    printf("Attempting to bind to a non-existant global LLVM variable\n");
-	    return _sc->F;
-    }
-    void* ptr = cptr_value(pair_cadr(args));
-    void** ptrptr = (void**) malloc(sizeof(void*));
-    ptrptr[0] = ptr;
-    //EXTLLVM::I()->EE->lock.acquire();
-    EXTLLVM::I()->EE->updateGlobalMapping(gv,ptrptr);
-    //EXTLLVM::I()->EE->lock.release();
-    return _sc->T;
-  }
-
     pointer SchemeFFI::ff_set_name(scheme* _sc, pointer args)
     {
        pointer x = pair_car(args);
