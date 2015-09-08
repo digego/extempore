@@ -64,7 +64,7 @@
 
 ////////////////////////////////
 
-#include <pcre.h>
+#include "pcre.h"
 
 #ifdef __APPLE__
 #include <malloc/malloc.h>

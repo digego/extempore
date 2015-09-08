@@ -63,7 +63,7 @@
 #include <execinfo.h>
 #endif
 
-#include <pcre.h>
+#include "pcre.h"
 #include "EXTLLVM.h"
 //#include "EXTMonitor"
 //#include "EXTThread"

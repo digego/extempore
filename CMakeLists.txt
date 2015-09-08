@@ -20,6 +20,31 @@ else()
     "path to Extempore's shared runtime files")
 endif()
 
+########
+# PCRE #
+########
+
+# current in-tree PCRE version: 8.37
+
+add_library(pcre STATIC
+  # headers
+  src/pcre/config.h
+  src/pcre/pcre.h
+  src/pcre/ucp.h
+  # source files
+  src/pcre/pcre_chartables.c
+  src/pcre/pcre_compile.c
+  src/pcre/pcre_exec.c
+  src/pcre/pcre_globals.c
+  src/pcre/pcre_internal.h
+  src/pcre/pcre_newline.c
+  src/pcre/pcre_tables.c
+  )
+
+target_compile_definitions(pcre
+  PRIVATE -DHAVE_CONFIG_H
+  )
+
 ########################
 # extempore executable #
 ########################
@@ -102,10 +127,15 @@ endif()
 # build-time dependencies #
 ###########################
 
+# tell Extempore about the (now in-tree) PCRE dependency
+
+add_dependencies(extempore pcre)
+target_include_directories(extempore PRIVATE src/pcre)
+target_link_libraries(extempore PRIVATE pcre)
+
 # Extempore's build-time dependencies are:
 #
 # - portaudio
-# - PCRE
 # - LLVM 3.4.2 (patched for Extempore)
 # - Boost (optional)
 
@@ -139,7 +169,7 @@ endif()
 
 find_package(LLVM 3.4 REQUIRED)
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
-target_link_libraries(extempore ${LLVM_LIBRARIES})
+target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
 if(WIN32)
   string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
@@ -156,24 +186,14 @@ if(WIN32)
 endif()
 find_package(Portaudio REQUIRED)
 target_include_directories(extempore PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
-target_link_libraries(extempore ${PORTAUDIO_LIBRARIES})
-
-# PCRE
-
-if(WIN32)
-  # give find_package a hint about where to find PCRE
-  set(PCRE_ROOT ${WIN64_PACKAGE_DIR})
-  target_compile_definitions(extempore PRIVATE -DPCRE_STATIC)
-endif()
-find_package(PCRE REQUIRED)
-target_include_directories(extempore PRIVATE ${PCRE_INCLUDE_DIRS})
-target_link_libraries(extempore ${PCRE_LIBRARIES})
+target_link_libraries(extempore PRIVATE ${PORTAUDIO_LIBRARIES})
 
 # Boost
 
 # *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
+  target_compile_definitions(extempore PRIVATE -DPCRE_STATIC)
 endif()
 
 if(BOOST)
@@ -194,13 +214,18 @@ if(APPLE)
   # use clang++ by default
   set(CMAKE_C_COMPILIER clang)
   set(CMAKE_CXX_COMPILIER clang++)
-  # tell the compiler that we're using ObjC++
-  target_compile_options(extempore PRIVATE -x objective-c++)
+  # tell the compiler about the few ObjC++ source files on OSX
+  set_source_files_properties(
+    src/Extempore.cpp
+    src/SchemeFFI.cpp
+    src/UNIV.cpp
+    PROPERTIES
+    COMPILE_FLAGS "-x objective-c++")
 
-  target_link_libraries(extempore pthread ncurses)
+  target_link_libraries(extempore PRIVATE pthread ncurses)
 
   # frameworks
-  target_link_libraries(extempore
+  target_link_libraries(extempore PRIVATE
     "-framework Cocoa"
     "-framework CoreAudio"
     "-framework AudioToolbox"
@@ -210,11 +235,11 @@ endif()
 # Linux
 if(UNIX AND NOT APPLE)
   set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
-  target_link_libraries(extempore --export-dynamic)
+  target_link_libraries(extempore PRIVATE --export-dynamic)
   find_package(X11 REQUIRED)
   target_include_directories(extempore PRIVATE ${X11_INCLUDE_DIR})
-  target_link_libraries(extempore ${X11_LIBRARIES})
-  target_link_libraries(extempore pthread ncurses)
+  target_link_libraries(extempore PRIVATE ${X11_LIBRARIES})
+  target_link_libraries(extempore PRIVATE pthread ncurses)
 endif()
 
 # on Windows, put the created extempore.exe straight into the source directory
