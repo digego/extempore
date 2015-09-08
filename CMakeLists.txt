@@ -136,7 +136,7 @@ target_link_libraries(extempore PRIVATE pcre)
 # Extempore's build-time dependencies are:
 #
 # - portaudio
-# - LLVM 3.4.2 (patched for Extempore)
+# - LLVM 3.7 (patched for Extempore)
 # - Boost (optional)
 
 # cmake will try and find these deps in the usual places.
@@ -167,7 +167,7 @@ else()
   message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")
 endif()
 
-find_package(LLVM 3.4 REQUIRED)
+find_package(LLVM 3.7 REQUIRED)
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
