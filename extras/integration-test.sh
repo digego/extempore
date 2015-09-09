@@ -22,26 +22,6 @@ mkdir $TEST_DIR && cd $TEST_DIR
 
 echo "Running tests in ${TEST_DIR}..."
 
-# without MCJIT
-
-cmake -DCMAKE_INSTALL_PREFIX=$TEST_DIR -DCMAKE_BUILD_TYPE=Release -DMCJIT=OFF $SRC_DIR && make clean && make && make install && $TEST_DIR/bin/extempore --port=${TEST_PORT} --sharedir $TEST_DIR/share/extempore --run tests/all.xtm
-
-if (($? != 0)); then
-    echo -e "\033[0;31mIntegration test failed (AOT:false, MCJIT:false) $f\033[0;00m"
-    echo
-    exit 1
-fi
-
-# aot-compile the stdlib, then run all the tests again
-
-make aot_stdlib && $TEST_DIR/bin/extempore --port=${TEST_PORT} --sharedir $TEST_DIR/share/extempore --run tests/all.xtm
-
-if (($? != 0)); then
-    echo -e "\033[0;31mIntegration test failed (AOT:true, MCJIT:false) $f\033[0;00m"
-    echo
-    exit 1
-fi
-
 # repeat the above steps, this time with MCJIT
 
 cmake -DCMAKE_INSTALL_PREFIX=$TEST_DIR -DCMAKE_BUILD_TYPE=Release -DMCJIT=ON $SRC_DIR && make clean && make && make install && $TEST_DIR/bin/extempore --port=${TEST_PORT} --sharedir $TEST_DIR/share/extempore --run tests/all.xtm
