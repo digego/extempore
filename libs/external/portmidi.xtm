@@ -34,6 +34,10 @@
                 (print ": unsupported platform ")
                 (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
+;;;;;;;;;;;;;;;;;;;;;;
+;; begin portmidi.h ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
 ;; #define FALSE 0
 ;; #define TRUE 1
 
@@ -644,6 +648,10 @@
 ;; */
 (bind-lib libportmidi Pm_WriteSysEx [PmError,PortMidiStream*,PmTimestamp,i8*]*)
 
+;;;;;;;;;;;;;;;;;;;;
+;; end portmidi.h ;;
+;;;;;;;;;;;;;;;;;;;;
+
 ;; the message flags
 
 (bind-val MIDI_NOTE_OFF i32          #x80 "args: key, velocity")
@@ -675,6 +683,58 @@
 (bind-val MIDI_OMNI_ON i32           #x7D)
 (bind-val MIDI_MONO_ON i32           #x7E)
 (bind-val MIDI_POLY_ON i32           #x7F)
+
+;; xtlang wrapper functions
+
+(bind-func pm_initialize
+  (lambda ()
+    (if (<> (Pm_Initialize) pmNoError)
+        (println "Error initialising Portmidi")
+        (println "Portmidi successfully initialised."))))
+
+(bind-func pm_print_devices
+  (lambda ()
+    (let ((ndev (Pm_CountDevices)))
+      (println "Portmidi: found" ndev "devices")
+      (doloop (i ndev)
+        (println "---- device" i " ----")
+        (println (Pm_GetDeviceInfo i))))))
+
+(bind-func pm_current_time_in_ms
+  "return current time in ms - required for the portmidi API
+
+@param time_info - ignored
+@return - current time (ms), retrieved through call to (now)"
+  (lambda (time_info:i8*)
+    (convert (* 1000.:f (/ (convert (now) float) 44100.:f)) i32)))
+
+(bind-func pm_create_input_stream
+  "create a midi *input* PmStream pointer for device
+
+Check the output of pm_print_devices to see the device id of your
+input device(s)
+
+@paran dev - device id of a midi input device"
+  (lambda (dev)
+    (let ((stream_ptr:PmStream** (salloc))
+          (res (Pm_OpenInput stream_ptr dev null 1 (convert (get_native_fptr pm_current_time_in_ms)) null)))
+      (if (<> res pmNoError)
+          (println "PortMIDI error opening input port:" (String (Pm_GetErrorText res))))
+      (pref stream_ptr 0))))
+
+(bind-func pm_create_output_stream
+  "create a midi *output* PmStream pointer for device
+
+Check the output of pm_print_devices to see the device id of your
+output device(s)
+
+@paran dev - device id of a midi output device"
+  (lambda (dev)
+    (let ((stream_ptr:PmStream** (salloc))
+          (res (Pm_OpenOutput stream_ptr dev null 1 (convert (get_native_fptr pm_current_time_in_ms)) null 0)))
+      (if (<> res pmNoError)
+          (println "PortMIDI error opening output port:" (String (Pm_GetErrorText res))))
+      (pref stream_ptr 0))))
 
 (impc:aot:insert-footer "xtmportmidi")
 (define *xtmlib-portmidi-loaded* #t)

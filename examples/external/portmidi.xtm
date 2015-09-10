@@ -12,50 +12,28 @@
 
 (sys:load "libs/external/portmidi.xtm")
 
-(call-as-xtlang
- (if (<> (Pm_Initialize) pmNoError)
-     (println "Error initialising Portmidi")
-     (println "Portmidi successfully initialised.")))
+(pm_initialize)
+(pm_print_devices)
 
-(call-as-xtlang
- (let ((ndev (Pm_CountDevices)))
-   (println "Portmidi: found" ndev "devices")
-   (doloop (i ndev)
-     (println "device" i (Pm_GetDeviceInfo i)))))
-
-(bind-val midi_in PmStream*)
-(bind-val midi_out PmStream*)
-
-(bind-func current_time_in_ms
-  (lambda (time_info:i8*)
-    (convert (* 1000.:f (/ (convert (now) float) 44100.:f)) i32)))
-
-(bind-func set_default_midi_io_vars
-  "initialise midi_in and midi_out devices
-
-This is just for testing. Have a look at the device IDs which you just
-printed to your log to figure out which IDs you should use."
-  (lambda (in_device_id out_device_id)
-    (let ((inptr:PmStream** (salloc))
-          (outptr:PmStream** (salloc)))
-      (if (<> (Pm_OpenInput inptr in_device_id null 1 (convert (get_native_fptr current_time_in_ms)) null)
-              pmNoError)
-          (println "Error opening input port"))
-      (if (<> (Pm_OpenOutput outptr out_device_id null 1 (convert (get_native_fptr current_time_in_ms)) null 0)
-              pmNoError)
-          (println "Error opening output port"))
-      (set! midi_in (pref inptr 0))
-      (set! midi_out (pref outptr 0)))))
-
-;; check what your input and output device IDs are!
-(set_default_midi_io_vars 0 1)
+;; we'll just create one input and one output device (midi_in and
+;; midi_out), but by passing the appropriate device index arguments to
+;; pm_create_input_stream and pm_create_output_stream you can create
+;; as many as you like
+(bind-val midi_in PmStream* (pm_create_input_stream (Pm_GetDefaultInputDeviceID)))
+(bind-val midi_out PmStream* (pm_create_output_stream (Pm_GetDefaultOutputDeviceID)))
 
 (bind-func midi_read_loop
+  "a callback loop to call Pm_Read on all the midi devices
+
+This will pick up any incoming MIDI messages - handle them however you
+like."
   (let ((buffer_length 1024)
         (input_buffer:PmEvent* (zalloc buffer_length))
         (read_count 0)
         (i:i32 0))
     (lambda (time:i64 delta_t:double)
+      ;; if you have more than one midi input device, you should call
+      ;; Pm_Read on all your devices here
       (set! read_count (Pm_Read midi_in input_buffer buffer_length))
       (if (> read_count 0)
           (dotimes (i read_count)
