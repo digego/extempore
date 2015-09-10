@@ -9,6 +9,7 @@ set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
 option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" OFF)
+option(ASSETS "download the Extempore assets (used in many of the examples)" OFF)
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
@@ -252,6 +253,12 @@ if(WIN32)
     LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR})
 endif()
 
+if(ASSETS)
+  file(DOWNLOAD http://extempore.moso.com.au/extras/assets.tgz assets.tgz)
+  execute_process(COMMAND ${CMAKE_COMMAND} -E tar xf assets.tgz)
+  execute_process(COMMAND ${CMAKE_COMMAND} -E remove assets.tgz)
+endif()
+
 ###########
 # install #
 ###########
@@ -280,18 +287,6 @@ add_custom_target(uninstall
   COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
   COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}
   COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore and ${EXT_SHARE_DIR}")
-
-##########
-# assets #
-##########
-
-add_custom_target(assets
-  WORKING_DIR ${EXT_SHARE_DIR}
-  COMMAND curl -O http://extempore.moso.com.au/extras/assets.tgz
-  COMMAND ${CMAKE_COMMAND} -E tar xf assets.tgz
-  COMMAND ${CMAKE_COMMAND} -E assets.tgz
-  COMMAND ${CMAKE_COMMAND} -E remove assets.tgz
-  COMMENT "Downloading assets from http://extempore.moso.com.au/extras/assets.tgz")
 
 ###################
 # AOT compilation #
