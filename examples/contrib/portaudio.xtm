@@ -19,70 +19,60 @@
    (println "---- device" i "----")
    (println (Pa_GetDeviceInfo i) "\n")))
 
-;; a callback function - generates white noise
-(bind-func noisemaker:PaStreamCallback
+;; we need a callback function - which just generates white noise at
+;; this stage
+(bind-func audio_callback:PaStreamCallback
   (lambda (input output frameCount timeInfo statusFlags userData)
     (doloop (i (* frameCount 2))
       (pset! (convert output float*) i (random 0.1)))
     ;; to ensure the callback continues to be called
     paContinue))
 
-;; the output stream
 (bind-val output_stream PaStream*)
 
-;; create stereo output stream (default device)
+;; create a stereo output stream (default device)
 
 (call-as-xtlang
- (let ((out_stream_ptr:PaStream** (salloc))
-       (res 0))
-   (set! res (Pa_OpenDefaultStream out_stream_ptr
-                                   0
-                                   2
-                                   paFloat32
-                                   44100.0
-                                   (convert paFramesPerBufferUnspecified)
-                                   (convert (get_native_fptr noisemaker))
-                                   null))
-   (if (<> res paNoError)
-       (println "Error opening stream:" (String (Pa_GetErrorText res)))
-       (begin
-         (set! output_stream (pref out_stream_ptr 0))
-         (set! res (Pa_StartStream output_stream))
-         (if (<> res paNoError)
-             (println "Error starting stream" (String (Pa_GetErrorText res)))
-             (println "Sucessfully started stream..."))))))
+ (set! output_stream (pa_create_default_stream
+                      0 2 (convert (get_native_fptr audio_callback)))))
+
+;; stop the stream
+(call-as-xtlang
+ (Pa_CloseStream output_stream))
+
+;; or, we can specify the stream parameters
+
+(call-as-xtlang
+ (set! output_stream
+       (pa_create_stream null ;; no input
+                         (pa_params_for_output_device (Pa_GetDefaultOutputDevice))
+                         (convert (get_native_fptr audio_callback)))))
+
+;; we can re-create the old "sample-by-sample" dsp callback easily -
+;; now in pure xtlang!
+
+(bind-func dsp:DSP
+  (lambda (in time chan dat)
+    (random 0.1)))
+
+(bind-func audio_callback:PaStreamCallback
+  (let ((time 0)
+        (nchan 2) ;; assume stereo
+        (idx 0))
+    (lambda (input output frameCount timeInfo statusFlags userData)
+      (doloop (i frameCount)
+        (doloop (j nchan)
+          (set! idx (+ (* i nchan) j))
+          ;; fill the output buffer with repeated values from our dsp
+          ;; closure (no input in this version, but that's easy to do)
+          (pset! (convert output float*)
+                 idx
+                 (dsp 0.0 time j null)))
+        (set! time (+ time 1)))
+      ;; to ensure the callback continues to be called
+      paContinue)))
 
 ;; shut it down
 (call-as-xtlang
  (Pa_CloseStream output_stream)
  (Pa_Terminate))
-
-;; specify device details
-
-(call-as-xtlang
- ;; use default output device
- (let ((out_device (Pa_GetDefaultOutputDevice))
-       (out_dev_info (Pa_GetDeviceInfo out_device))
-       (out_params (PaStreamParameters out_device
-                                       (tref out_dev_info 4) ;; maxOutputChannels
-                                       paFloat32 ;; sampleFormat
-                                       (tref out_dev_info 9) ;; defaultHighOutputLatency
-                                       null))
-       (out_stream_ptr:PaStream** (salloc))
-       (res 0))
-   (set! res (Pa_OpenStream out_stream_ptr
-                            out_params
-                            null
-                            44100.0
-                            (convert paFramesPerBufferUnspecified)
-                            paNoFlag
-                            (convert (get_native_fptr noisemaker))
-                            null))
-   (if (<> res paNoError)
-       (println "Error opening stream:" (String (Pa_GetErrorText res)))
-       (begin
-         (set! output_stream (pref out_stream_ptr 0))
-         (set! res (Pa_StartStream output_stream))
-         (if (<> res paNoError)
-             (println "Error starting stream" (String (Pa_GetErrorText res)))
-             (println "Sucessfully started stream..."))))))

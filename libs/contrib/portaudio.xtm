@@ -10,10 +10,12 @@
 ;; Portaudio as a build-time dependency for Extempore and dynamically
 ;; load it just like all the other C libraries.
 
-;; But this is just a first crack. Based on this Portaudio header file:
+;; But this is just a first crack. Suggestions/improvements welcome
 
-;; #ifndef PORTAUDIO_H
-;; #define PORTAUDIO_H
+;;;;;;;;;;;;;;;;;;;;;;;
+;; begin portaudio.h ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
 ;; /*
 ;;  * $Id: portaudio.h 1859 2012-09-01 00:10:13Z philburk $
 ;;  * PortAudio Portable Real-Time Audio Library
@@ -1439,6 +1441,106 @@
 ;;  musical timing.
 ;; */
 (bind-lib libportaudio Pa_Sleep [void,i32]*)
+
+;;;;;;;;;;;;;;;;;;;;;
+;; end portaudio.h ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; here are some xtlang wrappers
+
+(bind-func pa_create_default_stream
+  "create a stream with the default input/output devices
+
+@param in_chan - number of input channels
+@param out_chan - number of output channels
+@param cbfun - audio callback function (should be _native version of a callback)
+@return - a pointer to the newly-created PaStream, or null on failure"
+  (lambda (in_chan out_chan cbfun:PaStreamCallback)
+    (let ((stream_ptr:PaStream** (salloc))
+          (res paNoError))
+      (set! res (Pa_OpenDefaultStream stream_ptr
+                                      in_chan  ;; no channels in
+                                      out_chan ;; stereo out
+                                      paFloat32
+                                      44100.0 ;; assume 44.1kHz for now
+                                      (convert paFramesPerBufferUnspecified)
+                                      (convert cbfun)
+                                      null))
+      (if (<> res paNoError)
+          (begin (println "Error opening stream:" (String (Pa_GetErrorText res)))
+                 null)
+          (begin
+            (set! res (Pa_StartStream (pref stream_ptr 0)))
+            (if (<> res paNoError)
+                (println "Error starting stream" (String (Pa_GetErrorText res)))
+                (println "Sucessfully started stream..."))
+            (pref stream_ptr 0))))))
+
+(bind-func pa_params_for_input_device
+  "return a PaStreamParameters* type suitable for the device
+
+Channel counts, latencies and samplerates will be set according to the
+results of the 'input' fields of the result of Pa_GetDeviceinfo
+
+@param dev - device to base the stream parameters on
+@return - a appropriate PaStreamParameters pointer, or null on failure"
+  (lambda (dev:PaDeviceIndex)
+    (letz ((info (Pa_GetDeviceInfo dev)))
+      (if (null? info)
+          (begin (println "Error: input device" dev "doesn't exist")
+                 (convert null PaStreamParameters*))
+          (PaStreamParameters dev
+                              (tref info 3)
+                              paFloat32
+                              (tref info 5)
+                              null)))))
+
+(bind-func pa_params_for_output_device
+  "return a PaStreamParameters* type suitable for the device
+
+Channel counts, latencies and samplerates will be set according to the
+results of the 'output' fields of the result of Pa_GetDeviceinfo
+
+@param dev - device to base the stream parameters on
+@return - a appropriate PaStreamParameters pointer, or null on failure"
+  (lambda (dev:PaDeviceIndex)
+    (letz ((info (Pa_GetDeviceInfo dev)))
+      (if (null? info)
+          (begin (println "Error: output device" dev "doesn't exist")
+                 (convert null PaStreamParameters*))
+          (PaStreamParameters dev
+                              (tref info 4)
+                              paFloat32
+                              (tref info 6)
+                              null)))))
+
+(bind-func pa_create_stream
+  "create a stream with the specified input/output stream parameters
+
+@param in_params - PaStreamParameters for the input
+@param out_params - PaStreamParameters for the output
+@param cbfun - audio callback function (should be _native version of a callback)
+@return - a pointer to the newly-created PaStream, or null on failure"
+  (lambda (in_params out_params cbfun:PaStreamCallback)
+    (let ((stream_ptr:PaStream** (salloc))
+          (res paNoError))
+      (set! res (Pa_OpenStream stream_ptr
+                               in_params
+                               out_params
+                               44100.0 ;; assume 44.1kHz for now
+                               (convert paFramesPerBufferUnspecified)
+                               paNoFlag
+                               (convert cbfun)
+                               null))
+      (if (<> res paNoError)
+          (begin (println "Error opening stream:" (String (Pa_GetErrorText res)))
+                 null)
+          (begin
+            (set! res (Pa_StartStream (pref stream_ptr 0)))
+            (if (<> res paNoError)
+                (println "Error starting stream" (String (Pa_GetErrorText res)))
+                (println "Sucessfully started stream..."))
+            (pref stream_ptr 0))))))
 
 (impc:aot:insert-footer "xtmportaudio")
 (define *xtmlib-portaudio-loaded* #t)
