@@ -1,0 +1,95 @@
+;; PCG Random Number generator in Extempore - adapted from pcg_basic
+;; https://github.com/imneme/pcg-c-basic/
+
+;; Licence follows
+
+;; PCG Random Number Generation for C.
+
+;; Copyright 2014 Melissa O'Neill <oneill@pcg-random.org>
+;; Licensed under the Apache License, Version 2.0 (the "License");
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+;;     http://www.apache.org/licenses/LICENSE-2.0
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+;; For additional information about the PCG random number generation scheme,
+;; including its license and other licensing options, visit
+;;      http://www.pcg-random.org
+
+(bind-type PCG_RNG_State <i64,i64>
+  "type is <state,inc>")
+
+(bind-func PCG_RNG_State_print
+  (lambda (state:PCG_RNG_State*)
+    (printf "<PCG_RNG_State: %ld %ld>" (tref state 0) (tref state 1))
+    void))
+
+(bind-poly print PCG_RNG_State_print)
+
+;; default rng state
+(bind-val xt_pcg_rng_global_state PCG_RNG_State*
+  (PCG_RNG_State #x853c49e6748fea9b #xda3e39cb94b95bdb))
+
+(bind-func xt_pcg32_random_r:[i32,PCG_RNG_State*]*
+  "Generate a uniformaly distributed 32-bit random number
+
+@param state - the current rng state
+@return - 32 bit random number"
+  (lambda (state)
+    (let ((oldstate (tref state 0)))
+      (tset! state 0 (+ (* oldstate 6364136223846793005)
+                        (tref state 1)))
+      (let ((xorshifted (convert (>> (^ (>> oldstate 18) oldstate) 27) i32))
+            (rot (convert (>> oldstate 59) i32)))
+        (bor (>> xorshifted rot) 
+             (<< xorshifted (& (* -1 rot) 31)))))))
+
+(bind-func xt_pcg32_random:[i32]*
+  "Return i64 random number
+
+@return - 32 bit random number"
+  (lambda ()
+    (xt_pcg32_random_r xt_pcg_rng_global_state)))
+
+(bind-func xt_pcg32_srandom_r:[void,PCG_RNG_State*,i64,i64]*
+  "Seed the rng. Specified in two parts, state initializer and a 
+sequence selection constant (a.k.a. stream id). Additionally this private version
+takes the state variable.
+
+@param state - the current state of the rng
+@param init-state - the state initialisation
+@param state-sequence - the sequence selection constant (a.k.a. stream id)
+"
+  (lambda (state init-state state-sequence)
+    (tset! state 0 0) ;; reset state
+    (tset! state 1 (bor (<< state-sequence 1) 1))
+    (xt_pcg32_random_r state)
+    (tset! state 0 (+ (tref state 0) init-state))
+    (xt_pcg32_random_r state)
+    void
+    ))
+
+(bind-func xt_pcg32_srandom:[void,i64,i64]*
+  (lambda (a b)
+    (xt_pcg32_srandom_r xt_pcg_rng_global_state a b)
+    void))
+
+(bind-func pcg32_boundedrand_r:[i32,PCG_RNG_State*,i32]*
+  "Generate a uniformly distributed number, r, where 0 <= r < bound
+
+@param state - the current state of the rng
+@return - a bounded i32 number
+"
+  (lambda (state bound)
+    (let* ((threshold (% (- #x10000000 bound) bound))
+           (r (- threshold 1)))
+      (while (< r threshold)
+        (set! r (xt_pcg32_random_r state)))
+      (% r bound))))
+
+(bind-func pcg32_boundedrand:[i32,i32]*
+  (lambda (bound)
+    (pcg32_boundedrand_r xt_pcg_rng_global_state bound)))
