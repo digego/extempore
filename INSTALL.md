@@ -6,32 +6,21 @@
 git clone git@github.com:digego/extempore.git
 ```
 
-Currently we're on the `llvm-3.7` branch. This is because we're still
-trying to fix some Windows bugs. We'll merge things back as soon as
-we're able.
-
-```
-git checkout llvm-3.7
-```
-
 ## Get the build-time deps
 
 ### Deb/Ubuntu
 
 ```
-sudo apt-get install git g++ portaudio19-dev libpcre3-dev
+sudo apt-get install git g++ portaudio19-dev
 ```
 
 ### OSX
 
 ```
-brew install pcre portaudio
+brew install portaudio
 ```
 
 ### Windows
-
-The version of **PCRE** available through NuGet is pretty old (8.33 as of
-writing this) so it's probably worth building it from source.
 
 The NuGet version of **Portaudio** should be fine, but building it
 from source is fine too.
@@ -54,15 +43,22 @@ painful, but it's a one-time process.
 
 LLVM now uses CMake as well. Grab the
 [3.7.0 source tarball](http://llvm.org/releases/download.html#3.7.0),
-apply both patches (`llparser.patch` and `mcjit.patch` in `extras/`),
-and
+apply the `extempore-llvm-3.7.0.patch` in `extras/`
+
+```
+cd /path/to/llvm-3.7.0.src
+patch -p0 < /path/to/extempore/extras/extempore-llvm-3.7.0.patch
+```
+
+Then build LLVM, moving the libraries into
+`/path/to/extempore/llvm-build` as part of the `install` step
 
 ```
 mkdir cmake-build && cd cmake-build
 cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=/path/to/extempore/llvm-build ..
 ```
 
-On Windows, you'll probably want to specify a 64-bit generator e.g.
+On **Windows**, you'll probably want to specify a 64-bit generator e.g.
 `-G"Visual Studio 14 2015 Win64"`
 
 ## Generate build files with CMake
@@ -87,8 +83,6 @@ cmake -DIN_TREE=ON ..
 This will make the `make install` just install `extempore` into
 `/usr/local/bin`, and Extempore will keep using the Extempore source
 directory (i.e. the cloned repo) for it's `runtime/`, `libs/`, etc.
-
-### Windows
 
 On **Windows**, you'll need to give CMake a few more details
 
