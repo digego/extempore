@@ -51,11 +51,11 @@ patch -p0 < /path/to/extempore/extras/extempore-llvm-3.7.0.patch
 ```
 
 Then build LLVM, moving the libraries into
-`/path/to/extempore/llvm-build` as part of the `install` step
+`/path/to/extempore/llvm` as part of the `install` step
 
 ```
 mkdir cmake-build && cd cmake-build
-cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=/path/to/extempore/llvm-build ..
+cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=/path/to/extempore/llvm .. && make && make install
 ```
 
 On **Windows**, you'll probably want to specify a 64-bit generator e.g.
@@ -67,7 +67,7 @@ In your `extempore` directory,
 
 ```
 mkdir cmake-build && cd cmake-build
-cmake -DEXT_LLVM_DIR=/path/to/llvm-build-files ..
+cmake -DEXT_LLVM_DIR=/path/to/extempore/llvm ..
 ```
 
 If you've set the `EXT_LLVM_DIR` environment variable you don't have
@@ -88,7 +88,7 @@ On **Windows**, you'll need to give CMake a few more details
 
 ```
 md cmake-build && cd cmake-build
-cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\llvm-build-files
+cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm
 ```
 
 ## Build Extempore
