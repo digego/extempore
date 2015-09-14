@@ -48,7 +48,7 @@
 
 #ifdef _WIN32
 #include <SDKDDKVer.h>
-//void uSleep(int waitTime);
+#define WIN32_LEAN_AND_MEAN
 #endif
 
 #if _WIN32 || _WIN64
