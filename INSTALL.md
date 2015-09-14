@@ -88,7 +88,8 @@ On **Windows**, you'll need to give CMake a few more details
 
 ```
 md cmake-build && cd cmake-build
-cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm
+cmake -G"Visual Studio 14 2015 Win64"
+-DEXT_LLVM_DIR=c:\path\to\extempore\llvm ..
 ```
 
 ## Build Extempore
