@@ -168,7 +168,19 @@ else()
   message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")
 endif()
 
-find_package(LLVM 3.7 REQUIRED)
+if(MCJIT)
+  find_package(LLVM 3.7 EXACT)
+  if(NOT ${LLVM_FOUND})
+    message(FATAL_ERROR "Extempore requires LLVM 3.7 if you're using MCJIT")
+  endif()
+else()
+  # for the old JIT we need an older LLVM - the old JIT has been
+  # removed completely as of LLVM 3.6
+  find_package(LLVM 3.4.2 EXACT)
+  if(NOT ${LLVM_FOUND})
+    message(FATAL_ERROR "Extempore requires LLVM 3.4.2 if you're using the old JIT (i.e. not MCJIT)")
+  endif()
+endif()
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
