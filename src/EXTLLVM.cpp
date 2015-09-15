@@ -33,6 +33,31 @@
  *
  */
 
+///////////////////
+// LLVM includes //
+///////////////////
+
+// must be included before anything which pulls in <Windows.h>
+#include "llvm/AsmParser/Parser.h"
+#include "llvm/Config/llvm-config.h" // for LLVM_VERSION_STRING
+#include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/Interpreter.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/IR/CallingConv.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/LinkAllPasses.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Target/TargetOptions.h"
+
 #include "stdarg.h"
 #include "EXTLLVM.h"
 #include "UNIV.h"
@@ -75,39 +100,6 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-
-//#include "llvm/Analysis/DebugInfo.h"
-//#include "llvm/Analysis/Verifier.h"
-#include "llvm/Config/llvm-config.h" // for LLVM_VERSION_STRING
-#include "llvm/AsmParser/Parser.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/CallingConv.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/LegacyPassManager.h"
-
-#include "llvm/Support/TargetSelect.h"
-
-
-//#include "llvm/ModuleProvider.h"
-
-// #include "llvm/ExecutionEngine/Interpreter.h"
-// #include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/Target/TargetOptions.h"
-// #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SourceMgr.h"
-// #include "llvm/Analysis/Verifier.h"
-// #include "llvm/Target/TargetData.h"
-#include "llvm/LinkAllPasses.h"
-
-#include "llvm/ExecutionEngine/MCJIT.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
-#include "llvm/ExecutionEngine/Interpreter.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
 
 #include "SchemeProcess.h"
 

@@ -175,7 +175,10 @@ target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 if(WIN32)
   string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
   foreach(opt ${LLVM_COMPILE_OPTIONS})
-    target_compile_options(extempore PRIVATE ${opt})
+    # we need exceptions, so strip out this one
+    if(NOT ${opt} STREQUAL "/EHsc-")
+      target_compile_options(extempore PRIVATE ${opt})
+    endif()
   endforeach()
 endif()
 
@@ -199,7 +202,7 @@ endif()
 
 if(BOOST)
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
-  # target_compile_options(extempore PRIVATE -std=c++11)
+  # asio header
   find_path(BOOST_ASIO_INCLUDE_DIR
     NAMES boost/asio.hpp
     PATHS ${WIN64_PACKAGE_DIR}/include)
@@ -208,6 +211,11 @@ if(BOOST)
   else()
     message(FATAL_ERROR "Cannot find boost/asio.hpp header")
   endif()
+  # boost libraries - assumes boost 1.59
+  target_link_libraries(extempore
+    PRIVATE libboost_date_time-vc140-mt-1_59
+    PRIVATE libboost_regex-vc140-mt-1_59
+    PRIVATE libboost_system-vc140-mt-1_59)
 endif()
 
 # OSX
