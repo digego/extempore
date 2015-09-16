@@ -739,5 +739,39 @@
                          GL_DEPTH_BUFFER_BIT
                          GL_STENCIL_BUFFER_BIT))))
 
+;; Rect type
+
+;; <x,y,w,h>
+(bind-type Rect <float,float,float,float>)
+
+(bind-func Rect_print
+  "specialised print function for Rect*"
+  (lambda (rect:Rect*)
+    (if (null? rect)
+        (printf "<Rect 0x0>")
+        (printf "<Rect: x=%.3f y=%.3f w=%.3f h=%.3f>"
+                (convert (tref rect 0) double)
+                (convert (tref rect 1) double)
+                (convert (tref rect 2) double)
+                (convert (tref rect 3) double)))
+    void))
+
+(bind-poly print Rect_print)
+
+(bind-func Rect_toString
+  "specialised toString function for Rect*"
+  (lambda (rect:Rect*)
+    (let ((str:i8* (salloc 256)))
+      (if (null? rect)
+          (sprintf str "<Rect 0x0>")
+          (sprintf str "<Rect: x=%.3f y=%.3f w=%.3f h=%.3f>"
+                   (convert (tref rect 0) double)
+                   (convert (tref rect 1) double)
+                   (convert (tref rect 2) double)
+                   (convert (tref rect 3) double)))
+      (Str str))))
+
+(bind-poly toString Rect_toString)
+
 (impc:aot:insert-footer "xtmnanovg")
 (define *xtmlib-nanovg-loaded* #t)
