@@ -2363,10 +2363,6 @@ namespace extemp {
 	    }
 		    
 	}
-#ifdef EXT_MCJIT
-  // need to remove the mapping here, otherwise runFunction will bomb out under MCJIT
-  EXTLLVM::I()->EE->updateGlobalMapping(func,NULL);
-#endif
   GenericValue gv = EE->runFunction(func,fargs);
 
 	//std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
@@ -2588,6 +2584,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
     void* ptr = dlsym(library, symname);
 #endif
     if(ptr) {
+      EE->updateGlobalMapping(symname, (uint64_t)ptr);
       return _sc->T;
     }else{
       // printf("Could not find symbol named %s\n",symname);
