@@ -1,6 +1,10 @@
 project(Extempore)
 
-cmake_minimum_required(VERSION 3.1)
+if(WIN32)
+  cmake_minimum_required(VERSION 3.1)
+else()
+  cmake_minimum_required(VERSION 3.0)
+endif()
 
 set(EXTMPORE_VERSION_MAJOR "0")
 set(EXTMPORE_VERSION_MINOR "60")
@@ -55,22 +59,21 @@ if(WIN32)
   link_directories(${WIN64_PACKAGE_DIR}/lib)
 endif()
 
-add_executable(extempore src/Extempore.cpp)
-target_sources(extempore
-  PRIVATE src/AudioDevice.cpp
-  PRIVATE src/EXTCondition.cpp
-  PRIVATE src/EXTLLVM.cpp
-  PRIVATE src/EXTMonitor.cpp
-  PRIVATE src/EXTMutex.cpp
-  PRIVATE src/EXTThread.cpp
-  PRIVATE src/Extempore.cpp
-  PRIVATE src/OSC.cpp
-  PRIVATE src/Scheme.cpp
-  PRIVATE src/SchemeFFI.cpp
-  PRIVATE src/SchemeProcess.cpp
-  PRIVATE src/SchemeREPL.cpp
-  PRIVATE src/TaskScheduler.cpp
-  PRIVATE src/UNIV.cpp
+add_executable(extempore src/Extempore.cpp
+  src/AudioDevice.cpp
+  src/EXTCondition.cpp
+  src/EXTLLVM.cpp
+  src/EXTMonitor.cpp
+  src/EXTMutex.cpp
+  src/EXTThread.cpp
+  src/Extempore.cpp
+  src/OSC.cpp
+  src/Scheme.cpp
+  src/SchemeFFI.cpp
+  src/SchemeProcess.cpp
+  src/SchemeREPL.cpp
+  src/TaskScheduler.cpp
+  src/UNIV.cpp
   )
 
 if(WIN32)
