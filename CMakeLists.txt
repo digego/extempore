@@ -1,14 +1,11 @@
-project(Extempore)
-
 if(WIN32)
+  # on Windows we use target_sources()
   cmake_minimum_required(VERSION 3.1)
 else()
   cmake_minimum_required(VERSION 3.0)
 endif()
 
-set(EXTMPORE_VERSION_MAJOR "0")
-set(EXTMPORE_VERSION_MINOR "60")
-set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
+project(Extempore VERSION 0.60)
 
 option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
