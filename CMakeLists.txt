@@ -186,12 +186,6 @@ target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
 if(WIN32)
   string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
-  foreach(opt ${LLVM_COMPILE_OPTIONS})
-    # we need exceptions, so strip out this one
-    if(NOT ${opt} STREQUAL "/EHsc-")
-      target_compile_options(extempore PRIVATE ${opt})
-    endif()
-  endforeach()
 endif()
 
 # portaudio
