@@ -1,6 +1,6 @@
 project(Extempore)
 
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.1)
 
 set(EXTMPORE_VERSION_MAJOR "0")
 set(EXTMPORE_VERSION_MINOR "60")
