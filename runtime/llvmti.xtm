@@ -1836,7 +1836,7 @@
                  (error "")))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
-             (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
+             (bc-path (string-append tmp-dir module-name ".bc"))
              (asm-path (string-append tmp-dir module-name (unix-or-Windows ".s" ".obj")))
              (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/")))
              (output-shlib-path (string-append output-dir module-name
@@ -1876,17 +1876,14 @@
                                                       " -dynamiclib -undefined dynamic_lookup ")))
                                 asm-path
                                 " -o " output-shlib-path)
-                               (string-append "link "
+                               (string-append "link"
                                               ;; " /FORCE:UNRESOLVED "
-                                              " /MACHINE:x64 /DLL /OUT:"
-                                              output-shlib-path
-                                              " " (string-join link-libs " ") " "
-                                              ;; " opengl32.lib "
-                                              ;; " Glu32.lib "
-                                              " "
+                                              " /MACHINE:x64 /DLL"
+                                              " /OUT:" output-shlib-path
+                                              " " (string-join link-libs " ")
                                               ;; (string-append tmp-dir module-name ".lib ")
-                                              "extempore.lib "
-                                              "msvcrt.lib "
+                                              " extempore.lib"
+                                              " msvcrt.lib "
                                               asm-path))))
         (print "Looking for llc in " llvm-path "...\n\n")
         (begin
