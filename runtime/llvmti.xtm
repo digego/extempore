@@ -1910,11 +1910,12 @@
                                                      ((string=? platform "OSX") ".dylib")
                                                      ((string=? platform "Windows") ".dll"))))
              (link-libs (if (string=? platform "Windows")
-                            (cl:remove-if (lambda (s)
-                                            (or (not (regex:match? s "\\.lib$"))
-                                                (regex:match? s (string-append module-name ".lib$"))))
-                                          (append (sys:directory-list output-dir)
-                                                  (sys:directory-list (string-append (sys:share-dir) "\\libs\\win64\\lib"))))
+                            (cl:remove-if-not
+                             (lambda (s)
+                               (and (regex:match? s "\\.lib$")
+                                    (not (regex:match? s (string-append module-name "\\.lib$")))))
+                             (append (sys:directory-list output-dir)
+                                     (sys:directory-list (string-append (sys:share-dir) "\\libs\\win64\\lib"))))
                             '()))
              (optimize-compiles? #t)
              (llc-command
