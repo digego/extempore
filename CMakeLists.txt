@@ -330,14 +330,17 @@ elseif(UNIX AND NOT APPLE) # Linux
   target_link_libraries(extempore PRIVATE pthread)
 endif()
 
-# on Windows, put the created extempore.exe straight into the source directory
+# on Windows, put the created extempore.exe straight into the source
+# directory, and the .lib file into libs/win64/lib
 if(WIN32)
   set_target_properties(extempore
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
     LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
-    LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR})
+    LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
+    ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/libs/win64/lib
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/win64/lib)
 endif()
 
 if(ASSETS)
