@@ -1402,9 +1402,11 @@
                                                        ;; (println x '=? y)
                                                        (cond ((string=? x "_") 0)
                                                              ((char=? (string-ref x 0) (integer->char 91))
-                                                              (impc:ir:genericfunc-match-closure-types x y))
+                                                              (if (string=? y "_") 0
+                                                                  (impc:ir:genericfunc-match-closure-types x y)))
                                                              ((char=? (string-ref x 0) (integer->char 60))
-                                                              (impc:ir:genericfunc-match-tuple-types x y))
+                                                              (if (string=? y "_") 0
+                                                                  (impc:ir:genericfunc-match-tuple-types x y)))
                                                              ((string=? x y) 1)
                                                              ;; ((string=? y "_") 0)
                                                              (else -1)))
@@ -3506,7 +3508,7 @@
     ;; (println 'reify-generic-type: vs) ;; (symbol? vs))
     ;; (println 'vars: vars)
     ;; (println 'all-vs: all-vs)
-    ; (println 'gtype: vs 'vars: vars 'allvs: all-vs)
+    ;; (println 'gtype: vs 'vars: vars 'allvs: all-vs)
     (if (and (symbol? vs)
              (regex:match? (symbol->string vs) "##")
              (not (regex:match? (symbol->string vs) "^!")))
@@ -3550,7 +3552,7 @@
                                      (if (and (not (regex:match? x "^(<|\\[)"))
                                               (regex:match? x ":"))
                                          (let ((p (regex:type-split x ":")))
-                                           (or (regex:match? x gpolyname)
+                                           (or (string=? (car p) gpolyname)
                                                (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
                                          (if (regex:match? x "^!")
                                              #f

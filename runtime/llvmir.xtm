@@ -715,7 +715,6 @@
 
 (define impc:ir:get-pretty-tuple-arg-strings
   (lambda (string-type . args)
-    ;; (println 'gptas string-type args)
     (if (not (char=? (string-ref string-type 0) #\<))
         (impc:compiler:print-bad-type-error string-type "tuple type should start with '<'")
         (let* ((s1 (regex:replace string-type "\\<(.*)\\>?.*" "$1"))
@@ -936,27 +935,6 @@
                                                                      (cddr p))))))
                                    (make-string ptr-depth #\*))))))
             ((regex:match? base "^[A-Za-z0-9_]*\\{")
-             ;; (println "bingo squigle" base)
-             
-             ;; there are two cases for Type{...}
-             ;;
-             ;; first case is for a reified type (i.e. Type{i64} )
-             ;; this case is (should be!) straight-forward
-             ;; we just return {...} as in %Type_poly_(cname-encode "<i64>")
-             ;;
-             ;; the second case is generic (i.e. Type{!a} )
-             ;; in the second case we should recurse with the expanded generic type
-             ;; in other words for a list in List{!b} we should call
-             ;; (impc:ir:get-type-from-pretty-str "List:<!b,List*>")
-             
-             ;; (let* ((p (regex:squig-split base "{"))
-             ;;        ;; (llll (println (impc:ti:get-generictype-candidate-types (car p))))
-             ;;        (res (apply string-append "%" (car p) "_poly_"
-             ;;                    (cname-encode
-             ;;                     (string-append "<" (substring (cadr p) 0 (- (string-length (cadr p)) 1)) ">"))
-             ;;                    (make-list ptr-depth "*"))))
-             ;;   res))
-                    ;; (llll (println (impc:ti:get-generictype-candidate-types (car p))))             
              (let* ((p (impc:ti:split-namedtype base)) ;; (regex:type-split base "{"))
                     (argstr (cadr p)) ;;(string-append "<" (substring (cadr p) 0 (- (string-length (cadr p)) 1)) ">"))
                     (res ""))
@@ -966,30 +944,8 @@
                                     (cname-encode argstr)
                                     ; (string-append "<" argstr ">"))
                                     (make-list ptr-depth "*")))
-                   (let* ((ags (impc:ir:get-pretty-tuple-arg-strings argstr))
-                          (gtype (symbol->string (impc:ti:get-generictype-candidate-types (car p))))
-                          (plst (impc:ir:get-pretty-tuple-arg-strings gtype))
-                          (gags (cl:remove-duplicates
-                                 (cl:remove-if (lambda (x)
-                                                 ;;(println 'x: x)
-                                                 (and (not (regex:match? x "^!"))            ;; typevar
-                                                      (not (and (regex:match? x "^[A-Za-z]") ;; or generic type
-                                                                (impc:ti:generictype-exists?
-                                                                 (car (regex:type-split x ":")))))
-                                                      (not (and (regex:match? x "^\\[")
-                                                                (regex:match? x "!")))))
-                                               plst))))
-                     ;; (println 'ags ags 'plst plst 'gt gtype 'gags gags)                     
-                     (if (<> (length ags) (length gags))
-                         (impc:compiler:print-bad-type-error string-type (string-append " Bad generic type for " (car p))))
-                     (let* ((newplst (replace-all plst (map (lambda (x y) (cons x y)) gags ags)))
-                            (newgtype (apply string-append (car p) ":<" (string-join newplst ",") ">"
-                                             (make-list ptr-depth "*")))
-                            (newt (impc:ir:get-type-from-pretty-str newgtype)))
-                       ;; (println 'newgt newgtype 'newt newt)
-                       ;(set! res (list newt)))))
-                       (set! res newt))))
-               ;; (println 'res: res)
+                   (let ((max (impc:ti:maximize-generic-type base)))
+                     (set! res (impc:ir:get-type-from-pretty-str max))))
                res))
             ((and (char=? (string-ref base 0) #\%)
                   (impc:ti:namedtype-exists? base))
