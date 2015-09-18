@@ -24,7 +24,7 @@ echo "Running tests in ${TEST_DIR}..."
 
 # repeat the above steps, this time with MCJIT
 
-cmake -DCMAKE_INSTALL_PREFIX=$TEST_DIR -DCMAKE_BUILD_TYPE=Release -DMCJIT=ON $SRC_DIR && make clean && make && make install && $TEST_DIR/bin/extempore --port=${TEST_PORT} --sharedir $TEST_DIR/share/extempore --run tests/all.xtm
+cmake -DCMAKE_INSTALL_PREFIX=$TEST_DIR -DCMAKE_BUILD_TYPE=Release -DIN_TREE=OFF $SRC_DIR && make clean && make install && $TEST_DIR/bin/extempore --port=${TEST_PORT} --sharedir $TEST_DIR/share/extempore --run tests/all.xtm
 
 if (($? != 0)); then
     echo -e "\033[0;31mIntegration test failed (AOT:false, MCJIT:true) $f\033[0;00m"
