@@ -203,7 +203,9 @@ target_link_libraries(extempore PRIVATE ${PORTAUDIO_LIBRARIES})
 # *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
-  target_compile_definitions(extempore PRIVATE -DPCRE_STATIC)
+  target_compile_definitions(extempore
+    PRIVATE -DPCRE_STATIC
+    PRIVATE -D_CRT_SECURE_NO_WARNINGS)
 endif()
 
 if(BOOST)
