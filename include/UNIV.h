@@ -120,6 +120,7 @@ namespace extemp {
     static uint64_t DEVICE_TIME;
     static double AUDIO_CLOCK_BASE;
     static double AUDIO_CLOCK_NOW;
+    static uint64_t TIME_DIVISION;
     static uint32_t HOUR;
     static uint32_t MINUTE;
     static uint32_t SECOND;

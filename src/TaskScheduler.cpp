@@ -34,64 +34,144 @@
  */
 
 #include "TaskScheduler.h"
+#include "AudioDevice.h"
+#include <math.h>
 
 namespace extemp {
 	
-    TaskScheduler TaskScheduler::SINGLETON;
+  TaskScheduler TaskScheduler::SINGLETON;
 	
-    TaskScheduler::TaskScheduler()
-    {
-	queueThread = new EXTThread();
-	guard = new EXTMonitor("task_scheduler_guard");		
-	queueThread->create(TaskScheduler::queue_thread_callback, this);
-	guard->init();
-	//std::cout << "QUEUE THREAD " << queueThread->getPthread() << std::endl;
-    }
-		
-    void TaskScheduler::timeSlice() //(const long timestamp, const int frames)
-    {
-	//lock the queue for this thread only
-	queue.lock();
+  TaskScheduler::TaskScheduler()
+  {
+    queueThread = new EXTThread();
+    guard = new EXTMonitor("task_scheduler_guard");		
+    guard->init();
+    //std::cout << "QUEUE THREAD " << queueThread->getPthread() << std::endl;
+  }
 
-	// if(clearFlag) {
-	// 	queue.clear();
-	// 	clearFlag = false;
-	// }
-	TaskI* t = queue.peek();
+  // void TaskScheduler::timeSlice() 
+  // {
+  //   //lock the queue for this thread only
+  //   queue.lock();
 
-	// this is a task we need to do something with
-	while(t != NULL && (t->getStartTime() < (UNIV::TIME + UNIV::FRAMES))) {
-	    t = queue.get();
-	    try{
-		   if(t->getTag() == 0) t->execute();
-	    }catch(std::exception& e){ //...){
-		   std::cout << "Error executing scheduled task! " << e.what() << std::endl;
-	    }
-	    delete t;
-	    t = queue.peek();
-	}
+  //   // if(clearFlag) {
+  //   // 	queue.clear();
+  //   // 	clearFlag = false;
+  //   // }
+  //   TaskI* t = queue.peek();
 
-	//unlock queue for this thread
-	queue.unlock();
-    }	
+  //   // this is a task we need to do something with
+  //   while(t != NULL && (t->getStartTime() < (UNIV::TIME + UNIV::FRAMES))) {
+	//     t = queue.get();
+	//     try{
+  //       if(t->getTag() == 0) t->execute();
+	//     }catch(std::exception& e){ //...){
+  //       std::cout << "Error executing scheduled task! " << e.what() << std::endl;
+	//     }
+	//     delete t;
+	//     t = queue.peek();
+  //   }
 
-    //realtime thread for handling all scheduled tasks
-    void* TaskScheduler::queue_thread_callback(void* obj_p)
-    {
-	TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);					
-	EXTMonitor* guard = sched->getGuard();
-	while(true) {
-#ifdef EXT_BOOST
-	     sched->timeSlice();		
-	     guard->wait();
+  //   //unlock queue for this thread
+  //   queue.unlock();
+  // }
+  
+  static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
+  static double LAST_REALTIME_STAMP = 0.0;
+
+  void TaskScheduler::timeSlice() 
+  {
+    uint32_t frames = UNIV::FRAMES / UNIV::TIME_DIVISION;
+    uint64_t nanosecs = ((double)frames / (double)UNIV::SAMPLERATE) * 1000000000.0;
+    uint32_t division_num = 0;
+
+#ifdef TARGET_OS_WINDOWS
+    // not on windows yet!
 #else
-	     guard->lock();			
-	     sched->timeSlice();		
-	     guard->wait();
-	     guard->unlock();
+    struct timespec a, b;
+    b.tv_sec = 0;
+    b.tv_nsec = 0;
 #endif
-	}
-	return obj_p;
+
+    if(UNIV::AUDIO_NONE > 0) { // i.e. if no audio device
+      AudioDevice::CLOCKBASE = getRealTime();
+      UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
     }
 
+    LAST_REALTIME_STAMP=getRealTime();
+    do{
+      queue.lock();
+      TaskI* t = queue.peek();      
+      // this is a task we need to do something with
+      while(t != NULL && (t->getStartTime() < (UNIV::TIME + frames))) {
+        t = queue.get();
+        try{
+          if(t->getTag() == 0) t->execute();
+        }catch(std::exception& e){ //...){
+          std::cout << "Error executing scheduled task! " << e.what() << std::endl;
+        }
+        delete t;
+        t = queue.peek();
+      }
+      queue.unlock();
+      // increment time and run nanosleep if running separate to audiodevice (i.e. TIME_DIVISION > 1)
+      if (UNIV::TIME_DIVISION > 1) {
+        if(UNIV::AUDIO_NONE > 0) {
+          AudioDevice::REALTIME = getRealTime();
+          UNIV::AUDIO_CLOCK_NOW = AudioDevice::REALTIME;
+        }else if(UNIV::DEVICE_TIME == 0) {
+          AUDIO_DEVICE_START_OFFSET = UNIV::TIME;
+        }        
+        //std::cout << "TIME: " << UNIV::TIME << " diff: " << ((double)UNIV::TIME - ((double)UNIV::DEVICE_TIME+(double)AUDIO_DEVICE_START_OFFSET)) << " frames: " << frames << std::endl;
+        UNIV::TIME += frames;        
+#ifdef TARGET_OS_WINDOWS
+        // not on windows yet!
+#else
+        // if last error (b.tv_nsec) is small then keep sleeping
+        double realtime_stamp = getRealTime();
+        double timediff = realtime_stamp - (LAST_REALTIME_STAMP + ((double) frames / (double)UNIV::SAMPLERATE));
+        LAST_REALTIME_STAMP = realtime_stamp;                  
+        a.tv_sec = 0;
+        a.tv_nsec = nanosecs - b.tv_nsec; // subtract error from last nanosleep
+        // subtract any timediff error!
+        // then multiply by 0.5 to split the difference (i.e only move halfway towards the error).
+        a.tv_nsec -= ((uint64_t) (0.5*timediff*1000000000.0));
+        // if we are running an audio device move slowly towards the device time.
+        if(UNIV::AUDIO_NONE < 1) {
+          a.tv_nsec += (uint64_t)(((double)UNIV::TIME - ((double)UNIV::DEVICE_TIME+AUDIO_DEVICE_START_OFFSET)) / (double)UNIV::SAMPLERATE * 1000000000.0 * 0.5);
+        }
+        nanosleep(&a,&b);
+      }
+#endif
+    }while(UNIV::TIME_DIVISION > 1);
+    // return will never be called if UNIV::TIME_DIVISION > 1
+    return;
+  }
+
+  //realtime thread for handling all scheduled tasks
+  void* TaskScheduler::queue_thread_callback(void* obj_p)
+  {
+    // if TIME_DIVISION == 1 then lock to audiodevice.
+    if(UNIV::TIME_DIVISION == 1) {      
+      TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);					
+      EXTMonitor* guard = sched->getGuard();
+      while(true) {
+#ifdef EXT_BOOST
+        sched->timeSlice();		
+        guard->wait();
+#else
+        sched->timeSlice();
+        guard->lock();
+        guard->wait();
+        guard->unlock();
+#endif
+      }
+      return obj_p;
+    }else{ // otherwise if TIME_DIVISION > 1 then timeSlice never returns!
+      TaskScheduler* sched = static_cast<TaskScheduler*>(obj_p);					      
+      sched->timeSlice();
+      // should never return from timeSlice
+      return NULL;
+    }
+  }
 } // End Namespace

@@ -88,7 +88,7 @@ void sig_handler(int signo)
 
 enum { OPT_SHAREDIR, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
-       OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_DEVICE, OPT_IN_DEVICE,
+       OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
        OPT_HELP
      };
@@ -107,6 +107,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_PORT,        "--port",          SO_REQ_SEP    },
     { OPT_TERM,        "--term",          SO_REQ_SEP    },
     { OPT_NO_AUDIO,    "--noaudio",       SO_NONE       },
+    { OPT_TIME_DIV,    "--timediv",       SO_REQ_SEP    },    
     { OPT_DEVICE,      "--device",        SO_REQ_SEP    },
     { OPT_IN_DEVICE,   "--indevice",      SO_REQ_SEP    },
     { OPT_PRT_DEVICES, "--print-devices", SO_NONE       },
@@ -193,6 +194,9 @@ int main(int argc, char** argv)
 	case OPT_NO_AUDIO:
     extemp::UNIV::AUDIO_NONE = 1;
     break;
+	case OPT_TIME_DIV:
+	  extemp::UNIV::TIME_DIVISION = atoi(args.OptionArg());
+    break;
 	case OPT_DEVICE:
 	  extemp::UNIV::AUDIO_DEVICE = atoi(args.OptionArg());
           break;
@@ -234,7 +238,8 @@ int main(int argc, char** argv)
 	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
 	  std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
 	  std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
-	  std::cout << "          --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
+	  std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
+    std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the defaul)" << std::endl;
 	  std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
 	  std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
     std::cout << "            --arch: the target architecture [current host]" << std::endl;
@@ -271,6 +276,7 @@ int main(int argc, char** argv)
 	};
 #endif
 
+    extemp::TaskScheduler::I()->start();
     extemp::EXTLLVM::I()->initLLVM();
     extemp::SchemeProcess* primary = 0;
 
@@ -282,7 +288,6 @@ int main(int argc, char** argv)
     // never exits - do that below
     [NSApplication sharedApplication];
 #endif
-
     if(extemp::UNIV::AUDIO_NONE != 1)
       {
         extemp::AudioDevice* dev = extemp::AudioDevice::I();
@@ -294,7 +299,10 @@ int main(int argc, char** argv)
         printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
         exit(1);
 #else
-        extemp::AudioDevice::startNoAudioThread();
+        // don't need this anymore!
+        // but we do need timediv to be > 1
+        if (extemp::UNIV::TIME_DIVISION == 1) extemp::UNIV::TIME_DIVISION = 4;
+        //extemp::AudioDevice::startNoAudioThread();
 #endif
       }
     ascii_text_color(0,7,10);	        

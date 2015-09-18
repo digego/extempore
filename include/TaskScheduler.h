@@ -56,6 +56,8 @@ namespace extemp {
 	
 	// add task to task queue
 	void add(TaskI* t) { queue.add(t); }
+
+  void start() { queueThread->create(TaskScheduler::queue_thread_callback, this); }
 	
 	// static addTask	
 	template<typename T>

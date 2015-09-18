@@ -566,7 +566,8 @@ namespace extemp {
   uint64_t UNIV::TIME = 0l;
   uint64_t UNIV::DEVICE_TIME = 0l;
   double UNIV::AUDIO_CLOCK_NOW = 0.0;
-  double UNIV::AUDIO_CLOCK_BASE = 0.0;    
+  double UNIV::AUDIO_CLOCK_BASE = 0.0;
+  uint64_t UNIV::TIME_DIVISION = 1;
   uint32_t UNIV::AUDIO_NONE = 0; // 0 for real device, 1 for dummy device
   uint32_t UNIV::AUDIO_DEVICE = -1;
   uint32_t UNIV::AUDIO_IN_DEVICE = -1;

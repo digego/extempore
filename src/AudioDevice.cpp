@@ -331,7 +331,7 @@ namespace extemp {
 
     TaskScheduler* sched = static_cast<TaskScheduler*>(userData);
     UNIV::DEVICE_TIME = UNIV::DEVICE_TIME + UNIV::FRAMES;
-    UNIV::TIME = UNIV::DEVICE_TIME;
+    if(UNIV::TIME_DIVISION == 1) UNIV::TIME = UNIV::DEVICE_TIME;
 
     if(AudioDevice::CLOCKBASE < 1.0) {
       AudioDevice::CLOCKBASE = getRealTime();
@@ -341,7 +341,6 @@ namespace extemp {
     UNIV::AUDIO_CLOCK_NOW = AudioDevice::REALTIME;
     
     device_time = UNIV::DEVICE_TIME;
-    if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl;
 
     int channels = 2;
     uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
@@ -848,13 +847,12 @@ namespace extemp {
       current_thread_time = getRealTime() - thread_start_time;
       // set DEVICE_TIME to "time mod UNIV::FRAMES"
       UNIV::DEVICE_TIME = (uint64_t)(current_thread_time/sec_per_frame)*UNIV::FRAMES;
-      UNIV::TIME = UNIV::DEVICE_TIME;
+      if(UNIV::TIME_DIVISION == 1) UNIV::TIME = UNIV::DEVICE_TIME;
 
       if(AudioDevice::CLOCKBASE < 1.0) AudioDevice::CLOCKBASE = getRealTime();
       AudioDevice::REALTIME = getRealTime();
 
       device_time = UNIV::DEVICE_TIME;
-      if(UNIV::DEVICE_TIME != device_time) std::cout << "Timeing Sychronization problem!!!  UNIV::TIME[" << UNIV::TIME << "] DEVICE_TIME[ " << device_time << "]" << std::endl;
 
       // sleep until the next time mod UNIV::FRAMES
       double dur = sec_per_frame - fmod(current_thread_time, sec_per_frame);
