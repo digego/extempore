@@ -226,8 +226,7 @@ if(BOOST)
     PRIVATE libboost_system-vc140-mt-1_59)
 endif()
 
-# OSX
-if(APPLE)
+if(APPLE) # OSX
   # use clang++ by default
   set(CMAKE_C_COMPILIER clang)
   set(CMAKE_CXX_COMPILIER clang++)
@@ -239,7 +238,7 @@ if(APPLE)
     PROPERTIES
     COMPILE_FLAGS "-x objective-c++")
 
-  target_link_libraries(extempore PRIVATE pthread ncurses)
+  target_link_libraries(extempore PRIVATE pthread)
 
   # frameworks
   target_link_libraries(extempore PRIVATE
@@ -247,16 +246,11 @@ if(APPLE)
     "-framework CoreAudio"
     "-framework AudioToolbox"
     "-framework AudioUnit")
-endif()
 
-# Linux
-if(UNIX AND NOT APPLE)
+elseif(UNIX AND NOT APPLE) # Linux
   set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
-  target_link_libraries(extempore PRIVATE --export-dynamic)
-  find_package(X11 REQUIRED)
-  target_include_directories(extempore PRIVATE ${X11_INCLUDE_DIR})
-  target_link_libraries(extempore PRIVATE ${X11_LIBRARIES})
-  target_link_libraries(extempore PRIVATE pthread ncurses)
+  # target_link_libraries(extempore PRIVATE --export-dynamic)
+  target_link_libraries(extempore PRIVATE pthread)
 endif()
 
 # on Windows, put the created extempore.exe straight into the source directory
