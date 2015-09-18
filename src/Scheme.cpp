@@ -85,6 +85,7 @@
 #include <limits.h>
 #include <float.h>
 #include <ctype.h>
+#include <stddef.h>
 
 #include "UNIV.h"
 #include "SchemeProcess.h"
