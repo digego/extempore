@@ -88,8 +88,7 @@ On **Windows**, you'll need to give CMake a few more details
 
 ```
 md cmake-build && cd cmake-build
-cmake -G"Visual Studio 14 2015 Win64"
--DEXT_LLVM_DIR=c:\path\to\extempore\llvm ..
+cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm ..
 ```
 
 ## Build Extempore
@@ -110,3 +109,36 @@ targets:
 
 CMake will generate a Visual Studio solution (`.sln`) in
 `cmake-build`.  Open it, and build the `extempore` target.
+
+## Standard library
+
+## Linux/OSX
+
+It's pretty straightforward. You should be able to get most things
+through your package manager.
+
+### Windows
+
+Just some notes.  Mostly for my (Ben's) benefit.
+
+#### libsndfile
+
+Just grab the Windows 64-bit installer from
+(http://www.mega-nerd.com/libsndfile/), and copy `libsndfile-1.dll`
+and `libsndfile-1.lib` into `extempore/libs/Win64/lib`
+
+#### GLFW
+
+```
+cmake -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF ..
+```
+
+#### nanovg
+
+remove `"FONS_USE_FREETYPE"` from `premake4.lua`
+
+```
+premake4.exe --platform=x64 vs2012
+```
+
+then upgrade the `.sln` by opening it in VS2015
