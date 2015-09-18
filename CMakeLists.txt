@@ -1,14 +1,15 @@
-project(Extempore)
+if(WIN32)
+  # on Windows we use target_sources()
+  cmake_minimum_required(VERSION 3.1)
+else()
+  cmake_minimum_required(VERSION 3.0)
+endif()
 
-cmake_minimum_required(VERSION 3.0)
-
-set(EXTMPORE_VERSION_MAJOR "0")
-set(EXTMPORE_VERSION_MINOR "60")
-set(EXTEMPORE_VERSION "${EXTEMPORE_VERSION_MAJOR}.${EXTEMPORE_VERSION_MINOR}")
+project(Extempore VERSION 0.60)
 
 option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
-option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" OFF)
+option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASSETS "download the Extempore assets (used in many of the examples)" OFF)
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
@@ -55,22 +56,21 @@ if(WIN32)
   link_directories(${WIN64_PACKAGE_DIR}/lib)
 endif()
 
-add_executable(extempore src/Extempore.cpp)
-target_sources(extempore
-  PRIVATE src/AudioDevice.cpp
-  PRIVATE src/EXTCondition.cpp
-  PRIVATE src/EXTLLVM.cpp
-  PRIVATE src/EXTMonitor.cpp
-  PRIVATE src/EXTMutex.cpp
-  PRIVATE src/EXTThread.cpp
-  PRIVATE src/Extempore.cpp
-  PRIVATE src/OSC.cpp
-  PRIVATE src/Scheme.cpp
-  PRIVATE src/SchemeFFI.cpp
-  PRIVATE src/SchemeProcess.cpp
-  PRIVATE src/SchemeREPL.cpp
-  PRIVATE src/TaskScheduler.cpp
-  PRIVATE src/UNIV.cpp
+add_executable(extempore src/Extempore.cpp
+  src/AudioDevice.cpp
+  src/EXTCondition.cpp
+  src/EXTLLVM.cpp
+  src/EXTMonitor.cpp
+  src/EXTMutex.cpp
+  src/EXTThread.cpp
+  src/Extempore.cpp
+  src/OSC.cpp
+  src/Scheme.cpp
+  src/SchemeFFI.cpp
+  src/SchemeProcess.cpp
+  src/SchemeREPL.cpp
+  src/TaskScheduler.cpp
+  src/UNIV.cpp
   )
 
 if(WIN32)
@@ -168,15 +168,24 @@ else()
   message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")
 endif()
 
-find_package(LLVM 3.7 REQUIRED)
+if(MCJIT)
+  find_package(LLVM 3.7 EXACT)
+  if(NOT ${LLVM_FOUND})
+    message(FATAL_ERROR "Extempore requires LLVM 3.7 if you're using MCJIT")
+  endif()
+else()
+  # for the old JIT we need an older LLVM - the old JIT has been
+  # removed completely as of LLVM 3.6
+  find_package(LLVM 3.4.2 EXACT)
+  if(NOT ${LLVM_FOUND})
+    message(FATAL_ERROR "Extempore requires LLVM 3.4.2 if you're using the old JIT (i.e. not MCJIT)")
+  endif()
+endif()
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
 if(WIN32)
   string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
-  foreach(opt ${LLVM_COMPILE_OPTIONS})
-    target_compile_options(extempore PRIVATE ${opt})
-  endforeach()
 endif()
 
 # portaudio
@@ -194,12 +203,14 @@ target_link_libraries(extempore PRIVATE ${PORTAUDIO_LIBRARIES})
 # *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
-  target_compile_definitions(extempore PRIVATE -DPCRE_STATIC)
+  target_compile_definitions(extempore
+    PRIVATE -DPCRE_STATIC
+    PRIVATE -D_CRT_SECURE_NO_WARNINGS)
 endif()
 
 if(BOOST)
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
-  # target_compile_options(extempore PRIVATE -std=c++11)
+  # asio header
   find_path(BOOST_ASIO_INCLUDE_DIR
     NAMES boost/asio.hpp
     PATHS ${WIN64_PACKAGE_DIR}/include)
@@ -208,6 +219,11 @@ if(BOOST)
   else()
     message(FATAL_ERROR "Cannot find boost/asio.hpp header")
   endif()
+  # boost libraries - assumes boost 1.59
+  target_link_libraries(extempore
+    PRIVATE libboost_date_time-vc140-mt-1_59
+    PRIVATE libboost_regex-vc140-mt-1_59
+    PRIVATE libboost_system-vc140-mt-1_59)
 endif()
 
 # OSX

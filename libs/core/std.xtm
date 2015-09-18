@@ -813,30 +813,29 @@ Use via the polymorphic Str function
                 (print ": var-name must be a string\n")
                 #f)))))
 
-(impc:aot:insert-forms
- (impc:compiler:flush-jit-compilation-queue))
-
 ;; this stuff needs to go at the end, since redefinitions have to go
-;; in a new module
+;; in a new module.  these are special-case hacks.
 
 ;; override default constructors
 (impc:aot:do-or-emit
- (bind-func String_z
-   (lambda (lgth s)
-     (let ((news:i8* (zalloc (+ 1 lgth)))
-           (str:String* (zalloc)))
-       (strcpy news s)
-       (tset! str 0 lgth)
-       (tset! str 1 news)
-       str)))
- (bind-func String_h
-   (lambda (lgth s)
-     (let ((news:i8* (halloc (+ 1 lgth)))
-           (str:String* (halloc)))
-       (strcpy news s)
-       (tset! str 0 lgth)
-       (tset! str 1 news)
-       str))))
+ (if (not *impc:aot:current-output-port*)
+     (begin
+       (bind-func String_z
+         (lambda (lgth s)
+           (let ((news:i8* (zalloc (+ 1 lgth)))
+                 (str:String* (zalloc)))
+             (strcpy news s)
+             (tset! str 0 lgth)
+             (tset! str 1 news)
+             str)))
+       (bind-func String_h
+         (lambda (lgth s)
+           (let ((news:i8* (halloc (+ 1 lgth)))
+                 (str:String* (halloc)))
+             (strcpy news s)
+             (tset! str 0 lgth)
+             (tset! str 1 news)
+             str))))))
 
 (define *xtmlib-std-loaded* #t)
 

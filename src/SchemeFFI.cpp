@@ -32,7 +32,38 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+///////////////////
+// LLVM includes //
+///////////////////
 
+// must be included before anything which pulls in <Windows.h>
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/AsmParser/Parser.h"
+#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/Interpreter.h"
+#include "llvm/IR/CallingConv.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/LinkAllPasses.h"
+#include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/MutexGuard.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Target/TargetOptions.h"
+#ifdef EXT_MCJIT
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Verifier.h"
+#else
+#include "llvm/Analysis/Verifier.h"
+#include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/PassManager.h"
+#endif
 
 #include "SchemeFFI.h"
 #include "AudioDevice.h"
@@ -55,8 +86,6 @@
 #include <sstream>
 #include <string.h>
 
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-
 // setting this define should make call_compiled thread safe BUT ...
 // also extremely SLOW !
 
@@ -71,40 +100,7 @@
 #else
 #include <time.h>
 #endif
-
-/////////////////////// llvm includes
-#include "llvm/AsmParser/Parser.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/CallingConv.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/Bitcode/ReaderWriter.h"
-//#include "llvm/ModuleProvider.h"
-#ifndef EXT_MCJIT
-#include "llvm/ExecutionEngine/JIT.h"
-#endif
-#include "llvm/ExecutionEngine/Interpreter.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/Target/TargetOptions.h"
-#include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/MutexGuard.h"
-#ifdef EXT_MCJIT
-#include "llvm/IR/Verifier.h"
-#include "llvm/IR/LegacyPassManager.h"
-#else
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/PassManager.h"
-#endif
-//#include "llvm/Target/TargetData.h"
-#include "llvm/LinkAllPasses.h"
-#include "llvm/ADT/StringExtras.h"
-///////////////////////////////////////
-
+ 
 #ifdef _WIN32
 //#include <unistd.h>
 #include <malloc.h>
@@ -1609,7 +1605,6 @@ namespace extemp {
     std::unique_ptr<llvm::Module> newModule;
     do {
       newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
-      if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH.front());
 
       if(newModule != NULL) break;
       std::string err = pa.getMessage().str();
@@ -1688,6 +1683,8 @@ namespace extemp {
       }
     }while (newModule == 0);
 
+	if (!extemp::UNIV::ARCH.empty()) newModule->setTargetTriple(extemp::UNIV::ARCH.front());
+
     if(EXTLLVM::OPTIMIZE_COMPILES)
       {
         PM->run(*newModule);
@@ -1718,9 +1715,8 @@ namespace extemp {
         return _sc->F;
       }else{
       if (extemp::EXTLLVM::VERIFY_COMPILES) {
-        llvm::raw_ostream *err;
-        if (verifyModule(*M, err)) {
-          std::cout << err << "\nInvalid LLVM IR\n";
+        if (verifyModule(*M)) {
+          std::cout << "\nInvalid LLVM IR\n";
 #ifndef EXT_MCJIT        
           if(num_of_funcs != M->getFunctionList().size()) {
             iplist<Function>::iterator iter = M->getFunctionList().end();
@@ -2001,25 +1997,6 @@ namespace extemp {
       }			
         
     char* filename = string_value(pair_cadr(args));
-#ifdef _WIN32
-    std::string str;
-    std::ofstream fout(filename);
-    llvm::raw_string_ostream ss(str);
-    ss << *m;
-    std::string irStr = ss.str();
-    std::string oldStr(" external global ");
-    std::string newStr(" dllimport global ");
-
-    size_t pos = 0;
-    while((pos = irStr.find(oldStr, pos)) != std::string::npos)
-      {
-        irStr.replace(pos, oldStr.length(), newStr);
-        pos += newStr.length();
-      }
-
-    fout << irStr; //ss.str();
-    fout.close();    
-#else    
     std::error_code errcode;
     llvm::raw_fd_ostream ss(filename, errcode, llvm::sys::fs::F_RW);
     if(errcode) {
@@ -2027,7 +2004,6 @@ namespace extemp {
       return _sc->F;
     }
     llvm::WriteBitcodeToFile(m,ss);
-#endif
     return _sc->T;    
   }
 
@@ -2367,10 +2343,6 @@ namespace extemp {
 	    }
 		    
 	}
-#ifdef EXT_MCJIT
-  // need to remove the mapping here, otherwise runFunction will bomb out under MCJIT
-  EXTLLVM::I()->EE->updateGlobalMapping(func,NULL);
-#endif
   GenericValue gv = EE->runFunction(func,fargs);
 
 	//std::cout << "GV: " << gv.DoubleVal << " " << gv.FloatVal << " " << gv.IntVal.getZExtValue() << std::endl;
@@ -2592,6 +2564,7 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
     void* ptr = dlsym(library, symname);
 #endif
     if(ptr) {
+      EE->updateGlobalMapping(symname, (uint64_t)ptr);
       return _sc->T;
     }else{
       // printf("Could not find symbol named %s\n",symname);

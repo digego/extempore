@@ -17,7 +17,7 @@
 
 if(NOT WIN32)
   include(FindPkgConfig)
-  pkg_check_modules(PORTAUDIO portaudio-2.0)
+  pkg_check_modules(PORTAUDIO QUIET portaudio-2.0)
 endif()
 
 find_path(PORTAUDIO_INCLUDE_DIR

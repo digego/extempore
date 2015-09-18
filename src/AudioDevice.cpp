@@ -66,8 +66,11 @@
 
 #ifdef EXT_BOOST
 #include <thread>
-#else
-// this is duplicated in EXTThread::setPriority(), but kep here to not mess with the MT audio stuff
+#endif
+
+// this functionality is duplicated in EXTThread::setPriority(), but
+// kep here to not mess with the MT audio stuff
+#ifdef __APPLE__
 int set_thread_realtime(thread_port_t threadport, float period, float computation, float constraint) {
   struct thread_time_constraint_policy ttcpolicy;
   int ret;
@@ -82,6 +85,22 @@ int set_thread_realtime(thread_port_t threadport, float period, float computatio
                              THREAD_TIME_CONSTRAINT_POLICY_COUNT)) != KERN_SUCCESS) {
     fprintf(stderr, "set_thread_realtime() failed.\n");
     return 0;
+  }
+  return 1;
+}
+#elif __linux__
+// the arguments here on linux are a bit different to OSX, since the
+// semantics of a thread's "priority" are different
+int set_thread_realtime(pthread_t thread, int policy, int priority) {
+  // thread = pthread_self();
+  int current_policy; // currently we ignore this result
+  sched_param param;
+  pthread_getschedparam(thread, &current_policy, &param);
+  param.sched_priority = priority;
+  // policy should be SCHED_RR or SCHED_FIFO
+  int res = pthread_setschedparam(thread, policy, &param);
+  if(!res) {
+    printf("Failed to set realtime priority for Audio thread: %s\n", strerror(res));
   }
   return 1;
 }
@@ -148,16 +167,7 @@ namespace extemp {
     //set_thread_realtime(pthread_mach_thread_np(pthread_self()), sclockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif __linux__
-    pthread_t pt = pthread_self();
-    int policy;
-    sched_param param;
-    pthread_getschedparam(pt,&policy,&param);
-    param.sched_priority = 20;
-    policy = SCHED_RR; // SCHED_FIFO
-    int res = pthread_setschedparam(pt,policy,&param);
-    if(res != 0) {
-      printf("Failed to set realtime priority for Audio thread\nERR:%s\n",strerror(res));
-    }
+    set_thread_realtime(pthread_self(), SCHED_RR, 20);
 #elif _WIN32 // fix for RT windows
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
@@ -258,16 +268,7 @@ namespace extemp {
     //set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.005,clockFrequency*.005);
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif __linux__
-    pthread_t pt = pthread_self();
-    int policy;
-    sched_param param;
-    pthread_getschedparam(pt,&policy,&param);
-    param.sched_priority = 20;
-    policy = SCHED_RR; // SCHED_FIFO
-    int res = pthread_setschedparam(pt,policy,&param);
-    if(res != 0) {
-      printf("Failed to set realtime priority for Audio thread\nERR:%s\n",strerror(res));
-    }
+    set_thread_realtime(pthread_self(), SCHED_RR, 20);
 #elif _WIN32 // fix for RT windows
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif

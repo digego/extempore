@@ -40,9 +40,7 @@
 #include <vector>
 #include <map>
 #include <string>
-#ifdef _WIN32
 #include <memory>
-#endif
  //#include <ucontext.h>
 
 typedef struct _zone_hooks_t {
