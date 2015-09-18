@@ -3497,7 +3497,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
 	sc->op = (int)OP_EVAL;
 		
 	sc->last_symbol_apply = sc->NIL;
-	sc->call_end_time = std::numeric_limits<long long>::max();
+	sc->call_end_time = ULLONG_MAX;
 	// empty applied_symbol_names stack is empty
 	while(!sc->applied_symbol_names->empty())
 	{
@@ -3532,7 +3532,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     sc->op = (int)OP_EVAL;
 		
     sc->last_symbol_apply = sc->NIL;
-    sc->call_end_time = std::numeric_limits<long long>::max();
+    sc->call_end_time = ULLONG_MAX;
     // empty applied_symbol_names stack is empty
     while(!sc->applied_symbol_names->empty())
       {
@@ -3561,7 +3561,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
       sc->applied_symbol_names->pop();
     }
   sc->last_symbol_apply = sc->NIL;
-  sc->call_end_time = std::numeric_limits<long long>::max();
+  sc->call_end_time = ULLONG_MAX;
 	
   return sc->T;
 }
@@ -6126,7 +6126,7 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
 	    }else{
 		sprintf(msg,"Exceeded maximum rumtime. If you need a higher default process execution time use sys:set-default-timeout\n");
 	    }
-	    sc->call_end_time = std::numeric_limits<long long>::max();
+	    sc->call_end_time = ULLONG_MAX;
 	    _Error_1(sc, msg, sc->NIL, sc->code->_debugger->_size);
 	    return;
 	}
@@ -6550,7 +6550,7 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     sc->treadmill_scan_thread = new extemp::EXTThread();
     sc->treadmill_scan_thread->create(&treadmill_scanner, sc); //, CAPThread::kDefaultThreadPriority);
 	
-    sc->call_end_time = std::numeric_limits<long long>::max();
+    sc->call_end_time = ULLONG_MAX;
     //sc->call_default_time = 158760000ll;  // 1 hour
     sc->call_default_time = extemp::UNIV::SAMPLERATE*60*5; // 5 minutes
 	
@@ -6647,7 +6647,7 @@ void scheme_load_file(scheme *sc, FILE *fin) {
     sc->last_symbol_apply = sc->NIL;
     sc->error_position = -1;
 	
-    sc->call_end_time = std::numeric_limits<long long>::max();
+    sc->call_end_time = ULLONG_MAX;
 }
 
 void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_time, unsigned long long end_time) {
@@ -6694,7 +6694,7 @@ void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_ti
     sc->last_symbol_apply = sc->NIL;	
     sc->error_position = -1;
 	
-    sc->call_end_time = std::numeric_limits<long long>::max();
+    sc->call_end_time = ULLONG_MAX;
 }
 
 void scheme_define(scheme *sc, pointer envir, pointer symbol, pointer value) {
@@ -6772,6 +6772,6 @@ void scheme_call(scheme *sc, pointer func, pointer args, uint64_t start_time, ui
     sc->last_symbol_apply = sc->NIL;	
     sc->error_position = -1;
 	
-    sc->call_end_time = std::numeric_limits<long long>::max();
+    sc->call_end_time = ULLONG_MAX;
 }
 //#endif
