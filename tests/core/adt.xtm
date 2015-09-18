@@ -60,9 +60,9 @@
 ;; points and size must be the same primitive type!
 (xtmtest-compile '(bind-type Rectangle <Point*,Size*>))
 ;; this basically the same as Rectangle
-(xtmtest-compile '(bind-type RectangleA <Point:<!a,!a>*,Size:<!a,!a>*>))
+(xtmtest-compile '(bind-type RectangleA <Point{!a}*,Size{!a}*>))
 ;; this allows *different* point and size primitives
-(xtmtest-compile '(bind-type RectangleB <Point:<!a,!a>*,Size:<!b,!b>*>))
+(xtmtest-compile '(bind-type RectangleB <Point{!a}*,Size{!b}*>))
 
 ;; print routines for everything!
 (xtmtest-compile '(bind-func print:[void,Size*]*
@@ -108,9 +108,9 @@
 (xtmtest-compile
  '(bind-func test_rectangle_1
     (lambda ()
-      (let ((a (Rectangle (Point 1 2) (Size 3 4)))
-            (b (RectangleA (Point 5 6) (Size 7 8)))
-            (c (RectangleB (Point 9. 10.) (Size 11 12))))
+      (let ((a (Rectangle (Point 1:i64 2:i64) (Size 3:i64 4:i64)))
+            (b (RectangleA (Point 5:i64 6:i64) (Size 7:i64 8:i64)))
+            (c (RectangleB (Point 9.0:double 10.0:double) (Size 11:i64 12:i64))))
         c))))
 
 (xtmtest '(bind-func test_rectangle_2
@@ -329,8 +329,6 @@
 ;;
 ;; test some list functions
 ;;
-
-(println 'bug-buster)
 
 (xtmtest '(bind-func test_append_insert_length
             (lambda ()
@@ -568,12 +566,12 @@
           (Maybe #f (tref m 1)))))) ;; false Maybe (nothing)
 
 ;; short-hand
-(constrain-genericfunc
- bind
- $[i64,i64]*
- $[i32,i32]*
- $[float,float]*
- $[double,double]*)
+;(constrain-genericfunc
+; bind
+; $[i64,i64]*
+; $[i32,i32]*
+; $[float,float]*
+; $[double,double]*)
 
 ;; long-hand
 ;; (constrain-generic
@@ -636,7 +634,8 @@
                     (y (Maybe 5))
                     (z (Maybe 2))
                     (result (maybe_mul x (maybe_mul y z))))
-                (bind result Maybe:[Maybe:<i1,i64>*,i64]*)
+                ;;(bind result Maybe:[Maybe:<i1,i64>*,i64]*)
+                (bind result Maybe:[Maybe{i64}*,i64]*)
                 (bind (Maybe 5) (lambda (x) (Maybe (* x x))))
                 (bind (Maybe 6.0) (lambda (x) (Maybe (* x x))))
                 (bind (Maybe 5) (lambda (x) (Maybe (* x x))))
@@ -658,16 +657,16 @@
 ;;
 
 (xtmtest-compile '(bind-type TypeA <!a,!a>))
-(xtmtest-compile '(bind-type TypeB <TypeA:<!a,!a>*,!a>))
+(xtmtest-compile '(bind-type TypeB <TypeA{!a}*,!a>))
 (xtmtest-compile '(bind-type TypeC <TypeA*,!a>))
 (xtmtest-compile '(bind-type TypeD <!a,[!b,!a]*,!b>))
 
 (xtmtest '(bind-func test_exp2
             (lambda ()
-              (let ((a:TypeA:$<i64>* (alloc))
-                    (b:TypeB:$<i64>* (alloc))
-                    (c:TypeC:$<i64,i32>* (alloc))
-                    (d:TypeD:$<float,double>* (alloc)))
+              (let ((a:TypeA{i64}* (alloc))
+                    (b:TypeB{i64}* (alloc))
+                    (c:TypeC{i64,i32}* (alloc))
+                    (d:TypeD{float,double}* (alloc)))
                 d)))
 
          (test_exp2))
@@ -760,7 +759,7 @@
 
 (xtmtest '(bind-func test_list_ptr_2
             (lambda ()
-              (letz ((lst_ptr:List:<i64,List*>** (alloc 2)))
+              (letz ((lst_ptr:List{i64}** (alloc 2)))
                 (pset! lst_ptr 0 (list 1 2 3))
                 (pset! lst_ptr 1 (list 4 5 6))
                 (nth (pref lst_ptr 1) 1))))

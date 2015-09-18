@@ -5,6 +5,8 @@
 ;; obviously the idea would be to hide all of this behind syntax!
 ;;
 
+(sys:load "libs/core/test.xtm")
+
 ;; DEFINE a type class NUM
 ;; with FOUR functions (i.e. 4 elements)
 ;; note that although this class NUM has four functions of the same type
@@ -61,11 +63,11 @@
 ;; (bind-val NUM_f64 NUM{[double,double,double]*}*)
 (bind-val NUM_f64 NUM{double}*)
 
-(bind-func init_num_f64_dict
-  (lambda ()
-    (set! NUM_f64 (NUM_h num_f64_plus num_f64_minus num_f64_mul num_f64_div))))
-
-(init_num_f64_dict)
+(xtmtest 
+ '(bind-func init_num_f64_dict
+    (lambda ()
+      (set! NUM_f64 (NUM_h num_f64_plus num_f64_minus num_f64_mul num_f64_div))))
+ (init_num_f64_dict))
 ;; finished instance of NUM_double
 
 ;; i64 INSTANCE of NUM
@@ -87,11 +89,11 @@
 
 (bind-val NUM_i64 NUM{i64}*)
 
-(bind-func init_num_i64_dict
-  (lambda ()   
-    (set! NUM_i64 (NUM_h num_i64_plus num_i64_minus num_i64_mul num_i64_div))))
-
-(init_num_i64_dict)
+(xtmtest 
+ '(bind-func init_num_i64_dict
+    (lambda ()   
+      (set! NUM_i64 (NUM_h num_i64_plus num_i64_minus num_i64_mul num_i64_div))))
+ (init_num_i64_dict))
 ;; finished instance of NUM_i64
 
 ;; i32 INSTANCE of NUM
@@ -113,11 +115,11 @@
 
 (bind-val NUM_i32 NUM{i32}*)
 
-(bind-func init_num_i32_dict
-  (lambda ()   
-    (set! NUM_i32 (NUM_h num_i32_plus num_i32_minus num_i32_mul num_i32_div))))
-
-(init_num_i32_dict)
+(xtmtest
+ '(bind-func init_num_i32_dict
+    (lambda ()   
+      (set! NUM_i32 (NUM_h num_i32_plus num_i32_minus num_i32_mul num_i32_div))))
+ (init_num_i32_dict))
 ;; finished instance of NUM_i32
 
 ;; f32 INSTANCE of NUM
@@ -139,11 +141,11 @@
 
 (bind-val NUM_f32 NUM{float}*)
 
-(bind-func init_num_f32_dict
-  (lambda ()   
-    (set! NUM_f32 (NUM_h num_f32_plus num_f32_minus num_f32_mul num_f32_div))))
-
-(init_num_f32_dict)
+(xtmtest
+ '(bind-func init_num_f32_dict
+    (lambda ()   
+      (set! NUM_f32 (NUM_h num_f32_plus num_f32_minus num_f32_mul num_f32_div))))
+ (init_num_f32_dict))
 ;; finished instance of f32 NUM
 
 
@@ -151,12 +153,11 @@
 ;; now test the two instances
 ;;;;
 
-(bind-func type_class_test
-  (lambda ()
-    (println (plus NUM_f32 3.0:f 2.0:f)
-             (minus NUM_f32 3.0:f 2.0:f)
-             (mul NUM_f64 3.0 2.0)
-             (div NUM_i64 12 3))
-    (plus NUM_i32 3:i32 2:i32)))
-
-(type_class_test)
+(xtmtest '(bind-func type_class_test
+            (lambda ()
+              (println (plus NUM_f32 3.0:f 2.0:f)
+                       (minus NUM_f32 3.0:f 2.0:f)
+                       (mul NUM_f64 3.0 2.0)
+                       (div NUM_i64 12 3))
+              (plus NUM_i32 3:i32 2:i32)))
+         (type_class_test) 5)

@@ -27,7 +27,7 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;; points
 
-(bind-type Point <!x,!x>)
+(bind-type Point <!a,!a>)
 
 (bind-func print:[void,Point*]*
   (lambda (p)
@@ -38,11 +38,11 @@
                          (tref p 1) ">")
                void))))
 
-(bind-func first:[!a,Point:<!a,!a>*]*
+(bind-func first:[!a,Point{!a}*]*
   (lambda (a)
     (tref a 0)))
 
-(bind-func second:[!a,Point:<!a,!a>*]*
+(bind-func second:[!a,Point{!a}*]*
   (lambda (a)
     (tref a 1)))
 
@@ -58,11 +58,11 @@
         (begin (printout "<" (tref p 0) "," (tref p 1) ">")
                void))))
 
-(bind-func first:[!a,Pair:<!a,!b>*]*
+(bind-func first:[!a,Pair{!a,!b}*]*
   (lambda (a)
     (tref a 0)))
 
-(bind-func second:[!b,Pair:<!a,!b>*]*
+(bind-func second:[!b,Pair{!a,!b}*]*
   (lambda (a)
     (tref a 1)))
 
@@ -91,44 +91,43 @@
                     (cdr xs))
           (sprintout ska ")")))))
 
-
-(bind-func cons:[List:<!a,List*>*,!a,List:<!a,List*>*]*
+(bind-func cons:[List{!a}*,!a,List{!a}*]*
   (lambda (x y)
     (let ((obj (alloc)))
       (tset! obj 0 x)
       (tset! obj 1 y)
       obj)))
 
-(bind-func cons_h:[List:<!a,List*>*,!a,List:<!a,List*>*]*
+(bind-func cons_h:[List{!a}*,!a,List{!a}*]*
   (lambda (x y)
     (let ((obj (halloc)))
       (tset! obj 0 x)
       (tset! obj 1 y)
       obj)))
 
-(bind-func car:[!a,List:<!a,List*>*]*
+(bind-func car:[!a,List{!a}*]*
   (lambda (a)
     (tref a 0)))
 
-(bind-func cdr:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func cdr:[List{!a}*,List{!a}*]*
   (lambda (a)
     (tref a 1)))
 
-(bind-func set_car:[!a,List:<!a,List*>*,!a]*
+(bind-func set_car:[!a,List{!a}*,!a]*
   (lambda (a val)
     (tset! a 0 val)))
 
-(bind-func set_cdr:[List:<!a,List*>*,List:<!a,List*>*,,List:<!a,List*>*]*
+(bind-func set_cdr:[List{!a}*,List{!a}*,,List{!a}*]*
   (lambda (a val)
     (tset! a 1 val)))
 
-(bind-func length:[i64,List:<!a,List*>*]*
+(bind-func length:[i64,List{!a}*]*
   (lambda (a)
     (if (null? a)
         0
         (+ 1 (length (cdr a))))))
 
-(bind-func copy:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func copy:[List{!a}*,List{!a}*]*
   (lambda (lst)
     (let ((orig lst)
           (cpy null))
@@ -137,7 +136,7 @@
         (set! orig (cdr orig)))
       (reverse cpy))))
 
-(bind-func copy_h:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func copy_h:[List{!a}*,List{!a}*]*
   (lambda (lst)
     (let ((orig lst)
           (cpy null))
@@ -146,12 +145,12 @@
         (set! orig (cdr orig)))
       (reverse cpy))))
 
-(bind-func equal:[bool,List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func equal:[bool,List{!a}*,List{!a}*]*
   "returns true if 'equal' returns true for all pairs of elements"
   (lambda (list1 list2)
     (every (lambda (a b) (equal a b)) list1 list2)))
 
-(bind-func nth_tailr:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+(bind-func nth_tailr:[List{!a}*,List{!a}*,i64]*
   (lambda (lst idx)
     (let ((nt (lambdas (l i cnt)
                        (if (or (= cnt i) (> cnt i) (null? l))
@@ -162,21 +161,21 @@
       (let ((r (nt lst idx 0)))
         r))))
 
-(bind-func nth_tail:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+(bind-func nth_tail:[List{!a}*,List{!a}*,i64]*
   (lambda (lst idx)
     (if (or (<= idx 0) (null? lst))
         lst
         (nth_tail (cdr lst) (- idx 1)))))
 
-(bind-func nthr:[!a,List:<!a,List*>*,i64]*
+(bind-func nthr:[!a,List{!a}*,i64]*
   (lambda (lst idx)
     (car (nth_tailr lst idx))))
 
-(bind-func nth:[!a,List:<!a,List*>*,i64]*
+(bind-func nth:[!a,List{!a}*,i64]*
   (lambda (lst idx)
     (car (nth_tail lst idx))))
 
-(bind-func insert:[List:<!a,List*>*,List:<!a,List*>*,i64,!a]*
+(bind-func insert:[List{!a}*,List{!a}*,i64,!a]*
   (lambda (lst idx value)
     (if (= idx 0)
         (cons value lst)
@@ -185,7 +184,7 @@
           (tset! pre_cell 1 new_cell)
           lst))))
 
-(bind-func delete:[!a,List:<!a,List*>*,i64]*
+(bind-func delete:[!a,List{!a}*,i64]*
   (lambda (lst idx)
     (let ((pre_cell (nth_tail lst (- idx 1)))
           (cell (cdr pre_cell))
@@ -193,16 +192,16 @@
       (tset! pre_cell 1 post_cell)
       (car cell))))
 
-(bind-func reverse_inline:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func reverse_inline:[List{!a}*,List{!a}*,List{!a}*]*
   (lambda (old new)
     (if (null? old) new
         (reverse_inline (cdr old) (cons (car old) new)))))
 
-(bind-func reverse:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func reverse:[List{!a}*,List{!a}*]*
   (lambda (lst)
     (reverse_inline lst (convert null))))
 
-(bind-func reverse_r:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func reverse_r:[List{!a}*,List{!a}*]*
   (lambda (lst)
     (let ((rev (lambda (old new)
                  (if (null? old)
@@ -210,7 +209,7 @@
                      (rev (cdr old) (cons (car old) new))))))
       (rev lst (convert null)))))
 
-(bind-func map:[List:<!a,List*>*,[!a,!b]*,List:<!b,List*>*]*
+(bind-func map:[List{!a}*,[!a,!b]*,List{!b}*]*
   (lambda (func xs)
     (let ((f (lambda (l)
                (if (null? l)
@@ -218,7 +217,7 @@
                    (cons (func (car l)) (f (cdr l)))))))
       (f xs))))
 
-(bind-func map:[List:<!a,List*>*,[!a,!b,!c]*,List:<!b,List*>*,List:<!c,List*>*]*
+(bind-func map:[List{!a}*,[!a,!b,!c]*,List{!b}*,List{!c}*]*
   (lambda (func xs1 xs2)
     (let ((f (lambda (l1 l2)
                (if (null? l1)
@@ -227,7 +226,7 @@
                          (f (cdr l1) (cdr l2)))))))
       (f xs1 xs2))))
 
-(bind-func map:[List:<!a,List*>*,[!a,!b,!c,!d]*,List:<!b,List*>*,List:<!c,List*>*,List:<!d,List*>*]*
+(bind-func map:[List{!a}*,[!a,!b,!c,!d]*,List{!b}*,List{!c}*,List{!d}*]*
   (lambda (func xs1 xs2 xs3)
     (let ((f (lambda (l1 l2 l3)
                (if (null? l1)
@@ -236,7 +235,7 @@
                          (f (cdr l1) (cdr l2) (cdr l3)))))))
       (f xs1 xs2 xs3))))
 
-(bind-func filter:[List:<!a,List*>*,[bool,!a]*,List:<!a,List*>*]*
+(bind-func filter:[List{!a}*,[bool,!a]*,List{!a}*]*
   (lambda (pred xs)
     (let ((f (lambda (l)
                (if (null? l)
@@ -246,7 +245,7 @@
                        (f (cdr l)))))))
       (f xs))))
 
-(bind-func index_of:[size_t,!a,List:<!a,List*>*]*
+(bind-func index_of:[size_t,!a,List{!a}*]*
   "return index of first occurrence of element in lst, or -1 if not present"
   (lambda (element lst)
     (let ((f (lambda (l cnt)
@@ -257,7 +256,7 @@
                        (f (cdr l) (set! cnt (+ cnt 1))))))))
       (f lst 0))))
 
-(bind-func index_of:[size_t,!a,List:<!a,List*>*,[bool,!a,!a]*]*
+(bind-func index_of:[size_t,!a,List{!a}*,[bool,!a,!a]*]*
   "return index of first occurrence of element in lst, or -1 if not present"
   (lambda (element lst pred)
     (let ((f (lambda (l cnt)
@@ -268,7 +267,7 @@
                        (f (cdr l) (set! cnt (+ cnt 1))))))))
       (f lst 0))))
 
-(bind-func member:[List:<!a,List*>*,!a,List:<!a,List*>*]*
+(bind-func member:[List{!a}*,!a,List{!a}*]*
   (lambda (element lst)
     (let ((f (lambda (l)
                (if (null? l)
@@ -278,7 +277,8 @@
                        (f (cdr l)))))))
       (f lst))))
 
-(bind-func member:[List:<!a,List*>*,!a,List:<!a,List*>*,[bool,!a,!a]*]*
+
+(bind-func member:[List{!a}*,!a,List{!a}*,[bool,!a,!a]*]*
   (lambda (element lst pred)
     (let ((f (lambda (l)
                (if (null? l)
@@ -288,7 +288,7 @@
                        (f (cdr l)))))))
       (f lst))))
 
-(bind-func any:[bool,[bool,!a]*,List:<!a,List*>*]*
+(bind-func any:[bool,[bool,!a]*,List{!a}*]*
   (lambda (pred lst)
     (let ((f (lambda (l)
                (if (null? l)
@@ -298,7 +298,7 @@
                        (f (cdr l)))))))
       (f lst))))
 
-(bind-func any:[bool,[bool,!a,!b]*,List:<!a,List*>*,List:<!b,List*>*]*
+(bind-func any:[bool,[bool,!a,!b]*,List{!a}*,List{!b}*]*
   (lambda (pred lst1 lst2)
     (let ((f (lambda (l1 l2)
                (if (or (null? l1) (null? l2))
@@ -308,7 +308,7 @@
                        (f (cdr l1) (cdr l2)))))))
       (f lst1 lst2))))
 
-(bind-func every:[bool,[bool,!a]*,List:<!a,List*>*]*
+(bind-func every:[bool,[bool,!a]*,List{!a}*]*
   (lambda (pred lst)
     (let ((f (lambda (l)
                (if (null? l)
@@ -318,7 +318,7 @@
                        (f (cdr l)))))))
       (f lst))))
 
-(bind-func every:[bool,[bool,!a,!b]*,List:<!a,List*>*,List:<!b,List*>*]*
+(bind-func every:[bool,[bool,!a,!b]*,List{!a}*,List{!b}*]*
   (lambda (pred lst1 lst2)
     (let ((f (lambda (l1 l2)
                (if (or (null? l1) (null? l2))
@@ -328,7 +328,7 @@
                        (f (cdr l1) (cdr l2)))))))
       (f lst1 lst2))))
 
-(bind-func for-each:[void,[!a,!b]*,List:<!b,List*>*]*
+(bind-func for-each:[void,[!a,!b]*,List{!b}*]*
   (lambda (func xs)
     (let ((f (lambda (l)
                (if (null? l) void
@@ -336,7 +336,7 @@
                           (f (cdr l)))))))
       (f xs))))
 
-(bind-func for-each:[void,[!a,!b,!c]*,List:<!b,List*>*,List:<!c,List*>*]*
+(bind-func for-each:[void,[!a,!b,!c]*,List{!b}*,List{!c}*]*
   (lambda (func xs1 xs2)
     (let ((f (lambda (l1 l2)
                (if (null? l1) void
@@ -344,7 +344,7 @@
                           (f (cdr l1) (cdr l2)))))))
       (f xs1 xs2))))
 
-(bind-func for-each:[void,[!a,!b,!c,!d]*,List:<!b,List*>*,List:<!c,List*>*,List:<!d,List*>*]*
+(bind-func for-each:[void,[!a,!b,!c,!d]*,List{!b}*,List{!c}*,List{!d}*]*
   (lambda (func xs1 xs2 xs3)
     (let ((f (lambda (l1 l2 l3)
                (if (null? l1) void
@@ -352,13 +352,13 @@
                           (f (cdr l1) (cdr l2) (cdr l3)))))))
       (f xs1 xs2 xs3))))
 
-(bind-func last:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func last:[List{!a}*,List{!a}*]*
   (lambda (a)
     (if (null? (cdr a))
         a
         (last (cdr a)))))
 
-(bind-func range:[List:<!a,List*>*,!a]*
+(bind-func range:[List{!a}*,!a]*
   (lambda (end)
     (let ((val (- end (convert 1)))
           (result null))
@@ -367,7 +367,7 @@
         (set! val (- val (convert 1))))
       result)))
 
-(bind-func range:[List:<!a,List*>*,!a,!a]*
+(bind-func range:[List{!a}*,!a,!a]*
   (lambda (start end)
     (let ((val (- end (convert 1)))
           (result null))
@@ -376,7 +376,7 @@
         (set! val (- val (convert 1))))
       result)))
 
-(bind-func range:[List:<!a,List*>*,!a,!a,!a]*
+(bind-func range:[List{!a}*,!a,!a,!a]*
   (lambda (start end step)
     (if (<= step 0)
         (begin (println "Problem in call to range: step must be positive")
@@ -388,14 +388,14 @@
             (set! val (+ val step)))
           (reverse result)))))
 
-(bind-func append:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func append:[List{!a}*,List{!a}*,List{!a}*]*
   (lambda (a b)
     (if (null? a) b
         (begin
           (tset! (last a) 1 b)
           a))))
 
-(bind-func swap:[List:<!a,List*>*,List:<!a,List*>*,i64,i64]*
+(bind-func swap:[List{!a}*,List{!a}*,i64,i64]*
   ;; swap ith and jth list elements inplace
   (lambda (lst i j)
     (let ((ith_val (nth lst i)))
@@ -405,7 +405,7 @@
 
 ;; fold/reduce
 
-(bind-func foldl:[!b,[!b,!b,!a]*,!b,List:<!a,List*>*]*
+(bind-func foldl:[!b,[!b,!b,!a]*,!b,List{!a}*]*
   (lambda (fn start lst)
     (let ((fold (lambda (l r) ; list result
                   (if (null? l)
@@ -413,7 +413,7 @@
                       (fold (cdr l) (fn r (car l)))))))
       (fold lst start))))
 
-(bind-func foldr:[!b,[!b,!a,!b]*,!b,List:<!a,List*>*]*
+(bind-func foldr:[!b,[!b,!a,!b]*,!b,List{!a}*]*
   (lambda (fn end lst)
     (let ((fold (lambda (l r) ; list result
                   (if (null? l)
@@ -421,7 +421,7 @@
                       (fold (cdr l) (fn (car l) r))))))
       (fold (reverse lst) end))))
 
-(bind-func take:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+(bind-func take:[List{!a}*,List{!a}*,i64]*
   "returns a copy of the first n elements of lst"
   (lambda (lst n)
     (let ((newlst (list))
@@ -434,12 +434,12 @@
         (set! count  (+ count 1)))
       (reverse newlst))))
 
-(bind-func drop:[List:<!a,List*>*,List:<!a,List*>*,i64]*
+(bind-func drop:[List{!a}*,List{!a}*,i64]*
   "returns a copy of lst sans the first n elements"
   (lambda (lst n)
     (copy (nth_tail lst n))))
 
-(bind-func duplicates:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func duplicates:[List{!a}*,List{!a}*]*
   (lambda (lst)
     (let ((dupes (list)))
       (while (not (null? lst))
@@ -448,7 +448,7 @@
         (set! lst (cdr lst)))
       (reverse dupes))))
 
-(bind-func unique:[List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func unique:[List{!a}*,List{!a}*]*
   (lambda (lst)
     (let ((unq (list)))
       (while (not (null? lst))
@@ -457,11 +457,11 @@
         (set! lst (cdr lst)))
       (reverse unq))))
 
-(bind-func intersection:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func intersection:[List{!a}*,List{!a}*,List{!a}*]*
   (lambda (l1 l2)
     (duplicates (append (unique l1) (unique l2)))))
 
-(bind-func union:[List:<!a,List*>*,List:<!a,List*>*,List:<!a,List*>*]*
+(bind-func union:[List{!a}*,List{!a}*,List{!a}*]*
   (lambda (l1 l2)
     (unique (append l1 l2))))
 
@@ -475,7 +475,7 @@
 ;;     (set! lst (cons element lst))
 ;;     void))
 
-(bind-func pop:[!a,List:<!a,List*>*]*
+(bind-func pop:[!a,List{!a}*]*
   "pop first element from list (modifies list in-place)"
   (lambda (lst)
     (if (null? lst)
@@ -493,7 +493,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func dict_get:[!v,List:<Pair:<String*,!v>*,List*>*,String*]*
+(bind-func dict_get:[!v,List{Pair{String*,!v}*}*,String*]*
   "find value for key in dict (which must be a list of any <i8*,!v>)"
   (lambda (dict key)
     (if (null? dict)
@@ -502,7 +502,7 @@
             (second (car dict))
             (dict_get (cdr dict) key)))))
 
-(bind-func dict_set:[!v,List:<Pair:<String*,!v>*,List*>*,String*,!v]*
+(bind-func dict_set:[!v,List{Pair{String*,!v}*}*,String*,!v]*
   "set (or overwrite) value for key in dict (returns the old value)"
   (lambda (dict key value)
     (if (null? dict)
@@ -516,7 +516,7 @@
                        (convert null))
                 (dict_set (cdr dict) key value))))))
 
-(bind-func dict_update:[!v,List:<Pair:<String*,!v>*,List*>*,String*,[!v,!v]*]*
+(bind-func dict_update:[!v,List{Pair{String*,!v}*}*,String*,[!v,!v]*]*
   "set (or update) value for key in dict according to update_fn (returns the old value)"
   (lambda (dict key update_fn)
     (if (null? dict)
@@ -555,7 +555,7 @@
       (printout ">")
       void)))
 
-(bind-func BTree_leaf:[BTree:<!a,BTree*,BTree*>*,!a]*
+(bind-func BTree_leaf:[BTree{!a}*,!a]*
   (lambda (value)
     (BTree value null null)))
 
@@ -571,14 +571,14 @@
   (lambda (tree)
     (tref tree 2)))
 
-(bind-func BTree_map:[BTree:<!v,BTree*,BTree*>*,BTree:<!b,BTree*,BTree*>*,[!v,!r]*]*
+(bind-func BTree_map:[BTree{!v}*,BTree{!r}*,[!v,!r]*]*
   (lambda (tree fn)
     (if (null? tree) null
         (BTree (fn (tref tree 0))
                (BTree_map fn (tref tree 1))
                (BTree_map fn (BTree_right tree))))))
 
-(bind-func BTree_walk_preorder:[void,BTree:<!v,BTree*,BTree*>*,[void,!v]*]
+(bind-func BTree_walk_preorder:[void,BTree{!v}*,[void,!v]*]
   (lambda (tree fn)
     (if (null? tree) null
         (begin
@@ -586,7 +586,7 @@
           (BTree_walk_preorder fn (BTree_left tree))
           (BTree_walk_preorder fn (BTree_right tree))))))
 
-(bind-func BTree_walk_inorder:[void,BTree:<!v,BTree*,BTree*>*,[void,!v]*]
+(bind-func BTree_walk_inorder:[void,BTree{!v}*,[void,!v]*]
   (lambda (tree fn)
     (if (null? tree) null
         (begin
@@ -594,7 +594,7 @@
           (fn (tref tree 0))
           (BTree_walk_inorder fn (BTree_right tree))))))
 
-(bind-func BTree_walk_postorder:[void,BTree:<!v,BTree*,BTree*>*,[void,!v]*]
+(bind-func BTree_walk_postorder:[void,BTree{!v}*,[void,!v]*]
   (lambda (tree fn)
     (if (null? tree) null
         (begin
