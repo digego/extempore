@@ -133,12 +133,18 @@ and `libsndfile-1.lib` into `extempore/libs/Win64/lib`
 cmake -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF ..
 ```
 
+#### stb_image
+
+```
+git clone git@github.com:benswift/stb
+cd stb && mkdir cmake-build && cd cmake-build
+cmake -G"Visual Studio 14 2015 Win64" ..
+```
+
 #### nanovg
 
-remove `"FONS_USE_FREETYPE"` from `premake4.lua`
-
 ```
-premake4.exe --platform=x64 vs2012
+git clone git@github.com:benswift/nanovg
+cd nanovg && mkdir cmake-build && cd cmake-build
+cmake -G"Visual Studio 14 2015 Win64"
 ```
-
-then upgrade the `.sln` by opening it in VS2015
