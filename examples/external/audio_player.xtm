@@ -15,17 +15,19 @@
 (sys:load "libs/external/sndfile.xtm")
 
 (bind-func dsp:DSP 20000000 ; make sure we allocate enough memory
-  (let ((audio_file_path "assets/samples/bb.wav")
-        ;; get number of audio samples in file
-        (nsamp (read_audio_data audio_file_path null 0 0 0))
+  (let ((audio_file_path "assets/samples/piano/102.wav")
+        ;; get number of channels/frames in file
+        (nchan (convert (sf_channels_from_file audio_file_path)))
+        (nframes (sf_frames_from_file audio_file_path))
+        (nsamp (* nchan nframes))
         ;; allocate memory buffer for audio samples
-        (audio_data:double* (zalloc nsamp))
+        (audio_data:SAMPLE* (zalloc nsamp))
         ;; read audio samples into buffer
-        (samples_read (read_audio_data audio_file_path audio_data 0 nsamp 1))
+        (samples_read (sf_read_file_into_buffer audio_file_path audio_data 0 nframes #t))
         ;; markers for keeping track of playback position
         (playhead 0)
         (i 0))
-    (if (or (= nsamp 0) (< samples_read nsamp))
+    (if (< samples_read 0)
         (printf "Error reading audio file.\n"))
     (lambda (in time chan dat)
       ;; increment playhead (this is the most basic playback possible
@@ -37,13 +39,3 @@
 
 ;; now set the dsp closure to start the audio
 (dsp:set! dsp)
-
-(bind-func dsp:DSP 20000000 ; make sure we allocate enough memory
-  (let ((audio_player (audiofile_c "assets/samples/bb.wav" 0 0)))
-    (lambda (in time chan dat)
-      ;; all we have to do is call the audio_player closure
-      (* 3.0 (audio_player)))))
-
-;; more sophistication is required to playback audio files with a
-;; different number of channels to the output device - see the
-;; functions in libs/examples/sndfile.xtm for more details

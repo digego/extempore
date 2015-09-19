@@ -96,11 +96,11 @@
                       (+ (* t m) c))))))
       (Metronome tempoR 0 offset beat (Rat 4 1)
                  (line (Rat offset 1) beat
-                       (+ offset (* tempoR SR))
+                       (+ offset (* tempoR (llvm_samplerate)))
                        (+ beat 1/1))
                  (line beat (Rat offset 1)
                        (+ beat 1/1)
-                       (+ offset (* tempoR SR)))))))
+                       (+ offset (* tempoR (llvm_samplerate))))))))
 
 (bind-func MakeMetro_1
   (lambda (tempo)
@@ -126,7 +126,7 @@
   (lambda (m:Metronome* q:Rational)
     (let ((val (+ (tref m 3) ;; total beats
                   (/ (- (now) (tref m 2)) ;; mark
-                     (* SR (tref m 0)))))
+                     (* (llvm_samplerate) (tref m 0)))))
           (q2 (- q (% val q))))
       (+ val (- q (% val q))))))
 
@@ -136,7 +136,7 @@
 
 (bind-func metro_get_duration
   (lambda (m:Metronome* dur:Rational)
-    (convert (* SRf (* dur (tref m 0))) i64)))
+    (convert (* (convert (llvm_samplerate) SAMPLE) (* dur (tref m 0))) i64)))
 
 (bind-func print_metronome:[void,Metronome*]*
   (lambda (m)
@@ -466,7 +466,7 @@
 (bind-func fade_c
   (lambda ()
     (let ((t 0.0)
-          (inc (/ 1.0 SRf)))
+          (inc (/ 1.0 (convert (llvm_samplerate) SAMPLE))))
       (lambda (initial:SAMPLE final dur)
         (set! t (+ t inc))
         (if (> t dur)
@@ -966,7 +966,7 @@
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res outarray:|6,SAMPLE|*)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SRf))))
+	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1000,7 +1000,7 @@
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SRf))))
+	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1028,7 +1028,7 @@ but v1 and v2 can be computed in parallel"
           (a1 0.0) (a2 0.0) (a3 0.0)
           (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
 	    (lambda (in cutoff res)
-	      (set! g (tan (* SPI (/ cutoff SRf))))
+	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k )))))
         (set! a2 (* g a1))
@@ -1059,7 +1059,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SRf))))
+	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1087,7 +1087,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SRf))))
+	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1115,7 +1115,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SRf))))
+	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1143,7 +1143,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SRf))))
+	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1174,7 +1174,7 @@ but v1 and v2 can be computed in parallel"
 	    (lambda (in cutoff gain Q)
         ;; one option: do the check (= res oldres) trick here
 	      (set! A (pow 10.0 (/ gain 40.0)))
-        (set! g (/ (tan (* SPI (/ cutoff SRf)))
+        (set! g (/ (tan (* SPI (/ cutoff (convert (llvm_samplerate)))))
                    (sqrt A)))
         (set! k (/ 1.0 Q))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
@@ -1211,7 +1211,7 @@ but v1 and v2 can be computed in parallel"
 	    (lambda (in cutoff gain Q)
         ;; one option: do the check (= res oldres) trick here
 	      (set! A (pow 10.0 (/ gain 40.0)))
-        (set! g (/ (tan (* SPI (/ cutoff SRf)))
+        (set! g (/ (tan (* SPI (/ cutoff (convert (llvm_samplerate)))))
                    (sqrt A)))
         (set! k (/ 1.0 Q))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
@@ -1248,7 +1248,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff SRf))))
+	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
         (set! k (* 2.0 res))
         (set! a0 (/ 1.0 (- (* (+ 1.0 g)
                               (+ 1.0 g))
@@ -1541,7 +1541,7 @@ but v1 and v2 can be computed in parallel"
 (bind-func env_follow_c
   (lambda (ms:SAMPLE)
     (let ((y1 0.0)
-          (coeff (/ 1000. (* ms SRf))))
+          (coeff (/ 1000. (* ms (convert (llvm_samplerate))))))
       (lambda (x:SAMPLE)
         (set! y1 (+ x (* coeff (- y1 x))))
         y1))))
@@ -1550,8 +1550,8 @@ but v1 and v2 can be computed in parallel"
 (bind-func atkrel_env_follow_c
   (lambda (atk:SAMPLE rel:SAMPLE)
     (let ((y1 0.0)
-          (atkcoeff (/ 1000. (* atk SRf)))
-          (relcoeff (/ 1000. (* rel SRf))))
+          (atkcoeff (/ 1000. (* atk (convert (llvm_samplerate)))))
+          (relcoeff (/ 1000. (* rel (convert (llvm_samplerate))))))
       (lambda (x)
         (set! y1 (+ x (* (if (> x y1) atkcoeff relcoeff) (- y1 x))))
         y1))))

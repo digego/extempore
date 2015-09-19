@@ -15,7 +15,8 @@
 
 ;;; Code:
 
-(sys:load "libs/external/sndfile.xtm")
+;; (sys:load "libs/core/audio_dsp.xtm")
+;; (sys:load "libs/external/sndfile.xtm")
 (sys:load "libs/external/instruments_ext.xtm")
 
 ;;
@@ -29,12 +30,12 @@
 ;;
 ;; N should be 2's compliment
 (bind-func convolution_c
-  (lambda (path N:i64)
-    (let ((ir:double* (zalloc N))
+  (lambda (filename N:i64)
+    (let ((ir:SAMPLE* (zalloc N))
           (sum 0.0) (i 0) (n 0) (N1 (- N 1))
-          (input:double* (zalloc N)))
-      (read_audio_data path ir 0 N 0)
-      (lambda (in dry:double wet:double)
+          (input:SAMPLE* (zalloc N)))
+      (sf_read_file_into_buffer filename ir 0 N #f)
+      (lambda (in dry:SAMPLE wet:SAMPLE)
         (pset! input n in)
         (set! sum 0.0)
         (dotimes (i N)
@@ -51,12 +52,11 @@
   (let ((conv (convolution_c "assets/ir/minsterl.aif" (* 512 8)))
         (out 0.0)
         (dry 1.0)
-        (wet 0.2)
+        (wet 0.2))
     (lambda (in time chan dat)
-      (cond ((< chan 0.5)
-             (set! out (convl (sampler in time chan dat) dry wet)))
-            ((< chan 1.5)
-             (set! out (convr (sampler in time chan dat) dry wet))))
+      (if (= chan 0)
+          (set! out (convl (sampler in time chan dat) dry wet))
+          (set! out (convr (sampler in time chan dat) dry wet)))
       out)))
 
 (dsp.dry 1.0)

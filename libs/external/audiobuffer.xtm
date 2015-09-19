@@ -1,0 +1,331 @@
+;;; audiobuffer.xtm -- dealing with audio files
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libsndfile
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
+(sys:load "libs/aot-cache/audiobuffer.xtm" 'quiet)
+(sys:load-preload-check 'audiobuffer)
+(define *xtmlib-audiobuffer-loaded* #f)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/std.xtm")
+ (sys:load "libs/external/sndfile.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/core/std.xtm" 'quiet)
+ (sys:load "libs/external/sndfile.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmaudiobuffer")
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; AudioBuffer type ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+;; 0 frames (total)
+;; 1 samplerate
+;; 2 channels
+;; 3 loop_start
+;; 4 loop_frames
+;; 5 SAMPLE* (data)
+;; 6 filename
+;; 7 playhead
+
+
+(if (not (impc:ti:typealias-exists? "SAMPLE"))
+    (bind-alias SAMPLE float))
+
+(bind-type AudioBuffer <String*,i64,i64,i64,SAMPLE*,i64,i64,i64>)
+
+(bind-func AudioBuffer_print
+  "specialised print function for AudioBuffer*"
+  (lambda (ab:AudioBuffer*)
+    (if (null? ab)
+        (printf "<AudioBuffer 0x0>")
+        (printf "<AudioBuffer %p
+      filename: %s
+      playhead: %lld
+        frames: %lld
+      channels: %lld
+          data: %p
+    samplerate: %lld
+    loop_start: %lld
+   loop_frames: %lld>"
+                ab
+                (tref ab 0)
+                (tref ab 1)
+                (tref ab 2)
+                (tref ab 3)
+                (tref ab 4)
+                (tref ab 5)
+                (tref ab 6)
+                (tref ab 7)))
+    void))
+
+(bind-poly print AudioBuffer_print)
+
+(bind-func AudioBuffer_toString
+  "specialised toString function for AudioBuffer*"
+  (lambda (ab:AudioBuffer*)
+    (let ((str:i8* (salloc 1024)))
+      (if (null? ab)
+          (sprintf str "<AudioBuffer 0x0>")
+          (sprintf str "<AudioBuffer %p
+      filename: %s
+      playhead: %lld
+        frames: %lld
+      channels: %lld
+          data: %p
+    samplerate: %lld
+    loop_start: %lld
+   loop_frames: %lld>"
+                   ab
+                   (tref ab 0)
+                   (tref ab 1)
+                   (tref ab 2)
+                   (tref ab 3)
+                   (tref ab 4)
+                   (tref ab 5)
+                   (tref ab 6)
+                   (tref ab 7)))
+      (Str str))))
+
+(bind-poly toString AudioBuffer_toString)
+
+;; getters/setters
+
+(bind-func AudioBuffer_filename
+  (lambda (ab:AudioBuffer*)
+    (tref ab 0)))
+
+(bind-func AudioBuffer_set_filename
+  (lambda (ab:AudioBuffer* filename)
+    (tset! ab 0 filename)))
+
+(bind-func AudioBuffer_playhead
+  (lambda (ab:AudioBuffer*)
+    (tref ab 1)))
+
+(bind-func AudioBuffer_set_playhead
+  (lambda (ab:AudioBuffer* playhead)
+    (tset! ab 1 playhead)))
+
+(bind-func AudioBuffer_frames
+  (lambda (ab:AudioBuffer*)
+    (tref ab 2)))
+
+(bind-func AudioBuffer_set_frames
+  (lambda (ab:AudioBuffer* frames)
+    (tset! ab 2 frames)))
+
+(bind-func AudioBuffer_channels
+  (lambda (ab:AudioBuffer*)
+    (tref ab 3)))
+
+(bind-func AudioBuffer_set_channels
+  (lambda (ab:AudioBuffer* channels)
+    (tset! ab 3 channels)))
+
+(bind-func AudioBuffer_data
+  (lambda (ab:AudioBuffer*)
+    (tref ab 4)))
+
+(bind-func AudioBuffer_set_data
+  (lambda (ab:AudioBuffer* data)
+    (tset! ab 4 data)))
+
+(bind-func AudioBuffer_samplerate
+  (lambda (ab:AudioBuffer*)
+    (tref ab 5)))
+
+(bind-func AudioBuffer_set_samplerate
+  (lambda (ab:AudioBuffer* samplerate)
+    (tset! ab 5 samplerate)))
+
+(bind-func AudioBuffer_loop_start
+  (lambda (ab:AudioBuffer*)
+    (tref ab 6)))
+
+(bind-func AudioBuffer_set_loop_start
+  (lambda (ab:AudioBuffer* loop_start)
+    (tset! ab 6 loop_start)))
+
+(bind-func AudioBuffer_loop_frames
+  (lambda (ab:AudioBuffer*)
+    (tref ab 7)))
+
+(bind-func AudioBuffer_set_loop_frames
+  (lambda (ab:AudioBuffer* loop_frames)
+    (tset! ab 7 loop_frames)))
+
+(bind-func AudioBuffer_num_samples
+  "get the total number of samples (* frames channels) from an Audiobuffer"
+  (lambda (ab:AudioBuffer*)
+    (* (AudioBuffer_frames ab)
+       (AudioBuffer_channels ab))))
+
+(bind-func AudioBuffer_seek
+  (lambda (ab:AudioBuffer* seek_to)
+    (if (< seek_to 0)
+        (begin
+          (println "AudioBuffer seek value must be > 0")
+          #f)
+        (let ((len (AudioBuffer_frames ab)))
+          (AudioBuffer_set_playhead ab (if (< seek_to len) seek_to len))
+          #t))))
+
+;; "peek" doesn't advance the playhead, "read" does
+
+(bind-func AudioBuffer_peek
+  (lambda (ab:AudioBuffer* chan)
+    (let ((ph (AudioBuffer_playhead ab)))
+      (if (< ph (AudioBuffer_frames ab))
+          (pref (AudioBuffer_data ab)
+                (+ (* ph (AudioBuffer_channels ab)) chan))
+          0.0))))
+
+(bind-func AudioBuffer_peek_looped
+  (lambda (ab:AudioBuffer* chan)
+    (let ((ph (AudioBuffer_playhead ab)))
+      (pref (AudioBuffer_data ab)
+            (+ (* (% ph (AudioBuffer_frames ab)) (AudioBuffer_channels ab)) chan)))))
+
+(bind-func AudioBuffer_read
+  (lambda (ab:AudioBuffer* chan)
+    (let ((ph (AudioBuffer_playhead ab)))
+      (if (< ph (AudioBuffer_frames ab))
+          (begin
+            (AudioBuffer_set_playhead ab (+ ph 1))
+            (pref (AudioBuffer_data ab)
+                  (+ (* ph (AudioBuffer_channels ab)) chan)))
+          0.0))))
+
+(bind-func AudioBuffer_read_looped
+  (lambda (ab:AudioBuffer* chan)
+    (let ((ph (AudioBuffer_playhead ab)))
+      (AudioBuffer_set_playhead ab (% (+ ph 1) (AudioBuffer_frames ab)))
+      (pref (AudioBuffer_data ab)
+            (+ (* ph (AudioBuffer_channels ab)) chan)))))
+
+(bind-func AudioBuffer_ptr
+  "returns a pointer into the buffer"
+  (lambda (ab:AudioBuffer* frame chan)
+    (pref-ptr (AudioBuffer_data ab)
+              (+ (* frame (AudioBuffer_channels ab)) chan))))
+
+;; TODO this needs fixin
+
+;; (bind-func AudioBuffer_copy_region
+;;   "create a new AudioBuffer from a region of an existing AudioBuffer
+
+;; @param start - frame to start at
+;; @param nframes - number of frames to copy"
+;;   (lambda (ab:AudioBuffer* start nframes)
+;;     (if (or (null? ab) (< start 0)) null
+;;         (let ((fs (AudioBuffer_frames ab)))
+;;           (if (>= (+ start nframes) fs) null
+;;               null)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reading audio files ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; TODO up to here
+
+(bind-func AudioBuffer_region_from_file
+  "read a region of an audio file into an AudioBuffer
+
+@param nframes - number of frames to read
+@param start - start frame"
+  (lambda (filename start nframes)
+    (let ((info:SF_INFO* (salloc))
+          (audiofile (sf_open filename SFM_READ info))
+          (ab:AudioBuffer* null))
+      (if (null? audiofile)
+          (begin (println "soundfile error:" (sf_strerror audiofile))
+                 ab)
+          ;; when sf_open has read the file without error
+          (let ((channels (convert (sf_channels info)))
+                (samplerate (convert (sf_samplerate info)))
+                (available_frames (- nframes start)))
+            (if (<> samplerate (convert (llvm_samplerate)))
+                (println "Warning: file samplerate" samplerate "doesn't match the current audio samplerate" (llvm_samplerate) "- this could cause problems"))
+            (if (> nframes available_frames)
+                (begin (println "Error: audio file too short - trying to read more nframes than are available")
+                       (sf_close audiofile)
+                       ab)
+                (let ((frames_read 0)
+                      (data:float* (halloc (* nframes channels))))
+                  ;; initialise and allocate memory for the AudioBuffer
+                  (set! ab (AudioBuffer (String filename)
+                                        0
+                                        nframes
+                                        channels
+                                        data
+                                        samplerate
+                                        0 0))
+                  ;; read the audio data from the file
+                  (set! frames_read (sf_readf audiofile
+                                              data
+                                              (* nframes channels)))
+                  (sf_close audiofile)
+                  ;; set the metadata into the new Audiobuffer object
+                  (AudioBuffer_set_frames ab frames_read)
+                  (if (< frames_read nframes)
+                      (begin (println "Error: tried to read" nframes "frames, only read" frames_read "frames." (sf_strerror audiofile))
+                             ab)
+                      ab))))))))
+
+(bind-func AudioBuffer_from_file
+  "read an audio file into an AudioBuffer"
+  (lambda (filename)
+    (AudioBuffer_region_from_file filename 0 (sf_frames_from_file filename))))
+
+(bind-poly AudioBuffer AudioBuffer_region_from_file)
+(bind-poly AudioBuffer AudioBuffer_from_file)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; writing audio files ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func AudioBuffer_region_to_file
+  "write AudioBuffer to file
+
+@param filename
+@param format - 16bit PCM AIFF: (bor SF_FORMAT_AIF SF_FORMAT_PCM_16)
+@param start
+@param nframes"
+  (lambda (ab:AudioBuffer* filename format start nframes)
+    (let ((info:SF_INFO* (salloc)))
+      (sf_set_frames info nframes)
+      (sf_set_samplerate info (convert (AudioBuffer_samplerate ab)))
+      (sf_set_channels info (convert (AudioBuffer_channels ab)))
+      (sf_set_format info format)
+      (let ((audiofile (sf_open filename SFM_WRITE info)))
+        (if (null? audiofile)
+            (begin (println "Error writing audio file:" (sf_strerror audiofile)) -1)
+            (let ((frames_written (sf_writef audiofile (AudioBuffer_ptr ab start 0) nframes)))
+              ;; flush write to disk
+              (sf_write_sync audiofile)
+              (if (< frames_written nframes)
+                  (println "Error writing audio file: tried to write" nframes "frames, only wrote" frames_written "frames."
+                           (sf_strerror audiofile)))
+              (sf_close audiofile)
+              frames_written))))))
+
+(bind-func AudioBuffer_to_file
+  "write AudioBuffer to file
+
+@param filename
+@param format"
+  (lambda (ab:AudioBuffer* filename format)
+    (AudioBuffer_region_to_file ab filename format 0 (AudioBuffer_frames ab))))
+
+(impc:aot:insert-footer "xtmaudiobuffer")
+(define *xtmlib-audiobuffer-loaded* #t)
