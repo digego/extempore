@@ -2,17 +2,31 @@
 
 ## Build depenencies
 
-You'll need a C++ compiler toolchain, e.g.
+You'll need
+
+a **C++ compiler toolchain**, e.g.
 
 - `sudo apt-get install g++` on Ubuntu/Debian
 - Xcode or the standalone command line tools on OSX
 - Visual Studio on Windows (the "Community" version is now free)
 
-You'll need git as well
+**git**
 
 - `sudo apt-get install git` on Ubuntu/Debian
 - `brew install git` on OSX with Homebrew
 - `choco install git` on Windows with Chocolatey
+
+**CMake** (version 3.1 or greater)
+
+- `brew install cmake` on OSX with Homebrew
+- `choco install cmake` on Windows with Chocolatey
+
+The Ubuntu 15.04 package archive only includes CMake v3.0, but you can
+get a more up-to-date version through a package archive
+
+```
+sudo apt-get install software-properties-common && sudo add-apt-repository ppa:george-edison55/cmake-3.x && sudo apt-get update && sudo apt-get install cmake
+```
 
 ### Boost (Windows only)
 
