@@ -1,9 +1,4 @@
-if(WIN32)
-  # on Windows we use target_sources()
-  cmake_minimum_required(VERSION 3.1)
-else()
-  cmake_minimum_required(VERSION 3.0)
-endif()
+cmake_minimum_required(VERSION 3.1) # we use target_sources()
 
 project(Extempore VERSION 0.60)
 
@@ -46,6 +41,93 @@ add_library(pcre STATIC
 target_compile_definitions(pcre
   PRIVATE -DHAVE_CONFIG_H
   )
+
+#############
+# portaudio #
+#############
+
+add_library(portaudio STATIC
+  src/portaudio/src/common/pa_allocation.c
+  src/portaudio/src/common/pa_allocation.h
+  src/portaudio/src/common/pa_converters.c
+  src/portaudio/src/common/pa_converters.h
+  src/portaudio/src/common/pa_cpuload.c
+  src/portaudio/src/common/pa_cpuload.h
+  src/portaudio/src/common/pa_debugprint.c
+  src/portaudio/src/common/pa_debugprint.h
+  src/portaudio/src/common/pa_dither.c
+  src/portaudio/src/common/pa_dither.h
+  src/portaudio/src/common/pa_endianness.h
+  src/portaudio/src/common/pa_front.c
+  src/portaudio/src/common/pa_hostapi.h
+  src/portaudio/src/common/pa_memorybarrier.h
+  src/portaudio/src/common/pa_process.c
+  src/portaudio/src/common/pa_process.h
+  src/portaudio/src/common/pa_ringbuffer.c
+  src/portaudio/src/common/pa_ringbuffer.h
+  src/portaudio/src/common/pa_stream.c
+  src/portaudio/src/common/pa_stream.h
+  src/portaudio/src/common/pa_trace.c
+  src/portaudio/src/common/pa_trace.h
+  src/portaudio/src/common/pa_types.h
+  src/portaudio/src/common/pa_util.h
+  )
+
+target_include_directories(portaudio
+  PRIVATE src/portaudio/src/common)
+
+target_link_libraries(portaudio
+  PRIVATE "-framework CoreAudio"
+  PRIVATE "-framework AudioToolbox"
+  PRIVATE "-framework AudioUnit")
+
+# platform-specific
+
+if(APPLE)
+  # use CoreAudio on OSX
+  target_sources(portaudio
+    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core.c
+    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_blocking.c
+    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_blocking.h
+    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_internal.h
+    # PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_old.c
+    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_utilities.c
+    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_utilities.h
+    PRIVATE src/portaudio/src/os/unix/pa_unix_hostapis.c
+    PRIVATE src/portaudio/src/os/unix/pa_unix_util.c
+    PRIVATE src/portaudio/src/os/unix/pa_unix_util.h)
+  target_compile_definitions(portaudio
+    PRIVATE -DPA_USE_COREAUDIO)
+  target_compile_options(portaudio
+    PRIVATE -Wno-deprecated-declarations)
+
+elseif(LINUX)
+  # use ALSA on Linux
+  target_sources(portaudio
+    PRIVATE src/portaudio/src/hostapi/alsa/pa_linux_alsa.c
+    PRIVATE src/portaudio/src/os/unix/pa_unix_hostapis.c
+    PRIVATE src/portaudio/src/os/unix/pa_unix_util.c
+    PRIVATE src/portaudio/src/os/unix/pa_unix_util.h)
+  target_compile_definitions(portaudio
+    PRIVATE -DPA_USE_ALSA)
+
+elseif(WIN32)
+  # use wdmks on Windows
+  target_sources(portaudio
+    PRIVATE src/portaudio/src/hostapi/wdmks/pa_win_wdmks.c
+    PRIVATE src/portaudio/src/os/win/pa_win_coinitialize.c
+    PRIVATE src/portaudio/src/os/win/pa_win_coinitialize.h
+    PRIVATE src/portaudio/src/os/win/pa_win_hostapis.c
+    PRIVATE src/portaudio/src/os/win/pa_win_util.c
+    PRIVATE src/portaudio/src/os/win/pa_win_waveformat.c
+    PRIVATE src/portaudio/src/os/win/pa_win_wdmks_utils.c
+    PRIVATE src/portaudio/src/os/win/pa_win_wdmks_utils.h
+    PRIVATE src/portaudio/src/os/win/pa_x86_plain_converters.c
+    PRIVATE src/portaudio/src/os/win/pa_x86_plain_converters.h)
+    target_compile_definitions(portaudio
+      PRIVATE -DPA_USE_WDMKS)
+
+endif()
 
 ########################
 # extempore executable #
@@ -128,17 +210,20 @@ endif()
 # build-time dependencies #
 ###########################
 
-# tell Extempore about the (now in-tree) PCRE dependency
+# tell Extempore about the PCRE & portuaudio targets
 
-add_dependencies(extempore pcre)
-target_include_directories(extempore PRIVATE src/pcre)
-target_link_libraries(extempore PRIVATE pcre)
+add_dependencies(extempore pcre portaudio)
+target_include_directories(extempore
+  PRIVATE src/pcre
+  PRIVATE src/portaudio/include)
+target_link_libraries(extempore
+  PRIVATE pcre
+  PRIVATE portaudio)
 
 # Extempore's build-time dependencies are:
 #
-# - portaudio
 # - LLVM 3.7 (patched for Extempore)
-# - Boost (optional)
+# - Boost (required on Windows, optional on other platforms)
 
 # cmake will try and find these deps in the usual places.
 
@@ -150,7 +235,7 @@ target_link_libraries(extempore PRIVATE pcre)
 # interface (choco install nuget.commandline). As an example (assuming
 # VS2015), something like this might get you what you need:
 
-# nuget install portaudio & nuget install pcre & nuget install boost-vc140
+# nuget install boost-vc140
 
 # after that, you'll probably still have to move the relevant headers
 # and libs into libs/win64/{lib,include} - which is messy I know, but
@@ -187,16 +272,6 @@ target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 if(WIN32)
   string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
 endif()
-
-# portaudio
-
-if(WIN32)
-  # give find_package a hint about where to find portaudio
-  set(Portaudio_ROOT ${WIN64_PACKAGE_DIR})
-endif()
-find_package(Portaudio REQUIRED)
-target_include_directories(extempore PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
-target_link_libraries(extempore PRIVATE ${PORTAUDIO_LIBRARIES})
 
 # Boost
 
@@ -241,11 +316,11 @@ if(APPLE) # OSX
   target_link_libraries(extempore PRIVATE pthread)
 
   # frameworks
-  target_link_libraries(extempore PRIVATE
-    "-framework Cocoa"
-    "-framework CoreAudio"
-    "-framework AudioToolbox"
-    "-framework AudioUnit")
+  target_link_libraries(extempore
+    PRIVATE "-framework Cocoa"
+    PRIVATE "-framework CoreAudio"
+    PRIVATE "-framework AudioToolbox"
+    PRIVATE "-framework AudioUnit")
 
 elseif(UNIX AND NOT APPLE) # Linux
   set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)

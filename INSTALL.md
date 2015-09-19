@@ -1,29 +1,20 @@
 # Building Extempore from Source
 
-## Get the Extempore source
+## Build depenencies
 
-```
-git clone git@github.com:digego/extempore.git
-```
+You'll need a C++ compiler toolchain, e.g.
 
-## Get the build-time deps
+- `sudo apt-get install g++` on Ubuntu/Debian
+- Xcode or the standalone command line tools on OSX
+- Visual Studio on Windows (the "Community" version is now free)
 
-### Deb/Ubuntu
+You'll need git as well
 
-```
-sudo apt-get install git g++ portaudio19-dev
-```
+- `sudo apt-get install git` on Ubuntu/Debian
+- `brew install git` on OSX with Homebrew
+- `choco install git` on Windows with Chocolatey
 
-### OSX
-
-```
-brew install portaudio
-```
-
-### Windows
-
-The NuGet version of **Portaudio** should be fine, but building it
-from source is fine too.
+### Boost (Windows only)
 
 We still need one component of the **Boost** libs on Windows
 (specifically the ASIO component for TCP/UDP handling). If you've got
@@ -41,7 +32,7 @@ painful, but it's a one-time process.
 
 ### LLVM 3.7
 
-LLVM now uses CMake as well. Grab the
+Grab the
 [3.7.0 source tarball](http://llvm.org/releases/download.html#3.7.0),
 apply the `extempore-llvm-3.7.0.patch` in `extras/`
 
@@ -50,18 +41,20 @@ cd /path/to/llvm-3.7.0.src
 patch -p0 < /path/to/extempore/extras/extempore-llvm-3.7.0.patch
 ```
 
-Then build LLVM, moving the libraries into
-`/path/to/extempore/llvm` as part of the `install` step
+Then build LLVM, moving the libraries into `/path/to/extempore/llvm`
+as part of the `install` step
 
 ```
 mkdir cmake-build && cd cmake-build
 cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=/path/to/extempore/llvm .. && make && make install
 ```
 
-On **Windows**, you'll probably want to specify a 64-bit generator e.g.
+On **Windows**, you'll also need to specify a 64-bit generator e.g.
 `-G"Visual Studio 14 2015 Win64"`
 
-## Generate build files with CMake
+## Building Extempore
+
+### Generate build files with CMake
 
 In your `extempore` directory,
 
@@ -73,17 +66,6 @@ cmake -DEXT_LLVM_DIR=/path/to/extempore/llvm ..
 If you've set the `EXT_LLVM_DIR` environment variable you don't have
 to provide it again to CMake.
 
-If you want to work "in-tree" (handy for Extempore developers) then
-you can set
-
-```
-cmake -DIN_TREE=ON ..
-```
-
-This will make the `make install` just install `extempore` into
-`/usr/local/bin`, and Extempore will keep using the Extempore source
-directory (i.e. the cloned repo) for it's `runtime/`, `libs/`, etc.
-
 On **Windows**, you'll need to give CMake a few more details
 
 ```
@@ -91,12 +73,10 @@ md cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm ..
 ```
 
-## Build Extempore
+### Build Extempore
 
-### Linux/OSX
-
-CMake will generate a `Makefile` in `cmake-build`, with a few useful
-targets:
+On **Linux/OSX** CMake will generate a `Makefile` in `cmake-build`,
+with a few useful targets:
 
 - `make` will build Extempore
 - `make install` will install `extempore` into `/usr/local/bin` and
@@ -105,14 +85,12 @@ targets:
 - `make uninstall` will remove the installed files
 - `make aod_stdlibs` will ahead-of-time compile the standard library
 
-### Windows
+On **Windows**, CMake will generate a Visual Studio solution (`.sln`)
+in `cmake-build`. Open it, and build the `extempore` target.
 
-CMake will generate a Visual Studio solution (`.sln`) in
-`cmake-build`.  Open it, and build the `extempore` target.
+## Building the Extempore standard library
 
-## Standard library
-
-## Linux/OSX
+### Linux/OSX
 
 It's pretty straightforward. You should be able to get most things
 through your package manager.
