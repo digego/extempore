@@ -372,7 +372,7 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
           (extempore-scheme-names '("set!" "caaaar" "cdaaar" "cadaar" "cddaar" "caadar" "cdadar" "caddar" "cdddar" "caaadr" "cdaadr" "cadadr" "cddadr" "caaddr" "cdaddr" "cadddr" "cddddr" "caaar" "cdaar" "cadar" "cddar" "caadr" "cdadr" "caddr" "cdddr" "caar" "cdar" "cadr" "cddr" "car" "cdr" "print" "println" "printout" "load" "gensym" "tracing" "make-closure" "defined?" "inexact->exact" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "+" "-" "*" "/" "%" "bitwise-not" "bitwise-and" "bitwise-or" "bitwise-eor" "bitwise-shift-left" "bitwise-shift-right" "quotient" "remainder" "modulo" "car" "cdr" "cons" "set-car!" "set-cdr!" "char->integer" "integer->char" "char-upcase" "char-downcase" "symbol->string" "atom->string" "string->symbol" "string->atom" "sexpr->string" "string->sexpr" "real->integer" "make-string" "string-length" "string-ref" "string-set!" "string-append" "substring" "vector" "make-vector" "vector-length" "vector-ref" "vector-set!" "not" "boolean?" "eof-object?" "null?" "=" "<" ">" "<=" ">=" "member" "equal?" "eq?" "eqv?" "symbol?" "number?" "string?" "integer?" "real?" "rational?" "char?" "char-alphabetic?" "char-numeric?" "char-whitespace?" "char-upper-case?" "char-lower-case?" "port?" "input-port?" "output-port?" "procedure?" "pair?" "list?" "environment?" "vector?" "cptr?" "eq?" "eqv?" "force" "write" "write-char" "display" "emit" "newline" "error" "reverse" "list*" "append" "put" "get" "quit" "new-segment" "oblist" "sexp-bounds-port" "current-output-port" "open-input-file" "open-output-file" "open-input-output-file" "open-input-string" "open-output-string" "open-input-output-string" "close-input-port" "close-output-port" "interaction-environment" "current-environment" "read" "read-char" "peek-char" "char-ready?" "set-input-port" "set-output-port" "length" "assq" "get-closure-code" "closure?" "macro?" "macro-expand" "foldl" "foldr")))
       (list
        ;; other type annotations (has to be first in list)
-       '(":[][[:alnum:]_<>,*:/|?!-]+"
+       '(":[]{}[[:alnum:]_<>,*:/|!-]+"
          (0 font-lock-type-face))
        ;; built-ins
        (list
@@ -427,12 +427,12 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
          (3 font-lock-function-name-face))
        
        ;; bind-alias
-       '("(\\(bind-alias\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
+       '("(\\(bind-alias\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([]{}[[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
          (3 font-lock-type-face))
        ;; bind-type
-       '("(\\(bind-type\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|!-]+\\)"
+       '("(\\(bind-type\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([]{}[[:alnum:]_<>,*:/|!-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
          (3 font-lock-type-face))
@@ -441,30 +441,30 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face))
        ;; bind-lib
-       '("(\\(bind-lib\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
+       '("(\\(bind-lib\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([]{}[[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
          (4 font-lock-type-face))
        ;; bind-lib-type
-       '("(\\(bind-lib-type\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
+       '("(\\(bind-lib-type\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([]{}[[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
          (4 font-lock-type-face))
        ;; bind-lib-func
-       '("(\\(bind-lib-func\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
+       '("(\\(bind-lib-func\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([]{}[[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
          (4 font-lock-type-face))
        ;; bind-val
-       '("(\\(bind-val\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
+       '("(\\(bind-val\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([]{}[[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
          (3 font-lock-type-face))
        ;; bind-lib-val
-       '("(\\(bind-lib-val\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([][[:alnum:]_<>,*:/|-]+\\)"
+       '("(\\(bind-lib-val\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([]{}[[:alnum:]_<>,*:/|-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face)
          (3 font-lock-function-name-face)
