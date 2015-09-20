@@ -4629,6 +4629,27 @@
 
 (define xtmX call-as-xtlang)
 
+;; this version uses a let instead of a letz
+
+(define-macro (call-as-xtlang-halloc . expr)
+  (if (not (impc:aot:currently-compiling?))
+      (sys:with-quiet-compiler
+       (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
+         (eval `(bind-func xtlang_expression
+                  (lambda ()
+                    ,(if (equal? type -1)
+                         `(let ((s:i8* (halloc 2)))
+                            ,@expr
+                            s)
+                         `(let ((s (sprintln (begin ,@expr)))
+                                (lgth (+ 1 (String_length s)))
+                                (oldcs (String_cstr s))
+                                (newcs:i8* (halloc lgth)))
+                            (strcpy newcs oldcs)
+                            newcs))))
+               (interaction-environment))
+         (quote (string->atom (cptr->string (xtlang_expression))))))))
+
 (define-macro (xtm-dump-ir fname)
   (let ((n (llvm:get-closure-work-name (symbol->string fname))))
     (if n
