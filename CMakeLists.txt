@@ -76,11 +76,6 @@ add_library(portaudio STATIC
 target_include_directories(portaudio
   PRIVATE src/portaudio/src/common)
 
-target_link_libraries(portaudio
-  PRIVATE "-framework CoreAudio"
-  PRIVATE "-framework AudioToolbox"
-  PRIVATE "-framework AudioUnit")
-
 # platform-specific
 
 if(APPLE)
@@ -100,6 +95,10 @@ if(APPLE)
     PRIVATE -DPA_USE_COREAUDIO)
   target_compile_options(portaudio
     PRIVATE -Wno-deprecated-declarations)
+  target_link_libraries(portaudio
+    PRIVATE "-framework CoreAudio"
+    PRIVATE "-framework AudioToolbox"
+    PRIVATE "-framework AudioUnit")
 
 elseif(LINUX)
   # use ALSA on Linux
@@ -110,7 +109,9 @@ elseif(LINUX)
     PRIVATE src/portaudio/src/os/unix/pa_unix_util.h)
   target_compile_definitions(portaudio
     PRIVATE -DPA_USE_ALSA)
-
+  target_link_libraries(portaudio
+    PRIVATE asound)
+  
 elseif(WIN32)
   # use wdmks on Windows
   target_sources(portaudio
@@ -182,7 +183,8 @@ if(NOT MSVC)
     PRIVATE -fno-rtti
     PRIVATE -fno-common
     PRIVATE -Woverloaded-virtual
-    PRIVATE -Wcast-qual
+    # PRIVATE -Wcast-qual
+    PRIVATE -Wno-unused-result
     )
 endif()
 
