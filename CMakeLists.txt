@@ -74,6 +74,7 @@ add_library(portaudio STATIC
   )
 
 target_include_directories(portaudio
+  PRIVATE src/portaudio/include
   PRIVATE src/portaudio/src/common)
 
 # platform-specific
