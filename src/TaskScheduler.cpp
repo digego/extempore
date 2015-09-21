@@ -85,7 +85,7 @@ namespace extemp {
     uint64_t nanosecs = ((double)frames / (double)UNIV::SAMPLERATE) * 1000000000.0;
     uint32_t division_num = 0;
 
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
     // not on windows yet!
 #else
     struct timespec a, b;
@@ -124,7 +124,7 @@ namespace extemp {
         }        
         //std::cout << "TIME: " << UNIV::TIME << " diff: " << ((double)UNIV::TIME - ((double)UNIV::DEVICE_TIME+(double)AUDIO_DEVICE_START_OFFSET)) << " frames: " << frames << std::endl;
         UNIV::TIME += frames;        
-#ifdef TARGET_OS_WINDOWS
+#ifdef _WIN32
         // not on windows yet!
 #else
         // if last error (b.tv_nsec) is small then keep sleeping
@@ -141,9 +141,9 @@ namespace extemp {
           a.tv_nsec += (uint64_t)(((double)UNIV::TIME - ((double)UNIV::DEVICE_TIME+AUDIO_DEVICE_START_OFFSET)) / (double)UNIV::SAMPLERATE * 1000000000.0 * 0.5);
         }
         nanosleep(&a,&b);
-      }
 #endif
-    }while(UNIV::TIME_DIVISION > 1);
+	  }
+	}while(UNIV::TIME_DIVISION > 1);
     // return will never be called if UNIV::TIME_DIVISION > 1
     return;
   }
