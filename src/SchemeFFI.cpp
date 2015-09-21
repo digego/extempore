@@ -1997,6 +1997,25 @@ namespace extemp {
       }			
         
     char* filename = string_value(pair_cadr(args));
+#ifdef _WIN32
+    std::string str;
+    std::ofstream fout(filename);
+    llvm::raw_string_ostream ss(str);
+    ss << *m;
+    std::string irStr = ss.str();
+    std::string oldStr(" external global ");
+    std::string newStr(" external dllimport global ");
+
+    size_t pos = 0;
+    while((pos = irStr.find(oldStr, pos)) != std::string::npos)
+      {
+        irStr.replace(pos, oldStr.length(), newStr);
+        pos += newStr.length();
+      }
+
+    fout << irStr; //ss.str();
+    fout.close();
+#else
     std::error_code errcode;
     llvm::raw_fd_ostream ss(filename, errcode, llvm::sys::fs::F_RW);
     if(errcode) {
@@ -2004,6 +2023,7 @@ namespace extemp {
       return _sc->F;
     }
     llvm::WriteBitcodeToFile(m,ss);
+#endif
     return _sc->T;    
   }
 
