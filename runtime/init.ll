@@ -537,7 +537,7 @@ declare void @llvm_destroy_zone_after_delay(%mzone*, i64)
 declare void @free_after_delay(i8*, double)
 
 
-define double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data) 
+define dllexport double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data) 
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, double (i8*,i8*,double,i64,i64,double*)*}*
@@ -550,7 +550,7 @@ entry:
 ret double %result
 }
 
-define double @imp_dsp_sum_wrapper(i8* %_impz, i8* %closure, double* %sample, i64 %time, i64 %channel, double* %data) 
+define dllexport double @imp_dsp_sum_wrapper(i8* %_impz, i8* %closure, double* %sample, i64 %time, i64 %channel, double* %data) 
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, double (i8*,i8*,double*,i64,i64,double*)*}*
@@ -563,7 +563,7 @@ entry:
 ret double %result
 }
 
-define float @imp_dspf_wrapper(i8* %_impz, i8* %closure, float %sample, i64 %time, i64 %channel, float* %data) 
+define dllexport float @imp_dspf_wrapper(i8* %_impz, i8* %closure, float %sample, i64 %time, i64 %channel, float* %data) 
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, float (i8*,i8*,float,i64,i64,float*)*}*
@@ -576,7 +576,7 @@ entry:
 ret float %result
 }
 
-define float @imp_dspf_sum_wrapper(i8* %_impz, i8* %closure, float* %sample, i64 %time, i64 %channel, float* %data) 
+define dllexport float @imp_dspf_sum_wrapper(i8* %_impz, i8* %closure, float* %sample, i64 %time, i64 %channel, float* %data) 
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, float (i8*,i8*,float*,i64,i64,float*)*}*
@@ -589,7 +589,7 @@ entry:
 ret float %result
 }
 
-define void @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i64 %time, i8* %data) 
+define dllexport void @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i64 %time, i8* %data) 
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, void (i8*,i8*,float*,float*,i64,i8*)*}*
@@ -602,7 +602,7 @@ tail call fastcc void %f(i8* %_impz, i8* %e, float* %datain, float* %dataout, i6
 ret void
 }
 
-define void @imp_dsp_sum_wrapper_array(i8* %_impz, i8* %closure, float** %datain, float* %dataout, i64 %time, i8* %data) 
+define dllexport void @imp_dsp_sum_wrapper_array(i8* %_impz, i8* %closure, float** %datain, float* %dataout, i64 %time, i8* %data) 
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, void (i8*,i8*,float**,float*,i64,i8*)*}*
@@ -615,7 +615,7 @@ tail call fastcc void %f(i8* %_impz, i8* %e, float** %datain, float* %dataout, i
 ret void
 }
 
-define i8* @impc_get_env(i8* %impz, i8* %closure)
+define dllexport i8* @impc_get_env(i8* %impz, i8* %closure)
 {
 entry:
 %closureVal = bitcast i8* %closure to { i8*, i8*, i8* }*
@@ -634,19 +634,19 @@ declare i64 @llvm_now()
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SCHEME STUFF
 
-define i8* @impc_null()
+define dllexport i8* @impc_null()
 {
 entry:
 ret i8* null
 }
 
-define i1 @impc_true()
+define dllexport i1 @impc_true()
 {
 entry:
 ret i1 1
 }
 
-define i1 @impc_false()
+define dllexport i1 @impc_false()
 {
 entry:
 ret i1 0
@@ -656,56 +656,56 @@ ret i1 0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CASTING STUFF
 
-define i64 @i1toi64(i1 %a)
+define dllexport i64 @i1toi64(i1 %a)
 {
 entry:
 %return = zext i1 %a to i64
 ret i64 %return 
 }
 
-define i32 @i1toi32(i1 %a)
+define dllexport i32 @i1toi32(i1 %a)
 {
 entry:
 %return = zext i1 %a to i32
 ret i32 %return 
 }
 
-define i16 @i1toi16(i1 %a)
+define dllexport i16 @i1toi16(i1 %a)
 {
 entry:
 %return = zext i1 %a to i16
 ret i16 %return 
 }
 
-define i8 @i1toi8(i1 %a)
+define dllexport i8 @i1toi8(i1 %a)
 {
 entry:
 %return = zext i1 %a to i8
 ret i8 %return 
 }
 
-define i1 @i64toi1(i64 %a)
+define dllexport i1 @i64toi1(i64 %a)
 {
 entry:
 %return = trunc i64 %a to i1
 ret i1 %return
 }
 
-define i1 @i32toi1(i32 %a)
+define dllexport i1 @i32toi1(i32 %a)
 {
 entry:
 %return = trunc i32 %a to i1
 ret i1 %return
 }
 
-define i1 @i16toi1(i16 %a)
+define dllexport i1 @i16toi1(i16 %a)
 {
 entry:
 %return = trunc i16 %a to i1
 ret i1 %return
 }
 
-define i1 @i8toi1(i8 %a)
+define dllexport i1 @i8toi1(i8 %a)
 {
 entry:
 %return = trunc i8 %a to i1
@@ -714,56 +714,56 @@ ret i1 %return
 
 
 ;; i8 casts
-define i64 @i8toi64(i8 %a)
+define dllexport i64 @i8toi64(i8 %a)
 {
 entry:
 %return = sext i8 %a to i64
 ret i64 %return 
 }
 
-define i64 @i8toui64(i8 %a)
+define dllexport i64 @i8toui64(i8 %a)
 {
 entry:
 %return = zext i8 %a to i64
 ret i64 %return 
 }
 
-define i32 @i8toi32(i8 %a)
+define dllexport i32 @i8toi32(i8 %a)
 {
 entry:
 %return = sext i8 %a to i32
 ret i32 %return 
 }
 
-define i16 @i8toi16(i8 %a)
+define dllexport i16 @i8toi16(i8 %a)
 {
 entry:
 %return = sext i8 %a to i16
 ret i16 %return 
 }
 
-define i32 @i8toui32(i8 %a)
+define dllexport i32 @i8toui32(i8 %a)
 {
 entry:
 %return = zext i8 %a to i32
 ret i32 %return 
 }
 
-define i8 @i64toi8(i64 %a)
+define dllexport i8 @i64toi8(i64 %a)
 {
 entry:
 %return = trunc i64 %a to i8
 ret i8 %return
 }
 
-define i8 @i32toi8(i32 %a)
+define dllexport i8 @i32toi8(i32 %a)
 {
 entry:
 %return = trunc i32 %a to i8
 ret i8 %return
 }
 
-define i8 @i16toi8(i16 %a)
+define dllexport i8 @i16toi8(i16 %a)
 {
 entry:
 %return = trunc i16 %a to i8
@@ -771,42 +771,42 @@ ret i8 %return
 }
 
 ;; i16 casts
-define i64 @i16toi64(i16 %a)
+define dllexport i64 @i16toi64(i16 %a)
 {
 entry:
 %return = sext i16 %a to i64
 ret i64 %return 
 }
 
-define i64 @i16toui64(i16 %a)
+define dllexport i64 @i16toui64(i16 %a)
 {
 entry:
 %return = zext i16 %a to i64
 ret i64 %return 
 }
 
-define i32 @i16toi32(i16 %a)
+define dllexport i32 @i16toi32(i16 %a)
 {
 entry:
 %return = sext i16 %a to i32
 ret i32 %return 
 }
 
-define i32 @i16toui32(i16 %a)
+define dllexport i32 @i16toui32(i16 %a)
 {
 entry:
 %return = zext i16 %a to i32
 ret i32 %return 
 }
 
-define i16 @i64toi16(i64 %a)
+define dllexport i16 @i64toi16(i64 %a)
 {
 entry:
 %return = trunc i64 %a to i16
 ret i16 %return
 }
 
-define i16 @i32toi16(i32 %a)
+define dllexport i16 @i32toi16(i32 %a)
 {
 entry:
 %return = trunc i32 %a to i16
@@ -815,21 +815,21 @@ ret i16 %return
 
 
 ;; i32 casts
-define i64 @i32toi64(i32 %a)
+define dllexport i64 @i32toi64(i32 %a)
 {
 entry:
 %return = sext i32 %a to i64
 ret i64 %return 
 }
 
-define i64 @i32toui64(i32 %a)
+define dllexport i64 @i32toui64(i32 %a)
 {
 entry:
 %return = zext i32 %a to i64
 ret i64 %return 
 }
 
-define i32 @i64toi32(i64 %a)
+define dllexport i32 @i64toi32(i64 %a)
 {
 entry:
 %return = trunc i64 %a to i32
@@ -838,147 +838,147 @@ ret i32 %return
 
 
 ;; float casts
-define double @ftod(float %a)
+define dllexport double @ftod(float %a)
 {
 entry:
 %return = fpext float %a to double
 ret double %return
 }
 
-define float @dtof(double %a)
+define dllexport float @dtof(double %a)
 {
 entry:
 %return = fptrunc double %a to float
 ret float %return
 }
 
-define i64 @ftoi64(float %a)
+define dllexport i64 @ftoi64(float %a)
 {
 entry:
 %return = fptosi float %a to i64
 ret i64 %return
 }
 
-define i32 @ftoi32(float %a)
+define dllexport i32 @ftoi32(float %a)
 {
 entry:
 %return = fptosi float %a to i32
 ret i32 %return
 }
 
-define i16 @ftoi16(float %a)
+define dllexport i16 @ftoi16(float %a)
 {
 entry:
 %return = fptosi float %a to i16
 ret i16 %return
 }
 
-define i8 @ftoi8(float %a)
+define dllexport i8 @ftoi8(float %a)
 {
 entry:
 %return = fptosi float %a to i8
 ret i8 %return
 }
 
-define i1 @ftoi1(float %a)
+define dllexport i1 @ftoi1(float %a)
 {
 entry:
 %return = fptosi float %a to i1
 ret i1 %return
 }
 
-define i64 @ftoui64(float %a)
+define dllexport i64 @ftoui64(float %a)
 {
 entry:
 %return = fptoui float %a to i64
 ret i64 %return
 }
 
-define i32 @ftoui32(float %a)
+define dllexport i32 @ftoui32(float %a)
 {
 entry:
 %return = fptoui float %a to i32
 ret i32 %return
 }
 
-define i8 @ftoui8(float %a)
+define dllexport i8 @ftoui8(float %a)
 {
 entry:
 %return = fptoui float %a to i8
 ret i8 %return
 }
 
-define i1 @ftoui1(float %a)
+define dllexport i1 @ftoui1(float %a)
 {
 entry:
 %return = fptoui float %a to i1
 ret i1 %return
 }
 
-define float @i64tof(i64 %a)
+define dllexport float @i64tof(i64 %a)
 {
 entry:
 %return = sitofp i64 %a to float
 ret float %return
 }
 
-define float @i32tof(i32 %a)
+define dllexport float @i32tof(i32 %a)
 {
 entry:
 %return = sitofp i32 %a to float
 ret float %return
 }
 
-define float @i16tof(i16 %a)
+define dllexport float @i16tof(i16 %a)
 {
 entry:
 %return = sitofp i16 %a to float
 ret float %return
 }
 
-define float @i8tof(i8 %a)
+define dllexport float @i8tof(i8 %a)
 {
 entry:
 %return = sitofp i8 %a to float
 ret float %return
 }
 
-define float @i1tof(i1 %a)
+define dllexport float @i1tof(i1 %a)
 {
 entry:
 %return = sitofp i1 %a to float
 ret float %return
 }
 
-define float @ui64tof(i64 %a)
+define dllexport float @ui64tof(i64 %a)
 {
 entry:
 %return = uitofp i64 %a to float
 ret float %return
 }
 
-define float @ui32tof(i32 %a)
+define dllexport float @ui32tof(i32 %a)
 {
 entry:
 %return = uitofp i32 %a to float
 ret float %return
 }
 
-define float @ui16tof(i16 %a)
+define dllexport float @ui16tof(i16 %a)
 {
 entry:
 %return = uitofp i16 %a to float
 ret float %return
 }
 
-define float @ui8tof(i8 %a)
+define dllexport float @ui8tof(i8 %a)
 {
 entry:
 %return = uitofp i8 %a to float
 ret float %return
 }
 
-define float @ui1tof(i1 %a)
+define dllexport float @ui1tof(i1 %a)
 {
 entry:
 %return = uitofp i1 %a to float
@@ -987,175 +987,175 @@ ret float %return
 
 ;; double casts
 
-define i64 @dtoi64(double %a)
+define dllexport i64 @dtoi64(double %a)
 {
 entry:
 %return = fptosi double %a to i64
 ret i64 %return
 }
 
-define i32 @dtoi32(double %a)
+define dllexport i32 @dtoi32(double %a)
 {
 entry:
 %return = fptosi double %a to i32
 ret i32 %return
 }
 
-define i16 @dtoi16(double %a)
+define dllexport i16 @dtoi16(double %a)
 {
 entry:
 %return = fptosi double %a to i16
 ret i16 %return
 }
 
-define i8 @dtoi8(double %a)
+define dllexport i8 @dtoi8(double %a)
 {
 entry:
 %return = fptosi double %a to i8
 ret i8 %return
 }
 
-define i1 @dtoi1(double %a)
+define dllexport i1 @dtoi1(double %a)
 {
 entry:
 %return = fptosi double %a to i1
 ret i1 %return
 }
 
-define i64 @dtoui64(double %a)
+define dllexport i64 @dtoui64(double %a)
 {
 entry:
 %return = fptoui double %a to i64
 ret i64 %return
 }
 
-define i32 @dtoui32(double %a)
+define dllexport i32 @dtoui32(double %a)
 {
 entry:
 %return = fptoui double %a to i32
 ret i32 %return
 }
 
-define i8 @dtoui8(double %a)
+define dllexport i8 @dtoui8(double %a)
 {
 entry:
 %return = fptoui double %a to i8
 ret i8 %return
 }
 
-define i1 @dtoui1(double %a)
+define dllexport i1 @dtoui1(double %a)
 {
 entry:
 %return = fptoui double %a to i1
 ret i1 %return
 }
 
-define double @i64tod(i64 %a)
+define dllexport double @i64tod(i64 %a)
 {
 entry:
 %return = sitofp i64 %a to double
 ret double %return
 }
 
-define double @i32tod(i32 %a)
+define dllexport double @i32tod(i32 %a)
 {
 entry:
 %return = sitofp i32 %a to double
 ret double %return
 }
 
-define double @i16tod(i16 %a)
+define dllexport double @i16tod(i16 %a)
 {
 entry:
 %return = sitofp i16 %a to double
 ret double %return
 }
 
-define double @i8tod(i8 %a)
+define dllexport double @i8tod(i8 %a)
 {
 entry:
 %return = sitofp i8 %a to double
 ret double %return
 }
 
-define double @i1tod(i1 %a)
+define dllexport double @i1tod(i1 %a)
 {
 entry:
 %return = sitofp i1 %a to double
 ret double %return
 }
 
-define double @ui64tod(i64 %a)
+define dllexport double @ui64tod(i64 %a)
 {
 entry:
 %return = uitofp i64 %a to double
 ret double %return
 }
 
-define double @ui32tod(i32 %a)
+define dllexport double @ui32tod(i32 %a)
 {
 entry:
 %return = uitofp i32 %a to double
 ret double %return
 }
 
-define double @ui16tod(i16 %a)
+define dllexport double @ui16tod(i16 %a)
 {
 entry:
 %return = uitofp i16 %a to double
 ret double %return
 }
 
-define double @ui8tod(i8 %a)
+define dllexport double @ui8tod(i8 %a)
 {
 entry:
 %return = uitofp i8 %a to double
 ret double %return
 }
 
-define double @ui1tod(i1 %a)
+define dllexport double @ui1tod(i1 %a)
 {
 entry:
 %return = uitofp i1 %a to double
 ret double %return
 }
 
-define i64 @ptrtoi64(i8* %a)
+define dllexport i64 @ptrtoi64(i8* %a)
 {
 entry:
 %return = ptrtoint i8* %a to i64
 ret i64 %return
 }
 
-define i8* @i64toptr(i64 %a)
+define dllexport i8* @i64toptr(i64 %a)
 {
 entry:
 %return = inttoptr i64 %a to i8*
 ret i8* %return
 }
 
-define i32 @ptrtoi32(i8* %a)
+define dllexport i32 @ptrtoi32(i8* %a)
 {
 entry:
 %return = ptrtoint i8* %a to i32
 ret i32 %return
 }
 
-define i16 @ptrtoi16(i8* %a)
+define dllexport i16 @ptrtoi16(i8* %a)
 {
 entry:
 %return = ptrtoint i8* %a to i16
 ret i16 %return
 }
 
-define i8* @i32toptr(i32 %a)
+define dllexport i8* @i32toptr(i32 %a)
 {
 entry:
 %return = inttoptr i32 %a to i8*
 ret i8* %return
 }
 
-define i8* @i16toptr(i16 %a)
+define dllexport i8* @i16toptr(i16 %a)
 {
 entry:
 %return = inttoptr i16 %a to i8*
