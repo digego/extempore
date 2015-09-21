@@ -84,14 +84,13 @@ if(APPLE)
   target_sources(portaudio
     PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core.c
     PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_blocking.c
-    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_blocking.h
-    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_internal.h
     # PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_old.c
     PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_utilities.c
-    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_utilities.h
     PRIVATE src/portaudio/src/os/unix/pa_unix_hostapis.c
     PRIVATE src/portaudio/src/os/unix/pa_unix_util.c
-    PRIVATE src/portaudio/src/os/unix/pa_unix_util.h)
+    )
+  target_include_directories(portaudio
+    PRIVATE src/portaudio/src/os/unix)
   target_compile_definitions(portaudio
     PRIVATE -DPA_USE_COREAUDIO)
   target_compile_options(portaudio
@@ -107,7 +106,9 @@ elseif(LINUX)
     PRIVATE src/portaudio/src/hostapi/alsa/pa_linux_alsa.c
     PRIVATE src/portaudio/src/os/unix/pa_unix_hostapis.c
     PRIVATE src/portaudio/src/os/unix/pa_unix_util.c
-    PRIVATE src/portaudio/src/os/unix/pa_unix_util.h)
+    )
+  target_include_directories(portaudio
+    PRIVATE src/portaudio/src/os/unix)
   target_compile_definitions(portaudio
     PRIVATE -DPA_USE_ALSA)
   target_link_libraries(portaudio
@@ -117,17 +118,24 @@ elseif(WIN32)
   # use wdmks on Windows
   target_sources(portaudio
     PRIVATE src/portaudio/src/hostapi/wdmks/pa_win_wdmks.c
+    PRIVATE src/portaudio/src/hostapi/wmme/pa_win_wmme.c
+    PRIVATE src/portaudio/src/hostapi/dsound/pa_win_ds.c
+    PRIVATE src/portaudio/src/hostapi/dsound/pa_win_ds_dynlink.c
+    PRIVATE src/portaudio/src/hostapi/wasapi/pa_win_wasapi.c
     PRIVATE src/portaudio/src/os/win/pa_win_coinitialize.c
-    PRIVATE src/portaudio/src/os/win/pa_win_coinitialize.h
     PRIVATE src/portaudio/src/os/win/pa_win_hostapis.c
     PRIVATE src/portaudio/src/os/win/pa_win_util.c
     PRIVATE src/portaudio/src/os/win/pa_win_waveformat.c
     PRIVATE src/portaudio/src/os/win/pa_win_wdmks_utils.c
-    PRIVATE src/portaudio/src/os/win/pa_win_wdmks_utils.h
     PRIVATE src/portaudio/src/os/win/pa_x86_plain_converters.c
-    PRIVATE src/portaudio/src/os/win/pa_x86_plain_converters.h)
-    target_compile_definitions(portaudio
-      PRIVATE -DPA_USE_WDMKS)
+    )
+  target_include_directories(portaudio
+    PRIVATE src/portaudio/src/os/win)
+  target_compile_definitions(portaudio
+      PRIVATE -DPA_USE_WDMKS
+      PRIVATE -DPA_USE_WMME
+      PRIVATE -DPA_USE_DS
+      PRIVATE -DPA_USE_WASAPI)
 
 endif()
 
