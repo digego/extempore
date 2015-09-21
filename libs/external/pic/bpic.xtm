@@ -1,6 +1,7 @@
 ;; bpic
 
-(sys:load "libs/external/graphics-pipeline.xtm")
+(sys:load "libs/core/math.xtm")
+(sys:load "libs/external/gl.xtm")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib libbpic2
@@ -74,7 +75,7 @@
 (bind-val mixup i32*)
 (bind-val npicy i32*)
 ;; and a vbo for the graphics code
-(bind-val vbo E_vbo*)
+(bind-val vbo VBO*)
 
 (bind-func allocate_data_arrays
   (lambda (np:i32 nx:i32 ny:i32)
@@ -95,9 +96,9 @@
           (sct_ptr (halloc (/ (max2i32 nx ny) 2)))
           (npicy_ptr (halloc (+ ny 1))))
       (set! part part_ptr)
-      (set! vbo (create_vbo (* np 20)
-                            (cast part i8*)
-                            GL_STREAM_DRAW))
+      (set! vbo (VBO_create_float_usage part
+                                        (* (convert np) 5)
+                                        GL_STREAM_DRAW))
       (set! part2 part2_ptr)
       (set! qe qe_ptr)
       (set! fxyze fxyze_ptr)
@@ -191,13 +192,12 @@
 ;; need to set up the graphics context before we create the VBO or
 ;; it'll crash
 
-(define width 1024.0)
-(define height 768.0)
-(bind-val width float 1024.0)
-(bind-val height float 768.0)
-(define fullscreen #t)
+(sys:load "libs/external/glfw3.xtm")
 
-(define *gl-ctx* (gl:make-ctx ":0" fullscreen 0. 0. width height))
+(bind-val window GLFWwindow*
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_fullscreen_compatibility_window)))
 
 (define *max-grid-size* (real->integer (expt 2 9)))
 (define *max-num-particles* (real->integer (* 3072 3072)))
@@ -398,25 +398,24 @@
 
 ;; visualisation code
 
-(bind-val star_texture i32 0)
+(bind-val tex Texture)
+(bind-val vao VAO*)
+(bind-val sp ShaderProgram)
 
-(bind-func load-tex
-  (lambda (tex_path id)
-    (let ((t (gl_load_image tex_path id)))
-      (set! star_texture t)
-      (printf "texture: %d\n" star_texture)
-      void)))
+(call-as-xtlang
+ ;; (delete_texture tex)
+ (set! tex (Texture_bind_image (Texture_create) "assets/images/star.png"))
+ (if (< tex 0)
+     (println "Whoops - tex is < 0")))
 
-;; 0 meaning load texture into new id
-(load-tex "assets/images/star.png" 0)
+(bind-func create_texture_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
 
-(bind-val particle_shader i32 0)
+;; (create_texture_shader (file->string "examples/external/shader-tutorials/texture.vert")
+;;                        (file->string "examples/external/shader-tutorials/texture.frag"))
 
-(bind-func update_shader_program
-  (lambda (vert:i8* frag:i8*)
-    (set! particle_shader (create_shader vert frag))))
-
-(update_shader_program
+(create_texture_shader
  "// VERTEX SHADER
 // GLSL 1.2 compatible
 
@@ -450,6 +449,11 @@ void main() {
    //gl_FragColor = gl_Color;
 }")
 
+(bind-val GL_POINT_SPRITE                   i32 #x8861)
+(bind-val GL_COORD_REPLACE                  i32 #x8862)
+(bind-val GL_TEXTURE_RECTANGLE_ARB          i32 #x84F5)
+(bind-lib libGL glTexEnvi [void,GLenum,GLenum,GLint]*)
+
 (bind-func gl_draw_particles
   (let ((vert_loc:i32 -1)
         (vel_loc:i32 -1)
@@ -459,13 +463,13 @@ void main() {
               (= vel_loc -1)
               (= nx_loc -1))
           (begin
-            (set! vert_loc (glGetAttribLocation particle_shader "pvert"))
-            (set! vel_loc (glGetAttribLocation particle_shader "pvel"))
-            (set! nx_loc (glGetUniformLocation particle_shader "nx"))))
+            (set! vert_loc (glGetAttribLocation sp "pvert"))
+            (set! vel_loc (glGetAttribLocation sp "pvel"))
+            (set! nx_loc (glGetUniformLocation sp "nx"))))
       (let ((np (/ (tref vbo 1) 20)))
         (glClearColor 0.0 0.0 0.0 1.0)
         (glClear (+ GL_DEPTH_BUFFER_BIT GL_COLOR_BUFFER_BIT))
-        (glLoadIdentity)
+        ;; (glLoadIdentity)
         ;; gl setup
         (glEnable GL_BLEND)
         (glDisable GL_DEPTH_TEST)
@@ -474,7 +478,7 @@ void main() {
         (glEnable GL_POINT_SPRITE)
         (glEnable GL_VERTEX_PROGRAM_POINT_SIZE)
         ;; shader program
-        (glUseProgram particle_shader)
+        (glUseProgram sp)
         ;; set uniform
         (glUniform1f nx_loc (convert nx float))
         ;; vbo stuff
@@ -488,13 +492,13 @@ void main() {
         (glActiveTexture GL_TEXTURE0)
         (glDisable GL_TEXTURE_RECTANGLE_ARB)
         (glEnable GL_TEXTURE_2D)
-        (glBindTexture GL_TEXTURE_2D star_texture)
+        (glBindTexture GL_TEXTURE_2D tex)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
         (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
         (glTexEnvi GL_POINT_SPRITE GL_COORD_REPLACE 1)
-        (glUniform1i (glGetUniformLocation particle_shader "tex1") 0)
+        (glUniform1i (glGetUniformLocation sp "tex1") 0)
         ;; draw the points
         (glDrawArrays GL_POINTS 0 np)
         ;; disable texture
@@ -515,23 +519,23 @@ void main() {
         (glEnable GL_DEPTH_TEST)
         (glDepthMask GL_TRUE)
         ;; print errors (if there are any)
-        (let ((glErr (glGetError)))
-          (if (<>  glErr GL_NO_ERROR)
-              (printf "error in gl_draw_particles: %s\n"
-                      (gluErrorString glErr)))))
+        (gl_print_error))
       1)))
 
-(define run-bpic
-  (lambda (delta-t)
+(bind-func run_bpic
+  (lambda (delta_t:double)
     (let ((ntime (bpic_step)))
       (if (= (modulo ntime 1000) 0)
-          (println 'ntime: ntime)))
+          (println "ntime:" ntime)))
     (gl_draw_particles (bpic_step.nx))
-    (gl:swap-buffers *gl-ctx*)
-    (callback (+ (now) (* *second* delta-t))
-              'run-bpic
-              delta-t)))
+    (glfwSwapBuffers window)
+    (let ((next_time (+ (now) (convert (* 44100. delta_t)))))
+      (callback next_time run_bpic delta_t))))
 
+;; (bind-func run_bpic
+;;   (lambda (time:i64 delta_t:double)
+;;     (println "run_bpic callback stopped")
+;;     #f))
 
 ;; gaussian random number X ~ N(0,1)
 ;; algorithm by Marsaglia http://c-faq.com/lib/gaussian.html
