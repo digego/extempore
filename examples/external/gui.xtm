@@ -20,6 +20,9 @@
 ;; OpenSans fonts are located on your system
 (gui_set_default_theme "/Users/ben/Library/Fonts")
 
+;; start the render loop - now you should see the button appear
+(gui_render_loop (now) (/ 1. 30.))
+
 ;; first, create a button callback (must be of type [void]*)
 (bind-func my_button_cb
   (lambda ()
@@ -34,16 +37,6 @@
 
 (add_the_button)
 
-;; nothing happened, because we haven't provided a temporal recursion
-;; to draw the GUI frame
-(bind-func gui_render_loop
-  (lambda (time:i64 delta_t:double)
-    (gui_render)
-    (let ((next_time (+ time (convert (* 44100. delta_t)))))
-      (callback next_time gui_render_loop next_time delta_t))))
-
-;; start the render loop - now you should see the button appear
-(gui_render_loop (now) (/ 1. 30.))
 
 ;; let's add a slider along the bottom
 

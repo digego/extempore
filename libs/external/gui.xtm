@@ -835,6 +835,7 @@ several different editors."
 (bind-val GUI_SLIDER2D i64 (<< 1 7))
 (bind-val GUI_IMAGE i64 (<< 1 8))
 (bind-val GUI_FBO i64 (<< 1 9))
+(bind-val GUI_BLANK i64 (<< 1 10))
 
 ;; button
 
@@ -1172,6 +1173,18 @@ The widget will be assigned the next available id based on the current state of 
 
 (bind-poly Widget_slider2D Widget_slider2D_next_id)
 (bind-poly Widget_slider2D Widget_slider2D_with_id)
+
+;; running the GUI interaction loop
+
+(bind-func gui_render_loop
+  (lambda (time:i64 delta_t:double)
+    (gui_render)
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time gui_render_loop next_time delta_t))))
+
+;; to start the render loop - call this after (gui_init)
+
+;; (gui_render_loop (now) (/ 1. 30.))
 
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
