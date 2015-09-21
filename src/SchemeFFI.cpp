@@ -2003,10 +2003,23 @@ namespace extemp {
     llvm::raw_string_ostream ss(str);
     ss << *m;
     std::string irStr = ss.str();
+
+    // add dllimport (otherwise global variables won't work)
     std::string oldStr(" external global ");
     std::string newStr(" external dllimport global ");
-
     size_t pos = 0;
+
+    while((pos = irStr.find(oldStr, pos)) != std::string::npos)
+      {
+        irStr.replace(pos, oldStr.length(), newStr);
+        pos += newStr.length();
+      }
+
+    // LLVM can't handle guaranteed tail call under win64 yet
+    oldStr = std::string(" tail call ");
+    newStr = std::string(" call ");
+    pos = 0;
+
     while((pos = irStr.find(oldStr, pos)) != std::string::npos)
       {
         irStr.replace(pos, oldStr.length(), newStr);
