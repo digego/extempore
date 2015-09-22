@@ -1574,31 +1574,19 @@ namespace extemp {
 #endif
   pointer SchemeFFI::jitCompileIRString(scheme* _sc, pointer args)
   {
+    char* assm = string_value(pair_car(args));
+
     // Create some module to put our function into it.
     using namespace llvm;
+    SMDiagnostic pa;
     Module* M = EXTLLVM::I()->M;
     legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
 
-#ifdef EXT_MCJIT  
+#ifdef EXT_MCJIT
     char modname[256];
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
     char tmpbuf[1024];
-#endif
-  
-    char* assm = string_value(pair_car(args));
-    SMDiagnostic pa;
-    //ParseError pa;
-    long long num_of_funcs = M->getFunctionList().size();
 
-#ifndef EXT_MCJIT  
-    std::unique_ptr<llvm::Module> newModule = ParseAssemblyString(assm, M, pa, getGlobalContext());
-
-    if(EXTLLVM::OPTIMIZE_COMPILES)
-      {
-        PM->run(*M);
-      }
-  
-#else
     std::string asmcode(assm);
     int cnt = 0;
 
@@ -1689,7 +1677,15 @@ namespace extemp {
       {
         PM->run(*newModule);
       }
-  
+#else
+    // the "old JIT" code path
+    long long num_of_funcs = M->getFunctionList().size();
+    std::unique_ptr<llvm::Module> newModule = ParseAssemblyString(assm, M, pa, getGlobalContext());
+
+    if(EXTLLVM::OPTIMIZE_COMPILES)
+      {
+        PM->run(*M);
+      }
 #endif
   
     //std::stringstream ss;
@@ -1895,11 +1891,6 @@ namespace extemp {
   {
     using namespace llvm;
 
-#ifdef EXT_MCJIT
-    legacy::PassManager* PM = extemp::EXTLLVM::I()->PM;
-#else
-    PassManager* PM = extemp::EXTLLVM::I()->PM;
-#endif
     char* struct_type_str = string_value(pair_car(args));
     unsigned long long hash = string_hash((unsigned char*)struct_type_str);
     char name[128];
@@ -2251,12 +2242,11 @@ namespace extemp {
     //std::cout << "EE: " << EXTLLVM::I()->EE << std::endl;
     void* p = 0;
     try{
-      EXTLLVM* xll = EXTLLVM::I();
-      ExecutionEngine* EE = xll->EE;
       
 #ifdef EXT_MCJIT
       void* p = NULL;
 #else      
+      ExecutionEngine* EE = EXTLLVM::I()->EE;
       EE->lock.acquire();
       void* p = EE->recompileAndRelinkFunction(func);
       EE->lock.release();
@@ -2288,7 +2278,6 @@ namespace extemp {
   llvm::MutexGuard locked(EE->lock);
 #endif
 	
-        Module* M = EXTLLVM::I()->M;
 	llvm::Function* func = (Function*) cptr_value(pair_car(args));
 	if(func == 0)
 	{
@@ -2468,8 +2457,7 @@ namespace extemp {
  #endif
  	llvm::APFloat apf(f); 
  		
- 	bool ignored;
- 	bool isDouble = true; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
+	bool isDouble = true; // apf.getSemantics() == &llvm::APFloat::IEEEdouble;
  	double Val = isDouble ? apf.convertToDouble() : apf.convertToFloat();
 
         // char hexstr[128];
@@ -2586,7 +2574,6 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
     void* library = cptr_value(pair_car(args));
     char* symname = string_value(pair_cadr(args));
 
-    llvm::Module* M = EXTLLVM::I()->M;
     llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
 
     llvm::MutexGuard locked(EE->lock);

@@ -344,7 +344,6 @@ namespace extemp {
     device_time = UNIV::DEVICE_TIME;
 
     int channels = 2;
-    uint64_t numOfSamples = (uint64_t) (framesPerBuffer * channels);
     sched->getGuard()->signal();		
     void* dsp_closure = AudioDevice::I()->getDSPClosure();
     void* cache_closure = 0;
@@ -608,15 +607,7 @@ namespace extemp {
     }
 
     const   PaDeviceInfo *deviceInfo;
-    const   PaHostApiInfo* apiInfo;
-    /*
-      for( int i=0; i<numDevices; i++ ) {
-      deviceInfo = Pa_GetDeviceInfo( i );
-      apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-      printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n",i,deviceInfo->name,deviceInfo->hostApi,apiInfo->name,deviceInfo->maxInputChannels,deviceInfo->maxOutputChannels);
-      } 
-    */   
-    //printf("-----------------------------------\n\n");
+
     int inputDevice = Pa_GetDefaultInputDevice();
     int outputDevice = Pa_GetDefaultOutputDevice();     
 
@@ -782,7 +773,6 @@ namespace extemp {
 
   void AudioDevice::printDevices() {
     Pa_Initialize();
-    PaError err;
 
     int numDevices = Pa_GetDeviceCount();
     if( numDevices <= 0 ) {
@@ -840,7 +830,6 @@ namespace extemp {
     const double thread_start_time = getRealTime();
     const double sec_per_frame = (double)UNIV::FRAMES/(double)UNIV::SAMPLERATE;
     double current_thread_time;
-    double nextFrame;
 
     // the worker loop
     while(true){

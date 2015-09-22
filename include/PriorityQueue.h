@@ -94,7 +94,7 @@ namespace extemp {
 	{
 	    mutex.lock();
 				
-	    CIter pos  = queue.insert(std::make_pair(val->getStartTime(),val));
+      // CIter pos  = queue.insert(std::make_pair(val->getStartTime(),val));
 				
 #ifdef _DEBUG_QUEUE_
 	    std::cout << "QUEUE[" << this << "] " << "Successfully Added Task. Size: " << queue.size() << " at startime " << val->getStartTime() << std::endl;

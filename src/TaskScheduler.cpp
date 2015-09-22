@@ -83,7 +83,6 @@ namespace extemp {
   {
     uint32_t frames = UNIV::FRAMES / UNIV::TIME_DIVISION;
     uint64_t nanosecs = ((double)frames / (double)UNIV::SAMPLERATE) * 1000000000.0;
-    uint32_t division_num = 0;
 
 #ifdef _WIN32
     // not on windows yet!

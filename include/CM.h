@@ -56,7 +56,7 @@ namespace extemp {
     template<typename T>
     class CMI : public CM {
     public:
-	CMI(T* _object, void(T::* _member) (TaskI* task)) : CM(), object(_object), member(_member) {}
+	CMI(T* _object, void(T::* _member) (TaskI* task)) : CM(), member(_member), object(_object) {}
 	void execute(TaskI* task) { //TaskI* task) { 
 	    //std::cout << "TIME: " << current_time << "  TAG: " << tag << "  ARG: " << arg << "   OBJ: " << object << "   MEMBER: " << member << std::endl;
 	    if(object == NULL) std::cerr << "AIME::Object has been removed before task could execute!" << std::endl; 
