@@ -1151,7 +1151,10 @@
 
 (define impc:ti:print-genericfunc-cache
   (lambda ()
-    (println '*impc:ti:genericfunc-cache*: *impc:ti:genericfunc-cache*)))
+    (println '----------------------)
+    (map (lambda (x)
+           (println ':> x))
+         *impc:ti:genericfunc-cache*)))
 
 (define impc:ti:reset-genericfunc-cache
   (lambda ()
@@ -3557,7 +3560,7 @@
                                                (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
                                          (if (regex:match? x "^!")
                                              #f
-                                             (or (regex:match? x gpolyname)
+                                             (or (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
                                                  (impc:ir:type? (impc:ir:get-type-from-pretty-str x))))))
                                    ;; (impc:ir:type? x)))))
                                    es)))
@@ -3573,7 +3576,7 @@
                      (newtype2 (cons 14 (map (lambda (x)
                                                (if (string? (impc:ir:get-type-from-pretty-str x))
                                                    (impc:ir:get-type-from-pretty-str x)
-                                                   (if (regex:match? x gpolyname)
+                                                   (if (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
                                                        (impc:ir:pointer++ (string-append "%" newname) (impc:ir:get-ptr-depth x))
                                                        (impc:ir:get-type-from-pretty-str x))))
                                              elements)))
@@ -7965,9 +7968,11 @@
                                             (map (lambda (x)
                                                    (string-append
                                                     ","
-                                                    (regex:replace x
-                                                                   (string-append namestr "([*]*)")
-                                                                   (string-append namestr ":" type "$1"))))
+                                                    (if (regex:match? x (string-append namestr "([{<:*)|$"))
+                                                        (regex:replace x
+                                                                       (string-append namestr "([*]*)")
+                                                                       (string-append namestr ":" type "$1"))
+                                                        x)))
                                                  a))
                                      (apply string-append (symbol->string name) "*"
                                             (map (lambda (x) (string-append "," x)) a)))
