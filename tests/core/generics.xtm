@@ -1,8 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Messing around with some preiminary ideas for type classes
-;;
-;; obviously the idea would be to hide all of this behind syntax!
+;; Some more more advanced generics tests
 ;;
 
 (sys:load "libs/core/test.xtm")
@@ -161,3 +159,27 @@
                        (div NUM_i64 12 3))
               (plus NUM_i32 3:i32 2:i32)))
          (type_class_test) 5)
+
+
+
+(bind-type ShapeCircle <!a,!a,!a>)
+(bind-type ShapeRectangle <!a,!a,!a,!a>)
+(bind-type Shape <i64,ShapeCircle{!a}*,ShapeRectangle{!a}*>)
+
+(bind-func Circle:[Shape{!a}*,!a,!a,!a]*
+  (lambda (x y z)
+    (let ((c (ShapeCircle x y z))
+          (s (Shape 1 c (cast null))))
+      s)))
+
+(bind-func Rectangle:[Shape{!a}*,!a,!a,!a,!a]*
+  (lambda (x y w h)
+    (let ((r (ShapeRectangle x y w h)))
+      (Shape 2 (cast null) r))))
+
+(xtmtest '(bind-func make_shapes
+            (lambda ()
+              (let ((s1 (Circle 1.0 2.0 3.0))
+                    (s2 (Rectangle 1.0 2.0 3.0 4.0)))
+                (list s1 s2))))
+         (make_shapes))
