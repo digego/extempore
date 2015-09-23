@@ -62,7 +62,7 @@ namespace extemp {
 	virtual int getTag() { return this->tag; }
 				
     protected:
-	TaskI(long long int _startTime, long long int _duration, CM* _classMember, int _tag/*std::string _label*/) : startTime(_startTime), duration(_duration), active(true), is_callback(false), is_aumidi(false), tag(_tag), classMember(_classMember) {} //label(_label) {}				
+	TaskI(long long int _startTime, long long int _duration, CM* _classMember, int _tag/*std::string _label*/) : startTime(_startTime), duration(_duration), active(true), is_callback(false), is_aumidi(false), classMember(_classMember), tag(_tag) {} //label(_label) {}
 		
     private:
 	long long int startTime;

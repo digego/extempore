@@ -43,7 +43,9 @@
 
 namespace extemp
 {
-    EXTMonitor::EXTMonitor(std::string _name) : name(_name), mutex(_name)
+    EXTMonitor::EXTMonitor(std::string _name) :
+	mutex(_name),
+	name(_name)
     {
         initialised = false;
         init();

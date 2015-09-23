@@ -717,6 +717,8 @@ int llvm_fscanf(FILE* stream, char* format, ...)
 void llvm_send_udp(char* host, int port, void* message, int message_length)
 {
   int length = message_length;
+  int ret = 0;
+  char* ptr;
 
 #ifdef EXT_BOOST
   boost::asio::io_service io_service;

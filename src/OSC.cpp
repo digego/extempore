@@ -531,6 +531,7 @@ namespace extemp {
   // 0 = still filling packet + active escape is OFF
   // -1 = bad packet 
   int parse_osc_slip_data(std::vector<char>* data, char* buf, int res, bool active_escape) {
+    std::vector<char>::iterator it = data->end();
     // copy buf into data
     for(int i=0;i<res;i++,buf++) {
       switch(*buf){
@@ -1045,6 +1046,7 @@ namespace extemp {
 #endif
     OSC* osc = OSC::I(_sc);
     int ret = 0;
+    int tmpsize = 1024;
     int items = list_length(_sc,arg);
     for(int i=0;i<items;++i) {
       if(is_string(pair_car(arg))) {
@@ -1321,7 +1323,7 @@ namespace extemp {
         std::cout << "Error opening OSC socket"<< std::endl;
       }
       int broadcastEnable=1;
-      setsockopt(socket_fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+      int ret = setsockopt(socket_fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
 
       fcntl(socket_fd, F_SETFL, O_NONBLOCK); //set to non-blocking socket
 
