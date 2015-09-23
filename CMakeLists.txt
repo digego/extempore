@@ -382,10 +382,16 @@ install(DIRECTORY libs
   PATTERN "aot-cache" EXCLUDE
   PATTERN ".DS_Store" EXCLUDE)
 
-add_custom_target(uninstall
-  COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
-  COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}
-  COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore and ${EXT_SHARE_DIR}")
+if(IN_TREE)
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
+    COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore")
+else()
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}
+    COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore")
+endif()
 
 ###################
 # AOT compilation #
