@@ -1,0 +1,45 @@
+;;; datavis.xtm:examples --
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libglfw3, libnanovg
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
+(sys:load "libs/external/datavis.xtm")
+
+;; initialisation
+
+(gui_init 800 600)
+(gui_set_default_theme "/Users/ben/Library/Fonts")
+(gui_render_loop (/ 1. 30.))
+
+(bind-func draw_barplot
+  (let ((nlabs 5)
+        (labs:float* (zalloc nlabs))
+        (bars:float* (zalloc nlabs))
+        (i 0))
+    (dotimes (i nlabs)
+      (pset! labs i (* (convert i) (/ 1. (convert (- nlabs 1))))))
+    (lambda (bounds:Rect*)
+      (dotimes (i nlabs)
+        (pset! bars i (random)))
+      (dv_draw_bars bounds bars nlabs)
+      (dv_draw_axis_labels_2D bounds labs nlabs labs nlabs)
+      (dv_draw_axes_2D bounds)
+      void)))
+
+(bind-func Widget_create_blank
+  (lambda ()
+    (lambda (widget:Widget* bounds:Rect*)
+      (draw_barplot bounds))))
+
+(bind-func add_histogram_widget
+  (lambda ()
+    (gui_add_widget (Widget_with_cb 0 .5 GUI_BARPLOT (Widget_create_blank)) .5 (convert GUI_SPLIT_VERTICAL))))
+
+(add_histogram_widget)

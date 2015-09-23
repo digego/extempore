@@ -1,0 +1,107 @@
+;;; datavis.xtm -- data visualisation library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libnanovg, libglfw
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
+(sys:load "libs/aot-cache/datavis.xtm" 'quiet)
+(sys:load-preload-check 'datavis)
+(define *xtmlib-datavis-loaded* #f)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/std.xtm")
+ (sys:load "libs/external/gui.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/core/std.xtm" 'quiet)
+ (sys:load "libs/external/gui.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmdatavis")
+
+(bind-func dv_draw_axes_2D
+  "draw 2D axes"
+  (lambda (bounds:Rect*)
+    (letz ((vg (GUI_context EXTEMPORE_GUI))
+           (padding .1))
+      (_nvgStrokeColor vg (NVGcolor 1. 1. 1. 1.))
+      (nvgBeginPath vg)
+      ;; max y (top left)
+      (nvgMoveTo vg
+                 (+ (tref bounds 0) (* (tref bounds 2) padding))
+                 (+ (tref bounds 1) (* (tref bounds 3) (- 1. padding))))
+      ;; origin
+      (nvgLineTo vg
+                 (+ (tref bounds 0) (* (tref bounds 2) padding))
+                 (+ (tref bounds 1) (* (tref bounds 3) padding)))
+      ;; max x (bottom right)
+      (nvgLineTo vg
+                 (+ (tref bounds 0) (* (tref bounds 2) (- 1. padding)))
+                 (+ (tref bounds 1) (* (tref bounds 3) padding)))
+      (nvgStroke vg)
+      0)))
+
+(bind-func dv_draw_axis_labels_2D
+  "draw 2D axis labels"
+  (lambda (bounds:Rect* xlabs:float* nxlabs ylabs:float* nylabs)
+    (letz ((vg (GUI_context EXTEMPORE_GUI))
+           (padding 0.1)
+           (font_size 20.)
+           (str:i8* (zalloc 256))
+           (i 0))
+      (nvgFontSize vg font_size)
+      (_nvgFillColor vg (NVGcolor .7 .7 .7 1.))
+      (nvgBeginPath vg)
+      ;; x labels
+      (dotimes (i nxlabs)
+        (sprintf str "%.2f" (convert (pref xlabs i) double))
+        (nvgText vg
+                 (+ (+ (tref bounds 0) (* (tref bounds 2) padding))
+                    (* (convert i) (/ (* (tref bounds 2) (- 1. (* 2. padding))) (convert (- nxlabs 1)))))
+                 (- (+ (tref bounds 1) (* (tref bounds 3) padding)) font_size)
+                 str
+                 null))
+      ;; y labels
+      (dotimes (i nylabs)
+        (sprintf str "%.2f" (convert (pref ylabs i) double))
+        (nvgText vg
+                 (+ (tref bounds 0) font_size)
+                 (+ (+ (tref bounds 1) (* (tref bounds 3) padding))
+                    (* (convert i) (/ (* (tref bounds 3) (- 1. (* 2. padding))) (convert (- nylabs 1)))))
+                 str
+                 null))
+      (nvgFill vg)
+      0)))
+
+(bind-func dv_draw_bars
+  "draw 2D axis labels"
+  (lambda (bounds:Rect* bars:float* nbars)
+    (letz ((vg (GUI_context EXTEMPORE_GUI))
+           (padding 0.1)
+           (i 0))
+      ;; x labels
+      (nvgBeginPath vg)
+      (dotimes (i nbars)
+        (nvgRect vg
+                 (+ (+ (tref bounds 0) (* (tref bounds 2) padding))
+                    (* (convert i) (/ (* (tref bounds 2) (- 1. (* 2. padding))) (convert nbars))))
+                 (+ (tref bounds 1) (* (tref bounds 3) padding))
+                 (/ (* (tref bounds 2) (- 1. (* 2. padding))) (convert nbars))
+                 (* (pref bars i) (* (tref bounds 3) (- 1. (* 2. padding))))))
+      (_nvgFillColor vg (NVGcolor .2 .2 .9 1.))
+      (nvgFill vg)
+      (_nvgStrokeColor vg (NVGcolor 0. 0. 0. 1.))
+      (nvgStrokeWidth vg 3.)
+      (nvgStroke vg)
+      0)))
+
+(bind-val GUI_BARPLOT i64 (<< 1 10))
+(bind-val GUI_SCATTERPLOT i64 (<< 1 11))
+(bind-val GUI_LINEPLOT i64 (<< 1 12))
+
+(impc:aot:insert-footer "xtmdatavis")
+(define *xtmlib-datavis-loaded* #t)
