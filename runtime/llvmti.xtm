@@ -8292,10 +8292,12 @@
 
 (define sys:load-dylib
   (lambda (dylib-path)
-    ;; TODO: check libs\\win64 on Windows
     (let ((dylib (or
                   (sys:open-dylib dylib-path)
-                  (sys:open-dylib (string-append (sys:share-dir) "/" dylib-path)))))
+                  (sys:open-dylib (sanitize-platform-path (string-append (sys:share-dir) "/" dylib-path)))
+                  (if (string=? (sys:platform) "Windows")
+                      (sys:open-dylib (sanitize-platform-path (string-append (sys:share-dir) "/libs/win64/lib/" dylib-path)))
+                      #f))))
       (if dylib
           (begin
             (impc:compiler:print-dylib-loading-details-to-log dylib-path)
