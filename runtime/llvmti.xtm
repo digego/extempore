@@ -1975,6 +1975,8 @@
           (begin
             (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
             (print "\n  " link-command "\n\n"))
+          ;; doesn't work!
+          ;; (sys:command "call \"c:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\bin\\amd64\\vcvars64.bat\"")
           (set! linker-res (sys:command link-command))
           (if (<> linker-res 0)
               (begin (print-with-colors 'red 'default #t
@@ -2063,6 +2065,12 @@
     (if (string=? (sys:platform) "Windows")
         (Windows-convert-unix-path path)
         path)))
+
+(define Windows-add-libdir-to-PATH
+  (lambda ()
+    (let ((path (sys:command-output "echo %PATH%")))
+      (if (not (regex:match? path "libs/win64/lib"))
+          (sys:command (string-append "set PATH=" path ";" (sys:share-dir) "/libs/win64/lib"))))))
 
 (define impc:aot:compile-xtm-file
   (lambda (lib-path exit-afterwards?)
