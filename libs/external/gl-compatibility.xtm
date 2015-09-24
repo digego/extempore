@@ -35,21 +35,13 @@
   (cond ((string=? (sys:platform) "Linux")
          "libGL.so")
         ((string=? (sys:platform) "Windows")
-         "Gl32.dll")
+         "opengl32.dll")
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")
         (else
          (begin (print-with-colors 'red 'default #f (print "Error"))
                 (print ": unknown platform ")
                 (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
-
-;; if on windows also check for opengl32.dll
-(if (not libGL)
-    (if (string=? "Windows" (sys:platform))
-        (begin (set! libGL (sys:load-dylib "opengl32.dll"))
-               (if (not libGL)
-                   (sys:load-escape "Error loading OpenGL library")))
-        (sys:load-escape "Error loading OpenGL library")))
 
 ;; gltypes.h
 
