@@ -131,6 +131,33 @@ Just grab the Windows 64-bit installer from
 (http://www.mega-nerd.com/libsndfile/), and copy `libsndfile-1.dll`
 and `libsndfile-1.lib` into `extempore/libs/Win64/lib`
 
+#### GLEW
+
+We don't use GLEW directly, but we use it to build nanovg.
+
+http://glew.sourceforge.net/
+
+Download the latest stable version (I used 1.13.0).
+
+```
+mkdir cmake-build && cd cmake-build
+cmake -G"Visual Studio 14 2015 Win64" ../build/cmake/
+```
+
+nanovg requires the `include/GL/glew.h` header and the `libglew32.lib`
+"static" lib.
+
+To use the shared library version of GLEW, you need to copy the
+headers and libraries into their destination directories. On Windows
+this typically boils down to copying:
+
+```
+bin/glew32.dll	        to     	%SystemRoot%/system32
+lib/glew32.lib	        to     	{VC Root}/Lib
+include/GL/glew.h	    to     	{VC Root}/Include/GL
+include/GL/wglew.h	    to     	{VC Root}/Include/GL
+```
+
 #### GLFW
 
 ```
