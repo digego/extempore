@@ -15,8 +15,8 @@
 (define *xtmlib-glfw3-loaded* #f)
 
 (impc:aot:suppress-aot-do
- (sys:load "libs/external/gl.xtm"))
-(impc:aot:insert-forms (sys:load "libs/external/gl.xtm" 'quiet))
+ (sys:load "libs/core/std.xtm"))
+(impc:aot:insert-forms (sys:load "libs/core/std.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmglfw3")
 
@@ -3149,37 +3149,6 @@
 ;;  */
 (bind-lib libglfw3 glfwGetProcAddress [GLFWglproc,i8*]*)
 
-;; ;; GLEW
-
-;; (bind-val GLEW_OK i32 0)
-;; (bind-val GLEW_NO_ERROR i32 0)
-;; (bind-val GLEW_ERROR_NO_GL_VERSION i32 1)        ; /* missing GL version */
-;; (bind-val GLEW_ERROR_GL_VERSION_10_ONLY i32 2)   ; /* Need at least OpenGL 1.1 */
-;; (bind-val GLEW_ERROR_GLX_VERSION_11_ONLY i32 3)  ; /* Need at least GLX 1.2 */
-
-;; (bind-lib libGLEW glewInit [i32])
-;; ;; glewExperimental is really a GLboolean (unsigned char)
-;; (bind-lib-val libGLEW glewExperimental i8)
-
-;; ;; xtlang helper functions
-
-;; (bind-func glew_init
-;;   (lambda (experimental_p:i8)
-;;     (set! glewExperimental experimental_p)
-;;     (let ((res (glewInit)))
-;;       (if (= res GLEW_OK)
-;;           (printf "GLEW Initialised.\n")
-;;           (begin (printf "Error initialising GLEW: ")
-;;                  (cond ((= res GLEW_ERROR_NO_GL_VERSION)
-;;                         (printf "no GL version.\n"))
-;;                        ((= res GLEW_ERROR_GL_VERSION_10_ONLY)
-;;                         (printf "need at least OpenGL 1.1\n"))
-;;                        ((= res GLEW_ERROR_GLX_VERSION_11_ONLY)
-;;                         (printf "need at least GLX 1.2.\n"))
-;;                        (else
-;;                         (printf "unknown error.\n")))))
-;;       res)))
-
 (bind-func glfw_init
   (lambda ()
     (glfwInit)))
@@ -3273,7 +3242,7 @@
   (lambda ()
     (glfwWindowHint GLFW_CONTEXT_VERSION_MAJOR 3)
     (glfwWindowHint GLFW_CONTEXT_VERSION_MINOR 2)
-    (glfwWindowHint GLFW_OPENGL_FORWARD_COMPAT (convert GL_TRUE))
+    (glfwWindowHint GLFW_OPENGL_FORWARD_COMPAT (convert 1)) ;; GL_TRUE
     (glfwWindowHint GLFW_OPENGL_PROFILE GLFW_OPENGL_CORE_PROFILE)))
 
 ;; this doesn't work across all platforms - need to do more investigation
@@ -3281,7 +3250,7 @@
   (lambda ()
     (glfwWindowHint GLFW_CONTEXT_VERSION_MAJOR 3)
     (glfwWindowHint GLFW_CONTEXT_VERSION_MINOR 1)
-    (glfwWindowHint GLFW_OPENGL_FORWARD_COMPAT (convert GL_FALSE))
+    (glfwWindowHint GLFW_OPENGL_FORWARD_COMPAT (convert 0)) ;; GL_FALSE
     (glfwWindowHint GLFW_OPENGL_PROFILE GLFW_OPENGL_COMPAT_PROFILE)))
 
 ;; callbacks
@@ -3309,7 +3278,7 @@
 
 (bind-func glfw_window_focus_callback:GLFWwindowfocusfun
   (lambda (window focused)
-    (if (= focused (convert GL_TRUE))
+    (if (= focused (convert 1)) ;; GL_TRUE
         (printf "window %p gained focus\n" window)
         (printf "window %p lost focus\n" window))
     void))
@@ -3331,7 +3300,6 @@
     (let ((window (glfw_create_window width height)))
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
-      (gl_print_driver_info)
       window)))
 
 (bind-func glfw_init_and_create_compatibility_window
@@ -3341,7 +3309,6 @@
     (let ((window (glfw_create_window width height)))
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
-      (gl_print_driver_info)
       window)))
 
 (bind-func glfw_init_and_create_interaction_window
@@ -3351,7 +3318,6 @@
     (let ((window (glfw_create_interaction_window width height)))
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
-      (gl_print_driver_info)
       window)))
 
 (bind-func glfw_init_and_create_interaction_compatibility_window
@@ -3361,7 +3327,6 @@
     (let ((window (glfw_create_interaction_window width height)))
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
-      (gl_print_driver_info)
       window)))
 
 (bind-func glfw_init_and_create_fullscreen_window
@@ -3371,7 +3336,6 @@
     (let ((window (glfw_create_fullscreen_window)))
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
-      (gl_print_driver_info)
       window)))
 
 (bind-func glfw_init_and_create_fullscreen_compatibility_window
@@ -3381,7 +3345,6 @@
     (let ((window (glfw_create_fullscreen_window)))
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
-      (gl_print_driver_info)
       window)))
 
 (bind-func glfw_get_framebuffer_width
