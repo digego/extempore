@@ -7,17 +7,22 @@ You'll need
 a **C++ compiler toolchain**, e.g.
 
 - `sudo apt-get install g++` on Ubuntu/Debian
-- Xcode or the standalone command line tools on OSX
-- Visual Studio on Windows (the "Community" version is now free)
+- `sudo yum install gcc gcc-c++` on Fedora/CentOS/RHEL
+- Xcode or the [command line tools](https://developer.apple.com/library/ios/technotes/tn2339/_index.html#//apple_ref/doc/uid/DTS40014588-CH1-WHAT_IS_THE_COMMAND_LINE_TOOLS_PACKAGE_) on OSX
+- Visual Studio on Windows (the
+  [Community 2015](https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx)
+  version is now free)
 
 **git**
 
 - `sudo apt-get install git` on Ubuntu/Debian
+- `sudo yum install git` on Fedora/CentOS/RHEL
 - `brew install git` on OSX with Homebrew
 - `choco install git` on Windows with Chocolatey
 
 **CMake** (version 3.1 or greater)
 
+- `sudo yum install cmake` on Fedora/CentOS/RHEL
 - `brew install cmake` on OSX with Homebrew
 - `choco install cmake` on Windows with Chocolatey
 
