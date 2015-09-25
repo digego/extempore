@@ -1298,34 +1298,38 @@
 
 (define impc:ir:genericfunc-type-setup
   (lambda (type)
-    (map (lambda (x)
-           (cond ((string? x)
-                  (if (regex:match? x "_poly_")
-                      (cadr (regex:matched x "%(.*)_poly_.*"))
-                      (cadr (regex:matched x "%([^-*]*)"))))
-                 ((and (symbol? x)
-                       (regex:match? (symbol->string x) "(:|{)")) ;; this is my last change here!!
-                  (car (impc:ti:split-namedtype x)))
-                 ((impc:ir:closure? x)
-                  (let* ((depth (+ -1 (impc:ir:get-ptr-depth x)))
-                         (res (apply
-                               string-append "[" (impc:ir:genericfunc-stringify-generic-arg-strings (cdr x)) "]"
-                               (make-list depth "*"))))
-                    res))
-                 ((impc:ir:tuple? x)
-                  (let* ((depth (+ 0 (impc:ir:get-ptr-depth x)))
-                         (res (apply
-                               string-append "<" (impc:ir:genericfunc-stringify-generic-arg-strings (cdr x)) ">"
-                               (make-list depth "*"))))
-                    (println 'tuple-res: res)
-                    res))
-                 ((impc:ir:type? x)
-                  (impc:ir:pretty-print-type x))
-                 (else "_")))
-         (if (and (number? (car type))
-                  (impc:ir:closure? type))
-             (cddr type)
-             type))))
+    ;; (println 'type: type)    
+    (if (null? type)
+        '()
+        (map (lambda (x)
+               ;; (println 'x x)
+               (cond ((string? x)
+                      (if (regex:match? x "_poly_")
+                          (cadr (regex:matched x "%(.*)_poly_.*"))
+                          (cadr (regex:matched x "%([^-*]*)"))))
+                     ((and (symbol? x)
+                           (regex:match? (symbol->string x) "(:|{)")) ;; this is my last change here!!
+                      (car (impc:ti:split-namedtype x)))
+                     ((impc:ir:closure? x)
+                      (let* ((depth (+ -1 (impc:ir:get-ptr-depth x)))
+                             (res (apply
+                                   string-append "[" (impc:ir:genericfunc-stringify-generic-arg-strings (cdr x)) "]"
+                                   (make-list depth "*"))))
+                        res))
+                     ((impc:ir:tuple? x)
+                      (let* ((depth (+ 0 (impc:ir:get-ptr-depth x)))
+                             (res (apply
+                                   string-append "<" (impc:ir:genericfunc-stringify-generic-arg-strings (cdr x)) ">"
+                                   (make-list depth "*"))))
+                        (println 'tuple-res: res)
+                        res))
+                     ((impc:ir:type? x)
+                      (impc:ir:pretty-print-type x))
+                     (else "_")))
+             (if (and (number? (car type))
+                      (impc:ir:closure? type))
+                 (cddr type)
+                 type)))))
 
 (define impc:ir:genericfunc-match-closure-types
   (lambda (a b)
@@ -3987,12 +3991,21 @@
             (if (and type pos (list? (car type)) (> (length (car type)) pos))
                 (let ((val (list-ref (car type) pos)))
                   val)
-                #f))))))
+                (if (regex:match? (symbol->string (car r)) "^!g(.*)_.*##([0-9]*)$")
+                    (let ((l1 (regex:matched (symbol->string bang-sym) "^!g(.*)_.*##([0-9]*)$"))
+                          (l2 (regex:matched (symbol->string reified-sym) "^!g(.*)_.*##([0-9]*)$")))
+                      (if (and (= (length l1) (length l2))
+                               (> (length l1) 2)
+                               (and (string=? (cadr l1) (cadr l2))
+                                    (string=? (caddr l1) (caddr l2))))
+                          type
+                          #f))
+                    #f)))))))
+
 
 
 (define impc:ti:sym-unify
-  (lambda (sym types vars)
-
+  (lambda (sym types vars)    
     ;; if sym is a !bang symbol and has no type set
     ;; then we trawl through vars looking for reified
     ;; types which we might be able to match it against.
@@ -4184,17 +4197,18 @@
     ;; (println 'b1: t)
     (set! t (impc:ti:type-normalize t vars))
     ;; (println 'b2: t)
-    (if (and (string? t)
-             #t
-             (assoc-strcmp sym vars))
-        (let* ((p (assoc-strcmp sym vars))
-               (l (map (lambda (k) (string? k)) (cdr p))))
-          (if (and (member #t l)
-                   (not (member t (cdr p))))
-              (begin
-                (if (regex:match? t "^%")
-                    (impc:compiler:print-type-mismatch-error (impc:ir:pretty-print-type (impc:ti:get-named-type t)) p)
-                    (impc:compiler:print-type-mismatch-error t p))))))
+    ;; (if (and (string? t)
+    ;;          #t
+    ;;          (assoc-strcmp sym vars))
+    ;;     (let* ((p (assoc-strcmp sym vars))
+    ;;            (l (map (lambda (k) (string? k)) (cdr p))))
+    ;;       (println 'p p 'l l)
+    ;;       (if (and (member #t l)
+    ;;                (not (member t (cdr p))))
+    ;;           (begin
+    ;;             (if (regex:match? t "^%")
+    ;;                 (impc:compiler:print-type-mismatch-error (impc:ir:pretty-print-type (impc:ti:get-named-type t)) p)
+    ;;                 (impc:compiler:print-type-mismatch-error t p))))))
     ;; don't ever add oursevles (i.e. sym) as a type arg or NULL
     (if (or (null? t)
             (equal? t #f)

@@ -162,24 +162,114 @@
 
 
 
+;;;;;;;
+;;
+
+(sys:load "libs/core/adt.xtm")
+
 (bind-type ShapeCircle <!a,!a,!a>)
 (bind-type ShapeRectangle <!a,!a,!a,!a>)
 (bind-type Shape <i64,ShapeCircle{!a}*,ShapeRectangle{!a}*>)
 
+
+;; note that printout return i32
+;; inconsistent with print and println :(
+(bind-func print:[void,Shape*]*
+  (lambda (s)
+    (cond ((= (tref s 0) 1)
+           (Circle s
+            (lambda (x y z)
+              (printout "<Circle " x "," y "," z ">")
+              void)
+            (lambda ()
+              void)))
+          ((= (tref s 0) 2)
+           (Rectangle s
+            (lambda (x y w h)
+              (printout "<Rectangle " x "," y "," w "," h ">")
+              void)
+            (lambda () void)))
+          ((= (tref s 0) 3)
+           (Blob s
+            (lambda ()
+              (printout "<Blob>")
+              void)
+            (lambda () void)))
+          (else
+           (println "BAD shape")))))
+
+;; constructor
 (bind-func Circle:[Shape{!a}*,!a,!a,!a]*
   (lambda (x y z)
-    (let ((c (ShapeCircle x y z))
-          (s (Shape 1 c (cast null))))
-      s)))
+    (let ((c (ShapeCircle x y z)))
+      (Shape 1 c null))))
 
+;; deconstructor
+(bind-func Circle:[!b,Shape{!a}*,[!b,!a,!a,!a]*,[!b]*]*
+  (lambda (s success fail)
+    (if (<> (tref s 0) 1)
+        (fail)
+        (let ((c:ShapeCircle* (tref s 1)))
+          (success (tref c 0) (tref c 1) (tref c 2))))))
+
+;; constructor
 (bind-func Rectangle:[Shape{!a}*,!a,!a,!a,!a]*
   (lambda (x y w h)
     (let ((r (ShapeRectangle x y w h)))
-      (Shape 2 (cast null) r))))
+      (Shape 2 null r))))
 
-(xtmtest '(bind-func make_shapes
-            (lambda ()
-              (let ((s1 (Circle 1.0 2.0 3.0))
-                    (s2 (Rectangle 1.0 2.0 3.0 4.0)))
-                (list s1 s2))))
-         (make_shapes))
+;; deconstructor
+(bind-func Rectangle:[!b,Shape{!a}*,[!b,!a,!a,!a,!a]*,[!b]*]*
+  (lambda (s success fail)
+    (if (<> (tref s 0) 2)
+        (fail)
+        (let ((r:ShapeRectangle* (tref s 2)))
+          (success (tref r 0) (tref r 1) (tref r 2) (tref r 3))))))
+
+;; constructor
+(bind-func Blob:[Shape*]*
+  (lambda ()
+    (Shape 3 null null)))
+
+;; deconstructor
+(bind-func Blob:[!b,Shape{!a}*,[!b]*,[!b]*]*
+  (lambda (s success fail)
+    (if (<> (tref s 0) 3)
+        (fail)
+        (success))))
+
+(xtmtest 
+ '(bind-func make_shapes
+   (lambda ()
+     (let ((s1 (Circle 1.0 2.0 3.0))
+           (s2 (Rectangle 1.0 2.0 3.0 4.0))
+           (s3 (Blob))
+           (lst (list s1 s2 s3)))
+       (for-each (lambda (x) (println x)) lst)
+       lst)))
+ (make_shapes))
+
+
+
+
+;; (bind-type ShapeCircle <!a,!a,!a>)
+;; (bind-type ShapeRectangle <!a,!a,!a,!a>)
+;; (bind-type Shape <i64,ShapeCircle{!a}*,ShapeRectangle{!a}*>)
+
+;; (bind-func Circle:[Shape{!a}*,!a,!a,!a]*
+;;   (lambda (x y z)
+;;     (let ((c (ShapeCircle x y z))
+;;           (s (Shape 1 c (cast null))))
+;;       s)))
+
+;; (bind-func Rectangle:[Shape{!a}*,!a,!a,!a,!a]*
+;;   (lambda (x y w h)
+;;     (let ((r (ShapeRectangle x y w h)))
+;;       (Shape 2 (cast null) r))))
+
+;; (xtmtest '(bind-func make_shapes
+;;             (lambda ()
+;;               (let ((s1 (Circle 1.0 2.0 3.0))
+;;                     (s2 (Rectangle 1.0 2.0 3.0 4.0)))
+;;                 (list s1 s2))))
+;;          (make_shapes))
