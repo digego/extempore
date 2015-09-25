@@ -122,7 +122,7 @@ You may also need to add Extempore's Windows lib directory
 ways to do this, but the easiest is probably just (replacing my path
 to Extempore with wherever it is on your machine)
 ```
-set PATH=%PATH%;C:/Users/ben/Code/extempore/libs/win64/lib
+set PATH=C:/Users/ben/Code/extempore/libs/win64/lib;%PATH%
 ```
 
 #### libsndfile
