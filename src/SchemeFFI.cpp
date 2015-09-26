@@ -316,6 +316,7 @@ namespace extemp {
       { "llvm:print-closure-work",    &SchemeFFI::llvm_print_closure_work },
       { "llvm:get-closure-work-name", &SchemeFFI::llvm_closure_last_name },
 	    { "llvm:bind-symbol",			      &SchemeFFI::bind_symbol },
+	    { "llvm:update-mapping",			  &SchemeFFI::update_mapping },
 	    { "llvm:add-llvm-alias",        &SchemeFFI::add_llvm_alias },
 	    { "llvm:get-llvm-alias",        &SchemeFFI::get_llvm_alias },
 	    { "llvm:get-named-type",        &SchemeFFI::get_named_type },
@@ -2605,6 +2606,20 @@ pointer SchemeFFI::printLLVMFunction(scheme* _sc, pointer args)
     }
   }
 
+  pointer SchemeFFI::update_mapping(scheme* _sc, pointer args)
+  {
+    char* symname = string_value(pair_car(args));
+    void* ptr = cptr_value(pair_cadr(args));
+
+    llvm::Module* M = EXTLLVM::I()->M;
+    llvm::ExecutionEngine* EE = EXTLLVM::I()->EE;
+
+    llvm::MutexGuard locked(EE->lock);
+
+    // returns previous value of the mapping, or NULL if not set
+    uint64_t oldval = EE->updateGlobalMapping(symname, (uint64_t)ptr);
+    return mk_cptr(_sc, (void*)oldval);
+  }
 
     // For simple preprocessor alias's
     pointer SchemeFFI::add_llvm_alias(scheme* _sc, pointer args)
