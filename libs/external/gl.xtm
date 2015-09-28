@@ -34,7 +34,69 @@
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")))
 
-;; now, some platform-specific OpenGL shenanigans
+;; here are some compiler additions to deal with the messiness of
+;; using GL extensions in a robust, cross-platform way. It's
+;; necessary, but not necessarily nice - so let's keep it isolated in
+;; this gl.xtm library
+
+(define impc:aot:insert-gl-proc-binding-details
+  (lambda (lib-name proc-name type docstring)
+    (if (and (output-port? *impc:aot:current-output-port*)
+             ;; ignore the binding if we're just binding something
+             ;; from an Extempore AOT-compiled library
+             (not (and (>= (string-length (atom->string lib-name)) 3)
+                       (string=? "xtm" (substring (atom->string lib-name) 0 3)))))
+        (begin
+          (write
+           (list 'bind-gl-proc lib-name proc-name type)
+           *impc:aot:current-output-port*)
+          (newline *impc:aot:current-output-port*)))))
+
+(define-macro (bind-gl-proc library symname type . args)
+  `(impc:ti:bind-gl-proc ',library ',symname ',type
+                         ;; docstring
+                         ,(if (and (not (null? args)) (string? (car args)))
+                              (car args)
+                              "")))
+
+(impc:ti:register-new-builtin
+ "bind-gl-proc"
+ ""
+ "bind an OpenGL procedure"
+ '(libname function-name type optional-docstring))
+
+(define impc:ti:bind-gl-proc
+  (lambda (library proc-name type docstring)
+    (if (not (eval library))
+        (impc:compiler:print-compiler-error
+         (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
+        (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
+               (ir-string (string-append "declare ccc "
+                                         (impc:ir:get-type-str (car ctype))
+                                         " @"
+                                         (symbol->string proc-name)
+                                         "("
+                                         (if (null? (cdr ctype))
+                                             ""
+                                             (apply string-append
+                                                    (impc:ir:get-type-str (cadr ctype))
+                                                    (map (lambda (v)
+                                                           (string-append "," (impc:ir:get-type-str v)))
+                                                         (cddr ctype))))
+                                         ") nounwind")))
+          (if (and (llvm:compile-ir ir-string)
+                   (if (impc:aot:currently-compiling?)
+                       #t
+                       (llvm:update-mapping (symbol->string proc-name)
+                                            (gl_get_proc_address (eval library) (symbol->string proc-name)))))
+              (begin
+                (if (output-port? *impc:aot:current-output-port*)
+                    (begin (write `(llvm:bind-symbol ,library ,(symbol->string proc-name)) *impc:aot:current-output-port*)
+                           (newline *impc:aot:current-output-port*)))
+                (impc:ti:register-new-nativefunc (symbol->string proc-name) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+                (impc:compiler:print-lib-binding-details-to-log library proc-name type)
+                (impc:aot:insert-gl-proc-binding-details library proc-name type docstring))
+              (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string proc-name))))))))
 
 (let ((platform (sys:platform)))
   (cond ((string=? platform "OSX")
