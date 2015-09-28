@@ -100,7 +100,7 @@ if(APPLE)
     PRIVATE "-framework AudioToolbox"
     PRIVATE "-framework AudioUnit")
 
-elseif(LINUX)
+elseif(UNIX AND NOT APPLE)
   # use ALSA on Linux
   target_sources(portaudio
     PRIVATE src/portaudio/src/hostapi/alsa/pa_linux_alsa.c
@@ -336,7 +336,7 @@ if(APPLE) # OSX
 elseif(UNIX AND NOT APPLE) # Linux
   set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
   # target_link_libraries(extempore PRIVATE --export-dynamic)
-  target_link_libraries(extempore PRIVATE pthread)
+  target_link_libraries(extempore PRIVATE pthread dl)
 endif()
 
 # on Windows, put the created extempore.exe straight into the source

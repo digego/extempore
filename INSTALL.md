@@ -33,6 +33,19 @@ get a more up-to-date version through a package archive
 sudo apt-get install software-properties-common && sudo add-apt-repository ppa:george-edison55/cmake-3.x && sudo apt-get update && sudo apt-get install cmake
 ```
 
+### ALSA (Linux only)
+
+To use the ALSA portaudio backend (which is probably what you want,
+unless you have a real reason to go with something else) you'll need
+the libasound package at build-time, e.g. (on Ubuntu)
+
+```
+sudo apt-get install libasound2-dev
+```
+
+If you really want to use a different backend (e.g. `jack`) then you
+can hack the `PA_USE_*` definitions in `CMakeLists.txt`
+
 ### Boost (Windows only)
 
 We still need one component of the **Boost** libs on Windows
