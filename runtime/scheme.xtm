@@ -1216,30 +1216,24 @@
 			  (and (vector? x)
 			       (eqv? (vector-ref x 0) ',s)))))))))
 
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define bench
-   (lambda (func . args)
-      (let ((t (clock))
-	    (res (apply func args)))
-	 (println "benchmark time :" (- (clock) t))
-	 res)))
+  (lambda (func . args)
+    (let* ((t (clock:clock))
+          (res (apply func args)))
+      (- (clock:clock) t))))
 
 (define-macro (benchmark expr)
-   `(let ((t (clock))
-	  (res ,expr))
-       (println "benchmark time:" (- (clock) t))
-       res))
-
+  `(let* ((t (clock:clock))
+          (res ,expr))
+     (- (clock:clock) t)))
 
 (define sys:livecoding-error-hook?
    (lambda (on?)
       (if on?
 	  (set! *error-hook* '())
 	  (set! *error-hook* throw))))
-
 
 ;; this for buffered version
 (define _dsp:set!
