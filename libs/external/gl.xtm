@@ -39,19 +39,7 @@
 ;; necessary, but not necessarily nice - so let's keep it isolated in
 ;; this gl.xtm library
 
-(define impc:aot:insert-gl-proc-binding-details
-  (lambda (lib-name proc-name type docstring)
-    (if (and (output-port? *impc:aot:current-output-port*)
-             ;; ignore the binding if we're just binding something
-             ;; from an Extempore AOT-compiled library
-             (not (and (>= (string-length (atom->string lib-name)) 3)
-                       (string=? "xtm" (substring (atom->string lib-name) 0 3)))))
-        (begin
-          (write
-           (list 'bind-gl-proc lib-name proc-name type)
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
-(impc:aot:insert-forms
+(impc:aot:do-and-emit
  (define impc:aot:insert-gl-proc-binding-details
    (lambda (lib-name proc-name type docstring)
      (if (and (output-port? *impc:aot:current-output-port*)
@@ -65,13 +53,7 @@
             *impc:aot:current-output-port*)
            (newline *impc:aot:current-output-port*))))))
 
-(define-macro (bind-gl-proc library symname type . args)
-  `(impc:ti:bind-gl-proc ',library ',symname ',type
-                         ;; docstring
-                         ,(if (and (not (null? args)) (string? (car args)))
-                              (car args)
-                              "")))
-(impc:aot:insert-forms
+(impc:aot:do-and-emit
  (define-macro (bind-gl-proc library symname type . args)
    `(impc:ti:bind-gl-proc ',library ',symname ',type
                           ;; docstring
@@ -79,51 +61,14 @@
                                (car args)
                                ""))))
 
-(impc:ti:register-new-builtin
- "bind-gl-proc"
- ""
- "bind an OpenGL procedure"
- '(libname function-name type optional-docstring))
-(impc:aot:insert-forms
+(impc:aot:do-and-emit
  (impc:ti:register-new-builtin
   "bind-gl-proc"
   ""
   "bind an OpenGL procedure"
   '(libname function-name type optional-docstring)))
 
-(define impc:ti:bind-gl-proc
-  (lambda (library proc-name type docstring)
-    (if (not (eval library))
-        (impc:compiler:print-compiler-error
-         (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
-        (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
-               (ir-string (string-append "declare ccc "
-                                         (impc:ir:get-type-str (car ctype))
-                                         " @"
-                                         (symbol->string proc-name)
-                                         "("
-                                         (if (null? (cdr ctype))
-                                             ""
-                                             (apply string-append
-                                                    (impc:ir:get-type-str (cadr ctype))
-                                                    (map (lambda (v)
-                                                           (string-append "," (impc:ir:get-type-str v)))
-                                                         (cddr ctype))))
-                                         ") nounwind")))
-          (if (and (llvm:compile-ir ir-string)
-                   (if (impc:aot:currently-compiling?)
-                       #t
-                       (llvm:update-mapping (symbol->string proc-name)
-                                            (gl_get_proc_address (eval library) (symbol->string proc-name)))))
-              (begin
-                (if (output-port? *impc:aot:current-output-port*)
-                    (begin (write `(llvm:bind-symbol ,library ,(symbol->string proc-name)) *impc:aot:current-output-port*)
-                           (newline *impc:aot:current-output-port*)))
-                (impc:ti:register-new-nativefunc (symbol->string proc-name) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
-                (impc:compiler:print-lib-binding-details-to-log library proc-name type)
-                (impc:aot:insert-gl-proc-binding-details library proc-name type docstring))
-              (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string proc-name))))))))
-(impc:aot:insert-forms
+(impc:aot:do-and-emit
  (define impc:ti:bind-gl-proc
    (lambda (library proc-name type docstring)
      (if (not (eval library))
@@ -808,128 +753,13 @@
 (bind-val GL_BUFFER_MAP_LENGTH i32 #x9120)
 (bind-val GL_BUFFER_MAP_OFFSET i32 #x9121)
 ;; /* Reuse tokens from ARB_depth_buffer_float */
-;; /* reuse GL_DEPTH_COMPONENT32F */
-;; /* reuse GL_DEPTH32F_STENCIL8 */
-;; /* reuse GL_FLOAT_32_UNSIGNED_INT_24_8_REV */
 ;; /* Reuse tokens from ARB_framebuffer_object */
-;; /* reuse GL_INVALID_FRAMEBUFFER_OPERATION */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_GREEN_SIZE */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_BLUE_SIZE */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE */
-;; /* reuse GL_FRAMEBUFFER_DEFAULT */
-;; /* reuse GL_FRAMEBUFFER_UNDEFINED */
-;; /* reuse GL_DEPTH_STENCIL_ATTACHMENT */
-;; /* reuse GL_MAX_RENDERBUFFER_SIZE */
-;; /* reuse GL_DEPTH_STENCIL */
-;; /* reuse GL_UNSIGNED_INT_24_8 */
-;; /* reuse GL_DEPTH24_STENCIL8 */
-;; /* reuse GL_TEXTURE_STENCIL_SIZE */
-;; /* reuse GL_TEXTURE_RED_TYPE */
-;; /* reuse GL_TEXTURE_GREEN_TYPE */
-;; /* reuse GL_TEXTURE_BLUE_TYPE */
-;; /* reuse GL_TEXTURE_ALPHA_TYPE */
-;; /* reuse GL_TEXTURE_DEPTH_TYPE */
-;; /* reuse GL_UNSIGNED_NORMALIZED */
-;; /* reuse GL_FRAMEBUFFER_BINDING */
-;; /* reuse GL_DRAW_FRAMEBUFFER_BINDING */
-;; /* reuse GL_RENDERBUFFER_BINDING */
-;; /* reuse GL_READ_FRAMEBUFFER */
-;; /* reuse GL_DRAW_FRAMEBUFFER */
-;; /* reuse GL_READ_FRAMEBUFFER_BINDING */
-;; /* reuse GL_RENDERBUFFER_SAMPLES */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LAYER */
-;; /* reuse GL_FRAMEBUFFER_COMPLETE */
-;; /* reuse GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT */
-;; /* reuse GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT */
-;; /* reuse GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER */
-;; /* reuse GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER */
-;; /* reuse GL_FRAMEBUFFER_UNSUPPORTED */
-;; /* reuse GL_MAX_COLOR_ATTACHMENTS */
-;; /* reuse GL_COLOR_ATTACHMENT0 */
-;; /* reuse GL_COLOR_ATTACHMENT1 */
-;; /* reuse GL_COLOR_ATTACHMENT2 */
-;; /* reuse GL_COLOR_ATTACHMENT3 */
-;; /* reuse GL_COLOR_ATTACHMENT4 */
-;; /* reuse GL_COLOR_ATTACHMENT5 */
-;; /* reuse GL_COLOR_ATTACHMENT6 */
-;; /* reuse GL_COLOR_ATTACHMENT7 */
-;; /* reuse GL_COLOR_ATTACHMENT8 */
-;; /* reuse GL_COLOR_ATTACHMENT9 */
-;; /* reuse GL_COLOR_ATTACHMENT10 */
-;; /* reuse GL_COLOR_ATTACHMENT11 */
-;; /* reuse GL_COLOR_ATTACHMENT12 */
-;; /* reuse GL_COLOR_ATTACHMENT13 */
-;; /* reuse GL_COLOR_ATTACHMENT14 */
-;; /* reuse GL_COLOR_ATTACHMENT15 */
-;; /* reuse GL_DEPTH_ATTACHMENT */
-;; /* reuse GL_STENCIL_ATTACHMENT */
-;; /* reuse GL_FRAMEBUFFER */
-;; /* reuse GL_RENDERBUFFER */
-;; /* reuse GL_RENDERBUFFER_WIDTH */
-;; /* reuse GL_RENDERBUFFER_HEIGHT */
-;; /* reuse GL_RENDERBUFFER_INTERNAL_FORMAT */
-;; /* reuse GL_STENCIL_INDEX1 */
-;; /* reuse GL_STENCIL_INDEX4 */
-;; /* reuse GL_STENCIL_INDEX8 */
-;; /* reuse GL_STENCIL_INDEX16 */
-;; /* reuse GL_RENDERBUFFER_RED_SIZE */
-;; /* reuse GL_RENDERBUFFER_GREEN_SIZE */
-;; /* reuse GL_RENDERBUFFER_BLUE_SIZE */
-;; /* reuse GL_RENDERBUFFER_ALPHA_SIZE */
-;; /* reuse GL_RENDERBUFFER_DEPTH_SIZE */
-;; /* reuse GL_RENDERBUFFER_STENCIL_SIZE */
-;; /* reuse GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE */
-;; /* reuse GL_MAX_SAMPLES */
 ;; /* Reuse tokens from ARB_framebuffer_sRGB */
-;; /* reuse GL_FRAMEBUFFER_SRGB */
 ;; /* Reuse tokens from ARB_half_float_vertex */
-;; /* reuse GL_HALF_FLOAT */
 ;; /* Reuse tokens from ARB_map_buffer_range */
-;; /* reuse GL_MAP_READ_BIT */
-;; /* reuse GL_MAP_WRITE_BIT */
-;; /* reuse GL_MAP_INVALIDATE_RANGE_BIT */
-;; /* reuse GL_MAP_INVALIDATE_BUFFER_BIT */
-;; /* reuse GL_MAP_FLUSH_EXPLICIT_BIT */
-;; /* reuse GL_MAP_UNSYNCHRONIZED_BIT */
 ;; /* Reuse tokens from ARB_texture_compression_rgtc */
-;; /* reuse GL_COMPRESSED_RED_RGTC1 */
-;; /* reuse GL_COMPRESSED_SIGNED_RED_RGTC1 */
-;; /* reuse GL_COMPRESSED_RG_RGTC2 */
-;; /* reuse GL_COMPRESSED_SIGNED_RG_RGTC2 */
 ;; /* Reuse tokens from ARB_texture_rg */
-;; /* reuse GL_RG */
-;; /* reuse GL_RG_INTEGER */
-;; /* reuse GL_R8 */
-;; /* reuse GL_R16 */
-;; /* reuse GL_RG8 */
-;; /* reuse GL_RG16 */
-;; /* reuse GL_R16F */
-;; /* reuse GL_R32F */
-;; /* reuse GL_RG16F */
-;; /* reuse GL_RG32F */
-;; /* reuse GL_R8I */
-;; /* reuse GL_R8UI */
-;; /* reuse GL_R16I */
-;; /* reuse GL_R16UI */
-;; /* reuse GL_R32I */
-;; /* reuse GL_R32UI */
-;; /* reuse GL_RG8I */
-;; /* reuse GL_RG8UI */
-;; /* reuse GL_RG16I */
-;; /* reuse GL_RG16UI */
-;; /* reuse GL_RG32I */
-;; /* reuse GL_RG32UI */
 ;; /* Reuse tokens from ARB_vertex_array_object */
-;; /* reuse GL_VERTEX_ARRAY_BINDING */
 ;; #endif
 
 ;; #ifndef GL_VERSION_3_1
@@ -959,41 +789,6 @@
 (bind-val GL_SIGNED_NORMALIZED i32 #x8F9C)
 (bind-val GL_PRIMITIVE_RESTART i32 #x8F9D)
 (bind-val GL_PRIMITIVE_RESTART_INDEX i32 #x8F9E)
-;; /* Reuse tokens from ARB_copy_buffer */
-;; /* reuse GL_COPY_READ_BUFFER */
-;; /* reuse GL_COPY_WRITE_BUFFER */
-;; /* Reuse tokens from ARB_draw_instanced (none) */
-;; /* Reuse tokens from ARB_uniform_buffer_object */
-;; /* reuse GL_UNIFORM_BUFFER */
-;; /* reuse GL_UNIFORM_BUFFER_BINDING */
-;; /* reuse GL_UNIFORM_BUFFER_START */
-;; /* reuse GL_UNIFORM_BUFFER_SIZE */
-;; /* reuse GL_MAX_VERTEX_UNIFORM_BLOCKS */
-;; /* reuse GL_MAX_FRAGMENT_UNIFORM_BLOCKS */
-;; /* reuse GL_MAX_COMBINED_UNIFORM_BLOCKS */
-;; /* reuse GL_MAX_UNIFORM_BUFFER_BINDINGS */
-;; /* reuse GL_MAX_UNIFORM_BLOCK_SIZE */
-;; /* reuse GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS */
-;; /* reuse GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS */
-;; /* reuse GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT */
-;; /* reuse GL_ACTIVE_UNIFORM_BLOCK_MAX_NAME_LENGTH */
-;; /* reuse GL_ACTIVE_UNIFORM_BLOCKS */
-;; /* reuse GL_UNIFORM_TYPE */
-;; /* reuse GL_UNIFORM_SIZE */
-;; /* reuse GL_UNIFORM_NAME_LENGTH */
-;; /* reuse GL_UNIFORM_BLOCK_INDEX */
-;; /* reuse GL_UNIFORM_OFFSET */
-;; /* reuse GL_UNIFORM_ARRAY_STRIDE */
-;; /* reuse GL_UNIFORM_MATRIX_STRIDE */
-;; /* reuse GL_UNIFORM_IS_ROW_MAJOR */
-;; /* reuse GL_UNIFORM_BLOCK_BINDING */
-;; /* reuse GL_UNIFORM_BLOCK_DATA_SIZE */
-;; /* reuse GL_UNIFORM_BLOCK_NAME_LENGTH */
-;; /* reuse GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS */
-;; /* reuse GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES */
-;; /* reuse GL_UNIFORM_BLOCK_REFERENCED_BY_VERTEX_SHADER */
-;; /* reuse GL_UNIFORM_BLOCK_REFERENCED_BY_FRAGMENT_SHADER */
-;; /* reuse GL_INVALID_INDEX */
 ;; #endif
 
 ;; #ifndef GL_VERSION_3_2
@@ -1019,87 +814,10 @@
 (bind-val GL_MAX_GEOMETRY_OUTPUT_COMPONENTS i32 #x9124)
 (bind-val GL_MAX_FRAGMENT_INPUT_COMPONENTS i32 #x9125)
 (bind-val GL_CONTEXT_PROFILE_MASK i32 #x9126)
-;; /* reuse GL_MAX_VARYING_COMPONENTS */
-;; /* reuse GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LAYER */
-;; /* Reuse tokens from ARB_depth_clamp */
-;; /* reuse GL_DEPTH_CLAMP */
-;; /* Reuse tokens from ARB_draw_elements_base_vertex (none) */
-;; /* Reuse tokens from ARB_fragment_coord_conventions (none) */
-;; /* Reuse tokens from ARB_provoking_vertex */
-;; /* reuse GL_FIRST_VERTEX_CONVENTION */
-;; /* reuse GL_LAST_VERTEX_CONVENTION */
-;; /* reuse GL_PROVOKING_VERTEX */
-;; /* Reuse tokens from ARB_seamless_cube_map */
-;; /* reuse GL_TEXTURE_CUBE_MAP_SEAMLESS */
-;; /* Reuse tokens from ARB_sync */
-;; /* reuse GL_MAX_SERVER_WAIT_TIMEOUT */
-;; /* reuse GL_OBJECT_TYPE */
-;; /* reuse GL_SYNC_CONDITION */
-;; /* reuse GL_SYNC_STATUS */
-;; /* reuse GL_SYNC_FLAGS */
-;; /* reuse GL_SYNC_FENCE */
-;; /* reuse GL_SYNC_GPU_COMMANDS_COMPLETE */
-;; /* reuse GL_UNSIGNALED */
-;; /* reuse GL_SIGNALED */
-;; /* reuse GL_ALREADY_SIGNALED */
-;; /* reuse GL_TIMEOUT_EXPIRED */
-;; /* reuse GL_CONDITION_SATISFIED */
-;; /* reuse GL_WAIT_FAILED */
-;; /* reuse GL_TIMEOUT_IGNORED */
-;; /* reuse GL_SYNC_FLUSH_COMMANDS_BIT */
-;; /* reuse GL_TIMEOUT_IGNORED */
-;; /* Reuse tokens from ARB_texture_multisample */
-;; /* reuse GL_SAMPLE_POSITION */
-;; /* reuse GL_SAMPLE_MASK */
-;; /* reuse GL_SAMPLE_MASK_VALUE */
-;; /* reuse GL_MAX_SAMPLE_MASK_WORDS */
-;; /* reuse GL_TEXTURE_2D_MULTISAMPLE */
-;; /* reuse GL_PROXY_TEXTURE_2D_MULTISAMPLE */
-;; /* reuse GL_TEXTURE_2D_MULTISAMPLE_ARRAY */
-;; /* reuse GL_PROXY_TEXTURE_2D_MULTISAMPLE_ARRAY */
-;; /* reuse GL_TEXTURE_BINDING_2D_MULTISAMPLE */
-;; /* reuse GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY */
-;; /* reuse GL_TEXTURE_SAMPLES */
-;; /* reuse GL_TEXTURE_FIXED_SAMPLE_LOCATIONS */
-;; /* reuse GL_SAMPLER_2D_MULTISAMPLE */
-;; /* reuse GL_INT_SAMPLER_2D_MULTISAMPLE */
-;; /* reuse GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE */
-;; /* reuse GL_SAMPLER_2D_MULTISAMPLE_ARRAY */
-;; /* reuse GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY */
-;; /* reuse GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY */
-;; /* reuse GL_MAX_COLOR_TEXTURE_SAMPLES */
-;; /* reuse GL_MAX_DEPTH_TEXTURE_SAMPLES */
-;; /* reuse GL_MAX_INTEGER_SAMPLES */
-;; /* Don't need to reuse tokens from ARB_vertex_array_bgra since they're already in 1.2 core */
 ;; #endif
 
 ;; #ifndef GL_VERSION_3_3
 (bind-val GL_VERTEX_ATTRIB_ARRAY_DIVISOR i32 #x88FE)
-;; /* Reuse tokens from ARB_blend_func_extended */
-;; /* reuse GL_SRC1_COLOR */
-;; /* reuse GL_SRC1_ALPHA */
-;; /* reuse GL_ONE_MINUS_SRC1_COLOR */
-;; /* reuse GL_ONE_MINUS_SRC1_ALPHA */
-;; /* reuse GL_MAX_DUAL_SOURCE_DRAW_BUFFERS */
-;; /* Reuse tokens from ARB_explicit_attrib_location (none) */
-;; /* Reuse tokens from ARB_occlusion_query2 */
-;; /* reuse GL_ANY_SAMPLES_PASSED */
-;; /* Reuse tokens from ARB_sampler_objects */
-;; /* reuse GL_SAMPLER_BINDING */
-;; /* Reuse tokens from ARB_shader_bit_encoding (none) */
-;; /* Reuse tokens from ARB_texture_rgb10_a2ui */
-;; /* reuse GL_RGB10_A2UI */
-;; /* Reuse tokens from ARB_texture_swizzle */
-;; /* reuse GL_TEXTURE_SWIZZLE_R */
-;; /* reuse GL_TEXTURE_SWIZZLE_G */
-;; /* reuse GL_TEXTURE_SWIZZLE_B */
-;; /* reuse GL_TEXTURE_SWIZZLE_A */
-;; /* reuse GL_TEXTURE_SWIZZLE_RGBA */
-;; /* Reuse tokens from ARB_timer_query */
-;; /* reuse GL_TIME_ELAPSED */
-;; /* reuse GL_TIMESTAMP */
-;; /* Reuse tokens from ARB_vertex_type_2_10_10_10_rev */
-;; /* reuse GL_INT_2_10_10_10_REV */
 ;; #endif
 
 ;; #ifndef GL_VERSION_4_0
@@ -1114,125 +832,9 @@
 (bind-val GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW i32 #x900D)
 (bind-val GL_INT_SAMPLER_CUBE_MAP_ARRAY i32 #x900E)
 (bind-val GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY i32 #x900F)
-;; /* Reuse tokens from ARB_texture_query_lod (none) */
-;; /* Reuse tokens from ARB_draw_indirect */
-;; /* reuse GL_DRAW_INDIRECT_BUFFER */
-;; /* reuse GL_DRAW_INDIRECT_BUFFER_BINDING */
-;; /* Reuse tokens from ARB_gpu_shader5 */
-;; /* reuse GL_GEOMETRY_SHADER_INVOCATIONS */
-;; /* reuse GL_MAX_GEOMETRY_SHADER_INVOCATIONS */
-;; /* reuse GL_MIN_FRAGMENT_INTERPOLATION_OFFSET */
-;; /* reuse GL_MAX_FRAGMENT_INTERPOLATION_OFFSET */
-;; /* reuse GL_FRAGMENT_INTERPOLATION_OFFSET_BITS */
-;; /* reuse GL_MAX_VERTEX_STREAMS */
-;; /* Reuse tokens from ARB_gpu_shader_fp64 */
-;; /* reuse GL_DOUBLE_VEC2 */
-;; /* reuse GL_DOUBLE_VEC3 */
-;; /* reuse GL_DOUBLE_VEC4 */
-;; /* reuse GL_DOUBLE_MAT2 */
-;; /* reuse GL_DOUBLE_MAT3 */
-;; /* reuse GL_DOUBLE_MAT4 */
-;; /* reuse GL_DOUBLE_MAT2x3 */
-;; /* reuse GL_DOUBLE_MAT2x4 */
-;; /* reuse GL_DOUBLE_MAT3x2 */
-;; /* reuse GL_DOUBLE_MAT3x4 */
-;; /* reuse GL_DOUBLE_MAT4x2 */
-;; /* reuse GL_DOUBLE_MAT4x3 */
-;; /* Reuse tokens from ARB_shader_subroutine */
-;; /* reuse GL_ACTIVE_SUBROUTINES */
-;; /* reuse GL_ACTIVE_SUBROUTINE_UNIFORMS */
-;; /* reuse GL_ACTIVE_SUBROUTINE_UNIFORM_LOCATIONS */
-;; /* reuse GL_ACTIVE_SUBROUTINE_MAX_LENGTH */
-;; /* reuse GL_ACTIVE_SUBROUTINE_UNIFORM_MAX_LENGTH */
-;; /* reuse GL_MAX_SUBROUTINES */
-;; /* reuse GL_MAX_SUBROUTINE_UNIFORM_LOCATIONS */
-;; /* reuse GL_NUM_COMPATIBLE_SUBROUTINES */
-;; /* reuse GL_COMPATIBLE_SUBROUTINES */
-;; /* Reuse tokens from ARB_tessellation_shader */
-;; /* reuse GL_PATCHES */
-;; /* reuse GL_PATCH_VERTICES */
-;; /* reuse GL_PATCH_DEFAULT_INNER_LEVEL */
-;; /* reuse GL_PATCH_DEFAULT_OUTER_LEVEL */
-;; /* reuse GL_TESS_CONTROL_OUTPUT_VERTICES */
-;; /* reuse GL_TESS_GEN_MODE */
-;; /* reuse GL_TESS_GEN_SPACING */
-;; /* reuse GL_TESS_GEN_VERTEX_ORDER */
-;; /* reuse GL_TESS_GEN_POINT_MODE */
-;; /* reuse GL_ISOLINES */
-;; /* reuse GL_FRACTIONAL_ODD */
-;; /* reuse GL_FRACTIONAL_EVEN */
-;; /* reuse GL_MAX_PATCH_VERTICES */
-;; /* reuse GL_MAX_TESS_GEN_LEVEL */
-;; /* reuse GL_MAX_TESS_CONTROL_UNIFORM_COMPONENTS */
-;; /* reuse GL_MAX_TESS_EVALUATION_UNIFORM_COMPONENTS */
-;; /* reuse GL_MAX_TESS_CONTROL_TEXTURE_IMAGE_UNITS */
-;; /* reuse GL_MAX_TESS_EVALUATION_TEXTURE_IMAGE_UNITS */
-;; /* reuse GL_MAX_TESS_CONTROL_OUTPUT_COMPONENTS */
-;; /* reuse GL_MAX_TESS_PATCH_COMPONENTS */
-;; /* reuse GL_MAX_TESS_CONTROL_TOTAL_OUTPUT_COMPONENTS */
-;; /* reuse GL_MAX_TESS_EVALUATION_OUTPUT_COMPONENTS */
-;; /* reuse GL_MAX_TESS_CONTROL_UNIFORM_BLOCKS */
-;; /* reuse GL_MAX_TESS_EVALUATION_UNIFORM_BLOCKS */
-;; /* reuse GL_MAX_TESS_CONTROL_INPUT_COMPONENTS */
-;; /* reuse GL_MAX_TESS_EVALUATION_INPUT_COMPONENTS */
-;; /* reuse GL_MAX_COMBINED_TESS_CONTROL_UNIFORM_COMPONENTS */
-;; /* reuse GL_MAX_COMBINED_TESS_EVALUATION_UNIFORM_COMPONENTS */
-;; /* reuse GL_UNIFORM_BLOCK_REFERENCED_BY_TESS_CONTROL_SHADER */
-;; /* reuse GL_UNIFORM_BLOCK_REFERENCED_BY_TESS_EVALUATION_SHADER */
-;; /* reuse GL_TESS_EVALUATION_SHADER */
-;; /* reuse GL_TESS_CONTROL_SHADER */
-;; /* Reuse tokens from ARB_texture_buffer_object_rgb32 (none) */
-;; /* Reuse tokens from ARB_transform_feedback2 */
-;; /* reuse GL_TRANSFORM_FEEDBACK */
-;; /* reuse GL_TRANSFORM_FEEDBACK_BUFFER_PAUSED */
-;; /* reuse GL_TRANSFORM_FEEDBACK_BUFFER_ACTIVE */
-;; /* reuse GL_TRANSFORM_FEEDBACK_BINDING */
-;; /* Reuse tokens from ARB_transform_feedback3 */
-;; /* reuse GL_MAX_TRANSFORM_FEEDBACK_BUFFERS */
-;; /* reuse GL_MAX_VERTEX_STREAMS */
 ;; #endif
 
 ;; #ifndef GL_VERSION_4_1
-;; /* Reuse tokens from ARB_ES2_compatibility */
-;; /* reuse GL_FIXED */
-;; /* reuse GL_IMPLEMENTATION_COLOR_READ_TYPE */
-;; /* reuse GL_IMPLEMENTATION_COLOR_READ_FORMAT */
-;; /* reuse GL_LOW_FLOAT */
-;; /* reuse GL_MEDIUM_FLOAT */
-;; /* reuse GL_HIGH_FLOAT */
-;; /* reuse GL_LOW_INT */
-;; /* reuse GL_MEDIUM_INT */
-;; /* reuse GL_HIGH_INT */
-;; /* reuse GL_SHADER_COMPILER */
-;; /* reuse GL_NUM_SHADER_BINARY_FORMATS */
-;; /* reuse GL_MAX_VERTEX_UNIFORM_VECTORS */
-;; /* reuse GL_MAX_VARYING_VECTORS */
-;; /* reuse GL_MAX_FRAGMENT_UNIFORM_VECTORS */
-;; /* reuse GL_RGB565 */
-;; /* Reuse tokens from ARB_get_program_binary */
-;; /* reuse GL_PROGRAM_BINARY_RETRIEVABLE_HINT */
-;; /* reuse GL_PROGRAM_BINARY_LENGTH */
-;; /* reuse GL_NUM_PROGRAM_BINARY_FORMATS */
-;; /* reuse GL_PROGRAM_BINARY_FORMATS */
-;; /* Reuse tokens from ARB_separate_shader_objects */
-;; /* reuse GL_VERTEX_SHADER_BIT */
-;; /* reuse GL_FRAGMENT_SHADER_BIT */
-;; /* reuse GL_GEOMETRY_SHADER_BIT */
-;; /* reuse GL_TESS_CONTROL_SHADER_BIT */
-;; /* reuse GL_TESS_EVALUATION_SHADER_BIT */
-;; /* reuse GL_ALL_SHADER_BITS */
-;; /* reuse GL_PROGRAM_SEPARABLE */
-;; /* reuse GL_ACTIVE_PROGRAM */
-;; /* reuse GL_PROGRAM_PIPELINE_BINDING */
-;; /* Reuse tokens from ARB_shader_precision (none) */
-;; /* Reuse tokens from ARB_vertex_attrib_64bit - all are in GL 3.0 and 4.0 already */
-;; /* Reuse tokens from ARB_viewport_array - some are in GL 1.1 and ARB_provoking_vertex already */
-;; /* reuse GL_MAX_VIEWPORTS */
-;; /* reuse GL_VIEWPORT_SUBPIXEL_BITS */
-;; /* reuse GL_VIEWPORT_BOUNDS_RANGE */
-;; /* reuse GL_LAYER_PROVOKING_VERTEX */
-;; /* reuse GL_VIEWPORT_INDEX_PROVOKING_VERTEX */
-;; /* reuse GL_UNDEFINED_VERTEX */
 ;; #endif
 
 ;; #ifndef GL_ARB_depth_buffer_float
@@ -1478,7 +1080,6 @@
 ;; #endif
 
 ;; #ifndef GL_ARB_vertex_array_bgra
-;; /* reuse GL_BGRA */
 ;; #endif
 
 ;; #ifndef GL_ARB_texture_query_lod
@@ -1524,7 +1125,6 @@
 ;; #endif
 
 ;; #ifndef GL_ARB_vertex_type_2_10_10_10_rev
-;; /* reuse GL_UNSIGNED_INT_2_10_10_10_REV */
 (bind-val GL_INT_2_10_10_10_REV i32 #x8D9F)
 ;; #endif
 
@@ -1539,11 +1139,9 @@
 (bind-val GL_MIN_FRAGMENT_INTERPOLATION_OFFSET i32 #x8E5B)
 (bind-val GL_MAX_FRAGMENT_INTERPOLATION_OFFSET i32 #x8E5C)
 (bind-val GL_FRAGMENT_INTERPOLATION_OFFSET_BITS i32 #x8E5D)
-;; /* reuse GL_MAX_VERTEX_STREAMS */
 ;; #endif
 
 ;; #ifndef GL_ARB_gpu_shader_fp64
-;; /* reuse GL_DOUBLE */
 (bind-val GL_DOUBLE_VEC2 i32 #x8FFC)
 (bind-val GL_DOUBLE_VEC3 i32 #x8FFD)
 (bind-val GL_DOUBLE_VEC4 i32 #x8FFE)
@@ -1568,8 +1166,6 @@
 (bind-val GL_MAX_SUBROUTINE_UNIFORM_LOCATIONS i32 #x8DE8)
 (bind-val GL_NUM_COMPATIBLE_SUBROUTINES i32 #x8E4A)
 (bind-val GL_COMPATIBLE_SUBROUTINES i32 #x8E4B)
-;; /* reuse GL_UNIFORM_SIZE */
-;; /* reuse GL_UNIFORM_NAME_LENGTH */
 ;; #endif
 
 ;; #ifndef GL_ARB_tessellation_shader
@@ -1582,14 +1178,10 @@
 (bind-val GL_TESS_GEN_SPACING i32 #x8E77)
 (bind-val GL_TESS_GEN_VERTEX_ORDER i32 #x8E78)
 (bind-val GL_TESS_GEN_POINT_MODE i32 #x8E79)
-;; /* reuse GL_TRIANGLES */
 (bind-val GL_QUADS i32 #x0007)
 (bind-val GL_ISOLINES i32 #x8E7A)
-;; /* reuse GL_EQUAL */
 (bind-val GL_FRACTIONAL_ODD i32 #x8E7B)
 (bind-val GL_FRACTIONAL_EVEN i32 #x8E7C)
-;; /* reuse GL_CCW */
-;; /* reuse GL_CW */
 (bind-val GL_MAX_PATCH_VERTICES i32 #x8E7D)
 (bind-val GL_MAX_TESS_GEN_LEVEL i32 #x8E7E)
 (bind-val GL_MAX_TESS_CONTROL_UNIFORM_COMPONENTS i32 #x8E7F)
@@ -1613,9 +1205,6 @@
 ;; #endif
 
 ;; #ifndef GL_ARB_texture_buffer_object_rgb32
-;; /* reuse GL_RGB32F */
-;; /* reuse GL_RGB32UI */
-;; /* reuse GL_RGB32I */
 ;; #endif
 
 ;; #ifndef GL_ARB_transform_feedback2
@@ -1672,37 +1261,16 @@
 ;; #endif
 
 ;; #ifndef GL_ARB_vertex_attrib_64bit
-;; /* reuse GL_DOUBLE */
-;; /* reuse GL_DOUBLE_VEC2 */
-;; /* reuse GL_DOUBLE_VEC3 */
-;; /* reuse GL_DOUBLE_VEC4 */
-;; /* reuse GL_DOUBLE_MAT2 */
-;; /* reuse GL_DOUBLE_MAT3 */
-;; /* reuse GL_DOUBLE_MAT4 */
-;; /* reuse GL_DOUBLE_MAT2x3 */
-;; /* reuse GL_DOUBLE_MAT2x4 */
-;; /* reuse GL_DOUBLE_MAT3x2 */
-;; /* reuse GL_DOUBLE_MAT3x4 */
-;; /* reuse GL_DOUBLE_MAT4x2 */
-;; /* reuse GL_DOUBLE_MAT4x3 */
 ;; #endif
 
 ;; #ifndef GL_ARB_viewport_array
-;; /* reuse GL_SCISSOR_BOX */
-;; /* reuse GL_VIEWPORT */
-;; /* reuse GL_DEPTH_RANGE */
-;; /* reuse GL_SCISSOR_TEST */
 (bind-val GL_MAX_VIEWPORTS i32 #x825B)
 (bind-val GL_VIEWPORT_SUBPIXEL_BITS i32 #x825C)
 (bind-val GL_VIEWPORT_BOUNDS_RANGE i32 #x825D)
 (bind-val GL_LAYER_PROVOKING_VERTEX i32 #x825E)
 (bind-val GL_VIEWPORT_INDEX_PROVOKING_VERTEX i32 #x825F)
 (bind-val GL_UNDEFINED_VERTEX i32 #x8260)
-;; /* reuse GL_FIRST_VERTEX_CONVENTION */
-;; /* reuse GL_LAST_VERTEX_CONVENTION */
-;; /* reuse GL_PROVOKING_VERTEX */
 ;; #endif
-
 
 ;; /*************************************************************/
 
@@ -3000,590 +2568,6 @@
 ;; (bind-alias PFNGLDEPTHRANGEINDEXEDPROC [void,GLuint,GLclampd,GLclampd]*)
 ;; (bind-alias PFNGLGETFLOATI_VPROC [void,GLenum,GLuint,GLfloat*]*)
 ;; (bind-alias PFNGLGETDOUBLEI_VPROC [void,GLenum,GLuint,GLdouble*]*)
-;; some helper functions
-
-;; gl print
-(bind-func gl_print_error_with_msg
-  (lambda (msg:i8*)
-    (let ((err (glGetError)))
-      (cond
-       ((= err GL_INVALID_ENUM)
-        (printf "%s: Invalid Enum\n" msg))
-       ((= err GL_INVALID_VALUE)
-        (printf "%s: Invalid Value\n" msg))
-       ((= err GL_INVALID_OPERATION)
-        (printf "%s: Invalid Operation\n" msg))
-       ((= err GL_OUT_OF_MEMORY)
-        (printf "%s: Out Of Memory\n" msg))
-       ((= err GL_INVALID_FRAMEBUFFER_OPERATION)
-        (printf "%s: Invalid Framebuffer Operation\n" msg))
-       ((= err GL_NO_ERROR)
-        1:i32)
-       (else
-        (printf "%s\n" msg)))
-      void)))
-
-(bind-func gl_print_error_no_msg
-  (lambda ()
-    (gl_print_error_with_msg "OpenGL Error")))
-
-(bind-poly gl_print_error gl_print_error_with_msg)
-(bind-poly gl_print_error gl_print_error_no_msg)
-
-(bind-func gl_print_driver_info
-  (lambda ()
-    (println "--------------------------------------------------")
-    (println "Extempore OpenGL driver info")
-    (println "--------------------------------------------------")
-    (printf "  Vendor:  %s\n" (glGetString GL_VENDOR))
-    (printf "Renderer:  %s\n" (glGetString GL_RENDERER))
-    (printf " Version:  %s\n" (glGetString GL_VERSION))
-    (println "--------------------------------------------------")
-    void))
-
-;; Vertex Buffer Object
-
-;; id, type, size (bytes), data
-(bind-type VBO <GLuint,GLenum,GLsizeiptr,GLvoid*>)
-
-;; accessors
-
-(bind-func VBO_id
-  (lambda (vbo:VBO*)
-    (tref vbo 0)))
-
-(bind-func VBO_type
-  (lambda (vbo:VBO*)
-    (tref vbo 1)))
-
-(bind-func VBO_size
-  (lambda (vbo:VBO*)
-    (tref vbo 2)))
-
-(bind-func VBO_data
-  (lambda (vbo:VBO*)
-    (tref vbo 3)))
-
-(bind-func VBO_print
-  (lambda (vbo:VBO*)
-    (if (null? vbo)
-        (printf "<VBO: 0x0>")
-        (printf "<VBO: id=%d type=%s nbytes=%d data=%p>"
-                (tref vbo 0)
-                (let ((type (VBO_type vbo)))
-                  (cond ((= type GL_BYTE) "byte")
-                        ((= type GL_SHORT) "short")
-                        ((= type GL_INT) "int")
-                        ((= type GL_FLOAT) "float")
-                        (else "unknown")))
-                (tref vbo 2)
-                (tref vbo 3)))
-    void))
-
-(bind-poly print VBO_print)
-
-(bind-func VBO_toString
-  (lambda (vbo:VBO*)
-    (let ((s:i8* (salloc 256)))
-      (if (null? vbo)
-          (sprintf s "<VBO: 0x0>")
-          (sprintf s "<VBO: id=%d type=%s nbytes=%d data=%p>"
-                   (tref vbo 0)
-                   (let ((type (VBO_type vbo)))
-                     (cond ((= type GL_BYTE) "byte")
-                           ((= type GL_SHORT) "short")
-                           ((= type GL_INT) "int")
-                           ((= type GL_FLOAT) "float")
-                           (else "unknown")))
-                   (tref vbo 2)
-                   (tref vbo 3)))
-      (String s))))
-
-(bind-poly toString VBO_toString)
-
-(bind-func VBO_create_float
-  (lambda (buf:float* buflen)
-    (let ((vbo:VBO* (halloc))
-          (id:GLuint* (salloc)))
-      (glGenBuffers 1 id)
-      (gl_print_error "Error creating VBO")
-      (tfill! vbo
-              (pref id 0)
-              GL_FLOAT
-              (* buflen 4) ;; sizeof(float)
-              (cast buf GLvoid*))
-      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
-      (gl_print_error "Error setting VBO data")
-      (printf "Created ") (VBO_print vbo) (printf "\n")
-      vbo)))
-
-(bind-func VBO_create_i32
-  (lambda (buf:i32* buflen)
-    (let ((vbo:VBO* (halloc))
-          (id:GLuint* (salloc)))
-      (glGenBuffers 1 id)
-      (gl_print_error "Error creating VBO")
-      (tfill! vbo
-              (pref id 0)
-              GL_INT
-              (* buflen 4) ;; sizeof(float)
-              (cast buf GLvoid*))
-      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) GL_STREAM_DRAW)
-      (gl_print_error "Error setting VBO data")
-      (printf "Created ") (VBO_print vbo) (printf "\n")
-      vbo)))
-
-(bind-func VBO_create_float_usage
-  (lambda (buf:float* buflen usage)
-    (let ((vbo:VBO* (halloc))
-          (id:GLuint* (salloc)))
-      (glGenBuffers 1 id)
-      (gl_print_error "Error creating VBO")
-      (tfill! vbo
-              (pref id 0)
-              GL_FLOAT
-              (* buflen 4) ;; sizeof(float)
-              (cast buf GLvoid*))
-      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) usage)
-      (gl_print_error "Error setting VBO data")
-      (printf "Created ") (VBO_print vbo) (printf "\n")
-      vbo)))
-
-(bind-func VBO_create_i32_usage
-  (lambda (buf:i32* buflen usage)
-    (let ((vbo:VBO* (halloc))
-          (id:GLuint* (salloc)))
-      (glGenBuffers 1 id)
-      (gl_print_error "Error creating VBO")
-      (tfill! vbo
-              (pref id 0)
-              GL_INT
-              (* buflen 4) ;; sizeof(float)
-              (cast buf GLvoid*))
-      (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-      (glBufferData GL_ARRAY_BUFFER (VBO_size vbo) (VBO_data vbo) usage)
-      (gl_print_error "Error setting VBO data")
-      (printf "Created ") (VBO_print vbo) (printf "\n")
-      vbo)))
-
-(bind-poly VBO_create VBO_create_float)
-(bind-poly VBO_create VBO_create_i32)
-(bind-poly VBO_create VBO_create_float_usage)
-(bind-poly VBO_create VBO_create_i32_usage)
-
-(bind-func VBO_update_data
-  "update the full buffer"
-  (lambda (vbo:VBO*)
-    (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-    (gl_print_error "Error binding VBO")
-    (glBufferSubData GL_ARRAY_BUFFER 0 (VBO_size vbo) (VBO_data vbo))
-    (gl_print_error "Error updating VBO subdata")
-    (glBindBuffer GL_ARRAY_BUFFER 0)))
-
-(bind-func VBO_delete
-  (lambda (vbo:VBO*)
-    (let ((id:GLuint* (salloc)))
-      (pset! id 0 (VBO_id vbo))
-      (glDeleteBuffers 1 id)
-      (gl_print_error "Error deleting VBO")
-      (free vbo))))
-
-;; Vertex Array Object
-
-(bind-type VAO <GLuint>)
-
-(bind-func VAO_id
-  (lambda (vao:VAO*)
-    (tref vao 0)))
-
-(bind-func VAO_print
-  (lambda (vao:VAO*)
-    (if (null? vao)
-        (printf "<VAO: 0x0>")
-        (printf "<VAO: id %d>" (tref vao 0)))
-    void))
-
-(bind-poly print VAO_print)
-
-(bind-func VAO_toString
-  (lambda (vao:VAO*)
-    (let ((s:i8* (salloc 256)))
-      (if (null? vao)
-          (sprintf s "<VAO: 0x0>")
-          (sprintf s "<VAO: id %d>" (tref vao 0)))
-      (String s))))
-
-(bind-poly toString VAO_toString)
-
-(bind-func VAO_create
-  (lambda ()
-    (let ((vao:VAO* (halloc))
-          (id:GLuint* (salloc)))
-      (glGenVertexArrays 1 id)
-      (gl_print_error "Error creating VAO")
-      (tset! vao 0 (pref id 0))
-      vao)))
-
-(bind-func VAO_bind_attribute_base
-  (lambda (vao:VAO* vbo:VBO* index size stride offset)
-    (glBindVertexArray (VAO_id vao))
-    (gl_print_error "Error binding VAO")
-    (glBindBuffer GL_ARRAY_BUFFER (VBO_id vbo))
-    (gl_print_error "Error binding VBO")
-    (let ((component_size 4)) ;; for for GL_FLOAT and GL_INT
-      (glVertexAttribPointer index
-                             size
-                             (VBO_type vbo)
-                             GL_FALSE
-                             (* component_size stride)
-                             (pref-ptr (cast null GLvoid*) (* component_size offset))))
-    (gl_print_error "Error binding VAO attribute")
-    (glEnableVertexAttribArray index)
-    (gl_print_error "Error enabling VAO attribute")
-    (glBindVertexArray 0)))
-
-(bind-func VAO_bind_attribute_packed
-  (lambda (vao vbo index size)
-    (VAO_bind_attribute_base vao vbo index size 0 0)))
-
-(bind-poly VAO_bind_attribute VAO_bind_attribute_base)
-(bind-poly VAO_bind_attribute VAO_bind_attribute_packed)
-
-(bind-func VAO_bind_and_draw_arrays
-  (lambda (vao:VAO* draw_mode first_element count)
-    (glBindVertexArray (VAO_id vao))
-    (gl_print_error "Error binding vertex array")
-    (glDrawArrays draw_mode first_element count)
-    (gl_print_error "Error drawing vertex array")
-    (glBindVertexArray 0)))
-
-(bind-func VAO_delete
-  (lambda (vao:VAO*)
-    (let ((id:GLuint* (salloc)))
-      (pset! id 0 (VAO_id vao))
-      (glDeleteVertexArrays 1 id)
-      (gl_print_error "Error deleting VAO")
-      (free vao))))
-
-;; helper functions for drawing a screen-space quad
-
-(bind-func VAO_create_ss_quad
-  (let ((vbo null)
-        (vao null)
-        (ss_quad_pos_st:float* (zalloc 16)))
-    (pfill! ss_quad_pos_st
-              ;; pos     tex_coord
-              -1. -1.    0. 0.
-              -1.  1.    0. 1.
-               1. -1.    1. 0.
-               1.  1.    1. 1.
-              )
-    (lambda ()
-      (set! vbo (VBO_create ss_quad_pos_st 16))
-      (set! vao (VAO_create))
-      (VAO_bind_attribute vao vbo 0 2 4 0) ;; position
-      (VAO_bind_attribute vao vbo 1 2 4 2) ;; tex_coord
-      vao)))
-
-;; GL Texture
-
-(bind-alias Texture GLuint)
-
-(bind-func Texture_create
-  (lambda ()
-    (let ((id:GLuint* (salloc)))
-      (glGenTextures 1 id)
-      (gl_print_error "Error creating Texture")
-      (pref id 0))))
-
-;; (bind-func Texture_bind
-;;   (lambda (tex:Texture data:GLvoid*)
-;;     (glBindTexture GL_TEXTURE_2D (Texture_id tex))
-;;     (glTexImage2D GL_TEXTURE_2D 0 GL_RGB 2 2 0 GL_RGB GL_FLOAT data)
-;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-;;     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-;;     void))
-
-(bind-func Texture_delete
-  (lambda (tex:Texture)
-    (let ((id:GLuint* (salloc)))
-      (pset! id 0 tex)
-      (glDeleteTextures 1 id)
-      (gl_print_error "Error deleting Texture"))))
-
-(bind-func Texture_bind_image
-  (lambda (tex:Texture filename)
-    (let ((width_ptr:i32* (salloc))
-          (height_ptr:i32* (salloc))
-          (comp_ptr:i32* (salloc))
-          (data (stbi_load filename width_ptr height_ptr comp_ptr 4)))
-      (if (null? data)
-          (begin (println (stbi_failure_reason))
-                 -1)
-          (begin
-            (glActiveTexture GL_TEXTURE0)
-            (glBindTexture GL_TEXTURE_2D tex)
-            (glTexImage2D GL_TEXTURE_2D 0
-                          GL_RGBA
-                          (pref width_ptr 0)
-                          (pref height_ptr 0)
-                          0
-                          GL_RGBA
-                          GL_UNSIGNED_BYTE
-                          data)
-            ;; set some parameters
-            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-            (gl_print_error "couldn't Texture_bind_image")
-            tex)))))
-
-;; OpenGL shaders
-
-;;                <id    ,type  >
-(bind-type Shader <GLuint,GLenum>)
-(bind-alias ShaderProgram GLuint)
-
-(bind-func Shader_id
-  (lambda (shader:Shader*)
-    (tref shader 0)))
-
-(bind-func Shader_type
-  (lambda (shader:Shader*)
-    (tref shader 1)))
-
-(bind-func Shader_print_info_log
-  (let ((max_log_length 4096)
-        (logbuf:i8* (zalloc max_log_length)))
-    (lambda (shader:Shader*)
-      (let ((len_ptr (salloc 1 i32)))
-        (glGetShaderInfoLog (Shader_id shader)
-                            max_log_length
-                            len_ptr
-                            logbuf)
-        (printf "%sShader: %s\n"
-                (cond ((= (Shader_type shader) GL_VERTEX_SHADER)
-                       "Vert")
-                      ((= (Shader_type shader) GL_FRAGMENT_SHADER)
-                       "Frag")
-                      ((= (Shader_type shader) GL_GEOMETRY_SHADER)
-                       "Geom")
-                      (else ""))
-                (if (= (pref len_ptr 0) 0)
-                    "OK"
-                    logbuf))
-        (if (= (pref len_ptr 0) 0) 0 1)))))
-
-(bind-func ShaderProgram_print_info_log
-  (let ((max_log_length 4096)
-        (logbuf:i8* (zalloc max_log_length)))
-    (lambda (program:ShaderProgram)
-      (let ((len_ptr (salloc 1 i32)))
-        (glGetProgramInfoLog program
-                             max_log_length
-                             len_ptr
-                             logbuf)
-        (printf "   Program: %s\n"
-                (if (= (pref len_ptr 0) 0)
-                    "OK"
-                    logbuf))
-        (if (= (pref len_ptr 0) 0) 0 1)))))
-
-(bind-func Shader_create
-  "create (and compile) an OpenGL shader"
-  (lambda (source:i8* type:GLenum)
-    (if (not (or (= type GL_VERTEX_SHADER)
-                 (= type GL_FRAGMENT_SHADER)
-                 (= type GL_GEOMETRY_SHADER)))
-        (begin (println "Error: shader type must be one of GL_VERTEX_SHADER, GL_FRAGMENT_SHADER or GL_GEOMETRY_SHADER")
-               null)
-        (let ((shader_id (glCreateShader type))
-              (source_ptr:i8** (salloc))
-              (shader (Shader shader_id type)))
-          (pset! source_ptr 0 source)
-          (glShaderSource shader_id 1 source_ptr (cast null i32*))
-          (glCompileShader shader_id)
-          (Shader_print_info_log shader)
-          shader))))
-
-(bind-func ShaderProgram_create_vf
-  "compile and link shader program (vert and frag shader)"
-  (lambda (vert:Shader* frag:Shader*)
-    (if (not (and (= (Shader_type vert) GL_VERTEX_SHADER)
-                  (= (Shader_type frag) GL_FRAGMENT_SHADER)))
-        (begin (println "Error: input shader types must be vert and frag respectively.")
-               -1)
-        (let ((program (glCreateProgram)))
-          (glAttachShader program (Shader_id vert))
-          (glAttachShader program (Shader_id frag))
-          (glLinkProgram program)
-          (ShaderProgram_print_info_log program)
-          program))))
-
-(bind-func ShaderProgram_create_vgf
-  "compile and link shader program (vert and frag shader)"
-  (lambda (vert:Shader* geom:Shader* frag:Shader*)
-    (if (not (and (= (Shader_type vert) GL_VERTEX_SHADER)
-                  (= (Shader_type geom) GL_GEOMETRY_SHADER)
-                  (= (Shader_type frag) GL_FRAGMENT_SHADER)))
-        (begin (println "Error: input shader types must be vert and frag respectively.")
-               -1)
-        (let ((program (glCreateProgram)))
-          (glAttachShader program (Shader_id vert))
-          (glAttachShader program (Shader_id geom))
-          (glAttachShader program (Shader_id frag))
-          (glLinkProgram program)
-          (ShaderProgram_print_info_log program)
-          program))))
-
-;; these ones are handy when you want to create a new shader program
-;; directly from the sources
-
-(bind-func ShaderProgram_create_vsfs
-  "compile and link shader program (vert and frag shader source)"
-  (lambda (vsource:i8* fsource:i8*)
-    (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
-          (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
-      (if (or (null? vert) (null? frag))
-          -1
-          (ShaderProgram_create_vf vert frag)))))
-
-(bind-func ShaderProgram_create_vsgsfs
-  "compile and link shader program (vert and frag shader source)"
-  (lambda (vsource:i8* gsource:i8* fsource:i8*)
-    (let ((vert (Shader_create vsource GL_VERTEX_SHADER))
-          (geom (Shader_create vsource GL_GEOMETRY_SHADER))
-          (frag (Shader_create fsource GL_FRAGMENT_SHADER)))
-      (if (or (null? vert) (null? geom) (null? frag))
-          -1
-          (ShaderProgram_create_vgf vert geom frag)))))
-
-(bind-poly ShaderProgram_create ShaderProgram_create_vf)
-(bind-poly ShaderProgram_create ShaderProgram_create_vgf)
-(bind-poly ShaderProgram_create ShaderProgram_create_vsfs)
-(bind-poly ShaderProgram_create ShaderProgram_create_vsgsfs)
-
-;; Framebuffer Object
-
-;; fbo id          0
-;; texture id      1
-;; depth buffer id 2
-;; width           3
-;; height          4
-(bind-type FBO <GLuint,GLuint,GLuint,GLsizei,GLsizei>)
-
-;; accessor functions
-
-(bind-func FBO_id
-  (lambda (fbo:FBO*)
-    (tref fbo 0)))
-
-(bind-func FBO_color_texture
-  (lambda (fbo:FBO*)
-    (tref fbo 1)))
-
-(bind-func FBO_depth_texture
-  (lambda (fbo:FBO*)
-    (tref fbo 2)))
-
-(bind-func FBO_width
-  (lambda (fbo:FBO*)
-    (tref fbo 3)))
-
-(bind-func FBO_height
-  (lambda (fbo:FBO*)
-    (tref fbo 4)))
-
-(bind-func FBO_print
-  (lambda (fbo:FBO*)
-    (if (null? fbo)
-        (printf "<FBO: 0x0>")
-        (printf "<FBO: id=%d color_tex=%d depth_tex=%d width=%d height=%d>"
-                (FBO_id fbo)
-                (FBO_color_texture fbo)
-                (FBO_depth_texture fbo)
-                (FBO_width fbo)
-                (FBO_height fbo)))
-    void))
-
-(bind-func FBO_toString
-  (lambda (fbo:FBO*)
-    (let ((str:i8* (zalloc 256)))
-      (if (null? fbo)
-          (sprintf str "<FBO: 0x0>")
-          (sprintf str "<FBO: id=%d color_tex=%d depth_tex=%d width=%d height=%d>"
-                   (FBO_id fbo)
-                   (FBO_color_texture fbo)
-                   (FBO_depth_texture fbo)
-                   (FBO_width fbo)
-                   (FBO_height fbo)))
-      (String str))))
-
-(bind-poly print FBO_print)
-(bind-poly toString FBO_toString)
-
-;; create FBOs
-
-(bind-func FBO_create
-  (lambda ()
-    (let ((fbo:FBO* (halloc))
-          (id:GLuint* (salloc)))
-      (glGenFramebuffers 1 id)
-      (gl_print_error "Error creating FBO")
-      (tset! fbo 0 (pref id 0))
-      fbo)))
-
-(bind-func Texture_create_FBO_depth_texture
-  (lambda (width height)
-    (let ((depth_tex (Texture_create)))
-      (glActiveTexture GL_TEXTURE0)
-      (glBindTexture GL_TEXTURE_2D depth_tex)
-      (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT width height 0 GL_DEPTH_COMPONENT GL_UNSIGNED_BYTE null)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-      ;; attach depth texture to framebuffer
-      (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_2D depth_tex 0)
-      (gl_print_error "Error creating FBO depth texture")
-      depth_tex)))
-
-(bind-func FBO_create_with_textures
-  (lambda (width height depth_p:i1)
-    (let ((fbo (FBO_create))
-          (color_tex (Texture_create))
-          (depth_tex -1))
-      (glBindTexture GL_TEXTURE_2D color_tex)
-      (glTexImage2D GL_TEXTURE_2D 0 GL_RGBA width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_REPEAT)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_REPEAT)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
-      (glBindFramebuffer GL_FRAMEBUFFER (FBO_id fbo))
-      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D color_tex 0)
-      (if depth_p
-          (set! depth_tex (Texture_create_FBO_depth_texture width height)))
-      (if (<> (glCheckFramebufferStatus GL_FRAMEBUFFER) GL_FRAMEBUFFER_COMPLETE)
-          (begin
-            (println "Error creating framebuffer")
-            (gl_print_error "Error creating FBO & backing textures")
-            ;; return null pointer for fbo
-            null)
-          ;; fill the FBO tuple with metadata
-          (begin
-            (tfill! fbo
-                    (FBO_id fbo)
-                    color_tex
-                    depth_tex
-                    width
-                    height)
-            fbo)))))
 
 (impc:aot:insert-footer "xtmgl")
 (define *xtmlib-gl-loaded* #t)
