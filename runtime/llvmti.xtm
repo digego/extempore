@@ -8455,7 +8455,8 @@
 
 
 (define-macro (bind-lib-val library symname type . docstring)
-  `(let* ((type-str ,(or (impc:ti:get-typealias-ground-type (symbol->string type))
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
                          (symbol->string type)))
           (type-list (impc:ir:get-type-from-pretty-str type-str))
           (ds ,(if (null? docstring) "" (car docstring))))
