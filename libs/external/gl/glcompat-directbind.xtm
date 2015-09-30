@@ -1,4 +1,4 @@
-;;; gl-compatibility.xtm -- OpenGL compatibility bindings for Extempore
+;;; glcompat-directbind.xtm -- OpenGL compatibility bindings for Extempore
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
@@ -11,25 +11,21 @@
 ;; driver. This file is here for compatibility reasons.
 
 ;; If you'd prefer to use a more modern OpenGL (version 3.2+) library,
-;; then then you should use libs/external/gl.xtm instead
+;; then then you should use one of the "core" libs in this folder
 
 ;;; Code:
 
 ;; Constants
 
-(sys:load "libs/aot-cache/gl-compatibility.xtm" 'quiet)
-(sys:load-preload-check 'gl-compatibility)
-(define *xtmlib-gl-compatibility-loaded* #f)
-
-;; also need to check that the core profile OpenGL lib hasn't been
-;; loaded, as it's incompatible with this one
+(sys:load "libs/aot-cache/glcompat-directbind.xtm" 'quiet)
 (sys:load-preload-check 'gl)
+(define *xtmlib-gl-loaded* #f)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm"))
 (impc:aot:insert-forms (sys:load "libs/core/std.xtm"))
 
-(impc:aot:insert-header "xtmgl-compatibility")
+(impc:aot:insert-header "xtmglcompat-directbind")
 
 (bind-dylib libGL
   (cond ((string=? (sys:platform) "Linux")
@@ -2372,52 +2368,5 @@
 (bind-lib libGL glUniformMatrix3x4fv [void,GLint,GLsizei,GLboolean,GLfloat*]*)
 (bind-lib libGL glUniformMatrix4x3fv [void,GLint,GLsizei,GLboolean,GLfloat*]*)
 
-;; some helper functions
-
-(bind-func gl_print_error_with_msg
-  (lambda (msg:i8*)
-    (let ((err (glGetError)))
-      (cond
-       ((= err GL_INVALID_ENUM)
-        (printf "%s: Invalid Enum\n" msg))
-       ((= err GL_INVALID_VALUE)
-        (printf "%s: Invalid Value\n" msg))
-       ((= err GL_INVALID_OPERATION)
-        (printf "%s: Invalid Operation\n" msg))
-       ((= err GL_STACK_OVERFLOW)
-        (printf "%s: Stack Underflow\n" msg))
-       ((= err GL_STACK_UNDERFLOW)
-        (printf "%s: Stack Overflow\n" msg))
-       ((= err GL_OUT_OF_MEMORY)
-        (printf "%s: Out Of Memory\n" msg))
-       ((= err GL_TABLE_TOO_LARGE)
-        (printf "%s: Table Too Large\n" msg))
-       ((= err GL_NO_ERROR)
-        1:i32)
-       (else
-        (printf "%s\n" msg)))
-      void)))
-
-(bind-func gl_print_error_no_msg
-  (lambda ()
-    (gl_print_error_with_msg "OpenGL Error")))
-
-(bind-poly gl_print_error gl_print_error_with_msg)
-(bind-poly gl_print_error gl_print_error_no_msg)
-
-(bind-func gl_print_driver_info
-  (lambda ()
-    (println "--------------------------------------------------")
-    (println "Extempore OpenGL driver info")
-    (println "--------------------------------------------------")
-    (printf "  Vendor:  %s\n" (glGetString GL_VENDOR))
-    (printf "Renderer:  %s\n" (glGetString GL_RENDERER))
-    (printf " Version:  %s\n" (glGetString GL_VERSION))
-    (println "--------------------------------------------------")
-    void))
-
-(impc:aot:insert-footer "xtmgl-compatibility")
-(define *xtmlib-gl-compatibility-loaded* #t)
-
-;; so that preload checks for 'gl return true
-(impc:aot:do-or-emit (define *xtmlib-gl-loaded* #t))
+(impc:aot:insert-footer "xtmglcompat-directbind")
+(define *xtmlib-gl-loaded* #t)
