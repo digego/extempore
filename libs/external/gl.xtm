@@ -26,6 +26,11 @@
 
 (impc:aot:insert-header "xtmgl")
 
+(bind-val EXTEMPORE_GL_INITIALISED i1 0
+  "global boolean for checking if the OpenGL library has been loaded
+
+@see gl_initialised_p")
+
 (bind-dylib libGL
   (cond ((string=? (sys:platform) "Linux")
          "libGL.so")
@@ -33,6 +38,10 @@
          "opengl32.dll")
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; BEGIN MESSY OPENGL HACKS ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; here are some compiler additions to deal with the messiness of
 ;; using GL extensions in a robust, cross-platform way. It's
@@ -49,13 +58,13 @@
                         (string=? "xtm" (substring (atom->string lib-name) 0 3)))))
          (begin
            (write
-            (list 'bind-gl-proc lib-name proc-name type)
+            (list 'bind-gl-proc lib-name proc-name type docstring)
             *impc:aot:current-output-port*)
            (newline *impc:aot:current-output-port*))))))
 
 (impc:aot:do-and-emit
- (define-macro (bind-gl-proc library symname type . args)
-   `(impc:ti:bind-gl-proc ',library ',symname ',type
+ (define-macro (bind-gl-proc gl-lib proc-name type . args)
+   `(impc:ti:bind-gl-proc ',gl-lib ',proc-name ',type
                           ;; docstring
                           ,(if (and (not (null? args)) (string? (car args)))
                                (car args)
@@ -70,10 +79,10 @@
 
 (impc:aot:do-and-emit
  (define impc:ti:bind-gl-proc
-   (lambda (library proc-name type docstring)
-     (if (not (eval library))
+   (lambda (gl-lib proc-name type docstring)
+     (if (not (defined? 'gl_get_proc_address))
          (impc:compiler:print-compiler-error
-          (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
+          (string-append "cannot find gl_get_proc_address"))
          (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
                 (ir-string (string-append "declare ccc "
                                           (impc:ir:get-type-str (car ctype))
@@ -89,17 +98,18 @@
                                                           (cddr ctype))))
                                           ") nounwind")))
            (if (and (llvm:compile-ir ir-string)
-                    (if (impc:aot:currently-compiling?)
-                        #t
-                        (llvm:update-mapping (symbol->string proc-name)
-                                             (gl_get_proc_address (eval library) (symbol->string proc-name)))))
+                    (or (impc:aot:currently-compiling?)
+                        (let ((gl-proc-address (gl_get_proc_address (eval gl-lib) (symbol->string proc-name))))
+                          ;; if proc address is not 0x0, update mapping
+                          (if (not (string=? (cptr->string gl-proc-address) ""))
+
+                              (llvm:update-mapping (symbol->string proc-name)
+                                                   gl-proc-address)
+                              (begin (print "Warning: OpenGL proc address " (symbol->string proc-name) "is null\n") #f)))))
                (begin
-                 (if (output-port? *impc:aot:current-output-port*)
-                     (begin (write `(llvm:bind-symbol ,library ,(symbol->string proc-name)) *impc:aot:current-output-port*)
-                            (newline *impc:aot:current-output-port*)))
                  (impc:ti:register-new-nativefunc (symbol->string proc-name) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
-                 (impc:compiler:print-lib-binding-details-to-log library proc-name type)
-                 (impc:aot:insert-gl-proc-binding-details library proc-name type docstring))
+                 (impc:compiler:print-lib-binding-details-to-log gl-lib proc-name type)
+                 (impc:aot:insert-gl-proc-binding-details gl-lib proc-name type docstring))
                (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string proc-name)))))))))
 
 (let ((platform (sys:platform)))
@@ -129,6 +139,10 @@
 
         (else (impc:compiler:print-compiler-error
                "unknown platform, cannot load platform-specific gl_get_proc_address for OpenGL"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; END MESSY OPENGL HACKS ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; gltypes.h
 
@@ -2568,6 +2582,19 @@
 ;; (bind-alias PFNGLDEPTHRANGEINDEXEDPROC [void,GLuint,GLclampd,GLclampd]*)
 ;; (bind-alias PFNGLGETFLOATI_VPROC [void,GLenum,GLuint,GLfloat*]*)
 ;; (bind-alias PFNGLGETDOUBLEI_VPROC [void,GLenum,GLuint,GLdouble*]*)
+
+(impc:aot:insert-forms
+ (call-as-xtlang (set! EXTEMPORE_GL_INITIALISED 1:i1)))
+
+(bind-func gl_initialised_p
+  "check if Extempore's OpenGL library has been initialised
+
+Application code should call this before trying to use any OpenGL
+code
+
+@return true/false"
+  (lambda ()
+    EXTEMPORE_GL_INITIALISED))
 
 (impc:aot:insert-footer "xtmgl")
 (define *xtmlib-gl-loaded* #t)
