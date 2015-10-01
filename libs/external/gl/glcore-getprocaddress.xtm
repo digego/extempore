@@ -3744,9 +3744,11 @@ equal to (length *impc:ti:gl-proc-alist*)")
 
 ;; here is the OpenGL initialisation code
 (impc:aot:do-or-emit
- (gl_get_proc_address_init libGL #t)
- (if (<> (gl_get_proc_address_ready_p) 1)
-     (print "Warning: something went wrong - OpenGL proc array isn't initialised\n")))
+ (if (not (impc:aot:currently-compiling?))
+     (begin
+       (gl_get_proc_address_init libGL #t)
+       (if (<> (gl_get_proc_address_ready_p) 1)
+           (print "Warning: something went wrong - OpenGL proc array isn't initialised\n")))))
 
 (impc:aot:insert-footer "xtmglcore-getprocaddress")
 (define *xtmlib-glcore-getprocaddress-loaded* #t)
