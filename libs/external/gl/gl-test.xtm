@@ -1,0 +1,21 @@
+(sys:load "libs/aot-cache/gl-test.xtm" 'quiet)
+(sys:load-preload-check 'gl-test)
+(define *xtmlib-gl-test-loaded* #f)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/std.xtm")
+ (sys:load "libs/external/gl/glcore-getprocaddress.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/core/std.xtm" 'quiet)
+ (sys:load "libs/external/gl/glcore-getprocaddress.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmgl-test")
+
+(bind-func gl_cp
+  (lambda ()
+    (println "beginning...")
+    (println "ID:" (glCreateProgram))
+    (println "end.")))
+
+(impc:aot:insert-footer "xtmgl-test")
+(define *xtmlib-gl-test-loaded* #t)
