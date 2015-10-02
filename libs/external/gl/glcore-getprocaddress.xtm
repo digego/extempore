@@ -644,7 +644,7 @@
 
 equal to (length *impc:ti:gl-proc-alist*)")
 
-(bind-val EXTEMPORE_GL_FUNCTION_POINTERS i8** 479
+(bind-val EXTEMPORE_GL_FUNCTION_POINTERS |479,i8*|
   "global i8* array for storing OpenGL function pointers")
 
 (bind-func gl_set_proc_address
@@ -653,7 +653,7 @@ equal to (length *impc:ti:gl-proc-alist*)")
             (> index (- EXTEMPORE_GL_FUNCTION_POINTER_COUNT 1)))
         (println "Error in gl_set_proc_address: index must be between 0 and EXTEMPORE_GL_FUNCTION_POINTER_COUNT")
         (begin
-          (pset! EXTEMPORE_GL_FUNCTION_POINTERS index proc-fptr)
+          (aset! EXTEMPORE_GL_FUNCTION_POINTERS index proc-fptr)
           void))))
 
 ;; it would be nice if this was an xtlang function, but for now the
@@ -661,12 +661,14 @@ equal to (length *impc:ti:gl-proc-alist*)")
 (impc:aot:do-and-emit
  (define gl_get_proc_address_init
    (lambda (gl-lib warn?)
+     (print "Initialising OpenGL function pointers... ")
      (for-each (lambda (proc-pair)
                  (let* ((proc-ptr (gl_get_proc_address gl-lib (car proc-pair))))
                    (if (and warn? (string=? (cptr->string proc-ptr) ""))
                        (print "Warning: OpenGL proc address is null for " (car proc-pair) "\n"))
                    (gl_set_proc_address (cdr proc-pair) proc-ptr)))
-               *impc:ti:gl-proc-alist*))))
+               *impc:ti:gl-proc-alist*)
+     (print "done\n"))))
 
 (bind-func gl_get_proc_address_ready_p
   "check that alll of the OpenGL function pointers are non-null"
@@ -674,7 +676,7 @@ equal to (length *impc:ti:gl-proc-alist*)")
     (let ((i 0)
           (res #t))
       (dotimes (i EXTEMPORE_GL_FUNCTION_POINTER_COUNT)
-        (if (null? (pref EXTEMPORE_GL_FUNCTION_POINTERS i))
+        (if (null? (aref EXTEMPORE_GL_FUNCTION_POINTERS i))
             (set! res #f)))
       res)))
 
@@ -3741,14 +3743,6 @@ equal to (length *impc:ti:gl-proc-alist*)")
 ;; (bind-val GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR i32 #x93DB)
 ;; (bind-val GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR i32 #x93DC)
 ;; (bind-val GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR i32 #x93DD)
-
-;; here is the OpenGL initialisation code
-(impc:aot:do-or-emit
- (if (not (impc:aot:currently-compiling?))
-     (begin
-       (gl_get_proc_address_init libGL #t)
-       (if (<> (gl_get_proc_address_ready_p) 1)
-           (print "Warning: something went wrong - OpenGL proc array isn't initialised\n")))))
 
 (impc:aot:insert-footer "xtmglcore-getprocaddress")
 (define *xtmlib-glcore-getprocaddress-loaded* #t)
