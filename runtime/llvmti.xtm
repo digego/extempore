@@ -1817,15 +1817,11 @@
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
-           (append
-            ;; bind-lib-val only works for floats and ints
-            (if (impc:ir:array? type)
-                (list 'bind-val)
-                (list 'bind-lib-val (string->symbol *impc:aot:current-lib-name*)))
-            (list
-             (string->symbol name)
-             (string->symbol (impc:ir:pretty-print-type type))
-             docstring))
+           (list 'bind-lib-val
+                 (string->symbol *impc:aot:current-lib-name*)
+                 (string->symbol name)
+                 (string->symbol (impc:ir:pretty-print-type type))
+                 docstring)
            *impc:aot:current-output-port*)
           (newline *impc:aot:current-output-port*)))))
 
