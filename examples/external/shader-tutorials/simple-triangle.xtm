@@ -1,0 +1,96 @@
+;;; triangle.xtm -- basic OpenGL drawing and window management
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libGL, libglfw3
+
+;;; Commentary:
+
+;; 
+
+;;; Code:
+
+
+(sys:load "libs/external/glfw3.xtm")
+
+(bind-val width i32 800)
+(bind-val height i32 600)
+
+(bind-val window GLFWwindow*
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_interaction_window width height)))
+
+;; (sys:load "libs/external/gl/glcore-directbind.xtm")
+(sys:load "libs/external/gl/glcore-getprocaddress.xtm")
+(gl_get_proc_address_init libGL #t)
+
+;; shader stuff
+
+(bind-val triangle_vert_data |6,float|)
+
+(bind-val vbo i32)
+(bind-val vao i32)
+(bind-val sp i32)
+
+;; init data
+(call-as-xtlang
+ (afill! triangle_vert_data
+         ;; pos     
+         0.0  0.5  
+         0.5 -0.5  
+         -0.5 -0.5)
+ (let ((vbo_ptr:i32* (salloc))
+       (vao_ptr:i32* (salloc)))
+   ;; VBO
+   (glGenBuffers 1 vbo_ptr)
+   (set! vbo (pref vbo_ptr 0))
+   (glBindBuffer GL_ARRAY_BUFFER vbo)
+   (glBufferData GL_ARRAY_BUFFER (* 6 4) (convert (aref-ptr triangle_vert_data 0) i8*) GL_STREAM_DRAW)
+   ;; VAO
+   (glGenVertexArrays 1 vao_ptr)
+   (set! vao (pref vao_ptr 0))
+   (glBindVertexArray vao)
+   ;; (glBindBuffer GL_ARRAY_BUFFER vbo)
+   (glVertexAttribPointer 0 2 GL_FLOAT GL_FALSE 0 null)
+   (glEnableVertexAttribArray 0))
+ void)
+
+(bind-func create_triangle_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (let ((vert (glCreateShader GL_VERTEX_SHADER))
+          (frag (glCreateShader GL_FRAGMENT_SHADER))
+          (source_ptr:i8** (salloc))
+          (program (glCreateProgram)))
+      ;; vert shader
+      (pset! source_ptr 0 vsource)
+      (glShaderSource vert 1 source_ptr (cast null i32*))
+      (glCompileShader vert)
+      ;; frag shader
+      (pset! source_ptr 0 fsource)
+      (glShaderSource frag 1 source_ptr (cast null i32*))
+      (glCompileShader frag)
+      (glAttachShader program vert)
+      (glAttachShader program frag)
+      (glLinkProgram program)
+      (set! sp program))))
+
+(create_triangle_shader (sys:slurp-file "examples/external/shader-tutorials/simple-triangle.vert")
+                        (sys:slurp-file "examples/external/shader-tutorials/simple-triangle.frag"))
+
+(bind-func gl_draw_loop
+  (lambda (time:i64 delta_t:double)
+    (glClear GL_COLOR_BUFFER_BIT)
+    (glUseProgram sp)
+    (glBindVertexArray vao)
+    (glDrawArrays GL_TRIANGLES 0 3)
+    (glfwPollEvents)
+    (glfwSwapBuffers window)
+    (if (= (glfwWindowShouldClose window) 1)
+        (begin (glfwDestroyWindow window)
+               (println "Window closed, stopping draw loop.")
+               #t)
+        (let ((next_time (+ time (convert (* 44100. delta_t)))))
+          (callback next_time gl_draw_loop next_time delta_t)))))
+
+(gl_draw_loop (now) (/ 1.0 30.0)) ;; 30fps
