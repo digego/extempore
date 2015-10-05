@@ -3732,3 +3732,10 @@ equal to (length *impc:ti:gl-proc-alist*)")
 (impc:aot:insert-footer "xtmglcore-getprocaddress")
 (define *xtmlib-glcore-getprocaddress-loaded* #t)
 (impc:aot:do-and-emit (define *xtmlib-gl-loaded* #t))
+
+;; if we're running, and not pre-compiling, we should also trigger the
+;; init routine
+
+(impc:aot:do-or-emit
+ (if (not (output-port? *impc:aot:current-output-port*))
+     (gl_init libGL)))
