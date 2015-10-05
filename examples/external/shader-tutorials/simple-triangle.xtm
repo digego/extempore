@@ -6,7 +6,13 @@
 
 ;;; Commentary:
 
-;; 
+;; This is the simplest triangle example using the Core (3.2+) OpenGL
+;; profile. There are some nice xtlang helper types/functions in
+;; gl/gl-objects.xtm which make this a bit cleaner - see
+;; libs/external/shader-tutorials/triangle.xtm for an example.
+
+;; This file is useful as a a minimal working example for debugging
+;; problems in your OpenGL setup
 
 ;;; Code:
 
@@ -22,7 +28,6 @@
     (glfw_init_and_create_interaction_window width height)))
 
 (sys:load "libs/external/gl.xtm")
-(gl_init libGL)
 
 ;; shader stuff
 
@@ -35,9 +40,9 @@
 ;; init data
 (call-as-xtlang
  (afill! triangle_vert_data
-         ;; pos     
-         0.0  0.5  
-         0.5 -0.5  
+         ;; pos
+         0.0  0.5
+         0.5 -0.5
          -0.5 -0.5)
  (let ((vbo_ptr:i32* (salloc))
        (vao_ptr:i32* (salloc)))
@@ -74,8 +79,21 @@
       (glLinkProgram program)
       (set! sp program))))
 
-(create_triangle_shader (sys:slurp-file "examples/external/shader-tutorials/simple-triangle.vert")
-                        (sys:slurp-file "examples/external/shader-tutorials/simple-triangle.frag"))
+(create_triangle_shader
+ "#version 400
+
+layout(location = 0) in vec2 vertex_position;
+
+void main () {
+  gl_Position = vec4(vertex_position, 0.0, 1.0);
+}"
+ "#version 400
+
+out vec4 frag_colour;
+
+void main () {
+  frag_colour = vec4(1.,1.,1.,1.);
+}")
 
 (bind-func gl_draw_loop
   (lambda (time:i64 delta_t:double)
