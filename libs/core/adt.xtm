@@ -664,11 +664,11 @@
 
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Some extra string stuff
+;; Some extra string and symbol stuff
 ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func regex_match_a
   (lambda (regex str)
@@ -678,8 +678,18 @@
   (lambda (regex str)
     (rmatch (String_cstr regex) (String_cstr str))))
 
+(bind-func regex_match_c
+  (lambda (regex sym)
+    (rmatch regex (Symbol_cstr sym))))
+
+(bind-func regex_match_d
+  (lambda (regex sym)
+    (rmatch (String_cstr regex) (Symbol_cstr sym))))
+
 (bind-poly regex_match regex_match_a)
 (bind-poly regex_match regex_match_b)
+(bind-poly regex_match regex_match_c)
+(bind-poly regex_match regex_match_d)
 
 (bind-func regex_split_a
   (lambda (regex str)
@@ -696,19 +706,29 @@
 
 (bind-func regex_split_b
   (lambda (regex str)
+    (regex_split_a (String_cstr regex) str)))
+
+(bind-func regex_split_c
+  (lambda (regex sym)
     (let ((a:i8* (salloc 2048))
           (b:i8* (salloc 2048)))
       (sprintf a "")
       (sprintf b "")
-      (rsplit (String_cstr regex) (String_cstr str) a b)
+      (rsplit regex (Symbol_cstr sym) a b)
       (append (list (if (> (strlen a) 0)
-                        (String a) (String str)))
+                        (Symbol a) (Symbol sym)))
               (if (> (strlen b) 0)
-                  (regex_split_b regex (String b))
+                  (regex_split_c regex (Symbol b))
                   null)))))
+
+(bind-func regex_split_d
+  (lambda (regex sym)
+    (regex_split_c (String_cstr regex) sym)))
 
 (bind-poly regex_split regex_split_a)
 (bind-poly regex_split regex_split_b)
+(bind-poly regex_split regex_split_c)
+(bind-poly regex_split regex_split_d)
 
 (bind-func regex_replace_a
   (lambda (regex str:String* replace:String*)
@@ -728,6 +748,25 @@
                 res)
       (String res))))
 
+(bind-func regex_replace_c
+  (lambda (regex sym:Symbol* replace:String*)
+    (let ((res:i8* (salloc 4096)))
+      (rreplace regex
+                (Symbol_cstr sym)
+                (String_cstr replace)
+                res)
+      (Symbol res))))
+
+(bind-func regex_replace_d
+  (lambda (regex sym:Symbol* replace)
+    (let ((res:i8* (salloc 4096)))
+      (rreplace regex
+                (Symbol_cstr sym)
+                replace
+                res)
+      (Symbol res))))
+
 (bind-poly regex_replace regex_replace_a)
 (bind-poly regex_replace regex_replace_b)
-
+(bind-poly regex_replace regex_replace_c)
+(bind-poly regex_replace regex_replace_d)
