@@ -228,6 +228,7 @@ namespace extemp {
       { "sys:expand-path",            &SchemeFFI::pathExpansion },
       { "sys:command",                &SchemeFFI::command },
       { "sys:command-output",         &SchemeFFI::commandOutput },
+      { "sys:set-env",                &SchemeFFI::setEnv },
       { "sys:set-default-timeout",    &SchemeFFI::setDefaultTimeout },
       { "sys:get-default-timeout",    &SchemeFFI::getDefaultTimeout },
 	    // DSP sys stuff
@@ -561,6 +562,19 @@ namespace extemp {
       }
     else
       return _sc->F;     
+  }
+
+  pointer SchemeFFI::setEnv(scheme* _sc, pointer args) {
+    char* var = string_value(pair_car(args));
+    char* val = string_value(pair_cadr(args));
+
+    int res;
+#ifdef _WIN32
+    res = _putenv_s(var, val);
+#else
+    res = setenv(var, val, 1); // overwrite = TRUE
+#endif
+    return mk_integer(_sc,res);
   }
 
   pointer SchemeFFI::setDefaultTimeout(scheme* _sc, pointer args)
