@@ -945,8 +945,7 @@ namespace extemp {
         if(pair_cdr(args) != _sc->NIL && pair_cadr(args) != _sc->F)
           {
 #ifdef _WIN32
-            std::cout << "Error loading library: " << GetLastError() << std::endl;
-            printf("For Library Path: %ls\n",wstr);
+            std::cout << GetLastError() << std::endl;
 #else
             printf("%s\n", dlerror());
 #endif
