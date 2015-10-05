@@ -2075,7 +2075,11 @@
   (lambda ()
     (let ((path (sys:command-output "echo %PATH%")))
       (if (not (regex:match? path "libs/win64/lib"))
-          (sys:command (string-append "set PATH=" path ";" (sys:share-dir) "/libs/win64/lib"))))))
+          (sys:set-env "PATH" (string-append path ";" (sys:share-dir) "/libs/win64/lib"))))))
+
+;; do it!
+(if (string? (sys:platform "Windows"))
+    (Windows-add-libdir-to-PATH))
 
 (define impc:aot:compile-xtm-file
   (lambda (lib-path exit-afterwards?)

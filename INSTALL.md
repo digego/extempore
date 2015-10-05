@@ -135,13 +135,6 @@ To do this, there's a helpful `.bat` file in `extras/`
 ```
 .\extras\ms_build_vars.bat
 ```
-You may also need to add Extempore's Windows lib directory
-`libs/win64/lib` to your `PATH` environment variable.  There are a few
-ways to do this, but the easiest is probably just (replacing my path
-to Extempore with wherever it is on your machine)
-```
-set PATH=C:/Users/ben/Code/extempore/libs/win64/lib;%PATH%
-```
 
 #### libsndfile
 
