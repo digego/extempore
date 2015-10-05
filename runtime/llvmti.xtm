@@ -1951,14 +1951,17 @@
                                                       " -dynamiclib -undefined dynamic_lookup ")))
                                 asm-path
                                 " -o " output-shlib-path)
-                               (string-append "link"
-                                              ;; " /FORCE:UNRESOLVED "
-                                              " /MACHINE:x64 /DLL"
-                                              " /OUT:" output-shlib-path
-                                              " " (string-join link-libs " ")
-                                              ;; (string-append tmp-dir module-name ".lib ")
-                                              " msvcrt.lib opengl32.lib "
-                                              asm-path))))
+                               (string-append
+                                "call " 
+                                (sanitize-platform-path (sys:share-dir))
+                                "\\extras\\ms_build_vars.bat && link"
+                                ;; " /FORCE:UNRESOLVED "
+                                " /MACHINE:x64 /DLL"
+                                " /OUT:" output-shlib-path
+                                " " (string-join link-libs " ")
+                                ;; (string-append tmp-dir module-name ".lib ")
+                                " msvcrt.lib opengl32.lib "
+                                asm-path))))
         (print "Looking for llc in " llvm-path "...\n\n")
         (begin
           (print-with-colors 'black 'yellow #t (print " Exporting module "))
@@ -1981,7 +1984,7 @@
             (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
             (print "\n  " link-command "\n\n"))
           ;; doesn't work!
-          ;; (sys:command "call \"c:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\VC\\bin\\amd64\\vcvars64.bat\"")
+          (sys:command "call extras\\ms_build_vars.bat")
           (set! linker-res (sys:command link-command))
           (if (<> linker-res 0)
               (begin (print-with-colors 'red 'default #t
