@@ -669,7 +669,7 @@
 
 ;;  PCRE regex for parsing pretty type strings
 (define impc:ir:regex-tc-or-a (string-append "((\\[|\\<)(?<struct>[^<>\\[\\]]|(\\[|\\<)\\g<struct>*(\\]|\\>)\\**)*(\\]|\\>)\\**)"
-                                             "|([0-9A-Za-z]*{(?<tvar>[^{}]|{\\g<tvar>*}\\**)*}\\**)"
+                                             "|([0-9A-Za-z_]*{(?<tvar>[^{}]|{\\g<tvar>*}\\**)*}\\**)"
                                              "|(\\|[0-9](?<array>[^\\|]|\\|[0-9]\\g<array>*\\|\\**)*\\|\\**)"
                                              "|(/[0-9](?<vector>[^/]|/[0-9]\\g<vector>*/\\**)*/\\**)"
                                              ;; "|(?:([:%#!0-9a-zA-Z_-]({.*?}\\**\)?\\**)+)"))
@@ -3245,7 +3245,9 @@
       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
              (idx (impc:ir:gname))
              (t (impc:ir:get-type-from-str (cadr idx)))
-             (tt (impc:ir:pointer-- (car hint?)))) ;(impc:ir:convert-from-pretty-types (car hint?)))))
+             (tt (impc:ir:pointer-- (car hint?)))
+             (typesize (number->string (impc:ir:get-type-size tt))))
+        ;;(impc:ir:convert-from-pretty-types (car hint?)))))
         ;; (tt (if (null? (cddr ast))
         ;; 	     (impc:ir:pointer-- (impc:ir:convert-from-pretty-types (car hint?)))
         ;; 	     (impc:ir:convert-from-pretty-types (caddr ast)))))
@@ -3257,12 +3259,13 @@
                                         (car idx) " to i64\n") os)
                    (set! idx (impc:ir:gname))))
         (emit (impc:ir:gname "val" "i8*") " = getelementptr " (impc:ir:get-type-str t) ", " (impc:ir:get-type-str t) "* null, i32 1\n" os)
-        (emit (impc:ir:gname "typesize" *impc:ir:size_t_str*) " = ptrtoint " (impc:ir:get-type-str t) "* "
-              (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os)
-
-        (emit (impc:ir:gname "zonesize" "i64") " = mul "
-              (cadr (impc:ir:gname "typesize")) " " (car (impc:ir:gname "typesize")) ", "
-              (car idx) "\n" os)
+        ;; (emit (impc:ir:gname "typesize" *impc:ir:size_t_str*) " = ptrtoint " (impc:ir:get-type-str t) "* "
+        ;;       (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os)
+        ;;
+        ;; (emit (impc:ir:gname "zonesize" "i64") " = mul "
+        ;;       (cadr (impc:ir:gname "typesize")) " " (car (impc:ir:gname "typesize")) ", "
+        ;;       (car idx) "\n" os)        
+        (emit (impc:ir:gname "zonesize" "i64") " = mul " (cadr idx) " " typesize ", " (car idx) "\n" os)
 
         (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
               (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
@@ -3303,8 +3306,10 @@
     (let* ((os (make-string 0)))
       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
              (idx (impc:ir:gname))
-             (t (impc:ir:get-type-from-str (cadr idx)))
-             (tt (impc:ir:pointer-- (car hint?)))) ;(impc:ir:convert-from-pretty-types (car hint?)))))
+             (t (impc:ir:get-type-from-str (cadr idx)))        
+             (tt (impc:ir:pointer-- (car hint?)))
+             (typesize (number->string (impc:ir:get-type-size tt))))
+        ;;(impc:ir:convert-from-pretty-types (car hint?)))))
         ;;(tt (impc:ir:convert-from-pretty-types (caddr ast))))
         (if (not (impc:ir:fixed-point? t))
             (impc:compiler:print-bad-type-error (impc:ir:get-type-str t) "alloc size must be an integer"))
@@ -3316,12 +3321,13 @@
                    (set! idx (impc:ir:gname))))
         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (emit (impc:ir:gname "val" "i8*") " = getelementptr " (impc:ir:get-type-str t) ", " (impc:ir:get-type-str t) "* null, i32 1\n" os)
-        (emit (impc:ir:gname "typesize" *impc:ir:size_t_str*) " = ptrtoint " (impc:ir:get-type-str t) "* "
-              (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os)
-
-        (emit (impc:ir:gname "zonesize" "i64") " = mul "
-              (cadr (impc:ir:gname "typesize")) " " (car (impc:ir:gname "typesize")) ", "
-              (car idx) "\n" os)
+        ;; (emit (impc:ir:gname "typesize" *impc:ir:size_t_str*) " = ptrtoint " (impc:ir:get-type-str t) "* "
+        ;;       (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os)
+        ;;
+        ;; (emit (impc:ir:gname "zonesize" "i64") " = mul "
+        ;;       (cadr (impc:ir:gname "typesize")) " " (car (impc:ir:gname "typesize")) ", "
+        ;;       (car idx) "\n" os)
+        (emit (impc:ir:gname "zonesize" "i64") " = mul " (cadr idx) " " typesize ", " (car idx) "\n" os)
 
         (if (string=? *impc:ir:size_t_str* "i32")
             (begin
