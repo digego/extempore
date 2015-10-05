@@ -38,7 +38,7 @@
 ;;; Code:
 
 ;; make sure you include / on the end
-(define path "assets/models/")
+(bind-val model_path i8* "assets/models/")
 
 (sys:load "libs/external/assimp.xtm")
 (sys:load "libs/external/glfw3.xtm")
@@ -54,6 +54,10 @@
   (begin
     (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
     (glfw_init_and_create_compatibility_window width height)))
+
+(bind-func get_window
+  (lambda ()
+    window))
 
 ;; create a window
 ;; (call-as-xtlang
@@ -96,22 +100,26 @@
       (xtm_render prerender render null null (cast models i8*))
       void)))
 
-;; standard impromptu callback
-(define opengl-loop
-  (lambda (time dur model1 model2 model3 degree)
-    (let ((v (clock:clock)))
-      (gl_render model1 model2 model3)
-      ;;(gl:swap-buffers glctx)
-      (glfwPollEvents)
-      (glfwSwapBuffers window)
-      )
-    (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) dur
-              model1 model2 model3 (+ degree .5))))
+(bind-val peppino xtm_node*
+  (assimp_load_model model_path "/peppino.dae" aiProcess_Triangulate))
+(bind-val scene xtm_node*
+  (assimp_load_model model_path "/scene.dae" aiProcess_Triangulate))
+(bind-val dome xtm_node*
+  (assimp_load_model model_path "/dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
-(define peppino (assimp_load_model path "peppino.dae" aiProcess_Triangulate))
-(define scene (assimp_load_model path "scene.dae" aiProcess_Triangulate))
-(define dome (assimp_load_model path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
+(xtm_render_setup
+ (call-as-xtlang (glfw_get_framebuffer_width window))
+ (call-as-xtlang (glfw_get_framebuffer_height window)))
 
-(xtm_render_setup (real->integer width) (real->integer height))
- 
-(opengl-loop (now) 2000 peppino scene dome 70.0)
+(bind-func gl_draw_loop
+  (lambda (time:i64 delta_t:double)
+    (gl_render peppino scene dome)
+    ;; swap buffers
+    (glfwPollEvents)
+    (glfwSwapBuffers window)
+    ;; set next frame callback
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time gl_draw_loop next_time delta_t))))
+
+;; and to start it running...
+(gl_draw_loop (now) (/ 1.0 30.0)) ;; 30fps
