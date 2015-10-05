@@ -41,6 +41,15 @@
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")))
 
+;; this version doesn't really do anything, bit in the getprocaddress
+;; OpenGL code path it's important, so having it here allows us to
+;; include it in the examples
+(impc:aot:do-and-emit
+ (define gl_init
+   (lambda (gl-lib . warn?)
+     (if (not gl-lib)
+         (print "Error: libGL not loaded\n")))))
+
 ;; /*
 ;; ** Copyright (c) 2013-2015 The Khronos Group Inc.
 ;; **
