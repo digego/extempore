@@ -756,62 +756,7 @@ Use via the polymorphic Str function
 
 (bind-poly equal Symbol_equal)
 
-;; some helpers for AOT-compilation stuff
-
-(bind-func sys_getenv
-  (lambda (var_name)
-    (getenv var_name)))
-
-;; this just here to provide the scheme wrapper        
-(if (not (equal? (sys:platform) "Windows"))
-    (eval
-     '(bind-func sys_setenv
-       (lambda (var_name value replace_p)
-         (setenv var_name value replace_p)))
-     (interaction-environment)))
-
-(if (not (equal? (sys:platform) "Windows"))
-    (eval
-     '(bind-func sys_unsetenv
-        (lambda (var_name)
-          (unsetenv var_name)))
-     (interaction-environment)))
-
 (impc:aot:do-or-emit (set_float_nans_))
-
-;; some scheme helpers for acessing the environment
-
-(impc:aot:do-or-emit
- (define sys:get-env
-   (lambda (var-name)
-     (let ((res (cptr->string (sys_getenv var-name))))
-       (if (string=? res "")
-           #f
-           res)))))
-
-(impc:aot:do-or-emit
- (define sys:set-env
-   (lambda (var-name value replace?)
-     (if (and (string? var-name)
-              (string? value)
-              (boolean? replace?))
-         (let ((res (sys_setenv var-name value (if replace? 1 0))))
-           (if (<> res 0)
-               #f
-               #t))
-         (begin (print-with-colors 'red 'default #t (print "Error"))
-                (print ": var-name and value must be strings, replace must be boolean\n")
-                #f)))))
-
-(impc:aot:do-or-emit
- (define sys:unset-env
-   (lambda (var-name)
-     (if (string? var-name)
-         (let ((res (sys_unsetenv var-name)))
-           (if (<> res 0) #f #t))
-         (begin (print-with-colors 'red 'default #t (print "Error"))
-                (print ": var-name must be a string\n")
-                #f)))))
 
 ;; this stuff needs to go at the end, since redefinitions have to go
 ;; in a new module.  these are special-case hacks.

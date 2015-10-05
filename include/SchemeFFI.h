@@ -101,6 +101,7 @@ namespace extemp {
   static pointer pathExpansion(scheme* _sc, pointer args);
   static pointer command(scheme* _sc, pointer args);
   static pointer commandOutput(scheme* _sc, pointer args);
+  static pointer setEnv(scheme* _sc, pointer args);
   static pointer setDefaultTimeout(scheme* _sc, pointer args);
   static pointer getDefaultTimeout(scheme* _sc, pointer args); 
   

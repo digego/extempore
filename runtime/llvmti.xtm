@@ -1930,14 +1930,14 @@
               (unix-or-Windows (string-append
                                 llvm-path
                                 "/bin/llc " 
-                                (if optimize-compiles? "-O3" "-O0")
-                                " -relocation-model=pic -tailcallopt "
+                                (if optimize-compiles? "-O3 -tailcallopt" "-O0")
+                                " -relocation-model=pic "
                                 bc-path)
                                (string-append
                                 llvm-path
                                 "\\bin\\llc "
-                                (if optimize-compiles? "-O3" "-O0")
-                                " -tailcallopt -filetype=obj -mtriple=x86_64-pc-win32 "
+                                (if optimize-compiles? "-O3 -tailcallopt" "-O0")
+                                " -filetype=obj -mtriple=x86_64-pc-win32 "
                                 bc-path)))
              (link-command
               (unix-or-Windows (string-append
@@ -2075,7 +2075,11 @@
   (lambda ()
     (let ((path (sys:command-output "echo %PATH%")))
       (if (not (regex:match? path "libs/win64/lib"))
-          (sys:command (string-append "set PATH=" path ";" (sys:share-dir) "/libs/win64/lib"))))))
+          (sys:set-env "PATH" (string-append path ";" (sys:share-dir) "/libs/win64/lib"))))))
+
+;; do it!
+(if (string? (sys:platform "Windows"))
+    (Windows-add-libdir-to-PATH))
 
 (define impc:aot:compile-xtm-file
   (lambda (lib-path exit-afterwards?)
