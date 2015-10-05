@@ -654,26 +654,16 @@ equal to (length *impc:ti:gl-proc-alist*)")
 ;; it would be nice if this was an xtlang function, but for now the
 ;; list of gl proc names is in Scheme
 (impc:aot:do-and-emit
- (define gl_get_proc_address_init
-   (lambda (gl-lib warn?)
+ (define gl_init
+   (lambda (gl-lib . warn?)
      (print "Initialising OpenGL function pointers... ")
      (for-each (lambda (proc-pair)
                  (let* ((proc-ptr (gl_get_proc_address gl-lib (car proc-pair))))
-                   (if (and warn? (string=? (cptr->string proc-ptr) ""))
+                   (if (and (not (null? warn?)) warn? (string=? (cptr->string proc-ptr) ""))
                        (print "Warning: OpenGL proc address is null for " (car proc-pair) "\n"))
                    (gl_set_proc_address (cdr proc-pair) proc-ptr)))
                *impc:ti:gl-proc-alist*)
      (print "done\n"))))
-
-(bind-func gl_get_proc_address_ready_p
-  "check that alll of the OpenGL function pointers are non-null"
-  (lambda ()
-    (let ((i 0)
-          (res #t))
-      (dotimes (i EXTEMPORE_GL_FUNCTION_POINTER_COUNT)
-        (if (null? (aref EXTEMPORE_GL_FUNCTION_POINTERS i))
-            (set! res #f)))
-      res)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; END GL_GET_PROC_ADDRESS HANDLING ;;
