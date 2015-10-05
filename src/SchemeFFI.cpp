@@ -931,26 +931,30 @@ namespace extemp {
 	return mk_integer(_sc,val);
     }
 	
-    pointer SchemeFFI::openDynamicLib(scheme* _sc, pointer args)
-    {
-	//void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
+  pointer SchemeFFI::openDynamicLib(scheme* _sc, pointer args)
+  {
+    //void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
 #ifdef _WIN32
-      void* lib_handle = LoadLibraryA(string_value(pair_car(args)));
+    void* lib_handle = LoadLibraryA(string_value(pair_car(args)));
 #else
-      void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY|RTLD_GLOBAL);
+    void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY|RTLD_GLOBAL);
 #endif
-	if (!lib_handle)
-	{
-// #ifdef _WIN32
-// 	  std::cout << "Error loading library: " << GetLastError() << std::endl;
-// 	  printf("For Library Path: %ls\n",wstr);
-// #else
-// 	  printf("Error in %s\n", dlerror());
-// #endif
-	  return _sc->F;
-	}
-	return mk_cptr(_sc,lib_handle);
-    }
+    if (!lib_handle)
+      {
+        // if an optional second argument is non-nil, print the error
+        if(pair_cdr(args) != _sc->NIL && pair_cadr(args) != _sc->F)
+          {
+#ifdef _WIN32
+            std::cout << "Error loading library: " << GetLastError() << std::endl;
+            printf("For Library Path: %ls\n",wstr);
+#else
+            printf("%s\n", dlerror());
+#endif
+          }
+        return _sc->F;
+      }
+    return mk_cptr(_sc,lib_handle);
+  }
 
     pointer SchemeFFI::closeDynamicLib(scheme* _sc, pointer args)
     {
