@@ -38,6 +38,34 @@
 (bind-lib libGL glCheckFramebufferStatus [GLenum,GLenum]*)
 (bind-lib libGL glFramebufferTexture2D [void,GLenum,GLenum,GLenum,GLuint,GLint]*)
 
+;; this from gl-objects.xtm - we can remove it once graphics-pipeline
+;; can use the core profile
+
+(bind-func gl_print_error_with_msg
+  (lambda (msg:i8*)
+    (let ((err (glGetError)))
+      (cond
+       ((= err GL_INVALID_ENUM)
+        (printf "%s: Invalid Enum\n" msg))
+       ((= err GL_INVALID_VALUE)
+        (printf "%s: Invalid Value\n" msg))
+       ((= err GL_INVALID_OPERATION)
+        (printf "%s: Invalid Operation\n" msg))
+       ((= err GL_OUT_OF_MEMORY)
+        (printf "%s: Out Of Memory\n" msg))
+       ((= err GL_NO_ERROR)
+        1:i32)
+       (else
+        (printf "%s\n" msg)))
+      void)))
+
+(bind-func gl_print_error_no_msg
+  (lambda ()
+    (gl_print_error_with_msg "OpenGL Error")))
+
+(bind-poly gl_print_error gl_print_error_with_msg)
+(bind-poly gl_print_error gl_print_error_no_msg)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; OpenGL related Matrix Operations

@@ -2,7 +2,7 @@
 
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
-;; Required dylibs: libSOIL, libassimp, libGLU
+;; Required dylibs: libstb_image, libassimp
 
 ;;; Commentary:
 
@@ -14,11 +14,11 @@
 (define *xtmlib-assimp-loaded* #f)
 
 (impc:aot:suppress-aot-do
- (sys:load "libs/external/graphics-pipeline.xtm")
- (sys:load "libs/external/soil.xtm"))
+ (sys:load "libs/external/stb_image.xtm")
+ (sys:load "libs/external/graphics-pipeline.xtm"))
 (impc:aot:insert-forms
- (sys:load "libs/external/graphics-pipeline.xtm" 'quiet)
- (sys:load "libs/external/soil.xtm" 'quiet))
+ (sys:load "libs/external/stb_image.xtm" 'quiet)
+ (sys:load "libs/external/graphics-pipeline.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmassimp")
 
@@ -35,36 +35,73 @@
                 (print ": unsupported platform ")
                 (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
-;; load texture and returns texture number
-;; 16 is for verticle flip
-;; 512 is for GL_TEXTURE_RECTANGLE_ARB (otherwise GL_TEXTURE_2D)
-;; 4 is for repeat
-;; 8 multiply alpha
 (bind-func ai_load_ogl_texture
-  (lambda (path idx:i32)
-    (let ((res (SOIL_load_OGL_texture path 4 idx (+ 4 8 16)))) ; (+ 512 16))))
-      (if (= res 0)
-          (begin (printf "failed (%lld) to load %s\n" res path)
+  (lambda (filename tex_id:i32)
+    ;; if tex_id is 0, generate a new texture
+    (if (= tex_id 0)
+        (let ((texid_ptr:i32* (salloc)))
+          (glGenTextures 1 texid_ptr)
+          (set! tex_id (pref texid_ptr 0))))
+    (stbi_set_flip_vertically_on_load 1)
+    (let ((width_ptr:i32* (salloc))
+          (height_ptr:i32* (salloc))
+          (comp_ptr:i32* (salloc))
+          (data (stbi_load filename width_ptr height_ptr comp_ptr 4)))
+      (if (null? data)
+          (begin (println (stbi_failure_reason))
                  0)
-          (begin (printf "...tex:> id(%d) loaded path:%s\n" res path)
-                 res)))))
+          (begin
+            (glActiveTexture GL_TEXTURE0)
+            (glBindTexture GL_TEXTURE_2D tex_id)
+            (glTexImage2D GL_TEXTURE_2D 0
+                          GL_RGBA
+                          (pref width_ptr 0)
+                          (pref height_ptr 0)
+                          0
+                          GL_RGBA
+                          GL_UNSIGNED_BYTE
+                          data)
+            ;; set some parameters
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+            (gl_print_error "error in ai_load_ogl_texture")
+            tex_id)))))
 
-;; load texture and returns texture number
-;; 16 is for verticle flip
-;; 512 is for GL_TEXTURE_RECTANGLE_ARB (otherwise GL_TEXTURE_2D)
-;; 4 is for repeat
-;; 8 multiply alpha
 (bind-func ai_load_ogl_texture_from_buffer
-  (lambda (data datalgth idx:i32)
-    (printf "load ogl texture\n")
-    (let ((res (SOIL_load_OGL_texture_from_memory data datalgth 4 idx (+ 4 8 16)))) ; (+ 512 16))))
-      (printf "loaded ogl texture %d\n" res)
-      (if (= res 0)
-          (begin (printf "failed (%d) to load embedded texture\n" res)
+  (lambda (buffer buflen tex_id:i32)
+    ;; if tex_id is 0, generate a new texture
+    (if (= tex_id 0)
+        (let ((texid_ptr:i32* (salloc)))
+          (glGenTextures 1 texid_ptr)
+          (set! tex_id (pref texid_ptr 0))))
+    ;; (stbi_set_flip_vertically_on_load 1)
+    (let ((width_ptr:i32* (salloc))
+          (height_ptr:i32* (salloc))
+          (comp_ptr:i32* (salloc))
+          (data (stbi_load_from_memory buffer buflen width_ptr height_ptr comp_ptr 4)))
+      (if (null? data)
+          (begin (println (stbi_failure_reason))
                  0)
-          (begin (printf "...tex:> id(%d) loaded embedded texture\n" res)
-                 res)))))
-
+          (begin
+            (glActiveTexture GL_TEXTURE0)
+            (glBindTexture GL_TEXTURE_2D tex_id)
+            (glTexImage2D GL_TEXTURE_2D 0
+                          GL_RGBA
+                          (pref width_ptr 0)
+                          (pref height_ptr 0)
+                          0
+                          GL_RGBA
+                          GL_UNSIGNED_BYTE
+                          data)
+            ;; set some parameters
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+            (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+            (gl_print_error "error in ai_load_ogl_texture")
+            tex_id)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
