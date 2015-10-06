@@ -24,7 +24,6 @@
 ;; set up the FBO & backing textures
 
 (bind-val fbo FBO*)
-(bind-val draw_bufs GLenum*)
 (bind-val ss_quad_vao VAO*)
 
 ;; and here's the triangle we eventually want to draw (taken from triangle.xtm)
@@ -70,12 +69,13 @@
 
 (call-as-xtlang
  (let ((fbw_ptr:i32* (salloc))
-       (fbh_ptr:i32* (salloc)))
+       (fbh_ptr:i32* (salloc))
+       (drawbufs_ptr:GLenum* (salloc)))
    (glfwGetFramebufferSize window fbw_ptr fbh_ptr)
-   (println (set! fbo (FBO_create_with_textures (pref fbw_ptr 0) (pref fbh_ptr 0) #t))))
- (pset! draw_bufs 0 GL_COLOR_ATTACHMENT0)
- (glDrawBuffers 1 draw_bufs)
- (set! ss_quad_vao (VAO_create_ss_quad)))
+   (println (set! fbo (FBO_create_with_textures (pref fbw_ptr 0) (pref fbh_ptr 0) #t)))
+   ;; (pset! drawbufs_ptr 0 GL_COLOR_ATTACHMENT0)
+   (glDrawBuffers 1 drawbufs_ptr)
+   (set! ss_quad_vao (VAO_create_ss_quad))))
 
 (bind-func gl_draw
   (lambda ()
