@@ -27,31 +27,20 @@
         ((string=? (sys:platform) "Linux")
          "libmpi.so")
         ((string=? (sys:platform) "Windows")
-         "libmpi.dll")
-        (else
-         (begin (print-with-colors 'red 'default #f (print "Error"))
-                (print ": unsupported platform ")
-                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+         "libmpi.dll")))
 
 (bind-lib libmpi MPI_Get_library_version [i32,i8*,i32*]*)
 (bind-lib libmpi MPI_Get_version [i32,i32*,i32*]*)
 
 ;; bail out if not using Open MPI
-(if (<> (call-as-xtlang
-         (letz ((ver:i8* (zalloc 1024))
-                (lenptr:i32* (zalloc)))
-           (MPI_Get_library_version ver lenptr)
-           (strncmp ver "Open MPI" 7)))
-        0)
-    (sys:load-escape "Sorry, Extempore's MPI bindings only work with OpenMPI at the moment."))
-(impc:aot:insert-forms
- (if (<> (call-as-xtlang
-          (letz ((ver:i8* (zalloc 1024))
-                 (lenptr:i32* (zalloc)))
-            (MPI_Get_library_version ver lenptr)
-            (strncmp ver "Open MPI" 7)))
-         0)
-     (sys:load-escape "Sorry, Extempore's MPI bindings only work with OpenMPI at the moment.")))
+;; (impc:aot:do-or-emit
+;;  (if (<> (call-as-xtlang
+;;           (letz ((ver:i8* (zalloc 1024))
+;;                  (lenptr:i32* (zalloc)))
+;;             (MPI_Get_library_version ver lenptr)
+;;             (strncmp ver "Open MPI" 7)))
+;;          0)
+;;      (sys:load-escape "Sorry, Extempore's MPI bindings only work with OpenMPI at the moment.")))
 
 ;; opaque struct pointers
 
@@ -468,15 +457,11 @@
 (bind-lib-val libmpi ompi_mpi_comm_null_addr MPI_Comm)
 (bind-val MPI_COMM_NULL MPI_Comm)
 
-(call-as-xtlang
- (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr)
- (set! MPI_COMM_SELF ompi_mpi_comm_self_addr)
- (set! MPI_COMM_NULL ompi_mpi_comm_null_addr))
-(impc:aot:insert-forms
+(impc:aot:do-or-emit
  (call-as-xtlang
-   (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr)
-   (set! MPI_COMM_SELF ompi_mpi_comm_self_addr)
-   (set! MPI_COMM_NULL ompi_mpi_comm_null_addr)))
+  (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr)
+  (set! MPI_COMM_SELF ompi_mpi_comm_self_addr)
+  (set! MPI_COMM_NULL ompi_mpi_comm_null_addr)))
 
 ;; group/message
 
@@ -518,22 +503,23 @@
 (bind-lib-val libmpi ompi_mpi_op_no_op_addr MPI_Op)
 (bind-val MPI_NO_OP MPI_Op)
 
-(call-as-xtlang
- (set! MPI_NULL ompi_mpi_op_null_addr)
- (set! MPI_MAX ompi_mpi_op_max_addr)
- (set! MPI_MIN ompi_mpi_op_min_addr)
- (set! MPI_SUM ompi_mpi_op_sum_addr)
- (set! MPI_PROD ompi_mpi_op_prod_addr)
- (set! MPI_LAND ompi_mpi_op_land_addr)
- (set! MPI_BAND ompi_mpi_op_band_addr)
- (set! MPI_LOR ompi_mpi_op_lor_addr)
- (set! MPI_BOR ompi_mpi_op_bor_addr)
- (set! MPI_LXOR ompi_mpi_op_lxor_addr)
- (set! MPI_BXOR ompi_mpi_op_bxor_addr)
- (set! MPI_MAXLOC ompi_mpi_op_maxloc_addr)
- (set! MPI_MINLOC ompi_mpi_op_minloc_addr)
- (set! MPI_REPLACE ompi_mpi_op_replace_addr)
- (set! MPI_NO_OP ompi_mpi_op_no_op_addr))
+(impc:aot:do-or-emit
+ (call-as-xtlang
+  (set! MPI_NULL ompi_mpi_op_null_addr)
+  (set! MPI_MAX ompi_mpi_op_max_addr)
+  (set! MPI_MIN ompi_mpi_op_min_addr)
+  (set! MPI_SUM ompi_mpi_op_sum_addr)
+  (set! MPI_PROD ompi_mpi_op_prod_addr)
+  (set! MPI_LAND ompi_mpi_op_land_addr)
+  (set! MPI_BAND ompi_mpi_op_band_addr)
+  (set! MPI_LOR ompi_mpi_op_lor_addr)
+  (set! MPI_BOR ompi_mpi_op_bor_addr)
+  (set! MPI_LXOR ompi_mpi_op_lxor_addr)
+  (set! MPI_BXOR ompi_mpi_op_bxor_addr)
+  (set! MPI_MAXLOC ompi_mpi_op_maxloc_addr)
+  (set! MPI_MINLOC ompi_mpi_op_minloc_addr)
+  (set! MPI_REPLACE ompi_mpi_op_replace_addr)
+  (set! MPI_NO_OP ompi_mpi_op_no_op_addr)))
 (impc:aot:insert-forms
  (call-as-xtlang
    (set! MPI_NULL ompi_mpi_op_null_addr)
@@ -556,10 +542,12 @@
 
 (bind-val MPI_STATUS_IGNORE MPI_Status*)
 (bind-val MPI_STATUSES_IGNORE MPI_Status*)
-(call-as-xtlang
- (set! MPI_STATUS_IGNORE (convert 0 MPI_Status*))
- (set! MPI_STATUSES_IGNORE (convert 0 MPI_Status*))
- void)
+
+(impc:aot:do-or-emit
+ (call-as-xtlang
+  (set! MPI_STATUS_IGNORE (convert 0 MPI_Status*))
+  (set! MPI_STATUSES_IGNORE (convert 0 MPI_Status*))
+  void))
 
 ;; /* Maximum length of datarep string (default is 128) */
 (bind-val OPAL_MAX_DATAREP_STRING i32 128)
@@ -631,26 +619,27 @@
 (bind-lib-val libmpiaddresses ompi_mpi_unsigned_long_long_addr MPI_Datatype)
 (bind-val MPI_UNSIGNED_LONG_LONG MPI_Datatype)
 
-(call-as-xtlang
- (set! MPI_DATATYPE_NULL ompi_mpi_datatype_null_addr)
- (set! MPI_BYTE ompi_mpi_byte_addr)
- (set! MPI_PACKED ompi_mpi_packed_addr)
- (set! MPI_CHAR ompi_mpi_char_addr)
- (set! MPI_SHORT ompi_mpi_short_addr)
- (set! MPI_INT ompi_mpi_int_addr)
- (set! MPI_LONG ompi_mpi_long_addr)
- (set! MPI_FLOAT ompi_mpi_float_addr)
- (set! MPI_DOUBLE ompi_mpi_double_addr)
- (set! MPI_LONG_DOUBLE ompi_mpi_long_double_addr)
- (set! MPI_UNSIGNED_CHAR ompi_mpi_unsigned_char_addr)
- (set! MPI_SIGNED_CHAR ompi_mpi_signed_char_addr)
- (set! MPI_UNSIGNED_SHORT ompi_mpi_unsigned_short_addr)
- (set! MPI_UNSIGNED_LONG ompi_mpi_unsigned_long_addr)
- (set! MPI_UNSIGNED ompi_mpi_unsigned_addr)
- (set! MPI_WCHAR ompi_mpi_wchar_addr)
- (set! MPI_LONG_LONG_INT ompi_mpi_long_long_int_addr)
- (set! MPI_LONG_LONG ompi_mpi_long_long_int_addr)
- (set! MPI_UNSIGNED_LONG_LONG ompi_mpi_unsigned_long_long_addr))
+(impc:aot:do-or-emit
+ (call-as-xtlang
+  (set! MPI_DATATYPE_NULL ompi_mpi_datatype_null_addr)
+  (set! MPI_BYTE ompi_mpi_byte_addr)
+  (set! MPI_PACKED ompi_mpi_packed_addr)
+  (set! MPI_CHAR ompi_mpi_char_addr)
+  (set! MPI_SHORT ompi_mpi_short_addr)
+  (set! MPI_INT ompi_mpi_int_addr)
+  (set! MPI_LONG ompi_mpi_long_addr)
+  (set! MPI_FLOAT ompi_mpi_float_addr)
+  (set! MPI_DOUBLE ompi_mpi_double_addr)
+  (set! MPI_LONG_DOUBLE ompi_mpi_long_double_addr)
+  (set! MPI_UNSIGNED_CHAR ompi_mpi_unsigned_char_addr)
+  (set! MPI_SIGNED_CHAR ompi_mpi_signed_char_addr)
+  (set! MPI_UNSIGNED_SHORT ompi_mpi_unsigned_short_addr)
+  (set! MPI_UNSIGNED_LONG ompi_mpi_unsigned_long_addr)
+  (set! MPI_UNSIGNED ompi_mpi_unsigned_addr)
+  (set! MPI_WCHAR ompi_mpi_wchar_addr)
+  (set! MPI_LONG_LONG_INT ompi_mpi_long_long_int_addr)
+  (set! MPI_LONG_LONG ompi_mpi_long_long_int_addr)
+  (set! MPI_UNSIGNED_LONG_LONG ompi_mpi_unsigned_long_long_addr)))
 (impc:aot:insert-forms
  (call-as-xtlang
   (set! MPI_DATATYPE_NULL ompi_mpi_datatype_null_addr)
