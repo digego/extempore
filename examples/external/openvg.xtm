@@ -19,19 +19,18 @@
 ;;; Code:
 
 (sys:load "libs/external/glfw3.xtm")
-(sys:load "libs/external/nanovg.xtm")
 
 (bind-val width float 1024.)
 (bind-val height float 768.)
 
 (bind-val window GLFWwindow*
-  (glfw_init_and_create_window (convert width) (convert height)))
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_window (convert width) (convert height))))
+
+(sys:load "libs/external/nanovg.xtm")
 (bind-val vg NVGcontext* (nvg_create_context))
-
-(bind-val pixel_ratio float (nvg_get_pixel_ratio window))
-
-(call-as-xtlang
- (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback))))
+(bind-val pixel_ratio float (glfw_get_pixel_ratio window))
 
 ;; background image
 (bind-val bg_paint NVGpaint*

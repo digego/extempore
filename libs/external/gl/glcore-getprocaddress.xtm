@@ -3729,13 +3729,14 @@ equal to (length *impc:ti:gl-proc-alist*)")
 ;; (bind-val GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR i32 #x93DC)
 ;; (bind-val GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR i32 #x93DD)
 
+;; if we're running, and not pre-compiling, we should also trigger the
+;; init routine
+
+(impc:aot:do-and-emit
+ (if (not (impc:aot:currently-compiling?))
+     (gl_init libGL)))
+
 (impc:aot:insert-footer "xtmglcore-getprocaddress")
 (define *xtmlib-glcore-getprocaddress-loaded* #t)
 (impc:aot:do-and-emit (define *xtmlib-gl-loaded* #t))
 
-;; if we're running, and not pre-compiling, we should also trigger the
-;; init routine
-
-(impc:aot:do-or-emit
- (if (not (output-port? *impc:aot:current-output-port*))
-     (gl_init libGL)))

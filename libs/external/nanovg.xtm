@@ -715,6 +715,14 @@
 (bind-lib libnanovg _nvgFillColor [void,NVGcontext*,NVGcolor*]*)
 (bind-lib libnanovg _nvgFillPaint [void,NVGcontext*,NVGpaint*]*)
 
+;; initialisation
+
+(bind-lib libnanovg nvgInit [i32]*)
+
+(bind-func nvg_init
+  (lambda ()
+    (nvgInit)))
+
 ;;;;;;;;;;;;;;;;;
 ;; xtlang code ;;
 ;;;;;;;;;;;;;;;;;
@@ -763,6 +771,11 @@
       (Str str))))
 
 (bind-poly toString Rect_toString)
+
+;; run the init code
+(impc:aot:do-and-emit
+ (if (not (impc:aot:currently-compiling?))
+     (nvg_init)))
 
 (impc:aot:insert-footer "xtmnanovg")
 (define *xtmlib-nanovg-loaded* #t)
