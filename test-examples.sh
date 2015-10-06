@@ -9,7 +9,6 @@
     examples/core/temporal_recursion_101.xtm \
     examples/external/electrofunk.xtm \
     examples/external/fluid_dynamics.xtm \
-    examples/external/gl-compatibility.xtm \
     examples/external/openvg.xtm \
     examples/external/pic.xtm \
     examples/external/raymarcher.xtm \
