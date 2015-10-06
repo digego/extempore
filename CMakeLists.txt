@@ -143,11 +143,6 @@ endif()
 # extempore executable #
 ########################
 
-if(WIN32)
-  set(WIN64_PACKAGE_DIR ${CMAKE_SOURCE_DIR}/libs/win64)
-  link_directories(${WIN64_PACKAGE_DIR}/lib)
-endif()
-
 add_executable(extempore src/Extempore.cpp
   src/AudioDevice.cpp
   src/EXTCondition.cpp
@@ -238,20 +233,6 @@ target_link_libraries(extempore
 
 # cmake will try and find these deps in the usual places.
 
-# On *OSX/Linux*, this assumes you've got them through your package
-# manager
-
-# On *Windows*, it assumes the dependencies have been obtained through
-# NuGet, either through Visual Studio or the NuGet command line
-# interface (choco install nuget.commandline). As an example (assuming
-# VS2015), something like this might get you what you need:
-
-# nuget install boost-vc140
-
-# after that, you'll probably still have to move the relevant headers
-# and libs into libs/win64/{lib,include} - which is messy I know, but
-# should be pretty straightforwards
-
 # LLVM
 
 if(DEFINED ENV{EXT_LLVM_DIR})
@@ -295,21 +276,23 @@ if(WIN32)
 endif()
 
 if(BOOST)
+  if(NOT BOOST_DIR)
+    message(FATAL_ERROR "BOOST_DIR must be defined")
+  endif()
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
   # asio header
   find_path(BOOST_ASIO_INCLUDE_DIR
     NAMES boost/asio.hpp
-    PATHS ${WIN64_PACKAGE_DIR}/include)
+    PATHS ${BOOST_DIR}/include)
   if(BOOST_ASIO_INCLUDE_DIR)
     target_include_directories(extempore PRIVATE ${BOOST_ASIO_INCLUDE_DIR})
   else()
     message(FATAL_ERROR "Cannot find boost/asio.hpp header")
   endif()
-  # boost libraries - assumes boost 1.59
   target_link_libraries(extempore
-    PRIVATE libboost_date_time-vc140-mt-1_59
-    PRIVATE libboost_regex-vc140-mt-1_59
-    PRIVATE libboost_system-vc140-mt-1_59)
+    PRIVATE ${BOOST_DIR}/lib/libboost_date_time-vc140-mt-1_59.lib
+    PRIVATE ${BOOST_DIR}/lib/libboost_regex-vc140-mt-1_59.lib
+    PRIVATE ${BOOST_DIR}/lib/libboost_system-vc140-mt-1_59.lib)
 endif()
 
 if(APPLE) # OSX

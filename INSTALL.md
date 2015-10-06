@@ -56,11 +56,9 @@ the NuGet command line client installed, you can probably do
 nuget install boost-vc140 & nuget install boost_system-vc140 & nuget install boost_regex-vc140 & nuget install boost_date_time-vc140
 ```
 
-It doesn't matter how you get these deps, but the Extempore CMake
-build process expects to find them in `libs/win64/lib` (for the
-library files) and `libs/win64/include` (for the headers). So you'll
-need to (probably manually) move them in there, which is a bit
-painful, but it's a one-time process.
+It doesn't matter how you get these deps or where you put them, as
+long as you tell Extempore where they are through the `BOOST_DIR`
+cmake variable.
 
 ### LLVM 3.7
 
@@ -98,11 +96,12 @@ cmake -DEXT_LLVM_DIR=/path/to/extempore/llvm ..
 If you've set the `EXT_LLVM_DIR` environment variable you don't have
 to provide it again to CMake.
 
-On **Windows**, you'll need to give CMake a few more details
+On **Windows**, you'll need to give CMake a few more details about
+where LLVM and Boost are:
 
 ```
 md cmake-build && cd cmake-build
-cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm ..
+cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm -DBOOST__DIR=c:\path\to\extempore\boost ..
 ```
 
 ### Build Extempore
