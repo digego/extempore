@@ -139,7 +139,7 @@ To do this, there's a helpful `.bat` file in `extras/`
 
 Just grab the Windows 64-bit installer from
 (http://www.mega-nerd.com/libsndfile/), and copy `libsndfile-1.dll`
-and `libsndfile-1.lib` into `extempore/libs/Win64/lib`
+and `libsndfile-1.lib` into `extempore/libs/platform-shlibs`
 
 #### GLFW
 
@@ -189,5 +189,15 @@ mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
 
-#### Glib
+#### Glib/Gobject
+
+I got a precompiled binary from
+(http://ftp.gnome.org/pub/GNOME/binaries/win64/glib/2.26/) although
+the latest version I could find was 2.26, which is a few versions
+behind the latest (2.45). It seems like they might not be releasing
+Windows binaries anymore?
+
+You could also try getting it from
+[Winlibs](https://github.com/winlibs/glib) and building it yourself,
+but that seems hairy.
 
