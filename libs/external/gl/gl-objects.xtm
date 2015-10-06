@@ -297,22 +297,20 @@
 ;; helper functions for drawing a screen-space quad
 
 (bind-func VAO_create_ss_quad
-  (let ((vbo null)
-        (vao null)
-        (ss_quad_pos_st:float* (zalloc 16)))
-    (pfill! ss_quad_pos_st
+  (lambda ()
+    (let ((ss_quad_pos_st:float* (salloc 16)))
+      (pfill! ss_quad_pos_st
               ;; pos     tex_coord
               -1. -1.    0. 0.
               -1.  1.    0. 1.
-               1. -1.    1. 0.
-               1.  1.    1. 1.
+              1. -1.    1. 0.
+              1.  1.    1. 1.
               )
-    (lambda ()
-      (set! vbo (VBO_create ss_quad_pos_st 16))
-      (set! vao (VAO_create))
-      (VAO_bind_attribute vao vbo 0 2 4 0) ;; position
-      (VAO_bind_attribute vao vbo 1 2 4 2) ;; tex_coord
-      vao)))
+      (let ((vbo (VBO_create ss_quad_pos_st 16))
+            (vao (VAO_create)))
+        (VAO_bind_attribute vao vbo 0 2 4 0) ;; position
+        (VAO_bind_attribute vao vbo 1 2 4 2) ;; tex_coord
+        vao))))
 
 ;; GL Texture
 
