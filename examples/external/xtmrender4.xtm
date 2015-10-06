@@ -44,18 +44,14 @@
 (sys:load "libs/external/assimp.xtm")
 (sys:load "libs/external/glfw3.xtm")
 
-(define width 1024)
-(define height 768)
 (bind-val width i32 1024)
 (bind-val height i32 768)
 
-;; create a window
-(bind-val window  GLFWwindow*
-  ;; create a window
+(bind-val window GLFWwindow*
+  ;; some of the shaders in the graphics pipeline use older glsl
+  ;; versions, so we need a "compatibility" graphics context
   (begin
     (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
-    ;; some of the shaders in the graphics pipeline use older glsl
-    ;; versions, so we need a "compatibility" graphics context
     (glfw_init_and_create_compatibility_window width height)))
 
 (bind-func build_pyramid_node
