@@ -111,7 +111,7 @@ where LLVM and Boost are:
 
 ```
 md cmake-build && cd cmake-build
-cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm -DBOOST__DIR=c:\path\to\extempore\boost ..
+cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm -DBOOST_DIR=c:\path\to\extempore\boost ..
 ```
 
 ### Build Extempore
@@ -136,15 +136,11 @@ in `cmake-build`. Open it, and build the `extempore` target.
 It's pretty straightforward. You should be able to get most things
 through your package manager.
 
-On **OSX**
+On **OSX**, for example
 
 ```
-brew install glfw3
-brew install libstb-image
-brew install libkiss-fft
+brew install libkiss-fft glfw3 libstb-image libnanovg
 ```
-
-From source (all platforms)
 
 ### Windows
 
@@ -160,21 +156,21 @@ and `libsndfile-1.lib` into `extempore/libs/platform-shlibs`
 
 #### KissFFT
 
-From source (all platforms)
-
 ```
 git clone git@github.com:benswift/kiss_fft
 cd stb && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
+then install to `libs/platform-shlibs`.
 
 #### GLFW3
 
-From source (all platforms)
+Download from (http://www.glfw.org/), I used v3.1.1.
 
 ```
 cmake -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF ..
 ```
+then install to `libs/platform-shlibs`.
 
 #### stb_image
 
@@ -193,12 +189,10 @@ We don't use GLEW directly, but we use it to build nanovg.
 (http://glew.sourceforge.net/)
 
 Download the latest stable version (I used 1.13.0)
-
 ```
 mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ../build/cmake/
 ```
-
 You'll need to move `libglew32.lib` out of whichever `Release` dir
 it's in into just the toplevel `GLEW_DIR/lib`.
 
@@ -212,6 +206,7 @@ git clone git@github.com:benswift/nanovg
 cd nanovg && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" -DGLEW_DIR=c:/path/to/glew ..
 ```
+then install to `libs/platform-shlibs`.
 
 #### Assimp
 
@@ -222,8 +217,11 @@ Get latest source from
 mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
+then install to `libs/platform-shlibs`.
 
 #### Glib/Gobject
+
+*Currently not working - suggestions welcome!*
 
 I got a precompiled binary from
 (http://ftp.gnome.org/pub/GNOME/binaries/win64/glib/2.26/) although
