@@ -58,7 +58,9 @@ nuget install boost-vc140 & nuget install boost_system-vc140 & nuget install boo
 
 It doesn't matter how you get these deps or where you put them, as
 long as you tell Extempore where they are through the `BOOST_DIR`
-cmake variable.
+cmake variable. The `BOOST_DIR` should have two subdirectories
+`include` and `lib`, which should contain the boost header directory
+and the `libboost*.lib` files respectively.
 
 ### LLVM 3.7
 
