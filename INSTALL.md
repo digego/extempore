@@ -76,21 +76,24 @@ patch -p0 < /path/to/extempore/extras/extempore-llvm-3.7.0.patch
 On **Windows**, the `<` redirection will work with `cmd.exe`, but not
 PowerShell
 
-Then build LLVM, moving the libraries into `/path/to/extempore/llvm`
+Then build LLVM, moving the libraries into `/path/to/extempore/llvm-build`
 as part of the `install` step
 
 ```
 mkdir cmake-build && cd cmake-build
-cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=/path/to/extempore/llvm .. && make && make install
+cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/path/to/extempore/llvm-build .. && make && make install
 ```
 
 On **Windows**, you'll also need to specify a 64-bit generator e.g.
 `-G"Visual Studio 14 2015 Win64"`
 
 To build, open the `Extempore.sln` file and build the `ALL_BUILD`
-target, then the `INSTALL` target.  If the install step doesn't work,
+target, then the `INSTALL` target. If the install step doesn't work,
 you can try directly calling `cmake -P cmake_install.cmake` which
-should be in the same directory.
+should be in the same directory. On Windows, the LLVM build output
+must be installed into an `llvm-build` subdirectory in the top-level
+Extempore directory (since the AOT compilation process will look in
+there to find `llc`).
 
 ## Building Extempore
 
