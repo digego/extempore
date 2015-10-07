@@ -1,7 +1,3 @@
-if(NOT EXISTS "@CMAKE_INSTALL_PREFIX@/bin/extempore@CMAKE_EXECUTABLE_SUFFIX@")
-  message(FATAL_ERROR "you must install extempore (e.g. make install) before AOT-compiling the standard library")
-endif()
-
 set(AOT_STDLIB_LIBS
   # core
   "libs/core/std.xtm"
@@ -28,7 +24,7 @@ set(AOT_STDLIB_LIBS
 foreach(aot-lib ${AOT_STDLIB_LIBS})
   message(STATUS "AOT-compiling ${aot-lib}")
   execute_process(
-    COMMAND @CMAKE_INSTALL_PREFIX@/bin/extempore --runtime @EXT_SHARE_DIR@ --nostd --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
+    COMMAND extempore --runtime @EXT_SHARE_DIR@ --nostd --port 17097 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
       TIMEOUT 900 # 15 minutes
       RESULT_VARIABLE aot_retval)
   if(NOT "${aot_retval}" STREQUAL 0)
