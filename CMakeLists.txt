@@ -115,7 +115,7 @@ elseif(UNIX AND NOT APPLE)
     PRIVATE asound)
   
 elseif(WIN32)
-  # use wdmks on Windows
+  # use everything except for ASIO on Windows
   target_sources(portaudio
     PRIVATE src/portaudio/src/hostapi/wdmks/pa_win_wdmks.c
     PRIVATE src/portaudio/src/hostapi/wmme/pa_win_wmme.c
