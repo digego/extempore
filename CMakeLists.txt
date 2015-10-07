@@ -323,7 +323,7 @@ elseif(UNIX AND NOT APPLE) # Linux
 endif()
 
 # on Windows, put the created extempore.exe straight into the source
-# directory, and the .lib file into libs/win64/lib
+# directory, and the .lib file into libs/platform-shlibs
 if(WIN32)
   set_target_properties(extempore
     PROPERTIES
@@ -331,8 +331,8 @@ if(WIN32)
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
     LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
     LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
-    ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/libs/win64/lib
-    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/win64/lib)
+    ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/libs/platform-shlibs
+    ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
 endif()
 
 if(ASSETS)
