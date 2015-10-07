@@ -18,7 +18,7 @@ a **C++ compiler toolchain**, e.g.
 - `sudo apt-get install git` on Ubuntu/Debian
 - `sudo yum install git` on Fedora/CentOS/RHEL
 - `brew install git` on OSX with Homebrew
-- `choco install git` on Windows with Chocolatey
+- `choco install git git.commandline` on Windows with Chocolatey
 
 **CMake** (version 3.1 or greater)
 
@@ -71,6 +71,9 @@ cd /path/to/llvm-3.7.0.src
 patch -p0 < /path/to/extempore/extras/extempore-llvm-3.7.0.patch
 ```
 
+On **Windows**, the `<` redirection will work with `cmd.exe`, but not
+PowerShell
+
 Then build LLVM, moving the libraries into `/path/to/extempore/llvm`
 as part of the `install` step
 
@@ -81,6 +84,11 @@ cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=O
 
 On **Windows**, you'll also need to specify a 64-bit generator e.g.
 `-G"Visual Studio 14 2015 Win64"`
+
+To build, open the `Extempore.sln` file and build the `ALL_BUILD`
+target, then the `INSTALL` target.  If the install step doesn't work,
+you can try directly calling `cmake -P cmake_install.cmake` which
+should be in the same directory.
 
 ## Building Extempore
 
