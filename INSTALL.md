@@ -136,14 +136,21 @@ in `cmake-build`. Open it, and build the `extempore` target.
 It's pretty straightforward. You should be able to get most things
 through your package manager.
 
+On **OSX**
+
+```
+brew install glfw3
+brew install libstb-image
+brew install libkiss-fft
+```
+
+From source (all platforms)
+
 ### Windows
 
-In the shell where you run `extempore.exe`, you'll need to set the
-build vars so you can call `link` during the AOT-compilation process.
-To do this, there's a helpful `.bat` file in `extras/`
-```
-.\extras\ms_build_vars.bat
-```
+Since Windows doesn't have a lib path, all the dlls should go in
+`c:/Path/to/extempore/libs/platform-shlibs`. So for all these deps,
+move the dll in there when it's done.
 
 #### libsndfile
 
@@ -151,13 +158,27 @@ Just grab the Windows 64-bit installer from
 (http://www.mega-nerd.com/libsndfile/), and copy `libsndfile-1.dll`
 and `libsndfile-1.lib` into `extempore/libs/platform-shlibs`
 
-#### GLFW
+#### KissFFT
+
+From source (all platforms)
+
+```
+git clone git@github.com:benswift/kiss_fft
+cd stb && mkdir cmake-build && cd cmake-build
+cmake -G"Visual Studio 14 2015 Win64" ..
+```
+
+#### GLFW3
+
+From source (all platforms)
 
 ```
 cmake -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF ..
 ```
 
 #### stb_image
+
+From source (all platforms)
 
 ```
 git clone git@github.com:benswift/stb
@@ -178,7 +199,12 @@ mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ../build/cmake/
 ```
 
+You'll need to move `libglew32.lib` out of whichever `Release` dir
+it's in into just the toplevel `GLEW_DIR/lib`.
+
 #### nanovg
+
+From source (all platforms)
 
 nanovg needs to be told about where GLEW is through the `GLEW_DIR` variable
 ```
@@ -186,8 +212,6 @@ git clone git@github.com:benswift/nanovg
 cd nanovg && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" -DGLEW_DIR=c:/path/to/glew ..
 ```
-You might need to move `libglew32.lib` out of whichever `Release` dir
-it's in into just the toplevel `GLEW_DIR/lib`
 
 #### Assimp
 
@@ -210,4 +234,3 @@ Windows binaries anymore?
 You could also try getting it from
 [Winlibs](https://github.com/winlibs/glib) and building it yourself,
 but that seems hairy.
-
