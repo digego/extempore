@@ -1,33 +1,77 @@
-set(AOT_STDLIB_LIBS
-  # core
-  "libs/core/std.xtm"
-  "libs/core/math.xtm"
-  "libs/core/audio_dsp.xtm"
-  "libs/core/instruments.xtm"
-  # external
-  "libs/external/fft.xtm"
-  "libs/external/sndfile.xtm"
-  "libs/external/audio_dsp_ext.xtm"
-  "libs/external/instruments_ext.xtm"
-  "libs/external/glib.xtm"
-  # Graphics (OpenGL)
-  "libs/external/stb_image.xtm"
-  "libs/external/glfw3.xtm"
-  "libs/external/gl/glcore-directbind.xtm"
-  "libs/external/gl/glcore-getprocaddress.xtm"
-  "libs/external/gl/gl-objects.xtm"
-  "libs/external/nanovg.xtm"
-  "libs/external/graphics-pipeline.xtm"
-  "libs/external/assimp.xtm"
-  )
+if(UNIX)
 
-foreach(aot-lib ${AOT_STDLIB_LIBS})
-  message(STATUS "AOT-compiling ${aot-lib}")
-  execute_process(
-    COMMAND extempore --runtime @EXT_SHARE_DIR@ --nostd --port 17097 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
+  if(NOT EXISTS "@CMAKE_INSTALL_PREFIX@/bin/extempore@CMAKE_EXECUTABLE_SUFFIX@")
+    message(FATAL_ERROR "you must install extempore (e.g. make install) before AOT-compiling the standard library")
+  endif()
+
+  set(AOT_STDLIB_LIBS
+    # core
+    "libs/core/std.xtm"
+    "libs/core/math.xtm"
+    "libs/core/audio_dsp.xtm"
+    "libs/core/instruments.xtm"
+    # external
+    "libs/external/fft.xtm"
+    "libs/external/sndfile.xtm"
+    "libs/external/audio_dsp_ext.xtm"
+    "libs/external/instruments_ext.xtm"
+    "libs/external/glib.xtm"
+    # Graphics (OpenGL)
+    "libs/external/stb_image.xtm"
+    "libs/external/glfw3.xtm"
+    "libs/external/gl/glcore-directbind.xtm"
+    "libs/external/gl/gl-objects.xtm"
+    "libs/external/nanovg.xtm"
+    "libs/external/graphics-pipeline.xtm"
+    "libs/external/assimp.xtm"
+    )
+
+  foreach(aot-lib ${AOT_STDLIB_LIBS})
+    message(STATUS "AOT-compiling ${aot-lib}")
+    execute_process(
+      COMMAND @CMAKE_INSTALL_PREFIX@/bin/extempore --runtime @EXT_SHARE_DIR@ --nostd --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
       TIMEOUT 900 # 15 minutes
       RESULT_VARIABLE aot_retval)
-  if(NOT "${aot_retval}" STREQUAL 0)
-    message(FATAL_ERROR "Problem compiling ${aot-lib}")
-  endif()
-endforeach()
+    if(NOT "${aot_retval}" STREQUAL 0)
+      message(FATAL_ERROR "Problem compiling ${aot-lib}")
+    endif()
+  endforeach()
+
+elseif(WIN32)
+
+  set(AOT_STDLIB_LIBS
+    # core
+    "libs/core/std.xtm"
+    "libs/core/math.xtm"
+    "libs/core/audio_dsp.xtm"
+    "libs/core/instruments.xtm"
+    # external
+    "libs/external/fft.xtm"
+    "libs/external/sndfile.xtm"
+    "libs/external/audio_dsp_ext.xtm"
+    "libs/external/instruments_ext.xtm"
+    # "libs/external/glib.xtm"
+    # Graphics (OpenGL)
+    "libs/external/stb_image.xtm"
+    "libs/external/glfw3.xtm"
+    "libs/external/gl/glcore-getprocaddress.xtm"
+    "libs/external/gl/gl-objects.xtm"
+    "libs/external/nanovg.xtm"
+    "libs/external/graphics-pipeline.xtm"
+    "libs/external/assimp.xtm"
+    )
+
+  foreach(aot-lib ${AOT_STDLIB_LIBS})
+    message(STATUS "AOT-compiling ${aot-lib}")
+    execute_process(
+      COMMAND @CMAKE_SOURCE_DIR@/extempore --nostd --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
+      TIMEOUT 900 # 15 minutes
+      RESULT_VARIABLE aot_retval)
+    if(NOT "${aot_retval}" STREQUAL 0)
+      message(FATAL_ERROR "Problem compiling ${aot-lib}")
+    endif()
+  endforeach()
+
+else()
+  message(STATUS "sorry, cannot AOT compile on this platform")
+endif()
