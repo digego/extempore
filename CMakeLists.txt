@@ -6,6 +6,7 @@ option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASSETS "download the Extempore assets (used in many of the examples)" OFF)
+option(ASIO "use the ASIO Portaudio backend" OFF)
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
@@ -115,13 +116,14 @@ elseif(UNIX AND NOT APPLE)
     PRIVATE asound)
   
 elseif(WIN32)
-  # use everything except for ASIO on Windows
+  # use everything except for ASIO on Windows by default, but you can
+  # use asio with the cmake ASIO option (see below)
   target_sources(portaudio
     PRIVATE src/portaudio/src/hostapi/wdmks/pa_win_wdmks.c
-    PRIVATE src/portaudio/src/hostapi/wmme/pa_win_wmme.c
+    # PRIVATE src/portaudio/src/hostapi/wmme/pa_win_wmme.c
     PRIVATE src/portaudio/src/hostapi/dsound/pa_win_ds.c
     PRIVATE src/portaudio/src/hostapi/dsound/pa_win_ds_dynlink.c
-    PRIVATE src/portaudio/src/hostapi/wasapi/pa_win_wasapi.c
+    # PRIVATE src/portaudio/src/hostapi/wasapi/pa_win_wasapi.c
     PRIVATE src/portaudio/src/os/win/pa_win_coinitialize.c
     PRIVATE src/portaudio/src/os/win/pa_win_hostapis.c
     PRIVATE src/portaudio/src/os/win/pa_win_util.c
@@ -133,10 +135,36 @@ elseif(WIN32)
     PRIVATE src/portaudio/src/os/win)
   target_compile_definitions(portaudio
       PRIVATE -DPA_USE_WDMKS
-      PRIVATE -DPA_USE_WMME
-      PRIVATE -DPA_USE_DS
-      PRIVATE -DPA_USE_WASAPI)
+      # PRIVATE -DPA_USE_WMME
+      # PRIVATE -DPA_USE_WASAPI
+      PRIVATE -DPA_USE_DS)
+endif()
 
+if(ASIO)
+  # if you want to build with ASIO on Windows, you need the ASIO SDK.
+  # See src/portaudio/src/hostapi/asio/ASIO-README.txt for
+  # instructions on how to get it
+
+  # then, find the following files...
+
+  ## asio_sdk\common\asio.cpp
+  ## asio_sdk\host\asiodrivers.cpp
+  ## asio_sdk\host\pc\asiolist.cpp
+
+  # ...as well as the header files
+
+  # and move them all into the src/portaudio/src/hostapi/asio
+  # directory in the Extempore source folder
+  target_sources(portaudio
+    PRIVATE src/portaudio/src/hostapi/asio/pa_asio.cpp
+    PRIVATE src/portaudio/src/hostapi/asio/asio.cpp
+    PRIVATE src/portaudio/src/hostapi/asio/asiodrivers.cpp
+    PRIVATE src/portaudio/src/hostapi/asio/asiolist.cpp
+    )
+  target_include_directories(portaudio
+    PRIVATE src/portaudio/src/hostapi/asio)
+  target_compile_definitions(portaudio
+    PRIVATE -DPA_USE_ASIO)
 endif()
 
 ########################
