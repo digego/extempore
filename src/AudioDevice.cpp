@@ -180,7 +180,7 @@ namespace extemp {
     void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
     void* cache_closure = 0;
     cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
-    SAMPLE (*closure) (SAMPLE,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,long,long,SAMPLE*)) cache_closure);
+    SAMPLE (*closure) (SAMPLE,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,uint64_t,uint64_t,SAMPLE*)) cache_closure);
     
     SAMPLE* data = 0; 
     llvm_zone_t* zone = llvm_peek_zone_stack();
@@ -202,7 +202,7 @@ namespace extemp {
       void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
       void* cache_closure = 0;
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
-      SAMPLE (*closure) (SAMPLE,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,long,long,SAMPLE*)) cache_closure);
+      SAMPLE (*closure) (SAMPLE,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,uint64_t,uint64_t,SAMPLE*)) cache_closure);
       int cnt = 0;
 #ifdef _WIN32
 	  printf("MT Audio on Windows NOT Implemented!\n");
@@ -281,7 +281,7 @@ namespace extemp {
     void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
     void* cache_closure = 0;
     cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
-    void (*closure) (float*,float*,long,void*) = *((void(**)(float*,float*,long,void*)) cache_closure);
+    void (*closure) (float*,float*,uint64_t,void*) = *((void(**)(float*,float*,uint64_t,void*)) cache_closure);
     float* data = 0; 
     llvm_zone_t* zone = llvm_peek_zone_stack();
     float* outbuf = AudioDevice::I()->getDSPMTOutBufferArray();
@@ -292,7 +292,7 @@ namespace extemp {
       void* dsp_closure = AudioDevice::I()->getDSPMTClosure(idx);
       void* cache_closure = 0;
       cache_closure = ((void*(*)()) dsp_closure)(); // get actual LLVM closure from _getter() !    
-      void (*closure) (float*,float*,long,void*) = *((void(**)(float*,float*,long,void*)) cache_closure);
+      void (*closure) (float*,float*,uint64_t,void*) = *((void(**)(float*,float*,uint64_t,void*)) cache_closure);
       int cnt = 0;
 #ifdef _WIN32
 	  printf("MT Audio on Windows NOT Implemented!\n");
@@ -362,7 +362,7 @@ namespace extemp {
     if(AudioDevice::I()->getDSPWrapper() && !AudioDevice::I()->getDSPSUMWrapper()) { // if true then we must be sample by sample
 	    dsp_f_ptr dsp_wrapper = AudioDevice::I()->getDSPWrapper();
 	    dsp_f_ptr cache_wrapper = dsp_wrapper;
-	    SAMPLE (*closure) (SAMPLE,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE,long,long,SAMPLE*)) cache_closure);
+	    SAMPLE (*closure) (SAMPLE,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE, uint64_t, uint64_t,SAMPLE*)) cache_closure);
 	    SAMPLE* data = 0; 
 	    //llvm_zone_t* zone = llvm_zone_create(1024*1024); // 1M
 	    llvm_zone_t* zone = llvm_peek_zone_stack();
@@ -400,7 +400,7 @@ namespace extemp {
     }else if(AudioDevice::I()->getDSPWrapperArray() && !AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then we must be buffer by buffer
 	    dsp_f_ptr_array dsp_wrapper = AudioDevice::I()->getDSPWrapperArray();
 	    dsp_f_ptr_array cache_wrapper = dsp_wrapper;
-	    void (*closure) (float*,float*,long,void*) = * ((void(**)(float*,float*,long,void*)) cache_closure);
+	    void (*closure) (float*,float*,uint64_t,void*) = * ((void(**)(float*,float*,uint64_t,void*)) cache_closure);
 	    llvm_zone_t* zone = llvm_peek_zone_stack();
 	    float* indat = (float*) inputBuffer;
 	    float* outdat = (float*) outputBuffer;
@@ -443,7 +443,7 @@ namespace extemp {
       //printf("process audio sum ...\n");
       dsp_f_ptr_sum dsp_wrapper = AudioDevice::I()->getDSPSUMWrapper();
       dsp_f_ptr_sum cache_wrapper = dsp_wrapper;
-      SAMPLE (*closure) (SAMPLE*,long,long,SAMPLE*) = * ((SAMPLE(**)(SAMPLE*,long,long,SAMPLE*)) cache_closure);
+      SAMPLE (*closure) (SAMPLE*,uint64_t,uint64_t,SAMPLE*) = * ((SAMPLE(**)(SAMPLE*,uint64_t,uint64_t,SAMPLE*)) cache_closure);
       llvm_zone_t* zone = llvm_peek_zone_stack();
       bool toggle = AudioDevice::I()->getToggle();
 	  SAMPLE* indats[MAX_RT_AUDIO_THREADS];
@@ -522,7 +522,7 @@ namespace extemp {
 #endif
       dsp_f_ptr_sum_array dsp_wrapper = AudioDevice::I()->getDSPSUMWrapperArray();
       dsp_f_ptr_sum_array cache_wrapper = dsp_wrapper;
-      void (*closure) (float**,float*,long,void*) = * ((void(**)(float**,float*,long,void*)) cache_closure);
+      void (*closure) (float**,float*,uint64_t,void*) = * ((void(**)(float**,float*,uint64_t,void*)) cache_closure);
       llvm_zone_t* zone = llvm_peek_zone_stack();
       //float** indat = (float**) 
 	  float* indats[MAX_RT_AUDIO_THREADS];

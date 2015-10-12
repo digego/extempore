@@ -55,10 +55,10 @@
 
 #define SAMPLE float
 
-typedef void(*dsp_f_ptr_array)(void*,void*,float*,float*,long,void*);
-typedef void(*dsp_f_ptr_sum_array)(void*,void*,float**,float*,long,void*);
-typedef SAMPLE(*dsp_f_ptr)(void*,void*,SAMPLE,long,long,SAMPLE*);
-typedef SAMPLE(*dsp_f_ptr_sum)(void*,void*,SAMPLE*,long,long,SAMPLE*);
+typedef void(*dsp_f_ptr_array)(void*,void*,float*,float*,uint64_t,void*);
+typedef void(*dsp_f_ptr_sum_array)(void*,void*,float**,float*,uint64_t,void*);
+typedef SAMPLE(*dsp_f_ptr)(void*,void*,SAMPLE,uint64_t,uint64_t,SAMPLE*);
+typedef SAMPLE(*dsp_f_ptr_sum)(void*,void*,SAMPLE*,uint64_t,uint64_t,SAMPLE*);
 
 namespace extemp {
 
@@ -91,25 +91,25 @@ namespace extemp {
     }
     void* getDSPMTClosure(int idx) { return dsp_mt_closure[idx]; }
 	
-    void setDSPWrapperArray( void(*_wrapper)(void*,void*,float*,float*,long,void*) )
+    void setDSPWrapperArray( void(*_wrapper)(void*,void*,float*,float*,uint64_t,void*) )
     {
 	    if(dsp_wrapper != NULL || dsp_wrapper_sum != NULL || dsp_wrapper_array != NULL || dsp_wrapper_sum_array != NULL) return;
 	    dsp_wrapper_array = _wrapper; 
     }
-    void setDSPWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE,long,long,SAMPLE*) )
+    void setDSPWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE,uint64_t,uint64_t,SAMPLE*) )
     {
 	    if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
 	    dsp_wrapper = _wrapper;
     }
-    void setDSPMTWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE*,long,long,SAMPLE*),
-                          SAMPLE(*_wrappera)(void*,void*,SAMPLE,long,long,SAMPLE*))
+    void setDSPMTWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE*,uint64_t,uint64_t,SAMPLE*),
+                          SAMPLE(*_wrappera)(void*,void*,SAMPLE,uint64_t,uint64_t,SAMPLE*))
     {
 	    if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
 	    dsp_wrapper_sum = _wrapper;
       dsp_wrapper = _wrappera;
     }
-    void setDSPMTWrapperArray( void(*_wrapper)(void*,void*,float**,float*,long,void*),
-                               void(*_wrappera)(void*,void*,float*,float*,long,void*))
+    void setDSPMTWrapperArray( void(*_wrapper)(void*,void*,float**,float*,uint64_t,void*),
+                               void(*_wrappera)(void*,void*,float*,float*,uint64_t,void*))
     {
 	    if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
 	    dsp_wrapper_sum_array = _wrapper;
