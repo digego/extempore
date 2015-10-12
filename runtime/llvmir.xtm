@@ -99,8 +99,9 @@
 (define *impc:ir:pointer_size_bytes_str* (if (= 64 (sys:pointer-size)) "8" "4"))
 
 ;; A windows allocation bug that I can't track down yet!
-(define *WINDOWS_ALLOC_BUG* (if (string=? (sys:platform) "Windows") #t #f))
-
+(define *WINDOWS_ALLOC_BUG* (if (and (string=? (sys:platform) "Windows")
+                                     (not (sys:mcjit-enabled)))
+                                #t #f))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Compiler error printing
 
