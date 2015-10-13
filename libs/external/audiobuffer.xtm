@@ -27,20 +27,26 @@
 ;; AudioBuffer type ;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-;; 0 frames (total)
-;; 1 samplerate
-;; 2 channels
-;; 3 loop_start
-;; 4 loop_frames
-;; 5 SAMPLE* (data)
-;; 6 filename
-;; 7 playhead
-
+;; 0 filename
+;; 1 playhead
+;; 2 frames
+;; 3 channels
+;; 4 data
+;; 5 samplerate
+;; 6 loop start
+;; 7 loop frames
 
 (if (not (impc:ti:typealias-exists? "SAMPLE"))
     (bind-alias SAMPLE float))
 
 (bind-type AudioBuffer <String*,i64,i64,i64,SAMPLE*,i64,i64,i64>)
+
+(bind-func AudioBuffer_a
+  (lambda (frames chans)
+    (let ((dat:SAMPLE* (alloc (* frames chans))))
+      (AudioBuffer (String "") 0 frames chans dat SR 0 0))))
+
+(bind-poly AudioBuffer AudioBuffer_a)
 
 (bind-func AudioBuffer_print
   "specialised print function for AudioBuffer*"
