@@ -6817,7 +6817,9 @@
                                    a)))
                            (cddr ast)
                            (cdddr (if (not (assoc-strcmp (cadr ast) types)) ;; if not in local env then get types from global var
-                                      (cons (cadr ast) (impc:ti:get-closure-type (symbol->string (cadr ast))))
+                                      (if (impc:ti:globalvar-exists? (symbol->string (cadr ast)))
+                                          (cons (cadr ast) (impc:ti:get-globalvar-type (symbol->string (cadr ast))))
+                                          (cons (cadr ast) (impc:ti:get-closure-type (symbol->string (cadr ast)))))
                                       (assoc-strcmp (cadr ast) types))))))
 
               ;; inject (and potential compile) generic functions
@@ -6915,9 +6917,10 @@
                                   (impc:ti:add-types-to-source symname (cadr p) types envvars (car p))))
                           (caddr ast))
                      (impc:ti:add-types-to-source symname (cadddr ast) types envvars)))
+              ((and (impc:ti:globalvar-exists? (symbol->string (car ast)))
+                    (impc:ir:closure? (impc:ti:get-globalvar-type (symbol->string (car ast)))))
+               (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))
               ((and (assoc-strcmp (car ast) types)
-                    ;; (if (null? prev) #t
-                    ;;     (not (member (car ast) (car prev))))
                     (impc:ir:closure? (cdr (assoc-strcmp (car ast) types))))
                (impc:ti:add-types-to-source symname (cons 'clrun-> ast) types envvars))
               ((list? ast)

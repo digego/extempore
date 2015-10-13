@@ -4474,7 +4474,10 @@
                     (if (impc:ti:closure-exists? (symbol->string (cadr ast))) ;; if closure is a global var? (i.e. global env)
                         (string-append (impc:ir:compiler (cadr ast) types)
                                        (impc:ir:compile:apply-closure (cons (impc:ir:gname) (cddr ast)) types #t))
-                        (impc:ir:compile:apply-closure (cdr ast) types #f))) ;; else closure is in local env
+                        (if (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; else is gloval var (i.e. bind-val)
+                            (string-append (impc:ir:compiler (cadr ast) types)
+                                           (impc:ir:compile:apply-closure (cons (impc:ir:gname) (cddr ast)) types #t))
+                            (impc:ir:compile:apply-closure (cdr ast) types #f)))) ;; else closure is in local env
                    ((equal? (car ast) 'set!)
                     (impc:ir:compiler:set! ast types))
                    ((equal? (car ast) 'pref)

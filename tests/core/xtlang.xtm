@@ -1054,6 +1054,26 @@
 (xtmtest-result (call-as-xtlang (println 1) (println 2) 5)
                 5)
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; test globalvar as closure
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func testinc
+  (lambda (inc:i64)
+    (lambda (x:i64)
+      (+ x inc))))
+
+(bind-val GlobalInc [i64,i64]* (testinc 2))
+
+(xtmtest '(bind-func ginc
+            (lambda ()
+              (GlobalInc 5)))
+         (ginc) 7)
+                       
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; syntax highlighting tests ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
