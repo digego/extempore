@@ -414,7 +414,16 @@
      ("glArrayElement" . 331)
      ("glAreTexturesResident" . 332)
      ("glAlphaFunc" . 333)
-     ("glAccum" . 334))))
+     ("glAccum" . 334)
+     ;; for graphics-pipeline
+     ("glGenRenderbuffers" . 335)
+     ("glBindRenderbuffer" . 336)
+     ("glRenderbufferStorage" . 337)
+     ("glFramebufferRenderbuffer" . 338)
+     ("glBindFramebuffer" . 339)
+     ("glGenFramebuffers" . 340)
+     ("glCheckFramebufferStatus" . 341)
+     ("glFramebufferTexture2D" . 342))))
 
 (define impc:ti:gl-proc-alist-index
   (let ()
@@ -2861,6 +2870,22 @@ equal to (length *impc:ti:gl-proc-alist*)")
 (bind-gl-proc libGL glWindowPos3iv [void,GLint*]*)
 (bind-gl-proc libGL glWindowPos3s [void,GLshort,GLshort,GLshort]*)
 (bind-gl-proc libGL glWindowPos3sv [void,GLshort*]*)
+
+;; need these for graphics-pipeline - should be fine with a
+;; compatibility OpenGL context
+(bind-val GL_FRAMEBUFFER i32 #x8D40)
+(bind-val GL_RENDERBUFFER i32 #x8D41)
+(bind-val GL_COLOR_ATTACHMENT0 i32 #x8CE0)
+(bind-val GL_DEPTH_ATTACHMENT i32 #x8D00)
+(bind-val GL_FRAMEBUFFER_COMPLETE i32 #x8CD5)
+(bind-gl-proc libGL glGenRenderbuffers [void,GLsizei,GLuint*]*)
+(bind-gl-proc libGL glBindRenderbuffer [void,GLenum,GLuint]*)
+(bind-gl-proc libGL glRenderbufferStorage [void,GLenum,GLenum,GLsizei,GLsizei]*)
+(bind-gl-proc libGL glFramebufferRenderbuffer [void,GLenum,GLenum,GLenum,GLuint]*)
+(bind-gl-proc libGL glBindFramebuffer [void,GLenum,GLuint]*)
+(bind-gl-proc libGL glGenFramebuffers [void,GLsizei,GLuint*]*)
+(bind-gl-proc libGL glCheckFramebufferStatus [GLenum,GLenum]*)
+(bind-gl-proc libGL glFramebufferTexture2D [void,GLenum,GLenum,GLenum,GLuint,GLint]*)
 
 ;; if we're running, and not pre-compiling, we should also trigger the
 ;; init routine
