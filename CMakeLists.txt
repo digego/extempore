@@ -145,24 +145,18 @@ if(ASIO)
   # See src/portaudio/src/hostapi/asio/ASIO-README.txt for
   # instructions on how to get it
 
-  # then, find the following files...
-
-  ## asio_sdk\common\asio.cpp
-  ## asio_sdk\host\asiodrivers.cpp
-  ## asio_sdk\host\pc\asiolist.cpp
-
-  # ...as well as the header files
-
-  # and move them all into the src/portaudio/src/hostapi/asio
-  # directory in the Extempore source folder
+  # then, copy it into the src/portaudio/src/hostapi/asio directory in
+  # the Extempore source folder
   target_sources(portaudio
     PRIVATE src/portaudio/src/hostapi/asio/pa_asio.cpp
-    PRIVATE src/portaudio/src/hostapi/asio/asio.cpp
-    PRIVATE src/portaudio/src/hostapi/asio/asiodrivers.cpp
-    PRIVATE src/portaudio/src/hostapi/asio/asiolist.cpp
+    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/common/asio.cpp
+    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host/asiodrivers.cpp
+    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host/pc/asiolist.cpp
     )
   target_include_directories(portaudio
-    PRIVATE src/portaudio/src/hostapi/asio)
+    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/common
+    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host
+    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host/pc)
   target_compile_definitions(portaudio
     PRIVATE -DPA_USE_ASIO)
 endif()
