@@ -14,18 +14,13 @@
 (define *xtmlib-gmp-loaded* #f)
 
 ;; set up the current dylib name and path (for AOT compilation)
-(bind-dylib
- 'libgmp
- (cond ((string=? (sys:platform) "OSX")
-        "libgmp.dylib")
-       ((string=? (sys:platform) "Linux")
-        "libgmp.so")
-       ((string=? (sys:platform) "Windows")
-        "libgmp.dll")
-       (else
-        (begin (print-with-colors 'red 'default #f (print "Error"))
-               (print ": unsupported platform ")
-               (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+(bind-dylib libgmp
+  (cond ((string=? (sys:platform) "OSX")
+         "libgmp.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libgmp.so")
+        ((string=? (sys:platform) "Windows")
+         "libgmp.dll")))
 
 ;; load the dylib
 (define libgmp
