@@ -10,12 +10,21 @@ option(ASIO "use the ASIO Portaudio backend" OFF)
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
-if(IN_TREE)
-  set(EXT_SHARE_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH
+
+if(WIN32)
+  # Windows doesn't really do "installation", so we'll assume that
+  # extempore.exe's always going to be run from the Extempore
+  # directory
+  set(EXT_SHARE_DIR "." CACHE PATH
     "path to Extempore's shared runtime files")
 else()
-  set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
-    "path to Extempore's shared runtime files")
+  if(IN_TREE)
+    set(EXT_SHARE_DIR "${CMAKE_SOURCE_DIR}" CACHE PATH
+      "path to Extempore's shared runtime files")
+  else()
+    set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
+      "path to Extempore's shared runtime files")
+  endif()
 endif()
 
 ########

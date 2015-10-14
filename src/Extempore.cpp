@@ -309,15 +309,6 @@ int main(int argc, char** argv)
     std::cout << "---------------------------------------" << std::endl;
     ascii_text_color(0,9,10);	            
 
-    if(extemp::UNIV::SHARE_DIR == std::string("@EXT_SHARE_DIR@")){
-      ascii_text_color(1,1,10);
-      printf("Error");
-      ascii_text_color(0,9,10);
-      printf(": path to Extempore share directory not set---you need to either recompile, or use the --sharedir flag at startup.\n");
-      fflush(NULL);
-      exit(1);
-    }
-
     bool startup_ok = true;
     extemp::SchemeProcess* utility = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
     startup_ok &= utility->start();
