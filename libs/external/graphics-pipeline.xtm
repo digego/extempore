@@ -16,12 +16,155 @@
 (define *xtmlib-graphics-pipeline-loaded* #f)
 
 (impc:aot:suppress-aot-do
- (sys:load "libs/core/math.xtm")
  (sys:load "libs/external/glcompat.xtm"))
-(impc:aot:insert-forms (sys:load "libs/core/math.xtm" 'quiet)
-                       (sys:load "libs/external/glcompat.xtm" 'quiet))
+(impc:aot:insert-forms (sys:load "libs/external/glcompat.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmgraphics-pipeline")
+
+;; from math.xtm, but duplicated here so we don't have to pull in the
+;; whole lib
+
+(bind-func vnormf
+  (lambda (v:float* lgth:i64 n:float*)
+    (let ((mag 0.0)
+          (i 0))
+      (dotimes (i lgth)
+        (set! mag (+ mag (* (pref v i) (pref v i)))))
+      (set! mag (sqrt mag))
+      (dotimes (i lgth)
+        (pset! n i (/ (pref v i) mag)))
+      void)))
+
+;; for 3d only SO NO LGTH
+(bind-func vcrossf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* v3:float*)
+      (pfill! v3
+              (- (* (pref v1 1) (pref v2 2))
+                 (* (pref v2 1) (pref v1 2)))
+              (- (* (pref v2 0) (pref v1 2))
+                 (* (pref v1 0) (pref v2 2)))
+              (- (* (pref v1 0) (pref v2 1))
+                 (* (pref v2 0) (pref v1 1))))
+      void)))
+
+(bind-func vsubf
+  (let ((i 0))
+    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
+      (dotimes (i lgth)
+        (pset! v3 i (- (pref v1 i) (pref v2 i))))
+      void)))
+
+(bind-func vsmulf
+  (lambda (s:float v1:float* lgth:i64 v2:float*)
+    (let ((i 0))
+      (dotimes (i lgth)
+        (pset! v2 i (* s (pref v1 i))))
+      void)))
+
+;; matrix transposition (floats)
+(bind-func mtransf
+  (lambda (ma:float* r1:i64 c1:i64 mb:float*)
+    (let ((i 0) (j 0))
+      (dotimes (i r1)
+        (dotimes (j c1)
+          (pset! mb (+ (* j c1) i)
+                 (pref ma (+ (* i c1) j)))))
+      mb)))
+
+;; optimized 4x4 matrix only!!!
+(bind-func mmul4f
+  (lambda (ma:float* mb:float* mc:float*)
+    (let ((row1:/4,float/* (cast (pref-ptr mb 0)))
+          (row2:/4,float/* (cast (pref-ptr mb 4)))
+          (row3:/4,float/* (cast (pref-ptr mb 8)))
+          (row4:/4,float/* (cast (pref-ptr mb 12)))
+          (out:/4,float/* (cast mc))
+          (tmp:/4,float/* null) (i 0))
+      (dotimes (i 4)
+        (set! tmp (cast (pref-ptr ma (* 4 i))))
+        (let ((a (vshuffle tmp null 0 0 0 0))
+              (b (vshuffle tmp null 1 1 1 1))
+              (c (vshuffle tmp null 2 2 2 2))
+              (d (vshuffle tmp null 3 3 3 3)))
+          (pset! out i
+                 (+ (+ (* a row1)
+                       (* b row2))
+                    (+ (* c row3)
+                       (* d row4))))))
+      mc)))
+
+;; determinant (floats)
+;; k is for sqr matrix
+(bind-func mdetrmf
+  (lambda (ma:float* k:i64)
+    (if (= k 1) (pref ma 0)
+        (let ((det:float 0.0) (s:float 1.0)
+              (c 0) (i 0) (j 0) (m 0) (n 0)
+              (mb:float* (salloc (* k k))))
+          (dotimes (c k)
+            (set! m 0) (set! n 0)
+            (dotimes (i k)
+              (dotimes (j k)
+                (pset! mb (+ (* i k) j) 0.0)
+                (if (and (<> i 0) (<> j c))
+                    (begin
+                      (pset! mb (+ (* m (- k 1)) n)
+                             (pref ma (+ (* i k) j)))
+                      (if (< n (- k 2))
+                          (set! n (+ n 1))
+                          (begin
+                            (set! n 0)
+                            (set! m (+ m 1)))))
+                    (begin 1))))
+            (set! det (+ det (* s (* (pref ma c)
+                                     (mdetrmf mb (- k 1))))))
+            (set! s (* -1.0 s)))
+          det))))
+
+;; invert matrix (floats)
+(bind-func minvf
+  (lambda (ma:float* k:i64 inv:float*)
+    (let ((mb:float* (salloc (* k k)))
+          (fac:float* (salloc (* k k)))
+          (d:float 0.0)
+          (i 0) (j 0) (m 0) (n 0) (q:i64 0) (p:i64 0))
+      (dotimes (q k)
+        (dotimes (p k)
+          (set! m 0)
+          (set! n 0)
+          (dotimes (i k)
+            (dotimes (j k)
+              (pset! mb (+ (* i k) j) 0.0)
+              (if (and (<> i q) (<> j p))
+                  (begin
+                    (pset! mb (+ (* m (- k 1)) n)
+                           (pref ma (+ (* i k) j)))
+                    (if (< n (- k 2))
+                        (set! n (+ n 1))
+                        (begin
+                          (set! n 0)
+                          (set! m (+ m 1)))))
+                  (begin 1))))
+          (pset! fac (+ (* q k) p)
+                 (* (pow (dtof -1.0) (i64tof (+ q p)))
+                    (mdetrmf mb (- k 1))))))
+
+      (dotimes (i k)
+        (dotimes (j k)
+          (pset! mb (+ (* i k) j)
+                 (pref fac (+ (* j k) i)))))
+      (set! d (mdetrmf ma k))
+      (dotimes (i k)
+        (dotimes (j k)
+          (pset! inv (+ (* i k) j)
+                 (/ (pref mb (+ (* i k) j)) d))))
+      void)))
+
+(bind-func mcopyf
+  (lambda (m1:float* row col m2:float*)
+    (memcpy (cast m2 i8*) (cast m1 i8*) (* row col 4))
+    void))
 
 ;; this from gl-objects.xtm - we can remove it once graphics-pipeline
 ;; can use the core profile
@@ -74,7 +217,7 @@
               0.0 0.0 1.0 0.0
               x   y   z   1.0)
       ;;(mmulf mat2 4 4 mat 4 4 mat3)
-      (mmul4 mat2 mat mat3)
+      (mmul4f mat2 mat mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
       void)))
 
@@ -88,7 +231,7 @@
               0.0   0.0   z     0.0
               0.0   0.0   0.0   1.0)
       ;;(mmulf mat2 4 4 mat 4 4 mat3)
-      (mmul4 mat2 mat mat3)
+      (mmul4f mat2 mat mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
       void)))
 
@@ -112,7 +255,7 @@
               (- (* x z c-1) (* y s)) (+ (* y z c-1) (* x s)) (+ (* z z c-1) c) 0.0
               0.0               0.0                     0.0                     1.0)
       ;;(mmulf mat2 4 4 mat 4 4 mat3)
-      (mmul4 mat2 mat mat3)
+      (mmul4f mat2 mat mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
       void)))
 
@@ -161,8 +304,8 @@
 (bind-func fill_direction_vector
   (lambda (v1:float* v2:float* v3:float*)
     (let ((tmp:float* (salloc 4)))
-      (vsub v1 v2 3 tmp)
-      (vnorm tmp 3 v3)
+      (vsubf v1 v2 3 tmp)
+      (vnormf tmp 3 v3)
       (pset! v3 3 0.0) ;; direction vectors get w = 0.0
       void)))
 
@@ -179,12 +322,12 @@
             (mtmp1:float* (salloc 16))          
             (vtmp1:float* (salloc 3))
             (vtmp2:float* (salloc 3)))
-        (vsub vEye vTarget 3 vtmp1)
-        (vnorm vtmp1 3 vz)
-        (vnorm vUp 3 vtmp2)
-        (vcross vtmp2 vz vtmp1)
-        (vnorm vtmp1 3 vx)
-        (vcross vz vx vy)
+        (vsubf vEye vTarget 3 vtmp1)
+        (vnormf vtmp1 3 vz)
+        (vnormf vUp 3 vtmp2)
+        (vcrossf vtmp2 vz vtmp1)
+        (vnormf vtmp1 3 vx)
+        (vcrossf vz vx vy)
         (pfill! mat
                 (pref vx 0) (pref vx 1) (pref vx 2) 0.0
                 (pref vy 0) (pref vy 1) (pref vy 2) 0.0
@@ -210,11 +353,11 @@
             (mtmp1:float* (salloc 16))          
             (vtmp1:float* (salloc 3))
             (vtmp2:float* (salloc 3)))
-        (vnorm vDir 3 vz)
-        (vnorm vUp 3 vtmp2)
-        (vcross vtmp2 vz vtmp1)
-        (vnorm vtmp1 3 vx)
-        (vcross vz vx vy)
+        (vnormf vDir 3 vz)
+        (vnormf vUp 3 vtmp2)
+        (vcrossf vtmp2 vz vtmp1)
+        (vnormf vtmp1 3 vx)
+        (vcrossf vz vx vy)
         (pfill! mat
                 (pref vx 0) (pref vx 1) (pref vx 2) 0.0
                 (pref vy 0) (pref vy 1) (pref vy 2) 0.0
@@ -250,8 +393,8 @@
   (lambda (shader:i32 position target)
     (let ((direction:float* (salloc 8))
           (tmp:float* (pref-ptr direction 4)))
-      (vsub position target 3 tmp)
-      (vnorm tmp 3 direction)
+      (vsubf position target 3 tmp)
+      (vnormf tmp 3 direction)
       (pset! direction 3 0.0)
       (glUniform4fv (glGetUniformLocation shader "CameraPos") 1 position)
       (glUniform4fv (glGetUniformLocation shader "CameraDir") 1 direction)
@@ -272,8 +415,8 @@
     (glUniform4fv (glGetUniformLocation shader "LightDiffuse") 1 diffuse)
     (let ((direction:float* (salloc 4))
           (tmp:float* (salloc 4)))
-      (vsub target position 3 tmp)
-      (vnorm tmp 3 direction)
+      (vsubf target position 3 tmp)
+      (vnormf tmp 3 direction)
       (pset! direction 3 0.0)
       (glUniform4fv (glGetUniformLocation shader "SpotDir") 1 direction))
     void))
@@ -301,11 +444,11 @@
       (glUniform4fv (glGetUniformLocation shader "LightSpecular") numlights specular)
       (glUniform4fv (glGetUniformLocation shader "LightDiffuse") numlights diffuse)
       (dotimes (i numlights)
-        (vsub (pref-ptr target (* i 4))
+        (vsubf (pref-ptr target (* i 4))
               (pref-ptr position (* i 4))
               3
               (pref-ptr tmp (* i 4)))
-        (vnorm (pref-ptr tmp (* i 4))
+        (vnormf (pref-ptr tmp (* i 4))
                3
                (pref-ptr dir (* i 4)))
         (pset! (pref-ptr dir (* i 4)) 3 0.0))
@@ -321,12 +464,12 @@
           (mvp (pref-ptr mv 16))
           (mn (pref-ptr mv 32)))
       ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
-      (mmul4 m v mv) ;; final mv set
-      (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
-      (minv mn 4 mvp) ;; using mvp as a temporary      
+      (mmul4f m v mv) ;; final mv set
+      (mtransf mv 4 4 mn) ;; using mn as a temporary here!!
+      (minvf mn 4 mvp) ;; using mvp as a temporary
       (mat4_to_mat3 mvp mn)  ;; final mn set
       ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
-      (mmul4 mv p mvp)
+      (mmul4f mv p mvp)
       (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
       (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
       (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
@@ -356,22 +499,22 @@
             (mlvp:float* (salloc 16))
             (mlvpb:float* (salloc 16)))
         ;;(mmul m 4 4 lv 4 4 mlv)
-        (mmul4 m lv mlv)
+        (mmul4f m lv mlv)
         ;;(mmul mlv 4 4 p 4 4 mlvp)
-        (mmul4 mlv p mlvp)
+        (mmul4f mlv p mlvp)
         ;;(mmul mlvp 4 4 biasmc 4 4 mlvpb)
-        (mmul4 mlvp biasmc mlvpb)
+        (mmul4f mlvp biasmc mlvpb)
         (glUniformMatrix4fv (glGetUniformLocation id "LightModelViewProjectionMatrix") 1 GL_FALSE mlvpb))
       (let ((mv (salloc 48))
             (mvp (pref-ptr mv 16))
             (mn (pref-ptr mv 32)))
         ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
-        (mmul4 m v mv) ;; final mv set
-        (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
-        (minv mn 4 mvp) ;; using mvp as a temporary      
+        (mmul4f m v mv) ;; final mv set
+        (mtransf mv 4 4 mn) ;; using mn as a temporary here!!
+        (minvf mn 4 mvp) ;; using mvp as a temporary
         (mat4_to_mat3 mvp mn)  ;; final mn set
         ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
-        (mmul4 mv p mvp) ;; final mvp set
+        (mmul4f mv p mvp) ;; final mvp set
         (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
         (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
         (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
@@ -404,23 +547,23 @@
         (let ((mlv:float* (salloc 16))
               (mlvp:float* (salloc 16)))
           ;; (mmul m 4 4 (pref-ptr lv (* i 16)) 4 4 mlv)
-          (mmul4 m (pref-ptr lv (* i 16)) mlv)
+          (mmul4f m (pref-ptr lv (* i 16)) mlv)
           ;;(mmul mlv 4 4 p 4 4 mlvp)
-          (mmul4 mlv p mlvp)
+          (mmul4f mlv p mlvp)
           ;; (mmul mlvp 4 4 biasmc 4 4 (pref-ptr mlvpb (* i 16)))))
-          (mmul4 mlvp biasmc (pref-ptr mlvpb (* i 16)))))
+          (mmul4f mlvp biasmc (pref-ptr mlvpb (* i 16)))))
       (glUniformMatrix4fv (glGetUniformLocation id "LightModelViewProjectionMatrix")
                           lights GL_FALSE mlvpb)
       (let ((mv (salloc 48))
             (mvp (pref-ptr mv 16))
             (mn (pref-ptr mv 32)))
         ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
-        (mmul4 m v mv) ;; final mv set
-        (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
-        (minv mn 4 mvp) ;; using mvp as a temporary      
+        (mmul4f m v mv) ;; final mv set
+        (mtransf mv 4 4 mn) ;; using mn as a temporary here!!
+        (minvf mn 4 mvp) ;; using mvp as a temporary
         (mat4_to_mat3 mvp mn)  ;; final mn set
         ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
-        (mmul4 mv p mvp) ;; final mvp set
+        (mmul4f mv p mvp) ;; final mvp set
         (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
         (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
         (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
@@ -492,7 +635,7 @@
                 (begin (pfill! norm 0.0 1.0 0.0) 1)
                 (begin
                   (vcrossf vert (pref-ptr vert 3) n1)
-                  (vsmul -1.0 n1 3 norm)
+                  (vsmulf -1.0 n1 3 norm)
                   1))
             1)
         (pfill! (pref-ptr vbodata (* i vbostride))
@@ -728,7 +871,7 @@
                                    (pref-ptr (tref lights 1) (* light 4)) ;; target
                                    (pref-ptr (tref lights 2) (* light 4))) ;; up
                  (if (not (null? view))
-                     (mcopy (pref-ptr (tref lights 8) (* light 16)) 4 4 view))
+                     (mcopyf (pref-ptr (tref lights 8) (* light 16)) 4 4 view))
                  void)))))
 
 (bind-func xtm_update_lights
@@ -819,9 +962,9 @@
       (if (null? transmat)
           (begin (memcpy (cast m i8*) (cast model i8*) (* 4 16)) 1)
           (begin
-            (mtrans transmat 4 4 m2)
+            (mtransf transmat 4 4 m2)
             ;;(mmul m2 4 4 model 4 4 m)
-            (mmul4 m2 model m)
+            (mmul4f m2 model m)
             1))
       (xtm_update_matrices shader m view projection)
       ;; first draw meshes
