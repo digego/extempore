@@ -139,11 +139,21 @@ in `cmake-build`. Open it, and build the `extempore` target.
 It's pretty straightforward. You should be able to get most things
 through your package manager.
 
-On **OSX**, for example
+On **OSX** (assuming you've `brew tap benswift/extempore`)
 
 ```
 brew install libkiss-fft glfw3 libstb-image libnanovg
 ```
+
+On **Debian/Ubuntu**
+
+```
+sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp-dev
+```
+
+You'll have to build KissFFT, stb_image and nanovg yourself, using the
+instructions below, but `make install` step means that you won't have
+to move anything into `libs/platform-shlibs`.
 
 ### Windows
 
