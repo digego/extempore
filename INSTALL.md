@@ -148,7 +148,7 @@ brew install libkiss-fft glfw3 libstb-image libnanovg
 On **Debian/Ubuntu**
 
 ```
-sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp-dev
+sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3
 ```
 
 You'll have to build KissFFT, stb_image and nanovg yourself, using the
