@@ -5,7 +5,6 @@ project(Extempore VERSION 0.60)
 option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
-option(ASSETS "download the Extempore assets (used in many of the examples)" OFF)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
@@ -366,11 +365,16 @@ if(WIN32)
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
 endif()
 
-if(ASSETS)
-  file(DOWNLOAD http://extempore.moso.com.au/extras/assets.tgz assets.tgz)
-  execute_process(COMMAND ${CMAKE_COMMAND} -E tar xf assets.tgz)
-  execute_process(COMMAND ${CMAKE_COMMAND} -E remove assets.tgz)
-endif()
+##########
+# assets #
+##########
+
+add_custom_target(assets
+  WORKING_DIRECTORY ${EXT_SHARE_DIR}
+  COMMAND curl -O http://extempore.moso.com.au/extras/assets.tgz
+  COMMAND ${CMAKE_COMMAND} -E tar xf assets.tgz
+  COMMAND ${CMAKE_COMMAND} -E remove assets.tgz
+  COMMENT "Downloading assets from http://extempore.moso.com.au/extras/assets.tgz")
 
 ###########
 # install #
