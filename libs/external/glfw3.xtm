@@ -3179,39 +3179,34 @@
 
 (bind-func glfw_create_fullscreen_window
   "creates a windowed fullscreen window (i.e. doesn't change video mode)"
-  (lambda ()
-    (let ((monitor (glfwGetPrimaryMonitor))
-          (vidmode (glfwGetVideoMode monitor))
-          (width (tref vidmode 0))
-          (height (tref vidmode 1))
-          (res:GLFWwindow* null))
-      ;; (glfwWindowHint GLFW_RED_BITS (tref vidmode 2))
-      ;; (glfwWindowHint GLFW_GREEN_BITS (tref vidmode 3))
-      ;; (glfwWindowHint GLFW_BLUE_BITS (tref vidmode 4))
-      ;; (glfwWindowHint GLFW_REFRESH_RATE (tref vidmode 5))
-      (glfwWindowHint GLFW_DECORATED 0)
-      (set! res (glfwCreateWindow width height
-                                  "Extempore OpenGL Window"
-                                  null
-                                  null))
-      (glfwSetWindowPos res 0 0)
-      res)))
+  (let ((window_title:i8* (zalloc 128)))
+    (lambda ()
+      (sprintf window_title "Extempore OpenGL Window")
+      (let ((monitor (glfwGetPrimaryMonitor))
+            (vidmode (glfwGetVideoMode monitor))
+            (width (tref vidmode 0))
+            (height (tref vidmode 1))
+            (res:GLFWwindow* null))
+        ;; (glfwWindowHint GLFW_RED_BITS (tref vidmode 2))
+        ;; (glfwWindowHint GLFW_GREEN_BITS (tref vidmode 3))
+        ;; (glfwWindowHint GLFW_BLUE_BITS (tref vidmode 4))
+        ;; (glfwWindowHint GLFW_REFRESH_RATE (tref vidmode 5))
+        (glfwWindowHint GLFW_DECORATED 0)
+        (set! res (glfwCreateWindow width height window_title null null))
+        (glfwSetWindowPos res 0 0)
+        res))))
 
 (bind-func glfw_create_window
-  (lambda (width height)
-    (glfwCreateWindow width height
-                      "Extempore OpenGL Window"
-                      null
-                      null)))
+  (let ((window_title:i8* (zalloc 128)))
+    (lambda (width height)
+      (glfwCreateWindow width height window_title null null))))
 
 (bind-func glfw_create_interaction_window
-  (lambda (width height)
-    (register_for_window_events)
-    (glfwWindowHint GLFW_FOCUSED 1)
-    (glfwCreateWindow width height
-                      "Extempore OpenGL Window"
-                      null
-                      null)))
+  (let ((window_title:i8* (zalloc 128)))
+    (lambda (width height)
+      (register_for_window_events)
+      (glfwWindowHint GLFW_FOCUSED 1)
+      (glfwCreateWindow width height window_title null null))))
 
 (bind-func glfw_window_should_close
   (lambda (window)
