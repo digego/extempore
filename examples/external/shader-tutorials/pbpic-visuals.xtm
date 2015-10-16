@@ -26,26 +26,33 @@
   (lambda (vsource:i8* fsource:i8*)
     (set! field_sp (ShaderProgram_create vsource fsource))))
 
-(create_field_shader (file->string "examples/external/shader-tutorials/pbpic-field.vert")
-               (file->string "examples/external/shader-tutorials/pbpic-field.frag"))
+(impc:aot:do-or-emit
+ (create_field_shader (sys:slurp-file "examples/external/shader-tutorials/pbpic-field.vert")
+                      (sys:slurp-file "examples/external/shader-tutorials/pbpic-field.frag")))
 
 ;; this data should have interleaved the `bases' of the field arrows
 ;; (i.e. the grid) in 2D with the ndim (i.e. 3D) field components
 
-(bind-val field_arrows float* (call-as-xtlang (* 4 nx ny)))
+(bind-val field_arrows float*)
+
+(impc:aot:do-or-emit
+ (call-as-xtlang
+  (let ((field_arrows_:float* (halloc (* 4 nx ny))))
+    (set! field_arrows field_arrows_))))
 
 ;; set base verts (i.e. every second vec2) to regular grid
-(call-as-xtlang
- (let ((idx 0))
-   (doloop (i nx)
-     (doloop (j ny)
-       (set! idx (* (+ (* i nx) j) 4))
-       (pset! field_arrows
-              idx
-              (- (* (/ (convert i float) (convert nx float)) 2.0) 1.0))
-       (pset! field_arrows
-              (+ idx 1)
-              (- (* (/ (convert j float) (convert ny float)) 2.0) 1.0))))))
+(impc:aot:do-or-emit
+ (call-as-xtlang
+  (let ((idx 0))
+    (doloop (i nx)
+      (doloop (j ny)
+        (set! idx (* (+ (* i nx) j) 4))
+        (pset! field_arrows
+               idx
+               (- (* (/ (convert i float) (convert nx float)) 2.0) 1.0))
+        (pset! field_arrows
+               (+ idx 1)
+               (- (* (/ (convert j float) (convert ny float)) 2.0) 1.0)))))))
 
 (bind-func copy_field_xy_to_arrows_buffer
   (lambda (field:float* scale_factor:float)
@@ -105,20 +112,22 @@
   (lambda (vsource:i8* fsource:i8*)
     (set! particle_sp (ShaderProgram_create vsource fsource))))
 
-(create_particle_shader (file->string "examples/external/shader-tutorials/pbpic-particle.vert")
-               (file->string "examples/external/shader-tutorials/pbpic-particle.frag"))
+(impc:aot:do-or-emit
+ (create_particle_shader (sys:slurp-file "examples/external/shader-tutorials/pbpic-particle.vert")
+                         (sys:slurp-file "examples/external/shader-tutorials/pbpic-particle.frag")))
 
 ;; init all the things
-(call-as-xtlang
- (set! particle_vbo (VBO_create part_all (convert (* nvp idimp npmax))))
- (set! particle_vao (VAO_create))
- (VAO_bind_attribute particle_vao particle_vbo 0 2 5 0)
- (VAO_bind_attribute particle_vao particle_vbo 1 3 5 2)
- (set! particle_tex (Texture_bind_image (create_texture) "assets/images/star.png"))
- (set! field_vbo (VBO_create field_arrows (convert (* 4 nx ny))))
- (set! field_vao (VAO_create))
- (VAO_bind_attribute field_vao field_vbo 0 2)
- void)
+(impc:aot:do-or-emit
+ (call-as-xtlang
+  (set! particle_vbo (VBO_create part_all (convert (* nvp idimp npmax))))
+  (set! particle_vao (VAO_create))
+  (VAO_bind_attribute particle_vao particle_vbo 0 2 5 0)
+  (VAO_bind_attribute particle_vao particle_vbo 1 3 5 2)
+  (set! particle_tex (Texture_bind_image (Texture_create) "assets/images/star.png"))
+  (set! field_vbo (VBO_create field_arrows (convert (* 4 nx ny))))
+  (set! field_vao (VAO_create))
+  (VAO_bind_attribute field_vao field_vbo 0 2)
+  void))
 
 ;; draw all the things
 
@@ -126,7 +135,7 @@
   (lambda ()
     (copy_field_xy_to_arrows_buffer fxyze .1)
     ;; (remove_guff_from_arrows_buffer)
-    (update_vbo_data field_vbo)
+    (VBO_update_data field_vbo)
     (glUseProgram field_sp)
     (VAO_bind_and_draw_arrays field_vao GL_LINES 0 (convert (* 4 nxe ny)))
     void))
@@ -134,7 +143,7 @@
 (bind-func gl_draw_particles
   (lambda ()
     ;; move particles, update VBO
-    (update_vbo_data particle_vbo)
+    (VBO_update_data particle_vbo)
     ;; draw the world
     (let ((texloc (glGetUniformLocation particle_sp "particle_tex"))
           (nxnyloc (glGetUniformLocation particle_sp "nxny")))
@@ -144,26 +153,15 @@
     (VAO_bind_and_draw_arrays particle_vao GL_POINTS 0 (* nvp npmax))
     void))
 
-(bind-func gl_clear_colour_buffer
-  (lambda ()
-    (glClear GL_COLOR_BUFFER_BIT)))
-
-(bind-func gl_swap_buffers
-  (lambda ()
-    (glfwSwapBuffers window)))
-
-(define *draw-particles* #f)
-(define *draw-field* #f)
-
-(define gl-loop
-  (lambda (delta-t)
-    (gl_clear_colour_buffer)
-    (if *draw-particles* (gl_draw_particles))
-    (if *draw-field* (gl_draw_field))
-    (gl_swap_buffers)
-    (callback (+ (now) (* *second* delta-t))
-              'gl-loop
-              delta-t)))
+(bind-func gl_draw_loop
+  (lambda (time:i64 delta_t:double)
+    (glClear GL_COLOR_BUFFER_BIT)
+    (gl_draw_particles)
+    (gl_draw_field)
+    (glfwPollEvents)
+    (glfwSwapBuffers window)
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time gl_draw_loop next_time delta_t))))
 
 ;; start it running
-(gl-loop 1/30)
+(gl_draw_loop (now) (/ 1. 60.))

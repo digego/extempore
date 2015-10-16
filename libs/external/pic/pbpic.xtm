@@ -374,6 +374,10 @@
 
 (impc:aot:do-or-emit (pbpic_alloc_arrays))
 
+;; allocate memory for *all* the particles (or at least a
+;; subset) for visualisation on head node
+(bind-val part_all float*)
+
 (bind-func pbpic_free_arrays
   (lambda ()
     (free qe)
@@ -611,17 +615,17 @@
     ;;     (println "MPI_Gather fields error."))
 
     ;; gather the particles
-    ;; (if (<>
-    ;;      (MPI_Gather (convert part i8*) ;; gather particle data
-    ;;                  (* npmax idimp) ;; num particles * floats-per-particle
-    ;;                  MPI_FLOAT
-    ;;                  (convert part_all i8*) ;; recv buffer on root node
-    ;;                  (* npmax idimp) ;; num particles * floats-per-particle
-    ;;                  MPI_FLOAT
-    ;;                  0 ;; root
-    ;;                  MPI_COMM_WORLD)
-    ;;      0)
-    ;;     (println "MPI_Gather particles error."))
+    (if (<>
+         (MPI_Gather (convert part i8*) ;; gather particle data
+                     (* npmax idimp) ;; num particles * floats-per-particle
+                     MPI_FLOAT
+                     (convert part_all i8*) ;; recv buffer on root node
+                     (* npmax idimp) ;; num particles * floats-per-particle
+                     MPI_FLOAT
+                     0 ;; root
+                     MPI_COMM_WORLD)
+         0)
+        (println "MPI_Gather particles error."))
 
     (if (= ntime 0)
         (if (= kstrt 1)
@@ -650,15 +654,16 @@
 
 ;; visualisation (root node only)
 
-;; allocate memory for *all* the particles (or at least a
-;; subset) for visualisation on head node
-;; (bind-val part_all float* (if (= kstrt 1)
-;;                               (* nvp idimp npmax)
-;;                               0:i32))
+(impc:aot:do-or-emit
+ (call-as-xtlang
+  (let ((part_all_:float* (halloc (if (= kstrt 1)
+                                      (* nvp idimp npmax)
+                                      0:i32))))
+    (set! part_all part_all_))))
 
-;; (impc:aot:do-or-emit
-;;  (if (and #t (= (call-as-xtlang kstrt) 1))
-;;      (sys:load "examples/external/shader-tutorials/pbpic-visuals.xtm")))
+(impc:aot:do-or-emit
+ (if (and #t (= (call-as-xtlang kstrt) 1))
+     (sys:load "examples/external/shader-tutorials/pbpic-visuals.xtm")))
 
 (impc:aot:insert-footer "xtmpbpic")
 (define *xtmlib-pbpic-loaded* #t)
