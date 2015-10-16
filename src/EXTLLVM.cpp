@@ -1149,12 +1149,12 @@ uint32_t get_address_offset(const char* name, closure_address_table* table)
 {
     while(table)
     {
-        //printf("tablename: %s\n",table->name);
-	if(strcmp(table->name,name) == 0) {
-	    //printf("in %s returning offset %d from %s\n",table->name,table->offset,name);
-	    return table->offset;	
-	}
-	table = table->next;
+      // printf("%p name: %s\ntablename: %s\n\n", name, name, table->name);
+      if(strcmp(table->name,name) == 0) {
+        // printf("in %s returning offset %d from %s\n",table->name,table->offset,name);
+        return table->offset;
+      }
+      table = table->next;
     }
     printf("Unable to locate %s in closure environment b\n",name);
     return 0;
