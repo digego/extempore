@@ -256,44 +256,47 @@ target_link_libraries(extempore
   PRIVATE pcre
   PRIVATE portaudio)
 
-# Extempore's build-time dependencies are:
-#
-# - LLVM 3.7 (patched for Extempore)
-# - Boost (required on Windows, optional on other platforms)
+##############
+# LLVM 3.7.0 #
+##############
 
-# cmake will try and find these deps in the usual places.
+include(ExternalProject)
 
-# LLVM
+find_program(PATCH_PROGRAM patch)
 
-if(DEFINED ENV{EXT_LLVM_DIR})
-  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR}
-    CACHE PATH "path to the (patched) LLVM build")
-  set(LLVM_ROOT_DIR ${EXT_LLVM_DIR})
-elseif(EXT_LLVM_DIR)
-  set(LLVM_ROOT_DIR ${EXT_LLVM_DIR})
-else()
-  message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")
+if(NOT PATCH_PROGRAM)
+  message(FATAL_ERROR "Cannot find \"patch\" to patch LLVM")
 endif()
 
-if(MCJIT)
-  find_package(LLVM 3.7 EXACT)
-  if(NOT ${LLVM_FOUND})
-    message(FATAL_ERROR "Extempore requires LLVM 3.7 if you're using MCJIT")
-  endif()
-else()
-  # for the old JIT we need an older LLVM - the old JIT has been
-  # removed completely as of LLVM 3.6
-  find_package(LLVM 3.4.2 EXACT)
-  if(NOT ${LLVM_FOUND})
-    message(FATAL_ERROR "Extempore requires LLVM 3.4.2 if you're using the old JIT (i.e. not MCJIT)")
-  endif()
-endif()
+ExternalProject_Add(LLVM
+  PREFIX llvm
+  URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
+  PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+  CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${CMAKE_SOURCE_DIR}/llvm)
+
+add_dependencies(extempore LLVM)
+
+# set the EXT_LLVM_DIR environment variable, which is needed (by
+# Extempore) to find llc for AOT-compilation
+set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
+set($ENV{EXT_LLVM_DIR} ${EXT_LLVM_DIR})
+
+include(${EXT_LLVM_DIR}/share/llvm/cmake/LLVMConfig.cmake)
+
 target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
-target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
+# LLVM_LIBRARIES is a bit tricker on Windows
 if(WIN32)
-  string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
+  foreach(llvm_lib ${LLVM_AVAILABLE_LIBS})
+    get_filename_component(basename ${llvm_lib} NAME_WE)
+    string(SUBSTRING ${basename} 3 -1 stripped_basename)
+    list(APPEND LLVM_LIBRARIES "${LLVM_LIBRARY_DIRS}/${stripped_basename}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  endforeach()
+else()
+  set(LLVM_LIBRARIES ${LLVM_AVAILABLE_LIBS})
 endif()
+
+target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
 # Boost
 

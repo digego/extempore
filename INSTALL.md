@@ -64,6 +64,10 @@ and the `libboost*.lib` files respectively.
 
 ### LLVM 3.7
 
+**Note:** as of `21e750a`, downloading and building LLVM 3.7 happens
+automatically as part of the Extempore cmake build process. But the
+instructions are here in case you want to do it yourself.
+
 Grab the
 [3.7.0 source tarball](http://llvm.org/releases/download.html#3.7.0),
 apply the `extempore-llvm-3.7.0.patch` in `extras/`
@@ -76,12 +80,12 @@ patch -p0 < /path/to/extempore/extras/extempore-llvm-3.7.0.patch
 On **Windows**, the `<` redirection will work with `cmd.exe`, but not
 PowerShell
 
-Then build LLVM, moving the libraries into `/path/to/extempore/llvm-build`
+Then build LLVM, moving the libraries into `/path/to/extempore/llvm`
 as part of the `install` step
 
 ```
 mkdir cmake-build && cd cmake-build
-cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/path/to/extempore/llvm-build .. && make && make install
+cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/path/to/extempore/llvm .. && make && make install
 ```
 
 On **Windows**, you'll also need to specify a 64-bit generator e.g.
@@ -91,7 +95,7 @@ To build, open the `Extempore.sln` file and build the `ALL_BUILD`
 target, then the `INSTALL` target. If the install step doesn't work,
 you can try directly calling `cmake -P cmake_install.cmake` which
 should be in the same directory. On Windows, the LLVM build output
-must be installed into an `llvm-build` subdirectory in the top-level
+must be installed into an `llvm` subdirectory in the top-level
 Extempore directory (since the AOT compilation process will look in
 there to find `llc`).
 
@@ -122,12 +126,14 @@ cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm -
 On **Linux/OSX** CMake will generate a `Makefile` in `cmake-build`,
 with a few useful targets:
 
-- `make` will build Extempore
+- `make` will build Extempore (if you have a multicore machine, you
+  can try e.g. `make -j4` to parallellize the `make` step, especially
+  since LLVM takes so long to build)
 - `make install` will install `extempore` into `/usr/local/bin` and
   the rest of the files (the "Extempore share directory") into
   `/usr/local/share/extempore`
 - `make uninstall` will remove the installed files
-- `make aod_stdlibs` will ahead-of-time compile the standard library
+- `make aot_stdlibs` will ahead-of-time compile the standard library
 
 On **Windows**, CMake will generate a Visual Studio solution (`.sln`)
 in `cmake-build`. Open it, and build the `extempore` target.
