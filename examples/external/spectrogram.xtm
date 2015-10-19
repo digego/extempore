@@ -12,6 +12,22 @@
 
 ;; (sys:load "libs/external/graphics-pipeline.xtm")
 (sys:load "libs/external/glfw3.xtm")
+
+(define fullscreen #f)
+(define width 1024.0)
+(define height 768.0)
+(bind-val width float 1024.0)
+(bind-val height float 768.0)
+
+(bind-val window GLFWwindow*
+  ;; create a window
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    ;; some of the shaders in the graphics pipeline use older glsl
+    ;; versions, so we need a "compatibility" graphics context
+    ;;(glfw_init_and_create_compatibility_window (convert width) (convert height))))    
+    (glfw_init_and_create_window (convert width) (convert height))))
+
 (sys:load "libs/external/nanovg.xtm")
 (sys:load "libs/core/instruments.xtm")
 (sys:load "libs/core/pc_ivl.xtm")
@@ -32,35 +48,8 @@
 
 (dsp:set! dsp)
 
-(define fullscreen #f)
-;; (define width 1920.0)
-;; (define height 1200.0)
-(define width 1024.0)
-(define height 768.0)
-(bind-val width float 1024.0)
-(bind-val height float 768.0)
-
-(bind-val window GLFWwindow*
-  ;; create a window
-  (begin
-    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
-    ;; some of the shaders in the graphics pipeline use older glsl
-    ;; versions, so we need a "compatibility" graphics context
-    ;;(glfw_init_and_create_compatibility_window (convert width) (convert height))))    
-    (glfw_init_and_create_window (convert width) (convert height))))
-
 (bind-val vg NVGcontext* (nvg_create_context))
-
-(bind-val pixel_ratio float (nvg_get_pixel_ratio window))
-
-;; setup opengl
-;; (define *gl-ctx* (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
-
-;; (sys:load "libs/external/graphics-pipeline.xtm")
-;; (sys:load "libs/contrib/openvg.xtm")
-
-;; init xtm render pipeline
-;; (xtm_render_setup width height)
+(bind-val pixel_ratio float (glfw_get_pixel_ratio window))
 
 
 (bind-func post ;;:XTMRENDERCB
