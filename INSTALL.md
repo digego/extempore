@@ -186,6 +186,8 @@ better than having to install Java.
 mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
+build the `portmidi-dynamic` target (don't worry about the other
+ones).
 
 #### KissFFT
 
