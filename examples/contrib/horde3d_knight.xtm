@@ -19,10 +19,27 @@
 ;;; Code:
 
 ;; first load libfile
+(sys:load "libs/external/glfw3.xtm")
+(sys:load "libs/external/graphics-pipeline.xtm")
 (sys:load "libs/external/horde3d.xtm")
 
 ;; set path to Horde resources
-(bind-val resources_path i8* "/path/to/Horde3Dresources")
+(bind-val resources_path i8* "/Users/andrew/Documents/code/Horde3D/Content")
+
+(bind-val width i32 1024)
+(bind-val height i32 768)
+
+(bind-val window GLFWwindow*
+  ;; some of the shaders in the graphics pipeline use older glsl
+  ;; versions, so we need a "compatibility" graphics context
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_compatibility_window width height)))
+
+(bind-func get_window
+  (lambda ()
+    window))
+
 
 ;; globals
 (bind-val _knight i32 0)
@@ -143,7 +160,7 @@
       (h3dSetNodeParamF light H3DLight_ColorF3 2 0.7)
       (h3dSetNodeParamF light H3DLight_ColorMultiplierF 0 1.0)
       
-      (resize 1920.0 1200.0)
+      (resize (convert width) (convert height))
       
       1)))
 
@@ -197,28 +214,27 @@
     (if (< (*metro* beat) (now))
     	(println 'opengl-test-behind (- (*metro* beat) (now))))
     (mainLoop beat)
-    (gl:swap-buffers pr2)
+    (glfw_poll_events)
+    (glfw_swap_buffers (get_window))
     (callback (*metro* (+ beat (* dur .125))) 'opengl-test (+ beat dur) dur)))
 
 
 (define start
   (lambda ()
-    (println 'starting)
-    (eval '(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
-	  (interaction-environment))
     (h3d_init)
-    (resize 900.0 600.0)
+    (resize 1024.0 768.0)
     (opengl-test (*metro* 'get-beat 4) 1/12)))
 
+(start)
 
 ;; setup new process
-(let ((proc "opengl"))
-  (ipc:new proc 7095)  
-  (sys:sleep 11025)
-  (ipc:bind-func proc 'mainLoop)
-  (ipc:bind-func proc 'h3d_init)
-  (ipc:bind-func proc 'resize)
-  (ipc:define proc 'opengl-test opengl-test)
-  (ipc:define proc 'start start)
-  (ipc:call-async proc 'start))
+;; (let ((proc "opengl"))
+;;   (ipc:new proc 7095)  
+;;   (sys:sleep 11025)
+;;   (ipc:bind-func proc 'mainLoop)
+;;   (ipc:bind-func proc 'h3d_init)
+;;   (ipc:bind-func proc 'resize)
+;;   (ipc:define proc 'opengl-test opengl-test)
+;;   (ipc:define proc 'start start)
+;;   (ipc:call-async proc 'start))
 
