@@ -142,13 +142,13 @@ through your package manager.
 On **OSX** (assuming you've `brew tap benswift/extempore`)
 
 ```
-brew install libkiss-fft glfw3 libstb-image libnanovg
+brew install libkiss-fft glfw3 libstb-image libnanovg portmidi
 ```
 
 On **Debian/Ubuntu**
 
 ```
-sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3
+sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3 portmidi
 ```
 
 You'll have to build KissFFT, stb_image and nanovg yourself, using the
@@ -166,6 +166,20 @@ move the dll in there when it's done.
 Just grab the Windows 64-bit installer from
 (http://www.mega-nerd.com/libsndfile/), and copy `libsndfile-1.dll`
 and `libsndfile-1.lib` into `extempore/libs/platform-shlibs`
+
+#### Portmidi
+
+Get the source from (http://sourceforge.net/projects/portmedia/files/)
+
+If you don't have Java installed, then you'll need to comment out any
+reference to a `JNI_*` variable in the `CMakeLists.txt` - a bit messy
+I know, but we don't need the Java stuff in Extempore, and this is
+better than having to install Java.
+
+```
+mkdir cmake-build && cd cmake-build
+cmake -G"Visual Studio 14 2015 Win64" ..
+```
 
 #### KissFFT
 
