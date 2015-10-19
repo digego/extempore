@@ -11,14 +11,60 @@
 ;;; Code:
 
 ;; must create opengl context before calling sys:load
-(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+(sys:load "libs/external/glfw3.xtm")
 
-(sys:load "libs/opengl.xtm")
-(sys:load "libs/external/gl.xtm")
+(bind-val window GLFWwindow*
+  (glfw_init_and_create_compatibility_window 1024 768))
 
-(gl_set_view 900.0 600.0 100.0)
+(bind-func get_window
+  (lambda ()
+    window))
 
-;; (gl-load-extensions)
+(sys:load "libs/external/glcompat.xtm")
+(sys:load "libs/external/opengl.xtm")
+
+;; (bind-func gl_setup
+;;   (lambda ()
+;;     (glEnable GL_LIGHTING)
+;;     (glEnable GL_LIGHT0)
+;;     (let ((diffuse:float* (halloc 4))
+;; 	  (specular:float* (halloc 4))
+;; 	  (position:float* (halloc 4)))
+;;       (pset! diffuse 0 1.0)
+;;       (pset! diffuse 1 1.0)
+;;       (pset! diffuse 2 1.0)
+;;       (pset! diffuse 3 1.0)
+;;       (pset! specular 0 1.0)
+;;       (pset! specular 2 1.0)
+;;       (pset! specular 3 1.0)
+;;       (pset! specular 4 1.0)
+;;       (pset! position 0 100.0)
+;;       (pset! position 1 100.0)
+;;       (pset! position 2 100.0)
+;;       (pset! position 3 0.0)
+
+;;       (glLightfv GL_LIGHT0 GL_DIFFUSE diffuse)
+;;       (glLightfv GL_LIGHT0 GL_SPECULAR specular)
+;;       (glLightfv GL_LIGHT0 GL_POSITION position))
+
+;;     (glColorMaterial GL_FRONT_AND_BACK GL_AMBIENT_AND_DIFFUSE)
+;;     (glEnable GL_COLOR_MATERIAL)
+;;     (glShadeModel GL_SMOOTH)
+;;     (glDisable GL_BLEND)
+;;     (glBlendFunc GL_ONE GL_SRC_ALPHA)))
+
+;; (bind-func gl_set_view
+;;   (lambda (w:double h:double depth:double)
+;;     (glViewport 0 0 (dtoi32 w) (dtoi32 h))
+;;     (glMatrixMode GL_PROJECTION)
+;;     (glLoadIdentity)
+;;     (gluPerspective 35.0 (/ w h) 0.1 depth)
+;;     (glMatrixMode GL_MODELVIEW)
+;;     (glEnable GL_DEPTH_TEST)
+;;     (gl_setup)
+;;     1))
+
+(gl_set_view 1024.0 768.0 100.0)
 
 ;; a couple of shader helper functions
 (bind-func print-shader-info-log
@@ -113,7 +159,7 @@
     (define distance 80.0)
     ;(gl:set-context pr2)
     (opengl-draw degree)
-    (gl:swap-buffers pr2)
+    (glfw_swap_buffers (get_window))
     (callback (+ time 200) 'opengl-test (+ time 1000) (+ degree 1.0)))) ; distance)))
 
 
