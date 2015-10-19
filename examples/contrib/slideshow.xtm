@@ -1,21 +1,20 @@
-;;; slideshow.xtm
+;;; openvg.xtm -- OpenVG drawing example
 
-;; Author: Andrew Sorensen
+;; Author: Andrew Sorensen, Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: libOpenVG, gstreamer
+;; Required dylibs: libOpenVG
 
 ;;; Commentary:
 
-;; 
 ;;
 
 ;;; Code:
-
+ 
 (define fullscreen #t)
-;;(define width 1920.0)
-;;(define height 1200.0)
-(define width 1024.0)
-(define height 768.0)
+(define width 1920.0)
+(define height 1200.0)
+;; (define width 1024.0)
+;; (define height 768.0)
 
 (bind-val width float width)
 (bind-val height float height)
@@ -28,6 +27,7 @@
 (sys:load "libs/external/graphics-pipeline.xtm")
 (sys:load "libs/external/openvg.xtm")
 (sys:load "libs/external/glib.xtm")
+(sys:load "libs/external/instruments_ext.xtm")
 (sys:load "libs/external/gstreamer.xtm")
 
 (bind-val movietexid i32 0)
@@ -115,10 +115,12 @@
 
 ;; init xtm render pipeline
 (xtm_render_setup (real->integer width) (real->integer height))
+;; setup audio
+(xtm_audio_setup)
 ;; start glib loop
 (glib-main-loop)
 
-(let ((vg-ctx-res (xtm_create_vg_context (real->integer width) (real->integer height))))
+(let ((vg-ctx-res (xtm_vg_create_contexti32 (real->integer width) (real->integer height))))
   (if (<> vg-ctx-res 1)
       (xtm_vg_print_error)))
 
@@ -141,13 +143,13 @@
   (lambda (idx)
     (set! slide_idx idx)))
 
-(bind-func forward
+(bind-func forward_slide
   (lambda ()
     (set! slide_idx (+ slide_idx 1))
     (printf "slide: %d\n" slide_idx)
     slide_idx))
 
-(bind-func backward
+(bind-func backward_slide
   (lambda ()
     (set! slide_idx (- slide_idx 1))
     (if (< slide_idx 0) (set! slide_idx (i64toi32 0)))
@@ -189,7 +191,9 @@
     (gl:swap-buffers *gl-ctx*)
     (callback (*metro* (+ beat (* .5 dur))) 'gl-loop (+ beat dur) dur)))
 
-(callback (+ (now) 10000) 'gl-loop (*metro* 'get-beat 4) 1/8)
+(gl-loop (*metro* 'get-beat 4) 1/8)
 
-;; (forward)
-;; (backward)
+(forward_slide)
+(backward_slide)
+;; (xtm_play "file:///Users/sorensen/Movies/playroom_xtm.mov")
+;; (xtm_play "file:///Users/sorensen/Movies/stp_model.mov")

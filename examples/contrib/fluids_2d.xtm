@@ -27,9 +27,15 @@
 ;; optimize compiles
 (llvm:optimize #t)
 
-(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+(sys:load "libs/external/glcompat.xtm")
+(sys:load "libs/external/glfw3.xtm")
 
-(sys:load "libs/external/gl.xtm")
+(bind-val window GLFWwindow*
+  (glfw_init_and_create_compatibility_window 1024 768))
+
+(bind-func get_window
+  (lambda ()
+    window))
 
 (bind-func range_limit
   (lambda (h:double l:double v:double)
@@ -525,19 +531,17 @@
 
     (burners time)
     (gl_loop)
-    (gl:swap-buffers pr2)    
+    (glfw_swap_buffers (get_window))
 
     (ipc:call-async "fluid" 'fluid_fsc)
     
     ;(fluid_step_cube (get_fluid_cube))
     (callback (+ time 0) 'opengl-test
-	      (if (< time (now))
-		  (+ time 5000)
-		  (+ time 2500))
-	      (+ degree 0.001))))
+              (if (< time (now))
+                  (+ time 5000)
+                  (+ time 2500))
+              (+ degree 0.001))))
 
-
-(gl_set_view 900.0 600.0 900.0)
 
 (begin (ipc:bind-func "fluid" 'fluid_fsc)
        (sys:sleep 44100)
@@ -597,4 +601,4 @@
 	    (else 1))
       (callback (+ (now) 1000) 'evt-loop))))
 
-(evt-loop)
+;; (evt-loop)
