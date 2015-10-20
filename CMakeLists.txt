@@ -6,6 +6,7 @@ option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASIO "use the ASIO Portaudio backend" OFF)
+option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
@@ -186,17 +187,30 @@ endif()
 # LLVM 3.7.0 #
 ##############
 
-if(WIN32)
-  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
+# if there's an environment variable, use that
+
+if(DEFINED ENV{EXT_LLVM_DIR})
+  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
+  set(DOWNLOAD_LLVM OFF)
 else()
-  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  if(WIN32)
+    set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
+  else()
+    set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  endif()
 endif()
 
-# assume that if we can find llvm-config, it's a working LLVM install
+# assume that if we can find llvm-config, we already have a working LLVM install
 find_program(LLVM_CONFIG llvm-config
   ${EXT_LLVM_DIR}/bin)
 
-if(NOT LLVM_PROGRAM)
+if(LLVM_CONFIG)
+  set(DOWNLOAD_LLVM OFF)
+endif()
+
+# if we're gonna download and build LLVM, do it here
+
+if(DOWNLOAD_LLVM)
   message(STATUS "Downloading and building LLVM (patched for Extempore)")
 
   include(ExternalProject)
@@ -214,7 +228,6 @@ if(NOT LLVM_PROGRAM)
     PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
     CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR}
     BUILD_BYPRODUCTS share/llvm/cmake/LLVMConfig.cmake)
-
 endif()
 
 set(LLVM_AVAILABLE_LIBS "LLVMSupport;LLVMTableGen;LLVMCore;LLVMIRReader;LLVMCodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMMIRParser;LLVMBitReader;LLVMBitWriter;LLVMTransformUtils;LLVMInstrumentation;LLVMInstCombine;LLVMScalarOpts;LLVMipo;LLVMVectorize;LLVMObjCARCOpts;LLVMLinker;LLVMAnalysis;LLVMipa;LLVMLTO;LLVMMC;LLVMMCParser;LLVMMCDisassembler;LLVMObject;LLVMOption;LLVMDebugInfoDWARF;LLVMDebugInfoPDB;LLVMExecutionEngine;LLVMInterpreter;LLVMMCJIT;LLVMOrcJIT;LLVMRuntimeDyld;LLVMTarget;LLVMAArch64CodeGen;LLVMAArch64Info;LLVMAArch64AsmParser;LLVMAArch64Disassembler;LLVMAArch64AsmPrinter;LLVMAArch64Desc;LLVMAArch64Utils;LLVMAMDGPUCodeGen;LLVMAMDGPUAsmParser;LLVMAMDGPUAsmPrinter;LLVMAMDGPUInfo;LLVMAMDGPUDesc;LLVMAMDGPUUtils;LLVMARMCodeGen;LLVMARMInfo;LLVMARMAsmParser;LLVMARMDisassembler;LLVMARMAsmPrinter;LLVMARMDesc;LLVMBPFCodeGen;LLVMBPFAsmPrinter;LLVMBPFInfo;LLVMBPFDesc;LLVMCppBackendCodeGen;LLVMCppBackendInfo;LLVMHexagonCodeGen;LLVMHexagonInfo;LLVMHexagonDesc;LLVMHexagonDisassembler;LLVMMipsCodeGen;LLVMMipsAsmPrinter;LLVMMipsDisassembler;LLVMMipsInfo;LLVMMipsDesc;LLVMMipsAsmParser;LLVMMSP430CodeGen;LLVMMSP430AsmPrinter;LLVMMSP430Info;LLVMMSP430Desc;LLVMNVPTXCodeGen;LLVMNVPTXInfo;LLVMNVPTXAsmPrinter;LLVMNVPTXDesc;LLVMPowerPCCodeGen;LLVMPowerPCAsmParser;LLVMPowerPCDisassembler;LLVMPowerPCAsmPrinter;LLVMPowerPCInfo;LLVMPowerPCDesc;LLVMSparcCodeGen;LLVMSparcInfo;LLVMSparcDesc;LLVMSparcAsmPrinter;LLVMSparcAsmParser;LLVMSparcDisassembler;LLVMSystemZCodeGen;LLVMSystemZAsmParser;LLVMSystemZDisassembler;LLVMSystemZAsmPrinter;LLVMSystemZInfo;LLVMSystemZDesc;LLVMX86CodeGen;LLVMX86AsmParser;LLVMX86Disassembler;LLVMX86AsmPrinter;LLVMX86Desc;LLVMX86Info;LLVMX86Utils;LLVMXCoreCodeGen;LLVMXCoreDisassembler;LLVMXCoreAsmPrinter;LLVMXCoreInfo;LLVMXCoreDesc;LLVMAsmParser;LLVMLineEditor;LLVMProfileData;LLVMPasses;LLVMLibDriver")
@@ -268,7 +281,11 @@ endif()
 
 # dependencies
 
-add_dependencies(extempore pcre portaudio LLVM)
+add_dependencies(extempore pcre portaudio)
+
+if(DOWNLOAD_LLVM)
+  add_dependencies(extempore LLVM)
+endif()
 
 target_include_directories(extempore
   PRIVATE src/pcre
