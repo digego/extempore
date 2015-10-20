@@ -155,10 +155,10 @@ elseif(WIN32)
   target_include_directories(portaudio
     PRIVATE src/portaudio/src/os/win)
   target_compile_definitions(portaudio
-      PRIVATE -DPA_USE_WDMKS
-      # PRIVATE -DPA_USE_WMME
-      # PRIVATE -DPA_USE_WASAPI
-      PRIVATE -DPA_USE_DS)
+    PRIVATE -DPA_USE_WDMKS
+    # PRIVATE -DPA_USE_WMME
+    # PRIVATE -DPA_USE_WASAPI
+    PRIVATE -DPA_USE_DS)
 endif()
 
 if(ASIO)
@@ -186,7 +186,11 @@ endif()
 # LLVM 3.7.0 #
 ##############
 
-set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+if(WIN32)
+  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
+else()
+  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+endif()
 
 # assume that if we can find llvm-config, it's a working LLVM install
 find_program(LLVM_CONFIG llvm-config
@@ -197,35 +201,27 @@ if(NOT LLVM_PROGRAM)
 
   include(ExternalProject)
 
-find_program(PATCH_PROGRAM patch)
+  find_program(PATCH_PROGRAM patch)
 
-if(NOT PATCH_PROGRAM)
-  message(FATAL_ERROR "Cannot find \"patch\" to patch LLVM")
-endif()
+  if(NOT PATCH_PROGRAM)
+    message(FATAL_ERROR "Cannot find \"patch\" to patch LLVM")
+  endif()
 
-ExternalProject_Add(LLVM
-  PREFIX llvm
-  URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
-  URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
-  PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
-  CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR}
-  BUILD_BYPRODUCTS share/llvm/cmake/LLVMConfig.cmake)
+  ExternalProject_Add(LLVM
+    PREFIX llvm
+    URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
+    URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
+    PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+    CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR}
+    BUILD_BYPRODUCTS share/llvm/cmake/LLVMConfig.cmake)
 
 endif()
 
 set(LLVM_AVAILABLE_LIBS "LLVMSupport;LLVMTableGen;LLVMCore;LLVMIRReader;LLVMCodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMMIRParser;LLVMBitReader;LLVMBitWriter;LLVMTransformUtils;LLVMInstrumentation;LLVMInstCombine;LLVMScalarOpts;LLVMipo;LLVMVectorize;LLVMObjCARCOpts;LLVMLinker;LLVMAnalysis;LLVMipa;LLVMLTO;LLVMMC;LLVMMCParser;LLVMMCDisassembler;LLVMObject;LLVMOption;LLVMDebugInfoDWARF;LLVMDebugInfoPDB;LLVMExecutionEngine;LLVMInterpreter;LLVMMCJIT;LLVMOrcJIT;LLVMRuntimeDyld;LLVMTarget;LLVMAArch64CodeGen;LLVMAArch64Info;LLVMAArch64AsmParser;LLVMAArch64Disassembler;LLVMAArch64AsmPrinter;LLVMAArch64Desc;LLVMAArch64Utils;LLVMAMDGPUCodeGen;LLVMAMDGPUAsmParser;LLVMAMDGPUAsmPrinter;LLVMAMDGPUInfo;LLVMAMDGPUDesc;LLVMAMDGPUUtils;LLVMARMCodeGen;LLVMARMInfo;LLVMARMAsmParser;LLVMARMDisassembler;LLVMARMAsmPrinter;LLVMARMDesc;LLVMBPFCodeGen;LLVMBPFAsmPrinter;LLVMBPFInfo;LLVMBPFDesc;LLVMCppBackendCodeGen;LLVMCppBackendInfo;LLVMHexagonCodeGen;LLVMHexagonInfo;LLVMHexagonDesc;LLVMHexagonDisassembler;LLVMMipsCodeGen;LLVMMipsAsmPrinter;LLVMMipsDisassembler;LLVMMipsInfo;LLVMMipsDesc;LLVMMipsAsmParser;LLVMMSP430CodeGen;LLVMMSP430AsmPrinter;LLVMMSP430Info;LLVMMSP430Desc;LLVMNVPTXCodeGen;LLVMNVPTXInfo;LLVMNVPTXAsmPrinter;LLVMNVPTXDesc;LLVMPowerPCCodeGen;LLVMPowerPCAsmParser;LLVMPowerPCDisassembler;LLVMPowerPCAsmPrinter;LLVMPowerPCInfo;LLVMPowerPCDesc;LLVMSparcCodeGen;LLVMSparcInfo;LLVMSparcDesc;LLVMSparcAsmPrinter;LLVMSparcAsmParser;LLVMSparcDisassembler;LLVMSystemZCodeGen;LLVMSystemZAsmParser;LLVMSystemZDisassembler;LLVMSystemZAsmPrinter;LLVMSystemZInfo;LLVMSystemZDesc;LLVMX86CodeGen;LLVMX86AsmParser;LLVMX86Disassembler;LLVMX86AsmPrinter;LLVMX86Desc;LLVMX86Info;LLVMX86Utils;LLVMXCoreCodeGen;LLVMXCoreDisassembler;LLVMXCoreAsmPrinter;LLVMXCoreInfo;LLVMXCoreDesc;LLVMAsmParser;LLVMLineEditor;LLVMProfileData;LLVMPasses;LLVMLibDriver")
 
-if(WIN32)
-  foreach(llvm_lib ${LLVM_AVAILABLE_LIBS})
-    get_filename_component(basename ${llvm_lib} NAME_WE)
-    string(SUBSTRING ${basename} 3 -1 stripped_basename)
-    list(APPEND LLVM_LIBRARIES "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${stripped_basename}${CMAKE_STATIC_LIBRARY_SUFFIX}")
-  endforeach()
-else()
-  foreach(llvm_lib ${LLVM_AVAILABLE_LIBS})
-    list(APPEND LLVM_LIBRARIES "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}")
-  endforeach()
-endif()
+foreach(llvm_lib ${LLVM_AVAILABLE_LIBS})
+  list(APPEND LLVM_LIBRARIES "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+endforeach()
 
 #########
 # Boost #
@@ -234,29 +230,6 @@ endif()
 # *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
-  target_compile_definitions(extempore
-    PRIVATE -DPCRE_STATIC
-    PRIVATE -D_CRT_SECURE_NO_WARNINGS)
-endif()
-
-if(BOOST)
-  if(NOT BOOST_DIR)
-    message(FATAL_ERROR "BOOST_DIR must be defined")
-  endif()
-  target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
-  # asio header
-  find_path(BOOST_ASIO_INCLUDE_DIR
-    NAMES boost/asio.hpp
-    PATHS ${BOOST_DIR}/include)
-  if(BOOST_ASIO_INCLUDE_DIR)
-    target_include_directories(extempore PRIVATE ${BOOST_ASIO_INCLUDE_DIR})
-  else()
-    message(FATAL_ERROR "Cannot find boost/asio.hpp header")
-  endif()
-  target_link_libraries(extempore
-    PRIVATE ${BOOST_DIR}/lib/libboost_date_time-vc140-mt-1_59.lib
-    PRIVATE ${BOOST_DIR}/lib/libboost_regex-vc140-mt-1_59.lib
-    PRIVATE ${BOOST_DIR}/lib/libboost_system-vc140-mt-1_59.lib)
 endif()
 
 #############
@@ -340,7 +313,11 @@ if(UNIX)
   target_link_libraries(extempore PRIVATE pthread)
 endif()
 
-if(APPLE) # OSX
+if(WIN32)
+  target_compile_definitions(extempore
+    PRIVATE -DPCRE_STATIC
+    PRIVATE -D_CRT_SECURE_NO_WARNINGS)
+elseif(APPLE) # OSX
   # use clang++ by default
   set(CMAKE_C_COMPILIER clang)
   set(CMAKE_CXX_COMPILIER clang++)
@@ -375,6 +352,28 @@ if(WIN32)
     LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
     ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/libs/platform-shlibs
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
+endif()
+
+# boost
+
+if(BOOST)
+  if(NOT BOOST_DIR)
+    message(FATAL_ERROR "BOOST_DIR must be defined")
+  endif()
+  target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
+  # asio header
+  find_path(BOOST_ASIO_INCLUDE_DIR
+    NAMES boost/asio.hpp
+    PATHS ${BOOST_DIR}/include)
+  if(BOOST_ASIO_INCLUDE_DIR)
+    target_include_directories(extempore PRIVATE ${BOOST_ASIO_INCLUDE_DIR})
+  else()
+    message(FATAL_ERROR "Cannot find boost/asio.hpp header")
+  endif()
+  target_link_libraries(extempore
+    PRIVATE ${BOOST_DIR}/lib/libboost_date_time-vc140-mt-1_59.lib
+    PRIVATE ${BOOST_DIR}/lib/libboost_regex-vc140-mt-1_59.lib
+    PRIVATE ${BOOST_DIR}/lib/libboost_system-vc140-mt-1_59.lib)
 endif()
 
 ##########
