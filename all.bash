@@ -8,11 +8,6 @@ case $(uname) in
 esac
 export EXTEMPORE_OS
 
-if [ -z "$EXT_LLVM_DIR" ]; then
-	  echo -e "You must set \033[0;32mEXT_LLVM_DIR\033[0;00m to point to your (patched) LLVM directory." >&2
-    exit 1
-fi
-
 # LLVM DEFS
 EXT_LLVM_CONFIG_SCRIPT="$EXT_LLVM_DIR/bin/llvm-config"
 EXT_LLVM_CXXFLAGS=`$EXT_LLVM_CONFIG_SCRIPT --cxxflags`

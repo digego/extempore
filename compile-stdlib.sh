@@ -7,11 +7,6 @@ case $(uname) in
     *) echo Cannot AOT-compile modules for OS:  $(uname) >&2 ; exit 1 ;;
 esac
 
-if [ -z "$EXT_LLVM_DIR" ] && [ ! -d "/usr/local/Cellar/extempore-llvm/3.4.1" ] ; then
-    echo -e "\033[0;31mError\033[0;00m: You need to set the \033[0;32mEXT_LLVM_DIR\033[0;00m environment variable to point to your (Extempore) LLVM directory."
-    exit 2
-fi
-
 # this is the 'standard' library
 # to override this list, call this script with:
 # AOT_LIBS="libs/core/foo.xtm libs/external/bar.xtm" ./compile-stdlib.sh

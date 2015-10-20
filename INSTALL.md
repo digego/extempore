@@ -107,18 +107,15 @@ In your `extempore` directory,
 
 ```
 mkdir cmake-build && cd cmake-build
-cmake -DEXT_LLVM_DIR=/path/to/extempore/llvm ..
+cmake ..
 ```
 
-If you've set the `EXT_LLVM_DIR` environment variable you don't have
-to provide it again to CMake.
-
 On **Windows**, you'll need to give CMake a few more details about
-where LLVM and Boost are:
+where Boost is:
 
 ```
 md cmake-build && cd cmake-build
-cmake -G"Visual Studio 14 2015 Win64" -DEXT_LLVM_DIR=c:\path\to\extempore\llvm -DBOOST_DIR=c:\path\to\extempore\boost ..
+cmake -G"Visual Studio 14 2015 Win64" -DBOOST_DIR=c:\path\to\extempore\boost ..
 ```
 
 ### Build Extempore

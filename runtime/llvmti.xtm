@@ -1848,28 +1848,6 @@
 ;; polytype
 ;; generictype
 
-(define get-llvm-path
-  (lambda ()
-    (sanitize-platform-path
-     (unix-or-Windows
-      ;; otherwise have a gewd look
-      (let ((path_from_env (sys:command-output "echo $EXT_LLVM_DIR")))
-        (if (not (string=? path_from_env ""))
-            path_from_env
-            ;; check if homebrewed version (in default Cellar location)
-            ;; exists - need to keep the version up-to-date by hand
-            ;;
-            ;; OSX
-            (if (= (sys:command "[ -d /usr/local/Cellar/extempore-llvm/3.4.1 ]") 0)
-                "/usr/local/Cellar/extempore-llvm/3.4.1"
-                ;; Linux
-                (if (= (sys:command "[ -d ~/.linuxbrew/Cellar/extempore-llvm/3.4.1 ]") 0)
-                    "~/.linuxbrew/Cellar/extempore-llvm/3.4.1"
-                    path_from_env)
-                path_from_env)))
-      ;; on Windows, assume it's in SHARE_DIR/llvm-build
-      (string-append (sys:share-dir) "\\llvm")))))
-
 ;; insert arbitrary sexp (remember to quote!) into the AOT-compilation
 ;; file, otherwise do nothing
 (define-macro (impc:aot:insert-forms . forms)
@@ -1901,13 +1879,7 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module exit-afterwards?)
-    (let* ((llvm-path (get-llvm-path)))
-      (if (string=? "" llvm-path)
-          (begin (print-with-colors 'red 'default #t (print "Error"))
-                 (print ": you must set the environment variable ")
-                 (print-with-colors 'green 'default #f (print "EXT_LLVM_DIR"))
-                 (print " to point to your LLVM directory before you can ahead-of-time compile xtlang code.\n")
-                 (error "")))
+    (let* ((llvm-path (sanitize-platform-path (string-append (sys:share-dir) "\\llvm"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
