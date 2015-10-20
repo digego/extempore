@@ -1,1 +1,0 @@
-MSBuild msvc\extempore.vcxproj /p:OutDir="..\\" /p:configuration=Release /p:platform=x64
