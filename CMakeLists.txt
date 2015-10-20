@@ -26,6 +26,19 @@ else()
   endif()
 endif()
 
+# Set a default build type if none was specified
+
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "Building 'Release' configuration")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+# # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
+# set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
+#   "path to Extempore's cmake modules")
+
 ########
 # PCRE #
 ########
@@ -169,133 +182,48 @@ if(ASIO)
     PRIVATE -DPA_USE_ASIO)
 endif()
 
-########################
-# extempore executable #
-########################
+##############
+# LLVM 3.7.0 #
+##############
 
-add_executable(extempore src/Extempore.cpp
-  src/AudioDevice.cpp
-  src/EXTCondition.cpp
-  src/EXTLLVM.cpp
-  src/EXTMonitor.cpp
-  src/EXTMutex.cpp
-  src/EXTThread.cpp
-  src/Extempore.cpp
-  src/OSC.cpp
-  src/Scheme.cpp
-  src/SchemeFFI.cpp
-  src/SchemeProcess.cpp
-  src/SchemeREPL.cpp
-  src/TaskScheduler.cpp
-  src/UNIV.cpp
-  )
+# set the EXT_LLVM_DIR environment variable, which is needed (by
+# Extempore) to find llc for AOT-compilation
+set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+set($ENV{EXT_LLVM_DIR} ${EXT_LLVM_DIR})
+
+include(ExternalProject)
+
+find_program(PATCH_PROGRAM patch)
+
+if(NOT PATCH_PROGRAM)
+  message(FATAL_ERROR "Cannot find \"patch\" to patch LLVM")
+endif()
+
+ExternalProject_Add(LLVM
+  PREFIX llvm
+  URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
+  URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
+  PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+  CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR}
+  BUILD_BYPRODUCTS share/llvm/cmake/LLVMConfig.cmake)
+
+set(LLVM_AVAILABLE_LIBS "LLVMSupport;LLVMTableGen;LLVMCore;LLVMIRReader;LLVMCodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMMIRParser;LLVMBitReader;LLVMBitWriter;LLVMTransformUtils;LLVMInstrumentation;LLVMInstCombine;LLVMScalarOpts;LLVMipo;LLVMVectorize;LLVMObjCARCOpts;LLVMLinker;LLVMAnalysis;LLVMipa;LLVMLTO;LLVMMC;LLVMMCParser;LLVMMCDisassembler;LLVMObject;LLVMOption;LLVMDebugInfoDWARF;LLVMDebugInfoPDB;LLVMExecutionEngine;LLVMInterpreter;LLVMMCJIT;LLVMOrcJIT;LLVMRuntimeDyld;LLVMTarget;LLVMAArch64CodeGen;LLVMAArch64Info;LLVMAArch64AsmParser;LLVMAArch64Disassembler;LLVMAArch64AsmPrinter;LLVMAArch64Desc;LLVMAArch64Utils;LLVMAMDGPUCodeGen;LLVMAMDGPUAsmParser;LLVMAMDGPUAsmPrinter;LLVMAMDGPUInfo;LLVMAMDGPUDesc;LLVMAMDGPUUtils;LLVMARMCodeGen;LLVMARMInfo;LLVMARMAsmParser;LLVMARMDisassembler;LLVMARMAsmPrinter;LLVMARMDesc;LLVMBPFCodeGen;LLVMBPFAsmPrinter;LLVMBPFInfo;LLVMBPFDesc;LLVMCppBackendCodeGen;LLVMCppBackendInfo;LLVMHexagonCodeGen;LLVMHexagonInfo;LLVMHexagonDesc;LLVMHexagonDisassembler;LLVMMipsCodeGen;LLVMMipsAsmPrinter;LLVMMipsDisassembler;LLVMMipsInfo;LLVMMipsDesc;LLVMMipsAsmParser;LLVMMSP430CodeGen;LLVMMSP430AsmPrinter;LLVMMSP430Info;LLVMMSP430Desc;LLVMNVPTXCodeGen;LLVMNVPTXInfo;LLVMNVPTXAsmPrinter;LLVMNVPTXDesc;LLVMPowerPCCodeGen;LLVMPowerPCAsmParser;LLVMPowerPCDisassembler;LLVMPowerPCAsmPrinter;LLVMPowerPCInfo;LLVMPowerPCDesc;LLVMSparcCodeGen;LLVMSparcInfo;LLVMSparcDesc;LLVMSparcAsmPrinter;LLVMSparcAsmParser;LLVMSparcDisassembler;LLVMSystemZCodeGen;LLVMSystemZAsmParser;LLVMSystemZDisassembler;LLVMSystemZAsmPrinter;LLVMSystemZInfo;LLVMSystemZDesc;LLVMX86CodeGen;LLVMX86AsmParser;LLVMX86Disassembler;LLVMX86AsmPrinter;LLVMX86Desc;LLVMX86Info;LLVMX86Utils;LLVMXCoreCodeGen;LLVMXCoreDisassembler;LLVMXCoreAsmPrinter;LLVMXCoreInfo;LLVMXCoreDesc;LLVMAsmParser;LLVMLineEditor;LLVMProfileData;LLVMPasses;LLVMLibDriver")
 
 if(WIN32)
-  target_sources(extempore PRIVATE src/extempore.def)
-endif()
-
-target_include_directories(extempore PRIVATE include)
-
-# suppress the warning about the opcode switch statement
-if(NOT WIN32)
-  set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
-endif()
-
-target_compile_definitions(extempore
-  PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}"
-  PRIVATE -D_GNU_SOURCE
-	PRIVATE -D__STDC_CONSTANT_MACROS
-	PRIVATE -D__STDC_FORMAT_MACROS
-	PRIVATE -D__STDC_LIMIT_MACROS
-  )
-
-if(NOT MSVC)
-  target_compile_options(extempore
-    PRIVATE -std=c++11
-    PRIVATE -fvisibility-inlines-hidden
-    # PRIVATE -fno-exceptions
-    PRIVATE -fno-rtti
-    PRIVATE -fno-common
-    PRIVATE -Woverloaded-virtual
-    # PRIVATE -Wcast-qual
-    PRIVATE -Wno-unused-result
-    )
-endif()
-
-# set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
-  "path to Extempore's cmake modules")
-
-if(MCJIT)
-  target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-  message(STATUS "Using the new LLVM MCJIT backend...")
+  foreach(llvm_lib ${LLVM_AVAILABLE_LIBS})
+    get_filename_component(basename ${llvm_lib} NAME_WE)
+    string(SUBSTRING ${basename} 3 -1 stripped_basename)
+    list(APPEND LLVM_LIBRARIES "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${stripped_basename}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  endforeach()
 else()
-  message(STATUS "Using the old LLVM JIT backend...")
+  foreach(llvm_lib ${LLVM_AVAILABLE_LIBS})
+    list(APPEND LLVM_LIBRARIES "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  endforeach()
 endif()
 
-# Set a default build type if none was specified
-
-if(NOT CMAKE_BUILD_TYPE)
-  message(STATUS "Building 'Release' configuration")
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
-  # Set the possible values of build type for cmake-gui
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif()
-
-###########################
-# build-time dependencies #
-###########################
-
-# tell Extempore about the PCRE & portuaudio targets
-
-add_dependencies(extempore pcre portaudio)
-target_include_directories(extempore
-  PRIVATE src/pcre
-  PRIVATE src/portaudio/include)
-target_link_libraries(extempore
-  PRIVATE pcre
-  PRIVATE portaudio)
-
-# Extempore's build-time dependencies are:
-#
-# - LLVM 3.7 (patched for Extempore)
-# - Boost (required on Windows, optional on other platforms)
-
-# cmake will try and find these deps in the usual places.
-
-# LLVM
-
-if(DEFINED ENV{EXT_LLVM_DIR})
-  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR}
-    CACHE PATH "path to the (patched) LLVM build")
-  set(LLVM_ROOT_DIR ${EXT_LLVM_DIR})
-elseif(EXT_LLVM_DIR)
-  set(LLVM_ROOT_DIR ${EXT_LLVM_DIR})
-else()
-  message(FATAL_ERROR "You must set the EXT_LLVM_DIR environment variable or -DLLVM_ROOT_DIR cmake variable to point to your (patched for Extempore) LLVM build")
-endif()
-
-if(MCJIT)
-  find_package(LLVM 3.7 EXACT)
-  if(NOT ${LLVM_FOUND})
-    message(FATAL_ERROR "Extempore requires LLVM 3.7 if you're using MCJIT")
-  endif()
-else()
-  # for the old JIT we need an older LLVM - the old JIT has been
-  # removed completely as of LLVM 3.6
-  find_package(LLVM 3.4.2 EXACT)
-  if(NOT ${LLVM_FOUND})
-    message(FATAL_ERROR "Extempore requires LLVM 3.4.2 if you're using the old JIT (i.e. not MCJIT)")
-  endif()
-endif()
-target_include_directories(extempore PRIVATE ${LLVM_INCLUDE_DIRS})
-target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
-
-if(WIN32)
-  string(REPLACE " " ";" LLVM_COMPILE_OPTIONS ${LLVM_CXXFLAGS})
-endif()
-
-# Boost
+#########
+# Boost #
+#########
 
 # *must* have Boost on Windows
 if(WIN32)
@@ -325,6 +253,87 @@ if(BOOST)
     PRIVATE ${BOOST_DIR}/lib/libboost_system-vc140-mt-1_59.lib)
 endif()
 
+#############
+# extempore #
+#############
+
+# source files
+
+add_executable(extempore src/Extempore.cpp
+  src/AudioDevice.cpp
+  src/EXTCondition.cpp
+  src/EXTLLVM.cpp
+  src/EXTMonitor.cpp
+  src/EXTMutex.cpp
+  src/EXTThread.cpp
+  src/Extempore.cpp
+  src/OSC.cpp
+  src/Scheme.cpp
+  src/SchemeFFI.cpp
+  src/SchemeProcess.cpp
+  src/SchemeREPL.cpp
+  src/TaskScheduler.cpp
+  src/UNIV.cpp
+  )
+
+if(WIN32)
+  target_sources(extempore PRIVATE src/extempore.def)
+endif()
+
+target_include_directories(extempore PRIVATE include)
+
+# suppress the warning about the opcode switch statement
+if(UNIX)
+  set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
+endif()
+
+# dependencies
+
+add_dependencies(extempore pcre portaudio LLVM)
+
+target_include_directories(extempore
+  PRIVATE src/pcre
+  PRIVATE src/portaudio/include)
+
+target_link_libraries(extempore
+  PRIVATE pcre
+  PRIVATE portaudio)
+
+target_include_directories(extempore PRIVATE ${EXT_LLVM_DIR}/include)
+target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
+
+# compiler options
+
+if(MCJIT)
+  target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
+  message(STATUS "Using the new LLVM MCJIT backend...")
+else()
+  message(STATUS "Using the old LLVM JIT backend...")
+endif()
+
+target_compile_definitions(extempore
+  PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
+
+# platform-specific config
+
+if(UNIX)
+  target_compile_definitions(extempore
+    PRIVATE -D_GNU_SOURCE
+	  PRIVATE -D__STDC_CONSTANT_MACROS
+	  PRIVATE -D__STDC_FORMAT_MACROS
+	  PRIVATE -D__STDC_LIMIT_MACROS)
+  target_compile_options(extempore
+    PRIVATE -std=c++11
+    PRIVATE -fvisibility-inlines-hidden
+    # PRIVATE -fno-exceptions
+    PRIVATE -fno-rtti
+    PRIVATE -fno-common
+    PRIVATE -Woverloaded-virtual
+    # PRIVATE -Wcast-qual
+    PRIVATE -Wno-unused-result)
+  target_link_libraries(extempore PRIVATE pthread)
+endif()
+
 if(APPLE) # OSX
   # use clang++ by default
   set(CMAKE_C_COMPILIER clang)
@@ -336,9 +345,6 @@ if(APPLE) # OSX
     src/UNIV.cpp
     PROPERTIES
     COMPILE_FLAGS "-x objective-c++")
-
-  target_link_libraries(extempore PRIVATE pthread)
-
   # frameworks
   target_link_libraries(extempore
     PRIVATE "-framework Cocoa"
@@ -349,7 +355,7 @@ if(APPLE) # OSX
 elseif(UNIX AND NOT APPLE) # Linux
   set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
   # target_link_libraries(extempore PRIVATE --export-dynamic)
-  target_link_libraries(extempore PRIVATE pthread dl)
+  target_link_libraries(extempore PRIVATE dl)
 endif()
 
 # on Windows, put the created extempore.exe straight into the source
