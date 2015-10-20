@@ -221,13 +221,20 @@ if(DOWNLOAD_LLVM)
     message(FATAL_ERROR "Cannot find \"patch\" to patch LLVM")
   endif()
 
-  ExternalProject_Add(LLVM
-    PREFIX llvm
-    URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
-    URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
-    PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
-    CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR}
-    BUILD_BYPRODUCTS share/llvm/cmake/LLVMConfig.cmake)
+  if(WIN32)
+    ExternalProject_Add(LLVM
+      PREFIX llvm
+      URL http://extempore.moso.com.au/extras/extempore-llvm-3.7.0.src.zip
+      URL_MD5 4a2eafb937becec468ba985fca47532b
+      CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
+  else()
+    ExternalProject_Add(LLVM
+      PREFIX llvm
+      URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
+      URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
+      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+      CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
+  endif()
 endif()
 
 set(LLVM_AVAILABLE_LIBS "LLVMSupport;LLVMTableGen;LLVMCore;LLVMIRReader;LLVMCodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMMIRParser;LLVMBitReader;LLVMBitWriter;LLVMTransformUtils;LLVMInstrumentation;LLVMInstCombine;LLVMScalarOpts;LLVMipo;LLVMVectorize;LLVMObjCARCOpts;LLVMLinker;LLVMAnalysis;LLVMipa;LLVMLTO;LLVMMC;LLVMMCParser;LLVMMCDisassembler;LLVMObject;LLVMOption;LLVMDebugInfoDWARF;LLVMDebugInfoPDB;LLVMExecutionEngine;LLVMInterpreter;LLVMMCJIT;LLVMOrcJIT;LLVMRuntimeDyld;LLVMTarget;LLVMAArch64CodeGen;LLVMAArch64Info;LLVMAArch64AsmParser;LLVMAArch64Disassembler;LLVMAArch64AsmPrinter;LLVMAArch64Desc;LLVMAArch64Utils;LLVMAMDGPUCodeGen;LLVMAMDGPUAsmParser;LLVMAMDGPUAsmPrinter;LLVMAMDGPUInfo;LLVMAMDGPUDesc;LLVMAMDGPUUtils;LLVMARMCodeGen;LLVMARMInfo;LLVMARMAsmParser;LLVMARMDisassembler;LLVMARMAsmPrinter;LLVMARMDesc;LLVMBPFCodeGen;LLVMBPFAsmPrinter;LLVMBPFInfo;LLVMBPFDesc;LLVMCppBackendCodeGen;LLVMCppBackendInfo;LLVMHexagonCodeGen;LLVMHexagonInfo;LLVMHexagonDesc;LLVMHexagonDisassembler;LLVMMipsCodeGen;LLVMMipsAsmPrinter;LLVMMipsDisassembler;LLVMMipsInfo;LLVMMipsDesc;LLVMMipsAsmParser;LLVMMSP430CodeGen;LLVMMSP430AsmPrinter;LLVMMSP430Info;LLVMMSP430Desc;LLVMNVPTXCodeGen;LLVMNVPTXInfo;LLVMNVPTXAsmPrinter;LLVMNVPTXDesc;LLVMPowerPCCodeGen;LLVMPowerPCAsmParser;LLVMPowerPCDisassembler;LLVMPowerPCAsmPrinter;LLVMPowerPCInfo;LLVMPowerPCDesc;LLVMSparcCodeGen;LLVMSparcInfo;LLVMSparcDesc;LLVMSparcAsmPrinter;LLVMSparcAsmParser;LLVMSparcDisassembler;LLVMSystemZCodeGen;LLVMSystemZAsmParser;LLVMSystemZDisassembler;LLVMSystemZAsmPrinter;LLVMSystemZInfo;LLVMSystemZDesc;LLVMX86CodeGen;LLVMX86AsmParser;LLVMX86Disassembler;LLVMX86AsmPrinter;LLVMX86Desc;LLVMX86Info;LLVMX86Utils;LLVMXCoreCodeGen;LLVMXCoreDisassembler;LLVMXCoreAsmPrinter;LLVMXCoreInfo;LLVMXCoreDesc;LLVMAsmParser;LLVMLineEditor;LLVMProfileData;LLVMPasses;LLVMLibDriver")
