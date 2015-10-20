@@ -1879,7 +1879,7 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module exit-afterwards?)
-    (let* ((llvm-path (sanitize-platform-path (string-append (sys:share-dir) "\\llvm"))))
+    (let* ((llc-path (sanitize-platform-path (string-append (sys:share-dir) "/llvm/bin/llc"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
@@ -1900,15 +1900,13 @@
              (optimize-compiles? #t)
              (llc-command
               (unix-or-Windows (string-append
-                                llvm-path
-                                "/bin/llc " 
-                                (if optimize-compiles? "-O3 -tailcallopt" "-O0")
+                                llc-path
+                                (if optimize-compiles? " -O3 -tailcallopt" "-O0")
                                 " -relocation-model=pic "
                                 bc-path)
                                (string-append
-                                llvm-path
-                                "\\bin\\llc "
-                                (if optimize-compiles? "-O3 -tailcallopt" "-O0")
+                                llc-path
+                                (if optimize-compiles? " -O3 -tailcallopt" "-O0")
                                 " -filetype=obj -mtriple=x86_64-pc-win32 "
                                 bc-path)))
              (link-command
@@ -1934,7 +1932,7 @@
                                 ;; (string-append tmp-dir module-name ".lib ")
                                 " msvcrt.lib opengl32.lib "
                                 asm-path))))
-        (print "Looking for llc in " llvm-path "...\n\n")
+        (print "Using llc " llc-path "...\n\n")
         (begin
           (print-with-colors 'black 'yellow #t (print " Exporting module "))
           (print "\n  " bc-path "\n\n"))
