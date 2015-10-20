@@ -202,7 +202,8 @@ endif()
 
 # assume that if we can find llvm-config, we already have a working LLVM install
 find_program(LLVM_CONFIG llvm-config
-  ${EXT_LLVM_DIR}/bin)
+  ${EXT_LLVM_DIR}/bin
+  NO_DEFAULT_PATH)
 
 if(LLVM_CONFIG)
   set(DOWNLOAD_LLVM OFF)
@@ -479,3 +480,9 @@ add_custom_target(xtmdoc
   VERBATIM)
 
 add_dependencies(xtmdoc extempore)
+
+#########
+# cpack #
+#########
+
+include(CPack)

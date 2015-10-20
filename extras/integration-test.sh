@@ -5,6 +5,9 @@
 cd .. # move up one level into top-level extempore directory
 SRC_DIR=$PWD
 
+# uncomment this next line if you want to test the full "pull down LLVM" behaviour
+# unset EXT_LLVM_DIR
+
 if [ ! -f $SRC_DIR/extras/integration-test.sh ]; then
     echo -e "\033[0;31mError:\033[0;00m integration-test.sh must be run from inside the extras/ directory"
     exit 1
