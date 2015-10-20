@@ -238,7 +238,9 @@ if(DOWNLOAD_LLVM)
   endif()
 endif()
 
-set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMRuntimeDyld;LLVMObject;LLVMLinker;LLVMipo;LLVMVectorize;LLVMBitWriter;LLVMTableGen;LLVMOption;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMIRReader;LLVMBitReader;LLVMAsmParser;LLVMMCDisassembler;LLVMMCParser;LLVMInstrumentation;LLVMInterpreter;LLVMMCJIT;LLVMCodeGen;LLVMObjCARCOpts;LLVMScalarOpts;LLVMInstCombine;LLVMTransformUtils;LLVMipa;LLVMAnalysis;LLVMExecutionEngine;LLVMTarget;LLVMMC;LLVMCore;LLVMSupport")
+# the ordering of these libs matters, especially with the gcc linker.
+# Check the output of "llvm-config --libnames" to be sure
+set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMObjCARCOpts;LLVMLinker;LLVMBitWriter;LLVMIRReader;LLVMAsmParser;LLVMOption;LLVMTableGen;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMMCDisassembler;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMMCJIT;LLVMipo;LLVMVectorize;LLVMInterpreter;LLVMExecutionEngine;LLVMRuntimeDyld;LLVMCodeGen;LLVMTarget;LLVMScalarOpts;LLVMObject;LLVMMCParser;LLVMBitReader;LLVMInstCombine;LLVMInstrumentation;LLVMTransformUtils;LLVMipa;LLVMMC;LLVMAnalysis;LLVMCore;LLVMSupport")
 
 foreach(llvm_lib ${EXT_LLVM_LIBRARIES})
   list(APPEND LLVM_LIBRARIES "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}")
