@@ -10,200 +10,68 @@
 
 ;;; Code:
 
-;; must create opengl context before calling sys:load
 (sys:load "libs/external/glfw3.xtm")
 
+(bind-val width i32 800)
+(bind-val height i32 600)
+
 (bind-val window GLFWwindow*
-  (glfw_init_and_create_compatibility_window 1024 768))
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_interaction_window width height)))
 
-(bind-func get_window
-  (lambda ()
-    window))
+(sys:load "libs/external/gl/gl-objects.xtm")
 
-(sys:load "libs/external/glcompat.xtm")
-(sys:load "libs/external/opengl.xtm")
+(bind-val vao VAO* (VAO_create_ss_quad))
+(bind-val sp ShaderProgram)
 
-;; (bind-func gl_setup
-;;   (lambda ()
-;;     (glEnable GL_LIGHTING)
-;;     (glEnable GL_LIGHT0)
-;;     (let ((diffuse:float* (halloc 4))
-;; 	  (specular:float* (halloc 4))
-;; 	  (position:float* (halloc 4)))
-;;       (pset! diffuse 0 1.0)
-;;       (pset! diffuse 1 1.0)
-;;       (pset! diffuse 2 1.0)
-;;       (pset! diffuse 3 1.0)
-;;       (pset! specular 0 1.0)
-;;       (pset! specular 2 1.0)
-;;       (pset! specular 3 1.0)
-;;       (pset! specular 4 1.0)
-;;       (pset! position 0 100.0)
-;;       (pset! position 1 100.0)
-;;       (pset! position 2 100.0)
-;;       (pset! position 3 0.0)
+(bind-func create_raymarcher_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! sp (ShaderProgram_create vsource fsource))))
 
-;;       (glLightfv GL_LIGHT0 GL_DIFFUSE diffuse)
-;;       (glLightfv GL_LIGHT0 GL_SPECULAR specular)
-;;       (glLightfv GL_LIGHT0 GL_POSITION position))
+(bind-func gl_draw
+  (lambda (degree:float)
+    (glUseProgram sp)
+    (glUniform1f (glGetUniformLocation sp "time") (* .025 degree))
+    (glUniform2f (glGetUniformLocation sp "resolution") (convert width) (convert height))
+    (VAO_bind_and_draw_arrays vao GL_TRIANGLE_STRIP 0 4)
+    void))
 
-;;     (glColorMaterial GL_FRONT_AND_BACK GL_AMBIENT_AND_DIFFUSE)
-;;     (glEnable GL_COLOR_MATERIAL)
-;;     (glShadeModel GL_SMOOTH)
-;;     (glDisable GL_BLEND)
-;;     (glBlendFunc GL_ONE GL_SRC_ALPHA)))
+(bind-func gl_draw_loop
+  (lambda (time:i64 delta_t:double degree)
+    (glClear GL_COLOR_BUFFER_BIT)
+    (gl_draw degree)
+    (glfwSwapBuffers window)
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time gl_draw_loop next_time delta_t (+ degree 1.)))))
 
-;; (bind-func gl_set_view
-;;   (lambda (w:double h:double depth:double)
-;;     (glViewport 0 0 (dtoi32 w) (dtoi32 h))
-;;     (glMatrixMode GL_PROJECTION)
-;;     (glLoadIdentity)
-;;     (gluPerspective 35.0 (/ w h) 0.1 depth)
-;;     (glMatrixMode GL_MODELVIEW)
-;;     (glEnable GL_DEPTH_TEST)
-;;     (gl_setup)
-;;     1))
+;; The shaders - where all the work in this example happens
 
-(gl_set_view 1024.0 768.0 100.0)
-
-;; a couple of shader helper functions
-(bind-func print-shader-info-log
-  (lambda (obj:i32)
-    (let ((infologLength:i32* (salloc))
-          (charsWritten:i32* (salloc)))
-      (glGetShaderiv obj GL_INFO_LOG_LENGTH infologLength)
-      (if (> (pref infologLength 0) 0)
-          (let ((shader_log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
-            (glGetShaderInfoLog obj (pref infologLength 0) charsWritten shader_log)
-            (printf "printShaderInfoLog: %s\n" shader_log)
-            (free shader_log)
-            1)
-          (begin (printf "Shader Info log: OK\n") 1)))))
-
-(bind-func print-program-info-log
-  (lambda (obj:i32)
-    (let ((infologLength:i32* (salloc))
-	  (charsWritten:i32* (salloc)))
-      (glGetProgramiv obj GL_INFO_LOG_LENGTH infologLength)
-      (if (> (pref infologLength 0) 0)
-	  (let ((program_log (bitcast (malloc (i32toi64 (pref infologLength 0))) i8*)))
-	    (glGetProgramInfoLog obj (pref infologLength 0) charsWritten program_log)
-	    (printf "printProgramInfoLog: %s\n" program_log)
-	    (free program_log)
-	    1)
-	  (begin (printf "Program Info log: OK\n") 1)))))
-
-
-(bind-val _vshader i32 0)
-(bind-val _fshader i32 0)
-(bind-val _program i32 0)
-
-;; load the frag + vert shaders
-(bind-func load-shaders
-  (lambda (fsource:i8* vsource:i8*)
-    (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
-	  (vshader (glCreateShader GL_VERTEX_SHADER))
-          (prgm:i32 (glCreateProgram))
-          (vcode:|1,i8*|* (salloc))
-          (fcode:|1,i8*|* (salloc))
-	  (temp:i32* (salloc)))
-      
-      (set! _program prgm)
-      
-      (aset! fcode 0 fsource)
-      (aset! vcode 0 vsource)
-      (printf "prgm %d\n" prgm)
-      
-      (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
-      (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
-
-      (set! _fshader fshader)
-      (glCompileShader fshader)
-      (set! _vshader vshader)
-      (glCompileShader vshader)
-    
-      (glAttachShader prgm fshader)
-      (glAttachShader prgm vshader)
-      
-      (glLinkProgram prgm)
-      ;(glValidatePrgm prgm)
-      (glUseProgram prgm)
-      ;;
-      (print-shader-info-log fshader)
-      (print-shader-info-log vshader)
-      (print-program-info-log prgm)
-      (glUseProgram prgm))))
-
-;; draw a simple quad which fills the whole screen space
-(bind-func opengl-draw
-  (let ((ratio (/ 4.0 2.75)))
-    (lambda (degree:double)
-      (glUniform1f (glGetUniformLocation _program "time") (dtof (* .025 degree)))
-      (glUniform3f (glGetUniformLocation _program "unResolution") 900.0 600.0 0.0)
-      (glLoadIdentity)
-      (glTranslated 0.0 0.0 -3.0)
-      (glClearColor 0.0 0.0 0.0 1.0)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      (glBegin GL_QUADS)
-      (glVertex3d (* -1.0 ratio) -1.0 0.0)
-      (glVertex3d (* -1.0 ratio)  1.0 0.0)
-      (glVertex3d (* 1.0 ratio)  1.0 0.0)
-      (glVertex3d (* 1.0 ratio) -1.0 0.0)
-      (glEnd))))
-
-
-;; standard impromptu callback to call openg-draw
-(define opengl-test
-  (lambda (time degree) ; distance)
-    (define tt (now))
-    (define distance 80.0)
-    ;(gl:set-context pr2)
-    (opengl-draw degree)
-    (glfw_swap_buffers (get_window))
-    (callback (+ time 200) 'opengl-test (+ time 1000) (+ degree 1.0)))) ; distance)))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; The shaders
-;;
-;; This is actually where all the work
-;; in this example happens.
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; vert shader does nothing
-;; just passes through the QUAD without change
+;; vert shader does nothing, just draws a full-screen quad
 (define vertshader
-"// VERTEX SHADER
+"#version 400
 
-void main() {
-   //Transform the vertex (ModelViewProj matrix)
-   gl_Position = ftransform();
+layout(location = 0) in vec2 vertexPosition;
+
+void main () {
+  gl_Position = vec4(vertexPosition,1.0,1.0);
 }")
 
 
 ;; Frag shader does EVERYTHING
 (define fragshader
-"//  FRAGMENT SHADER
- // #version 120
- // #extension GL_ARB_geometry_shader4 : enable
+  "#version 400
 
-uniform vec3 unResolution;
+uniform vec2 resolution;
 uniform float time;
-uniform sampler2D tex0;
-uniform sampler2D tex1;
-uniform sampler2D fft;
-uniform vec4 unPar;
-uniform vec4 unPos;
-uniform vec3 unBeatBassFFT;
 
+out vec4 fragColor;
 
 /**
  useful with domain repetition.
  shapes are only rendered between min and max limits
  using abs makes this symmetric (left/right and front/ back)
- */
+**/
 vec3 clamp_abs_xz( vec3 p, vec3 min, vec3 max ) {
     vec3 q = p;
     q.x = clamp( abs(q.x), min.x, max.x);
@@ -333,7 +201,7 @@ vec3 calcNormal( in vec3 p) {
 
 void main() {
    // uv are the pixel coordinates from 0 to 1
-   vec2 uv = (gl_FragCoord.xy/unResolution.xy);
+   vec2 uv = (gl_FragCoord.xy/resolution);
 
    // we generate a ray with origin ro and direction rd
    vec3 ro = vec3(0.0,0.0,-3.5);
@@ -388,15 +256,10 @@ void main() {
      // add specular from light2 
      col += 0.5*spe2;
    }
-   gl_FragColor = vec4(col,1.0);
+   fragColor = vec4(col,1.0);
 }")
 
+(create_raymarcher_shader vertshader fragshader)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  Now setup and run
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(opengl-test (now) 0.0)
-(load-shaders fragshader vertshader)
+;; set the wheels in motion
+(gl_draw_loop (now) (/ 1. 30.) 0.)
