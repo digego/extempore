@@ -1,6 +1,13 @@
-# Building Extempore from Source
+# Building Extempore
 
-## Build depenencies
+**TL;DR** If you've got `git`, `cmake` and a C++ compiler toolchain
+installed, then you can build Extempore with:
+```
+git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake ..
+```
+For more detailed instructions, read on...
+
+## Get the depenencies
 
 You'll need
 
@@ -13,12 +20,15 @@ a **C++ compiler toolchain**, e.g.
   [Community 2015](https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx)
   version is now free)
 
+Extempore should build with clang, gcc and MSVC - and possibly other
+compilers (but I haven't tried them).
+
 **git**
 
 - `sudo apt-get install git` on Ubuntu/Debian
 - `sudo yum install git` on Fedora/CentOS/RHEL
 - `brew install git` on OSX with Homebrew
-- `choco install git git.commandline` on Windows with Chocolatey
+- `choco install git` on Windows with Chocolatey
 
 **CMake** (version 3.1 or greater)
 
@@ -28,97 +38,57 @@ a **C++ compiler toolchain**, e.g.
 
 The Ubuntu 15.04 package archive only includes CMake v3.0, but you can
 get a more up-to-date version through a package archive
-
 ```
 sudo apt-get install software-properties-common && sudo add-apt-repository ppa:george-edison55/cmake-3.x && sudo apt-get update && sudo apt-get install cmake
 ```
 
-### ALSA (Linux only)
+**ALSA** (Linux only)
 
 To use the ALSA portaudio backend (which is probably what you want,
 unless you have a real reason to go with something else) you'll need
 the libasound package at build-time, e.g. (on Ubuntu)
-
 ```
 sudo apt-get install libasound2-dev
 ```
-
 If you really want to use a different backend (e.g. `jack`) then you
 can hack the `PA_USE_*` definitions in `CMakeLists.txt`
 
-### Boost (Windows only)
+**Boost** (Windows only)
 
 We still need one component of the **Boost** libs on Windows
 (specifically the ASIO component for TCP/UDP handling). If you've got
 the NuGet command line client installed, you can probably do
-
 ```
 nuget install boost-vc140 & nuget install boost_system-vc140 & nuget install boost_regex-vc140 & nuget install boost_date_time-vc140
 ```
-
 It doesn't matter how you get these deps or where you put them, as
 long as you tell Extempore where they are through the `BOOST_DIR`
 cmake variable. The `BOOST_DIR` should have two subdirectories
 `include` and `lib`, which should contain the boost header directory
 and the `libboost*.lib` files respectively.
 
-### LLVM 3.7
+**LLVM 3.7.0**
 
-**Note:** as of `21e750a`, downloading and building LLVM 3.7 happens
-automatically as part of the Extempore cmake build process. But the
-instructions are here in case you want to do it yourself.
+As of `21e750a`, downloading and building LLVM 3.7 happens
+automatically as part of the Extempore cmake build process. But
+instructions are included at the end of this file in case you want to
+do it yourself.
 
-Grab the
-[3.7.0 source tarball](http://llvm.org/releases/download.html#3.7.0),
-apply the `extempore-llvm-3.7.0.patch` in `extras/`
+## Configure
 
+Extempore uses CMake for configuration. In your `extempore` directory
+(i.e. the one this `INSTALL.md` file is in)
 ```
-cd /path/to/llvm-3.7.0.src
-patch -p0 < /path/to/extempore/extras/extempore-llvm-3.7.0.patch
+mkdir cmake-build && cd cmake-build && cmake ..
 ```
-
-On **Windows**, the `<` redirection will work with `cmd.exe`, but not
-PowerShell
-
-Then build LLVM, moving the libraries into `/path/to/extempore/llvm`
-as part of the `install` step
-
-```
-mkdir cmake-build && cd cmake-build
-cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/path/to/extempore/llvm .. && make && make install
-```
-
-On **Windows**, you'll also need to specify a 64-bit generator e.g.
-`-G"Visual Studio 14 2015 Win64"`
-
-To build, open the `Extempore.sln` file and build the `ALL_BUILD`
-target, then the `INSTALL` target. If the install step doesn't work,
-you can try directly calling `cmake -P cmake_install.cmake` which
-should be in the same directory. On Windows, the LLVM build output
-must be installed into an `llvm` subdirectory in the top-level
-Extempore directory (since the AOT compilation process will look in
-there to find `llc`).
-
-## Building Extempore
-
-### Generate build files with CMake
-
-In your `extempore` directory,
-
-```
-mkdir cmake-build && cd cmake-build
-cmake ..
-```
-
 On **Windows**, you'll need to give CMake a few more details about
 where Boost is:
-
 ```
 md cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" -DBOOST_DIR=c:\path\to\extempore\boost ..
 ```
 
-### Build Extempore
+## Build & Install
 
 On **Linux/OSX** CMake will generate a `Makefile` in `cmake-build`,
 with a few useful targets:
@@ -135,40 +105,53 @@ with a few useful targets:
 On **Windows**, CMake will generate a Visual Studio solution (`.sln`)
 in `cmake-build`. Open it, and build the `extempore` target.
 
-## Building the Extempore standard library
+After that, you're done. Time to
+[get started](http://benswift.me/2012/09/26/interacting-with-the-extempore-compiler/).
 
-### Linux/OSX
+## External shared libs
 
-It's pretty straightforward. You should be able to get most things
-through your package manager.
+Extempore is all about being dynamic and adding functionality
+on-the-fly. As a result, there are a bunch of helpful libraries (e.g.
+for sound file IO, FFTs, graphics) which we use a lot, but which
+aren't compiled statically into the `extempore` executable. Instead,
+we load this code at runtime through shared libraries (`.dylib` on
+OSX, `.so` on Linux and `.dll` on Windows).
 
-On **OSX** (assuming you've `brew tap benswift/extempore`)
+This means that you have to have these shared libraries on your system
+somewhere where Extempore can find them.
+
+On **OSX** you can get them through [homebrew](http://brew.sh/)
+(assuming you've done a `brew tap benswift/extempore`)
 
 ```
-brew install libkiss-fft glfw3 libstb-image libnanovg portmidi
+brew install assimp libsndfile portmidi libkiss-fft glfw3 libstb-image libnanovg
 ```
 
-On **Debian/Ubuntu**
+On **Debian/Ubuntu** you can use `apt-get`
 
 ```
-sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3 portmidi
+sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3 libportmidi-dev
 ```
 
 You'll have to build KissFFT, stb_image and nanovg yourself, using the
 instructions below, but `make install` step means that you won't have
 to move anything into `libs/platform-shlibs`.
 
-### Windows
-
-Since Windows doesn't have a lib path, all the dlls should go in
-`c:/Path/to/extempore/libs/platform-shlibs`. So for all these deps,
+On **Windows**, there isn't a package manager which will do the job so
+you'll need to build from source. Since Windows doesn't have a lib
+path, all the dlls should go in
+`c:/path/to/extempore/libs/platform-shlibs`. So for all these deps,
 move the dll in there when it's done.
+
+### Build from source
 
 #### libsndfile
 
-Just grab the Windows 64-bit installer from
+For Windows, you can just grab the Windows 64-bit installer from
 (http://www.mega-nerd.com/libsndfile/), and copy `libsndfile-1.dll`
 and `libsndfile-1.lib` into `extempore/libs/platform-shlibs`
+
+Or follow the instructions to build from source.
 
 #### Portmidi
 
@@ -178,13 +161,12 @@ If you don't have Java installed, then you'll need to comment out any
 reference to a `JNI_*` variable in the `CMakeLists.txt` - a bit messy
 I know, but we don't need the Java stuff in Extempore, and this is
 better than having to install Java.
-
 ```
 mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
 build the `portmidi-dynamic` target (don't worry about the other
-ones).
+ones) then install to `libs/platform-shlibs`
 
 #### KissFFT
 
@@ -193,39 +175,37 @@ git clone git@github.com:benswift/kiss_fft
 cd stb && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
-then install to `libs/platform-shlibs`.
+then install to `libs/platform-shlibs`
 
 #### GLFW3
 
 Download from (http://www.glfw.org/), I used v3.1.1.
-
 ```
 cmake -DBUILD_SHARED_LIBS=ON -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF ..
 ```
-then install to `libs/platform-shlibs`.
+then install to `libs/platform-shlibs`
 
 #### stb_image
-
-From source (all platforms)
 
 ```
 git clone git@github.com:benswift/stb
 cd stb && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
+then install to `libs/platform-shlibs`
 
 #### GLEW
 
-We don't use GLEW directly, but we use it to build nanovg.
+**Note:** GLEW is only used on Windows, as a build-time dependency for
+nanovg.
 
-(http://glew.sourceforge.net/)
-
-Download the latest stable version (I used 1.13.0)
+Download the latest stable version from
+(http://glew.sourceforge.net/).
 ```
 mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ../build/cmake/
 ```
-You'll need to move `libglew32.lib` out of whichever `Release` dir
+then move `libglew32.lib` out of whichever `Release` dir
 it's in into just the toplevel `GLEW_DIR/lib`.
 
 #### nanovg
@@ -238,7 +218,7 @@ git clone git@github.com:benswift/nanovg
 cd nanovg && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" -DGLEW_DIR=c:/path/to/glew ..
 ```
-then install to `libs/platform-shlibs`.
+then install to `libs/platform-shlibs`
 
 #### Assimp
 
@@ -249,7 +229,7 @@ Get latest source from
 mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
-then install to `libs/platform-shlibs`.
+then install to `libs/platform-shlibs`
 
 #### Glib/Gobject
 
@@ -264,3 +244,41 @@ Windows binaries anymore?
 You could also try getting it from
 [Winlibs](https://github.com/winlibs/glib) and building it yourself,
 but that seems hairy.
+
+## AOT-compiling the Extempore standard library
+
+This step isn't necessary, but it will make some common Extempore
+libraries load up much faster.
+```
+cd extempore/cmake-build # or wherever your Extempore build dir is
+make aot_stdlib
+```
+
+### LLVM 3.7.0
+
+Grab the
+[3.7.0 source tarball](http://llvm.org/releases/download.html#3.7.0),
+apply the `extempore-llvm-3.7.0.patch` in `extras/`
+```
+cd /path/to/llvm-3.7.0.src
+patch -p0 < /path/to/extempore/extras/extempore-llvm-3.7.0.patch
+```
+On **Windows**, the `<` redirection will work with `cmd.exe`, but not
+PowerShell.
+
+Then build LLVM, moving the libraries into `/path/to/extempore/llvm`
+as part of the `install` step
+```
+mkdir cmake-build && cd cmake-build
+cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/path/to/extempore/llvm .. && make && make install
+```
+On **Windows**, you'll also need to specify a 64-bit generator e.g.
+`-G"Visual Studio 14 2015 Win64"`
+
+To build, open the `Extempore.sln` file and build the `ALL_BUILD`
+target, then the `INSTALL` target. If the install step doesn't work,
+you can try directly calling `cmake -P cmake_install.cmake` which
+should be in the same directory. On Windows, the LLVM build output
+must be installed into an `llvm` subdirectory in the top-level
+Extempore directory (since the AOT compilation process will look in
+there to find `llc`).
