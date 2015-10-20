@@ -238,7 +238,7 @@ if(DOWNLOAD_LLVM)
   endif()
 endif()
 
-set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMLinker;LLVMipo;LLVMVectorize;LLVMBitWriter;LLVMTableGen;LLVMOption;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMIRReader;LLVMBitReader;LLVMAsmParser;LLVMMCDisassembler;LLVMMCParser;LLVMInstrumentation;LLVMInterpreter;LLVMMCJIT;LLVMCodeGen;LLVMObjCARCOpts;LLVMScalarOpts;LLVMInstCombine;LLVMTransformUtils;LLVMipa;LLVMAnalysis;LLVMRuntimeDyld;LLVMExecutionEngine;LLVMTarget;LLVMMC;LLVMObject;LLVMCore;LLVMSupport")
+set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMRuntimeDyld;LLVMObject;LLVMLinker;LLVMipo;LLVMVectorize;LLVMBitWriter;LLVMTableGen;LLVMOption;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMIRReader;LLVMBitReader;LLVMAsmParser;LLVMMCDisassembler;LLVMMCParser;LLVMInstrumentation;LLVMInterpreter;LLVMMCJIT;LLVMCodeGen;LLVMObjCARCOpts;LLVMScalarOpts;LLVMInstCombine;LLVMTransformUtils;LLVMipa;LLVMAnalysis;LLVMExecutionEngine;LLVMTarget;LLVMMC;LLVMCore;LLVMSupport")
 
 foreach(llvm_lib ${EXT_LLVM_LIBRARIES})
   list(APPEND LLVM_LIBRARIES "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}")
