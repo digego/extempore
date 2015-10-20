@@ -1848,6 +1848,16 @@
 ;; polytype
 ;; generictype
 
+(define get-llvm-path
+  (lambda ()
+    (sanitize-platform-path
+     ;; otherwise have a gewd look
+     (let ((path_from_env (sys:command-output (unix-or-Windows "echo $EXT_LLVM_DIR" "echo %EXT_LLVM_DIR%"))))
+       (if (not (string=? path_from_env ""))
+           path_from_env
+           ;; otherwise, it should be in SHARE_DIR/llvm-build
+           (string-append (sys:share-dir) "/llvm"))))))
+
 ;; insert arbitrary sexp (remember to quote!) into the AOT-compilation
 ;; file, otherwise do nothing
 (define-macro (impc:aot:insert-forms . forms)
@@ -1879,7 +1889,7 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module exit-afterwards?)
-    (let* ((llc-path (sanitize-platform-path (string-append (sys:share-dir) "/llvm/bin/llc"))))
+    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
              (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
