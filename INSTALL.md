@@ -171,7 +171,7 @@ ones) then install to `libs/platform-shlibs`
 #### KissFFT
 
 ```
-git clone git@github.com:benswift/kiss_fft
+git clone git@github.com:extemporelang/kiss_fft
 cd stb && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
@@ -188,7 +188,7 @@ then install to `libs/platform-shlibs`
 #### stb_image
 
 ```
-git clone git@github.com:benswift/stb
+git clone git@github.com:extemporelang/stb
 cd stb && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
@@ -214,7 +214,7 @@ From source (all platforms)
 
 nanovg needs to be told about where GLEW is through the `GLEW_DIR` variable
 ```
-git clone git@github.com:benswift/nanovg
+git clone git@github.com:extemporelang/nanovg
 cd nanovg && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" -DGLEW_DIR=c:/path/to/glew ..
 ```

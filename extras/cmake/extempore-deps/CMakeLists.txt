@@ -15,15 +15,15 @@ include(ExternalProject)
 
 ExternalProject_Add(nanovg
   PREFIX nanovg
-  URL https://github.com/benswift/nanovg/archive/master.zip
+  URL https://github.com/extemporelang/nanovg/archive/master.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE})
 
 ExternalProject_Add(kiss_fft
   PREFIX kiss_fft
-  URL https://github.com/benswift/kiss_fft/archive/master.zip
+  URL https://github.com/extemporelang/kiss_fft/archive/master.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE})
 
 ExternalProject_Add(stb_image
   PREFIX stb_image
-  URL https://github.com/benswift/stb/archive/master.zip
+  URL https://github.com/extemporelang/stb/archive/master.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE})
