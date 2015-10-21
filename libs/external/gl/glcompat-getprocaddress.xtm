@@ -626,7 +626,10 @@
 
 (define-macro (bind-gl-proc gl-lib proc-name type . args)
   (let* ((arg-types (cddr (impc:ir:get-type-from-pretty-str (symbol->string type))))
-         (arg-list (glwrapper-arg-list-symbols (length arg-types))))
+         (arg-list (glwrapper-arg-list-symbols (length arg-types)))
+         (index (impc:ti:gl-proc-alist-index (symbol->string proc-name))))
+    (if (not index)
+        (impc:compiler:print-compiler-error (string-append "couldn't find GLproc index for " (symbol->string proc-name))))
     `(eval (bind-func ,proc-name
              ;; docstring
              ,(if (and (not (null? args)) (string? (car args)))
@@ -634,7 +637,7 @@
                   "")
              (lambda ,arg-list
                (fptrcall (cast (aref EXTEMPORE_GL_FUNCTION_POINTERS
-                                     ,(impc:ti:gl-proc-alist-index (symbol->string proc-name)))
+                                     ,index)
                                ,type)
                          ,@arg-list)))
            (interaction-environment))))
