@@ -1,7 +1,10 @@
 (sys:load "libs/external/glfw3.xtm")
 
+(bind-val width i32 800)
+(bind-val height i32 600)
+
 (bind-val window GLFWwindow*
-  (glfw_init_and_create_fullscreen_window))
+  (glfw_init_and_create_interaction_window width height))
 
 (sys:load "libs/external/gl/gl-objects.xtm")
 
@@ -27,8 +30,8 @@
     (set! field_sp (ShaderProgram_create vsource fsource))))
 
 (impc:aot:do-or-emit
- (create_field_shader (sys:slurp-file "examples/external/shader-tutorials/pbpic-field.vert")
-                      (sys:slurp-file "examples/external/shader-tutorials/pbpic-field.frag")))
+      (create_field_shader (sys:slurp-file "libs/contrib/pic/pbpic-field.vert")
+                           (sys:slurp-file "libs/contrib/pic/pbpic-field.frag")))
 
 ;; this data should have interleaved the `bases' of the field arrows
 ;; (i.e. the grid) in 2D with the ndim (i.e. 3D) field components
@@ -113,8 +116,8 @@
     (set! particle_sp (ShaderProgram_create vsource fsource))))
 
 (impc:aot:do-or-emit
- (create_particle_shader (sys:slurp-file "examples/external/shader-tutorials/pbpic-particle.vert")
-                         (sys:slurp-file "examples/external/shader-tutorials/pbpic-particle.frag")))
+      (create_particle_shader (sys:slurp-file "libs/contrib/pic/pbpic-particle.vert")
+                              (sys:slurp-file "libs/contrib/pic/pbpic-particle.frag")))
 
 ;; init all the things
 (impc:aot:do-or-emit
