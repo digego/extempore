@@ -254,19 +254,28 @@
 ;; 2.0 - repeat after two cycles
 ;; 4.0 - repeat after four cycles etc..
 ;;
-(bind-func hann
+(bind-func hann_a
   (lambda (time:i64 width:i64 repeat:i64)
-    (if (> (% time (* width repeat)) width) 0.0
+    (if (or (< width 1)
+            (> (% time (* width repeat)) width))            
+        0.0
         (* 0.5
            (- 1.0
               (cos (* STWOPI (/ (convert time)
                                 (convert width)))))))))
 
+(bind-func hann_b
+  (lambda (time:i64 width:i64)
+    (hann_a time width 10000000000)))
+
+(bind-poly hann hann_a)
+(bind-poly hann hann_b)
+
 ;; time in samples (starting from 0)
 ;; apex (in samples) is after how many samples we hit 1.0 before decaying
 (bind-func impulse
   (lambda (time:i64 apex:i64)
-    (let ((h:SAMPLE (convert (* time apex))))
+    (let ((h:SAMPLE (convert (/ time apex))))
       (* h (exp (- 1.0 h))))))
 
 
@@ -311,6 +320,14 @@
     (lambda (amp freq)
       (let ((inc (* STWOPI (/ (clamp freq (- 0.0 SRf) SRf) SAMPLERATE))))
         (set! phase (+ phase inc))
+        (if (> phase SPI) (set! phase (- phase STWOPI)))
+        (* amp (_sin phase))))))
+
+(bind-func osc_c
+  (lambda (phase)
+    (let ((t (/ STWOPI SAMPLERATE)))
+      (lambda (amp freq)
+        (set! phase (+ phase (* t (clamp freq (- 0.0 SRf) SRf)))) 
         (if (> phase SPI) (set! phase (- phase STWOPI)))
         (* amp (_sin phase))))))
 
