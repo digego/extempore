@@ -604,33 +604,35 @@
 ;;  "bind an OpenGL procedure"
 ;;  '(libname function-name type optional-docstring))
 
-(let ((platform (sys:platform)))
-  (cond ((string=? platform "OSX")
-         (eval '(bind-func gl_get_proc_address
-                  (lambda (lib:i8* name:i8*)
-                    (if (not (null? lib))
-                        (dlsym lib name)
-                        null)))
-               (interaction-environment)))
+(impc:aot:do-and-emit
+ (if (not (impc:aot:currently-compiling?))
+     (let ((platform (sys:platform)))
+       (cond ((string=? platform "OSX")
+              (eval '(bind-func gl_get_proc_address
+                       (lambda (lib:i8* name:i8*)
+                         (if (not (null? lib))
+                             (dlsym lib name)
+                             null)))
+                    (interaction-environment)))
 
-        ((string=? platform "Linux")
-         (eval '(bind-lib libGL glXGetProcAddressARB [i8*,i8*]*)
-               (interaction-environment))
-         (eval '(bind-func gl_get_proc_address
-                  (lambda (lib:i8* name:i8*)
-                    (glXGetProcAddressARB name)))
-               (interaction-environment)))
+             ((string=? platform "Linux")
+              (eval '(bind-lib libGL glXGetProcAddressARB [i8*,i8*]*)
+                    (interaction-environment))
+              (eval '(bind-func gl_get_proc_address
+                       (lambda (lib:i8* name:i8*)
+                         (glXGetProcAddressARB name)))
+                    (interaction-environment)))
 
-        ((string=? platform "Windows")
-         (eval '(bind-lib libGL wglGetProcAddress [i8*,i8*]*)
-               (interaction-environment))
-         (eval '(bind-func gl_get_proc_address
-                  (lambda (lib:i8* name:i8*)
-                    (wglGetProcAddress name)))
-               (interaction-environment)))
+             ((string=? platform "Windows")
+              (eval '(bind-lib libGL wglGetProcAddress [i8*,i8*]*)
+                    (interaction-environment))
+              (eval '(bind-func gl_get_proc_address
+                       (lambda (lib:i8* name:i8*)
+                         (wglGetProcAddress name)))
+                    (interaction-environment)))
 
-        (else (impc:compiler:print-compiler-error
-               "unknown platform, cannot load platform-specific gl_get_proc_address for OpenGL"))))
+             (else (impc:compiler:print-compiler-error
+                    "unknown platform, cannot load platform-specific gl_get_proc_address for OpenGL"))))))
 
 ;; if you change this, change the size of
 ;; EXTEMPORE_GL_FUNCTION_POINTERS as well!
@@ -651,6 +653,13 @@ equal to (length *impc:ti:gl-proc-alist*)")
           (aset! EXTEMPORE_GL_FUNCTION_POINTERS index proc-fptr)
           void))))
 
+
+(impc:aot:do-and-emit
+ (define cptr-null?
+   (lambda (cptr)
+     (and (cptr? cptr)
+          (string=? (cptr->string cptr) "")))))
+
 ;; it would be nice if this was an xtlang function, but for now the
 ;; list of gl proc names is in Scheme
 (impc:aot:do-and-emit
@@ -659,7 +668,10 @@ equal to (length *impc:ti:gl-proc-alist*)")
      (print "Initialising OpenGL function pointers... ")
      (for-each (lambda (proc-pair)
                  (let* ((proc-ptr (gl_get_proc_address gl-lib (car proc-pair))))
-                   (if (and (not (null? warn?)) warn? (string=? (cptr->string proc-ptr) ""))
+                   ;; On Windows, additionally check GetProcAddress
+                   (if (cptr-null? proc-ptr)
+                       (set! proc-ptr (sys:symbol-cptr libGL (car proc-pair))))
+                   (if (and (not (null? warn?)) warn? (cptr-null? proc-ptr))
                        (print "Warning: OpenGL proc address is null for " (car proc-pair) "\n"))
                    (gl_set_proc_address (cdr proc-pair) proc-ptr)))
                *impc:ti:gl-proc-alist*)
@@ -740,101 +752,101 @@ equal to (length *impc:ti:gl-proc-alist*)")
 (bind-alias GLubyte i8)
 
 ;; void glCullFace(GLenum mode);
-(bind-lib libGL glCullFace [void,GLenum]*)
+(bind-gl-proc libGL glCullFace [void,GLenum]*)
 ;; void glFrontFace(GLenum mode);
-(bind-lib libGL glFrontFace [void,GLenum]*)
+(bind-gl-proc libGL glFrontFace [void,GLenum]*)
 ;; void glHint(GLenum target, GLenum mode);
-(bind-lib libGL glHint [void,GLenum,GLenum]*)
+(bind-gl-proc libGL glHint [void,GLenum,GLenum]*)
 ;; void glLineWidth(GLfloat width);
-(bind-lib libGL glLineWidth [void,GLfloat]*)
+(bind-gl-proc libGL glLineWidth [void,GLfloat]*)
 ;; void glPointSize(GLfloat size);
-(bind-lib libGL glPointSize [void,GLfloat]*)
+(bind-gl-proc libGL glPointSize [void,GLfloat]*)
 ;; void glPolygonMode(GLenum face, GLenum mode);
-(bind-lib libGL glPolygonMode [void,GLenum,GLenum]*)
+(bind-gl-proc libGL glPolygonMode [void,GLenum,GLenum]*)
 ;; void glScissor(GLint x, GLint y, GLsizei width, GLsizei height);
-(bind-lib libGL glScissor [void,GLint,GLint,GLsizei,GLsizei]*)
+(bind-gl-proc libGL glScissor [void,GLint,GLint,GLsizei,GLsizei]*)
 ;; void glTexParameterf(GLenum target, GLenum pname, GLfloat param);
-(bind-lib libGL glTexParameterf [void,GLenum,GLenum,GLfloat]*)
+(bind-gl-proc libGL glTexParameterf [void,GLenum,GLenum,GLfloat]*)
 ;; void glTexParameterfv(GLenum target, GLenum pname, GLfloat* params);
-(bind-lib libGL glTexParameterfv [void,GLenum,GLenum,GLfloat*]*)
+(bind-gl-proc libGL glTexParameterfv [void,GLenum,GLenum,GLfloat*]*)
 ;; void glTexParameteri(GLenum target, GLenum pname, GLint param);
-(bind-lib libGL glTexParameteri [void,GLenum,GLenum,GLint]*)
+(bind-gl-proc libGL glTexParameteri [void,GLenum,GLenum,GLint]*)
 ;; void glTexParameteriv(GLenum target, GLenum pname, GLint* params);
-(bind-lib libGL glTexParameteriv [void,GLenum,GLenum,GLint*]*)
+(bind-gl-proc libGL glTexParameteriv [void,GLenum,GLenum,GLint*]*)
 ;; void glTexImage1D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLint border, GLenum format, GLenum type, void* pixels);
-(bind-lib libGL glTexImage1D [void,GLenum,GLint,GLint,GLsizei,GLint,GLenum,GLenum,i8*]*)
+(bind-gl-proc libGL glTexImage1D [void,GLenum,GLint,GLint,GLsizei,GLint,GLenum,GLenum,i8*]*)
 ;; void glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, void* pixels);
-(bind-lib libGL glTexImage2D [void,GLenum,GLint,GLint,GLsizei,GLsizei,GLint,GLenum,GLenum,i8*]*)
+(bind-gl-proc libGL glTexImage2D [void,GLenum,GLint,GLint,GLsizei,GLsizei,GLint,GLenum,GLenum,i8*]*)
 ;; void glDrawBuffer(GLenum buf);
-(bind-lib libGL glDrawBuffer [void,GLenum]*)
+(bind-gl-proc libGL glDrawBuffer [void,GLenum]*)
 ;; void glClear(GLbitfield mask);
-(bind-lib libGL glClear [void,GLbitfield]*)
+(bind-gl-proc libGL glClear [void,GLbitfield]*)
 ;; void glClearColor(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
-(bind-lib libGL glClearColor [void,GLfloat,GLfloat,GLfloat,GLfloat]*)
+(bind-gl-proc libGL glClearColor [void,GLfloat,GLfloat,GLfloat,GLfloat]*)
 ;; void glClearStencil(GLint s);
-(bind-lib libGL glClearStencil [void,GLint]*)
+(bind-gl-proc libGL glClearStencil [void,GLint]*)
 ;; void glClearDepth(GLdouble depth);
-(bind-lib libGL glClearDepth [void,GLdouble]*)
+(bind-gl-proc libGL glClearDepth [void,GLdouble]*)
 ;; void glStencilMask(GLuint mask);
-(bind-lib libGL glStencilMask [void,GLuint]*)
+(bind-gl-proc libGL glStencilMask [void,GLuint]*)
 ;; void glColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
-(bind-lib libGL glColorMask [void,GLboolean,GLboolean,GLboolean,GLboolean]*)
+(bind-gl-proc libGL glColorMask [void,GLboolean,GLboolean,GLboolean,GLboolean]*)
 ;; void glDepthMask(GLboolean flag);
-(bind-lib libGL glDepthMask [void,GLboolean]*)
+(bind-gl-proc libGL glDepthMask [void,GLboolean]*)
 ;; void glDisable(GLenum cap);
-(bind-lib libGL glDisable [void,GLenum]*)
+(bind-gl-proc libGL glDisable [void,GLenum]*)
 ;; void glEnable(GLenum cap);
-(bind-lib libGL glEnable [void,GLenum]*)
+(bind-gl-proc libGL glEnable [void,GLenum]*)
 ;; void glFinish(void);
-(bind-lib libGL glFinish [void]*)
+(bind-gl-proc libGL glFinish [void]*)
 ;; void glFlush(void);
-(bind-lib libGL glFlush [void]*)
+(bind-gl-proc libGL glFlush [void]*)
 ;; void glBlendFunc(GLenum sfactor, GLenum dfactor);
-(bind-lib libGL glBlendFunc [void,GLenum,GLenum]*)
+(bind-gl-proc libGL glBlendFunc [void,GLenum,GLenum]*)
 ;; void glLogicOp(GLenum opcode);
-(bind-lib libGL glLogicOp [void,GLenum]*)
+(bind-gl-proc libGL glLogicOp [void,GLenum]*)
 ;; void glStencilFunc(GLenum func, GLint ref, GLuint mask);
-(bind-lib libGL glStencilFunc [void,GLenum,GLint,GLuint]*)
+(bind-gl-proc libGL glStencilFunc [void,GLenum,GLint,GLuint]*)
 ;; void glStencilOp(GLenum fail, GLenum zfail, GLenum zpass);
-(bind-lib libGL glStencilOp [void,GLenum,GLenum,GLenum]*)
+(bind-gl-proc libGL glStencilOp [void,GLenum,GLenum,GLenum]*)
 ;; void glDepthFunc(GLenum func);
-(bind-lib libGL glDepthFunc [void,GLenum]*)
+(bind-gl-proc libGL glDepthFunc [void,GLenum]*)
 ;; void glPixelStoref(GLenum pname, GLfloat param);
-(bind-lib libGL glPixelStoref [void,GLenum,GLfloat]*)
+(bind-gl-proc libGL glPixelStoref [void,GLenum,GLfloat]*)
 ;; void glPixelStorei(GLenum pname, GLint param);
-(bind-lib libGL glPixelStorei [void,GLenum,GLint]*)
+(bind-gl-proc libGL glPixelStorei [void,GLenum,GLint]*)
 ;; void glReadBuffer(GLenum src);
-(bind-lib libGL glReadBuffer [void,GLenum]*)
+(bind-gl-proc libGL glReadBuffer [void,GLenum]*)
 ;; void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void *pixels);
-(bind-lib libGL glReadPixels [void,GLint,GLint,GLsizei,GLsizei,GLenum,GLenum,i8*]*)
+(bind-gl-proc libGL glReadPixels [void,GLint,GLint,GLsizei,GLsizei,GLenum,GLenum,i8*]*)
 ;; void glGetBooleanv(GLenum pname, GLboolean *data);
-(bind-lib libGL glGetBooleanv [void,GLenum,GLboolean*]*)
+(bind-gl-proc libGL glGetBooleanv [void,GLenum,GLboolean*]*)
 ;; void glGetDoublev(GLenum pname, GLdouble *data);
-(bind-lib libGL glGetDoublev [void,GLenum,GLdouble*]*)
+(bind-gl-proc libGL glGetDoublev [void,GLenum,GLdouble*]*)
 ;; GLenum glGetError(void);
-(bind-lib libGL glGetError [GLenum]*)
+(bind-gl-proc libGL glGetError [GLenum]*)
 ;; void glGetFloatv(GLenum pname, GLfloat *data);
-(bind-lib libGL glGetFloatv [void,GLenum,GLfloat*]*)
+(bind-gl-proc libGL glGetFloatv [void,GLenum,GLfloat*]*)
 ;; void glGetIntegerv(GLenum pname, GLint *data);
-(bind-lib libGL glGetIntegerv [void,GLenum,GLint*]*)
+(bind-gl-proc libGL glGetIntegerv [void,GLenum,GLint*]*)
 ;; GLubyte*  glGetString(GLenum name);
-(bind-lib libGL glGetString [GLubyte*,GLenum]*)
+(bind-gl-proc libGL glGetString [GLubyte*,GLenum]*)
 ;; void glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, void *pixels);
-(bind-lib libGL glGetTexImage [void,GLenum,GLint,GLenum,GLenum,i8*]*)
+(bind-gl-proc libGL glGetTexImage [void,GLenum,GLint,GLenum,GLenum,i8*]*)
 ;; void glGetTexParameterfv(GLenum target, GLenum pname, GLfloat *params);
-(bind-lib libGL glGetTexParameterfv [void,GLenum,GLenum,GLfloat*]*)
+(bind-gl-proc libGL glGetTexParameterfv [void,GLenum,GLenum,GLfloat*]*)
 ;; void glGetTexParameteriv(GLenum target, GLenum pname, GLint *params);
-(bind-lib libGL glGetTexParameteriv [void,GLenum,GLenum,GLint*]*)
+(bind-gl-proc libGL glGetTexParameteriv [void,GLenum,GLenum,GLint*]*)
 ;; void glGetTexLevelParameterfv(GLenum target, GLint level, GLenum pname, GLfloat *params);
-(bind-lib libGL glGetTexLevelParameterfv [void,GLenum,GLint,GLenum,GLfloat*]*)
+(bind-gl-proc libGL glGetTexLevelParameterfv [void,GLenum,GLint,GLenum,GLfloat*]*)
 ;; void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint *params);
-(bind-lib libGL glGetTexLevelParameteriv [void,GLenum,GLint,GLenum,GLint*]*)
+(bind-gl-proc libGL glGetTexLevelParameteriv [void,GLenum,GLint,GLenum,GLint*]*)
 ;; GLboolean glIsEnabled(GLenum cap);
-(bind-lib libGL glIsEnabled [GLboolean,GLenum]*)
+(bind-gl-proc libGL glIsEnabled [GLboolean,GLenum]*)
 ;; void glDepthRange(GLdouble near, GLdouble far);
-(bind-lib libGL glDepthRange [void,GLdouble,GLdouble]*)
+(bind-gl-proc libGL glDepthRange [void,GLdouble,GLdouble]*)
 ;; void glViewport(GLint x, GLint y, GLsizei width, GLsizei height);
-(bind-lib libGL glViewport [void,GLint,GLint,GLsizei,GLsizei]*)
+(bind-gl-proc libGL glViewport [void,GLint,GLint,GLsizei,GLsizei]*)
 ;; #endif /* GL_VERSION_1_0 */
 
 ;; #ifndef GL_VERSION_1_1
@@ -1047,33 +1059,33 @@ equal to (length *impc:ti:gl-proc-alist*)")
 (bind-val GL_VERTEX_ARRAY i32 #x8074)
 
 ;; void glDrawArrays(GLenum mode, GLint first, GLsizei count);
-(bind-lib libGL glDrawArrays [void,GLenum,GLint,GLsizei]*)
+(bind-gl-proc libGL glDrawArrays [void,GLenum,GLint,GLsizei]*)
 ;; void glDrawElements(GLenum mode, GLsizei count, GLenum type, void* indices);
-(bind-lib libGL glDrawElements [void,GLenum,GLsizei,GLenum,i8*]*)
+(bind-gl-proc libGL glDrawElements [void,GLenum,GLsizei,GLenum,i8*]*)
 ;; void glGetPointerv(GLenum pname, void **params);
-(bind-lib libGL glGetPointerv [void,GLenum,GLvoid**]*)
+(bind-gl-proc libGL glGetPointerv [void,GLenum,GLvoid**]*)
 ;; void glPolygonOffset(GLfloat factor, GLfloat units);
-(bind-lib libGL glPolygonOffset [void,GLfloat,GLfloat]*)
+(bind-gl-proc libGL glPolygonOffset [void,GLfloat,GLfloat]*)
 ;; void glCopyTexImage1D(GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLint border);
-(bind-lib libGL glCopyTexImage1D [void,GLenum,GLint,GLenum,GLint,GLint,GLsizei,GLint]*)
+(bind-gl-proc libGL glCopyTexImage1D [void,GLenum,GLint,GLenum,GLint,GLint,GLsizei,GLint]*)
 ;; void glCopyTexImage2D(GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border);
-(bind-lib libGL glCopyTexImage2D [void,GLenum,GLint,GLenum,GLint,GLint,GLsizei,GLsizei,GLint]*)
+(bind-gl-proc libGL glCopyTexImage2D [void,GLenum,GLint,GLenum,GLint,GLint,GLsizei,GLsizei,GLint]*)
 ;; void glCopyTexSubImage1D(GLenum target, GLint level, GLint xoffset, GLint x, GLint y, GLsizei width);
-(bind-lib libGL glCopyTexSubImage1D [void,GLenum,GLint,GLint,GLint,GLint,GLsizei]*)
+(bind-gl-proc libGL glCopyTexSubImage1D [void,GLenum,GLint,GLint,GLint,GLint,GLsizei]*)
 ;; void glCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height);
-(bind-lib libGL glCopyTexSubImage2D [void,GLenum,GLint,GLint,GLint,GLint,GLint,GLsizei,GLsizei]*)
+(bind-gl-proc libGL glCopyTexSubImage2D [void,GLenum,GLint,GLint,GLint,GLint,GLint,GLsizei,GLsizei]*)
 ;; void glTexSubImage1D(GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLenum type, void* pixels);
-(bind-lib libGL glTexSubImage1D [void,GLenum,GLint,GLint,GLsizei,GLenum,GLenum,i8*]*)
+(bind-gl-proc libGL glTexSubImage1D [void,GLenum,GLint,GLint,GLsizei,GLenum,GLenum,i8*]*)
 ;; void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, void* pixels);
-(bind-lib libGL glTexSubImage2D [void,GLenum,GLint,GLint,GLint,GLsizei,GLsizei,GLenum,GLenum,i8*]*)
+(bind-gl-proc libGL glTexSubImage2D [void,GLenum,GLint,GLint,GLint,GLsizei,GLsizei,GLenum,GLenum,i8*]*)
 ;; void glBindTexture(GLenum target, GLuint texture);
-(bind-lib libGL glBindTexture [void,GLenum,GLuint]*)
+(bind-gl-proc libGL glBindTexture [void,GLenum,GLuint]*)
 ;; void glDeleteTextures(GLsizei n, GLuint* textures);
-(bind-lib libGL glDeleteTextures [void,GLsizei,GLuint*]*)
+(bind-gl-proc libGL glDeleteTextures [void,GLsizei,GLuint*]*)
 ;; void glGenTextures(GLsizei n, GLuint *textures);
-(bind-lib libGL glGenTextures [void,GLsizei,GLuint*]*)
+(bind-gl-proc libGL glGenTextures [void,GLsizei,GLuint*]*)
 ;; GLboolean glIsTexture(GLuint texture);
-(bind-lib libGL glIsTexture [GLboolean,GLuint]*)
+(bind-gl-proc libGL glIsTexture [GLboolean,GLuint]*)
 ;; #endif /* GL_VERSION_1_1 */
 
 ;; #ifndef GL_VERSION_1_2
