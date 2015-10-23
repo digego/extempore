@@ -7,6 +7,7 @@ option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
+option(PACKAGE "set up install targets for packaging" OFF)
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
@@ -317,8 +318,13 @@ else()
   message(STATUS "Using the old LLVM JIT backend...")
 endif()
 
-target_compile_definitions(extempore
-  PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
+if(PACKAGE)
+  target_compile_definitions(extempore
+    PRIVATE -DEXT_SHARE_DIR=".")
+else()
+  target_compile_definitions(extempore
+    PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
+endif()
 
 # platform-specific config
 
@@ -418,35 +424,64 @@ add_custom_target(assets
 # install #
 ###########
 
-install(TARGETS extempore
-  RUNTIME DESTINATION bin)
+if(PACKAGE) # there's probably a better way to do this
+  install(TARGETS extempore
+    RUNTIME
+    DESTINATION extempore
+    COMPONENT compiler)
+  # install the rest of the necessary files into the "share" directory
+  install(DIRECTORY runtime examples extras
+    COMPONENT compiler
+    DESTINATION extempore
+    PATTERN ".DS_Store" EXCLUDE)
+  # need to filter out precomp guff from libs
+  install(DIRECTORY libs
+    COMPONENT compiler
+    DESTINATION extempore
+    PATTERN ".DS_Store" EXCLUDE)
+  # only install assets if it exists
+  if(EXISTS ${CMAKE_SOURCE_DIR}/assets)
+    install(DIRECTORY assets
+      COMPONENT assets
+      DESTINATION extempore
+      PATTERN ".DS_Store" EXCLUDE)
+  endif()
 
-# install the rest of the necessary files into the "share" directory
-install(DIRECTORY runtime examples tests extras
-  DESTINATION ${EXT_SHARE_DIR}
-  PATTERN ".DS_Store" EXCLUDE)
-# only install assets if it exists
-if(EXISTS ${CMAKE_SOURCE_DIR}/assets)
-  install(DIRECTORY assets
+else(PACKAGE)
+
+  install(TARGETS extempore
+    RUNTIME
+    DESTINATION bin
+    COMPONENT compiler)
+  # install the rest of the necessary files into the "share" directory
+  install(DIRECTORY runtime examples tests extras
+    COMPONENT compiler
     DESTINATION ${EXT_SHARE_DIR}
     PATTERN ".DS_Store" EXCLUDE)
-endif()
-# need to filter out precomp guff from libs
-install(DIRECTORY libs
-  DESTINATION ${EXT_SHARE_DIR}
-  PATTERN "*.xtm"
-  PATTERN "aot-cache" EXCLUDE
-  PATTERN ".DS_Store" EXCLUDE)
+  # need to filter out precomp guff from libs
+  install(DIRECTORY libs
+    COMPONENT compiler
+    DESTINATION ${EXT_SHARE_DIR}
+    PATTERN ".DS_Store" EXCLUDE)
+  # only install assets if it exists
+  if(EXISTS ${CMAKE_SOURCE_DIR}/assets)
+    install(DIRECTORY assets
+      COMPONENT assets
+      DESTINATION ${EXT_SHARE_DIR}
+      PATTERN ".DS_Store" EXCLUDE)
+  endif()
 
-if(IN_TREE)
-  add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
-    COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore")
-else()
-  add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}
-    COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore")
+  if(IN_TREE)
+    add_custom_target(uninstall
+      COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
+      COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore")
+  else()
+    add_custom_target(uninstall
+      COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
+      COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}
+      COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore")
+  endif()
+
 endif()
 
 ###################
@@ -487,4 +522,55 @@ add_dependencies(xtmdoc extempore)
 # cpack #
 #########
 
+# cpack is cmake's tool for providing distributable
+# binaries/installers on various platforms.
+
+set(CPACK_PACKAGE_NAME "Extempore")
+set(CPACK_PACKAGE_VENDOR "Andrew Sorensen")
+set(CPACK_PACKAGE_CONTACT "Ben Swift")
+
+# CPACK_PACKAGE_DIRECTORY
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH 0)
+
+# CPACK_PACKAGE_DESCRIPTION_FILE
+
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")
+
+if(APPLE)
+  set(CPACK_GENERATOR DragNDrop)
+  set(CPACK_PACKAGE_INSTALL_DIRECTORY "extempore") 
+  set(CPACK_TOPLEVEL_TAG "extempore")
+  # set(CPACK_GENERATOR TGZ)
+  # set(CPACK_BINARY_DRAGNDROP "ON")
+  # set(CPACK_BINARY_TGZ "OFF")
+  # set(CPACK_BINARY_STGZ "OFF")
+  # set(CPACK_MONOLITHIC_INSTALL TRUE)
+  set(CPACK_INSTALL_PREFIX "~/Applications")
+elseif(UNIX AND NOT APPLE)
+  set(CPACK_GENERATOR DEB)
+  include(CPackDeb)
+  set(CPACK_INSTALL_PREFIX "~")
+elseif(WIN32)
+  set(CPACK_GENERATOR NSIS64)
+  include(CPackNSIS)
+  set(CPACK_INSTALL_PREFIX "c:/Program Files")
+endif()
+
 include(CPack)
+
+# CPACK_PACKAGE_FILE_NAME
+
+# CPACK_PACKAGE_INSTALL_DIRECTORY
+
+# if(APPLE)
+#   set(CPACK_GENERATOR DragNDrop)
+#   include(CPackDMG)
+# elseif(UNIX AND NOT APPLE) # Linux
+#   set(CPACK_GENERATOR DEB)
+#   include(CPackDeb)
+# elseif(WIN32)
+#   set(CPACK_GENERATOR NSIS64)
+#   include(CPackNSIS)
+# endif()
