@@ -1984,7 +1984,7 @@
                    *impc:aot:current-output-port*)
           (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
                    *impc:aot:current-output-port*)
-          (display (string-append "(define " libname " (sys:load-dylib \"libs/aot-cache/" libname
+          (display (string-append "(define " libname " (sys:load-dylib \"" libname
                                   (cond ((string=? (sys:platform) "Linux") ".so\"))\n")
                                         ((string=? (sys:platform) "Windows") ".dll\"))\n")
                                         ((string=? (sys:platform) "OSX") ".dylib\"))\n")))
@@ -8341,11 +8341,9 @@
 (define sys:load-dylib
   (lambda (dylib-path)
     (let ((dylib (or
-                  (sys:open-dylib dylib-path)
-                  (sys:open-dylib (sanitize-platform-path (string-append (sys:share-dir) "/" dylib-path)))
-                  (if (string=? (sys:platform) "Windows")
-                      (sys:open-dylib (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" dylib-path)))
-                      #f))))
+                  (sys:open-dylib (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" dylib-path)))
+                  (sys:open-dylib (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" dylib-path)))
+                  (sys:open-dylib dylib-path))))
       (if dylib
           (begin
             (impc:compiler:print-dylib-loading-details-to-log dylib-path)
