@@ -51,24 +51,16 @@ brew install extempore
 If you get stuck, there are more detailed instructions
 [here](http://benswift.me/2013/11/12/building-extempore-through-homebrew/).
 
-Alternately, you can [build it yourself from source](http://benswift.me/2013-03-20-building-extempore-on-osx-linux.html).
-
 ## Linux
 
-On Linux, too, you can build Extempore
-[through homebrew](http://benswift.me/2013/11/12/building-extempore-through-homebrew/)
-or
-[build from source](http://benswift.me/2013-03-20-building-extempore-on-osx-linux.html).
+On Linux, you can you can [build from source](./INSTALL.md)
 
 ## Windows 7
 
-Windows installation instructions are available [here](http://benswift.me/2013-03-20-building-extempore-on-windows.html).
+Windows installation instructions are provided in
+[INSTALL.md](./INSTALL.md) as well.
 
-Extempore has thus far only been tested on Windows 7 64-bit, but if you
-can get it to build/run on other flavours of Windows then do let us
-know and we'll update these instructions.  Also, if anyone wants to
-improve and streamline the Windows build process, then patches are
-welcome :)
+<!-- TODO link to binary -->
 
 # Running Extempore
 
@@ -93,7 +85,6 @@ you can get a list by running `extempore --help`
 
 For more detail, see this post on
 [interacting with the Exempore compiler](http://benswift.me/2012-09-26-interacting-with-the-extempore-compiler.html).
-
 
 # Docs & Community
 
