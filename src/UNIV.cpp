@@ -460,6 +460,10 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 	return result;
 }
 
+const char* sys_sharedir(){
+  return extemp::UNIV::SHARE_DIR.c_str();
+}
+
 //////////////////////////////////////////////////////////////////
 //  CLOCK/TIME
 #ifdef EXT_BOOST

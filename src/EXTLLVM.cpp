@@ -1678,6 +1678,7 @@ namespace extemp {
       EE->updateGlobalMapping("llvm_asin", (uint64_t)&llvm_asin);
       EE->updateGlobalMapping("llvm_atan", (uint64_t)&llvm_atan);
       EE->updateGlobalMapping("llvm_atan2", (uint64_t)&llvm_atan2);
+      EE->updateGlobalMapping("sys_sharedir", (uint64_t)&sys_sharedir);
 #ifdef EXT_MCJIT
       extemp::EXTLLVM::I()->EE->finalizeObject();
 #endif
