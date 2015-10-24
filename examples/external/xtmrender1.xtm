@@ -11,11 +11,6 @@
 
 ;;; Code:
 
-;; path to the model files: if you've put assets in the top-level
-;; Extempore folder then this will work, otherwise change it to suit
-;; (make sure you include / on the end)
-(bind-val model_path i8* "assets/models/")
-
 (sys:load "libs/external/glfw3.xtm")
 
 (bind-val width i32 1024)
@@ -38,11 +33,13 @@
 
 (bind-func gl_render
   (lambda (model:xtm_node*)
-    (xtm_render null render null null (convert model i8*))
-    void))
+    (if (null? model)
+        (println "gl_render recieved null pointer for model - did you load the model successfully?")
+        (begin (xtm_render null render null null (convert model i8*))
+               void))))
 
 (bind-val peppino xtm_node*
-  (assimp_load_model model_path "/peppino.dae" aiProcess_Triangulate))
+  (assimp_load_model (String_cstr (String_cat2 (String (sys_sharedir)) (String "/assets/models/"))) "peppino.dae" aiProcess_Triangulate))
 
 (xtm_render_setup
  (call-as-xtlang (glfw_get_framebuffer_width window))
