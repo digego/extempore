@@ -2088,6 +2088,10 @@
                   ;; if the preload check passes, create aot-cache dir
                   ;; if it doesn't exist
                   (sys:command (string-append (unix-or-Windows "mkdir " "md ") output-dir))
+                  ;; remove old AOT file if present
+                  (if (file-exists? aot-compilation-file-path)
+                      (sys:command (string-append (unix-or-Windows "rm " "TODO ") aot-compilation-file-path)))
+                  ;; open output file, ready for writing
                   (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
