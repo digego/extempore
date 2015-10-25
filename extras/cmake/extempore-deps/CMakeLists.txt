@@ -27,3 +27,16 @@ ExternalProject_Add(stb_image
   PREFIX stb_image
   URL https://github.com/extemporelang/stb/archive/master.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE})
+
+ExternalProject_Add(glfw3
+  PREFIX glfw3
+  URL https://github.com/glfw/glfw/archive/3.1.2.zip
+  CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE})
+
+ExternalProject_Add(assimp
+  PREFIX assimp
+  URL https://github.com/assimp/assimp/archive/v3.1.1.zip
+  CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE})
+
+# libsndfile
+# portmidi
