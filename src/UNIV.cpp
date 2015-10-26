@@ -464,6 +464,24 @@ const char* sys_sharedir(){
   return extemp::UNIV::SHARE_DIR.c_str();
 }
 
+char* sys_slurp_file(const char* filename)
+{
+  std::FILE *fp = std::fopen(filename, "rb");
+
+  if(fp){
+    std::fseek(fp, 0, SEEK_END);
+    size_t file_size = std::ftell(fp);
+    char* buf = (char*)malloc(file_size*sizeof(char));
+    std::rewind(fp);
+    std::fread(buf, 1, file_size, fp);
+    std::fclose(fp);
+
+    buf[file_size-1] = '\0';
+    return buf;
+  }
+  return NULL;
+}
+
 //////////////////////////////////////////////////////////////////
 //  CLOCK/TIME
 #ifdef EXT_BOOST
