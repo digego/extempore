@@ -644,7 +644,14 @@ namespace extemp {
 
   pointer SchemeFFI::slurpFile(scheme* _sc, pointer args)
   {
-    std::FILE *fp = std::fopen(string_value(pair_car(args)), "rb");
+    std::string filename(string_value(pair_car(args)));
+    std::string sharedir_filename(UNIV::SHARE_DIR + "/" + filename);
+
+    // check raw path first, then prepend SHARE_DIR
+    std::FILE *fp = std::fopen(filename.c_str(), "rb");
+    if (!fp) {
+      fp = std::fopen(sharedir_filename.c_str(), "rb");
+    }
 
     if(fp){
       std::string contents;

@@ -464,9 +464,16 @@ const char* sys_sharedir(){
   return extemp::UNIV::SHARE_DIR.c_str();
 }
 
-char* sys_slurp_file(const char* filename)
+char* sys_slurp_file(const char* fname)
 {
-  std::FILE *fp = std::fopen(filename, "rb");
+    std::string filename(fname);
+    std::string sharedir_filename(extemp::UNIV::SHARE_DIR + "/" + filename);
+
+    // check raw path first, then prepend SHARE_DIR
+    std::FILE *fp = std::fopen(filename.c_str(), "rb");
+    if (!fp) {
+      fp = std::fopen(sharedir_filename.c_str(), "rb");
+    }
 
   if(fp){
     std::fseek(fp, 0, SEEK_END);

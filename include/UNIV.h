@@ -89,7 +89,7 @@ unsigned char* base64_decode(const char *data,size_t input_length,size_t *output
 char* cname_encode(char *data,size_t input_length,size_t *output_length);
 char* cname_decode(char *data,size_t input_length,size_t *output_length);
 const char* sys_sharedir();
-char* sys_slurp_file(const char* filename);
+char* sys_slurp_file(const char* fname);
 
 // clock/time
 #ifdef EXT_BOOST
