@@ -489,14 +489,24 @@ endif()
 ###################
 
 configure_file(
+  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib_core.cmake.in
+  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib_core.cmake
+  @ONLY)
+
+configure_file(
   ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake.in
   ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake
   @ONLY)
+
+add_custom_target(aot_stdlib_core
+  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib_core.cmake
+  COMMENT "Ahead-of-time compiling the standard library...")
 
 add_custom_target(aot_stdlib
   COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake
   COMMENT "Ahead-of-time compiling the standard library...")
 
+add_dependencies(aot_stdlib_core extempore)
 add_dependencies(aot_stdlib extempore)
 
 # uninstall only AOT-compiled libs
