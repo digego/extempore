@@ -22,7 +22,7 @@
 ;;; Code:
 
 (sys:load "libs/aot-cache/pbpic2.xtm" 'quiet)
-(sys:load-preload-check 'pbpic)
+(sys:load-preload-check 'pbpic2)
 (define *xtmlib-pbpic2-loaded* #f)
 
 (impc:aot:suppress-aot-do
@@ -56,6 +56,7 @@
 (bind-lib-val libmpi ompi_mpi_comm_world_addr MPI_Comm)
 (bind-val MPI_COMM_WORLD MPI_Comm)
 (impc:aot:do-or-emit (call-as-xtlang (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr)))
+(bind-val MPI_FLOAT MPI_Datatype)
 
 ;; end inserted mpi.xtm code ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -70,14 +71,10 @@
          "libpbpic2.dll")))
 
 (bind-lib-val libpbpic2 ompi_mpi_float_addr MPI_Datatype)
-(bind-val MPI_FLOAT MPI_Datatype)
 (impc:aot:do-or-emit (call-as-xtlang (set! MPI_FLOAT ompi_mpi_float_addr)))
 
 (bind-type timeval <i64,i64>) ;; <time_t,suseconds_t>
-
 (bind-lib libpbpic2 dtimer [void,double*,timeval*,i32]*)
-(bind-lib libpbpic2 main [i32,i32,i8**]*)
-
 ;; from pbpush2.h
 (bind-lib libpbpic2 ranorm [double]*)
 (bind-lib libpbpic2 cpdicomp2l [void,float*,i32*,i32*,i32*,i32*,i32,i32,i32,i32]*)
@@ -316,7 +313,7 @@
             (printf "combination not supported nvp ny = %d %d\n" nvp ny))
         (cppexit)))))
 
-(bind-func pbpic_alloc_arrays
+(bind-func pbpic2_alloc_arrays
   (lambda ()
     (println "allocating memory for data arrays")
     (let ((nypmx (pref nypmx_ptr 0))
@@ -372,13 +369,13 @@
       (set! rbufr rbufr_)
       (set! scr scr_))))
 
-(impc:aot:do-or-emit (pbpic_alloc_arrays))
+(impc:aot:do-or-emit (pbpic2_alloc_arrays))
 
 ;; allocate memory for *all* the particles (or at least a
 ;; subset) for visualisation on head node
 (bind-val part_all float*)
 
-(bind-func pbpic_free_arrays
+(bind-func pbpic2_free_arrays
   (lambda ()
     (free part part_)
     (free part2 part2_)
@@ -430,7 +427,7 @@
           (printf "Warning: Courant condition may be exceeded!\n"))))
  1)
 
-(bind-func pbpic_print_energies
+(bind-func pbpic2_print_energies
   (lambda ()
     (if (= kstrt 1)
         (begin
@@ -455,7 +452,7 @@
 
 ;; * * * start main iteration loop * * *
 
-(bind-func pbpic_step
+(bind-func pbpic2_step
   (lambda ()
     ;; deposit current with standard procedure: updates part, cue, ihole
     (doloop (j (* ndim nxe (pref nypmx_ptr 0)))
@@ -632,9 +629,9 @@
     (if (= ntime 0)
         (if (= kstrt 1)
             ;; this could be replaced by a call to
-            ;; pbpic_print_energies, but then it wouldn't say
+            ;; pbpic2_print_energies, but then it wouldn't say
             ;; "Initial"
-            (pbpic_print_energies)))
+            (pbpic2_print_energies)))
 
     ;; ntime is incremented in the scheme callback
     (set! ntime (+ ntime 1))
@@ -642,17 +639,11 @@
 
 ;; * * * end main iteration loop * * *
 
-;; (define *num-loops* (call-as-xtlang nloop))
-
-(impc:aot:do-or-emit
- (define run-pbpic
-   (lambda (time delta-t)
-     (pbpic_step)
-     (let ((next-time (max (+ time (* *second* delta-t)) (now))))
-       (callback next-time
-                 'run-pbpic
-                 next-time
-                 delta-t)))))
+(bind-func pbpic2_loop
+  (lambda (time:i64 delta_t:double)
+    (pbpic2_step)    
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time pbpic2_loop next_time delta_t))))
 
 ;; visualisation (root node only)
 
@@ -665,7 +656,7 @@
 
 (impc:aot:do-or-emit
  (if (and #t (= (call-as-xtlang kstrt) 1))
-     (sys:load "libs/contrib/pic/pbpic-visuals.xtm")))
+     (sys:load "libs/contrib/pic/pbpic2-visuals.xtm")))
 
 (impc:aot:insert-footer "xtmpbpic2")
 (define *xtmlib-pbpic2-loaded* #t)
