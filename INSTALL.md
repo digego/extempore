@@ -100,7 +100,8 @@ with a few useful targets:
   the rest of the files (the "Extempore share directory") into
   `/usr/local/share/extempore`
 - `make uninstall` will remove the installed files
-- `make aot_stdlibs` will ahead-of-time compile the standard library
+- `make aot`/`make aot_extended` will ahead-of-time compile the
+  core/extended "standard library"
 
 On **Windows**, CMake will generate a Visual Studio solution (`.sln`)
 in `cmake-build`. Open it, and build the `extempore` target.
@@ -251,8 +252,12 @@ This step isn't necessary, but it will make some common Extempore
 libraries load up much faster.
 ```
 cd extempore/cmake-build # or wherever your Extempore build dir is
-make aot_stdlib
+make aot
 ```
+
+If you want the "extended" Extempore standard library, which requires
+the aforementioned external shared libs, then you can try `make
+aot_extended` instead.
 
 ### LLVM 3.7.0
 

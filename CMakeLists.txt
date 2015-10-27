@@ -489,28 +489,28 @@ endif()
 ###################
 
 configure_file(
-  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib_core.cmake.in
-  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib_core.cmake
+  ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake.in
+  ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake
   @ONLY)
 
 configure_file(
-  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake.in
-  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake
+  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake.in
+  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake
   @ONLY)
 
-add_custom_target(aot_stdlib_core
-  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib_core.cmake
+add_custom_target(aot
+  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake
   COMMENT "Ahead-of-time compiling the standard library...")
 
-add_custom_target(aot_stdlib
-  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_stdlib.cmake
+add_custom_target(aot_extended
+  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake
   COMMENT "Ahead-of-time compiling the standard library...")
 
-add_dependencies(aot_stdlib_core extempore)
-add_dependencies(aot_stdlib extempore)
+add_dependencies(aot extempore)
+add_dependencies(aot_extended extempore)
 
 # uninstall only AOT-compiled libs
-add_custom_target(uninstall_aot_stdlib
+add_custom_target(uninstall_aot
   COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
   COMMENT "Removing AOT-compiled libs")
 

@@ -4,7 +4,7 @@ if(UNIX)
     message(FATAL_ERROR "you must install extempore (e.g. make install) before AOT-compiling the standard library")
   endif()
 
-  set(AOT_STDLIB_LIBS
+  set(AOT_LIBS
     # core
     "libs/core/std.xtm"
     "libs/core/math.xtm"
@@ -12,7 +12,7 @@ if(UNIX)
     "libs/core/instruments.xtm"
     )
 
-  foreach(aot-lib ${AOT_STDLIB_LIBS})
+  foreach(aot-lib ${AOT_LIBS})
     message(STATUS "AOT-compiling ${aot-lib}")
     execute_process(
       COMMAND @CMAKE_INSTALL_PREFIX@/bin/extempore --runtime @EXT_SHARE_DIR@ --nostd --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
@@ -25,7 +25,7 @@ if(UNIX)
 
 elseif(WIN32)
 
-  set(AOT_STDLIB_LIBS
+  set(AOT_LIBS
     # core
     "libs/core/std.xtm"
     "libs/core/math.xtm"
@@ -33,7 +33,7 @@ elseif(WIN32)
     "libs/core/instruments.xtm"
     )
 
-  foreach(aot-lib ${AOT_STDLIB_LIBS})
+  foreach(aot-lib ${AOT_LIBS})
     message(STATUS "AOT-compiling ${aot-lib}")
     execute_process(
       COMMAND @CMAKE_SOURCE_DIR@/extempore --nostd --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"

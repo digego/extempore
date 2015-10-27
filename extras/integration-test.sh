@@ -35,7 +35,7 @@ if (($? != 0)); then
     exit 1
 fi
 
-make aot_stdlib && $TEST_DIR/bin/extempore --port=${TEST_PORT} --sharedir $TEST_DIR/share/extempore --run tests/all.xtm
+make aot_extended && $TEST_DIR/bin/extempore --port=${TEST_PORT} --sharedir $TEST_DIR/share/extempore --run tests/all.xtm
 
 if (($? != 0)); then
     echo -e "\033[0;31mIntegration test failed (AOT:true, MCJIT:true) $f\033[0;00m"
