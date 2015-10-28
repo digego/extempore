@@ -27,28 +27,41 @@
 
 This will pick up any incoming MIDI messages - handle them however you
 like."
-  (let ((buffer_length 1024)
-        (input_buffer:PmEvent* (zalloc buffer_length))
+  (let ((input_buffer:PmEvent* (zalloc PM_MIDI_BUFFER_SIZE))
         (read_count 0)
         (i:i32 0))
     (lambda (time:i64 delta_t:double)
       ;; if you have more than one midi input device, you should call
       ;; Pm_Read on all your devices here
-      (set! read_count (Pm_Read midi_in input_buffer buffer_length))
+      (set! read_count (Pm_Read midi_in input_buffer PM_MIDI_BUFFER_SIZE))
+      ;; (println "read_count:" (convert read_count i32))
       (if (> read_count 0)
           (dotimes (i read_count)
-            (println "midi recv:" i (pref-ptr input_buffer i))))
+            (cond ((= (Pm_MessageStatus (PmEvent_message (pref-ptr input_buffer i))) MIDI_NOTE_ON)
+                   (println "note: ON pitch:"
+                            (Pm_MessageData1 (PmEvent_message (pref-ptr input_buffer i)))
+                            "velocity:"
+                            (Pm_MessageData2 (PmEvent_message (pref-ptr input_buffer i)))))
+                  ((= (Pm_MessageStatus (PmEvent_message (pref-ptr input_buffer i))) MIDI_NOTE_OFF)
+                   (println "note: OFF pitch:"
+                            (Pm_MessageData1 (PmEvent_message (pref-ptr input_buffer i)))
+                            "velocity:"
+                            (Pm_MessageData2 (PmEvent_message (pref-ptr input_buffer i)))))
+                  (else
+                   (println "midi recv:" i (pref-ptr input_buffer i))))))
       (let ((next_time (+ time (convert (* 44100. delta_t)))))
         (callback next_time midi_read_loop next_time delta_t)))))
 
 ;; start the read loop
 (midi_read_loop (now) .01) ;; 100Hz
 
-;; now, let's send a (single) message
-(call-as-xtlang (Pm_WriteShort midi_out 0 (Pm_Message MIDI_NOTE_ON (random 60 80) 80)))
+;; Scheme MIDI I/O
 
-;; turn off the read loop
-(bind-func midi_read_loop
-  (lambda (time:i64 delta_t:double)
-    (println "midi_read_loop callback stopped")
-    #f))
+;; let's grab a handle for our midi out device in scheme
+(bind-func get_midi_out
+  (lambda ()
+    midi_out))
+(define *midi-out* (get_midi_out))
+
+(play-midi-note (now) *midi-out* (random 60 72) (random 60 90) 44100)
+

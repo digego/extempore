@@ -621,6 +621,14 @@
 ;; */
 (bind-lib libportmidi Pm_WriteShort [PmError,PortMidiStream*,PmTimestamp,i32]*)
 
+(bind-func pm_write
+  "a wrapper around Pm_WriteShort with timestamp == 0
+
+most of the time this is what you'll want to call (especially from
+Scheme)"
+  (lambda (stream message)
+    (Pm_WriteShort stream 0 message)))
+
 ;; /**
 ;;     Pm_WriteSysEx() writes a timestamped system-exclusive midi message.
 ;; */
@@ -686,6 +694,9 @@
   (lambda (time_info:i8*)
     (convert (* 1000.:f (/ (convert (now) float) 44100.:f)) i32)))
 
+(bind-val PM_MIDI_BUFFER_SIZE i32 256
+  "default size of the MIDI input/output buffers")
+
 (bind-func pm_create_input_stream
   "create a midi *input* PmStream pointer for device
 
@@ -695,7 +706,7 @@ input device(s)
 @paran dev - device id of a midi input device"
   (lambda (dev)
     (let ((stream_ptr:PmStream** (salloc))
-          (res (Pm_OpenInput stream_ptr dev null 1 (convert (get_native_fptr pm_current_time_in_ms)) null)))
+          (res (Pm_OpenInput stream_ptr dev null PM_MIDI_BUFFER_SIZE (convert (get_native_fptr pm_current_time_in_ms)) null)))
       (if (<> res pmNoError)
           (println "PortMIDI error opening input port:" (String (Pm_GetErrorText res))))
       (pref stream_ptr 0))))
@@ -709,10 +720,76 @@ output device(s)
 @paran dev - device id of a midi output device"
   (lambda (dev)
     (let ((stream_ptr:PmStream** (salloc))
-          (res (Pm_OpenOutput stream_ptr dev null 1 (convert (get_native_fptr pm_current_time_in_ms)) null 0)))
+          (res (Pm_OpenOutput stream_ptr dev null PM_MIDI_BUFFER_SIZE (convert (get_native_fptr pm_current_time_in_ms)) null 0)))
       (if (<> res pmNoError)
           (println "PortMIDI error opening output port:" (String (Pm_GetErrorText res))))
       (pref stream_ptr 0))))
+
+;; scheme helper functions
+
+(define *midi-note-off*     #x80) ;; args: key, velocity
+(define *midi-note-on*      #x90) ;; args: key, velocity
+(define *midi-poly-touch*   #xA0) ;; args: key, touch
+(define *midi-ctrl*         #xB0) ;; args: controller, value
+(define *midi-ch-program*   #xC0) ;; args: value, ignored
+(define *midi-touch*        #xD0) ;; args: value, ignored
+(define *midi-bend*         #xE0) ;; args: lsb (7 bits), msb (7 bits)
+
+(impc:aot:do-or-emit
+ (define play-midi-note
+   (lambda (time device pitch velocity duration)
+     (callback time 'pm_write device (Pm_Message *midi-note-on* pitch velocity))
+     (callback (+ time duration) 'pm_write device (Pm_Message *midi-note-off* pitch velocity)))))
+
+;; homophonic playnote
+(impc:aot:do-or-emit
+ (define homo-play-midi-note
+   (let ((notes (make-vector 127 0)))
+     (lambda (time device pitch velocity duration channel)
+       (if (> time (vector-ref notes pitch))
+           (let ((dur (- duration (* 2 *au:block-size*))))
+             (vector-set! notes pitch (+ time dur))
+             (callback time 'pm_write (Pm_Message *midi-note-on* pitch velocity))
+             (callback (+ time duration) 'pm_write device (Pm_Message *midi-note-off* pitch velocity))))))))
+
+;; A midi-specific play macro
+
+(impc:aot:do-or-emit
+ (define-macro (mplay . args)
+   (if (symbol? (car args))
+       `(play-midi-note (*metro* beat) ,(car args)
+                        (real->integer ,(cadr args))
+                        (real->integer ,(caddr args))
+                        (*metro* 'dur ,(car (cdddr args))) 0)
+       `(play-midi-note (*metro* (+ beat ,(car args))) ,(cadr args)
+                        (real->integer ,(caddr args))
+                        (real->integer ,(car (cdddr args)))
+                        (*metro* 'dur ,(cadr (cdddr args))) 0))))
+
+(impc:aot:do-or-emit
+ (define-macro (mplayob o b . args)
+   `(if (= 0 (modulo (+ ,o beat) ,b))
+        (mplay ,@args)
+        #f)))
+
+(impc:aot:do-or-emit
+ (define-macro (mplayobs l b . args)
+   `(if (member (modulo beat ,b) ,l)
+        (mplay ,@args)
+        #f)))
+
+;; uncomment if you want to use play instead of mplay
+;;
+;; (macro (play args)
+;;   (if (symbol? (cadr args))
+;;       `(play-midi-note (*metro* beat) ,(cadr args)
+;;                   (real->integer ,(caddr args))
+;;                   (real->integer ,(cadddr args))
+;;                   (*metro* 'dur ,(car (cddddr args))) 0)
+;;       `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args)
+;;                   (real->integer ,(cadddr args))
+;;                   (real->integer ,(car (cddddr args)))
+;;                   (*metro* 'dur ,(cadr (cddddr args))) 0)))
 
 (impc:aot:insert-footer "xtmportmidi")
 (define *xtmlib-portmidi-loaded* #t)
