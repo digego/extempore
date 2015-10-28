@@ -203,7 +203,7 @@
         (cppexit)))))
 
 ;; initialize data for MPI code
-(bind-val edges float* 2) ;; idps
+(bind-val edges |2,float|)
 
 ;; initialize additional scalars for MPI code
 ;; kxp = number of complex grids in each field partition in x direction
@@ -301,7 +301,7 @@
   ;; noff = lowermost global gridpoint in particle partition
   ;; nypmx = maximum size of particle partition, including guard cells
   ;; nypmn = minimum value of nyp
-  (cpdicomp2l edges nyp_ptr noff_ptr nypmx_ptr nypmn_ptr ny kstrt nvp idps)
+  (cpdicomp2l (aref-ptr edges 0) nyp_ptr noff_ptr nypmx_ptr nypmn_ptr ny kstrt nvp idps)
   (if (< (pref nypmn_ptr 0) 1)
       (begin
         (if (= kstrt 1)
@@ -404,7 +404,7 @@
   ;; calculate form factors
   (cppois23 qt fxyt isign ffc ax ay affp we_ptr nx ny kstrt nye kxp nyh)
   ;; initialize electrons
-  (cpdistr2h part edges npp_ptr nps vtx vty vtz vx0 vy0 vz0 npx npy nx ny idimp npmax idps ipbc ierr_ptr)
+  (cpdistr2h part (aref-ptr edges 0) npp_ptr nps vtx vty vtz vx0 vy0 vz0 npx npy nx ny idimp npmax idps ipbc ierr_ptr)
   ;; check for particle initialization error
   (if (<> (pref ierr_ptr 0) 0)
       (begin
@@ -454,8 +454,8 @@
       (pset! cue j 0.0))
 
     (if (= relativity 1)
-        (cppgrjpost2l part cue edges (pref npp_ptr 0) (pref noff_ptr 0) ihole qme dth ci nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc)
-        (cppgjpost2l part cue edges (pref npp_ptr 0) (pref noff_ptr 0) ihole qme dth nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc))
+        (cppgrjpost2l part cue (aref-ptr edges 0) (pref npp_ptr 0) (pref noff_ptr 0) ihole qme dth ci nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc)
+        (cppgjpost2l part cue (aref-ptr edges 0) (pref npp_ptr 0) (pref noff_ptr 0) ihole qme dth nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc))
 
     ;; check for ihole overflow error
     (if (< (pref ihole 0) 0)
@@ -466,8 +466,8 @@
           (cppabort)
           (cppexit)))
 
-    ;; move electrons into appropriate spatial regions: updates part, (pref npp_ptr 0)
-    (cppmove2 part edges npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt nvp idimp npmax idps nbmax ntmax (aref-ptr info 0))
+    ;; move electrons into appropriate spatial regions: updates part, npp
+    (cppmove2 part (aref-ptr edges 0) npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt nvp idimp npmax idps nbmax ntmax (aref-ptr info 0))
     ;; check for particle manager error
     (if (<> (aref info 0) 0)
         (begin
@@ -544,9 +544,9 @@
     ;; push particles: updates part, wke, and ihole
     (pset! wke_ptr 0 0.0)
     (if (= relativity 1)
-        (cppgrbpush23l part fxyze bxyze edges (pref npp_ptr 0) (pref noff_ptr 0) ihole qbme dt dth ci wke_ptr nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc)
+        (cppgrbpush23l part fxyze bxyze (aref-ptr edges 0) (pref npp_ptr 0) (pref noff_ptr 0) ihole qbme dt dth ci wke_ptr nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc)
 
-        (cppgbpush23l part fxyze bxyze edges (pref npp_ptr 0) (pref noff_ptr 0) ihole qbme dt dth wke_ptr nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc))
+        (cppgbpush23l part fxyze bxyze (aref-ptr edges 0) (pref npp_ptr 0) (pref noff_ptr 0) ihole qbme dt dth wke_ptr nx ny idimp npmax nxe (pref nypmx_ptr 0) idps ntmax ipbc))
 
     ;; check for ihole overflow error
     (if (< (pref ihole 0) 0)
@@ -558,7 +558,7 @@
           (cppexit)))
 
     ;; move electrons into appropriate spatial regions: updates part, (pref npp_ptr 0)
-    (cppmove2 part edges npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt nvp idimp npmax idps nbmax ntmax (aref-ptr info 0))
+    (cppmove2 part (aref-ptr edges 0) npp_ptr sbufr sbufl rbufr rbufl ihole ny kstrt nvp idimp npmax idps nbmax ntmax (aref-ptr info 0))
     ;; check for particle manager error
     (if (<> (aref info 0) 0)
         (begin
