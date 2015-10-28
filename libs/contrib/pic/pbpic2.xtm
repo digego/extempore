@@ -635,11 +635,20 @@
 
 ;; * * * end main iteration loop * * *
 
+;; (bind-func pbpic2_loop
+;;   (lambda (time:i64 delta_t:double)
+;;     (pbpic2_step)
+;;     (let ((next_time (+ time (convert (* 44100. delta_t)))))
+;;       (callback next_time pbpic2_loop next_time delta_t))))
+
 (bind-func pbpic2_loop
-  (lambda (time:i64 delta_t:double)
-    (pbpic2_step)    
-    (let ((next_time (+ time (convert (* 44100. delta_t)))))
-      (callback next_time pbpic2_loop next_time delta_t))))
+  (lambda ()
+    (while (>= (pbpic2_step) 0)
+      1)
+    0))
+
+(impc:aot:do-or-emit
+ (ipc:bind-func "utility" 'pbpic2_loop))
 
 ;; visualisation (root node only)
 
