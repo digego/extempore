@@ -37,9 +37,6 @@
 
 ;; (sys:load "libs/contrib/mpi.xtm")
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; begin inserted mpi.xtm code ;;
-
 ;; set up the current dylib name and path (for precompilation)
 (bind-dylib libmpi
   (cond ((string=? (sys:platform) "OSX")
@@ -49,17 +46,10 @@
         ((string=? (sys:platform) "Windows")
          "libmpi.dll")))
 
-(bind-alias MPI_Comm i8*) ;; ompi_communicator_t*
-(bind-alias MPI_Datatype i8*) ;; ompi_datatype_t*
+(bind-alias MPI_Comm i8*)
+(bind-alias MPI_Datatype i8*)
 
 (bind-lib libmpi MPI_Gather [i32,i8*,i32,MPI_Datatype,i8*,i32,MPI_Datatype,i32,MPI_Comm]*)
-(bind-lib-val libmpi ompi_mpi_comm_world_addr MPI_Comm)
-(bind-val MPI_COMM_WORLD MPI_Comm)
-(impc:aot:do-or-emit (call-as-xtlang (set! MPI_COMM_WORLD ompi_mpi_comm_world_addr)))
-(bind-val MPI_FLOAT MPI_Datatype)
-
-;; end inserted mpi.xtm code ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; set up the current dylib name and path (for precompilation)
 (bind-dylib libpbpic2
@@ -70,8 +60,13 @@
         ((string=? (sys:platform) "Windows")
          "libpbpic2.dll")))
 
-(bind-lib-val libpbpic2 ompi_mpi_float_addr MPI_Datatype)
-(impc:aot:do-or-emit (call-as-xtlang (set! MPI_FLOAT ompi_mpi_float_addr)))
+(bind-val MPI_COMM_WORLD MPI_Comm)
+(bind-val MPI_FLOAT MPI_Datatype)
+(bind-lib-val libpbpic2 xtm_mpi_comm_world MPI_Comm)
+(bind-lib-val libpbpic2 xtm_mpi_float MPI_Datatype)
+(impc:aot:do-or-emit
+ (call-as-xtlang (set! MPI_COMM_WORLD xtm_mpi_comm_world)
+                 (set! MPI_FLOAT xtm_mpi_float)))
 
 (bind-type timeval <i64,i64>) ;; <time_t,suseconds_t>
 (bind-lib libpbpic2 dtimer [void,double*,timeval*,i32]*)
