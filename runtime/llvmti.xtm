@@ -1713,8 +1713,7 @@
                     ;; behaviour
                     (cons (cons globalvar-name (vector (impc:ir:pointer++ type) docstring))
                           *impc:ti:globalvar-cache*))
-              (car *impc:ti:globalvar-cache*)
-              (impc:aot:insert-globalvar-binding-details globalvar-name type docstring))))))
+              (car *impc:ti:globalvar-cache*))))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
@@ -1815,12 +1814,12 @@
           (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-globalvar-binding-details
-  (lambda (name type docstring)
+  (lambda (library name type docstring)
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
            (list 'bind-lib-val
-                 (string->symbol *impc:aot:current-lib-name*)
+                 (string->symbol library)
                  (string->symbol name)
                  (string->symbol (impc:ir:pretty-print-type type))
                  docstring)
@@ -8237,6 +8236,10 @@
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
               (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+              (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                         ,(symbol->string symbol)
+                                                         ,(symbol->string type)
+                                                         ,docstring)
               (impc:aot:do-or-emit
                (call-as-xtlang (set! ,symbol ,value) void))
               (impc:compiler:print-binding-details-to-log "SetValue:"
@@ -8260,6 +8263,10 @@
                                                    ;; set! inside a call-as-xtlang a bit further down
                                                    "zeroinitializer")))
               (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+              (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                         ,(symbol->string symbol)
+                                                         ,(symbol->string type)
+                                                         ,docstring)
               ;; set value for non int/float literals
               ,(if (and value (not (number? value)))
                    `(impc:aot:do-or-emit
@@ -8278,6 +8285,10 @@
                                                   ,(impc:ir:get-type-str t)
                                                   " zeroinitializer"))
                   (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+                  (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                             ,(symbol->string symbol)
+                                                             ,(symbol->string type)
+                                                             ,docstring)
                   (impc:aot:do-or-emit
                    (call-as-xtlang (set! ,symbol (cast (malloc ,(* (or value 1)
                                                                    (if (impc:ir:number? t)
@@ -8297,6 +8308,10 @@
                                                       ,(impc:ir:get-type-str t)
                                                       "zeroinitializer"))
                       (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+                      (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                                 ,(symbol->string symbol)
+                                                                 ,(symbol->string type)
+                                                                 ,docstring)
                       (impc:aot:do-or-emit
                        (call-as-xtlang (set! ,symbol ,value) void))
                       ;; we should really take the globalvar out of the cache
@@ -8314,6 +8329,10 @@
                 " = dllexport global "
                 ,(impc:ir:get-type-str t) " zeroinitializer"))
               (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+              (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                         ,(symbol->string symbol)
+                                                         ,(symbol->string type)
+                                                         ,docstring)
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
               (impc:compiler:print-binding-details-to-log "SetValue:"
@@ -8501,6 +8520,10 @@
            (impc:ti:register-new-globalvar ,(symbol->string symname)
                                            type-list
                                            ds)
+           (impc:aot:insert-globalvar-binding-details ,(symbol->string library)
+                                                      ,(symbol->string symname)
+                                                      ,(symbol->string type)
+                                                      ds)
            (impc:compiler:print-binding-details-to-log "LibBound:"
                                                        ,(symbol->string symname)
                                                        ,(symbol->string type)))
