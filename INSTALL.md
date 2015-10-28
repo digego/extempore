@@ -259,6 +259,9 @@ If you want the "extended" Extempore standard library, which requires
 the aforementioned external shared libs, then you can try `make
 aot_extended` instead.
 
+To remove the AOT-compiled files, use the `clean_aot` target in the
+makefile or MSVS project.
+
 ### LLVM 3.7.0
 
 Grab the

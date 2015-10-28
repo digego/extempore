@@ -510,7 +510,7 @@ add_dependencies(aot extempore)
 add_dependencies(aot_extended extempore)
 
 # uninstall only AOT-compiled libs
-add_custom_target(uninstall_aot
+add_custom_target(clean_aot
   COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
   COMMENT "Removing AOT-compiled libs")
 
