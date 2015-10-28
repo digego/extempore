@@ -18,23 +18,23 @@
 ;; WAVE file read/write ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-type wave_format_t <i32,i32,i16,i16,i32,i32,i16,i16>)
+(bind-type WaveFormat <i32,i32,i16,i16,i32,i32,i16,i16>)
 
 ;; accessor functions
-(bind-func wave_format_type
-  (lambda (data:wave_format_t*)
+(bind-func WaveFormat_type
+  (lambda (data:WaveFormat*)
     (i16toi64 (tref data 2))))
 
-(bind-func wave_format_num_chan
-  (lambda (data:wave_format_t*)
+(bind-func WaveFormat_nchan
+  (lambda (data:WaveFormat*)
     (i16toi64 (tref data 3))))
 
-(bind-func wave_format_samplerate
-  (lambda (data:wave_format_t*)
+(bind-func WaveFormat_samplerate
+  (lambda (data:WaveFormat*)
     (i32toi64 (tref data 4))))
 
-(bind-func wave_format_bit_depth
-  (lambda (data:wave_format_t*)
+(bind-func WaveFormat_bit_depth
+  (lambda (data:WaveFormat*)
     (i16toi64 (tref data 7))))
 
 ;; ;; AIFF file structs ("EA IFF 85" Standard for Interchange Format Files)
@@ -43,35 +43,35 @@
 ;; (bind-type iff_container_chunk <iff_ID,i64,iff_ID,i8>)
 ;; (bind-type iff_common_chunk <iff_ID,i64,|2,i8|,iff_ID,i8>)
 
-;; <num_chan,samplerate,bit_depth,num_frames,data_ptr>
-(bind-type wave_audio_data_t <i64,i64,i64,i64,i8*>)
+;; <num_chan,samplerate,bit_depth,nframes,data_ptr>
+(bind-type WaveData <i64,i64,i64,i64,i8*>)
 
 ;; accessor functions
-(bind-func wave_num_chan
-  (lambda (data:wave_audio_data_t*)
+(bind-func WaveData_nchan
+  (lambda (data:WaveData*)
     (tref data 0)))
 
-(bind-func wave_samplerate
-  (lambda (data:wave_audio_data_t*)
+(bind-func WaveData_samplerate
+  (lambda (data:WaveData*)
     (tref data 1)))
 
-(bind-func wave_bit_depth
-  (lambda (data:wave_audio_data_t*)
+(bind-func WaveData_bit_depth
+  (lambda (data:WaveData*)
     (tref data 2)))
 
-(bind-func wave_num_frames
-  (lambda (data:wave_audio_data_t*)
+(bind-func WaveData_nframes
+  (lambda (data:WaveData*)
     (tref data 3)))
 
-(bind-func wave_audio_data_ptr
-  (lambda (data:wave_audio_data_t*)
+(bind-func WaveData_audio_data_ptr
+  (lambda (data:WaveData*)
     (tref data 4)))
 
 
-(bind-func wave_print_format_info
-  (lambda (format:wave_format_t*)
+(bind-func WaveData_print_format_info
+  (lambda (format:WaveFormat*)
     (printf "----WAVE file format info----\n")
-    (let ((compression_code (wave_format_type format)))
+    (let ((compression_code (WaveFormat_type format)))
       (cond ((= compression_code 0) (printf "Format: Unknown\n"))
             ((= compression_code 1) (printf "Format: PCM/uncompressed\n"))
             ((= compression_code 2) (printf "Format: Microsoft ADPCM\n"))
@@ -83,9 +83,9 @@
             ((= compression_code 64) (printf "Format: ITU G.721 ADPCM\n"))
             ((= compression_code 80) (printf "Format: MPEG\n"))
             (else (printf "Format: Unknown\n"))))
-    (printf "  Channels: %lld\n" (wave_format_num_chan format))
-    (printf "Samplerate: %dHz\n" (wave_format_samplerate format))
-    (printf " Bit depth: %lld\n" (wave_format_bit_depth format))
+    (printf "  Channels: %lld\n" (WaveFormat_nchan format))
+    (printf "Samplerate: %dHz\n" (WaveFormat_samplerate format))
+    (printf " Bit depth: %lld\n" (WaveFormat_bit_depth format))
     (printf "-----------------------------\n")))
 
 ;; RIFF data structure acess
@@ -169,7 +169,7 @@
     (let ((format_chunk_offset 12)
           (data_chunk_offset 36)
           (file_size (wave_get_file_size filename))
-          (wave_data:wave_audio_data_t* (zalloc)))
+          (wave_data:WaveData* (zalloc)))
       (if (< file_size 0)
           (begin
             (printf "Error: file size < 0%\n" )
@@ -177,7 +177,7 @@
           (let ((bytes_read (read_file_into_memory filename file_buf (+ file_size 100)))
                 (data_ptr (pref-ptr file_buf data_chunk_offset))
                 (data_size (riff_chunk_size data_ptr))
-                (format (cast (pref-ptr file_buf format_chunk_offset) wave_format_t*)))
+                (format (cast (pref-ptr file_buf format_chunk_offset) WaveFormat*)))
             (cond ((< data_size 1)
                    (printf "Problem with data chunk size."))
                   ((<> file_size bytes_read)
@@ -192,16 +192,16 @@
                    ;; (it's the caller's job to make sure the buffer
                    ;; is big enough)
                    (begin
-                     ;; <num_chan,samplerate,bit_depth,num_frames,data_ptr>
-                     (tset! wave_data 0 (wave_format_num_chan format))
-                     (tset! wave_data 1 (wave_format_samplerate format))
-                     (tset! wave_data 2 (wave_format_bit_depth format))
+                     ;; <num_chan,samplerate,bit_depth,nframes,data_ptr>
+                     (tset! wave_data 0 (WaveFormat_nchan format))
+                     (tset! wave_data 1 (WaveFormat_samplerate format))
+                     (tset! wave_data 2 (WaveFormat_bit_depth format))
                      (tset! wave_data 3 (/ data_size
-                                           (* (wave_format_num_chan format)
-                                              (/ (wave_format_bit_depth format) 8))))
+                                           (* (WaveFormat_nchan format)
+                                              (/ (WaveFormat_bit_depth format) 8))))
                      (tset! wave_data 4 data_ptr)
                      (printf "\nSuccessfully read %lld bytes from file: name: %s\n" bytes_read filename)
-                     (wave_print_format_info format))))
+                     (WaveData_print_format_info format))))
             wave_data)))))
 
 ;; 16-bit PCM (could maybe use generics here?)
@@ -210,15 +210,15 @@
     (let ((file_size (wave_get_file_size filename))
           (buf:i16* (zalloc file_size))
           (wave_data (wave_read_file filename (cast buf i8*)))
-          (num_chan (wave_num_chan wave_data))
-          (num_frames (wave_num_frames wave_data))
-          (audio_ptr (cast (wave_audio_data_ptr wave_data) i16*))
+          (num_chan (WaveData_nchan wave_data))
+          (nframes (WaveData_nframes wave_data))
+          (audio_ptr (cast (WaveData_audio_data_ptr wave_data) i16*))
           (playhead:i64 0)
-          (scale_factor (pow 2.0 (i64tod (- (wave_bit_depth wave_data) 1)))))
+          (scale_factor (pow 2.0 (i64tod (- (WaveData_bit_depth wave_data) 1)))))
       (lambda (chan)
         (let ((int_chan (dtoi64 chan)))
           (if (= int_chan 0)
-              (set! playhead (modulo (+ playhead 1) num_frames)))
+              (set! playhead (modulo (+ playhead 1) nframes)))
           (if (< (dtoi64 chan) num_chan)
               (/ (i16tod (pref audio_ptr (+ (* playhead num_chan) int_chan)))
                  scale_factor)
