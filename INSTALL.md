@@ -6,7 +6,22 @@
 
 **Through homebrew**
 
-First,
+[Homebrew](http://brew.sh/) makes the process pretty simple, although
+since it's building everything (including LLVM) from source it may
+still take up to 15mins depending on your machine.
+
+Extempore has a "core" library, which includes things like the math
+and audio DSP libraries and doesn't depend on any external shared
+libraries. This is the option homebrew will use by default - it's
+still a fully-fledged xtlang compiler and everything else.
+
+However, there are a few external libraries which you might want to
+use to do certain things, like open up OpenGL canvases or load
+compressed audio files. We call this the "extended" library, and
+there's a `--with-extended` flag to tell homebrew to go and grab those
+other packages as well.
+
+To install Extempore through homebrew, first
 ```
 brew tap benswift/extempore
 ```
@@ -18,6 +33,7 @@ or, if you want the "extended" libs (e.g. graphics)
 ```
 brew install extempore --with-extended
 ```
+
 **Caveats**
 
 If you've installed Extempore through homebrew previously
