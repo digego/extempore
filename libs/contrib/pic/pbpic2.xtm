@@ -21,6 +21,14 @@
 
 ;;; Code:
 
+(if (not (and (impc:ti:globalvar-exists? "indx")
+              (impc:ti:globalvar-exists? "indy")
+              (impc:ti:globalvar-exists? "npx")
+              (impc:ti:globalvar-exists? "npy")))
+    (begin
+      (print "Error: you need to set indx, indy, npx and npy before running this code.\nSee examples/contrib/pic/pbpic2.xtm\n")
+      (error "")))
+
 (sys:load "libs/aot-cache/pbpic2.xtm" 'quiet)
 (sys:load-preload-check 'pbpic2)
 (define *xtmlib-pbpic2-loaded* #f)
@@ -113,12 +121,6 @@
 (bind-lib libpbpic2 cppntpose [void,Complexf*,Complexf*,Complexf*,Complexf*,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32,i32]*)
 (bind-lib libpbpic2 cppmove2 [void,float*,float*,i32*,float*,float*,float*,float*,i32*,i32,i32,i32,i32,i32,i32,i32,i32,i32*]*)
 
-;; we don't use the timing stuff for now, but here it is:
-
-(bind-val indx i32 7)
-(bind-val indy i32 7)
-(bind-val npx i32 100)
-(bind-val npy i32 100)
 (bind-val ndim i32 3)
 (bind-val tend float 10.0)
 (bind-val dt float 0.04)
@@ -636,12 +638,11 @@
 ;; * * * end main iteration loop * * *
 
 (bind-func pbpic2_loop
-  (lambda (time:i64 delta_t:double)
-    (let ((ntime (pbpic2_step))
-          (next_time (+ time (convert (* 44100. delta_t)))))
+  (lambda ()
+    (let ((ntime (pbpic2_step)))
       (if (= (% ntime 1000) 0)
           (println "ntime:" ntime))
-      (callback next_time pbpic2_loop next_time delta_t))))
+      (callback (now) pbpic2_loop))))
 
 (impc:aot:insert-footer "xtmpbpic2")
 (define *xtmlib-pbpic2-loaded* #t)
