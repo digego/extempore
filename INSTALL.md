@@ -2,7 +2,9 @@
 
 ## Quick install
 
-**Through homebrew (OSX)**
+### OSX
+
+**Through homebrew**
 
 First,
 ```
@@ -16,14 +18,30 @@ or, if you want the "extended" libs (e.g. graphics)
 ```
 brew install extempore --with-extended
 ```
-*Note:* If you've installed Extempore through homebrew previously
+**Caveats**
+
+If you've installed Extempore through homebrew previously
 (i.e. if `brew info extempore` shows a version <= 0.59) then you'll
 need to remove a couple of things first:
 ```
 brew rm extempore kissfft
 ```
+If you're on OSX **10.9** or earlier, there's an incompatibility with
+your version of clang and the LLVM 3.7.0 which Extempore uses.  For
+the moment the easiest way around this is to download the old `0.5.9`
+version of Extempore with
+```
+brew tap benswift/extempore
+brew install extempore059
+```
+again, if you want the "extended" libs (e.g. graphics)
+```
+brew install extempore059 --with-extended
+```
 
-**Build from source (Linux/OSX)**
+### Linux
+
+**Build from source** (also works on OSX)
 
 If you've got `git`, `cmake` and a C++ compiler toolchain
 installed, then you can build Extempore with:
@@ -31,8 +49,10 @@ installed, then you can build Extempore with:
 git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install && make aot
 ```
 
-Those are the "quick install" tips. For more detailed instructions,
-read on...
+### Windows
+
+Download a precompiled binary, unzip it and run `extempore.exe` from
+inside the `extempore` folder.
 
 ## Get the depenencies
 
