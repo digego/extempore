@@ -67,8 +67,9 @@ git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && 
 
 ### Windows
 
-Download a precompiled binary, unzip it and run `extempore.exe` from
-inside the `extempore` folder.
+Download a
+[precompiled binary](http://extempore.moso.com.au/extras/Extempore-0.6.0-win64.zip),
+unzip it and run `extempore.exe` from inside the `extempore` folder.
 
 ## Get the depenencies
 
