@@ -28,7 +28,7 @@ brew rm extempore kissfft
 If you've got `git`, `cmake` and a C++ compiler toolchain
 installed, then you can build Extempore with:
 ```
-git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake ..
+git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install && make aot
 ```
 
 Those are the "quick install" tips. For more detailed instructions,
