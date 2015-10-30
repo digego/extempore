@@ -125,7 +125,15 @@ declare i64 @next_prime(i64)
 ;; alias for environment data
 %envt = type i8*
 
+
+;; stdlib.h
+declare void @abort()
+declare void @exit(i32)
+declare i32 @raise(i32)
+
 declare i8* @malloc(i64) nounwind
+declare i8* @calloc(i64,i64) nounwind
+declare i8* @realloc(i8*,i64) nounwind
 declare void @free(i8*) nounwind
 declare i8* @malloc16(i64) nounwind
 declare void @free16(i8*) nounwind
