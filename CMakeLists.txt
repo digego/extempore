@@ -218,11 +218,20 @@ if(DOWNLOAD_LLVM)
   include(ExternalProject)
 
   if(WIN32)
-    ExternalProject_Add(LLVM
-      PREFIX llvm
-      URL http://extempore.moso.com.au/extras/extempore-llvm-3.7.0.src.zip
-      URL_MD5 4a2eafb937becec468ba985fca47532b
-      CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
+    if(DEFINED PYTHON_EXECUTABLE)
+      message(STATUS "building LLVM using using python at ${PYTHON_EXECUTABLE}")
+      ExternalProject_Add(LLVM
+        PREFIX llvm
+        URL http://extempore.moso.com.au/extras/extempore-llvm-3.7.0.src.zip
+        URL_MD5 4a2eafb937becec468ba985fca47532b
+        CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR} -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE})
+    else()
+      ExternalProject_Add(LLVM
+        PREFIX llvm
+        URL http://extempore.moso.com.au/extras/extempore-llvm-3.7.0.src.zip
+        URL_MD5 4a2eafb937becec468ba985fca47532b
+        CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
+    endif()
   else()
     find_program(PATCH_PROGRAM patch)
 
