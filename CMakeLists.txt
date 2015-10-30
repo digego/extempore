@@ -500,7 +500,7 @@ function(aotcompile_lib lib group port) # deps are optional, and go at the end
   get_filename_component(basename ${lib} NAME_WE)
   set(targetname aot_${basename})
   add_custom_target(${targetname}
-    COMMAND extempore --nostd --noaudio --port ${port} --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
+    COMMAND extempore --nostd $<$<NOT:$<PLATFORM_ID:Windows>>:--noaudio> --port ${port} --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
     BYPRODUCTS libs/aot-cache/xtmstd${CMAKE_SHARED_LIBRARY_SUFFIX}
     WORKING_DIRECTORY ${AOT_WORKING_DIRECTORY}
     VERBATIM)
