@@ -137,7 +137,7 @@ elseif(UNIX AND NOT APPLE)
     PRIVATE -DPA_USE_ALSA)
   target_link_libraries(portaudio
     PRIVATE asound)
-  
+
 elseif(WIN32)
   # use everything except for ASIO on Windows by default, but you can
   # use asio with the cmake ASIO option (see below)
@@ -488,26 +488,61 @@ endif()
 # AOT compilation #
 ###################
 
-configure_file(
-  ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake.in
-  ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake
-  @ONLY)
+# this approach requires specifying the inter-lib dependencies by hand, but allows us to do AOT compilation in parallell
 
-configure_file(
-  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake.in
-  ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake
-  @ONLY)
+if(WIN32)
+  set(AOT_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+else()
+  set(AOT_WORKING_DIRECTORY ${EXT_SHARE_DIR})
+endif()
 
-add_custom_target(aot
-  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake
-  COMMENT "Ahead-of-time compiling the standard library...")
+function(aotcompile_lib lib group port) # deps are optional, and go at the end
+  get_filename_component(basename ${lib} NAME_WE)
+  set(targetname aot_${basename})
+  add_custom_target(${targetname}
+    COMMAND extempore --nostd --noaudio --port ${port} --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
+    BYPRODUCTS libs/aot-cache/xtmstd${CMAKE_SHARED_LIBRARY_SUFFIX}
+    WORKING_DIRECTORY ${AOT_WORKING_DIRECTORY}
+    VERBATIM)
+  add_dependencies(${targetname} extempore)
+  add_dependencies(${group} ${targetname})
+  foreach(dep ${ARGN})
+    add_dependencies(${targetname} aot_${dep})
+  endforeach()
+endfunction(aotcompile_lib)
 
-add_custom_target(aot_extended
-  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake
-  COMMENT "Ahead-of-time compiling the standard library...")
+# core
+add_custom_target(aot)
+aotcompile_lib(libs/core/std.xtm aot 17099) # no lib dependency for std.xtm
+aotcompile_lib(libs/core/math.xtm aot 17097 std)
+aotcompile_lib(libs/core/audio_dsp.xtm aot 17095 std math)
+aotcompile_lib(libs/core/instruments.xtm aot 17093 std math audio_dsp)
 
-add_dependencies(aot extempore)
-add_dependencies(aot_extended extempore)
+# extended
+add_custom_target(aot_extended)
+aotcompile_lib(libs/external/fft.xtm aot_extended 17091 std math)
+aotcompile_lib(libs/external/sndfile.xtm aot_extended 17089 std)
+aotcompile_lib(libs/external/audiobuffer.xtm aot_extended 17087 std audio_dsp sndfile)
+aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended 17085 std fft sndfile)
+aotcompile_lib(libs/external/instruments_ext.xtm aot_extended 17083 std sndfile instruments)
+aotcompile_lib(libs/external/portmidi.xtm aot_extended 17081 std)
+aotcompile_lib(libs/external/stb_image.xtm aot_extended 17077 std)
+aotcompile_lib(libs/external/glfw3.xtm aot_extended 17075 std)
+if(WIN32)
+  set(GL_BIND_METHOD getprocaddress)
+else()
+  set(GL_BIND_METHOD directbind)
+endif()
+aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended 17073 std)
+aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended 17071 std glcore-${GL_BIND_METHOD} stb_image)
+aotcompile_lib(libs/external/nanovg.xtm aot_extended 17069 std glcore-${GL_BIND_METHOD})
+aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended 17067 std)
+aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended 17065 std glcompat-${GL_BIND_METHOD})
+if(NOT WIN32)
+  # these ones don't currently work on Windows
+  aotcompile_lib(libs/external/glib.xtm aot_extended 17079 std)
+  aotcompile_lib(libs/external/assimp.xtm aot_extended 17063 std stb_image graphics-pipeline)
+endif()
 
 # uninstall only AOT-compiled libs
 add_custom_target(clean_aot
@@ -550,7 +585,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (ht
 
 if(APPLE)
   set(CPACK_GENERATOR DragNDrop)
-  set(CPACK_PACKAGE_INSTALL_DIRECTORY "extempore") 
+  set(CPACK_PACKAGE_INSTALL_DIRECTORY "extempore")
   set(CPACK_TOPLEVEL_TAG "extempore")
   # set(CPACK_GENERATOR TGZ)
   # set(CPACK_BINARY_DRAGNDROP "ON")
