@@ -217,12 +217,6 @@ if(DOWNLOAD_LLVM)
 
   include(ExternalProject)
 
-  find_program(PATCH_PROGRAM patch)
-
-  if(NOT PATCH_PROGRAM)
-    message(FATAL_ERROR "Cannot find \"patch\" to patch LLVM")
-  endif()
-
   if(WIN32)
     ExternalProject_Add(LLVM
       PREFIX llvm
@@ -230,6 +224,12 @@ if(DOWNLOAD_LLVM)
       URL_MD5 4a2eafb937becec468ba985fca47532b
       CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
   else()
+    find_program(PATCH_PROGRAM patch)
+
+    if(NOT PATCH_PROGRAM)
+      message(FATAL_ERROR "Cannot find \"patch\" to patch LLVM")
+    endif()
+
     ExternalProject_Add(LLVM
       PREFIX llvm
       URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
