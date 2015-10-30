@@ -354,3 +354,11 @@ should be in the same directory. On Windows, the LLVM build output
 must be installed into an `llvm` subdirectory in the top-level
 Extempore directory (since the AOT compilation process will look in
 there to find `llc`).
+
+If LLVM complains about not being able to find python, you can specify
+a path to your python executable with the PYTHON_EXECUTABLE CMake
+variable:
+
+```
+cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/path/to/extempore/llvm -DPYTHON_EXECUTABLE=c:/path/to/python .. && make && make install
+```
