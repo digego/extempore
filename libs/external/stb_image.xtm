@@ -173,5 +173,17 @@
 ;; int stbi_write_hdr(char const *filename, int w, int h, int comp, const void *data);
 (bind-lib libstb_image stbi_write_hdr [i32,i8*,i32,i32,i32,float*]*)
 
+;; xtlang code
+
+(bind-func stbi_flip_vertically
+  (lambda (width:i32 height:i32 ncomp:i32 data:i8*)
+    (let ((stride (* ncomp width))
+          (tmp 0))
+      (doloop (i (/ height 2))
+        (doloop (j stride)
+          (set! tmp (pref data (+ (* i stride) j)))
+          (pset! data (+ (* i stride) j) (pref data (+ (* (- height i 1) stride) j)))
+          (pset! data (+ (* (- height i 1) stride) j) tmp))))))
+
 (impc:aot:insert-footer "xtmstb_image")
 (define *xtmlib-stb_image-loaded* #t)
