@@ -388,9 +388,6 @@
 
 (bind-lib libportmidi Pm_SetFilter [PmError,PortMidiStream*,i32]*)
 
-(bind-func PmChannel
-  (lambda (channel:i32)
-    (<< 1:i32 channel)))
 ;; /**
 ;;     Pm_SetChannelMask() filters incoming messages based on channel.
 ;;     The mask is a 16-bit bitfield corresponding to appropriate channels.
@@ -559,6 +556,11 @@
 
 (bind-poly toString PmEvent_toString)
 
+;; a few more useful functions for pulling data out of PmEvent
+
+(bind-func PmEvent_channel
+  (lambda (event:PmEvent*)
+    (& (tref event 0) #x0F)))
 
 ;; /** 
 ;;     @}
@@ -640,35 +642,28 @@ Scheme)"
 
 ;; the message flags
 
-(bind-val MIDI_NOTE_OFF i32          #x80 "args: key, velocity")
-(bind-val MIDI_NOTE_ON i32           #x90 "args: key, velocity")
-(bind-val MIDI_POLY_TOUCH i32        #xA0 "args: key, touch")
-(bind-val MIDI_CTRL i32              #xB0 "args: controller, value")
-(bind-val MIDI_CH_PROGRAM i32        #xC0 "args: value, ignored")
-(bind-val MIDI_TOUCH i32             #xD0 "args: value, ignored")
-(bind-val MIDI_BEND i32              #xE0 "args: lsb (7 bits), msb (7 bits)")
-
-(bind-val MIDI_SYSEX i32             #xF0)
-(bind-val MIDI_Q_FRAME i32           #xF1)
-(bind-val MIDI_SONG_POINTER i32      #xF2)
-(bind-val MIDI_SONG_SELECT i32       #xF3)
-(bind-val MIDI_TUNE_REQ i32          #xF6)
-(bind-val MIDI_EOX i32               #xF7)
-(bind-val MIDI_TIME_CLOCK i32        #xF8)
-(bind-val MIDI_START i32             #xFA)
-(bind-val MIDI_CONTINUE i32          #xFB)
-(bind-val MIDI_STOP i32              #xFC)
-(bind-val MIDI_ACTIVE_SENSING i32    #xFE)
-(bind-val MIDI_SYS_RESET i32         #xFF)
-
-(bind-val MIDI_ALL_SOUND_OFF i32     #x78)
-(bind-val MIDI_RESET_CONTROLLERS i32 #x79)
-(bind-val MIDI_LOCAL i32             #x7A)
-(bind-val MIDI_ALL_OFF i32           #x7B)
-(bind-val MIDI_OMNI_OFF i32          #x7C)
-(bind-val MIDI_OMNI_ON i32           #x7D)
-(bind-val MIDI_MONO_ON i32           #x7E)
-(bind-val MIDI_POLY_ON i32           #x7F)
+(bind-val MIDI_CLOCK i32 #xF8)
+(bind-val MIDI_ACTIVE i32 #xFE)
+(bind-val MIDI_STATUS_MASK i32 #x80)
+(bind-val MIDI_SYSEX i32 #xF0)
+(bind-val MIDI_EOX i32 #xF7)
+(bind-val MIDI_START i32 #xFA)
+(bind-val MIDI_STOP i32 #xFC)
+(bind-val MIDI_CONTINUE i32 #xFB)
+(bind-val MIDI_F9 i32 #xF9)
+(bind-val MIDI_FD i32 #xFD)
+(bind-val MIDI_RESET i32 #xFF)
+(bind-val MIDI_NOTE_ON i32 #x90 "args: key, velocity")
+(bind-val MIDI_NOTE_OFF i32 #x80 "args: key, velocity")
+(bind-val MIDI_CHANNEL_AT i32 #xD0)
+(bind-val MIDI_POLY_AT i32 #xA0)
+(bind-val MIDI_PROGRAM i32 #xC0 "args: value, ignored")
+(bind-val MIDI_CONTROL i32 #xB0 "args: controller, value")
+(bind-val MIDI_PITCHBEND i32 #xE0 "args: lsb (7 bits), msb (7 bits)")
+(bind-val MIDI_MTC i32 #xF1)
+(bind-val MIDI_SONGPOS i32 #xF2)
+(bind-val MIDI_SONGSEL i32 #xF3)
+(bind-val MIDI_TUNE i32 #xF6)
 
 ;; xtlang wrapper functions
 
@@ -725,21 +720,31 @@ output device(s)
           (println "PortMIDI error opening output port:" (String (Pm_GetErrorText res))))
       (pref stream_ptr 0))))
 
+;; these functions work with
+
+(bind-func PmEvent_note_on_p
+  (lambda (event:PmEvent*)
+    (= (& (tref event 0) #xF0) MIDI_NOTE_ON)))
+
+(bind-func PmEvent_note_off_p
+  (lambda (event:PmEvent*)
+    (= (& (tref event 0) #xF0) MIDI_NOTE_OFF)))
+
 ;; scheme helper functions
 
-(define *midi-note-off*     #x80) ;; args: key, velocity
-(define *midi-note-on*      #x90) ;; args: key, velocity
-(define *midi-poly-touch*   #xA0) ;; args: key, touch
-(define *midi-ctrl*         #xB0) ;; args: controller, value
-(define *midi-ch-program*   #xC0) ;; args: value, ignored
-(define *midi-touch*        #xD0) ;; args: value, ignored
-(define *midi-bend*         #xE0) ;; args: lsb (7 bits), msb (7 bits)
+(impc:aot:do-or-emit (define *midi-note-off*     #x80)) ;; args: key, velocity
+(impc:aot:do-or-emit (define *midi-note-on*      #x90)) ;; args: key, velocity
+(impc:aot:do-or-emit (define *midi-poly-touch*   #xA0)) ;; args: key, touch
+(impc:aot:do-or-emit (define *midi-ctrl*         #xB0)) ;; args: controller, value
+(impc:aot:do-or-emit (define *midi-ch-program*   #xC0)) ;; args: value, ignored
+(impc:aot:do-or-emit (define *midi-touch*        #xD0)) ;; args: value, ignored
+(impc:aot:do-or-emit (define *midi-bend*         #xE0)) ;; args: lsb (7 bits), msb (7 bits)
 
 (impc:aot:do-or-emit
  (define play-midi-note
-   (lambda (time device pitch velocity duration)
-     (callback time 'pm_write device (Pm_Message *midi-note-on* pitch velocity))
-     (callback (+ time duration) 'pm_write device (Pm_Message *midi-note-off* pitch velocity)))))
+   (lambda (time device pitch velocity duration channel)
+     (callback time 'pm_write device (Pm_Message (+ channel *midi-note-on*) pitch velocity))
+     (callback (+ time duration) 'pm_write device (Pm_Message (+ channel *midi-note-off*) pitch velocity)))))
 
 ;; homophonic playnote
 (impc:aot:do-or-emit
@@ -749,8 +754,8 @@ output device(s)
        (if (> time (vector-ref notes pitch))
            (let ((dur (- duration (* 2 *au:block-size*))))
              (vector-set! notes pitch (+ time dur))
-             (callback time 'pm_write (Pm_Message *midi-note-on* pitch velocity))
-             (callback (+ time duration) 'pm_write device (Pm_Message *midi-note-off* pitch velocity))))))))
+             (callback time 'pm_write (Pm_Message (+ channel *midi-note-on*) pitch velocity))
+             (callback (+ time duration) 'pm_write device (Pm_Message (+ channel *midi-note-off*) pitch velocity))))))))
 
 ;; A midi-specific play macro
 

@@ -37,18 +37,22 @@ like."
       ;; (println "read_count:" (convert read_count i32))
       (if (> read_count 0)
           (dotimes (i read_count)
-            (cond ((= (Pm_MessageStatus (PmEvent_message (pref-ptr input_buffer i))) MIDI_NOTE_ON)
+            (cond ((PmEvent_note_on_p (pref-ptr input_buffer i))
                    (println "note: ON pitch:"
                             (Pm_MessageData1 (PmEvent_message (pref-ptr input_buffer i)))
                             "velocity:"
-                            (Pm_MessageData2 (PmEvent_message (pref-ptr input_buffer i)))))
-                  ((= (Pm_MessageStatus (PmEvent_message (pref-ptr input_buffer i))) MIDI_NOTE_OFF)
+                            (Pm_MessageData2 (PmEvent_message (pref-ptr input_buffer i)))
+                            "channel:"
+                            (PmEvent_channel (pref-ptr input_buffer i))))
+                  ((PmEvent_note_off_p (pref-ptr input_buffer i))
                    (println "note: OFF pitch:"
                             (Pm_MessageData1 (PmEvent_message (pref-ptr input_buffer i)))
                             "velocity:"
-                            (Pm_MessageData2 (PmEvent_message (pref-ptr input_buffer i)))))
+                            (Pm_MessageData2 (PmEvent_message (pref-ptr input_buffer i)))
+                            "channel:"
+                            (PmEvent_channel (pref-ptr input_buffer i))))
                   (else
-                   (println "midi recv:" i (pref-ptr input_buffer i))))))
+                   (println i (pref-ptr input_buffer i))))))
       (let ((next_time (+ time (convert (* 44100. delta_t)))))
         (callback next_time midi_read_loop next_time delta_t)))))
 
@@ -63,5 +67,4 @@ like."
     midi_out))
 (define *midi-out* (get_midi_out))
 
-(play-midi-note (now) *midi-out* (random 60 72) (random 60 90) 44100)
-
+(play-midi-note (now) *midi-out* (random 60 72) (random 60 90) 44100 0)
