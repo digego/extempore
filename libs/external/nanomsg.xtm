@@ -10,8 +10,16 @@
 
 ;;; Code:
 
+(sys:load "libs/aot-cache/nanomsg.xtm" 'quiet)
 (sys:load-preload-check 'nanomsg)
 (define *xtmlib-nanomsg-loaded* #f)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/core/std.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/core/std.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmnanomsg")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib libnanomsg
@@ -21,38 +29,6 @@
          "libnanomsg.so")
         ((string=? (sys:platform) "Windows")
          "libnanomsg.dll")))
-
-;; #include <errno.h>
-;; #include <stddef.h>
-
-;; /*  Handle DSO symbol visibility                                             */
-;; #if defined NN_NO_EXPORTS
-;; #   define NN_EXPORT
-;; #else
-;; #   if defined _WIN32
-;; #      if defined NN_EXPORTS
-;; #          define NN_EXPORT __declspec(dllexport)
-;; #      else
-;; #          define NN_EXPORT __declspec(dllimport)
-;; #      endif
-;; #   else
-;; #      if defined __SUNPRO_C
-;; #          define NN_EXPORT __global
-;; #      elif (defined __GNUC__ && __GNUC__ >= 4) || \
-;;              defined __INTEL_COMPILER || defined __clang__
-;; #          define NN_EXPORT __attribute__ ((visibility("default")))
-;; #      else
-;; #          define NN_EXPORT
-;; #      endif
-;; #   endif
-;; #endif
-
-;; /*  Inline functions are everywhere, but MSVC requires underscores           */
-;; #if defined _WIN32
-;; #  define NN_INLINE static __inline
-;; #else
-;; #  define NN_INLINE static inline
-;; #endif
 
 ;; /******************************************************************************/
 ;; /*  ABI versioning support.                                                   */
@@ -64,13 +40,13 @@
 ;; /*  www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html  */
 
 ;; /*  The current interface version. */
-(bind-val NN_VERSION_CURRENT i32 2)
+(bind-val NN_VERSION_CURRENT i32 3)
 
 ;; /*  The latest revision of the current interface. */
 (bind-val NN_VERSION_REVISION i32 0)
 
 ;; /*  How many past interface versions are still supported. */
-(bind-val NN_VERSION_AGE i32 2)
+(bind-val NN_VERSION_AGE i32 0)
 
 ;; /******************************************************************************/
 ;; /*  Errors.                                                                   */
@@ -78,103 +54,46 @@
 
 ;; /*  A number random enough not to collide with different errno ranges on      */
 ;; /*  different OSes. The assumption is that error_t is at least 32-bit type.   */
-
-(define nn-hausnumero 156384712)
-(bind-val NN_HAUSNUMERO i32 nn-hausnumero)
+(bind-val NN_HAUSNUMERO i32 156384712)
 
 ;; /*  On some platforms some standard POSIX errnos are not defined.    */
-;; #ifndef ENOTSUP
-(bind-val ENOTSUP i32 (+ nn-hausnumero 1))
-;; #endif
-;; #ifndef EPROTONOSUPPORT
-(bind-val EPROTONOSUPPORT i32 (+ nn-hausnumero 2))
-;; #endif
-;; #ifndef ENOBUFS
-(bind-val ENOBUFS i32 (+ nn-hausnumero 3))
-;; #endif
-;; #ifndef ENETDOWN
-(bind-val ENETDOWN i32 (+ nn-hausnumero 4))
-;; #endif
-;; #ifndef EADDRINUSE
-(bind-val EADDRINUSE i32 (+ nn-hausnumero 5))
-;; #endif
-;; #ifndef EADDRNOTAVAIL
-(bind-val EADDRNOTAVAIL i32 (+ nn-hausnumero 6))
-;; #endif
-;; #ifndef ECONNREFUSED
-(bind-val ECONNREFUSED i32 (+ nn-hausnumero 7))
-;; #endif
-;; #ifndef EINPROGRESS
-(bind-val EINPROGRESS i32 (+ nn-hausnumero 8))
-;; #endif
-;; #ifndef ENOTSOCK
-(bind-val ENOTSOCK i32 (+ nn-hausnumero 9))
-;; #endif
-;; #ifndef EAFNOSUPPORT
-(bind-val EAFNOSUPPORT i32 (+ nn-hausnumero 10))
-;; #endif
-;; #ifndef EPROTO
-(bind-val EPROTO i32 (+ nn-hausnumero 11))
-;; #endif
-;; #ifndef EAGAIN
-(bind-val EAGAIN i32 (+ nn-hausnumero 12))
-;; #endif
-;; #ifndef EBADF
-(bind-val EBADF i32 (+ nn-hausnumero 13))
-;; #endif
-;; #ifndef EINVAL
-(bind-val EINVAL i32 (+ nn-hausnumero 14))
-;; #endif
-;; #ifndef EMFILE
-(bind-val EMFILE i32 (+ nn-hausnumero 15))
-;; #endif
-;; #ifndef EFAULT
-(bind-val EFAULT i32 (+ nn-hausnumero 16))
-;; #endif
-;; #ifndef EACCESS
-(bind-val EACCESS i32 (+ nn-hausnumero 17))
-;; #endif
-;; #ifndef ENETRESET
-(bind-val ENETRESET i32 (+ nn-hausnumero 18))
-;; #endif
-;; #ifndef ENETUNREACH
-(bind-val ENETUNREACH i32 (+ nn-hausnumero 19))
-;; #endif
-;; #ifndef EHOSTUNREACH
-(bind-val EHOSTUNREACH i32 (+ nn-hausnumero 20))
-;; #endif
-;; #ifndef ENOTCONN
-(bind-val ENOTCONN i32 (+ nn-hausnumero 21))
-;; #endif
-;; #ifndef EMSGSIZE
-(bind-val EMSGSIZE i32 (+ nn-hausnumero 22))
-;; #endif
-;; #ifndef ETIMEDOUT
-(bind-val ETIMEDOUT i32 (+ nn-hausnumero 23))
-;; #endif
-;; #ifndef ECONNABORTED
-(bind-val ECONNABORTED i32 (+ nn-hausnumero 24))
-;; #endif
-;; #ifndef ECONNRESET
-(bind-val ECONNRESET i32 (+ nn-hausnumero 25))
-;; #endif
-;; #ifndef ENOPROTOOPT
-(bind-val ENOPROTOOPT i32 (+ nn-hausnumero 26))
-;; #endif
-;; #ifndef EISCONN
-(bind-val EISCONN i32 (+ nn-hausnumero 27))
-;; #define NN_EISCONN_DEFINED
-;; #endif
-;; #ifndef ESOCKTNOSUPPORT
-(bind-val ESOCKTNOSUPPORT i32 (+ nn-hausnumero 28))
+(bind-val ENOTSUP i32 (+ NN_HAUSNUMERO 1))
+(bind-val EPROTONOSUPPORT i32 (+ NN_HAUSNUMERO 2))
+(bind-val ENOBUFS i32 (+ NN_HAUSNUMERO 3))
+(bind-val ENETDOWN i32 (+ NN_HAUSNUMERO 4))
+(bind-val EADDRINUSE i32 (+ NN_HAUSNUMERO 5))
+(bind-val EADDRNOTAVAIL i32 (+ NN_HAUSNUMERO 6))
+(bind-val ECONNREFUSED i32 (+ NN_HAUSNUMERO 7))
+(bind-val EINPROGRESS i32 (+ NN_HAUSNUMERO 8))
+(bind-val ENOTSOCK i32 (+ NN_HAUSNUMERO 9))
+(bind-val EAFNOSUPPORT i32 (+ NN_HAUSNUMERO 10))
+(bind-val EPROTO i32 (+ NN_HAUSNUMERO 11))
+(bind-val EAGAIN i32 (+ NN_HAUSNUMERO 12))
+(bind-val EBADF i32 (+ NN_HAUSNUMERO 13))
+(bind-val EINVAL i32 (+ NN_HAUSNUMERO 14))
+(bind-val EMFILE i32 (+ NN_HAUSNUMERO 15))
+(bind-val EFAULT i32 (+ NN_HAUSNUMERO 16))
+(bind-val EACCES i32 (+ NN_HAUSNUMERO 17))
+(bind-val EACCESS i32 EACCES)
+(bind-val ENETRESET i32 (+ NN_HAUSNUMERO 18))
+(bind-val ENETUNREACH i32 (+ NN_HAUSNUMERO 19))
+(bind-val EHOSTUNREACH i32 (+ NN_HAUSNUMERO 20))
+(bind-val ENOTCONN i32 (+ NN_HAUSNUMERO 21))
+(bind-val EMSGSIZE i32 (+ NN_HAUSNUMERO 22))
+(bind-val ETIMEDOUT i32 (+ NN_HAUSNUMERO 23))
+(bind-val ECONNABORTED i32 (+ NN_HAUSNUMERO 24))
+(bind-val ECONNRESET i32 (+ NN_HAUSNUMERO 25))
+(bind-val ENOPROTOOPT i32 (+ NN_HAUSNUMERO 26))
+(bind-val EISCONN i32 (+ NN_HAUSNUMERO 27))
+(bind-val ESOCKTNOSUPPORT i32 (+ NN_HAUSNUMERO 28))
 ;; #endif
 
 ;; /*  Native nanomsg error codes.                                               */
 ;; #ifndef ETERM
-(bind-val ETERM i32 (+ nn-hausnumero 53))
+(bind-val ETERM i32 (+ NN_HAUSNUMERO 53))
 ;; #endif
 ;; #ifndef EFSM
-(bind-val EFSM i32 (+ nn-hausnumero 54))
+(bind-val EFSM i32 (+ NN_HAUSNUMERO 54))
 ;; #endif
 
 ;; /*  This function retrieves the errno as it is known to the library.          */
@@ -206,6 +125,7 @@
 (bind-val NN_NS_FLAG i32 10)
 (bind-val NN_NS_ERROR i32 11)
 (bind-val NN_NS_LIMIT i32 12)
+(bind-val NN_NS_EVENT i32 13)
 
 ;; /*  Constants that are returned in `type` member of nn_symbol_properties      */
 (bind-val NN_TYPE_NONE i32 0)
@@ -225,7 +145,7 @@
 ;;     ;; /*  The constant value  */
 ;;     int value;
 
-;;     ;; /*  The contant name  */
+;;     ;; /*  The constant name  */
 ;;     const char* name;
 
 ;;     ;; /*  The constant namespace, or zero for namespaces themselves */
@@ -254,7 +174,7 @@
 ;; /*  Zero-copy support.                                                        */
 ;; /******************************************************************************/
 
-(bind-val NN_MSG size_t -1)
+(bind-val NN_MSG i64 -1) ;; actually size_t
 
 (bind-lib libnanomsg nn_allocmsg [void*,size_t,i32]*)
 (bind-lib libnanomsg nn_reallocmsg [void*,i8*,size_t]*)
@@ -285,42 +205,6 @@
 ;; };
 (bind-type nn_cmsghdr <size_t,i32,i32>)
 
-;; /*  Internal function. Not to be used directly.                               */
-;; /*  Use NN_CMSG_NEXTHDR macro instead.                                        */
-;; NN_INLINE struct nn_cmsghdr *nn_cmsg_nexthdr_ (const struct nn_msghdr *mhdr,
-;;     const struct nn_cmsghdr *cmsg)
-;; {
-;;     size_t sz;
-
-;;     sz = sizeof (struct nn_cmsghdr) + cmsg->cmsg_len;
-;;     if (((char*) cmsg) - ((char*) mhdr->msg_control) + sz >=
-;;            mhdr->msg_controllen)
-;;         return NULL;
-;;     return (struct nn_cmsghdr*) (((char*) cmsg) + sz);
-;; }
-
-;; #define NN_CMSG_FIRSTHDR(mhdr) \
-;;     ((mhdr)->msg_controllen >= sizeof (struct nn_cmsghdr) \
-;;     ? (struct nn_cmsghdr*) (mhdr)->msg_control : (struct nn_cmsghdr*) NULL)
-
-;; #define NN_CMSG_NXTHDR(mhdr,cmsg) \
-;;     nn_cmsg_nexthdr_ ((struct nn_msghdr*) (mhdr), (struct nn_cmsghdr*) (cmsg))
-
-;; #define NN_CMSG_DATA(cmsg) \
-;;     ((unsigned char*) (((struct nn_cmsghdr*) (cmsg)) + 1))
-
-;; /*  Helper macro. Not to be used directly.                                    */
-;; #define NN_CMSG_ALIGN(len) \
-;;     (((len) + sizeof (size_t) - 1) & (size_t) ~(sizeof (size_t) - 1))
-
-;; /* Extensions to POSIX defined by RFC3542.                                    */
-
-;; #define NN_CMSG_SPACE(len) \
-;;     (NN_CMSG_ALIGN (len) + NN_CMSG_ALIGN (sizeof (struct nn_cmsghdr)))
-
-;; #define NN_CMSG_LEN(len) \
-;;     (NN_CMSG_ALIGN (sizeof (struct nn_cmsghdr)) + (len))
-
 ;; /*  SP address families.                                                      */
 (bind-val AF_SP i32 1)
 (bind-val AF_SP_RAW i32 2)
@@ -348,9 +232,14 @@
 (bind-val NN_PROTOCOL i32 13)
 (bind-val NN_IPV4ONLY i32 14)
 (bind-val NN_SOCKET_NAME i32 15)
+(bind-val NN_RCVMAXSIZE i32 16)
 
 ;; /*  Send/recv options.                                                        */
 (bind-val NN_DONTWAIT i32 1)
+
+;; /*  Ancillary data.                                                           */
+(bind-val PROTO_SP i32 1)
+(bind-val SP_HDR i32 1)
 
 (bind-lib libnanomsg nn_socket [i32,i32,i32]*)
 (bind-lib libnanomsg nn_close [i32,i32]*)
@@ -386,18 +275,24 @@
 
 (bind-lib libnanomsg nn_device [i32,i32,i32]*)
 
+;; /******************************************************************************/
+;; /*  Built-in support for multiplexers.                                        */
+;; /******************************************************************************/
+
+(bind-lib libnanomsg nn_tcpmuxd [i32,i32]*)
+
 ;; <nanomsg/pair.h>
 
 (bind-val NN_PROTO_PAIR i32 1)
 
-(bind-val NN_PAIR i32 (+ (* 1 16 0)))
+(bind-val NN_PAIR i32 (* NN_PROTO_PAIR 16))
 
 ;; <nanomsg/pubsub.h>
 
 (bind-val NN_PROTO_PUBSUB i32 2)
 
-(bind-val NN_PUB i32 (+ (* 2 16) 0))
-(bind-val NN_SUB i32 (+ (* 2 16) 1))
+(bind-val NN_PUB i32 (* NN_PROTO_PUBSUB 16))
+(bind-val NN_SUB i32 (+ (* NN_PROTO_PUBSUB 16) 1))
 
 (bind-val NN_SUB_SUBSCRIBE i32 1)
 (bind-val NN_SUB_UNSUBSCRIBE i32 2)
@@ -406,8 +301,8 @@
 
 (bind-val NN_PROTO_REQREP i32 3)
 
-(bind-val NN_REQ i32 (+ (* 3 16) 0))
-(bind-val NN_REP i32 (+ (* 3 16) 1))
+(bind-val NN_REQ i32 (* NN_PROTO_REQREP 16))
+(bind-val NN_REP i32 (+ (* NN_PROTO_REQREP 16) 1))
 
 (bind-val NN_REQ_RESEND_IVL i32 1)
 
@@ -415,15 +310,15 @@
 
 (bind-val NN_PROTO_PIPELINE i32 5)
 
-(bind-val NN_PUSH i32 (+ (* 5 16) 0))
-(bind-val NN_PULL i32 (+ (* 5 16) 1))
+(bind-val NN_PUSH i32 (* NN_PROTO_PIPELINE 16))
+(bind-val NN_PULL i32 (+ (* NN_PROTO_PIPELINE 16) 1))
 
 ;; <nanomsg/survey.h>
 
 (bind-val NN_PROTO_SURVEY i32 6)
 
-(bind-val NN_SURVEYOR i32 (+ (* 6 16) 0))
-(bind-val NN_RESPONDENT i32 (+ (* 6 16) 1))
+(bind-val NN_SURVEYOR i32 (* NN_PROTO_SURVEY 16))
+(bind-val NN_RESPONDENT i32 (+ (* NN_PROTO_SURVEY 16) 3))
 
 (bind-val NN_SURVEYOR_DEADLINE i32 1)
 
@@ -431,7 +326,7 @@
 
 (bind-val NN_PROTO_BUS i32 7)
 
-(bind-val NN_BUS i32 (+ (* 7 16) 0))
+(bind-val NN_BUS i32 (* NN_PROTO_BUS 16))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; xtlang wrapper functions ;;
@@ -504,4 +399,5 @@
         (nn_println_strerror "error connecting socket"))
     sock))
 
+(impc:aot:insert-footer "xtmnanomsg")
 (define *xtmlib-nanomsg-loaded* #t)
