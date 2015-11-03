@@ -317,7 +317,7 @@
 
 (bind-val NN_PROTO_SURVEY i32 6)
 
-(bind-val NN_SURVEYOR i32 (* NN_PROTO_SURVEY 16))
+(bind-val NN_SURVEYOR i32 (+ (* NN_PROTO_SURVEY 16) 2))
 (bind-val NN_RESPONDENT i32 (+ (* NN_PROTO_SURVEY 16) 3))
 
 (bind-val NN_SURVEYOR_DEADLINE i32 1)
@@ -349,34 +349,34 @@
 (bind-poly nn_println_strerror nn_println_strerror_with_msg)
 (bind-poly nn_println_strerror nn_println_strerror_no_msg)
 
-(bind-func nn_sock_set_send_timeout
+(bind-func nnsock_set_send_timeout
   (lambda (sock:i32 timeout_ms:i32)
     (let ((timeout_ptr:i32* (salloc)))
       (pset! timeout_ptr 0 timeout_ms)
       (nn_setsockopt sock NN_SOL_SOCKET NN_SNDTIMEO (cast timeout_ptr i8*) 4))))
 
-(bind-func nn_sock_set_recv_timeout
+(bind-func nnsock_set_recv_timeout
   (lambda (sock:i32 timeout_ms:i32)
     (let ((timeout_ptr:i32* (salloc)))
       (pset! timeout_ptr 0 timeout_ms)
       (nn_setsockopt sock NN_SOL_SOCKET NN_RCVTIMEO (cast timeout_ptr i8*) 4))))
 
-(bind-func nn_sock_set_timeout
+(bind-func nnsock_set_timeout
   "sets both send and recieve timeouts"
   (lambda (sock:i32 timeout_ms:i32)
-    (nn_sock_set_send_timeout sock timeout_ms)
-    (nn_sock_set_recv_timeout sock timeout_ms)))
+    (nnsock_set_send_timeout sock timeout_ms)
+    (nnsock_set_recv_timeout sock timeout_ms)))
 
-(bind-func create_socket_with_timeout
+(bind-func nnsock_create_with_timeout
   "return socket id (i32)"
   (lambda (protocol timeout)
     (let  ((sock (nn_socket AF_SP protocol)))
       (if (or (< sock 0)
-              (< (nn_sock_set_timeout sock timeout) 0))
+              (< (nnsock_set_timeout sock timeout) 0))
           (nn_println_strerror "error creating socket"))
       sock)))
 
-(bind-func create_socket_default_timeout
+(bind-func nnsock_create_default_timeout
   "return socket id (i32)"
   (lambda (protocol)
     (let  ((sock (nn_socket AF_SP protocol)))
@@ -384,16 +384,16 @@
           (nn_println_strerror "error creating socket"))
       sock)))
 
-(bind-poly create_socket create_socket_with_timeout)
-(bind-poly create_socket create_socket_default_timeout)
+(bind-poly nnsock_create nnsock_create_with_timeout)
+(bind-poly nnsock_create nnsock_create_default_timeout)
 
-(bind-func bind_socket
+(bind-func nnsock_bind
   (lambda (sock addr)
     (if (< (nn_bind sock addr) 0)
         (nn_println_strerror "error binding socket"))
     sock))
 
-(bind-func connect_socket
+(bind-func nnsock_connect
   (lambda (sock addr)
     (if (< (nn_connect sock addr) 0)
         (nn_println_strerror "error connecting socket"))

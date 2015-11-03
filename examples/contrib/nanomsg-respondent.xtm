@@ -1,0 +1,46 @@
+(sys:load "libs/external/nanomsg.xtm")
+
+(bind-val RESPONDENT_ADDRESS i8* "tcp://127.0.0.1:7150")
+(bind-val RESPONDENT_SOCKET i32
+  (begin (nnsock_create NN_RESPONDENT)
+         (nnsock_connect RESPONDENT_SOCKET RESPONDENT_ADDRESS)))
+
+(bind-func nonblocking_read
+  (let ((buflen:i64 1024)
+        (buf:i8* (zalloc buflen))
+        (continue #t))
+    (lambda (sock cb:[void,i8*,i32]*)
+      (if (< sock 0)
+          (nn_println_strerror)
+          (let ((nbytes (nn_recv sock buf buflen NN_DONTWAIT)))
+            ;; if we get some bytes, trigger the callback
+            (if (> nbytes 0)
+                (cb buf nbytes))))
+      (if continue
+          (callback (+ (now) 1000) nonblocking_read sock cb)
+          (begin
+            (println "stopping nonblocking_read loop")
+            0)))))
+
+(bind-func send_response
+  (let ((msglen:i64 4096)
+        (msg:i8* (zalloc msglen))
+        (continue #t))
+    (lambda (buf:i8* nbytes:i32)
+      (printf "revieved survey: %.*s\n" nbytes buf)
+      (sprintf msg "RESPONSE ")
+      (sprintf (pref-ptr msg (strlen msg)) "%s" buf)
+      (let ((msglen (+ (strlen msg) 1))
+            (bytes (nn_send RESPONDENT_SOCKET msg msglen 0)))
+        (if (or (< bytes 0) (< bytes (convert msglen)))
+            (nn_println_strerror)
+            void)))))
+
+;; start the read loop running
+(call-as-xtlang
+ (nonblocking_read RESPONDENT_SOCKET send_response))
+
+;; kill everything
+(call-as-xtlang
+ (nonblocking_read.continue #f)
+ (nn_shutdown RESPONDENT_SOCKET 0))
