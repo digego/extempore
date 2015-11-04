@@ -5,23 +5,6 @@
   (begin (nnsock_create NN_RESPONDENT)
          (nnsock_connect RESPONDENT_SOCKET RESPONDENT_ADDRESS)))
 
-(bind-func nonblocking_read
-  (let ((buflen:i64 1024)
-        (buf:i8* (zalloc buflen))
-        (continue #t))
-    (lambda (sock cb:[void,i8*,i32]*)
-      (if (< sock 0)
-          (nn_println_strerror)
-          (let ((nbytes (nn_recv sock buf buflen NN_DONTWAIT)))
-            ;; if we get some bytes, trigger the callback
-            (if (> nbytes 0)
-                (cb buf nbytes))))
-      (if continue
-          (callback (+ (now) 1000) nonblocking_read sock cb)
-          (begin
-            (println "stopping nonblocking_read loop")
-            0)))))
-
 (bind-func send_response
   (let ((msglen:i64 4096)
         (msg:i8* (zalloc msglen))
@@ -36,11 +19,27 @@
             (nn_println_strerror)
             void)))))
 
-;; start the read loop running
-(call-as-xtlang
- (nonblocking_read RESPONDENT_SOCKET send_response))
+(bind-func nonblocking_read_loop
+  (let ((buflen:i64 1024)
+        (buf:i8* (zalloc buflen))
+        (continue #t))
+    (lambda ()
+      (if (< RESPONDENT_SOCKET 0)
+          (nn_println_strerror)
+          (let ((nbytes (nn_recv RESPONDENT_SOCKET buf buflen NN_DONTWAIT)))
+            ;; if we get some bytes, trigger the callback
+            (if (> nbytes 0)
+                (send_response buf nbytes))))
+      (if continue
+          (callback (+ (now) 1000) nonblocking_read_loop)
+          (begin
+            (println "stopping nonblocking_read_loop")
+            0)))))
 
-;; kill everything
-(call-as-xtlang
- (nonblocking_read.continue #f)
- (nn_shutdown RESPONDENT_SOCKET 0))
+;; start the read loop running
+(nonblocking_read_loop)
+
+;; ;; kill everything
+;; (call-as-xtlang
+;;  (nonblocking_read.continue #f)
+;;  (nn_shutdown RESPONDENT_SOCKET 0))
