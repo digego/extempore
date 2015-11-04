@@ -384,8 +384,11 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
        ;; float and int literals
        '("\\_<[-+]?[/.[:digit:]]+?\\_>"
          (0 font-lock-constant-face))
-       ;; hex literals
+       ;; hex/oct/binary literals
        '("\\_<#[xob][0-9a-fA-F]+?\\_>"
+         (0 font-lock-constant-face))
+       ;; scientific notation e.g. 1 million = 1e6
+       '("\\_<[[:digit:]]+?e[[:digit:]]+?\\_>"
          (0 font-lock-constant-face))
        ;; hack to make sure / gets highlighted as a function
        '("\\_</\\_>"
