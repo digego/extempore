@@ -19,22 +19,20 @@
 ;; midi_out), but by passing the appropriate device index arguments to
 ;; pm_create_input_stream and pm_create_output_stream you can create
 ;; as many as you like
-(bind-val midi_in PmStream* (pm_create_input_stream (Pm_GetDefaultInputDeviceID)))
-(bind-val midi_out PmStream* (pm_create_output_stream (Pm_GetDefaultOutputDeviceID)))
+(define *midi-in* (pm_create_input_stream (pm_default_in)))
+(define *midi-out* (pm_create_output_stream (pm_default_out)))
 
 (bind-func midi_read_loop
-  "a callback loop to call Pm_Read on all the midi devices
+  "a callback loop to call Pm_Read on a midi input stream
 
 This will pick up any incoming MIDI messages - handle them however you
 like."
   (let ((input_buffer:PmEvent* (zalloc PM_MIDI_BUFFER_SIZE))
         (read_count 0)
         (i:i32 0))
-    (lambda (time:i64 delta_t:double)
-      ;; if you have more than one midi input device, you should call
-      ;; Pm_Read on all your devices here
-      (set! read_count (Pm_Read midi_in input_buffer PM_MIDI_BUFFER_SIZE))
-      ;; (println "read_count:" (convert read_count i32))
+    (lambda (input_stream:PmStream* time:i64 delta_t:double)
+      (set! read_count (Pm_Read input_stream input_buffer PM_MIDI_BUFFER_SIZE))
+      ;; (println "read_count:" read_count)
       (if (> read_count 0)
           (dotimes (i read_count)
             (cond ((PmEvent_note_on_p (pref-ptr input_buffer i))
@@ -54,17 +52,11 @@ like."
                   (else
                    (println i (pref-ptr input_buffer i))))))
       (let ((next_time (+ time (convert (* 44100. delta_t)))))
-        (callback next_time midi_read_loop next_time delta_t)))))
+        (callback next_time midi_read_loop input_stream next_time delta_t)))))
 
 ;; start the read loop
-(midi_read_loop (now) .01) ;; 100Hz
+(midi_read_loop *midi-in* (now) .01) ;; 100Hz
 
 ;; Scheme MIDI I/O
-
-;; let's grab a handle for our midi out device in scheme
-(bind-func get_midi_out
-  (lambda ()
-    midi_out))
-(define *midi-out* (get_midi_out))
 
 (play-midi-note (now) *midi-out* (random 60 72) (random 60 90) 44100 0)
