@@ -2775,7 +2775,9 @@
                      (+ lower (* (convert i) (/ range (convert nbins))))))
             (doloop (i buflen)
               (set! current_bin
-                    (pref-ptr histogram (clamp 0 (convert (* (convert nbins float) (/ (- (pref buf i) lower) range)) i64) (- nbins 1))))
+                    ;; use "mod nbins" to make sure it always goes
+                    ;; into a valid slot in memory
+                    (pref-ptr histogram (% (convert (* (convert nbins float) (/ (- (pref buf i) lower) range)) i64) nbins)))
               (tset! current_bin 1 (+ (tref current_bin 1) 1)))
             histogram)))))
 
