@@ -136,4 +136,54 @@
            (= (clamp 1. 0.4 3.3) 1.))))
  (test_clampd) 1)
 
+(xtmtest
+ '(bind-func test_bufcpy_unpack_float
+    (lambda ()
+      (let ((src:float* (salloc 4))
+            (dest:float* (salloc 8)))
+        (pfill! src 4. 5. 6. 7.)
+        (bufcpy_unpack dest src 4 2 2)
+        (and (= (pref dest 0) 4.)
+             (= (pref dest 1) 5.)
+             (= (pref dest 4) 6.)
+             (= (pref dest 5) 7.)))))
+ (test_bufcpy_unpack_float)
+ 1)
+
+(xtmtest
+ '(bind-func test_bufcpy_pack_float
+    (lambda ()
+      (let ((src:float* (salloc 8))
+            (dest:float* (salloc 4)))
+        (pfill! src 0. 1. 2. 3. 4. 5. 6. 7.)
+        (bufcpy_pack dest src 4 2 2)
+        (sumf dest 4))))
+ (test_bufcpy_pack_float)
+ 10.)
+
+(xtmtest
+ '(bind-func test_bufcpy_pack_double
+    (lambda ()
+      (let ((src:double* (salloc 8))
+            (dest:double* (salloc 4)))
+        (pfill! src 0. 1. 2. 3. 4. 5. 6. 7.)
+        (bufcpy_pack dest src 4 2 2)
+        (sum dest 4))))
+ (test_bufcpy_pack_double)
+ 10.)
+
+(xtmtest
+ '(bind-func test_histogram_float
+    (lambda ()
+      (let ((buf:float* (salloc 8))
+            (hist:HistBin* null))
+        (pfill! buf 0. 1. 2. 3. 4. 5. 6. 7.)
+        (set! hist (histogram_float_range buf 8 4))
+        (doloop (i 4)
+          (println (pref-ptr hist i)))
+        (and (= (tref (pref hist 1) 0) 1.75)
+             (= (tref (pref hist 1) 1) 2)))))
+ (test_histogram_float)
+ 1)
+
 (xtmtest-print-results)

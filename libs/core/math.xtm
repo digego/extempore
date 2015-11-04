@@ -2680,8 +2680,122 @@
         (set! hash (- (+ (convert (pref str i)) (<< hash 6) (<< hash 16)) hash)))
       hash)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; data buffer packing/unpacking ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; other naming options: sparse/dense, stride/unstride
+
+(bind-func bufcpy_unpack_float
+  "take a packed buffer and copy it into a sparse representation"
+  (lambda (dest:float* src:float* stride neighbors srclen)
+    (doloop (i srclen)
+      (doloop (j neighbors)
+        (pset! dest (+ (* stride i) j) (pref src (+ (* neighbors i) j)))))))
+
+(bind-func bufcpy_unpack_double
+  "take a packed buffer and copy it into a sparse representation"
+  (lambda (dest:double* src:double* stride neighbors srclen)
+    (doloop (i srclen)
+      (doloop (j neighbors)
+        (pset! dest (+ (* stride i) j) (pref src (+ (* neighbors i) j)))))))
+
+(bind-poly bufcpy_unpack bufcpy_unpack_float)
+(bind-poly bufcpy_unpack bufcpy_unpack_double)
+
+(bind-func bufcpy_pack_float
+  "take a sparse buffer and copy it into a packed representation"
+  (lambda (dest:float* src:float* stride neighbors srclen)
+    (doloop (i srclen)
+      (doloop (j neighbors)
+        (pset! dest (+ (* neighbors i) j) (pref src (+ (* stride i) j)))))))
+
+(bind-func bufcpy_pack_double
+  "take a sparse buffer and copy it into a packed representation"
+  (lambda (dest:double* src:double* stride neighbors srclen)
+    (doloop (i srclen)
+      (doloop (j neighbors)
+        (pset! dest (+ (* neighbors i) j) (pref src (+ (* stride i) j)))))))
+
+(bind-poly bufcpy_pack bufcpy_pack_float)
+(bind-poly bufcpy_pack bufcpy_pack_double)
+
+;;;;;;;;;;;;;;;
+;; histogram ;;
+;;;;;;;;;;;;;;;
+
+;; currently uses floating-point values, i32 counts
+
+(bind-type HistBin <float,i32>
+  "a histogram bin: <lower,count>")
+
+(bind-func HistBin_print
+  "specialised print function for HistBin*"
+  (lambda (histbin:HistBin*)
+    (if (null? histbin)
+        (printf "<HistBin 0x0>")
+        (printf "<HistBin %p minval=%f count=%d>"
+                histbin
+                (convert (tref histbin 0) double)
+                (tref histbin 1)))
+    void))
+
+(bind-poly print HistBin_print)
+
+(bind-func HistBin_toString
+  "specialised toString function for HistBin*"
+  (lambda (histbin:HistBin*)
+    (let ((str:i8* (salloc 256)))
+      (if (null? histbin)
+          (sprintf str "<HistBin 0x0>")
+          
+          (sprintf str
+                   "<HistBin %p minval=%f count=%d>"
+                   histbin
+                   (convert (tref histbin 0) double)
+                   (tref histbin 1)))
+      (Str str))))
+
+(bind-poly toString HistBin_toString)
+
+(bind-func histogram_float_full
+  (lambda (buf:float* buflen lower upper nbins)
+    (let ((histogram:HistBin* (zalloc nbins))
+          (current_bin:HistBin* null)
+          (range (- upper lower)))
+      (if (not (> range 0.))
+          (begin
+            (println "Error in histogram: range (- upper lower) must be greater than 0.0")
+            null)
+          (begin
+            ;; setup the bins
+            (doloop (i nbins)
+              (tset! (pref-ptr histogram i)
+                     0
+                     (+ lower (* (convert i) (/ range (convert nbins))))))
+            (doloop (i buflen)
+              (set! current_bin
+                    (pref-ptr histogram (clamp 0 (convert (* (convert nbins float) (/ (- (pref buf i) lower) range)) i64) (- nbins 1))))
+              (tset! current_bin 1 (+ (tref current_bin 1) 1)))
+            histogram)))))
+
+(bind-func histogram_float_range
+  "like the full version, but use the min and max values in the buffer as upper and lower"
+  (lambda (buf:float* buflen nbins)
+    (let ((lower 0.0)
+          (upper 0.0))
+      ;; find max/min values
+      (doloop (i buflen)
+        (if (< (pref buf i) lower)
+            (set! lower (pref buf i)))
+        (if (> (pref buf i) upper)
+            (set! upper (pref buf i))))
+      (histogram_float_full buf buflen lower upper nbins))))
+
+(bind-poly histogram histogram_float_full)
+(bind-poly histogram histogram_float_range)
+
+;; end libs/core/math.xtm
 
 (define *xtmlib-math-loaded* #t)
-
 (impc:aot:insert-footer "xtmmath")
