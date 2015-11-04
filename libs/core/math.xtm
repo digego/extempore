@@ -307,32 +307,138 @@
 (bind-poly sort sorti16)
 (bind-poly sort sorti8)
 
-;;;;;;;;;;;;;;;; mean, median, mode
+;;;;;;;;;;;;;;;; sum, mean, median, mode
 ;; need to extend these to ints
 
-(bind-func meand
-  (lambda (x:double* lgth:i64)
-    (let ((s 0.0) (i 0))
-      (dotimes (i lgth)
-        (set! s (+ s (pref x i))))
-      (/ s (i64tod lgth)))))
-
-(bind-func meanf
-  (lambda (x:float* lgth:i64)
+(bind-func sumi32
+  (lambda (buf:i32* lgth:i64)
     (if (= (& lgth 3) 0) ;; i.e. mod 4
-        (let ((xx:/4,float/* (cast x))
-              (sum:/4,float/* (alloc))
+        (let ((vbuf:/4,i32/* (cast buf))
+              (tot:/4,i32/* (alloc))
               (j 0))
           (dotimes (j (/ lgth 4))
-            (pset! sum 0 (+ (pref-ptr xx j) sum)))
-          (/ (+ (vref sum 0) (vref sum 1)
-                (vref sum 2) (vref sum 3))
-             (i64tof lgth)))
-        (let ((s 0.0) (i 0))
+            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
+          (+ (vref tot 0) (vref tot 1) (vref tot 2) (vref tot 3)))
+        (let ((tot 0) (i 0))
           (dotimes (i lgth)
-            (set! s (+ s (pref x i))))
-          (/ s (i64tof lgth))))))
+            (set! tot (+ tot (pref buf i))))
+          tot))))
 
+(bind-func sumi64
+  (lambda (buf:i64* lgth:i64)
+    (if (= (& lgth 1) 0) ;; i.e. mod 2
+        (let ((vbuf:/2,i64/* (cast buf))
+              (tot:/2,i64/* (alloc))
+              (j 0))
+          (dotimes (j (/ lgth 2))
+            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
+          (+ (vref tot 0) (vref tot 1)))
+        (let ((tot 0) (i 0))
+          (dotimes (i lgth)
+            (set! tot (+ tot (pref buf i))))
+          tot))))
+
+(bind-func sumf
+  (lambda (buf:float* lgth:i64)
+    (if (= (& lgth 3) 0) ;; i.e. mod 4
+        (let ((vbuf:/4,float/* (cast buf))
+              (tot:/4,float/* (alloc))
+              (j 0))
+          (dotimes (j (/ lgth 4))
+            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
+          (+ (vref tot 0) (vref tot 1) (vref tot 2) (vref tot 3)))
+        (let ((tot 0.0) (i 0))
+          (dotimes (i lgth)
+            (set! tot (+ tot (pref buf i))))
+          tot))))
+
+(bind-func sumd
+  (lambda (buf:double* lgth:i64)
+    (if (= (& lgth 1) 0) ;; i.e. mod 2
+        (let ((vbuf:/2,double/* (cast buf))
+              (tot:/2,double/* (alloc))
+              (j 0))
+          (dotimes (j (/ lgth 2))
+            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
+          (+ (vref tot 0) (vref tot 1)))
+        (let ((tot 0.0) (i 0))
+          (dotimes (i lgth)
+            (set! tot (+ tot (pref buf i))))
+          tot))))
+
+(bind-poly sum sumi32)
+(bind-poly sum sumi64)
+(bind-poly sum sumf)
+(bind-poly sum sumd)
+
+;; even for ints, you probably want a floating-point answer for the
+;; mean - these ones return doubles to minimize the chance of
+;; precision error
+
+(bind-func meani32
+  (lambda (buf:i32* lgth:i64)
+    (if (= (& lgth 3) 0) ;; i.e. mod 4
+        (let ((vbuf:/4,i32/* (cast buf))
+              (tot:/4,i32/* (alloc))
+              (j 0))
+          (dotimes (j (/ lgth 4))
+            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
+          (/ (i32tod (+ (vref tot 0) (vref tot 1)
+                        (vref tot 2) (vref tot 3)))
+             (i64tod lgth)))
+        (let ((tot 0) (i 0))
+          (dotimes (i lgth)
+            (set! tot (+ tot (pref buf i))))
+          (/ (i32tod tot) (i64tod lgth))))))
+
+(bind-func meani64
+  (lambda (buf:i64* lgth:i64)
+    (if (= (& lgth 1) 0) ;; i.e. mod 2
+        (let ((vbuf:/2,i64/* (cast buf))
+              (tot:/2,i64/* (alloc))
+              (j 0))
+          (dotimes (j (/ lgth 4))
+            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
+          (/ (i64tod (+ (vref tot 0) (vref tot 1)))
+             (i64tod lgth)))
+        (let ((tot 0) (i 0))
+          (dotimes (i lgth)
+            (set! tot (+ tot (pref buf i))))
+          (/ (i64tod tot) (i64tod lgth))))))
+
+(bind-func meanf
+  (lambda (buf:float* lgth:i64)
+    (if (= (& lgth 3) 0) ;; i.e. mod 4
+        (let ((vbuf:/4,float/* (cast buf))
+              (tot:/4,float/* (alloc))
+              (j 0))
+          (dotimes (j (/ lgth 4))
+            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
+          (/ (+ (vref tot 0) (vref tot 1)
+                (vref tot 2) (vref tot 3))
+             (i64tof lgth)))
+        (let ((tot 0.0) (i 0))
+          (dotimes (i lgth)
+            (set! tot (+ tot (pref buf i))))
+          (/ tot (i64tof lgth))))))
+
+(bind-func meand
+  (lambda (buf:double* lgth:i64)
+    (if (= (& lgth 1) 0) ;; i.e. mod 2
+        (let ((vbuf:/2,double/* (cast buf))
+              (tot:/2,double/* (alloc))
+              (j 0))
+          (dotimes (j (/ lgth 4))
+            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
+          (/ (+ (vref tot 0) (vref tot 1))
+             (i64tod lgth)))
+        (let ((tot 0.0) (i 0))
+          (dotimes (i lgth)
+            (set! tot (+ tot (pref buf i))))
+          (/ tot (i64tod lgth))))))
+
+(bind-poly mean meani32)
+(bind-poly mean meani64)
 (bind-poly mean meand)
 (bind-poly mean meanf)
 
