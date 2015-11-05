@@ -2734,10 +2734,10 @@
   (lambda (histbin:HistBin*)
     (if (null? histbin)
         (printf "<HistBin 0x0>")
-        (printf "<HistBin %p minval=%f count=%d>"
+        (printf "<HistBin %p minval=%f count=%f>"
                 histbin
                 (convert (tref histbin 0) double)
-                (tref histbin 1)))
+                (convert (tref histbin 1) double)))
     void))
 
 (bind-poly print HistBin_print)
@@ -2750,10 +2750,10 @@
           (sprintf str "<HistBin 0x0>")
           
           (sprintf str
-                   "<HistBin %p minval=%f count=%d>"
+                   "<HistBin %p minval=%f count=%f>"
                    histbin
                    (convert (tref histbin 0) double)
-                   (tref histbin 1)))
+                   (convert (tref histbin 1) double)))
       (Str str))))
 
 (bind-poly toString HistBin_toString)
@@ -2771,7 +2771,10 @@
             (doloop (i nbins)
               (tset! (pref-ptr hist i)
                      0
-                     (+ lower (* (convert i) (/ range (convert nbins))))))
+                     (+ lower (* (convert i) (/ range (convert nbins)))))
+              (tset! (pref-ptr hist i)
+                     1
+                     0.))
             (doloop (i buflen)
               (set! current_bin
                     ;; use "mod nbins" to make sure it always goes
