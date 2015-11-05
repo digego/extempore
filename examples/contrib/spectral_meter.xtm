@@ -124,14 +124,14 @@
 (bind-func bin_spectrum
   (let ((i:i64 0)
         (j:i64 0)
-        (sum 0.0))
+        (total 0.0))
     (lambda (spectrum:double* freq_buffer fft_window_size nbins)
       (let ((bin_width (/ (/ fft_window_size nbins) 2)))
         (dotimes (i nbins)
-          (set! sum 0.0)
+          (set! total 0.0)
           (dotimes (j (* i bin_width) bin_width)
-            (set! sum (+ sum (magnitude_cpxd (pref-ptr freq_buffer j)))))
-          (pset! spectrum i (* 1.0 (/ sum (i64tod bin_width)))))))))
+            (set! total (+ total (magnitude_cpxd (pref-ptr freq_buffer j)))))
+          (pset! spectrum i (* 1.0 (/ total (i64tod bin_width)))))))))
 
 ;; take the time_domain signal (time_buffer) and return the spectrum
 (bind-func mag_spectrum

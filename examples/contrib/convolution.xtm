@@ -32,19 +32,19 @@
 (bind-func convolution_c
   (lambda (filename N:i64)
     (let ((ir:SAMPLE* (zalloc N))
-          (sum 0.0) (i 0) (n 0) (N1 (- N 1))
+          (total 0.0) (i 0) (n 0) (N1 (- N 1))
           (input:SAMPLE* (zalloc N)))
       (sf_read_file_into_buffer filename ir 0 N #f)
       (lambda (in dry:SAMPLE wet:SAMPLE)
         (pset! input n in)
-        (set! sum 0.0)
+        (set! total 0.0)
         (dotimes (i N)
-          (set! sum
-                (+ sum
+          (set! total
+                (+ total
                    (* (pref ir i)
                       (pref input (& (- n i) N1))))))
         (set! n (& (+ n 1) N1))
-        (+ (* dry in) (* wet sum))))))
+        (+ (* dry in) (* wet total))))))
 
 
 ;; make sure you put your stereo IR file in here!!
