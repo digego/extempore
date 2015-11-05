@@ -2686,39 +2686,39 @@
 
 ;; other naming options: sparse/dense, stride/unstride
 
-(bind-func bufcpy_unpack_float
+(bind-func data_unpack_float
   "take a packed buffer and copy it into a sparse representation"
   (lambda (dest:float* src:float* stride neighbors srclen)
     (doloop (i srclen)
       (doloop (j neighbors)
         (pset! dest (+ (* stride i) j) (pref src (+ (* neighbors i) j)))))))
 
-(bind-func bufcpy_unpack_double
+(bind-func data_unpack_double
   "take a packed buffer and copy it into a sparse representation"
   (lambda (dest:double* src:double* stride neighbors srclen)
     (doloop (i srclen)
       (doloop (j neighbors)
         (pset! dest (+ (* stride i) j) (pref src (+ (* neighbors i) j)))))))
 
-(bind-poly bufcpy_unpack bufcpy_unpack_float)
-(bind-poly bufcpy_unpack bufcpy_unpack_double)
+(bind-poly data_unpack data_unpack_float)
+(bind-poly data_unpack data_unpack_double)
 
-(bind-func bufcpy_pack_float
+(bind-func data_pack_float
   "take a sparse buffer and copy it into a packed representation"
   (lambda (dest:float* src:float* stride neighbors srclen)
     (doloop (i srclen)
       (doloop (j neighbors)
         (pset! dest (+ (* neighbors i) j) (pref src (+ (* stride i) j)))))))
 
-(bind-func bufcpy_pack_double
+(bind-func data_pack_double
   "take a sparse buffer and copy it into a packed representation"
   (lambda (dest:double* src:double* stride neighbors srclen)
     (doloop (i srclen)
       (doloop (j neighbors)
         (pset! dest (+ (* neighbors i) j) (pref src (+ (* stride i) j)))))))
 
-(bind-poly bufcpy_pack bufcpy_pack_float)
-(bind-poly bufcpy_pack bufcpy_pack_double)
+(bind-poly data_pack data_pack_float)
+(bind-poly data_pack data_pack_double)
 
 ;;;;;;;;;;;;;;;
 ;; histogram ;;
@@ -2726,7 +2726,7 @@
 
 ;; currently uses floating-point values, i32 counts
 
-(bind-type HistBin <float,i32>
+(bind-type HistBin <float,float>
   "a histogram bin: <lower,count>")
 
 (bind-func HistBin_print
@@ -2759,9 +2759,8 @@
 (bind-poly toString HistBin_toString)
 
 (bind-func histogram_float_full
-  (lambda (buf:float* buflen lower upper nbins)
-    (let ((histogram:HistBin* (zalloc nbins))
-          (current_bin:HistBin* null)
+  (lambda (hist:HistBin* buf:float* buflen lower upper nbins)
+    (let ((current_bin:HistBin* null)
           (range (- upper lower)))
       (if (not (> range 0.))
           (begin
@@ -2770,20 +2769,20 @@
           (begin
             ;; setup the bins
             (doloop (i nbins)
-              (tset! (pref-ptr histogram i)
+              (tset! (pref-ptr hist i)
                      0
                      (+ lower (* (convert i) (/ range (convert nbins))))))
             (doloop (i buflen)
               (set! current_bin
                     ;; use "mod nbins" to make sure it always goes
                     ;; into a valid slot in memory
-                    (pref-ptr histogram (% (convert (* (convert nbins float) (/ (- (pref buf i) lower) range)) i64) nbins)))
-              (tset! current_bin 1 (+ (tref current_bin 1) 1)))
-            histogram)))))
+                    (pref-ptr hist (% (convert (* (convert nbins float) (/ (- (pref buf i) lower) range)) i64) nbins)))
+              (tset! current_bin 1 (+ (tref current_bin 1) 1.0)))
+            hist)))))
 
 (bind-func histogram_float_range
   "like the full version, but use the min and max values in the buffer as upper and lower"
-  (lambda (buf:float* buflen nbins)
+  (lambda (hist:HistBin* buf:float* buflen nbins)
     (let ((lower 0.0)
           (upper 0.0))
       ;; find max/min values
@@ -2792,7 +2791,7 @@
             (set! lower (pref buf i)))
         (if (> (pref buf i) upper)
             (set! upper (pref buf i))))
-      (histogram_float_full buf buflen lower upper nbins))))
+      (histogram_float_full hist buf buflen lower upper nbins))))
 
 (bind-poly histogram histogram_float_full)
 (bind-poly histogram histogram_float_range)
