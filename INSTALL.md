@@ -40,7 +40,7 @@ If you've installed Extempore through homebrew previously
 (i.e. if `brew info extempore` shows a version <= 0.59) then you'll
 need to remove a couple of things first:
 ```
-brew rm extempore kissfft
+brew rm extempore kissfft libnanovg
 ```
 If you're on OSX **10.9** or earlier, there's an incompatibility with
 your version of clang and the LLVM 3.7.0 which Extempore uses.  For
