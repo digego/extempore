@@ -1,3 +1,50 @@
+;; first, the code to actually get the data back for visualisation
+;; (assumes MPI - doesn't yet support the nanomsg communication)
+
+;; allocate memory for *all* the particles (or at least a
+;; subset) for visualisation on head node
+(bind-val part_all float*)
+
+(bind-func pbpic2_alloc_and_visuals_arrays
+  (lambda ()
+    (let ((part_all_:float* (halloc (if (= kstrt 1)
+                                        (* nvp idimp npmax)
+                                        0:i32))))
+      (set! part_all part_all_))))
+
+(pbpic2_alloc_and_visuals_arrays)
+
+(bind-func pbpic2_gather_data
+  "gather data (or a subset) from all the nodes to the head node for
+visualisation"
+  (lambda ()
+    ;; ;; gather the fields (fxyze)
+    ;; (if (<>
+    ;;      (MPI_Gather (convert fxyze i8*) ;; gather field data
+    ;;                  (* nxe ny ndim) ;; field size * floats-per-field-component
+    ;;                  MPI_FLOAT
+    ;;                  (convert fxyze_all i8*) ;; recv buffer on root node
+    ;;                  (* nxe ny ndim) ;; num particles * floats-per-particle
+    ;;                  MPI_FLOAT
+    ;;                  0 ;; root
+    ;;                  MPI_COMM_WORLD)
+    ;;      0)
+    ;;     (println "MPI_Gather fields error."))
+
+    ;; gather the particles
+    (if (<> (MPI_Gather (convert part i8*) ;; gather particle data
+                        (* npmax idimp) ;; num particles * floats-per-particle
+                        MPI_FLOAT
+                        (convert part_all i8*) ;; recv buffer on root node
+                        (* npmax idimp) ;; num particles * floats-per-particle
+                        MPI_FLOAT
+                        0 ;; root
+                        MPI_COMM_WORLD)
+            0)
+        (println "MPI_Gather particles error."))))
+
+;; now the actual graphics code
+
 (sys:load "libs/external/glfw3.xtm")
 
 (bind-val width i32 800)
@@ -7,6 +54,21 @@
   (glfw_init_and_create_interaction_window width height))
 
 (sys:load "libs/external/gl/gl-objects.xtm")
+
+;; set up the FBO & backing textures
+
+(bind-val fbo FBO*)
+(bind-val ss_quad_vao VAO*)
+
+(bind-val post_process_sp ShaderProgram)
+
+(bind-func create_post_process_shader
+  (lambda (vsource:i8* fsource:i8*)
+    (set! post_process_sp (ShaderProgram_create vsource fsource))))
+
+(create_post_process_shader
+ (sys:slurp-file "libs/contrib/pic/framebuffer.vert")
+ (sys:slurp-file "libs/contrib/pic/framebuffer.frag"))
 
 ;; OpenGL setup
 
@@ -30,8 +92,8 @@
     (set! field_sp (ShaderProgram_create vsource fsource))))
 
 (impc:aot:do-or-emit
- (create_field_shader (sys:slurp-file "libs/contrib/pic/pbpic2-field.vert")
-                      (sys:slurp-file "libs/contrib/pic/pbpic2-field.frag")))
+      (create_field_shader (sys:slurp-file "libs/contrib/pic/pbpic2-field.vert")
+                           (sys:slurp-file "libs/contrib/pic/pbpic2-field.frag")))
 
 ;; this data should have interleaved the `bases' of the field arrows
 ;; (i.e. the grid) in 2D with the ndim (i.e. 3D) field components
@@ -103,15 +165,6 @@
                      (+ 3 idx)
                      (pref field_arrows (+ 1 idx)))))))))
 
-(bind-func gl_draw_field
-  (lambda ()
-    (copy_field_xy_to_arrows_buffer fxyze .1)
-    ;; (remove_guff_from_arrows_buffer)
-    (VBO_update_data field_vbo)
-    (glUseProgram field_sp)
-    (VAO_bind_and_draw_arrays field_vao GL_LINES 0 (convert (* 4 nxe ny)))
-    void))
-
 ;; particles
 
 (bind-val particle_vbo VBO*)
@@ -124,54 +177,10 @@
     (set! particle_sp (ShaderProgram_create vsource fsource))))
 
 (impc:aot:do-or-emit
- (create_particle_shader (sys:slurp-file "libs/contrib/pic/pbpic2-particle.vert")
-                         (sys:slurp-file "libs/contrib/pic/pbpic2-particle.frag")))
-
-(bind-func gl_draw_particles
-  (lambda ()
-    ;; move particles, update VBO
-    (VBO_update_data particle_vbo)
-    ;; draw the world
-    (let ((nxnyloc (glGetUniformLocation particle_sp "nxny")))
-      (glUseProgram particle_sp)
-      (glUniform2f nxnyloc (convert nxe) (convert ny)))
-    (VAO_bind_and_draw_arrays particle_vao GL_POINTS 0 (* nvp npmax))
-    void))
-
-;; framebuffer & backing textures
-
-(bind-val fbo FBO*)
-(bind-val ss_quad_vao VAO*)
-
-(bind-val post_process_sp ShaderProgram)
-
-(bind-func create_post_process_shader
-  (lambda (vsource:i8* fsource:i8*)
-    (set! post_process_sp (ShaderProgram_create vsource fsource))))
-
-(impc:aot:do-or-emit
- (create_post_process_shader
-  (sys:slurp-file "libs/contrib/pic/framebuffer.vert")
-  (sys:slurp-file "libs/contrib/pic/framebuffer.frag")))
-
-(bind-func gl_draw_framebuffer
-  (lambda ()
-    ;; bind default framebuffer
-    (glBindFramebuffer GL_FRAMEBUFFER 0)
-    ;; clear the framebuffer's colour and depth buffers
-    (glClear (bor GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-    ;; our post-processing shader for the screen-space quad
-    (glUseProgram post_process_sp)
-    ;; bind the quad's VAO
-    (glBindVertexArray (VAO_id ss_quad_vao))
-    ;; activate the first texture slot and put texture from previous pass in it
-    (glActiveTexture GL_TEXTURE0)
-    (glBindTexture GL_TEXTURE_2D (FBO_color_texture fbo))
-    ;; draw the quad
-    (glDrawArrays GL_TRIANGLE_STRIP 0 4)))
+      (create_particle_shader (sys:slurp-file "libs/contrib/pic/pbpic2-particle.vert")
+                              (sys:slurp-file "libs/contrib/pic/pbpic2-particle.frag")))
 
 ;; init all the things
-
 (impc:aot:do-or-emit
  (call-as-xtlang
   ;; FBO
@@ -193,6 +202,42 @@
 
 ;; draw all the things
 
+(bind-func gl_draw_field
+  (lambda ()
+    (copy_field_xy_to_arrows_buffer fxyze .1)
+    ;; (remove_guff_from_arrows_buffer)
+    (VBO_update_data field_vbo)
+    (glUseProgram field_sp)
+    (VAO_bind_and_draw_arrays field_vao GL_LINES 0 (convert (* 4 nxe ny)))
+    void))
+
+(bind-func gl_draw_particles
+  (lambda ()
+    ;; move particles, update VBO
+    (VBO_update_data particle_vbo)
+    ;; draw the world
+    (let ((nxnyloc (glGetUniformLocation particle_sp "nxny")))
+      (glUseProgram particle_sp)
+      (glUniform2f nxnyloc (convert nxe) (convert ny)))
+    (VAO_bind_and_draw_arrays particle_vao GL_POINTS 0 (* nvp npmax))
+    void))
+
+(bind-func gl_draw_framebuffer
+  (lambda ()
+    ;; bind default framebuffer
+    (glBindFramebuffer GL_FRAMEBUFFER 0)
+    ;; clear the framebuffer's colour and depth buffers
+    (glClear (bor GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+    ;; our post-processing shader for the screen-space quad
+    (glUseProgram post_process_sp)
+    ;; bind the quad's VAO
+    (glBindVertexArray (VAO_id ss_quad_vao))
+    ;; activate the first texture slot and put texture from previous pass in it
+    (glActiveTexture GL_TEXTURE0)
+    (glBindTexture GL_TEXTURE_2D (FBO_color_texture fbo))
+    ;; draw the quad
+    (glDrawArrays GL_TRIANGLE_STRIP 0 4)))
+
 (bind-func gl_draw_loop
   (let ((drawbufs_ptr:GLenum* (zalloc)))
     (pset! drawbufs_ptr 0 GL_COLOR_ATTACHMENT0)
@@ -212,4 +257,4 @@
         (callback next_time gl_draw_loop next_time delta_t)))))
 
 ;; start it running
-(gl_draw_loop (now) (/ 1. 30.))
+(gl_draw_loop (now) (/ 1. 60.))

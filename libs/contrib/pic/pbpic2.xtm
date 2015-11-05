@@ -369,10 +369,6 @@
 
 (impc:aot:do-or-emit (pbpic2_alloc_arrays))
 
-;; allocate memory for *all* the particles (or at least a
-;; subset) for visualisation on head node
-(bind-val part_all float*)
-
 (bind-func pbpic2_free_arrays
   (lambda ()
     (free part part_)
@@ -444,7 +440,13 @@
                   (convert (pref wm_ptr 0) double))))
     void))
 
+;; stubs (to be redefined later/live)
+
 (bind-func external_field
+  (lambda ()
+    void))
+
+(bind-func pbpic2_gather_data
   (lambda ()
     void))
 
@@ -597,33 +599,8 @@
 
     ;; gather data (or a subset) from all the nodes to the head node
     ;; for visualisation
-
-    ;; gather the fields (fxyze)
-    ;; (if (<>
-    ;;      (MPI_Gather (convert fxyze i8*) ;; gather field data
-    ;;                  (* nxe ny ndim) ;; field size * floats-per-field-component
-    ;;                  MPI_FLOAT
-    ;;                  (convert fxyze_all i8*) ;; recv buffer on root node
-    ;;                  (* nxe ny ndim) ;; num particles * floats-per-particle
-    ;;                  MPI_FLOAT
-    ;;                  0 ;; root
-    ;;                  MPI_COMM_WORLD)
-    ;;      0)
-    ;;     (println "MPI_Gather fields error."))
-
-    ;; gather the particles
-    ;; (if (<>
-    ;;      (MPI_Gather (convert part i8*) ;; gather particle data
-    ;;                  (* npmax idimp) ;; num particles * floats-per-particle
-    ;;                  MPI_FLOAT
-    ;;                  (convert part_all i8*) ;; recv buffer on root node
-    ;;                  (* npmax idimp) ;; num particles * floats-per-particle
-    ;;                  MPI_FLOAT
-    ;;                  0 ;; root
-    ;;                  MPI_COMM_WORLD)
-    ;;      0)
-    ;;     (println "MPI_Gather particles error."))
-
+    (pbpic2_gather_data)
+    
     (if (= ntime 0)
         (if (= kstrt 1)
             ;; this could be replaced by a call to
