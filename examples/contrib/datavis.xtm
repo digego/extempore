@@ -10,6 +10,7 @@
 
 ;;; Code:
 
+(sys:load "libs/external/gui.xtm")
 (sys:load "libs/external/datavis.xtm")
 
 ;; initialisation
@@ -26,7 +27,8 @@
 (gui_render_loop (now) (/ 1. 30.))
 
 (bind-func draw_barplot
-  (let ((nlabs 5)
+  (let ((vg (GUI_context EXTEMPORE_GUI))
+        (nlabs 5)
         (labs:float* (zalloc nlabs))
         (bars:float* (zalloc nlabs))
         (line:float* (zalloc (* 2 nlabs)))
@@ -38,11 +40,11 @@
       (dotimes (i nlabs)
         (pset! bars i (+ (* .3 (cos (* 0.00001 (convert (* (now) (+ i 1)))))) (random .49 .51)))
         (pset! line (+ (* i 2) 1) (+ (* .3 (cos (* 0.00001 (convert (* (now) (+ i 1)))))) (random .49 .51))))
-      (dv_draw_bars bounds bars nlabs)
-      (dv_draw_axis_labels_2D bounds labs nlabs labs nlabs)
-      (dv_draw_axes_2D bounds)
-      (dv_draw_title bounds "Ben's Title")
-      (dv_draw_line bounds line nlabs)
+      (dv_draw_bars vg bounds bars nlabs)
+      (dv_draw_axis_labels_2D vg bounds labs nlabs labs nlabs)
+      (dv_draw_axes_2D vg bounds)
+      (dv_draw_title vg bounds "Ben's Title")
+      (dv_draw_line vg bounds line nlabs)
       void)))
 
 (bind-func Widget_create_blank

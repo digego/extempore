@@ -16,18 +16,17 @@
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/std.xtm")
- (sys:load "libs/external/gui.xtm"))
+ (sys:load "libs/external/nanovg.xtm"))
 (impc:aot:insert-forms
  (sys:load "libs/core/std.xtm" 'quiet)
- (sys:load "libs/external/gui.xtm" 'quiet))
+ (sys:load "libs/external/nanovg.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmdatavis")
 
 (bind-func dv_draw_axes_2D
   "draw 2D axes"
-  (lambda (bounds:Rect*)
-    (letz ((vg (GUI_context EXTEMPORE_GUI))
-           (padding .1)
+  (lambda (vg bounds:Rect*)
+    (letz ((padding .1)
            ;; we add the padding here
            (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
            (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
@@ -46,9 +45,8 @@
 
 (bind-func dv_draw_axis_labels_2D
   "draw 2D axis labels"
-  (lambda (bounds:Rect* xlabs:float* nxlabs ylabs:float* nylabs)
-    (letz ((vg (GUI_context EXTEMPORE_GUI))
-           (padding 0.1)
+  (lambda (vg bounds:Rect* xlabs:float* nxlabs ylabs:float* nylabs)
+    (letz ((padding 0.1)
            (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
            (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
            (w (* (tref bounds 2) (- 1. (* 2. padding))))
@@ -81,9 +79,8 @@
 
 (bind-func dv_draw_title
   "draw a title (top-center)"
-  (lambda (bounds:Rect* title:i8*)
-    (letz ((vg (GUI_context EXTEMPORE_GUI))
-           (padding 0.1)
+  (lambda (vg bounds:Rect* title:i8*)
+    (letz ((padding 0.1)
            (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
            (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
            (w (* (tref bounds 2) (- 1. (* 2. padding))))
@@ -104,9 +101,8 @@
 
 (bind-func dv_draw_bars
   "draw 2D axis labels"
-  (lambda (bounds:Rect* bars:float* nbars)
-    (letz ((vg (GUI_context EXTEMPORE_GUI))
-           (padding 0.1)
+  (lambda (vg bounds:Rect* bars:float* nbars)
+    (letz ((padding 0.1)
            (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
            (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
            (w (* (tref bounds 2) (- 1. (* 2. padding))))
@@ -132,9 +128,8 @@
   "draw a 2D line plot
 
 Input data should be a pointer to packed floats: x1,y1,x2,y2,..."
-  (lambda (bounds:Rect* line:float* npoints:i64)
-    (letz ((vg (GUI_context EXTEMPORE_GUI))
-           (padding 0.1)
+  (lambda (vg bounds:Rect* line:float* npoints:i64)
+    (letz ((padding 0.1)
            (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
            (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
            (w (* (tref bounds 2) (- 1. (* 2. padding))))
