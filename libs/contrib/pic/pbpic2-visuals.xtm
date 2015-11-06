@@ -4,60 +4,84 @@
 (bind-val height i32 600)
 
 (bind-val window GLFWwindow*
-  (glfw_init_and_create_interaction_window width height))
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_interaction_window width height)))
+
+(sys:load "libs/external/nanovg.xtm")
+
+(bind-val vg NVGcontext* (nvg_create_context))
+(bind-val pixel_ratio float (glfw_get_pixel_ratio window))
 
 (sys:load "libs/external/gl/gl-objects.xtm")
+(sys:load "libs/external/nanovg.xtm")
 
 ;; OpenGL setup
 
-(call-as-xtlang
- ;; (glDisable GL_DEPTH_TEST)
- (glDepthMask GL_FALSE)
- (glEnable GL_BLEND)
- (glBlendFunc GL_SRC_ALPHA GL_ONE)
- (glEnable GL_PROGRAM_POINT_SIZE)
- (glDisable GL_LINE_SMOOTH)
- void)
+(bind-func pbpic2_visuals_set_gl_capabilities
+  (lambda ()
+    (glDepthMask GL_FALSE)
+    (glEnable GL_BLEND)
+    (glBlendFunc GL_SRC_ALPHA GL_ONE)
+    (glEnable GL_PROGRAM_POINT_SIZE)
+    (glDisable GL_LINE_SMOOTH)
+    void))
 
-;; fields
+(pbpic2_visuals_set_gl_capabilities)
+
+(bind-func pbpic2_visuals_unset_gl_capabilities
+  (lambda ()
+    (glDepthMask GL_TRUE)
+    (glDisable GL_BLEND)
+    (glDisable GL_PROGRAM_POINT_SIZE)
+    ;; (glEnable GL_LINE_SMOOTH)
+    void))
+
+;; not sure if we need to call this - depends on whether the above
+;; stuff messes with nanovg
+
+;; (pbpic2_visuals_unset_gl_capabilities)
+
+;;;;;;;;;;;;
+;; fields ;;
+;;;;;;;;;;;;
 
 (bind-val field_vbo VBO*)
 (bind-val field_vao VAO*)
 (bind-val field_sp ShaderProgram)
-
-(bind-func create_field_shader
-  (lambda (vsource:i8* fsource:i8*)
-    (set! field_sp (ShaderProgram_create vsource fsource))))
-
-(impc:aot:do-or-emit
- (create_field_shader (sys:slurp-file "libs/contrib/pic/pbpic2-field.vert")
-                      (sys:slurp-file "libs/contrib/pic/pbpic2-field.frag")))
 
 ;; this data should have interleaved the `bases' of the field arrows
 ;; (i.e. the grid) in 2D with the ndim (i.e. 3D) field components
 
 (bind-val field_arrows float*)
 
-(impc:aot:do-or-emit
- (call-as-xtlang
-  (let ((field_arrows_:float* (halloc (* 4 nx ny))))
-    (set! field_arrows field_arrows_))))
+(bind-func pbpic2_visuals_field_init
+  (lambda ()
+    (let ((field_arrows_:float* (halloc (* 4 nx ny)))
+          (idx 0))
+      (set! field_arrows field_arrows_)
+      ;; set base verts (i.e. every second vec2) to regular grid
+      (doloop (i nx)
+        (doloop (j ny)
+          (set! idx (* (+ (* i nx) j) 4))
+          (pset! field_arrows
+                 idx
+                 (- (* (/ (convert i float) (convert nx float)) 2.0) 1.0))
+          (pset! field_arrows
+                 (+ idx 1)
+                 (- (* (/ (convert j float) (convert ny float)) 2.0) 1.0))))
+      ;; fields
+      (set! field_vbo (VBO_create field_arrows (convert (* 4 nx ny))))
+      (set! field_vao (VAO_create))
+      (VAO_bind_attribute field_vao field_vbo 0 2)
+      (set! field_sp (ShaderProgram_create
+                      (sys_slurp_file "libs/contrib/pic/pbpic2-field.vert")
+                      (sys_slurp_file "libs/contrib/pic/pbpic2-field.frag")))
+      void)))
 
-;; set base verts (i.e. every second vec2) to regular grid
-(impc:aot:do-or-emit
- (call-as-xtlang
-  (let ((idx 0))
-    (doloop (i nx)
-      (doloop (j ny)
-        (set! idx (* (+ (* i nx) j) 4))
-        (pset! field_arrows
-               idx
-               (- (* (/ (convert i float) (convert nx float)) 2.0) 1.0))
-        (pset! field_arrows
-               (+ idx 1)
-               (- (* (/ (convert j float) (convert ny float)) 2.0) 1.0)))))))
+(pbpic2_visuals_field_init)
 
-(bind-func copy_field_xy_to_arrows_buffer
+(bind-func pbpic2_visuals_copy_field_data
   (lambda (field:float* scale_factor:float)
     (let ((field_arrows_idx 0)
           (field_idx 0)
@@ -87,7 +111,7 @@
 
 ;; not sure why fxyze tends to get massive (junk) numbers in it, but
 ;; this hack cleans them out.
-(bind-func remove_guff_from_arrows_buffer
+(bind-func pbpic2_visuals_reset_arrows_buffer
   (lambda ()
     (let ((idx 0))
       (doloop (i nx)
@@ -103,10 +127,10 @@
                      (+ 3 idx)
                      (pref field_arrows (+ 1 idx)))))))))
 
-(bind-func gl_draw_field
+(bind-func pbpic2_visuals_field_draw
   (lambda ()
-    (copy_field_xy_to_arrows_buffer fxyze .1)
-    ;; (remove_guff_from_arrows_buffer)
+    (pbpic2_visuals_copy_field_data fxyze .1)
+    ;; (pbpic2_visuals_reset_arrows_buffer)
     (VBO_update_data field_vbo)
     (glUseProgram field_sp)
     (VAO_bind_and_draw_arrays field_vao GL_LINES 0 (convert (* 4 nxe ny)))
@@ -119,42 +143,127 @@
 
 (bind-val particle_sp ShaderProgram)
 
-(bind-func create_particle_shader
-  (lambda (vsource:i8* fsource:i8*)
-    (set! particle_sp (ShaderProgram_create vsource fsource))))
+(bind-func pbpic2_visuals_particles_init
+  (lambda ()
+    (set! particle_vbo (VBO_create part (convert (* nvp idimp npmax))))
+    (set! particle_vao (VAO_create))
+    (VAO_bind_attribute particle_vao particle_vbo 0 2 5 0)
+    (VAO_bind_attribute particle_vao particle_vbo 1 3 5 2)
+    (set! particle_sp (ShaderProgram_create
+                       (sys_slurp_file "libs/contrib/pic/pbpic2-particle.vert")
+                       (sys_slurp_file "libs/contrib/pic/pbpic2-particle.frag")))
+    void))
 
-(impc:aot:do-or-emit
- (create_particle_shader (sys:slurp-file "libs/contrib/pic/pbpic2-particle.vert")
-                         (sys:slurp-file "libs/contrib/pic/pbpic2-particle.frag")))
+(pbpic2_visuals_particles_init)
 
-(bind-func gl_draw_particles
+(bind-func pbpic2_visuals_particles_draw
   (lambda ()
     ;; move particles, update VBO
     (VBO_update_data particle_vbo)
     ;; draw the world
-    (let ((nxnyloc (glGetUniformLocation particle_sp "nxny")))
-      (glUseProgram particle_sp)
-      (glUniform2f nxnyloc (convert nxe) (convert ny)))
+    (glUseProgram particle_sp)
+    (glUniform2f (glGetUniformLocation particle_sp "nxny") (convert nxe) (convert ny))
     (VAO_bind_and_draw_arrays particle_vao GL_POINTS 0 (* nvp npmax))
     void))
+
+;; histograms (currently taken from math.xtm, but with some modifications)
+
+(bind-type HistBin <float,float>
+  "a histogram bin: <lower,count>")
+
+(bind-func HistBin_print
+  "specialised print function for HistBin*"
+  (lambda (histbin:HistBin*)
+    (if (null? histbin)
+        (printf "<HistBin 0x0>")
+        (printf "<HistBin %p minval=%f count=%f>"
+                histbin
+                (convert (tref histbin 0) double)
+                (convert (tref histbin 1) double)))
+    void))
+
+(bind-poly print HistBin_print)
+
+(bind-func HistBin_toString
+  "specialised toString function for HistBin*"
+  (lambda (histbin:HistBin*)
+    (let ((str:i8* (salloc 256)))
+      (if (null? histbin)
+          (sprintf str "<HistBin 0x0>")
+          
+          (sprintf str
+                   "<HistBin %p minval=%f count=%f>"
+                   histbin
+                   (convert (tref histbin 0) double)
+                   (convert (tref histbin 1) double)))
+      (Str str))))
+
+(bind-poly toString HistBin_toString)
+
+;; this version is aware of the stride required for the part data
+;; buffer
+
+(bind-func histogram_float_full
+  (lambda (hist:HistBin* buf:float* buflen lower upper nbins)
+    (let ((current_bin:HistBin* null)
+          (range (- upper lower))
+          (i 0))
+      (if (not (> range 0.))
+          (begin
+            (println "Error in histogram: range (- upper lower) must be greater than 0.0")
+            null)
+          (begin
+            ;; setup the bins
+            (doloop (i nbins)
+              (tset! (pref-ptr hist i)
+                     0
+                     (+ lower (* (convert i) (/ range (convert nbins)))))
+              (tset! (pref-ptr hist i) 1 0.))
+            (doloop (i buflen)
+              (set! current_bin
+                    ;; use "mod nbins" to make sure it always goes
+                    ;; into a valid slot in memory
+                    (pref-ptr hist (% (convert (* (convert nbins float) (/ (- (pref buf (+ (* i 5) 2)) lower) range)) i64) nbins)))
+              (tset! current_bin 1 (+ (tref current_bin 1) 1.0)))
+            hist)))))
+
+(bind-func histogram_float_range
+  "like the full version, but use the min and max values in the buffer as upper and lower"
+  (lambda (hist:HistBin* buf:float* buflen nbins)
+    (let ((lower 0.0)
+          (upper 0.0))
+      ;; find max/min values
+      (doloop (i buflen)
+        (if (< (pref buf i) lower)
+            (set! lower (pref buf i)))
+        (if (> (pref buf i) upper)
+            (set! upper (pref buf i))))
+      (histogram_float_full hist buf buflen lower upper nbins))))
+
+(bind-poly histogram histogram_float_full)
+(bind-poly histogram histogram_float_range)
 
 ;; framebuffer & backing textures
 
 (bind-val fbo FBO*)
 (bind-val ss_quad_vao VAO*)
-
 (bind-val post_process_sp ShaderProgram)
 
-(bind-func create_post_process_shader
-  (lambda (vsource:i8* fsource:i8*)
-    (set! post_process_sp (ShaderProgram_create vsource fsource))))
+(bind-func pbpic2_visuals_framebuffer_init
+  (lambda ()
+    (let ((fbw_ptr:i32* (salloc))
+          (fbh_ptr:i32* (salloc)))
+      (glfwGetFramebufferSize window fbw_ptr fbh_ptr)
+      (println (set! fbo (FBO_create_with_textures (pref fbw_ptr 0) (pref fbh_ptr 0) #t)))
+      (set! ss_quad_vao (VAO_create_ss_quad))
+      (set! post_process_sp (ShaderProgram_create
+                             (sys_slurp_file "libs/contrib/pic/framebuffer.vert")
+                             (sys_slurp_file "libs/contrib/pic/framebuffer.frag")))
+      void)))
 
-(impc:aot:do-or-emit
- (create_post_process_shader
-  (sys:slurp-file "libs/contrib/pic/framebuffer.vert")
-  (sys:slurp-file "libs/contrib/pic/framebuffer.frag")))
+(pbpic2_visuals_framebuffer_init)
 
-(bind-func gl_draw_framebuffer
+(bind-func pbpic2_visuals_draw_framebuffer
   (lambda ()
     ;; bind default framebuffer
     (glBindFramebuffer GL_FRAMEBUFFER 0)
@@ -170,30 +279,9 @@
     ;; draw the quad
     (glDrawArrays GL_TRIANGLE_STRIP 0 4)))
 
-;; init all the things
-
-(impc:aot:do-or-emit
- (call-as-xtlang
-  ;; FBO
-  (let ((fbw_ptr:i32* (salloc))
-        (fbh_ptr:i32* (salloc)))
-    (glfwGetFramebufferSize window fbw_ptr fbh_ptr)
-    (println (set! fbo (FBO_create_with_textures (pref fbw_ptr 0) (pref fbh_ptr 0) #t)))
-    (set! ss_quad_vao (VAO_create_ss_quad)))
-  ;; particles
-  (set! particle_vbo (VBO_create part (convert (* nvp idimp npmax))))
-  (set! particle_vao (VAO_create))
-  (VAO_bind_attribute particle_vao particle_vbo 0 2 5 0)
-  (VAO_bind_attribute particle_vao particle_vbo 1 3 5 2)
-  ;; fields
-  (set! field_vbo (VBO_create field_arrows (convert (* 4 nx ny))))
-  (set! field_vao (VAO_create))
-  (VAO_bind_attribute field_vao field_vbo 0 2)
-  void))
-
 ;; draw all the things
 
-(bind-func gl_draw_loop
+(bind-func pbpic2_visuals_loop
   (let ((drawbufs_ptr:GLenum* (zalloc)))
     (pset! drawbufs_ptr 0 GL_COLOR_ATTACHMENT0)
     (lambda (time:i64 delta_t:double)
@@ -201,15 +289,37 @@
       (glBindFramebuffer GL_FRAMEBUFFER (FBO_id fbo))
       (glDrawBuffers 1 drawbufs_ptr)
       (glClear (bor GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      ;; draw the things
-      (gl_draw_particles)
-      (gl_draw_field)
-      ;; render it to screen from FBO
-      (gl_draw_framebuffer)
+      ;; (raw) OpenGL draw routines
+      (pbpic2_visuals_particles_draw)
+      (pbpic2_visuals_field_draw)
+      ;; setup nanovg
+      (nvgBeginFrame vg width height pixel_ratio)
+      (nvgResetTransform vg)
+      (_nvgFillColor vg (NVGcolor 1. 1. 1. 1.))
+      (nvgRect vg 100. 100. 100. 100.)
+      (nvgFill vg)
+      ;; draw any nanovg things
+      (nvgEndFrame vg)
+      ;; render FBO to screen
+      (pbpic2_visuals_draw_framebuffer)
+      ;; poll events, swap buffers
       (glfwPollEvents)
       (glfwSwapBuffers window)
       (let ((next_time (+ time (convert (* 44100. delta_t)))))
-        (callback next_time gl_draw_loop next_time delta_t)))))
+        (callback next_time pbpic2_visuals_loop next_time delta_t)))))
 
 ;; start it running
-(gl_draw_loop (now) (/ 1. 30.))
+(pbpic2_visuals_loop (now) (/ 1. 30.))
+
+(bind-dylib libc
+  (cond ((string=? (sys:platform) "OSX") "libc.dylib")
+        ((string=? (sys:platform) "Linux") "libc.so")
+        ((string=? (sys:platform) "Windows") "libc.dll")))
+
+(bind-lib libc getloadavg [i32,double*,i32]*)
+
+(call-as-xtlang
+ (let ((load:double* (salloc 3)))
+   (if (<> (getloadavg load 3) -1)
+       (doloop (i 3)
+         (println (pref load i))))))

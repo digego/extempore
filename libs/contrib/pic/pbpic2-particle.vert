@@ -8,7 +8,7 @@ uniform vec2 nxny;
 out vec4 colour;
 
 void main() {
-  gl_PointSize = 4; // min(50.0, 8.*sqrt(length(velocity)));
+  gl_PointSize = 2; // min(50.0, 8.*sqrt(length(velocity)));
   colour = vec4(velocity,.5);
   gl_Position = vec4((2*(position/nxny))-1.0,0.0,1.0);
 }
