@@ -14,7 +14,7 @@
 (bind-val pixel_ratio float (glfw_get_pixel_ratio window))
 
 (sys:load "libs/external/gl/gl-objects.xtm")
-(sys:load "libs/external/nanovg.xtm")
+(sys:load "libs/external/datavis.xtm")
 
 ;; OpenGL setup
 
@@ -200,11 +200,11 @@
 
 (bind-poly toString HistBin_toString)
 
-;; this version is aware of the stride required for the part data
-;; buffer
+;; this version takes extra arguments to do with the stride required
+;; for the part data buffer
 
 (bind-func histogram_float_full
-  (lambda (hist:HistBin* buf:float* buflen lower upper nbins)
+  (lambda (hist:HistBin* buf:float* buflen lower upper nbins amp dc)
     (let ((current_bin:HistBin* null)
           (range (- upper lower))
           (i 0))
@@ -223,13 +223,13 @@
               (set! current_bin
                     ;; use "mod nbins" to make sure it always goes
                     ;; into a valid slot in memory
-                    (pref-ptr hist (% (convert (* (convert nbins float) (/ (- (pref buf (+ (* i 5) 2)) lower) range)) i64) nbins)))
+                    (pref-ptr hist (% (convert (* (convert nbins float) (/ (- (pref buf (+ (* i amp) dc)) lower) range)) i64) nbins)))
               (tset! current_bin 1 (+ (tref current_bin 1) 1.0)))
             hist)))))
 
 (bind-func histogram_float_range
   "like the full version, but use the min and max values in the buffer as upper and lower"
-  (lambda (hist:HistBin* buf:float* buflen nbins)
+  (lambda (hist:HistBin* buf:float* buflen nbins amp dc)
     (let ((lower 0.0)
           (upper 0.0))
       ;; find max/min values
@@ -238,10 +238,89 @@
             (set! lower (pref buf i)))
         (if (> (pref buf i) upper)
             (set! upper (pref buf i))))
-      (histogram_float_full hist buf buflen lower upper nbins))))
+      (histogram_float_full hist buf buflen lower upper nbins amp dc))))
 
 (bind-poly histogram histogram_float_full)
 (bind-poly histogram histogram_float_range)
+
+;; now for the actual histogram visuals
+
+(bind-val vhist_nbins i64 100)
+(bind-val vhist_data HistBin*)
+
+(bind-func pbpic2_visuals_vhist_init
+  (lambda ()
+    (let ((hb:HistBin* (halloc (* vhist_nbins 3))))
+      (set! vhist_data hb))))
+
+(pbpic2_visuals_vhist_init)
+
+(bind-func pbpic2_visuals_vhist_draw
+  (let ((bounds (Rect (* (convert width) .5) 0.
+                      (* (convert width) .5) (* (convert height) .5)))
+        (xcolor (NVGcolor 1. 0. 0. 1.))
+        (xrect (Rect (tref bounds 0) (tref bounds 1)
+                     (/ (tref bounds 2) 3.) (tref bounds 3)))
+        (ycolor (NVGcolor 0. 1. 0. 1.))
+        (yrect (Rect (+ (tref bounds 0) (/ (tref bounds 2) 3.)) (tref bounds 1)
+                     (/ (tref bounds 2) 3.) (tref bounds 3)))
+        (zcolor (NVGcolor 0. 0. 1. 1.))
+        (zrect (Rect (+ (tref bounds 0) (* 2. (/ (tref bounds 2) 3.))) (tref bounds 1)
+                     (/ (tref bounds 2) 3.) (tref bounds 3)))
+        (histrange 4.)
+        (histscale .002)
+        (font_size 30.))
+    (lambda ()
+      ;; x histogram
+      (histogram vhist_data part (convert np) (* -1. histrange) histrange vhist_nbins 5 2)
+      ;; y histogram
+      (histogram (pref-ptr vhist_data vhist_nbins) part (convert np) (* -1. histrange) histrange vhist_nbins 5 3)
+      ;; z histogram
+      (histogram (pref-ptr vhist_data (* 2 vhist_nbins)) part (convert np) (* -1. histrange) histrange vhist_nbins 5 4)
+      ;; apply some scaling
+      (doloop (i (* 3 vhist_nbins))
+        (tset! (pref-ptr vhist_data i) 0 (+ .5 (/ (tref (pref-ptr vhist_data i) 0) (* 2. histrange))))
+        (tset! (pref-ptr vhist_data i) 1 (* (tref (pref-ptr vhist_data i) 1) histscale)))
+      ;; nvg labels
+      (nvgFontSize vg font_size)
+      ;; vx histogram
+      
+      ;; (dv_draw_title vg xrect "vx")
+      (dv_draw_axes_2D vg xrect)
+      ;; (nvgBeginPath vg)
+      (nvgText vg (tref xrect 0) (+ (tref xrect 1) font_size) "vx" null)
+      ;; (nvgFill vg)
+      (dv_draw_line vg xrect (cast vhist_data float*) vhist_nbins)
+      ;; ;; vy histogram
+      ;; (dv_draw_title vg yrect "vy")
+      (dv_draw_axes_2D vg yrect)
+      (nvgText vg (tref xrect 0) (+ (tref xrect 1) font_size) "vy" null)
+      (dv_draw_line vg yrect (cast (pref-ptr vhist_data vhist_nbins) float*) vhist_nbins)
+      ;; ;; vz histogram
+      ;; (dv_draw_title vg zrect "vz")
+      (dv_draw_axes_2D vg zrect)
+      (nvgText vg (tref xrect 0) (+ (tref xrect 1) font_size) "vz" null)
+      (dv_draw_line vg zrect (cast (pref-ptr vhist_data (* 2 vhist_nbins)) float*) vhist_nbins)
+      void)))
+
+(call-as-xtlang
+ (doloop (i (* 3 vhist_nbins))
+   (println (pref-ptr vhist_data i))))
+
+;; load indicators
+
+(bind-dylib libc
+  (cond ((string=? (sys:platform) "OSX") "libc.dylib")
+        ((string=? (sys:platform) "Linux") "libc.so")
+        ((string=? (sys:platform) "Windows") "libc.dll")))
+
+(bind-lib libc getloadavg [i32,double*,i32]*)
+
+;; (call-as-xtlang
+;;  (let ((load:double* (salloc 3)))
+;;    (if (<> (getloadavg load 3) -1)
+;;        (doloop (i 3)
+;;          (println (pref load i))))))
 
 ;; framebuffer & backing textures
 
@@ -295,9 +374,7 @@
       ;; setup nanovg
       (nvgBeginFrame vg width height pixel_ratio)
       (nvgResetTransform vg)
-      (_nvgFillColor vg (NVGcolor 1. 1. 1. 1.))
-      (nvgRect vg 100. 100. 100. 100.)
-      (nvgFill vg)
+      (pbpic2_visuals_vhist_draw)
       ;; draw any nanovg things
       (nvgEndFrame vg)
       ;; render FBO to screen
@@ -310,16 +387,3 @@
 
 ;; start it running
 (pbpic2_visuals_loop (now) (/ 1. 30.))
-
-(bind-dylib libc
-  (cond ((string=? (sys:platform) "OSX") "libc.dylib")
-        ((string=? (sys:platform) "Linux") "libc.so")
-        ((string=? (sys:platform) "Windows") "libc.dll")))
-
-(bind-lib libc getloadavg [i32,double*,i32]*)
-
-(call-as-xtlang
- (let ((load:double* (salloc 3)))
-   (if (<> (getloadavg load 3) -1)
-       (doloop (i 3)
-         (println (pref load i))))))
