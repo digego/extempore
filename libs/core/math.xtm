@@ -2687,14 +2687,14 @@
 ;; other naming options: sparse/dense, stride/unstride
 
 (bind-func data_unpack_float
-  "take a packed buffer and copy it into a sparse representation"
+  "take a packed float* buffer and copy it into a sparse representation"
   (lambda (dest:float* src:float* stride neighbors srclen)
     (doloop (i srclen)
       (doloop (j neighbors)
         (pset! dest (+ (* stride i) j) (pref src (+ (* neighbors i) j)))))))
 
 (bind-func data_unpack_double
-  "take a packed buffer and copy it into a sparse representation"
+  "take a packed double* buffer and copy it into a sparse representation"
   (lambda (dest:double* src:double* stride neighbors srclen)
     (doloop (i srclen)
       (doloop (j neighbors)
@@ -2704,14 +2704,14 @@
 (bind-poly data_unpack data_unpack_double)
 
 (bind-func data_pack_float
-  "take a sparse buffer and copy it into a packed representation"
+  "take a sparse float* buffer and copy it into a packed representation"
   (lambda (dest:float* src:float* stride neighbors srclen)
     (doloop (i srclen)
       (doloop (j neighbors)
         (pset! dest (+ (* neighbors i) j) (pref src (+ (* stride i) j)))))))
 
 (bind-func data_pack_double
-  "take a sparse buffer and copy it into a packed representation"
+  "take a sparse double* buffer and copy it into a packed representation"
   (lambda (dest:double* src:double* stride neighbors srclen)
     (doloop (i srclen)
       (doloop (j neighbors)
@@ -2719,6 +2719,39 @@
 
 (bind-poly data_pack data_pack_float)
 (bind-poly data_pack data_pack_double)
+
+(bind-func data_print_float
+  "print a packed float* buffer"
+  (lambda (buf:float* buflen ncols)
+    (doloop (i buflen)
+      (printf "buf[%lld] = %.4f " i (convert (pref buf i) double))
+      (if (= (% i ncols) (- ncols 1))
+          (println)))
+    (println)))
+
+(bind-func data_print_float_onecol
+  "print a packed float* buffer"
+  (lambda (buf buflen)
+    (data_print_float buf buflen 1)))
+
+(bind-func data_print_double
+  "print a packed double* buffer"
+  (lambda (buf:double* buflen ncols)
+    (doloop (i buflen)
+      (printf "buf[%lld] = %.4f " i (pref buf i))
+      (if (= (% i ncols) (- ncols 1))
+          (println)))
+    (println)))
+
+(bind-func data_print_double_onecol
+  "print a packed double* buffer"
+  (lambda (buf buflen)
+    (data_print_float buf buflen 1)))
+
+(bind-poly data_print data_print_float)
+(bind-poly data_print data_print_float_onecol)
+(bind-poly data_print data_print_double)
+(bind-poly data_print data_print_double_onecol)
 
 ;;;;;;;;;;;;;;;
 ;; histogram ;;
