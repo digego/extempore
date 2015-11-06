@@ -23,7 +23,7 @@ other packages as well.
 
 To install Extempore through homebrew, first
 ```
-brew tap benswift/extempore
+brew tap benswift/extempore && brew tap homebrew/versions
 ```
 then
 ```
@@ -33,6 +33,9 @@ or, if you want the "extended" libs (e.g. graphics)
 ```
 brew install extempore --with-extended
 ```
+The `homebrew/versions` tap is needed for `glfw3` (required to build
+the extended stdlib) while the `benswift/extempore` tap is contains
+Extempore itself (and a few other deps)
 
 **Caveats**
 
