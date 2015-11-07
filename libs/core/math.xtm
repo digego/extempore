@@ -1983,21 +1983,55 @@
 
 (bind-type Complexd <double,double>)
 
-(bind-func Complexd_print
-  (lambda (c:Complexd)
-    (printf "%.2f%+.2fi"
-            (tref c 0)
-            (tref c 1))
-    void))
-
-(bind-poly print Complexd_print)
-
 (bind-func Cpxd
   (lambda (re im)
     (let ((c:Complexd* (salloc)))
       (tset! c 0 re)
       (tset! c 1 im)
       (pref c 0))))
+
+(bind-func Complexd_print
+  "specialised print function for Complexd"
+  (lambda (c:Complexd)
+    (printf "%.2f%+.2fi"
+            (tref c 0)
+            (tref c 1))
+    void))
+
+(bind-func Complexd_ptr_print
+  "specialised print function for Complexd*"
+  (lambda (c:Complexd*)
+    (if (null? c)
+        (printf "<Complexd 0x0>")
+        (printf "%.2f%+.2fi"
+                (tref c 0)
+                (tref c 1)))
+    void))
+
+(bind-func Complexd_toString
+  "specialised toString function for Complexd"
+  (lambda (c:Complexd)
+    (let ((str:i8* (salloc 256)))
+      (sprintf str "%.2f%+.2fi"
+               (tref c 0)
+               (tref c 1))
+      (Str str))))
+
+(bind-func Complexd_ptr_toString
+  "specialised toString function for Complexd"
+  (lambda (c:Complexd*)
+    (let ((str:i8* (salloc 256)))
+      (if (null? c)
+          (sprintf str "<Complexd 0x0>")
+          (sprintf str "%.2f%+.2fi"
+                   (tref c 0)
+                   (tref c 1)))
+      (Str str))))
+
+(bind-poly print Complexd_ptr_print)
+(bind-poly print Complexd_print)
+(bind-poly toString Complexd_ptr_toString)
+(bind-poly toString Complexd_toString)
 
 (bind-func Complexd_addition_cpx_cpx
   (lambda (a:Complexd b:Complexd)
@@ -2229,13 +2263,47 @@
       (pref c 0))))
 
 (bind-func Complexf_print
+  "specialised print function for Complexf"
   (lambda (c:Complexf)
-    (printf "%.2f%+.2fi" ;; "%f+%fi\n"
+    (printf "%.2f%+.2fi"
             (ftod (tref c 0))
             (ftod (tref c 1)))
     void))
 
+(bind-func Complexf_ptr_print
+  "specialised print function for Complexf*"
+  (lambda (c:Complexf*)
+    (if (null? c)
+        (printf "<Complexf 0x0>")
+        (printf "%.2f%+.2fi"
+            (ftod (tref c 0))
+            (ftod (tref c 1))))
+    void))
+
+(bind-func Complexf_toString
+  "specialised toString function for Complexf"
+  (lambda (c:Complexf)
+    (let ((str:i8* (salloc 256)))
+      (sprintf str "%.2f%+.2fi"
+               (ftod (tref c 0))
+               (ftod (tref c 1)))
+      (Str str))))
+
+(bind-func Complexf_ptr_toString
+  "specialised toString function for Complexf"
+  (lambda (c:Complexf*)
+    (let ((str:i8* (salloc 256)))
+      (if (null? c)
+          (sprintf str "<Complexf 0x0>")
+          (sprintf str "%.2f%+.2fi"
+                   (ftod (tref c 0))
+                   (ftod (tref c 1))))
+      (Str str))))
+
+(bind-poly print Complexf_ptr_print)
 (bind-poly print Complexf_print)
+(bind-poly toString Complexf_ptr_toString)
+(bind-poly toString Complexf_toString)
 
 (bind-func Complexf_addition_cpx_cpx
   (lambda (a:Complexf b:Complexf)
