@@ -253,7 +253,7 @@ int main(int argc, char** argv)
         std::string key((char*)args.OptionText());
         std::string val(args.OptionArg());
 
-        if(key.substr(0,2) == std::string("--")) {
+        if(key.substr(0,2) != std::string("--")) {
             std::cout << "Poorly formed argument: " << key << std::endl;
             return 1;
         }
