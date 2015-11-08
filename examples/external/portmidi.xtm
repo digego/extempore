@@ -6,7 +6,10 @@
 
 ;;; Commentary:
 
-;; 
+;; this example shows how to send and recieve MIDI in Extempore. If
+;; all you want to do is send MIDI out to an external device (e.g. a
+;; hard/soft synth) then have a look at portmidi-output.xtm in this
+;; directory
 
 ;;; Code:
 
@@ -60,3 +63,10 @@ like."
 ;; Scheme MIDI I/O
 
 (play-midi-note (now) *midi-out* (random 60 72) (random 60 90) 44100 0)
+
+(define midi-loop
+  (lambda (beat dur)
+    (mplay *midi-out* (random (list 60 60 60 67 70 74 75)) (random 60 80) dur)
+    (callback (*metro* (+ beat (* .5 dur))) 'midi-loop (+ beat dur) dur)))
+
+(midi-loop (*metro* 'get-beat 4) 1/4)
