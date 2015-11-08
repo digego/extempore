@@ -705,6 +705,17 @@ Scheme)"
 (bind-val MIDI_SONGSEL i32 #xF3)
 (bind-val MIDI_TUNE i32 #xF6)
 
+;; bind them in scheme, too
+
+(impc:aot:do-or-emit (define *midi-note-off*     #x80)) ;; args: key, velocity
+(impc:aot:do-or-emit (define *midi-note-on*      #x90)) ;; args: key, velocity
+(impc:aot:do-or-emit (define *midi-poly-touch*   #xA0)) ;; args: key, touch
+(impc:aot:do-or-emit (define *midi-ctrl*         #xB0)) ;; args: controller, value
+(impc:aot:do-or-emit (define *midi-cc*           #xB0)) ;; args: controller, value
+(impc:aot:do-or-emit (define *midi-ch-program*   #xC0)) ;; args: value, ignored
+(impc:aot:do-or-emit (define *midi-touch*        #xD0)) ;; args: value, ignored
+(impc:aot:do-or-emit (define *midi-bend*         #xE0)) ;; args: lsb (7 bits), msb (7 bits)
+
 ;; xtlang wrapper functions
 
 (bind-func pm_initialize
@@ -782,15 +793,6 @@ output device(s)
     (= (& (tref event 0) #xF0) MIDI_CONTROL)))
 
 ;; scheme helper functions
-
-(impc:aot:do-or-emit (define *midi-note-off*     #x80)) ;; args: key, velocity
-(impc:aot:do-or-emit (define *midi-note-on*      #x90)) ;; args: key, velocity
-(impc:aot:do-or-emit (define *midi-poly-touch*   #xA0)) ;; args: key, touch
-(impc:aot:do-or-emit (define *midi-ctrl*         #xB0)) ;; args: controller, value
-(impc:aot:do-or-emit (define *midi-cc*           #xB0)) ;; args: controller, value
-(impc:aot:do-or-emit (define *midi-ch-program*   #xC0)) ;; args: value, ignored
-(impc:aot:do-or-emit (define *midi-touch*        #xD0)) ;; args: value, ignored
-(impc:aot:do-or-emit (define *midi-bend*         #xE0)) ;; args: lsb (7 bits), msb (7 bits)
 
 (impc:aot:do-or-emit
  (define play-midi-note
