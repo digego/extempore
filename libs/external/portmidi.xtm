@@ -716,10 +716,17 @@ Scheme)"
 (bind-func pm_print_devices
   (lambda ()
     (let ((ndev (Pm_CountDevices)))
-      (println "Portmidi: found" ndev "devices")
-      (doloop (i ndev)
-        (println "---- device" i " ----")
-        (println (Pm_GetDeviceInfo i))))))
+      (if (= ndev 0)
+          (println "No MIDI devices found")
+          (begin
+            (println "\n-- MIDI input devices --\n")
+            (doloop (i ndev)
+              (if (= (tref (Pm_GetDeviceInfo i) 3) 1)
+                  (println "  device id" i ":" (Pm_GetDeviceInfo i))))
+            (println "\n-- MIDI output devices --\n")
+            (doloop (i ndev)
+              (if (= (tref (Pm_GetDeviceInfo i) 4) 1)
+                  (println "  device id" i ":" (Pm_GetDeviceInfo i)))))))))
 
 (bind-func pm_current_time_in_ms
   "return current time in ms - required for the portmidi API
