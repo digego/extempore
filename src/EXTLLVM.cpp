@@ -887,8 +887,14 @@ int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
   struct timespec a, b;
   a.tv_sec = secs;
   a.tv_nsec = nanosecs;
-  nanosleep(&a,&b);
-  return b.tv_nsec;
+  int rval = nanosleep(&a,&b);
+  if(rval == 0) {
+    return 0;
+  } else if (errno == EINTR) {
+    return b.tv_nsec;
+  } else {
+    return -1;
+  }
 #endif  
 }
 

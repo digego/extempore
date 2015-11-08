@@ -484,6 +484,8 @@
     ("atof" . #((213 0 108) "" ()))
     ("atoi" . #((213 4 108) "" ()))
     ("atol" . #((213 2 108) "" ()))
+    ("audio_clock_base" . #((213 0) "" ()))
+    ("audio_clock_now" . #((213 0) "" ()))
     ("base64_decode" . #((213 108 108 2 2) "" ()))
     ("base64_encode" . #((213 108 108 2 2) "" ()))
     ("calloc" . #((213 108 2 2) "" ()))
@@ -914,6 +916,8 @@
     ("thread_kill" . #((213 4 108) "" ()))
     ("thread_self" . #((213 108) "" ()))
     ("thread_sleep" . #((213 2 2 2) "" ()))
+    ("thread_equal" . #((213 4 108 108) "" ()))
+    ("thread_equal_self" . #((213 4 108) "" ()))
     ("tmpfile" . #((213 108) "" ()))
     ("tmpnam" . #((213 108 108) "" ()))
     ("trunc" . #((213 0 0) "" ()))
@@ -5503,13 +5507,12 @@
       (let ((ret (impc:ti:type-check (caddr ast) vars kts request?)))
         ret))))
 
-
-
 (define impc:ti:null?-check
   (lambda (ast vars kts request?)
-    ;;(println 'nullcheck)
     (let ((a (impc:ti:type-check (cadr ast) vars kts request?)))
-      (if (null? a) ;; couldn't resolve yet!
+      (if (or (null? a) ;; couldn't resolve yet!
+              (and (pair? a)
+                   (null? (car a))))
           (list *impc:ir:i1*)
           (if (if (not (impc:ir:type? a))
                   (impc:ir:pointer? (car a))
@@ -5937,6 +5940,7 @@
       ;;         #f)
       ;;     #f))))
       (if (and (not (null? a))
+               (not (null? (car a)))
                (not (symbol? (car a))) ;; symbol may not have yet been defined!!
                (not (impc:ir:tuple? (car a))))
           (impc:compiler:print-bad-type-error (caddr ast) (string-append "invalid tuple-set-check type " (impc:ir:get-type-str (car a)))))

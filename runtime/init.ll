@@ -66,8 +66,8 @@ declare i8* @thread_fork(i8*,i8*);
 declare i32 @thread_join(i8*);
 declare i32 @thread_kill(i8*);
 declare i8* @thread_self();
-declare i8* @thread_equal_self(i8*);
-declare i8* @thread_equal(i8*,i8*);
+declare i32 @thread_equal_self(i8*);
+declare i32 @thread_equal(i8*,i8*);
 declare i64 @thread_sleep(i64,i64);
 declare i8* @mutex_create()
 declare i32 @mutex_destroy(i8*)
