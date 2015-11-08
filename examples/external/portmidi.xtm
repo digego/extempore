@@ -19,7 +19,7 @@
 ;; midi_out), but by passing the appropriate device index arguments to
 ;; pm_create_input_stream and pm_create_output_stream you can create
 ;; as many as you like
-(define *midi-in* (pm_create_input_stream (pm_default_in)))
+(define *midi-in* (pm_create_input_stream 1)) ;(pm_default_in)))
 (define *midi-out* (pm_create_output_stream (pm_default_out)))
 
 (bind-func midi_read_loop
@@ -37,25 +37,25 @@ like."
           (dotimes (i read_count)
             (cond ((PmEvent_note_on_p (pref-ptr input_buffer i))
                    (println "note: ON pitch:"
-                            (Pm_MessageData1 (PmEvent_message (pref-ptr input_buffer i)))
+                            (Pm_Message_Data1 (Pm_Event_Message (pref-ptr input_buffer i)))
                             "velocity:"
-                            (Pm_MessageData2 (PmEvent_message (pref-ptr input_buffer i)))
+                            (Pm_Message_Data2 (Pm_Event_Message (pref-ptr input_buffer i)))
                             "channel:"
-                            (PmEvent_channel (pref-ptr input_buffer i))))
+                            (Pm_Event_Channel (pref-ptr input_buffer i))))
                   ((PmEvent_note_off_p (pref-ptr input_buffer i))
                    (println "note: OFF pitch:"
-                            (Pm_MessageData1 (PmEvent_message (pref-ptr input_buffer i)))
+                            (Pm_Message_Data1 (Pm_Event_Message (pref-ptr input_buffer i)))
                             "velocity:"
-                            (Pm_MessageData2 (PmEvent_message (pref-ptr input_buffer i)))
+                            (Pm_Message_Data2 (Pm_Event_Message (pref-ptr input_buffer i)))
                             "channel:"
-                            (PmEvent_channel (pref-ptr input_buffer i))))
+                            (Pm_Event_Channel (pref-ptr input_buffer i))))
                   (else
                    (println i (pref-ptr input_buffer i))))))
       (let ((next_time (+ time (convert (* 44100. delta_t)))))
         (callback next_time midi_read_loop input_stream next_time delta_t)))))
 
 ;; start the read loop
-(midi_read_loop *midi-in* (now) .01) ;; 100Hz
+(midi_read_loop *midi-in* (now) 0.01) ;; 100Hz
 
 ;; Scheme MIDI I/O
 
