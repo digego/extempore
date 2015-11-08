@@ -682,39 +682,51 @@ Scheme)"
 
 ;; the message flags
 
-(bind-val MIDI_CLOCK i32 #xF8)
-(bind-val MIDI_ACTIVE i32 #xFE)
-(bind-val MIDI_STATUS_MASK i32 #x80)
-(bind-val MIDI_SYSEX i32 #xF0)
-(bind-val MIDI_EOX i32 #xF7)
-(bind-val MIDI_START i32 #xFA)
-(bind-val MIDI_STOP i32 #xFC)
-(bind-val MIDI_CONTINUE i32 #xFB)
-(bind-val MIDI_F9 i32 #xF9)
-(bind-val MIDI_FD i32 #xFD)
-(bind-val MIDI_RESET i32 #xFF)
 (bind-val MIDI_NOTE_ON i32 #x90 "args: key, velocity")
 (bind-val MIDI_NOTE_OFF i32 #x80 "args: key, velocity")
-(bind-val MIDI_CHANNEL_AT i32 #xD0)
-(bind-val MIDI_POLY_AT i32 #xA0)
-(bind-val MIDI_PROGRAM i32 #xC0 "args: value, ignored")
-(bind-val MIDI_CONTROL i32 #xB0 "args: controller, value")
-(bind-val MIDI_PITCHBEND i32 #xE0 "args: lsb (7 bits), msb (7 bits)")
-(bind-val MIDI_MTC i32 #xF1)
-(bind-val MIDI_SONGPOS i32 #xF2)
-(bind-val MIDI_SONGSEL i32 #xF3)
+(bind-val MIDI_CHANNEL_AFTERTOUCH i32 #xD0)
+(bind-val MIDI_POLY_AFTERTOUCH i32 #xA0)
+(bind-val MIDI_PROGRAM_CHANGE i32 #xC0 "args: value, ignored")
+(bind-val MIDI_CONTROL_CHANGE i32 #xB0 "args: controller, value")
+(bind-val MIDI_CC i32 #xB0 "args: controller, value")
+(bind-val MIDI_PITCH_BEND i32 #xE0 "args: lsb (7 bits), msb (7 bits)")
+
+(bind-val MIDI_SYSEX i32 #xF0)
+(bind-val MIDI_TIME_CODE i32 #xF1)
+(bind-val MIDI_SONG_POSITION i32 #xF2)
+(bind-val MIDI_SONG_SELECT i32 #xF3)
 (bind-val MIDI_TUNE i32 #xF6)
+(bind-val MIDI_SYSEX_END i32 #xF7)
+(bind-val MIDI_TIMIING_CLOCK i32 #xF8)
+(bind-val MIDI_START i32 #xFA)
+(bind-val MIDI_CONTINUE i32 #xFB)
+(bind-val MIDI_STOP i32 #xFC)
+(bind-val MIDI_ACTIVE_SENSING i32 #xFE)
+(bind-val MIDI_RESET i32 #xFF)
 
 ;; bind them in scheme, too
 
-(impc:aot:do-or-emit (define *midi-note-off*     #x80)) ;; args: key, velocity
-(impc:aot:do-or-emit (define *midi-note-on*      #x90)) ;; args: key, velocity
-(impc:aot:do-or-emit (define *midi-poly-touch*   #xA0)) ;; args: key, touch
-(impc:aot:do-or-emit (define *midi-ctrl*         #xB0)) ;; args: controller, value
-(impc:aot:do-or-emit (define *midi-cc*           #xB0)) ;; args: controller, value
-(impc:aot:do-or-emit (define *midi-ch-program*   #xC0)) ;; args: value, ignored
-(impc:aot:do-or-emit (define *midi-touch*        #xD0)) ;; args: value, ignored
-(impc:aot:do-or-emit (define *midi-bend*         #xE0)) ;; args: lsb (7 bits), msb (7 bits)
+(impc:aot:do-or-emit (define *midi-note-on* #x90))
+(impc:aot:do-or-emit (define *midi-note-off* #x80))
+(impc:aot:do-or-emit (define *midi-channel-aftertouch* #xD0))
+(impc:aot:do-or-emit (define *midi-poly-aftertouch* #xA0))
+(impc:aot:do-or-emit (define *midi-program-change* #xC0))
+(impc:aot:do-or-emit (define *midi-control-change* #xB0))
+(impc:aot:do-or-emit (define *midi-cc* #xB0))
+(impc:aot:do-or-emit (define *midi-pitch-bend* #xE0))
+
+(impc:aot:do-or-emit (define *midi-sysex* #xF0))
+(impc:aot:do-or-emit (define *midi-time-code* #xF1))
+(impc:aot:do-or-emit (define *midi-song-position* #xF2))
+(impc:aot:do-or-emit (define *midi-song-select* #xF3))
+(impc:aot:do-or-emit (define *midi-tune* #xF6))
+(impc:aot:do-or-emit (define *midi-sysex-end* #xF7))
+(impc:aot:do-or-emit (define *midi-timiing-clock* #xF8))
+(impc:aot:do-or-emit (define *midi-start* #xFA))
+(impc:aot:do-or-emit (define *midi-continue* #xFB))
+(impc:aot:do-or-emit (define *midi-stop* #xFC))
+(impc:aot:do-or-emit (define *midi-active-sensing* #xFE))
+(impc:aot:do-or-emit (define *midi-reset* #xFF))
 
 ;; xtlang wrapper functions
 
@@ -790,15 +802,15 @@ output device(s)
 
 (bind-func PmEvent_cc_p
   (lambda (event:PmEvent*)
-    (= (& (tref event 0) #xF0) MIDI_CONTROL)))
+    (= (& (tref event 0) #xF0) MIDI_CONTROL_CHANGE)))
 
 ;; scheme helper functions
 
 (impc:aot:do-or-emit
  (define play-midi-note
    (lambda (time device pitch velocity duration channel)
-     (callback time 'pm_write device (Pm_Message (+ channel *midi-note-on*) pitch velocity))
-     (callback (+ time duration) 'pm_write device (Pm_Message (+ channel *midi-note-off*) pitch velocity)))))
+     (callback time 'pm_send device *midi-note-on* channel pitch velocity)
+     (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity))))
 
 ;; homophonic playnote
 (impc:aot:do-or-emit
