@@ -8358,6 +8358,8 @@
 (define-macro (bind-poly poly_sym implementation_sym . docstring)
   (if (impc:ti:genericfunc-exists? implementation_sym)
       (impc:compiler:print-compiler-error (string-append "bind-poly only accepts monomorphic functions, not " (symbol->string implementation_sym))))
+  (if (not (impc:ti:closure-or-nativefunc-exists? (symbol->string implementation_sym)))
+      (impc:compiler:print-missing-identifier-error implementation_sym 'closure))
   (let ((type (impc:ti:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
     ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
     (if type
