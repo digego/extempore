@@ -1,0 +1,45 @@
+(sys:load "libs/external/nanomsg.xtm")
+
+(bind-val REPLY_ADDRESS i8* "tcp://127.0.0.1:7150")
+(bind-val REPLY_SOCKET i32
+  (begin (nnsock_create NN_REP)
+         (nnsock_bind REPLY_SOCKET REPLY_ADDRESS)))
+
+(bind-func send_response
+  (let ((msglen:i64 4096)
+        (msg:i8* (zalloc msglen))
+        (continue #t))
+    (lambda (buf:i8* nbytes:i32)
+      (printf "revieved request: %.*s\n" nbytes buf)
+      (sprintf msg "**REPLY** ")
+      (sprintf (pref-ptr msg (strlen msg)) "%s" buf)
+      (let ((msglen (+ (strlen msg) 1))
+            (bytes (nn_send REPLY_SOCKET msg msglen 0)))
+        (if (or (< bytes 0) (< bytes (convert msglen)))
+            (nn_println_strerror)
+            void)))))
+
+(bind-func nonblocking_read_loop
+  (let ((buflen:i64 1024)
+        (buf:i8* (zalloc buflen))
+        (continue #t))
+    (lambda ()
+      (if (< REPLY_SOCKET 0)
+          (nn_println_strerror)
+          (let ((nbytes (nn_recv REPLY_SOCKET buf buflen NN_DONTWAIT)))
+            ;; if we get some bytes, trigger the callback
+            (if (> nbytes 0)
+                (send_response buf nbytes))))
+      (if continue
+          (callback (+ (now) 1000) nonblocking_read_loop)
+          (begin
+            (println "stopping nonblocking_read_loop")
+            0)))))
+
+;; start the read loop running
+(nonblocking_read_loop)
+
+;; ;; kill everything
+;; (call-as-xtlang
+;;  (nonblocking_read_loop.continue #f)
+;;  (nn_shutdown REPLY_SOCKET 0))
