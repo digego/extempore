@@ -310,8 +310,8 @@
 ;; (bind-func osc_c
 ;;   (lambda (phase)
 ;;     (lambda (amp freq)
-;;       (let ((inc (* TWOPI (/ freq SAMPLERATE))))
-;; 	(set! phase (+ phase inc))
+;;       (let ((incr (* TWOPI (/ freq SAMPLERATE))))
+;; 	(set! phase (+ phase incr))
 ;; 	(* amp (sin phase))))))
 
 (bind-func osc_c
@@ -386,8 +386,8 @@
 (bind-func rect_c
   (lambda (phase)
     (lambda (amp:SAMPLE freq duty)
-      (let ((inc (/ freq SAMPLERATE)))
-        (set! phase (+ phase inc))
+      (let ((incr (/ freq SAMPLERATE)))
+        (set! phase (+ phase incr))
         (if (> phase 1.0) (set! phase (- phase 1.0)))
         (if (< phase duty) amp (* -1.0 amp))))))
 
@@ -474,9 +474,9 @@
 (bind-func fade_c
   (lambda ()
     (let ((t 0.0)
-          (inc (/ 1.0 (convert (llvm_samplerate) SAMPLE))))
+          (incr (/ 1.0 (convert (llvm_samplerate) SAMPLE))))
       (lambda (initial:SAMPLE final dur)
-        (set! t (+ t inc))
+        (set! t (+ t incr))
         (if (> t dur)
             final
             (+ initial (* (/ t dur) (- final initial))))))))
@@ -1805,8 +1805,8 @@ but v1 and v2 can be computed in parallel"
     (lambda (start:SAMPLE end:SAMPLE dur:SAMPLE)
       (let* ((m (/ (- end start) dur))
              (c (- end (* m dur))))
-        (lambda (inc)
-          (set! time (+ time inc))
+        (lambda (incr)
+          (set! time (+ time incr))
           (+ (* m time) c))))))
 
 (bind-func linear_mc_c
@@ -1814,9 +1814,9 @@ but v1 and v2 can be computed in parallel"
     (lambda (start:SAMPLE end:SAMPLE dur:SAMPLE)
       (let* ((m (/ (- end start) dur))
              (c (- end (* m dur))))
-        (lambda (chan inc)
+        (lambda (chan incr)
           (if (= chan 0)
-              (set! time (+ time inc)))
+              (set! time (+ time incr)))
           (+ (* m time) c))))))
 
 (bind-func line_c
