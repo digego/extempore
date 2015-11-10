@@ -3165,9 +3165,19 @@
 
 ;; xtlang helper functions
 
+(bind-func glfw_error_callback:GLFWerrorfun
+  (lambda (err description)
+    (printf "GLFW error %d: %s\n" err description)
+    void))
+
 (bind-func glfw_init
   (lambda ()
-    (glfwInit)))
+    (let ((res (glfwInit)))
+      (if (= res 1)
+          (begin
+            (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+            res)
+          res))))
 
 (bind-func glfw_terminate
   (lambda ()
@@ -3265,11 +3275,6 @@
     (glfwWindowHint GLFW_OPENGL_PROFILE GLFW_OPENGL_COMPAT_PROFILE)))
 
 ;; callbacks
-
-(bind-func glfw_error_callback:GLFWerrorfun
-  (lambda (err description)
-    (printf "GLFW error %d: %s\n" err description)
-    void))
 
 (bind-func glfw_key_callback:GLFWkeyfun
   (lambda (window key scancode action mods)
