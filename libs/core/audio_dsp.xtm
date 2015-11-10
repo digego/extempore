@@ -1284,6 +1284,16 @@ but v1 and v2 can be computed in parallel"
         ((pref skf_buf chan) in cutoff res)))))
 
 
+(bind-func hermite_interp
+  (lambda (fractional y1:SAMPLE x0 x1 x2)
+    (let ((c (* 0.5 (- x1 y1)))
+          (v (- x0 x1))
+          (w (+ c v))
+          (a (+ w v (* (- x2 x0) 0.5)))
+          (b (+ w a)))
+      (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
+
+
 ;; a rough and ready granulator
 ;; expects to work on 'n' channels
 ;; see examples/external/granular.xtm
@@ -2095,14 +2105,6 @@ but v1 and v2 can be computed in parallel"
         val))))
 
 
-(bind-func hermite_interp
-  (lambda (fractional y1:SAMPLE x0 x1 x2)
-    (let ((c (* 0.5 (- x1 y1)))
-          (v (- x0 x1))
-          (w (+ c v))
-          (a (+ w v (* (- x2 x0) 0.5)))
-          (b (+ w a)))
-      (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
 
 ;;  midi/freq utilities
 
