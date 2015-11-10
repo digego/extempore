@@ -24,142 +24,261 @@
 (impc:aot:insert-header "xtmdatavis")
 
 (bind-func dv_draw_axes_2D
-  "draw 2D axes"
-  (lambda (vg bounds:Rect*)
-    (letz ((padding .1)
-           ;; we add the padding here
-           (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
-           (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
-           (w (* (tref bounds 2) (- 1. (* 2. padding))))
-           (h (* (tref bounds 3) (- 1. (* 2. padding)))))
-      (_nvgStrokeColor vg (NVGcolor 1. 1. 1. 1.))
-      (nvgStrokeWidth vg 1.)
-      (nvgBeginPath vg)
-      ;; max y (top left)
-      (nvgMoveTo vg x y)
-      ;; origin
-      (nvgLineTo vg x (+ y h))
-      ;; max x (bottom right)
-      (nvgLineTo vg (+ x w) (+ y h))
-      (nvgStroke vg)
-      0)))
+  "draw 2D axes
+
+@param vg - nanovg context pointer
+@param bounds - bounding rect in which to draw the axes"
+  (let ((stroke_width 2.)
+        (padding .1)
+        (colour (NVGcolor 1. 1. 1. 1.)))
+    (lambda (vg bounds:Rect*)
+      (let ((x (+ (tref bounds 0) (* (tref bounds 2) padding)))
+            (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
+            (w (* (tref bounds 2) (- 1. (* 2. padding))))
+            (h (* (tref bounds 3) (- 1. (* 2. padding)))))
+        (nvgStrokeWidth vg stroke_width)
+        (_nvgStrokeColor vg colour)
+        (nvgBeginPath vg)
+        ;; max y (top left)
+        (nvgMoveTo vg x y)
+        ;; origin
+        (nvgLineTo vg x (+ y h))
+        ;; max x (bottom right)
+        (nvgLineTo vg (+ x w) (+ y h))
+        (nvgStroke vg)
+        0))))
 
 (bind-func dv_draw_axis_labels_2D
-  "draw 2D axis labels"
-  (lambda (vg bounds:Rect* xlabs:float* nxlabs ylabs:float* nylabs)
-    (letz ((padding 0.1)
-           (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
-           (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
-           (w (* (tref bounds 2) (- 1. (* 2. padding))))
-           (h (* (tref bounds 3) (- 1. (* 2. padding))))
-           (font_size 20.)
-           (str:i8* (zalloc 256))
-           (i 0))
-      (nvgFontSize vg font_size)
-      (_nvgFillColor vg (NVGcolor .7 .7 .7 1.))
-      (nvgBeginPath vg)
-      ;; x labels
-      (dotimes (i nxlabs)
-        (sprintf str "%.2f" (convert (pref xlabs i) double))
-        (nvgText vg
-                 (+ x (* (convert i) (/ w (convert (- nxlabs 1)))))
-                 (+ y h font_size)
-                 str
-                 null))
-      ;; y labels
-      (dotimes (i nylabs)
-        (sprintf str "%.2f" (convert (pref ylabs i) double))
-        (nvgText vg
-                 (- x (* 3. font_size))
-                 (- (+ y h)
-                    (* (convert i) (/ h (convert (- nylabs 1)))))
-                 str
-                 null))
-      (nvgFill vg)
-      0)))
+  "draw 2D axis labels
+
+@param vg - nanovg context pointer
+@param bounds - bounding rect in which to draw the axis labels"
+  (let ((padding 0.1)
+        (font_size 20.)
+        (str:i8* (zalloc 256)))
+    (lambda (vg bounds:Rect* xlabs:float* nxlabs ylabs:float* nylabs)
+      (let ((x (+ (tref bounds 0) (* (tref bounds 2) padding)))
+            (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
+            (w (* (tref bounds 2) (- 1. (* 2. padding))))
+            (h (* (tref bounds 3) (- 1. (* 2. padding))))
+            (str:i8* (salloc 256))
+            (i 0))
+        (nvgFontSize vg font_size)
+        (_nvgFillColor vg (NVGcolor .7 .7 .7 1.))
+        (nvgBeginPath vg)
+        ;; x labels
+        (dotimes (i nxlabs)
+          (sprintf str "%.2f" (convert (pref xlabs i) double))
+          (nvgText vg
+                   (+ x (* (convert i) (/ w (convert (- nxlabs 1)))))
+                   (+ y h font_size)
+                   str
+                   null))
+        ;; y labels
+        (dotimes (i nylabs)
+          (sprintf str "%.2f" (convert (pref ylabs i) double))
+          (nvgText vg
+                   (- x (* 3. font_size))
+                   (- (+ y h)
+                      (* (convert i) (/ h (convert (- nylabs 1)))))
+                   str
+                   null))
+        (nvgFill vg)
+        0))))
 
 (bind-func dv_draw_title
-  "draw a title (top-center)"
-  (lambda (vg bounds:Rect* title:i8*)
-    (letz ((padding 0.1)
-           (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
-           (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
-           (w (* (tref bounds 2) (- 1. (* 2. padding))))
-           (h (* (tref bounds 3) (- 1. (* 2. padding))))
-           (font_size 40.)
-           (textwidth 0.))
-      (nvgFontSize vg font_size)
-      (set! textwidth (nvgTextBounds vg 0. 0. title null null))
-      (_nvgFillColor vg (NVGcolor 1. 1. 1. 1.))
-      (nvgBeginPath vg)
-      (nvgText vg
-               (+ x (* (- w textwidth) .5))
-               (- y (* 2. font_size))
-               title
-               null)
-      (nvgFill vg)
-      0)))
+  "draw a title (top-center)
+
+@param vg - nanovg context pointer
+@param bounds - bounding rect in which to draw the title (centre-top)
+@param title"
+  (let ((padding 0.1)
+        (font_size 40.)
+        (colour (NVGcolor 1. 1. 1. 1.)))
+    (lambda (vg bounds:Rect* title:i8*)
+      (let ((x (+ (tref bounds 0) (* (tref bounds 2) padding)))
+            (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
+            (w (* (tref bounds 2) (- 1. (* 2. padding))))
+            (h (* (tref bounds 3) (- 1. (* 2. padding))))
+            (textwidth 0.))
+        (nvgFontSize vg font_size)
+        (set! textwidth (nvgTextBounds vg 0. 0. title null null))
+        (_nvgFillColor vg colour)
+        (nvgBeginPath vg)
+        (nvgText vg
+                 (+ x (* (- w textwidth) .5))
+                 (- y (* 2. font_size))
+                 title
+                 null)
+        (nvgFill vg)
+        0))))
 
 (bind-func dv_draw_bars
-  "draw 2D axis labels"
-  (lambda (vg bounds:Rect* bars:float* nbars)
-    (if (< nbars 1)
-        (begin (println "nbars must be greater than 0 for barplot") -1)
-        (letz ((padding 0.1)
-               (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
-               (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
-               (w (* (tref bounds 2) (- 1. (* 2. padding))))
-               (h (* (tref bounds 3) (- 1. (* 2. padding))))
-               (barheight 0.)
-               (i 0))
-          (nvgBeginPath vg)
-          (dotimes (i nbars)
-            (set! barheight (* (pref bars i) h))
-            (nvgRect vg
-                     (+ x (* (convert i) (/ w (convert nbars))))
-                     (+ y (- h barheight))
-                     (/ w (convert nbars))
-                     barheight))
-          (_nvgFillColor vg (NVGcolor .2 .2 .9 1.))
-          (nvgFill vg)
-          (_nvgStrokeColor vg (NVGcolor 0. 0. 0. 1.))
-          (nvgStrokeWidth vg 3.)
-          (nvgStroke vg)
-          0))))
+  "draw 2D axis labels
+
+@param vg - nanovg context pointer
+@param bounds - bounding rect in which to draw the bars
+@param points - pointer to bar heights (packed) e.g. x1,y1,x2,y2,...
+@param npoints - number of bars"
+  (let ((padding 0.1)
+        (colour (NVGcolor 1. 1. 1. 1.)))
+    (lambda (vg bounds:Rect* bar_heights:float* nbars)
+      (if (< nbars 1)
+          (begin (println "nbars must be greater than 0 for barplot") -1)
+          (let ((x (+ (tref bounds 0) (* (tref bounds 2) padding)))
+                (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
+                (w (* (tref bounds 2) (- 1. (* 2. padding))))
+                (h (* (tref bounds 3) (- 1. (* 2. padding))))
+                (barheight 0.)
+                (i 0))
+            ;; (_nvgStrokeColor vg (NVGcolor 0. 0. 0. 1.))
+            (dotimes (i nbars)
+              (nvgBeginPath vg)
+              (_nvgFillColor vg (NVGcolor (random .1 1.:f) .2 .9 1.))
+              (set! barheight (* 100. (* (pref bar_heights i) h)))
+              (if (> barheight h) (set! barheight h))
+              (nvgRect vg
+                       (+ x (* (convert i) (/ w (convert nbars))))
+                       (+ y (- h barheight))
+                       (/ w (convert nbars))
+                       barheight)
+              (nvgFill vg))
+            0)))))
 
 (bind-func dv_draw_line
   "draw a 2D line plot
 
-Input data should be a pointer to packed floats: x1,y1,x2,y2,..."
-  (lambda (vg bounds:Rect* line:float* npoints:i64)
-    (if (< npoints 2)
-        (begin (println "npoints must be greater than 1 for line") -1)
-        (letz ((padding 0.1)
-               (x (+ (tref bounds 0) (* (tref bounds 2) padding)))
-               (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
-               (w (* (tref bounds 2) (- 1. (* 2. padding))))
-               (h (* (tref bounds 3) (- 1. (* 2. padding))))
-               (i 0))
-          (_nvgStrokeColor vg (NVGcolor 1. 1. 1. 1.))
-          (nvgStrokeWidth vg 2.)
-          (nvgBeginPath vg)
-          ;; add first point
-          (nvgMoveTo vg
-                     (+ x (* w (pref line 0)))
-                     (+ y (* h (- 1. (pref line 1)))))
-          ;; add rest of the points
-          (dotimes (i 1 (- npoints 1))
-            (nvgLineTo vg
-                       (+ x (* w (pref line (* i 2))))
-                       (+ y (* h (- 1. (pref line (+ (* i 2) 1)))))))
-          ;; finish it off
-          ;; (nvgClosePath vg)
-          (nvgStroke vg)
-          0))))
+@param vg - nanovg context pointer
+@param bounds - bounding rect in which to draw the line
+@param line - pointer to line data (packed) e.g. x1,y1,x2,y2,...
+@param npoints - number of points in the line"
+  (let ((stroke_width 2.)
+        (padding 0.1)
+        (colour (NVGcolor .7 .7 .7 1.)))
+    (lambda (vg bounds:Rect* line:float* npoints:i64)
+      (if (< npoints 2)
+          (begin (println "npoints must be greater than 1 for line") -1)
+          (let ((x (+ (tref bounds 0) (* (tref bounds 2) padding)))
+                (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
+                (w (* (tref bounds 2) (- 1. (* 2. padding))))
+                (h (* (tref bounds 3) (- 1. (* 2. padding))))
+                (i 0))
+            (nvgStrokeWidth vg stroke_width)
+            (_nvgStrokeColor vg colour)
+            ;; (nvgStrokeWidth vg 2.)
+            (nvgBeginPath vg)
+            ;; add first point
+            (nvgMoveTo vg
+                       (+ x (* w (pref line 0)))
+                       (+ y (* h (- 1. (pref line 1)))))
+            ;; add rest of the points
+            (dotimes (i 1 (- npoints 1))
+              (nvgLineTo vg
+                         (+ x (* w (pref line (* i 2))))
+                         (+ y (* h (- 1. (pref line (+ (* i 2) 1)))))))
+            (nvgStroke vg)
+            0)))))
 
-(bind-val GUI_BARPLOT i64 (<< 1 10))
-(bind-val GUI_SCATTERPLOT i64 (<< 1 11))
-(bind-val GUI_LINEPLOT i64 (<< 1 12))
+(bind-func dv_draw_line_segments
+  "draw a 2D line segment plot
+
+In a segmented line plot, successive x,y pairs are connected to each other.
+
+@param vg - nanovg context pointer
+@param bounds - bounding rect in which to draw the line segments
+@param line - pointer to line data (packed) e.g. x11,y11,x12,y12,x21,y21,x22,y22,...
+@param npoints - number of points in the line"
+  (let ((stroke_width 2.)
+        (padding .1)
+        (colour (NVGcolor 1. 1. 1. 1.)))
+    (lambda (vg bounds:Rect* line:float* npoints:i64)
+      (if (or (< npoints 2)
+              (<> (% npoints 2) 0))
+          (begin (println "npoints must be an even number greater than 1 for line_segments") -1)
+          (let ((x (+ (tref bounds 0) (* (tref bounds 2) padding)))
+                (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
+                (w (* (tref bounds 2) (- 1. (* 2. padding))))
+                (h (* (tref bounds 3) (- 1. (* 2. padding))))
+                (i 0))
+            (nvgStrokeWidth vg stroke_width)
+            (_nvgStrokeColor vg colour)
+            (nvgBeginPath vg)
+            (dotimes (i 1 (/ npoints 2))
+              ;; line segment start
+              (nvgMoveTo vg
+                         (+ x (* w (pref line (* i 4))))
+                         (+ y (* h (- 1. (pref line (+ (* i 4) 1))))))
+              ;; line segment end
+              (nvgLineTo vg
+                         (+ x (* w (pref line (* i (+ (* i 4) 2)))))
+                         (+ y (* h (- 1. (pref line (+ (* i 4) 3)))))))
+            (nvgStroke vg)
+            0)))))
+
+(bind-func dv_draw_scatter_points_fixed_size
+  "draw 2D points for a scatterplot
+
+@param vg - nanovg context pointer
+@param bounds - bounding rect in which to draw the points
+@param points - pointer to point data (packed) e.g. x1,y1,x2,y2,...
+@param npoints - number of points
+@param size - point size"
+  (let ((stroke_width 2.)
+        (padding .1)
+        (colour (NVGcolor 1. 1. 1. 1.)))
+    (lambda (vg bounds:Rect* points:float* npoints:i64 size:float)
+      (if (< npoints 1)
+          (begin (println "npoints must be at least 1 for scatter_points") -1)
+          (let ((x (+ (tref bounds 0) (* (tref bounds 2) padding)))
+                (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
+                (w (* (tref bounds 2) (- 1. (* 2. padding))))
+                (h (* (tref bounds 3) (- 1. (* 2. padding))))
+                (i 0))
+            (nvgStrokeWidth vg stroke_width)
+            (_nvgStrokeColor vg colour)
+            (nvgBeginPath vg)
+            ;; add circles to path
+            (dotimes (i npoints)
+              (nvgCircle vg
+                         (+ x (* w (pref points (* i 2))))
+                         (+ y (* h (- 1. (pref points (+ (* i 2) 1)))))
+                         size))
+            (nvgStroke vg)
+            0)))))
+
+(bind-func dv_draw_scatter_points_scaled_size
+  "draw 2D points for a scatterplot
+
+@param vg - nanovg context pointer
+@param bounds - bounding rect in which to draw the points
+@param points - pointer to point data (packed) e.g. x1,y1,x2,y2,...
+@param npoints - number of points
+@param sizes - pointer to packed floats for point sizes: size1,size2,size3,..."
+  (let ((stroke_width 2.)
+        (padding .1)
+        (colour (NVGcolor 1. 1. 1. 1.)))
+    (lambda (vg bounds:Rect* points:float* npoints:i64 sizes:float*)
+      (if (< npoints 1)
+          (begin (println "npoints must be at least 1 for scatter_points") -1)
+          (let ((x (+ (tref bounds 0) (* (tref bounds 2) padding)))
+                (y (+ (tref bounds 1) (* (tref bounds 3) padding)))
+                (w (* (tref bounds 2) (- 1. (* 2. padding))))
+                (h (* (tref bounds 3) (- 1. (* 2. padding))))
+                (i 0))
+            (nvgStrokeWidth vg stroke_width)
+            (_nvgStrokeColor vg colour)
+            (nvgBeginPath vg)
+            ;; add circles to path
+            (dotimes (i npoints)
+              (nvgCircle vg
+                         (+ x (* w (pref points (* i 2))))
+                         (+ y (* h (- 1. (pref points (+ (* i 2) 1)))))
+                         (pref sizes i)))
+            (nvgStroke vg)
+            0)))))
+
+(bind-poly dv_draw_scatter_points dv_draw_scatter_points_fixed_size)
+(bind-poly dv_draw_scatter_points dv_draw_scatter_points_scaled_size)
 
 (impc:aot:insert-footer "xtmdatavis")
 (define *xtmlib-datavis-loaded* #t)
