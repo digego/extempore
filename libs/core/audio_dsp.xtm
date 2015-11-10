@@ -1284,6 +1284,176 @@ but v1 and v2 can be computed in parallel"
         ((pref skf_buf chan) in cutoff res)))))
 
 
+;; a rough and ready granulator
+;; expects to work on 'n' channels
+;; see examples/external/granular.xtm
+;; or examples/core/granular.xtm
+(bind-func granulator_c
+  (lambda (channels)
+    (let ((cnt 0) (idx 0)
+          (iot 2000)
+          (iotn 100000000) ;; we want a grain right at the start
+          (dlo 5000.0)
+          (dhi 5000.0)
+          (rlo 1.0)
+          (rhi 1.0)
+          (plo 0.4)
+          (phi 0.6)
+          (alo 0.2)
+          (ahi 0.2)
+          (wet 1.0)
+          (PI2:double (* 2.0 3.141592))
+          (gidx 0)
+          (offset 0)
+          (out:SAMPLE 0.0) (i 0)
+          (cachesize:i64 (* 88200 2 channels)) 
+          (audio_cache:SAMPLE* (alloc cachesize))
+          (lengths:|200,double|* (alloc))
+          (durations:|200,double|* (alloc))
+          (phases:|200,double|* (alloc))
+          (startidx:|200,i64|* (alloc))
+          (amps:|200,float|* (alloc))
+          (rates:|200,double|* (alloc))
+          (panning:|200,float|* (alloc))
+          (active:|200,i1|* (alloc)))
+      (dotimes (i 200) (aset! active i 0))
+      (lambda (chan time:i64 in)        
+        (set! iotn (+ iotn 1))
+        (pset! audio_cache (% cnt cachesize) in)
+        (if (and (>= iotn iot)
+                 (= chan 0))
+            (begin
+              (set! iotn 0)
+              (aset! active gidx #t)
+              (aset! lengths gidx (+ dlo (* (- dhi dlo) (random))))
+              (aset! amps gidx (+ alo (* (- ahi alo) (random))))
+              (aset! panning gidx (+ plo (* (- phi plo) (random))))
+              (aset! durations gidx (aref lengths gidx))
+              (aset! rates gidx (+ rlo (* (- rhi rlo)  (random))))
+              (set! offset 
+                    (if (> (aref rates gidx) 1.0)
+                        (+ 128
+                           (* channels (dtoi64 (floor (- (* (aref rates gidx)
+                                                            (aref lengths gidx))
+                                                         (aref lengths gidx))))))
+                        128))
+              (aset! startidx gidx (% (- cnt offset) cachesize))
+              (aset! phases gidx 0.0)
+              (set! gidx (% (+ gidx 1) 200))))
+        (set! cnt (+ cnt 1))        
+        (set! out 0.0)
+        (dotimes (i 200)
+          (if (= #t (aref active i))
+              (begin
+                (set! idx (+ (aref startidx i)
+                             chan
+                             (* channels (dtoi64 (floor (aref phases i))))))
+                (set! out (+ out
+                             (* (aref amps i)
+                                (dtof (* 0.5 (- 1.0 (cos (* PI2 (/ (aref durations i) (aref lengths i)))))))
+                                (panner chan (aref panning i))
+                                (pref audio_cache (% idx cachesize)))))
+                (if (= chan 0)
+                    (begin
+                      (aset! phases i (+ (aref phases i) (aref rates i)))
+                      (aset! durations i (- (aref durations i) (aref rates i)))))
+                (if (< (aref durations i) 8.0)
+                    (begin
+                      (aset! active i #f)
+                      void)
+                    void))))
+        (+ (* (- 1.0 wet) in)
+           (* wet out))))))
+
+
+;; a rough and ready granulator
+;; expects to work on 'n' channels
+;; see examples/external/granular.xtm
+;; or examples/core/granular.xtm
+;; more expensive than linear
+(bind-func granulator_hermite_c
+  (lambda (channels)
+    (let ((cnt 0) (idx 0)
+          (iot 2000)
+          (iotn 100000000) ;; we want a grain right at the start
+          (dlo 5000.0)
+          (dhi 5000.0)
+          (rlo 1.0)
+          (rhi 1.0)
+          (plo 0.5)
+          (phi 0.5)
+          (alo 0.2)
+          (ahi 0.2)
+          (wet 1.0)
+          (PI2:double (* 2.0 3.141592))
+          (gidx 0)
+          (offset 0)
+          (y1 0.0) (x0 0.0) (x1 0.0) (x2 0.0)
+          (out:SAMPLE 0.0) (i 0)
+          (cachesize:i64 (* 88200 2 channels)) 
+          (audio_cache:SAMPLE* (alloc cachesize))
+          (lengths:|200,double|* (alloc))
+          (durations:|200,double|* (alloc))
+          (phases:|200,double|* (alloc))
+          (startidx:|200,i64|* (alloc))
+          (amps:|200,float|* (alloc))
+          (rates:|200,double|* (alloc))
+          (panning:|200,float|* (alloc))
+          (active:|200,i1|* (alloc)))
+      (dotimes (i 200) (aset! active i 0))
+      (lambda (chan time:i64 in)        
+        (set! iotn (+ iotn 1))
+        (pset! audio_cache (% cnt cachesize) in)
+        (if (and (>= iotn iot)
+                 (= chan 0))
+            (begin
+              (set! iotn 0)
+              (aset! active gidx #t)
+              (aset! lengths gidx (+ dlo (* (- dhi dlo) (random))))
+              (aset! amps gidx (+ alo (* (- ahi alo) (random))))
+              (aset! panning gidx (+ plo (* (- phi plo) (random))))
+              (aset! durations gidx (aref lengths gidx))
+              (aset! rates gidx (+ rlo (* (- rhi rlo)  (random))))
+              (set! offset 
+                    (if (> (aref rates gidx) 1.0)
+                        (+ 128
+                           (* channels (dtoi64 (floor (- (* (aref rates gidx)
+                                                            (aref lengths gidx))
+                                                         (aref lengths gidx))))))
+                        128))
+              (aset! startidx gidx (% (- cnt offset) cachesize))
+              (aset! phases gidx 0.0)
+              (set! gidx (% (+ gidx 1) 200))))
+        (set! cnt (+ cnt 1))        
+        (set! out 0.0)
+        (dotimes (i 200)
+          (if (= #t (aref active i))
+              (begin
+                (set! idx (+ (aref startidx i)
+                             chan
+                             (* channels (dtoi64 (floor (aref phases i))))))
+                (set! y1 (pref audio_cache (% (- idx channels) cachesize)))
+                (set! x0 (pref audio_cache (% idx cachesize)))
+                (set! x1 (pref audio_cache (% (+ idx channels) cachesize)))
+                (set! x2 (pref audio_cache (% (+ idx (* 2 channels)) cachesize)))
+                (set! out (+ out
+                             (* (aref amps i)
+                                (dtof (* 0.5 (- 1.0 (cos (* PI2 (/ (aref durations i) (aref lengths i)))))))
+                                (panner chan (aref panning i))
+                                (hermite_interp (dtof (modulo (aref phases i) 1.0)) y1 x0 x1 x2))))
+                (if (= chan 0)
+                    (begin
+                      (aset! phases i (+ (aref phases i) (aref rates i)))
+                      (aset! durations i (- (aref durations i) (aref rates i)))))
+                (if (< (aref durations i) 8.0)
+                    (begin
+                      (aset! active i #f)
+                      void)
+                    void))))
+        (+ (* (- 1.0 wet) in)
+           (* wet out))))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; BiQuad coefficient formulae from

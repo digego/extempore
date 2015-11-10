@@ -200,22 +200,47 @@
       (pref (AudioBuffer_data ab)
             (+ (* (% ph (AudioBuffer_frames ab)) (AudioBuffer_channels ab)) chan)))))
 
-(bind-func AudioBuffer_read
+(bind-func AudioBuffer_read_a
   (lambda (ab:AudioBuffer* chan)
     (let ((ph (AudioBuffer_playhead ab)))
       (if (< ph (AudioBuffer_frames ab))
           (begin
-            (AudioBuffer_set_playhead ab (+ ph 1))
+            (if (= chan 0) (AudioBuffer_set_playhead ab (+ ph 1)))
             (pref (AudioBuffer_data ab)
                   (+ (* ph (AudioBuffer_channels ab)) chan)))
           0.0))))
 
-(bind-func AudioBuffer_read_looped
+(bind-func AudioBuffer_read_b
+  (lambda (ab:AudioBuffer* frame chan)
+    (if (< frame (AudioBuffer_frames ab))
+        (begin
+          (if (= chan 0) (AudioBuffer_set_playhead ab frame))
+          (pref (AudioBuffer_data ab)
+                (+ (* frame (AudioBuffer_channels ab)) chan)))
+        0.0)))
+
+(bind-poly AudioBuffer_read AudioBuffer_read_a)
+(bind-poly AudioBuffer_read AudioBuffer_read_b)
+
+(bind-func AudioBuffer_read_looped_a
   (lambda (ab:AudioBuffer* chan)
     (let ((ph (AudioBuffer_playhead ab)))
-      (AudioBuffer_set_playhead ab (% (+ ph 1) (AudioBuffer_frames ab)))
+      (if (= chan 0)
+          (AudioBuffer_set_playhead ab (% (+ ph 1) (AudioBuffer_frames ab))))
       (pref (AudioBuffer_data ab)
             (+ (* ph (AudioBuffer_channels ab)) chan)))))
+
+(bind-func AudioBuffer_read_looped_b
+  (lambda (ab:AudioBuffer* frame chan)
+    (if (= chan 0)
+        (AudioBuffer_set_playhead ab (% frame (AudioBuffer_frames ab))))
+    (if (> frame (AudioBuffer_frames ab))
+        0.0
+        (pref (AudioBuffer_data ab)
+              (+ (* frame (AudioBuffer_channels ab)) chan)))))
+
+(bind-poly AudioBuffer_read_looped AudioBuffer_read_looped_a)
+(bind-poly AudioBuffer_read_looped AudioBuffer_read_looped_b)
 
 (bind-func AudioBuffer_ptr
   "returns a pointer into the buffer"
@@ -259,6 +284,7 @@
           (let ((channels (convert (sf_channels info)))
                 (samplerate (convert (sf_samplerate info)))
                 (available_frames (- nframes start)))
+            ;;(println "Channels:" channels "Samplerate:" samplerate "Frames:" available_frames)
             (if (<> samplerate (convert (llvm_samplerate)))
                 (println "Warning: file samplerate" samplerate "doesn't match the current audio samplerate" (llvm_samplerate) "- this could cause problems"))
             (if (> nframes available_frames)
@@ -266,7 +292,7 @@
                        (sf_close audiofile)
                        ab)
                 (let ((frames_read 0)
-                      (data:float* (halloc (* nframes channels))))
+                      (data:float* (halloc (* nframes channels 4))))
                   ;; initialise and allocate memory for the AudioBuffer
                   (set! ab (AudioBuffer (String filename)
                                         0
@@ -279,6 +305,7 @@
                   (set! frames_read (sf_readf audiofile
                                               data
                                               (* nframes channels)))
+                  ;;(println "frames read:" frames_read)
                   (sf_close audiofile)
                   ;; set the metadata into the new Audiobuffer object
                   (AudioBuffer_set_frames ab frames_read)
