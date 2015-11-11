@@ -37,16 +37,16 @@
         (i 0))
     (dotimes (i nlabs)
       (pset! labs i (* (convert i) (/ 1. (convert (- nlabs 1)))))
-      ;; x positions should be in the middle of the points
+      ;; x positions should be in the middle of the bars
       (pset! line (* i 2) (+ (/ .5 (convert nlabs)) (* (convert i) (/ 1. (convert nlabs))))))
     (lambda (bounds:Rect*)
       (dotimes (i nlabs)
-        (pset! points i (+ .5 (* .3 (cos (* 0.00001 (convert (* (now) (+ i 1))))))))
+        (pset! bars i (+ .5 (* .3 (cos (* 0.00001 (convert (* (now) (+ i 1))))))))
         (pset! line (+ (* i 2) 1) (+ .5 (* .3 (cos (* 0.00001 (convert (* (now) (+ i 1)))))))))
-      (dv_draw_bars vg bounds points nlabs)
+      (dv_draw_bars vg bounds bars nlabs)
       (dv_draw_axis_labels_2D vg bounds labs nlabs labs nlabs)
       (dv_draw_axes_2D vg bounds)
-      (dv_draw_title vg bounds "Ben's Title")
+      (dv_draw_title vg bounds "Barplot")
       (dv_draw_line vg bounds line nlabs)
       void)))
 
@@ -56,13 +56,13 @@
         (i 0))
     (lambda (bounds:Rect*)
       (dotimes (i npoints)
-        (pset! points (* i 2) (+ (* (cos (* .00000064 (convert (* i (now))))) .5) .5))
+        (pset! points (* i 2) (+ (* (cos (* .00000064 (convert (* i 2 (now))))) .5) .5))
         ;; (pset! points (+ 1 (* i 2)) (/ (convert i) (convert npoints)))
-        (pset! points (+ 1 (* i 2)) (+ .5 (% (tan (* 0.00000003 (convert (* (now) i) float))) .5))))
-      (dv_draw_scatter_points vg bounds points npoints (+ (* (cos (* .00003 (convert (now)))) 3.) 5.))
+        (pset! points (+ 1 (* i 2)) (+ .5 (% (* 3.2 (cos (* 0.0000003 (convert (* (now) i) float)))) .5))))
+      (dv_draw_scatter_points vg bounds points npoints (+ (* (cos (* .0000053 (convert (now)))) 3.) 5.))
       ;; (dv_draw_axis_labels_2D vg bounds points npoints points npoints)
       (dv_draw_axes_2D vg bounds)
-      (dv_draw_title vg bounds "Ben's Title")
+      (dv_draw_title vg bounds "Scatterplot")
       void)))
 
 (bind-func nvg_draw_loop
