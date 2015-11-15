@@ -47,7 +47,9 @@
 
 ;; Installation:
 
-;; Install via package.el functionality
+;; Install via package.el with
+
+;; (package-install-file "/path/to/extempore-mode.el")
 
 ;; Currently, extempore.el requires Emacs 24, because it inherits from
 ;; prog-mode (via lisp-mode)
