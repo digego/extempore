@@ -185,5 +185,19 @@
           (pset! data (+ (* i stride) j) (pref data (+ (* (- height i 1) stride) j)))
           (pset! data (+ (* (- height i 1) stride) j) tmp))))))
 
+;; needs libGL for glReadPixels
+
+;; (bind-func stbi_write_framebuffer_to_png
+;;   (lambda (filename width:i32 height:i32)
+;;     (let ((ncomp 3)
+;;           (stride (* ncomp width))
+;;           (data:i8* (alloc (* width height ncomp))))
+;;       (glReadPixels 0 0 width height GL_RGB GL_UNSIGNED_BYTE data)
+;;       (if (null? data)
+;;           (begin (println "Error reading framebuffer") -1:i32)
+;;           (begin
+;;             (stbi_flip_vertically width height ncomp data)
+;;             (stbi_write_png filename width height ncomp data stride))))))
+
 (impc:aot:insert-footer "xtmstb_image")
 (define *xtmlib-stb_image-loaded* #t)
