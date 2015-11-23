@@ -1,0 +1,462 @@
+(sys:load "libs/core/audiobuffer.xtm")
+
+;; helper functions, bit twiddling
+
+;; from stdio.h
+(bind-val	SEEK_SET i32 0)	;; set file offset to offset
+(bind-val	SEEK_CUR i32 1)	;; set file offset to current plus offset
+(bind-val	SEEK_END i32 2)	;; set file offset to EOF plus offset
+
+;; AIFFs are big-endian, so need some helper functions for
+;; byte-swapping
+
+(bind-func swapi16
+  (lambda (x:i16)
+    (bor (>> x 8)
+         (<< x 8))))
+
+(bind-func swapi32
+  (lambda (x:i32)
+    (bor (bor (& (>> x 24) #xff)        ;; move byte 3 to byte 0
+              (& (<< x 8) #xff0000))     ;; move byte 1 to byte 2
+         (bor (& (>> x 8) #xff00)       ;; move byte 2 to byte 1
+              (& (<< x 24) #xff000000))) ;; byte 0 to byte 3
+    ))
+
+(bind-func audiofile_16bit_to_sample_le
+  (let ((range (i64tod (<< 2 15))))
+    (lambda (src:i16* dest:SAMPLE* nsamp)
+      (doloop (i nsamp)
+        (pset! dest i (dtof (/ (convert (pref src i)) range)))))))
+
+(bind-func audiofile_16bit_to_sample_be
+  (let ((range (i64tod (<< 2 15))))
+    (lambda (src:i16* dest:SAMPLE* nsamp)
+      (doloop (i nsamp)
+        (pset! dest i (dtof (/ (convert (swapi16 (pref src i))) range)))))))
+
+;;;;;;;;;;;;;;;;
+;; WAVE files ;;
+;;;;;;;;;;;;;;;;
+
+(bind-type WaveFormat <|4,i8|,i32,|4,i8|,|4,i8|,i32,i16,i16,i32,i32,i16,i16,|4,i8|,i32>)
+
+;; accessor functions
+(bind-func waveformat_type
+  (lambda (wf:WaveFormat*)
+    (i16toi64 (tref wf 5))))
+
+(bind-func waveformat_nchan
+  (lambda (wf:WaveFormat*)
+    (i16toi64 (tref wf 6))))
+
+(bind-func waveformat_samplerate
+  (lambda (wf:WaveFormat*)
+    (i32toi64 (tref wf 7))))
+
+(bind-func waveformat_bitdepth
+  (lambda (wf:WaveFormat*)
+    (i16toi64 (tref wf 10))))
+
+(bind-func waveformat_datasize
+  (lambda (wf:WaveFormat*)
+    (i32toi64 (tref wf 12))))
+
+(bind-func waveformat_nframes
+  (lambda (wf:WaveFormat*)
+    (/ (* 8 (waveformat_datasize wf))
+       (* (waveformat_nchan wf)
+          (waveformat_bitdepth wf)))))
+
+(bind-func waveformat_check
+  (lambda (wf:WaveFormat*)
+    (and (= (strncmp (aref-ptr (tref-ptr wf 0) 0) "RIFF" 4) 0)
+         (= (strncmp (aref-ptr (tref-ptr wf 2) 0) "WAVE" 4) 0))))
+
+(bind-func waveformat_print
+  "specialised print function for WaveFormat*"
+  (lambda (wf:WaveFormat*)
+    (if (null? wf)
+        (printf "<WaveFormat 0x0>")
+        (printf "<WaveFormat
+    filesize: %d
+    filetype: %.4s
+      format: %s
+       nchan: %d
+  samplerate: %d
+    bitdepth: %d
+     nframes: %d
+>"
+                (tref wf 1)
+                (cast (tref-ptr wf 2) i8*)
+                (let ((type (waveformat_type wf)))
+                  (cond ((= type 0) "Unknown")
+                        ((= type 1) "PCM (uncompressed)")
+                        ((= type 2) "Microsoft ADPCM")
+                        ((= type 6) "ITU G.711 a-law")
+                        ((= type 7) "ITU G.711 mu-law")
+                        ((= type 17) "IMA ADPCM")
+                        ((= type 20) "ITU G.723 ADPCM (Yamaha)")
+                        ((= type 49) "GSM 6.10")
+                        ((= type 64) "ITU G.721 ADPCM")
+                        ((= type 80) "MPEG")
+                        (else "Unknown")))
+                (waveformat_nchan wf)
+                (waveformat_samplerate wf)
+                (waveformat_bitdepth wf)
+                (waveformat_nframes wf)))
+    void))
+
+(bind-poly print waveformat_print)
+
+(bind-func waveformat_toString
+  "specialised toString function for WaveFormat*"
+  (lambda (wf:WaveFormat*)
+    (let ((str:i8* (salloc 256)))
+      (if (null? wf)
+          (sprintf str "<WaveFormat 0x0>")
+          (sprintf str
+                   "<WaveFormat
+    filesize: %d
+    filetype: %.4s
+      format: %s
+       nchan: %d
+  samplerate: %d
+    bitdepth: %d
+     nframes: %d
+>"
+                   (tref wf 1)
+                   (cast (tref-ptr wf 2) i8*)
+                   (let ((type (waveformat_type wf)))
+                     (cond ((= type 0) "Unknown")
+                           ((= type 1) "PCM (uncompressed)")
+                           ((= type 2) "Microsoft ADPCM")
+                           ((= type 6) "ITU G.711 a-law")
+                           ((= type 7) "ITU G.711 mu-law")
+                           ((= type 17) "IMA ADPCM")
+                           ((= type 20) "ITU G.723 ADPCM (Yamaha)")
+                           ((= type 49) "GSM 6.10")
+                           ((= type 64) "ITU G.721 ADPCM")
+                           ((= type 80) "MPEG")
+                           (else "Unknown")))
+                   (waveformat_nchan wf)
+                   (waveformat_samplerate wf)
+                   (waveformat_bitdepth wf)
+                   (waveformat_nframes wf)))
+      (Str str))))
+
+(bind-poly toString waveformat_toString)
+
+(bind-func audiofile_wave_allocsize
+  (lambda (filename)
+    (let ((fp (fopen filename "r"))
+          (wf:WaveFormat* (salloc)))
+      (if (null? fp)
+          (begin (printf "wavefile error: could not open file\n")
+                 -1)
+          (begin
+            (fread (cast wf i8*) 1 44 fp)
+            (fclose fp)
+            (if (not (waveformat_check wf))
+                (begin
+                  (printf "wavefile error: there was a problem with the chunk IDs\n")
+                  -1)
+                (waveformat_datasize wf)))))))
+
+(bind-func audiofile_wave_read_samples
+  (lambda (filename dest:SAMPLE*)
+    (let ((filedata (sys_slurp_file filename))
+          (wfsize 44) ;; sizeof WaveFormat
+          (wf:WaveFormat* (cast filedata WaveFormat*)))
+      (if (null? filedata)
+          (begin (println "wavefile error: could not open file")
+                 (free filedata)
+                 #f)
+          (cond ((not (waveformat_check wf))
+                 (println "wavefile error: there was a problem with the chunk IDs")
+                 (free filedata)
+                 #f)
+                ((<> (waveformat_bitdepth wf) 16)
+                 (println "wavefile error: the native xtlang wave file reader currently only supports 16-bit audio\nFor more format options, use libs/external/sndfile.xtm")
+                 (free filedata)
+                 #f)
+                (else
+                 (let ((dsize (waveformat_datasize wf))
+                       (nchan (waveformat_nchan wf))
+                       (bitdepth (waveformat_bitdepth wf))
+                       (nframes (waveformat_nframes wf)))
+                   ;; read data into memory
+                   (audiofile_16bit_to_sample_le (cast (pref-ptr filedata wfsize) i16*) dest (* nchan nframes))
+                   (free filedata)
+                   #t)))))))
+
+(bind-func AudioBuffer_from_wave
+  (lambda (filename)
+    (let ((filedata (sys_slurp_file filename))
+          (wfsize 44) ;; sizeof WaveFormat
+          (wf:WaveFormat* (cast filedata WaveFormat*)))
+      (if (null? filedata)
+          (begin (println "wavefile error: could not open file")
+                 (free filedata)
+                 null)
+          (cond ((not (waveformat_check wf))
+                 (println "wavefile error: there was a problem with the chunk IDs")
+                 (free filedata)
+                 null)
+                ((<> (waveformat_bitdepth wf) 16)
+                 (println "wavefile error: the native xtlang wave file reader currently only supports 16-bit audio\nFor more format options, use libs/external/sndfile.xtm")
+                 (free filedata)
+                 null)
+                (else
+                 (let ((dsize (waveformat_datasize wf))
+                       (nchan (waveformat_nchan wf))
+                       (bitdepth (waveformat_bitdepth wf))
+                       (nframes (waveformat_nframes wf))
+                       (ab (AudioBuffer nframes nchan)))
+                   ;; read data into memory
+                   (audiofile_16bit_to_sample_le (cast (pref-ptr filedata wfsize) i16*) (AudioBuffer_data ab) (* nchan nframes))
+                   (free filedata)
+                   ab)))))))
+
+;;;;;;;;;;
+;; AIFF ;;
+;;;;;;;;;;
+
+(bind-type AiffChunk <|4,i8|,i32>)
+
+(bind-func aiffheader_chunksize
+  (lambda (hdr:AiffChunk*)
+    ;; AIFFs use big-endian, so need to swap the bytes
+    (swapi32 (tref hdr 1))))
+
+(bind-func aiffheader_check_ID
+  "check the chunk & form IDs are valid"
+  (lambda (hdr:AiffChunk* id:i8*)
+    (= (strncmp (aref-ptr (tref-ptr hdr 0) 0) id 4) 0)))
+
+(bind-func aiffheader_print
+  "specialised print function for AiffChunk*"
+  (lambda (hdr:AiffChunk*)
+    (if (null? hdr)
+        (printf "<AiffChunk 0x0>")
+        (printf "<AiffChunk chunk ID: %.4s  chunk size: %d>"
+                (aref-ptr (tref-ptr hdr 0) 0)
+                (aiffheader_chunksize hdr)))
+    void))
+
+(bind-poly print aiffheader_print)
+
+(bind-func aiffheader_toString
+  "specialised toString function for AiffChunk*"
+  (lambda (hdr:AiffChunk*)
+    (let ((str:i8* (salloc 256)))
+      (if (null? hdr)
+          (sprintf str "<AiffChunk 0x0>")
+          (sprintf str
+                   "<AiffChunk chunk ID: %.4s  chunk size: %d>"
+                   (aref-ptr (tref-ptr hdr 0) 0)
+                   (aiffheader_chunksize hdr)))
+      (Str str))))
+
+(bind-poly toString aiffheader_toString)
+
+;; currently, this will crash out if the AIFF sub-chunks are bad (it
+;; doesn't know where the end of the file). It will gracefully handle
+;; non AIFF files, though. Only corrupted ones would be a problem
+(bind-func audiofile_aiff_read_samples
+  (lambda (filename dest:SAMPLE*)
+    (let ((filedata (sys_slurp_file filename))
+          (hdr:AiffChunk* (salloc))
+          (hdrsize 8) ;; sizeof AiffChunk
+          (find_chunk (lambda (fileptr:i8* id)
+                        ;; check that it's a valid AIFF file
+                        (if (not (aiffheader_check_ID (cast fileptr AiffChunk*) "FORM"))
+                            null
+                            (begin
+                              (set! fileptr (pref-ptr fileptr (+ hdrsize 4)))
+                              (while (not (aiffheader_check_ID (cast fileptr AiffChunk*) id))
+                                (set! fileptr
+                                      (pref-ptr fileptr
+                                                (+ hdrsize
+                                                   (convert
+                                                    (aiffheader_chunksize (cast fileptr AiffChunk*))
+                                                    i64)))))
+                              fileptr)))))
+      (if (null? filedata)
+          (begin (println "aiff file error: could not open file")
+                 #f)
+          (let ((common (find_chunk filedata "COMM"))
+                (sounddata (find_chunk filedata "SSND")))
+            (if (or (null? common) (null? sounddata))
+                (begin
+                  (println "aiff file error: there was a problem with the chunk IDs")
+                  (free filedata)
+                  #f)
+                ;; pull the data out of the common chunk
+                (let ((nchan (i16toi64 (swapi16 (pref (cast (pref-ptr common hdrsize) i16*) 0))))
+                      (nframes (i32toi64 (swapi32 (pref (cast (pref-ptr common (+ hdrsize 2)) i32*) 0))))
+                      (bitdepth (i16toi64 (swapi16 (pref (cast (pref-ptr common (+ hdrsize 6)) i16*) 0)))))
+                  (if (<> bitdepth 16)
+                      (begin
+                        (println "aiff file error: the native xtlang wave file reader currently only supports 16-bit audio\nFor more format options, use libs/external/sndfile.xtm")
+                        (free filedata)
+                        #f)
+                      (begin
+                        (audiofile_16bit_to_sample_be (cast (pref-ptr sounddata (+ hdrsize 8)) i16*) dest (* nchan nframes))
+                        ;; (free filedata) ;; why does this cause a crash?
+                        #t)))))))))
+
+(bind-func AudioBuffer_from_aiff
+  (lambda (filename)
+    (let ((filedata (sys_slurp_file filename))
+          (hdr:AiffChunk* (salloc))
+          (hdrsize 8) ;; sizeof AiffChunk
+          (find_chunk (lambda (fileptr:i8* id)
+                        ;; check that it's a valid AIFF file
+                        (if (not (aiffheader_check_ID (cast fileptr AiffChunk*) "FORM"))
+                            null
+                            (begin
+                              (set! fileptr (pref-ptr fileptr (+ hdrsize 4)))
+                              (while (not (aiffheader_check_ID (cast fileptr AiffChunk*) id))
+                                (set! fileptr
+                                      (pref-ptr fileptr
+                                                (+ hdrsize
+                                                   (convert
+                                                    (aiffheader_chunksize (cast fileptr AiffChunk*))
+                                                    i64)))))
+                              fileptr)))))
+      (if (null? filedata)
+          (begin (println "aiff file error: could not open file")
+                 null)
+          (let ((common (find_chunk filedata "COMM"))
+                (sounddata (find_chunk filedata "SSND")))
+            (if (or (null? common) (null? sounddata))
+                (begin
+                  (println "aiff file error: there was a problem with the chunk IDs")
+                  (free filedata)
+                  null)
+                ;; pull the data out of the common chunk
+                (let ((nchan (i16toi64 (swapi16 (pref (cast (pref-ptr common hdrsize) i16*) 0))))
+                      (nframes (i32toi64 (swapi32 (pref (cast (pref-ptr common (+ hdrsize 2)) i32*) 0))))
+                      (bitdepth (i16toi64 (swapi16 (pref (cast (pref-ptr common (+ hdrsize 6)) i16*) 0))))
+                      (ab (AudioBuffer nframes nchan)))
+                  (if (<> bitdepth 16)
+                      (begin
+                        (println "aiff file error: the native xtlang wave file reader currently only supports 16-bit audio\nFor more format options, use libs/external/sndfile.xtm")
+                        (free filedata)
+                        null)
+                      (begin
+                        (audiofile_16bit_to_sample_be (cast (pref-ptr sounddata (+ hdrsize 8)) i16*) (AudioBuffer_data ab) (* nchan nframes))
+                        ;; (free filedata) ;; why does this cause a crash?
+                        ab)))))))))
+
+(bind-func aiff_nchan_from_file
+  (lambda (filename)
+    (let ((fp (fopen filename "r"))
+          (hdr:AiffChunk* (salloc))
+          (buf:i8* (salloc 28))
+          (nchan -1))
+      (if (null? fp)
+          (begin (printf "aiff file error: could not open file\n")
+                 -1)
+          (begin
+            (fread (cast hdr i8*) 1 12 fp)
+            (if (not (aiffheader_check_ID hdr "FORM"))
+                (begin
+                  (printf "aiff file Error: there was a problem with the chunk IDs\n")
+                  (fclose fp)
+                  -1)
+                (begin
+                  (while (and (< nchan 0) (= (feof fp) 0))
+                    (fread (cast hdr i8*) 1 8 fp)
+                    (if (aiffheader_check_ID hdr "COMM")
+                        (begin
+                          (fread buf 1 28 fp)
+                          (set! nchan (convert (swapi16 (pref (cast buf i16*) 0))))
+                          0:i32)
+                        (fseek fp (convert (aiffheader_chunksize hdr) i64) SEEK_CUR)))
+                  (fclose fp)
+                  nchan)))))))
+
+(bind-func aiff_nframes_from_file
+  (lambda (filename)
+    (let ((fp (fopen filename "r"))
+          (hdr:AiffChunk* (salloc))
+          (buf:i8* (salloc 28))
+          (nframes -1))
+      (if (null? fp)
+          (begin (printf "aiff file error: could not open file\n")
+                 -1)
+          (begin
+            (fread (cast hdr i8*) 1 12 fp)
+            (if (not (aiffheader_check_ID hdr "FORM"))
+                (begin
+                  (printf "aiff file Error: there was a problem with the chunk IDs\n")
+                  (fclose fp)
+                  -1)
+                (begin
+                  (while (and (< nframes 0) (= (feof fp) 0))
+                    (fread (cast hdr i8*) 1 8 fp)
+                    (if (aiffheader_check_ID hdr "COMM")
+                        (begin
+                          (fread buf 1 28 fp)
+                          (set! nframes (convert (swapi32 (pref (cast (pref-ptr buf 2) i32*) 0))))
+                          0:i32)
+                        (fseek fp (convert (aiffheader_chunksize hdr) i64) SEEK_CUR)))
+                  (fclose fp)
+                  nframes)))))))
+
+
+(bind-func aiff_bitdepth_from_file
+  (lambda (filename)
+    (let ((fp (fopen filename "r"))
+          (hdr:AiffChunk* (salloc))
+          (buf:i8* (salloc 28))
+          (nbits -1))
+      (if (null? fp)
+          (begin (printf "aiff file error: could not open file\n")
+                 -1)
+          (begin
+            (fread (cast hdr i8*) 1 12 fp)
+            (if (not (aiffheader_check_ID hdr "FORM"))
+                (begin
+                  (printf "aiff file Error: there was a problem with the chunk IDs\n")
+                  (fclose fp)
+                  -1)
+                (begin
+                  (while (and (< nbits 0) (= (feof fp) 0))
+                    (fread (cast hdr i8*) 1 8 fp)
+                    (if (aiffheader_check_ID hdr "COMM")
+                        (begin
+                          (fread buf 1 28 fp)
+                          (set! nbits (convert (swapi16 (pref (cast (pref-ptr buf 6) i16*) 0))))
+                          0:i32)
+                        (fseek fp (convert (aiffheader_chunksize hdr) i64) SEEK_CUR)))
+                  (fclose fp)
+                  nbits)))))))
+
+;;;;;;;;;;;;;;;;;;;;;
+;; user-facing API ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; works for aiff and wave files
+
+(bind-func audiofile_read_samples
+  (lambda (filename dest:SAMPLE*)
+    (cond ((rmatch "\\.wave?$" filename)
+           (audiofile_wave_read_samples filename dest))
+          ((rmatch "\\.aiff?$" filename)
+           (audiofile_aiff_read_samples filename dest))
+          (else
+           (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
+           #f))))
+
+(bind-func AudioBuffer_from_file
+  (lambda (filename)
+    (cond ((rmatch "\\.wave?$" filename)
+           (AudioBuffer_from_wave filename))
+          ((rmatch "\\.aiff?$" filename)
+           (AudioBuffer_from_aiff filename))
+          (else
+           (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
+           null))))

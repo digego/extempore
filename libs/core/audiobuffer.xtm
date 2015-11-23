@@ -15,13 +15,9 @@
 (define *xtmlib-audiobuffer-loaded* #f)
 
 (impc:aot:suppress-aot-do
- (sys:load "libs/core/std.xtm")
- (sys:load "libs/core/audio_dsp.xtm")
- (sys:load "libs/external/sndfile.xtm"))
+ (sys:load "libs/core/std.xtm"))
 (impc:aot:insert-forms
- (sys:load "libs/core/std.xtm" 'quiet)
- (sys:load "libs/core/audio_dsp.xtm" 'quiet)
- (sys:load "libs/external/sndfile.xtm" 'quiet))
+ (sys:load "libs/core/std.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmaudiobuffer")
 
@@ -43,7 +39,7 @@
 (bind-func AudioBuffer_a
   (lambda (frames chans)
     (let ((dat:SAMPLE* (alloc (* frames chans))))
-      (AudioBuffer_z (String "") 0 frames chans dat SR 0 0))))
+      (AudioBuffer_z (String "") 0 frames chans dat (convert (llvm_samplerate)) 0 0))))
 
 (bind-poly AudioBuffer AudioBuffer_a)
 
@@ -248,116 +244,19 @@
     (pref-ptr (AudioBuffer_data ab)
               (+ (* frame (AudioBuffer_channels ab)) chan))))
 
-;; TODO this needs fixin
-
-;; (bind-func AudioBuffer_copy_region
-;;   "create a new AudioBuffer from a region of an existing AudioBuffer
-
-;; @param start - frame to start at
-;; @param nframes - number of frames to copy"
-;;   (lambda (ab:AudioBuffer* start nframes)
-;;     (if (or (null? ab) (< start 0)) null
-;;         (let ((fs (AudioBuffer_frames ab)))
-;;           (if (>= (+ start nframes) fs) null
-;;               null)))))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; reading audio files ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; TODO up to here
 
-(bind-func AudioBuffer_region_from_file
-  "read a region of an audio file into an AudioBuffer
+;; (bind-func AudioBuffer_from_file
+;;   "read an audio file into an AudioBuffer"
+;;   (lambda (filename)
+;;     (AudioBuffer_region_from_file filename 0 (sf_frames_from_file filename))))
 
-@param nframes - number of frames to read
-@param start - start frame"
-  (lambda (filename start nframes)
-    (let ((info:SF_INFO* (salloc))
-          (audiofile (sf_open filename SFM_READ info))
-          (ab:AudioBuffer* null))
-      (if (null? audiofile)
-          (begin (println "soundfile error:" (sf_strerror audiofile))
-                 ab)
-          ;; when sf_open has read the file without error
-          (let ((channels (convert (sf_channels info)))
-                (samplerate (convert (sf_samplerate info)))
-                (available_frames (- nframes start)))
-            ;;(println "Channels:" channels "Samplerate:" samplerate "Frames:" available_frames)
-            (if (<> samplerate (convert (llvm_samplerate)))
-                (println "Warning: file samplerate" samplerate "doesn't match the current audio samplerate" (llvm_samplerate) "- this could cause problems"))
-            (if (> nframes available_frames)
-                (begin (println "Error: audio file too short - trying to read more nframes than are available")
-                       (sf_close audiofile)
-                       ab)
-                (let ((frames_read 0)
-                      (data:float* (halloc (* nframes channels 4))))
-                  ;; initialise and allocate memory for the AudioBuffer
-                  (set! ab (AudioBuffer (String filename)
-                                        0
-                                        nframes
-                                        channels
-                                        data
-                                        samplerate
-                                        0 0))
-                  ;; read the audio data from the file
-                  (set! frames_read (sf_readf audiofile
-                                              data
-                                              (* nframes channels)))
-                  ;;(println "frames read:" frames_read)
-                  (sf_close audiofile)
-                  ;; set the metadata into the new Audiobuffer object
-                  (AudioBuffer_set_frames ab frames_read)
-                  (if (< frames_read nframes)
-                      (begin (println "Error: tried to read" nframes "frames, only read" frames_read "frames." (sf_strerror audiofile))
-                             ab)
-                      ab))))))))
-
-(bind-func AudioBuffer_from_file
-  "read an audio file into an AudioBuffer"
-  (lambda (filename)
-    (AudioBuffer_region_from_file filename 0 (sf_frames_from_file filename))))
-
-(bind-poly AudioBuffer AudioBuffer_region_from_file)
-(bind-poly AudioBuffer AudioBuffer_from_file)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;
-;; writing audio files ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(bind-func AudioBuffer_region_to_file
-  "write AudioBuffer to file
-
-@param filename
-@param format - 16bit PCM AIFF: (bor SF_FORMAT_AIF SF_FORMAT_PCM_16)
-@param start
-@param nframes"
-  (lambda (ab:AudioBuffer* filename format start nframes)
-    (let ((info:SF_INFO* (salloc)))
-      (sf_set_frames info nframes)
-      (sf_set_samplerate info (convert (AudioBuffer_samplerate ab)))
-      (sf_set_channels info (convert (AudioBuffer_channels ab)))
-      (sf_set_format info format)
-      (let ((audiofile (sf_open filename SFM_WRITE info)))
-        (if (null? audiofile)
-            (begin (println "Error writing audio file:" (sf_strerror audiofile)) -1)
-            (let ((frames_written (sf_writef audiofile (AudioBuffer_ptr ab start 0) nframes)))
-              ;; flush write to disk
-              (sf_write_sync audiofile)
-              (if (< frames_written nframes)
-                  (println "Error writing audio file: tried to write" nframes "frames, only wrote" frames_written "frames."
-                           (sf_strerror audiofile)))
-              (sf_close audiofile)
-              frames_written))))))
-
-(bind-func AudioBuffer_to_file
-  "write AudioBuffer to file
-
-@param filename
-@param format"
-  (lambda (ab:AudioBuffer* filename format)
-    (AudioBuffer_region_to_file ab filename format 0 (AudioBuffer_frames ab))))
+;; (bind-poly AudioBuffer AudioBuffer_region_from_file)
+;; (bind-poly AudioBuffer AudioBuffer_from_file)
 
 (impc:aot:insert-footer "xtmaudiobuffer")
 (define *xtmlib-audiobuffer-loaded* #t)

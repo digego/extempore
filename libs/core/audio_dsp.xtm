@@ -2120,6 +2120,57 @@ but v1 and v2 can be computed in parallel"
     (if (<= freq 0.0) 0.0
         (+ (* 12.0 (log2 (/ freq 440.0))) 69.0))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; native xtlang audio file readers ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; WAV/AIFF reading only, for reading compressed audio formats or
+;; writing audio files, see libs/external/sndfile.xtm
+
+;; sound data chunk
+
+(bind-func AiffSoundDataChunkHeader_print
+  "specialised print function for AiffSoundDataChunkHeader*"
+  (lambda (hdr:AiffSoundDataChunkHeader*)
+    (if (null? hdr)
+        (printf "<AiffSoundDataChunkHeader 0x0>")
+        (printf "<AiffSoundDataChunkHeader
+         ID: %.4s
+       size: %d
+     offset: %d
+  blocksize: %d
+>"
+                (tref hdr 0)
+                (tref hdr 1)
+                (tref hdr 2)
+                (tref hdr 3)))
+    void))
+
+(bind-poly print AiffSoundDataChunkHeader_print)
+
+(bind-func AiffSoundDataChunkHeader_toString
+  "specialised toString function for AiffSoundDataChunkHeader*"
+  (lambda (hdr:AiffSoundDataChunkHeader*)
+    (let ((str:i8* (salloc 256)))
+      (if (null? hdr)
+          (sprintf str "<AiffSoundDataChunkHeader 0x0>")
+          (sprintf str "<AiffSoundDataChunkHeader
+         ID: %.4s
+       size: %d
+     offset: %d
+  blocksize: %d
+>"
+                   (tref hdr 0)
+                   (tref hdr 1)
+                   (tref hdr 2)
+                   (tref hdr 3)))
+      (Str str))))
+
+(bind-poly toString AiffSoundDataChunkHeader_toString)
+
+
+
+
 (define *xtmlib-audio_dsp-loaded* #t)
 
 (impc:aot:insert-footer "xtmaudio_dsp")
