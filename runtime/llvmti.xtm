@@ -5588,6 +5588,10 @@
     ;; we should ONLY use request? on the LAST sexpr in the begin
     ;; i.e. we should only use the LAST begin sexpr for a return type
     (let ((sexplst (reverse (cdr ast))))
+      (if (and (list? (car sexplst))
+               (member (caar sexplst) '(ifret)))
+          (if (<> (length (car sexplst)) 4)
+              (impc:compiler:print-compiler-error "Conditional statements in a return position must provide two branches!" (car sexplst))))
       ;; we need type check coverage for ALL sexpr's
       ;; by only the last one counts towards the returned type
 
