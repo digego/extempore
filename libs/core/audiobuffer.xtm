@@ -286,325 +286,294 @@
         (pset! buf i (pref buf (- nbytes 1 i)))
         (pset! buf (- nbytes 1 i) tmp)))))
 
-(bind-func audiofile_16bit_to_sample_le
-  (let ((range (i64tod (<< 2 15))))
-    (lambda (src:i16* dest:SAMPLE* nsamp)
+;; IEEE floating point
+
+(bind-func audiofile_float_to_sample_le
+  (lambda (src:i8* dest:SAMPLE* nsamp)
+    (doloop (i nsamp)
+      (pset! dest i (pref (cast src float*) i)))))
+
+(bind-func audiofile_float_to_sample_be
+  (let ((tmp:i32* (zalloc 1)))
+    (lambda (src:i8* dest:SAMPLE* nsamp)
       (doloop (i nsamp)
-        (pset! dest i (dtof (/ (convert (pref src i)) range)))))))
+        ;; flip the byte order
+        (pset! tmp 0 (pref (cast src i32*) i))
+        (pset! tmp 0 (swapi32 (pref tmp 0)))
+        ;; stuff it into dest
+        (pset! dest i (pref (cast tmp float*) 0))))))
 
-(bind-func audiofile_16bit_to_sample_be
-  (let ((range (i64tod (<< 2 15))))
-    (lambda (src:i16* dest:SAMPLE* nsamp)
+;; 16-bit PCM
+
+(bind-func audiofile_16bitPCM_to_sample_le
+  (let ((range (i64tod (<< 1 16))))
+    (lambda (src:i8* dest:SAMPLE* nsamp)
       (doloop (i nsamp)
-        (pset! dest i (dtof (/ (convert (swapi16 (pref src i))) range)))))))
+        (pset! dest i (dtof (/ (i16tod (pref (cast src i16*) i)) range)))))))
 
-;;;;;;;;;;;;;;;;
-;; WAVE files ;;
-;;;;;;;;;;;;;;;;
+(bind-func audiofile_16bitPCM_to_sample_be
+  (let ((range (i64tod (<< 1 16))))
+    (lambda (src:i8* dest:SAMPLE* nsamp)
+      (doloop (i nsamp)
+        (pset! dest i (dtof (/ (i16tod (swapi16 (pref (cast src i16*) i))) range)))))))
 
-(bind-type WaveFormat <|4,i8|,i32,|4,i8|,|4,i8|,i32,i16,i16,i32,i32,i16,i16,|4,i8|,i32>)
+;; 24-bit PCM
 
-;; accessor functions
-(bind-func waveformat_type
-  (lambda (wf:WaveFormat*)
-    (i16toi64 (tref wf 5))))
+(bind-func audiofile_24bitPCM_to_sample_le
+  (let ((range (i64tod (<< 1 32)))
+        (tmp:i8* (zalloc 4)))
+    (lambda (src:i8* dest:SAMPLE* nsamp)
+      (pset! tmp 3 0)
+      (doloop (i nsamp)
+        ;; copy the 3 bytes to tmp
+        (pset! tmp 1 (pref src (* i 3)))
+        (pset! tmp 2 (pref src (+ (* i 3) 1)))
+        (pset! tmp 3 (pref src (+ (* i 3) 2)))
+        (pset! dest i (dtof (/ (i32tod (pref (cast tmp i32*) 0)) range)))))))
 
-(bind-func waveformat_nchan
-  (lambda (wf:WaveFormat*)
-    (i16toi64 (tref wf 6))))
+(bind-func audiofile_24bitPCM_to_sample_be
+  (let ((range (i64tod (<< 1 32)))
+        (tmp:i8* (zalloc 4)))
+    (lambda (src:i8* dest:SAMPLE* nsamp)
+      (pset! tmp 0 0)
+      (doloop (i nsamp)
+        ;; copy the 3 bytes to tmp (in reverse order)
+        (pset! tmp 3 (pref src (* i 3)))
+        (pset! tmp 2 (pref src (+ (* i 3) 1)))
+        (pset! tmp 1 (pref src (+ (* i 3) 2)))
+        (pset! dest i (dtof (/ (i32tod (pref (cast tmp i32*) 0)) range)))))))
 
-(bind-func waveformat_samplerate
-  (lambda (wf:WaveFormat*)
-    (i32tod (tref wf 7))))
+;; might as well use the WAVE format IDs
 
-(bind-func waveformat_bitdepth
-  (lambda (wf:WaveFormat*)
-    (i16toi64 (tref wf 10))))
+;; these are usually 16-bit
+(bind-val WAVE_FORMAT_PCM i64 1)
+(bind-val WAVE_FORMAT_IEEE_FLOAT i64 3)
+(bind-val WAVE_FORMAT_ALAW i64 6)
+(bind-val WAVE_FORMAT_MULAW i64 7)
+(bind-val WAVE_FORMAT_EXTENSIBLE i64 -2)
 
-(bind-func waveformat_datasize
-  (lambda (wf:WaveFormat*)
-    (i32toi64 (tref wf 12))))
+(bind-func audiofile_copy_samples
+  (lambda (src dest nsamp bitdepth type le:i1)
+    (cond ((= type WAVE_FORMAT_IEEE_FLOAT)
+           (if le
+               (audiofile_float_to_sample_le src dest nsamp)
+               (audiofile_float_to_sample_be src dest nsamp))
+           #t)
+          ((and (or (= type WAVE_FORMAT_PCM)
+                    (= type WAVE_FORMAT_EXTENSIBLE))
+                (= bitdepth 16))
+           (if le
+               (audiofile_16bitPCM_to_sample_le src dest nsamp)
+               (audiofile_16bitPCM_to_sample_be src dest nsamp))
+           #t)
+          ((and (or (= type WAVE_FORMAT_PCM)
+                    (= type WAVE_FORMAT_EXTENSIBLE))
+                (= bitdepth 24))
+           (if le
+               (audiofile_24bitPCM_to_sample_le src dest nsamp)
+               (audiofile_24bitPCM_to_sample_be src dest nsamp))
+           #t)
+          (else
+           (println "audiofile error: the native xtlang wave/aiff file reader currently\nonly supports 16/24-bit PCM or 32-bit IEEE float audio\n\nFor more audio format options, use libs/external/sndfile.xtm")
+           #f))))
 
-(bind-func waveformat_nframes
-  (lambda (wf:WaveFormat*)
-    (/ (* 8 (waveformat_datasize wf))
-       (* (waveformat_nchan wf)
-          (waveformat_bitdepth wf)))))
+;;;;;;;;;
+;; IFF ;;
+;;;;;;;;;
 
-(bind-func waveformat_check
-  (lambda (wf:WaveFormat*)
-    (and (= (strncmp (aref-ptr (tref-ptr wf 0) 0) "RIFF" 4) 0)
-         (= (strncmp (aref-ptr (tref-ptr wf 2) 0) "WAVE" 4) 0))))
+;; wave and aiff files are both descendents of IFF, except they differ
+;; in endianness. So we define a base type which represents a chunk
+;; header
 
-(bind-func waveformat_print
-  "specialised print function for WaveFormat*"
-  (lambda (wf:WaveFormat*)
-    (if (null? wf)
-        (printf "<WaveFormat 0x0>")
-        (printf "<WaveFormat
-    filesize: %d
-    filetype: %.4s
-      format: %s
-       nchan: %d
-  samplerate: %f
-    bitdepth: %d
-     nframes: %d
->"
-                (tref wf 1)
-                (cast (tref-ptr wf 2) i8*)
-                (let ((type (waveformat_type wf)))
-                  (cond ((= type 0) "Unknown")
-                        ((= type 1) "PCM (uncompressed)")
-                        ((= type 2) "Microsoft ADPCM")
-                        ((= type 3) "IEEE 32-bit float")
-                        ((= type 6) "ITU G.711 a-law")
-                        ((= type 7) "ITU G.711 mu-law")
-                        ((= type 17) "IMA ADPCM")
-                        ((= type 20) "ITU G.723 ADPCM (Yamaha)")
-                        ((= type 49) "GSM 6.10")
-                        ((= type 64) "ITU G.721 ADPCM")
-                        ((= type 80) "MPEG")
-                        (else "Unknown")))
-                (waveformat_nchan wf)
-                (waveformat_samplerate wf)
-                (waveformat_bitdepth wf)
-                (waveformat_nframes wf)))
+(bind-type IffChunkHeader <|4,i8|,i32>)
+(bind-val IFF_CHUNK_HEADER_SIZE i64 8)
+
+(bind-func iffchunk_check_ID
+  "check the chunk & form IDs are valid"
+  (lambda (hdr:IffChunkHeader* id:i8*)
+    (= (strncmp (aref-ptr (tref-ptr hdr 0) 0) id 4) 0)))
+
+(bind-func iffchunk_size
+  (lambda (hdr:IffChunkHeader* le:i1)
+    (if le (tref hdr 1) (swapi32 (tref hdr 1)))))
+
+;; this version "smartly" jumps through the file based on the chunk sizes
+(bind-func iffchunk_find_smart
+  (lambda (fileptr:i8* id le:i1)
+    (while (not (iffchunk_check_ID (cast fileptr IffChunkHeader*) id))
+      (set! fileptr
+            (pref-ptr fileptr
+                      (+ IFF_CHUNK_HEADER_SIZE
+                         (convert
+                          (iffchunk_size (cast fileptr IffChunkHeader*) le)
+                          i64)))))
+    fileptr))
+
+;; super naive - will run off the end of the buffer if it doesn't find
+;; the desired ID
+(bind-func iffchunk_find_dumb
+  (lambda (fileptr:i8* id:i8*)
+    (while (<> (strncmp fileptr id 4) 0)
+      (set! fileptr (pref-ptr fileptr 1)))
+    fileptr))
+
+(bind-func iffheader_print
+  "specialised print function for IffChunkHeader*"
+  (lambda (hdr:IffChunkHeader*)
+    (if (null? hdr)
+        (printf "<IffChunkHeader 0x0>")
+        (printf "<IffChunkHeader chunk ID: %.4s  chunk size: %d>"
+                (aref-ptr (tref-ptr hdr 0) 0)
+                (iffchunk_size hdr #t))) ;; this will only work for WAVE
     void))
 
-(bind-poly print waveformat_print)
+(bind-poly print iffheader_print)
 
-(bind-func waveformat_toString
-  "specialised toString function for WaveFormat*"
-  (lambda (wf:WaveFormat*)
+(bind-func iffheader_toString
+  "specialised toString function for IffChunkHeader*"
+  (lambda (hdr:IffChunkHeader*)
     (let ((str:i8* (salloc 256)))
-      (if (null? wf)
-          (sprintf str "<WaveFormat 0x0>")
+      (if (null? hdr)
+          (sprintf str "<IffChunkHeader 0x0>")
           (sprintf str
-                   "<WaveFormat
-    filesize: %d
-    filetype: %.4s
-      format: %s
-       nchan: %d
-  samplerate: %f
-    bitdepth: %d
-     nframes: %d
->"
-                   (tref wf 1)
-                   (cast (tref-ptr wf 2) i8*)
-                   (let ((type (waveformat_type wf)))
-                     (cond ((= type 0) "Unknown")
-                           ((= type 1) "PCM (uncompressed)")
-                           ((= type 2) "Microsoft ADPCM")
-                           ((= type 3) "IEEE 32-bit float")
-                           ((= type 6) "ITU G.711 a-law")
-                           ((= type 7) "ITU G.711 mu-law")
-                           ((= type 17) "IMA ADPCM")
-                           ((= type 20) "ITU G.723 ADPCM (Yamaha)")
-                           ((= type 49) "GSM 6.10")
-                           ((= type 64) "ITU G.721 ADPCM")
-                           ((= type 80) "MPEG")
-                           (else "Unknown")))
-                   (waveformat_nchan wf)
-                   (waveformat_samplerate wf)
-                   (waveformat_bitdepth wf)
-                   (waveformat_nframes wf)))
+                   "<IffChunkHeader chunk ID: %.4s  chunk size: %d>"
+                   (aref-ptr (tref-ptr hdr 0) 0)
+                   (iffchunk_size hdr #t))) ;; this will only work for WAVE
       (Str str))))
 
-(bind-poly toString waveformat_toString)
+(bind-poly toString iffheader_toString)
+
+;;;;;;;;;;
+;; WAVE ;;
+;;;;;;;;;;
+
+(bind-func wave_validate
+  (lambda (fileptr)
+    (and (= (strncmp fileptr "RIFF" 4) 0)
+         (= (strncmp (pref-ptr fileptr 8) "WAVE" 4) 0))))
 
 (bind-func audiofile_wave_read_samples
   (lambda (filepath dest:SAMPLE*)
-    (let ((filedata (sys_slurp_file filepath))
-          (wfsize 44) ;; sizeof WaveFormat
-          (wf:WaveFormat* (cast filedata WaveFormat*)))
+    (let ((filedata (sys_slurp_file filepath)))
       (if (null? filedata)
           (begin (println "wavefile error: could not open file")
                  (free filedata)
                  #f)
-          (cond ((not (waveformat_check wf))
-                 (println "wavefile error: there was a problem with the chunk IDs")
-                 (free filedata)
-                 #f)
-                ((<> (waveformat_bitdepth wf) 16)
-                 (println "wavefile error: the native xtlang wave file reader currently only supports 16-bit audio\nFor more format options, use libs/external/sndfile.xtm")
+          (cond ((not (wave_validate filedata))
+                 (println "wavefile error: there was a problem with the chunk IDs...\nis the file corrupt?")
                  (free filedata)
                  #f)
                 (else
-                 (let ((dsize (waveformat_datasize wf))
-                       (nchan (waveformat_nchan wf))
-                       (bitdepth (waveformat_bitdepth wf))
-                       (samplerate (waveformat_samplerate wf))
-                       (nframes (waveformat_nframes wf)))
-                   ;; read data into memory
-                   (audiofile_16bit_to_sample_le (cast (pref-ptr filedata wfsize) i16*) dest (* nchan nframes))
+                 (let ((fmt (iffchunk_find_dumb filedata "fmt "))
+                       (chunksize (i32toi64 (iffchunk_size (cast fmt IffChunkHeader*) #t)))
+                       (type (i16toi64 (pref (cast (pref-ptr fmt IFF_CHUNK_HEADER_SIZE) i16*) 0)))
+                       (nchan (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 2)) i16*) 0)))
+                       (samplerate (i32toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 4)) i32*) 0)))
+                       (bitdepth (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 14)) i16*) 0)))
+                       (data (iffchunk_find_dumb filedata "data"))
+                       (nframes (/ (i32toi64 (iffchunk_size (cast data IffChunkHeader*) #t))
+                                   (* nchan (/ bitdepth 8))))
+                       ;; read data into memory
+                       (res (audiofile_copy_samples (pref-ptr data IFF_CHUNK_HEADER_SIZE)
+                                                    dest
+                                                    (* nchan nframes)
+                                                    bitdepth
+                                                    type
+                                                    #t)))
                    (free filedata)
-                   #t)))))))
+                   res)))))))
 
 (bind-func AudioBuffer_from_wave
   (lambda (filepath)
-    (let ((filedata (sys_slurp_file filepath))
-          (wfsize 44) ;; sizeof WaveFormat
-          (wf:WaveFormat* (cast filedata WaveFormat*)))
+    (let ((filedata (sys_slurp_file filepath)))
       (if (null? filedata)
           (begin (println "wavefile error: could not open file")
                  (free filedata)
                  null)
-          (cond ((not (waveformat_check wf))
-                 (println "wavefile error: there was a problem with the chunk IDs")
-                 (free filedata)
-                 null)
-                ((<> (waveformat_bitdepth wf) 16)
-                 (println "wavefile error: the native xtlang wave file reader currently only supports 16-bit audio\nFor more format options, use libs/external/sndfile.xtm")
+          (cond ((not (wave_validate filedata))
+                 (println "wavefile error: there was a problem with the chunk IDs...\nis the file corrupt?")
                  (free filedata)
                  null)
                 (else
-                 (let ((dsize (waveformat_datasize wf))
-                       (nchan (waveformat_nchan wf))
-                       (bitdepth (waveformat_bitdepth wf))
-                       (samplerate (waveformat_samplerate wf))
-                       (nframes (waveformat_nframes wf))
-                       (ab (AudioBuffer nframes nchan samplerate)))
-                   (AudioBuffer_set_filepath ab (Str filepath))
-                   ;; read data into memory
-                   (audiofile_16bit_to_sample_le (cast (pref-ptr filedata wfsize) i16*) (AudioBuffer_data ab) (* nchan nframes))
+                 (let ((fmt (iffchunk_find_dumb filedata "fmt "))
+                       (chunksize (i32toi64 (iffchunk_size (cast fmt IffChunkHeader*) #t)))
+                       (type (i16toi64 (pref (cast (pref-ptr fmt IFF_CHUNK_HEADER_SIZE) i16*) 0)))
+                       (nchan (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 2)) i16*) 0)))
+                       (samplerate (i32tod (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 4)) i32*) 0)))
+                       (bitdepth (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 14)) i16*) 0)))
+                       (data (iffchunk_find_dumb filedata "data"))
+                       (nframes (/ (i32toi64 (iffchunk_size (cast data IffChunkHeader*) #t))
+                                   (* nchan (/ bitdepth 8))))
+                       (ab (AudioBuffer nframes nchan samplerate))
+                       (abres (AudioBuffer_set_filepath ab (Str filepath)))
+                       ;; read data into memory
+                       (res (audiofile_copy_samples (pref-ptr data IFF_CHUNK_HEADER_SIZE)
+                                                    (AudioBuffer_data ab)
+                                                    (* nchan nframes)
+                                                    bitdepth
+                                                    type
+                                                    #t)))
                    (free filedata)
-                   ab)))))))
+                   (if res ab null))))))))
 
 ;;;;;;;;;;
 ;; AIFF ;;
 ;;;;;;;;;;
 
-(bind-type AiffChunk <|4,i8|,i32>)
-
-(bind-func aiffheader_chunksize
-  (lambda (hdr:AiffChunk*)
-    ;; AIFFs use big-endian, so need to swap the bytes
-    (swapi32 (tref hdr 1))))
-
-(bind-func aiffheader_check_ID
-  "check the chunk & form IDs are valid"
-  (lambda (hdr:AiffChunk* id:i8*)
-    (= (strncmp (aref-ptr (tref-ptr hdr 0) 0) id 4) 0)))
-
-(bind-func aiffheader_print
-  "specialised print function for AiffChunk*"
-  (lambda (hdr:AiffChunk*)
-    (if (null? hdr)
-        (printf "<AiffChunk 0x0>")
-        (printf "<AiffChunk chunk ID: %.4s  chunk size: %d>"
-                (aref-ptr (tref-ptr hdr 0) 0)
-                (aiffheader_chunksize hdr)))
-    void))
-
-(bind-poly print aiffheader_print)
-
-(bind-func aiffheader_toString
-  "specialised toString function for AiffChunk*"
-  (lambda (hdr:AiffChunk*)
-    (let ((str:i8* (salloc 256)))
-      (if (null? hdr)
-          (sprintf str "<AiffChunk 0x0>")
-          (sprintf str
-                   "<AiffChunk chunk ID: %.4s  chunk size: %d>"
-                   (aref-ptr (tref-ptr hdr 0) 0)
-                   (aiffheader_chunksize hdr)))
-      (Str str))))
-
-(bind-poly toString aiffheader_toString)
+(bind-func aiff_validate
+  (lambda (fileptr)
+    (and (= (strncmp fileptr "FORM" 4) 0)
+         (= (strncmp (pref-ptr fileptr 8) "AIFF" 4) 0))))
 
 ;; currently, this will crash out if the AIFF sub-chunks are bad (it
 ;; doesn't know where the end of the file). It will gracefully handle
 ;; non AIFF files, though. Only corrupted ones would be a problem
 (bind-func audiofile_aiff_read_samples
   (lambda (filepath dest:SAMPLE*)
-    (let ((filedata (sys_slurp_file filepath))
-          (hdr:AiffChunk* (salloc))
-          (hdrsize 8) ;; sizeof AiffChunk
-          (find_chunk (lambda (fileptr:i8* id)
-                        ;; check that it's a valid AIFF file
-                        (if (not (aiffheader_check_ID (cast fileptr AiffChunk*) "FORM"))
-                            null
-                            (begin
-                              (set! fileptr (pref-ptr fileptr (+ hdrsize 4)))
-                              (while (not (aiffheader_check_ID (cast fileptr AiffChunk*) id))
-                                (set! fileptr
-                                      (pref-ptr fileptr
-                                                (+ hdrsize
-                                                   (convert
-                                                    (aiffheader_chunksize (cast fileptr AiffChunk*))
-                                                    i64)))))
-                              fileptr)))))
+    (let ((filedata (sys_slurp_file filepath)))
       (if (null? filedata)
           (begin (println "aiff file error: could not open file")
                  #f)
-          (let ((common (find_chunk filedata "COMM"))
-                (sounddata (find_chunk filedata "SSND")))
-            (if (or (null? common) (null? sounddata))
-                (begin
-                  (println "aiff file error: there was a problem with the chunk IDs")
-                  (free filedata)
-                  #f)
-                ;; pull the data out of the common chunk
-                (let ((nchan (i16toi64 (swapi16 (pref (cast (pref-ptr common hdrsize) i16*) 0))))
-                      (nframes (i32toi64 (swapi32 (pref (cast (pref-ptr common (+ hdrsize 2)) i32*) 0))))
-                      (bitdepth (i16toi64 (swapi16 (pref (cast (pref-ptr common (+ hdrsize 6)) i16*) 0)))))
-                  (if (<> bitdepth 16)
-                      (begin
-                        (println "aiff file error: the native xtlang wave file reader currently only supports 16-bit audio\nFor more format options, use libs/external/sndfile.xtm")
-                        (free filedata)
-                        #f)
-                      (begin
-                        (audiofile_16bit_to_sample_be (cast (pref-ptr sounddata (+ hdrsize 8)) i16*) dest (* nchan nframes))
-                        ;; (free filedata) ;; why does this cause a crash?
-                        #t)))))))))
+          (let ((common (iffchunk_find_dumb filedata "COMM"))
+                (sounddata (iffchunk_find_dumb filedata "SSND")))
+            ;; pull the data out of the common chunk
+            (let ((nchan (i16toi64 (swapi16 (pref (cast (pref-ptr common IFF_CHUNK_HEADER_SIZE) i16*) 0))))
+                  (nframes (i32toi64 (swapi32 (pref (cast (pref-ptr common (+ IFF_CHUNK_HEADER_SIZE 2)) i32*) 0))))
+                  (bitdepth (i16toi64 (swapi16 (pref (cast (pref-ptr common (+ IFF_CHUNK_HEADER_SIZE 6)) i16*) 0))))
+                  (res (audiofile_copy_samples (pref-ptr sounddata (+ IFF_CHUNK_HEADER_SIZE 8))
+                                               dest
+                                               (* nchan nframes)
+                                               bitdepth
+                                               WAVE_FORMAT_PCM ;; AIFF is always PCM
+                                               #f)))           ;; AIFF is *not* little-endian
+              (free filedata)
+              res))))))
 
 (bind-func AudioBuffer_from_aiff
   (lambda (filepath)
-    (let ((filedata (sys_slurp_file filepath))
-          (hdr:AiffChunk* (salloc))
-          (hdrsize 8) ;; sizeof AiffChunk
-          (find_chunk (lambda (fileptr:i8* id)
-                        ;; check that it's a valid AIFF file
-                        (if (not (aiffheader_check_ID (cast fileptr AiffChunk*) "FORM"))
-                            null
-                            (begin
-                              (set! fileptr (pref-ptr fileptr (+ hdrsize 4)))
-                              (while (not (aiffheader_check_ID (cast fileptr AiffChunk*) id))
-                                (set! fileptr
-                                      (pref-ptr fileptr
-                                                (+ hdrsize
-                                                   (convert
-                                                    (aiffheader_chunksize (cast fileptr AiffChunk*))
-                                                    i64)))))
-                              fileptr)))))
+    (let ((filedata (sys_slurp_file filepath)))
       (if (null? filedata)
           (begin (println "aiff file error: could not open file")
                  null)
-          (let ((common (find_chunk filedata "COMM"))
-                (sounddata (find_chunk filedata "SSND")))
-            (if (or (null? common) (null? sounddata))
-                (begin
-                  (println "aiff file error: there was a problem with the chunk IDs")
-                  (free filedata)
-                  null)
-                ;; pull the data out of the common chunk
-                (let ((nchan (i16toi64 (swapi16 (pref (cast (pref-ptr common hdrsize) i16*) 0))))
-                      (nframes (i32toi64 (swapi32 (pref (cast (pref-ptr common (+ hdrsize 2)) i32*) 0))))
-                      (bitdepth (i16toi64 (swapi16 (pref (cast (pref-ptr common (+ hdrsize 6)) i16*) 0))))
-                      (samplerate (begin
-                                    (swap_bytes_inplace (pref-ptr common (+ hdrsize 8)) 10)
-                                    (fp80ptrtod (pref-ptr common (+ hdrsize 8)))))
-                      (ab (AudioBuffer nframes nchan samplerate)))
-                  (AudioBuffer_set_filepath ab (Str filepath))
-                  (if (<> bitdepth 16)
-                      (begin
-                        (println "aiff file error: the native xtlang wave file reader currently only supports 16-bit audio\nFor more format options, use libs/external/sndfile.xtm")
-                        (free filedata)
-                        null)
-                      (begin
-                        (audiofile_16bit_to_sample_be (cast (pref-ptr sounddata (+ hdrsize 8)) i16*) (AudioBuffer_data ab) (* nchan nframes))
-                        ;; (free filedata) ;; why does this cause a crash?
-                        ab)))))))))
+          (let ((common (iffchunk_find_dumb filedata "COMM"))
+                (sounddata (iffchunk_find_dumb filedata "SSND")))
+            ;; pull the data out of the common chunk
+            (let ((nchan (i16toi64 (swapi16 (pref (cast (pref-ptr common IFF_CHUNK_HEADER_SIZE) i16*) 0))))
+                  (nframes (i32toi64 (swapi32 (pref (cast (pref-ptr common (+ IFF_CHUNK_HEADER_SIZE 2)) i32*) 0))))
+                  (bitdepth (i16toi64 (swapi16 (pref (cast (pref-ptr common (+ IFF_CHUNK_HEADER_SIZE 6)) i16*) 0))))
+                  (samplerate (begin
+                                (swap_bytes_inplace (pref-ptr common (+ IFF_CHUNK_HEADER_SIZE 8)) 10)
+                                (fp80ptrtod (pref-ptr common (+ IFF_CHUNK_HEADER_SIZE 8)))))
+                  (ab (AudioBuffer nframes nchan samplerate))
+                  (abres (AudioBuffer_set_filepath ab (Str filepath)))
+                  (res (audiofile_copy_samples (pref-ptr sounddata (+ IFF_CHUNK_HEADER_SIZE 8))
+                                               (AudioBuffer_data ab)
+                                               (* nchan nframes)
+                                               bitdepth
+                                               WAVE_FORMAT_PCM ;; AIFF is always PCM
+                                               #f)))
+              (free filedata) ;; why does this cause a crash?
+              (if res ab null)))))))
 
 ;; works for both aiff and wave files
 
