@@ -60,6 +60,7 @@
 
 #include "stdarg.h"
 #include "EXTLLVM.h"
+#include "EXTThread.h"
 #include "UNIV.h"
 #include "SchemeFFI.h"
 #include "TaskScheduler.h"
@@ -819,61 +820,41 @@ long long llvm_get_next_prime(long long start)
 /////////////////////////////////////////////
 
 void* thread_fork(void*(*start_routine)(void*),void* args) {
-#ifdef _WIN32
-  return NULL;
-#else
-  pthread_t* t = (pthread_t*) malloc(sizeof(pthread_t));
-  int res = pthread_create(t,NULL,start_routine,args);
-  if(res == 0) return t;
-  else return NULL;
+	auto thread = new extemp::EXTThread;
+	int result = thread->create(start_routine, args);
+
+#ifdef _EXTTHREAD_DEBUG_
+	if (result)
+	{
+		std::cerr << "Error creating thread: " << result << std::endl;
+	}
 #endif
+
+	return static_cast<void*>(thread);
 }
 
 int thread_join(void* thread) {
-#ifdef _WIN32
-  return NULL;
-#else
-  pthread_t* t = (pthread_t*) thread;
-  return pthread_join(*t,NULL);
-#endif
+	return static_cast<extemp::EXTThread*>(thread)->join();
 }
 
 int thread_kill(void* thread) {
-#ifdef _WIN32
-  return NULL;
-#else
-  pthread_t* t = (pthread_t*) thread;
-  return pthread_cancel(*t);
-#endif
+	return static_cast<extemp::EXTThread*>(thread)->kill();
 }
 
 int thread_equal(void* thread1, void* thread2) {
-#ifdef _WIN32
-  return 0;
-#else
-  pthread_t* t1 = (pthread_t*) thread1;
-  pthread_t* t2 = (pthread_t*) thread2;  
-  return pthread_equal(*t1,*t2);
-#endif  
+	return static_cast<extemp::EXTThread*>(thread1)->isEqualTo(static_cast<extemp::EXTThread*>(thread2));
 }
 
 int thread_equal_self(void* thread1) {
-#ifdef _WIN32
-  return 0;
-#else
-  pthread_t* t1 = (pthread_t*) thread1;
-  return pthread_equal(*t1,pthread_self());
-#endif  
+	return static_cast<extemp::EXTThread*>(thread1)->isCurrentThread(); 
 }
 
 void* thread_self() {
+	
 #ifdef _WIN32
-  return NULL;
+	return nullptr;
 #else
-  pthread_t* t1 = (pthread_t*) malloc(sizeof(pthread_t));  
-  pthread_t t2 = pthread_self();
-  memcpy(t1,&t2,sizeof(pthread_t));
-  return t1;
+	return static_cast<void*>(new extemp::EXTThread(pthread_self()));
 #endif  
 }
 
