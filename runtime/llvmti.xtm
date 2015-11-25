@@ -4301,11 +4301,13 @@
 
 (define impc:ti:get-var
   (lambda (sym vars)
-    (if (not (assoc-strcmp sym vars))
-        (if (impc:ti:globalvar-exists? (symbol->string sym))
-            (cons sym (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string sym))))
-            (impc:compiler:print-missing-identifier-error sym 'variable))
-        (assoc-strcmp sym vars))))
+    (if (not (symbol? sym))
+        (impc:compiler:print-missing-identifier-error sym 'variable)
+        (if (not (assoc-strcmp sym vars))
+            (if (impc:ti:globalvar-exists? (symbol->string sym))
+                (cons sym (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string sym))))
+                (impc:compiler:print-missing-identifier-error sym 'variable))
+            (assoc-strcmp sym vars)))))
 
 
 ;; clear all vars
