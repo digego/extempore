@@ -1,3 +1,8 @@
+;;; .emacs -- a starter Emacs config for working with Extempore
+;; Author: You! (with a little help from Ben Swift to get your started...)
+
+;;; Commentary:
+
 ;; If you're new to Emacs...
 
 ;; This file is a 'starter' .emacs ('dot emacs') file, which might
@@ -21,15 +26,19 @@
 ;; 
 ;; after that, Emacs will load the file on startup.
 
-;; You'll also need to change the `user-extempore-directory' variable
+;; You'll also need to change the `extempore-share-directory' variable
 ;; (further down in this file) to point to your Extempore source
 ;; directory.
 
 ;; If you're already an Emacs user...
 
-;; You'll have your own .emacs with its own tweaks. You'll probably
-;; just want to copy over the extempore-mode config stuff (down the
-;; bottom of this file).
+;; You'll have your own .emacs with its own tweaks. Just grab
+;; extempore-mode.el from MELPA:
+
+;; M-x `package-install' RET `extempore-mode' RET
+
+;; and see the commentary at the top of that file for usage
+;; instructions.
 
 ;; Further info:
 
@@ -39,6 +48,8 @@
 ;;;;;;;;;;
 ;; elpa ;;
 ;;;;;;;;;;
+
+;; this is the Emacs package manager
 
 (require 'package)
 (setq package-archives
@@ -57,7 +68,8 @@
            magit
            markdown-mode
            smex
-           yasnippet))
+           yasnippet
+           extempore-mode))
   (if (not (package-installed-p package))
       (package-install package)))
 
@@ -65,7 +77,6 @@
 ;; smex ;;
 ;;;;;;;;;;
 
-(setq smex-save-file (concat user-emacs-directory ".smex-items"))
 (smex-initialize)
 
 (setq ido-enable-prefix nil
@@ -176,33 +187,3 @@
 ;; (set-face-attribute 'default nil :height base-face-height :family "Ubuntu Mono")
 ;; ;; variable-width font
 ;; (set-face-attribute 'variable-pitch nil :height base-face-height :family "Ubuntu")
-
-;;;;;;;;;;;;;;;
-;; extempore ;;
-;;;;;;;;;;;;;;;
-
-(setq user-extempore-directory "/path/to/extempore/")
-;; this one will be helpful for a default homebrew install of extempore on OSX
-;; (setq user-extempore-directory "/usr/local/Cellar/extempore/0.5.2/")
-
-;; you can delete this once you've setup your extempore path
-(if (string-equal user-extempore-directory "/path/to/extempore/")
-    (if user-init-file
-        (progn (find-file user-init-file)
-               (search-forward "/path/to/extempore/" nil t 2)
-               (error "You need to set your Extempore path!"))
-      (error "You need to set your Extempore path!")))
-
-;; (auto)load the key emacs mode functions
-(autoload 'extempore-mode (concat user-extempore-directory "extras/extempore.el") "" t)
-(autoload 'extempore-run (concat user-extempore-directory "extras/extempore.el") nil t)
-(autoload 'extempore-repl (concat user-extempore-directory "extras/extempore.el") nil t)
-(add-to-list 'auto-mode-alist '("\\.xtm$" . extempore-mode))
-
-(autoload #'llvm-mode (concat user-extempore-directory "extras/llvm-mode.el")
-  "Major mode for editing LLVM IR files" t)
-
-(add-to-list 'auto-mode-alist '("\\.ir$" . llvm-mode))
-(add-to-list 'auto-mode-alist '("\\.ll$" . llvm-mode))
-
-;; start adding your own customizations here...
