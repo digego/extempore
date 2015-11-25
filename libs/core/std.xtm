@@ -50,10 +50,73 @@
 
 ;; (suppress-compiler-messages #f)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; SETUP NAN's
-(bind-val NaNf float  0.0 "not-a-number (NaN)")
-(bind-val NaNd double 0.0 "not-a-number (NaN)")
+;;;;;;;;;;;;;
+;; aliases ;;
+;;;;;;;;;;;;;
+
+(bind-alias bool i1 "boolean true/false type")
+
+(if (= (sys:pointer-size) 64)
+    (bind-alias size_t i64 "useful for working with C libraries")
+    (bind-alias size_t i32 "useful for working with C libraries"))
+
+(bind-alias enum i32 "useful for working with C libraries")
+
+;;;;;;;;;;;;;;;
+;; constants ;;
+;;;;;;;;;;;;;;;
+
+;; maths
+
+(bind-val PIf float 3.1415926535897932384626433832795028841971693993751058209749 "pi of float type")
+(bind-val TWOPIf float 6.2831853071795864769252867665590057683943387987502116419498 "2pi of float type")
+(bind-val Ef float 2.7182818284590452353602874713526624977572470936999595749669
+          "e (base of natural log) of float type")
+
+(bind-val PI double 3.1415926535897932384626433832795028841971693993751058209749
+          "pi of double type")
+(bind-val TWOPI double 6.2831853071795864769252867665590057683943387987502116419498
+          "pi of double type")
+(bind-val E double 2.7182818284590452353602874713526624977572470936999595749669
+          "e (base of natural log) of double type")
+
+;; audio
+
+;; if you change one of these, make sure you change them all!
+
+(bind-alias SAMPLE float
+            "audio I/O sample type in the dsp processing chain")
+(bind-alias DSP [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*
+            "audio output callback type")
+(bind-alias DSPMT [SAMPLE,SAMPLE*,i64,i64,SAMPLE*]*
+            "(multithreaded) audio output callback type")
+(bind-alias DSPMC [void,float*,float*,i64,i8*]*
+            "buffered audio output callback type")
+(bind-alias DSPMCMT [void,float**,float*,i64,i8*]*
+            "buffered (multithreaded) audio output callback type")
+(bind-func audio_64bit (lambda () 0:i1))
+
+(bind-val SPI SAMPLE 3.1415926535897932384626433832795028841971693993751058209749
+          "pi of type SAMPLE")
+(bind-val STWOPI SAMPLE 6.2831853071795864769252867665590057683943387987502116419498
+          "2pi of type SAMPLE")
+(bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669
+          "e (base of natural log) of type SAMPLE")
+
+(bind-val SAMPLERATE SAMPLE (llvm_samplerate)
+  "audio sample rate")
+(bind-val SRs SAMPLE SAMPLERATE "audio sample rate")
+(bind-val SRf float SAMPLERATE "audio sample rate (float)")
+(bind-val SRd double SAMPLERATE "audio sample rate (double)")
+(bind-val SR i64 SAMPLERATE) "audio sample rate (i64)"
+(bind-val CHANNELS i64 (llvm_channels)) "number of audio output channels"
+(bind-val IN_CHANNELS i64 (llvm_in_channels)) "number of audio input channels"
+(bind-val FRAMES i64 (llvm_frames)) "audio signal chain block size"
+
+;; IEEE floating point NaNs
+
+(bind-val NaNf float  0.0 "single-precision not-a-number (NaN)")
+(bind-val NaN double 0.0 "double-precision not-a-number (NaN)")
 
 (bind-func set_float_nans_
   (lambda ()
@@ -64,27 +127,14 @@
       (pset! n32 0 nan32)
       (pset! n64 0 nan64)
       (set! NaNf (pref (cast n32 float*) 0))
-      (set! NaNd (pref (cast n64 double*) 0))
+      (set! NaN (pref (cast n64 double*) 0))
       void)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; some global aliases
+(impc:aot:do-or-emit (set_float_nans_))
 
-(bind-alias bool i1 "boolean true/false type")
-(if (= (sys:pointer-size) 64)
-    (bind-alias size_t i64 "useful for working with C libraries")
-    (bind-alias size_t i32 "useful for working with C libraries"))
-(bind-alias enum i32 "useful for working with C libraries")
-
-;;;;;;;;;;;;; this for audio ;;;;;;;;;;;;;;;;;;
-;; THESE ALL NEED TO BE CHANGED TOGETHER!!!!
-(bind-alias SAMPLE float "audio I/O sample type in the dsp processing chain")
-(bind-alias DSP [SAMPLE,SAMPLE,i64,i64,SAMPLE*]* "audio output callback type")
-(bind-alias DSPMT [SAMPLE,SAMPLE*,i64,i64,SAMPLE*]* "(multithreaded) audio output callback type")
-(bind-alias DSPMC [void,float*,float*,i64,i8*]* "buffered audio output callback type")
-(bind-alias DSPMCMT [void,float**,float*,i64,i8*]* "buffered (multithreaded) audio output callback type")
-(bind-func audio_64bit (lambda () 0:i1))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;
+;; random ;;
+;;;;;;;;;;;;
 
 (bind-poly random imp_randf "polymorphic (pseudo)random number generation")
 (bind-poly random imp_randd)
@@ -96,6 +146,12 @@
 (bind-poly random imp_rand2_f)
 (bind-poly random imp_rand1_d)
 (bind-poly random imp_rand2_d)
+
+;;;;;;;;;;;;;;;;;;
+;; triginometry ;;
+;;;;;;;;;;;;;;;;;;
+
+;; many of these are handled through llvm intrinsics these days
 
 ;(bind-poly cos cosf)
 ;(bind-poly cos llvm_cos)
@@ -138,10 +194,9 @@
 ;; (bind-poly fabs fabsf)
 ;; (bind-poly fabs llvm_fabs)
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; support for zcopy
+;;;;;;;;;;;;;;;
+;; zone copy ;;
+;;;;;;;;;;;;;;;
 
 (bind-func zcopy_i1
   (lambda (x:i1 fromz:mzone* toz:mzone*) x))
@@ -181,7 +236,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; XTLang strings
+;; xtlang strings
 
 ;; 
 (bind-type String <size_t,i8*>
@@ -755,8 +810,6 @@ Use via the polymorphic Str function
         1:i1 0:i1)))
 
 (bind-poly equal Symbol_equal)
-
-(impc:aot:do-or-emit (set_float_nans_))
 
 ;; this stuff needs to go at the end, since redefinitions have to go
 ;; in a new module.  these are special-case hacks.
