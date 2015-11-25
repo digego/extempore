@@ -9,6 +9,10 @@ option(ASIO "use the ASIO Portaudio backend" OFF)
 option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
 
+if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
+  message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
+endif()
+
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
 
