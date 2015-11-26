@@ -1,0 +1,52 @@
+;;; scheduler.xtm -- rudimentary scheduling 
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+;;; Code:
+
+(sys:load "libs/core/scheduler.xtm")
+(sys:load "libs/external/instruments_ext.xtm")
+
+;; 120.0 bpm 100.0hz
+(bind-val bs1 [void]* (beat_scheduler 120.0 100.0))
+;; 200.0hz
+(bind-val cs1 [void]* (clock_scheduler 200.0))
+;; 100.0hz
+(bind-val cs2 [void]* (clock_scheduler 100.0))
+
+(bind-func beat_test
+  (lambda (beat:float)
+    (println "BEAT:" beat " SCHED:" (ftod (bs1.beat)))
+    (xtm_play_note (now) fmsynth (+ 80.0 (* (random) 800.0)) 0.2 100 0 null)
+    (sched bs1 (+ 1.0 beat) beat_test)
+    void))
+
+(bind-func clock_test_a
+  (lambda (time:double)
+    (let ((tt:double (cs1.time)))
+      (println "TIME1:" time ":" (clock_clock) ":" (floor tt)))
+    (xtm_play_note (now) fmsynth (+ 400.0 (* (random) 1200.0)) 0.2 1000 0 null)
+    (sched cs1 (+ 1.0 time) clock_test_a)
+    void))
+
+(bind-func clock_test_b
+  (lambda (time:double)
+    (let ((tt:double (cs2.time)))
+       (println "TIME2:" time ":" (clock_clock) ":" (floor tt)))
+    (xtm_play_note (now) fmsynth (+ 80.0 (* (random) 300.0)) 0.2 1000 0 null)
+    (sched cs2 (+ 1.0 time) clock_test_b)
+    void))
+
+(dsp:set! dsp)
+
+(call-as-xtlang (beat_test (+ 1.0 (floor (bs1.beat)))))
+(call-as-xtlang (beat_test (+ 1.0 (floor (bs1.beat)))))
+(call-as-xtlang (beat_test (+ 1.0 (floor (bs1.beat)))))
+
+(call-as-xtlang (bs1.bpm 200.0))
+
+(call-as-xtlang (clock_test_a (+ 1.0 (floor (clock_clock)))))
+(call-as-xtlang (clock_test_b (+ 1.0 (floor (clock_clock)))))
