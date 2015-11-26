@@ -207,7 +207,7 @@ int main(int argc, char** argv)
 #if !( defined (___ALSA_AUDIO___) || defined (COREAUDIO))
 	case OPT_PRT_DEVICES:          
           extemp::AudioDevice::printDevices();
-	  return 1;
+	  return 0;
 #endif
         case OPT_REALTIME:
 #ifdef _WIN32          
@@ -247,7 +247,7 @@ int main(int argc, char** argv)
     std::cout << "             --cpu: the target cpu [current host]" << std::endl;
     std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;  
 	  std::cout << "   --print-devices: print the available audio devices to console" << std::endl;	
-	  return -1;
+	  return 0;
 	}
       } else {
         std::string key((char*)args.OptionText());
