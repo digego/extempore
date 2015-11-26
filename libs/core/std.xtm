@@ -242,22 +242,24 @@
 (bind-type String <size_t,i8*>
   "xtlang's string type
 
-Tuple contains <string_length,characters>
+Tuple contains <string_length,pointer_to_data>
 
 Should be created, modified and destroyed with the String_* library functions.
 
 Second item in tuple is a char* c-style string ")
 
-;; must be a Halloced string!
+;; must be a heap string!
 (bind-func String_free
   "Free an xtlang String
 
-Frees both the underlying character array and the tuple container.
-@param str - String to be deleted 
+Frees both the underlying character array and the tuple container. The
+string must have been a heap-allocated (halloc).
+
+@param s - String to be deleted
 "
-  (lambda (str:String*)
-    (free (tref str 1))
-    (free str)
+  (lambda (s:String*)
+    (free (tref s 1))
+    (free s)
     void))
 
 ;; String printing!
@@ -267,13 +269,13 @@ Frees both the underlying character array and the tuple container.
 Overloads and should be used via the `println` function
 If the string is empty will print a zero length string
 
-@param str - String to be printed
+@param s - String to be printed
 "
-  (lambda (x)
-    (if (null? x)
+  (lambda (s)
+    (if (null? s)
         (begin (printf "")
                void)
-        (begin (printf "'%s'" (tref x 1))
+        (begin (printf "'%s'" (tref s 1))
                void))))
 
 (bind-poly print String_print)
@@ -282,104 +284,104 @@ If the string is empty will print a zero length string
   "convert String to String
 
 This is just the identity function, since a String is already a String."
-  (lambda (x)
-    x))
+  (lambda (s)
+    s))
 
 (bind-poly toString String_toString)
+
+(bind-func String_strlen
+  "Takes a String* and calls strlen on the data pointer
+
+@param s - the String*
+@return length - length (via strlen)"
+  (lambda (s:String*)
+    (strlen (tref s 1))))
 
 (bind-func String_length
   "Takes a (null-terminated) String* and returns the string length
 
-@param str - the String*
+@param s - the String*
 @return length - length (via strlen)"
-  (lambda (str:String*)
-    (strlen (tref str 1))))
+  (lambda (s:String*)
+    (tref s 0)))
 
-(bind-func String_size
-  "Takes a String* and returns the size of allocated memory
+(bind-func String_validate
+  "Check that the String's length matches that returned by strlen
 
-Not necessarily the same as String_length - 
-@param str - the String
-@return size - size of alloc'ed memory"
-  (lambda (str:String*)
-    (tref str 0)))
+@param s - the String*
+@return bool"
+  (lambda (s:String*)
+    (= (tref s 0) (strlen (tref s 1)))))
 
 (bind-func String_cstr
   "Return an i8* pointer to the underlying char array
 
-@param str
+@param s
 @return c_str - the underlying i8 'char' array"
-  (lambda (str:String*)
-    (tref str 1)))
+  (lambda (s:String*)
+    (tref s 1)))
 
 ;; easy String dataconstructors from c strings
 
 ;; zone alloc'ed versions
 
-(bind-func String_from_cptr
+(bind-func String_from_cstr_zalloc
   "Create an xtlang String type from a c string (char array)
 
 Use via the polymorphic Str function
 
-@param str - character array from which to generate a new String
+Allocates (zone) memory to store the string.
+Allocation size will be (+ (strlen cstr) 1)
+
+@param cstr - character array from which to generate a new String
 @return - the new String*
 "
-  (lambda (s)
-    (let ((lgth (strlen s))
-          (str (String_z lgth s)))
-      str)))
+  (lambda (cstr)
+    (let ((len (strlen cstr))
+          (buf:i8* (zalloc (+ len 1))))
+      (memcpy buf cstr (+ len 1))
+      (String_z len buf))))
+
+(bind-poly String String_from_cstr_zalloc)
+
+;; a shorter one (by three characters) just for convenience
+(bind-poly Str String_from_cstr_zalloc)
 
 (bind-func String_copy
   "Create a new xtlang String type from an existing String
 
-Use via the polymorphic Str function
-
-@param str - pointer to the String to copy
+@param s - pointer to the String to copy
 @return - the new String*
 "
-  (lambda (str:String*)
-    (let ((lgth (String_length str))
-          (new_str (String_z lgth (String_cstr str))))
-      new_str)))
+  (lambda (s:String*)
+    (Str (tref s 1))))
 
-(bind-poly String String_from_cptr)
 (bind-poly String String_copy)
-
-;; deprecated - use the (now polymorphic) "String" closure instead
-(bind-poly Str String_from_cptr)
 (bind-poly Str String_copy)
 
-;; heap alloc'ed versions
+(bind-func String_substring
+  "Create a new xtlang String which is a substring of an existing one
 
-(bind-func String_from_cptr_h
-  "Create an (heap-allocated) xtlang String type from a c string (char array)
+If `start' and `end' are out of range, return null
 
-Use via the polymorphic Str function
-
-@param str - character array from which to generate a new String
+@param s - pointer to an existing String
+@param start - substring start index
+@param end - substring end index
 @return - the new String*
 "
-  (lambda (s)
-    (let ((lgth (strlen s))
-          (str (String_h lgth s)))
-      str)))
-
-(bind-func String_copy_h
-  "Create a new (heap-allocated) xtlang String type from an existing String
-
-Use via the polymorphic Str function
-
-@param str - pointer to the String to copy
-@return - the new String*
-"
-  (lambda (str:String*)
-    (let ((lgth (String_length str))
-          (new_str (String_h lgth (String_cstr str))))
-      new_str)))
-
-(bind-poly Str_h String_from_cptr_h)
-(bind-poly Str_h String_copy_h)
-
+  (lambda (s:String* start end)
+    ;; handle some arg combinations which are bad
+    (if (or (< start 0)
+            (< end start)
+            (> end (tref s 0)))
+        null
+        (let ((buf:i8* (zalloc (+ (- end start) 1)))
+              (i 0))
+          (dotimes (i (- end start))
+            (pset! buf i (pref (tref s 1) (+ i start))))
+          ;; null-terminate the string
+          (pset! buf (- end start) 0)
+          (String buf)))))
 
 (bind-func String_cat2
   "Concatenate 2 Strings
@@ -400,15 +402,15 @@ If both strings are null an empty String will be returned
               (strncat news (tref s2 1) size)
               (String news))))))
 
-(bind-func String_cat2_h
-  (lambda (s1:String* s2:String*)
-    (if (null? s2) (String s1)
-        (if (null? s1) (String s2)
-            (let ((size (+ (tref s1 0) (tref s2 0)))
-                  (news:i8* (zalloc (+ 1 size))))
-              (strcpy news (tref s1 1))
-              (strncat news (tref s2 1) size)
-              (Str_h news))))))
+;; String_cat macro (poor-man's varargs)
+
+(impc:aot:do-or-emit
+ (define-macro (String_cat . args)
+   (let loop ((rem (cdr args))
+              (ret (car args)))
+     (if (null? rem)
+         ret
+         (loop (cdr rem) (list 'String_cat2 ret (car rem)))))))
 
 (bind-func String_equal
   "Equality test for String
@@ -421,18 +423,6 @@ If both strings are null an empty String will be returned
     (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
         1:i1 0:i1)))
 
-;; String_cat macro (poor-man's varargs)
-(impc:aot:do-or-emit
- (define-macro (String_cat . args)
-   (apply String_cat_macro args)))
-
-(impc:aot:do-or-emit
- (define (String_cat_macro . args)
-   `(String_cat2 ,(car args)
-                 ,(if (null? (cdr args))
-                      'null
-                      (apply String_cat_macro (cdr args))))))
-
 ;; bind to eq
 (bind-poly equal String_equal)
 
@@ -440,46 +430,72 @@ If both strings are null an empty String will be returned
 (bind-func String_levenshtein
   "Returns the levenshtein distance between two strings
 
-@param s - string 1
-@param t - string 2
+@param s1 - string 1
+@param s1 - string 2
 @return - levenshetein distance
 "
-  (lambda (s:String* t:String*)
+  (lambda (s1:String* s2:String*)
     (let ((i 0) (j 0)
           ;; column-major indexing closure
-          (s_cstr (String_cstr s))
-          (slen:size_t (String_length s))
-          (t_cstr (String_cstr t))
-          (tlen:size_t (String_length t))
-          (row:i64* (salloc (+ slen 1)))
-          (prev_row:i64* (salloc (+ slen 1)))
+          (s1cstr (String_cstr s1))
+          (s1len:size_t (String_length s1))
+          (s2cstr (String_cstr s1))
+          (s2len:size_t (String_length s1))
+          (row:i64* (salloc (+ s1len 1)))
+          (prev_row:i64* (salloc (+ s1len 1)))
           (min3 (lambda (a:i64 b c)
                   (if (< a b)
                       (if (< a c)
                           a c)
                       (if (< b c)
                           b c)))))
-      (dotimes (i (+ tlen 1))
+      (dotimes (i (+ s2len 1))
         (pset! prev_row i i))
-      (dotimes (i slen)
+      (dotimes (i s1len)
         (pset! row 0 (+ i 1))
-        (dotimes (j tlen)
+        (dotimes (j s2len)
           (pset! row (+ j 1)
                  (min3 (+ (pref row j) 1)
                        (+ 1 (pref prev_row (+ j 1)))
                        (+ (pref prev_row j)
-                          (if (= (pref s_cstr j)
-                                 (pref t_cstr i))
+                          (if (= (pref s1cstr j)
+                                 (pref s2cstr i))
                               0 1)))))
         (let ((tmp_row:i64* null))
           (set! tmp_row prev_row)
           (set! prev_row row)
           (set! row tmp_row)))
-      (pref prev_row tlen))))
+      (pref prev_row s2len))))
 
 (bind-func String_similarity
-  (lambda (s:String* t:String*)
-    (/ 1.0 (i64tod (+ 1 (String_levenshtein s t))))))
+  (lambda (s1:String* s2:String*)
+    (/ 1.0 (i64tod (+ 1 (String_levenshtein s1 s2))))))
+
+;; ;; TODO
+
+;; start/atindex variants
+
+;; substring
+;; insert
+;; replace
+;; truncate
+;; {r,l}trim
+;; toupper/tolower
+;; compare (caseless as well)
+;; concat
+;; append
+;; firstpos
+
+;; ;; more regex-y ones
+
+;; find/replace
+
+;; ;; list-based
+
+;; split
+;; join
+
+;; heap alloc'ed versions
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; equality
@@ -774,12 +790,12 @@ Not necessarily the same as Symbol_length -
 
 Use via the polymorphic Str function
 
-@param str - character array from which to generate a new Symbol
+@param s - character array from which to generate a new Symbol
 @return - the new Symbol*
 "
   (lambda (s)
-    (let ((lgth (strlen s))
-          (str (Symbol_z lgth s)))
+    (let ((len (strlen s))
+          (str (Symbol_z len s)))
       str)))
 
 (bind-func Symbol_copy
@@ -787,12 +803,12 @@ Use via the polymorphic Str function
 
 Use via the polymorphic Str function
 
-@param str - pointer to the Symbol to copy
+@param s - pointer to the Symbol to copy
 @return - the new Symbol*
 "
   (lambda (str:Symbol*)
-    (let ((lgth (Symbol_length str))
-          (new_str (Symbol_z lgth (Symbol_cstr str))))
+    (let ((len (Symbol_length str))
+          (new_str (Symbol_z len (Symbol_cstr str))))
       new_str)))
 
 (bind-poly Symbol Symbol_from_cptr)
@@ -810,30 +826,6 @@ Use via the polymorphic Str function
         1:i1 0:i1)))
 
 (bind-poly equal Symbol_equal)
-
-;; this stuff needs to go at the end, since redefinitions have to go
-;; in a new module.  these are special-case hacks.
-
-;; override default constructors
-(impc:aot:do-or-emit
- (if (not *impc:aot:current-output-port*)
-     (begin
-       (bind-func String_z
-         (lambda (lgth s)
-           (let ((news:i8* (zalloc (+ 1 lgth)))
-                 (str:String* (zalloc)))
-             (strcpy news s)
-             (tset! str 0 lgth)
-             (tset! str 1 news)
-             str)))
-       (bind-func String_h
-         (lambda (lgth s)
-           (let ((news:i8* (halloc (+ 1 lgth)))
-                 (str:String* (halloc)))
-             (strcpy news s)
-             (tset! str 0 lgth)
-             (tset! str 1 news)
-             str))))))
 
 (define *xtmlib-std-loaded* #t)
 
