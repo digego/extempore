@@ -248,7 +248,50 @@ Should be created, modified and destroyed with the String_* library functions.
 
 Second item in tuple is a char* c-style string ")
 
-;; must be a heap string!
+;; easy String dataconstructors from c strings
+
+;; zone alloc'ed versions
+
+(bind-func String_from_cstr_zalloc
+  "Create an xtlang String type from a c string (char array)
+
+Use via the polymorphic Str function
+
+Allocates (zone) memory to store the string.
+Allocation size will be (+ (strlen cstr) 1)
+
+@param cstr - character array from which to generate a new String
+@return - the new String*
+"
+  (lambda (cstr)
+    (let ((len (strlen cstr))
+          (buf:i8* (zalloc (+ len 1))))
+      (memcpy buf cstr (+ len 1))
+      (String_z len buf))))
+
+(bind-poly String String_from_cstr_zalloc)
+(bind-poly Str String_from_cstr_zalloc)
+
+(bind-func String_from_cstr_halloc
+  "Create an xtlang String type from a c string (char array)
+
+Use via the polymorphic Str function
+
+Allocates (zone) memory to store the string.
+Allocation size will be (+ (strlen cstr) 1)
+
+@param cstr - character array from which to generate a new String
+@return - the new String*
+"
+  (lambda (cstr)
+    (let ((len (strlen cstr))
+          (buf:i8* (halloc (+ len 1))))
+      (memcpy buf cstr (+ len 1))
+      (String_h len buf))))
+
+(bind-poly String_h String_from_cstr_halloc)
+(bind-poly Str_h String_from_cstr_halloc)
+
 (bind-func String_free
   "Free an xtlang String
 
@@ -262,7 +305,6 @@ string must have been a heap-allocated (halloc).
     (free s)
     void))
 
-;; String printing!
 (bind-func String_print:[void,String*]*
   "Prints all characters in a given string object.
 
@@ -321,32 +363,6 @@ This is just the identity function, since a String is already a String."
   (lambda (s:String*)
     (tref s 1)))
 
-;; easy String dataconstructors from c strings
-
-;; zone alloc'ed versions
-
-(bind-func String_from_cstr_zalloc
-  "Create an xtlang String type from a c string (char array)
-
-Use via the polymorphic Str function
-
-Allocates (zone) memory to store the string.
-Allocation size will be (+ (strlen cstr) 1)
-
-@param cstr - character array from which to generate a new String
-@return - the new String*
-"
-  (lambda (cstr)
-    (let ((len (strlen cstr))
-          (buf:i8* (zalloc (+ len 1))))
-      (memcpy buf cstr (+ len 1))
-      (String_z len buf))))
-
-(bind-poly String String_from_cstr_zalloc)
-
-;; a shorter one (by three characters) just for convenience
-(bind-poly Str String_from_cstr_zalloc)
-
 (bind-func String_copy
   "Create a new xtlang String type from an existing String
 
@@ -381,7 +397,7 @@ If `start' and `end' are out of range, return null
             (pset! buf i (pref (tref s 1) (+ i start))))
           ;; null-terminate the string
           (pset! buf (- end start) 0)
-          (String buf)))))
+          (Str buf)))))
 
 (bind-func String_cat2
   "Concatenate 2 Strings
@@ -394,13 +410,13 @@ If both strings are null an empty String will be returned
 @return - pointer to new String 
 "
   (lambda (s1:String* s2:String*)
-    (if (null? s2) (String s1)
-        (if (null? s1) (String s2)
+    (if (null? s2) (Str s1)
+        (if (null? s1) (Str s2)
             (let ((size (+ (tref s1 0) (tref s2 0)))
                   (news:i8* (zalloc (+ 1 size))))
               (strcpy news (tref s1 1))
               (strncat news (tref s2 1) size)
-              (String news))))))
+              (Str news))))))
 
 ;; String_cat macro (poor-man's varargs)
 
