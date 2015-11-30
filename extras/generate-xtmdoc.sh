@@ -7,11 +7,9 @@
 # shell> ./extras/generate-xtmdoc.sh xtmdoc.json
 
 extempore --eval "(begin
-  (sys:load \"libs/core/adt.xtm\")
   (sys:load \"libs/core/audio_dsp.xtm\")
   (sys:load \"libs/core/instruments.xtm\")
   (sys:load \"libs/core/math.xtm\")
-  (sys:load \"libs/core/math_ext.xtm\")
   (sys:load \"libs/core/std.xtm\")
   (sys:load \"libs/external/fft.xtm\")
   (sys:load \"libs/external/gl.xtm\")
