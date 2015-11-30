@@ -250,8 +250,8 @@ int main(int argc, char** argv)
 	  return 0;
 	}
       } else {
-        std::string key((char*)args.OptionText());
-        std::string val(args.OptionArg());
+        std::string key(args.OptionText());
+        std::string val = args.OptionArg() == NULL ? std::string("") : std::string(args.OptionArg());
 
         if(key.substr(0,2) != std::string("--")) {
             std::cout << "Poorly formed argument: " << key << std::endl;
