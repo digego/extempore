@@ -53,7 +53,7 @@ namespace extemp
 #ifdef _WIN32
 	EXTThread(std::thread&& _bthread);
 #else
-	EXTThread(std::thread&& _pthread);
+	EXTThread(pthread_t _pthread);
 #endif
 	~EXTThread();
 

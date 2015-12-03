@@ -61,9 +61,9 @@ namespace extemp
 	{
 	}
 #else
-	EXTThread::EXTThread(std::thread&& _pthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_pthread) }
-	{
-	}
+    EXTThread::EXTThread(pthread_t _pthread) : initialised(false), detached(false), joined(false), pthread{ _pthread }
+    {
+    }
 #endif
 
     EXTThread::~EXTThread()
