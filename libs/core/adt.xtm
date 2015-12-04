@@ -209,6 +209,16 @@
                      (rev (cdr old) (cons (car old) new))))))
       (rev lst (convert null)))))
 
+;; this map IS tail optimized!
+(bind-func map_t:[List{!a}*,[!a,!b]*,List{!b}*]*
+  (lambda (func xs)
+    (let ((f (lambda (accum l)
+               (if (null? l)
+                   (reverse accum)
+                   (f (cons (func (car l)) accum) (cdr l))))))
+      (f null xs))))
+
+;; this map is NOT tail optimized
 (bind-func map:[List{!a}*,[!a,!b]*,List{!b}*]*
   (lambda (func xs)
     (let ((f (lambda (l)
@@ -217,6 +227,7 @@
                    (cons (func (car l)) (f (cdr l)))))))
       (f xs))))
 
+;; this map is NOT tail optimized
 (bind-func map:[List{!a}*,[!a,!b,!c]*,List{!b}*,List{!c}*]*
   (lambda (func xs1 xs2)
     (let ((f (lambda (l1 l2)
@@ -226,6 +237,7 @@
                          (f (cdr l1) (cdr l2)))))))
       (f xs1 xs2))))
 
+;; this map is NOT tail optmized
 (bind-func map:[List{!a}*,[!a,!b,!c,!d]*,List{!b}*,List{!c}*,List{!d}*]*
   (lambda (func xs1 xs2 xs3)
     (let ((f (lambda (l1 l2 l3)
