@@ -13,15 +13,15 @@
 
 (sys:load "libs/core/xthread.xtm")
 
-(bind-type SchedEvt <!a,i8*,i8*,SchedEvt*,SchedEvt*>)
+(bind-type SchedEvt <double,i8*,i8*,SchedEvt*,SchedEvt*>)
 
-(bind-func scheduler_init:[[i64,!a]*,SchedEvt*,[void,!a,i8*]*]*
+(bind-func scheduler_init:[[i64,double]*,SchedEvt*,[void,double,i8*]*]*
   (lambda (el f)
     (let ((mutex:i8* (mutex_create))
           (thread:i8* (thread_self))
           (cnt 0)
           (evtlist:SchedEvt* el)
-          (fp:[void,!a,i8*]* f)
+          (fp:[void,double,i8*]* f)
           (element:SchedEvt* null)
           (next:SchedEvt* null)
           (prev:SchedEvt* null))
@@ -45,7 +45,7 @@
         (mutex_unlock mutex)
         cnt))))
 
-(bind-func scheduler_at:[SchedEvt*,SchedEvt*,!a]*
+(bind-func scheduler_at:[SchedEvt*,SchedEvt*,double]*
   (let ((prev:SchedEvt* null))
     (lambda (evtlist time)
       (set! prev null)
@@ -55,7 +55,7 @@
         (set! evtlist (tref evtlist 4)))
       prev)))
 
-(bind-func scheduler_evt:[void,[i64,!a]*,!a,i8*,i8*]*
+(bind-func scheduler_evt:[void,[i64,double]*,double,i8*,i8*]*
   (let ((evtlist:SchedEvt* null)
         (next:SchedEvt* null)
         (new:SchedEvt* null))
@@ -79,9 +79,9 @@
           (mutex_unlock (scheduler.mutex)))
       void)))
 
-(bind-func scheduler_evt:[void,!a,i8*]*
-  (lambda (time fname)
-    (scheduler_evt time fname null)))
+;; (bind-func scheduler_evt:[void,double,i8*]*
+;;   (lambda (time fname)
+;;     (scheduler_evt time fname null)))
 
 (define-macro (sched sname time fname . args)
   (if (null? args)
@@ -92,10 +92,10 @@
     
 (bind-func beat_scheduler
   (lambda (bpm:double hz:double)
-    (let ((evtlist:SchedEvt{float}* null)
-          (ft:[void,float,i8*]* null)
-          (scheduler:[i64,float]* null)
-          (beat:float 0.0)
+    (let ((evtlist:SchedEvt* null)
+          (ft:[void,double,i8*]* null)
+          (scheduler:[i64,double]* null)
+          (beat:double 0.0)
           (running:i64 1)
           (offset:i64 0)
           (time 0.0)
@@ -106,7 +106,7 @@
                         (set! time (clock_clock))
                         (while (> running 0)
                           (scheduler beat)
-                          (set! beat (+ beat (dtof (* i (/ bpm 60.0)))))
+                          (set! beat (+ beat (* i (/ bpm 60.0))))
                           (while (< (clock_clock) time) (thread_sleep 0 100000))
                           (set! time (+ time i))
                           void)
@@ -117,7 +117,7 @@
 
 (bind-func clock_scheduler
   (lambda (hz:double)
-    (let ((evtlist:SchedEvt{double}* null)
+    (let ((evtlist:SchedEvt* null)
           (ft:[void,double,i8*]* null)
           (scheduler:[i64,double]* null)
           (hz:double 100.0)
