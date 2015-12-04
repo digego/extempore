@@ -61,6 +61,21 @@
       ff)))
 
 
+;; make synth defaults
+(bind-func default_note_c
+  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
+    (let ((sawl (saw_c 0.0))
+          (sawr (saw_c 0.0)))
+      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
+        (if (= chan 0)
+            (* amp (/ 200.0 freq) (sawl amp freq))
+            (* amp (/ 200.0 freq) (sawr amp freq)))))))
+
+(bind-func default_fx
+  (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+    in))
+
+
 ;; NOTE!
 ;; (* 5.0 SAMPLERATE) is time padding
 ;; it is used because the decay length of the note may go
@@ -76,40 +91,73 @@
           1)
         1)))
 
-;; playnote wrapper
-;; (define-macro (play-note time inst pitch vol dur . args)  
-;;   (let ((nargs (length args)))
-;;     `(let ((duration (* 1.0 ,dur))
-;;            (dargs (sys:make-cptr ,(* (if (audio_64bit) 8 4) nargs))) 
-;;            (native (llvm:get-native-closure ,(symbol->string inst))))
-;;        (if (audio_64bit)
-;;            (dotimes (i ,nargs) (cptr:set-double dargs (* i 8) (eval (list-ref ',args i))))
-;;            (dotimes (i ,nargs) (cptr:set-float dargs (* i 4) (eval (list-ref ',args i)))))
-;;        (if (cptr? native)
-;;            (_play_note time
-;;                        native
-;;                        (midi2frq (* 1.0 ,pitch))
-;;                        (/ (exp (/ ,vol 26.222)) 127.0)
-;;                        duration
-;;                        ,nargs
-;;                        dargs)
-;;            (print-error 'No 'inst 'named ,(symbol->string inst))))))
 
-;; make synth defaults
-(bind-func default_note_c
-  (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
-    (let ((sawl (saw_c 0.0))
-          (sawr (saw_c 0.0)))
-      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
-        (if (= chan 0)
-            (* amp (/ 200.0 freq) (sawl amp freq))
-            (* amp (/ 200.0 freq) (sawr amp freq)))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;xplay for use with native beat shceduler
+;;
+(bind-func xtm_play_a
+  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double)
+    (let ((bpm (bsched.bpm)))
+      (xtm_play_note (now) inst
+                     (midi2frq (convert pitch))
+                     (convert (/ (exp (/ vol 26.222)) 127.0))
+                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
+                     0 null))))
 
-(bind-func default_fx
-  (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
-    in))
+(bind-func xtm_play_b
+  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double
+                     arg1:double)
+    (let ((mem:SAMPLE* (alloc 1))
+          (bpm (bsched.bpm)))
+      (pfill! mem (convert arg1))
+      (xtm_play_note (now) inst
+                     (midi2frq (convert pitch))
+                     (convert (/ (exp (/ vol 26.222)) 127.0))
+                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
+                     1 mem))))
 
-;; (bind-instrument definst default_note_c default_fx)
+(bind-func xtm_play_c
+  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double
+                     arg1:double arg2:double)
+    (let ((mem:SAMPLE* (alloc 2))
+          (bpm (bsched.bpm)))
+      (pfill! mem (convert arg1) (convert arg2))
+      (xtm_play_note (now) inst
+                     (midi2frq (convert pitch))
+                     (convert (/ (exp (/ vol 26.222)) 127.0))
+                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
+                     2 mem))))
+
+(bind-func xtm_play_d
+  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double
+                     arg1:double arg2:double arg3:double)
+    (let ((mem:SAMPLE* (alloc 3))
+          (bpm (bsched.bpm)))
+      (pfill! mem (convert arg1) (convert arg2) (convert arg3))
+      (xtm_play_note (now) inst
+                     (midi2frq (convert pitch))
+                     (convert (/ (exp (/ vol 26.222)) 127.0))
+                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
+                     3 mem))))
+
+(bind-func xtm_play_e
+  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double
+                     arg1:double arg2:double arg3:double arg4:double)
+    (let ((mem:SAMPLE* (alloc 4))
+          (bpm (bsched.bpm)))
+      (pfill! mem (convert arg1) (convert arg2) (convert arg3) (convert arg4))
+      (xtm_play_note (now) inst
+                     (midi2frq (convert pitch))
+                     (convert (/ (exp (/ vol 26.222)) 127.0))
+                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
+                     4 mem))))
+
+(bind-poly xplay xtm_play_a)
+(bind-poly xplay xtm_play_b)
+(bind-poly xplay xtm_play_c)
+(bind-poly xplay xtm_play_d)
+(bind-poly xplay xtm_play_e)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
