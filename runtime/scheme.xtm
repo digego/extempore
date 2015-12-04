@@ -461,73 +461,72 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define pi 3.14159265358979323846)
-(define 2pi (* 2.0 pi))
+;; (define pi 3.14159265358979323846)
+;; (define 2pi (* 2.0 pi))
+
+(define PI 3.14159265358979323846)
+(define TWOPI (* 2.0 PI))
 
 ;; sinusoidal LFOs
 
 (macro (cosr args)
    (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (cos (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (cos (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (* ,(cadddr args) (cos (* TWOPI (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (cos (* TWOPI beat ,(cadddr args)))))))
 
 (macro (sinr args)
        (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (sin (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (sin (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (* ,(cadddr args) (sin (* TWOPI (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (sin (* TWOPI beat ,(cadddr args)))))))
 
 (macro (tanr args)
        (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (tan (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (tan (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (* ,(cadddr args) (tan (* TWOPI (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (tan (* TWOPI beat ,(cadddr args)))))))
 
 ;; sawtooth wave LFO with period 2pi
 
-(define ramp
-  (lambda (x)
-    (let ((xmod2pi (- x (* 2pi (floor (/ x 2pi))))))
-      (* (/ 1 pi) (if (< xmod2pi pi) xmod2pi (- xmod2pi 2pi))))))
+(define-macro (ramp x)
+  `(let ((xmod2pi (- ,x (* TWOPI (floor (/ ,x TWOPI))))))
+     (* (/ 1.0 PI) (if (< xmod2pi PI) xmod2pi (- xmod2pi TWOPI)))))
 
 (macro (rampr args)
        (if (> (length args) 4)
-       `(+ ,(caddr args) (+ (* .5 ,(cadddr args)) (* .5 ,(cadddr args) (ramp (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args)))))))
-       `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (ramp (* 2pi beat ,(cadddr args))))))))
+       `(+ ,(caddr args) (+ (* .5 ,(cadddr args)) (* .5 ,(cadddr args) (ramp (* TWOPI (+ beat ,(cadr args)) ,(car (cddddr args)))))))
+       `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (ramp (* TWOPI beat ,(cadddr args))))))))
 
-(define slide
-  (lambda (x)
-    (- 1.0 (ramp x))))
+(define-macro (slide x)
+  `(- 1.0 (ramp ,x)))
 
 (macro (slider args)
        (if (> (length args) 4)
-           `(+ ,(caddr args) (+ (* .5 ,(cadddr args)) (* .5 ,(cadddr args) (slide (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args)))))))
-           `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (slide (* 2pi beat ,(cadddr args))))))))
+           `(+ ,(caddr args) (+ (* .5 ,(cadddr args)) (* .5 ,(cadddr args) (slide (* TWOPI (+ beat ,(cadr args)) ,(car (cddddr args)))))))
+           `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (slide (* TWOPI beat ,(cadddr args))))))))
 
 
 ;; square wave LFO with period 2pi
 
-(define rect
-  (lambda (x)
-    (let ((xmod2pi (- x (* 2pi (floor (/ x 2pi))))))
-      (if (< xmod2pi pi) 1 0))))
+(define-macro (rect x)  
+  `(let ((xmod2pi (- ,x (* TWOPI (floor (/ ,x TWOPI))))))
+     (if (< xmod2pi PI) 1.0 0.0)))
 
 (macro (rectr args)
    (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (rect (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (rect (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (* ,(cadddr args) (rect (* TWOPI (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (rect (* TWOPI beat ,(cadddr args)))))))
 
 ;; triangle wave LFO with period 2pi
 
-(define tri-wave
-  (lambda (x)
-    (let ((xmod2pi (- x (* 2pi (floor (/ x 2pi))))))
-      (if (< xmod2pi pi)
-	  (+ 1 (* (/ -1 pi) xmod2pi))
-	  (- (* (/ 1 pi) xmod2pi) 1)))))
+(define-macro (tri-wave x)
+  `(let ((xmod2pi (- ,x (* TWOPI (floor (/ ,x TWOPI))))))
+     (if (< xmod2pi PI)
+         (+ 1.0 (* (/ -1.0 PI) xmod2pi))
+         (- (* (/ 1.0 PI) xmod2pi) 1.0))))
 
 (macro (trir args)
    (if (> (length args) 4)
-       `(+ ,(caddr args) (* ,(cadddr args) (tri-wave (* 2pi (+ beat ,(cadr args)) ,(car (cddddr args))))))
-       `(+ ,(cadr args) (* ,(caddr args) (tri-wave (* 2pi beat ,(cadddr args)))))))
+       `(+ ,(caddr args) (* ,(cadddr args) (tri-wave (* TWOPI (+ beat ,(cadr args)) ,(car (cddddr args))))))
+       `(+ ,(cadr args) (* ,(caddr args) (tri-wave (* TWOPI beat ,(cadddr args)))))))
 
 ;; creates a rhythm of a given length a tactus is provided and a
 ;; percentage of synconization (from 0 - 1) a rhythm-list defines
