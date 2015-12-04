@@ -5017,7 +5017,10 @@
                                           *impc:ti:bound-lambdas*)))
                           (impc:ti:update-var s newvars '() (impc:ti:type-unify t vars))
                           )
-                        (cadr s1) ;;lambda-code)
+                        (if (eq? (car s1) 'lambda)
+                            (cadr s1) ;; lambda arguments
+                            (cadr (cl:find-if (lambda (x) (if (and (list? x) (eq? (car x) 'lambda)) #t #f))
+                                              s1))) ;; this case here for generic starting with let not a lambda!
                         args
                         (cdr ast))
               ;; NOW DO ACTUAL TYPE CHECK!
@@ -8776,6 +8779,61 @@
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
           #t))))
+
+(define-macro (call-as-xtlang . expr)
+  (if (not (impc:aot:currently-compiling?))
+      (sys:with-quiet-compiler
+       (begin
+         (set! *impc:ir:sym-name-stack* '())
+         (set! *impc:ir:ls_var* '())
+         (set! *impc:ti:bound-lambdas* '())
+         (set! *impc:ti:generic-type-mappings* '())
+         (set! *impc:ti:nativef-generics-recurse-test* 0)             
+         (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
+           (eval `(bind-func xtlang_expression
+                    (lambda ()
+                      ,(if (equal? type -1)
+                           `(let ((s:i8* (halloc 2)))
+                              ,@expr
+                              s)
+                           `(letz ((s (sprintln (begin ,@expr)))
+                                   (lgth (+ 1 (String_length s)))
+                                   (oldcs (String_cstr s))
+                                   (newcs:i8* (halloc lgth)))
+                              (strcpy newcs oldcs)
+                              newcs))))
+                 (interaction-environment))
+           (quote (string->atom (cptr->string (xtlang_expression)))))))))
+
+(define xtmX call-as-xtlang)
+
+;; this version uses a let instead of a letz
+
+(define-macro (call-as-xtlang-halloc . expr)
+  (if (not (impc:aot:currently-compiling?))
+      (sys:with-quiet-compiler
+       (begin
+         (set! *impc:ir:sym-name-stack* '())
+         (set! *impc:ir:ls_var* '())
+         (set! *impc:ti:bound-lambdas* '())
+         (set! *impc:ti:generic-type-mappings* '())
+         (set! *impc:ti:nativef-generics-recurse-test* 0)                      
+         (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
+           (eval `(bind-func xtlang_expression
+                    (lambda ()
+                      ,(if (equal? type -1)
+                           `(let ((s:i8* (halloc 2)))
+                              ,@expr
+                              s)
+                           `(let ((s (sprintln (begin ,@expr)))
+                                  (lgth (+ 1 (String_length s)))
+                                  (oldcs (String_cstr s))
+                                  (newcs:i8* (halloc lgth)))
+                              (strcpy newcs oldcs)
+                              newcs))))
+                 (interaction-environment))
+           (quote (string->atom (cptr->string (xtlang_expression)))))))))
+
 
 ;; helper macro for specializing generics
 ;;
