@@ -126,6 +126,34 @@
 ;; this is an alias for compatibility - but don't use it in new code
 (define define-instrument bind-instrument)
 
+(define-macro (xplay . args)
+  (let ((ns 0)
+        (instargs '()))
+    (if (symbol? (car args))
+        (begin (set! ns (- (length args) 5))
+               (set! instargs (map (lambda (a) (list 'convert a)) (cdr (cddddr args))))
+               `(let ((dat:SAMPLE* ,(if (= ns 0) 'null `(alloc ,ns))))
+                  ,(if (> ns 0) `(pfill! dat ,@instargs) 1)
+                  (xtm_play 0.0
+                            ,(car args)
+                            ,(cadr args)
+                            (convert ,(caddr args))
+                            (convert ,(cadddr args))
+                            (convert (* 1.0 (* 1/1 ,(car (cddddr args)))))
+                            ,ns dat)))
+        (begin (set! ns (- (length args) 6))
+               (set! instargs (map (lambda (a) (list 'convert a)) (cddr (cddddr args))))
+               `(let ((dat:SAMPLE* ,(if (= ns 0) 'null `(alloc ,ns))))
+                  ,(if (> ns 0) `(pfill! dat ,@instargs) 1)
+                  (xtm_play ,(car args)
+                            ,(cadr args)
+                            ,(caddr args)
+                            (convert ,(cadddr args))
+                            (convert ,(car (cddddr args)))
+                            (convert (* 1.0 (* 1/1 ,(cadr (cddddr args)))))
+                            ,ns dat))))))
+
+
 (if (not (impc:aot:currently-compiling?))
     (begin
       (eval '(bind-val Metro Metronome*)
@@ -139,3 +167,5 @@
        (interaction-environment))
       (metro_init 120. 0 0 1)
       (sys:load "libs/core/pc_ivl.xtm")))
+
+
