@@ -96,69 +96,21 @@
 ;;
 ;;xplay for use with native beat shceduler
 ;;
+
 (bind-func xtm_play_a
-  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double)
+  (lambda (offset:double bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]*
+                    pitch:double vol:double dur:double
+                    num:i64 mem:SAMPLE*)
     (let ((bpm (bsched.bpm)))
-      (xtm_play_note (now) inst
+      (xtm_play_note (+ (now) (dtoi64 (* offset (/ 60.0 bpm) SRd)))
+                     inst
                      (midi2frq (convert pitch))
                      (convert (/ (exp (/ vol 26.222)) 127.0))
                      (dtoi64 (* dur (/ 60.0 bpm) SRd))
-                     0 null))))
+                     num mem))))
 
-(bind-func xtm_play_b
-  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double
-                     arg1:double)
-    (let ((mem:SAMPLE* (alloc 1))
-          (bpm (bsched.bpm)))
-      (pfill! mem (convert arg1))
-      (xtm_play_note (now) inst
-                     (midi2frq (convert pitch))
-                     (convert (/ (exp (/ vol 26.222)) 127.0))
-                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
-                     1 mem))))
-
-(bind-func xtm_play_c
-  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double
-                     arg1:double arg2:double)
-    (let ((mem:SAMPLE* (alloc 2))
-          (bpm (bsched.bpm)))
-      (pfill! mem (convert arg1) (convert arg2))
-      (xtm_play_note (now) inst
-                     (midi2frq (convert pitch))
-                     (convert (/ (exp (/ vol 26.222)) 127.0))
-                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
-                     2 mem))))
-
-(bind-func xtm_play_d
-  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double
-                     arg1:double arg2:double arg3:double)
-    (let ((mem:SAMPLE* (alloc 3))
-          (bpm (bsched.bpm)))
-      (pfill! mem (convert arg1) (convert arg2) (convert arg3))
-      (xtm_play_note (now) inst
-                     (midi2frq (convert pitch))
-                     (convert (/ (exp (/ vol 26.222)) 127.0))
-                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
-                     3 mem))))
-
-(bind-func xtm_play_e
-  (lambda (bsched:[void]* inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* pitch:double vol:double dur:double
-                     arg1:double arg2:double arg3:double arg4:double)
-    (let ((mem:SAMPLE* (alloc 4))
-          (bpm (bsched.bpm)))
-      (pfill! mem (convert arg1) (convert arg2) (convert arg3) (convert arg4))
-      (xtm_play_note (now) inst
-                     (midi2frq (convert pitch))
-                     (convert (/ (exp (/ vol 26.222)) 127.0))
-                     (dtoi64 (* dur (/ 60.0 bpm) SRd))
-                     4 mem))))
-
-(bind-poly xplay xtm_play_a)
-(bind-poly xplay xtm_play_b)
-(bind-poly xplay xtm_play_c)
-(bind-poly xplay xtm_play_d)
-(bind-poly xplay xtm_play_e)
-
+(bind-poly xtm_play xtm_play_a)
+      
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Default synth stuff
