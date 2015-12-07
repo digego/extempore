@@ -4483,43 +4483,44 @@ static pointer opexe_1(scheme *sc, enum scheme_opcodes op) {
 	s_return(sc,sc->code);
 			
     case OP_CASE0:      /* case */
-	s_save(sc,OP_CASE1, sc->NIL, cdr(sc->code));
-	sc->code = car(sc->code);
-	s_goto(sc,OP_EVAL);
+      s_save(sc,OP_CASE1, sc->NIL, cdr(sc->code));
+      sc->code = car(sc->code);
+      s_goto(sc,OP_EVAL);
 				
     case OP_CASE1:      /* case */
-	for (x = sc->code; x != sc->NIL; x = cdr(x)) {
-	    if (!is_pair(y = caar(x))) {
-		break;
-	    }
-	    for ( ; y != sc->NIL; y = cdr(y)) {
-		if (eqv_sc(sc ,car(y), sc->value)) {
-		    break;
-		}
-	    }
-	    if (y != sc->NIL) {
-		break;
-	    }
-	}
-	if (x != sc->NIL) {
-	    if (is_pair(caar(x))) {
-		sc->code = cdar(x);
-		s_goto(sc,OP_BEGIN);
-	    } else {/* else */
-		s_save(sc,OP_CASE2, sc->NIL, cdar(x));
-		sc->code = caar(x);
-		s_goto(sc,OP_EVAL);
-	    }
-	} else {
-	    s_return(sc,sc->NIL);
-	}
+      for (x = sc->code; x != sc->NIL; x = cdr(x)) {
+        if (!is_pair(y = caar(x))) {
+          Error_1(sc,"Syntax Error - Case clause must be a list",y,sc->code->_debugger->_size);
+          break;
+        }
+        for ( ; y != sc->NIL; y = cdr(y)) {
+          if (eqv_sc(sc ,car(y), sc->value)) {
+            break;
+          }
+        }
+        if (y != sc->NIL) {
+          break;
+        }
+      }
+      if (x != sc->NIL) {
+        if (is_pair(caar(x))) {
+          sc->code = cdar(x);
+          s_goto(sc,OP_BEGIN);
+        } else {/* else */
+          s_save(sc,OP_CASE2, sc->NIL, cdar(x));
+          sc->code = caar(x);
+          s_goto(sc,OP_EVAL);
+        }
+      } else {
+        s_return(sc,sc->NIL);
+      }
 			
     case OP_CASE2:      /* case */
-	if (is_true(sc->value)) {
-	    s_goto(sc,OP_BEGIN);
-	} else {
-	    s_return(sc,sc->NIL);
-	}
+      if (is_true(sc->value)) {
+        s_goto(sc,OP_BEGIN);
+      } else {
+        s_return(sc,sc->NIL);
+      }
 			
     case OP_PAPPLY:     /* apply */
 	sc->code = car(sc->args);
