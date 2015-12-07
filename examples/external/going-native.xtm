@@ -1,0 +1,134 @@
+;;; going-native.xtm -- an example that demonstrate 'pure' native xtlang
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: nanovg, opengl
+
+;;; Commentary:
+
+;;; Code:
+
+;; need some libs
+(sys:load "libs/core/scheduler.xtm")
+(sys:load "libs/external/glfw3.xtm")
+(sys:load "libs/core/instruments.xtm")
+(sys:load "libs/core/adt.xtm")
+
+;; first off create a native 'beat' scheduler
+;; 120.0 bpm and 200hz update rate
+(bind-val bs1 [void]* (beat_scheduler 120.0 200.0))
+
+;; next setup audio!
+(bind-instrument fmsynth fmsynth_note_c fmsynth_fx)
+
+(bind-func dsp:DSP 
+  (lambda (in time chan dat)
+    (fmsynth in time chan dat)))
+
+(dsp:set! dsp)
+
+;; now graphics stuff
+
+(bind-val width float 1024.)
+(bind-val height float 768.)
+
+;; bind window on primary thread
+(bind-val window GLFWwindow*
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    ;(glfw_init_and_create_fullscreen_window)))
+    (glfw_init_and_create_interaction_window (convert width) (convert height))))
+
+;; load nanovg AFTER creating opengl window
+(sys:load "libs/external/nanovg.xtm")
+
+;; The Context for NanoVG must be created
+;; on the thread which will be doing
+;; the drawing.  In this example, that
+;; thread is *owned* by the scheduler.
+;; 
+;; Don't instantiate anything here yet!
+;; Instead call init_vg from the scheduler
+;; which happens at the bottom of the file
+(bind-val vg NVGcontext*)
+(bind-val pixel_ratio float)
+
+;; make sure to call this from the scheduler!
+(bind-func init_vg
+  (lambda (beat:float)
+    ;; set THIS thread as opengl thread
+    (glfwMakeContextCurrent	null)    
+    (glfwMakeContextCurrent	window)
+    (glfwSwapInterval 1)    
+    (set! vg (nvg_create_context))
+    (set! pixel_ratio (glfw_get_pixel_ratio window))
+    (println "initialized vg")))
+
+(bind-func draw_frame
+  (let ((fill (NVGcolor 1.0 1.0 1.0 0.3))
+        (stroke (NVGcolor 1.0 1.0 1.0 0.5))
+        (i 0) (x 0.0) (y 0.0)
+        (frame 0))
+    (lambda (beat:Rational)
+      (nvgBeginFrame vg (convert width) (convert height) pixel_ratio)
+      (nvgResetTransform vg)
+      ;; loop and draw the circles
+      (dotimes (i 2000)
+        (nvgResetTransform vg)
+        (set! x (+ (/ width 2.0) (* 400.0 (cos (* 0.000005 (i64tof i) (convert frame))))))
+        (set! y (+ 400.0 (* 200.0 (cos (* 0.000005 (rtof (+ beat 100000)) (i64tof i))))))
+        (nvgBeginPath vg)
+        (nvgCircle vg x y 15.0)
+        (if (= 0 ( % i 2))
+            (tfill! fill 1.0 0.0 0.0 0.1)
+            (tfill! fill 1.0 1.0 1.0 0.1))
+        (_nvgFillColor vg fill)
+        (nvgFill vg)
+        (nvgStrokeWidth vg 1.0)
+        (_nvgStrokeColor vg stroke)
+        (nvgStroke vg))
+      (set! frame (+ frame 1))
+      (nvgEndFrame vg))))
+
+
+(bind-func floor_rat
+  (lambda (a:Rational)
+    (- a (% a 1/1))))
+
+(fmsynth_fx.cfb 0.7)
+(fmsynth_fx.cwet 0.7)
+(fmsynth_fx.dfb 0.9)
+(fmsynth_fx.fb 0.7)
+(fmsynth_fx.wet 0.1)
+(fmsynth_fx.res 0.97)
+
+(bind-func beat_loop
+  (lambda (beat:Rational)
+    (beginz 
+     (bs1.bpm (trir 150.0 3000.0 1/350))
+     (nvg_clear)
+     (draw_frame beat)
+     (xplay bs1 fmsynth
+           (random (list 36 48 55 60 70 75 80 72 63 67 82 84))
+           60.0 1/1
+           0.1
+           (floor (rampr 0.0 5.0 1/291)))
+     (glfwSwapBuffers window)
+     (sched bs1 (+ 1/1 beat) beat_loop)
+     void)))
+
+(define local-poll
+  (lambda ()
+    (glfw_poll_events)
+    (callback (+ (now) 1000) 'local-poll)))
+
+;; start 'event' poll (on primary)
+(local-poll)
+
+;; call init_vg from schedulers thread (i.e. bs1)
+(call-as-xtlang
+ (let ((beat:Rational (bs1.beat)))
+   (sched bs1 beat init_vg)))
+
+;; start main loop on scheduler thread (i.e. bs1)
+(call-as-xtlang (beat_loop (+ 2/1 (floor_rat (bs1.beat)))))
