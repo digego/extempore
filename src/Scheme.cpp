@@ -4490,7 +4490,7 @@ static pointer opexe_1(scheme *sc, enum scheme_opcodes op) {
     case OP_CASE1:      /* case */
       for (x = sc->code; x != sc->NIL; x = cdr(x)) {
         if (!is_pair(y = caar(x))) {
-          Error_1(sc,"Syntax Error - Case clause must be a list",y,sc->code->_debugger->_size);
+          Error_1(sc,"Syntax Error - Case clause must have the form ((<datum1> ...) <exp1> <exp2> ...)",y,sc->code->_debugger->_size);
           break;
         }
         for ( ; y != sc->NIL; y = cdr(y)) {
