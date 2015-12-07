@@ -11,17 +11,18 @@
 
 ;;; Code:
 
+(sys:load "libs/core/math.xtm")
 (sys:load "libs/core/xthread.xtm")
 
-(bind-type SchedEvt <double,i8*,i8*,SchedEvt*,SchedEvt*>)
+(bind-type SchedEvt <!a,i8*,i8*,SchedEvt*,SchedEvt*>)
 
-(bind-func scheduler_init:[[i64,double]*,SchedEvt*,[void,double,i8*]*]*
+(bind-func scheduler_init:[[i64,!a]*,SchedEvt*,[void,!a,i8*]*]*
   (lambda (el f)
     (let ((mutex:i8* (mutex_create))
           (thread:i8* (thread_self))
           (cnt 0)
           (evtlist:SchedEvt* el)
-          (fp:[void,double,i8*]* f)
+          (fp:[void,!a,i8*]* f)
           (element:SchedEvt* null)
           (next:SchedEvt* null)
           (prev:SchedEvt* null))
@@ -41,11 +42,12 @@
               (set! evtlist next)
               (tset! prev 4 next))
           (if (not (null? next)) (tset! next 3 prev))
+          (free element)
           (set! element next))
         (mutex_unlock mutex)
         cnt))))
 
-(bind-func scheduler_at:[SchedEvt*,SchedEvt*,double]*
+(bind-func scheduler_at:[SchedEvt*,SchedEvt*,!a]*
   (let ((prev:SchedEvt* null))
     (lambda (evtlist time)
       (set! prev null)
@@ -55,7 +57,7 @@
         (set! evtlist (tref evtlist 4)))
       prev)))
 
-(bind-func scheduler_evt:[void,[i64,double]*,double,i8*,i8*]*
+(bind-func scheduler_evt:[void,[i64,!a]*,!a,i8*,i8*]*
   (let ((evtlist:SchedEvt* null)
         (next:SchedEvt* null)
         (new:SchedEvt* null))
@@ -66,12 +68,12 @@
       (if (null? evtlist)
           (begin
             (set! next (scheduler.evtlist))
-            (set! new (SchedEvt time fname data null next))
+            (set! new (SchedEvt_h time fname data null next))
             (scheduler.evtlist new)
             void)
           (begin
             (set! next (tref evtlist 4)) ;; get next from previous
-            (set! new (SchedEvt time fname data evtlist next))
+            (set! new (SchedEvt_h time fname data evtlist next))
             (tset! evtlist 4 new) ;; make us next of previous            
             (if (not (null? next)) (tset! next 3 new)) ;; set us to previous of next
             void))
@@ -89,38 +91,14 @@
                       ,time ,(string-append (symbol->string fname) "_native") null)
       `(scheduler_evt (,(string->symbol (string-append (symbol->string sname) ".scheduler")))
                       ,time ,(string-append (symbol->string fname) "_native") ,(car args))))
-    
-(bind-func beat_scheduler
-  (lambda (bpm:double hz:double)
-    (let ((evtlist:SchedEvt* null)
-          (ft:[void,double,i8*]* null)
-          (scheduler:[i64,double]* null)
-          (beat:double 0.0)
-          (running:i64 1)
-          (offset:i64 0)
-          (time 0.0)
-          (i (/ 1.0 hz))
-          (f (lambda ()
-               (spawn (lambda ()
-                        (set! scheduler (scheduler_init evtlist ft))
-                        (set! time (clock_clock))
-                        (while (> running 0)
-                          (scheduler beat)
-                          (set! beat (+ beat (* i (/ bpm 60.0))))
-                          (while (< (clock_clock) time) (thread_sleep 0 100000))
-                          (set! time (+ time i))
-                          void)
-                        (println "exiting scheduler")))
-               void)))
-      (f)
-      f)))
+
+
 
 (bind-func clock_scheduler
   (lambda (hz:double)
-    (let ((evtlist:SchedEvt* null)
+    (let ((evtlist:SchedEvt{double}* null)
           (ft:[void,double,i8*]* null)
           (scheduler:[i64,double]* null)
-          (hz:double 100.0)
           (running:i64 1)
           (time 0.0)
           (err 0)
@@ -133,6 +111,32 @@
                           (scheduler time)
                           (while (< (clock_clock) time) (thread_sleep 0 100000))
                           (set! time (+ time i))
+                          void)
+                        (println "exiting scheduler")))
+               void)))
+      (f)
+      f)))
+
+    
+(bind-func beat_scheduler
+  (lambda (bpm:double hz:double)
+    (let ((evtlist:SchedEvt{Rational}* null)
+          (ft:[void,Rational,i8*]* null)
+          (scheduler:[i64,Rational]* null)
+          (beat:Rational 1/1)
+          (running:i64 1)
+          (offset:i64 0)
+          (time 0.0)
+          (i (Rat 1 (dtoi64 hz)))
+          (f (lambda ()
+               (spawn (lambda ()
+                        (set! scheduler (scheduler_init evtlist ft))
+                        (set! time (clock_clock))
+                        (while (> running 0)
+                          (scheduler beat)
+                          (set! beat (+ beat (* i (Rat (dtoi64 bpm) 60))))
+                          (while (< (clock_clock) time) (thread_sleep 0 100000))
+                          (set! time (+ time (rtod i)))
                           void)
                         (println "exiting scheduler")))
                void)))
