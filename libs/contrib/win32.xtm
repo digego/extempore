@@ -1,3 +1,5 @@
+;;; Code:
+
 ;;; win32.xtm -- Win32 api bits and pieces
 
 ;; Author: Andrew Sorensen
@@ -10,14 +12,34 @@
 
 ;;; Code:
 
-(bind-dylib kernel32 "Kernel32.dll")
-(bind-dylib user32 "User32.dll")
+(bind-dylib libkernel32 "Kernel32.dll")
+(bind-dylib libuser32 "User32.dll")
+(bind-dylib libwmapi "Dwmapi.dll")
+(bind-dylib libgdi "Gdi32.dll")
 
 (bind-alias HANDLE i8*)
 (bind-alias DWORD i32)
+(bind-alias WORD i16)
+(bind-alias UINT i32)
+(bind-alias UINT32 i32)
+(bind-alias INT32 i32)
+(bind-alias UINT64 i64)
+(bind-alias INT64 i64)
+(bind-alias LONG i32)
+(bind-alias LONGLONG i64)
+(bind-alias HRESULT i32)
 (bind-alias DWORD_PTR i64)
 (bind-alias BOOL i1)
 (bind-alias PDWORD_PTR i64*) ;; pointer to DWORD_PTR
+
+(bind-type POINT <LONG,LONG>) ;; x y
+(bind-type RECT <LONG,LONG,LONG,LONG>) ;; left,top,right,bottom
+
+(bind-type MOUSEINPUT <i32,i32,DWORD,DWORD,DWORD,i64>)
+(bind-type KEYBDINPUT <WORD,WORD,DWORD,DWORD,i64>)
+(bind-type HARDWAREINPUT <DWORD,WORD,WORD>)
+(bind-type INPUT <DWORD,MOUSEINPUT>) ;; MOUSEINPUT should really be a union of the above!
+(bind-alias LPINPUT INPUT*)
 
 (bind-val REALTIME_PRIORITY_CLASS i32 256)
 (bind-val HIGH_PRIORITY_CLASS i32 128)
@@ -28,19 +50,152 @@
 
 (bind-val ALL_PROCESSOR_GROUPS i32 -1)
 
-(bind-lib kernel32 GetCurrentProcess [HANDLE]*)
-(bind-lib kernel32 SetPriorityClass [i1,HANDLE,DWORD]*)
-(bind-lib kernel32 GetPriorityClass [DWORD,HANDLE]*)
-(bind-lib kernel32 GetProcessAffinityMask [i1,HANDLE,PDWORD_PTR,PDWORD_PTR]*)
-(bind-lib kernel32 SetProcessAffinityMask [i1,HANDLE,DWORD_PTR]*)
-(bind-lib kernel32 GetMaximumProcessorCount [DWORD,DWORD]*)
-(bind-lib kernel32 GetActiveProcessorCount [DWORD,DWORD]*)
-(bind-lib kernel32 SetProcessPriorityBoost [i1,HANDLE,i1]*)
-(bind-lib kernel32 GetLastError [DWORD]*)
+(bind-lib libkernel32 GetCurrentProcess [HANDLE]*)
+(bind-lib libkernel32 SetPriorityClass [i1,HANDLE,DWORD]*)
+(bind-lib libkernel32 GetPriorityClass [DWORD,HANDLE]*)
+(bind-lib libkernel32 GetProcessAffinityMask [i1,HANDLE,PDWORD_PTR,PDWORD_PTR]*)
+(bind-lib libkernel32 SetProcessAffinityMask [i1,HANDLE,DWORD_PTR]*)
+(bind-lib libkernel32 GetMaximumProcessorCount [DWORD,DWORD]*)
+(bind-lib libkernel32 GetActiveProcessorCount [DWORD,DWORD]*)
+(bind-lib libkernel32 SetProcessPriorityBoost [i1,HANDLE,i1]*)
+(bind-lib libkernel32 GetLastError [DWORD]*)
 
 (bind-alias HWND i8*)
 (bind-alias HDC i8*)
 
-(bind-lib user32 WindowFromDC [HWND,HDC]*)
-(bind-lib user32 BringWindowToTop [BOOL,HWND]*)
-(bind-lib user32 SetFocus [HWND,HWND]*)
+(bind-val GWL_EXSTYLE i32 -20)
+(bind-val GWL_HINSTANCE i32 -6)
+(bind-val GWL_HWNDPARENT i32 -8)
+(bind-val GWL_ID i32 -12)
+(bind-val GWL_STYLE i32 -16)
+(bind-val GWL_USERDATA i32 -21)
+(bind-val GWL_WNDPROC i32 -4)
+
+(bind-val WS_OVERLAPPED DWORD #x00000000)
+(bind-val WS_CAPTION DWORD #x00C00000)
+(bind-val WS_SYSMENU DWORD #x00080000)
+(bind-val WS_THICKFRAME DWORD #x00040000)
+(bind-val WS_MINIMIZEBOX DWORD #x00020000)
+(bind-val WS_MAXIMIZEBOX DWORD #x00010000)
+(bind-val WS_POPUP DWORD #x80000000)
+(bind-val WS_OVERLAPPEDWINDOW DWORD (+ WS_OVERLAPPED WS_CAPTION WS_SYSMENU WS_THICKFRAME WS_MINIMIZEBOX WS_MAXIMIZEBOX))
+
+(bind-lib libuser32 WindowFromDC [HWND,HDC]*)
+(bind-lib libuser32 BringWindowToTop [BOOL,HWND]*)
+(bind-lib libuser32 SetFocus [HWND,HWND]*)
+(bind-lib libuser32 GetWindowLongA [DWORD,HWND,i32]*)
+(bind-lib libuser32 SetWindowLongA [DWORD,HWND,i32,DWORD]*)
+(bind-lib libuser32 SendInput [UINT,UINT,LPINPUT,i32]*)
+
+;; mouse down = -1
+;; mouse up = 1
+;; otherwise = 0
+(bind-func mouse-injection2
+  (let ((evt:LPINPUT (alloc))
+        (mi (tref-ptr evt 1)))
+    (tset! evt 0 0)
+    (lambda (x:float y:float down_or_up:i32)
+      (let ((md
+             (i64toi32
+              (cond ((< down_or_up 0:i32) #x0002)
+                    ((> down_or_up 0:i32) #x0004)
+                    (else #x0001)))))
+        (tfill! mi (ftoi32 (* x 65536.0)) (ftoi32 (* y 65536.0)) (i64toi32 #x0001) (+ md (i64toi32 #x8000)) 0 0)
+        ;;(mi (MOUSEINPUT x y (i64toi32 #x0001) (+ md (i64toi32 #x8000)) 0 0))
+        (SendInput 1 evt 40)))))
+
+(bind-alias HRGN i8*)
+(bind-type DWM_BLURBEHIND <DWORD,BOOL,HRGN,BOOL>)
+(bind-val DWM_BB_ENABLE DWORD #x00000001)
+(bind-val DWM_BB_BLURREGION DWORD #x00000002)
+
+(bind-lib libwmapi DwmEnableBlurBehindWindow [HRESULT,HWND,DWM_BLURBEHIND*]*)
+;; x upper left, upper left, x lower right, y lower right 
+(bind-lib libgdi CreateRectRgn [HRGN,i32,i32,i32,i32]*)
+
+(bind-func make_window_transparent
+  (lambda (win32dow)
+    (let ((rect (CreateRectRgn 0 0 -1 -1))
+          ;(style (GetWindowLongA win32dow GWL_STYLE))
+          (bb (DWM_BLURBEHIND (+ DWM_BB_ENABLE DWM_BB_BLURREGION) #t rect #t)))
+      ;; (set! style (bitwise-and style (bitwise-not WS_OVERLAPPED)))
+      ;; (set! style (bitwise-or style WS_POPUP))
+      ;; (SetWindowLongA win32dow GWL_STYLE style)
+      (DwmEnableBlurBehindWindow win32dow bb)
+      (println "make window transparent:" win32dow)
+      void)))
+
+
+(bind-val MAX_TOUCH_COUNT DWORD 256)
+(bind-val TOUCH_FEEDBACK_DEFAULT DWORD #x1)
+(bind-val TOUCH_FEEDBACK_INDIRECT DWORD #x2)
+(bind-val TOUCH_FEEDBACK_NONE DWORD #x3)
+
+(bind-alias TouchMask DWORD)
+(bind-val TOUCH_MASK_NONE TouchMask #x00000000)
+(bind-val TOUCH_MASK_CONTACTAREA TouchMask #x00000000)
+(bind-val TOUCH_MASK_ORIENTATION TouchMask #x00000000)
+(bind-val TOUCH_MASK_PRESSURE TouchMask #x00000000)
+
+(bind-alias TouchFlags DWORD)
+(bind-val TOUCH_FLAG_NONE TouchFlags #x00000000)
+
+(bind-alias POINTER_INPUT_TYPE DWORD)
+(bind-val PT_POINTER POINTER_INPUT_TYPE #x00000001)
+(bind-val PT_TOUCH POINTER_INPUT_TYPE #x00000002)
+(bind-val PT_PEN POINTER_INPUT_TYPE #x00000003)
+(bind-val PT_MOUSE POINTER_INPUT_TYPE #x00000004)
+(bind-val PT_TOUCHPAD POINTER_INPUT_TYPE #x00000005)
+
+(bind-alias POINTER_FLAGS DWORD)
+(bind-val POINTER_FLAG_NONE POINTER_FLAGS #x00000000)
+(bind-val POINTER_FLAG_NEW POINTER_FLAGS #x00000001)
+(bind-val POINTER_FLAG_INRANGE POINTER_FLAGS #x0000002)
+(bind-val POINTER_FLAG_INCONTACT POINTER_FLAGS #x00000004)
+(bind-val POINTER_FLAG_FIRSTBUTTON POINTER_FLAGS #x00000010)
+(bind-val POINTER_FLAG_SECONDBUTTON POINTER_FLAGS #x00000020)
+(bind-val POINTER_FLAG_THIRDBUTTON POINTER_FLAGS #x00000040)
+(bind-val POINTER_FLAG_FIFTHBUTTON POINTER_FLAGS #x00000100)
+(bind-val POINTER_FLAG_PRIMARY POINTER_FLAGS #x00002000)
+(bind-val POINTER_FLAG_CONFIDENCE POINTER_FLAGS #x00004000)
+(bind-val POINTER_FLAG_CANCELED POINTER_FLAGS #x00008000)
+(bind-val POINTER_FLAG_DOWN POINTER_FLAGS #x00010000)
+(bind-val POINTER_FLAG_UPDATE POINTER_FLAGS #x00020000)
+(bind-val POINTER_FLAG_UP POINTER_FLAGS #x00040000)
+(bind-val POINTER_FLAG_WHEEL POINTER_FLAGS #x00080000)
+(bind-val POINTER_FLAG_HWHEEL POINTER_FLAGS #x00100000)
+(bind-val POINTER_FLAG_CAPTURECHANGED POINTER_FLAGS #x00200000)
+
+(bind-alias POINTER_BUTTON_CHANGE_TYPE DWORD)
+;; typedef struct tagPOINTER_INFO {
+;;   POINTER_INPUT_TYPE         pointerType;
+;;   UINT32                     pointerId;
+;;   UINT32                     frameId;
+;;   POINTER_FLAGS              pointerFlags;
+;;   HANDLE                     sourceDevice;
+;;   HWND                       hwndTarget;
+;;   POINT                      ptPixelLocation;
+;;   POINT                      ptHimetricLocation;
+;;   POINT                      ptPixelLocationRaw;
+;;   POINT                      ptHimetricLocationRaw;
+;;   DWORD                      dwTime;
+;;   UINT32                     historyCount;
+;;   INT32                      inputData;
+;;   DWORD                      dwKeyStates;
+;;   UINT64                     PerformanceCount;
+;;   POINTER_BUTTON_CHANGE_TYPE ButtonChangeType;
+;; } POINTER_INFO;
+(bind-type POINTER_INFO <POINTER_INPUT_TYPE,UINT32,UINT32,POINTER_FLAGS,HANDLE,HWND,POINT,POINT,POINT,POINT,DWORD,UINT32,INT32,DWORD,UINT64,POINTER_BUTTON_CHANGE_TYPE>)
+;; typedef struct tagPOINTER_TOUCH_INFO {
+;;   POINTER_INFO pointerInfo;
+;;   Touch Flags  touchFlags;
+;;   Touch Mask   touchMask;
+;;   RECT         rcContact;
+;;   RECT         rcContactRaw;
+;;   UINT32       orientation;
+;;   UINT32       pressure;
+;; } POINTER_TOUCH_INFO;
+(bind-type POINTER_TOUCH_INFO <POINTER_INFO,DWORD,DWORD,RECT,RECT,UINT32,UINT32>)
+(bind-lib libuser32 InitializeTouchInjection [BOOL,UINT32,DWORD]*)
+(bind-lib libuser32 InjectTouchInput [BOOL,UINT32,POINTER_TOUCH_INFO*]*)        
+      
