@@ -36,7 +36,7 @@
 #ifndef EXT_THREAD
 #define EXT_THREAD
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #include <thread>
 #include <functional>
 #else
@@ -50,16 +50,23 @@ namespace extemp
     {
     public:
 	EXTThread();
+#ifdef _WIN32
+	EXTThread(std::thread&& _bthread);
+#else
+	EXTThread(pthread_t _pthread);
+#endif
 	~EXTThread();
 
 	int create(void *(*start_routine)(void *), void *arg);
+	int kill();
 	int detach();
 	int join();
 	bool isRunning();
 	bool isCurrentThread();
 	int setPriority(int, bool);
 	int getPriority(); //doesn't say if it's realtime or not
-#ifdef EXT_BOOST
+	bool isEqualTo(EXTThread* other_thread);
+#ifdef _WIN32
 	std::thread& getBthread();
 #else
 	pthread_t getPthread();
@@ -70,7 +77,7 @@ namespace extemp
 	bool detached;
 	bool joined;
 	bool cancelled;			
-#ifdef EXT_BOOST
+#ifdef _WIN32
 	std::thread bthread;
 #else
 	pthread_t pthread;

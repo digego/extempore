@@ -56,6 +56,16 @@ namespace extemp
     {       
     }
 
+#ifdef _WIN32
+	EXTThread::EXTThread(std::thread&& _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
+	{
+	}
+#else
+    EXTThread::EXTThread(pthread_t _pthread) : initialised(false), detached(false), joined(false), pthread{ _pthread }
+    {
+    }
+#endif
+
     EXTThread::~EXTThread()
     {		
 #ifdef _EXTTHREAD_DEBUG_
@@ -72,7 +82,7 @@ namespace extemp
 
 	if (! initialised)
 	{
-#ifdef EXT_BOOST
+#ifdef _WIN32
     // std::function<void*(void*)> fn = static_cast<std::function<void*(void*)> >(start_routine);
     std::function<void*()> fn = [start_routine,arg]()->void* { return start_routine(arg); };
     bthread = std::thread(fn);
@@ -91,7 +101,16 @@ namespace extemp
 #endif
 
 	return result;
-    }    
+    }
+
+	int EXTThread::kill()
+	{
+#ifdef _WIN32
+		return 0;
+#else
+		return pthread_cancel(pthread);
+#endif
+	}
 
 
     int EXTThread::detach()
@@ -100,7 +119,7 @@ namespace extemp
 
 	if (initialised)
 	{
-#ifdef EXT_BOOST
+#ifdef _WIN32
 	    bthread.detach();
 	    result = 0;
 #else
@@ -125,7 +144,7 @@ namespace extemp
 
 	if (initialised)
 	{
-#ifdef EXT_BOOST
+#ifdef _WIN32
 	    bthread.join();
             result = 0;
 #else
@@ -146,7 +165,7 @@ namespace extemp
 
   int EXTThread::setPriority(int priority, bool realtime)
   {
-#ifdef EXT_BOOST
+#ifdef _WIN32
     auto thread = bthread.native_handle();
 #else
 	pthread_t thread = pthread;
@@ -209,7 +228,7 @@ namespace extemp
   
     bool EXTThread::isRunning() 
     { 
-#ifdef EXT_BOOST
+#ifdef _WIN32
       return initialised;
 #else
 	return 0 != pthread; 
@@ -218,14 +237,23 @@ namespace extemp
 	
     bool EXTThread::isCurrentThread()
     {
-#ifdef EXT_BOOST
+#ifdef _WIN32
       return (bthread.get_id() == std::this_thread::get_id());
 #else
 	return pthread_equal(pthread_self(), pthread);
 #endif
     }
-	
-#ifdef EXT_BOOST
+
+	bool EXTThread::isEqualTo(EXTThread* other_thread)
+	{
+#ifdef _WIN32
+		return bthread.get_id() == other_thread->getBthread().get_id();		
+#else
+		return pthread_equal(pthread, other_thread->getPthread());
+#endif  
+	}
+
+#ifdef _WIN32
   std::thread& EXTThread::getBthread()
     {
 	return bthread;
