@@ -6379,6 +6379,8 @@
 
 (define impc:ti:while-check
   (lambda (ast vars kts request?)
+    (if (tree-member 'let ast)
+        (impc:compiler:print-compiler-error "You cannot bind variables within a while condition check!" (cadr ast)))
     (let ((type (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:i1*)))
           (body (impc:ti:type-check (caddr ast) vars kts #f)))
       (if (not (or (and (number? type) (= type *impc:ir:i1*))
