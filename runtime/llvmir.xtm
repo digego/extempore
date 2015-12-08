@@ -318,13 +318,13 @@
                        'default #t (print "Type Error"))
 
     (if (not (null? name))
-        (begin (print " calling ")
+        (begin (print " in ")
                (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
                                   (print  (car name)))
                (print ",")))
     (print " got " )
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f
-                       (print (impc:ir:pretty-print-type (if (impc:ir:type? got) (impc:ir:get-type-from-str got) got))))
+                       (print (impc:ir:pretty-print-type got))) ;;(if (impc:ir:type? got) (impc:ir:get-type-from-str got) got))))
     (print ", was expecting ")
     (if (and (list? expected)
              (= 1 (length expected)))
@@ -1094,10 +1094,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define impc:ir:regex-structs-or-atoms (string-append "(\\<?\\{(?<struct>[^<{}>]|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
-                                                      "|(\\[(?<array>[^\\[\\]]|\\[\\g<array>*\\]\\**)*\\]\\**)"
-                                                      "|(\\<(?<vector>[^<>]|\\<\\g<vector>*\\>\\**)*\\>\\**)"
-                                                      "|(?:([%#0-9a-zA-Z_-]\\**)+)"))
+(define impc:ir:regex-structs-or-atoms (string-append
+                                        ;;"(\\<?\\{(?<struct>[^{}]|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
+                                        "(\\<?\\{(?<struct>(?!\\{|\\}|\\<\\{|\\}\\>).|\\<?\\{\\g<struct>*\\}\\>?\\**)*\\}\\>?\\**)"
+                                        ;;"|(\\[(?<array>[^\\[\\]]|\\[\\g<array>*\\]\\**)*\\]\\**)"
+                                        "|(\\[(?<array>(?!\\[|\\]).|\\[\\g<array>*\\]\\**)*\\]\\**)"
+                                        ;;"|(\\<(?<vector>[^<>]|\\<\\g<vector>*\\>\\**)*\\>\\**)"
+                                        "|(\\<(?<vector>(?!\\<|\\>).|\\<\\g<vector>*\\>\\**)*\\>\\**)"
+                                        "|(?:([%#0-9a-zA-Z_-]\\**)+)"))
 
 
 (define impc:ir:get-tuple-type-from-str
