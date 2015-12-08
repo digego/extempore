@@ -4525,6 +4525,9 @@ static pointer opexe_1(scheme *sc, enum scheme_opcodes op) {
     case OP_PAPPLY:     /* apply */
 	sc->code = car(sc->args);
 	sc->args = list_star(sc,cdr(sc->args));
+  if(!is_pair(sc->args) && sc->args != sc->NIL) {
+    Error_1(sc,"Error: Apply must finish with a string argument! not:",sc->args,sc->code->_debugger->_size);
+  }  
 	/*sc->args = cadr(sc->args);*/
 	s_goto(sc,OP_APPLY);
 																
