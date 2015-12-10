@@ -1,6 +1,7 @@
 /* config.h.  Generated from config.h.in by configure.  */
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+
 /* PCRE is written in Standard C, but there are a few non-standard things it
 can cope with, allowing it to run on SunOS4 and other "close to standard"
 systems.
@@ -52,19 +53,19 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef EBCDIC_NL25 */
 
 /* Define to 1 if you have the `bcopy' function. */
-/* #undef HAVE_BCOPY */
+#define HAVE_BCOPY 1
 
 /* Define to 1 if you have the <bits/type_traits.h> header file. */
 /* #undef HAVE_BITS_TYPE_TRAITS_H */
 
 /* Define to 1 if you have the <bzlib.h> header file. */
-/* #undef HAVE_BZLIB_H */
+#define HAVE_BZLIB_H 1
 
 /* Define to 1 if you have the <dirent.h> header file. */
-/* #undef HAVE_DIRENT_H */
+#define HAVE_DIRENT_H 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
-/* #undef HAVE_DLFCN_H */
+#define HAVE_DLFCN_H 1
 
 /* Define to 1 if you have the <editline/readline.h> header file. */
 /* #undef HAVE_EDITLINE_READLINE_H */
@@ -73,19 +74,19 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef HAVE_EDIT_READLINE_READLINE_H */
 
 /* Define to 1 if you have the <inttypes.h> header file. */
-/* #undef HAVE_INTTYPES_H */
+#define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the <limits.h> header file. */
-/* #undef HAVE_LIMITS_H */
+#define HAVE_LIMITS_H 1
 
 /* Define to 1 if the system has the type `long long'. */
-/* #undef HAVE_LONG_LONG */
+#define HAVE_LONG_LONG 1
 
 /* Define to 1 if you have the `memmove' function. */
-/* #undef HAVE_MEMMOVE */
+#define HAVE_MEMMOVE 1
 
 /* Define to 1 if you have the <memory.h> header file. */
-/* #undef HAVE_MEMORY_H */
+#define HAVE_MEMORY_H 1
 
 /* Define if you have POSIX threads libraries and header files. */
 /* #undef HAVE_PTHREAD */
@@ -100,22 +101,22 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef HAVE_READLINE_READLINE_H */
 
 /* Define to 1 if you have the <stdint.h> header file. */
-/* #undef HAVE_STDINT_H */
+#define HAVE_STDINT_H 1
 
 /* Define to 1 if you have the <stdlib.h> header file. */
-/* #undef HAVE_STDLIB_H */
+#define HAVE_STDLIB_H 1
 
 /* Define to 1 if you have the `strerror' function. */
-/* #undef HAVE_STRERROR */
+#define HAVE_STRERROR 1
 
 /* Define to 1 if you have the <string> header file. */
-/* #undef HAVE_STRING */
+#define HAVE_STRING 1
 
 /* Define to 1 if you have the <strings.h> header file. */
-/* #undef HAVE_STRINGS_H */
+#define HAVE_STRINGS_H 1
 
 /* Define to 1 if you have the <string.h> header file. */
-/* #undef HAVE_STRING_H */
+#define HAVE_STRING_H 1
 
 /* Define to 1 if you have `strtoimax'. */
 /* #undef HAVE_STRTOIMAX */
@@ -124,31 +125,31 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef HAVE_STRTOLL */
 
 /* Define to 1 if you have `strtoq'. */
-/* #undef HAVE_STRTOQ */
+#define HAVE_STRTOQ 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
-/* #undef HAVE_SYS_STAT_H */
+#define HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-/* #undef HAVE_SYS_TYPES_H */
+#define HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <type_traits.h> header file. */
 /* #undef HAVE_TYPE_TRAITS_H */
 
 /* Define to 1 if you have the <unistd.h> header file. */
-/* #undef HAVE_UNISTD_H */
+#define HAVE_UNISTD_H 1
 
 /* Define to 1 if the system has the type `unsigned long long'. */
-/* #undef HAVE_UNSIGNED_LONG_LONG */
+#define HAVE_UNSIGNED_LONG_LONG 1
 
 /* Define to 1 if the compiler supports simple visibility declarations. */
-/* #undef HAVE_VISIBILITY */
+#define HAVE_VISIBILITY 1
 
 /* Define to 1 if you have the <windows.h> header file. */
 /* #undef HAVE_WINDOWS_H */
 
 /* Define to 1 if you have the <zlib.h> header file. */
-/* #undef HAVE_ZLIB_H */
+#define HAVE_ZLIB_H 1
 
 /* Define to 1 if you have `_strtoi64'. */
 /* #undef HAVE__STRTOI64 */
@@ -158,15 +159,10 @@ sure both macros are undefined; an emulation function will then be used. */
    compiled patterns up to 64K long. This covers the vast majority of cases.
    However, PCRE can also be compiled to use 3 or 4 bytes instead. This allows
    for longer patterns in extreme cases. */
-#ifndef LINK_SIZE
 #define LINK_SIZE 2
-#endif
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
-/* This is ignored unless you are using libtool. */
-#ifndef LT_OBJDIR
 #define LT_OBJDIR ".libs/"
-#endif
 
 /* The value of MATCH_LIMIT determines the default number of times the
    internal match() function can be called during a single execution of
@@ -174,9 +170,7 @@ sure both macros are undefined; an emulation function will then be used. */
    The limit exists in order to catch runaway regular expressions that take
    for ever to determine that they do not match. The default is set very large
    so that it does not accidentally catch legitimate cases. */
-#ifndef MATCH_LIMIT
 #define MATCH_LIMIT 10000000
-#endif
 
 /* The above limit applies to all calls of match(), whether or not they
    increase the recursion depth. In some environments it is desirable to limit
@@ -186,23 +180,17 @@ sure both macros are undefined; an emulation function will then be used. */
    match(). To have any useful effect, it must be less than the value of
    MATCH_LIMIT. The default is to use the same value as MATCH_LIMIT. There is
    a runtime method for setting a different limit. */
-#ifndef MATCH_LIMIT_RECURSION
 #define MATCH_LIMIT_RECURSION MATCH_LIMIT
-#endif
 
 /* This limit is parameterized just in case anybody ever wants to change it.
    Care must be taken if it is increased, because it guards against integer
    overflow caused by enormously large patterns. */
-#ifndef MAX_NAME_COUNT
 #define MAX_NAME_COUNT 10000
-#endif
 
 /* This limit is parameterized just in case anybody ever wants to change it.
    Care must be taken if it is increased, because it guards against integer
    overflow caused by enormously large patterns. */
-#ifndef MAX_NAME_SIZE
 #define MAX_NAME_SIZE 32
-#endif
 
 /* The value of NEWLINE determines the default newline character sequence.
    PCRE client programs can override this by selecting other values at run
@@ -212,9 +200,7 @@ sure both macros are undefined; an emulation function will then be used. */
    0x25) that are used as the NL line terminator that is equivalent to ASCII
    LF. In both ASCII and EBCDIC environments the value can also be -1 (ANY),
    or -2 (ANYCRLF). */
-#ifndef NEWLINE
 #define NEWLINE 10
-#endif
 
 /* PCRE uses recursive function calls to handle backtracking while matching.
    This can sometimes be a problem on systems that have stacks of limited
@@ -235,7 +221,7 @@ sure both macros are undefined; an emulation function will then be used. */
 #define PACKAGE_NAME "PCRE"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "PCRE 8.37"
+#define PACKAGE_STRING "PCRE 8.38"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "pcre"
@@ -244,23 +230,38 @@ sure both macros are undefined; an emulation function will then be used. */
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "8.37"
+#define PACKAGE_VERSION "8.38"
 
 /* The value of PARENS_NEST_LIMIT specifies the maximum depth of nested
    parentheses (of any kind) in a pattern. This limits the amount of system
    stack that is used while compiling a pattern. */
-#ifndef PARENS_NEST_LIMIT
 #define PARENS_NEST_LIMIT 250
-#endif
+
+/* to make a symbol visible */
+#define PCRECPP_EXP_DECL extern __attribute__ ((visibility ("default")))
+
+/* to make a symbol visible */
+#define PCRECPP_EXP_DEFN __attribute__ ((visibility ("default")))
 
 /* The value of PCREGREP_BUFSIZE determines the size of buffer used by
    pcregrep to hold parts of the file it is searching. This is also the
    minimum value. The actual amount of memory used by pcregrep is three times
    this number, because it allows for the buffering of "before" and "after"
    lines. */
-#ifndef PCREGREP_BUFSIZE
 #define PCREGREP_BUFSIZE 20480
-#endif
+
+/* to make a symbol visible */
+#define PCREPOSIX_EXP_DECL extern __attribute__ ((visibility ("default")))
+
+/* to make a symbol visible */
+#define PCREPOSIX_EXP_DEFN extern __attribute__ ((visibility ("default")))
+
+/* to make a symbol visible */
+#define PCRE_EXP_DATA_DEFN __attribute__ ((visibility ("default")))
+
+/* to make a symbol visible */
+#define PCRE_EXP_DECL extern __attribute__ ((visibility ("default")))
+
 
 /* If you are compiling for a system other than a Unix-like system or
    Win32, and it needs some magic to be inserted before the definition
@@ -271,7 +272,7 @@ sure both macros are undefined; an emulation function will then be used. */
    This macro apears at the start of every exported function that is part
    of the external API. It does not appear on functions that are "external"
    in the C sense, but which are internal to the library. */
-/* #undef PCRE_EXP_DEFN */
+#define PCRE_EXP_DEFN __attribute__ ((visibility ("default")))
 
 /* Define to any value if linking statically (TODO: make nice with Libtool) */
 /* #undef PCRE_STATIC */
@@ -283,16 +284,14 @@ sure both macros are undefined; an emulation function will then be used. */
    function uses space on the stack, because this is faster than using
    malloc() for each call. The threshold above which the stack is no longer
    used is defined by POSIX_MALLOC_THRESHOLD. */
-#ifndef POSIX_MALLOC_THRESHOLD
 #define POSIX_MALLOC_THRESHOLD 10
-#endif
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
 /* #undef PTHREAD_CREATE_JOINABLE */
 
 /* Define to 1 if you have the ANSI C header files. */
-/* #undef STDC_HEADERS */
+#define STDC_HEADERS 1
 
 /* Define to any value to enable support for Just-In-Time compiling. */
 /* #undef SUPPORT_JIT */
@@ -318,7 +317,7 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef SUPPORT_PCRE32 */
 
 /* Define to any value to enable the 8 bit PCRE library. */
-#define SUPPORT_PCRE8 1
+#define SUPPORT_PCRE8 /**/
 
 /* Define to any value to enable JIT support in pcregrep. */
 /* #undef SUPPORT_PCREGREP_JIT */
@@ -336,7 +335,7 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef SUPPORT_VALGRIND */
 
 /* Version number of package */
-#define VERSION "8.37"
+#define VERSION "8.38"
 
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */

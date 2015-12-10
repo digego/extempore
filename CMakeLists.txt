@@ -49,7 +49,7 @@ endif()
 # PCRE #
 ########
 
-# current in-tree PCRE version: 8.37
+# current in-tree PCRE version: 8.38
 
 add_library(pcre STATIC
   # headers
