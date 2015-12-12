@@ -1333,7 +1333,6 @@
                              (res (apply
                                    string-append "<" (impc:ir:genericfunc-stringify-generic-arg-strings (cdr x)) ">"
                                    (make-list depth "*"))))
-                        (println 'tuple-res: res)
                         res))
                      ((impc:ir:type? x)
                       (impc:ir:pretty-print-type x))
@@ -5313,6 +5312,20 @@
               (list request?)
               (list (cadr gpoly-type)))))))
 
+(define impc:ti:nativef-poly-exact-check
+  (lambda (ast vars kts request?)
+    (let* ((polyf (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
+           (ftypes (impc:ti:get-polyfunc-candidate-types (symbol->string polyf)))
+           (asttype (cons 213 (cons request? (map (lambda (a)
+                                                   (impc:ti:type-unify (impc:ti:type-check a vars kts #f) vars))
+                                                 (cdr ast))))))
+      ;;(println 'ftypes: ftypes 'asttype asttype)
+      (if (and (list? ftypes)
+               (member asttype ftypes))
+          (begin (impc:ti:update-var (car ast) vars kts (list asttype))
+                 #t)
+          #f))))
+    
 
 ;; polymorphic version
 (define impc:ti:nativef-poly-check
@@ -6561,13 +6574,19 @@
           ((and (list? ast) (member (car ast) '(bitconvert))) (impc:ti:bitconvert-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(void))) (impc:ti:void-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(fptrcall))) (impc:ti:fptrcall-check ast vars kts request?))
+          ((and (list? ast) ;; poly func (specific match)
+                (symbol? (car ast))
+                request?
+                (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
+                (impc:ti:nativef-poly-exact-check ast vars kts request?))
+           request?)          
           ((and (list? ast) ;; generic function
                 (symbol? (car ast))
                 (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
                 (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
                                              (length (cdr ast))))
            (impc:ti:nativef-generics ast vars kts request?))
-          ((and (list? ast) ;; polymorphic function
+          ((and (list? ast) ;; poly func (closest match)
                 (symbol? (car ast))
                 (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
                 (impc:ti:get-polyfunc-candidate-types (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$")))))
