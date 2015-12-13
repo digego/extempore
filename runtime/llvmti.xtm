@@ -4452,6 +4452,7 @@
 
 (define impc:ti:math-check
   (lambda (ast vars kts request?)
+    ;; (println 'math: ast 'r: request?)
     ;; if request is false
     (if (not request?)
         (begin (if (member (cadr ast) kts) (set! request? (cdr (assoc-strcmp (cadr ast) vars))))
@@ -4480,6 +4481,13 @@
                      (assoc-strcmp (car n2) vars))
                 (begin (impc:ti:force-var (car n2) vars kts '())
                        (impc:ti:type-check n2 vars kts t)))))
+      ;; one more try for equality!
+      (if (and
+           (not (equal? a b))
+           (impc:ir:type? t))               
+          (begin
+            (set! a (impc:ti:type-check n1 vars kts t))
+            (set! b (impc:ti:type-check n2 vars kts t))))
       (if (and (not (equal? a b))
                (impc:ir:type? b)
                (impc:ir:type? a)
@@ -4528,6 +4536,7 @@
 
 (define impc:ti:math-intrinsic-check
   (lambda (ast vars kts request?)
+    ;; (println 'intrinsic: ast 'r: request?) 
     (let* ((args (- (length ast) 1))
            (a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
            (b (if (> args 1)
@@ -5079,6 +5088,10 @@
     ;; (println 'vars: vars)
     ;; (println 'genericf-in: (assoc-strcmp (car ast) vars) 'request?)
     (set! impc:ir:get-type-expand-poly #f)
+    (if (or (null? request?)
+            (and (list? request?)
+                 (equal? (car request?) *impc:ir:notype*)))
+        (set! request? #f))
     ;; only check if no already fully formed!
     (if (impc:ir:type? (impc:ti:type-unify (cdr (assoc-strcmp (car ast) vars)) vars))
         (begin
@@ -5312,25 +5325,41 @@
               (list request?)
               (list (cadr gpoly-type)))))))
 
+
 (define impc:ti:nativef-poly-exact-check
   (lambda (ast vars kts request?)
-    (let* ((polyf (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
-           (ftypes (impc:ti:get-polyfunc-candidate-types (symbol->string polyf)))
-           (asttype (cons 213 (cons request? (map (lambda (a)
-                                                   (impc:ti:type-unify (impc:ti:type-check a vars kts #f) vars))
-                                                 (cdr ast))))))
-      ;;(println 'ftypes: ftypes 'asttype asttype)
-      (if (and (list? ftypes)
-               (member asttype ftypes))
-          (begin (impc:ti:update-var (car ast) vars kts (list asttype))
-                 #t)
-          #f))))
+    ;; (println 'nateivef-poly: ast 'req: request?)
+    (if (or (null? request?)
+            (regex:match? (sexpr->string request?) "(!|(##))"))  ;; must be generic - exit!
+        #f
+        (let* ((polyf (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
+               (ftypes (impc:ti:get-polyfunc-candidate-types (symbol->string polyf)))
+               (asttype (cons 213 (cons request? (map (lambda (a)
+                                                        (impc:ti:type-unify (impc:ti:type-check a vars kts #f) vars))
+                                                      (cdr ast))))))
+          (if (not ftypes)
+              #f
+              (begin
+                ;; if no return type is ever required
+                ;; then we can ignore it for our checks
+                (if (and (list? request?)
+                         (equal? *impc:ir:notype* (car request?)))
+                    (for-each (lambda (ft)
+                                (if (equal? (cddr asttype) (cddr ft))
+                                    (set! asttype ft)))
+                              ftypes))      
+                (if (and (list? ftypes)
+                         (member asttype ftypes))
+                    (begin
+                      (impc:ti:update-var (car ast) vars kts (list asttype))
+                      #t)
+                    #f)))))))
     
 
 ;; polymorphic version
 (define impc:ti:nativef-poly-check
   (lambda (ast vars kts request?)
-    ;; (println 'poly-checking: (car ast))
+    ;; (println 'poly-checking: ast 'req? request?)
     (if (impc:ir:type? (impc:ti:type-unify (cdr (assoc-strcmp (car ast) vars)) vars))
         (begin
           ;; (println 'bingo: 'saving 'time!)
@@ -5617,8 +5646,10 @@
       ;; so we start with type coverage
       ;; reverse order shouldn't matter because there
       ;; should be no type dependencies between these sexpressions
-      ;; also we don't want to pass any request? to these
-      (map (lambda (e) (impc:ti:type-check e vars kts #f)) (cdr sexplst))
+      ;; also we pass *impc:ir:notype* as a request
+      ;; because no return type is required from this expression
+      ;; not just that we don't know it, but that none is actually required
+      (map (lambda (e) (impc:ti:type-check e vars kts (list *impc:ir:notype*))) (cdr sexplst))
       ;; now we do the last sexpr in the begin for a return type
       ;; it SHOULD get passed the request?
       (let ((res (impc:ti:type-check (car sexplst) vars kts request?)))
@@ -5682,7 +5713,7 @@
   (lambda (ast vars kts request?)
     (if (<> (length ast) 4)
         (impc:compiler:print-bad-arity-error (car ast)))
-    (let* ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
+    (let* ((a (impc:ti:type-check (cadr ast) vars kts #f))
            ;; b should be fixed point types
            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*)))
            ;; c should be of type a*
@@ -5718,8 +5749,8 @@
 
 (define impc:ti:array-ref-check
   (lambda (ast vars kts request?)
-                                        ;(println 'request? request?)
-                                        ;(println 'array-ref-check: 'ast: ast 'vars: vars 'kts: kts)
+    ;;(println 'request? request?)
+    ;;(println 'array-ref-check: 'ast: ast 'vars: vars 'kts: kts)
     (if (<> (length ast) 3)
         (impc:compiler:print-bad-arity-error ast))
     (let ((a (impc:ti:type-check (cadr ast) vars kts '()))
@@ -5738,7 +5769,7 @@
                                         ;(println 'ast: ast 'vars: vars)
     (if (<> (length ast) 4)
         (impc:compiler:print-bad-arity-error ast))
-    (let* ((a (impc:ti:type-check (cadr ast) vars kts '())) ;request?))
+    (let* ((a (impc:ti:type-check (cadr ast) vars kts #f))
            ;; b should be i32
            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si32*)))
            ;; c should be of type a*
@@ -5784,11 +5815,11 @@
   (lambda (ast vars kts request?)
     (if (<> (length ast) 4)
         (impc:compiler:print-bad-arity-error ast))
-    (let* ((aa (impc:ti:type-check (cadr ast) vars kts request?))
+    (let* ((aa (impc:ti:type-check (cadr ast) vars kts #f))
            (a (if (and (list? aa) (= (length aa) 1) (symbol? (car aa))) '() aa))
            ;; b should be fixed point types
            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*)))
-           ;; c should be of type a*
+           ;; c should be of type *a
            (c (impc:ti:type-check (cadddr ast) vars kts (if (null? a) #f
                                                             (if (atom? a)
                                                                 (list (impc:ir:pointer-- a))
@@ -5928,14 +5959,14 @@
 
 (define impc:ti:tuple-set-check
   (lambda (ast vars kts request?)
-    ;; (println 'tsetcheck ast) ; vars kts request?)
+    ;;(println 'tsetcheck ast vars kts request?)
     (if (<> (length ast) 4)
         (impc:compiler:print-bad-arity-error ast))
     ;; (caddr ast) must be an integer
     (if (not (integer? (caddr ast)))
         (impc:compiler:print-bad-type-error (caddr ast) "tuple-set! must use a literal integer index"))
     (let* (;; a should be a tuple of some kind
-           (a (let ((res (impc:ti:type-check (cadr ast) vars kts request?)))
+           (a (let ((res (impc:ti:type-check (cadr ast) vars kts #f)))
                 (if (null? res) res
                     (if (and (string? (car res))
                              (char=? (string-ref (car res) 0) #\%))
@@ -6076,14 +6107,14 @@
 ;;(closure-set! closure a i32 5)
 (define impc:ti:closure-set-check
   (lambda (ast vars kts request?)
-                                        ;(println 'cset 'ast: ast 'request? request?)
+    ;;(println 'cset 'ast: ast 'request? request?)
     (if (<> (length ast) 5)
         (impc:compiler:print-bad-arity-error ast))
     (let* (;; a should be a closure of some kind
            (a (if (and (symbol? (cadr ast))
                        (impc:ti:closure-exists? (symbol->string (cadr ast))))
                   #t ; // yes (cadr ast) is a globally defined closure
-                  (impc:ti:type-check (cadr ast) vars kts request?)))
+                  (impc:ti:type-check (cadr ast) vars kts #f)))
            ;; b should be a string (the var's name)
            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*)))
            ;; c should be a value for var's name
@@ -6284,6 +6315,8 @@
                          (impc:ir:closure? (car ctype)))
                     (cadr (car ctype))
                     (if (and request?
+                             (not (and (list? request?)
+                                       (equal? (car request?) *impc:ir:notype*)))
                              (not (null? request?)))
                         request?
                         '()))))
