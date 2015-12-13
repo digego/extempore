@@ -345,77 +345,6 @@
    (call-cpp time *io:osc:send-msg* (car host-address) (cdr host-address) osc-address args))
 
 
-(define make-envelope
-  (lambda (points . args)
-     (if (vector? points)
-	 (make-envelope-v points (if (null? args) #f (car args)))
-	 (make-envelope-l points (if (null? args) #f (car args))))))
-
-(define envelope-segments-l
-   (lambda (points)
-      (let loop ((lst points)
-		 (lines '()))
-	 (if (null? (cdr lst))
-	     (reverse lines)
-	     (let* ((x1 (caar lst))
-		    (y1 (cdar lst))
-		    (x2 (caadr lst))
-		    (y2 (cdadr lst))
-		    (m (if (= 0 (- x2 x1)) 0 (/ (- y2 y1) (- x2 x1))))
-		    (c (- y2 (* m x2))))
-		(loop (cdr lst) (cons (lambda (time) (+ (* m time) c)) lines)))))))
-
-(define make-envelope-l
-   (lambda (points whole-num?)
-      (let ((lines (envelope-segments-l points)))
-	 (lambda (time)
-	    (let loop ((p-list (cdr points))
-		       (l-list lines))
-	       (if (or (<= time (caar p-list))
-		       (null? (cdr p-list)))
-		   (if whole-num?
-		       (real->integer (round ((car  l-list) time)))
-		       ((car l-list) time))
-		   (loop (cdr p-list) (cdr l-list))))))))
-
-(define envelope-segments-v
-   (lambda (points)
-      (let loop ((idx 0)
-		 (lines '()))
-	 (if (>= (+ idx 2) (vector-length points))
-	     (reverse lines)
-	     (let* ((x1 (vector-ref points idx))
-		    (y1 (vector-ref points (+ idx 1)))
-		    (x2 (vector-ref points (+ idx 2)))
-		    (y2 (vector-ref points (+ idx 3)))
-		    (m (if (= 0 (- x2 x1)) 0 (/ (- y2 y1) (- x2 x1))))
-		    (c (- y2 (* m x2))))
-		(loop (+ idx 2) (cons (lambda (time) (+ (* m time) c)) lines)))))))
-
-(define make-envelope-v
-   (lambda (points whole-num?)
-      (let ((lines (envelope-segments-v points)))
-	 (lambda (time)
-	    (let loop ((idx 2)
-		       (l-list lines))
-	       (if (or (<= time (vector-ref points idx))
-		       (null? (cdr l-list)))
-		   (if whole-num?
-		       (real->integer (round ((car l-list) time)))
-		       ((car l-list) time))
-		   (loop (+ idx 2) (cdr l-list))))))))
-
-(define random-envelope
-   (lambda (duration interval whole-numbers? . args)
-      (let* ((lgth (real->integer (/ duration interval)))
-	     (v1 (make-vector-with-proc lgth (lambda (i) (* i interval))))
-	     (v2 (make-vector-with-proc lgth (lambda (i) (apply random args))))
-	     (v3 (make-vector (* 2 lgth))))
-	 (math:vector= v3 v1 (list 0 lgth 2))
-	 (math:vector= v3 v2 (list 1 lgth 2))
-	 (make-envelope-v v3 whole-numbers?))))
-
-
 (define math:mean
    (lambda (lst)
       (/ (apply + lst) (length lst))))
@@ -433,21 +362,6 @@
 		(/ v (length lst))
 		(let ((var (- (car l) m)))
 		   (loop (cdr l) (+ v (* var var)))))))))
-
-
-;; function must take two arguments beat and duration
-(define change-over-time
-   (lambda (start duration rate from to function . args)
-      (let* ((env (make-envelope (vector start from (+ start duration) to)))
-	     (func (lambda (beat dur)
-		      ;(callback (*metro* beat) function beat (env beat) args)
-		      (function beat (env beat) args)
-		      (if (> dur rate)
-			  (callback (*metro* (+ beat rate)) func
-				    (+ beat rate)
-				    (- dur rate))))))
-	 (callback (*metro* start) func start duration))))
-
 
 (define (string->sexpr str)
    (let* ((port (open-input-string str))
