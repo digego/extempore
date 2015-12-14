@@ -1334,6 +1334,9 @@
                                    string-append "<" (impc:ir:genericfunc-stringify-generic-arg-strings (cdr x)) ">"
                                    (make-list depth "*"))))
                         res))
+                     ((and (number? x)
+                           (= x *impc:ir:notype*))
+                      "notype")
                      ((impc:ir:type? x)
                       (impc:ir:pretty-print-type x))
                      (else "_")))
@@ -1418,7 +1421,8 @@
                                  ;; (println 'gp: (car (cddddr gp)) 'type type)
                                  (cons (apply + (map (lambda (x y)
                                                        ;; (println x '=? y)
-                                                       (cond ((string=? x "_") 0)
+                                                       (cond ((string=? y "notype") 0)
+                                                             ((string=? x "_") 0)
                                                              ((char=? (string-ref x 0) (integer->char 91))
                                                               (if (string=? y "_") 0
                                                                   (impc:ir:genericfunc-match-closure-types x y)))
