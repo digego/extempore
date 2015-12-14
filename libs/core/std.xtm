@@ -132,6 +132,52 @@
 
 (impc:aot:do-or-emit (set_float_nans_))
 
+;;;;;;;;;;;;;;;;;;;
+;; xtlang macros ;;
+;;;;;;;;;;;;;;;;;;;
+
+(bind-macro (inc x y)
+  "increment variable by y"
+  `(set! ,x (+ ,x ,y)))
+
+(bind-macro (dec x y)
+  "decrement variable by y"
+  `(set! ,x (- ,x ,y)))
+
+(bind-macro (min x y)
+  "minimum of x and y"
+  `(if (< ,x ,y) ,x ,y))
+
+(bind-macro (max x y)
+  "maximum of x and y"
+  `(if (> ,x ,y) ,x ,y))
+
+(bind-macro (clamp x minval maxval)
+  "clamp input value to range"
+  `(if (> ,x ,maxval) ,maxval
+       (if (< ,x ,minval) ,minval
+           ,x)))
+
+(bind-macro (logn x base)
+  "log with arbitrary base"
+  `(/ (log ,x) (log ,base)))
+
+(bind-macro (deg2rad degrees)
+  "convert angle in degrees to radians"
+  `(/ ,degrees 57.2957795))
+
+(bind-macro (rad2deg radians)
+  "convert angle in radians to degrees"
+  `(* 57.2957795 ,radians))
+
+(bind-macro (evenp x)
+  "returns #t for even integers, #f otherwise"
+  `(if (= (bitwise-and ,x 1) 0) 1:i1 0:i1))
+
+(bind-macro (oddp x)
+  "returns #t for odd integers, #f otherwise"
+  `(if (= (bitwise-and ,x 1) 0) 0:i1 1:i1))
+
 ;;;;;;;;;;;;
 ;; random ;;
 ;;;;;;;;;;;;
@@ -421,7 +467,8 @@ If both strings are null an empty String will be returned
 ;; String_cat macro (poor-man's varargs)
 
 (impc:aot:do-or-emit
- (define-macro (String_cat . args)
+ (bind-macro (String_cat . args)
+   "concatenate Strings"
    (let loop ((rem (cdr args))
               (ret (car args)))
      (if (null? rem)

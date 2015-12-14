@@ -56,34 +56,23 @@
 
 
 ;;
-(define-macro (spawn f)
+(bind-macro (spawn f)
+  "spawn a new thread"
   (let* ((sym (symbol->string (gensym)))
          (s (string-append sym ":[void]*")))
     `(let ((,(string->symbol s) ,f))
        (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ,(string->symbol sym) i8*)))))
 
-(define-macro (syncspawn f)
+(bind-macro (syncspawn f)
+  "spawn a new thread (sync)"
   (let* ((sym (symbol->string (gensym)))
          (s (string-append sym ":[void]*")))
     `(let ((,(string->symbol s) ,f))  
        (pset! spawnz numspawn (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ,(string->symbol sym) i8*)))
        (set! numspawn (+ numspawn 1)))))
 
-(define-macro (sync . expr)
-  (set! expr (cons 'begin expr))
-  (set! expr (replace-all expr '((spawn . syncspawn))))
-  (let ((ijk (gensym)))
-    `(letz (* 1024 1024)
-       ((numspawn 0)
-        (,ijk 0)
-        (spawnz:i8** (alloc 10000)))
-       ,expr
-       (dotimes (,ijk numspawn)
-         (thread_join (pref spawnz ,ijk)))
-       ;;(printf "syncd %d threads\n" ,ijk)
-       null)))
-
-(define-macro (sync . expr)
+(bind-macro (sync . expr)
+  "synchronize threads"
   (define final '(cast null i8*))
   (if (not (regex:match? (sexpr->string (car (reverse expr))) "spawn"))
       (begin (set! final (car (reverse expr)))

@@ -794,7 +794,7 @@
         ;; check arg types
         (if (not (and (or (string? namedtype-name) (begin (println 'bad 'namedtype-name: namedtype-name) #f))
                       (or (list? type) (integer? type) (begin (println 'bad 'type: type) #f))
-                      (or (string? docstring) (begin (println 'bad 'doctstring: docstring) #f))))
+                      (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new named type")
             (begin
               ;; add to the AOT-header if we're precompiling
@@ -885,7 +885,7 @@
                           (and (string? type)
                                (impc:ti:namedtype-exists? type))
                           (begin (println 'bad 'type: type) #f))
-                      (or (string? docstring) (begin (println 'bad 'doctstring: docstring) #f))))
+                      (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new type alias")
             (begin
               ;; add to the AOT-header if we're precompiling
@@ -905,15 +905,19 @@
     (let ((typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
       (if typealias-data (vector-set! (cdr typealias-data) 1 docstring) #f))))
 
-;;;;;;;;;;;;;;;
-;; type aliases
-;; ------------
+;;;;;;;;;;;;;;;;
+;; xtlang macros
+;; -------------
 ;;
 (define *impc:ti:xtmacro-cache* '())
 ;;
 ;; each element of the list is of the form
 ;;
-;; (name . #(type-alias docstring))
+;; (name . #(docstring))
+;;
+;; create an xtlang macro through bind-macro. behind the scenes, these
+;; are currently implemented as scheme macros (although with an
+;; "xtmacro_" prefix) but this could change in future
 
 (define impc:ti:print-xtmacro-cache
   (lambda ()
@@ -923,77 +927,48 @@
   (lambda ()
     (set! *impc:ti:xtmacro-cache* '())))
 
-(define impc:ti:get-xtmacro-type
-  (lambda (xtmacro-name)
-    (if (string? xtmacro-name)
-        (let ((ptr-depth (impc:ir:get-ptr-depth xtmacro-name))
-              (xtmacro-data (assoc-strcmp (impc:ir:clean-named-type xtmacro-name) *impc:ti:xtmacro-cache*)))
-          (if xtmacro-data (impc:ir:pointer++ (vector-ref (cdr xtmacro-data) 0) ptr-depth) #f))
-        #f)))
-
-;; as above but returns pretty type
-(define impc:ti:get-xtmacro-type-pretty
-  (lambda (xtmacro-name)
-    (if (string? xtmacro-name)
-        (let ((ptr-depth (impc:ir:get-ptr-depth xtmacro-name))
-              (xtmacro-data (assoc-strcmp (impc:ir:clean-named-type xtmacro-name) *impc:ti:xtmacro-cache*)))
-          (if xtmacro-data (impc:ir:pretty-print-type (impc:ir:pointer++ (vector-ref (cdr xtmacro-data) 0) ptr-depth))
-              #f))
-        #f)))
-
 (define impc:ti:xtmacro-exists?
   (lambda (xtmacro-name)
-    (let ((res (impc:ti:get-xtmacro-type xtmacro-name)))
-      (if (and res (not (null? res))) #t #f))))
-
-;; this one will recursively keep following aliases until it reaches
-;; the "ground" type
-(define impc:ti:get-xtmacro-ground-type
-  (lambda (xtmacro-name)
-    (let loop ((lowered-alias (impc:ti:get-xtmacro-type xtmacro-name)))
-      (if (and lowered-alias (string? lowered-alias))
-          (loop (impc:ti:get-xtmacro-type lowered-alias))
-          lowered-alias))))
-
-;; as above but returns pretty print
-(define impc:ti:get-xtmacro-ground-type-pretty
-  (lambda (xtmacro-name)
-    (let loop ((lowered-alias (impc:ti:get-xtmacro-type xtmacro-name)))
-      (if (and lowered-alias (string? lowered-alias))
-          (loop (impc:ti:get-xtmacro-type lowered-alias))
-          (impc:ir:pretty-print-type lowered-alias)))))
+    (if (and (string? xtmacro-name)
+             (assoc-strcmp xtmacro-name *impc:ti:xtmacro-cache*))
+        #t
+        #f)))
 
 (define impc:ti:register-new-xtmacro
-  (lambda (xtmacro-name type docstring)
-    ;; (println 'xtmacro-name: xtmacro-name 'type: type 'docstring: docstring)
-    (if (impc:ti:xtmacro-exists? xtmacro-name)
-        (impc:compiler:print-already-bound-error xtmacro-name (impc:ir:pretty-print-type type))
-        ;; check arg types
-        (if (not (and (or (string? xtmacro-name) (begin (println 'bad 'xtmacro-name: xtmacro-name) #f))
-                      (or (list? type)
-                          (integer? type)
-                          (and (string? type)
-                               (impc:ti:namedtype-exists? type))
-                          (begin (println 'bad 'type: type) #f))
-                      (or (string? docstring) (begin (println 'bad 'doctstring: docstring) #f))))
-            (impc:compiler:print-compiler-error "couldn't register new type alias")
-            (begin
-              ;; add to the AOT-header if we're precompiling
-              (set! *impc:ti:xtmacro-cache*
-                    (cons (cons xtmacro-name (vector type docstring))
-                          *impc:ti:xtmacro-cache*))
-              (car *impc:ti:xtmacro-cache*)
-              (impc:aot:insert-xtmacro-binding-details xtmacro-name type docstring))))))
+  (lambda (macro-name docstring)
+    ;; check arg types
+    (if (and (or (string? macro-name) (begin (println 'bad 'macro-name: macro-name) #f))
+             (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f)))
+        (begin
+          (set! *impc:ti:xtmacro-cache*
+                (cons (cons macro-name (vector docstring))
+                      *impc:ti:xtmacro-cache*))
+          (car *impc:ti:xtmacro-cache*)))))
 
 (define impc:ti:get-xtmacro-docstring
   (lambda (xtmacro-name)
-    (let ((xtmacro-data (assoc-strcmp (impc:ir:clean-named-type xtmacro-name) *impc:ti:xtmacro-cache*)))
-      (if xtmacro-data (vector-ref (cdr xtmacro-data) 1) #f))))
+    (let ((xtmacro-data (assoc-strcmp xtmacro-name *impc:ti:xtmacro-cache*)))
+      (if xtmacro-data (vector-ref (cdr xtmacro-data) 0) #f))))
 
 (define impc:ti:set-xtmacro-docstring
   (lambda (xtmacro-name docstring)
-    (let ((xtmacro-data (assoc-strcmp (impc:ir:clean-named-type xtmacro-name) *impc:ti:xtmacro-cache*)))
-      (if xtmacro-data (vector-set! (cdr xtmacro-data) 1 docstring) #f))))
+    (let ((xtmacro-data (assoc-strcmp xtmacro-name *impc:ti:xtmacro-cache*)))
+      (if xtmacro-data (vector-set! (cdr xtmacro-data) 0 docstring) #f))))
+
+;; docstrings are compulsory for xtlang macros
+(define-macro (bind-macro name-and-args docstring . body)
+  `(begin
+     (impc:aot:insert-xtmacro-binding-details ',name-and-args ,docstring ',@body)
+     (impc:ti:register-new-xtmacro ,(symbol->string (car name-and-args)) ,docstring)
+     (impc:compiler:print-binding-details-to-log
+      " xtmacro:"
+      ',(car name-and-args)
+      ""
+      ;; now actually create the macro
+      (define-macro
+        ,(cons (string->symbol (string-append "xtmacro_" (symbol->string (car name-and-args))))
+               (cdr name-and-args))
+        ,@body))))
 
 ;;;;;;;;;;;
 ;; closures
@@ -1836,10 +1811,11 @@
     (cond ((atom? ast) ast)
           ((and (list? ast)
                 (symbol? (car ast))
-                (not (eq? 'dotimes (car ast)))
-                (defined? (car ast))
-                (macro? (eval (car ast))))
-           (macro-expand ast))
+                (impc:ti:xtmacro-exists? (symbol->string (car ast))))
+           (macro-expand (cons (string->symbol
+                                (string-append "xtmacro_"
+                                               (symbol->string (car ast))))
+                               (cdr ast))))
           ((pair? ast)
            (cons (impc:ti:genericfunc-apply-macros (car ast))
                  (impc:ti:genericfunc-apply-macros (cdr ast))))
@@ -2413,6 +2389,19 @@
             (string->symbol name) 
             (string->symbol (impc:ir:pretty-print-type type))
             docstring)
+           *impc:aot:current-output-port*)
+          (newline *impc:aot:current-output-port*)))))
+
+(define impc:aot:insert-xtmacro-binding-details
+  (lambda (name-and-args docstring body)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          (write
+           (list
+            'bind-macro
+            name-and-args
+            docstring
+            body)
            *impc:aot:current-output-port*)
           (newline *impc:aot:current-output-port*)))))
 
@@ -3308,15 +3297,14 @@
                  (cdr ast)
                  (make-list-with-proc (length ast) (lambda (i) i))))))
 
-;; simple tuple binding
-;; (let ((tuple:<i32,double,i32,i64>* (alloc))
-;;       ((var1 0) (var2 0.0)))
-;;   (tbind tuple _ var2 _ var1)
-;;
-;;   would match var2 to the double
-;;   and var1 to the i64
-;;
-(define-macro (tbind data . args)
+(bind-macro (tbind data . args)
+  "simple tuple binding
+
+(let ((tuple:<i32,double,i32,i64>* (alloc))
+      ((var1 0) (var2 0.0)))
+  (tbind tuple _ var2 _ var1)
+
+  would match var2 to the double, and var1 to the i64"
   (cons 'begin
         (map (lambda (x n)
                (if (not (eq? x '_))
@@ -3656,10 +3644,13 @@
                                 (impc:ti:first-transform (list 'cset! a b (cadr ast)) inbody?)))))
                      ((and (atom? (car ast))
                            (symbol? (car ast))
-                           (not (eq? 'dotimes (car ast)))
-                           (defined? (car ast))
-                           (macro? (eval (car ast))))
-                      (impc:ti:first-transform (macro-expand ast) 'inbody?))
+                           (impc:ti:xtmacro-exists? (symbol->string (car ast))))
+                      (impc:ti:first-transform
+                       (macro-expand (cons (string->symbol
+                                            (string-append "xtmacro_"
+                                                           (symbol->string (car ast))))
+                                           (cdr ast)))
+                       'inbody?))
                      (else
                       (cons ;(impc:ti:first-transform (car ast) inbody?)
                        (impc:ti:first-transform (car ast) #t)
@@ -4052,7 +4043,7 @@
                                      ;;  (regex:match? x gpolyname)))
                                      (regex:match-all s1 impc:ir:regex-tc-or-a))))
                  (es (map (lambda (x) (if (string? (impc:ir:get-type-from-pretty-str x))
-                                     (impc:ir:get-type-from-pretty-str x) x))
+                                          (impc:ir:get-type-from-pretty-str x) x))
                           es2))
                  (tr (cl:remove-if (lambda (x)
                                      ;; (println 'x: x 'gpolyname: gpolyname)
@@ -9136,7 +9127,8 @@
         (llvm:get-function-pointer (string-append name "_native")))))
 
 ;; the same functionality, but for use in xtlang code
-(define-macro (get_native_fptr closure-name)
+(bind-macro (get_native_fptr closure-name)
+  "return native function pointer for closure"
   `(llvm_get_function_ptr ,(string-append (symbol->string closure-name) "_native")))
 
 ;; Wrap a native, bound C function, allowing it to be called from scheme

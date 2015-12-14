@@ -595,16 +595,17 @@
                       (Maybe #f z)
                       (Maybe #t z))))))))))
 
-;; create a haskell style do syntax
-;; but we'll use a let style form
-;; mlet for monadic-let -- bad name :(
-(macro (mlet args)
-       (letrec ((f (lambda (xs body)
-                     (if (null? xs) body
-                         `(bind ,(cadar xs)
-                                (lambda (,(caar xs))
-                                  ,(f (cdr xs) body)))))))
-         (f (cadr args) (caddr args))))
+(bind-macro (mlet . args)
+  "create a haskell style do syntax
+
+but we'll use a let style form
+mlet for monadic-let---bad name :("
+  (letrec ((f (lambda (xs body)
+                (if (null? xs) body
+                    `(bind ,(cadar xs)
+                           (lambda (,(caar xs))
+                             ,(f (cdr xs) body)))))))
+    (f (car args) (cadr args))))
 
 ;; which makes maybe_mul considerably more readable
 (xtmtest-compile
