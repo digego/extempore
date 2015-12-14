@@ -2442,152 +2442,6 @@
 
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Simple Compile Time Generics using type classes
-;;
-
-(define *impc:ti:vtypes* (list))
-
-(define impc:ti:add-vtype
-  (lambda (name type)
-    (if (string? type)
-        (set! type (impc:ir:get-type-from-pretty-str type)))
-    (if (string? name)
-        (set! name (string->symbol name)))
-    (let ((v (assoc-strcmp name *impc:ti:vtypes*)))
-      (if v
-          (if (member type v) #t
-              (set-cdr! v (cons type (cdr v))))
-          (set! *impc:ti:vtypes* (cons (list name type) *impc:ti:vtypes*)))
-      (impc:compiler:print-binding-details-to-log "Appended type variable " name type)
-      #t)))
-
-
-(define impc:ti:vtypes
-  (lambda (name)
-    (let ((res (assoc-strcmp name *impc:ti:vtypes*)))
-      (if res (cdr res)
-          #f))))
-
-(define impc:ti:vtype-match?
-  (lambda (name type)
-    (let ((res (assoc-strcmp name *impc:ti:vtypes*)))
-      (if (list? res) (if (member type res) #t #f)
-          #f))))
-
-
-(define impc:ti:check-for-vtypes
-  (lambda (ast)
-    (let* ((atypes (cdr (impc:ti:get-var-types ast)))
-           (types (map (lambda (v) (impc:ti:vtypes (cdr v))) atypes))
-           (rest (cl:remove #f types)))
-                                        ;(println 'atypes: atypes 'types: types 'rest: rest)
-      (if (> (length rest) 0) #t #f))))
-
-(define impc:ti:force-vtypes
-  (lambda (ast)
-    (replace-all ast '((y:num . y:double)))))
-
-
-
-(define impc:ti:vtype-transforms
-  (lambda (name ast)
-    (if (symbol? name) (set! name (symbol->string name)))
-    (let* ((stripped (impc:ti:get-var-types ast))
-           (args (cadr (caddr (car stripped))))
-           (atypes (reverse (cdr stripped))) ;; statically bound types
-           (tvar-lists (map (lambda (v) (impc:ti:vtypes (cdr v))) atypes))
-           (tlists (cl:remove #f tvar-lists))
-           (combinations (if (= (length tlists) 1)
-                             (map (lambda (x) (list x)) (car tlists))
-                             (apply multi-list-combination tlists)))
-           (fixedtype-lists (map (lambda (comb)
-                                   (map (lambda (at c)
-                                          (let ((findstr (string-append (symbol->string (car at))
-                                                                        ":"
-                                                                        (symbol->string (cdr at))))
-                                                (replacestr (string-append (symbol->string (car at))
-                                                                           ":"
-                                                                           (symbol->string c))))
-                                            (cons (string->symbol findstr)
-                                                  (string->symbol replacestr))))
-                                        atypes
-                                        comb))
-                                 combinations))
-           (fixedtype-lists2 (map (lambda (comb)
-                                    (map (lambda (at c)
-                                           (let ((findstr (string-append ":" (symbol->string (cdr at))))
-                                                 (replacestr (impc:ir:get-base-type (symbol->string c))))
-                                             (cons (string->symbol findstr)
-                                                   (string->symbol replacestr))))
-                                         atypes
-                                         comb))
-                                  combinations))
-           (newnames (map (lambda (r)
-                            (let* ((ctype (cname_encode (apply string-append
-                                                               (map (lambda (t)
-                                                                      (symbol->string t))
-                                                                    r))))
-                                   (name:type (string-append name "_poly_" ctype)))
-                              (cons (string->symbol name) (string->symbol name:type))))
-                          combinations)))
-      (list (map (lambda (n) (cdr n)) newnames)
-            (map (lambda (n r r2)
-                                        ;(println '-> (cons n (append r r2)))
-                   (replace-all (cl:copy-list ast) (cons n (append r r2))))
-                 newnames
-                 fixedtype-lists
-                 fixedtype-lists2)))))
-
-
-(define impc:ti:parametric-poly-pass
-  (lambda (ast)
-    ;; (println 'impc:ti:parametric-poly-pass ast)
-    (if (not (impc:ti:check-for-vtypes ast))
-        (eval ast (interaction-environment)) ;; if not generic func compile normally
-        (let* ((storeprint print) ;; set print to nothing but store original as storeprint
-               (name (cadr ast)) ;; otherwise compile all required templates
-               (dat (impc:ti:vtype-transforms name ast))
-               (_ (set! print (lambda args (storeprint "")))) ;;setting print to suppress compiler output
-               (res (map (lambda (fname nast)
-                                        ;(println 'fname: fname)
-                           (let ((val (call/cc (lambda (k)
-                                                 (set! print-error (lambda args
-                                                                     ;; (println "andrew world")
-                                                                     ;;(apply pprint-error args)
-                                                                     (k #f)))
-                                                 #t))))
-                                        ;(println 'bingo: val 'fname: fname)
-                             (if (equal? val #t)
-                                 (let* ((rr (eval nast (interaction-environment)))
-                                        (strtype (impc:ti:get-closure-or-nativefunc-type (symbol->string fname)))
-                                        (type (impc:ir:get-type-from-pretty-str strtype)))
-                                   (and type
-                                        (begin
-                                          (eval `(bind-poly ,name ,fname ,(string->symbol strtype))
-                                                (interaction-environment))
-                                          type))))))
-                         (car dat)
-                         (cadr dat))))
-          ;; restore print-error and print
-          (set! print-error (lambda args (apply pprint-error args) (throw "")))
-          (set! print storeprint)
-          (print)
-          (if (> (length (cl:remove '() (cl:remove #f res))) 0)
-              (begin
-                (print "Compiled generic function")
-                (print-with-colors 'green 'default #t name)
-                (print-with-colors 'blue 'default #t
-                                   (for-each (lambda (k)
-                                               (print " " (impc:ir:pretty-print-type k)))
-                                             (cl:remove '() (cl:remove #f res))))
-                #t)
-              (begin (impc:compiler:print-no-valid-forms-for-generic-error name)
-                     #f))))))
-
-
-
 ;;
 ;; TRANSFORM CODE
 ;;
@@ -8018,14 +7872,15 @@
                       (impc:ti:set-closure-docstring func-name docstring)
                       (impc:ti:set-closure-body func-name closure-body))
                     (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
-                `(impc:ti:parametric-poly-pass '(definec ,@args)))))
+                `(eval '(definec ,@args) (interaction-environment)))))
         (begin
           (if (impc:ti:closure-exists? func-name)
               (begin
                 (impc:ti:set-closure-docstring func-name docstring)
                 (impc:ti:set-closure-body func-name closure-body))
               (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
-          `(impc:ti:parametric-poly-pass '(definec ,@args))))))
+          `(eval '(definec ,@args) (interaction-environment))))))
+
 
 (impc:ti:register-new-builtin
  "bind-func"
