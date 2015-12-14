@@ -5748,20 +5748,6 @@
               (list (impc:ir:pointer-- (car a))))))))
 
 
-
-;; make should be of the form
-;; (make type)
-;; where type is a valid type
-;; (make i64)
-;; memory is allocated on the head
-(define impc:ti:heap-alloc-check
-  (lambda (ast vars kts request?)
-    ;; make should return a ptr to type a
-    (let ((a (impc:ir:convert-from-pretty-types (if (< (length ast) 3) (cadr ast) (caddr ast)))))
-      ;; returns a pointer of tuple type 'a'
-      (if (null? a) a
-          (impc:ir:pointer++ a)))))
-
 ;; make should be of the form
 ;; (halloc type)
 ;; where type is a valid type
@@ -5769,22 +5755,11 @@
 ;; memory is allocated on the head
 (define impc:ti:heap-alloc-check
   (lambda (ast vars kts request?)
+    (if (and request?
+             (not (impc:ir:pointer? request?)))
+        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))     
     request?))
 
-
-;; make should be of the form
-;; (make type)
-;; where type is a valid type
-;; (make i64)
-;; memory is allocated on the head
-(define impc:ti:zone-alloc-check
-  (lambda (ast vars kts request?)
-    ;; make should return a ptr to type a
-    (let ((a (impc:ir:convert-from-pretty-types (if (< (length ast) 3) (cadr ast) (caddr ast)))))
-                                        ;(println 'zone-alloc-check 'a: a 'request: request?)
-      ;; returns a pointer of tuple type 'a'
-      (if (null? a) a
-          (impc:ir:pointer++ a)))))
 
 ;; make should be of the form
 ;; (alloc type)
@@ -5793,21 +5768,11 @@
 ;; memory is allocated on the head
 (define impc:ti:zone-alloc-check
   (lambda (ast vars kts request?)
+    (if (and request?
+             (not (impc:ir:pointer? request?)))
+        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast)) 
     request?))
 
-
-;; make should be of the form
-;; (make type)
-;; where type is a valid type
-;; (make i64)
-;; memory is allocated on the stack
-(define impc:ti:stack-alloc-check
-  (lambda (ast vars kts request?)
-    ;; alloc should return a ptr to type a
-    (let ((a (impc:ir:convert-from-pretty-types (if (< (length ast) 3) (cadr ast) (caddr ast)))))
-      ;; returns a pointer of tuple type 'a'
-      (if (null? a) a
-          (impc:ir:pointer++ a)))))
 
 
 ;; make should be of the form
@@ -5817,6 +5782,9 @@
 ;; memory is allocated on the head
 (define impc:ti:stack-alloc-check
   (lambda (ast vars kts request?)
+    (if (and request?
+             (not (impc:ir:pointer? request?)))
+        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))     
     request?))
 
 
