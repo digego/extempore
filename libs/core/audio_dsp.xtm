@@ -2041,6 +2041,9 @@ but v1 and v2 can be computed in parallel"
 ;; an accumulative adsr (random access not allowed! time must be linear).
 (bind-func adsr_accum_c
   (lambda (start_time:i64 atk_dur:i64 dky_dur:i64 sus_dur:i64 rel_dur:i64 peak_amp:SAMPLE sus_amp:SAMPLE)
+    (if (or (= atk_dur 0) (= dky_dur 0))
+        (begin (set! dky_dur 0)
+               (set! peak_amp sus_amp)))
     (let ((val:SAMPLE (if (> (+ atk_dur dky_dur) 1) 0.0 peak_amp))
           (t1 (+ atk_dur start_time))
           (t2 (+ atk_dur dky_dur start_time))
