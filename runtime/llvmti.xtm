@@ -7038,6 +7038,8 @@
                ast))
           ((pair? ast)
            (cond ((equal? (car ast) 'if)
+                  (if (or (< (length ast) 3) (> (length ast) 4))
+                      (impc:compiler:print-compiler-error "Badly formed conditional" ast))
                   ;; if statement need special syntax adjustments for returns
                   (append (if blocked? (list 'if) (list 'ifret)) (list (cadr ast))
                           (list (impc:ti:mark-returns (caddr ast) name in-body? last-pair? blocked?))
