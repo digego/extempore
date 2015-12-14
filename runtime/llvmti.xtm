@@ -32,6 +32,11 @@
 ;; POSSIBILITY OF SUCH DAMAGE.
 ;;
 
+;; A windows allocation bug that I can't track down yet!
+(define *WINDOWS_ALLOC_BUG* (if (and (string=? (sys:platform) "Windows")
+                                     (not (sys:mcjit-enabled)))
+                                #t #f))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; flags for printing debug info ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -64,8 +69,559 @@
 (define *impc:compiler:message:level* 'high)
 (define *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)
 
+(define suppress-compiler-messages
+  (lambda (bool)
+    (if bool
+        (set! *impc:compiler:message:level* 'low)
+        (set! *impc:compiler:message:level* 'high))))
+
+(define-macro (sys:with-quiet-compiler . form)
+  `(let ((msglvl *impc:compiler:message:level*))
+     (set! *impc:compiler:message:level* 'low)
+     (let ((res (catch #f ,@form)))
+       (set! *impc:compiler:message:level* msglvl)
+       res)))
+
+(define-macro (sys:with-noisy-compiler . form)
+  `(let ((msglvl *impc:compiler:message:level*))
+     (set! *impc:compiler:message:level* 'high)
+     (let ((res (catch #f ,@form)))
+       (set! *impc:compiler:message:level* msglvl)
+       res)))
+
 (define *impc:alphabetlist* '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
 (define *impc:alphabetidxlist* '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
+
+;;;;;;;;;;;;;;;;
+;; type enums ;;
+;;;;;;;;;;;;;;;;
+
+;; MAKE SURE SIGNED VERSIONS ARE
+;; LOWER THAN UNSIGNED VERSIONS
+;; i.e. si64 should be lower than ui64
+;;
+(define *impc:ir:notype* -3) ;; no type!
+(define *impc:ir:badtype* -2)
+(define *impc:ir:void* -1)
+(define *impc:ir:fp64* 0)
+(define *impc:ir:double* 0)
+(define *impc:ir:fp32* 1)
+(define *impc:ir:float* 1)
+(define *impc:ir:si64* 2)
+(define *impc:ir:ui64* 3)
+(define *impc:ir:si32* 4)
+(define *impc:ir:ui32* 5)
+(define *impc:ir:si16* 6)
+(define *impc:ir:ui16* 7)
+(define *impc:ir:si8* 8)
+(define *impc:ir:ui8* 9)
+(define *impc:ir:i1* 10)
+(define *impc:ir:char* 11)
+(define *impc:ir:null* 12)
+(define *impc:ir:closure* 13)
+(define *impc:ir:tuple* 14)
+(define *impc:ir:array* 15)
+(define *impc:ir:vector* 16)
+;; this should be incremented to represent the lowest native type
+(define *impc:ir:lowest-base-type* 17)
+
+;; and a non-type
+(define *impc:ir:other* 1000)
+
+;; pointer offset
+(define *impc:ir:pointer* 100)
+
+;;
+;; global string constant cnt
+;;
+;; This WILL cause problems when
+;; doing multi-core compilation
+;;
+(define *impc:ir:gstrcnt* 0)
+
+;; local stack vars
+;;
+;; This is to hold local stack
+;; allocations for if statements
+;; These get promoted to the
+;; top of the closure to avoid
+;; excessive stack allocation
+;; in loops etc..
+;;
+(define *impc:ir:ls_var* '())
+
+;; a list of currently valid local symbols!
+;; NOT including global symbols
+(define *impc:ir:sym-name-stack* '())
+
+;; type of size_t on platform
+(define *impc:ir:size_t_str* (if (= 64 (sys:pointer-size)) "i64" "i32"))
+;; pointer size in bytes (as a string)
+(define *impc:ir:pointer_size_bytes_str* (if (= 64 (sys:pointer-size)) "8" "4"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Compiler error printing
+
+(define *impc:compiler:pretty-print-name-color* 'green)
+(define *impc:compiler:pretty-print-type-color* 'yellow)
+(define *impc:compiler:pretty-print-error-color* 'red)
+(define *impc:compiler:pretty-print-code-color* 'blue)
+
+(define impc:compiler:print-double-colon-error
+  (lambda (var)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
+    (print " double colon error for ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print var "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-bad-type-error
+  (lambda (type . message)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " bad type ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type))
+    (if (not (null? message))
+        (print " " (car message)))
+    (println)
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-bad-numeric-value-error
+  (lambda (value expected-type)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " bad numeric value ")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print value))
+    (print ", should be ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print expected-type "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-bad-type-error-with-ast
+  (lambda (type message ast)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " bad type ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type))
+    (print " " message " ")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-badly-formed-expression-error
+  (lambda (expr-type ast)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
+    (print " badly formed ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print expr-type))
+    (print " expression:\n")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-index-oob-error
+  (lambda (type ast)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
+    (print " ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print type))
+    (print " index out of bounds: ")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-cannot-expand-non-generic-error
+  (lambda (name)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Generics Error"))
+    (print " cannot expand on non-generic ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print name "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-expansion-arity-error
+  (lambda (before after)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Generics Error"))
+    (print " expansion arity error ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print before))
+    (print " -> ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print after "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-no-valid-forms-for-generic-error
+  (lambda (name)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Generics Error"))
+    (print " cannot find any valid forms for generic function ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print name "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-shadow-var-error
+  (lambda (name)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
+    (print " cannot define ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
+    (print " as a shadow variable\n")
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-already-bound-error
+  (lambda (name type)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error "))
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name))
+    (print " already bound as ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-no-redefinitions-error
+  (lambda (name oldtype newtype)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
+    (print " cannot redefine or overload the type signature of existing functions.  In this case, ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name)) (print " from ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print oldtype)) (print " to ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print newtype "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-bad-arity-error
+  (lambda (ast)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
+    (print " bad arity in expression:\n")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-no-retval-error
+  (lambda (ast)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
+    (print " no return value for body: ")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-needs-zone-size-error
+  (lambda (expr-name)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
+    (print " ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print expr-name))
+    (print " requires a zone size as its first argument\n")
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-needs-zone-delay-error
+  (lambda (expr-name)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Syntax Error"))
+    (print " ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print expr-name))
+    (print " requires an ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print "i64"))
+    (print " delay as its second argument\n")
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-variable-not-marked-as-free-error
+  (lambda (vs)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " variable " )
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print vs))
+    (print " not marked as free - check the variable name in the polytype\n")
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define *impc:compiler:top-level-generic-error* #f)
+
+(define impc:compiler:print-type-mismatch-error
+  (lambda (got expected . name)
+    (if *impc:compiler:top-level-generic-error*
+        (begin
+          (set! name (list (car *impc:compiler:top-level-generic-error*)))))
+    (if (and (not (null? name))
+             (list? (car name))
+             (symbol? (caar name)))
+        (set! name (list (car (regex:type-split (symbol->string (caar name)) "_poly_")))))
+
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+
+    (if (not (null? name))
+        (begin (print " in ")
+               (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
+                                  (print  (car name)))
+               (print ",")))
+    (print " got " )
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f
+                       (print (impc:ir:pretty-print-type got))) ;;(if (impc:ir:type? got) (impc:ir:get-type-from-str got) got))))
+    (print ", was expecting ")
+    (if (and (list? expected)
+             (= 1 (length expected)))
+        (set! expected (car expected)))
+
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f
+                       (print (impc:ir:pretty-print-type expected) "\n"))
+
+    (if *impc:compiler:top-level-generic-error*
+        (set! *impc:compiler:top-level-generic-error* #f))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+
+(define impc:compiler:print-type-conflict-error
+  (lambda (type1 type2 ast)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " conflicting " )
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type1))
+    (print " with ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type2))
+    (if *impc:compiler:top-level-generic-error*
+        (begin
+          (print " calling ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #f
+                             (print (car *impc:compiler:top-level-generic-error*)))
+          (print "\n")
+          (set! *impc:compiler:top-level-generic-error* #f))
+        (begin
+          (print " in ")
+          (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-if-type-conflict-error
+  (lambda (then else)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " type conflict between " )
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print "then"))
+    (print " (")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print then))
+    (print ") and ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print "else"))
+    (print " (")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print else))
+    (print ") branch of " )
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print  "if"))
+    (print " statement\n")
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-unsupported-conversion-error
+  (lambda (from to)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " unsupported conversion from " )
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (if (number? from) (impc:ir:get-type-str from) from)))
+    (print " to ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (if (number? to) (impc:ir:get-type-str to) to) "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-could-not-resolve-type-error
+  (lambda (types . message)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (if (list? types)
+        (print " couldn't resolve types: ")
+        (print " couldn't resolve type: "))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print types))
+    (if (not (null? message))
+        (print " " (car message)))
+    (println)
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-could-not-resolve-generic-type-error
+  (lambda (types ast)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (if (list? types)
+        (print " couldn't resolve generic types: ")
+        (print " couldn't resolve generic type: "))
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print types))
+    (print " ")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print ast "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-missing-identifier-error
+  (lambda (name type)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
+    (print " cannot find" type "")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-missing-generic-type-error
+  (lambda (type-name)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " cannot find generic type ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type-name "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-not-during-aot-error
+  (lambda (message)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
+    (print " cannot access LLVM during AOT-compilation.")
+    (println)
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-compiler-error
+  (lambda (message . ast)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Error"))
+    (print " " message)
+    (if (not (null? ast))
+        (begin (print " ast: ")
+               (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f
+                                  (print (car ast)))))
+    (println)
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-compiler-warning
+  (lambda (message . ast)
+    (print-with-colors *impc:compiler:pretty-print-type-color*
+                       'default #t (print "Compiler Warning"))
+    (print " " message)
+    (if (not (null? ast))
+        (begin (print " ast: ")
+               (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f
+                                  (print (car ast)))))
+    (println)
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+(define impc:compiler:print-compiler-failed-error
+  (lambda ()
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Compiler Failed."))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
+
+(define impc:compiler:print-binding-details-to-log
+  (lambda (lead-string symname type)
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print lead-string " ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
+          (print " >>> ")
+          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
+          (println)))))
+
+(define impc:compiler:print-bind-func-details-to-log
+  (lambda (lead-string symname type zone-size)
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print lead-string " ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
+          (print " >>> ")
+          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
+          (print " zone size: ")
+          (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f
+                             (print zone-size))
+          (if (= zone-size *impc:default-zone-size*)
+              (print " (default)"))
+          (println)))))
+
+(define impc:compiler:print-lib-binding-details-to-log
+  (lambda (libname symname type)
+    ;; don't write the header stuff for other AOT-compiled xtm libs -
+    ;; assume a header file already exists in that case
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print "LibBound:  ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
+          (print " >>> ")
+          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
+          (print  " bound from ")
+          (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f  (print libname))
+          (println)))))
+
+(define impc:compiler:print-polying-details-to-log
+  (lambda (lead-string poly-name native-name type)
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print lead-string " ")
+          (print-with-colors *impc:compiler:pretty-print-name-color*
+                             'default #t (print poly-name))
+          (print " with ")
+          (print-with-colors *impc:compiler:pretty-print-name-color*
+                             'default #t (print native-name))
+          (print " >>> ")
+          (print-with-colors *impc:compiler:pretty-print-type-color*
+                             'default #f  (print type))
+          (println)))))
+
+(define impc:compiler:print-dylib-loading-details-to-log
+  (lambda (dylib-path)
+    (let* ((basename (car (reverse (regex:split dylib-path "/"))))
+           (libname (car (regex:split basename "[.]"))))
+      (if (equal? *impc:compiler:message:level* 'high)
+          (begin
+            (print "Lib Load:  ")
+            (print-with-colors *impc:compiler:pretty-print-name-color*
+                               'default #t (print libname))
+            (print " dynamic library loaded from ")
+            (print-with-colors *impc:compiler:pretty-print-code-color*
+                               'default #t (print dylib-path))
+            (println))))))
+
+(define impc:compiler:print-no-scheme-stub-notification
+  (lambda (symname)
+    (if (equal? *impc:compiler:message:level* 'high)
+        (begin
+          (print "There is no ")
+          (print-with-colors 'cyan 'default #t (print  "scheme stub"))
+          (print " available for ")
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname "\n"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; GLOBAL XTLANG CACHE ;;
@@ -348,6 +904,96 @@
   (lambda (typealias-name docstring)
     (let ((typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
       (if typealias-data (vector-set! (cdr typealias-data) 1 docstring) #f))))
+
+;;;;;;;;;;;;;;;
+;; type aliases
+;; ------------
+;;
+(define *impc:ti:xtmacro-cache* '())
+;;
+;; each element of the list is of the form
+;;
+;; (name . #(type-alias docstring))
+
+(define impc:ti:print-xtmacro-cache
+  (lambda ()
+    (println '*impc:ti:xtmacro-cache*: *impc:ti:xtmacro-cache*)))
+
+(define impc:ti:reset-xtmacro-cache
+  (lambda ()
+    (set! *impc:ti:xtmacro-cache* '())))
+
+(define impc:ti:get-xtmacro-type
+  (lambda (xtmacro-name)
+    (if (string? xtmacro-name)
+        (let ((ptr-depth (impc:ir:get-ptr-depth xtmacro-name))
+              (xtmacro-data (assoc-strcmp (impc:ir:clean-named-type xtmacro-name) *impc:ti:xtmacro-cache*)))
+          (if xtmacro-data (impc:ir:pointer++ (vector-ref (cdr xtmacro-data) 0) ptr-depth) #f))
+        #f)))
+
+;; as above but returns pretty type
+(define impc:ti:get-xtmacro-type-pretty
+  (lambda (xtmacro-name)
+    (if (string? xtmacro-name)
+        (let ((ptr-depth (impc:ir:get-ptr-depth xtmacro-name))
+              (xtmacro-data (assoc-strcmp (impc:ir:clean-named-type xtmacro-name) *impc:ti:xtmacro-cache*)))
+          (if xtmacro-data (impc:ir:pretty-print-type (impc:ir:pointer++ (vector-ref (cdr xtmacro-data) 0) ptr-depth))
+              #f))
+        #f)))
+
+(define impc:ti:xtmacro-exists?
+  (lambda (xtmacro-name)
+    (let ((res (impc:ti:get-xtmacro-type xtmacro-name)))
+      (if (and res (not (null? res))) #t #f))))
+
+;; this one will recursively keep following aliases until it reaches
+;; the "ground" type
+(define impc:ti:get-xtmacro-ground-type
+  (lambda (xtmacro-name)
+    (let loop ((lowered-alias (impc:ti:get-xtmacro-type xtmacro-name)))
+      (if (and lowered-alias (string? lowered-alias))
+          (loop (impc:ti:get-xtmacro-type lowered-alias))
+          lowered-alias))))
+
+;; as above but returns pretty print
+(define impc:ti:get-xtmacro-ground-type-pretty
+  (lambda (xtmacro-name)
+    (let loop ((lowered-alias (impc:ti:get-xtmacro-type xtmacro-name)))
+      (if (and lowered-alias (string? lowered-alias))
+          (loop (impc:ti:get-xtmacro-type lowered-alias))
+          (impc:ir:pretty-print-type lowered-alias)))))
+
+(define impc:ti:register-new-xtmacro
+  (lambda (xtmacro-name type docstring)
+    ;; (println 'xtmacro-name: xtmacro-name 'type: type 'docstring: docstring)
+    (if (impc:ti:xtmacro-exists? xtmacro-name)
+        (impc:compiler:print-already-bound-error xtmacro-name (impc:ir:pretty-print-type type))
+        ;; check arg types
+        (if (not (and (or (string? xtmacro-name) (begin (println 'bad 'xtmacro-name: xtmacro-name) #f))
+                      (or (list? type)
+                          (integer? type)
+                          (and (string? type)
+                               (impc:ti:namedtype-exists? type))
+                          (begin (println 'bad 'type: type) #f))
+                      (or (string? docstring) (begin (println 'bad 'doctstring: docstring) #f))))
+            (impc:compiler:print-compiler-error "couldn't register new type alias")
+            (begin
+              ;; add to the AOT-header if we're precompiling
+              (set! *impc:ti:xtmacro-cache*
+                    (cons (cons xtmacro-name (vector type docstring))
+                          *impc:ti:xtmacro-cache*))
+              (car *impc:ti:xtmacro-cache*)
+              (impc:aot:insert-xtmacro-binding-details xtmacro-name type docstring))))))
+
+(define impc:ti:get-xtmacro-docstring
+  (lambda (xtmacro-name)
+    (let ((xtmacro-data (assoc-strcmp (impc:ir:clean-named-type xtmacro-name) *impc:ti:xtmacro-cache*)))
+      (if xtmacro-data (vector-ref (cdr xtmacro-data) 1) #f))))
+
+(define impc:ti:set-xtmacro-docstring
+  (lambda (xtmacro-name docstring)
+    (let ((xtmacro-data (assoc-strcmp (impc:ir:clean-named-type xtmacro-name) *impc:ti:xtmacro-cache*)))
+      (if xtmacro-data (vector-set! (cdr xtmacro-data) 1 docstring) #f))))
 
 ;;;;;;;;;;;
 ;; closures
@@ -2139,27 +2785,6 @@
                              (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
                              (if exit-afterwards? (quit 2)))))))))))
 
-
-
-(define suppress-compiler-messages
-  (lambda (bool)
-    (if bool
-        (set! *impc:compiler:message:level* 'low)
-        (set! *impc:compiler:message:level* 'high))))
-
-(define-macro (sys:with-quiet-compiler . form)
-  `(let ((msglvl *impc:compiler:message:level*))
-     (set! *impc:compiler:message:level* 'low)
-     (let ((res (catch #f ,@form)))
-       (set! *impc:compiler:message:level* msglvl)
-       res)))
-
-(define-macro (sys:with-noisy-compiler . form)
-  `(let ((msglvl *impc:compiler:message:level*))
-     (set! *impc:compiler:message:level* 'high)
-     (let ((res (catch #f ,@form)))
-       (set! *impc:compiler:message:level* msglvl)
-       res)))
 
 (define icr:new-zone
   (lambda args

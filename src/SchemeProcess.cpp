@@ -557,8 +557,8 @@ namespace extemp {
     while(!scm->getRunning()) {}
 
     scm->loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
-    scm->loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
     scm->loadFile("runtime/llvmti.xtm", UNIV::SHARE_DIR);
+    scm->loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
 
     scm->setLoadedLibs(true);
 #ifdef _WIN32
