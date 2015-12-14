@@ -2841,11 +2841,16 @@
 ;; This to auto surround dotimes with a let
 (define impc:ti:doloop
   (lambda (ast inbody?)
+    ;; (println 'doloop 'ast: ast)
     (let* ((pair (regex:type-split (symbol->string (caadr ast)) ":"))
            (sym (string->symbol (car pair))))
       `(let ((,(caadr ast) (bitconvert 0)))
          (begin
-           (dotimes (,sym ,(impc:ti:first-transform (cadr (cadr ast)) inbody?))
+           (dotimes
+               ,(if (null? (cddr (cadr ast)))
+                    `(,sym ,(impc:ti:first-transform (cadr (cadr ast)) inbody?))
+                    `(,sym ,(impc:ti:first-transform (cadr (cadr ast)) inbody?)
+                           ,(impc:ti:first-transform (caddr (cadr ast)) inbody?)))
              (begin ,@(impc:ti:first-transform (cddr ast) inbody?))))))))
 
 (define impc:ti:dotimes
