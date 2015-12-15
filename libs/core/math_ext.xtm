@@ -201,8 +201,36 @@
         (pset! mdat2 i (* s (pref mdat1 i))))
       (Matrix mdat2 (tref m1 1) (tref m1 2) (tref m1 3)))))
 
-(impc:aot:do-or-emit
- (sys:load "libs/core/math_ext-scm.xtm"))
+(bind-macro (Vec . args)
+  "convenience macro for Vector creation"
+  (let ((l (length args))
+        (int? (if (integer? (car args)) #t #f))
+        (ary 'impgenvec9217928))
+    `(let ((,(string->symbol
+              (string-append (symbol->string ary)
+                             (if int? ":i64*" ":double*")))
+             (alloc ,l)))
+       (pfill! ,ary ,@args)
+       (Vector ,ary ,l))))
+
+(bind-macro (Mat . args)
+  "convenience macro for Matrix creation"
+  (let ((rows (length args))
+        (a2 (reverse args))
+        (cols (length (car args)))
+        (int? (if (integer? (caar args)) #t #f))
+        (ary 'impgenmat9217928)
+        (biglst '()))
+    (dotimes (i rows)
+      (set! biglst (append (list-ref a2 i) biglst))
+      (if (<> (length (list-ref args i)) cols)
+          (print-error "Bad Matrix - column length mismatch")))
+    `(let ((,(string->symbol
+              (string-append (symbol->string ary)
+                             (if int? ":i64*" ":double*")))
+             (alloc ,(* rows cols))))
+       (pfill! ,ary ,@biglst)
+       (Matrix ,ary ,rows ,cols #f))))
 
 (define *xtmlib-math_ext-loaded* #t)
 
