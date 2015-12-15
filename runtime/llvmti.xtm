@@ -3297,21 +3297,6 @@
                  (cdr ast)
                  (make-list-with-proc (length ast) (lambda (i) i))))))
 
-(bind-macro (tbind data . args)
-  "simple tuple binding
-
-(let ((tuple:<i32,double,i32,i64>* (alloc))
-      ((var1 0) (var2 0.0)))
-  (tbind tuple _ var2 _ var1)
-
-  would match var2 to the double, and var1 to the i64"
-  (cons 'begin
-        (map (lambda (x n)
-               (if (not (eq? x '_))
-                   `(set! ,x (tref ,data ,n))))
-             args
-             (make-list-with-proc (length args) (lambda (i) (real->integer i))))))
-
 (define *xtm_mz_num* 0)
 
 (define impc:ti:check-memzone-void?
@@ -9125,11 +9110,6 @@
     (if (impc:aot:currently-compiling?)
         (impc:compiler:print-not-during-aot-error)
         (llvm:get-function-pointer (string-append name "_native")))))
-
-;; the same functionality, but for use in xtlang code
-(bind-macro (get_native_fptr closure-name)
-  "return native function pointer for closure"
-  `(llvm_get_function_ptr ,(string-append (symbol->string closure-name) "_native")))
 
 ;; Wrap a native, bound C function, allowing it to be called from scheme
 (define-macro (bind-wrapper local-sym native-sym)
