@@ -198,6 +198,41 @@
   "return native function pointer for closure"
   `(llvm_get_function_ptr ,(string-append (symbol->string closure-name) "_native")))
 
+
+(bind-macro (-> value . args)
+  "a \"thread-first\" macro
+
+This macro can help make code more readable by removing nesting.
+Threads the first expr passed to the macro into the first position in
+the second sexp. Recursively continues to thread the resultant sexp
+into any further sexp arguments."
+  (if (null? args)
+      value
+      (let loop ((thread-items args)
+                 (transformed value))
+        (if (null? thread-items)
+            transformed
+            (loop 
+             (cdr thread-items)
+             (insert-at-index 1 (car thread-items) transformed))))))
+
+(bind-macro (->> value . args)
+  "a \"thread-last\" macro
+
+This macro can help make code more readable by removing nesting.
+Threads the first expr passed to the macro into the last position in
+the second sexp. Recursively continues to thread the resultant sexp
+into any further sexp arguments."
+  (if (null? args)
+      value
+      (let loop ((thread-items args)
+                 (transformed value))
+        (if (null? thread-items)
+            transformed
+            (loop 
+             (cdr thread-items)
+             (insert-at-index (length (car thread-items)) (car thread-items) transformed))))))
+
 ;;;;;;;;;;;;
 ;; random ;;
 ;;;;;;;;;;;;

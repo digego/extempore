@@ -1081,6 +1081,40 @@
         (inc x 10))))
  (test_inc_macro) 13)
 
+(xtmtest '(bind-func test_thread_first1
+            (lambda ()
+              (-> "this string is 33 characters long"
+                  (strlen)
+                  )))
+         (test_thread_first1) 33)
+
+(xtmtest '(bind-func test_thread_first2
+            (lambda ()
+              (-> 1
+                  (+ 2)
+                  (* 2)
+                  (modulo 2)
+                  )))
+         (test_thread_first2) 0)
+
+(xtmtest '(bind-func test_thread_last1
+            (lambda ()
+              (->> (list 1 2 3)
+                   (map (lambda (x) (+ x 1)))
+                   (filter (lambda (x) (= (modulo x 2) 0)))
+                   (car)
+                   )))
+         (test_thread_last1) 2)
+
+(xtmtest '(bind-func test_thread_last2
+            (lambda ()
+              (->> 1
+                  (+ 2)
+                  (* 2)
+                  (modulo 2)
+                  )))
+         (test_thread_last2) 2)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; syntax highlighting tests ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
