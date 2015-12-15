@@ -11,7 +11,7 @@ esac
 # to override this list, call this script with:
 # AOT_LIBS="libs/core/foo.xtm libs/external/bar.xtm" ./compile-stdlib.sh
 : ${AOT_LIBS:="\
-libs/core/std.xtm \
+libs/base/base.xtm \
 libs/core/math.xtm \
 libs/core/audio_dsp.xtm \
 libs/core/instruments.xtm \

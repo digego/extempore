@@ -545,35 +545,35 @@ else(WIN32)
 
   # core
   add_custom_target(aot)
-  aotcompile_lib(libs/core/std.xtm aot 17099) # no lib dependency for std.xtm
-  aotcompile_lib(libs/core/math.xtm aot 17097 std)
-  aotcompile_lib(libs/core/audio_dsp.xtm aot 17095 std math)
-  aotcompile_lib(libs/core/instruments.xtm aot 17093 std math audio_dsp)
+  aotcompile_lib(libs/base/base.xtm aot 17099) # no lib dependency base.xtm
+  aotcompile_lib(libs/core/math.xtm aot 17097 base)
+  aotcompile_lib(libs/core/audio_dsp.xtm aot 17095 base math)
+  aotcompile_lib(libs/core/instruments.xtm aot 17093 base math audio_dsp)
 
   # extended
   add_custom_target(aot_extended)
-  aotcompile_lib(libs/external/fft.xtm aot_extended 17091 std math)
-  aotcompile_lib(libs/external/sndfile.xtm aot_extended 17089 std)
-  aotcompile_lib(libs/core/audiobuffer.xtm aot_extended 17087 std audio_dsp sndfile)
-  aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended 17085 std fft sndfile)
-  aotcompile_lib(libs/external/instruments_ext.xtm aot_extended 17083 std sndfile instruments)
-  aotcompile_lib(libs/external/portmidi.xtm aot_extended 17081 std)
-  aotcompile_lib(libs/external/stb_image.xtm aot_extended 17077 std)
-  aotcompile_lib(libs/external/glfw3.xtm aot_extended 17075 std)
+  aotcompile_lib(libs/external/fft.xtm aot_extended 17091 base math)
+  aotcompile_lib(libs/external/sndfile.xtm aot_extended 17089 base)
+  aotcompile_lib(libs/core/audiobuffer.xtm aot_extended 17087 base audio_dsp sndfile)
+  aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended 17085 base fft sndfile)
+  aotcompile_lib(libs/external/instruments_ext.xtm aot_extended 17083 base sndfile instruments)
+  aotcompile_lib(libs/external/portmidi.xtm aot_extended 17081 base)
+  aotcompile_lib(libs/external/stb_image.xtm aot_extended 17077 base)
+  aotcompile_lib(libs/external/glfw3.xtm aot_extended 17075 base)
   if(WIN32)
     set(GL_BIND_METHOD getprocaddress)
   else()
     set(GL_BIND_METHOD directbind)
   endif()
-  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended 17073 std)
-  aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended 17071 std glcore-${GL_BIND_METHOD} stb_image)
-  aotcompile_lib(libs/external/nanovg.xtm aot_extended 17069 std glcore-${GL_BIND_METHOD})
-  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended 17067 std)
-  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended 17065 std glcompat-${GL_BIND_METHOD})
+  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended 17073 base)
+  aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended 17071 base glcore-${GL_BIND_METHOD} stb_image)
+  aotcompile_lib(libs/external/nanovg.xtm aot_extended 17069 base glcore-${GL_BIND_METHOD})
+  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended 17067 base)
+  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended 17065 base glcompat-${GL_BIND_METHOD})
   if(NOT WIN32)
     # these ones don't currently work on Windows
-    aotcompile_lib(libs/external/glib.xtm aot_extended 17079 std)
-    aotcompile_lib(libs/external/assimp.xtm aot_extended 17063 std stb_image graphics-pipeline)
+    aotcompile_lib(libs/external/glib.xtm aot_extended 17079 base)
+    aotcompile_lib(libs/external/assimp.xtm aot_extended 17063 base stb_image graphics-pipeline)
   endif()
 
 endif(WIN32)
@@ -594,7 +594,7 @@ add_custom_target(xtmdoc
   COMMAND ${CMAKE_INSTALL_PREFIX}/bin/extempore
            --runtime ${EXT_SHARE_DIR}
            --port 17095
-           --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/core/std.xtm\") (sys:load \"libs/external/fft.xtm\") (sys:load \"libs/external/gl.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/nanovg.xtm\") (sys:load \"libs/external/sndfile.xtm\") (sys:load \"libs/external/stb_image.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
+           --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/external/fft.xtm\") (sys:load \"libs/external/gl.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/nanovg.xtm\") (sys:load \"libs/external/sndfile.xtm\") (sys:load \"libs/external/stb_image.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
   COMMENT "Generating xtmdoc output in /tmp/xtmdoc.json"
   VERBATIM)
 
