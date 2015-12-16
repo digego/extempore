@@ -17,12 +17,13 @@
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 
 ;; lib assimp
-(define libhid
-  (let ((platform (sys:platform)))
-    (cond ((string=? platform "Linux") (sys:load-dylib "libhid.so"))
-          ((string=? platform "Windows") (sys:load-dylib "libhid.dll"))
-          ((string=? platform "OSX") (sys:load-dylib "libhid.dylib"))
-          (else (print "Unknown platform: " platform)))))
+(bind-dylib libhid
+  (cond ((string=? (sys:platform) "OSX")
+         "libhid.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libhid.so")
+        ((string=? (sys:platform) "Windows")
+         "libhid.dll")))
 
 (impc:aot:insert-header "xtmhid")
 

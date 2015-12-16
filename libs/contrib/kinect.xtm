@@ -10,11 +10,13 @@
 
 ;;; Code:
 
-(define kinectlib (if (string=? "Linux" (sys:platform))
-		       (println "Kinect Not Supported on Linux")
-		       (if (string=? "Windows" (sys:platform))
-			   (sys:load-dylib "kinectlib.dll")
-			   (println "Kinect not supported on OSX"))))
+(bind-dylib kinectlib
+  (cond ((string=? (sys:platform) "OSX")
+         (begin (println "Kinect Not Supported on Linux") #f))
+        ((string=? (sys:platform) "Linux")
+         (begin (println "Kinect Not Supported on Linux") #f))
+        ((string=? (sys:platform) "Windows")
+         "kinectlib.dll")))
 
 (bind-type Vector4 <float,float,float,float>)
 (bind-type NUI_SKELETON_DATA <i32,i32,i32,i32,Vector4,|20,Vector4|,|20,i32|,i32>)

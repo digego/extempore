@@ -2479,7 +2479,7 @@
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
-           (list 'define (car dylib-info-pair) (list 'sys:load-dylib (cdr dylib-info-pair)))
+           (list 'bind-dylib (car dylib-info-pair) (cdr dylib-info-pair))
            *impc:aot:current-output-port*)
           (write
            `(if (not ,(car dylib-info-pair))
@@ -2639,10 +2639,10 @@
                    *impc:aot:current-output-port*)
           (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
                    *impc:aot:current-output-port*)
-          (display (string-append "(define " libname " (sys:load-dylib \"" libname
-                                  (cond ((string=? (sys:platform) "Linux") ".so\"))\n")
-                                        ((string=? (sys:platform) "Windows") ".dll\"))\n")
-                                        ((string=? (sys:platform) "OSX") ".dylib\"))\n")))
+          (display (string-append "(bind-dylib " libname " \"" libname
+                                  (cond ((string=? (sys:platform) "Linux") ".so\")\n")
+                                        ((string=? (sys:platform) "Windows") ".dll\")\n")
+                                        ((string=? (sys:platform) "OSX") ".dylib\")\n")))
                    *impc:aot:current-output-port*)
           (write
            `(if (not ,(string->symbol libname))
@@ -8887,33 +8887,50 @@
  "bind a polymorphic symbol"
  '(poly-name closure-name optional-docstring))
 
-(define sys:load-dylib
-  (lambda (dylib-path)
-    (let ((dylib (or
-                  (sys:open-dylib (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" dylib-path)))
-                  (sys:open-dylib (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" dylib-path)))
-                  (sys:open-dylib dylib-path))))
-      (if dylib
+(define impc:ti:search-for-dylib
+  (lambda (path)
+    (let loop ((rel-paths
+                (list
+                 path
+                 (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" path)))
+                (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" path))))
+      (if (null? rel-paths)
+          #f
+          (let ((dylib (sys:open-dylib (car rel-paths))))
+            (if dylib
+                (cons dylib (car rel-paths))
+                (loop (cdr rel-paths))))))))
+
+(define impc:ti:bind-dylib
+  (lambda (library lib-paths)
+    (let ((dylib-pair
+           (let loop ((paths lib-paths))
+             (if (null? paths)
+                 #f
+                 (or (impc:ti:search-for-dylib (car paths))
+                     (loop (cdr paths)))))))
+      (if dylib-pair
           (begin
-            (impc:compiler:print-dylib-loading-details-to-log dylib-path)
-            dylib)
+            (eval (list 'define library (car dylib-pair))
+                  (interaction-environment))
+            (set! *impc:aot:current-load-dylib-info*
+                  (cons library (cdr dylib-pair)))
+            (impc:aot:insert-load-dylib-details *impc:aot:current-load-dylib-info*)
+            (impc:compiler:print-dylib-loading-details-to-log (cdr dylib-pair))
+            #t)
           (begin
             (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
                                (print "Error"))
             (print ": could not find ")
-            (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (print dylib-path))
+            (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (print library))
             (print " dynamic library\n")
             (error ""))))))
 
-(define-macro (bind-dylib lib-symbol lib-path)
-  `(let ((dylib (sys:load-dylib ,(eval lib-path))))
-     (if dylib
-         (begin
-           (eval (list 'define ',lib-symbol dylib)
-                 (interaction-environment))
-           (set! *impc:aot:current-load-dylib-info*
-                 (cons ',lib-symbol ,(eval lib-path)))
-           (impc:aot:insert-load-dylib-details *impc:aot:current-load-dylib-info*)))))
+(define-macro (bind-dylib library lib-path)
+  (let ((path (eval lib-path)))
+    (if (string? path)
+        (set! path (list path)))
+    `(impc:ti:bind-dylib ',library ',path)))
 
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
