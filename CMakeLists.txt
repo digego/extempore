@@ -591,7 +591,7 @@ add_custom_target(clean_aot
 ##########
 
 add_custom_target(xtmdoc
-  COMMAND ${CMAKE_INSTALL_PREFIX}/bin/extempore
+  COMMAND extempore
            --runtime ${EXT_SHARE_DIR}
            --port 17095
            --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/external/fft.xtm\") (sys:load \"libs/external/gl.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/nanovg.xtm\") (sys:load \"libs/external/sndfile.xtm\") (sys:load \"libs/external/stb_image.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
