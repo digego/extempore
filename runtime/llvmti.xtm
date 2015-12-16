@@ -2943,7 +2943,7 @@
     (map (lambda (t)
            (cons (car t) (impc:ti:expand-generic-type (cdr t)))) types)))
 
-(define impc:ti:simplify-generic-pretty-type
+(define impc:ti:simplify-genericfunc-pretty-type
   (lambda (pretty-type)
     (string-append
      "["
@@ -2956,6 +2956,20 @@
            (impc:ir:get-pretty-closure-arg-strings pretty-type))
       ",")
      "]*")))
+
+(define impc:ti:simplify-generictype-pretty-type
+  (lambda (pretty-type)
+    (string-append
+     "<"
+     (string-join
+      (map (lambda (x)
+             (if (regex:match? x ":")
+                 (impc:ir:pointer++ (car (regex:type-split x ":"))
+                                    (impc:ir:get-ptr-depth x))
+                 x))
+           (impc:ir:get-pretty-tuple-arg-strings pretty-type))
+      ",")
+     ">")))
 
 ;; this currently doesn't work for multiple "replace" instances
 ;; (define impc:ti:get-initial-generic-pretty-type
@@ -9390,7 +9404,7 @@
      '(category . "generic closure")
      (cons 'name (symbol->string name-sym))
      (cons 'args (xtmdoc-get-xtlang-genericfunc-args name-sym))
-     (cons 'type (impc:ti:simplify-generic-pretty-type
+     (cons 'type (impc:ti:simplify-genericfunc-pretty-type
                   (symbol->string (caddar (assoc-strcmp-all name-sym *impc:ti:genericfunc-cache*)))))
      (list 'docstring))))
 
@@ -9400,7 +9414,7 @@
      '(category . "generic type")
      (cons 'name (symbol->string name-sym))
      (list 'args)
-     (cons 'type (impc:ti:simplify-generic-pretty-type
+     (cons 'type (impc:ti:simplify-generictype-pretty-type
                   (symbol->string (impc:ti:get-generictype-candidate-types name-sym))))
      (list 'docstring))))
 
@@ -9520,22 +9534,22 @@
              (cons 'xtmdoc-docstring (xtmdoc-builtin-handler sym)))
             ((impc:ti:typealias-exists? name)
              (cons 'xtmdoc-docstring (xtmdoc-typealias-handler sym)))
-            ((impc:ti:polytype-exists? name)
-             (cons 'xtmdoc-docstring (xtmdoc-polytype-handler sym)))
-            ((impc:ti:namedtype-exists? name)
-             (cons 'xtmdoc-docstring (xtmdoc-namedtype-handler sym)))
-            ((impc:ti:generictype-exists? name)
-             (cons 'xtmdoc-docstring (xtmdoc-generictype-handler sym)))
+            ((impc:ti:genericfunc-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-genericfunc-handler sym)))
             ((impc:ti:polyfunc-exists? name)
              (cons 'xtmdoc-docstring (xtmdoc-polyfunc-handler sym)))
             ((impc:ti:closure-exists? name)
              (cons 'xtmdoc-docstring (xtmdoc-closure-handler sym)))
             ((impc:ti:nativefunc-exists? name)
              (cons 'xtmdoc-docstring (xtmdoc-nativefunc-handler sym)))
-            ((impc:ti:genericfunc-exists? name)
-             (cons 'xtmdoc-docstring (xtmdoc-genericfunc-handler sym)))
             ((impc:ti:globalvar-exists? name)
              (cons 'xtmdoc-docstring (xtmdoc-globalvar-handler sym)))
+            ((impc:ti:generictype-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-generictype-handler sym)))
+            ((impc:ti:polytype-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-polytype-handler sym)))
+            ((impc:ti:namedtype-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-namedtype-handler sym)))
             ((and (defined? sym) (closure? (eval sym)))
              (cons 'xtmdoc-docstring (xtmdoc-scheme-function-handler sym)))
             ((and (defined? sym) (macro? (eval sym)))
