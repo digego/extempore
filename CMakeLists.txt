@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
 
-project(Extempore VERSION 0.6.0)
-
 option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
@@ -9,6 +7,14 @@ option(ASIO "use the ASIO Portaudio backend" OFF)
 option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
 
+# this needs to be set before project() is called
+if(PACKAGE)
+  set(CMAKE_OSX_SYSROOT macosx)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)
+  message(STATUS "Building Extempore for binary distribution")
+endif()
+
+project(Extempore VERSION 0.6.0)
 if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
   message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
 endif()
