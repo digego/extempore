@@ -573,9 +573,9 @@ namespace extemp {
                   if (extemp::UNIV::EXT_LOADSTD == 1) {
                     memset(sstr,0,EXT_INITEXPR_BUFLEN);
 #ifdef _WIN32
-					_snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/core/std.xtm\" 'quiet)");
+					_snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/base/base.xtm\" 'quiet)");
 #else
-                    snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/core/std.xtm\" 'quiet)");
+                    snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/base/base.xtm\" 'quiet)");
 #endif
                     std::string* s4 = new std::string(sstr);
                     guard.lock();
