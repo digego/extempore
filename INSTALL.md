@@ -365,3 +365,16 @@ variable:
 ```
 cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/path/to/extempore/llvm -DPYTHON_EXECUTABLE=c:/path/to/python .. && make && make install
 ```
+
+## Packaging
+
+*Note: this is still experimental - things may not work, but
+ patches/suggestions welcome!*
+
+To build a "package" for binary distribution, use the `-DPACKAGE=ON`
+cmake option.
+
+For example, in a `cmake-build` directory,
+```
+cmake -DIN_TREE=OFF -DPACKAGE=ON .. && cmake --build . --target aot_extended --config Release && cmake --build . --target package
+```
