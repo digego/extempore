@@ -128,7 +128,7 @@ namespace extemp {
     static uint32_t SECOND;
     static uint32_t FRAMES;
     static uint32_t EXT_TERM;
-    static uint32_t EXT_LOADSTD;
+    static uint32_t EXT_LOADBASE;
     static uint32_t AUDIO_NONE;
     static uint32_t AUDIO_DEVICE;
     static uint32_t AUDIO_IN_DEVICE;

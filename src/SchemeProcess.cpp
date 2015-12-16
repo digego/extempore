@@ -570,7 +570,7 @@ namespace extemp {
                 // only load extempore.xtm in primary process
                 char sstr[EXT_INITEXPR_BUFLEN];
                 if(scm->getName().compare("primary") == 0) {
-                  if (extemp::UNIV::EXT_LOADSTD == 1) {
+                  if (extemp::UNIV::EXT_LOADBASE == 1) {
                     memset(sstr,0,EXT_INITEXPR_BUFLEN);
 #ifdef _WIN32
 					_snprintf(sstr,EXT_INITEXPR_BUFLEN,"(sys:load \"libs/base/base.xtm\" 'quiet)");

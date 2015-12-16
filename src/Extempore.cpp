@@ -86,7 +86,7 @@ void sig_handler(int signo)
 #endif
 
 
-enum { OPT_SHAREDIR, OPT_NOSTD, OPT_SAMPLERATE, OPT_FRAMES,
+enum { OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
@@ -97,7 +97,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
     { OPT_SHAREDIR,    "--runtime",       SO_REQ_SEP    },
     { OPT_SHAREDIR,    "--sharedir",      SO_REQ_SEP    },
-    { OPT_NOSTD,       "--nostd",         SO_NONE       },  
+    { OPT_NOBASE,       "--nobase",         SO_NONE       },  
     { OPT_SAMPLERATE,  "--samplerate",    SO_REQ_SEP    },
     { OPT_FRAMES,      "--frames",        SO_REQ_SEP    },
     { OPT_CHANNELS,    "--channels",      SO_REQ_SEP    },
@@ -174,8 +174,8 @@ int main(int argc, char** argv)
           initexpr = std::string("(sys:load \"") + std::string(args.OptionArg()) + std::string("\")");
           initexpr_on = true;	  
 	  break;
-  case OPT_NOSTD:
-    extemp::UNIV::EXT_LOADSTD = 0;
+  case OPT_NOBASE:
+    extemp::UNIV::EXT_LOADBASE = 0;
     break;
 	case OPT_PORT:
 	  primary_port = atoi(args.OptionArg());
@@ -234,7 +234,7 @@ int main(int argc, char** argv)
 	  std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
 	  std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
 	  std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
-	  std::cout << "           --nostd: don't load std lib on startup" << std::endl;
+	  std::cout << "           --nobase: don't load base lib on startup" << std::endl;
 	  std::cout << "      --samplerate: audio samplerate" << std::endl; 
 	  std::cout << "          --frames: attempts to force frames [128]" << std::endl;
 	  std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;

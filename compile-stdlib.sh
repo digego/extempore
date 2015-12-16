@@ -31,7 +31,7 @@ libs/external/nanovg.xtm \
 libs/external/soil.xtm \
 libs/external/assimp.xtm"}
 
-: ${AOT_COMPILATION_COMMAND:="extempore --nostd $1 --eval "}
+: ${AOT_COMPILATION_COMMAND:="extempore --nobase $1 --eval "}
 
 echo Ahead-of-time \(AOT\) compiling the Extempore standard library.  This may take several minutes...
 echo

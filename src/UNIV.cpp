@@ -618,7 +618,7 @@ namespace extemp {
 #else
     uint32_t UNIV::EXT_TERM = 0; 
 #endif
-    uint32_t UNIV::EXT_LOADSTD = 1;
+    uint32_t UNIV::EXT_LOADBASE = 1;
 
     void UNIV::initRand() {
 #ifdef _WIN32
