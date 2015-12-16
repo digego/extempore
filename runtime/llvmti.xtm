@@ -2562,6 +2562,12 @@
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
                                 " -relocation-model=pic "
+                                (if (and (string=? (sys:platform) "OSX")
+                                         (not (string=? (sys:cmdarg "mcpu") "")))
+                                    (string-append "-mcpu="
+                                                   (sys:cmdarg "mcpu")
+                                                   " ")
+                                    "")
                                 bc-path)
                                (string-append
                                 llc-path
