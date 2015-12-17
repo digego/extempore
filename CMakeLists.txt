@@ -601,6 +601,24 @@ add_custom_target(clean_aot
   COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
   COMMENT "Removing AOT-compiled libs")
 
+#########
+# tests #
+#########
+
+include(CTest)
+
+if(BUILD_TESTING)
+  add_test(
+    NAME core
+    COMMAND extempore --noaudio --port=17097 --run tests/all-core.xtm)
+  add_test(
+    NAME extended
+    COMMAND extempore --noaudio --port=17097 --run tests/all-external.xtm)
+  # add_test(
+  #   NAME all
+  #   COMMAND --noaudio --port=17097 --run tests/all.xtm)
+endif()
+
 ##########
 # xtmdoc #
 ##########
