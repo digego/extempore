@@ -2405,6 +2405,22 @@
            *impc:aot:current-output-port*)
           (newline *impc:aot:current-output-port*)))))
 
+(define impc:aot:insert-generic-func
+  (lambda (expr)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          ;; (println 'inserting 'generic 'func: expr)          
+          (write expr *impc:aot:current-output-port*)
+          (newline *impc:aot:current-output-port*)))))
+
+(define impc:aot:insert-generic-type
+  (lambda (expr)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          ;; (println 'inserting 'generic 'type: expr)          
+          (write expr *impc:aot:current-output-port*)
+          (newline *impc:aot:current-output-port*)))))
+
 (define impc:aot:insert-namedtype-binding-details
   (lambda (name type docstring)
     (if (output-port? *impc:aot:current-output-port*)
@@ -2516,6 +2532,13 @@
                   `(begin (write ',sexp *impc:aot:current-output-port*)
                           (newline *impc:aot:current-output-port*)))
                 forms))))
+
+;; insert arbitrary sexp into the AOT-compilation
+(define impc:aot:insert-sexpr
+  (lambda (sexpr)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin (write sexpr *impc:aot:current-output-port*)
+               (newline *impc:aot:current-output-port*)))))
 
 (define-macro (impc:aot:do-and-emit . forms)
   `(begin
@@ -7318,6 +7341,7 @@
                                                           *impc:default-zone-size*
                                                           ""
                                                           code))
+                        ;; (println 'spec-compile2: pfunc 'code: code)                        
                         (set! code `(let ((,pfunc ,code)) ,pfunc))
                         (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol ptype)))
                         (impc:ti:register-new-polyfunc n1
@@ -7398,6 +7422,7 @@
                  ;; (println 'p: (car ast) 'exists: exists 'changed: (impc:ti:genericfunc-src-changed polyname arity))
                  (if (or (if exists
                              (if (and (regex:match? (symbol->string exists) "_poly_")
+                                      (not *impc:aot:current-output-port*)
                                       (impc:ti:genericfunc-src-changed polyname arity))
                                  #f
                                  #t)
@@ -7429,7 +7454,7 @@
                                                          *impc:default-zone-size*
                                                          ""
                                                          code))
-                       ;; (println 'spec-compile2: pfunc 'code: code)
+                       ;; (println 'spec-compile3: pfunc 'code: code)
                        (set! code `(let ((,pfunc ,code)) ,pfunc))
                        (impc:ti:run pfunc code *impc:default-zone-size* (cons pfunc (string->symbol type)))
                        (impc:ti:register-new-polyfunc (symbol->string polyname)
@@ -8415,66 +8440,72 @@
 (define-macro (bind-func . args)
   (if (list? (car args))
       (impc:compiler:print-compiler-error "bind-func requires a name!"))
-  ;; if doc-string exists!
-  (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
-        (zone-size (if (number? (cadr args)) (cadr args) *impc:default-zone-size*))
-        (docstring (if (string? (cadr args))
-                       (cadr args)
-                       (if (and (not (null? (cddr args))) (string? (caddr args)))
-                           (caddr args)
-                           "")))
-        ;; closure body is always in last position, preceeded by zone
-        ;; size and/or docstring
-        (closure-body (car (reverse args))))
-    ;; strip docstring
-    (set! args (cl:remove-if string? args))
-    (if (impc:ti:polyfunc-exists? (car args))
-        (impc:compiler:print-already-bound-error (car args) "polymorphic closure"))
-    (if (impc:ti:genericfunc-exists? (car args))
-        (impc:compiler:print-already-bound-error (car args) "generic closure"))
-    (if (regex:match? (symbol->string (car args)) ":")
-        (let* ((res (regex:type-split (symbol->string (car args)) ":"))
-               (name (car res))
-               (type1 (cadr res))
-               (type (if (char=? (string-ref type1 0) #\[)
-                         type1
-                         (if (impc:ti:typealias-exists? type1)
-                             (impc:ti:get-typealias-type-pretty type1)
-                             (impc:compiler:print-bad-type-error type1 "Bad closure type for bind-func"))))
-               (ags (impc:ir:get-pretty-closure-arg-strings type))
-               ;; expand all non-explict generic types
-               ;; i.e. expand list* into list:<!a,list*>*
-               (expand-polys (map (lambda (k)
-                                    (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
-                                        (impc:ir:pointer++
-                                         (string-append (impc:ir:get-base-type k) ":"
-                                                        (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
-                                         (impc:ir:get-ptr-depth k))
-                                        k))
-                                  ags))
-               (newtype (string-append "[" (string-join expand-polys ",") "]*"))
-               (newnametype (string->symbol (string-append name ":" newtype))))
-          ;; (println 'oldargs: args)
-          ;; (println 'newargs: (cons newnametype (cdr args)))
-          (if (impc:ti:bang-type? newtype)
-              (begin
-                (impc:ti:register-new-genericfunc (cons 'bind-func (cons newnametype (cdr args))))
-                ;;(impc:ti:register-new-genericfunc (cons 'bind-func args))
-                `(impc:compiler:print-binding-details-to-log "GenrFunc:" ,(car res) ,(cadr res)))
-              (begin
-                (if (impc:ti:closure-exists? func-name)
-                    (begin
-                      (impc:ti:set-closure-docstring func-name docstring)
-                      (impc:ti:set-closure-body func-name closure-body))
-                    (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
-                `(eval '(definec ,@args) (interaction-environment)))))
-        (begin
-          (if (impc:ti:closure-exists? func-name)
-              (begin
-                (impc:ti:set-closure-docstring func-name docstring)
-                (impc:ti:set-closure-body func-name closure-body))
-              (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
-          `(eval '(definec ,@args) (interaction-environment))))))
+  ;; if aot and func already exists then bomb out
+  (if (and (output-port? *impc:aot:current-output-port*)
+           (impc:ti:closure-exists? (symbol->string (car args))))
+      (begin ;; (impc:aot:insert-sexpr `(println 'Warning: ',(car args) 'is 'overriden)) ;; insert warning into aot file
+             #t)
+      ;; if doc-string exists!
+      (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
+            (zone-size (if (number? (cadr args)) (cadr args) *impc:default-zone-size*))
+            (docstring (if (string? (cadr args))
+                           (cadr args)
+                           (if (and (not (null? (cddr args))) (string? (caddr args)))
+                               (caddr args)
+                               "")))
+            ;; closure body is always in last position, preceeded by zone
+            ;; size and/or docstring
+            (closure-body (car (reverse args))))
+        ;; strip docstring
+        (set! args (cl:remove-if string? args))
+        (if (impc:ti:polyfunc-exists? (car args))
+            (impc:compiler:print-already-bound-error (car args) "polymorphic closure"))
+        (if (impc:ti:genericfunc-exists? (car args))
+            (impc:compiler:print-already-bound-error (car args) "generic closure"))
+        (if (regex:match? (symbol->string (car args)) ":")
+            (let* ((res (regex:type-split (symbol->string (car args)) ":"))
+                   (name (car res))
+                   (type1 (cadr res))
+                   (type (if (char=? (string-ref type1 0) #\[)
+                             type1
+                             (if (impc:ti:typealias-exists? type1)
+                                 (impc:ti:get-typealias-type-pretty type1)
+                                 (impc:compiler:print-bad-type-error type1 "Bad closure type for bind-func"))))
+                   (ags (impc:ir:get-pretty-closure-arg-strings type))
+                   ;; expand all non-explict generic types
+                   ;; i.e. expand list* into list:<!a,list*>*
+                   (expand-polys (map (lambda (k)
+                                        (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
+                                            (impc:ir:pointer++
+                                             (string-append (impc:ir:get-base-type k) ":"
+                                                            (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
+                                             (impc:ir:get-ptr-depth k))
+                                            k))
+                                      ags))
+                   (newtype (string-append "[" (string-join expand-polys ",") "]*"))
+                   (newnametype (string->symbol (string-append name ":" newtype))))
+              ;; (println 'oldargs: args)
+              ;; (println 'newargs: (cons newnametype (cdr args)))
+              (if (impc:ti:bang-type? newtype)
+                  (begin
+                    (impc:aot:insert-generic-func (cons 'bind-func (cons newnametype (cdr args))))
+                    (impc:ti:register-new-genericfunc (cons 'bind-func (cons newnametype (cdr args))))
+                    ;;(impc:ti:register-new-genericfunc (cons 'bind-func args))
+                    `(impc:compiler:print-binding-details-to-log "GenrFunc:" ,(car res) ,(cadr res)))
+                  (begin
+                    (if (impc:ti:closure-exists? func-name)
+                        (begin
+                          (impc:ti:set-closure-docstring func-name docstring)
+                          (impc:ti:set-closure-body func-name closure-body))
+                        (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
+                    `(eval '(definec ,@args) (interaction-environment)))))
+            (begin
+              (if (impc:ti:closure-exists? func-name)
+                  (begin
+                    (impc:ti:set-closure-docstring func-name docstring)
+                    (impc:ti:set-closure-body func-name closure-body))
+                  (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
+              `(eval '(definec ,@args) (interaction-environment)))))))
 
 
 (impc:ti:register-new-builtin
@@ -8612,8 +8643,26 @@
                    ,@body
                    obj)))
             (interaction-environment))
+      (if generic
+          (begin
+            (eval `(bind-func ,(string->symbol (string-append "print:[void, " namestr "*]*"))
+                     (lambda (x)
+                       (printout ,(string-append "<" namestr ": ")
+                                ,@(cdr (apply append (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                ">")
+                       void))
+                  (interaction-environment))))
       (if (not generic)
           (begin
+            (eval `(bind-func ,(string->symbol (string-append namestr "_default_print:[void, " namestr "*]*"))
+                     (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                       (printout ,(string-append "<" namestr ":")
+                                 ,@(cdr (apply append (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                 ">")
+                       void))
+                  (interaction-environment))
+            (eval `(bind-poly print ,(string->symbol (string-append namestr "_default_print")))
+                  (interaction-environment))            
             (eval `(bind-poly ,(string->symbol namestr) ,(string->symbol (string-append namestr "_z")))
                   (interaction-environment))
             (eval `(bind-func ,(string->symbol (string-append namestr "_hcopy:[" namestr "*," namestr "*]*"))
@@ -8648,11 +8697,14 @@
 
 ;; bind-type expects: (symbol type [docstring])
 (define-macro (bind-type . args)
+  ;; (println 'bind-type args)
   (if (null? args)
       (impc:compiler:print-compiler-error "Bind type missing arguments! (symbol type [docstring])"))
   (let ((symbol (car args))
         (type (cadr args))
         (docstring (if (string? (car (reverse args))) (car (reverse args)) "")))
+    (if (impc:ti:bang-type? type) ;; send generic named types to aot
+        (impc:aot:insert-generic-type `(bind-type ,@args)))
     (if (<> (impc:ir:get-ptr-depth type) 0)
         (impc:compiler:print-bad-type-error type "cannot be a pointer"))
     (if (not (char=? (string-ref (symbol->string type) 0) #\<))
@@ -8676,8 +8728,9 @@
          ;; (println 'transformed_type: newtype)
          ;; and on with the show!
          (if (impc:ti:bang-type? newtype) ;; then must be poly type
-             (begin (impc:ti:register-new-generictype ',symbol (string->symbol newtype))
-                    (impc:compiler:print-binding-details-to-log "GenrType:" ',symbol ',type))
+             (begin
+               (impc:ti:register-new-generictype ',symbol (string->symbol newtype))
+               (impc:compiler:print-binding-details-to-log "GenrType:" ',symbol ',type))
              (let ((typelist (cons *impc:ir:tuple* (impc:ir:get-type-from-pretty-tuple ,(symbol->string type)
                                                                                        ,(symbol->string symbol)))))
                (if (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
