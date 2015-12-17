@@ -7,10 +7,10 @@ option(ASIO "use the ASIO Portaudio backend" OFF)
 option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
 
-# this needs to be set before project() is called
 if(PACKAGE)
+  # this needs to be set before project() is called
   set(CMAKE_OSX_SYSROOT macosx)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
   message(STATUS "Building Extempore for binary distribution")
   if(IN_TREE)
     set(IN_TREE OFF CACHE BOOL "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" FORCE)
