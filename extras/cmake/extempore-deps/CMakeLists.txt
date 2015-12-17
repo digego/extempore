@@ -6,11 +6,11 @@ project(extempore-deps)
 
 # Set a default build type if none was specified
 
-if(PACKAGE)
-  if(APPLE)
-    set(PACKAGING_C_FLAGS "-mtune=generic")
-  endif()
-endif()
+# if(PACKAGE)
+#   if(APPLE)
+#     set(PACKAGING_C_FLAGS "-mcpu=sandybridge")
+#   endif()
+# endif()
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Building 'Release' configuration")
