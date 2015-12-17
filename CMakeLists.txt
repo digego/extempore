@@ -343,6 +343,8 @@ endif()
 if(PACKAGE)
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR=".")
+  target_compile_options(extempore
+    PRIVATE -mtune=generic)
 else()
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
