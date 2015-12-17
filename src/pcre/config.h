@@ -80,7 +80,7 @@ sure both macros are undefined; an emulation function will then be used. */
 #define HAVE_LIMITS_H 1
 
 /* Define to 1 if the system has the type `long long'. */
-#define HAVE_LONG_LONG 1
+/* #undef HAVE_LONG_LONG 1 */
 
 /* Define to 1 if you have the `memmove' function. */
 #define HAVE_MEMMOVE 1
@@ -110,7 +110,7 @@ sure both macros are undefined; an emulation function will then be used. */
 #define HAVE_STRERROR 1
 
 /* Define to 1 if you have the <string> header file. */
-#define HAVE_STRING 1
+/* #undef HAVE_STRING 1 */
 
 /* Define to 1 if you have the <strings.h> header file. */
 #define HAVE_STRINGS_H 1
@@ -125,7 +125,7 @@ sure both macros are undefined; an emulation function will then be used. */
 /* #undef HAVE_STRTOLL */
 
 /* Define to 1 if you have `strtoq'. */
-#define HAVE_STRTOQ 1
+/* #undef HAVE_STRTOQ 1 */
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
@@ -140,7 +140,7 @@ sure both macros are undefined; an emulation function will then be used. */
 #define HAVE_UNISTD_H 1
 
 /* Define to 1 if the system has the type `unsigned long long'. */
-#define HAVE_UNSIGNED_LONG_LONG 1
+/* #undef HAVE_UNSIGNED_LONG_LONG 1 */
 
 /* Define to 1 if the compiler supports simple visibility declarations. */
 #define HAVE_VISIBILITY 1
