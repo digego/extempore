@@ -378,3 +378,7 @@ For example, in a `cmake-build` directory,
 ```
 cmake -DIN_TREE=OFF -DPACKAGE=ON .. && cmake --build . --target aot_extended --config Release && cmake --build . --target package
 ```
+Or, on Windows
+```
+cmake -G"Visual Studio 14 2015 Win64" -DIN_TREE=OFF -DPACKAGE=ON -DBOOST_DIR=c:/Users/ben/Code/extempore/boost .. && cmake --build . --target aot_extended --config Release && cmake --build . --target package
+```
