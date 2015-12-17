@@ -3444,6 +3444,32 @@
         (impc:ti:memzone `(memzone ,(cadr ast)
                                    (let ,(caddr ast) ,@(cdddr ast)))))))
 
+(impc:ti:register-new-builtin
+ "letz"
+ ""
+ "let-bind temporary variables
+
+Create a new memzone (with optional zone-size), execute `body' with
+temporary variables bound as described in `bindings', copy the final
+body form up out of the new zone into the surrounding zone, and free the
+newly-created zone.
+
+This is handy for computations which will generate a lot of
+short-lived allocations - by performing them inside a new zone then
+any `zalloc' calls will allocate from within this \"temporary\" zone,
+which is much cheaper than heap allocations and can be easily freed at
+the end.
+
+e.g.
+
+(letz 100000 ((a 3)                  ;; 3 is bound to a
+              (b 42)                 ;; 42 is bound to b
+              (c:float* (alloc 10))) ;; a pointer to enough memory for 10 floats is bound to c
+  (+ a b (ftoi64 (pref c 0))))
+
+`letz' is the same as `let', with the addition of the new memzone"
+ '(bindings [zone-size] . body))
+
 (define impc:ti:cleanup
   (lambda (ast)
     `(let ((zone (llvm_peek_zone_stack))
@@ -3495,17 +3521,53 @@
                            ,(impc:ti:first-transform (caddr (cadr ast)) inbody?)))
              (begin ,@(impc:ti:first-transform (cddr ast) inbody?))))))))
 
+(impc:ti:register-new-builtin
+ "doloop"
+ ""
+ "doloop
+
+Execute `body' forms `count' times, with `index-variable' bound to
+successive numerical values (incrementing by 1 each loop). If `start'
+is given, start from there, otherwise start from 0.
+
+`index-variable' will be automatically bound as a temporary variable
+of type i32, i64, float or double - the type will be inferred from the
+types of `start' and `count'"
+ '(index-variable [start] count . body))
+
 (define impc:ti:dotimes
   (lambda (ast inbody?)
     (list 'dotimes
           (impc:ti:first-transform (cadr ast) inbody?)
           (cons 'begin (impc:ti:first-transform (cddr ast) inbody?)))))
 
+(impc:ti:register-new-builtin
+ "dotimes"
+ ""
+ "dotimes loop
+
+Execute `body' forms `count' times, with `index-variable' bound to
+successive numerical values (incrementing by 1 each loop). If `start'
+is given, start from there, otherwise start from 0.
+
+`index-variable' can be either i32, i64, float or double, and must be
+defined outside the loop. For a loop where the index variable is
+automatically bound as a temporary variable, see `doloop'."
+ '(index-variable [start] count . body))
+
 (define impc:ti:while
   (lambda (ast inbody?)
     (list 'while
           (impc:ti:first-transform (cadr ast) inbody?)
           (cons 'begin (impc:ti:first-transform (cddr ast) inbody?)))))
+
+(impc:ti:register-new-builtin
+ "while"
+ ""
+ "while loop
+
+Continue executing `body' forms until `test-expression' returns #f"
+ '(test-expression . body))
 
 (define *unique-polynum* 0)
 
@@ -6062,6 +6124,23 @@
       ;; which should have a begin body! so caddr should work
       (let ((ret (impc:ti:type-check (caddr ast) vars kts request?)))
         ret))))
+
+(impc:ti:register-new-builtin
+ "let"
+ ""
+ "let-bind temporary variables
+
+Execute `body' with temporary variables bound as described in `bindings'.
+
+e.g.
+
+(let ((a 3)                  ;; 3 is bound to a
+      (b 42)                 ;; 42 is bound to b
+      (c:float* (alloc 10))) ;; a pointer to enough memory for 10 floats is bound to c
+  (+ a b (ftoi64 (pref c 0))))
+
+xtlang's `let' syntax is the same as Scheme"
+ '(bindings . body))
 
 (define impc:ti:null?-check
   (lambda (ast vars kts request?)
@@ -8985,6 +9064,19 @@
     (if (string? path)
         (set! path (list path)))
     `(impc:ti:bind-dylib ',library ',path)))
+
+(impc:ti:register-new-builtin
+ "bind-dylib"
+ ""
+ "load a dynamic library
+
+e.g.
+
+(bind-dylib lib \"libGL.so\")
+
+@param lib-symbol - symbol to refer to the library
+@param lib-paths - a string (or list of strings) of paths to search for the dylib"
+ '(lib-symbol lib-paths))
 
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
