@@ -201,7 +201,7 @@ endif()
 # LLVM 3.7.0 #
 ##############
 
-if(PACKAGING)
+if(PACKAGE)
   # when packaging, assume that we've run the CMakeLists.txt in
   # extras/cmake/extempore-deps, and tell this build process to use that
   # LLVM build
