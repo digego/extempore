@@ -381,7 +381,7 @@ cd extras/cmake/extempore-deps/cmake-build && cmake .. && make -j8 && cp ../inst
 ```
 Then back into the top-level Extempore source dir and do this:
 ```
-EXT_LLVM_DIR=/Users/ben/Code/extempore/extras/cmake/extempore-deps/install cmake -DIN_TREE=OFF .. && make -j4 && make install && make -j8 aot_extended && cmake -DPACKAGE=ON .. && make package
+cmake -DPACKAGE=ON .. && make -j8 aot_extended && make package
 ```
 
 To build a "package" for binary distribution, use the `-DPACKAGE=ON`
