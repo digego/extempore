@@ -588,9 +588,6 @@ if(BUILD_TESTING)
   add_test(
     NAME extended
     COMMAND extempore --noaudio --port=17097 --run tests/all-external.xtm)
-  # add_test(
-  #   NAME all
-  #   COMMAND --noaudio --port=17097 --run tests/all.xtm)
 endif()
 
 ##########
