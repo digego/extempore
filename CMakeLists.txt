@@ -457,7 +457,8 @@ if(PACKAGE) # there's probably a better way to do this
   install(DIRECTORY runtime examples extras
     COMPONENT compiler
     DESTINATION extempore
-    PATTERN ".DS_Store" EXCLUDE)
+    PATTERN ".DS_Store" EXCLUDE
+    PATTERN "extras/cmake" EXCLUDE)
   # need to filter out precomp guff from libs
   install(DIRECTORY libs
     COMPONENT compiler
@@ -481,7 +482,8 @@ else(PACKAGE)
   install(DIRECTORY runtime examples tests extras
     COMPONENT compiler
     DESTINATION ${EXT_SHARE_DIR}
-    PATTERN ".DS_Store" EXCLUDE)
+    PATTERN ".DS_Store" EXCLUDE
+    PATTERN "extras/cmake" EXCLUDE)
   # need to filter out precomp guff from libs
   install(DIRECTORY libs
     COMPONENT compiler
