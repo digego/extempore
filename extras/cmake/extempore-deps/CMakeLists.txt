@@ -3,16 +3,17 @@ cmake_minimum_required(VERSION 3.0)
 option(PACKAGE "set up install targets for packaging" ON)
 
 set(EXT_DEPS_INSTALL_DIR ${CMAKE_SOURCE_DIR}/deps-install)
+set(CMAKE_BUILD_TYPE "Release")
 
 project(extempore-deps)
 
 # Set a default build type if none was specified
 
-# if(PACKAGE)
-#   if(APPLE)
-#     set(PACKAGING_C_FLAGS "-mcpu=sandybridge")
-#   endif()
-# endif()
+if(PACKAGE AND UNIX)
+  set(PACKAGING_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
+  set(PACKAGING_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
+  message(STATUS "compiler flags for packaging:\nC    ${PACKAGING_C_FLAGS}\nCXX  ${PACKAGING_CXX_FLAGS}")
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Building 'Release' configuration")
@@ -28,7 +29,7 @@ ExternalProject_Add(portmidi
   URL https://github.com/extemporelang/portmidi/archive/217.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
              -DCMAKE_C_FLAGS=${PACKAGING_C_FLAGS}
-             -DCMAKE_CXX_FLAGS=${PACKAGING_C_FLAGS}
+             -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
 ExternalProject_Add(nanovg
@@ -36,7 +37,7 @@ ExternalProject_Add(nanovg
   URL https://github.com/extemporelang/nanovg/archive/master.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
              -DCMAKE_C_FLAGS=${PACKAGING_C_FLAGS}
-             -DCMAKE_CXX_FLAGS=${PACKAGING_C_FLAGS}
+             -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
 ExternalProject_Add(kiss_fft
@@ -44,7 +45,7 @@ ExternalProject_Add(kiss_fft
   URL https://github.com/extemporelang/kiss_fft/archive/master.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
              -DCMAKE_C_FLAGS=${PACKAGING_C_FLAGS}
-             -DCMAKE_CXX_FLAGS=${PACKAGING_C_FLAGS}
+             -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
 ExternalProject_Add(stb_image
@@ -52,7 +53,7 @@ ExternalProject_Add(stb_image
   URL https://github.com/extemporelang/stb/archive/master.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
              -DCMAKE_C_FLAGS=${PACKAGING_C_FLAGS}
-             -DCMAKE_CXX_FLAGS=${PACKAGING_C_FLAGS}
+             -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
 ExternalProject_Add(glfw3
@@ -60,7 +61,10 @@ ExternalProject_Add(glfw3
   URL https://github.com/glfw/glfw/archive/3.1.2.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
              -DCMAKE_C_FLAGS=${PACKAGING_C_FLAGS}
-             -DCMAKE_CXX_FLAGS=${PACKAGING_C_FLAGS}
+             -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
+             -DBUILD_SHARED_LIBS=ON
+             -DGLFW_BUILD_EXAMPLES=OFF
+             -DGLFW_BUILD_TESTS=OFF
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
 ExternalProject_Add(assimp
@@ -68,7 +72,7 @@ ExternalProject_Add(assimp
   URL https://github.com/assimp/assimp/archive/v3.1.1.zip
   CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
              -DCMAKE_C_FLAGS=${PACKAGING_C_FLAGS}
-             -DCMAKE_CXX_FLAGS=${PACKAGING_C_FLAGS}
+             -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
 ExternalProject_Add(sndfile
@@ -91,5 +95,9 @@ ExternalProject_Add(LLVM
              -DLLVM_ENABLE_ZLIB=OFF
              -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR}
              -DCMAKE_C_FLAGS=${PACKAGING_C_FLAGS}
-             -DCMAKE_CXX_FLAGS=${PACKAGING_C_FLAGS}
+             -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+# to copy the relevant bits
+
+# cp deps-install/lib/libassimp.dylib deps-install/lib/libkiss_fft.dylib deps-install/lib/libnanovg.dylib deps-install/lib/libportmidi.dylib deps-install/lib/libsndfile.dylib deps-install/lib/libstb_image.dylib ~/Code/extempore/libs/platform-shlibs
