@@ -438,7 +438,7 @@ endif()
 ##########
 
 add_custom_target(assets
-  WORKING_DIRECTORY ${EXT_SHARE_DIR}
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   COMMAND curl -O http://extempore.moso.com.au/extras/assets.tgz
   COMMAND ${CMAKE_COMMAND} -E tar xf assets.tgz
   COMMAND ${CMAKE_COMMAND} -E remove assets.tgz
@@ -448,66 +448,33 @@ add_custom_target(assets
 # install #
 ###########
 
-if(PACKAGE) # there's probably a better way to do this
+if(IN_TREE)
+  # if we're developing in-tree, installation just involves moving the
+  # binary into the toplevel source directory
   install(TARGETS extempore
     RUNTIME
-    DESTINATION extempore
-    COMPONENT compiler)
-  # install the rest of the necessary files into the "share" directory
-  install(DIRECTORY runtime examples extras
-    COMPONENT compiler
-    DESTINATION extempore
-    PATTERN ".DS_Store" EXCLUDE
-    PATTERN "extras/cmake" EXCLUDE)
-  # need to filter out precomp guff from libs
-  install(DIRECTORY libs
-    COMPONENT compiler
-    DESTINATION extempore
-    PATTERN ".DS_Store" EXCLUDE)
-  # only install assets if it exists
-  if(EXISTS ${CMAKE_SOURCE_DIR}/assets)
-    install(DIRECTORY assets
-      COMPONENT assets
-      DESTINATION extempore
-      PATTERN ".DS_Store" EXCLUDE)
-  endif()
-
-else(PACKAGE)
-
+    DESTINATION ${CMAKE_SOURCE_DIR})
+else()
+  # otherwise, install all the things
   install(TARGETS extempore
     RUNTIME
-    DESTINATION bin
-    COMPONENT compiler)
+    DESTINATION bin)
   # install the rest of the necessary files into the "share" directory
-  install(DIRECTORY runtime examples tests extras
-    COMPONENT compiler
-    DESTINATION ${EXT_SHARE_DIR}
+  install(DIRECTORY runtime libs examples tests extras
+    DESTINATION share/extempore
     PATTERN ".DS_Store" EXCLUDE
-    PATTERN "extras/cmake" EXCLUDE)
-  # need to filter out precomp guff from libs
-  install(DIRECTORY libs
-    COMPONENT compiler
-    DESTINATION ${EXT_SHARE_DIR}
+    PATTERN "extras/cmake" EXCLUDE
+    PATTERN "extras/extempore-emacs-mode" EXCLUDE)
+  # assets are optional
+  install(DIRECTORY assets
+    OPTIONAL
+    DESTINATION share/extempore
     PATTERN ".DS_Store" EXCLUDE)
-  # only install assets if it exists
-  if(EXISTS ${CMAKE_SOURCE_DIR}/assets)
-    install(DIRECTORY assets
-      COMPONENT assets
-      DESTINATION ${EXT_SHARE_DIR}
-      PATTERN ".DS_Store" EXCLUDE)
-  endif()
 
-  if(IN_TREE)
-    add_custom_target(uninstall
-      COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
-      COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore")
-  else()
-    add_custom_target(uninstall
-      COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
-      COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}
-      COMMENT "Removing ${CMAKE_INSTALL_PREFIX}/bin/extempore")
-  endif()
-
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_INSTALL_PREFIX}/share/extempore
+    COMMENT "Uninstalling Extempore")
 endif()
 
 ###################
@@ -515,7 +482,6 @@ endif()
 ###################
 
 if(WIN32)
-  set(AOT_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
   configure_file(
     ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake.in
@@ -539,8 +505,6 @@ else(WIN32)
 
   # this approach requires specifying the inter-lib dependencies by hand, but allows us to do AOT compilation in parallell
 
-  set(AOT_WORKING_DIRECTORY ${EXT_SHARE_DIR})
-
   function(aotcompile_lib lib group port) # deps are optional, and go at the end
     get_filename_component(basename ${lib} NAME_WE)
     set(targetname aot_${basename})
@@ -551,7 +515,6 @@ else(WIN32)
                         --port=${port}
                         --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
       BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
-      WORKING_DIRECTORY ${AOT_WORKING_DIRECTORY}
       VERBATIM)
     add_dependencies(${targetname} extempore)
     add_dependencies(${group} ${targetname})
@@ -627,7 +590,6 @@ endif()
 
 add_custom_target(xtmdoc
   COMMAND extempore
-           --runtime ${EXT_SHARE_DIR}
            --port 17095
            --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/external/fft.xtm\") (sys:load \"libs/external/gl.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/nanovg.xtm\") (sys:load \"libs/external/sndfile.xtm\") (sys:load \"libs/external/stb_image.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
   COMMENT "Generating xtmdoc output in /tmp/xtmdoc.json"
