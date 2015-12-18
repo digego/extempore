@@ -458,7 +458,7 @@ if(IN_TREE)
   # binary into the toplevel source directory
   install(TARGETS extempore
     RUNTIME
-    DESTINATION ${CMAKE_SOURCE_DIR})
+    DESTINATION bin)
 else()
   # otherwise, install all the things
   if(PACKAGE)
