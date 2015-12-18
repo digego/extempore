@@ -22,13 +22,6 @@ if(PACKAGE AND UNIX)
   message(STATUS "compiler flags for packaging:\nC    ${PACKAGING_C_FLAGS}\nCXX  ${PACKAGING_CXX_FLAGS}")
 endif()
 
-if(NOT CMAKE_BUILD_TYPE)
-  message(STATUS "Building 'Release' configuration")
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
-  # Set the possible values of build type for cmake-gui
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif()
-
 include(ExternalProject)
 
 ExternalProject_Add(portmidi
