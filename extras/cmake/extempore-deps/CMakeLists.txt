@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 option(PACKAGE "set up install targets for packaging" ON)
 
-set(EXT_DEPS_INSTALL_DIR ${CMAKE_SOURCE_DIR}/deps-install)
+set(EXT_DEPS_INSTALL_DIR ${CMAKE_SOURCE_DIR}/install)
 set(CMAKE_BUILD_TYPE "Release")
 
 project(extempore-deps)
@@ -100,4 +100,4 @@ ExternalProject_Add(LLVM
 
 # to copy the relevant bits
 
-# cp deps-install/lib/libassimp.dylib deps-install/lib/libkiss_fft.dylib deps-install/lib/libnanovg.dylib deps-install/lib/libportmidi.dylib deps-install/lib/libsndfile.dylib deps-install/lib/libstb_image.dylib ~/Code/extempore/libs/platform-shlibs
+# cp install/lib/libassimp.dylib install/lib/libkiss_fft.dylib install/lib/libnanovg.dylib install/lib/libportmidi.dylib install/lib/libsndfile.dylib install/lib/libstb_image.dylib ~/Code/extempore/libs/platform-shlibs
