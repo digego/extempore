@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.0)
 
 option(PACKAGE "set up install targets for packaging" ON)
 
+if(PACKAGE)
+  # this needs to be set before project() is called
+  set(CMAKE_OSX_SYSROOT macosx)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
+  message(STATUS "Building Extempore dependencies for binary distribution")
+endif()
+
 set(EXT_DEPS_INSTALL_DIR ${CMAKE_SOURCE_DIR}/install)
 set(CMAKE_BUILD_TYPE "Release")
 
