@@ -75,13 +75,21 @@ ExternalProject_Add(assimp
              -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
-ExternalProject_Add(sndfile
-  PREFIX libsndfile
-  URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-  CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR}
-  BUILD_COMMAND make
-  INSTALL_COMMAND make install
-  BUILD_IN_SOURCE ON)
+if(WIN32)
+  ExternalProject_Add(sndfile
+    PREFIX libsndfile
+    URL https://github.com/erikd/libsndfile/archive/master.zip
+    CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+               -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+else()
+  ExternalProject_Add(sndfile
+    PREFIX libsndfile
+    URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
+    CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR}
+    BUILD_COMMAND make
+    INSTALL_COMMAND make install
+    BUILD_IN_SOURCE ON)
+endif()
 
 # llvm (taken from main Extempore CMakeLists.txt)
 
