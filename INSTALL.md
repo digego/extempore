@@ -373,13 +373,11 @@ cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=O
 
 ## OSX
 
-Ugh, this is messy.  Suggestions welcome.
-
 First, build the extempore deps:
 ```
 cd extras/cmake/extempore-deps/cmake-build && cmake .. && make -j8 && cp ../install/lib/libassimp.dylib ../install/lib/libkiss_fft.dylib ../install/lib/libnanovg.dylib ../install/lib/libportmidi.dylib ../install/lib/libsndfile.dylib ../install/lib/libstb_image.dylib ~/Code/extempore/libs/platform-shlibs
 ```
-Then back into the top-level Extempore source dir and do this:
+Then go back into the top-level Extempore source dir and do this:
 ```
 cmake -DPACKAGE=ON .. && make -j8 aot_extended && make package
 ```
@@ -394,7 +392,11 @@ cmake -DIN_TREE=OFF -DPACKAGE=ON .. && cmake --build . --target aot_extended --c
 
 ## Windows
 
-Or, on Windows
+First, build the extempore deps:
 ```
-cmake -G"Visual Studio 14 2015 Win64" -DIN_TREE=OFF -DPACKAGE=ON -DBOOST_DIR=c:/Users/ben/Code/extempore/boost .. && cmake --build . --target aot_extended --config Release && cmake --build . --target package
+cd extras/cmake/extempore-deps/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --config Release
+```
+Then go back into the top-level Extempore source dir and do this:
+```
+cmake -G"Visual Studio 14 2015 Win64" -DPACKAGE=ON -DBOOST_DIR=c:/Users/ben/Code/extempore/boost .. && cmake --build . --config Release
 ```
