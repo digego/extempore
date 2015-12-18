@@ -17,7 +17,7 @@ if(PACKAGE)
   endif()
 endif()
 
-project(Extempore VERSION 0.6.0)
+project(Extempore VERSION 0.6.1)
 if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
   message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
 endif()
