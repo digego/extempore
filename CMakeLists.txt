@@ -201,9 +201,14 @@ endif()
 # LLVM 3.7.0 #
 ##############
 
+if(PACKAGING)
+  # when packaging, assume that we've run the CMakeLists.txt in
+  # extras/cmake/extempore-deps, and tell this build process to use that
+  # LLVM build
+  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/extras/cmake/extempore-deps/install)
+  set(DOWNLOAD_LLVM OFF)
+elseif(DEFINED ENV{EXT_LLVM_DIR})
 # if there's an environment variable, use that
-
-if(DEFINED ENV{EXT_LLVM_DIR})
   set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
   set(DOWNLOAD_LLVM OFF)
 else()
@@ -456,25 +461,28 @@ if(IN_TREE)
     DESTINATION ${CMAKE_SOURCE_DIR})
 else()
   # otherwise, install all the things
-  install(TARGETS extempore
-    RUNTIME
-    DESTINATION bin)
+  if(PACKAGE)
+    set(EXT_INSTALL_PREFIX extempore)
+    install(TARGETS extempore
+      RUNTIME
+      DESTINATION ${EXT_INSTALL_PREFIX})
+  else()
+    set(EXT_INSTALL_PREFIX share/extempore)
+    install(TARGETS extempore
+      RUNTIME
+      DESTINATION bin)
+  endif()
   # install the rest of the necessary files into the "share" directory
   install(DIRECTORY runtime libs examples tests extras
-    DESTINATION share/extempore
+    DESTINATION ${EXT_INSTALL_PREFIX}
     PATTERN ".DS_Store" EXCLUDE
     PATTERN "extras/cmake" EXCLUDE
     PATTERN "extras/extempore-emacs-mode" EXCLUDE)
   # assets are optional
   install(DIRECTORY assets
     OPTIONAL
-    DESTINATION share/extempore
+    DESTINATION ${EXT_INSTALL_PREFIX}
     PATTERN ".DS_Store" EXCLUDE)
-
-  add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_INSTALL_PREFIX}/bin/extempore
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_INSTALL_PREFIX}/share/extempore
-    COMMENT "Uninstalling Extempore")
 endif()
 
 ###################
@@ -619,14 +627,6 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (ht
 
 if(APPLE)
   set(CPACK_GENERATOR DragNDrop)
-  set(CPACK_PACKAGE_INSTALL_DIRECTORY "extempore")
-  set(CPACK_TOPLEVEL_TAG "extempore")
-  # set(CPACK_GENERATOR TGZ)
-  # set(CPACK_BINARY_DRAGNDROP "ON")
-  # set(CPACK_BINARY_TGZ "OFF")
-  # set(CPACK_BINARY_STGZ "OFF")
-  # set(CPACK_MONOLITHIC_INSTALL TRUE)
-  set(CPACK_INSTALL_PREFIX "~/Applications")
 elseif(UNIX AND NOT APPLE)
   set(CPACK_GENERATOR DEB)
   set(CPACK_INSTALL_PREFIX "~")
