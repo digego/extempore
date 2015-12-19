@@ -134,8 +134,8 @@ if(APPLE)
     PRIVATE -Wno-deprecated-declarations)
   target_link_libraries(portaudio
     PRIVATE "-framework CoreAudio"
-    PRIVATE "-framework AudioToolbox"
-    PRIVATE "-framework AudioUnit")
+    PRIVATE "-framework AudioUnit"
+    PRIVATE "-framework AudioToolbox")
 
 elseif(UNIX AND NOT APPLE)
   # use ALSA on Linux
@@ -394,8 +394,8 @@ elseif(APPLE) # OSX
   target_link_libraries(extempore
     PRIVATE "-framework Cocoa"
     PRIVATE "-framework CoreAudio"
-    PRIVATE "-framework AudioToolbox"
-    PRIVATE "-framework AudioUnit")
+    PRIVATE "-framework AudioUnit"
+    PRIVATE "-framework AudioToolbox")
 
 elseif(UNIX AND NOT APPLE) # Linux
   set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
