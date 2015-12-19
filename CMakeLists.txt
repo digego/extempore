@@ -627,25 +627,9 @@ if(APPLE)
   set(CPACK_GENERATOR DragNDrop)
 elseif(UNIX AND NOT APPLE)
   set(CPACK_GENERATOR DEB)
-  set(CPACK_INSTALL_PREFIX "~")
 elseif(WIN32)
   set(CPACK_GENERATOR ZIP)
-  # set(CPACK_INSTALL_PREFIX "c:/Program Files")
+  # set(CPACK_GENERATOR NSIS64)
 endif()
 
 include(CPack)
-
-# CPACK_PACKAGE_FILE_NAME
-
-# CPACK_PACKAGE_INSTALL_DIRECTORY
-
-# if(APPLE)
-#   set(CPACK_GENERATOR DragNDrop)
-#   include(CPackDMG)
-# elseif(UNIX AND NOT APPLE) # Linux
-#   set(CPACK_GENERATOR DEB)
-#   include(CPackDeb)
-# elseif(WIN32)
-#   set(CPACK_GENERATOR NSIS64)
-#   include(CPackNSIS)
-# endif()
