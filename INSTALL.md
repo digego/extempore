@@ -262,29 +262,13 @@ cmake -G"Visual Studio 14 2015 Win64" ..
 ```
 then install to `libs/platform-shlibs`
 
-#### GLEW
-
-**Note:** GLEW is only used on Windows, as a build-time dependency for
-nanovg.
-
-Download the latest stable version from
-(http://glew.sourceforge.net/).
-```
-mkdir cmake-build && cd cmake-build
-cmake -G"Visual Studio 14 2015 Win64" ../build/cmake/
-```
-then move `libglew32.lib` out of whichever `Release` dir
-it's in into just the toplevel `GLEW_DIR/lib`.
-
 #### nanovg
 
 From source (all platforms)
-
-nanovg needs to be told about where GLEW is through the `GLEW_DIR` variable
 ```
 git clone git@github.com:extemporelang/nanovg
 cd nanovg && mkdir cmake-build && cd cmake-build
-cmake -G"Visual Studio 14 2015 Win64" -DGLEW_DIR=c:/path/to/glew ..
+cmake -G"Visual Studio 14 2015 Win64" ..
 ```
 then install to `libs/platform-shlibs`
 
