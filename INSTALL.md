@@ -223,18 +223,12 @@ Or follow the instructions to build from source.
 
 #### Portmidi
 
-Get the source from (http://sourceforge.net/projects/portmedia/files/)
-
-If you don't have Java installed, then you'll need to comment out any
-reference to a `JNI_*` variable in the `CMakeLists.txt` - a bit messy
-I know, but we don't need the Java stuff in Extempore, and this is
-better than having to install Java.
 ```
-mkdir cmake-build && cd cmake-build
+git clone git@github.com:extemporelang/portmidi
+cd portmidi && mkdir cmake-build && cd cmake-build
 cmake -G"Visual Studio 14 2015 Win64" ..
 ```
-build the `portmidi-dynamic` target (don't worry about the other
-ones) then install to `libs/platform-shlibs`
+then install to `libs/platform-shlibs`
 
 #### KissFFT
 
@@ -264,7 +258,6 @@ then install to `libs/platform-shlibs`
 
 #### nanovg
 
-From source (all platforms)
 ```
 git clone git@github.com:extemporelang/nanovg
 cd nanovg && mkdir cmake-build && cd cmake-build
