@@ -350,21 +350,10 @@ cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=O
 
 ## OSX
 
-First, build the extempore deps:
-```
-cd extras/cmake/extempore-deps/cmake-build && cmake .. && make -j8 && cp ../install/lib/libassimp.dylib ../install/lib/libkiss_fft.dylib ../install/lib/libnanovg.dylib ../install/lib/libportmidi.dylib ../install/lib/libsndfile.dylib ../install/lib/libstb_image.dylib ~/Code/extempore/libs/platform-shlibs
-```
-Then go back into the top-level Extempore source dir and do this:
-```
-cmake -DPACKAGE=ON .. && make -j8 aot_extended && make package
-```
-
 To build a "package" for binary distribution, use the `-DPACKAGE=ON`
 cmake option.
-
-For example, in a `cmake-build` directory,
 ```
-cmake -DIN_TREE=OFF -DPACKAGE=ON .. && cmake --build . --target aot_extended --config Release && cmake --build . --target package
+cmake -DPACKAGE=ON .. && make -j8 aot_extended && make package
 ```
 
 ## Windows
@@ -373,7 +362,8 @@ First, build the extempore deps:
 ```
 cd extras/cmake/extempore-deps/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --config Release
 ```
-Then go back into the top-level Extempore source dir and do this:
+Then go back into the top-level Extempore source dir and do (something
+like) this:
 ```
 cmake -G"Visual Studio 14 2015 Win64" -DPACKAGE=ON -DBOOST_DIR=c:/Users/ben/Code/extempore/boost .. && cmake --build . --config Release
 ```
