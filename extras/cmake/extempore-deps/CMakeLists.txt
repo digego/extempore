@@ -107,6 +107,14 @@ ExternalProject_Add(LLVM
              -DCMAKE_CXX_FLAGS=${PACKAGING_CXX_FLAGS}
              -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
-# to copy the relevant bits
+# wrap the whole thing in a target
 
-# cp install/lib/libassimp.dylib install/lib/libkiss_fft.dylib install/lib/libnanovg.dylib install/lib/libportmidi.dylib install/lib/libsndfile.dylib install/lib/libstb_image.dylib ~/Code/extempore/libs/platform-shlibs
+add_custom_target(platform_shlibs
+  COMMENT "moving shared libs into libs/platform-shlibs"
+  DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libportmidi.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libstb_image.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs)
