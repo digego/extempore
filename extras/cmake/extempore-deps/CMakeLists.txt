@@ -82,11 +82,12 @@ if(WIN32)
     CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 else()
+  # build with as few deps as we can get away with
   ExternalProject_Add(sndfile
     PREFIX libsndfile
     URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-    CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR}
-    BUILD_COMMAND make
+    CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite
+    BUILD_COMMAND make CFLAGS=${PACKAGING_C_FLAGS}
     INSTALL_COMMAND make install
     BUILD_IN_SOURCE ON)
 endif()
