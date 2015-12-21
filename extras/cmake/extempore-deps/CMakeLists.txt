@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
 
-option(PACKAGE "set up install targets for packaging" ON)
-
 if(PACKAGE)
   # this needs to be set before project() is called
   set(CMAKE_OSX_SYSROOT macosx)
@@ -9,7 +7,8 @@ if(PACKAGE)
   message(STATUS "Building Extempore dependencies for binary distribution")
 endif()
 
-set(EXT_DEPS_INSTALL_DIR ${CMAKE_SOURCE_DIR}/install)
+set(EXT_DEPS_INSTALL_DIR ${CMAKE_CURRENT_LIST_DIR}/install)
+message(STATUS "installing deps to ${EXT_DEPS_INSTALL_DIR}")
 set(CMAKE_BUILD_TYPE "Release")
 
 project(extempore-deps)
@@ -94,7 +93,7 @@ endif()
 
 # llvm (taken from main Extempore CMakeLists.txt)
 
-ExternalProject_Add(LLVM
+ExternalProject_Add(LLVM-packaging
   PREFIX llvm
   URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
   URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
@@ -111,10 +110,10 @@ ExternalProject_Add(LLVM
 
 add_custom_target(platform_shlibs
   COMMENT "moving shared libs into libs/platform-shlibs"
-  DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
-  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
-  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
-  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libportmidi.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
-  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
-  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libstb_image.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs
-  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${CMAKE_SOURCE_DIR}/../../../libs/platform-shlibs)
+  DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${CMAKE_CURRENT_LIST_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${CMAKE_CURRENT_LIST_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${CMAKE_CURRENT_LIST_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libportmidi.dylib ${CMAKE_CURRENT_LIST_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile.dylib ${CMAKE_CURRENT_LIST_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libstb_image.dylib ${CMAKE_CURRENT_LIST_DIR}/../../../libs/platform-shlibs
+  COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${CMAKE_CURRENT_LIST_DIR}/../../../libs/platform-shlibs)

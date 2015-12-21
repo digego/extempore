@@ -575,6 +575,17 @@ add_custom_target(clean_aot
   COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
   COMMENT "Removing AOT-compiled libs")
 
+###################
+# platform-shlibs #
+###################
+
+if(PACKAGE)
+  add_subdirectory(extras/cmake/extempore-deps
+    EXCLUDE_FROM_ALL)
+  add_dependencies(extempore LLVM-packaging)
+  add_dependencies(aot_extended platform_shlibs)
+endif()
+
 #########
 # tests #
 #########
