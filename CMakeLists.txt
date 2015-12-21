@@ -6,12 +6,15 @@ option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for devel
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
+option(EXTENDED_DEPS "download & build deps for aot_extended" OFF)
 
 if(PACKAGE)
   # this needs to be set before project() is called
   set(CMAKE_OSX_SYSROOT macosx)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
   message(STATUS "Building Extempore for binary distribution")
+  # need deps if we're packaging
+  set(EXTENDED_DEPS ON CACHE BOOL "" FORCE)
   if(IN_TREE)
     set(IN_TREE OFF CACHE BOOL "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" FORCE)
   endif()
@@ -212,10 +215,9 @@ endif()
 ##############
 
 if(PACKAGE)
-  # when packaging, assume that we've run the CMakeLists.txt in
-  # extras/cmake/extempore-deps, and tell this build process to use that
-  # LLVM build
-  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/extras/cmake/extempore-deps/install)
+  # when packaging, we'll build LLVM a bit differently (see the "deps
+  # for AOT-extended" section further down in this file)
+  set(EXT_LLVM_DIR ${CMAKE_BINARY_DIR}/deps-install)
   set(DOWNLOAD_LLVM OFF)
 elseif(DEFINED ENV{EXT_LLVM_DIR})
 # if there's an environment variable, use that
@@ -585,16 +587,153 @@ add_custom_target(clean_aot
   COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
   COMMENT "Removing AOT-compiled libs")
 
-###################
-# platform-shlibs #
-###################
+#########################
+# deps for AOT-extended #
+#########################
 
-if(PACKAGE)
-  add_subdirectory(extras/cmake/extempore-deps
-    EXCLUDE_FROM_ALL)
-  add_dependencies(extempore LLVM-packaging)
-  add_dependencies(aot_extended platform_shlibs)
-endif()
+if(EXTENDED_DEPS)
+
+  set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
+  if(WIN32)
+    set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
+  else()
+    set(EXT_PLATFORM_SHLIBS_DIR ${EXT_SHARE_DIR}/libs/platform-shlibs)
+  endif()
+
+  if(PACKAGE)
+
+    set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
+    set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
+    message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
+  endif()
+
+  include(ExternalProject)
+
+  ExternalProject_Add(portmidi
+    PREFIX portmidi
+    URL https://github.com/extemporelang/portmidi/archive/217.zip
+    CMAKE_ARGS
+    -DCMAKE_OSX_SYSROOT=macosx
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  ExternalProject_Add(nanovg
+    PREFIX nanovg
+    URL https://github.com/extemporelang/nanovg/archive/master.zip
+    CMAKE_ARGS
+    -DCMAKE_OSX_SYSROOT=macosx
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  ExternalProject_Add(kiss_fft
+    PREFIX kiss_fft
+    URL https://github.com/extemporelang/kiss_fft/archive/master.zip
+    CMAKE_ARGS
+    -DCMAKE_OSX_SYSROOT=macosx
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  ExternalProject_Add(stb_image
+    PREFIX stb_image
+    URL https://github.com/extemporelang/stb/archive/master.zip
+    CMAKE_ARGS
+    -DCMAKE_OSX_SYSROOT=macosx
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  ExternalProject_Add(glfw3
+    PREFIX glfw3
+    URL https://github.com/glfw/glfw/archive/3.1.2.zip
+    CMAKE_ARGS
+    -DCMAKE_OSX_SYSROOT=macosx
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DBUILD_SHARED_LIBS=ON
+    -DGLFW_BUILD_EXAMPLES=OFF
+    -DGLFW_BUILD_TESTS=OFF
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  ExternalProject_Add(assimp
+    PREFIX assimp
+    URL https://github.com/assimp/assimp/archive/v3.1.1.zip
+    CMAKE_ARGS
+    -DCMAKE_OSX_SYSROOT=macosx
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  if(WIN32)
+    ExternalProject_Add(sndfile
+      PREFIX libsndfile
+      URL https://github.com/erikd/libsndfile/archive/master.zip
+      CMAKE_ARGS
+      -DCMAKE_OSX_SYSROOT=macosx
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+  else()
+    # build with as few deps as we can get away with
+    ExternalProject_Add(sndfile
+      PREFIX libsndfile
+      URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
+      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite
+      BUILD_COMMAND make CFLAGS=${EXT_DEPS_C_FLAGS}
+      INSTALL_COMMAND make install
+      BUILD_IN_SOURCE ON)
+  endif()
+
+  if(PACKAGE)
+    message(STATUS "EXT_DEPS_INSTALL_DIR: ${EXT_DEPS_INSTALL_DIR}")
+
+    ExternalProject_Add(LLVM-packaging
+      PREFIX llvm
+      URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
+      URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
+      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+      CMAKE_ARGS
+      -DCMAKE_OSX_SYSROOT=macosx
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DLLVM_ENABLE_TERMINFO=OFF
+      -DLLVM_ENABLE_ZLIB=OFF
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+    add_dependencies(extempore LLVM-packaging)
+  endif()
+
+  # wrap the whole thing in a target
+  add_custom_target(extended_deps
+    COMMENT "moving shared libs into libs/platform-shlibs"
+    DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile
+    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libportmidi.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libstb_image.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${EXT_PLATFORM_SHLIBS_DIR})
+
+  add_dependencies(aot_extended extended_deps)
+
+endif(EXTENDED_DEPS)
 
 #########
 # tests #
