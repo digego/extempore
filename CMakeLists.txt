@@ -682,6 +682,7 @@ if(EXTENDED_DEPS)
     ExternalProject_Add(sndfile
       PREFIX libsndfile
       URL https://github.com/erikd/libsndfile/archive/master.zip
+      CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/libsndfile/src/sndfile/autogen.sh cmake && ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}
       CMAKE_ARGS
       -DCMAKE_OSX_SYSROOT=macosx
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
