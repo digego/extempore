@@ -571,7 +571,7 @@ else(WIN32)
   aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended 17065 base glcompat-${GL_BIND_METHOD})
   if(NOT WIN32)
     # these ones don't currently work on Windows
-    aotcompile_lib(libs/external/glib.xtm aot_extended 17079 base)
+    # aotcompile_lib(libs/external/glib.xtm aot_extended 17079 base)
     aotcompile_lib(libs/external/assimp.xtm aot_extended 17063 base stb_image graphics-pipeline)
   endif()
 
