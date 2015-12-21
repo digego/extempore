@@ -51,6 +51,7 @@
 (define *impc:compile* #t)
 (define *impc:compiler:print* #f)
 (define *impc:compiler:print-ast* #f)
+(define *impc:compiler:print-work-names #f) ;; this prints test__498 for example (i.e. closure bodies)
 (define *impc:compiler:verbose* #f)
 
 (define *impc:compiler:print-raw-llvm* #f)
@@ -7433,6 +7434,9 @@ xtlang's `let' syntax is the same as Scheme"
                   (string->symbol newn))
                 ast))
         (cond ((member (car ast) '(__make-closure __make-closure-s __make-closure-h __make-closure-z))
+               (if *impc:compiler:print-work-names
+                   (println '>> 'worker: (string-append (symbol->string symname) "__"
+                                                        (number->string (+ 1 (llvm:count))))))
                (list (car ast)
                      (cadr ast)
                      ;; global name
