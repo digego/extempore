@@ -2491,17 +2491,17 @@
           (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-load-dylib-details
-  (lambda (dylib-info-pair)
+  (lambda (library lib-path)
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
-           (list 'bind-dylib (car dylib-info-pair) (cdr dylib-info-pair))
+           (list 'bind-dylib library `(list ,@lib-path))
            *impc:aot:current-output-port*)
           (write
-           `(if (not ,(car dylib-info-pair))
+           `(if (not ',library)
                 (begin
                   (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
-                  (print ": could not load the " ,(cdr dylib-info-pair)
+                  (print ": could not load the " ',library
                          " dynamic library - perhaps you can install it through your package manager?\n")
                   (error "")))
            *impc:aot:current-output-port*)
@@ -9056,7 +9056,6 @@ xtlang's `let' syntax is the same as Scheme"
                   (interaction-environment))
             (set! *impc:aot:current-load-dylib-info*
                   (cons library (cdr dylib-pair)))
-            (impc:aot:insert-load-dylib-details *impc:aot:current-load-dylib-info*)
             (impc:compiler:print-dylib-loading-details-to-log (cdr dylib-pair))
             #t)
           (begin
@@ -9071,6 +9070,7 @@ xtlang's `let' syntax is the same as Scheme"
   (let ((path (eval lib-path)))
     (if (string? path)
         (set! path (list path)))
+    (impc:aot:insert-load-dylib-details library path)
     `(impc:ti:bind-dylib ',library ',path)))
 
 (impc:ti:register-new-builtin
