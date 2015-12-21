@@ -348,22 +348,17 @@ cmake -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=O
 *Note: this is still experimental - things may not work, but
  patches/suggestions welcome!*
 
-## OSX
-
 To build a "package" for binary distribution, use the `-DPACKAGE=ON`
 cmake option.
+
+## OSX
+
 ```
 cmake -DPACKAGE=ON .. && make -j8 aot_extended && make package
 ```
 
 ## Windows
 
-First, build the extempore deps:
 ```
-cd extras/cmake/extempore-deps/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --config Release
-```
-Then go back into the top-level Extempore source dir and do (something
-like) this:
-```
-cmake -G"Visual Studio 14 2015 Win64" -DPACKAGE=ON -DBOOST_DIR=c:/Users/ben/Code/extempore/boost .. && cmake --build . --config Release
+cmake -G"Visual Studio 14 2015 Win64" -DPACKAGE=ON -DBOOST_DIR=c:/Users/ben/Code/extempore/boost .. && cmake --build . --config Release --target aot_extended && cmake --build . --config Release --target package
 ```
