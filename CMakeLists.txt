@@ -79,6 +79,11 @@ target_compile_definitions(pcre
   PRIVATE -DHAVE_CONFIG_H
   )
 
+if(PACKAGE)
+  target_compile_options(pcre
+    PRIVATE -mtune=generic)
+endif()
+
 #############
 # portaudio #
 #############
@@ -195,6 +200,11 @@ if(ASIO)
     PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host/pc)
   target_compile_definitions(portaudio
     PRIVATE -DPA_USE_ASIO)
+endif()
+
+if(PACKAGE)
+  target_compile_options(portaudio
+    PRIVATE -mtune=generic)
 endif()
 
 ##############
