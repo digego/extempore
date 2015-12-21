@@ -1484,11 +1484,30 @@ namespace extemp {
       factory.setUseMCJIT(false);
 #endif
       //if(!extemp::UNIV::ARCH.empty()) factory.setMArch(extemp::UNIV::ARCH.front());
-      if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
-      if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
+      // if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
+      // if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
       factory.setOptLevel(llvm::CodeGenOpt::Aggressive);
       //factory.setOptLevel(llvm::CodeGenOpt::None);
-      llvm::TargetMachine* tm = factory.selectTarget();
+      llvm::Triple triple(llvm::sys::getProcessTriple());           
+      std::string cpu = llvm::sys::getHostCPUName();
+      if(!extemp::UNIV::CPU.empty()) cpu = extemp::UNIV::CPU.front();
+      llvm::StringMap<bool> HostFeatures;
+      llvm::sys::getHostCPUFeatures(HostFeatures);
+      llvm::SmallVector<std::string,10> lattrs;
+      for( llvm::StringMap<bool>::const_iterator it = HostFeatures.begin(); it != HostFeatures.end(); it++  )
+        {
+          std::string att = it->getValue() ? it->getKey().str() :
+            std::string("-") + it->getKey().str();
+          lattrs.append( 1, att );
+        }
+      if(!extemp::UNIV::ATTRS.empty()) {
+        lattrs.clear();
+        for(int i=0;i<extemp::UNIV::ATTRS.size();i++) {
+          lattrs.append(1, extemp::UNIV::ATTRS[i]);
+        }
+      }          
+      
+      llvm::TargetMachine* tm = factory.selectTarget(triple,"",cpu,lattrs);
       EE = factory.create(tm);
       EE->DisableLazyCompilation(true);
 
@@ -1496,7 +1515,7 @@ namespace extemp {
       std::cout << "ARCH           : " << std::flush;
       ascii_text_color(1,6,10);
       std::cout << std::string(tm->getTargetTriple().normalize()) << std::endl;
-      if(!std::string(tm->getTargetFeatureString()).empty())
+      if(!std::string(tm->getTargetCPU()).empty())
         {
           ascii_text_color(0,7,10);
           std::cout << "CPU            : " << std::flush;
