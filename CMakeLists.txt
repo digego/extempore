@@ -703,8 +703,6 @@ if(EXTENDED_DEPS)
   endif()
 
   if(PACKAGE)
-    message(STATUS "EXT_DEPS_INSTALL_DIR: ${EXT_DEPS_INSTALL_DIR}")
-
     ExternalProject_Add(LLVM-packaging
       PREFIX llvm
       URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
