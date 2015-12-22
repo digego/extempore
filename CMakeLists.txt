@@ -210,95 +210,6 @@ if(PACKAGE)
     PRIVATE -mtune=generic)
 endif()
 
-#######
-# APR #
-#######
-
-# current in-tree APR version: 1.5.2
-
-# generate the header with
-
-# ./configure --disable-dso --disable-shared
-
-add_library(apr STATIC
-  # headers
-  src/apr/include/apr.h  # make sure the right one for the platform!
-  src/apr/include/apr_env.h
-  src/apr/include/apr_file_io.h
-  src/apr/include/apr_file_info.h
-  )
-target_include_directories(apr
-  PRIVATE src/apr/include)
-
-if(UNIX)
-  target_sources(apr
-    PRIVATE src/apr/include/arch/unix/apr_arch_file_io.h
-    PRIVATE src/apr/include/arch/unix/apr_arch_misc.h
-    PRIVATE src/apr/file_io/unix/buffer.c
-    PRIVATE src/apr/file_io/unix/copy.c
-    PRIVATE src/apr/file_io/unix/dir.c
-    PRIVATE src/apr/file_io/unix/fileacc.c
-    PRIVATE src/apr/file_io/unix/filedup.c
-    PRIVATE src/apr/file_io/unix/filepath.c
-    PRIVATE src/apr/file_io/unix/filepath_util.c
-    PRIVATE src/apr/file_io/unix/filestat.c
-    PRIVATE src/apr/file_io/unix/flock.c
-    PRIVATE src/apr/file_io/unix/fullrw.c
-    PRIVATE src/apr/file_io/unix/mktemp.c
-    PRIVATE src/apr/file_io/unix/open.c
-    PRIVATE src/apr/file_io/unix/pipe.c
-    PRIVATE src/apr/file_io/unix/readwrite.c
-    PRIVATE src/apr/file_io/unix/seek.c
-    PRIVATE src/apr/file_io/unix/tempdir.c
-    PRIVATE src/apr/misc/unix/charset.c
-    PRIVATE src/apr/misc/unix/env.c
-    PRIVATE src/apr/misc/unix/errorcodes.c
-    PRIVATE src/apr/misc/unix/getopt.c
-    PRIVATE src/apr/misc/unix/otherchild.c
-    PRIVATE src/apr/misc/unix/rand.c
-    PRIVATE src/apr/misc/unix/randbyte_os2.inc
-    PRIVATE src/apr/misc/unix/start.c
-    PRIVATE src/apr/misc/unix/version.c
-    )
-  target_include_directories(apr
-    PRIVATE src/apr/include/arch/unix)
-elseif(WIN32)
-  target_sources(apr
-    PRIVATE src/apr/include/arch/win32/apr_arch_file_io.h
-    PRIVATE src/apr/include/arch/win32/apr_arch_misc.h
-    PRIVATE src/apr/file_io/win32/buffer.c
-    PRIVATE src/apr/file_io/win32/dir.c
-    PRIVATE src/apr/file_io/win32/filedup.c
-    PRIVATE src/apr/file_io/win32/filepath.c
-    PRIVATE src/apr/file_io/win32/filestat.c
-    PRIVATE src/apr/file_io/win32/filesys.c
-    PRIVATE src/apr/file_io/win32/flock.c
-    PRIVATE src/apr/file_io/win32/open.c
-    PRIVATE src/apr/file_io/win32/pipe.c
-    PRIVATE src/apr/file_io/win32/readwrite.c
-    PRIVATE src/apr/file_io/win32/seek.c
-    PRIVATE src/apr/misc/win32/apr_app.c
-    PRIVATE src/apr/misc/win32/charset.c
-    PRIVATE src/apr/misc/win32/env.c
-    PRIVATE src/apr/misc/win32/internal.c
-    PRIVATE src/apr/misc/win32/misc.c
-    PRIVATE src/apr/misc/win32/rand.c
-    PRIVATE src/apr/misc/win32/start.c
-    PRIVATE src/apr/misc/win32/utf8.c
-    )
-  target_include_directories(apr
-    PRIVATE src/apr/include/arch/win32)
-endif()
-
-# target_compile_definitions(apr
-#   PRIVATE -DHAVE_CONFIG_H
-#   )
-
-if(PACKAGE)
-  target_compile_options(apr
-    PRIVATE -mtune=generic)
-endif()
-
 ##############
 # LLVM 3.7.0 #
 ##############
@@ -420,7 +331,7 @@ endif()
 
 # dependencies
 
-add_dependencies(extempore pcre portaudio apr)
+add_dependencies(extempore pcre portaudio)
 
 if(DOWNLOAD_LLVM)
   add_dependencies(extempore LLVM)
@@ -767,8 +678,40 @@ if(EXTENDED_DEPS)
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
   if(WIN32)
-    # aargh! this still requires sh, sed, etc. and doesn't work. so
-    # we'll just grab the pre-built one manually
+    # on Windows, we need expat for apr
+    ExternalProject_Add(expat
+      PREFIX expat
+      URL http://downloads.sourceforge.net/project/expat/expat/2.1.0/expat-2.1.0.tar.gz
+      CMAKE_ARGS
+      -DBUILD_tools=OFF
+      -DBUILD_examples=OFF
+      -DBUILD_tests=OFF
+      -DCMAKE_OSX_SYSROOT=macosx
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+    # need to tell CMake where to find libexpat
+    set(CMAKE_MODULE_PATH ${EXT_DEPS_INSTALL_DIR})
+    ExternalProject_Add(apr
+      PREFIX apr
+      URL http://mirror.ventraip.net.au/apache/apr/apr-1.5.2.tar.gz
+      CMAKE_ARGS
+      -DAPR_HAVE_ODBC=OFF
+      -DINSTALL_PDB=OFF
+      -DCMAKE_OSX_SYSROOT=macosx
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+    add_dependencies(apr expat)
+
+    # aargh! sndfile on Windows still requires sh, sed, etc. and
+    # doesn't work. so we'll just grab the pre-built one manually
 
     # ExternalProject_Add(sndfile
     #   PREFIX libsndfile
@@ -786,6 +729,14 @@ if(EXTENDED_DEPS)
       URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
       CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite
       BUILD_COMMAND make CFLAGS=${EXT_DEPS_C_FLAGS}
+      INSTALL_COMMAND make install
+      BUILD_IN_SOURCE ON)
+
+    ExternalProject_Add(apr
+      PREFIX apr
+      URL http://mirror.ventraip.net.au/apache/apr/apr-1.5.2.tar.gz
+      CONFIGURE_COMMAND sh configure --prefix=${CMAKE_BINARY_DIR}/deps-install --enable-threads --disable-static
+      BUILD_COMMAND make
       INSTALL_COMMAND make install
       BUILD_IN_SOURCE ON)
   endif()
@@ -814,7 +765,7 @@ if(EXTENDED_DEPS)
   if(APPLE)
     add_custom_target(extended_deps
       COMMENT "moving shared libs into libs/platform-shlibs"
-      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile apr
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${EXT_PLATFORM_SHLIBS_DIR}
@@ -825,7 +776,7 @@ if(EXTENDED_DEPS)
   elseif(WIN32)
     add_custom_target(extended_deps
       COMMENT "moving shared libs into libs/platform-shlibs"
-      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile apr
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/bin/assimp.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
@@ -833,6 +784,7 @@ if(EXTENDED_DEPS)
       # COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/apr.dll ${EXT_PLATFORM_SHLIBS_DIR}
       # on Windows, move the .lib files as well
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/assimp.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
@@ -840,7 +792,8 @@ if(EXTENDED_DEPS)
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       # COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR})
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/apr.lib ${EXT_PLATFORM_SHLIBS_DIR})
   endif()
 
   add_dependencies(aot_extended extended_deps)
