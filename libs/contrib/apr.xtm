@@ -34,16 +34,389 @@
 (define *xtmlib-apr-loaded* #f)
 
 (impc:aot:suppress-aot-do
- (sys:load "libs/core/std.xtm"))
+ (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms
- (sys:load "libs/core/std.xtm" 'quiet))
+ (sys:load "libs/base/base.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmapr")
 
 (bind-dylib libapr
-  (cond ((string=? (sys:platform) "OSX") "libapr.dylib")
+  (cond ((string=? (sys:platform) "OSX") (list "libapr-1.dylib" "/usr/local/Cellar/apr/1.5.2/libexec/lib/libapr-1.0.dylib"))
         ((string=? (sys:platform) "Linux") "libapr.so")
         ((string=? (sys:platform) "Windows") "libapr.dll")))
+
+(bind-alias apr_status_t i32) ;; int
+(bind-alias apr_time_t i64)
+(bind-alias apr_interval_time_t i64)
+(bind-alias apr_off_t i64)
+(bind-alias apr_uid_t i32)
+(bind-alias apr_gid_t i32)
+(bind-alias apr_ino_t i64)
+;; use as opaque i8*
+(bind-alias apr_pool_t i8)
+(bind-alias apr_file_t i8)
+(bind-alias apr_array_header_t i8)
+
+;;;;;;;;;;;;;;;;;;;;;
+;; apr_file_info.h ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; /**
+;;  * @defgroup apr_file_info File Information
+;;  * @ingroup APR
+;;  * @{
+;;  */
+
+;; /* Many applications use the type member to determine the
+;;  * existance of a file or initialization of the file info,
+;;  * so the APR_NOFILE value must be distinct from APR_UNKFILE.
+;;  */
+
+;; /** apr_filetype_e values for the filetype member of the
+;;  * apr_file_info_t structure
+;;  * @warning: Not all of the filetypes below can be determined.
+;;  * For example, a given platform might not correctly report
+;;  * a socket descriptor as APR_SOCK if that type isn't
+;;  * well-identified on that platform.  In such cases where
+;;  * a filetype exists but cannot be described by the recognized
+;;  * flags below, the filetype will be APR_UNKFILE.  If the
+;;  * filetype member is not determined, the type will be APR_NOFILE.
+;;  */
+
+
+(bind-alias apr_filetype_e enum)
+
+(bind-val APR_NOFILE apr_filetype_e 0)     ;; no file type determined
+(bind-val APR_REG apr_filetype_e 1)        ;; a regular file
+(bind-val APR_DIR apr_filetype_e 2)        ;; a directory
+(bind-val APR_CHR apr_filetype_e 3)        ;; a character device
+(bind-val APR_BLK apr_filetype_e 4)        ;; a block device
+(bind-val APR_PIPE apr_filetype_e 5)       ;; a FIFO / pipe
+(bind-val APR_LNK apr_filetype_e 6)        ;; a symbolic link
+(bind-val APR_SOCK apr_filetype_e 7)       ;; a [unix domain] socket
+(bind-val APR_UNKFILE7 apr_filetype_e 127) ;; a file of some other unknown type
+
+;; /**
+;;  * @defgroup apr_file_permissions File Permissions flags
+;;  * @{
+;;  */
+
+(bind-val APR_FPROT_USETID i32 #x8000)
+(bind-val APR_FPROT_UREAD i32 #x0400)
+(bind-val APR_FPROT_UWRITE i32 #x0200)
+(bind-val APR_FPROT_UEXECUTE i32 #x0100)
+
+(bind-val APR_FPROT_GSETID i32 #x4000)
+(bind-val APR_FPROT_GREAD i32 #x0040)
+(bind-val APR_FPROT_GWRITE i32 #x0020)
+(bind-val APR_FPROT_GEXECUTE i32 #x0010)
+
+(bind-val APR_FPROT_WSTICKY i32 #x2000)
+(bind-val APR_FPROT_WREAD i32 #x0004)
+(bind-val APR_FPROT_WWRITE i32 #x0002)
+(bind-val APR_FPROT_WEXECUTE i32 #x0001)
+
+(bind-val APR_FPROT_OS_DEFAULT i32 #x0FFF)
+
+;; /* additional permission flags for apr_file_copy  and apr_file_append */
+(bind-val APR_FPROT_FILE_SOURCE_PERMS i32 #x1000)
+
+
+;; /**
+;;  * Structure for referencing directories.
+;;  */
+(bind-alias apr_dir_t i8)
+;; /**
+;;  * Structure for determining file permissions.
+;;  */
+(bind-alias apr_fileperms_t i32)
+;; #if (defined WIN32) || (defined NETWARE)
+;; /**
+;;  * Structure for determining the device the file is on.
+;;  */
+(bind-alias apr_dev_t i32)
+;; #else
+;; /**
+;;  * Structure for determining the device the file is on.
+;;  */
+;; (bind-alias apr_dev_t dev_t)
+;; #endif
+
+;; /**
+;;  * @defgroup apr_file_stat Stat Functions
+;;  * @{
+;;  */
+;; /** file info structure */
+
+(bind-val APR_FINFO_LINK i32 #x00000001)
+(bind-val APR_FINFO_MTIME i32 #x00000010)
+(bind-val APR_FINFO_CTIME i32 #x00000020)
+(bind-val APR_FINFO_ATIME i32 #x00000040)
+(bind-val APR_FINFO_SIZE i32 #x00000100)
+(bind-val APR_FINFO_CSIZE i32 #x00000200)
+(bind-val APR_FINFO_DEV i32 #x00001000)
+(bind-val APR_FINFO_INODE i32 #x00002000)
+(bind-val APR_FINFO_NLINK i32 #x00004000)
+(bind-val APR_FINFO_TYPE i32 #x00008000)
+(bind-val APR_FINFO_USER i32 #x00010000)
+(bind-val APR_FINFO_GROUP i32 #x00020000)
+(bind-val APR_FINFO_UPROT i32 #x00100000)
+(bind-val APR_FINFO_GPROT i32 #x00200000)
+(bind-val APR_FINFO_WPROT i32 #x00400000)
+(bind-val APR_FINFO_ICASE i32 #x01000000)
+(bind-val APR_FINFO_NAME i32 #x02000000)
+
+(bind-val APR_FINFO_MIN i32 #x00008170)
+(bind-val APR_FINFO_IDENT i32 #x00003000)
+(bind-val APR_FINFO_OWNER i32 #x00030000)
+(bind-val APR_FINFO_PROT i32 #x00700000)
+(bind-val APR_FINFO_NORM i32 #x0073b170)
+(bind-val APR_FINFO_DIRENT i32 #x02000000)
+
+;; ;; /**
+;; ;;  * The file information structure.  This is analogous to the POSIX
+;; ;;  * stat structure.
+;; ;;  */
+;; struct apr_finfo_t {
+;;     ;; /** Allocates memory and closes lingering handles in the specified pool */
+;;     apr_pool_t *pool;
+;;     ;; /** The bitmask describing valid fields of this apr_finfo_t structure
+;;     ;;  *  including all available 'wanted' fields and potentially more */
+;;     i32 valid;
+;;     ;; /** The access permissions of the file.  Mimics Unix access rights. */
+;;     apr_fileperms_t protection;
+;;     ;; /** The type of file.  One of APR_REG, APR_DIR, APR_CHR, APR_BLK, APR_PIPE,
+;;     ;;  * APR_LNK or APR_SOCK.  If the type is undetermined, the value is APR_NOFILE.
+;;     ;;  * If the type cannot be determined, the value is APR_UNKFILE.
+;;     ;;  */
+;;     apr_filetype_e filetype;
+;;     ;; /** The user id that owns the file */
+;;     apr_uid_t user;
+;;     ;; /** The group id that owns the file */
+;;     apr_gid_t group;
+;;     ;; /** The inode of the file. */
+;;     apr_ino_t inode;
+;;     ;; /** The id of the device the file is on. */
+;;     apr_dev_t device;
+;;     ;; /** The number of hard links to the file. */
+;;     i32 nlink;
+;;     ;; /** The size of the file */
+;;     apr_off_t size;
+;;     ;; /** The storage size consumed by the file */
+;;     apr_off_t csize;
+;;     ;; /** The time the file was last accessed */
+;;     apr_time_t atime;
+;;     ;; /** The time the file was last modified */
+;;     apr_time_t mtime;
+;;     ;; /** The time the file was created, or the inode was last changed */
+;;     apr_time_t ctime;
+;;     ;; /** The pathname of the file (possibly unrooted) */
+;;     const char *fname;
+;;     ;; /** The file's name (no path) in filesystem case */
+;;     const char *name;
+;;     ;; /** Unused */
+;;     struct apr_file_t *filehand;
+;; };
+
+(bind-type apr_finfo_t <apr_pool_t*,i32,apr_fileperms_t,apr_filetype_e,apr_uid_t,apr_gid_t,apr_ino_t,apr_dev_t,i32,apr_off_t,apr_off_t,apr_time_t,apr_time_t,apr_time_t,i8*,i8*,apr_file_t*>
+  "file information structure - analogous to the POSIX stat structure")
+
+
+;; /**
+;;  * get the specified file's stats.  The file is specified by filename,
+;;  * instead of using a pre-opened file.
+;;  * @param finfo Where to store the information about the file, which is
+;;  * never touched if the call fails.
+;;  * @param fname The name of the file to stat.
+;;  * @param wanted The desired apr_finfo_t fields, as a bit flag of APR_FINFO_
+;;                  values
+;;  * @param pool the pool to use to allocate the new file.
+;;  *
+;;  * @note If @c APR_INCOMPLETE is returned all the fields in @a finfo may
+;;  *       not be filled in, and you need to check the @c finfo->valid bitmask
+;;  *       to verify that what you're looking for is there.
+;;  */
+
+(bind-lib libapr apr_stat [apr_status_t,apr_finfo_t*,i8*,i32,apr_pool_t*]*)
+
+;; /** @} */
+;; /**
+;;  * @defgroup apr_dir Directory Manipulation Functions
+;;  * @{
+;;  */
+
+;; /**
+;;  * Open the specified directory.
+;;  * @param new_dir The opened directory descriptor.
+;;  * @param dirname The full path to the directory (use / on all systems)
+;;  * @param pool The pool to use.
+;;  */
+
+(bind-lib libapr apr_dir_open [apr_status_t,apr_dir_t**,i8*,apr_pool_t*]*)
+
+;; /**
+;;  * close the specified directory.
+;;  * @param thedir the directory descriptor to close.
+;;  */
+
+(bind-lib libapr apr_dir_close [apr_status_t,apr_dir_t*]*)
+
+;; /**
+;;  * Read the next entry from the specified directory.
+;;  * @param finfo the file info structure and filled in by apr_dir_read
+;;  * @param wanted The desired apr_finfo_t fields, as a bit flag of APR_FINFO_
+;;                  values
+;;  * @param thedir the directory descriptor returned from apr_dir_open
+;;  * @remark No ordering is guaranteed for the entries read.
+;;  *
+;;  * @note If @c APR_INCOMPLETE is returned all the fields in @a finfo may
+;;  *       not be filled in, and you need to check the @c finfo->valid bitmask
+;;  *       to verify that what you're looking for is there. When no more
+;;  *       entries are available, APR_ENOENT is returned.
+;;  */
+
+(bind-lib libapr apr_dir_read [apr_status_t,apr_finfo_t*,i32,apr_dir_t*]*)
+
+;; /**
+;;  * Rewind the directory to the first entry.
+;;  * @param thedir the directory descriptor to rewind.
+;;  */
+
+(bind-lib libapr apr_dir_rewind [apr_status_t,apr_dir_t*]*)
+;; /** @} */
+
+;; /**
+;;  * @defgroup apr_filepath Filepath Manipulation Functions
+;;  * @{
+;;  */
+
+;; /** Cause apr_filepath_merge to fail if addpath is above rootpath
+;;  * @bug in APR 0.9 and 1.x, this flag's behavior is undefined
+;;  * if the rootpath is NULL or empty.  In APR 2.0 this should be
+;;  * changed to imply NOTABSOLUTE if the rootpath is NULL or empty.
+;;  */
+(bind-val APR_FILEPATH_NOTABOVEROOT i32 #x01)
+
+;; /** internal: Only meaningful with APR_FILEPATH_NOTABOVEROOT */
+(bind-val APR_FILEPATH_SECUREROOTTEST i32 #x02)
+
+;; /** Cause apr_filepath_merge to fail if addpath is above rootpath,
+;;  * even given a rootpath /foo/bar and an addpath ../bar/bash
+;;  */
+(bind-val APR_FILEPATH_SECUREROOT i32 #x03)
+
+;; /** Fail apr_filepath_merge if the merged path is relative */
+(bind-val APR_FILEPATH_NOTRELATIVE i32 #x04)
+
+;; /** Fail apr_filepath_merge if the merged path is absolute */
+(bind-val APR_FILEPATH_NOTABSOLUTE i32 #x08)
+
+;; /** Return the file system's native path format (e.g. path delimiters
+;;  * of ':' on MacOS9, '\' on Win32, etc.) */
+(bind-val APR_FILEPATH_NATIVE i32 #x10)
+
+;; /** Resolve the true case of existing directories and file elements
+;;  * of addpath, (resolving any aliases on Win32) and append a proper
+;;  * trailing slash if a directory
+;;  */
+(bind-val APR_FILEPATH_TRUENAME i32 #x20)
+
+;; /**
+;;  * Extract the rootpath from the given filepath
+;;  * @param rootpath the root file path returned with APR_SUCCESS or APR_EINCOMPLETE
+;;  * @param filepath the pathname to parse for its root component
+;;  * @param flags the desired rules to apply, from
+;;  * <PRE>
+;;  *      APR_FILEPATH_NATIVE    Use native path separators (e.g. '\' on Win32)
+;;  *      APR_FILEPATH_TRUENAME  Tests that the root exists, and makes it proper
+;;  * </PRE>
+;;  * @param p the pool to allocate the new path string from
+;;  * @remark on return, filepath points to the first non-root character in the
+;;  * given filepath.  In the simplest example, given a filepath of "/foo",
+;;  * returns the rootpath of "/" and filepath points at "foo".  This is far
+;;  * more complex on other platforms, which will canonicalize the root form
+;;  * to a consistant format, given the APR_FILEPATH_TRUENAME flag, and also
+;;  * test for the validity of that root (e.g., that a drive d:/ or network
+;;  * share //machine/foovol/).
+;;  * The function returns APR_ERELATIVE if filepath isn't rooted (an
+;;  * error), APR_EINCOMPLETE if the root path is ambiguous (but potentially
+;;  * legitimate, e.g. "/" on Windows is incomplete because it doesn't specify
+;;  * the drive letter), or APR_EBADPATH if the root is simply invalid.
+;;  * APR_SUCCESS is returned if filepath is an absolute path.
+;;  */
+(bind-lib libapr apr_filepath_root [apr_status_t,i8**,i8**,i32,apr_pool_t*]*)
+
+;; /**
+;;  * Merge additional file path onto the previously processed rootpath
+;;  * @param newpath the merged paths returned
+;;  * @param rootpath the root file path (NULL uses the current working path)
+;;  * @param addpath the path to add to the root path
+;;  * @param flags the desired APR_FILEPATH_ rules to apply when merging
+;;  * @param p the pool to allocate the new path string from
+;;  * @remark if the flag APR_FILEPATH_TRUENAME is given, and the addpath
+;;  * contains wildcard characters ('*', '?') on platforms that don't support
+;;  * such characters within filenames, the paths will be merged, but the
+;;  * result code will be APR_EPATHWILD, and all further segments will not
+;;  * reflect the true filenames including the wildcard and following segments.
+;;  */
+
+(bind-lib libapr apr_filepath_merge [apr_status_t,i8**,i8*,i8*,i32,apr_pool_t*]*)
+
+;; /**
+;;  * Split a search path into separate components
+;;  * @param pathelts the returned components of the search path
+;;  * @param liststr the search path (e.g., <tt>getenv("PATH")</tt>)
+;;  * @param p the pool to allocate the array and path components from
+;;  * @remark empty path components do not become part of @a pathelts.
+;;  * @remark the path separator in @a liststr is system specific;
+;;  * e.g., ':' on Unix, ';' on Windows, etc.
+;;  */
+(bind-lib libapr apr_filepath_list_split [apr_status_t,apr_array_header_t**,i8*,apr_pool_t*]*)
+
+;; /**
+;;  * Merge a list of search path components into a single search path
+;;  * @param liststr the returned search path; may be NULL if @a pathelts is empty
+;;  * @param pathelts the components of the search path
+;;  * @param p the pool to allocate the search path from
+;;  * @remark emtpy strings in the source array are ignored.
+;;  * @remark the path separator in @a liststr is system specific;
+;;  * e.g., ':' on Unix, ';' on Windows, etc.
+;;  */
+(bind-lib libapr apr_filepath_list_merge [apr_status_t,i8**,apr_array_header_t*,apr_pool_t*]*)
+
+;; /**
+;;  * Return the default file path (for relative file names)
+;;  * @param path the default path string returned
+;;  * @param flags optional flag APR_FILEPATH_NATIVE to retrieve the
+;;  *              default file path in os-native format.
+;;  * @param p the pool to allocate the default path string from
+;;  */
+(bind-lib libapr apr_filepath_get [apr_status_t,i8**,i32,apr_pool_t*]*)
+
+;; /**
+;;  * Set the default file path (for relative file names)
+;;  * @param path the default path returned
+;;  * @param p the pool to allocate any working storage
+;;  */
+(bind-lib libapr apr_filepath_set [apr_status_t,i8*,apr_pool_t*]*)
+
+;; /** The FilePath character encoding is unknown */
+(bind-val APR_FILEPATH_ENCODING_UNKNOWN i32 0)
+
+;; /** The FilePath character encoding is locale-dependent */
+(bind-val APR_FILEPATH_ENCODING_LOCALE i32 1)
+
+;; /** The FilePath character encoding is UTF-8 */
+(bind-val APR_FILEPATH_ENCODING_UTF8 i32 2)
+
+;; /**
+;;  * Determine the encoding used internally by the FilePath functions
+;;  * @param style points to a variable which receives the encoding style flag
+;;  * @param p the pool to allocate any working storage
+;;  * @remark Use @c apr_os_locale_encoding and/or @c apr_os_default_encoding
+;;  * to get the name of the path encoding if it's not UTF-8.
+;;  */
+(bind-lib libapr apr_filepath_encoding [apr_status_t,i32*,apr_pool_t*]*)
 
 ;;;;;;;;;;;;;;;;;;;
 ;; apr_file_io.h ;;
@@ -137,11 +510,11 @@
 
 ;; /* flags for apr_file_seek */
 ;; /** Set the file position */
-(bind-val APR_SET i32 SEEK_SET)
+(bind-val APR_SET i32 0)
 ;; /** Current */
-(bind-val APR_CUR i32 SEEK_CUR)
+(bind-val APR_CUR i32 1)
 ;; /** Go to end of file */
-(bind-val APR_END i32 SEEK_END)
+(bind-val APR_END i32 2)
 ;; /** @} */
 
 ;; /**
@@ -159,28 +532,14 @@
 ;;  * @defgroup apr_file_writev{_full} max iovec size
 ;;  * @{
 ;;  */
-;; #if defined(DOXYGEN)
+(bind-alias iovec i8)
 (bind-val APR_MAX_IOVEC_SIZE i32 1024)
-                                               ;;      size of an iovec array */
-;; #elif defined(IOV_MAX)
-(bind-val APR_MAX_IOVEC_SIZE i32 IOV_MAX)
-;; #elif defined(MAX_IOVEC)
-(bind-val APR_MAX_IOVEC_SIZE i32 MAX_IOVEC)
-;; #else
-(bind-val APR_MAX_IOVEC_SIZE i32 1024)
-;; #endif
-;; /** @} */
 
 ;; /** File attributes */
-(bind-alias apr_fileattrs_t apr_uint32_t)
+(bind-alias apr_fileattrs_t i32)
 
 ;; /** Type to pass as whence argument to apr_file_seek. */
 (bind-alias apr_seek_where_t i32)
-
-;; /**
-;;  * Structure for referencing files.
-;;  */
-(bind-alias apr_file_t apr_file_t)
 
 ;; /* File lock types/flags */
 ;; /**
@@ -242,7 +601,7 @@
 ;;  * inherited by child processes created by apr_proc_create().  This
 ;;  * can be changed using apr_file_inherit_set().
 ;;  */
-(bind-lib libapr apr_file_open [apr_status_t,apr_file_t**,i8*,apr_int32_t,apr_fileperms_t,apr_pool_t*]*)
+(bind-lib libapr apr_file_open [apr_status_t,apr_file_t**,i8*,i32,apr_fileperms_t,apr_pool_t*]*)
 
 ;; /**
 ;;  * Close the specified file.
@@ -364,7 +723,7 @@
 ;;  *
 ;;  * @remark See remarks for apr_file_open_stderr().
 ;;  */
-(bind-lib libapr apr_file_open_flags_stderr [apr_status_t,apr_file_t**,apr_int32_t,apr_pool_t*]*)
+(bind-lib libapr apr_file_open_flags_stderr [apr_status_t,apr_file_t**,i32,apr_pool_t*]*)
 
 ;; /**
 ;;  * open standard output as an apr file pointer, with flags.
@@ -383,7 +742,7 @@
 ;;  *
 ;;  * @remark See remarks for apr_file_open_stderr().
 ;;  */
-(bind-lib libapr apr_file_open_flags_stdout [apr_status_t,apr_file_t**,apr_int32_t,apr_pool_t*]*)
+(bind-lib libapr apr_file_open_flags_stdout [apr_status_t,apr_file_t**,i32,apr_pool_t*]*)
 
 ;; /**
 ;;  * open standard input as an apr file pointer, with flags.
@@ -402,7 +761,7 @@
 ;;  *
 ;;  * @remark See remarks for apr_file_open_stderr().
 ;;  */
-(bind-lib libapr apr_file_open_flags_stdin [apr_status_t,apr_file_t**,apr_int32_t,apr_pool_t*]*)
+(bind-lib libapr apr_file_open_flags_stdin [apr_status_t,apr_file_t**,i32,apr_pool_t*]*)
 
 ;; /**
 ;;  * Read data from the specified file.
@@ -421,7 +780,7 @@
 ;;  * @remark It is not possible for both bytes to be read and an #APR_EOF
 ;;  * or other error to be returned.  #APR_EINTR is never returned.
 ;;  */
-(bind-lib libapr apr_file_read [apr_status_t,apr_file_t*,void*,apr_size_t*]*)
+(bind-lib libapr apr_file_read [apr_status_t,apr_file_t*,i8*,size_t*]*)
 
 ;; /**
 ;;  * Write data to the specified file.
@@ -438,7 +797,7 @@
 ;;  * @remark It is possible for both bytes to be written and an error to
 ;;  * be returned.  #APR_EINTR is never returned.
 ;;  */
-(bind-lib libapr apr_file_write [apr_status_t,apr_file_t*,void*,apr_size_t*]*)
+(bind-lib libapr apr_file_write [apr_status_t,apr_file_t*,i8*,size_t*]*)
 
 ;; /**
 ;;  * Write data from iovec array to the specified file.
@@ -455,7 +814,7 @@
 ;;  * @remark apr_file_writev() is available even if the underlying
 ;;  * operating system doesn't provide writev().
 ;;  */
-(bind-lib libapr apr_file_writev [apr_status_t,apr_file_t*,iovec*,apr_size_t,apr_size_t*]*)
+(bind-lib libapr apr_file_writev [apr_status_t,apr_file_t*,iovec*,size_t,size_t*]*)
 
 ;; /**
 ;;  * Read data from the specified file, ensuring that the buffer is filled
@@ -477,7 +836,7 @@
 ;;  *
 ;;  * @remark #APR_EINTR is never returned.
 ;;  */
-(bind-lib libapr apr_file_read_full [apr_status_t,apr_file_t*,void*,apr_size_t,apr_size_t*]*)
+(bind-lib libapr apr_file_read_full [apr_status_t,apr_file_t*,i8*,size_t,size_t*]*)
 
 ;; /**
 ;;  * Write data to the specified file, ensuring that all of the data is
@@ -499,7 +858,7 @@
 ;;  *
 ;;  * @remark #APR_EINTR is never returned.
 ;;  */
-(bind-lib libapr apr_file_write_full [apr_status_t,apr_file_t*,void*,apr_size_t,apr_size_t*]*)
+(bind-lib libapr apr_file_write_full [apr_status_t,apr_file_t*,i8*,size_t,size_t*]*)
 
 
 ;; /**
@@ -515,7 +874,7 @@
 ;;  * @remark apr_file_writev_full() is available even if the underlying
 ;;  * operating system doesn't provide writev().
 ;;  */
-(bind-lib libapr apr_file_writev_full [apr_status_t,apr_file_t*,iovec*,apr_size_t,apr_size_t*]*)
+(bind-lib libapr apr_file_writev_full [apr_status_t,apr_file_t*,iovec*,size_t,size_t*]*)
 ;; /**
 ;;  * Write a character into the specified file.
 ;;  * @param ch The character to write.
@@ -616,13 +975,13 @@
 ;;  *         bufsize=0 arguments it is possible to make a previously
 ;;  *         buffered file handle unbuffered.
 ;;  */
-(bind-lib libapr apr_file_buffer_set [apr_status_t,apr_file_t*,i8*,apr_size_t]*)
+(bind-lib libapr apr_file_buffer_set [apr_status_t,apr_file_t*,i8*,size_t]*)
 
 ;; /**
 ;;  * Get the size of any buffer for the specified apr file handle
 ;;  * @param thefile  The file handle
 ;;  */
-(bind-lib libapr apr_file_buffer_size_get [apr_size_t,apr_file_t*]*)
+(bind-lib libapr apr_file_buffer_size_get [size_t,apr_file_t*]*)
 
 ;; /**
 ;;  * Move the read/write file offset to a specified byte within a file.
@@ -671,7 +1030,7 @@
 ;;  * Use this function rather than apr_file_pipe_create() to create pipes
 ;;  * where one or both ends require non-blocking semantics.
 ;;  */
-(bind-lib libapr apr_file_pipe_create_ex [apr_status_t,apr_file_t**,apr_file_t**,apr_int32_t,apr_pool_t*]*)
+(bind-lib libapr apr_file_pipe_create_ex [apr_status_t,apr_file_t**,apr_file_t**,i32,apr_pool_t*]*)
 
 ;; /**
 ;;  * Create a named pipe.
@@ -732,7 +1091,7 @@
 ;;  * @param file The currently open file.
 ;;  */
 
-(bind-lib libapr apr_file_data_get [apr_status_t,void**,i8*,apr_file_t*]*)
+(bind-lib libapr apr_file_data_get [apr_status_t,i8**,i8*,apr_file_t*]*)
 
 ;; /**
 ;;  * Set the data associated with the current file.
@@ -742,7 +1101,7 @@
 ;;  * @param cleanup The cleanup routine to use when the file is destroyed.
 ;;  */
 
-(bind-lib libapr apr_file_data_set [apr_status_t,apr_file_t*,void*,i8*,apr_status_t*]*)
+(bind-lib libapr apr_file_data_set [apr_status_t,apr_file_t*,i8*,i8*,apr_status_t*]*)
 
 ;; /**
 ;;  * set the specified file's permission bits.
@@ -821,7 +1180,7 @@
 ;;  * @param thefile The file to get information about.
 ;;  */
 
-(bind-lib libapr apr_file_info_get [apr_status_t,apr_finfo_t*,apr_int32_t,apr_file_t*]*)
+(bind-lib libapr apr_file_info_get [apr_status_t,apr_finfo_t*,i32,apr_file_t*]*)
 
 
 ;; /**
@@ -835,9 +1194,9 @@
 ;; /**
 ;;  * Retrieve the flags that were passed into apr_file_open()
 ;;  * when the file was opened.
-;;  * @return apr_int32_t the flags
+;;  * @return i32 the flags
 ;;  */
-(bind-lib libapr apr_file_flags_get [apr_int32_t,apr_file_t*]*)
+(bind-lib libapr apr_file_flags_get [i32,apr_file_t*]*)
 
 ;; /**
 ;;  * Get the pool used by the file.
@@ -872,7 +1231,7 @@
 ;;  * array.
 ;;  *
 ;;  */
-(bind-lib libapr apr_file_mktemp [apr_status_t,apr_file_t**,i8*,apr_int32_t,apr_pool_t*]*)
+(bind-lib libapr apr_file_mktemp [apr_status_t,apr_file_t**,i8*,i32,apr_pool_t*]*)
 
 
 ;; /**
@@ -885,368 +1244,6 @@
 ;;  *
 ;;  */
 (bind-lib libapr apr_temp_dir_get [apr_status_t,i8**,apr_pool_t*]*)
-
-;;;;;;;;;;;;;;;;;;;;;
-;; apr_file_info.h ;;
-;;;;;;;;;;;;;;;;;;;;;
-
-;; /**
-;;  * @defgroup apr_file_info File Information
-;;  * @ingroup APR
-;;  * @{
-;;  */
-
-;; /* Many applications use the type member to determine the
-;;  * existance of a file or initialization of the file info,
-;;  * so the APR_NOFILE value must be distinct from APR_UNKFILE.
-;;  */
-
-;; /** apr_filetype_e values for the filetype member of the
-;;  * apr_file_info_t structure
-;;  * @warning: Not all of the filetypes below can be determined.
-;;  * For example, a given platform might not correctly report
-;;  * a socket descriptor as APR_SOCK if that type isn't
-;;  * well-identified on that platform.  In such cases where
-;;  * a filetype exists but cannot be described by the recognized
-;;  * flags below, the filetype will be APR_UNKFILE.  If the
-;;  * filetype member is not determined, the type will be APR_NOFILE.
-;;  */
-
-
-(bind-alias apr_filetype_e enum)
-
-(bind-val APR_NOFILE apr_filetype_e 0)     ;; no file type determined
-(bind-val APR_REG apr_filetype_e 1)        ;; a regular file
-(bind-val APR_DIR apr_filetype_e 2)        ;; a directory
-(bind-val APR_CHR apr_filetype_e 3)        ;; a character device
-(bind-val APR_BLK apr_filetype_e 4)        ;; a block device
-(bind-val APR_PIPE apr_filetype_e 5)       ;; a FIFO / pipe
-(bind-val APR_LNK apr_filetype_e 6)        ;; a symbolic link
-(bind-val APR_SOCK apr_filetype_e 7)       ;; a [unix domain] socket
-(bind-val APR_UNKFILE7 apr_filetype_e 127) ;; a file of some other unknown type
-
-;; /**
-;;  * @defgroup apr_file_permissions File Permissions flags
-;;  * @{
-;;  */
-
-(bind-val APR_FPROT_USETID i32 #x8000)
-(bind-val APR_FPROT_UREAD i32 #x0400)
-(bind-val APR_FPROT_UWRITE i32 #x0200)
-(bind-val APR_FPROT_UEXECUTE i32 #x0100)
-
-(bind-val APR_FPROT_GSETID i32 #x4000)
-(bind-val APR_FPROT_GREAD i32 #x0040)
-(bind-val APR_FPROT_GWRITE i32 #x0020)
-(bind-val APR_FPROT_GEXECUTE i32 #x0010)
-
-(bind-val APR_FPROT_WSTICKY i32 #x2000)
-(bind-val APR_FPROT_WREAD i32 #x0004)
-(bind-val APR_FPROT_WWRITE i32 #x0002)
-(bind-val APR_FPROT_WEXECUTE i32 #x0001)
-
-(bind-val APR_FPROT_OS_DEFAULT i32 #x0FFF)
-
-;; /* additional permission flags for apr_file_copy  and apr_file_append */
-(bind-val APR_FPROT_FILE_SOURCE_PERMS i32 #x1000)
-
-
-;; /**
-;;  * Structure for referencing directories.
-;;  */
-(bind-alias apr_dir_t apr_dir_t)
-;; /**
-;;  * Structure for determining file permissions.
-;;  */
-(bind-alias apr_fileperms_t apr_int32_t)
-;; #if (defined WIN32) || (defined NETWARE)
-;; /**
-;;  * Structure for determining the device the file is on.
-;;  */
-(bind-alias apr_dev_t apr_uint32_t)
-;; #else
-;; /**
-;;  * Structure for determining the device the file is on.
-;;  */
-(bind-alias apr_dev_t dev_t)
-;; #endif
-
-;; /**
-;;  * @defgroup apr_file_stat Stat Functions
-;;  * @{
-;;  */
-;; /** file info structure */
-(bind-alias apr_finfo_t apr_finfo_t)
-
-(bind-val APR_FINFO_LINK i32 #x00000001)
-(bind-val APR_FINFO_MTIME i32 #x00000010)
-(bind-val APR_FINFO_CTIME i32 #x00000020)
-(bind-val APR_FINFO_ATIME i32 #x00000040)
-(bind-val APR_FINFO_SIZE i32 #x00000100)
-(bind-val APR_FINFO_CSIZE i32 #x00000200)
-(bind-val APR_FINFO_DEV i32 #x00001000)
-(bind-val APR_FINFO_INODE i32 #x00002000)
-(bind-val APR_FINFO_NLINK i32 #x00004000)
-(bind-val APR_FINFO_TYPE i32 #x00008000)
-(bind-val APR_FINFO_USER i32 #x00010000)
-(bind-val APR_FINFO_GROUP i32 #x00020000)
-(bind-val APR_FINFO_UPROT i32 #x00100000)
-(bind-val APR_FINFO_GPROT i32 #x00200000)
-(bind-val APR_FINFO_WPROT i32 #x00400000)
-(bind-val APR_FINFO_ICASE i32 #x01000000)
-(bind-val APR_FINFO_NAME i32 #x02000000)
-
-(bind-val APR_FINFO_MIN i32 #x00008170)
-(bind-val APR_FINFO_IDENT i32 #x00003000)
-(bind-val APR_FINFO_OWNER i32 #x00030000)
-(bind-val APR_FINFO_PROT i32 #x00700000)
-(bind-val APR_FINFO_NORM i32 #x0073b170)
-(bind-val APR_FINFO_DIRENT i32 #x02000000)
-
-;; ;; /**
-;; ;;  * The file information structure.  This is analogous to the POSIX
-;; ;;  * stat structure.
-;; ;;  */
-;; struct apr_finfo_t {
-;;     ;; /** Allocates memory and closes lingering handles in the specified pool */
-;;     apr_pool_t *pool;
-;;     ;; /** The bitmask describing valid fields of this apr_finfo_t structure
-;;     ;;  *  including all available 'wanted' fields and potentially more */
-;;     apr_int32_t valid;
-;;     ;; /** The access permissions of the file.  Mimics Unix access rights. */
-;;     apr_fileperms_t protection;
-;;     ;; /** The type of file.  One of APR_REG, APR_DIR, APR_CHR, APR_BLK, APR_PIPE,
-;;     ;;  * APR_LNK or APR_SOCK.  If the type is undetermined, the value is APR_NOFILE.
-;;     ;;  * If the type cannot be determined, the value is APR_UNKFILE.
-;;     ;;  */
-;;     apr_filetype_e filetype;
-;;     ;; /** The user id that owns the file */
-;;     apr_uid_t user;
-;;     ;; /** The group id that owns the file */
-;;     apr_gid_t group;
-;;     ;; /** The inode of the file. */
-;;     apr_ino_t inode;
-;;     ;; /** The id of the device the file is on. */
-;;     apr_dev_t device;
-;;     ;; /** The number of hard links to the file. */
-;;     apr_int32_t nlink;
-;;     ;; /** The size of the file */
-;;     apr_off_t size;
-;;     ;; /** The storage size consumed by the file */
-;;     apr_off_t csize;
-;;     ;; /** The time the file was last accessed */
-;;     apr_time_t atime;
-;;     ;; /** The time the file was last modified */
-;;     apr_time_t mtime;
-;;     ;; /** The time the file was created, or the inode was last changed */
-;;     apr_time_t ctime;
-;;     ;; /** The pathname of the file (possibly unrooted) */
-;;     const char *fname;
-;;     ;; /** The file's name (no path) in filesystem case */
-;;     const char *name;
-;;     ;; /** Unused */
-;;     struct apr_file_t *filehand;
-;; };
-
-(bind-type apr_finfo_t <apr_pool_t*,apr_int32_t,apr_fileperms_t,apr_filetype_e,apr_uid_t,apr_gid_t,apr_ino_t,apr_dev_t,apr_int32_t,apr_off_t,apr_off_t,apr_time_t,apr_time_t,apr_time_t,i8*,i8*,apr_file_t*>
-  "file information structure - analogous to the POSIX stat structure")
-
-
-;; /**
-;;  * get the specified file's stats.  The file is specified by filename,
-;;  * instead of using a pre-opened file.
-;;  * @param finfo Where to store the information about the file, which is
-;;  * never touched if the call fails.
-;;  * @param fname The name of the file to stat.
-;;  * @param wanted The desired apr_finfo_t fields, as a bit flag of APR_FINFO_
-;;                  values
-;;  * @param pool the pool to use to allocate the new file.
-;;  *
-;;  * @note If @c APR_INCOMPLETE is returned all the fields in @a finfo may
-;;  *       not be filled in, and you need to check the @c finfo->valid bitmask
-;;  *       to verify that what you're looking for is there.
-;;  */
-
-(bind-lib libapr apr_stat [apr_status_t,apr_finfo_t*,i8*,apr_int32_t,apr_pool_t*]*)
-
-;; /** @} */
-;; /**
-;;  * @defgroup apr_dir Directory Manipulation Functions
-;;  * @{
-;;  */
-
-;; /**
-;;  * Open the specified directory.
-;;  * @param new_dir The opened directory descriptor.
-;;  * @param dirname The full path to the directory (use / on all systems)
-;;  * @param pool The pool to use.
-;;  */
-
-(bind-lib libapr apr_dir_open [apr_status_t,apr_dir_t**,i8*,apr_pool_t*]*)
-
-;; /**
-;;  * close the specified directory.
-;;  * @param thedir the directory descriptor to close.
-;;  */
-
-(bind-lib libapr apr_dir_close [apr_status_t,apr_dir_t*]*)
-
-;; /**
-;;  * Read the next entry from the specified directory.
-;;  * @param finfo the file info structure and filled in by apr_dir_read
-;;  * @param wanted The desired apr_finfo_t fields, as a bit flag of APR_FINFO_
-;;                  values
-;;  * @param thedir the directory descriptor returned from apr_dir_open
-;;  * @remark No ordering is guaranteed for the entries read.
-;;  *
-;;  * @note If @c APR_INCOMPLETE is returned all the fields in @a finfo may
-;;  *       not be filled in, and you need to check the @c finfo->valid bitmask
-;;  *       to verify that what you're looking for is there. When no more
-;;  *       entries are available, APR_ENOENT is returned.
-;;  */
-
-(bind-lib libapr apr_dir_read [apr_status_t,apr_finfo_t*,apr_int32_t,apr_dir_t*]*)
-
-;; /**
-;;  * Rewind the directory to the first entry.
-;;  * @param thedir the directory descriptor to rewind.
-;;  */
-
-(bind-lib libapr apr_dir_rewind [apr_status_t,apr_dir_t*]*)
-;; /** @} */
-
-;; /**
-;;  * @defgroup apr_filepath Filepath Manipulation Functions
-;;  * @{
-;;  */
-
-;; /** Cause apr_filepath_merge to fail if addpath is above rootpath
-;;  * @bug in APR 0.9 and 1.x, this flag's behavior is undefined
-;;  * if the rootpath is NULL or empty.  In APR 2.0 this should be
-;;  * changed to imply NOTABSOLUTE if the rootpath is NULL or empty.
-;;  */
-(bind-val APR_FILEPATH_NOTABOVEROOT i32 #x01)
-
-;; /** internal: Only meaningful with APR_FILEPATH_NOTABOVEROOT */
-(bind-val APR_FILEPATH_SECUREROOTTEST i32 #x02)
-
-;; /** Cause apr_filepath_merge to fail if addpath is above rootpath,
-;;  * even given a rootpath /foo/bar and an addpath ../bar/bash
-;;  */
-(bind-val APR_FILEPATH_SECUREROOT i32 #x03)
-
-;; /** Fail apr_filepath_merge if the merged path is relative */
-(bind-val APR_FILEPATH_NOTRELATIVE i32 #x04)
-
-;; /** Fail apr_filepath_merge if the merged path is absolute */
-(bind-val APR_FILEPATH_NOTABSOLUTE i32 #x08)
-
-;; /** Return the file system's native path format (e.g. path delimiters
-;;  * of ':' on MacOS9, '\' on Win32, etc.) */
-(bind-val APR_FILEPATH_NATIVE i32 #x10)
-
-;; /** Resolve the true case of existing directories and file elements
-;;  * of addpath, (resolving any aliases on Win32) and append a proper
-;;  * trailing slash if a directory
-;;  */
-(bind-val APR_FILEPATH_TRUENAME i32 #x20)
-
-;; /**
-;;  * Extract the rootpath from the given filepath
-;;  * @param rootpath the root file path returned with APR_SUCCESS or APR_EINCOMPLETE
-;;  * @param filepath the pathname to parse for its root component
-;;  * @param flags the desired rules to apply, from
-;;  * <PRE>
-;;  *      APR_FILEPATH_NATIVE    Use native path separators (e.g. '\' on Win32)
-;;  *      APR_FILEPATH_TRUENAME  Tests that the root exists, and makes it proper
-;;  * </PRE>
-;;  * @param p the pool to allocate the new path string from
-;;  * @remark on return, filepath points to the first non-root character in the
-;;  * given filepath.  In the simplest example, given a filepath of "/foo",
-;;  * returns the rootpath of "/" and filepath points at "foo".  This is far
-;;  * more complex on other platforms, which will canonicalize the root form
-;;  * to a consistant format, given the APR_FILEPATH_TRUENAME flag, and also
-;;  * test for the validity of that root (e.g., that a drive d:/ or network
-;;  * share //machine/foovol/).
-;;  * The function returns APR_ERELATIVE if filepath isn't rooted (an
-;;  * error), APR_EINCOMPLETE if the root path is ambiguous (but potentially
-;;  * legitimate, e.g. "/" on Windows is incomplete because it doesn't specify
-;;  * the drive letter), or APR_EBADPATH if the root is simply invalid.
-;;  * APR_SUCCESS is returned if filepath is an absolute path.
-;;  */
-(bind-lib libapr apr_filepath_root [apr_status_t,i8**,i8**,apr_int32_t,apr_pool_t*]*)
-
-;; /**
-;;  * Merge additional file path onto the previously processed rootpath
-;;  * @param newpath the merged paths returned
-;;  * @param rootpath the root file path (NULL uses the current working path)
-;;  * @param addpath the path to add to the root path
-;;  * @param flags the desired APR_FILEPATH_ rules to apply when merging
-;;  * @param p the pool to allocate the new path string from
-;;  * @remark if the flag APR_FILEPATH_TRUENAME is given, and the addpath
-;;  * contains wildcard characters ('*', '?') on platforms that don't support
-;;  * such characters within filenames, the paths will be merged, but the
-;;  * result code will be APR_EPATHWILD, and all further segments will not
-;;  * reflect the true filenames including the wildcard and following segments.
-;;  */
-
-(bind-lib libapr apr_filepath_merge [apr_status_t,i8**,i8*,i8*,apr_int32_t,apr_pool_t*]*)
-
-;; /**
-;;  * Split a search path into separate components
-;;  * @param pathelts the returned components of the search path
-;;  * @param liststr the search path (e.g., <tt>getenv("PATH")</tt>)
-;;  * @param p the pool to allocate the array and path components from
-;;  * @remark empty path components do not become part of @a pathelts.
-;;  * @remark the path separator in @a liststr is system specific;
-;;  * e.g., ':' on Unix, ';' on Windows, etc.
-;;  */
-(bind-lib libapr apr_filepath_list_split [apr_status_t,apr_array_header_t**,i8*,apr_pool_t*]*)
-
-;; /**
-;;  * Merge a list of search path components into a single search path
-;;  * @param liststr the returned search path; may be NULL if @a pathelts is empty
-;;  * @param pathelts the components of the search path
-;;  * @param p the pool to allocate the search path from
-;;  * @remark emtpy strings in the source array are ignored.
-;;  * @remark the path separator in @a liststr is system specific;
-;;  * e.g., ':' on Unix, ';' on Windows, etc.
-;;  */
-(bind-lib libapr apr_filepath_list_merge [apr_status_t,i8**,apr_array_header_t*,apr_pool_t*]*)
-
-;; /**
-;;  * Return the default file path (for relative file names)
-;;  * @param path the default path string returned
-;;  * @param flags optional flag APR_FILEPATH_NATIVE to retrieve the
-;;  *              default file path in os-native format.
-;;  * @param p the pool to allocate the default path string from
-;;  */
-(bind-lib libapr apr_filepath_get [apr_status_t,i8**,apr_int32_t,apr_pool_t*]*)
-
-;; /**
-;;  * Set the default file path (for relative file names)
-;;  * @param path the default path returned
-;;  * @param p the pool to allocate any working storage
-;;  */
-(bind-lib libapr apr_filepath_set [apr_status_t,i8*,apr_pool_t*]*)
-
-;; /** The FilePath character encoding is unknown */
-(bind-val APR_FILEPATH_ENCODING_UNKNOWN i32 0)
-
-;; /** The FilePath character encoding is locale-dependent */
-(bind-val APR_FILEPATH_ENCODING_LOCALE i32 1)
-
-;; /** The FilePath character encoding is UTF-8 */
-(bind-val APR_FILEPATH_ENCODING_UTF8 i32 2)
-
-;; /**
-;;  * Determine the encoding used internally by the FilePath functions
-;;  * @param style points to a variable which receives the encoding style flag
-;;  * @param p the pool to allocate any working storage
-;;  * @remark Use @c apr_os_locale_encoding and/or @c apr_os_default_encoding
-;;  * to get the name of the path encoding if it's not UTF-8.
-;;  */
-(bind-lib libapr apr_filepath_encoding [apr_status_t,i32*,apr_pool_t*]*)
 
 ;;;;;;;;;;;;;;;
 ;; apr_env.h ;;
