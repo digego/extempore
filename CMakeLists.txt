@@ -210,6 +210,95 @@ if(PACKAGE)
     PRIVATE -mtune=generic)
 endif()
 
+#######
+# APR #
+#######
+
+# current in-tree APR version: 1.5.2
+
+# generate the header with
+
+# ./configure --disable-dso --disable-shared
+
+add_library(apr STATIC
+  # headers
+  src/apr/include/apr.h  # make sure the right one for the platform!
+  src/apr/include/apr_env.h
+  src/apr/include/apr_file_io.h
+  src/apr/include/apr_file_info.h
+  )
+target_include_directories(apr
+  PRIVATE src/apr/include)
+
+if(UNIX)
+  target_sources(apr
+    PRIVATE src/apr/include/arch/unix/apr_arch_file_io.h
+    PRIVATE src/apr/include/arch/unix/apr_arch_misc.h
+    PRIVATE src/apr/file_io/unix/buffer.c
+    PRIVATE src/apr/file_io/unix/copy.c
+    PRIVATE src/apr/file_io/unix/dir.c
+    PRIVATE src/apr/file_io/unix/fileacc.c
+    PRIVATE src/apr/file_io/unix/filedup.c
+    PRIVATE src/apr/file_io/unix/filepath.c
+    PRIVATE src/apr/file_io/unix/filepath_util.c
+    PRIVATE src/apr/file_io/unix/filestat.c
+    PRIVATE src/apr/file_io/unix/flock.c
+    PRIVATE src/apr/file_io/unix/fullrw.c
+    PRIVATE src/apr/file_io/unix/mktemp.c
+    PRIVATE src/apr/file_io/unix/open.c
+    PRIVATE src/apr/file_io/unix/pipe.c
+    PRIVATE src/apr/file_io/unix/readwrite.c
+    PRIVATE src/apr/file_io/unix/seek.c
+    PRIVATE src/apr/file_io/unix/tempdir.c
+    PRIVATE src/apr/misc/unix/charset.c
+    PRIVATE src/apr/misc/unix/env.c
+    PRIVATE src/apr/misc/unix/errorcodes.c
+    PRIVATE src/apr/misc/unix/getopt.c
+    PRIVATE src/apr/misc/unix/otherchild.c
+    PRIVATE src/apr/misc/unix/rand.c
+    PRIVATE src/apr/misc/unix/randbyte_os2.inc
+    PRIVATE src/apr/misc/unix/start.c
+    PRIVATE src/apr/misc/unix/version.c
+    )
+  target_include_directories(apr
+    PRIVATE src/apr/include/arch/unix)
+elseif(WIN32)
+  target_sources(apr
+    PRIVATE src/apr/include/arch/win32/apr_arch_file_io.h
+    PRIVATE src/apr/include/arch/win32/apr_arch_misc.h
+    PRIVATE src/apr/file_io/win32/buffer.c
+    PRIVATE src/apr/file_io/win32/dir.c
+    PRIVATE src/apr/file_io/win32/filedup.c
+    PRIVATE src/apr/file_io/win32/filepath.c
+    PRIVATE src/apr/file_io/win32/filestat.c
+    PRIVATE src/apr/file_io/win32/filesys.c
+    PRIVATE src/apr/file_io/win32/flock.c
+    PRIVATE src/apr/file_io/win32/open.c
+    PRIVATE src/apr/file_io/win32/pipe.c
+    PRIVATE src/apr/file_io/win32/readwrite.c
+    PRIVATE src/apr/file_io/win32/seek.c
+    PRIVATE src/apr/misc/win32/apr_app.c
+    PRIVATE src/apr/misc/win32/charset.c
+    PRIVATE src/apr/misc/win32/env.c
+    PRIVATE src/apr/misc/win32/internal.c
+    PRIVATE src/apr/misc/win32/misc.c
+    PRIVATE src/apr/misc/win32/rand.c
+    PRIVATE src/apr/misc/win32/start.c
+    PRIVATE src/apr/misc/win32/utf8.c
+    )
+  target_include_directories(apr
+    PRIVATE src/apr/include/arch/win32)
+endif()
+
+# target_compile_definitions(apr
+#   PRIVATE -DHAVE_CONFIG_H
+#   )
+
+if(PACKAGE)
+  target_compile_options(apr
+    PRIVATE -mtune=generic)
+endif()
+
 ##############
 # LLVM 3.7.0 #
 ##############
@@ -331,7 +420,7 @@ endif()
 
 # dependencies
 
-add_dependencies(extempore pcre portaudio)
+add_dependencies(extempore pcre portaudio apr)
 
 if(DOWNLOAD_LLVM)
   add_dependencies(extempore LLVM)
@@ -680,7 +769,7 @@ if(EXTENDED_DEPS)
   if(WIN32)
     # aargh! this still requires sh, sed, etc. and doesn't work. so
     # we'll just grab the pre-built one manually
-    
+
     # ExternalProject_Add(sndfile
     #   PREFIX libsndfile
     #   URL https://github.com/erikd/libsndfile/archive/master.zip
