@@ -1854,16 +1854,20 @@ namespace extemp {
     memcpy((void*)&rgx[0],x,strlen(x));
     strcat((char*)&rgx[0],"_.*");
     // printf("check regex: %s\n",(char*)&rgx[0]);
-    
-    Module* M = EXTLLVM::I()->M;    
-    for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-      const llvm::Function* func = GI;
-      if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
-        //printf("HIT %s\n",func->getName().data());
-        std::string str;
-        llvm::raw_string_ostream ss(str);
-        ss << *func;
-        printf("\n---------------------------------------------------\n%s",str.c_str());        
+
+    Module* M = NULL;
+    std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
+    for (int i=0;i<Ms.size();i++) {
+      M = Ms[i];    
+      for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
+        const llvm::Function* func = GI;
+        if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
+          //printf("HIT %s\n",func->getName().data());
+          std::string str;
+          llvm::raw_string_ostream ss(str);
+          ss << *func;
+          printf("\n---------------------------------------------------\n%s",str.c_str());        
+        }
       }
     }
     return _sc->T;
@@ -1879,15 +1883,19 @@ namespace extemp {
     strcat((char*)&rgx[0],"__[0-9]*");
     // printf("check regex: %s\n",(char*)&rgx[0]);
     
-    Module* M = EXTLLVM::I()->M;    
-    for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-      const llvm::Function* func = GI;
-      if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
-        //printf("HIT %s\n",func->getName().data());
-        std::string str;
-        llvm::raw_string_ostream ss(str);
-        ss << *func;
-        printf("\n---------------------------------------------------\n%s",str.c_str());        
+    Module* M = NULL;
+    std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
+    for (int i=0;i<Ms.size();i++) {
+      M = Ms[i];
+      for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
+        const llvm::Function* func = GI;
+        if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
+          //printf("HIT %s\n",func->getName().data());
+          std::string str;
+          llvm::raw_string_ostream ss(str);
+          ss << *func;
+          printf("\n---------------------------------------------------\n%s",str.c_str());        
+        }
       }
     }
     return _sc->T;
@@ -1903,12 +1911,16 @@ namespace extemp {
     strcat((char*)&rgx[0],"__[0-9]*");
     // printf("check regex: %s\n",(char*)&rgx[0]);
     char* last_name = NULL;
-    
-    Module* M = EXTLLVM::I()->M;    
-    for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-      const llvm::Function* func = GI;
-      if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
-        last_name = (char*)func->getName().data();
+
+    Module* M = NULL;
+    std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
+    for (int i=0;i<Ms.size();i++) {
+      M = Ms[i];    
+      for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
+        const llvm::Function* func = GI;
+        if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
+          last_name = (char*)func->getName().data();
+        }
       }
     }
 

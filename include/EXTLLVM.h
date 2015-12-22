@@ -227,12 +227,14 @@ namespace extemp {
 #ifdef EXT_MCJIT  
   uint64_t getSymbolAddress(std::string);
 #endif
-  void addModule(llvm::Module* m) { Ms.push_back(m); }  
+  void addModule(llvm::Module* m) { Ms.push_back(m); }
+  std::vector<llvm::Module*>& getModules() { return Ms; }
 	
 	static int64_t LLVM_COUNT;
 	static bool OPTIMIZE_COMPILES;	
 	static bool VERIFY_COMPILES;	
-		
+
+
 	llvm::Module* M;
 	llvm::ModuleProvider* MP;
 	llvm::ExecutionEngine* EE;
@@ -242,8 +244,8 @@ namespace extemp {
 #endif  
 
     private:
-	static EXTLLVM SINGLETON;
   std::vector<llvm::Module*> Ms;  
+	static EXTLLVM SINGLETON;
     };
 
 } // end extemp namespace
