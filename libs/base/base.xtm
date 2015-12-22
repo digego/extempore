@@ -1,37 +1,37 @@
-;; 
+;;
 ;; Copyright (c) 2011, Andrew Sorensen
-;; 
+;;
 ;; All rights reserved.
-;; 
-;; 
-;; Redistribution and use in source and binary forms, with or without 
+;;
+;;
+;; Redistribution and use in source and binary forms, with or without
 ;; modification, are permitted provided that the following conditions are met:
-;; 
-;; 1. Redistributions of source code must retain the above copyright notice, 
+;;
+;; 1. Redistributions of source code must retain the above copyright notice,
 ;;    this list of conditions and the following disclaimer.
-;; 
+;;
 ;; 2. Redistributions in binary form must reproduce the above copyright notice,
-;;    this list of conditions and the following disclaimer in the documentation 
+;;    this list of conditions and the following disclaimer in the documentation
 ;;    and/or other materials provided with the distribution.
-;; 
+;;
 ;; Neither the name of the authors nor other contributors may be used to endorse
-;; or promote products derived from this software without specific prior written 
+;; or promote products derived from this software without specific prior written
 ;; permission.
-;; 
-;; 
-;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-;; ARE DISCLEXTD. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
-;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
-;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
-;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
-;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
-;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+;;
+;;
+;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+;; ARE DISCLEXTD. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;; POSSIBILITY OF SUCH DAMAGE.
-;; 
-;; 
+;;
+;;
 
 
 ;; std.xtm is loaded automatically by all processes on startup
@@ -179,49 +179,59 @@
 ;; xtlang macros ;;
 ;;;;;;;;;;;;;;;;;;;
 
-(bind-macro (inc x y)
+(bind-macro
   "increment variable by y"
+  (inc x y)
   `(set! ,x (+ ,x ,y)))
 
-(bind-macro (dec x y)
+(bind-macro
   "decrement variable by y"
+  (dec x y)
   `(set! ,x (- ,x ,y)))
 
-(bind-macro (min x y)
+(bind-macro
   "minimum of x and y"
+  (min x y)
   `(if (< ,x ,y) ,x ,y))
 
-(bind-macro (max x y)
+(bind-macro
   "maximum of x and y"
+  (max x y)
   `(if (> ,x ,y) ,x ,y))
 
-(bind-macro (clamp x minval maxval)
+(bind-macro
   "clamp input value to range"
+  (clamp x minval maxval)
   `(if (> ,x ,maxval) ,maxval
        (if (< ,x ,minval) ,minval
            ,x)))
 
-(bind-macro (logn x base)
+(bind-macro
   "log with arbitrary base"
+  (logn x base)
   `(/ (log ,x) (log ,base)))
 
-(bind-macro (deg2rad degrees)
+(bind-macro
+  (deg2rad degrees)
   "convert angle in degrees to radians"
   `(/ ,degrees 57.2957795))
 
-(bind-macro (rad2deg radians)
+(bind-macro
   "convert angle in radians to degrees"
+  (rad2deg radians)
   `(* 57.2957795 ,radians))
 
-(bind-macro (evenp x)
+(bind-macro
   "returns #t for even integers, #f otherwise"
+  (evenp x)
   `(if (= (bitwise-and ,x 1) 0) 1:i1 0:i1))
 
-(bind-macro (oddp x)
+(bind-macro
   "returns #t for odd integers, #f otherwise"
+  (oddp x)
   `(if (= (bitwise-and ,x 1) 0) 0:i1 1:i1))
 
-(bind-macro (tbind data . args)
+(bind-macro
   "simple tuple binding
 
 (let ((tuple:<i32,double,i32,i64>* (alloc))
@@ -229,6 +239,7 @@
   (tbind tuple _ var2 _ var1)
 
   would match var2 to the double, and var1 to the i64"
+  (tbind data . args)
   (cons 'begin
         (map (lambda (x n)
                (if (not (eq? x '_))
@@ -237,42 +248,45 @@
              (make-list-with-proc (length args) (lambda (i) (real->integer i))))))
 
 ;; the same functionality, but for use in xtlang code
-(bind-macro (get_native_fptr closure-name)
+(bind-macro
   "return native function pointer for closure"
+  (get_native_fptr closure-name)
   `(llvm_get_function_ptr ,(string-append (symbol->string closure-name) "_native")))
 
 
-(bind-macro (-> value . args)
+(bind-macro
   "a \"thread-first\" macro
 
 This macro can help make code more readable by removing nesting.
 Threads the first expr passed to the macro into the first position in
 the second sexp. Recursively continues to thread the resultant sexp
 into any further sexp arguments."
+  (-> value . args)
   (if (null? args)
       value
       (let loop ((thread-items args)
                  (transformed value))
         (if (null? thread-items)
             transformed
-            (loop 
+            (loop
              (cdr thread-items)
              (insert-at-index 1 (car thread-items) transformed))))))
 
-(bind-macro (->> value . args)
+(bind-macro
   "a \"thread-last\" macro
 
 This macro can help make code more readable by removing nesting.
 Threads the first expr passed to the macro into the last position in
 the second sexp. Recursively continues to thread the resultant sexp
 into any further sexp arguments."
+  (->> value . args)
   (if (null? args)
       value
       (let loop ((thread-items args)
                  (transformed value))
         (if (null? thread-items)
             transformed
-            (loop 
+            (loop
              (cdr thread-items)
              (insert-at-index (length (car thread-items)) (car thread-items) transformed))))))
 
@@ -329,8 +343,8 @@ into any further sexp arguments."
 ;; (bind-poly pow llvm_pow)
 ;; (bind-poly log logf)
 ;; (bind-poly log llvm_log)
-;; (bind-poly log2 log2f) 
-;; (bind-poly log2 llvm_log2) 
+;; (bind-poly log2 log2f)
+;; (bind-poly log2 llvm_log2)
 ;; (bind-poly log10 log10f)
 ;; (bind-poly log10 llvm_log10)
 ;; (bind-poly sqrt sqrtf)
@@ -382,7 +396,7 @@ into any further sexp arguments."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; xtlang strings
 
-;; 
+;;
 (bind-type String <size_t,i8*>
   "xtlang's string type
 
@@ -547,11 +561,11 @@ If `start' and `end' are out of range, return null
   "Concatenate 2 Strings
 
 If one string is null, the alternate String will be returned.
-If both strings are null an empty String will be returned 
+If both strings are null an empty String will be returned
 
 @param s1 - first string to be concatenated
 @param s2 - second string to be concatenated
-@return - pointer to new String 
+@return - pointer to new String
 "
   (lambda (s1:String* s2:String*)
     (if (null? s2) (Str s1)
@@ -564,8 +578,9 @@ If both strings are null an empty String will be returned
 
 ;; String_cat macro (poor-man's varargs)
 
-(bind-macro (String_cat . args)
+(bind-macro
   "concatenate Strings"
+  (String_cat . args)
   (let loop ((rem (cdr args))
              (ret (car args)))
     (if (null? rem)
@@ -659,7 +674,7 @@ If both strings are null an empty String will be returned
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; equality
-;; 
+;;
 ;; this is the catch-all for equality testing
 ;; covers all numeric types
 ;; will also catch all for all pointer types
@@ -705,13 +720,13 @@ If both strings are null an empty String will be returned
 
 (bind-func String_format_i32
   (lambda (x:i32)
-    (let ((str:i8* (salloc 256)))    
+    (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (String str))))
 
 (bind-func String_format_i64
   (lambda (x:i64)
-    (let ((str:i8* (salloc 256)))    
+    (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%lld" x)
       (String str))))
 
@@ -723,7 +738,7 @@ If both strings are null an empty String will be returned
 
 (bind-func String_format_d
   (lambda (x:double)
-    (let ((str:i8* (salloc 256)))      
+    (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%f" x)
       (String str))))
 
@@ -763,25 +778,25 @@ If both strings are null an empty String will be returned
 
 (bind-func toString_i32
   (lambda (x:i32)
-    (let ((s:i8* (salloc 256)))    
+    (let ((s:i8* (salloc 256)))
       (sprintf s "%d" x)
       (String s))))
 
 (bind-func toString_i64
   (lambda (x:i64)
-    (let ((st:i8* (salloc 256))) 
+    (let ((st:i8* (salloc 256)))
       (sprintf st "%lld" x)
       (String st))))
 
 (bind-func toString_f
   (lambda (x:float)
-    (let ((st:i8* (salloc 256)))        
+    (let ((st:i8* (salloc 256)))
       (sprintf st "%f" (ftod x))
       (String st))))
 
 (bind-func toString_d
   (lambda (x:double)
-    (let ((st:i8* (salloc 256)))        
+    (let ((st:i8* (salloc 256)))
       (sprintf st "%f" x)
       (String st))))
 
@@ -833,7 +848,7 @@ If both strings are null an empty String will be returned
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; XTLang symbols
 
-;; 
+;;
 (bind-type Symbol <size_t,i8*>
   "xtlang's symbol type
 
@@ -848,7 +863,7 @@ Second item in tuple is a char* c-style symbol ")
   "Free an xtlang Symbol
 
 Frees both the underlying character array and the tuple container.
-@param sym - Symbol to be deleted 
+@param sym - Symbol to be deleted
 "
   (lambda (sym:Symbol*)
     (free (tref sym 1))
@@ -891,7 +906,7 @@ If the symbol is empty will print a zero length symbol
 (bind-func Symbol_size
   "Takes a Symbol* and returns the size of allocated memory
 
-Not necessarily the same as Symbol_length - 
+Not necessarily the same as Symbol_length -
 @param sym - the Symbol
 @return size - size of alloc'ed memory"
   (lambda (sym:Symbol*)

@@ -957,19 +957,29 @@
       (if xtmacro-data (vector-set! (cdr xtmacro-data) 0 docstring) #f))))
 
 ;; docstrings are compulsory for xtlang macros
-(define-macro (bind-macro name-and-args docstring . body)
-  `(begin
-     (impc:aot:insert-xtmacro-binding-details ',name-and-args ,docstring ',@body)
-     (impc:ti:register-new-xtmacro ,(symbol->string (car name-and-args)) ,docstring)
-     (impc:compiler:print-binding-details-to-log
-      "XtmMacro:"
-      ',(car name-and-args)
-      ""
-      ;; now actually create the macro
-      (define-macro
-        ,(cons (string->symbol (string-append "xtmacro_" (symbol->string (car name-and-args))))
-               (cdr name-and-args))
-        ,@body))))
+(define-macro (bind-macro . forms)
+  (let* ((string-in-first-pos? (string? (car forms)))
+         (docstring (if string-in-first-pos? (car forms) ""))
+         (name-and-args (if string-in-first-pos? (cadr forms) (car forms)))
+         (body (if string-in-first-pos? (cddr forms) (cdr forms))))
+    `(begin
+       (impc:aot:insert-xtmacro-binding-details ',name-and-args ,docstring ',@body)
+       (impc:ti:register-new-xtmacro ,(symbol->string (car name-and-args)) ,docstring)
+       (impc:compiler:print-binding-details-to-log
+        "XtmMacro:"
+        ',(car name-and-args)
+        ""
+        ;; now actually create the macro
+        (define-macro
+          ,(cons (string->symbol (string-append "xtmacro_" (symbol->string (car name-and-args))))
+                 (cdr name-and-args))
+          ,@body)))))
+
+(impc:ti:register-new-builtin
+ "bind-macro"
+ ""
+ "bind an xtlang macro"
+ '([docstring] name-and-args-list macro-body))
 
 ;;;;;;;;;;;
 ;; closures

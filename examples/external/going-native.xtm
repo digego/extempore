@@ -21,7 +21,7 @@
 ;; next setup audio!
 (bind-instrument fmsynth fmsynth_note_c fmsynth_fx)
 
-(bind-func dsp:DSP 
+(bind-func dsp:DSP
   (lambda (in time chan dat)
     (fmsynth in time chan dat)))
 
@@ -46,7 +46,7 @@
 ;; on the thread which will be doing
 ;; the drawing.  In this example, that
 ;; thread is *owned* by the scheduler.
-;; 
+;;
 ;; Don't instantiate anything here yet!
 ;; Instead call init_vg from the scheduler
 ;; which happens at the bottom of the file
@@ -57,9 +57,9 @@
 (bind-func init_vg
   (lambda (beat:float)
     ;; set THIS thread as opengl thread
-    (glfwMakeContextCurrent	null)    
+    (glfwMakeContextCurrent	null)
     (glfwMakeContextCurrent	window)
-    (glfwSwapInterval 1)    
+    (glfwSwapInterval 1)
     (set! vg (nvg_create_context))
     (set! pixel_ratio (glfw_get_pixel_ratio window))
     (println "initialized vg")))
@@ -102,34 +102,36 @@
 (fmsynth_fx.wet 0.1)
 (fmsynth_fx.res 0.97)
 
-(bind-macro (ramp x)
-            ""
-            `(let ((xmod2pi (- ,x (* TWOPI (floor (/ ,x TWOPI))))))
-               (* (/ 1.0 PI) (if (< xmod2pi PI) xmod2pi (- xmod2pi TWOPI)))))
+(bind-macro
+  "a ramp function, range [-1,1]"
+  (ramp x)
+  `(let ((xmod2pi (- ,x (* TWOPI (floor (/ ,x TWOPI))))))
+    (* (/ 1.0 PI) (if (< xmod2pi PI) xmod2pi (- xmod2pi TWOPI)))))
 
-(bind-macro (rampr . args)
-            ""
-            (if (> (length args) 3)
-                `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (ramp (* TWOPI (+ beat ,(car args)) ,(cadddr args))))))
-                `(+ ,(car args) (+ (* .5 ,(cadr args)) (* .5 ,(cadr args) (ramp (* TWOPI beat ,(caddr args))))))))
+(bind-macro
+  (rampr . args)
+  (if (> (length args) 3)
+      `(+ ,(cadr args) (+ (* .5 ,(caddr args)) (* .5 ,(caddr args) (ramp (* TWOPI (+ beat ,(car args)) ,(cadddr args))))))
+      `(+ ,(car args) (+ (* .5 ,(cadr args)) (* .5 ,(cadr args) (ramp (* TWOPI beat ,(caddr args))))))))
 
-(bind-macro (tri-wave x)
-            ""
-            `(let ((xmod2pi (- ,x (* TWOPI (floor (/ ,x TWOPI))))))
-               (if (< xmod2pi PI)
-                   (+ 1.0 (* (/ -1.0 PI) xmod2pi))
-                   (- (* (/ 1.0 PI) xmod2pi) 1.0))))
+(bind-macro
+  "triangle function, range [0,1]"
+  (tri-wave x)
+  `(let ((xmod2pi (- ,x (* TWOPI (floor (/ ,x TWOPI))))))
+    (if (< xmod2pi PI)
+        (+ 1.0 (* (/ -1.0 PI) xmod2pi))
+        (- (* (/ 1.0 PI) xmod2pi) 1.0))))
 
-(bind-macro (trir . args)
-            ""
-            (if (> (length args) 3)
-                `(+ ,(cadr args) (* ,(caddr args) (tri-wave (* TWOPI (+ beat ,(car args)) ,(cadddr args)))))
-                `(+ ,(car args) (* ,(cadr args) (tri-wave (* TWOPI beat ,(caddr args)))))))
+(bind-macro
+  (trir . args)
+  (if (> (length args) 3)
+      `(+ ,(cadr args) (* ,(caddr args) (tri-wave (* TWOPI (+ beat ,(car args)) ,(cadddr args)))))
+      `(+ ,(car args) (* ,(cadr args) (tri-wave (* TWOPI beat ,(caddr args)))))))
 
 
 (bind-func beat_loop
   (lambda (beat:Rational)
-    (beginz 
+    (beginz
      (bs1.bpm (trir 150.0 3000.0 1/350))
      (nvg_clear)
      (draw_frame beat)
