@@ -62,6 +62,234 @@
 (bind-val APR_SUCCESS i32 0)
 (bind-lib libapr apr_strerror [i8*,apr_status_t,i8*,size_t]*)
 
+;;;;;;;;;;;;;;;;;
+;; apr_errno.h ;;
+;;;;;;;;;;;;;;;;;
+
+;; /**
+;;  * APR_OS_START_ERROR is where the APR specific error values start.
+;;  */
+(bind-val APR_OS_START_ERROR i32 20000)
+;; /**
+;;  * APR_OS_ERRSPACE_SIZE is the maximum number of errors you can fit
+;;  *    into one of the error/status ranges below -- except for
+;;  *    APR_OS_START_USERERR, which see.
+;;  */
+(bind-val APR_OS_ERRSPACE_SIZE i32 50000)
+;; /**
+;;  * APR_UTIL_ERRSPACE_SIZE is the size of the space that is reserved for
+;;  * use within apr-util. This space is reserved above that used by APR
+;;  * internally.
+;;  * @note This number MUST be smaller than APR_OS_ERRSPACE_SIZE by a
+;;  *       large enough amount that APR has sufficient room for its
+;;  *       codes.
+;;  */
+(bind-val APR_UTIL_ERRSPACE_SIZE i32 20000)
+;; /**
+;;  * APR_OS_START_STATUS is where the APR specific status codes start.
+;;  */
+(bind-val APR_OS_START_STATUS i32 70000)
+;; /**
+;;  * APR_UTIL_START_STATUS is where APR-Util starts defining its
+;;  * status codes.
+;;  */
+(bind-val APR_UTIL_START_STATUS i32 100000)
+;; /**
+;;  * APR_OS_START_USERERR are reserved for applications that use APR that
+;;  *     layer their own error codes along with APR's.  Note that the
+;;  *     error immediately following this one is set ten times farther
+;;  *     away than usual, so that users of apr have a lot of room in
+;;  *     which to declare custom error codes.
+;;  *
+;;  * In general applications should try and create unique error codes. To try
+;;  * and assist in finding suitable ranges of numbers to use, the following
+;;  * ranges are known to be used by the listed applications. If your
+;;  * application defines error codes please advise the range of numbers it
+;;  * uses to dev@apr.apache.org for inclusion in this list.
+;;  *
+;;  * Ranges shown are in relation to APR_OS_START_USERERR
+;;  *
+;;  * Subversion - Defined ranges, of less than 100, at intervals of 5000
+;;  *              starting at an offset of 5000, e.g.
+;;  *               +5000 to 5100,  +10000 to 10100
+;;  *
+;;  * Apache HTTPD - +2000 to 2999
+;;  */
+(bind-val APR_OS_START_USERERR i32 120000)
+;; /**
+;;  * APR_OS_START_CANONERR is where APR versions of errno values are defined
+;;  *     on systems which don't have the corresponding errno.
+;;  */
+(bind-val APR_OS_START_CANONERR i32 620000)
+;; /**
+;;  * APR_OS_START_EAIERR folds EAI_ error codes from getaddrinfo() into
+;;  *     apr_status_t values.
+;;  */
+(bind-val APR_OS_START_EAIERR i32 670000)
+;; /**
+;;  * APR_OS_START_SYSERR folds platform-specific system error values into
+;;  *     apr_status_t values.
+;;  */
+(bind-val APR_OS_START_SYSERR i32 720000)
+
+;; /**
+;;  * @defgroup APR_ERROR_map APR Error Space
+;;  * <PRE>
+;;  * The following attempts to show the relation of the various constants
+;;  * used for mapping APR Status codes.
+;;  *
+;;  *       0
+;;  *
+;;  *  20,000     APR_OS_START_ERROR
+;;  *
+;;  *         + APR_OS_ERRSPACE_SIZE (50,000)
+;;  *
+;;  *  70,000      70000
+;;  *
+;;  *         + APR_OS_ERRSPACE_SIZE - APR_UTIL_ERRSPACE_SIZE (30,000)
+;;  *
+;;  * 100,000      APR_UTIL_START_STATUS
+;;  *
+;;  *         + APR_UTIL_ERRSPACE_SIZE (20,000)
+;;  *
+;;  * 120,000      APR_OS_START_USERERR
+;;  *
+;;  *         + 10 x APR_OS_ERRSPACE_SIZE (50,000 * 10)
+;;  *
+;;  * 620,000      APR_OS_START_CANONERR
+;;  *
+;;  *         + APR_OS_ERRSPACE_SIZE (50,000)
+;;  *
+;;  * 670,000      APR_OS_START_EAIERR
+;;  *
+;;  *         + APR_OS_ERRSPACE_SIZE (50,000)
+;;  *
+;;  * 720,000      APR_OS_START_SYSERR
+;;  *
+;;  * </PRE>
+;;  */
+
+;; /** no error. */
+
+;; /**
+;;  * @defgroup APR_Error APR Error Values
+;;  * <PRE>
+;;  * <b>APR ERROR VALUES</b>
+;;  * APR_ENOSTAT      APR was unable to perform a stat on the file
+;;  * APR_ENOPOOL      APR was not provided a pool with which to allocate memory
+;;  * APR_EBADDATE     APR was given an invalid date
+;;  * APR_EINVALSOCK   APR was given an invalid socket
+;;  * APR_ENOPROC      APR was not given a process structure
+;;  * APR_ENOTIME      APR was not given a time structure
+;;  * APR_ENODIR       APR was not given a directory structure
+;;  * APR_ENOLOCK      APR was not given a lock structure
+;;  * APR_ENOPOLL      APR was not given a poll structure
+;;  * APR_ENOSOCKET    APR was not given a socket
+;;  * APR_ENOTHREAD    APR was not given a thread structure
+;;  * APR_ENOTHDKEY    APR was not given a thread key structure
+;;  * APR_ENOSHMAVAIL  There is no more shared memory available
+;;  * APR_EDSOOPEN     APR was unable to open the dso object.  For more
+;;  *                  information call apr_dso_error().
+;;  * APR_EGENERAL     General failure (specific information not available)
+;;  * APR_EBADIP       The specified IP address is invalid
+;;  * APR_EBADMASK     The specified netmask is invalid
+;;  * APR_ESYMNOTFOUND Could not find the requested symbol
+;;  * APR_ENOTENOUGHENTROPY Not enough entropy to continue
+;;  * </PRE>
+;;  *
+;;  * <PRE>
+;;  * <b>APR STATUS VALUES</b>
+;;  * APR_INCHILD        Program is currently executing in the child
+;;  * APR_INPARENT       Program is currently executing in the parent
+;;  * APR_DETACH         The thread is detached
+;;  * APR_NOTDETACH      The thread is not detached
+;;  * APR_CHILD_DONE     The child has finished executing
+;;  * APR_CHILD_NOTDONE  The child has not finished executing
+;;  * APR_TIMEUP         The operation did not finish before the timeout
+;;  * APR_INCOMPLETE     The operation was incomplete although some processing
+;;  *                    was performed and the results are partially valid
+;;  * APR_BADCH          Getopt found an option not in the option string
+;;  * APR_BADARG         Getopt found an option that is missing an argument
+;;  *                    and an argument was specified in the option string
+;;  * APR_EOF            APR has encountered the end of the file
+;;  * APR_NOTFOUND       APR was unable to find the socket in the poll structure
+;;  * APR_ANONYMOUS      APR is using anonymous shared memory
+;;  * APR_FILEBASED      APR is using a file name as the key to the shared memory
+;;  * APR_KEYBASED       APR is using a shared key as the key to the shared memory
+;;  * APR_EINIT          Ininitalizer value.  If no option has been found, but
+;;  *                    the status variable requires a value, this should be used
+;;  * APR_ENOTIMPL       The APR function has not been implemented on this
+;;  *                    platform, either because nobody has gotten to it yet,
+;;  *                    or the function is impossible on this platform.
+;;  * APR_EMISMATCH      Two passwords do not match.
+;;  * APR_EABSOLUTE      The given path was absolute.
+;;  * APR_ERELATIVE      The given path was relative.
+;;  * APR_EINCOMPLETE    The given path was neither relative nor absolute.
+;;  * APR_EABOVEROOT     The given path was above the root path.
+;;  * APR_EBUSY          The given lock was busy.
+;;  * APR_EPROC_UNKNOWN  The given process wasn't recognized by APR
+;;  * </PRE>
+;;  * @{
+;;  */
+(bind-val APR_ENOSTAT i32 20001)
+(bind-val APR_ENOPOOL i32 20002)
+;; /* empty slot: +3 */
+(bind-val APR_EBADDATE i32 20004)
+(bind-val APR_EINVALSOCK i32 20005)
+(bind-val APR_ENOPROC i32 20006)
+(bind-val APR_ENOTIME i32 20007)
+(bind-val APR_ENODIR i32 20008)
+(bind-val APR_ENOLOCK i32 20009)
+(bind-val APR_ENOPOLL i32 20010)
+(bind-val APR_ENOSOCKET i32 20011)
+(bind-val APR_ENOTHREAD i32 20012)
+(bind-val APR_ENOTHDKEY i32 20013)
+(bind-val APR_EGENERAL i32 20014)
+(bind-val APR_ENOSHMAVAIL i32 20015)
+(bind-val APR_EBADIP i32 20016)
+(bind-val APR_EBADMASK i32 20017)
+;; /* empty slot: +18 */
+(bind-val APR_EDSOOPEN i32 20019)
+(bind-val APR_EABSOLUTE i32 20020)
+(bind-val APR_ERELATIVE i32 20021)
+(bind-val APR_EINCOMPLETE i32 20022)
+(bind-val APR_EABOVEROOT i32 20023)
+(bind-val APR_EBADPATH i32 20024)
+(bind-val APR_EPATHWILD i32 20025)
+(bind-val APR_ESYMNOTFOUND i32 20026)
+(bind-val APR_EPROC_UNKNOWN i32 20027)
+(bind-val APR_ENOTENOUGHENTROPY i32 20028)
+
+;; /**
+;;  * @addtogroup APR_Error
+;;  * @{
+;;  */
+(bind-val APR_INCHILD i32 70001)
+(bind-val APR_INPARENT i32 70002)
+(bind-val APR_DETACH i32 70003)
+(bind-val APR_NOTDETACH i32 70004)
+(bind-val APR_CHILD_DONE i32 70005)
+(bind-val APR_CHILD_NOTDONE i32 70006)
+(bind-val APR_TIMEUP i32 70007)
+(bind-val APR_INCOMPLETE i32 70008)
+;; /* empty slot: +9 */
+;; /* empty slot: +10 */
+;; /* empty slot: +11 */
+(bind-val APR_BADCH i32 70012)
+(bind-val APR_BADARG i32 70013)
+(bind-val APR_EOF i32 70014)
+(bind-val APR_NOTFOUND i32 70015)
+;; /* empty slot: +16 */
+;; /* empty slot: +17 */
+;; /* empty slot: +18 */
+(bind-val APR_ANONYMOUS i32 70019)
+(bind-val APR_FILEBASED i32 70020)
+(bind-val APR_KEYBASED i32 70021)
+(bind-val APR_EINIT i32 70022)
+(bind-val APR_ENOTIMPL i32 70023)
+(bind-val APR_EMISMATCH i32 70024)
+(bind-val APR_EBUSY i32 70025)
+
 ;;;;;;;;;;;;;;;;;;;
 ;; apr_general.h ;;
 ;;;;;;;;;;;;;;;;;;;
