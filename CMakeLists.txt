@@ -601,7 +601,6 @@ if(EXTENDED_DEPS)
   endif()
 
   if(PACKAGE)
-
     set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
     set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
     message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
@@ -722,16 +721,38 @@ if(EXTENDED_DEPS)
   endif()
 
   # wrap the whole thing in a target
-  add_custom_target(extended_deps
-    COMMENT "moving shared libs into libs/platform-shlibs"
-    DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile
-    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libportmidi.dylib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile.dylib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libstb_image.dylib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${EXT_PLATFORM_SHLIBS_DIR})
+
+  if(APPLE)
+    add_custom_target(extended_deps
+      COMMENT "moving shared libs into libs/platform-shlibs"
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libportmidi.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libstb_image.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${EXT_PLATFORM_SHLIBS_DIR})
+  elseif(WIN32)
+    add_custom_target(extended_deps
+      COMMENT "moving shared libs into libs/platform-shlibs"
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/bin/assimp.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      # COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      # on Windows, move the .lib files as well
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/assimp.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      # COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR})
+  endif()
 
   add_dependencies(aot_extended extended_deps)
 
