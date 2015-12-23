@@ -88,6 +88,7 @@ typedef struct _llvm_callback_struct_ {
 
 extern "C"
 {
+  char* llvm_disassemble(const unsigned char*,int syntax);  
   void* malloc16 (size_t s);
   void free16(void* p);
 llvm_zone_t* llvm_threads_get_callback_zone();

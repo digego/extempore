@@ -545,6 +545,7 @@ declare double @imp_rand2_d(double,double)
 
 declare void @llvm_destroy_zone_after_delay(%mzone*, i64)
 declare void @free_after_delay(i8*, double)
+declare i8* @llvm_disassemble(i8*,i32)
 
 
 define dllexport double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data) 

@@ -316,6 +316,7 @@ namespace extemp {
       { "llvm:print-closure",         &SchemeFFI::llvm_print_closure },
       { "llvm:print-closure-work",    &SchemeFFI::llvm_print_closure_work },
       { "llvm:get-closure-work-name", &SchemeFFI::llvm_closure_last_name },
+      { "llvm:disassemble",           &SchemeFFI::llvm_disasm },      
 	    { "llvm:bind-symbol",			      &SchemeFFI::bind_symbol },
 	    { "llvm:update-mapping",			  &SchemeFFI::update_mapping },
 	    { "llvm:add-llvm-alias",        &SchemeFFI::add_llvm_alias },
@@ -1923,10 +1924,31 @@ namespace extemp {
         }
       }
     }
-
+    //std::cout << "fullname:" << last_name << std::endl;
     if(last_name) return mk_string(_sc,last_name);
     else return _sc->F;
   }
+
+  pointer SchemeFFI::llvm_disasm(scheme* _sc, pointer args)
+  {
+    //using namespace llvm;
+    //long bytes = ivalue(pair_cadr(args));
+    //int x64 = (pair_caddr(args) == _sc->T) ? 1 : 0;
+    int lgth = list_length(_sc, args);
+    int syntax = 1;
+    if(lgth > 1) {
+      syntax = ivalue(pair_cadr(args));
+    }
+    if (syntax > 1) {
+      std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
+      std::cout << "The default is 1: intel" << std::endl;      
+      syntax = 1;
+    }
+    pointer name = SchemeFFI::llvm_closure_last_name(_sc, args);
+    unsigned char* fptr = (unsigned char*) cptr_value(SchemeFFI::get_function_pointer(_sc,cons(_sc,name,pair_cdr(args))));
+    char* dasm = llvm_disassemble(fptr,syntax); //,bytes,x64);
+    return mk_string(_sc,dasm);
+  }  
   
   pointer SchemeFFI::get_struct_size(scheme* _sc, pointer args)
   {

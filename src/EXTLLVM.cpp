@@ -55,8 +55,16 @@
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Support/MemoryObject.h"
+#include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCDisassembler.h"
+#include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCInstPrinter.h"
+#include "llvm/MC/MCContext.h"
+
 
 #include "stdarg.h"
 #include "EXTLLVM.h"
@@ -1357,6 +1365,70 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
 }
 
 
+char* llvm_disassemble(const unsigned char* code,int syntax)
+{
+        int x64 = 1;
+        size_t code_size = 1024 * 100;
+        //std::string ArchName = (x64 > 0) ? "x86-64" : "x86";
+        //std::string TripleName = llvm::Triple::normalize(ArchName);
+        //llvm::Triple Triple(TripleName);
+        std::string Error;
+        llvm::TargetMachine *TM = extemp::EXTLLVM::I()->EE->getTargetMachine();
+        llvm::Triple Triple = TM->getTargetTriple();                 
+        const llvm::Target TheTarget = TM->getTarget();
+        std::string TripleName = Triple.getTriple();
+
+        //const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(ArchName,Triple,Error);
+        const llvm::MCRegisterInfo* MRI(TheTarget.createMCRegInfo(TripleName));
+        const llvm::MCAsmInfo* AsmInfo(TheTarget.createMCAsmInfo(*MRI,TripleName));
+        const llvm::MCSubtargetInfo* STI(TheTarget.createMCSubtargetInfo(TripleName,"",""));
+        const llvm::MCInstrInfo* MII(TheTarget.createMCInstrInfo());        
+        //const llvm::MCInstrAnalysis* MIA(TheTarget->createMCInstrAnalysis(MII->get()));
+        llvm::MCContext Ctx(AsmInfo, MRI, nullptr);
+        llvm::MCDisassembler* DisAsm(TheTarget.createMCDisassembler(*STI,Ctx));        
+        llvm::MCInstPrinter* IP(TheTarget.createMCInstPrinter(Triple,syntax,*AsmInfo,*MII,*MRI)); //,*STI));
+        IP->setPrintImmHex(true);
+        IP->setUseMarkup(true);
+        uint64_t MemoryAddr = 0;
+        uint64_t Size = code_size;
+        uint64_t Start = 0;
+        uint64_t End = code_size;
+        std::string out_str;
+        llvm::raw_string_ostream OS(out_str);
+        llvm::ArrayRef<uint8_t> mem(code,code_size);
+        uint64_t size;
+        uint64_t index;
+        OS << "\n";
+        for (index = 0; (index < code_size); index += size) {
+          llvm::MCInst Inst;
+          //printf("%p index: %lld\n", DisAsm, (long long) index);
+          //if (Disassmbler->getInstruction(Inst, size, *BufferMObj, index, llvm::nulls(), llvm::nulls())) {
+          if (DisAsm->getInstruction(Inst, size, mem.slice(index), index, llvm::nulls(), llvm::nulls())) {
+            if((*(size_t *)(code + index)) > 0) {
+              OS.indent(4);
+              OS.write("0x", 2);
+              OS.write_hex((size_t)code + index);
+              OS.write(": ", 2);  // 0x", 4);
+              //OS.write_hex(*(size_t *)(code + index));
+              IP->printInst(&Inst,OS,"",*STI);
+              OS << "\n";
+            }else{
+              break;
+            }
+          } else {
+            if (size == 0)
+              size = 1;  // skip illegible bytes
+          }
+        }
+        //OS << "\n";
+        std::string tmp = OS.str();
+        //std::cout << "TEST:" << std::endl << tmp.c_str() << std::endl << std::endl;
+        char* tmpstr = (char*) malloc(tmp.length()+1);
+        strcpy(tmpstr,tmp.c_str());
+        return tmpstr;
+}
+
+
 
 namespace extemp {
 	
@@ -1461,6 +1533,8 @@ namespace extemp {
 
       llvm::InitializeNativeTarget();
       llvm::InitializeNativeTargetAsmPrinter();
+      LLVMInitializeX86Disassembler();      
+      
       llvm::LLVMContext &context = llvm::getGlobalContext();
       //llvm::IRBuilder<> theBuilder(context);
 
@@ -1568,6 +1642,7 @@ namespace extemp {
 	    PM->add(llvm::createPromoteMemoryToRegisterPass());
 
       // tell LLVM about some built-in functions
+	    EE->updateGlobalMapping("llvm_disassemble", (uint64_t)&llvm_disassemble);      
 	    EE->updateGlobalMapping("llvm_destroy_zone_after_delay", (uint64_t)&llvm_destroy_zone_after_delay);
 	    EE->updateGlobalMapping("free_after_delay", (uint64_t)&free_after_delay);
 	    EE->updateGlobalMapping("llvm_get_next_prime", (uint64_t)&llvm_get_next_prime);
