@@ -1558,7 +1558,7 @@ namespace extemp {
 
       llvm::TargetOptions Opts;
 	    //llvm::PerformTailCallOpt = true;
-      Opts.GuaranteedTailCallOpt = true;
+      // Opts.GuaranteedTailCallOpt = true;
       Opts.UnsafeFPMath = false;
 
 
