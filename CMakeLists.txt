@@ -790,7 +790,8 @@ if(EXTENDED_DEPS)
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libportmidi.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libstb_image.dylib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${EXT_PLATFORM_SHLIBS_DIR})
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libapr-1.0.dylib ${EXT_PLATFORM_SHLIBS_DIR})
   elseif(WIN32)
     add_custom_target(extended_deps
       COMMENT "moving shared libs into libs/platform-shlibs"
