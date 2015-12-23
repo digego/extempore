@@ -802,7 +802,7 @@ if(EXTENDED_DEPS)
       # COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/apr.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/bin/libapr-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
       # on Windows, move the .lib files as well
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/assimp.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
@@ -811,7 +811,7 @@ if(EXTENDED_DEPS)
       # COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/apr.lib ${EXT_PLATFORM_SHLIBS_DIR})
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libapr-1.lib ${EXT_PLATFORM_SHLIBS_DIR})
   endif()
 
   add_dependencies(aot_extended extended_deps)
