@@ -254,13 +254,25 @@ if(DOWNLOAD_LLVM)
         PREFIX llvm
         URL http://extempore.moso.com.au/extras/extempore-llvm-3.7.0.src.zip
         URL_MD5 a2fb39e154f62c1731d32f0c789d8f99
-        CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR} -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE})
+        CMAKE_ARGS
+        -DLLVM_TARGETS_TO_BUILD=X86
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        -DLLVM_ENABLE_TERMINFO=OFF
+        -DLLVM_ENABLE_ZLIB=OFF
+        -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR}
+        -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE})
     else()
       ExternalProject_Add(LLVM
         PREFIX llvm
         URL http://extempore.moso.com.au/extras/extempore-llvm-3.7.0.src.zip
         URL_MD5 a2fb39e154f62c1731d32f0c789d8f99
-        CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
+        CMAKE_ARGS
+        CMAKE_ARGS
+        -DLLVM_TARGETS_TO_BUILD=X86
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        -DLLVM_ENABLE_TERMINFO=OFF
+        -DLLVM_ENABLE_ZLIB=OFF
+        -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
     endif()
   else()
     find_program(PATCH_PROGRAM patch)
@@ -274,7 +286,12 @@ if(DOWNLOAD_LLVM)
       URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
       URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
       PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
-      CMAKE_ARGS -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
+      CMAKE_ARGS
+      -DLLVM_TARGETS_TO_BUILD=X86
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DLLVM_ENABLE_TERMINFO=OFF
+      -DLLVM_ENABLE_ZLIB=OFF
+      -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
   endif()
 endif()
 
@@ -678,9 +695,41 @@ if(EXTENDED_DEPS)
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
   if(WIN32)
-    # aargh! this still requires sh, sed, etc. and doesn't work. so
-    # we'll just grab the pre-built one manually
-    
+    # on Windows, we need expat for apr
+    ExternalProject_Add(expat
+      PREFIX expat
+      URL http://downloads.sourceforge.net/project/expat/expat/2.1.0/expat-2.1.0.tar.gz
+      CMAKE_ARGS
+      -DBUILD_tools=OFF
+      -DBUILD_examples=OFF
+      -DBUILD_tests=OFF
+      -DCMAKE_OSX_SYSROOT=macosx
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+    # need to tell CMake where to find libexpat
+    set(CMAKE_MODULE_PATH ${EXT_DEPS_INSTALL_DIR})
+    ExternalProject_Add(apr
+      PREFIX apr
+      URL http://mirror.ventraip.net.au/apache/apr/apr-1.5.2.tar.gz
+      CMAKE_ARGS
+      -DAPR_HAVE_ODBC=OFF
+      -DINSTALL_PDB=OFF
+      -DCMAKE_OSX_SYSROOT=macosx
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+    add_dependencies(apr expat)
+
+    # aargh! sndfile on Windows still requires sh, sed, etc. and
+    # doesn't work. so we'll just grab the pre-built one manually
+
     # ExternalProject_Add(sndfile
     #   PREFIX libsndfile
     #   URL https://github.com/erikd/libsndfile/archive/master.zip
@@ -699,6 +748,14 @@ if(EXTENDED_DEPS)
       BUILD_COMMAND make CFLAGS=${EXT_DEPS_C_FLAGS}
       INSTALL_COMMAND make install
       BUILD_IN_SOURCE ON)
+
+    ExternalProject_Add(apr
+      PREFIX apr
+      URL http://mirror.ventraip.net.au/apache/apr/apr-1.5.2.tar.gz
+      CONFIGURE_COMMAND sh configure --prefix=${CMAKE_BINARY_DIR}/deps-install --enable-threads --disable-static
+      BUILD_COMMAND make
+      INSTALL_COMMAND make install
+      BUILD_IN_SOURCE ON)
   endif()
 
   if(PACKAGE)
@@ -710,6 +767,7 @@ if(EXTENDED_DEPS)
       CMAKE_ARGS
       -DCMAKE_OSX_SYSROOT=macosx
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+      -DLLVM_TARGETS_TO_BUILD=X86
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
       -DLLVM_ENABLE_ZLIB=OFF
@@ -725,18 +783,19 @@ if(EXTENDED_DEPS)
   if(APPLE)
     add_custom_target(extended_deps
       COMMENT "moving shared libs into libs/platform-shlibs"
-      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile apr
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libportmidi.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libstb_image.dylib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${EXT_PLATFORM_SHLIBS_DIR})
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libglfw.3.dylib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libapr-1.0.dylib ${EXT_PLATFORM_SHLIBS_DIR})
   elseif(WIN32)
     add_custom_target(extended_deps
       COMMENT "moving shared libs into libs/platform-shlibs"
-      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile apr
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/bin/assimp.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
@@ -744,6 +803,7 @@ if(EXTENDED_DEPS)
       # COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/bin/libapr-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
       # on Windows, move the .lib files as well
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/assimp.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
@@ -751,7 +811,8 @@ if(EXTENDED_DEPS)
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       # COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR})
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libapr-1.lib ${EXT_PLATFORM_SHLIBS_DIR})
   endif()
 
   add_dependencies(aot_extended extended_deps)
