@@ -71,6 +71,48 @@
 
          (int-literal-test 30))
 
+;; array literals tests
+(xtmtest '(bind-func i64-array-lit-test
+            (lambda ()
+              (let ((a 5)
+                    (b 6))
+                (array a b)
+                void)))
+         
+         (i64-array-lit-test))
+
+(xtmtest '(bind-func float-array-lit-test
+            (lambda ()
+              (array 1.0:f 2.0 3.0 4.0 5.0)
+              void))
+         
+         (float-array-lit-test))
+
+(xtmtest '(bind-func float-ref-array-lit-test
+            (lambda ()
+              (let ((a (array 1.0:f 2.0 3.0)))
+                (aref a 2))))
+         
+         (float-ref-array-lit-test) 3.0)
+
+(xtmtest '(bind-func tuple-lit-test
+            (lambda ()
+              (let ((a 5:i64)
+                    (b 5.0:double))
+                (tuple a b)
+                void)))
+
+         (tuple-lit-test))
+
+(xtmtest '(bind-func tuple-ref-lit-test
+            (lambda ()
+              (let ((a 5:i64)
+                    (b 5.0:double)
+                    (c (tuple a b a)))
+                (tref c 1))))
+
+         (tuple-ref-lit-test) 5.0) 
+
 (xtmtest '(bind-func closure-test1
             (let ((power 0))
               (lambda (x)

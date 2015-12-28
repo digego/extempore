@@ -3554,6 +3554,7 @@ types of `start' and `count'"
           (impc:ti:first-transform (cadr ast) inbody?)
           (cons 'begin (impc:ti:first-transform (cddr ast) inbody?)))))
 
+
 (impc:ti:register-new-builtin
  "dotimes"
  ""
@@ -3654,15 +3655,17 @@ Continue executing `body' forms until `test-expression' returns #f"
                      ((eq? (car ast) 'free)
                       (list 'free (list 'bitcast (impc:ti:first-transform (cadr ast) inbody?)
                                         'i8*)))
+                     ((member (car ast) '(vector))
+                      `(make-vector ,@(map (lambda (x) (impc:ti:first-transform x inbody?)) (cdr ast))))
                      ((member (car ast) '(array))
-                      (impc:ti:first-transform (impc:ti:array ast) inbody?))
+                      `(make-array ,@(map (lambda (x) (impc:ti:first-transform x inbody?)) (cdr ast))))
                      ((member (car ast) '(tuple))
-                      (impc:ti:first-transform (impc:ti:tuple ast) inbody?))
+                      `(make-tuple ,@(map (lambda (x) (impc:ti:first-transform x inbody?)) (cdr ast))))
                      ((eq? (car ast) 'not)
                       (impc:ti:first-transform (impc:ti:not (cadr ast)) inbody?))
                      ((member (car ast) '(callback schedule))
                       (impc:ti:first-transform (impc:ti:callback (impc:ti:first-transform (cdr ast) inbody?)) inbody?))
-                     ((and (member (car ast) *impc:mathbinaryaritylist*) ;; '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
+                     ((and (member (car ast) *impc:mathbinaryaritylist*)
                            (<> (length ast) 3))
                       (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
                      ((member (car ast) '(bitwise-not ~))
@@ -5128,7 +5131,8 @@ Continue executing `body' forms until `test-expression' returns #f"
            (c (if (> args 2)
                   (impc:ti:type-unify (impc:ti:type-check (cadddr ast) vars kts request?) vars)
                   #f)))
-      (if (impc:ir:fixed-point? a)
+      (if (and (not (list? a))
+               (impc:ir:fixed-point? a))
           (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type a)
                                               (string-append "Only real numbers are supported for math intrinsics: "
                                                              (symbol->string (car ast)))))
@@ -6309,6 +6313,14 @@ xtlang's `let' syntax is the same as Scheme"
         (list *impc:ir:void*))))
 
 
+(define impc:ti:make-array-check
+  (lambda (ast vars kts request?)
+    ;; (println 'make-array request?)
+    (let* ((a (impc:ti:type-check (cadr ast) vars kts #f))
+           (b (map (lambda (x) (impc:ti:type-check x vars kts a)) (cddr ast))))
+      (list *impc:ir:array* (length (cdr ast)) a))))
+
+
 (define impc:ti:array-set-check
   (lambda (ast vars kts request?)
     (if (<> (length ast) 4)
@@ -6363,6 +6375,13 @@ xtlang's `let' syntax is the same as Scheme"
                   (> (impc:ir:get-ptr-depth (car a)) 1))
               (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a)))
               (list (caddr (car a))))))))
+
+(define impc:ti:make-vector-check
+  (lambda (ast vars kts request?)
+    ;; (println 'make-vector request?)
+    (let* ((a (impc:ti:type-check (cadr ast) vars kts #f))
+           (b (map (lambda (x) (impc:ti:type-check x vars kts a)) (cddr ast))))
+      (list *impc:ir:vector* (length (cdr ast)) a))))
 
 (define impc:ti:vector-set-check
   (lambda (ast vars kts request?)
@@ -6523,6 +6542,18 @@ xtlang's `let' syntax is the same as Scheme"
              (not (impc:ir:pointer? request?)))
         (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))     
     request?))
+
+
+(define impc:ti:make-tuple-check
+  (lambda (ast vars kts request?)
+    (let* ((a (map (lambda (x t)
+                     (impc:ti:type-check x vars kts t))
+                   (cdr ast)
+                   (if (and (list? request?)
+                            (equal? 14 (car request?)))
+                       (cdr request?)
+                       (make-list (length (cdr ast)) #f)))))
+      (cons *impc:ir:tuple* a))))
 
 
 (define impc:ti:tuple-set-check
@@ -7090,7 +7121,7 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:type-check
   (lambda (ast vars kts request?)
     ;; (println 'tc: ast 'vars: vars)
-    ;; (println 'type-check: ast  'vars: vars  'kts: kts 'request? request?)
+    ;;(println 'type-check: ast  'vars: vars  'kts: kts 'request? request?)
     (if *impc:ti:print-main-check* (println 'type-check: ast 'kts: kts 'request? request?))
     (if *impc:ti:print-main-check* (println 'vars------: vars))
     (cond ((null? ast) '())
@@ -7147,10 +7178,11 @@ xtlang's `let' syntax is the same as Scheme"
           ((and (list? ast) (member (car ast) '(create_zone))) (impc:ti:create_zone-check ast vars kts request?))
           ;;((and (list? ast) (member (car ast) '(memzone))) (impc:ti:memzone-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(llvm_callback))) (impc:ti:callback-check ast vars kts request?))
-                                        ;((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(make-vector))) (impc:ti:make-vector-check ast vars kts request?))          
           ((and (list? ast) (member (car ast) '(vector-set!))) (impc:ti:vector-set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(vector-ref))) (impc:ti:vector-ref-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(vector-shuffle))) (impc:ti:vector-shuffle-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(make-array))) (impc:ti:make-array-check ast vars kts request?))          
           ((and (list? ast) (member (car ast) '(array-set!))) (impc:ti:array-set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(array-ref))) (impc:ti:array-ref-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(array-ref-ptr))) (impc:ti:array-ref-ptr-check ast vars kts request?))
@@ -7160,7 +7192,7 @@ xtlang's `let' syntax is the same as Scheme"
           ((and (list? ast) (member (car ast) '(stack-alloc))) (impc:ti:stack-alloc-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(heap-alloc))) (impc:ti:heap-alloc-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(zone-alloc))) (impc:ti:zone-alloc-check ast vars kts request?))
-                                        ;((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(tuple-ref-ptr))) (impc:ti:tuple-ref-ptr-check ast vars kts request?))

@@ -988,6 +988,8 @@
 
 (define impc:ir:fixed-point?
   (lambda (type)
+    (if (null? type)
+        (error))
     (let ((t (impc:ir:str-list-check type)))
       (if (string? t) #f
           (if (member t ;;(modulo t *impc:ir:pointer*)
@@ -1409,7 +1411,7 @@
            (res
             (map (lambda (p)
                    (set! *impc:ir:sym-name-stack* (cons (caar p) *impc:ir:sym-name-stack*))
-                   ;; (println '__envin: *impc:ir:sym-name-stack*)
+                   ;;(println '__envin: *impc:ir:sym-name-stack*)
                    ;; (println 'p2: (cadr p))
                    (let* ((symstr (symbol->string (caar p)))
                           (symtype (cdr (assoc-strcmp (caar p) types)))
@@ -2308,41 +2310,39 @@
       (impc:ir:strip-space os))))
 
 
-;; this function is currently unused!
+;; makes an array 'literal'
 (define impc:ir:compiler:make-array
-  (lambda (ast types)
-    (let* ((os (make-string 0)))
-      (let* ((idx-str (impc:ir:compiler (cadr ast) types))
-             (idx (impc:ir:gname))
-                                        ;(t (impc:ir:get-type-from-str (cadr (impc:ir:gname))))
-             (t (impc:ir:get-type-from-str (cadr idx)))
-             (tt (impc:ir:convert-from-pretty-types (caddr ast))))
-        (if (not (impc:ir:fixed-point? t))
-            (impc:compiler:print-bad-type-error-with-ast (impc:ir:pretty-print-type t) "array size must be an integer" ast))
-        (emit idx-str os)
-	    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
-            (begin (emit (string-append (impc:ir:gname "tmp" "i64") " = zext " (impc:ir:get-type-str t) " "
-                                        (car idx) " to i64\n") os)
-                   (set! idx (impc:ir:gname))))
-            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-        (emit (impc:ir:gname "val" "i8*") " = getelementptr " (impc:ir:get-type-str t) ", " (impc:ir:get-type-str t) "* null, i32 1\n" os)
-        (emit (impc:ir:gname "typesize" *impc:ir:size_t_str*) " = ptrtoint " (impc:ir:get-type-str t) "* "
-              (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os)
-        (emit (impc:ir:gname "zonesize" "i64") " = mul "
-              (cadr (impc:ir:gname "typesize")) " " (car (impc:ir:gname "typesize")) ", "
-              (car idx) "\n" os)
-        (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
-              (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-              os)
-        (emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
-                             (car (impc:ir:gname "zonesize"))
-                             ")\n") os)
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
-        (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str (list *impc:ir:array* (cadr ast) tt)) "*"))
-                             " = bitcast i8* " (car (impc:ir:gname "dat"))
-                             " to " (impc:ir:get-type-str (list *impc:ir:array* (cadr ast) tt)) "*\n") os)
-                                        ;" to " (impc:ir:get-type-str tt) "*\n") os)
+  (lambda (ast types hint?)
+    ;; (println 'make-array-literal: hint?)
+    (let* ((os (make-string 0))
+           (tt #f))
+      (let* ((elts (map (lambda (x t)
+                          (let ((res (cons (impc:ir:compiler x types (if tt tt t))
+                                           (impc:ir:gname))))
+                            (if (and (not tt) (not t))
+                                (set! tt (impc:ir:get-type-from-str (cadr (impc:ir:gname)))))
+                            res))
+                        (cdr ast)
+                        (if (and (not (null? hint?))
+                                 (list? hint?)
+                                 (list? (car hint?))
+                                 (equal? (caar hint?) 15))
+                            (make-list (length (cdr ast)) (caddr (car hint?)))
+                            (make-list (length (cdr ast)) #f))))
+             (num-elts (length elts))
+             (fullt (string-append "[" (number->string num-elts) " x " (cadr (cdar elts)) "]")))
+        (emit "; stack alloc array literal")        
+        (emit (caar elts) os)
+        (emit (impc:ir:gname "arrayl" fullt) " = insertvalue " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", 0\n" os)
+        (emit "; set array literal elts")
+        (for-each (lambda (x idx)
+                    (emit (car x) os)
+                    (let ((last (impc:ir:gname "arrayl")))
+                      (emit (impc:ir:gname "arrayl" fullt)
+                            " = insertvalue " fullt " " (car last)
+                            ", " (caddr x) " " (cadr x) ", " (number->string idx) "\n" os)))
+                  (cdr elts)
+                  (range 1 (+ 1 num-elts)))
         (impc:ir:strip-space os)))))
 
 
@@ -2566,6 +2566,42 @@
                            (cadr (impc:ir:gname)) " " (car (impc:ir:gname)) "\n") os)
       (impc:ir:gname "val" (car val) (cadr val))
       (impc:ir:strip-space os))))
+
+;; makes an array 'literal'
+(define impc:ir:compiler:make-vector
+  (lambda (ast types hint?)
+    ;; (println 'make-vector-literal: hint?)
+    (let* ((os (make-string 0))
+           (tt #f))
+      (let* ((elts (map (lambda (x t)
+                          (let ((res (cons (impc:ir:compiler x types (if tt tt t))
+                                           (impc:ir:gname))))
+                            (if (and (not tt) (not t))
+                                (set! tt (impc:ir:get-type-from-str (cadr (impc:ir:gname)))))
+                            res))
+                        (cdr ast)
+                        (if (and (not (null? hint?))
+                                 (list? hint?)
+                                 (list? (car hint?))
+                                 (equal? (caar hint?) 16))
+                            (make-list (length (cdr ast)) (caddr (car hint?)))
+                            (make-list (length (cdr ast)) #f))))
+             (num-elts (length elts))
+             (fullt (string-append "<" (number->string num-elts) " x " (cadr (cdar elts)) ">")))
+        (emit "; stack alloc vector literal")        
+        (emit (caar elts) os)
+        (emit (impc:ir:gname "vecl" fullt) " = insertelement " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", i32 0\n" os)
+        (emit "; set array literal elts")
+        (for-each (lambda (x idx)
+                    (emit (car x) os)
+                    (let ((last (impc:ir:gname "vecl")))
+                      (emit (impc:ir:gname "vecl" fullt)
+                            " = insertelement " fullt " " (car last)
+                            ", " (caddr x) " " (cadr x) ", i32 " (number->string idx) "\n" os)))
+                  (cdr elts)
+                  (range 1 (+ 1 num-elts)))
+        (impc:ir:strip-space os)))))
+
 
 
 (define impc:ir:compiler:vector-ref
@@ -2854,23 +2890,37 @@
 
 
 
+;; makes a tuple 'literal'
 (define impc:ir:compiler:make-tuple
-  (lambda (ast types)
+  (lambda (ast types hint?)
+    ;; (println 'make-tuple-ir hint?) 
     (let* ((os (make-string 0)))
-      (let* ((t (cons *impc:ir:tuple* (impc:ir:convert-from-pretty-types (cdr ast)))))
-        (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
-              (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-              os)
-        ;;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
-        (emit (impc:ir:gname "val" "i8*") " = getelementptr " (impc:ir:get-type-str t) ", " (impc:ir:get-type-str t) "* null, i32 1\n" os)
-        (emit (impc:ir:gname "typesize" *impc:ir:size_t_str*) " = ptrtoint " (impc:ir:get-type-str t) "* "
-              (car (impc:ir:gname 1)) " to " *impc:ir:size_t_str* "\n" os)
-
-        (emit (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
-              (cadr (impc:ir:gname "size")) " " (car (impc:ir:gname "size")) ")\n" os)
-        (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
-              " = bitcast i8* " (car (impc:ir:gname "dat"))
-              " to " (impc:ir:get-type-str t) "*\n" os)
+      (let* ((elts (map (lambda (x t)
+                          (cons (impc:ir:compiler x types t)
+                                (impc:ir:gname)))
+                        (cdr ast)
+                        (if (and (not (null? hint?))
+                                 (list? hint?)
+                                 (list? (car hint?))
+                                 (equal? (caar hint?) 14))
+                            (cdr (car hint?))
+                            (make-list (length (cdr ast)) #f))))
+             (num-elts (length elts))
+             (fullt (string-append "{" (caddr (car elts))
+                                   (apply string-append (map (lambda (x) (string-append ", " (caddr x))) (cdr elts)))
+                                   "}")))
+        (emit "; stack alloc tuple literal")        
+        (emit (caar elts) os)
+        (emit (impc:ir:gname "tuplel" fullt) " = insertvalue " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", 0\n" os)
+        (emit "; set tuple literal elts")
+        (for-each (lambda (x idx)
+                    (emit (car x) os)
+                    (let ((last (impc:ir:gname "tuplel")))
+                      (emit (impc:ir:gname "tuplel" fullt)
+                            " = insertvalue " fullt " " (car last)
+                            ", " (caddr x) " " (cadr x) ", " (number->string idx) "\n" os)))
+                  (cdr elts)
+                  (range 1 (+ 1 num-elts)))
         (impc:ir:strip-space os)))))
 
 
@@ -3026,6 +3076,7 @@
   (lambda (ast types . hint?)
     ;; (println 'ast: ast)
     ;; (println 'types: types)
+    ;; (println 'hint?: hint?)
     ;; (println 'ping: (assoc-strcmp (caddr ast) types))
     ;; (println 'return-> (cadr (assoc-strcmp (cadr ast) types)))
     (let* ((hinttype? (cadr (cdr (assoc-strcmp (cadr ast) types))))
@@ -3041,7 +3092,7 @@
                      (not (equal? (cadr ast) (caddr ast)))) ;; this line is a weird catch for outer let??
                 (emit (impc:ir:gname "retval" (impc:ir:get-type-str type)) " = bitcast " (cadr val) " " (car val) " to " (impc:ir:get-type-str type) "\n" os))
             (emit "ret " (cadr (impc:ir:gname)) " " (car (impc:ir:gname)) "\n" os)))
-                                        ;(println 'os2: os)
+      ;;(println 'os2: os)
       (impc:ir:strip-space os))))
 
 
@@ -3243,20 +3294,22 @@
 (define impc:ir:compiler:math-intrinsics
   (let ((mls '(("double" . "f64") ("float" . "f32")
                ("<2 x double>" . "v2f64") ("<4 x float>" . "v4f32")
-               ("<4 x double>" . "v4f64") ("<8 x float>" . "v8f32"))))
+               ("<4 x double>" . "v4f64") ("<8 x float>" . "v8f32")
+               ("<8 x double>" . "v8f64") ("<16 x float>" . "v16f32"))))
     (lambda (ast types . hint?)
+      ;; (println 'math: ast types hint?)
       (let* ((args (- (length ast) 1))
-             (astr (impc:ir:compiler (cadr ast) types (if (null? hint?) '() (car hint?))))
+             (astr (impc:ir:compiler (cadr ast) types (if (null? hint?) #f (car hint?))))
              (aval (impc:ir:gname))
              (bstr (if (member (car ast) '(pow powi fma))
-                       (impc:ir:compiler (caddr ast) types (if (null? hint?) '() (car hint?)))
+                       (impc:ir:compiler (caddr ast) types (if (null? hint?) #f (car hint?)))
                        ""))
              (bval (if (< args 2) #f (impc:ir:gname)))
              (cstr (if (member (car ast) '(fma))
-                       (impc:ir:compiler (cadddr ast) types (if (null? hint?) '() (car hint?)))
+                       (impc:ir:compiler (cadddr ast) types (if (null? hint?) #f (car hint?)))
                        ""))
              (cval (if (< args 3) #f (impc:ir:gname)))
-             (os (make-string 0)))
+             (os (make-string 0)))      
         ;; (println 'intrinsice ast aval bval cval)
         ;; sanity checks
         (if (not (or (impc:ir:number? (cadr aval))
@@ -3594,12 +3647,12 @@
 ;; if that might need to return a value
 (define impc:ir:compiler:if
   (lambda (ast types . hint?)
+    ;; (println 'ast: ast)
     (let* ((os (make-string 0))
            (elset (if (or (null? (cdddr ast))
                           (null? (cadddr ast)))
                       #f #t))
            (num (number->string (llvm:count++))))
-      ;;(println 'ifast: ast)
       ;; first do compare expression
       (emit (impc:ir:compiler (cadr ast) types) os)
       ;; then break on compare
@@ -3614,7 +3667,6 @@
           (emit (string-append "store " (cadr (impc:ir:gname)) " " (car (impc:ir:gname))
                                ", " (cadr (impc:ir:gname)) "* %ifptr" num "\n") os))
       (emit  "br label %ifcont" num "\n" os)
-
       (define a (impc:ir:gname))
       ;; do else if requried
       (if elset
@@ -3690,7 +3742,6 @@
            (total_size1 (* (/ (sys:pointer-size) 8) 2))
            ;; this is the last usage of impc:ir:get-type-size in llvmir.xtm - need to get rid of it as well
            (total_size2 (apply + (map (lambda (a) (impc:ir:get-type-size (cadr (cdr a)))) args))))
-
       (if (not (impc:ir:fixed-point? (cadr time)))
           (impc:compiler:print-compiler-error "arg 1 of callback must be an i64 time value"))
       (if (<> (length args) (length (cdr ftypes)))
@@ -3874,6 +3925,10 @@
 (define impc:ir:compiler
   (let ((intrinsics '(sin cos ceil floor exp fmod pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi)))
     (lambda (ast types . hint?)
+      (if (and (list? hint?)
+               (= 1 (length hint?))
+               (equal? (car hint?) #f))
+          (set! hint? '()))
       ;; (println 'compiler: ast 'types: types 'hint?: hint?)
       (cond ((null? ast) "")
             ((atom? ast)
@@ -3907,6 +3962,7 @@
                                                  ")*\n"))
                                 (impc:compiler:print-missing-identifier-error ast 'variable)))))
                    ((number? ast)
+                    ;; (println 'ast: ast 'hint: hint?)
                     (if (not (null? hint?))
                         (begin (if (and (integer? ast) (impc:ir:floating-point? (car hint?)))
                                    (impc:compiler:print-bad-numeric-value-error ast (impc:ir:pretty-print-type (car hint?))))
@@ -3978,14 +4034,16 @@
                     (impc:ir:compiler:loop (cdr ast) types))
                    ((equal? (car ast) 'while)
                     (impc:ir:compiler:while-loop (cdr ast) types))
-                   ;; ((equal? (car ast) 'make-array)
-                   ;;  (impc:ir:compiler:make-array ast types))
+                   ((equal? (car ast) 'make-array)
+                    (impc:ir:compiler:make-array ast types hint?))
                    ((equal? (car ast) 'array-ref)
                     (impc:ir:compiler:array-ref ast types))
                    ((equal? (car ast) 'array-ref-ptr)
                     (impc:ir:compiler:array-ref-ptr ast types))
                    ((equal? (car ast) 'array-set!)
                     (impc:ir:compiler:array-set ast types))
+                   ((equal? (car ast) 'make-vector)
+                    (impc:ir:compiler:make-vector ast types hint?))
                    ((equal? (car ast) 'vector-set!)
                     (impc:ir:compiler:vector-set ast types))
                    ((equal? (car ast) 'vector-ref)
@@ -4008,8 +4066,8 @@
                     (impc:ir:compiler:heap-alloc ast types hint?))
                    ((equal? (car ast) 'stack-alloc)
                     (impc:ir:compiler:stack-alloc ast types hint?))
-                   ;; ((equal? (car ast) 'make-tuple)
-                   ;;  (impc:ir:compiler:make-tuple ast types))
+                   ((equal? (car ast) 'make-tuple)
+                    (impc:ir:compiler:make-tuple ast types hint?))
                    ((equal? (car ast) 'tuple-ref)
                     (impc:ir:compiler:tuple-ref ast types))
                    ((equal? (car ast) 'tuple-ref-ptr)
