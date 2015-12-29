@@ -118,7 +118,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
 
-unsigned long string_hash(unsigned char* str);
+uint64_t string_hash(unsigned char* str);
 
   void* llvm_memset(void* ptr, int32_t c, int64_t n);
   int llvm_printf(char* format, ...);
@@ -159,10 +159,10 @@ unsigned long string_hash(unsigned char* str);
   struct closure_address_table* new_address_table();
   struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table);
   struct closure_address_table* get_address_table(const char* name, closure_address_table* table);
-  uint32_t get_address_offset(const char* name, closure_address_table* table);
-  char* get_address_type(const char* name, closure_address_table* table);
-  bool check_address_exists(const char* name, closure_address_table* table);
-  bool check_address_type(const char* name, closure_address_table* table, const char* type);
+  uint32_t get_address_offset(uint64_t id, closure_address_table* table);
+  char* get_address_type(uint64_t id, closure_address_table* table);
+  bool check_address_exists(uint64_t id, closure_address_table* table);
+  bool check_address_type(uint64_t id, closure_address_table* table, const char* type);
 
   //  double llvm_cos(double x);
   // double llvm_sin(double x);  

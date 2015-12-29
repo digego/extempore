@@ -1070,13 +1070,13 @@ namespace extemp {
     pointer SchemeFFI::stringHash(scheme* _sc, pointer args)
     {
       char* str = string_value(pair_car(args));
-      unsigned long hash = 0;
-      int c;
+      // unsigned long hash = 0;
+      // int c;
   
-      while ((c = *str++))
-	hash = c + (hash << 6) + (hash << 16) - hash;
+  //     while ((c = *str++))
+	// hash = c + (hash << 6) + (hash << 16) - hash;
   
-      return mk_integer(_sc,hash);
+      return mk_integer(_sc,string_hash((unsigned char*) str));
     }
 	
     pointer SchemeFFI::stringStrip(scheme* _sc, pointer args)

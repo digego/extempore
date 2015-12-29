@@ -1558,13 +1558,13 @@
                             (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
                             (impc:ir:compiler (cadr ast) types)))
            (closure (impc:ir:gname))
-           (name-str (impc:ir:compiler (caddr ast) types))
-           (name (impc:ir:gname))
+           ;; (name-str (impc:ir:compiler (caddr ast) types))
+           ;; (name (impc:ir:gname))
            (type-str (impc:ir:compiler (cadddr ast) types))
            (type (impc:ir:gname)))
       (emit "\n; closure ref \n" os)
       (emit closure-str os)
-      (emit name-str os)
+      ;; (emit name-str os)
       (emit type-str os)
       (emit (string-append (impc:ir:gname "tablePtr" (cadr closure)) " = getelementptr "
                            (impc:ir:pointer-- (cadr closure)) ", "
@@ -1581,8 +1581,8 @@
                            " = load i8*, i8** " (car (impc:ir:gname "ePtr")) "\n") os)
       (define e (impc:ir:gname))
       (emit (string-append (impc:ir:gname "offset" "i32")
-                           " = call i32 @get_address_offset(i8* "
-                           (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n") os)
+                           " = call i32 @get_address_offset(i64 "
+                           (string-hash (caddr ast)) ", %clsvar* " (car (impc:ir:gname "table")) ")\n") os)
       (define offset (impc:ir:gname))
       (emit (string-append (impc:ir:gname "valPtr" "i8*") " = getelementptr "
                            (impc:ir:pointer-- (cadr e)) ", "
@@ -1606,15 +1606,15 @@
                             (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
                             (impc:ir:compiler (cadr ast) types)))
            (closure (impc:ir:gname))
-           (name-str (impc:ir:compiler (caddr ast) types))
-           (name (impc:ir:gname))
+           ;; (name-str (impc:ir:compiler (caddr ast) types))
+           ;; (name (impc:ir:gname))
            (type-str (impc:ir:compiler (cadddr ast) types))
            (type (impc:ir:gname))
            (val-str (impc:ir:compiler (car (cddddr ast)) types (impc:ir:get-type-from-str (cadddr ast))))
            (val (impc:ir:gname)))
       (emit "\n; closure set! \n" os)
       (emit closure-str os)
-      (emit name-str os)
+      ;; (emit name-str os)
       (emit type-str os)
       (emit val-str os)
 
@@ -1633,8 +1633,8 @@
                            " = load i8*, i8** " (car (impc:ir:gname "ePtr")) "\n") os)
       (define e (impc:ir:gname))
       (emit (string-append (impc:ir:gname "offset" "i32")
-                           " = call i32 @get_address_offset(i8* "
-                           (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n") os)
+                           " = call i32 @get_address_offset(i64 "
+                           (number->string (string-hash (caddr ast))) ", %clsvar* " (car (impc:ir:gname "table")) ")\n") os)
       (define offset (impc:ir:gname))
       (emit (string-append (impc:ir:gname "valPtr" "i8*") " = getelementptr "
                            (impc:ir:pointer-- (cadr e)) ", "
@@ -1669,13 +1669,13 @@
                                            (cadddr ast))
                                        types))
            (type (impc:ir:gname))
-           (valtype (if (null? (cadddr ast)) (impc:ir:get-type-str (car hint?)) (cadddr ast)))
-           (name-str (impc:ir:compiler (caddr ast) types))
-           (name (impc:ir:gname)))
+           ;; (name-str (impc:ir:compiler (caddr ast) types))
+           ;; (name (impc:ir:gname))
+           (valtype (if (null? (cadddr ast)) (impc:ir:get-type-str (car hint?)) (cadddr ast))))
       (emit "\n; closure ref \n" os)
       ;; (emit "call ccc void @llvm_print_i32(i32 123)\n" os)
       (emit closure-str os)
-      (emit name-str os)
+      ;; (emit name-str os)
       (emit type-str os)
 
       ;; first deref closure
@@ -1699,8 +1699,8 @@
       (define ePtr (impc:ir:gname))
       (emit (impc:ir:gname "e" "i8*") " = load i8*, i8** " (car (impc:ir:gname "ePtr")) "\n" os)
       (define e (impc:ir:gname))
-      (emit (impc:ir:gname "offset" "i32") " = call i32 @get_address_offset(i8* "
-            (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
+      (emit (impc:ir:gname "offset" "i32") " = call i32 @get_address_offset(i64 "
+            (number->string (string-hash (caddr ast))) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
       (define offset (impc:ir:gname))
 
       (emit (impc:ir:gname "valPtr" "i8*") " = getelementptr "
@@ -1714,7 +1714,7 @@
 
 
       ;; type check
-      (emit (impc:ir:gname "check" "i1") " = call i1 @check_address_type(i8* " (car name) ", %clsvar* " (car (impc:ir:gname "table")) ", i8* " (car type) ")\n" os)
+      (emit (impc:ir:gname "check" "i1") " = call i1 @check_address_type(i64 " (number->string (string-hash (caddr ast))) ", %clsvar* " (car (impc:ir:gname "table")) ", i8* " (car type) ")\n" os)
       (emit  "br i1 " (car (impc:ir:gname "check")) ", label %then" num ", label %else" num "\n" os)
 
       ;; do then
@@ -1750,8 +1750,8 @@
                             (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
                             (impc:ir:compiler (cadr ast) types)))
            (closure (impc:ir:gname))
-           (name-str (impc:ir:compiler (caddr ast) types))
-           (name (impc:ir:gname))
+           ;; (name-str (impc:ir:compiler (caddr ast) types))
+           ;; (name (impc:ir:gname))
            (val-str (if (null? (car (cddddr ast)))
                         (impc:ir:compiler (cadddr ast) types)
                         (impc:ir:compiler (cadddr ast) types
@@ -1764,7 +1764,7 @@
            (type (impc:ir:gname)))
       (emit "\n; closure set! \n" os)
       (emit closure-str os)
-      (emit name-str os)
+      ;; (emit name-str os)
       (emit type-str os)
       (emit val-str os)
 
@@ -1790,8 +1790,8 @@
       (define ePtr (impc:ir:gname))
       (emit (impc:ir:gname "e" "i8*") " = load i8*, i8** " (car (impc:ir:gname "ePtr")) "\n" os)
       (define e (impc:ir:gname))
-      (emit (impc:ir:gname "offset" "i32") " = call i32 @get_address_offset(i8* "
-            (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
+      (emit (impc:ir:gname "offset" "i32") " = call i32 @get_address_offset(i64 "
+            (number->string (string-hash (caddr ast))) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
       (define offset (impc:ir:gname))
 
 
@@ -1804,7 +1804,7 @@
             (string-append (cadr val) "*\n") os)
 
       ;; type check
-      (emit (impc:ir:gname "check" "i1") " = call i1 @check_address_type(i8* " (car name) ", %clsvar* " (car (impc:ir:gname "table")) ", i8* " (car type) ")\n" os)
+      (emit (impc:ir:gname "check" "i1") " = call i1 @check_address_type(i64 " (number->string (string-hash (caddr ast))) ", %clsvar* " (car (impc:ir:gname "table")) ", i8* " (car type) ")\n" os)
       (emit  "br i1 " (car (impc:ir:gname "check")) ", label %then" num ", label %else" num "\n" os)
 
       ;; do then
@@ -1831,16 +1831,16 @@
   (lambda (ast types . hint?)
     (let* ((os (make-string 0))
            (num (number->string (llvm:count++)))
+           ;; (name-str (impc:ir:compiler (caddr ast) types))
+           ;; (name (impc:ir:gname))
            (closure-str (if (and (symbol? (cadr ast))
                                  (impc:ti:closure-exists? (symbol->string (cadr ast))))
                             (impc:ir:compiler:closure-from-getter (symbol->string (cadr ast)))
                             (impc:ir:compiler (cadr ast) types)))
-           (closure (impc:ir:gname))
-           (name-str (impc:ir:compiler (caddr ast) types))
-           (name (impc:ir:gname)))
+           (closure (impc:ir:gname)))
       (emit "\n; closure ref check \n" os)
       (emit closure-str os)
-      (emit name-str os)
+      ;; (emit name-str os)
 
       ;; first deref closure
       (emit (impc:ir:gname "closure" (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr closure)))))
@@ -1855,8 +1855,8 @@
                            (car (impc:ir:gname 1)) " to %clsvar**\n") os)
       (emit (string-append (impc:ir:gname "table" "%clsvar*")
                            " = load %clsvar*, %clsvar** " (car (impc:ir:gname 1)) "\n") os)
-      (emit (impc:ir:gname "val" "i1") " = call i1 @check_address_exists(i8* "
-            (car name) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
+      (emit (impc:ir:gname "val" "i1") " = call i1 @check_address_exists(i64 "
+            (number->string (string-hash (caddr ast))) ", %clsvar* " (car (impc:ir:gname "table")) ")\n" os)
 
       (impc:ir:strip-space os))))
 

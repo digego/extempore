@@ -98,9 +98,9 @@ declare i8* @llvm_stack_alloc(i64) nounwind
 declare i1 @llvm_ptr_in_zone(%mzone*, i8*) nounwind
 declare i1 @llvm_ptr_in_current_zone(i8*) nounwind
 declare %clsvar* @get_address_table(i8*, %clsvar*) nounwind
-declare i32 @get_address_offset(i8*, %clsvar*) nounwind
-declare i1 @check_address_type(i8*, %clsvar*, i8*) nounwind
-declare i1 @check_address_exists(i8*, %clsvar*) nounwind
+declare i32 @get_address_offset(i64, %clsvar*) nounwind
+declare i1 @check_address_type(i64, %clsvar*, i8*) nounwind
+declare i1 @check_address_exists(i64, %clsvar*) nounwind
 declare %clsvar* @new_address_table() nounwind
 declare %clsvar* @add_address_table(%mzone*, i8*, i32, i8*, i32, %clsvar*) nounwind
 declare void @llvm_print_pointer(i8*)

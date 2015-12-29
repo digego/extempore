@@ -220,7 +220,7 @@ std::map<long,uint64_t> LLVM_ZONE_STACKSIZES;
 std::map<uint64_t,llvm_zone_t*> LLVM_CALLBACK_ZONES;
 #endif
 
-int LLVM_ZONE_ALIGN = 16;
+int LLVM_ZONE_ALIGN = 64;
 int LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN-1;
 
 // this is going to cause concurrency problems at some stage.
@@ -652,7 +652,7 @@ char* extitoa(int64_t val) {
   return buf;//&buf[i+1];        
 }
 
-unsigned long string_hash(unsigned char* str) 
+uint64_t string_hash(unsigned char* str) 
 {
   unsigned long hash = 0;
   int c;
@@ -1123,70 +1123,72 @@ float imp_rand2_f(float a, float b)
 // This is temporary and needs to replaced with something sensible!
 struct closure_address_table
 {
+    uint64_t id; 
     char* name;
     uint32_t offset;
-    char* type;		
+    char* type;
     struct closure_address_table* next;
 };
 
 struct closure_address_table* get_address_table(const char* name, closure_address_table* table)
 {
-    while(table)
+  while(table)
     {
-	if(strcmp(table->name,name)) return table;
-	table = table->next;
+      if(strcmp(table->name,name)) return table;
+      table = table->next;
     }
-    printf("Unable to locate %s in closure environment a\n",name);
-    return 0;
+  printf("Unable to locate %s in closure environment a\n",name);
+  return 0;
 }
 
-uint32_t get_address_offset(const char* name, closure_address_table* table)
+uint32_t get_address_offset(uint64_t id, closure_address_table* table)
 {
     while(table)
     {
       // printf("%p name: %s\ntablename: %s\n\n", name, name, table->name);
-      if(strcmp(table->name,name) == 0) {
+      if(table->id == id) {
         // printf("in %s returning offset %d from %s\n",table->name,table->offset,name);
         return table->offset;
       }
       table = table->next;
     }
-    printf("Unable to locate %s in closure environment b\n",name);
+    printf("Unable to locate %llu in closure environment b\n",id);
     return 0;
 }
 
-char* get_address_type(const char* name, closure_address_table* table)
+char* get_address_type(uint64_t id, closure_address_table* table)
+//char* get_address_type(const char* name, closure_address_table* table)
 {
     while(table)
     {
-      if(strcmp(table->name,name) == 0) {
-	return table->type;
+      if(table->id == id) {
+        return table->type;
       }
       table = table->next;
     }
-    printf("Unable to locate %s in closure environment c\n",name);
+    printf("Unable to locate id in closure environment c\n");
     return 0;  
 }
 
-bool check_address_exists(const char* name, closure_address_table* table)
-{
-    while(table)
-    {
-      if(strcmp(table->name,name) == 0) {
-	return true;
-      }
-      table = table->next;
-    }
-    return false;  
-}
-
-bool check_address_type(const char* name, closure_address_table* table, const char* type)
+bool check_address_exists(uint64_t id, closure_address_table* table)
 {
   while(table)
     {
-      if(strcmp(table->name,name) == 0) {
+      if(table->id == id) {
+        return true;
+      }
+      table = table->next;
+    }
+  return false;  
+}
+
+bool check_address_type(uint64_t id, closure_address_table* table, const char* type)
+{
+  while(table)
+    {
+      if(table->id == id) {
         if(strcmp(table->type,type)!=0) {
-          printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,name,table->type);
+          printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,table->name,table->type);
           return 0;
         }else{
           return 1;
@@ -1194,7 +1196,7 @@ bool check_address_type(const char* name, closure_address_table* table, const ch
       }
       table = table->next;
     }
-  printf("Unable to locate %s in closure environment type: %s d\n",name,type);
+  printf("Unable to locate id in closure environment type: %s d\n",type);
   return 0;
 }
 
@@ -1217,7 +1219,7 @@ struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, u
   } else {
     t = (struct closure_address_table*) llvm_zone_malloc(zone,sizeof(struct closure_address_table));
   }
-
+    t->id = string_hash((unsigned char*) name);
   t->name = name;
   t->offset = offset;
   t->type = type;
@@ -1266,9 +1268,9 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     memset(tname, 0, 256);
     memset(vname, 0, 256);
     memcpy(vname, tmp, 256);
-  }   
+  }
   //printf("in llvm scheme env set %s.%s:%s\n",fname,vname,tname);
-  
+  uint64_t id = string_hash((unsigned char*)vname);
   // Module* M = extemp::EXTLLVM::I()->M;
   std::string funcname(fname);
   std::string getter("_getter");
@@ -1292,7 +1294,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   //uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
   closure_address_table* addy_table = (closure_address_table*) *(closure+0);
   // check address exists
-  if(!check_address_exists(vname, addy_table)) {
+  if(!check_address_exists(id, addy_table)) {
     ascii_text_color(0,1,10);
     printf("RunTime Error:");
     ascii_text_color(0,7,10);
@@ -1305,8 +1307,8 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     return _sc->F;
   }
   char* eptr = (char*) *(closure+1);
-  char* type = get_address_type(vname,addy_table);
-  uint32_t offset = get_address_offset(vname,addy_table);
+  char* type = get_address_type(id,addy_table);
+  uint32_t offset = get_address_offset(id,addy_table);
 
   //printf("type: %s  offset: %d\n",type, offset);
 
