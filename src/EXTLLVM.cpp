@@ -220,7 +220,7 @@ std::map<long,uint64_t> LLVM_ZONE_STACKSIZES;
 std::map<uint64_t,llvm_zone_t*> LLVM_CALLBACK_ZONES;
 #endif
 
-int LLVM_ZONE_ALIGN = 64;
+int LLVM_ZONE_ALIGN = 32;
 int LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN-1;
 
 // this is going to cause concurrency problems at some stage.
