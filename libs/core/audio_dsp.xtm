@@ -52,6 +52,22 @@
 ;;     0.0))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  midi/freq utilities
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func midi2frq
+  (lambda (pitch:SAMPLE)
+    (if (<= pitch 0.0) 0.0
+        (* 440.0 (pow 2.0 (/ (- pitch 69.0) 12.0))))))
+
+(bind-func frq2midi
+  (lambda (freq:SAMPLE)
+    (if (<= freq 0.0) 0.0
+        (+ (* 12.0 (log2 (/ freq 440.0))) 69.0))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -296,10 +312,9 @@
   (lambda (phase)
     (let ((t (/ STWOPI SAMPLERATE)))
       (lambda (amp freq)
-        (set! phase (+ phase (* t (clamp freq (- 0.0 SRf) SRf)))) 
+        (set! phase (+ phase (* t (clamp freq (- 0.0 SRs) SRs)))) 
         (if (> phase SPI) (set! phase (- phase STWOPI)))
         (* amp (_sin phase))))))
-
 
 (bind-func osc_mc_c
   (lambda (phase)
@@ -313,20 +328,29 @@
 ;; where 'n' is how squared off the wave is
 ;; an n of 1.0 is very rounded
 ;; an n of 30.0 is very sharp
-(bind-func square_c
+(bind-func square_n_c
   (lambda (phase)
     (let ((osc (osc_c phase)))
       (lambda (amp freq n)
-        (* amp (tanh (* n (osc 1.0 freq))))))))
+        (* amp 0.8 (tanh (* n (osc 1.0 freq))))))))
 
+;; same as square_n_c
+;; but 'n' is a function of frequency
+(bind-func square_c
+  (lambda (phase)
+    (let ((osc (osc_c phase)))
+      (lambda (amp freq)        
+        (* amp 0.8
+           (tanh (* (clamp (- 100.0 (frq2midi freq)) 2.0 150.0)
+                    (osc 1.0 freq))))))))
 
 ;; square oscillator multichannel
 (bind-func square_mc_c
   (lambda (phase)
     (let ((sqr (square_c phase))
           (mem 0.0))
-      (lambda (chan:i64 amp freq n)
-        (if (= chan 0) (set! mem (sqr amp freq n)))
+      (lambda (chan:i64 amp freq)
+        (if (= chan 0) (set! mem (sqr amp freq)))
         mem))))
 
 ;; a 'leaky' integrator
@@ -340,7 +364,7 @@
 ;; triangle oscillator
 ;; by using leak integrator over square
 ;; see square wave for 'n'
-(bind-func triangle_c
+(bind-func triangle_n_c
   (lambda (phase)
     (let ((osc (osc_c phase))
           (old:SAMPLE 0.0)
@@ -351,13 +375,26 @@
                      (* amp (tanh (* n (osc 1.0 freq))))))
         (* 0.125 old)))))
 
+(bind-func triangle_c
+  (lambda (phase)
+    (let ((osc (osc_c phase))
+          (old:SAMPLE 0.0)
+          (new:SAMPLE 0.0)
+          (leak 0.9))
+      (lambda (amp freq)
+        (set! old (+ (* leak old)
+                     (* amp (tanh (* (clamp (- 100.0 (frq2midi freq)) 2.0 150.0)
+                                     (osc 1.0 freq))))))
+        (* 0.125 old)))))
+
+
 ;; saw oscillator
 (bind-func triangle_mc_c
   (lambda (phase)
     (let ((mem 0.0)
           (tri (triangle_c phase)))
-      (lambda (chan:i64 amp freq n)
-        (if (= chan 0) (set! mem (tri amp freq n)))
+      (lambda (chan:i64 amp freq)
+        (if (= chan 0) (set! mem (tri amp freq)))
         mem))))
 
 ;; rect wave oscillator - useful for pulse width modulation
@@ -386,7 +423,7 @@
           (leak 0.995)
           (saw 0.0))
       (lambda (amp freq)
-        (let* ((qmax (/ SAMPLERATE freq))
+        (let* ((qmax (/ SAMPLERATE freq 2.0))
                (dc (/ -0.498 qmax)))
           (set! phase (+ phase dp))
           (if (< phase 0.0)
@@ -397,7 +434,7 @@
                          (set! dp (- 0.0 dp)))))
           (set! x (* SPI phase))
           (if (< x limitchk) (set! x limitchk))
-          (set! saw (* leak (+ saw (+ dc (/ (sin x) x)))))
+          (set! saw (* leak (+ saw dc (/ (sin x) x))))
           (* amp saw))))))
 
 
@@ -855,7 +892,6 @@
             (begin (set! mem in)
                    in))))))
 
-
 (bind-func hold_mc_c
   (lambda (channels:i64)
     (let ((holds:[SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
@@ -865,13 +901,11 @@
         (let ((f (pref holds chan)))
           (f x h))))))
 
-
 ;; a dodgy bitcrusher
 (bind-func crush
   (lambda (in:SAMPLE bits:SAMPLE)
     (/ (floor (* in (pow 2. bits)))
        (pow 2. bits))))
-
 
 ;; a dodgy amp distortion
 (bind-func distort_c
@@ -880,45 +914,69 @@
       (lambda (in:SAMPLE)
         (clamp lim (* -1.0 lim) (* gain in))))))
 
-;; mono in (ignores anything in on channel 2)
-;; pan value [0.0-1.0]
-(bind-func pan2
-  (let ((out:SAMPLE 0.0))
-    (lambda (x:SAMPLE chan:i64 pan)
-      (if (= chan 0)
-          (begin (set! out x) (* (- 1.0 pan) out))
-          (* pan out)))))
-
 ;; mono in (ignores all other channels)
 ;; pan value [0.0-1.0]
-(bind-func pan_mc
+(bind-func panner_c
   (lambda (channels)
     (let ((v:SAMPLE 0.0)
           (out:SAMPLE 0.0))
-      (lambda (x:SAMPLE chan:i64 pan)
+      (lambda (chan x:SAMPLE pan)
         (if (= chan 0) (set! out x))
         (set! v (fabs (- (* (- channels 1.0) pan) (convert chan))))
         (if (> v 1.0) 0.0
             (* (- 1.0 v) out))))))
 
-
 ;; simple stereo weights
 (bind-func mix2
-  (lambda (x:SAMPLE chan:i64 left right)
+  (lambda (chan:i64 x:SAMPLE left right)
     (cond ((= chan 0) (* x left))
           ((= chan 1) (* x right))
           (else 0.0))))
 
+;; simple stereo weights (from mono)
+(bind-func mix2_c
+  (lambda ()
+    (let ((out 0.0))
+      (lambda (chan:i64 x:SAMPLE left right)
+        (cond ((= chan 0) (set! out x) (* out left))
+              ((= chan 1) (* out right))
+              (else 0.0))))))
+
 ;; simple quad weights
 (bind-func mix4
-  (lambda (x:SAMPLE chan c1 c2 c3 c4)
+  (lambda (chan x:SAMPLE c1 c2 c3 c4)
     (cond ((= chan 0) (* x c1))
           ((= chan 1) (* x c2))
           ((= chan 2) (* x c3))
           ((= chan 3) (* x c4))
           (else 0.0))))
 
-;; a four channel mixer
+;; simple quad weights (from mono)
+(bind-func mix4_c
+  (lambda ()
+    (let ((out 0.0))
+      (lambda (chan:i64 x:SAMPLE c1 c2 c3 c4)
+        (cond ((= chan 0) (set! out x) (* out c1))
+              ((= chan 1) (* out c2))
+              ((= chan 2) (* out c3))
+              ((= chan 3) (* out c4))
+              (else 0.0))))))
+
+
+;; simple oct weights
+(bind-func mix8
+  (lambda (chan x:SAMPLE c1 c2 c3 c4 c5 c6 c7 c8)
+    (cond ((= chan 0) (* x c1))
+          ((= chan 1) (* x c2))
+          ((= chan 2) (* x c3))
+          ((= chan 3) (* x c4))
+          ((= chan 4) (* x c5))          
+          ((= chan 5) (* x c6))          
+          ((= chan 6) (* x c7))          
+          ((= chan 7) (* x c8))
+          (else 0.0))))
+
+;; an n channel mixer
 ;; cdat is an array of doubles values
 ;; each array element is a channels mix (between 0.0 and 1.0)
 (bind-func mixer_c
@@ -2016,26 +2074,34 @@ but v1 and v2 can be computed in parallel"
                   (set! res (line time)))))
           res)))))
 
-;; make a convenience wrapper for asr
+
+;; chan, gate, attack, decay, sustain, release
 (bind-func adsr_c
-  (lambda (start_time:i64 atk_dur:i64 dky_dur:i64 sus_dur:i64 rel_dur:i64 peak_amp sus_amp)
-    (let* ((points 6)
-           (data:SAMPLE* (zalloc (* points 2))))
-      (pset! data 0 (convert start_time))
-      (pset! data 1 0.0)
-      (pset! data 2 (convert (+ start_time atk_dur))) ;; point data
-      (pset! data 3 peak_amp)
-      (pset! data 4 (convert (+ start_time atk_dur dky_dur)))
-      (pset! data 5 sus_amp)
-      (pset! data 6 (convert (+ start_time atk_dur dky_dur sus_dur)))
-      (pset! data 7 sus_amp)
-      (pset! data 8 (convert (+ start_time atk_dur dky_dur sus_dur rel_dur)))
-      (pset! data 9 0.0)
-      (pset! data 10 (convert (+ start_time atk_dur dky_dur sus_dur rel_dur 1))) ;; this to flatten out at 0.0
-      (pset! data 11 0.0)
-      (let ((f (envelope_c data points)))
-        (lambda (time:i64)
-          (f (convert time)))))))
+  (lambda ()
+    (let ((t:SAMPLE 0.0)
+          (out:SAMPLE 0.0)
+          (t1 0.0) (t2 0.0) (t3 0.0) (t4 0.0)
+          (inc1 0.0) (inc2 0.0) (inc3 0.0))
+      (lambda (chan:i64 g a d s r)
+        (if (<> chan 0)
+            out
+            (begin              
+              (set! a (+ 1.0 (* a .001 SRs)))
+              (set! d (+ 1.0 (* d .001 SRs)))
+              (set! r (+ 1.0 (* r .001 SRs)))
+              (if (< g 0.00001:f) (set! t 0.0) (inc t 1.0))
+              (set! t1 a)
+              (set! t2 (+ a d))
+              (set! inc1 (/ 1.0 a))
+              (set! inc2 (/ (- 1.0 s) d))
+              (set! inc3 (if (or (< s .01) (> out s)) (/ 1.0 r) (/ s r)))
+              (cond ((< t 0.001) (dec out inc3)) ;; release
+                    ((> t (+ a d)) (set! out s)) ;; sustain
+                    ((> t a) (dec out inc2)) ;; decay
+                    ((> t 0.0) (inc out inc1)) ;; attack
+                    (else (set! out 0.0)))
+              (set! out (clamp out 0.0 1.0))
+              out))))))
 
 
 ;; an accumulative adsr (random access not allowed! time must be linear).
@@ -2089,17 +2155,6 @@ but v1 and v2 can be computed in parallel"
 
 
 
-;;  midi/freq utilities
-
-(bind-func midi2frq
-  (lambda (pitch:SAMPLE)
-    (if (<= pitch 0.0) 0.0
-        (* 440.0 (pow 2.0 (/ (- pitch 69.0) 12.0))))))
-
-(bind-func frq2midi
-  (lambda (freq:SAMPLE)
-    (if (<= freq 0.0) 0.0
-        (+ (* 12.0 (log2 (/ freq 440.0))) 69.0))))
 
 (define *xtmlib-audio_dsp-loaded* #t)
 
