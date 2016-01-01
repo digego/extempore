@@ -995,7 +995,7 @@
 (bind-func vector-test2
   (lambda ()
     (let ((v1:/4,float/* (alloc))
-	  (v2:/4,float/* (alloc)))
+          (v2:/4,float/* (alloc)))
       (vfill! v1 1.0 2.0 4.0 8.0)
       (vfill! v2 2.0 2.5 2.25 2.125)
       (* v1 v2))))
@@ -1093,6 +1093,72 @@
 ;; make sure it'll handle multiple body forms
 (xtmtest-result (call-as-xtlang (println 1) (println 2) 5)
                 5)
+
+
+(bind-func print_v4f32:[void,/4,float/]*
+  (lambda (v)
+    (printout "/" (vref v 0) " " (vref v 1) " " (vref v 2) " " (vref v 3) "/")))
+
+(bind-func print_v4f64:[void,/4,double/]*
+  (lambda (v)
+    (printout "/" (vref v 0) " " (vref v 1) " " (vref v 2) " " (vref v 3) "/")))
+
+(bind-poly print print_v4f32)
+(bind-poly print print_v4f64)
+
+(xtmtest
+ '(bind-func vector-test5:[/4,float/]*
+    (lambda ()
+      (* (vector 1.0 2.0 3.0 4.0)
+         (vector 2.0 2.0 2.0 2.0))))
+
+ (call-as-xtlang (println (vector-test5))))
+
+(xtmtest
+ '(bind-func vector-test6:[/4,float/]*
+    (lambda ()
+      (* (vector 1.0 2.0 3.0 4.0)
+         2.0)))
+
+ (call-as-xtlang (println (vector-test6))))
+
+(xtmtest
+ '(bind-func vector-test7:[/4,double/]*
+   (lambda ()
+     (cos (vector 0.0 1.0 2.0 3.0))))
+
+ (call-as-xtlang (println (vector-test7))))
+
+(xtmtest
+ '(bind-func vector-test8:[/4,double/]*
+   (lambda ()
+     (cos 2.0)))
+
+ (call-as-xtlang (println (vector-test8))))
+
+(xtmtest
+ '(bind-func vector-test9:[/4,double/]*
+    (lambda ()
+      (* (cos 2.0) (log (vector 1.0 2.0 3.0 4.0)))))
+
+ (call-as-xtlang (println (vector-test9))))
+
+(xtmtest
+ '(bind-func vector-test10:[/4,double/]*
+   (lambda ()
+     (pow (vector 1.0 2.0 3.0 4.0)
+          (vector 1.0 2.0 3.0 4.0))))
+
+ (call-as-xtlang (println (vector-test10))))
+
+(xtmtest
+ '(bind-func vector-test11:[/4,double/]*
+    (lambda ()
+      (pow (vector 1.0 2.0 3.0 4.0)
+           2.0)))
+
+ (call-as-xtlang (println (vector-test11))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
