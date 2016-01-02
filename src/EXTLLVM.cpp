@@ -1187,12 +1187,12 @@ bool check_address_type(uint64_t id, closure_address_table* table, const char* t
   while(table)
     {
       if(table->id == id) {
-        if(strcmp(table->type,type)!=0) {
+        if((strcmp(table->type,type)!=0) && (strcmp("{i8*, i8*, void (i8*, i8*)*}**",type)!=0)) {
           printf("Runtime Type Error: bad type %s for %s. Should be %s\n",type,table->name,table->type);
           return 0;
         }else{
           return 1;
-        }	  
+        }
       }
       table = table->next;
     }
