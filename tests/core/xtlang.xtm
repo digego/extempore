@@ -1223,6 +1223,25 @@
                   )))
          (test_thread_last2) 2)
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; closure ref/set checks
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest 
+ '(bind-func lvl1
+    (let ((lvl2
+           (let ((lvl3
+                  (let ((x 5))
+                    (lambda (x:double) (+ 1 2)))))
+             (lambda (y:|4,float|*) (+ 3 4)))))
+      (lambda () (+ 5 6))))
+ 
+ (xtmX (begin
+         (lvl1.lvl2.lvl3.x:i64 128)
+         (lvl1.lvl2.lvl3.x:i64))) 128)
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; syntax highlighting tests ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

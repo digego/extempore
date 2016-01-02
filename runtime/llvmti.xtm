@@ -3509,6 +3509,41 @@ e.g.
                                          (* ,*au:samplerate* 10)))
        #t)))
 
+(define (impc:ti:multicref args)
+  `(let ,(append (map (lambda (a b n)
+                        (list (string->symbol (string-append "f" (number->string n) ":[void]*"))
+                              (list (string->symbol
+                                     (string-append
+                                      (if (= n 0)
+                                          (symbol->string a)
+                                          (string-append "f" (number->string (- n 1))))
+                                      "." (symbol->string b))))))
+                      (reverse (cdddr (reverse args)))
+                      (cdr (reverse (cdr (reverse args))))
+                      (range (length (cddr args))))
+                 (list (list (string->symbol (string-append "v:" (symbol->string (car (reverse args)))))
+                             (list (string->symbol (string-append "f" (number->string (length (cddddr args))) "."
+                                                                  (symbol->string (cadr (reverse args)))))))))
+         v))
+
+(define (impc:ti:multicset args)
+  `(let ,(map (lambda (a b n)
+                (list (string->symbol (string-append "f" (number->string n) ":[void]*"))
+                      (list (string->symbol
+                             (string-append
+                              (if (= n 0)
+                                  (symbol->string a)
+                                  (string-append "f" (number->string (- n 1))))
+                              "." (symbol->string b))))))
+              (reverse (cddddr (reverse args)))
+              (cdr (reverse (cdr (reverse args))))
+              (range (length (cdddr args))))
+        (,(string->symbol (string-append "f" (number->string (- (length (cddddr args)) 1)) "."
+                                         (symbol->string (caddr (reverse args)))
+                                         ":" (symbol->string (cadr (reverse args)))))
+          ,(car (reverse args)))))
+
+
 (define impc:ti:gteq
   (lambda (ast)
     `(or (> ,(cadr ast) ,(caddr ast))
@@ -3737,12 +3772,28 @@ Continue executing `body' forms until `test-expression' returns #f"
                       (if (regex:match? (symbol->string (car ast)) ".*\\..*:.*")
                           (let* ((subs (regex:split (symbol->string (car ast)) "\\."))
                                  (a (string->symbol (car subs)))
-                                 (subs2 (regex:type-split (cadr subs) ":"))
+                                 (subs2 (regex:type-split (car (reverse subs)) ":"))
                                  (b (string->symbol (car subs2)))
                                  (c (string->symbol (cadr subs2))))
-                            (if (= (length ast) 1)
-                                (impc:ti:first-transform (list 'cref a b c) inbody?)
-                                (impc:ti:first-transform (list 'cset! a b (cadr ast) c) inbody?)))
+                            (cond ((and (= (length ast) 1) (= (length subs) 2)) ;; cref
+                                   (impc:ti:first-transform (list 'cref a b c) inbody?))
+                                  ((= (length subs) 2) ;; cset
+                                   (impc:ti:first-transform (list 'cset! a b (cadr ast) c) inbody?))
+                                  ((and (> (length subs) 2) (= (length ast) 2)) ;; multipart cset
+                                   (impc:ti:first-transform
+                                    (impc:ti:multicset
+                                     (append (map (lambda (x) (string->symbol x))
+                                                  (append (reverse (cdr (reverse subs))) subs2))
+                                             (cdr ast)))
+                                    inbody?))
+                                  ((and (> (length subs) 2) (= (length ast) 1)) ;; multipart cref
+                                   (impc:ti:first-transform
+                                    (impc:ti:multicref
+                                     (map (lambda (x) (string->symbol x))
+                                          (append (reverse (cdr (reverse subs))) subs2)))
+                                    inbody?))
+                                  (else ;; error!
+                                   (impc:compiler:print-compiler-error "Bad form!" ast))))
                           (let* ((subs (regex:split (symbol->string (car ast)) "\\."))
                                  (a (string->symbol (car subs)))
                                  (b (string->symbol (cadr subs))))
