@@ -60,6 +60,13 @@
 (bind-alias apr_array_header_t i8)
 
 (bind-val APR_SUCCESS i32 0)
+
+;; /**
+;;  * Return a human readable string describing the specified error.
+;;  * @param statcode The error code to get a string for.
+;;  * @param buf A buffer to hold the error string.
+;;  * @param bufsize Size of the buffer to hold the string.
+;;  */
 (bind-lib libapr apr_strerror [i8*,apr_status_t,i8*,size_t]*)
 
 ;;;;;;;;;;;;;;;;;
@@ -2191,6 +2198,33 @@ filename           : %s
 ;;  * @param pool where to allocate temporary storage from
 ;;  */
 (bind-lib libapr apr_env_delete [apr_status_t,i8*,apr_pool_t*]*)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; xtlang helper functions ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; this is just a scheme wrapper
+(bind-func apr_init
+  (lambda ()
+    (apr_initialize)))
+
+;; in apr.h, this is actually a C preprocessor macro
+(bind-func apr_pool_create_no_parent
+  (lambda ()
+    (let ((pool:apr_pool_t** (salloc)))
+      (apr_pool_create_ex pool null null null)
+      (pref pool 0))))
+
+(bind-func apr_pool_create_with_parent
+  (lambda (parent)
+    (let ((pool:apr_pool_t** (salloc)))
+      (apr_pool_create_ex pool parent null null)
+      (pref pool 0))))
+
+(bind-poly apr_pool_create apr_pool_create_no_parent)
+(bind-poly apr_pool_create apr_pool_create_with_parent)
+
+(impc:aot:do-at-runtime (apr_init))
 
 (impc:aot:insert-footer "xtmapr")
 (define *xtmlib-apr-loaded* #t)

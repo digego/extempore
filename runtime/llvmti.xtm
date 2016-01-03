@@ -2563,6 +2563,11 @@
       `(begin ,@forms)
       `(impc:aot:insert-forms ,@forms)))
 
+(define-macro (impc:aot:do-at-runtime . forms)
+  `(impc:aot:do-or-emit
+    (if (not (output-port? *impc:aot:current-output-port*))
+        (begin ,@forms))))
+
 (define-macro (impc:aot:suppress-aot-do . forms)
   `(if ,*impc:aot:current-output-port*
        (let ((aot-compilation-port *impc:aot:current-output-port*))
