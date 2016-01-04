@@ -2460,13 +2460,8 @@
            (ttype (impc:ir:get-type-from-str (cadr var)))
            (tt '()))
       ;; type tests
-      (if (and (not (impc:ir:pointer? ttype))
-               (not (impc:ir:array? ttype)))
+      (if (not (impc:ir:pointer? ttype))
           (impc:compiler:print-bad-type-error-with-ast (cadr var) "array must take a pointer to an array" ast))
-      ;; (if (and (= 1 (impc:ir:get-ptr-depth ttype))
-      ;; 	 (or (impc:ir:closure? ttype)))
-      ;;     ;;(impc:ir:tuple? ttype)))
-      ;;     (print-error 'Compiler 'Error: 'Type 'Mismatch: ast 'array 'must 'be 'pointer 'not (cadr var)))
       (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
           (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
       (emit index-str os)
@@ -2475,15 +2470,9 @@
       (if (not (impc:ir:pointer? ttype)) ;; must be an array if we're not a pointer
           (emit (string-append (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractvalue "
                                (cadr var) " " (car var) ", " (car idx) "\n") os)
-          (if (impc:ir:array? ttype)
-              (begin (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
-                                          " = getelementptr " (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var)
-                                          ", i32 0, " (cadr idx) " " (car idx) "\n") os)
-                     (set! tt (impc:ir:get-type-str (caddr ttype))))
-              (begin (emit (string-append (impc:ir:gname "val" (cadr var)) " = getelementptr "
-                                          (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n") os)
-                     (set! tt (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var))))))))
-	    ;;(set! tt (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var)))))
+          (begin (emit (string-append (impc:ir:gname "val" (cadr var)) " = getelementptr "
+                                      (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n") os)
+                 (set! tt (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var)))))))
       (if (impc:ir:pointer? ttype)
           (emit (string-append (impc:ir:gname "val" tt) " = load " tt ", " tt "* "
                                (car (impc:ir:gname 1)) "\n") os))
@@ -2500,22 +2489,19 @@
            (ttype (impc:ir:get-type-from-str (cadr var))))
       ;; type tests
       (if (not (impc:ir:pointer? ttype))
-          (impc:compiler:print-bad-type-error-with-ast ttype "array must be a pointer" ast))
+          (impc:compiler:print-bad-type-error-with-ast ttype "must be a pointer" ast))
       (if (and (= 1 (impc:ir:get-ptr-depth ttype))
                (or (impc:ir:closure? ttype)))
-                                        ;(impc:ir:tuple? ttype)))
-          (impc:compiler:print-bad-type-error-with-ast ttype "array must be a pointer" ast))
+          (impc:compiler:print-bad-type-error-with-ast ttype "must be a pointer" ast))
       (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
           (impc:compiler:print-bad-type-error-with-ast (cadr idx) "index must be an integer" ast))
       (emit index-str os)
       (emit var-str os)
       (emit "; pointer ref\n" os)
-      (if (impc:ir:array? ttype)
-          (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
-                               " = getelementptr " (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var)
-                               ", i32 0, " (cadr idx) " " (car idx) "\n") os)
-          (emit (string-append (impc:ir:gname "val" (cadr var)) " = getelementptr "
-                               (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n") os))
+      (emit (string-append (impc:ir:gname "val" (cadr var)) " = getelementptr "
+                           (impc:ir:pointer-- (cadr var))
+                           ", " (cadr var) " " (car var) ", "
+                           (cadr idx) " " (car idx) "\n") os)
       (impc:ir:strip-space os))))
 
 
@@ -2528,40 +2514,36 @@
            (var (impc:ir:gname))
            (ttype (impc:ir:get-type-from-str (cadr var)))
            (val-str (impc:ir:compiler (cadddr ast) types
-                                      (if (impc:ir:array? ttype)
-                                          (caddr ttype)
-                                          (impc:ir:pointer-- ttype))))
+                                      (impc:ir:pointer-- ttype)))
            (val (impc:ir:gname)))
       ;; type tests
       (if (not (impc:ir:pointer? ttype))
-          (impc:compiler:print-bad-type-error-with-ast ttype "array must be a pointer" ast))
+          (impc:compiler:print-bad-type-error-with-ast ttype "must be a pointer" ast))
       (if (not (impc:ir:fixed-point? (impc:ir:get-type-from-str (cadr idx))))
           (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-from-str (cadr idx))  "index must be an integer" ast))
-      (if (and (= 1 (impc:ir:get-ptr-depth ttype))
-               (or (impc:ir:closure? ttype)
-                   (impc:ir:tuple? ttype)))
-          (if (impc:ir:tuple? ttype)
-              (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be a tuple type, maybe you want " (cadr var) "*") ast)
-              (impc:compiler:print-bad-type-error-ast (cadr var) (string-append "cannot be a closure type, maybe you want " (cadr var) "*") ast)))
+      ;; (if (and (= 1 (impc:ir:get-ptr-depth ttype))
+      ;;          (or (impc:ir:closure? ttype)
+      ;;              (impc:ir:array? ttype)
+      ;;              (impc:ir:tuple? ttype)))
+      ;;     (if (impc:ir:tuple? ttype)
+      ;;         (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be a tuple type, maybe you want " (cadr var) "*") ast)
+      ;;         (if (impc:ir:array? ttype)
+      ;;             (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be an array type, maybe you want " (cadr var) "*") ast)
+      ;;             (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be a closure type, maybe you want " (cadr var) "*") ast))))
                
-      (if (not (equal? (impc:ir:get-type-from-str (cadr val)) ;(impc:ir:get-type-from-str (cadr var))
-                       (if (impc:ir:array? ttype)
-                           (caddr ttype)
-                           (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var))))))
-                                        ;(impc:ir:pointer++ (impc:ir:get-type-from-str (cadr val)))))
-          (impc:compiler:print-type-mismatch-error (cadr val) (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var))) (car ast)))
+      (if (not (equal? (impc:ir:get-type-from-str (cadr val))
+                       (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var)))))
+          (impc:compiler:print-type-mismatch-error
+           (cadr val)
+           (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var))) (car ast)))
       ;; type tests done
       (emit index-str os)
       (emit var-str os)
       (emit val-str os)
       (emit "; set pointer\n" os)
-      (if (impc:ir:array? ttype)
-          (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
-                               " = getelementptr " (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var)
-                               ", i32 0, " (cadr idx) " " (car idx) "\n") os)
-          (emit (string-append (impc:ir:gname "val" (cadr var)) " = getelementptr "
-                               (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n") os))
-                                        ;(define tt (impc:ir:get-type-str (impc:ir:pointer-to-scalar (impc:ir:get-type-from-str (cadr var)))))
+      (emit (string-append (impc:ir:gname "val" (cadr var)) " = getelementptr "
+                           (impc:ir:pointer-- (cadr var)) ", " (cadr var) " "
+                           (car var) ", " (cadr idx) " " (car idx) "\n") os)
       (emit (string-append "store " (cadr val) " " (car val) ", "
                            (cadr (impc:ir:gname)) " " (car (impc:ir:gname)) "\n") os)
       (impc:ir:gname "val" (car val) (cadr val))

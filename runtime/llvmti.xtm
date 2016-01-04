@@ -3691,6 +3691,12 @@ Continue executing `body' forms until `test-expression' returns #f"
                      ((eq? (car ast) 'free)
                       (list 'free (list 'bitcast (impc:ti:first-transform (cadr ast) inbody?)
                                         'i8*)))
+                     ((member (car ast) '(Vector))
+                      (impc:ti:first-transform `(let ((v1 (alloc)) (v2 (vector ,@(cdr ast)))) (pset! v1 0 v2) v1) inbody?))
+                     ((member (car ast) '(Array))
+                      (impc:ti:first-transform `(let ((a1 (alloc)) (a2 (array ,@(cdr ast)))) (pset! a1 0 a2) a1) inbody?))
+                     ((member (car ast) '(Tuple))
+                      (impc:ti:first-transform `(let ((t1 (alloc)) (t2 (tuple ,@(cdr ast)))) (pset! t1 0 t2) t1) inbody?))
                      ((member (car ast) '(vector))
                       `(make-vector ,@(map (lambda (x) (impc:ti:first-transform x inbody?)) (cdr ast))))
                      ((member (car ast) '(array))
@@ -4404,6 +4410,7 @@ Continue executing `body' forms until `test-expression' returns #f"
     (cond ((atom? t) t)
           ((and (list? t)
                 (not (null? t))
+                (not (impc:ir:type? (car t)))
                 (number? (car t))
                 ;;(= *impc:ir:tuple* (modulo (car t) *impc:ir:pointer*)))
                 (impc:ir:tuple? (car t)))
@@ -6508,10 +6515,7 @@ xtlang's `let' syntax is the same as Scheme"
            (c (impc:ti:type-check (cadddr ast) vars kts (if (null? a) #f
                                                             (if (atom? a)
                                                                 (list (impc:ir:pointer-- a))
-                                                                (if (and (not (impc:ir:type? a))
-                                                                         (impc:ir:array? (car a)))
-                                                                    (list (caddr (car a)))
-                                                                    (list (impc:ir:pointer-- (car a)))))))))
+                                                                (list (impc:ir:pointer-- (car a))))))))
       ;; try running type check on a if C exists! but a does not
       (if (and (null? a)
                (not (null? c)))
@@ -6544,11 +6548,13 @@ xtlang's `let' syntax is the same as Scheme"
           ;; b should be fixed point
           (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
       (if (impc:ir:type? a) (set! a (list a)))
+      (if (and (not (null? a))
+               (< (impc:ir:get-ptr-depth (car a)) 1))
+          (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type (car a))
+                                              "Cannot de-reference non-pointer type"))      
       (if (null? a)
           a
-          (if (impc:ir:array? (car a))
-              (list (impc:ir:pointer++ (caddr (car a))))
-              (list (car a)))))))
+          (list (car a))))))
 
 
 (define impc:ti:pointer-ref-check
@@ -6563,11 +6569,13 @@ xtlang's `let' syntax is the same as Scheme"
           ;; b should be fixed point
           (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))
       (if (impc:ir:type? a) (set! a (list a)))
+      (if (and (not (null? a))
+               (< (impc:ir:get-ptr-depth (car a)) 1))
+          (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type (car a))
+                                              "Cannot de-reference non-pointer type"))
       (if (null? a)
           a
-          (if (impc:ir:array? (car a))
-              (list (caddr (car a)))
-              (list (impc:ir:pointer-- (car a))))))))
+          (list (impc:ir:pointer-- (car a)))))))
 
 
 ;; make should be of the form
