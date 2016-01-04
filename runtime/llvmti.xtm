@@ -9147,11 +9147,14 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:search-for-dylib
   (lambda (path)
     (let loop ((rel-paths
-                (list
-                 path
-								 (sanitize-platform-path (string-append (sys:command-output "echo $LD_LIBRARY_PATH") "/" path))
-                 (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" path))
-                 (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" path)))))
+                (append
+                 (list
+                  path
+                  (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" path))
+                  (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" path)))
+                 (unix-or-Windows (map (lambda (x) (sanitize-platform-path (string-append x "/" path)))
+                                       (regex:split (sys:command-output "echo $LD_LIBRARY_PATH") ":"))
+                                  '()))))
       (if (null? rel-paths)
           #f
           (if (file-exists? (car rel-paths))
