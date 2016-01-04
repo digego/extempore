@@ -410,8 +410,8 @@ if(WIN32)
     PRIVATE -D_CRT_SECURE_NO_WARNINGS)
 elseif(APPLE) # OSX
   # use clang++ by default
-  set(CMAKE_C_COMPILIER clang)
-  set(CMAKE_CXX_COMPILIER clang++)
+  set(CMAKE_C_COMPILER clang)
+  set(CMAKE_CXX_COMPILER clang++)
   # tell the compiler about the few ObjC++ source files on OSX
   set_source_files_properties(
     src/Extempore.cpp
