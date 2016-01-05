@@ -57,6 +57,14 @@
       (apr_pool_destroy pool)
       res)))
 
+(bind-func sys_file_rename
+  (lambda (from_path to_path)
+    (let ((pool (apr_pool_create))
+          (res APR_SUCCESS))
+      (set! res (apr_file_rename (String_cstr from_path) (String_cstr to_path) pool))
+      (apr_pool_destroy pool)
+      res)))
+
 (bind-func sys_file_link
   (lambda (from_path to_path)
     (apr_file_link (String_cstr from_path) (String_cstr to_path))))
@@ -224,7 +232,7 @@
       (apr_pool_destroy pool)
       file_list)))
 
-(bind-func sys_mkdir
+(bind-func sys_dir_make
   (lambda (dirname permissions)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
@@ -232,7 +240,7 @@
       (apr_pool_destroy pool)
       res)))
 
-(bind-func sys_mkdir_recursive
+(bind-func sys_dir_make_recursive
   (lambda (dirname permissions)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
@@ -240,13 +248,22 @@
       (apr_pool_destroy pool)
       res)))
 
-(bind-func sys_rm
+(bind-func sys_dir_remove
   (lambda (dirname)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
       (set! res (apr_dir_remove (String_cstr dirname) pool))
       (apr_pool_destroy pool)
       res)))
+
+(bind-func sys_file_mktemp
+  (lambda (filename_prefix pool)
+    (letz ((file:apr_file_t** (zalloc))
+           (namebuf:i8* (zalloc 1024))
+           (res APR_SUCCESS))
+      (sprintf namebuf "%sXXXXXX" (String_cstr filename_prefix))
+      (set! res (apr_file_mktemp file namebuf 0 pool))
+      (if (= res APR_SUCCESS) (pref file 0) null))))
 
 (bind-func sys_temp_dir_get
   (lambda ()
