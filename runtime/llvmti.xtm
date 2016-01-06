@@ -613,7 +613,7 @@
 
 (define impc:compiler:print-dylib-loading-details-to-log
   (lambda (dylib-path)
-    (let* ((basename (car (reverse (regex:split dylib-path "/"))))
+    (let* ((basename (car (reverse (regex:split dylib-path "[/\\\\]"))))
            (libname (car (regex:split basename "[.]"))))
       (if (equal? *impc:compiler:message:level* 'high)
           (begin
@@ -9599,7 +9599,7 @@ xtlang's `let' syntax is the same as Scheme"
                                              "echo $LD_LIBRARY_PATH")
                                             ":")
                                            '("/usr/local/lib/" "/usr/lib/" "/opt/local/lib/")))
-                                  '()))))
+                                  (list (sanitize-platform-path (string-append "C:/Windows/System32/" path)))))))
       (if (null? rel-paths)
           #f
           (if (file-exists? (car rel-paths))
