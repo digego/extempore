@@ -360,6 +360,16 @@
         (quit 2)
         (throw ""))))
 
+(define impc:compiler:print-multiply-typed-variable-error
+  (lambda (vars)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Type Error"))
+    (print " the following variables have multiple type annotations: ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print vars "\n"))
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
+
 (define *impc:compiler:top-level-generic-error* #f)
 
 (define impc:compiler:print-type-mismatch-error
@@ -8087,7 +8097,7 @@ xtlang's `let' syntax is the same as Scheme"
                                             (map (lambda (t)
                                                    ;; first off we might be introducing a new spec'd type here!
                                                    (if (string? (cdr t))
-                                                      (impc:ti:spec-new-type? (cdr t)))
+                                                       (impc:ti:spec-new-type? (cdr t)))
                                                    ;; on with the show!
                                                    (if (and (impc:ir:closure? (cdr t))
                                                             (not (null? (impc:ti:get-closure-arg-symbols (car t) t1))))
@@ -8103,21 +8113,21 @@ xtlang's `let' syntax is the same as Scheme"
                                                  forced-types)))
                ;; (lllllllllllll (println 'typesupdated forced-types-updated))
                (checked-for-duplicates (let loop ((types forced-types-updated))
-                                         (if (null? types) (cl:remove-duplicates forced-types-updated)
+                                         (if (null? types)
+                                             (cl:remove-duplicates forced-types-updated)
                                              (if (and (assoc-strcmp (caar types) (cdr types))
                                                       (not (equal? (cdr (assoc-strcmp (caar types) (cdr types)))
                                                                    (cdr (car types)))))
-                                                 (impc:compiler:print-type-mismatch-error
-                                                  (assoc-strcmp (caar types) (cdr types))
-                                                  (car types))
+                                                 (let ((dupes (cl:duplicates (map car types))))
+                                                   (if (null? dupes)
+                                                       (impc:compiler:print-type-mismatch-error
+                                                        (assoc-strcmp (caar types) (cdr types))
+                                                        (car types))
+                                                       (impc:compiler:print-multiply-typed-variable-error dupes 0)))
                                                  (loop (cdr types))))))
                (fullyqualified (cl:remove-if-not (lambda (t) (impc:ir:type? (cdr t))) checked-for-duplicates)))
           ;; return fully qualified types
           fullyqualified))))
-
-
-
-
 
 (define impc:ti:get-closure-names
   (lambda (ast . args)

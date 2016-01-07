@@ -1508,6 +1508,17 @@
 			       (else (rem-dup (cdr lst) (cons (car lst) nlst)))))))
       (lambda (lst)
 	 (rem-dup lst '()))))
+;;;@ keep only MEMBERs of a list which occur more than once
+(define cl:duplicates
+  (lambda (lst)
+    (let loop ((rem lst)
+               (dupes '()))
+      (if (null? rem)
+          (reverse dupes)
+          (loop (cdr rem)
+                (if (member (car rem) (cdr rem))
+                    (cons (car rem) dupes)
+                    dupes))))))
 
 ;@
 (define cl:list*
