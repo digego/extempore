@@ -8992,7 +8992,9 @@ xtlang's `let' syntax is the same as Scheme"
                    (name (car res))
                    (type1 (cadr res))
                    (type (if (char=? (string-ref type1 0) #\[)
-                             type1
+                             (if (= (impc:ir:get-ptr-depth type1) 1)
+                                 type1
+                                 (impc:compiler:print-bad-type-error type1 "must be a closure pointer"))
                              (if (impc:ti:typealias-exists? type1)
                                  (impc:ti:get-typealias-type-pretty type1)
                                  (impc:compiler:print-bad-type-error type1 "Bad closure type for bind-func"))))
