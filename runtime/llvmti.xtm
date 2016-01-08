@@ -360,16 +360,6 @@
         (quit 2)
         (throw ""))))
 
-(define impc:compiler:print-multiply-typed-variable-error
-  (lambda (vars)
-    (print-with-colors *impc:compiler:pretty-print-error-color*
-                       'default #t (print "Type Error"))
-    (print " the following variables have multiple type annotations: ")
-    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print vars "\n"))
-    (if (impc:aot:currently-compiling?)
-        (quit 2)
-        (throw ""))))
-
 (define *impc:compiler:top-level-generic-error* #f)
 
 (define impc:compiler:print-type-mismatch-error
@@ -4197,106 +4187,109 @@ Continue executing `body' forms until `test-expression' returns #f"
     ;; (println 'vars: vars)
     ;; (println 'all-vs: all-vs)
     ;; (println 'gtype: vs 'vars: vars 'allvs: all-vs)
-    (if (and (symbol? vs)
-             (regex:match? (symbol->string vs) "##")
-             (not (regex:match? (symbol->string vs) "^!")))
-        (let* ((rsplit1a (regex:split (symbol->string vs) "##")) ;\\$\\$\\$"))
-               (rsplit1 (if (regex:match? (car rsplit1a) "{")
-                            (cons (impc:ti:maximize-generic-type (car rsplit1a)) (cdr rsplit1a))
-                            rsplit1a))
-               (gnum (if (> (length rsplit1) 1) (cadr rsplit1) #f))
-               (rsplit2 (impc:ti:split-namedtype (car rsplit1)))
-               (gpolyname (car rsplit2))
-               (gtype-explicit (if (null? (cdr rsplit2)) '()
-                                   (impc:ir:get-base-type (cadr rsplit2))))
-               ;; (llllll (println 'gpolyname: gpolyname 'gtype: gtype-explicit))
-               (spec (if (> (length rsplit2) 1) (cadr rsplit2) #f))
-               (ptrdepth (impc:ir:get-ptr-depth (car rsplit1)))
-               (elements '())
-               (validelements? #f)
-               (t1 (symbol->string (impc:ti:get-generictype-candidate-types (string->symbol (impc:ir:get-base-type gpolyname)))))
-               (gtype t1))
-          ;; (println 'reifyts gtype 'vs gtype-explicit)
-          (if (and (not (null? gtype-explicit))
-                   (impc:ti:bang-type? gtype-explicit))
-              (set! t1 gtype-explicit))
-          ;; go through and check that there are NO non-explicit gpoly's at top level of type
-          ;; (println '%%%%%%%%%%%%%%%%%%%%%%%% gnum)
-          ;; (println '->A: t1 'gtype: gtype 'explict: gtype-explicit 'ptrdepth: ptrdepth 'gpoly: gpolyname 'gnum: gnum)
-          ;; (println '->VARS: vars 'all-vs all-vs)
-          ;; attempt to expand any <!head,xlist*> into <i64,xlist*>
-          (set! t1 (impc:ti:reify-generic-type-expand t1 gnum spec vars))
-          ;; (println '->B: t1 'ptrdepth: ptrdepth 'gpoly: gpolyname)
-          (let* ((s1 (regex:replace t1 "\\<(.*)\\>?.*" "$1"))
-                 (es2 (impc:ir:get-type-joiner
-                       (cl:remove-if (lambda (x) (string=? x ""))
-                                     ;;  (regex:match? x gpolyname)))
-                                     (regex:match-all s1 impc:ir:regex-tc-or-a))))
-                 (es (map (lambda (x) (if (string? (impc:ir:get-type-from-pretty-str x))
-                                          (impc:ir:get-type-from-pretty-str x) x))
-                          es2))
-                 (tr (cl:remove-if (lambda (x)
-                                     ;; (println 'x: x 'gpolyname: gpolyname)
-                                     (if (and (not (regex:match? x "^(<|\\[)"))
-                                              (regex:match? x ":"))
-                                         (let ((p (regex:type-split x ":")))
-                                           (or (string=? (car p) gpolyname)
-                                               (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
-                                         (if (regex:match? x "^!")
-                                             #f
-                                             (or (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
-                                                 (impc:ir:type? (impc:ir:get-type-from-pretty-str x))))))
-                                   ;; (impc:ir:type? x)))))
-                                   es)))
-            (if (null? tr) (set! validelements? #t))
-            (set! elements es))
-          ;; (println '->C: t1 (impc:ti:type-normalize t1))
-          ;; (println 'elements: elements 'tr: validelements? 't1: t1 'vs: vs (regex:match? t1 "!"))
-          (if (and validelements?
-                   (not (regex:match? t1 "!")))
-              (let* ((base (impc:ir:get-base-type gpolyname)) ;(symbol->string vs)))
-                     ;; (newname (string-append base "_poly_" (cname-encode t1)))
-                     (newname (string-append base "_poly_" (impc:ti:generate-generic-type-cname t1 gtype)))
-                     (newtype1 t1) ;;(regex:replace t2 (string-append base "([^-][^-])") (string-append newname "$1")))
-                     (newtype2 (cons 14 (map (lambda (x)
-                                               (if (string? (impc:ir:get-type-from-pretty-str x))
-                                                   (impc:ir:get-type-from-pretty-str x)
-                                                   (if (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
-                                                       (impc:ir:pointer++ (string-append "%" newname) (impc:ir:get-ptr-depth x))
-                                                       (impc:ir:get-type-from-pretty-str x))))
-                                             elements)))
-                     (newtype3 (impc:ir:get-type-str newtype2)))
-                ;; (println 'base: base 't1: t1 'gt: gtype 'nt1 newtype1 'nt2 newtype2 'nt3 newtype3 'nn: newname)
-                ;; ok now we have a type we need to add it to llvm and
-                ;; polytype
-                ;; (println 'newtype! newname 'totype: newtype3) 
-                (if (not (impc:ti:namedtype-exists? newname))
-                    (begin ;; if this is a new reification of a generic type then ...
-                      ;; (println 'compile-type! newname 'totype: newtype3 'type: t1 'gt: gtype ) 
-                      (if (llvm:compile-ir (string-append "%" newname " = type " newtype3))
-                          (begin
-                            (impc:ti:register-new-polytype base
-                                                           newname
-                                                           newtype2
-                                                           "")
-                            ;; we should probably also build dataconstructors for the new
-                            ;; concrete type?? (at least for printing reasons)
-                            ;; because impc:ti:compile-type-dataconstructors needs to be called from
-                            ;; the top level, we should call use callback to add to queue
-                            (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol newname) newtype1 #f)
-                            'done)
-                          (impc:compiler:print-compiler-failed-error))))
-                (let ((rettype (impc:ir:pointer++ (string-append "%" newname) ptrdepth)))
-                  ;; (println 'oldvs: vs)
-                  ;; (set! vs (string->symbol
-                  ;;           (string-append base ":" gtype
-                  ;;                          (apply string-append (make-list ptrdepth "*"))
-                  ;;                          "##" gnum)))
-                  ;; (println 'updatevar: vs 'with rettype)
-                  (impc:ti:update-var vs vars '() rettype)
-                  rettype))
-              vs))
-        vs)))
+    (if (and (not (null? (cdr (assoc-strcmp vs vars))))
+             (impc:ir:type? (cadr (assoc-strcmp vs vars))))
+        (cadr (assoc-strcmp vs vars))
+        (if (and (symbol? vs)
+                 (regex:match? (symbol->string vs) "##")
+                 (not (regex:match? (symbol->string vs) "^!")))
+            (let* ((rsplit1a (regex:split (symbol->string vs) "##")) ;\\$\\$\\$"))
+                   (rsplit1 (if (regex:match? (car rsplit1a) "{")
+                                (cons (impc:ti:maximize-generic-type (car rsplit1a)) (cdr rsplit1a))
+                                rsplit1a))
+                   (gnum (if (> (length rsplit1) 1) (cadr rsplit1) #f))
+                   (rsplit2 (impc:ti:split-namedtype (car rsplit1)))
+                   (gpolyname (car rsplit2))
+                   (gtype-explicit (if (null? (cdr rsplit2)) '()
+                                       (impc:ir:get-base-type (cadr rsplit2))))
+                   ;; (llllll (println 'gpolyname: gpolyname 'gtype: gtype-explicit))
+                   (spec (if (> (length rsplit2) 1) (cadr rsplit2) #f))
+                   (ptrdepth (impc:ir:get-ptr-depth (car rsplit1)))
+                   (elements '())
+                   (validelements? #f)
+                   (t1 (symbol->string (impc:ti:get-generictype-candidate-types (string->symbol (impc:ir:get-base-type gpolyname)))))
+                   (gtype t1))
+              ;; (println 'reifyts gtype 'vs gtype-explicit)
+              (if (and (not (null? gtype-explicit))
+                       (impc:ti:bang-type? gtype-explicit))
+                  (set! t1 gtype-explicit))
+              ;; go through and check that there are NO non-explicit gpoly's at top level of type
+              ;; (println '%%%%%%%%%%%%%%%%%%%%%%%% gnum)
+              ;; (println '->A: t1 'gtype: gtype 'explict: gtype-explicit 'ptrdepth: ptrdepth 'gpoly: gpolyname 'gnum: gnum)
+              ;; (println '->VARS: vars 'all-vs all-vs)
+              ;; attempt to expand any <!head,xlist*> into <i64,xlist*>
+              (set! t1 (impc:ti:reify-generic-type-expand t1 gnum spec vars))
+              ;; (println '->B: t1 'ptrdepth: ptrdepth 'gpoly: gpolyname)
+              (let* ((s1 (regex:replace t1 "\\<(.*)\\>?.*" "$1"))
+                     (es2 (impc:ir:get-type-joiner
+                           (cl:remove-if (lambda (x) (string=? x ""))
+                                         ;;  (regex:match? x gpolyname)))
+                                         (regex:match-all s1 impc:ir:regex-tc-or-a))))
+                     (es (map (lambda (x) (if (string? (impc:ir:get-type-from-pretty-str x))
+                                         (impc:ir:get-type-from-pretty-str x) x))
+                              es2))
+                     (tr (cl:remove-if (lambda (x)
+                                         ;; (println 'x: x 'gpolyname: gpolyname)
+                                         (if (and (not (regex:match? x "^(<|\\[)"))
+                                                  (regex:match? x ":"))
+                                             (let ((p (regex:type-split x ":")))
+                                               (or (string=? (car p) gpolyname)
+                                                   (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
+                                             (if (regex:match? x "^!")
+                                                 #f
+                                                 (or (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
+                                                     (impc:ir:type? (impc:ir:get-type-from-pretty-str x))))))
+                                       ;; (impc:ir:type? x)))))
+                                       es)))
+                (if (null? tr) (set! validelements? #t))
+                (set! elements es))
+              ;; (println '->C: t1 (impc:ti:type-normalize t1))
+              ;; (println 'elements: elements 'tr: validelements? 't1: t1 'vs: vs (regex:match? t1 "!"))
+              (if (and validelements?
+                       (not (regex:match? t1 "!")))
+                  (let* ((base (impc:ir:get-base-type gpolyname)) ;(symbol->string vs)))
+                         ;; (newname (string-append base "_poly_" (cname-encode t1)))
+                         (newname (string-append base "_poly_" (impc:ti:generate-generic-type-cname t1 gtype)))
+                         (newtype1 t1) ;;(regex:replace t2 (string-append base "([^-][^-])") (string-append newname "$1")))
+                         (newtype2 (cons 14 (map (lambda (x)
+                                                   (if (string? (impc:ir:get-type-from-pretty-str x))
+                                                       (impc:ir:get-type-from-pretty-str x)
+                                                       (if (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
+                                                           (impc:ir:pointer++ (string-append "%" newname) (impc:ir:get-ptr-depth x))
+                                                           (impc:ir:get-type-from-pretty-str x))))
+                                                 elements)))
+                         (newtype3 (impc:ir:get-type-str newtype2)))
+                    ;; (println 'base: base 't1: t1 'gt: gtype 'nt1 newtype1 'nt2 newtype2 'nt3 newtype3 'nn: newname)
+                    ;; ok now we have a type we need to add it to llvm and
+                    ;; polytype
+                    ;; (println 'newtype! newname 'totype: newtype3) 
+                    (if (not (impc:ti:namedtype-exists? newname))
+                        (begin ;; if this is a new reification of a generic type then ...
+                          ;; (println 'compile-type! newname 'totype: newtype3 'type: t1 'gt: gtype ) 
+                          (if (llvm:compile-ir (string-append "%" newname " = type " newtype3))
+                              (begin
+                                (impc:ti:register-new-polytype base
+                                                               newname
+                                                               newtype2
+                                                               "")
+                                ;; we should probably also build dataconstructors for the new
+                                ;; concrete type?? (at least for printing reasons)
+                                ;; because impc:ti:compile-type-dataconstructors needs to be called from
+                                ;; the top level, we should call use callback to add to queue
+                                (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol newname) newtype1 #f)
+                                'done)
+                              (impc:compiler:print-compiler-failed-error))))
+                    (let ((rettype (impc:ir:pointer++ (string-append "%" newname) ptrdepth)))
+                      ;; (println 'oldvs: vs)
+                      ;; (set! vs (string->symbol
+                      ;;           (string-append base ":" gtype
+                      ;;                          (apply string-append (make-list ptrdepth "*"))
+                      ;;                          "##" gnum)))
+                      ;; (println 'updatevar: vs 'with rettype)
+                      (impc:ti:update-var vs vars '() rettype)
+                      rettype))
+                  vs))
+            vs))))
 
 
 
@@ -7528,7 +7521,7 @@ xtlang's `let' syntax is the same as Scheme"
                                         ;(println 'fvars: fvars)
                                         ;(println 'types: u)
       (if *impc:ti:print-unifications* (println 'tirun:> a '-> u))
-      ;(println (caaadr ast) 'type-check: (- t2 t1) 'unify: (- t3 t2) 'unity: (- t4 t3))
+      (println (caaadr ast) 'type-check: (- t2 t1) 'unify: (- t3 t2) 'unity: (- t4 t3))
       ;; if we have unified types then return them through continuation
       (if (or tt
               (and (not (null? cnt))
@@ -8104,7 +8097,7 @@ xtlang's `let' syntax is the same as Scheme"
                                             (map (lambda (t)
                                                    ;; first off we might be introducing a new spec'd type here!
                                                    (if (string? (cdr t))
-                                                       (impc:ti:spec-new-type? (cdr t)))
+                                                      (impc:ti:spec-new-type? (cdr t)))
                                                    ;; on with the show!
                                                    (if (and (impc:ir:closure? (cdr t))
                                                             (not (null? (impc:ti:get-closure-arg-symbols (car t) t1))))
@@ -8120,21 +8113,21 @@ xtlang's `let' syntax is the same as Scheme"
                                                  forced-types)))
                ;; (lllllllllllll (println 'typesupdated forced-types-updated))
                (checked-for-duplicates (let loop ((types forced-types-updated))
-                                         (if (null? types)
-                                             (cl:remove-duplicates forced-types-updated)
+                                         (if (null? types) (cl:remove-duplicates forced-types-updated)
                                              (if (and (assoc-strcmp (caar types) (cdr types))
                                                       (not (equal? (cdr (assoc-strcmp (caar types) (cdr types)))
                                                                    (cdr (car types)))))
-                                                 (let ((dupes (cl:duplicates (map car types))))
-                                                   (if (null? dupes)
-                                                       (impc:compiler:print-type-mismatch-error
-                                                        (assoc-strcmp (caar types) (cdr types))
-                                                        (car types))
-                                                       (impc:compiler:print-multiply-typed-variable-error dupes 0)))
+                                                 (impc:compiler:print-type-mismatch-error
+                                                  (assoc-strcmp (caar types) (cdr types))
+                                                  (car types))
                                                  (loop (cdr types))))))
                (fullyqualified (cl:remove-if-not (lambda (t) (impc:ir:type? (cdr t))) checked-for-duplicates)))
           ;; return fully qualified types
           fullyqualified))))
+
+
+
+
 
 (define impc:ti:get-closure-names
   (lambda (ast . args)
@@ -10146,3 +10139,9 @@ e.g.
               (if (not (null? (cdr doc-alists)))
                   (display ",\n" outfile-port))
               (loop (cdr doc-alists))))))))
+
+;; to catch the dreaded heisenbug...
+
+(define s-p-a-c-e-s___
+  (lambda ()
+    (string-append "           ")))
