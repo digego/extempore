@@ -2615,7 +2615,7 @@
                                (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractelement "
                                (cadr (impc:ir:gname "vect")) " " (car (impc:ir:gname "vect")) ", i32 " (car idx) "\n") os)
           (emit (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractelement "
-                (cadr var) " " (car var) ", i32 " (car idx) "\n" os))
+                (cadr var) " " (car var) ", " (cadr idx) " " (car idx) "\n" os))
       (impc:ir:strip-space os))))
 
 
@@ -2642,7 +2642,7 @@
       (if (impc:ir:pointer? ttype) ;; must be an array if we're not a pointer
           (emit (impc:ir:gname "vect" (impc:ir:get-type-str (impc:ir:pointer-- ttype))) " = load " (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var) "\n"
                 (impc:ir:gname "vect2" (cadr (impc:ir:gname "vect"))) " = insertelement " (cadr (impc:ir:gname "vect")) " " (car (impc:ir:gname "vect"))
-                ", " (cadr val) " " (car val) ", i32 " (car idx) "\n"
+                ", " (cadr val) " " (car val) ", " (cadr idx) " " (car idx) "\n"
                 "store " (cadr (impc:ir:gname "vect2")) " " (car (impc:ir:gname "vect2")) ", " (cadr var) " " (car var) "\n" os)
           (impc:compiler:print-bad-type-error-with-ast ttype "vset! needs to be a pointer to a vector" ast))
       (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
