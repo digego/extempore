@@ -549,10 +549,11 @@ else(WIN32)
       COMMAND extempore --nobase
                         $<$<NOT:$<PLATFORM_ID:Windows>>:--noaudio>
                         $<$<AND:$<PLATFORM_ID:Darwin>,$<BOOL:PACKAGE>>:--mcpu=generic>
+                        --sharedir=${EXT_SHARE_DIR}
                         --port=${port}
                         --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
       BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      $<PLATFORM_ID:Windows>:WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}>
       VERBATIM)
     add_dependencies(${targetname} extempore)
     add_dependencies(${group} ${targetname})
