@@ -33,8 +33,6 @@
  *
  */
 
-#include <regex>
-
 ///////////////////
 // LLVM includes //
 ///////////////////
@@ -1627,20 +1625,24 @@ namespace extemp {
           ascii_text_color(0,7,10);
           std::cout << "ATTRS          : " << std::flush;
 
-          std::string attr_string(tm->getTargetFeatureString());
-          std::regex attr_regex("[^,]+");
-          auto attr_begin = std::sregex_iterator(attr_string.begin(), attr_string.end(), attr_regex);
-          auto attr_end = std::sregex_iterator();
+          const char* data = tm->getTargetFeatureString().data();
 
-          for (std::sregex_iterator i = attr_begin; i != attr_end; ++i) {
-            std::smatch match = *i;
-            std::string match_str = match.str();
-            if (match_str.front() == '+') {
+          for (int i = 0; i < strlen(data); i++) {
+            switch (data[i]) {
+            case '+': {
               ascii_text_color(1,2,10);
-            } else if (match_str.front() == '-') {
-              ascii_text_color(1,1,10);
+              break;
             }
-            std::cout << match_str << ' ';
+            case '-': {
+              ascii_text_color(1,1,10);
+              break;
+            }
+            case ',': {
+              ascii_text_color(0,7,10);
+              break;
+            }
+            }
+            printf("%c", data[i]);
           }
           std::cout << std::endl;
         }
