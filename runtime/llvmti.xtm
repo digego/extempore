@@ -1810,27 +1810,31 @@
 
 (define impc:ti:remove-polyfunc-candidate
   (lambda (polyfunc-name func-type)
-    (let ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name)))
-      (cl:delete-if (lambda (x) (equal? (vector-ref x 1) func-type)) candidates)
+    (let* ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name))
+          (n (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*))
+          (v (cdr n)))
+      (vector-set! v 0 (cl:delete-if (lambda (x) (equal? (vector-ref x 1) func-type)) candidates))
       (if (= (length candidates) 1)
           (impc:ti:create-scheme-wrapper (vector-ref (car candidates) 0))))))
 
 (define impc:ti:unique-polyfunc-candidate
   (lambda (polyfunc-name func-type)
-    (let ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name)))
-      (cl:delete-if-not (lambda (x) (equal? (vector-ref x 1) func-type)) candidates)
+    (let* ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name))
+          (n (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*))
+          (v (cdr n)))
+      (vector-set! v 0 (cl:delete-if-not (lambda (x) (equal? (vector-ref x 1) func-type)) candidates))
       (if (= (length candidates) 1)
           (impc:ti:create-scheme-wrapper (vector-ref (car candidates) 0))))))
 
 (define-macro (remove-func name type)
   `(impc:ti:remove-polyfunc-candidate
     ,(symbol->string name)
-    (impc:ir:get-type-from-pretty-str ,(symbol->string type))))
+    ',(impc:ir:pointer++ (impc:ir:get-type-from-pretty-str (impc:ir:get-base-type (symbol->string type))))))
 
 (define-macro (unique-func name type)
   `(impc:ti:unique-polyfunc-candidate
     ,(symbol->string name)
-    (impc:ir:get-type-from-pretty-str ,(symbol->string type))))
+    ',(impc:ir:pointer++ (impc:ir:get-type-from-pretty-str (impc:ir:get-base-type (symbol->string type))))))
 
 (define-macro clear-session
   (lambda ()
