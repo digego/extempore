@@ -1814,6 +1814,8 @@
           (n (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*))
           (v (cdr n)))
       (vector-set! v 0 (cl:delete-if (lambda (x) (equal? (vector-ref x 1) func-type)) candidates))
+      (set! candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name))
+      (println 'Removed (string->symbol polyfunc-name))
       (if (= (length candidates) 1)
           (impc:ti:create-scheme-wrapper (vector-ref (car candidates) 0))))))
 
@@ -1823,8 +1825,11 @@
           (n (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*))
           (v (cdr n)))
       (vector-set! v 0 (cl:delete-if-not (lambda (x) (equal? (vector-ref x 1) func-type)) candidates))
+      (set! candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name))
       (if (= (length candidates) 1)
-          (impc:ti:create-scheme-wrapper (vector-ref (car candidates) 0))))))
+          (begin (impc:ti:create-scheme-wrapper (vector-ref (car candidates) 0))
+                 (println 'Success! (string->symbol polyfunc-name) 'is 'now 'monomorphic!))
+          (impc:compiler:print-compiler-error (string-append "Could not make " polyfunc-name " monomorphic"))))))
 
 (define-macro (remove-func name type)
   `(impc:ti:remove-polyfunc-candidate
