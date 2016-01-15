@@ -66,7 +66,7 @@
               (memcpy padbuf (convert (pref-ptr buf start)) (* sample_size_in_bytes samps))
               (memcpy padbuf (convert (pref-ptr buf 0)) (* sample_size_in_bytes start))
               ;; apply windowing function
-              (window_hamming_f (cast padbuf SAMPLE*) n)
+              (window_hamming (cast padbuf SAMPLE*) n)
               ;; forward fft (pad is padbuf)
               (fft pad (convert spectrum) k)
               ;; inc index
@@ -104,7 +104,7 @@
 
 ;; uniform partitioned convolution in frq domain
 ;; expects mono aif/wav audio file at samplerate
-(bind-func spectral_convolution_c
+(bind-func creverb_c
   (lambda (filename:i8* len:i64)
     (let ((ir_len_unpadded (sf_samples_from_file filename)) ;; get size of ir file (assumes mono!!)
           (ir_len (+ ir_len_unpadded (- len (% ir_len_unpadded len)))) ;; pad to whole multiple of len
@@ -148,7 +148,7 @@
             (let ((_fft:SComplex* (pref-ptr ffts (* po padlgth)))
                   (_ir:SComplex* null))
               ;; forward FFT of incoming signal
-              (fftr (if aorb drya dryb) B padlgth)
+              (fft (if aorb drya dryb) B padlgth)
               ;; store FFT to use 'now' and also for 'delayed' use
               (memcpy (cast _fft i8*) (cast B i8*) (convert (* padlgth 8)))
               ;; run convolution over all partions
@@ -157,10 +157,10 @@
                 (set! _fft (pref-ptr ffts (* j padlgth)))                
                 (set! _ir (pref-ptr irs (* i padlgth)))
                 ;; '*' and '+' are overloaded for buffers of Complex{f,d}
-                (Complexf_multiplication_bybuf _fft _ir A padlgth)
-                (Complexf_addition_bybuf A B B padlgth))
+                (Complex_multiplication_bybuf _fft _ir A padlgth)
+                (Complex_addition_bybuf A B B padlgth))
               ;; after convolution is complete back to time domain!
-              (ifftr B a padlgth)
+              (ifft B a padlgth)
               (let ((scale:SAMPLE (/ 1.0 (convert (* len parts))))
                     (tail (if aorb irtaila irtailb)))
                 (dotimes (i len)
@@ -178,17 +178,15 @@
 
 
 ;; poly wrapper for spectral_convolution_c
-(bind-func spectral_convolution_c_
+(bind-func creverb_c
   (lambda (path:i8*)
-    (spectral_convolution_c path (* 4 (convert (llvm_frames))))))
+    (creverb_c:[[float,float,float,float]*,i8*,i64]* path (* 4 (convert (llvm_frames))))))
 
-(bind-poly creverb_c spectral_convolution_c)
-(bind-poly creverb_c spectral_convolution_c_)
 
-(bind-func creverb_st_c_a
+(bind-func creverb_st_c
   (lambda (pathl pathr lgth)
-    (let ((convl (spectral_convolution_c pathl lgth))
-          (convr (spectral_convolution_c pathr lgth)))
+    (let ((convl (creverb_c pathl lgth))
+          (convr (creverb_c pathr lgth)))
       (lambda (chan:i64 in dry wet)
         (cond ((= chan 0)
                (convl in dry wet))
@@ -196,12 +194,10 @@
                (convr in dry wet))
               (else 0.0))))))
 
-(bind-func creverb_st_c_b
+(bind-func creverb_st_c
   (lambda (pathl pathr)
-    (creverb_st_c_a pathl pathr (* (convert (llvm_frames)) 4))))
+    (creverb_st_c:[[float,i64,float,float,float]*,i8*,i8*,i64] pathl pathr (* (convert (llvm_frames)) 4))))
 
-(bind-poly creverb_st_c creverb_st_c_a)
-(bind-poly creverb_st_c creverb_st_c_b)
 
 (define *xtmlib-audio_dsp_ext-loaded* #t)
 

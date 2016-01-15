@@ -94,7 +94,7 @@
             "buffered audio output callback type")
 (bind-alias DSPMCMT [void,float**,float*,i64,i8*]*
             "buffered (multithreaded) audio output callback type")
-(bind-func audio_64bit (lambda () 0:i1))
+(bind-func audio_64bit "audiostuff" (lambda () 0:i1))
 
 (bind-val SPI SAMPLE 3.1415926535897932384626433832795028841971693993751058209749
           "pi of type SAMPLE")
@@ -130,7 +130,8 @@
       (set! NaN (pref (cast n64 double*) 0))
       void)))
 
-(impc:aot:do-or-emit (set_float_nans_))
+;;(impc:aot:do-or-emit (set_float_nans__adhoc_W3ZvaWRd))
+(impc:aot:do-or-emit (xtmX (set_float_nans_)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -146,30 +147,23 @@
 (bind-func print_space
   (lambda () (printf " ") void))
 
-(bind-func print_i1
+(bind-func print
   (lambda (x:i1) (printf "%d" x) void))
 
-(bind-func print_i8
+(bind-func print
   (lambda (x:i8) (printf "%d" (convert x i32)) void))
 
-(bind-func print_i32
+(bind-func print
   (lambda (x:i32) (printf "%d" x) void))
 
-(bind-func print_i64
+(bind-func print
   (lambda (x:i64) (printf "%lld" x) void))
 
-(bind-func print_f
+(bind-func print
   (lambda (x:float) (printf "%f" (ftod x)) void))
 
-(bind-func print_d
+(bind-func print
   (lambda (x:double) (printf "%f" x) void))
-
-(bind-poly print print_i1)
-(bind-poly print print_i8)
-(bind-poly print print_i32)
-(bind-poly print print_i64)
-(bind-poly print print_f)
-(bind-poly print print_d)
 
 (bind-func print:[void,!a]
   "generic \"catch-all\" print"
@@ -249,10 +243,26 @@
 
 ;; the same functionality, but for use in xtlang code
 (bind-macro
-  "return native function pointer for closure"
-  (get_native_fptr closure-name)
-  `(llvm_get_function_ptr ,(string-append (symbol->string closure-name) "_native")))
-
+ "return native function pointer for closure"
+ (get_native_fptr closure-name . type)
+ (set! closure-name (symbol->string closure-name))
+ (if (null? type)
+     (if (and (impc:ti:polyfunc-exists? closure-name)
+              (= (length (impc:ti:get-polyfunc-candidate-types closure-name)) 1))
+         (let* ((t (impc:ir:pretty-print-type (car (impc:ti:get-polyfunc-candidate-types closure-name))))
+                (bt (impc:ir:get-base-type t))
+                (fullname (string-append closure-name
+                                        "_adhoc_"
+                                        (cname-encode bt)
+                                        "_native")))               
+           `(llvm_get_function_ptr ,fullname))
+         (impc:compiler:print-compiler-error "Ambiguous call to get_native_fptr" (string->symbol closure-name)))
+     (let* ((bt (impc:ir:get-base-type (symbol->string (car type))))
+           (fullname (string-append closure-name
+                                    "_adhoc_"
+                                    (cname-encode bt)
+                                    "_native")))
+       `(llvm_get_function_ptr ,fullname))))
 
 (bind-macro
   "a \"thread-first\" macro
@@ -356,30 +366,30 @@ into any further sexp arguments."
 ;; zone copy ;;
 ;;;;;;;;;;;;;;;
 
-(bind-func zcopy_i1
+(bind-func zcopy
   (lambda (x:i1 fromz:mzone* toz:mzone*) x))
 
-(bind-func zcopy_i8
+(bind-func zcopy
   (lambda (x:i8 fromz:mzone* toz:mzone*) x))
 
-(bind-func zcopy_i32
+(bind-func zcopy
   (lambda (x:i32 fromz:mzone* toz:mzone*) x))
 
-(bind-func zcopy_i64
+(bind-func zcopy
   (lambda (x:i64 fromz:mzone* toz:mzone*) x))
 
-(bind-func zcopy_f
+(bind-func zcopy
   (lambda (x:float fromz:mzone* toz:mzone*) x))
 
-(bind-func zcopy_d
+(bind-func zcopy
   (lambda (x:double fromz:mzone* toz:mzone*) x))
 
-(bind-poly zcopy zcopy_i1)
-(bind-poly zcopy zcopy_i8)
-(bind-poly zcopy zcopy_i32)
-(bind-poly zcopy zcopy_i64)
-(bind-poly zcopy zcopy_f)
-(bind-poly zcopy zcopy_d)
+;; (bind-poly zcopy zcopy_i1)
+;; (bind-poly zcopy zcopy_i8)
+;; (bind-poly zcopy zcopy_i32)
+;; (bind-poly zcopy zcopy_i64)
+;; (bind-poly zcopy zcopy_f)
+;; (bind-poly zcopy zcopy_d)
 
 (impc:aot:do-or-emit
  (bind-func zcopy:[!a,!a,mzone*,mzone*]*
@@ -397,7 +407,7 @@ into any further sexp arguments."
 ;; xtlang strings
 
 ;;
-(bind-type String <size_t,i8*>
+(bind-type String <size_t,i8*> (printer? . #f)
   "xtlang's string type
 
 Tuple contains <string_length,pointer_to_data>
@@ -410,7 +420,7 @@ Second item in tuple is a char* c-style string ")
 
 ;; zone alloc'ed versions
 
-(bind-func String_from_cstr_zalloc
+(bind-func String
   "Create an xtlang String type from a c string (char array)
 
 Use via the polymorphic Str function
@@ -427,10 +437,11 @@ Allocation size will be (+ (strlen cstr) 1)
       (memcpy buf cstr (+ len 1))
       (String_z len buf))))
 
-(bind-poly String String_from_cstr_zalloc)
-(bind-poly Str String_from_cstr_zalloc)
+(bind-func Str
+  (lambda (cstr:i8*)
+    (String cstr)))
 
-(bind-func String_from_cstr_halloc
+(bind-func String_h
   "Create an xtlang String type from a c string (char array)
 
 Use via the polymorphic Str function
@@ -445,10 +456,10 @@ Allocation size will be (+ (strlen cstr) 1)
     (let ((len (strlen cstr))
           (buf:i8* (halloc (+ len 1))))
       (memcpy buf cstr (+ len 1))
-      (String_h len buf))))
+      (String_h:[String*,i64,i8*]* len buf))))
 
-(bind-poly String_h String_from_cstr_halloc)
-(bind-poly Str_h String_from_cstr_halloc)
+;; (bind-poly String_h String_from_cstr_halloc)
+;; (bind-poly Str_h String_from_cstr_halloc)
 
 (bind-func String_free
   "Free an xtlang String
@@ -463,7 +474,7 @@ string must have been a heap-allocated (halloc).
     (free s)
     void))
 
-(bind-func String_print:[void,String*]*
+(bind-func print:[void,String*]*
   "Prints all characters in a given string object.
 
 Overloads and should be used via the `println` function
@@ -478,16 +489,14 @@ If the string is empty will print a zero length string
         (begin (printf "'%s'" (tref s 1))
                void))))
 
-(bind-poly print String_print)
+;; (bind-poly print String_print)
 
-(bind-func String_toString:[String*,String*]*
+(bind-func toString:[String*,String*]*
   "convert String to String
 
 This is just the identity function, since a String is already a String."
   (lambda (s)
     s))
-
-(bind-poly toString String_toString)
 
 (bind-func String_strlen
   "Takes a String* and calls strlen on the data pointer
@@ -521,17 +530,15 @@ This is just the identity function, since a String is already a String."
   (lambda (s:String*)
     (tref s 1)))
 
-(bind-func String_copy
+(bind-func String
   "Create a new xtlang String type from an existing String
 
 @param s - pointer to the String to copy
 @return - the new String*
 "
   (lambda (s:String*)
-    (Str (tref s 1))))
+    (String:[String*,i8*]* (tref s 1))))
 
-(bind-poly String String_copy)
-(bind-poly Str String_copy)
 
 (bind-func String_substring
   "Create a new xtlang String which is a substring of an existing one
@@ -568,13 +575,13 @@ If both strings are null an empty String will be returned
 @return - pointer to new String
 "
   (lambda (s1:String* s2:String*)
-    (if (null? s2) (Str s1)
-        (if (null? s1) (Str s2)
+    (if (null? s2) (String s1)
+        (if (null? s1) (String s2)
             (let ((size (+ (tref s1 0) (tref s2 0)))
                   (news:i8* (zalloc (+ 1 size))))
               (strcpy news (tref s1 1))
               (strncat news (tref s2 1) size)
-              (Str news))))))
+              (String news))))))
 
 ;; String_cat macro (poor-man's varargs)
 
@@ -587,7 +594,7 @@ If both strings are null an empty String will be returned
         ret
         (loop (cdr rem) (list 'String_cat2 ret (car rem))))))
 
-(bind-func String_equal
+(bind-func equal
   "Equality test for String
 
 @param s1 - first string
@@ -598,8 +605,6 @@ If both strings are null an empty String will be returned
     (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
         1:i1 0:i1)))
 
-;; bind to eq
-(bind-poly equal String_equal)
 
 ;; levenshtein edit distance
 (bind-func String_levenshtein
@@ -706,54 +711,46 @@ If both strings are null an empty String will be returned
   (lambda ()
     (String " ")))
 
-(bind-func String_format_i1
+(bind-func String_format
   (lambda (x:i1)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (String str))))
 
-(bind-func String_format_i8
+(bind-func String_format
   (lambda (x:i8)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (String str))))
 
-(bind-func String_format_i32
+(bind-func String_format
   (lambda (x:i32)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (String str))))
 
-(bind-func String_format_i64
+(bind-func String_format
   (lambda (x:i64)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%lld" x)
       (String str))))
 
-(bind-func String_format_f
+(bind-func String_format
   (lambda (x:float)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%f" (ftod x))
       (String str))))
 
-(bind-func String_format_d
+(bind-func String_format
   (lambda (x:double)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%f" x)
       (String str))))
 
-(bind-poly String_format String_format_i1)
-(bind-poly String_format String_format_i8)
-(bind-poly String_format String_format_i32)
-(bind-poly String_format String_format_i64)
-(bind-poly String_format String_format_f)
-(bind-poly String_format String_format_d)
-
 ;; String formatting!
-(bind-func String_format_String:[String*,String*]*
+(bind-func String_format:[String*,String*]*
   (lambda (x) x))
 
-(bind-poly String_format String_format_String)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; toString
@@ -764,48 +761,41 @@ If both strings are null an empty String will be returned
 (bind-func toString_space
   (lambda () (String " ")))
 
-(bind-func toString_i1
+(bind-func toString
   (lambda (x:i1)
     (let ((s:i8* (salloc 256)))
       (sprintf s "%d" x)
       (String s))))
 
-(bind-func toString_i8
+(bind-func toString
   (lambda (x:i8)
     (let ((s:i8* (salloc 256)))
       (sprintf s "%d" x)
       (String s))))
 
-(bind-func toString_i32
+(bind-func toString
   (lambda (x:i32)
     (let ((s:i8* (salloc 256)))
       (sprintf s "%d" x)
       (String s))))
 
-(bind-func toString_i64
+(bind-func toString
   (lambda (x:i64)
     (let ((st:i8* (salloc 256)))
       (sprintf st "%lld" x)
       (String st))))
 
-(bind-func toString_f
+(bind-func toString
   (lambda (x:float)
     (let ((st:i8* (salloc 256)))
       (sprintf st "%f" (ftod x))
       (String st))))
 
-(bind-func toString_d
+(bind-func toString
   (lambda (x:double)
     (let ((st:i8* (salloc 256)))
       (sprintf st "%f" x)
       (String st))))
-
-(bind-poly toString toString_i1)
-(bind-poly toString toString_i8)
-(bind-poly toString toString_i32)
-(bind-poly toString toString_i64)
-(bind-poly toString toString_f)
-(bind-poly toString toString_d)
 
 ;; generic "catch-all" toString
 (impc:aot:do-or-emit
@@ -816,17 +806,14 @@ If both strings are null an empty String will be returned
 ;; we print i8* as pointers, not C strings - if you want to print them
 ;; as C strings use printf with %s
 
-(bind-func print_voidptr
+(bind-func print
   (lambda (x:i8*) (printf "%p" x) void))
 
-(bind-func toString_voidptr
+(bind-func toString
   (lambda (x:i8*)
     (let ((s:i8* (salloc 256)))
       (sprintf s "%p" x)
       (String s))))
-
-(bind-poly print print_voidptr)
-(bind-poly toString toString_voidptr)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -849,7 +836,7 @@ If both strings are null an empty String will be returned
 ;; XTLang symbols
 
 ;;
-(bind-type Symbol <size_t,i8*>
+(bind-type Symbol <size_t,i8*> (printer? . #f)
   "xtlang's symbol type
 
 Tuple contains <symbol_length,characters>
@@ -871,7 +858,7 @@ Frees both the underlying character array and the tuple container.
     void))
 
 ;; Symbol printing!
-(bind-func Symbol_print:[void,Symbol*]*
+(bind-func print:[void,Symbol*]*
   "Prints all characters in a given symbol object.
 
 Overloads and should be used via the `println` function
@@ -886,14 +873,11 @@ If the symbol is empty will print a zero length symbol
         (begin (printf "%s" (tref x 1))
                void))))
 
-(bind-poly print Symbol_print)
 
-(bind-func Symbol_toString:[String*,Symbol*]*
+(bind-func toString:[String*,Symbol*]*
   "convert Symbol to String"
   (lambda (x)
     (String (tref x 0) (tref x 1))))
-
-(bind-poly toString Symbol_toString)
 
 (bind-func Symbol_length
   "Takes a (null-terminated) Symbol* and returns the symbol length
@@ -920,7 +904,7 @@ Not necessarily the same as Symbol_length -
   (lambda (sym:Symbol*)
     (tref sym 1)))
 
-(bind-func Symbol_from_cptr
+(bind-func Symbol
   "Create an xtlang Symbol type from a c string (char array)
 
 Use via the polymorphic Str function
@@ -933,7 +917,7 @@ Use via the polymorphic Str function
           (str (Symbol_z len s)))
       str)))
 
-(bind-func Symbol_copy
+(bind-func Symbol
   "Create a new xtlang Symbol type from an existing Symbol
 
 Use via the polymorphic Str function
@@ -946,10 +930,7 @@ Use via the polymorphic Str function
           (new_str (Symbol_z len (Symbol_cstr str))))
       new_str)))
 
-(bind-poly Symbol Symbol_from_cptr)
-(bind-poly Symbol Symbol_copy)
-
-(bind-func Symbol_equal
+(bind-func equal
   "Equality test for Symbol
 
 @param s1 - first symbol
@@ -959,8 +940,6 @@ Use via the polymorphic Str function
   (lambda (s1:Symbol* s2:Symbol*)
     (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
         1:i1 0:i1)))
-
-(bind-poly equal Symbol_equal)
 
 (define *xtmlib-base-loaded* #t)
 

@@ -12,14 +12,16 @@
 
 (define play-note
   (lambda (time inst pitch vol dur . args)
+    ;; (if (closure? inst) (println 'kkk: (apply inst (list 'xtlang))))
+    ;; (if (symbol? inst) (println 'lll: (eval (string->symbol (string-append (symbol->string inst) "_xtlang_name")))))
     (let* ((nargs (length args))
            (duration dur)
            (dargs (sys:make-cptr (* (if (audio_64bit) 8 4) nargs))) ;; doubles
-           (native (if (procedure? inst)
-                       (llvm:get-native-closure (llvm:ffi-get-name inst))
-                       (llvm:get-native-closure (if (symbol? inst)
-                                                    (symbol->string inst)
-                                                    inst)))))
+           (native (if (closure? inst)
+                       (llvm:get-native-closure (symbol->string (apply inst (list 'xtlang))))
+                       (if (symbol? inst)
+                           (llvm:get-native-closure (eval (string->symbol (string-append (symbol->string inst) "_xtlang_name"))))
+                           #f))))
       (if (= (audio_64bit) 1)
           (dotimes (i nargs) (cptr:set-double dargs (* i 8) (eval (list-ref args i))))
           (dotimes (i nargs) (cptr:set-float dargs (* i 4) (eval (list-ref args i)))))
@@ -160,16 +162,16 @@ for use with native beat shceduler"
 
 (if (not (impc:aot:currently-compiling?))
     (begin
-      (eval '(bind-val Metro Metronome*)
-            (interaction-environment))
-      (eval
-       '(bind-func metro_init
-          (lambda (bpm:double offset:i64 n:i64 d:i64)
-            (if (not (null? Metro)) (hfree Metro))
-            (set! Metro (hcopy (MakeMetro_4 bpm offset n d)))
-            void))
-       (interaction-environment))
-      (metro_init 120. 0 0 1)
+      ;; (eval '(bind-val Metro Metronome*)
+      ;;       (interaction-environment))
+      ;; (eval
+      ;;  '(bind-func metro_init
+      ;;     (lambda (bpm:double offset:i64 n:i64 d:i64)
+      ;;       (if (not (null? Metro)) (hfree Metro))
+      ;;       (set! Metro (hcopy (MakeMetro_4 bpm offset n d)))
+      ;;       void))
+      ;;  (interaction-environment))
+      ;; (metro_init 120. 0 0 1)
       (sys:load "libs/core/pc_ivl.xtm")))
 
 

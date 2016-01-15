@@ -18,15 +18,15 @@
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib libudis86
   (cond ((string=? (sys:platform) "OSX")
-         "libudis86.dylib")
+         "/usr/local/lib/libudis86.dylib")
         ((string=? (sys:platform) "Linux")
          "libudis86.so")
         ((string=? (sys:platform) "Windows")
          "libudis86.dll")))
 
 (bind-type ud_operand <i32,i8,i32,i32,i8,i8,i64,i64,i8> #f)
-(bind-type ud <[i32,ud*],i8*,size_t,size_t,i8,size_t,|64,i8|,i32,[void,ud*],i64,|64,i8|,i8*,size_t,size_t,|128,i8|,[i8*,ud*,i64,i64*]*,i8,i64,i8,i32,|3,ud_operand|,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8*,i8*,i8*> #f)
-
+                                        ;<[i32,ud*],i8*,size_t,size_t,i8,size_t,|64,i8|,i32,[void,ud*],i64,|64,i8|,i8*,size_t,size_t,|128,i8|,[i8*,ud*,i64,i64*]*,i8,i64,i8,i32,|3,ud_operand|,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8*,i8*,i8*> #f)
+(bind-alias ud i8*)
 (bind-lib libudis86 ud_init [void,ud*]*)
 (bind-lib libudis86 ud_set_mode [void,ud*,i8]*)
 (bind-lib libudis86 ud_set_pc [void,ud*,i64]*)
@@ -43,26 +43,28 @@
 
 (bind-func xtm_asm_dump
   (lambda (fname bytes)
-    (let ((ud_obj:ud* (alloc))
+    (let ((ud_obj:ud* (alloc (* 1024 100)))
           (loop #t)
           (offset 0)
-          (f2 (llvm_get_function_ptr fname)) 
-          (f (i64toptr (- (ptrtoi64 f2) 24))))
+          (f2 (llvm_get_function_ptr fname))
+          (f (ptrtoi64 f2)))
+;          (f (i64toptr (- (ptrtoi64 f2) 24))))
       (printf "\n%s (%p)\n------\n" fname f)
       (if (not (null? f))
           (begin
             (set! loop #t)
             (ud_init ud_obj)
-            (ud_set_mode ud_obj 64)
             (ud_set_input_buffer ud_obj f bytes)            
-            (ud_set_pc ud_obj 0)
-            (ud_set_syntax ud_obj ud_translate_intel)
+            (ud_set_mode ud_obj 64)
+            ;; (ud_set_pc ud_obj 0)
+            (ud_set_syntax ud_obj (cast ud_translate_att i8*))
             (while (and loop (> (ud_disassemble ud_obj) 0))
               (if (or (= (strcmp (ud_lookup_mnemonic (ud_insn_mnemonic ud_obj)) "ret") 0)
                       (= (strcmp (ud_lookup_mnemonic (ud_insn_mnemonic ud_obj)) "int") 0))
                   (set! loop #f))
               (printf "0x%08llX:\t\t%s\n" (+ (ptrtoi64 f) offset) (ud_insn_asm ud_obj))
-              (set! offset  (ud_insn_off ud_obj)))))
+              (set! offset (+ offset (i32toi64 (ud_insn_len ud_obj)))))))
+;              (set! offset  (ud_insn_off ud_obj)))))
       (println "------")
       void)))
 
@@ -79,3 +81,7 @@
     (+ (+ 3 4) (random 6) (random 5))))
 
 (xtm-dump-asm test3)
+
+(define *xtmlib-udis86-loaded* #t)
+
+(impc:aot:insert-footer "xtmudis86")

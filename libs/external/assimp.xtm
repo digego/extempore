@@ -136,7 +136,7 @@
 (bind-val aiProcess_SplitByBoneCount enum  #x2000000)
 (bind-val aiProcess_Debone enum  #x4000000)
 
-(bind-type aiString <size_t,|1024,i8|>)
+(bind-type aiString <size_t,|1024,i8|> (printer? . #f))
                                         ;(llvm:compile "%aiString = type {i64, |1024xi8|}
 (bind-type aiMatrix4x4 <float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float>)
 (bind-type aiMatrix3x3 <float,float,float,float,float,float,float,float,float>)
@@ -224,14 +224,12 @@
     (doloop (i 16)
       (pset! mat2 i (aref (convert mat1 |16,float|*) i)))))
 
-(bind-func Print_aiString
+(bind-func print
   (lambda (str:aiString*)
     (let ((size (tref str 0))
           (dat (convert (tref-ptr str 1) i8*)))
       (printf "%.*s\n" size dat)
       void)))
-
-(bind-poly print Print_aiString)
 
 (bind-func ai_color4_to_float4
   (lambda (colour:aiColor4D* dat:float*)
@@ -439,7 +437,7 @@
 ;; if value > 0 then use post exactly as defined
 ;; which means the user must add AT LEAST aiProcess_Triangulate
 ;;
-(bind-func assimp_load_model_a
+(bind-func assimp_load_model
   (lambda (dir file post)
     (let ((lgth (+ (strlen dir) (strlen file) 1))
           (scene:aiScene* null)
@@ -460,12 +458,10 @@
               (aiReleaseImport scene)))
         root))))
 
-(bind-func assimp_load_model_b
+(bind-func assimp_load_model
   (lambda (dir file)
-    (assimp_load_model_a dir file 0)))
+    (assimp_load_model:[xtm_node*,i8*,i8*,i32]* dir file 0)))
 
-(bind-poly assimp_load_model assimp_load_model_a)
-(bind-poly assimp_load_model assimp_load_model_b)
 
 (bind-func ai_print_export_formats
   (lambda ()

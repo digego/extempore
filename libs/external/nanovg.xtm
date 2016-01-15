@@ -54,9 +54,9 @@
 ;;   };
 ;;  };
 ;; };
-(bind-type NVGcolor <float,float,float,float>)
+(bind-type NVGcolor <float,float,float,float> (printer? . #f))
 
-(bind-func NVGcolor_print
+(bind-func print
   (lambda (color:NVGcolor*)
     (printf "<NVGcolor: r=%.3f, g=%.3f, b=%.3f, a=%.3f>"
             (convert (tref color 0) double)
@@ -64,8 +64,6 @@
             (convert (tref color 2) double)
             (convert (tref color 3) double))
     void))
-
-(bind-poly print NVGcolor_print)
 
 (bind-func NVGcolor_hex
   "takes a 8-digit hex string (e.g. #x12ab3eff) and returns an NVGcolor
@@ -91,9 +89,9 @@
 ;;  NVGcolor outerColor;
 ;;  int image;
 ;; };
-(bind-type NVGpaint <|6,float|,|2,float|,float,float,NVGcolor,NVGcolor,i32>)
+(bind-type NVGpaint <|6,float|,|2,float|,float,float,NVGcolor,NVGcolor,i32> (printer? . #f))
 
-(bind-func NVGpaint_print
+(bind-func print
   (lambda (paint:NVGpaint*)
     (printf "<NVGpaint:\n    xform=|")
     (printf "%.3f " (convert (aref (tref paint 0) 0) double))
@@ -121,7 +119,6 @@
     (printf "    image=%d>" (tref paint 6))
     void))
 
-(bind-poly print NVGpaint_print)
 
 (bind-alias NVGwinding enum)
 (bind-val NVG_CCW NVGwinding 1) ;; Winding for solid shapes
@@ -741,9 +738,9 @@
 ;; Rect type
 
 ;; <x,y,w,h>
-(bind-type Rect <float,float,float,float>)
+(bind-type Rect <float,float,float,float> (printer? . #f))
 
-(bind-func Rect_print
+(bind-func print
   "specialised print function for Rect*"
   (lambda (rct:Rect*)
     (if (null? rct)
@@ -755,9 +752,8 @@
                 (convert (tref rct 3) double)))
     void))
 
-(bind-poly print Rect_print)
 
-(bind-func Rect_toString
+(bind-func toString
   "specialised toString function for Rect*"
   (lambda (rct:Rect*)
     (let ((str:i8* (salloc 256)))
@@ -770,7 +766,6 @@
                    (convert (tref rct 3) double)))
       (Str str))))
 
-(bind-poly toString Rect_toString)
 
 ;; run the init code
 (impc:aot:do-and-emit

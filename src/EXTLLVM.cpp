@@ -1232,15 +1232,26 @@ struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, u
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
   char a[256];
   char b[256];
+  char c[1024];
+  memset(c,0,1024);
+  const char* d = "_xtlang_name";
   if(!rsplit((char*)"\\.", symbol, (char*) a, (char*) b)) {
     //printf("Eval error: not valid dot syntax\n");
     return false;
   }
+  strcat(c,a);
+  strcat(c,d);
+  // printf("a:%s c:%s\n",a,c);
   pointer x=find_slot_in_env(sc,sc->envir,mk_symbol(sc,a),1);
-  if(x==sc->NIL) { // || !is_closure(x)) { // then we failed
+  pointer y=find_slot_in_env(sc,sc->envir,mk_symbol(sc,c),1);  
+  if(x==sc->NIL || y==sc->NIL) { // || !is_closure(x)) { // then we failed
     //printf("Eval error: not valid dot syntax: bad value\n");
     return false;
   }else{
+    return true;
+  }
+}
+/*
     //llvm::Module* M = extemp::EXTLLVM::I()->M;
     std::string funcname(a);
     std::string getter("_getter");
@@ -1253,8 +1264,10 @@ bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
       return false; 
     }
   }
-}
+  }
+*/
 
+#define strvalue(p)      ((p)->_object._string._svalue)
 pointer llvm_scheme_env_set(scheme* _sc, char* sym)
 {
   using namespace llvm; 
@@ -1262,6 +1275,11 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   char tmp[256];
   char vname[256];
   char tname[256];
+  
+  char c[1024];
+  memset(c,0,1024);
+  const char* d = "_xtlang_name";
+  
   if(!(rsplit((char*)"\\.",sym, (char*) fname, (char*) tmp))) {
     printf("Error attempting to set environment variable in closure bad split %s\n",sym);
     return _sc->F;  
@@ -1271,10 +1289,14 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
     memset(vname, 0, 256);
     memcpy(vname, tmp, 256);
   }
-  //printf("in llvm scheme env set %s.%s:%s\n",fname,vname,tname);
+  strcat(c,fname);
+  strcat(c,d);
+  pointer xtlang_f_name = find_slot_in_env(_sc,_sc->envir,mk_symbol(_sc,c),1);
+  char* xtlang_name = strvalue(pair_cdr(xtlang_f_name));
+  //printf("in llvm scheme env set %s.%s:%s  xtlang:%s\n",fname,vname,tname,xtlang_name);
   uint64_t id = string_hash((unsigned char*)vname);
   // Module* M = extemp::EXTLLVM::I()->M;
-  std::string funcname(fname);
+  std::string funcname(xtlang_name);
   std::string getter("_getter");
   //llvm::Function* func = M->getFunction(funcname+getter); //std::string(string_value(pair_car(args))));
   llvm::Function* func = extemp::EXTLLVM::I()->getFunction(funcname+getter);

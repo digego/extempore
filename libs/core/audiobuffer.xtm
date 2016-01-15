@@ -34,22 +34,19 @@
 ;; 6 loop start
 ;; 7 loop frames
 
-(bind-type AudioBuffer <String*,i64,i64,i64,SAMPLE*,double,i64,i64>)
+(bind-type AudioBuffer <String*,i64,i64,i64,SAMPLE*,double,i64,i64> (printer? . #f))
 
-(bind-func AudioBuffer_a
+(bind-func AudioBuffer
   (lambda (frames chans)
     (let ((dat:SAMPLE* (alloc (* frames chans))))
       (AudioBuffer_z (String "") 0 frames chans dat (convert (llvm_samplerate)) 0 0))))
 
-(bind-func AudioBuffer_b
+(bind-func AudioBuffer
   (lambda (frames chans samplerate)
     (let ((dat:SAMPLE* (alloc (* frames chans))))
       (AudioBuffer_z (String "") 0 frames chans dat samplerate 0 0))))
 
-(bind-poly AudioBuffer AudioBuffer_a)
-(bind-poly AudioBuffer AudioBuffer_b)
-
-(bind-func AudioBuffer_print
+(bind-func print
   "specialised print function for AudioBuffer*"
   (lambda (ab:AudioBuffer*)
     (if (null? ab)
@@ -74,9 +71,8 @@
                 (tref ab 7)))
     void))
 
-(bind-poly print AudioBuffer_print)
 
-(bind-func AudioBuffer_toString
+(bind-func toString
   "specialised toString function for AudioBuffer*"
   (lambda (ab:AudioBuffer*)
     (let ((str:i8* (salloc 1024)))
@@ -101,8 +97,6 @@
                    (tref ab 6)
                    (tref ab 7)))
       (Str str))))
-
-(bind-poly toString AudioBuffer_toString)
 
 ;; getters/setters
 
@@ -202,7 +196,7 @@
       (pref (AudioBuffer_data ab)
             (+ (* (% ph (AudioBuffer_frames ab)) (AudioBuffer_channels ab)) chan)))))
 
-(bind-func AudioBuffer_read_a
+(bind-func AudioBuffer_read
   (lambda (ab:AudioBuffer* chan)
     (let ((ph (AudioBuffer_playhead ab)))
       (if (< ph (AudioBuffer_frames ab))
@@ -212,7 +206,7 @@
                   (+ (* ph (AudioBuffer_channels ab)) chan)))
           0.0))))
 
-(bind-func AudioBuffer_read_b
+(bind-func AudioBuffer_read
   (lambda (ab:AudioBuffer* frame chan)
     (if (< frame (AudioBuffer_frames ab))
         (begin
@@ -221,10 +215,7 @@
                 (+ (* frame (AudioBuffer_channels ab)) chan)))
         0.0)))
 
-(bind-poly AudioBuffer_read AudioBuffer_read_a)
-(bind-poly AudioBuffer_read AudioBuffer_read_b)
-
-(bind-func AudioBuffer_read_looped_a
+(bind-func AudioBuffer_read_looped
   (lambda (ab:AudioBuffer* chan)
     (let ((ph (AudioBuffer_playhead ab)))
       (if (= chan 0)
@@ -232,7 +223,7 @@
       (pref (AudioBuffer_data ab)
             (+ (* ph (AudioBuffer_channels ab)) chan)))))
 
-(bind-func AudioBuffer_read_looped_b
+(bind-func AudioBuffer_read_looped
   (lambda (ab:AudioBuffer* frame chan)
     (if (= chan 0)
         (AudioBuffer_set_playhead ab (% frame (AudioBuffer_frames ab))))
@@ -240,9 +231,6 @@
         0.0
         (pref (AudioBuffer_data ab)
               (+ (* frame (AudioBuffer_channels ab)) chan)))))
-
-(bind-poly AudioBuffer_read_looped AudioBuffer_read_looped_a)
-(bind-poly AudioBuffer_read_looped AudioBuffer_read_looped_b)
 
 (bind-func AudioBuffer_ptr
   "returns a pointer into the buffer"
@@ -385,7 +373,7 @@
 ;; in endianness. So we define a base type which represents a chunk
 ;; header
 
-(bind-type IffChunkHeader <|4,i8|,i32>)
+(bind-type IffChunkHeader <|4,i8|,i32> (printer? . #f))
 (bind-val IFF_CHUNK_HEADER_SIZE i64 8)
 
 (bind-func iffchunk_check_ID
@@ -417,7 +405,7 @@
       (set! fileptr (pref-ptr fileptr 1)))
     fileptr))
 
-(bind-func iffheader_print
+(bind-func print
   "specialised print function for IffChunkHeader*"
   (lambda (hdr:IffChunkHeader*)
     (if (null? hdr)
@@ -427,9 +415,7 @@
                 (iffchunk_size hdr #t))) ;; this will only work for WAVE
     void))
 
-(bind-poly print iffheader_print)
-
-(bind-func iffheader_toString
+(bind-func toString
   "specialised toString function for IffChunkHeader*"
   (lambda (hdr:IffChunkHeader*)
     (let ((str:i8* (salloc 256)))
@@ -440,8 +426,6 @@
                    (aref-ptr (tref-ptr hdr 0) 0)
                    (iffchunk_size hdr #t))) ;; this will only work for WAVE
       (Str str))))
-
-(bind-poly toString iffheader_toString)
 
 ;;;;;;;;;;
 ;; WAVE ;;
@@ -587,7 +571,7 @@
            (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
            #f))))
 
-(bind-func AudioBuffer_from_file
+(bind-func AudioBuffer
   (lambda (filepath)
     (cond ((rmatch "\\.wave?$" filepath)
            (AudioBuffer_from_wave filepath))
@@ -597,7 +581,6 @@
            (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
            null))))
 
-(bind-poly AudioBuffer AudioBuffer_from_file)
 
 (impc:aot:insert-footer "xtmaudiobuffer")
 (define *xtmlib-audiobuffer-loaded* #t)

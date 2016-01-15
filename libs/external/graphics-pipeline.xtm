@@ -169,7 +169,7 @@
 ;; this from gl-objects.xtm - we can remove it once graphics-pipeline
 ;; can use the core profile
 
-(bind-func gl_print_error_with_msg
+(bind-func gl_print_error
   (lambda (msg:i8*)
     (let ((err (glGetError)))
       (cond
@@ -187,12 +187,10 @@
         (printf "%s\n" msg)))
       void)))
 
-(bind-func gl_print_error_no_msg
+(bind-func gl_print_error
   (lambda ()
-    (gl_print_error_with_msg "OpenGL Error")))
+    (gl_print_error:[void,i8*]* "OpenGL Error")))
 
-(bind-poly gl_print_error gl_print_error_with_msg)
-(bind-poly gl_print_error gl_print_error_no_msg)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -660,7 +658,7 @@
         (glBindBuffer GL_ARRAY_BUFFER 0)
         vbo))))
 
-(bind-func xtm_make_node_a
+(bind-func xtm_make_node
   (lambda (name:i8* verts:float* num_verts:i32 r g b)
     (let ((mesh:xtm_mesh* (halloc))
           (node:xtm_node* (halloc))
@@ -682,8 +680,6 @@
       (fill_identity_matrix transmat)
       (tfill! node name transmat null 0 null 1 mesh)
       node)))
-
-(bind-poly xtm_make_node xtm_make_node_a)
 
 (bind-type xtm_camera <float*,float*,float*>)
 
@@ -1298,10 +1294,6 @@
     (set! xtm_render_angle a)
     (xtm_render_setup_b w h n f s1v s1f s2v s2f s2f_nl s4v s4f)
     void))
-
-(bind-poly xtm_render_setup xtm_render_setup_a)
-(bind-poly xtm_render_setup xtm_render_setup_b)
-(bind-poly xtm_render_setup xtm_render_setup_c)
 
 ;; make sure we load them with precompiled code as well
 (impc:aot:do-or-emit

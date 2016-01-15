@@ -43,7 +43,7 @@
     (printf "  IN CHANS: %lld\n" IN_CHANNELS)
     (printf "SAMPLERATE: %f\n" (ftod (convert SAMPLERATE)))))
 
-(print_audio_state)
+(xtmX print_audio_state)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; silence
@@ -76,67 +76,67 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; tempo,offset,mark,total-beats,cycle-beats,beat-env,samp-env
-(bind-type Metronome <Rational,i64,i64,Rational,Rational,[Rational,Rational]*,[Rational,Rational]*>)
+;; (bind-type Metronome <Rational,i64,i64,Rational,Rational,[Rational,Rational]*,[Rational,Rational]*>)
 
-(bind-func MakeMetro_3
-  (lambda (tempo offset:i64 beat:Rational)
-    (let ((tempoR (/ 60 (Rat (dtoi64 (* 100. tempo)) 100)))
-          (line (lambda (x1:Rational y1:Rational x2:Rational y2:Rational)
-                  (let ((m (if (= (Rat 0 1) (- x2 x1))
-                               (Rat 0 1)
-                               (/ (- y2 y1) (- x2 x1))))
-                        (c (- y1 (* m x1))))
-                    (lambda (t:Rational)
-                      (+ (* t m) c))))))
-      (Metronome tempoR 0 offset beat (Rat 4 1)
-                 (line (Rat offset 1) beat
-                       (+ offset (* tempoR (llvm_samplerate)))
-                       (+ beat 1/1))
-                 (line beat (Rat offset 1)
-                       (+ beat 1/1)
-                       (+ offset (* tempoR (llvm_samplerate))))))))
+;; (bind-func MakeMetro_3
+;;   (lambda (tempo offset:i64 beat:Rational)
+;;     (let ((tempoR (/ 60 (Rat (dtoi64 (* 100. tempo)) 100)))
+;;           (line (lambda (x1:Rational y1:Rational x2:Rational y2:Rational)
+;;                   (let ((m (if (= (Rat 0 1) (- x2 x1))
+;;                                (Rat 0 1)
+;;                                (/ (- y2 y1) (- x2 x1))))
+;;                         (c (- y1 (* m x1))))
+;;                     (lambda (t:Rational)
+;;                       (+ (* t m) c))))))
+;;       (Metronome tempoR 0 offset beat (Rat 4 1)
+;;                  (line (Rat offset 1) beat
+;;                        (+ offset (* tempoR (llvm_samplerate)))
+;;                        (+ beat 1/1))
+;;                  (line beat (Rat offset 1)
+;;                        (+ beat 1/1)
+;;                        (+ offset (* tempoR (llvm_samplerate))))))))
 
-(bind-func MakeMetro_1
-  (lambda (tempo)
-    (MakeMetro_3 tempo (now) (Rat 0 1))))
+;; (bind-func MakeMetro_1
+;;   (lambda (tempo)
+;;     (MakeMetro_3 tempo (now) (Rat 0 1))))
 
-(bind-func MakeMetro_4
-  (lambda (tempo offset beatn beatd)
-    (MakeMetro_3 tempo offset (Rat beatn beatd))))
+;; (bind-func MakeMetro_4
+;;   (lambda (tempo offset beatn beatd)
+;;     (MakeMetro_3 tempo offset (Rat beatn beatd))))
 
-(bind-poly MakeMetro MakeMetro_3)
-(bind-poly MakeMetro MakeMetro_1)
-(bind-poly MakeMetro MakeMetro_4)
+;; (bind-poly MakeMetro MakeMetro_3)
+;; (bind-poly MakeMetro MakeMetro_1)
+;; (bind-poly MakeMetro MakeMetro_4)
 
-(bind-func metro_get_time
-  (lambda (m:Metronome* beat:Rational)
-    (+ (dtoi64 (* 1.0 ((tref m 6) beat))) (tref m 1))))
+;; (bind-func metro_get_time
+;;   (lambda (m:Metronome* beat:Rational)
+;;     (+ (dtoi64 (* 1.0 ((tref m 6) beat))) (tref m 1))))
 
-(bind-func metro_get_beat
-  (lambda (m:Metronome* time:i64)
-    ((tref m 5) (Rat time 1))))
+;; (bind-func metro_get_beat
+;;   (lambda (m:Metronome* time:i64)
+;;     ((tref m 5) (Rat time 1))))
 
-(bind-func metro_get_quantized
-  (lambda (m:Metronome* q:Rational)
-    (let ((val (+ (tref m 3) ;; total beats
-                  (/ (- (now) (tref m 2)) ;; mark
-                     (* (llvm_samplerate) (tref m 0)))))
-          (q2 (- q (% val q))))
-      (+ val (- q (% val q))))))
+;; (bind-func metro_get_quantized
+;;   (lambda (m:Metronome* q:Rational)
+;;     (let ((val (+ (tref m 3) ;; total beats
+;;                   (/ (- (now) (tref m 2)) ;; mark
+;;                      (* (llvm_samplerate) (tref m 0)))))
+;;           (q2 (- q (% val q))))
+;;       (+ val (- q (% val q))))))
 
-(bind-func metro_get_tempo
-  (lambda (m:Metronome*)
-    (/ 60 (tref m 0))))
+;; (bind-func metro_get_tempo
+;;   (lambda (m:Metronome*)
+;;     (/ 60 (tref m 0))))
 
-(bind-func metro_get_duration
-  (lambda (m:Metronome* dur:Rational)
-    (convert (* (convert (llvm_samplerate) SAMPLE) (* dur (tref m 0))) i64)))
+;; (bind-func metro_get_duration
+;;   (lambda (m:Metronome* dur:Rational)
+;;     (convert (* (convert (llvm_samplerate) SAMPLE) (* dur (tref m 0))) i64)))
 
-(bind-func print_metronome:[void,Metronome*]*
-  (lambda (m)
-    (println "Metronome>> bpm:" (metro_get_tempo m) "beats:" (tref m 3))))
+;; (bind-func print_metronome:[void,Metronome*]*
+;;   (lambda (m)
+;;     (println "Metronome>> bpm:" (metro_get_tempo m) "beats:" (tref m 3))))
 
-(bind-poly print print_metronome)
+;; (bind-poly print print_metronome)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -213,7 +213,7 @@
 ;; 6.0 = steeper curve etc..
 ;;
 ;; time 0.0 -> width
-(bind-func gain:[SAMPLE,i64,i64,SAMPLE]*
+(bind-func gainf:[SAMPLE,i64,i64,SAMPLE]*
   (lambda (time width power)
     (let ((amp 1.0)
           (p:double (convert power))
@@ -248,7 +248,7 @@
 ;; 2.0 - repeat after two cycles
 ;; 4.0 - repeat after four cycles etc..
 ;;
-(bind-func hann_a
+(bind-func hann
   (lambda (time:i64 width:i64 repeat:i64)
     (if (or (< width 1)
             (> (% time (* width repeat)) width))            
@@ -258,12 +258,10 @@
               (cos (* STWOPI (/ (convert time)
                                 (convert width)))))))))
 
-(bind-func hann_b
+(bind-func hann
   (lambda (time:i64 width:i64)
-    (hann_a time width 10000000000)))
+    (hann:[float,i64,i64,i64]* time width 10000000000)))
 
-(bind-poly hann hann_a)
-(bind-poly hann hann_b)
 
 ;; time in samples (starting from 0)
 ;; apex (in samples) is after how many samples we hit 1.0 before decaying

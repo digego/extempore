@@ -148,9 +148,9 @@
 
 ;; } PmDeviceInfo;
 
-(bind-type PmDeviceInfo <i32,i8*,i8*,i32,i32,i32>)
+(bind-type PmDeviceInfo <i32,i8*,i8*,i32,i32,i32> (printer? . #f))
 
-(bind-func PmDeviceInfo_print
+(bind-func print
   (lambda (pmdi:PmDeviceInfo*)
     (printf "<PmDeviceInfo: interface=%s name=%s I/O?:"
             (tref pmdi 1)
@@ -162,9 +162,7 @@
     (printf ">")
     void))
 
-(bind-poly print PmDeviceInfo_print)
-
-(bind-func PmDeviceInfo_toString
+(bind-func toString
   (lambda (pmdi:PmDeviceInfo*)
     (let ((str:i8* (zalloc 256)))
       (sprintf str "<PmDeviceInfo: interface=%s name=%s I/O?:"
@@ -176,8 +174,6 @@
           (sprintf str "O"))
       (sprintf str ">")
       (String str))))
-
-(bind-poly toString PmDeviceInfo_toString)
 
 ;; /**  Get devices count, ids range from 0 to Pm_CountDevices()-1. */
 (bind-lib libportmidi Pm_CountDevices [i32]*)
@@ -539,7 +535,7 @@
 ;;     PmMessage      message;
 ;;     PmTimestamp    timestamp;
 ;; } PmEvent;
-(bind-type PmEvent <PmMessage,PmTimestamp>)
+(bind-type PmEvent <PmMessage,PmTimestamp> (printer? . #f))
 
 (bind-func Pm_Event_Message
   (lambda (event:PmEvent*)
@@ -549,7 +545,7 @@
   (lambda (event:PmEvent*)
     (tref event 1)))
 
-(bind-func Pm_Event_print
+(bind-func print
   "specialised print function for PmEvent*"
   (lambda (pmevent:PmEvent*)
     (printf "<PmEvent: type=%d chan=%d data1=%d data2=%d timestamp=%d>"
@@ -560,9 +556,8 @@
             (tref pmevent 1))
     void))
 
-(bind-poly print Pm_Event_print)
 
-(bind-func Pm_Event_toString
+(bind-func toString
   "specialised toString function for PmEvent*"
   (lambda (pmevent:PmEvent*)
     (let ((str:i8* (salloc 256)))
@@ -574,7 +569,6 @@
                (tref pmevent 1))
       (String str))))
 
-(bind-poly toString Pm_Event_toString)
 
 ;; a few more useful functions for pulling data out of PmEvent
 
@@ -771,7 +765,8 @@ input device(s)
 @paran dev - device id of a midi input device"
   (lambda (dev)
     (let ((stream_ptr:PmStream** (salloc))
-          (res (Pm_OpenInput stream_ptr dev null PM_MIDI_BUFFER_SIZE (convert (get_native_fptr pm_current_time_in_ms)) null)))
+          (res (Pm_OpenInput stream_ptr dev null PM_MIDI_BUFFER_SIZE
+                             (convert (get_native_fptr pm_current_time_in_ms)) null)))
       (if (<> res pmNoError)
           (println "PortMIDI error opening input port:" (String (Pm_GetErrorText res))))
       (pref stream_ptr 0))))
@@ -785,7 +780,8 @@ output device(s)
 @paran dev - device id of a midi output device"
   (lambda (dev)
     (let ((stream_ptr:PmStream** (salloc))
-          (res (Pm_OpenOutput stream_ptr dev null PM_MIDI_BUFFER_SIZE (convert (get_native_fptr pm_current_time_in_ms)) null 0)))
+          (res (Pm_OpenOutput stream_ptr dev null PM_MIDI_BUFFER_SIZE
+                              (convert (get_native_fptr pm_current_time_in_ms)) null 0)))
       (if (<> res pmNoError)
           (println "PortMIDI error opening output port:" (String (Pm_GetErrorText res))))
       (pref stream_ptr 0))))

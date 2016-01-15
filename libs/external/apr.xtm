@@ -1054,7 +1054,7 @@
 (bind-type apr_finfo_t <apr_pool_t*,i32,apr_fileperms_t,apr_filetype_e,apr_uid_t,apr_gid_t,apr_ino_t,apr_dev_t,i32,apr_off_t,apr_off_t,apr_time_t,apr_time_t,apr_time_t,i8*,i8*,apr_file_t*>
   "file information structure - analogous to the POSIX stat structure")
 
-(bind-func apr_finfo_t_print
+(bind-func print
   "specialised print function for apr_finfo*"
   (lambda (finfo:apr_finfo_t*)
     (if (null? finfo)
@@ -1096,9 +1096,8 @@ filename           : %s
                 (tref finfo 15)))
     void))
 
-(bind-poly print apr_finfo_t_print)
 
-(bind-func apr_finfo_t_toString
+(bind-func toString
   "specialised toString function for apr_finfo*"
   (lambda (finfo:apr_finfo_t*)
     (let ((str:i8* (salloc 256)))
@@ -1141,7 +1140,6 @@ filename           : %s
                    (tref finfo 15)))
       (Str str))))
 
-(bind-poly toString apr_finfo_t_toString)
 
 ;; /**
 ;;  * get the specified file's stats.  The file is specified by filename,
@@ -2209,20 +2207,17 @@ filename           : %s
     (apr_initialize)))
 
 ;; in apr.h, this is actually a C preprocessor macro
-(bind-func apr_pool_create_no_parent
+(bind-func apr_pool_create
   (lambda ()
     (let ((pool:apr_pool_t** (salloc)))
       (apr_pool_create_ex pool null null null)
       (pref pool 0))))
 
-(bind-func apr_pool_create_with_parent
+(bind-func apr_pool_create
   (lambda (parent)
     (let ((pool:apr_pool_t** (salloc)))
       (apr_pool_create_ex pool parent null null)
       (pref pool 0))))
-
-(bind-poly apr_pool_create apr_pool_create_no_parent)
-(bind-poly apr_pool_create apr_pool_create_with_parent)
 
 (impc:aot:do-at-runtime (apr_init))
 
