@@ -1385,9 +1385,9 @@ static int alloc_cellseg(scheme *sc, int n) {
 		
     char str[256];
     //    sprintf(str,"Allocated: %d cell segements for a total of %d.  Free cells = %lld",n,sc->last_cell_seg,sc->fcells);
-    sprintf(str,"Allocated: %d cell segments for a total of %d.",n,sc->last_cell_seg);
+    //sprintf(str,"Allocated: %d cell segments for a total of %d.",n,sc->last_cell_seg);
     //CPPBridge::notification(str);
-    std::cout << "Allocated: " << n << " Cell Segments For A Total Of " << sc->last_cell_seg << ",  Free Cells = " << sc->fcells << std::endl;
+    //std::cout << "Allocated: " << n << " Cell Segments For A Total Of " << sc->last_cell_seg << ",  Free Cells = " << sc->fcells << std::endl;
     return n;
 }
 
