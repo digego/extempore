@@ -9246,7 +9246,17 @@ xtlang's `let' syntax is the same as Scheme"
   (if (null? args)
       (impc:compiler:print-compiler-error "Bind type missing arguments! (symbol type [docstring])"))
   (let* ((symbol (car args))
-         (type (cadr args))
+         (type_1 (cadr args))
+         (type (string->symbol
+                (string-append "<"
+                 (string-join 
+                  (map (lambda (x)
+                         (if (impc:ti:typealias-exists? x)                                  
+                             (impc:ir:pretty-print-type (impc:ti:get-typealias-type x))
+                             x))
+                       (impc:ir:get-pretty-tuple-arg-strings (symbol->string type_1)))
+                  ",")
+                 ">")))
          (docstring (if (string? (car (reverse args))) (car (reverse args)) ""))
          (extras (cl:remove #f (map (lambda (x) (if (pair? x) x #f)) args)))
          (printer? (if (assoc-strcmp 'printer? extras)
