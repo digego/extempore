@@ -3555,7 +3555,7 @@ e.g.
 `letz' is the same as `let', with the addition of the new memzone"
  '(bindings [zone-size] body))
 
-(define impc:ti:cleanup
+(define impc:ti:zone_cleanup
   (lambda (ast)
     `(let ((zone (llvm_peek_zone_stack))
            (hooks:<i64,i8*,i8*>* (cast (tref zone 4)))         
@@ -3738,8 +3738,8 @@ Continue executing `body' forms until `test-expression' returns #f"
                       (impc:ti:first-transform (impc:ti:memzone ast) inbody?))
                      ((eq? (car ast) 'beginz)
                       (impc:ti:first-transform (impc:ti:beginz ast) inbody?))
-                     ((eq? (car ast) 'cleanup)
-                      (impc:ti:first-transform (impc:ti:cleanup ast) inbody?))
+                     ((eq? (car ast) 'zone_cleanup)
+                      (impc:ti:first-transform (impc:ti:zone_cleanup ast) inbody?))
                      ((eq? (car ast) '>=)
                       (impc:ti:first-transform (impc:ti:gteq ast) inbody?))
                      ((eq? (car ast) '<=)
