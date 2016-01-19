@@ -740,7 +740,10 @@
     (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
       (if builtin-data
           (if (not (null? (vector-ref (cdr builtin-data) 0)))
-              (print "Warning: attempting to re-type already typed builtin" builtin-name "to" (impc:ir:pretty-print-type-str type-str) "\n")
+              (begin (print "Warning: attempting to re-type already typed builtin")
+                     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print builtin-name))
+                     (print " to ")
+                     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (print (impc:ir:pretty-print-type-str type-str) "\n")))
               (vector-set! (cdr builtin-data) 0 type-str))
           (impc:compiler:print-compiler-error "tried to set type of unknown builtin" builtin-name)))))
 
