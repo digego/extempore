@@ -3167,7 +3167,6 @@
                                                                 (impc:ti:closure-exists? (symbol->string sym)))
                                                            (impc:ti:globalvar-exists? (symbol->string sym)))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
-                                                         (println 'shadow2 shadow 'sym sym)
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
                                                              (cons x shadow)
@@ -5141,10 +5140,10 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; IS NEW
 (define impc:ti:symbol-check
   (lambda (ast vars kts request?)
-    ;;(println 'symcheck 'ast: ast 'vars: vars)
     ;; (println 'vars: vars)
     (if (not (symbol? ast))
         (impc:compiler:print-compiler-error "Trying to symbol check a non-symbol" ast))
+    ;; (println 'symcheck 'ast: ast 'request? request? (impc:ir:get-base-type (symbol->string ast)))    
     (if (and
          (assoc-strcmp ast vars)
          (impc:ir:type? (impc:ti:type-unify (cdr (assoc-strcmp ast vars)) vars)))
@@ -5154,13 +5153,22 @@ Continue executing `body' forms until `test-expression' returns #f"
           (if (and (symbol? ast)
                    (impc:ti:genericfunc-exists? (string->symbol (impc:ir:get-base-type (symbol->string ast)))))
               (begin
-                (impc:compiler:print-compiler-error "Try forcing a type! Ambiguous generic function as value" ast)))
+                (impc:compiler:print-compiler-error "Try forcing a type? Ambiguous generic function as value" ast)))
           (if (and (symbol? ast)
                    (impc:ti:polyfunc-exists? (impc:ir:get-base-type (symbol->string ast))))
               (let ((pt (impc:ti:get-polyfunc-candidate-types (impc:ir:get-base-type (symbol->string ast)))))
-                (if (= (length pt) 1)
-                    (set! ast (string->symbol (string-append (impc:ir:get-base-type (symbol->string ast)) ":" (impc:ir:pretty-print-type (car pt)))))
-                    (impc:compiler:print-compiler-error "Try forcing a type! Ambiguous polymorphic function as a value" ast))))          
+                (cond ((and (> (length pt) 1)
+                            (assoc request? pt))
+                       (if (assoc-strcmp ast vars) (impc:ti:update-var ast vars kts (list request?)))
+                       (set! ast (string->symbol (string-append (impc:ir:get-base-type (symbol->string ast))
+                                                                ":" (impc:ir:pretty-print-type request?)))))
+                      ((= (length pt) 1)
+                       (if (assoc-strcmp ast vars) (impc:ti:update-var ast vars kts pt))
+                       (set! ast (string->symbol (string-append (impc:ir:get-base-type (symbol->string ast))
+                                                                ":" (impc:ir:pretty-print-type (car pt))))))
+                      (else
+                       (impc:compiler:print-compiler-error
+                        "Try forcing a type? Ambiguous polymorphic function as a value" ast)))))
           (if *impc:ti:print-sub-checks* (println 'sym:> 'ast: ast 'request? request?))
           ;; if a request is made - assume it's forced
           ;; find the intersection between the request
