@@ -259,7 +259,6 @@
 
 (define impc:ir:pretty-print-type
   (lambda (t)
-    ;; (println 'typein: t)
     (if (null? t)
         (impc:compiler:print-compiler-error "impc:ir:pretty-print-type cannot print null type")
         (if (string? t)
@@ -281,8 +280,7 @@
                         t))
                 (impc:ir:pretty-print-type (impc:ir:get-type-from-pretty-str t)))
             (if (or (null? t) (not (impc:ir:type? t))) '()
-                (cond ((atom? t)
-                       (impc:ir:get-type-str t))
+                (cond ((atom? t) (impc:ir:get-type-str t))
                       ((impc:ir:tuple? t)
                        (string-append "<" (string-join (map (lambda (k) (impc:ir:pretty-print-type k)) (cdr t)) ",")
                                       ">" (make-string (impc:ir:get-ptr-depth t) #\*)))
@@ -317,9 +315,7 @@
       (if (< (string-length base) 1)
           (impc:compiler:print-bad-type-error string-type "Illegal type"))
       (cond ((string=? base "void") *impc:ir:void*)
-                                        ;((string=? base "size_t") (+ offset (if (= 64 (sys:pointer-size))
-                                        ;					       *impc:ir:ui64*
-                                        ;					       *impc:ir:ui32*)))
+            ((string=? base "notype") *impc:ir:notype*)
             ((string=? base "@") (+ -2 (* *impc:ir:pointer* ptr-depth)))
             ((string=? base "closure") (+ *impc:ir:closure* offset))
             ((string=? base "tuple") (+ *impc:ir:tuple* offset))
@@ -624,6 +620,7 @@
       (if (= 92 (char->integer (string-ref base 0)))
           (string-set! base 0 (integer->char 48)))
       (cond ((string=? base "void") *impc:ir:void*)
+            ((string=? base "notype") *impc:ir:notype*)
             ;; this here just for recursive named types from LLVM IR
             ((string=? base "@") -2)
             ((regex:match? base "^[0-9]*$")
@@ -685,6 +682,7 @@
                                      (make-string (impc:ir:get-ptr-depth (car type)) #\*)))
                      (else (impc:compiler:print-bad-type-error type "bad complex type"))))
               ((= type *impc:ir:void*) "void")
+              ((= type *impc:ir:notype*) "notype")
               ((< type 0) ;; this here for recursive llvm ir type defs only!
                (let ((base (* -1 (modulo type (* -1 *impc:ir:pointer*))))
                      (ptr-depth (real->integer (floor (/ type (* -1 *impc:ir:pointer*))))))
@@ -863,7 +861,6 @@
               nl)
             (+ (impc:ir:str-list-check type) (* *impc:ir:pointer* ptr-depth))))))
 
-
 (define impc:ir:type?
   (lambda (type)
     (if (string? type)
@@ -874,7 +871,8 @@
             #t
             (impc:ir:type? (impc:ir:get-type-from-str type)))
         (cond ((null? type) #f)
-              ((and (number? type) (< type 1001)) #t)
+              ((and (number? type)
+                    (< type 1001)) #t)
               ((and (list? type)
                     (number? (car type))
                     (or (impc:ir:closure? type)

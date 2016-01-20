@@ -206,8 +206,8 @@
   `(/ (log ,x) (log ,base)))
 
 (bind-macro
+  "convert angle in degrees to radians" 
   (deg2rad degrees)
-  "convert angle in degrees to radians"
   `(/ ,degrees 57.2957795))
 
 (bind-macro
@@ -241,28 +241,41 @@
              args
              (make-list-with-proc (length args) (lambda (i) (real->integer i))))))
 
+
+(bind-macro
+ "return native function name for closure"
+ (get_native_name closure-name . type)
+ (let* ((pair (regex:type-split (symbol->string closure-name) ":"))
+        (base (if (null? (cdr pair)) "" (impc:ir:get-base-type (cadr pair)))))
+   (set! closure-name (symbol->string closure-name))
+   (if (not (null? (cdr pair)))
+       (string-append (car pair) "_adhoc_" (cname-encode base) "_native")
+       (if (null? type)
+           (if (and (impc:ti:polyfunc-exists? closure-name)
+                    (= (length (impc:ti:get-polyfunc-candidate-types closure-name)) 1))
+               (let* ((t (impc:ir:pretty-print-type (car (impc:ti:get-polyfunc-candidate-types closure-name))))
+                      (bt (impc:ir:get-base-type t))
+                      (fullname (string-append closure-name
+                                               "_adhoc_"
+                                               (cname-encode bt)
+                                               "_native")))
+                 fullname)
+               (impc:compiler:print-compiler-error "Ambiguous call to get_native_fptr" (string->symbol closure-name)))
+           (let* ((bt (impc:ir:get-base-type (symbol->string (car type))))
+                  (fullname (string-append closure-name
+                                           "_adhoc_"
+                                           (cname-encode bt)
+                                           "_native")))
+             fullname)))))
+
 ;; the same functionality, but for use in xtlang code
 (bind-macro
  "return native function pointer for closure"
  (get_native_fptr closure-name . type)
- (set! closure-name (symbol->string closure-name))
  (if (null? type)
-     (if (and (impc:ti:polyfunc-exists? closure-name)
-              (= (length (impc:ti:get-polyfunc-candidate-types closure-name)) 1))
-         (let* ((t (impc:ir:pretty-print-type (car (impc:ti:get-polyfunc-candidate-types closure-name))))
-                (bt (impc:ir:get-base-type t))
-                (fullname (string-append closure-name
-                                        "_adhoc_"
-                                        (cname-encode bt)
-                                        "_native")))               
-           `(llvm_get_function_ptr ,fullname))
-         (impc:compiler:print-compiler-error "Ambiguous call to get_native_fptr" (string->symbol closure-name)))
-     (let* ((bt (impc:ir:get-base-type (symbol->string (car type))))
-           (fullname (string-append closure-name
-                                    "_adhoc_"
-                                    (cname-encode bt)
-                                    "_native")))
-       `(llvm_get_function_ptr ,fullname))))
+     `(llvm_get_function_ptr (get_native_name ,closure-name))
+     `(llvm_get_function_ptr (get_native_name ,closure-name ,(car type)))))
+
 
 (bind-macro
   "a \"thread-first\" macro

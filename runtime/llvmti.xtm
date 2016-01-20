@@ -103,6 +103,7 @@
 ;; LOWER THAN UNSIGNED VERSIONS
 ;; i.e. si64 should be lower than ui64
 ;;
+
 (define *impc:ir:notype* -3) ;; no type!
 (define *impc:ir:badtype* -2)
 (define *impc:ir:void* -1)
@@ -389,11 +390,13 @@
     (if (and (list? expected)
              (= 1 (length expected)))
         (set! expected (car expected)))
-
+    
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f
                        (print
                         (if (impc:ir:type? expected)
-                            (impc:ir:pretty-print-type expected)
+                            (if (null? (impc:ir:pretty-print-type expected))
+                                expected
+                                (impc:ir:pretty-print-type expected))                                
                             expected)
                         "\n"))
 
@@ -492,6 +495,7 @@
                        'default #t (print "Compiler Error"))
     (print " cannot find" type "")
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n"))
+    (error)
     (if (impc:aot:currently-compiling?)
         (quit 2)
         (throw ""))))
@@ -969,6 +973,9 @@
          (docstring (if string-in-first-pos? (car forms) ""))
          (name-and-args (if string-in-first-pos? (cadr forms) (car forms)))
          (body (if string-in-first-pos? (cddr forms) (cdr forms))))
+    ;; (if (> (length body) 1)
+    ;;     (set! body (cons 'begin body)))
+    ;; (println 'body: body)
     `(begin
        (impc:aot:insert-xtmacro-binding-details ',name-and-args ,docstring ',@body)
        (impc:ti:register-new-xtmacro ,(symbol->string (car name-and-args)) ,docstring)
@@ -3104,7 +3111,7 @@
 ;; this code expects that all pretty types
 ;; have already been removed from the ast!
 (define impc:ti:rename-all-shadow-vars
-  (lambda (full-ast syms)
+  (lambda (symname full-ast syms)
     (letrec ((f (lambda (ast fname)
                   (cond ((atom? ast) ast)
                         ((null? ast) ast)
@@ -3118,13 +3125,14 @@
                                           (map (lambda (x)
                                                  (let* ((pair (regex:type-split (symbol->string (car x)) ":"))
                                                         (sym (string->symbol (car pair))))
-                                                   (if (or (member sym syms)
-                                                           (impc:ti:namedtype-exists? (symbol->string sym))
-                                                           (impc:ti:genericfunc-exists? sym)
-                                                           (impc:ti:polyfunc-exists? (symbol->string sym))
-                                                           (and (not (equal? sym fname))
-                                                                (impc:ti:closure-exists? (symbol->string sym)))
-                                                           (impc:ti:globalvar-exists? (symbol->string sym)))
+                                                   (if (and (not (equal? sym symname))
+                                                            (or (member sym syms)
+                                                                (impc:ti:namedtype-exists? (symbol->string sym))
+                                                                (impc:ti:genericfunc-exists? sym)
+                                                                (impc:ti:polyfunc-exists? (symbol->string sym))
+                                                                (and (not (equal? sym fname))
+                                                                     (impc:ti:closure-exists? (symbol->string sym)))
+                                                                (impc:ti:globalvar-exists? (symbol->string sym))))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
@@ -3159,6 +3167,7 @@
                                                                 (impc:ti:closure-exists? (symbol->string sym)))
                                                            (impc:ti:globalvar-exists? (symbol->string sym)))
                                                        (let ((shadow (impc:ti:gen-shadow sym)))
+                                                         (println 'shadow2 shadow 'sym sym)
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
                                                              (cons x shadow)
@@ -5206,14 +5215,14 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define impc:ti:math-check
   (lambda (ast vars kts request?)
+    ;; cleanup request!
+    (if (and (list? request?) (= 1 (length request?))) (set! request? (car request?)))
+    ;; if request? is notype - make false
+    (if (equal? request? *impc:ir:notype*) (set! request? #f))
     ;; if request is false
     (if (not request?)
         (begin (if (member (cadr ast) kts) (set! request? (cdr (assoc-strcmp (cadr ast) vars))))
                (if (member (caddr ast) kts) (set! request? (cdr (assoc-strcmp (caddr ast) vars))))))
-    ;; cleanup request!
-    (if (and (list? request?)
-             (= 1 (length request?)))
-        (set! request? (car request?)))
     ;; now start type checking
     (let* ((n1 (cadr ast))
            (n2 (caddr ast))
@@ -5290,6 +5299,8 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define impc:ti:math-intrinsic-check
   (lambda (ast vars kts request?)
+    (if (equal? request? *impc:ir:notype*) (set! request? #f))
+    (if (equal? request? (list *impc:ir:notype*)) (set! request? #f))
     ;; (println 'intrinsic: ast 'r: request?) 
     (let* ((args (- (length ast) 1))
            (a (impc:ti:type-unify (impc:ti:type-check (cadr ast) vars kts request?) vars))
@@ -5763,10 +5774,10 @@ Continue executing `body' forms until `test-expression' returns #f"
             ;; type inferencing for generic functions return argument!
             (let* ((symname 'placeholder)
                    (extantsyms (map (lambda (x) (car x)) vars))
-                   (s1 (impc:ti:rename-all-shadow-vars lambda-code extantsyms))
+                   (s1 (impc:ti:rename-all-shadow-vars symname lambda-code extantsyms))
                    (c1 (impc:ti:get-var-types s1))
                    (t1 (impc:ti:first-transform (car c1) #t))
-                   (s2 (impc:ti:rename-all-shadow-vars t1 extantsyms))
+                   (s2 (impc:ti:rename-all-shadow-vars symname t1 extantsyms))
                    (c2 (impc:ti:get-var-types s2)) ;;lambda-code))
                    (t2 (impc:ti:mark-returns (car c2) symname #f #f #f))
                    (t3 (impc:ti:closure:convert t2 (list symname)))
@@ -6450,8 +6461,8 @@ xtlang's `let' syntax is the same as Scheme"
 
 (define impc:ti:ret-check
   (lambda (ast vars kts request?)
-    ;; (println 'retcheck: request?)
-    ;; (println 'ast: ast)
+    ;; (println 'retcheck: request? 'a: ast)
+    ;; (println 'vars: vars)
     ;; grab function name from ret->
     (let* ((sym (if (equal? (caddr ast) (cadr ast))
                     '()
@@ -8358,10 +8369,10 @@ xtlang's `let' syntax is the same as Scheme"
   (lambda (ast)
     (let* ((symname 'nosuchname)
            (c `(let ((xtm_exp_result ,ast)) xtm_exp_result))
-           (shadows (impc:ti:rename-all-shadow-vars c '()))
+           (shadows (impc:ti:rename-all-shadow-vars symname c '()))
            (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
            (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
-           (shadow-code (impc:ti:rename-all-shadow-vars ta '()))
+           (shadow-code (impc:ti:rename-all-shadow-vars symname ta '()))
            (c2 (impc:ti:get-var-types shadow-code))
            (ccc (append (cdr c2) (cdr c1)))
            (cc (impc:ti:expand-generic-types ccc))
@@ -8409,12 +8420,12 @@ xtlang's `let' syntax is the same as Scheme"
     (let* ((symname-string (symbol->string symname))
            (oldsymname-string symname-string)
            ;(c code)
-           (shadows (impc:ti:rename-all-shadow-vars code '()))
+           (shadows (impc:ti:rename-all-shadow-vars symname code '()))
            (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
            (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
            ;;(llll (println 'ta: ta))
            ;; might be over kill doing shadow vars twice!
-           (shadow-code (impc:ti:rename-all-shadow-vars ta '()))
+           (shadow-code (impc:ti:rename-all-shadow-vars symname ta '()))
            (c2 (impc:ti:get-var-types shadow-code)) ;; it is possible for macros in the first-transform to introduce new var-types
            (ccc (append (cdr c2) (cdr c1)))
            (cc (impc:ti:expand-generic-types ccc))
@@ -8489,11 +8500,6 @@ xtlang's `let' syntax is the same as Scheme"
             (set! symname-string new)        
             (set! newast (impc:ti:add-types-to-source symname t6 (cl:tree-copy types) (list))))      
           (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list))))
-
-      ;; (println 'ast:)
-      ;; (println newast)
-      ;; (println 'types:)
-      ;; (for-each (lambda (t) (println t)) types)
       
       ;; (println 'newast:)
       ;; (println newast)

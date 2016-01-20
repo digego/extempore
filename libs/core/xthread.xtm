@@ -25,7 +25,7 @@
                 (set! res (f))
                 (pop_zone)
                 void))
-          (thread (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ff i8*))))
+          (thread (thread_fork (get_native_fptr thread_native_call) (cast ff i8*))))
       (lambda ()
         (thread_join thread)
         (let ((r2 (zcopy res z1 (llvm_peek_zone_stack))))
@@ -47,7 +47,7 @@
                 (set! res (f arg))
                 (pop_zone)
                 void))
-          (thread (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ff i8*))))
+          (thread (thread_fork (get_native_fptr thread_native_call) (cast ff i8*))))
       (lambda ()
         (thread_join thread)
         (let ((r2 (zcopy res z1 (llvm_peek_zone_stack))))
@@ -62,7 +62,7 @@
   (let* ((sym (symbol->string (gensym)))
          (s (string-append sym ":[void]*")))
     `(let ((,(string->symbol s) ,f))
-       (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ,(string->symbol sym) i8*)))))
+       (thread_fork (get_native_fptr thread_native_call) (cast ,(string->symbol sym) i8*)))))
 
 (bind-macro
   "spawn a new thread (sync)"
@@ -70,26 +70,27 @@
   (let* ((sym (symbol->string (gensym)))
          (s (string-append sym ":[void]*")))
     `(let ((,(string->symbol s) ,f))
-       (pset! spawnz numspawn (thread_fork (llvm_get_function_ptr "thread_native_call_native") (cast ,(string->symbol sym) i8*)))
+       (pset! spawnz numspawn (thread_fork (get_native_fptr thread_native_call) (cast ,(string->symbol sym) i8*)))
        (set! numspawn (+ numspawn 1)))))
 
 (bind-macro
   "synchronize threads"
   (sync . expr)
-  (define final '(cast null i8*))
-  (if (not (regex:match? (sexpr->string (car (reverse expr))) "spawn"))
-      (begin (set! final (car (reverse expr)))
-             (set! expr (reverse (cdr (reverse expr))))))
-  (set! expr (cons 'begin expr))
-  (set! expr (replace-all expr '((spawn . syncspawn))))
-  (let ((ijk (gensym)))
-    `(letz (* 1024 1024)
-       ((numspawn 0)
-        (,ijk 0)
-        (spawnz:i8** (alloc 10000)))
-       ,expr
-       (dotimes (,ijk numspawn)
-         (thread_join (pref spawnz ,ijk)))
-       ;;(printf "syncd %d threads\n" ,ijk)
-       ,final)))
+  (begin
+    (define final '(cast null i8*))
+    (if (not (regex:match? (sexpr->string (car (reverse expr))) "spawn"))
+        (begin (set! final (car (reverse expr)))
+               (set! expr (reverse (cdr (reverse expr))))))
+    (set! expr (cons 'begin expr))
+    (set! expr (replace-all expr '((spawn . syncspawn))))
+    (let ((ijk (gensym)))
+      `(letz (* 1024 1024)
+         ((numspawn 0)
+          (,ijk 0)
+          (spawnz:i8** (alloc 10000)))
+         ,expr
+         (dotimes (,ijk numspawn)
+           (thread_join (pref spawnz ,ijk)))
+         ;;(printf "syncd %d threads\n" ,ijk)
+         ,final))))
 

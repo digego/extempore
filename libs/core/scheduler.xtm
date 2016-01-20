@@ -62,6 +62,7 @@
         (next:SchedEvt* null)
         (new:SchedEvt* null))
     (lambda (scheduler time fname data)
+      ;; (println "sched:" scheduler time fname data)
       (if (= (thread_equal_self (scheduler.thread)) 0)
           (mutex_lock (scheduler.mutex)))
       (set! evtlist (scheduler_at (scheduler.evtlist) time))
@@ -81,18 +82,15 @@
           (mutex_unlock (scheduler.mutex)))
       void)))
 
-;; (bind-func scheduler_evt:[void,double,i8*]*
-;;   (lambda (time fname)
-;;     (scheduler_evt time fname null)))
 
 (bind-macro
   ""
   (sched sname time fname . args)
   (if (null? args)
       `(scheduler_evt (,(string->symbol (string-append (symbol->string sname) ".scheduler")))
-                      ,time ,(string-append (symbol->string fname) "_native") null)
+                      ,time (get_native_name ,fname) null)
       `(scheduler_evt (,(string->symbol (string-append (symbol->string sname) ".scheduler")))
-                      ,time ,(string-append (symbol->string fname) "_native") ,(car args))))
+                      ,time (get_native_name ,fname) ,(car args))))
 
 
 
