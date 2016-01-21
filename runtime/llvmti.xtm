@@ -390,10 +390,11 @@
     (if (and (list? expected)
              (= 1 (length expected)))
         (set! expected (car expected)))
-    
+
     (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f
                        (print
-                        (if (impc:ir:type? expected)
+                        (if (and (not (impc:ti:namedtype-exists? (impc:ir:get-base-type expected)))
+                                 (impc:ir:type? expected))
                             (if (null? (impc:ir:pretty-print-type expected))
                                 expected
                                 (impc:ir:pretty-print-type expected))                                
@@ -495,7 +496,6 @@
                        'default #t (print "Compiler Error"))
     (print " cannot find" type "")
     (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n"))
-    (error)
     (if (impc:aot:currently-compiling?)
         (quit 2)
         (throw ""))))
