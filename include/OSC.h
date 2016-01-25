@@ -53,7 +53,8 @@
 #include <netinet/in.h>
 #endif
 
- 
+extern "C"
+{ 
 uint64_t swap64f(double d);
 double unswap64f(uint64_t a);
 uint32_t swap32f(float f);
@@ -62,7 +63,7 @@ uint64_t  swap64i(uint64_t d);
 uint64_t unswap64i(uint64_t a);
 uint32_t swap32i(uint32_t f);
 uint32_t unswap32i(uint32_t a);
-
+}
 //#define _OSC_DEBUG_
 
 namespace extemp {

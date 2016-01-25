@@ -406,18 +406,22 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
       ascii_text_color(0,9,10);
       exit(1);
     }
+  if (size > 0) {
 #ifdef _WIN32
     zone->memory = malloc((size_t) size);
 #else
     // zone->memory = malloc((size_t) size);
     posix_memalign(&zone->memory,LLVM_ZONE_ALIGN,(size_t)size);
 #endif
+  }else{
+    zone->memory = NULL;
+  }
     zone->mark = 0;
     zone->offset = 0;
     if(zone->memory == NULL) {
-      ascii_text_color(0,3,10);      
-      printf("Failed to allocate memory for Zone!\n");
-      ascii_text_color(0,9,10);    
+      //ascii_text_color(0,3,10);      
+      //printf("Failed to allocate memory for Zone!\n");
+      //ascii_text_color(0,9,10);    
       size = 0;
     }
     zone->size = size;
@@ -492,18 +496,21 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
     {
 
 #if EXTENSIBLE_ZONES // if extensible_zones is true then extend zone size by zone->size
+    int iszero = (zone->size == 0) ? 1 : 0;
     if(size > zone->size) zone->size = size;
-    zone->size = zone->size * 2; // keep doubling zone size for each new allocation  
-    // ascii_text_color(0,3,10);      
-    // printf("Warning ");
-    // ascii_text_color(0,9,10);
-    // printf("zone:%p size:%lld is full ... extending\n",zone,zone->size);
+    zone->size = zone->size * 2; // keep doubling zone size for each new allocation
+    if(zone->size < 1024) zone->size = 1024; // allocate a min size of 1024 bytes
     llvm_zone_t* newzone = llvm_zone_create(zone->size);
     void* tmp = newzone->memory;
-    newzone->memories = zone->memories;
-    newzone->memory = zone->memory;
-    zone->memory = tmp;
-    zone->memories = newzone;
+    if(iszero == 1) { // if initial zone is 0 - the replace don't extend
+      zone->memory = tmp;
+      free(newzone);
+    }else{
+      newzone->memories = zone->memories;
+      newzone->memory = zone->memory;
+      zone->memory = tmp;
+      zone->memories = newzone;
+    }
     llvm_zone_reset(zone);
 #elif LEAKY_ZONES       // if LEAKY ZONE is TRUE then just print a warning and just leak the memory
         printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
