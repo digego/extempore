@@ -211,4 +211,67 @@
              (= (pref m (colmaj_idx_2D 1 2 2)) 5)))))
  (test_colmaj_idx_2D) 1)
 
+;; diff e^x
+(xtmtest
+ '(bind-func test-diff1
+   (lambda ()
+     (let ((a (diff (lambda (x) (exp x)) 5.0))
+           (b ((lambda (x:double) (exp x)) 5.0)))
+       (println 'diff_a a 'diff_b b)
+       (if (< (fabs (- a b)) .0001) 1 0))))
+ (test-diff1) 1)
+
+;; diff sin x
+(xtmtest
+ '(bind-func test-diff2
+    (lambda ()
+      (let ((a (diff (lambda (x) (sin x)) 5.0))
+            (b ((lambda (x:double) (cos x)) 5.0)))
+       (println 'diff_a a 'diff_b b)        
+        (if (< (fabs (- a b)) .0001) 1 0))))
+ (test-diff2) 1)
+
+;; diff x^2
+(xtmtest
+ '(bind-func test-diff3
+    (lambda ()
+      (let ((a (diff (lambda (x) (* x x)) 5.0))
+            (b ((lambda (x:double) (* 2.0 x)) 5.0)))
+        (println 'diff_a a 'diff_b b)                
+        (if (< (fabs (- a b)) .0001) 1 0))))
+ (test-diff3) 1)
+
+;; diff ln x
+(xtmtest
+ '(bind-func test-diff4
+    (lambda ()
+      (let ((a (diff (lambda (x) (log x)) 5.0))
+            (b ((lambda (x:double) (/ 1.0 x)) 5.0)))
+        (println 'diff_a a 'diff_b b)                        
+        (if (< (fabs (- a b)) .0001) 1 0))))
+ (test-diff4) 1)
+
+
+;; integrate x^2 [4,5]
+(xtmtest
+ '(bind-func test-intgrate1
+    (lambda ()
+      (let ((a (integrate (lambda (x) (* x x)) 4.0 5.0))
+            (b (- ((lambda (x:double) (* (/ 1.0 3.0) (* x x x))) 5.0)
+                  ((lambda (x:double) (* (/ 1.0 3.0) (* x x x))) 4.0))))
+        (println 'integrate_a a 'integrate_b b)
+        (if (< (fabs (- a b)) .0001) 1 0))))
+ (test-intgrate1) 1)
+
+;; integrate 
+(xtmtest
+ '(bind-func test-integrate2
+    (lambda ()
+      (let ((a (integrate (lambda (x) (sin x)) 0.0 2.0))
+            (b (- ((lambda (x:double) (* -1.0 (cos x))) 2.0)
+                  ((lambda (x:double) (* -1.0 (cos x))) 0.0))))
+        (if (< (fabs (- a b)) .0001) 1 0))))
+ (test-integrate2) 1)
+
+
 (xtmtest-print-results)
