@@ -9562,8 +9562,15 @@ xtlang's `let' syntax is the same as Scheme"
                   path
                   (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" path))
                   (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" path)))
-                 (unix-or-Windows (map (lambda (x) (sanitize-platform-path (string-append x "/" path)))
-                                       (regex:split (sys:command-output "echo $LD_LIBRARY_PATH") ":"))
+                 (unix-or-Windows (map
+                                   (lambda (x)
+                                     (sanitize-platform-path
+                                      (string-append x "/" path)))
+                                   (append (regex:split
+                                            (sys:command-output
+                                             "echo $LD_LIBRARY_PATH")
+                                            ":")
+                                           '("/usr/local/lib/" "/usr/lib/")))
                                   '()))))
       (if (null? rel-paths)
           #f
