@@ -45,10 +45,11 @@ straightforward:
 
 ```shell
 brew tap benswift/extempore
-brew install extempore
+brew install extempore --with-extended
 ```
 
-If you get stuck, there are more detailed instructions
+If you get stuck, or want to find out more about the installation
+instructions, there are more detailed instructions
 [here](http://benswift.me/2013/11/12/building-extempore-through-homebrew/).
 
 ## Linux
