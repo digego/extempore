@@ -163,9 +163,7 @@ with a few useful targets:
 - `make` will build Extempore (if you have a multicore machine, you
   can try e.g. `make -j4` to parallellize the `make` step, especially
   since LLVM takes so long to build)
-- `make install` will install `extempore` into `/usr/local/bin` and
-  the rest of the files (the "Extempore share directory") into
-  `/usr/local/share/extempore`
+- `make install` will install `extempore` into `/usr/local/bin`
 - `make uninstall` will remove the installed files
 - `make aot`/`make aot_extended` will ahead-of-time compile the
   core/extended "standard library"
