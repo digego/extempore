@@ -1,0 +1,86 @@
+;;; a little midi driven synth example
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+;;; Code:
+
+(sys:load "libs/core/audio_dsp.xtm")
+(sys:load "libs/external/midi_input.xtm")
+;; set your midi input device
+;; look at your log for available input devices
+(set_midi_in 3)
+
+;; audio stuff first
+
+(bind-func my_simple_fm_inst
+  (lambda ()
+    (let ((freq 440.0) (newfreq 440.0) ;; frequency           
+          (amp 1.0) (newamp 1.0)       ;; amplitude          
+          (a 10.0) (b 0.1) ;; fm params (midi cc 21 & 22)
+          (attack 100.0) (decay 200.0) (sustain 0.75) (release 200.0) 
+          (gate 0.0)      ;; gate (as per analogue synth)
+          (pitch:i32 0)   ;; to help with note off
+          (glide 0.001:f) ;; frequency glide amount (midi cc 23)
+          (wet 0.35)      ;; amount of delay (midi cc 24)
+          (adsr (adsr_c)) ;; adsr all in ms (midi cc 25,26,27,28)
+          (osc1 (osc_mc_c 0.0))
+          (lfo1 (osc_mc_c 0.0))
+          (dly (delay_st_c (/ SR 6) (/ SR 4))))
+      (lambda (chan:i64)
+        (if (< (fabs (- newfreq freq)) 5.0) ;; portamento
+            (set! freq newfreq)
+            (set! freq (+ freq (* glide (- newfreq freq)))))
+        (if (< (fabs (- newamp amp)) 0.05)
+            (set! amp newamp)
+            (set! amp (+ amp (* 0.0001:f (- newamp amp)))))
+        (dly chan
+             (* (adsr chan gate attack decay sustain release)
+                (osc1 chan (* 0.25 amp)
+                      (+ freq
+                         (lfo1 chan
+                               (* a b freq)
+                               (* a freq)))))
+             wet 0.75)))))
+
+(bind-func dsp:DSP
+  (let ((inst1 (my_simple_fm_inst)))
+    (lambda (in time chan dat)
+      (inst1 chan))))
+
+(dsp:set! dsp)
+
+;; midi stuff second
+
+(bind-func midi_note_on
+  (lambda (pitch:i32 vol:i32 chan:i32)
+    (if (< (dsp.inst1.adsr.out:float) 0.05)  
+        (begin
+          (dsp.inst1.freq:float (midi2frq (i32tof pitch)))
+          (dsp.inst1.amp:float (/ (i32tof vol) 127.0))))
+    (dsp.inst1.newfreq:float (midi2frq (i32tof pitch)))
+    (dsp.inst1.newamp:float (/ (i32tof vol) 127.0))   
+    (dsp.inst1.pitch:i32 pitch)
+    (dsp.inst1.gate:float 1.0)
+    void))
+
+(bind-func midi_note_off
+  (lambda (pitch:i32 vol:i32 chan:i32)
+    (if (= pitch (dsp.inst1.pitch:i32))
+        (dsp.inst1.gate:float 0.0))
+    void))
+
+(bind-func midi_cc
+  (lambda (controller:i32 value:i32 chan:i32)
+    (cond ((= controller 21) (dsp.inst1.a:float (floor (* 12.0 (/ (i32tof value) 127.0)))))
+          ((= controller 22) (dsp.inst1.b:float (* 2.0 (/ (i32tof value) 127.0))))
+          ((= controller 23) (dsp.inst1.glide:float (- 0.0128 (* 0.0001 (i32tof value)))))
+          ((= controller 24) (dsp.inst1.wet:float (/ (i32tof value) 127.0)))
+          ((= controller 25) (dsp.inst1.attack:float (* 500.0 (/ (i32tof value) 127.0))))
+          ((= controller 26) (dsp.inst1.decay:float (* 500.0 (/ (i32tof value) 127.0))))
+          ((= controller 27) (dsp.inst1.sustain:float (/ (i32tof value) 127.0)))
+          ((= controller 28) (dsp.inst1.release:float (* 2000.0 (/ (i32tof value) 127.0))))
+          (else 1.0:f))
+    void))  ;; nothing
