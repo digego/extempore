@@ -1,0 +1,80 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Record into an AudioBuffer
+;; and assign the audio buffer to a sampler
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+
+;;; Commentary:
+
+;;; Code:
+
+(sys:load "libs/external/instruments_ext.xtm")
+(sys:load "libs/core/audiobuffer.xtm")
+
+(default-audio-setup)
+
+;; init a 10 minute (stereo) buffer
+(bind-val Buf AudioBuffer* (AudioBuffer (* SR 60 10) 2))
+;; assign Buf to sampler (pitch 60 bank 0)
+($ (set_sampler_audiobuffer sampler Buf 60 0))
+;; make a recorder
+(bind-val Rec [SAMPLE,SAMPLE]* (recorder Buf))
+
+;; assuming a mic is connected to input 1 (i.e. 0)
+(bind-func dsp:DSP
+  (let ((dly (delay_st_c (/ SR 4) (/ SR 6)))
+        (micamp 0.0))
+    (lambda (in time chan dat)
+      (Rec ;; record everything when (Rec.rec > 0)
+       (dly chan
+            (cond ((= chan 0)
+                   (+ (sampler in time chan dat)
+                      (* micamp (pref dat 0))))
+                  ((= chan 1)
+                   (+ (sampler in time chan dat)
+                      (* micamp (pref dat 0))))
+                  (else 0.0:f))
+            0.5 0.5)))))
+
+(dsp:set! dsp)
+
+;; fist turn up the mic
+($ (dsp.micamp 1.0))
+;; start recording for 1 minute
+;; you can call this again in the future
+;; to overwrite previous material
+($ (Rec.rec (* SR 60 1)))
+;; sing something!
+;; then turn down the mic
+
+;; ($ (dsp.micamp 0.0))
+
+;; here is a simple loop playback
+(define loop
+  (lambda (beat dur)
+    (play sampler 60 100 dur 0 0.5 (* 5.0 44100.0)) ;; 5 seconds in 
+    (callback (*metro* (+ beat (* .5 dur))) 'loop (+ beat dur) dur)))
+
+(loop (*metro* 'get-beat 4) 8)
+
+;; granulate 'singing' with sampler
+(define grains
+  (lambda (beat dur)
+    (play sampler
+          (+ 36 (* 36.0 (random))) ;; random pitch
+          (random 80 100)          ;; random volume
+          (* 8 dur)                ;; overlapping grains
+          0                        ;; first bank
+          (random)                 ;; random panning
+          (cosr (* 10.0 44100)
+                (* 5.0 44100)
+                1/64))             ;; shuffle playback head betwen 5.0-15.0 seconds
+    (callback (*metro* (+ beat (* .5 dur))) 'grains (+ beat dur) dur)))
+
+(grains (*metro* 'get-beat 4) 1/32)
+
+;; note that there is much more sophisticated granulator in audio_dsp
+;; see examples/
+
