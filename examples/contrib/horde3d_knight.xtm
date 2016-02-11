@@ -29,12 +29,23 @@
 (bind-val width i32 1024)
 (bind-val height i32 768)
 
+;; (bind-val width i32 1920)
+;; (bind-val height i32 1200)
+
+(bind-func set_width_and_height
+  (lambda (w:i32 h:i32)
+    (set! width w)
+    (set! height h)
+    void))
+
+
 (bind-val window GLFWwindow*
   ;; some of the shaders in the graphics pipeline use older glsl
   ;; versions, so we need a "compatibility" graphics context
   (begin
-    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
-    (glfw_init_and_create_interaction_compatibility_window width height)))
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))    
+    ;;(glfw_init_and_create_interaction_compatibility_window width height)))
+    (glfw_init_and_create_fullscreen_compatibility_window)))
 
 (bind-func get_window
   (lambda ()
@@ -42,7 +53,7 @@
 
 
 ;; globals
-(bind-val _knight i32 0)
+(bind-val Knight i32 0)
 (bind-val light i32 0)
 (bind-val _particleSys i32 0)
 (bind-val _particleSys2 i32 0)
@@ -129,22 +140,22 @@
       			       20.0 20.0 20.0)
       
       ;; add knight
-      (set! _knight (h3dAddNodes H3DRootNode knightRes))
-      (h3dSetNodeTransform _knight 0.0 0.0   0.0
+      (set! Knight (h3dAddNodes H3DRootNode knightRes))
+      (h3dSetNodeTransform Knight 0.0 0.0   0.0
       			           0.0 180.0 0.0
       				   0.1 0.1   0.1)
-      (h3dSetupModelAnimStage _knight 0 knightAnim1Res 0 "" #f)
-      (h3dSetupModelAnimStage _knight 1 knightAnim2Res 0 "" #f)
+      (h3dSetupModelAnimStage Knight 0 knightAnim1Res 0 "" #f)
+      (h3dSetupModelAnimStage Knight 1 knightAnim2Res 0 "" #f)
 
       ;; attach particle system to hand joint
-      (h3dFindNodes _knight "Bip01_R_Hand" H3DNodeTypes_Joint)
+      (h3dFindNodes Knight "Bip01_R_Hand" H3DNodeTypes_Joint)
       (set! hand (h3dGetNodeFindResult 0))
       (set! _particleSys (h3dAddNodes hand particleSysRes))
       (h3dSetNodeTransform _particleSys 0.0  40.0 0.0
       			                90.0 0.0  0.0
       					1.0  1.0  1.0)
       ;; attached 2nd particle system to root node
-      (set! _particleSys2 (h3dAddNodes H3DRootNode particleSysRes))
+      ;; (set! _particleSys2 (h3dAddNodes H3DRootNode particleSysRes))
       
       ;; add light source
       (set! light (h3dAddLightNode H3DRootNode "Light1" 0 "LIGHTING" "SHADOWMAP"))
@@ -164,7 +175,37 @@
       
       1)))
 
+(bind-val Head i8* "Bip01_Head")
+(bind-val Neck i8* "Bip01_Neck")
+(bind-val Spine i8* "Bip01_Spine2")
+(bind-val RHand i8* "Bip01_R_Hand")
+(bind-val LHand i8* "Bip01_L_Hand")
+(bind-val RArm i8* "Bip01_R_Forearm")
+(bind-val LArm i8* "Bip01_L_Forearm")
+(bind-val RFoot i8* "Bip01_R_Foot")
+(bind-val LFoot i8* "Bip01_L_Foot")
 
+
+;; (bind-func model_anim
+;;   (lambda (_at:double)
+;;     (rotate-joint Knight
+;;                   "Bip01_Neck"                    
+;;                   0.0
+;;                   (+ 10.0 (dtof (* 30.0 (cos (* 2/1 3.141592 _at)))))
+;;                   0.0)
+;;     (rotate-joint Knight
+;;                   "Bip01_Spine2"
+;;                   (dtof (* 30.0 (sin (* 1/2 PI _at))))                    
+;;                   0.0 
+;;                   (dtof (* 50.0 (cos (* 1/2 PI _at)))))
+;;     void))
+
+(bind-func model_update
+  (lambda (at:float)
+    void))
+
+(bind-val LookY float 5.0)
+(bind-val PosZ float 10.0)
 
 (bind-func mainLoop
   (let ((fps:float 30.0))
@@ -174,32 +215,30 @@
       (h3dSetOption H3DOptions_WireframeMode 0.0)
       (set! _at (+ _at 0.025))
       
-      (h3dSetModelAnimParams _knight 0 (* (dtof (* 0.5 _at)) 24.0) 24.0) ;_weight)     
-      
       (let ((cnt (h3dFindNodes _particleSys "" H3DNodeTypes_Emitter))
-	    (i 0))
+            (i 0))
       	(dotimes (i cnt)
       	  (h3dUpdateEmitter (h3dGetNodeFindResult i) (/ 1.0 _curFPS))))
-      (h3dSetNodeTransform _particleSys2 (* 12.0 (dtof (sin _at))) 2.0 (* 12.0 (dtof (cos _at))) 0.0 0.0 0.0 1.0 1.0 1.0)
-      (let ((cnt3 (h3dFindNodes _particleSys2 "" H3DNodeTypes_Emitter))
-	    (i3 0))
-      	(dotimes (i3 cnt3)
-      	  (h3dUpdateEmitter (h3dGetNodeFindResult i3) (/ 1.0 _curFPS))))
-      (h3dUpdateModel _knight 1)
+      
+      (h3dUpdateModel Knight 1)                                                
+      (h3dSetModelAnimParams Knight 0 (* (dtof (* 0.5 _at)) 24.0) 24.0) ;_weight)
+      
+      (model_update (dtof _at))
 
-      (h3dSetNodeTransform light 4.0 9.0 3.0
-			         -60.0 0.0  0.0
-				 1.0  1.0  1.0)
+      (h3dSetNodeTransform light
+                           4.0 9.0 3.0
+                           -60.0 0.0  0.0
+                           1.0  1.0  1.0)
 
       (h3dSetNodeTransform _cam
-			   (+ (* 25.0 (dtof (cos (* 0.25 _at)))) 0.0)
-			   5.0
-			   (+ (* 25.0 (dtof (sin (* 0.25 _at)))) 0.0)
-			   0.0
-			   (dtof (* 57.295791 (atan2 (cos (* 0.25 _at))
-						     (sin (* 0.25 _at)))))
-			   0.0
-			   1.0 1.0 1.0)
+                           (+ (* PosZ (dtof (cos (* 0.25 _at)))) 0.0)
+                           LookY ;;(+ 5.0 (dtof (* 0.1 (sin (* 2/1 3.141592 _at)))))
+                           (+ (* PosZ (dtof (sin (* 0.25 _at)))) 0.0)
+                           0.0
+                           (dtof (* 57.295791 (atan2 (cos (* 0.25 _at))
+                                                     (sin (* 0.25 _at)))))
+                           0.0
+                           1.0 1.0 1.0)
       (h3dRender _cam)
       (h3dFinalizeFrame)
       (h3dClearOverlays)
@@ -211,8 +250,8 @@
 (define opengl-test
   (lambda (beat dur)
     (set! dur 1/16)
-    (if (< (*metro* beat) (now))
-    	(println 'opengl-test-behind (- (*metro* beat) (now))))
+    ;; (if (< (*metro* beat) (now))
+    ;; 	(println 'opengl-test-behind (- (*metro* beat) (now))))
     (mainLoop beat)
     (glfw_poll_events)
     (glfw_swap_buffers (get_window))
@@ -226,6 +265,8 @@
     (opengl-test (*metro* 'get-beat 4) 1/12)))
 
 (start)
+
+;; ($ (resize 1920.0 1200.0))
 
 ;; setup new process
 ;; (let ((proc "opengl"))
