@@ -52,7 +52,10 @@
 (define addy3 (cons "localhost" 7020))
 
 ;; start server pointing to native wrapper around osc_receive_7020 closure
-(io:osc:start-server 7020 "osc_receive_7020" (llvm:get-native-function "osc_receive_7020"))
+(io:osc:start-server 7020
+                     (impc:ti:get-mono-name osc_receive_7020)
+                     (llvm:get-function-pointer
+                      (impc:ti:get-native-name osc_receive_7020)))
 
 ;; Send a test message
 (io:osc:send (now) addy3 "/native/test" 5.5 1234)
