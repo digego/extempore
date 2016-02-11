@@ -2152,6 +2152,49 @@ but v1 and v2 can be computed in parallel"
         val))))
 
 
+;; a 'recorder' unit gen
+(bind-func recorder
+  (lambda (buf:AudioBuffer*)
+    (let ((rec 0) ;; where rec is the number of 'frames' to record
+          (prec 0) ;; previous value of rec
+          (chans (AudioBuffer_channels buf))
+          (chan 0)
+          (lgth (* chans (AudioBuffer_frames buf)))
+          (l1 (- lgth 1))
+          (rhead 0)
+          (phead 0)
+          (pos 0)
+          (t 0)
+          (dat (AudioBuffer_ptr buf 0 0))
+          (start 0) ;; loop start in frames
+          (loop 0) ;; loop length in frames (negative plays backwards)
+          (ploop 0)) ;; previous loop value          
+      (lambda (x)
+        (if (<> prec rec) (set! rhead 0))
+        (if (> rec 0)
+            (begin (pset! dat rhead x)
+                   (set! rhead (+ 1 rhead))
+                   (if (= chan 0) (set! rec (- rec 1)))
+                   (if (= rhead lgth) (set! rec 0)))                                          
+            (begin (set! rhead 0)))
+        (if (<> ploop loop) (set! phead 0))        
+        (if (<> loop 0)
+            (begin
+              (set! pos (+ (* start chans) phead))
+              (if (or (< pos 0) (> pos l1))
+                  (set! x x) ;; (i.e. don't pref if bad index)
+                  (set! x (pref dat pos)))
+              (set! phead (+ phead (if (< loop 0) -1 1)))
+              (if (= phead (* chans loop)) (set! phead 0))))
+        ;; (if (= 0 (% t (* chans SR)))
+        ;;     (println "rec:" rec "loop:" loop "start:" start "rhead:" rhead "phead:" phead)) 
+        (set! chan (+ chan 1))
+        (if (= chan chans) (set! chan 0))
+        (set! t (+ t 1))
+        (set! ploop loop)
+        (set! prec rec)
+        x))))
+
 
 
 (define *xtmlib-audio_dsp-loaded* #t)
