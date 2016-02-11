@@ -1,0 +1,111 @@
+;;; midi_input.xtm -- a 'simple' wrapper for portmidi input
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: portmidi
+
+;;; Commentary:
+
+;; Simple MIDI input loads the default MIDI input device on startup
+;; It also prints the available devices on startup
+;; To change from the default MIDI input simply call (set_midi_in *devicenum*)
+;;
+;; By default MIDI_NOTE_ON, MIDI_NOTE_OFF and MIDI_CONTROL_CHANGE messages
+;; are printed to the log.
+;; To start doing something with these messages, override
+;; midi_note_on, midi_note_off, midi_cc
+;;
+;; NOTE: this lib automatically converts note-on velocity 0 into note-off.
+;; i.e. you will not see note-on msg with a velocity 0.
+;;
+
+
+;;; Code:
+
+(sys:load "libs/core/scheduler.xtm")
+(sys:load "libs/external/portmidi.xtm")
+
+;; first off create a native 'clock' scheduler
+;; update rate of 200hz
+(bind-val clock_sched [void]* (clock_scheduler 200.0))
+
+(pm_initialize)
+(pm_print_devices)
+
+;; start with a default midi stream
+(bind-val midi_in PmStream* (pm_create_input_stream 0))
+
+;; OVERRIDE default midi in
+(bind-func set_midi_in
+  (lambda (idx)
+     (set! midi_in (pm_create_input_stream idx))
+     void))
+
+(bind-func midi_note_on
+  (lambda (pitch:i32 volume:i32 chan:i32)
+    (println "NOTE_ON :" pitch volume chan)
+    void))
+
+(bind-func midi_note_off
+  (lambda (pitch:i32 volume:i32 chan:i32)
+    (println "NOTE_OFF:" pitch volume chan)
+    void))
+
+(bind-func midi_cc
+  (lambda (controller:i32 value:i32 chan:i32)
+    (println "MIDI_CC :" controller value chan)
+    void))
+
+;; by default don't print non note/cc MIDI messages
+(bind-func midi_msg
+  (lambda (type:i32 a:i32 b:i32 chan:i32)
+    ;; (println "MIDIMSG: " type a b chan)
+    void))
+
+(bind-func midi_read_msg
+  (let ((buffer_length 1024)
+        (input_buffer:PmEvent* (zalloc buffer_length))
+        (msg:PmMessage 0)
+        (read_count 0)
+        (i:i32 0))
+    (lambda ()
+      (set! read_count 0)
+      ;; if you have more than one midi input device, you should call
+      ;; Pm_Read on all your devices here
+      (set! read_count (Pm_Read midi_in input_buffer buffer_length))
+      (if (> read_count 0)
+          (begin
+            (dotimes (i read_count)
+              (set! msg (tref (pref-ptr input_buffer i) 0))
+              (cond ((= (Pm_Message_Type msg) MIDI_NOTE_ON)
+                     (if (= (Pm_Message_Data2 msg) 0)
+                         (midi_note_off (Pm_Message_Data1 msg)
+                                        (Pm_Message_Data2 msg)
+                                        (Pm_Message_Channel msg))
+                         (midi_note_on (Pm_Message_Data1 msg)
+                                       (Pm_Message_Data2 msg)
+                                       (Pm_Message_Channel msg))))
+                    ((= (Pm_Message_Type msg) MIDI_NOTE_OFF)
+                     (midi_note_off (Pm_Message_Data1 msg)
+                                    (Pm_Message_Data2 msg)
+                                    (Pm_Message_Channel msg)))
+                    ((= (Pm_Message_Type msg) MIDI_CONTROL_CHANGE)
+                     (midi_cc (Pm_Message_Data1 msg)
+                              (Pm_Message_Data2 msg)
+                              (Pm_Message_Channel msg)))
+                    (else
+                     (midi_msg (Pm_Message_Type msg)
+                               (Pm_Message_Data1 msg)
+                               (Pm_Message_Data2 msg)
+                               (Pm_Message_Channel msg))))
+              void)
+            void)
+          void))))
+
+;; poll for midi messages at 100hz
+(bind-func midi_input_polling
+  (lambda (time)
+    (midi_read_msg)
+    (sched clock_sched (+ time 0.01) midi_input_polling:[void,double]*)))
+
+(xtmX (midi_input_polling (+ (clock_sched.time) 1.0)))
