@@ -22,20 +22,20 @@
 ;; forka and join
 (bind-func fork-join
   (lambda ()
-    (memzone (* 1024 1024)
-      (let ((i 0))
-        (printout "Finish Order: ")
-        (sync
-         (dotimes (i 4)
-           (spawn (let ((jj i)) ;; each closure needs it's own i!
-                    (lambda ()
-                      (thread_sleep (dtoi64 (* 10. (random))) 0)
-                      (printout jj)))))
-         1)
-        (println)
-        (println "Joined\n")
-        1))))
+    (letz ((i 0))
+      (printout "Finish Order: ")
+      (sync
+       (dotimes (i 4)
+         (spawn (let ((jj i)) ;; each closure needs it's own i!
+                  (lambda ()
+                    (thread_sleep (dtoi64 (* 10. (random))) 0)
+                    (printout jj)))))
+       1)
+      (println)
+      (println "Joined\n")
+      void)))
 
+  
 (fork-join)
 
 ;; futures using async
@@ -46,7 +46,7 @@
 ;; 
 (bind-func await_futures
   (lambda (num:i64)
-    (let ((future1 (async (lambda () ;; aysnc accepts zero arguments
+    (letz ((future1 (async (lambda () ;; aysnc accepts zero arguments
                             (println "start async 1")
                             (let ((res 0))
                               (thread_sleep 2 0)
@@ -68,3 +68,68 @@
       res)))
 
 (await_futures 100000)
+
+;;
+;; parallel map
+;;
+(sys:load "libs/core/adt.xtm")
+(sys:load "libs/core/math.xtm")
+
+(bind-func pmap:[List{!a}*,[!a,!b]*,List{!b}*]*
+  (lambda (func xs)
+    (let ((futures (map (lambda (x) (async func x)) xs))
+          (results (map (lambda (y) (y)) futures)))
+      results)))
+
+(bind-func pmap_test
+  (lambda ()
+    (let ((l1 (range 0 5)))
+      (pmap (lambda (x)
+              (thread_sleep 1 0)
+              (* x x)) l1))))
+
+(bind-func map_test
+  (lambda ()
+    (let ((l1 (range 0 5)))
+      (map (lambda (x)
+             (thread_sleep 1 0)
+             (* x x)) l1))))
+
+($ (letz ((t1 (clock_clock))
+          (l1 (map_test))
+          (t2 (clock_clock))
+          (l2 (pmap_test))
+          (t3 (clock_clock)))
+     (println "serial  :" l1 "->" (- t2 t1) "seconds")
+     (println "parallel:" l2 "->" (- t3 t2) "seconds")
+     void))
+
+(bind-func pmap_test2
+  (lambda (arr:i64* size:i64 num_procs:i64)
+    (let ((subs (/ size num_procs)))
+      (foldl (lambda (a:i64 b) (+ a b)) 0 
+             (pmap (lambda (xs:i64*) (vsum xs subs))
+                   (map (lambda (idx) (pref-ptr arr idx))
+                        (range 0 size subs)))))))
+
+(bind-func map_test2
+  (lambda (arr:i64* size:i64)
+    (vsum arr size)))
+
+($ (letz ((size 100000000)
+          (data:i64* (alloc size))
+          (i 0)
+          (filthy_inline_init (begin (dotimes (i size) (pset! data i i)) 1))
+          (t1 (clock_clock))
+          (l1 (map_test2 data size))
+          (t2 (clock_clock))
+          (l2 (pmap_test2 data size 4))
+          (t3 (clock_clock)))
+     (println)
+     (println "serial   sum:" l1 "->" (- t2 t1) "seconds")
+     (println "parallel sum:" l2 "->" (- t3 t2) "seconds")
+     void))
+
+
+
+
