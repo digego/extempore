@@ -161,6 +161,23 @@
                    amp (hermite_interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
 
 
+(bind-func set_sampler_audiobuffer
+  (lambda (inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* buf:AudioBuffer* index:i64 bank:i32)
+    (let ((channels:i64 (AudioBuffer_channels buf))
+          (num (AudioBuffer_frames buf))
+          (adat:SAMPLE* (AudioBuffer_ptr buf 0 0))
+          (offsets:|20,|128,i64||* (sampler.samples_offsets))
+          (samples:|20,|128,SAMPLE*||* (inst.samples))
+          (samples_channels:|20,|128,i64||* (inst.samples_channels))
+          (samples_length:|20,|128,i64||* (inst.samples_length)))
+            ;;(printf "%lld samples read into: %lld\n" samples_read index)
+      (aset! (aref-ptr samples_channels bank) index (convert channels))
+      (aset! (aref-ptr samples bank) index adat)
+      (aset! (aref-ptr offsets bank) index (AudioBuffer_loop_start buf))
+      (aset! (aref-ptr samples_length bank) index num)          
+      1)))
+
+
 (bind-func sampler_fx 400000
   (let ((reverbl (reverb_c 80.0))
         (reverbr (reverb_c 79.0))
