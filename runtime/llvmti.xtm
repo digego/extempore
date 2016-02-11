@@ -1939,7 +1939,7 @@
                            (if (regex:match? s "^!g")
                                (let ((r (regex:split s "_")))
                                  (string-append (car r) "___" (number->string num)))
-                               (let ((r (string-append "!g" 
+                               (let ((r (string-append "!gx" 
                                                        (substring s 1 (string-length s))
                                                        "_"
                                                        (number->string num))))
@@ -9056,7 +9056,17 @@ xtlang's `let' syntax is the same as Scheme"
 
 (define ipc:bind-func
   (lambda (procname symname)
-    (ipc:call procname 'bind-func-ipc symname)))
+    (if (regex:match? (symbol->string symname) "_adhoc_")
+        (ipc:call procname 'bind-func-ipc symname)
+        (let* ((polyname (symbol->string symname))
+               (polytypes (impc:ti:get-polyfunc-candidate-list polyname)))
+          (if (and (list? polytypes)
+                   (= (length polytypes) 1))
+              (begin (ipc:call procname 'bind-func-ipc
+                               (string->symbol (vector-ref (car polytypes) 0)))
+                     (ipc:define procname symname (eval symname)))
+              (print-error "No a monomorphic xtlang function:" symname))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-macro (bind-alias symbol type . docstring)
@@ -10492,10 +10502,8 @@ e.g.
               (loop (cdr doc-alists))))))))
 
 (define-macro (impc:ti:get-native-name closure-name . type)
-  (println 'cn closure-name 't type)
   (let* ((pair (regex:type-split (symbol->string closure-name) ":"))
          (base (if (null? (cdr pair)) "" (impc:ir:get-base-type (cadr pair)))))
-    (println 'pair pair 'base base)
     (set! closure-name (symbol->string closure-name))
     (if (not (null? (cdr pair)))
         (string-append (car pair) "_adhoc_" (cname-encode base) "_native")
