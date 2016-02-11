@@ -433,6 +433,26 @@
                       (fold (cdr l) (fn (car l) r))))))
       (fold (reverse lst) end))))
 
+(bind-func scanl:[List{!b}*,[!b,!b,!a]*,!b,List{!a}*]*
+  (lambda (fn start lst)
+    (let ((scan (lambda (l rl)
+                  (if (null? l) rl
+                      (scan (cdr l)
+                            (cons (fn (car rl)
+                                      (car l))
+                                  rl))))))
+      (reverse (scan lst (list start))))))
+
+(bind-func scanr:[List{!b}*,[!b,!b,!a]*,!b,List{!a}*]*
+  (lambda (fn end lst)
+    (let ((scan (lambda (l rl)
+                  (if (null? l) rl
+                      (scan (cdr l)
+                            (cons (fn (car rl)
+                                      (car l))
+                                  rl))))))
+      (reverse (scan (reverse lst) (list end))))))
+
 (bind-func take:[List{!a}*,List{!a}*,i64]*
   "returns a copy of the first n elements of lst"
   (lambda (lst n)
@@ -516,7 +536,7 @@
 ;; a simple 'assoc' dictionary
 ;;
 ;; the "dictionary" is any List of Pairs
-;; where the pair is any <i8*,!a>
+;; where the pair is any <String*,!a>
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
