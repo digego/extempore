@@ -564,16 +564,16 @@ else(WIN32)
 
   # core
   add_custom_target(aot)
-  aotcompile_lib(libs/base/base.xtm aot 17099) # no lib dependency base.xtm
+  aotcompile_lib(libs/base/base.xtm aot 17099) # no lib dependency for base.xtm
   aotcompile_lib(libs/core/math.xtm aot 17097 base)
-  aotcompile_lib(libs/core/audio_dsp.xtm aot 17095 base math)
+  aotcompile_lib(libs/core/audiobuffer.xtm aot 17087 base)
+  aotcompile_lib(libs/core/audio_dsp.xtm aot 17095 base math audiobuffer)
   aotcompile_lib(libs/core/instruments.xtm aot 17093 base math audio_dsp)
 
   # extended
   add_custom_target(aot_extended)
   aotcompile_lib(libs/external/fft.xtm aot_extended 17091 base math)
   aotcompile_lib(libs/external/sndfile.xtm aot_extended 17089 base)
-  aotcompile_lib(libs/core/audiobuffer.xtm aot_extended 17087 base audio_dsp sndfile)
   aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended 17085 base fft sndfile)
   aotcompile_lib(libs/external/instruments_ext.xtm aot_extended 17083 base sndfile instruments)
   aotcompile_lib(libs/external/portmidi.xtm aot_extended 17081 base)
