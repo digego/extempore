@@ -214,6 +214,9 @@ endif()
 # LLVM 3.7.0 #
 ##############
 
+# if you need to build LLVM by hand, the command will be something like
+# cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0rc2-release
+
 if(PACKAGE)
   # when packaging, we'll build LLVM a bit differently (see the "deps
   # for AOT-extended" section further down in this file)
