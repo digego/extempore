@@ -1174,7 +1174,7 @@ entry:
 ret i8* %return
 }
 
-define double @fp80ptrtod(i8* %fp80ptr) {
+define dllexport double @fp80ptrtod(i8* %fp80ptr) {
   %1 = alloca i8*, align 8
   store i8* %fp80ptr, i8** %1, align 8
   %2 = load i8*, i8** %1, align 8
