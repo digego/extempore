@@ -465,9 +465,9 @@ if(BOOST)
     message(FATAL_ERROR "Cannot find boost/asio.hpp header")
   endif()
   target_link_libraries(extempore
-    PRIVATE ${BOOST_DIR}/lib/libboost_date_time-vc140-mt-1_59.lib
-    PRIVATE ${BOOST_DIR}/lib/libboost_regex-vc140-mt-1_59.lib
-    PRIVATE ${BOOST_DIR}/lib/libboost_system-vc140-mt-1_59.lib)
+    PRIVATE ${BOOST_DIR}/lib/libboost_date_time-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
+    PRIVATE ${BOOST_DIR}/lib/libboost_regex-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
+    PRIVATE ${BOOST_DIR}/lib/libboost_system-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib)
 endif()
 
 ##########
