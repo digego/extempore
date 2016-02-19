@@ -3304,7 +3304,7 @@
     (if (null? ast)
         (String "")
         `(memzone 1024
-           (String_cat
+           (cat
             ,(if (string? (car ast))
                  `(let ((x_t_mst:i8* (salloc 1024)))
                     (llvm_sprintf x_t_mst "%s" ,(car ast))
@@ -3326,7 +3326,7 @@
     (if (null? ast)
         (String "")
         `(memzone 1024
-           (String_cat
+           (cat
             ,@(map (lambda (x)
                      (if (string? x)
                          `(let ((xx_t_mst:i8* (salloc 1024)))
@@ -3339,10 +3339,10 @@
 (define impc:ti:format
   (lambda (ast)
     (if (null? ast) 'null
-        (list 'String_cat
+        (list 'cat
               (if (string? (car ast))
                   (list 'Str (car ast))
-                  (list 'String_format (car ast)))
+                  (list 'format (car ast)))
               (impc:ti:format (cdr ast))))))
 
 
@@ -10084,9 +10084,9 @@ e.g.
                            `(let ((s:i8* (halloc 2)))
                               ,@expr
                               s)
-                           `(letz ((s (sprintln (begin ,@expr)))
-                                   (lgth (+ 1 (String_length s)))
-                                   (oldcs (String_cstr s))
+                           `(letz ((s:String* (sprintln (begin ,@expr)))
+                                   (lgth (+ 1 (tref s 0)))
+                                   (oldcs (tref s 1))
                                    (newcs:i8* (halloc lgth)))
                               (strcpy newcs oldcs)
                               newcs))))
@@ -10114,9 +10114,9 @@ e.g.
                            `(let ((s:i8* (halloc 2)))
                               ,@expr
                               s)
-                           `(let ((s (sprintln (begin ,@expr)))
-                                  (lgth (+ 1 (String_length s)))
-                                  (oldcs (String_cstr s))
+                           `(let ((s:String* (sprintln (begin ,@expr)))
+                                  (lgth (+ 1 (tref s 0)))
+                                  (oldcs (tref s 1))
                                   (newcs:i8* (halloc lgth)))
                               (strcpy newcs oldcs)
                               newcs))))

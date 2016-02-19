@@ -42,7 +42,7 @@
 (bind-func sys_file_open
   (lambda (filename flags permissions pool)
     (letz ((file:apr_file_t** (zalloc))
-           (res (apr_file_open file (String_cstr filename) flags permissions pool)))
+           (res (apr_file_open file (cstring filename) flags permissions pool)))
       (if (= res APR_SUCCESS) (pref file 0) null))))
 
 (bind-func sys_file_close
@@ -53,7 +53,7 @@
   (lambda (filepath)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_file_remove (String_cstr filepath) pool))
+      (set! res (apr_file_remove (cstring filepath) pool))
       (apr_pool_destroy pool)
       res)))
 
@@ -61,19 +61,19 @@
   (lambda (from_path to_path)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_file_rename (String_cstr from_path) (String_cstr to_path) pool))
+      (set! res (apr_file_rename (cstring from_path) (cstring to_path) pool))
       (apr_pool_destroy pool)
       res)))
 
 (bind-func sys_file_link
   (lambda (from_path to_path)
-    (apr_file_link (String_cstr from_path) (String_cstr to_path))))
+    (apr_file_link (cstring from_path) (cstring to_path))))
 
 (bind-func sys_file_copy
   (lambda (from_path to_path permissions)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_file_copy (String_cstr from_path) (String_cstr to_path) permissions pool))
+      (set! res (apr_file_copy (cstring from_path) (cstring to_path) permissions pool))
       (apr_pool_destroy pool)
       res)))
 
@@ -81,7 +81,7 @@
   (lambda (from_path to_path permissions)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_file_append (String_cstr from_path) (String_cstr to_path) permissions pool))
+      (set! res (apr_file_append (cstring from_path) (cstring to_path) permissions pool))
       (apr_pool_destroy pool)
       res)))
 
@@ -151,7 +151,7 @@
 
 (bind-func sys_file_puts
   (lambda (file str)
-    (apr_file_puts (String_cstr str) file)))
+    (apr_file_puts (cstring str) file)))
 
 (bind-func sys_file_flush
   (lambda (file)
@@ -193,7 +193,7 @@
            (filename:i8** (zalloc))
            (res APR_SUCCESS)
            (path_list null))
-      (pset! filename 0 (String_cstr filepath))
+      (pset! filename 0 (cstring filepath))
       (set! res (apr_filepath_root root filename 0 pool))
       (if (= res APR_SUCCESS)
           (set! path_list (list (Str (pref root 0))
@@ -214,7 +214,7 @@
   (lambda (dirname)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_filepath_set (String_cstr dirname) pool))
+      (set! res (apr_filepath_set (cstring dirname) pool))
       (apr_pool_destroy pool)
       res)))
 
@@ -225,7 +225,7 @@
            (info:apr_finfo_t* (zalloc))
            (res APR_SUCCESS)
            (file_list (list)))
-      (apr_dir_open dir (String_cstr dirname) pool)
+      (apr_dir_open dir (cstring dirname) pool)
       (while (= (apr_dir_read info APR_FINFO_NAME (pref dir 0)) 0)
         (set! file_list (cons (Str (tref info 15)) file_list)))
       (apr_dir_close (pref dir 0))
@@ -236,7 +236,7 @@
   (lambda (dirname permissions)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_dir_make (String_cstr dirname) permissions pool))
+      (set! res (apr_dir_make (cstring dirname) permissions pool))
       (apr_pool_destroy pool)
       res)))
 
@@ -244,7 +244,7 @@
   (lambda (dirname permissions)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_dir_make_recursive (String_cstr dirname) permissions pool))
+      (set! res (apr_dir_make_recursive (cstring dirname) permissions pool))
       (apr_pool_destroy pool)
       res)))
 
@@ -252,7 +252,7 @@
   (lambda (dirname)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_dir_remove (String_cstr dirname) pool))
+      (set! res (apr_dir_remove (cstring dirname) pool))
       (apr_pool_destroy pool)
       res)))
 
@@ -261,7 +261,7 @@
     (letz ((file:apr_file_t** (zalloc))
            (namebuf:i8* (zalloc 1024))
            (res APR_SUCCESS))
-      (sprintf namebuf "%sXXXXXX" (String_cstr filename_prefix))
+      (sprintf namebuf "%sXXXXXX" (cstring filename_prefix))
       (set! res (apr_file_mktemp file namebuf 0 pool))
       (if (= res APR_SUCCESS) (pref file 0) null))))
 
@@ -283,7 +283,7 @@
     (let ((pool (apr_pool_create))
           (val:i8** (salloc))
           (res APR_SUCCESS))
-      (set! res (apr_env_get val (String_cstr var) pool))
+      (set! res (apr_env_get val (cstring var) pool))
       (apr_pool_destroy pool)
       (if (= res APR_SUCCESS)
           (Str (pref val 0))
@@ -293,7 +293,7 @@
   (lambda (var val)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_env_set (String_cstr val) (String_cstr var) pool))
+      (set! res (apr_env_set (cstring val) (cstring var) pool))
       (apr_pool_destroy pool)
       res)))
 
@@ -301,7 +301,7 @@
   (lambda (var)
     (let ((pool (apr_pool_create))
           (res APR_SUCCESS))
-      (set! res (apr_env_delete (String_cstr var) pool))
+      (set! res (apr_env_delete (cstring var) pool))
       (apr_pool_destroy pool)
       res)))
 

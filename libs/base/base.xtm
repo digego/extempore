@@ -404,16 +404,15 @@ into any further sexp arguments."
 ;; (bind-poly zcopy zcopy_f)
 ;; (bind-poly zcopy zcopy_d)
 
-(impc:aot:do-or-emit
- (bind-func zcopy:[!a,!a,mzone*,mzone*]*
-   "generic \"catch-all\" zcopy"
-   (lambda (x fromz toz)
-     (if (llvm_ptr_in_zone fromz (convert x))
-         (let ((size (llvm_zone_ptr_size (convert x)))
-               (newdat (convert (llvm_zone_malloc (llvm_peek_zone_stack) size))))
-           (memcpy (convert newdat) (convert x) size)
-           newdat)
-         x))))
+(bind-func zcopy:[!a,!a,mzone*,mzone*]*
+  "generic \"catch-all\" zcopy"
+  (lambda (x fromz toz)
+    (if (llvm_ptr_in_zone fromz (convert x))
+        (let ((size (llvm_zone_ptr_size (convert x)))
+              (newdat (convert (llvm_zone_malloc (llvm_peek_zone_stack) size))))
+          (memcpy (convert newdat) (convert x) size)
+          newdat)
+        x)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -502,8 +501,6 @@ If the string is empty will print a zero length string
         (begin (printf "'%s'" (tref s 1))
                void))))
 
-;; (bind-poly print String_print)
-
 (bind-func toString:[String*,String*]*
   "convert String to String
 
@@ -519,7 +516,7 @@ This is just the identity function, since a String is already a String."
   (lambda (s:String*)
     (strlen (tref s 1))))
 
-(bind-func String_length
+(bind-func length
   "Takes a (null-terminated) String* and returns the string length
 
 @param s - the String*
@@ -527,7 +524,7 @@ This is just the identity function, since a String is already a String."
   (lambda (s:String*)
     (tref s 0)))
 
-(bind-func String_validate
+(bind-func validate
   "Check that the String's length matches that returned by strlen
 
 @param s - the String*
@@ -535,7 +532,7 @@ This is just the identity function, since a String is already a String."
   (lambda (s:String*)
     (= (tref s 0) (strlen (tref s 1)))))
 
-(bind-func String_cstr
+(bind-func cstring
   "Return an i8* pointer to the underlying char array
 
 @param s
@@ -553,7 +550,7 @@ This is just the identity function, since a String is already a String."
     (String:[String*,i8*]* (tref s 1))))
 
 
-(bind-func String_substring
+(bind-func substring
   "Create a new xtlang String which is a substring of an existing one
 
 If `start' and `end' are out of range, return null
@@ -577,7 +574,7 @@ If `start' and `end' are out of range, return null
           (pset! buf (- end start) 0)
           (Str buf)))))
 
-(bind-func String_cat2
+(bind-func cat2
   "Concatenate 2 Strings
 
 If one string is null, the alternate String will be returned.
@@ -596,16 +593,16 @@ If both strings are null an empty String will be returned
               (strncat news (tref s2 1) size)
               (String news))))))
 
-;; String_cat macro (poor-man's varargs)
+;; cat macro (poor-man's varargs)
 
 (bind-macro
   "concatenate Strings"
-  (String_cat . args)
+  (cat . args)
   (let loop ((rem (cdr args))
              (ret (car args)))
     (if (null? rem)
         ret
-        (loop (cdr rem) (list 'String_cat2 ret (car rem))))))
+        (loop (cdr rem) (list 'cat2 ret (car rem))))))
 
 (bind-func equal
   "Equality test for String
@@ -629,12 +626,12 @@ If both strings are null an empty String will be returned
       (set! start i) (set! i (- len 1))
       (while (and (> i -1) (= (pref s i) 32)) (dec i 1))
       (set! end (+ 1 i))
-      ;; (println "s:" start "e:" end (String_substring e start end))      
-      (String_substring e start end))))
+      ;; (println "s:" start "e:" end (substring e start end))
+      (substring e start end))))
 
 
 ;; levenshtein edit distance
-(bind-func String_levenshtein
+(bind-func levenshtein
   "Returns the levenshtein distance between two strings
 
 @param s1 - string 1
@@ -644,10 +641,10 @@ If both strings are null an empty String will be returned
   (lambda (s1:String* s2:String*)
     (let ((i 0) (j 0)
           ;; column-major indexing closure
-          (s1cstr (String_cstr s1))
-          (s1len:size_t (String_length s1))
-          (s2cstr (String_cstr s1))
-          (s2len:size_t (String_length s1))
+          (s1cstr (cstring s1))
+          (s1len:size_t (length s1))
+          (s2cstr (cstring s1))
+          (s2len:size_t (length s1))
           (row:i64* (salloc (+ s1len 1)))
           (prev_row:i64* (salloc (+ s1len 1)))
           (min3 (lambda (a:i64 b c)
@@ -674,12 +671,12 @@ If both strings are null an empty String will be returned
           (set! row tmp_row)))
       (pref prev_row s2len))))
 
-(bind-func String_similarity
+(bind-func similarity
   (lambda (s1:String* s2:String*)
-    (/ 1.0 (i64tod (+ 1 (String_levenshtein s1 s2))))))
+    (/ 1.0 (i64tod (+ 1 (levenshtein s1 s2))))))
 
 
-(bind-func String_replace
+(bind-func replace
   (lambda (orig:i8* rep:i8* with:i8*)
     (if (null? (strstr orig rep)) (Str orig)
         (let ((origl (strlen orig))
@@ -698,17 +695,17 @@ If both strings are null an empty String will be returned
 
 (bind-func replace
   (lambda (orig:String* rep:i8* with:i8*)
-    (String_replace:[String*,i8*,i8*,i8*]* (String_cstr orig) rep with)))
+    (replace:[String*,i8*,i8*,i8*]* (cstring orig) rep with)))
 
 (bind-func replace
   (lambda (orig:String* rep:i8* with:String*)
-    (String_replace:[String*,i8*,i8*,i8*]* (String_cstr orig) rep (String_cstr with))))
+    (replace:[String*,i8*,i8*,i8*]* (cstring orig) rep (cstring with))))
 
 (bind-func replace
   (lambda (orig:String* rep:String* with:String*)
-    (String_replace:[String*,i8*,i8*,i8*]* (String_cstr orig) (String_cstr rep) (String_cstr with))))
+    (replace:[String*,i8*,i8*,i8*]* (cstring orig) (cstring rep) (cstring with))))
 
-(bind-func String_replace_all
+(bind-func replace_all
   (lambda (orig:i8* rep:i8* with:i8*)
     (let ((s1:String* (Str orig))
           (s2:String* (Str with))
@@ -722,15 +719,15 @@ If both strings are null an empty String will be returned
 
 (bind-func replace_all
   (lambda (orig:String* rep:i8* with:i8*)
-    (String_replace_all:[String*,i8*,i8*,i8*]* (String_cstr orig) rep with)))
+    (replace_all:[String*,i8*,i8*,i8*]* (cstring orig) rep with)))
 
 (bind-func replace_all
   (lambda (orig:String* rep:i8* with:String*)
-    (String_replace_all:[String*,i8*,i8*,i8*]* (String_cstr orig) rep (String_cstr with))))
+    (replace_all:[String*,i8*,i8*,i8*]* (cstring orig) rep (cstring with))))
 
 (bind-func replace_all
   (lambda (orig:String* rep:String* with:String*)
-    (String_replace_all:[String*,i8*,i8*,i8*]* (String_cstr orig) (String_cstr rep) (String_cstr with))))
+    (replace_all:[String*,i8*,i8*,i8*]* (cstring orig) (cstring rep) (cstring with))))
 
 
 ;; ;; TODO
@@ -769,11 +766,10 @@ If both strings are null an empty String will be returned
 ;; otherwise expect poly override
 ;;
 ;; i.e. see string below
-(impc:aot:do-or-emit
- (bind-func equal:[bool,!a,!b]*
-   "basic equality check"
-   (lambda (a b)
-     (= a b))))
+(bind-func equal:[bool,!a,!b]*
+  "basic equality check"
+  (lambda (a b)
+    (= a b)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -782,55 +778,55 @@ If both strings are null an empty String will be returned
 ;; same as print but returns string
 ;; should REPLACE PRINT!
 
-(bind-func String_format_return
+(bind-func format_return
   (lambda ()
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "\n")
       (String str))))
 
 ;; prints a space
-(bind-func String_format_space
+(bind-func format_space
   (lambda ()
     (String " ")))
 
-(bind-func String_format
+(bind-func format
   (lambda (x:i1)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (String str))))
 
-(bind-func String_format
+(bind-func format
   (lambda (x:i8)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (String str))))
 
-(bind-func String_format
+(bind-func format
   (lambda (x:i32)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%d" x)
       (String str))))
 
-(bind-func String_format
+(bind-func format
   (lambda (x:i64)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%lld" x)
       (String str))))
 
-(bind-func String_format
+(bind-func format
   (lambda (x:float)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%f" (ftod x))
       (String str))))
 
-(bind-func String_format
+(bind-func format
   (lambda (x:double)
     (let ((str:i8* (salloc 256)))
       (llvm_sprintf str "%f" x)
       (String str))))
 
 ;; String formatting!
-(bind-func String_format:[String*,String*]*
+(bind-func format:[String*,String*]*
   (lambda (x) x))
 
 
@@ -960,7 +956,7 @@ If the symbol is empty will print a zero length symbol
   (lambda (x)
     (String (tref x 0) (tref x 1))))
 
-(bind-func Symbol_length
+(bind-func length
   "Takes a (null-terminated) Symbol* and returns the symbol length
 
 @param sym - the Symbol*
@@ -968,16 +964,16 @@ If the symbol is empty will print a zero length symbol
   (lambda (sym:Symbol*)
     (strlen (tref sym 1))))
 
-(bind-func Symbol_size
+(bind-func size
   "Takes a Symbol* and returns the size of allocated memory
 
-Not necessarily the same as Symbol_length -
+Not necessarily the same as length -
 @param sym - the Symbol
 @return size - size of alloc'ed memory"
   (lambda (sym:Symbol*)
     (tref sym 0)))
 
-(bind-func Symbol_cstr
+(bind-func cstring
   "Return an i8* pointer to the underlying char array
 
 @param sym
@@ -1007,8 +1003,8 @@ Use via the polymorphic Str function
 @return - the new Symbol*
 "
   (lambda (str:Symbol*)
-    (let ((len (Symbol_length str))
-          (new_str (Symbol_z len (Symbol_cstr str))))
+    (let ((len (length str))
+          (new_str (Symbol_z len (cstring str))))
       new_str)))
 
 (bind-func equal

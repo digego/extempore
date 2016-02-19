@@ -718,28 +718,28 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func regex_match
-  (lambda (regex str)
-    (rmatch regex (String_cstr str))))
+  (lambda (regex str:String*)
+    (rmatch regex (cstring str))))
 
 (bind-func regex_match
-  (lambda (regex str)
-    (rmatch (String_cstr regex) (String_cstr str))))
+  (lambda (regex:String* str:String*)
+    (rmatch (cstring regex) (cstring str))))
 
 (bind-func regex_match
-  (lambda (regex sym)
-    (rmatch regex (Symbol_cstr sym))))
+  (lambda (regex sym:Symbol*)
+    (rmatch regex (cstring sym))))
 
 (bind-func regex_match
-  (lambda (regex sym)
-    (rmatch (String_cstr regex) (Symbol_cstr sym))))
+  (lambda (regex:Symbol* sym:Symbol*)
+    (rmatch (cstring regex) (cstring sym))))
 
 (bind-func regex_split
-  (lambda (regex str)
+  (lambda (regex str:String*)
     (let ((a:i8* (salloc 2048))
           (b:i8* (salloc 2048)))
       (sprintf a "")
       (sprintf b "")
-      (rsplit regex (String_cstr str) a b)
+      (rsplit regex (cstring str) a b)
       (append (list (if (> (strlen a) 0)
                         (String a) (String str)))
               (if (> (strlen b) 0)
@@ -748,7 +748,7 @@
 
 ;; (bind-func regex_split
 ;;   (lambda (regex str)
-;;     (regex_split (String_cstr regex) str)))
+;;     (regex_split (cstring regex) str)))
 
 (bind-func regex_split
   (lambda (regex sym)
@@ -756,7 +756,7 @@
           (b:i8* (salloc 2048)))
       (sprintf a "")
       (sprintf b "")
-      (rsplit regex (Symbol_cstr sym) a b)
+      (rsplit regex (cstring sym) a b)
       (append (list (if (> (strlen a) 0)
                         (Symbol a) (Symbol sym)))
               (if (> (strlen b) 0)
@@ -771,16 +771,16 @@
 
 (bind-func regex_replace
   (lambda (regex:i8* str:String* replace:i8*)
-    (regex_replace:[String*,i8*,i8*,i8*]* regex (String_cstr str) replace)))
+    (regex_replace:[String*,i8*,i8*,i8*]* regex (cstring str) replace)))
 
 (bind-func regex_replace
   (lambda (regex:i8* str:String* replace:String*)
-    (regex_replace:[String*,i8*,i8*,i8*]* regex (String_cstr str) (String_cstr replace))))
+    (regex_replace:[String*,i8*,i8*,i8*]* regex (cstring str) (cstring replace))))
 
 (bind-func regex_replace
   (lambda (regex:String* str:String* replace:String*)
     (regex_replace:[String*,i8*,i8*,i8*]*
-     (String_cstr regex) (String_cstr str) (String_cstr replace))))
+     (cstring regex) (cstring str) (cstring replace))))
 
 (bind-func regex_replace_all
   (lambda (regex str:i8* replace:i8*)
@@ -795,15 +795,15 @@
 
 (bind-func regex_replace_all
   (lambda (regex str replace)
-    (regex_replace_all:[String*,i8*,i8*,i8*]* regex (String_cstr str) replace)))
+    (regex_replace_all:[String*,i8*,i8*,i8*]* regex (cstring str) replace)))
 
 (bind-func regex_replace_all
   (lambda (regex str replace)
-    (regex_replace_all:[String*,i8*,i8*,i8*]* regex (String_cstr str) (String_cstr replace))))
+    (regex_replace_all:[String*,i8*,i8*,i8*]* regex (cstring str) (cstring replace))))
 
 (bind-func regex_replace_all
   (lambda (regex str replace)
-    (regex_replace_all:[String*,i8*,i8*,i8*]* (String_cstr regex) (String_cstr str) (String_cstr replace))))
+    (regex_replace_all:[String*,i8*,i8*,i8*]* (cstring regex) (cstring str) (cstring replace))))
 
 
 (bind-func regex_matches
@@ -821,11 +821,11 @@
 
 (bind-func regex_matches
   (lambda (regex:i8* str:String* max)
-    (regex_matches:[List{String*}*,i8*,i8*,i64]* regex (String_cstr str) max)))
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* regex (cstring str) max)))
 
 (bind-func regex_matches
   (lambda (regex:String* str:String* max)
-    (regex_matches:[List{String*}*,i8*,i8*,i64]* (String_cstr regex) (String_cstr str) max)))
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* (cstring regex) (cstring str) max)))
 
 (bind-func regex_matches
   (lambda (regex:i8* str:i8*)
@@ -833,16 +833,18 @@
 
 (bind-func regex_matches
   (lambda (regex:i8* str:String*)
-    (regex_matches:[List{String*}*,i8*,i8*,i64]* regex (String_cstr str) 50)))
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* regex (cstring str) 50)))
 
 (bind-func regex_matches
   (lambda (regex:String* str:String*)
-    (regex_matches:[List{String*}*,i8*,i8*,i64]* (String_cstr regex) (String_cstr str) 50)))
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* (cstring regex) (cstring str) 50)))
 
-(bind-func cat:[String*,List{String*}*]*
+;; if this is just called `cat' then the auto-generated printers for
+;; some named types don't work. need to investigate...
+(bind-func list_cat:[String*,List{String*}*]*
   (lambda (lst)
     (let ((s (String ""))
           (n (length lst)) (i 0))
       (dotimes (i n)
-        (set! s (String_cat2 s (nth lst i))))
+        (set! s (cat2 s (nth lst i))))
       s)))

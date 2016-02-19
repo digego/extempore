@@ -69,7 +69,7 @@
 
 (bind-func trim_brackets
   (lambda (s:String*)
-    (String_substring s 1 (- (String_length s) 1))))
+    (substring s 1 (- (String_length s) 1))))
 
 (bind-func find_sexprs
   (lambda (t)
@@ -96,9 +96,9 @@
             (regex_match "^\\[.*\\]$" t)
             (= 1 (length (find_sqr_exprs t))))
            (println "sqrs" t)
-           (let ((r (regex_split "," (String_substring t 1 (- (String_length t) 1)))))
+           (let ((r (regex_split "," (substring t 1 (- (String_length t) 1)))))
              (if (null? r)
-                 (cas_expand_term (String_substring t 1 (- (String_length t) 1)))
+                 (cas_expand_term (substring t 1 (- (String_length t) 1)))
                  (String_cat (Str "(vector")
                              (cat (map (lambda (x) (String_cat (Str " ") (cas_expand_term x))) r))
                              (Str ")")))))
@@ -162,7 +162,7 @@
                                            (if (regex_match "^\\-" x)
                                                (cas_expand_term
                                                 (String_cat (Str "(neg ")
-                                                            (String_substring x 1 (String_length x))
+                                                            (substring x 1 (String_length x))
                                                             (Str ")")))
                                                (cas_expand_term (replace x "+" "")))))
                                         l))
@@ -175,11 +175,11 @@
           (m8 (regex_matches "(^|\\+|\\-)([^+-]|\\(plus)+" (if (> (length m4) 0) (car m4) e)))
           (res (map (lambda (x:String*)
                       (if (regex_match "^\\-" x)
-                          (let ((r1 (cas_expand_term (String_substring x 1 (String_length x))))
+                          (let ((r1 (cas_expand_term (substring x 1 (String_length x))))
                                 (r2 (String_cat (Str "(neg ") r1 (Str ")"))))
                             r2)
                           (if (regex_match "^\\+" x)
-                              (cas_expand_term (String_substring x 1 (String_length x)))
+                              (cas_expand_term (substring x 1 (String_length x)))
                               (cas_expand_term x))))
                     m8)))
       ;;(println "out:" res "in:" ein "\n")
@@ -188,10 +188,10 @@
 (bind-func multi_replace_all
   (lambda (s pairs) 
     (let ((res (map (lambda (x)
-                      (set! s (String_replace_all
-                               (String_cstr s)
-                               (String_cstr (nth x 0))
-                               (String_cstr (nth x 1))))
+                      (set! s (replace_all
+                               (cstring s)
+                               (cstring (nth x 0))
+                               (cstring (nth x 1))))
                       1:i64)
                     pairs)))
       s)))
@@ -200,9 +200,9 @@
   (lambda (e:String*)
     (beginz
      (if (regex_match "^list\\[.*\\]$" e)
-         (set! e (String_substring e 4 (String_length e)))) 
+         (set! e (substring e 4 (String_length e))))
      (if (regex_match "^\\[.*\\]$" e)
-         (let ((p (regex_split "," (String_substring e 1 (- (String_length e) 1)))))
+         (let ((p (regex_split "," (substring e 1 (- (String_length e) 1)))))
            (String_cat (Str "(vector") (cat (map (lambda (x) (String_cat (Str " ") (cas2xtm x))) p)) (Str ")")))          
          (String_cat (Str "(+ 0.0:double ")
                      (multi_replace_all (cat (cas_parse_terms e))
@@ -216,11 +216,11 @@
 
 (bind-func cas2xtmi8
   (lambda (e)
-    (String_cstr (cas2xtm e))))
+    (cstring (cas2xtm e))))
 
 (bind-func cas2xtm_scm
   (lambda (e)
-    (String_cstr (cas2xtm:[String*,String*]* (Str e)))))
+    (cstring (cas2xtm:[String*,String*]* (Str e)))))
 
 
 (bind-func caspp
@@ -256,7 +256,7 @@
                                          "{" "\("))
                    (b (regex:replace-all a "}" "\)"))
                    (c b) ; (string-append "simplify(" b ")"))
-                   (d (eval `(string->sexpr (string-append (cptr->string (String_cstr (cas2xtm (Str ,(casppoff c))))))))))
+                   (d (eval `(string->sexpr (string-append (cptr->string (cstring (cas2xtm (Str ,(casppoff c))))))))))
               (if *icas-print-inline* (println 'inlined 'cas: d))
               `(let ((res ,d)) res)))
 
