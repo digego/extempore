@@ -78,9 +78,18 @@
 #define OS_PATH_DELIM '/'
 #endif
 
+/*
+struct regex_matched_buffer
+{
+  int matches;
+  char* data[100];
+  };
+*/
+
 extern "C" {
 
-bool rmatch(char* regex, char* str);
+  bool rmatch(char* regex, char* str);
+  int64_t rmatches(char* regex, char* str, char** results,int64_t maxnum); //struct regex_matched_buffer* result);
 bool rsplit(char* regex, char* str, char* a, char* b);
 char* rreplace(char* regex, char* str, char* replacement, char* result);
 void ascii_text_color(int attr, int fg, int bg);

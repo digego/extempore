@@ -763,40 +763,86 @@
                   (regex_split regex (Symbol b))
                   null)))))
 
-
 (bind-func regex_replace
-  (lambda (regex str:String* replace:String*)
+  (lambda (regex str:i8* replace:i8*)
     (let ((res:i8* (salloc 4096)))
-      (rreplace regex
-                (String_cstr str)
-                (String_cstr replace)
-                res)
+      (rreplace regex str replace res)
       (String res))))
 
 (bind-func regex_replace
-  (lambda (regex str:String* replace)
-    (let ((res:i8* (salloc 4096)))
-      (rreplace regex
-                (String_cstr str)
-                replace
-                res)
-      (String res))))
+  (lambda (regex:i8* str:String* replace:i8*)
+    (regex_replace:[String*,i8*,i8*,i8*]* regex (String_cstr str) replace)))
 
 (bind-func regex_replace
-  (lambda (regex sym:Symbol* replace:String*)
-    (let ((res:i8* (salloc 4096)))
-      (rreplace regex
-                (Symbol_cstr sym)
-                (String_cstr replace)
-                res)
-      (Symbol res))))
+  (lambda (regex:i8* str:String* replace:String*)
+    (regex_replace:[String*,i8*,i8*,i8*]* regex (String_cstr str) (String_cstr replace))))
 
 (bind-func regex_replace
-  (lambda (regex sym:Symbol* replace)
-    (let ((res:i8* (salloc 4096)))
-      (rreplace regex
-                (Symbol_cstr sym)
-                replace
-                res)
-      (Symbol res))))
+  (lambda (regex:String* str:String* replace:String*)
+    (regex_replace:[String*,i8*,i8*,i8*]*
+     (String_cstr regex) (String_cstr str) (String_cstr replace))))
 
+(bind-func regex_replace_all
+  (lambda (regex str:i8* replace:i8*)
+    (let ((res:i8* (salloc 4096))
+          (tmp:String* (Str str))
+          (cnt 0))
+      (while (and (regex_match regex tmp)
+                  (< cnt 100))
+        (set! tmp (regex_replace regex tmp replace))
+        (set! cnt (+ cnt 1)))
+      tmp)))
+
+(bind-func regex_replace_all
+  (lambda (regex str replace)
+    (regex_replace_all:[String*,i8*,i8*,i8*]* regex (String_cstr str) replace)))
+
+(bind-func regex_replace_all
+  (lambda (regex str replace)
+    (regex_replace_all:[String*,i8*,i8*,i8*]* regex (String_cstr str) (String_cstr replace))))
+
+(bind-func regex_replace_all
+  (lambda (regex str replace)
+    (regex_replace_all:[String*,i8*,i8*,i8*]* (String_cstr regex) (String_cstr str) (String_cstr replace))))
+
+
+(bind-func regex_matches
+  (lambda (regex:i8* str:i8* maxnum:i64)
+    (let ((slen:i64 (strlen str))
+          (results:i8** (salloc maxnum))
+          (resdata:i8* (salloc (* slen maxnum)))
+          (result:String* null) (i:i64 0) (num 0))
+      (dotimes (i maxnum) (pset! results i (pref-ptr resdata (* i slen))))
+      (set! num (rmatches regex str results maxnum))
+      (if (> num 0)
+          (map (lambda (i:i64) (Str (pref results i)))
+               (range 0 num))
+          null))))
+
+(bind-func regex_matches
+  (lambda (regex:i8* str:String* max)
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* regex (String_cstr str) max)))
+
+(bind-func regex_matches
+  (lambda (regex:String* str:String* max)
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* (String_cstr regex) (String_cstr str) max)))
+
+(bind-func regex_matches
+  (lambda (regex:i8* str:i8*)
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* regex str 50)))
+
+(bind-func regex_matches
+  (lambda (regex:i8* str:String*)
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* regex (String_cstr str) 50)))
+
+(bind-func regex_matches
+  (lambda (regex:String* str:String*)
+    (regex_matches:[List{String*}*,i8*,i8*,i64]* (String_cstr regex) (String_cstr str) 50)))
+
+(bind-func cat:[String*,List{String*}*]*
+  (lambda (lst)
+    (let ((s (String ""))
+          (n (length lst)) (i 0))
+      (dotimes (i n)
+        (set! s (String_cat2 s (nth lst i))))
+      s)))

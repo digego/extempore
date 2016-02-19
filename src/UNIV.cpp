@@ -361,6 +361,108 @@ bool rmatch(char* regex, char* str)
   return (rc>=0) ? true : false;
 }
 
+
+// bool rmatches(char* regex, char* str, struct regex_matched_buffer* result)
+//     {
+//   char* data = str;
+//   char* pattern = regex;		
+// 	pcre *re; 
+// 	const char *error; 
+// 	int erroffset; 
+// 	re = pcre_compile(	pattern, /* the pattern */ 
+// 				0, /* default options */ 
+// 				&error, /* for error message */ 
+// 				&erroffset, /* for error offset */ 
+// 				NULL); /* use default character tables */
+		
+// 	int rc; 
+// 	int ovector[60]; 
+// 	rc = pcre_exec(	re, /* result of pcre_compile() */ 
+// 			NULL, /* we didn’t study the pattern */ 
+// 			data, /* the subject string */ 
+// 			strlen(data), /* the length of the subject string */ 
+// 			0, /* start at offset 0 in the subject */ 
+// 			0, /* default options */ 
+// 			ovector, /* vector of integers for substring information */ 
+// 			60); /* number of elements (NOT size in bytes) */
+						
+// 	// if failed to match return empty list
+// 	if(rc<0 || rc>100) return false;
+
+//   result->matches = rc;
+// 	for(int i=0, p=0, k=(rc-1);i<rc;i++,k--)
+// 	{
+// 	    //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
+//     p=i*2;
+   
+// 	  if(ovector[p]==-1) {
+//       strcpy(result->data[k],"");
+// 	  }else{
+//       int range = ovector[p+1] - ovector[p];				
+//       char* b = (char*) alloca(range+1);
+//       memset(b,0,range+1);
+//       char* a = data+ovector[p];
+//       char* substring = strncpy(b, a, range);
+//       strcpy(result->data[k],substring);
+// 	  }
+// 	}
+//   return true;
+// }	
+
+
+int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
+    {
+  char* data = str;
+  char* pattern = regex;		
+	pcre *re; 
+	const char *error; 
+	int erroffset; 
+	re = pcre_compile(	pattern, /* the pattern */ 
+				0, /* default options */ 
+				&error, /* for error message */ 
+				&erroffset, /* for error offset */ 
+				NULL); /* use default character tables */
+		
+	// pointer to hold return results		
+	int rc; 
+	int ovector[60];
+  int64_t num=0;
+		
+	while(true) {
+	    rc = pcre_exec(	re, /* result of pcre_compile() */ 
+				NULL, /* we didn’t study the pattern */ 
+				data, /* the subject string */ 
+				strlen(data), /* the length of the subject string */ 
+				0, /* start at offset 0 in the subject */ 
+				0, /* default options */ 
+				ovector, /* vector of integers for substring information */ 
+				60); /* number of elements (NOT size in bytes) */
+							
+	    //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << "  num " << num << " max " << maxnum << std::endl;
+	    if(rc<1 || num>=maxnum) {
+        return num;
+	    }
+	    int range = ovector[1] - ovector[0];
+	    char* b = (char*) alloca(range+1);
+	    memset(b,0,range+1);
+	    char* a = data+ovector[0];
+	    char* substring = strncpy(b, a, range);
+      // std::cout << "substr:" << substring << std::endl;
+      char* tmp = (char*) malloc(range+1);
+      memset(tmp,0,range+1);
+      strncpy(tmp,substring,range);
+      // std::cout << "adding:" << tmp << " at:" << num << std::endl;
+      results[num]=tmp;
+      // std::cout << "done!" << std::endl;      
+      num++;
+	    //_sc->imp_env->insert(list);
+	    data = data+range+ovector[0];
+	}
+  return 0;
+}
+
+
+
 bool rsplit(char* regex, char* str, char* a, char* b)
 {
   char* data = str;
@@ -398,12 +500,14 @@ bool rsplit(char* regex, char* str, char* a, char* b)
   return true;
 }
 
+
 // returns char* result
 char* rreplace(char* regex, char* str, char* replacement, char* result) {
 
-        char* data = str; //string_value(pair_car(args));
+  char* data = str; //string_value(pair_car(args));
 	char* pattern = regex; //string_value(pair_cadr(args));
-	strcpy(result,replacement);
+  char* replace = replacement;
+	//strcpy(result,replacement);
 		
 	pcre *re;
 	const char *error; 
@@ -428,18 +532,26 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 
 	// no match found return original string
 	if(rc<1) {strcpy(result,str); return result;} // Return mk_string(_sc,data);
-
 	// ok we have a match
 	// first replace any groups in replace string (i.e. $1 $2 ...)
 	char* res = (char*) "";
 	char* sep = (char*) "$";
 	char* tmp = 0;
-	int pos,range,size = 0;
+  int datalength = strlen(data);
+	int pos,range,size,cnt = 0;
+  strcpy(result,replace);
 	char* p = strtok(result,sep);
+  if(p==NULL) { strcpy(result, str); return result; };
 	do{
 	    char* cc;
 	    pos = strtol(p,&cc,10);
-	    range = (pos>0) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
+      // std::cout << "p: " << p << " pos: " << pos << " cc:" << cc << std::endl;
+	    range = (pos>0 && pos<20) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
+      // std::cout << "cnt: " << cnt << " rc:" << rc << " range: " << range << std::endl;      
+      if(pos>=rc || range < 0 || range > datalength) {
+        range = 0;
+        cc = p;
+      }
 	    size = strlen(res);
 	    tmp = (char*) alloca(size+range+strlen(cc)+1);
 	    memset(tmp,0,size+range+strlen(cc)+1);
@@ -448,15 +560,17 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
 	    memcpy(tmp+size+range,cc,strlen(cc));
 	    res = tmp;
 	    p = strtok(NULL, sep);
+      cnt++;
 	}while(p);
 	// now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
 	int lgth = (strlen(data)-range)+strlen(res)+1;
 	range = ovector[1] - ovector[0];
 	//char* result = (char*) alloca(lgth);
+  if(lgth>4096) return str; 
 	memset(result,0,lgth);
 	memcpy(result,data,ovector[0]);
 	memcpy(result+ovector[0],res,strlen(res));
-	memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);		
+	memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
 	return result;
 }
 

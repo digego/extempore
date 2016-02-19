@@ -618,6 +618,20 @@ If both strings are null an empty String will be returned
     (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
         1:i1 0:i1)))
 
+;; trim whitespace
+(bind-func trim
+  (lambda (e:String*)
+    (let ((s (tref e 1))
+          (len (tref e 0)) ;; +1 for cstr
+          (i 0)
+          (start -1) (end 0))
+      (while (and (< i len) (= (pref s i) 32)) (inc i 1))
+      (set! start i) (set! i (- len 1))
+      (while (and (> i -1) (= (pref s i) 32)) (dec i 1))
+      (set! end (+ 1 i))
+      ;; (println "s:" start "e:" end (String_substring e start end))      
+      (String_substring e start end))))
+
 
 ;; levenshtein edit distance
 (bind-func String_levenshtein
@@ -663,6 +677,61 @@ If both strings are null an empty String will be returned
 (bind-func String_similarity
   (lambda (s1:String* s2:String*)
     (/ 1.0 (i64tod (+ 1 (String_levenshtein s1 s2))))))
+
+
+(bind-func String_replace
+  (lambda (orig:i8* rep:i8* with:i8*)
+    (if (null? (strstr orig rep)) (Str orig)
+        (let ((origl (strlen orig))
+              (repl (strlen rep))
+              (withl (strlen with))
+              (pos (strstr orig rep))
+              (start (- (ptrtoi64 pos) (ptrtoi64 orig)))
+              (newstr:i8* (salloc (+ 1 (strlen orig) (- withl repl)))))
+          (memset newstr 0 (+ 1 (strlen orig) (- withl repl)))
+          (strncpy newstr orig start)
+          (strncpy (pref-ptr newstr start) with withl)
+          (strncpy (pref-ptr newstr (+ start withl))
+                   (pref-ptr orig (+ start repl))
+                   (- origl (+ start repl)))
+          (Str newstr)))))
+
+(bind-func replace
+  (lambda (orig:String* rep:i8* with:i8*)
+    (String_replace:[String*,i8*,i8*,i8*]* (String_cstr orig) rep with)))
+
+(bind-func replace
+  (lambda (orig:String* rep:i8* with:String*)
+    (String_replace:[String*,i8*,i8*,i8*]* (String_cstr orig) rep (String_cstr with))))
+
+(bind-func replace
+  (lambda (orig:String* rep:String* with:String*)
+    (String_replace:[String*,i8*,i8*,i8*]* (String_cstr orig) (String_cstr rep) (String_cstr with))))
+
+(bind-func String_replace_all
+  (lambda (orig:i8* rep:i8* with:i8*)
+    (let ((s1:String* (Str orig))
+          (s2:String* (Str with))
+          (cnt 0))
+      (while (and (not (equal s1 s2))
+                  (< cnt 100))
+        (set! s2 s1)
+        (set! s1 (replace s1 rep with))
+        (set! cnt (+ cnt 1)))
+      s1)))
+
+(bind-func replace_all
+  (lambda (orig:String* rep:i8* with:i8*)
+    (String_replace_all:[String*,i8*,i8*,i8*]* (String_cstr orig) rep with)))
+
+(bind-func replace_all
+  (lambda (orig:String* rep:i8* with:String*)
+    (String_replace_all:[String*,i8*,i8*,i8*]* (String_cstr orig) rep (String_cstr with))))
+
+(bind-func replace_all
+  (lambda (orig:String* rep:String* with:String*)
+    (String_replace_all:[String*,i8*,i8*,i8*]* (String_cstr orig) (String_cstr rep) (String_cstr with))))
+
 
 ;; ;; TODO
 

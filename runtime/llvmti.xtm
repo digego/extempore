@@ -627,7 +627,7 @@
 
 (define impc:compiler:print-no-scheme-stub-notification
   (lambda (symname)
-    (if (equal? *impc:compiler:message:level* 'high)
+    (if #f ;;(equal? *impc:compiler:message:level* 'high)
         (begin
           (print "There is no ")
           (print-with-colors 'cyan 'default #t (print  "scheme stub"))
@@ -1542,6 +1542,7 @@
     ("rint" . #((213 4 0) "" ()))
     ("rintf" . #((213 4 1) "" ()))
     ("rmatch" . #((213 10 108 108) "" ()))
+    ("rmatches" . #((213 2 108 108 208 2) "" ()))
     ("rreplace" . #((213 108 108 108 108 108) "" ()))
     ("rsplit" . #((213 10 108 108 108 108) "" ()))
     ("scalbn" . #((213 0 0 4) "" ()))
@@ -5229,7 +5230,6 @@ Continue executing `body' forms until `test-expression' returns #f"
                   type)))))))
 
 
-
 (define impc:ti:math-check
   (lambda (ast vars kts request?)
     ;; cleanup request!
@@ -5245,8 +5245,10 @@ Continue executing `body' forms until `test-expression' returns #f"
            (n2 (caddr ast))
            (a (impc:ti:type-unify (impc:ti:type-check n1 vars kts request?) vars))
            (b (impc:ti:type-unify (impc:ti:type-check n2 vars kts request?) vars))
-           (t (impc:ti:type-unify (list a b) vars)))
-      ;; (println 'a a 'b b 't t ast)
+           (t (impc:ti:type-unify (cl:remove #f (list (if (null? a) #f a) (if (null? b) #f b))) vars)))
+      (if (equal? a #f) (set! a '()))
+      (if (equal? b #f) (set! b '()))      
+      ;; (println 'math: 'a a 'b b 't t 'r request? 'ast: ast)
       ;; if we can fully unify on 't'
       ;; then we might need to retypecheck a or b
       (if (impc:ir:type? t)
@@ -5327,7 +5329,13 @@ Continue executing `body' forms until `test-expression' returns #f"
            (c (if (> args 2)
                   (impc:ti:type-unify (impc:ti:type-check (cadddr ast) vars kts request?) vars)
                   #f)))
-      ;; (println 'a a 'b b 'c c)
+      (if (null? a) (set! a b))
+      (if (null? b) (set! b a))
+      ;; (println 'a a 'b b 'c c 'r: request? 'ast ast)
+      ;; if (cadr ast) is a symbol update it
+      (if (and (symbol? (cadr ast))
+               (impc:ir:type? a))
+          (impc:ti:update-var (cadr ast) vars kts a))
       (if (and (not (list? a))
                (impc:ir:fixed-point? a))
           (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type a)
@@ -6800,8 +6808,11 @@ xtlang's `let' syntax is the same as Scheme"
   (lambda (ast vars kts request?)
     (if (and request?
              (not (impc:ir:pointer? request?)))
-        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))     
-    request?))
+        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))
+    (if (= (length ast) 2)
+        (let ((a (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))    
+          request?)
+        request?)))
 
 
 ;; make should be of the form
@@ -6812,9 +6823,12 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:zone-alloc-check
   (lambda (ast vars kts request?)
     (if (and request?
-             (not (impc:ir:pointer? request?)))
-        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast)) 
-    request?))
+             (not (impc:ir:pointer? request?)))        
+        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))
+    (if (= (length ast) 2)
+        (let ((a (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))    
+          request?)
+        request?)))
 
 
 
@@ -6827,8 +6841,11 @@ xtlang's `let' syntax is the same as Scheme"
   (lambda (ast vars kts request?)
     (if (and request?
              (not (impc:ir:pointer? request?)))
-        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))     
-    request?))
+        (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))
+    (if (= (length ast) 2)
+        (let ((a (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))    
+          request?)
+        request?)))
 
 
 (define impc:ti:make-tuple-check

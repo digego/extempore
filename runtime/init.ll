@@ -34,8 +34,9 @@
 
 ;; regex stuff
 declare i1 @rmatch(i8*,i8*)
+declare i64 @rmatches(i8*,i8*,i8**,i64)
 declare i1 @rsplit(i8*,i8*,i8*,i8*)
-declare i8* @rreplace(i8*,i8*,i8*,i8*);
+declare i8* @rreplace(i8*,i8*,i8*,i8*)
 
 ;; base64 stuff
 ;; i64's here should be size_t !!!
