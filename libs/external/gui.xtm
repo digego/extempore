@@ -96,7 +96,7 @@
   (lambda (parent:Widget* child)
     (tset! parent 6 child)))
 
-(bind-func Widget_print
+(bind-func print
   (lambda (widget:Widget*)
     (if (null? widget)
         (printf "<Widget 0x0>")
@@ -111,7 +111,7 @@
                 (Widget_right_child widget)))
     void))
 
-(bind-func Widget_toString
+(bind-func toString
   (lambda (widget:Widget*)
     (let ((s:i8* (salloc 1024)))
       (if (null? widget)
@@ -128,17 +128,12 @@
                    (Widget_right_child widget)))
       (String s))))
 
-(bind-poly print Widget_print)
-(bind-poly toString Widget_toString)
-
 ;; not sure why the conversion to i64 is necessary - this was a result
 ;; of the most recent SB generics update
-(bind-func Widget_equal
+(bind-func equal
   "naive pointer equality check for Widgets"
   (lambda (w1:Widget* w2:Widget*)
     (= (convert w1 i64) (convert w2 i64))))
-
-(bind-poly equal Widget_equal)
 
 ;; create
 
@@ -232,7 +227,8 @@
           (Widget_find_postorder (Widget_left_child widget) pred)
           (Widget_find_postorder (Widget_right_child widget) pred)
           (if (and (not (null? widget)) (pred widget)) widget
-              null)))))
+              null))
+        widget)))
 
 ;; the GUI type
 
@@ -273,7 +269,7 @@
   (lambda (gui:GUI*)
     (tref gui 5)))
 
-(bind-func GUI_print
+(bind-func print
   (lambda (gui:GUI*)
     (if (null? gui)
         (printf "<GUI 0x0>")
@@ -287,7 +283,7 @@
                 (convert (GUI_pixel_ratio gui) double)))
     void))
 
-(bind-func GUI_toString
+(bind-func toString
   (lambda (gui:GUI*)
     (let ((s:i8* (salloc 1024)))
       (if (null? gui)
@@ -302,9 +298,6 @@
                    (convert (GUI_height gui) double)
                    (convert (GUI_pixel_ratio gui) double)))
       (String s))))
-
-(bind-poly print GUI_print)
-(bind-poly toString GUI_toString)
 
 ;; this is the global gui structure - there can only be one in each
 ;; Extempore process
@@ -365,11 +358,12 @@
             ;; call the render callback
             (let ((winWidth (GUI_width EXTEMPORE_GUI))
                   (winHeight (GUI_height EXTEMPORE_GUI))
-                  (vg (GUI_context EXTEMPORE_GUI)))
+                  (vg (GUI_context EXTEMPORE_GUI))
+                  (cb (Widget_cb widget)))
               ;; (nvgResetTransform vg)
               ;; (nvgTranslate vg x y)
               ;; (nvgScale vg w h)
-              ((Widget_cb widget) widget bounds)
+              (cb widget bounds)
               null)
             ;; otherwise recurse into the child widgets - horizontal
             ;; splits only at this point
@@ -479,7 +473,7 @@
 ;; this is the all-singing, all-dancing "base" widget add function.
 ;; see below for helper functions which use sensible default
 ;; parameters
-(bind-func gui_add_widget_base
+(bind-func gui_add_widget
   "add a new widget to the GUI
 
 @param new_widget - widget to add
@@ -525,16 +519,14 @@ If parent_widget is null, new_widget becomes the new GUI root node.
                  (if (equal (Widget_left_child grandparent_widget) parent_widget)
                      (Widget_set_left_child grandparent_widget new_parent)
                      (if (equal (Widget_right_child grandparent_widget) parent_widget)
-                         (Widget_set_right_child grandparent_widget new_parent))
-                     (println "gui_add_widget: could not reconnect the widget tree")))
+                         (Widget_set_right_child grandparent_widget new_parent)
+                         (begin (println "gui_add_widget: could not reconnect the widget tree")
+                                (convert null Widget*)))))
              1:i1)))))
 
-(bind-func gui_add_widget_preorder
+(bind-func gui_add_widget
   (lambda (new_widget split_size split_orientation)
-    (gui_add_widget_base new_widget (gui_find_leaf_preorder) split_size split_orientation)))
-
-(bind-poly gui_add_widget gui_add_widget_base)
-(bind-poly gui_add_widget gui_add_widget_preorder)
+    (gui_add_widget:[i1,Widget*,Widget*,float,i32]* new_widget (gui_find_leaf_preorder) split_size split_orientation)))
 
 ;; flip l and r child widgets of internal node
 
@@ -893,7 +885,7 @@ several different editors."
           (gui_draw_text_in_bounds bounds lab 30.)
           (nvgFill vg))))))
 
-(bind-func Widget_button_next_id
+(bind-func Widget_button
   "create a button widget
 
 @param label - a text label for the button
@@ -904,7 +896,7 @@ The widget will be assigned the next available id based on the current state of 
   (lambda (label:i8* cb)
     (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON (Widget_button_c label cb))))
 
-(bind-func Widget_button_with_id
+(bind-func Widget_button
   "create a button widget with a specified id
 
 @param label - a text label for the button
@@ -913,9 +905,6 @@ The widget will be assigned the next available id based on the current state of 
 "
   (lambda (label:i8* cb id)
     (Widget_with_cb id .5 GUI_BUTTON (Widget_button_c label cb))))
-
-(bind-poly Widget_button Widget_button_next_id)
-(bind-poly Widget_button Widget_button_with_id)
 
 ;; checkbox
 
@@ -948,7 +937,7 @@ The widget will be assigned the next available id based on the current state of 
           (gui_draw_text_in_bounds bounds lab 30.)
           (nvgFill vg))))))
 
-(bind-func Widget_checkbox_next_id
+(bind-func Widget_checkbox
   "create a checkbox widget
 
 @param label - a text label for the checkbox
@@ -959,7 +948,7 @@ The widget will be assigned the next available id based on the current state of 
   (lambda (label:i8* cb)
     (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON_CHECKBOX (Widget_checkbox_c label cb))))
 
-(bind-func Widget_checkbox_with_id
+(bind-func Widget_checkbox
   "create a checkbox widget with a specified id
 
 @param label - a text label for the checkbox
@@ -968,9 +957,6 @@ The widget will be assigned the next available id based on the current state of 
 "
   (lambda (label:i8* cb id)
     (Widget_with_cb id .5 GUI_BUTTON_CHECKBOX (Widget_checkbox_c label cb))))
-
-(bind-poly Widget_checkbox Widget_checkbox_with_id)
-(bind-poly Widget_checkbox Widget_checkbox_next_id)
 
 ;; radio
 
@@ -1031,7 +1017,7 @@ The widget will be assigned the next available id based on the current state of 
           ;; (nvgFill vg)
           void)))))
 
-(bind-func Widget_radio_next_id
+(bind-func Widget_radio
   "create a radio button widget
 
 @param label - a text label for the radio button
@@ -1043,7 +1029,7 @@ The widget will be assigned the next available id based on the current state of 
   (lambda (label:i8* cb nstates)
     (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_BUTTON_CHECKBOX (Widget_radio_c label cb nstates))))
 
-(bind-func Widget_radio_with_id
+(bind-func Widget_radio
   "create a radio button widget with a specified id
 
 @param label - a text label for the radio button
@@ -1053,9 +1039,6 @@ The widget will be assigned the next available id based on the current state of 
 "
   (lambda (label:i8* cb nstates id)
     (Widget_with_cb id .5 GUI_BUTTON_CHECKBOX (Widget_radio_c label cb nstates))))
-
-(bind-poly Widget_radio Widget_radio_with_id)
-(bind-poly Widget_radio Widget_radio_next_id)
 
 ;; slider
 
@@ -1108,7 +1091,7 @@ The widget will be assigned the next available id based on the current state of 
           (gui_draw_text_in_bounds bounds lab 30.)
           (nvgFill vg))))))
 
-(bind-func Widget_slider_next_id
+(bind-func Widget_slider
   "create a slider widget
 
 @param label - a text label for the slider
@@ -1119,7 +1102,7 @@ The widget will be assigned the next available id based on the current state of 
   (lambda (label:i8* cb)
     (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER (Widget_slider_c label cb))))
 
-(bind-func Widget_slider_with_id
+(bind-func Widget_slider
   "create a slider widget with a specified id
 
 @param label - a text label for the slider
@@ -1128,9 +1111,6 @@ The widget will be assigned the next available id based on the current state of 
 "
   (lambda (label:i8* cb id)
     (Widget_with_cb id .5 GUI_SLIDER (Widget_slider_c label cb))))
-
-(bind-poly Widget_slider Widget_slider_next_id)
-(bind-poly Widget_slider Widget_slider_with_id)
 
 ;; slider 2D
 
@@ -1172,7 +1152,7 @@ The widget will be assigned the next available id based on the current state of 
           (gui_draw_text_in_bounds bounds lab 30.)
           (nvgFill vg))))))
 
-(bind-func Widget_slider2D_next_id
+(bind-func Widget_slider2D
   "create a 2D slider widget
 
 @param label - a text label for the slider
@@ -1183,7 +1163,7 @@ The widget will be assigned the next available id based on the current state of 
   (lambda (label:i8* cb)
     (Widget_with_cb (+ (gui_find_next_id) 1) .5 GUI_SLIDER2D (Widget_slider2D_c label cb))))
 
-(bind-func Widget_slider2D_with_id
+(bind-func Widget_slider2D
   "create a 2D slider widget with a specified id
 
 @param label - a text label for the slider
@@ -1192,9 +1172,6 @@ The widget will be assigned the next available id based on the current state of 
 "
   (lambda (label:i8* cb id)
     (Widget_with_cb id .5 GUI_SLIDER2D (Widget_slider2D_c label cb))))
-
-(bind-poly Widget_slider2D Widget_slider2D_next_id)
-(bind-poly Widget_slider2D Widget_slider2D_with_id)
 
 ;; running the GUI interaction loop
 
