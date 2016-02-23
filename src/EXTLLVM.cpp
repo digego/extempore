@@ -1557,8 +1557,13 @@ namespace extemp {
       //
 
       llvm::TargetOptions Opts;
-	    //llvm::PerformTailCallOpt = true;
-      // Opts.GuaranteedTailCallOpt = true;
+
+#ifdef _WIN32
+      // guaranteed tail call *still* not supported on Windows
+      Opts.GuaranteedTailCallOpt = false;
+#else
+      Opts.GuaranteedTailCallOpt = true;
+#endif
       Opts.UnsafeFPMath = false;
 
 
