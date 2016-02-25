@@ -1562,18 +1562,10 @@ namespace extemp {
   void EXTLLVM::initLLVM()
   {
     if(M == 0) { // Initalize Once Only (not per scheme process)
-      //
 
       llvm::TargetOptions Opts;
-
-#ifdef _WIN32
-      // guaranteed tail call *still* not supported on Windows
-      Opts.GuaranteedTailCallOpt = false;
-#else
       Opts.GuaranteedTailCallOpt = true;
-#endif
       Opts.UnsafeFPMath = false;
-
 
       llvm::InitializeNativeTarget();
       llvm::InitializeNativeTargetAsmPrinter();
@@ -1601,11 +1593,12 @@ namespace extemp {
 #else          
       factory.setUseMCJIT(false);
 #endif
-      //if(!extemp::UNIV::ARCH.empty()) factory.setMArch(extemp::UNIV::ARCH.front());
-      // if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
-      // if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
+#ifdef _WIN32
+      if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
+      if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
+      llvm::TargetMachine* tm = factory.selectTarget();
+#else
       factory.setOptLevel(llvm::CodeGenOpt::Aggressive);
-      //factory.setOptLevel(llvm::CodeGenOpt::None);
       llvm::Triple triple(llvm::sys::getProcessTriple());           
       std::string cpu = llvm::sys::getHostCPUName();
       if(!extemp::UNIV::CPU.empty()) cpu = extemp::UNIV::CPU.front();
@@ -1626,6 +1619,7 @@ namespace extemp {
       }          
       
       llvm::TargetMachine* tm = factory.selectTarget(triple,"",cpu,lattrs);
+#endif // _WIN32
       EE = factory.create(tm);
       EE->DisableLazyCompilation(true);
 
@@ -1633,7 +1627,11 @@ namespace extemp {
       std::cout << "ARCH           : " << std::flush;
       ascii_text_color(1,6,10);
       std::cout << std::string(tm->getTargetTriple().normalize()) << std::endl;
+#ifdef _WIN32
+      if(!std::string(tm->getTargetFeatureString()).empty())
+#else
       if(!std::string(tm->getTargetCPU()).empty())
+#endif
         {
           ascii_text_color(0,7,10);
           std::cout << "CPU            : " << std::flush;
