@@ -1,5 +1,5 @@
 .. Extempore documentation master file, created by
-   sphinx-quickstart on Fri Sep 11 16:05:43 2015.
+   sphinx-quickstart on Fri Feb 26 09:45:22 2016.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
@@ -16,6 +16,7 @@ in the ``docs/`` subdirectory in the Extempore source distribution. So
 if you find problems, or can think of improvements, fork away on GH,
 edit the doc source files and submit a pull request---we'd love these
 docs to become a real community effort.
+Contents:
 
 .. toctree::
    :maxdepth: 2
@@ -26,14 +27,14 @@ Getting Started
 
 - Quickstart guide
 - editor support
-  
+
 xtlang - the Extempore language
--------------------------------  
+-------------------------------
 
 - type system
 - generics
 - binding to C libs
-  
+
 Extempore runtime
 -----------------
 
@@ -43,7 +44,7 @@ Extempore runtime
 
 Tutorial
 --------
-  
+
 - Audio
 - Graphics
 
