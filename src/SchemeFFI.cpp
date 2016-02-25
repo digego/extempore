@@ -313,8 +313,8 @@ namespace extemp {
 	    { "llvm:call-closure",			    &SchemeFFI::callClosure },
 	    { "llvm:print",				          &SchemeFFI::printLLVMModule },
 	    { "llvm:print-function",		    &SchemeFFI::printLLVMFunction },
-      { "llvm:print-closure",         &SchemeFFI::llvm_print_closure },
-      { "llvm:print-closure-work",    &SchemeFFI::llvm_print_closure_work },
+      { "llvm:print-all-closures",         &SchemeFFI::llvm_print_all_closures },
+      { "llvm:print-closure",    &SchemeFFI::llvm_print_closure },
       { "llvm:get-closure-work-name", &SchemeFFI::llvm_closure_last_name },
       { "llvm:disassemble",           &SchemeFFI::llvm_disasm },      
 	    { "llvm:bind-symbol",			      &SchemeFFI::bind_symbol },
@@ -1854,7 +1854,7 @@ namespace extemp {
     return func->isVarArg() ? _sc->T : _sc->F;
   }
 
-  pointer SchemeFFI::llvm_print_closure(scheme* _sc, pointer args)
+  pointer SchemeFFI::llvm_print_all_closures(scheme* _sc, pointer args)
   {
     using namespace llvm;
     char* x = string_value(pair_car(args));
@@ -1868,34 +1868,6 @@ namespace extemp {
     std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
     for (int i=0;i<Ms.size();i++) {
       M = Ms[i];    
-      for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
-        const llvm::Function* func = GI;
-        if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
-          //printf("HIT %s\n",func->getName().data());
-          std::string str;
-          llvm::raw_string_ostream ss(str);
-          ss << *func;
-          printf("\n---------------------------------------------------\n%s",str.c_str());        
-        }
-      }
-    }
-    return _sc->T;
-  }
-
-    pointer SchemeFFI::llvm_print_closure_work(scheme* _sc, pointer args)
-  {
-    using namespace llvm;
-    char* x = string_value(pair_car(args));
-    char rgx[1024];
-    memset((void*)&rgx[0],0,1024);
-    memcpy((void*)&rgx[0],x,strlen(x));
-    strcat((char*)&rgx[0],"__[0-9]*");
-    // printf("check regex: %s\n",(char*)&rgx[0]);
-    
-    Module* M = NULL;
-    std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
-    for (int i=0;i<Ms.size();i++) {
-      M = Ms[i];
       for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
         const llvm::Function* func = GI;
         if (func->hasName() && rmatch((char*)&rgx[0],(char*)func->getName().data())) {
@@ -1936,6 +1908,33 @@ namespace extemp {
     if(last_name) return mk_string(_sc,last_name);
     else return _sc->F;
   }
+
+
+    pointer SchemeFFI::llvm_print_closure(scheme* _sc, pointer args)
+  {
+    using namespace llvm;
+    char* fname = string_value(pair_car(args));
+    
+    Module* M = NULL;
+    std::vector<llvm::Module*> Ms = EXTLLVM::I()->getModules();
+    for (int i=0;i<Ms.size();i++) {
+      M = Ms[i];
+      for (Module::const_iterator GI = M->begin(), GE = M->end(); GI != GE; ++GI) {
+        const llvm::Function* func = GI;
+        if (func->hasName() && strcmp(func->getName().data(),fname)==0) {
+          std::string str;
+          llvm::raw_string_ostream ss(str);
+          ss << *func;
+          if(str.find_first_of("{") != std::string::npos) {
+            std::cout << str << std::endl;
+          }
+          //printf("\n---------------------------------------------------\n%s",str.c_str());
+        }
+      }
+    }
+    return _sc->T;
+  }
+  
 
   pointer SchemeFFI::llvm_disasm(scheme* _sc, pointer args)
   {

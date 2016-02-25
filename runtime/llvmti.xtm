@@ -479,7 +479,10 @@
              (list? types)
              (= (length types) 1)
              (list? (car types)))
-        (set! types (car types)))        
+        (set! types (car types)))
+    (if (and (not (null? types))
+             (symbol? (car types)))
+        (set! types (list types)))
     ;; (println 'types: types)
     ;; (println 'ast: ast)
     (print-with-colors 'black 'red #t (print "Could not resolve types!"))
@@ -490,7 +493,8 @@
     (print-with-colors 'default 'default #t (print "\n"))
     (for-each (lambda (t)
                 ;; (println 't t (impc:ir:type? (cdr t)))
-                (if (or (and (not (null? (cdr t)))
+                (if (or (atom? t)
+                        (and (not (null? (cdr t)))
                              (not (atom? (cdr t)))
                              (member (cadr t) '(213)))
                         (and (not (null? (cdr t)))
@@ -508,7 +512,9 @@
                            (expr1 (if (null? ast) '()
                                       (flatten (impc:compiler:print-could-not-resolve-types_find-expr (car t) ast))))
                            (expr2 (cl:remove #f expr1))
-                           (expr (if (null? expr2) '() (vector-ref (car expr2) 0))))
+                           (expr1a (if (null? expr2) '() (vector-ref (car expr2) 0)))
+                           (all-expr (cl:every (lambda (x) (symbol? x)) expr1a))
+                           (expr (if all-expr (car expr1a) expr1a)))
                       ;; (println tsr ': expr)
                       ;; (println 'tsr tsr (car t))
                       (if (null? tsr)
@@ -11251,6 +11257,32 @@ e.g.
                                             "")))
               fullname)))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; print ir & x86 assm
+;;
+
+(define-macro (llvm:ir name . type)
+  (let ((t (if (null? type) #f (car type))))
+    `(let* ((n1 ,(if t
+                     `(impc:ti:get-mono-name ,name ,t)
+                     `(impc:ti:get-mono-name ,name)))                  
+            (n2 (llvm:get-closure-work-name n1)))
+       ;; (println 'n1 n1 'n2 n2)
+       (llvm:print-closure n2))))
+
+(define-macro (llvm:asm name . args)
+  (let* ((a1 (if (null? args) #f (car args)))
+         (a2 (if (null? args) #f (if (null? (cdr args)) #f (cadr args))))
+         (type (if (symbol? a1) a1 (if (symbol? a2) a2 #f)))
+         (assm_print_type (if (number? a1) a1 (if (number? a2) a2 #f))))
+    `(let ((n1 ,(if type
+                    `(impc:ti:get-mono-name ,name ,type)
+                    `(impc:ti:get-mono-name ,name))))
+       ,(if (not assm_print_type)
+            `(print (llvm:disassemble n1 0) "\n")
+            `(print (llvm:disassemble n1 ,assm_print_type) "\n")))))
 
 ;; to catch the dreaded heisenbug...
 

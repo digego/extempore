@@ -190,8 +190,8 @@ namespace extemp {
 	static pointer llvm_count(scheme* _sc, pointer args);
 	static pointer llvm_count_set(scheme* _sc, pointer args);
 	static pointer llvm_count_inc(scheme* _sc, pointer args);
+  static pointer llvm_print_all_closures(scheme* _sc, pointer args);
   static pointer llvm_print_closure(scheme* _sc, pointer args);
-  static pointer llvm_print_closure_work(scheme* _sc, pointer args);
   static pointer llvm_closure_last_name(scheme* _sc, pointer args);
   static pointer llvm_disasm(scheme* _sc, pointer args);
 	static pointer callClosure(scheme* _sc, pointer args);
