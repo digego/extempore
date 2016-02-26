@@ -74,7 +74,7 @@ Download a
 [precompiled binary](http://extempore.moso.com.au/extras/Extempore-0.6.0-win64.zip),
 unzip it and run `extempore.exe` from inside the `extempore` folder.
 
-## Get the depenencies
+## Get the dependencies
 
 You'll need
 
@@ -161,7 +161,7 @@ On **Linux/OSX** CMake will generate a `Makefile` in `cmake-build`,
 with a few useful targets:
 
 - `make` will build Extempore (if you have a multicore machine, you
-  can try e.g. `make -j4` to parallellize the `make` step, especially
+  can try e.g. `make -j4` to parallelize the `make` step, especially
   since LLVM takes so long to build)
 - `make install` will install `extempore` into `/usr/local/bin`
 - `make uninstall` will remove the installed files
