@@ -6,6 +6,14 @@
 The Extempore programming environment
 =====================================
 
+.. code-block:: extempore
+
+  (bind-func dsp:DSP
+    (lambda (in time chan dat)
+      (* 0.1 (cos (* .1 (convert time))))))
+  
+  (dsp:set! dsp)
+
 Welcome to Extempore's documentation site. It's a work in
 progress---up till now things have been hosted on `Ben's blog
 <http://benswift.me/extempore-docs/>`_ but this is an attempt to do
@@ -20,7 +28,6 @@ Contents:
 
 .. toctree::
    :maxdepth: 2
-
 
 Getting Started
 ---------------
@@ -42,8 +49,8 @@ Extempore runtime
 - time
 - Scheme-xtlang interop
 
-Tutorial
---------
+Tutorials
+---------
 
 - Audio
 - Graphics
