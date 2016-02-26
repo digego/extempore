@@ -7,6 +7,7 @@ option(ASIO "use the ASIO Portaudio backend" OFF)
 option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(EXTENDED_DEPS "download & build deps for aot_extended" OFF)
+option(JACK "compile jack interface for portaudio" OFF)
 
 if(PACKAGE)
   # this needs to be set before project() is called
@@ -158,6 +159,15 @@ elseif(UNIX AND NOT APPLE)
     PRIVATE -DPA_USE_ALSA)
   target_link_libraries(portaudio
     PRIVATE asound)
+
+  if(JACK)
+    target_sources(portaudio
+      PRIVATE src/portaudio/src/hostapi/jack/pa_jack.c)
+    target_compile_definitions(portaudio
+      PRIVATE -DPA_USE_JACK)
+    target_link_libraries(portaudio
+      PRIVATE jack)
+  endif()
 
 elseif(WIN32)
   # use everything except for ASIO on Windows by default, but you can
