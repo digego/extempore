@@ -1,8 +1,3 @@
-.. Extempore documentation master file, created by
-   sphinx-quickstart on Fri Feb 26 09:45:22 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 The Extempore programming environment
 =====================================
 
@@ -24,46 +19,58 @@ in the ``docs/`` subdirectory in the Extempore source distribution. So
 if you find problems, or can think of improvements, fork away on GH,
 edit the doc source files and submit a pull request---we'd love these
 docs to become a real community effort.
-Contents:
+
+.. _getting-started-docs:
 
 .. toctree::
    :maxdepth: 2
+   :caption: Getting started
 
-Getting Started
----------------
+   quickstart
+   editor-support
 
-- Quickstart guide
-- editor support
+.. _xtlang-docs:
 
-xtlang - the Extempore language
--------------------------------
+.. toctree::
+   :maxdepth: 2
+   :caption: xtlang---the Extempore language
 
-- type system
-- generics
-- binding to C libs
+   type-system
+   generics
+   binding-to-C-libs
 
-Extempore runtime
------------------
+.. _extempore-environment-docs:
 
-- CaaS
-- time
-- Scheme-xtlang interop
+.. toctree::
+   :maxdepth: 2
+   :caption: Extempore programming environment
 
-Tutorials
----------
+   caas
+   time
+   scheme-xtlang-interop
 
-- Audio
-- Graphics
+.. _tutorials:
 
-Getting involved
-----------------
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
 
-- list of projects
+   audio
+   graphics
+
+.. _community-docs:
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Community
+
+   mailing-list
+   contributing
+   list-of-projects
 
 Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
 
