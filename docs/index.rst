@@ -3,9 +3,10 @@ The Extempore programming environment
 
 Welcome to Extempore's documentation site. It's a work in
 progress---up till now things have been hosted on `Ben's blog`_ but
-this is an attempt to do things right, using Sphinx_.
+this is an attempt to do things right, using Sphinx_. Having said
+that, these docs are still very much a `work in progress`_.
 
-.. code-block:: extempore
+.. code:: extempore
 
   (bind-func dsp:DSP
     (lambda (in time chan dat)
@@ -28,6 +29,7 @@ these docs to become a real community effort.
 
 .. _Ben's blog: http://benswift.me/extempore-docs/
 .. _Sphinx: http://sphinx-doc.org/
+.. _work in progress: about-these-docs
 
 .. _getting-started-docs:
 
@@ -37,6 +39,7 @@ these docs to become a real community effort.
 
    quickstart
    editor-support
+   about-these-docs
 
 .. _xtlang-docs:
 
@@ -77,8 +80,8 @@ these docs to become a real community effort.
    contributing
    list-of-projects
 
-Indices and tables
-==================
+Other useful things
+===================
 
 * :ref:`genindex`
 * :ref:`search`
