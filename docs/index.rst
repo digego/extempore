@@ -1,6 +1,10 @@
 The Extempore programming environment
 =====================================
 
+Welcome to Extempore's documentation site. It's a work in
+progress---up till now things have been hosted on `Ben's blog`_ but
+this is an attempt to do things right, using Sphinx_.
+
 .. code-block:: extempore
 
   (bind-func dsp:DSP
@@ -9,16 +13,21 @@ The Extempore programming environment
   
   (dsp:set! dsp)
 
-Welcome to Extempore's documentation site. It's a work in
-progress---up till now things have been hosted on `Ben's blog
-<http://benswift.me/extempore-docs/>`_ but this is an attempt to do
-things right, using `Sphinx <http://sphinx-doc.org/>`_.
-
 These docs are generated from the reStructured text (``.rst``) files
-in the ``docs/`` subdirectory in the Extempore source distribution. So
-if you find problems, or can think of improvements, fork away on GH,
-edit the doc source files and submit a pull request---we'd love these
-docs to become a real community effort.
+in the ``docs/`` subdirectory in the Extempore source distribution.
+You can edit those files and build the documentation locally if you've
+got all the Sphinx stuff on your box, just run::
+
+    sphinx-autobuild . _build_html
+
+in the ``docs/`` subdirectory.
+
+So if you find problems, or can think of improvements, fork away on
+GH, edit the doc source files and submit a pull request---we'd love
+these docs to become a real community effort.
+
+.. _Ben's blog: http://benswift.me/extempore-docs/
+.. _Sphinx: http://sphinx-doc.org/
 
 .. _getting-started-docs:
 
