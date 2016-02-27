@@ -4,10 +4,10 @@ option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASIO "use the ASIO Portaudio backend" OFF)
+option(JACK "use the Jack Portaudio backend" OFF)
 option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(EXTENDED_DEPS "download & build deps for aot_extended" OFF)
-option(JACK "compile jack interface for portaudio" OFF)
 
 if(PACKAGE)
   # this needs to be set before project() is called
