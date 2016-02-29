@@ -427,9 +427,9 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     zone->size = size;
     zone->cleanup_hooks = NULL;
     zone->memories = NULL;
-#if DEBUG_ZONE_ALLOC    
+    #if DEBUG_ZONE_ALLOC    
     printf("CreateZone: %x:%x:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
-#endif
+    #endif
     return zone;
 }
 
@@ -441,10 +441,12 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone)
 
 void llvm_zone_destroy(llvm_zone_t* zone)
 {
-#if DEBUG_ZONE_ALLOC  
+  #if DEBUG_ZONE_ALLOC  
     printf("DestroyZone: %p:%p:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size);
-#endif
+  #endif
     if(zone->memories != NULL) llvm_zone_destroy(zone->memories);
+    // immediate zeroing for debug purposes!
+    memset(zone->memory,0,zone->size);
     free(zone->memory);    
     free(zone);
     return;
@@ -610,7 +612,7 @@ void free_after_delay(char* dat, double delay)
 extemp::CM* DestroyMallocZoneWithDelayCM = mk_cb(extemp::SchemeFFI::I(),extemp::SchemeFFI,destroyMallocZoneWithDelay);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay)
 {
-    //printf("destroyWithDelay %p\n",zone);
+    // printf("destroyWithDelay %p\n",zone);
     extemp::CM* cb = DestroyMallocZoneWithDelayCM;
     extemp::Task<llvm_zone_t*>* task = new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME+delay,44100,cb,zone);
     extemp::TaskScheduler::I()->add(task);
