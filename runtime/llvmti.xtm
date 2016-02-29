@@ -3820,7 +3820,19 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                            "##" ;"$$$"
                                                            (number->string *unique-polynum*)))
                             (impc:ti:first-transform (cdr ast) inbody?)))
-                     ((and
+                     ((and ;; exact poly match (with type)
+                       (symbol? (car ast))
+                       (regex:match? (symbol->string (car ast)) ":\\[")
+                       ;;(impc:ti:polyfunc-exists? (car (regex:type-split (symbol->string (car ast)) ":"))
+                       (impc:ti:get-polyfunc-candidate (car (regex:type-split (symbol->string (car ast)) ":"))
+                                                       (impc:ir:get-type-from-pretty-str
+                                                        (cadr (regex:type-split (symbol->string (car ast)) ":")))))
+                      (let ((p (regex:type-split (symbol->string (car ast)) ":")))
+                        (cons
+                         (impc:ti:get-polyfunc-candidate (car p)
+                                                         (impc:ir:get-type-from-pretty-str (cadr p)))
+                         (impc:ti:first-transform (cdr ast) inbody?))))                   
+                     ((and ;; generic match (with type)
                        (symbol? (car ast))
                        (regex:match? (symbol->string (car ast)) ":\\[")
                        (impc:ti:genericfunc-exists? (car (regex:type-split (symbol->string (car ast)) ":"))))
@@ -3830,7 +3842,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                         (cons
                          (string->symbol (impc:ir:pointer++ (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
                          (impc:ti:first-transform (cdr ast) inbody?))))
-                     ((and
+                     ((and ;; non exact poly match with (with type)
                        (symbol? (car ast))
                        (regex:match? (symbol->string (car ast)) ":\\[")
                        (impc:ti:polyfunc-exists? (car (regex:type-split (symbol->string (car ast)) ":"))))
@@ -8002,7 +8014,7 @@ xtlang's `let' syntax is the same as Scheme"
 
 (define impc:ti:while-check
   (lambda (ast vars kts request?)
-    (if (tree-member 'let ast)
+    (if (tree-member 'let (cadr ast))
         (impc:compiler:print-compiler-error "You cannot bind variables within a while condition check!" (cadr ast)))
     (let ((type (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:i1*)))
           (body (impc:ti:type-check (caddr ast) vars kts #f)))
@@ -9870,10 +9882,13 @@ xtlang's `let' syntax is the same as Scheme"
                                   (if (and (impc:ir:tuple? a)
                                            (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
                                            (= 1 (impc:ir:get-ptr-depth a)))
-                                      `(if (not (null? (tref x ,c)))
-                                           (tset! obj ,b (,(string->symbol
-                                                            (string-append (substring a 1 (- (string-length a) 1)) "_hcopy"))
-                                                           (tref x ,c))))
+                                      (let* ((t (substring a 1 (- (string-length a) 1)))
+                                             (fname (if (string=? namestr t)
+                                                        'hcopy
+                                                        (string->symbol (string-append "hcopy:[" t "*," t "*]*")))))
+                                        ;; (println 't: t 'name: name 'type: type)
+                                        `(if (not (null? (tref x ,c)))
+                                             (tset! obj ,b (,fname (tref x ,c)))))
                                       `(tset! obj ,b (tref x ,c))))
                                 a arglst2 (range (length a)))))
            (hfree_body (if generic #f
@@ -9882,10 +9897,12 @@ xtlang's `let' syntax is the same as Scheme"
                                   (if (and (impc:ir:tuple? a)
                                            (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
                                            (= 1 (impc:ir:get-ptr-depth a)))
-                                      `(if (not (null? (tref x ,c)))
-                                           (,(string->symbol
-                                              (string-append (substring a 1 (- (string-length a) 1)) "_hfree"))
-                                             (tref x ,c)))))
+                                      (let* ((t (substring a 1 (- (string-length a) 1)))
+                                             (fname (if (string=? namestr t)
+                                                        'hfree
+                                                        (string->symbol (string-append "hfree:[void," t "*]*")))))
+                                        `(if (not (null? (tref x ,c)))
+                                             (,fname (tref x ,c))))))
                                 a (range (length a)))))
            (zcopy_body (if generic #f
                            (map (lambda (a b c)
@@ -9893,10 +9910,12 @@ xtlang's `let' syntax is the same as Scheme"
                                   (if (and (impc:ir:tuple? a)
                                            (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
                                            (= 1 (impc:ir:get-ptr-depth a)))
-                                      `(if (not (null? (tref x ,c)))
-                                           (tset! obj ,b (,(string->symbol
-                                                            (string-append (substring a 1 (- (string-length a) 1)) "_zcopy"))
-                                                           (tref x ,c) fromz toz)))
+                                      (let* ((t (substring a 1 (- (string-length a) 1)))
+                                             (fname (if (string=? namestr t)
+                                                        'zcopy
+                                                        (string->symbol (string-append "zcopy:[" t "*," t "*,mzone*,mzone*]*")))))
+                                        `(if (not (null? (tref x ,c)))
+                                             (tset! obj ,b (,fname (tref x ,c) fromz toz))))
                                       (if (and (impc:ir:pointer? a)
                                                (= 1 (impc:ir:get-ptr-depth a)))
                                           `(if (llvm_ptr_in_zone fromz (cast (tref x ,c) i8*))
@@ -9980,20 +9999,21 @@ xtlang's `let' syntax is the same as Scheme"
                          (free obj)
                          val)))
                   (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append namestr "_hcopy:[" namestr "*," namestr "*]*"))
+            (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
                        (let ((obj (halloc)))
                          ,@hcopy_body
                          obj)))
                   (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append namestr "_hfree:[void," namestr "*]*"))
+            (eval `(bind-func ,(string->symbol (string-append "hfree:[void," namestr "*]*"))
                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
                        ,@hfree_body
                        (free x)
                        void))
                   (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append namestr "_zcopy:[" namestr "*," namestr "*,%mzone*,%mzone*]*"))
+            (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
                      (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
+                       (println "calling zcopy on " ,namestr)                       
                        (let ((obj (zalloc)))
                          ,@zcopy_body
                          obj)))
