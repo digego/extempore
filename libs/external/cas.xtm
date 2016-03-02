@@ -201,15 +201,16 @@
          (set! e (substring e 4 (length e))))
      (if (regex_match "^\\[.*\\]$" e)
          (let ((p (regex_split "," (substring e 1 (- (length e) 1)))))
-           (cat (Str "(vector") (concat (map (lambda (x) (cat (Str " ") (cas2xtm x))) p)) (Str ")")))          
-         (cat (Str "(+ 0.0:double ")
-                     (multi_replace_all (concat (cas_parse_terms e))
+           (cat (Str "(vector") (concat (map (lambda (x) (cat (Str " ") (cas2xtm x))) p)) (Str ")")))
+         (let ((res1 (multi_replace_all (concat (cas_parse_terms e))
                                         (list
                                          (list (Str "plus") (Str "+"))
                                          (list (Str "neg") (Str "* -1.0:double"))
-                                         (list (Str "pi") (Str "PI"))))
-                     (Str ")")
-                     )))))
+                                         (list (Str "pi") (Str "PI")))))
+               (res (cat (Str "(+ 0.0:double ")
+                         res1
+                         (Str ")"))))
+           res)))))
 
 
 (bind-func cas2xtmi8
@@ -218,7 +219,8 @@
 
 (bind-func cas2xtm_scm
   (lambda (e)
-    (cstring (cas2xtm:[String*,String*]* (Str e)))))
+    (let ((res (cas2xtm:[String*,String*]* (Str e))))
+      (cstring res))))
 
 
 (bind-func caspp
@@ -262,7 +264,8 @@
   (let* ((a (cas-xtm-to-string `(,name ,e ,@args)))
          (b (regex:replace-all a "}" "\)"))
          (c (regex:replace-all b "{" "\("))
-         (res1 (cptr->string (cas2xtm_scm (cptr->string (casppoff c)))))
+         (xx (cptr->string (casppoff c)))
+         (res1 (cptr->string (cas2xtm_scm xx)))
          (res2 (regex:replace-all res1 "([0-9]*)\\.0*\\:double" "$1"))
          (res3 (regex:replace-all res2 "\\:double" "0"))
          (res (string->sexpr res2)))
