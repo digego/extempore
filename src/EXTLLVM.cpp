@@ -454,7 +454,15 @@ void llvm_zone_destroy(llvm_zone_t* zone)
 
 void llvm_zone_print(llvm_zone_t* zone)
 {
-  printf("Zone(%p) Mem(%p) Offset(%lld) Size(%lld)\n",zone,zone->memory,zone->offset,zone->size);
+  llvm_zone_t* tmp = zone;
+  int64_t total_size = zone->size;
+  int64_t segments = 1;
+  while(tmp->memories != NULL) {
+    tmp = tmp->memories;
+    total_size += tmp->size;
+    segments++;
+  }
+  printf("<MemZone(%p) size(%lld) free(%lld) segs(%lld)>",zone,total_size,(zone->size - zone->offset),segments);
   return;
 }
 
