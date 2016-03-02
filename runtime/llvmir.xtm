@@ -2038,10 +2038,11 @@
       (impc:ir:strip-space os))))
 
 (define impc:ir:compile:apply-closure
-  (lambda (ast types ftype-provided?)
-    ;; (println 'apply-closure ast types ftype-provided? (car *impc:ir:sym-name-stack*))
+  (lambda (ast types ftype-provided? . args)
+    ;; (println 'apply-closure ast 'ts: types 'symstack: *impc:ir:sym-name-stack*)
+    ;; (if ftype-provided? (println 'ftype: (car args)))
     (let* ((functiontype (if ftype-provided?
-                             (cdr (impc:ir:get-type-from-str (cadar ast)))
+                             (cdr (impc:ir:get-type-from-str (cadar (car args))))
                              (if (and (assoc-strcmp (car ast) types)
                                       (impc:ir:closure? (cdr (assoc-strcmp (car ast) types)))
                                       (= 2 (impc:ir:get-ptr-depth (cdr (assoc-strcmp (car ast) types)))))
@@ -2059,12 +2060,12 @@
                         (impc:ir:gname))
                       (cdr ast)
                       (cdr functiontype))))
-      ;;(println 'recursive-call! recursive-call (car *impc:ir:sym-name-stack*) (car ast))
+      ;; (println 'recursive-call! recursive-call (car *impc:ir:sym-name-stack*) (car ast))
       (emit "\n; apply closure \n" os)
       (define v '())
       (if ftype-provided?
           (begin (emit (impc:ir:gname "val" clstype)
-                       " = load " clstype "," clstype "* " (caar ast) "\n" os)
+                       " = load " clstype "," clstype "* " (caar (car args)) "\n" os)
                  (set! v (car (impc:ir:gname "val"))))
           (begin (emit (impc:ir:gname "vval" (string-append clstype "*"))
                        " = load " clstype "*, " clstype "** %"
@@ -3993,12 +3994,14 @@
                                          (impc:compiler:print-compiler-error "compiler failed")))))
                       lstr))
                    ((member (car ast) '(clrun->)) ;; apply function
-                    (if (impc:ti:closure-exists? (symbol->string (cadr ast))) ;; if closure is a global var? (i.e. global env)
+                    (if (impc:ti:closure-exists? (symbol->string (cadr ast)))
                         (string-append (impc:ir:compiler (cadr ast) types)
-                                       (impc:ir:compile:apply-closure (cons (impc:ir:gname) (cddr ast)) types #t))
+                                       (impc:ir:compile:apply-closure (cdr ast) types #t
+                                                                      (cons (impc:ir:gname) (cddr ast))))
                         (if (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; else is gloval var (i.e. bind-val)
                             (string-append (impc:ir:compiler (cadr ast) types)
-                                           (impc:ir:compile:apply-closure (cons (impc:ir:gname) (cddr ast)) types #t))
+                                           (impc:ir:compile:apply-closure (cdr ast) types #t
+                                                                          (cons (impc:ir:gname) (cddr ast))))
                             (impc:ir:compile:apply-closure (cdr ast) types #f)))) ;; else closure is in local env
                    ((equal? (car ast) 'set!)
                     (impc:ir:compiler:set! ast types))
@@ -4123,10 +4126,11 @@
                                    (impc:ir:compiler (cdr ast) types)))
                    ((list? (car ast))
                     (string-append (impc:ir:compiler (car ast) types)
-                                   (impc:ir:compile:apply-closure (cons (impc:ir:gname) (cdr ast)) types #t)))
+                                   (impc:ir:compile:apply-closure (cons 'anonlambdaref (cdr ast)) types #t (cons (impc:ir:gname) (cdr ast)))))
                    (else (string-append (impc:ir:compiler (car ast) types)
                                         (impc:ir:compiler (cdr ast) types)))))
             ((pair? ast)
              (let ((a (impc:ir:compiler (car ast) types))
                    (b (impc:ir:compiler (cdr ast) types)))
                (string-append a b)))))))
+
