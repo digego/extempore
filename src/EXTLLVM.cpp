@@ -498,6 +498,7 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
     {
 
 #if EXTENSIBLE_ZONES // if extensible_zones is true then extend zone size by zone->size
+    int old_zone_size = zone->size;
     int iszero = (zone->size == 0) ? 1 : 0;
     if(size > zone->size) zone->size = size;
     zone->size = zone->size * 2; // keep doubling zone size for each new allocation
@@ -507,9 +508,11 @@ void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
     if(iszero == 1) { // if initial zone is 0 - the replace don't extend
       zone->memory = tmp;
       free(newzone);
-    }else{
+    } else {
+      // printf("adding new memory %p:%lld to existing %p:%lld\n",newzone,newzone->size,zone,zone->size);
       newzone->memories = zone->memories;
       newzone->memory = zone->memory;
+      newzone->size = old_zone_size;
       zone->memory = tmp;
       zone->memories = newzone;
     }
