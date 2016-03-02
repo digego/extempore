@@ -9952,21 +9952,20 @@ xtlang's `let' syntax is the same as Scheme"
             (interaction-environment))
       (if (and generic printer?)
           (begin
-            (eval `(bind-func ,(string->symbol (string-append "toString:[void, " namestr "*]*")) #t
+            (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
                      (lambda (x)
                        (if (null? x)
                            (sprintout ,(string-append "<" namestr ":null"))
                            (sprintout ,(string-append "<" namestr ":")
-                                     ,@(cdr (apply append (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
-                                     ">"))
-                       void))
+                                     ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                     ">"))))
                   (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append "print:[void, " namestr "*]*")) #t
+            (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
                      (lambda (x)
                        (if (null? x)
                            (printout ,(string-append "<" namestr ":null"))
                            (printout ,(string-append "<" namestr ":")
-                                     ,@(cdr (apply append (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                     ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
                                      ">"))
                        void))
                   (interaction-environment))))
@@ -9974,21 +9973,22 @@ xtlang's `let' syntax is the same as Scheme"
           (begin
             (if (and (not (regex:match? namestr "_poly_")) printer?)
                 (begin
-                  (eval `(bind-func ,(string->symbol (string-append "toString:[void, " namestr "*]*")) #t
+                  (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
                            (lambda (,(string->symbol (string-append "x:" namestr "*")))
                              (if (null? x)
                                  (sprintout ,(string-append "<" namestr ":null>"))
                                  (sprintout ,(string-append "<" namestr ":")
-                                           ,@(cdr (apply append (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
-                                           ">"))
-                             void))
-                        (interaction-environment))               
-                  (eval `(bind-func ,(string->symbol (string-append "print:[void, " namestr "*]*")) #t
+                                            ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n)))
+                                                                          (range (length a)))))
+                                            ">"))))
+                        (interaction-environment))          
+                  (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
                            (lambda (,(string->symbol (string-append "x:" namestr "*")))
                              (if (null? x)
                                  (printout ,(string-append "<" namestr ":null>"))
                                  (printout ,(string-append "<" namestr ":")
-                                           ,@(cdr (apply append (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                           ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n)))
+                                                                         (range (length a)))))
                                            ">"))
                              void))
                         (interaction-environment))))
