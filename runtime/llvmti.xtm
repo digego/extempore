@@ -9932,19 +9932,19 @@ xtlang's `let' syntax is the same as Scheme"
       (suppress-compiler-messages #t)
       (if constructor?
           (begin
-            (eval `(bind-func ,(string->symbol (string-append namestr ":" ctype)) #t
+            (eval `(bind-func ,(string->symbol (string-append namestrup ":" ctype)) #t
                      (lambda ,argslist
                        (let ((obj (zalloc)))
                          ,@body
                          obj)))
                   (interaction-environment))))
-      (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
+      (eval `(bind-func ,(string->symbol (string-append namestrup (if generic ":" "_z:") ctype)) #t
                (lambda ,argslist
                  (let ((obj (zalloc)))
                    ,@body
                    obj)))
             (interaction-environment))
-      (eval `(bind-func ,(string->symbol (string-append namestr "_h:" ctype)) #t
+      (eval `(bind-func ,(string->symbol (string-append namestrup "_h:" ctype)) #t
                (lambda ,argslist
                  (let ((obj (halloc)))
                    ,@body
@@ -9992,9 +9992,9 @@ xtlang's `let' syntax is the same as Scheme"
                                            ">"))
                              void))
                         (interaction-environment))))
-            (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
+            (eval `(bind-func ,(string->symbol (string-append namestrdown "")) ; "_val"))
                      (lambda ,argslist
-                       (let ((obj (,(string->symbol (string-append namestr "_h")) ,@argslist))
+                       (let ((obj (,(string->symbol (string-append namestrup "_h")) ,@argslist))
                              (val (pref obj 0)))
                          (free obj)
                          val)))
@@ -10013,7 +10013,6 @@ xtlang's `let' syntax is the same as Scheme"
                   (interaction-environment))
             (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
                      (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
-                       (println "calling zcopy on " ,namestr)                       
                        (let ((obj (zalloc)))
                          ,@zcopy_body
                          obj)))
@@ -10029,6 +10028,8 @@ xtlang's `let' syntax is the same as Scheme"
   ;; (println 'bind-type args)
   (if (null? args)
       (impc:compiler:print-compiler-error "Bind type missing arguments! (symbol type [docstring])"))
+  (if (regex:match? (symbol->string (car args)) "^[a-z].*")
+      (print-with-colors 'cyan 'black #t (print "Note: by convention XTLang prefers capitalized named types\nYour reference constructor will be capitalized, your value constructor lower case.\n")))
   (let* ((symbol (car args))
          (type_1 (cadr args))
          (type (string->symbol
