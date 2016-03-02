@@ -10,7 +10,7 @@
 # You can build the documentation locally if you've got all the Sphinx
 # stuff on your box, just run
 
-#   sphinx-autobuild . _build_html
+#   sphinx-autobuild . _build
 
 # in the docs/ subdirectory.
 

@@ -1,12 +1,15 @@
 The Extempore programming environment
 =====================================
 
+.. note:: This documentation is not yet ready for prime time, so
+          don't rely on it yet. See :doc:`about-this-documentation`
+          for more info.
+
 Welcome to Extempore's documentation site. It's a work in
 progress---up till now things have been hosted on `Ben's blog`_ but
-this is an attempt to do things right, using Sphinx_. Having said
-that, these docs are still very much a `work in progress`_.
+this is an attempt to do things right, using Sphinx_.
 
-.. code:: extempore
+.. code-block:: extempore
 
   (bind-func dsp:DSP
     (lambda (in time chan dat)
@@ -14,71 +17,58 @@ that, these docs are still very much a `work in progress`_.
   
   (dsp:set! dsp)
 
-These docs are generated from the reStructured text (``.rst``) files
-in the ``docs/`` subdirectory in the Extempore source distribution.
-You can edit those files and build the documentation locally if you've
-got all the Sphinx stuff on your box, just run::
-
-    sphinx-autobuild . _build_html
-
-in the ``docs/`` subdirectory.
-
-So if you find problems, or can think of improvements, fork away on
-GH, edit the doc source files and submit a pull request---we'd love
-these docs to become a real community effort.
-
 .. _Ben's blog: http://benswift.me/extempore-docs/
 .. _Sphinx: http://sphinx-doc.org/
-.. _work in progress: about-these-docs
 
 .. _getting-started-docs:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Getting started
 
    quickstart
    editor-support
-   about-these-docs
-
-.. _xtlang-docs:
-
-.. toctree::
-   :maxdepth: 2
-   :caption: xtlang---the Extempore language
-
-   type-system
-   generics
-   binding-to-C-libs
+   about-this-documentation
 
 .. _extempore-environment-docs:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Extempore programming environment
 
+   philosophy
    caas
    time
+   c-xtlang-interop
    scheme-xtlang-interop
+
+.. _xtlang-docs:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: xtlang---the Extempore language
+
+   type-system
+   generics
+   memory
 
 .. _tutorials:
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Tutorials
+   :maxdepth: 1
+   :caption: Tutorials & Guides
 
    audio
    graphics
 
-.. _community-docs:
+.. _help-docs:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Community
 
-   mailing-list
+   getting-help
    contributing
-   list-of-projects
 
 Other useful things
 ===================
