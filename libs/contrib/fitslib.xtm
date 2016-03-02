@@ -10,15 +10,25 @@
 
 ;;; Code:
 
+(sys:load "libs/aot-cache/fits.xtm" 'quiet)
+(sys:load-preload-check 'fits)
+(define *xtmlib-fits-loaded* #f)
+
+;; (impc:aot:suppress-aot-do
+;;  (sys:load "libs/base/base.xtm"))
+;; (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmfits")
+
 (bind-dylib fitslib
-  (if (string=? "Linux" (sys:platform))
-      "libcfitsio.so.3"
-      (print-error "tell me where to find the cfitsio dynamic library on your platform here!")))
+  (cond ((string=? (sys:platform) "OSX") "libcfitsio.dylib")
+        ((string=? (sys:platform) "Linux") "libcfitsio.so.3")
+        ((string=? (sys:platform) "Windows") "cfitsio.dll")))
 
 (bind-dylib wcslib
-  (if (string=? "Linux" (sys:platform))
-      "libwcs.so.4.13.4"
-      (print-error "tell me where to find the wcs dynamic library on your platform here!")))
+  (cond ((string=? (sys:platform) "OSX") "libwcs.dylib")
+        ((string=? (sys:platform) "Linux") "libwcs.so.4")
+        ((string=? (sys:platform) "Windows") "libwcs.dll")))
 
 
 ;; should really add this struct (wcsprm) from wcslib
@@ -573,3 +583,7 @@
       (printf "%s:\t%f\n" comment (pref datamin 0) (pref status 0))
       (printf "\n")
       void)))
+
+
+(impc:aot:insert-footer "xtmfits")
+(define *xtmlib-fits-loaded* #t)
