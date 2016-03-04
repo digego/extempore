@@ -3899,11 +3899,11 @@ Continue executing `body' forms until `test-expression' returns #f"
                      ((eq? (car ast) 'free)
                       (list 'free (list 'bitcast (impc:ti:first-transform (cadr ast) inbody?)
                                         'i8*)))
-                     ((member (car ast) '(Vector))
+                     ((member (car ast) '(vector_ref))
                       (impc:ti:first-transform `(let ((v1 (alloc)) (v2 (vector ,@(cdr ast)))) (pset! v1 0 v2) v1) inbody?))
-                     ((member (car ast) '(Array))
+                     ((member (car ast) '(array_ref))
                       (impc:ti:first-transform `(let ((a1 (alloc)) (a2 (array ,@(cdr ast)))) (pset! a1 0 a2) a1) inbody?))
-                     ((member (car ast) '(Tuple))
+                     ((member (car ast) '(tuple_ref))
                       (impc:ti:first-transform `(let ((t1 (alloc)) (t2 (tuple ,@(cdr ast)))) (pset! t1 0 t2) t1) inbody?))
                      ((member (car ast) '(vector))
                       `(make-vector ,@(map (lambda (x) (impc:ti:first-transform x inbody?)) (cdr ast))))
@@ -9843,8 +9843,8 @@ xtlang's `let' syntax is the same as Scheme"
            (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
            (arglst2 *impc:alphabetidxlist*) ;; '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
            (namestr (symbol->string name))
-           (namestrup (impc:ti:word-upcase (symbol->string name)))
-           (namestrdown (impc:ti:word-downcase (symbol->string name)))
+           ;;(namestrup (impc:ti:word-upcase (symbol->string name)))
+           ;;(namestrdown (impc:ti:word-downcase (symbol->string name)))
            (ctype (string-append "["
                                  (if generic
                                      (apply string-append namestr ":" type "*"
@@ -9932,19 +9932,19 @@ xtlang's `let' syntax is the same as Scheme"
       (suppress-compiler-messages #t)
       (if constructor?
           (begin
-            (eval `(bind-func ,(string->symbol (string-append namestrup ":" ctype)) #t
+            (eval `(bind-func ,(string->symbol (string-append namestr ":" ctype)) #t
                      (lambda ,argslist
                        (let ((obj (zalloc)))
                          ,@body
                          obj)))
                   (interaction-environment))))
-      (eval `(bind-func ,(string->symbol (string-append namestrup (if generic ":" "_z:") ctype)) #t
+      (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
                (lambda ,argslist
                  (let ((obj (zalloc)))
                    ,@body
                    obj)))
             (interaction-environment))
-      (eval `(bind-func ,(string->symbol (string-append namestrup "_h:" ctype)) #t
+      (eval `(bind-func ,(string->symbol (string-append namestr "_h:" ctype)) #t
                (lambda ,argslist
                  (let ((obj (halloc)))
                    ,@body
@@ -9992,9 +9992,9 @@ xtlang's `let' syntax is the same as Scheme"
                                            ">"))
                              void))
                         (interaction-environment))))
-            (eval `(bind-func ,(string->symbol (string-append namestrdown "")) ; "_val"))
+            (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
                      (lambda ,argslist
-                       (let ((obj (,(string->symbol (string-append namestrup "_h")) ,@argslist))
+                       (let ((obj (,(string->symbol (string-append namestr "_h")) ,@argslist))
                              (val (pref obj 0)))
                          (free obj)
                          val)))
