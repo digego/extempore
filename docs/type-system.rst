@@ -4,19 +4,16 @@ xtlang type reference
 .. note:: This was once a blog post---corrections/improvements
           welcome.
 
+.. note:: It's not really possible to explain detour into some :doc:`memory
+          stuff <memory>` as well, so we'll cover some of that as well. For
+          more info on how xtlang fits into the big picture of
+          Extempore, see :doc:`philosophy`.
+
+
 xtlang, the 'systems language' component of Extempore, has a rich
 static type system.
 
-.. note:: It's not really possible to explain detour into some `memory
-          stuff`_ as well, so we'll cover some of that as well. For
-          more info on how xtlang fits into the big picture of
-          Extempore, check out `this post`_ on the overall philosophy
-          and architecture of the project.
-
-xtlang type hierarchy
----------------------
-
-xtlang code is statically typed—the types are determined at compile
+xtlang code is statically typed---the types are determined at compile
 time, and the compiler checks that the types of the arguments to a
 function match the type signature of that closure. If they don't match,
 you get a compile error, and a (hopefully) helpful message about where
@@ -25,7 +22,7 @@ things are going wrong and what needs to be fixed.
 The base types will be familiar to those who are used to working with C,
 although there are a couple of slight differences. Just like C, the
 types are all low level in the sense that they represent a particular
-bit pattern in memory—there's no boxing and unboxing going on.
+bit pattern in memory---there's no boxing and unboxing going on.
 
 In xtlang, type annotations (a type definition following a colon in the
 source code) are used to tell the compiler about the types of variables.
@@ -35,16 +32,16 @@ there's a problem, the compiler will complain and you have to fix it,
 either with an explicit coercion or by changing the structure of the
 code.
 
-The examples in this post use a lot of these type annotations. This is
-for clarity—some of these aren't strictly necessary (*as I'll show
-later*) because the type inferencing compiler will figure out the types
-of variables in many cases.
+The examples here use a lot of these type annotations. This is for
+clarity---some of these aren't strictly necessary (*as I'll show
+later*) because the type inferencing compiler will figure out the
+types of variables in many cases.
 
 Primitive types
 ---------------
 
 Integers
-~~~~~~~~
+^^^^^^^^
 
 .. raw:: html
 
@@ -69,7 +66,7 @@ A couple of gotchas:
    null-terminated char arrays/pointers with the signature ``i8*``.
 
 Floats
-~~~~~~
+^^^^^^
 
 .. raw:: html
 
@@ -87,7 +84,7 @@ Float literals in xtlang code (e.g. ``4.2``) are interpreted as
 with ``i64`` int literals).
 
 Pointer types
--------------
+^^^^^^^^^^^^^
 
 .. raw:: html
 
@@ -99,19 +96,21 @@ xtlang supports `pointers`_ to any type, in fact some types (such as
 closures) are almost always handled by reference (that is, through
 pointers). Pointers in xtlang are indicated by the usual ``*`` syntax.
 
+.. _pointers: http://en.wikipedia.org/wiki/Pointer_(computer_programming)
+
 Examples:
 
 -  ``double*``: a pointer to a double
 -  ``i64**``: a pointer to a pointer to a 64-bit integer
 
-Pointers represent *memory addresses*, and the use of pointers in xtlang
-is one of the key differences between xtlang and Scheme (and indeed
-between xtlang and any high-level language). C programmers will be
-(intimately) familiar with the concept of pointers, and xtlang's
-pointers are the same (you can ``printf`` them with ``%p``) For others,
-though, a more in-depth explanation of the concept of pointers can be
-found `in this post`_. If you've never encountered pointers before then
-I suggest you check it out before continuing.
+Pointers represent *memory addresses*, and the use of pointers in
+xtlang is one of the key differences between xtlang and Scheme (and
+indeed between xtlang and any high-level language). C programmers will
+be (intimately) familiar with the concept of pointers, and xtlang's
+pointers are the same (you can ``printf`` them with ``%p``) For
+others, though, a more in-depth explanation of the concept of pointers
+can be found :ref:`here <pointer-doc>`. If you've never encountered
+pointers before then I suggest you check it out before continuing.
 
 The way to allocate (and store a pointer to) memory is through a call to
 one of xtlang's 'alloc' functions. Extempore has 3 different alloc
@@ -125,7 +124,7 @@ alias for ``zalloc``.
 
 More detail about the Extempore's memory architecture (and the
 difference between ``salloc``, ``halloc`` and ``zalloc``) can be found
-in `this post <2012-08-17-memory-management-in-extempore.org>`__. For
+in :doc:`memory`. For
 now, though, we'll just use ``zalloc``, which allocates memory from the
 current zone, which for these examples will work fine.
 
@@ -144,7 +143,7 @@ the memory address that ``a`` points to.
 
 Pointers aren't very interesting, though, if you can't read and write to
 the values they point to. That's where the xtlang functions ``pref``,
-``pset!`` and ``pref-ptr`` come in. [1]_
+``pset!`` and ``pref-ptr`` come in.
 
 Unlike in C, ``*`` is not a dereference *operator*, it's just the syntax
 for the specifying pointer types. Instead, there's a function ``pref``
@@ -157,7 +156,7 @@ the value of the third (``pref`` uses 0-based indexing) of those
 
 To *set* the value associated with a pointer, there's ``pset!``. Like
 ``pref``, ``pset!`` takes a pointer as the first argument, and offset as
-the second argument, but it also takes an additional third argument—the
+the second argument, but it also takes an additional third argument---the
 value to set into that memory location. This must be of the appropriate
 type: so if the pointer is to a double, then the value passed to
 ``pset!`` must also be a double.
@@ -176,7 +175,7 @@ type: so if the pointer is to a double, then the value passed to
 In this example the closure ``ptr_test2`` takes no arguments, allocates
 some memory, sets a value into that memory location, then reads it back
 out. Notice that for both ``pref`` and ``pset!`` the index argument was
-zero—this means that we were storing and reading the value directly into
+zero---this means that we were storing and reading the value directly into
 the pointer (memory location) bound to ``a``.
 
 This is important (and useful) because the call to ``zalloc`` can
@@ -242,7 +241,7 @@ done through a call to one of the alloc functions, as in the example
 above with pointers to primitive types.
 
 Tuples
-~~~~~~
+^^^^^^
 
 An n-tuple is a fixed-length structure with n elements. *Different*
 tuples can have different lengths (different values of *n*), but a
@@ -250,7 +249,7 @@ particular tuple always has the same fixed length.
 
 The elements of a tuple need not be of the same type, tuples are
 heterogeneous. Each element can be any type that the xtlang compiler
-recognises, including another tuple—turtles all the way down!
+recognises, including another tuple---turtles all the way down!
 
 The syntax for declaring and identifying tuples in xtlang is the use of
 angle brackets (``<>``). Tuples in xtlang are analogous to C structs,
@@ -278,11 +277,14 @@ Like ``pref`` for pointers, getting an element from a tuple involves a
 function called ``tref``. So, to get element number ``i`` from a tuple
 pointer ``t``, use ``(tref t i)``. If ``tref`` doesn't have an *i* th
 element, the compiler will complain (as it should). The first argument
-to ``tref`` should be a pointer to a tuple rather than the tuple itself,
-and this holds for the array and vector equivalents as well. In fact,
-you'll almost [2]_ never work with aggregate data types directly,
+to ``tref`` should be a pointer to a tuple rather than the tuple
+itself, and this holds for the array and vector equivalents as well.
+In fact, you'll almost never work with aggregate data types directly,
 instead getting pointers to them via calls to the memory allocation
-functions.
+functions. The exception to this rule is if you're binding to a C
+library and you need to pass structs around by value (rather than by
+reference).
+
 
 Similarly, ``tset!`` is used to set a value into a tuple. Again, the
 compiler will check that the value being set is of the right type, and
@@ -305,7 +307,7 @@ do get confused and try to ``tset!`` an array type the compiler will
 catch the error for you.
 
 Arrays
-~~~~~~
+^^^^^^
 
 An array in xtlang is a fixed length array of elements of a single type
 (like a static C array). The array type signature specifies the length
@@ -338,7 +340,7 @@ into an array (that is, not to the first element but to some element
 further into the array), use ``aref-ptr``.
 
 Vectors
-~~~~~~~
+^^^^^^^
 
 The final aggregate data type in xtlang is the vector type. Vectors are
 like arrays in that they are fixed length homogeneous type buffers, but
@@ -373,11 +375,13 @@ it's probably best to start out with arrays, and to change to vectors
 later on if it becomes necessary.
 
 Closure type
-------------
+^^^^^^^^^^^^
 
 The final important type in xtlang is the `closure`_ type, and
 understanding closures is crucial to understanding how xtlang works as a
 whole.
+
+.. _closure: http://en.wikipedia.org/wiki/Closure_(computer_science)
 
 xtlang's closures are lexical closures (like in Scheme), which means
 that they are the combination of a function and its referencing
@@ -416,14 +420,16 @@ comes in handy in lots of situations, as lots of the files in
 Extempore's ``examples`` directory show.
 
 The way to make closures in xtlang is with a `lambda form`_, just like
-in Scheme. A ``lambda`` returns an *anonymous* function closure—that's
+in Scheme. A ``lambda`` returns an *anonymous* function closure---that's
 what it means for xtlang to have 'first class' functions/closures.
 Closures don't have to have names, they can be elements of lists and
 arrays, they can be passed to and returned from other closures, they can
 do anything any other type can do.
 
+.. _lambda form: http://en.wikipedia.org/wiki/Lambda_(programming)
+
 Sometimes, though, we want to give a closure a name, and that's where
-``bind-func``  [3]_ comes in. ``bind-func`` is the (only) way in xtlang
+``bind-func`` comes in. ``bind-func`` is the (only) way in xtlang
 to assign a global name to a closure. Here's an example of creating a
 simple (named) xtlang closure using ``bind-func``
 
@@ -440,9 +446,17 @@ are provided in the initial argument list) and returns their sum. It's
 also worth noting that when we compile ``xt_add`` the log view prints
 the closure's type signature:
 
-.. code-block:: bash
+.. code::
 
     Compiled xt_add >>> [i64,i64,i64]*
+
+``bind-func`` is xtlang's equivalent to Scheme's ``define``, although
+with the limitation that ``define`` in Scheme can bind any scheme
+object (not just a closure) to a symbol, while in xtlang ``bind-func``
+has to return a closure (via a ``lambda`` form). Although if you need
+to compile & bind an xtlang entity of some other type, there are other
+functions like ``bind-val`` and ``bind-type`` which will do the
+necessary for you.
 
 As another example, if you want to return a closure from the function
 it's exactly like you would do it in Scheme:
@@ -468,8 +482,8 @@ This example is a bit more complicated: the first closure
 (``make_xt_adder``) takes one argument ``a`` and returns a closure
 (notice the *second* ``lambda`` form inside the toplevel one) which
 takes one argument ``b`` and adds it to ``a``. Note that ``a`` is 'baked
-in' to this closure—it's not passed in directly, but it's referenced
-from the outside scope. We say that this closure (which has no name—it's
+in' to this closure---it's not passed in directly, but it's referenced
+from the outside scope. We say that this closure (which has no name---it's
 anonymous) 'closes over' ``a``.
 
 Then, in the second function (``test_xt_adder``) we call
@@ -483,8 +497,8 @@ enough you'll reach enlightenment. Or something.
 There's lots more to say about closures, but I'll leave that for another
 post.
 
-Strings in xtlang
------------------
+Strings
+-------
 
 One other gotcha for C programmers is that there's no ``char`` type, or
 at least it's not called ``char``, it's called ``i8``. So strings in
@@ -509,8 +523,8 @@ then disappearing on you.
 
       (string_literals) ;; prints "Vive le tour!"
 
-Custom types
-------------
+Named types
+-----------
 
 To round it off, you can also define your own types. This is convenient:
 it's easier to type ``my_type`` than
@@ -585,7 +599,7 @@ Now, what happens if we change this testing example to make
 
 Now, instead of compiling nicely, we get the compiler error:
 
-.. code-block:: bash
+.. code::
 
     Compiler Error: Type Error: (euclid_distance bot_left top_right)
      function argument does not match. Expected "%point*" but got "{double,double}*"
@@ -626,7 +640,7 @@ any variable using a colon, e.g.
    arguments)
 
 Now, most of the examples in this file have been fairly explicit about
-the types of the variables. Look at the code for ``xt_add`` above—in the
+the types of the variables. Look at the code for ``xt_add`` above---in the
 argument list ``(a:i64 b:i64)`` both arguments are identified as
 ``i64``. What happens, though, if we take out just one of these type
 annotations?
@@ -652,6 +666,8 @@ information it has about ``b`` (because there isn't any), then the
 compiler can infer that the only acceptable type signature for the
 closure pointer is ``[i64,i64,i64]*``.
 
+.. _type inferencing: http://en.wikipedia.org/wiki/Type_inference
+
 How about if we try removing ``a``\ 's type annotation as well?
 
 .. code-block:: extempore
@@ -662,13 +678,13 @@ How about if we try removing ``a``\ 's type annotation as well?
 
 This time, the compiler prints the message:
 
-.. code-block:: bash
+.. code::
 
     Compiler Error: could not resolve ("a" "b" "xt_add3") you could try
     forcing the type of one or more of these symbols
 
 There just isn't enough info to unambiguously determine the types of
-``a`` and ``b``. They could be both ``i32``, or both ``floats``—the
+``a`` and ``b``. They could be both ``i32``, or both ``floats``---the
 compiler can't tell. And rather than guess, it throws a compile error.
 
 It's also worth mentioning that we could have specified the closure's
@@ -686,10 +702,12 @@ Scheme and xtlang types
 -----------------------
 
 Extempore can run both Scheme and xtlang code, but Scheme doesn't know
-anything about xtlang's types—things like tuples, arrays, vectors,
+anything about xtlang's types---things like tuples, arrays, vectors,
 closures, and user-defined types through ``bind-type``. Scheme only
-knows about `Scheme types`_\  [4]_ like symbols, integers, reals,
+knows about `Scheme types`_ like symbols, integers, reals,
 strings, c pointers, etc.
+
+.. _Scheme types: https://groups.csail.mit.edu/mac/ftpdir/scheme-reports/r5rs-html/r5rs_8.html#SEC48
 
 There is some (approximate) overlap in these type systems, for ints,
 floats, strings and c pointers, although even in these cases there are
@@ -723,50 +741,3 @@ Here's an example to make things a bit clearer:
                                 ;; as void pointers, but you lose the type checking
 
 Have a look at ``examples/core/extempore_lang.xtm`` for more examples.
-
-Where to from here?
--------------------
-
-Hopefully that's a good overview of how the type system works in xtlang.
-Remember, xtlang is just one of the two languages hosted by Extempore
-(the other being Scheme, see `this post`_ for an explanation of how it
-all fits together). And this post has just scratched the surface of
-Extempore's memory model and allocation functions. But I hope it's been
-helpful.
-
-As usual, there are other places to look for more info: the `main docs
-page`_, the file ``examples/core/extempore_lang.xtm`` includes heaps of
-examples as well. And there's always the project page and source code at
-`github`_.
-
-.. [1]
-   Like Scheme, xtlang uses the convention that any function which does
-   anything destructive (like mutate the values of the arguments passed
-   to it) ends with an exclamation mark/bang (``!``).
-
-.. [2]
-   The exception to this rule is if you're binding to a C library and
-   you need to pass structs around by value (rather than by reference).
-
-.. [3]
-   ``bind-func`` is xtlang's equivalent to Scheme's ``define``, although
-   with the limitation that ``define`` in Scheme can bind any scheme
-   object (not just a closure) to a symbol, while in xtlang
-   ``bind-func`` has to return a closure (via a ``lambda`` form).
-   Although if you need to compile & bind an xtlang entity of some other
-   type, there are other functions like ``bind-val`` and ``bind-type``
-   which will do the necessary for you.
-
-.. [4]
-   R5RS builtins, for those who are interested
-
-.. _memory stuff: 2012-08-17-memory-management-in-extempore.org
-.. _this post: 2012-08-07-extempore-philosophy.org
-.. _pointers: http://en.wikipedia.org/wiki/Pointer_(computer_programming)
-.. _in this post: 2012-08-13-understanding-pointers-in-xtlang.org
-.. _closure: http://en.wikipedia.org/wiki/Closure_(computer_science)
-.. _lambda form: http://en.wikipedia.org/wiki/Lambda_(programming)
-.. _type inferencing: http://en.wikipedia.org/wiki/Type_inference
-.. _Scheme types: https://groups.csail.mit.edu/mac/ftpdir/scheme-reports/r5rs-html/r5rs_8.html#SEC48
-.. _main docs page: ../extempore-docs/index.org
-.. _github: https://github.com/digego/extempore

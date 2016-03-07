@@ -13,8 +13,8 @@ and good numerical performance are required. Extempore also has strong
 timing and concurrency semantics, which are helpful when working in
 problem spaces where timing is important (such as audio and video).
 
-These two goals—dynamic flexibility and close-to-the-metal
-control—seem at odds. Extempore tries to offer both by supporting both
+These two goals---dynamic flexibility and close-to-the-metal
+control---seem at odds. Extempore tries to offer both by supporting both
 a high-level dynamic language (Scheme) and a low-level 'C like'
 language (xtlang) simultaneously, with tight integration and
 transparency between the two. A running Extempore process will compile
@@ -67,17 +67,17 @@ provides the xtlang compiler. Like Scheme, xtlang is has an
 ``xtlang_closure`` is also a closure which takes two arguments, and
 xtlang uses the ``lambda`` form to build closures, just like Scheme. In
 fact, ``xtlang_closure`` does the exact same thing as ``scheme-closure``
-does—it takes two arguments, multiplies them together, then both prints
+does---it takes two arguments, multiplies them together, then both prints
 and returns the result. One thing that's different in the xtlang
 version, though, is the presence of type annotations for the arguments:
 they're the (blue) parts of the symbol name following the colon. The
 types should be familiar: ``double`` for a double-precision floating
 point number, and ``i64`` for a 64-bit (signed) integer. Unlike
-Scheme—which is dynamically typed, and will silently coerce floats into
-ints and other things like that—xtlang is statically typed. Not every
+Scheme---which is dynamically typed, and will silently coerce floats into
+ints and other things like that---xtlang is statically typed. Not every
 type needs to be specified, the compiler will infer types when it is
 *unambiguous*, but the compiler will never silently coerce types. This
-is by design—the whole point of using xtlang in Extempore is to make
+is by design---the whole point of using xtlang in Extempore is to make
 things explicit. If you want more dynamic typing, then there's always
 Scheme.
 
@@ -170,7 +170,7 @@ war about dynamic vs statically typed languages or anything like that.
 It's a brute-force algorithm for a problem with many more elegant
 algorithms. What it does show, though, is that *Extempore's* Scheme
 interpreter is *slow*. There are some crazy fast and efficient Scheme
-compilers, but Extempore's isn't one of them—it's dog slow.
+compilers, but Extempore's isn't one of them---it's dog slow.
 
 You may now be thinking that this pretty much rules Scheme out for
 anything computationally intensive in Extempore, such as audio and
@@ -235,7 +235,7 @@ but often this interaction is limited to the building and debugging
 phase of software development, with the program being frozen (possibly
 compiled) upon completion and then left to run unmolested. In Extempore,
 on the other hand, this interactive development style is supported (and
-encouraged) through the whole software lifecycle—up to and including the
+encouraged) through the whole software lifecycle---up to and including the
 deployment and running of the 'final' code. An Extempore codebase is not
 necessarily a static artefact: the behaviour of the system is determined
 by the development of the code over the whole time the system is
@@ -251,8 +251,8 @@ this idea of improvisational live programming makes sense, but there are
 also many other contexts where having a human in the loop even at
 program execution time (to catch unforseen bugs or add hitherto
 unplanned functionality) is advantageous. This is a tough job for the
-programmer—there's no safety net when you're modifying the program as
-it's being run—but that's exactly why Extempore is being designed as it
+programmer---there's no safety net when you're modifying the program as
+it's being run---but that's exactly why Extempore is being designed as it
 is: to provide as much support as possible to the programmer as they
 deal with this difficult (and exciting) challenge.
 

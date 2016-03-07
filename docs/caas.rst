@@ -30,51 +30,33 @@ So, to do anything in Extempore you need a text editor which can
    code
 #. send that string over the TCP connection
 
-There are lots of text editors which can perform these functions, so you
-basically have two options:
-
--  **If you already have a favourite text editor**, then you'll probably
-   want to write and evaluate your code using that editor. There are
-   already Extempore modes/plugins for `Emacs`_, `vim`_ and `Sublime
-   Text 2`_ (see the ``extras`` subdirectory). If your favourite editor
-   isn't one of those three, then you might even have the chops to hack
-   together a plugin yourself—at its most basic all it has to do is
-   perform those three functions listed above (you can even use
-   ``telnet`` or ``netcat``).
-
--  **If you don't have a favourite text editor** then pick one of the
-   ones listed above (`Emacs <http://www.gnu.org/software/emacs/>`__,
-   `vim <http://www.vim.org>`__ or `Sublime Text
-   2 <http://www.sublimetext.com>`__). The Emacs Extempore mode is the
-   most mature and featureful. However, if you don't want to deal with
-   the (admittedly daunting) task of learning Emacs *as well as*
-   Extempore, then the ST2 plugin is pretty good as well (although ST2
-   does cost money).
-
-There are some "cheat sheets" for using Extempore in
-`Emacs <2012-10-10-extempore-emacs-cheat-sheet.org>`__,
-`vim <2014-11-07-hacking-extempore-in-vim.org>`__ and `ST2`_. In the end
-it doesn't matter too much which editor you use, so pick the one that
-makes you happiest :)
+There are already Extempore modes/plugins for Atom, Emacs, vim and
+Sublime Text 2 (see :doc:`editor-support`). If you already have a
+favourite text editor, then you'll probably want to use that one. If
+you don't, then Atom is probably a good choice, and :ref:`setting it
+up is pretty easy <atom-editor-setup>` In the end it doesn't matter
+too much which editor you use, so pick the one that makes you happiest.
 
 Running Extempore
 -----------------
 
-I'm assuming that you've already downloaded and built the Extempore
-binary executable. It will be called ``extempore`` on OSX or Linux
-(`installation instructions`_) and ``extempore.exe`` on Windows
-(`installation
-instructions <2013-03-20-building-extempore-on-windows.org>`__).
+Once you've :doc:`downloaded and built <quickstart>` Extempore you'll
+have an `executable`_, which will be called ``extempore`` on OSX/Linux
+or ``extempore.exe`` on Windows.
+
+.. _executable: https://en.wikipedia.org/wiki/Executable
 
 When you start Extempore, you need to specify an audio device. This is
 necessary even if you're not planning to do any audio processing or
 output, because Extempore's internal clock is driven by the audio
-device's clock. [3]_
+device's clock. This is a good thing: the audio clock will usually be
+more stable and accurate than your computer's default system clock,
+especially if you're using a dedicated external audio interface.
 
-But how do we know what audio device to select? Well, the ``extempore``
-executable provides a handy command-line argument called
-``--print-devices``. At a shell prompt, ``cd`` into the extempore source
-directory (where the executable will be) and run
+But how do we know what audio device to select? Well, the
+``extempore`` executable takes a command-line argument called
+``--print-devices``. At a shell prompt, ``cd`` into the extempore
+source directory (where the executable will be) and run
 
 .. raw:: html
 
@@ -85,19 +67,22 @@ directory (where the executable will be) and run
 
 As you can see, running ``extempore`` with the ``--print-devices``
 argument prints a list of all the audio devices (input, output and
-duplex) that PortAudio can find on the system. On my laptop (as you can
-see above) there are five devices. Three devices (device index ``0`` to
-``2``) are for the built-in soundcard, and two more (device index ``3``
-and ``4``) are for `Soundflower`_, which is a utility for routing audio
-between different applications. Your computer will probably print
-different devices—that's ok.
+duplex) that `PortAudio`_ can find on the system. For example, in the
+image there are five devices. Three devices (device index 0 to 2) are
+for the built-in soundcard, and two more (device index 3 and 4) are
+for `Soundflower`_, which is a utility for routing audio between
+different applications. Different computers will print different
+devices---that's ok.
 
-For now, I want to use the default laptop output, which is ``audio
-device[2]``. When I run ``extempore``, then, I want to pass this device
-index with the ``--device`` argument. The ``--device`` argument is
-optional, if it's not supplied then Extempore will default to using
-whatever device is found at index ``0``. But it's probably a good idea
-to specify it explicitly, just to avoid any surprises.
+.. _PortAudio: http://www.portaudio.com/
+.. _Soundflower: http://code.google.com/p/soundflower/
+
+In this example, you probably want to use the default laptop output,
+which is ``audio device[2]``. When you run ``extempore``, then, I want
+to pass this device index with the ``--device`` argument. The
+``--device`` argument is optional, if it's not supplied then Extempore
+will default to using whatever device is found at index 0. But it
+doesn't hurt to specify it explicitly, just to avoid any surprises.
 
 .. raw:: html
 
@@ -106,21 +91,21 @@ to specify it explicitly, just to avoid any surprises.
      </div>
 
 After running ``extempore`` with ``--device 2``, it prints some
-information to ``stdout`` (which I'll often refer to as the *log*) about
+information to ``stdout`` (sometimes referred to as the *log*) about
 the device that it's using. As you can see, it all looks ok: 2 channels
 out, samplerate of 44100Hz. At this point, the ``extempore`` process is
 running, and will keep doing so until you kill it.
 
-Also, the compiler prints some information about 'starting up some
-processes', namely a ``primary`` process on port ``7099`` and a
-``utility`` process on port ``7098``. These are the TCP ports we'll send
-our code to. A running Extempore binary can provide *multiple* Extempore
-processes [4]_, as well as connecting to multiple other Extempore
-processes, potentially running on remote hosts. This forms the basis for
-Extempore's powerful distributed processing capability, which I'll cover
-in a future blog post. For the moment, though, you don't have to worry
-about multiple processes, we'll only connect and interact with the
-``primary`` process.
+Also, the compiler prints some information about "starting up some
+processes", namely a ``primary`` process on port ``7099`` and a
+``utility`` process on port ``7098``. These are the TCP ports we'll
+send our code to. A running Extempore binary can provide *multiple*
+Extempore processes (*kindof* like POSIX threads) as well as
+connecting to multiple other Extempore processes, potentially running
+on remote hosts. This forms the basis for Extempore's powerful
+distributed processing capability. For the moment, though, you don't
+have to worry about multiple processes, just connect and interact with
+the ``primary`` process.
 
 Connecting to the Extempore compiler
 ------------------------------------
@@ -130,16 +115,11 @@ So far, all the stuff we've done has been in a shell console. The
 sitting there idle, waiting to be given some code to evaluate. That's
 where the text editor part of the equation comes in.
 
-In this post I'm going to be fairly editor-agnostic, because (as I
-mentioned before) as long your editor can open up the TCP connection to
-the compiler and send code strings over it, then you're good to go. In
-places where there are editor-specific instructions, I'll give
-instructions for Emacs and ST2.
-
 When you open up a file ending in ``.xtm`` (Extempore's default file
-extension), your editor should detect that you're editing Extempore
-source code, and load the appropriate Extempore plugin. Here's a (short)
-example file containing some Extempore code:
+extension), your :doc:`editor <editor-support>` should detect that
+you're editing Extempore source code, and load the appropriate
+Extempore plugin. Here's a (short) example file containing some
+Extempore code:
 
 .. raw:: html
 
@@ -148,11 +128,10 @@ example file containing some Extempore code:
      </div>
 
 The content of the file is at the top, and I've also included a
-representation of the 'echo area' at the bottom (the *minibuffer* in
-Emacs terminology). This is a part of your editor which displays
-information about the results of different editor commands, and may also
-be where the feedback from the Extempore compiler is 'echoed' (printed
-out). It's blank at the moment.
+representation of the "echo area" at the bottom. This is a part of
+your editor which displays information about the results of different
+editor commands, and may also be where the feedback from the Extempore
+compiler is "echoed" (printed out). It's blank at the moment.
 
 Now that we have
 
@@ -161,10 +140,11 @@ Now that we have
 -  the ``extempore`` process still running
 
 we can open up the TCP connection. In Emacs, this is done with ``M-x
-extempore-connect``. In ST2, use the menu item ``Tools > Extempore >
-Connect...``. The default host and port arguments will be ``localhost``
-and ``7099`` respectively. If the connection is made successfully, then
-``extempore`` will echo back the string "Welcome to extempore!".
+extempore-connect``. In Atom, with ``Alt+O``. In ST2, use the menu
+item ``Tools > Extempore > Connect...``. The default host and port
+arguments will be ``localhost`` and ``7099`` respectively. If the
+connection is made successfully, then Extempore will echo back the
+string "Welcome to extempore!".
 
 Evaluating code
 ---------------
@@ -176,15 +156,12 @@ along, you can write ``(+ 1 2)`` into your file somewhere.
 
 This is where the 'Compiler as a Service' (CaaS) thing starts to get
 real. Currently, the code ``(+ 1 2)`` is just text sitting in your
-editor. It won't get compiled until you send it for evaluation. If
-you're using Emacs, then the easiest way to do this is to move your
-cursor somewhere inside the code ``(+ 1 2)`` and hit ``C-M-x`` (which is
-bound to ``extempore-send-definition``). In ST2, you can highlight the
-code you want to evaluate and call the ``Extempore: evaluate`` command,
-either from the command palette (``Ctrl+Shift+P`` on Windows/Linux or
-``Cmd+Shift+P`` on OSX) or through the default ``Ctrl+e`` keybinding.
-This takes the whole expression ``(+ 1 2)`` and sends it (as a string)
-to the running ``extempore`` compiler.
+editor. It won't get compiled until you send it for evaluation. The
+easiest way to do this is to move your cursor somewhere inside the
+code ``(+ 1 2)`` and hit ``Alt+S`` (in Atom) or ``C-M-x`` (in Emacs).
+In ST2, you have to highlight the code you want to evaluate and hit
+``Ctrl+e``. This takes the whole expression ``(+ 1 2)`` and sends it
+(as a string) to the running ``extempore`` compiler.
 
 .. raw:: html
 
@@ -196,13 +173,13 @@ The orange 'box' in the diagram indicates code that has been sent for
 evaluation. See how the code string (in grey) is sent over the
 connection, and the result is sent back (also as a string) and displayed
 in the echo area. Nothing is printed in the console where ``extempore``
-is running. Congratulations—you've just evaluated your first Extempore
+is running. Congratulations---you've just evaluated your first Extempore
 code!
 
-We can write some more code to ``bind-val`` a global variable ``myPI``,
-which is an xtlang global variable of `type`_ ``double``. If you
-evaluate this with ``C-M-x`` (or whatever the command is in your editor)
-then what happens is
+We can write some more code to ``bind-val`` a global variable
+``myPI``, which is an xtlang global variable of :doc:`type
+<type-system>` ``double``. If you evaluate this with ``Alt+S`` or ``C-M-x`` (or
+whatever the command is in your editor) then what happens is
 
 .. raw:: html
 
@@ -213,7 +190,7 @@ then what happens is
 One difference from the previous (Scheme) example is that the
 ``extempore`` compiler now prints a message to the console: ``Bound myPI
 >>> double``. Evaluating *xtlang* code will always print a message to
-the log about the name and type of the variables. [5]_ Also, notice how
+the log about the name and type of the variables. Also, notice how
 the string that is echoed back is "#t", which is the Scheme/xtlang
 literal for boolean ``true``. This is what the compiler returns if the
 value is '\ ``bind-val``\ 'ed successfully. It's worth observing that
@@ -246,15 +223,15 @@ call ``circle_area`` with the argument ``5.0``.
      </div>
 
 When we evaluate the ``(circle_area 5.0)`` expression, a couple of
-things happen. The code is sent to the compiler, which returns the value
-``78.539816`` to the editor. In addition, a message about 'creating a
-new `memory zone`_' is printed to the log. That's because this is the
-first time we've *called* some xtlang code, and so a memory zone needs
-to be set up to provide any ``zalloc`` memory. This zone allocation
-won't happen if we evaluate the same code again, because the default
-zone already exists. The compiler in this 'created default zone' message
-is just telling us helpful things about the state of our Extempore
-world.
+things happen. The code is sent to the compiler, which returns the
+value ``78.539816`` to the editor. In addition, a message about
+creating a new :ref:`memory zone <memory-doc>` is printed to the log.
+That's because this is the first time we've *called* some xtlang code,
+and so a memory zone needs to be set up to provide any ``zalloc``
+memory. This zone allocation won't happen if we evaluate the same code
+again, because the default zone already exists. The compiler in this
+'created default zone' message is just telling us helpful things about
+the state of our Extempore world.
 
 As another example of the difference between the *return value* of an
 xtlang expression and any *side effects* it may introduce, have a think
@@ -272,10 +249,10 @@ the log) a string representation of whatever arguments it is passed.
      </div>
 
 This time, the result (``78.539816``) is printed to the log. And the
-result returned to the editor is different, too—it's now ``#t``. That's
+result returned to the editor is different, too---it's now ``#t``. That's
 because the ``println`` function returns a value, indicating whether it
 was successful in printing its arguments to the log or not. The actual
-*printing* is a 'side effect' of the ``println`` function—behaviour that
+*printing* is a 'side effect' of the ``println`` function---behaviour that
 happens during the course of the function's execution.
 
 As a final basic example, we can send code to the compiler more than
@@ -311,10 +288,10 @@ the result ``58.904862`` was returned to the editor.
 The power (and danger) of CaaS
 ------------------------------
 
-Thus far in this post we've only evaluated code in the order it appears
+Thus we've only evaluated code in the order it appears
 in the file. Closures which use other closures or globals have all
 worked fine. But when we kill the ``extempore`` process (i.e. with
-``SIGINT``), the Extempore environment we've 'built up' isn't saved—it's
+``SIGINT``), the Extempore environment we've 'built up' isn't saved---it's
 destroyed.
 
 .. raw:: html
@@ -337,7 +314,7 @@ throws an error (and no value is returned to the editor). Because the
 compiler is a 'service', it'll just evaluate the code and build up the
 environment in whatever order you throw code at it. The source code
 isn't necessarily a linear representation of the evolution of the
-environment—it all depends on the 'evaluation trajectory' that you take
+environment---it all depends on the 'evaluation trajectory' that you take
 through the code.
 
 So, if we go back and evaluate all the necessary code, everything works
@@ -363,9 +340,9 @@ re-evaluate:
        <img src="/img/interacting-with-compiler/xtlang-eval-7.png" alt="">
      </div>
 
-The result is (slightly) different, but not too far off—not bad for a
+The result is (slightly) different, but not too far off---not bad for a
 4000 year old formula. But the main thing is that the code to *call*
-``circle_area`` didn't change—only the definition did. The new closure
+``circle_area`` didn't change---only the definition did. The new closure
 definition has to have the same signature as the old one, so that any
 code which calls the existing closure will still work ok (type-signature
 wise). This re-configurability in the behaviour of the code lies at the
@@ -390,63 +367,13 @@ still works great in that paradigm. But you have the ability to dive in
 and change things if you need to, and that opens up some interesting
 possibilities.
 
-This post is really just the tip of the compiler-as-a-service (CaaS)
+This is really just the tip of the compiler-as-a-service (CaaS)
 iceberg. Extempore's CaaS will also let you do things like query for all
 bound symbols, print all closures of a particular signature type, return
 the `abstract syntax tree`_ of a particular closure, etc… In fact the
 Extempore compiler itself is fully runtime modifiable!
 
-Next steps
-----------
-
-There are lots of places to go now, you can keep reading through the
-`docs`_, or start poking around the ``examples/`` subdirectory in the
-Extempore source folder (which will be in
-``/usr/local/Cellar/extempore/<version>/`` if you installed Extempore
-through homebrew).
-
-Once you start doing that, you'll notice that loading whole libraries on
-startup each time is *slow*. The good news is you can get around this by
-`pre-compiling the xtlang standard library`_. You don't have to use the
-standard library, but it will save you a lot of time on startup, and you
-don't lose any flexibility (the xtlang functions can all still be
-re-defined on the fly) so it's probably not a bad idea to use the
-library unless you have a reason not to.
-
-Enjoy, and remember that if you have any problems you can hit us up on
-the `mailing list`_. The standard library is both a binary file
-(``libs/xtm.{dll,so,dylib}`` depending on your platform) and a
-``libs/xtm.xtm`` file which is the 'header' for the xtlang code in this
-library—it tells Extempore about what closures and other data are
-present in the library and how to call them.
-
-.. [3]
-   This is a good thing: the audio clock will usually be more stable and
-   accurate than your computer's default system clock, especially if
-   you're using a dedicated external audio interface.
-
-.. [4]
-   Extempore's processes are kindof like POSIX threads.
-
-.. [5]
-   Interpreted Scheme code, on the other hand, won't cause the
-   ``extempore`` process to print anything to the log.
-
-.. _docs index: ../extempore-docs/index.org
-.. _this post: 2012-08-07-extempore-philosophy.org
-.. _Emacs: https://github.com/digego/extempore/blob/master/extras/extempore.el
-.. _vim: https://github.com/digego/extempore/blob/master/extras/extempore.vim
-.. _Sublime Text 2: https://github.com/benswift/extempore-sublime
-.. _ST2: 2012-10-23-extempore-st2-cheat-sheet.org
-.. _installation instructions: 2013-03-20-building-extempore-on-osx-linux.org
-.. _Soundflower: http://code.google.com/p/soundflower/
-.. _type: 2012-08-09-xtlang-type-reference.org
-.. _memory zone: 2012-08-17-memory-management-in-extempore.org
 .. _Rhind papyrus: http://en.wikipedia.org/wiki/Rhind_papyrus
 .. _live coding: http://toplap.org
 .. _abstract syntax tree: http://en.wikipedia.org/wiki/Abstract_syntax_tree
-.. _docs: ../extempore-docs/index.org
-.. _pre-compiling the xtlang standard library: 2013-12-16-building-the-extempore-standard-library.org
-.. _mailing list: mailto:extemporelang@googlegroups.com
-.. _other: ../2012-08-09-xtlang-type-reference.org
-.. _posts: ../2012-08-17-memory-management-in-extempore.org
+

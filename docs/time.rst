@@ -12,14 +12,14 @@ program and then re-run the program, etc…
 Extempore is different. Extempore is a dynamic, interactive programming
 environment where programs are modified and extended while they are
 running. As a simple example: type the following code into your editor
-and `evaluate`_ it:
+and :doc:`evaluate <caas>` it:
 
 .. code-block:: extempore
 
     (now)
 
 Your editor's echo area should display the result of evaluating the
-expression, and it should be a big (integer) number—when I did it on my
+expression, and it should be a big (integer) number---when I did it on my
 computer just now it came back with ``770432``.
 
 Now try pressing the eval button again. It's a different result!
@@ -48,7 +48,7 @@ although you can access the system clock as well through
 ``(clock:clock)``. Instead, the audio device will (usually) have a much
 more accurate clock, running at the audio sample rate (which will
 usually be 44.1kHz). That's why Extempore *always* connects to an audio
-device on startup—even if you're not producing any audio output.
+device on startup---even if you're not producing any audio output.
 
 Scheduling events for future execution
 --------------------------------------
@@ -85,7 +85,7 @@ in sequence (an arpeggiated triad).
 
 Extempore uses an asynchronous 'schedule and forget' style of
 programming, often in conjunction with a design pattern called temporal
-recursion—a concept I'll come back to shortly. This is different from
+recursion---a concept I'll come back to shortly. This is different from
 languages such as ChucK which use a synchronous approach. What *is* the
 difference? Synchronous timing works by holding up code until some
 specified time in the future. This is basically the same concept as
@@ -96,7 +96,7 @@ task has been scheduled, thread execution moves immediately onto the
 next expression. A pseudocode example may help to illustrate this
 difference.
 
-.. code-block:: extempore
+.. code-block::
 
     //synchronous timing
     play-note(now)
@@ -139,7 +139,7 @@ second (this loop will continue indefinitely).
 
       (foo)
 
-You can create as many of these temporal recursion loops as you like—try
+You can create as many of these temporal recursion loops as you like---try
 evaluating ``foo`` multiple times. Notice that you get multitasking for
 free, you don't need to do anything special to run two event streams.
 You can even create temporal recursions *inside* temporal recursions.
@@ -250,5 +250,4 @@ that you will use all the time. Take a look at the `playing an
 instrument`_ tutorial to get more of an idea about using temporal
 recursion in a practical setting.
 
-.. _evaluate: 2012-09-26-interacting-with-the-extempore-compiler.org
-.. _playing an instrument: 2012-10-15-playing-an-instrument-part-ii.org
+.. _playing an instrument: TODO

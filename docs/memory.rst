@@ -8,7 +8,7 @@ Memory management in Extempore
 
 The two languages hosted by the Extempore compiler, xtlang and Scheme,
 have different approaches to dealing with memory allocation and
-management. Both languages ultimately share the same memory—the stack
+management. Both languages ultimately share the same memory---the stack
 and heap associated with the Extempore process, Extempore gives access
 to this memory to both languages via different mechanisms. Broadly
 speaking, with Scheme code Extempore manages memory for you, while in
@@ -61,7 +61,7 @@ top of the old one. What it does (and in fact what re-defining things
 and change the variable ``a`` to point to that new value.
 
 But what happens to the old value of ``5`` in memory? Well, it sits
-there unmolested, at least for a while. But we can't reach it—the only
+there unmolested, at least for a while. But we can't reach it---the only
 'handle' we had to refer to it with was the symbol ``a``, and that's now
 bound to some other value instead. The value ``5`` in memory is
 'unreachable'. So there's no point having it sitting around, taking up
@@ -79,11 +79,11 @@ being used the better. [4]_
 Basically, having a GC means that when you're writing Scheme code, you
 don't have to worry about memory. The GC takes care of all the
 allocation/deallocation bookkeeping for you. The cost is that this
-bookkeeping requires CPU cycles—cycles which you could be using to do
+bookkeeping requires CPU cycles---cycles which you could be using to do
 other cool things. Also, every now and then the GC has to briefly 'stop
 the world' (freeze the execution of all Scheme code) to do its job. This
 takes time, and introduces an element of uncertainty (non-determinism)
-to the execution of your code—you never know exactly when the GC is
+to the execution of your code---you never know exactly when the GC is
 going to freeze things to do it's job, and there's a risk that it'll
 happen at a really inconvenient time as far as your program is concerned
 (Murphy's law and all that). This is particularly problematic in domains
@@ -92,11 +92,11 @@ where timing is critical, such as real-time audio and video.
 Manual memory management in xtlang
 ----------------------------------
 
-Hang on a sec—isn't working with real-time audio and video xtlang (and
-therefore Extempore's) *raison d'etre?* Well, yes is is—the sluggishness
+Hang on a sec---isn't working with real-time audio and video xtlang (and
+therefore Extempore's) *raison d'etre?* Well, yes is is---the sluggishness
 (and non-determinism) of Impromptu's Scheme interpreter was the spark
 which ignited the development of xtlang (as mentioned in `this post`_).
-Again, this isn't a knock on Scheme in general as slow—there are some
+Again, this isn't a knock on Scheme in general as slow---there are some
 very sprightly Scheme compilers, but Impromptu's one was slow. The
 non-determinism was even more of a problem, because the last thing you
 want when you're generating audio or video is a 'stop the world' GC
@@ -108,10 +108,10 @@ that when you want some memory you ask the compiler for it, it's yours
 for a time and you can do whatever you want with it, and then you know
 when it's going to be 'given back'. It doesn't necessarily mean that you
 have it forever (in fact in many cases the memory is quite short-lived),
-but it does mean that there are no surprises—you specify exactly how
+but it does mean that there are no surprises---you specify exactly how
 much memory you'll get and you know it's going to hang around for. This
 determinism an important benefit of manual memory management in
-xtlang—especially in a real-time systems context.
+xtlang---especially in a real-time systems context.
 
 Zooming out for a second, a running program has access to and uses two
 main regions of memory: the **stack** and the **heap**. There's lots of
@@ -129,7 +129,7 @@ an explanation at stackoverflow`_), but I'll give a quick summary here.
    heap.
 
 I should also point out that the stack and heap aren't actually
-different types of memory in the computer—they're just different areas
+different types of memory in the computer---they're just different areas
 in the computer's RAM. The difference is in the way the program *uses*
 the different regions. Each running process has its own stack [5]_ and
 heap, and they are just regions of memory given to the process by the
@@ -187,7 +187,7 @@ variables which are bound in the ``let`` (in this case the integer ``a``
 and the float ``b``) are allocated on the stack. This is always where
 the memory for ``let``-bound float and int literals is allocated from in
 xtlang. String literals are bound globally (more on this shortly), but
-that's the exception to the rule—everything else which is bound in a
+that's the exception to the rule---everything else which is bound in a
 ``let`` inside an xtlang ``lambda`` will be stack allocated, unless you
 explicitly request otherwise with ``halloc`` or ``zalloc``.
 
@@ -398,11 +398,11 @@ much space ``int_buf`` will need (``region_length`` multiplied by 8,
 because there are 8 bytes per ``i64``) and therefore how much of the
 zone's memory will be allocated with the call to ``(zalloc
 region_length)``. If this number is *greater* than the memzone size,
-then we'll get the "Zone is full, leaking *n* bytes" warning—as we did
+then we'll get the "Zone is full, leaking *n* bytes" warning---as we did
 with ``fill_buffer_memzone2``.
 
 When zones leak, the Extempore run-time will scramble to find extra
-memory for you, but it will be from the heap—which is time-consuming and
+memory for you, but it will be from the heap---which is time-consuming and
 it will never be deallocated. This is bad, so it's always worth making
 sure that the zones are big enough to start with.
 
@@ -420,7 +420,7 @@ the *zone stack*, but it's still all done with ``memzone`` and
 By default each process has an initial **top** zone with 1M of memory.
 If no user defined zones are created (i.e. no uses of ``memzone``) then
 any and all calls to zalloc will slowly (or quickly) use up this 1M of
-memory—you'll know when it runs out as you'll get about a gazillion
+memory---you'll know when it runs out as you'll get about a gazillion
 memory leak messages.
 
 In general this is the zone story. But to complicate things slightly
@@ -442,7 +442,7 @@ there are two special zones.
 To allocate memory from a closure's zone, we need a ``let`` outside the
 ``lambda``. Anything ``zalloc``\ 'ed from there will come from the
 closure's zone. Anything ``zalloc``\ 'ed from *inside* the closure will
-come from whatever the top zone is at the time—usually the default zone
+come from whatever the top zone is at the time---usually the default zone
 (unless you're in an enclosing ``memzone``).
 
 As an example, let's revisit our 'fill buffer' examples from earlier.
@@ -486,7 +486,7 @@ Let's try it again, but with a 'zone size' argument to ``bind-func``
 
       (fill_buffer_closure_zone2) ;; prints "int_buf[366] = 366"
 
-Sweet—no more warnings, and the buffer seems to be getting filled
+Sweet---no more warnings, and the buffer seems to be getting filled
 nicely.
 
 This type of thing is very useful for holding data closed over by the
@@ -559,8 +559,8 @@ Choosing the right memory for the job
 
 Each different alloc function is good for different things, and the
 general idea to keep in mind is that you want your memory to hang around
-for as long as you need it to—and *no longer*. Sometimes you only need
-data in the body of a closure—then ``salloc`` is the way to go. Other
+for as long as you need it to---and *no longer*. Sometimes you only need
+data in the body of a closure---then ``salloc`` is the way to go. Other
 times you want it to be around for as long as the closure remains
 unchanged, then ``zalloc`` is the right choice. Also, if you're going to
 be alloc'ing a whole lot of objects for a specific algorithmic task and
@@ -646,7 +646,7 @@ Understanding pointers in xtlang
 
 xtlang's pointer types may cause some confusion for those who aren't
 used to (explicitly) working with reference types. That's nothing to be
-ashamed of—the whole `pass by value`_/`pass by reference`_ thing can
+ashamed of---the whole `pass by value`_/`pass by reference`_ thing can
 take a bit to get your head around.
 
 So what does it mean to say that xtlang supports pointer types? Simply
@@ -741,7 +741,7 @@ What we've done so far is store the value (how many cats we have) into
 the variable ``num_cats``. The value has an address in memory, but as a
 programmer we don't necessarily know what that address is, just that we
 can refer to the value using the name ``num_cats``. It's important to
-note that the *compiler* knows what the address is—in fact as far as the
+note that the *compiler* knows what the address is---in fact as far as the
 compiler is concerned every variable is just an address. But the
 compiler allows us to give these variables names, which makes the code
 much easier to write and understand.
@@ -779,13 +779,13 @@ The orange bar on the variable name indicates that it's a pointer.
 So why does ``print_num_cats3`` print such a weird (on my machine:
 4555984976 cats!) answer? Well, it's because we're trying to print it as
 an ``i64`` *value* (using ``%lld`` in the ``printf`` format string), but
-it's not an ``i64`` value—it's the *address* of a memory location where
+it's not an ``i64`` value---it's the *address* of a memory location where
 an ``i64`` value is located. On a 64-bit system (such as the laptop I'm
 writing this blog post on) the pointers *are* actually 64-bit integers,
 because an integer is a pretty sensible way to store an address.
 
 Incidentally, this is one of the key benefits (and driving forces
-behind) the switch from 32 to 64 bit architectures—the need for more
+behind) the switch from 32 to 64 bit architectures---the need for more
 memory addresses. If a pointer is a 32 bit integer, then you can only
 'address' about 4.3 billion (2:sup:`32`) different memory locations.
 This might seem like a lot, but as more and more computers came with
@@ -833,7 +833,7 @@ must be a ``double``.
 
       (print_num_cats4) ;; prints "You have 5 cats!"
 
-Great—the function now prints the right number of cats (in this case
+Great---the function now prints the right number of cats (in this case
 ``5``), so things are working properly again. After the ``pset!`` call,
 the memory will look like this (the only difference from last time is
 that the value 5 is stored in address 29, just as it should be).
@@ -1034,7 +1034,7 @@ This ``print_tuples`` example works in 3 basic steps:
    second). This pointer is then passed as the first argument to
    ``tset!``, which fills it with a value at the appropriate element.
 #. **Read (& print) values** back out of the tuples. These should be the
-   values we just set in step 2—and they are.
+   values we just set in step 2---and they are.
 
 Let's have a look at what the memory will look like during the execution
 of ``print_tuples``. After the call to ``(zalloc)`` (step 1), we have a
@@ -1048,7 +1048,7 @@ uninitialised (indicated by u).
    </div>
 
 After using ``pref`` and ``tset!`` in step 2, the values get set into
-the tuples. Step 3 simply reads these values back out—it doesn't change
+the tuples. Step 3 simply reads these values back out---it doesn't change
 the memory.
 
 .. raw:: html
@@ -1070,7 +1070,7 @@ There are a couple of other things worth discussing about this example.
     tup_ptr 1)`` gets called 4 times. We could have stored this pointer
    in a temporary variable to prevent these multiple dereferences, how
    could we have done that (hint: create the new 'tmp' pointer in the
-   ``let``—make sure it's of the right type).
+   ``let``---make sure it's of the right type).
 
 There's one final thing worth saying about pointers in xtlang. Why do
 pointers even *have* types? Isn't the address the same whether it's an
@@ -1086,7 +1086,7 @@ is just a ``0`` or a ``1``, and a byte is made up of 8 bits, for example
 ``101``, and although they are difficult for humans to read (unless
 you're used to them), computers *live and breathe* binary digits.
 
-This is why the integer types all have numbers associated with them—the
+This is why the integer types all have numbers associated with them---the
 number represents the number of bytes used to store the integer. So
 ``i64`` requires 64 bits, while an ``i8`` only requires 8. The reason
 for having different sizes is that larger sizes take up more room (more
@@ -1121,7 +1121,7 @@ Now, consider the layout of an aggregate type like a tuple:
 Each tuple contains (and therefore takes up the space of) an ``i64`` and
 a ``double``. So the actual memory address offset between the beginning
 of consecutive tuples is 16 bytes. But ``pref`` still works the same as
-in the ``i64*`` case. ``(pref tup_ptr 1)`` gets the second tuple—it
+in the ``i64*`` case. ``(pref tup_ptr 1)`` gets the second tuple---it
 doesn't try and read a tuple from 'half way in'.
 
 This is one reason why pointers have types: the type of the pointer

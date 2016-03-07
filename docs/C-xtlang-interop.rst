@@ -15,10 +15,12 @@ functionality in different ways, but at the end of the day the aim is to
 be able to call external C code from within the language, and xtlang
 provides a way to do this.
 
+.. _foreign function interface: http://en.wikipedia.org/wiki/Foreign_function_interface
+
 The reasons for binding to C library code are different in xtlang than
 they are in other languages, particularly 'scripting' languages like
 Perl or Ruby. In those languages, it's often for performance
-reasons—there's a certain hot loop of the code, and rewriting it in C
+reasons---there's a certain hot loop of the code, and rewriting it in C
 can give a huge performance win. xtlang, on the other hand, is *already*
 high performance, because of its native compilation via LLVM, so
 rewriting bits in C isn't usually of any benefit. The main reason you'll
@@ -32,7 +34,7 @@ In some ways, mixing xtlang code and C code is easy. The type system is
 quite similar: all of xtlang's floats and ints have a C counterpart
 which is exactly the same. Tuples are the same as C structs, and
 xtlang's arrays are the same as C arrays. These type equivalences aren't
-just conceptual or semantic—they're the exact same bit patterns in
+just conceptual or semantic---they're the exact same bit patterns in
 memory.
 
 Also, both languages have pointer types, and deal with manual memory
@@ -44,7 +46,7 @@ together.
 Having said that, there are some key differences between C and xtlang. C
 is the archetype of the 'static language', while xtlang is designed to
 allow the programmer to redefine core parts of the program *while it is
-executing* (see the post on `Extempore's philosophy`_ for more details).
+executing* (see :doc:`philosophy` for more details).
 Extempore supports REPL-style development, with the programmer
 interacting with the source code, evaluating and compiling parts of it
 in a non-linear fashion, and then modifying and recompiling it as
@@ -52,24 +54,33 @@ necessary. There are a few quirky projects which allow this type of
 development with C, but in general you build the whole project, then
 ship the resulting binary.
 
-So how *does* xtlang support binding and calling C code dynamically from
-xtlang code? The basic answer is though shared (dynamic) libraries. [1]_
-To call a C library from xtlang involves creating an xtlang
-'header', [2]_ which lets the xtlang compiler know about the types and
-function signatures in C library's header. Extempore can then load the
-shared library, xtlang can call functions in the library, and it should
-all be peaches.
+So how *does* xtlang support binding and calling C code dynamically
+from xtlang code? The basic answer is though shared (dynamic)
+libraries. To recap, C libraries can either be statically compiled
+into an application, or dynamically linked in at run-time. There are
+pros and cons to both approaches, and so C libraries can be compiled
+either statically or dynamically (by setting a compiler flag).
+
+To call a C library from xtlang involves creating an xtlang 'header',
+which lets the xtlang compiler know about the types and function
+signatures in C library's header. I'm using the term *header* in
+quotes because it doesn't have to be its own source file, there are no
+restrictions on naming, etc. It's just regular xtlang code that needs
+to be evaluated before you can use the functions in the library.
+Extempore can then load the shared library, xtlang can call functions
+in the library, and it should all be peaches.
+
 
 Foolib: the world's most useless C library
 ------------------------------------------
 
 Let's consider a really simple example. Say we have a C library which
-only defines *one function* called ``foo``. This library (foolib) will
+only defines *one function* called ``foo``. This library (libfoo) will
 have a header
 
 .. code-block:: c
 
-      /* foolib.h */
+      /* libfoo.h */
 
       int foo(int bar);
 
@@ -77,7 +88,7 @@ and an implementation
 
 .. code-block:: c
 
-      /* foolib.c */
+      /* libfoo.c */
 
       int foo(int bar){
         return bar + 42;
@@ -87,32 +98,32 @@ Not the most useful library in the world, to be sure, but let's compile
 it as a shared library anyway. Shared libraries have different file
 extensions on the different platforms that Extempore runs on:
 
--  **OSX**: ``sharedlib.dylib``
--  **Linux**: ``sharedlib.so``
--  **Windows**: ``sharedlib.dll``
+-  **OSX**: ``libname.dylib``
+-  **Linux**: ``libname.so``
+-  **Windows**: ``libname.dll``
 
 If you compile the library yourself, in general you should get the right
-type of binary for your platform. [3]_ If you've just downloaded the
+type of binary for your platform. If you've just downloaded the
 ``.dylib`` (or ``.so``, or ``.dll``) from the interwebs, though, you
 need to be careful that the binary file was compiled for the platform
 you're on. It's not just a matter of renaming the file to right file
 extension, either: the guts of the file are different between the
 platforms as well.
 
-I'm writing this blog post on OSX, so I'll refer to libraries with the
+From here on I'll assume you're on OSX, so I'll refer to libraries with the
 ``.dylib`` extension, but just substitute in the appropriate extension
 for your platform. To build the shared library on OSX, move into
-foolib's directory and build it with the ``-dynamiclib`` flag:
+libfoo's directory and build it with the ``-dynamiclib`` flag:
 
 .. code-block:: bash
 
-    clang foolib.c -dynamiclib -o foolib.dylib
+    clang libfoo.c -dynamiclib -o libfoo.dylib
 
 ``clang`` is a C compiler that's part of the LLVM project. I could also
 have used ``gcc`` or some other compiler.
 
-After running the above command, the file ``foolib.dylib`` will appear
-in the directory—a binary file which contains the instructions for how
+After running the above command, the file ``libfoo.dylib`` will appear
+in the directory---a binary file which contains the instructions for how
 to perform the functions provided by the library (in this case just the
 function ``foo``). This is the *shared* or *dynamic* library.
 
@@ -123,13 +134,13 @@ signature of the functions in the library. To do this, we use
 
 .. code-block:: extempore
 
-      ;; foolib.xtm -- an xtm header for foolib
+      ;; libfoo.xtm -- an xtm header for libfoo
 
       ;; load the shared lib
-      (define foolib (sys:open-dylib "foolib.dylib"))
+      (bind-dylib libfoo "libfoo.dylib")
 
       ;; define foo as a function
-      (bind-lib foolib foo [i64,i64]*)
+      (bind-lib libfoo foo [i64,i64]*)
 
       ;; test that everything worked ok
       (bind-func foo_test
@@ -138,21 +149,21 @@ signature of the functions in the library. To do this, we use
 
       (foo_test 6) ;; prints "foo(x) = 48"
 
-``sys:open-dylib`` is the Extempore interface for loading shared
+``bind-dylib`` is the Extempore interface for loading shared
 libraries. To find the library, it first looks for one of that name in
 the directory in which the Extempore process is running. After that,
-it'll look on your system's library path. [4]_ ``sys:open-dylib`` has a
+it'll look on your system's library path. ``bind-dylib`` has a
 return value, which in the example above is bound to the symbol
-``foolib``. It's important to capture this return value, because we'll
+``libfoo``. It's important to capture this return value, because we'll
 need it shortly with ``bind-lib``.
 
-In ``foolib.xtm`` (above), ``bind-lib`` is really only declaring that
-"there is a C function called ``foo`` in the shared library ``foolib``,
+In ``libfoo.xtm`` (above), ``bind-lib`` is really only declaring that
+"there is a C function called ``foo`` in the shared library ``libfoo``,
 and it takes one ``i64`` argument and returns an ``i64``.
 
-But hang on a sec—if ``foo`` is a C *function*, why does it have the
-type signature (square brackets) of an xtlang *closure*? [5]_ Well, this
-is a bit of a cheat on xtlang's part—the bound function ``foo`` *is*
+But hang on a sec---if ``foo`` is a C *function*, why does it have the
+type signature (square brackets) of an xtlang *closure*? Well, this
+is a bit of a cheat on xtlang's part---the bound function ``foo`` *is*
 just the plain C function from the library. But we do have to specify
 its type signature (argument and return types), and because xtlang
 doesn't provide a syntax for functions (only closures), then
@@ -174,15 +185,21 @@ As a more useful example, let's look at the library ``fft.xtm`` in the
 ``libs/external`` directory which comes with Extempore. ``fft.xtm`` uses
 the excellent `KissFFT`_ library for doing `Fourier transforms`_. The
 library is quite small and clean, and is spread over only a few source
-files—the main ones being ``kiss_fft.h`` & ``kiss_fft.c``. There's gonna
+files---the main ones being ``kiss_fft.h`` & ``kiss_fft.c``. There's gonna
 be a bit of C in this section. Nothing too complicated, but if you're
 rusty it might be worth picking up a copy of `K&R`_ or your to flip
 through if necessary.
 
+.. _KissFFT: http://sourceforge.net/projects/kissfft/
+.. _Fourier transforms: http://en.wikipedia.org/wiki/Fourier_transform
+.. _K&R: http://www.iu.hio.no/~mark/CTutorial/CTutorial.html
+
 If you're playing along at home, then you'll need to download the
-`source`_, build the ``kiss_fft.dylib`` library and put it somewhere
-that ``sys:open-dylib`` will find it. The ``fft.xtm`` header has some
+`KissFFT source`_, build the ``kiss_fft.dylib`` library and put it somewhere
+that ``bind-dylib`` will find it. The ``fft.xtm`` header has some
 instructions on how to do this.
+
+.. _KissFFT source: https://github.com/extemporelang/kiss_fft
 
 After that's done, then it's a matter of providing ``bind-lib`` xtlang
 definitions which tell Extempore about the functions in
@@ -236,30 +253,30 @@ important.
 Why is the library written this way? Well, one of the key benefits of
 this "pass in a location for the answer to be written to" approach is
 that the memory with the answer in it can be managed by the calling
-function (that is, the function which calls ``kiss_fft``). As discussed
-in the `memory management post`_, the explicit nature of memory
+function (that is, the function which calls ``kiss_fft``). As
+discussed in the :doc:`memory`, the explicit nature of memory
 allocation and deallocation in xtlang (and in C) gives the programmer
-great control over the lifetime of any memory the program allocates. The
-function which *calls* ``kiss_fft`` will have a much better idea of what
-it wants to do with the output values than ``kiss_fft`` does, so it
-makes sense to have this calling function allocate some memory of the
-appropriate size and type, and then just pass in a pointer to this
-memory in ``fout``.
+great control over the lifetime of any memory the program allocates.
+The function which *calls* ``kiss_fft`` will have a much better idea
+of what it wants to do with the output values than ``kiss_fft`` does,
+so it makes sense to have this calling function allocate some memory
+of the appropriate size and type, and then just pass in a pointer to
+this memory in ``fout``.
 
-So now we can just go ahead and turn the signature of ``kiss_fft`` into
-a ``bind-lib`` and we're done, right? Something like (`remembering
-that`_ xtlang uses ``i8*`` in place of C's ``void`` type)
+So now we can just go ahead and turn the signature of ``kiss_fft``
+into a ``bind-lib`` and we're done, right? Something like (remembering
+that xtlang uses ``i8*`` in place of C's ``void`` type)
 
 .. code-block:: extempore
 
-      (define kissfft (sys:open-dylib "kiss_fft.dylib"))
+      (define kissfft (bind-dylib "kiss_fft.dylib"))
 
       (bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
 
 But then when we try and evaluate the ``bind-lib``, the compiler throws
 an error:
 
-.. code-block:: bash
+.. code-block::
 
     Compiler Error: cannot find type for "kiss_fft_cfg"
 
@@ -274,7 +291,7 @@ declaration of ``kiss_fft_cfg``.
 
       typedef struct kiss_fft_state* kiss_fft_cfg;
 
-So it seems that ``kiss_fft_cfg`` is actually ``typedef``\ 'ed as a
+So it seems that ``kiss_fft_cfg`` is actually ``typedef`` as a
 pointer to the struct ``kiss_fft_state``. A ``typedef`` is just like a
 ``bind-alias`` in xtlang: the compiler doesn't know anything about it,
 it just looks like the type it points to. So the function ``kiss_fft``
@@ -305,7 +322,7 @@ So the ``kiss_fft_state`` struct has four members:
 
 Earlier in that header ``MAXFACTORS`` is defined to be 32, so the
 ``factos`` array will be of length ``64``. Also, in ``twiddles``, the
-``kiss_fft_cpx`` type is new—we haven't found a definition for it yet.
+``kiss_fft_cpx`` type is new---we haven't found a definition for it yet.
 So we need to do that before we can tell the xtlang compiler about the
 ``kiss_fft_state`` struct.
 
@@ -364,7 +381,7 @@ just need to tell the xtlang compiler about them.
       (bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
 
 See how each struct in C gets bound as a type in xtlang? If you don't
-believe me, go and have a look at the struct definitions above—they
+believe me, go and have a look at the struct definitions above---they
 should match up perfectly. We can now create tuples of type
 ``kiss_fft_cpx`` in xtlang just like we would any other tuple, and in
 fact we'll *have to* if we want to actually call the functions from the
@@ -381,7 +398,7 @@ type signatures, the above code finally compiles:
     Bound kiss_fft >>> [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*
 
 There are a few more functions in the actual ``fft.xtm`` file which I
-haven't included in this post: helper functions for setting up the
+haven't included here: helper functions for setting up the
 ``kiss_fft_cfg`` struct, determining efficient FFT stride lengths and
 other things like that. You don't have to ``bind-lib`` all the functions
 in the library, just the ones you need, although knowing which ones
@@ -407,7 +424,7 @@ Kinect library.
 Everything in these folders is honest-to-goodness xtlang code just like
 you could write yourself, and if you want to change anything in these
 libraries you can do it on the fly, just as you can with any other
-xtlang code. This is pretty cool—there's something exciting about being
+xtlang code. This is pretty cool---there's something exciting about being
 able to hack on the standard library while your code is running.
 
 They're also a great place to explore and get ideas for your own xtlang
@@ -415,41 +432,6 @@ code. And if you do end up writing a cool library (or xtlang bindings
 for a cool C shared library) then submit a pull request and we'll see if
 we can get it included in the main Extempore distribution.
 
-.. [1]
-   To recap, C libraries can either be statically compiled into an
-   application, or dynamically linked in at run-time. There are pros and
-   cons to both approaches, and so C libraries can be compiled either
-   statically or dynamically (by setting a compiler flag).
 
-.. [2]
-   I'm using the term *header* in quotes because it doesn't have to be
-   its own source file, there are no restrictions on naming, etc. It's
-   just regular xtlang code that needs to be evaluated before you can
-   use the functions in the library.
-
-.. [3]
-   It is possible to compile on one platform for a different target
-   platform—this is called *cross-compiling*. But if you know how to do
-   that then you don't need these instructions anyway.
-
-.. [4]
-   =sys:open-dylib= doesn't do anything clever, just tries to find and
-   load a shared library of the name you gave it. So it's up to you to
-   make sure that the library exists, and is of the right type for your
-   platform.
-
-.. [5]
-   See `this post`_ for more detail on the differences between closures
-   and functions.
-
-.. _foreign function interface: http://en.wikipedia.org/wiki/Foreign_function_interface
-.. _Extempore's philosophy: 2012-08-07-extempore-philosophy.org
-.. _KissFFT: http://sourceforge.net/projects/kissfft/
-.. _Fourier transforms: http://en.wikipedia.org/wiki/Fourier_transform
-.. _K&R: http://www.iu.hio.no/~mark/CTutorial/CTutorial.html
-.. _source: http://sourceforge.net/projects/kissfft/files/kissfft/
 .. _Wikipedia: http://en.wikipedia.org/wiki/Fourier_transform
-.. _memory management post: 2012-08-17-memory-management-in-extempore.org
-.. _remembering that: 2012-08-09-xtlang-type-reference.org
 .. _API: http://en.wikipedia.org/wiki/Application_programming_interface
-.. _this post: 2012-08-09-xtlang-type-reference.org

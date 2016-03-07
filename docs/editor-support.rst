@@ -5,6 +5,8 @@ Text editors
           know what a text editor is, then that's ok! Atom is probably
           the text editor for you.
 
+.. _atom-editor-support:
+
 Atom
 ----
 
@@ -24,7 +26,7 @@ remember how to do something off the top of your head.
 Installation
 ^^^^^^^^^^^^
 
-Installing Atom is a piece of cake—go to the `Atom homepage`_ and hit
+Installing Atom is a piece of cake---go to the `Atom homepage`_ and hit
 the big red "Download" button near the top of the page. When it's
 finished downloading, click on the downloaded file and follow the
 instructions which show up on the screen.
@@ -32,7 +34,7 @@ instructions which show up on the screen.
 .. _Atom homepage: https://atom.io/
 
 Once you've got Atom up and running, you need to install the `Extempore
-package`_—this tells the Atom editor how to deal with Extempore code.
+package`_---this tells the Atom editor how to deal with Extempore code.
 You can do this through the menu bar: ``Packages > Settings View >
 Install Packages/Themes``, then search for "extempore" and click install
 on the ``Extempore-Atom`` package. Alternatively, you can install it at
@@ -65,13 +67,13 @@ Writing Extempore code
    ``examples/core/fmsynth.xtm``, or create and save new file with a
    ``.xtm`` extension
 #. connect to the running Extempore process with the ``Extempore connect``
-   command—either with the keyboard shortcut ``Alt+O`` or the
+   command---either with the keyboard shortcut ``Alt+O`` or the
    menu bar (``Packages > Extempore > Connect``), the default
    ``host:port`` combination of ``localhost:7099`` should be fine
 
 Then, to evaluate Extempore code, move your cursor onto (or highlight)
 the code you want to evaluate and hit ``Alt+S`` to evaluate the code.
-Change the code and re-evaluate it by hitting ``Alt+S`` again—the code
+Change the code and re-evaluate it by hitting ``Alt+S`` again---the code
 is live, so you can change and re-evaluate things without having to
 re-start Extempore.
 
@@ -151,7 +153,7 @@ remember how to do something off the top of your head.
 Installing ST2
 ^^^^^^^^^^^^^^
 
-Installing ST2 is a piece of cake—there are binaries for all platforms
+Installing ST2 is a piece of cake---there are binaries for all platforms
 on the `download`_ page.
 
 You'll also need the `ST2 Extempore plugin`_, which provides syntax
@@ -197,7 +199,7 @@ post on `interacting with the Extempore compiler`_.
 Known issues
 ^^^^^^^^^^^^
 
-The syntax highlighting currently doesn't cover a few edge cases—so if
+The syntax highlighting currently doesn't cover a few edge cases---so if
 you end up tinkering with ``Extempore.JSON-tmLanguage`` to fix anything
 then I'd love it if you submitted a patch.
 
