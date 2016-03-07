@@ -17,18 +17,18 @@ The ‘chunks’ of code (serialised as strings) which are sent to the
 xtlang compiler may be anything from small one-liners to whole source
 files (via the ``load`` function). The functions and data (often
 referred to collectively as the *environment*) persist for as long as
-the ``extempore`` process is running. As discussed in `this post`_, the
-Extempore compiler actually compiles *two* languages: Scheme and xtlang
-(Extempore’s own programming language). [1]_ But the process of
-evaluating them is the same—just sending strings to the compiler over
-the TCP port.
-
+the ``extempore`` process is running. As discussed in
+:doc:`philosophy`, the Extempore compiler actually compiles *two*
+languages: Scheme and xtlang (Extempore’s own programming language).
+The process of evaluating them is the same---just sending strings to
+the compiler over the TCP port.
+     
 So, to do anything in Extempore you need a text editor which can
 
 #. open up a TCP connection to the compiler
 #. create a string which represents a valid chunk of Scheme or xtlang
    code
-#. send that string over the TCP connection [2]_
+#. send that string over the TCP connection
 
 There are lots of text editors which can perform these functions, so you
 basically have two options:
@@ -419,21 +419,6 @@ the `mailing list`_. The standard library is both a binary file
 ``libs/xtm.xtm`` file which is the ‘header’ for the xtlang code in this
 library—it tells Extempore about what closures and other data are
 present in the library and how to call them.
-
-.. [1]
-   There are lots of `other`_ `posts`_ describing xtlang in more detail.
-   In this post, I’ll just refer to the code generally, only clarifying
-   whether its Scheme or xtlang when there’s a possibility for
-   confusion.
-
-.. [2]
-   Currently Extempore doesn’t support encrypted connections for this
-   purpose, and will blindly accept any connection which makes the right
-   handshake. This is obviously a security risk, which will be addressed
-   in a future release. For the moment, either block the default ports
-   (``7098`` and ``7099``) in your firewall so that only machines on the
-   local network can connect to Extempore, or cross your fingers and
-   rely on security through obscurity.
 
 .. [3]
    This is a good thing: the audio clock will usually be more stable and

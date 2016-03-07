@@ -5,24 +5,25 @@ The Extempore philosophy
           welcome.
 
 Extempore is a programming language and runtime environment designed
-with *live* programming in mind. It supports interactive programming in
-a REPL style, compiling and binding code just-in-time. Although
-Extempore has its roots in ‘live coding’ of audiovisual media art [1]_,
-it is suitable for any task domain where dynamic run-time modifiability
+with *live* programming in mind. It supports interactive programming
+in a REPL style, compiling and binding code just-in-time. Although
+Extempore has its roots in ‘live coding’ of audiovisual media art, it
+is suitable for any task domain where dynamic run-time modifiability
 and good numerical performance are required. Extempore also has strong
 timing and concurrency semantics, which are helpful when working in
 problem spaces where timing is important (such as audio and video).
 
-These two goals—dynamic flexibility and close-to-the-metal control—seem
-at odds. Extempore tries to offer both by supporting both a high-level
-dynamic language (Scheme) and a low-level ‘C like’ language (xtlang)
-simultaneously, with tight integration and transparency between the two.
-A running Extempore process will compile both valid scheme and xtlang
-forms. Scheme objects (lists, closures, continuations, etc.) coexist
-with `xtlang’s types`_ and `pointers`_ to `malloc’ed memory`_, and with
-a few ‘helper functions’ data can even flow through both languages
-fluidly.
-
+These two goals—dynamic flexibility and close-to-the-metal
+control—seem at odds. Extempore tries to offer both by supporting both
+a high-level dynamic language (Scheme) and a low-level ‘C like’
+language (xtlang) simultaneously, with tight integration and
+transparency between the two. A running Extempore process will compile
+both valid scheme and xtlang forms. Scheme objects (lists, closures,
+continuations, etc.) coexist with the :ref:`xtlang's types
+<type-system-doc>` and :ref:`pointers <pointer-doc>` to :ref:`allocated memory <memory-doc>`,
+and with a few ‘helper functions’ data can even
+flow through both languages fluidly.
+   
 What’s scheme, and what’s xtlang?
 ---------------------------------
 
@@ -54,10 +55,14 @@ for which ``number?`` returns ``#t``. Closures are first-class objects
 in Scheme, and ``scheme-closure`` is no exception. It can be passed to
 ``map``, ``apply``, and friends.
 
+.. _closure: http://en.wikipedia.org/wiki/Closure_(computer_science)
+
 ``xtlang_closure``, on the other hand, is an xtlang closure. xtlang
 (unlike Scheme) is a *new* language, and the Extempore executable
 provides the xtlang compiler. Like Scheme, xtlang is has an
 `s-expression`_ based syntax.
+
+.. _s-expression: http://en.wikipedia.org/wiki/S-expression
 
 ``xtlang_closure`` is also a closure which takes two arguments, and
 xtlang uses the ``lambda`` form to build closures, just like Scheme. In
@@ -79,6 +84,8 @@ Scheme.
 The xtlang compiler uses an `LLVM`_ backend to generate high-performance
 machine code. Basically, Extempore’s xtlang compiler generates the LLVM
 IR, and this is then passed to LLVM for compiling and linking.
+
+.. _LLVM: http://llvm.org
 
 So why two languages?
 ---------------------
@@ -116,17 +123,17 @@ using a brute-force approach:
 The code for Scheme (``hcf-scheme``) and xtlang (``hcf_xtlang``) is
 identical except for an ``i64`` type annotation on the first argument
 ``a`` in ``hcf_xtlang`` and a ``letrec`` instead of a ``let`` in
-``hcf-scheme``. Both functions use tail call recursion, and are written
-in a fairly ‘scheme-like’ way. Although there is only the one type
-annotation, ``hcf_xtlang`` is strongly (and fully) typed. The types of
-all the other variables and the return type of the closure are all
-inferred by the compiler from the type of ``a``: the function
-``hcf_xtlang`` takes two ``i64`` arguments and returns another ``i64``.
-In more complex functions there may be a greater need to specify the
-types of the variables, but often just a few type annonations can
-unambiguously determine everything in scope. The `xtlang type
-reference`_ has more info on how type inferencing works in the xtlang
-compiler.
+``hcf-scheme``. Both functions use tail call recursion, and are
+written in a fairly ‘scheme-like’ way. Although there is only the one
+type annotation, ``hcf_xtlang`` is strongly (and fully) typed. The
+types of all the other variables and the return type of the closure
+are all inferred by the compiler from the type of ``a``: the function
+``hcf_xtlang`` takes two ``i64`` arguments and returns another
+``i64``. In more complex functions there may be a greater need to
+specify the types of the variables, but often just a few type
+annonations can unambiguously determine everything in scope. The
+:doc:`xtlang type reference <type-system>` has more info on how
+type inferencing works in the xtlang compiler.
 
 .. code-block:: extempore
 
@@ -167,7 +174,7 @@ compilers, but Extempore’s isn’t one of them—it’s dog slow.
 
 You may now be thinking that this pretty much rules Scheme out for
 anything computationally intensive in Extempore, such as audio and
-graphics. Well, late one night [2]_ in about 2010 Andrew (Extempore’s
+graphics. Well, late one night in about 2010 Andrew (Extempore’s
 creator) had pretty much the same realisation. At the time he was
 working on Impromptu, Extempore’s predecessor, which had the same Scheme
 interpreter. And he realised that the Scheme interpreter would need some
@@ -197,7 +204,7 @@ is that it’s easy to bind to shared libraries (``.dll``, ``.so`` or
 xtlang. You can even bind and rebind these shared libraries dynamically,
 switching the bindings around as you please. There’s more details about
 binding to C shared libraries in the ``examples/external`` directory,
-and in `this post`_.
+and in :doc:`c-xtlang-interop`.
 
 There’s heaps more to say about the Scheme/xtlang interop in Extempore
 (as well as the details of xtlang itself!), but the key point is that
@@ -213,8 +220,8 @@ performance benefits and bit-level control of working much closer to the
 metal. It’s even nice (most of the time, at least!) to get the compile
 errors, it’s better to catch type mismatches earlier rather than later.
 
-*Live* programming: Interacting with the Extempore compiler/runtime
--------------------------------------------------------------------
+**Live** programming: Interacting with the Extempore compiler/runtime
+---------------------------------------------------------------------
 
 Remember the claim in the opening paragraph that Extempore is a language
 designed with ‘live programming’ in mind? Now, ‘live programming’ is a
@@ -249,6 +256,8 @@ it’s being run—but that’s exactly why Extempore is being designed as it
 is: to provide as much support as possible to the programmer as they
 deal with this difficult (and exciting) challenge.
 
+.. _laptop performance: http://toplap.org
+
 This ‘everything should be hot-swappable at runtime’ philosophy has a
 couple of implications for the architecture of the Extempore compiler
 and programming environment:
@@ -264,126 +273,3 @@ and programming environment:
    it’s written in Scheme, even the compiler *itself* is reconfigurable
    at runtime.
 
-What’s possible with Extempore?
--------------------------------
-
-Real-time DSP
--------------
-
-Make your own DSP signal chain. `Start low-level`_ (with unit
-generators, envelopes, LFOs, etc.) and `build whatever abstractions take
-your fancy`_. You can even build Extempore ‘instruments’ which can be
-played like soft synths (here’s a simple and And because it’s all
-dynamically compiled, if things aren’t working for you you can dig into
-the source and change things on the fly :)
-
-The ``examples/core/audio_101.xtm`` example file is a good place to
-start for this sort of thing.
-
-Higher-level (note based) audio sequencing
-------------------------------------------
-
-If writing raw bits to the sound card isn’t your cup of tea, then
-there’s a ‘`instrument`_’ (note-level) audio framework in Extempore as
-well. You can `load an instrument`_, `trigger sounds using the familiar
-pitch/velocity/duration arguments`_, and build `complex rhythmic and
-harmonic patterns`_ (this type of musical coding will be `familiar to
-Impromptu users`_).
-
-Apart from the aforelinked blog posts, the
-``examples/core/polysynth.xtm`` example file is a good place to start
-for this type of musical interaction. There aren’t a heap of preset
-instruments available currently, but more will be added as development
-continues.
-
-It’s important to point out that there’s nothing forcing you to choose
-between these high-level and low-level music making approaches. Mixing
-Scheme and xtlang code is the whole point of Extempore—so pick whichever
-approach is the best fit for what you’re trying to achieve.
-
-Graphics processing
--------------------
-
-This ‘philosophy’ document doesn’t cover it, but Extempore also has
-support for working with graphics. Both 2D (via `cairo`_) and 3D (via
-`OpenGL`_) graphics are supported, and again everything can be tweaked
-on the fly.
-
-There are a few OpenGL examples in ``examples/external/`` which might be
-of interest for those who want to get started with graphics in
-Extempore.
-
-Working with external C libraries
----------------------------------
-
-If there’s a particular C library that you’d like to explore in a more
-dynamic way than is possible with a statically compiled binary, then you
-can `create xtlang bindings for the library`_, load it at runtime and
-away you go. This could be used, for instance, to add OpenCV image
-processing to a computer-vision based program, or to leverage GStreamer
-for playback and remixing of video content in real-time.
-
-If you’ve got the compiled library and the header file (so that you can
-determine the types/function signatures of the library’s functions), you
-can bind it on the fly and add it into the live programming loop. Check
-out the ``libs/external`` directory to see how it’s done.
-
-And much more…
---------------
-
-I’m sure you can think of a way to leverage Extempore that I haven’t
-even thought of :)
-
-How do I start?
----------------
-
-Extempore works on `Windows 7`_, `OSX and Linux`_, and you can `interact
-with the compiler`_ using any client that can write strings to a TCP
-port. Having said that, there’s an `Emacs major mode`_, `a vim plugin`_,
-and a `Sublime Text 2 plugin`_ in the ``extras`` directory, which all
-make the programming/debugging experience a bit nicer than echoing
-strings to a port using ``netcat``. But hey, whatever floats your boat.
-
-There’s `a bunch more documentation`_ on this blog, as well as the
-project’s `github project page`_. There are some examples in the
-``examples`` subdirectory which are a great way to start off. And
-finally, because it’s open source, if you really want to see how it
-works you can examine the source for yourself :)
-
-.. [1]
-   In the form of `Impromptu`_, Extempore’s predecessor (see also
-   `Extempore for Impromptu users`_).
-
-.. [2]
-   Or early one morning, or whenever. The time isn’t really important to
-   the story.
-
-.. _xtlang’s types: 2012-08-09-xtlang-type-reference.org
-.. _pointers: 2012-08-13-understanding-pointers-in-xtlang.org
-.. _malloc’ed memory: 2012-08-17-memory-management-in-extempore.org
-.. _closure: http://en.wikipedia.org/wiki/Closure_(computer_science)
-.. _s-expression: http://en.wikipedia.org/wiki/S-expression
-.. _LLVM: http://llvm.org
-.. _xtlang type reference: 2012-08-09-xtlang-type-reference.org
-.. _this post: 2012-08-23-binding-to-c-libs.org
-.. _laptop performance: http://toplap.org
-.. _Start low-level: 2012-06-07-dsp-basics-in-extempore.org
-.. _build whatever abstractions take your fancy: 2012-06-07-more-dsp-and-extempore-types.org
-.. _instrument: 2012-10-16-a-really-simple-instrument.org
-.. _load an instrument: 2012-10-17-loading-and-using-a-sampler.org
-.. _trigger sounds using the familiar pitch/velocity/duration arguments: 2012-10-15-playing-an-instrument-part-i.org
-.. _complex rhythmic and harmonic patterns: 2012-10-15-playing-an-instrument-part-ii.org
-.. _familiar to Impromptu users: 2012-10-15-extempore-for-impromptu-users.org
-.. _cairo: http://cairographics.org
-.. _OpenGL: http://www.opengl.org
-.. _create xtlang bindings for the library: 2012-08-23-binding-to-c-libs.org
-.. _Windows 7: 2013-03-20-building-extempore-on-windows.org
-.. _OSX and Linux: 2013-03-20-building-extempore-on-osx-linux.org
-.. _interact with the compiler: 2012-09-26-interacting-with-the-extempore-compiler.org
-.. _Emacs major mode: 2012-10-10-extempore-emacs-cheat-sheet.org
-.. _a vim plugin: 2014-11-07-hacking-extempore-in-vim.org
-.. _Sublime Text 2 plugin: 2012-10-23-extempore-st2-cheat-sheet.org
-.. _a bunch more documentation: ../extempore-docs/index.org
-.. _github project page: https://github.com/digego/extempore
-.. _Impromptu: http://impromptu.moso.com.au
-.. _Extempore for Impromptu users: 2012-10-15-extempore-for-impromptu-users.org

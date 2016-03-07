@@ -27,6 +27,7 @@ this is an attempt to do things right, using Sphinx_.
    :caption: Getting started
 
    quickstart
+   installation
    editor-support
    about-this-documentation
 
@@ -60,6 +61,7 @@ this is an attempt to do things right, using Sphinx_.
 
    audio
    graphics
+   impromptu-users
 
 .. _help-docs:
 

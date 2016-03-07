@@ -1,3 +1,5 @@
+.. _memory-doc:
+
 Memory management in Extempore
 ==============================
 
@@ -636,6 +638,8 @@ of cool possibilities.
 .. _function *closures*: 2012-08-09-xtlang-type-reference.org
 .. _This post: 2012-08-09-xtlang-type-reference.org
 .. _DSP basics: 2012-06-07-dsp-basics-in-extempore.org
+
+.. _pointero-:
 
 Understanding pointers in xtlang
 --------------------------------
