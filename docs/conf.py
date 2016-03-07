@@ -5,7 +5,7 @@
 #
 # To make these docs, you'll need a few python packages, something like
 #
-# pip install sphinx sphinx-autobuild sphinx_rtd_theme recommonmark
+# pip install sphinx sphinx-autobuild sphinx_rtd_theme
 #
 # You can build the documentation locally if you've got all the Sphinx
 # stuff on your box, just run
@@ -291,13 +291,3 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
-
-# -- Options for markdown output -------------------------------------------
-
-from recommonmark.parser import CommonMarkParser
-
-source_parsers = {
-    '.md': CommonMarkParser,
-}
-
-source_suffix = ['.rst', '.md']
