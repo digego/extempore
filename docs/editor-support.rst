@@ -210,10 +210,10 @@ tricky to add if you know a bit about how ST2 works.
 Vim
 ---
 
-Extempore’s `vim`_ plugin can be found in the ``extras/`` subdirectory.
-The plugin uses python to get the job done, so it won’t work in ``vi``.
+Extempore's `vim`_ plugin can be found in the ``extras/`` subdirectory.
+The plugin uses python to get the job done, so it won't work in ``vi``.
 To install it, you can either ``:source`` it each time, or put it in
-your vim plugin directory (probably a better option if you’re going to
+your vim plugin directory (probably a better option if you're going to
 be using it often).
 
 .. _vim: http://www.vim.org/
@@ -232,7 +232,7 @@ top, but the most important ones (and their default keybindings) are:
    Extempore
 
 Remember to have your terminal (where Extempore is running) somewhere
-you can see it, since Extempore’s ``stdout`` will show up there (and not
+you can see it, since Extempore's ``stdout`` will show up there (and not
 in vim).
 
 Writing Extempore code
@@ -255,16 +255,16 @@ the code you want to evaluate and use the
 ``<Leader>w``).
 
 To restart the Extempore process, just ``ctrl+c`` in the shell where
-``extempore`` is running to kill it, then start it up again (you’ll have
+``extempore`` is running to kill it, then start it up again (you'll have
 to reconnect vim to this new Extempore process).
 
-For more detail on how to ‘program’ in Extempore, have a look at this
+For more detail on how to 'program' in Extempore, have a look at this
 post on `interacting with the Extempore compiler`_.
 
 Known issues
 ^^^^^^^^^^^^
 
-The vim mode doesn’t yet support multiple connections or user-specified
+The vim mode doesn't yet support multiple connections or user-specified
 host/port, but pull requests are welcome!
 
 A big thankyou to Tim Mellor and others (including Garett Shulman) who
