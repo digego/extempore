@@ -96,7 +96,7 @@ task has been scheduled, thread execution moves immediately onto the
 next expression. A pseudocode example may help to illustrate this
 difference.
 
-.. code-block::
+.. code::
 
     //synchronous timing
     play-note(now)

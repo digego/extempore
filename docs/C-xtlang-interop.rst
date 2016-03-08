@@ -115,7 +115,7 @@ From here on I'll assume you're on OSX, so I'll refer to libraries with the
 for your platform. To build the shared library on OSX, move into
 libfoo's directory and build it with the ``-dynamiclib`` flag:
 
-.. code-block:: bash
+.. code::
 
     clang libfoo.c -dynamiclib -o libfoo.dylib
 
@@ -276,7 +276,7 @@ that xtlang uses ``i8*`` in place of C's ``void`` type)
 But then when we try and evaluate the ``bind-lib``, the compiler throws
 an error:
 
-.. code-block::
+.. code::
 
     Compiler Error: cannot find type for "kiss_fft_cfg"
 
@@ -390,7 +390,7 @@ library.
 So after all this detective work, finding and declaring the appropriate
 type signatures, the above code finally compiles:
 
-.. code-block:: bash
+.. code::
 
     Bound kiss_fft_cpx >>> <float,float>
     Bound kiss_fft_state >>> <i32,i32,|64,i32|,|1,kiss_fft_cpx|>

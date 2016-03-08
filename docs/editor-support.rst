@@ -5,7 +5,7 @@ Text editors
           know what a text editor is, then that's ok! Atom is probably
           the text editor for you.
 
-.. _atom-editor-support:
+.. _atom-editor-setup:
 
 Atom
 ----
@@ -21,7 +21,7 @@ for dipping back into to refresh your memory when you just can't
 remember how to do something off the top of your head.
 
 .. _Atom: https://atom.io/
-.. _documentation: https://atom.io/docs
+.. _Atom documentation: https://atom.io/docs
 
 Installation
 ^^^^^^^^^^^^
@@ -33,13 +33,15 @@ instructions which show up on the screen.
 
 .. _Atom homepage: https://atom.io/
 
-Once you've got Atom up and running, you need to install the `Extempore
+Once you've got Atom up and running, you need to install the `Atom Extempore
 package`_---this tells the Atom editor how to deal with Extempore code.
 You can do this through the menu bar: ``Packages > Settings View >
 Install Packages/Themes``, then search for "extempore" and click install
 on the ``Extempore-Atom`` package. Alternatively, you can install it at
 a terminal with ``apm install extempore-atom``. Once that's done, you're
 ready to go.
+
+.. _Atom Extempore package: https://github.com/benswift/extempore-sublime
 
 If you want to run Extempore in a terminal *inside* Atom, then you can
 get the ``term`` package as well, search for it in the same window as
@@ -81,13 +83,6 @@ If you *do* want to restart the Extempore process, just ``ctrl+c`` in
 the terminal where ``extempore`` is running to kill it, then start it up
 again.
 
-For more detail on how to 'program' in Extempore, have a look at this
-post on `interacting with the Extempore compiler`_.
-
-.. _documentation: http://docs.sublimetext.info/en/latest/
-.. _Extempore package: https://github.com/benswift/extempore-sublime
-.. _interacting with the Extempore compiler: 2012-09-26-interacting-with-the-extempore-compiler.org
-
 
 Emacs
 -----
@@ -118,7 +113,7 @@ Writing Extempore code
 #. connect to the running Extempore process: ``C-c C-j`` (this needs to
    be done for *every* ``.xtm`` buffer)
 
-Then, to `evaluate`_ Extempore code, use either
+Then, to evaluate Extempore code, use either
 
 -  evaluate enclosing s-expression: ``C-c C-c`` or ``C-M-x``
 -  evaluate region: ``C-c C-r``
@@ -127,11 +122,6 @@ Then, to `evaluate`_ Extempore code, use either
 To restart the Extempore process, just ``C-c C-c`` in the
 ``*extempore*`` buffer where ``extempore`` is running to kill it, then
 start it up again with ``M-x switch-to-extempore`` (``C-c C-z``).
-
-For more detail on how to 'program' in Extempore, have a look at this
-post on `interacting with the Extempore compiler`_.
-
-.. _interacting with the Extempore compiler: 2012-09-26-interacting-with-the-extempore-compiler.org
 
 
 Sublime Text 2
@@ -183,18 +173,13 @@ Writing Extempore code
    (``Ctrl+Shift+P`` on Windows/Linux or ``Cmd+Shift+P`` on OSX) or
    the menu bar (``Tools > Extempore > Connect``)
 
-Then, to evaluate_ Extempore code, highlight the code you want to
+Then, to evaluate Extempore code, highlight the code you want to
 evaluate and hit ``evaluate region`` (which by default is mapped to
 ``ctrl+e``).
 
 To restart the Extempore process, just ``ctrl+c`` in the terminal where
 ``extempore`` is running to kill it, then start it up again.
 
-For more detail on how to 'program' in Extempore, have a look at this
-post on `interacting with the Extempore compiler`_.
-
-.. _evaluate: 2012-09-26-interacting-with-the-extempore-compiler.org
-.. _interacting with the Extempore compiler: 2012-09-26-interacting-with-the-extempore-compiler.org
 
 Known issues
 ^^^^^^^^^^^^
@@ -260,8 +245,6 @@ To restart the Extempore process, just ``ctrl+c`` in the shell where
 ``extempore`` is running to kill it, then start it up again (you'll have
 to reconnect vim to this new Extempore process).
 
-For more detail on how to 'program' in Extempore, have a look at this
-post on `interacting with the Extempore compiler`_.
 
 Known issues
 ^^^^^^^^^^^^

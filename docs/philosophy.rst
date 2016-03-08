@@ -14,15 +14,15 @@ timing and concurrency semantics, which are helpful when working in
 problem spaces where timing is important (such as audio and video).
 
 These two goals---dynamic flexibility and close-to-the-metal
-control---seem at odds. Extempore tries to offer both by supporting both
-a high-level dynamic language (Scheme) and a low-level 'C like'
+control---seem at odds. Extempore tries to offer both by supporting
+both a high-level dynamic language (Scheme) and a low-level 'C like'
 language (xtlang) simultaneously, with tight integration and
 transparency between the two. A running Extempore process will compile
 both valid scheme and xtlang forms. Scheme objects (lists, closures,
-continuations, etc.) coexist with the :ref:`xtlang's types
-<type-system-doc>` and :ref:`pointers <pointer-doc>` to :ref:`allocated memory <memory-doc>`,
-and with a few 'helper functions' data can even
-flow through both languages fluidly.
+continuations, etc.) coexist with the :doc:`xtlang's types
+<type-system>` and :ref:`pointers <pointer-doc>` to :doc:`allocated
+memory <memory>`, and with a few 'helper functions' data can even flow
+through both languages fluidly.
    
 What's scheme, and what's xtlang?
 ---------------------------------

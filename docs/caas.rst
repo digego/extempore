@@ -58,12 +58,7 @@ But how do we know what audio device to select? Well, the
 ``--print-devices``. At a shell prompt, ``cd`` into the extempore
 source directory (where the executable will be) and run
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/extempore-print-devices.png"
-            alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/extempore-print-devices.png
 
 As you can see, running ``extempore`` with the ``--print-devices``
 argument prints a list of all the audio devices (input, output and
@@ -84,11 +79,7 @@ to pass this device index with the ``--device`` argument. The
 will default to using whatever device is found at index 0. But it
 doesn't hurt to specify it explicitly, just to avoid any surprises.
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/extempore-start.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/extempore-start.png
 
 After running ``extempore`` with ``--device 2``, it prints some
 information to ``stdout`` (sometimes referred to as the *log*) about
@@ -121,11 +112,7 @@ you're editing Extempore source code, and load the appropriate
 Extempore plugin. Here's a (short) example file containing some
 Extempore code:
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/text-editor-start.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/text-editor-start.png
 
 The content of the file is at the top, and I've also included a
 representation of the "echo area" at the bottom. This is a part of
@@ -163,11 +150,7 @@ In ST2, you have to highlight the code you want to evaluate and hit
 ``Ctrl+e``. This takes the whole expression ``(+ 1 2)`` and sends it
 (as a string) to the running ``extempore`` compiler.
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/scheme-eval.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/scheme-eval.png
 
 The orange 'box' in the diagram indicates code that has been sent for
 evaluation. See how the code string (in grey) is sent over the
@@ -181,11 +164,7 @@ We can write some more code to ``bind-val`` a global variable
 <type-system>` ``double``. If you evaluate this with ``Alt+S`` or ``C-M-x`` (or
 whatever the command is in your editor) then what happens is
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/xtlang-eval-1.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/xtlang-eval-1.png
 
 One difference from the previous (Scheme) example is that the
 ``extempore`` compiler now prints a message to the console: ``Bound myPI
@@ -199,11 +178,7 @@ result it echoes back to the editor over the TCP connection.
 
 How about compiling an xtlang closure?
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/xtlang-eval-2.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/xtlang-eval-2.png
 
 ``circle_area`` is an xtlang closure which takes a (``double``) argument
 representing the radius of a circle and returns the area of that circle
@@ -216,11 +191,7 @@ printed a (hopefully helpful) compile error to the log instead.
 Let's find out the area of a circle of radius ``5.0`` units. We need to
 call ``circle_area`` with the argument ``5.0``.
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/xtlang-eval-3.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/xtlang-eval-3.png
 
 When we evaluate the ``(circle_area 5.0)`` expression, a couple of
 things happen. The code is sent to the compiler, which returns the
@@ -242,11 +213,7 @@ The answer: we can wrap the call to the ``circle_area`` closure in a
 call to ``println``. ``println`` is a built-in function which prints (to
 the log) a string representation of whatever arguments it is passed.
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/xtlang-eval-4.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/xtlang-eval-4.png
 
 This time, the result (``78.539816``) is printed to the log. And the
 result returned to the editor is different, too---it's now ``#t``. That's
@@ -259,11 +226,7 @@ As a final basic example, we can send code to the compiler more than
 'one closure at a time'. Let's write another closure, this time for
 figuring out the area of a 'doughnut'
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/doughnut-area.png" width="250px" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/doughnut-area.png
 
 Because we already have a closure (``circle_area``) for figuring out the
 area of a circle, it makes sense to use that closure in our
@@ -271,11 +234,7 @@ area of a circle, it makes sense to use that closure in our
 outer circle (radius ``r1``) minus the area of the inner circle (radius
 ``r2``).
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/xtlang-eval-5.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/xtlang-eval-5.png
 
 See how this time both the definition of the ``doughnut_area`` closure
 and the call ``(doughnut_area 5.0 2.5)`` are sent to the compiler in the
@@ -294,20 +253,12 @@ worked fine. But when we kill the ``extempore`` process (i.e. with
 ``SIGINT``), the Extempore environment we've 'built up' isn't saved---it's
 destroyed.
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/extempore-restart.png" width="300px" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/extempore-restart.png
 
 After restarting the ``extempore`` process above, and reconnecting the
 editor to it, let's try compiling the ``doughnut_area`` closure first:
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/xtlang-compile-error.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/xtlang-compile-error.png
 
 The ``circle_area`` closure isn't there anymore, and so the compiler
 throws an error (and no value is returned to the editor). Because the
@@ -320,11 +271,7 @@ through the code.
 So, if we go back and evaluate all the necessary code, everything works
 properly
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/xtlang-eval-6.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/xtlang-eval-6.png
 
 One other thing you can do is *redefine* the behaviour of existing
 functions and variables. For example, say we wanted to change our
@@ -334,11 +281,7 @@ the area of a circle described on the `Rhind papyrus`_ (c. 1800BC).
 In the editor, *change the code* for the ``circle_area`` closure and
 re-evaluate:
 
-.. raw:: html
-
-     <div class="ui image segment">
-       <img src="/img/interacting-with-compiler/xtlang-eval-7.png" alt="">
-     </div>
+.. image:: /images/interacting-with-compiler/xtlang-eval-7.png
 
 The result is (slightly) different, but not too far off---not bad for a
 4000 year old formula. But the main thing is that the code to *call*

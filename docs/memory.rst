@@ -22,11 +22,13 @@ Automatic garbage collection in Scheme
 --------------------------------------
 
 Scheme objects (lists, closures, numbers, etc.) are automatically
-`garbage collected`_ by the Extempore run-time garbage collector
-(GC) [1]_. This means that when new objects are created, memory is
-automatically allocated to store those objects, and as objects are
-destroyed or go out of scope (that is, there are no longer any
-references to them) the memory is automatically freed up for re-use.
+`garbage collected`_ by the Extempore run-time garbage collector (GC).
+This means that when new objects are created, memory is automatically
+allocated to store those objects, and as objects are destroyed or go
+out of scope (that is, there are no longer any references to them) the
+memory is automatically freed up for re-use.
+
+.. _garbage collected: http://en.wikipedia.org/wiki/Garbage_collection_(computer_science)
 
 Let's do the most basic memory allocation imaginable: just binding a
 numerical value to a symbol.
@@ -37,13 +39,13 @@ numerical value to a symbol.
 
       (println 'a '= a)  ;; prints a = 5
 
-The fact that we can use the symbol ``a`` and have it evaluate to ``5``
-(as it should) means that the value (``5``) must be stored in memory
-somewhere. [2]_ It doesn't matter *where* in memory (what the address
-is), because we can always refer to the value using the symbol ``a``.
-But it's good to remember that the ``define`` form is allocating some
-memory, storing the value ``5`` in that memory, and binding a reference
-to the value in the symbol ``a``.
+The fact that we can use the symbol ``a`` and have it evaluate to
+``5`` (as it should) means that the value (``5``) must be stored in
+memory somewhere. It doesn't matter *where* in memory (what the
+address is), because we can always refer to the value using the symbol
+``a``. But it's good to remember that the ``define`` form is
+allocating some memory, storing the value ``5`` in that memory, and
+binding a reference to the value in the symbol ``a``.
 
 We can redefine the symbol ``a`` to be some other Scheme object, say, a
 list.
@@ -68,13 +70,13 @@ bound to some other value instead. The value ``5`` in memory is
 space like some freeloading relative.
 
 That's where the garbage collector comes in. Every now and then the
-garbage collector checks all the Scheme objects in the world, [3]_
+garbage collector checks all the Scheme objects in the world,
 determines which of them are no longer reachable, and then frees up that
 memory to be used for other things. While I don't recommend this harsh
 utilitarian approach to dealing with relatives who are down on their
 luck, it *is* good idea in a computer program. Memory is a finite
 resource, and the more efficiently we can get rid of memory that's not
-being used the better. [4]_
+being used the better.
 
 Basically, having a GC means that when you're writing Scheme code, you
 don't have to worry about memory. The GC takes care of all the
@@ -95,7 +97,7 @@ Manual memory management in xtlang
 Hang on a sec---isn't working with real-time audio and video xtlang (and
 therefore Extempore's) *raison d'etre?* Well, yes is is---the sluggishness
 (and non-determinism) of Impromptu's Scheme interpreter was the spark
-which ignited the development of xtlang (as mentioned in `this post`_).
+which ignited the development of xtlang (as mentioned in :doc:`philosophy`).
 Again, this isn't a knock on Scheme in general as slow---there are some
 very sprightly Scheme compilers, but Impromptu's one was slow. The
 non-determinism was even more of a problem, because the last thing you
@@ -113,10 +115,15 @@ much memory you'll get and you know it's going to hang around for. This
 determinism an important benefit of manual memory management in
 xtlang---especially in a real-time systems context.
 
+.. _manual memory management: http://en.wikipedia.org/wiki/Manual_memory_management
+
 Zooming out for a second, a running program has access to and uses two
-main regions of memory: the **stack** and the **heap**. There's lots of
-material on the web about the differences between these two a (`here's
-an explanation at stackoverflow`_), but I'll give a quick summary here.
+main regions of memory: the **stack** and the **heap**. There's lots
+of material on the web about the differences between these two a
+(`here's an explanation at stackoverflow`_), but I'll give a quick
+summary here.
+
+.. _here's an explanation at stackoverflow: http://stackoverflow.com/questions/79923/what-and-where-are-the-stack-and-heap
 
 -  The **stack** is for dealing with function arguments and local
    variables. Each function call 'pushes' some new data onto the stack,
@@ -129,11 +136,11 @@ an explanation at stackoverflow`_), but I'll give a quick summary here.
    heap.
 
 I should also point out that the stack and heap aren't actually
-different types of memory in the computer---they're just different areas
-in the computer's RAM. The difference is in the way the program *uses*
-the different regions. Each running process has its own stack [5]_ and
-heap, and they are just regions of memory given to the process by the
-OS.
+different types of memory in the computer---they're just different
+areas in the computer's RAM. The difference is in the way the program
+*uses* the different regions. Each running process has its own
+stack(s) heap, and they are just regions of memory given to the
+process by the OS.
 
 So, that's the stack and the heap, but there's actually one other type
 of memory in Extempore: **zone** memory. A zone is a `region`_ of memory
@@ -143,6 +150,8 @@ allocation is no good), but want to be able to conveniently deallocate
 all at once, then use a zone. There can be multiple zones in existence
 at once, and they don't interfere (or have anything to do with) each
 other.
+
+.. _region: http://en.wikipedia.org/wiki/Region-based_memory_management
 
 The three flavours of memory in Extempore
 -----------------------------------------
@@ -161,13 +170,13 @@ a zone.
 Stack allocation with salloc
 ----------------------------
 
-As I mentioned above, the stack is associated with function calls, their
-arguments and local variables. Because xtlang uses (in general)
-`function *closures*`_ rather than just plain functions, stack
-allocation and ``salloc`` in xtlang is used in the body of a closure.
-Remember that closures are just functions with their enclosing scope:
-think of a function which has packaged up any variables it references
-and carries them around in its saddlebags.
+As I mentioned above, the stack is associated with function calls,
+their arguments and local variables. Because xtlang uses (in general)
+:ref:`closures <closure-type-doc>` rather than just plain functions,
+stack allocation and ``salloc`` in xtlang is used in the body of a
+closure. Remember that closures are just functions with their
+enclosing scope: think of a function which has packaged up any
+variables it references and carries them around in its saddlebags.
 
 Well, that's as clear as mud. Let's have an example.
 
@@ -191,12 +200,11 @@ that's the exception to the rule---everything else which is bound in a
 ``let`` inside an xtlang ``lambda`` will be stack allocated, unless you
 explicitly request otherwise with ``halloc`` or ``zalloc``.
 
-String literals are the exception to the "all literals are on the stack"
-rule. String literals are actually stored as ``i8*`` on the heap (as
-though they were *halloced*). If you capture a pointer to one of these
-strings (e.g. with ``pref-ptr``), then you can pass it around and
-dereference it from anywhere. `This post`_ has more details on strings
-in Extempore.
+:ref:`String <string-type-doc>` literals are the exception to the "all
+literals are on the stack" rule. String literals are actually stored
+as ``i8*`` on the heap (as though they were *halloced*). If you
+capture a pointer to one of these strings (e.g. with ``pref-ptr``),
+then you can pass it around and dereference it from anywhere.
 
 This 'implicit stack allocation' works for int and float literals, but
 how about aggregate and other higher-order types? In those cases, we
@@ -220,12 +228,11 @@ This ``double_tuple`` closure takes an ``i64`` argument, and creates a
 2-tuple which contains the input value and also its double. Think of it
 as creating input-output pairs for the function *f(x) = 2x*.
 
-Notice how the tuple pointer ``tup:<i64,i64>*`` was ``let``-bound to the
-return value of the call to ``salloc``. Initially, the memory was
-uninitialised (see `this
-post <2012-08-13-understanding-pointers-in-xtlang.org>`__ for more
-background about pointers), then two ``i64`` values were filled into it
-with ``tfill!``. This is basically all the closure does, apart from the
+Notice how the tuple pointer ``tup:<i64,i64>*`` was ``let``-bound to
+the return value of the call to ``salloc``. Initially, the memory was
+uninitialised (:ref:`see here <pointer-doc>` for more background about
+pointers), then two ``i64`` values were filled into it with
+``tfill!``. This is basically all the closure does, apart from the
 ``printf`` calls which are just reading and printing out what's going
 on.
 
@@ -387,7 +394,7 @@ This time, with a region length of one million, the code still works (at
 least, the 367Th element is still correct), but the compiler also prints
 a warning message to the log:
 
-.. code-block:: bash
+.. code::
 
     Zone:0x7ff7ac99a100 size:100000 is full ... leaking 8000000 bytes
     Leaving a leaky zone can be dangerous ... particularly for concurrency
@@ -429,8 +436,9 @@ there are two special zones.
 #. The **audio zone**: there is a zone allocated for each audio frame
    processed, be that sample by sample, or buffer by buffer. The zones
    extent is for the duration of the audio frame (i.e. is deallocated at
-   the end of the frame). The `DSP basics`_ post covers audio processing
-   in Extempore.
+   the end of the frame).
+
+.. TODO The `DSP basics`_ post covers audio processing in Extempore.
 
 #. **Closure zones**: all 'top level' closures (any closure created
    using ``bind-func``) has an associated zone created at compile time
@@ -465,7 +473,7 @@ form, so the memory will be coming from the zone associated with the
 closure ``fill_buffer_closure_zone``. When we try and compile that, we
 get the warning:
 
-.. code-block:: bash
+.. code::
 
     Zone:0x7fb8b3a4a610 size:8192 is full ... leaking 32 bytes
     Leaving a leaky zone can be dangerous ... particularly for concurrency
@@ -551,9 +559,6 @@ is in binding global data structures which you want to have accessible
 from anywhere in your xtlang code. Binding global xtlang variables is
 the job of ``bind-val``.
 
-*Note:* ``bind-val`` *is currently undergoing some reworking, so watch
-this space for best practices.*
-
 Choosing the right memory for the job
 -------------------------------------
 
@@ -593,7 +598,7 @@ allocate a memory region of 10\ :sup:`15` 8-byte ``i64``:
 When I call ``(fill_massive_buffer)`` on my computer (with 8GB of RAM),
 disaster strikes.
 
-.. code-block:: bash
+.. code::
 
     Zone:0x7fc5cbc268c0 size:100000 is full ... leaking 8000000000000000 bytes
     Leaving a leaky zone can be dangerous ... particularly for concurrency
@@ -611,43 +616,18 @@ write clean and performant code in xtlang. And from there, the
 performance and control of working with 'bare metal' types opens up lots
 of cool possibilities.
 
-.. [1]
-   Extempore uses a tri-color (quad treadmill extension) mark-and-sweep
-   garbage collector for those who are into that sort of thing.
+.. _pointer-doc:
 
-.. [2]
-   `This post <2012-08-13-understanding-pointers-in-xtlang.org>`__
-   covers in more detail how computers store data in memory.
-
-.. [3]
-   Well, at least the world of your Extempore process, which *is* the
-   world as far as the GC is concerned.
-
-.. [4]
-   I guess it also shows the danger of anthromorphising bit patterns in
-   memory. Lots of life lessons in this blog post
-
-.. [5]
-   actually each *thread* has its own stack
-
-.. _garbage collected: http://en.wikipedia.org/wiki/Garbage_collection_(computer_science)
-.. _this post: ../2012-08-07-Extempore-philosophy.org
-.. _manual memory management: http://en.wikipedia.org/wiki/Manual_memory_management
-.. _here's an explanation at stackoverflow: http://stackoverflow.com/questions/79923/what-and-where-are-the-stack-and-heap
-.. _region: http://en.wikipedia.org/wiki/Region-based_memory_management
-.. _function *closures*: 2012-08-09-xtlang-type-reference.org
-.. _This post: 2012-08-09-xtlang-type-reference.org
-.. _DSP basics: 2012-06-07-dsp-basics-in-extempore.org
-
-.. _pointero-:
-
-Understanding pointers in xtlang
---------------------------------
+Pointers
+--------
 
 xtlang's pointer types may cause some confusion for those who aren't
-used to (explicitly) working with reference types. That's nothing to be
-ashamed of---the whole `pass by value`_/`pass by reference`_ thing can
-take a bit to get your head around.
+used to (explicitly) working with reference types. That's nothing to
+be ashamed of---the whole `pass by value`_ / `pass by reference`_
+thing can take a bit to get your head around.
+
+.. _pass by value: http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_value
+.. _pass by reference: http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_reference
 
 So what does it mean to say that xtlang supports pointer types? Simply
 put, this means that we can use variables in our program to store not
@@ -676,11 +656,7 @@ whatever value is stored there. The computer's memory is laid out like a
 row of little boxes, and each box has an address (the location of the
 box) and also a value (what's *in* the box).
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-1.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-1.png
 
 In this image the computer's memory is represented by the blue boxes.
 Each box has an address (the number below the box), an in this picture
@@ -712,21 +688,13 @@ value into the memory location that ``num_cats`` refers to. In
 the first ``printf`` call prints "You have 4 cats…". The memory at this
 point might look like this:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-2a.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-2a.png
 
 But then a new value (``13``) is set into ``num_cats`` with the call to
 ``set!``, so the second call to ``printf`` prints "and now you have 13
 cats!". After the call to ``set!``, this is what the memory looks like:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-2b.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-2b.png
 
 Notice how this time the memory address for ``num_cats`` is different to
 what it was the previous time (28 rather than 26). This is because the
@@ -769,7 +737,7 @@ an ``i64`` like it was before.
 There are a couple of other changes to the code. Firstly, we no longer
 bind the value straight away (as we were doing with ``(num_cats:i64
 4)``), but instead we make a call to ``zalloc``. This is the way to get
-pointers in xtlang: through a call to an 'alloc' function. [1]_
+pointers in xtlang: through a call to an 'alloc' function.
 ``zalloc`` is a function which 'allocates' and returns the *address*
 (i.e. a pointer) of some memory which can be used to store the value in.
 This address is the assigned to the variable ``num_cats_ptr``, just like
@@ -791,7 +759,7 @@ memory addresses. If a pointer is a 32 bit integer, then you can only
 This might seem like a lot, but as more and more computers came with
 more than 4.3Gb of RAM installed, so the need for 64-bit pointers became
 more pressing. There are workarounds, but having a larger addressable
-space is a key benefit of 64-bit architectures [2]_. And it helps to
+space is a key benefit of 64-bit architectures. And it helps to
 remember that pointers *are* just integers, but they're not like the int
 types that we use to store and manipulate data.
 
@@ -806,11 +774,7 @@ After the call to ``zalloc``, the memory therefore will look like this
 (the value is now shown in a different coloured box, to indicate it's an
 ``i64*`` pointer type and not an ``i64`` value type)
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-3.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-3.png
 
 This is cool, we can see that the value in memory location 27 is
 actually the address 29, and the value of 29 is ``0`` because we haven't
@@ -838,11 +802,7 @@ Great---the function now prints the right number of cats (in this case
 the memory will look like this (the only difference from last time is
 that the value 5 is stored in address 29, just as it should be).
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-4.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-4.png
 
 Notice also that in ``print_num_cats4`` we don't pass ``num_cats_ptr``
 directly to ``printf``, we do it through a call to ``pref``. Whereas
@@ -884,7 +844,7 @@ this is to store each of the different numbers with its own name.
 The ``let`` form binds the (``double``) values ``4.5``, ``3.3`` and
 ``7.9`` to the names ``num1``, ``num2`` and ``num3``. Then, all three
 values are added together (with ``+``) and then divided by ``3.0`` (with
-``/``)  [3]_. Now, this code does give the right answer, but it's easy
+``/``). Now, this code does give the right answer, but it's easy
 to see how things would get out of hand if we wanted to find the mean of
 5, 20 or one million values. What we really want is a way to give *one*
 name to all the values we're interested in, rather than having to refer
@@ -915,11 +875,7 @@ values. The pointer that gets returned is still only a pointer to the
 first of these memory slots. And this is where the second 'offset'
 argument to ``pref`` and ``pset!`` come in.
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-5.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-5.png
 
 See how the repeated calls to ``pset!`` and ``pref`` above have
 different offset values? Well, that's because the offset argument allows
@@ -967,11 +923,7 @@ memory for 5 ``i64`` values, and just fills it with ascending numbers:
 
 After the ``dotimes`` the memory will look like this:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-6.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-6.png
 
 There's one more useful function for working with pointers:
 ``pref-ptr``. Where ``(pref num_ptr 3)`` returns the *value* of the 4th
@@ -985,11 +937,11 @@ n)`` for any integer *n*.
 Pointers to higher-order types
 ------------------------------
 
-The xtlang type system is covered in `this post`_, but as a quick recap
-there are primitive types (floats and ints) there are higher-order types
-like tuples, arrays and closures. Higher-order in this instance just
-means that they are made up of other types, although these component
-types may be themselves higher-order types.
+The :doc:`xtlang type system <type-system>` has both primitive types
+(floats and ints) and higher-order types like tuples, arrays and
+closures. Higher-order in this instance just means that they are made
+up of other types, although these component types may be themselves
+higher-order types.
 
 As an example of an aggregate type, consider a 2 element tuple. Tuples
 are (fixed-length) n-element structures, and are declared with angle
@@ -1041,21 +993,13 @@ of ``print_tuples``. After the call to ``(zalloc)`` (step 1), we have a
 pointer to a chunk of memory, but the tuples in this memory are
 uninitialised (indicated by u).
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-7.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-7.png
 
 After using ``pref`` and ``tset!`` in step 2, the values get set into
 the tuples. Step 3 simply reads these values back out---it doesn't change
 the memory.
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-8.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-8.png
 
 There are a couple of other things worth discussing about this example.
 
@@ -1066,8 +1010,8 @@ There are a couple of other things worth discussing about this example.
    ``tup_ptr`` directly instead of ``(pref-ptr tup_ptr 0)`` in a couple
    of places, because these two pointers will always be equal (have a
    think about why this is true).
--  There are a few bits of repeated code, for example ``(pref-ptr
-    tup_ptr 1)`` gets called 4 times. We could have stored this pointer
+-  There are a few bits of repeated code, for example ``(pref-ptr tup_ptr 1)``
+   gets called 4 times. We could have stored this pointer
    in a temporary variable to prevent these multiple dereferences, how
    could we have done that (hint: create the new 'tmp' pointer in the
    ``let``---make sure it's of the right type).
@@ -1086,6 +1030,8 @@ is just a ``0`` or a ``1``, and a byte is made up of 8 bits, for example
 ``101``, and although they are difficult for humans to read (unless
 you're used to them), computers *live and breathe* binary digits.
 
+.. _base-2 numerals: http://en.wikipedia.org/wiki/Binary_numeral_system
+
 This is why the integer types all have numbers associated with them---the
 number represents the number of bytes used to store the integer. So
 ``i64`` requires 64 bits, while an ``i8`` only requires 8. The reason
@@ -1100,11 +1046,7 @@ So, reconsidering our very first example, where we stored an ``i64``
 value of ``4`` to represent how many cats we had, a more accurate
 diagram of the actual memory layout in this situation is:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-9.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-9.png
 
 See how each ``i64`` value takes up 8 bytes? Also, each byte has a
 memory addresses, so the start of each ``i64`` in memory is actually 8
@@ -1112,11 +1054,7 @@ bytes along from the previous one.
 
 Now, consider the layout of an aggregate type like a tuple:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-tut-10.png" alt="">
-   </div>
+.. image:: /images/pointer-tut-10.png
 
 Each tuple contains (and therefore takes up the space of) an ``i64`` and
 a ``double``. So the actual memory address offset between the beginning
@@ -1147,29 +1085,3 @@ around is really handy.
    huge performance benefit.
 -  You can programatically determine the amount of memory to allocate,
    which is something you can't to with xtlang's array types.
-
-.. [1]
-   There are 3 types of alloc in xtlang: ``salloc``, ``zalloc`` and
-   ``halloc``. They all return a pointer of the appropriate type, but
-   they differ in *where* that memory is allocated from. In order of how
-   'long-lived' the memory will be: ``salloc`` allocates memory on the
-   stack, ``zalloc`` allocates memory from the current zone, and
-   ``halloc`` allocates memory from the heap. Finally, ``alloc`` is an
-   alias for ``zalloc``.
-
-.. [2]
-   The exact size of the int used for pointers will depend on the CPU
-   and OS you're using. Most desktop/laptop machines and OSes these days
-   are 64-bit, but many ARM processors in smartphones are 32-bit,
-   embedded systems sometimes use even smaller pointer sizes. The OS
-   will take care of this for you, though, and will always know how to
-   deal with the pointers it gives you.
-
-.. [3]
-   Remember that xtlang (like Scheme) uses infix notation for its
-   function calls, so the syntax is ``(func_name arg1 arg2 ...)``.
-
-.. _pass by value: http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_value
-.. _pass by reference: http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_reference
-.. _this post: 2012-08-09-xtlang-type-reference.org
-.. _base-2 numerals: http://en.wikipedia.org/wiki/Binary_numeral_system

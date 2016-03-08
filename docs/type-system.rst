@@ -40,14 +40,12 @@ types of variables in many cases.
 Primitive types
 ---------------
 
+.. _int-type-doc:
+
 Integers
 ^^^^^^^^
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/int-examples.png" alt="">
-   </div>
+.. image:: /images/int-examples.png
 
 Extempore supports signed integers of various different sizes:
 
@@ -65,14 +63,12 @@ A couple of gotchas:
 -  there is no ``char`` type, only ``i8``. In xtlang, strings are
    null-terminated char arrays/pointers with the signature ``i8*``.
 
+.. _float-type-doc:
+
 Floats
 ^^^^^^
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/float-examples.png" alt="">
-   </div>
+.. image:: /images/float-examples.png
 
 There are two sizes of floating point number:
 
@@ -83,14 +79,12 @@ Float literals in xtlang code (e.g. ``4.2``) are interpreted as
 ``double`` unless the type signatures suggest otherwise (as is the case
 with ``i64`` int literals).
 
+.. _pointer-type-doc:
+
 Pointer types
 ^^^^^^^^^^^^^
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/pointer-examples.png" alt="">
-   </div>
+.. image:: /images/pointer-examples.png
 
 xtlang supports `pointers`_ to any type, in fact some types (such as
 closures) are almost always handled by reference (that is, through
@@ -240,6 +234,8 @@ is, by reference). Allocating memory for a tuples, array or vector is
 done through a call to one of the alloc functions, as in the example
 above with pointers to primitive types.
 
+.. _tuple-type-doc:
+
 Tuples
 ^^^^^^
 
@@ -259,11 +255,7 @@ will be added in a future release.
 
 Examples:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/tuple-examples.png" alt="">
-   </div>
+.. image:: /images/tuple-examples.png
 
 -  ``<double,i32>*`` is a pointer to a 2-tuple: the first element is a
    ``double`` and the second element is an ``i32``
@@ -306,6 +298,8 @@ the different types. And because xtlang is strongly typed, even if you
 do get confused and try to ``tset!`` an array type the compiler will
 catch the error for you.
 
+.. _array-type-doc:
+
 Arrays
 ^^^^^^
 
@@ -316,11 +310,7 @@ pipe (``|``) character.
 
 Examples:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/array-examples.png" alt="">
-   </div>
+.. image:: /images/array-examples.png
 
 -  ``|4,double|*``: a pointer to an array of 4 ``double``
 -  ``|10000000,i32|*``: a pointer to an array of one million ``i32``
@@ -338,6 +328,8 @@ Setting and getting values from arrays is done with (you guessed it!)
 ``aref``, ``aset!``, and ``afill!``. And if you want to get a pointer
 into an array (that is, not to the first element but to some element
 further into the array), use ``aref-ptr``.
+
+.. _vector-type-doc:
 
 Vectors
 ^^^^^^^
@@ -358,11 +350,7 @@ they're going *faster*.
 
 Examples:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/vector-examples.png" alt="">
-   </div>
+.. image:: /images/vector-examples.png
 
 -  ``/4,float/*``: a pointer to a vector of four floats
 -  ``/256,i32/*``: a pointer to a vector of 256 ints
@@ -373,6 +361,8 @@ vector hardware on your computer. Unless you know that the particular
 code you're working on is the performance bottleneck in your system,
 it's probably best to start out with arrays, and to change to vectors
 later on if it becomes necessary.
+
+.. _closure-type-doc:
 
 Closure type
 ^^^^^^^^^^^^
@@ -397,11 +387,7 @@ other elements representing the type signature of the function.
 
 Examples:
 
-.. raw:: html
-
-   <div class="ui image segment">
-     <img src="/img/closure-examples.png" alt="">
-   </div>
+.. image:: /images/closure-examples.png
 
 -  ``[i64]*``: a pointer to a closure which takes no arguments and
    returns a single ``i64``
@@ -497,6 +483,8 @@ enough you'll reach enlightenment. Or something.
 There's lots more to say about closures, but I'll leave that for another
 post.
 
+.. _string-type-doc:
+
 Strings
 -------
 
@@ -522,6 +510,8 @@ then disappearing on you.
             (printf "%s\n" str))))
 
       (string_literals) ;; prints "Vive le tour!"
+
+.. _named-type-doc:
 
 Named types
 -----------
