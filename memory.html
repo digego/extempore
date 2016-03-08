@@ -1,0 +1,1180 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Memory management in Extempore &mdash; Extempore 0.6.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="Extempore 0.6.1 documentation" href="index.html"/>
+        <link rel="next" title="Audio" href="audio.html"/>
+        <link rel="prev" title="Generics" href="generics.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Extempore
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.6
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="editor-support.html">Text editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="about-this-documentation.html">About this documentation</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Extempore programming environment</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="philosophy.html">The Extempore philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="caas.html">Interacting with the Extempore Compiler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="time.html">Time in Extempore</a></li>
+<li class="toctree-l1"><a class="reference internal" href="c-xtlang-interop.html">C-xtlang interop</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheme-xtlang-interop.html">Scheme-xtlang interop</a></li>
+</ul>
+<p class="caption"><span class="caption-text">xtlang&#8212;the Extempore language</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="type-system.html">xtlang type reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="generics.html">Generics</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">Memory management in Extempore</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#automatic-garbage-collection-in-scheme">Automatic garbage collection in Scheme</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#manual-memory-management-in-xtlang">Manual memory management in xtlang</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-three-flavours-of-memory-in-extempore">The three flavours of memory in Extempore</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#stack-allocation-with-salloc">Stack allocation with salloc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#zone-allocation-with-zalloc">Zone allocation with zalloc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#heap-allocation-with-halloc">Heap allocation with halloc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#choosing-the-right-memory-for-the-job">Choosing the right memory for the job</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pointers">Pointers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pointers-storing-memory-addresses-as-values">Pointers: storing memory addresses as values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#buffers-and-pointer-arithmetic">Buffers and pointer arithmetic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pointers-to-higher-order-types">Pointers to higher-order types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#other-benefits-of-using-pointers">Other benefits of using pointers</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials &amp; Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="audio.html">Audio</a></li>
+<li class="toctree-l1"><a class="reference internal" href="graphics.html">Graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="impromptu-users.html">Extempore for Impromptu users</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Community</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting-help.html">Getting Help</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">Extempore</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Memory management in Extempore</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/memory.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="memory-management-in-extempore">
+<span id="memory-doc"></span><h1>Memory management in Extempore<a class="headerlink" href="#memory-management-in-extempore" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This was once a blog post&#8212;corrections/improvements
+welcome.</p>
+</div>
+<p>The two languages hosted by the Extempore compiler, xtlang and Scheme,
+have different approaches to dealing with memory allocation and
+management. Both languages ultimately share the same memory&#8212;the stack
+and heap associated with the Extempore process, Extempore gives access
+to this memory to both languages via different mechanisms. Broadly
+speaking, with Scheme code Extempore manages memory for you, while in
+xtlang you have to do it yourself. This is a common trade-off, and each
+has its advantages (in performance, programmer productivity, etc.) and
+disadvantages. To work effectively in Extempore it&#8217;s helpful to know a
+bit more about how to work with memory in Extempore, and that&#8217;s what
+I&#8217;ll try to cover in this post.</p>
+<div class="section" id="automatic-garbage-collection-in-scheme">
+<h2>Automatic garbage collection in Scheme<a class="headerlink" href="#automatic-garbage-collection-in-scheme" title="Permalink to this headline">¶</a></h2>
+<p>Scheme objects (lists, closures, numbers, etc.) are automatically
+<a class="reference external" href="http://en.wikipedia.org/wiki/Garbage_collection_(computer_science)">garbage collected</a> by the Extempore run-time garbage collector (GC).
+This means that when new objects are created, memory is automatically
+allocated to store those objects, and as objects are destroyed or go
+out of scope (that is, there are no longer any references to them) the
+memory is automatically freed up for re-use.</p>
+<p>Let&#8217;s do the most basic memory allocation imaginable: just binding a
+numerical value to a symbol.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(define a 5)
+
+(println &#39;a &#39;= a)  ;; prints a = 5
+</pre></div>
+</div>
+<p>The fact that we can use the symbol <code class="docutils literal"><span class="pre">a</span></code> and have it evaluate to
+<code class="docutils literal"><span class="pre">5</span></code> (as it should) means that the value (<code class="docutils literal"><span class="pre">5</span></code>) must be stored in
+memory somewhere. It doesn&#8217;t matter <em>where</em> in memory (what the
+address is), because we can always refer to the value using the symbol
+<code class="docutils literal"><span class="pre">a</span></code>. But it&#8217;s good to remember that the <code class="docutils literal"><span class="pre">define</span></code> form is
+allocating some memory, storing the value <code class="docutils literal"><span class="pre">5</span></code> in that memory, and
+binding a reference to the value in the symbol <code class="docutils literal"><span class="pre">a</span></code>.</p>
+<p>We can redefine the symbol <code class="docutils literal"><span class="pre">a</span></code> to be some other Scheme object, say, a
+list.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(define a &#39;(1 2 3))
+
+(println &#39;a &#39;= a)  ;; prints a = (1 2 3)
+</pre></div>
+</div>
+<p>The three-element list <code class="docutils literal"><span class="pre">(1</span> <span class="pre">2</span> <span class="pre">3)</span></code> takes up more memory than the number
+<code class="docutils literal"><span class="pre">5</span></code>. So <code class="docutils literal"><span class="pre">define</span></code> can&#8217;t just write the new value of <code class="docutils literal"><span class="pre">a</span></code> over the
+top of the old one. What it does (and in fact what re-defining things
+<em>always</em> does) is allocate some new memory to store the new value into,
+and change the variable <code class="docutils literal"><span class="pre">a</span></code> to point to that new value.</p>
+<p>But what happens to the old value of <code class="docutils literal"><span class="pre">5</span></code> in memory? Well, it sits
+there unmolested, at least for a while. But we can&#8217;t reach it&#8212;the only
+&#8216;handle&#8217; we had to refer to it with was the symbol <code class="docutils literal"><span class="pre">a</span></code>, and that&#8217;s now
+bound to some other value instead. The value <code class="docutils literal"><span class="pre">5</span></code> in memory is
+&#8216;unreachable&#8217;. So there&#8217;s no point having it sitting around, taking up
+space like some freeloading relative.</p>
+<p>That&#8217;s where the garbage collector comes in. Every now and then the
+garbage collector checks all the Scheme objects in the world,
+determines which of them are no longer reachable, and then frees up that
+memory to be used for other things. While I don&#8217;t recommend this harsh
+utilitarian approach to dealing with relatives who are down on their
+luck, it <em>is</em> good idea in a computer program. Memory is a finite
+resource, and the more efficiently we can get rid of memory that&#8217;s not
+being used the better.</p>
+<p>Basically, having a GC means that when you&#8217;re writing Scheme code, you
+don&#8217;t have to worry about memory. The GC takes care of all the
+allocation/deallocation bookkeeping for you. The cost is that this
+bookkeeping requires CPU cycles&#8212;cycles which you could be using to do
+other cool things. Also, every now and then the GC has to briefly &#8216;stop
+the world&#8217; (freeze the execution of all Scheme code) to do its job. This
+takes time, and introduces an element of uncertainty (non-determinism)
+to the execution of your code&#8212;you never know exactly when the GC is
+going to freeze things to do it&#8217;s job, and there&#8217;s a risk that it&#8217;ll
+happen at a really inconvenient time as far as your program is concerned
+(Murphy&#8217;s law and all that). This is particularly problematic in domains
+where timing is critical, such as real-time audio and video.</p>
+</div>
+<div class="section" id="manual-memory-management-in-xtlang">
+<h2>Manual memory management in xtlang<a class="headerlink" href="#manual-memory-management-in-xtlang" title="Permalink to this headline">¶</a></h2>
+<p>Hang on a sec&#8212;isn&#8217;t working with real-time audio and video xtlang (and
+therefore Extempore&#8217;s) <em>raison d&#8217;etre?</em> Well, yes is is&#8212;the sluggishness
+(and non-determinism) of Impromptu&#8217;s Scheme interpreter was the spark
+which ignited the development of xtlang (as mentioned in <a class="reference internal" href="philosophy.html"><em>The Extempore philosophy</em></a>).
+Again, this isn&#8217;t a knock on Scheme in general as slow&#8212;there are some
+very sprightly Scheme compilers, but Impromptu&#8217;s one was slow. The
+non-determinism was even more of a problem, because the last thing you
+want when you&#8217;re generating audio or video is a &#8216;stop the world&#8217; GC
+pause, which will lead to clicks and pops in audio or dropped frames in
+video. Real-time systems and garbage collection are uneasy bedfellows.</p>
+<p>So, xtlang requires <a class="reference external" href="http://en.wikipedia.org/wiki/Manual_memory_management">manual memory management</a>. In general, this means
+that when you want some memory you ask the compiler for it, it&#8217;s yours
+for a time and you can do whatever you want with it, and then you know
+when it&#8217;s going to be &#8216;given back&#8217;. It doesn&#8217;t necessarily mean that you
+have it forever (in fact in many cases the memory is quite short-lived),
+but it does mean that there are no surprises&#8212;you specify exactly how
+much memory you&#8217;ll get and you know it&#8217;s going to hang around for. This
+determinism an important benefit of manual memory management in
+xtlang&#8212;especially in a real-time systems context.</p>
+<p>Zooming out for a second, a running program has access to and uses two
+main regions of memory: the <strong>stack</strong> and the <strong>heap</strong>. There&#8217;s lots
+of material on the web about the differences between these two a
+(<a class="reference external" href="http://stackoverflow.com/questions/79923/what-and-where-are-the-stack-and-heap">here&#8217;s an explanation at stackoverflow</a>), but I&#8217;ll give a quick
+summary here.</p>
+<ul class="simple">
+<li>The <strong>stack</strong> is for dealing with function arguments and local
+variables. Each function call &#8216;pushes&#8217; some new data onto the stack,
+and when the function returns it &#8216;pops&#8217; off any local variables and
+leaves its return value. The stack is therefore generally changing
+pretty quickly.</li>
+<li>The <strong>heap</strong>, on the other hand, is for longer-lived data. Buffers of
+audio, video, or any data which you want to have around for a while:
+these are the sort of things you&#8217;ll generally want to store on the
+heap.</li>
+</ul>
+<p>I should also point out that the stack and heap aren&#8217;t actually
+different types of memory in the computer&#8212;they&#8217;re just different
+areas in the computer&#8217;s RAM. The difference is in the way the program
+<em>uses</em> the different regions. Each running process has its own
+stack(s) heap, and they are just regions of memory given to the
+process by the OS.</p>
+<p>So, that&#8217;s the stack and the heap, but there&#8217;s actually one other type
+of memory in Extempore: <strong>zone</strong> memory. A zone is a <a class="reference external" href="http://en.wikipedia.org/wiki/Region-based_memory_management">region</a> of memory
+which can be easily deallocated all at once. So, if you have some data
+that you need to hang around longer than a function call (so a stack
+allocation is no good), but want to be able to conveniently deallocate
+all at once, then use a zone. There can be multiple zones in existence
+at once, and they don&#8217;t interfere (or have anything to do with) each
+other.</p>
+</div>
+<div class="section" id="the-three-flavours-of-memory-in-extempore">
+<h2>The three flavours of memory in Extempore<a class="headerlink" href="#the-three-flavours-of-memory-in-extempore" title="Permalink to this headline">¶</a></h2>
+<p>So, in accordance with the three different memory &#8216;types&#8217; (the stack,
+the heap, and zones) there are three memory allocation functions in
+xtlang: <code class="docutils literal"><span class="pre">salloc</span></code>, <code class="docutils literal"><span class="pre">halloc</span></code> and <code class="docutils literal"><span class="pre">zalloc</span></code>. They all return a pointer
+to some allocated memory, but they differ in <em>where</em> that memory is
+allocated from, and there are no prizes in guessing which function is
+paired with which type of memory :)</p>
+<p>Also, <code class="docutils literal"><span class="pre">alloc</span></code> in xtlang is an alias for <code class="docutils literal"><span class="pre">zalloc</span></code>. So if you ever see
+an <code class="docutils literal"><span class="pre">alloc</span></code> in xtlang code just remember that it&#8217;s grabbing memory from
+a zone.</p>
+</div>
+<div class="section" id="stack-allocation-with-salloc">
+<h2>Stack allocation with salloc<a class="headerlink" href="#stack-allocation-with-salloc" title="Permalink to this headline">¶</a></h2>
+<p>As I mentioned above, the stack is associated with function calls,
+their arguments and local variables. Because xtlang uses (in general)
+<a class="reference internal" href="type-system.html#closure-type-doc"><span>closures</span></a> rather than just plain functions,
+stack allocation and <code class="docutils literal"><span class="pre">salloc</span></code> in xtlang is used in the body of a
+closure. Remember that closures are just functions with their
+enclosing scope: think of a function which has packaged up any
+variables it references and carries them around in its saddlebags.</p>
+<p>Well, that&#8217;s as clear as mud. Let&#8217;s have an example.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func simple_stack_alloc
+  (lambda ()
+    (let ((a 2)
+          (b 3.5))
+      (printf &quot;a x b = %f\n&quot;
+              (* (i64tod a) b)))))
+
+(simple_stack_alloc) ;; prints &quot;a x b = 7.000000&quot;
+</pre></div>
+</div>
+<p>Even though there was no explicit call to <code class="docutils literal"><span class="pre">salloc</span></code>, the local
+variables which are bound in the <code class="docutils literal"><span class="pre">let</span></code> (in this case the integer <code class="docutils literal"><span class="pre">a</span></code>
+and the float <code class="docutils literal"><span class="pre">b</span></code>) are allocated on the stack. This is always where
+the memory for <code class="docutils literal"><span class="pre">let</span></code>-bound float and int literals is allocated from in
+xtlang. String literals are bound globally (more on this shortly), but
+that&#8217;s the exception to the rule&#8212;everything else which is bound in a
+<code class="docutils literal"><span class="pre">let</span></code> inside an xtlang <code class="docutils literal"><span class="pre">lambda</span></code> will be stack allocated, unless you
+explicitly request otherwise with <code class="docutils literal"><span class="pre">halloc</span></code> or <code class="docutils literal"><span class="pre">zalloc</span></code>.</p>
+<p><a class="reference internal" href="type-system.html#string-type-doc"><span>String</span></a> literals are the exception to the &#8220;all
+literals are on the stack&#8221; rule. String literals are actually stored
+as <code class="docutils literal"><span class="pre">i8*</span></code> on the heap (as though they were <em>halloced</em>). If you
+capture a pointer to one of these strings (e.g. with <code class="docutils literal"><span class="pre">pref-ptr</span></code>),
+then you can pass it around and dereference it from anywhere.</p>
+<p>This &#8216;implicit stack allocation&#8217; works for int and float literals, but
+how about aggregate and other higher-order types? In those cases, we
+call <code class="docutils literal"><span class="pre">salloc</span></code> explicitly.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple
+  (lambda (a:i64)
+    (let ((tup:&lt;i64,i64&gt;* (salloc)))
+      (printf &quot;input: %lld, &quot; a)
+      (tfill! tup a (* 2 a))
+      (printf &quot;output: &lt;%lld,%lld&gt;\n&quot;
+              (tref tup 0)
+              (tref tup 1))
+      tup)))
+
+(double_tuple 3) ;; prints &quot;input: 3, output: &lt;3,6&gt;&quot;
+</pre></div>
+</div>
+<p>This <code class="docutils literal"><span class="pre">double_tuple</span></code> closure takes an <code class="docutils literal"><span class="pre">i64</span></code> argument, and creates a
+2-tuple which contains the input value and also its double. Think of it
+as creating input-output pairs for the function <em>f(x) = 2x</em>.</p>
+<p>Notice how the tuple pointer <code class="docutils literal"><span class="pre">tup:&lt;i64,i64&gt;*</span></code> was <code class="docutils literal"><span class="pre">let</span></code>-bound to
+the return value of the call to <code class="docutils literal"><span class="pre">salloc</span></code>. Initially, the memory was
+uninitialised (<a class="reference internal" href="#pointer-doc"><span>see here</span></a> for more background about
+pointers), then two <code class="docutils literal"><span class="pre">i64</span></code> values were filled into it with
+<code class="docutils literal"><span class="pre">tfill!</span></code>. This is basically all the closure does, apart from the
+<code class="docutils literal"><span class="pre">printf</span></code> calls which are just reading and printing out what&#8217;s going
+on.</p>
+<p>The printout confirms that the doubling is working correctly: <code class="docutils literal"><span class="pre">6</span></code> is
+indeed what you get when you double <code class="docutils literal"><span class="pre">3</span></code>, so the output value of
+<code class="docutils literal"><span class="pre">&lt;3,6&gt;</span></code> is spot on. The pointer (and memory) returned by <code class="docutils literal"><span class="pre">(salloc)</span></code>
+is obviously working fine. And this pointer is also the return value of
+the closure (so <code class="docutils literal"><span class="pre">double_tuple</span></code> has type signature
+<code class="docutils literal"><span class="pre">[&lt;i64,i64&gt;*,i64]*</span></code>).</p>
+<p>What happens if we try and dereference this returned pointer?</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple_test
+  (lambda ()
+    (let ((tup (double_tuple 6)))
+      (printf &quot;tup* = &lt;%lld,%lld&gt;\n&quot;
+              (tref tup 0)
+              (tref tup 1)))))
+
+(double_tuple_test)
+
+;; prints:
+
+;; input: 6, output: &lt;6,12&gt;
+;; tup* = &lt;6,12&gt;
+</pre></div>
+</div>
+<p>Well, that seems to work OK. What about if we call <code class="docutils literal"><span class="pre">double_tuple</span></code>
+again in the body of the <code class="docutils literal"><span class="pre">let</span></code>, ignoring its return value?</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple_test2
+  (lambda ()
+    (let ((tup (double_tuple 6)))
+      (double_tuple 2)
+      (printf &quot;tup* = &lt;%lld,%lld&gt;\n&quot;
+              (tref tup 0)
+              (tref tup 1)))))
+
+(double_tuple_test2)
+
+;; prints:
+
+;; input: 6, output: &lt;6,12&gt; (in the 1st call to double_tuple)
+;; input: 2, output: &lt;2,4&gt;  (in the 2nd call to double_tuple)
+;; tup* = &lt;2,4&gt;
+</pre></div>
+</div>
+<p>This isn&#8217;t right: <code class="docutils literal"><span class="pre">tup*</span></code> should still be the original tuple
+<code class="docutils literal"><span class="pre">&lt;6,12&gt;</span></code>, because we&#8217;ve bound it the <code class="docutils literal"><span class="pre">let</span></code>. But somewhere in the
+process of calling <code class="docutils literal"><span class="pre">double_tuple</span></code> again (with a different argument:
+<code class="docutils literal"><span class="pre">2</span></code>), the values in our original tuple (which we have a pointer to in
+<code class="docutils literal"><span class="pre">tup</span></code>) have been overwritten.</p>
+<p>Finally, consider this example:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple_test3
+  (lambda ()
+    (let ((tup (double_tuple 6))
+          (test_closure
+           (lambda ()
+             (printf &quot;tup* = &lt;%lld,%lld&gt;\n&quot;
+                     (tref tup 0)
+                     (tref tup 1)))))
+      (test_closure))))
+
+(double_tuple_test3)
+
+;; prints:
+
+;; input: 6, output: &lt;6,12&gt;
+;; tup* = &lt;0,4508736416&gt;
+</pre></div>
+</div>
+<p>Wow. That&#8217;s not just wrong, that&#8217;s <em>super wrong</em>. What&#8217;s going on is
+that the call to <code class="docutils literal"><span class="pre">salloc</span></code> inside the closure <code class="docutils literal"><span class="pre">double_tuple</span></code> doesn&#8217;t
+keep the memory after the closure returns, because at this point all the
+local variables get popped off the stack. Subsequent calls to <em>any</em>
+closure will push new arguments and local variables <em>onto</em> the stack and
+overwrite the memory that <code class="docutils literal"><span class="pre">tup</span></code> points to.</p>
+<p>That&#8217;s what deallocating memory <em>means</em>: it doesn&#8217;t mean that the memory
+gets set to zero, or that new values will be written in straight away,
+but it means that the memory <em>might</em> be overwritten at any stage. Which,
+from a programming perspective, is just as bad as having new data
+written into it, because if you can&#8217;t trust that your pointer still
+points to the value(s) you think it does then it&#8217;s pretty useless.</p>
+<p>So, what we need in this case is to allocate some memory which will
+still hang around after the closure returns. <code class="docutils literal"><span class="pre">salloc</span></code> isn&#8217;t up to the
+task, but <code class="docutils literal"><span class="pre">zalloc</span></code> is.</p>
+</div>
+<div class="section" id="zone-allocation-with-zalloc">
+<h2>Zone allocation with zalloc<a class="headerlink" href="#zone-allocation-with-zalloc" title="Permalink to this headline">¶</a></h2>
+<p>Zone allocation is kindof like stack allocation, except with user
+control over when the memory is freed (as opposed it happening at the
+end of function execution, as with memory on the stack). Essentially
+this means that we can push and pop zones off of a stack of memory zones
+of user-defined size.</p>
+<p>A memory zone can be created using the special <code class="docutils literal"><span class="pre">memzone</span></code> form.
+<code class="docutils literal"><span class="pre">memzone</span></code> takes as a first argument a zone size in bytes, and then an
+arbitrary number of other forms (s-expressions) which make up the body
+of the <code class="docutils literal"><span class="pre">memzone</span></code>. The <em>extent</em> of the zone is defined by
+<code class="docutils literal"><span class="pre">memzone</span></code>&#8216;s s-expression. Anything within the body of the
+<code class="docutils literal"><span class="pre">memzone</span></code> s-expression is <em>in scope</em>.</p>
+<p>Say we want to fill a memory region with <code class="docutils literal"><span class="pre">i64</span></code> values which just count
+from <code class="docutils literal"><span class="pre">0</span></code> up to the length of the region (<code class="docutils literal"><span class="pre">region_length</span></code>). We&#8217;ll
+need to allocate the memory for this region, and get a pointer to the
+start of the region. We can do this using <code class="docutils literal"><span class="pre">zalloc</span></code> inside a
+<code class="docutils literal"><span class="pre">memzone</span></code>.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_buffer_memzone
+  (lambda ()
+    (memzone 100000  ;; size of memzone (in bytes)
+             (let ((region_length 1000)
+                   (int_buf:i64* (zalloc region_length))
+                   (i:i64 0))
+               (dotimes (i region_length)
+                 (pset! int_buf i i))
+               (printf &quot;int_buf[366] = %lld\n&quot;
+                       (pref int_buf 366))))))
+
+(fill_buffer_memzone) ;; prints &quot;int_buf[366] = 366&quot;
+</pre></div>
+</div>
+<p>The code works as it should: as confirmed by the print statement. Notice
+how the call to <code class="docutils literal"><span class="pre">zalloc</span></code> took an argument (<code class="docutils literal"><span class="pre">region_length</span></code>). This
+tells <code class="docutils literal"><span class="pre">zalloc</span></code> how much memory to allocate from the zone. If we hadn&#8217;t
+passed this argument (and it <em>is</em> optional), the default length is
+<code class="docutils literal"><span class="pre">1</span></code>, to allocate enough memory for <em>one</em> <code class="docutils literal"><span class="pre">i64</span></code>. All of the alloc
+functions (<code class="docutils literal"><span class="pre">salloc</span></code>, <code class="docutils literal"><span class="pre">halloc</span></code> and <code class="docutils literal"><span class="pre">zalloc</span></code>) can take this optional
+size argument, and they all default to <code class="docutils literal"><span class="pre">1</span></code> if no argument is passed.</p>
+<p>Let&#8217;s try another version of this code <code class="docutils literal"><span class="pre">fill_buffer_memzone2</span></code>, but
+with a much longer buffer of <code class="docutils literal"><span class="pre">i64</span></code> values.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_buffer_memzone2
+  (lambda ()
+    (memzone 100000  ;; size of memzone (in bytes)
+             (let ((region_length 1000000)
+                   (int_buf:i64* (zalloc region_length))
+                   (i:i64 0))
+               (dotimes (i region_length)
+                 (pset! int_buf i i))
+               (printf &quot;int_buf[366] = %lld\n&quot;
+                       (pref int_buf 366))))))
+
+(fill_buffer_memzone2) ;; prints &quot;int_buf[366] = 366&quot;
+</pre></div>
+</div>
+<p>This time, with a region length of one million, the code still works (at
+least, the 367Th element is still correct), but the compiler also prints
+a warning message to the log:</p>
+<div class="code highlight-python"><div class="highlight"><pre><span></span>Zone:0x7ff7ac99a100 size:100000 is full ... leaking 8000000 bytes
+Leaving a leaky zone can be dangerous ... particularly for concurrency
+</pre></div>
+</div>
+<p>So what&#8217;s wrong? Well, remember that the <code class="docutils literal"><span class="pre">memzone</span></code> has a size (in
+bytes) which is specified by its first argument. We can calculate how
+much space <code class="docutils literal"><span class="pre">int_buf</span></code> will need (<code class="docutils literal"><span class="pre">region_length</span></code> multiplied by 8,
+because there are 8 bytes per <code class="docutils literal"><span class="pre">i64</span></code>) and therefore how much of the
+zone&#8217;s memory will be allocated with the call to <code class="docutils literal"><span class="pre">(zalloc</span>
+<span class="pre">region_length)</span></code>. If this number is <em>greater</em> than the memzone size,
+then we&#8217;ll get the &#8220;Zone is full, leaking <em>n</em> bytes&#8221; warning&#8212;as we did
+with <code class="docutils literal"><span class="pre">fill_buffer_memzone2</span></code>.</p>
+<p>When zones leak, the Extempore run-time will scramble to find extra
+memory for you, but it will be from the heap&#8212;which is time-consuming and
+it will never be deallocated. This is bad, so it&#8217;s always worth making
+sure that the zones are big enough to start with.</p>
+<p><code class="docutils literal"><span class="pre">memzone</span></code> calls can also be nested inside one another. When a new zone
+is created (pushed) any calls to <code class="docutils literal"><span class="pre">zalloc</span></code> will be allocated from the
+new zone (which is the <strong>top</strong> zone). When the extent of the zone is
+reached it is <strong>popped</strong> and its memory is reclaimed. The new
+<strong>current</strong> zone is then the next <strong>top</strong> zone. The zones are in a stack
+in the &#8216;stack <em>data structure</em>&#8216; sense of the term, but this is not the
+stack that I was talking about earlier with <code class="docutils literal"><span class="pre">salloc</span></code>. Hopefully that&#8217;s
+not too confusing. So we&#8217;ll talk about pushing and popping zones from
+the <em>zone stack</em>, but it&#8217;s still all done with <code class="docutils literal"><span class="pre">memzone</span></code> and
+<code class="docutils literal"><span class="pre">zalloc</span></code>.</p>
+<p>By default each process has an initial <strong>top</strong> zone with 1M of memory.
+If no user defined zones are created (i.e. no uses of <code class="docutils literal"><span class="pre">memzone</span></code>) then
+any and all calls to zalloc will slowly (or quickly) use up this 1M of
+memory&#8212;you&#8217;ll know when it runs out as you&#8217;ll get about a gazillion
+memory leak messages.</p>
+<p>In general this is the zone story. But to complicate things slightly
+there are two special zones.</p>
+<ol class="arabic simple">
+<li>The <strong>audio zone</strong>: there is a zone allocated for each audio frame
+processed, be that sample by sample, or buffer by buffer. The zones
+extent is for the duration of the audio frame (i.e. is deallocated at
+the end of the frame).</li>
+</ol>
+<ol class="arabic simple">
+<li><strong>Closure zones</strong>: all &#8216;top level&#8217; closures (any closure created
+using <code class="docutils literal"><span class="pre">bind-func</span></code>) has an associated zone created at compile time
+(not at run-time, although this distinction is quite blurry in
+Extempore). The <code class="docutils literal"><span class="pre">bind-func</span></code> zone default size is 8KB, however,
+<code class="docutils literal"><span class="pre">bind-func</span></code> has an optional argument to specify any arbitrary
+<code class="docutils literal"><span class="pre">bind-func</span></code> zone size.</li>
+</ol>
+<p>To allocate memory from a closure&#8217;s zone, we need a <code class="docutils literal"><span class="pre">let</span></code> outside the
+<code class="docutils literal"><span class="pre">lambda</span></code>. Anything <code class="docutils literal"><span class="pre">zalloc</span></code>&#8216;ed from there will come from the
+closure&#8217;s zone. Anything <code class="docutils literal"><span class="pre">zalloc</span></code>&#8216;ed from <em>inside</em> the closure will
+come from whatever the top zone is at the time&#8212;usually the default zone
+(unless you&#8217;re in an enclosing <code class="docutils literal"><span class="pre">memzone</span></code>).</p>
+<p>As an example, let&#8217;s revisit our &#8216;fill buffer&#8217; examples from earlier.
+With a region length of one thousand:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_buffer_closure_zone
+  (let ((region_length 1000)
+        (int_buf:i64* (zalloc region_length))
+        (i:i64 0))
+    (lambda ()
+      (dotimes (i region_length)
+        (pset! int_buf i i))
+      (printf &quot;int_buf[366] = %lld\n&quot;
+              (pref int_buf 366)))))
+</pre></div>
+</div>
+<p>The <code class="docutils literal"><span class="pre">let</span></code> where <code class="docutils literal"><span class="pre">int_buf</span></code> is allocated is outside the <code class="docutils literal"><span class="pre">lambda</span></code>
+form, so the memory will be coming from the zone associated with the
+closure <code class="docutils literal"><span class="pre">fill_buffer_closure_zone</span></code>. When we try and compile that, we
+get the warning:</p>
+<div class="code highlight-python"><div class="highlight"><pre><span></span>Zone:0x7fb8b3a4a610 size:8192 is full ... leaking 32 bytes
+Leaving a leaky zone can be dangerous ... particularly for concurrency
+</pre></div>
+</div>
+<p>Let&#8217;s try it again, but with a &#8216;zone size&#8217; argument to <code class="docutils literal"><span class="pre">bind-func</span></code></p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_buffer_closure_zone2 10000 ;; zone size: 10KB
+  (let ((region_length 1000)
+        (int_buf:i64* (zalloc region_length))
+        (i:i64 0))
+    (lambda ()
+      (dotimes (i region_length)
+        (pset! int_buf i i))
+      (printf &quot;int_buf[366] = %lld\n&quot;
+              (pref int_buf 366)))))
+
+(fill_buffer_closure_zone2) ;; prints &quot;int_buf[366] = 366&quot;
+</pre></div>
+</div>
+<p>Sweet&#8212;no more warnings, and the buffer seems to be getting filled
+nicely.</p>
+<p>This type of thing is very useful for holding data closed over by the
+top level closure. For example, an audio delay closure might specify a
+large <code class="docutils literal"><span class="pre">bind-func</span></code> zone size and then allocate an audio buffer to be
+closed over. The example file <code class="docutils literal"><span class="pre">examples/core/audio-dsp.xtm</span></code> has lots
+of examples of this.</p>
+<p>The <code class="docutils literal"><span class="pre">bind-func</span></code> zone will live for the extent of the top level
+closure, and will be refreshed if the closure is rebuilt (i.e. the old
+zone will be destroyed and a new zone allocated).</p>
+</div>
+<div class="section" id="heap-allocation-with-halloc">
+<h2>Heap allocation with halloc<a class="headerlink" href="#heap-allocation-with-halloc" title="Permalink to this headline">¶</a></h2>
+<p>Finally, we meet <code class="docutils literal"><span class="pre">halloc</span></code>, the Extempore function for allocating
+memory from the heap. The heap is for long-lived memory, such as data
+that you want to keep hanging around for the life of the program.</p>
+<p>You can use <code class="docutils literal"><span class="pre">halloc</span></code> anywhere you would use <code class="docutils literal"><span class="pre">salloc</span></code> or <code class="docutils literal"><span class="pre">zalloc</span></code>
+and it will give you a pointer to some memory on the heap. So, let&#8217;s
+revisit the <code class="docutils literal"><span class="pre">double_tuple_test3</span></code> example from earlier, which didn&#8217;t
+work because the memory for <code class="docutils literal"><span class="pre">tup</span></code> on the stack went out of scope when
+the closure returned. If we replace the <code class="docutils literal"><span class="pre">salloc</span></code> with a <code class="docutils literal"><span class="pre">halloc</span></code>:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple_halloc
+  (lambda (a:i64)
+    (let ((tup:&lt;i64,i64&gt;* (halloc))) ;; halloc instead of salloc
+      (tfill! tup a (* 2 a))
+      tup)))
+
+(bind-func double_tuple_halloc_test
+  (lambda ()
+    (let ((tup (double_tuple_halloc 4))
+          (test_closure
+           (lambda ()
+             (printf &quot;tup* = &lt;%lld,%lld&gt;\n&quot;
+                     (tref tup 0)
+                     (tref tup 1)))))
+      (test_closure))))
+
+(double_tuple_halloc_test) ;; prints &quot;tup* = &lt;4,8&gt;&quot;
+</pre></div>
+</div>
+<p>Now, the returned tuple pointer <code class="docutils literal"><span class="pre">tup</span></code> is a heap pointer, so we can
+refer to it from <em>anywhere</em> without any issues. In fact, the only way to
+deallocate memory which has been <code class="docutils literal"><span class="pre">halloc</span></code>&#8216;ed and free it up for
+re-use is to use the xtlang function <code class="docutils literal"><span class="pre">free</span></code> (which is the same as
+calling <code class="docutils literal"><span class="pre">free</span></code> in C).</p>
+<p>In practice, a lot of the times where you want long-lived memory you&#8217;ll
+want it to be associated with a closure anyway, so the closure&#8217;s zone is
+a better option than the heap for memory allocation, as in the
+<code class="docutils literal"><span class="pre">fill_buffer_closure_zone2</span></code> example above. This has the added
+advantage that if you re-compile the closure, because you&#8217;ve changed the
+functionality or whatever, all the memory in the zone is freed and
+re-bound, which is often what you want.</p>
+<p>Where you <em>may</em> want to use <code class="docutils literal"><span class="pre">halloc</span></code> to allocate memory on the heap,
+is in binding global data structures which you want to have accessible
+from anywhere in your xtlang code. Binding global xtlang variables is
+the job of <code class="docutils literal"><span class="pre">bind-val</span></code>.</p>
+</div>
+<div class="section" id="choosing-the-right-memory-for-the-job">
+<h2>Choosing the right memory for the job<a class="headerlink" href="#choosing-the-right-memory-for-the-job" title="Permalink to this headline">¶</a></h2>
+<p>Each different alloc function is good for different things, and the
+general idea to keep in mind is that you want your memory to hang around
+for as long as you need it to&#8212;and <em>no longer</em>. Sometimes you only need
+data in the body of a closure&#8212;then <code class="docutils literal"><span class="pre">salloc</span></code> is the way to go. Other
+times you want it to be around for as long as the closure remains
+unchanged, then <code class="docutils literal"><span class="pre">zalloc</span></code> is the right choice. Also, if you&#8217;re going to
+be alloc&#8217;ing a whole lot of objects for a specific algorithmic task and
+want to be able to conveniently let go of them all when you&#8217;re done,
+then creating a new zone with <code class="docutils literal"><span class="pre">memzone</span></code> and using <code class="docutils literal"><span class="pre">zalloc</span></code> is a good
+way to go. Finally, if you know that a particular buffer of data is
+going to hang around for the life of the program, then use <code class="docutils literal"><span class="pre">halloc</span></code>.</p>
+<p>It&#8217;s worth acknowledging that memory management in xtlang is a &#8216;training
+wheels off&#8217; scenario. It&#8217;s a joy to have the low level control and
+performance of direct memory access, but there are also opportunities to
+really mess things up in a way that&#8217;s trickier to do in higher-level
+languages. Remember that memory is a finite resource. Don&#8217;t try and
+allocate a memory region of 10<sup>15</sup> 8-byte <code class="docutils literal"><span class="pre">i64</span></code>:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_massive_buffer
+  (lambda ()
+    (let ((region_length 1000000000000000)
+          (int_buf:i64* (zalloc region_length))
+          (i:i64 0))
+      (dotimes (i region_length)
+        (pset! int_buf i i))
+      (printf &quot;int_buf[366] = %lld\n&quot;
+              (pref int_buf 366)))))
+
+(fill_massive_buffer)
+</pre></div>
+</div>
+<p>When I call <code class="docutils literal"><span class="pre">(fill_massive_buffer)</span></code> on my computer (with 8GB of RAM),
+disaster strikes.</p>
+<div class="code highlight-python"><div class="highlight"><pre><span></span>Zone:0x7fc5cbc268c0 size:100000 is full ... leaking 8000000000000000 bytes
+Leaving a leaky zone can be dangerous ... particularly for concurrency
+extempore(21386,0x11833d000) malloc: *** mmap(size=8000000000000000) failed (error code=12)
+error: can&#39;t allocate region
+set a breakpoint in malloc_error_break to debug
+Segmentation fault: 11
+</pre></div>
+</div>
+<p>If you&#8217;re not used to working directly with memory, you&#8217;ll almost
+certainly crash (segfault) Extempore when you start out. In fact, be
+prepared to crash things <em>a lot</em> at first. Don&#8217;t be discouraged: once
+you get your head around the three-fold memory model and where each
+allocation function is getting its memory from, it&#8217;s much easier to
+write clean and performant code in xtlang. And from there, the
+performance and control of working with &#8216;bare metal&#8217; types opens up lots
+of cool possibilities.</p>
+</div>
+<div class="section" id="pointers">
+<span id="pointer-doc"></span><h2>Pointers<a class="headerlink" href="#pointers" title="Permalink to this headline">¶</a></h2>
+<p>xtlang&#8217;s pointer types may cause some confusion for those who aren&#8217;t
+used to (explicitly) working with reference types. That&#8217;s nothing to
+be ashamed of&#8212;the whole <a class="reference external" href="http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_value">pass by value</a> / <a class="reference external" href="http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_reference">pass by reference</a>
+thing can take a bit to get your head around.</p>
+<p>So what does it mean to say that xtlang supports pointer types? Simply
+put, this means that we can use variables in our program to store not
+just values, but the <em>addresses</em> of values in memory. A few examples
+might help to clarify things.</p>
+<p>The <code class="docutils literal"><span class="pre">let</span></code> form in xtlang (as in Scheme) is a way of binding or
+assigning variables: giving a name to a particular value. If we want to
+keep track of the number of cats you have, then we can create a variable
+<code class="docutils literal"><span class="pre">num_cats</span></code></p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_num_cats
+  (lambda ()
+    (let ((num_cats:i64 4))
+      ;; the i64 printf format specifier is %lld
+      (printf &quot;You have %lld cats!\n&quot; num_cats))))
+
+(print_num_cats) ;; prints &quot;You have 4 cats!&quot;
+</pre></div>
+</div>
+<p>What&#8217;s happening here is that the <code class="docutils literal"><span class="pre">let</span></code> assigns the value <code class="docutils literal"><span class="pre">4</span></code> to the
+variable <code class="docutils literal"><span class="pre">num_cats</span></code>, so that whenever the program sees the variable
+<code class="docutils literal"><span class="pre">num_cats</span></code> it&#8217;ll look in the <code class="docutils literal"><span class="pre">num_cats</span></code> &#8216;place&#8217; in memory and use
+whatever value is stored there. The computer&#8217;s memory is laid out like a
+row of little boxes, and each box has an address (the location of the
+box) and also a value (what&#8217;s <em>in</em> the box).</p>
+<img alt="_images/pointer-tut-1.png" src="_images/pointer-tut-1.png" />
+<p>In this image the computer&#8217;s memory is represented by the blue boxes.
+Each box has an address (the number below the box), an in this picture
+you can see that this is only a subset of the total number of memory
+boxes (in a modern computer there are millions of memory boxes).</p>
+<p>The variable <code class="docutils literal"><span class="pre">num_cats</span></code> keeps track of the value that we&#8217;re interested
+in. In this case the address of that value is &#8216;memory location 26&#8217;, but
+it could easily be any other location (and indeed will almost certainly
+be different if the closure <code class="docutils literal"><span class="pre">print_num_cats</span></code> is called again).</p>
+<p>Once a variable exists, we can change its value with <code class="docutils literal"><span class="pre">set!</span></code>:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_num_cats2
+  (lambda ()
+    (let ((num_cats:i64 4))
+      (printf &quot;You have %lld cats... &quot; num_cats)
+      (set! num_cats 13)
+      (printf &quot;and now you have %lld cats!\n&quot; num_cats))))
+
+(print_num_cats2)
+;; prints &quot;You have 4 cats... and now you have 13 cats!&quot;
+</pre></div>
+</div>
+<p>The <code class="docutils literal"><span class="pre">set!</span></code> function changes the value of <code class="docutils literal"><span class="pre">num_cats</span></code>: it sets a new
+value into the memory location that <code class="docutils literal"><span class="pre">num_cats</span></code> refers to. In
+<code class="docutils literal"><span class="pre">print_num_cats2</span></code> the value of <code class="docutils literal"><span class="pre">num_cats</span></code> starts out as <code class="docutils literal"><span class="pre">4</span></code>, so
+the first <code class="docutils literal"><span class="pre">printf</span></code> call prints &#8220;You have 4 cats…&#8221;. The memory at this
+point might look like this:</p>
+<img alt="_images/pointer-tut-2a.png" src="_images/pointer-tut-2a.png" />
+<p>But then a new value (<code class="docutils literal"><span class="pre">13</span></code>) is set into <code class="docutils literal"><span class="pre">num_cats</span></code> with the call to
+<code class="docutils literal"><span class="pre">set!</span></code>, so the second call to <code class="docutils literal"><span class="pre">printf</span></code> prints &#8220;and now you have 13
+cats!&#8221;. After the call to <code class="docutils literal"><span class="pre">set!</span></code>, this is what the memory looks like:</p>
+<img alt="_images/pointer-tut-2b.png" src="_images/pointer-tut-2b.png" />
+<p>Notice how this time the memory address for <code class="docutils literal"><span class="pre">num_cats</span></code> is different to
+what it was the previous time (28 rather than 26). This is because the
+<code class="docutils literal"><span class="pre">let</span></code> rebinds all its variable-value pairs each time it is entered,
+and then forgets them when it is exited (that is, when the paren
+matching the opening paren is reached).</p>
+</div>
+<div class="section" id="pointers-storing-memory-addresses-as-values">
+<h2>Pointers: storing memory addresses as values<a class="headerlink" href="#pointers-storing-memory-addresses-as-values" title="Permalink to this headline">¶</a></h2>
+<p>What we&#8217;ve done so far is store the value (how many cats we have) into
+the variable <code class="docutils literal"><span class="pre">num_cats</span></code>. The value has an address in memory, but as a
+programmer we don&#8217;t necessarily know what that address is, just that we
+can refer to the value using the name <code class="docutils literal"><span class="pre">num_cats</span></code>. It&#8217;s important to
+note that the <em>compiler</em> knows what the address is&#8212;in fact as far as the
+compiler is concerned every variable is just an address. But the
+compiler allows us to give these variables names, which makes the code
+much easier to write and understand.</p>
+<p>Pointer types in xtlang are indicated with an asterisk (<code class="docutils literal"><span class="pre">*</span></code>), for
+example the type <code class="docutils literal"><span class="pre">i64*</span></code> represents a pointer to a 64-bit integer
+(sometimes called an <code class="docutils literal"><span class="pre">i64</span></code>-pointer). With pointers, we actually assign
+the <em>address itself</em> in a variable. That&#8217;s the reason it&#8217;s called a
+pointer: because it points to (is a reference to) the value.</p>
+<p>Let&#8217;s update our code for printing the number of cats to use a pointer
+to the value, rather than the value itself. Notice how the type of
+<code class="docutils literal"><span class="pre">num_cats_ptr</span></code> is <code class="docutils literal"><span class="pre">i64*</span></code> (a pointer to an <code class="docutils literal"><span class="pre">i64</span></code>) rather than just
+an <code class="docutils literal"><span class="pre">i64</span></code> like it was before.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_num_cats3
+  (lambda ()
+    (let ((num_cats_ptr:i64* (zalloc)))
+      (printf &quot;You have %lld cats!\n&quot; num_cats_ptr))))
+
+(print_num_cats3) ;; prints &quot;You have 4555984976 cats!&quot;
+</pre></div>
+</div>
+<p>There are a couple of other changes to the code. Firstly, we no longer
+bind the value straight away (as we were doing with <code class="docutils literal"><span class="pre">(num_cats:i64</span>
+<span class="pre">4)</span></code>), but instead we make a call to <code class="docutils literal"><span class="pre">zalloc</span></code>. This is the way to get
+pointers in xtlang: through a call to an &#8216;alloc&#8217; function.
+<code class="docutils literal"><span class="pre">zalloc</span></code> is a function which &#8216;allocates&#8217; and returns the <em>address</em>
+(i.e. a pointer) of some memory which can be used to store the value in.
+This address is the assigned to the variable <code class="docutils literal"><span class="pre">num_cats_ptr</span></code>, just like
+the number <code class="docutils literal"><span class="pre">4</span></code> was assigned to <code class="docutils literal"><span class="pre">num_cats</span></code> in the earlier examples.
+The orange bar on the variable name indicates that it&#8217;s a pointer.</p>
+<p>So why does <code class="docutils literal"><span class="pre">print_num_cats3</span></code> print such a weird (on my machine:
+4555984976 cats!) answer? Well, it&#8217;s because we&#8217;re trying to print it as
+an <code class="docutils literal"><span class="pre">i64</span></code> <em>value</em> (using <code class="docutils literal"><span class="pre">%lld</span></code> in the <code class="docutils literal"><span class="pre">printf</span></code> format string), but
+it&#8217;s not an <code class="docutils literal"><span class="pre">i64</span></code> value&#8212;it&#8217;s the <em>address</em> of a memory location where
+an <code class="docutils literal"><span class="pre">i64</span></code> value is located. On a 64-bit system (such as the laptop I&#8217;m
+writing this blog post on) the pointers <em>are</em> actually 64-bit integers,
+because an integer is a pretty sensible way to store an address.</p>
+<p>Incidentally, this is one of the key benefits (and driving forces
+behind) the switch from 32 to 64 bit architectures&#8212;the need for more
+memory addresses. If a pointer is a 32 bit integer, then you can only
+&#8216;address&#8217; about 4.3 billion (2:sup:<cite>32</cite>) different memory locations.
+This might seem like a lot, but as more and more computers came with
+more than 4.3Gb of RAM installed, so the need for 64-bit pointers became
+more pressing. There are workarounds, but having a larger addressable
+space is a key benefit of 64-bit architectures. And it helps to
+remember that pointers <em>are</em> just integers, but they&#8217;re not like the int
+types that we use to store and manipulate data.</p>
+<p>In <code class="docutils literal"><span class="pre">print_num_cats3</span></code> we don&#8217;t set any value into that location, we
+only deal with the address. In fact, the memory this address points to
+is referred to as <em>uninitialised</em>, which is a name for memory that has
+been allocated but hasn&#8217;t had any values set into it. In Extempore,
+uninitialised memory will be &#8216;zeroed out&#8217;, meaning all of the bits will
+be set to <code class="docutils literal"><span class="pre">0</span></code>. So for an <code class="docutils literal"><span class="pre">i64</span></code> this will be the integer value <code class="docutils literal"><span class="pre">0</span></code>.</p>
+<p>After the call to <code class="docutils literal"><span class="pre">zalloc</span></code>, the memory therefore will look like this
+(the value is now shown in a different coloured box, to indicate it&#8217;s an
+<code class="docutils literal"><span class="pre">i64*</span></code> pointer type and not an <code class="docutils literal"><span class="pre">i64</span></code> value type)</p>
+<img alt="_images/pointer-tut-3.png" src="_images/pointer-tut-3.png" />
+<p>This is cool, we can see that the value in memory location 27 is
+actually the address 29, and the value of 29 is <code class="docutils literal"><span class="pre">0</span></code> because we haven&#8217;t
+initialised it yet. So, remember how in <code class="docutils literal"><span class="pre">print_num_cats2</span></code> we used
+<code class="docutils literal"><span class="pre">set!</span></code> to set a value into the variable <code class="docutils literal"><span class="pre">num_cats</span></code>? Well, we can do
+a similar thing with the pointer <code class="docutils literal"><span class="pre">num_cats_ptr</span></code> using the function
+<code class="docutils literal"><span class="pre">pset!</span></code>. <code class="docutils literal"><span class="pre">pset!</span></code> takes three arguments: a pointer, an index (which
+is zero in this next example, but I&#8217;ll get to what the index means in
+the next section) and a value. The value must be of the right type: e.g.
+if the pointer is a pointer to a double (a <code class="docutils literal"><span class="pre">double*</span></code>) then the value
+must be a <code class="docutils literal"><span class="pre">double</span></code>.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_num_cats4
+  (lambda ()
+    (let ((num_cats_ptr:i64* (zalloc)))
+      (pset! num_cats_ptr 0 5)
+      (printf &quot;You have %lld cats!\n&quot; (pref num_cats_ptr 0)))))
+
+(print_num_cats4) ;; prints &quot;You have 5 cats!&quot;
+</pre></div>
+</div>
+<p>Great&#8212;the function now prints the right number of cats (in this case
+<code class="docutils literal"><span class="pre">5</span></code>), so things are working properly again. After the <code class="docutils literal"><span class="pre">pset!</span></code> call,
+the memory will look like this (the only difference from last time is
+that the value 5 is stored in address 29, just as it should be).</p>
+<img alt="_images/pointer-tut-4.png" src="_images/pointer-tut-4.png" />
+<p>Notice also that in <code class="docutils literal"><span class="pre">print_num_cats4</span></code> we don&#8217;t pass <code class="docutils literal"><span class="pre">num_cats_ptr</span></code>
+directly to <code class="docutils literal"><span class="pre">printf</span></code>, we do it through a call to <code class="docutils literal"><span class="pre">pref</span></code>. Whereas
+<code class="docutils literal"><span class="pre">pset!</span></code> is for writing values into memory locations, <code class="docutils literal"><span class="pre">pref</span></code> is for
+reading them out. Like <code class="docutils literal"><span class="pre">pset!</span></code>, pref takes a pointer as the first
+argument and an offset for the second argument. In this way, we can read
+<em>and</em> write <code class="docutils literal"><span class="pre">i64</span></code> values to the memory location without actually
+having a variable of type <code class="docutils literal"><span class="pre">i64</span></code> (which we did with <code class="docutils literal"><span class="pre">num_cats</span></code> in the
+<code class="docutils literal"><span class="pre">print_num_cats</span></code> and <code class="docutils literal"><span class="pre">print_num_cats2</span></code>). All this is possible
+because we have a pointer variable (<code class="docutils literal"><span class="pre">num_cats_ptr</span></code>) which gives us a
+place to load and store the data.</p>
+</div>
+<div class="section" id="buffers-and-pointer-arithmetic">
+<h2>Buffers and pointer arithmetic<a class="headerlink" href="#buffers-and-pointer-arithmetic" title="Permalink to this headline">¶</a></h2>
+<p>In all the examples so far, we&#8217;ve only used a pointer to a single value.
+This has worked fine, but you might have been wondering why we bothered,
+because assigning values directly to variables (as we did in the first
+couple of examples) seemed to work just fine.</p>
+<p>One thing that pointers and alloc&#8217;ing allows us to do is work with whole
+regions in memory, in which we can store <em>lots</em> of values. Say we want
+to be able to determine the mean (average) of 3 numbers. One way to do
+this is to store each of the different numbers with its own name.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func mean1
+  (lambda ()
+    (let ((num1:double 4.5)
+          (num2:double 3.3)
+          (num3:double 7.9))
+      (/ (+ num1 num2 num3)
+         3.0))))
+
+;; call the function
+(mean1) ;; returns 5.233333
+</pre></div>
+</div>
+<p>The <code class="docutils literal"><span class="pre">let</span></code> form binds the (<code class="docutils literal"><span class="pre">double</span></code>) values <code class="docutils literal"><span class="pre">4.5</span></code>, <code class="docutils literal"><span class="pre">3.3</span></code> and
+<code class="docutils literal"><span class="pre">7.9</span></code> to the names <code class="docutils literal"><span class="pre">num1</span></code>, <code class="docutils literal"><span class="pre">num2</span></code> and <code class="docutils literal"><span class="pre">num3</span></code>. Then, all three
+values are added together (with <code class="docutils literal"><span class="pre">+</span></code>) and then divided by <code class="docutils literal"><span class="pre">3.0</span></code> (with
+<code class="docutils literal"><span class="pre">/</span></code>). Now, this code does give the right answer, but it&#8217;s easy
+to see how things would get out of hand if we wanted to find the mean of
+5, 20 or one million values. What we really want is a way to give <em>one</em>
+name to all the values we&#8217;re interested in, rather than having to refer
+to all the values by name individually. And to do that, we can use a
+pointer.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func mean2
+  (lambda ()
+    (let ((num_ptr:double* (zalloc 3)))
+      ;; set the values into memory
+      (pset! num_ptr 0 4.5)
+      (pset! num_ptr 1 3.3)
+      (pset! num_ptr 2 7.9)
+      ;; read the values back out, add them
+      ;; together, and then divide  by 3
+      (/ (+ (pref num_ptr 0)
+            (pref num_ptr 1)
+            (pref num_ptr 2))
+         3.0))))
+
+(mean2) ;; returns 5.233333
+</pre></div>
+</div>
+<p>In <code class="docutils literal"><span class="pre">mean2</span></code>, we pass an integer argument (in this case <code class="docutils literal"><span class="pre">3</span></code>) to
+<code class="docutils literal"><span class="pre">zalloc</span></code>. <code class="docutils literal"><span class="pre">zalloc</span></code> then allocates enough memory to fit 3 <code class="docutils literal"><span class="pre">double</span></code>
+values. The pointer that gets returned is still only a pointer to the
+first of these memory slots. And this is where the second &#8216;offset&#8217;
+argument to <code class="docutils literal"><span class="pre">pref</span></code> and <code class="docutils literal"><span class="pre">pset!</span></code> come in.</p>
+<img alt="_images/pointer-tut-5.png" src="_images/pointer-tut-5.png" />
+<p>See how the repeated calls to <code class="docutils literal"><span class="pre">pset!</span></code> and <code class="docutils literal"><span class="pre">pref</span></code> above have
+different offset values? Well, that&#8217;s because the offset argument allows
+you to get and set values &#8216;further into&#8217; the memory returned by
+<code class="docutils literal"><span class="pre">(zalloc</span> <span class="pre">3)</span></code>. This isn&#8217;t anything magical, they just add the offset to
+the memory address.</p>
+<p>There is a helpful function called <code class="docutils literal"><span class="pre">pfill!</span></code> for filling multiple
+values into memory (multiple calls to <code class="docutils literal"><span class="pre">pset!</span></code>) as we did in the above
+example. Rewriting <code class="docutils literal"><span class="pre">mean2</span></code> to use <code class="docutils literal"><span class="pre">pfill!</span></code>:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func mean3
+  (lambda ()
+    (let ((num_ptr:double* (zalloc 3)))
+      ;; set the values into memory
+      (pfill! num_ptr 4.5 3.3 7.9)
+      ;; read the values back out, add them
+      ;; together, and then divide  by 3
+      (/ (+ (pref num_ptr 0)
+            (pref num_ptr 1)
+            (pref num_ptr 2))
+         3.0))))
+
+(mean3) ;; returns 5.233333
+</pre></div>
+</div>
+<p>Finally, one more useful way to fill values into a chunk of memory is
+using a <code class="docutils literal"><span class="pre">dotimes</span></code> loop. To do this, we need to bind a helper value
+<code class="docutils literal"><span class="pre">i</span></code> to use as an index for the loop. This function allocates enough
+memory for 5 <code class="docutils literal"><span class="pre">i64</span></code> values, and just fills it with ascending numbers:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func ptr_loop
+  (lambda ()
+    (let ((num_ptr:i64* (zalloc 5))
+          (i:i64 0))
+      ;; loop from i = 0 to i = 4
+      (dotimes (i 5)
+        (pset! num_ptr i i))
+     (pref num_ptr 3))))
+
+(ptr_loop) ;; returns 3
+</pre></div>
+</div>
+<p>After the <code class="docutils literal"><span class="pre">dotimes</span></code> the memory will look like this:</p>
+<img alt="_images/pointer-tut-6.png" src="_images/pointer-tut-6.png" />
+<p>There&#8217;s one more useful function for working with pointers:
+<code class="docutils literal"><span class="pre">pref-ptr</span></code>. Where <code class="docutils literal"><span class="pre">(pref</span> <span class="pre">num_ptr</span> <span class="pre">3)</span></code> returns the <em>value</em> of the 4th
+element of the chunk of memory pointed to by <code class="docutils literal"><span class="pre">num_ptr</span></code>, <code class="docutils literal"><span class="pre">(pref-ptr</span>
+<span class="pre">num_ptr</span> <span class="pre">3)</span></code> returns the address of that value (a pointer to that
+value). So, in the example above, <code class="docutils literal"><span class="pre">num_ptr</span></code> points to memory address
+27, so <code class="docutils literal"><span class="pre">(pref</span> <span class="pre">num_ptr</span> <span class="pre">2)</span></code> would point to memory address 29. <code class="docutils literal"><span class="pre">(pref</span>
+<span class="pre">(pref-ptr</span> <span class="pre">num_ptr</span> <span class="pre">n)</span> <span class="pre">0)</span></code> is the same as <code class="docutils literal"><span class="pre">(pref</span> <span class="pre">(pref-ptr</span> <span class="pre">num_ptr</span> <span class="pre">0)</span>
+<span class="pre">n)</span></code> for any integer <em>n</em>.</p>
+</div>
+<div class="section" id="pointers-to-higher-order-types">
+<h2>Pointers to higher-order types<a class="headerlink" href="#pointers-to-higher-order-types" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference internal" href="type-system.html"><em>xtlang type system</em></a> has both primitive types
+(floats and ints) and higher-order types like tuples, arrays and
+closures. Higher-order in this instance just means that they are made
+up of other types, although these component types may be themselves
+higher-order types.</p>
+<p>As an example of an aggregate type, consider a 2 element tuple. Tuples
+are (fixed-length) n-element structures, and are declared with angle
+brackes (<code class="docutils literal"><span class="pre">&lt;&gt;</span></code>). So a tuple with an <code class="docutils literal"><span class="pre">i64</span></code> as the first element and a
+double as the second element would have the type signature
+<code class="docutils literal"><span class="pre">&lt;i64,double&gt;</span></code>. Getting and setting tuple elements is done with
+<code class="docutils literal"><span class="pre">tref</span></code> and <code class="docutils literal"><span class="pre">tset!</span></code> respectively, which both work exactly like
+<code class="docutils literal"><span class="pre">pref=/=pset!</span></code> except the first argument has to be a pointer to a
+tuple.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_tuples
+  (lambda ()
+    ;; step 1: allocate memory for 2 tuples
+    (let ((tup_ptr:&lt;i64,double&gt;* (zalloc 2)))
+      ;; step 2: initialise tuples
+      (tset! (pref-ptr tup_ptr 0) 0 2)         ; tuple 1, element 1
+      (tset! (pref-ptr tup_ptr 0) 1 2.0)       ; tuple 1, element 2
+      (tset! (pref-ptr tup_ptr 1) 0 6)         ; tuple 2, element 1
+      (tset! (pref-ptr tup_ptr 1) 1 6.0)       ; tuple 2, element 2
+      ;; step 3: read &amp; print tuple values
+      (printf &quot;tup_ptr[0] = &lt;%lld,%f&gt;\n&quot;
+              (tref (pref-ptr tup_ptr 0) 0)    ; tuple 1, element 1
+              (tref (pref-ptr tup_ptr 0) 1))   ; tuple 1, element 2
+      (printf &quot;tup_ptr[1] = &lt;%lld,%f&gt;\n&quot;
+              (tref (pref-ptr tup_ptr 1) 0)    ; tuple 2, element 1
+              (tref (pref-ptr tup_ptr 1) 1))))); tuple 2, element 2
+
+(print_tuples) ;; prints
+;; tup_ptr[0] = &lt;2,2.000000&gt;
+;; tup_ptr[1] = &lt;6,6.000000&gt;
+</pre></div>
+</div>
+<p>This <code class="docutils literal"><span class="pre">print_tuples</span></code> example works in 3 basic steps:</p>
+<ol class="arabic simple">
+<li><strong>Allocate memory</strong> for two (uninitialised) <code class="docutils literal"><span class="pre">&lt;i64,double&gt;</span></code> tuples,
+bind pointer to this memory to <code class="docutils literal"><span class="pre">tup_ptr</span></code>.</li>
+<li><strong>Initialise tuples with values</strong> (in this case <code class="docutils literal"><span class="pre">2</span></code> and <code class="docutils literal"><span class="pre">2.0</span></code> for
+the first tuple and <code class="docutils literal"><span class="pre">6</span></code> and <code class="docutils literal"><span class="pre">6.0</span></code> for the second one). Notice the
+nested <code class="docutils literal"><span class="pre">tset!</span></code> and <code class="docutils literal"><span class="pre">pref-ptr</span></code> calls: <code class="docutils literal"><span class="pre">pref-ptr</span></code> returns a
+pointer to the tuple at offset 0 (for the first) and 1 (for the
+second). This pointer is then passed as the first argument to
+<code class="docutils literal"><span class="pre">tset!</span></code>, which fills it with a value at the appropriate element.</li>
+<li><strong>Read (&amp; print) values</strong> back out of the tuples. These should be the
+values we just set in step 2&#8212;and they are.</li>
+</ol>
+<p>Let&#8217;s have a look at what the memory will look like during the execution
+of <code class="docutils literal"><span class="pre">print_tuples</span></code>. After the call to <code class="docutils literal"><span class="pre">(zalloc)</span></code> (step 1), we have a
+pointer to a chunk of memory, but the tuples in this memory are
+uninitialised (indicated by u).</p>
+<img alt="_images/pointer-tut-7.png" src="_images/pointer-tut-7.png" />
+<p>After using <code class="docutils literal"><span class="pre">pref</span></code> and <code class="docutils literal"><span class="pre">tset!</span></code> in step 2, the values get set into
+the tuples. Step 3 simply reads these values back out&#8212;it doesn&#8217;t change
+the memory.</p>
+<img alt="_images/pointer-tut-8.png" src="_images/pointer-tut-8.png" />
+<p>There are a couple of other things worth discussing about this example.</p>
+<ul class="simple">
+<li>We used <code class="docutils literal"><span class="pre">pref_ptr</span></code> rather than <code class="docutils literal"><span class="pre">pref</span></code> in both step 2 and step 3.
+That&#8217;s because <code class="docutils literal"><span class="pre">tset!</span></code> and <code class="docutils literal"><span class="pre">tref</span></code> need a <em>pointer to</em> a tuple as
+their first argument, and if we had used regular <code class="docutils literal"><span class="pre">pref</span></code> we would
+have got the tuple itself. This means that we could have just used
+<code class="docutils literal"><span class="pre">tup_ptr</span></code> directly instead of <code class="docutils literal"><span class="pre">(pref-ptr</span> <span class="pre">tup_ptr</span> <span class="pre">0)</span></code> in a couple
+of places, because these two pointers will always be equal (have a
+think about why this is true).</li>
+<li>There are a few bits of repeated code, for example <code class="docutils literal"><span class="pre">(pref-ptr</span> <span class="pre">tup_ptr</span> <span class="pre">1)</span></code>
+gets called 4 times. We could have stored this pointer
+in a temporary variable to prevent these multiple dereferences, how
+could we have done that (hint: create the new &#8216;tmp&#8217; pointer in the
+<code class="docutils literal"><span class="pre">let</span></code>&#8212;make sure it&#8217;s of the right type).</li>
+</ul>
+<p>There&#8217;s one final thing worth saying about pointers in xtlang. Why do
+pointers even <em>have</em> types? Isn&#8217;t the address the same whether it&#8217;s an
+int, a float, a tuple, or some complex custom type stored at that memory
+address? The reason is to do with something all this talk of memory
+locations as &#8216;boxes&#8217; has glossed over: that different types require
+different amounts of memory to store.</p>
+<p>A more accurate (though still simplified) picture of the computer&#8217;s
+memory is to think of the boxes as 8-bit bytes. One bit (a binary digit)
+is just a <code class="docutils literal"><span class="pre">0</span></code> or a <code class="docutils literal"><span class="pre">1</span></code>, and a byte is made up of 8 bits, for example
+<code class="docutils literal"><span class="pre">11001011</span></code>. These are just <a class="reference external" href="http://en.wikipedia.org/wiki/Binary_numeral_system">base-2 numerals</a>, so <code class="docutils literal"><span class="pre">5</span></code> in decimal is
+<code class="docutils literal"><span class="pre">101</span></code>, and although they are difficult for humans to read (unless
+you&#8217;re used to them), computers <em>live and breathe</em> binary digits.</p>
+<p>This is why the integer types all have numbers associated with them&#8212;the
+number represents the number of bytes used to store the integer. So
+<code class="docutils literal"><span class="pre">i64</span></code> requires 64 bits, while an <code class="docutils literal"><span class="pre">i8</span></code> only requires 8. The reason
+for having different sizes is that larger sizes take up more room (more
+bytes) in memory, but can also store larger values (n bits can store
+2<sup>n</sup> different numbers). All the other types have sizes, too: a
+<code class="docutils literal"><span class="pre">float</span></code> is 32 bits for instance, and the number of bits required to
+represent an aggregate type like a tuple or an array is (at least) the
+sum of the sizes of their components.</p>
+<p>So, reconsidering our very first example, where we stored an <code class="docutils literal"><span class="pre">i64</span></code>
+value of <code class="docutils literal"><span class="pre">4</span></code> to represent how many cats we had, a more accurate
+diagram of the actual memory layout in this situation is:</p>
+<img alt="_images/pointer-tut-9.png" src="_images/pointer-tut-9.png" />
+<p>See how each <code class="docutils literal"><span class="pre">i64</span></code> value takes up 8 bytes? Also, each byte has a
+memory addresses, so the start of each <code class="docutils literal"><span class="pre">i64</span></code> in memory is actually 8
+bytes along from the previous one.</p>
+<p>Now, consider the layout of an aggregate type like a tuple:</p>
+<img alt="_images/pointer-tut-10.png" src="_images/pointer-tut-10.png" />
+<p>Each tuple contains (and therefore takes up the space of) an <code class="docutils literal"><span class="pre">i64</span></code> and
+a <code class="docutils literal"><span class="pre">double</span></code>. So the actual memory address offset between the beginning
+of consecutive tuples is 16 bytes. But <code class="docutils literal"><span class="pre">pref</span></code> still works the same as
+in the <code class="docutils literal"><span class="pre">i64*</span></code> case. <code class="docutils literal"><span class="pre">(pref</span> <span class="pre">tup_ptr</span> <span class="pre">1)</span></code> gets the second tuple&#8212;it
+doesn&#8217;t try and read a tuple from &#8216;half way in&#8217;.</p>
+<p>This is one reason why pointers have types: the type of the pointer
+tells <code class="docutils literal"><span class="pre">pref</span></code> how far to jump to get between consecutive elements (this
+value is called the stride). This becomes increasingly helpful when
+working with pointers to compound types: no-one wants figure out (and
+keep track of) the size of a tuple like <code class="docutils literal"><span class="pre">&lt;i32,i8,|17,double|*,double&gt;</span></code>
+and calculate the stride manually.</p>
+</div>
+<div class="section" id="other-benefits-of-using-pointers">
+<h2>Other benefits of using pointers<a class="headerlink" href="#other-benefits-of-using-pointers" title="Permalink to this headline">¶</a></h2>
+<p>There are a few other situations where being able to pass pointers
+around is really handy.</p>
+<ul class="simple">
+<li>When the chunks of memory we&#8217;re dealing with are large, copying them
+around in memory becomes expensive (in the &#8216;time taken&#8217; sense). So,
+if lots of different functions need to work on the same data, instead
+of copying it around so that each function has its own copy of the
+data, they can just pass around pointers to the same chunk of data.
+This means that each function needs to be a good citizen and not
+stuff up things for the others, but if you&#8217;re careful this can be a
+huge performance benefit.</li>
+<li>You can programatically determine the amount of memory to allocate,
+which is something you can&#8217;t to with xtlang&#8217;s array types.</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="audio.html" class="btn btn-neutral float-right" title="Audio" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="generics.html" class="btn btn-neutral" title="Generics" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Andrew Sorensen.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.6.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
