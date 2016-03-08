@@ -52,15 +52,20 @@
 
 namespace extemp
 {
-    EXTThread::EXTThread() : initialised(false), detached(false), joined(false)
+
+  EXTThread::EXTThread() : initialised(false), detached(false), joined(false)
     {       
     }
 
 #ifdef _WIN32
+  std::map<std::thread::id,EXTThread*> EXTThread::EXTTHREAD_MAP;
+  
 	EXTThread::EXTThread(std::thread&& _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
 	{
 	}
 #else
+    std::map<pthread_t,EXTThread*> EXTThread::EXTTHREAD_MAP;
+  
     EXTThread::EXTThread(pthread_t _pthread) : initialised(false), detached(false), joined(false), pthread{ _pthread }
     {
     }
@@ -74,6 +79,11 @@ namespace extemp
 	    std::cerr << "Resource leak destroying EXTThread: creator has not joined nor detached thread." << std::endl;
 	}
 #endif
+#ifdef _WIN32
+  EXTTHREAD_MAP.erase(this->get_id());  
+#else
+  EXTTHREAD_MAP.erase(pthread);
+#endif
     }
 
     int EXTThread::create(void *(*start_routine)(void *), void *arg)
@@ -86,9 +96,11 @@ namespace extemp
     // std::function<void*(void*)> fn = static_cast<std::function<void*(void*)> >(start_routine);
     std::function<void*()> fn = [start_routine,arg]()->void* { return start_routine(arg); };
     bthread = std::thread(fn);
+    EXTTHREAD_MAP[this->get_id()] = this;
     result = 0;
 #else
-	    result = pthread_create(&pthread, NULL, start_routine, arg);
+    result = pthread_create(&pthread, NULL, start_routine, arg);
+    extemp::EXTThread::EXTTHREAD_MAP[pthread] = this;
 #endif
 	    initialised = ! result;
 	}
@@ -102,6 +114,22 @@ namespace extemp
 
 	return result;
     }
+
+  EXTThread* EXTThread::activeThread()
+  {
+       EXTThread* res = NULL;
+#ifdef _WIN32
+       return EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()];
+#else
+       pthread_t p = pthread_self();
+       res = EXTThread::EXTTHREAD_MAP[p];
+       if (res == NULL) {         
+         res = new EXTThread(p);
+         EXTTHREAD_MAP[p] = res;
+       }
+       return res;
+#endif    
+  }
 
 	int EXTThread::kill()
 	{

@@ -877,13 +877,8 @@ int thread_equal_self(void* thread1) {
 	return static_cast<extemp::EXTThread*>(thread1)->isCurrentThread(); 
 }
 
-void* thread_self() {
-	
-#ifdef _WIN32
-	return nullptr;
-#else
-	return static_cast<void*>(new extemp::EXTThread(pthread_self()));
-#endif  
+void* thread_self() {	
+	return static_cast<void*>(extemp::EXTThread::activeThread());
 }
 
 // return value is number of nanosecs sleep missed by

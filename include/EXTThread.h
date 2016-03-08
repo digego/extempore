@@ -36,6 +36,8 @@
 #ifndef EXT_THREAD
 #define EXT_THREAD
 
+#include <map>
+
 #ifdef _WIN32
 #include <thread>
 #include <functional>
@@ -72,6 +74,8 @@ namespace extemp
 	pthread_t getPthread();
 #endif
 
+  static EXTThread* activeThread();
+
     protected:
 	bool initialised;
 	bool detached;
@@ -79,9 +83,12 @@ namespace extemp
 	bool cancelled;			
 #ifdef _WIN32
 	std::thread bthread;
+  static std::map<std::thread::id,EXTThread*> EXTTHREAD_MAP;  
 #else
 	pthread_t pthread;
+    static std::map<pthread_t,EXTThread*> EXTTHREAD_MAP;
 #endif
+
     };
 } //End Namespace
 
