@@ -22,7 +22,7 @@ Generating the docs
 To generate these docs, you'll need a few python packages, something
 like::
 
-    pip install sphinx sphinx-autobuild sphinx_rtd_theme recommonmark
+    pip install sphinx sphinx-autobuild sphinx_rtd_theme
 
 The docs are generated from the reStructured text (``.rst``) files
 in the ``docs/`` subdirectory in the Extempore source distribution.
