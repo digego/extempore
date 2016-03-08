@@ -134,17 +134,14 @@ int main(int argc, char** argv)
 #ifndef _WIN32
     // redirect stderr to NULL
     freopen("/tmp/","w",stderr);
-#endif
-
-// more evil windows termination code
-#ifdef _WIN32
-    SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
+	// signal handlers for OSX/Linux
+	if (signal(SIGINT, sig_handler) == SIG_ERR)
+		printf("\nWarning: can't catch SIGINT.\n");
+	if (signal(SIGTERM, sig_handler) == SIG_ERR)
+		printf("\nWarning: can't catch SIGTERM.\n");
 #else
-    // signal handlers for OSX/Linux
-    if (signal(SIGINT, sig_handler) == SIG_ERR)
-      printf("\nWarning: can't catch SIGINT.\n");
-    if (signal(SIGTERM, sig_handler) == SIG_ERR)
-      printf("\nWarning: can't catch SIGTERM.\n");
+	// evil windows termination code
+    SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
 #endif
 
     CSimpleOptA args(argc, argv, g_rgOptions);
