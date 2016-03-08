@@ -965,6 +965,11 @@ namespace extemp {
   {
     //void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_GLOBAL); //LAZY);
 #ifdef _WIN32
+	// set up the DLL load path
+	  SetDllDirectory(""); // Plug "binary planting" security hole.
+	  if (!SetDllDirectory((extemp::UNIV::SHARE_DIR + "/libs/aot-cache").c_str()))
+		  std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
+
     void* lib_handle = LoadLibraryA(string_value(pair_car(args)));
 #else
     void* lib_handle = dlopen(string_value(pair_car(args)), RTLD_LAZY|RTLD_GLOBAL);
