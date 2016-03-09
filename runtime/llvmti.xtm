@@ -9071,10 +9071,10 @@ xtlang's `let' syntax is the same as Scheme"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define impc:ti:scm_rt_check_string
-  (lambda (n)
+  (lambda (n closure-name)
     (let* ((os (make-string 0))
            (n1 (substring n 1 2))
-           (name-str (impc:ir:make-const-string "Error in scheme->xtlang wrapper: check the arg arity and types\n"))
+           (name-str (impc:ir:make-const-string (string-append closure-name " Scheme wrapper error: check the arg arity and types\n")))
            (name (impc:ir:gname)))
       (emit n "_bool = icmp eq i32 " n "_rt_check, 1\n" os)
       (emit "br i1 " n "_bool, label " n "_true, label " n "_false\n" os)
@@ -9389,47 +9389,47 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                     (if (and (number? t)
                                                                                                              (= t (+ *impc:ir:pointer* *impc:ir:si8*)))
                                                                                                         (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
-                                                                                                                       (impc:ti:scm_rt_check_string n)
+                                                                                                                       (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                        n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
                                                                                                         (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
-                                                                                                                       (impc:ti:scm_rt_check_string n)
+                                                                                                                       (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                        "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
                                                                                                                        n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
                                                                                                    ((= t *impc:ir:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc double @r64value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc float  @r32value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc i64  @i64value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc i64  @i64value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc i32  @i32value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc i32  @i32value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc i16  @i16value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc i16  @i16value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                       (impc:ti:scm_rt_check_string n)
+                                                                                                                                       (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                        n " = call ccc i8  @i8value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                       (impc:ti:scm_rt_check_string n)
+                                                                                                                                       (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                        n " = call ccc i8  @i8value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                                                                      (impc:ti:scm_rt_check_string n)
+                                                                                                                                      (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                       n " = call ccc i1  @i1value(i8* " n "_val)\n"))
                                                                                                    ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
-                                                                                                                                        (impc:ti:scm_rt_check_string n)
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
                                                                                                                                         n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
                                                                                                    (else (impc:compiler:print-compiler-error "bad type in scheme stub")))))
                                                                             (cdr stub-type)
