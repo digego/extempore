@@ -245,9 +245,10 @@ The 'best' version schedules the callback just ahead of the time that we
 want the note to play. This gives us ``4100`` samples to execute the
 code to schedule the note before the note is required to sound.
 
-Temporal recursion is a fundamental pattern in Extempore and something
-that you will use all the time. Take a look at the `playing an
-instrument`_ tutorial to get more of an idea about using temporal
-recursion in a practical setting.
+..
+   Temporal recursion is a fundamental pattern in Extempore and something
+   that you will use all the time. Take a look at the `playing an
+   instrument`_ tutorial to get more of an idea about using temporal
+   recursion in a practical setting.
 
-.. _playing an instrument: TODO
+   .. _playing an instrument: TODO

@@ -1,4 +1,4 @@
 Contributing
 ============
 
-TODO
+.. note:: This section is coming soon - stay tuned!
